@@ -2,8 +2,8 @@
 
 ## Purpose
 Fasst einen Einsatz auf wenigen Seiten als Druckstück zusammen: Stammdaten, Zeiten, Führung,
-Kräfte, Lage, Bilanz und ETB-Auszug. Er dient der Einsatznachbereitung und als Bericht an
-Auftraggeber oder Behörde, vollständig und ohne personenbezogene Daten Betroffener.
+Kräfte, Lage, Bilanz, Hilfeleistungen und ETB-Auszug. Er dient der Einsatznachbereitung und als
+Bericht an Auftraggeber oder Behörde, vollständig und ohne personenbezogene Daten Betroffener.
 
 ## Requirements
 
@@ -28,17 +28,17 @@ Druckdialog des Browsers wie bei jedem Druckstück.
 ### Requirement: Blöcke in fester Reihenfolge
 
 Der Einsatzbericht SHALL seine Blöcke in dieser Reihenfolge drucken: Stammdaten, Zeiten,
-Führung, Kräfte, Lage, Bilanz, ETB-Auszug, Anlage Einheiten mit Einsatzzeiten, Anlage Personal
-je Kopf. Die ersten sieben bilden den Standardumfang, die beiden Anlagen sind optional. Jeder
-gedruckte Block SHALL eine Überschrift tragen und im Ausdruck mit seinem Inhalt beginnen. Ein
-gedruckter, lesbarer Block ohne Daten MUST mit einem Vermerk stehen bleiben („keine Einträge“)
-und MUST NOT wegfallen.
+Führung, Kräfte, Lage, Bilanz, Hilfeleistungen, ETB-Auszug, Anlage Einheiten mit Einsatzzeiten,
+Anlage Personal je Kopf, Anlage Materialverbrauch. Die ersten acht bilden den Standardumfang,
+die drei Anlagen sind optional. Jeder gedruckte Block SHALL eine Überschrift tragen und im
+Ausdruck mit seinem Inhalt beginnen. Ein gedruckter, lesbarer Block ohne Daten MUST mit einem
+Vermerk stehen bleiben („keine Einträge“) und MUST NOT wegfallen.
 
 #### Scenario: Vollständiger Bericht
 
 - **WHEN** ein Einsatz mit Daten in allen Modulen ohne Auswahl als Bericht geöffnet wird
-- **THEN** stehen die sieben Blöcke des Standardumfangs in der genannten Reihenfolge
-- **AND** keine der beiden Anlagen steht im Bericht
+- **THEN** stehen die acht Blöcke des Standardumfangs in der genannten Reihenfolge
+- **AND** keine der drei Anlagen steht im Bericht
 
 #### Scenario: Leerer Block bleibt stehen
 
@@ -133,16 +133,24 @@ Eine Kraft ohne Ereignis MUST NOT mit 0 in die Helferstunden eingehen.
 
 ### Requirement: Keine personenbezogenen Daten Betroffener
 
-Der Block Bilanz SHALL Betroffene, Patienten, Schäden, Betreuung, Evakuierung und Verpflegung
-ausschließlich als Zählung zeigen. Der Bericht MUST keine Namen, Vornamen, Geburtsdaten oder
-Registriernummern betroffener Personen und keine Namen Geschädigter enthalten. Namen der
-Führungskräfte (Einsatzleitung, Stab, freigebende Personen) SHALL genannt werden.
+Die Blöcke Bilanz und Hilfeleistungen SHALL Betroffene, Patienten, Schäden, Betreuung,
+Evakuierung und Verpflegung ausschließlich als Zählung zeigen. Der Bericht MUST keine Namen,
+Vornamen, Geburtsdaten oder Registriernummern betroffener Personen und keine Namen Geschädigter
+enthalten. Namen der Führungskräfte (Einsatzleitung, Stab, freigebende Personen) SHALL genannt
+werden.
 
 #### Scenario: Patienten in der Bilanz
 
 - **WHEN** im Einsatz zwölf Patienten mit Sichtung erfasst sind
 - **THEN** zeigt die Bilanz die Verteilung nach Sichtungskategorie, Verbleib und Transporten
 - **AND** kein Name und keine Registriernummer einer betroffenen Person steht im Bericht
+
+#### Scenario: Hilfeleistungen ohne Personenbezug
+
+- **WHEN** im Einsatz zwanzig Kontakte mit Anlass, Verbleib und versorgender Einheit erfasst sind
+- **THEN** zeigt der Block Hilfeleistungen nur Zahlen je Anlass, Stunde, Verbleib, Rettungsmittel,
+  Ziel, Verweigerung und Einheit
+- **AND** kein Name, keine Registriernummer und kein Fundort einer betroffenen Person steht im Bericht
 
 ### Requirement: Vollständig oder gar nicht
 
@@ -254,7 +262,8 @@ freien Platz. Mindestens ein Block MUST gewählt bleiben.
 #### Scenario: Bilanz abwählen
 
 - **WHEN** eine Person im Standardumfang den Block Bilanz abwählt
-- **THEN** stehen im Bericht Stammdaten, Zeiten, Führung, Kräfte, Lage und ETB-Auszug
+- **THEN** stehen im Bericht Stammdaten, Zeiten, Führung, Kräfte, Lage, Hilfeleistungen und
+  ETB-Auszug
 - **AND** vom Block Bilanz steht weder Überschrift noch Vermerk im Bericht
 
 #### Scenario: Letzter Block
@@ -287,9 +296,10 @@ Verwerfen kein gültiger Schlüssel, MUST der Standardumfang gelten.
 
 ### Requirement: Druckkopf nennt den Umfang
 
-Der Druckkopf SHALL den Umfang nennen: „Standardumfang“, wenn genau die sieben Blöcke des
-Standardumfangs gedruckt werden, sonst „Auswahl“ mit den gedruckten Blöcken in
-Druckreihenfolge. Die genannte Menge MUST der gedruckten entsprechen.
+Der Druckkopf SHALL den Umfang nennen: „Standardumfang“, wenn genau die acht Blöcke des
+Standardumfangs gedruckt werden, „Kurzbericht für den Auftraggeber“, wenn genau dessen Blöcke
+gedruckt werden, sonst „Auswahl“ mit den gedruckten Blöcken in Druckreihenfolge. Die genannte
+Menge MUST der gedruckten entsprechen.
 
 #### Scenario: Ohne Auswahl
 
@@ -300,6 +310,69 @@ Druckreihenfolge. Die genannte Menge MUST der gedruckten entsprechen.
 
 - **WHEN** nur Stammdaten, Kräfte und die Anlage Personal je Kopf gewählt sind
 - **THEN** nennt der Druckkopf „Auswahl: Stammdaten, Kräfte, Anlage Personal je Kopf“
+
+### Requirement: Block Hilfeleistungen
+
+Der Block Hilfeleistungen SHALL die Kontakte zählen (alle Personen außer vermissten, ohne
+stornierte): gesamt und nach Anlass der Hilfeleistung, nach Stunde der Erfassung in der Zeitzone
+der Organisation, nach Verbleib samt „Entlassen an“, die Transporte nach Rettungsmittel und nach
+Ziel, die Verweigerungen gegen Rat nach Behandlung und Transport sowie die Kontakte je
+versorgender Einheit. Angaben am Verbleib MUST aus dem jüngsten Verbleib stammen, der keine
+Übergabe ist. Ein Transport mit Voranmeldung MUST NOT als Transport zählen. Das Ziel MUST nur bei
+Transporten erscheinen. Der Block schöpft aus dem Modul Personen; ist es gesperrt, gilt
+„Vollständig oder gar nicht“.
+
+#### Scenario: Kontakte nach Anlass und Stunde
+
+- **WHEN** zwischen 18 und 21 Uhr zwölf Kontakte erfasst sind, drei davon mit Anlass Verletzung
+  und keiner zwischen 19 und 20 Uhr
+- **THEN** nennt der Block „Kontakte gesamt 12“ und unter „Nach Anlass“ „Verletzung 3“
+- **AND** die Stunden 18, 19 und 20 Uhr stehen mit ihrer Zahl, 19 Uhr mit 0
+
+#### Scenario: Verweigerung mit anschließender Übergabe
+
+- **WHEN** ein Patient beim Eigentransport „gegen Rat: Behandlung abgelehnt“ erfasst hat und der
+  Transport danach übergeben wird
+- **THEN** zählt der Block die Verweigerung „Behandlung abgelehnt 1“
+
+#### Scenario: Transporte nach Rettungsmittel und Ziel
+
+- **WHEN** drei Patienten mit „RTW 1-83-1“ ins „Klinikum Mitte“ und einer mit dem eigenen KTW ohne
+  Ziel transportiert wurden und ein Transport nur vorangemeldet ist
+- **THEN** nennt der Block „Transporte gesamt 4“, nach Rettungsmittel „RTW 1-83-1 3“ und den KTW
+  mit 1, nach Ziel „Klinikum Mitte 3“ und „ohne Angabe 1“
+
+### Requirement: Kurzbericht für den Auftraggeber
+
+Die Auswahl SHALL eine Voreinstellung „Kurzbericht für den Auftraggeber“ anbieten, die genau
+Stammdaten, Zeiten, Kräfte und Hilfeleistungen wählt. Bei genau dieser Auswahl MUST der Druckkopf
+als Umfang „Kurzbericht für den Auftraggeber“ nennen. Die Voreinstellung MUST wie jede Auswahl in
+der Adresse stehen.
+
+#### Scenario: Kurzbericht wählen
+
+- **WHEN** eine Person „Kurzbericht für den Auftraggeber“ wählt
+- **THEN** stehen im Bericht Stammdaten, Zeiten, Kräfte mit Helferstunden und Hilfeleistungen
+- **AND** weder ETB-Auszug noch eine Anlage steht im Bericht
+- **AND** der Druckkopf nennt „Umfang: Kurzbericht für den Auftraggeber“
+
+#### Scenario: Kurzbericht ergänzt
+
+- **WHEN** eine Person nach dem Kurzbericht die Anlage Materialverbrauch zuwählt
+- **THEN** nennt der Druckkopf „Auswahl: …“ mit allen fünf Blöcken
+
+### Requirement: Anlage Materialverbrauch
+
+Die Anlage Materialverbrauch SHALL die ausgegebenen Mengen der Verbrauchsgüter je Material mit
+Kategorie nennen, auch von Posten, die aus dem Einsatz genommen sind. Geräte und nicht
+ausgegebene Verbrauchsgüter MUST NOT darin stehen. Die Anlage schöpft aus dem Modul Material.
+
+#### Scenario: Verbrauch über zwei Posten
+
+- **WHEN** von „Rettungsdecke“ an einem Posten 4 und an einem aus dem Einsatz genommenen 2
+  ausgegeben wurden und eine Trage disponiert ist
+- **THEN** nennt die Anlage „Rettungsdecke“ mit 6
+- **AND** die Trage steht nicht in der Anlage
 
 ### Requirement: Anlage Einheiten mit Einsatzzeiten
 

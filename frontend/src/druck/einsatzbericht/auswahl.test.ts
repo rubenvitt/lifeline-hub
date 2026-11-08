@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BLOECKE,
+  KURZBERICHT,
   STANDARDUMFANG,
+  istKurzbericht,
   istStandardumfang,
   parseBerichtAuswahl,
   umfangZeilen,
@@ -13,7 +15,7 @@ import {
 const params = (s: string) => new URLSearchParams(s);
 
 describe('BLOECKE', () => {
-  it('Standardumfang sind die sieben Blöcke aus LFH-726 in alter Reihenfolge', () => {
+  it('Standardumfang sind die sieben Blöcke aus LFH-726 und die Hilfeleistungen nach der Bilanz', () => {
     expect(STANDARDUMFANG).toEqual([
       'stammdaten',
       'zeiten',
@@ -21,15 +23,24 @@ describe('BLOECKE', () => {
       'kraefte',
       'lage',
       'bilanz',
+      'hilfeleistungen',
       'etb',
     ]);
   });
 
-  it('die beiden Anlagen stehen am Ende und sind nicht Standard', () => {
-    expect(BLOECKE.slice(-2).map((b) => [b.schluessel, b.titel, b.standard])).toEqual([
+  it('die drei Anlagen stehen am Ende und sind nicht Standard', () => {
+    expect(BLOECKE.slice(-3).map((b) => [b.schluessel, b.titel, b.standard])).toEqual([
       ['einheiten-zeiten', 'Anlage Einheiten mit Einsatzzeiten', false],
       ['personal-kopf', 'Anlage Personal je Kopf', false],
+      ['materialverbrauch', 'Anlage Materialverbrauch', false],
     ]);
+  });
+
+  it('der Kurzbericht wählt Stammdaten, Zeiten, Kräfte und Hilfeleistungen (LLH-1575)', () => {
+    expect(KURZBERICHT).toEqual(['stammdaten', 'zeiten', 'kraefte', 'hilfeleistungen']);
+    expect(istKurzbericht(['hilfeleistungen', 'stammdaten', 'kraefte', 'zeiten'])).toBe(true);
+    expect(istKurzbericht([...KURZBERICHT, 'materialverbrauch'])).toBe(false);
+    expect(istStandardumfang(KURZBERICHT)).toBe(false);
   });
 });
 
@@ -72,7 +83,7 @@ describe('parseBerichtAuswahl', () => {
 });
 
 describe('istStandardumfang', () => {
-  it('erkennt genau die sieben Standardblöcke', () => {
+  it('erkennt genau die acht Standardblöcke', () => {
     expect(istStandardumfang(STANDARDUMFANG)).toBe(true);
     expect(istStandardumfang(STANDARDUMFANG.filter((b) => b !== 'bilanz'))).toBe(false);
     expect(istStandardumfang([...STANDARDUMFANG, 'personal-kopf'])).toBe(false);
@@ -88,6 +99,13 @@ describe('umfangZeilen', () => {
 
   it('mit Auswahl die gedruckten Blöcke in Druckreihenfolge', () => {
     expect(wert(['stammdaten', 'kraefte'])).toEqual([['Umfang', 'Auswahl: Stammdaten, Kräfte']]);
+  });
+
+  it('beim Kurzbericht dessen Namen, ergänzt wieder „Auswahl“ (LLH-1575)', () => {
+    expect(wert(KURZBERICHT)).toEqual([['Umfang', 'Kurzbericht für den Auftraggeber']]);
+    expect(wert([...KURZBERICHT, 'materialverbrauch'])).toEqual([
+      ['Umfang', 'Auswahl: Stammdaten, Zeiten, Kräfte, Hilfeleistungen, Anlage Materialverbrauch'],
+    ]);
   });
 
   it('mit der Personal-Anlage zusätzlich den Personenbezug', () => {

@@ -1,7 +1,13 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import type { Person, PersonAnlass, Sichtungskategorie, VerbleibArt } from '../api/types';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { inZone } from '../anzeige/zeitDarstellung';
 import { ANLASS_REIHE } from './personMeta';
 import { hatKoordinate } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
+
+dayjs.extend(utc);
 
 /**
  * Ableitungen der Betroffenen-Seitenleiste („Sichtungsbild", „Verbleib", „Offene Felder") und
@@ -160,24 +166,34 @@ export function verbleibZaehlung(
  *    Voranmeldung ist kein erledigter Transport; ohne Status zählt der Transport).
  *  · offen — dieselbe Lücke „Verbleib offen" wie auf der Betroffenen-Seite ({@link lueckenVon}).
  */
-export function transportBilanz(
-  alle: readonly Pick<
-    Person,
-    | 'status'
-    | 'versorgung'
-    | 'aktuelle_verbleib_art'
-    | 'aktueller_verbleib_status'
-    | 'aktuelle_uhs_id'
-  >[],
-): { transportiert: number; offen: number } {
+type TransportFelder = Pick<
+  Person,
+  | 'status'
+  | 'versorgung'
+  | 'aktuelle_verbleib_art'
+  | 'aktueller_verbleib_status'
+  | 'aktuelle_uhs_id'
+>;
+
+/**
+ * Transportiert (Regel von {@link transportBilanz}; auch der Block Hilfeleistungen des Berichts,
+ * LLH-1575): angetroffen, Verbleib-Klasse Transport oder unterwegs, nicht nur vorangemeldet.
+ */
+export function istTransportiert(p: TransportFelder): boolean {
+  if (!istAngetroffen(p)) return false;
+  const k = verbleibKlasse(p);
+  return (k === 'transport' || k === 'unterwegs') && p.aktueller_verbleib_status !== 'angemeldet';
+}
+
+export function transportBilanz(alle: readonly TransportFelder[]): {
+  transportiert: number;
+  offen: number;
+} {
   let transportiert = 0;
   let offen = 0;
   for (const p of alle) {
-    if (!istAngetroffen(p)) continue;
-    const k = verbleibKlasse(p);
-    if ((k === 'transport' || k === 'unterwegs') && p.aktueller_verbleib_status !== 'angemeldet')
-      transportiert++;
-    else if (k === 'offen') offen++;
+    if (istTransportiert(p)) transportiert++;
+    else if (istAngetroffen(p) && verbleibKlasse(p) === 'offen') offen++;
   }
   return { transportiert, offen };
 }
@@ -335,4 +351,59 @@ export function anlassbild(alle: readonly Pick<Person, 'status' | 'anlass'>[]): 
     gesamt++;
   }
   return { gesamt, je };
+}
+
+// ── Kontakte je Stunde (LLH-1575) ───────────────────────────────────────────────────────
+
+const STUNDE_MS = 3_600_000;
+
+/** Eine Stunde des Verlaufs: Beginn als UTC-Wirestring, Zahl der Kontakte und ihre Anlässe. */
+export interface StundenPosten {
+  /** Beginn der Stunde in der Zone der Konventionen, als UTC-Wirestring (`YYYY-MM-DD HH:mm:ss`). */
+  beginn: string;
+  wert: number;
+  je: Record<AnlassbildSchluessel, number>;
+}
+
+/**
+ * Kontakte je Stunde über den ganzen Einsatz (LLH-1575, design.md D4; das Lagebild zählt in
+ * einem festen Fenster, `pages/lage-dashboard/verlauf.ts`): Zeit des Kontakts ist `erfasst_at`
+ * (bei einer vorgemerkten Aufnahme die Erfassungszeit). Gezählt wird wie in {@link anlassbild},
+ * ohne Vermisste. Die Stunden gelten in der Zone der
+ * Konventionen (`konv.zeitzone`, im Bericht die der Organisation); jede Stunde vom ersten bis zum
+ * letzten Kontakt steht da, eine ohne Kontakt mit 0. Ohne Kontakt eine leere Liste.
+ */
+export function kontakteJeStunde(
+  alle: readonly Pick<Person, 'status' | 'anlass' | 'erfasst_at'>[],
+  konv: AnzeigeKonventionen,
+): StundenPosten[] {
+  const je = new Map<number, StundenPosten>();
+  const leer = (ms: number): StundenPosten => ({
+    beginn: dayjs.utc(ms).format('YYYY-MM-DD HH:mm:ss'),
+    wert: 0,
+    je: Object.fromEntries([...ANLASS_REIHE, 'ohne'].map((k) => [k, 0])) as Record<
+      AnlassbildSchluessel,
+      number
+    >,
+  });
+  for (const p of alle) {
+    if (p.status === 'vermisst') continue;
+    const d = inZone(p.erfasst_at, konv);
+    if (!d.isValid()) continue;
+    // Nicht `startOf('hour')`: das Zonen-Plugin legt in der Nacht der Zeitumstellung beide
+    // Stunden 02 Uhr auf dieselbe. Minuten und Sekunden der Wanduhr abziehen trifft auch Zonen
+    // mit halben Stunden Versatz.
+    const ms = d.valueOf() - (d.minute() * 60 + d.second()) * 1000 - d.millisecond();
+    const posten = je.get(ms) ?? leer(ms);
+    posten.wert++;
+    posten.je[p.anlass ?? 'ohne']++;
+    je.set(ms, posten);
+  }
+  if (je.size === 0) return [];
+  const schluessel = [...je.keys()];
+  const von = Math.min(...schluessel);
+  const bis = Math.max(...schluessel);
+  const reihe: StundenPosten[] = [];
+  for (let ms = von; ms <= bis; ms += STUNDE_MS) reihe.push(je.get(ms) ?? leer(ms));
+  return reihe;
 }

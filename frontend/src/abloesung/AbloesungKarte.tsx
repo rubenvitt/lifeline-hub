@@ -19,6 +19,7 @@ import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
 import { planungEntfallenText, planungWarnungText } from './planungWarnung';
+import { lautPlanText } from './lautPlan';
 
 const { Text } = Typography;
 
@@ -107,6 +108,10 @@ function zeitspalte(s: Abloesung): { zeit: string | null | undefined; wort: stri
  * beim Planen; sie sind keine Einstufung und färben weder Kante noch Fläche. Angesprungen
  * (`?schicht=`) trägt die Karte die Deeplink-Hervorhebung: Bedienfläche, Linie oben und unten,
  * Gefahr gewinnt (eine überfällige Karte behält ihre Alarmfläche).
+ *
+ * Laut Schichtplan (LLH-1555, `abloesung/lautPlan.ts`) nennt die Rhythmuszeile den Folgeblock
+ * („Laut Plan · danach 1600–1800 · 3 Personen“, ohne ihn „Laut Plan · Posten endet“), und
+ * „Rhythmus ändern“ fehlt: die Fälligkeit ändert der Block.
  */
 export default function AbloesungKarte({
   schicht: s,
@@ -149,9 +154,15 @@ export default function AbloesungKarte({
         ? rollen.bedienFlaeche
         : rollen.paneel;
 
+  // Laut Plan (LLH-1555) gibt der Block die Fälligkeit, kein Rhythmus: geändert wird der Block.
+  const planZeile = lautPlanText(s, konventionen, jetzt);
+  const rhythmusZeile = `Rhythmus ${formatDauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`;
+
   const menue: MenueEintrag<'abloeser' | 'rhythmus'>[] = [
     ...(onAbloeserPlanen ? [{ key: 'abloeser' as const, label: 'Ablösung planen' }] : []),
-    ...(onRhythmusAendern ? [{ key: 'rhythmus' as const, label: 'Rhythmus ändern' }] : []),
+    ...(onRhythmusAendern && planZeile == null
+      ? [{ key: 'rhythmus' as const, label: 'Rhythmus ändern' }]
+      : []),
   ];
 
   return (
@@ -233,7 +244,7 @@ export default function AbloesungKarte({
           <Text
             type="secondary"
             data-lfh="abloesung-rhythmus"
-            title={`Rhythmus ${formatDauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`}
+            title={planZeile ?? rhythmusZeile}
             style={{
               display: 'block',
               whiteSpace: 'nowrap',
@@ -241,10 +252,18 @@ export default function AbloesungKarte({
               textOverflow: 'ellipsis',
             }}
           >
-            <span data-lfh="abloesung-rhythmus-wert">
-              Rhythmus {formatDauer(s.rhythmus_minuten)}
-            </span>{' '}
-            ({QUELLE_WORT[s.rhythmus_quelle]})
+            {/* Laut Plan (LLH-1555) steht hier der Folgeblock statt des Rhythmus, in derselben
+                einzeiligen Zeile: ein geänderter Block ändert die Höhe der Karte nicht. */}
+            {planZeile != null ? (
+              <span data-lfh="abloesung-laut-plan">{planZeile}</span>
+            ) : (
+              <>
+                <span data-lfh="abloesung-rhythmus-wert">
+                  Rhythmus {formatDauer(s.rhythmus_minuten)}
+                </span>{' '}
+                ({QUELLE_WORT[s.rhythmus_quelle]})
+              </>
+            )}
           </Text>
           {/* Knoten-Modell (LLH-1118 Punkt 1): die Erben nennt der Server, der Client rechnet
               nichts nach. Einzeilig wie der Rhythmus: kommt ein Erbe hinzu oder fällt einer weg,

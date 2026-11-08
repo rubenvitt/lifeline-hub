@@ -34,12 +34,15 @@ export type QuellenSchluessel =
   | 'fahrzeuge'
   | 'lageberichte'
   | 'personen'
+  | 'personenVerbleibAngaben'
   | 'schaeden'
   | 'evakuierung'
   | 'betreuung'
   | 'verpflegung'
   | 'etbZaehler'
-  | 'etbEntscheidungen';
+  | 'etbEntscheidungen'
+  | 'material'
+  | 'materialEntlassen';
 
 export interface Quelle {
   schluessel: QuellenSchluessel;
@@ -95,8 +98,12 @@ export const QUELLEN: readonly Quelle[] = [
   // GET …/lageberichte — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
   // (src/routes/lagebericht.rs:20/30, src/routes/vorlagendokument.rs:39).
   { schluessel: 'lageberichte', bloecke: nur('lage'), modul: 'lageberichte' },
-  // GET …/personen — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs:99).
-  { schluessel: 'personen', bloecke: nur('bilanz'), modul: 'personen' },
+  // GET …/personen — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs, `liste`).
+  // Die Hilfeleistungen zählen dieselben Personen (LLH-1575).
+  { schluessel: 'personen', bloecke: ['bilanz', 'hilfeleistungen'], modul: 'personen' },
+  // GET …/personen/verbleib-angaben — `EinsatzLesezugriff<Personen>`
+  // (src/routes/einsatz_person.rs, `verbleib_angaben`, LLH-1575 D3).
+  { schluessel: 'personenVerbleibAngaben', bloecke: nur('hilfeleistungen'), modul: 'personen' },
   // GET …/schaeden — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
   { schluessel: 'schaeden', bloecke: nur('bilanz'), modul: 'schaeden' },
   // GET …/evakuierung — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
@@ -109,6 +116,10 @@ export const QUELLEN: readonly Quelle[] = [
   { schluessel: 'etbZaehler', bloecke: nur('etb'), modul: 'etb' },
   // GET …/etb?typ=entscheidung — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:304).
   { schluessel: 'etbEntscheidungen', bloecke: nur('etb'), modul: 'etb' },
+  // GET …/material — `EinsatzLesezugriff<Material>` (src/routes/einsatz_material.rs, `liste`).
+  { schluessel: 'material', bloecke: nur('materialverbrauch'), modul: 'material' },
+  // GET …/material?entlassene=1 — dasselbe Gate: was aus dem Einsatz genommen ist, war verbraucht.
+  { schluessel: 'materialEntlassen', bloecke: nur('materialverbrauch'), modul: 'material' },
 ];
 
 /**

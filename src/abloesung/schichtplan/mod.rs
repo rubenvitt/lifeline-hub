@@ -6,8 +6,8 @@
 //! Anlegen) und die eingeteilten Personen: Stamm-Personal der Organisation, Ad-hoc-Kräfte des
 //! Einsatzes oder **Helfer des Plans**. Wer nur im Plan steht, ist nicht im Einsatz.
 //!
-//! **Der Plan ist Soll.** Er setzt keine Zuordnung, keine Fälligkeit und keinen Status; die
-//! Kopplung an die Ablösung kommt mit LLH-1555, das Raster mit LLH-1554.
+//! **Der Plan ist Soll.** Er setzt keine Zuordnung und keinen Status. Er gibt einer laufenden
+//! Schicht die Fälligkeit ([`kopplung`], LLH-1555); das Raster zeichnet LLH-1554.
 //!
 //! **Prüfbefunde** ([`pruefung`]) rechnet der Server beim Lesen, rein und an einer Stelle. Sie
 //! blockieren nie. Der Dienst-Befund liest nur Planblöcke: die Kräfte-Zeitachse stuft weiter
@@ -23,6 +23,7 @@ use crate::personal::quali_soll::QualiSoll;
 use crate::personal::qualifikation_deckung::OffeneAnforderung;
 use crate::wire_enum::wire_enum;
 
+pub mod kopplung;
 pub mod pruefung;
 pub mod repo;
 pub mod uebernahme;

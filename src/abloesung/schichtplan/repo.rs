@@ -12,7 +12,7 @@ use super::{
     PlanBlockAnzeige, PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, PlanPostenAnzeige, Posten,
     SchichtplanAnzeige, SchichtplanGrenzwerte, PLAN_BLOECKE_MAX, PLAN_HELFER_MAX, SOLL_ANZAHL_MAX,
 };
-use crate::abloesung::repo::load_einsatz_vorgabe_tx;
+use crate::abloesung::repo::{load_einsatz_vorgabe_tx, nachziehen_plan_tx};
 use crate::error::{AppError, ZeilenArt, ZeilenGrund};
 use crate::personal::quali_soll::QualiSoll;
 use crate::write_retry;
@@ -378,19 +378,39 @@ async fn personen_daten(
         );
     }
 
-    let helfer: Vec<(i64, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, name, qualifikationen FROM einsatz_plan_helfer WHERE einsatz_id = ?",
+    // Ein übernommener Helfer (LLH-1555) ist als seine Kraft im Einsatz.
+    type HelferZeile = (
+        i64,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+    );
+    let helfer: Vec<HelferZeile> = sqlx::query_as(
+        "SELECT h.id, h.name, h.qualifikationen, ep.id, ep.einheit_id, ep.uhs_id, ps.label \
+         FROM einsatz_plan_helfer h \
+         LEFT JOIN einsatz_personal ep ON ep.id = h.einsatz_personal_id AND ep.beendet_at IS NULL \
+         LEFT JOIN personal_status ps ON ps.id = ep.status_id \
+         WHERE h.einsatz_id = ?",
     )
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
-    for (id, name, quals) in helfer {
+    for (id, name, quals, ep, einheit_id, uhs_id, status) in helfer {
         aus.insert(
             PlanPerson::Helfer(id),
             PersonDaten {
                 name,
                 stand: PersonStand {
                     qualifikationen: json_ids(quals.as_deref()),
+                    ist: Ist {
+                        im_einsatz: ep.is_some(),
+                        einheit_id,
+                        uhs_id,
+                        pause: ist_pause(status.as_deref()),
+                    },
                     ..PersonStand::default()
                 },
             },
@@ -745,12 +765,19 @@ fn pause_ohne_soll(posten: Posten, soll: Option<i64>, quali: Option<&str>) -> Re
 // Blöcke schreiben
 // ---------------------------------------------------------------------------------------------
 
-/// Legt einen Block an. Kein ETB (design.md D7). Liefert die Kennung.
+/// Die Einheiten, deren laufende Schicht dem Block folgen kann (LLH-1555): die seines Postens.
+fn einheiten_von(posten: &[Posten]) -> Vec<i64> {
+    posten.iter().filter_map(|p| p.einheit_id()).collect()
+}
+
+/// Legt einen Block an. Kein ETB (design.md D7); die Schicht der Einheit zieht nach (LLH-1555).
+/// Liefert die Kennung.
 pub async fn block_anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
     eingabe: &BlockEingabe,
+    jetzt: &str,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
         let org_id = org_von(conn, einsatz_id).await?;
@@ -784,6 +811,14 @@ pub async fn block_anlegen(
         )
         .await?;
         schreibe_personen_tx(conn, bid, &eingabe.personen).await?;
+        nachziehen_plan_tx(
+            conn,
+            einsatz_id,
+            &einheiten_von(&[eingabe.posten]),
+            benutzer_id,
+            jetzt,
+        )
+        .await?;
         Ok(bid)
     })
 }
@@ -885,36 +920,48 @@ pub async fn block_aendern(
         if let Some(personen) = &patch.personen {
             schreibe_personen_tx(conn, bid, personen).await?;
         }
+        // Beide Zeilen: die, aus der der Block geht, und die, in die er kommt (LLH-1555).
+        nachziehen_plan_tx(
+            conn,
+            einsatz_id,
+            &einheiten_von(&[posten_alt, posten]),
+            benutzer_id,
+            jetzt,
+        )
+        .await?;
         Ok(())
     })
 }
 
 /// Löscht einen Block mit CAS über `version` (409). Ohne `darf_personen` (Freigabe Personal)
-/// nur einen leeren Block (403 sonst), geprüft im selben Stand. Kein ETB.
+/// nur einen leeren Block (403 sonst), geprüft im selben Stand. Kein ETB; die Schicht der
+/// Einheit zieht nach (LLH-1555).
 pub async fn block_loeschen(
     pool: &SqlitePool,
     einsatz_id: i64,
     bid: i64,
+    benutzer_id: i64,
     version: i64,
     darf_personen: bool,
+    jetzt: &str,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        let stand: Option<i64> = sqlx::query_scalar(
-            "SELECT version FROM einsatz_planschicht WHERE id = ? AND einsatz_id = ?",
+        let stand: Option<(i64, Option<i64>)> = sqlx::query_as(
+            "SELECT version, einheit_id FROM einsatz_planschicht WHERE id = ? AND einsatz_id = ?",
         )
         .bind(bid)
         .bind(einsatz_id)
         .fetch_optional(&mut *conn)
         .await?;
-        match stand {
+        let einheit_id = match stand {
             None => return Err(AppError::NotFound),
-            Some(v) if v != version => {
+            Some((v, _)) if v != version => {
                 return Err(AppError::Conflict(
                     "Die Schicht wurde zwischenzeitlich geändert".into(),
                 ))
             }
-            Some(_) => {}
-        }
+            Some((_, e)) => e,
+        };
         if !darf_personen {
             let belegt: bool = sqlx::query_scalar(
                 "SELECT EXISTS(SELECT 1 FROM einsatz_planschicht_person WHERE planschicht_id = ?)",
@@ -930,6 +977,8 @@ pub async fn block_loeschen(
             .bind(bid)
             .execute(&mut *conn)
             .await?;
+        let einheiten: Vec<i64> = einheit_id.into_iter().collect();
+        nachziehen_plan_tx(conn, einsatz_id, &einheiten, benutzer_id, jetzt).await?;
         Ok(())
     })
 }
@@ -944,6 +993,7 @@ pub async fn erzeugen(
     von: &str,
     bis: &str,
     laenge_minuten: Option<i64>,
+    jetzt: &str,
 ) -> Result<(Vec<i64>, i64), AppError> {
     let startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let (von_t, bis_t) = (utc(von)?, utc(bis)?);
@@ -1026,6 +1076,14 @@ pub async fn erzeugen(
         );
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?;
+        nachziehen_plan_tx(
+            conn,
+            einsatz_id,
+            &einheiten_von(&[posten]),
+            benutzer_id,
+            jetzt,
+        )
+        .await?;
         Ok((ids, etb_id))
     })
 }
@@ -1227,16 +1285,36 @@ pub async fn helfer_aendern(
     })
 }
 
-/// Löscht einen Helfer und nimmt ihn aus allen Blöcken (CASCADE).
-pub async fn helfer_loeschen(pool: &SqlitePool, einsatz_id: i64, hid: i64) -> Result<(), AppError> {
-    let geloescht = sqlx::query("DELETE FROM einsatz_plan_helfer WHERE id = ? AND einsatz_id = ?")
+/// Löscht einen Helfer und nimmt ihn aus allen Blöcken (CASCADE). Die Schichten der Einheiten,
+/// in deren Blöcken er stand, ziehen nach (ein Folgeblock kann dadurch leer werden, LLH-1555).
+pub async fn helfer_loeschen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    hid: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    write_retry!(pool, |conn| {
+        let einheiten: Vec<i64> = sqlx::query_scalar(
+            "SELECT DISTINCT b.einheit_id FROM einsatz_planschicht_person p \
+             JOIN einsatz_planschicht b ON b.id = p.planschicht_id \
+             WHERE p.helfer_id = ? AND b.einsatz_id = ? AND b.einheit_id IS NOT NULL",
+        )
         .bind(hid)
         .bind(einsatz_id)
-        .execute(pool)
-        .await?
-        .rows_affected();
-    if geloescht == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+        .fetch_all(&mut *conn)
+        .await?;
+        let geloescht =
+            sqlx::query("DELETE FROM einsatz_plan_helfer WHERE id = ? AND einsatz_id = ?")
+                .bind(hid)
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?
+                .rows_affected();
+        if geloescht == 0 {
+            return Err(AppError::NotFound);
+        }
+        nachziehen_plan_tx(conn, einsatz_id, &einheiten, benutzer_id, jetzt).await?;
+        Ok(())
+    })
 }

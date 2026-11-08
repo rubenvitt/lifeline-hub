@@ -7,6 +7,8 @@ import { renderMitProviders } from '../test/utils';
 import { farbenHell } from '../theme/tokens';
 import AbloesungKarte from './AbloesungKarte';
 import type { AbloeserStand } from './abloeserStand';
+import { offenesMenue, warteAufMenueFokus } from '../test/menue';
+import userEvent from '@testing-library/user-event';
 
 dayjs.extend(utc);
 
@@ -48,6 +50,7 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   verbleib: 'ruhe',
   beginn_quelle: 'hand',
   planung_warnungen: [],
+  faellig_laut_plan: false,
   angelegt_at: '2026-10-17 06:00:00',
   ...over,
 });
@@ -532,5 +535,60 @@ describe('AbloesungKarte — Verbleib nach dem Vollzug (LLH-1308)', () => {
   it('in Ruhe keine Zeile', () => {
     zeige(schicht(abgeloest));
     expect(document.querySelector('[data-lfh="abloesung-verbleib"]')).toBeNull();
+  });
+});
+
+/**
+ * LLH-1555 (Spec `kraefte-abloesung`, „Fälligkeit laut Plan“): Folgt die Schicht dem Schichtplan,
+ * nennt die Rhythmuszeile den Folgeblock statt des Rhythmus, und „Rhythmus ändern“ fehlt.
+ */
+describe('AbloesungKarte — laut Schichtplan (LLH-1555)', () => {
+  const zeigeMitMenue = (s: Abloesung) =>
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={s}
+        jetzt={jetzt}
+        darfSchreiben
+        onVollziehen={() => {}}
+        onAbloeserPlanen={() => {}}
+        onRhythmusAendern={() => {}}
+      />,
+    );
+  const zeile = () => document.querySelector<HTMLElement>('[data-lfh="abloesung-rhythmus"]')!;
+  const menue = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Zug 1' }));
+    await warteAufMenueFokus();
+    return within(offenesMenue())
+      .getAllByRole('menuitem')
+      .map((m) => m.textContent);
+  };
+
+  it('nennt den Folgeblock in der einen Zeile und bietet keinen Rhythmus an', async () => {
+    zeigeMitMenue(
+      schicht({
+        faellig_laut_plan: true,
+        plan_folgeblock: {
+          id: 40,
+          von: '2026-10-17 14:00:00',
+          bis: '2026-10-17 16:00:00',
+          personen: 3,
+        },
+      }),
+    );
+    expect(zeile()).toHaveTextContent(/^Laut Plan · danach \d{4}–\d{4} · 3 Personen$/);
+    expect(zeile()).toHaveAttribute('title', zeile().textContent);
+    expect(zeile().querySelector('[data-lfh="abloesung-rhythmus-wert"]')).toBeNull();
+    expect(await menue()).toEqual(['Ablösung planen']);
+  });
+
+  it('ohne Folgeblock: „Posten endet“', () => {
+    zeigeMitMenue(schicht({ faellig_laut_plan: true, plan_folgeblock: null }));
+    expect(zeile()).toHaveTextContent(/^Laut Plan · Posten endet$/);
+  });
+
+  it('ohne Plan wie bisher: Rhythmus und „Rhythmus ändern“', async () => {
+    zeigeMitMenue(schicht());
+    expect(zeile().querySelector('[data-lfh="abloesung-rhythmus-wert"]')).not.toBeNull();
+    expect(await menue()).toEqual(['Ablösung planen', 'Rhythmus ändern']);
   });
 });

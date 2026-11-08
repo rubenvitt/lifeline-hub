@@ -1314,6 +1314,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("beginn_quelle", G_ENUM),
             // LLH-1319 (0264): der Vollzug hat die Ablöser-Planung für die Rücknahme gesichert.
             retain("planung_gesichert", G_KONFIG),
+            // LLH-1555 (0294): Fälligkeit laut Plan und der Block des Vollzugs.
+            retain("faellig_laut_plan", G_KONFIG),
+            retain("plan_block_id", G_FK),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.
@@ -1371,6 +1374,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
             retain("einheit_nachher_id", G_FK),
             retain("fahrzeug_nachher_id", G_FK),
+            // LLH-1555 (0294): beim Vollzug aus dem Plan in den Einsatz übernommen.
+            retain("uebernommen", G_KONFIG),
         ],
     },
     // Helfer des Schichtplans (LLH-1552, Mig 0277): Personen außerhalb des Einsatzes. Name,
@@ -1389,12 +1394,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("telefon", Strategie::NullSetzen, Z_EINSATZ),
             scrub("organisation", Strategie::NullSetzen, Z_EINSATZ),
             retain("qualifikationen", G_KONFIG),
-            // Externe Kennung und ihre Herkunft aus dem Einlesen (LLH-1556, Mig 0292)
+            // Externe Kennung und ihre Herkunft aus dem Einlesen (LLH-1556, Mig 0296)
             // führen zur Person zurück.
             scrub("kennung", Strategie::NullSetzen, Z_EINSATZ),
             scrub("herkunft", Strategie::NullSetzen, Z_EINSATZ),
             retain("angelegt_at", G_ZEIT),
             retain("angelegt_von", G_FK),
+            // LLH-1555 (0294): die Kraft, als die der Helfer übernommen wurde.
+            retain("einsatz_personal_id", G_FK),
         ],
     },
     // Planblöcke des Schichtplans (LLH-1552, Mig 0277): Posten, Zeit und Soll sind Struktur; die

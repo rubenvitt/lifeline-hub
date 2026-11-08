@@ -203,7 +203,14 @@ pub async fn block_anlegen(
     if !eingabe.personen.is_empty() {
         ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     }
-    repo::block_anlegen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eingabe).await?;
+    repo::block_anlegen(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        &eingabe,
+        &jetzt(),
+    )
+    .await?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok((StatusCode::CREATED, Json(plan(&state, &ctx).await?)))
 }
@@ -303,7 +310,16 @@ pub async fn block_loeschen(
     // Ein belegter Block nimmt mit dem Löschen Einteilungen weg: das verlangt Personal, geprüft
     // in der Transaktion gegen den Stand von `version`.
     let darf_personen = mit_personen(&state, &ctx).await?;
-    repo::block_loeschen(&state.pool, ctx.einsatz.id, bid, version, darf_personen).await?;
+    repo::block_loeschen(
+        &state.pool,
+        ctx.einsatz.id,
+        bid,
+        ctx.benutzer.id,
+        version,
+        darf_personen,
+        &jetzt(),
+    )
+    .await?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -352,6 +368,7 @@ pub async fn erzeugen(
         &von,
         &bis,
         laenge,
+        &jetzt(),
     )
     .await?;
     publiziere(&state, ctx.einsatz.id, Some(etb_id));
@@ -472,7 +489,7 @@ pub async fn helfer_loeschen(
     PfadParam((_eid, hid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
-    repo::helfer_loeschen(&state.pool, ctx.einsatz.id, hid).await?;
+    repo::helfer_loeschen(&state.pool, ctx.einsatz.id, hid, ctx.benutzer.id, &jetzt()).await?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(StatusCode::NO_CONTENT)
 }

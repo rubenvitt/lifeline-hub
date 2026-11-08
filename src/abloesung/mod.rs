@@ -465,7 +465,66 @@ pub struct AbloesungAnzeige {
     /// jede Änderung der Ablöser-Liste räumt den Vermerk.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub planung_entfallen: Option<AbloesungPlanungEntfallen>,
+    /// Die Fälligkeit kommt aus dem Schichtplan (LLH-1555): der nächste Wechsel der Blöcke der
+    /// Einheit, nicht der Rhythmus. Dann ändert sich der Rhythmus nicht von Hand (422).
+    pub faellig_laut_plan: bool,
+    /// Der Block, in den ein Vollzug aus dem Plan in diese Schicht gewechselt hat.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_block_id: Option<i64>,
+    /// Bei `faellig_laut_plan` an einer laufenden Schicht: der Block, der am Wechsel beginnt.
+    /// Fehlt er, endet der Posten mit der Fälligkeit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_folgeblock: Option<AbloesungPlanFolgeblock>,
     pub angelegt_at: String,
+}
+
+/// Der Folgeblock einer Schicht laut Plan (LLH-1555, design.md D2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungPlanFolgeblock {
+    pub id: i64,
+    pub von: String,
+    pub bis: String,
+    /// Zahl der eingeteilten Personen; 0 heißt, der Wechsel ist noch nicht geplant.
+    pub personen: i64,
+}
+
+/// Die Vorlage des Besatzungswechsels aus dem Schichtplan (LLH-1555, design.md D5), vom Server
+/// gerechnet: wer bleibt, wer kommt (mit Ziel), wer geht. Verlangt die Freigabe Personal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungPlanVorlage {
+    /// Der Folgeblock der Schicht; fehlt er, endet der Posten (dann sind `kommen` und `bleiben`
+    /// leer, und der Vollzug ist „Abziehen“).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folgeblock_id: Option<i64>,
+    pub wechsel_at: String,
+    pub bleiben: Vec<PlanVorlagePerson>,
+    pub kommen: Vec<PlanVorlageKommen>,
+    pub gehen: Vec<PlanVorlagePerson>,
+    /// Personen der Folgeblöcke, die nicht kommen können (außer Dienst, eine entlassene
+    /// Ad-hoc-Kraft); nur ihre Namen.
+    pub fehlen: Vec<String>,
+}
+
+/// Eine Kraft des Einsatzes in der Vorlage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct PlanVorlagePerson {
+    /// `einsatz_personal.id`
+    pub personal_id: i64,
+    pub name: String,
+}
+
+/// Wer laut Plan kommt: genau eine der drei Kennungen, so wie der Vollzug sie nimmt
+/// (`personal_id` in `besatzung`, die anderen in `uebernahme`), und die Einheit des Blocks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct PlanVorlageKommen {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub personal_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stamm_personal_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_helfer_id: Option<i64>,
+    pub name: String,
+    pub einheit_id: i64,
 }
 
 /// Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`).

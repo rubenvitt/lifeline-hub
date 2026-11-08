@@ -654,6 +654,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             patch(routes::abloesung::aendern),
         )
         .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}/plan-vorlage",
+            get(routes::abloesung::plan_vorlage),
+        )
+        .route(
             "/api/einsaetze/{id}/abloesungen/{aid}/vollzug",
             post(routes::abloesung::vollziehen),
         )
@@ -1166,6 +1170,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen/transportmittel",
             get(routes::einsatz_person::transportmittel),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/verbleib-angaben",
+            get(routes::einsatz_person::verbleib_angaben),
         )
         .route(
             "/api/einsaetze/{id}/personen/einheiten",
