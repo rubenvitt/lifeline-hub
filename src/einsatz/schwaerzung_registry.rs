@@ -1442,6 +1442,48 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("helfer_id", G_FK),
         ],
     },
+    // Vollzogene Wechsel aus dem Schichtplan an einer UHS und in der Pause (LLH-1555, Mig 0297):
+    // Art, Block, Zeit und Verweise, kein Freitext → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_plan_wechsel",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("planschicht_id", G_FK),
+            retain("art", G_ENUM),
+            retain("uhs_id", G_FK),
+            retain("zeitpunkt", G_ZEIT),
+            retain("vollzogen_at", G_ZEIT),
+            retain("vollzogen_von", G_FK),
+            retain("zurueckgenommen_at", G_ZEIT),
+            retain("zurueckgenommen_von", G_FK),
+            retain("etb_id", G_FK),
+        ],
+    },
+    // Kräfte eines Wechsels aus dem Plan (LLH-1555, Mig 0297): nur Verweise und Stand davor und
+    // danach; der Name steckt in `einsatz_personal` → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_plan_wechsel_person",
+        scoping: Scoping::UeberParent {
+            fk: "wechsel_id",
+            parent: "einsatz_plan_wechsel",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("wechsel_id", G_FK),
+            retain("einsatz_personal_id", G_FK),
+            retain("rolle", G_ENUM),
+            retain("uhs_vorher_id", G_FK),
+            retain("status_vorher_id", G_FK),
+            retain("status_nachher_id", G_FK),
+            retain("zeitachse_id", G_FK),
+            retain("uebernommen", G_KONFIG),
+        ],
+    },
     // Geplanter Besatzungswechsel einer Schicht (LLH-1319, Mig 0264): wer kommen soll und wohin.
     // Nur Verweise und Zeit; der Name steckt in `einsatz_personal` → RETAIN.
     TabellenRegel {

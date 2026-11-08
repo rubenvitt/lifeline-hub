@@ -3454,7 +3454,7 @@ async fn check_neue_besatzung_tx(
 /// einzigen Schreibpfad. Liefert seine ID; `None`, wenn die Perioden-Regeln es auslassen (ohne
 /// offene Periode keine Ablösung, mit offener kein zweites Eintreffen) — der Vollzug gelingt
 /// trotzdem.
-async fn besatzung_ereignis_tx(
+pub(crate) async fn besatzung_ereignis_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -3509,7 +3509,7 @@ fn verteilung_text(neu: &[NeuePerson], selbst: i64) -> String {
 }
 
 /// Namen für ETB-Texte: „«A», «B»“, ohne einen „keine“.
-fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
+pub(crate) fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
     let text = namen
         .map(|n| format!("«{n}»"))
         .collect::<Vec<_>>()
@@ -3534,9 +3534,6 @@ async fn uebernehmen_tx(
     benutzer_id: i64,
     liste: &[PlanUebernahme],
 ) -> Result<Vec<(BesatzungZiel, bool)>, AppError> {
-    use crate::personal::disposition_repo::{
-        disponieren_adhoc_tx, disponieren_stamm_tx, reaktivieren_tx, start_zeitachse_tx, AdhocDaten,
-    };
     if liste.is_empty() {
         return Ok(Vec::new());
     }
@@ -3546,84 +3543,7 @@ async fn uebernehmen_tx(
         .await?;
     let mut aus = Vec::new();
     for u in liste {
-        let (kraft, neu) = match u.quelle {
-            UebernahmeQuelle::Stamm(pid) => {
-                let bestehend: Option<(i64, bool)> = sqlx::query_as(
-                    "SELECT id, beendet_at IS NOT NULL FROM einsatz_personal \
-                     WHERE einsatz_id = ? AND personal_id = ?",
-                )
-                .bind(einsatz_id)
-                .bind(pid)
-                .fetch_optional(&mut *conn)
-                .await?;
-                match bestehend {
-                    Some((ep, false)) => (ep, false),
-                    _ => {
-                        let d =
-                            disponieren_stamm_tx(conn, einsatz_id, org_id, pid, None, benutzer_id)
-                                .await?;
-                        start_zeitachse_tx(conn, einsatz_id, benutzer_id, d.id).await?;
-                        (d.id, true)
-                    }
-                }
-            }
-            UebernahmeQuelle::Helfer(hid) => {
-                type Helfer = (
-                    String,
-                    Option<String>,
-                    Option<String>,
-                    Option<i64>,
-                    Option<bool>,
-                );
-                let h: Option<Helfer> = sqlx::query_as(
-                    "SELECT h.name, h.organisation, \
-                            (SELECT group_concat(q.label, ', ') FROM json_each(h.qualifikationen) j \
-                             JOIN qualifikation q ON q.id = j.value), \
-                            ep.id, ep.beendet_at IS NOT NULL \
-                     FROM einsatz_plan_helfer h \
-                     LEFT JOIN einsatz_personal ep \
-                            ON ep.id = h.einsatz_personal_id AND ep.einsatz_id = h.einsatz_id \
-                     WHERE h.id = ? AND h.einsatz_id = ?",
-                )
-                .bind(hid)
-                .bind(einsatz_id)
-                .fetch_optional(&mut *conn)
-                .await?;
-                let (name, organisation, funktion, ep, beendet) = h.ok_or(AppError::NotFound)?;
-                match (ep, beendet) {
-                    (Some(ep), Some(false)) => (ep, false),
-                    (Some(ep), _) => {
-                        reaktivieren_tx(conn, einsatz_id, org_id, ep, None, benutzer_id).await?;
-                        start_zeitachse_tx(conn, einsatz_id, benutzer_id, ep).await?;
-                        (ep, true)
-                    }
-                    (None, _) => {
-                        let ep = disponieren_adhoc_tx(
-                            conn,
-                            einsatz_id,
-                            org_id,
-                            AdhocDaten {
-                                name: &name,
-                                funktion: funktion.as_deref(),
-                                traegerorganisation: organisation.as_deref(),
-                                staerke_position: None,
-                            },
-                            benutzer_id,
-                        )
-                        .await?;
-                        start_zeitachse_tx(conn, einsatz_id, benutzer_id, ep).await?;
-                        sqlx::query(
-                            "UPDATE einsatz_plan_helfer SET einsatz_personal_id = ? WHERE id = ?",
-                        )
-                        .bind(ep)
-                        .bind(hid)
-                        .execute(&mut *conn)
-                        .await?;
-                        (ep, true)
-                    }
-                }
-            }
-        };
+        let (kraft, neu) = uebernehme_tx(conn, einsatz_id, org_id, benutzer_id, u.quelle).await?;
         aus.push((
             BesatzungZiel {
                 personal_id: kraft,
@@ -3634,6 +3554,98 @@ async fn uebernehmen_tx(
         ));
     }
     Ok(aus)
+}
+
+/// Eine Person aus dem Schichtplan als Kraft des Einsatzes (Regeln wie [`uebernehmen_tx`]), auch
+/// für den Wechsel an einer UHS (LLH-1555, design.md D6). Liefert die Kraft und ob sie erst jetzt
+/// in den Einsatz kam.
+pub(crate) async fn uebernehme_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer_id: i64,
+    quelle: UebernahmeQuelle,
+) -> Result<(i64, bool), AppError> {
+    use crate::personal::disposition_repo::{
+        disponieren_adhoc_tx, disponieren_stamm_tx, reaktivieren_tx, start_zeitachse_tx, AdhocDaten,
+    };
+    Ok(match quelle {
+        UebernahmeQuelle::Stamm(pid) => {
+            let bestehend: Option<(i64, bool)> = sqlx::query_as(
+                "SELECT id, beendet_at IS NOT NULL FROM einsatz_personal \
+                 WHERE einsatz_id = ? AND personal_id = ?",
+            )
+            .bind(einsatz_id)
+            .bind(pid)
+            .fetch_optional(&mut *conn)
+            .await?;
+            match bestehend {
+                Some((ep, false)) => (ep, false),
+                _ => {
+                    let d = disponieren_stamm_tx(conn, einsatz_id, org_id, pid, None, benutzer_id)
+                        .await?;
+                    start_zeitachse_tx(conn, einsatz_id, benutzer_id, d.id).await?;
+                    (d.id, true)
+                }
+            }
+        }
+        UebernahmeQuelle::Helfer(hid) => {
+            type Helfer = (
+                String,
+                Option<String>,
+                Option<String>,
+                Option<i64>,
+                Option<bool>,
+            );
+            let h: Option<Helfer> = sqlx::query_as(
+                "SELECT h.name, h.organisation, \
+                        (SELECT group_concat(q.label, ', ') FROM json_each(h.qualifikationen) j \
+                         JOIN qualifikation q ON q.id = j.value), \
+                        ep.id, ep.beendet_at IS NOT NULL \
+                 FROM einsatz_plan_helfer h \
+                 LEFT JOIN einsatz_personal ep \
+                        ON ep.id = h.einsatz_personal_id AND ep.einsatz_id = h.einsatz_id \
+                 WHERE h.id = ? AND h.einsatz_id = ?",
+            )
+            .bind(hid)
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+            let (name, organisation, funktion, ep, beendet) = h.ok_or(AppError::NotFound)?;
+            match (ep, beendet) {
+                (Some(ep), Some(false)) => (ep, false),
+                (Some(ep), _) => {
+                    reaktivieren_tx(conn, einsatz_id, org_id, ep, None, benutzer_id).await?;
+                    start_zeitachse_tx(conn, einsatz_id, benutzer_id, ep).await?;
+                    (ep, true)
+                }
+                (None, _) => {
+                    let ep = disponieren_adhoc_tx(
+                        conn,
+                        einsatz_id,
+                        org_id,
+                        AdhocDaten {
+                            name: &name,
+                            funktion: funktion.as_deref(),
+                            traegerorganisation: organisation.as_deref(),
+                            staerke_position: None,
+                        },
+                        benutzer_id,
+                    )
+                    .await?;
+                    start_zeitachse_tx(conn, einsatz_id, benutzer_id, ep).await?;
+                    sqlx::query(
+                        "UPDATE einsatz_plan_helfer SET einsatz_personal_id = ? WHERE id = ?",
+                    )
+                    .bind(ep)
+                    .bind(hid)
+                    .execute(&mut *conn)
+                    .await?;
+                    (ep, true)
+                }
+            }
+        }
+    })
 }
 
 /// Vollzug als Besatzungswechsel (LLH-1150, Entscheidung LLH-1118 Punkt 4): die Einheit, ihr

@@ -75,6 +75,11 @@ pub const PERSONAL_STATUS_STARTLISTE: [(&str, &str, i64); 6] = [
     ("abgemeldet", KATEGORIE_NICHT_VERFUEGBAR, 60),
 ];
 
+/// Der Status „Pause“ der Startliste (LLH-1555): trägt das Kennzeichen für den Schichtplan.
+/// **Muss mit dem Bestands-Update in `migrations/0297_plan_wechsel_uhs_pause.sql`
+/// übereinstimmen.**
+pub const PERSONAL_STATUS_STARTPAUSE: &str = "Pause";
+
 /// Zeitachsen-Marken der Startliste (LFH-552): nur wo der Status die Art eindeutig benennt.
 /// Gilt nur für neu angelegte Organisationen; der Bestand bleibt ohne Marke (Migration 0130).
 pub const PERSONAL_STATUS_STARTMARKEN: [(&str, &str); 3] = [
@@ -161,6 +166,8 @@ pub struct PersonalStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<crate::zeitachse::ZeitachseMarke>)]
     pub zeitachse_marke: Option<String>,
+    /// LLH-1555: der Status „Pause“ des Schichtplans (höchstens einer je Organisation).
+    pub pause: bool,
 }
 
 /// Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel (Live aus dem

@@ -13278,4 +13278,162 @@ mod tests {
                 .unwrap();
         assert_eq!(verweis, None, "SET NULL löst nur den Verweis");
     }
+
+    #[tokio::test]
+    async fn migration_0297_plan_wechsel_uhs_pause() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 297;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        // Org 1: Startliste mit „Pause“; Org 2: umbenannt klein, dazu ein deaktivierter.
+        for (org, label, aktiv) in [
+            (1, "im Einsatz", 1),
+            (1, "Pause", 1),
+            (2, "alt pause", 0),
+            (2, " pause ", 1),
+        ] {
+            sqlx::query(
+                "INSERT INTO personal_status (org_id, label, kategorie, aktiv) \
+                 VALUES (?, ?, 'gebunden', ?)",
+            )
+            .bind(org)
+            .bind(label)
+            .bind(aktiv)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        migriere_bis(&pool, VERSION).await;
+
+        let markiert: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT org_id, label FROM personal_status WHERE pause = 1 ORDER BY org_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            markiert,
+            vec![(1, "Pause".to_string()), (2, " pause ".to_string())],
+            "je Organisation der aktive Status „Pause“"
+        );
+        assert!(
+            sqlx::query("UPDATE personal_status SET pause = 1 WHERE label = 'im Einsatz'")
+                .execute(&pool)
+                .await
+                .is_err(),
+            "höchstens ein aktiver Pausenstatus je Organisation"
+        );
+
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'sonstige', 'Markt', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let block: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_planschicht (einsatz_id, posten_art, uhs_id, von, bis) \
+             VALUES (?, 'uhs', ?, '2026-11-14 18:00:00', '2026-11-14 22:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(uhs)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let wechsel = |art: &'static str, uhs: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_plan_wechsel (einsatz_id, planschicht_id, art, uhs_id, \
+                        zeitpunkt, vollzogen_at) \
+                     VALUES (?, ?, ?, ?, '2026-11-14 18:00:00', '2026-11-14 18:02:00') \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(block)
+                .bind(art)
+                .bind(uhs)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        let w = wechsel("uhs", Some(uhs)).await.unwrap();
+        assert!(
+            wechsel("uhs", Some(uhs)).await.is_err(),
+            "je Block und Art ein offener Wechsel"
+        );
+        assert!(
+            wechsel("pause_beginn", Some(uhs)).await.is_err(),
+            "die UHS nur am UHS-Wechsel"
+        );
+        sqlx::query(
+            "UPDATE einsatz_plan_wechsel SET zurueckgenommen_at = '2026-11-14 18:05:00' WHERE id = ?",
+        )
+        .bind(w)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let zweiter = wechsel("uhs", Some(uhs)).await.unwrap();
+
+        let kraft: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Ben') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_plan_wechsel_person (wechsel_id, einsatz_personal_id, rolle) \
+             VALUES (?, ?, 'neu')",
+        )
+        .bind(zweiter)
+        .bind(kraft)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            sqlx::query(
+                "INSERT INTO einsatz_plan_wechsel_person (wechsel_id, einsatz_personal_id, rolle) \
+                 VALUES (?, ?, 'mitte')",
+            )
+            .bind(w)
+            .bind(kraft)
+            .execute(&pool)
+            .await
+            .is_err(),
+            "rolle nur alt oder neu"
+        );
+
+        // Ein gelöschter Block lässt den Wechsel als Geschichte stehen.
+        sqlx::query("DELETE FROM einsatz_planschicht WHERE id = ?")
+            .bind(block)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let ohne: Vec<Option<i64>> = sqlx::query_scalar(
+            "SELECT planschicht_id FROM einsatz_plan_wechsel WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(ohne, vec![None, None], "SET NULL löst nur den Block");
+        let personen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_plan_wechsel_person")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(personen, 1);
+    }
 }

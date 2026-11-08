@@ -119,6 +119,7 @@ async fn setup(pool: &SqlitePool) -> Zug {
             farbe: None,
             sortier: 20,
             zeitachse_marke: Some("alarmierung"),
+            pause: false,
         },
     )
     .await

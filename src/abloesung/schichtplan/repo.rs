@@ -19,10 +19,6 @@ use crate::write_retry;
 use crate::zeit;
 use crate::zeitdarstellung::Zeitstil;
 
-/// Label des Personalstatus, der für die Zeile „Pause“ als „am Posten“ gilt (Startliste
-/// `personal::STATUS_STARTLISTE`, Migration 0012).
-const PAUSE_STATUS_LABEL: &str = "Pause";
-
 /// Ein neuer Block, Felder schon geprüft (Handler). Zeiten im kanonischen Format.
 #[derive(Debug, Clone)]
 pub struct BlockEingabe {
@@ -323,13 +319,13 @@ async fn personen_daten(
         Option<i64>,
         Option<i64>,
         Option<i64>,
-        Option<String>,
+        bool,
     );
     let stamm: Vec<StammZeile> = sqlx::query_as(
         "SELECT pe.id, pe.name, pe.dienststatus, \
                 (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
                   WHERE pq.personal_id = pe.id), \
-                ep.id, ep.einheit_id, ep.uhs_id, ps.label \
+                ep.id, ep.einheit_id, ep.uhs_id, COALESCE(ps.pause, 0) = 1 \
          FROM personal pe \
          LEFT JOIN einsatz_personal ep \
            ON ep.personal_id = pe.id AND ep.einsatz_id = ?1 AND ep.beendet_at IS NULL \
@@ -353,16 +349,17 @@ async fn personen_daten(
                         im_einsatz: ep.is_some(),
                         einheit_id,
                         uhs_id,
-                        pause: ist_pause(status.as_deref()),
+                        pause: status,
                     },
                 },
             },
         );
     }
 
-    type EinsatzZeile = (i64, String, bool, Option<i64>, Option<i64>, Option<String>);
+    type EinsatzZeile = (i64, String, bool, Option<i64>, Option<i64>, bool);
     let einsatz: Vec<EinsatzZeile> = sqlx::query_as(
-        "SELECT ep.id, ep.snap_name, ep.beendet_at IS NULL, ep.einheit_id, ep.uhs_id, ps.label \
+        "SELECT ep.id, ep.snap_name, ep.beendet_at IS NULL, ep.einheit_id, ep.uhs_id, \
+                COALESCE(ps.pause, 0) = 1 \
          FROM einsatz_personal ep \
          LEFT JOIN personal_status ps ON ps.id = ep.status_id \
          WHERE ep.id IN (SELECT pp.einsatz_personal_id FROM einsatz_planschicht_person pp \
@@ -384,7 +381,7 @@ async fn personen_daten(
                         im_einsatz: aktiv,
                         einheit_id: einheit_id.filter(|_| aktiv),
                         uhs_id: uhs_id.filter(|_| aktiv),
-                        pause: aktiv && ist_pause(status.as_deref()),
+                        pause: aktiv && status,
                     },
                 },
             },
@@ -399,10 +396,11 @@ async fn personen_daten(
         Option<i64>,
         Option<i64>,
         Option<i64>,
-        Option<String>,
+        bool,
     );
     let helfer: Vec<HelferZeile> = sqlx::query_as(
-        "SELECT h.id, h.name, h.qualifikationen, ep.id, ep.einheit_id, ep.uhs_id, ps.label \
+        "SELECT h.id, h.name, h.qualifikationen, ep.id, ep.einheit_id, ep.uhs_id, \
+                COALESCE(ps.pause, 0) = 1 \
          FROM einsatz_plan_helfer h \
          LEFT JOIN einsatz_personal ep ON ep.id = h.einsatz_personal_id AND ep.beendet_at IS NULL \
          LEFT JOIN personal_status ps ON ps.id = ep.status_id \
@@ -422,7 +420,7 @@ async fn personen_daten(
                         im_einsatz: ep.is_some(),
                         einheit_id,
                         uhs_id,
-                        pause: ist_pause(status.as_deref()),
+                        pause: status,
                     },
                     ..PersonStand::default()
                 },
@@ -430,10 +428,6 @@ async fn personen_daten(
         );
     }
     Ok(aus)
-}
-
-fn ist_pause(label: Option<&str>) -> bool {
-    label.is_some_and(|l| l.trim().eq_ignore_ascii_case(PAUSE_STATUS_LABEL))
 }
 
 /// Der Posten eines Blocks (für die Modulprüfung im Handler). Fremd oder unbekannt → 404.

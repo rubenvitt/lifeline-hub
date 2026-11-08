@@ -24,6 +24,9 @@ pub struct StatusBody {
     /// LFH-552: optionale Zeitachsen-Marke.
     #[serde(default)]
     pub zeitachse_marke: Option<String>,
+    /// LLH-1555: der Status „Pause“ des Schichtplans; nimmt das Kennzeichen jedem anderen.
+    #[serde(default)]
+    pub pause: bool,
 }
 
 struct Normalisiert {
@@ -32,6 +35,7 @@ struct Normalisiert {
     farbe: Option<String>,
     sortier: i64,
     zeitachse_marke: Option<String>,
+    pause: bool,
 }
 
 impl Normalisiert {
@@ -42,6 +46,7 @@ impl Normalisiert {
             farbe: self.farbe.as_deref(),
             sortier: self.sortier,
             zeitachse_marke: self.zeitachse_marke.as_deref(),
+            pause: self.pause,
         }
     }
 }
@@ -59,6 +64,7 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
         farbe: trimme(body.farbe),
         sortier: body.sortier,
         zeitachse_marke: crate::zeitachse::ZeitachseMarke::pruefe(body.zeitachse_marke)?,
+        pause: body.pause,
     })
 }
 
@@ -80,6 +86,9 @@ pub struct PatchStatus {
     /// LFH-552, Tri-State: fehlt = unverändert, `null`/`""` = Marke entfernen.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub zeitachse_marke: Option<Option<String>>,
+    /// LLH-1555: `true` setzt das Kennzeichen „Pause“ (und nimmt es jedem anderen), `false`
+    /// nimmt es; fehlt = unverändert.
+    pub pause: Option<bool>,
 }
 
 struct PatchNormalisiert {
@@ -88,6 +97,7 @@ struct PatchNormalisiert {
     farbe: Option<Option<String>>,
     sortier: Option<i64>,
     zeitachse_marke: Option<Option<String>>,
+    pause: Option<bool>,
 }
 
 impl PatchNormalisiert {
@@ -98,6 +108,7 @@ impl PatchNormalisiert {
             farbe: self.farbe.as_ref().map(|v| v.as_deref()),
             sortier: self.sortier,
             zeitachse_marke: self.zeitachse_marke.as_ref().map(|v| v.as_deref()),
+            pause: self.pause,
         }
     }
 }
@@ -127,6 +138,7 @@ fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> 
             .zeitachse_marke
             .map(crate::zeitachse::ZeitachseMarke::pruefe)
             .transpose()?,
+        pause: body.pause,
     })
 }
 

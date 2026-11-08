@@ -34,6 +34,7 @@ async fn setup(pool: &SqlitePool) -> Kontext {
             farbe: None,
             sortier: 20,
             zeitachse_marke: Some("alarmierung"),
+            pause: false,
         },
     )
     .await
