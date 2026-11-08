@@ -608,6 +608,9 @@ offen“ (oder mehr), solange Plätze oder Qualifikationen fehlen, und bei einem
 „doppelt verplant“, „Qualifikation fehlt“, „zu lange im Dienst“, „nicht verfügbar“ oder „nicht am
 Posten“. Ein Befund geht der Lücke vor. Ohne Soll steht „ohne Soll“ oder „unbesetzt“, in der Pause
 „Pause“. Die Befunde rechnet der Server; der Plan prüft sie neu, sobald eine Grenze erreicht ist.
+„zu lange im Dienst“ prüft gegen Höchstdienst und Mindestruhe des Einsatzes, ohne eigenen Wert 12 h
+und 8 h. Mit denselben Werten stuft das Meldebild die Kräfte ein, die tatsächlich im Einsatz sind
+(„zu lang“, „Ruhe zu kurz“, Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 
 In der Zeile eines Postens liegen Blöcke nicht übereinander; ein Zug, der einen anderen Block
 überdecken würde, wird nicht übernommen. In der Pause dürfen Blöcke gleichzeitig laufen. Ein

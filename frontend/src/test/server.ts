@@ -181,6 +181,15 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/einheiten/zeitachse', () => HttpResponse.json([])),
   http.get('/api/einsaetze/:einsatzId/personal/zeitachse', () => HttpResponse.json([])),
+  // Grenzwerte der Einstufung (LLH-730): die Vorgaben des Schichtplans, wie ohne eigenen Wert.
+  http.get('/api/einsaetze/:einsatzId/:modul/zeitachse/grenzwerte', () =>
+    HttpResponse.json({
+      max_dienst_minuten: 720,
+      min_ruhe_minuten: 480,
+      max_dienst_eigen: false,
+      min_ruhe_eigen: false,
+    }),
+  ),
   http.get('/api/einsaetze/:einsatzId/:modul/:kraftId/zeitachse', () =>
     HttpResponse.json({ ereignisse: [], perioden: [] }),
   ),

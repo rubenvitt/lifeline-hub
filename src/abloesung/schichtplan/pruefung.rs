@@ -13,7 +13,8 @@
 //!   am Posten (Einheit samt Untereinheiten, UHS, Status „Pause“). Helfer und nicht disponierte
 //!   Stamm-Personen sind nie am Posten.
 //!
-//! Die Kräfte-Zeitachse stuft weiter nicht ein (LFH-860): der Dienst-Befund liest nur Planblöcke.
+//! Der Dienst-Befund liest nur Planblöcke. Das Ist stuft der Client mit derselben Trennregel ein
+//! (LLH-730, `frontend/src/kraefte/zeitachse.ts`, `stufeEin`).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -226,6 +227,8 @@ pub fn pruefe(bloecke: &[Block], g: &Grundlage<'_>) -> Ergebnis {
 
 /// Dienststrecken einer Person: je Strecke die Blöcke und die Länge in Minuten. Pausen zählen
 /// nicht; eine Lücke trennt, wenn sie echt größer als null und mindestens die Mindestruhe ist.
+/// Gegenstück für das Ist: `frontend/src/kraefte/zeitachse.ts`, `stufeEin` (LLH-730); wer die
+/// Regel ändert, ändert beide.
 fn dienststrecken(liste: &[&Block], grenzwerte: SchichtplanGrenzwerte) -> Vec<(Vec<i64>, i64)> {
     let mut dienst: Vec<&&Block> = liste.iter().filter(|b| b.posten != Posten::Pause).collect();
     dienst.sort_by_key(|b| (b.von, b.bis, b.id));
