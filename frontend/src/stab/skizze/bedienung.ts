@@ -2,6 +2,7 @@ import type { SkizzenBezug } from '../../api/fernmeldeskizzeVertrag';
 import type { Fernmeldenetz, NetzBaumKnoten, Rechtsquelle } from '../fernmeldeskizze';
 import { bedingungszeichenText } from '../skizzenZeichen';
 import { SCHRIFTFELD, stichSchluessel, stichleitungen } from './ebenen';
+import { istKontextTaste } from '../../components/useKontextMenue';
 
 /**
  * Bedienung der Fernmeldeskizze ohne Zeiger (LFH-893 D6, D8), rein: Fokusfolge, Tasten,
@@ -105,6 +106,8 @@ export function tastenBefehl(e: Taste): TastenBefehl | null {
     return { art: 'verschiebe', dx: pfeil[0] * n, dy: pfeil[1] * n };
   }
   if (e.altKey) return null;
+  // Dieselbe Erkennung wie jeder Datensatz (LLH-1596, `components/useKontextMenue.ts`).
+  if (istKontextTaste(e)) return { art: 'menue' };
   switch (taste) {
     case 'Enter':
       return { art: 'oeffne' };
@@ -117,10 +120,6 @@ export function tastenBefehl(e: Taste): TastenBefehl | null {
       return { art: 'wandere', richtung: e.shiftKey ? -1 : 1 };
     case 'Escape':
       return { art: 'abwaehlen' };
-    case 'ContextMenu':
-      return { art: 'menue' };
-    case 'F10':
-      return e.shiftKey ? { art: 'menue' } : null;
     case '+':
     case '=':
       return { art: 'zoom', richtung: 1 };

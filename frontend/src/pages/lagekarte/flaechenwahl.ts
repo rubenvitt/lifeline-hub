@@ -52,4 +52,4 @@ export function flaechenKennung<F extends Merkmal>(ziel: Flaechenziel<F>): Flaec
 /**
  * Stil eines Menüeintrags: seit LFH-776 die gemeinsame Schale aller Punktmenüs der Karte.
  */
-export { punktmenueEintragStil as flaechenwahlEintragStil } from './PunktankerMenue';
+export { punktmenueEintragStil as flaechenwahlEintragStil } from '../../components/PunktankerMenue';
