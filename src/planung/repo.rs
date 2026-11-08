@@ -238,7 +238,7 @@ const SELECT_KOPF: &str = "SELECT id, version, bezeichnung, einsatzart, ort, ort
      von, bis, max_dienst_min, min_ruhe_min, angelegt_at, uebernommen_at, uebernahme_einsatz, \
      uebernahme_einsatznummer, uebernahme_kennzahlen FROM planung WHERE id = ? AND org_id = ?";
 
-/// Die Übernahme aus den Spalten von 0300; fehlt, solange die Planung nicht übernommen ist.
+/// Die Übernahme aus den Spalten von 0302; fehlt, solange die Planung nicht übernommen ist.
 fn build_uebernahme(
     at: Option<String>,
     einsatz: Option<i64>,
@@ -251,7 +251,7 @@ fn build_uebernahme(
     })
 }
 
-/// Die bei der Übernahme gespeicherten Kennzahlen (0300).
+/// Die bei der Übernahme gespeicherten Kennzahlen (0302).
 fn parse_kennzahlen(json: Option<&str>) -> Result<Option<PlanungKennzahlen>, AppError> {
     json.map(|j| {
         serde_json::from_str(j)

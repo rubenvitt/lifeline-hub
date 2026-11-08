@@ -13814,9 +13814,9 @@ mod tests {
 
     /// LLH-1587: eine Planung im Bestand ist nicht übernommen; die Kennzahlen sind ein Objekt.
     #[tokio::test]
-    async fn migration_0300_planung_uebernahme() {
+    async fn migration_0302_planung_uebernahme() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 300;
+        const VERSION: i64 = 302;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
