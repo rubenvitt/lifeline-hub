@@ -68,6 +68,7 @@ import {
   schichtplanBloecke,
   sollVorgaben,
 } from './planungZeilen';
+import { uebernimmPlanung } from './planungCache';
 
 /**
  * Reiter „Plan“ einer Planung (LLH-1586, Spec `vorplanung`): dasselbe Raster wie der
@@ -166,8 +167,8 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
     ...tage.map((t) => ({ wert: t.schluessel, label: datum(dayjs(t.von), konventionen) })),
   ];
 
-  // ── Schreiben ── Jede Antwort ist die ganze Planung; sie ersetzt den Cache.
-  const setzePlanung = (p: Planung) => qc.setQueryData(globalKeys.planung(planungId), p);
+  // ── Schreiben ── Jede Antwort ist die ganze Planung; sie ersetzt den Cache, ein Abruf folgt.
+  const setzePlanung = (p: Planung) => uebernimmPlanung(qc, p);
   const anlegenMut = useMutation({
     mutationFn: (body: SchichtplanBlockBody) => legePlanungBlockAn(planungId, blockBody(body)),
     onSuccess: setzePlanung,

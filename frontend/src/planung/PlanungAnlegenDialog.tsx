@@ -14,6 +14,7 @@ import { mitVorgabe } from '../components/vorgabeText';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { planungPfad } from '../routing/deeplinks';
 import { zeitraumRegel } from './planungRegeln';
+import { uebernimmPlanung } from './planungCache';
 
 interface Werte {
   bezeichnung: string;
@@ -55,7 +56,7 @@ export default function PlanungAnlegenDialog({
       return legePlanungAn(body);
     },
     onSuccess: (p) => {
-      qc.setQueryData(globalKeys.planung(p.kopf.id), p);
+      uebernimmPlanung(qc, p);
       void qc.invalidateQueries({ queryKey: globalKeys.planungen(), exact: true });
     },
   });

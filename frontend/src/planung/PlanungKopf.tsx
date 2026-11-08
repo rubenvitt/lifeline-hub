@@ -23,6 +23,7 @@ import {
   minRuheRegel,
   zeitraumRegel,
 } from './planungRegeln';
+import { uebernimmPlanung } from './planungCache';
 
 export interface KopfWerte {
   bezeichnung: string;
@@ -96,7 +97,7 @@ export default function PlanungKopf({
     const neuester = qc.getQueryData<Planung>(globalKeys.planung(kopf.id))?.kopf.version;
     const version = basis !== undefined ? Number(basis) : (neuester ?? kopf.version);
     const p = await aenderePlanung(kopf.id, { version, ...patch });
-    qc.setQueryData(globalKeys.planung(kopf.id), p);
+    uebernimmPlanung(qc, p);
     void qc.invalidateQueries({ queryKey: globalKeys.planungen(), exact: true });
   };
 

@@ -114,15 +114,18 @@ describe('PlanungPage (LLH-1586)', () => {
     expect(await screen.findByText('UHS · Behandlungsplatz')).toBeInTheDocument();
   });
 
-  it('Kopf bearbeiten schickt die Version und nur das Geänderte', async () => {
+  it('Kopf bearbeiten schickt die Version und nur das Geänderte, danach gilt der neueste Stand', async () => {
     let body: unknown;
+    let stand = planung();
     setup();
     server.use(
+      http.get('/api/planungen/5', () => HttpResponse.json(stand)),
       http.patch('/api/planungen/5', async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json(
-          planung({ kopf: { ...planung().kopf, version: 4, ort: 'Rathaus' } }),
-        );
+        const antwort = planung({ kopf: { ...planung().kopf, version: 4, ort: 'Rathaus' } });
+        // Gleich danach ändert jemand anderes die Bezeichnung: die Antwort ist schon überholt.
+        stand = planung({ kopf: { ...antwort.kopf, version: 5, bezeichnung: 'Stadtfest Süd' } });
+        return HttpResponse.json(antwort);
       }),
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Planung bearbeiten' }));
@@ -135,6 +138,7 @@ describe('PlanungPage (LLH-1586)', () => {
       expect(body).toEqual({ version: 3, ort: 'Rathaus', max_dienst_minuten: 600 }),
     );
     expect(await screen.findByText('Rathaus')).toBeInTheDocument();
+    expect((await screen.findAllByText('Stadtfest Süd')).length).toBeGreaterThan(0);
   });
 
   it('Posten nach unten schickt die ganze Reihenfolge', async () => {

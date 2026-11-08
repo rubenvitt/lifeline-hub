@@ -17,6 +17,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { qualiSollText } from '../kraefte/qualiSoll';
 import PlanungPostenDialog, { herkunftText, type PostenSpeichern } from './PlanungPostenDialog';
+import { uebernimmPlanung } from './planungCache';
 
 type Aktion = 'bearbeiten' | 'hoch' | 'runter' | 'loeschen';
 
@@ -46,7 +47,7 @@ export default function PlanungPostenListe({ planung }: { planung: Planung }) {
   const [zuLoeschen, setZuLoeschen] = useState<PlanungPosten | null>(null);
   const posten = [...planung.posten].sort((a, b) => a.sortier - b.sortier);
 
-  const setzePlanung = (p: Planung) => qc.setQueryData(globalKeys.planung(planungId), p);
+  const setzePlanung = (p: Planung) => uebernimmPlanung(qc, p);
   const speichernMut = useMutation({
     mutationFn: (s: PostenSpeichern) =>
       s.art === 'anlegen'
