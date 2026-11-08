@@ -120,6 +120,7 @@ const ART_LABEL: Record<DemoStammdatenArt, string> = {
   material: 'Material',
   einheit_vorlage: 'Einheiten-Vorlagen',
   schichtmodell: 'Schichtmodelle',
+  planung: 'Planungen',
 };
 
 const VORGANG_LABEL: Record<DemoVorgang, string> = {

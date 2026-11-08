@@ -533,6 +533,7 @@ async fn import_legt_den_uebungseinsatz_samt_kopf_und_bericht_an() {
             zeile(DemoStammdatenArt::Material, 4),
             zeile(DemoStammdatenArt::EinheitVorlage, 2),
             zeile(DemoStammdatenArt::Schichtmodell, 1),
+            zeile(DemoStammdatenArt::Planung, 0),
         ],
     };
     assert_eq!(erg.bericht, erwartet);

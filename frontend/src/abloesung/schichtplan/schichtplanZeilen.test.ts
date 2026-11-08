@@ -12,8 +12,10 @@ import {
   ampelVon,
   baueZeilen,
   befundText,
+  kopieBody,
   lueckeText,
   mitPerson,
+  naechsterBlockBody,
   personenOptionen,
   personenText,
   postenEingabe,
@@ -218,6 +220,62 @@ describe('schichtplanZeilen (LLH-1554)', () => {
         { art: 'stamm', personal_id: 50 },
         { art: 'helfer', helfer_id: 7 },
       ]);
+    });
+  });
+});
+
+describe('Kopie eines Blocks (LLH-1584)', () => {
+  const voll = block({
+    soll_anzahl: 3,
+    quali_soll: [{ qualifikation_id: 5, anzahl: 1, label: 'Rettungssanitäter' }],
+    notiz: 'Schlüssel an der Wache',
+    personen: [person({ name: 'Anna', personal_id: 4 }), person({ name: 'Ben', helfer_id: 9 })],
+  });
+  const ziel = {
+    posten: { art: 'uhs', uhs_id: 2 } as const,
+    von: '2026-11-08 10:00:00',
+    bis: '2026-11-08 11:00:00',
+  };
+
+  it('nimmt Soll, Qualifikationssoll und Personen mit, die Notiz nie', () => {
+    expect(kopieBody(voll, ziel, true)).toEqual({
+      ...ziel,
+      soll_anzahl: 3,
+      quali_soll: [{ qualifikation_id: 5, anzahl: 1 }],
+      personen: [
+        { art: 'stamm', personal_id: 4 },
+        { art: 'helfer', helfer_id: 9 },
+      ],
+    });
+    expect(kopieBody(voll, ziel, false).personen).toBeUndefined();
+  });
+
+  it('ein Block ohne Soll bleibt ohne, statt die Vorgabe des Ziels zu bekommen', () => {
+    const body = kopieBody(block(), ziel, true);
+    expect(body).toMatchObject({ soll_anzahl: null, quali_soll: null });
+    expect(body.personen).toBeUndefined();
+  });
+
+  it('an der Pause kein Soll, aus der Pause die Vorgabe des Zielpostens', () => {
+    expect(kopieBody(voll, { ...ziel, posten: { art: 'pause' } }, false)).toEqual({
+      posten: { art: 'pause' },
+      von: ziel.von,
+      bis: ziel.bis,
+      soll_anzahl: null,
+    });
+    const pause = block({ posten: { art: 'pause', aufgeloest: false } });
+    const ausPause = kopieBody(pause, ziel, false);
+    expect('soll_anzahl' in ausPause).toBe(false);
+    expect('quali_soll' in ausPause).toBe(false);
+  });
+
+  it('der nächste Block beginnt am Ende, dauert gleich lang und bleibt ohne Personen', () => {
+    expect(naechsterBlockBody(voll)).toEqual({
+      posten: { art: 'einheit', einheit_id: 11 },
+      von: '2026-11-07 11:00:00',
+      bis: '2026-11-07 12:00:00',
+      soll_anzahl: 3,
+      quali_soll: [{ qualifikation_id: 5, anzahl: 1 }],
     });
   });
 });

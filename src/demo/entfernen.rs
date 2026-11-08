@@ -39,11 +39,21 @@ struct Loeschweg {
     mehrere_runden: bool,
 }
 
-/// Reihenfolge: Einheiten-Vorlagen zuerst (ihre Kindzeilen kaskadieren; sonst hielte eine
-/// Demo-Vorlage die Demo-Fahrzeuge und -Personen fest, LLH-1042), dann Personal (samt
+/// Reihenfolge: Planungen zuerst (LLH-1585), dann Einheiten-Vorlagen (ihre Kindzeilen
+/// kaskadieren; sonst hielte eine Demo-Vorlage die Demo-Fahrzeuge und -Personen fest, LLH-1042),
+/// dann Personal (samt
 /// Qualifikationen), Fahrzeug, Material. Die Reihenfolge der Berichtszeilen ist davon unabhängig
 /// (s. [`bericht_zeilen`]).
-const LOESCHWEGE: [Loeschweg; 5] = [
+const LOESCHWEGE: [Loeschweg; 6] = [
+    // LLH-1585: Planungen zuerst, sie teilen Demo-Personal ein und zeigen auf Demo-Fahrzeuge
+    // (ohne ON-DELETE-Aktion). Posten, Blöcke und Helfer kaskadieren mit der Planung.
+    Loeschweg {
+        art: DemoStammdatenArt::Planung,
+        behalten_wenn: None,
+        vorlauf: None,
+        loeschen: "DELETE FROM planung WHERE id = ? AND org_id = ?",
+        mehrere_runden: false,
+    },
     Loeschweg {
         art: DemoStammdatenArt::EinheitVorlage,
         // Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen entfernen“: steht die Vorlage

@@ -557,6 +557,17 @@ impl LiveHub {
         });
     }
 
+    /// Eine Planung von `org_id` hat sich geändert (LLH-1585); erreicht nur die Planer dieser
+    /// Organisation ([`org::OrgEmpfaenger::Planer`]).
+    pub fn publiziere_planung(&self, org_id: i64, planung_id: i64) {
+        self.publiziere_org(org::OrgNachricht {
+            org_id,
+            event: org::OrgLiveEvent::Planung,
+            empfaenger: org::OrgEmpfaenger::Planer,
+            nutzlast: Some(format!(r#"{{"id":{planung_id}}}"#).into()),
+        });
+    }
+
     fn publiziere_org(&self, nachricht: org::OrgNachricht) {
         // Err heißt nur „kein Empfänger" — dann geht die Nachricht verloren, wie im Einsatz-Kanal.
         let _ = self.org.send(nachricht);

@@ -20,6 +20,7 @@ use utoipa::ToSchema;
 pub mod entfernen;
 pub mod import;
 pub mod katalog;
+pub mod planung;
 pub mod stammdaten;
 pub mod szenario;
 pub mod szenario_stadtfest;
@@ -135,6 +136,8 @@ wire_enum! {
         EinheitVorlage => "einheit_vorlage",
         /// Schichtmodell der Ablösung (LLH-1122).
         Schichtmodell => "schichtmodell",
+        /// Vorplanung ohne Einsatz (LLH-1585).
+        Planung => "planung",
     }
 }
 

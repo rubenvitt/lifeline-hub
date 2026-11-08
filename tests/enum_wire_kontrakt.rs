@@ -1119,6 +1119,11 @@ fn schichtplan_wire() {
         Verfuegbar => "verfuegbar",
         Abweichung => "abweichung",
     } in lifeline_hub::abloesung::schichtplan::PlanBefundArt::ALLE);
+    // Vorplanung (LLH-1585)
+    enum_wire!(lifeline_hub::planung::PlanungPostenArt {
+        Einheit => "einheit",
+        Uhs => "uhs",
+    } in lifeline_hub::planung::PlanungPostenArt::ALLE);
 }
 
 #[test]
@@ -1318,6 +1323,7 @@ fn demo_bericht_enums_wire() {
         Material => "material",
         EinheitVorlage => "einheit_vorlage",
         Schichtmodell => "schichtmodell",
+        Planung => "planung",
     });
     // LLH-1576: Die Lage steht im Pfad und als `szenario` am Import-Kopf (CHECK in 0290).
     enum_wire!(lifeline_hub::demo::DemoLage {
@@ -1406,6 +1412,7 @@ fn org_live_event_wire() {
         Einsatzliste => "einsatzliste",
         Stammdaten => "stammdaten",
         OrgBenachrichtigung => "org_benachrichtigung",
+        Planung => "planung",
     } in lifeline_hub::live::org::OrgLiveEvent::ALLE);
 }
 

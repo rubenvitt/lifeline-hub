@@ -230,6 +230,7 @@ async fn laden_mit(
             ueber_einheit: &ueber,
             grenzwerte,
             jetzt,
+            mit_ist: true,
         },
     );
 
