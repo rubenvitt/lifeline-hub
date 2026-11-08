@@ -3544,7 +3544,7 @@ async fn uebernehmen_tx(
         .bind(einsatz_id)
         .fetch_one(&mut *conn)
         .await?;
-    let mut aus = Vec::with_capacity(liste.len());
+    let mut aus = Vec::new();
     for u in liste {
         let (kraft, neu) = match u.quelle {
             UebernahmeQuelle::Stamm(pid) => {

@@ -388,7 +388,7 @@ fn uebernahme_aus(liste: Vec<UebernahmeBody>) -> Result<Vec<PlanUebernahme>, App
             "uebernahme: höchstens {BESATZUNG_MAX} Personen"
         )));
     }
-    let mut aus: Vec<PlanUebernahme> = Vec::with_capacity(liste.len());
+    let mut aus: Vec<PlanUebernahme> = Vec::new();
     for u in liste {
         let quelle =
             match (u.stamm_personal_id, u.plan_helfer_id) {
