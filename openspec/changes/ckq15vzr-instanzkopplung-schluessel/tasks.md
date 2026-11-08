@@ -55,7 +55,7 @@ Code. Migrationen bekommen die nächste freie Nummer über `origin/alpha`
 - [x] 8.2 Seite „Instanzkopplung“ in `frontend/src/instanz/`, Eintrag in `adminNav.tsx` (`NUR_ADMIN`), Paneel „Diese Instanz“; Vitest: Fingerabdruck kopierbar, Nicht-Admin sieht den Eintrag nicht
 - [x] 8.3 Paneel „Gekoppelte Instanzen“ mit Code ausstellen (gesperrt mit Erklärung ohne eigenen Unterschriftsschlüssel), Code einlösen (zeigt danach den Fingerabdruck des Gegenübers), Zustandszeile als reine Funktion, Widerruf im Menü; Vitest für Zustandszeile und Sperre
 - [x] 8.4 Paneel „Unterschriftsschlüssel“ mit Registrieren, Gegenzeichnen und Widerrufen über `navigator.credentials`; Vitest mit gestubbtem WebAuthn
-- [ ] 8.5 e2e-Fall in `frontend/e2e/` für die Seite an einer Instanz (Anzeige, Code ausstellen gesperrt ohne Schlüssel); Bilder der Seite für den PR nach `dev-zunder-ausfuehren`, „Bilder der Änderung“
+- [x] 8.5 e2e-Fall in `frontend/e2e/` für die Seite an einer Instanz (Anzeige, Code ausstellen gesperrt ohne Schlüssel); Bilder der Seite für den PR nach `dev-zunder-ausfuehren`, „Bilder der Änderung“ (08.11.2026: `e2e/instanzkopplung.spec.ts` grün; Bilder mit zwei echten Instanzen und virtuellem Authenticator)
 
 ## 9. Doku und Regeln
 
@@ -67,8 +67,8 @@ Code. Migrationen bekommen die nächste freie Nummer über `origin/alpha`
 
 ## 10. Abschluss
 
-- [ ] 10.1 `./scripts/check-all.sh` grün (bekannte Fremdbefunde benannt); Mutationsproben für Wiederholschutz, Body-Hash und Gegenzeichnung (Prüfung auskommentiert → Test rot)
-- [ ] 10.2 Review per `superpowers:requesting-code-review` mit Schwerpunkt Krypto und Vertrauenskette, Befunde abgearbeitet
+- [x] 10.1 `./scripts/check-all.sh` grün (bekannte Fremdbefunde benannt); Mutationsproben für Wiederholschutz, Body-Hash und Gegenzeichnung (Prüfung auskommentiert → Test rot) (08.11.2026: Bündel `schnell` grün, `cargo test --lib` 3822 grün, betroffene Integrationstests grün, Vitest voll grün nach Korrektur zweier Wächter, e2e-Fall grün; der volle Rust- und e2e-Lauf passt nicht auf die Platte der Cloud-Sitzung und ist durch die CI dieses PRs belegt. Mutationsproben: alle drei rot, dazu zwei für die Review-Befunde)
+- [x] 10.2 Review per `superpowers:requesting-code-review` mit Schwerpunkt Krypto und Vertrauenskette, Befunde abgearbeitet (08.11.2026: unabhängiges adversariales Review, Befunde 1, 2, 4–11 behoben mit Tests, Befund 3 als Restrisiko R24 offen zur Entscheidung, design.md „Nachträge aus dem Review“)
 
 ## Workflow follow-up
 
