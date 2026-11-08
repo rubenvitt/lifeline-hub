@@ -2,30 +2,6 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Zählung der Anrufe
-Das System SHALL unter `GET /api/einsaetze/{id}/stab/infotelefon/zaehler` die Anrufe des
-Einsatzes zählen. Die Antwort trägt `gesamt`, `offen` (Anrufe im Status `offen`) und
-`je_anliegen` mit einem Wert für **jedes** der sieben Anliegen. Ein Anliegen ohne Anruf MUST als
-0 erscheinen und DARF NICHT fehlen. Die Summe über `je_anliegen` MUST `gesamt` ergeben. Die
-Zählung hat dasselbe Gate wie die Liste.
-
-#### Scenario: Ungefilterte Zählung
-- **WHEN** ein Einsatz 3 Anrufe „Auskunft zur Lage“, davon 1 offen, und 1 Anruf „Hinweis“ hat
-- **THEN** antwortet die Zählung mit `gesamt: 4`, `offen: 1`, `je_anliegen.auskunft_lage: 3`,
-  `je_anliegen.hinweis: 1` und 0 für die übrigen fünf Anliegen
-
-#### Scenario: Mehr Anrufe als eine Seite
-- **WHEN** ein Einsatz 2 000 Anrufe hat
-- **THEN** ist `gesamt` 2 000, nicht die Seitengröße der Liste
-
-#### Scenario: Andere Einsätze zählen nicht mit
-- **WHEN** ein anderer Einsatz Anrufe hat
-- **THEN** sind diese in der Zählung dieses Einsatzes nicht enthalten
-
-#### Scenario: Informationstelefon gesperrt
-- **WHEN** eine Person ohne Freigabe des Moduls Informationstelefon die Zählung abruft
-- **THEN** antwortet das System wie bei der Liste mit 403
-
 ### Requirement: Rechte, Lebenszyklus, Live
 Lesen SHALL jedes Einsatzmitglied mit Leserecht auf das Modul Informationstelefon
 (`infotelefon`). Erfassen und Statuswechsel MUST Schreibrecht und die Freigabe des Moduls
@@ -77,3 +53,34 @@ auf das Informationstelefon MUST die neue Adresse nennen.
 - **WHEN** eine Person `/einsaetze/:id/stab/infotelefon?anruf=42` aufruft
 - **THEN** zeigt die App `/einsaetze/:id/infotelefon?anruf=42` mit dem Anruf 42 hervorgehoben, und
   „Zurück“ im Browser führt nicht erneut auf die alte Adresse
+
+### Requirement: Zählung der Anrufe unter der Freigabe des Informationstelefons
+
+Das System SHALL unter `GET /api/einsaetze/{id}/stab/infotelefon/zaehler` die Anrufe des
+Einsatzes zählen. Die Antwort trägt `gesamt`, `offen` (Anrufe im Status `offen`) und
+`je_anliegen` mit einem Wert für **jedes** der sieben Anliegen. Ein Anliegen ohne Anruf MUST als
+0 erscheinen und DARF NICHT fehlen. Die Summe über `je_anliegen` MUST `gesamt` ergeben. Die
+Zählung hat dasselbe Gate wie die Liste.
+
+#### Scenario: Ungefilterte Zählung
+- **WHEN** ein Einsatz 3 Anrufe „Auskunft zur Lage“, davon 1 offen, und 1 Anruf „Hinweis“ hat
+- **THEN** antwortet die Zählung mit `gesamt: 4`, `offen: 1`, `je_anliegen.auskunft_lage: 3`,
+  `je_anliegen.hinweis: 1` und 0 für die übrigen fünf Anliegen
+
+#### Scenario: Mehr Anrufe als eine Seite
+- **WHEN** ein Einsatz 2 000 Anrufe hat
+- **THEN** ist `gesamt` 2 000, nicht die Seitengröße der Liste
+
+#### Scenario: Andere Einsätze zählen nicht mit
+- **WHEN** ein anderer Einsatz Anrufe hat
+- **THEN** sind diese in der Zählung dieses Einsatzes nicht enthalten
+
+#### Scenario: Informationstelefon gesperrt
+- **WHEN** eine Person ohne Freigabe des Moduls Informationstelefon die Zählung abruft
+- **THEN** antwortet das System wie bei der Liste mit 403
+
+## REMOVED Requirements
+
+### Requirement: Zählung der Anrufe
+**Reason**: Das Informationstelefon ist ein eigenes Modul `infotelefon` statt einer Unterseite des Stabs (LLH-722; design.md D3). Das Szenario „Stab gesperrt“ nennt das entfallene Modul, und OpenSpec erlaubt nicht, es in einem MODIFIED-Block umzubenennen.
+**Migration**: Die Zählung gilt unverändert unter „Zählung der Anrufe unter der Freigabe des Informationstelefons“; das Gate ist das Modul Informationstelefon.

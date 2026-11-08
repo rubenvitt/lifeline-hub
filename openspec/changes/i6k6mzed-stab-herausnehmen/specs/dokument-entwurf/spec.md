@@ -14,7 +14,15 @@ Abschnitt) daneben tragen.
 - **THEN** stehen Gliederung, Umschalter „Bearbeiten | Lesefassung“ und die Abschnitte in
   derselben Anordnung und Bedienung
 
+## REMOVED Requirements
+
 ### Requirement: Rückfrage vor dem Verlassen eines Entwurfs
+**Reason**: Das Modul Stab samt Presse und Medienarbeit (S5) entfällt (LLH-722, Entscheidung 08.11.2026; design.md D1). Die Pressemitteilung ist keine Dokumentart mehr; das Szenario „Pressemitteilung über die Brotkrume verlassen“ hätte keinen Gegenstand, und OpenSpec erlaubt nicht, es in einem MODIFIED-Block wegzulassen.
+**Migration**: Die Rückfrage gilt unverändert für Lagebericht und Befehl unter „Rückfrage vor dem Verlassen eines Lagebericht- oder Befehlsentwurfs“.
+
+## ADDED Requirements
+
+### Requirement: Rückfrage vor dem Verlassen eines Lagebericht- oder Befehlsentwurfs
 
 Hat ein Lagebericht- oder Befehlsentwurf eine ungespeicherte Fassung und die Person Schreibrecht, SHALL jeder Wechsel auf einen anderen Pfad in der App (Brotkrume, Seitenmenü,
 Link, Browser-Zurück) angehalten werden. Beide Seiten SHALL dieselbe Rückfrage „Ungespeicherte

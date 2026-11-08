@@ -1,8 +1,14 @@
 # Spec Delta
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Eintragstitel als Überschrift nur bei eigenständigen Gegenständen
+**Reason**: Das Modul Stab samt Presse und Medienarbeit (S5) entfällt (LLH-722, Entscheidung 08.11.2026; design.md D1). Die Szenarien „Stab und Presse“ und „Kacheln der Stab-Seite“ nennen Presse- und Stab-Seite; OpenSpec erlaubt nicht, sie in einem MODIFIED-Block wegzulassen oder umzubenennen.
+**Migration**: Die Regel gilt unverändert unter „Nur eigenständige Gegenstände tragen ihren Eintragstitel als Überschrift“; der Verlauf der Lagebesprechungen bleibt als Beispiel.
+
+## ADDED Requirements
+
+### Requirement: Nur eigenständige Gegenstände tragen ihren Eintragstitel als Überschrift
 
 Ein Eintragstitel SHALL nur dann eine Überschrift sein, wenn der Eintrag ein eigener Gegenstand
 mit Inhalt darunter ist, zwischen dem jemand springen will. Bei Auswahl-, Einstellungs- und

@@ -104,7 +104,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
   - `AUSNAHMEN_SYSTEM_ETB` in `tests/aufbewahrung_e2e.rs` bereinigen
   - Ein neues Ersuchen mit Ziel `medienkontakt` ergibt 422, ein altes bleibt lesbar (neuer Test in `tests/aufbewahrung*.rs`)
 
-  Grün sind `jede_einsatz_scoped_spalte_ist_klassifiziert`, `keine_toten_registry_eintraege`, `entdeckte_tabellen_gleich_registry_tabellen` und `purge_scheduler`-Tests.
+  Grün sind `jede_einsatz_scoped_spalte_ist_klassifiziert`, `keine_toten_registry_eintraege`, `entdeckte_tabellen_gleich_registry_tabellen` und `purge_scheduler`-Tests. Den Verweis in `src/einsatz/schwaerzung_person_tests.rs:521` auf die neue Requirement „Vollzug für eine Betroffene, externe Kraft oder anrufende Person“ umstellen.
 - [ ] 6.4 Typ-Codegen (Stab-, Checklisten-, Presse-Schemas entfallen, `LiveEvent` ohne `stab`/`presse`) mitcommittet. `tests/enum_wire_kontrakt.rs` und `liveEvent.contract.test.ts` sind grün.
 - [ ] 6.5 Frontend löschen:
   - `pages/{Stab,Presse,PressemitteilungDetail}Page*`, `presse/`, restliches `stab/`
@@ -163,6 +163,6 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## Workflow follow-up
 
-- `/opsx:archive i6k6mzed-stab-herausnehmen` im selben Branch vor dem PR, Spec-Sync und Verweise eingeschlossen. Die Specs `stab-uebersicht`, `stab-checkliste`, `stab-presse-log`, `stab-pressemitteilung` und `stab-medienlage` sind danach leer und werden entfernt.
+- `/opsx:archive i6k6mzed-stab-herausnehmen` im selben Branch vor dem PR, Spec-Sync und Verweise eingeschlossen. Die Specs `stab-uebersicht`, `stab-checkliste`, `stab-presse-log`, `stab-pressemitteilung` und `stab-medienlage` sind danach leer und werden entfernt (`retire_capabilities: true` in `.openspec.yaml`).
 - Beim Archivieren die `## Purpose`-Texte von Hand berichtigen, weil ein Delta sie nicht ändert: `stab-infotelefon` („des Sachgebiets S5“), `dokument-entwurf` (Pressemitteilung), `nachforderungen-board` („Stab-Seite“), `lage-verdichtung` („der Stab“).
 - PR gegen `alpha` mit Bildern. Board-Status `review`, `pr_url` und `release_task`.

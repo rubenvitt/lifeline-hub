@@ -1,29 +1,41 @@
 # Spec Delta
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Ausgewählte Einsatzdaten bleiben ohne Netz lesbar
+**Reason**: Das Modul Stab samt Presse und Medienarbeit (S5) entfällt (LLH-722, Entscheidung 08.11.2026; design.md D1). Das Szenario „Kommunikationsplan ohne Stab“ setzt ein ausblendbares Modul Stab voraus; der Kommunikationsplan hängt nur noch am Fernmeldewesen. OpenSpec erlaubt nicht, das Szenario in einem MODIFIED-Block wegzulassen.
+**Migration**: Das Verhalten gilt unverändert unter „Ausgewählte Einsatzansichten und ihre Rahmendaten bleiben ohne Netz lesbar“. Die Beschreibung ist gekürzt; Umfang je Ansicht und Rahmendaten stehen dort als Szenarien.
 
-Das System SHALL die zuletzt erfolgreich geladenen Daten folgender Ansichten eines Einsatzes
-geräteseitig vorhalten und nach einem Neuladen ohne Netz anzeigen:
+## ADDED Requirements
 
-- **ETB** mit Einträgen und Anzahl, in seinen festen Ansichten: Gesamtliste, Typ-Reiter und die
-  festen Ausschnitte anderer Seiten (Überblick, Lage-Dashboard)
-- **Meldebild** mit Einheiten, Personal, Fahrzeugen, Material, Abschnitten, Aufträgen und
+### Requirement: Ausgewählte Einsatzansichten und ihre Rahmendaten bleiben ohne Netz lesbar
+
+Das System SHALL die zuletzt erfolgreich geladenen Daten der Ansichten ETB, Meldebild,
+Betroffene, Aufträge, Lagekarte, Bereitstellungsräume (nur die Liste), Kommunikationsplan und
+Eingänge eines Einsatzes geräteseitig vorhalten und nach einem Neuladen ohne Netz anzeigen,
+dazu die Rahmendaten, ohne die diese Ansichten nicht darstellbar sind. Vorgehalten wird nur,
+was die Person zuvor mit Netz tatsächlich geladen hat.
+
+#### Scenario: Umfang je Ansicht
+
+- **WHEN** eine Person die ausgewählten Ansichten eines Einsatzes mit Netz geladen hat und ohne
+  Netz neu lädt
+- **THEN** zeigt das ETB Einträge und Anzahl in seinen festen Ansichten: Gesamtliste, Typ-Reiter
+  und die festen Ausschnitte anderer Seiten (Überblick, Lage-Dashboard)
+- **AND** zeigt das Meldebild Einheiten, Personal, Fahrzeuge, Material, Abschnitte, Aufträge und
   Rückmeldungen
-- **Betroffene** mit Personen und Unfallhilfsstellen
-- **Aufträge** mit Aufträgen und Befehlen
-- **Lagekarte** mit den Datenebenen des Einsatzes
-- **Bereitstellungsräume** als Liste mit Status, Standort und Belegung; die Seite eines
-  einzelnen Raums nicht
-- **Kommunikationsplan** mit den gepflegten Stellen und Verbindungen des Fernmeldewesens
-- **Eingänge** mit dem Verlauf der eigenen Benachrichtigungen (Spec `benachrichtigungen`,
-  „Verlauf ohne Netz“)
+- **AND** zeigen Betroffene ihre Personen und Unfallhilfsstellen, Aufträge ihre Aufträge und
+  Befehle und die Lagekarte die Datenebenen des Einsatzes
+- **AND** zeigen die Bereitstellungsräume ihre Liste mit Status, Standort und Belegung, der
+  Kommunikationsplan die gepflegten Stellen und Verbindungen des Fernmeldewesens und die
+  Eingänge den Verlauf der eigenen Benachrichtigungen (Spec `benachrichtigungen`, „Verlauf ohne
+  Netz“)
 
-Dazu SHALL das System die Rahmendaten vorhalten, ohne die diese Ansichten nicht darstellbar
-sind: Einsatzkopf, Modulfreigaben, Einsatzeinstellungen, Modulzähler, Einsatzliste,
-Kartenkonfiguration, Organisation und Fahrzeugstatus-Katalog. Vorgehalten wird nur, was die
-Person zuvor mit Netz tatsächlich geladen hat.
+#### Scenario: Rahmendaten
+
+- **WHEN** eine Person eine ausgewählte Ansicht mit Netz geladen hat und ohne Netz neu lädt
+- **THEN** stehen Einsatzkopf, Modulfreigaben, Einsatzeinstellungen, Modulzähler, Einsatzliste,
+  Kartenkonfiguration, Organisation und Fahrzeugstatus-Katalog im zuletzt geladenen Stand bereit
 
 #### Scenario: Neuladen ohne Netz zeigt den letzten Stand
 

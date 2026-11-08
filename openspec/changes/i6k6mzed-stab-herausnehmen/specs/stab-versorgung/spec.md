@@ -1,8 +1,14 @@
 # Spec Delta
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Jeder Versorgungsbereich hat genau einen Träger
+**Reason**: Das Modul Stab samt Presse und Medienarbeit (S5) entfällt (LLH-722, Entscheidung 08.11.2026; design.md D1). Mit der Stabseite entfällt ihre Zeile S4; das Szenario „S4 führt die Träger“ hat keinen Gegenstand, und OpenSpec erlaubt nicht, es in einem MODIFIED-Block wegzulassen.
+**Migration**: Die Zuordnung der Versorgungsbereiche gilt unverändert unter „Versorgungsbereiche liegen bei Verpflegung, Nachforderungen und Material“, ohne Zeile S4.
+
+## ADDED Requirements
+
+### Requirement: Versorgungsbereiche liegen bei Verpflegung, Nachforderungen und Material
 
 Jeder Versorgungsbereich von S4 SHALL genau einem bestehenden Modul zugeordnet sein:
 

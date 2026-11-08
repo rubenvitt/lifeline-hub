@@ -31,14 +31,21 @@ Archivakte mit Zielart, Kennung, Aktenzeichen und Stand lesbar bleiben.
 - **WHEN** ein Einsatz vor dem Update einen vollzogenen Antrag für einen Medienkontakt trug und der Admin die Archivakte öffnet
 - **THEN** steht der Antrag mit Zielart Medienkontakt, Kennung, Aktenzeichen und Stand in der Liste der Anträge
 
+## REMOVED Requirements
+
 ### Requirement: Vollzug für eine Person
+**Reason**: Das Modul Stab samt Presse und Medienarbeit (S5) entfällt (LLH-722, Entscheidung 08.11.2026; design.md D1). Mit ihm entfallen die Personenart Medienkontakt (design.md D4) und die Stabsfunktion; das Szenario „Anrufende Person und Ansprechperson“ trägt beide noch, und OpenSpec erlaubt nicht, es in einem MODIFIED-Block wegzulassen.
+**Migration**: Das Verhalten gilt weiter unter „Vollzug für eine Betroffene, externe Kraft oder anrufende Person“, ohne Medienkontakt und Stabsfunktion. Ein alter Antrag für einen Medienkontakt bleibt nach „Ziel eines Antrags“ lesbar.
+
+## ADDED Requirements
+
+### Requirement: Vollzug für eine Betroffene, externe Kraft oder anrufende Person
 
 Der Vollzug eines Personen-Antrags SHALL genau die Werte entfernen, die die Klassifikation für
 die Personenart dieser Person als personengebunden führt, und nur in den Zeilen, die über ihren
-Bezug zu dieser Person gehören. Die Werte anderer Personen MUST unverändert bleiben. Erhalten
-bleiben MUST Registriernummer, Status, Kategorien, Zeitpunkte und Verweise. Die physische
-Entfernung MUST wie bei der Einsatz-Schwärzung erfolgen. Fotos und Dateien, die an der Person
-abgelegt sind, MUST samt gespeicherter Datei gelöscht werden, auch bereits entfernte.
+Bezug zu dieser Person gehören. Die Werte anderer Personen MUST unverändert bleiben. Die
+physische Entfernung MUST wie bei der Einsatz-Schwärzung erfolgen. Fotos und Dateien, die an der
+Person abgelegt sind, MUST samt gespeicherter Datei gelöscht werden, auch bereits entfernte.
 
 #### Scenario: Betroffene Person
 - **WHEN** der Antrag für die Betroffene `R-042` mit Sichtung, Verlaufsnotiz, Verbleib, einem Tier als Halterin und einem Schaden als Geschädigte vollzogen wird
@@ -65,3 +72,7 @@ abgelegt sind, MUST samt gespeicherter Datei gelöscht werden, auch bereits entf
 - **WHEN** ein Antrag für einen Anruf am Informationstelefon vollzogen wird
 - **THEN** fehlen Name, Rückrufnummer und Notiz des Anrufs
 - **AND** bleiben Anliegen, Status und Zeitpunkte erhalten
+
+#### Scenario: Ordnende Werte bleiben
+- **WHEN** der Antrag für eine Person vollzogen wird
+- **THEN** behalten ihre Zeilen Registriernummer, Status, Kategorien, Zeitpunkte und Verweise

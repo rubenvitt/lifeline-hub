@@ -52,50 +52,6 @@ Organisation folgen; eine Vorlage blendet nie ein.
 - **WHEN** ein Einsatz mit einer Vorlage angelegt wird, die `infotelefon` ausblendet
 - **THEN** liefert `GET /api/einsaetze/{id}/modul-overrides` für `infotelefon` `sichtbar: false`, und der Eintrag `infotelefon` der Freigaben lautet `sichtbar: false`
 
-### Requirement: Eine Modulroute ohne Zugriff zeigt einen einheitlichen Hinweis
-Öffnet ein Benutzer eine Route, die zu einem Modul gehört, und melden die Freigaben des Servers
-für dieses Modul `zugriff: false`, MUST der Einsatzrahmen statt der Modulseite einen
-einheitlichen Hinweis zeigen. Das gilt für die Modulroute und für jede ihrer Unterrouten. Der
-Hinweis MUST das Modul nennen und den Grund angeben. Bei `sichtbar: false` lautet er
-„ausgeblendet“, sonst „für deine Rolle nicht freigegeben“. Er MUST einen Rückweg in ein Modul
-anbieten, das für den Benutzer frei ist. Die Modulseite MUST dabei nicht gerendert werden und
-MUST keine Anfrage an den Listen-Endpunkt des Moduls stellen. Die Navigation des Einsatzes bleibt
-bedienbar. Solange die Freigaben laden, MUST der Rahmen statt der Modulseite einen Ladezustand
-zeigen; für `einsatzdaten` und `einsatz-einstellungen` gilt das nicht. Ist ihr Abruf gescheitert
-oder ruht er ohne Netz, MUST der Rahmen die Modulseite unverändert rendern.
-
-#### Scenario: Deeplink in ein gesperrtes Modul
-- **WHEN** die Org-Vorgabe das Modul `lagemeldungen` auf Führungskräfte beschränkt und ein normales Mitglied `/einsaetze/:id/lagemeldungen` direkt aufruft
-- **THEN** zeigt der Inhaltsbereich den Hinweis mit „Lagemeldungen“ und „Keine Berechtigung“, es geht keine Anfrage an die Liste der Lagemeldungen, und die Navigation steht daneben
-
-#### Scenario: Unterroute eines gesperrten Moduls
-- **WHEN** das Modul `fernmeldewesen` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/fernmeldewesen/kommunikationsplan` aufruft
-- **THEN** zeigt der Rahmen denselben Hinweis für „Fernmeldewesen“
-
-#### Scenario: Altadresse eines gesperrten Moduls
-- **WHEN** das Modul `infotelefon` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/stab/infotelefon` aufruft
-- **THEN** zeigt der Rahmen denselben Hinweis für „Informationstelefon“
-
-#### Scenario: Ausgeblendetes Modul
-- **WHEN** der Einsatz das Modul `meldungen` ausblendet und ein Mitglied ohne Admin-Rechte dessen Route aufruft
-- **THEN** nennt der Hinweis das Modul als ausgeblendet
-
-#### Scenario: System-Admin in einem ausgeblendeten Modul
-- **WHEN** der Einsatz das Modul `meldungen` ausblendet und ein System-Admin dessen Route aufruft
-- **THEN** rendert der Rahmen die Modulseite, weil `zugriff: true` gilt
-
-#### Scenario: Freigaben laden noch
-- **WHEN** ein Benutzer eine Modulroute öffnet und die Freigaben noch nicht geantwortet haben
-- **THEN** zeigt der Rahmen einen Ladezustand, rendert die Modulseite noch nicht und zeigt keinen Hinweis
-
-#### Scenario: Freigaben gescheitert
-- **WHEN** der Abruf der Freigaben scheitert
-- **THEN** rendert der Rahmen die Modulseite wie bisher
-
-#### Scenario: Rückweg
-- **WHEN** der Hinweis erscheint
-- **THEN** führt sein Rückweg in ein Modul, für das der Benutzer `zugriff: true` hat, notfalls in die Einsatzdaten
-
 ### Requirement: Ein Einsatz-Override kann die Sichtbarkeit offen lassen
 Der Schreibweg eines Modul-Overrides im Einsatz MUST für `sichtbar` die Werte `true`, `false` und
 `null` annehmen. `null` MUST bedeuten, dass der Einsatz die Sichtbarkeit erbt. Das Lesen der
@@ -265,3 +221,61 @@ weiter auf ihr Modul.
 #### Scenario: Lesezeichen auf die Pressearbeit
 - **WHEN** eine Person mit Lesezugriff `/einsaetze/7/stab/presse` aufruft
 - **THEN** zeigt die App den Einsatz 7 und nicht die Einsatzliste
+
+### Requirement: Modulroute, Unterroute und Altadresse ohne Zugriff zeigen einen einheitlichen Hinweis
+
+Öffnet ein Benutzer eine Route, die zu einem Modul gehört, oder eine ihrer Unterrouten, und
+melden die Freigaben des Servers für dieses Modul `zugriff: false`, MUST der Einsatzrahmen statt
+der Modulseite einen einheitlichen Hinweis zeigen. Die Modulseite MUST dabei nicht gerendert
+werden und MUST keine Anfrage an den Listen-Endpunkt des Moduls stellen. Die Navigation des
+Einsatzes bleibt bedienbar.
+
+#### Scenario: Deeplink in ein gesperrtes Modul
+- **WHEN** die Org-Vorgabe das Modul `lagemeldungen` auf Führungskräfte beschränkt und ein normales Mitglied `/einsaetze/:id/lagemeldungen` direkt aufruft
+- **THEN** zeigt der Inhaltsbereich den Hinweis mit „Lagemeldungen“ und „Keine Berechtigung“, es geht keine Anfrage an die Liste der Lagemeldungen, und die Navigation steht daneben
+
+#### Scenario: Unterroute eines gesperrten Moduls
+- **WHEN** das Modul `fernmeldewesen` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/fernmeldewesen/kommunikationsplan` aufruft
+- **THEN** zeigt der Rahmen denselben Hinweis für „Fernmeldewesen“
+
+#### Scenario: Altadresse eines gesperrten Moduls
+- **WHEN** das Modul `infotelefon` für den Benutzer `zugriff: false` hat und er `/einsaetze/:id/stab/infotelefon` aufruft
+- **THEN** zeigt der Rahmen denselben Hinweis für „Informationstelefon“
+
+#### Scenario: Ausgeblendetes Modul
+- **WHEN** der Einsatz das Modul `meldungen` ausblendet und ein Mitglied ohne Admin-Rechte dessen Route aufruft
+- **THEN** nennt der Hinweis das Modul als ausgeblendet
+
+#### Scenario: System-Admin in einem ausgeblendeten Modul
+- **WHEN** der Einsatz das Modul `meldungen` ausblendet und ein System-Admin dessen Route aufruft
+- **THEN** rendert der Rahmen die Modulseite, weil `zugriff: true` gilt
+
+#### Scenario: Freigaben laden noch
+- **WHEN** ein Benutzer eine Modulroute öffnet und die Freigaben noch nicht geantwortet haben
+- **THEN** zeigt der Rahmen einen Ladezustand, rendert die Modulseite noch nicht und zeigt keinen Hinweis
+
+#### Scenario: Freigaben gescheitert
+- **WHEN** der Abruf der Freigaben scheitert
+- **THEN** rendert der Rahmen die Modulseite wie bisher
+
+#### Scenario: Rückweg
+- **WHEN** der Hinweis erscheint
+- **THEN** führt sein Rückweg in ein Modul, für das der Benutzer `zugriff: true` hat, notfalls in die Einsatzdaten
+
+#### Scenario: Grund im Hinweis
+- **WHEN** der Hinweis für ein Modul erscheint, das sichtbar, aber für die Rolle des Benutzers gesperrt ist
+- **THEN** nennt er das Modul und als Grund „für deine Rolle nicht freigegeben“; bei `sichtbar: false` lautet der Grund „ausgeblendet“
+
+#### Scenario: Einsatzdaten und Einsatzeinstellungen ohne Ladezustand
+- **WHEN** ein Benutzer `einsatzdaten` oder `einsatz-einstellungen` öffnet und die Freigaben noch nicht geantwortet haben
+- **THEN** zeigt der Rahmen für sie keinen Ladezustand
+
+#### Scenario: Freigaben ruhen ohne Netz
+- **WHEN** der Abruf der Freigaben ohne Netz ruht
+- **THEN** rendert der Rahmen die Modulseite unverändert
+
+## REMOVED Requirements
+
+### Requirement: Eine Modulroute ohne Zugriff zeigt einen einheitlichen Hinweis
+**Reason**: Das Modul Stab samt Presse und Medienarbeit (S5) entfällt (LLH-722, Entscheidung 08.11.2026; design.md D1). Das Szenario „Unterroute eines gesperrten Stabs“ setzt den Modul-Key `stab` voraus; an seine Stelle tritt die Altadresse des Informationstelefons (design.md D3, D8). OpenSpec erlaubt nicht, das Szenario in einem MODIFIED-Block wegzulassen oder umzubenennen.
+**Migration**: Das Verhalten gilt unverändert unter „Modulroute, Unterroute und Altadresse ohne Zugriff zeigen einen einheitlichen Hinweis“. Die Beschreibung ist gekürzt; Grund, Rückweg, Ladezustand und Rückfall stehen dort als Szenarien.
