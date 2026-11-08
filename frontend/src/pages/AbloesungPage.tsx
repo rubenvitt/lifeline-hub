@@ -37,6 +37,7 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import SchichtplanAnsicht from '../abloesung/schichtplan/SchichtplanAnsicht';
+import SchichtplanAusgabeKnoepfe from '../abloesung/schichtplan/ausgabe/SchichtplanAusgabeKnoepfe';
 import SchichtplanEinlesen from '../abloesung/schichtplan/SchichtplanEinlesen';
 import {
   AbloeserDialog,
@@ -929,7 +930,10 @@ export default function AbloesungPage() {
           darfSchreiben={darfSchreiben}
           abschnitte={vorgaben}
           werkzeuge={
-            darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null
+            <>
+              {darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null}
+              <SchichtplanAusgabeKnoepfe einsatzId={einsatzId} />
+            </>
           }
         />
       ) : wirksam === 'ohne-schicht' ? (
