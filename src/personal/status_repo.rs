@@ -138,16 +138,22 @@ pub async fn patche(
 ) -> Result<PersonalStatus, AppError> {
     let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     if patch.pause == Some(true) {
-        let eigen: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM personal_status WHERE id = ? AND org_id = ?")
+        // Nur ein aktiver Status trägt „Pause“: sonst verlöre die Org ihr Kennzeichen still.
+        let aktiv: Option<bool> =
+            sqlx::query_scalar("SELECT aktiv FROM personal_status WHERE id = ? AND org_id = ?")
                 .bind(id)
                 .bind(org_id)
                 .fetch_optional(&mut *tx)
                 .await?;
-        if eigen.is_none() {
-            return Err(AppError::NotFound);
+        match aktiv {
+            None => return Err(AppError::NotFound),
+            Some(false) => {
+                return Err(AppError::UnprocessableEntity(
+                    "Ein deaktivierter Status kann nicht „Pause“ sein.".into(),
+                ))
+            }
+            Some(true) => pause_abgeben_tx(&mut tx, org_id).await?,
         }
-        pause_abgeben_tx(&mut tx, org_id).await?;
     }
     let ergebnis = sqlx::query(
         "UPDATE personal_status SET \
@@ -487,5 +493,46 @@ mod tests {
             laden(&pool, 2, s.id).await.unwrap_err(),
             AppError::NotFound
         ));
+    }
+
+    #[tokio::test]
+    async fn pause_auf_deaktiviertem_status_ist_422_und_laesst_kennzeichen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let pause = anlegen(
+            &pool,
+            1,
+            StatusDaten {
+                pause: true,
+                ..daten("Rast", KATEGORIE_GEBUNDEN, 10)
+            },
+        )
+        .await
+        .unwrap();
+        let alt = anlegen(&pool, 1, daten("alt", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        deaktivieren(&pool, 1, alt.id).await.unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                1,
+                alt.id,
+                StatusPatch {
+                    pause: Some(true),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
+        let mut conn = pool.acquire().await.unwrap();
+        let jetzt = pause_status_tx(&mut conn, 1).await.unwrap();
+        assert_eq!(
+            jetzt.map(|(id, _)| id),
+            Some(pause.id),
+            "Kennzeichen bleibt"
+        );
     }
 }
