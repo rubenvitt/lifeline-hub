@@ -144,7 +144,7 @@ pub fn pruefe_zeitraum(von: &str, bis: &str) -> Result<(), AppError> {
     let (a, b) = (utc(von)?, utc(bis)?);
     if b <= a {
         return Err(AppError::Validation(
-            "Das Ende liegt nach dem Beginn".into(),
+            "Das Ende muss nach dem Beginn liegen".into(),
         ));
     }
     if b - a > Duration::days(ZEITRAUM_MAX_TAGE) {
