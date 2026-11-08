@@ -245,8 +245,9 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
 ## Checkpoints & Entscheidungen
 
-- **Zwei Halte immer:** nach Phase 1 (Lösungsweg gemeinsam ausarbeiten) und nach Phase 2
-  (Freigabe der Changes). Weitere Checkpoints sparsam, nur wenn eine Phase eine Unklarheit,
+- **Zwei feste Halte:** nach Phase 1 (Lösungsweg gemeinsam ausarbeiten; entfällt nur, wenn alle
+  Tasks auf `trivial` stehen) und nach Phase 2 (Freigabe, sobald dort eine Change entstanden ist).
+  Weitere Checkpoints sparsam, nur wenn eine Phase eine Unklarheit,
   einen Konflikt oder mehrere vertretbare Optionen aufwirft; sonst kurz zusammenfassen und
   weiterlaufen.
 - **Optionen anbieten, nicht offene Fragen stellen.** Wenn du fragst, leg konkrete Optionen

@@ -89,7 +89,7 @@ sagt, **wann** welcher Status gilt; `dev-zunder-orchestrieren` verweist hierher.
 | Branch steht (Schritt 2) | — | `branch` |
 | Route gewählt (Schritt 3) | — | `plan`: Route, bei `entwurf` der Change-Name |
 | Lösungsweg liegt zur Abstimmung vor („Gemeinsam ausarbeiten“) | `blocked` | Kommentar: was zur Entscheidung steht |
-| Lösungsweg abgestimmt | `in_progress` | `plan`: der abgestimmte Weg |
+| Mensch stimmt dem Lösungsweg zu | `in_progress` | `plan`: der abgestimmte Weg |
 | Change liegt zur Freigabe vor (Route `entwurf`) | `blocked` | `plan`: „Change `<name>` wartet auf Freigabe“ |
 | Freigabe erteilt, `/opsx:apply` beginnt | `in_progress` | `plan` nachziehen |
 | PR gegen `alpha` offen (Schritt 4) | `review` | `pr_url` |
@@ -176,8 +176,9 @@ nach eigener Empfehlung losbauen, auch wenn der Weg klar scheint.
 - **Was du vorlegst, kurz:** was sich aus Bediensicht ändert, die Varianten mit Empfehlung und
   Begründung, die offenen Fragen. Fragen mit konkreten Optionen stellen, nicht offen, und
   gesammelt statt einzeln nacheinander. Bei `bug-unklar` kommt die gefundene Ursache dazu.
-- **Währenddessen** steht der Task auf `blocked` (Tabelle „Board-Status mitführen“). Mit der
-  Antwort zurück auf `in_progress`, der abgestimmte Weg kommt in `plan`.
+- **Währenddessen** steht der Task auf `blocked` (Tabelle „Board-Status mitführen“). Erst mit
+  der Zustimmung zurück auf `in_progress`, der abgestimmte Weg kommt in `plan`. Eine Rückfrage
+  oder ein anderer Wunsch lässt ihn auf `blocked`, bis ihr euch einig seid.
 - **Route `entwurf`:** Die Abstimmung liegt **vor** `/opsx:propose`, damit die Change schon den
   gemeinsamen Weg beschreibt. Der Freigabe-Checkpoint danach bleibt unverändert Pflicht.
 - **Ändert sich der Weg beim Bauen** (neue Variante, verworfene Annahme, größerer Schnitt),
@@ -284,7 +285,8 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 **Festlegung des Users vom 08.11.2026: „am Ende Screenshots, damit ich verstehe, was gemacht
 wurde“.** Jede Entwicklung endet mit Bildern der geänderten Stellen, und zwar an zwei Orten:
 im PR (Abschnitt „Bilder“ der Vorlage) und in der Meldung an den Menschen, sobald der PR offen
-ist.
+ist. Die Abschlussmeldung nach dem Merge zeigt dann keine neuen Bilder mehr, außer der PR hat
+die sichtbare Wirkung seither geändert.
 
 - **Was:** jede sichtbar geänderte Stelle im echten Zustand, mit den Daten, an denen der
   Unterschied auffällt. Vorher und nachher nebeneinander, wo sich Bestehendes ändert. Weitere
@@ -296,7 +298,10 @@ ist.
   (`anmelden`, `uhrAnhalten`, `demoEinsatz`, `fuelle`), aber `page.screenshot`/
   `locator.screenshot` mit Pfad **außerhalb** von `docs/anwender/bilder/`. Lauf in `frontend/`:
   `mise exec -- pnpm exec playwright test -c playwright.doku.config.ts e2e/doku-bilder/zz-<kurz>.bilder.ts`.
-  Die Demo-Daten sind dort schon eingespielt. Für Druckansichten
+  Der Lauf startet das Backend-Binary, baut es aber nicht: vorher `cargo build` im
+  Repo-Wurzelverzeichnis auf dem Stand des Branches, sonst zeigen die Bilder ein altes Backend
+  (bei gesetztem `PW_BINAER` muss dieses Binary zum Stand passen). Die Demo-Daten sind dort
+  schon eingespielt. Für Druckansichten
   `page.emulateMedia({ media: 'print' })`, sonst verdecken Kopfleiste und Devtools-Knopf das Bild.
   Danach die Spec löschen.
 - **Im PR:** GitHub nimmt Bilder nicht per API an. Deshalb die Bilder in einem eigenen Commit
