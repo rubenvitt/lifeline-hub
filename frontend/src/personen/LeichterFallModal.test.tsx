@@ -155,7 +155,7 @@ describe('LeichterFallModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lagerung' }));
     await userEvent.click(screen.getByRole('button', { name: 'Wundversorgung' }));
     await userEvent.click(screen.getByRole('button', { name: 'Kühlung' }));
-    expect(screen.getByRole('button', { name: 'Betreuung/Gespräch' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Betreuung / Gespräch' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Kühlung' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('radio', { name: 'Hitze / Kälte' }));
     await userEvent.click(screen.getByRole('button', { name: 'Entlassen' }));

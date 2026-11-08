@@ -213,7 +213,7 @@ export const MASSNAHME_WORT: Record<MassnahmeArt, string> = {
   wundversorgung: 'Wundversorgung',
   kuehlung: 'Kühlung',
   lagerung: 'Lagerung',
-  betreuung_gespraech: 'Betreuung/Gespräch',
+  betreuung_gespraech: 'Betreuung / Gespräch',
 };
 
 /** Feste Folge der Maßnahmen in der Wahl: die Katalogfolge der Spec. */

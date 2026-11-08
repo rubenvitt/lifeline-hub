@@ -111,7 +111,7 @@ Kürzel für den Anlass der Hilfeleistung: „!verl“, „!intern“, „!neuro
 „!kaelte“), „!allergie“ (auch „!stich“), „!psych“ und „!sonst“.
 
 Für einen leichten Fall kommen Maßnahmen mit „+“ dazu, etwa „+kuehl“, „+wunde“, „+lager“, „+betr“
-(Betreuung/Gespräch), „+waerme“ oder „+o2“, und „>entl“ für „versorgt und entlassen“: „!hitze +kuehl
+(Betreuung / Gespräch), „+waerme“ oder „+o2“, und „>entl“ für „versorgt und entlassen“: „!hitze +kuehl
 >entl“ legt die Person wie der Dialog „Versorgt und entlassen“ an. Zu „>entl“ gehört ein Anlass.
 
 ### In der Liste nachsichten und Lücken schließen
