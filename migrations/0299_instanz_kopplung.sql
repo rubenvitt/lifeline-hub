@@ -90,7 +90,7 @@ CREATE TABLE instanz_jti (
     jti      TEXT NOT NULL,
     bis      TEXT NOT NULL,
     PRIMARY KEY (absender, jti)
-) WITHOUT ROWID;
+);
 
 -- Unterschriftsschlüssel der Org-Admins (design.md D7, Spec org-admin-unterschrift). Getrennt von
 -- `webauthn_credential`: der Anmeldeweg liest diese Tabelle nie. `herkunft = lokal`: hier
