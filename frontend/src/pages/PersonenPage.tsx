@@ -18,6 +18,7 @@ import {
   listePersonen,
   registrierAnzeige,
   schlageAbgleichVor,
+  type PersonAnlegenEingabe,
 } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeUhs } from '../api/einsatzUhs';
@@ -57,7 +58,7 @@ import {
 import { hatLuecke, istAbgeschlossen } from '../personen/personenBilanz';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
-import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
+import LeichterFallModal, { LEICHTER_FALL_TITEL } from '../personen/LeichterFallModal';
 import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
@@ -303,6 +304,11 @@ export default function PersonenPage() {
   const [maskeFehler, setMaskeFehler] = useState<{ einsatzId: number; fehler: unknown } | null>(
     null,
   );
+  /** Dialog „Versorgt und entlassen“ (LLH-1572) je Einsatz offen, mit eigenem Grund. */
+  const [leichterFallFuer, setLeichterFallFuer] = useState<number | null>(null);
+  const [leichtFehler, setLeichtFehler] = useState<{ einsatzId: number; fehler: unknown } | null>(
+    null,
+  );
   const abgleichZeilen = useZeilenFehler<number>();
   /*
    * Zeilenaktionen (LLH-1130, design.md D4/D5): die Nachsichtung aus der Zelle meldet ihren Grund an
@@ -369,18 +375,23 @@ export default function PersonenPage() {
     mutationFn: async (v: {
       benutzerId: number;
       einsatzId: number;
-      daten: AufnahmeEingabe;
+      daten: PersonAnlegenEingabe;
       folgeStatus?: 'vermisst';
-      /** Die Zeile quittiert an sich selbst („Zuletzt: …") und meldet Fehler an sich selbst. */
-      quelle: 'maske' | 'zeile';
+      /**
+       * Die Zeile quittiert an sich selbst („Zuletzt: …") und meldet Fehler an sich selbst; der
+       * leichte Fall (LLH-1572) hat seinen eigenen Dialog.
+       */
+      quelle: 'maske' | 'zeile' | 'leicht';
     }) => {
       return erfassePersonOfflineFaehig(v.benutzerId, v.einsatzId, {
         ...v.daten,
-        status: v.folgeStatus ?? 'erfasst',
+        // Ein leichter Fall bringt `betroffen` mit (design.md D5), die Maske legt `erfasst` an.
+        status: v.folgeStatus ?? v.daten.status ?? 'erfasst',
       });
     },
     onMutate: async (v) => {
       if (v.quelle === 'maske') setMaskeFehler(null);
+      if (v.quelle === 'leicht') setLeichtFehler(null);
       await qc.cancelQueries({ queryKey: einsatzKeys.personen(v.einsatzId) });
     },
     // Geschlossen wird über `onFertig` des Erfassungs-Primitivs: im Serienmodus ist ein
@@ -431,9 +442,12 @@ export default function PersonenPage() {
           typ: 'success',
           // Die Sichtung kommt aus der Antwort, nicht aus den gesendeten Werten: nur die Antwort
           // belegt, dass sie angekommen ist; ein 422 hätte sie verworfen.
-          text: person.aktuelle_sichtung
-            ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
-            : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
+          text:
+            variablen.quelle === 'leicht'
+              ? `Entlassen als ${registrierAnzeige(person.registrier_nr)}`
+              : person.aktuelle_sichtung
+                ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
+                : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
           benutzerId: variablen.benutzerId,
         });
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(zielEinsatzId) });
@@ -444,6 +458,8 @@ export default function PersonenPage() {
       // Maske im Dialog, nur in ihrem Einsatz.
       if (variablen.quelle === 'maske')
         setMaskeFehler({ einsatzId: variablen.einsatzId, fehler: e });
+      if (variablen.quelle === 'leicht')
+        setLeichtFehler({ einsatzId: variablen.einsatzId, fehler: e });
     },
   });
 
@@ -935,6 +951,10 @@ export default function PersonenPage() {
     anlegenMutation.isPending &&
     anlegenMutation.variables?.einsatzId === einsatzId &&
     anlegenMutation.variables?.quelle === 'maske';
+  const leichtLaeuft =
+    anlegenMutation.isPending &&
+    anlegenMutation.variables?.einsatzId === einsatzId &&
+    anlegenMutation.variables?.quelle === 'leicht';
 
   const leerText = sicht.nurLuecken
     ? 'Keine Datensätze mit offenen Feldern in dieser Sicht.'
@@ -997,6 +1017,19 @@ export default function PersonenPage() {
       weitere={{
         name: 'Weitere Aktionen zu den Betroffenen',
         eintraege: [
+          // Der leichte Fall in einem Schritt (LLH-1572, design.md D2/D10): ein eigener Dialog,
+          // der erst beim „Entlassen“ anlegt. Ab `md` ein Knopf neben „Vermisst melden“; unter
+          // `md` hinter „Weitere“, sonst bräche der Kopf bei 390 px in eine dritte Zeile und
+          // schöbe die erste Person aus dem ersten Bild. Am Handy bleibt `>entl` der kurze Weg.
+          ...(darfSchreiben
+            ? [
+                {
+                  key: 'leichter-fall',
+                  label: LEICHTER_FALL_TITEL,
+                  onWahl: () => setLeichterFallFuer(einsatzId),
+                },
+              ]
+            : []),
           {
             key: 'druck',
             label: 'Drucken / als PDF',
@@ -1337,6 +1370,31 @@ export default function PersonenPage() {
             quelle: 'maske',
             // Die allgemeine Maske legt immer `erfasst` an (LFH-963); mit Sichtung hebt der Server.
             folgeStatus: modus === 'vermisst' ? 'vermisst' : undefined,
+          });
+        }}
+      />
+      <LeichterFallModal
+        key={`leicht-${einsatzId}`}
+        einsatzId={einsatzId}
+        offen={leichterFallFuer === einsatzId}
+        uhsListe={uhsListe}
+        laeuft={leichtLaeuft}
+        speicherung={{
+          error: leichtFehler?.einsatzId === einsatzId ? leichtFehler.fehler : null,
+          isPending: leichtLaeuft,
+          reset: () => setLeichtFehler(null),
+        }}
+        // Nur den eigenen Dialog schließen: eine späte Antwort aus Einsatz A darf den inzwischen
+        // in Einsatz B geöffneten Dialog nicht zuklappen.
+        onAbbrechen={() => setLeichterFallFuer((alt) => (alt === einsatzId ? null : alt))}
+        onFertig={() => setLeichterFallFuer((alt) => (alt === einsatzId ? null : alt))}
+        onErfassen={(daten) => {
+          if (!benutzer) return Promise.reject(new Error('Nicht angemeldet'));
+          return anlegenMutation.mutateAsync({
+            benutzerId: benutzer.id,
+            einsatzId,
+            daten,
+            quelle: 'leicht',
           });
         }}
       />

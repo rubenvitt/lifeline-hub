@@ -11,13 +11,21 @@ import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instr
 import { formatKoordinate } from './koordinate';
 import {
   ANLASS_KUERZEL,
+  ENTLASSEN_KUERZEL,
+  MASSNAHME_KUERZEL,
   SICHTUNG_BUCHSTABEN,
   loeseBefehl,
   loeseUhsAuf,
   parsePersonBefehl,
   type BefehlTeil,
 } from './personBefehl';
-import { ANLASS_REIHE, ANLASS_WORT, SK_META } from './personMeta';
+import {
+  ANLASS_REIHE,
+  ANLASS_WORT,
+  LEICHTE_MASSNAHMEN,
+  MASSNAHME_WORT,
+  SK_META,
+} from './personMeta';
 
 /** Aus dem Bild, nicht aus dem Baum: der Vorleser liest die Kürzel weiter als Feldbeschreibung. */
 const NUR_VORLESER = {
@@ -83,6 +91,18 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       return (
         <span style={{ fontSize: 13, color: rollen.text }} title="Anlass">
           {ANLASS_WORT[teil.wert]}
+        </span>
+      );
+    case 'massnahme':
+      return (
+        <span style={{ fontSize: 13, color: rollen.text }} title="Maßnahme">
+          + {MASSNAHME_WORT[teil.wert]}
+        </span>
+      );
+    case 'entlassen':
+      return (
+        <span style={{ ...monoStil(12), color: rollen.bedien }} title="Verbleib">
+          → entlassen
         </span>
       );
     case 'uhs': {
@@ -226,6 +246,11 @@ export default function BetroffeneZeile({
             <span style={{ color: rollen.gedaempft }}>
               !Anlass: {ANLASS_REIHE.map((a) => ANLASS_KUERZEL[a][0]).join(' · ')}
             </span>
+            {/* Leichter Fall (LLH-1572): Maßnahmen der Kurzliste und die Entlassung, gleiche Quelle. */}
+            <span style={{ color: rollen.gedaempft }}>
+              +Maßnahme: {LEICHTE_MASSNAHMEN.map((m) => MASSNAHME_KUERZEL[m][0]).join(' · ')}
+            </span>
+            <span style={{ color: rollen.gedaempft }}>&gt;{ENTLASSEN_KUERZEL[0]}</span>
             {/* Das Format zeigt der Platzhalter nicht, also hier. */}
             <span style={{ color: rollen.gedaempft }}>#Fundort (52.2691/9.1342)</span>
             <span style={{ color: rollen.gedaempft }}>@Unfallhilfsstelle</span>

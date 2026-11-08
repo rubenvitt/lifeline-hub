@@ -209,10 +209,34 @@ export const MASSNAHME_WORT: Record<MassnahmeArt, string> = {
   immobilisation: 'Immobilisation',
   waermeerhalt: 'Wärmeerhalt',
   dekontamination: 'Dekontamination',
+  // Die häufigen Maßnahmen des Sanitätsdienstes (LLH-1572, design.md D8).
+  wundversorgung: 'Wundversorgung',
+  kuehlung: 'Kühlung',
+  lagerung: 'Lagerung',
+  betreuung_gespraech: 'Betreuung / Gespräch',
 };
 
 /** Feste Folge der Maßnahmen in der Wahl: die Katalogfolge der Spec. */
 export const MASSNAHME_REIHE = Object.keys(MASSNAHME_WORT) as readonly MassnahmeArt[];
+
+/**
+ * Die Maßnahmen eines leichten Falls (LLH-1572, Dialog „Versorgt und entlassen“): was vor Ort
+ * versorgt und danach entlassen wird. Zugang, Infusion, Atemweg, Analgesie und Dekontamination
+ * fehlen: wer sie braucht, ist kein leichter Fall und geht über die gewohnte Erfassung.
+ */
+export const LEICHTE_MASSNAHMEN: readonly MassnahmeArt[] = [
+  'wundversorgung',
+  'kuehlung',
+  'lagerung',
+  'betreuung_gespraech',
+  'waermeerhalt',
+  'blutstillung',
+  'immobilisation',
+  'sauerstoff',
+];
+
+/** Höchstens so viele Maßnahmen nimmt der leichte Fall (LLH-1572, Konzept 5.2). */
+export const LEICHTE_MASSNAHMEN_MAX = 3;
 
 /** Das Wort je Art der Verletzung (LLH-1113). */
 export const VERLETZUNG_ART_WORT: Record<VerletzungArt, string> = {

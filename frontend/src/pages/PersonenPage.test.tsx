@@ -334,6 +334,41 @@ describe('PersonenPage', () => {
     expect(gesendet.status).toBe('erfasst');
   });
 
+  /** Der leichte Fall (LLH-1572, design.md D1/D2): Kopfknopf, Anlass, „Entlassen“ — ein POST. */
+  it('„Versorgt und entlassen“ legt in drei Griffen betroffen und entlassen an', async () => {
+    let gesendet: Record<string, unknown> = {};
+    server.use(
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            ...person,
+            id: 51,
+            registrier_nr: 51,
+            status: 'betroffen',
+            aktuelle_verbleib_art: 'entlassung',
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    render(einsatzAktiv, []);
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Versorgt und entlassen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Versorgt und entlassen' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Hitze / Kälte' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Entlassen' }));
+    expect(await screen.findByText('Entlassen als R-051')).toBeInTheDocument();
+    expect(gesendet).toEqual(
+      expect.objectContaining({ status: 'betroffen', entlassen: true, anlass: 'hitze_kaelte' }),
+    );
+    expect(gesendet).not.toHaveProperty('sichtung');
+  });
+
   it('stellt unter xl die Sichtungszeile über den Statusfilter', async () => {
     // Vitest-Vorgabe 1024 px: unter `xl` steht die Seitenleiste unter der Liste.
     render(einsatzAktiv, [{ ...person, aktuelle_sichtung: 'sk1' as const }, unbekannt]);
