@@ -207,6 +207,12 @@ pub mod test_authenticator {
         ) -> UnterschriftAssertion {
             let cdj = serde_json::json!({"type": typ, "challenge": challenge, "origin": origin})
                 .to_string();
+            self.sign_client_data(&cdj, rp_id, flags)
+        }
+
+        /// Unterschreibt ein vorgegebenes `clientDataJSON` (etwa mit Zusatzfeldern, wie Browser
+        /// sie anhängen dürfen).
+        pub fn sign_client_data(&self, cdj: &str, rp_id: &str, flags: u8) -> UnterschriftAssertion {
             let mut auth_data = Sha256::digest(rp_id.as_bytes()).to_vec();
             auth_data.push(flags);
             auth_data.extend_from_slice(&[0, 0, 0, 0]);
@@ -280,6 +286,35 @@ mod tests {
                 "Feld {feld}"
             );
         }
+    }
+
+    /// Gültig signiert, mit einem Zusatzfeld im `clientDataJSON`: knapp unter der Grenze gilt die
+    /// Unterschrift, knapp darüber nicht.
+    #[test]
+    fn grosses_gueltig_signiertes_client_data_json() {
+        let p = passkey();
+        let mit_polster = |polster: usize| {
+            let cdj = serde_json::json!({
+                "type": "webauthn.get", "challenge": challenge(ERKL), "origin": ORIGIN,
+                "other_keys_can_be_added_here": "x".repeat(polster)
+            })
+            .to_string();
+            p.sign_client_data(&cdj, RP, 0x05)
+        };
+        // Base64url: 4 Zeichen je 3 Byte.
+        let roh_max = CLIENT_DATA_JSON_MAX / 4 * 3;
+        let grundlaenge = serde_json::json!({
+            "type": "webauthn.get", "challenge": challenge(ERKL), "origin": ORIGIN,
+            "other_keys_can_be_added_here": ""
+        })
+        .to_string()
+        .len();
+        let passt = mit_polster(roh_max - grundlaenge);
+        assert!(passt.client_data_json.len() <= CLIENT_DATA_JSON_MAX);
+        assert_eq!(pruefe_mit(&p, ERKL, &passt), Ok(()));
+        let zu_gross = mit_polster(roh_max - grundlaenge + 3);
+        assert!(zu_gross.client_data_json.len() > CLIENT_DATA_JSON_MAX);
+        assert_eq!(pruefe_mit(&p, ERKL, &zu_gross), Err(VerifyError::Groesse));
     }
 
     #[test]
