@@ -21,7 +21,7 @@
 ## 5. Abschluss
 
 - [ ] 5.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die Frontend, Spiegeltest und Doku decken). Prüfen mit dem Lauf ohne `| tail`.
-- [ ] 5.2 Bilder der Änderung (Paneel, Dialog, Lesezeile im Plan) per Wegwerf-Spec aufnehmen und für PR und Meldung bereitlegen. Prüfen: Die Bilder liegen außerhalb von `docs/anwender/bilder/`, die Spec ist gelöscht.
+- [x] 5.2 Bilder der Änderung (Paneel, Dialog, Lesezeile im Plan) per Wegwerf-Spec aufnehmen und für PR und Meldung bereitlegen. Prüfen: Die Bilder liegen außerhalb von `docs/anwender/bilder/`, die Spec ist gelöscht.
 
 ## Workflow follow-up
 
