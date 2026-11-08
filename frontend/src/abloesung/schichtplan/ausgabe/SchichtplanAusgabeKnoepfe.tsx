@@ -13,8 +13,9 @@ interface SchichtplanAusgabeKnoepfeProps {
   einsatzId: number;
   /** Für den Dateinamen der Mappe. */
   einsatzBezeichnung: string;
-  /** Ohne Freigabe des Moduls Personal ist „Excel“ gesperrt (der Server antwortete 403). */
-  personalFrei: boolean;
+  /** Ohne Freigabe des Moduls Personal ist „Excel“ gesperrt (der Server antwortete 403);
+   *  `undefined`, solange die Freigaben laden: gesperrt, aber noch ohne Grund (`freigabeVon`). */
+  personalFrei: boolean | undefined;
 }
 
 /**
@@ -54,14 +55,14 @@ export default function SchichtplanAusgabeKnoepfe({
         Drucken
       </Button>
       <Button
-        disabled={!personalFrei}
+        disabled={personalFrei !== true}
         loading={fuerDiesen && mappe.isPending}
-        aria-describedby={personalFrei ? undefined : grundId}
+        aria-describedby={personalFrei === false ? grundId : undefined}
         onClick={() => mappe.mutate(einsatzId)}
       >
         Excel
       </Button>
-      {!personalFrei && (
+      {personalFrei === false && (
         <Typography.Text type="secondary" id={grundId} data-lfh="mappe-gesperrt">
           {MODUL_PERSONAL_GESPERRT}
         </Typography.Text>

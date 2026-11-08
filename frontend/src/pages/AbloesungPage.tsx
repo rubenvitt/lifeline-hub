@@ -85,7 +85,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { freigabeVon, istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import {
@@ -935,7 +935,7 @@ export default function AbloesungPage() {
               <SchichtplanAusgabeKnoepfe
                 einsatzId={einsatzId}
                 einsatzBezeichnung={einsatz.bezeichnung}
-                personalFrei={personalFrei}
+                personalFrei={freigabeVon('personal', freigabenQuery.data)}
               />
             </>
           }

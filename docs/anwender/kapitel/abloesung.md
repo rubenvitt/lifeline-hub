@@ -622,7 +622,7 @@ Die Mappe hat fünf Blätter:
 |---|---|
 | Austausch | der Plan im Format der Schichtplan-Datei, eine Zeile je Person und Schicht, eine Schicht ohne Person als Zeile ohne Namen |
 | Übersicht | Einsatz, Ort, Zeitraum, Besetzung (etwa „18 von 22 Plätzen“), Zahl der Befunde, Stand |
-| Je Posten | Abschnitt, Posten, Tag, Von, Bis, Soll, Ist, Offen, Eingeteilt, Soll-Qualifikationen |
+| Je Posten | Abschnitt, Posten, Tag, Von, Bis, Soll, Soll-Qualifikationen, Ist, Offen, Eingeteilt |
 | Je Person | Name, Organisation und Telefon (bei Helfern), Posten, Abschnitt, Tag, Von, Bis, Stunden |
 | Befunde | Art wie in der Ampel, Posten, Zeit, Person, Beschreibung |
 

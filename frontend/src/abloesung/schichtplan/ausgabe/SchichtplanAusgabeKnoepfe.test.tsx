@@ -11,7 +11,7 @@ import SchichtplanAusgabeKnoepfe from './SchichtplanAusgabeKnoepfe';
 
 const EXPORT = '/api/einsaetze/4/abloesungen/schichtplan/export';
 
-function zeige(personalFrei = true) {
+function zeige(personalFrei: boolean | undefined) {
   return renderMitProviders(
     <SchichtplanAusgabeKnoepfe
       einsatzId={4}
@@ -27,7 +27,7 @@ describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
   it('„Excel“ lädt die Mappe und speichert sie unter dem Namen des Einsatzes', async () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     server.use(http.get(EXPORT, () => new HttpResponse('PK-mappe')));
-    zeige();
+    zeige(true);
     await userEvent.click(screen.getByRole('button', { name: 'Excel' }));
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
     const [datei, name] = speichern.mock.calls[0];
@@ -42,7 +42,7 @@ describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
         HttpResponse.json({ error: 'Kein Zugriff auf das Modul Personal' }, { status: 403 }),
       ),
     );
-    zeige();
+    zeige(true);
     await userEvent.click(screen.getByRole('button', { name: 'Excel' }));
     expect(await screen.findByText('Kein Zugriff auf das Modul Personal')).toBeInTheDocument();
     expect(screen.getByText('Excel fehlgeschlagen')).toBeInTheDocument();
@@ -63,5 +63,13 @@ describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
       'href',
       schichtplanDruckPfad(4),
     );
+  });
+
+  it('solange die Freigaben laden, ist „Excel“ gesperrt, aber ohne Grund', () => {
+    zeige(undefined);
+    const knopf = screen.getByRole('button', { name: 'Excel' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText(MODUL_PERSONAL_GESPERRT)).not.toBeInTheDocument();
   });
 });
