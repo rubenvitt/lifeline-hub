@@ -13,7 +13,7 @@ import { neuerQueryClient, setzeOnline } from '../test/utils';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
-import { verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
+import { meldeServerErreichbar, verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
 import { queueLeerenFuerTests } from '../offline/queue';
 import { kontaktMarke } from './GeraetKontaktePage';
 
@@ -197,8 +197,40 @@ describe('Einheitengerät — Kontakte', () => {
     const { user, dialog } = await oeffneKontakt();
     await user.click(within(dialog).getByRole('button', { name: 'RTW nötig' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
-    expect(gesendet[0].body).toMatchObject({ rtw: true, versorgende_einheit_id: 5 });
+    expect(gesendet[0].body).toMatchObject({
+      rtw: true,
+      versorgende_einheit_id: 5,
+      client_id: expect.any(String),
+    });
     expect(gesendet[0].ausQueue).toBe(false);
+    expect(await screen.findByText('R-012 · RTW angefordert')).toBeInTheDocument();
+  });
+
+  it('ein erneuter RTW nach verlorener Antwort trägt dieselbe client_id', async () => {
+    const { gesendet } = stelleBereit();
+    let ersterVersuch = true;
+    server.use(
+      http.post('/api/einsaetze/7/personen', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        gesendet.push({ body, ausQueue: request.headers.has(OFFLINE_QUEUE_BENUTZER_HEADER) });
+        if (ersterVersuch) {
+          ersterVersuch = false;
+          return HttpResponse.error();
+        }
+        return HttpResponse.json(kontakt(12, { registrier_nr: 12 }), { status: 201 });
+      }),
+    );
+    renderApp('/geraet/7/kontakte');
+    const { user, dialog } = await oeffneKontakt();
+    await user.click(within(dialog).getByRole('button', { name: 'RTW nötig' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    // Der Fehler meldet den Server unerreichbar: bis die Verbindung steht, heißt es „über Funk“.
+    expect(await within(dialog).findByRole('button', { name: 'RTW über Funk' })).toBeDisabled();
+    act(() => meldeServerErreichbar(true));
+    await user.click(await within(dialog).findByRole('button', { name: 'RTW nötig' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[0].body.client_id).toEqual(expect.any(String));
+    expect(gesendet[1].body.client_id).toBe(gesendet[0].body.client_id);
     expect(await screen.findByText('R-012 · RTW angefordert')).toBeInTheDocument();
   });
 

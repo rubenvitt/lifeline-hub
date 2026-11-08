@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, App, Button, Flex, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -22,6 +22,7 @@ import { Paneel, StatusChip, monoStil, useRollen } from '../components/instrumen
 import type { StatusTon } from '../components/instrument/statusFlaeche';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { IconPersonPlus } from '../icons';
+import { neueClientId } from '../offline/clientId';
 import { erfassePersonOfflineFaehig, type OfflineSchreibErgebnis } from '../offline/schreiben';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 import LeichterFallModal, {
@@ -74,6 +75,9 @@ export default function GeraetKontaktePage() {
   const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const [offen, setOffen] = useState(false);
+  // Ein Schlüssel je RTW-Anforderung: geht die Antwort verloren und wird erneut gesendet, legt
+  // der Server keine zweite Person und keine zweite Sofortmeldung an.
+  const rtwClientId = useRef<string | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -127,7 +131,12 @@ export default function GeraetKontaktePage() {
     mutationFn: async (daten: PersonAnlegenEingabe): Promise<OfflineSchreibErgebnis<Person>> => {
       if (!benutzer) throw new Error('Nicht angemeldet');
       // Der RTW geht nie über die Warteschlange (K2): ein Fehler bleibt im Dialog, dann Funk.
-      if (daten.rtw) return { zustand: 'gesendet', daten: await legePersonAn(einsatzId, daten) };
+      if (daten.rtw) {
+        rtwClientId.current ??= neueClientId();
+        const person = await legePersonAn(einsatzId, { ...daten, client_id: rtwClientId.current });
+        rtwClientId.current = null;
+        return { zustand: 'gesendet', daten: person };
+      }
       return erfassePersonOfflineFaehig(benutzer.id, einsatzId, daten);
     },
     onSuccess: (ergebnis, daten) => {
@@ -168,6 +177,7 @@ export default function GeraetKontaktePage() {
           disabled={!darfErfassen}
           onClick={() => {
             void uhsQuery.refetch();
+            rtwClientId.current = null;
             setOffen(true);
           }}
         >

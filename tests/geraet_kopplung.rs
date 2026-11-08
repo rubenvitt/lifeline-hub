@@ -8105,6 +8105,60 @@ async fn einheitengeraet_erfasst_kontakt_und_sieht_nur_eigene_ohne_namen() {
     );
 }
 
+/// Ein Replay derselben `client_id` am Handy bleibt ohne Personalien, auch wenn die Führung sie
+/// inzwischen ergänzt hat, und die `client_id` einer Person einer anderen Einheit ist 404.
+#[tokio::test]
+async fn einheitengeraet_replay_ohne_personalien_und_nur_eigene() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+
+    let eigener = kontakt(json!({"entlassen": true, "client_id": "kontakt-1"}));
+    let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&eigener)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{personen}/{id}"),
+        &admin,
+        Some(&json!({"name": "Meier", "alter_geschaetzt": 34})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&eigener)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["id"], id, "Replay legt nichts neu an");
+    assert_eq!(v["name"], Value::Null, "ohne Namen: {v}");
+    assert_eq!(v["alter_geschaetzt"], Value::Null);
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &admin,
+        Some(&json!({
+            "name": "Fremd",
+            "versorgende_einheit_id": l.zug_nord,
+            "client_id": "fremd-1",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &geraet,
+        Some(&kontakt(json!({"entlassen": true, "client_id": "fremd-1"}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde client_id: {v}");
+}
+
 /// Personalien, Sichtung oder eine fremde versorgende Einheit vom Handy sind 403 (F6, K5); mehr
 /// als ein Ausgang ist 422.
 #[tokio::test]

@@ -472,7 +472,15 @@ pub async fn anlegen(
         ));
     }
     if let Some(cid) = client_id.as_deref() {
-        if let Some(person) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+        if let Some(mut person) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            // Am Einheitengerät auch beim Replay nur die eigene und ohne Personalien (LLH-1580):
+            // UHS oder Einsatzleitung können sie inzwischen ergänzt haben.
+            if einheit_name.is_some() {
+                if person.versorgende_einheit_id != body.versorgende_einheit_id {
+                    return Err(AppError::NotFound);
+                }
+                person.ohne_personalien();
+            }
             return Ok((StatusCode::CREATED, Json(person)));
         }
     }
@@ -1025,6 +1033,10 @@ pub async fn anlegen(
     }
     let mut person = person;
     if einheit_name.is_some() {
+        // Replay im Rennen (`war_neu` false): dieselbe Schranke wie oben.
+        if person.versorgende_einheit_id != body.versorgende_einheit_id {
+            return Err(AppError::NotFound);
+        }
         person.ohne_personalien();
     }
     Ok((StatusCode::CREATED, Json(person)))
