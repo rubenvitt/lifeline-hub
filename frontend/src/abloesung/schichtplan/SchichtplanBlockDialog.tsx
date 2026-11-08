@@ -456,7 +456,7 @@ export default function SchichtplanBlockDialog({
         {block && onWechsel && (
           <Button
             data-lfh="schichtplan-block-wechsel"
-            disabled={geaendert || laeuft || loeschenLaeuft}
+            disabled={geaendert || laeuft || loeschenLaeuft || kopierenLaeuft}
             onClick={() => onWechsel(block)}
             style={{ marginTop: 8, marginInlineEnd: 8 }}
           >
