@@ -430,7 +430,12 @@ export default function SchichtplanAnsicht({
           />
         )}
         {darfSchreiben && <Button onClick={oeffneAnlegen}>Block anlegen</Button>}
-        {darfSchreiben && <Button onClick={oeffneErzeugen}>Schichten erzeugen</Button>}
+        {darfSchreiben && (
+          // Erst mit geladenem Plan: die Meldung zählt nur, was vorher nicht darin stand.
+          <Button onClick={oeffneErzeugen} disabled={!plan}>
+            Schichten erzeugen
+          </Button>
+        )}
         {werkzeuge}
       </Flex>
       {planQuery.isError && (

@@ -238,14 +238,15 @@ export default function SchichtplanRaster({
       const l = laufRef.current;
       if (!l || e.pointerId !== l.pointerId) return;
       setLauf(null);
-      if (!l.aktiv) return;
+      // Bricht der Browser den Zeiger ab (Geste übernommen), bleibt alles, wie es war.
+      if (!l.aktiv || e.type === 'pointercancel') return;
       klickSchlucken.current = true;
       // Der Klick folgt dem Loslassen unmittelbar; danach gilt wieder jeder Klick.
       window.setTimeout(() => {
         klickSchlucken.current = false;
       }, 0);
-      // Die Tasten beim Loslassen entscheiden; pointercancel trägt keine verlässlichen.
-      const kopie = e.type === 'pointerup' ? alsKopie(l.zug, e) : l.kopie;
+      // Die Tasten beim Loslassen entscheiden.
+      const kopie = alsKopie(l.zug, e);
       if (pruefeZug(l.zug, l.stand, zeilen, bloecke, kopie) !== 'ok') return;
       if (l.zug.art === 'anlegen') onAnlegen(l.stand.zeile, l.stand.von, l.stand.bis);
       else if (kopie) onKopieren?.(l.zug.blockId, l.stand);
