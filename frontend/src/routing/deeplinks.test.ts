@@ -76,6 +76,7 @@ import {
   chatPfad,
   nachforderungenPfad,
   parseNachforderungBezug,
+  parseNachforderungPerson,
   parseNachforderungStelle,
   parseNachforderungVorbelegung,
   auftraegePfad,
@@ -558,12 +559,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('abloesungPfad mit ?schicht= wie der Server-Pfad der Benachrichtigung (LLH-1131 Teil II)', () => {
     expect(abloesungPfad(E, { schicht: 9 })).toBe('/einsaetze/5/abloesung?schicht=9');
   });
-  it('abloesungPfad mit ?ansicht= (LLH-1312): „laufend“ ohne Parameter, Umkehr verwirft Unbekanntes', () => {
+  it('abloesungPfad mit ?ansicht= (LLH-1312): „laufend“ ausdrücklich (Vorgabe im Sanitätsdienst ist der Plan, LLH-1554), Umkehr verwirft Unbekanntes', () => {
     expect(abloesungPfad(E, { ansicht: 'ohne-schicht' })).toBe(
       '/einsaetze/5/abloesung?ansicht=ohne-schicht',
     );
-    expect(abloesungPfad(E, { ansicht: 'laufend' })).toBe('/einsaetze/5/abloesung');
-    for (const a of ['ohne-schicht', 'vergangen', 'laufend'] as const) {
+    expect(abloesungPfad(E, { ansicht: 'laufend' })).toBe('/einsaetze/5/abloesung?ansicht=laufend');
+    for (const a of ['ohne-schicht', 'vergangen', 'laufend', 'plan'] as const) {
       const pfad = abloesungPfad(E, { ansicht: a });
       const params = new URLSearchParams(pfad.split('?')[1] ?? '');
       expect(parseAbloesungAnsicht(params) ?? 'laufend').toBe(a);
@@ -1113,6 +1114,18 @@ describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
     const p = new URLSearchParams({ betreuungsstelle: wert, stelle: wert });
     expect(parseNachforderungBezug(p)).toBeNull();
     expect(parseNachforderungStelle(p)).toBeNull();
+  });
+
+  it('Personenbezug setzt neu=1 und person, ohne Vorbelegung (LLH-1573)', () => {
+    const pfad = nachforderungenPfad(E, { bezugPerson: 12 });
+    expect(pfad).toBe('/einsaetze/5/nachforderungen?neu=1&person=12');
+    const p = params(pfad);
+    expect(parseNachforderungPerson(p)).toBe(12);
+    expect(parseNachforderungBezug(p)).toBeNull();
+    expect(parseNachforderungVorbelegung(p)).toBeNull();
+    for (const wert of ['0', '-1', 'abc', '']) {
+      expect(parseNachforderungPerson(new URLSearchParams({ person: wert }))).toBeNull();
+    }
   });
 
   it('?nachforderung= steuert eine Nachforderung an und übersteht den Round-Trip (LLH-1226 D10)', () => {

@@ -461,6 +461,7 @@ mod tests {
             teilschwaerzungen: None,
             evakuierung_angeordnet: false,
             nachforderungen_gewaehlt: false,
+            sanitaetsdienst_gewaehlt: false,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status,

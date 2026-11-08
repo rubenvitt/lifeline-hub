@@ -2153,14 +2153,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     // — kein 401/403/405, das seine Existenz verriete.
     let router = if opt.demo_daten {
         router
+            .route("/api/demo-daten", get(routes::demo_daten::status))
+            // LLH-1576: die Lage steht im Pfad, unbekannte Lagen sind 404 aus dem Handler.
             .route(
-                "/api/demo-daten",
-                get(routes::demo_daten::status)
-                    .post(routes::demo_daten::importieren)
-                    .delete(routes::demo_daten::entfernen),
+                "/api/demo-daten/{lage}",
+                post(routes::demo_daten::importieren).delete(routes::demo_daten::entfernen),
             )
             .route(
-                "/api/demo-daten/neu",
+                "/api/demo-daten/{lage}/neu",
                 post(routes::demo_daten::neu_importieren),
             )
     } else {

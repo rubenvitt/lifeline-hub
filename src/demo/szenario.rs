@@ -1,6 +1,8 @@
-//! Das Szenario „ÜBUNG – Starkregen Musterstadt“ als reine Daten (LFH-690).
+//! Das Szenario „ÜBUNG – Starkregen Musterstadt“ als reine Daten (LFH-690), dazu die Bausteine,
+//! aus denen jedes Demo-Szenario besteht ([`Szenario`], LLH-1576). Das zweite Szenario liegt in
+//! [`super::szenario_stadtfest`].
 //!
-//! Diese Datei ist die **einzige Quelle** für Zahlen und Inhalte des Demo-Imports; der Bericht
+//! Diese Datei ist die **einzige Quelle** für Zahlen und Inhalte der Starkregen-Lage; der Bericht
 //! leitet sich daraus ab. Logik enthält sie nur für den Katalogbedarf.
 //!
 //! Jeder Eintrag trägt einen stabilen **Schlüssel** (`&'static str`), über den das Drehbuch die
@@ -11,13 +13,18 @@
 //! Telefonnummern. Über die festen fachlichen Kennungen (`DEMO-P-001` …, „Musterstadt …“)
 //! gleicht der Import mit vorhandenen Stammdaten ab.
 
+use super::DemoLage;
 use crate::betreuung::{BetreuungsstelleArt, Erhebung};
 use crate::einsatzabschnitt::AbschnittLagezustand;
 use crate::error::AppError;
 use crate::gefahr::Warnstufe;
 use crate::katalog::StatusKategorie;
 use crate::material::MaterialStatus;
-use crate::person::Sichtungskategorie;
+use crate::person::anlass_repo::PersonAnlass;
+use crate::person::{
+    EntlassenAn, GegenRat, Sichtungskategorie, TransportDurch, Unterschrift, VerbleibArt,
+    VerbleibStatus,
+};
 use crate::staerke::StaerkePosition;
 use crate::uhs::{PlatzTyp, UhsTyp};
 
@@ -366,6 +373,130 @@ pub enum Katalogeintrag {
     PersonalstatusKategorie(StatusKategorie),
 }
 
+/// Schichtmodell eines Szenarios (LLH-1122): Kennung ist die Bezeichnung, die Werte liefert
+/// eine Funktion (die Uhrzeiten werden geparst).
+#[derive(Debug, Clone, Copy)]
+pub struct SchichtmodellVorlage {
+    pub bezeichnung: &'static str,
+    pub werte: fn() -> Result<crate::schichtmodell::Werte, AppError>,
+}
+
+/// Ein Demo-Szenario als Wert (LLH-1576, design.md D3): alles, was Import, Stammdaten-Anlage und
+/// Katalogbedarf über eine Lage wissen müssen.
+#[derive(Debug, Clone, Copy)]
+pub struct Szenario {
+    pub lage: DemoLage,
+    /// Bezeichnung des Demo-Einsatzes; beginnt nach der Spec mit „ÜBUNG – “.
+    pub einsatz_bezeichnung: &'static str,
+    /// Stichwort als Freitext; der Import legt keinen Katalogvorschlag an.
+    pub einsatz_stichwort: &'static str,
+    /// Einsatzbeginn in Minuten vor dem Importzeitpunkt; kein Drehbuch-Schritt liegt davor.
+    pub beginn_vor_min: i64,
+    /// Standort aller angelegten Fahrzeuge und Materialien.
+    pub standort: &'static str,
+    /// Bemerkung an jeder angelegten Stammdatenzeile.
+    pub bemerkung: &'static str,
+    pub fahrzeuge: &'static [FahrzeugVorlage],
+    pub personal: &'static [PersonalVorlage],
+    pub material: &'static [MaterialVorlage],
+    pub einheiten_vorlagen: &'static [EinheitVorlageStamm],
+    /// `None`: die Lage bringt kein Schichtmodell mit, und der Demo-Einsatz bekommt keins.
+    pub schichtmodell: Option<SchichtmodellVorlage>,
+    pub drehbuch: &'static [Schritt],
+}
+
+impl Szenario {
+    /// Katalogbedarf des Drehbuchs: Einheitstypen der Einheiten, die FMS-Anker der
+    /// Statuswechsel und die `gebunden`-Kategorien der Dispositionen. Doppelte Einträge entfallen.
+    pub fn katalog_bedarf_einsatz(&self) -> Vec<Katalogeintrag> {
+        let mut bedarf = Vec::new();
+        for schritt in self.drehbuch {
+            let eintrag = match schritt.vorgang {
+                Vorgang::Einheit(v) => Some(Katalogeintrag::Einheitstyp(v.typ)),
+                Vorgang::FahrzeugDisponieren { .. } => Some(
+                    Katalogeintrag::FahrzeugstatusKategorie(StatusKategorie::Gebunden),
+                ),
+                Vorgang::FmsStatus { fms, .. } => Some(Katalogeintrag::FahrzeugstatusFms(fms)),
+                Vorgang::PersonalDisponieren { .. } => Some(
+                    Katalogeintrag::PersonalstatusKategorie(StatusKategorie::Gebunden),
+                ),
+                // Die übrigen Vorgänge brauchen keinen Katalogeintrag: Gefahrentyp, Schutzobjekt,
+                // Warnstufe, UHS- und Platztyp, Sichtung, Anlass, Verbleib, Meldungs- und
+                // Betreuungswerte sind feste Enums im Code, keine Organisationskataloge.
+                Vorgang::Abschnitt(_)
+                | Vorgang::FahrzeugZuEinheit { .. }
+                | Vorgang::PersonalZuEinheit { .. }
+                | Vorgang::Besatzung { .. }
+                | Vorgang::MaterialDisponieren { .. }
+                | Vorgang::MaterialStatus { .. }
+                | Vorgang::PersonalAnUhs { .. }
+                | Vorgang::Einsatzleiter { .. }
+                | Vorgang::Gefahrengebiet(_)
+                | Vorgang::Uhs(_)
+                | Vorgang::Bereitstellungsraum(_)
+                | Vorgang::Person(_)
+                | Vorgang::Verbleib(_)
+                | Vorgang::Bezirk(_)
+                | Vorgang::Stand { .. }
+                | Vorgang::Stelle(_)
+                | Vorgang::StelleInBetrieb { .. }
+                | Vorgang::Belegung { .. }
+                | Vorgang::Meldung(_)
+                | Vorgang::Auftrag(_)
+                | Vorgang::AuftragVollzug { .. }
+                | Vorgang::Befehl(_)
+                | Vorgang::Lagebericht(_)
+                | Vorgang::Erinnerung(_)
+                | Vorgang::ErinnerungErledigt { .. }
+                | Vorgang::Etb { .. } => None,
+            };
+            if let Some(eintrag) = eintrag {
+                if !bedarf.contains(&eintrag) {
+                    bedarf.push(eintrag);
+                }
+            }
+        }
+        bedarf
+    }
+
+    /// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals und des
+    /// Qualifikationssolls der Vorlagen, dazu die Einheitstypen der Vorlagen.
+    pub fn katalog_bedarf_stammdaten(&self) -> Vec<Katalogeintrag> {
+        let mut bedarf = Vec::new();
+        let qualifikationen = self
+            .personal
+            .iter()
+            .flat_map(|p| p.qualifikationen.iter())
+            .chain(
+                self.einheiten_vorlagen
+                    .iter()
+                    .flat_map(|v| v.quali_soll.iter().map(|(label, _)| label)),
+            )
+            .map(|label| Katalogeintrag::Qualifikation(label));
+        let typen = self
+            .einheiten_vorlagen
+            .iter()
+            .map(|v| Katalogeintrag::Einheitstyp(v.typ));
+        for eintrag in qualifikationen.chain(typen) {
+            if !bedarf.contains(&eintrag) {
+                bedarf.push(eintrag);
+            }
+        }
+        bedarf
+    }
+
+    /// Gesamter Katalogbedarf des Szenarios: Stammdaten, dann Einsatz.
+    pub fn katalog_bedarf(&self) -> Vec<Katalogeintrag> {
+        let mut bedarf = self.katalog_bedarf_stammdaten();
+        for eintrag in self.katalog_bedarf_einsatz() {
+            if !bedarf.contains(&eintrag) {
+                bedarf.push(eintrag);
+            }
+        }
+        bedarf
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Der Einsatz: Kopfdaten und Drehbuch
 // ---------------------------------------------------------------------------------------------
@@ -492,6 +623,37 @@ pub struct PersonVorlage {
     pub sichtung: Option<Sichtungskategorie>,
     /// Schlüssel einer früher angelegten UHS.
     pub uhs: Option<&'static str>,
+    /// Schlüssel, unter dem ein späterer [`Vorgang::Verbleib`] die Person findet (LLH-1576).
+    pub schluessel: Option<&'static str>,
+    /// Anlass der Hilfeleistung (LLH-1566), bei der Anlage erfasst.
+    pub anlass: Option<PersonAnlass>,
+    /// Schlüssel der versorgenden Einheit (LLH-1567), früher gebildet.
+    pub einheit: Option<&'static str>,
+    /// Platz im Grundriss der UHS ([`PlatzVorlage::bezeichnung`]); nur mit `uhs`.
+    pub platz: Option<&'static str>,
+}
+
+/// Verbleib einer früher erfassten Person wie über `POST …/personen/{pid}/verbleib`
+/// (LLH-1576): Erfassungszeit = Schrittzeit, Auto-Austritt aus der UHS wie in der Route. Die
+/// Paarung von Art, Fahrer-Angabe und Angaben aus LLH-1568 prüft der Import mit den Regeln der
+/// Route.
+#[derive(Debug, Clone, Copy)]
+pub struct VerbleibVorlage {
+    /// Schlüssel der Person ([`PersonVorlage::schluessel`]).
+    pub person: &'static str,
+    pub art: VerbleibArt,
+    pub status: Option<VerbleibStatus>,
+    /// Wer fährt, nur beim Transport.
+    pub durch: Option<TransportDurch>,
+    /// Fahrzeug-Schlüssel beim Eigentransport (disponiert).
+    pub fahrzeug: Option<&'static str>,
+    /// Freitext beim fremden Transport, etwa „RTW Leitstelle“.
+    pub transportmittel: Option<&'static str>,
+    pub ziel: Option<&'static str>,
+    pub einsatznummer: Option<&'static str>,
+    pub entlassen_an: Option<EntlassenAn>,
+    pub gegen_rat: Option<GegenRat>,
+    pub unterschrift: Option<Unterschrift>,
 }
 
 /// Evakuierungsbezirk; das Anlegen ist die Anordnung samt Plangröße (Räumung `angeordnet`).
@@ -571,7 +733,7 @@ pub struct ErinnerungVorlage {
 /// Schlüssel verweisen auf Stammdaten ([`FAHRZEUGE`], [`PERSONAL`]) oder auf Objekte eines
 /// früheren Schritts.
 ///
-/// **Ergänzen:** Variante hier anlegen, in [`katalog_bedarf_einsatz`] ihren Katalogbedarf
+/// **Ergänzen:** Variante hier anlegen, in [`Szenario::katalog_bedarf_einsatz`] ihren Katalogbedarf
 /// entscheiden (der `match` ist erschöpfend), in `import.rs` einen Zweig schreiben und die
 /// Schritte in [`DREHBUCH`] einsortieren.
 #[derive(Debug, Clone, Copy)]
@@ -636,6 +798,8 @@ pub enum Vorgang {
     Bereitstellungsraum(BrVorlage),
     /// Betroffene Person erfassen. ETB: „Person R-… erfasst“, Sichtung, UHS-Aufnahme.
     Person(PersonVorlage),
+    /// Verbleib einer früher erfassten Person. ETB: „Person R-…: …“, dazu der UHS-Austritt.
+    Verbleib(VerbleibVorlage),
     /// Evakuierungsbezirk anlegen. ETB (Entscheidung): „Evakuierung Bezirk … angeordnet …“.
     Bezirk(BezirkVorlage),
     /// Standmeldung „evakuiert“ eines Bezirks zur Schrittzeit. ETB (Meldung).
@@ -687,27 +851,31 @@ pub struct Schritt {
     pub vorgang: Vorgang,
 }
 
-const fn s(vor_min: i64, vorgang: Vorgang) -> Schritt {
+pub(super) const fn s(vor_min: i64, vorgang: Vorgang) -> Schritt {
     Schritt { vor_min, vorgang }
 }
 
-const fn dispo_fahrzeug(vor_min: i64, fahrzeug: &'static str) -> Schritt {
+pub(super) const fn dispo_fahrzeug(vor_min: i64, fahrzeug: &'static str) -> Schritt {
     s(vor_min, Vorgang::FahrzeugDisponieren { fahrzeug })
 }
 
-const fn zu_einheit(vor_min: i64, fahrzeug: &'static str, einheit: &'static str) -> Schritt {
+pub(super) const fn zu_einheit(
+    vor_min: i64,
+    fahrzeug: &'static str,
+    einheit: &'static str,
+) -> Schritt {
     s(vor_min, Vorgang::FahrzeugZuEinheit { fahrzeug, einheit })
 }
 
-const fn fms(vor_min: i64, fahrzeug: &'static str, fms: i64) -> Schritt {
+pub(super) const fn fms(vor_min: i64, fahrzeug: &'static str, fms: i64) -> Schritt {
     s(vor_min, Vorgang::FmsStatus { fahrzeug, fms })
 }
 
-const fn dispo_personal(vor_min: i64, personal: &'static str) -> Schritt {
+pub(super) const fn dispo_personal(vor_min: i64, personal: &'static str) -> Schritt {
     s(vor_min, Vorgang::PersonalDisponieren { personal })
 }
 
-const fn lage(vor_min: i64, inhalt: &'static str) -> Schritt {
+pub(super) const fn lage(vor_min: i64, inhalt: &'static str) -> Schritt {
     s(
         vor_min,
         Vorgang::Etb {
@@ -718,7 +886,7 @@ const fn lage(vor_min: i64, inhalt: &'static str) -> Schritt {
     )
 }
 
-const fn entscheidung(vor_min: i64, inhalt: &'static str) -> Schritt {
+pub(super) const fn entscheidung(vor_min: i64, inhalt: &'static str) -> Schritt {
     s(
         vor_min,
         Vorgang::Etb {
@@ -729,11 +897,11 @@ const fn entscheidung(vor_min: i64, inhalt: &'static str) -> Schritt {
     )
 }
 
-const fn abschnitt(vor_min: i64, vorlage: AbschnittVorlage) -> Schritt {
+pub(super) const fn abschnitt(vor_min: i64, vorlage: AbschnittVorlage) -> Schritt {
     s(vor_min, Vorgang::Abschnitt(vorlage))
 }
 
-const fn einheit(
+pub(super) const fn einheit(
     vor_min: i64,
     schluessel: &'static str,
     name: &'static str,
@@ -756,7 +924,7 @@ const fn einheit(
 
 /// Einheit unter einer früher gebildeten Einheit (`ueber`).
 #[allow(clippy::too_many_arguments)]
-const fn untereinheit(
+pub(super) const fn untereinheit(
     vor_min: i64,
     schluessel: &'static str,
     name: &'static str,
@@ -778,7 +946,7 @@ const fn untereinheit(
     )
 }
 
-const fn besatzung(
+pub(super) const fn besatzung(
     vor_min: i64,
     fahrzeug: &'static str,
     personal: &'static [&'static str],
@@ -786,15 +954,27 @@ const fn besatzung(
     s(vor_min, Vorgang::Besatzung { fahrzeug, personal })
 }
 
-const fn material(vor_min: i64, material: &'static str, einheit: &'static str) -> Schritt {
+pub(super) const fn material(
+    vor_min: i64,
+    material: &'static str,
+    einheit: &'static str,
+) -> Schritt {
     s(vor_min, Vorgang::MaterialDisponieren { material, einheit })
 }
 
-const fn personal_zu(vor_min: i64, personal: &'static str, einheit: &'static str) -> Schritt {
+pub(super) const fn personal_zu(
+    vor_min: i64,
+    personal: &'static str,
+    einheit: &'static str,
+) -> Schritt {
     s(vor_min, Vorgang::PersonalZuEinheit { personal, einheit })
 }
 
-const fn personal_an_uhs(vor_min: i64, personal: &'static str, uhs: &'static str) -> Schritt {
+pub(super) const fn personal_an_uhs(
+    vor_min: i64,
+    personal: &'static str,
+    uhs: &'static str,
+) -> Schritt {
     s(vor_min, Vorgang::PersonalAnUhs { personal, uhs })
 }
 
@@ -823,11 +1003,15 @@ const fn person(
             zustand,
             sichtung,
             uhs,
+            schluessel: None,
+            anlass: None,
+            einheit: None,
+            platz: None,
         }),
     )
 }
 
-const fn rueckmeldung(
+pub(super) const fn rueckmeldung(
     vor_min: i64,
     absender: &'static str,
     einheit: &'static str,
@@ -849,7 +1033,11 @@ const fn rueckmeldung(
     )
 }
 
-const fn lagemeldung(vor_min: i64, absender: &'static str, inhalt: &'static str) -> Schritt {
+pub(super) const fn lagemeldung(
+    vor_min: i64,
+    absender: &'static str,
+    inhalt: &'static str,
+) -> Schritt {
     s(
         vor_min,
         Vorgang::Meldung(MeldungVorlage {
@@ -1613,98 +1801,24 @@ pub const DREHBUCH: &[Schritt] = &[
     ),
 ];
 
-/// Katalogbedarf des Einsatz-Teils aus dem [`DREHBUCH`], jeder Eintrag einmal, in der
-/// Reihenfolge des ersten Vorkommens.
-///
-/// Der `match` ist bewusst erschöpfend ohne `_`-Zweig: eine neue [`Vorgang`]-Variante
-/// kompiliert erst, wenn ihr Bedarf entschieden ist. Die Dispositionen verlangen je den ersten
-/// `gebunden`-Status, weil `disponiere_stamm_tx` ihn nachschlägt und ohne ihn still `NULL`
-/// setzte; der Import prüft ihn vorab (422).
-pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
-    let mut bedarf = Vec::new();
-    for schritt in DREHBUCH {
-        let eintrag = match schritt.vorgang {
-            Vorgang::Einheit(v) => Some(Katalogeintrag::Einheitstyp(v.typ)),
-            Vorgang::FahrzeugDisponieren { .. } => Some(Katalogeintrag::FahrzeugstatusKategorie(
-                StatusKategorie::Gebunden,
-            )),
-            Vorgang::FmsStatus { fms, .. } => Some(Katalogeintrag::FahrzeugstatusFms(fms)),
-            Vorgang::PersonalDisponieren { .. } => Some(Katalogeintrag::PersonalstatusKategorie(
-                StatusKategorie::Gebunden,
-            )),
-            // Die übrigen Vorgänge brauchen keinen Katalogeintrag: Gefahrentyp, Schutzobjekt,
-            // Warnstufe, UHS- und Platztyp, Sichtung, Meldungs- und Betreuungswerte sind feste
-            // Enums im Code, keine Organisationskataloge.
-            Vorgang::Abschnitt(_)
-            | Vorgang::FahrzeugZuEinheit { .. }
-            | Vorgang::PersonalZuEinheit { .. }
-            | Vorgang::Besatzung { .. }
-            | Vorgang::MaterialDisponieren { .. }
-            | Vorgang::MaterialStatus { .. }
-            | Vorgang::PersonalAnUhs { .. }
-            | Vorgang::Einsatzleiter { .. }
-            | Vorgang::Gefahrengebiet(_)
-            | Vorgang::Uhs(_)
-            | Vorgang::Bereitstellungsraum(_)
-            | Vorgang::Person(_)
-            | Vorgang::Bezirk(_)
-            | Vorgang::Stand { .. }
-            | Vorgang::Stelle(_)
-            | Vorgang::StelleInBetrieb { .. }
-            | Vorgang::Belegung { .. }
-            | Vorgang::Meldung(_)
-            | Vorgang::Auftrag(_)
-            | Vorgang::AuftragVollzug { .. }
-            | Vorgang::Befehl(_)
-            | Vorgang::Lagebericht(_)
-            | Vorgang::Erinnerung(_)
-            | Vorgang::ErinnerungErledigt { .. }
-            | Vorgang::Etb { .. } => None,
-        };
-        if let Some(eintrag) = eintrag {
-            if !bedarf.contains(&eintrag) {
-                bedarf.push(eintrag);
-            }
-        }
-    }
-    bedarf
-}
-
-/// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals und des
-/// Qualifikationssolls der Vorlagen, dann die Einheitstypen der Vorlagen, jeder einmal, in der Reihenfolge ihres ersten Vorkommens.
-/// Fahrzeugtyp und Materialkategorie sind Freitext und brauchen keinen Katalog.
-pub fn katalog_bedarf_stammdaten() -> Vec<Katalogeintrag> {
-    let mut bedarf = Vec::new();
-    let qualifikationen = PERSONAL
-        .iter()
-        .flat_map(|p| p.qualifikationen.iter())
-        .chain(
-            EINHEITEN_VORLAGEN
-                .iter()
-                .flat_map(|v| v.quali_soll.iter().map(|(label, _)| label)),
-        )
-        .map(|label| Katalogeintrag::Qualifikation(label));
-    let typen = EINHEITEN_VORLAGEN
-        .iter()
-        .map(|v| Katalogeintrag::Einheitstyp(v.typ));
-    for eintrag in qualifikationen.chain(typen) {
-        if !bedarf.contains(&eintrag) {
-            bedarf.push(eintrag);
-        }
-    }
-    bedarf
-}
-
-/// Gesamter Katalogbedarf des Szenarios: Stammdaten, dann Einsatz.
-pub fn katalog_bedarf() -> Vec<Katalogeintrag> {
-    let mut bedarf = katalog_bedarf_stammdaten();
-    for eintrag in katalog_bedarf_einsatz() {
-        if !bedarf.contains(&eintrag) {
-            bedarf.push(eintrag);
-        }
-    }
-    bedarf
-}
+/// Die Starkregen-Lage (LFH-690) als [`Szenario`].
+pub const STARKREGEN: Szenario = Szenario {
+    lage: DemoLage::Starkregen,
+    einsatz_bezeichnung: EINSATZ_BEZEICHNUNG,
+    einsatz_stichwort: EINSATZ_STICHWORT,
+    beginn_vor_min: BEGINN_VOR_MIN,
+    standort: STANDORT,
+    bemerkung: BEMERKUNG,
+    fahrzeuge: &FAHRZEUGE,
+    personal: &PERSONAL,
+    material: &MATERIAL,
+    einheiten_vorlagen: &EINHEITEN_VORLAGEN,
+    schichtmodell: Some(SchichtmodellVorlage {
+        bezeichnung: SCHICHTMODELL_BEZEICHNUNG,
+        werte: schichtmodell,
+    }),
+    drehbuch: DREHBUCH,
+};
 
 #[cfg(test)]
 mod tests {
@@ -1764,7 +1878,7 @@ mod tests {
 
     #[test]
     fn stammdaten_bedarf_ist_jede_qualifikation_und_jeder_vorlagentyp_einmal() {
-        let bedarf = katalog_bedarf_stammdaten();
+        let bedarf = STARKREGEN.katalog_bedarf_stammdaten();
         let mut labels: Vec<&str> = Vec::new();
         let mut typen: Vec<&str> = Vec::new();
         for e in &bedarf {
@@ -1850,17 +1964,21 @@ mod tests {
     /// der letzte vor dem Importzeitpunkt (nichts in der Zukunft).
     #[test]
     fn drehbuch_steht_in_zeitfolge() {
-        assert!(!DREHBUCH.is_empty());
-        for paar in DREHBUCH.windows(2) {
-            assert!(
-                paar[0].vor_min >= paar[1].vor_min,
-                "Zeitfolge verletzt: {:?} vor {:?}",
-                paar[0],
-                paar[1]
-            );
+        for lage in DemoLage::ALLE {
+            let sz = lage.szenario();
+            let drehbuch = sz.drehbuch;
+            assert!(!drehbuch.is_empty());
+            for paar in drehbuch.windows(2) {
+                assert!(
+                    paar[0].vor_min >= paar[1].vor_min,
+                    "Zeitfolge verletzt: {:?} vor {:?}",
+                    paar[0],
+                    paar[1]
+                );
+            }
+            assert!(drehbuch[0].vor_min <= sz.beginn_vor_min);
+            assert!(drehbuch[drehbuch.len() - 1].vor_min > 0);
         }
-        assert!(DREHBUCH[0].vor_min <= BEGINN_VOR_MIN);
-        assert!(DREHBUCH[DREHBUCH.len() - 1].vor_min > 0);
     }
 
     /// Jeder Schlüssel, auf den ein Schritt verweist, ist vorher definiert: Stammdaten in den
@@ -1868,6 +1986,14 @@ mod tests {
     /// Zuordnung und Status disponiert. Jedes Objekt entsteht genau einmal.
     #[test]
     fn drehbuch_verweist_nur_auf_frueher_angelegtes() {
+        for lage in DemoLage::ALLE {
+            verweise_pruefen(lage.szenario());
+        }
+    }
+
+    fn verweise_pruefen(sz: &Szenario) {
+        let mut personen = BTreeSet::new();
+        let mut plaetze = BTreeSet::new();
         let mut abschnitte = BTreeSet::new();
         let mut einheiten = BTreeSet::new();
         let mut fahrzeuge = BTreeSet::new();
@@ -1888,7 +2014,7 @@ mod tests {
         let mut einheit_von: std::collections::BTreeMap<&str, &str> = Default::default();
         let mut besatzung = BTreeSet::new();
         let mut material = BTreeSet::new();
-        for schritt in DREHBUCH {
+        for schritt in sz.drehbuch {
             match schritt.vorgang {
                 Vorgang::PersonalZuEinheit {
                     personal: p,
@@ -1919,7 +2045,10 @@ mod tests {
                     material: m,
                     einheit,
                 } => {
-                    assert!(MATERIAL.iter().any(|v| v.schluessel == m), "Material {m}");
+                    assert!(
+                        sz.material.iter().any(|v| v.schluessel == m),
+                        "Material {m}"
+                    );
                     assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
                     assert!(material.insert(m), "{m} doppelt disponiert");
                 }
@@ -1942,6 +2071,13 @@ mod tests {
                 Vorgang::Uhs(v) => {
                     assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt);
                     assert!(uhs.insert(v.schluessel), "{} doppelt", v.schluessel);
+                    for p in v.plaetze {
+                        assert!(
+                            plaetze.insert((v.schluessel, p.bezeichnung)),
+                            "{}",
+                            p.bezeichnung
+                        );
+                    }
                 }
                 Vorgang::Bereitstellungsraum(v) => {
                     assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt)
@@ -1949,6 +2085,26 @@ mod tests {
                 Vorgang::Person(v) => {
                     if let Some(u) = v.uhs {
                         assert!(uhs.contains(u), "{u} vor {}", v.name);
+                    }
+                    if let Some(e) = v.einheit {
+                        assert!(einheiten.contains(e), "{e} vor {}", v.name);
+                    }
+                    if let Some(k) = v.schluessel {
+                        assert!(personen.insert(k), "Person {k} doppelt");
+                    }
+                    if let Some(p) = v.platz {
+                        let u = v.uhs.expect("Platz nur mit UHS");
+                        assert!(
+                            plaetze.contains(&(u, p)),
+                            "Platz {p} nicht in {u} ({})",
+                            v.name
+                        );
+                    }
+                }
+                Vorgang::Verbleib(v) => {
+                    assert!(personen.contains(v.person), "{} nicht erfasst", v.person);
+                    if let Some(f) = v.fahrzeug {
+                        assert!(fahrzeuge.contains(f), "{f} nicht disponiert");
                     }
                 }
                 Vorgang::Bezirk(v) => {
@@ -2007,7 +2163,7 @@ mod tests {
                     assert!(einheiten.insert(v.schluessel), "{} doppelt", v.schluessel);
                 }
                 Vorgang::FahrzeugDisponieren { fahrzeug } => {
-                    assert!(FAHRZEUGE.iter().any(|f| f.schluessel == fahrzeug));
+                    assert!(sz.fahrzeuge.iter().any(|f| f.schluessel == fahrzeug));
                     assert!(fahrzeuge.insert(fahrzeug), "{fahrzeug} doppelt disponiert");
                 }
                 Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => {
@@ -2020,7 +2176,7 @@ mod tests {
                     assert!((0..=9).contains(&fms), "FMS {fms}");
                 }
                 Vorgang::PersonalDisponieren { personal: p } => {
-                    assert!(PERSONAL.iter().any(|v| v.schluessel == p));
+                    assert!(sz.personal.iter().any(|v| v.schluessel == p));
                     assert!(personal.insert(p), "{p} doppelt disponiert");
                 }
                 Vorgang::Etb { inhalt, .. } => assert!(!inhalt.trim().is_empty()),
@@ -2086,7 +2242,7 @@ mod tests {
     /// vorkommt, dazu die beiden `gebunden`-Kategorien der Dispositionen.
     #[test]
     fn einsatz_bedarf_folgt_dem_drehbuch() {
-        let bedarf = katalog_bedarf_einsatz();
+        let bedarf = STARKREGEN.katalog_bedarf_einsatz();
         for erwartet in [
             Katalogeintrag::Einheitstyp("Zug"),
             Katalogeintrag::Einheitstyp("Staffel"),
@@ -2108,7 +2264,7 @@ mod tests {
     /// Gefahren-Kombination, Geschlecht, Meldungs-Enums, Abschnitte der Vorlagen.
     #[test]
     fn fachwerte_sind_gueltig() {
-        for schritt in DREHBUCH {
+        for schritt in DemoLage::ALLE.iter().flat_map(|l| l.szenario().drehbuch) {
             match schritt.vorgang {
                 Vorgang::Gefahrengebiet(v) => {
                     assert!(crate::gefahr::Gefahrentyp::parse(v.gefahrentyp).is_some());
@@ -2121,6 +2277,31 @@ mod tests {
                 }
                 Vorgang::Person(v) => {
                     assert!(crate::person::Geschlecht::parse(v.geschlecht).is_some());
+                }
+                Vorgang::Verbleib(v) => {
+                    // Dieselben Paarungsregeln wie die Route (LLH-1332, LLH-1568).
+                    crate::routes::einsatz_person::pruefe_fahrer_angabe(
+                        v.art,
+                        v.status,
+                        v.durch,
+                        v.fahrzeug.map(|_| 0),
+                    )
+                    .unwrap_or_else(|e| panic!("{}: {e:?}", v.person));
+                    crate::routes::einsatz_person::pruefe_verbleib_angaben(
+                        v.art,
+                        v.status,
+                        v.durch,
+                        &crate::routes::einsatz_person::VerbleibAngaben {
+                            einsatznummer: v.einsatznummer.map(str::to_string),
+                            entlassen_an: v.entlassen_an,
+                            gegen_rat: v.gegen_rat,
+                            unterschrift: v.unterschrift,
+                        },
+                    )
+                    .unwrap_or_else(|e| panic!("{}: {e:?}", v.person));
+                    if let Some(n) = v.einsatznummer {
+                        assert!(n.chars().count() <= crate::person::EINSATZNUMMER_MAX);
+                    }
                 }
                 Vorgang::Meldung(v) => {
                     assert!(crate::meldung::meldungsart_gueltig(v.meldungsart));

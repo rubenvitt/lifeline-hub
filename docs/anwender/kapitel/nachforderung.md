@@ -360,6 +360,18 @@ Nachforderung gehört dann zu dieser Stelle: ihre Karte nennt die Stelle, ein Kl
 Wird die Stelle storniert, bleibt die Nachforderung mit ihrem Stand bestehen und verweist auf
 keine Stelle mehr; die Begründung bleibt, wie sie ist.
 
+### Rettungsmittel für einen Patienten
+
+„Rettungsmittel anfordern“ im Patientenkopf oder im Menü eines belegten Platzes der
+Unfallhilfsstelle öffnet dieses Formular mit „Für R-…“ ([Betroffene](betroffene.md)). Die
+Nachforderung gehört dann zu dieser Person und gilt für genau ein Rettungsmittel; ihre Karte nennt
+„Für R-…“, ein Klick öffnet die Person. Bei der Zusage steht statt „Zugesagt“ das Feld
+„Einsatznummer Leitstelle“, unter „Bearbeiten“ lässt sie sich ändern. Die Karte zeigt sie als
+„Einsatznr. …“, das Einsatztagebuch nennt sie nicht.
+
+Der Stand erscheint am Patienten und an der Unfallhilfsstelle, etwa „RTW unterwegs“ am Platz und im
+Wartebereich.
+
 ### Überfälliges Eintreffen
 
 Ist das erwartete Eintreffen einer zugesagten oder unterwegs gemeldeten Nachforderung verstrichen,

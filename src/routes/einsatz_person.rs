@@ -1911,7 +1911,7 @@ pub async fn verbleib(
 /// Paarung von Art, Status, Fahrer-Angabe und Fahrzeug (LLH-1332, Spec `patienten-uebergabe`):
 /// die Fahrer-Angabe nur beim Transport, ein Eigentransport nur mit Fahrzeug, ein Fahrzeug nur
 /// beim Eigentransport, die Übergabe nur beim Eigentransport. Jeder Verstoß ist 422.
-fn pruefe_fahrer_angabe(
+pub(crate) fn pruefe_fahrer_angabe(
     art: VerbleibArt,
     status: Option<VerbleibStatus>,
     durch: Option<TransportDurch>,
@@ -1935,18 +1935,18 @@ fn pruefe_fahrer_angabe(
 }
 
 /// Angaben am Verbleib aus LLH-1568, jede für sich schon geprüft (400).
-struct VerbleibAngaben {
-    einsatznummer: Option<String>,
-    entlassen_an: Option<crate::person::EntlassenAn>,
-    gegen_rat: Option<crate::person::GegenRat>,
-    unterschrift: Option<crate::person::Unterschrift>,
+pub(crate) struct VerbleibAngaben {
+    pub(crate) einsatznummer: Option<String>,
+    pub(crate) entlassen_an: Option<crate::person::EntlassenAn>,
+    pub(crate) gegen_rat: Option<crate::person::GegenRat>,
+    pub(crate) unterschrift: Option<crate::person::Unterschrift>,
 }
 
 /// Paarung der Angaben aus LLH-1568 mit der Art (Spec `verbleib-angaben`, design.md D3): die
 /// Einsatznummer nur beim fremden Transport, „Entlassen an“ nur bei der Entlassung, „Gegen Rat“
 /// bei Entlassung und Transport, die Unterschrift nur mit „Gegen Rat“, nichts davon an einer
 /// Übergabe. Jeder Verstoß ist 422.
-fn pruefe_verbleib_angaben(
+pub(crate) fn pruefe_verbleib_angaben(
     art: VerbleibArt,
     status: Option<VerbleibStatus>,
     durch: Option<TransportDurch>,

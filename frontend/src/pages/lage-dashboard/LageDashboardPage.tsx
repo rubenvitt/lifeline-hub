@@ -95,6 +95,7 @@ import {
   baueLagebild,
   evakuierungDatenzustand,
   evakuierungStand,
+  istSanitaetsdienstReihe,
   kennzahlReihe,
   lagebildZeit,
   reihenWechsel,
@@ -107,7 +108,13 @@ import {
 } from './lagebild';
 import { beurteilungHinweis, sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstrom';
-import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
+import {
+  GefahrenmatrixPaneel,
+  MeldungsstromPaneel,
+  SichtungsPaneel,
+  VerlaufPaneel,
+} from './LagePaneele';
+import { kontakteJeStunde } from './verlauf';
 import { versorgungsBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
@@ -344,7 +351,23 @@ export default function LageDashboardPage() {
     'Nachforderungen offen': nachforderungen.zustand,
     'Schäden offen': quellZustand.schaeden,
     Einsatzdauer: zustandVon(einsatzQuery),
+    Kontakte: zBetroffene,
+    'Letzte Stunde': zBetroffene,
+    'In Versorgung': zBetroffene,
+    Transporte: zBetroffene,
+    // Die Zahl kommt aus den Einheiten; die Notiz („meiste Kontakte“) aus den Personen. Ohne
+    // Personen bleibt die Zahl, die Notiz nennt nur den Bestand.
+    'Einheiten verfügbar': quellZustand.einheiten,
   };
+
+  // Reihe „Sanitätsdienst“ (LLH-1574): „Verlauf“ statt Gefahrenmatrix. Hängt an der gezeigten
+  // Reihe, damit Band und Paneel erst mit „übernehmen“ gemeinsam wechseln.
+  const sanitaetsdienst = reihe != null && istSanitaetsdienstReihe(reihe);
+  const personenListe = daten.personen;
+  const verlauf = useMemo(
+    () => kontakteJeStunde(personenListe ?? [], jetzt, konv),
+    [personenListe, jetzt, konv],
+  );
 
   // Eine gesperrte Quelle zählt nicht in den Datenstand (`stand` liefert dann 0).
   const datenstand = gemeinsamerDatenstand(
@@ -486,17 +509,27 @@ export default function LageDashboardPage() {
           </Kennzahlenband>
 
           <PaneelReihe kennung="lagebild-paneele">
-            <GefahrenmatrixPaneel
-              zustand={zMatrix}
-              zeilen={matrix.zeilen}
-              beurteilung={beurteilungHinweis(daten.gefahren ?? [])}
-              gebiete={anzahlGebiete}
-              onNeuladen={() => {
-                nachladen('gefahren');
-                for (const q of matrixQueries) void q.refetch();
-              }}
-              onGefahren={() => waehle(gefahrenPfad(einsatzId))}
-            />
+            {sanitaetsdienst ? (
+              <VerlaufPaneel
+                zustand={zBetroffene}
+                verlauf={verlauf}
+                onNeuladen={() => nachladen('personen')}
+                onPersonen={() => waehle(personenPfad(einsatzId))}
+                onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
+              />
+            ) : (
+              <GefahrenmatrixPaneel
+                zustand={zMatrix}
+                zeilen={matrix.zeilen}
+                beurteilung={beurteilungHinweis(daten.gefahren ?? [])}
+                gebiete={anzahlGebiete}
+                onNeuladen={() => {
+                  nachladen('gefahren');
+                  for (const q of matrixQueries) void q.refetch();
+                }}
+                onGefahren={() => waehle(gefahrenPfad(einsatzId))}
+              />
+            )}
             <SichtungsPaneel
               zustand={
                 zBetroffene === 'daten' && (daten.personen ?? []).length === 0

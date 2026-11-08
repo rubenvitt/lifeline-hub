@@ -31,7 +31,16 @@ import { warnstufeKennzahl } from '../../theme/statusFarben';
 import type { KennzahlTon } from '../../components/instrument';
 import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import { pegelKennzahl } from '../../pegel/pegelKennzahl';
-import { versorgungsBilanz } from '../../personen/personenBilanz';
+import {
+  anlassbild,
+  istAbgeschlossen,
+  istAngetroffen,
+  kontakteJeEinheit,
+  transportBilanz,
+  verbleibKlasse,
+  versorgungsBilanz,
+} from '../../personen/personenBilanz';
+import { ANLASS_REIHE, ANLASS_WORT } from '../../personen/personMeta';
 import type { EvakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import type { EvakuierungKennzahlZustand } from '../../betreuung/useEvakuierungKennzahl';
 import { kennzahlTeile } from '../../betreuung/betreuungText';
@@ -77,6 +86,12 @@ export const KENNZAHL_ETIKETTEN = [
   'Kräfte',
   'Vermisste',
   'Einsatzdauer',
+  // Reihe „Sanitätsdienst“ (LLH-1574)
+  'Kontakte',
+  'Letzte Stunde',
+  'In Versorgung',
+  'Transporte',
+  'Einheiten verfügbar',
 ] as const;
 
 export type KennzahlEtikett = (typeof KENNZAHL_ETIKETTEN)[number];
@@ -103,7 +118,7 @@ type Lageplatz = 'A' | 'B';
  * angeordnete Evakuierung geht ihm auf Platz B vor (Rang).
  */
 const LAGEKENNZAHL: Record<
-  Lagekennzahl,
+  Exclude<Lagekennzahl, 'sanitaetsdienst'>,
   { etikett: KennzahlEtikett; platz: Lageplatz; rang: number }
 > = {
   pegel: { etikett: 'Pegel', platz: 'A', rang: 0 },
@@ -122,13 +137,34 @@ const FUELLUNG: Record<Lageplatz, KennzahlEtikett> = {
 };
 
 /**
+ * Die Reihe „Sanitätsdienst“ (LLH-1574, `/mnt/project-files/llh-1574/design.md` D2): ein Zuschnitt
+ * der ganzen Reihe, kein Lageplatz. Vermisste bleiben als einzige Alarmzahl (Fundkind).
+ */
+export const SANITAETSDIENST_REIHE: readonly KennzahlEtikett[] = [
+  'Kontakte',
+  'Letzte Stunde',
+  'In Versorgung',
+  'Transporte',
+  'Einheiten verfügbar',
+  'Vermisste',
+];
+
+/** Ob eine Reihe der Zuschnitt „Sanitätsdienst“ ist: dann trägt das Lagebild den Verlauf statt
+ *  der Gefahrenmatrix. Hängt an der gezeigten Reihe, damit Band und Paneel gemeinsam wechseln. */
+export function istSanitaetsdienstReihe(reihe: readonly KennzahlEtikett[]): boolean {
+  return reihe[0] === SANITAETSDIENST_REIHE[0];
+}
+
+/**
  * Die sechs Etiketten eines Einsatzes aus seinen aktiven Lagekennzahlen. Plätze 2, 4, 5, 6 sind der
- * Kern, 1 und 3 die Lageplätze A und B. Rein.
+ * Kern, 1 und 3 die Lageplätze A und B. Ist die Reihe „Sanitätsdienst“ gewählt, gilt sie ganz;
+ * Pegel, Evakuierung und Nachforderungen wirken dann nicht. Rein.
  */
 export function kennzahlReihe(aktiv: readonly Lagekennzahl[]): KennzahlEtikett[] {
+  if (aktiv.includes('sanitaetsdienst')) return [...SANITAETSDIENST_REIHE];
   const belegung = (platz: Lageplatz): KennzahlEtikett => {
     const kandidaten = aktiv
-      .map((k) => LAGEKENNZAHL[k])
+      .flatMap((k) => (k === 'sanitaetsdienst' ? [] : [LAGEKENNZAHL[k]]))
       .filter((k) => k.platz === platz)
       .sort((a, b) => a.rang - b.rang);
     return kandidaten[0]?.etikett ?? FUELLUNG[platz];
@@ -360,6 +396,86 @@ function nachforderungenZelle(
   return { wert: String(z.zahl.offen), notiz: nachforderungenNotiz(z.zahl) };
 }
 
+/** Eine Stunde in Millisekunden. */
+const STUNDE_MS = 60 * 60_000;
+
+/**
+ * Kontakte, deren Erfassung in `(jetzt − 1 h, jetzt]` bzw. die Stunde davor fällt (Kennzahl „Letzte
+ * Stunde“, LLH-1574). Kontakt wie {@link anlassbild}: alle außer Vermissten. Rein.
+ */
+export function kontakteLetzteStunde(
+  personen: readonly Pick<Person, 'status' | 'erfasst_at'>[],
+  jetzt: number,
+): { letzte: number; davor: number } {
+  let letzte = 0;
+  let davor = 0;
+  for (const p of personen) {
+    // Ohne Erfassungszeit (Altstand, Testdaten) kein Beitrag statt eines Absturzes.
+    if (p.status === 'vermisst' || !p.erfasst_at) continue;
+    const t = wireAlsEpoche(p.erfasst_at);
+    if (!Number.isFinite(t) || t > jetzt) continue;
+    if (t > jetzt - STUNDE_MS) letzte++;
+    else if (t > jetzt - 2 * STUNDE_MS) davor++;
+  }
+  return { letzte, davor };
+}
+
+/** Notiz der Kennzahl „Kontakte“: Kontakte ohne Anlass, sonst der häufigste Anlass. Rein. */
+export function kontakteNotiz(personen: readonly Pick<Person, 'status' | 'anlass'>[]): string {
+  const bild = anlassbild(personen);
+  if (bild.gesamt === 0) return 'noch keine';
+  if (bild.je.ohne > 0) return `${bild.je.ohne} ohne Anlass`;
+  let meist = ANLASS_REIHE[0];
+  for (const a of ANLASS_REIHE) if (bild.je[a] > bild.je[meist]) meist = a;
+  return `meist ${ANLASS_WORT[meist]}`;
+}
+
+/**
+ * „In Versorgung“: angetroffene Personen, die nicht abgeschlossen sind; davon in einer UHS und
+ * unterwegs. Rein.
+ */
+export function inVersorgung(
+  personen: readonly Pick<
+    Person,
+    'status' | 'versorgung' | 'aktuelle_verbleib_art' | 'aktuelle_uhs_id'
+  >[],
+): { gesamt: number; inUhs: number; unterwegs: number } {
+  let gesamt = 0;
+  let inUhs = 0;
+  let unterwegs = 0;
+  for (const p of personen) {
+    if (!istAngetroffen(p) || istAbgeschlossen(p)) continue;
+    gesamt++;
+    const k = verbleibKlasse(p);
+    if (k === 'uhs') inUhs++;
+    else if (k === 'unterwegs') unterwegs++;
+  }
+  return { gesamt, inUhs, unterwegs };
+}
+
+/**
+ * „Einheiten verfügbar“: aktive Einheiten, deren Status der Kategorie „verfügbar“ angehört. Es gibt
+ * keinen Einheitentyp „Streife“; gezählt werden alle (design.md D2). Rein.
+ */
+export function einheitenVerfuegbar(
+  einheiten: readonly Pick<Einheit, 'aufgeloest_at' | 'status'>[],
+): { verfuegbar: number; aktiv: number } {
+  let verfuegbar = 0;
+  let aktiv = 0;
+  for (const e of einheiten) {
+    if (e.aufgeloest_at != null) continue;
+    aktiv++;
+    if (e.status.kategorie === 'verfuegbar') verfuegbar++;
+  }
+  return { verfuegbar, aktiv };
+}
+
+/** Notiz „Einheiten verfügbar“: Bestand und die Einheit mit den meisten Kontakten (LLH-1567). */
+function einheitenNotiz(aktiv: number, personen: readonly Person[]): string {
+  const meiste = kontakteJeEinheit(personen)[0];
+  return meiste ? `von ${aktiv} · ${meiste.name}: ${meiste.wert} Kontakte` : `von ${aktiv}`;
+}
+
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
@@ -419,6 +535,11 @@ export function baueLagebild(
   const bericht = neuesterLagebericht(r.lageberichte);
   const pegel = pegelKennzahl(r.pegel, jetzt, konv);
   const versorgung = versorgungsBilanz(r.personen);
+  const kontakte = anlassbild(r.personen);
+  const stunde = kontakteLetzteStunde(r.personen, jetzt);
+  const inVers = inVersorgung(r.personen);
+  const transporte = transportBilanz(r.personen);
+  const einheitenFrei = einheitenVerfuegbar(r.einheiten);
 
   // Jede Kennzahl, die das Band tragen kann; die Reihe wählt sechs davon. Der `Record` über
   // `KennzahlEtikett` erzwingt, dass jedes Etikett gebaut wird.
@@ -500,6 +621,45 @@ export function baueLagebild(
       ...einsatzdauerKennzahl(r.einsatz, jetzt, konv),
       ton: 'neutral',
       route: 'einsatzdaten',
+    },
+    // ── Reihe „Sanitätsdienst“ (LLH-1574, design.md D2): nur Zahlen, kein Personenbezug ──
+    Kontakte: {
+      // Abgeschlossene zählen mit: der versorgte und entlassene Fall ist der häufigste Kontakt.
+      etikett: 'Kontakte',
+      wert: String(kontakte.gesamt),
+      notiz: kontakteNotiz(r.personen),
+      ton: 'neutral',
+      route: 'personen',
+    },
+    'Letzte Stunde': {
+      etikett: 'Letzte Stunde',
+      wert: String(stunde.letzte),
+      notiz: `Stunde davor: ${stunde.davor}`,
+      ton: 'neutral',
+      route: 'personen',
+    },
+    'In Versorgung': {
+      etikett: 'In Versorgung',
+      wert: String(inVers.gesamt),
+      notiz: `${inVers.inUhs} in UHS · ${inVers.unterwegs} unterwegs`,
+      ton: 'neutral',
+      route: 'personen',
+    },
+    Transporte: {
+      // Wie der Einsatzbericht: eine Voranmeldung ist kein Transport.
+      etikett: 'Transporte',
+      wert: String(transporte.transportiert),
+      notiz: `${versorgung.unterwegs} unterwegs`,
+      ton: 'neutral',
+      route: 'personen',
+    },
+    'Einheiten verfügbar': {
+      // Achtung erst, wenn es Einheiten gibt und keine frei ist.
+      etikett: 'Einheiten verfügbar',
+      wert: String(einheitenFrei.verfuegbar),
+      notiz: einheitenNotiz(einheitenFrei.aktiv, r.personen),
+      ton: einheitenFrei.aktiv > 0 && einheitenFrei.verfuegbar === 0 ? 'achtung' : 'neutral',
+      route: 'einheiten',
     },
   };
   const kennzahlen = reihe.map((e) => alle[e]);

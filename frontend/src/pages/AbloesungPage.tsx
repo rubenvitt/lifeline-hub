@@ -35,6 +35,7 @@ import {
 } from '../abloesung/besatzung';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
+import SchichtplanAnsicht from '../abloesung/schichtplan/SchichtplanAnsicht';
 import {
   AbloeserDialog,
   RhythmusDialog,
@@ -188,20 +189,29 @@ export default function AbloesungPage() {
   const jetzt = useUhr();
   const { istSchmal } = useViewport();
 
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const [searchParams, setSearchParams] = useSearchParams();
-  const ansicht: Ansicht = parseAbloesungAnsicht(searchParams) ?? 'laufend';
+  // Ohne Parameter die Vorgabe der Seite: im Sanitätsdienst (Einsatz-Vorlage „Sanitätsdienst“)
+  // der Schichtplan, sonst die laufenden Schichten (LLH-1554). Die Seite zeigt erst mit dem
+  // Einsatz etwas, die Vorgabe steht also, bevor eine Ansicht gerendert wird.
+  const vorgabeAnsicht: Ansicht =
+    einsatzQuery.data?.einsatzart === 'sanitaetsdienst' ? 'plan' : 'laufend';
+  const ansicht: Ansicht = parseAbloesungAnsicht(searchParams) ?? vorgabeAnsicht;
   const setAnsicht = useCallback(
     (a: Ansicht) =>
       setSearchParams(
         (p) => {
           const n = new URLSearchParams(p);
-          if (a === 'laufend') n.delete('ansicht');
+          if (a === vorgabeAnsicht) n.delete('ansicht');
           else n.set('ansicht', a);
           return n;
         },
         { replace: true },
       ),
-    [setSearchParams],
+    [setSearchParams, vorgabeAnsicht],
   );
   // Ein Sprung `?schicht=` wählt die Ansicht erst, wenn sein Parameter geräumt ist: das Räumen
   // (`useQueryParamSelektion`) schreibt die Adresse aus demselben Stand und überschriebe sonst
@@ -237,10 +247,6 @@ export default function AbloesungPage() {
     ...LEERER_ZUFLUSSSTAND,
   });
 
-  const einsatzQuery = useQuery({
-    queryKey: einsatzKeys.einsatz(einsatzId),
-    queryFn: () => ladeEinsatz(einsatzId),
-  });
   const laufendQuery = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
@@ -751,6 +757,12 @@ export default function AbloesungPage() {
   // für „1 neu“ (gemessen in `e2e/gate1-ueberlauf.spec.ts`).
   const segmentZahl = (n: number | undefined) => (istSchmal || n == null ? '' : ` (${n})`);
   const ohneWort = istSchmal && token.controlHeight >= 72 ? 'Ohne\nSchicht' : 'Ohne Schicht';
+  // Ein Ansichtswechsel ist die Bitte, den aktuellen Stand zu sehen.
+  const wechsleAnsicht = (w: Ansicht) => {
+    gibFrei();
+    gibOhneFrei();
+    setAnsicht(w);
+  };
 
   return (
     <EinsatzSeite
@@ -794,57 +806,70 @@ export default function AbloesungPage() {
         )
       }
     >
-      {/* Die Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen
-          (Segmentleiste und Banner tragen beide einen 1-px-Rand). Das Banner ändert ihre Höhe
-          nicht, also verschiebt es keine Karte. */}
-      <Flex
-        // Schmal nur `marginXS` (Muster Verpflegung, LLH-1040): die Segmente rücken in ihrer Zelle
-        // um den Zielabstand ein, die Ziele stehen so weiter ≥ 16 px auseinander.
-        gap={istSchmal ? token.marginXS : token.marginSM}
-        align="center"
-        data-lfh="abloesung-werkzeugzeile"
-        style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
-      >
+      {/* Auf dem Handschirm trüge die Werkzeugzeile neben vier Segmenten kein Banner mehr (im
+          Handschuh-Betrieb füllen vier allein die Zeile, LLH-1554). Dort wählt eine eigene Leiste
+          darüber zwischen den Schichten und dem Plan; die Werkzeugzeile bleibt wie bisher. */}
+      {istSchmal && (
         <Segmentleiste
           beschriftung="Ansicht"
-          wert={wirksam}
-          onWechsel={(w) => {
-            // Ein Ansichtswechsel ist die Bitte, den aktuellen Stand zu sehen.
-            gibFrei();
-            gibOhneFrei();
-            setAnsicht(w);
-          }}
+          wert={wirksam === 'plan' ? 'plan' : 'schichten'}
+          onWechsel={(w) => wechsleAnsicht(w === 'plan' ? 'plan' : 'laufend')}
           optionen={[
-            { wert: 'laufend', label: `Laufend${segmentZahl(laufende.length)}` },
-            {
-              wert: 'ohne-schicht',
-              label: `${ohneWort}${segmentZahl(ohneZahl)}`,
-              gesperrt: einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined,
-            },
-            { wert: 'vergangen', label: 'Vergangen' },
+            { wert: 'schichten', label: 'Schichten' },
+            { wert: 'plan', label: 'Plan' },
           ]}
-          style={{ flex: 'none' }}
+          style={{ marginBottom: token.margin }}
         />
-        {banner?.zeigen && (
-          <Sammelbanner
-            aktion={{ label: 'anzeigen', onKlick: banner.onKlick }}
-            kurz={istSchmal ? banner.kurz : undefined}
-            style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
-          >
-            <span
-              title={banner.text}
-              style={{
-                display: 'block',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
+      )}
+      {/* Die Werkzeugzeile: immer gerendert (auf dem Handschirm außer im Plan), `nowrap`,
+          Mindesthöhe = Steuerhöhe + 2 px Rahmen (Segmentleiste und Banner tragen beide einen
+          1-px-Rand). Das Banner ändert ihre Höhe nicht, also verschiebt es keine Karte. */}
+      {!(istSchmal && wirksam === 'plan') && (
+        <Flex
+          // Schmal nur `marginXS` (Muster Verpflegung, LLH-1040): die Segmente rücken in ihrer Zelle
+          // um den Zielabstand ein, die Ziele stehen so weiter ≥ 16 px auseinander.
+          gap={istSchmal ? token.marginXS : token.marginSM}
+          align="center"
+          data-lfh="abloesung-werkzeugzeile"
+          style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
+        >
+          <Segmentleiste
+            beschriftung={istSchmal ? 'Schichten' : 'Ansicht'}
+            wert={wirksam}
+            onWechsel={wechsleAnsicht}
+            optionen={[
+              { wert: 'laufend', label: `Laufend${segmentZahl(laufende.length)}` },
+              {
+                wert: 'ohne-schicht',
+                label: `${ohneWort}${segmentZahl(ohneZahl)}`,
+                gesperrt: einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined,
+              },
+              { wert: 'vergangen', label: 'Vergangen' },
+              ...(istSchmal ? [] : [{ wert: 'plan' as const, label: 'Schichtplan' }]),
+            ]}
+            style={{ flex: 'none' }}
+          />
+          {banner?.zeigen && (
+            <Sammelbanner
+              aktion={{ label: 'anzeigen', onKlick: banner.onKlick }}
+              kurz={istSchmal ? banner.kurz : undefined}
+              style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
             >
-              {banner.text}
-            </span>
-          </Sammelbanner>
-        )}
-      </Flex>
+              <span
+                title={banner.text}
+                style={{
+                  display: 'block',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {banner.text}
+              </span>
+            </Sammelbanner>
+          )}
+        </Flex>
+      )}
       {/* Der Grund des gesperrten Segments sichtbar unter der Leiste (LLH-1462, LFH-1078): der
           Tooltip des Segments erreicht kein Tablet, und im Segment selbst fehlt neben dem Banner
           der Platz. Er hängt nur an den Freigaben, verschiebt also beim Arbeiten nichts. */}
@@ -873,7 +898,14 @@ export default function AbloesungPage() {
         />
       )}
 
-      {wirksam === 'ohne-schicht' ? (
+      {wirksam === 'plan' ? (
+        <SchichtplanAnsicht
+          einsatzId={einsatzId}
+          einsatzBeginn={einsatz.begonnen_at}
+          darfSchreiben={darfSchreiben}
+          abschnitte={vorgaben}
+        />
+      ) : wirksam === 'ohne-schicht' ? (
         <>
           {ohneFehler && (
             <Alert
@@ -966,88 +998,93 @@ export default function AbloesungPage() {
         </>
       )}
 
-      <Paneel titel="Rhythmus je Abschnitt" style={{ marginTop: token.marginLG }}>
-        {vorgaben.length === 0 ? (
-          <Text type="secondary" style={{ display: 'block', padding: token.paddingSM }}>
-            Keine Einsatzabschnitte
-          </Text>
-        ) : (
-          vorgaben.map((v) => (
-            <PaneelZeile key={v.abschnitt_id}>
+      {/* Rhythmus und Vorgabe gehören zu den Schichten, nicht zum Plan. */}
+      {wirksam !== 'plan' && (
+        <>
+          <Paneel titel="Rhythmus je Abschnitt" style={{ marginTop: token.marginLG }}>
+            {vorgaben.length === 0 ? (
+              <Text type="secondary" style={{ display: 'block', padding: token.paddingSM }}>
+                Keine Einsatzabschnitte
+              </Text>
+            ) : (
+              vorgaben.map((v) => (
+                <PaneelZeile key={v.abschnitt_id}>
+                  <Flex
+                    justify="space-between"
+                    align="center"
+                    gap={token.marginXS}
+                    wrap
+                    style={{ width: '100%' }}
+                  >
+                    <span>
+                      <Text strong>{v.abschnitt_name}</Text>{' '}
+                      <Text type="secondary">
+                        {v.rhythmus_minuten != null
+                          ? `Rhythmus ${formatDauer(v.rhythmus_minuten)}`
+                          : 'keine Vorgabe'}
+                        {v.laufende_schichten > 0 ? ` · ${v.laufende_schichten} laufend` : ''}
+                      </Text>
+                    </span>
+                    {darfSchreiben && (
+                      <Button
+                        type="text"
+                        icon={<IconStift />}
+                        aria-label={`Rhythmus-Vorgabe ${v.abschnitt_name} ändern`}
+                        onClick={() => {
+                          vorgabeMut.reset();
+                          setRhythmusZiel({ art: 'abschnitt', vorgabe: v });
+                        }}
+                      />
+                    )}
+                  </Flex>
+                </PaneelZeile>
+              ))
+            )}
+          </Paneel>
+
+          {/* Unter den Abschnitten, wie in der Rangfolge: sie gilt, wo der Abschnitt keine hat. */}
+          <Paneel titel="Vorgabe des Einsatzes" style={{ marginTop: token.marginLG }}>
+            <PaneelZeile>
               <Flex
                 justify="space-between"
                 align="center"
                 gap={token.marginXS}
                 wrap
                 style={{ width: '100%' }}
+                data-lfh="abloesung-einsatzvorgabe"
               >
-                <span>
-                  <Text strong>{v.abschnitt_name}</Text>{' '}
+                {einsatzModell ? (
+                  <span>
+                    <Text strong>{einsatzModell.bezeichnung}</Text>{' '}
+                    <Text type="secondary">
+                      {formatRegel(einsatzModell, konventionen)} · Vorwarnung{' '}
+                      {formatDauer(einsatzModell.vorwarnung_minuten)}
+                      {einsatzVorgabeQuery.data && einsatzVorgabeQuery.data.laufende_schichten > 0
+                        ? ` · ${einsatzVorgabeQuery.data.laufende_schichten} laufend`
+                        : ''}
+                    </Text>
+                  </span>
+                ) : (
                   <Text type="secondary">
-                    {v.rhythmus_minuten != null
-                      ? `Rhythmus ${formatDauer(v.rhythmus_minuten)}`
-                      : 'keine Vorgabe'}
-                    {v.laufende_schichten > 0 ? ` · ${v.laufende_schichten} laufend` : ''}
+                    {einsatzVorgabeQuery.isError ? 'nicht geladen' : 'keine Vorgabe'}
                   </Text>
-                </span>
+                )}
                 {darfSchreiben && (
+                  // Ein Sprung, keine Handlung (LFH-616): gesetzt wird in den Einsatz-Einstellungen.
+                  // Als Knopf mit `href`, damit das Ziel die Steuerhöhe trägt (LFH-365).
                   <Button
                     type="text"
                     icon={<IconStift />}
-                    aria-label={`Rhythmus-Vorgabe ${v.abschnitt_name} ändern`}
-                    onClick={() => {
-                      vorgabeMut.reset();
-                      setRhythmusZiel({ art: 'abschnitt', vorgabe: v });
-                    }}
+                    href={einsatzVorgabePfad}
+                    onClick={zurEinsatzVorgabe}
+                    aria-label="Vorgabe des Einsatzes ändern"
                   />
                 )}
               </Flex>
             </PaneelZeile>
-          ))
-        )}
-      </Paneel>
-
-      {/* Unter den Abschnitten, wie in der Rangfolge: sie gilt, wo der Abschnitt keine hat. */}
-      <Paneel titel="Vorgabe des Einsatzes" style={{ marginTop: token.marginLG }}>
-        <PaneelZeile>
-          <Flex
-            justify="space-between"
-            align="center"
-            gap={token.marginXS}
-            wrap
-            style={{ width: '100%' }}
-            data-lfh="abloesung-einsatzvorgabe"
-          >
-            {einsatzModell ? (
-              <span>
-                <Text strong>{einsatzModell.bezeichnung}</Text>{' '}
-                <Text type="secondary">
-                  {formatRegel(einsatzModell, konventionen)} · Vorwarnung{' '}
-                  {formatDauer(einsatzModell.vorwarnung_minuten)}
-                  {einsatzVorgabeQuery.data && einsatzVorgabeQuery.data.laufende_schichten > 0
-                    ? ` · ${einsatzVorgabeQuery.data.laufende_schichten} laufend`
-                    : ''}
-                </Text>
-              </span>
-            ) : (
-              <Text type="secondary">
-                {einsatzVorgabeQuery.isError ? 'nicht geladen' : 'keine Vorgabe'}
-              </Text>
-            )}
-            {darfSchreiben && (
-              // Ein Sprung, keine Handlung (LFH-616): gesetzt wird in den Einsatz-Einstellungen.
-              // Als Knopf mit `href`, damit das Ziel die Steuerhöhe trägt (LFH-365).
-              <Button
-                type="text"
-                icon={<IconStift />}
-                href={einsatzVorgabePfad}
-                onClick={zurEinsatzVorgabe}
-                aria-label="Vorgabe des Einsatzes ändern"
-              />
-            )}
-          </Flex>
-        </PaneelZeile>
-      </Paneel>
+          </Paneel>
+        </>
+      )}
 
       {/* Dialoge werden je Ziel frisch montiert: `initialValues` greift nur beim Einhängen, und
           der Speicher von rc-field-form überlebt sonst ein Schließen. */}

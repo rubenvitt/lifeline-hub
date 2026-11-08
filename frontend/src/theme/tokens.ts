@@ -518,6 +518,36 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
 };
 
 /**
+ * Säulen des Paneels „Verlauf“ im Lagebild Sanitätsdienst (LLH-1574, design.md D3): Kontakte je
+ * Stunde, gestapelt nach Anlass. Vier feste Anlässe tragen eine eigene Farbe, die übrigen vier und
+ * „ohne Anlass“ teilen sich das Grau `uebrige`: neun Farben liest niemand auseinander, und die
+ * Farbe folgt dem Anlass, nie seinem Rang. Kategorische Reihenfolge Blau, Orange, Violett, Aqua;
+ * bewusst kein Rot, Gelb oder Grün (Statusrollen). Geprüft mit dem Paletten-Validator (OKLab):
+ * benachbarte Paare ΔE ≥ 22,9 (Tag) bzw. 17,3 (Nacht) unter Deuteranopie, jede Farbe ≥ 3 : 1 auf
+ * `flaeche`; das Grau 3,74 : 1 (Tag) bzw. 3,91 : 1 (Nacht). Der zweite Kanal ist die Legende mit
+ * Wort und die Ablesung je Säule. `AnlassVerlaufTon` steht hier ohne API-Typ (wie
+ * {@link FachebeneTon}); die Abbildung vom Anlass steht in `pages/lage-dashboard/verlauf.ts`.
+ */
+export type AnlassVerlaufTon =
+  'verletzung' | 'internistisch' | 'intoxikation' | 'hitze_kaelte' | 'uebrige';
+
+export const anlassVerlaufFarbenHell: Record<AnlassVerlaufTon, string> = {
+  verletzung: '#2a78d6',
+  internistisch: '#eb6834',
+  intoxikation: '#6250d6',
+  hitze_kaelte: '#16946a',
+  uebrige: '#7d858e',
+};
+
+export const anlassVerlaufFarbenDunkel: Record<AnlassVerlaufTon, string> = {
+  verletzung: '#3987e5',
+  internistisch: '#d95926',
+  intoxikation: '#9085e9',
+  hitze_kaelte: '#199e70',
+  uebrige: '#6b737c',
+};
+
+/**
  * Ausmaß eines Schadens (LLH-1141), gespiegelt aus `Ausmass` der API plus `unbekannt` für einen
  * Schaden ohne Ausmaß, damit diese Datei keine API-Typen zieht (wie {@link FachebeneTon}). Die
  * Abbildung steht exhaustiv in `pages/lagekarte/taktischesZeichen.ts` (`AUSMASS_FARBE`).

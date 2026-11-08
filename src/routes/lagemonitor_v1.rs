@@ -70,6 +70,10 @@ pub struct LagemonitorEinsatz {
     /// Zusammenfassung des jüngsten freigegebenen Lageberichts; `null` ohne einen.
     #[schema(required)]
     pub lagemeldung: Option<LagemonitorLagemeldung>,
+    /// Hilfeleistungen in Zahlen, nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist
+    /// (LLH-1574). Neues optionales Feld, `api_version` bleibt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sanitaetsdienst: Option<super::lagemonitor::LagemonitorSanitaetsdienst>,
 }
 
 /// Eine UHS in Zahlen.
@@ -159,6 +163,7 @@ pub async fn lage(
             .collect(),
         sofortmeldungen_offen: verdichtet.sofortmeldungen_offen,
         lagemeldung: lagemeldung(pool, einsatz_id).await?,
+        sanitaetsdienst: verdichtet.sanitaetsdienst,
     };
     Ok(Json(LagemonitorLage {
         api_version: API_VERSION,

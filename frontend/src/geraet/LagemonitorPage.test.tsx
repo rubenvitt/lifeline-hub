@@ -312,6 +312,34 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     });
   }
 
+  it('Reihe Sanitätsdienst: „Hilfeleistungen“ statt „Betroffene“, SK I bleibt (LLH-1574)', async () => {
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        sanitaetsdienst: {
+          kontakte: 41,
+          kontakte_letzte_stunde: 9,
+          in_versorgung: 5,
+          transporte: 3,
+        },
+      });
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Hilfeleistungen' });
+    expect(screen.queryByRole('region', { name: 'Betroffene' })).toBeNull();
+    for (const [wert, wort] of [
+      ['41', 'Kontakte'],
+      ['9', 'letzte Stunde'],
+      ['5', 'in Versorgung'],
+      ['3', 'Transporte'],
+    ]) {
+      expect(within(kachel).getByText(wort).closest('[data-lfh="monitor-zahl"]')).toHaveTextContent(
+        `${wert}${wort}`,
+      );
+    }
+    expect(within(kachel).getByText('SK I')).toBeInTheDocument();
+  });
+
   it('Zwei offene Sofortmeldungen: „Sofortmeldungen offen 2“', async () => {
     bereit();
     lagebildAntwort = () => HttpResponse.json({ ...lage, sofortmeldungen_offen: 2 });

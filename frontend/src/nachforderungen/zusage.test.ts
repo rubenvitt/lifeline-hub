@@ -6,6 +6,7 @@ import {
   aenderungBody,
   aenderungStart,
   bereinigeWer,
+  mitEinsatznummer,
   zusageBody,
   zusageStart,
   zusageZeilen,
@@ -37,7 +38,12 @@ const ABSCHNITTE = [{ id: 9, name: 'EA Süd' }];
 
 describe('Zusage (LLH-1097 D1–D3)', () => {
   it('Vorgabe ist die angeforderte Menge', () => {
-    expect(zusageStart(nf())).toEqual({ anzahl: 2, wer: [], eintreffen: null });
+    expect(zusageStart(nf())).toEqual({
+      anzahl: 2,
+      wer: [],
+      eintreffen: null,
+      einsatznummer: '',
+    });
     expect(zusageStart(nf({ anzahl: null })).anzahl).toBeNull();
   });
 
@@ -123,5 +129,51 @@ describe('Bearbeiten (LLH-1097 D9)', () => {
     expect(aenderungBody(zugesagt, sz, { ...sz, eintreffen: null }, [], [])).toEqual({
       eintreffen_erwartet_at: null,
     });
+  });
+});
+
+describe('Einsatznummer der Leitstelle (LLH-1573 D5)', () => {
+  const start = (n: Nachforderung) => aenderungStart(n, '', null);
+
+  it('nur mit Personenbezug', () => {
+    expect(mitEinsatznummer(nf())).toBe(false);
+    expect(mitEinsatznummer(nf({ person_id: 7 }))).toBe(true);
+  });
+
+  it('Zusage schickt die Nummer getrimmt, leer gar nicht', () => {
+    const w = zusageStart(nf({ anzahl: 1, person_id: 7 }));
+    expect(zusageBody({ ...w, einsatznummer: ' 2611-0815 ' })).toEqual({
+      anzahl: 1,
+      leitstelle_einsatznummer: '2611-0815',
+    });
+    expect(zusageBody({ ...w, einsatznummer: '  ' })).toEqual({ anzahl: 1 });
+  });
+
+  it('Bearbeiten: geändert, geleert oder unverändert', () => {
+    const n = nf({
+      anzahl: 1,
+      person_id: 7,
+      status: 'zugesagt',
+      leitstelle_einsatznummer: '2611-0815',
+    });
+    const s = start(n);
+    expect(s.einsatznummer).toBe('2611-0815');
+    expect(aenderungBody(n, s, s, [], [])).toEqual({});
+    expect(aenderungBody(n, s, { ...s, einsatznummer: '2611-0816' }, [], [])).toEqual({
+      leitstelle_einsatznummer: '2611-0816',
+    });
+    expect(aenderungBody(n, s, { ...s, einsatznummer: '' }, [], [])).toEqual({
+      leitstelle_einsatznummer: null,
+    });
+    // Ohne Personenbezug geht die Nummer nie mit.
+    const ohne = nf({ status: 'zugesagt' });
+    const so = start(ohne);
+    expect(aenderungBody(ohne, so, { ...so, einsatznummer: 'x' }, [], [])).toEqual({});
+  });
+
+  it('die Karte nennt die Nummer', () => {
+    expect(zusageZeilen(nf({ leitstelle_einsatznummer: '2611-0815' }))).toContain(
+      'Einsatznr. 2611-0815',
+    );
   });
 });

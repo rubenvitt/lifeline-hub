@@ -1840,12 +1840,12 @@ export interface components {
              */
             mitbenutzt: number;
         };
-        /** @description Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte. */
+        /**
+         * @description Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte: je Lage ein
+         *     Eintrag, immer alle Lagen in der Reihenfolge von [`DemoLage::ALLE`].
+         */
         DemoDatenStatus: {
-            bericht?: components["schemas"]["DemoBericht"] | null;
-            import?: components["schemas"]["DemoImportKopf"] | null;
-            /** @description Ob für die Organisation ein aktiver Import besteht. */
-            importiert: boolean;
+            lagen: components["schemas"]["DemoLageStatus"][];
         };
         /** @description Kopf eines aktiven Imports. */
         DemoImportKopf: {
@@ -1856,6 +1856,20 @@ export interface components {
             id: number;
             /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             importiert_at: string;
+        };
+        /**
+         * @description Eine Demo-Lage (LLH-1576, design.md D1). Wire == `as_str()` == `demo_import.szenario`
+         *     (CHECK in `migrations/0290_demo_import_szenario.sql`) == Pfadsegment der Routen.
+         * @enum {string}
+         */
+        DemoLage: "starkregen" | "stadtfest";
+        /** @description Stand einer Lage. */
+        DemoLageStatus: {
+            bericht?: components["schemas"]["DemoBericht"] | null;
+            import?: components["schemas"]["DemoImportKopf"] | null;
+            /** @description Ob für die Organisation ein aktiver Import dieser Lage besteht. */
+            importiert: boolean;
+            lage: components["schemas"]["DemoLage"];
         };
         /**
          * @description Stammdatenart im Bericht. Wire == `as_str()`.
@@ -4188,7 +4202,7 @@ export interface components {
          *     Reihenfolge der Ausgabe von [`ableiten`].
          * @enum {string}
          */
-        Lagekennzahl: "pegel" | "evakuiert" | "nachforderungen";
+        Lagekennzahl: "pegel" | "evakuiert" | "nachforderungen" | "sanitaetsdienst";
         /** @description Antwort der Wahl: die gespeicherten gewählten Lagekennzahlen. */
         LagekennzahlWahl: {
             gewaehlt: components["schemas"]["Lagekennzahl"][];
@@ -4221,6 +4235,7 @@ export interface components {
              *     [`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen.
              */
             programm: components["schemas"]["Programmpunkt"][];
+            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
             /**
              * Format: int64
              * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
@@ -4278,6 +4293,7 @@ export interface components {
             einsatzart: components["schemas"]["Einsatzart"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             lagemeldung: components["schemas"]["LagemonitorLagemeldung"] | null;
+            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
             /**
              * Format: int64
              * @description Unbestätigte, nicht erledigte Sofortmeldungen; nur die Zahl.
@@ -4311,6 +4327,34 @@ export interface components {
             /** @description Freigabe des Lageberichts (UTC, SQLite-Format). */
             freigegeben_at: string;
             text: string;
+        };
+        /**
+         * @description Hilfeleistungen in Zahlen für die Reihe „Sanitätsdienst“ (LLH-1574, design.md D6): dieselben
+         *     Regeln wie die Kennzahlen des Lagebilds (`pages/lage-dashboard/lagebild.ts`). Nur Zahlen.
+         */
+        LagemonitorSanitaetsdienst: {
+            /**
+             * Format: int64
+             * @description Angetroffene, die noch nicht abgeschlossen sind (offen oder unterwegs).
+             */
+            in_versorgung: number;
+            /**
+             * Format: int64
+             * @description Kontakte: alle Personen außer Vermissten, Abgeschlossene eingeschlossen
+             *     (`anlassbild().gesamt` im Client).
+             */
+            kontakte: number;
+            /**
+             * Format: int64
+             * @description Kontakte, die in den letzten 60 Minuten erfasst wurden.
+             */
+            kontakte_letzte_stunde: number;
+            /**
+             * Format: int64
+             * @description Transporte wie im Einsatzbericht (`transportBilanz().transportiert`): Verbleib Transport,
+             *     nicht nur angemeldet.
+             */
+            transporte: number;
         };
         /** @description Eine nicht aufgelöste UHS mit ihrer Belegung als Zahl. */
         LagemonitorUhs: {
@@ -4922,12 +4966,26 @@ export interface components {
             id: number;
             /** @description Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen'). */
             ist_offen: boolean;
+            /** @description Einsatznummer der Leitstelle aus der Zusage (D5); fehlt ohne Angabe. */
+            leitstelle_einsatznummer?: string | null;
             /**
              * @description Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
              *     Materialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:
              *     Bezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material.
              */
             material_ids: number[];
+            /**
+             * Format: int64
+             * @description Person, für die angefordert wurde (LLH-1573 design.md D1/D2): nur beim Anlegen gesetzt,
+             *     danach fest. Fehlt ohne Bezug.
+             */
+            person_id?: number | null;
+            /**
+             * Format: int64
+             * @description Abgeleitet: Registriernummer dieser Person für „Für R-12“ (D7). Pseudonym wie im ETB; den
+             *     Namen liest die Oberfläche nie von hier.
+             */
+            person_registrier_nr?: number | null;
             prioritaet: components["schemas"]["Prioritaet"];
             status: components["schemas"]["NachforderungStatus"];
             /**
@@ -5577,6 +5635,7 @@ export interface components {
             pat_nummer?: string | null;
             /** Format: int64 */
             registrier_nr: number;
+            rettungsmittel?: components["schemas"]["RettungsmittelStand"] | null;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
             transport_art?: components["schemas"]["TransportArt"] | null;
@@ -5997,6 +6056,21 @@ export interface components {
             name: string;
             region: string;
             slug: string;
+        };
+        /**
+         * @description Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus
+         *     einem `json_object` in `repo::SELECT_ALLE`. Nur, was Kopf, UHS und die Vorbelegung des
+         *     Verbleibs brauchen (D6): Art, Status, Rufnamen der Zusage, Eintreffen, Einsatznummer.
+         */
+        RettungsmittelStand: {
+            art: string;
+            eintreffen_erwartet_at?: string | null;
+            leitstelle_einsatznummer?: string | null;
+            /** Format: int64 */
+            nachforderung_id: number;
+            /** @description Zugesagte Rufnamen in Eingabefolge, leer ohne Angabe. */
+            rufnamen: string[];
+            status: components["schemas"]["NachforderungStatus"];
         };
         /**
          * @description Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.

@@ -786,13 +786,15 @@ fn stab_sachgebiet_wire() {
 
 /// LFH-640: Lagekennzahlen am Einsatz — der Auslöser der Lageplätze im Lage-Dashboard. Das
 /// Frontend bildet die Werte in `pages/lage-dashboard/lagebild.ts` exhaustiv auf Plätze ab.
-/// `nachforderungen` (LLH-1371) ist zugleich der Wert im CHECK von `einsatz_lagekennzahl_wahl`.
+/// `nachforderungen` (LLH-1371) und `sanitaetsdienst` (LLH-1574) sind zugleich die Werte im CHECK
+/// von `einsatz_lagekennzahl_wahl` (0289).
 #[test]
 fn einsatz_lagekennzahl_wire() {
     enum_wire_as_str!(lifeline_hub::einsatz::lagekennzahl::Lagekennzahl {
         Pegel,
         Evakuiert,
-        Nachforderungen
+        Nachforderungen,
+        Sanitaetsdienst
     });
 }
 
@@ -1313,6 +1315,11 @@ fn demo_bericht_enums_wire() {
         EinheitVorlage => "einheit_vorlage",
         Schichtmodell => "schichtmodell",
     });
+    // LLH-1576: Die Lage steht im Pfad und als `szenario` am Import-Kopf (CHECK in 0290).
+    enum_wire!(lifeline_hub::demo::DemoLage {
+        Starkregen => "starkregen",
+        Stadtfest => "stadtfest",
+    } in lifeline_hub::demo::DemoLage::ALLE);
 }
 
 #[test]

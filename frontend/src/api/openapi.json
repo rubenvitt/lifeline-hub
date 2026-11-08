@@ -4492,36 +4492,16 @@
       },
       "DemoDatenStatus": {
         "type": "object",
-        "description": "Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte.",
+        "description": "Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte: je Lage ein\nEintrag, immer alle Lagen in der Reihenfolge von [`DemoLage::ALLE`].",
         "required": [
-          "importiert"
+          "lagen"
         ],
         "properties": {
-          "bericht": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DemoBericht",
-                "description": "Bericht des letzten Vorgangs (Import oder Entfernen); fehlt, wenn es keinen gab."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "import": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DemoImportKopf",
-                "description": "Der aktive Import; fehlt, wenn keiner besteht."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "importiert": {
-            "type": "boolean",
-            "description": "Ob für die Organisation ein aktiver Import besteht."
+          "lagen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoLageStatus"
+            }
           }
         }
       },
@@ -4549,6 +4529,53 @@
           "importiert_at": {
             "type": "string",
             "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
+      },
+      "DemoLage": {
+        "type": "string",
+        "description": "Eine Demo-Lage (LLH-1576, design.md D1). Wire == `as_str()` == `demo_import.szenario`\n(CHECK in `migrations/0290_demo_import_szenario.sql`) == Pfadsegment der Routen.",
+        "enum": [
+          "starkregen",
+          "stadtfest"
+        ]
+      },
+      "DemoLageStatus": {
+        "type": "object",
+        "description": "Stand einer Lage.",
+        "required": [
+          "lage",
+          "importiert"
+        ],
+        "properties": {
+          "bericht": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DemoBericht",
+                "description": "Bericht des letzten Vorgangs (Import oder Entfernen) dieser Lage; fehlt, wenn es keinen\ngab."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "import": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DemoImportKopf",
+                "description": "Der aktive Import; fehlt, wenn keiner besteht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "importiert": {
+            "type": "boolean",
+            "description": "Ob für die Organisation ein aktiver Import dieser Lage besteht."
+          },
+          "lage": {
+            "$ref": "#/components/schemas/DemoLage"
           }
         }
       },
@@ -10374,7 +10401,8 @@
         "enum": [
           "pegel",
           "evakuiert",
-          "nachforderungen"
+          "nachforderungen",
+          "sanitaetsdienst"
         ]
       },
       "LagekennzahlWahl": {
@@ -10466,6 +10494,17 @@
               "$ref": "#/components/schemas/Programmpunkt"
             },
             "description": "Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens\n[`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen."
+          },
+          "sanitaetsdienst": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorSanitaetsdienst",
+                "description": "Hilfeleistungen in Zahlen, nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist\n(LLH-1574); dann zeigt der Monitor sie statt der Sichtungszeile."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sofortmeldungen_offen": {
             "type": "integer",
@@ -10598,6 +10637,17 @@
               }
             ]
           },
+          "sanitaetsdienst": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorSanitaetsdienst",
+                "description": "Hilfeleistungen in Zahlen, nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist\n(LLH-1574). Neues optionales Feld, `api_version` bleibt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sofortmeldungen_offen": {
             "type": "integer",
             "format": "int64",
@@ -10703,6 +10753,38 @@
           },
           "text": {
             "type": "string"
+          }
+        }
+      },
+      "LagemonitorSanitaetsdienst": {
+        "type": "object",
+        "description": "Hilfeleistungen in Zahlen für die Reihe „Sanitätsdienst“ (LLH-1574, design.md D6): dieselben\nRegeln wie die Kennzahlen des Lagebilds (`pages/lage-dashboard/lagebild.ts`). Nur Zahlen.",
+        "required": [
+          "kontakte",
+          "kontakte_letzte_stunde",
+          "in_versorgung",
+          "transporte"
+        ],
+        "properties": {
+          "in_versorgung": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Angetroffene, die noch nicht abgeschlossen sind (offen oder unterwegs)."
+          },
+          "kontakte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kontakte: alle Personen außer Vermissten, Abgeschlossene eingeschlossen\n(`anlassbild().gesamt` im Client)."
+          },
+          "kontakte_letzte_stunde": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kontakte, die in den letzten 60 Minuten erfasst wurden."
+          },
+          "transporte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Transporte wie im Einsatzbericht (`transportBilanz().transportiert`): Verbleib Transport,\nnicht nur angemeldet."
           }
         }
       },
@@ -12223,6 +12305,13 @@
             "type": "boolean",
             "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen')."
           },
+          "leitstelle_einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatznummer der Leitstelle aus der Zusage (D5); fehlt ohne Angabe."
+          },
           "material_ids": {
             "type": "array",
             "items": {
@@ -12230,6 +12319,22 @@
               "format": "int64"
             },
             "description": "Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten\nMaterialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:\nBezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material."
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Person, für die angefordert wurde (LLH-1573 design.md D1/D2): nur beim Anlegen gesetzt,\ndanach fest. Fehlt ohne Bezug."
+          },
+          "person_registrier_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet: Registriernummer dieser Person für „Für R-12“ (D7). Pseudonym wie im ETB; den\nNamen liest die Oberfläche nie von hier."
           },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"
@@ -13728,6 +13833,17 @@
             "type": "integer",
             "format": "int64"
           },
+          "rettungsmittel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RettungsmittelStand",
+                "description": "Stand des für diese Person angeforderten Rettungsmittels (LLH-1573 design.md D4): die\njüngste Nachforderung mit Bezug auf sie, ohne zurückgezogene. Beim Lesen abgeleitet; so\nsehen ihn Patientenkopf und UHS auch ohne Leserecht auf Nachforderungen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/PersonStatus"
           },
@@ -14920,6 +15036,47 @@
           },
           "slug": {
             "type": "string"
+          }
+        }
+      },
+      "RettungsmittelStand": {
+        "type": "object",
+        "description": "Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus\neinem `json_object` in `repo::SELECT_ALLE`. Nur, was Kopf, UHS und die Vorbelegung des\nVerbleibs brauchen (D6): Art, Status, Rufnamen der Zusage, Eintreffen, Einsatznummer.",
+        "required": [
+          "nachforderung_id",
+          "art",
+          "status",
+          "rufnamen"
+        ],
+        "properties": {
+          "art": {
+            "type": "string"
+          },
+          "eintreffen_erwartet_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "leitstelle_einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nachforderung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rufnamen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Zugesagte Rufnamen in Eingabefolge, leer ohne Angabe."
+          },
+          "status": {
+            "$ref": "#/components/schemas/NachforderungStatus"
           }
         }
       },

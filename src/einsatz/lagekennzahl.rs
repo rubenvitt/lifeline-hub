@@ -38,17 +38,23 @@ wire_enum! {
         /// „Nachforderungen offen“ ist gewählt (LLH-1371, `einsatz_lagekennzahl_wahl`). Der
         /// Auslöser ist die Wahl, nie die Zahl der offenen Nachforderungen.
         Nachforderungen => "nachforderungen",
+        /// Die Reihe „Sanitätsdienst“ ist gewählt (LLH-1574): Kontakte, letzte Stunde, in
+        /// Versorgung, Transporte, Einheiten verfügbar, Vermisste statt der Schadenslage, und das
+        /// Paneel „Verlauf“ statt der Gefahrenmatrix. Ein Zuschnitt der ganzen Reihe, kein
+        /// Lageplatz; gewählt am Einsatz, vorbelegt beim Anlegen mit Einsatzart Sanitätsdienst
+        /// ([`vorbelegen`]). Herleitung `/mnt/project-files/llh-1574/design.md`.
+        Sanitaetsdienst => "sanitaetsdienst",
     }
 }
 
 impl Lagekennzahl {
     /// Ob die Kennzahl per Wahl am Einsatz gesetzt wird ([`waehlen`]). Pegel und Evakuiert
     /// entstehen aus ihren Fachentscheidungen und sind nicht wählbar. Muss zum CHECK von
-    /// `einsatz_lagekennzahl_wahl` (Migration 0245) passen.
+    /// `einsatz_lagekennzahl_wahl` (Migrationen 0245, 0289) passen.
     pub const fn ist_waehlbar(self) -> bool {
         match self {
             Lagekennzahl::Pegel | Lagekennzahl::Evakuiert => false,
-            Lagekennzahl::Nachforderungen => true,
+            Lagekennzahl::Nachforderungen | Lagekennzahl::Sanitaetsdienst => true,
         }
     }
 }
@@ -69,6 +75,7 @@ pub const WAHL_MAX: usize = 8;
 ///   „Evakuiert" auf dem Platz, aber die Kennzahl daneben ist leer.
 /// - `nachforderungen_gewaehlt`: `EXISTS` über `einsatz_lagekennzahl_wahl` mit
 ///   `kennzahl = 'nachforderungen'` (LLH-1371).
+/// - `sanitaetsdienst_gewaehlt`: dasselbe mit `kennzahl = 'sanitaetsdienst'` (LLH-1574).
 ///
 /// Die Ausdrücke stehen in drei SQL-Literalen (Detail, Liste und [`lesen`]), nicht als geteilte
 /// Konstante: `query_as` nimmt unter sqlx 0.9 nur `&'static str`, ein `format!` bräche den
@@ -80,6 +87,7 @@ pub fn ableiten(
     pegel_festgelegt: bool,
     evakuierung_angeordnet: bool,
     nachforderungen_gewaehlt: bool,
+    sanitaetsdienst_gewaehlt: bool,
 ) -> Vec<Lagekennzahl> {
     let mut aktiv = Vec::new();
     if pegel_festgelegt {
@@ -90,6 +98,9 @@ pub fn ableiten(
     }
     if nachforderungen_gewaehlt {
         aktiv.push(Lagekennzahl::Nachforderungen);
+    }
+    if sanitaetsdienst_gewaehlt {
+        aktiv.push(Lagekennzahl::Sanitaetsdienst);
     }
     aktiv
 }
@@ -106,23 +117,28 @@ pub async fn lesen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<Vec<Lagekennzahl>, AppError> {
-    let (pegel_festgelegt, evakuierung_angeordnet, nachforderungen_gewaehlt): (bool, bool, bool) =
-        sqlx::query_as(
-            "SELECT EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = ?), \
-                    EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = ? \
-                            AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben'), \
-                    EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = ? \
-                            AND w.kennzahl = 'nachforderungen')",
-        )
-        .bind(einsatz_id)
-        .bind(einsatz_id)
-        .bind(einsatz_id)
-        .fetch_one(&mut *conn)
-        .await?;
+    let (
+        pegel_festgelegt,
+        evakuierung_angeordnet,
+        nachforderungen_gewaehlt,
+        sanitaetsdienst_gewaehlt,
+    ): (bool, bool, bool, bool) = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = ?1), \
+                EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = ?1 \
+                        AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben'), \
+                EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = ?1 \
+                        AND w.kennzahl = 'nachforderungen'), \
+                EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = ?1 \
+                        AND w.kennzahl = 'sanitaetsdienst')",
+    )
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
     Ok(ableiten(
         pegel_festgelegt,
         evakuierung_angeordnet,
         nachforderungen_gewaehlt,
+        sanitaetsdienst_gewaehlt,
     ))
 }
 
@@ -177,29 +193,62 @@ pub async fn waehlen(
     })
 }
 
+/// Vorbelegung beim Anlegen (LLH-1574, design.md D4): ein Einsatz mit Einsatzart
+/// Sanitätsdienst bekommt die Wahl [`Lagekennzahl::Sanitaetsdienst`], so als hätte die
+/// Einsatzleitung den Schalter selbst umgelegt. Eine spätere Änderung der Einsatzart ändert die
+/// Wahl nicht. Läuft in der Anlage-Transaktion (`einsatz::repo::anlegen_tx`).
+pub async fn vorbelegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einsatzart: Option<&str>,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    if einsatzart != Some(super::EINSATZART_SANITAETSDIENST) {
+        return Ok(());
+    }
+    sqlx::query(
+        "INSERT INTO einsatz_lagekennzahl_wahl (einsatz_id, kennzahl, gewaehlt_von_id) \
+         VALUES (?, 'sanitaetsdienst', ?) ON CONFLICT(einsatz_id, kennzahl) DO NOTHING",
+    )
+    .bind(einsatz_id)
+    .bind(benutzer_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn ohne_ausloeser_leer() {
-        assert_eq!(ableiten(false, false, false), Vec::<Lagekennzahl>::new());
+        assert_eq!(
+            ableiten(false, false, false, false),
+            Vec::<Lagekennzahl>::new()
+        );
     }
 
     #[test]
     fn pegel_festgelegt_schaltet_pegel() {
-        assert_eq!(ableiten(true, false, false), vec![Lagekennzahl::Pegel]);
+        assert_eq!(
+            ableiten(true, false, false, false),
+            vec![Lagekennzahl::Pegel]
+        );
     }
 
     #[test]
     fn evakuierung_angeordnet_schaltet_evakuiert() {
-        assert_eq!(ableiten(false, true, false), vec![Lagekennzahl::Evakuiert]);
+        assert_eq!(
+            ableiten(false, true, false, false),
+            vec![Lagekennzahl::Evakuiert]
+        );
     }
 
     #[test]
     fn beide_in_enum_reihenfolge() {
         assert_eq!(
-            ableiten(true, true, false),
+            ableiten(true, true, false, false),
             vec![Lagekennzahl::Pegel, Lagekennzahl::Evakuiert]
         );
     }
@@ -207,11 +256,11 @@ mod tests {
     #[test]
     fn gewaehlte_nachforderungen_stehen_hinter_den_abgeleiteten() {
         assert_eq!(
-            ableiten(false, false, true),
+            ableiten(false, false, true, false),
             vec![Lagekennzahl::Nachforderungen]
         );
         assert_eq!(
-            ableiten(true, true, true),
+            ableiten(true, true, true, false),
             vec![
                 Lagekennzahl::Pegel,
                 Lagekennzahl::Evakuiert,
@@ -221,13 +270,30 @@ mod tests {
     }
 
     #[test]
-    fn nur_nachforderungen_ist_waehlbar() {
+    fn sanitaetsdienst_steht_zuletzt() {
+        assert_eq!(
+            ableiten(true, true, true, true),
+            vec![
+                Lagekennzahl::Pegel,
+                Lagekennzahl::Evakuiert,
+                Lagekennzahl::Nachforderungen,
+                Lagekennzahl::Sanitaetsdienst
+            ]
+        );
+    }
+
+    #[test]
+    fn nachforderungen_und_sanitaetsdienst_sind_waehlbar() {
         let waehlbar: Vec<_> = Lagekennzahl::ALLE
             .into_iter()
             .filter(|k| k.ist_waehlbar())
             .collect();
-        assert_eq!(waehlbar, vec![Lagekennzahl::Nachforderungen]);
+        assert_eq!(
+            waehlbar,
+            vec![Lagekennzahl::Nachforderungen, Lagekennzahl::Sanitaetsdienst]
+        );
         assert_eq!(Lagekennzahl::Nachforderungen.as_str(), "nachforderungen");
+        assert_eq!(Lagekennzahl::Sanitaetsdienst.as_str(), "sanitaetsdienst");
     }
 
     #[test]
@@ -353,6 +419,70 @@ mod tests {
         let aus = waehlen(&pool, einsatz, von, &[]).await.unwrap();
         assert!(aus.umgeschaltet);
         assert_eq!(gelesen(&pool, einsatz).await, Vec::<Lagekennzahl>::new());
+    }
+
+    #[tokio::test]
+    async fn waehlen_nimmt_den_sanitaetsdienst_neben_nachforderungen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = einsatz_mit_benutzer(&pool).await;
+        let beide = [Lagekennzahl::Nachforderungen, Lagekennzahl::Sanitaetsdienst];
+        let an = waehlen(&pool, einsatz, von, &beide).await.unwrap();
+        assert_eq!(an.gewaehlt, beide.to_vec());
+        assert!(an.umgeschaltet);
+        let nur_san = waehlen(&pool, einsatz, von, &[Lagekennzahl::Sanitaetsdienst])
+            .await
+            .unwrap();
+        assert_eq!(nur_san.gewaehlt, vec![Lagekennzahl::Sanitaetsdienst]);
+        assert_eq!(
+            gelesen(&pool, einsatz).await,
+            vec![Lagekennzahl::Sanitaetsdienst]
+        );
+    }
+
+    #[tokio::test]
+    async fn vorbelegen_nur_beim_sanitaetsdienst() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = einsatz_mit_benutzer(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        vorbelegen_tx(&mut conn, einsatz, Some("realeinsatz"), von)
+            .await
+            .unwrap();
+        vorbelegen_tx(&mut conn, einsatz, None, von).await.unwrap();
+        drop(conn);
+        assert_eq!(gelesen(&pool, einsatz).await, Vec::<Lagekennzahl>::new());
+        let mut conn = pool.acquire().await.unwrap();
+        vorbelegen_tx(&mut conn, einsatz, Some("sanitaetsdienst"), von)
+            .await
+            .unwrap();
+        drop(conn);
+        assert_eq!(
+            gelesen(&pool, einsatz).await,
+            vec![Lagekennzahl::Sanitaetsdienst]
+        );
+    }
+
+    #[tokio::test]
+    async fn anlegen_als_sanitaetsdienst_waehlt_die_reihe() {
+        let pool = crate::db::test_pool().await;
+        let (_, von) = einsatz_mit_benutzer(&pool).await;
+        let daten = |art| crate::einsatz::repo::NeuerEinsatzDaten {
+            bezeichnung: "Stadtfest",
+            stichwort: None,
+            einsatzart: art,
+            begonnen_at: None,
+            ort: Default::default(),
+            vorlage_id: None,
+        };
+        let san = crate::einsatz::repo::anlegen(&pool, daten(Some("sanitaetsdienst")), von)
+            .await
+            .unwrap();
+        assert!(san.sanitaetsdienst_gewaehlt);
+        assert!(!san.nachforderungen_gewaehlt);
+        let real = crate::einsatz::repo::anlegen(&pool, daten(Some("realeinsatz")), von)
+            .await
+            .unwrap();
+        assert!(!real.sanitaetsdienst_gewaehlt);
+        assert!(gelesen(&pool, real.id).await.is_empty());
     }
 
     #[tokio::test]

@@ -15,7 +15,7 @@ use super::szenario::{self, EtbArt, Vorgang, DREHBUCH};
 use super::test_hilfen::{
     admin_anlegen, anzahl, einsatz_anlegen, kataloge_seeden, org_anlegen, zeilen,
 };
-use super::{DemoBericht, DemoBerichtZeile, DemoStammdatenArt, DemoVorgang};
+use super::{DemoBericht, DemoBerichtZeile, DemoLage, DemoStammdatenArt, DemoVorgang};
 use crate::error::AppError;
 
 // ---------------------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ async fn importieren(
     jetzt: NaiveDateTime,
 ) -> Result<ImportErgebnis, AppError> {
     crate::write_retry!(pool, |conn| {
-        importieren_tx(conn, org.org, org.admin, jetzt).await
+        importieren_tx(conn, org.org, org.admin, DemoLage::Starkregen, jetzt).await
     })
 }
 
@@ -307,6 +307,8 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     );
                 }
             }
+            // Die Starkregen-Lage erfasst keinen Verbleib; die Stadtfest-Lage prüft ihn eigens.
+            Vorgang::Verbleib(_) => panic!("Verbleib im Starkregen-Drehbuch"),
             Vorgang::Bezirk(v) => {
                 bezirke.insert(v.schluessel, (v.bezeichnung, v.plan_personen, None));
                 eintrag(
@@ -924,7 +926,10 @@ async fn einsatzleiter_ist_der_zugfuehrer_seit_seinem_schritt() {
         )]
     );
 
-    crate::write_retry!(&pool, |conn| { entfernen_tx(conn, o.org).await }).expect("entfernen");
+    crate::write_retry!(&pool, |conn| {
+        entfernen_tx(conn, o.org, DemoLage::Starkregen).await
+    })
+    .expect("entfernen");
     assert_eq!(
         anzahl(
             &pool,
@@ -1032,6 +1037,7 @@ async fn ueberblick_zeigt_evakuiert_und_keinen_pegel() {
         e.pegel_festgelegt,
         e.evakuierung_angeordnet,
         e.nachforderungen_gewaehlt,
+        e.sanitaetsdienst_gewaehlt,
     );
     assert_eq!(
         kennzahlen,
@@ -1362,7 +1368,7 @@ async fn zweiter_import_ist_409_und_schreibt_nichts() {
     assert_eq!(bild(&pool).await, vorher);
 
     let mut conn = pool.acquire().await.unwrap();
-    let autocommit = importieren_tx(&mut conn, o.org, o.admin, jetzt()).await;
+    let autocommit = importieren_tx(&mut conn, o.org, o.admin, DemoLage::Starkregen, jetzt()).await;
     drop(conn);
     erwarte_status(autocommit, 409, "bereits");
     assert_eq!(
@@ -1420,7 +1426,7 @@ async fn deaktivierter_einheitstyp_ist_422_und_schreibt_nichts() {
     assert_eq!(bild(&pool).await, vorher);
 
     let mut conn = pool.acquire().await.unwrap();
-    let autocommit = importieren_tx(&mut conn, o.org, o.admin, jetzt()).await;
+    let autocommit = importieren_tx(&mut conn, o.org, o.admin, DemoLage::Starkregen, jetzt()).await;
     drop(conn);
     erwarte_status(autocommit, 422, "Einheitstyp «Gruppe»");
     assert_eq!(
@@ -1533,8 +1539,10 @@ async fn rundlauf_import_entfernen_import() {
     let erster = importieren(&pool, &o, jetzt())
         .await
         .expect("erster Import");
-    let entfernt =
-        crate::write_retry!(&pool, |conn| { entfernen_tx(conn, o.org).await }).expect("entfernen");
+    let entfernt = crate::write_retry!(&pool, |conn| {
+        entfernen_tx(conn, o.org, DemoLage::Starkregen).await
+    })
+    .expect("entfernen");
     assert_eq!(entfernt.vorgang, DemoVorgang::Entfernt);
     let zweiter = importieren(&pool, &o, jetzt())
         .await

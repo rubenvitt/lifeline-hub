@@ -24,7 +24,14 @@ const SELECT_ALLE: &str = "\
              WHERE e.id = einsatz_person.versorgende_einheit_id) \
              AS versorgende_einheit_abschnitt_name, \
            (SELECT m.lfd_nr FROM meldung m WHERE m.id = einsatz_person.meldung_id) \
-             AS meldung_lfd_nr \
+             AS meldung_lfd_nr, \
+           (SELECT json_object('nachforderung_id', n.id, 'art', n.art, 'status', n.status, \
+                   'rufnamen', json(COALESCE(n.zusage_rufnamen, '[]')), \
+                   'eintreffen_erwartet_at', n.eintreffen_erwartet_at, \
+                   'leitstelle_einsatznummer', n.leitstelle_einsatznummer) \
+              FROM nachforderung n \
+             WHERE n.person_id = einsatz_person.id AND n.status <> 'zurueckgezogen' \
+             ORDER BY n.id DESC LIMIT 1) AS rettungsmittel \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);

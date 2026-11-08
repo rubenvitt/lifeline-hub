@@ -1172,19 +1172,37 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     menueZu();
   });
 
-  it('führt beim belegten Platz Verbleib oben, Person und Rückweg, zurückweisen zuletzt', async () => {
+  it('führt beim belegten Platz Verbleib oben, Rettungsmittel, Person und Rückweg, zurückweisen zuletzt', async () => {
     renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
     await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
     await warteAufMenueFokus();
 
     const namen = eintraege();
     expect(namen[0]).toContain('Verbleib / Entlassung erfassen');
-    expect(namen[1]).toContain('Person öffnen');
-    expect(namen[2]).toContain('Zurück in den Wartebereich');
+    // LLH-1573 (design.md D3): ohne laufende Anforderung der Sprung in die Nachforderung.
+    expect(namen[1]).toContain('Rettungsmittel anfordern');
+    expect(namen[2]).toContain('Person öffnen');
+    expect(namen[3]).toContain('Zurück in den Wartebereich');
     expect(namen[namen.length - 1]).toContain('zurückweisen');
     expect(
       within(offenesMenue()).getByRole('menuitem', { name: /zurückweisen/ }).className,
     ).toContain('danger');
+  });
+
+  it('zeigt das laufende Rettungsmittel am Platz und bietet keine zweite Anforderung an', async () => {
+    const p = person({
+      id: 7,
+      registrier_nr: 7,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: 10,
+      rettungsmittel: { nachforderung_id: 3, art: 'RTW', status: 'unterwegs', rufnamen: [] },
+    });
+    renderGrundriss(unbelegt(), [p], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    expect(await within(karte).findByText('RTW unterwegs')).toBeInTheDocument();
+    await userEvent.click(karte);
+    await warteAufMenueFokus();
+    expect(eintraege().join(' ')).not.toContain('Rettungsmittel anfordern');
   });
 
   it('öffnet über „Person öffnen" den Detail-Drawer', async () => {
@@ -1512,6 +1530,24 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
         wartebereich: true,
       });
       expect(folge(items)).toEqual(['verbleib', 'wartebereich', ...VERF]);
+    });
+    // „Rettungsmittel anfordern“ (LLH-1573, design.md D3): nur belegt und wenn erlaubt.
+    it('Rettungsmittel anfordern hinter Verbleib, beide Formen', () => {
+      const lage = { ...grund, belegt: true, wartebereich: true, rettungsmittel: true };
+      expect(folge(platzMenueEintraege({ ...lage, form: 'zeile' }))).toEqual([
+        'verbleib',
+        'rettungsmittel',
+        'wartebereich',
+        ...VERF,
+      ]);
+      expect(folge(platzMenueEintraege({ ...lage, form: 'karte' })).slice(0, 3)).toEqual([
+        'verbleib',
+        'rettungsmittel',
+        'person',
+      ]);
+      expect(
+        folge(platzMenueEintraege({ ...grund, form: 'zeile', rettungsmittel: true })),
+      ).not.toContain('rettungsmittel');
     });
     it('belegt bei laufender Belegung: Verbleib gesperrt, nicht entfernt', () => {
       const items = platzMenueEintraege({

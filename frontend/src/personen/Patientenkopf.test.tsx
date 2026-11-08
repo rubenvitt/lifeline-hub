@@ -93,9 +93,12 @@ const basis = {
   },
 } as PersonDetail;
 
+const aufenthaltVon = (kopf: HTMLElement) =>
+  kopf.querySelector<HTMLElement>('[data-lfh="aufenthalt"]')!;
+
 function zeige(person: Partial<PersonDetail> = {}, props: Record<string, unknown> = {}) {
   const onGeschrieben = vi.fn();
-  renderMitProviders(
+  const { client } = renderMitProviders(
     <Patientenkopf
       einsatzId={1}
       person={{ ...basis, ...person } as PersonDetail}
@@ -104,7 +107,11 @@ function zeige(person: Partial<PersonDetail> = {}, props: Record<string, unknown
       {...props}
     />,
   );
-  return { onGeschrieben, kopf: screen.getByRole('region', { name: 'Patientenkopf' }) };
+  return {
+    onGeschrieben,
+    client,
+    kopf: screen.getByRole('region', { name: 'Patientenkopf' }),
+  };
 }
 
 let gesendet: { pfad: string; body: unknown }[];
@@ -202,7 +209,8 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
       expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
         /^Notunterkunft → NU Turnhalle Nord · /,
       );
-      expect(within(kopf).queryByRole('link')).toBeNull();
+      // Nur der Verbleib: die Zeile „Rettungsmittel“ (LLH-1573) springt eigens.
+      expect(within(aufenthaltVon(kopf)).queryByRole('link')).toBeNull();
     });
 
     it('ohne Zugriff auf das Modul Betreuung entfällt der Link, der Text bleibt', async () => {
@@ -225,7 +233,8 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
       expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
         /^Notunterkunft → NU Turnhalle Nord · /,
       );
-      expect(within(kopf).queryByRole('link')).toBeNull();
+      // Nur der Verbleib: die Zeile „Rettungsmittel“ (LLH-1573) springt eigens.
+      expect(within(aufenthaltVon(kopf)).queryByRole('link')).toBeNull();
     });
 
     it('am Gerät kein Sprung: dort gibt es keine Stellenseite', () => {
@@ -242,7 +251,8 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
       expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
         /^Notunterkunft → NU Turnhalle Nord · /,
       );
-      expect(within(kopf).queryByRole('link')).toBeNull();
+      // Nur der Verbleib: die Zeile „Rettungsmittel“ (LLH-1573) springt eigens.
+      expect(within(aufenthaltVon(kopf)).queryByRole('link')).toBeNull();
     });
   });
 
@@ -1382,7 +1392,12 @@ describe('Patientenkopf — Review PAT-Kern', () => {
   });
 
   it('sperrt Aufheben, PAT-Nummer und Kontamination auch, wenn nur der Server fehlt', async () => {
-    const { kopf } = zeige(vollerKern);
+    const { kopf, client } = zeige(vollerKern);
+    // Erst die Freigaben (Sprung „Rettungsmittel anfordern“, LLH-1573) ankommen lassen: jede
+    // Antwort meldet den Server wieder erreichbar.
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
+    );
     // Das Gerät hat ein Netz (`navigator.onLine`), aber der Server antwortet nicht.
     act(() => meldeServerErreichbar(false));
     expect(within(kopf).queryByRole('button', { name: /PAT-Nummer/ })).toBeNull();
@@ -1629,6 +1644,72 @@ describe('Patientenkopf — Versorgt von (LLH-1567)', () => {
     act(() => meldeServerErreichbar(false));
     expect(within(kopf).getByText(EINHEIT_OHNE_NETZ)).toBeInTheDocument();
     expect(kopf.querySelector('[data-lfh="versorgt-von"]')?.textContent).toBe('Streife 2 · Bühne');
+  });
+});
+
+/**
+ * „Rettungsmittel“ (LLH-1573, design.md D3/D4/D6): Stand der Anforderung mit Verweis auf die Karte,
+ * der Sprung in die Erfassung, solange keine läuft, und die Verbleib-Vorbelegung beim Eintreffen.
+ */
+describe('Patientenkopf — Rettungsmittel (LLH-1573)', () => {
+  const zugesagt = {
+    rettungsmittel: {
+      nachforderung_id: 3,
+      art: 'RTW',
+      status: 'zugesagt' as const,
+      rufnamen: ['RTW 1/83-1'],
+      leitstelle_einsatznummer: '2611-0815',
+    },
+  };
+
+  it('nennt den Stand und verweist auf die Karte', () => {
+    const { kopf } = zeige(zugesagt, { darfSchreiben: false });
+    expect(within(kopf).getByText('Rettungsmittel')).toBeInTheDocument();
+    expect(kopf.querySelector('[data-lfh="rettungsmittel"]')?.textContent).toBe(
+      'RTW · Zugesagt · RTW 1/83-1 · Einsatznr. 2611-0815',
+    );
+    expect(within(kopf).getByRole('link', { name: 'RTW' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen?nachforderung=3',
+    );
+    expect(within(kopf).queryByRole('button', { name: /Rettungsmittel anfordern/ })).toBeNull();
+  });
+
+  it('lässt die Zeile lesend ohne Anforderung weg', () => {
+    const { kopf } = zeige({}, { darfSchreiben: false });
+    expect(within(kopf).queryByText('Rettungsmittel')).toBeNull();
+  });
+
+  it('springt ohne laufende Anforderung in die Erfassung', () => {
+    const { kopf } = zeige();
+    expect(within(kopf).getByRole('link', { name: /Rettungsmittel anfordern/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen?neu=1&person=10',
+    );
+  });
+
+  it('belegt beim Eintreffen den Verbleib mit Rettungsmittel und Einsatznummer vor', async () => {
+    const { kopf } = zeige({
+      rettungsmittel: { ...zugesagt.rettungsmittel, status: 'eingetroffen' },
+    });
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verbleib erfassen' }));
+    const paneel = await screen.findByRole('region', { name: 'Verbleib erfassen' });
+    expect(within(paneel).getByLabelText(/Rettungsmittel/)).toHaveValue('RTW 1/83-1');
+    expect(within(paneel).getByLabelText('Einsatznummer Leitstelle')).toHaveValue('2611-0815');
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        {
+          pfad: 'verbleib',
+          body: expect.objectContaining({
+            art: 'transport',
+            transportmittel: 'RTW 1/83-1',
+            transport_durch: 'fremd',
+            leitstelle_einsatznummer: '2611-0815',
+          }),
+        },
+      ]),
+    );
   });
 });
 

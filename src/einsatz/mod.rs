@@ -151,6 +151,9 @@ pub struct Einsatz {
     /// Read-only abgeleitet (LLH-1371): „Nachforderungen offen“ ist am Einsatz gewählt
     /// (`einsatz_lagekennzahl_wahl`). Auslöser der Lagekennzahl `nachforderungen`.
     pub nachforderungen_gewaehlt: bool,
+    /// Read-only abgeleitet (LLH-1574): die Reihe „Sanitätsdienst“ ist am Einsatz gewählt
+    /// (`einsatz_lagekennzahl_wahl`). Auslöser der Lagekennzahl `sanitaetsdienst`.
+    pub sanitaetsdienst_gewaehlt: bool,
     /// Read-only abgeleitet (LFH-996): Schwärzungsstand, `None` bei 0. Siehe
     /// [`EinsatzAnzeige::teilschwaerzungen`] und `teilschwaerzungen_spalte!` in `repo`.
     pub teilschwaerzungen: Option<i64>,
@@ -211,6 +214,7 @@ impl Einsatz {
                 self.pegel_festgelegt,
                 self.evakuierung_angeordnet,
                 self.nachforderungen_gewaehlt,
+                self.sanitaetsdienst_gewaehlt,
             ),
             teilschwaerzungen: self.teilschwaerzungen,
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
@@ -365,6 +369,7 @@ mod tests {
             pegel_festgelegt: false,
             evakuierung_angeordnet: false,
             nachforderungen_gewaehlt: false,
+            sanitaetsdienst_gewaehlt: false,
             teilschwaerzungen: None,
             bezeichnung: "Lage".into(),
             stichwort: None,

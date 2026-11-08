@@ -9,7 +9,12 @@ import {
   einsatzdauerKennzahl,
   evakuierungDatenzustand,
   evakuierungStand,
+  einheitenVerfuegbar,
+  inVersorgung,
+  istSanitaetsdienstReihe,
   kennzahlReihe,
+  kontakteLetzteStunde,
+  kontakteNotiz,
   reihenWechsel,
   lagebildZeit,
   standText,
@@ -573,5 +578,150 @@ describe('Kennzahl „Nachforderungen offen" (LLH-1371)', () => {
     ] as const) {
       expect(zelle(stand)).toMatchObject({ etikett: 'Nachforderungen offen', wert: '' });
     }
+  });
+});
+
+describe('Reihe „Sanitätsdienst“ (LLH-1574)', () => {
+  const p = (extra: Partial<Person>) =>
+    ({
+      status: 'betroffen',
+      versorgung: 'offen',
+      aktuelle_verbleib_art: null,
+      aktueller_verbleib_status: null,
+      aktuelle_uhs_id: null,
+      anlass: null,
+      erfasst_at: '2026-06-11 11:30:00',
+      storniert_at: null,
+      ...extra,
+    }) as Person;
+
+  it('ersetzt alle sechs Plätze, gleich welche Auslöser sonst aktiv sind', () => {
+    const san = [
+      'Kontakte',
+      'Letzte Stunde',
+      'In Versorgung',
+      'Transporte',
+      'Einheiten verfügbar',
+      'Vermisste',
+    ];
+    expect(kennzahlReihe(['sanitaetsdienst'])).toEqual(san);
+    expect(kennzahlReihe(['pegel', 'evakuiert', 'nachforderungen', 'sanitaetsdienst'])).toEqual(
+      san,
+    );
+    expect(istSanitaetsdienstReihe(kennzahlReihe(['sanitaetsdienst']))).toBe(true);
+    expect(istSanitaetsdienstReihe(kennzahlReihe(['nachforderungen']))).toBe(false);
+  });
+
+  it('das Umschalten nennt das Banner je Platz', () => {
+    expect(reihenWechsel(kennzahlReihe([]), kennzahlReihe(['sanitaetsdienst']))).toBe(
+      'Kontakte statt Verbleib offen · Letzte Stunde statt Betroffene · In Versorgung statt ' +
+        'Schäden offen · Transporte statt Kräfte · Einheiten verfügbar statt Vermisste · ' +
+        'Vermisste statt Einsatzdauer',
+    );
+  });
+
+  it('Kontakte, letzte Stunde, in Versorgung und Transporte', () => {
+    const bild = baueLagebild(
+      roh({
+        einsatz: { ...roh().einsatz, lagekennzahlen: ['sanitaetsdienst'] },
+        personen: [
+          // in der letzten Stunde, offen in einer UHS
+          p({ anlass: 'verletzung', aktuelle_uhs_id: 3 }),
+          // die Stunde davor, entlassen
+          p({
+            anlass: 'verletzung',
+            erfasst_at: '2026-06-11 10:30:00',
+            aktuelle_verbleib_art: 'entlassung',
+            versorgung: 'abgeschlossen',
+          }),
+          // früher, Eigentransport unterwegs
+          p({
+            anlass: 'internistisch',
+            erfasst_at: '2026-06-11 08:00:00',
+            aktuelle_verbleib_art: 'transport',
+            versorgung: 'unterwegs',
+          }),
+          // Transport nur angemeldet: kein Transport, noch in Versorgung
+          p({
+            anlass: 'intoxikation',
+            erfasst_at: '2026-06-11 09:00:00',
+            aktuelle_verbleib_art: 'transport',
+            aktueller_verbleib_status: 'angemeldet',
+          }),
+          // vermisst: kein Kontakt
+          p({ status: 'vermisst' }),
+        ],
+      }),
+      JETZT,
+      BERLIN,
+    );
+    const [kontakte, stunde, versorgung, transporte] = bild.kennzahlen;
+    expect(kontakte).toMatchObject({ etikett: 'Kontakte', wert: '4', notiz: 'meist Verletzung' });
+    expect(stunde).toMatchObject({ wert: '1', notiz: 'Stunde davor: 1' });
+    expect(versorgung).toMatchObject({ wert: '3', notiz: '1 in UHS · 1 unterwegs' });
+    expect(transporte).toMatchObject({ wert: '1', notiz: '1 unterwegs' });
+  });
+
+  it('Kontakte ohne Anlass stehen in der Notiz, ohne Kontakte „noch keine“', () => {
+    expect(kontakteNotiz([p({}), p({ anlass: 'allergie' })])).toBe('1 ohne Anlass');
+    expect(kontakteNotiz([])).toBe('noch keine');
+    expect(kontakteNotiz([p({ status: 'vermisst' })])).toBe('noch keine');
+  });
+
+  it('letzte Stunde: genau 60 min zählt zur Stunde davor, Zukünftiges gar nicht', () => {
+    expect(
+      kontakteLetzteStunde(
+        [
+          p({ erfasst_at: '2026-06-11 11:00:00' }),
+          p({ erfasst_at: '2026-06-11 11:00:01' }),
+          p({ erfasst_at: '2026-06-11 12:00:01' }),
+        ],
+        JETZT,
+      ),
+    ).toEqual({ letzte: 1, davor: 1 });
+  });
+
+  it('in Versorgung zählt nur Angetroffene, nicht Abgeschlossene', () => {
+    expect(
+      inVersorgung([
+        p({}),
+        p({ status: 'abgemeldet' }),
+        p({ versorgung: 'abgeschlossen', aktuelle_verbleib_art: 'entlassung' }),
+      ]),
+    ).toEqual({ gesamt: 1, inUhs: 0, unterwegs: 0 });
+  });
+
+  it('Einheiten verfügbar: aktive mit Kategorie verfügbar, Achtung erst ohne freie', () => {
+    const einheit = (kategorie: string | null, aufgeloest_at: string | null = null) =>
+      ({ aufgeloest_at, status: { quelle: 'hand', kategorie, verteilung: [] } }) as never;
+    expect(
+      einheitenVerfuegbar([
+        einheit('verfuegbar'),
+        einheit('gebunden'),
+        einheit(null),
+        einheit('verfuegbar', '2026-06-11 10:00:00'),
+      ]),
+    ).toEqual({ verfuegbar: 1, aktiv: 3 });
+
+    const reihe = kennzahlReihe(['sanitaetsdienst']);
+    const zelle = (einheiten: never[], personen: Person[] = []) =>
+      baueLagebild(roh({ einheiten, personen }), JETZT, BERLIN, reihe).kennzahlen[4];
+    expect(zelle([einheit('gebunden')])).toMatchObject({
+      etikett: 'Einheiten verfügbar',
+      wert: '0',
+      notiz: 'von 1',
+      ton: 'achtung',
+      route: 'einheiten',
+    });
+    expect(zelle([])).toMatchObject({ wert: '0', ton: 'neutral' });
+    expect(
+      zelle(
+        [einheit('verfuegbar')],
+        [
+          p({ versorgende_einheit_id: 7, versorgende_einheit_name: 'Streife 2' }),
+          p({ versorgende_einheit_id: 7, versorgende_einheit_name: 'Streife 2' }),
+        ],
+      ),
+    ).toMatchObject({ wert: '1', notiz: 'von 1 · Streife 2: 2 Kontakte', ton: 'neutral' });
   });
 });

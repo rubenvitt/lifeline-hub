@@ -16,7 +16,12 @@ import { useAuth } from '../auth/AuthContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeLagemonitor } from '../api/lagemonitor';
 import { einsatzKeys } from '../api/queryKeys';
-import type { GeraetAnzeige, LagemonitorAnzeige, Programmpunkt } from '../api/types';
+import type {
+  GeraetAnzeige,
+  LagemonitorAnzeige,
+  LagemonitorSanitaetsdienst,
+  Programmpunkt,
+} from '../api/types';
 import { useRollen } from '../components/instrument';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
@@ -270,12 +275,61 @@ function Zahl({
   );
 }
 
+/**
+ * Kachel „Hilfeleistungen“ statt „Betroffene“, wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt
+ * ist (LLH-1574, design.md D6): dieselben Zahlen wie das Lagebild, SK I bleibt als Alarmbeitrag.
+ */
+function SanitaetsdienstKachel({
+  san,
+  b,
+  sk1Neu,
+}: {
+  san: LagemonitorSanitaetsdienst;
+  b: LagemonitorAnzeige['betroffene'];
+  sk1Neu: boolean;
+}) {
+  const { rollen } = useRollen();
+  return (
+    <Kachel
+      titel="Hilfeleistungen"
+      zusatz={sk1Neu ? 'Neu in SK I' : undefined}
+      zusatzAlarm={sk1Neu}
+    >
+      <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
+        <Zahl wert={san.kontakte} bezeichnung="Kontakte" groesse={GROSS.kennzahl} />
+        <Zahl
+          wert={san.kontakte_letzte_stunde}
+          bezeichnung="letzte Stunde"
+          groesse={GROSS.kennzahl}
+        />
+        <Zahl
+          wert={b.vermisst}
+          bezeichnung="vermisst"
+          groesse={GROSS.kennzahl}
+          farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 32 }}>
+        <Zahl wert={san.in_versorgung} bezeichnung="in Versorgung" />
+        <Zahl wert={san.transporte} bezeichnung="Transporte" />
+        <Zahl
+          wert={b.sk1}
+          bezeichnung="SK I"
+          farbe={b.sk1 > 0 ? rollen.alarmText : undefined}
+          hervorgehoben={sk1Neu}
+        />
+      </div>
+    </Kachel>
+  );
+}
+
 /** So viele UHS passen ohne Bildlauf in die Kachel; der Rest steht als „+n weitere“. */
 const UHS_SICHTBAR = 6;
 
 function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }) {
   const { rollen } = useRollen();
   const b = lage.betroffene;
+  const san = lage.sanitaetsdienst;
   const k = lage.kraefte;
   const s = k.staerke;
   // Die vollsten zuerst: passt nicht jede UHS in die Kachel, fehlen die leeren.
@@ -286,30 +340,34 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
   const anUhs = lage.uhs.reduce((summe, u) => summe + u.kraefte, 0);
   return (
     <>
-      <Kachel titel="Betroffene" zusatz={sk1Neu ? 'Neu in SK I' : undefined} zusatzAlarm={sk1Neu}>
-        <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
-          <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse={GROSS.kennzahl} />
-          <Zahl wert={b.patienten} bezeichnung="Patienten" groesse={GROSS.kennzahl} />
-          <Zahl
-            wert={b.vermisst}
-            bezeichnung="vermisst"
-            groesse={GROSS.kennzahl}
-            farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 32 }}>
-          <Zahl
-            wert={b.sk1}
-            bezeichnung="SK I"
-            farbe={b.sk1 > 0 ? rollen.alarmText : undefined}
-            hervorgehoben={sk1Neu}
-          />
-          <Zahl wert={b.sk2} bezeichnung="SK II" />
-          <Zahl wert={b.sk3} bezeichnung="SK III" />
-          <Zahl wert={b.sk4} bezeichnung="SK IV" />
-          <Zahl wert={b.ohne} bezeichnung="ungesichtet" />
-        </div>
-      </Kachel>
+      {san ? (
+        <SanitaetsdienstKachel san={san} b={b} sk1Neu={sk1Neu} />
+      ) : (
+        <Kachel titel="Betroffene" zusatz={sk1Neu ? 'Neu in SK I' : undefined} zusatzAlarm={sk1Neu}>
+          <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
+            <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse={GROSS.kennzahl} />
+            <Zahl wert={b.patienten} bezeichnung="Patienten" groesse={GROSS.kennzahl} />
+            <Zahl
+              wert={b.vermisst}
+              bezeichnung="vermisst"
+              groesse={GROSS.kennzahl}
+              farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 32 }}>
+            <Zahl
+              wert={b.sk1}
+              bezeichnung="SK I"
+              farbe={b.sk1 > 0 ? rollen.alarmText : undefined}
+              hervorgehoben={sk1Neu}
+            />
+            <Zahl wert={b.sk2} bezeichnung="SK II" />
+            <Zahl wert={b.sk3} bezeichnung="SK III" />
+            <Zahl wert={b.sk4} bezeichnung="SK IV" />
+            <Zahl wert={b.ohne} bezeichnung="ungesichtet" />
+          </div>
+        </Kachel>
+      )}
       {/* Die Kräfte an den UHS als eine Zahl in der Titelzeile (LFH-1045): je UHS und als
           eigene Kennzahl fehlt bei 1920 × 1080 der Platz, ohne dass eine Kachel abschneidet. */}
       <Kachel titel="Kräfte" zusatz={`${anUhs} an UHS`}>

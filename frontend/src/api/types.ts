@@ -22,6 +22,7 @@ export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
 export type LagemonitorZone = S['LagemonitorZone'];
 export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
+export type LagemonitorSanitaetsdienst = S['LagemonitorSanitaetsdienst'];
 export type KopplungAnzeige = S['KopplungAnzeige'];
 export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];
@@ -102,9 +103,12 @@ export type DatentraegerStatus = S['DatentraegerStatus'];
 export type DatentraegerOrt = S['DatentraegerOrt'];
 
 // ============================== Demo-Daten ==============================
-/** Stand der Demo-Daten der eigenen Organisation, die eine Antwort aller vier Endpunkte.
- *  `import` fehlt ohne aktiven Import, `bericht` fehlt, solange nie importiert wurde. */
+/** Stand der Demo-Daten der eigenen Organisation, die eine Antwort aller Endpunkte: je Lage ein
+ *  Eintrag (LLH-1576). `import` fehlt ohne aktiven Import der Lage, `bericht` fehlt, solange sie
+ *  nie importiert wurde. */
 export type DemoDatenStatus = S['DemoDatenStatus'];
+export type DemoLage = S['DemoLage'];
+export type DemoLageStatus = S['DemoLageStatus'];
 export type DemoBerichtZeile = S['DemoBerichtZeile'];
 export type DemoStammdatenArt = S['DemoStammdatenArt'];
 export type DemoVorgang = S['DemoVorgang'];
@@ -443,6 +447,8 @@ export type Verbleib = S['VerbleibAnzeige'];
 export type Bestaetiger = S['Bestaetiger'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
+/** Stand des für eine Person angeforderten Rettungsmittels (LLH-1573). */
+export type RettungsmittelStand = S['RettungsmittelStand'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
@@ -1524,6 +1530,11 @@ export interface NeueNachforderung {
    * liefert die schon gespeicherte Nachforderung statt einer zweiten.
    */
   client_id?: string;
+  /**
+   * Person, für die ein Rettungsmittel angefordert wird (LLH-1573); dann gilt Anzahl 1 und kein
+   * Stellenbezug daneben.
+   */
+  person_id?: number;
 }
 
 /**
@@ -1537,6 +1548,8 @@ export interface NachforderungZusageEingabe {
   rufnamen?: string[];
   /** Voraussichtliches Eintreffen (UTC); fehlt = ohne. */
   eintreffen_erwartet_at?: string;
+  /** Einsatznummer der Leitstelle (LLH-1573), nur mit Personenbezug. */
+  leitstelle_einsatznummer?: string;
 }
 
 /**
@@ -1553,6 +1566,8 @@ export interface PatchNachforderung {
   ziel_text?: string | null;
   eintreffen_erwartet_at?: string | null;
   rufnamen?: string[];
+  /** Einsatznummer der Leitstelle (LLH-1573), nur mit Personenbezug und nach der Zusage. */
+  leitstelle_einsatznummer?: string | null;
 }
 
 /**

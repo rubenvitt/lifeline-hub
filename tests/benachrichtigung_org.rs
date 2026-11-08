@@ -356,12 +356,22 @@ async fn demo_import_meldet_keinen_neuen_einsatz() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "fritz", "fuehrungskraft").await;
 
-    let (s, v) = anfrage(&app, "POST", "/api/demo-daten", &admin, None).await;
-    assert_eq!(s, StatusCode::CREATED, "{v}");
+    // LLH-1576: beide Lagen, jede legt ihren Einsatz an.
+    for lage in ["starkregen", "stadtfest"] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/demo-daten/{lage}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{lage}: {v}");
+    }
     let einsaetze: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz")
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert!(einsaetze >= 1, "der Import legt einen Einsatz an");
+    assert!(einsaetze >= 2, "jeder Import legt einen Einsatz an");
     assert!(zeilen(&pool).await.is_empty());
 }

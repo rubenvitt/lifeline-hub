@@ -429,3 +429,58 @@ describe('NachforderungFormular — Schnellwahl, Vorschläge, Ziel und Bedarfsze
     expect(anzahl()).toHaveValue('');
   });
 });
+
+/** LLH-1573 (design.md D3): Rettungsmittel für einen Patienten, vorbelegt und mit fester Anzahl. */
+describe('NachforderungFormular — Personenbezug (LLH-1573)', () => {
+  it('belegt RTW, Ziel, Priorität und „Für R-…“ vor und sendet die Person', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(
+      <NachforderungFormular
+        card={false}
+        senden={false}
+        onAnlegen={onAnlegen}
+        personBezug={{
+          personId: 10,
+          registrierNr: 12,
+          pfad: '/einsaetze/1/personen/10',
+          uhs: 'Turnhalle',
+          prioritaet: 'sofort',
+        }}
+      />,
+    );
+    expect(screen.getByRole('link', { name: /R-0*12/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/personen/10',
+    );
+    expect(was()).toHaveValue('RTW');
+    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue('Für R-012');
+    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(
+        expect.objectContaining({
+          art: 'RTW',
+          anzahl: 1,
+          person_id: 10,
+          prioritaet: 'sofort',
+          ziel_text: 'Turnhalle',
+        }),
+      ),
+    );
+  });
+
+  it('zeigt ein nicht geladenes Detail mit „Erneut laden“', async () => {
+    const erneutLaden = vi.fn();
+    renderMitProviders(
+      <NachforderungFormular
+        card={false}
+        senden={false}
+        onAnlegen={vi.fn()}
+        personBezug={{ personId: 10, ladefehler: true, erneutLaden }}
+      />,
+    );
+    const bezug = document.querySelector('[data-lfh="nachforderung-bezug"]') as HTMLElement;
+    expect(bezug).toHaveTextContent('Für eine Person · nicht geladen');
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+    expect(erneutLaden).toHaveBeenCalledOnce();
+  });
+});

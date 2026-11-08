@@ -34,9 +34,18 @@ const BEZUG_LINK: Record<
   etb: { pfad: (einsatzId, id) => etbPfad(einsatzId, { eintrag: id }), wort: 'ETB-Eintrag' },
   // Auto-Fristen einer Ablösungsschicht: die Seite kennt keine Selektion per Query, der Link
   // führt auf die nach Fälligkeit geordnete Liste.
-  abloesung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
-  abloesung_vorwarnung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
-  abloesung_planung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
+  abloesung: {
+    pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'laufend' }),
+    wort: 'Ablösung',
+  },
+  abloesung_vorwarnung: {
+    pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'laufend' }),
+    wort: 'Ablösung',
+  },
+  abloesung_planung: {
+    pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'laufend' }),
+    wort: 'Ablösung',
+  },
 };
 
 /**

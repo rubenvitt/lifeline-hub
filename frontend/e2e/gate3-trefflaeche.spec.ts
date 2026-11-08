@@ -2632,9 +2632,9 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
     const segmente = page.locator(
       '[data-lfh="abloesung-werkzeugzeile"] [data-lfh="segmentleiste"] button',
     );
-    // „Laufend“, „Ohne Schicht“, „Vergangen“ (LLH-1128).
-    await expect(segmente).toHaveCount(3);
-    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 3);
+    // „Laufend“, „Ohne Schicht“, „Vergangen“ (LLH-1128), „Schichtplan“ (LLH-1554).
+    await expect(segmente).toHaveCount(4);
+    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 4);
 
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Primär gesperrt ${kopf}, Segment ${segment}`);
   }

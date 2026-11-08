@@ -8,7 +8,7 @@ import { useAuthOptional } from '../auth/AuthContext';
 import type { VerbleibEingabe } from '../api/einsatzPerson';
 import { EINSATZNUMMER_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Betreuungsstelle, VerbleibArt } from '../api/types';
+import type { Betreuungsstelle, Person, VerbleibArt } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -23,6 +23,7 @@ import {
   sichtbareVerbleibAngaben,
   sichtbareVerbleibFelder,
   stellenOptionen,
+  verbleibAusRettungsmittel,
   verbleibBody,
   zielNachArtwechsel,
   zielNachStellenwahl,
@@ -36,7 +37,8 @@ const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
 
 interface VerbleibErfassungProps {
   einsatzId: number;
-  person: PersonZiel;
+  /** Mit Rettungsmittel-Stand belegt ein eingetroffenes Rettungsmittel vor (LLH-1573, D6). */
+  person: PersonZiel & Partial<Pick<Person, 'aktuelle_verbleib_art' | 'rettungsmittel'>>;
   /** Nach erfolgreichem POST (Invalidierung der Person); der Dialog schließt danach selbst. */
   onErfasst: () => void;
   /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand; die Zeile quittiert. */
@@ -62,6 +64,8 @@ export function useVerbleibFelder(
    * diesen Rückfall fokussierte die Hülle beim Öffnen die Art.
    */
   vorbelegteArt?: VerbleibArt,
+  /** „Weitere Angaben“ offen, etwa weil die Einsatznummer der Leitstelle vorbelegt ist (LLH-1573). */
+  weitereOffen = false,
 ) {
   const art = Form.useWatch('art', form) ?? vorbelegteArt;
   const artVorbelegt = vorbelegteArt != null;
@@ -170,6 +174,7 @@ export function useVerbleibFelder(
       )}
       <Collapse
         ghost
+        defaultActiveKey={weitereOffen ? ['weitere'] : undefined}
         items={[
           {
             key: 'weitere',
@@ -234,7 +239,15 @@ export default function VerbleibErfassung({
   vorbelegung,
 }: VerbleibErfassungProps) {
   const [form] = Form.useForm<VerbleibFormWerte>();
-  const { elemente, body } = useVerbleibFelder(einsatzId, form, vorbelegung?.art);
+  // Ein eingetroffenes Rettungsmittel belegt vor (LLH-1573, design.md D6); die Vorbelegung des
+  // Aufrufers gewinnt.
+  const startwerte = { ...verbleibAusRettungsmittel(person), ...vorbelegung };
+  const { elemente, body } = useVerbleibFelder(
+    einsatzId,
+    form,
+    startwerte.art,
+    startwerte.leitstelle_einsatznummer != null,
+  );
   const save = useSavePersonEintrag();
   const mutation = useMutation({
     // Merkt ohne Netz vor (LLH-1138, design.md D8; `frontend/src/offline/AGENTS.md`).
@@ -248,7 +261,7 @@ export default function VerbleibErfassung({
       offen
       titel={titel}
       form={form}
-      initialValues={vorbelegung}
+      initialValues={startwerte}
       laeuft={mutation.isPending}
       onErfassen={(werte) => mutation.mutateAsync(body(werte))}
       onFertig={onSchliessen}
