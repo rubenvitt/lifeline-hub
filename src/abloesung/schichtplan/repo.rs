@@ -491,24 +491,25 @@ pub(super) async fn pruefe_posten_tx(
     }
 }
 
-/// Ein Block am Posten, der sich mit `[von, bis)` überschneidet (außer `ausser`); die Pause darf
-/// überlappen.
-pub(super) async fn ueberschneidung_tx(
+/// Alle Blöcke am Posten, die sich mit `[von, bis)` überschneiden (außer `ausser`), früheste
+/// zuerst; die Pause darf überlappen. Anlegen und Ändern nennen den ersten, „Schichten erzeugen“
+/// alle (LLH-1594).
+pub(super) async fn ueberschneidungen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     posten: Posten,
     von: &str,
     bis: &str,
     ausser: Option<i64>,
-) -> Result<Option<(i64, String, String)>, AppError> {
+) -> Result<Vec<(i64, String, String)>, AppError> {
     if posten == Posten::Pause {
-        return Ok(None);
+        return Ok(Vec::new());
     }
     Ok(sqlx::query_as(
         "SELECT id, von, bis FROM einsatz_planschicht \
          WHERE einsatz_id = ? AND posten_art = ? AND einheit_id IS ? AND uhs_id IS ? \
            AND von < ? AND bis > ? AND id IS NOT ? \
-         ORDER BY von LIMIT 1",
+         ORDER BY von, id",
     )
     .bind(einsatz_id)
     .bind(posten.art().as_str())
@@ -517,7 +518,7 @@ pub(super) async fn ueberschneidung_tx(
     .bind(bis)
     .bind(von)
     .bind(ausser)
-    .fetch_optional(&mut *conn)
+    .fetch_all(&mut *conn)
     .await?)
 }
 
@@ -536,7 +537,11 @@ async fn pruefe_frei_tx(
     bis: &str,
     ausser: Option<i64>,
 ) -> Result<(), AppError> {
-    if let Some((_, a, b)) = ueberschneidung_tx(conn, einsatz_id, posten, von, bis, ausser).await? {
+    if let Some((_, a, b)) = ueberschneidungen_tx(conn, einsatz_id, posten, von, bis, ausser)
+        .await?
+        .into_iter()
+        .next()
+    {
         let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
         return Err(AppError::UnprocessableEntity(format!(
             "Die Schicht überschneidet sich mit {}",
@@ -1019,9 +1024,7 @@ pub async fn erzeugen(
         let mut konflikte = Vec::new();
         for (a, b) in &teile {
             let (a, b) = (zeit::formatiere_utc(*a), zeit::formatiere_utc(*b));
-            if let Some((id, x, y)) =
-                ueberschneidung_tx(conn, einsatz_id, posten, &a, &b, None).await?
-            {
+            for (id, x, y) in ueberschneidungen_tx(conn, einsatz_id, posten, &a, &b, None).await? {
                 if !konflikte.iter().any(|k: &ZeilenGrund| k.id == id) {
                     konflikte.push(ZeilenGrund {
                         art: ZeilenArt::Planschicht,

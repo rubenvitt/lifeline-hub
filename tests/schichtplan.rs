@@ -827,7 +827,8 @@ async fn schichten_erzeugen_nennt_jeden_ueberschnittenen_block_einmal() {
         "{json}"
     );
     assert!(
-        z.iter().all(|(_, g)| g.starts_with("überschneidet sich mit ")),
+        z.iter()
+            .all(|(_, g)| g.starts_with("überschneidet sich mit ")),
         "{json}"
     );
 
@@ -843,15 +844,16 @@ async fn schichten_erzeugen_nennt_jeden_ueberschnittenen_block_einmal() {
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
-        zeilen(&json)
-            .iter()
-            .map(|(id, _)| *id)
-            .collect::<Vec<_>>(),
+        zeilen(&json).iter().map(|(id, _)| *id).collect::<Vec<_>>(),
         ids,
         "{json}"
     );
     let (_, plan) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
-    assert_eq!(plan["bloecke"].as_array().unwrap().len(), 2, "nichts angelegt");
+    assert_eq!(
+        plan["bloecke"].as_array().unwrap().len(),
+        2,
+        "nichts angelegt"
+    );
 }
 
 #[tokio::test]
