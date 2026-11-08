@@ -2,7 +2,7 @@
 
 use super::basis32::{b64, b64_lesen, fingerabdruck};
 use super::code::Ableitung;
-use super::{KopplungRichtung, KopplungZustand};
+use super::{InstanzKopplungRichtung, InstanzKopplungZustand};
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -31,11 +31,11 @@ pub struct KopplungZeile {
 }
 
 impl KopplungZeile {
-    pub fn zustand(&self) -> Option<KopplungZustand> {
-        KopplungZustand::parse(&self.zustand)
+    pub fn zustand(&self) -> Option<InstanzKopplungZustand> {
+        InstanzKopplungZustand::parse(&self.zustand)
     }
-    pub fn richtung(&self) -> Option<KopplungRichtung> {
-        KopplungRichtung::parse(&self.richtung)
+    pub fn richtung(&self) -> Option<InstanzKopplungRichtung> {
+        InstanzKopplungRichtung::parse(&self.richtung)
     }
 }
 
@@ -185,19 +185,19 @@ pub struct Gegenueber<'a> {
 pub async fn kopplung_anlegen_oder_erneuern(
     conn: &mut SqliteConnection,
     g: &Gegenueber<'_>,
-    richtung: KopplungRichtung,
+    richtung: InstanzKopplungRichtung,
     adresse: Option<&str>,
-    zustand_neu: KopplungZustand,
+    zustand_neu: InstanzKopplungZustand,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    let angebahnt = (zustand_neu == KopplungZustand::Angebahnt).then_some(jetzt);
+    let angebahnt = (zustand_neu == InstanzKopplungZustand::Angebahnt).then_some(jetzt);
     if let Some(alt) = kopplung_nach_kennung(conn, g.kennung).await? {
         if alt.richtung() != Some(richtung) {
             return Err(AppError::Conflict(
                 "Mit dieser Instanz besteht schon eine Kopplung in der anderen Richtung.".into(),
             ));
         }
-        let aktiv = alt.zustand() == Some(KopplungZustand::Aktiv);
+        let aktiv = alt.zustand() == Some(InstanzKopplungZustand::Aktiv);
         sqlx::query(
             "UPDATE instanz_kopplung SET gegenueber_schluessel = ?, gegenueber_name = ?, \
              gegenueber_adresse = ?, gegenueber_softwarestand = ?, gegenueber_protokoll = ?, \
@@ -311,7 +311,7 @@ pub async fn orgs_widerruf_offen(
 pub async fn zustand_nach_orgs(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
-    ohne: KopplungZustand,
+    ohne: InstanzKopplungZustand,
 ) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE instanz_kopplung SET zustand = ? WHERE id = ? \
@@ -524,7 +524,7 @@ pub async fn purge(pool: &SqlitePool, jetzt: &str) -> Result<(), sqlx::Error> {
 crate::wire_enum::wire_enum! {
     /// Wie weit die Protokollversionen auseinanderliegen, für die Anzeige (design.md D5).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-    pub enum ProtokollAnzeige {
+    pub enum InstanzProtokoll {
         /// Noch keine Meldung oder Abstand höchstens eins.
         Passt => "passt",
         /// Diese Instanz ist zu alt.
@@ -536,22 +536,22 @@ crate::wire_enum::wire_enum! {
 
 /// Eine Kopplung, wie die Admin-Seite sie zeigt: aus Sicht einer Org.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct KopplungAnzeige {
+pub struct InstanzKopplungAnzeige {
     pub id: i64,
     pub gegenueber_name: String,
     pub gegenueber_kennung: String,
     pub gegenueber_fingerabdruck: String,
-    pub richtung: KopplungRichtung,
+    pub richtung: InstanzKopplungRichtung,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gegenueber_adresse: Option<String>,
-    pub zustand: KopplungZustand,
+    pub zustand: InstanzKopplungZustand,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zuletzt_gesehen_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gegenueber_softwarestand: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gegenueber_protokoll: Option<i64>,
-    pub protokoll: ProtokollAnzeige,
+    pub protokoll: InstanzProtokoll,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub letzter_fehler: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -559,11 +559,11 @@ pub struct KopplungAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uhr_abweichung_s: Option<i64>,
     /// Die Org-Zuordnung der eigenen Org (die jüngste).
-    pub org: OrgZuordnungAnzeige,
+    pub org: InstanzOrgZuordnung,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct OrgZuordnungAnzeige {
+pub struct InstanzOrgZuordnung {
     pub id: i64,
     pub fremde_org_name: String,
     pub fremde_org_kennung: String,
@@ -576,7 +576,7 @@ pub struct OrgZuordnungAnzeige {
 pub async fn liste_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
-) -> Result<Vec<KopplungAnzeige>, AppError> {
+) -> Result<Vec<InstanzKopplungAnzeige>, AppError> {
     let orgs: Vec<OrgZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ORG_SPALTEN} FROM instanz_kopplung_org o WHERE org_id = ? AND id = \
          (SELECT MAX(id) FROM instanz_kopplung_org WHERE kopplung_id = o.kopplung_id AND org_id = o.org_id) \
@@ -598,7 +598,7 @@ pub async fn anzeige_fuer_org(
     pool: &SqlitePool,
     kopplung_id: i64,
     org_id: i64,
-) -> Result<KopplungAnzeige, AppError> {
+) -> Result<InstanzKopplungAnzeige, AppError> {
     liste_fuer_org(pool, org_id)
         .await?
         .into_iter()
@@ -606,26 +606,28 @@ pub async fn anzeige_fuer_org(
         .ok_or(AppError::NotFound)
 }
 
-fn anzeige(k: KopplungZeile, o: OrgZeile) -> KopplungAnzeige {
+fn anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
     let protokoll = match k.gegenueber_protokoll.and_then(|p| u32::try_from(p).ok()) {
         Some(fremd) => match super::protokollfenster(super::PROTOKOLL, fremd) {
-            super::Protokollfenster::Voll => ProtokollAnzeige::Passt,
+            super::Protokollfenster::Voll => InstanzProtokoll::Passt,
             super::Protokollfenster::NurMelden {
                 veraltet: super::Seite::Eigen,
-            } => ProtokollAnzeige::UpdateHier,
+            } => InstanzProtokoll::UpdateHier,
             super::Protokollfenster::NurMelden {
                 veraltet: super::Seite::Gegenueber,
-            } => ProtokollAnzeige::UpdateGegenueber,
+            } => InstanzProtokoll::UpdateGegenueber,
         },
-        None => ProtokollAnzeige::Passt,
+        None => InstanzProtokoll::Passt,
     };
     let fingerabdruck = b64_lesen(&k.gegenueber_schluessel)
         .map(|b| fingerabdruck(&b))
         .unwrap_or_default();
-    KopplungAnzeige {
+    InstanzKopplungAnzeige {
         id: k.id,
-        richtung: k.richtung().unwrap_or(KopplungRichtung::WirdGemeldet),
-        zustand: k.zustand().unwrap_or(KopplungZustand::Widerrufen),
+        richtung: k
+            .richtung()
+            .unwrap_or(InstanzKopplungRichtung::WirdGemeldet),
+        zustand: k.zustand().unwrap_or(InstanzKopplungZustand::Widerrufen),
         gegenueber_fingerabdruck: fingerabdruck,
         gegenueber_name: k.gegenueber_name,
         gegenueber_kennung: k.gegenueber_kennung,
@@ -637,7 +639,7 @@ fn anzeige(k: KopplungZeile, o: OrgZeile) -> KopplungAnzeige {
         letzter_fehler: k.letzter_fehler,
         hinweis: k.hinweis,
         uhr_abweichung_s: k.uhr_abweichung_s,
-        org: OrgZuordnungAnzeige {
+        org: InstanzOrgZuordnung {
             id: o.id,
             fremde_org_name: o.fremde_org_name,
             fremde_org_kennung: o.fremde_org_kennung,

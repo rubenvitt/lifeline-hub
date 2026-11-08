@@ -10,10 +10,10 @@ use super::extractor::MELDEN_PFAD;
 use super::identitaet::{self, oeffentlich_lesen, Identitaet};
 use super::repo::{self, KopplungZeile};
 use super::signatur::{self, AnfrageEntwurf, ANTWORT_KOPF, SCHEMA};
-use super::{org_kennung, KopplungZustand, PROTOKOLL};
+use super::{org_kennung, InstanzKopplungZustand, PROTOKOLL};
 use crate::auth::admin_audit::{self, AdminAktion, Ziel, ZugangsAngaben};
 use crate::auth::unterschrift::repo as unterschrift;
-use crate::auth::unterschrift::SchluesselLieferung;
+use crate::auth::unterschrift::UnterschriftSchluesselLieferung;
 use crate::error::AppError;
 use chrono::Utc;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -75,7 +75,7 @@ pub struct MeldenOrgAntwort {
     pub org: String,
     pub widerrufen: bool,
     #[serde(default)]
-    pub unterschrift: Vec<SchluesselLieferung>,
+    pub unterschrift: Vec<UnterschriftSchluesselLieferung>,
 }
 
 /// Antwort auf eine Meldung.
@@ -330,8 +330,12 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             )
             .await?;
         }
-        repo::zustand_nach_orgs(conn, kopplung.id, KopplungZustand::VomGegenueberWiderrufen)
-            .await?;
+        repo::zustand_nach_orgs(
+            conn,
+            kopplung.id,
+            InstanzKopplungZustand::VomGegenueberWiderrufen,
+        )
+        .await?;
         Ok(())
     })?;
     let naechste = plus_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone());
@@ -423,7 +427,7 @@ pub async fn beantworten(
     kopplung: &KopplungZeile,
     anfrage: &MeldenAnfrage,
 ) -> Result<MeldenAntwort, AppError> {
-    if kopplung.richtung() != Some(super::KopplungRichtung::WirdGemeldet) {
+    if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
     }
     let jetzt = crate::zeit::jetzt();
@@ -483,8 +487,12 @@ pub async fn beantworten(
             }
         }
         repo::widerruf_als_gemeldet(conn, &gemeldet, &jetzt).await?;
-        repo::zustand_nach_orgs(conn, kopplung.id, KopplungZustand::VomGegenueberWiderrufen)
-            .await?;
+        repo::zustand_nach_orgs(
+            conn,
+            kopplung.id,
+            InstanzKopplungZustand::VomGegenueberWiderrufen,
+        )
+        .await?;
         Ok(orgs)
     })?;
     for o in &vom_gegenueber {

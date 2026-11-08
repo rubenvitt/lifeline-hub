@@ -1042,6 +1042,8 @@ export const GLOBAL_KEYS = {
   authProvider: 'auth-provider',
   // Lesezugänge externer Lagemonitore (LLH-1484), Verwaltung.
   lagemonitorZugaenge: 'lagemonitor-zugaenge',
+  // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
+  instanzkopplung: 'instanzkopplung',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
   // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
@@ -1153,6 +1155,7 @@ export const globalKeys = {
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
+  instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   /**
    * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
    * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).
@@ -1327,6 +1330,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `benutzer`, `authProvider`: Benutzerverwaltung und Anmeldewege, nur für den Admin.
  * - `lagemonitorZugaenge` (LLH-1484): Verwaltung der Lesezugänge; die eigene Änderung setzt die
  *   Antwort, eine Freigabe am Einsatz wirkt beim nächsten Abruf.
+ * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
+ *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
@@ -1343,6 +1348,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
   GLOBAL_KEYS.authProvider,
   GLOBAL_KEYS.lagemonitorZugaenge,
+  GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,

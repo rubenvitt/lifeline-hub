@@ -56,7 +56,7 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             repo::kopplung_nach_kennung(&mut conn, &kopf.kid).await?
         }
         .ok_or_else(|| abgelehnt("unbekannte Instanz", Some(&kopf.kid)))?;
-        if kopplung.zustand() == Some(super::KopplungZustand::VomGegenueberWiderrufen) {
+        if kopplung.zustand() == Some(super::InstanzKopplungZustand::VomGegenueberWiderrufen) {
             return Err(abgelehnt(
                 "Kopplung vom Gegenüber widerrufen",
                 Some(&kopf.kid),

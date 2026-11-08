@@ -5,7 +5,7 @@
 //! `docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md`.
 //!
 //! Das Protokoll unterscheidet nicht zwischen Hub und ELW (Entscheidung 13): eine Kopplung kennt
-//! nur ihre Richtung, also welche Seite sich meldet ([`KopplungRichtung`]).
+//! nur ihre Richtung, also welche Seite sich meldet ([`InstanzKopplungRichtung`]).
 
 pub mod basis32;
 pub mod code;
@@ -58,7 +58,7 @@ wire_enum! {
     /// Richtung einer Kopplung aus Sicht dieser Instanz (design.md D6). Die einlösende Seite meldet
     /// sich, die ausstellende wird gemeldet und baut nie selbst eine Verbindung auf.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-    pub enum KopplungRichtung {
+    pub enum InstanzKopplungRichtung {
         /// Diese Instanz meldet sich beim Gegenüber (sie hat dessen Code eingelöst).
         MeldetSich => "meldet_sich",
         /// Das Gegenüber meldet sich hier (es hat einen Code dieser Instanz eingelöst).
@@ -69,7 +69,7 @@ wire_enum! {
 wire_enum! {
     /// Zustand einer Kopplung (design.md D6, D9).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-    pub enum KopplungZustand {
+    pub enum InstanzKopplungZustand {
         /// Code eingelöst, die erste Meldung des Gegenübers steht noch aus (nur ausstellende Seite).
         Angebahnt => "angebahnt",
         Aktiv => "aktiv",

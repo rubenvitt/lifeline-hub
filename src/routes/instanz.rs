@@ -5,13 +5,13 @@
 
 use crate::app::AppState;
 use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
-use crate::auth::session::AdminUser;
-use crate::auth::unterschrift::pruefen::{self, Assertion};
+use crate::auth::session::{AdminUser, CurrentUser};
+use crate::auth::unterschrift::pruefen::{self, UnterschriftAssertion};
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::auth::unterschrift::zeremonie::{self, Zeremonie};
 use crate::auth::unterschrift::{
-    AufnahmeErklaerung, Gegenzeichnung, SchluesselAnzeige, SchluesselLieferung, SchluesselZustand,
-    TYP_AUFNAHME,
+    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand, TYP_AUFNAHME,
 };
 use crate::error::AppError;
 use crate::extract::{JsonBody, PeerIp, PfadParam};
@@ -20,9 +20,9 @@ use crate::instanz::code::{self as kcode, Ableitung};
 use crate::instanz::extractor::{signierte_antwort, GekoppelteInstanz};
 use crate::instanz::identitaet::{self, oeffentlich_lesen, Identitaet};
 use crate::instanz::melden::{self, MeldenAnfrage};
-use crate::instanz::repo::{self, Gegenueber, KopplungAnzeige};
+use crate::instanz::repo::{self, Gegenueber, InstanzKopplungAnzeige};
 use crate::instanz::signatur::{self, ANTWORT_KOPF};
-use crate::instanz::{org_kennung, KopplungRichtung, KopplungZustand, PROTOKOLL};
+use crate::instanz::{org_kennung, InstanzKopplungRichtung, InstanzKopplungZustand, PROTOKOLL};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::Response;
@@ -70,16 +70,20 @@ pub struct InstanzUebersicht {
     /// Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
     /// „Code ausstellen“).
     pub eigener_schluessel: bool,
-    pub kopplungen: Vec<KopplungAnzeige>,
-    pub schluessel: Vec<SchluesselAnzeige>,
+    pub kopplungen: Vec<InstanzKopplungAnzeige>,
+    pub schluessel: Vec<UnterschriftSchluesselAnzeige>,
 }
 
 /// GET /api/admin/instanz — Identität dieser Instanz, Kopplungen und Unterschriftsschlüssel der
-/// eigenen Org.
+/// eigenen Org. Lesen darf, wer die Verwaltung sieht (wie die Lagemonitore); handeln nur der
+/// Admin.
 pub async fn uebersicht(
     State(state): State<AppState>,
-    AdminUser(admin): AdminUser,
+    CurrentUser(admin): CurrentUser,
 ) -> Result<Json<InstanzUebersicht>, AppError> {
+    if !admin.darf_admin_bereich() {
+        return Err(AppError::Forbidden);
+    }
     let i = identitaet::laden_oder_erzeugen(&state.pool)
         .await
         .map_err(identitaet_fehler)?;
@@ -203,7 +207,7 @@ pub struct KoppelnAntwort {
     pub softwarestand: String,
     pub protokoll: u32,
     pub org: OrgLeitung,
-    pub unterschrift: Vec<SchluesselLieferung>,
+    pub unterschrift: Vec<UnterschriftSchluesselLieferung>,
     pub pruefwert: String,
 }
 
@@ -311,9 +315,9 @@ async fn koppeln_pruefen(
                 softwarestand: &a.softwarestand,
                 protokoll: a.protokoll,
             },
-            KopplungRichtung::WirdGemeldet,
+            InstanzKopplungRichtung::WirdGemeldet,
             None,
-            KopplungZustand::Angebahnt,
+            InstanzKopplungZustand::Angebahnt,
             &jetzt,
         )
         .await?;
@@ -366,7 +370,7 @@ pub async fn einloesen(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     JsonBody(body): JsonBody<EinloesenBody>,
-) -> Result<(StatusCode, Json<KopplungAnzeige>), AppError> {
+) -> Result<(StatusCode, Json<InstanzKopplungAnzeige>), AppError> {
     let code = kcode::normalisiere(&body.code).ok_or_else(|| {
         AppError::Validation("Der Code hat 16 Zeichen, etwa ABCD-EFGH-JKMN-PQRS.".into())
     })?;
@@ -397,9 +401,9 @@ pub async fn einloesen(
                 softwarestand: &antwort.softwarestand,
                 protokoll: antwort.protokoll,
             },
-            KopplungRichtung::MeldetSich,
+            InstanzKopplungRichtung::MeldetSich,
             Some(&adresse),
-            KopplungZustand::Aktiv,
+            InstanzKopplungZustand::Aktiv,
             &jetzt,
         )
         .await?;
@@ -572,7 +576,7 @@ pub async fn widerrufen(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(kopplung_id): PfadParam<i64>,
-) -> Result<Json<KopplungAnzeige>, AppError> {
+) -> Result<Json<InstanzKopplungAnzeige>, AppError> {
     let vorher = repo::anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
     let jetzt = crate::zeit::jetzt();
     let widerrufen = crate::write_retry!(&state.pool, |conn| {
@@ -584,7 +588,7 @@ pub async fn widerrufen(
             return Ok(false);
         };
         let w = repo::org_widerrufen(conn, o.id, Some(admin.id), &jetzt, false).await?;
-        repo::zustand_nach_orgs(conn, kopplung_id, KopplungZustand::Widerrufen).await?;
+        repo::zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen).await?;
         Ok(w)
     })?;
     if widerrufen {
@@ -603,7 +607,7 @@ pub async fn widerrufen(
             },
         )
         .await;
-        if kopplung.richtung() == Some(KopplungRichtung::MeldetSich) {
+        if kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich) {
             melden::melden_einmal(&state.pool, &kopplung).await?;
         }
     }
@@ -632,7 +636,7 @@ pub struct RegistrierenStartBody {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct RegistrierenStart {
+pub struct UnterschriftRegistrierenStart {
     pub zeremonie: String,
     /// Optionen für `navigator.credentials.create` (`publicKey`).
     #[schema(value_type = Object)]
@@ -645,7 +649,7 @@ pub struct RegistrierenStart {
 pub async fn registrieren_start(
     AdminUser(admin): AdminUser,
     JsonBody(body): JsonBody<RegistrierenStartBody>,
-) -> Result<Json<RegistrierenStart>, AppError> {
+) -> Result<Json<UnterschriftRegistrierenStart>, AppError> {
     let bezeichnung =
         crate::routes::support::pflicht_max(&body.bezeichnung, "bezeichnung", BEZEICHNUNG_MAX)?;
     crate::auth::unterschrift::rp().ok_or_else(passkeys_fehlen)?;
@@ -664,7 +668,7 @@ pub async fn registrieren_start(
         zustand,
     })
     .map_err(zeremonie_voll)?;
-    Ok(Json(RegistrierenStart {
+    Ok(Json(UnterschriftRegistrierenStart {
         zeremonie,
         optionen,
     }))
@@ -683,7 +687,7 @@ pub async fn registrieren_abschluss(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     JsonBody(body): JsonBody<RegistrierenAbschlussBody>,
-) -> Result<(StatusCode, Json<SchluesselAnzeige>), AppError> {
+) -> Result<(StatusCode, Json<UnterschriftSchluesselAnzeige>), AppError> {
     let (rp_id, origin) = crate::auth::unterschrift::rp().ok_or_else(passkeys_fehlen)?;
     let webauthn = crate::auth::webauthn::webauthn().ok_or_else(passkeys_fehlen)?;
     let Some(Zeremonie::Registrierung {
@@ -761,7 +765,7 @@ fn es256_punkt(passkey: &webauthn_rs::prelude::Passkey) -> Option<String> {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct GegenzeichnenStart {
+pub struct UnterschriftGegenzeichnenStart {
     pub zeremonie: String,
     /// Challenge für `navigator.credentials.get` (Base64url): SHA-256 der Erklärung.
     pub challenge: String,
@@ -779,7 +783,7 @@ pub async fn gegenzeichnen_start(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
-) -> Result<Json<GegenzeichnenStart>, AppError> {
+) -> Result<Json<UnterschriftGegenzeichnenStart>, AppError> {
     let (rp_id, _) = crate::auth::unterschrift::rp().ok_or_else(passkeys_fehlen)?;
     let i = identitaet::laden_oder_erzeugen(&state.pool)
         .await
@@ -791,7 +795,9 @@ pub async fn gegenzeichnen_start(
             unterschrift::gueltige_eigene(&mut conn, admin.id).await?,
         )
     };
-    if ziel.herkunft != "lokal" || ziel.zustand() != SchluesselZustand::WartetAufGegenzeichnung {
+    if ziel.herkunft != "lokal"
+        || ziel.zustand() != UnterschriftSchluesselZustand::WartetAufGegenzeichnung
+    {
         return Err(AppError::Conflict(
             "Dieser Schlüssel wartet nicht auf eine Gegenzeichnung.".into(),
         ));
@@ -820,7 +826,7 @@ pub async fn gegenzeichnen_start(
         erklaerung: erklaerung.clone(),
     })
     .map_err(zeremonie_voll)?;
-    Ok(Json(GegenzeichnenStart {
+    Ok(Json(UnterschriftGegenzeichnenStart {
         zeremonie,
         challenge,
         rp_id: rp_id.to_string(),
@@ -832,7 +838,7 @@ pub async fn gegenzeichnen_start(
 #[derive(Debug, Deserialize)]
 pub struct GegenzeichnenAbschlussBody {
     pub zeremonie: String,
-    pub assertion: Assertion,
+    pub assertion: UnterschriftAssertion,
 }
 
 /// POST /api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss — prüft die Unterschrift
@@ -843,7 +849,7 @@ pub async fn gegenzeichnen_abschluss(
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<GegenzeichnenAbschlussBody>,
-) -> Result<Json<SchluesselAnzeige>, AppError> {
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
     let Some(Zeremonie::Gegenzeichnung {
         ziel_id,
         erklaerung,
@@ -913,7 +919,7 @@ pub async fn unterschrift_widerrufen(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
-) -> Result<Json<SchluesselAnzeige>, AppError> {
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
     let (wirkung, zeile) = crate::write_retry!(&state.pool, |conn| {
         let zeile = unterschrift::laden(conn, admin.org_id, id).await?;
@@ -922,7 +928,7 @@ pub async fn unterschrift_widerrufen(
                 "Schlüssel einer gekoppelten Instanz widerruft diese selbst.".into(),
             ));
         }
-        if zeile.zustand() != SchluesselZustand::Widerrufen
+        if zeile.zustand() != UnterschriftSchluesselZustand::Widerrufen
             && unterschrift::ist_letzter_bei_kopplung(conn, admin.org_id, id).await?
         {
             return Err(AppError::Conflict(

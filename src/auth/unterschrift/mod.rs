@@ -13,7 +13,7 @@ pub mod repo;
 pub mod zeremonie;
 
 use crate::wire_enum::wire_enum;
-use pruefen::Assertion;
+use pruefen::UnterschriftAssertion;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -40,7 +40,7 @@ pub const TYP_AUFNAHME: &str = "unterschriftsschluessel-aufnahme";
 wire_enum! {
     /// Woher ein Unterschriftsschlüssel stammt.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-    pub enum SchluesselHerkunft {
+    pub enum UnterschriftSchluesselHerkunft {
         /// An dieser Instanz registriert.
         Lokal => "lokal",
         /// Von einer gekoppelten Instanz übernommen.
@@ -51,7 +51,7 @@ wire_enum! {
 wire_enum! {
     /// Zustand eines Unterschriftsschlüssels.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-    pub enum SchluesselZustand {
+    pub enum UnterschriftSchluesselZustand {
         /// Registriert, die Gegenzeichnung eines bekannten Admins steht aus; wird nicht verteilt.
         WartetAufGegenzeichnung => "wartet_auf_gegenzeichnung",
         Gueltig => "gueltig",
@@ -59,12 +59,12 @@ wire_enum! {
     }
 }
 
-/// Eine Gegenzeichnung: die Erklärung (wörtlich, ihr SHA-256 ist die Challenge), die Assertion und
+/// Eine Gegenzeichnung: die Erklärung (wörtlich, ihr SHA-256 ist die Challenge), die UnterschriftAssertion und
 /// welcher Schlüssel unterschrieben hat.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Gegenzeichnung {
     pub erklaerung: String,
-    pub assertion: Assertion,
+    pub assertion: UnterschriftAssertion,
     pub unterzeichner_credential_id: String,
 }
 
@@ -86,7 +86,7 @@ pub struct AufnahmeErklaerung {
 /// Ein Schlüssel, wie er an gekoppelte Instanzen geht (Grundstock beim Koppeln, Nachlieferung
 /// beim Melden). `id` ist die id an der registrierenden Instanz.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct SchluesselLieferung {
+pub struct UnterschriftSchluesselLieferung {
     pub id: i64,
     pub benutzer_name: String,
     pub credential_id: String,
@@ -95,7 +95,7 @@ pub struct SchluesselLieferung {
     pub rp_id: String,
     pub origin: String,
     pub bezeichnung: String,
-    pub zustand: SchluesselZustand,
+    pub zustand: UnterschriftSchluesselZustand,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gegenzeichnung: Option<Gegenzeichnung>,
     pub stand: i64,
@@ -103,13 +103,13 @@ pub struct SchluesselLieferung {
 
 /// Ein Schlüssel, wie die Admin-Seite ihn zeigt.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct SchluesselAnzeige {
+pub struct UnterschriftSchluesselAnzeige {
     pub id: i64,
     pub benutzer_name: String,
     pub bezeichnung: String,
     pub fingerabdruck: String,
-    pub zustand: SchluesselZustand,
-    pub herkunft: SchluesselHerkunft,
+    pub zustand: UnterschriftSchluesselZustand,
+    pub herkunft: UnterschriftSchluesselHerkunft,
     /// Gehört dem anfragenden Admin.
     pub eigen: bool,
     pub erstellt_at: String,

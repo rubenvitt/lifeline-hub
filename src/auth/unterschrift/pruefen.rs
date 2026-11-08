@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-/// Eine Assertion, wie der Browser sie aus `navigator.credentials.get` liefert (Base64url).
+/// Eine UnterschriftAssertion, wie der Browser sie aus `navigator.credentials.get` liefert (Base64url).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct Assertion {
+pub struct UnterschriftAssertion {
     pub credential_id: String,
     pub authenticator_data: String,
     pub client_data_json: String,
@@ -93,7 +93,7 @@ pub fn challenge(erklaerung: &str) -> String {
 /// Prüft `assertion` als Unterschrift über `erklaerung` mit `schluessel`.
 pub fn pruefe(
     erklaerung: &str,
-    assertion: &Assertion,
+    assertion: &UnterschriftAssertion,
     schluessel: &PruefSchluessel<'_>,
 ) -> Result<(), PruefFehler> {
     if assertion.credential_id != schluessel.credential_id {
@@ -172,7 +172,7 @@ pub mod test_authenticator {
             origin: &str,
             rp_id: &str,
             flags: u8,
-        ) -> Assertion {
+        ) -> UnterschriftAssertion {
             self.unterschreibe_roh(&challenge(erklaerung), "webauthn.get", origin, rp_id, flags)
         }
 
@@ -183,7 +183,7 @@ pub mod test_authenticator {
             origin: &str,
             rp_id: &str,
             flags: u8,
-        ) -> Assertion {
+        ) -> UnterschriftAssertion {
             let cdj = serde_json::json!({"type": typ, "challenge": challenge, "origin": origin})
                 .to_string();
             let mut auth_data = Sha256::digest(rp_id.as_bytes()).to_vec();
@@ -192,7 +192,7 @@ pub mod test_authenticator {
             let mut nachricht = auth_data.clone();
             nachricht.extend_from_slice(&Sha256::digest(cdj.as_bytes()));
             let sig: Signature = self.schluessel.sign(&nachricht);
-            Assertion {
+            UnterschriftAssertion {
                 credential_id: self.credential_id.clone(),
                 authenticator_data: b64(&auth_data),
                 client_data_json: b64(cdj.as_bytes()),
@@ -215,7 +215,11 @@ mod tests {
         SoftwarePasskey::neu("cred-a", [5u8; 32])
     }
 
-    fn pruefe_mit(p: &SoftwarePasskey, erklaerung: &str, a: &Assertion) -> Result<(), PruefFehler> {
+    fn pruefe_mit(
+        p: &SoftwarePasskey,
+        erklaerung: &str,
+        a: &UnterschriftAssertion,
+    ) -> Result<(), PruefFehler> {
         let oeff = p.oeffentlich();
         pruefe(
             erklaerung,

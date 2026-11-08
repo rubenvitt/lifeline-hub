@@ -33,11 +33,28 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   einmalpasswort_vergeben: 'Einmalpasswort vergeben',
   lesezugang_angelegt: 'Lagemonitor-Zugang angelegt',
   lesezugang_widerrufen: 'Lagemonitor-Zugang widerrufen',
+  instanz_code_ausgestellt: 'Kopplungscode ausgestellt',
+  instanz_code_eingeloest: 'Kopplungscode eingelöst',
+  instanz_gekoppelt: 'Instanz gekoppelt',
+  instanz_kopplung_widerrufen: 'Instanzkopplung widerrufen',
+  instanz_kopplung_vom_gegenueber_widerrufen: 'Instanzkopplung vom Gegenüber widerrufen',
+  unterschrift_registriert: 'Unterschriftsschlüssel registriert',
+  unterschrift_gegengezeichnet: 'Unterschriftsschlüssel gegengezeichnet',
+  unterschrift_widerrufen: 'Unterschriftsschlüssel widerrufen',
+  unterschrift_abgelehnt: 'Unterschriftsschlüssel abgelehnt',
 };
 
-/** Aktionen am Lagemonitor-Zugang (LLH-1484): ihr Ziel ist die Bezeichnung des Zugangs. */
+/**
+ * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
+ * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber).
+ */
 export function istLesezugang(aktion: AdminAktion): boolean {
-  return aktion === 'lesezugang_angelegt' || aktion === 'lesezugang_widerrufen';
+  return (
+    aktion === 'lesezugang_angelegt' ||
+    aktion === 'lesezugang_widerrufen' ||
+    aktion.startsWith('instanz_') ||
+    aktion.startsWith('unterschrift_')
+  );
 }
 
 /**

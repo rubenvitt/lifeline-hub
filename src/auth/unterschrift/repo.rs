@@ -2,8 +2,9 @@
 
 use super::pruefen::{self, PruefSchluessel};
 use super::{
-    AufnahmeErklaerung, Gegenzeichnung, SchluesselAnzeige, SchluesselHerkunft, SchluesselLieferung,
-    SchluesselZustand, ALG_ES256, TYP_AUFNAHME,
+    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    UnterschriftSchluesselHerkunft, UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand,
+    ALG_ES256, TYP_AUFNAHME,
 };
 use crate::error::AppError;
 use crate::instanz::basis32::{b64_lesen, fingerabdruck, sha256_b64};
@@ -38,8 +39,9 @@ const SPALTEN: &str = "id, org_id, herkunft, kopplung_org_id, fremde_id, benutze
      zustand, gegenzeichnung, stand, erstellt_at, widerrufen_at";
 
 impl SchluesselZeile {
-    pub fn zustand(&self) -> SchluesselZustand {
-        SchluesselZustand::parse(&self.zustand).unwrap_or(SchluesselZustand::Widerrufen)
+    pub fn zustand(&self) -> UnterschriftSchluesselZustand {
+        UnterschriftSchluesselZustand::parse(&self.zustand)
+            .unwrap_or(UnterschriftSchluesselZustand::Widerrufen)
     }
 
     fn gegenzeichnung(&self) -> Option<Gegenzeichnung> {
@@ -48,8 +50,8 @@ impl SchluesselZeile {
             .and_then(|g| serde_json::from_str(g).ok())
     }
 
-    pub fn lieferung(&self) -> SchluesselLieferung {
-        SchluesselLieferung {
+    pub fn lieferung(&self) -> UnterschriftSchluesselLieferung {
+        UnterschriftSchluesselLieferung {
             id: self.id,
             benutzer_name: self.benutzer_name.clone(),
             credential_id: self.credential_id.clone(),
@@ -121,9 +123,9 @@ pub async fn anlegen_lokal(
     neu: &NeuerSchluessel<'_>,
 ) -> Result<i64, AppError> {
     let zustand = if org_verteilt(conn, neu.org_id).await? {
-        SchluesselZustand::WartetAufGegenzeichnung
+        UnterschriftSchluesselZustand::WartetAufGegenzeichnung
     } else {
-        SchluesselZustand::Gueltig
+        UnterschriftSchluesselZustand::Gueltig
     };
     let stand = naechster_stand(conn, neu.org_id).await?;
     let fp = b64_lesen(neu.schluessel)
@@ -276,7 +278,7 @@ pub async fn alle_des_benutzers_widerrufen(
 pub async fn grundstock(
     conn: &mut SqliteConnection,
     org_id: i64,
-) -> Result<(Vec<SchluesselLieferung>, i64), AppError> {
+) -> Result<(Vec<UnterschriftSchluesselLieferung>, i64), AppError> {
     let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
          AND zustand = 'gueltig' ORDER BY stand"
@@ -302,7 +304,7 @@ pub async fn nachlieferung(
     conn: &mut SqliteConnection,
     org_id: i64,
     seit: i64,
-) -> Result<Vec<SchluesselLieferung>, AppError> {
+) -> Result<Vec<UnterschriftSchluesselLieferung>, AppError> {
     let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
          AND stand > ? AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand"
@@ -332,7 +334,7 @@ pub struct Ziel<'a> {
 
 /// Prüft eine Gegenzeichnung gegen die schon bekannten, gültigen Schlüssel dieser Org-Zuordnung.
 fn gegenzeichnung_gilt(
-    l: &SchluesselLieferung,
+    l: &UnterschriftSchluesselLieferung,
     ziel: &Ziel<'_>,
     bekannte: &[SchluesselZeile],
 ) -> Result<(), String> {
@@ -354,7 +356,7 @@ fn gegenzeichnung_gilt(
         .iter()
         .find(|b| {
             b.credential_id == g.unterzeichner_credential_id
-                && b.zustand() == SchluesselZustand::Gueltig
+                && b.zustand() == UnterschriftSchluesselZustand::Gueltig
         })
         .ok_or_else(|| "gegengezeichnet von einem unbekannten Schlüssel".to_string())?;
     pruefen::pruefe(
@@ -371,7 +373,7 @@ fn gegenzeichnung_gilt(
 pub async fn annehmen(
     conn: &mut SqliteConnection,
     ziel: &Ziel<'_>,
-    lieferungen: &[SchluesselLieferung],
+    lieferungen: &[UnterschriftSchluesselLieferung],
     grundstock: bool,
     jetzt: &str,
 ) -> Result<Vec<Abgelehnt>, AppError> {
@@ -388,7 +390,7 @@ pub async fn annehmen(
         .fetch_optional(&mut *conn)
         .await?;
         match (l.zustand, vorhanden) {
-            (SchluesselZustand::Widerrufen, Some((id, _))) => {
+            (UnterschriftSchluesselZustand::Widerrufen, Some((id, _))) => {
                 sqlx::query(
                     "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
                      widerrufen_at = COALESCE(widerrufen_at, ?), stand = ? WHERE id = ?",
@@ -401,10 +403,10 @@ pub async fn annehmen(
             }
             // Ein unbekannter widerrufener oder ein noch wartender Schlüssel ändert nichts; ein
             // hier schon bekannter gültiger auch nicht. Ein widerrufener lebt nie wieder auf.
-            (SchluesselZustand::Widerrufen, None)
-            | (SchluesselZustand::WartetAufGegenzeichnung, _)
-            | (SchluesselZustand::Gueltig, Some(_)) => {}
-            (SchluesselZustand::Gueltig, None) => {
+            (UnterschriftSchluesselZustand::Widerrufen, None)
+            | (UnterschriftSchluesselZustand::WartetAufGegenzeichnung, _)
+            | (UnterschriftSchluesselZustand::Gueltig, Some(_)) => {}
+            (UnterschriftSchluesselZustand::Gueltig, None) => {
                 if l.alg != ALG_ES256 {
                     abgelehnt.push(Abgelehnt {
                         fingerabdruck: fp,
@@ -475,7 +477,7 @@ pub async fn liste_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
     benutzer_id: i64,
-) -> Result<Vec<SchluesselAnzeige>, AppError> {
+) -> Result<Vec<UnterschriftSchluesselAnzeige>, AppError> {
     let zeilen: Vec<(SchluesselZeile, Option<String>)> = {
         let roh: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? \
@@ -517,13 +519,14 @@ pub async fn liste_fuer_org(
             }
             None => None,
         };
-        aus.push(SchluesselAnzeige {
+        aus.push(UnterschriftSchluesselAnzeige {
             id: z.id,
             benutzer_name: z.benutzer_name.clone(),
             bezeichnung: z.bezeichnung.clone(),
             fingerabdruck: z.fingerabdruck.clone(),
             zustand: z.zustand(),
-            herkunft: SchluesselHerkunft::parse(&z.herkunft).unwrap_or(SchluesselHerkunft::Lokal),
+            herkunft: UnterschriftSchluesselHerkunft::parse(&z.herkunft)
+                .unwrap_or(UnterschriftSchluesselHerkunft::Lokal),
             eigen: z.benutzer_id == Some(benutzer_id),
             erstellt_at: z.erstellt_at.clone(),
             widerrufen_at: z.widerrufen_at.clone(),
@@ -540,7 +543,7 @@ pub async fn anzeige(
     org_id: i64,
     benutzer_id: i64,
     id: i64,
-) -> Result<SchluesselAnzeige, AppError> {
+) -> Result<UnterschriftSchluesselAnzeige, AppError> {
     liste_fuer_org(pool, org_id, benutzer_id)
         .await?
         .into_iter()

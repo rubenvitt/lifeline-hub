@@ -3,7 +3,7 @@
 use super::*;
 use crate::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey;
 use crate::instanz::repo as kopplung;
-use crate::instanz::{KopplungRichtung, KopplungZustand};
+use crate::instanz::{InstanzKopplungRichtung, InstanzKopplungZustand};
 
 const JETZT: &str = "2026-11-08 12:00:00";
 const ORIGIN: &str = "https://hub.example.org";
@@ -19,7 +19,7 @@ async fn pool_mit_admin() -> SqlitePool {
 }
 
 /// Eine Kopplung, in der diese Instanz sich meldet, mit einer Org-Zuordnung; liefert deren id.
-async fn kopplung_org(pool: &SqlitePool, richtung: KopplungRichtung) -> i64 {
+async fn kopplung_org(pool: &SqlitePool, richtung: InstanzKopplungRichtung) -> i64 {
     let mut conn = pool.acquire().await.unwrap();
     let k = kopplung::kopplung_anlegen_oder_erneuern(
         &mut conn,
@@ -31,8 +31,8 @@ async fn kopplung_org(pool: &SqlitePool, richtung: KopplungRichtung) -> i64 {
             protokoll: 1,
         },
         richtung,
-        (richtung == KopplungRichtung::MeldetSich).then_some("https://hub.example.org"),
-        KopplungZustand::Aktiv,
+        (richtung == InstanzKopplungRichtung::MeldetSich).then_some("https://hub.example.org"),
+        InstanzKopplungZustand::Aktiv,
         JETZT,
     )
     .await
@@ -45,10 +45,10 @@ async fn kopplung_org(pool: &SqlitePool, richtung: KopplungRichtung) -> i64 {
 fn lieferung(
     id: i64,
     p: &SoftwarePasskey,
-    zustand: SchluesselZustand,
+    zustand: UnterschriftSchluesselZustand,
     stand: i64,
-) -> SchluesselLieferung {
-    SchluesselLieferung {
+) -> UnterschriftSchluesselLieferung {
+    UnterschriftSchluesselLieferung {
         id,
         benutzer_name: format!("admin{id}"),
         credential_id: p.credential_id.clone(),
@@ -64,10 +64,10 @@ fn lieferung(
 }
 
 fn gegengezeichnet(
-    mut l: SchluesselLieferung,
+    mut l: UnterschriftSchluesselLieferung,
     unterzeichner: &SoftwarePasskey,
     org: &str,
-) -> SchluesselLieferung {
+) -> UnterschriftSchluesselLieferung {
     let erklaerung = serde_json::to_string(&AufnahmeErklaerung {
         typ: TYP_AUFNAHME.into(),
         org: org.into(),
@@ -100,7 +100,7 @@ async fn gueltige_fremde(conn: &mut SqliteConnection) -> Vec<String> {
 #[tokio::test]
 async fn grundstock_gilt_ohne_gegenzeichnung() {
     let pool = pool_mit_admin().await;
-    let ko = kopplung_org(&pool, KopplungRichtung::MeldetSich).await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
     let a = SoftwarePasskey::neu("a", [1u8; 32]);
     let ziel = Ziel {
         kopplung_org_id: ko,
@@ -111,7 +111,7 @@ async fn grundstock_gilt_ohne_gegenzeichnung() {
     let abgelehnt = annehmen(
         &mut conn,
         &ziel,
-        &[lieferung(10, &a, SchluesselZustand::Gueltig, 3)],
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 3)],
         true,
         JETZT,
     )
@@ -131,7 +131,7 @@ async fn grundstock_gilt_ohne_gegenzeichnung() {
 #[tokio::test]
 async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
     let pool = pool_mit_admin().await;
-    let ko = kopplung_org(&pool, KopplungRichtung::MeldetSich).await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
     let a = SoftwarePasskey::neu("a", [1u8; 32]);
     let boese = SoftwarePasskey::neu("boese", [9u8; 32]);
     let ziel = Ziel {
@@ -143,7 +143,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
     annehmen(
         &mut conn,
         &ziel,
-        &[lieferung(10, &a, SchluesselZustand::Gueltig, 1)],
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
         true,
         JETZT,
     )
@@ -153,7 +153,12 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
     let ab = annehmen(
         &mut conn,
         &ziel,
-        &[lieferung(11, &boese, SchluesselZustand::Gueltig, 2)],
+        &[lieferung(
+            11,
+            &boese,
+            UnterschriftSchluesselZustand::Gueltig,
+            2,
+        )],
         false,
         JETZT,
     )
@@ -162,7 +167,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
     assert_eq!(ab.len(), 1, "{ab:?}");
     // Vom bösen Schlüssel selbst gegengezeichnet (nicht bekannt)
     let selbst = gegengezeichnet(
-        lieferung(11, &boese, SchluesselZustand::Gueltig, 2),
+        lieferung(11, &boese, UnterschriftSchluesselZustand::Gueltig, 2),
         &boese,
         FREMDE_ORG,
     );
@@ -173,7 +178,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
     assert!(ab[0].grund.contains("unbekannt"), "{ab:?}");
     // Gegenzeichnung für eine andere Org
     let falsche_org = gegengezeichnet(
-        lieferung(11, &boese, SchluesselZustand::Gueltig, 2),
+        lieferung(11, &boese, UnterschriftSchluesselZustand::Gueltig, 2),
         &a,
         "andere/1",
     );
@@ -183,7 +188,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
     assert_eq!(ab.len(), 1);
     // Gegenzeichnung eines anderen Schlüssels untergeschoben
     let mut fremd = gegengezeichnet(
-        lieferung(11, &boese, SchluesselZustand::Gueltig, 2),
+        lieferung(11, &boese, UnterschriftSchluesselZustand::Gueltig, 2),
         &a,
         FREMDE_ORG,
     );
@@ -198,7 +203,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
 #[tokio::test]
 async fn gegengezeichneter_schluessel_wird_angenommen_und_widerruf_uebernommen() {
     let pool = pool_mit_admin().await;
-    let ko = kopplung_org(&pool, KopplungRichtung::MeldetSich).await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
     let a = SoftwarePasskey::neu("a", [1u8; 32]);
     let b = SoftwarePasskey::neu("b", [2u8; 32]);
     let ziel = Ziel {
@@ -210,14 +215,14 @@ async fn gegengezeichneter_schluessel_wird_angenommen_und_widerruf_uebernommen()
     annehmen(
         &mut conn,
         &ziel,
-        &[lieferung(10, &a, SchluesselZustand::Gueltig, 1)],
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
         true,
         JETZT,
     )
     .await
     .unwrap();
     let neu = gegengezeichnet(
-        lieferung(11, &b, SchluesselZustand::Gueltig, 2),
+        lieferung(11, &b, UnterschriftSchluesselZustand::Gueltig, 2),
         &a,
         FREMDE_ORG,
     );
@@ -230,7 +235,12 @@ async fn gegengezeichneter_schluessel_wird_angenommen_und_widerruf_uebernommen()
     annehmen(
         &mut conn,
         &ziel,
-        &[lieferung(10, &a, SchluesselZustand::Widerrufen, 3)],
+        &[lieferung(
+            10,
+            &a,
+            UnterschriftSchluesselZustand::Widerrufen,
+            3,
+        )],
         false,
         JETZT,
     )
@@ -241,7 +251,7 @@ async fn gegengezeichneter_schluessel_wird_angenommen_und_widerruf_uebernommen()
     annehmen(
         &mut conn,
         &ziel,
-        &[lieferung(10, &a, SchluesselZustand::Gueltig, 4)],
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 4)],
         true,
         JETZT,
     )
@@ -273,11 +283,11 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
     .unwrap();
     assert_eq!(
         laden(&mut conn, 1, id_a).await.unwrap().zustand(),
-        SchluesselZustand::Gueltig
+        UnterschriftSchluesselZustand::Gueltig
     );
     drop(conn);
     // Jetzt verteilt die Org ihre Schlüssel (wir stellen aus).
-    kopplung_org(&pool, KopplungRichtung::WirdGemeldet).await;
+    kopplung_org(&pool, InstanzKopplungRichtung::WirdGemeldet).await;
     let mut conn = pool.acquire().await.unwrap();
     assert!(ist_letzter_bei_kopplung(&mut conn, 1, id_a).await.unwrap());
     let b = SoftwarePasskey::neu("b", [2u8; 32]);
@@ -299,7 +309,7 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
     .unwrap();
     assert_eq!(
         laden(&mut conn, 1, id_b).await.unwrap().zustand(),
-        SchluesselZustand::WartetAufGegenzeichnung
+        UnterschriftSchluesselZustand::WartetAufGegenzeichnung
     );
     // Wartende gehen nicht hinaus, nur der gültige.
     let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
@@ -317,5 +327,5 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
     );
     let n = nachlieferung(&mut conn, 1, 1).await.unwrap();
     assert_eq!(n.len(), 1);
-    assert_eq!(n[0].zustand, SchluesselZustand::Widerrufen);
+    assert_eq!(n[0].zustand, UnterschriftSchluesselZustand::Widerrufen);
 }
