@@ -35,6 +35,9 @@ wire_enum! {
         /// Verbindung laufen und ihre Namen disjunkt sein müssen (`benachrichtigung` ist das
         /// Einsatz-Ereignis).
         OrgBenachrichtigung => "org_benachrichtigung",
+        /// Eine Planung der Organisation hat sich geändert (LLH-1585, Spec `vorplanung`); nur an
+        /// ihre Planer ([`OrgEmpfaenger::Planer`]). Nutzlast `{"id":…}`.
+        Planung => "planung",
     }
 }
 
@@ -59,6 +62,9 @@ pub enum OrgEmpfaenger {
     /// Genau die genannten Benutzer, ohne Ausnahme für System-Admins oder org-weite Leser
     /// (LLH-1207): eine Benachrichtigung gehört ihrem Empfänger.
     Benutzer { benutzer_ids: Arc<[i64]> },
+    /// Wer in der Organisation planen darf (`planung::zugriff::darf_planen`): Planungen sind
+    /// kein Katalog, `stammdaten` erreichte jeden der Organisation.
+    Planer,
 }
 
 /// Eine Nachricht im Org-Kanal. `org_id` ist die Organisation des Katalogs bzw. des Einsatzes.
@@ -67,7 +73,8 @@ pub struct OrgNachricht {
     pub org_id: i64,
     pub event: OrgLiveEvent,
     pub empfaenger: OrgEmpfaenger,
-    /// Nutzlast; `None` = [`ORG_NUTZLAST`]. Nur `org_benachrichtigung` trägt eine.
+    /// Nutzlast; `None` = [`ORG_NUTZLAST`]. Nur `org_benachrichtigung` und `planung` tragen
+    /// eine.
     pub nutzlast: Option<Arc<str>>,
 }
 
@@ -89,6 +96,8 @@ pub struct OrgAbonnent {
     pub ist_admin: bool,
     /// Liest jeden Einsatz der EIGENEN Organisation ohne Mitgliedschaft (Führungskraft, Admin).
     pub org_weiter_leser: bool,
+    /// Darf in der eigenen Organisation planen (`planung::zugriff::darf_planen`).
+    pub planer: bool,
 }
 
 impl OrgAbonnent {
@@ -98,6 +107,7 @@ impl OrgAbonnent {
             org_id: benutzer.org_id,
             ist_admin: benutzer.ist_admin(),
             org_weiter_leser: benutzer.darf_fremdeinsatz_lesen(benutzer.org_id),
+            planer: crate::planung::zugriff::darf_planen(benutzer),
         }
     }
 
@@ -111,6 +121,7 @@ impl OrgAbonnent {
                     || benutzer_ids.contains(&self.benutzer_id)
             }
             OrgEmpfaenger::Benutzer { benutzer_ids } => benutzer_ids.contains(&self.benutzer_id),
+            OrgEmpfaenger::Planer => self.planer && self.org_id == n.org_id,
         }
     }
 }
@@ -206,6 +217,7 @@ mod tests {
             org_id,
             ist_admin,
             org_weiter_leser: org_weit || ist_admin,
+            planer: org_weit || ist_admin,
         }
     }
 
@@ -230,12 +242,34 @@ mod tests {
     }
 
     #[test]
-    fn drei_ereignisse_mit_festen_wire_namen() {
+    fn vier_ereignisse_mit_festen_wire_namen() {
         let wire: Vec<&str> = OrgLiveEvent::ALLE.iter().map(|e| e.as_str()).collect();
         assert_eq!(
             wire,
-            vec!["einsatzliste", "stammdaten", "org_benachrichtigung"]
+            vec![
+                "einsatzliste",
+                "stammdaten",
+                "org_benachrichtigung",
+                "planung"
+            ]
         );
+    }
+
+    /// LLH-1585: eine Planung erreicht nur die Planer ihrer Organisation, auch keinen
+    /// System-Admin einer anderen.
+    #[test]
+    fn planung_erreicht_nur_die_planer_der_organisation() {
+        let n = OrgNachricht {
+            org_id: 1,
+            event: OrgLiveEvent::Planung,
+            empfaenger: OrgEmpfaenger::Planer,
+            nutzlast: Some(r#"{"id":4}"#.into()),
+        };
+        assert!(abonnent(10, 1, false, true).sieht(&n), "Führungskraft");
+        assert!(abonnent(12, 1, true, true).sieht(&n), "Admin derselben Org");
+        assert!(!abonnent(13, 1, false, false).sieht(&n), "ohne Org-Rolle");
+        assert!(!abonnent(20, 2, true, true).sieht(&n), "Admin fremder Org");
+        assert_eq!(n.daten(), r#"{"id":4}"#);
     }
 
     /// LLH-1207: eine Org-Benachrichtigung erreicht genau ihren Empfänger, auch keinen

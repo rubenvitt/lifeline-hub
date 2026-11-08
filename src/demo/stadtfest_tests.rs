@@ -373,6 +373,114 @@ async fn beide_lagen_nebeneinander_entfernen_trifft_nur_die_eigene() {
     }
 }
 
+/// LLH-1585: Die Lage bringt die Planung „Stadtfest Musterstadt“ mit (Samstag nach dem
+/// Importtag, 10–24 Uhr): Kennzahlen aus derselben Prüfung, ein „doppelt“, eine Lücke, kein
+/// Einsatz. Das Entfernen räumt sie vor dem Personal.
+#[tokio::test]
+async fn stadtfest_bringt_die_demo_planung_mit() {
+    let pool = crate::db::test_pool().await;
+    let admin = org(&pool).await;
+    let erg = importieren(&pool, admin, DemoLage::Stadtfest)
+        .await
+        .expect("Import");
+    let zeile = erg
+        .bericht
+        .je_art
+        .iter()
+        .find(|z| z.art == DemoStammdatenArt::Planung)
+        .expect("Berichtszeile Planung");
+    assert_eq!((zeile.angelegt, zeile.mitbenutzt), (1, 0));
+
+    let id: i64 = sqlx::query_scalar("SELECT id FROM planung WHERE org_id = 1 AND bezeichnung = ?")
+        .bind(stadtfest::PLANUNG_BEZEICHNUNG)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let p = crate::planung::repo::laden(&pool, 1, id).await.unwrap();
+    // 4. Juli 2026 ist ein Samstag: die Planung liegt eine Woche später, in Sommerzeit.
+    assert_eq!(p.kopf.von, "2026-07-11 08:00:00");
+    assert_eq!(p.kopf.bis, "2026-07-11 22:00:00");
+    assert_eq!(
+        p.posten
+            .iter()
+            .map(|x| x.bezeichnung.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "UHS Marktplatz",
+            "Streife 1",
+            "Streife 2",
+            "Sanitätswache Bühne",
+            "KTW Musterstadt 87-85"
+        ]
+    );
+    let ktw = &p.posten[4];
+    assert!(ktw.fahrzeug_id.is_some());
+    assert_eq!(ktw.soll_anzahl, Some(2), "Soll aus der Sollbesatzung");
+    assert_eq!(p.helfer.len(), 2);
+    assert_eq!(
+        p.kennzahlen,
+        crate::planung::PlanungKennzahlen {
+            soll: 26,
+            ist: 24,
+            offen: 2,
+            konflikte: 2,
+        }
+    );
+    let doppelt: Vec<&str> = p
+        .bloecke
+        .iter()
+        .flat_map(|b| b.personen.iter())
+        .filter(|x| {
+            x.befunde
+                .iter()
+                .any(|f| f.art == crate::abloesung::schichtplan::PlanBefundArt::Doppelt)
+        })
+        .map(|x| x.name.as_str())
+        .collect();
+    assert_eq!(doppelt, ["Mia Muster", "Mia Muster"]);
+    assert!(
+        p.bloecke
+            .iter()
+            .flat_map(|b| b
+                .personen
+                .iter()
+                .flat_map(|x| x.befunde.iter())
+                .chain(b.befunde.iter()))
+            .all(|f| f.art == crate::abloesung::schichtplan::PlanBefundArt::Doppelt),
+        "sonst kein Befund"
+    );
+    assert_eq!(
+        anzahl(&pool, "SELECT COUNT(*) FROM einsatz WHERE org_id = ?", 1).await,
+        1,
+        "nur der Demo-Einsatz, die Planung ist keiner"
+    );
+
+    let bericht = crate::write_retry!(&pool, |conn| {
+        entfernen_tx(conn, 1, DemoLage::Stadtfest).await
+    })
+    .expect("entfernen");
+    let zeile = bericht
+        .je_art
+        .iter()
+        .find(|z| z.art == DemoStammdatenArt::Planung)
+        .unwrap();
+    assert_eq!((zeile.entfernt, zeile.behalten), (1, 0));
+    assert_eq!(
+        anzahl(&pool, "SELECT COUNT(*) FROM planung WHERE org_id = ?", 1).await,
+        0
+    );
+    assert_eq!(
+        anzahl(
+            &pool,
+            "SELECT COUNT(*) FROM personal WHERE org_id = ? AND personalnummer LIKE 'DEMO-S-%'",
+            1
+        )
+        .await,
+        0,
+        "die Planung hält das Personal nicht fest"
+    );
+}
+
 /// Stammdaten der Org mit Kennung und Marke: (Tabelle, Kennung, Import-Kopf der Marke).
 async fn stamm_bild(pool: &SqlitePool) -> Vec<(String, String, Option<i64>)> {
     sqlx::query_as(

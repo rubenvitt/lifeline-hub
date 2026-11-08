@@ -6,7 +6,7 @@
 --
 -- Je Einsatz ist das Paar (Herkunft, Kennung) eindeutig; eine fehlende Herkunft zählt als leer.
 -- Ohne Kennung gibt es keine Eindeutigkeit (Helfer von Hand, LLH-1552). Längen (je 100 Zeichen)
--- prüft Rust. Abgesichert von db::tests::migration_0296_plan_helfer_kennung.
+-- prüft Rust. Abgesichert von db::tests::migration_0297_plan_helfer_kennung.
 ALTER TABLE einsatz_plan_helfer ADD COLUMN kennung TEXT;
 ALTER TABLE einsatz_plan_helfer ADD COLUMN herkunft TEXT;
 CREATE UNIQUE INDEX uq_plan_helfer_kennung

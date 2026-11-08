@@ -74,6 +74,7 @@ pub mod person_transport;
 pub mod person_verletzung;
 pub mod personal;
 pub mod personal_status;
+pub mod planung;
 pub mod presse;
 pub mod programmpunkt;
 pub mod qualifikation;

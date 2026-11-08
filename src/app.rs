@@ -1895,6 +1895,50 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/stichwort-vorschlaege/{id}/vorlage",
             put(routes::stichwort::set_vorlage),
         )
+        // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
+        .route(
+            "/api/planungen",
+            get(routes::planung::liste).post(routes::planung::anlegen),
+        )
+        .route(
+            "/api/planungen/{id}",
+            get(routes::planung::lesen)
+                .patch(routes::planung::aendern)
+                .delete(routes::planung::loeschen),
+        )
+        .route(
+            "/api/planungen/{id}/posten",
+            post(routes::planung::posten_anlegen),
+        )
+        // `reihenfolge` ist ein festes Segment neben `{pid}`.
+        .route(
+            "/api/planungen/{id}/posten/reihenfolge",
+            put(routes::planung::reihenfolge),
+        )
+        .route(
+            "/api/planungen/{id}/posten/{pid}",
+            patch(routes::planung::posten_aendern).delete(routes::planung::posten_loeschen),
+        )
+        .route(
+            "/api/planungen/{id}/bloecke",
+            post(routes::planung::block_anlegen),
+        )
+        .route(
+            "/api/planungen/{id}/bloecke/{bid}",
+            patch(routes::planung::block_aendern).delete(routes::planung::block_loeschen),
+        )
+        .route(
+            "/api/planungen/{id}/erzeugen",
+            post(routes::planung::erzeugen),
+        )
+        .route(
+            "/api/planungen/{id}/helfer",
+            post(routes::planung::helfer_anlegen),
+        )
+        .route(
+            "/api/planungen/{id}/helfer/{hid}",
+            patch(routes::planung::helfer_aendern).delete(routes::planung::helfer_loeschen),
+        )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
         .route(
             "/api/einsatz-vorlagen",

@@ -1056,6 +1056,8 @@ export const GLOBAL_KEYS = {
   aufbewahrung: 'aufbewahrung',
   // Zugangsprotokoll (LFH-1097): Anmelde- und Admin-Spur, nur für den System-Admin.
   zugangsprotokoll: 'zugangsprotokoll',
+  // Vorplanung ohne Einsatz (LLH-1585): Liste und Planungen, nur für Planer der Organisation.
+  planungen: 'planungen',
 
   // Stammdaten-Kataloge
   personal: 'personal',
@@ -1178,6 +1180,9 @@ export const globalKeys = {
     [GLOBAL_KEYS.aufbewahrung, 'antraege' satisfies AufbewahrungBereich, einsatzId] as const,
   /** Prefix beider Spuren des Zugangsprotokolls. */
   zugangsprotokoll: () => [GLOBAL_KEYS.zugangsprotokoll] as const,
+  /** Liste der Planungen; zugleich Prefix jeder einzelnen Planung (LLH-1585). */
+  planungen: () => [GLOBAL_KEYS.planungen] as const,
+  planung: (planungId: number) => [GLOBAL_KEYS.planungen, planungId] as const,
   /** Seitenkette einer Spur mit ihrem Filter. */
   zugangsprotokollSeiten: (
     spur: ZugangsprotokollSpur,
@@ -1276,6 +1281,9 @@ export const ORG_STREAM_EVENTS = {
   // Die Liste samt Switcher und Sprungpalette, dazu die Admin-Listen, deren Zeilen an Einsätzen
   // hängen (Demo-Stand, Aufbewahrung).
   einsatzliste: [GLOBAL_KEYS.einsaetze, GLOBAL_KEYS.demoDaten, GLOBAL_KEYS.aufbewahrung],
+  // Vorplanung (LLH-1585): Liste und jede Planung, nur an die Planer der Organisation. Die
+  // Demo-Übersicht zählt Planungen mit.
+  planung: [GLOBAL_KEYS.planungen, GLOBAL_KEYS.demoDaten],
   stammdaten: [
     GLOBAL_KEYS.personal,
     GLOBAL_KEYS.personalStatus,

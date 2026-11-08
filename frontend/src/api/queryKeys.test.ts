@@ -788,6 +788,10 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
     expect(ORG_STREAM_EVENTS.einsatzliste).toEqual(['einsaetze', 'demo-daten', 'aufbewahrung']);
   });
 
+  it('planung frischt die Planungen und den Demo-Stand auf (LLH-1585)', () => {
+    expect(ORG_STREAM_EVENTS.planung).toEqual(['planungen', 'demo-daten']);
+  });
+
   it('stammdaten frischt jeden Katalog, die Organisation und die Einsatzliste auf', () => {
     expect([...ORG_STREAM_EVENTS.stammdaten].sort()).toEqual(
       [
