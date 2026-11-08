@@ -151,17 +151,23 @@ export type ZugPruefung = 'ok' | 'zu-kurz' | 'ueberschneidung' | 'keine-zeile' |
 /**
  * Darf der Stand eines Zugs geschrieben werden? Der Server prüft dasselbe (400/422); das Raster
  * sendet nur, was er annähme, und zeigt den Grund am Schatten.
+ *
+ * `kopie` (LLH-1584): ein verschobener Block mit Strg oder Alt legt eine Kopie an. Das Original
+ * bleibt stehen, die Kopie prüft deshalb auch gegen den eigenen Block, und am alten Platz ist sie
+ * nicht „unverändert“, sondern eine Überschneidung (außer in der Pause).
  */
 export function pruefeZug(
   zug: Zug,
   stand: ZugStand,
   zeilen: readonly RasterZeile[],
   bloecke: readonly RasterBlock[],
+  kopie = false,
 ): ZugPruefung {
   const zeile = zeilen.find((z) => z.schluessel === stand.zeile);
   if (!zeile) return 'keine-zeile';
   if (stand.bis - stand.von < MINDEST_MS) return 'zu-kurz';
-  if (zug.art !== 'anlegen') {
+  const alsKopie = kopie && zug.art === 'verschieben';
+  if (zug.art !== 'anlegen' && !alsKopie) {
     const block = bloecke.find((b) => b.id === zug.blockId);
     if (block && block.zeile === stand.zeile && block.von === stand.von && block.bis === stand.bis)
       return 'unveraendert';
@@ -173,7 +179,7 @@ export function pruefeZug(
       stand.zeile,
       stand.von,
       stand.bis,
-      zug.art === 'anlegen' ? undefined : zug.blockId,
+      zug.art === 'anlegen' || alsKopie ? undefined : zug.blockId,
     )
   )
     return 'ueberschneidung';

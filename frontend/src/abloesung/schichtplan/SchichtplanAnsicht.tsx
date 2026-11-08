@@ -7,10 +7,11 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { Alert, Button, Flex, Spin } from 'antd';
+import { Alert, App, Button, Flex, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { fetchEinsatzSchichtmodell } from '../../api/abloesungen';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeUhs } from '../../api/einsatzUhs';
@@ -19,16 +20,19 @@ import { listeQualifikationen } from '../../api/qualifikationen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import {
   aendereSchichtplanBlock,
+  erzeugeSchichten,
   fetchSchichtplan,
   legeSchichtplanBlockAn,
   loescheSchichtplanBlock,
 } from '../../api/schichtplan';
 import type {
   AbloesungVorgabe,
+  QualiSollEintrag,
   Schichtplan,
   SchichtplanBlock,
   SchichtplanBlockAendernBody,
   SchichtplanBlockBody,
+  SchichtplanErzeugenBody,
 } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { datum, uhrzeit } from '../../anzeige/zeitDarstellung';
@@ -40,15 +44,19 @@ import { useViewport } from '../../components/useViewport';
 import { ZugPointerSensor } from '../../components/zugPointerSensor';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
+import { formatRegelKurz } from '../schichtmodellText';
 import { useUhr } from '../useUhr';
 import { spanneAus, type SpannenWahl, type ZugStand } from './raster';
+import SchichtenErzeugenDialog from './SchichtenErzeugenDialog';
 import SchichtplanBlockDialog, { type BlockSpeichern } from './SchichtplanBlockDialog';
 import SchichtplanListe from './SchichtplanListe';
 import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen';
 import SchichtplanRaster, { type BlockZielDaten } from './SchichtplanRaster';
 import {
   baueZeilen,
+  kopieBody,
   mitPerson,
+  naechsterBlockBody,
   personenOptionen,
   postenEingabe,
   postenSchluessel,
@@ -68,6 +76,10 @@ import {
  * Zeilen brauchen Einheiten (Modul Einheiten) und UHS (Modul Unfallhilfsstellen); ohne Freigabe
  * fehlen nur deren Posten ohne Blöcke. Personen brauchen das Modul Personal: ohne steht die
  * Seitenleiste gesperrt mit Grund, der Blockdialog ebenso (Server: 403).
+ *
+ * LLH-1584: Strg/Alt beim Verschieben kopiert den Block (mit Personen, ohne Notiz), der Blockdialog
+ * kopiert ihn als nächsten Block (ohne Personen) und öffnet die Kopie, „Schichten erzeugen“ füllt
+ * einen Zeitraum am Posten (`SchichtenErzeugenDialog`).
  */
 
 interface SchichtplanAnsichtProps {
@@ -83,7 +95,8 @@ interface SchichtplanAnsichtProps {
 
 type Dialog =
   | { art: 'anlegen'; vorbelegt?: { zeile?: string; von?: number; bis?: number } }
-  | { art: 'block'; blockId: number };
+  | { art: 'block'; blockId: number }
+  | { art: 'erzeugen' };
 
 const SPANNEN: { wert: SpannenWahl; label: string }[] = [
   { wert: '6h', label: '6 h' },
@@ -119,6 +132,7 @@ export default function SchichtplanAnsicht({
   werkzeuge,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
+  const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const { istSchmal, abBreite } = useViewport();
@@ -161,6 +175,14 @@ export default function SchichtplanAnsicht({
     queryKey: globalKeys.qualifikationen(),
     queryFn: listeQualifikationen,
   });
+  // Schichtmodell des Einsatzes: teilt „Schichten erzeugen“ ohne eigene Länge (LLH-1584).
+  const einsatzVorgabeQuery = useQuery({
+    queryKey: einsatzKeys.abloesungEinsatzVorgabe(einsatzId),
+    queryFn: () => fetchEinsatzSchichtmodell(einsatzId),
+    enabled: darfSchreiben,
+  });
+  const einsatzModell = einsatzVorgabeQuery.data?.schichtmodell ?? null;
+  const schichtmodellKurz = einsatzModell ? formatRegelKurz(einsatzModell, konventionen) : null;
 
   // Uhrabhängige Befunde (Plan gegen Ist ab Blockbeginn + 10 min) ändern sich ohne Ereignis.
   const naechstePruefung = planQuery.data?.naechste_pruefung_at ?? null;
@@ -210,6 +232,15 @@ export default function SchichtplanAnsicht({
       m.set(postenSchluessel({ art: 'uhs', uhs_id: u.id }), u.soll_anzahl ?? null);
     return m;
   }, [einheitenQuery.data, uhsQuery.data]);
+  // Wirksames Qualifikationssoll je Posten (Einheit, sonst ihr Typ; UHS), wie der Server kopiert.
+  const qualiVorgabe = useMemo(() => {
+    const m = new Map<string, readonly QualiSollEintrag[] | null>();
+    for (const e of einheitenQuery.data ?? [])
+      m.set(postenSchluessel({ art: 'einheit', einheit_id: e.id }), e.quali_soll ?? null);
+    for (const u of uhsQuery.data ?? [])
+      m.set(postenSchluessel({ art: 'uhs', uhs_id: u.id }), u.quali_soll ?? null);
+    return m;
+  }, [einheitenQuery.data, uhsQuery.data]);
 
   const beginn = alsZeitpunkt(einsatzBeginn)?.valueOf() ?? jetzt;
   const spanne = useMemo(
@@ -227,6 +258,23 @@ export default function SchichtplanAnsicht({
     mutationFn: (v: { blockId: number; body: SchichtplanBlockAendernBody }) =>
       aendereSchichtplanBlock(einsatzId, v.blockId, v.body),
     onSuccess: setzePlan,
+  });
+  // Eigene Mutation für die Kopie aus dem Dialog: ihr Fehler steht dort, nicht beim Speichern.
+  const kopierenMut = useMutation({
+    mutationFn: (body: SchichtplanBlockBody) => legeSchichtplanBlockAn(einsatzId, body),
+    onSuccess: setzePlan,
+  });
+  const erzeugenMut = useMutation({
+    mutationFn: (body: SchichtplanErzeugenBody) => erzeugeSchichten(einsatzId, body),
+    onSuccess: (p) => {
+      // Neu ist, was vorher nicht im Plan stand.
+      const vorher = new Set(
+        qc.getQueryData<Schichtplan>(einsatzKeys.schichtplan(einsatzId))?.bloecke.map((b) => b.id),
+      );
+      setzePlan(p);
+      const neu = p.bloecke.filter((b) => !vorher.has(b.id)).length;
+      message.success(neu === 1 ? '1 Schicht erzeugt' : `${neu} Schichten erzeugt`);
+    },
   });
   const loeschenMut = useMutation({
     mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
@@ -276,6 +324,44 @@ export default function SchichtplanAnsicht({
   const sensoren = useSensors(
     useSensor(ZugPointerSensor, { activationConstraint: { distance: 5 } }),
   );
+  // Strg/Alt-Zug: Kopie an Zeile und Zeit des Schattens, mit Personen (die Notiz bleibt).
+  const onKopieren = (blockId: number, stand: ZugStand) => {
+    const block = blockVon(blockId);
+    const posten = postenEingabe(stand.zeile);
+    if (!block || !posten) return;
+    zugSchreiben(
+      anlegenMut.mutateAsync(
+        kopieBody(
+          block,
+          {
+            posten,
+            von: alsBackendZeit(dayjs(stand.von)),
+            bis: alsBackendZeit(dayjs(stand.bis)),
+          },
+          !personenGesperrt,
+        ),
+      ),
+    );
+  };
+  // „Als nächsten Block kopieren“: danach zeigt der Dialog die Kopie.
+  const kopiereAlsNaechsten = (block: SchichtplanBlock) => {
+    const body = naechsterBlockBody(block);
+    if (!body) return;
+    kopierenMut.mutate(body, {
+      onSuccess: (p) => {
+        const neu = p.bloecke.find(
+          (b) =>
+            postenSchluessel(b.posten) === postenSchluessel(block.posten) && b.von === body.von,
+        );
+        if (!neu) return;
+        aendernMut.reset();
+        loeschenMut.reset();
+        kopierenMut.reset();
+        setDialog({ art: 'block', blockId: neu.id });
+      },
+    });
+  };
+
   const onDragStart = (e: DragStartEvent) => {
     setGezogen((e.active.data.current as PersonZugDaten | undefined) ?? null);
   };
@@ -308,7 +394,12 @@ export default function SchichtplanAnsicht({
   const oeffneBlock = (blockId: number) => {
     aendernMut.reset();
     loeschenMut.reset();
+    kopierenMut.reset();
     setDialog({ art: 'block', blockId });
+  };
+  const oeffneErzeugen = () => {
+    erzeugenMut.reset();
+    setDialog({ art: 'erzeugen' });
   };
   const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
   const mitSeitenleiste = !istSchmal && darfSchreiben;
@@ -332,6 +423,7 @@ export default function SchichtplanAnsicht({
           />
         )}
         {darfSchreiben && <Button onClick={oeffneAnlegen}>Block anlegen</Button>}
+        {darfSchreiben && <Button onClick={oeffneErzeugen}>Schichten erzeugen</Button>}
         {werkzeuge}
       </Flex>
       {planQuery.isError && (
@@ -386,6 +478,7 @@ export default function SchichtplanAnsicht({
               formatZeit={zeitText}
               onAnlegen={onAnlegen}
               onAendern={onAendern}
+              onKopieren={onKopieren}
               onOeffnen={oeffneBlock}
               personenZiel={mitSeitenleiste && !personenGesperrt}
               beschriftung="Schichtplan"
@@ -411,6 +504,17 @@ export default function SchichtplanAnsicht({
           </DragOverlay>
         </DndContext>
       )}
+      {dialog?.art === 'erzeugen' && (
+        <SchichtenErzeugenDialog
+          zeilen={zeilen}
+          schichtmodell={schichtmodellKurz}
+          darfSchreiben={darfSchreiben}
+          laeuft={erzeugenMut.isPending}
+          speicherung={erzeugenMut}
+          onErzeugen={(body) => erzeugenMut.mutateAsync(body)}
+          onSchliessen={() => setDialog(null)}
+        />
+      )}
       {dialog && (dialog.art === 'anlegen' || dialogBlock) && (
         <SchichtplanBlockDialog
           key={dialog.art === 'block' ? `b-${dialog.blockId}` : 'neu'}
@@ -420,6 +524,7 @@ export default function SchichtplanAnsicht({
           personen={personen}
           personenGesperrt={personenGesperrt}
           sollVorgabe={sollVorgabe}
+          qualiVorgabe={qualiVorgabe}
           qualiNamen={qualiNamen}
           darfSchreiben={darfSchreiben}
           laeuft={anlegenMut.isPending || aendernMut.isPending}
@@ -428,6 +533,9 @@ export default function SchichtplanAnsicht({
           loeschFehler={loeschenMut.error}
           onSpeichern={speichern}
           onLoeschen={(b) => loeschenMut.mutate(b)}
+          onKopieren={kopiereAlsNaechsten}
+          kopierenLaeuft={kopierenMut.isPending}
+          kopierFehler={kopierenMut.error}
           onSchliessen={() => setDialog(null)}
         />
       )}

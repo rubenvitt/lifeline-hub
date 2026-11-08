@@ -5,9 +5,11 @@ import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import { SCHICHTPLAN_NOTIZ_MAX, SCHICHTPLAN_PERSONEN_MAX } from '../../api/eingabegrenzen';
 import type {
+  QualiSollEintrag,
   SchichtplanBlock,
   SchichtplanBlockAendernBody,
   SchichtplanBlockBody,
+  SchichtplanPersonEingabe,
 } from '../../api/types';
 import { ZeitraumEingabe, type Zeitraum } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
@@ -15,6 +17,8 @@ import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { mitVorgabe } from '../../components/vorgabeText';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
+import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../../kraefte/QualiSollFeld';
+import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../../kraefte/qualiSoll';
 import type { RasterZeile } from './raster';
 import { MINDEST_MS } from './raster';
 import {
@@ -36,6 +40,12 @@ import {
  *
  * Beim Ändern gehen nur die geänderten Felder hinaus (PATCH mit `version`); ein veralteter Stand
  * ist 409 und steht als Fehler im Dialog.
+ *
+ * LLH-1584: Das Qualifikationssoll steht eingeklappt wie die Notiz, sein Wert im Kopf; beim
+ * Anlegen gilt leer die Vorgabe des Postens (Einheit bzw. Typ, UHS), die der Kopf nennt.
+ * „Als nächsten Block kopieren“ legt am Ende des Blocks einen gleich langen an, mit Soll und ohne
+ * Personen; mit ungespeicherten Änderungen ist der Knopf gesperrt, damit klar bleibt, welcher
+ * Stand kopiert wird.
  */
 
 export interface BlockWerte {
@@ -43,6 +53,7 @@ export interface BlockWerte {
   zeit: Zeitraum | null;
   personen: string[];
   soll?: number | null;
+  quali?: QualiSollZeile[];
   notiz?: string;
 }
 
@@ -62,6 +73,8 @@ interface SchichtplanBlockDialogProps {
   personenGesperrt?: string;
   /** Soll-Anzahl, die ein Posten ohne eigene Angabe gibt. */
   sollVorgabe: ReadonlyMap<string, number | null>;
+  /** Qualifikationssoll, das ein Posten ohne eigene Angabe gibt (LLH-1553). */
+  qualiVorgabe: ReadonlyMap<string, readonly QualiSollEintrag[] | null>;
   qualiNamen: ReadonlyMap<number, string>;
   darfSchreiben: boolean;
   laeuft: boolean;
@@ -71,6 +84,11 @@ interface SchichtplanBlockDialogProps {
   loeschFehler?: unknown;
   onSpeichern: (s: BlockSpeichern) => Promise<unknown>;
   onLoeschen?: (block: SchichtplanBlock) => void;
+  /** „Als nächsten Block kopieren“; ohne gibt es den Knopf nicht. */
+  onKopieren?: (block: SchichtplanBlock) => void;
+  kopierenLaeuft?: boolean;
+  /** Ablehnung der Kopie (etwa 422, der Folgeplatz ist belegt). */
+  kopierFehler?: unknown;
   onSchliessen: () => void;
 }
 
@@ -85,6 +103,7 @@ export default function SchichtplanBlockDialog({
   personen,
   personenGesperrt,
   sollVorgabe,
+  qualiVorgabe,
   qualiNamen,
   darfSchreiben,
   laeuft,
@@ -93,6 +112,9 @@ export default function SchichtplanBlockDialog({
   loeschFehler,
   onSpeichern,
   onLoeschen,
+  onKopieren,
+  kopierenLaeuft,
+  kopierFehler,
   onSchliessen,
 }: SchichtplanBlockDialogProps) {
   const [form] = Form.useForm<BlockWerte>();
@@ -110,6 +132,7 @@ export default function SchichtplanBlockDialog({
           return e ? [eingabeSchluessel(e)] : [];
         }),
         soll: block.soll_anzahl ?? null,
+        quali: qualiSollEingabe(block.quali_soll),
         notiz: block.notiz ?? '',
       };
     }
@@ -121,6 +144,7 @@ export default function SchichtplanBlockDialog({
           : null,
       personen: [],
       soll: undefined,
+      quali: [],
       notiz: '',
     };
   }, [block, vorbelegt]);
@@ -164,43 +188,104 @@ export default function SchichtplanBlockDialog({
   const sollPlatzhalter =
     block != null ? 'kein Soll' : vorgabe != null ? mitVorgabe(String(vorgabe)) : 'kein Soll';
 
+  // Qualifikationssoll: der Kopf der eingeklappten Zeile nennt den Wert, beim Anlegen ohne
+  // eigenen Wert die Vorgabe des Postens.
+  const quali = Form.useWatch('quali', form) ?? anfang.quali;
+  const qualiEigen = vollstaendig(quali);
+  const qualiVorgabeText =
+    block == null && posten != null ? qualiSollText(qualiVorgabe.get(posten)) : '';
+  const qualiKopf =
+    qualiEigen.length > 0
+      ? qualiSollText(
+          qualiEigen.map((e) => ({
+            ...e,
+            label:
+              qualiNamen.get(e.qualifikation_id) ??
+              block?.quali_soll?.find((q) => q.qualifikation_id === e.qualifikation_id)?.label ??
+              '?',
+          })),
+        )
+      : qualiVorgabeText
+        ? mitVorgabe(qualiVorgabeText)
+        : '';
+
+  const personenAus = (w: BlockWerte): SchichtplanPersonEingabe[] | undefined =>
+    personenGesperrt
+      ? undefined
+      : (w.personen ?? []).flatMap((s) => {
+          const e = eingabeVon.get(s);
+          return e ? [e] : [];
+        });
+
+  /** Nur Geändertes (frontend/AGENTS.md, „Bearbeiten in der Ansicht“, Punkt 4). */
+  const aenderungAus = (
+    b: SchichtplanBlock,
+    w: BlockWerte,
+    von: string,
+    bis: string,
+  ): SchichtplanBlockAendernBody => {
+    const body: SchichtplanBlockAendernBody = { version: b.version };
+    const p = postenEingabe(w.posten);
+    if (p && w.posten !== anfang.posten) body.posten = p;
+    if (von !== b.von) body.von = von;
+    if (bis !== b.bis) body.bis = bis;
+    const personenEingaben = personenAus(w);
+    if (personenEingaben && (w.personen ?? []).join('|') !== anfang.personen.join('|'))
+      body.personen = personenEingaben;
+    const pause = w.posten === PAUSE;
+    if (pause && b.soll_anzahl != null) body.soll_anzahl = null;
+    else if (!pause && (w.soll ?? null) !== (b.soll_anzahl ?? null))
+      body.soll_anzahl = w.soll ?? null;
+    // An die Pause räumt der Server das Qualifikationssoll selbst.
+    const qualiNeu = vollstaendig(w.quali);
+    if (!pause && !gleichesQualiSoll(qualiNeu, qualiSollEingabe(b.quali_soll)))
+      body.quali_soll = qualiNeu.length > 0 ? qualiNeu : null;
+    const notiz = w.notiz?.trim() ?? '';
+    if (notiz !== (b.notiz ?? '')) body.notiz = notiz || null;
+    return body;
+  };
+
   const speichern = (w: BlockWerte) => {
     if (!zeitraumGueltig(w.zeit)) return Promise.reject(new Error('Zeit fehlt'));
     const p = postenEingabe(w.posten);
     if (!p) return Promise.reject(new Error('Posten fehlt'));
     const von = alsBackendZeit(w.zeit[0]);
     const bis = alsBackendZeit(w.zeit[1]);
-    const personenEingaben = personenGesperrt
-      ? undefined
-      : w.personen.flatMap((s) => {
-          const e = eingabeVon.get(s);
-          return e ? [e] : [];
-        });
     const pause = w.posten === PAUSE;
     if (!block) {
       const body: SchichtplanBlockBody = { posten: p, von, bis };
+      const personenEingaben = personenAus(w);
       if (personenEingaben?.length) body.personen = personenEingaben;
       if (pause) body.soll_anzahl = null;
-      else if (w.soll != null) body.soll_anzahl = w.soll;
+      else {
+        if (w.soll != null) body.soll_anzahl = w.soll;
+        // Leer = Vorgabe des Postens (Server); nur ein eigenes Soll geht hinaus.
+        const qualiNeu = vollstaendig(w.quali);
+        if (qualiNeu.length > 0) body.quali_soll = qualiNeu;
+      }
       const notiz = w.notiz?.trim();
       if (notiz) body.notiz = notiz;
       return onSpeichern({ art: 'anlegen', body });
     }
-    // Nur Geändertes (frontend/AGENTS.md, „Bearbeiten in der Ansicht“, Punkt 4).
-    const body: SchichtplanBlockAendernBody = { version: block.version };
-    if (w.posten !== anfang.posten) body.posten = p;
-    if (von !== block.von) body.von = von;
-    if (bis !== block.bis) body.bis = bis;
-    if (personenEingaben && w.personen.join('|') !== anfang.personen.join('|'))
-      body.personen = personenEingaben;
-    if (pause && block.soll_anzahl != null) body.soll_anzahl = null;
-    else if (!pause && (w.soll ?? null) !== (block.soll_anzahl ?? null))
-      body.soll_anzahl = w.soll ?? null;
-    const notiz = w.notiz?.trim() ?? '';
-    if (notiz !== (block.notiz ?? '')) body.notiz = notiz || null;
+    const body = aenderungAus(block, w, von, bis);
     if (Object.keys(body).length === 1) return Promise.resolve();
     return onSpeichern({ art: 'aendern', blockId: block.id, body });
   };
+
+  // Ungespeichertes sperrt die Kopie: kopiert wird der gespeicherte Stand.
+  const werte = Form.useWatch((v: BlockWerte) => v, form);
+  const geaendert = (() => {
+    if (!block || !werte) return false;
+    const z = werte.zeit === undefined ? anfang.zeit : werte.zeit;
+    if (!zeitraumGueltig(z)) return true;
+    const body = aenderungAus(
+      block,
+      { ...anfang, ...werte },
+      alsBackendZeit(z[0]),
+      alsBackendZeit(z[1]),
+    );
+    return Object.keys(body).length > 1;
+  })();
 
   const titel = block ? `Block ${block.posten.bezeichnung ?? 'Pause'}` : 'Block anlegen';
   const luecke = block ? lueckeText(block, qualiNamen) : null;
@@ -301,6 +386,23 @@ export default function SchichtplanBlockDialog({
       <Collapse
         ghost
         items={[
+          ...(istPause
+            ? []
+            : [
+                {
+                  key: 'quali',
+                  label: qualiKopf ? `Qualifikationssoll · ${qualiKopf}` : 'Qualifikationssoll',
+                  forceRender: true,
+                  children: (
+                    <Form.Item<BlockWerte> name="quali" label="Qualifikationssoll">
+                      <QualiSollFeld
+                        disabled={!darfSchreiben}
+                        bekannt={block?.quali_soll ?? (posten ? qualiVorgabe.get(posten) : null)}
+                      />
+                    </Form.Item>
+                  ),
+                },
+              ]),
           {
             key: 'notiz',
             label: block?.notiz ? 'Notiz · vorhanden' : 'Notiz',
@@ -319,6 +421,18 @@ export default function SchichtplanBlockDialog({
       />
       {loeschFehler != null && (
         <SpeicherFehler fehler={loeschFehler} titel="Block nicht gelöscht" />
+      )}
+      {kopierFehler != null && <SpeicherFehler fehler={kopierFehler} titel="Block nicht kopiert" />}
+      {block && onKopieren && darfSchreiben && (
+        <Button
+          data-lfh="schichtplan-block-kopieren"
+          loading={kopierenLaeuft}
+          disabled={geaendert}
+          onClick={() => onKopieren(block)}
+          style={{ marginTop: 8, marginInlineEnd: 8 }}
+        >
+          Als nächsten Block kopieren
+        </Button>
       )}
       {block && onLoeschen && darfSchreiben && (
         <Popconfirm
