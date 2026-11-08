@@ -192,8 +192,10 @@ Widerruf einer Org-Zuordnung setzt `widerrufen_at`; ohne gültige Zuordnung wird
 `widerrufen`. Ein schon gesetzter Widerruf bleibt, wie er ist (wer zuerst widerrufen hat, steht
 fest). Auf der erreichten Seite trägt die Antwort auf die nächste Meldung den Widerruf signiert
 (`widerrufen: true` je Org), danach wird `widerruf_gemeldet_at` gesetzt. Auf der meldenden Seite
-schickt der Widerruf sofort eine letzte Meldung, die die widerrufenen Orgs in `widerrufen` nennt;
-ohne Netz erfährt das Gegenüber nichts und sieht nur keine Meldungen mehr. Eine eigene
+schickt der Widerruf sofort eine letzte Meldung, die die widerrufenen Orgs in `widerrufen` nennt.
+Scheitert sie, bleibt der Widerruf offen (`widerruf_gemeldet_at` leer), und die Meldeschleife
+stellt ihn nach, auch an einer schon widerrufenen Kopplung, bis die Gegenseite signiert antwortet;
+diese Meldung trägt nur noch den Widerruf (Nachtrag 08.11.2026, CodeRabbit-Review). Eine eigene
 Widerrufs-Route gibt es nicht: Melden ist der eine signierte Weg und geht über alle
 Protokollversionen. Eine empfangene Widerrufsmitteilung setzt `vom_gegenueber_widerrufen`. Ein
 Wiederkoppeln derselben Gegenstelle legt eine neue Org-Zuordnung an, die alte Zeile bleibt als

@@ -455,14 +455,19 @@ pub async fn save_meldeversuch(
     Ok(())
 }
 
-/// Meldende Seite: die Kopplungen, die sich jetzt melden sollen.
+/// Meldende Seite: die Kopplungen, die sich jetzt melden sollen. Das sind die aktiven und die,
+/// deren eigener Widerruf noch nicht zugestellt ist (design.md D9): Ihre Meldung trägt nur noch
+/// den Widerruf und wird nachgestellt, bis die Gegenseite sie signiert quittiert.
 pub async fn list_faellige_meldungen(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<KopplungZeile>, AppError> {
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung \
-         WHERE richtung = 'meldet_sich' AND zustand = 'aktiv' \
+        "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung k \
+         WHERE richtung = 'meldet_sich' \
+         AND (zustand = 'aktiv' OR (zustand <> 'angebahnt' AND EXISTS ( \
+             SELECT 1 FROM instanz_kopplung_org o WHERE o.kopplung_id = k.id \
+             AND o.widerrufen_at IS NOT NULL AND o.widerruf_gemeldet_at IS NULL))) \
          AND (naechste_meldung_at IS NULL OR naechste_meldung_at <= ?) ORDER BY id"
     )))
     .bind(jetzt)

@@ -74,6 +74,23 @@ describe('instanzText', () => {
     ]);
   });
 
+  it('Widerruf, der noch nicht zugestellt ist, steht als Hinweis', () => {
+    const offen = kopplung({
+      zustand: 'widerrufen',
+      letzter_fehler: 'nicht erreichbar: Zeitüberschreitung',
+    });
+    expect(kopplungHinweise(offen)).toEqual([
+      'Widerruf noch nicht beim Gegenüber, wird nachgereicht',
+      'Letzte Meldung: nicht erreichbar: Zeitüberschreitung',
+    ]);
+    expect(kopplungHinweise(kopplung({ zustand: 'widerrufen' }))).toEqual([]);
+    expect(
+      kopplungHinweise(
+        kopplung({ zustand: 'widerrufen', richtung: 'wird_gemeldet', letzter_fehler: 'x' }),
+      ),
+    ).toEqual(['Letzte Meldung: x']);
+  });
+
   it('Code ausstellen ist ohne Passkeys oder eigenen Schlüssel gesperrt', () => {
     const u = (teil: Partial<InstanzUebersicht>): InstanzUebersicht => ({
       name: 'ELW',

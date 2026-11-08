@@ -153,6 +153,10 @@ signierte Mitteilung erhalten und anzeigen.
 - **WHEN** der Admin am ELW ohne Netz widerruft
 - **THEN** ist die Kopplung am ELW sofort widerrufen, und der Hub sieht keine Meldungen mehr
 
+#### Scenario: Widerruf wird nachgestellt, bis er zugestellt ist
+- **WHEN** die letzte Meldung beim Widerruf am ELW scheitert und das Netz später zurückkommt
+- **THEN** stellt der ELW den Widerruf mit der nächsten fälligen Meldung zu, die nur noch den Widerruf trägt, der Hub zeigt „vom Gegenüber widerrufen“, und erst nach der signierten Antwort stellt der ELW das Melden ein
+
 ### Requirement: Kopplungsaktionen landen in der Admin-Spur
 
 Ausstellen eines Codes, Einlösen, Hinzufügen einer Org und Widerruf SHALL je einen Eintrag in der

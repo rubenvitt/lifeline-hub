@@ -668,6 +668,49 @@ async fn elw_widerruft_ohne_netz() {
     assert_eq!(uebersicht(&hub).await["kopplungen"][0]["zustand"], "aktiv");
 }
 
+/// Ohne Netz bleibt der Widerruf offen und wird nachgestellt, bis die Gegenseite ihn quittiert;
+/// danach ruht die Kopplung.
+#[tokio::test]
+async fn widerruf_ohne_netz_wird_nachgestellt() {
+    let (hub, elw) = gekoppelt().await;
+    let adresse: String = sqlx::query_scalar("SELECT gegenueber_adresse FROM instanz_kopplung")
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    let setze_adresse = |a: String| {
+        let pool = elw.pool.clone();
+        async move {
+            sqlx::query("UPDATE instanz_kopplung SET gegenueber_adresse = ?")
+                .bind(a)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    // Netz weg: die letzte Meldung beim Widerruf scheitert.
+    setze_adresse("http://127.0.0.1:9".into()).await;
+    assert_eq!(widerrufen(&elw).await["zustand"], "widerrufen");
+    elw_meldet(&elw).await;
+    assert_eq!(uebersicht(&hub).await["kopplungen"][0]["zustand"], "aktiv");
+
+    // Netz zurück: der nächste Durchlauf stellt den Widerruf zu.
+    setze_adresse(adresse).await;
+    elw_meldet(&elw).await;
+    assert_eq!(
+        uebersicht(&hub).await["kopplungen"][0]["zustand"],
+        "vom_gegenueber_widerrufen"
+    );
+    assert_eq!(
+        uebersicht(&elw).await["kopplungen"][0]["zustand"],
+        "widerrufen"
+    );
+    let faellig =
+        lifeline_hub::instanz::repo::list_faellige_meldungen(&elw.pool, "2999-01-01 00:00:00")
+            .await
+            .unwrap();
+    assert!(faellig.is_empty(), "nach der Quittung keine Meldung mehr");
+}
+
 #[tokio::test]
 async fn ausfall_des_gegenuebers_steht_an_der_kopplung() {
     let (mut hub, elw) = gekoppelt().await;

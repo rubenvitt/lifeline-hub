@@ -78,9 +78,11 @@ Kopplung. Jede Organisation sieht und widerruft nur ihre eigene Zuordnung.
 Der Widerruf wirkt hier sofort. Die andere Installation erfährt ihn, sobald eine Meldung
 durchgeht, und zeigt „vom Gegenüber widerrufen“. Ein neuer Code koppelt wieder.
 
-Widerruft die Installation, die sich meldet, ohne Netz, geht der Widerruf nicht mehr hinaus: sie
-meldet sich danach nicht mehr. Die andere Installation sieht dann nur, dass die Meldungen
-ausbleiben, und ihr Admin widerruft dort selbst.
+Widerruft die Installation, die sich meldet, ohne Netz, steht an der Kopplung „Widerruf noch nicht
+beim Gegenüber, wird nachgereicht“. Sie versucht es weiter und schickt dabei nur noch den
+Widerruf. Sobald die andere Installation ihn bestätigt hat, verschwindet der Hinweis, und die
+Meldungen hören auf. Bleibt die andere Installation dauerhaft unerreichbar, sollte ihr Admin
+die Kopplung dort selbst widerrufen.
 
 ### Fingerabdruck und Sicherheit
 

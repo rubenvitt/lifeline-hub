@@ -50,6 +50,11 @@ export function kopplungZustandZeile(
 /** Hinweise, die an einer Kopplung stehen müssen; leer, wenn alles passt. */
 export function kopplungHinweise(k: InstanzKopplungAnzeige): string[] {
   const aus: string[] = [];
+  // Meldet sich diese Instanz und ist widerrufen, meldet sie nur noch den Widerruf; ein Fehler
+  // heißt dann, dass er noch nicht zugestellt ist (design.md D9, wird nachgestellt).
+  if (k.zustand === 'widerrufen' && k.richtung === 'meldet_sich' && k.letzter_fehler) {
+    aus.push('Widerruf noch nicht beim Gegenüber, wird nachgereicht');
+  }
   if (k.protokoll === 'update_hier') aus.push('Update nötig: diese Instanz ist zu alt');
   if (k.protokoll === 'update_gegenueber') aus.push('Update nötig: das Gegenüber ist zu alt');
   if (k.uhr_abweichung_s != null && Math.abs(k.uhr_abweichung_s) > UHR_HINWEIS_AB_S) {
