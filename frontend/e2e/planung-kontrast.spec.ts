@@ -276,7 +276,7 @@ for (const modus of ['light', 'dark'] as const) {
       type: 'messwert',
       description:
         `${modus}: ${messwerte.filter((w) => w.art !== 'ampelkante').length} Texte, ` +
-        `minVerhaeltnis ${minVerhaeltnis(messwerte, (w) => w.art !== 'ampelkante' && !w.gesperrt)} : 1, ` +
+        `kleinster ${minVerhaeltnis(messwerte, (w) => w.art !== 'ampelkante' && !w.gesperrt)} : 1, ` +
         `gesperrt ${minVerhaeltnis(messwerte, (w) => w.gesperrt === true)} : 1, ` +
         `Ampelwort Raster ${minVerhaeltnis(messwerte, (w) => w.flaeche === 'plan' && AMPEL_WORT.test(String(w.wortlaut)))} : 1, ` +
         `Handy-Liste ${minVerhaeltnis(messwerte, (w) => w.flaeche === 'handy-liste' && w.art !== 'ampelkante')} : 1, ` +
