@@ -37,6 +37,7 @@ ursprünglichen Entscheidung laut Herleitung, nicht der Tag der Niederschrift.
 | [ADR-0011](entscheidungen/ADR-0011-anmeldewege-als-provider-mit-einer-sitzung.md) | Anmeldewege sind schaltbare Provider, die alle in dieselbe Server-Sitzung münden | akzeptiert | 2026-07-14 | `src/auth/**`, `src/routes/auth.rs` |
 | [ADR-0012](entscheidungen/ADR-0012-zeit-utc-auf-dem-wire-anzeigezone-im-client.md) | Zeitpunkte reisen in UTC, angezeigt und eingegeben werden sie in der Anzeigezone | akzeptiert | 2026-10-01 | `src/zeit.rs`, `src/uhrzeit.rs`, `src/**/*.rs`, `frontend/src/anzeige/**` |
 | [ADR-0013](entscheidungen/ADR-0013-openspec-traegt-den-aenderungszyklus.md) | OpenSpec trägt den Änderungszyklus, Fähigkeits-Specs liegen unter openspec/specs | akzeptiert | 2026-09-20 | `openspec/**`, `scripts/check-openspec-archiv.sh` |
+| [ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md) | Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus | akzeptiert | 2026-11-08 | `src/instanz/**`, `src/routes/instanz.rs`, `src/auth/unterschrift/**` |
 
 ## 9.2 Weitere Entscheidungen ohne eigene ADR
 

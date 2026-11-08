@@ -33,11 +33,28 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   einmalpasswort_vergeben: 'Einmalpasswort vergeben',
   lesezugang_angelegt: 'Lagemonitor-Zugang angelegt',
   lesezugang_widerrufen: 'Lagemonitor-Zugang widerrufen',
+  instanz_code_ausgestellt: 'Kopplungscode ausgestellt',
+  instanz_code_eingeloest: 'Kopplungscode eingelöst',
+  instanz_gekoppelt: 'Instanz gekoppelt',
+  instanz_kopplung_widerrufen: 'Instanzkopplung widerrufen',
+  instanz_kopplung_vom_gegenueber_widerrufen: 'Instanzkopplung vom Gegenüber widerrufen',
+  unterschrift_registriert: 'Unterschriftsschlüssel registriert',
+  unterschrift_gegengezeichnet: 'Unterschriftsschlüssel gegengezeichnet',
+  unterschrift_widerrufen: 'Unterschriftsschlüssel widerrufen',
+  unterschrift_abgelehnt: 'Unterschriftsschlüssel abgelehnt',
 };
 
-/** Aktionen am Lagemonitor-Zugang (LLH-1484): ihr Ziel ist die Bezeichnung des Zugangs. */
-export function istLesezugang(aktion: AdminAktion): boolean {
-  return aktion === 'lesezugang_angelegt' || aktion === 'lesezugang_widerrufen';
+/**
+ * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
+ * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber).
+ */
+export function hasNamensziel(aktion: AdminAktion): boolean {
+  return (
+    aktion === 'lesezugang_angelegt' ||
+    aktion === 'lesezugang_widerrufen' ||
+    aktion.startsWith('instanz_') ||
+    aktion.startsWith('unterschrift_')
+  );
 }
 
 /**
@@ -82,6 +99,21 @@ export function rollenText(a: ZugangsAngaben): string | undefined {
   rolle(SYSTEM_ROLLE_FELD, SYSTEM_ROLLE_TEXT, a.system_rolle_vorher, a.system_rolle);
   rolle(ORG_ROLLE_FELD, ORG_ROLLE_TEXT, a.org_rolle_vorher, a.org_rolle);
   return teile.length > 0 ? teile.join(', ') : undefined;
+}
+
+/**
+ * Angaben der Instanzkopplung und der Unterschriftsschlüssel (LLH-1490): Gegenstelle mit Org,
+ * Fingerabdruck, Adresse und bei `unterschrift_abgelehnt` der Grund. `undefined`, wenn keine
+ * dieser Angaben steht.
+ */
+export function instanzText(a: ZugangsAngaben): string | undefined {
+  const teile = [
+    a.fremde_org ? `Org dort: ${a.fremde_org}` : null,
+    a.fingerabdruck ? `Fingerabdruck ${a.fingerabdruck}` : null,
+    a.adresse ?? null,
+    a.grund ? `Grund: ${a.grund}` : null,
+  ].filter((t): t is string => t != null);
+  return teile.length > 0 ? teile.join(' · ') : undefined;
 }
 
 export function istEreignis(wert: string | null): wert is AnmeldeEreignis {

@@ -307,3 +307,42 @@ async fn ablehnung_je_zeile_liefert_422_im_fehler_envelope_mit_zeilen() {
         serde_json::json!([{"art": "personal", "id": 424242, "grund": "unbekannt"}])
     );
 }
+
+/// Instanzkopplung (LLH-1490): die Ablehnung einer unsignierten oder zu großen Anfrage an
+/// `/api/instanz/melden` und eines falschen Codes an `/api/instanz/koppeln` kommt im Envelope.
+#[tokio::test]
+async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
+    let app = common::setup().await;
+    let unsigniert = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/instanz/melden")
+                .header(header::AUTHORIZATION, "Instanz kaputt")
+                .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(unsigniert.status(), StatusCode::UNAUTHORIZED);
+    assert_fehler_envelope(unsigniert, "Melden unsigniert").await;
+
+    let falscher_code = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/instanz/koppeln")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    r#"{"suche":"x","jti":"j","protokoll":1,"kennung":"k","schluessel":"s",
+                        "name":"n","softwarestand":"1","org":{"kennung":"k/1","name":"o"},
+                        "pruefwert":"p"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(falscher_code.status(), StatusCode::UNAUTHORIZED);
+    assert_fehler_envelope(falscher_code, "Koppeln mit falschem Code").await;
+}

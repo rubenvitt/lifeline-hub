@@ -1848,6 +1848,49 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/lagemonitor/v1/lage",
             get(routes::lagemonitor_v1::lage),
         )
+        // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
+        // (IP-Sperre wie die Gerätekopplung), Melden signiert (`instanz::extractor`).
+        .route("/api/admin/instanz", get(routes::instanz::uebersicht))
+        .route(
+            "/api/admin/instanz/codes",
+            post(routes::instanz::code_ausstellen),
+        )
+        .route(
+            "/api/admin/instanz/einloesen",
+            post(routes::instanz::einloesen),
+        )
+        .route(
+            "/api/admin/instanz/kopplungen/{id}/widerrufen",
+            post(routes::instanz::widerrufen),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/registrieren/start",
+            post(routes::instanz::registrieren_start),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/registrieren/abschluss",
+            post(routes::instanz::registrieren_abschluss),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/start",
+            post(routes::instanz::gegenzeichnen_start),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss",
+            post(routes::instanz::gegenzeichnen_abschluss),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/widerrufen",
+            post(routes::instanz::unterschrift_widerrufen),
+        )
+        .route(
+            "/api/instanz/koppeln",
+            post(routes::instanz::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        .route(
+            crate::instanz::extractor::MELDEN_PFAD,
+            post(routes::instanz::melden),
+        )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(
             "/api/organisation",
