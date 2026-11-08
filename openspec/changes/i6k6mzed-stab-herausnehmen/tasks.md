@@ -68,7 +68,8 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 - [ ] 5.1 `fuehrung::aufloesung` liest `einsatz_mitgliedschaft.fuehrungsfunktion` statt der Besetzung, ohne `darf_stab_lesen`. Geräte bleiben ausgeschlossen. Mehrere Mitglieder ergeben alle Namen alphabetisch. Die Wire-Form `AktuelleBesetzung` bleibt. Grün sind `src/fuehrung/tests.rs`, `tests/fuehrungsfunktionen.rs` (Setup auf Mitgliedschaft) und `tests/geraet_kopplung.rs`.
 - [ ] 5.2 `benachrichtigung::aufloesung` (`besetzung_nutzer`, `funktionen_der_nutzer`) liest nur noch die Mitgliedschaft und den EL der Führungsstelle. Die `tests/benachrichtigung*.rs` (Setup auf Mitgliedschaft), `tests/dokument_verteiler.rs` und `tests/lagebesprechung.rs` sind grün.
 - [ ] 5.3 `einsatz::funktion`, `meine_sachgebiete`/`meine_funktion` (`einsatz/mod.rs`, `routes/einsatz.rs`), `fuehrungsstelle::absender_tx` und den ETB-Funktions-Snapshot auf die Mitgliedschaft umstellen. `tests/einsatz_funktion.rs`, `tests/einsatz_live.rs` und `tests/org_live.rs` sind grün.
-- [ ] 5.4 Frontend: gemeinsame Ableitung `fuehrung/besetzungAusMitgliedern.ts` aus `GET …/mitglieder`. Folgende Stellen lesen sie:
+- [ ] 5.4 Live-Ereignis `mitglieder` (Wire `mitglieder`, Gate Einsatz-Lesezugriff) bei `PUT`/`DELETE …/mitglieder/…`. Ein Leser des Einsatzes erhält es. Eine fremde Organisation erhält nichts. Außerdem entsteht keine Auflösung für geschwärzte Einsätze. Grün sind `gate_mengen_sind_gepinnt`, `tests/enum_wire_kontrakt.rs`, `tests/einsatz_live.rs` und der Codegen. Frontend: `EINSATZ_STREAM_EVENTS.mitglieder` invalidiert Mitglieder, Aufträge, Erinnerungen und Modulzähler; dazu `useEinsatzLiveStream.test.tsx` und `liveEvent.contract.test.ts`.
+- [ ] 5.5 Frontend: gemeinsame Ableitung `fuehrung/besetzungAusMitgliedern.ts` aus `GET …/mitglieder`. Folgende Stellen lesen sie:
   - Organigramm (Stabsstelle ohne Stab-Freigabe)
   - `fuehrungsorganisation.ts`
   - Fernmeldeskizze (`useNetzQuellen`, Quelle „Mitglieder“)
@@ -80,7 +81,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
   - `stammdaten/vorschlagsquellen.ts`
 
   Grün sind die Vitest-Dateien dieser Stellen und `e2e/fernmeldeskizze-ausstattung.spec.ts`, `fuehrungsfunktionen.spec.ts`, `einsatzbericht-druck.spec.ts` und `kommunikationsplan-offline.spec.ts`.
-- [ ] 5.5 `frontend/src/fuehrung/AGENTS.md`, `src/AGENTS.md` (Auflösung) und `lagebesprechung/AGENTS.md` nachziehen. Die Anwenderdoku-Kapitel `einsatzabschnitte`, `funkplan`, `rechte-im-einsatz` und `auftraege-befehle` beschreiben die Pflege unter „Mitglieder“. `anwenderdoku.guard.test.ts` und Prettier sind grün.
+- [ ] 5.6 `frontend/src/fuehrung/AGENTS.md`, `src/AGENTS.md` (Auflösung) und `lagebesprechung/AGENTS.md` nachziehen. Die Anwenderdoku-Kapitel `einsatzabschnitte`, `funkplan`, `rechte-im-einsatz` und `auftraege-befehle` beschreiben die Pflege unter „Mitglieder“. `anwenderdoku.guard.test.ts` und Prettier sind grün.
 
 ## 6. Stab und Presse entfernen (D1, D4, D6, D8)
 

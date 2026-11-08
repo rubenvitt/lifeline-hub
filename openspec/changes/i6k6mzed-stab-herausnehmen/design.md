@@ -77,6 +77,27 @@ Jede Stelle, die heute `einsatz_stabsfunktion` liest, liest stattdessen
   als Felder erhalten (Grenzwert-Regel). Erzeugt werden nur noch `personal` (mit Name) und
   `nicht_vergeben`. `einsatzleitung`, `extern` und `rueckwaertig` bleiben im Enum, werden aber
   nicht mehr geliefert. Der Client behandelt sie weiter, das kostet nichts.
+- **EL bleibt wie heute:** Der Einsatzleiter kommt aus der Führungsstelle, mit Rückfall auf die
+  Mitgliedschaft. D2 ersetzt nur, was bisher `einsatz_stabsfunktion` las.
+- **`meine_funktion`** ist das Label der eigenen Mitgliedschaftsfunktion aus dem ganzen Katalog
+  (EL, S1–S7, FHP und FB mit Bezeichnung). Ohne Funktion und mit der Rolle Einsatzleitung ist
+  es „EL“ wie bisher, sonst leer.
+- **Schwärzung:** Bisher verschwand der Name mit `einsatz_stabsfunktion.snap_name`. Die
+  Mitgliedschaft bleibt nach der Schwärzung bestehen. Deshalb liefert die Auflösung für einen
+  geschwärzten Einsatz keinen Namen (Zustand `personal` ohne `name`). Grundlage ist die
+  vorhandene Schwärzungsmarke des Einsatzes. Der Snapshot trägt weiter nur das Label.
+- **Gekoppelte Geräte** erhalten keine Auflösung. Das entspricht dem heutigen Verhalten: Seit
+  LLH-1156 bekam ein Gerät sie nur, wenn `stab` zu seiner Ansicht gehört, und keine
+  Funktionsansicht enthält `stab`.
+- **Live:** Ändert die Einsatzleitung eine Mitgliedschaft (`PUT`/`DELETE …/mitglieder/…`),
+  verteilt der Server ein neues einsatzbezogenes Ereignis `mitglieder`. Gate ist der
+  Einsatz-Lesezugriff, denn die Mitgliederliste ist für jedes Mitglied lesbar. Der Client
+  invalidiert damit Mitglieder, Aufträge, Erinnerungen und den Modulzähler, also die Rolle, die
+  bisher `stab` hatte. Organigramm, Skizze und Kommunikationsplan folgen über die
+  Mitglieder-Abfrage. Der Kopf (`meine_*`) folgt wie heute über `kopf_melden`.
+- **Bezeichnungen:** Die Stabsstelle „Stab“ im Organigramm und die Gruppe „Einsatzleitung und
+  Stab“ im Kommunikationsplan bleiben. Das sind Begriffe der Führungsorganisation (FwDV 100),
+  kein Verweis auf das entfernte Modul.
 - **Konsequenz:** S1–S6 kann nur sein, wer ein Benutzerkonto und eine Mitgliedschaft im Einsatz
   hat. Eine Helferin ohne Konto konnte die Besetzung tragen, die Mitgliedschaft nicht. Das ist
   in Kauf genommen: Wer im Fükw eine Funktion führt, bedient in der Regel auch die Anwendung.
@@ -226,6 +247,10 @@ und `stab/medienlage*` entfallen. Bestehende Lageberichte und Entwürfe bleiben 
 - [Mehrere Mitglieder mit derselben Funktion statt einer eindeutigen Besetzung] → Alle gelten
   (D2). Die Benachrichtigung erreicht dann mehr Menschen statt niemanden, was auf der sicheren
   Seite liegt.
+- [Eine entlassene Kraft mit Konto behält ihre Funktion in der Mitgliedschaft und bekommt weiter
+  Benachrichtigungen; die Entlassung löste bisher die Besetzung] → Die Mitgliedschaft ist der
+  Zugang zum Einsatz und wird von der Einsatzleitung gepflegt. Die Entlassung berührt sie
+  bewusst nicht. Die Anwenderdoku nennt den Handgriff „Funktion unter Mitglieder entfernen“.
 - [S1–S6 ohne Benutzerkonto nicht mehr abbildbar] → Bewusst in Kauf genommen (D2). Der
   Kommunikationsplan kennt weiter externe Stellen und Freitext.
 - [Großer Diff über Backend, Frontend, e2e und Doku in einem PR] → Getrennte Commits in der
