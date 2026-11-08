@@ -1383,7 +1383,10 @@ Wechselpunkt, Ziel die Einheit ihres Blocks), wer geht, und wer fehlt (außer Di
 Ad-hoc-Kraft). Ohne Folgeblock MUST die Vorlage leer sein (Posten endet). Die Vorlage nennt
 Personen und MUST die Freigabe des Moduls Personal verlangen (403); eine Schicht ohne Plan MUST
 422 sein. Der Vollzug-Dialog MUST sie als Art „Laut Plan“ vorbelegen und die anderen Arten
-wählbar lassen. Eine neue Person MAY eine Kraft des Einsatzes (`besatzung`), eine Stamm-Person der
+wählbar lassen. Er MUST sie je Öffnen frisch abrufen; solange sie aussteht, MUST er den Vollzug
+der Vorbelegung sperren (eine selbst gewählte Art bleibt möglich), und „Laut Plan“ MUST auf einen
+laufenden neuen Abruf warten. Ohne Vorlage (Freigabe Personal fehlt) MUST er ein Postenende aus
+der Schicht selbst erkennen (kein Folgeblock) und das Abziehen ohne Ablöser vorbelegen. Eine neue Person MAY eine Kraft des Einsatzes (`besatzung`), eine Stamm-Person der
 Organisation oder ein Helfer des Plans (`uebernahme`) sein; Stamm-Personen und Helfer MUST dabei
 in den Einsatz übernommen werden (Helfer als Ad-hoc-Kraft mit Name, Organisation und
 Qualifikationen; der Helfer bleibt im Plan und zeigt danach auf diese Kraft), mit Eintreffen in der

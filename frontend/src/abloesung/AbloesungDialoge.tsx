@@ -1,6 +1,6 @@
 import { Checkbox, Collapse, Form, Input, Radio, Typography, type FormInstance } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useId, useRef, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type {
@@ -35,7 +35,13 @@ import {
 import { verbleibBody, verbleibOptionen, type VerbleibRaum, type VerbleibWert } from './verbleib';
 import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { planVollzugBody, postenEndet, vorlageWechselt, vorlageZeilen } from './lautPlan';
+import {
+  folgtPlan,
+  planVollzugBody,
+  postenEndet,
+  vorlageWechselt,
+  vorlageZeilen,
+} from './lautPlan';
 
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
@@ -472,6 +478,8 @@ interface VollzugProps {
    * (die Schicht folgt keinem Plan, Freigaben fehlen, Fehler), `null`, solange sie lädt.
    */
   planVorlage?: AbloesungPlanVorlage | null;
+  /** Die Vorlage wird gerade (neu) abgerufen, etwa nach einer Änderung am Plan. */
+  planVorlageLaedt?: boolean;
   laeuft: boolean;
   fehler: unknown;
   onErfassen: (body: VollzugBody) => Promise<unknown>;
@@ -516,6 +524,7 @@ export function VollzugDialog({
   raeume = [],
   raumGesperrt,
   planVorlage,
+  planVorlageLaedt = false,
   laeuft,
   fehler,
   onErfassen,
@@ -539,9 +548,19 @@ export function VollzugDialog({
   usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   useVorlageVorbelegung(form, planVorlage);
   const mitPlan = planVorlage != null && vorlageWechselt(planVorlage);
+  // Endet der Posten laut Plan? Die Vorlage weiß es genauer; ohne sie (Freigabe Personal fehlt,
+  // lädt noch) sagt es die Schicht selbst (kein Folgeblock).
+  const endet =
+    planVorlage != null
+      ? postenEndet(planVorlage)
+      : schicht != null && folgtPlan(schicht) && schicht.plan_folgeblock == null;
   const abloeser = (Form.useWatch('abloeser_ids', form) as number[] | undefined) ?? [];
-  const abziehen =
-    planVorlage != null && postenEndet(planVorlage) && art === 'einheit' && abloeser.length === 0;
+  const abziehen = endet && art === 'einheit' && abloeser.length === 0;
+  // Solange die Vorlage aussteht, steht die Vorbelegung noch nicht: Vollziehen erst mit ihr, außer
+  // die Art ist selbst gewählt. „Laut Plan“ wartet auch auf einen neuen Abruf (Plan geändert).
+  const [artGewaehlt, setArtGewaehlt] = useState(false);
+  const vorlageSteht = planVorlage === null && !artGewaehlt;
+  const sperre = vorlageSteht || (art === 'plan' && planVorlageLaedt);
   return (
     <ErfassungsModal<VollzugWerte>
       offen={schicht != null}
@@ -549,10 +568,10 @@ export function VollzugDialog({
       form={form}
       erfassenText={abziehen ? 'Abziehen' : 'Vollziehen'}
       laeuft={laeuft}
+      gesperrt={sperre}
       initialValues={{
         art: mitPlan ? 'plan' : artVorgabe(schicht, gesperrt),
-        abloeser_ids:
-          schicht && !(planVorlage != null && postenEndet(planVorlage)) ? abloeserIds(schicht) : [],
+        abloeser_ids: schicht && !endet ? abloeserIds(schicht) : [],
         abschnitt_uebergeben: uebergabeMoeglich,
         besatzung_ids: [],
         verbleib: 'ruhe',
@@ -584,6 +603,7 @@ export function VollzugDialog({
       <Form.Item<VollzugWerte> name="art" label="Art">
         <Radio.Group
           optionType="button"
+          onChange={() => setArtGewaehlt(true)}
           aria-describedby={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
           options={[...(mitPlan ? [PLAN_OPTION] : []), ...ART_OPTIONEN].map((o) => ({
             ...o,
@@ -594,6 +614,11 @@ export function VollzugDialog({
       {artGrund != null && (
         <Typography.Text type="secondary" id={artGrundId} data-lfh="vollzug-besatzung-gesperrt">
           {artGrund}
+        </Typography.Text>
+      )}
+      {planVorlage === null && (
+        <Typography.Text type="secondary" data-lfh="vollzug-plan-laedt">
+          Schichtplan lädt …
         </Typography.Text>
       )}
       {art === 'plan' && planVorlage && mitPlan ? (

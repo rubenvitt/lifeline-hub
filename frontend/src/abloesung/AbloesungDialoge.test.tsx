@@ -1122,6 +1122,12 @@ describe('Ablösung — Vollzug laut Schichtplan (LLH-1555)', () => {
     einheit_name: 'Florian 1',
     status: 'laufend',
     faellig_laut_plan: true,
+    plan_folgeblock: {
+      id: 40,
+      von: '2026-09-24 14:00:00',
+      bis: '2026-09-24 20:00:00',
+      personen: 3,
+    },
     abloeser: [],
   } as unknown as Abloesung;
   const vorlage: AbloesungPlanVorlage = {
@@ -1144,10 +1150,13 @@ describe('Ablösung — Vollzug laut Schichtplan (LLH-1555)', () => {
     fehlen: [],
   };
 
-  function oeffne(planVorlage: AbloesungPlanVorlage | null | undefined) {
+  function oeffne(
+    planVorlage: AbloesungPlanVorlage | null | undefined,
+    { laedt = false, s = schicht }: { laedt?: boolean; s?: Abloesung } = {},
+  ) {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const props = {
-      schicht,
+      schicht: s,
       einheiten: [{ value: 12, label: 'Florian 2' }],
       bisherigeBesatzung: ['Anna', 'Dana'],
       personen: [{ value: 21, label: 'Cora', name: 'Cora' }],
@@ -1156,9 +1165,11 @@ describe('Ablösung — Vollzug laut Schichtplan (LLH-1555)', () => {
       onErfassen,
       onSchliessen: vi.fn(),
     };
-    const ansicht = renderMitProviders(<VollzugDialog {...props} planVorlage={planVorlage} />);
-    const neu = (v: AbloesungPlanVorlage | null | undefined) =>
-      ansicht.rerender(<VollzugDialog {...props} planVorlage={v} />);
+    const ansicht = renderMitProviders(
+      <VollzugDialog {...props} planVorlage={planVorlage} planVorlageLaedt={laedt} />,
+    );
+    const neu = (v: AbloesungPlanVorlage | null | undefined, l = false) =>
+      ansicht.rerender(<VollzugDialog {...props} planVorlage={v} planVorlageLaedt={l} />);
     return { onErfassen, neu };
   }
 
@@ -1192,10 +1203,53 @@ describe('Ablösung — Vollzug laut Schichtplan (LLH-1555)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByRole('radio', { name: 'Laut Plan' })).toBeNull();
     expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked();
+    // Die Vorbelegung steht noch aus: kein Vollzug der alten Vorgabe.
+    expect(dialog.querySelector('[data-lfh="vollzug-plan-laedt"]')).toHaveTextContent(
+      'Schichtplan lädt',
+    );
+    expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeDisabled();
     neu(vorlage);
     await waitFor(() =>
       expect(within(dialog).getByRole('radio', { name: 'Laut Plan' })).toBeChecked(),
     );
+    expect(dialog.querySelector('[data-lfh="vollzug-plan-laedt"]')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeEnabled();
+  });
+
+  it('lädt die Vorlage noch, geht eine selbst gewählte Art', async () => {
+    const { onErfassen } = oeffne(null);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeEnabled();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('„Laut Plan“ wartet auf den neuen Abruf der Vorlage', async () => {
+    const { neu } = oeffne(vorlage, { laedt: true });
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'Laut Plan' })).toBeChecked(),
+    );
+    expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeDisabled();
+    neu(vorlage, false);
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeEnabled(),
+    );
+  });
+
+  it('Posten endet ohne Vorlage (Freigabe Personal fehlt): „Abziehen“ ohne Ablöser', async () => {
+    const ohneFolge = {
+      ...schicht,
+      plan_folgeblock: undefined,
+      abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }],
+    } as unknown as Abloesung;
+    const { onErfassen } = oeffne(undefined, { s: ohneFolge });
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abziehen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ abloeser_ids: [] });
   });
 
   it('die anderen Arten bleiben wählbar und schicken nichts aus dem Plan', async () => {

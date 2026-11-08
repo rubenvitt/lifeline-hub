@@ -337,9 +337,13 @@ export default function AbloesungPage() {
     queryKey: einsatzKeys.abloesungPlanVorlage(einsatzId, planSchicht?.id ?? 0),
     queryFn: () => ladePlanVorlage(einsatzId, planSchicht?.id ?? 0),
     enabled: planSchicht != null,
+    // Je Öffnen frisch: eine Vorlage aus dem Cache kennt eine Personenänderung im selben Block
+    // nicht. Geschlossen hat der Schlüssel keinen Beobachter mehr und fällt sofort heraus.
+    gcTime: 0,
   });
   const planVorlage =
     planSchicht == null || planVorlageQuery.isError ? undefined : (planVorlageQuery.data ?? null);
+  const planVorlageLaedt = planSchicht != null && planVorlageQuery.isFetching;
   // Die Felder des Besatzungswechsels, wie Vollzug und Planung sie brauchen (LLH-1319): Personen
   // `null`, solange das Personal lädt, Ziele `undefined`, solange die Einheiten fehlen. Auch ein
   // Fehler bleibt `undefined`: die Ziele eines geplanten Wechsels sind dann unbekannt, nicht leer.
@@ -1140,6 +1144,7 @@ export default function AbloesungPage() {
           raeume={verbleibRaeume(brFrei ? brQuery.data : undefined)}
           raumGesperrt={raumGesperrt}
           planVorlage={planVorlage}
+          planVorlageLaedt={planVorlageLaedt}
           laeuft={vollzugMut.isPending}
           fehler={vollzugMut.error}
           onErfassen={(body) => vollzugMut.mutateAsync({ abloesungId: vollzugSchicht.id, body })}
