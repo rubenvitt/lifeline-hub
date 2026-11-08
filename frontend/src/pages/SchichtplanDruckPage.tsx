@@ -39,7 +39,9 @@ import {
  *
  * Der Stand ist ein Schnappschuss (`schichtplanDruck`, nicht live): ein Ereignis darf das Blatt vor
  * dem Druck nicht still ändern, „Neu laden“ holt neu. Einheiten und UHS liefern nur Abschnitt und
- * Reihenfolge der Posten; fehlen sie (Modul gesperrt, Fehler), stehen die Posten ohne Abschnitt.
+ * Reihenfolge der Posten; ist ihr Modul gesperrt, stehen die Posten ohne Abschnitt. Scheitert ein
+ * Abruf, scheitert die ganze Ansicht (Ladefehler mit „Erneut laden“, kein Druck): sonst stünde ein
+ * Blatt still ohne Abschnitt oder Qualifikation da.
  * Ohne Modul Personal liefert der Plan keine Namen: dann nur der Aushang mit der Besetzung als
  * Zahl.
  */
@@ -66,10 +68,10 @@ export default function SchichtplanDruckPage() {
     queryFn: async () => {
       const [plan, vorgaben, einheiten, uhs, qualifikationen] = await Promise.all([
         fetchSchichtplan(einsatzId),
-        listeAbloesungVorgaben(einsatzId).catch(() => []),
-        einheitenFrei ? listeEinheiten(einsatzId).catch(() => undefined) : undefined,
-        uhsFrei ? listeUhs(einsatzId).catch(() => undefined) : undefined,
-        listeQualifikationen().catch(() => []),
+        listeAbloesungVorgaben(einsatzId),
+        einheitenFrei ? listeEinheiten(einsatzId) : undefined,
+        uhsFrei ? listeUhs(einsatzId) : undefined,
+        listeQualifikationen(),
       ]);
       return {
         plan,
