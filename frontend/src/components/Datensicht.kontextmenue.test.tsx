@@ -80,7 +80,7 @@ const offenesMenue = () =>
   document.querySelector<HTMLElement>(
     '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label^="Aktionen zu"]',
   );
-const kontextAnker = () => document.querySelector('[data-lfh="kontextmenue-anker"]');
+const kontextAnker = () => document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]');
 const zelleVon = (text: string) => screen.getByText(text).closest('td')!;
 const zeileVon = (name: string) => screen.getByRole('link', { name }).closest('tr')!;
 

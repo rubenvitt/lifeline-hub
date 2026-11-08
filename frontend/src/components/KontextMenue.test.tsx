@@ -99,7 +99,7 @@ describe('KontextMenue (LLH-1596, D6)', () => {
         onSchliessen={vi.fn()}
       />,
     );
-    expect(document.querySelector('[data-lfh="kontextmenue-anker"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]')).toBeNull();
   });
 });
 

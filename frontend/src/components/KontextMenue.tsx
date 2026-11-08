@@ -42,7 +42,7 @@ export function KontextMenue<K extends string = string>({
       anker={offen.anker}
       bezug="fenster"
       ariaLabel={zugaenglicherName}
-      ankerKennung="kontextmenue-anker"
+      ankerKennung="datensatz-kontextmenue-anker"
       items={menueEintraege(eintraege) ?? []}
       onWaehlen={(key) => onWahl(key as K)}
       onSchliessen={onSchliessen}
