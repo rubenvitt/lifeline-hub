@@ -302,6 +302,28 @@ Spec `passwort-anmeldung`, Herleitung
   serverweit (versuchter Name ohne Konto). Ein Rebuild einer der Tabellen nimmt die Spalte mit.
   Nachweis `tests/zugangsprotokoll.rs` (`jede_org_liest_nur_ihre_spur`).
 
+## Backend — Instanzkopplung (LLH-1490)
+
+Zwei Instanzen (ELW und Hub) sprechen nur signiert miteinander; Regeln des Verfahrens in
+[ADR-0014](../docs/architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
+Herleitung in der Change `ckq15vzr-instanzkopplung-schluessel` (`design.md`).
+
+- **Eine Route, die eine andere Instanz ruft, nimmt `instanz::extractor::GekoppelteInstanz`**
+  und antwortet über dessen `antwort` (signiert); nie `CurrentUser`, nie ein eigener
+  Token-Vergleich. Nur `POST /api/instanz/koppeln` ist öffentlich (IP-Sperre, einheitlich 401).
+- **Das Protokoll kennt Richtung, nicht Hub und ELW** (`InstanzKopplungRichtung`): wer einlöst,
+  meldet sich; die erreichte Seite baut nie eine Verbindung auf.
+- **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
+  kommt; Melden geht über alle Versionen (`extractor::protokoll_zulaessig`) und sein Schema
+  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv.
+- **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
+  haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
+  gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::annehmen`); wer ein
+  Admin-Konto deaktiviert oder herabstuft, widerruft dessen Schlüssel im selben Commit.
+- Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
+  (`akteur_id` NULL, Name der Gegenstelle).
+- Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
+
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
 
 - **Ein System-Admin schreibt ohne Mitgliedschaft nur an Einsätzen seiner eigenen Org**; lesen

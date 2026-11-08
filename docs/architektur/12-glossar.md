@@ -71,6 +71,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Funktionsansicht | Was ein gekoppeltes Gerät lesen und schreiben darf (etwa UHS, Abschnitt, Lagemonitor). | Spec [`funktionsansichten`](../../openspec/specs/funktionsansichten/spec.md), [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |
 | Gerätekonto | Konto, unter dem ein gekoppeltes Gerät schreibt; keine Person. | `ist_geraetekonto` in `src/geraet/repo.rs`, Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md), „Gerätekonto ist keine Person“ |
 | Hülle (Desktop-Hülle) | Tauri-2-App `src-tauri`, deren Webview die https-Adresse des Servers lädt; ohne Anwendungslogik. | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md), `frontend/src/huelle/faehigkeiten.ts` |
+| Instanzkopplung | Vertrauensbeziehung zweier Lifeline-Hub-Instanzen (etwa ELW und Hub): Einmal-Code, Austausch der Ed25519-Schlüssel, signierte Meldungen; eine Kopplung je Instanzpaar, Orgs einzeln. | `src/instanz/`, Spec `instanz-kopplung` (`openspec/specs/instanz-kopplung/`) |
 | Kanal `alpha`, `beta`, `main` | Release-Kanäle: jeder Merge auf `alpha` gibt eine Vorabversion `X.Y.Z-alpha.N` frei, `main` die stabile; `beta` ist vorbereitet. | `branches` in `release.config.mjs` |
 | Kopplung | Bindung eines ausgegebenen Geräts an genau einen Einsatz, befristet und widerrufbar. | `src/geraet/`, Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md) |
 | Lagebild-Speicher | IndexedDB `lifeline-lagebild` mit dem ohne Netz lesbaren Stand. | `frontend/src/offline/lagebildSpeicher.ts`, [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md) |
@@ -90,6 +91,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Sprungpalette | Tastaturgesteuerte Suche über Module und Datensätze. | [`frontend/src/command-palette/AGENTS.md`](../../frontend/src/command-palette/AGENTS.md), Spec [`sprungpalette`](../../openspec/specs/sprungpalette/spec.md) |
 | Stellenbindung | Bindung einer Kopplung an eine Stelle (UHS, Betreuungsstelle, BR, Abschnitt, Verpflegungsstelle). | `src/geraet/stelle.rs`, [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |
 | Typ-Codegen | Erzeugung der Frontend-Typen aus dem OpenAPI-Schema des Backends. | [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“ |
+| Unterschriftsschlüssel | Passkey eines Org-Admins nur zum Unterschreiben (nie zur Anmeldung); gekoppelte Instanzen kennen seinen öffentlichen Schlüssel und prüfen damit Erklärungen des Admins. | `src/auth/unterschrift/`, Spec `org-admin-unterschrift` (`openspec/specs/org-admin-unterschrift/`) |
 | Wächter | Test oder Skript, das eine Regel im Code durchsetzt (`*.guard.test.ts`, `tests/*_guard.rs`, `scripts/check-*.sh`). | [Querschnitt 8.27](08-querschnittliche-konzepte.md) |
 | Wire-Enum | Enum, dessen Wire-Werte aus einer Liste `Variante => "wire"` entstehen. | `wire_enum!` in `src/wire_enum.rs`, `tests/enum_wire_kontrakt.rs` |
 | Zunder | Aufgabenverwaltung des Projekts; alte Kennungen `LFH-<n>` bleiben gültig. | [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Zunder“ |

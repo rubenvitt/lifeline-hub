@@ -51,19 +51,19 @@ Code. Migrationen bekommen die nächste freie Nummer über `origin/alpha`
 
 ## 8. Oberfläche (D10)
 
-- [ ] 8.1 OpenAPI-Typen für alle neuen Antworten, `scripts/check-typ-codegen.sh` grün, beide generierten Dateien mitcommittet; `frontend/src/api/instanz.ts` mit Query-Keys nach `frontend/AGENTS.md`
-- [ ] 8.2 Seite „Instanzkopplung“ in `frontend/src/instanz/`, Eintrag in `adminNav.tsx` (`NUR_ADMIN`), Paneel „Diese Instanz“; Vitest: Fingerabdruck kopierbar, Nicht-Admin sieht den Eintrag nicht
-- [ ] 8.3 Paneel „Gekoppelte Instanzen“ mit Code ausstellen (gesperrt mit Erklärung ohne eigenen Unterschriftsschlüssel), Code einlösen (zeigt danach den Fingerabdruck des Gegenübers), Zustandszeile als reine Funktion, Widerruf im Menü; Vitest für Zustandszeile und Sperre
-- [ ] 8.4 Paneel „Unterschriftsschlüssel“ mit Registrieren, Gegenzeichnen und Widerrufen über `navigator.credentials`; Vitest mit gestubbtem WebAuthn
+- [x] 8.1 OpenAPI-Typen für alle neuen Antworten, `scripts/check-typ-codegen.sh` grün, beide generierten Dateien mitcommittet; `frontend/src/api/instanz.ts` mit Query-Keys nach `frontend/AGENTS.md`
+- [x] 8.2 Seite „Instanzkopplung“ in `frontend/src/instanz/`, Eintrag in `adminNav.tsx` (`NUR_ADMIN`), Paneel „Diese Instanz“; Vitest: Fingerabdruck kopierbar, Nicht-Admin sieht den Eintrag nicht
+- [x] 8.3 Paneel „Gekoppelte Instanzen“ mit Code ausstellen (gesperrt mit Erklärung ohne eigenen Unterschriftsschlüssel), Code einlösen (zeigt danach den Fingerabdruck des Gegenübers), Zustandszeile als reine Funktion, Widerruf im Menü; Vitest für Zustandszeile und Sperre
+- [x] 8.4 Paneel „Unterschriftsschlüssel“ mit Registrieren, Gegenzeichnen und Widerrufen über `navigator.credentials`; Vitest mit gestubbtem WebAuthn
 - [ ] 8.5 e2e-Fall in `frontend/e2e/` für die Seite an einer Instanz (Anzeige, Code ausstellen gesperrt ohne Schlüssel); Bilder der Seite für den PR nach `dev-zunder-ausfuehren`, „Bilder der Änderung“
 
 ## 9. Doku und Regeln
 
-- [ ] 9.1 ADR-0014 „Maschinen weisen sich mit Schlüsselpaar und signierten Anfrage-JWTs aus“ mit Regeln und Prüfung nach `docs/architektur/AGENTS.md`, Kapitel 9; Wächter der ADRs grün
-- [ ] 9.2 Architektur: Kapitel 5 (neue Module), 6 (Ablauf Koppeln und Melden als Mermaid), 8 (Instanzkopplung als Konzept), 11 (Risiko Instanzschlüssel im Klartext, öffentlicher Einlöse-Endpunkt), 12 (Instanz, Kopplung, Unterschriftsschlüssel); Wächter der Architektur grün
-- [ ] 9.3 Abschnitt „Instanzkopplung“ in `src/AGENTS.md` (Signatur-Extractor, Protokollversion erhöhen, Melden nur additiv) samt Zeile in der Tabelle der Wurzel-`AGENTS.md`, falls ein eigener Bereich entsteht
-- [ ] 9.4 Anwenderdoku: Kapitel zur Administration um „Instanzen koppeln“ und „Unterschriftsschlüssel“ nach `docs/anwender/AGENTS.md`; Bilder über den Bildlauf
-- [ ] 9.5 Kommentar an LLH-1148 mit Verweis auf ADR-0014; Konzeptnotiz `docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md` mit Verweis auf diese Change unter „Offene Fragen“ (Protokollversion beantwortet)
+- [x] 9.1 ADR-0014 „Maschinen weisen sich mit Schlüsselpaar und signierten Anfrage-JWTs aus“ mit Regeln und Prüfung nach `docs/architektur/AGENTS.md`, Kapitel 9; Wächter der ADRs grün
+- [x] 9.2 Architektur: Kapitel 5 (neue Module), 6 (Ablauf Koppeln und Melden als Mermaid), 8 (Instanzkopplung als Konzept), 11 (Risiko Instanzschlüssel im Klartext, öffentlicher Einlöse-Endpunkt), 12 (Instanz, Kopplung, Unterschriftsschlüssel); Wächter der Architektur grün
+- [x] 9.3 Abschnitt „Instanzkopplung“ in `src/AGENTS.md` (Signatur-Extractor, Protokollversion erhöhen, Melden nur additiv) samt Zeile in der Tabelle der Wurzel-`AGENTS.md`, falls ein eigener Bereich entsteht
+- [x] 9.4 Anwenderdoku: Kapitel zur Administration um „Instanzen koppeln“ und „Unterschriftsschlüssel“ nach `docs/anwender/AGENTS.md`; Bilder über den Bildlauf
+- [x] 9.5 Kommentar an LLH-1148 mit Verweis auf ADR-0014; Konzeptnotiz `docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md` mit Verweis auf diese Change unter „Offene Fragen“ (Protokollversion beantwortet)
 
 ## 10. Abschluss
 
