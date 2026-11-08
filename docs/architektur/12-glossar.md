@@ -46,7 +46,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Schichtmodell | Stammdatum der Organisation: wie lange eine Schicht läuft (Rhythmus oder Wechselzeiten) samt Vorwarnung. | `src/schichtmodell/mod.rs` |
 | Sichtung | Einstufung eines Patienten in SK I bis SK IV, dazu `tot` und `unverletzt`. | `Sichtungskategorie` in `src/person/mod.rs`, Spec [`sichtungswahl`](../../openspec/specs/sichtungswahl/spec.md) |
 | Sprechgruppe | Funk-Sprechgruppe der Organisation oder eines Einsatzes. | `src/sprechgruppe/mod.rs`, `tests/sprechgruppe_katalog.rs` |
-| Stab, Sachgebiete S1 bis S6 | S1 Personal, S2 Lage, S3 Einsatz, S4 Versorgung, S5 Presse- und Medienarbeit, S6 Information und Kommunikation. | `Sachgebiet` in `src/fuehrung/sachgebiet.rs`, [`frontend/src/stab/AGENTS.md`](../../frontend/src/stab/AGENTS.md) |
+| Stab, Sachgebiete S1 bis S6 | S1 Personal, S2 Lage, S3 Einsatz, S4 Versorgung, S5 Presse- und Medienarbeit, S6 Information und Kommunikation. | `Sachgebiet` in `src/fuehrung/sachgebiet.rs`, [`frontend/src/fuehrung/AGENTS.md`](../../frontend/src/fuehrung/AGENTS.md) |
 | Standard-Rufname | Eigenname: der vorbelegte Absender eines Mitglieds im ETB. | Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md), Szenario „Eigenname bleibt“ |
 | Stichwort | Einsatzstichwort; die Organisation führt Vorschläge dafür. | `src/stichwort/mod.rs` |
 | UHS (Unfallhilfsstelle) | Stelle mit Behandlungsplätzen, Belegung und Material; Status endet in `aufgeloest`. | `src/uhs/mod.rs`, Modul „Unfallhilfsstellen“ in `frontend/src/einsatz/modulRegistry.ts` |

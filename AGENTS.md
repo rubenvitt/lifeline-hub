@@ -24,7 +24,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/entwurf/AGENTS.md`         | Entwürfe, gegliederte Dokumente (`DokumentEntwurf`)                                                                                                |
 | `frontend/src/personen/AGENTS.md`        | Personen und Sichtung                                                                                                                              |
 | `frontend/src/fernmeldewesen/AGENTS.md`  | Fernmeldewesen: Funkplan, Fernmeldeskizze, Sprechgruppen, Kommunikationsplan (S6), Einsatzleiter                                                   |
-| `frontend/src/stab/AGENTS.md`            | Stab (wird mit LLH-1602 entfernt): Stab-Weiche, Checkliste Arbeitsaufnahme, Presse S5, Informationstelefon                                         |
+| `frontend/src/infotelefon/AGENTS.md`     | Informationstelefon: eigenes Modul, Fenster und Zählung, Funkprotokoll-Ordnung, Handschirm                                                         |
 | `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server                              |
 | `frontend/src/fuehrung/AGENTS.md`        | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server                                                                             |
 | `frontend/src/kraefte/AGENTS.md`         | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server                         |

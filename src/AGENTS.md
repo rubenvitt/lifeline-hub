@@ -246,10 +246,6 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   Cursor falsch.
 - **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`,
   `…/schaeden/auswahl`), nicht die Vollliste.
-- **Das Presse-Log trennt nach Phase wie die Meldungen** (LFH-1075), Ordnung und Cursor über
-  `eingang_at`; offen ist nur `offen`. `…/medienkontakte/kennzahlen` trägt Zahlen und Namen der
-  Medien, nie Personenbezug. `art=` (kommagetrennt, nur mit `phase`) engt beide Phasen vor dem
-  `LIMIT` ein (LLH-1096, Kopffilter „Art“).
 - **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
   gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.
   `…/infotelefon` liefert immer eine Seite (`kommunikation::parse_page`, Cursor `eingang_at` + `id`),
@@ -564,8 +560,8 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Kopf. Herleitung: `openspec/changes/archive/2026-10-05-lfh-996-schwaerzung-clients-raeumen/design.md`.
 - **Personen-Scrub nur über `PERSONENBEZUEGE`** (`einsatz/schwaerzung_person.rs`): je
   Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
-  eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,
-  `infotelefon_anruf` oder `medienkontakt` braucht dort einen Eintrag (Guard
+  eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal` oder
+  `infotelefon_anruf` braucht dort einen Eintrag (Guard
   `jeder_personenverweis_ist_als_bezug_deklariert`); ein Datei-Linker an einer Person (Registry
   `ZeileLoeschen`) steht stattdessen in `PERSONENANHAENGE`, der Vollzug löscht seine Dateien
   (LFH-769). Freitexte, die eine Person nur erwähnen, bleiben bis zur Einsatz-Schwärzung.

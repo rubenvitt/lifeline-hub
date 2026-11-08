@@ -51,7 +51,7 @@ stehen in [Kapitel 4](04-loesungsstrategie.md).
 | Rolle | Erwartung an das System | Wo im Code oder in der Doku |
 | --- | --- | --- |
 | Einsatzleitung | Führt einen Einsatz, verwaltet seinen Zugriff, koppelt Geräte, schreibt in allen freigegebenen Modulen | `EinsatzRolle::Einsatzleitung` in `src/einsatz/mod.rs`; [`rechte-im-einsatz.md`](../anwender/kapitel/rechte-im-einsatz.md) |
-| Führungspersonal und Stab | Schreibt in den Modulen, arbeitet in den Sachgebieten S1 bis S6 | `EinsatzRolle::Fuehrungspersonal`; [`frontend/src/stab/AGENTS.md`](../../frontend/src/stab/AGENTS.md) |
+| Führungspersonal und Stab | Schreibt in den Modulen, arbeitet in den Sachgebieten S1 bis S6 | `EinsatzRolle::Fuehrungspersonal`; [`frontend/src/fuehrung/AGENTS.md`](../../frontend/src/fuehrung/AGENTS.md) |
 | Beobachter | Liest einen Einsatz mit, ohne zu schreiben | `EinsatzRolle::Beobachter` |
 | Führungskräfte der Organisation | Lesen Einsätze der Organisation ohne eigene Einsatzrolle mit | `OrgRolle::Fuehrungskraft` in `src/auth/mod.rs` |
 | Einsatzkräfte an gekoppelten Geräten | Bedienen an UHS, Betreuungsstelle, Bereitstellungsraum oder Abschnitt eine schmale, touchtaugliche Oberfläche ohne eigenes Konto; der Lagemonitor zeigt das Lagebild ohne Bedienung | Specs [`feldgeraet-bedienung`](../../openspec/specs/feldgeraet-bedienung/spec.md), [`lagemonitor`](../../openspec/specs/lagemonitor/spec.md); [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |

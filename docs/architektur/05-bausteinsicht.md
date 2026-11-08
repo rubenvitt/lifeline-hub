@@ -176,22 +176,20 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 
 ### Stab & Führung
 
-Regeln: [frontend/src/stab/AGENTS.md](../../frontend/src/stab/AGENTS.md),
+Regeln: [frontend/src/infotelefon/AGENTS.md](../../frontend/src/infotelefon/AGENTS.md),
 [frontend/src/fernmeldewesen/AGENTS.md](../../frontend/src/fernmeldewesen/AGENTS.md),
 [frontend/src/fuehrung/AGENTS.md](../../frontend/src/fuehrung/AGENTS.md),
 [frontend/src/lagebesprechung/AGENTS.md](../../frontend/src/lagebesprechung/AGENTS.md).
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/stab` | Besetzung S1–S6 und Checkliste | `…/{id}/stab`; Live `stab` |
 | `src/fernmeldewesen` | Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen | `…/{id}/stab/kommunikationsplan`, `…/{id}/stab/fernmeldeskizze`; Live `fernmeldewesen` |
 | `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels, Sachgebiete S1–S6 | `/api/fuehrungsfunktionen`, `/api/org-fuehrungsfunktionen/{funktion}` |
-| `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul neben dem Stab | `…/{id}/lagebesprechung[en]`; Live `lagebesprechung` |
+| `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul | `…/{id}/lagebesprechung[en]`; Live `lagebesprechung` |
 | `src/programmpunkt` | Programmpunkte der Veranstaltung (Ablauf), Quelle der nächsten Marken und des Lagemonitors | `…/{id}/programmpunkte`, Feld `programm` von `…/{id}/lagemonitor`; Live `einsatz` |
 | `src/lagebericht` | Lageberichte nach Vorlage (Registry synchron zu `frontend/src/lageberichte/vorlagen.ts`) | `…/{id}/lageberichte`; Live `lagebericht` |
-| `src/vorlagendokument` | Gemeinsamer Kern von Befehl, Lagebericht, Pressemitteilung: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht`, `src/presse` genutzt |
-| `src/presse` | Presse-Log und Pressemitteilungen S5 | `…/{id}/stab/medienkontakte`, `…/stab/pressemitteilungen`; Live `presse` |
-| `src/infotelefon` | Bürgertelefon S5: Anrufprotokoll mit Rückrufbedarf | `…/{id}/stab/infotelefon`; Live `infotelefon` |
+| `src/vorlagendokument` | Gemeinsamer Kern von Befehl und Lagebericht: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht` genutzt |
+| `src/infotelefon` | Bürgertelefon, eigenes Modul `infotelefon`: Anrufprotokoll mit Rückrufbedarf | `…/{id}/stab/infotelefon`; Live `infotelefon` |
 | `src/sprechgruppe` | TETRA-Sprechgruppen im Stamm und einsatzlokal, Zuordnung zu Zielen | `/api/sprechgruppen`, `…/{id}/sprechgruppen` |
 
 Die Führungsstelle eines Einsatzes liegt in `src/einsatz` (`fuehrungsstelle.rs`, Routen
@@ -370,15 +368,13 @@ flowchart TB
 
 | Pfad | Zweck | Gegenstück im Backend |
 | --- | --- | --- |
-| `frontend/src/stab` | Besetzung, Checkliste, Medienlage ([AGENTS.md](../../frontend/src/stab/AGENTS.md)) | `src/stab` |
 | `frontend/src/fernmeldewesen` | Funkplan, Skizze, Sprechgruppen, Kommunikationsplan ([AGENTS.md](../../frontend/src/fernmeldewesen/AGENTS.md)) | `src/fernmeldewesen`, `src/sprechgruppe` |
 | `frontend/src/fuehrung` | Auswahl von Führungsfunktionen und Empfängern ([AGENTS.md](../../frontend/src/fuehrung/AGENTS.md)) | `src/fuehrung` |
 | `frontend/src/lagebesprechung` | Termin, Vorbereitung, Abschluss, Verlauf ([AGENTS.md](../../frontend/src/lagebesprechung/AGENTS.md)) | `src/lagebesprechung` |
 | `frontend/src/programmpunkt` | Paneel „Ablauf“ der Einsatzdaten, anstehende Programmpunkte | `src/programmpunkt` |
 | `frontend/src/lageberichte` | Lageberichte mit Übernahmen aus der Lage | `src/lagebericht` |
 | `frontend/src/entwurf` | Gegliederte Dokumente `DokumentEntwurf`, Freigabe, Anlagen, Verteiler ([AGENTS.md](../../frontend/src/entwurf/AGENTS.md)) | `src/vorlagendokument` |
-| `frontend/src/presse` | Presse-Labels und -Vorlagen | `src/presse` |
-| `frontend/src/infotelefon` | Anruferfassung | `src/infotelefon` |
+| `frontend/src/infotelefon` | Anruferfassung ([AGENTS.md](../../frontend/src/infotelefon/AGENTS.md)) | `src/infotelefon` |
 | `frontend/src/dokumente` | Dokument ablegen und bearbeiten | `src/dokument` |
 
 ### Geräte, Verwaltung und Archiv

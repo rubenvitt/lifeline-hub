@@ -6,10 +6,10 @@ Server-Gegenstück `src/lagebesprechung/`, `src/routes/lagebesprechung.rs`; erg�
 
 **Eigenes Modul** (LLH-1111,
 `openspec/changes/archive/2026-10-13-llj8s2rt-lagebesprechung-eigenes-modul/design.md`): Key
-`lagebesprechung` unter Führung, eigene Freigabe, eigenes Live-Ereignis `lagebesprechung` (Gate nur dieses Modul,
-nie `stab`). Die Stab-Freigabe wirkt hier nirgends — weder auf Seite, Einstiege, Endpunkte noch
-auf Zeilen der Vorbereitung. Stab-Seite, Überblick-Marke und Palette-Schnellaktion sind nur
-Einstiege und prüfen `istSprungGesperrt('lagebesprechung')`.
+`lagebesprechung` unter Führung, eigene Freigabe, eigenes Live-Ereignis `lagebesprechung` (Gate nur dieses Modul).
+Überblick-Marke und Palette-Schnellaktion sind nur Einstiege und prüfen
+`istSprungGesperrt('lagebesprechung')`; die alte Adresse `…/stab` führt in den Einsatz (i6k6mzed,
+design.md D8).
 
 **Ein Termin, ein Schreibweg** (LLH-1111, D3): Wahrheit ist die Spalte
 `einsatz.naechste_lagebesprechung_at`; der Einsatzkopf liest sie für alle Mitglieder (LFH-555).

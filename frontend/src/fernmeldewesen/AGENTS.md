@@ -6,7 +6,7 @@ Gilt für `frontend/src/fernmeldewesen/`, `pages/FunkplanPage.tsx`, `pages/Kommu
 
 **Fernmeldewesen** (LLH-1180, `openspec/changes/archive/2026-10-13-nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
 Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
-Kommunikationsplan; die Dateien liegen unter `fernmeldewesen/` (umgezogen mit LLH-1602). **Die Stab-Freigabe wirkt dort nirgends.**
+Kommunikationsplan; die Dateien liegen unter `fernmeldewesen/` (umgezogen mit LLH-1602).
 Die Besetzung (Nebentext im Kommunikationsplan, Sachgebiete im Kasten „Einsatzleitung“) kommt aus
 den Mitgliedern (`GET …/mitglieder`, ohne eigenes Modulrecht, über
 `fuehrung/besetzungAusMitgliedern.ts`; i6k6mzed D7) und ist eine eigene Quelle mit Weiche
@@ -122,8 +122,8 @@ ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, st
 
 **Kommunikationsplan S6** (LFH-848,
 `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`): Unterroute
-`fernmeldewesen/kommunikationsplan` (`kommunikationsplanPfad`), Reiter des Moduls und zweiter
-S6-Eintrag in `stab/unterseiten.ts`, `useModulFreigabe('fernmeldewesen')` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
+`fernmeldewesen/kommunikationsplan` (`kommunikationsplanPfad`), Reiter des Moduls,
+`useModulFreigabe('fernmeldewesen')` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
 dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/fernmeldewesen/kommunikation.rs`,
 zwei Tabellen, eine Funktion je Einsatz, FHP/FB je Bezeichnung); **Abschnitte und Einheiten werden
 abgeleitet** (alle `verbindungen` des Datensatzes, LLH-1134; Zeile führt zum Datensatz, keine zweite
