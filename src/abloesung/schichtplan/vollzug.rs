@@ -1201,13 +1201,19 @@ async fn uhs_zuruecknehmen_tx(
     wirkung: &mut WechselWirkung,
 ) -> Result<Vec<String>, AppError> {
     use crate::zeitachse::repo::{streiche_tx, Kraft};
+    // Wer in einem späteren, nicht zurückgenommenen UHS-Wechsel steht, trägt dessen Stand, nicht
+    // mehr den dieses Wechsels (auch nach A → B → A): ihn lässt die Rücknahme ganz aus.
     // Das Eintreffen eines Kommenden nur, solange er noch hier steht: ist er weitergewechselt,
     // trägt der spätere Wechsel seine Periode (er legt kein zweites Eintreffen an).
     let ereignisse: Vec<(i64, i64, String)> = sqlx::query_as(
         "SELECT w.einsatz_personal_id, z.id, p.snap_name FROM einsatz_plan_wechsel_person w \
          JOIN einsatz_kraft_zeitachse z ON z.id = w.zeitachse_id AND z.gestrichen_at IS NULL \
          JOIN einsatz_personal p ON p.id = w.einsatz_personal_id \
-         WHERE w.wechsel_id = ?1 AND (w.rolle <> 'neu' OR p.uhs_id = ?2) ORDER BY w.rowid",
+         WHERE w.wechsel_id = ?1 AND (w.rolle <> 'neu' OR p.uhs_id = ?2) \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_plan_wechsel_person s \
+                       JOIN einsatz_plan_wechsel sw ON sw.id = s.wechsel_id \
+                       WHERE s.einsatz_personal_id = w.einsatz_personal_id AND sw.id > ?1 \
+                         AND sw.art = 'uhs' AND sw.zurueckgenommen_at IS NULL) ORDER BY w.rowid",
     )
     .bind(wid)
     .bind(uhs_id)
@@ -1242,6 +1248,10 @@ async fn uhs_zuruecknehmen_tx(
          WHERE uhs_id = ?2 AND beendet_at IS NULL \
            AND id IN (SELECT einsatz_personal_id FROM einsatz_plan_wechsel_person \
                       WHERE wechsel_id = ?1 AND rolle = 'neu') \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_plan_wechsel_person s \
+                       JOIN einsatz_plan_wechsel sw ON sw.id = s.wechsel_id \
+                       WHERE s.einsatz_personal_id = einsatz_personal.id AND sw.id > ?1 \
+                         AND sw.art = 'uhs' AND sw.zurueckgenommen_at IS NULL) \
          RETURNING id, uhs_id",
     )
     .bind(wid)
@@ -1254,6 +1264,10 @@ async fn uhs_zuruecknehmen_tx(
          WHERE uhs_id IS NULL AND beendet_at IS NULL \
            AND id IN (SELECT einsatz_personal_id FROM einsatz_plan_wechsel_person \
                       WHERE wechsel_id = ?1 AND rolle = 'alt') \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_plan_wechsel_person s \
+                       JOIN einsatz_plan_wechsel sw ON sw.id = s.wechsel_id \
+                       WHERE s.einsatz_personal_id = einsatz_personal.id AND sw.id > ?1 \
+                         AND sw.art = 'uhs' AND sw.zurueckgenommen_at IS NULL) \
          RETURNING id",
     )
     .bind(wid)

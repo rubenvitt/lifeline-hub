@@ -365,7 +365,7 @@ Pause beendet oder ihr Beginn zurückgenommen ist.
 Jeder Block wechselt einmal je Art: an der UHS einmal, in der Pause einmal zum Beginn und einmal
 zum Ende. Ist ein Wechsel zurückgenommen, lässt sich dieselbe Art erneut vollziehen. Die Rücknahme legt nur zurück, was noch so steht, wie der Wechsel es hinterließ; den
 Beginn einer Pause erst, wenn ihr Ende zurückgenommen ist. Ist der Pausenblock gelöscht oder in
-eine andere Zeile geschoben, lassen sich seine Wechsel nicht mehr zurücknehmen. Wer erst mit dem Wechsel in den
+eine andere Zeile geschoben, lassen sich seine Wechsel nicht mehr zurücknehmen. Wer seither an einer UHS erneut gewechselt hat, bleibt bei der Rücknahme, wo er ist. Wer erst mit dem Wechsel in den
 Einsatz kam, bleibt im Einsatz. Jeder Wechsel und jede Rücknahme steht im Einsatztagebuch, etwa
 „Wechsel UHS «Markt»: Geht «Anna». Kommt «Ben». Bleibt «Dana».“
 

@@ -893,3 +893,98 @@ async fn weitergewechselt_behaelt_eintreffen() {
         .await
         .contains(&ereignis("eintreffen", "abloesung", false)));
 }
+
+#[tokio::test]
+async fn zurueck_an_die_erste_uhs_behaelt_zuordnung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let markt = uhs_anlegen(&app, &admin, e, "Markt").await;
+    let bahnhof = uhs_anlegen(&app, &admin, e, "Bahnhof").await;
+    let ben = stammpersonal_anlegen(&app, &admin, "Ben").await;
+    let b1 = block(
+        &app,
+        &admin,
+        e,
+        json!({"art": "uhs", "uhs_id": markt}),
+        json!([{"art": "stamm", "personal_id": ben}]),
+    )
+    .await;
+    let w1 = vollziehen(
+        &app,
+        &admin,
+        e,
+        b1,
+        json!({"art": "uhs", "kommen": [{"art": "stamm", "personal_id": ben}]}),
+    )
+    .await;
+    let ben_ep = kraft_von_stamm(&app, &admin, e, ben).await.unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    assert_eq!(kraft(&app, &admin, e, ben_ep).await["uhs_id"], markt);
+
+    let (s, p) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/bloecke", plan(e)),
+        &admin,
+        Some(&json!({"posten": {"art": "uhs", "uhs_id": bahnhof},
+                     "von": "2026-11-14 22:00:00", "bis": "2026-11-15 02:00:00",
+                     "personen": [{"art": "stamm", "personal_id": ben}]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let b2 = p["bloecke"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["posten"]["uhs_id"] == bahnhof)
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    vollziehen(
+        &app,
+        &admin,
+        e,
+        b2,
+        json!({"art": "uhs", "kommen": [{"art": "stamm", "personal_id": ben}]}),
+    )
+    .await;
+    assert_eq!(kraft(&app, &admin, e, ben_ep).await["uhs_id"], bahnhof);
+
+    let (s, p) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/bloecke", plan(e)),
+        &admin,
+        Some(&json!({"posten": {"art": "uhs", "uhs_id": markt},
+                     "von": "2026-11-15 02:00:00", "bis": "2026-11-15 06:00:00",
+                     "personen": [{"art": "stamm", "personal_id": ben}]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let b3 = p["bloecke"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["posten"]["uhs_id"] == markt && b["id"] != b1)
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    vollziehen(
+        &app,
+        &admin,
+        e,
+        b3,
+        json!({"art": "uhs", "kommen": [{"art": "stamm", "personal_id": ben}]}),
+    )
+    .await;
+    assert_eq!(kraft(&app, &admin, e, ben_ep).await["uhs_id"], markt);
+
+    // Die Zuordnung an „Markt“ stammt jetzt aus dem dritten Wechsel, nicht mehr aus dem ersten.
+    zuruecknehmen(&app, &admin, e, w1["id"].as_i64().unwrap()).await;
+    assert_eq!(kraft(&app, &admin, e, ben_ep).await["uhs_id"], markt);
+    assert!(zeitachse(&pool, ben_ep)
+        .await
+        .contains(&ereignis("eintreffen", "abloesung", false)));
+}

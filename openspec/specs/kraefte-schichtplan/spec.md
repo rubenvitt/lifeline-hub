@@ -152,7 +152,8 @@ ETB-Eintrag schreiben. Den Beginn einer Pause MUST sie erst nach Rücknahme ihre
 (409). Danach lässt sich der Wechsel erneut vollziehen. Einen Pausenblock mit begonnener, nicht
 beendeter Pause MUST das System weder löschen noch aus der Zeile „Pause“ verschieben (409). Ist der
 Pausenblock gelöscht oder nicht mehr in der Zeile „Pause“, MUST die Rücknahme seiner Wechsel 409
-sein.
+sein. Eine Kraft, die in einem späteren, nicht zurückgenommenen Wechsel an einer UHS
+steht, MUST die Rücknahme an der UHS auslassen.
 
 ### Requirement: Austauschformat
 Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,
