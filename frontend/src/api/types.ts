@@ -879,8 +879,8 @@ export type SchichtplanImportZaehlung = S['ImportZaehlung'];
 export type SchichtplanImportPosten = S['VorschauPosten'];
 export type SchichtplanImportPerson = S['VorschauPerson'];
 export type SchichtplanImportMeldung = S['ImportMeldung'];
-export type SchichtplanImportPostenZiel = S['PostenZiel'];
-export type SchichtplanImportPersonZiel = S['PersonZiel'];
+export type SchichtplanImportPostenZiel = S['VorschauPosten']['ziel'];
+export type SchichtplanImportPersonZiel = S['VorschauPerson']['ziel'];
 export type SchichtplanImportTreffer = S['Treffer'];
 
 /** Kein Backend-Schema: Wahl eines Postens beim Einlesen (`uebernahme::PostenEntscheidung`). */

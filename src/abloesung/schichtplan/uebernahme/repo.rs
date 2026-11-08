@@ -1306,7 +1306,7 @@ pub async fn schreiben_tx(
                     None => {
                         sqlx::query_scalar::<_, i64>(
                             "SELECT COALESCE(MAX(sortier), 0) + 1 FROM einsatz_einheit \
-                             WHERE einsatz_id = ?",
+                             WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
                         )
                         .bind(einsatz_id)
                         .fetch_one(&mut *conn)
@@ -1698,7 +1698,7 @@ mod tests {
             nachname: nachname.into(),
             vorname: Some(vorname.into()),
             kennung: kennung.map(Into::into),
-            herkunft: kennung.map(|_| "HiOrg".into()),
+            herkunft: kennung.map(|_| "Helferplanung".into()),
             zeilen: vec![2],
             ..Default::default()
         })

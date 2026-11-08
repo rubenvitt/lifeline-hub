@@ -14363,71 +14363,6 @@
           }
         }
       },
-      "PersonZiel": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "personal_id",
-              "name",
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "stamm"
-                ]
-              },
-              "name": {
-                "type": "string"
-              },
-              "personal_id": {
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "helfer_id",
-              "name",
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "helfer"
-                ]
-              },
-              "helfer_id": {
-                "type": "integer",
-                "format": "int64"
-              },
-              "name": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "neu"
-                ]
-              }
-            }
-          }
-        ],
-        "description": "Ziel einer Person in der Vorschau."
-      },
       "PersonalAnzeige": {
         "type": "object",
         "description": "Öffentliche Personal-Darstellung (ohne `org_id`), inkl. aufgelöster Qualifikationen.",
@@ -14733,7 +14668,7 @@
               "string",
               "null"
             ],
-            "description": "Herkunft der Kennung, etwa `HiOrg`."
+            "description": "Herkunft der Kennung: freier Name der Quelle."
           },
           "id": {
             "type": "integer",
@@ -14744,7 +14679,7 @@
               "string",
               "null"
             ],
-            "description": "Kennung aus einer Schichtplan-Datei oder der Vorplanung, etwa die HiOrg-ID (LLH-1556);\nnur lesend."
+            "description": "Kennung aus einer Schichtplan-Datei oder der Vorplanung, eine externe Kennung (LLH-1556);\nnur lesend."
           },
           "name": {
             "type": "string"
@@ -14978,92 +14913,6 @@
           "uhs",
           "pause"
         ]
-      },
-      "PostenZiel": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "einheit_id",
-              "bezeichnung",
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "einheit"
-                ]
-              },
-              "bezeichnung": {
-                "type": "string"
-              },
-              "einheit_id": {
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "uhs_id",
-              "bezeichnung",
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "uhs"
-                ]
-              },
-              "bezeichnung": {
-                "type": "string"
-              },
-              "uhs_id": {
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "neu"
-                ]
-              },
-              "einheit_vorlage_id": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "format": "int64"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "art"
-            ],
-            "properties": {
-              "art": {
-                "type": "string",
-                "enum": [
-                  "pause"
-                ]
-              }
-            }
-          }
-        ],
-        "description": "Ziel eines Postens in der Vorschau."
       },
       "PressemitteilungAbschnitt": {
         "type": "object",
@@ -19118,7 +18967,69 @@
           "kandidaten": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PersonZiel"
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "personal_id",
+                    "name",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "stamm"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "personal_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "helfer_id",
+                    "name",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "helfer"
+                      ]
+                    },
+                    "helfer_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "neu"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "description": "Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`]."
             },
             "description": "Gefundene Kandidaten, aus denen gewählt werden kann (ohne „neu“)."
           },
@@ -19152,7 +19063,69 @@
             }
           },
           "ziel": {
-            "$ref": "#/components/schemas/PersonZiel"
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "personal_id",
+                  "name",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "stamm"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "personal_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "helfer_id",
+                  "name",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "helfer"
+                    ]
+                  },
+                  "helfer_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "neu"
+                    ]
+                  }
+                }
+              }
+            ],
+            "description": "Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`]."
           }
         }
       },
@@ -19275,7 +19248,90 @@
           "kandidaten": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PostenZiel"
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "einheit_id",
+                    "bezeichnung",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "einheit"
+                      ]
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "einheit_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "uhs_id",
+                    "bezeichnung",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "uhs"
+                      ]
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "uhs_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "neu"
+                      ]
+                    },
+                    "einheit_vorlage_id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "pause"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "description": "Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit\nDaten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`)."
             },
             "description": "Weitere gleich gute Kandidaten (Einheiten bzw. UHS), wenn der Treffer unsicher ist."
           },
@@ -19297,7 +19353,90 @@
             }
           },
           "ziel": {
-            "$ref": "#/components/schemas/PostenZiel"
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "einheit_id",
+                  "bezeichnung",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "einheit"
+                    ]
+                  },
+                  "bezeichnung": {
+                    "type": "string"
+                  },
+                  "einheit_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "uhs_id",
+                  "bezeichnung",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "uhs"
+                    ]
+                  },
+                  "bezeichnung": {
+                    "type": "string"
+                  },
+                  "uhs_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "neu"
+                    ]
+                  },
+                  "einheit_vorlage_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "pause"
+                    ]
+                  }
+                }
+              }
+            ],
+            "description": "Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit\nDaten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`)."
           }
         }
       },

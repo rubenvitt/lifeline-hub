@@ -355,11 +355,11 @@ pub struct PlanHelferAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub organisation: Option<String>,
     pub qualifikationen: Vec<i64>,
-    /// Kennung aus einer Schichtplan-Datei oder der Vorplanung, etwa die HiOrg-ID (LLH-1556);
+    /// Kennung aus einer Schichtplan-Datei oder der Vorplanung, eine externe Kennung (LLH-1556);
     /// nur lesend.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kennung: Option<String>,
-    /// Herkunft der Kennung, etwa `HiOrg`.
+    /// Herkunft der Kennung: freier Name der Quelle.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub herkunft: Option<String>,
 }

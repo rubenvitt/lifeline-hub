@@ -364,7 +364,7 @@ impl Spalte {
             "telefon" | "tel" | "handy" | "mobil" => Spalte::Telefon,
             "organisation" | "gliederung" => Spalte::Organisation,
             "qualifikationen" | "qualifikation" => Spalte::Qualifikationen,
-            "kennung" | "id" | "hiorgid" => Spalte::Kennung,
+            "kennung" | "id" => Spalte::Kennung,
             "herkunft" | "quelle" => Spalte::Herkunft,
             _ => return None,
         })
@@ -1031,9 +1031,9 @@ mod tests {
     #[test]
     fn pause_ohne_posten_und_person_ueber_kennung_zusammengefasst() {
         let text = "Posten;Posten-Art;Beginn;Ende;Nachname;Vorname;Telefon;Kennung;Herkunft\n\
-            ;Pause;2026-08-15 16:00;2026-08-15 16:30;Neu;Nina;;4711;HiOrg\n\
-            Streife 2;;2026-08-15 16:30;2026-08-15 18:30;Neu;Nina;0170 9;4711;hiorg\n\
-            Pause;;2026-08-15 18:30;2026-08-15 19:00;Neu;Nina;;4711;HiOrg\n";
+            ;Pause;2026-08-15 16:00;2026-08-15 16:30;Neu;Nina;;4711;Helferplanung\n\
+            Streife 2;;2026-08-15 16:30;2026-08-15 18:30;Neu;Nina;0170 9;4711;helferplanung\n\
+            Pause;;2026-08-15 18:30;2026-08-15 19:00;Neu;Nina;;4711;Helferplanung\n";
         let (p, m) = csv(text);
         assert!(fehler(&m).is_empty(), "{m:?}");
         assert_eq!(p.posten.len(), 2);

@@ -1389,7 +1389,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("telefon", Strategie::NullSetzen, Z_EINSATZ),
             scrub("organisation", Strategie::NullSetzen, Z_EINSATZ),
             retain("qualifikationen", G_KONFIG),
-            // Kennung (etwa die HiOrg-ID) und ihre Herkunft aus dem Einlesen (LLH-1556, Mig 0292)
+            // Externe Kennung und ihre Herkunft aus dem Einlesen (LLH-1556, Mig 0292)
             // führen zur Person zurück.
             scrub("kennung", Strategie::NullSetzen, Z_EINSATZ),
             scrub("herkunft", Strategie::NullSetzen, Z_EINSATZ),

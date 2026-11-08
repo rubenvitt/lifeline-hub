@@ -1115,6 +1115,37 @@ fn schichtplan_wire() {
         Verfuegbar => "verfuegbar",
         Abweichung => "abweichung",
     } in lifeline_hub::abloesung::schichtplan::PlanBefundArt::ALLE);
+    // LLH-1556: Schichtplan-Datei einlesen.
+    enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::PaketPostenArt {
+        Einheit => "einheit",
+        Fahrzeug => "fahrzeug",
+        Uhs => "uhs",
+        Pause => "pause",
+    });
+    enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::MeldungStufe {
+        Fehler => "fehler",
+        Hinweis => "hinweis",
+    });
+    enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::Treffer {
+        Sicher => "sicher",
+        Unsicher => "unsicher",
+        Neu => "neu",
+    });
+    enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::TrefferGrund {
+        Kennung => "kennung",
+        KennungName => "kennung_name",
+        KennungOhneName => "kennung_ohne_name",
+        NameTelefon => "name_telefon",
+        Name => "name",
+        Bezug => "bezug",
+        Wahl => "wahl",
+    });
+    enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::BlockZustand {
+        Neu => "neu",
+        Ergaenzt => "ergaenzt",
+        Unveraendert => "unveraendert",
+        Fehler => "fehler",
+    });
 }
 
 #[test]

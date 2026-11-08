@@ -5813,23 +5813,6 @@ export interface components {
             kennung: string;
             person_status?: components["schemas"]["PersonStatus"] | null;
         };
-        /** @description Ziel einer Person in der Vorschau. */
-        PersonZiel: {
-            /** @enum {string} */
-            art: "stamm";
-            name: string;
-            /** Format: int64 */
-            personal_id: number;
-        } | {
-            /** @enum {string} */
-            art: "helfer";
-            /** Format: int64 */
-            helfer_id: number;
-            name: string;
-        } | {
-            /** @enum {string} */
-            art: "neu";
-        };
         /** @description Öffentliche Personal-Darstellung (ohne `org_id`), inkl. aufgelöster Qualifikationen. */
         PersonalAnzeige: {
             angelegt_at: string;
@@ -5935,12 +5918,12 @@ export interface components {
         };
         /** @description Ein Helfer des Plans. */
         PlanHelferAnzeige: {
-            /** @description Herkunft der Kennung, etwa `HiOrg`. */
+            /** @description Herkunft der Kennung: freier Name der Quelle. */
             herkunft?: string | null;
             /** Format: int64 */
             id: number;
             /**
-             * @description Kennung aus einer Schichtplan-Datei oder der Vorplanung, etwa die HiOrg-ID (LLH-1556);
+             * @description Kennung aus einer Schichtplan-Datei oder der Vorplanung, eine externe Kennung (LLH-1556);
              *     nur lesend.
              */
             kennung?: string | null;
@@ -6024,28 +6007,6 @@ export interface components {
          * @enum {string}
          */
         PostenArt: "einheit" | "uhs" | "pause";
-        /** @description Ziel eines Postens in der Vorschau. */
-        PostenZiel: {
-            /** @enum {string} */
-            art: "einheit";
-            bezeichnung: string;
-            /** Format: int64 */
-            einheit_id: number;
-        } | {
-            /** @enum {string} */
-            art: "uhs";
-            bezeichnung: string;
-            /** Format: int64 */
-            uhs_id: number;
-        } | {
-            /** @enum {string} */
-            art: "neu";
-            /** Format: int64 */
-            einheit_vorlage_id?: number | null;
-        } | {
-            /** @enum {string} */
-            art: "pause";
-        };
         /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
         PressemitteilungAbschnitt: {
             schluessel: string;
@@ -7620,14 +7581,45 @@ export interface components {
             grund?: components["schemas"]["TrefferGrund"] | null;
             herkunft?: string | null;
             /** @description Gefundene Kandidaten, aus denen gewählt werden kann (ohne „neu“). */
-            kandidaten: components["schemas"]["PersonZiel"][];
+            kandidaten: ({
+                /** @enum {string} */
+                art: "stamm";
+                name: string;
+                /** Format: int64 */
+                personal_id: number;
+            } | {
+                /** @enum {string} */
+                art: "helfer";
+                /** Format: int64 */
+                helfer_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+            })[];
             kennung?: string | null;
             name: string;
             schluessel: string;
             telefon?: string | null;
             treffer: components["schemas"]["Treffer"];
             zeilen: number[];
-            ziel: components["schemas"]["PersonZiel"];
+            /** @description Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`]. */
+            ziel: {
+                /** @enum {string} */
+                art: "stamm";
+                name: string;
+                /** Format: int64 */
+                personal_id: number;
+            } | {
+                /** @enum {string} */
+                art: "helfer";
+                /** Format: int64 */
+                helfer_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+            };
         };
         /** @description Eine Person der Stammbesetzung und ihr Zustand im Einsatz. */
         VorschauPersonal: {
@@ -7674,12 +7666,56 @@ export interface components {
             /** Format: int64 */
             bloecke: number;
             /** @description Weitere gleich gute Kandidaten (Einheiten bzw. UHS), wenn der Treffer unsicher ist. */
-            kandidaten: components["schemas"]["PostenZiel"][];
+            kandidaten: ({
+                /** @enum {string} */
+                art: "einheit";
+                bezeichnung: string;
+                /** Format: int64 */
+                einheit_id: number;
+            } | {
+                /** @enum {string} */
+                art: "uhs";
+                bezeichnung: string;
+                /** Format: int64 */
+                uhs_id: number;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+                /** Format: int64 */
+                einheit_vorlage_id?: number | null;
+            } | {
+                /** @enum {string} */
+                art: "pause";
+            })[];
             name: string;
             schluessel: string;
             treffer: components["schemas"]["Treffer"];
             zeilen: number[];
-            ziel: components["schemas"]["PostenZiel"];
+            /**
+             * @description Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit
+             *     Daten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`).
+             */
+            ziel: {
+                /** @enum {string} */
+                art: "einheit";
+                bezeichnung: string;
+                /** Format: int64 */
+                einheit_id: number;
+            } | {
+                /** @enum {string} */
+                art: "uhs";
+                bezeichnung: string;
+                /** Format: int64 */
+                uhs_id: number;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+                /** Format: int64 */
+                einheit_vorlage_id?: number | null;
+            } | {
+                /** @enum {string} */
+                art: "pause";
+            };
         };
         /**
          * @description Zustand einer Kraft der Vorlage im Einsatz (D4). Wire == `as_str()`.

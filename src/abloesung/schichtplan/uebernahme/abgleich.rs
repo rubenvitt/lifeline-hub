@@ -425,10 +425,10 @@ mod tests {
     fn kennung_und_herkunft_treffen_den_helfer() {
         let mut a = angabe("Neu", Some("Nina"));
         a.kennung = Some("4711".into());
-        a.herkunft = Some("hiorg".into());
+        a.herkunft = Some("helferplanung".into());
         let h = [
             helfer(1, "Nina Neu", Some("4711"), Some("vorplanung")),
-            helfer(2, "Nina Neu", Some("4711"), Some("HiOrg")),
+            helfer(2, "Nina Neu", Some("4711"), Some("Helferplanung")),
         ];
         let v = person_vorschlag(&a, &[], &h);
         assert_eq!(
@@ -490,10 +490,10 @@ mod tests {
 
     #[test]
     fn unbekannt_ist_neu_und_andere_kennung_ist_andere_person() {
-        let h = [helfer(3, "Nina Neu", Some("1"), Some("HiOrg"))];
+        let h = [helfer(3, "Nina Neu", Some("1"), Some("Helferplanung"))];
         let mut a = angabe("Neu", Some("Nina"));
         a.kennung = Some("2".into());
-        a.herkunft = Some("HiOrg".into());
+        a.herkunft = Some("Helferplanung".into());
         let v = person_vorschlag(&a, &[], &h);
         assert_eq!((v.ziel, v.treffer), (PersonZiel::Neu, Treffer::Neu));
     }

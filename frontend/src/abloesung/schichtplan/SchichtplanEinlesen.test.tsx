@@ -52,7 +52,7 @@ function vorschau(teil: Partial<SchichtplanImportVorschau> = {}): SchichtplanImp
         schluessel: 'm1',
         name: 'Jonas Fiktiv',
         kennung: '10231',
-        herkunft: 'HiOrg',
+        herkunft: 'Helferplanung',
         ziel: { art: 'neu' },
         treffer: 'neu',
         kandidaten: [],
@@ -123,7 +123,7 @@ describe('SchichtplanEinlesen', () => {
     expect(vorschauApi).toHaveBeenCalledWith(7, datei, { posten: {}, personen: {} });
     expect(within(dialog).getByText('Streife 3')).toBeInTheDocument();
     expect(within(dialog).getByText('Jonas Fiktiv')).toBeInTheDocument();
-    expect(within(dialog).getByText(/HiOrg 10231/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Helferplanung 10231/)).toBeInTheDocument();
     expect(within(dialog).getByText('plan.csv')).toBeInTheDocument();
 
     await waehle('Ziel für Streife 3', 'Streife 1');

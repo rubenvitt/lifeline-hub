@@ -548,7 +548,7 @@ Person in einer Schicht. Zeilen mit gleichem Posten, Beginn und Ende bilden eine
 | Soll-Qualifikationen | nein | etwa „1 Notfallsanitäter, 2 Sanitäter“ |
 | Nachname, Vorname | nein | ohne Namen ein Block ohne Person |
 | Telefon, Organisation, Qualifikationen | nein | für neue Helfer; Qualifikationen durch Komma getrennt |
-| Kennung, Herkunft | nein | etwa die ID aus der Helferplanung und „HiOrg“ |
+| Kennung, Herkunft | nein | externe Kennung der Person und der Name ihrer Quelle, etwa „Helferplanung“ |
 
 Eine Zeit mit Versatz (`+02:00`) gilt, wie sie ist. Eine Zeit ohne Versatz und eine Datumszelle
 aus Excel gelten als Ortszeit in der Zone des Einsatzes; die Vorschau nennt das als Hinweis. In

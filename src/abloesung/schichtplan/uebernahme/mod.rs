@@ -37,10 +37,10 @@ pub const ZEILEN_MAX: usize = 5_000;
 /// Entpackte Größe aller Teile einer XLSX (400 darüber): schützt vor einer Zip-Bombe.
 pub const XLSX_ENTPACKT_MAX_BYTES: u64 = 64 * 1024 * 1024;
 
-/// Kennung einer Person, etwa die HiOrg-ID.
+/// Externe Kennung einer Person.
 pub const KENNUNG_MAX: usize = 100;
 
-/// Herkunft einer Kennung, etwa `HiOrg`.
+/// Herkunft einer Kennung: freier Name der Quelle.
 pub const HERKUNFT_MAX: usize = 100;
 
 /// Name eines Postens oder Abschnitts in der Datei.
@@ -300,7 +300,8 @@ wire_enum! {
     try_from = |s| format!("Ungültiger Grund: {s}");
 }
 
-/// Ziel eines Postens in der Vorschau.
+/// Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit
+/// Daten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(tag = "art", rename_all = "lowercase")]
 pub enum PostenZiel {
@@ -331,16 +332,18 @@ pub struct VorschauPosten {
     /// Der gefundene Abschnitt; bei einem neuen Posten liegt er dort.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    #[schema(inline)]
     pub ziel: PostenZiel,
     #[schema(value_type = Treffer)]
     pub treffer: Treffer,
     /// Weitere gleich gute Kandidaten (Einheiten bzw. UHS), wenn der Treffer unsicher ist.
+    #[schema(inline)]
     pub kandidaten: Vec<PostenZiel>,
     pub zeilen: Vec<u32>,
     pub bloecke: i64,
 }
 
-/// Ziel einer Person in der Vorschau.
+/// Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(tag = "art", rename_all = "lowercase")]
 pub enum PersonZiel {
@@ -360,6 +363,7 @@ pub struct VorschauPerson {
     pub kennung: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub herkunft: Option<String>,
+    #[schema(inline)]
     pub ziel: PersonZiel,
     #[schema(value_type = Treffer)]
     pub treffer: Treffer,
@@ -367,6 +371,7 @@ pub struct VorschauPerson {
     #[schema(value_type = Option<TrefferGrund>)]
     pub grund: Option<TrefferGrund>,
     /// Gefundene Kandidaten, aus denen gewählt werden kann (ohne „neu“).
+    #[schema(inline)]
     pub kandidaten: Vec<PersonZiel>,
     pub zeilen: Vec<u32>,
     /// In wie vielen Blöcken sie steht.

@@ -1,6 +1,6 @@
 -- LLH-1556 (Change `kwyb1rwb-schichtplan-datei-einlesen`): Kennung und Herkunft eines Helfers des
 -- Plans. Das Einlesen einer Schichtplan-Datei legt neue Personen als Helfer an und vermerkt, woher
--- sie kommen (etwa `HiOrg` mit der HiOrg-ID, die Vorplanung LLH-1561 mit `vorplanung` und der
+-- sie kommen (eine externe Kennung mit dem freien Namen ihrer Quelle, die Vorplanung LLH-1561 mit `vorplanung` und der
 -- Kennung ihres Helfers). Ein zweites Einlesen findet den Helfer über dieses Paar wieder und legt
 -- ihn nicht noch einmal an.
 --

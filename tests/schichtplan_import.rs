@@ -137,7 +137,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
         .find(|h| h["name"] == "Jonas Fiktiv")
         .unwrap_or_else(|| panic!("Helfer fehlt: {r}"));
     assert_eq!(jonas["kennung"], "10231");
-    assert_eq!(jonas["herkunft"], "HiOrg");
+    assert_eq!(jonas["herkunft"], "Helferplanung");
     assert_eq!(jonas["organisation"], "DRK Nachbarstadt");
     let uhs = r["plan"]["bloecke"]
         .as_array()
