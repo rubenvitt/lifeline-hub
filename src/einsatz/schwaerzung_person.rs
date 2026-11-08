@@ -404,6 +404,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("einsatz_personal_id"),
         spalten: &[],
     },
+    // Ein Helfer des Plans, als Kraft in den Einsatz übernommen (LLH-1555): dieselbe Person,
+    // also gehen Name, Telefon und Organisation mit ihr.
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_plan_helfer",
+        bezug: Bezug::Spalte("einsatz_personal_id"),
+        spalten: &[("name", Mit), ("telefon", Mit), ("organisation", Mit)],
+    },
     // Letzte Besetzung einer aufgelösten Einheit (LLH-1266): nur Verweise, nichts zu entfernen;
     // der Name geht mit `einsatz_personal`.
     PersonenBezug {

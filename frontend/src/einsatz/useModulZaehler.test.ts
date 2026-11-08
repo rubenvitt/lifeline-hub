@@ -110,6 +110,7 @@ describe('Modul-Zähler', () => {
       beginn_quelle: 'hand' as const,
       abschnitt_uebergeben: false,
       planung_warnungen: [],
+      faellig_laut_plan: false,
       angelegt_at: '2026-09-22 09:00:00',
     });
     expect(

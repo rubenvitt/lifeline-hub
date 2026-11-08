@@ -64,7 +64,9 @@ const nimmVollzugZurueck = vi.fn();
 const aendereSchicht = vi.fn();
 const setzeAbloesungVorgabe = vi.fn();
 const fetchEinsatzSchichtmodell = vi.fn();
+const ladePlanVorlage = vi.fn();
 vi.mock('../api/abloesungen', () => ({
+  ladePlanVorlage: (...a: unknown[]) => ladePlanVorlage(...a),
   fetchEinsatzSchichtmodell: (...a: unknown[]) => fetchEinsatzSchichtmodell(...a),
   listeAbloesungen: (...a: unknown[]) => listeAbloesungen(...a),
   listeAbloesungVorgaben: (...a: unknown[]) => listeAbloesungVorgaben(...a),
@@ -122,6 +124,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
+  faellig_laut_plan: false,
   angelegt_at: inMinuten(-300),
   ...over,
 });
@@ -525,6 +528,63 @@ describe('AbloesungPage (LFH-635)', () => {
       await screen.findByText('Besatzungswechsel vollzogen: Florian 1, neu Cora Neu'),
     ).toBeInTheDocument();
     expect(listeEinsatzPersonal).toHaveBeenCalledWith(1);
+  });
+
+  /** LLH-1555: Laut Plan holt der Vollzug die Vorlage des Servers und schickt sie ab. */
+  it('Vollzug laut Plan: Vorlage geladen, Art „Laut Plan“, POST mit Folgeblock', async () => {
+    const a = schicht({
+      id: 1,
+      faellig_at: inMinuten(10),
+      faellig_laut_plan: true,
+      plan_folgeblock: { id: 40, von: inMinuten(10), bis: inMinuten(130), personen: 1 },
+    });
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [a] : []),
+    );
+    listeEinsatzPersonal.mockResolvedValue([]);
+    ladePlanVorlage.mockResolvedValue({
+      folgeblock_id: 40,
+      wechsel_at: inMinuten(10),
+      kommen: [{ plan_helfer_id: 9, name: 'Cem', einheit_id: 11 }],
+      bleiben: [],
+      gehen: [{ personal_id: 20, name: 'Anna Alt' }],
+      fehlen: [],
+    });
+    vollzieheAbloesung.mockResolvedValue({
+      abgeloest: { ...a, status: 'abgeloest', art: 'besatzung', besatzung: [] },
+      folgeschichten: [],
+    });
+    renderPage();
+    expect(await screen.findByText(/^Laut Plan · danach /)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'Laut Plan' })).toBeChecked(),
+    );
+    expect(ladePlanVorlage).toHaveBeenCalledWith(1, 1);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(vollzieheAbloesung).toHaveBeenCalledWith(1, 1, {
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung: [],
+        uebernahme: [{ plan_helfer_id: 9 }],
+        plan_block_id: 40,
+      }),
+    );
+  });
+
+  it('Vollzug laut Plan ohne Freigabe Personal: keine Vorlage, der gewohnte Dialog', async () => {
+    freigaben.wert = freigabenFixture({ personal: { zugriff: false } });
+    const a = schicht({ id: 1, faellig_at: inMinuten(10), faellig_laut_plan: true });
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [a] : []),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('radio', { name: 'Laut Plan' })).toBeNull();
+    expect(ladePlanVorlage).not.toHaveBeenCalled();
   });
 
   it('Besatzungswechsel ohne Freigabe des Moduls Personal: gesperrt mit Grund, keine Anfrage', async () => {
