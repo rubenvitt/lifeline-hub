@@ -85,8 +85,8 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 6. Stab und Presse entfernen (D1, D4, D6, D8)
 
-- [ ] 6.1 Migration B „stab_presse_entfernen“ nach D4 (Ergebnis aus 1.1): Spalte `etb_eintrag.pressemitteilung_id` und die vier Tabellen löschen. Den Test aus 1.1 auf die echte Migration umstellen.
-- [ ] 6.2 Backend löschen bzw. bereinigen:
+- [x] 6.1 Migration B „stab_presse_entfernen“ nach D4 (Ergebnis aus 1.1): Spalte `etb_eintrag.pressemitteilung_id` und die vier Tabellen löschen. Den Test aus 1.1 auf die echte Migration umstellen.
+- [x] 6.2 Backend löschen bzw. bereinigen:
   - `src/stab/`, `src/presse/`, `routes/stab.rs` (Rest), `routes/presse.rs`, die Routen in `app.rs`
   - `api_doc.rs`
   - `LiveEvent::{Stab,Presse}`, `Betroffen.stab` in `einsatz_personal.rs`
@@ -98,15 +98,15 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
   - Tests `tests/{stab,stab_checkliste,stab_presse}.rs`, Medienkontakte in `eingabegrenzen_*`
 
   `cargo test` ist grün.
-- [ ] 6.3 Schwärzung und Aufbewahrung:
+- [x] 6.3 Schwärzung und Aufbewahrung:
   - Registry-Einträge der vier Tabellen und der Spalte entfernen
   - `PERSONENBEZUEGE` (Stabsfunktion, Medienkontakt) entfernen, ebenso `PersonenArt::Medienkontakt` und die Suche
   - `AUSNAHMEN_SYSTEM_ETB` in `tests/aufbewahrung_e2e.rs` bereinigen
   - Ein neues Ersuchen mit Ziel `medienkontakt` ergibt 422, ein altes bleibt lesbar (neuer Test in `tests/aufbewahrung*.rs`)
 
   Grün sind `jede_einsatz_scoped_spalte_ist_klassifiziert`, `keine_toten_registry_eintraege`, `entdeckte_tabellen_gleich_registry_tabellen` und `purge_scheduler`-Tests. Den Verweis in `src/einsatz/schwaerzung_person_tests.rs:521` auf die neue Requirement „Vollzug für eine Betroffene, externe Kraft oder anrufende Person“ umstellen.
-- [ ] 6.4 Typ-Codegen (Stab-, Checklisten-, Presse-Schemas entfallen, `LiveEvent` ohne `stab`/`presse`) mitcommittet. `tests/enum_wire_kontrakt.rs` und `liveEvent.contract.test.ts` sind grün.
-- [ ] 6.5 Frontend löschen:
+- [x] 6.4 Typ-Codegen (Stab-, Checklisten-, Presse-Schemas entfallen, `LiveEvent` ohne `stab`/`presse`) mitcommittet. `tests/enum_wire_kontrakt.rs` und `liveEvent.contract.test.ts` sind grün.
+- [x] 6.5 Frontend löschen:
   - `pages/{Stab,Presse,PressemitteilungDetail}Page*`, `presse/`, restliches `stab/`
   - `api/{stab,presse}.ts`, `test/presseAttrappe.ts`, `useStabFreigabe`
   - `lagebesprechung/LagebesprechungZeile*`
@@ -118,7 +118,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
   - `MEDIENLAGE_QUELLE` (der Abschnitt Medienlage bleibt)
 
   Vitest ist grün, auch `queryKeys.guard`, `lagebildOffline.guard`, `schnellaktionen.guard` und `designSystem.guard`. Ein Vitest belegt die Weiterleitung `…/stab/presse` → `/einsaetze/:id`.
-- [ ] 6.6 Tests, die `stab` nur als Beispielmodul nutzen, auf ein anderes ausblendbares Modul umstellen:
+- [x] 6.6 Tests, die `stab` nur als Beispielmodul nutzen, auf ein anderes ausblendbares Modul umstellen:
   - Backend: `tests/{org_einstellungen,einsatz_vorlage,modul_override,aufbewahrung_e2e}.rs`, `einsatz/berechtigung.rs`, `org/modul_einstellung.rs`, `auth/bootstrap.rs`
   - Frontend: `EinsatzModule`, `EinsatzDefaults`, `ModulEinstellungsListe`, `useModulFreigabe`, `ModulPanel`, `ModulAkkordeon`, `EinsatzLayout`, `UeberblickPage`, `EinsatzVorlage*`
 

@@ -174,6 +174,13 @@ Entscheidung Ruben, 08.11.2026. Neue Migrationen werden angehängt, Nummern grö
   in 0140 bleibt unverändert. Ein Ersuchen, das beim Update noch offen ist (24-Stunden-Fenster),
   gilt mit Migration B als vollzogen, weil sein Ziel dann gelöscht ist. Die Migration setzt es
   auf den Vollzugsstand, und der Verlauf nennt den Grund „Modul entfernt“.
+  - **Umsetzung (Aufgabe 6.1):** `schwaerzung_antrag` hat kein Feld für einen Grund (0140), und
+    ein ETB-Eintrag aus einer Migration hätte Nummernvergabe und Funktions-Snapshot an
+    `etb::repo::einfuegen` vorbei. Migration B setzt deshalb nur `vollzogen_at`; der Grund steht
+    im Kopf der Migration. Die Archivakte zeigt den Antrag als „vollzogen“ mit dem Zeitpunkt des
+    Updates. Trifft der Purge-Lauf doch auf ein offenes Ersuchen mit diesem Ziel, schwärzt er
+    nichts und schreibt den Grund „Modul Presse und Medienarbeit entfernt“ in den ETB-Eintrag
+    des Vollzugs (`aufbewahrung::antrag::vollziehen_ergebnis`).
 - **Datenverlust** ist gewollt. Was davon im ETB steht, bleibt als Text: Besetzungswechsel,
   freigegebene Pressemitteilungen, die Meldung an die Leitstelle aus der Checkliste.
 
