@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use super::plan::{
-    aus_einsatz, aus_planung, AusgabeKopf, AusgabePlan, EinsatzGliederung, QualiNamen, Quelle,
+    from_einsatz, from_planung, AusgabeKopf, AusgabePlan, EinsatzGliederung, QualiNamen, Quelle,
 };
 use crate::abloesung::schichtplan::repo as plan_repo;
 use crate::einsatz::Einsatz;
@@ -116,7 +116,7 @@ pub async fn einsatz(
         stand: zeit::parse_utc(jetzt)
             .ok_or_else(|| AppError::Internal(format!("Ungültige Zeit {jetzt}")))?,
     };
-    Ok(aus_einsatz(kopf, &plan, &gliederung, &quali))
+    Ok(from_einsatz(kopf, &plan, &gliederung, &quali))
 }
 
 /// Eine Planung der Organisation (fremd oder unbekannt 404).
@@ -141,7 +141,7 @@ pub async fn planung(
         stand: zeit::parse_utc(jetzt)
             .ok_or_else(|| AppError::Internal(format!("Ungültige Zeit {jetzt}")))?,
     };
-    Ok(aus_planung(kopf, &anzeige, &quali))
+    Ok(from_planung(kopf, &anzeige, &quali))
 }
 
 #[cfg(test)]

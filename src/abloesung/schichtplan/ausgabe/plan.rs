@@ -1,5 +1,5 @@
-//! Der fachneutrale Ausgabeplan und seine zwei Adapter (design.md D1): [`aus_einsatz`] aus dem
-//! Plan eines Einsatzes, [`aus_planung`] aus einer Vorplanung. Rein; die Daten lädt
+//! Der fachneutrale Ausgabeplan und seine zwei Adapter (design.md D1): [`from_einsatz`] aus dem
+//! Plan eines Einsatzes, [`from_planung`] aus einer Vorplanung. Rein; die Daten lädt
 //! [`super::repo`].
 
 use std::collections::{BTreeMap, HashMap};
@@ -147,7 +147,7 @@ pub struct AusgabePerson {
 }
 
 impl AusgabePerson {
-    pub fn ist_helfer(&self) -> bool {
+    pub fn is_helfer(&self) -> bool {
         matches!(
             self.art,
             AusgabePersonArt::Helfer | AusgabePersonArt::Planungshelfer
@@ -184,7 +184,7 @@ impl AusgabePerson {
             .as_deref()
             .filter(|o| !o.trim().is_empty())
         {
-            Some(o) if self.ist_helfer() => format!("{} ({o})", self.name),
+            Some(o) if self.is_helfer() => format!("{} ({o})", self.name),
             _ => self.name.clone(),
         }
     }
@@ -236,7 +236,7 @@ impl AusgabePlan {
         v
     }
 
-    fn ist_pause(&self, s: &AusgabeSchicht) -> bool {
+    fn is_pause(&self, s: &AusgabeSchicht) -> bool {
         self.posten_von(&s.posten)
             .is_none_or(|p| p.art == AusgabePostenArt::Pause)
     }
@@ -244,7 +244,7 @@ impl AusgabePlan {
     /// Besetzung über alle Schichten an Posten: (besetzte Plätze, Plätze nach Soll, offen).
     pub fn besetzung(&self) -> (i64, i64, i64) {
         let (mut ist, mut soll, mut offen) = (0, 0, 0);
-        for s in self.schichten.iter().filter(|s| !self.ist_pause(s)) {
+        for s in self.schichten.iter().filter(|s| !self.is_pause(s)) {
             let n = s.soll();
             soll += n;
             ist += (s.personen.len() as i64).min(n);
@@ -465,7 +465,7 @@ type PostenRang = (usize, u8, usize, String);
 
 /// Der Plan eines Einsatzes. Ohne Personen (`personen: null`, ohne Modul Personal) bleiben
 /// die Schichten ohne Namen.
-pub fn aus_einsatz(
+pub fn from_einsatz(
     kopf: AusgabeKopf,
     plan: &SchichtplanAnzeige,
     gliederung: &EinsatzGliederung,
@@ -664,7 +664,11 @@ pub fn aus_einsatz(
 
 /// Eine Vorplanung: Posten in ihrer Reihenfolge (`sortier`), die Pause zuletzt; Personen sind
 /// Stamm-Personal und Helfer der Planung.
-pub fn aus_planung(kopf: AusgabeKopf, planung: &PlanungAnzeige, quali: &QualiNamen) -> AusgabePlan {
+pub fn from_planung(
+    kopf: AusgabeKopf,
+    planung: &PlanungAnzeige,
+    quali: &QualiNamen,
+) -> AusgabePlan {
     let zone = kopf.zone;
     let schluessel_von = |posten_id: Option<i64>| match posten_id {
         Some(id) => format!("posten:{id}"),
@@ -931,7 +935,7 @@ pub(crate) mod tests {
             uhs: vec![(20, None)],
         };
         let quali = QualiNamen::from([(5, "Sanitäter".to_string())]);
-        aus_einsatz(kopf(), &plan, &gliederung, &quali)
+        from_einsatz(kopf(), &plan, &gliederung, &quali)
     }
 
     #[test]

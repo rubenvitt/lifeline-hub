@@ -3,7 +3,7 @@
 //!
 //! **Eine Form, zwei Quellen** (design.md D1): Der Plan eines Einsatzes und eine Vorplanung
 //! (`crate::planung`) werden zu demselben [`plan::AusgabePlan`]; daraus schreibt
-//! [`mappe::schreibe`] die Excel-Mappe. Der Druck im Browser arbeitet auf derselben Form
+//! [`mappe::write_mappe`] die Excel-Mappe. Der Druck im Browser arbeitet auf derselben Form
 //! (`frontend/src/abloesung/schichtplan/ausgabe/ausgabePlan.ts`).
 //!
 //! **Rundweg** (design.md D6): Das erste Blatt „Austausch“ hat das Format, das der Leser aus

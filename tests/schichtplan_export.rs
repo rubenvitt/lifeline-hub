@@ -26,7 +26,7 @@ fn pfad(einsatz: i64) -> String {
 }
 
 /// GET mit Bytes statt JSON.
-async fn laden(app: &axum::Router, uri: &str, cookie: &str) -> (StatusCode, String, Vec<u8>) {
+async fn load(app: &axum::Router, uri: &str, cookie: &str) -> (StatusCode, String, Vec<u8>) {
     let req = Request::builder()
         .method("GET")
         .uri(uri)
@@ -170,7 +170,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
     let anzahl = plan["bloecke"].as_array().unwrap().len();
     assert_eq!(anzahl, 12);
 
-    let (s, typ, mappe) = laden(&app, &format!("{}/export", pfad(e)), &admin).await;
+    let (s, typ, mappe) = load(&app, &format!("{}/export", pfad(e)), &admin).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(typ, XLSX_TYP);
     assert!(mappe.starts_with(b"PK\x03\x04"));
@@ -228,7 +228,7 @@ async fn planung_export_in_leeren_einsatz_und_zweiter_lauf() {
         .as_i64()
         .unwrap();
     let (_, planung) = anfrage(&app, "GET", &format!("/api/planungen/{p}"), &admin, None).await;
-    let (s, typ, mappe) = laden(&app, &format!("/api/planungen/{p}/export"), &admin).await;
+    let (s, typ, mappe) = load(&app, &format!("/api/planungen/{p}/export"), &admin).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(typ, XLSX_TYP);
 
@@ -286,7 +286,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let bert = login_cookie(&app, "bertram", "bertrampw1").await;
 
     // Lesen der Ablösung genügt, auch für den Beobachter.
-    let (s, typ, _) = laden(&app, &format!("{}/export", pfad(e)), &bert).await;
+    let (s, typ, _) = load(&app, &format!("{}/export", pfad(e)), &bert).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(typ, XLSX_TYP);
 
@@ -300,7 +300,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let (s, _, _) = laden(&app, &format!("{}/export", pfad(e)), &bert).await;
+    let (s, _, _) = load(&app, &format!("{}/export", pfad(e)), &bert).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     let (s, v) = anfrage(
         &app,
@@ -322,14 +322,14 @@ async fn rechte_und_abgeschlossener_einsatz() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let (s, _, _) = laden(&app, &format!("{}/export", pfad(e)), &admin).await;
+    let (s, _, _) = load(&app, &format!("{}/export", pfad(e)), &admin).await;
     assert_eq!(s, StatusCode::OK);
 
     // Planung: nur, wer planen darf; eine fremde ist 404.
     let (_, liste) = anfrage(&app, "GET", "/api/planungen", &admin, None).await;
     let p = liste[0]["id"].as_i64().unwrap();
-    let (s, _, _) = laden(&app, &format!("/api/planungen/{p}/export"), &bert).await;
+    let (s, _, _) = load(&app, &format!("/api/planungen/{p}/export"), &bert).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _, _) = laden(&app, "/api/planungen/999999/export", &admin).await;
+    let (s, _, _) = load(&app, "/api/planungen/999999/export", &admin).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }

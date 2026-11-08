@@ -134,6 +134,6 @@ const MAPPE_TIMEOUT_MS = 60_000;
  * Der Schichtplan als Excel-Mappe (LLH-1557): Austausch, Übersicht, Je Posten, Je Person,
  * Befunde. Ohne Freigabe des Moduls Personal 403. Der Server schickt keinen Dateinamen.
  */
-export function ladeSchichtplanMappe(einsatzId: number): Promise<Blob> {
+export function loadSchichtplanMappe(einsatzId: number): Promise<Blob> {
   return apiDatei(`${basis(einsatzId)}/export`, { timeoutMs: MAPPE_TIMEOUT_MS });
 }

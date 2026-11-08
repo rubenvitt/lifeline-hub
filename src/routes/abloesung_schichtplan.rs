@@ -592,7 +592,7 @@ pub(crate) async fn mappe_antwort(
 ) -> Result<axum::response::Response, AppError> {
     use crate::abloesung::schichtplan::ausgabe::mappe;
     use axum::response::IntoResponse;
-    let bytes = tokio::task::spawn_blocking(move || mappe::schreibe(&plan))
+    let bytes = tokio::task::spawn_blocking(move || mappe::write_mappe(&plan))
         .await
         .map_err(|e| AppError::Internal(format!("Excel-Mappe des Schichtplans: {e}")))??;
     Ok((

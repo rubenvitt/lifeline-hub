@@ -95,7 +95,7 @@ struct Blatt<'a> {
     dezimal: &'a [u16],
 }
 
-fn schreibe_blatt(ws: &mut Worksheet, b: &Blatt<'_>) -> Result<(), XlsxError> {
+fn write_blatt(ws: &mut Worksheet, b: &Blatt<'_>) -> Result<(), XlsxError> {
     ws.set_name(b.name)?;
     let fett = Format::new().set_bold();
     let dezimal = Format::new().set_num_format("0.00");
@@ -177,7 +177,7 @@ fn austausch(plan: &AusgabePlan) -> Vec<Vec<Wert>> {
         }
         for person in personen {
             let (kennung, herkunft) = person.bezug();
-            let helfer = person.ist_helfer();
+            let helfer = person.is_helfer();
             let mut z = kopf();
             z.extend([
                 // Ein Name in einem Feld: unzerlegt als Nachname (design.md D4).
@@ -287,7 +287,7 @@ fn je_person(plan: &AusgabePlan) -> Vec<Vec<Wert>> {
     let zone = plan.kopf.zone;
     let mut zeilen = Vec::new();
     for person in &plan.personen {
-        let helfer = person.ist_helfer();
+        let helfer = person.is_helfer();
         let mut schichten: Vec<_> = plan
             .schichten
             .iter()
@@ -344,7 +344,7 @@ fn befunde(plan: &AusgabePlan) -> Vec<Vec<Wert>> {
 }
 
 /// Schreibt die Mappe.
-pub fn schreibe(plan: &AusgabePlan) -> Result<Vec<u8>, AppError> {
+pub fn write_mappe(plan: &AusgabePlan) -> Result<Vec<u8>, AppError> {
     let austausch_kopf: Vec<(&str, f64)> = AUSTAUSCH_SPALTEN
         .iter()
         .zip([
@@ -418,7 +418,7 @@ pub fn schreibe(plan: &AusgabePlan) -> Result<Vec<u8>, AppError> {
     ];
     let mut mappe = Workbook::new();
     for b in &blaetter {
-        schreibe_blatt(mappe.add_worksheet(), b).map_err(fehler)?;
+        write_blatt(mappe.add_worksheet(), b).map_err(fehler)?;
     }
     mappe.save_to_buffer().map_err(fehler)
 }
@@ -450,7 +450,7 @@ mod tests {
 
     #[test]
     fn fuenf_blaetter_austausch_zuerst() {
-        let bytes = schreibe(&einsatz_plan()).unwrap();
+        let bytes = write_mappe(&einsatz_plan()).unwrap();
         let m: Xlsx<_> = calamine::open_workbook_from_rs(std::io::Cursor::new(&bytes[..])).unwrap();
         assert_eq!(
             m.sheet_names(),
@@ -510,7 +510,7 @@ mod tests {
 
     #[test]
     fn lesbare_blaetter_in_der_zone() {
-        let bytes = schreibe(&einsatz_plan()).unwrap();
+        let bytes = write_mappe(&einsatz_plan()).unwrap();
         let u = blatt(&bytes, "Übersicht");
         let wert = |k: &str| u.iter().find(|z| z[0] == k).unwrap()[1].clone();
         assert_eq!(wert("Einsatz"), "Stadtfest");
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn der_leser_nimmt_den_austausch_wie_er_ist() {
-        let bytes = schreibe(&einsatz_plan()).unwrap();
+        let bytes = write_mappe(&einsatz_plan()).unwrap();
         let t = lies_tabelle(&bytes).unwrap();
         assert!(t.meldungen.is_empty(), "{:?}", t.meldungen);
         let (paket, meldungen) = lies_paket(&bytes, BERLIN).unwrap();
@@ -598,7 +598,7 @@ mod tests {
     fn text_bleibt_text() {
         let mut plan = einsatz_plan();
         plan.posten[0].name = "=HYPERLINK(\"x\")".into();
-        let bytes = schreibe(&plan).unwrap();
+        let bytes = write_mappe(&plan).unwrap();
         let a = blatt(&bytes, "Austausch");
         assert_eq!(a[1][0], "=HYPERLINK(\"x\")");
     }

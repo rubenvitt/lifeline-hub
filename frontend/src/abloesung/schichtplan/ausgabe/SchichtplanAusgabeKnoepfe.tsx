@@ -3,7 +3,7 @@ import { Button, Typography } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { schichtplanDruckPfad } from '../../../routing/deeplinks';
-import { ladeSchichtplanMappe } from '../../../api/schichtplan';
+import { loadSchichtplanMappe } from '../../../api/schichtplan';
 import { speichereDatei } from '../../../components/dateiSpeichern';
 import { SpeicherFehler } from '../../../components/SpeicherHinweis';
 import { MODUL_PERSONAL_GESPERRT } from '../../../components/nurAnsicht';
@@ -37,7 +37,7 @@ export default function SchichtplanAusgabeKnoepfe({
   const mappe = useMutation({
     networkMode: 'always',
     mutationFn: async (id: number) => {
-      const datei = await ladeSchichtplanMappe(id);
+      const datei = await loadSchichtplanMappe(id);
       speichereDatei(datei, mappeDateiname(einsatzBezeichnung, `einsatz-${id}`));
     },
   });

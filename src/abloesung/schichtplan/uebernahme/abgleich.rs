@@ -284,7 +284,7 @@ impl EigenerBezug {
     }
 
     /// Umkehr von [`Self::kennung`]; eine andere Form ist kein eigener Bezug.
-    pub fn aus_kennung(kennung: &str) -> Option<Self> {
+    pub fn from_kennung(kennung: &str) -> Option<Self> {
         let k = kennung.trim();
         let (art, id) = k.rsplit_once('-')?;
         if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
@@ -320,7 +320,7 @@ pub fn eigener_treffer(
     if herkunft_norm(angabe.herkunft.as_deref()) != norm(EIGENE_HERKUNFT) {
         return None;
     }
-    let bezug = EigenerBezug::aus_kennung(angabe.kennung.as_deref()?)?;
+    let bezug = EigenerBezug::from_kennung(angabe.kennung.as_deref()?)?;
     let formen = namensformen(&angabe.nachname, angabe.vorname.as_deref());
     let ziel = match bezug {
         EigenerBezug::Personal(id) => stamm
@@ -610,7 +610,7 @@ mod tests {
             EigenerBezug::Einsatzkraft(3),
             EigenerBezug::Helfer(70),
         ] {
-            assert_eq!(EigenerBezug::aus_kennung(&b.kennung()), Some(b));
+            assert_eq!(EigenerBezug::from_kennung(&b.kennung()), Some(b));
         }
         for fremd in [
             "personal-",
@@ -619,7 +619,7 @@ mod tests {
             "4711",
             "helfer--1",
         ] {
-            assert_eq!(EigenerBezug::aus_kennung(fremd), None, "{fremd}");
+            assert_eq!(EigenerBezug::from_kennung(fremd), None, "{fremd}");
         }
     }
 
