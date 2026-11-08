@@ -26,9 +26,9 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 3. Umzug Backend (D5, refactor)
 
-- [ ] 3.1 `fordere_aktiv_in_tx` nach `src/einsatz/repo.rs` verschieben. Die Aufrufer (Lagebesprechung, Führungsstelle, Lagemonitor-Zugang, Kommunikation, Fernmeldeskizze) werden umgestellt. `cargo test --lib` ist grün.
-- [ ] 3.2 `src/stab/{kommunikation,fernmeldeskizze}.rs` nach `src/fernmeldewesen/` verschieben. Die Fernmeldewesen-Handler und `sse_fernmeldewesen` ziehen aus `routes/stab.rs` nach `routes/fernmeldewesen.rs`. `Sachgebiet` kommt nach `src/fuehrung/`. Die Pfade in `tests/` (`lifeline_hub::stab::…`), `src/demo/import.rs`, `einsatzabschnitt`, `einheit` und `einsatz` werden umgestellt. `cargo test`, `scripts/check-typ-codegen.sh` (die Schema-Namen bleiben gleich) und `tests/einsatz_kontext_guard.rs` sind grün.
-- [ ] 3.3 Die Bausteinsicht (`docs/architektur/05-bausteinsicht.md`) und das Glossar (`Sachgebiet`) auf die neuen Module nachziehen. `scripts/check-architektur.sh` ist grün.
+- [x] 3.1 `fordere_aktiv_in_tx` nach `src/einsatz/repo.rs` verschieben. Die Aufrufer (Lagebesprechung, Führungsstelle, Lagemonitor-Zugang, Kommunikation, Fernmeldeskizze) werden umgestellt. `cargo test --lib` ist grün.
+- [x] 3.2 `src/stab/{kommunikation,fernmeldeskizze}.rs` nach `src/fernmeldewesen/` verschieben. Die Fernmeldewesen-Handler und `sse_fernmeldewesen` ziehen aus `routes/stab.rs` nach `routes/fernmeldewesen.rs`. `Sachgebiet` kommt nach `src/fuehrung/`. Die Pfade in `tests/` (`lifeline_hub::stab::…`), `src/demo/import.rs`, `einsatzabschnitt`, `einheit` und `einsatz` werden umgestellt. `cargo test`, `scripts/check-typ-codegen.sh` (die Schema-Namen bleiben gleich) und `tests/einsatz_kontext_guard.rs` sind grün.
+- [x] 3.3 Die Bausteinsicht (`docs/architektur/05-bausteinsicht.md`) und das Glossar (`Sachgebiet`) auf die neuen Module nachziehen. `scripts/check-architektur.sh` ist grün.
 
 ## 4. Informationstelefon als eigenes Modul (D3)
 
