@@ -46,6 +46,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Kräfte | [Bereitstellungsräume](kapitel/bereitstellungsraeume.md) | Führung |
 | Kräfte | [Ablösung](kapitel/abloesung.md) | Führung |
 | Kräfte | [Verpflegung](kapitel/verpflegung.md) | Führung |
+| Kräfte | [Vorplanung](kapitel/vorplanung.md) | Führung, Administration |
 | Stab | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
 | Stab | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
 | Stab | [Stab und Checkliste](kapitel/stab.md) | Führung |

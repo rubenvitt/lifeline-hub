@@ -6,7 +6,7 @@ import type { SchichtplanErzeugenBody } from '../../api/types';
 import { ZeitraumEingabe, type Zeitraum } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../../anzeige/zeitEingabe';
 import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
-import { einsatzVorgabe } from '../../components/vorgabeText';
+import { einsatzVorgabe, mitVorgabe } from '../../components/vorgabeText';
 import { dauerMinuten, dauerRegel } from '../dauer';
 import type { RasterZeile } from './raster';
 import { MINDEST_MS } from './raster';
@@ -22,6 +22,9 @@ import { PAUSE, postenEingabe } from './schichtplanZeilen';
  * Abstimmung 08.11.2026). Alles oder nichts: überschneidet sich eine erzeugte Schicht mit einem
  * Block, legt der Server nichts an und nennt je Block eine Zeile; die stehen im Dialog, der offen
  * bleibt. Die Pause ist kein Posten zum Erzeugen.
+ *
+ * Vorplanung (LLH-1586): dort gibt es kein Schichtmodell; ohne Länge teilt der Server nach der
+ * Schichtlänge des gewählten Postens (`laengeVorgabe`). Hat der Posten keine, ist die Länge Pflicht.
  */
 
 /** Grenzen der Länge wie der Server (`BLOCK_MIN_MINUTEN`, `BLOCK_MAX_MINUTEN`, Raster 5 min). */
@@ -38,6 +41,8 @@ interface SchichtenErzeugenDialogProps {
   zeilen: readonly RasterZeile[];
   /** Kurzform des Schichtmodells des Einsatzes („4 h“, „Wechsel 0600/1800“); `null` = keins. */
   schichtmodell: string | null;
+  /** Schichtlänge je Zeile (Vorplanung: die des Postens, „4 h“); geht dem Schichtmodell vor. */
+  laengeVorgabe?: ReadonlyMap<string, string>;
   darfSchreiben: boolean;
   laeuft: boolean;
   speicherung: Speicherung;
@@ -58,6 +63,7 @@ export function konfliktZeilen(fehler: unknown): string[] {
 export default function SchichtenErzeugenDialog({
   zeilen,
   schichtmodell,
+  laengeVorgabe,
   darfSchreiben,
   laeuft,
   speicherung,
@@ -72,7 +78,15 @@ export default function SchichtenErzeugenDialog({
   // Mit Konflikten nennt der Dialog Meldung und Zeilen in einem Hinweis; die Hülle zeigt dann
   // keinen zweiten.
   const huelle: Speicherung = konflikte.length > 0 ? { ...speicherung, error: null } : speicherung;
-  const pflicht = schichtmodell == null;
+  const posten = Form.useWatch('posten', form);
+  const postenLaenge = posten != null ? laengeVorgabe?.get(posten) : undefined;
+  const pflicht = schichtmodell == null && postenLaenge == null;
+  const laengePlatzhalter =
+    postenLaenge != null
+      ? mitVorgabe(postenLaenge)
+      : schichtmodell != null
+        ? einsatzVorgabe(schichtmodell)
+        : undefined;
 
   const erzeugen = (w: ErzeugenWerte) => {
     if (!zeitraumGueltig(w.zeit)) return Promise.reject(new Error('Zeit fehlt'));
@@ -132,6 +146,8 @@ export default function SchichtenErzeugenDialog({
         name="laenge"
         label="Länge je Schicht"
         required={pflicht}
+        // Die Pflicht hängt am Posten (dessen Schichtlänge ist die Vorgabe): ein Wechsel prüft neu.
+        dependencies={['posten']}
         rules={[
           dauerRegel({
             pflicht,
@@ -149,10 +165,7 @@ export default function SchichtenErzeugenDialog({
           },
         ]}
       >
-        <Input
-          placeholder={schichtmodell != null ? einsatzVorgabe(schichtmodell) : undefined}
-          autoComplete="off"
-        />
+        <Input placeholder={laengePlatzhalter} autoComplete="off" />
       </Form.Item>
       {konflikte.length > 0 && (
         <Alert

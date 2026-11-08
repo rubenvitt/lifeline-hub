@@ -90,7 +90,7 @@ const spalten = spaltenFuer<Fahrzeug>()([
     filter: {
       werte: [
         { text: 'Feuerwehr', value: 'FW' },
-        { text: 'Hilfsorganisation', value: 'HiOrg' },
+        { text: 'Hilfsorganisation', value: 'DRK' },
       ],
       trifft: (f, w) => f.traeger === w,
     },
@@ -194,7 +194,7 @@ describe('etikettVon()', () => {
 });
 
 describe('effektiveDaten()', () => {
-  const daten = [F(1, 'Cäsar', { traeger: 'HiOrg' }), F(2, 'Anton'), F(3, 'Berta')];
+  const daten = [F(1, 'Cäsar', { traeger: 'DRK' }), F(2, 'Anton'), F(3, 'Berta')];
 
   it('gibt im Baummodus die Rohdaten REFERENZGLEICH zurück', () => {
     /**
@@ -315,7 +315,7 @@ describe('effektiveDaten()', () => {
       gruppen: {
         schluessel: (f) => f.traeger ?? 'ohne',
         etikett: (w) => w,
-        reihenfolge: ['HiOrg', 'FW'],
+        reihenfolge: ['DRK', 'FW'],
       },
       baum: false,
     });
@@ -338,7 +338,7 @@ describe('effektiveDaten()', () => {
       daten,
       spalten,
       sortierung: null,
-      suchbegriff: 'HiOrg',
+      suchbegriff: 'DRK',
       filterWerte: OHNE_FILTER,
       baum: false,
     });
@@ -361,7 +361,7 @@ describe('effektiveDaten()', () => {
       spalten,
       sortierung: null,
       suchbegriff: '',
-      filterWerte: { traeger: ['FW', 'HiOrg'] },
+      filterWerte: { traeger: ['FW', 'DRK'] },
       baum: false,
     });
     expect(beide).toHaveLength(3);
@@ -380,7 +380,7 @@ describe('effektiveDaten()', () => {
 
 describe('gruppiere()', () => {
   const daten = [
-    F(1, 'A', { traeger: 'HiOrg' }),
+    F(1, 'A', { traeger: 'DRK' }),
     F(2, 'B', { traeger: 'FW' }),
     F(3, 'C', { traeger: 'Bundeswehr' }),
     F(4, 'D', { traeger: 'FW' }),
@@ -388,12 +388,12 @@ describe('gruppiere()', () => {
   const achse = {
     schluessel: (f: Fahrzeug) => f.traeger ?? 'ohne',
     etikett: (w: string) => `Träger ${w}`,
-    reihenfolge: ['FW', 'HiOrg', 'THW'],
+    reihenfolge: ['FW', 'DRK', 'THW'],
   };
 
   it('die feste Reihenfolge gewinnt, Unbekanntes hängt in Antreffreihenfolge hinten an', () => {
     const gruppen = gruppiere(daten, achse);
-    expect(gruppen.map((g) => g.wert)).toEqual(['FW', 'HiOrg', 'Bundeswehr']);
+    expect(gruppen.map((g) => g.wert)).toEqual(['FW', 'DRK', 'Bundeswehr']);
     expect(gruppen.map((g) => g.zeilen.length)).toEqual([2, 1, 1]);
     expect(gruppen[0].etikett).toBe('Träger FW');
   });
@@ -698,7 +698,7 @@ describe('Typgrenzen (nur tsc)', () => {
 
 const DREI = [
   F(1, 'Florian 1', { traeger: 'FW' }),
-  F(2, 'Rotkreuz 2', { traeger: 'HiOrg' }),
+  F(2, 'Rotkreuz 2', { traeger: 'DRK' }),
   F(3, 'Florian 3'),
 ];
 
@@ -1079,7 +1079,7 @@ describe('Datensicht · Kartenzweig', () => {
       gruppen: {
         schluessel: (f) => f.traeger ?? 'ohne',
         etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
-        reihenfolge: ['FW', 'HiOrg'],
+        reihenfolge: ['FW', 'DRK'],
         unterEbene: 1,
       },
     });
@@ -1094,7 +1094,7 @@ describe('Datensicht · Kartenzweig', () => {
       gruppen: {
         schluessel: (f) => f.traeger ?? 'ohne',
         etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
-        reihenfolge: ['FW', 'HiOrg'],
+        reihenfolge: ['FW', 'DRK'],
         unterEbene: 1,
       },
     });
@@ -1108,7 +1108,7 @@ describe('Datensicht · Kartenzweig', () => {
       gruppen: {
         schluessel: (f) => f.traeger ?? 'ohne',
         etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
-        reihenfolge: ['FW', 'HiOrg'],
+        reihenfolge: ['FW', 'DRK'],
         unterEbene: 1,
       },
     });
@@ -1142,7 +1142,7 @@ describe('Datensicht · Filteretikett und Leerzustand (LFH-967)', () => {
 
     await userEvent.click(feld);
     await userEvent.click(await screen.findByTitle('Feuerwehr'));
-    // Auf die Wirkung warten: „Rotkreuz 2“ (HiOrg) fällt aus der Sicht.
+    // Auf die Wirkung warten: „Rotkreuz 2“ (DRK) fällt aus der Sicht.
     await waitFor(() => expect(screen.queryByText('Rotkreuz 2')).toBeNull());
     // Der Wert selbst steht in jsdom nicht als Text da (`maxTagCount="responsive"` misst 0 px);
     // getragen wird die Aussage vom Präfix, der Platzhalter ist jetzt verschwunden.
@@ -1173,7 +1173,7 @@ describe('Datensicht · Filteretikett und Leerzustand (LFH-967)', () => {
 
   it('aktiver Spaltenfilter ohne Treffer nennt die Einschränkung', async () => {
     setzeViewportBreite(1366);
-    rendere({ daten: [F(2, 'Rotkreuz 2', { traeger: 'HiOrg' })], leerText: 'Leer' });
+    rendere({ daten: [F(2, 'Rotkreuz 2', { traeger: 'DRK' })], leerText: 'Leer' });
     await kopfFilterWaehlen('Träger', [/^Feuerwehr/]);
     expect(await screen.findByText('Keine Treffer für die gewählten Filter')).toBeInTheDocument();
     expect(screen.queryByText('Leer')).toBeNull();
@@ -2076,8 +2076,8 @@ describe('Datensicht · Zeilenschleuse', () => {
     const gruppen = {
       schluessel: (f: Fahrzeug) => f.traeger ?? 'ohne',
       etikett: (w: string) =>
-        w === 'FW' ? 'Feuerwehr' : w === 'HiOrg' ? 'Hilfsorganisation' : 'ohne Träger',
-      reihenfolge: ['FW', 'HiOrg'],
+        w === 'FW' ? 'Feuerwehr' : w === 'DRK' ? 'Hilfsorganisation' : 'ohne Träger',
+      reihenfolge: ['FW', 'DRK'],
       unterEbene: 1 as const,
     };
     const { rerender } = rendere({ gruppen });
@@ -2089,7 +2089,7 @@ describe('Datensicht · Zeilenschleuse', () => {
       <Datensicht<Fahrzeug, FahrzeugKey>
         bezeichnung="Fahrzeuge im Einsatz"
         spalten={spalten}
-        daten={[{ ...DREI[0], traeger: 'HiOrg' }, DREI[1], DREI[2]]}
+        daten={[{ ...DREI[0], traeger: 'DRK' }, DREI[1], DREI[2]]}
         zeilenSchluessel="id"
         karte={karte}
         gruppen={gruppen}
@@ -2102,7 +2102,7 @@ describe('Datensicht · Zeilenschleuse', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('1 Hilfsorganisation')).toBeInTheDocument();
     // Der neue Wert steht trotzdem in der Karte — eingefroren ist die POSITION, nicht der Inhalt.
-    expect(screen.getAllByText('HiOrg')).toHaveLength(2);
+    expect(screen.getAllByText('DRK')).toHaveLength(2);
   });
 });
 

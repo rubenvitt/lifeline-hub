@@ -7,7 +7,7 @@ import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
 import { leseLetztenOrt } from '../einsatz/letzterOrt';
 import { useAuth } from '../auth/AuthContext';
-import { darfVerwaltung } from '../einsatz/schreibrecht';
+import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import OrgBenachrichtigungen from '../alarm/OrgBenachrichtigungen';
 import BenutzerMenu from './BenutzerMenu';
@@ -25,6 +25,7 @@ import {
 import { useViewport } from './useViewport';
 import { useDokumentTitel } from './useDokumentTitel';
 import { ebene1Seite } from './ebene1Seite';
+import { planungenPfad } from '../routing/deeplinks';
 import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
 
 const { Header, Content } = Layout;
@@ -227,6 +228,18 @@ export default function AppLayout() {
               linkStil={linkStil}
               aktiv={pathname === '/admin' || pathname.startsWith('/admin/')}
             />
+            {/* Vorplanung (LLH-1586): nur für wer planen darf, sonst fehlt der Eintrag ganz
+                (Abstimmung 08.11.2026, anders als die gesperrt stehende Verwaltung). */}
+            {darfPlanen(benutzer) && (
+              <GlobalLink
+                to={planungenPfad()}
+                label="Planungen"
+                gesperrt={false}
+                grundSichtbar={breit}
+                linkStil={linkStil}
+                aktiv={pathname === '/planungen' || pathname.startsWith('/planungen/')}
+              />
+            )}
           </div>
         </div>
         {/* SUCHZELLE ab `lg` — sie trägt die Kopf-Polsterung (`kopfpolsterung.guard.test.ts`).

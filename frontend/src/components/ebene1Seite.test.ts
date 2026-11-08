@@ -43,6 +43,8 @@ describe('ebene1Seite', () => {
 
   it('Verwaltung ohne bekannte Sektion nennt nur den Bereich', () => {
     expect(ebene1Seite('/admin')).toEqual({ titel: ['Verwaltung'], ort: ['Verwaltung'] });
+    expect(ebene1Seite('/planungen')).toEqual({ titel: ['Planungen'], ort: ['Planungen'] });
+    expect(ebene1Seite('/planungen/7')).toEqual({ titel: ['Planungen'], ort: ['Planungen'] });
   });
 
   it('unbekannte Adresse: kein Teil', () => {

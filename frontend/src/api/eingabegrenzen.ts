@@ -203,6 +203,8 @@ export const BETREUUNG_STELLE_STANDORT_MAX = 500;
 export const BETREUUNG_STELLE_NOTIZ_MAX = 2_000;
 /** Personen je Schicht des Schichtplans im Request, gezählt vor dem Entdoppeln (LLH-1552). */
 export const SCHICHTPLAN_PERSONEN_MAX = 50;
+/** Soll-Anzahl eines Postens oder Blocks im Schichtplan (Spiegel `abloesung::schichtplan::SOLL_ANZAHL_MAX`, LLH-1586). */
+export const SCHICHTPLAN_SOLL_ANZAHL_MAX = 200;
 /** Schichten, die „Schichten erzeugen“ auf einmal anlegt (LLH-1552). */
 export const SCHICHTPLAN_ERZEUGEN_MAX = 100;
 /** Notiz einer Schicht des Schichtplans (LLH-1552). */
