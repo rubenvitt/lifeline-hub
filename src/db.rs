@@ -13169,9 +13169,9 @@ mod tests {
     /// Bestand bleibt mit seinen ids und seinem Aufheben stehen, `client_id` bleibt je Einsatz
     /// eindeutig und Fremdwerte bleiben draußen.
     #[tokio::test]
-    async fn migration_0292_person_massnahme_sanitaetsdienst() {
+    async fn migration_0295_person_massnahme_sanitaetsdienst() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 292;
+        const VERSION: i64 = 295;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
