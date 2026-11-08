@@ -8,7 +8,7 @@
 -- Die ids bleiben 1:1, die AUTOINCREMENT-Sequenz zieht mit (Muster 0112/0222): sonst vergäbe
 -- SQLite die id einer gelöschten höchsten Zeile erneut. Schema = 0220 1:1 plus die vier Werte im
 -- CHECK.
--- Abgesichert von db::tests::migration_0292_person_massnahme_sanitaetsdienst.
+-- Abgesichert von db::tests::migration_0295_person_massnahme_sanitaetsdienst.
 
 CREATE TABLE person_massnahme_neu (
     id                      INTEGER PRIMARY KEY AUTOINCREMENT,
