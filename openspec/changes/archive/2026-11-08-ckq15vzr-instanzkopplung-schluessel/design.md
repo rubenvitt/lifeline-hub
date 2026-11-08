@@ -277,11 +277,14 @@ Ein adversariales Review vor dem PR fand Lücken; behoben und mit Tests belegt
 - **Fehlermeldung beim Einlösen** ohne Netzdetails (sonst ein Port-Scanner für Org-Admins); der
   Grund steht im Log.
 - **Listen von der Gegenstelle** sind begrenzt: höchstens 256 Orgs und 256 Widerrufe je Meldung
-  (sonst 400, gezählt vor dem Entdoppeln) und je Antwort höchstens 256 Orgs. Je Org gehen höchstens
-  256 Unterschriftsschlüssel in eine Lieferung. Die Nachlieferung liefert nach Stand sortiert, der
-  Rest folgt mit der nächsten Meldung. Der Grundstock wird nie abgeschnitten: Hat die Org mehr
-  gültige Schlüssel, scheitern Code ausstellen und Koppeln mit 409. Die übrigen kämen sonst ohne
-  Gegenzeichnung nach und gingen still verloren. Eine Antwort mit einer Org doppelt ist
+  (sonst 400, gezählt vor dem Entdoppeln) und je Antwort höchstens 256 Orgs. Eine Antwort trägt
+  über alle Orgs zusammen höchstens 64 Unterschriftsschlüssel, ein Grundstock ebenso; gelesen wird
+  eine Antwort bis 1 MiB, und ein Test rechnet die größte zulässige Antwort dagegen. Die
+  Nachlieferung liefert nach Stand sortiert, der Rest folgt mit der nächsten Meldung. Der
+  Grundstock wird nie abgeschnitten: Hat die Org mehr gültige Schlüssel, scheitert Code ausstellen
+  mit 409 und Grund, ein Einlösen danach scheitert ganz (am Einlöser ohne Grund, wie jedes
+  gescheiterte Einlösen). Die übrigen kämen sonst ohne Gegenzeichnung nach und gingen still
+  verloren. Eine Antwort mit einer Org doppelt ist
   ungültig, statt entdoppelt zu werden, damit die Reihenfolge nicht über einen Widerruf entscheidet.
 - **Zeitstempel** werden ohne Überlauf verrechnet (`checked_sub`, gesättigt), denn sie kommen
   signiert, aber von der Gegenstelle.

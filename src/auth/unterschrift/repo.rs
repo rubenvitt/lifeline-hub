@@ -34,10 +34,12 @@ pub struct SchluesselZeile {
     pub widerrufen_at: Option<String>,
 }
 
-/// Höchstzahl gelieferter Unterschriftsschlüssel je Org und Lieferung (`src/AGENTS.md`, Listen
-/// von außen). Grundstock und Nachlieferung liefern nach `stand` sortiert höchstens so viele; was
-/// darüber liegt, folgt mit der nächsten Meldung, weil der Stand der Gegenseite mitwandert.
-pub const LIEFERUNGEN_MAX: usize = 256;
+/// Höchstzahl gelieferter Unterschriftsschlüssel je Lieferung (`src/AGENTS.md`, Listen von außen):
+/// je Grundstock und je Antwort auf eine Meldung, über alle Orgs zusammen. Abgestimmt auf
+/// `melden::ANTWORT_MAX` (Test `groesste_antwort_passt_in_die_lesegrenze`). Die Nachlieferung
+/// liefert nach `stand` sortiert; was darüber liegt, folgt mit der nächsten Meldung, weil der Stand
+/// der Gegenseite mitwandert. Ein Grundstock darüber ist ein 409.
+pub const LIEFERUNGEN_MAX: usize = 64;
 
 const SPALTEN: &str = "id, org_id, herkunft, kopplung_org_id, fremde_id, benutzer_id, \
      benutzer_name, credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, \
@@ -314,18 +316,21 @@ pub async fn grundstock(
 }
 
 /// Nachlieferung beim Melden: was sich an gültigen oder widerrufenen lokalen Schlüsseln der Org
-/// seit `seit` geändert hat. Wartende gehen nie hinaus.
+/// seit `seit` geändert hat, höchstens `hoechstens` (gedeckelt auf [`LIEFERUNGEN_MAX`]). Wartende
+/// gehen nie hinaus.
 pub async fn nachlieferung(
     conn: &mut SqliteConnection,
     org_id: i64,
     seit: i64,
+    hoechstens: usize,
 ) -> Result<Vec<UnterschriftSchluesselLieferung>, AppError> {
     let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
-         AND stand > ? AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand LIMIT {LIEFERUNGEN_MAX}"
+         AND stand > ? AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand LIMIT ?"
     )))
     .bind(org_id)
     .bind(seit)
+    .bind(hoechstens.min(LIEFERUNGEN_MAX) as i64)
     .fetch_all(&mut *conn)
     .await?;
     Ok(zeilen.iter().map(SchluesselZeile::lieferung).collect())

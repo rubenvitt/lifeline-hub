@@ -22,7 +22,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 /// Größte Antwort, die die meldende Seite liest.
-pub const ANTWORT_MAX: usize = 256 * 1024;
+pub const ANTWORT_MAX: usize = 1024 * 1024;
 /// Obergrenze des Abstands bei wiederholten Fehlern.
 pub const ABSTAND_MAX_S: u64 = 600;
 /// Höchstzahl Orgs je Meldung und je Antwort, ebenso Widerrufe je Meldung (`src/AGENTS.md`,
@@ -267,20 +267,18 @@ fn dedupe_anfrage(anfrage: &MeldenAnfrage) -> Result<(Vec<&MeldenOrg>, Vec<&str>
     Ok((orgs, widerrufen))
 }
 
-/// Prüft die Listen einer Antwort gegen [`ORGS_MAX`] und [`unterschrift::LIEFERUNGEN_MAX`]. Eine
+/// Prüft die Listen einer Antwort gegen [`ORGS_MAX`] und [`unterschrift::LIEFERUNGEN_MAX`] (über
+/// alle Orgs zusammen). Eine
 /// Org doppelt macht die Antwort ungültig, statt entdoppelt zu werden: sonst entschiede die
 /// Reihenfolge, ob ein Widerruf gilt.
 fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
     if antwort.orgs.len() > ORGS_MAX {
         return Err(format!("mehr als {ORGS_MAX} Orgs in der Antwort"));
     }
-    if antwort
-        .orgs
-        .iter()
-        .any(|o| o.unterschrift.len() > unterschrift::LIEFERUNGEN_MAX)
-    {
+    let lieferungen: usize = antwort.orgs.iter().map(|o| o.unterschrift.len()).sum();
+    if lieferungen > unterschrift::LIEFERUNGEN_MAX {
         return Err(format!(
-            "mehr als {} Unterschriftsschlüssel je Org in der Antwort",
+            "mehr als {} Unterschriftsschlüssel in der Antwort",
             unterschrift::LIEFERUNGEN_MAX
         ));
     }
@@ -514,6 +512,9 @@ pub async fn handle_meldung(
         }
         let mut orgs = Vec::with_capacity(anfrage_orgs.len());
         let mut gemeldet = Vec::new();
+        // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
+        // nächsten Meldung, weil der Stand je Org nur bis zum Gelieferten wandert.
+        let mut budget = unterschrift::LIEFERUNGEN_MAX;
         for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
             let zuordnung = alle.iter().rev().find(|o| kennung(o) == mo.org);
@@ -524,16 +525,17 @@ pub async fn handle_meldung(
                 repo::confirm_org(conn, o.id).await?;
             }
             match aktiv {
-                Some(o) => orgs.push(MeldenOrgAntwort {
-                    org: mo.org.clone(),
-                    widerrufen: false,
-                    unterschrift: unterschrift::nachlieferung(
-                        conn,
-                        o.org_id,
-                        mo.unterschrift_stand,
-                    )
-                    .await?,
-                }),
+                Some(o) => {
+                    let lieferung =
+                        unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
+                            .await?;
+                    budget -= lieferung.len();
+                    orgs.push(MeldenOrgAntwort {
+                        org: mo.org.clone(),
+                        widerrufen: false,
+                        unterschrift: lieferung,
+                    });
+                }
                 None => {
                     if let Some(o) = zuordnung {
                         gemeldet.push(o.id);
@@ -647,13 +649,60 @@ mod tests {
 
     #[test]
     fn antwort_ueber_der_grenze_oder_mit_doppelter_org_ist_ungueltig() {
-        assert!(check_antwort(&antwort(2, unterschrift::LIEFERUNGEN_MAX)).is_ok());
+        assert!(check_antwort(&antwort(1, unterschrift::LIEFERUNGEN_MAX)).is_ok());
         let mut doppelt = antwort(2, 0);
         doppelt.orgs[1].org = doppelt.orgs[0].org.clone();
         assert!(check_antwort(&doppelt).is_err(), "Org doppelt");
         assert!(check_antwort(&antwort(ORGS_MAX, 0)).is_ok());
         assert!(check_antwort(&antwort(ORGS_MAX + 1, 0)).is_err());
         assert!(check_antwort(&antwort(1, unterschrift::LIEFERUNGEN_MAX + 1)).is_err());
+        assert!(
+            check_antwort(&antwort(2, unterschrift::LIEFERUNGEN_MAX / 2 + 1)).is_err(),
+            "die Grenze gilt für die ganze Antwort, nicht je Org"
+        );
+    }
+
+    /// Die größte zulässige Antwort muss in [`ANTWORT_MAX`] passen, sonst bliebe Melden bei vielen
+    /// Schlüsseln dauerhaft an einer unlesbaren Antwort hängen.
+    #[test]
+    fn groesste_antwort_passt_in_die_lesegrenze() {
+        // Großzügig gerechnet: Credential-ID 1023 Byte (WebAuthn-Höchstwert) in Base64url, Namen
+        // und Bezeichnung mit Umlauten, eine Gegenzeichnung samt Erklärung und Assertion.
+        let cid = "A".repeat(1364);
+        let erklaerung = serde_json::to_string(&serde_json::json!({
+            "typ": "unterschriftsschluessel-aufnahme", "org": "k".repeat(88),
+            "credential_id": cid, "schluessel_hash": "h".repeat(43),
+            "fingerabdruck": "F".repeat(39), "inhaber": "ü".repeat(200),
+            "zeitpunkt": "2026-11-08 12:00:00", "rp_id": "r".repeat(253),
+            "origin": "o".repeat(261), "alg": "es256"
+        }))
+        .expect("Erklärung");
+        let lieferung: UnterschriftSchluesselLieferung =
+            serde_json::from_value(serde_json::json!({
+                "id": i64::MAX, "benutzer_name": "ü".repeat(200), "credential_id": cid,
+                "schluessel": "s".repeat(87), "alg": "es256", "rp_id": "r".repeat(253),
+                "origin": "o".repeat(261), "bezeichnung": "ü".repeat(80),
+                "zustand": "widerrufen", "stand": i64::MAX,
+                "gegenzeichnung": {
+                    "erklaerung": erklaerung,
+                    "assertion": {
+                        "credential_id": cid, "authenticator_data": "a".repeat(400),
+                        "client_data_json": "c".repeat(800), "signatur": "s".repeat(100)
+                    },
+                    "unterzeichner_credential_id": cid
+                }
+            }))
+            .expect("Lieferung");
+        let mut a = antwort(ORGS_MAX, 0);
+        for o in &mut a.orgs {
+            o.org = "k".repeat(88);
+        }
+        a.orgs[0].unterschrift = vec![lieferung; unterschrift::LIEFERUNGEN_MAX];
+        let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        assert!(
+            groesse < ANTWORT_MAX,
+            "{groesse} Byte passen nicht in {ANTWORT_MAX}"
+        );
     }
 
     #[test]

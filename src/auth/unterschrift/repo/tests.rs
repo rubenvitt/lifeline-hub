@@ -317,7 +317,7 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
     // Wartende gehen nicht hinaus, nur der gültige.
     let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
     assert_eq!(grund.len(), 1);
-    assert!(nachlieferung(&mut conn, 1, 0)
+    assert!(nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX)
         .await
         .unwrap()
         .iter()
@@ -328,7 +328,9 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
         !widerrufen(&mut conn, 1, id_a, JETZT).await.unwrap(),
         "zweites Mal ohne Wirkung"
     );
-    let n = nachlieferung(&mut conn, 1, 1).await.unwrap();
+    let n = nachlieferung(&mut conn, 1, 1, LIEFERUNGEN_MAX)
+        .await
+        .unwrap();
     assert_eq!(n.len(), 1);
     assert_eq!(n[0].zustand, UnterschriftSchluesselZustand::Widerrufen);
 }
@@ -487,18 +489,27 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
     for stand in 1..=anzahl {
         lokaler_gueltiger(&mut conn, stand).await;
     }
-    let erste = nachlieferung(&mut conn, 1, 0).await.unwrap();
+    let erste = nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX)
+        .await
+        .unwrap();
     assert_eq!(erste.len(), LIEFERUNGEN_MAX);
     let bis = erste.last().unwrap().stand;
     assert_eq!(
         bis, LIEFERUNGEN_MAX as i64,
         "nach Stand sortiert, die ältesten zuerst"
     );
-    let rest = nachlieferung(&mut conn, 1, bis).await.unwrap();
+    let rest = nachlieferung(&mut conn, 1, bis, LIEFERUNGEN_MAX)
+        .await
+        .unwrap();
     assert_eq!(
         rest.iter().map(|l| l.stand).collect::<Vec<_>>(),
         [anzahl],
         "der Rest folgt mit der nächsten Meldung"
+    );
+    assert_eq!(
+        nachlieferung(&mut conn, 1, 0, 3).await.unwrap().len(),
+        3,
+        "das Restbudget der Antwort deckelt"
     );
 }
 

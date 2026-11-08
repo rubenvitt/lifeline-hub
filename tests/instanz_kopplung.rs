@@ -225,6 +225,73 @@ async fn code_nur_fuer_admin_mit_unterschriftsschluessel() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
+/// Die Nachlieferung teilt sich eine Grenze über alle Orgs der Antwort; was nicht passt, folgt
+/// mit der nächsten Meldung. Ohne gemeinsame Grenze lehnte der ELW die Antwort ab.
+#[tokio::test]
+async fn nachlieferung_ueber_mehrere_orgs_bleibt_in_der_grenze() {
+    let max = lifeline_hub::auth::unterschrift::repo::LIEFERUNGEN_MAX as i64;
+    let (hub, elw) = gekoppelt().await;
+    let c = code_org_y(&hub).await;
+    org_admin(&elw.pool, "Y am ELW", "elwy").await;
+    let elw_y = common::login_cookie(&elw.app, "elwy", "elwypw1").await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw_y,
+        Some(&json!({"adresse": hub.adresse, "code": c})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    // Je Org mehr als die halbe Grenze an Widerrufen, die nachzuliefern sind.
+    let orgs: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT o.org_id, b.id FROM instanz_kopplung_org o \
+         JOIN benutzer b ON b.org_id = o.org_id AND b.system_rolle = 'admin'",
+    )
+    .fetch_all(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(orgs.len(), 2);
+    let je_org = max / 2 + 5;
+    for (org_id, benutzer_id) in &orgs {
+        for n in 0..je_org {
+            sqlx::query(
+                "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, \
+                 benutzer_name, credential_id, alg, schluessel, rp_id, origin, bezeichnung, \
+                 fingerabdruck, zustand, stand) VALUES (?, 'lokal', ?, 'x', ?, 'es256', 'AAAA', \
+                 'r', 'o', 'Stick', 'fp', 'widerrufen', ?)",
+            )
+            .bind(org_id)
+            .bind(benutzer_id)
+            .bind(format!("w{org_id}-{n}"))
+            .bind(1000 + n)
+            .execute(&hub.pool)
+            .await
+            .unwrap();
+        }
+    }
+    let fehler = || async {
+        sqlx::query_scalar::<_, Option<String>>("SELECT letzter_fehler FROM instanz_kopplung")
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap()
+    };
+    elw_meldet(&elw).await;
+    assert_eq!(fehler().await, None);
+    elw_meldet(&elw).await;
+    assert_eq!(fehler().await, None);
+    let staende: Vec<i64> =
+        sqlx::query_scalar("SELECT unterschrift_stand FROM instanz_kopplung_org ORDER BY id")
+            .fetch_all(&elw.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        staende,
+        vec![1000 + je_org - 1; 2],
+        "nach zwei Meldungen ist alles nachgeliefert"
+    );
+}
+
 #[tokio::test]
 async fn code_nur_bis_zur_grenze_gueltiger_schluessel() {
     let hub = instanz().await;
@@ -257,7 +324,58 @@ async fn code_nur_bis_zur_grenze_gueltiger_schluessel() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
-    assert!(v["error"].as_str().unwrap().contains("256"), "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains(&lifeline_hub::auth::unterschrift::repo::LIEFERUNGEN_MAX.to_string()),
+        "{v}"
+    );
+}
+
+/// Der Grundstock geht bis zur Grenze vollständig über, auch nach der ersten Meldung. Wird die
+/// Grenze zwischen Ausstellen und Einlösen überschritten, scheitert das Koppeln ganz, statt einen
+/// Teil zu übernehmen.
+#[tokio::test]
+async fn grundstock_bis_zur_grenze_geht_ganz_durch_und_darueber_scheitert_das_koppeln() {
+    let max = lifeline_hub::auth::unterschrift::repo::LIEFERUNGEN_MAX;
+    let gueltige_fremde = |pool: sqlx::SqlitePool| async move {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM unterschrift_schluessel WHERE herkunft = 'gegenueber' \
+             AND zustand = 'gueltig'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    let hub = instanz().await;
+    let elw = instanz().await;
+    for n in 0..max {
+        let p = SoftwarePasskey::new(&format!("k{n}"), [n as u8 + 1; 32]);
+        schluessel(&hub, &p, "Stick").await;
+    }
+    let c = code(&hub).await;
+    let (s, v) = einloesen(&elw, &hub.adresse, &c).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(gueltige_fremde(elw.pool.clone()).await, max as i64);
+    elw_meldet(&elw).await;
+    assert_eq!(gueltige_fremde(elw.pool.clone()).await, max as i64);
+
+    let hub = instanz().await;
+    let elw = instanz().await;
+    for n in 0..max {
+        let p = SoftwarePasskey::new(&format!("k{n}"), [n as u8 + 1; 32]);
+        schluessel(&hub, &p, "Stick").await;
+    }
+    let c = code(&hub).await;
+    schluessel(&hub, &SoftwarePasskey::new("zuviel", [250; 32]), "Stick").await;
+    let (s, v) = einloesen(&elw, &hub.adresse, &c).await;
+    assert_ne!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(gueltige_fremde(elw.pool.clone()).await, 0);
+    assert!(uebersicht(&elw).await["kopplungen"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
