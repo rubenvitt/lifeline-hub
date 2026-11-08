@@ -1087,7 +1087,8 @@ function findeZeile<T>(
   for (const zeile of zeilen) {
     if (schluessel(zeile) === k) return zeile;
     const unter = kinder != null ? (zeile[kinder] as readonly T[] | undefined) : undefined;
-    const treffer = unter && unter.length > 0 ? findeZeile(unter, k, schluessel, kinder) : undefined;
+    const treffer =
+      unter && unter.length > 0 ? findeZeile(unter, k, schluessel, kinder) : undefined;
     if (treffer !== undefined) return treffer;
   }
   return undefined;

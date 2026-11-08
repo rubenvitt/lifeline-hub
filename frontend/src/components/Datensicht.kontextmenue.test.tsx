@@ -44,12 +44,13 @@ function plan(
     { key: 'bearbeiten', label: 'Bearbeiten' },
     { key: 'stornieren', label: 'Stornieren', gefahr: true },
   ],
+  mitPrimaer = true,
 ): Kartenplan<Fahrzeug, FahrzeugKey> {
   return {
     art: 'plan',
     titel: { spalte: 'funkrufname', ziel: (f) => `/fahrzeuge/${f.id}` },
     sekundaer: ['typ'],
-    aktion: { etikett: 'Melden', onKlick },
+    ...(mitPrimaer ? { aktion: { etikett: 'Melden', onKlick } } : {}),
     weitere: {
       eintraege,
       zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
@@ -97,11 +98,11 @@ describe('Datensicht · Kontextmenü im Tabellenzweig (4.1)', () => {
     expect(fireEvent.contextMenu(zelle, { clientX: 200, clientY: 120, button: 2 })).toBe(false);
     const menue = await waitFor(() => offenesMenue()!);
     expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Rotkreuz 2');
-    expect(within(menue).getAllByRole('menuitem').map((e) => e.textContent)).toEqual([
-      'Melden',
-      'Bearbeiten',
-      'Stornieren',
-    ]);
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Melden', 'Bearbeiten', 'Stornieren']);
     expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
 
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
@@ -131,8 +132,7 @@ describe('Datensicht · Kontextmenü im Tabellenzweig (4.1)', () => {
 
   it('eine Zeile ohne Einträge lässt das Browsermenü', () => {
     setzeViewportBreite(1200);
-    const ohne = plan(vi.fn(), vi.fn(), () => []);
-    renderMitProviders(sicht({ ...ohne, aktion: undefined }));
+    renderMitProviders(sicht(plan(vi.fn(), vi.fn(), () => [], false)));
     expect(fireEvent.contextMenu(zelleVon('Florian 1'), { button: 2 })).toBe(true);
     expect(kontextAnker()).toBeNull();
   });
@@ -219,7 +219,7 @@ describe('Datensicht · offenes Kontextmenü (4.3)', () => {
     const { container, rerender } = renderMitProviders(sicht(plan()));
     fireEvent.contextMenu(within(zeileVon('Florian 1')).getByText('LF'), { button: 2 });
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
-    const leer = { ...plan(vi.fn(), vi.fn(), () => []), aktion: undefined };
+    const leer = plan(vi.fn(), vi.fn(), () => [], false);
     rerender(sicht(leer));
     await waitFor(() => expect(kontextAnker()).toBeNull());
     act(() => (document.activeElement as HTMLElement | null)?.blur());

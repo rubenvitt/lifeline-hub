@@ -72,7 +72,9 @@ describe('KontextMenue (LLH-1596, D6)', () => {
   it('löst genau die gewählte Aktion aus, nicht die Umgebung, und gibt den Fokus zurück', async () => {
     const { onWahl, ursprung } = aufbau();
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
-    await userEvent.click(within(offenesMenue()!).getByRole('menuitem', { name: 'Menge ändern …' }));
+    await userEvent.click(
+      within(offenesMenue()!).getByRole('menuitem', { name: 'Menge ändern …' }),
+    );
     expect(onWahl).toHaveBeenCalledTimes(1);
     expect(onWahl).toHaveBeenCalledWith('menge');
     await waitFor(() => expect(document.activeElement).toBe(ursprung));
@@ -142,7 +144,10 @@ describe('kontextEintraege (D6)', () => {
   });
 
   it('läuft eine Aktion, stehen die ⋮-Einträge gesperrt, die Primäraktion bleibt frei', () => {
-    const e = kontextEintraege({ aktion: primaer(), weitere: weitere({ laeuft: () => true }) }, ZEILE);
+    const e = kontextEintraege(
+      { aktion: primaer(), weitere: weitere({ laeuft: () => true }) },
+      ZEILE,
+    );
     expect(e[0].gesperrt).toBeUndefined();
     expect(e.slice(1).every((x) => x.gesperrt)).toBe(true);
   });

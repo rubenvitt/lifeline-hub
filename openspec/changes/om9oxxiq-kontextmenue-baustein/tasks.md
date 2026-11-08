@@ -33,14 +33,14 @@
 
 ## 5. Skizze auf den Baustein (D3, D4)
 
-- [ ] 5.1 `SkizzenFlaeche.tsx`: eigenen Langdruck-Zeitgeber und `onContextMenu` am Element durch `useKontextMenue` ersetzen; `onKontext(key, px)` bleibt die Schnittstelle zu `FernmeldeskizzeBild`
+- [x] 5.1 `SkizzenFlaeche.tsx`: eigenen Langdruck-Zeitgeber und `onContextMenu` am Element durch `useKontextMenue` ersetzen; `onKontext(key, px)` bleibt die Schnittstelle zu `FernmeldeskizzeBild`
 - [ ] 5.2 Bestehende Skizzen-Tests und `e2e/fernmeldeskizze.spec.ts` (Kontextmenü, langer Druck, Tasten) grün; Verhalten aus Spec `stab-fernmeldeskizze-bearbeitung` unverändert
 
 ## 6. Wächter, Regeln, Doku
 
-- [ ] 6.1 `components/kontextMenue.guard.test.ts` (D8) mit Ausnahmen Lagemonitor und Skizzen-Übersicht, je mit Grund; ein toter Eintrag färbt rot
-- [ ] 6.2 `frontend/AGENTS.md`, Abschnitt Datensatz-Aktionen: Regel „Kontextmenü nur über `useKontextMenue` und `KontextMenue`, Einträge aus derselben Quelle wie das ⋮-Menü, Browsermenü auf Link/Feld/Markierung“; `pages/lagekarte/AGENTS.md` nennt die neuen Pfade von Schale und Riegel
-- [ ] 6.3 Anwenderdoku: `docs/anwender/kapitel/einsatz-oberflaeche.md` kurzer Absatz zum Kontextmenü an Listenzeilen (Rechtsklick, langer Druck, Umschalt+F10), `quellen:` um die neuen Bausteine ergänzt; Doku-Wächter grün
+- [x] 6.1 `components/kontextMenue.guard.test.ts` (D8) mit Ausnahmen Lagemonitor und Skizzen-Übersicht, je mit Grund; ein toter Eintrag färbt rot
+- [x] 6.2 `frontend/AGENTS.md`, Abschnitt Datensatz-Aktionen: Regel „Kontextmenü nur über `useKontextMenue` und `KontextMenue`, Einträge aus derselben Quelle wie das ⋮-Menü, Browsermenü auf Link/Feld/Markierung“; `pages/lagekarte/AGENTS.md` nennt die neuen Pfade von Schale und Riegel
+- [x] 6.3 Anwenderdoku: `docs/anwender/kapitel/einsatz-oberflaeche.md` kurzer Absatz zum Kontextmenü an Listenzeilen (Rechtsklick, langer Druck, Umschalt+F10), `quellen:` um die neuen Bausteine ergänzt; Doku-Wächter grün
 
 ## 7. Browser-Nachweis und Gate
 
