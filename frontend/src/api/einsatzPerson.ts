@@ -21,6 +21,7 @@ import type {
   TransportPrioritaet,
   TransportDurch,
   TransportmittelAuswahl,
+  VerbleibAngaben,
   Unterschrift,
   VersorgendeEinheitAuswahl,
   Verbleib,
@@ -355,6 +356,14 @@ export function savePersonEinheit(
 /** Vorschläge zum Rettungsmittel der Verbleib-Maske (LLH-1332, Spec `patienten-uebergabe`). */
 export function ladeTransportmittel(einsatzId: number): Promise<TransportmittelAuswahl> {
   return apiGet<TransportmittelAuswahl>(`/api/einsaetze/${einsatzId}/personen/transportmittel`);
+}
+
+/**
+ * Angaben des maßgeblichen Verbleibs je Person für den Einsatzbericht (LLH-1575, design.md D3):
+ * Rettungsmittel, „Entlassen an“, „gegen Rat“, Unterschrift. Nur Personen mit Angabe.
+ */
+export function ladeVerbleibAngaben(einsatzId: number): Promise<VerbleibAngaben[]> {
+  return apiGet<VerbleibAngaben[]>(`/api/einsaetze/${einsatzId}/personen/verbleib-angaben`);
 }
 
 export interface VerbleibEingabe extends OfflineEintragEingabe {

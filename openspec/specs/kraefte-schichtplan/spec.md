@@ -3,8 +3,9 @@
 ## Purpose
 Ein Einsatz hat einen Schichtplan: Blöcke an Einheiten, UHS und der Zeile „Pause“, mit Soll und
 eingeteilten Personen. Der Plan ist Soll und ändert kein Ist. Prüfbefunde zeigen an und
-blockieren nie (LLH-1552, Konzept LLH-1523). Wechsel aus dem Plan regelt `kraefte-abloesung`
-(LLH-1555), das Raster LLH-1554.
+blockieren nie (LLH-1552, Konzept LLH-1523). Er gibt einer laufenden Schicht die Fälligkeit und
+belegt den Wechsel vor (`kraefte-abloesung`, „Fälligkeit laut Plan“ und „Vollzug aus dem Plan“,
+LLH-1555); der Wechsel selbst ist ein Griff, kein Automatismus. Das Raster regelt LLH-1554.
 
 ## Requirements
 
@@ -45,7 +46,9 @@ Soll-Anzahl und Qualifikationssoll. Spätere Änderungen am Posten MUST bestehen
 ### Requirement: Personen im Plan
 Ein Block SHALL bis zu 50 Personen aufnehmen: Stamm-Personal der Organisation, Ad-hoc-Kräfte des
 Einsatzes oder Helfer des Plans (Name, Telefon, Organisation, Qualifikationen). Wer nur im Plan
-steht, MUST NOT in den Einsatz übernommen, alarmiert oder in der Stärke gezählt werden. Personen
+steht, MUST NOT in den Einsatz übernommen, alarmiert oder in der Stärke gezählt werden; erst der
+Vollzug aus dem Plan übernimmt (`kraefte-abloesung`, LLH-1555), ein übernommener Helfer zeigt dann
+das Ist seiner Kraft. Personen
 zu schreiben MUST die Freigabe des Moduls Personal verlangen (403 sonst). Ohne diese Freigabe
 MUST das Lesen keine Namen liefern.
 

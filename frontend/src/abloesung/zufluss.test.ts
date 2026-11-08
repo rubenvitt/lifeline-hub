@@ -40,6 +40,7 @@ function schicht(id: number, faellig_at = '2026-09-22 18:00:00'): Abloesung {
     beginn_quelle: 'hand' as const,
     abschnitt_uebergeben: false,
     planung_warnungen: [],
+    faellig_laut_plan: false,
     angelegt_at: '2026-09-22 09:30:00',
   };
 }

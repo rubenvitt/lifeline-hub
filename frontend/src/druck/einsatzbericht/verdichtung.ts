@@ -15,10 +15,12 @@ import type {
   LageberichtKopf,
   Lagebesprechung,
   Fuehrungsstelle,
+  EinsatzMaterial,
   Person,
   PersonPerioden,
   Schaden,
   Stab,
+  VerbleibAngaben,
   Verpflegung,
 } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
@@ -34,10 +36,23 @@ import { kettenKoepfe } from '../../lageberichte/ketten';
 import { vorlage } from '../../lageberichte/vorlagen';
 import {
   SICHTUNGSBILD_REIHE,
+  anlassbild,
+  istAngetroffen,
+  istTransportiert,
+  kontakteJeEinheit,
+  kontakteJeStunde,
   sichtungsbild,
   transportBilanz,
+  verbleibKlasse,
   verbleibZaehlung,
 } from '../../personen/personenBilanz';
+import {
+  ANLASS_REIHE,
+  ANLASS_WORT,
+  ENTLASSEN_AN_WORT,
+  GEGEN_RAT_WORT,
+  UNTERSCHRIFT_WORT,
+} from '../../personen/personMeta';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../stab/einsatzleiter';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
 import { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL } from '../../pages/schaeden/gefahrWorte';
@@ -389,6 +404,24 @@ function lage(quelle: LageberichtQuelle | null, konv: AnzeigeKonventionen): Absc
 }
 
 /**
+ * Verbleib der angetroffenen Personen nach Art, für Bilanz und Hilfeleistungen dieselbe Zählung.
+ * Je UHS ein Posten wäre ein Name der Einrichtung; im Bericht genügt die Art des Verbleibs. Der
+ * Verbleib „verstorben“ hieße wie der Status und trägt deshalb seine Achse im Etikett.
+ */
+function nachVerbleib(personen: readonly Person[]): Zeile[] {
+  const verbleib = new Map<string, number>();
+  for (const p of verbleibZaehlung(personen, () => undefined)) {
+    const label = p.schluessel.startsWith('uhs:')
+      ? 'Unfallhilfsstelle'
+      : p.schluessel === 'verstorben'
+        ? 'verstorben (Verbleib)'
+        : p.label;
+    verbleib.set(label, (verbleib.get(label) ?? 0) + p.wert);
+  }
+  return [...verbleib].map(([etikett, n]) => ({ etikett, wert: zahl(n) }));
+}
+
+/**
  * Personenbilanz in drei Achsen mit Überschrift (LFH-956): Sichtung, Personenstatus und Verbleib
  * zählen dieselben Personen je nach eigener Achse und dürfen sich nicht zu widersprechen
  * scheinen. Kein Etikett steht zweimal (auch nicht in anderer Schreibweise); die Summe heißt
@@ -400,17 +433,6 @@ function personenBilanz(personen: Person[]): Inhalt[] {
   const status = { erfasst: 0, vermisst: 0, betroffen: 0, verstorben: 0, abgemeldet: 0 };
   for (const p of personen) status[p.status] += 1;
   const patienten = bild.je.sk1 + bild.je.sk2 + bild.je.sk3 + bild.je.sk4;
-  // Je UHS ein Posten wäre ein Name der Einrichtung; im Bericht genügt die Art des Verbleibs.
-  // Der Verbleib „verstorben“ hieße wie der Status und trägt deshalb seine Achse im Etikett.
-  const verbleib = new Map<string, number>();
-  for (const p of verbleibZaehlung(personen, () => undefined)) {
-    const label = p.schluessel.startsWith('uhs:')
-      ? 'Unfallhilfsstelle'
-      : p.schluessel === 'verstorben'
-        ? 'verstorben (Verbleib)'
-        : p.label;
-    verbleib.set(label, (verbleib.get(label) ?? 0) + p.wert);
-  }
   return [
     zeilen([
       { etikett: 'Personen gesamt', wert: zahl(personen.length) },
@@ -433,10 +455,7 @@ function personenBilanz(personen: Person[]): Inhalt[] {
       })),
       'Nach Personenstatus',
     ),
-    zeilen(
-      [...verbleib].map(([etikett, n]) => ({ etikett, wert: zahl(n) })),
-      'Nach Verbleib',
-    ),
+    zeilen(nachVerbleib(personen), 'Nach Verbleib'),
     vermerk(
       '„Tot“ (Sichtung), „Verstorben“ (Personenstatus) und „Verstorben (Verbleib)“ werden getrennt geführt und müssen nicht übereinstimmen. „Transportiert“ ohne Voranmeldung; Verbleib nur angetroffene Personen (nicht vermisst, nicht abgemeldet).',
     ),
@@ -596,6 +615,142 @@ function etbAuszug(
   ];
 }
 
+// ── Hilfeleistungen (LLH-1575, design.md D2) ───────────────────────────────────────
+
+const OHNE_ANGABE = 'ohne Angabe';
+
+/**
+ * Zählung von Freitexten (Rettungsmittel, Ziel): absteigend nach Zahl, dann nach Wortlaut; Groß
+ * und Klein sowie Ränder zählen nicht als Unterschied, angezeigt wird die erste Schreibweise.
+ * Leeres steht als „ohne Angabe“ zuletzt.
+ */
+function nachText(werte: readonly (string | null | undefined)[]): Zeile[] {
+  const je = new Map<string, { text: string; n: number }>();
+  let ohne = 0;
+  for (const w of werte) {
+    const text = w?.trim();
+    if (!text) {
+      ohne++;
+      continue;
+    }
+    const k = text.toLocaleLowerCase('de');
+    const bisher = je.get(k);
+    if (bisher) bisher.n++;
+    else je.set(k, { text, n: 1 });
+  }
+  const posten = [...je.values()]
+    .sort((a, b) => b.n - a.n || a.text.localeCompare(b.text, 'de'))
+    .map((x) => ({ etikett: x.text, wert: zahl(x.n) }));
+  return ohne > 0 ? [...posten, { etikett: OHNE_ANGABE, wert: zahl(ohne) }] : posten;
+}
+
+/**
+ * Block Hilfeleistungen: nur Zählungen über die Kontakte (alle gelieferten Personen außer den
+ * vermissten, wie `anlassbild`). Die Verbleib-Angaben (D3) werden über die Kennung zugeordnet;
+ * die Kennung verlässt diese Funktion nicht. Das Ziel zählt nur bei Transporten: bei einer
+ * Entlassung kann dort eine Anschrift stehen.
+ */
+function hilfeleistungen(
+  personen: Person[] | null,
+  angabenListe: VerbleibAngaben[] | null,
+  konv: AnzeigeKonventionen,
+): Abschnitt[] {
+  if (personen == null || angabenListe == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
+  const kontakte = personen.filter((p) => p.status !== 'vermisst');
+  if (kontakte.length === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
+  const angaben = new Map(angabenListe.map((a) => [a.person_id, a]));
+  const angabe = (p: Person) => angaben.get(p.id);
+
+  const anlass = anlassbild(kontakte);
+  const nachAnlass: Zeile[] = [
+    ...ANLASS_REIHE.filter((k) => anlass.je[k] > 0).map((k) => ({
+      etikett: ANLASS_WORT[k],
+      wert: zahl(anlass.je[k]),
+    })),
+    { etikett: 'ohne Anlass', wert: zahl(anlass.je.ohne) },
+  ];
+
+  const stunden = kontakteJeStunde(kontakte, konv);
+
+  const entlassenAn = (Object.keys(ENTLASSEN_AN_WORT) as (keyof typeof ENTLASSEN_AN_WORT)[])
+    .map((k) => ({
+      k,
+      n: kontakte.filter(
+        (p) =>
+          istAngetroffen(p) && verbleibKlasse(p) === 'entlassung' && angabe(p)?.entlassen_an === k,
+      ).length,
+    }))
+    .filter((x) => x.n > 0)
+    .map((x) => ({ etikett: ENTLASSEN_AN_WORT[x.k], wert: zahl(x.n) }));
+
+  const transportiert = kontakte.filter(istTransportiert);
+  const transporte: Inhalt[] = [
+    zeilen([{ etikett: 'Transporte gesamt', wert: zahl(transportiert.length) }]),
+  ];
+  if (transportiert.length > 0) {
+    transporte.push(
+      zeilen(nachText(transportiert.map((p) => angabe(p)?.transportmittel)), 'Nach Rettungsmittel'),
+      zeilen(nachText(transportiert.map((p) => p.aktuelles_verbleib_ziel)), 'Nach Ziel'),
+    );
+  }
+
+  const verweigert = kontakte.map(angabe).filter((a) => a?.gegen_rat != null);
+  const unterschriftVerweigert = verweigert.filter((a) => a?.unterschrift === 'verweigert').length;
+  const verweigerungen: Zeile[] = [
+    ...(['behandlung', 'transport'] as const).map((k) => ({
+      etikett: GEGEN_RAT_WORT[k],
+      wert: zahl(verweigert.filter((a) => a?.gegen_rat === k).length),
+    })),
+    ...(unterschriftVerweigert > 0
+      ? [{ etikett: UNTERSCHRIFT_WORT.verweigert, wert: zahl(unterschriftVerweigert) }]
+      : []),
+  ];
+
+  const einheiten = kontakteJeEinheit(kontakte);
+  const ohneEinheit = kontakte.filter((p) => p.versorgende_einheit_id == null).length;
+  const jeEinheit: Inhalt[] =
+    einheiten.length > 0
+      ? [
+          {
+            art: 'tabelle',
+            kopf: ['Einheit', 'Abschnitt', 'Kontakte'],
+            zeilen: einheiten.map((e) => [e.name, textOder(e.abschnitt), zahl(e.wert)]),
+          },
+        ]
+      : [];
+  if (ohneEinheit > 0) jeEinheit.push(vermerk(`Ohne versorgende Einheit: ${ohneEinheit}`));
+
+  return [
+    {
+      titel: 'Kontakte',
+      inhalt: [
+        zeilen([{ etikett: 'Kontakte gesamt', wert: zahl(kontakte.length) }]),
+        zeilen(nachAnlass, 'Nach Anlass'),
+      ],
+    },
+    {
+      titel: 'Kontakte nach Stunde',
+      inhalt: [
+        {
+          art: 'tabelle',
+          kopf: ['Stunde ab', 'Kontakte'],
+          zeilen: stunden.map((s) => [zeit(s.beginn, konv), zahl(s.wert)]),
+        },
+      ],
+    },
+    {
+      titel: 'Verbleib',
+      inhalt: [
+        zeilen(nachVerbleib(kontakte), 'Nach Verbleib'),
+        ...(entlassenAn.length > 0 ? [zeilen(entlassenAn, 'Entlassen an')] : []),
+      ],
+    },
+    { titel: 'Transporte', inhalt: transporte },
+    { titel: 'Verweigerungen gegen Rat', inhalt: [zeilen(verweigerungen)] },
+    { titel: 'Kontakte je Einheit', inhalt: jeEinheit },
+  ];
+}
+
 // ── Anlagen (LFH-902, design.md D5) ────────────────────────────────────────────────
 
 const OHNE_ZEITACHSE = 'keine Zeitachse';
@@ -730,6 +885,46 @@ function personalJeKopf(
   ];
 }
 
+/**
+ * Anlage Materialverbrauch (LLH-1575, design.md D6): ausgegebene Mengen der Verbrauchsgüter, auch
+ * aus dem Einsatz genommener Posten, je Stammeintrag zusammengefasst (Ad-hoc-Posten je
+ * Bezeichnung und Kategorie). Geräte werden nicht verbraucht und stehen nicht darin.
+ */
+function materialverbrauch(
+  aktiv: EinsatzMaterial[] | null,
+  entlassen: EinsatzMaterial[] | null,
+): Abschnitt[] {
+  if (aktiv == null || entlassen == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
+  const je = new Map<string, { bezeichnung: string; kategorie: string | null; menge: number }>();
+  for (const m of [...aktiv, ...entlassen]) {
+    if (m.art !== 'verbrauchsgut' || m.ausgegeben <= 0) continue;
+    const kategorie = m.kategorie?.trim() || null;
+    const k =
+      m.material_id != null
+        ? `stamm:${m.material_id}`
+        : `adhoc:${m.bezeichnung.trim().toLocaleLowerCase('de')}|${(kategorie ?? '').toLocaleLowerCase('de')}`;
+    const bisher = je.get(k);
+    if (bisher) bisher.menge += m.ausgegeben;
+    else je.set(k, { bezeichnung: m.bezeichnung.trim(), kategorie, menge: m.ausgegeben });
+  }
+  if (je.size === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
+  const zeilenListe = [...je.values()]
+    .sort(
+      (a, b) =>
+        Number(a.kategorie == null) - Number(b.kategorie == null) ||
+        (a.kategorie ?? '').localeCompare(b.kategorie ?? '', 'de') ||
+        a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
+    )
+    .map((x) => [x.bezeichnung, textOder(x.kategorie), zahl(x.menge)]);
+  return [
+    {
+      inhalt: [
+        { art: 'tabelle', kopf: ['Material', 'Kategorie', 'Ausgegeben'], zeilen: zeilenListe },
+      ],
+    },
+  ];
+}
+
 // ── Gesamt ─────────────────────────────────────────────────────────────────────────
 
 /**
@@ -785,6 +980,8 @@ export function verdichteEinsatzbericht(
         verpflegungBilanz,
       ),
     ],
+    hilfeleistungen: () =>
+      hilfeleistungen(daten(q.personen), daten(q.personenVerbleibAngaben), konv),
     etb: () => etbAuszug(daten(q.etbZaehler), daten(q.etbEntscheidungen), konv),
     'einheiten-zeiten': () =>
       einheitenZeiten(
@@ -805,6 +1002,7 @@ export function verdichteEinsatzbericht(
         abgeschlossen,
         konv,
       ),
+    materialverbrauch: () => materialverbrauch(daten(q.material), daten(q.materialEntlassen)),
   };
 
   const gewaehlt = ordneAuswahl(auswahl);

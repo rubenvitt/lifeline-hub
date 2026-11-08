@@ -57,9 +57,11 @@ describe('QUELLEN', () => {
       'Kräfte',
       'Lage',
       'Bilanz',
+      'Hilfeleistungen',
       'ETB-Auszug',
       'Anlage Einheiten mit Einsatzzeiten',
       'Anlage Personal je Kopf',
+      'Anlage Materialverbrauch',
     ]);
   });
 });
@@ -74,10 +76,14 @@ describe('berichtFreigabe', () => {
     expect(f.gesperrteModule).toEqual([]);
   });
 
-  it('der Standardumfang ruft jede Quelle ab außer der nur für die Einheiten-Anlage', () => {
+  it('der Standardumfang ruft jede Quelle ab außer denen nur für Einheiten- und Material-Anlage', () => {
     const f = berichtFreigabe(freigabenFixture());
     const nicht = Object.entries(f.je).filter(([, z]) => z !== 'abrufen');
-    expect(nicht).toEqual([['einheitenAufgeloest', 'nicht-gewaehlt']]);
+    expect(nicht).toEqual([
+      ['einheitenAufgeloest', 'nicht-gewaehlt'],
+      ['material', 'nicht-gewaehlt'],
+      ['materialEntlassen', 'nicht-gewaehlt'],
+    ]);
     expect(f.gesperrteModule).toEqual([]);
   });
 
@@ -147,9 +153,10 @@ describe('berichtFreigabe mit Auswahl (LFH-902, design.md D3)', () => {
   it('ein gesperrtes Modul eines abgewählten Blocks sperrt nicht und wird nicht abgerufen', () => {
     const f = berichtFreigabe(
       freigabenFixture({ personen: { zugriff: false } }),
-      STANDARDUMFANG.filter((b) => b !== 'bilanz'),
+      STANDARDUMFANG.filter((b) => b !== 'bilanz' && b !== 'hilfeleistungen'),
     );
     expect(f.je.personen).toBe('nicht-gewaehlt');
+    expect(f.je.personenVerbleibAngaben).toBe('nicht-gewaehlt');
     expect(f.je.schaeden).toBe('nicht-gewaehlt');
     expect(f.gesperrteModule).toEqual([]);
   });
@@ -166,6 +173,27 @@ describe('berichtFreigabe mit Auswahl (LFH-902, design.md D3)', () => {
       'personalEntlassen',
       'personalPerioden',
     ]);
+  });
+
+  it('Hilfeleistungen schöpfen nur aus dem Modul Personen, Rechte wie die Bilanz (LLH-1575)', () => {
+    const f = berichtFreigabe(freigabenFixture({ personen: { zugriff: false } }), [
+      'stammdaten',
+      'hilfeleistungen',
+    ]);
+    expect(f.je.personen).toBe('gesperrt');
+    expect(f.je.personenVerbleibAngaben).toBe('gesperrt');
+    expect(f.je.schaeden).toBe('nicht-gewaehlt');
+    expect(f.gesperrteModule).toEqual(['Betroffene']);
+  });
+
+  it('die Material-Anlage schöpft aus dem Modul Material (LLH-1575)', () => {
+    const f = berichtFreigabe(freigabenFixture({ material: { zugriff: false } }), [
+      'stammdaten',
+      'materialverbrauch',
+    ]);
+    expect(f.je.material).toBe('gesperrt');
+    expect(f.je.materialEntlassen).toBe('gesperrt');
+    expect(f.gesperrteModule).toEqual(['Material']);
   });
 
   it('der Einsatz wird bei jeder Auswahl abgerufen', () => {
