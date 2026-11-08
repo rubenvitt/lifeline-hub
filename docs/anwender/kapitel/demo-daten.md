@@ -51,7 +51,7 @@ geändert wurde, ist weg. Die andere Lage bleibt, wie sie ist.
    ![Rückfrage „Demo-Lage Starkregen entfernen?“ mit dem Knopf „Endgültig entfernen“](../bilder/demo-daten/entfernen.png)
 
 Das Paneel „Letzter Vorgang“ der Lage zählt danach je Fahrzeuge, Personal, Material,
-Einheiten-Vorlagen und Schichtmodelle, was entfernt und was behalten wurde. Die andere Lage
+Einheiten-Vorlagen, Schichtmodelle und Planungen, was entfernt und was behalten wurde. Die andere Lage
 bleibt, wie sie ist.
 
 ## Hintergrund
@@ -75,6 +75,10 @@ bleibt, wie sie ist.
   18:00 und vier Stunden Mindestdauer. Es wird nie die Vorgabe der Organisation, prägt also keinen echten Einsatz; der
   Demo-Einsatz nimmt es als seine Vorgabe für die Ablösung, wenn die Organisation keine eigene
   hat. Gibt es schon ein Schichtmodell mit demselben Namen, benutzt der Import es unverändert mit.
+- Nur beim Stadtfest: die Planung „Stadtfest Musterstadt“ für den Samstag nach dem Import, mit
+  der Unfallhilfsstelle, beiden Streifen, einer Sanitätswache an der Bühne und dem KTW als Posten,
+  dazu zwei Helfer und eine Einteilung, in der ein Mensch doppelt verplant ist. Gibt es schon eine
+  Planung mit demselben Namen, bleibt sie unverändert.
 - **Keine** Benutzerkonten. Kataloge wie Status, Einheitstypen und Qualifikationen benutzt der
   Import nur mit; fehlt ein benötigter Eintrag, bricht er mit einer Meldung ab.
 

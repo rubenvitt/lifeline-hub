@@ -84,12 +84,15 @@ fn erwarte_bericht(ergebnis: &StammdatenErgebnis, erwartet: [(i64, i64); 5]) {
         DemoStammdatenArt::Material,
         DemoStammdatenArt::EinheitVorlage,
         DemoStammdatenArt::Schichtmodell,
+        DemoStammdatenArt::Planung,
     ];
     assert_eq!(
         ergebnis.je_art.iter().map(|z| z.art).collect::<Vec<_>>(),
         arten.to_vec(),
         "alle Arten, in Enum-Reihenfolge"
     );
+    // Die Planung legt erst der Szenario-Import an, nicht der Stammdaten-Schritt.
+    let erwartet = erwartet.into_iter().chain([(0, 0)]);
     for (art, (angelegt, mitbenutzt)) in arten.into_iter().zip(erwartet) {
         assert_eq!(
             zeile(ergebnis, art),
@@ -1005,6 +1008,7 @@ async fn rundlauf_angelegtes_verschwindet_mitbenutztes_bleibt() {
                 0
             ),
             (DemoStammdatenArt::Schichtmodell, 1, 0),
+            (DemoStammdatenArt::Planung, 0, 0),
         ]
     );
     assert_eq!(

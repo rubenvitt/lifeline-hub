@@ -343,6 +343,7 @@ async fn entfernt_demo_einsatz_samt_etb_personen_und_stammdaten() {
             DemoStammdatenArt::Material,
             DemoStammdatenArt::EinheitVorlage,
             DemoStammdatenArt::Schichtmodell,
+            DemoStammdatenArt::Planung,
         ]
     );
     erwarte_zeile(&bericht, DemoStammdatenArt::Fahrzeug, 1, 0);

@@ -6,13 +6,15 @@ import type {
   Schichtplan,
   SchichtplanBefund,
   SchichtplanBlock,
+  SchichtplanBlockBody,
   SchichtplanHelfer,
   SchichtplanPerson,
   SchichtplanPersonEingabe,
   SchichtplanPostenEingabe,
   Uhs,
 } from '../../api/types';
-import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
+import { qualiSollEingabe } from '../../kraefte/qualiSoll';
 import { abschnittDerEinheit } from '../../kraefte/kraeftebaumKern';
 import { formatDauer } from '../dauer';
 import type { Ampel, RasterBlock, RasterZeile } from './raster';
@@ -309,4 +311,48 @@ export function mitPerson(
   const schluessel = eingabeSchluessel(neu);
   if (bisher.some((e) => eingabeSchluessel(e) === schluessel)) return null;
   return [...bisher, neu];
+}
+
+/**
+ * Body der Kopie eines Blocks (LLH-1584) an einen anderen Posten oder eine andere Zeit (Wire):
+ * gleiches Soll und Qualifikationssoll, die Personen nur mit `mitPersonen`, die Notiz nie (sie
+ * gilt meist der Zeit des Originals). An der Pause gibt es kein Soll; kommt die Kopie aus der
+ * Pause, fehlt das Soll und der Server nimmt die Vorgabe des Zielpostens.
+ */
+export function kopieBody(
+  block: SchichtplanBlock,
+  ziel: { posten: SchichtplanPostenEingabe; von: string; bis: string },
+  mitPersonen: boolean,
+): SchichtplanBlockBody {
+  const body: SchichtplanBlockBody = { posten: ziel.posten, von: ziel.von, bis: ziel.bis };
+  if (ziel.posten.art === 'pause') body.soll_anzahl = null;
+  else if (block.posten.art !== 'pause') {
+    body.soll_anzahl = block.soll_anzahl ?? null;
+    body.quali_soll = block.quali_soll ? qualiSollEingabe(block.quali_soll) : null;
+  }
+  const personen = mitPersonen ? blockPersonenEingaben(block) : [];
+  if (personen.length > 0) body.personen = personen;
+  return body;
+}
+
+/** Posten eines gelesenen Blocks als Eingabe. */
+function postenVon(block: SchichtplanBlock): SchichtplanPostenEingabe | null {
+  return postenEingabe(postenSchluessel(block.posten));
+}
+
+/**
+ * „Als nächsten Block kopieren“ (LLH-1584): derselbe Posten, Beginn am Ende des Blocks, gleiche
+ * Dauer, ohne Personen (der Folgeblock ist die Ablösung, Abstimmung 08.11.2026).
+ */
+export function naechsterBlockBody(block: SchichtplanBlock): SchichtplanBlockBody | null {
+  const posten = postenVon(block);
+  const von = alsZeitpunkt(block.von);
+  const bis = alsZeitpunkt(block.bis);
+  if (!posten || !von || !bis) return null;
+  const dauer = bis.valueOf() - von.valueOf();
+  return kopieBody(
+    block,
+    { posten, von: block.bis, bis: alsBackendZeit(bis.add(dauer, 'millisecond')) },
+    false,
+  );
 }

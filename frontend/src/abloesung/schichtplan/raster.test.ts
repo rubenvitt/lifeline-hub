@@ -135,6 +135,34 @@ describe('raster (LLH-1554)', () => {
       ).toBe('ueberschneidung');
     });
 
+    it('eine Kopie prüft gegen das Original und ist am alten Platz nie unverändert (LLH-1584)', () => {
+      const bloecke = [block(1, 'einheit:1', 0, 60), block(2, 'einheit:2', 0, 60)];
+      const schieben = {
+        art: 'verschieben',
+        blockId: 1,
+        von: min(0),
+        bis: min(60),
+        griff: 0,
+      } as const;
+      const pruefe = (zeile: string, von: number, bis: number) =>
+        pruefeZug(schieben, { zeile, von: min(von), bis: min(bis) }, ZEILEN, bloecke, true);
+      expect(pruefe('einheit:1', 0, 60)).toBe('ueberschneidung');
+      expect(pruefe('einheit:1', 30, 90)).toBe('ueberschneidung');
+      expect(pruefe('einheit:1', 60, 120)).toBe('ok');
+      expect(pruefe('einheit:2', 30, 90)).toBe('ueberschneidung');
+      // Aufziehen und Kanten kennen keine Kopie.
+      const kante = {
+        art: 'ende',
+        blockId: 1,
+        zeile: 'einheit:1',
+        von: min(0),
+        bis: min(60),
+      } as const;
+      expect(
+        pruefeZug(kante, { zeile: 'einheit:1', von: min(0), bis: min(60) }, ZEILEN, bloecke, true),
+      ).toBe('unveraendert');
+    });
+
     it('eine Kante am Fensterrand ist kein Griff, die echte Kante bleibt einer', () => {
       const spanne = { von: min(0), bis: min(360) };
       // Beginnt vor der Spanne: links nur verschieben, rechts die echte Kante.

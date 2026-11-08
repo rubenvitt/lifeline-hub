@@ -61,6 +61,7 @@ pub mod org;
 pub mod pegel;
 pub mod person;
 pub mod personal;
+pub mod planung;
 pub mod presse;
 pub mod programmpunkt;
 pub mod routes;

@@ -402,6 +402,8 @@ pub struct Szenario {
     pub einheiten_vorlagen: &'static [EinheitVorlageStamm],
     /// `None`: die Lage bringt kein Schichtmodell mit, und der Demo-Einsatz bekommt keins.
     pub schichtmodell: Option<SchichtmodellVorlage>,
+    /// Demo-Planung ohne Einsatz (LLH-1585); `None`: die Lage bringt keine mit.
+    pub planung: Option<&'static super::planung::PlanungVorlage>,
     pub drehbuch: &'static [Schritt],
 }
 
@@ -472,7 +474,9 @@ impl Szenario {
                     .iter()
                     .flat_map(|v| v.quali_soll.iter().map(|(label, _)| label)),
             )
-            .map(|label| Katalogeintrag::Qualifikation(label));
+            .copied()
+            .chain(self.planung.iter().flat_map(|p| p.qualifikationen()))
+            .map(Katalogeintrag::Qualifikation);
         let typen = self
             .einheiten_vorlagen
             .iter()
@@ -1817,6 +1821,7 @@ pub const STARKREGEN: Szenario = Szenario {
         bezeichnung: SCHICHTMODELL_BEZEICHNUNG,
         werte: schichtmodell,
     }),
+    planung: None,
     drehbuch: DREHBUCH,
 };
 

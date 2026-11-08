@@ -78,6 +78,10 @@ pub struct Grundlage<'a> {
     pub ueber_einheit: &'a HashMap<i64, Option<i64>>,
     pub grenzwerte: SchichtplanGrenzwerte,
     pub jetzt: DateTime<Utc>,
+    /// Ob es ein Ist gibt, gegen das der Plan läuft. Eine Vorplanung ohne Einsatz (LLH-1561,
+    /// design.md D4) prüft ohne: dann entfallen `abweichung` und `naechste_pruefung`, und die
+    /// Art des Postens zählt nur für die Pause.
+    pub mit_ist: bool,
 }
 
 /// Ergebnis für einen Block.
@@ -193,9 +197,9 @@ pub fn pruefe(bloecke: &[Block], g: &Grundlage<'_>) -> Ergebnis {
 
         // Plan gegen Ist: nur im Fenster [von + 10 min, bis).
         let ab = block.von + schwelle;
-        let im_fenster = ab <= g.jetzt && g.jetzt < block.bis;
+        let im_fenster = g.mit_ist && ab <= g.jetzt && g.jetzt < block.bis;
         for t in [ab, block.bis] {
-            if t > g.jetzt && ab < block.bis {
+            if g.mit_ist && t > g.jetzt && ab < block.bis {
                 ergebnis.naechste_pruefung = Some(match ergebnis.naechste_pruefung {
                     Some(n) => n.min(t),
                     None => t,
@@ -304,6 +308,7 @@ mod tests {
         ueber: HashMap<i64, Option<i64>>,
         grenzwerte: SchichtplanGrenzwerte,
         jetzt: DateTime<Utc>,
+        mit_ist: bool,
     }
 
     impl Welt {
@@ -315,6 +320,7 @@ mod tests {
                 ueber: HashMap::new(),
                 grenzwerte: SchichtplanGrenzwerte::aus(None, None),
                 jetzt: t("00:00"),
+                mit_ist: true,
             }
         }
 
@@ -327,6 +333,7 @@ mod tests {
                     ueber_einheit: &self.ueber,
                     grenzwerte: self.grenzwerte,
                     jetzt: self.jetzt,
+                    mit_ist: self.mit_ist,
                 },
             )
         }
@@ -611,5 +618,24 @@ mod tests {
         );
         assert!(r.bloecke[&2].personen[&BEN].is_empty());
         assert!(r.bloecke[&3].personen[&carla].is_empty());
+    }
+
+    /// Eine Vorplanung ohne Einsatz (LLH-1561) prüft ohne Ist: keine Abweichung, keine nächste
+    /// Prüfung, die übrigen Befunde bleiben.
+    #[test]
+    fn ohne_ist_keine_abweichung_aber_doppelt() {
+        let mut w = Welt::neu();
+        w.mit_ist = false;
+        w.jetzt = t("15:00");
+        let mut a = block(1, Posten::Einheit(2), t("14:00"), t("16:00"));
+        let mut b = block(2, Posten::Einheit(3), t("15:00"), t("17:00"));
+        a.personen = vec![BEN];
+        b.personen = vec![BEN];
+        let e = w.pruefe(&[a, b]);
+        assert_eq!(
+            arten(&e.bloecke[&1].personen[&BEN]),
+            [PlanBefundArt::Doppelt]
+        );
+        assert_eq!(e.naechste_pruefung, None);
     }
 }

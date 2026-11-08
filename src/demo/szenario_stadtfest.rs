@@ -14,6 +14,10 @@
 //! Anlass ist ein fester Katalogwert, das ETB nennt weder Anlass noch Zustand. Keine
 //! Einheiten-Vorlage und kein Schichtmodell (Sanitätsdienst ohne Schichten).
 
+use super::planung::{
+    PlanungEinteilung, PlanungHelferVorlage, PlanungPerson, PlanungPostenVorlage, PlanungVorlage,
+    PostenHerkunft,
+};
 use super::szenario::{
     abschnitt, besatzung, dispo_fahrzeug, dispo_personal, einheit, entscheidung, fms, lage,
     lagemeldung, material, personal_an_uhs, personal_zu, rueckmeldung, s, zu_einheit,
@@ -804,6 +808,168 @@ pub const DREHBUCH: &[Schritt] = &[
     ),
 ];
 
+/// Bezeichnung der Demo-Planung (LLH-1585, Spec `vorplanung`, „Stadtfest in neuen Einsatz“).
+pub const PLANUNG_BEZEICHNUNG: &str = "Stadtfest Musterstadt";
+
+/// Die Demo-Planung (design.md D8): fünf Posten, Schichten aus der Schichtlänge, zwei Helfer.
+/// Mia Muster steht in „UHS Marktplatz“ 10–17 und in „Streife 2“ 15–18 (Befund „doppelt“),
+/// „Streife 2“ 21–24 bleibt leer (die Lücke). Emil Probe dient genau 12 Stunden, also ohne
+/// Befund „Dienst“.
+pub const PLANUNG: PlanungVorlage = {
+    use PlanungPerson::{Helfer, Stamm};
+    PlanungVorlage {
+        bezeichnung: PLANUNG_BEZEICHNUNG,
+        ort: "Marktplatz Musterstadt",
+        von_stunde: 10,
+        bis_stunde: 24,
+        posten: &[
+            PlanungPostenVorlage {
+                schluessel: "uhs",
+                bezeichnung: "UHS Marktplatz",
+                abschnitt: Some("Marktplatz"),
+                herkunft: PostenHerkunft::Uhs(UhsTyp::Behandlungsplatz),
+                schichtlaenge_min: 420,
+                soll_anzahl: Some(3),
+                quali_soll: &[("Rettungssanitäter", 1)],
+                von_stunde: 10,
+                bis_stunde: 24,
+            },
+            PlanungPostenVorlage {
+                schluessel: "streife1",
+                bezeichnung: "Streife 1",
+                abschnitt: Some("Festmeile"),
+                herkunft: PostenHerkunft::Frei,
+                schichtlaenge_min: 180,
+                soll_anzahl: Some(2),
+                quali_soll: &[("Sanitäter", 1)],
+                von_stunde: 12,
+                bis_stunde: 24,
+            },
+            PlanungPostenVorlage {
+                schluessel: "streife2",
+                bezeichnung: "Streife 2",
+                abschnitt: Some("Festmeile"),
+                herkunft: PostenHerkunft::Frei,
+                schichtlaenge_min: 180,
+                soll_anzahl: Some(2),
+                quali_soll: &[("Sanitäter", 1)],
+                von_stunde: 12,
+                bis_stunde: 24,
+            },
+            PlanungPostenVorlage {
+                schluessel: "buehne",
+                bezeichnung: "Sanitätswache Bühne",
+                abschnitt: Some("Bühne"),
+                herkunft: PostenHerkunft::Frei,
+                schichtlaenge_min: 240,
+                soll_anzahl: Some(2),
+                quali_soll: &[],
+                von_stunde: 19,
+                bis_stunde: 23,
+            },
+            PlanungPostenVorlage {
+                schluessel: "ktw",
+                bezeichnung: "KTW Musterstadt 87-85",
+                abschnitt: None,
+                herkunft: PostenHerkunft::Fahrzeug("ktw"),
+                schichtlaenge_min: 300,
+                soll_anzahl: None,
+                quali_soll: &[],
+                von_stunde: 12,
+                bis_stunde: 17,
+            },
+        ],
+        helfer: &[
+            PlanungHelferVorlage {
+                schluessel: "nora",
+                name: "Nora Exempel",
+                organisation: "Helferkreis Musterstadt",
+                qualifikationen: &["Sanitäter"],
+            },
+            PlanungHelferVorlage {
+                schluessel: "finn",
+                name: "Finn Platzhalter",
+                organisation: "Helferkreis Musterstadt",
+                qualifikationen: &[],
+            },
+        ],
+        einteilung: &[
+            PlanungEinteilung {
+                posten: Some("uhs"),
+                ab_stunde: 10,
+                bis_stunde: 17,
+                personen: &[Stamm("uhs_leitung"), Stamm("uhs_san1"), Stamm("uhs_san2")],
+            },
+            PlanungEinteilung {
+                posten: Some("uhs"),
+                ab_stunde: 17,
+                bis_stunde: 24,
+                personen: &[Stamm("streife2_fuehrer"), Stamm("funker"), Helfer("nora")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife1"),
+                ab_stunde: 12,
+                bis_stunde: 15,
+                personen: &[Stamm("streife1_fuehrer"), Stamm("streife1_san")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife1"),
+                ab_stunde: 15,
+                bis_stunde: 18,
+                personen: &[Stamm("streife1_fuehrer"), Stamm("streife1_san")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife1"),
+                ab_stunde: 18,
+                bis_stunde: 21,
+                personen: &[Stamm("streife1_fuehrer"), Stamm("streife1_san")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife1"),
+                ab_stunde: 21,
+                bis_stunde: 24,
+                personen: &[Stamm("ktw_beifahrer"), Helfer("finn")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife2"),
+                ab_stunde: 12,
+                bis_stunde: 15,
+                personen: &[Stamm("ktw_fahrer"), Stamm("streife2_san")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife2"),
+                ab_stunde: 15,
+                bis_stunde: 18,
+                personen: &[Stamm("streife2_san"), Stamm("uhs_san2")],
+            },
+            PlanungEinteilung {
+                posten: Some("streife2"),
+                ab_stunde: 18,
+                bis_stunde: 21,
+                personen: &[Stamm("ktw_fahrer"), Stamm("ktw_beifahrer")],
+            },
+            PlanungEinteilung {
+                posten: None,
+                ab_stunde: 18,
+                bis_stunde: 19,
+                personen: &[Stamm("streife2_san")],
+            },
+            PlanungEinteilung {
+                posten: Some("buehne"),
+                ab_stunde: 19,
+                bis_stunde: 23,
+                personen: &[Stamm("einsatzleiter"), Stamm("streife2_san")],
+            },
+            PlanungEinteilung {
+                posten: Some("ktw"),
+                ab_stunde: 12,
+                bis_stunde: 17,
+                personen: &[Stamm("einsatzleiter"), Stamm("streife2_fuehrer")],
+            },
+        ],
+    }
+};
+
 /// Die Stadtfest-Lage als [`Szenario`]: ohne Einheiten-Vorlage, ohne Schichtmodell.
 pub const STADTFEST: Szenario = Szenario {
     lage: DemoLage::Stadtfest,
@@ -817,6 +983,7 @@ pub const STADTFEST: Szenario = Szenario {
     material: &MATERIAL,
     einheiten_vorlagen: &[],
     schichtmodell: None,
+    planung: Some(&PLANUNG),
     drehbuch: DREHBUCH,
 };
 

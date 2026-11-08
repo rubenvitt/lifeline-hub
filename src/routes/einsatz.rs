@@ -75,7 +75,7 @@ pub struct NeuerEinsatz {
 /// `ortsfeld`, „Koordinate des Einsatzorts wird geprüft“). Breite und Länge kommen nur als Paar:
 /// beide fehlen, beide `null` oder beide mit Wert. Ein halbes Paar ist **422**, ein Wert außerhalb
 /// des Bereichs **400** (`src/AGENTS.md`, Statuscode-Konvention). Liefert das gesetzte Paar.
-fn pruefe_koordinate(
+pub(crate) fn pruefe_koordinate(
     lat: Option<Option<f64>>,
     lon: Option<Option<f64>>,
 ) -> Result<Option<(f64, f64)>, AppError> {
