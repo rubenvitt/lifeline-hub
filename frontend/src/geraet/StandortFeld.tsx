@@ -70,12 +70,14 @@ export default function StandortFeld({
     );
   };
 
-  // Einmal je Einhängen; `ermitteln` liest nur Refs und Props des ersten Renders.
-  const sofortGelaufen = useRef(false);
+  // Einmal je Einhängen; `ermitteln` liest nur Refs und Props des ersten Renders. Das Aushängen
+  // verwirft die Anfrage; StrictMode hängt einmal aus und wieder ein, dann gilt die zweite.
   useEffect(() => {
-    if (!sofort || sofortGelaufen.current || value || disabled) return;
-    sofortGelaufen.current = true;
+    if (!sofort || value || disabled) return;
     ermitteln();
+    return () => {
+      anfrage.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Einhängen
   }, []);
 
