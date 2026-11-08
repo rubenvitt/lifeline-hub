@@ -689,7 +689,7 @@ Sonst steht die Herkunft „Lifeline Hub“ mit `personal-17` (Stamm-Personal), 
 (Einsatzkraft ohne Stammdaten) oder `helfer-4` (Helfer des Plans); ein Helfer einer Planung trägt
 seine Nummer und die Herkunft `vorplanung`. Beim Einlesen trifft ein solcher Bezug sicher, wenn
 die Person dieser Organisation bzw. dieses Einsatzes so heißt; trägt schon ein Helfer des Plans
-genau diese Kennung, bleibt es bei ihm. Sonst, etwa in einem anderen
+genau diese Kennung mit der Herkunft „Lifeline Hub“, bleibt es bei ihm. Sonst, etwa in einem anderen
 Einsatz, wird die Person wie jede andere gesucht und, wenn nötig, Helfer mit Kennung und
 Herkunft; ein zweiter Lauf trifft sie dann wieder.
 
