@@ -1,4 +1,13 @@
-import { Button, Collapse, Form, Input, InputNumber, Popconfirm, Typography } from 'antd';
+import {
+  Button,
+  Collapse,
+  ConfigProvider,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Typography,
+} from 'antd';
 import { Select } from '../../components/Select';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -308,147 +317,153 @@ export default function SchichtplanBlockDialog({
       initialValues={anfang}
       erfassenText={block ? 'Speichern' : 'Block anlegen'}
       laeuft={laeuft}
-      gesperrt={!darfSchreiben}
+      gesperrt={!darfSchreiben || !!kopierenLaeuft}
       speicherung={speicherung}
       speicherFehlerTitel={block ? 'Block nicht gespeichert' : 'Block nicht angelegt'}
       onErfassen={speichern}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {(luecke || befunde.length > 0) && (
-        <div data-lfh="schichtplan-block-befunde" style={{ marginBottom: 12 }}>
-          {luecke && (
-            <Typography.Text type="warning" style={{ display: 'block' }}>
-              {luecke}
-            </Typography.Text>
-          )}
-          {befunde.map((t) => (
-            <Typography.Text key={t} type="danger" style={{ display: 'block' }}>
-              {t}
-            </Typography.Text>
-          ))}
-        </div>
-      )}
-      <Form.Item<BlockWerte>
-        name="posten"
-        label="Posten"
-        rules={[{ required: true, message: 'Bitte einen Posten wählen' }]}
-      >
-        <Select placeholder="Posten wählen…" options={postenOptionen} />
-      </Form.Item>
-      <Form.Item<BlockWerte>
-        name="zeit"
-        label="Zeit"
-        rules={[
-          {
-            validator: (_, z: Zeitraum | null) => {
-              if (!zeitraumGueltig(z)) return Promise.reject(new Error('Beginn und Ende angeben'));
-              if (z[1].valueOf() - z[0].valueOf() < MINDEST_MS)
-                return Promise.reject(new Error('Mindestens 10 Minuten'));
-              if (z[0].minute() % 5 !== 0 || z[1].minute() % 5 !== 0)
-                return Promise.reject(new Error('Auf volle 5 Minuten'));
-              return Promise.resolve();
+      {/* Während die Kopie entsteht, ruht die Eingabe: danach zeigt der Dialog die Kopie. */}
+      <ConfigProvider componentDisabled={!!kopierenLaeuft}>
+        {(luecke || befunde.length > 0) && (
+          <div data-lfh="schichtplan-block-befunde" style={{ marginBottom: 12 }}>
+            {luecke && (
+              <Typography.Text type="warning" style={{ display: 'block' }}>
+                {luecke}
+              </Typography.Text>
+            )}
+            {befunde.map((t) => (
+              <Typography.Text key={t} type="danger" style={{ display: 'block' }}>
+                {t}
+              </Typography.Text>
+            ))}
+          </div>
+        )}
+        <Form.Item<BlockWerte>
+          name="posten"
+          label="Posten"
+          rules={[{ required: true, message: 'Bitte einen Posten wählen' }]}
+        >
+          <Select placeholder="Posten wählen…" options={postenOptionen} />
+        </Form.Item>
+        <Form.Item<BlockWerte>
+          name="zeit"
+          label="Zeit"
+          rules={[
+            {
+              validator: (_, z: Zeitraum | null) => {
+                if (!zeitraumGueltig(z))
+                  return Promise.reject(new Error('Beginn und Ende angeben'));
+                if (z[1].valueOf() - z[0].valueOf() < MINDEST_MS)
+                  return Promise.reject(new Error('Mindestens 10 Minuten'));
+                if (z[0].minute() % 5 !== 0 || z[1].minute() % 5 !== 0)
+                  return Promise.reject(new Error('Auf volle 5 Minuten'));
+                return Promise.resolve();
+              },
             },
-          },
-        ]}
-      >
-        <ZeitraumEingabe art="frist" />
-      </Form.Item>
-      <Form.Item<BlockWerte>
-        name="personen"
-        label="Personen"
-        extra={personenGesperrt}
-        rules={[
-          {
-            type: 'array',
-            max: SCHICHTPLAN_PERSONEN_MAX,
-            message: `Höchstens ${SCHICHTPLAN_PERSONEN_MAX} Personen`,
-          },
-        ]}
-      >
-        <Select
-          mode="multiple"
-          disabled={personenGesperrt != null}
-          loading={personen == null && personenGesperrt == null}
-          placeholder={personenGesperrt ? '—' : 'unbesetzt'}
-          options={personenOptionen}
-        />
-      </Form.Item>
-      {!istPause && (
-        <Form.Item<BlockWerte> name="soll" label="Soll">
-          <InputNumber
-            min={0}
-            max={SCHICHTPLAN_PERSONEN_MAX}
-            precision={0}
-            placeholder={sollPlatzhalter}
-            style={{ width: '100%' }}
+          ]}
+        >
+          <ZeitraumEingabe art="frist" />
+        </Form.Item>
+        <Form.Item<BlockWerte>
+          name="personen"
+          label="Personen"
+          extra={personenGesperrt}
+          rules={[
+            {
+              type: 'array',
+              max: SCHICHTPLAN_PERSONEN_MAX,
+              message: `Höchstens ${SCHICHTPLAN_PERSONEN_MAX} Personen`,
+            },
+          ]}
+        >
+          <Select
+            mode="multiple"
+            disabled={personenGesperrt != null}
+            loading={personen == null && personenGesperrt == null}
+            placeholder={personenGesperrt ? '—' : 'unbesetzt'}
+            options={personenOptionen}
           />
         </Form.Item>
-      )}
-      <Collapse
-        ghost
-        items={[
-          ...(istPause
-            ? []
-            : [
-                {
-                  key: 'quali',
-                  label: qualiKopf ? `Qualifikationssoll · ${qualiKopf}` : 'Qualifikationssoll',
-                  forceRender: true,
-                  children: (
-                    <Form.Item<BlockWerte> name="quali" label="Qualifikationssoll">
-                      <QualiSollFeld
-                        disabled={!darfSchreiben}
-                        bekannt={block?.quali_soll ?? (posten ? qualiVorgabe.get(posten) : null)}
-                      />
-                    </Form.Item>
-                  ),
-                },
-              ]),
-          {
-            key: 'notiz',
-            label: block?.notiz ? 'Notiz · vorhanden' : 'Notiz',
-            forceRender: true,
-            children: (
-              <Form.Item<BlockWerte>
-                name="notiz"
-                label="Notiz"
-                rules={[zeichenRegel(SCHICHTPLAN_NOTIZ_MAX, 'Notiz')]}
-              >
-                <Input.TextArea rows={2} count={zeichenGrenze(SCHICHTPLAN_NOTIZ_MAX)} />
-              </Form.Item>
-            ),
-          },
-        ]}
-      />
-      {loeschFehler != null && (
-        <SpeicherFehler fehler={loeschFehler} titel="Block nicht gelöscht" />
-      )}
-      {kopierFehler != null && <SpeicherFehler fehler={kopierFehler} titel="Block nicht kopiert" />}
-      {block && onKopieren && darfSchreiben && (
-        <Button
-          data-lfh="schichtplan-block-kopieren"
-          loading={kopierenLaeuft}
-          disabled={geaendert}
-          onClick={() => onKopieren(block)}
-          style={{ marginTop: 8, marginInlineEnd: 8 }}
-        >
-          Als nächsten Block kopieren
-        </Button>
-      )}
-      {block && onLoeschen && darfSchreiben && (
-        <Popconfirm
-          title="Block löschen?"
-          okText="Block löschen"
-          cancelText="Behalten"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => onLoeschen(block)}
-        >
-          <Button danger loading={loeschenLaeuft} style={{ marginTop: 8 }}>
-            Block löschen
+        {!istPause && (
+          <Form.Item<BlockWerte> name="soll" label="Soll">
+            <InputNumber
+              min={0}
+              max={SCHICHTPLAN_PERSONEN_MAX}
+              precision={0}
+              placeholder={sollPlatzhalter}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+        )}
+        <Collapse
+          ghost
+          items={[
+            ...(istPause
+              ? []
+              : [
+                  {
+                    key: 'quali',
+                    label: qualiKopf ? `Qualifikationssoll · ${qualiKopf}` : 'Qualifikationssoll',
+                    forceRender: true,
+                    children: (
+                      <Form.Item<BlockWerte> name="quali" label="Qualifikationssoll">
+                        <QualiSollFeld
+                          disabled={!darfSchreiben}
+                          bekannt={block?.quali_soll ?? (posten ? qualiVorgabe.get(posten) : null)}
+                        />
+                      </Form.Item>
+                    ),
+                  },
+                ]),
+            {
+              key: 'notiz',
+              label: block?.notiz ? 'Notiz · vorhanden' : 'Notiz',
+              forceRender: true,
+              children: (
+                <Form.Item<BlockWerte>
+                  name="notiz"
+                  label="Notiz"
+                  rules={[zeichenRegel(SCHICHTPLAN_NOTIZ_MAX, 'Notiz')]}
+                >
+                  <Input.TextArea rows={2} count={zeichenGrenze(SCHICHTPLAN_NOTIZ_MAX)} />
+                </Form.Item>
+              ),
+            },
+          ]}
+        />
+        {loeschFehler != null && (
+          <SpeicherFehler fehler={loeschFehler} titel="Block nicht gelöscht" />
+        )}
+        {kopierFehler != null && (
+          <SpeicherFehler fehler={kopierFehler} titel="Block nicht kopiert" />
+        )}
+        {block && onKopieren && darfSchreiben && (
+          <Button
+            data-lfh="schichtplan-block-kopieren"
+            loading={kopierenLaeuft}
+            disabled={geaendert}
+            onClick={() => onKopieren(block)}
+            style={{ marginTop: 8, marginInlineEnd: 8 }}
+          >
+            Als nächsten Block kopieren
           </Button>
-        </Popconfirm>
-      )}
+        )}
+        {block && onLoeschen && darfSchreiben && (
+          <Popconfirm
+            title="Block löschen?"
+            okText="Block löschen"
+            cancelText="Behalten"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => onLoeschen(block)}
+          >
+            <Button danger loading={loeschenLaeuft} style={{ marginTop: 8 }}>
+              Block löschen
+            </Button>
+          </Popconfirm>
+        )}
+      </ConfigProvider>
     </ErfassungsModal>
   );
 }

@@ -190,6 +190,12 @@ describe('SchichtplanBlockDialog · Als nächsten Block kopieren (LLH-1584)', ()
     await waitFor(() => expect(knopf).toBeDisabled());
   });
 
+  it('während die Kopie entsteht, ruht die Eingabe', () => {
+    const { dialog } = zeige(block(), { kopierenLaeuft: true });
+    expect(within(dialog).getByRole('spinbutton', { name: 'Soll' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
   it('beim Anlegen gibt es keinen Knopf', () => {
     zeige(null);
     expect(screen.queryByRole('button', { name: 'Als nächsten Block kopieren' })).toBeNull();
