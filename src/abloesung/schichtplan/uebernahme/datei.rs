@@ -55,6 +55,9 @@ pub struct Tabelle {
     pub kopf: Vec<String>,
     pub zeilen: Vec<(u32, Vec<Zelle>)>,
     pub meldungen: Vec<ImportMeldung>,
+    /// Tage, die eine Zahl der Mappe zur Excel-Seriennummer des 1900-Systems fehlen: 1462 bei
+    /// einer Mappe im 1904-Datumssystem (ältere Mac-Excel), sonst 0.
+    pub serien_versatz: f64,
 }
 
 fn unlesbar(was: &str) -> AppError {
@@ -208,12 +211,16 @@ fn lies_csv(bytes: &[u8]) -> Result<Tabelle, AppError> {
         kopf: kopf.into_iter().map(|k| k.trim().to_string()).collect(),
         zeilen,
         meldungen,
+        serien_versatz: 0.0,
     })
 }
 
 // ---------------------------------------------------------------------------------------------
 // XLSX
 // ---------------------------------------------------------------------------------------------
+
+/// Tage zwischen den Epochen des 1900- und des 1904-Datumssystems von Excel.
+const EPOCHE_1904_TAGE: f64 = 1462.0;
 
 /// Excel-Seriennummer (Tage seit 1899-12-30, Bruchteil = Uhrzeit) als Zeit, auf die Sekunde
 /// gerundet. Außerhalb von 1900–9999 `None`.
@@ -261,6 +268,11 @@ fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
         .or_else(|| namen.first())
         .cloned()
         .ok_or_else(|| unlesbar("XLSX"))?;
+    let serien_versatz = if mappe.has_1904_epoch() {
+        EPOCHE_1904_TAGE
+    } else {
+        0.0
+    };
     let zelle = |d: &DataRef| -> Zelle {
         let text = |t: &str| {
             let t = t.trim();
@@ -277,9 +289,11 @@ fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
             DataRef::String(s) | DataRef::DateTimeIso(s) | DataRef::DurationIso(s) => text(s),
             DataRef::SharedString(s) => text(s),
             DataRef::Bool(b) => Zelle::Text(b.to_string()),
-            DataRef::DateTime(dt) if dt.is_datetime() => excel_seriell(dt.as_f64())
-                .map(Zelle::Zeit)
-                .unwrap_or(Zelle::Zahl(dt.as_f64())),
+            DataRef::DateTime(dt) if dt.is_datetime() => {
+                excel_seriell(dt.as_f64() + serien_versatz)
+                    .map(Zelle::Zeit)
+                    .unwrap_or(Zelle::Zahl(dt.as_f64()))
+            }
             DataRef::DateTime(dt) => Zelle::Zahl(dt.as_f64()),
         }
     };
@@ -330,6 +344,7 @@ fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
         kopf,
         zeilen,
         meldungen: Vec::new(),
+        serien_versatz,
     })
 }
 
@@ -491,12 +506,16 @@ fn ortszeit(t: NaiveDateTime, zone: Tz) -> Result<DateTime<Utc>, String> {
     }
 }
 
-fn lies_zeit(zelle: &Zelle, zone: Tz) -> Result<Option<(DateTime<Utc>, ZeitQuelle)>, String> {
+fn lies_zeit(
+    zelle: &Zelle,
+    zone: Tz,
+    serien_versatz: f64,
+) -> Result<Option<(DateTime<Utc>, ZeitQuelle)>, String> {
     let ort = |t: NaiveDateTime| ortszeit(t, zone).map(|z| Some((z, ZeitQuelle::Ortszeit)));
     match zelle {
         Zelle::Leer => Ok(None),
         Zelle::Zeit(t) => ort(*t),
-        Zelle::Zahl(z) => match excel_seriell(*z) {
+        Zelle::Zahl(z) => match excel_seriell(*z + serien_versatz) {
             Some(t) => ort(t),
             None => Err(format!("„{z}“ ist keine Zeit")),
         },
@@ -654,6 +673,7 @@ fn pruefe_zeile(
     nr: u32,
     z: &[Zelle],
     zone: Tz,
+    serien_versatz: f64,
     meldungen: &mut Vec<ImportMeldung>,
 ) -> Result<Zeile, String> {
     let posten_text = sp.text(z, Spalte::Posten);
@@ -670,8 +690,10 @@ fn pruefe_zeile(
             hoechstens(sp.text(z, Spalte::Abschnitt), POSTEN_TEXT_MAX, "Abschnitt")?,
         )
     };
-    let (von, q1) = lies_zeit(sp.zelle(z, Spalte::Beginn), zone)?.ok_or("Beginn fehlt")?;
-    let (bis, q2) = lies_zeit(sp.zelle(z, Spalte::Ende), zone)?.ok_or("Ende fehlt")?;
+    let (von, q1) =
+        lies_zeit(sp.zelle(z, Spalte::Beginn), zone, serien_versatz)?.ok_or("Beginn fehlt")?;
+    let (bis, q2) =
+        lies_zeit(sp.zelle(z, Spalte::Ende), zone, serien_versatz)?.ok_or("Ende fehlt")?;
     for t in [von, bis] {
         if !crate::zeit::JAHRE.contains(&chrono::Datelike::year(&t)) {
             return Err(format!(
@@ -791,7 +813,7 @@ pub fn lies_paket(bytes: &[u8], zone: Tz) -> Result<(PlanPaket, Vec<ImportMeldun
         if z.iter().all(|c| *c == Zelle::Leer) {
             continue;
         }
-        let zeile = match pruefe_zeile(&sp, *nr, z, zone, &mut meldungen) {
+        let zeile = match pruefe_zeile(&sp, *nr, z, zone, tabelle.serien_versatz, &mut meldungen) {
             Ok(zeile) => zeile,
             Err(grund) => {
                 meldungen.push(ImportMeldung::fehler(Some(*nr), grund));
@@ -966,8 +988,13 @@ pub fn begrenzt_lesen(mut r: impl Read) -> Result<Vec<u8>, AppError> {
 mod tests {
     use super::*;
 
-    /// Kleinste XLSX mit einem Blatt; `zellen` als (Bezug wie „A1“, Text).
+    /// Kleinste XLSX mit einem Blatt; `zellen` als (Bezug wie „A1“, Text). Ein Text mit `#`
+    /// vorn wird eine Zahlzelle.
     fn mini_xlsx(zellen: &[(&str, &str)]) -> Vec<u8> {
+        mini_xlsx_mit(zellen, false)
+    }
+
+    fn mini_xlsx_mit(zellen: &[(&str, &str)], datum_1904: bool) -> Vec<u8> {
         use std::io::Write;
         let mut zeilen: std::collections::BTreeMap<u32, String> = Default::default();
         for (bezug, text) in zellen {
@@ -975,9 +1002,11 @@ mod tests {
                 .trim_start_matches(|c: char| c.is_ascii_alphabetic())
                 .parse()
                 .unwrap();
-            zeilen.entry(nr).or_default().push_str(&format!(
-                r#"<c r="{bezug}" t="inlineStr"><is><t>{text}</t></is></c>"#
-            ));
+            let c = match text.strip_prefix('#') {
+                Some(zahl) => format!(r#"<c r="{bezug}"><v>{zahl}</v></c>"#),
+                None => format!(r#"<c r="{bezug}" t="inlineStr"><is><t>{text}</t></is></c>"#),
+            };
+            zeilen.entry(nr).or_default().push_str(&c);
         }
         let daten: String = zeilen
             .iter()
@@ -994,7 +1023,7 @@ mod tests {
             ),
             (
                 "xl/workbook.xml",
-                r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Plan" sheetId="1" r:id="rId1"/></sheets></workbook>"#.to_string(),
+                r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{}<sheets><sheet name="Plan" sheetId="1" r:id="rId1"/></sheets></workbook>"#.replace("{}", if datum_1904 { r#"<workbookPr date1904="1"/>"# } else { "" }),
             ),
             (
                 "xl/_rels/workbook.xml.rels",
@@ -1029,6 +1058,23 @@ mod tests {
         assert_eq!(t.zeilen.len(), 1);
         assert_eq!(t.zeilen[0].0, 4, "Zeilennummer wie in Excel");
         assert_eq!(t.zeilen[0].1[1], Zelle::Text("Streife 1".into()));
+    }
+
+    #[test]
+    fn xlsx_im_1904_datumssystem() {
+        // 44481.5 im 1904-System ist 45943.5 im 1900-System: 13.10.2025 12:00.
+        let t = lies_xlsx(&mini_xlsx_mit(
+            &[("A1", "Beginn"), ("A2", "#44481.5")],
+            true,
+        ))
+        .unwrap();
+        assert_eq!(t.serien_versatz, EPOCHE_1904_TAGE);
+        let (z, _) = lies_zeit(&t.zeilen[0].1[0], BERLIN, t.serien_versatz)
+            .unwrap()
+            .unwrap();
+        assert_eq!(crate::zeit::formatiere_utc(z), "2025-10-13 10:00:00");
+        let t = lies_xlsx(&mini_xlsx(&[("A1", "Beginn"), ("A2", "#45943.5")])).unwrap();
+        assert_eq!(t.serien_versatz, 0.0);
     }
 
     #[test]
@@ -1176,11 +1222,11 @@ mod tests {
     #[test]
     fn zeitumstellung_doppelte_stunde_frueher_fehlende_fehler() {
         // 25.10.2026: 02:00–03:00 doppelt; 29.03.2026: 02:00–03:00 fehlt.
-        let z = lies_zeit(&Zelle::Text("2026-10-25 02:30".into()), BERLIN)
+        let z = lies_zeit(&Zelle::Text("2026-10-25 02:30".into()), BERLIN, 0.0)
             .unwrap()
             .unwrap();
         assert_eq!(crate::zeit::formatiere_utc(z.0), "2026-10-25 00:30:00");
-        assert!(lies_zeit(&Zelle::Text("2026-03-29 02:30".into()), BERLIN).is_err());
+        assert!(lies_zeit(&Zelle::Text("2026-03-29 02:30".into()), BERLIN, 0.0).is_err());
     }
 
     #[test]

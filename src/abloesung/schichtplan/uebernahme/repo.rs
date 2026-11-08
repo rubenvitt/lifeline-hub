@@ -758,6 +758,30 @@ pub fn planen(
             }
             (_, Some(&i)) => {
                 let g = &mut gruppen[i];
+                // Zwei Blöcke der Datei landen auf demselben Ziel: ihr Soll muss passen.
+                let anzahl_widerspricht = matches!(
+                    (g.soll_anzahl, b.soll_anzahl),
+                    (Some(a), Some(n)) if a != n
+                );
+                let quali_widerspricht = g.quali_soll.is_some()
+                    && quali_soll.is_some()
+                    && quali_paare(g.quali_soll.as_deref()) != quali_paare(quali_soll.as_deref());
+                if anzahl_widerspricht || quali_widerspricht {
+                    let bezug = g
+                        .zeile
+                        .map(|z| format!(" von Zeile {z}"))
+                        .unwrap_or_default();
+                    meldungen.push(ImportMeldung::fehler(
+                        b.zeile,
+                        format!("Soll weicht{bezug} ab"),
+                    ));
+                }
+                if g.soll_anzahl.is_none() {
+                    g.soll_anzahl = b.soll_anzahl;
+                }
+                if g.quali_soll.is_none() {
+                    g.quali_soll = quali_soll;
+                }
                 for w in personen {
                     if !g.personen.contains(&w) {
                         g.personen.push(w);
@@ -1873,6 +1897,49 @@ mod tests {
                 .status(),
             axum::http::StatusCode::BAD_REQUEST
         );
+    }
+
+    #[test]
+    fn zwei_bloecke_auf_einem_ziel_mit_anderem_soll_sind_ein_fehler() {
+        let mut a = block("p1", "2026-07-04T13:00:00Z", "2026-07-04T15:00:00Z", &[], 2);
+        a.soll_anzahl = Some(2);
+        let mut b = block("p2", "2026-07-04T13:00:00Z", "2026-07-04T15:00:00Z", &[], 3);
+        b.soll_anzahl = Some(3);
+        let paket = PlanPaket {
+            posten: vec![
+                posten("p1", PaketPostenArt::Einheit, "Streife 9", 2),
+                posten("p2", PaketPostenArt::Einheit, "Streife 8", 3),
+            ],
+            bloecke: vec![a, b.clone()],
+            ..Default::default()
+        };
+        let mut e = Entscheidungen::default();
+        for s in ["p1", "p2"] {
+            e.posten
+                .insert(s.into(), PostenEntscheidung::Einheit { einheit_id: 10 });
+        }
+        let v = planen(&bestand(), &paket, vec![], &e, ALLE)
+            .unwrap()
+            .vorschau;
+        assert!(!v.uebernehmbar);
+        assert!(
+            v.meldungen
+                .iter()
+                .any(|m| m.zeile == Some(3) && m.text == "Soll weicht von Zeile 2 ab"),
+            "{:?}",
+            v.meldungen
+        );
+
+        // Ein Block ohne eigenes Soll widerspricht nicht.
+        b.soll_anzahl = None;
+        let paket = PlanPaket {
+            bloecke: vec![paket.bloecke[0].clone(), b],
+            ..paket
+        };
+        let v = planen(&bestand(), &paket, vec![], &e, ALLE)
+            .unwrap()
+            .vorschau;
+        assert!(v.uebernehmbar, "{:?}", v.meldungen);
     }
 
     #[test]
