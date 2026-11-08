@@ -726,6 +726,28 @@ async fn nachtrag_sendet_live_events() {
     assert!(n.data.contains(&ep.to_string()), "{}", n.data);
 }
 
+/// Neue Grenzwerte erreichen auch Leser ohne das Modul Ablösung (LLH-730): `abloesung` allein
+/// filtert das Modul-Gate für sie weg, deshalb melden `einheit` und `personal` mit, die den Prefix
+/// der Kräfte-Zeitachse im Client invalidieren.
+#[tokio::test]
+async fn grenzwerte_setzen_meldet_einheit_und_personal() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(e);
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/abloesungen/schichtplan/grenzwerte"),
+        &admin,
+        Some(r#"{"max_dienst_minuten":360}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    recv_until_tag(&mut rx, "einheit", Duration::from_secs(2)).await;
+    recv_until_tag(&mut rx, "personal", Duration::from_secs(2)).await;
+}
+
 const PERSONAL: &[(&str, &str)] = &[("personal", "personal_id")];
 
 /// Zweite Person der Einheit, die per eigenem Status schon eingetroffen ist: ihre Kopie eines

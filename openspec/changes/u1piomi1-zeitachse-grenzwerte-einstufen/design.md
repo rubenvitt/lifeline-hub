@@ -14,8 +14,9 @@
   Befund.
 - **Zugriff:** Die Grenzwerte liefert nur `GET …/abloesungen/schichtplan`. Das verlangt das Modul
   Ablösung und lädt den ganzen Plan. Meldebild und Personal-Seite haben das Modul oft nicht.
-- **Live:** Das Setzen der Grenzwerte sendet `abloesung` über SSE. Das Ereignis `abloesung`
-  invalidiert schon den Prefix `kraefteZeitachse` (`api/queryKeys.ts`). Dieser Prefix steht in
+- **Live:** Das Setzen der Grenzwerte sendet `abloesung` über SSE. Das Ereignis invalidiert den
+  Prefix `kraefteZeitachse` (`api/queryKeys.ts`), erreicht aber nur Leser des Moduls Ablösung
+  (Modul-Gate in `src/live/mod.rs`, `LiveNachricht::fuer`). Der Prefix steht in
   `LAGEBILD_OFFLINE` und ist ohne Netz lesbar.
 - **Abgestimmt mit Ruben am 08.11.2026** (Zunder LLH-730, Kommentare): wirksame Werte samt
   Vorgaben, Dienststrecke wie im Plan, „Ruhe zu kurz“ beim Wiedereinsatz, eigener Lese-GET.
@@ -87,11 +88,18 @@ ist der vorhandene Typ, also kommt kein neuer Codegen-Typ dazu, nur zwei neue Pf
 `api_doc.rs`, falls die Datei Pfade listet. Der Pfad `…/einheiten/zeitachse/grenzwerte` ist
 statisch und kollidiert nicht mit `…/einheiten/{eid}/zeitachse`, weil schon
 `…/einheiten/zeitachse` danebensteht.
-Im Client steht `ladeZeitachseGrenzwerte(einsatzId, art)` in `api/kraefteZeitachse.ts`, mit den
-Keys `einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, art)` =
-`[kraefteZeitachse, einsatzId, 'grenzwerte', art]`. Sie liegen unter dem Prefix, damit sie live
-über `abloesung` und ohne Netz laufen, wie die Perioden. `lagebildOffline.guard.test.ts` deckt
-den Prefix schon ab.
+Im Client steht `ladeZeitachseGrenzwerte(einsatzId, modul)` in `api/kraefteZeitachse.ts`, mit den
+Keys `einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, modul)` =
+`[kraefteZeitachse, einsatzId, 'einheiten' | 'personal', 'grenzwerte']`. Sie liegen im Unterbereich
+des Moduls, damit `einsatz/gesperrteListen.ts` sie beim Modulentzug mit räumt (es prüft `k[2]`),
+und unter dem Prefix, damit sie ohne Netz lesbar sind wie die Perioden.
+**Live (Befund aus dem Review):** `abloesung` allein erreicht Leser ohne das Modul Ablösung nicht.
+`grenzwerte_setzen` sendet deshalb zusätzlich `einheit` und `personal` ohne Nutzlast; beide
+Familien invalidieren im Client den Prefix `kraefteZeitachse`. Das ist das Muster aus LLH-1501
+(`sse_namens_traeger`: Leser ohne das Recht über ihr eigenes Modul erreichen). Es kostet einen
+breiteren Neuabruf, aber Grenzwerte ändern sich selten.
+*Verworfen:* eine eigene `LiveEvent`-Variante. Sie bräuchte den Enum-Wire-Kontrakt und
+`EINSATZ_STREAM_EVENTS` für ein seltenes Ereignis.
 *Verworfen:* die Perioden-Antworten zu `{ grenzwerte, perioden }` umzubauen. Das würde die Form
 brechen (Codegen, Druck, Offline-Cache, Überblick, Bereitstellungsraum).
 *Verworfen:* der Schichtplan-GET. Er verlangt das Modul Ablösung und lädt den ganzen Plan.

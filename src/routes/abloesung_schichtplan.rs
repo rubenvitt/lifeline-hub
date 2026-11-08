@@ -7,7 +7,8 @@
 //! Einheiten-Posten, Unfallhilfsstellen für einen UHS-Posten, Personal sobald Personen oder
 //! Helfer geschrieben werden (403). Lesen ohne Personal liefert keine Namen (`personen: null`).
 //! Jeder wirksame Schreibweg veröffentlicht `LiveEvent::Abloesung`; ETB nur für „Schichten
-//! erzeugen“ und geänderte Grenzwerte.
+//! erzeugen“ und geänderte Grenzwerte. Geänderte Grenzwerte melden zusätzlich `Einheit` und
+//! `Personal`, weil die Kräfte-Zeitachse sie auch ohne das Modul Ablösung einstuft (LLH-730).
 
 use axum::extract::{Multipart, Query, State};
 use axum::http::StatusCode;
@@ -410,6 +411,15 @@ pub async fn grenzwerte_setzen(
     .await?;
     if etb_id.is_some() {
         publiziere(&state, ctx.einsatz.id, etb_id);
+        // Dieselben Werte stuft die Kräfte-Zeitachse in Meldebild und Personalliste ein (LLH-730).
+        // `abloesung` erreicht nur Leser des Moduls Ablösung; `einheit` und `personal` frischen
+        // die Grenzwerte (Prefix der Kräfte-Zeitachse im Client) auch für alle anderen auf.
+        state
+            .live
+            .publiziere_einsatz(ctx.einsatz.id, crate::live::LiveEvent::Einheit);
+        state
+            .live
+            .publiziere_einsatz(ctx.einsatz.id, crate::live::LiveEvent::Personal);
     }
     Ok(Json(plan(&state, &ctx).await?))
 }

@@ -9,7 +9,8 @@
 
 - [x] 2.1 Tests in `kraefte/zeitachse.test.ts` (rot) für `stufeEin(perioden, grenzwerte, jetztMs)` mit den Zahlen der Spec-Szenarien: 12 h 20 → `zu_lang`; genau 12 h 00 → keine; 08–14 und ab 16:00 um 22:30 → `zu_lang` mit Strecke ab 08:00 und 14 h 30; dieselben um 17:00 → `ruhe_zu_kurz` mit 2 h Ruhe; 06–12 und ab 20:00 → keine; Lücke 0 → keine `ruhe_zu_kurz`; beide treffen zu → `zu_lang`; ohne offene Periode, ohne Perioden und ohne Grenzwerte (`undefined`) → `null`.
 - [x] 2.2 `stufeEin` in `kraefte/zeitachse.ts` umsetzen: rein, Trennregel wie `pruefung.rs:dienststrecken`, mit Verweis darauf. Der Kopfkommentar „Keine Grenzwerte, keine Einstufung“ wird berichtigt.
-- [x] 2.3 `ladeZeitachseGrenzwerte(einsatzId, art)` in `api/kraefteZeitachse.ts` und `einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, art)` unter dem Prefix `kraefteZeitachse` in `api/queryKeys.ts`. Prüfen, dass Live (`abloesung`) und `lagebildOffline.guard.test.ts` den Key ohne eigenen Eintrag abdecken.
+- [x] 2.3 `ladeZeitachseGrenzwerte(einsatzId, modul)` in `api/kraefteZeitachse.ts` und `einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, modul)` im Unterbereich des Moduls unter dem Prefix `kraefteZeitachse` in `api/queryKeys.ts`. Prüfen, dass Modulentzug (`gesperrteListen.ts`) und `lagebildOffline.guard.test.ts` den Key ohne eigenen Eintrag abdecken.
+- [x] 2.4 Live (Befund aus dem Review): `grenzwerte_setzen` sendet zusätzlich `einheit` und `personal`, damit Leser ohne das Modul Ablösung neue Grenzwerte bekommen. Test `grenzwerte_setzen_meldet_einheit_und_personal` in `tests/kraefte_zeitachse.rs`.
 
 ## 3. Client: Anzeige (D6)
 
@@ -20,9 +21,9 @@
 
 ## 4. Regeln und Doku (D7)
 
-- [ ] 4.1 `frontend/src/kraefte/AGENTS.md`, Absatz Kräfte-Zeitachse: „keine Grenzwerte (LFH-860)“ ersetzen durch die Regel aus D7 (nur `stufeEin`, wirksame Grenzwerte des Schichtplans, Anzeige nur in Meldebild und Personal, kein Alarm, kein Zähler). Wer „LFH-860“ in Code und Doku verwendet, wird per grep nachgezogen.
+- [x] 4.1 `frontend/src/kraefte/AGENTS.md`, Absatz Kräfte-Zeitachse: „keine Grenzwerte (LFH-860)“ ersetzen durch die Regel aus D7 (nur `stufeEin`, wirksame Grenzwerte des Schichtplans, Anzeige nur in Meldebild und Personal, kein Alarm, kein Zähler). Wer „LFH-860“ in Code und Doku verwendet, wird per grep nachgezogen.
 - [ ] 4.2 Anwenderdoku: `docs/anwender/kapitel/meldebild.md` („Einsatzdauer und Ruhezeit“: Grenzwerte, Wörter, woher die Werte kommen) und `personal.md` („Einsatzdauer und Zeitachse ablesen“). `quellen:` um die neuen Dateien ergänzen. Betroffene Bilder neu erzeugen (`pnpm doku:bilder --grep meldebild`, `--grep personal`), wenn sie die Spalte zeigen.
-- [ ] 4.3 `docs/anwender/kapitel/abloesung.md`: Bei den Grenzwerten des Schichtplans einen Satz ergänzen, dass dieselben Werte das Ist im Meldebild und auf der Personal-Seite einstufen.
+- [x] 4.3 `docs/anwender/kapitel/abloesung.md`: Bei den Grenzwerten des Schichtplans einen Satz ergänzen, dass dieselben Werte das Ist im Meldebild und auf der Personal-Seite einstufen.
 
 ## 5. Abschluss
 
