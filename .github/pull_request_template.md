@@ -20,6 +20,12 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
 <!-- Die eine Entscheidung, die beim Lesen des Diffs nicht offensichtlich ist. Verworfene
      Alternativen gehören hierher, nicht in den Code. -->
 
+## Bilder
+
+<!-- Jede sichtbar geänderte Stelle, vorher/nachher wo sich Bestehendes ändert. Ohne sichtbare
+     Wirkung: ein Satz, warum es kein Bild gibt. Aufnahme und Einbinden:
+     `dev-zunder-ausfuehren`, „Bilder der Änderung“. -->
+
 ## Geprüft
 
 <!-- `./scripts/check-all.sh` ist die Untergrenze, nicht der Nachweis. Was wurde GEMESSEN
