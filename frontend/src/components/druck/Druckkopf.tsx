@@ -20,6 +20,8 @@ interface DruckkopfProps {
   /** Titel des Dokuments, falls es einen eigenen hat (Befehl, Lagebericht). */
   titel?: string;
   einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  /** Etikett der Zeile zu `einsatz`; „Planung“ für eine Vorplanung ohne Einsatz (LLH-1593). */
+  bezug?: string;
   /** Stand bzw. gedruckte Auswahl — die Seite weiß, was ihren Stand ausmacht. */
   zeilen?: DruckkopfZeile[];
   /**
@@ -58,6 +60,7 @@ export default function Druckkopf({
   dokumentart,
   titel,
   einsatz,
+  bezug = 'Einsatz',
   zeilen = [],
   sichtbarkeit,
   ebene = 1,
@@ -85,7 +88,7 @@ export default function Druckkopf({
   const nummer = einsatz.einsatznummer_intern?.trim();
   const angaben: DruckkopfZeile[] = [
     {
-      etikett: 'Einsatz',
+      etikett: bezug,
       wert: nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung,
     },
     ...zeilen,

@@ -97,3 +97,28 @@ Das Entfernen der Lage MUST die markierte Planung löschen, bevor es das Demo-Pe
 #### Scenario: Demo-Planung
 - **WHEN** der Admin die Lage „Stadtfest“ importiert
 - **THEN** steht die Planung „Stadtfest Musterstadt“ in der Liste mit Soll 26, Ist 24, Offen 2 und Konflikte 2
+
+### Requirement: Planung als Excel-Mappe
+Eine Planung SHALL dieselbe Excel-Mappe wie der Schichtplan eines Einsatzes ausgeben
+(`GET /api/planungen/{id}/export`), mit Ort und Zeitraum der Planung in der Übersicht und den
+Zeiten in der Zone der Organisation. Der Abruf MUST das Leserecht der Planung verlangen; eine
+fremde oder unbekannte Planung MUST 404 ergeben.
+
+#### Scenario: Planung in einen Einsatz einlesen
+- **WHEN** jemand die Mappe der Demo-Planung „Stadtfest Musterstadt“ exportiert und in einen
+  leeren Einsatz einliest
+- **THEN** stehen dort dieselben Schichten mit Soll und Personen, und ein zweiter Lauf ergibt nur
+  „unverändert“
+
+### Requirement: Planung drucken
+Eine Planung SHALL dieselben Druckblätter wie der Schichtplan eines Einsatzes ausgeben
+(`/planungen/{id}/druck?sicht=posten|person&auswahl=…`): einen Aushang je Posten in der
+Reihenfolge der Planung ohne die Pause und einen Schichtzettel je eingeteilter Person mit der Pause.
+Der Druckkopf MUST die Planung statt eines Einsatzes nennen, die Zeiten MUST in der Zone der
+Organisation stehen. Die Druckansicht MUST ein Schnappschuss sein, den eine Änderung an der Planung
+nicht still ändert. Der Reiter „Plan“ der Planungsseite MUST „Drucken“ und „Excel“ anbieten.
+
+#### Scenario: Aushang aus der Planungsseite
+- **WHEN** jemand im Reiter „Plan“ einer Planung mit zwei Posten „Drucken“ wählt
+- **THEN** stehen zwei Aushänge in der Reihenfolge der Posten da, jeder auf eigener Seite, und der
+  Druckkopf nennt „Planung“ mit ihrer Bezeichnung

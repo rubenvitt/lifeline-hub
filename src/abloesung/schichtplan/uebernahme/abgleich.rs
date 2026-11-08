@@ -5,7 +5,8 @@
 //! Abschnitt; UHS nach Bezeichnung; Pause ist immer die Pause. Ein Treffer ist sicher, wenn er
 //! eindeutig ist; mehrere sind unsicher; keiner heißt neu.
 //!
-//! **Personen**, erster Treffer gilt: (1) Kennung und Herkunft gleich einem Helfer des Plans;
+//! **Personen**, erster Treffer gilt: (0) ein eigener Bezug aus einer Mappe von Lifeline Hub
+//! ([`eigener_treffer`], LLH-1557); (1) Kennung und Herkunft gleich einem Helfer des Plans;
 //! (2) Kennung gleich der Personalnummer einer Stamm-Person im Dienst, sicher nur mit passendem
 //! Namen; (3) Name und Telefon; (4) Name allein, unsicher; (5) sonst neu.
 
@@ -248,6 +249,113 @@ fn helfer_ziel(h: &BestandHelfer) -> PersonZiel {
 /// Herkunft zum Vergleichen: fehlend wie leer.
 pub fn herkunft_norm(h: Option<&str>) -> String {
     h.map(norm).unwrap_or_default()
+}
+
+// ---------------------------------------------------------------------------------------------
+// Eigene Bezüge (LLH-1557, design.md D6)
+// ---------------------------------------------------------------------------------------------
+
+/// Herkunft der eigenen Bezüge, die die Excel-Mappe in den Austausch schreibt.
+pub const EIGENE_HERKUNFT: &str = "Lifeline Hub";
+
+/// Herkunft eines Helfers der Vorplanung; seine Kennung ist die Kennung des Helfers der Planung
+/// (vereinbart in LLH-1556/LLH-1561 für die Übernahme einer Planung, LLH-1587).
+pub const VORPLANUNG_HERKUNFT: &str = "vorplanung";
+
+/// Ein eigener Bezug: auf wen eine Kennung mit Herkunft [`EIGENE_HERKUNFT`] zeigt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EigenerBezug {
+    /// Stamm-Personal der Organisation (`personal-<id>`).
+    Personal(i64),
+    /// Eine Ad-hoc-Kraft des Einsatzes (`einsatzkraft-<id>`).
+    Einsatzkraft(i64),
+    /// Ein Helfer des Plans ohne eigene Kennung (`helfer-<id>`).
+    Helfer(i64),
+}
+
+impl EigenerBezug {
+    /// Die Kennung im Austausch, etwa `personal-12`.
+    pub fn kennung(self) -> String {
+        match self {
+            EigenerBezug::Personal(id) => format!("personal-{id}"),
+            EigenerBezug::Einsatzkraft(id) => format!("einsatzkraft-{id}"),
+            EigenerBezug::Helfer(id) => format!("helfer-{id}"),
+        }
+    }
+
+    /// Umkehr von [`Self::kennung`]; eine andere Form ist kein eigener Bezug.
+    pub fn from_kennung(kennung: &str) -> Option<Self> {
+        let k = kennung.trim();
+        let (art, id) = k.rsplit_once('-')?;
+        if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let id: i64 = id.parse().ok()?;
+        match art {
+            "personal" => Some(EigenerBezug::Personal(id)),
+            "einsatzkraft" => Some(EigenerBezug::Einsatzkraft(id)),
+            "helfer" => Some(EigenerBezug::Helfer(id)),
+            _ => None,
+        }
+    }
+}
+
+/// Eine Ad-hoc-Kraft dieses Einsatzes (ohne Stammdatenbezug).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BestandEinsatzkraft {
+    pub id: i64,
+    pub name: String,
+}
+
+/// Regel 0 (design.md D6 von LLH-1557): Kennung mit Herkunft [`EIGENE_HERKUNFT`] zeigt auf
+/// Stamm-Personal (`stamm`), eine Ad-hoc-Kraft oder einen Helfer **dieses** Einsatzes, und der
+/// Name passt: dann ist es diese Person, sicher. Sonst `None`, und die Regeln 1 bis 5 gelten wie
+/// für jede Zeile (anderer Einsatz, andere Organisation, anderer Name).
+///
+/// Trägt schon ein Helfer dieses Plans genau diese Kennung und Herkunft (ein früheres Einlesen
+/// fand den Bezug nicht und legte ihn an), bleibt es bei ihm (Regel 1): sonst käme dieselbe
+/// Person ein zweites Mal in den Block, sobald der Bezug später trifft.
+pub fn eigener_treffer(
+    angabe: &PersonAngabe,
+    stamm: &[BestandStamm],
+    einsatzkraefte: &[BestandEinsatzkraft],
+    helfer: &[BestandHelfer],
+) -> Option<PersonVorschlag> {
+    if herkunft_norm(angabe.herkunft.as_deref()) != norm(EIGENE_HERKUNFT) {
+        return None;
+    }
+    let kennung = angabe.kennung.as_deref()?.trim();
+    if helfer.iter().any(|h| {
+        h.kennung.as_deref().map(str::trim) == Some(kennung)
+            && herkunft_norm(h.herkunft.as_deref()) == norm(EIGENE_HERKUNFT)
+    }) {
+        return None;
+    }
+    let bezug = EigenerBezug::from_kennung(kennung)?;
+    let formen = namensformen(&angabe.nachname, angabe.vorname.as_deref());
+    let ziel = match bezug {
+        EigenerBezug::Personal(id) => stamm
+            .iter()
+            .find(|s| s.id == id && name_passt(&s.name, &formen))
+            .map(stamm_ziel),
+        EigenerBezug::Einsatzkraft(id) => einsatzkraefte
+            .iter()
+            .find(|k| k.id == id && name_passt(&k.name, &formen))
+            .map(|k| PersonZiel::Einsatz {
+                einsatz_personal_id: k.id,
+                name: k.name.clone(),
+            }),
+        EigenerBezug::Helfer(id) => helfer
+            .iter()
+            .find(|h| h.id == id && name_passt(&h.name, &formen))
+            .map(helfer_ziel),
+    }?;
+    Some(PersonVorschlag {
+        ziel,
+        treffer: Treffer::Sicher,
+        grund: Some(TrefferGrund::Bezug),
+        kandidaten: Vec::new(),
+    })
 }
 
 /// Vorschlag für eine Person (design.md D5).
@@ -496,6 +604,91 @@ mod tests {
         a.herkunft = Some("Helferplanung".into());
         let v = person_vorschlag(&a, &[], &h);
         assert_eq!((v.ziel, v.treffer), (PersonZiel::Neu, Treffer::Neu));
+    }
+
+    fn eigen(nach: &str, kennung: &str) -> PersonAngabe {
+        PersonAngabe {
+            kennung: Some(kennung.into()),
+            herkunft: Some(EIGENE_HERKUNFT.into()),
+            ..angabe(nach, None)
+        }
+    }
+
+    #[test]
+    fn eigene_kennung_hin_und_zurueck() {
+        for b in [
+            EigenerBezug::Personal(12),
+            EigenerBezug::Einsatzkraft(3),
+            EigenerBezug::Helfer(70),
+        ] {
+            assert_eq!(EigenerBezug::from_kennung(&b.kennung()), Some(b));
+        }
+        for fremd in [
+            "personal-",
+            "personal-1x",
+            "planungshelfer-4",
+            "4711",
+            "helfer--1",
+        ] {
+            assert_eq!(EigenerBezug::from_kennung(fremd), None, "{fremd}");
+        }
+    }
+
+    #[test]
+    fn regel_0_trifft_eigene_personen_mit_passendem_namen() {
+        let s = [stamm(7, "Sophie Vorlage", None, None)];
+        let k = [BestandEinsatzkraft {
+            id: 3,
+            name: "Ali Adhoc".into(),
+        }];
+        let h = [helfer(9, "Nina Neu", None, None)];
+        let v = eigener_treffer(&eigen("Sophie  Vorlage", "personal-7"), &s, &k, &h).unwrap();
+        assert!(matches!(v.ziel, PersonZiel::Stamm { personal_id: 7, .. }));
+        assert_eq!(
+            (v.treffer, v.grund),
+            (Treffer::Sicher, Some(TrefferGrund::Bezug))
+        );
+        let v = eigener_treffer(&eigen("ali adhoc", "einsatzkraft-3"), &s, &k, &h).unwrap();
+        assert_eq!(
+            v.ziel,
+            PersonZiel::Einsatz {
+                einsatz_personal_id: 3,
+                name: "Ali Adhoc".into()
+            }
+        );
+        let v = eigener_treffer(&eigen("Nina Neu", "helfer-9"), &s, &k, &h).unwrap();
+        assert!(matches!(v.ziel, PersonZiel::Helfer { helfer_id: 9, .. }));
+    }
+
+    #[test]
+    fn regel_0_greift_nicht_bei_anderem_namen_anderer_herkunft_oder_fremder_id() {
+        let s = [stamm(7, "Sophie Vorlage", None, None)];
+        let h = [helfer(9, "Nina Neu", None, None)];
+        assert!(eigener_treffer(&eigen("Anna Anders", "personal-7"), &s, &[], &h).is_none());
+        assert!(eigener_treffer(&eigen("Nina Neu", "helfer-10"), &s, &[], &h).is_none());
+        assert!(eigener_treffer(&eigen("Nina Neu", "einsatzkraft-9"), &s, &[], &h).is_none());
+        let mut fremd = eigen("Sophie Vorlage", "personal-7");
+        fremd.herkunft = Some("Helferplanung".into());
+        assert!(eigener_treffer(&fremd, &s, &[], &h).is_none());
+        // Herkunft ohne Rücksicht auf Groß/klein und Leerraum.
+        fremd.herkunft = Some("  lifeline   HUB ".into());
+        assert!(eigener_treffer(&fremd, &s, &[], &h).is_some());
+    }
+
+    #[test]
+    fn ein_helfer_mit_derselben_kennung_geht_dem_bezug_vor() {
+        let s = [stamm(7, "Sophie Vorlage", None, None)];
+        let h = [helfer(
+            12,
+            "Sophie Vorlage",
+            Some("personal-7"),
+            Some("Lifeline Hub"),
+        )];
+        let angabe = eigen("Sophie Vorlage", "personal-7");
+        assert!(eigener_treffer(&angabe, &s, &[], &h).is_none());
+        let v = person_vorschlag(&angabe, &s, &h);
+        assert_eq!(v.treffer, Treffer::Sicher);
+        assert!(matches!(v.ziel, PersonZiel::Helfer { helfer_id: 12, .. }));
     }
 
     #[test]
