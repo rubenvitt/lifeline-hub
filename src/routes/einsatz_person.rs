@@ -423,11 +423,13 @@ pub async fn anlegen(
         {
             return Err(AppError::Forbidden);
         }
+        // Genau ein Ausgang (Spec `funktionsansichten`, „Ansicht Einheit“): ohne bliebe der
+        // Kontakt am Handy offen, ohne dass jemand ihn weiterführt.
         if [entlassen, body.uhs_id.is_some(), rtw]
             .into_iter()
             .filter(|a| *a)
             .count()
-            > 1
+            != 1
         {
             return Err(AppError::UnprocessableEntity(
                 "Ein Kontakt ist entlassen, zur UHS gebracht oder wartet auf den RTW".into(),

@@ -8159,8 +8159,8 @@ async fn einheitengeraet_replay_ohne_personalien_und_nur_eigene() {
     assert_eq!(s, StatusCode::NOT_FOUND, "fremde client_id: {v}");
 }
 
-/// Personalien, Sichtung oder eine fremde versorgende Einheit vom Handy sind 403 (F6, K5); mehr
-/// als ein Ausgang ist 422.
+/// Personalien, Sichtung oder eine fremde versorgende Einheit vom Handy sind 403 (F6, K5); kein
+/// oder mehr als ein Ausgang ist 422.
 #[tokio::test]
 async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -8182,6 +8182,8 @@ async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
     }
     for extra in [
+        json!({}),
+        json!({"entlassen": false}),
         json!({"entlassen": true, "uhs_id": uhs}),
         json!({"entlassen": true, "rtw": true}),
         json!({"uhs_id": uhs, "rtw": true}),
