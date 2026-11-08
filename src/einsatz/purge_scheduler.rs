@@ -23,6 +23,8 @@
 //!   eigener Frist, an keinem Einsatz.
 //! - **Phase C2** (LFH-928): abgelaufene Sitzungen (`auth::session::purge_abgelaufene`), aus
 //!   demselben Grund wie Phase C.
+//! - **Phase C3** (LLH-1585): Planungen 90 Tage nach dem Ende ihres Zeitraums
+//!   (`planung::repo::purge_abgelaufene`), samt Posten, Blöcken und Helfern.
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
 //!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
@@ -270,6 +272,25 @@ pub async fn tick_mit_rueckschrieb(
             anzahl += n as usize;
         }
         Err(e) => tracing::warn!("Purge Phase C2: Sitzungs-Purge fehlgeschlagen: {e}"),
+    }
+
+    // --- Phase C3: abgelaufene Planungen (LLH-1585, Spec `vorplanung`) ---
+    // Eine Planung trägt Namen und Telefonnummern von Helfern, ist aber kein Einsatz: sie geht
+    // 90 Tage nach ihrem Ende, übernommen oder nicht. Die Planer der Organisation sehen das live.
+    match crate::planung::repo::purge_abgelaufene(pool, jetzt).await {
+        Ok(weg) if weg.is_empty() => {}
+        Ok(weg) => {
+            tracing::warn!(
+                anzahl = weg.len(),
+                "Purge Phase C3: abgelaufene Planungen gelöscht (Aufbewahrung 90 Tage)"
+            );
+            for (org_id, id) in &weg {
+                live.publiziere_planung(*org_id, *id);
+            }
+            anzahl += weg.len();
+            geloescht += weg.len();
+        }
+        Err(e) => tracing::warn!("Purge Phase C3: Planungs-Purge fehlgeschlagen: {e}"),
     }
 
     // --- Phase D: endgültige Löschung geschwärzter Skelette (UNUMKEHRBAR, LFH-750) ---

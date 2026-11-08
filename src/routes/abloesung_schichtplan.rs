@@ -78,7 +78,7 @@ async fn plan(state: &AppState, ctx: &EinsatzKontext) -> Result<SchichtplanAnzei
 }
 
 /// Ein Zeitpunkt des Plans: normalisiert, im Jahresbereich, auf dem 5-Minuten-Raster (400).
-fn planzeit(wert: &str, was: &str) -> Result<String, AppError> {
+pub(crate) fn planzeit(wert: &str, was: &str) -> Result<String, AppError> {
     let normal = crate::zeit::im_jahresbereich(crate::etb::normalisiere_zeit(wert.trim())?, was)?;
     let t = crate::zeit::parse_utc(&normal)
         .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{wert}'")))?;
@@ -92,7 +92,7 @@ fn planzeit(wert: &str, was: &str) -> Result<String, AppError> {
 }
 
 /// Beginn und Ende eines Blocks als Feldprüfung (400): Raster, 10 min bis 24 h.
-fn zeitraum(von: &str, bis: &str) -> Result<(String, String), AppError> {
+pub(crate) fn zeitraum(von: &str, bis: &str) -> Result<(String, String), AppError> {
     let (von, bis) = (planzeit(von, "Beginn")?, planzeit(bis, "Ende")?);
     let (a, b) = (
         crate::zeit::parse_utc(&von).ok_or_else(|| AppError::Validation("Beginn".into()))?,
@@ -114,7 +114,7 @@ fn personen(liste: Vec<PlanPersonEingabe>) -> Result<Vec<PlanPerson>, AppError> 
     Ok(crate::kraefte_disposition::dedupe(&personen, |p| *p))
 }
 
-fn soll_anzahl(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppError> {
+pub(crate) fn soll_anzahl(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppError> {
     if let Some(Some(n)) = wert {
         if !(1..=SOLL_ANZAHL_MAX).contains(&n) {
             return Err(AppError::Validation(format!(
@@ -126,7 +126,7 @@ fn soll_anzahl(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppErro
 }
 
 /// Qualifikationen eines Helfers: höchstens [`HELFER_QUALIFIKATIONEN_MAX`] vor dem Entdoppeln.
-fn qualifikationen(ids: &[i64]) -> Result<Vec<i64>, AppError> {
+pub(crate) fn qualifikationen(ids: &[i64]) -> Result<Vec<i64>, AppError> {
     if ids.len() > HELFER_QUALIFIKATIONEN_MAX {
         return Err(AppError::Validation(format!(
             "qualifikationen: höchstens {HELFER_QUALIFIKATIONEN_MAX}"
@@ -135,7 +135,7 @@ fn qualifikationen(ids: &[i64]) -> Result<Vec<i64>, AppError> {
     Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
 }
 
-fn grenzwert(
+pub(crate) fn grenzwert(
     wert: Option<Option<i64>>,
     feld: &str,
     bereich: std::ops::RangeInclusive<i64>,

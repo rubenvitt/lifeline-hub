@@ -10,8 +10,8 @@ use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
     einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
     kraefte_disposition, lage_zone, lagebesprechung, lagemonitor_zugang, material, nachforderung,
-    person, personal, presse, programmpunkt, schaden, schichtmodell, sprechgruppe, verpflegung,
-    vorlagendokument, zeitachse,
+    person, personal, planung, presse, programmpunkt, schaden, schichtmodell, sprechgruppe,
+    verpflegung, vorlagendokument, zeitachse,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -238,6 +238,14 @@ fn backend() -> BTreeMap<&'static str, usize> {
         (
             "SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX",
             schichtplan::HELFER_QUALIFIKATIONEN_MAX,
+        ),
+        ("PLANUNG_BEZEICHNUNG_MAX", planung::BEZEICHNUNG_MAX),
+        ("PLANUNG_ABSCHNITT_MAX", planung::ABSCHNITT_MAX),
+        ("PLANUNG_ORT_MAX", planung::ORT_MAX),
+        ("PLANUNG_POSTEN_MAX", planung::POSTEN_MAX as usize),
+        (
+            "PLANUNG_ZEITRAUM_MAX_TAGE",
+            planung::ZEITRAUM_MAX_TAGE as usize,
         ),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
         ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
