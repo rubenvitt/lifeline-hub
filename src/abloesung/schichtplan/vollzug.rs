@@ -768,7 +768,9 @@ async fn uhs_tx_vollziehen(
     }
 
     // Die Kommenden: erst in den Einsatz, dann an die UHS.
-    let mut kommende: Vec<(i64, String, Option<i64>, Option<i64>, bool)> = Vec::new();
+    // (Einsatzkraft, Name, UHS vorher, Einheit, neu übernommen)
+    type Kommend = (i64, String, Option<i64>, Option<i64>, bool);
+    let mut kommende: Vec<Kommend> = Vec::new();
     for p in kommen {
         let (ep, neu) = match *p {
             PlanPerson::Stamm(pid) => {
