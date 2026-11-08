@@ -306,7 +306,8 @@ Spec `passwort-anmeldung`, Herleitung
 
 Zwei Instanzen (ELW und Hub) sprechen nur signiert miteinander; Regeln des Verfahrens in
 [ADR-0014](../docs/architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
-Herleitung in der Change `ckq15vzr-instanzkopplung-schluessel` (`design.md`).
+Herleitung in
+`openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`.
 
 - **Eine Route, die eine andere Instanz ruft, nimmt `instanz::extractor::GekoppelteInstanz`**
   und antwortet über dessen `antwort` (signiert); nie `CurrentUser`, nie ein eigener

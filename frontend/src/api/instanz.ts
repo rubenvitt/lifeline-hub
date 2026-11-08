@@ -11,8 +11,9 @@ import type {
 import type { WebauthnCreationChallenge } from './webauthn';
 import { apiGet, apiSend } from './client';
 
-// Instanzkopplung (LLH-1490, Change `ckq15vzr-instanzkopplung-schluessel`): Verwaltung durch den
-// Admin der Org. Die Routen, die eine andere Instanz ruft, kennt das Frontend nicht.
+// Instanzkopplung (LLH-1490, Herleitung
+// `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`):
+// Verwaltung durch den Admin der Org. Die Routen, die eine andere Instanz ruft, kennt das Frontend nicht.
 
 export function ladeInstanzUebersicht(): Promise<InstanzUebersicht> {
   return apiGet<InstanzUebersicht>('/api/admin/instanz');

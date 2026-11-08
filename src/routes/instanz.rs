@@ -1,4 +1,5 @@
-//! Instanzkopplung (LLH-1490, Change `ckq15vzr-instanzkopplung-schluessel`): Verwaltung durch den
+//! Instanzkopplung (LLH-1490, Herleitung
+//! `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`): Verwaltung durch den
 //! Org-Admin (`/api/admin/instanz/…`) und die Routen, die eine andere Instanz ruft
 //! (`/api/instanz/…`: Einlösen öffentlich, Melden signiert). Herleitung im `design.md` der
 //! Change, D2–D11.

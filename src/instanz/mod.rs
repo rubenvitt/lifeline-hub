@@ -1,7 +1,8 @@
 //! Instanzkopplung (LLH-1490): zwei Lifeline-Hub-Instanzen, etwa ein ELW und ein öffentlicher Hub,
 //! erkennen einander über je ein Ed25519-Schlüsselpaar, koppeln sich per Einmal-Code eines
 //! Org-Admins und sprechen nur über signierte Nachrichten. Herleitung:
-//! `openspec/changes/ckq15vzr-instanzkopplung-schluessel/design.md` (D1–D12), Konzept
+//! `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`
+//! (D1–D12), Konzept
 //! `docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md`.
 //!
 //! Das Protokoll unterscheidet nicht zwischen Hub und ELW (Entscheidung 13): eine Kopplung kennt

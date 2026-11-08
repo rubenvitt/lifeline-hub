@@ -175,7 +175,7 @@ sequenceDiagram
   sprechen N und N−1, bei größerem Abstand nur Melden und der Hinweis „Update nötig“. Ebenso
   festgelegt: Schlüsselverfahren und Einmal-Code
   ([ADR-0014](../architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
-  Change `ckq15vzr-instanzkopplung-schluessel`).
+  `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`).
 - **Anmeldung am ELW ohne Netz:** Wie kommt ein Konto aus der Hub-Kopie zu einer lokalen
   Anmeldung (Passwort-Hash mitverteilen, eigener Passkey je ELW, Kopplung des Geräts)?
 - **Gleichzeitige Notübernahmen** mit derselben Epoche (zwei Seiten ohne Verbindung): Gleichstand
