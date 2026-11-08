@@ -109,6 +109,7 @@ import LageberichtePage from './pages/LageberichtePage';
 import LageberichtDetailPage from './pages/LageberichtDetailPage';
 import BefehlDetailPage from './pages/BefehlDetailPage';
 import AuftragDruckPage from './pages/AuftragDruckPage';
+import SchichtplanDruckPage from './pages/SchichtplanDruckPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -413,6 +414,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
           <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
+          {/* Druckansicht des Schichtplans (LLH-1557): Unterroute der Ablösung. */}
+          <Route path="abloesung/schichtplan/druck" element={<SchichtplanDruckPage />} />
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
           {/* Einheit aus Vorlage bilden (LLH-1049): Ziel des Dialogs „Einheit bilden“. */}
           <Route path="einheiten/aus-vorlage/:vorlageId" element={<EinheitAusVorlagePage />} />

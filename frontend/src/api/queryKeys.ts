@@ -186,6 +186,8 @@ export const EINSATZ_KEYS = {
   auftragDruck: 'einsatz-auftrag-druck',
   // Druckansicht einer Person: Schnappschuss, eigener Prefix außerhalb von `person` (LLH-1120).
   personDruck: 'einsatz-person-druck',
+  // Druckansicht des Schichtplans: Schnappschuss, eigener Prefix außerhalb von `abloesungen` (LLH-1557).
+  schichtplanDruck: 'einsatz-schichtplan-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -534,6 +536,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Ereignis `auftrag` per Präfix mit.
  * - `personDruck` (LLH-1120): derselbe Schnappschuss-Grundsatz für das Blatt einer Person; jeder
  *   Abruf schreibt einen `druck`-Eintrag ins Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
+ * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
+ *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
@@ -572,6 +576,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.auftragDruck,
   EINSATZ_KEYS.personDruck,
+  EINSATZ_KEYS.schichtplanDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
   EINSATZ_KEYS.personenListenzugriffe,
@@ -818,6 +823,7 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtmodell'] as const,
   /** Schichtplan des Einsatzes (LLH-1552); live über `abloesung` wie die Schichten. */
   schichtplan: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtplan'] as const,
+  schichtplanDruck: (einsatzId: number) => [EINSATZ_KEYS.schichtplanDruck, einsatzId] as const,
   // Kräfte-Zeitachse (LFH-552): argumentlos = Invalidierungs-Prefix; Perioden-Listen je Kraftart
   // und die Zeitachse einer Kraft hängen als Sub-Keys darunter.
   kraefteZeitachse: (einsatzId: number) => [EINSATZ_KEYS.kraefteZeitachse, einsatzId] as const,

@@ -364,6 +364,37 @@ export function parseAbloesungAnsicht(params: URLSearchParams): AbloesungAnsicht
     : undefined;
 }
 
+/**
+ * Druckansicht des Schichtplans (LLH-1557, Change `jwqanxja-schichtplan-ausgeben` D2): Aushang je
+ * Posten (`sicht=posten`, Vorgabe) oder Zettel je Person, für alle Blätter oder eines
+ * (`auswahl=<schluessel>` wie `uhs:3` oder `helfer:4`). Unterroute der Ablösung, `modulAusPfad`
+ * gatet sie über das Segment `abloesung`.
+ */
+export interface SchichtplanDruckAuswahl {
+  sicht: 'posten' | 'person';
+  auswahl: string | null;
+}
+
+export function schichtplanDruckPfad(
+  einsatzId: number,
+  opts: Partial<SchichtplanDruckAuswahl> = {},
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'abloesung')}/schichtplan/druck`, {
+    sicht: opts.sicht === 'person' ? 'person' : undefined,
+    auswahl: opts.auswahl ?? undefined,
+  });
+}
+
+/** Umkehr von {@link schichtplanDruckPfad}: unbekannte Sicht ist „posten“; ob es die Auswahl
+ *  gibt, entscheidet die Seite (unbekannt = alle). */
+export function parseSchichtplanDruckAuswahl(params: URLSearchParams): SchichtplanDruckAuswahl {
+  const auswahl = params.get('auswahl');
+  return {
+    sicht: params.get('sicht') === 'person' ? 'person' : 'posten',
+    auswahl: auswahl && /^(einheit|uhs|stamm|einsatz|helfer):\d+$/.test(auswahl) ? auswahl : null,
+  };
+}
+
 /** Verpflegungs-Modul: Zeitfenster mit Bedarf, Ausgaben und Deckung. */
 export function verpflegungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'verpflegung');
