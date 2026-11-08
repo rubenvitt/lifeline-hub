@@ -5,7 +5,7 @@ Ein Einsatz hat einen Schichtplan: Blöcke an Einheiten, UHS und der Zeile „Pa
 eingeteilten Personen. Der Plan ist Soll und ändert kein Ist. Prüfbefunde zeigen an und
 blockieren nie (LLH-1552, Konzept LLH-1523). Er gibt einer laufenden Schicht die Fälligkeit und
 belegt den Wechsel vor (`kraefte-abloesung`, „Fälligkeit laut Plan“ und „Vollzug aus dem Plan“,
-LLH-1555); der Wechsel selbst ist ein Griff, kein Automatismus. Das Raster regelt LLH-1554.
+LLH-1555); der Wechsel selbst ist ein Griff, kein Automatismus. Das Raster regelt LLH-1554, das Einlesen aus einer Datei LLH-1556.
 
 ## Requirements
 
@@ -117,6 +117,59 @@ einen ETB-Systemsatz schreiben; einzelne Blöcke schreiben keinen.
 #### Scenario: Eigene Länge
 - **WHEN** jemand an der Streife 2 18:00–00:00 mit 2 h erzeugt
 - **THEN** entstehen drei Blöcke zu 2 h mit dem Soll der Streife
+
+### Requirement: Austauschformat
+Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,
+höchstens 2 MB und 5.000 Zeilen. Die erste Zeile MUST die Kopfzeile sein; eine Zeile steht für
+eine Person in einer Schicht. Pflicht sind `Beginn`, `Ende` und, außer bei der Pause, `Posten`.
+Eine Zeit mit Versatz MUST so gelten, wie sie ist; eine Zeit ohne Versatz oder eine Datumszelle
+MUST als Ortszeit in der Zone des Einsatzes gelten. Raster und Länge der Blöcke MUST den Regeln
+der Planschicht folgen. Das Format MUST in der Anwenderdoku beschrieben sein.
+
+#### Scenario: CSV aus dem deutschen Excel
+- **WHEN** jemand eine CSV mit `;` als Trennzeichen und BOM einliest
+- **THEN** liest das System dieselben Blöcke wie aus der gleichen Liste als XLSX
+
+#### Scenario: Zeit ohne Zone
+- **WHEN** eine Zeile `Beginn` = `2026-08-15 14:00` ohne Versatz trägt und der Einsatz in Europe/Berlin läuft
+- **THEN** beginnt der Block um 12:00 UTC, und die Vorschau nennt einen Hinweis zur Zeile
+
+### Requirement: Schichtplan einlesen
+Das Einlesen MUST in zwei Schritten laufen: Die Vorschau MUST nichts schreiben und je Posten
+einen Vorschlag (bestehende Einheit oder UHS, sonst neu) und je Person einen Abgleich (Kennung
+und Herkunft, Kennung mit Name, Name mit Telefon, Name allein als unsicher, sonst neu als Helfer
+des Plans) zeigen, dazu Fehler und Hinweise mit Zeile. Erst das Übernehmen MUST schreiben, alles
+oder nichts, und MUST bei einem Fehler mit 422 antworten. Neue Personen MUST Helfer des Plans mit
+Kennung und Herkunft werden, kein Stamm-Personal. Das Einlesen MUST NOT alarmieren, disponieren
+oder einen Status setzen. Es MUST das Schreibrecht in der Ablösung und die Freigabe des Moduls
+Personal verlangen, für Blöcke an Einheiten (bestehend oder neu) zusätzlich die Freigabe
+Einheiten, an UHS die Freigabe Unfallhilfsstellen, wie beim Planen von Hand.
+
+#### Scenario: Vorschau schreibt nichts
+- **WHEN** jemand die Beispieldatei „Stadtfest“ in der Vorschau öffnet
+- **THEN** zeigt das System Posten, Personen und Zählung, und der Plan bleibt unverändert
+
+#### Scenario: Treffer über die Personalnummer
+- **WHEN** eine Zeile `Kennung` = `DEMO-S-006` und den Namen „Karl Beispiel“ trägt und die Stamm-Person mit dieser Personalnummer so heißt
+- **THEN** schlägt die Vorschau diese Stamm-Person als sicheren Treffer vor
+
+#### Scenario: Neuer Helfer
+- **WHEN** eine Person der Datei weder über Kennung noch über Name zu finden ist
+- **THEN** legt das Übernehmen sie als Helfer des Plans mit Kennung und Herkunft an, und sie steht nicht in der Personalliste des Einsatzes
+
+#### Scenario: Fehler sperrt
+- **WHEN** ein Block der Datei sich mit einem vorhandenen Block desselben Postens überschneidet
+- **THEN** nennt die Vorschau die Zeile als Fehler, und das Übernehmen antwortet 422 und schreibt nichts
+
+### Requirement: Wiederholtes Einlesen
+Ein zweites Einlesen MUST nur ergänzen: Ein Block mit gleichem Posten, Beginn und Ende MUST
+bestehen bleiben und nur fehlende Personen aufnehmen; Soll, Notiz und vorhandene Personen MUST
+unverändert bleiben. Das Einlesen MUST NOT löschen. Dieselbe Datei ein zweites Mal MUST keine
+Änderung, keinen ETB-Satz und kein Live-Ereignis erzeugen.
+
+#### Scenario: Zweiter Lauf
+- **WHEN** jemand die Beispieldatei „Stadtfest“ übernommen hat und sie noch einmal übernimmt
+- **THEN** meldet das System 0 Änderungen, und der Plan ist derselbe
 
 ### Requirement: Schichtplan drucken
 Die Ablösung SHALL den Schichtplan eines Einsatzes als Druckansicht ausgeben, wahlweise je

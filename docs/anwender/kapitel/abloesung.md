@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/]
 ---
 
 ## Überblick
@@ -244,6 +244,28 @@ Für Einsatzleitung und Führungspersonal:
 
 Soll es anders laufen, unter „Art“ „Besatzungswechsel“ oder „Ganze Einheit“ wählen. Endet der
 Posten, steht „Ganze Einheit“ ohne ablösende Einheit bereit, und der Knopf heißt „Abziehen“.
+
+### Einen Schichtplan einlesen
+
+Für Einsatzleitung und Führungspersonal mit Freigabe des Moduls Personal, wenn der Plan schon in
+einer Tabelle steht, etwa aus der Helferplanung der Gliederung:
+
+1. In der Ansicht „Schichtplan“ „Schichtplan einlesen“ wählen.
+2. „Datei wählen“ und die Tabelle als Excel (`.xlsx`) oder CSV wählen. Wie sie aufgebaut ist,
+   zeigt die „Beispieldatei“ (CSV oder Excel) und der Abschnitt „Format der Schichtplan-Datei“
+   weiter unten.
+3. Die Vorschau prüfen. Oben steht, was sich ändert, etwa „10 Schichten neu“ und „7 Helfer neu“.
+   Unter „Posten“ steht je Posten der Datei, wohin er geht: „Gefunden“ ist eine bestehende
+   Einheit oder UHS, „Neu“ legt sie an, „Unsicher“ heißt, dass mehrere passen. Die Auswahl daneben
+   ändert das Ziel; eine neue Einheit kann aus einer Einheitenvorlage kommen. Unter „Personen“
+   steht ebenso, wer gefunden ist; „Neu als Helfer“ legt die Person als Helfer des Plans an.
+4. Fehler und Hinweise stehen mit ihrer Zeile in der Datei. Solange es Fehler gibt, ist
+   „Übernehmen“ gesperrt; dann die Datei berichtigen und über „Andere Datei“ neu wählen.
+5. „Übernehmen“ schreibt den Plan. Danach stehen die Blöcke im Raster und die neuen Helfer in der
+   Leiste „Personen“ unter „Helfer“.
+
+Dieselbe Datei kann später noch einmal eingelesen werden, etwa mit nachgemeldeten Helfern: Was
+schon im Plan steht, bleibt, nur Neues kommt dazu. Ist nichts neu, steht „Keine Änderungen“.
 
 ### Den Schichtplan drucken
 
@@ -594,6 +616,47 @@ aufgelöster Posten steht noch mit „(aufgelöst)“ im Raster, solange er Blö
 Ohne Freigabe des Moduls Personal zeigen Blöcke nur die Zahl der eingeteilten Personen, und statt
 der Leiste „Personen“ steht „Modul Personal gesperrt“. Auf Touch-Geräten wird im Raster nicht
 gezogen; Blöcke entstehen dort über „Block anlegen“.
+
+### Format der Schichtplan-Datei
+
+Die Datei ist eine Tabelle mit einer Kopfzeile, höchstens 2 MB und 5.000 Zeilen. Aus einer
+Excel-Datei gilt das Blatt „Austausch“, sonst das erste. Eine CSV darf `;`, `,` oder Tabulator
+trennen; Umlaute gehen in UTF-8 und im Format des deutschen Excel. Jede Zeile steht für eine
+Person in einer Schicht. Zeilen mit gleichem Posten, Beginn und Ende bilden einen Block.
+
+| Spalte | Pflicht | Inhalt |
+|---|---|---|
+| Posten | ja, außer bei der Pause | Name der Einheit oder Bezeichnung der UHS |
+| Abschnitt | nein | Name oder Kurzbezeichnung des Einsatzabschnitts, etwa „Festmeile“ oder „EA 3“ |
+| Posten-Art | nein | „Einheit“ (Vorgabe), „Fahrzeug“, „UHS“ oder „Pause“ |
+| Beginn, Ende | ja | etwa `2027-06-26T14:00+02:00`, `2027-06-26 14:00` oder `26.06.2027 14:00` |
+| Soll-Anzahl | nein | 1 bis 200; ohne gilt das Soll des Postens |
+| Soll-Qualifikationen | nein | etwa „1 Notfallsanitäter, 2 Sanitäter“ |
+| Nachname, Vorname | nein | ohne Namen ein Block ohne Person |
+| Telefon, Organisation, Qualifikationen | nein | für neue Helfer; Qualifikationen durch Komma getrennt |
+| Kennung, Herkunft | nein | externe Kennung der Person und der Name ihrer Quelle, etwa „Helferplanung“ |
+
+Eine Zeit mit Versatz (`+02:00`) gilt, wie sie ist. Eine Zeit ohne Versatz und eine Datumszelle
+aus Excel gelten als Ortszeit in der Zone des Einsatzes; die Vorschau nennt das als Hinweis. In
+der Nacht der Zeitumstellung gilt eine doppelte Stunde als die frühere, eine ausgefallene ist ein
+Fehler. Beginn und Ende liegen auf 5 Minuten, ein Block dauert 10 Minuten bis 24 Stunden.
+Unbekannte Spalten und Qualifikationen, die der Katalog der Organisation nicht kennt, sind
+Hinweise und fallen weg.
+
+**Wer wer ist.** Eine Person der Datei wird in dieser Reihenfolge gesucht: Kennung und Herkunft
+gleich einem Helfer des Plans; Kennung gleich der Personalnummer einer Person im Dienst (mit
+passendem Namen gefunden, sonst unsicher); Name und Telefon; der Name allein (unsicher). Sonst
+wird sie Helfer des Plans mit Kennung und Herkunft und steht damit nicht in den Stammdaten der
+Organisation. Ein Posten wird über den Namen gefunden, im genannten Abschnitt zuerst, ein
+Fahrzeug auch über den Funkrufnamen.
+
+**Was das Einlesen ändert.** Es legt Blöcke, Helfer und fehlende Einheiten oder UHS an und
+trägt Personen in bestehende Blöcke nach. Es löscht nichts, ändert kein Soll und keine Notiz,
+alarmiert niemanden und disponiert nichts: Der Plan bleibt Soll. Überschneidet sich ein Block mit
+einem anderen am selben Posten, ist das ein Fehler, und nichts wird übernommen. Eine neue Einheit
+verlangt die Freigabe des Moduls Einheiten, eine neue UHS die des Moduls Unfallhilfsstellen. Das
+Einsatztagebuch hält das Einlesen fest, etwa „Schichtplan eingelesen: 10 Schichten neu, 7 Helfer
+neu, 1 Einheit neu.“, eine neue Einheit dazu mit „Einheit … gebildet“.
 
 ### Rechte und ohne Netz
 
