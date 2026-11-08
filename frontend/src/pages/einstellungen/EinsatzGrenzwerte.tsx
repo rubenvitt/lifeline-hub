@@ -49,11 +49,13 @@ export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzw
 
   const applyPlan = (plan: Schichtplan) => {
     qc.setQueryData(planKey, plan);
-    for (const modul of ['einheiten', 'personal'] as const) {
-      void qc.invalidateQueries({
-        queryKey: einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, modul),
-      });
-    }
+    // Einstufung in Meldebild und Personalliste (LLH-730) liest eigene Keys.
+    void qc.invalidateQueries({
+      queryKey: einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, 'einheiten'),
+    });
+    void qc.invalidateQueries({
+      queryKey: einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, 'personal'),
+    });
   };
 
   // Fehler über dem Paneel (`SeitenHinweise`, auch für Rückgängig aus dem Toast); der Fehler des
