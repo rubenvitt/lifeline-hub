@@ -80,8 +80,9 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `personenBilanz.ts` für Lagebild und Bericht.
 - **Leichter Fall „Versorgt und entlassen“** (LLH-1572, Spec `betroffene-erfassung`):
   `personen/LeichterFallModal.tsx` auf `ErfassungsModal` (Anlass Pflicht, ≤ 3 Maßnahmen über
-  `FlaechenMehrfachWahl`, Kurzliste `LEICHTE_MASSNAHMEN`), in der Liste und am UHS-Gerät
-  (`stelle` = eigene UHS). EIN `POST …/personen` mit `massnahmen` und `entlassen: true`, Status
+  `FlaechenMehrfachWahl`, Kurzliste `LEICHTE_MASSNAHMEN`), in der Liste als Nebenweg des Kopfes
+  (`weitere`: ab `md` Knopf, unter `md` hinter „Weitere“, damit die erste Person bei 390 px im
+  ersten Bild bleibt) und am UHS-Gerät (`stelle` = eigene UHS). EIN `POST …/personen` mit `massnahmen` und `entlassen: true`, Status
   `betroffen`, ohne Sichtung, offlinefähig wie jede Anlage; der Server schreibt Maßnahmen,
   Verbleib und UHS-Ein-/Austritt zur Erfassungszeit und EINEN ETB-Eintrag. Kurzeingabe `+kürzel`
   (`MASSNAHME_KUERZEL`) und `>entl` (`ENTLASSEN_KUERZEL`) in `personBefehl.ts`, Hinweiszeile aus

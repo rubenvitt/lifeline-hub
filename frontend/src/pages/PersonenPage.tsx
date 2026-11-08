@@ -58,7 +58,7 @@ import {
 import { hatLuecke, istAbgeschlossen } from '../personen/personenBilanz';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
-import LeichterFallModal from '../personen/LeichterFallModal';
+import LeichterFallModal, { LEICHTER_FALL_TITEL } from '../personen/LeichterFallModal';
 import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
@@ -1006,9 +1006,6 @@ export default function PersonenPage() {
                 Betroffene erfassen
               </Button>
               <Button onClick={() => setModusFuer(einsatzId, 'vermisst')}>Vermisst melden</Button>
-              {/* Der leichte Fall in einem Schritt (LLH-1572, design.md D2/D10): in jeder
-                  Einsatzart, ein eigener Dialog. */}
-              <Button onClick={() => setLeichterFallFuer(einsatzId)}>Versorgt und entlassen</Button>
             </>
           )}
         </>
@@ -1020,6 +1017,19 @@ export default function PersonenPage() {
       weitere={{
         name: 'Weitere Aktionen zu den Betroffenen',
         eintraege: [
+          // Der leichte Fall in einem Schritt (LLH-1572, design.md D2/D10): ein eigener Dialog,
+          // der erst beim „Entlassen“ anlegt. Ab `md` ein Knopf neben „Vermisst melden“; unter
+          // `md` hinter „Weitere“, sonst bräche der Kopf bei 390 px in eine dritte Zeile und
+          // schöbe die erste Person aus dem ersten Bild. Am Handy bleibt `>entl` der kurze Weg.
+          ...(darfSchreiben
+            ? [
+                {
+                  key: 'leichter-fall',
+                  label: LEICHTER_FALL_TITEL,
+                  onWahl: () => setLeichterFallFuer(einsatzId),
+                },
+              ]
+            : []),
           {
             key: 'druck',
             label: 'Drucken / als PDF',

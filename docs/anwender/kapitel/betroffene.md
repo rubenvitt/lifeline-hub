@@ -78,7 +78,8 @@ Sichtung wird nie übernommen.
 
 Für kleine Hilfeleistungen, die vor Ort enden (Pflaster, Kühlpack, Gespräch):
 
-1. „Versorgt und entlassen“ wählen.
+1. „Versorgt und entlassen“ wählen. Auf dem Handy steht er im Menü „Weitere Aktionen zu den
+   Betroffenen“ (drei Punkte).
 2. Unter „Anlass“ die Fläche antippen, etwa „Hitze / Kälte“. Der Anlass ist Pflicht.
 3. Unter „Maßnahmen“ bis zu drei Flächen antippen, etwa „Kühlung“ oder „Wundversorgung“; ein
    zweiter Tipp nimmt eine Maßnahme zurück.
