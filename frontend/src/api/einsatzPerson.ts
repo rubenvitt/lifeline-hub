@@ -22,6 +22,7 @@ import type {
   TransportDurch,
   TransportmittelAuswahl,
   Unterschrift,
+  UhsZielAuswahl,
   VersorgendeEinheitAuswahl,
   Verbleib,
   VerbleibArt,
@@ -126,6 +127,12 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
    * selben Schritt, an einer UHS mit Austritt, und EIN ETB-Eintrag.
    */
   entlassen?: boolean;
+  /**
+   * „RTW nötig“ am Einheitengerät (LLH-1580, K1/K2): der Server legt im selben Schritt eine
+   * bestätigungspflichtige Sofortmeldung der eigenen Einheit an und verknüpft sie als `meldung_id`.
+   * Nur mit Netz: nie über die Warteschlange senden (dort 422), sondern {@link legePersonAn}.
+   */
+  rtw?: boolean;
 }
 
 export function listePersonen(
@@ -332,6 +339,11 @@ export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
  * Wahl der versorgenden Einheit (LLH-1567, design.md D4): aktive Einheiten des Einsatzes mit
  * Abschnitt, am Modul Personen. Nicht am gekoppelten Gerät.
  */
+/** Aktive UHS als Ziel „Zur UHS“ am Einheitengerät (LLH-1580, K3): nur Kennung und Bezeichnung. */
+export function ladeUhsZiele(einsatzId: number): Promise<UhsZielAuswahl[]> {
+  return apiGet<UhsZielAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/uhs`);
+}
+
 export function ladeVersorgendeEinheiten(einsatzId: number): Promise<VersorgendeEinheitAuswahl[]> {
   return apiGet<VersorgendeEinheitAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/einheiten`);
 }

@@ -42,6 +42,7 @@ import {
   geraetMonitorPfad,
   geraetPatientenPfad,
   geraetStatusPfad,
+  geraetKontaktePfad,
   geraetStellePfad,
   geraetUhsPfad,
   geraetVerpflegungPfad,
@@ -394,6 +395,12 @@ function EinheitNavigation({ eid }: { eid: number }) {
       {navigationZeigt('meldungen', freigaben) && (
         <NavZiel zu={geraetMeldenPfad(eid)} Icon={IconPapierflieger}>
           Melden
+        </NavZiel>
+      )}
+      {/* LLH-1580: Kontakte der Einheit (Schnellerfassung mit RTW-Anforderung). */}
+      {navigationZeigt('personen', freigaben) && (
+        <NavZiel zu={geraetKontaktePfad(eid)} Icon={IconPersonen}>
+          Kontakte
         </NavZiel>
       )}
     </>

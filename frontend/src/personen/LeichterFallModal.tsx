@@ -4,11 +4,17 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ladeVersorgendeEinheiten, type PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { PERSON_ANGABE_MAX, PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { MassnahmeArt, PersonAnlass, Uhs, VersorgendeEinheitAuswahl } from '../api/types';
+import type {
+  MassnahmeArt,
+  PersonAnlass,
+  Uhs,
+  UhsZielAuswahl,
+  VersorgendeEinheitAuswahl,
+} from '../api/types';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder, ortRegeln } from '../anzeige/ortsfeldFormular';
-import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
+import { ErfassungsModal, type Nebenaktion, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { Select } from '../components/Select';
 import { useRollen } from '../components/instrument';
@@ -18,14 +24,24 @@ import {
   schreibeErfassungsSitzungswert,
 } from '../components/erfassungsSitzung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import StandortFeld from '../geraet/StandortFeld';
+import { useOhneVerbindung } from '../offline/verbindung';
+import type { Eigenposition } from '../pages/lagekarte/useEigenposition';
 import AnlassWahl from './AnlassWahl';
-import { FlaechenMehrfachWahl } from './FlaechenWahl';
+import FlaechenWahl, { FlaechenMehrfachWahl } from './FlaechenWahl';
 import { fundortAusText } from './AufnahmeFelder';
 import { LEICHTE_MASSNAHMEN, LEICHTE_MASSNAHMEN_MAX, MASSNAHME_WORT } from './personMeta';
 import { einheitText } from './VersorgtVon';
 
 /** Titel und Primärknopf des Dialogs (LLH-1572, design.md D2). */
 export const LEICHTER_FALL_TITEL = 'Versorgt und entlassen';
+
+/** Titel am Einheitengerät (LLH-1580): ein Kontakt hat dort drei Ausgänge. */
+export const KONTAKT_TITEL = 'Kontakt';
+
+/** Die Nebenausgänge am Einheitengerät (LLH-1580, Entwurf K1–K3); der Primärknopf entlässt. */
+export const KONTAKT_AUSGANG = { zurUhs: 'zur-uhs', rtw: 'rtw' } as const;
+type KontaktAusgang = (typeof KONTAKT_AUSGANG)[keyof typeof KONTAKT_AUSGANG];
 
 const MASSNAHMEN_OPTIONEN = LEICHTE_MASSNAHMEN.map((m) => ({ wert: m, label: MASSNAHME_WORT[m] }));
 
@@ -39,13 +55,31 @@ export interface LeichterFallWerte {
   antreff_ort?: OrtsfeldWert;
   name?: string;
   alter_geschaetzt?: number | null;
+  /** Nur am Einheitengerät: die Position des Handys, beim Öffnen einmal ermittelt (K6). */
+  standort?: Eigenposition | null;
+  /** Nur am Einheitengerät mit mehr als einer aktiven UHS: das Ziel „Zur UHS“ (K3). */
+  ziel_uhs?: string | null;
 }
 
-/** Die feste Stelle eines Geräts (design.md D2/D4): die eigene UHS, die Wahl entfällt. */
-export type LeichterFallStelle = {
-  art: 'uhs';
-  uhs: Pick<Uhs, 'id' | 'bezeichnung' | 'lat' | 'lon'>;
-};
+/**
+ * Die feste Stelle eines Geräts (design.md D2/D4): die eigene UHS, die Wahl entfällt. Am
+ * Einheitengerät (LLH-1580) die eigene Einheit mit den aktiven UHS als Ziel „Zur UHS“.
+ */
+export type LeichterFallStelle =
+  | {
+      art: 'uhs';
+      uhs: Pick<Uhs, 'id' | 'bezeichnung' | 'lat' | 'lon'>;
+    }
+  | {
+      art: 'einheit';
+      einheit: Pick<VersorgendeEinheitAuswahl, 'id' | 'name' | 'abschnitt_name'>;
+      uhsZiele: readonly UhsZielAuswahl[];
+    };
+
+/** Fundort einer festen Stelle (design.md D4). */
+function fundortDerStelle(stelle: LeichterFallStelle): OrtsfeldWert {
+  return stelle.art === 'uhs' ? fundortAusUhs(stelle.uhs) : fundortAusEinheit(stelle.einheit);
+}
 
 /** Fundort aus der UHS: ihre Bezeichnung, ihre Koordinate, wenn sie eine hat (design.md D4). */
 export function fundortAusUhs(uhs: Pick<Uhs, 'bezeichnung' | 'lat' | 'lon'>): OrtsfeldWert {
@@ -76,7 +110,9 @@ function liesSchluessel(
 export function leichterFallZuEingabe(
   werte: LeichterFallWerte,
   stelle: LeichterFallStelle | null,
+  ausgang?: string,
 ): PersonAnlegenEingabe {
+  if (stelle?.art === 'einheit') return kontaktZuEingabe(werte, stelle, ausgang);
   const ort = ortFelder(werte.antreff_ort);
   const name = werte.name?.trim();
   const bezug = stelle
@@ -93,6 +129,37 @@ export function leichterFallZuEingabe(
     ...(ort.lat != null && ort.lon != null ? { antreff_lat: ort.lat, antreff_lon: ort.lon } : {}),
     ...(bezug?.art === 'uhs' ? { uhs_id: bezug.id } : {}),
     ...(bezug?.art === 'einheit' ? { versorgende_einheit_id: bezug.id } : {}),
+  };
+}
+
+/**
+ * Formularwerte → Kontakt am Einheitengerät (LLH-1580, Entwurf K1–K6): ohne Name und Alter, die
+ * eigene Einheit als versorgende, Koordinate aus dem Standort des Handys. Ohne `ausgang` (der
+ * Primärknopf) entlassen, `zur-uhs` in den Eingang der gewählten (oder einzigen) UHS, `rtw` mit
+ * Sofortmeldung. Rein.
+ */
+export function kontaktZuEingabe(
+  werte: LeichterFallWerte,
+  stelle: Extract<LeichterFallStelle, { art: 'einheit' }>,
+  ausgang?: string,
+): PersonAnlegenEingabe {
+  const ort = ortFelder(werte.antreff_ort);
+  const zielUhs =
+    werte.ziel_uhs != null ? Number(werte.ziel_uhs) : (stelle.uhsZiele[0]?.id ?? null);
+  const ausgangFelder =
+    ausgang === KONTAKT_AUSGANG.rtw
+      ? { rtw: true }
+      : ausgang === KONTAKT_AUSGANG.zurUhs && zielUhs != null
+        ? { uhs_id: zielUhs }
+        : { entlassen: true };
+  return {
+    status: 'betroffen',
+    versorgende_einheit_id: stelle.einheit.id,
+    ...ausgangFelder,
+    ...(werte.anlass ? { anlass: werte.anlass } : {}),
+    ...(werte.massnahmen && werte.massnahmen.length > 0 ? { massnahmen: werte.massnahmen } : {}),
+    ...(ort.text != null ? { antreff_ort: ort.text } : {}),
+    ...(werte.standort ? { antreff_lat: werte.standort.lat, antreff_lon: werte.standort.lon } : {}),
   };
 }
 
@@ -142,6 +209,8 @@ export default function LeichterFallModal({
   const formular = useFormularEingehaengt();
   const geladen = useRef<string | null>(null);
   const mitWahl = stelle == null;
+  const einheitStelle = stelle?.art === 'einheit' ? stelle : null;
+  const ohneVerbindung = useOhneVerbindung();
 
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.personenEinheiten(einsatzId),
@@ -199,7 +268,13 @@ export default function LeichterFallModal({
     if (stelle) {
       geladen.current = kennung;
       if (!ortsText(form.getFieldValue('antreff_ort')))
-        form.setFieldValue('antreff_ort', fundortAusUhs(stelle.uhs));
+        form.setFieldValue('antreff_ort', fundortDerStelle(stelle));
+      // Die letzte Wahl „Zur UHS“ bleibt stehen, solange die UHS aktiv ist (K3).
+      if (stelle.art === 'einheit' && stelle.uhsZiele.length > 1) {
+        const letzte = liesErfassungsSitzungswert(einsatzId, MASKE, 'ziel_uhs');
+        const ziel = stelle.uhsZiele.find((u) => String(u.id) === letzte) ?? stelle.uhsZiele[0];
+        form.setFieldValue('ziel_uhs', String(ziel.id));
+      }
       return;
     }
     if (schluessel == null || form.getFieldValue('versorgt_von') != null) {
@@ -218,16 +293,37 @@ export default function LeichterFallModal({
     });
   }, [offen, formular.da, einsatzId, stelle, einheiten.length, aktiveUhs.length, fundortVon, form]);
 
+  // Am Einheitengerät (LLH-1580): „Entlassen“ ist der Primärknopf, daneben „Zur UHS“ (nur mit
+  // aktiver UHS) und „RTW nötig“. Ohne Netz geht der RTW über Funk (K2), die anderen werden
+  // vorgemerkt.
+  const nebenaktionen: Nebenaktion[] | undefined = einheitStelle
+    ? [
+        ...(einheitStelle.uhsZiele.length > 0
+          ? [{ schluessel: KONTAKT_AUSGANG.zurUhs satisfies KontaktAusgang, text: 'Zur UHS' }]
+          : []),
+        {
+          schluessel: KONTAKT_AUSGANG.rtw satisfies KontaktAusgang,
+          text: ohneVerbindung ? 'RTW über Funk' : 'RTW nötig',
+          danger: true,
+          gesperrt: ohneVerbindung,
+        },
+      ]
+    : undefined;
+
   return (
     <ErfassungsModal<LeichterFallWerte>
       offen={offen}
-      titel={LEICHTER_FALL_TITEL}
+      titel={einheitStelle ? KONTAKT_TITEL : LEICHTER_FALL_TITEL}
       form={form}
       erfassenText="Entlassen"
-      onErfassen={(werte) => onErfassen(leichterFallZuEingabe(werte, stelle))}
+      nebenaktionen={nebenaktionen}
+      onErfassen={(werte, ausgang) => onErfassen(leichterFallZuEingabe(werte, stelle, ausgang))}
       onErfasst={(werte) => {
         if (mitWahl && werte.versorgt_von) {
           schreibeErfassungsSitzungswert(einsatzId, MASKE, 'versorgt_von', werte.versorgt_von);
+        }
+        if (einheitStelle && werte.ziel_uhs) {
+          schreibeErfassungsSitzungswert(einsatzId, MASKE, 'ziel_uhs', werte.ziel_uhs);
         }
       }}
       onFertig={onFertig}
@@ -235,8 +331,11 @@ export default function LeichterFallModal({
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel="Person nicht erfasst"
-      serie
-      uebernahme={mitWahl ? ['versorgt_von', 'antreff_ort'] : ['antreff_ort']}
+      // Am Handy schließt jeder Kontakt den Dialog: die Liste darunter zeigt ihn gleich.
+      serie={!einheitStelle}
+      uebernahme={
+        einheitStelle ? undefined : mitWahl ? ['versorgt_von', 'antreff_ort'] : ['antreff_ort']
+      }
     >
       <FormularEingehaengt onWechsel={formular.melde} />
       <Form.Item label="Anlass" name="anlass" rules={[{ required: true, message: 'Anlass fehlt' }]}>
@@ -249,6 +348,17 @@ export default function LeichterFallModal({
           max={LEICHTE_MASSNAHMEN_MAX}
         />
       </Form.Item>
+      {einheitStelle && einheitStelle.uhsZiele.length > 1 && (
+        <Form.Item label="UHS" name="ziel_uhs">
+          <FlaechenWahl<string>
+            aria-label="UHS"
+            optionen={einheitStelle.uhsZiele.map((u) => ({
+              wert: String(u.id),
+              label: u.bezeichnung,
+            }))}
+          />
+        </Form.Item>
+      )}
       {mitWahl && (
         <Form.Item label="Versorgt von" name="versorgt_von">
           <Select
@@ -287,19 +397,27 @@ export default function LeichterFallModal({
           <Input count={zeichenGrenze(PERSON_ANGABE_MAX)} />
         </Form.Item>
       )}
-      <div style={{ display: 'flex', gap: token.margin, flexWrap: 'wrap' }}>
-        <Form.Item
-          label="Name"
-          name="name"
-          rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}
-          style={{ flex: '1 1 200px' }}
-        >
-          <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
+      {einheitStelle && (
+        <Form.Item label="Standort" name="standort">
+          <StandortFeld sofort />
         </Form.Item>
-        <Form.Item label="Alter" name="alter_geschaetzt">
-          <InputNumber min={0} max={120} style={{ width: 120 }} />
-        </Form.Item>
-      </div>
+      )}
+      {/* Am Handy ohne Namen und Alter (F6, K5): sie ergänzen UHS oder Einsatzleitung. */}
+      {!einheitStelle && (
+        <div style={{ display: 'flex', gap: token.margin, flexWrap: 'wrap' }}>
+          <Form.Item
+            label="Name"
+            name="name"
+            rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}
+            style={{ flex: '1 1 200px' }}
+          >
+            <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
+          </Form.Item>
+          <Form.Item label="Alter" name="alter_geschaetzt">
+            <InputNumber min={0} max={120} style={{ width: 120 }} />
+          </Form.Item>
+        </div>
+      )}
     </ErfassungsModal>
   );
 }

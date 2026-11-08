@@ -2,18 +2,19 @@
 titel: Einheit am Gerät
 gruppen: [geraete]
 reihenfolge: 755
-quellen: [frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetStatusPage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/StandortFeld.tsx, frontend/src/geraet/auftragsVibration.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/geraet/abschnitt.rs]
+quellen: [frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetStatusPage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/StandortFeld.tsx, frontend/src/geraet/GeraetKontaktePage.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/geraet/auftragsVibration.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/geraet/abschnitt.rs, src/geraet/stelle.rs, src/routes/einsatz_person.rs]
 ---
 
 ## Überblick
 
 Ein Handy der **Einheit** arbeitet für genau eine Einheit des Einsatzes, etwa einen Trupp oder
 eine Gruppe ohne eigenes Konto: Es zeigt die Aufträge an diese Einheit, setzt ihren Status und
-schickt Meldungen an die Einsatzleitung, auf Wunsch mit dem eigenen Standort. Es ist an genau
+schickt Meldungen an die Einsatzleitung, auf Wunsch mit dem eigenen Standort. Unter „Kontakte“
+hält es fest, wen die Einheit versorgt hat, und fordert bei Bedarf einen RTW an. Es ist an genau
 eine Einheit gekoppelt (siehe [Geräte koppeln](geraete-koppeln.md)).
 
-Die Navigation unten führt zu „Aufträge“, „Status“ und „Melden“. Die Bedienung des Geräts selbst
-steht in [Gerät bedienen](geraet-bedienen.md).
+Die Navigation unten führt zu „Aufträge“, „Status“, „Melden“ und „Kontakte“. Die Bedienung des
+Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 
 ## Abläufe
 
@@ -55,6 +56,31 @@ dann nur an.
    seiner Genauigkeit an; das Kreuz daneben nimmt ihn wieder heraus.
 4. „Meldung senden“ wählen. Die Meldung steht danach unter „Eigene Meldungen“.
 
+### Kontakt erfassen
+
+Für eine Person, die die Einheit vor Ort versorgt, etwa bei Hitze oder einer kleinen Verletzung:
+
+1. Unten „Kontakte“ wählen und oben „Kontakt“ antippen. Das Handy ermittelt dabei einmal den
+   eigenen Standort.
+2. Den „Anlass“ wählen, bei Bedarf bis zu drei „Maßnahmen“ und den „Fundort“.
+3. Den Ausgang wählen:
+   - „Entlassen“: die Person ist versorgt und geht ihrer Wege.
+   - „Zur UHS“: die Einheit bringt die Person in die Unfallhilfsstelle. Gibt es mehrere, vorher
+     die UHS wählen; die Wahl bleibt für den nächsten Kontakt stehen. Die Person steht danach im
+     Eingang dieser UHS.
+   - „RTW nötig“: siehe unten.
+
+Name, Alter und andere Personalien nimmt das Handy nicht auf. Die Liste unter „Kontakte“ zeigt
+die Kontakte der eigenen Einheit mit Registriernummer, Uhrzeit, Anlass und Ausgang, neueste oben.
+
+### RTW anfordern
+
+1. Wie oben einen Kontakt beginnen und den Anlass wählen.
+2. „RTW nötig“ wählen. Bei der Einsatzleitung geht sofort eine Sofortmeldung „RTW angefordert“
+   mit Registriernummer und Ort ein, die sie bestätigen muss.
+3. In der Liste steht am Kontakt „RTW offen bis …“, nach der Bestätigung „RTW bestätigt“. Ist die
+   Frist abgelaufen, steht dort „RTW · Funk“: dann die Einsatzleitung über Funk ansprechen.
+
 ## Hintergrund
 
 ### Was das Handy sieht und darf
@@ -65,7 +91,16 @@ eigenen Einheit. Andere Einheiten, Abschnitte, Einsatzbefehle, Karte und Einsatz
 am Handy nicht, ebenso Aufträge erteilen oder abnehmen und Einheiten ändern. Den Status
 entfernen kann nur die Führung.
 
-Ein Ziel unten erscheint nur, wenn das Modul dahinter im Einsatz freigegeben ist.
+Ein Ziel unten erscheint nur, wenn das Modul dahinter im Einsatz freigegeben ist; „Kontakte“
+braucht das Modul Personen.
+
+### Kontakte und Personalien
+
+Das Handy sieht nur Kontakte mit der eigenen Einheit als versorgender Einheit, und auch diese
+ohne Namen und Personalien. Ändern kann es einen Kontakt nach dem Erfassen
+nicht; das übernimmt die UHS oder die Einsatzleitung (siehe [Betroffene](betroffene.md)). Jeder
+Kontakt steht mit einem Eintrag im Einsatztagebuch, etwa „Person R-012 von Streife 2 versorgt und
+entlassen“.
 
 ### Absender und Standort
 
@@ -78,7 +113,9 @@ Bei der Einsatzleitung steht er an der Meldung und führt auf die Lagekarte.
 
 Ohne Verbindung zeigen „Aufträge“ und „Status“ den letzten Stand. Quittieren, Vollzug melden und
 den Status setzen sind dann gesperrt, damit nichts Veraltetes nachträglich ankommt. Eine
-Meldung merkt das Handy vor und sendet sie, sobald die Verbindung wieder steht.
+Meldung und einen Kontakt mit „Entlassen“ oder „Zur UHS“ merkt das Handy vor und sendet sie,
+sobald die Verbindung wieder steht. Ein RTW geht ohne Verbindung nicht: Der Knopf heißt dann
+„RTW über Funk“ und ist gesperrt, denn eine RTW-Anforderung darf nicht unbemerkt warten.
 
 ### Kurze Vibration
 

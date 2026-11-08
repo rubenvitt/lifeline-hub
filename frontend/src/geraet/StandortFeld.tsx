@@ -17,15 +17,20 @@ import {
  *
  * Eine Antwort, die erst nach dem Senden kommt, verfällt: Zurücksetzen hängt das Feld neu ein
  * (rc-field-form), und eine alte Ermittlung darf die nächste Meldung nicht verorten.
+ *
+ * `sofort` (Kontakt am Einheitengerät, LLH-1580 K6): ermittelt einmal beim Einhängen, das Öffnen
+ * des Kontakts ist der Knopfdruck. Ohne Freigabe bleibt der Knopf.
  */
 export default function StandortFeld({
   value,
   onChange,
   disabled,
+  sofort = false,
 }: {
   value?: Eigenposition | null;
   onChange?: (wert: Eigenposition | null) => void;
   disabled?: boolean;
+  sofort?: boolean;
 }) {
   const { formatKoordinate, formatDistanz } = useAnzeigeKonventionen();
   const [laeuft, setLaeuft] = useState(false);
@@ -64,6 +69,15 @@ export default function StandortFeld({
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 5_000 },
     );
   };
+
+  // Einmal je Einhängen; `ermitteln` liest nur Refs und Props des ersten Renders.
+  const sofortGelaufen = useRef(false);
+  useEffect(() => {
+    if (!sofort || sofortGelaufen.current || value || disabled) return;
+    sofortGelaufen.current = true;
+    ermitteln();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Einhängen
+  }, []);
 
   if (value) {
     return (

@@ -54,6 +54,14 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   neuen Auftragskennung in derselben Abfrage wie die Seite, nie beim ersten Stand, nie Ton.
   „Gerät koppeln“ am Einheiten-Detail führt über `einsatzEinstellungenPfad(…, 'geraete', {
 einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öffnen).
+  **Kontakte** (LLH-1580, K1–K8): `GeraetKontaktePage` mit `LeichterFallModal` (Stelle
+  `art: 'einheit'`), drei Ausgänge über `nebenaktionen` des `ErfassungsFormular` (Entlassen, Zur
+  UHS, RTW nötig). Der Server erzwingt die eigene Einheit als versorgende, lehnt Personalien ab
+  (403), liefert Personen nur der eigenen Einheit und ohne Personalien (`ohne_personalien`) und
+  legt bei `rtw: true` in derselben Transaktion die Sofortmeldung an. Der RTW geht nie über die
+  Warteschlange (Server 422 bei Queue-Header, Client ruft `legePersonAn` direkt; ohne Netz
+  „RTW über Funk“ gesperrt). UHS-Ziele über `GET …/personen/uhs` (das Gerät hat kein Modul UHS,
+  bekommt also kein `uhs`-Ereignis: beim Öffnen frisch laden).
 - **Eine Ansicht wird verfügbar, wenn sie fertig ist:** `Funktionsansicht::ist_verfuegbar` erst
   setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
   422, und die Kopplungsmaske bietet nur, was `GeraeteUebersicht.ansichten` nennt;

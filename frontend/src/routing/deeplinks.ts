@@ -1550,6 +1550,11 @@ export function geraetMeldenPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/melden`;
 }
 
+/** Kontakte der eigenen Einheit am Einheitengerät (LLH-1580). */
+export function geraetKontaktePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/kontakte`;
+}
+
 /** Status der eigenen Einheit am Einheitengerät (LLH-1579). */
 export function geraetStatusPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/status`;

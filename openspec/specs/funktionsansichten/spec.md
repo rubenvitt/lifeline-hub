@@ -743,6 +743,10 @@ Modulzähler MUST das Gerät nicht erhalten. Gefahrenzonen und Karte gehören ni
 | `auftraege`: die eigene Empfängerzeile quittieren, Vollzug melden | S |
 | `auftraege`: erteilen, abnehmen, Kennzahlen; Aufträge nur an den Abschnitt der Einheit | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen (Absender fest die eigene Einheit), wahlweise mit Standort, eigene Meldungen lesen | L/S |
+| `personen`: Kontakte mit der eigenen Einheit als versorgender Einheit, ohne Personalien (LLH-1580) | L |
+| `personen`: Kontakt erfassen mit Anlass, Maßnahmen, Fundort und Standort und genau einem Ausgang: entlassen, in eine aktive UHS gebracht oder RTW angefordert | S |
+| `personen`: aktive UHS als Ziel (nur Kennung und Bezeichnung) | L |
+| `personen`: Name, Alter und übrige Personalien, Einzelansicht, Verbleib, Anlass oder Sichtung ändern, fremde Kontakte | — |
 | `einsatzabschnitte`, `befehle`, `lagekarte`, alle übrigen Module, Einstellungen, Verwaltung | — |
 
 #### Scenario: Nur die eigene Einheit
@@ -786,6 +790,38 @@ Modulzähler MUST das Gerät nicht erhalten. Gefahrenzonen und Karte gehören ni
 - **WHEN** das Gerät keine Verbindung hat
 - **THEN** zeigt es Aufträge und Status mit dem letzten Stand und sperrt Quittung, Vollzug und Status
 - **AND** merkt es eine Meldung vor
+
+#### Scenario: Kontakt erfassen
+
+- **WHEN** das Gerät der Streife 2 einen Kontakt mit Anlass und „Entlassen“ erfasst
+- **THEN** legt der Server eine betroffene Person mit der Streife 2 als versorgender Einheit an
+- **AND** schreibt genau einen ETB-Eintrag „Person R-… von Streife 2 versorgt und entlassen“
+- **AND** sind Name, Alter und übrige Personalien 403 und mehr als ein Ausgang 422
+
+#### Scenario: Kontakte ohne Namen
+
+- **WHEN** das Gerät die Personen abruft
+- **THEN** erhält es nur Kontakte der eigenen Einheit, ohne Personalien
+- **AND** ist ein fremder Kontakt 404
+
+#### Scenario: Zur UHS
+
+- **WHEN** das Gerät einen Kontakt in eine aktive UHS bringt
+- **THEN** steht die Person im Eingang dieser UHS
+- **AND** ist eine geplante oder aufgelöste UHS 422
+
+#### Scenario: RTW anfordern
+
+- **WHEN** das Gerät einen Kontakt mit „RTW nötig“ erfasst
+- **THEN** legt der Server in derselben Transaktion eine Sofortmeldung „RTW angefordert“ mit Reg.-Nr., Ort und Bestätigungspflicht an die Einsatzleitung an und verknüpft sie mit der Person
+- **AND** zeigt das Gerät an der Person, ob die Meldung bestätigt, offen bis zur Frist oder überfällig ist
+
+#### Scenario: RTW ohne Netz
+
+- **WHEN** das Gerät keine Verbindung hat
+- **THEN** ist „RTW nötig“ gesperrt und verweist auf Funk
+- **AND** lehnt der Server einen RTW aus der Warteschlange mit 422 ab
+- **AND** merkt das Gerät „Entlassen“ und „Zur UHS“ vor
 
 #### Scenario: Auflösen beendet die Kopplung
 

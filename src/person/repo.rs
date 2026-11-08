@@ -354,6 +354,56 @@ pub async fn versorgende_einheiten(
     .await?)
 }
 
+/// Aktive UHS des Einsatzes als Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3).
+pub async fn uhs_ziele(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<super::UhsZielAuswahl>, AppError> {
+    Ok(sqlx::query_as::<_, super::UhsZielAuswahl>(
+        "SELECT id, bezeichnung FROM uhs WHERE einsatz_id = ? AND status = 'aktiv' \
+         ORDER BY bezeichnung COLLATE NOCASE, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Name der Einheit im Einsatz, für ETB und Absender des Einheitengeräts (LLH-1580).
+pub async fn einheit_name(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// Verknüpft eine frisch angelegte Person mit der Meldung, die ihre Anlage im selben Schritt
+/// erzeugt hat (RTW-Anforderung am Einheitengerät, LLH-1580 K1). Nur innerhalb der Anlage: die
+/// Herkunftsmeldung ist danach nicht änderbar (LLH-1567).
+pub async fn setze_meldung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    meldung_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_person SET meldung_id = ? \
+         WHERE id = ? AND einsatz_id = ? AND meldung_id IS NULL",
+    )
+    .bind(meldung_id)
+    .bind(person_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Prüft die versorgende Einheit einer Person (LLH-1567, design.md D4): sie gehört zum Einsatz
 /// und ist nicht aufgelöst, sonst 422 (der Zusammenhang, `src/AGENTS.md`).
 pub async fn pruefe_versorgende_einheit(

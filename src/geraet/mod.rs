@@ -233,7 +233,8 @@ impl Funktionsansicht {
             Funktionsansicht::Verpflegung => &["verpflegung", "meldungen"],
             // LLH-1579: die eigene Einheit (Status), ihre Aufträge und ihre Meldungen. Keine
             // Lagekarte: S1 hat keine Karte (Konzept LLH-1571, Abschnitt 3).
-            Funktionsansicht::Einheit => &["einheiten", "auftraege", "meldungen"],
+            // LLH-1580: die Kontakte der Einheit (versorgende Einheit = eigene, ohne Personalien).
+            Funktionsansicht::Einheit => &["einheiten", "auftraege", "meldungen", "personen"],
         }
     }
 
@@ -518,6 +519,13 @@ const EINHEIT: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
+    // Kontakte am Handy (LLH-1580, Konzept LLH-1571 S2): die Personen mit versorgender Einheit =
+    // eigene ohne Personalien lesen, einen Kontakt anlegen (Einheit fest, „Zur UHS“ in eine
+    // aktive UHS, RTW als Sofortmeldung) und die aktiven UHS als Ziel wählen. Kein Detail, keine
+    // Korrektur: das bleibt UHS und Einsatzleitung.
+    ("GET", "/api/einsaetze/{id}/personen"),
+    ("POST", "/api/einsaetze/{id}/personen"),
+    ("GET", "/api/einsaetze/{id}/personen/uhs"),
 ];
 
 /// Ob eine Gerätesitzung mit dieser Ansicht die Route `(methode, pfad)` aufrufen darf. `pfad`
@@ -938,7 +946,10 @@ mod tests {
         assert!(e.ist_stellengebunden());
         assert_eq!(e.stellenart(), Some(Bindungsart::Einheit));
         assert!(e.rolle().darf_schreiben());
-        assert_eq!(e.lese_module(), ["einheiten", "auftraege", "meldungen"]);
+        assert_eq!(
+            e.lese_module(),
+            ["einheiten", "auftraege", "meldungen", "personen"]
+        );
         for (m, p) in [
             ("GET", "/api/fahrzeug-status"),
             ("GET", "/api/einsaetze/{id}/einheiten"),
@@ -952,6 +963,9 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
             ("GET", "/api/einsaetze/{id}/meldungen"),
             ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("POST", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/personen/uhs"),
         ] {
             assert!(darf_route(e, m, p), "Einheitengerät darf {m} {p}");
         }
@@ -961,7 +975,12 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/zonen"),
             ("GET", "/api/einsaetze/{id}/fahrzeuge"),
             ("GET", "/api/einsaetze/{id}/personal"),
-            ("GET", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+            ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+            ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
+            ("POST", "/api/einsaetze/{id}/personen/{pid}/anlass"),
+            ("GET", "/api/einsaetze/{id}/personen/einheiten"),
+            ("GET", "/api/einsaetze/{id}/uhs"),
             ("POST", "/api/einsaetze/{id}/einheiten"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}/position"),

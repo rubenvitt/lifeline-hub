@@ -189,7 +189,28 @@ pub async fn liste(
     if let Some(sichtbar) = stelle::sichtbare_personen(&state.pool, ctx.geraet.as_ref()).await? {
         liste.retain(|p| sichtbar.contains(&p.id));
     }
+    // Das Einheitengerät sieht keine Personalien (LLH-1580, Entwurf K5).
+    if ist_einheitengeraet(&ctx) {
+        liste.iter_mut().for_each(PersonAnzeige::ohne_personalien);
+    }
     Ok(Json(liste))
+}
+
+/// Ob die Sitzung ein Einheitengerät ist (LLH-1579/LLH-1580).
+fn ist_einheitengeraet(ctx: &crate::einsatz::kontext::EinsatzKontext) -> bool {
+    ctx.geraet
+        .as_ref()
+        .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::Einheit)
+}
+
+/// GET /api/einsaetze/{id}/personen/uhs — die aktiven UHS als Ziel „Zur UHS“ am Einheitengerät
+/// (LLH-1580, Entwurf K3): nur Kennung und Bezeichnung. Am Modul Personen wie `einheiten`; nicht
+/// auditiert (kein Personenbezug).
+pub async fn uhs_ziele(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<Vec<crate::person::UhsZielAuswahl>>, AppError> {
+    Ok(Json(repo::uhs_ziele(&state.pool, ctx.einsatz.id).await?))
 }
 
 /// GET /api/einsaetze/{id}/personen/auswahl — Personenauswahl ohne Freitexte (LFH-940). NICHT
@@ -303,6 +324,12 @@ pub struct AnlegenBody {
     /// schreibt EINEN ETB-Eintrag statt der einzelnen.
     #[serde(default)]
     pub entlassen: Option<bool>,
+    /// LLH-1580 (Entwurf K1/K2): „RTW nötig“ am Einheitengerät. Legt in derselben Transaktion eine
+    /// bestätigungspflichtige Sofortmeldung der eigenen Einheit an, deren Text der Server bildet
+    /// (Registriernummer und Ort, nichts Medizinisches), und verknüpft sie als `meldung_id`. Nur
+    /// mit Netz: aus der Offline-Warteschlange 422.
+    #[serde(default)]
+    pub rtw: Option<bool>,
 }
 
 /// POST /api/einsaetze/{id}/personen — Person anlegen (initial erfasst/vermisst/betroffen).
@@ -326,8 +353,9 @@ pub async fn anlegen(
             return Err(AppError::Forbidden);
         }
         body.uhs_id = Some(eigene);
-    } else if ctx.geraet.is_some() && body.uhs_id.is_some() {
-        // Ein Gerät ohne UHS bucht in keine (LFH-1040).
+    } else if ctx.geraet.is_some() && body.uhs_id.is_some() && !ist_einheitengeraet(&ctx) {
+        // Ein Gerät ohne UHS bucht in keine (LFH-1040). Ausnahme Einheitengerät (LLH-1580, K3):
+        // „Zur UHS“ bucht den Kontakt bei der Anlage in den Eingang einer aktiven UHS.
         return Err(AppError::Forbidden);
     }
     if body.uhs_id.is_some() {
@@ -348,6 +376,74 @@ pub async fn anlegen(
         && (gesetzt(&body.sichtung) || gesetzt(&body.anlass) || hat_massnahmen || entlassen)
     {
         return Err(AppError::Forbidden);
+    }
+    // Kontakt am Einheitengerät (LLH-1580): versorgende Einheit fest die eigene, ohne Personalien
+    // und ohne Sichtung (Entwurf K5, Konzept LLH-1571 F6); Name und Alter ergänzen UHS oder
+    // Einsatzleitung. Ausgang entweder „Entlassen“, „Zur UHS“ oder „RTW nötig“.
+    let rtw = body.rtw == Some(true);
+    let einheit_name = if ist_einheitengeraet(&ctx) {
+        let Some(eigene) = stelle::eigene(ctx.geraet.as_ref(), Bindungsart::Einheit) else {
+            return Err(AppError::Forbidden);
+        };
+        if body.versorgende_einheit_id.is_some_and(|e| e != eigene) {
+            return Err(AppError::Forbidden);
+        }
+        body.versorgende_einheit_id = Some(eigene);
+        let personalien = [
+            &body.name,
+            &body.vorname,
+            &body.geschlecht,
+            &body.geburtsdatum,
+            &body.herkunft_adresse,
+            &body.melder_kontakt,
+            &body.notiz,
+            &body.zustand,
+            &body.sichtung,
+            &body.vermisst_seit,
+        ];
+        if personalien.into_iter().any(gesetzt)
+            || body.alter_geschaetzt.is_some()
+            || body.bestaetigt_personal_id.is_some()
+        {
+            return Err(AppError::Forbidden);
+        }
+        if [entlassen, body.uhs_id.is_some(), rtw]
+            .into_iter()
+            .filter(|a| *a)
+            .count()
+            > 1
+        {
+            return Err(AppError::UnprocessableEntity(
+                "Ein Kontakt ist entlassen, zur UHS gebracht oder wartet auf den RTW".into(),
+            ));
+        }
+        Some(
+            repo::einheit_name(&state.pool, ctx.einsatz.id, eigene)
+                .await?
+                .ok_or(AppError::Forbidden)?,
+        )
+    } else {
+        None
+    };
+    if rtw {
+        if einheit_name.is_none() {
+            return Err(AppError::UnprocessableEntity(
+                "Einen RTW fordert hier nur das Gerät einer Einheit an".into(),
+            ));
+        }
+        // Eine Sofortmeldung, die nach einem Funkloch ankommt, schadet mehr als keine (K2).
+        if headers.contains_key(crate::routes::support::OFFLINE_QUEUE_BENUTZER_ID_HEADER) {
+            return Err(AppError::UnprocessableEntity(
+                "Ein RTW geht ohne Netz über Funk".into(),
+            ));
+        }
+        if body.meldung_id.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Die RTW-Anforderung ist selbst die Meldung der Person".into(),
+            ));
+        }
+        ctx.fordere_zielmodul::<crate::einsatz::modul::Meldungen>(&state.pool)
+            .await?;
     }
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
@@ -555,11 +651,35 @@ pub async fn anlegen(
         repo::pruefe_meldung(&state.pool, einsatz_id, meldung_id, nur_von).await?;
     }
 
+    // RTW (LLH-1580, K1): Eingang und Bestätigungsfrist wie jede Sofortmeldung (LFH-97, Task 8).
+    let rtw_eingang = crate::zeit::jetzt();
+    // Absender wie jede Meldung vom Gerät: Einheit und Gerät („2. Zug · Handy“).
+    let rtw_absender = match (einheit_name.as_deref(), ctx.geraet.as_ref()) {
+        (Some(einheit), Some(g)) => format!("{einheit} · {}", g.bezeichnung),
+        (Some(einheit), None) => einheit.to_owned(),
+        _ => String::new(),
+    };
+    let rtw_frist_at = if rtw {
+        let einst =
+            crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
+        let org_einst =
+            crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
+        let frist_min = crate::meldung::meldung_bestaetigung_frist_min_ableiten(
+            &einst,
+            &org_einst,
+            None,
+            crate::meldung::BESTAETIGUNG_FRIST_DEFAULT_MIN,
+        );
+        crate::zeit::plus_minuten(&rtw_eingang, frist_min)
+    } else {
+        None
+    };
+
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (person, war_neu, uhs_etb_id, verbleib_etb_id) =
+    let (person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id) =
         crate::write_retry!(&state.pool, |conn| {
             let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
                 conn,
@@ -593,9 +713,18 @@ pub async fn anlegen(
                 // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
                 // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
                 // ein zweiter Roundtrip für einen Wert, der schon dasteht.
-                // Ein leichter Fall schreibt am Ende EINEN Eintrag (design.md D7).
-                if !entlassen {
-                    let text = crate::person::etb_text_erfasst(reg);
+                // Ein leichter Fall schreibt am Ende EINEN Eintrag (design.md D7), ebenso ein
+                // Kontakt der Einheit „Zur UHS“ (LLH-1580, K7).
+                let zur_uhs_der_einheit = einheit_name.is_some() && body.uhs_id.is_some();
+                if !entlassen && !zur_uhs_der_einheit {
+                    let text = match einheit_name.as_deref() {
+                        Some(einheit) => crate::person::etb_text_kontakt_einheit(
+                            reg,
+                            einheit,
+                            crate::person::KontaktAusgang::Offen,
+                        ),
+                        None => crate::person::etb_text_erfasst(reg),
+                    };
                     crate::etb::system_audit_zu_tx(
                         conn,
                         einsatz_id,
@@ -697,7 +826,14 @@ pub async fn anlegen(
                     .await?;
                     let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
                     if !entlassen {
-                        let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
+                        let text = match einheit_name.as_deref() {
+                            Some(einheit) => crate::person::etb_text_kontakt_einheit(
+                                reg,
+                                einheit,
+                                crate::person::KontaktAusgang::ZurUhs(&uhs.bezeichnung),
+                            ),
+                            None => crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung),
+                        };
                         uhs_etb_id = Some(
                             crate::etb::system_audit_zu_tx(
                                 conn,
@@ -740,8 +876,17 @@ pub async fn anlegen(
                         )
                         .await?;
                     }
-                    let text =
-                        crate::person::etb_text_versorgt_entlassen(reg, uhs_bezeichnung.as_deref());
+                    let text = match einheit_name.as_deref() {
+                        Some(einheit) => crate::person::etb_text_kontakt_einheit(
+                            reg,
+                            einheit,
+                            crate::person::KontaktAusgang::Entlassen,
+                        ),
+                        None => crate::person::etb_text_versorgt_entlassen(
+                            reg,
+                            uhs_bezeichnung.as_deref(),
+                        ),
+                    };
                     verbleib_etb_id = Some(
                         crate::etb::system_audit_zu_tx(
                             conn,
@@ -788,12 +933,56 @@ pub async fn anlegen(
                     );
                 }
             }
+            // RTW (LLH-1580, K1): die Sofortmeldung der eigenen Einheit im selben Schritt, Text vom
+            // Server, Ort als Koordinate der Meldung; die Person verweist auf sie.
+            let mut rtw_meldung_id = None;
+            if war_neu && rtw {
+                let inhalt = crate::person::rtw_meldung_text(reg, antreff.as_deref());
+                let meldung_id = crate::meldung::repo::anlegen_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    &crate::meldung::repo::MeldungDaten {
+                        absender: &rtw_absender,
+                        empfaenger: Some("Einsatzleitung"),
+                        empfaenger_funktion: None,
+                        meldeweg: "sonstige",
+                        inhalt: &inhalt,
+                        meldungsart: crate::meldung::ART_SOFORTMELDUNG,
+                        prioritaet: crate::meldung::PRIO_SOFORT,
+                        richtung: crate::meldung::RICHTUNG_INTERN,
+                        ereigniszeit: &erfasst_at,
+                        eingang_at: &rtw_eingang,
+                        bestaetigung_pflicht: true,
+                        bestaetigung_frist_at: rtw_frist_at.as_deref(),
+                        einheit_id: body.versorgende_einheit_id,
+                        abschnitt_id: None,
+                        geo: body.antreff_lat.zip(body.antreff_lon),
+                    },
+                )
+                .await?;
+                repo::setze_meldung_tx(conn, einsatz_id, id, meldung_id).await?;
+                rtw_meldung_id = Some(meldung_id);
+            }
             // NACH Sichtung, UHS-Eintritt und Verbleib geladen: sonst trüge die Antwort den Vorzustand — Status
             // `erfasst`, `aktuelle_sichtung` leer —, und der Client zeigte die Quittung zu
             // einem Datensatz, den es so nie gab.
             let person = repo::laden_tx(conn, einsatz_id, id).await?;
-            Ok((person, war_neu, uhs_etb_id, verbleib_etb_id))
+            Ok((person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id))
         })?;
+    // Die RTW-Meldung erreicht die Einsatzleitung wie jede Sofortmeldung: Live-Bündel mit
+    // Sofortalarm und Erinnerung an die Frist (LFH-97, LLH-1301).
+    if let Some(meldung_id) = rtw_meldung_id {
+        let meldung =
+            crate::meldung::repo::laden(&state.pool, meldung_id, &crate::zeit::jetzt()).await?;
+        crate::meldung::live_publikation_sicherstellen(&state, &meldung).await?;
+        crate::meldung::auto_frist_erinnerung_sicherstellen(
+            &state,
+            &meldung,
+            crate::meldung::AutoFristHerkunft::Meldung,
+        )
+        .await?;
+    }
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {
@@ -805,7 +994,7 @@ pub async fn anlegen(
             state.live.publiziere(einsatz_id, etb_id);
         }
         // Die Meldung zeigt ihre Patienten (design.md D6): ohne Neuladen.
-        if body.meldung_id.is_some() {
+        if body.meldung_id.is_some() || rtw_meldung_id.is_some() {
             state
                 .live
                 .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
@@ -817,6 +1006,10 @@ pub async fn anlegen(
         if status_enum == PersonStatus::Vermisst {
             melde_vermisst(&state, einsatz_id, person.id, ctx.benutzer.id).await;
         }
+    }
+    let mut person = person;
+    if einheit_name.is_some() {
+        person.ohne_personalien();
     }
     Ok((StatusCode::CREATED, Json(person)))
 }
