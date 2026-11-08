@@ -213,7 +213,11 @@ export default function SchichtplanDruckPage() {
           type="error"
           showIcon
           title="Der Schichtplan konnte nicht geladen werden"
-          action={<Button onClick={() => void refetch()}>Erneut laden</Button>}
+          action={
+            <Button onClick={() => void refetch()} disabled={freigabenLaden}>
+              Erneut laden
+            </Button>
+          }
         />
       ) : !plan || !daten || isFetching ? (
         <Typography.Text role="status" aria-live="polite">
