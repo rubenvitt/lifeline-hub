@@ -1,4 +1,4 @@
-import type { PersonAnlass, Sichtungskategorie, Uhs } from '../api/types';
+import type { MassnahmeArt, PersonAnlass, Sichtungskategorie, Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { istZuLang } from '../components/zeichenGrenze';
@@ -24,12 +24,18 @@ import { parseKoordinate } from './koordinate';
  *  · Anlass        `!` + Kürzel (`!intox`, `!verl`, `!hitze` …, Liste {@link ANLASS_KUERZEL}): der
  *                  Anlass der Hilfeleistung (LLH-1566) im SELBEN POST. Groß-/Kleinschreibung egal,
  *                  „ä“ auch als „ae“.
+ *  · Maßnahme      `+` + Kürzel (`+kuehl`, `+wunde`, `+o2` …, Liste {@link MASSNAHME_KUERZEL}), auch
+ *                  mehrere, im SELBEN POST (LLH-1572). Groß-/Kleinschreibung egal, „ä“ auch als „ae“.
+ *  · Entlassen     `>entl` (auch `>ent`, `>entlassen`): der leichte Fall, versorgt und entlassen
+ *                  (LLH-1572, design.md D1/D3): Status `betroffen`, Verbleib „Entlassung“ im selben
+ *                  POST. Braucht einen Anlass (`!…`).
  *  · Koordinate    `#` + Breite/Länge (`#52.2691/9.1342`, `#52,2691/9,1342`) — der Fundort,
  *                  im SELBEN POST als `antreff_lat`/`antreff_lon`, gelesen über
  *                  `personen/koordinate.ts`. Ein `#`-Wort wird nie als Namensteil geschluckt.
  *
  * ── UNERKANNTES SPERRT DAS ABSENDEN ─────────────────────────────────────────────────────
- * Doppelte Angaben, ein unbekannter Anlass, ein Alter außerhalb 0–120, ein Name oder Vorname über `PERSON_NAME_MAX`
+ * Doppelte Angaben, ein unbekannter Anlass, eine unbekannte Maßnahme, `>` ohne `entl`, `>entl`
+ * ohne Anlass, ein Alter außerhalb 0–120, ein Name oder Vorname über `PERSON_NAME_MAX`
  * (LLH-1329), ein unbrauchbares `#`, ein `@` ohne Bezeichnung und eine nicht eindeutige UHS
  * erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
  * verstandener Befehl legte eine Person mit falscher Sichtung oder in der falschen UHS an.
@@ -41,6 +47,8 @@ export type BefehlTeil =
   | { art: 'alter'; text: string; wert: number }
   | { art: 'sichtung'; text: string; wert: Sichtungskategorie }
   | { art: 'anlass'; text: string; wert: PersonAnlass }
+  | { art: 'massnahme'; text: string; wert: MassnahmeArt }
+  | { art: 'entlassen'; text: string }
   | { art: 'uhs'; text: string; suche: string }
   | { art: 'koordinate'; text: string; lat: number; lon: number }
   | { art: 'unerkannt'; text: string; grund: string };
@@ -61,6 +69,9 @@ interface PersonBefehl {
     | 'anlass'
     | 'antreff_lat'
     | 'antreff_lon'
+    | 'massnahmen'
+    | 'entlassen'
+    | 'status'
   >;
   /** Suchtext hinter `@`, oder `null`. */
   uhsSuche: string | null;
@@ -128,6 +139,41 @@ const ANLASS_NACH_KUERZEL: ReadonlyMap<string, PersonAnlass> = new Map(
   ),
 );
 
+/**
+ * Die Kürzel der Maßnahmen (LLH-1572) hinter `+`, je Maßnahme das erste zuerst: die Hinweiszeile
+ * der Schnellerfassung zeigt es (eine Quelle wie {@link ANLASS_KUERZEL}).
+ */
+export const MASSNAHME_KUERZEL: Readonly<Record<MassnahmeArt, readonly string[]>> = {
+  blutstillung: ['blut', 'blutstillung'],
+  zugang: ['zugang'],
+  infusion: ['inf', 'infusion'],
+  sauerstoff: ['o2', 'sauerstoff'],
+  atemweg: ['atemweg'],
+  analgesie: ['analgesie'],
+  immobilisation: ['immo', 'immobilisation'],
+  waermeerhalt: ['waerme', 'waermeerhalt'],
+  dekontamination: ['deko', 'dekontamination'],
+  wundversorgung: ['wunde', 'wundversorgung', 'pflaster'],
+  kuehlung: ['kuehl', 'kuehlung'],
+  lagerung: ['lager', 'lagerung'],
+  betreuung_gespraech: ['betr', 'betreuung', 'gespraech'],
+};
+
+const MASSNAHME_NACH_KUERZEL: ReadonlyMap<string, MassnahmeArt> = new Map(
+  (Object.entries(MASSNAHME_KUERZEL) as [MassnahmeArt, readonly string[]][]).flatMap(([m, ks]) =>
+    ks.map((k) => [k, m] as const),
+  ),
+);
+
+/** Maßnahme aus einem `+`-Wort (`+kuehl`, `+Kühlung`) — sonst `null`. */
+export function massnahmeAus(wort: string): MassnahmeArt | null {
+  const kuerzel = wort.slice(1).toLowerCase().replace(/ä/g, 'ae');
+  return MASSNAHME_NACH_KUERZEL.get(kuerzel) ?? null;
+}
+
+/** Die Kürzel der Entlassung hinter `>` (LLH-1572), das erste zeigt die Hinweiszeile. */
+export const ENTLASSEN_KUERZEL: readonly string[] = ['entl', 'ent', 'entlassen'];
+
 /** Anlass aus einem `!`-Wort (`!intox`, `!Kälte`) — sonst `null`. */
 export function anlassAus(wort: string): PersonAnlass | null {
   const kuerzel = wort.slice(1).toLowerCase().replace(/ä/g, 'ae');
@@ -153,7 +199,8 @@ function sichtungAus(wort: string): Sichtungskategorie | null {
 }
 
 /**
- * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`, `!`. Eine
+ * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`, `!`, `+`,
+ * `>`. Eine
  * NACKTE Zahl nicht: „UHS 2" ist üblich, und ein Alter steht hinter dem Geschlecht.
  */
 function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
@@ -162,7 +209,7 @@ function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
   if (klein === 'sk' && naechstes != null && ROEMISCH[naechstes.toLowerCase()] != null) return true;
   if (GESCHLECHT[klein] != null) return true;
   if (GESCHLECHT_ALTER_MUSTER.test(wort)) return true;
-  return wort.startsWith('@') || wort.startsWith('#') || wort.startsWith('!');
+  return ['@', '#', '!', '+', '>'].some((z) => wort.startsWith(z));
 }
 
 /** „Nachname, Vorname" → Teile; `unbekannt`/`?` → kein Name. */
@@ -191,6 +238,8 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
   let alter: number | undefined;
   let uhsSuche: string | null = null;
   let koordinate: { lat: number; lon: number } | undefined;
+  const massnahmen: MassnahmeArt[] = [];
+  let entlassen = false;
 
   const setzeSichtung = (wert: Sichtungskategorie, text: string) => {
     if (sichtung != null) {
@@ -245,6 +294,35 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       } else {
         anlass = wert;
         teile.push({ art: 'anlass', text: wort, wert });
+      }
+      continue;
+    }
+
+    if (wort.startsWith('+')) {
+      const wert = massnahmeAus(wort);
+      if (wert == null) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Maßnahme unbekannt' });
+        probleme.push(`Unbekannte Maßnahme („${wort}")`);
+      } else if (massnahmen.includes(wert)) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Maßnahme doppelt' });
+        probleme.push(`Maßnahme doppelt angegeben („${wort}")`);
+      } else {
+        massnahmen.push(wert);
+        teile.push({ art: 'massnahme', text: wort, wert });
+      }
+      continue;
+    }
+
+    if (wort.startsWith('>')) {
+      if (!ENTLASSEN_KUERZEL.includes(klein.slice(1))) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Verbleib unbekannt' });
+        probleme.push(`Unbekannter Verbleib („${wort}")`);
+      } else if (entlassen) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Entlassung doppelt' });
+        probleme.push(`Entlassung doppelt angegeben („${wort}")`);
+      } else {
+        entlassen = true;
+        teile.push({ art: 'entlassen', text: wort });
       }
       continue;
     }
@@ -327,6 +405,8 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
   if (namensWoerter.length > 0) {
     teile.splice(namensIndex, 0, { art: 'name', text: namensText, name, vorname });
   }
+  // Ohne Anlass zählt der leichte Fall weder im Lagebild noch im Bericht (design.md D3).
+  if (entlassen && anlass == null) probleme.push('Entlassung ohne Anlass („!…“ fehlt)');
 
   return {
     teile,
@@ -338,6 +418,9 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       ...(sichtung != null ? { sichtung } : {}),
       ...(anlass != null ? { anlass } : {}),
       ...(koordinate != null ? { antreff_lat: koordinate.lat, antreff_lon: koordinate.lon } : {}),
+      ...(massnahmen.length > 0 ? { massnahmen } : {}),
+      // Der leichte Fall legt `betroffen` an, ohne Sichtung (design.md D5).
+      ...(entlassen ? { entlassen: true, status: 'betroffen' as const } : {}),
     },
     uhsSuche,
     probleme,

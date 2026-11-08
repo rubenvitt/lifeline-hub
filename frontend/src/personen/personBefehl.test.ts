@@ -3,8 +3,10 @@ import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import type { Uhs } from '../api/types';
 import {
   ANLASS_KUERZEL,
+  MASSNAHME_KUERZEL,
   SICHTUNG_BUCHSTABEN,
   anlassAus,
+  massnahmeAus,
   loeseBefehl,
   loeseUhsAuf,
   nameAus,
@@ -212,6 +214,62 @@ describe('Anlass (LLH-1566)', () => {
     const b = parsePersonBefehl('Bauer @Weserstadion !hitze');
     expect(b.uhsSuche).toBe('Weserstadion');
     expect(b.eingabe.anlass).toBe('hitze_kaelte');
+  });
+});
+
+describe('Leichter Fall: Maßnahmen und Entlassung (LLH-1572)', () => {
+  it('nimmt Maßnahmen und Entlassung in EINE Eingabe, Status betroffen', () => {
+    const b = parsePersonBefehl('!hitze +kuehl +lager >entl');
+    expect(b.probleme).toEqual([]);
+    expect(b.eingabe).toEqual({
+      anlass: 'hitze_kaelte',
+      massnahmen: ['kuehlung', 'lagerung'],
+      entlassen: true,
+      status: 'betroffen',
+    });
+    expect(b.teile.map((t) => t.art)).toEqual(['anlass', 'massnahme', 'massnahme', 'entlassen']);
+  });
+
+  it('kennt jedes Kürzel der Liste, auch mit „ä“ und groß', () => {
+    for (const [m, kuerzel] of Object.entries(MASSNAHME_KUERZEL)) {
+      for (const k of kuerzel) expect(massnahmeAus(`+${k}`)).toBe(m);
+    }
+    expect(massnahmeAus('+Wärme')).toBe('waermeerhalt');
+    expect(massnahmeAus('+blau')).toBeNull();
+  });
+
+  it('Maßnahmen ohne Entlassung bleiben eine gewöhnliche Anlage', () => {
+    const b = parsePersonBefehl('Bauer +wunde');
+    expect(b.eingabe).toEqual({ name: 'Bauer', massnahmen: ['wundversorgung'] });
+    expect(b.probleme).toEqual([]);
+  });
+
+  it('meldet Unbekanntes und Doppeltes, statt es als Namen zu führen', () => {
+    const b = parsePersonBefehl('!verl +kuehl +kuehl +blau >heim >entl >ent');
+    expect(b.eingabe).toEqual({
+      anlass: 'verletzung',
+      massnahmen: ['kuehlung'],
+      entlassen: true,
+      status: 'betroffen',
+    });
+    expect(b.probleme).toEqual([
+      'Maßnahme doppelt angegeben („+kuehl")',
+      'Unbekannte Maßnahme („+blau")',
+      'Unbekannter Verbleib („>heim")',
+      'Entlassung doppelt angegeben („>ent")',
+    ]);
+  });
+
+  it('verlangt zur Entlassung den Anlass', () => {
+    const b = parsePersonBefehl('+kuehl >entl');
+    expect(b.probleme).toEqual(['Entlassung ohne Anlass („!…“ fehlt)']);
+  });
+
+  it('beendet einen „@“-Suchtext an Maßnahme und Entlassung', () => {
+    const b = parsePersonBefehl('!hitze @UHS Bühne +kuehl >entl');
+    expect(b.uhsSuche).toBe('UHS Bühne');
+    expect(b.eingabe.massnahmen).toEqual(['kuehlung']);
+    expect(b.eingabe.entlassen).toBe(true);
   });
 });
 

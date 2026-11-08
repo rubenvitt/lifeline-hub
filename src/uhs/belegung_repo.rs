@@ -222,6 +222,20 @@ pub async fn austritt_intern_tx(
     notiz: Option<&str>,
     erfasst_von: i64,
 ) -> Result<Option<AustrittInfo>, AppError> {
+    austritt_zum_tx(conn, einsatz_id, person_id, notiz, erfasst_von, None).await
+}
+
+/// [`austritt_intern_tx`] zu einer Erfassungszeit (`None` = jetzt): ein ohne Netz vorgemerkter
+/// leichter Fall (LLH-1572, design.md D6) tritt zu derselben Zeit aus, zu der er eintrat, statt
+/// erst bei der Übertragung.
+pub async fn austritt_zum_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    notiz: Option<&str>,
+    erfasst_von: i64,
+    zeitpunkt_at: Option<&str>,
+) -> Result<Option<AustrittInfo>, AppError> {
     {
         let (ex_uhs, ex_platz) = lade_cache(&mut *conn, person_id).await?;
         // Reservierungs-Cleanup IMMER (bei Storno, Status verstorben/abgemeldet):
@@ -242,7 +256,7 @@ pub async fn austritt_intern_tx(
                 "austritt",
                 notiz,
                 erfasst_von,
-                None,
+                zeitpunkt_at,
             )
             .await?;
             if let Some(ex_pid) = ex_platz {
