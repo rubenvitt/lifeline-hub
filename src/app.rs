@@ -1957,6 +1957,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/planungen/{id}/helfer/{hid}",
             patch(routes::planung::helfer_aendern).delete(routes::planung::helfer_loeschen),
         )
+        // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
+        .route(
+            "/api/planungen/{id}/uebernahme/vorschau",
+            post(routes::planung::uebernahme_vorschau),
+        )
+        .route(
+            "/api/planungen/{id}/uebernahme",
+            post(routes::planung::uebernehmen),
+        )
         // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
         .route(
             "/api/einsatz-vorlagen",

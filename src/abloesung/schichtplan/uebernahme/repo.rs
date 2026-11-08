@@ -1308,9 +1308,14 @@ fn fehler_als_zeilen(planung: &Planung) -> AppError {
     }
 }
 
+/// Anlass im ETB, wenn eine Datei eingelesen wird.
+pub const ANLASS_DATEI: &str = "Schichtplan eingelesen";
+
 /// Schreibt eine fehlerfreie Planung auf der offenen Verbindung (öffnet und committet nichts).
 /// Mit Fehlern 422 (Zeilen), mit fehlenden Rechten 403. Ohne Änderung schreibt es nichts, auch
-/// kein ETB.
+/// kein ETB. `anlass` beginnt den ETB-Eintrag ([`etb_text`]); der Aufrufer hält ihn in den
+/// ETB-Grenzen.
+#[allow(clippy::too_many_arguments)]
 pub async fn schreiben_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -1319,6 +1324,7 @@ pub async fn schreiben_tx(
     planung: &Planung,
     etb_startwert: i64,
     jetzt: &str,
+    anlass: &str,
 ) -> Result<Geschrieben, AppError> {
     if planung.fehlende_rechte {
         return Err(AppError::Forbidden);
@@ -1563,15 +1569,16 @@ pub async fn schreiben_tx(
             einsatz_id,
             benutzer_id,
             etb_startwert,
-            &etb_text(&zaehlung),
+            &etb_text(anlass, &zaehlung),
         )
         .await?,
     );
     Ok(ergebnis)
 }
 
-/// „Schichtplan eingelesen: 24 Schichten neu, 3 ergänzt, 12 Helfer neu, 3 Einheiten neu.“
-pub fn etb_text(z: &ImportZaehlung) -> String {
+/// „Schichtplan eingelesen: 24 Schichten neu, 3 ergänzt, 12 Helfer neu, 3 Einheiten neu.“ —
+/// `anlass` vor dem Doppelpunkt.
+pub fn etb_text(anlass: &str, z: &ImportZaehlung) -> String {
     let mut teile: Vec<String> = Vec::new();
     let mehrzahl =
         |n: i64, eins: &str, viele: &str| format!("{n} {}", if n == 1 { eins } else { viele });
@@ -1608,7 +1615,7 @@ pub fn etb_text(z: &ImportZaehlung) -> String {
             mehrzahl(z.einteilungen_neu, "Person", "Personen")
         ));
     }
-    format!("Schichtplan eingelesen: {}.", teile.join(", "))
+    format!("{anlass}: {}.", teile.join(", "))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1655,6 +1662,7 @@ pub async fn uebernehmen(
             &planung,
             startwert,
             jetzt,
+            ANLASS_DATEI,
         )
         .await
     })
@@ -2040,7 +2048,7 @@ mod tests {
         };
         z.summe();
         assert_eq!(
-            etb_text(&z),
+            etb_text(ANLASS_DATEI, &z),
             "Schichtplan eingelesen: 24 Schichten neu, 12 Helfer neu, 1 Einheit neu."
         );
     }

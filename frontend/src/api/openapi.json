@@ -15171,7 +15171,7 @@
       },
       "PlanungKennzahlen": {
         "type": "object",
-        "description": "Soll, Ist, Offen und Konflikte einer Planung (design.md D7), gerechnet aus denselben Befunden\nwie die Planung selbst.",
+        "description": "Soll, Ist, Offen und Konflikte einer Planung (design.md D7), gerechnet aus denselben Befunden\nwie die Planung selbst. Nach der Übernahme gespeichert (`planung.uebernahme_kennzahlen`).",
         "required": [
           "soll",
           "ist",
@@ -15259,6 +15259,17 @@
             ],
             "format": "double"
           },
+          "uebernahme": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlanungUebernahme",
+                "description": "Fehlt, solange die Planung nicht übernommen ist."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version": {
             "type": "integer",
             "format": "int64",
@@ -15323,6 +15334,17 @@
           "posten_anzahl": {
             "type": "integer",
             "format": "int64"
+          },
+          "uebernahme": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlanungUebernahme",
+                "description": "Fehlt, solange die Planung nicht übernommen ist."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "von": {
             "type": "string"
@@ -15434,6 +15456,58 @@
           "einheit",
           "uhs"
         ]
+      },
+      "PlanungUebernahme": {
+        "type": "object",
+        "description": "Die Übernahme einer Planung in einen Einsatz (LLH-1587). Danach ist die Planung\nschreibgeschützt und zeigt die Kennzahlen von diesem Zeitpunkt.",
+        "required": [
+          "at",
+          "einsatz_id"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "Zeitpunkt der Übernahme."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Der Einsatz, in den sie ging. Er kann inzwischen gelöscht sein."
+          },
+          "einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seine Einsatznummer zum Zeitpunkt der Übernahme."
+          }
+        }
+      },
+      "PlanungUebernahmeErgebnis": {
+        "type": "object",
+        "description": "Antwort der Übernahme einer Planung (LLH-1587): der Einsatz, die Zählung des Kerns und die\nnun schreibgeschützte Planung.",
+        "required": [
+          "einsatz_id",
+          "einsatz_neu",
+          "zaehlung",
+          "planung"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatz_neu": {
+            "type": "boolean",
+            "description": "Der Einsatz ist mit der Übernahme entstanden."
+          },
+          "planung": {
+            "$ref": "#/components/schemas/PlanungAnzeige"
+          },
+          "zaehlung": {
+            "$ref": "#/components/schemas/ImportZaehlung"
+          }
+        }
       },
       "PlatzAnzeige": {
         "type": "object",

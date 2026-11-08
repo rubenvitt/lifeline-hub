@@ -15,7 +15,7 @@
 //! Lesen und Schreiben verlangen das Recht, Einsätze anzulegen, in der eigenen Organisation
 //! ([`zugriff::PlanungsZugriff`]); eine Planung einer anderen Organisation ist 404.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::abloesung::schichtplan::pruefung::{Block, Ergebnis};
@@ -29,6 +29,7 @@ use crate::uhs::UhsTyp;
 use crate::wire_enum::wire_enum;
 
 pub mod repo;
+pub mod uebernahme;
 pub mod zugriff;
 
 #[cfg(test)]
@@ -58,7 +59,7 @@ pub const ZEITRAUM_MAX_TAGE: i64 = 14;
 pub const AUFBEWAHRUNG_TAGE: i64 = 90;
 
 /// Die Liste rechnet die Kennzahlen einer Planung, deren Ende höchstens so viele Tage zurückliegt
-/// (design.md D7); ältere zeigen keine.
+/// (design.md D7); ältere zeigen keine, außer eine übernommene ihre gespeicherten.
 pub const KENNZAHLEN_TAGE: i64 = 7;
 
 wire_enum! {
@@ -74,8 +75,8 @@ wire_enum! {
 }
 
 /// Soll, Ist, Offen und Konflikte einer Planung (design.md D7), gerechnet aus denselben Befunden
-/// wie die Planung selbst.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, ToSchema)]
+/// wie die Planung selbst. Nach der Übernahme gespeichert (`planung.uebernahme_kennzahlen`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct PlanungKennzahlen {
     /// Summe des Solls aller Blöcke an Posten (ohne Pause).
     pub soll: i64,
@@ -110,6 +111,19 @@ pub fn kennzahlen(bloecke: &[Block], ergebnis: &Ergebnis) -> PlanungKennzahlen {
     k
 }
 
+/// Die Übernahme einer Planung in einen Einsatz (LLH-1587). Danach ist die Planung
+/// schreibgeschützt und zeigt die Kennzahlen von diesem Zeitpunkt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct PlanungUebernahme {
+    /// Zeitpunkt der Übernahme.
+    pub at: String,
+    /// Der Einsatz, in den sie ging. Er kann inzwischen gelöscht sein.
+    pub einsatz_id: i64,
+    /// Seine Einsatznummer zum Zeitpunkt der Übernahme.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatznummer: Option<String>,
+}
+
 /// Kopf einer Planung.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct PlanungKopf {
@@ -131,6 +145,9 @@ pub struct PlanungKopf {
     /// Wann der Aufbewahrungslauf die Planung löscht ([`AUFBEWAHRUNG_TAGE`] nach `bis`).
     pub loeschung_at: String,
     pub angelegt_at: String,
+    /// Fehlt, solange die Planung nicht übernommen ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uebernahme: Option<PlanungUebernahme>,
 }
 
 /// Eine Zeile der Liste der Planungen.
@@ -150,6 +167,9 @@ pub struct PlanungListeneintrag {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kennzahlen: Option<PlanungKennzahlen>,
     pub loeschung_at: String,
+    /// Fehlt, solange die Planung nicht übernommen ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uebernahme: Option<PlanungUebernahme>,
 }
 
 /// Ein Posten der Planung.
@@ -225,4 +245,15 @@ pub struct PlanungAnzeige {
     pub bloecke: Vec<PlanungBlockAnzeige>,
     pub helfer: Vec<PlanHelferAnzeige>,
     pub kennzahlen: PlanungKennzahlen,
+}
+
+/// Antwort der Übernahme einer Planung (LLH-1587): der Einsatz, die Zählung des Kerns und die
+/// nun schreibgeschützte Planung.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct PlanungUebernahmeErgebnis {
+    pub einsatz_id: i64,
+    /// Der Einsatz ist mit der Übernahme entstanden.
+    pub einsatz_neu: bool,
+    pub zaehlung: crate::abloesung::schichtplan::uebernahme::ImportZaehlung,
+    pub planung: PlanungAnzeige,
 }

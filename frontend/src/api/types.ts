@@ -1001,6 +1001,17 @@ export type PlanungPosten = S['PlanungPostenAnzeige'];
 export type PlanungPostenArt = S['PlanungPostenArt'];
 /** Ein Block der Planung in der Form des Einsatz-Blocks, der Posten als `posten_id`. */
 export type PlanungBlock = S['PlanungBlockAnzeige'];
+/** Übernahme in einen Einsatz (LLH-1587): danach ist die Planung schreibgeschützt. */
+export type PlanungUebernahme = S['PlanungUebernahme'];
+export type PlanungUebernahmeErgebnis = S['PlanungUebernahmeErgebnis'];
+/** Kein Backend-Schema: Ziel der Übernahme, ein neuer oder ein laufender Einsatz. */
+export type PlanungUebernahmeZiel =
+  { art: 'neu'; vorlage_id?: number } | { art: 'einsatz'; einsatz_id: number };
+/** Kein Backend-Schema: Vorschau und Übernahme einer Planung, Wahl wie beim Einlesen. */
+export interface PlanungUebernahmeBody {
+  ziel: PlanungUebernahmeZiel;
+  entscheidungen?: SchichtplanEntscheidungenEingabe;
+}
 
 /** Kein Backend-Schema: `POST /api/planungen`; Einsatzart fehlt = Sanitätsdienst. */
 export interface PlanungBody {

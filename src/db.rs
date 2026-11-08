@@ -13812,6 +13812,62 @@ mod tests {
             .expect_err("fehlende Herkunft zählt als leer");
     }
 
+    /// LLH-1587: eine Planung im Bestand ist nicht übernommen; die Kennzahlen sind ein Objekt.
+    #[tokio::test]
+    async fn migration_0300_planung_uebernahme() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 300;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (_, b) = bild_grundlage(&pool).await;
+        let planung: i64 = sqlx::query_scalar(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis, angelegt_von) \
+             VALUES (1, 'Stadtfest', '2026-11-14 09:00:00', '2026-11-14 23:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (Option<String>, Option<i64>, Option<String>) = sqlx::query_as(
+            "SELECT uebernommen_at, uebernahme_einsatz, uebernahme_kennzahlen \
+             FROM planung WHERE id = ?",
+        )
+        .bind(planung)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bestand, (None, None, None), "Bestand nicht übernommen");
+
+        let setzen = |kennzahlen: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "UPDATE planung SET uebernommen_at = '2026-11-14 08:00:00', \
+                        uebernommen_von = ?, uebernahme_einsatz = 999, \
+                        uebernahme_einsatznummer = 'E-2026-0001', uebernahme_kennzahlen = ? \
+                     WHERE id = ?",
+                )
+                .bind(b)
+                .bind(kennzahlen)
+                .bind(planung)
+                .execute(&pool)
+                .await
+            }
+        };
+        setzen("[1, 2]").await.expect_err("Kennzahlen als Objekt");
+        setzen("kein json").await.expect_err("Kennzahlen als JSON");
+        setzen(r#"{"soll": 4, "ist": 3, "offen": 1, "konflikte": 2}"#)
+            .await
+            .expect("Einsatz ohne Fremdschlüssel, Kennzahlen als Objekt");
+    }
+
     /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
     #[tokio::test]
     async fn migration_0298_person_rtw_angefordert() {

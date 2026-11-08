@@ -39,7 +39,14 @@ export function verschobeneFolge(
  * unten“ (Abstimmung 08.11.2026). Bearbeiten und Anlegen im Dialog, Löschen mit Rückfrage; trägt
  * ein Posten Blöcke mit Personen, nennt die Rückfrage sie und löscht sie mit.
  */
-export default function PlanungPostenListe({ planung }: { planung: Planung }) {
+export default function PlanungPostenListe({
+  planung,
+  readOnly = false,
+}: {
+  planung: Planung;
+  /** Übernommen (LLH-1587): ohne Anlegen und Aktionen. */
+  readOnly?: boolean;
+}) {
   const planungId = planung.kopf.id;
   const qc = useQueryClient();
   const [dialog, setDialog] = useState<{ posten: PlanungPosten | null } | null>(null);
@@ -162,25 +169,28 @@ export default function PlanungPostenListe({ planung }: { planung: Planung }) {
       },
     },
   ];
+  const sichtbareSpalten = readOnly ? spalten.filter((sp) => sp.key !== 'aktionen') : spalten;
 
   // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
   return (
     <div data-lfh="planung-posten">
-      <Space style={{ marginBottom: 12 }}>
-        <Button
-          onClick={() => {
-            speichernMut.reset();
-            setDialog({ posten: null });
-          }}
-        >
-          Posten anlegen
-        </Button>
-      </Space>
+      {!readOnly && (
+        <Space style={{ marginBottom: 12 }}>
+          <Button
+            onClick={() => {
+              speichernMut.reset();
+              setDialog({ posten: null });
+            }}
+          >
+            Posten anlegen
+          </Button>
+        </Space>
+      )}
       <SeitenHinweise fehler={folgeMut.error} fehlerTitel="Reihenfolge nicht geändert" />
       <KatalogTabelle
         rowKey="id"
         dataSource={posten}
-        columns={spalten}
+        columns={sichtbareSpalten}
         spaltenSchalter={{ bezeichnung: 'Posten' }}
         mehrzahl="Posten"
         locale={{ emptyText: 'Noch keine Posten' }}

@@ -318,6 +318,30 @@ pub fn fordere_modul_zugriff(
     }
 }
 
+/// Ob `benutzer` das Modul `modul_key` in diesem Einsatz nutzen darf, gelesen auf einer offenen
+/// Verbindung: für einen Einsatz, den dieselbe Transaktion eben angelegt hat (Übernahme einer
+/// Planung, LLH-1587), samt der Module, die seine Vorlage ausblendet.
+pub async fn can_use_modul_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    modul_key: &str,
+    benutzer: &Benutzer,
+    einsatz_rolle: Option<EinsatzRolle>,
+) -> Result<bool, AppError> {
+    let overrides = modul_override::laden_alle(&mut *conn, einsatz_id).await?;
+    let org_defaults = crate::org::modul_einstellung::laden_alle(&mut *conn, org_id).await?;
+    Ok(modul_freigabe(
+        &overrides,
+        &org_defaults,
+        modul_key,
+        benutzer,
+        org_id,
+        einsatz_rolle,
+    )
+    .zugriff)
+}
+
 /// Lädt die beiden Eingaben der Modulregel: Einsatz-Override-Map und Org-Modul-Defaults.
 ///
 /// Bewusst uncached (LFH-230): Autorisierungs-Daten; ein Rechte-Entzug muss sofort
