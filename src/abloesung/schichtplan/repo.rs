@@ -124,7 +124,7 @@ pub async fn grenzwerte(
     Ok(SchichtplanGrenzwerte::aus(max, ruhe))
 }
 
-fn json_ids(json: Option<&str>) -> Vec<i64> {
+pub(super) fn json_ids(json: Option<&str>) -> Vec<i64> {
     json.and_then(|j| serde_json::from_str::<Vec<i64>>(j).ok())
         .unwrap_or_default()
 }
@@ -177,14 +177,14 @@ async fn laden_mit(
     }
 
     let personen = personen_daten(conn, einsatz_id).await?;
-    let helfer: Vec<(i64, String, Option<String>, Option<String>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT id, name, telefon, organisation, qualifikationen FROM einsatz_plan_helfer \
-             WHERE einsatz_id = ? ORDER BY name COLLATE NOCASE, id",
-        )
-        .bind(einsatz_id)
-        .fetch_all(&mut *conn)
-        .await?;
+    let helfer: Vec<HelferZeile> = sqlx::query_as(
+        "SELECT id, name, telefon, organisation, qualifikationen, kennung, herkunft \
+         FROM einsatz_plan_helfer \
+         WHERE einsatz_id = ? ORDER BY name COLLATE NOCASE, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
     // Nur bestehende Einheiten: beim Auflösen rückt die Unterstellung hoch, eine aufgelöste
     // Einheit trägt also niemanden mehr.
     let ueber: HashMap<i64, Option<i64>> = sqlx::query_as(
@@ -288,20 +288,7 @@ async fn laden_mit(
     Ok(SchichtplanAnzeige {
         grenzwerte,
         bloecke: anzeige,
-        helfer: mit_personen.then(|| {
-            helfer
-                .into_iter()
-                .map(
-                    |(id, name, telefon, organisation, quals)| PlanHelferAnzeige {
-                        id,
-                        name,
-                        telefon,
-                        organisation,
-                        qualifikationen: json_ids(quals.as_deref()),
-                    },
-                )
-                .collect()
-        }),
+        helfer: mit_personen.then(|| helfer.into_iter().map(PlanHelferAnzeige::from).collect()),
         naechste_pruefung_at: ergebnis.naechste_pruefung.map(zeit::formatiere_utc),
     })
 }
@@ -450,7 +437,7 @@ pub async fn posten_von(pool: &SqlitePool, einsatz_id: i64, bid: i64) -> Result<
 // ---------------------------------------------------------------------------------------------
 
 /// Der Posten gehört zum Einsatz und besteht (422 sonst). Liefert seine Bezeichnung.
-async fn pruefe_posten_tx(
+pub(super) async fn pruefe_posten_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     posten: Posten,
@@ -500,7 +487,7 @@ async fn pruefe_posten_tx(
 
 /// Ein Block am Posten, der sich mit `[von, bis)` überschneidet (außer `ausser`); die Pause darf
 /// überlappen.
-async fn ueberschneidung_tx(
+pub(super) async fn ueberschneidung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     posten: Posten,
@@ -528,7 +515,7 @@ async fn ueberschneidung_tx(
     .await?)
 }
 
-fn zeitraum_text(stil: &Zeitstil, von: &str, bis: &str) -> String {
+pub(super) fn zeitraum_text(stil: &Zeitstil, von: &str, bis: &str) -> String {
     match (zeit::parse_utc(von), zeit::parse_utc(bis)) {
         (Some(a), Some(b)) => stil.zeitraum(a, b),
         _ => format!("{von}–{bis}"),
@@ -570,7 +557,7 @@ fn helfer(p: PlanPerson) -> Option<i64> {
 
 /// Jede Person gehört zur Organisation bzw. zum Einsatz (422 sonst); eine Abfrage je Art über
 /// `json_each` (`src/AGENTS.md`, „Eingabegrenzen“).
-async fn pruefe_personen_tx(
+pub(super) async fn pruefe_personen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
@@ -627,7 +614,7 @@ async fn pruefe_personen_tx(
 }
 
 /// Ersetzt die Personen eines Blocks (drei Anweisungen, unabhängig von der Zahl).
-async fn schreibe_personen_tx(
+pub(super) async fn schreibe_personen_tx(
     conn: &mut SqliteConnection,
     bid: i64,
     personen: &[PlanPerson],
@@ -667,7 +654,7 @@ async fn schreibe_personen_tx(
 /// Soll-Vorgabe eines Postens (design.md D4): Einheit = Summe des wirksamen Solls F/UF/M und
 /// das wirksame Qualifikationssoll (eigen → Typ), UHS = ihre Soll-Anzahl und ihr
 /// Qualifikationssoll, Pause = keins. Eine Summe von 0 ist kein Soll, über 200 wird 200.
-async fn soll_vorgabe_tx(
+pub(super) async fn soll_vorgabe_tx(
     conn: &mut SqliteConnection,
     posten: Posten,
 ) -> Result<(Option<i64>, Option<String>), AppError> {
@@ -702,7 +689,7 @@ async fn soll_vorgabe_tx(
     Ok((anzahl, quali))
 }
 
-async fn org_von(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<i64, AppError> {
+pub(super) async fn org_von(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<i64, AppError> {
     Ok(
         sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
             .bind(einsatz_id)
@@ -730,7 +717,7 @@ async fn pruefe_anzahl_tx(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn insert_block_tx(
+pub(super) async fn insert_block_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -1162,7 +1149,7 @@ pub async fn grenzwerte_setzen(
 // ---------------------------------------------------------------------------------------------
 
 /// Jede Qualifikation gehört zur Organisation (422 sonst).
-async fn pruefe_qualifikationen_tx(
+pub(super) async fn pruefe_qualifikationen_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     ids: &[i64],
@@ -1183,8 +1170,34 @@ async fn pruefe_qualifikationen_tx(
     Ok(())
 }
 
-fn quals_json(ids: &[i64]) -> Option<String> {
+pub(super) fn quals_json(ids: &[i64]) -> Option<String> {
     (!ids.is_empty()).then(|| serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
+}
+
+/// Eine Zeile aus `einsatz_plan_helfer`.
+#[derive(sqlx::FromRow)]
+struct HelferZeile {
+    id: i64,
+    name: String,
+    telefon: Option<String>,
+    organisation: Option<String>,
+    qualifikationen: Option<String>,
+    kennung: Option<String>,
+    herkunft: Option<String>,
+}
+
+impl From<HelferZeile> for PlanHelferAnzeige {
+    fn from(z: HelferZeile) -> Self {
+        PlanHelferAnzeige {
+            id: z.id,
+            name: z.name,
+            telefon: z.telefon,
+            organisation: z.organisation,
+            qualifikationen: json_ids(z.qualifikationen.as_deref()),
+            kennung: z.kennung,
+            herkunft: z.herkunft,
+        }
+    }
 }
 
 async fn helfer_laden_tx(
@@ -1192,28 +1205,16 @@ async fn helfer_laden_tx(
     einsatz_id: i64,
     hid: i64,
 ) -> Result<PlanHelferAnzeige, AppError> {
-    let (id, name, telefon, organisation, quals): (
-        i64,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) = sqlx::query_as(
-        "SELECT id, name, telefon, organisation, qualifikationen FROM einsatz_plan_helfer \
-         WHERE id = ? AND einsatz_id = ?",
+    let zeile: HelferZeile = sqlx::query_as(
+        "SELECT id, name, telefon, organisation, qualifikationen, kennung, herkunft \
+         FROM einsatz_plan_helfer WHERE id = ? AND einsatz_id = ?",
     )
     .bind(hid)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
-    Ok(PlanHelferAnzeige {
-        id,
-        name,
-        telefon,
-        organisation,
-        qualifikationen: json_ids(quals.as_deref()),
-    })
+    Ok(zeile.into())
 }
 
 pub async fn helfer_anlegen(

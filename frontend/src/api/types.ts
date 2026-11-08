@@ -877,6 +877,37 @@ export type SchichtplanBefundArt = S['PlanBefundArt'];
 export type SchichtplanPostenArt = S['PostenArt'];
 export type SchichtplanPersonArt = S['PlanPersonArt'];
 
+// ============================== LLH-1556 Schichtplan einlesen ==============================
+/** Vorschau einer Schichtplan-Datei: Abgleich, Zählung, Fehler und Hinweise; nichts geschrieben. */
+export type SchichtplanImportVorschau = S['ImportVorschau'];
+export type SchichtplanImportErgebnis = S['ImportErgebnis'];
+export type SchichtplanImportZaehlung = S['ImportZaehlung'];
+export type SchichtplanImportPosten = S['VorschauPosten'];
+export type SchichtplanImportPerson = S['VorschauPerson'];
+export type SchichtplanImportMeldung = S['ImportMeldung'];
+export type SchichtplanImportPostenZiel = S['VorschauPosten']['ziel'];
+export type SchichtplanImportPersonZiel = S['VorschauPerson']['ziel'];
+export type SchichtplanImportTreffer = S['Treffer'];
+
+/** Kein Backend-Schema: Wahl eines Postens beim Einlesen (`uebernahme::PostenEntscheidung`). */
+export type SchichtplanPostenWahlEingabe =
+  | { art: 'einheit'; einheit_id: number }
+  | { art: 'uhs'; uhs_id: number }
+  | { art: 'neu'; einheit_vorlage_id?: number | null };
+
+/** Kein Backend-Schema: Wahl einer Person beim Einlesen (`uebernahme::PersonEntscheidung`). */
+export type SchichtplanPersonWahlEingabe =
+  { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number } | { art: 'neu' };
+
+/**
+ * Kein Backend-Schema: Teil `entscheidungen` beim Einlesen (`uebernahme::Entscheidungen`), je
+ * Schlüssel aus der Vorschau. Fehlt ein Schlüssel, gilt der Vorschlag.
+ */
+export interface SchichtplanEntscheidungenEingabe {
+  posten: Record<string, SchichtplanPostenWahlEingabe>;
+  personen: Record<string, SchichtplanPersonWahlEingabe>;
+}
+
 /** Kein Backend-Schema: der Posten eines Blocks im Request (`schichtplan::PostenEingabe`). */
 export type SchichtplanPostenEingabe =
   { art: 'einheit'; einheit_id: number } | { art: 'uhs'; uhs_id: number } | { art: 'pause' };

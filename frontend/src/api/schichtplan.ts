@@ -1,6 +1,9 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, apiUpload } from './client';
 import type {
   Schichtplan,
+  SchichtplanEntscheidungenEingabe,
+  SchichtplanImportErgebnis,
+  SchichtplanImportVorschau,
   SchichtplanBlockAendernBody,
   SchichtplanBlockBody,
   SchichtplanErzeugenBody,
@@ -117,5 +120,47 @@ export function nimmSchichtplanWechselZurueck(
   return apiSend<SchichtplanWechsel>(
     `${basis(einsatzId)}/wechsel/${wechselId}/zuruecknehmen`,
     'POST',
+  );
+}
+
+function einleseDaten(datei: File, entscheidungen: SchichtplanEntscheidungenEingabe): FormData {
+  const daten = new FormData();
+  daten.append('datei', datei);
+  daten.append('entscheidungen', JSON.stringify(entscheidungen));
+  return daten;
+}
+
+/** Zeit für Lesen und Abgleich einer großen Datei (bis 5.000 Zeilen). */
+const EINLESEN_TIMEOUT_MS = 60_000;
+
+/**
+ * Schichtplan einlesen, Vorschau (LLH-1556): schreibt nichts; Fehler stehen in der Antwort
+ * (`uebernehmbar: false`). Eine unlesbare Datei ist 400.
+ */
+export function schichtplanEinlesenVorschau(
+  einsatzId: number,
+  datei: File,
+  entscheidungen: SchichtplanEntscheidungenEingabe,
+): Promise<SchichtplanImportVorschau> {
+  return apiUpload<SchichtplanImportVorschau>(
+    `${basis(einsatzId)}/import/vorschau`,
+    einleseDaten(datei, entscheidungen),
+    { timeoutMs: EINLESEN_TIMEOUT_MS },
+  );
+}
+
+/**
+ * Schichtplan einlesen, Übernehmen: dieselbe Datei und die Wahl aus der Vorschau, alles oder
+ * nichts. Fehler sind 422 mit Zeilen, ein neuer Posten ohne Freigabe seines Moduls 403.
+ */
+export function schichtplanEinlesen(
+  einsatzId: number,
+  datei: File,
+  entscheidungen: SchichtplanEntscheidungenEingabe,
+): Promise<SchichtplanImportErgebnis> {
+  return apiUpload<SchichtplanImportErgebnis>(
+    `${basis(einsatzId)}/import`,
+    einleseDaten(datei, entscheidungen),
+    { timeoutMs: EINLESEN_TIMEOUT_MS },
   );
 }

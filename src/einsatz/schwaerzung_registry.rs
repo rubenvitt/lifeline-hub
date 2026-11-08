@@ -1394,6 +1394,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("telefon", Strategie::NullSetzen, Z_EINSATZ),
             scrub("organisation", Strategie::NullSetzen, Z_EINSATZ),
             retain("qualifikationen", G_KONFIG),
+            // Externe Kennung und ihre Herkunft aus dem Einlesen (LLH-1556, Mig 0297)
+            // führen zur Person zurück.
+            scrub("kennung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("herkunft", Strategie::NullSetzen, Z_EINSATZ),
             retain("angelegt_at", G_ZEIT),
             retain("angelegt_von", G_FK),
             // LLH-1555 (0294): die Kraft, als die der Helfer übernommen wurde.
@@ -1442,7 +1446,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("helfer_id", G_FK),
         ],
     },
-    // Vollzogene Wechsel aus dem Schichtplan an einer UHS und in der Pause (LLH-1555, Mig 0297):
+    // Vollzogene Wechsel aus dem Schichtplan an einer UHS und in der Pause (LLH-1555, Mig 0298):
     // Art, Block, Zeit und Verweise, kein Freitext → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_plan_wechsel",
@@ -1463,7 +1467,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_id", G_FK),
         ],
     },
-    // Kräfte eines Wechsels aus dem Plan (LLH-1555, Mig 0297): nur Verweise und Stand davor und
+    // Kräfte eines Wechsels aus dem Plan (LLH-1555, Mig 0298): nur Verweise und Stand davor und
     // danach; der Name steckt in `einsatz_personal` → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_plan_wechsel_person",

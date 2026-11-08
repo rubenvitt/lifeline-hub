@@ -9,13 +9,17 @@
 //! Jeder wirksame Schreibweg veröffentlicht `LiveEvent::Abloesung`; ETB nur für „Schichten
 //! erzeugen“ und geänderte Grenzwerte.
 
-use axum::extract::{Query, State};
+use axum::extract::{Multipart, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
 use crate::abloesung::schichtplan::repo::{
     self, BlockEingabe, BlockPatch, HelferEingabe, HelferPatch,
+};
+use crate::abloesung::schichtplan::uebernahme::{
+    self, repo::Rechte, Entscheidungen, ImportErgebnis, ImportMeldung, ImportVorschau, PlanPaket,
+    ENTSCHEIDUNGEN_MAX,
 };
 use crate::abloesung::schichtplan::vollzug::{
     self, PlanWechselAnzeige, WechselArt, WechselEingabe, WechselVorlage, WechselWirkung,
@@ -630,6 +634,163 @@ pub async fn wechsel_zuruecknehmen(
         vollzug::zuruecknehmen(&state.pool, ctx.einsatz.id, wid, ctx.benutzer.id, &jetzt()).await?;
     publiziere_wechsel(&state, ctx.einsatz.id, &wirkung);
     Ok(Json(anzeige))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Schichtplan einlesen (LLH-1556)
+// ---------------------------------------------------------------------------------------------
+
+/// Die Teile einer Einlese-Anfrage: `datei` (die Tabelle) und optional `entscheidungen` (JSON).
+/// Ein anderes Feld, eine zweite Datei oder ungültiges JSON ist 400.
+async fn lies_einlese_anfrage(
+    multipart: &mut Multipart,
+) -> Result<(Vec<u8>, Entscheidungen), AppError> {
+    let mut datei: Option<Vec<u8>> = None;
+    let mut entscheidungen: Option<Entscheidungen> = None;
+    while let Some(feld) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
+    {
+        match feld.name() {
+            Some("datei") => {
+                if datei.is_some() {
+                    return Err(AppError::Validation("Genau eine Datei".into()));
+                }
+                let bytes = feld.bytes().await.map_err(|e| {
+                    AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}"))
+                })?;
+                datei = Some(bytes.to_vec());
+            }
+            Some("entscheidungen") => {
+                if entscheidungen.is_some() {
+                    return Err(AppError::Validation("entscheidungen doppelt".into()));
+                }
+                let text = feld
+                    .text()
+                    .await
+                    .map_err(|e| AppError::Validation(format!("entscheidungen: {e}")))?;
+                let e: Entscheidungen = serde_json::from_str(&text)
+                    .map_err(|e| AppError::Validation(format!("entscheidungen: {e}")))?;
+                if e.posten.len() > ENTSCHEIDUNGEN_MAX || e.personen.len() > ENTSCHEIDUNGEN_MAX {
+                    return Err(AppError::Validation(format!(
+                        "entscheidungen: höchstens {ENTSCHEIDUNGEN_MAX} je Art"
+                    )));
+                }
+                entscheidungen = Some(e);
+            }
+            andere => {
+                return Err(AppError::Validation(format!(
+                    "Unbekanntes Feld '{}'",
+                    andere.unwrap_or_default()
+                )))
+            }
+        }
+    }
+    let datei = datei.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))?;
+    Ok((datei, entscheidungen.unwrap_or_default()))
+}
+
+/// Ob ein Modul freigegeben ist (403 heißt nein).
+async fn darf<M: crate::einsatz::modul::ModulMarker>(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+) -> Result<bool, AppError> {
+    match ctx.fordere_zielmodul::<M>(&state.pool).await {
+        Ok(()) => Ok(true),
+        Err(AppError::Forbidden) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+/// Gemeinsamer Anfang beider Einlese-Routen: Personal (403), Anfrage und Datei lesen (400),
+/// Rechte für Posten.
+async fn einlesen_vorbereiten(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    multipart: &mut Multipart,
+) -> Result<(PlanPaket, Vec<ImportMeldung>, Entscheidungen, Rechte), AppError> {
+    // Die Vorschau zeigt Namen: ohne Personal nichts lesen (403 vor der Datei).
+    ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
+    let (datei, entscheidungen) = lies_einlese_anfrage(multipart).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, ctx.einsatz.id).await?;
+    // Entpacken und Parsen (XLSX bis 2 MiB, 5.000 Zeilen) außerhalb der Async-Worker.
+    let zone = stil.zone;
+    let (paket, meldungen) =
+        tokio::task::spawn_blocking(move || uebernahme::datei::lies_paket(&datei, zone))
+            .await
+            .map_err(|e| AppError::Internal(format!("Einlesen der Schichtplan-Datei: {e}")))??;
+    let rechte = Rechte {
+        einheiten: darf::<Einheiten>(state, ctx).await?,
+        uhs: darf::<Unfallhilfsstellen>(state, ctx).await?,
+    };
+    Ok((paket, meldungen, entscheidungen, rechte))
+}
+
+/// POST /api/einsaetze/{id}/abloesungen/schichtplan/import/vorschau — Multipart mit `datei` und
+/// optional `entscheidungen`. Gleicht ab und schreibt nichts; Fehler stehen in der Antwort (200).
+/// Eine unlesbare Datei ist 400.
+pub async fn import_vorschau(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Abloesung>,
+    mut multipart: Multipart,
+) -> Result<Json<ImportVorschau>, AppError> {
+    let (paket, meldungen, entscheidungen, rechte) =
+        einlesen_vorbereiten(&state, &ctx, &mut multipart).await?;
+    Ok(Json(
+        uebernahme::repo::vorschau(
+            &state.pool,
+            ctx.einsatz.id,
+            ctx.einsatz.org_id,
+            &paket,
+            meldungen,
+            &entscheidungen,
+            rechte,
+        )
+        .await?,
+    ))
+}
+
+/// POST /api/einsaetze/{id}/abloesungen/schichtplan/import — wie die Vorschau, schreibt aber in
+/// EINER Transaktion (alles oder nichts). Fehler der Planung: 422 mit Zeilen der Datei; ein
+/// neuer Posten ohne Freigabe seines Moduls: 403. Ein zweiter Lauf derselben Datei ändert
+/// nichts (kein ETB, kein Live-Ereignis). Liefert die Zählung und den ganzen Plan.
+pub async fn import_uebernehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Abloesung>,
+    mut multipart: Multipart,
+) -> Result<Json<ImportErgebnis>, AppError> {
+    let (paket, meldungen, entscheidungen, rechte) =
+        einlesen_vorbereiten(&state, &ctx, &mut multipart).await?;
+    let einsatz_id = ctx.einsatz.id;
+    let geschrieben = uebernahme::repo::uebernehmen(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        ctx.benutzer.id,
+        &paket,
+        &meldungen,
+        &entscheidungen,
+        rechte,
+        &jetzt(),
+    )
+    .await?;
+    if geschrieben.zaehlung.aenderungen > 0 {
+        for etb_id in &geschrieben.etb_ids {
+            state.live.publiziere(einsatz_id, *etb_id);
+        }
+        for id in &geschrieben.einheit_ids {
+            super::einsatz_einheit::sse_einheit(&state, einsatz_id, *id);
+        }
+        for id in &geschrieben.uhs_ids {
+            super::einsatz_uhs::sse_uhs(&state, einsatz_id, *id);
+        }
+        super::abloesung::sse(&state, einsatz_id);
+    }
+    Ok(Json(ImportErgebnis {
+        zaehlung: geschrieben.zaehlung,
+        plan: plan(&state, &ctx).await?,
+    }))
 }
 
 #[cfg(test)]

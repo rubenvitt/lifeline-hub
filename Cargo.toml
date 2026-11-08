@@ -52,6 +52,13 @@ age = { version = "0.12", default-features = false }
 sha2 = "0.11"
 base64 = "0.23"
 mime_guess = "2"
+# Schichtplan-Datei einlesen (LLH-1556, `src/abloesung/schichtplan/uebernahme/datei.rs`): liest
+# XLSX, reines Rust (zip, quick-xml), ohne Vorgabe-Features; Datumszellen rechnet der Leser selbst
+# aus der Seriennummer, darum ohne `dates`.
+calamine = { version = "0.38", default-features = false }
+# Vor dem Lesen die entpackte Größe der XLSX-Teile prüfen (Zip-Bombe): dieselbe Version, die
+# calamine mitbringt, nur mit `deflate`.
+zip = { version = "9", default-features = false, features = ["deflate"] }
 # Vorschaubilder der Anhänge (LFH-759, `src/anhang/vorschau/`): nur die Decoder für JPEG, PNG,
 # GIF, WebP und TIFF plus den JPEG-Encoder. Alle reines Rust (zune-jpeg, png, gif, image-webp,
 # tiff), kein `-sys`-Crate, damit das Single-Binary ohne C-Bibliothek bleibt; ohne `rayon`, die
