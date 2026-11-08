@@ -25,11 +25,11 @@
 
 ## 4. Anbindung der `Datensicht` (D7)
 
-- [ ] 4.1 TDD: Tabellenzweig — Rechtsklick auf eine Zeile mit Aktionen öffnet das Menü dieser Zeile; Zeilenklick-Riegel und Fenster-Props über `onRow` wirken weiter (Bestandstests grün)
-- [ ] 4.2 TDD: Kartenzweig — Rechtsklick und langer Druck auf `datensicht-karte` öffnen das Menü; Wahl öffnet nicht den Titel-Link
-- [ ] 4.3 TDD: offenes Kontextmenü hält die Zeilenschleuse wie ein offenes ⋮ (`reportKartenMenue`); verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü
-- [ ] 4.4 Dokumente: Spalte im Tabellenzweig und Kartenplan zeigen dieselben Aktionen; Abweichung als eine Quelle zusammenführen (Material, Fahrzeuge, Personen dabei gegenprüfen)
-- [ ] 4.5 `datensicht.guard.test.ts` und übrige Datensicht-Tests grün
+- [x] 4.1 TDD: Tabellenzweig — Rechtsklick auf eine Zeile mit Aktionen öffnet das Menü dieser Zeile; Zeilenklick-Riegel und Fenster-Props über `onRow` wirken weiter (Bestandstests grün)
+- [x] 4.2 TDD: Kartenzweig — Rechtsklick und langer Druck auf `datensicht-karte` öffnen das Menü; Wahl öffnet nicht den Titel-Link
+- [x] 4.3 TDD: offenes Kontextmenü hält die Zeilenschleuse wie ein offenes ⋮ (`reportKartenMenue`); verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü
+- [x] 4.4 Dokumente: Spalte im Tabellenzweig und Kartenplan zeigen dieselben Aktionen; Abweichung als eine Quelle zusammenführen (Material, Fahrzeuge, Personen dabei gegenprüfen) — geprüft: dieselben Aktionen in beiden Zweigen (Fahrzeuge führen „Entlassen“ in der Tabelle im ⋮, im Kartenplan als Primäraktion; Presse zeigt „Beantworten“ im Kartenplan, in der Tabelle als Statuswahl), keine Codeänderung nötig
+- [x] 4.5 `datensicht.guard.test.ts` und übrige Datensicht-Tests grün
 
 ## 5. Skizze auf den Baustein (D3, D4)
 
