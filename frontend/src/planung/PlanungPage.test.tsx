@@ -497,6 +497,11 @@ describe('PlanungPage (LLH-1586)', () => {
           entscheidungen: { posten: {}, personen: {} },
         }),
       );
+      // Ein zweiter Klick auf das aktive Ziel lässt Einsatz und Vorschau stehen.
+      const bisher = anfragen.length;
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Laufender Einsatz' }));
+      expect(within(dialog).getByText('E-2027-0007 · Konzert')).toBeInTheDocument();
+      expect(anfragen).toHaveLength(bisher);
     });
 
     it('Fehler in der Vorschau sperren das Übernehmen', async () => {

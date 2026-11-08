@@ -222,7 +222,11 @@ export default function PlanungUebernahmeDialog({
                     ? ZIEL_OPTIONEN.map((o) => ({ ...o, gesperrt: 'Übernahme läuft' }))
                     : ZIEL_OPTIONEN
                 }
-                onWechsel={(a) => changeZiel(a, a === 'neu' ? vorlageId : null, null)}
+                onWechsel={(a) => {
+                  // Das aktive Segment meldet sich beim Klick erneut; Wahl und Einsatz bleiben.
+                  if (a === art) return;
+                  changeZiel(a, a === 'neu' ? vorlageId : null, null);
+                }}
                 style={{ flex: 'none' }}
               />
               {art === 'neu' ? (
