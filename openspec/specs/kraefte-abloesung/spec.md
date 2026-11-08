@@ -36,6 +36,11 @@ Einsatz hat einen Schichtplan mit Blöcken an Einheiten, UHS und der Pause (Spec
 `kraefte-schichtplan`, Pfade unter `…/abloesungen/schichtplan`, Modul Ablösung). Der Plan ist
 Soll; Fälligkeit, Vollzug und Kräfte-Zeitachse bleiben, bis LLH-1555 Plan und Wechsel koppelt.
 
+LLH-1555 koppelt Plan und Ablösung: Der Plan gibt einer laufenden Schicht die Fälligkeit, ein
+Wechsel ohne Folgeblock heißt „Posten endet“, und der Vollzug übernimmt die Vorlage des
+Folgeblocks mit Bleibenden und Personen, die erst in den Einsatz kommen. Der Wechsel selbst bleibt
+ein Griff, kein Automatismus.
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
@@ -757,8 +762,9 @@ Das System SHALL für jede laufende Schicht ohne geplante ablösende Einheit ein
 führen, den Planungsvorlauf vor der Fälligkeit (aus dem Schichtmodell des Einsatzes, ohne eines
 2 h; LLH-1118 Punkt 5). Erreicht der Scheduler sie, MUST er genau einmal die Benachrichtigung
 `abloesung_planung` („Keine ablösende Einheit geplant“, Hinweis) an alle Leser des Moduls Ablösung
-melden. Geplant MUST heißen: Einzelplanung, Ablöser-Liste oder geplanter Besatzungswechsel
-(LLH-1319). Die Frist MUST mit der Fälligkeit und mit dem Planungsvorlauf wandern, beim Planen einer
+melden. Geplant MUST heißen: Einzelplanung, Ablöser-Liste, geplanter Besatzungswechsel
+(LLH-1319) oder ein Folgeblock laut Plan mit mindestens einer Person (LLH-1555); endet der Posten
+laut Plan, MUST die Frist entfallen. Die Frist MUST mit der Fälligkeit und mit dem Planungsvorlauf wandern, beim Planen einer
 ablösenden Einheit (auch über die Ablöser-Liste) oder eines Besatzungswechsels schließen und mit einer aufgehobenen oder
 entfallenen Planung wieder entstehen, solange ihr Zeitpunkt noch vor uns liegt; ein Zeitpunkt in
 der Vergangenheit MUST keine Frist ergeben. Der Planungshinweis MUST NOT eine Einstufung sein:
@@ -775,6 +781,14 @@ es bleibt bei `planmaessig`, `vorwarnung` und `ueberfaellig`.
 #### Scenario: Fälligkeit verschoben
 - **WHEN** der Beginn der Schicht um eine Stunde später gesetzt wird
 - **THEN** kommt der Planungshinweis um 14:30
+
+#### Scenario: Folgeblock besetzt
+- **WHEN** der Folgeblock einer Schicht laut Plan mit „Cora“ besetzt ist
+- **THEN** kommt kein Planungshinweis
+
+#### Scenario: Folgeblock leer
+- **WHEN** der Folgeblock leer ist
+- **THEN** kommt der Planungshinweis wie bisher
 
 ### Requirement: Hinweise zur ablösenden Einheit
 
@@ -1133,6 +1147,12 @@ oder zu lange Liste und eine unbekannte Art MUST 400 sein. Der Besatzungswechsel
 des Moduls Einheiten verlangen (403 ohne). Grenzwerte und Ruhezeiten je Person rechnet er nicht
 (LFH-860).
 
+Ein Vollzug MAY Bleibende nennen (`bleiben`, höchstens 50, Teilmenge der heutigen Besatzung,
+sonst 422; LLH-1555). Die alte Besatzung MUST dann die Zuordnung ohne die Bleibenden sein;
+Bleibende MUST Einheit, Fahrzeug und Führung behalten und kein Ereignis der Zeitachse bekommen,
+und das ETB MUST sie nennen („Bleibt: «…».“). Leer MAY die neue Besatzung nur aus dem Plan sein:
+mit Übernahme oder mit Bleibenden und dem Folgeblock (Requirement „Vollzug aus dem Plan“).
+
 #### Scenario: Mannschaft wechselt, Fahrzeug bleibt
 - **WHEN** die Schicht von „Florian 1“ (mit „Anna Alt“, Führerin auf „Florian 1-44“, und „Gruppe 1“ mit „Bernd Alt“, die die Schicht erbt) um 15:40 als Besatzungswechsel mit „Cora Neu“ und „Dirk Neu“ vollzogen wird
 - **THEN** ist die Schicht abgelöst mit Art `besatzung`, „Florian 1“ hat eine Folgeschicht ab 15:40, „Gruppe 1“ erbt sie
@@ -1146,6 +1166,10 @@ des Moduls Einheiten verlangen (403 ohne). Grenzwerte und Ruhezeiten je Person r
 #### Scenario: Ohne neue Besatzung
 - **WHEN** ein Besatzungswechsel ohne `besatzung_ids` abgeschickt wird
 - **THEN** antwortet das System mit 400
+
+#### Scenario: Einer von zweien wechselt
+- **WHEN** die „Streife 2“ mit „Anna“ und „Dirk“ als Besatzungswechsel mit Bleibendem „Dirk“ und neu „Cora“ vollzogen wird
+- **THEN** gehören „Dirk“ und „Cora“ zur „Streife 2“, „Anna“ nicht mehr, und das ETB nennt „Bleibt: «Dirk».“
 
 ### Requirement: Rücknahme eines Besatzungswechsels
 
@@ -1305,3 +1329,76 @@ zeigen. Der Sprung `?schicht=` MUST die Ansicht seiner Schicht in die Adresse sc
 #### Scenario: Zurück
 - **WHEN** jemand in „Ohne Schicht“ eine Einheit öffnet und mit dem Browser zurückgeht
 - **THEN** steht wieder „Ohne Schicht“
+
+### Requirement: Fälligkeit laut Plan
+
+Hat die Einheit einer laufenden Schicht Blöcke im Schichtplan (Spec `kraefte-schichtplan`), MUST
+die Fälligkeit der erste Wechselpunkt (Beginn oder Ende eines ihrer Blöcke) nach dem Anker sein,
+sofern der Anker in einem Block liegt oder dieser Wechselpunkt vor der Fälligkeit nach Rangfolge
+liegt (LLH-1555). Anker MUST der spätere Wert von Beginn plus 15 Minuten und dem Beginn des
+Blocks sein, in den ein Vollzug aus dem Plan gewechselt hat (`plan_block_id`). Sonst MUST die
+Rangfolge gelten. Die Schicht MUST `faellig_laut_plan` tragen, solange ihre Fälligkeit aus dem
+Plan kommt. Jede Änderung eines Blocks der Einheit (anlegen, ändern, auch die Zeile wechseln,
+löschen, erzeugen, einen Helfer löschen) MUST Fälligkeit, Vorwarnung und Planungshinweis in
+derselben Transaktion nachziehen, ohne ETB-Eintrag. Die Karte MUST statt des Rhythmus den
+Folgeblock nennen („Laut Plan · danach 1600–1800 · 3 Personen“) und „Rhythmus ändern“ nicht
+anbieten. Ein eigener Rhythmus an einer Schicht laut Plan MUST mit 422 abgelehnt werden („Die
+Schicht folgt dem Schichtplan“); eine geänderte Vorgabe von Abschnitt oder Einsatz MUST den Plan
+überlagern, nicht verdrängen. Fällt der Block weg, MUST wieder die Rangfolge gelten.
+
+#### Scenario: Blockende verschoben
+- **WHEN** die Schicht von „Streife 2“ seit 14:00 im Block 14:00–16:00 läuft und jemand das Blockende auf 17:00 legt
+- **THEN** ist die Schicht um 17:00 fällig, die Vorwarnung liegt die Vorwarnzeit davor, und die Karte sagt „Laut Plan“
+
+#### Scenario: Früh gewechselt
+- **WHEN** der Vollzug aus dem Plan um 15:30 in den Folgeblock 16:00–18:00 wechselt
+- **THEN** ist die Folgeschicht um 18:00 fällig
+
+#### Scenario: Plan zieht vor
+- **WHEN** eine Schicht seit 08:00 mit Rhythmus 8 h läuft und der erste Block der Einheit um 14:00 beginnt
+- **THEN** ist sie um 14:00 fällig
+
+#### Scenario: Plan schiebt nicht hinaus
+- **WHEN** dieselbe Schicht nur einen Block morgen um 10:00 hat
+- **THEN** bleibt sie um 16:00 fällig, ohne „Laut Plan“
+
+### Requirement: Posten endet
+
+Hat der Wechselpunkt einer Schicht laut Plan keinen Folgeblock (Beginn eines Blocks der Einheit
+binnen 15 Minuten), MUST die Karte „Laut Plan · Posten endet“ nennen, der Planungshinweis MUST
+entfallen, und der Vollzug-Dialog MUST die ganze Einheit ohne ablösende Einheit vorbelegen, mit
+„Danach“ und dem Knopf „Abziehen“ (LLH-1555).
+
+#### Scenario: Wache endet
+- **WHEN** die „Sanitätswache Bühne“ nur einen Block bis 23:00 hat
+- **THEN** sagt ihre Karte „Laut Plan · Posten endet“, sie ist um 23:00 fällig, und um 21:00 kommt kein Planungshinweis
+
+### Requirement: Vollzug aus dem Plan
+
+Für eine laufende Schicht laut Plan MUST das System eine Vorlage des Wechsels liefern
+(`GET …/abloesungen/{id}/plan-vorlage`, LLH-1555): wer bleibt (heutige Besatzung im Folgeblock),
+wer kommt (Personen des Folgeblocks und der Folgeblöcke erbender Untereinheiten am selben
+Wechselpunkt, Ziel die Einheit ihres Blocks), wer geht, und wer fehlt (außer Dienst, entlassene
+Ad-hoc-Kraft). Ohne Folgeblock MUST die Vorlage leer sein (Posten endet). Die Vorlage nennt
+Personen und MUST die Freigabe des Moduls Personal verlangen (403); eine Schicht ohne Plan MUST
+422 sein. Der Vollzug-Dialog MUST sie als Art „Laut Plan“ vorbelegen und die anderen Arten
+wählbar lassen. Eine neue Person MAY eine Kraft des Einsatzes (`besatzung`), eine Stamm-Person der
+Organisation oder ein Helfer des Plans (`uebernahme`) sein; Stamm-Personen und Helfer MUST dabei
+in den Einsatz übernommen werden (Helfer als Ad-hoc-Kraft mit Name, Organisation und
+Qualifikationen; der Helfer bleibt im Plan und zeigt danach auf diese Kraft), mit Eintreffen in der
+Zeitachse; das verlangt die Freigabe des Moduls Personal (403). Eine schon übernommene Person
+MUST dieselbe Kraft bleiben. `plan_block_id` MUST der Folgeblock der Schicht sein (422 sonst) und
+wird der Anker der Folgeschicht. Die Rücknahme MUST die Zuordnung zurücknehmen und die Übernahme
+stehen lassen: die Kraft bleibt im Einsatz, ohne Einheit, und das ETB sagt es.
+
+#### Scenario: Spätschicht aus dem Stamm
+- **WHEN** im Folgeblock der „Streife 2“ „Ben Stamm“ steht, der nicht im Einsatz ist, und der Wechsel mit der Vorlage vollzogen wird
+- **THEN** ist „Ben Stamm“ im Einsatz, gehört zur „Streife 2“, seine Zeitachse beginnt mit dem Eintreffen, und das ETB nennt „Aus dem Schichtplan in den Einsatz übernommen: «Ben Stamm».“
+
+#### Scenario: Alle bleiben
+- **WHEN** der Folgeblock dieselben Personen hat wie die heutige Besatzung und der Wechsel mit der Vorlage vollzogen wird
+- **THEN** entsteht die Folgeschicht im Folgeblock, und niemand bekommt ein Ereignis der Zeitachse
+
+#### Scenario: Rücknahme nach Übernahme
+- **WHEN** der Vollzug mit „Ben Stamm“ zurückgenommen wird
+- **THEN** gehört er keiner Einheit mehr an, bleibt aber im Einsatz, und das ETB nennt „Im Einsatz bleiben, ohne Einheit: «Ben Stamm».“

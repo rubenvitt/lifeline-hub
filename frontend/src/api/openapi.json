@@ -127,6 +127,7 @@
           "ruecknehmbar",
           "erbende_einheiten",
           "planung_warnungen",
+          "faellig_laut_plan",
           "angelegt_at"
         ],
         "properties": {
@@ -252,6 +253,10 @@
           "faellig_at": {
             "type": "string"
           },
+          "faellig_laut_plan": {
+            "type": "boolean",
+            "description": "Die Fälligkeit kommt aus dem Schichtplan (LLH-1555): der nächste Wechsel der Blöcke der\nEinheit, nicht der Rhythmus. Dann ändert sich der Rhythmus nicht von Hand (422)."
+          },
           "folgeschicht_id": {
             "type": [
               "integer",
@@ -277,6 +282,25 @@
               "$ref": "#/components/schemas/AbloesungBesatzung"
             },
             "description": "Ist der Vorgänger dieser Schicht als Besatzungswechsel vollzogen, die neue Besatzung dieses\nWechsels (Rolle `neu`, LLH-1319); sonst leer."
+          },
+          "plan_block_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Block, in den ein Vollzug aus dem Plan in diese Schicht gewechselt hat."
+          },
+          "plan_folgeblock": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AbloesungPlanFolgeblock",
+                "description": "Bei `faellig_laut_plan` an einer laufenden Schicht: der Block, der am Wechsel beginnt.\nFehlt er, endet der Posten mit der Fälligkeit."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "planung_entfallen": {
             "oneOf": [
@@ -512,6 +536,82 @@
           "uebernommen": {
             "type": "boolean",
             "description": "Übernommen statt neu angelegt (ungeplanter Ablöser mit eigener laufender Schicht)."
+          }
+        }
+      },
+      "AbloesungPlanFolgeblock": {
+        "type": "object",
+        "description": "Der Folgeblock einer Schicht laut Plan (LLH-1555, design.md D2).",
+        "required": [
+          "id",
+          "von",
+          "bis",
+          "personen"
+        ],
+        "properties": {
+          "bis": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "personen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der eingeteilten Personen; 0 heißt, der Wechsel ist noch nicht geplant."
+          },
+          "von": {
+            "type": "string"
+          }
+        }
+      },
+      "AbloesungPlanVorlage": {
+        "type": "object",
+        "description": "Die Vorlage des Besatzungswechsels aus dem Schichtplan (LLH-1555, design.md D5), vom Server\ngerechnet: wer bleibt, wer kommt (mit Ziel), wer geht. Verlangt die Freigabe Personal.",
+        "required": [
+          "wechsel_at",
+          "bleiben",
+          "kommen",
+          "gehen",
+          "fehlen"
+        ],
+        "properties": {
+          "bleiben": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanVorlagePerson"
+            }
+          },
+          "fehlen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Personen der Folgeblöcke, die nicht kommen können (außer Dienst, eine entlassene\nAd-hoc-Kraft); nur ihre Namen."
+          },
+          "folgeblock_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Folgeblock der Schicht; fehlt er, endet der Posten (dann sind `kommen` und `bleiben`\nleer, und der Vollzug ist „Abziehen“)."
+          },
+          "gehen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanVorlagePerson"
+            }
+          },
+          "kommen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanVorlageKommen"
+            }
+          },
+          "wechsel_at": {
+            "type": "string"
           }
         }
       },
@@ -14583,6 +14683,62 @@
               "null"
             ],
             "format": "int64"
+          }
+        }
+      },
+      "PlanVorlageKommen": {
+        "type": "object",
+        "description": "Wer laut Plan kommt: genau eine der drei Kennungen, so wie der Vollzug sie nimmt\n(`personal_id` in `besatzung`, die anderen in `uebernahme`), und die Einheit des Blocks.",
+        "required": [
+          "name",
+          "einheit_id"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "plan_helfer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "stamm_personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "PlanVorlagePerson": {
+        "type": "object",
+        "description": "Eine Kraft des Einsatzes in der Vorlage.",
+        "required": [
+          "personal_id",
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_personal.id`"
           }
         }
       },

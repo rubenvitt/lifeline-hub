@@ -13164,4 +13164,118 @@ mod tests {
             "SET NULL löst nur den Bezug"
         );
     }
+
+    #[tokio::test]
+    async fn migration_0293_abloesung_laut_plan() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 293;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Streife 2') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let schicht: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+                rhythmus_quelle, faellig_at, angelegt_von_id) \
+             VALUES (?, ?, '2026-11-14 14:00:00', 120, 'einheit', '2026-11-14 16:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (i64, Option<i64>) = sqlx::query_as(
+            "SELECT faellig_laut_plan, plan_block_id FROM einsatz_abloesung WHERE id = ?",
+        )
+        .bind(schicht)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bestand, (0, None), "Bestand folgt der Rangfolge");
+
+        let block: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_planschicht (einsatz_id, posten_art, einheit_id, von, bis) \
+             VALUES (?, 'einheit', ?, '2026-11-14 16:00:00', '2026-11-14 18:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET faellig_laut_plan = 1, plan_block_id = ? WHERE id = ?",
+        )
+        .bind(block)
+        .bind(schicht)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            sqlx::query("UPDATE einsatz_abloesung SET faellig_laut_plan = 2 WHERE id = ?")
+                .bind(schicht)
+                .execute(&pool)
+                .await
+                .is_err(),
+            "CHECK lässt nur 0 und 1 zu"
+        );
+        sqlx::query("DELETE FROM einsatz_planschicht WHERE id = ?")
+            .bind(block)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nachher: Option<i64> =
+            sqlx::query_scalar("SELECT plan_block_id FROM einsatz_abloesung WHERE id = ?")
+                .bind(schicht)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(nachher, None, "SET NULL löst nur den Anker");
+
+        // Der übernommene Helfer verweist auf seine Kraft; ohne sie bleibt er stehen.
+        let helfer: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_plan_helfer (einsatz_id, name) VALUES (?, 'Ben') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let kraft: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Ben') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_plan_helfer SET einsatz_personal_id = ? WHERE id = ?")
+            .bind(kraft)
+            .bind(helfer)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz_personal WHERE id = ?")
+            .bind(kraft)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let verweis: Option<i64> =
+            sqlx::query_scalar("SELECT einsatz_personal_id FROM einsatz_plan_helfer WHERE id = ?")
+                .bind(helfer)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(verweis, None, "SET NULL löst nur den Verweis");
+    }
 }

@@ -2,6 +2,7 @@ import { apiGet, apiSend } from './client';
 import type {
   Abloesung,
   AbloesungEinsatzVorgabe,
+  AbloesungPlanVorlage,
   AbloesungStatus,
   AbloesungVollzug,
   AbloesungVorgabe,
@@ -41,6 +42,17 @@ export function vollzieheAbloesung(
   body: VollzugBody,
 ): Promise<AbloesungVollzug> {
   return apiSend<AbloesungVollzug>(`${basis(einsatzId)}/${abloesungId}/vollzug`, 'POST', body);
+}
+
+/**
+ * Vorlage des Wechsels aus dem Schichtplan (LLH-1555): wer bleibt, kommt, geht. Nur für eine
+ * laufende Schicht laut Plan (sonst 422); verlangt die Freigabe Personal (403).
+ */
+export function ladePlanVorlage(
+  einsatzId: number,
+  abloesungId: number,
+): Promise<AbloesungPlanVorlage> {
+  return apiGet<AbloesungPlanVorlage>(`${basis(einsatzId)}/${abloesungId}/plan-vorlage`);
 }
 
 /** Rückweg des Vollzugs, solange die Folgeschicht unberührt ist (sonst 422). */
