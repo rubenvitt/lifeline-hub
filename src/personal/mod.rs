@@ -76,7 +76,7 @@ pub const PERSONAL_STATUS_STARTLISTE: [(&str, &str, i64); 6] = [
 ];
 
 /// Der Status „Pause“ der Startliste (LLH-1555): trägt das Kennzeichen für den Schichtplan.
-/// **Muss mit dem Bestands-Update in `migrations/0297_plan_wechsel_uhs_pause.sql`
+/// **Muss mit dem Bestands-Update in `migrations/0298_plan_wechsel_uhs_pause.sql`
 /// übereinstimmen.**
 pub const PERSONAL_STATUS_STARTPAUSE: &str = "Pause";
 
