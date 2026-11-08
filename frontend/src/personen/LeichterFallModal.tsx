@@ -98,6 +98,11 @@ export function leichterFallZuEingabe(
 
 const MASKE = 'leichter-fall';
 
+/** Der getippte Text eines Ortsfelds; ein leeres Feld trägt `{ text: '' }` oder nichts. */
+function ortsText(wert: OrtsfeldWert | undefined): string {
+  return wert?.text?.trim() ?? '';
+}
+
 interface Props {
   einsatzId: number;
   offen: boolean;
@@ -193,7 +198,7 @@ export default function LeichterFallModal({
     if (geladen.current === kennung) return;
     if (stelle) {
       geladen.current = kennung;
-      if (!form.getFieldValue('antreff_ort'))
+      if (!ortsText(form.getFieldValue('antreff_ort')))
         form.setFieldValue('antreff_ort', fundortAusUhs(stelle.uhs));
       return;
     }
@@ -206,7 +211,11 @@ export default function LeichterFallModal({
     // bleibt draußen.
     if (ort === undefined) return;
     geladen.current = kennung;
-    form.setFieldsValue({ versorgt_von: schluessel as VersorgtVonSchluessel, antreff_ort: ort });
+    // Ein schon getippter Fundort bleibt stehen, die Wahl „Versorgt von“ kommt trotzdem.
+    form.setFieldsValue({
+      versorgt_von: schluessel as VersorgtVonSchluessel,
+      ...(ortsText(form.getFieldValue('antreff_ort')) ? {} : { antreff_ort: ort }),
+    });
   }, [offen, formular.da, einsatzId, stelle, einheiten.length, aktiveUhs.length, fundortVon, form]);
 
   return (

@@ -49,7 +49,7 @@ mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unte
 Die Bestätigung nennt die neue Registriernummer, die Kategorie und den Ort, etwa „Erfasst als
 R-013 · SK II · im Wartebereich“. Die Aufnahme geht immer in die eigene UHS.
 
-### Leichten Fall versorgt entlassen
+### Leichten Fall versorgen und entlassen
 
 Wer nur kurz versorgt wird und gleich wieder geht, braucht keine Aufnahme mit Platz:
 

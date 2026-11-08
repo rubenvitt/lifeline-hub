@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Uhs } from '../api/types';
 import {
@@ -172,6 +172,11 @@ describe('LeichterFallModal', () => {
     const { onErfassen } = zeige();
     const fundort = await screen.findByRole('textbox', { name: 'Fundort' });
     await waitFor(() => expect(fundort).toHaveValue('Abschnitt Nord'));
+    // Ohne angemeldete Sitzung räumt der Provider die Sitzungswerte einmal; erst danach zählt,
+    // was „Entlassen“ für den nächsten Fall stehen lässt.
+    await waitFor(() =>
+      expect(liesErfassungsSitzungswert(1, 'leichter-fall', 'versorgt_von')).toBeUndefined(),
+    );
     await userEvent.click(screen.getByRole('radio', { name: 'Psychisch' }));
     await userEvent.click(screen.getByRole('button', { name: 'Entlassen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
@@ -179,5 +184,37 @@ describe('LeichterFallModal', () => {
       expect.objectContaining({ versorgende_einheit_id: 7, antreff_ort: 'Abschnitt Nord' }),
     );
     expect(liesErfassungsSitzungswert(1, 'leichter-fall', 'versorgt_von')).toBe('einheit:7');
+  });
+
+  it('lässt einen schon getippten Fundort stehen, wenn die Wahl erst danach lädt', async () => {
+    let freigeben: () => void = () => {};
+    const geladen = new Promise<void>((r) => (freigeben = r));
+    server.use(
+      http.get('/api/einsaetze/1/personen/einheiten', async () => {
+        await geladen;
+        await delay(0);
+        return HttpResponse.json([
+          { id: 7, name: 'RTW 1', abschnitt_id: 2, abschnitt_name: 'Abschnitt Nord' },
+        ]);
+      }),
+    );
+    schreibeErfassungsSitzungswert(1, 'leichter-fall', 'versorgt_von', 'einheit:7');
+    const { onErfassen } = zeige();
+    // Ohne angemeldete Sitzung räumt der Provider die Sitzungswerte einmal; danach neu setzen.
+    await waitFor(() =>
+      expect(liesErfassungsSitzungswert(1, 'leichter-fall', 'versorgt_von')).toBeUndefined(),
+    );
+    schreibeErfassungsSitzungswert(1, 'leichter-fall', 'versorgt_von', 'einheit:7');
+    const fundort = await screen.findByRole('textbox', { name: 'Fundort' });
+    await userEvent.type(fundort, 'Zelt 3');
+    freigeben();
+    await waitFor(() => expect(screen.getByTitle('RTW 1 · Abschnitt Nord')).toBeInTheDocument());
+    expect(fundort).toHaveValue('Zelt 3');
+    await userEvent.click(screen.getByRole('radio', { name: 'Sonstiges' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Entlassen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onErfassen.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ versorgende_einheit_id: 7, antreff_ort: 'Zelt 3' }),
+    );
   });
 });

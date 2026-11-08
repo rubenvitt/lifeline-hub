@@ -13201,6 +13201,24 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
+        // Die höchste Zeile ist vor der Migration gelöscht: ihre id darf nicht wiederkommen.
+        let geloescht: i64 = sqlx::query_scalar(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von) \
+             VALUES (?, ?, 'zugang', '2026-11-08 08:20:00', '2026-11-08 08:20:05', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_massnahme WHERE id = ?")
+            .bind(geloescht)
+            .execute(&pool)
+            .await
+            .unwrap();
         migriere_bis(&pool, VERSION).await;
 
         let bestand: (i64, String, Option<String>, Option<String>) = sqlx::query_as(
@@ -13219,6 +13237,22 @@ mod tests {
                 Some("m1".into())
             ),
             "der Bestand bleibt 1:1"
+        );
+        let naechste: i64 = sqlx::query_scalar(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von) \
+             VALUES (?, ?, 'lagerung', '2026-11-08 08:30:00', '2026-11-08 08:30:05', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            naechste > geloescht,
+            "die Sequenz zieht mit: {naechste} > {geloescht}"
         );
         let massnahme = |art: &'static str, client_id: Option<&'static str>| {
             let pool = pool.clone();

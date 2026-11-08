@@ -260,3 +260,19 @@ async fn unbrauchbare_angaben_werden_abgewiesen_ohne_etwas_zu_schreiben() {
     }
     assert_eq!(zeilen(&pool).await, vorher);
 }
+
+#[tokio::test]
+async fn entlassen_ohne_status_legt_betroffen_an() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for body in [
+        json!({"anlass": "sonstiges", "entlassen": true}),
+        json!({"status": "erfasst", "anlass": "sonstiges", "entlassen": true}),
+    ] {
+        let (s, v) = anlegen(&app, &admin, e, body.clone()).await;
+        assert_eq!(s, StatusCode::CREATED, "{body}: {v}");
+        assert_eq!(v["status"], "betroffen", "{body}: {v}");
+        assert_eq!(v["aktuelle_verbleib_art"], "entlassung");
+    }
+}

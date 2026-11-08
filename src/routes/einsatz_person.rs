@@ -488,6 +488,13 @@ pub async fn anlegen(
             "Maßnahmen und Entlassung sind nur mit Status erfasst oder betroffen zulässig".into(),
         ));
     }
+    // Der leichte Fall ist immer betroffen (design.md D5), auch wenn der Aufrufer `erfasst` schickt
+    // oder den Status weglässt; erst nach der Kombinationsprüfung, `vermisst` bleibt 422.
+    let status_enum = if entlassen {
+        PersonStatus::Betroffen
+    } else {
+        status_enum
+    };
     if kategorie.is_none() && body.bestaetigt_personal_id.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Eine Bestätigung gibt es nur zu einer Erst-Sichtung".into(),

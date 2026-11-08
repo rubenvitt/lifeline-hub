@@ -5,7 +5,9 @@
 --
 -- SQLite ändert einen Tabellen-CHECK nur per Rebuild. `person_massnahme` ist ein Blatt: keine
 -- Tabelle verweist auf sie, also löscht das DROP über keine Kaskade etwas mit (anders als 0286).
--- Die ids bleiben 1:1. Schema = 0220 1:1 plus die vier Werte im CHECK.
+-- Die ids bleiben 1:1, die AUTOINCREMENT-Sequenz zieht mit (Muster 0112/0222): sonst vergäbe
+-- SQLite die id einer gelöschten höchsten Zeile erneut. Schema = 0220 1:1 plus die vier Werte im
+-- CHECK.
 -- Abgesichert von db::tests::migration_0292_person_massnahme_sanitaetsdienst.
 
 CREATE TABLE person_massnahme_neu (
@@ -33,9 +35,19 @@ INSERT INTO person_massnahme_neu
            bestaetigt_personal_id, bestaetigt_name, aufgehoben_at, aufgehoben_von_id, client_id
     FROM person_massnahme;
 
+-- Sequenz der Alt-Tabelle übernehmen, bevor DROP ihren Eintrag entfernt (Begründung in 0112).
+DELETE FROM sqlite_sequence
+ WHERE name = 'person_massnahme_neu'
+   AND EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'person_massnahme');
+INSERT INTO sqlite_sequence (name, seq)
+    SELECT 'person_massnahme_neu', seq FROM sqlite_sequence WHERE name = 'person_massnahme';
+
 DROP TABLE person_massnahme;
 
 ALTER TABLE person_massnahme_neu RENAME TO person_massnahme;
+
+-- No-op, falls SQLite den Eintrag beim RENAME bereits mitzieht (wie in 0082).
+UPDATE sqlite_sequence SET name = 'person_massnahme' WHERE name = 'person_massnahme_neu';
 
 CREATE INDEX idx_person_massnahme_person ON person_massnahme (person_id, zeitpunkt_at);
 CREATE UNIQUE INDEX idx_person_massnahme_client_id
