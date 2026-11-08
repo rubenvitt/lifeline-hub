@@ -97,3 +97,15 @@ Das Entfernen der Lage MUST die markierte Planung löschen, bevor es das Demo-Pe
 #### Scenario: Demo-Planung
 - **WHEN** der Admin die Lage „Stadtfest“ importiert
 - **THEN** steht die Planung „Stadtfest Musterstadt“ in der Liste mit Soll 26, Ist 24, Offen 2 und Konflikte 2
+
+### Requirement: Planung als Excel-Mappe
+Eine Planung SHALL dieselbe Excel-Mappe wie der Schichtplan eines Einsatzes ausgeben
+(`GET /api/planungen/{id}/export`), mit Ort und Zeitraum der Planung in der Übersicht und den
+Zeiten in der Zone der Organisation. Der Abruf MUST das Leserecht der Planung verlangen; eine
+fremde oder unbekannte Planung MUST 404 ergeben.
+
+#### Scenario: Planung in einen Einsatz einlesen
+- **WHEN** jemand die Mappe der Demo-Planung „Stadtfest Musterstadt“ exportiert und in einen
+  leeren Einsatz einliest
+- **THEN** stehen dort dieselben Schichten mit Soll und Personen, und ein zweiter Lauf ergibt nur
+  „unverändert“

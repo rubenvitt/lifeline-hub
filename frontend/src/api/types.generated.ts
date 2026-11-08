@@ -7852,6 +7852,12 @@ export interface components {
                 name: string;
             } | {
                 /** @enum {string} */
+                art: "einsatz";
+                /** Format: int64 */
+                einsatz_personal_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
                 art: "neu";
             })[];
             kennung?: string | null;
@@ -7872,6 +7878,12 @@ export interface components {
                 art: "helfer";
                 /** Format: int64 */
                 helfer_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
+                art: "einsatz";
+                /** Format: int64 */
+                einsatz_personal_id: number;
                 name: string;
             } | {
                 /** @enum {string} */

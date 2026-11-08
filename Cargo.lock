@@ -3813,6 +3813,7 @@ dependencies = [
  "rcgen",
  "reqwest",
  "rust-embed",
+ "rust_xlsxwriter",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -5743,6 +5744,15 @@ dependencies = [
  "cfg-if",
  "ordered-multimap",
  "trim-in-place",
+]
+
+[[package]]
+name = "rust_xlsxwriter"
+version = "0.102.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ca3d0e879a578c1313c2800ab0c6c029d38eed18098675e50341a30d32372ed"
+dependencies = [
+ "zip",
 ]
 
 [[package]]

@@ -898,7 +898,10 @@ export type SchichtplanPostenWahlEingabe =
 
 /** Kein Backend-Schema: Wahl einer Person beim Einlesen (`uebernahme::PersonEntscheidung`). */
 export type SchichtplanPersonWahlEingabe =
-  { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number } | { art: 'neu' };
+  | { art: 'stamm'; personal_id: number }
+  | { art: 'helfer'; helfer_id: number }
+  | { art: 'einsatz'; einsatz_personal_id: number }
+  | { art: 'neu' };
 
 /**
  * Kein Backend-Schema: Teil `entscheidungen` beim Einlesen (`uebernahme::Entscheidungen`), je
