@@ -19647,6 +19647,30 @@
                 },
                 {
                   "type": "object",
+                  "description": "Eine Ad-hoc-Kraft des Einsatzes; nur über einen eigenen Bezug (LLH-1557, Regel 0).",
+                  "required": [
+                    "einsatz_personal_id",
+                    "name",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "einsatz"
+                      ]
+                    },
+                    "einsatz_personal_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
                   "required": [
                     "art"
                   ],
@@ -19733,6 +19757,30 @@
                     ]
                   },
                   "helfer_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "description": "Eine Ad-hoc-Kraft des Einsatzes; nur über einen eigenen Bezug (LLH-1557, Regel 0).",
+                "required": [
+                  "einsatz_personal_id",
+                  "name",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "einsatz"
+                    ]
+                  },
+                  "einsatz_personal_id": {
                     "type": "integer",
                     "format": "int64"
                   },

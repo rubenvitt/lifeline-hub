@@ -932,7 +932,11 @@ export default function AbloesungPage() {
           werkzeuge={
             <>
               {darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null}
-              <SchichtplanAusgabeKnoepfe einsatzId={einsatzId} />
+              <SchichtplanAusgabeKnoepfe
+                einsatzId={einsatzId}
+                einsatzBezeichnung={einsatz.bezeichnung}
+                personalFrei={personalFrei}
+              />
             </>
           }
         />
