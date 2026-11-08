@@ -34,7 +34,8 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 365;
 wire_enum! {
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
     /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
-    /// `0174_admin_audit_einmalpasswort.sql` und `0269_admin_audit_lesezugang.sql` — beide Seiten
+    /// `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
+    /// `0299_admin_audit_instanz.sql` — beide Seiten
     /// müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
     /// Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -58,6 +59,27 @@ wire_enum! {
         LesezugangAngelegt => "lesezugang_angelegt",
         /// Lesezugang für eine externe Anzeige widerrufen (LLH-1484).
         LesezugangWiderrufen => "lesezugang_widerrufen",
+        /// Kopplungscode für eine andere Instanz ausgestellt (LLH-1490). Der Code steht nie in
+        /// der Spur.
+        InstanzCodeAusgestellt => "instanz_code_ausgestellt",
+        /// Eine andere Instanz hat einen Kopplungscode dieser Org eingelöst (ausstellende Seite;
+        /// ausgelöst vom Gegenüber, ohne handelnde Person).
+        InstanzCodeEingeloest => "instanz_code_eingeloest",
+        /// Diese Instanz hat sich mit dem Code einer anderen gekoppelt (einlösende Seite).
+        InstanzGekoppelt => "instanz_gekoppelt",
+        /// Die Org-Zuordnung einer Kopplung hier widerrufen.
+        InstanzKopplungWiderrufen => "instanz_kopplung_widerrufen",
+        /// Das Gegenüber hat die Kopplung widerrufen und es signiert mitgeteilt.
+        InstanzKopplungVomGegenueberWiderrufen => "instanz_kopplung_vom_gegenueber_widerrufen",
+        /// Unterschriftsschlüssel registriert (LLH-1490).
+        UnterschriftRegistriert => "unterschrift_registriert",
+        /// Neuen Unterschriftsschlüssel gegengezeichnet.
+        UnterschriftGegengezeichnet => "unterschrift_gegengezeichnet",
+        /// Unterschriftsschlüssel widerrufen, von Hand oder mit dem Konto.
+        UnterschriftWiderrufen => "unterschrift_widerrufen",
+        /// Ein vom Gegenüber gelieferter Unterschriftsschlüssel wurde verworfen (ohne gültige
+        /// Gegenzeichnung eines bekannten Schlüssels).
+        UnterschriftAbgelehnt => "unterschrift_abgelehnt",
     }
 }
 
@@ -70,6 +92,10 @@ pub enum Ziel<'a> {
     Anmeldeweg(&'a str),
     /// Ein Lesezugang für externe Anzeigen, mit seiner Bezeichnung (LLH-1484).
     Lesezugang(&'a str),
+    /// Eine gekoppelte Instanz, mit ihrem Namen (LLH-1490).
+    Instanz(&'a str),
+    /// Ein Unterschriftsschlüssel, mit Inhaber und Bezeichnung (LLH-1490).
+    Unterschrift(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -80,6 +106,9 @@ pub enum Ziel<'a> {
 /// - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
 /// - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
 /// - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
+/// - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.
+/// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
+///   Gegenstelle.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ZugangsAngaben {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -96,6 +125,21 @@ pub struct ZugangsAngaben {
     /// Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angemeldet_at: Option<String>,
+    /// Instanzkopplung (LLH-1490): Kennung der Gegenstelle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instanz_kennung: Option<String>,
+    /// Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerabdruck: Option<String>,
+    /// Adresse der Gegenstelle (nur auf der Seite, die sich meldet).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adresse: Option<String>,
+    /// Org der Gegenstelle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fremde_org: Option<String>,
+    /// Warum ein Unterschriftsschlüssel verworfen wurde.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grund: Option<String>,
 }
 
 impl ZugangsAngaben {
@@ -133,9 +177,10 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
             Some(id),
             crate::auth::benutzername::fuer_protokoll(benutzername),
         ),
-        Ziel::Anmeldeweg(id) | Ziel::Lesezugang(id) => {
-            (None, crate::auth::benutzername::fuer_protokoll(id))
-        }
+        Ziel::Anmeldeweg(id)
+        | Ziel::Lesezugang(id)
+        | Ziel::Instanz(id)
+        | Ziel::Unterschrift(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
@@ -173,6 +218,54 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
     if let Err(e) = ergebnis {
         tracing::error!(
             aktion = eintrag.aktion.as_str(),
+            "Admin-Audit konnte nicht geschrieben werden: {e}"
+        );
+    }
+}
+
+/// Ein Eintrag, den eine gekoppelte Instanz ausgelöst hat, nicht eine Person dieser Instanz
+/// (LLH-1490, design.md D11): `akteur_id` NULL, als Name die Gegenstelle. Schlägt wie
+/// [`schreibe`] nie nach außen durch.
+pub async fn schreibe_ohne_akteur(
+    pool: &SqlitePool,
+    aktion: AdminAktion,
+    org_id: i64,
+    gegenstelle: &str,
+    ziel: Ziel<'_>,
+    angaben: Option<ZugangsAngaben>,
+    peer_ip: Option<IpAddr>,
+) {
+    let ziel = match ziel {
+        Ziel::Benutzer { benutzername, .. } => benutzername,
+        Ziel::Anmeldeweg(t) | Ziel::Lesezugang(t) | Ziel::Instanz(t) | Ziel::Unterschrift(t) => t,
+    };
+    let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
+    let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);
+    let detail = angaben
+        .as_ref()
+        .map(|a| serde_json::to_string(a).expect("ZugangsAngaben sind serialisierbar"));
+    tracing::info!(
+        aktion = aktion.as_str(),
+        gegenstelle = %akteur_name,
+        ziel = %ziel,
+        detail = ?detail,
+        "Zugang durch gekoppelte Instanz geändert"
+    );
+    let ergebnis = sqlx::query(
+        "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
+         VALUES (?, NULL, ?, NULL, ?, ?, ?, ?)",
+    )
+    .bind(aktion.as_str())
+    .bind(&akteur_name)
+    .bind(&ziel)
+    .bind(detail.as_deref())
+    .bind(peer_ip.map(|ip| ip.to_string()))
+    .bind(org_id)
+    .execute(pool)
+    .await;
+    if let Err(e) = ergebnis {
+        tracing::error!(
+            aktion = aktion.as_str(),
             "Admin-Audit konnte nicht geschrieben werden: {e}"
         );
     }

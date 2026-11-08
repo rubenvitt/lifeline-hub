@@ -97,14 +97,7 @@ impl FromRequest<AppState> for GekoppelteInstanz {
         if !repo::jti_merken(&state.pool, &kopplung.gegenueber_kennung, &claims.jti, &bis).await? {
             return Err(abgelehnt("Wiederholung", Some(&kopf.kid)));
         }
-        if parts.uri.path() != MELDEN_PFAD
-            && protokollfenster(PROTOKOLL, claims.pv) != Protokollfenster::Voll
-        {
-            return Err(AppError::UpgradeRequired(format!(
-                "Protokoll {} wird hier nicht mehr verstanden (hier {PROTOKOLL}); nur Melden geht.",
-                claims.pv
-            )));
-        }
+        protokoll_zulaessig(parts.uri.path(), claims.pv)?;
         Ok(GekoppelteInstanz {
             kopplung,
             claims,
@@ -112,6 +105,17 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             identitaet,
         })
     }
+}
+
+/// Protokollfenster (design.md D5): Melden geht immer, alles andere nur bei höchstens einem Stand
+/// Abstand (sonst 426).
+pub fn protokoll_zulaessig(pfad: &str, pv: u32) -> Result<(), AppError> {
+    if pfad != MELDEN_PFAD && protokollfenster(PROTOKOLL, pv) != Protokollfenster::Voll {
+        return Err(AppError::UpgradeRequired(format!(
+            "Protokoll {pv} wird hier nicht mehr verstanden (hier {PROTOKOLL}); nur Melden geht."
+        )));
+    }
+    Ok(())
 }
 
 impl GekoppelteInstanz {
@@ -170,4 +174,17 @@ pub fn signierte_antwort<T: serde::Serialize>(
         body,
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn melden_geht_immer_anderes_nur_im_fenster() {
+        assert!(protokoll_zulaessig(MELDEN_PFAD, PROTOKOLL + 5).is_ok());
+        assert!(protokoll_zulaessig("/api/instanz/etwas", PROTOKOLL + 1).is_ok());
+        let fehler = protokoll_zulaessig("/api/instanz/etwas", PROTOKOLL + 2).unwrap_err();
+        assert_eq!(fehler.status(), axum::http::StatusCode::UPGRADE_REQUIRED);
+    }
 }

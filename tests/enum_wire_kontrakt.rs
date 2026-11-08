@@ -643,6 +643,37 @@ fn serde_wire_gleich_as_str() {
         EinmalpasswortVergeben,
         LesezugangAngelegt,
         LesezugangWiderrufen,
+        InstanzCodeAusgestellt,
+        InstanzCodeEingeloest,
+        InstanzGekoppelt,
+        InstanzKopplungWiderrufen,
+        InstanzKopplungVomGegenueberWiderrufen,
+        UnterschriftRegistriert,
+        UnterschriftGegengezeichnet,
+        UnterschriftWiderrufen,
+        UnterschriftAbgelehnt,
+    });
+    // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0298.
+    enum_wire_as_str!(lifeline_hub::instanz::KopplungRichtung {
+        MeldetSich,
+        WirdGemeldet,
+    });
+    enum_wire_as_str!(lifeline_hub::instanz::KopplungZustand {
+        Angebahnt,
+        Aktiv,
+        Widerrufen,
+        VomGegenueberWiderrufen,
+    });
+    enum_wire_as_str!(lifeline_hub::instanz::repo::ProtokollAnzeige {
+        Passt,
+        UpdateHier,
+        UpdateGegenueber,
+    });
+    enum_wire_as_str!(lifeline_hub::auth::unterschrift::SchluesselHerkunft { Lokal, Gegenueber });
+    enum_wire_as_str!(lifeline_hub::auth::unterschrift::SchluesselZustand {
+        WartetAufGegenzeichnung,
+        Gueltig,
+        Widerrufen,
     });
 }
 

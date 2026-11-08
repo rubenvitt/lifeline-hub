@@ -22,6 +22,7 @@ pub struct KopplungZeile {
     pub gegenueber_softwarestand: Option<String>,
     pub gegenueber_protokoll: Option<i64>,
     pub letzter_fehler: Option<String>,
+    pub hinweis: Option<String>,
     pub uhr_abweichung_s: Option<i64>,
     pub fehlversuche: i64,
     pub naechste_meldung_at: Option<String>,
@@ -40,8 +41,8 @@ impl KopplungZeile {
 
 const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
      richtung, gegenueber_adresse, zustand, zuletzt_gesehen_at, gegenueber_softwarestand, \
-     gegenueber_protokoll, letzter_fehler, uhr_abweichung_s, fehlversuche, naechste_meldung_at, \
-     angebahnt_at, erstellt_at";
+     gegenueber_protokoll, letzter_fehler, hinweis, uhr_abweichung_s, fehlversuche, \
+     naechste_meldung_at, angebahnt_at, erstellt_at";
 
 /// Eine Org-Zuordnung einer Kopplung.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -202,7 +203,7 @@ pub async fn kopplung_anlegen_oder_erneuern(
              gegenueber_adresse = ?, gegenueber_softwarestand = ?, gegenueber_protokoll = ?, \
              zustand = CASE WHEN ? THEN zustand ELSE ? END, \
              angebahnt_at = CASE WHEN ? THEN angebahnt_at ELSE ? END, \
-             letzter_fehler = NULL, fehlversuche = 0, naechste_meldung_at = NULL \
+             letzter_fehler = NULL, hinweis = NULL, fehlversuche = 0, naechste_meldung_at = NULL \
              WHERE id = ?",
         )
         .bind(g.schluessel_b64)
@@ -305,14 +306,16 @@ pub async fn orgs_widerruf_offen(
 }
 
 /// Setzt den Zustand einer Kopplung danach, ob noch eine Org-Zuordnung gilt: ohne gültige wird
-/// sie `ohne` (`widerrufen` oder `vom_gegenueber_widerrufen`).
+/// eine angebahnte oder aktive Kopplung `ohne` (`widerrufen` oder `vom_gegenueber_widerrufen`).
+/// Ein schon gesetzter Widerruf bleibt, wie er ist: wer zuerst widerrufen hat, steht fest.
 pub async fn zustand_nach_orgs(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     ohne: KopplungZustand,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE instanz_kopplung SET zustand = ? WHERE id = ? AND NOT EXISTS \
+        "UPDATE instanz_kopplung SET zustand = ? WHERE id = ? \
+         AND zustand IN ('angebahnt', 'aktiv') AND NOT EXISTS \
          (SELECT 1 FROM instanz_kopplung_org WHERE kopplung_id = ? AND widerrufen_at IS NULL)",
     )
     .bind(ohne.as_str())
@@ -457,6 +460,33 @@ pub async fn angebahnte_verwerfen(pool: &SqlitePool, grenze: &str) -> Result<u64
     Ok(ids.len() as u64)
 }
 
+/// Setzt einen bleibenden Hinweis an der Kopplung.
+pub async fn hinweis_setzen(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    hinweis: &str,
+) -> Result<(), AppError> {
+    sqlx::query("UPDATE instanz_kopplung SET hinweis = ? WHERE id = ?")
+        .bind(hinweis)
+        .bind(kopplung_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Alle Org-Zuordnungen einer Kopplung, auch widerrufene, jüngste zuletzt.
+pub async fn orgs_alle(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<Vec<OrgZeile>, AppError> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {ORG_SPALTEN} FROM instanz_kopplung_org WHERE kopplung_id = ? ORDER BY id"
+    )))
+    .bind(kopplung_id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
 // ── Wiederholschutz ──────────────────────────────────────────────────────────────────────────
 
 /// Merkt sich eine `jti`; `false`, wenn sie von diesem Absender schon kam.
@@ -524,6 +554,8 @@ pub struct KopplungAnzeige {
     pub protokoll: ProtokollAnzeige,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub letzter_fehler: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hinweis: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uhr_abweichung_s: Option<i64>,
     /// Die Org-Zuordnung der eigenen Org (die jüngste).
@@ -603,6 +635,7 @@ fn anzeige(k: KopplungZeile, o: OrgZeile) -> KopplungAnzeige {
         gegenueber_protokoll: k.gegenueber_protokoll,
         protokoll,
         letzter_fehler: k.letzter_fehler,
+        hinweis: k.hinweis,
         uhr_abweichung_s: k.uhr_abweichung_s,
         org: OrgZuordnungAnzeige {
             id: o.id,
@@ -611,5 +644,38 @@ fn anzeige(k: KopplungZeile, o: OrgZeile) -> KopplungAnzeige {
             angelegt_at: o.angelegt_at,
             widerrufen_at: o.widerrufen_at,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn wiederholung_wird_erkannt_und_abgelaufenes_geraeumt() {
+        let pool = crate::db::test_pool().await;
+        assert!(jti_merken(&pool, "elw", "j1", "2026-11-08 12:01:00")
+            .await
+            .unwrap());
+        assert!(!jti_merken(&pool, "elw", "j1", "2026-11-08 12:01:00")
+            .await
+            .unwrap());
+        assert!(jti_merken(&pool, "elw2", "j1", "2026-11-08 12:01:00")
+            .await
+            .unwrap());
+        purge(&pool, "2026-11-08 12:00:00").await.unwrap();
+        assert!(
+            !jti_merken(&pool, "elw", "j1", "2026-11-08 12:01:00")
+                .await
+                .unwrap(),
+            "noch nicht abgelaufen"
+        );
+        purge(&pool, "2026-11-08 12:02:00").await.unwrap();
+        assert!(
+            jti_merken(&pool, "elw", "j1", "2026-11-08 12:03:00")
+                .await
+                .unwrap(),
+            "geräumt"
+        );
     }
 }

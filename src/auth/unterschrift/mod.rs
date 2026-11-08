@@ -17,6 +17,20 @@ use pruefen::Assertion;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+static RP: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
+
+/// Setzt RP-ID und Herkunft dieser Instanz einmal beim Start, wenn Passkeys eingerichtet sind.
+/// Ein Unterschriftsschlüssel trägt beides, damit eine andere Instanz seine Unterschrift prüfen
+/// kann.
+pub fn set_rp(rp_id: String, origin: String) {
+    let _ = RP.set((rp_id, origin));
+}
+
+/// RP-ID und Herkunft; `None`, wenn Passkeys hier nicht eingerichtet sind.
+pub fn rp() -> Option<(&'static str, &'static str)> {
+    RP.get().map(|(a, b)| (a.as_str(), b.as_str()))
+}
+
 /// Der einzige angenommene Algorithmus (ES256, P-256); `webauthn-rs` bietet bei Passkeys sonst
 /// nur RS256 an.
 pub const ALG_ES256: &str = "es256";

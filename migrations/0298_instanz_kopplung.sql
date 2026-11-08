@@ -29,6 +29,9 @@ CREATE TABLE instanz_kopplung (
     gegenueber_protokoll     INTEGER,
     -- Letzter Fehler beim Melden (nur meldende Seite), leer nach Erfolg.
     letzter_fehler           TEXT,
+    -- Hinweis, der bleibt, bis die Kopplung erneuert wird: etwa ein vom Gegenüber gelieferter
+    -- Unterschriftsschlüssel, der verworfen wurde.
+    hinweis                  TEXT,
     -- Abweichung der Uhr des Gegenübers in Sekunden (Gegenüber minus wir), aus der letzten Antwort.
     uhr_abweichung_s         INTEGER,
     -- Aufeinanderfolgende Fehlschläge beim Melden; trägt die Verdopplung des Abstands.
