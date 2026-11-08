@@ -226,6 +226,41 @@ async fn code_nur_fuer_admin_mit_unterschriftsschluessel() {
 }
 
 #[tokio::test]
+async fn code_nur_bis_zur_grenze_gueltiger_schluessel() {
+    let hub = instanz().await;
+    let (admin_id, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE system_rolle = 'admin' LIMIT 1")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    for n in 0..=lifeline_hub::auth::unterschrift::repo::LIEFERUNGEN_MAX as i64 {
+        sqlx::query(
+            "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
+             credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, \
+             zustand, stand) VALUES (?, 'lokal', ?, 'admin', ?, 'es256', 'AAAA', 'r', 'o', \
+             'Stick', 'fp', 'gueltig', ?)",
+        )
+        .bind(org_id)
+        .bind(admin_id)
+        .bind(format!("c{n}"))
+        .bind(n + 1)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    }
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("256"), "{v}");
+}
+
+#[tokio::test]
 async fn code_gilt_einmal_und_nicht_abgelaufen() {
     let hub = instanz().await;
     let elw = instanz().await;

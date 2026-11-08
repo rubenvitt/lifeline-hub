@@ -278,8 +278,10 @@ Ein adversariales Review vor dem PR fand Lücken; behoben und mit Tests belegt
   Grund steht im Log.
 - **Listen von der Gegenstelle** sind begrenzt: höchstens 256 Orgs und 256 Widerrufe je Meldung
   (sonst 400, gezählt vor dem Entdoppeln) und je Antwort höchstens 256 Orgs. Je Org gehen höchstens
-  256 Unterschriftsschlüssel in eine Lieferung. Grundstock und Nachlieferung liefern nach Stand
-  sortiert, der Rest folgt mit der nächsten Meldung. Eine Antwort mit einer Org doppelt ist
+  256 Unterschriftsschlüssel in eine Lieferung. Die Nachlieferung liefert nach Stand sortiert, der
+  Rest folgt mit der nächsten Meldung. Der Grundstock wird nie abgeschnitten: Hat die Org mehr
+  gültige Schlüssel, scheitern Code ausstellen und Koppeln mit 409. Die übrigen kämen sonst ohne
+  Gegenzeichnung nach und gingen still verloren. Eine Antwort mit einer Org doppelt ist
   ungültig, statt entdoppelt zu werden, damit die Reihenfolge nicht über einen Widerruf entscheidet.
 - **Zeitstempel** werden ohne Überlauf verrechnet (`checked_sub`, gesättigt), denn sie kommen
   signiert, aber von der Gegenstelle.

@@ -462,28 +462,34 @@ async fn lieferung_ueber_der_grenze_wird_abgelehnt_und_ein_widerruf_derselben_id
 }
 
 #[tokio::test]
-async fn grundstock_und_nachlieferung_liefern_hoechstens_die_grenze_und_der_rest_folgt() {
+async fn grundstock_ueber_der_grenze_scheitert_statt_abzuschneiden() {
+    // Ein abgeschnittener Grundstock verlöre Schlüssel still: was danach nachkommt, braucht eine
+    // Gegenzeichnung, die ein Schlüssel aus der Zeit vor der Kopplung nicht hat.
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    for stand in 1..=LIEFERUNGEN_MAX as i64 {
+        lokaler_gueltiger(&mut conn, stand).await;
+    }
+    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
+    assert_eq!(grund.len(), LIEFERUNGEN_MAX);
+    lokaler_gueltiger(&mut conn, LIEFERUNGEN_MAX as i64 + 1).await;
+    assert!(matches!(
+        grundstock(&mut conn, 1).await,
+        Err(AppError::Conflict(_))
+    ));
+}
+
+#[tokio::test]
+async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
     let pool = pool_mit_admin().await;
     let mut conn = pool.acquire().await.unwrap();
     let anzahl = LIEFERUNGEN_MAX as i64 + 1;
     for stand in 1..=anzahl {
-        sqlx::query(
-            "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
-             credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, \
-             stand) VALUES (1, 'lokal', 1, 'admin', ?, 'es256', 'AAAA', ?, ?, 'Stick', 'fp', \
-             'gueltig', ?)",
-        )
-        .bind(format!("c{stand}"))
-        .bind(RP)
-        .bind(ORIGIN)
-        .bind(stand)
-        .execute(&mut *conn)
-        .await
-        .unwrap();
+        lokaler_gueltiger(&mut conn, stand).await;
     }
-    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
-    assert_eq!(grund.len(), LIEFERUNGEN_MAX);
-    let bis = grund.last().unwrap().stand;
+    let erste = nachlieferung(&mut conn, 1, 0).await.unwrap();
+    assert_eq!(erste.len(), LIEFERUNGEN_MAX);
+    let bis = erste.last().unwrap().stand;
     assert_eq!(
         bis, LIEFERUNGEN_MAX as i64,
         "nach Stand sortiert, die ältesten zuerst"
@@ -494,8 +500,21 @@ async fn grundstock_und_nachlieferung_liefern_hoechstens_die_grenze_und_der_rest
         [anzahl],
         "der Rest folgt mit der nächsten Meldung"
     );
-    assert_eq!(
-        nachlieferung(&mut conn, 1, 0).await.unwrap().len(),
-        LIEFERUNGEN_MAX
-    );
+}
+
+/// Ein gültiger lokaler Schlüssel von Admin 1 in Org 1 mit dem Stand `stand`.
+async fn lokaler_gueltiger(conn: &mut SqliteConnection, stand: i64) {
+    sqlx::query(
+        "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
+         credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, \
+         stand) VALUES (1, 'lokal', 1, 'admin', ?, 'es256', 'AAAA', ?, ?, 'Stick', 'fp', \
+         'gueltig', ?)",
+    )
+    .bind(format!("c{stand}"))
+    .bind(RP)
+    .bind(ORIGIN)
+    .bind(stand)
+    .execute(&mut *conn)
+    .await
+    .unwrap();
 }

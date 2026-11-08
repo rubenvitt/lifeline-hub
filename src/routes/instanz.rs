@@ -139,6 +139,9 @@ pub async fn code_ausstellen(
                     .into(),
             ));
         }
+        // Derselbe Grundstock wie beim Einlösen: zu viele Schlüssel scheitern hier mit Grund,
+        // nicht erst an der anderen Instanz.
+        unterschrift::grundstock(&mut conn, admin.org_id).await?;
     }
     let i = identitaet::load_or_create(&state.pool)
         .await

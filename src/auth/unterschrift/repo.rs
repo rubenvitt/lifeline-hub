@@ -279,18 +279,28 @@ pub async fn alle_des_benutzers_widerrufen(
     Ok(aus)
 }
 
-/// Grundstock beim Koppeln: alle gültigen lokalen Schlüssel der Org und der höchste Stand.
+/// Grundstock beim Koppeln: alle gültigen lokalen Schlüssel der Org und der höchste Stand. Mehr
+/// als [`LIEFERUNGEN_MAX`] sind ein 409 statt eines abgeschnittenen Grundstocks: was danach mit der
+/// Nachlieferung käme, bräuchte eine Gegenzeichnung, die ein Schlüssel aus der Zeit vor der
+/// Kopplung nicht hat, und ginge still verloren.
 pub async fn grundstock(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<(Vec<UnterschriftSchluesselLieferung>, i64), AppError> {
     let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
-         AND zustand = 'gueltig' ORDER BY stand LIMIT {LIEFERUNGEN_MAX}"
+         AND zustand = 'gueltig' ORDER BY stand LIMIT {}",
+        LIEFERUNGEN_MAX + 1
     )))
     .bind(org_id)
     .fetch_all(&mut *conn)
     .await?;
+    if zeilen.len() > LIEFERUNGEN_MAX {
+        return Err(AppError::Conflict(format!(
+            "Die Organisation hat mehr als {LIEFERUNGEN_MAX} gültige Unterschriftsschlüssel. \
+             Bitte vor dem Koppeln die überzähligen widerrufen."
+        )));
+    }
     let stand: i64 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(stand), 0) FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal'",
     )
