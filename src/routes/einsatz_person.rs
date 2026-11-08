@@ -1036,8 +1036,6 @@ pub async fn anlegen(
             let person = repo::laden_tx(conn, einsatz_id, id).await?;
             Ok((person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id))
         })?;
-    // Auch nach einem Replay im Rennen (`war_neu` falsch): die Zustellung ist idempotent.
-    rtw_meldung_sicherstellen(&state, &person).await?;
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {
@@ -1062,6 +1060,10 @@ pub async fn anlegen(
             melde_vermisst(&state, einsatz_id, person.id, ctx.benutzer.id).await;
         }
     }
+    // Auch nach einem Replay im Rennen (`war_neu` falsch): die Zustellung ist idempotent. Erst
+    // nach den Live-Ereignissen der Person, damit ein Fehler sie nicht verschluckt; die
+    // Wiederholung mit derselben `client_id` holt nur die Zustellung nach.
+    rtw_meldung_sicherstellen(&state, &person).await?;
     let mut person = person;
     if einheit_name.is_some() {
         // Replay im Rennen (`war_neu` false): dieselbe Schranke wie oben.
