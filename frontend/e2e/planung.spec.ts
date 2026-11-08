@@ -5,6 +5,7 @@ import {
   waitForPlanung,
   waitForRaster,
   wireZeit,
+  zeitpunktAm,
 } from './planung-kern';
 
 /**
@@ -144,8 +145,9 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
 
 /**
  * Kriterium 12 der Prüfliste (LLH-1595, für LLH-1586): Änderungen anderer erscheinen im Raster
- * direkt. Ein fremder Block steht in seiner Zeile an seiner Uhrzeit; nichts unter dem Zeiger
- * verschiebt sich. Gemessen am Block, über dem der Zeiger steht, in der letzten Postenzeile.
+ * direkt, ohne Neuladen. Der fremde Block landet in DERSELBEN Zeile wie der Block unter dem Zeiger,
+ * gleich daneben; der Block unter dem Zeiger behält Lage, Größe und Ampel. Dass andere Zeilen
+ * nicht springen, folgt aus der festen Zeilenhöhe und ist hier nicht eigens belegt.
  *
  * Bewusst NICHT abgedeckt: ein fremder Posten, der VOR anderen einsortiert wird, und eine fremde
  * Umsortierung schieben die Zeilen darunter um eine Zeilenhöhe. Die Zeilenschleuse mit
@@ -166,27 +168,35 @@ test('Vorplanung (LLH-1595): ein fremder Block verschiebt im Raster nichts unter
   await waitForPlanung(page, planung.bezeichnung);
   await waitForRaster(page);
 
-  const unterZeiger = page.locator('[data-lfh="schichtplan-block"][data-ampel="ohne-soll"]');
+  // Fußtrupp trägt 08–12 Uhr (`planung-kern.ts`); der Zeiger steht darauf.
+  const fussBlock = page.locator('[data-lfh="schichtplan-block"][data-ampel="ohne-soll"]');
+  await expect(fussBlock).toHaveCount(1);
+  // Über die Kennung gegriffen: der fremde Block trägt dieselbe Ampel.
+  const blockId = await fussBlock.getAttribute('data-block-id');
+  const unterZeiger = page.locator(`[data-lfh="schichtplan-block"][data-block-id="${blockId}"]`);
   await unterZeiger.hover();
   const vorher = (await unterZeiger.boundingBox())!;
 
-  // Der „andere Schirm“ legt an RTW 1 einen Block 16–18 Uhr an.
+  // Der „andere Schirm“ legt am Fußtrupp gleich anschließend 12–14 Uhr an.
   const stand = (await (await page.request.get(`/api/planungen/${planung.id}`)).json()) as {
     posten: { id: number; bezeichnung: string }[];
   };
-  const rtw1 = stand.posten.find((p) => p.bezeichnung === 'RTW 1')!.id;
-  const um = (stunde: number) => {
-    const d = new Date(Date.now() + 7 * 24 * 3_600_000);
-    d.setHours(stunde, 0, 0, 0);
-    return wireZeit(d);
-  };
+  const fusstrupp = stand.posten.find((p) => p.bezeichnung === 'Fußtrupp')!.id;
   const antwort = await page.request.post(`/api/planungen/${planung.id}/bloecke`, {
-    data: { posten_id: rtw1, von: um(16), bis: um(18) },
+    data: {
+      posten_id: fusstrupp,
+      von: wireZeit(zeitpunktAm(planung.tag, 12)),
+      bis: wireZeit(zeitpunktAm(planung.tag, 14)),
+    },
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
 
-  const bloecke = page.locator('[data-lfh="schichtplan-block"]');
-  await expect(bloecke, 'der fremde Block erscheint ohne Neuladen').toHaveCount(BLOECKE_ANZAHL + 1);
+  const zeile = page.locator('[data-lfh="schichtplan-zeile"]').filter({ hasText: 'Fußtrupp' });
+  await expect(
+    zeile.locator('[data-lfh="schichtplan-block"]'),
+    'der fremde Block erscheint ohne Neuladen in der Zeile unter dem Zeiger',
+  ).toHaveCount(2);
+  await expect(page.locator('[data-lfh="schichtplan-block"]')).toHaveCount(BLOECKE_ANZAHL + 1);
   const nachher = (await unterZeiger.boundingBox())!;
   expect(
     { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },

@@ -53,9 +53,19 @@ export function wireZeit(d: Date): string {
   );
 }
 
-/** Ein Zeitpunkt `tage` Tage voraus zur lokalen Wanduhr `stunde:00` (Browser und Lauf teilen TZ). */
-function tagUm(tage: number, stunde: number): Date {
+/**
+ * Der Tag der Planung als lokale Mitternacht, EINMAL je Saat gelesen: läse jeder Zeitpunkt die Uhr
+ * neu, landeten Planung und Blöcke beim Lauf über Mitternacht auf verschiedenen Tagen.
+ */
+function planungsTag(tage: number): Date {
   const d = new Date(Date.now() + tage * 24 * 3_600_000);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Lokale Wanduhr `stunde:00` am Tag `tag` (Browser und Lauf teilen die Zeitzone). */
+export function zeitpunktAm(tag: Date, stunde: number): Date {
+  const d = new Date(tag);
   d.setHours(stunde, 0, 0, 0);
   return d;
 }
@@ -71,31 +81,33 @@ async function send<T>(
   return (await r.json()) as T;
 }
 
-interface PlanungAntwort {
+interface PlanungResponse {
   kopf: { id: number };
   posten: { id: number; bezeichnung: string }[];
   bloecke: { id: number; ampel?: string }[];
 }
 
-export interface GesaetePlanung {
+export interface SeededPlanung {
   id: number;
   bezeichnung: string;
+  /** Der Tag der Planung, lokale Mitternacht. */
+  tag: Date;
 }
 
 /** Legt die Planung im Messzustand an (Tabelle im Kopf). */
-export async function seedPlanung(page: Page, bezeichnung: string): Promise<GesaetePlanung> {
-  const tag = 7;
-  const p = await send<PlanungAntwort>(page, 'post', '/api/planungen', {
+export async function seedPlanung(page: Page, bezeichnung: string): Promise<SeededPlanung> {
+  const tag = planungsTag(7);
+  const p = await send<PlanungResponse>(page, 'post', '/api/planungen', {
     bezeichnung,
     ort: 'Stadtpark Messweg',
-    von: wireZeit(tagUm(tag, 6)),
-    bis: wireZeit(tagUm(tag, 22)),
+    von: wireZeit(zeitpunktAm(tag, 6)),
+    bis: wireZeit(zeitpunktAm(tag, 22)),
     max_dienst_minuten: 180,
   });
   const id = p.kopf.id;
   const postenIds: number[] = [];
   for (const posten of POSTEN) {
-    const antwort = await send<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+    const antwort = await send<PlanungResponse>(page, 'post', `/api/planungen/${id}/posten`, {
       bezeichnung: posten.bezeichnung,
       abschnitt: posten.abschnitt,
       art: 'einheit',
@@ -113,10 +125,10 @@ export async function seedPlanung(page: Page, bezeichnung: string): Promise<Gesa
     helferIds.push(h.id);
   }
   const block = (posten: number, von: number, bis: number, helfer?: number) =>
-    send<PlanungAntwort>(page, 'post', `/api/planungen/${id}/bloecke`, {
+    send<PlanungResponse>(page, 'post', `/api/planungen/${id}/bloecke`, {
       posten_id: postenIds[posten],
-      von: wireZeit(tagUm(tag, von)),
-      bis: wireZeit(tagUm(tag, bis)),
+      von: wireZeit(zeitpunktAm(tag, von)),
+      bis: wireZeit(zeitpunktAm(tag, bis)),
       ...(helfer != null ? { personen: [{ art: 'helfer', helfer_id: helferIds[helfer] }] } : {}),
     });
   await block(0, 8, 12);
@@ -124,7 +136,7 @@ export async function seedPlanung(page: Page, bezeichnung: string): Promise<Gesa
   await block(1, 8, 10, 0);
   await block(1, 12, 16, 1);
   await block(2, 8, 12);
-  return { id, bezeichnung };
+  return { id, bezeichnung, tag };
 }
 
 /**
@@ -132,10 +144,10 @@ export async function seedPlanung(page: Page, bezeichnung: string): Promise<Gesa
  * zehn Tagen, und die Liste nennt den Tag („wird am … gelöscht“, ab 14 Tagen vorher).
  */
 export async function seedAltePlanung(page: Page, bezeichnung: string): Promise<number> {
-  const p = await send<PlanungAntwort>(page, 'post', '/api/planungen', {
+  const p = await send<PlanungResponse>(page, 'post', '/api/planungen', {
     bezeichnung,
-    von: wireZeit(tagUm(-81, 8)),
-    bis: wireZeit(tagUm(-80, 8)),
+    von: wireZeit(zeitpunktAm(planungsTag(-81), 8)),
+    bis: wireZeit(zeitpunktAm(planungsTag(-80), 8)),
   });
   return p.kopf.id;
 }

@@ -3255,7 +3255,7 @@ const PLANUNG_FELD =
   ':not(:is(.ant-input-affix-wrapper, .ant-select, .ant-picker, .ant-input-number) *)';
 
 /** Abstand nach Stufe, falls die Stufe einen fordert; liefert den gemessenen Wert. */
-function haeltAbstand(abstand: number, dichte: keyof typeof ZIELABSTAND, was: string): number {
+function checkAbstand(abstand: number, dichte: keyof typeof ZIELABSTAND, was: string): number {
   const soll = ZIELABSTAND[dichte];
   if (soll != null) {
     expect(abstand, `${was} (${dichte}, Soll ≥ ${soll})`).toBeGreaterThanOrEqual(soll - SUBPIXEL);
@@ -3264,7 +3264,7 @@ function haeltAbstand(abstand: number, dichte: keyof typeof ZIELABSTAND, was: st
 }
 
 /** Kleinster Abstand einer Menge von Zielen zu ihren Nachbarn in `bereich`. */
-async function kleinsterAbstand(bereich: Locator, ziele: Locator): Promise<number> {
+async function minAbstand(bereich: Locator, ziele: Locator): Promise<number> {
   let min = Number.POSITIVE_INFINITY;
   for (let i = 0; i < (await ziele.count()); i += 1) {
     min = Math.min(min, await abstandZuNachbarn(bereich, ziele.nth(i)));
@@ -3279,7 +3279,9 @@ async function kleinsterAbstand(bereich: Locator, ziele: Locator): Promise<numbe
  * verfälschte sie. Das ist die begründete Ausnahme vom Zielabstand (Abstimmung 08.11.2026);
  * gezielt wird dort über die Kante, nicht über den Spalt.
  */
-async function rasterAbstaende(raster: Locator): Promise<{ zeilen: number; inZeile: number }> {
+async function measureRasterAbstaende(
+  raster: Locator,
+): Promise<{ zeilen: number; inZeile: number }> {
   return raster.evaluate((r) => {
     const bloecke = [...r.querySelectorAll<HTMLElement>('[data-lfh="schichtplan-block"]')];
     let zeilen = Number.POSITIVE_INFINITY;
@@ -3360,8 +3362,8 @@ test('Vorplanung (LLH-1595): Liste und Kopf im Bearbeiten folgen der Dichte-Staf
     const feld = await alleHaltenStufe(felder, soll, `Feld im Kopf (${dichte})`, 7);
     const knoepfe = form.getByRole('button');
     const knopf = await alleHaltenStufe(knoepfe, soll, `Knopf im Kopf (${dichte})`, 4);
-    const abstandKopf = haeltAbstand(
-      await kleinsterAbstand(form, form.getByRole('button', { name: /^(Speichern|Abbrechen)$/ })),
+    const abstandKopf = checkAbstand(
+      await minAbstand(form, form.getByRole('button', { name: /^(Speichern|Abbrechen)$/ })),
       dichte,
       'Speichern und Abbrechen zum Nachbarziel',
     );
@@ -3407,8 +3409,8 @@ test('Vorplanung (LLH-1595): Raster, Werkzeugzeile, Personenleiste und Dialog �
       name: /^(Block anlegen|Schichten erzeugen)$/,
     });
     const aktion = await alleHaltenStufe(aktionen, soll, `Werkzeug (${dichte})`, 2);
-    const abstandWerkzeug = haeltAbstand(
-      await kleinsterAbstand(werkzeug, aktionen),
+    const abstandWerkzeug = checkAbstand(
+      await minAbstand(werkzeug, aktionen),
       dichte,
       'Block anlegen und Schichten erzeugen zum Nachbarziel',
     );
@@ -3416,8 +3418,8 @@ test('Vorplanung (LLH-1595): Raster, Werkzeugzeile, Personenleiste und Dialog �
     const raster = page.locator('[data-lfh="schichtplan-raster"]');
     const bloecke = raster.locator('[data-lfh="schichtplan-block"]');
     const block = await alleHaltenStufe(bloecke, soll, `Block (${dichte})`, BLOECKE_ANZAHL);
-    const { zeilen, inZeile } = await rasterAbstaende(raster);
-    haeltAbstand(zeilen, dichte, 'Blöcke benachbarter Zeilen');
+    const { zeilen, inZeile } = await measureRasterAbstaende(raster);
+    checkAbstand(zeilen, dichte, 'Blöcke benachbarter Zeilen');
 
     // Die Zeilen der Personenleiste sind Griffe zum Ziehen, keine Tastaturziele (den Weg ohne
     // Ziehen trägt das Feld „Personen“ im Blockdialog): gemessen wird ihre Höhe.
@@ -3449,8 +3451,8 @@ test('Vorplanung (LLH-1595): Raster, Werkzeugzeile, Personenleiste und Dialog �
     const fuss = dialogAktion.getByRole('button');
     const fussKnopf = await alleHaltenStufe(fuss, soll, `Fuß (${dichte})`, 2);
     const kreuz = await haeltStufe(dialog.locator('.ant-modal-close'), soll, `Kreuz (${dichte})`);
-    const abstandFuss = haeltAbstand(
-      await kleinsterAbstand(dialogAktion, fuss),
+    const abstandFuss = checkAbstand(
+      await minAbstand(dialogAktion, fuss),
       dichte,
       'Fußknöpfe „Schichten erzeugen“',
     );
@@ -3488,7 +3490,7 @@ test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten an
     await expect(posten.getByText('Fußtrupp', { exact: true })).toBeVisible();
     const anlegen = posten.getByRole('button', { name: 'Posten anlegen', exact: true });
     const hAnlegen = await haeltStufe(anlegen, soll, `Posten anlegen (${dichte})`);
-    const abstandAnlegen = haeltAbstand(
+    const abstandAnlegen = checkAbstand(
       await abstandZuNachbarn(posten, anlegen),
       dichte,
       '„Posten anlegen“ zum Nachbarziel',
@@ -3500,8 +3502,8 @@ test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten an
       `⋮ je Posten (${dichte})`,
       POSTEN.length,
     );
-    const abstandZeilenMenue = haeltAbstand(
-      await kleinsterAbstand(posten, zeilenMenues),
+    const abstandZeilenMenue = checkAbstand(
+      await minAbstand(posten, zeilenMenues),
       dichte,
       '⋮ je Posten zum Nachbarziel',
     );
@@ -3556,15 +3558,15 @@ test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten an
     const fuss = aktion.getByRole('button');
     const fussKnopf = await alleHaltenStufe(fuss, soll, `Fuß (${dichte})`, 3);
     const kreuz = await haeltStufe(dialog.locator('.ant-modal-close'), soll, `Kreuz (${dichte})`);
-    const abstandFuss = haeltAbstand(
-      await kleinsterAbstand(aktion, fuss),
+    const abstandFuss = checkAbstand(
+      await minAbstand(aktion, fuss),
       dichte,
       'Fußknöpfe „Posten anlegen“',
     );
     // „Werte behalten“ steht in der Zeile über dem Fuß.
     const k = (await dialog.locator('label.ant-checkbox-wrapper').boundingBox())!;
     const f = (await fuss.first().boundingBox())!;
-    const abstandBehalten = haeltAbstand(
+    const abstandBehalten = checkAbstand(
       f.y - (k.y + k.height),
       dichte,
       '„Werte behalten“ über dem Fuß',
@@ -3578,7 +3580,7 @@ test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten an
     await expect(helfer.getByText(HELFER[1], { exact: true })).toBeVisible();
     const helferAnlegen = helfer.getByRole('button', { name: 'Helfer anlegen', exact: true });
     const hHelferAnlegen = await haeltStufe(helferAnlegen, soll, `Helfer anlegen (${dichte})`);
-    const abstandHelferAnlegen = haeltAbstand(
+    const abstandHelferAnlegen = checkAbstand(
       await abstandZuNachbarn(helfer, helferAnlegen),
       dichte,
       '„Helfer anlegen“ zum Nachbarziel',
@@ -3590,8 +3592,8 @@ test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten an
       `Bearbeiten/Löschen je Helfer (${dichte})`,
       2 * HELFER.length,
     );
-    const abstandZeile = haeltAbstand(
-      await kleinsterAbstand(helfer, zeilenKnoepfe),
+    const abstandZeile = checkAbstand(
+      await minAbstand(helfer, zeilenKnoepfe),
       dichte,
       'Bearbeiten und Löschen je Helfer',
     );
@@ -3629,8 +3631,8 @@ test('Vorplanung (LLH-1595): die Handy-Liste des Plans folgt auf 390 px der Dich
     await expect(bloecke).toHaveCount(BLOECKE_ANZAHL);
     const block = await alleHaltenStufe(bloecke, soll, `Block (${dichte})`, BLOECKE_ANZAHL);
     // Zwei Blöcke an RTW 1 und zwei an RTW 2 stehen untereinander.
-    const abstand = haeltAbstand(
-      await kleinsterAbstand(liste, bloecke),
+    const abstand = checkAbstand(
+      await minAbstand(liste, bloecke),
       dichte,
       'Blöcke der Handy-Liste',
     );

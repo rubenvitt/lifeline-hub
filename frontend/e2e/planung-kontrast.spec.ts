@@ -64,10 +64,10 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
 
 type Messwert = Record<string, unknown> & { verhaeltnis: number };
 
-function messer(page: Page, modus: 'light' | 'dark') {
+function createMessung(page: Page, modus: 'light' | 'dark') {
   const messwerte: Messwert[] = [];
   const gemessen: [string, string][] = [];
-  const messeTexte = async (wurzel: Locator, flaeche: string) => {
+  const measureTexte = async (wurzel: Locator, flaeche: string) => {
     await page.mouse.move(0, 0);
     const knoten = await textknoten(wurzel);
     expect(knoten.length, `${flaeche}: Texte gefunden`).toBeGreaterThan(0);
@@ -92,7 +92,7 @@ function messer(page: Page, modus: 'light' | 'dark') {
     }
   };
   /** Die Ampelkante eines Blocks gegen Blockfläche und Spur. */
-  const messeKante = async (block: Locator, flaeche: string, ampel: string) => {
+  const measureKante = async (block: Locator, flaeche: string, ampel: string) => {
     const rand = await randKontrast(block, 'left');
     messwerte.push({
       modus,
@@ -108,10 +108,10 @@ function messer(page: Page, modus: 'light' | 'dark') {
       .soft(rand.gegenInnen, `${kontext} gegen die Blockfläche`)
       .toBeGreaterThanOrEqual(ZUSTAND);
   };
-  return { messwerte, gemessen, messeTexte, messeKante };
+  return { messwerte, gemessen, measureTexte, measureKante };
 }
 
-function pflichtGemessen(
+function checkPflichtGemessen(
   gemessen: [string, string][],
   pflichten: readonly (readonly [string, string | RegExp])[],
 ) {
@@ -123,7 +123,7 @@ function pflichtGemessen(
   }
 }
 
-function kleinster(messwerte: Messwert[], f: (w: Messwert) => boolean): string {
+function minVerhaeltnis(messwerte: Messwert[], f: (w: Messwert) => boolean): string {
   const werte = messwerte.filter(f).map((w) => w.verhaeltnis);
   return werte.length ? Math.min(...werte).toFixed(2) : '—';
 }
@@ -135,7 +135,7 @@ function kleinster(messwerte: Messwert[], f: (w: Messwert) => boolean): string {
  * der Test ihn aus und misst gegen den Grund ZWISCHEN den Linien, auf dem Text und Ampelkante
  * stehen. Ein kräftigeres Muster bliebe als Vorbedingung rot.
  */
-async function stundenlinienAus(page: Page) {
+async function hideStundenlinien(page: Page) {
   const spuren = page.locator('[data-lfh="schichtplan-spur"]');
   await expect(spuren.first()).toBeVisible();
   const verlaeufe = await spuren.evaluateAll((alle) =>
@@ -167,7 +167,7 @@ for (const modus of ['light', 'dark'] as const) {
     const alt = `Altplanung ${modus} ${Date.now()}`;
     const { id } = await seedPlanung(page, name);
     await seedAltePlanung(page, alt);
-    const { messwerte, gemessen, messeTexte, messeKante } = messer(page, modus);
+    const { messwerte, gemessen, measureTexte, measureKante } = createMessung(page, modus);
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     const kopf = page.locator('[data-lfh="seitenkopf"]');
@@ -181,19 +181,19 @@ for (const modus of ['light', 'dark'] as const) {
     const zeileAlt = page.getByRole('row').filter({ hasText: alt });
     await expect(zeileAlt.locator('[data-lfh="planung-loeschhinweis"]')).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible();
-    await messeTexte(kopf, 'liste-kopf');
-    await messeTexte(inhalt, 'liste');
+    await measureTexte(kopf, 'liste-kopf');
+    await measureTexte(inhalt, 'liste');
 
     // (2) Planungsseite, Reiter Plan: Kopf in der Ansicht, Raster mit allen Ampelstufen.
     await page.goto(`/planungen/${id}`);
     await waitForPlanung(page, name);
     await waitForRaster(page);
-    await messeTexte(kopf, 'seite-kopf');
-    await stundenlinienAus(page);
-    await messeTexte(inhalt, 'plan');
+    await measureTexte(kopf, 'seite-kopf');
+    await hideStundenlinien(page);
+    await measureTexte(inhalt, 'plan');
     for (const ampel of Object.keys(AMPELN)) {
       const block = page.locator(`[data-lfh="schichtplan-block"][data-ampel="${ampel}"]`).first();
-      await messeKante(block, 'raster', ampel);
+      await measureKante(block, 'raster', ampel);
     }
 
     // (3) Dialog „Schichten erzeugen“.
@@ -201,26 +201,26 @@ for (const modus of ['light', 'dark'] as const) {
     const erzeugen = page.getByRole('dialog', { name: 'Schichten erzeugen' });
     await expect(erzeugen).toBeVisible();
     await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
-    await messeTexte(erzeugen, 'dialog-erzeugen');
+    await measureTexte(erzeugen, 'dialog-erzeugen');
     await page.keyboard.press('Escape');
     await expect(erzeugen).toBeHidden();
 
     // (4) Kopf im Bearbeiten.
     await page.getByRole('button', { name: 'Planung bearbeiten', exact: true }).click();
     await expect(page.getByLabel('Höchstens im Dienst')).toBeVisible();
-    await messeTexte(inhalt, 'kopf-bearbeiten');
+    await measureTexte(inhalt, 'kopf-bearbeiten');
     await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(page.getByLabel('Höchstens im Dienst')).toBeHidden();
 
     // (5) Reiter Posten und Dialog „Posten anlegen“.
     await page.getByRole('tab', { name: /^Posten/ }).click();
     await expect(page.locator('[data-lfh="planung-posten"]').getByText('Fußtrupp')).toBeVisible();
-    await messeTexte(inhalt, 'posten');
+    await measureTexte(inhalt, 'posten');
     await page.getByRole('button', { name: 'Posten anlegen', exact: true }).click();
     const posten = page.getByRole('dialog', { name: 'Posten anlegen' });
     await expect(posten).toBeVisible();
     await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
-    await messeTexte(posten, 'dialog-posten');
+    await measureTexte(posten, 'dialog-posten');
     await page.keyboard.press('Escape');
     await expect(posten).toBeHidden();
 
@@ -229,24 +229,24 @@ for (const modus of ['light', 'dark'] as const) {
     await expect(
       page.locator('[data-lfh="planung-helfer"]').getByText('Hanna Messweg'),
     ).toBeVisible();
-    await messeTexte(inhalt, 'helfer');
+    await measureTexte(inhalt, 'helfer');
 
     // (7) Handy: dieselben vier Stufen als Liste.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('tab', { name: 'Plan', exact: true }).click();
     const listenBloecke = page.locator('[data-lfh="schichtplan-listen-block"]');
     await expect(listenBloecke).toHaveCount(BLOECKE_ANZAHL);
-    await messeTexte(page.locator('[data-lfh="schichtplan-liste"]'), 'handy-liste');
+    await measureTexte(page.locator('[data-lfh="schichtplan-liste"]'), 'handy-liste');
     for (const [ampel, wort] of Object.entries(AMPELN)) {
       const block = page
         .locator(`[data-lfh="schichtplan-listen-block"][aria-label$=", ${wort}"]`)
         .first();
       await expect(block).toBeVisible();
-      await messeKante(block, 'handy-liste', ampel);
+      await measureKante(block, 'handy-liste', ampel);
     }
 
     // Die Probe hat die tragenden Texte wirklich gesehen — sonst wäre Grün trivial wahr.
-    pflichtGemessen(gemessen, [
+    checkPflichtGemessen(gemessen, [
       ['liste-kopf', 'Planungen'],
       ['liste-kopf', 'Planung anlegen'],
       ['liste', /^wird am .* gelöscht$/],
@@ -276,12 +276,12 @@ for (const modus of ['light', 'dark'] as const) {
       type: 'messwert',
       description:
         `${modus}: ${messwerte.filter((w) => w.art !== 'ampelkante').length} Texte, ` +
-        `kleinster ${kleinster(messwerte, (w) => w.art !== 'ampelkante' && !w.gesperrt)} : 1, ` +
-        `gesperrt ${kleinster(messwerte, (w) => w.gesperrt === true)} : 1, ` +
-        `Ampelwort Raster ${kleinster(messwerte, (w) => w.flaeche === 'plan' && AMPEL_WORT.test(String(w.wortlaut)))} : 1, ` +
-        `Handy-Liste ${kleinster(messwerte, (w) => w.flaeche === 'handy-liste' && w.art !== 'ampelkante')} : 1, ` +
-        `Löschhinweis ${kleinster(messwerte, (w) => /gelöscht$/.test(String(w.wortlaut)))} : 1, ` +
-        `Ampelkante ${kleinster(messwerte, (w) => w.art === 'ampelkante')} : 1`,
+        `minVerhaeltnis ${minVerhaeltnis(messwerte, (w) => w.art !== 'ampelkante' && !w.gesperrt)} : 1, ` +
+        `gesperrt ${minVerhaeltnis(messwerte, (w) => w.gesperrt === true)} : 1, ` +
+        `Ampelwort Raster ${minVerhaeltnis(messwerte, (w) => w.flaeche === 'plan' && AMPEL_WORT.test(String(w.wortlaut)))} : 1, ` +
+        `Handy-Liste ${minVerhaeltnis(messwerte, (w) => w.flaeche === 'handy-liste' && w.art !== 'ampelkante')} : 1, ` +
+        `Löschhinweis ${minVerhaeltnis(messwerte, (w) => /gelöscht$/.test(String(w.wortlaut)))} : 1, ` +
+        `Ampelkante ${minVerhaeltnis(messwerte, (w) => w.art === 'ampelkante')} : 1`,
     });
     await testInfo.attach(`kontrastwerte-${modus}.json`, {
       body: JSON.stringify(messwerte, null, 2),

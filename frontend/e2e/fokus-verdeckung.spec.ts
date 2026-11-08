@@ -2716,7 +2716,7 @@ test('Unterkunft planen (LLH-1525): kein Ziel verdeckt im Dialog „Nachforderun
  */
 type PlanungFlaeche = 'liste' | 'plan' | 'posten' | 'helfer' | 'kopf';
 
-async function planungFlaecheOeffnen(
+async function openPlanungFlaeche(
   page: Page,
   flaeche: PlanungFlaeche,
   planung: { id: number; bezeichnung: string },
@@ -2777,7 +2777,7 @@ for (const viewport of [
       const gemessen: string[] = [];
       let groessteReserve = 0;
       for (const flaeche of ['liste', 'plan', 'posten', 'helfer', 'kopf'] as const) {
-        await planungFlaecheOeffnen(page, flaeche, planung);
+        await openPlanungFlaeche(page, flaeche, planung);
         await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
         const ziele = await markiereTabZiele(page.getByRole('main'));
         expect(ziele.length, `${flaeche}: ${ziele.join(' | ')}`).toBeGreaterThanOrEqual(
@@ -2841,7 +2841,7 @@ for (const dialog of ['Posten anlegen', 'Schichten erzeugen'] as const) {
     await anmelden(page);
     const planung = await seedPlanung(page, `Fokusdialog ${Date.now()}`);
     await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
-    await planungFlaecheOeffnen(page, dialog === 'Posten anlegen' ? 'posten' : 'plan', planung);
+    await openPlanungFlaeche(page, dialog === 'Posten anlegen' ? 'posten' : 'plan', planung);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
     await page.getByRole('button', { name: dialog, exact: true }).click();
