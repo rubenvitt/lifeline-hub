@@ -43,6 +43,7 @@ import {
   istAktion,
   istEreignis,
   istLesezugang,
+  instanzText,
   rollenText,
 } from './zugangsprotokollText';
 
@@ -164,7 +165,7 @@ const ANMELDE_KARTE: Kartenplan<AnmeldeEintrag, (typeof anmeldeSpalten)[number][
  */
 function AngabenAnzeige({ angaben }: { angaben: ZugangsAngaben }) {
   const rollen = rollenText(angaben);
-  if (angaben.angemeldet_at == null) return <>{rollen ?? leer}</>;
+  if (angaben.angemeldet_at == null) return <>{rollen ?? instanzText(angaben) ?? leer}</>;
   return (
     <>
       {angaben.geraet ?? 'unbekanntes Gerät'}, angemeldet{' '}

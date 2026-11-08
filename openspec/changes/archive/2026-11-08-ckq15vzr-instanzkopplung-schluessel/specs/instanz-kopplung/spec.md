@@ -60,9 +60,14 @@ Beim Einlösen MUST jede Seite ihren öffentlichen Schlüssel mit einem aus dem 
 Prüfwert versehen, und jede Seite MUST den Prüfwert des Gegenübers prüfen, bevor sie dessen
 Schlüssel speichert. Der Code selbst MUST NOT über die Leitung gehen.
 
-#### Scenario: Angreifer in der Mitte
-- **WHEN** eine Stelle zwischen ELW und Hub den öffentlichen Schlüssel einer Seite austauscht
-- **THEN** lehnt die andere Seite das Einlösen ab, und keine Seite speichert eine Kopplung
+#### Scenario: Angreifer in der Mitte tauscht den Schlüssel der einlösenden Seite
+- **WHEN** eine Stelle zwischen ELW und Hub in der Anfrage den öffentlichen Schlüssel des ELW austauscht
+- **THEN** lehnt der Hub das Einlösen ab, und keine Seite speichert eine Kopplung
+
+#### Scenario: Angreifer in der Mitte tauscht den Schlüssel der ausstellenden Seite
+- **WHEN** eine Stelle zwischen ELW und Hub in der Antwort den öffentlichen Schlüssel des Hubs austauscht
+- **THEN** lehnt der ELW die Antwort ab und speichert keine Kopplung
+- **AND** verwirft der Hub seine angebahnte Kopplung, weil die erste Meldung binnen 15 Minuten ausbleibt
 
 ### Requirement: Eine Kopplung je Instanzpaar, Orgs einzeln
 

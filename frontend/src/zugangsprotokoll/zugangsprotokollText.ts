@@ -101,6 +101,21 @@ export function rollenText(a: ZugangsAngaben): string | undefined {
   return teile.length > 0 ? teile.join(', ') : undefined;
 }
 
+/**
+ * Angaben der Instanzkopplung und der Unterschriftsschlüssel (LLH-1490): Gegenstelle mit Org,
+ * Fingerabdruck, Adresse und bei `unterschrift_abgelehnt` der Grund. `undefined`, wenn keine
+ * dieser Angaben steht.
+ */
+export function instanzText(a: ZugangsAngaben): string | undefined {
+  const teile = [
+    a.fremde_org ? `Org dort: ${a.fremde_org}` : null,
+    a.fingerabdruck ? `Fingerabdruck ${a.fingerabdruck}` : null,
+    a.adresse ?? null,
+    a.grund ? `Grund: ${a.grund}` : null,
+  ].filter((t): t is string => t != null);
+  return teile.length > 0 ? teile.join(' · ') : undefined;
+}
+
 export function istEreignis(wert: string | null): wert is AnmeldeEreignis {
   return wert != null && Object.prototype.hasOwnProperty.call(EREIGNIS_TEXT, wert);
 }

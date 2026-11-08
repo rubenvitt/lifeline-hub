@@ -124,4 +124,16 @@ describe('InstanzkopplungSeite', () => {
     expect(await screen.findByText(/nur System-Admin/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Code ausstellen/ })).not.toBeInTheDocument();
   });
+
+  it('ein späterer Fehlschlag des Abrufs blendet vorhandene Daten nicht aus', async () => {
+    vi.mocked(ladeInstanzUebersicht)
+      .mockResolvedValueOnce(uebersicht())
+      .mockRejectedValue(new Error('offline'));
+    const { client } = renderMitProviders(<InstanzkopplungSeite />);
+    expect(await screen.findByText('Bea Admin · Stick B')).toBeInTheDocument();
+    await client.refetchQueries();
+    await waitFor(() => expect(ladeInstanzUebersicht).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Bea Admin · Stick B')).toBeInTheDocument();
+    expect(screen.queryByText('Instanzkopplung nicht ladbar')).not.toBeInTheDocument();
+  });
 });

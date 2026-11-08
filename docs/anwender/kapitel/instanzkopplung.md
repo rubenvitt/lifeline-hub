@@ -28,8 +28,8 @@ ausstellen.
 3. Den Passkey im Browser bestätigen. Der Schlüssel steht danach in der Liste.
 
 Hat die Organisation schon eine Kopplung, steht ein neuer Schlüssel auf „wartet auf
-Gegenzeichnung“. Ein anderer Admin mit gültigem Schlüssel wählt im Menü der Zeile
-„Gegenzeichnen“ und bestätigt mit seinem Passkey.
+Gegenzeichnung“. Ein Admin mit eigenem gültigem Schlüssel, auch derselbe Admin mit seinem ersten
+Schlüssel, wählt im Menü der Zeile „Gegenzeichnen“ und bestätigt mit seinem Passkey.
 
 ### Code ausstellen
 
@@ -77,6 +77,10 @@ Kopplung. Jede Organisation sieht und widerruft nur ihre eigene Zuordnung.
 
 Der Widerruf wirkt hier sofort. Die andere Installation erfährt ihn, sobald eine Meldung
 durchgeht, und zeigt „vom Gegenüber widerrufen“. Ein neuer Code koppelt wieder.
+
+Widerruft die Installation, die sich meldet, ohne Netz, geht der Widerruf nicht mehr hinaus: sie
+meldet sich danach nicht mehr. Die andere Installation sieht dann nur, dass die Meldungen
+ausbleiben, und ihr Admin widerruft dort selbst.
 
 ### Fingerabdruck und Sicherheit
 

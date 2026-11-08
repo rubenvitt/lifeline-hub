@@ -152,7 +152,7 @@ export default function InstanzkopplungSeite() {
     >
       {uebersichtQ.isLoading ? (
         <Spin />
-      ) : uebersichtQ.isError || !u ? (
+      ) : !u ? (
         <Alert type="error" title="Instanzkopplung nicht ladbar" showIcon />
       ) : (
         <>
@@ -410,6 +410,9 @@ export default function InstanzkopplungSeite() {
       <Modal
         open={neuerCode != null}
         title="Kopplungscode"
+        // Der Code kommt nie wieder vom Server: kein Schließen per Klick daneben oder Escape.
+        mask={{ closable: false }}
+        keyboard={false}
         footer={
           <Button type="primary" onClick={() => setNeuerCode(null)}>
             Fertig

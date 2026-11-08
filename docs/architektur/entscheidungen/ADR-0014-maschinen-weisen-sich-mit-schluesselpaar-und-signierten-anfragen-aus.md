@@ -27,7 +27,7 @@ herleitung:
 - MUST: Der Einstieg geschieht per Einmal-Code eines Org-Admins, aus dem beide Seiten Prüfwerte
   über ihre öffentlichen Schlüssel ableiten (`src/instanz/code.rs`); der Code selbst geht nie über
   die Leitung.
-- MUST NOT: Routen unter `/api/instanz/` nehmen kein geteiltes Geheimnis und kein Bearer-Token als
+- MUST NOT: Routen unter `/api/instanz/` nehmen ein geteiltes Geheimnis oder ein Bearer-Token als
   Anmeldung einer Maschine an.
 - SHOULD: LLH-1148 übernimmt das Verfahren für Fremdsysteme (etwa als OAuth2 `private_key_jwt`
   mit denselben Claims), statt ein zweites zu erfinden.
