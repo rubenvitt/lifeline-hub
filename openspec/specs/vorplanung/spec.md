@@ -3,8 +3,8 @@
 ## Purpose
 Eine Organisation plant einen Dienst, bevor es einen Einsatz gibt: Posten, Schichten und Helfer
 einer Planung mit denselben Regeln und Prüfbefunden wie der Schichtplan im Einsatz
-(`kraefte-schichtplan`), ohne dass die Planung als Einsatz zählt (LLH-1585). Die Übernahme in
-einen Einsatz und die Oberfläche folgen in eigenen Schritten.
+(`kraefte-schichtplan`), ohne dass die Planung als Einsatz zählt (LLH-1585), mit Oberfläche
+(LLH-1586) und Übernahme in einen neuen oder laufenden Einsatz (LLH-1587).
 
 ## Requirements
 
@@ -97,3 +97,31 @@ Das Entfernen der Lage MUST die markierte Planung löschen, bevor es das Demo-Pe
 #### Scenario: Demo-Planung
 - **WHEN** der Admin die Lage „Stadtfest“ importiert
 - **THEN** steht die Planung „Stadtfest Musterstadt“ in der Liste mit Soll 26, Ist 24, Offen 2 und Konflikte 2
+
+### Requirement: Übernahme in einen Einsatz
+Eine Planung SHALL sich mit Vorschau in einen neuen oder einen laufenden Einsatz übernehmen lassen,
+über denselben Abgleich wie das Einlesen einer Schichtplan-Datei (Spec `kraefte-schichtplan`,
+„Schichtplan einlesen“): ein Posten wird eine Einheit (frei, aus seiner Einheitenvorlage, mit
+seinem Stamm-Fahrzeug ohne Disposition) oder eine UHS seines Typs, Stamm-Personal kommt mit festem
+Bezug, ein Helfer der Planung als Helfer des Plans mit der Herkunft `vorplanung` und einer Kennung
+je Helfer. Die Vorschau MUST nichts schreiben; für einen neuen Einsatz MUST sie dieselbe Rechnung
+sehen wie das Übernehmen. Das Übernehmen MUST in EINER Transaktion laufen, ein neuer Einsatz
+(Bezeichnung, Einsatzart und Ort der Planung, wahlweise mit Einsatz-Vorlage, Ersteller als
+Einsatzleitung) eingeschlossen; Fehler des Abgleichs MUST es mit 422 ablehnen, ohne etwas zu
+schreiben. Ein laufender Einsatz MUST zur eigenen Organisation gehören (404 sonst) und verlangt
+Schreibrecht und die Module Ablösung und Personal (403), aktiv (409). Niemand wird alarmiert oder
+disponiert. Danach MUST die Planung schreibgeschützt sein: jeder Schreibweg und eine zweite
+Übernahme antworten mit 409, Lesen und Löschen bleiben. Kopf und Liste MUST Zeitpunkt, Einsatz und
+Einsatznummer der Übernahme nennen und die Kennzahlen vom Zeitpunkt der Übernahme zeigen.
+
+#### Scenario: Neuer Einsatz
+- **WHEN** eine Führungskraft die Demo-Planung „Stadtfest Musterstadt“ in einen neuen Einsatz übernimmt
+- **THEN** entsteht der Einsatz „Stadtfest Musterstadt“ mit ihr als Einsatzleitung, vier neuen Einheiten, einer UHS, zwei Helfern und jedem Block der Planung im Schichtplan
+
+#### Scenario: Zweiter Aufruf
+- **WHEN** jemand dieselbe Planung danach noch einmal übernimmt oder einen Posten anlegt
+- **THEN** antwortet das System mit 409 und legt keinen Einsatz an
+
+#### Scenario: Laufender Einsatz
+- **WHEN** eine Planung mit dem Posten „Streife 2“ in einen laufenden Einsatz mit der Einheit „Streife 2“ übernommen wird
+- **THEN** schlägt die Vorschau diese Einheit vor, und ihre Blöcke kommen an sie, ohne neue Einheit

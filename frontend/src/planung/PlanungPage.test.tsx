@@ -394,6 +394,7 @@ describe('PlanungPage (LLH-1586)', () => {
           });
         }),
       );
+      expect(await screen.findByRole('button', { name: 'Planung bearbeiten' })).toBeInTheDocument();
       await userEvent.click(await screen.findByRole('button', { name: 'In Einsatz übernehmen' }));
       const dialog = await screen.findByRole('dialog', { name: 'In Einsatz übernehmen' });
       expect(await within(dialog).findByText('1 Einheit neu')).toBeInTheDocument();
@@ -401,7 +402,9 @@ describe('PlanungPage (LLH-1586)', () => {
         ziel: { art: 'neu' },
         entscheidungen: { posten: {}, personen: {} },
       });
-      expect(within(dialog).getByText(/Der neue Einsatz heißt „Stadtfest“/)).toBeInTheDocument();
+      expect(
+        within(dialog).getByText('Neuer Einsatz: „Stadtfest“ · Sanitätsdienst · Marktplatz'),
+      ).toBeInTheDocument();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
       expect(
         await within(dialog).findByText('Einsatz angelegt, Plan übernommen · E-2027-0042'),
@@ -493,7 +496,7 @@ describe('PlanungPage (LLH-1586)', () => {
         '/einsaetze/42',
       );
       expect(screen.queryByRole('button', { name: 'In Einsatz übernehmen' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Planung bearbeiten' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Block anlegen' })).toBeNull();
       await userEvent.click(screen.getByRole('tab', { name: 'Posten · 2' }));
       expect(await screen.findByText('UHS · Behandlungsplatz')).toBeInTheDocument();

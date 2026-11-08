@@ -20,6 +20,7 @@ import {
 import { Segmentleiste, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { EINSATZART_LABELS } from '../einsatz/einsatzart';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { abloesungPfad } from '../routing/deeplinks';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
@@ -42,10 +43,17 @@ export function uebernahmeZiel(
   return einsatzId != null ? { art, einsatz_id: einsatzId } : null;
 }
 
+/** Was der neue Einsatz von der Planung trägt: Bezeichnung, Einsatzart, Ort. */
+export function neuerEinsatzText(planung: Planung): string {
+  const k = planung.kopf;
+  return [`„${k.bezeichnung}“`, EINSATZART_LABELS[k.einsatzart], k.ort].filter(Boolean).join(' · ');
+}
+
 /**
  * „In Einsatz übernehmen“ (LLH-1587, Spec `vorplanung`, „Übernahme in einen Einsatz“): Ziel,
  * Vorschau, Ergebnis. Ziel ist ein neuer Einsatz (Bezeichnung, Einsatzart und Ort der Planung,
- * wahlweise mit Einsatz-Vorlage) oder ein laufender, in dem man schreiben darf. Die Vorschau
+ * wahlweise mit Einsatz-Vorlage; er beginnt mit der Übernahme, die übernehmende Person leitet ihn)
+ * oder ein laufender, in dem man schreiben darf. Die Vorschau
  * rechnet der Server mit demselben Kern wie „Schichtplan einlesen“ und schreibt nichts; jede Wahl
  * fragt sie neu ab. Danach ist die Planung schreibgeschützt.
  */
@@ -174,7 +182,7 @@ export default function PlanungUebernahmeDialog({
       footer={fuss}
       width={760}
       destroyOnHidden
-      maskClosable={false}
+      mask={{ closable: false }}
       closable={!uebernehmenMut.isPending}
     >
       <div data-lfh="planung-uebernahme">
@@ -196,8 +204,7 @@ export default function PlanungUebernahmeDialog({
         ) : (
           <Flex vertical gap={token.margin}>
             <Typography.Text type="secondary">
-              Posten werden Einheiten oder UHS, Personen kommen in den Plan des Einsatzes. Niemand
-              wird alarmiert oder disponiert. Danach ist die Planung schreibgeschützt.
+              Danach ist die Planung schreibgeschützt.
             </Typography.Text>
             <Flex gap={token.marginSM} align="center" wrap>
               <Segmentleiste<ZielArt>
@@ -218,7 +225,7 @@ export default function PlanungUebernahmeDialog({
                 />
               ) : laufende.length === 0 ? (
                 <Typography.Text type="secondary" data-lfh="uebernahme-kein-einsatz">
-                  Kein laufender Einsatz, in dem du schreiben darfst
+                  Kein laufender Einsatz mit Schreibrecht
                 </Typography.Text>
               ) : (
                 <Select<number>
@@ -237,8 +244,7 @@ export default function PlanungUebernahmeDialog({
             </Flex>
             {art === 'neu' && (
               <Typography.Text type="secondary" data-lfh="uebernahme-neu-hinweis">
-                Der neue Einsatz heißt „{planung.kopf.bezeichnung}“ und beginnt jetzt; du leitest
-                ihn.
+                Neuer Einsatz: {neuerEinsatzText(planung)}
               </Typography.Text>
             )}
             <SpeicherFehler fehler={vorschauMut.error} titel="Keine Vorschau" />

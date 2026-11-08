@@ -144,7 +144,7 @@ export default function PlanungPage() {
               übernommen
             </>
           }
-          description="Die Planung ist schreibgeschützt; Soll, Ist, Offen und Konflikte stehen auf dem Stand der Übernahme. Löschen geht weiter."
+          description="Schreibgeschützt · Soll, Ist, Offen und Konflikte vom Stand der Übernahme"
         />
       )}
       {/* Eine offene Bearbeitung je Seite: der Kopf sperrt, solange er offen ist, nichts anderes
