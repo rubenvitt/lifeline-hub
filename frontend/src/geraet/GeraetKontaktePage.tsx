@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, App, Button, Flex, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import {
   ladeUhsZiele,
@@ -22,6 +22,7 @@ import { Paneel, StatusChip, monoStil, useRollen } from '../components/instrumen
 import type { StatusTon } from '../components/instrument/statusFlaeche';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { IconPersonPlus } from '../icons';
+import { navigationZeigt } from './GeraeteLayout';
 import { neueClientId } from '../offline/clientId';
 import { erfassePersonOfflineFaehig, type OfflineSchreibErgebnis } from '../offline/schreiben';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
@@ -42,14 +43,18 @@ export interface KontaktMarke {
  * RTW-Meldung (offen mit Frist, bestätigt, nach der Frist „Funk“), die UHS oder offen. Rein.
  */
 export function kontaktMarke(
-  person: Pick<Person, 'aktuelle_verbleib_art' | 'aktuelle_uhs_id' | 'meldung_id' | 'versorgung'>,
+  person: Pick<
+    Person,
+    'aktuelle_verbleib_art' | 'aktuelle_uhs_id' | 'rtw_angefordert' | 'versorgung'
+  >,
   meldung: Pick<Meldung, 'ist_bestaetigt' | 'ist_ueberfaellig' | 'eskaliert'> | undefined,
   uhsName: string | undefined,
   fristText: string | undefined,
 ): KontaktMarke {
   if (person.aktuelle_verbleib_art === 'entlassung') return { ton: 'neutral', wort: 'entlassen' };
   if (person.aktuelle_verbleib_art === 'transport') return { ton: 'neutral', wort: 'Transport' };
-  if (person.meldung_id != null && meldung) {
+  // Nur die RTW-Anforderung des Geräts, nicht die Meldung, aus der die Leitung anlegte (LLH-1567).
+  if (person.rtw_angefordert && meldung) {
     if (meldung.ist_bestaetigt) return { ton: 'normal', wort: 'RTW bestätigt' };
     if (meldung.ist_ueberfaellig || meldung.eskaliert) return { ton: 'alarm', wort: 'RTW · Funk' };
     return { ton: 'achtung', wort: fristText ? `RTW offen bis ${fristText}` : 'RTW offen' };
@@ -57,6 +62,22 @@ export function kontaktMarke(
   if (person.aktuelle_uhs_id != null) return { ton: 'bedien', wort: uhsName ?? 'UHS' };
   if (person.versorgung === 'abgeschlossen') return { ton: 'neutral', wort: 'abgeschlossen' };
   return { ton: 'achtung', wort: 'offen' };
+}
+
+/**
+ * Ob der Server einen anderen Stand gespeichert hat als gesendet: eine RTW-Wiederholung mit
+ * derselben `client_id` liefert den ersten Versuch zurück. Rein.
+ */
+export function weichtAb(
+  person: Pick<Person, 'anlass' | 'antreff_ort' | 'antreff_lat' | 'antreff_lon'>,
+  daten: Pick<PersonAnlegenEingabe, 'anlass' | 'antreff_ort' | 'antreff_lat' | 'antreff_lon'>,
+): boolean {
+  return (
+    (person.anlass ?? null) !== (daten.anlass ?? null) ||
+    (person.antreff_ort ?? null) !== (daten.antreff_ort?.trim() || null) ||
+    (person.antreff_lat ?? null) !== (daten.antreff_lat ?? null) ||
+    (person.antreff_lon ?? null) !== (daten.antreff_lon ?? null)
+  );
 }
 
 /**
@@ -78,6 +99,9 @@ export default function GeraetKontaktePage() {
   // Ein Schlüssel je RTW-Anforderung: geht die Antwort verloren und wird erneut gesendet, legt
   // der Server keine zweite Person und keine zweite Sofortmeldung an.
   const rtwClientId = useRef<string | null>(null);
+  // Eine Wiederholung mit geänderten Angaben bekommt den ersten Stand zurück: die Änderung geht
+  // dann über Funk (K4: am Gerät wird ein Kontakt nicht geändert).
+  const rtwAbweichung = useRef(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -94,6 +118,12 @@ export default function GeraetKontaktePage() {
     queryFn: () => listePersonen(einsatzId),
     enabled: geraet != null,
   });
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: geraet != null,
+  });
+  const ohneMeldungen = !navigationZeigt('meldungen', freigabenQuery.data);
   const meldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungen(einsatzId),
     queryFn: () => listeMeldungen(einsatzId),
@@ -121,9 +151,10 @@ export default function GeraetKontaktePage() {
               abschnitt_name: einheit.abschnitt_name ?? undefined,
             },
             uhsZiele,
+            ohneMeldungen,
           }
         : null,
-    [einheit, uhsZiele],
+    [einheit, uhsZiele, ohneMeldungen],
   );
 
   const anlegen = useMutation({
@@ -132,9 +163,11 @@ export default function GeraetKontaktePage() {
       if (!benutzer) throw new Error('Nicht angemeldet');
       // Der RTW geht nie über die Warteschlange (K2): ein Fehler bleibt im Dialog, dann Funk.
       if (daten.rtw) {
+        const wiederholt = rtwClientId.current != null;
         rtwClientId.current ??= neueClientId();
         const person = await legePersonAn(einsatzId, { ...daten, client_id: rtwClientId.current });
         rtwClientId.current = null;
+        rtwAbweichung.current = wiederholt && weichtAb(person, daten);
         return { zustand: 'gesendet', daten: person };
       }
       return erfassePersonOfflineFaehig(benutzer.id, einsatzId, daten);
@@ -145,9 +178,13 @@ export default function GeraetKontaktePage() {
         return;
       }
       const reg = registrierAnzeige(ergebnis.daten.registrier_nr);
-      void message.success(
-        daten.rtw ? `${reg} · RTW angefordert` : daten.uhs_id != null ? `${reg} · UHS` : reg,
-      );
+      if (daten.rtw && rtwAbweichung.current) {
+        void message.warning(`${reg} · RTW angefordert · Änderung über Funk`);
+      } else {
+        void message.success(
+          daten.rtw ? `${reg} · RTW angefordert` : daten.uhs_id != null ? `${reg} · UHS` : reg,
+        );
+      }
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
       if (daten.rtw) void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
     },

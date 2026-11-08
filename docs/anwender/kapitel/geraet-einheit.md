@@ -115,7 +115,8 @@ Ohne Verbindung zeigen „Aufträge“ und „Status“ den letzten Stand. Quitt
 den Status setzen sind dann gesperrt, damit nichts Veraltetes nachträglich ankommt. Eine
 Meldung und einen Kontakt mit „Entlassen“ oder „Zur UHS“ merkt das Handy vor und sendet sie,
 sobald die Verbindung wieder steht. Ein RTW geht ohne Verbindung nicht: Der Knopf heißt dann
-„RTW über Funk“ und ist gesperrt, denn eine RTW-Anforderung darf nicht unbemerkt warten.
+„RTW über Funk“ und ist gesperrt, denn eine RTW-Anforderung darf nicht unbemerkt warten. Dasselbe
+gilt, wenn das Modul Meldungen für das Handy gesperrt ist.
 
 ### Kurze Vibration
 

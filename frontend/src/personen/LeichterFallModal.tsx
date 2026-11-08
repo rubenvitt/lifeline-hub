@@ -74,6 +74,8 @@ export type LeichterFallStelle =
       art: 'einheit';
       einheit: Pick<VersorgendeEinheitAuswahl, 'id' | 'name' | 'abschnitt_name'>;
       uhsZiele: readonly UhsZielAuswahl[];
+      /** Meldungen ist gesperrt: der Server nimmt keine RTW-Anforderung an, es bleibt Funk. */
+      ohneMeldungen?: boolean;
     };
 
 /** Fundort einer festen Stelle (design.md D4). */
@@ -144,8 +146,11 @@ export function kontaktZuEingabe(
   ausgang?: string,
 ): PersonAnlegenEingabe {
   const ort = ortFelder(werte.antreff_ort);
+  // Eine inzwischen geschlossene UHS zählt nicht: dann die erste aktive (K3).
   const zielUhs =
-    werte.ziel_uhs != null ? Number(werte.ziel_uhs) : (stelle.uhsZiele[0]?.id ?? null);
+    stelle.uhsZiele.find((u) => String(u.id) === werte.ziel_uhs)?.id ??
+    stelle.uhsZiele[0]?.id ??
+    null;
   const ausgangFelder =
     ausgang === KONTAKT_AUSGANG.rtw
       ? { rtw: true }
@@ -269,12 +274,6 @@ export default function LeichterFallModal({
       geladen.current = kennung;
       if (!ortsText(form.getFieldValue('antreff_ort')))
         form.setFieldValue('antreff_ort', fundortDerStelle(stelle));
-      // Die letzte Wahl „Zur UHS“ bleibt stehen, solange die UHS aktiv ist (K3).
-      if (stelle.art === 'einheit' && stelle.uhsZiele.length > 1) {
-        const letzte = liesErfassungsSitzungswert(einsatzId, MASKE, 'ziel_uhs');
-        const ziel = stelle.uhsZiele.find((u) => String(u.id) === letzte) ?? stelle.uhsZiele[0];
-        form.setFieldValue('ziel_uhs', String(ziel.id));
-      }
       return;
     }
     if (schluessel == null || form.getFieldValue('versorgt_von') != null) {
@@ -293,9 +292,22 @@ export default function LeichterFallModal({
     });
   }, [offen, formular.da, einsatzId, stelle, einheiten.length, aktiveUhs.length, fundortVon, form]);
 
+  // „Zur UHS“: die letzte Wahl, solange die UHS aktiv ist, sonst die erste aktive (K3). Die Ziele
+  // kommen beim Öffnen frisch; fällt die gewählte dabei weg, gilt dasselbe. Ohne Netz bleiben die zuletzt geladenen Ziele stehen.
+  const uhsZiele = einheitStelle?.uhsZiele;
+  useEffect(() => {
+    if (!offen || !formular.da || !uhsZiele || uhsZiele.length < 2) return;
+    const gewaehlt = form.getFieldValue('ziel_uhs') as string | null | undefined;
+    if (uhsZiele.some((u) => String(u.id) === gewaehlt)) return;
+    const letzte = liesErfassungsSitzungswert(einsatzId, MASKE, 'ziel_uhs');
+    const ziel = uhsZiele.find((u) => String(u.id) === letzte) ?? uhsZiele[0];
+    form.setFieldValue('ziel_uhs', String(ziel.id));
+  }, [offen, formular.da, uhsZiele, einsatzId, form]);
+
   // Am Einheitengerät (LLH-1580): „Entlassen“ ist der Primärknopf, daneben „Zur UHS“ (nur mit
-  // aktiver UHS) und „RTW nötig“. Ohne Netz geht der RTW über Funk (K2), die anderen werden
-  // vorgemerkt.
+  // aktiver UHS) und „RTW nötig“. Ohne Netz oder ohne Meldungen geht der RTW über Funk (K2), die
+  // anderen werden ohne Netz vorgemerkt.
+  const rtwUeberFunk = ohneVerbindung || einheitStelle?.ohneMeldungen === true;
   const nebenaktionen: Nebenaktion[] | undefined = einheitStelle
     ? [
         ...(einheitStelle.uhsZiele.length > 0
@@ -303,9 +315,9 @@ export default function LeichterFallModal({
           : []),
         {
           schluessel: KONTAKT_AUSGANG.rtw satisfies KontaktAusgang,
-          text: ohneVerbindung ? 'RTW über Funk' : 'RTW nötig',
+          text: rtwUeberFunk ? 'RTW über Funk' : 'RTW nötig',
           danger: true,
-          gesperrt: ohneVerbindung,
+          gesperrt: rtwUeberFunk,
         },
       ]
     : undefined;

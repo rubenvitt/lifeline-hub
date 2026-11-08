@@ -8317,6 +8317,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
         .as_i64()
         .expect("Bezug auf die Meldung");
     assert_eq!(person["versorgung"], "offen");
+    assert_eq!(person["rtw_angefordert"], true, "{person}");
     let reg = format!("R-{:03}", person["registrier_nr"].as_i64().unwrap());
 
     let (s, v) = anfrage(&app, "GET", &format!("{basis}/meldungen"), &geraet, None).await;

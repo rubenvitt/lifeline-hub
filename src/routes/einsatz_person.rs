@@ -987,7 +987,7 @@ pub async fn anlegen(
                     },
                 )
                 .await?;
-                repo::setze_meldung_tx(conn, einsatz_id, id, meldung_id).await?;
+                repo::setze_rtw_meldung_tx(conn, einsatz_id, id, meldung_id).await?;
                 rtw_meldung_id = Some(meldung_id);
             }
             // NACH Sichtung, UHS-Eintritt und Verbleib geladen: sonst trüge die Antwort den Vorzustand — Status

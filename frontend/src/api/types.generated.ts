@@ -5681,6 +5681,11 @@ export interface components {
             /** Format: int64 */
             registrier_nr: number;
             rettungsmittel?: components["schemas"]["RettungsmittelStand"] | null;
+            /**
+             * @description LLH-1580 (K1): `meldung_id` ist die RTW-Anforderung des Einheitengeräts, nicht die Meldung,
+             *     aus der die Einsatzleitung die Person angelegt hat. Fehlt, wenn nicht.
+             */
+            rtw_angefordert?: boolean;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
             transport_art?: components["schemas"]["TransportArt"] | null;

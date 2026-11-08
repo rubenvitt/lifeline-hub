@@ -815,6 +815,18 @@ Modulzähler MUST das Gerät nicht erhalten. Gefahrenzonen und Karte gehören ni
 - **WHEN** das Gerät einen Kontakt mit „RTW nötig“ erfasst
 - **THEN** legt der Server in derselben Transaktion eine Sofortmeldung „RTW angefordert“ mit Reg.-Nr., Ort und Bestätigungspflicht an die Einsatzleitung an und verknüpft sie mit der Person
 - **AND** zeigt das Gerät an der Person, ob die Meldung bestätigt, offen bis zur Frist oder überfällig ist
+- **AND** trägt die Person die Marke `rtw_angefordert`; eine Meldung, aus der die Einsatzleitung eine Person anlegt, zeigt am Gerät keinen RTW-Stand
+
+#### Scenario: RTW ohne Meldungen
+
+- **WHEN** das Modul Meldungen für das Gerät gesperrt ist
+- **THEN** ist „RTW nötig“ gesperrt und verweist auf Funk
+
+#### Scenario: RTW erneut mit geänderten Angaben
+
+- **WHEN** die Antwort auf „RTW nötig“ verloren geht und das Gerät mit geändertem Fundort erneut sendet
+- **THEN** liefert der Server über dieselbe `client_id` den ersten Stand, ohne zweite Person und ohne zweite Sofortmeldung
+- **AND** meldet das Gerät „RTW angefordert · Änderung über Funk“
 
 #### Scenario: RTW ohne Netz
 

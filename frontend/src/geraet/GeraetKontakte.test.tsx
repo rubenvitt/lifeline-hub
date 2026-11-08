@@ -10,12 +10,13 @@ import { OFFLINE_QUEUE_BENUTZER_HEADER } from '../api/client';
 import type { Einheit, GeraetAnzeige, Meldung, Person } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { neuerQueryClient, setzeOnline } from '../test/utils';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { meldeServerErreichbar, verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
 import { queueLeerenFuerTests } from '../offline/queue';
-import { kontaktMarke } from './GeraetKontaktePage';
+import { schreibeErfassungsSitzungswert } from '../components/erfassungsSitzung';
+import { kontaktMarke, weichtAb } from './GeraetKontaktePage';
 
 /**
  * Kontakt am Einheitengerät (LLH-1580, Konzept LLH-1571 S2): Schnellerfassung mit drei Ausgängen
@@ -217,7 +218,11 @@ describe('Einheitengerät — Kontakte', () => {
           ersterVersuch = false;
           return HttpResponse.error();
         }
-        return HttpResponse.json(kontakt(12, { registrier_nr: 12 }), { status: 201 });
+        // Der Server speichert, was ankam (hier dasselbe wie im ersten Versuch).
+        return HttpResponse.json(
+          kontakt(12, { registrier_nr: 12, antreff_ort: body.antreff_ort as string }),
+          { status: 201 },
+        );
       }),
     );
     renderApp('/geraet/7/kontakte');
@@ -232,6 +237,99 @@ describe('Einheitengerät — Kontakte', () => {
     expect(gesendet[0].body.client_id).toEqual(expect.any(String));
     expect(gesendet[1].body.client_id).toBe(gesendet[0].body.client_id);
     expect(await screen.findByText('R-012 · RTW angefordert')).toBeInTheDocument();
+  });
+
+  it('eine Wiederholung mit geändertem Fundort meldet die Änderung über Funk', async () => {
+    const { gesendet } = stelleBereit();
+    let ersterVersuch = true;
+    server.use(
+      http.post('/api/einsaetze/7/personen', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        gesendet.push({ body, ausQueue: false });
+        if (ersterVersuch) {
+          ersterVersuch = false;
+          return HttpResponse.error();
+        }
+        // Der erste Versuch kam an: der Server liefert ihn zurück, nicht die Änderung.
+        return HttpResponse.json(kontakt(12, { registrier_nr: 12, antreff_ort: 'Streife 2' }), {
+          status: 201,
+        });
+      }),
+    );
+    renderApp('/geraet/7/kontakte');
+    const { user, dialog } = await oeffneKontakt();
+    await user.click(within(dialog).getByRole('button', { name: 'RTW nötig' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    act(() => meldeServerErreichbar(true));
+    const fundort = within(dialog).getByRole('textbox', { name: 'Fundort' });
+    await user.clear(fundort);
+    await user.type(fundort, 'Bühne 2');
+    await user.click(await within(dialog).findByRole('button', { name: 'RTW nötig' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[1].body).toMatchObject({
+      antreff_ort: 'Bühne 2',
+      client_id: gesendet[0].body.client_id,
+    });
+    expect(
+      await screen.findByText('R-012 · RTW angefordert · Änderung über Funk'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne Meldungen: RTW über Funk und gesperrt', async () => {
+    stelleBereit();
+    const freigaben = freigabenFixture();
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json({ ...freigaben, meldungen: { ...freigaben.meldungen, zugriff: false } }),
+      ),
+    );
+    renderApp('/geraet/7/kontakte');
+    const { dialog } = await oeffneKontakt();
+    expect(await within(dialog).findByRole('button', { name: 'RTW über Funk' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Entlassen' })).toBeEnabled();
+  });
+
+  it('fällt die gewählte UHS beim Nachladen weg, gilt die erste aktive', async () => {
+    const { gesendet } = stelleBereit();
+    let abrufe = 0;
+    let eingangZu = false;
+    let nachladen = () => {};
+    const nachgeladen = new Promise<void>((r) => {
+      nachladen = r;
+    });
+    server.use(
+      http.get('/api/einsaetze/7/personen/uhs', async () => {
+        abrufe += 1;
+        if (!eingangZu) {
+          return HttpResponse.json([
+            { id: 3, bezeichnung: 'UHS Bühne' },
+            { id: 4, bezeichnung: 'UHS Eingang' },
+            { id: 6, bezeichnung: 'UHS Zelt' },
+          ]);
+        }
+        await nachgeladen;
+        return HttpResponse.json([
+          { id: 3, bezeichnung: 'UHS Bühne' },
+          { id: 6, bezeichnung: 'UHS Zelt' },
+        ]);
+      }),
+    );
+    renderApp('/geraet/7/kontakte');
+    await waitFor(() => expect(abrufe).toBeGreaterThan(0));
+    await screen.findByText('Noch keine Kontakte');
+    // Die letzte Wahl war „UHS Eingang“; beim Öffnen steht erst der alte Stand, dann ist sie zu.
+    schreibeErfassungsSitzungswert(7, 'leichter-fall', 'ziel_uhs', '4');
+    eingangZu = true;
+    const { user, dialog } = await oeffneKontakt();
+    expect(within(dialog).getByRole('radio', { name: 'UHS Eingang' })).toBeChecked();
+    act(() => nachladen());
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('radio', { name: 'UHS Eingang' })).toBeNull(),
+    );
+    expect(within(dialog).getByRole('radio', { name: 'UHS Bühne' })).toBeChecked();
+    await user.click(within(dialog).getByRole('button', { name: 'Zur UHS' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0].body).toMatchObject({ uhs_id: 3 });
   });
 
   it('ohne Verbindung: RTW über Funk und gesperrt, Entlassen merkt vor', async () => {
@@ -252,7 +350,7 @@ describe('kontaktMarke', () => {
   const offen = {
     aktuelle_verbleib_art: null,
     aktuelle_uhs_id: null,
-    meldung_id: null,
+    rtw_angefordert: undefined,
     versorgung: null,
   } as unknown as Parameters<typeof kontaktMarke>[0];
   const meldung = (p: Partial<Meldung>) =>
@@ -277,7 +375,7 @@ describe('kontaktMarke', () => {
   });
 
   it('zeigt den Stand der RTW-Meldung (K8): offen mit Frist, bestätigt, überfällig über Funk', () => {
-    const mitRtw = { ...offen, meldung_id: 41 };
+    const mitRtw = { ...offen, rtw_angefordert: true };
     expect(kontaktMarke(mitRtw, meldung({}), undefined, '10:05')).toEqual({
       ton: 'achtung',
       wort: 'RTW offen bis 10:05',
@@ -290,5 +388,42 @@ describe('kontaktMarke', () => {
       ton: 'alarm',
       wort: 'RTW · Funk',
     });
+  });
+});
+
+describe('kontaktMarke · Herkunftsmeldung', () => {
+  it('eine Meldung, aus der die Leitung anlegte, ist kein RTW (LLH-1567)', () => {
+    const ausMeldung = {
+      aktuelle_verbleib_art: null,
+      aktuelle_uhs_id: 3,
+      versorgung: null,
+    } as unknown as Parameters<typeof kontaktMarke>[0];
+    const m = { ist_bestaetigt: false, ist_ueberfaellig: false, eskaliert: false } as Meldung;
+    expect(kontaktMarke(ausMeldung, m, 'UHS Bühne', '10:05')).toEqual({
+      ton: 'bedien',
+      wort: 'UHS Bühne',
+    });
+  });
+});
+
+describe('weichtAb', () => {
+  const gesendet = {
+    anlass: 'hitze_kaelte' as const,
+    antreff_ort: 'Bühne 2',
+    antreff_lat: 50.1,
+    antreff_lon: 8.6,
+  };
+  it('gleich, wenn der Server speicherte, was ging', () => {
+    expect(
+      weichtAb({ ...gesendet, antreff_ort: 'Bühne 2' }, { ...gesendet, antreff_ort: ' Bühne 2 ' }),
+    ).toBe(false);
+    expect(
+      weichtAb({ anlass: null, antreff_ort: null, antreff_lat: null, antreff_lon: null }, {}),
+    ).toBe(false);
+  });
+  it('abweichend bei anderem Anlass, Fundort oder Standort', () => {
+    expect(weichtAb({ ...gesendet, anlass: 'sturz' } as never, gesendet)).toBe(true);
+    expect(weichtAb({ ...gesendet, antreff_ort: 'Streife 2' }, gesendet)).toBe(true);
+    expect(weichtAb({ ...gesendet, antreff_lat: null }, gesendet)).toBe(true);
   });
 });

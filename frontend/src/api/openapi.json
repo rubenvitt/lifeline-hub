@@ -13948,6 +13948,10 @@
               }
             ]
           },
+          "rtw_angefordert": {
+            "type": "boolean",
+            "description": "LLH-1580 (K1): `meldung_id` ist die RTW-Anforderung des Einheitengeräts, nicht die Meldung,\naus der die Einsatzleitung die Person angelegt hat. Fehlt, wenn nicht."
+          },
           "status": {
             "$ref": "#/components/schemas/PersonStatus"
           },

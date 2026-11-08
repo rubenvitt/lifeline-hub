@@ -638,6 +638,11 @@ pub struct PersonAnzeige {
     /// Laufende Nummer dieser Meldung, für „aus Meldung #n“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meldung_lfd_nr: Option<i64>,
+    /// LLH-1580 (K1): `meldung_id` ist die RTW-Anforderung des Einheitengeräts, nicht die Meldung,
+    /// aus der die Einsatzleitung die Person angelegt hat. Fehlt, wenn nicht.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[schema(required = false)]
+    pub rtw_angefordert: bool,
     /// Anlass der Hilfeleistung (LLH-1566, Cache des jüngsten Stands in `person_anlass`);
     /// fehlt ohne Anlass oder nach dem Aufheben. Kategorie Behandlung, nie im ETB.
     #[serde(skip_serializing_if = "Option::is_none")]
