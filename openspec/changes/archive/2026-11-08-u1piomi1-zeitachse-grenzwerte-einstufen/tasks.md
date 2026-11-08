@@ -17,16 +17,16 @@
 - [x] 3.1 Komponente `kraefte/DauerEinstufung.tsx` mit Test (rot, dann grün): Zahl in Mono, daneben das Wort „zu lang“ bzw. „Ruhe zu kurz“ in `rollen.achtungText`, Beschreibung im Attribut `title` und als Text für den Screenreader. Ohne Einstufung ist die Darstellung genau wie bisher.
 - [x] 3.2 Meldebild: `KraefteuebersichtPage.tsx` lädt die Grenzwerte (Einheiten), `ImEinsatzZelle` zeigt die Einstufung. Test in `KraefteuebersichtPage.test.tsx` für „zu lang“, ohne Grenzwerte (Abruf scheitert) keine Einstufung, und „—“ unverändert.
 - [x] 3.3 Personal: `PersonalPage.tsx` lädt die Grenzwerte (Personal), `dauerZelle` der Spalte „Einsatzdauer“ zeigt die Einstufung, die Spalte „Ruhe“ bleibt neutral. Sortierung unverändert. Test in `PersonalPage.test.tsx`.
-- [ ] 3.4 Druck des Meldeblatts prüfen: Das Wort erscheint lesbar ohne Farbe.
+- [x] 3.4 Druck des Meldeblatts prüfen: Das Wort erscheint lesbar ohne Farbe.
 
 ## 4. Regeln und Doku (D7)
 
 - [x] 4.1 `frontend/src/kraefte/AGENTS.md`, Absatz Kräfte-Zeitachse: „keine Grenzwerte (LFH-860)“ ersetzen durch die Regel aus D7 (nur `stufeEin`, wirksame Grenzwerte des Schichtplans, Anzeige nur in Meldebild und Personal, kein Alarm, kein Zähler). Wer „LFH-860“ in Code und Doku verwendet, wird per grep nachgezogen.
-- [ ] 4.2 Anwenderdoku: `docs/anwender/kapitel/meldebild.md` („Einsatzdauer und Ruhezeit“: Grenzwerte, Wörter, woher die Werte kommen) und `personal.md` („Einsatzdauer und Zeitachse ablesen“). `quellen:` um die neuen Dateien ergänzen. Betroffene Bilder neu erzeugen (`pnpm doku:bilder --grep meldebild`, `--grep personal`), wenn sie die Spalte zeigen.
+- [x] 4.2 Anwenderdoku: `docs/anwender/kapitel/meldebild.md` („Einsatzdauer und Ruhezeit“: Grenzwerte, Wörter, woher die Werte kommen) und `personal.md` („Einsatzdauer und Zeitachse ablesen“). `quellen:` um die neuen Dateien ergänzen. Betroffene Bilder neu erzeugen (`pnpm doku:bilder --grep meldebild`, `--grep personal`), wenn sie die Spalte zeigen.
 - [x] 4.3 `docs/anwender/kapitel/abloesung.md`: Bei den Grenzwerten des Schichtplans einen Satz ergänzen, dass dieselben Werte das Ist im Meldebild und auf der Personal-Seite einstufen.
 
 ## 5. Abschluss
 
-- [ ] 5.1 `scripts/check-typ-codegen.sh` (kein neuer Typ erwartet), `./scripts/check-all.sh` grün.
-- [ ] 5.2 Review (`requesting-code-review`), Bilder der Änderung (Meldebild mit „zu lang“, Personal mit „Ruhe zu kurz“) für PR und Meldung.
-- [ ] 5.3 `/opsx:archive`. Dabei den Purpose von `openspec/specs/kraefte-zeitachse/spec.md` anpassen („bleiben LFH-860 vorbehalten“ → Verweis auf die neue Anforderung).
+- [x] 5.1 `scripts/check-typ-codegen.sh` (kein neuer Typ erwartet), `./scripts/check-all.sh` grün. Lokal: Bündel `schnell` grün, `rust` und `frontend` im selben Lauf; belegt durch die CI des PRs.
+- [x] 5.2 Review (`requesting-code-review`), Bilder der Änderung (Meldebild mit „zu lang“, Personal mit „Ruhe zu kurz“) für PR und Meldung. Review: ein Befund (Live ohne Modul Ablösung, behoben als 2.4), einer zur Key-Form im Plan (berichtigt).
+- [x] 5.3 `/opsx:archive`. Dabei den Purpose von `openspec/specs/kraefte-zeitachse/spec.md` anpassen („bleiben LFH-860 vorbehalten“ → Verweis auf die neue Anforderung).

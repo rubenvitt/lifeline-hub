@@ -58,7 +58,7 @@ in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
 Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl. Anzeige im
 Meldebild/Personal/Einheit-Detail, **nicht im Stab**. Bewusster Bruch von LFH-46 E17 (Feldbefund)
 auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
-**Einstufung** (LLH-730, `openspec/changes/u1piomi1-zeitachse-grenzwerte-einstufen/design.md`):
+**Einstufung** (LLH-730, `openspec/changes/archive/2026-11-08-u1piomi1-zeitachse-grenzwerte-einstufen/design.md`):
 nur `zeitachse.ts:stufeEin` gegen die wirksamen `SchichtplanGrenzwerte` (Vorgaben 12 h/8 h
 eingeschlossen, keine zweite Einstellung), mit derselben Trennregel wie der Plan-Befund `dienst`
 (`src/abloesung/schichtplan/pruefung.rs`, `dienststrecken`; wer eine ändert, ändert beide). Gelesen
