@@ -448,6 +448,9 @@ pub(crate) async fn pause_offen_tx(
 /// Sperrgrund für Löschen und Verschieben aus der Zeile „Pause“.
 pub(crate) const PAUSE_OFFEN: &str = "Erst die Pause beenden oder ihren Beginn zurücknehmen";
 
+/// Rücknahme eines Pausenwechsels, dessen Block gelöscht ist oder die Zeile „Pause“ verlassen hat.
+pub(crate) const PAUSENBLOCK_FEHLT: &str = "Der Pausenblock besteht nicht mehr";
+
 /// Die vollzogenen Wechsel einer Art zum Block, die nicht zurückgenommen sind.
 fn offen_von(wechsel: &[PlanWechselAnzeige], art: WechselArt) -> Option<&PlanWechselAnzeige> {
     wechsel.iter().find(|w| w.art == art)
@@ -1092,6 +1095,21 @@ pub async fn zuruecknehmen(
             return Err(AppError::Conflict(
                 "Der Wechsel ist schon zurückgenommen".into(),
             ));
+        }
+        if matches!(w.art, WechselArt::PauseBeginn | WechselArt::PauseEnde) {
+            // Ohne den Pausenblock gäbe es kein Ende mehr, das die Rücknahme wieder aufhebt.
+            let posten: Option<String> = match w.planschicht_id {
+                Some(bid) => {
+                    sqlx::query_scalar("SELECT posten_art FROM einsatz_planschicht WHERE id = ?")
+                        .bind(bid)
+                        .fetch_optional(&mut *conn)
+                        .await?
+                }
+                None => None,
+            };
+            if posten.as_deref().and_then(PostenArt::parse) != Some(PostenArt::Pause) {
+                return Err(AppError::Conflict(PAUSENBLOCK_FEHLT.into()));
+            }
         }
         if w.art == WechselArt::PauseBeginn {
             let ende: Option<i64> = sqlx::query_scalar(

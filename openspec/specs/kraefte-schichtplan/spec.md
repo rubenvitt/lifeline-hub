@@ -150,7 +150,9 @@ Die Rücknahme MUST nur zurücklegen, was noch den Stand des Wechsels trägt: an
 der Kraft, in der Pause den Status. Sie MUST die Ereignisse der Zeitachse streichen und einen
 ETB-Eintrag schreiben. Den Beginn einer Pause MUST sie erst nach Rücknahme ihres Endes zulassen
 (409). Danach lässt sich der Wechsel erneut vollziehen. Einen Pausenblock mit begonnener, nicht
-beendeter Pause MUST das System weder löschen noch aus der Zeile „Pause“ verschieben (409).
+beendeter Pause MUST das System weder löschen noch aus der Zeile „Pause“ verschieben (409). Ist der
+Pausenblock gelöscht oder nicht mehr in der Zeile „Pause“, MUST die Rücknahme seiner Wechsel 409
+sein.
 
 ### Requirement: Austauschformat
 Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,

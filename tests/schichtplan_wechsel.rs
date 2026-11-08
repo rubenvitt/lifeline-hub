@@ -783,3 +783,46 @@ async fn offene_pause_leerer_status_und_fremde_kommende() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     assert!(kraft(&app, &admin, e, finn).await["uhs_id"].is_null());
 }
+
+/// Review #1213: ist der Block einer beendeten Pause gelöscht, lässt sich keiner ihrer Wechsel
+/// mehr zurücknehmen; sonst stünde eine Kraft wieder auf „Pause“ ohne Ende über den Block.
+#[tokio::test]
+async fn pause_ohne_block_bleibt_wie_sie_ist() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anna = adhoc(&app, &admin, e, "Anna").await;
+    let vorher = kraft(&app, &admin, e, anna).await["status_id"].clone();
+    let bid = block(
+        &app,
+        &admin,
+        e,
+        json!({"art": "pause"}),
+        json!([{"art": "einsatz", "einsatz_personal_id": anna}]),
+    )
+    .await;
+    let beginn = vollziehen(&app, &admin, e, bid, json!({"art": "pause_beginn"})).await;
+    let ende = vollziehen(&app, &admin, e, bid, json!({"art": "pause_ende"})).await;
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/bloecke/{bid}?version=1", plan(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
+    for w in [&ende, &beginn] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &ruecknahme_pfad(e, w["id"].as_i64().unwrap()),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    }
+    assert_eq!(kraft(&app, &admin, e, anna).await["status_id"], vorher);
+}
