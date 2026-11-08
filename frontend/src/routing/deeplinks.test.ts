@@ -43,6 +43,8 @@ import {
   dokumentePfad,
   abloesungPfad,
   parseAbloesungAnsicht,
+  parseSchichtplanDruckAuswahl,
+  schichtplanDruckPfad,
   betreuungPfad,
   betreuungsstellePfad,
   unterkunftPlanenPfad,
@@ -570,6 +572,19 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       expect(parseAbloesungAnsicht(params) ?? 'laufend').toBe(a);
     }
     expect(parseAbloesungAnsicht(new URLSearchParams('ansicht=ohne'))).toBeUndefined();
+  });
+
+  it('schichtplanDruckPfad (LLH-1557): Sicht „posten“ ist Vorgabe, Auswahl reist mit, Unbekanntes fällt weg', () => {
+    expect(schichtplanDruckPfad(E)).toBe('/einsaetze/5/abloesung/schichtplan/druck');
+    const pfad = schichtplanDruckPfad(E, { sicht: 'person', auswahl: 'helfer:4' });
+    expect(pfad).toBe('/einsaetze/5/abloesung/schichtplan/druck?sicht=person&auswahl=helfer%3A4');
+    expect(parseSchichtplanDruckAuswahl(new URLSearchParams(pfad.split('?')[1]))).toEqual({
+      sicht: 'person',
+      auswahl: 'helfer:4',
+    });
+    expect(parseSchichtplanDruckAuswahl(new URLSearchParams('sicht=tag&auswahl=<script>'))).toEqual(
+      { sicht: 'posten', auswahl: null },
+    );
   });
 
   it('verpflegungPfad trifft die Registry-Route (LFH-634)', () => {

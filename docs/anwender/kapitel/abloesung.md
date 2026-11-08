@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs]
 ---
 
 ## Überblick
@@ -294,6 +294,22 @@ einer Tabelle steht, etwa aus der Helferplanung der Gliederung:
 
 Dieselbe Datei kann später noch einmal eingelesen werden, etwa mit nachgemeldeten Helfern: Was
 schon im Plan steht, bleibt, nur Neues kommt dazu. Ist nichts neu, steht „Keine Änderungen“.
+
+### Den Schichtplan drucken
+
+Für Einsatzleitung und Führungspersonal:
+
+1. In der Ansicht „Schichtplan“ „Drucken“ wählen. Die „Schichtplan – Druckansicht“ öffnet sich.
+2. Unter „Blätter“ wählen, was gedruckt wird: „Je Posten“ gibt einen Aushang je Einheit oder UHS
+   mit den Schichten in Zeitfolge und den eingeteilten Personen, „Je Person“ einen Schichtzettel
+   je Person mit ihren Schichten, dem Posten und wer dort mit ihr eingeteilt ist.
+3. Unter „Blatt“ einen einzelnen Posten oder eine einzelne Person wählen, oder alle Blätter
+   lassen („Alle Posten“, „Alle Personen“).
+4. „Drucken / als PDF“ wählen. Jedes Blatt beginnt auf einer neuen Seite und trägt einen eigenen
+   Druckkopf, damit es einzeln aushängen oder ausgegeben werden kann.
+
+Die Druckansicht ist ein fester Stand: Änderungen am Plan holt „Neu laden“. „Zurück zum
+Schichtplan“ führt zur Ansicht zurück.
 
 ## Hintergrund
 
@@ -617,6 +633,21 @@ und Planung, eine entfallene Planung, jeden Vollzug mit Einheit, ablösenden Ein
 übernommener Schicht, übergebenem Abschnitt, Verbleib, Abruf aus dem Bereitstellungsraum und
 Zeitpunkt, beim Besatzungswechsel mit alter und neuer Besatzung, jede Rücknahme, das Ende mit der Entlassung und eine mit dem Eintreffen gestrichene Schicht fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
 dort als Entscheidung.
+
+### Aushang und Schichtzettel
+
+Der Aushang nennt je Schicht Zeit, eingeteilte Personen (bei Helfern mit Organisation) und offene
+Plätze, dazu die Qualifikationen der Personen; hat am Posten niemand eine, entfällt die Spalte.
+Ist das Soll an allen Schichten eines Postens gleich, steht es im Druckkopf, sonst je Schicht in
+der Spalte „Soll“. Pausen und Befunde stehen nicht auf dem Aushang.
+
+Der Schichtzettel führt auch die Pausen als Zeile; der „Umfang“ im Druckkopf zählt Schichten und
+Stunden ohne Pausen. Organisation und Telefon stehen nur bei Helfern des Plans. Läuft der Plan über
+mehrere Tage, kommt auf beiden Blättern eine Spalte „Tag“ hinzu. Die Zeiten folgen der Darstellung
+der Organisation, nicht der Wahl des Geräts.
+
+Ohne das Modul Personal stehen auf dem Aushang keine Namen, nur die Besetzung, etwa „3 von 4
+besetzt“; „Je Person“ ist dann gesperrt.
 
 ### Ampel im Schichtplan
 
