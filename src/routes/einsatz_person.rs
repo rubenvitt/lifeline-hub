@@ -203,6 +203,27 @@ fn ist_einheitengeraet(ctx: &crate::einsatz::kontext::EinsatzKontext) -> bool {
         .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::Einheit)
 }
 
+/// Die RTW-Meldung einer Person erreicht die Einsatzleitung wie jede Sofortmeldung: Live-Bündel
+/// mit Sofortalarm und Erinnerung an die Frist (LFH-97, LLH-1301, LLH-1580 K1). Beides ist
+/// idempotent; so holt ein `client_id`-Replay nach, was nach dem Commit scheiterte.
+async fn rtw_meldung_sicherstellen(
+    state: &AppState,
+    person: &PersonAnzeige,
+) -> Result<(), AppError> {
+    let Some(meldung_id) = person.meldung_id.filter(|_| person.rtw_angefordert) else {
+        return Ok(());
+    };
+    let meldung =
+        crate::meldung::repo::laden(&state.pool, meldung_id, &crate::zeit::jetzt()).await?;
+    crate::meldung::live_publikation_sicherstellen(state, &meldung).await?;
+    crate::meldung::auto_frist_erinnerung_sicherstellen(
+        state,
+        &meldung,
+        crate::meldung::AutoFristHerkunft::Meldung,
+    )
+    .await
+}
+
 /// GET /api/einsaetze/{id}/personen/uhs — die aktiven UHS als Ziel „Zur UHS“ am Einheitengerät
 /// (LLH-1580, Entwurf K3): nur Kennung und Bezeichnung. Am Modul Personen wie `einheiten`; nicht
 /// auditiert (kein Personenbezug).
@@ -483,6 +504,8 @@ pub async fn anlegen(
                 }
                 person.ohne_personalien();
             }
+            // Scheiterte die Zustellung der RTW-Meldung nach dem Commit, holt der Replay sie nach.
+            rtw_meldung_sicherstellen(&state, &person).await?;
             return Ok((StatusCode::CREATED, Json(person)));
         }
     }
@@ -544,6 +567,13 @@ pub async fn anlegen(
         ));
     }
 
+    // Ein Kontakt der Einheit ist versorgt, nicht gesucht (LLH-1580): auch eine RTW-Anforderung
+    // für eine vermisste Person wäre ein Widerspruch.
+    if einheit_name.is_some() && matches!(status_enum, PersonStatus::Vermisst) {
+        return Err(AppError::UnprocessableEntity(
+            "Ein Kontakt der Einheit ist nicht vermisst".into(),
+        ));
+    }
     if body.uhs_id.is_some() && matches!(status_enum, PersonStatus::Vermisst) {
         return Err(AppError::UnprocessableEntity(
             "Eine vermisste Person kann keinen UHS-Wartebereich betreten".into(),
@@ -996,19 +1026,8 @@ pub async fn anlegen(
             let person = repo::laden_tx(conn, einsatz_id, id).await?;
             Ok((person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id))
         })?;
-    // Die RTW-Meldung erreicht die Einsatzleitung wie jede Sofortmeldung: Live-Bündel mit
-    // Sofortalarm und Erinnerung an die Frist (LFH-97, LLH-1301).
-    if let Some(meldung_id) = rtw_meldung_id {
-        let meldung =
-            crate::meldung::repo::laden(&state.pool, meldung_id, &crate::zeit::jetzt()).await?;
-        crate::meldung::live_publikation_sicherstellen(&state, &meldung).await?;
-        crate::meldung::auto_frist_erinnerung_sicherstellen(
-            &state,
-            &meldung,
-            crate::meldung::AutoFristHerkunft::Meldung,
-        )
-        .await?;
-    }
+    // Auch nach einem Replay im Rennen (`war_neu` falsch): die Zustellung ist idempotent.
+    rtw_meldung_sicherstellen(&state, &person).await?;
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {

@@ -360,7 +360,8 @@ pub async fn uhs_ziele(
     einsatz_id: i64,
 ) -> Result<Vec<super::UhsZielAuswahl>, AppError> {
     Ok(sqlx::query_as::<_, super::UhsZielAuswahl>(
-        "SELECT id, bezeichnung FROM uhs WHERE einsatz_id = ? AND status = 'aktiv' \
+        "SELECT id, bezeichnung FROM uhs \
+         WHERE einsatz_id = ? AND status = 'aktiv' AND storniert_at IS NULL \
          ORDER BY bezeichnung COLLATE NOCASE, id",
     )
     .bind(einsatz_id)

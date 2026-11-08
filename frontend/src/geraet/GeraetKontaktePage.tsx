@@ -54,7 +54,9 @@ export function kontaktMarke(
   if (person.aktuelle_verbleib_art === 'entlassung') return { ton: 'neutral', wort: 'entlassen' };
   if (person.aktuelle_verbleib_art === 'transport') return { ton: 'neutral', wort: 'Transport' };
   // Nur die RTW-Anforderung des Geräts, nicht die Meldung, aus der die Leitung anlegte (LLH-1567).
-  if (person.rtw_angefordert && meldung) {
+  if (person.rtw_angefordert) {
+    // Die Meldung lädt noch oder ist nicht lesbar: angefordert ist er trotzdem.
+    if (!meldung) return { ton: 'achtung', wort: 'RTW angefordert' };
     if (meldung.ist_bestaetigt) return { ton: 'normal', wort: 'RTW bestätigt' };
     if (meldung.ist_ueberfaellig || meldung.eskaliert) return { ton: 'alarm', wort: 'RTW · Funk' };
     return { ton: 'achtung', wort: fristText ? `RTW offen bis ${fristText}` : 'RTW offen' };

@@ -376,6 +376,12 @@ describe('kontaktMarke', () => {
 
   it('zeigt den Stand der RTW-Meldung (K8): offen mit Frist, bestätigt, überfällig über Funk', () => {
     const mitRtw = { ...offen, rtw_angefordert: true };
+    expect(
+      kontaktMarke({ ...mitRtw, aktuelle_uhs_id: 3 }, undefined, 'UHS Bühne', undefined),
+    ).toEqual({
+      ton: 'achtung',
+      wort: 'RTW angefordert',
+    });
     expect(kontaktMarke(mitRtw, meldung({}), undefined, '10:05')).toEqual({
       ton: 'achtung',
       wort: 'RTW offen bis 10:05',

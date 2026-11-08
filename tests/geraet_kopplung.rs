@@ -8187,6 +8187,8 @@ async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
         json!({"entlassen": true, "uhs_id": uhs}),
         json!({"entlassen": true, "rtw": true}),
         json!({"uhs_id": uhs, "rtw": true}),
+        // Ein Kontakt ist versorgt, nicht gesucht: ohne Anlass, damit die Status-Regel greift.
+        json!({"rtw": true, "status": "vermisst", "anlass": null, "massnahmen": null}),
     ] {
         let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&kontakt(extra))).await;
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
@@ -8207,10 +8209,17 @@ async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
 /// ist; die UHS sieht den Kontakt sofort. Eine nicht aktive UHS steht nicht zur Wahl (K3).
 #[tokio::test]
 async fn einheitengeraet_bringt_kontakt_zur_uhs() {
-    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let uhs = uhs_anlegen(&app, &admin, l.einsatz, "UHS Bühne").await;
+    // Eine stornierte UHS behält ihren Status, steht aber nicht zur Wahl.
+    let storniert = uhs_anlegen(&app, &admin, l.einsatz, "UHS Fehleingabe").await;
+    sqlx::query("UPDATE uhs SET storniert_at = '2026-11-08 10:00:00' WHERE id = ?")
+        .bind(storniert)
+        .execute(&pool)
+        .await
+        .unwrap();
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -8316,6 +8325,30 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     let meldung_id = person["meldung_id"]
         .as_i64()
         .expect("Bezug auf die Meldung");
+    // Ein Replay derselben Anforderung liefert sie, ohne zweite Person oder zweite Meldung; er
+    // stellt die Zustellung erneut sicher (idempotent).
+    let erneut = kontakt(json!({"rtw": true, "client_id": "rtw-1"}));
+    let (s, erste) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&erneut),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erste}");
+    let (s, zweite) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&erneut),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{zweite}");
+    assert_eq!(zweite["id"], erste["id"]);
+    assert_eq!(zweite["meldung_id"], erste["meldung_id"]);
+    assert_eq!(zweite["rtw_angefordert"], true);
     assert_eq!(person["versorgung"], "offen");
     assert_eq!(person["rtw_angefordert"], true, "{person}");
     let reg = format!("R-{:03}", person["registrier_nr"].as_i64().unwrap());
