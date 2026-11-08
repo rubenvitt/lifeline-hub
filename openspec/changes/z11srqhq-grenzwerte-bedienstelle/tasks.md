@@ -11,12 +11,12 @@
 
 ## 3. Lesezeile im Schichtplan
 
-- [ ] 3.1 `abloesung/schichtplan/SchichtplanAnsicht.tsx`: Zeile „Höchstdienst … · Mindestruhe …“ aus `plan.grenzwerte`, mit Schreibrecht ein Link „ändern“ auf `einsatzEinstellungenPfad(id, 'abloesung')` (D6). Test: Text mit „(Vorgabe)“, ohne Schreibrecht kein Link. Prüfen mit Vitest, Test der Ansicht oder eines kleinen Bausteins.
+- [x] 3.1 `abloesung/schichtplan/SchichtplanAnsicht.tsx`: Zeile „Höchstdienst … · Mindestruhe …“ aus `plan.grenzwerte`, mit Schreibrecht ein Link „ändern“ auf `einsatzEinstellungenPfad(id, 'abloesung')` (D6). Test: Text mit „(Vorgabe)“, ohne Schreibrecht kein Link. Prüfen mit Vitest, Test der Ansicht oder eines kleinen Bausteins.
 
 ## 4. Anwenderdoku und Bilder
 
-- [ ] 4.1 `docs/anwender/kapitel/einsatz-einstellungen.md`: Ablauf „Dienst und Ruhe festlegen“ (Werte ändern, leeres Feld = Vorgabe, Vorgaben wiederherstellen, Rückgängig), Hintergrund zu Rechten und ETB. Den Kopf `quellen` ergänzen und ein Bild des Paneels über `frontend/e2e/doku-bilder/einsatz-einstellungen.bilder.ts` einbinden. Prüfen mit den Doku-Wächtern aus `docs/anwender/AGENTS.md` und dem Bildlauf.
-- [ ] 4.2 `abloesung.md` („Ampel im Schichtplan“: die Lesezeile, Verweis auf den Reiter) und `meldebild.md` (Grenzwerte: wo man sie setzt) nachziehen; `personal.md` nur, falls es die Grenzwerte erklärt. Prüfen mit den Doku-Wächtern.
+- [x] 4.1 `docs/anwender/kapitel/einsatz-einstellungen.md`: Ablauf „Dienst und Ruhe festlegen“ (Werte ändern, leeres Feld = Vorgabe, Vorgaben wiederherstellen, Rückgängig), Hintergrund zu Rechten und ETB. Den Kopf `quellen` ergänzen und ein Bild des Paneels über `frontend/e2e/doku-bilder/einsatz-einstellungen.bilder.ts` einbinden. Prüfen mit den Doku-Wächtern aus `docs/anwender/AGENTS.md` und dem Bildlauf.
+- [x] 4.2 `abloesung.md` („Ampel im Schichtplan“: die Lesezeile, Verweis auf den Reiter) und `meldebild.md` (Grenzwerte: wo man sie setzt) nachziehen; `personal.md` nur, falls es die Grenzwerte erklärt. Prüfen mit den Doku-Wächtern.
 
 ## 5. Abschluss
 
