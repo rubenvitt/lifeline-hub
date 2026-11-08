@@ -803,15 +803,23 @@ fn pruefe_zeile(
 }
 
 /// Schlüssel einer Person: Kennung mit Herkunft, sonst Name mit Telefon.
-fn person_schluessel(a: &PersonAngabe) -> String {
+fn person_schluessel(a: &PersonAngabe) -> PersonSchluessel {
     match a.kennung.as_deref() {
-        Some(k) => format!("k|{}|{}", herkunft_norm(a.herkunft.as_deref()), k.trim()),
-        None => format!(
-            "n|{}|{}",
+        Some(k) => {
+            PersonSchluessel::Kennung(herkunft_norm(a.herkunft.as_deref()), k.trim().to_string())
+        }
+        None => PersonSchluessel::Name(
             norm(&a.anzeigename()),
-            a.telefon.as_deref().map(telefon_norm).unwrap_or_default()
+            a.telefon.as_deref().map(telefon_norm).unwrap_or_default(),
         ),
     }
+}
+
+/// Felder getrennt: „a|b“ + „c“ ist nicht „a“ + „b|c“.
+#[derive(Debug, Hash, PartialEq, Eq)]
+enum PersonSchluessel {
+    Kennung(String, String),
+    Name(String, String),
 }
 
 /// Liest eine Datei in ein Paket. Die Zone des Einsatzes gilt für Zeiten ohne Versatz.
@@ -823,7 +831,7 @@ pub fn lies_paket(bytes: &[u8], zone: Tz) -> Result<(PlanPaket, Vec<ImportMeldun
     let mut paket = PlanPaket::default();
     let mut posten_index: HashMap<(PaketPostenArt, String, String), usize> = HashMap::new();
     let mut block_index: HashMap<(usize, DateTime<Utc>, DateTime<Utc>), usize> = HashMap::new();
-    let mut person_index: HashMap<String, usize> = HashMap::new();
+    let mut person_index: HashMap<PersonSchluessel, usize> = HashMap::new();
     let mut ortszeit_zeilen: Vec<u32> = Vec::new();
 
     for (nr, z) in &tabelle.zeilen {
@@ -1262,6 +1270,17 @@ mod tests {
         };
         assert_eq!(a.telefon.as_deref(), Some("0170 9"));
         assert_eq!(a.zeilen, vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn kennung_und_herkunft_bleiben_getrennt() {
+        // „a|b“ + „c“ und „a“ + „b|c“ sind zwei Personen.
+        let text = "Posten;Beginn;Ende;Nachname;Vorname;Kennung;Herkunft\n\
+            Streife 2;2026-08-15 16:30;2026-08-15 18:30;Neu;Nina;c;a|b\n\
+            Streife 2;2026-08-15 16:30;2026-08-15 18:30;Neu;Nina;b|c;a\n";
+        let (p, m) = csv(text);
+        assert!(fehler(&m).is_empty(), "{m:?}");
+        assert_eq!(p.personen.len(), 2);
     }
 
     #[test]
