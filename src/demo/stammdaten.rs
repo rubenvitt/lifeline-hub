@@ -361,6 +361,8 @@ pub async fn stammdaten_importieren_tx(
             zeile(DemoStammdatenArt::Material, m_angelegt, m_mitbenutzt),
             zeile(DemoStammdatenArt::EinheitVorlage, v_angelegt, v_mitbenutzt),
             zeile(DemoStammdatenArt::Schichtmodell, s_angelegt, s_mitbenutzt),
+            // Die Planung legt der Import nach den Stammdaten an (`demo::planung`).
+            zeile(DemoStammdatenArt::Planung, 0, 0),
         ],
     })
 }

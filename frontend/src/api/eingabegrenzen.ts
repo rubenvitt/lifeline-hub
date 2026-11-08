@@ -213,6 +213,16 @@ export const SCHICHTPLAN_HELFER_TEXT_MAX = 200;
 export const SCHICHTPLAN_HELFER_TELEFON_MAX = 50;
 /** Qualifikationen eines Helfers im Request, gezählt vor dem Entdoppeln (LLH-1552). */
 export const SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX = 20;
+/** Bezeichnung einer Planung und eines Postens der Vorplanung (LLH-1585). */
+export const PLANUNG_BEZEICHNUNG_MAX = 200;
+/** Abschnitt eines Postens der Vorplanung, Freitext (LLH-1585). */
+export const PLANUNG_ABSCHNITT_MAX = 200;
+/** Ort einer Planung, wie der Einsatzort (LLH-1585). */
+export const PLANUNG_ORT_MAX = 500;
+/** Posten je Planung (LLH-1585). */
+export const PLANUNG_POSTEN_MAX = 100;
+/** Höchstens so viele Tage zwischen Beginn und Ende einer Planung (LLH-1585). */
+export const PLANUNG_ZEITRAUM_MAX_TAGE = 14;
 /** Leitung einer Betreuungsstelle (LLH-1044). */
 export const BETREUUNG_LEITUNG_MAX = 200;
 /** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `kontaktweg`). */

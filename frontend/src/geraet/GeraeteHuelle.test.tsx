@@ -420,6 +420,44 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     expect(gesendet).toHaveLength(1);
   });
 
+  it('UHS-Tablet ohne Netz: „Versorgt und entlassen“ merkt den leichten Fall vor und sendet ihn einmal (LLH-1572)', async () => {
+    vi.useRealTimers();
+    await queueLeerenFuerTests();
+    stelleBereit();
+    const gesendet: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personen', async ({ request }) => {
+        gesendet.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(
+          { id: 30, einsatz_id: 7, registrier_nr: 30, status: 'betroffen' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp('/geraet');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Versorgt und entlassen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Versorgt und entlassen' });
+    act(() => setzeOnline(false));
+    // Drei Griffe: öffnen, Anlass, „Entlassen“.
+    await user.click(within(dialog).getByRole('radio', { name: 'Hitze / Kälte' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Entlassen' }));
+    expect(await screen.findByText('Offline vorgemerkt · R-…')).toBeInTheDocument();
+    expect(gesendet).toEqual([]);
+
+    act(() => setzeOnline(true));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      status: 'betroffen',
+      entlassen: true,
+      anlass: 'hitze_kaelte',
+      uhs_id: 2,
+      client_id: expect.any(String),
+      zeitpunkt_at: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/),
+    });
+    expect(gesendet[0]).not.toHaveProperty('sichtung');
+  });
+
   it('Fremde Adresse: die Lagekarte führt auf die Startseite', async () => {
     stelleBereit();
     const router = renderApp('/einsaetze/7/lagekarte');

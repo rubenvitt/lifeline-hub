@@ -42,7 +42,10 @@ const KEINE_KANTEN = { anfang: false, ende: false } as const;
  *
  * Bedienung wie die Schichtplanung der Suite: in einer Zeile einen Zeitbereich aufziehen legt
  * einen Block an, einen Block ziehen verschiebt ihn (auch in eine andere Zeile), seine Kanten
- * ändern die Dauer, Raster 5 Minuten. Gezogen wird nur mit Maus oder Stift: auf Touch rollt der
+ * ändern die Dauer, Raster 5 Minuten. Mit Strg oder Alt beim Loslassen wird aus dem Verschieben
+ * eine Kopie (LLH-1584, `onKopieren`); die Taste darf erst während des Zugs dazukommen, wie beim
+ * Kopieren im Dateimanager. Beide Tasten gelten auf jedem System: Alt/⌥ ist der Weg am Mac, wo
+ * Strg-Klick das Kontextmenü öffnet. Gezogen wird nur mit Maus oder Stift: auf Touch rollt der
  * Finger die Fläche, ein Tipp auf einen Block öffnet ihn (Konzept: „Auf Touch wird nicht
  * gezeichnet“). Jeder Block ist ein Knopf; den Weg ohne Ziehen tragen der Blockdialog und „Block
  * anlegen“ der Ansicht (WCAG 2.5.7).
@@ -71,6 +74,8 @@ export interface SchichtplanRasterProps {
   formatZeit: (ms: number) => string;
   onAnlegen: (zeile: string, von: number, bis: number) => void;
   onAendern: (blockId: number, stand: ZugStand) => void;
+  /** Ein verschobener Block mit Strg/Alt: Kopie an den Stand. Ohne gibt es keine Kopie per Zug. */
+  onKopieren?: (blockId: number, stand: ZugStand) => void;
   onOeffnen: (blockId: number) => void;
   /** Blöcke nehmen gezogene Personen an (dnd-kit-Kontext beim Aufrufer). */
   personenZiel?: boolean;
@@ -132,6 +137,8 @@ interface LaufenderZug {
   pruefung: ZugPruefung;
   /** Erst ab der Schwelle wird gezogen; vorher ist es ein Klick. */
   aktiv: boolean;
+  /** Strg oder Alt gehalten: Kopie statt Verschieben (nur beim Verschieben). */
+  kopie: boolean;
   startX: number;
   startY: number;
   pointerId: number;
@@ -148,6 +155,7 @@ export default function SchichtplanRaster({
   formatZeit,
   onAnlegen,
   onAendern,
+  onKopieren,
   onOeffnen,
   personenZiel = false,
   beschriftung,
@@ -174,14 +182,24 @@ export default function SchichtplanRaster({
     [zeitBreite, spanne],
   );
 
+  // Kopie nur beim Verschieben und nur, wenn der Aufrufer sie annimmt.
+  const kannKopieren = onKopieren != null;
+  const alsKopie = useCallback(
+    (zug: Zug, tasten: { ctrlKey: boolean; altKey: boolean }) =>
+      kannKopieren && zug.art === 'verschieben' && (tasten.ctrlKey || tasten.altKey),
+    [kannKopieren],
+  );
+
   const starte = (e: ReactPointerEvent, zug: Zug, zeile: string) => {
     if (!darfSchreiben || e.pointerType === 'touch' || e.button !== 0) return;
     const stand = zugStand(zug, zeitAmZeiger(e.clientX), zeile);
+    const kopie = alsKopie(zug, e);
     setLauf({
       zug,
       stand,
-      pruefung: pruefeZug(zug, stand, zeilen, bloecke),
+      pruefung: pruefeZug(zug, stand, zeilen, bloecke, kopie),
       aktiv: false,
+      kopie,
       startX: e.clientX,
       startY: e.clientY,
       pointerId: e.pointerId,
@@ -207,39 +225,66 @@ export default function SchichtplanRaster({
           ? (zeileAn(e.clientX, e.clientY) ?? l.stand.zeile)
           : l.stand.zeile;
       const stand = zugStand(l.zug, zeitAmZeiger(e.clientX), zeile);
-      setLauf({ ...l, aktiv: true, stand, pruefung: pruefeZug(l.zug, stand, zeilen, bloecke) });
+      const kopie = alsKopie(l.zug, e);
+      setLauf({
+        ...l,
+        aktiv: true,
+        stand,
+        kopie,
+        pruefung: pruefeZug(l.zug, stand, zeilen, bloecke, kopie),
+      });
     };
     const loslassen = (e: PointerEvent) => {
       const l = laufRef.current;
       if (!l || e.pointerId !== l.pointerId) return;
       setLauf(null);
-      if (!l.aktiv) return;
+      // Bricht der Browser den Zeiger ab (Geste übernommen), bleibt alles, wie es war.
+      if (!l.aktiv || e.type === 'pointercancel') return;
       klickSchlucken.current = true;
       // Der Klick folgt dem Loslassen unmittelbar; danach gilt wieder jeder Klick.
       window.setTimeout(() => {
         klickSchlucken.current = false;
       }, 0);
-      if (l.pruefung !== 'ok') return;
+      // Die Tasten beim Loslassen entscheiden.
+      const kopie = alsKopie(l.zug, e);
+      if (pruefeZug(l.zug, l.stand, zeilen, bloecke, kopie) !== 'ok') return;
       if (l.zug.art === 'anlegen') onAnlegen(l.stand.zeile, l.stand.von, l.stand.bis);
+      else if (kopie) onKopieren?.(l.zug.blockId, l.stand);
       else onAendern(l.zug.blockId, l.stand);
     };
-    const abbrechen = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLauf(null);
+    // Strg/Alt drücken oder lösen, ohne den Zeiger zu bewegen, schaltet den Schatten gleich um.
+    const tasten = (e: KeyboardEvent) => {
+      if (e.type === 'keydown' && e.key === 'Escape') {
+        setLauf(null);
+        return;
+      }
+      if (e.key !== 'Control' && e.key !== 'Alt') return;
+      const l = laufRef.current;
+      if (!l) return;
+      // Alt allein holte in Firefox und unter Windows die Menüleiste nach vorn.
+      e.preventDefault();
+      const kopie = alsKopie(l.zug, e);
+      if (kopie === l.kopie) return;
+      setLauf({ ...l, kopie, pruefung: pruefeZug(l.zug, l.stand, zeilen, bloecke, kopie) });
     };
     document.addEventListener('pointermove', bewegen);
     document.addEventListener('pointerup', loslassen);
     document.addEventListener('pointercancel', loslassen);
-    document.addEventListener('keydown', abbrechen);
+    document.addEventListener('keydown', tasten);
+    document.addEventListener('keyup', tasten);
     return () => {
       document.removeEventListener('pointermove', bewegen);
       document.removeEventListener('pointerup', loslassen);
       document.removeEventListener('pointercancel', loslassen);
-      document.removeEventListener('keydown', abbrechen);
+      document.removeEventListener('keydown', tasten);
+      document.removeEventListener('keyup', tasten);
     };
-  }, [laeuft, zeitAmZeiger, zeilen, bloecke, onAnlegen, onAendern]);
+  }, [laeuft, zeitAmZeiger, zeilen, bloecke, onAnlegen, onAendern, onKopieren, alsKopie]);
 
   const schatten = lauf?.aktiv ? lauf : null;
-  const gezogenerBlock = schatten && schatten.zug.art !== 'anlegen' ? schatten.zug.blockId : null;
+  // Bei einer Kopie bleibt das Original voll sichtbar.
+  const gezogenerBlock =
+    schatten && schatten.zug.art !== 'anlegen' && !schatten.kopie ? schatten.zug.blockId : null;
   const x = (t: number) => xAusZeit(t, zeitBreite, spanne);
   const jetztX = jetzt != null && jetzt >= spanne.von && jetzt <= spanne.bis ? x(jetzt) : null;
 
@@ -264,7 +309,7 @@ export default function SchichtplanRaster({
       role="region"
       aria-label={beschriftung}
       data-lfh="schichtplan-raster"
-      data-zug={schatten ? schatten.zug.art : undefined}
+      data-zug={schatten ? (schatten.kopie ? 'kopieren' : schatten.zug.art) : undefined}
       style={{
         overflowX: 'auto',
         border: `1px solid ${rollen.linie}`,
@@ -406,6 +451,7 @@ export default function SchichtplanRaster({
                     <div
                       data-lfh="schichtplan-schatten"
                       data-pruefung={schatten.pruefung}
+                      data-kopie={schatten.kopie || undefined}
                       aria-hidden="true"
                       style={{
                         position: 'absolute',
@@ -427,6 +473,7 @@ export default function SchichtplanRaster({
                       }}
                     >
                       {`${formatZeit(schatten.stand.von)}–${formatZeit(schatten.stand.bis)}`}
+                      {schatten.kopie ? ' · Kopie' : ''}
                       {schatten.pruefung !== 'ok' && schatten.pruefung !== 'unveraendert'
                         ? ` · ${PRUEFUNG_TEXT[schatten.pruefung]}`
                         : ''}

@@ -142,7 +142,7 @@ pub async fn importieren_tx(
     .await?;
 
     // 5. Stammdaten (D8).
-    let stamm = stammdaten_importieren_tx(conn, org_id, import_id, sz).await?;
+    let mut stamm = stammdaten_importieren_tx(conn, org_id, import_id, sz).await?;
 
     // 5a. Schichtmodell (LLH-1122): hat der Demo-Einsatz bei der Anlage keine Vorgabe der
     //     Organisation bekommen, wird das Szenario-Modell seine Vorgabe (eine Kopie wie bei der
@@ -156,6 +156,22 @@ pub async fn importieren_tx(
             let werte = crate::schichtmodell::repo::load_werte_tx(conn, org_id, modell).await?;
             crate::schichtmodell::repo::set_einsatz_tx(conn, einsatz_id, Some(&werte), admin_id)
                 .await?;
+        }
+    }
+
+    // 5b. Demo-Planung ohne Einsatz (LLH-1585): sie teilt das eben angelegte Personal ein.
+    if let Some(vorlage) = sz.planung {
+        let (angelegt, mitbenutzt) = super::planung::planung_importieren_tx(
+            conn, org_id, import_id, admin_id, jetzt, vorlage, &stamm,
+        )
+        .await?;
+        if let Some(z) = stamm
+            .je_art
+            .iter_mut()
+            .find(|z| z.art == super::DemoStammdatenArt::Planung)
+        {
+            z.angelegt = angelegt;
+            z.mitbenutzt = mitbenutzt;
         }
     }
 

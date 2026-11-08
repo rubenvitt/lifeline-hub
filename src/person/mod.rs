@@ -943,6 +943,22 @@ pub fn etb_text_bestaetigt(
 }
 
 /// System-ETB des UHS-Eintritts beim Anlegen (ohne Platz, also in die Inbox).
+/// System-ETB eines leichten Falls (LLH-1572, design.md D7): EIN Eintrag statt Anlage,
+/// UHS-Aufnahme, Entlassung und UHS-Austritt. «Person R-012 versorgt und entlassen», an einer
+/// UHS «Person R-012: in UHS Bühne versorgt und entlassen». Nichts Medizinisches.
+pub fn etb_text_versorgt_entlassen(registrier_nr: i64, uhs_bezeichnung: Option<&str>) -> String {
+    match uhs_bezeichnung {
+        Some(uhs) => format!(
+            "Person {}: in {uhs} versorgt und entlassen",
+            registrier_anzeige(registrier_nr)
+        ),
+        None => format!(
+            "Person {} versorgt und entlassen",
+            registrier_anzeige(registrier_nr)
+        ),
+    }
+}
+
 pub fn etb_text_uhs_aufnahme(registrier_nr: i64, uhs_bezeichnung: &str) -> String {
     format!(
         "Person {}: Aufnahme in {} (Inbox)",

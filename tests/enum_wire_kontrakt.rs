@@ -224,7 +224,7 @@ fn serde_wire_gleich_as_str() {
         Psychiatrie => "psychiatrie",
         Sonstige => "sonstige",
     });
-    // Maßnahmen (LLH-1324, Spec `personen-massnahmen`)
+    // Maßnahmen (LLH-1324, Spec `personen-massnahmen`; die vier letzten aus LLH-1572)
     enum_wire!(lifeline_hub::person::massnahme_repo::MassnahmeArt {
         Blutstillung => "blutstillung",
         Zugang => "zugang",
@@ -235,6 +235,10 @@ fn serde_wire_gleich_as_str() {
         Immobilisation => "immobilisation",
         Waermeerhalt => "waermeerhalt",
         Dekontamination => "dekontamination",
+        Wundversorgung => "wundversorgung",
+        Kuehlung => "kuehlung",
+        Lagerung => "lagerung",
+        BetreuungGespraech => "betreuung_gespraech",
     });
     // Verletzungen (LLH-1113, Spec `personen-verletzungen`)
     enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungAnsicht {
@@ -1115,6 +1119,11 @@ fn schichtplan_wire() {
         Verfuegbar => "verfuegbar",
         Abweichung => "abweichung",
     } in lifeline_hub::abloesung::schichtplan::PlanBefundArt::ALLE);
+    // Vorplanung (LLH-1585)
+    enum_wire!(lifeline_hub::planung::PlanungPostenArt {
+        Einheit => "einheit",
+        Uhs => "uhs",
+    } in lifeline_hub::planung::PlanungPostenArt::ALLE);
 }
 
 #[test]
@@ -1314,6 +1323,7 @@ fn demo_bericht_enums_wire() {
         Material => "material",
         EinheitVorlage => "einheit_vorlage",
         Schichtmodell => "schichtmodell",
+        Planung => "planung",
     });
     // LLH-1576: Die Lage steht im Pfad und als `szenario` am Import-Kopf (CHECK in 0290).
     enum_wire!(lifeline_hub::demo::DemoLage {
@@ -1402,6 +1412,7 @@ fn org_live_event_wire() {
         Einsatzliste => "einsatzliste",
         Stammdaten => "stammdaten",
         OrgBenachrichtigung => "org_benachrichtigung",
+        Planung => "planung",
     } in lifeline_hub::live::org::OrgLiveEvent::ALLE);
 }
 

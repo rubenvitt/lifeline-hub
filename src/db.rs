@@ -13278,4 +13278,315 @@ mod tests {
                 .unwrap();
         assert_eq!(verweis, None, "SET NULL löst nur den Verweis");
     }
+
+    /// LLH-1572 (design.md D8): der Katalog nimmt die vier Maßnahmen des Sanitätsdienstes, der
+    /// Bestand bleibt mit seinen ids und seinem Aufheben stehen, `client_id` bleibt je Einsatz
+    /// eindeutig und Fremdwerte bleiben draußen.
+    #[tokio::test]
+    async fn migration_0295_person_massnahme_sanitaetsdienst() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 295;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von, aufgehoben_at, aufgehoben_von_id, client_id) \
+             VALUES (?, ?, 'sauerstoff', '2026-11-08 08:00:00', '2026-11-08 08:00:05', ?, \
+                '2026-11-08 08:10:00', ?, 'm1') RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        // Die höchste Zeile ist vor der Migration gelöscht: ihre id darf nicht wiederkommen.
+        let geloescht: i64 = sqlx::query_scalar(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von) \
+             VALUES (?, ?, 'zugang', '2026-11-08 08:20:00', '2026-11-08 08:20:05', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_massnahme WHERE id = ?")
+            .bind(geloescht)
+            .execute(&pool)
+            .await
+            .unwrap();
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (i64, String, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT id, art, aufgehoben_at, client_id FROM person_massnahme WHERE person_id = ?",
+        )
+        .bind(p)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            bestand,
+            (
+                alt,
+                "sauerstoff".into(),
+                Some("2026-11-08 08:10:00".into()),
+                Some("m1".into())
+            ),
+            "der Bestand bleibt 1:1"
+        );
+        let naechste: i64 = sqlx::query_scalar(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von) \
+             VALUES (?, ?, 'lagerung', '2026-11-08 08:30:00', '2026-11-08 08:30:05', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            naechste > geloescht,
+            "die Sequenz zieht mit: {naechste} > {geloescht}"
+        );
+        let massnahme = |art: &'static str, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, \
+                        erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, '2026-11-08 09:00:00', '2026-11-08 09:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(art)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        for art in [
+            "blutstillung",
+            "dekontamination",
+            "wundversorgung",
+            "kuehlung",
+            "lagerung",
+            "betreuung_gespraech",
+        ] {
+            massnahme(art, None)
+                .await
+                .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        massnahme("tourniquet", None)
+            .await
+            .expect_err("nur der Katalog");
+        massnahme("kuehlung", Some("m1"))
+            .await
+            .expect_err("derselbe Schlüssel im selben Einsatz");
+    }
+
+    /// LLH-1585: Planungen ohne Einsatz mit Posten, Blöcken, Personen und Helfern; die
+    /// Demo-Markierung kennt `planung`, ihr Bestand bleibt.
+    #[tokio::test]
+    async fn migration_0296_planung() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 296;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let import: i64 = sqlx::query_scalar(
+            "INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (1, ?, '{}') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (?, 'fahrzeug', 5)",
+        )
+        .bind(import)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM demo_herkunft WHERE tabelle = 'fahrzeug' AND datensatz_id = 5",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bestand, 1, "Bestand der Demo-Markierung bleibt");
+
+        let sql = |q: &'static str| {
+            let pool = pool.clone();
+            async move { sqlx::query(q).execute(&pool).await }
+        };
+        let planung: i64 = sqlx::query_scalar(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis, angelegt_von) \
+             VALUES (1, 'Stadtfest', '2026-11-14 09:00:00', '2026-11-14 23:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let art: String = sqlx::query_scalar("SELECT einsatzart FROM planung WHERE id = ?")
+            .bind(planung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(art, "sanitaetsdienst", "Vorgabe der Einsatzart");
+        sql("INSERT INTO planung (org_id, bezeichnung, von, bis) \
+             VALUES (1, 'stadtfest', '2026-11-15 09:00:00', '2026-11-15 10:00:00')")
+        .await
+        .expect_err("Bezeichnung in der Org eindeutig, ohne Groß und klein");
+        sql("INSERT INTO planung (org_id, bezeichnung, von, bis) \
+             VALUES (1, 'Rückwärts', '2026-11-15 10:00:00', '2026-11-15 09:00:00')")
+        .await
+        .expect_err("bis nach von");
+        sql(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis, ort_lat) \
+             VALUES (1, 'Halb', '2026-11-15 09:00:00', '2026-11-15 10:00:00', 52.1)",
+        )
+        .await
+        .expect_err("Koordinate nur als Paar");
+        sql(
+            "INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (1, 'planung', 1)",
+        )
+        .await
+        .expect("Demo-Markierung kennt planung");
+
+        let posten = |q: &'static str| {
+            let pool = pool.clone();
+            async move { sqlx::query(q).bind(planung).execute(&pool).await }
+        };
+        posten("INSERT INTO planung_posten (planung_id, bezeichnung, art) VALUES (?, 'Streife', 'einheit')")
+            .await
+            .expect("freie Einheit");
+        posten(
+            "INSERT INTO planung_posten (planung_id, bezeichnung, art, uhs_typ) \
+                VALUES (?, 'UHS Markt', 'uhs', 'patientenablage')",
+        )
+        .await
+        .expect("UHS mit Typ");
+        posten(
+            "INSERT INTO planung_posten (planung_id, bezeichnung, art) VALUES (?, 'UHS 2', 'uhs')",
+        )
+        .await
+        .expect_err("UHS ohne Typ");
+        posten(
+            "INSERT INTO planung_posten (planung_id, bezeichnung, art, uhs_typ) \
+                VALUES (?, 'Streife 2', 'einheit', 'sonstige')",
+        )
+        .await
+        .expect_err("Einheit ohne UHS-Typ");
+        posten(
+            "INSERT INTO planung_posten (planung_id, bezeichnung, art, schichtlaenge_min) \
+                VALUES (?, 'Streife 3', 'einheit', 182)",
+        )
+        .await
+        .expect_err("Schichtlänge auf vollen 5 Minuten");
+        posten("INSERT INTO planung_posten (planung_id, bezeichnung, art) VALUES (?, 'Streife', 'einheit')")
+            .await
+            .expect_err("Bezeichnung in der Planung eindeutig");
+        let streife: i64 = sqlx::query_scalar(
+            "SELECT id FROM planung_posten WHERE planung_id = ? AND bezeichnung = 'Streife'",
+        )
+        .bind(planung)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let block: i64 = sqlx::query_scalar(
+            "INSERT INTO planung_schicht (planung_id, posten_id, von, bis, soll_anzahl)              VALUES (?, ?, '2026-11-14 12:00:00', '2026-11-14 15:00:00', 2) RETURNING id",
+        )
+        .bind(planung)
+        .bind(streife)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        posten(
+            "INSERT INTO planung_schicht (planung_id, von, bis, soll_anzahl) \
+                VALUES (?, '2026-11-14 12:00:00', '2026-11-14 13:00:00', 1)",
+        )
+        .await
+        .expect_err("die Pause hat kein Soll");
+        let personal: i64 = sqlx::query_scalar(
+            "INSERT INTO personal (org_id, name) VALUES (1, 'Mia') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let helfer: i64 = sqlx::query_scalar(
+            "INSERT INTO planung_helfer (planung_id, name) VALUES (?, 'Cem') RETURNING id",
+        )
+        .bind(planung)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let person = |p: Option<i64>, h: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO planung_schicht_person (schicht_id, personal_id, helfer_id)                      VALUES (?, ?, ?)",
+                )
+                .bind(block)
+                .bind(p)
+                .bind(h)
+                .execute(&pool)
+                .await
+            }
+        };
+        person(Some(personal), None).await.expect("Stamm");
+        person(None, Some(helfer)).await.expect("Helfer");
+        person(Some(personal), None)
+            .await
+            .expect_err("je Block und Person einmal");
+        person(Some(personal), Some(helfer))
+            .await
+            .expect_err("genau eins von Stamm und Helfer");
+
+        sqlx::query("DELETE FROM planung WHERE id = ?")
+            .bind(planung)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM planung_posten) + (SELECT COUNT(*) FROM planung_schicht) \
+                  + (SELECT COUNT(*) FROM planung_schicht_person) \
+                  + (SELECT COUNT(*) FROM planung_helfer)",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            rest, 0,
+            "Posten, Blöcke, Personen und Helfer gehen mit der Planung"
+        );
+    }
 }

@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs]
 ---
 
 ## Überblick
@@ -74,6 +74,25 @@ Kommen mehrere Personen nacheinander, speichert „Speichern und nächste“ (St
 die Maske offen. Mit „Werte behalten“ bleibt der Fundort für die nächste Person stehen; die
 Sichtung wird nie übernommen.
 
+### Einen leichten Fall in einem Schritt erfassen
+
+Für kleine Hilfeleistungen, die vor Ort enden (Pflaster, Kühlpack, Gespräch):
+
+1. „Versorgt und entlassen“ wählen. Auf dem Handy steht er im Menü „Weitere Aktionen zu den
+   Betroffenen“ (drei Punkte).
+2. Unter „Anlass“ die Fläche antippen, etwa „Hitze / Kälte“. Der Anlass ist Pflicht.
+3. Unter „Maßnahmen“ bis zu drei Flächen antippen, etwa „Kühlung“ oder „Wundversorgung“; ein
+   zweiter Tipp nimmt eine Maßnahme zurück.
+4. „Versorgt von“ nennt die Unfallhilfsstelle oder Einheit, die geholfen hat. Sie füllt den
+   „Fundort“ vor: bei einer Unfallhilfsstelle ihre Bezeichnung, bei einer Einheit ihr Abschnitt.
+   Die Wahl bleibt für den nächsten Fall stehen. Name und Alter sind freiwillig.
+5. „Entlassen“ wählen. Die Quittung nennt die Registriernummer („Entlassen als R-…“).
+
+Die Person steht danach mit Status „betroffen“, ohne Sichtung, mit den Maßnahmen und dem Verbleib
+„entlassen“ in der Liste und zählt in Bilanz und Lagebericht wie jeder andere Kontakt. War eine
+Unfallhilfsstelle gewählt, ist die Person dort zur Erfassungszeit aufgenommen und wieder
+ausgetreten. Ohne Netz wird der Fall vorgemerkt und geht mit seiner Erfassungszeit hinaus.
+
 ### Eine Person mit der Kurzeingabe erfassen
 
 1. In der Liste in das Feld „Kurzeingabe Person“ (Zeile „/person“) schreiben, etwa
@@ -91,6 +110,11 @@ bis „sk4“, „skt“ für tot und „sku“ für unverletzt; „#Breite/Län
 Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen wird; „!“ mit einem
 Kürzel für den Anlass der Hilfeleistung: „!verl“, „!intern“, „!neuro“, „!intox“, „!hitze“ (auch
 „!kaelte“), „!allergie“ (auch „!stich“), „!psych“ und „!sonst“.
+
+Für einen leichten Fall kommen Maßnahmen mit „+“ dazu, etwa „+kuehl“, „+wunde“, „+lager“, „+betr“
+(Betreuung / Gespräch), „+waerme“ oder „+o2“, und „>entl“ für „versorgt und entlassen“. So legt
+„!hitze +kuehl >entl“ die Person wie der Dialog „Versorgt und entlassen“ an. Zu „>entl“ gehört ein
+Anlass.
 
 ### In der Liste nachsichten und Lücken schließen
 
@@ -467,7 +491,9 @@ wird nie still überschrieben.
 
 ### Einsatztagebuch und Zugriffsprotokoll
 
-Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „Person R-… erfasst“,
+Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „Person R-… erfasst“
+(ein leichter Fall steht dort als ein Eintrag „Person R-… versorgt und entlassen“, an einer
+Unfallhilfsstelle „Person R-…: in … versorgt und entlassen“),
 „Person R-…: Sichtung SK …“, „Person R-…: Transportpriorität dringlich“, Statuswechsel und
 Stornierungen. Ein nachgereichter älterer Eintrag steht dort zu seiner Erfassungszeit mit
 „nachgetragen“, bei Sichtung und Transportpriorität mit dem Wert, der weiter gilt. Art und
@@ -498,7 +524,8 @@ und eine Druckansicht gibt es dort nicht ([UHS-Tablet und UHS-Laptop](geraet-uhs
 
 ### Ohne Netz
 
-Personen lassen sich ohne Netz erfassen, über die Maske, die Kurzeingabe und die Aufnahme; bis
+Personen lassen sich ohne Netz erfassen, über die Maske, die Kurzeingabe, „Versorgt und
+entlassen“ und die Aufnahme; bis
 zur Verbindung tragen sie „R-…“ statt der Nummer. An einer schon geöffneten Person lassen sich
 Sichtung, Anlass, Verbleib, Notiz, Transport, Maßnahme und Verletzung vormerken, aus der Liste Sichtung
 und Verbleib; am Ort

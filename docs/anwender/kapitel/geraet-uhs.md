@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/offline/personEintrag.ts, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs, src/geraet/bestaetigung.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/offline/personEintrag.ts, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs, src/geraet/bestaetigung.rs]
 ---
 
 ## Überblick
@@ -48,6 +48,18 @@ mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unte
 
 Die Bestätigung nennt die neue Registriernummer, die Kategorie und den Ort, etwa „Erfasst als
 R-013 · SK II · im Wartebereich“. Die Aufnahme geht immer in die eigene UHS.
+
+### Leichten Fall versorgen und entlassen
+
+Wer nur kurz versorgt wird und gleich wieder geht, braucht keine Aufnahme mit Platz:
+
+1. „Versorgt und entlassen“ wählen.
+2. Den „Anlass“ antippen und bis zu drei „Maßnahmen“, etwa „Kühlung“ oder „Wundversorgung“. Der
+   „Fundort“ ist mit der eigenen UHS vorbelegt; Name und Alter sind freiwillig.
+3. „Entlassen“ wählen. Die Bestätigung nennt die Registriernummer („Entlassen als R-…“).
+
+Die Person ist zur Erfassungszeit in die UHS aufgenommen und gleich wieder entlassen; sie steht
+nicht unter „In der UHS“. Ohne Netz merkt das Gerät den Fall vor („Offline vorgemerkt · R-…“).
 
 ### Patient einem Platz zuweisen
 
@@ -142,7 +154,7 @@ entlassen, bevor ein ohne Netz vorgemerkter Eintrag ankommt, gilt die Bestätigu
 
 ### Ohne Netz
 
-Aufnahmen und Meldungen merkt das Gerät ohne Netz vor und sendet sie nach (siehe
+Aufnahmen, leichte Fälle und Meldungen merkt das Gerät ohne Netz vor und sendet sie nach (siehe
 [Arbeiten ohne Netz](ohne-netz.md)). Bis dahin trägt eine aufgenommene Person „R-…“ statt ihrer
 Registriernummer.
 
