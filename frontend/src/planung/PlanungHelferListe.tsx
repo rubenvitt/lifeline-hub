@@ -16,6 +16,7 @@ import type {
   SchichtplanHelferBody,
 } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
+import { useRollen } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachText, werteAus } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
@@ -153,6 +154,7 @@ function HelferDialog({
 export default function PlanungHelferListe({ planung }: { planung: Planung }) {
   const planungId = planung.kopf.id;
   const qc = useQueryClient();
+  const { token } = useRollen();
   const [dialog, setDialog] = useState<{ helfer: SchichtplanHelfer | null } | null>(null);
   const [zuLoeschen, setZuLoeschen] = useState<SchichtplanHelfer | null>(null);
   const qualiQuery = useQuery({
@@ -258,7 +260,8 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
   // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
   return (
     <div data-lfh="planung-helfer">
-      <Space style={{ marginBottom: 12 }}>
+      {/* Zielabstand zur Werkzeugzeile der Tabelle darunter (LLH-1595): 7 / 11 / 16 px. */}
+      <Space style={{ marginBottom: token.marginSM }}>
         <Button
           onClick={() => {
             speichernMut.reset();

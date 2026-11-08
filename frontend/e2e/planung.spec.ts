@@ -1,4 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import {
+  BLOECKE_ANZAHL,
+  seedPlanung,
+  waitForPlanung,
+  waitForRaster,
+  wireZeit,
+} from './planung-kern';
 
 /**
  * Vorplanung ohne Einsatz (LLH-1586, Spec `vorplanung`): der ganze Weg über die Oberfläche gegen
@@ -133,4 +140,57 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await expect(zeile).toBeVisible();
   await zeile.getByRole('link', { name }).click();
   await expect(page).toHaveURL(new RegExp(`/planungen/${planungId}$`));
+});
+
+/**
+ * Kriterium 12 der Prüfliste (LLH-1595, für LLH-1586): Änderungen anderer erscheinen im Raster
+ * direkt. Ein fremder Block steht in seiner Zeile an seiner Uhrzeit; nichts unter dem Zeiger
+ * verschiebt sich. Gemessen am Block, über dem der Zeiger steht, in der letzten Postenzeile.
+ *
+ * Bewusst NICHT abgedeckt: ein fremder Posten, der VOR anderen einsortiert wird, und eine fremde
+ * Umsortierung schieben die Zeilen darunter um eine Zeilenhöhe. Die Zeilenschleuse mit
+ * Sammelbanner für das gemeinsame Raster (Einsatz und Planung) ist eine eigene Aufgabe (LLH-1604).
+ */
+test('Vorplanung (LLH-1595): ein fremder Block verschiebt im Raster nichts unter dem Zeiger', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+  const planung = await seedPlanung(page, `E2E Planung live ${Date.now()}`);
+
+  // Der Org-Strom abonniert erst mit der Antwort auf `/api/live` (wie LLH-1317 für den Einsatz).
+  const strom = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/live');
+  await page.goto(`/planungen/${planung.id}`);
+  await strom;
+  await waitForPlanung(page, planung.bezeichnung);
+  await waitForRaster(page);
+
+  const unterZeiger = page.locator('[data-lfh="schichtplan-block"][data-ampel="ohne-soll"]');
+  await unterZeiger.hover();
+  const vorher = (await unterZeiger.boundingBox())!;
+
+  // Der „andere Schirm“ legt an RTW 1 einen Block 16–18 Uhr an.
+  const stand = (await (await page.request.get(`/api/planungen/${planung.id}`)).json()) as {
+    posten: { id: number; bezeichnung: string }[];
+  };
+  const rtw1 = stand.posten.find((p) => p.bezeichnung === 'RTW 1')!.id;
+  const um = (stunde: number) => {
+    const d = new Date(Date.now() + 7 * 24 * 3_600_000);
+    d.setHours(stunde, 0, 0, 0);
+    return wireZeit(d);
+  };
+  const antwort = await page.request.post(`/api/planungen/${planung.id}/bloecke`, {
+    data: { posten_id: rtw1, von: um(16), bis: um(18) },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+
+  const bloecke = page.locator('[data-lfh="schichtplan-block"]');
+  await expect(bloecke, 'der fremde Block erscheint ohne Neuladen').toHaveCount(BLOECKE_ANZAHL + 1);
+  const nachher = (await unterZeiger.boundingBox())!;
+  expect(
+    { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },
+    'der Block unter dem Zeiger bleibt, wo er war',
+  ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
+  await expect(unterZeiger).toHaveAttribute('data-ampel', 'ohne-soll');
 });

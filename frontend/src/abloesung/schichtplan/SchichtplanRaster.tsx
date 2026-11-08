@@ -36,6 +36,17 @@ import {
 const KEINE_KANTEN = { anfang: false, ende: false } as const;
 
 /**
+ * Einzug über und unter einem Block in seiner Zeile (LLH-1595): die Hälfte von `marginSM`,
+ * aufgerundet (4 / 6 / 8 px). Blöcke benachbarter Zeilen stehen damit `2 × Einzug + 1` px
+ * auseinander (9 / 13 / 17), im Handschuh über dem Zielabstand von 16 px (`gate3-trefflaeche`).
+ * Zwei Schichten an einem Posten stoßen an der Schichtgrenze bündig aneinander: das Raster bildet
+ * die Uhrzeit ab, ein Spalt verfälschte sie (begründete Ausnahme vom Zielabstand).
+ */
+function blockEinzug(marginSM: number): number {
+  return Math.ceil(marginSM / 2);
+}
+
+/**
  * Das Raster des Schichtplans (LLH-1554, Konzept LLH-1523 Abschnitt 6): Zeilen = Posten,
  * Spalten = Zeit, Jetzt-Linie, Blöcke mit Ampel und Wort. Fachneutral: Zeilen und Blöcke kommen
  * vom Aufrufer (`raster.ts`), die Vorplanung ohne Einsatz (LLH-1561) nimmt dasselbe Raster.
@@ -163,7 +174,8 @@ export default function SchichtplanRaster({
   const { token, rollen } = useRollen();
   const [aussenRef, aussenBreite] = useBreite<HTMLDivElement>(960);
   const spurRef = useRef<HTMLDivElement | null>(null);
-  const zeilenHoehe = token.controlHeight + 2 * token.paddingXXS;
+  const einzug = blockEinzug(token.marginSM);
+  const zeilenHoehe = token.controlHeight + 2 * einzug;
   const pxStunde = pxJeStunde(aussenBreite - TITEL_BREITE - 2, spanne, MINDEST_JE_STUNDE);
   const zeitBreite = Math.round(((spanne.bis - spanne.von) / STUNDE_MS) * pxStunde);
   const marken = stundenMarken(spanne, zone, markenSchritt(pxStunde));
@@ -457,8 +469,8 @@ export default function SchichtplanRaster({
                         position: 'absolute',
                         left: x(schatten.stand.von),
                         width: Math.max(2, x(schatten.stand.bis) - x(schatten.stand.von)),
-                        top: token.paddingXXS,
-                        bottom: token.paddingXXS,
+                        top: einzug,
+                        bottom: einzug,
                         border: `2px dashed ${schatten.pruefung === 'ok' || schatten.pruefung === 'unveraendert' ? rollen.bedien : rollen.alarm}`,
                         background: rollen.auswahlFlaeche,
                         pointerEvents: 'none',
@@ -544,6 +556,7 @@ function BlockKachel({
   onKlick,
 }: BlockKachelProps) {
   const { token, rollen } = useRollen();
+  const einzug = blockEinzug(token.marginSM);
   const zeit = `${formatZeit(block.von)}–${formatZeit(block.bis)}`;
   const name = `${zeileTitel} ${zeit}`;
   const instanz = useId();
@@ -572,8 +585,8 @@ function BlockKachel({
         position: 'absolute',
         left: links,
         width: breite,
-        top: token.paddingXXS,
-        height: hoehe - 2 * token.paddingXXS,
+        top: einzug,
+        height: hoehe - 2 * einzug,
         minWidth: 2,
         padding: 0,
         paddingInline: Math.min(token.paddingXS, Math.max(0, breite / 4)),
