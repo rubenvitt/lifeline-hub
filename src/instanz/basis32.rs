@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 pub const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /// Kodiert Bytes bitweise in Crockford-Base32 (ohne Prüfzeichen, ohne Auffüllung).
-pub fn kodiere(bytes: &[u8]) -> String {
+pub fn encode(bytes: &[u8]) -> String {
     let mut aus = String::with_capacity(bytes.len() * 8 / 5 + 1);
     let mut puffer: u32 = 0;
     let mut bits = 0;
@@ -32,7 +32,7 @@ pub fn kodiere(bytes: &[u8]) -> String {
 /// können, was der Bildschirm zeigt.
 pub fn fingerabdruck(oeffentlich: &[u8]) -> String {
     let hash = Sha256::digest(oeffentlich);
-    let zeichen = kodiere(&hash[..20]);
+    let zeichen = encode(&hash[..20]);
     zeichen
         .as_bytes()
         .chunks(4)
@@ -47,7 +47,7 @@ pub fn b64(bytes: &[u8]) -> String {
 }
 
 /// Liest Base64url ohne Auffüllung; `None` bei jeder Abweichung.
-pub fn b64_lesen(text: &str) -> Option<Vec<u8>> {
+pub fn parse_b64(text: &str) -> Option<Vec<u8>> {
     URL_SAFE_NO_PAD.decode(text).ok()
 }
 
@@ -63,11 +63,11 @@ mod tests {
     #[test]
     fn kodiert_bitweise() {
         // 0xFF 0xFF → 11111 11111 111111(0000) → "ZZZG"
-        assert_eq!(kodiere(&[0xff, 0xff]), "ZZZG");
-        assert_eq!(kodiere(&[0x00]), "00");
-        assert_eq!(kodiere(&[]), "");
+        assert_eq!(encode(&[0xff, 0xff]), "ZZZG");
+        assert_eq!(encode(&[0x00]), "00");
+        assert_eq!(encode(&[]), "");
         // 5 Byte = 40 Bit = genau 8 Zeichen
-        assert_eq!(kodiere(&[0x08, 0x42, 0x10, 0x84, 0x21]), "11111111");
+        assert_eq!(encode(&[0x08, 0x42, 0x10, 0x84, 0x21]), "11111111");
     }
 
     #[test]
@@ -84,7 +84,7 @@ mod tests {
 
     fn fingerabdruck_erwartet() -> String {
         let h = Sha256::digest([7u8; 32]);
-        let z = kodiere(&h[..20]);
+        let z = encode(&h[..20]);
         format!(
             "{}-{}-{}-{}-{}-{}-{}-{}",
             &z[0..4],
@@ -101,8 +101,8 @@ mod tests {
     #[test]
     fn b64_hin_und_zurueck() {
         assert_eq!(b64(b"ab?"), "YWI_");
-        assert_eq!(b64_lesen("YWI_").as_deref(), Some(&b"ab?"[..]));
-        assert_eq!(b64_lesen("YWI/"), None);
-        assert_eq!(b64_lesen("YWI_="), None);
+        assert_eq!(parse_b64("YWI_").as_deref(), Some(&b"ab?"[..]));
+        assert_eq!(parse_b64("YWI/"), None);
+        assert_eq!(parse_b64("YWI_="), None);
     }
 }

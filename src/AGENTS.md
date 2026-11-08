@@ -315,11 +315,11 @@ Herleitung in
 - **Das Protokoll kennt Richtung, nicht Hub und ELW** (`InstanzKopplungRichtung`): wer einlöst,
   meldet sich; die erreichte Seite baut nie eine Verbindung auf.
 - **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
-  kommt; Melden geht über alle Versionen (`extractor::protokoll_zulaessig`) und sein Schema
+  kommt; Melden geht über alle Versionen (`extractor::check_protokoll`) und sein Schema
   (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv.
 - **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
   haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
-  gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::annehmen`); wer ein
+  gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::accept_lieferungen`); wer ein
   Admin-Konto deaktiviert oder herabstuft, widerruft dessen Schlüssel im selben Commit.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
   (`akteur_id` NULL, Name der Gegenstelle).

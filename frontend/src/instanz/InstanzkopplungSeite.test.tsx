@@ -10,9 +10,9 @@ vi.mock('../auth/AuthContext', () => ({
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 vi.mock('../api/instanz', () => ({
-  ladeInstanzUebersicht: vi.fn(),
-  stelleKopplungscodeAus: vi.fn(),
-  loeseKopplungscodeEin: vi.fn(),
+  loadInstanzUebersicht: vi.fn(),
+  issueKopplungscode: vi.fn(),
+  redeemKopplungscode: vi.fn(),
   widerrufeKopplung: vi.fn(),
   registriereUnterschriftsschluessel: vi.fn(),
   gegenzeichne: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('../api/instanz', () => ({
 }));
 
 import { useAuth } from '../auth/AuthContext';
-import { gegenzeichne, ladeInstanzUebersicht, stelleKopplungscodeAus } from '../api/instanz';
+import { gegenzeichne, loadInstanzUebersicht, issueKopplungscode } from '../api/instanz';
 import { adminFixture, authWertFixture, benutzerFixture } from '../test/fixtures';
 
 const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht => ({
@@ -68,7 +68,7 @@ const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht =>
 describe('InstanzkopplungSeite', () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
-    vi.mocked(ladeInstanzUebersicht).mockResolvedValue(uebersicht());
+    vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht());
   });
 
   it('zeigt Fingerabdruck, Kopplung mit Richtung und Hinweis, Schlüssel', async () => {
@@ -82,7 +82,7 @@ describe('InstanzkopplungSeite', () => {
   });
 
   it('Code ausstellen zeigt den Code einmal', async () => {
-    vi.mocked(stelleKopplungscodeAus).mockResolvedValue({
+    vi.mocked(issueKopplungscode).mockResolvedValue({
       code: 'ABCD-EFGH-JKMN-PQRS',
       laeuft_ab_at: '2026-11-08 12:15:00',
       fingerabdruck: 'AAAA',
@@ -95,7 +95,7 @@ describe('InstanzkopplungSeite', () => {
   });
 
   it('ohne eigenen Schlüssel ist Code ausstellen gesperrt und sagt warum', async () => {
-    vi.mocked(ladeInstanzUebersicht).mockResolvedValue(uebersicht({ eigener_schluessel: false }));
+    vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht({ eigener_schluessel: false }));
     renderMitProviders(<InstanzkopplungSeite />);
     expect(
       await screen.findByText('Erst einen eigenen Unterschriftsschlüssel registrieren'),
@@ -126,13 +126,13 @@ describe('InstanzkopplungSeite', () => {
   });
 
   it('ein späterer Fehlschlag des Abrufs blendet vorhandene Daten nicht aus', async () => {
-    vi.mocked(ladeInstanzUebersicht)
+    vi.mocked(loadInstanzUebersicht)
       .mockResolvedValueOnce(uebersicht())
       .mockRejectedValue(new Error('offline'));
     const { client } = renderMitProviders(<InstanzkopplungSeite />);
     expect(await screen.findByText('Bea Admin · Stick B')).toBeInTheDocument();
     await client.refetchQueries();
-    await waitFor(() => expect(ladeInstanzUebersicht).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(loadInstanzUebersicht).toHaveBeenCalledTimes(2));
     expect(screen.getByText('Bea Admin · Stick B')).toBeInTheDocument();
     expect(screen.queryByText('Instanzkopplung nicht ladbar')).not.toBeInTheDocument();
   });

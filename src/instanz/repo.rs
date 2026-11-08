@@ -1,6 +1,6 @@
 //! Speicher der Instanzkopplung (design.md D2, D3, D6, D9; `migrations/0299_instanz_kopplung.sql`).
 
-use super::basis32::{b64, b64_lesen, fingerabdruck};
+use super::basis32::{b64, fingerabdruck, parse_b64};
 use super::code::Ableitung;
 use super::{InstanzKopplungRichtung, InstanzKopplungZustand};
 use crate::error::AppError;
@@ -96,7 +96,7 @@ pub struct OffenerCode {
 }
 
 /// Liest einen noch nicht eingelösten, nicht abgelaufenen Code.
-pub async fn code_offen(
+pub async fn find_offener_code(
     conn: &mut SqliteConnection,
     suche: &str,
     jetzt: &str,
@@ -113,7 +113,7 @@ pub async fn code_offen(
         return Ok(None);
     };
     let lesen = |t: &str| -> Result<[u8; 32], AppError> {
-        b64_lesen(t)
+        parse_b64(t)
             .and_then(|b| b.try_into().ok())
             .ok_or_else(|| AppError::Internal("Kopplungscode beschädigt".into()))
     };
@@ -126,7 +126,7 @@ pub async fn code_offen(
 }
 
 /// Verbraucht einen Code genau einmal; `false`, wenn ein anderer schneller war.
-pub async fn code_verbrauchen(
+pub async fn consume_code(
     conn: &mut SqliteConnection,
     suche: &str,
     jetzt: &str,
@@ -146,7 +146,7 @@ pub async fn code_verbrauchen(
 
 // ── Kopplungen ───────────────────────────────────────────────────────────────────────────────
 
-pub async fn kopplung_nach_kennung(
+pub async fn find_kopplung(
     conn: &mut SqliteConnection,
     kennung: &str,
 ) -> Result<Option<KopplungZeile>, AppError> {
@@ -158,7 +158,7 @@ pub async fn kopplung_nach_kennung(
     .await?)
 }
 
-pub async fn kopplung_laden(pool: &SqlitePool, id: i64) -> Result<KopplungZeile, AppError> {
+pub async fn load_kopplung(pool: &SqlitePool, id: i64) -> Result<KopplungZeile, AppError> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung WHERE id = ?"
     )))
@@ -182,7 +182,7 @@ pub struct Gegenueber<'a> {
 /// bestehende Kopplung in der anderen Richtung ist ein Konflikt: Orgs, die schon gekoppelt sind,
 /// verlören sonst ihre Richtung. `zustand_neu` gilt nur, wenn die Kopplung neu ist oder nicht
 /// mehr aktiv war.
-pub async fn kopplung_anlegen_oder_erneuern(
+pub async fn create_or_renew_kopplung(
     conn: &mut SqliteConnection,
     g: &Gegenueber<'_>,
     richtung: InstanzKopplungRichtung,
@@ -191,7 +191,7 @@ pub async fn kopplung_anlegen_oder_erneuern(
     jetzt: &str,
 ) -> Result<i64, AppError> {
     let angebahnt = (zustand_neu == InstanzKopplungZustand::Angebahnt).then_some(jetzt);
-    if let Some(alt) = kopplung_nach_kennung(conn, g.kennung).await? {
+    if let Some(alt) = find_kopplung(conn, g.kennung).await? {
         if alt.richtung() != Some(richtung) {
             return Err(AppError::Conflict(
                 "Mit dieser Instanz besteht schon eine Kopplung in der anderen Richtung.".into(),
@@ -200,7 +200,7 @@ pub async fn kopplung_anlegen_oder_erneuern(
         // Ein anderer Schlüssel unter bekannter Kennung: solange eine Org-Zuordnung gilt, nie.
         // Die Kennung ist nicht geheim, sonst übernähme ein Code einer anderen Org die Kopplung.
         if alt.gegenueber_schluessel != g.schluessel_b64
-            && !orgs_aktiv(conn, alt.id).await?.is_empty()
+            && !list_orgs_aktiv(conn, alt.id).await?.is_empty()
         {
             return Err(AppError::Conflict(
                 "Unter dieser Kennung ist schon eine Instanz mit einem anderen Schlüssel gekoppelt."
@@ -251,7 +251,7 @@ pub async fn kopplung_anlegen_oder_erneuern(
 
 /// Bindet eine Org dieser Instanz an eine Org des Gegenübers. Ist eine der beiden in dieser
 /// Kopplung schon aktiv gebunden, ist das ein Konflikt.
-pub async fn org_zuordnen(
+pub async fn create_org_zuordnung(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     org_id: i64,
@@ -302,10 +302,7 @@ pub async fn org_zuordnen(
 }
 
 /// Erreichte Seite: das Gegenüber hat die Zuordnung gemeldet.
-pub async fn org_bestaetigen(
-    conn: &mut SqliteConnection,
-    org_zeile_id: i64,
-) -> Result<(), AppError> {
+pub async fn confirm_org(conn: &mut SqliteConnection, org_zeile_id: i64) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE instanz_kopplung_org SET bestaetigt_at = datetime('now') \
          WHERE id = ? AND bestaetigt_at IS NULL",
@@ -317,7 +314,7 @@ pub async fn org_bestaetigen(
 }
 
 /// Alle Org-Zuordnungen einer Kopplung, die noch gelten.
-pub async fn orgs_aktiv(
+pub async fn list_orgs_aktiv(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<OrgZeile>, AppError> {
@@ -332,7 +329,7 @@ pub async fn orgs_aktiv(
 
 /// Org-Zuordnungen, die hier widerrufen wurden und deren Widerruf das Gegenüber noch nicht
 /// signiert erhalten hat.
-pub async fn orgs_widerruf_offen(
+pub async fn list_orgs_widerruf_offen(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<OrgZeile>, AppError> {
@@ -348,7 +345,7 @@ pub async fn orgs_widerruf_offen(
 /// Setzt den Zustand einer Kopplung danach, ob noch eine Org-Zuordnung gilt: ohne gültige wird
 /// eine angebahnte oder aktive Kopplung `ohne` (`widerrufen` oder `vom_gegenueber_widerrufen`).
 /// Ein schon gesetzter Widerruf bleibt, wie er ist: wer zuerst widerrufen hat, steht fest.
-pub async fn zustand_nach_orgs(
+pub async fn update_zustand_nach_orgs(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     ohne: InstanzKopplungZustand,
@@ -395,7 +392,7 @@ pub async fn org_widerrufen(
     Ok(n == 1)
 }
 
-pub async fn widerruf_als_gemeldet(
+pub async fn mark_widerruf_gemeldet(
     conn: &mut SqliteConnection,
     org_zeile_ids: &[i64],
     jetzt: &str,
@@ -412,7 +409,7 @@ pub async fn widerruf_als_gemeldet(
 
 /// Hält fest, was eine Meldung des Gegenübers (erreichte Seite) oder eine Antwort darauf
 /// (meldende Seite) über es verrät, und macht eine angebahnte Kopplung aktiv.
-pub async fn gesehen(
+pub async fn mark_gesehen(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     softwarestand: &str,
@@ -438,7 +435,7 @@ pub async fn gesehen(
 
 /// Meldende Seite: Ergebnis eines Meldeversuchs. Bei Erfolg (`fehler = None`) beginnt der Abstand
 /// wieder von vorn, sonst verdoppelt er sich bis zur Obergrenze (design.md D4).
-pub async fn meldeversuch(
+pub async fn save_meldeversuch(
     pool: &SqlitePool,
     kopplung_id: i64,
     fehler: Option<&str>,
@@ -459,7 +456,7 @@ pub async fn meldeversuch(
 }
 
 /// Meldende Seite: die Kopplungen, die sich jetzt melden sollen.
-pub async fn faellige_meldungen(
+pub async fn list_faellige_meldungen(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<KopplungZeile>, AppError> {
@@ -475,7 +472,7 @@ pub async fn faellige_meldungen(
 
 /// Ausstellende Seite: Kopplungen, die länger als `minuten` auf ihre erste Meldung warten, werden
 /// verworfen (design.md D2). Ihre Org-Zuordnungen gelten danach als widerrufen.
-pub async fn angebahnte_verwerfen(pool: &SqlitePool, grenze: &str) -> Result<u64, AppError> {
+pub async fn discard_angebahnte(pool: &SqlitePool, grenze: &str) -> Result<u64, AppError> {
     let mut tx = pool.begin().await?;
     let ids: Vec<i64> = sqlx::query_scalar(
         "SELECT id FROM instanz_kopplung WHERE zustand = 'angebahnt' AND angebahnt_at <= ?",
@@ -511,14 +508,15 @@ pub async fn angebahnte_verwerfen(pool: &SqlitePool, grenze: &str) -> Result<u64
     .await?;
     for (org_id, kopplung_id) in &verwaist {
         org_widerrufen(&mut *tx, *org_id, None, grenze, true).await?;
-        zustand_nach_orgs(&mut *tx, *kopplung_id, InstanzKopplungZustand::Widerrufen).await?;
+        update_zustand_nach_orgs(&mut *tx, *kopplung_id, InstanzKopplungZustand::Widerrufen)
+            .await?;
     }
     tx.commit().await?;
     Ok((ids.len() + verwaist.len()) as u64)
 }
 
 /// Setzt einen bleibenden Hinweis an der Kopplung.
-pub async fn hinweis_setzen(
+pub async fn set_hinweis(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     hinweis: &str,
@@ -532,7 +530,7 @@ pub async fn hinweis_setzen(
 }
 
 /// Alle Org-Zuordnungen einer Kopplung, auch widerrufene, jüngste zuletzt.
-pub async fn orgs_alle(
+pub async fn list_orgs(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<OrgZeile>, AppError> {
@@ -547,7 +545,7 @@ pub async fn orgs_alle(
 // ── Wiederholschutz ──────────────────────────────────────────────────────────────────────────
 
 /// Merkt sich eine `jti`; `false`, wenn sie von diesem Absender schon kam.
-pub async fn jti_merken(
+pub async fn remember_jti(
     pool: &SqlitePool,
     absender: &str,
     jti: &str,
@@ -630,7 +628,7 @@ pub struct InstanzOrgZuordnung {
 }
 
 /// Die Kopplungen, an denen `org_id` beteiligt ist oder war, jüngste Zuordnung je Kopplung.
-pub async fn liste_fuer_org(
+pub async fn list_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
 ) -> Result<Vec<InstanzKopplungAnzeige>, AppError> {
@@ -644,26 +642,26 @@ pub async fn liste_fuer_org(
     .await?;
     let mut aus = Vec::with_capacity(orgs.len());
     for o in orgs {
-        let k = kopplung_laden(pool, o.kopplung_id).await?;
-        aus.push(anzeige(k, o));
+        let k = load_kopplung(pool, o.kopplung_id).await?;
+        aus.push(to_anzeige(k, o));
     }
     Ok(aus)
 }
 
 /// Eine Kopplung aus Sicht von `org_id`; 404, wenn die Org nie beteiligt war.
-pub async fn anzeige_fuer_org(
+pub async fn load_anzeige_fuer_org(
     pool: &SqlitePool,
     kopplung_id: i64,
     org_id: i64,
 ) -> Result<InstanzKopplungAnzeige, AppError> {
-    liste_fuer_org(pool, org_id)
+    list_fuer_org(pool, org_id)
         .await?
         .into_iter()
         .find(|k| k.id == kopplung_id)
         .ok_or(AppError::NotFound)
 }
 
-fn anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
+fn to_anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
     let protokoll = match k.gegenueber_protokoll.and_then(|p| u32::try_from(p).ok()) {
         Some(fremd) => match super::protokollfenster(super::PROTOKOLL, fremd) {
             super::Protokollfenster::Voll => InstanzProtokoll::Passt,
@@ -676,7 +674,7 @@ fn anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
         },
         None => InstanzProtokoll::Passt,
     };
-    let fingerabdruck = b64_lesen(&k.gegenueber_schluessel)
+    let fingerabdruck = parse_b64(&k.gegenueber_schluessel)
         .map(|b| fingerabdruck(&b))
         .unwrap_or_default();
     InstanzKopplungAnzeige {
@@ -713,25 +711,25 @@ mod tests {
     #[tokio::test]
     async fn wiederholung_wird_erkannt_und_abgelaufenes_geraeumt() {
         let pool = crate::db::test_pool().await;
-        assert!(jti_merken(&pool, "elw", "j1", "2026-11-08 12:01:00")
+        assert!(remember_jti(&pool, "elw", "j1", "2026-11-08 12:01:00")
             .await
             .unwrap());
-        assert!(!jti_merken(&pool, "elw", "j1", "2026-11-08 12:01:00")
+        assert!(!remember_jti(&pool, "elw", "j1", "2026-11-08 12:01:00")
             .await
             .unwrap());
-        assert!(jti_merken(&pool, "elw2", "j1", "2026-11-08 12:01:00")
+        assert!(remember_jti(&pool, "elw2", "j1", "2026-11-08 12:01:00")
             .await
             .unwrap());
         purge(&pool, "2026-11-08 12:00:00").await.unwrap();
         assert!(
-            !jti_merken(&pool, "elw", "j1", "2026-11-08 12:01:00")
+            !remember_jti(&pool, "elw", "j1", "2026-11-08 12:01:00")
                 .await
                 .unwrap(),
             "noch nicht abgelaufen"
         );
         purge(&pool, "2026-11-08 12:02:00").await.unwrap();
         assert!(
-            jti_merken(&pool, "elw", "j1", "2026-11-08 12:03:00")
+            remember_jti(&pool, "elw", "j1", "2026-11-08 12:03:00")
                 .await
                 .unwrap(),
             "geräumt"

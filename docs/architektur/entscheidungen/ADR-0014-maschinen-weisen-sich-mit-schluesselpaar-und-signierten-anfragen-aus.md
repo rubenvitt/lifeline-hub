@@ -37,7 +37,7 @@ herleitung:
 ```sh
 verlange 'kopf\.alg != "EdDSA"' src/instanz/signatur.rs
 verlange 'LEBENSDAUER_S: i64 = 60' src/instanz/signatur.rs
-verlange 'jti_merken' src/instanz/extractor.rs
+verlange 'remember_jti' src/instanz/extractor.rs
 verlange 'impl FromRequest<AppState> for GekoppelteInstanz' src/instanz/extractor.rs
 verbiete '[Bb]earer' 'src/instanz/**' src/routes/instanz.rs
 ```

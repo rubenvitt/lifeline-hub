@@ -309,7 +309,8 @@ pub async fn deaktivieren(
     .await?;
     tx.commit().await?;
     state.live.melde_sitzung_ende(beendet);
-    schluessel_widerruf_spur(&state.pool, &admin, &ziel.anzeigename, &schluessel, peer_ip).await;
+    write_schluessel_widerruf_spur(&state.pool, &admin, &ziel.anzeigename, &schluessel, peer_ip)
+        .await;
 
     admin_audit::schreibe(
         &state.pool,
@@ -332,7 +333,7 @@ pub async fn deaktivieren(
 }
 
 /// Je widerrufenem Unterschriftsschlüssel ein Eintrag der Admin-Spur (LLH-1490).
-async fn schluessel_widerruf_spur(
+async fn write_schluessel_widerruf_spur(
     pool: &sqlx::SqlitePool,
     admin: &crate::auth::Benutzer,
     inhaber: &str,
@@ -437,7 +438,7 @@ pub async fn bearbeiten(
     };
     tx.commit().await?;
     state.live.melde_sitzung_ende(beendet);
-    schluessel_widerruf_spur(&state.pool, &admin, &anzeigename, &schluessel, peer_ip).await;
+    write_schluessel_widerruf_spur(&state.pool, &admin, &anzeigename, &schluessel, peer_ip).await;
 
     // Je geänderter Rolle alt → neu (LFH-1152: strukturiert, die Verwaltung beschriftet).
     let mut rollen = ZugangsAngaben::default();

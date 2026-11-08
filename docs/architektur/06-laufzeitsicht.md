@@ -278,7 +278,7 @@ sequenceDiagram
 - Eine angebahnte Kopplung ohne erste Meldung verfällt nach 15 Minuten; einen Widerruf der
   meldenden Seite trägt eine letzte Meldung, den der erreichten Seite die Antwort auf die nächste.
 - Neue Unterschriftsschlüssel nimmt E nur mit Gegenzeichnung eines bekannten an
-  (`src/auth/unterschrift/repo.rs`, `annehmen`).
+  (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

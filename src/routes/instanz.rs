@@ -16,10 +16,10 @@ use crate::auth::unterschrift::{
 };
 use crate::error::AppError;
 use crate::extract::{JsonBody, PeerIp, PfadParam};
-use crate::instanz::basis32::{b64, b64_lesen, fingerabdruck, sha256_b64};
+use crate::instanz::basis32::{b64, fingerabdruck, parse_b64, sha256_b64};
 use crate::instanz::code::{self as kcode, Ableitung};
-use crate::instanz::extractor::{signierte_antwort, GekoppelteInstanz};
-use crate::instanz::identitaet::{self, oeffentlich_lesen, Identitaet};
+use crate::instanz::extractor::{signed_antwort, GekoppelteInstanz};
+use crate::instanz::identitaet::{self, parse_oeffentlich, Identitaet};
 use crate::instanz::melden::{self, MeldenAnfrage};
 use crate::instanz::repo::{self, Gegenueber, InstanzKopplungAnzeige};
 use crate::instanz::signatur::{self, ANTWORT_KOPF};
@@ -41,7 +41,7 @@ const NAME_MAX: usize = 200;
 /// Längste Bezeichnung eines Unterschriftsschlüssels.
 pub const BEZEICHNUNG_MAX: usize = 80;
 
-fn identitaet_fehler(e: anyhow::Error) -> AppError {
+fn identitaet_error(e: anyhow::Error) -> AppError {
     AppError::Internal(format!("Instanzidentität: {e}"))
 }
 
@@ -85,12 +85,12 @@ pub async fn uebersicht(
     if !admin.darf_admin_bereich() {
         return Err(AppError::Forbidden);
     }
-    let i = identitaet::laden_oder_erzeugen(&state.pool)
+    let i = identitaet::load_or_create(&state.pool)
         .await
-        .map_err(identitaet_fehler)?;
+        .map_err(identitaet_error)?;
     let eigener = {
         let mut conn = state.pool.acquire().await?;
-        !unterschrift::gueltige_eigene(&mut conn, admin.id)
+        !unterschrift::list_gueltige_eigene(&mut conn, admin.id)
             .await?
             .is_empty()
     };
@@ -102,8 +102,8 @@ pub async fn uebersicht(
         softwarestand: crate::instanz::softwarestand().to_string(),
         passkeys_eingerichtet: crate::auth::unterschrift::rp().is_some(),
         eigener_schluessel: eigener,
-        kopplungen: repo::liste_fuer_org(&state.pool, admin.org_id).await?,
-        schluessel: unterschrift::liste_fuer_org(&state.pool, admin.org_id, admin.id).await?,
+        kopplungen: repo::list_fuer_org(&state.pool, admin.org_id).await?,
+        schluessel: unterschrift::list_fuer_org(&state.pool, admin.org_id, admin.id).await?,
     }))
 }
 
@@ -129,7 +129,7 @@ pub async fn code_ausstellen(
 ) -> Result<(StatusCode, Json<KopplungscodeAntwort>), AppError> {
     {
         let mut conn = state.pool.acquire().await?;
-        if unterschrift::gueltige_eigene(&mut conn, admin.id)
+        if unterschrift::list_gueltige_eigene(&mut conn, admin.id)
             .await?
             .is_empty()
         {
@@ -140,11 +140,11 @@ pub async fn code_ausstellen(
             ));
         }
     }
-    let i = identitaet::laden_oder_erzeugen(&state.pool)
+    let i = identitaet::load_or_create(&state.pool)
         .await
-        .map_err(identitaet_fehler)?;
-    let code = kcode::neu();
-    let ableitung = kcode::ableiten(&code);
+        .map_err(identitaet_error)?;
+    let code = kcode::generate();
+    let ableitung = kcode::derive(&code);
     let laeuft_ab_at = crate::zeit::plus_minuten(&crate::zeit::jetzt(), kcode::GUELTIG_MINUTEN)
         .ok_or_else(|| AppError::Internal("Zeit".into()))?;
     repo::code_ausstellen(
@@ -169,7 +169,7 @@ pub async fn code_ausstellen(
     Ok((
         StatusCode::CREATED,
         Json(KopplungscodeAntwort {
-            code: kcode::anzeige(&code),
+            code: kcode::format_anzeige(&code),
             laeuft_ab_at,
             fingerabdruck: i.fingerabdruck(),
         }),
@@ -212,7 +212,7 @@ pub struct KoppelnAntwort {
     pub pruefwert: String,
 }
 
-fn zu_lang(text: &str, max: usize) -> bool {
+fn is_zu_lang(text: &str, max: usize) -> bool {
     text.is_empty() || text.chars().count() > max
 }
 
@@ -231,10 +231,10 @@ pub async fn koppeln(
             ));
         }
     }
-    let i = identitaet::laden_oder_erzeugen(&state.pool)
+    let i = identitaet::load_or_create(&state.pool)
         .await
-        .map_err(identitaet_fehler)?;
-    let ergebnis = koppeln_pruefen(&state, &i, &a).await;
+        .map_err(identitaet_error)?;
+    let ergebnis = check_koppeln(&state, &i, &a).await;
     let (org_id, antwort) = match ergebnis {
         Ok(wert) => wert,
         // Nach außen einheitlich 401, auch bei einem Konflikt mit einer bestehenden Kopplung.
@@ -247,7 +247,7 @@ pub async fn koppeln(
         }
         Err(e) => return Err(e),
     };
-    let fp = b64_lesen(&a.schluessel)
+    let fp = parse_b64(&a.schluessel)
         .map(|b| fingerabdruck(&b))
         .unwrap_or_default();
     admin_audit::schreibe_ohne_akteur(
@@ -265,7 +265,7 @@ pub async fn koppeln(
         peer_ip,
     )
     .await;
-    Ok(signierte_antwort(
+    Ok(signed_antwort(
         &i,
         &a.kennung,
         &a.jti,
@@ -274,19 +274,19 @@ pub async fn koppeln(
     ))
 }
 
-async fn koppeln_pruefen(
+async fn check_koppeln(
     state: &AppState,
     i: &Identitaet,
     a: &KoppelnAnfrage,
 ) -> Result<(i64, KoppelnAntwort), AppError> {
-    if zu_lang(&a.kennung, KENNUNG_MAX)
-        || zu_lang(&a.name, NAME_MAX)
-        || zu_lang(&a.org.kennung, KENNUNG_MAX + 24)
-        || zu_lang(&a.org.name, NAME_MAX)
+    if is_zu_lang(&a.kennung, KENNUNG_MAX)
+        || is_zu_lang(&a.name, NAME_MAX)
+        || is_zu_lang(&a.org.kennung, KENNUNG_MAX + 24)
+        || is_zu_lang(&a.org.name, NAME_MAX)
         || a.softwarestand.chars().count() > 64
-        || zu_lang(&a.jti, 64)
+        || is_zu_lang(&a.jti, 64)
         || a.kennung == i.kennung
-        || oeffentlich_lesen(&a.schluessel).is_none()
+        || parse_oeffentlich(&a.schluessel).is_none()
     {
         return Err(AppError::Unauthorized);
     }
@@ -301,16 +301,16 @@ async fn koppeln_pruefen(
         &a.jti,
     );
     let (org_id, unterschrift, k_aussteller) = crate::write_retry!(&state.pool, |conn| {
-        let Some(code) = repo::code_offen(conn, &a.suche, &jetzt).await? else {
+        let Some(code) = repo::find_offener_code(conn, &a.suche, &jetzt).await? else {
             return Err(AppError::Unauthorized);
         };
-        if !kcode::pruefwert_stimmt(&code.k_einloeser, &transkript_e, &a.pruefwert) {
+        if !kcode::is_pruefwert_valid(&code.k_einloeser, &transkript_e, &a.pruefwert) {
             return Err(AppError::Unauthorized);
         }
-        if !repo::code_verbrauchen(conn, &a.suche, &jetzt).await? {
+        if !repo::consume_code(conn, &a.suche, &jetzt).await? {
             return Err(AppError::Unauthorized);
         }
-        let kopplung_id = repo::kopplung_anlegen_oder_erneuern(
+        let kopplung_id = repo::create_or_renew_kopplung(
             conn,
             &Gegenueber {
                 kennung: &a.kennung,
@@ -325,7 +325,7 @@ async fn koppeln_pruefen(
             &jetzt,
         )
         .await?;
-        repo::org_zuordnen(
+        repo::create_org_zuordnung(
             conn,
             kopplung_id,
             code.org_id,
@@ -376,19 +376,19 @@ pub async fn einloesen(
     PeerIp(peer_ip): PeerIp,
     JsonBody(body): JsonBody<EinloesenBody>,
 ) -> Result<(StatusCode, Json<InstanzKopplungAnzeige>), AppError> {
-    let code = kcode::normalisiere(&body.code).ok_or_else(|| {
+    let code = kcode::normalize(&body.code).ok_or_else(|| {
         AppError::Validation("Der Code hat 16 Zeichen, etwa ABCD-EFGH-JKMN-PQRS.".into())
     })?;
-    let adresse = melden::adresse_normalisieren(&body.adresse)?;
-    let i = identitaet::laden_oder_erzeugen(&state.pool)
+    let adresse = melden::normalize_adresse(&body.adresse)?;
+    let i = identitaet::load_or_create(&state.pool)
         .await
-        .map_err(identitaet_fehler)?;
-    let ableitung = kcode::ableiten(&code);
+        .map_err(identitaet_error)?;
+    let ableitung = kcode::derive(&code);
     let eigene_org = OrgLeitung {
         kennung: org_kennung(&i.kennung, admin.org_id),
         name: org_name(&state.pool, admin.org_id).await?,
     };
-    let antwort = einloesen_senden(&i, &adresse, &ableitung, &eigene_org).await?;
+    let antwort = send_einloesen(&i, &adresse, &ableitung, &eigene_org).await?;
     if antwort.kennung == i.kennung {
         return Err(AppError::UnprocessableEntity(
             "Eine Instanz kann sich nicht mit sich selbst koppeln.".into(),
@@ -397,7 +397,7 @@ pub async fn einloesen(
 
     let jetzt = crate::zeit::jetzt();
     let (kopplung_id, abgelehnt) = crate::write_retry!(&state.pool, |conn| {
-        let kopplung_id = repo::kopplung_anlegen_oder_erneuern(
+        let kopplung_id = repo::create_or_renew_kopplung(
             conn,
             &Gegenueber {
                 kennung: &antwort.kennung,
@@ -412,7 +412,7 @@ pub async fn einloesen(
             &jetzt,
         )
         .await?;
-        let org_zeile = repo::org_zuordnen(
+        let org_zeile = repo::create_org_zuordnung(
             conn,
             kopplung_id,
             admin.org_id,
@@ -428,7 +428,8 @@ pub async fn einloesen(
             fremde_org_kennung: &antwort.org.kennung,
         };
         let abgelehnt =
-            unterschrift::annehmen(conn, &ziel, &antwort.unterschrift, true, &jetzt).await?;
+            unterschrift::accept_lieferungen(conn, &ziel, &antwort.unterschrift, true, &jetzt)
+                .await?;
         Ok((kopplung_id, abgelehnt))
     })?;
     if !abgelehnt.is_empty() {
@@ -437,14 +438,17 @@ pub async fn einloesen(
             "Grundstock enthielt nicht unterstützte Schlüssel"
         );
     }
-    let kopplung = repo::kopplung_laden(&state.pool, kopplung_id).await?;
+    let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
     admin_audit::schreibe(
         &state.pool,
         AdminEintrag {
             aktion: AdminAktion::InstanzGekoppelt,
             akteur: &admin,
             ziel: Ziel::Instanz(&antwort.name),
-            angaben: Some(melden::angaben_gegenstelle(&kopplung, &antwort.org.name)),
+            angaben: Some(melden::build_angaben_gegenstelle(
+                &kopplung,
+                &antwort.org.name,
+            )),
             peer_ip,
         },
     )
@@ -453,20 +457,20 @@ pub async fn einloesen(
     melden::melden_einmal(&state.pool, &kopplung).await?;
     Ok((
         StatusCode::CREATED,
-        Json(repo::anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?),
+        Json(repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?),
     ))
 }
 
 /// Schickt die Einlöse-Anfrage und prüft die Antwort: Prüfwert des Ausstellers (bindet dessen
 /// Schlüssel an den Code) und die Signatur der Antwort mit genau diesem Schlüssel.
-async fn einloesen_senden(
+async fn send_einloesen(
     i: &Identitaet,
     adresse: &str,
     ableitung: &Ableitung,
     eigene_org: &OrgLeitung,
 ) -> Result<KoppelnAntwort, AppError> {
     let schluessel = i.oeffentlich_b64();
-    let jti = signatur::neue_jti();
+    let jti = signatur::new_jti();
     let transkript_e = kcode::transkript_einloeser(
         &ableitung.suche,
         &i.kennung,
@@ -540,13 +544,13 @@ async fn einloesen_senden(
     let a: KoppelnAntwort =
         serde_json::from_slice(&rumpf).map_err(|_| nicht_vertrauenswuerdig("Antwort unlesbar"))?;
     let transkript_a = kcode::transkript_aussteller(&transkript_e, &a.kennung, &a.schluessel);
-    if !kcode::pruefwert_stimmt(&ableitung.k_aussteller, &transkript_a, &a.pruefwert) {
+    if !kcode::is_pruefwert_valid(&ableitung.k_aussteller, &transkript_a, &a.pruefwert) {
         return Err(nicht_vertrauenswuerdig("Prüfwert stimmt nicht"));
     }
     let schluessel_a =
-        oeffentlich_lesen(&a.schluessel).ok_or_else(|| nicht_vertrauenswuerdig("Schlüssel"))?;
+        parse_oeffentlich(&a.schluessel).ok_or_else(|| nicht_vertrauenswuerdig("Schlüssel"))?;
     let token = token.ok_or_else(|| nicht_vertrauenswuerdig("ohne Signatur"))?;
-    signatur::antwort_pruefen(
+    signatur::verify_antwort(
         &token,
         &schluessel_a,
         &a.kennung,
@@ -569,7 +573,7 @@ pub async fn melden(
 ) -> Result<Response, AppError> {
     let body: MeldenAnfrage = anfrage.json()?;
     let antwort =
-        melden::beantworten(&state.pool, &anfrage.identitaet, &anfrage.kopplung, &body).await?;
+        melden::handle_meldung(&state.pool, &anfrage.identitaet, &anfrage.kopplung, &body).await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
@@ -585,10 +589,10 @@ pub async fn widerrufen(
     PeerIp(peer_ip): PeerIp,
     PfadParam(kopplung_id): PfadParam<i64>,
 ) -> Result<Json<InstanzKopplungAnzeige>, AppError> {
-    let vorher = repo::anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
+    let vorher = repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
     let jetzt = crate::zeit::jetzt();
     let widerrufen = crate::write_retry!(&state.pool, |conn| {
-        let Some(o) = repo::orgs_aktiv(conn, kopplung_id)
+        let Some(o) = repo::list_orgs_aktiv(conn, kopplung_id)
             .await?
             .into_iter()
             .find(|o| o.org_id == admin.org_id)
@@ -596,18 +600,19 @@ pub async fn widerrufen(
             return Ok(false);
         };
         let w = repo::org_widerrufen(conn, o.id, Some(admin.id), &jetzt, false).await?;
-        repo::zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen).await?;
+        repo::update_zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen)
+            .await?;
         Ok(w)
     })?;
     if widerrufen {
-        let kopplung = repo::kopplung_laden(&state.pool, kopplung_id).await?;
+        let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
         admin_audit::schreibe(
             &state.pool,
             AdminEintrag {
                 aktion: AdminAktion::InstanzKopplungWiderrufen,
                 akteur: &admin,
                 ziel: Ziel::Instanz(&kopplung.gegenueber_name),
-                angaben: Some(melden::angaben_gegenstelle(
+                angaben: Some(melden::build_angaben_gegenstelle(
                     &kopplung,
                     &vorher.org.fremde_org_name,
                 )),
@@ -620,13 +625,13 @@ pub async fn widerrufen(
         }
     }
     Ok(Json(
-        repo::anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?,
+        repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?,
     ))
 }
 
 // ── Unterschriftsschlüssel ───────────────────────────────────────────────────────────────────
 
-fn passkeys_fehlen() -> AppError {
+fn passkeys_missing() -> AppError {
     AppError::NotImplemented(
         "Passkeys sind an dieser Instanz nicht eingerichtet (LIFELINE_WEBAUTHN_RP_ID und \
          LIFELINE_WEBAUTHN_RP_ORIGIN)."
@@ -634,7 +639,7 @@ fn passkeys_fehlen() -> AppError {
     )
 }
 
-fn zeremonie_voll(_: crate::auth::ablauf_speicher::Voll) -> AppError {
+fn zeremonie_full(_: crate::auth::ablauf_speicher::Voll) -> AppError {
     AppError::ServiceUnavailable("Gerade laufen zu viele Vorgänge. Bitte kurz warten.".into())
 }
 
@@ -660,8 +665,8 @@ pub async fn registrieren_start(
 ) -> Result<Json<UnterschriftRegistrierenStart>, AppError> {
     let bezeichnung =
         crate::routes::support::pflicht_max(&body.bezeichnung, "bezeichnung", BEZEICHNUNG_MAX)?;
-    crate::auth::unterschrift::rp().ok_or_else(passkeys_fehlen)?;
-    let webauthn = crate::auth::webauthn::webauthn().ok_or_else(passkeys_fehlen)?;
+    crate::auth::unterschrift::rp().ok_or_else(passkeys_missing)?;
+    let webauthn = crate::auth::webauthn::webauthn().ok_or_else(passkeys_missing)?;
     let (optionen, zustand) = webauthn
         .start_passkey_registration(
             uuid::Uuid::new_v4(),
@@ -670,12 +675,12 @@ pub async fn registrieren_start(
             None,
         )
         .map_err(|e| AppError::Internal(format!("Registrierung konnte nicht starten: {e}")))?;
-    let zeremonie = zeremonie::ablegen(Zeremonie::Registrierung {
+    let zeremonie = zeremonie::store(Zeremonie::Registrierung {
         benutzer_id: admin.id,
         bezeichnung,
         zustand,
     })
-    .map_err(zeremonie_voll)?;
+    .map_err(zeremonie_full)?;
     Ok(Json(UnterschriftRegistrierenStart {
         zeremonie,
         optionen,
@@ -696,13 +701,13 @@ pub async fn registrieren_abschluss(
     PeerIp(peer_ip): PeerIp,
     JsonBody(body): JsonBody<RegistrierenAbschlussBody>,
 ) -> Result<(StatusCode, Json<UnterschriftSchluesselAnzeige>), AppError> {
-    let (rp_id, origin) = crate::auth::unterschrift::rp().ok_or_else(passkeys_fehlen)?;
-    let webauthn = crate::auth::webauthn::webauthn().ok_or_else(passkeys_fehlen)?;
+    let (rp_id, origin) = crate::auth::unterschrift::rp().ok_or_else(passkeys_missing)?;
+    let webauthn = crate::auth::webauthn::webauthn().ok_or_else(passkeys_missing)?;
     let Some(Zeremonie::Registrierung {
         bezeichnung,
         zustand,
         ..
-    }) = zeremonie::entnehmen(&body.zeremonie, admin.id)
+    }) = zeremonie::take(&body.zeremonie, admin.id)
     else {
         return Err(AppError::Validation(
             "Registrierung abgelaufen oder unbekannt".into(),
@@ -720,7 +725,7 @@ pub async fn registrieren_abschluss(
     })?;
     let credential_id = b64(passkey.cred_id().as_ref());
     let id = crate::write_retry!(&state.pool, |conn| {
-        unterschrift::anlegen_lokal(
+        unterschrift::create_lokal(
             conn,
             &unterschrift::NeuerSchluessel {
                 org_id: admin.org_id,
@@ -735,7 +740,7 @@ pub async fn registrieren_abschluss(
         )
         .await
     })?;
-    let anzeige = unterschrift::anzeige(&state.pool, admin.org_id, admin.id, id).await?;
+    let anzeige = unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?;
     admin_audit::schreibe(
         &state.pool,
         AdminEintrag {
@@ -792,15 +797,15 @@ pub async fn gegenzeichnen_start(
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<UnterschriftGegenzeichnenStart>, AppError> {
-    let (rp_id, _) = crate::auth::unterschrift::rp().ok_or_else(passkeys_fehlen)?;
-    let i = identitaet::laden_oder_erzeugen(&state.pool)
+    let (rp_id, _) = crate::auth::unterschrift::rp().ok_or_else(passkeys_missing)?;
+    let i = identitaet::load_or_create(&state.pool)
         .await
-        .map_err(identitaet_fehler)?;
+        .map_err(identitaet_error)?;
     let (ziel, eigene) = {
         let mut conn = state.pool.acquire().await?;
         (
-            unterschrift::laden(&mut conn, admin.org_id, id).await?,
-            unterschrift::gueltige_eigene(&mut conn, admin.id).await?,
+            unterschrift::load(&mut conn, admin.org_id, id).await?,
+            unterschrift::list_gueltige_eigene(&mut conn, admin.id).await?,
         )
     };
     if ziel.herkunft != "lokal"
@@ -816,7 +821,7 @@ pub async fn gegenzeichnen_start(
         ));
     }
     let schluessel_bytes =
-        b64_lesen(&ziel.schluessel).ok_or_else(|| AppError::Internal("Schlüssel".into()))?;
+        parse_b64(&ziel.schluessel).ok_or_else(|| AppError::Internal("Schlüssel".into()))?;
     let erklaerung = serde_json::to_string(&AufnahmeErklaerung {
         typ: TYP_AUFNAHME.into(),
         org: org_kennung(&i.kennung, admin.org_id),
@@ -831,12 +836,12 @@ pub async fn gegenzeichnen_start(
     })
     .expect("serialisierbar");
     let challenge = pruefen::challenge(&erklaerung);
-    let zeremonie = zeremonie::ablegen(Zeremonie::Gegenzeichnung {
+    let zeremonie = zeremonie::store(Zeremonie::Gegenzeichnung {
         benutzer_id: admin.id,
         ziel_id: id,
         erklaerung: erklaerung.clone(),
     })
-    .map_err(zeremonie_voll)?;
+    .map_err(zeremonie_full)?;
     Ok(Json(UnterschriftGegenzeichnenStart {
         zeremonie,
         challenge,
@@ -865,7 +870,7 @@ pub async fn gegenzeichnen_abschluss(
         ziel_id,
         erklaerung,
         ..
-    }) = zeremonie::entnehmen(&body.zeremonie, admin.id)
+    }) = zeremonie::take(&body.zeremonie, admin.id)
     else {
         return Err(AppError::Validation(
             "Gegenzeichnung abgelaufen oder unbekannt".into(),
@@ -877,7 +882,7 @@ pub async fn gegenzeichnen_abschluss(
         ));
     }
     let mut conn = state.pool.acquire().await?;
-    let eigene = unterschrift::gueltige_eigene(&mut conn, admin.id).await?;
+    let eigene = unterschrift::list_gueltige_eigene(&mut conn, admin.id).await?;
     drop(conn);
     let unterzeichner = eigene
         .iter()
@@ -887,7 +892,7 @@ pub async fn gegenzeichnen_abschluss(
                 "Unterschrieben mit einem Schlüssel, der kein gültiger eigener ist.".into(),
             )
         })?;
-    pruefen::pruefe(
+    pruefen::verify(
         &erklaerung,
         &body.assertion,
         &unterzeichner.pruef_schluessel(),
@@ -899,9 +904,9 @@ pub async fn gegenzeichnen_abschluss(
         unterzeichner_credential_id: unterzeichner.credential_id.clone(),
     };
     crate::write_retry!(&state.pool, |conn| {
-        unterschrift::gegenzeichnung_speichern(conn, admin.org_id, id, &gegenzeichnung).await
+        unterschrift::save_gegenzeichnung(conn, admin.org_id, id, &gegenzeichnung).await
     })?;
-    let anzeige = unterschrift::anzeige(&state.pool, admin.org_id, admin.id, id).await?;
+    let anzeige = unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?;
     admin_audit::schreibe(
         &state.pool,
         AdminEintrag {
@@ -933,14 +938,14 @@ pub async fn unterschrift_widerrufen(
 ) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
     let (wirkung, zeile) = crate::write_retry!(&state.pool, |conn| {
-        let zeile = unterschrift::laden(conn, admin.org_id, id).await?;
+        let zeile = unterschrift::load(conn, admin.org_id, id).await?;
         if zeile.herkunft != "lokal" {
             return Err(AppError::UnprocessableEntity(
                 "Schlüssel einer gekoppelten Instanz widerruft diese selbst.".into(),
             ));
         }
         if zeile.zustand() != UnterschriftSchluesselZustand::Widerrufen
-            && unterschrift::ist_letzter_bei_kopplung(conn, admin.org_id, id).await?
+            && unterschrift::is_letzter_bei_kopplung(conn, admin.org_id, id).await?
         {
             return Err(AppError::Conflict(
                 "Das ist der letzte gültige Unterschriftsschlüssel der Organisation, und eine \
@@ -972,6 +977,6 @@ pub async fn unterschrift_widerrufen(
         .await;
     }
     Ok(Json(
-        unterschrift::anzeige(&state.pool, admin.org_id, admin.id, id).await?,
+        unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?,
     ))
 }

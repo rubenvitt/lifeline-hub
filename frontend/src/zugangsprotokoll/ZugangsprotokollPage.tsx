@@ -42,7 +42,7 @@ import {
   anmeldewegText,
   istAktion,
   istEreignis,
-  istLesezugang,
+  hasNamensziel,
   instanzText,
   rollenText,
 } from './zugangsprotokollText';
@@ -204,7 +204,7 @@ const aenderungsSpalten = spaltenFuer<Zugangsaenderung>()([
     // Ohne Konto ist das Ziel ein Anmeldeweg, beim Lagemonitor-Zugang (LLH-1484) seine
     // Bezeichnung.
     render: (_, e) =>
-      e.ziel_benutzer_id == null && !istLesezugang(e.aktion) ? anmeldewegText(e.ziel) : e.ziel,
+      e.ziel_benutzer_id == null && !hasNamensziel(e.aktion) ? anmeldewegText(e.ziel) : e.ziel,
   },
   {
     key: 'detail',

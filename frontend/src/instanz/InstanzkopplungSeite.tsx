@@ -15,10 +15,10 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
   gegenzeichne,
-  ladeInstanzUebersicht,
-  loeseKopplungscodeEin,
+  loadInstanzUebersicht,
+  redeemKopplungscode,
   registriereUnterschriftsschluessel,
-  stelleKopplungscodeAus,
+  issueKopplungscode,
   widerrufeKopplung,
   widerrufeUnterschriftsschluessel,
 } from '../api/instanz';
@@ -60,7 +60,7 @@ interface RegistrierenWerte {
  */
 export default function InstanzkopplungSeite() {
   const { benutzer } = useAuth();
-  const istAdmin = benutzer?.system_rolle === 'admin';
+  const isAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
@@ -76,45 +76,45 @@ export default function InstanzkopplungSeite() {
 
   const uebersichtQ = useQuery({
     queryKey: globalKeys.instanzkopplung(),
-    queryFn: ladeInstanzUebersicht,
+    queryFn: loadInstanzUebersicht,
     refetchInterval: 30_000,
   });
-  const neuLaden = () => qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() });
+  const reload = () => qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() });
 
   const codeAusstellen = useMutation({
-    mutationFn: stelleKopplungscodeAus,
+    mutationFn: issueKopplungscode,
     onSuccess: (c) => setNeuerCode(c),
   });
   const einloesen = useMutation({
-    mutationFn: (w: { adresse: string; code: string }) => loeseKopplungscodeEin(w.adresse, w.code),
+    mutationFn: (w: { adresse: string; code: string }) => redeemKopplungscode(w.adresse, w.code),
     onSuccess: (k) => {
-      void neuLaden();
+      void reload();
       message.success(`Gekoppelt mit ${k.gegenueber_name}`);
     },
   });
   const kopplungWiderrufen = useMutation({
     mutationFn: (k: InstanzKopplungAnzeige) => widerrufeKopplung(k.id),
     onSuccess: (k) => {
-      void neuLaden();
+      void reload();
       setWiderrufKopplung(null);
       message.success(`Kopplung mit ${k.gegenueber_name} widerrufen`);
     },
   });
   const registrieren = useMutation({
     mutationFn: (bezeichnung: string) => registriereUnterschriftsschluessel(bezeichnung),
-    onSuccess: () => void neuLaden(),
+    onSuccess: () => void reload(),
   });
   const gegenzeichnen = useMutation({
     mutationFn: (s: UnterschriftSchluesselAnzeige) => gegenzeichne(s.id),
     onSuccess: (s) => {
-      void neuLaden();
+      void reload();
       message.success(`Schlüssel von ${s.benutzer_name} gegengezeichnet`);
     },
   });
   const schluesselWiderrufen = useMutation({
     mutationFn: (s: UnterschriftSchluesselAnzeige) => widerrufeUnterschriftsschluessel(s.id),
     onSuccess: () => {
-      void neuLaden();
+      void reload();
       setWiderrufSchluessel(null);
     },
   });
@@ -128,7 +128,7 @@ export default function InstanzkopplungSeite() {
       titel="Instanzkopplung"
       breite="schmal"
       aktionen={
-        istAdmin && (
+        isAdmin && (
           <Space wrap size={token.marginSM}>
             <Tooltip title={sperre}>
               <Button
@@ -148,7 +148,7 @@ export default function InstanzkopplungSeite() {
           </Space>
         )
       }
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={NUR_ADMIN} />}
+      hinweis={<SeitenHinweise rechteFehlt={!isAdmin} rechteText={NUR_ADMIN} />}
     >
       {uebersichtQ.isLoading ? (
         <Spin />
@@ -156,7 +156,7 @@ export default function InstanzkopplungSeite() {
         <Alert type="error" title="Instanzkopplung nicht ladbar" showIcon />
       ) : (
         <>
-          {istAdmin && sperre && (
+          {isAdmin && sperre && (
             <Alert
               type="info"
               showIcon
@@ -198,7 +198,7 @@ export default function InstanzkopplungSeite() {
                 return (
                   <ListenEintrag
                     actions={
-                      istAdmin && aktiv
+                      isAdmin && aktiv
                         ? [
                             <MenueAusloeser
                               key="aktionen"
@@ -264,7 +264,7 @@ export default function InstanzkopplungSeite() {
             koerperPolster
             style={{ marginBlockStart: token.marginMD }}
             aktion={
-              istAdmin && u.passkeys_eingerichtet ? (
+              isAdmin && u.passkeys_eingerichtet ? (
                 <Button
                   icon={<IconPlus />}
                   onClick={() => setRegistrierenOffen(true)}
@@ -301,7 +301,7 @@ export default function InstanzkopplungSeite() {
                 return (
                   <ListenEintrag
                     actions={
-                      istAdmin && eintraege.length > 0
+                      isAdmin && eintraege.length > 0
                         ? [
                             <MenueAusloeser
                               key="aktionen"

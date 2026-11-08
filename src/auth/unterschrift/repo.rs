@@ -1,13 +1,13 @@
 //! Speicher der Unterschriftsschlüssel (`unterschrift_schluessel`, design.md D7, D9).
 
-use super::pruefen::{self, PruefSchluessel};
+use super::pruefen::{self, VerifySchluessel};
 use super::{
     AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
     UnterschriftSchluesselHerkunft, UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand,
     ALG_ES256, TYP_AUFNAHME,
 };
 use crate::error::AppError;
-use crate::instanz::basis32::{b64_lesen, fingerabdruck, sha256_b64};
+use crate::instanz::basis32::{fingerabdruck, parse_b64, sha256_b64};
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// Eine Zeile, wie sie in der DB steht.
@@ -66,8 +66,8 @@ impl SchluesselZeile {
         }
     }
 
-    pub fn pruef_schluessel(&self) -> PruefSchluessel<'_> {
-        PruefSchluessel {
+    pub fn pruef_schluessel(&self) -> VerifySchluessel<'_> {
+        VerifySchluessel {
             credential_id: &self.credential_id,
             schluessel: &self.schluessel,
             rp_id: &self.rp_id,
@@ -77,7 +77,7 @@ impl SchluesselZeile {
 }
 
 /// Nächster `stand` der lokalen Schlüssel einer Org.
-async fn naechster_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
+async fn next_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT COALESCE(MAX(stand), 0) + 1 FROM unterschrift_schluessel \
          WHERE org_id = ? AND herkunft = 'lokal'",
@@ -89,7 +89,7 @@ async fn naechster_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64
 
 /// Hat die Org eine Kopplung, in der eine andere Instanz ihre Schlüssel bekommt (wir stellen aus,
 /// das Gegenüber meldet sich)?
-pub async fn org_verteilt(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
+pub async fn is_org_verteilt(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
     let n: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM instanz_kopplung_org o JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE o.org_id = ? AND o.widerrufen_at IS NULL AND k.richtung = 'wird_gemeldet' \
@@ -118,17 +118,17 @@ pub struct NeuerSchluessel<'a> {
 /// Legt einen lokal registrierten Schlüssel an. Gültig sofort, solange die Org ihre Schlüssel an
 /// keine gekoppelte Instanz verteilt; sonst wartet er auf eine Gegenzeichnung (Spec
 /// `org-admin-unterschrift`).
-pub async fn anlegen_lokal(
+pub async fn create_lokal(
     conn: &mut SqliteConnection,
     neu: &NeuerSchluessel<'_>,
 ) -> Result<i64, AppError> {
-    let zustand = if org_verteilt(conn, neu.org_id).await? {
+    let zustand = if is_org_verteilt(conn, neu.org_id).await? {
         UnterschriftSchluesselZustand::WartetAufGegenzeichnung
     } else {
         UnterschriftSchluesselZustand::Gueltig
     };
-    let stand = naechster_stand(conn, neu.org_id).await?;
-    let fp = b64_lesen(neu.schluessel)
+    let stand = next_stand(conn, neu.org_id).await?;
+    let fp = parse_b64(neu.schluessel)
         .map(|b| fingerabdruck(&b))
         .ok_or_else(|| AppError::Internal("Schlüssel unlesbar".into()))?;
     Ok(sqlx::query_scalar(
@@ -153,7 +153,7 @@ pub async fn anlegen_lokal(
 }
 
 /// Ein Schlüssel der Org (beliebiger Herkunft); 404, wenn er nicht zur Org gehört.
-pub async fn laden(
+pub async fn load(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
@@ -169,7 +169,7 @@ pub async fn laden(
 }
 
 /// Gültige lokale Schlüssel eines Benutzers.
-pub async fn gueltige_eigene(
+pub async fn list_gueltige_eigene(
     conn: &mut SqliteConnection,
     benutzer_id: i64,
 ) -> Result<Vec<SchluesselZeile>, AppError> {
@@ -183,13 +183,13 @@ pub async fn gueltige_eigene(
 }
 
 /// Setzt einen wartenden Schlüssel nach geprüfter Gegenzeichnung auf gültig.
-pub async fn gegenzeichnung_speichern(
+pub async fn save_gegenzeichnung(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
     gegenzeichnung: &Gegenzeichnung,
 ) -> Result<(), AppError> {
-    let stand = naechster_stand(conn, org_id).await?;
+    let stand = next_stand(conn, org_id).await?;
     let n = sqlx::query(
         "UPDATE unterschrift_schluessel SET zustand = 'gueltig', gegenzeichnung = ?, stand = ? \
          WHERE id = ? AND org_id = ? AND herkunft = 'lokal' AND zustand = 'wartet_auf_gegenzeichnung'",
@@ -210,12 +210,12 @@ pub async fn gegenzeichnung_speichern(
 }
 
 /// Ist `id` der letzte gültige lokale Schlüssel einer Org, die ihre Schlüssel verteilt?
-pub async fn ist_letzter_bei_kopplung(
+pub async fn is_letzter_bei_kopplung(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
 ) -> Result<bool, AppError> {
-    if !org_verteilt(conn, org_id).await? {
+    if !is_org_verteilt(conn, org_id).await? {
         return Ok(false);
     }
     let andere: i64 = sqlx::query_scalar(
@@ -236,7 +236,7 @@ pub async fn widerrufen(
     id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
-    let stand = naechster_stand(conn, org_id).await?;
+    let stand = next_stand(conn, org_id).await?;
     let n = sqlx::query(
         "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', widerrufen_at = ?, stand = ? \
          WHERE id = ? AND org_id = ? AND herkunft = 'lokal' AND zustand <> 'widerrufen'",
@@ -333,7 +333,7 @@ pub struct Ziel<'a> {
 }
 
 /// Prüft eine Gegenzeichnung gegen die schon bekannten, gültigen Schlüssel dieser Org-Zuordnung.
-fn gegenzeichnung_gilt(
+fn check_gegenzeichnung(
     l: &UnterschriftSchluesselLieferung,
     ziel: &Ziel<'_>,
     bekannte: &[SchluesselZeile],
@@ -344,7 +344,7 @@ fn gegenzeichnung_gilt(
         .ok_or_else(|| "ohne Gegenzeichnung".to_string())?;
     let e: AufnahmeErklaerung =
         serde_json::from_str(&g.erklaerung).map_err(|_| "Erklärung unlesbar".to_string())?;
-    let schluessel_bytes = b64_lesen(&l.schluessel).ok_or("Schlüssel unlesbar")?;
+    let schluessel_bytes = parse_b64(&l.schluessel).ok_or("Schlüssel unlesbar")?;
     if e.typ != TYP_AUFNAHME
         || e.org != ziel.fremde_org_kennung
         || e.credential_id != l.credential_id
@@ -362,7 +362,7 @@ fn gegenzeichnung_gilt(
                 && b.zustand() == UnterschriftSchluesselZustand::Gueltig
         })
         .ok_or_else(|| "gegengezeichnet von einem unbekannten Schlüssel".to_string())?;
-    pruefen::pruefe(
+    pruefen::verify(
         &g.erklaerung,
         &g.assertion,
         &unterzeichner.pruef_schluessel(),
@@ -373,7 +373,7 @@ fn gegenzeichnung_gilt(
 /// Übernimmt gelieferte Schlüssel (design.md D7). `grundstock = true` nur beim Koppeln: dann
 /// gilt, was der durch den Code gebundene Aussteller liefert. Sonst braucht ein neuer Schlüssel die
 /// Gegenzeichnung eines bekannten; ein Widerruf gilt ohne. Liefert die verworfenen Schlüssel.
-pub async fn annehmen(
+pub async fn accept_lieferungen(
     conn: &mut SqliteConnection,
     ziel: &Ziel<'_>,
     lieferungen: &[UnterschriftSchluesselLieferung],
@@ -382,7 +382,7 @@ pub async fn annehmen(
 ) -> Result<Vec<Abgelehnt>, AppError> {
     let mut abgelehnt = Vec::new();
     for l in lieferungen {
-        let fp = b64_lesen(&l.schluessel)
+        let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
             .unwrap_or_default();
         let vorhanden: Option<(i64, String)> = sqlx::query_as(
@@ -451,7 +451,7 @@ pub async fn annehmen(
                         .bind(ziel.kopplung_org_id)
                         .fetch_all(&mut *conn)
                         .await?;
-                    if let Err(grund) = gegenzeichnung_gilt(l, ziel, &bekannte) {
+                    if let Err(grund) = check_gegenzeichnung(l, ziel, &bekannte) {
                         abgelehnt.push(Abgelehnt {
                             fingerabdruck: fp,
                             benutzer_name: l.benutzer_name.clone(),
@@ -517,7 +517,7 @@ pub async fn fremde_der_zuordnung_widerrufen(
 }
 
 /// Alle Schlüssel einer Org für die Admin-Seite: lokale und die gekoppelter Instanzen.
-pub async fn liste_fuer_org(
+pub async fn list_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
     benutzer_id: i64,
@@ -582,13 +582,13 @@ pub async fn liste_fuer_org(
 }
 
 /// Eine Zeile für die Anzeige.
-pub async fn anzeige(
+pub async fn load_anzeige(
     pool: &SqlitePool,
     org_id: i64,
     benutzer_id: i64,
     id: i64,
 ) -> Result<UnterschriftSchluesselAnzeige, AppError> {
-    liste_fuer_org(pool, org_id, benutzer_id)
+    list_fuer_org(pool, org_id, benutzer_id)
         .await?
         .into_iter()
         .find(|s| s.id == id)

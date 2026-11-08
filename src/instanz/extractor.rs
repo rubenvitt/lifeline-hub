@@ -3,7 +3,7 @@
 //! sind geprüft, bevor ein Handler läuft. Jede Ablehnung ist 401 ohne Grund nach außen; der Grund
 //! steht im Log.
 
-use super::identitaet::{self, oeffentlich_lesen, Identitaet};
+use super::identitaet::{self, parse_oeffentlich, Identitaet};
 use super::repo::{self, KopplungZeile};
 use super::signatur::{self, Anfrage, SCHEMA, TYP_ANFRAGE, UHR_TOLERANZ_S};
 use super::{protokollfenster, Protokollfenster, PROTOKOLL};
@@ -31,7 +31,7 @@ pub struct GekoppelteInstanz {
     pub identitaet: Identitaet,
 }
 
-fn abgelehnt(grund: &str, kennung: Option<&str>) -> AppError {
+fn reject(grund: &str, kennung: Option<&str>) -> AppError {
     tracing::warn!(kennung = ?kennung, grund, "Anfrage einer Instanz abgelehnt");
     AppError::Unauthorized
 }
@@ -47,27 +47,24 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix(SCHEMA))
             .and_then(|v| v.strip_prefix(' '))
-            .ok_or_else(|| abgelehnt("ohne Token", None))?
+            .ok_or_else(|| reject("ohne Token", None))?
             .to_string();
-        let kopf = signatur::kopf_lesen(&token, TYP_ANFRAGE)
-            .map_err(|e| abgelehnt(&e.to_string(), None))?;
+        let kopf =
+            signatur::parse_kopf(&token, TYP_ANFRAGE).map_err(|e| reject(&e.to_string(), None))?;
         let kopplung = {
             let mut conn = state.pool.acquire().await?;
-            repo::kopplung_nach_kennung(&mut conn, &kopf.kid).await?
+            repo::find_kopplung(&mut conn, &kopf.kid).await?
         }
-        .ok_or_else(|| abgelehnt("unbekannte Instanz", Some(&kopf.kid)))?;
+        .ok_or_else(|| reject("unbekannte Instanz", Some(&kopf.kid)))?;
         if kopplung.zustand() == Some(super::InstanzKopplungZustand::VomGegenueberWiderrufen) {
-            return Err(abgelehnt(
-                "Kopplung vom Gegenüber widerrufen",
-                Some(&kopf.kid),
-            ));
+            return Err(reject("Kopplung vom Gegenüber widerrufen", Some(&kopf.kid)));
         }
-        let schluessel = oeffentlich_lesen(&kopplung.gegenueber_schluessel)
-            .ok_or_else(|| abgelehnt("gespeicherter Schlüssel unlesbar", Some(&kopf.kid)))?;
+        let schluessel = parse_oeffentlich(&kopplung.gegenueber_schluessel)
+            .ok_or_else(|| reject("gespeicherter Schlüssel unlesbar", Some(&kopf.kid)))?;
         let body = axum::body::to_bytes(body, BODY_MAX)
             .await
             .map_err(|_| AppError::PayloadTooLarge("Anfrage ist zu groß.".into()))?;
-        let identitaet = identitaet::laden_oder_erzeugen(&state.pool)
+        let identitaet = identitaet::load_or_create(&state.pool)
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?;
         // Der Absender signiert den API-Pfad ohne den Pfad seiner Basisadresse; ein Proxy vor
@@ -78,7 +75,7 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             .map(|p| p.as_str())
             .unwrap_or_else(|| parts.uri.path());
         let jetzt = Utc::now().timestamp();
-        let claims = signatur::anfrage_pruefen(
+        let claims = signatur::verify_anfrage(
             &token,
             &schluessel,
             &kopplung.gegenueber_kennung,
@@ -88,21 +85,22 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             &body,
             jetzt,
         )
-        .map_err(|e| abgelehnt(&e.to_string(), Some(&kopf.kid)))?;
+        .map_err(|e| reject(&e.to_string(), Some(&kopf.kid)))?;
         let bis = Utc
             .timestamp_opt(claims.exp + UHR_TOLERANZ_S, 0)
             .single()
             .map(crate::zeit::formatiere_utc)
-            .ok_or_else(|| abgelehnt("Ablauf unlesbar", Some(&kopf.kid)))?;
-        if !repo::jti_merken(&state.pool, &kopplung.gegenueber_kennung, &claims.jti, &bis).await? {
-            return Err(abgelehnt("Wiederholung", Some(&kopf.kid)));
+            .ok_or_else(|| reject("Ablauf unlesbar", Some(&kopf.kid)))?;
+        if !repo::remember_jti(&state.pool, &kopplung.gegenueber_kennung, &claims.jti, &bis).await?
+        {
+            return Err(reject("Wiederholung", Some(&kopf.kid)));
         }
-        protokoll_zulaessig(parts.uri.path(), claims.pv)?;
+        check_protokoll(parts.uri.path(), claims.pv)?;
         // Außer Melden (das Widerrufe überbringt) nur bei aktiver Kopplung.
         if parts.uri.path() != MELDEN_PFAD
             && kopplung.zustand() != Some(super::InstanzKopplungZustand::Aktiv)
         {
-            return Err(abgelehnt("Kopplung nicht aktiv", Some(&kopf.kid)));
+            return Err(reject("Kopplung nicht aktiv", Some(&kopf.kid)));
         }
         Ok(GekoppelteInstanz {
             kopplung,
@@ -115,7 +113,7 @@ impl FromRequest<AppState> for GekoppelteInstanz {
 
 /// Protokollfenster (design.md D5): Melden geht immer, alles andere nur bei höchstens einem Stand
 /// Abstand (sonst 426).
-pub fn protokoll_zulaessig(pfad: &str, pv: u32) -> Result<(), AppError> {
+pub fn check_protokoll(pfad: &str, pv: u32) -> Result<(), AppError> {
     if pfad != MELDEN_PFAD && protokollfenster(PROTOKOLL, pv) != Protokollfenster::Voll {
         return Err(AppError::UpgradeRequired(format!(
             "Protokoll {pv} wird hier nicht mehr verstanden (hier {PROTOKOLL}); nur Melden geht."
@@ -137,7 +135,7 @@ impl GekoppelteInstanz {
         status: axum::http::StatusCode,
         wert: &T,
     ) -> axum::response::Response {
-        signierte_antwort(
+        signed_antwort(
             &self.identitaet,
             &self.kopplung.gegenueber_kennung,
             &self.claims.jti,
@@ -148,7 +146,7 @@ impl GekoppelteInstanz {
 }
 
 /// Eine JSON-Antwort mit Signatur im Kopf [`signatur::ANTWORT_KOPF`].
-pub fn signierte_antwort<T: serde::Serialize>(
+pub fn signed_antwort<T: serde::Serialize>(
     identitaet: &Identitaet,
     ziel_kennung: &str,
     bezug: &str,
@@ -157,7 +155,7 @@ pub fn signierte_antwort<T: serde::Serialize>(
 ) -> axum::response::Response {
     use axum::response::IntoResponse;
     let body = serde_json::to_vec(wert).expect("Antwort ist serialisierbar");
-    let token = signatur::antwort_signieren(
+    let token = signatur::sign_antwort(
         identitaet,
         ziel_kennung,
         bezug,
@@ -188,9 +186,9 @@ mod tests {
 
     #[test]
     fn melden_geht_immer_anderes_nur_im_fenster() {
-        assert!(protokoll_zulaessig(MELDEN_PFAD, PROTOKOLL + 5).is_ok());
-        assert!(protokoll_zulaessig("/api/instanz/etwas", PROTOKOLL + 1).is_ok());
-        let fehler = protokoll_zulaessig("/api/instanz/etwas", PROTOKOLL + 2).unwrap_err();
+        assert!(check_protokoll(MELDEN_PFAD, PROTOKOLL + 5).is_ok());
+        assert!(check_protokoll("/api/instanz/etwas", PROTOKOLL + 1).is_ok());
+        let fehler = check_protokoll("/api/instanz/etwas", PROTOKOLL + 2).unwrap_err();
         assert_eq!(fehler.status(), axum::http::StatusCode::UPGRADE_REQUIRED);
     }
 }

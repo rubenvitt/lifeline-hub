@@ -9,7 +9,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey;
 use lifeline_hub::auth::unterschrift::repo as unterschrift;
 use lifeline_hub::instanz::identitaet::{self, Identitaet};
-use lifeline_hub::instanz::signatur::{self, AnfrageEntwurf};
+use lifeline_hub::instanz::signatur::{self, AnfrageDraft};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tower::ServiceExt;
@@ -73,7 +73,7 @@ async fn instanz_mit(mit_adressen: bool) -> Instanz {
 async fn schluessel(i: &Instanz, p: &SoftwarePasskey, bezeichnung: &str) -> i64 {
     let mut conn = i.pool.acquire().await.unwrap();
     let oeff = p.oeffentlich();
-    unterschrift::anlegen_lokal(
+    unterschrift::create_lokal(
         &mut conn,
         &unterschrift::NeuerSchluessel {
             org_id: 1,
@@ -136,7 +136,7 @@ async fn org_admin(pool: &sqlx::SqlitePool, org: &str, name: &str) -> (i64, i64)
 async fn gekoppelt() -> (Instanz, Instanz) {
     let hub = instanz().await;
     let elw = instanz().await;
-    schluessel(&hub, &SoftwarePasskey::neu("a", [1u8; 32]), "Stick A").await;
+    schluessel(&hub, &SoftwarePasskey::new("a", [1u8; 32]), "Stick A").await;
     let c = code(&hub).await;
     let (s, v) = einloesen(&elw, &hub.adresse, &c).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -230,7 +230,7 @@ async fn code_gilt_einmal_und_nicht_abgelaufen() {
     let hub = instanz().await;
     let elw = instanz().await;
     let elw2 = instanz().await;
-    schluessel(&hub, &SoftwarePasskey::neu("a", [1u8; 32]), "Stick").await;
+    schluessel(&hub, &SoftwarePasskey::new("a", [1u8; 32]), "Stick").await;
     let c = code(&hub).await;
     assert_eq!(
         einloesen(&elw, &hub.adresse, &c).await.0,
@@ -272,10 +272,10 @@ async fn zweite_org_erweitert_die_kopplung() {
         .await
         .unwrap();
     {
-        let p = SoftwarePasskey::neu("sued", [3u8; 32]);
+        let p = SoftwarePasskey::new("sued", [3u8; 32]);
         let oeff = p.oeffentlich();
         let mut conn = hub.pool.acquire().await.unwrap();
-        unterschrift::anlegen_lokal(
+        unterschrift::create_lokal(
             &mut conn,
             &unterschrift::NeuerSchluessel {
                 org_id: org_hub2,
@@ -337,7 +337,7 @@ async fn zweite_org_erweitert_die_kopplung() {
 async fn mitte(ziel: String, anfrage_tauschen: bool) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let adresse = format!("http://{}", listener.local_addr().unwrap());
-    let fremd = Identitaet::aus_teilen("mitte", [42u8; 32]).oeffentlich_b64();
+    let fremd = Identitaet::from_parts("mitte", [42u8; 32]).oeffentlich_b64();
     let app = axum::Router::new().route(
         "/api/instanz/koppeln",
         axum::routing::post(move |body: axum::body::Bytes| {
@@ -379,7 +379,7 @@ async fn mitte(ziel: String, anfrage_tauschen: bool) -> String {
 async fn angreifer_in_der_mitte_faellt_auf() {
     let hub = instanz().await;
     let elw = instanz().await;
-    schluessel(&hub, &SoftwarePasskey::neu("a", [1u8; 32]), "Stick").await;
+    schluessel(&hub, &SoftwarePasskey::new("a", [1u8; 32]), "Stick").await;
 
     // Schlüssel des ELW in der Anfrage getauscht: der Hub lehnt ab.
     let c = code(&hub).await;
@@ -411,7 +411,7 @@ async fn angreifer_in_der_mitte_faellt_auf() {
         .await
         .unwrap();
     assert_eq!(zustand, "angebahnt");
-    lifeline_hub::instanz::repo::angebahnte_verwerfen(&hub.pool, "2999-01-01 00:00:00")
+    lifeline_hub::instanz::repo::discard_angebahnte(&hub.pool, "2999-01-01 00:00:00")
         .await
         .unwrap();
     let zustand: String = sqlx::query_scalar("SELECT zustand FROM instanz_kopplung")
@@ -425,7 +425,7 @@ async fn angreifer_in_der_mitte_faellt_auf() {
 async fn durchprobieren_sperrt_die_quelle() {
     let hub = instanz_mit(true).await;
     let elw = instanz().await;
-    schluessel(&hub, &SoftwarePasskey::neu("a", [1u8; 32]), "Stick").await;
+    schluessel(&hub, &SoftwarePasskey::new("a", [1u8; 32]), "Stick").await;
     for _ in 0..10 {
         let (s, _) = einloesen(&elw, &hub.adresse, "AAAA-AAAA-AAAA-AAAA").await;
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
@@ -439,7 +439,7 @@ async fn durchprobieren_sperrt_die_quelle() {
 
 /// Die Identität des ELW, wie sie in seiner DB steht.
 async fn identitaet_von(i: &Instanz) -> Identitaet {
-    identitaet::laden_oder_erzeugen(&i.pool).await.unwrap()
+    identitaet::load_or_create(&i.pool).await.unwrap()
 }
 
 async fn melden_roh(
@@ -450,9 +450,9 @@ async fn melden_roh(
     gesendet: &[u8],
     pfad: &str,
 ) -> StatusCode {
-    let (token, _) = signatur::anfrage_signieren(
+    let (token, _) = signatur::sign_anfrage(
         absender,
-        &AnfrageEntwurf {
+        &AnfrageDraft {
             ziel_kennung: ziel,
             methode: "POST",
             pfad,
@@ -534,16 +534,16 @@ async fn melden_nur_signiert_einmalig_und_unveraendert() {
         StatusCode::UNAUTHORIZED
     );
     // Unbekannte Instanz
-    let fremd = Identitaet::aus_teilen("unbekannt", [77u8; 32]);
+    let fremd = Identitaet::from_parts("unbekannt", [77u8; 32]);
     assert_eq!(
         melden_roh(&hub, &fremd, &hub_k, &body, &body, "/api/instanz/melden").await,
         StatusCode::UNAUTHORIZED
     );
 
     // Wiederholung derselben Anfrage
-    let (token, _) = signatur::anfrage_signieren(
+    let (token, _) = signatur::sign_anfrage(
         &elw_i,
-        &AnfrageEntwurf {
+        &AnfrageDraft {
             ziel_kennung: &hub_k,
             methode: "POST",
             pfad: "/api/instanz/melden",
@@ -602,7 +602,7 @@ async fn elw_meldet(elw: &Instanz) {
         .execute(&elw.pool)
         .await
         .unwrap();
-    lifeline_hub::instanz::melden::durchlauf(&elw.pool)
+    lifeline_hub::instanz::melden::run_durchlauf(&elw.pool)
         .await
         .unwrap();
 }
@@ -624,9 +624,10 @@ async fn hub_widerruft_und_elw_erfaehrt_es_beim_melden() {
             .unwrap();
     assert!(gemeldet.is_some());
     // Danach meldet sich der ELW nicht mehr.
-    let faellig = lifeline_hub::instanz::repo::faellige_meldungen(&elw.pool, "2999-01-01 00:00:00")
-        .await
-        .unwrap();
+    let faellig =
+        lifeline_hub::instanz::repo::list_faellige_meldungen(&elw.pool, "2999-01-01 00:00:00")
+            .await
+            .unwrap();
     assert!(faellig.is_empty());
 }
 
@@ -669,7 +670,7 @@ async fn ausfall_des_gegenuebers_steht_an_der_kopplung() {
 #[tokio::test]
 async fn instanz_ohne_kopplung_meldet_nichts() {
     let i = instanz().await;
-    lifeline_hub::instanz::melden::durchlauf(&i.pool)
+    lifeline_hub::instanz::melden::run_durchlauf(&i.pool)
         .await
         .unwrap();
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM instanz_kopplung")
@@ -692,7 +693,7 @@ async fn gegenzeichnen(hub: &Instanz, id: i64, mit: &SoftwarePasskey) -> (Status
     .await;
     assert_eq!(s, StatusCode::OK, "{start}");
     let erklaerung = start["erklaerung"].as_str().unwrap();
-    let assertion = mit.unterschreibe(erklaerung, ORIGIN, RP, 0x05);
+    let assertion = mit.sign(erklaerung, ORIGIN, RP, 0x05);
     common::anfrage_json(
         &hub.app,
         "POST",
@@ -716,8 +717,8 @@ fn gueltige_fremde(u: &Value) -> Vec<String> {
 #[tokio::test]
 async fn neuer_schluessel_braucht_gegenzeichnung_und_wird_nachgeliefert() {
     let (hub, elw) = gekoppelt().await;
-    let a = SoftwarePasskey::neu("a", [1u8; 32]);
-    let b = SoftwarePasskey::neu("b", [2u8; 32]);
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
     let id_b = schluessel(&hub, &b, "Stick B").await;
     let hub_u = uebersicht(&hub).await;
     let zeile_b = hub_u["schluessel"]
@@ -758,7 +759,7 @@ async fn untergeschobener_schluessel_wird_am_elw_verworfen() {
          credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, stand) \
          VALUES (1, 'lokal', 1, 'Mallory', 'boese', 'es256', ?, ?, ?, 'boese', 'X', 'gueltig', 99)",
     )
-    .bind(SoftwarePasskey::neu("boese", [9u8; 32]).oeffentlich())
+    .bind(SoftwarePasskey::new("boese", [9u8; 32]).oeffentlich())
     .bind(RP)
     .bind(ORIGIN)
     .execute(&hub.pool)
@@ -792,9 +793,9 @@ async fn letzter_schluessel_bleibt_solange_gekoppelt_und_widerruf_wandert() {
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
 
     // Mit einem zweiten, gegengezeichneten Schlüssel geht es; der Widerruf erreicht den ELW.
-    let id_b = schluessel(&hub, &SoftwarePasskey::neu("b", [2u8; 32]), "B").await;
+    let id_b = schluessel(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "B").await;
     assert_eq!(
-        gegenzeichnen(&hub, id_b, &SoftwarePasskey::neu("a", [1u8; 32]))
+        gegenzeichnen(&hub, id_b, &SoftwarePasskey::new("a", [1u8; 32]))
             .await
             .0,
         StatusCode::OK
@@ -829,10 +830,10 @@ async fn deaktivieren_widerruft_die_schluessel_des_kontos() {
         .await
         .unwrap();
     {
-        let p = SoftwarePasskey::neu("z", [4u8; 32]);
+        let p = SoftwarePasskey::new("z", [4u8; 32]);
         let oeff = p.oeffentlich();
         let mut conn = hub.pool.acquire().await.unwrap();
-        unterschrift::anlegen_lokal(
+        unterschrift::create_lokal(
             &mut conn,
             &unterschrift::NeuerSchluessel {
                 org_id: 1,
@@ -896,8 +897,8 @@ async fn koppeln_roh(
     org: (&str, &str),
 ) -> StatusCode {
     use lifeline_hub::instanz::code as kcode;
-    let c = kcode::normalisiere(code).unwrap();
-    let a = kcode::ableiten(&c);
+    let c = kcode::normalize(code).unwrap();
+    let a = kcode::derive(&c);
     let schluessel = schluessel_von.oeffentlich_b64();
     let t = kcode::transkript_einloeser(
         &a.suche,
@@ -932,10 +933,10 @@ async fn koppeln_roh(
 async fn code_org_y(hub: &Instanz) -> String {
     let (org_y, id_y) = org_admin(&hub.pool, "Org Y", "yadmin").await;
     {
-        let p = SoftwarePasskey::neu("y", [6u8; 32]);
+        let p = SoftwarePasskey::new("y", [6u8; 32]);
         let oeff = p.oeffentlich();
         let mut conn = hub.pool.acquire().await.unwrap();
-        unterschrift::anlegen_lokal(
+        unterschrift::create_lokal(
             &mut conn,
             &unterschrift::NeuerSchluessel {
                 org_id: org_y,
@@ -967,7 +968,7 @@ async fn fremder_schluessel_unter_bekannter_kennung_wird_abgelehnt() {
             .await
             .unwrap();
     let c = code_org_y(&hub).await;
-    let angreifer = Identitaet::aus_teilen("egal", [99u8; 32]);
+    let angreifer = Identitaet::from_parts("egal", [99u8; 32]);
     let s = koppeln_roh(&hub, &c, &elw_i.kennung, &angreifer, ("m/1", "M")).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
     let schluessel_nachher: String =
@@ -986,7 +987,7 @@ async fn unbestaetigte_org_zuordnung_verfaellt() {
     // Der echte ELW löst ein, verwirft aber die Antwort (meldet die Org nie).
     let s = koppeln_roh(&hub, &c, &elw_i.kennung, &elw_i, ("elw/9", "Org ELW Y")).await;
     assert_eq!(s, StatusCode::OK);
-    lifeline_hub::instanz::repo::angebahnte_verwerfen(&hub.pool, "2999-01-01 00:00:00")
+    lifeline_hub::instanz::repo::discard_angebahnte(&hub.pool, "2999-01-01 00:00:00")
         .await
         .unwrap();
     let aktiv: i64 =

@@ -40,20 +40,20 @@ impl Zeremonie {
 static STORE: LazyLock<Mutex<BegrenzterAblaufSpeicher<Zeremonie>>> =
     LazyLock::new(|| Mutex::new(BegrenzterAblaufSpeicher::neu(TTL, OBERGRENZE)));
 
-fn store() -> MutexGuard<'static, BegrenzterAblaufSpeicher<Zeremonie>> {
+fn speicher() -> MutexGuard<'static, BegrenzterAblaufSpeicher<Zeremonie>> {
     STORE.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 /// Legt eine Zeremonie ab und liefert ihren Schlüssel.
-pub fn ablegen(z: Zeremonie) -> Result<String, Voll> {
+pub fn store(z: Zeremonie) -> Result<String, Voll> {
     let key = crate::auth::session::neuer_token();
-    store().einfuegen(key.clone(), z, Instant::now())?;
+    speicher().einfuegen(key.clone(), z, Instant::now())?;
     Ok(key)
 }
 
 /// Entnimmt die Zeremonie einmalig, nur für das Konto, das sie begonnen hat. Kein `.await` hier
 /// (der std-Guard ist bei der Rückkehr frei).
-pub fn entnehmen(key: &str, benutzer_id: i64) -> Option<Zeremonie> {
-    let z = store().entnehmen(key, Instant::now())?;
+pub fn take(key: &str, benutzer_id: i64) -> Option<Zeremonie> {
+    let z = speicher().entnehmen(key, Instant::now())?;
     (z.benutzer_id() == benutzer_id).then_some(z)
 }

@@ -48,7 +48,7 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
  * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
  * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber).
  */
-export function istLesezugang(aktion: AdminAktion): boolean {
+export function hasNamensziel(aktion: AdminAktion): boolean {
   return (
     aktion === 'lesezugang_angelegt' ||
     aktion === 'lesezugang_widerrufen' ||

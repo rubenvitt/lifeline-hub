@@ -15,17 +15,17 @@ import { apiGet, apiSend } from './client';
 // `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`):
 // Verwaltung durch den Admin der Org. Die Routen, die eine andere Instanz ruft, kennt das Frontend nicht.
 
-export function ladeInstanzUebersicht(): Promise<InstanzUebersicht> {
+export function loadInstanzUebersicht(): Promise<InstanzUebersicht> {
   return apiGet<InstanzUebersicht>('/api/admin/instanz');
 }
 
 /** Stellt einen Kopplungscode aus; der Code steht nur in dieser Antwort. */
-export function stelleKopplungscodeAus(): Promise<KopplungscodeAntwort> {
+export function issueKopplungscode(): Promise<KopplungscodeAntwort> {
   return apiSend<KopplungscodeAntwort>('/api/admin/instanz/codes', 'POST');
 }
 
 /** Koppelt diese Instanz mit dem Code einer anderen unter `adresse`. */
-export function loeseKopplungscodeEin(
+export function redeemKopplungscode(
   adresse: string,
   code: string,
 ): Promise<InstanzKopplungAnzeige> {

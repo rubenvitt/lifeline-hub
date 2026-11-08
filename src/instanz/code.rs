@@ -17,7 +17,7 @@ pub const GUELTIG_MINUTEN: i64 = 15;
 const SALZ: &[u8] = b"lifeline-instanzkopplung/1";
 
 /// Erzeugt einen neuen, zufälligen Code in Normalform (ohne Trennzeichen).
-pub fn neu() -> String {
+pub fn generate() -> String {
     let mut bytes = [0u8; LAENGE];
     OsRng.fill_bytes(&mut bytes);
     bytes
@@ -27,7 +27,7 @@ pub fn neu() -> String {
 }
 
 /// Zur Anzeige in Vierergruppen: `ABCD-EFGH-JKMN-PQRS`.
-pub fn anzeige(code: &str) -> String {
+pub fn format_anzeige(code: &str) -> String {
     code.as_bytes()
         .chunks(4)
         .map(|c| std::str::from_utf8(c).expect("ASCII"))
@@ -36,7 +36,7 @@ pub fn anzeige(code: &str) -> String {
 }
 
 /// Normalform wie `geraet::code::normalisiere`, aber mit [`LAENGE`] Zeichen.
-pub fn normalisiere(eingabe: &str) -> Option<String> {
+pub fn normalize(eingabe: &str) -> Option<String> {
     let mut aus = String::with_capacity(LAENGE);
     for c in eingabe.chars() {
         let c = match c.to_ascii_uppercase() {
@@ -73,7 +73,7 @@ impl std::fmt::Debug for Ableitung {
 }
 
 /// Leitet aus einem normalisierten Code die drei Werte ab.
-pub fn ableiten(code: &str) -> Ableitung {
+pub fn derive(code: &str) -> Ableitung {
     let hk = Hkdf::<Sha256>::new(Some(SALZ), code.as_bytes());
     let mut suche = [0u8; 32];
     let mut k_einloeser = [0u8; 32];
@@ -139,8 +139,8 @@ pub fn pruefwert(schluessel: &[u8; 32], transkript: &[u8]) -> String {
 }
 
 /// Prüft einen Prüfwert in konstanter Zeit.
-pub fn pruefwert_stimmt(schluessel: &[u8; 32], transkript: &[u8], erhalten: &str) -> bool {
-    let Some(bytes) = super::basis32::b64_lesen(erhalten) else {
+pub fn is_pruefwert_valid(schluessel: &[u8; 32], transkript: &[u8], erhalten: &str) -> bool {
+    let Some(bytes) = super::basis32::parse_b64(erhalten) else {
         return false;
     };
     let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(schluessel).expect("jede Länge");
@@ -155,29 +155,29 @@ mod tests {
     #[test]
     fn neuer_code_ist_normalform_mit_80_bit() {
         for _ in 0..200 {
-            let c = neu();
+            let c = generate();
             assert_eq!(c.len(), LAENGE);
-            assert_eq!(normalisiere(&c).as_deref(), Some(c.as_str()));
-            assert_eq!(normalisiere(&anzeige(&c)).as_deref(), Some(c.as_str()));
+            assert_eq!(normalize(&c).as_deref(), Some(c.as_str()));
+            assert_eq!(normalize(&format_anzeige(&c)).as_deref(), Some(c.as_str()));
         }
     }
 
     #[test]
     fn normalisiert_eingabe() {
         assert_eq!(
-            normalisiere("abcd-efgh jkmn-pqrs").as_deref(),
+            normalize("abcd-efgh jkmn-pqrs").as_deref(),
             Some("ABCDEFGHJKMNPQRS")
         );
-        assert_eq!(normalisiere("ABCDEFGH"), None, "Gerätecode ist zu kurz");
-        assert_eq!(normalisiere("ABCDEFGHJKMNPQRSU"), None);
-        assert_eq!(anzeige("ABCDEFGHJKMNPQRS"), "ABCD-EFGH-JKMN-PQRS");
+        assert_eq!(normalize("ABCDEFGH"), None, "Gerätecode ist zu kurz");
+        assert_eq!(normalize("ABCDEFGHJKMNPQRSU"), None);
+        assert_eq!(format_anzeige("ABCDEFGHJKMNPQRS"), "ABCD-EFGH-JKMN-PQRS");
     }
 
     #[test]
     fn ableitung_ist_stabil_und_trennt_die_werte() {
-        let a = ableiten("ABCDEFGHJKMNPQRS");
-        let b = ableiten("ABCDEFGHJKMNPQRS");
-        let c = ableiten("ABCDEFGHJKMNPQRT");
+        let a = derive("ABCDEFGHJKMNPQRS");
+        let b = derive("ABCDEFGHJKMNPQRS");
+        let c = derive("ABCDEFGHJKMNPQRT");
         assert_eq!(a, b);
         assert_ne!(a.suche, c.suche);
         assert_ne!(a.k_einloeser, a.k_aussteller);
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn pruefwert_scheitert_an_ausgetauschtem_schluessel_und_anderem_code() {
-        let a = ableiten("ABCDEFGHJKMNPQRS");
+        let a = derive("ABCDEFGHJKMNPQRS");
         let t = transkript_einloeser(
             &a.suche,
             "elw",
@@ -197,7 +197,7 @@ mod tests {
             "j",
         );
         let p = pruefwert(&a.k_einloeser, &t);
-        assert!(pruefwert_stimmt(&a.k_einloeser, &t, &p));
+        assert!(is_pruefwert_valid(&a.k_einloeser, &t, &p));
         let getauscht = transkript_einloeser(
             &a.suche,
             "elw",
@@ -207,14 +207,14 @@ mod tests {
             "ELW",
             "j",
         );
-        assert!(!pruefwert_stimmt(&a.k_einloeser, &getauscht, &p));
-        let anderer = ableiten("ABCDEFGHJKMNPQRT");
-        assert!(!pruefwert_stimmt(&anderer.k_einloeser, &t, &p));
+        assert!(!is_pruefwert_valid(&a.k_einloeser, &getauscht, &p));
+        let anderer = derive("ABCDEFGHJKMNPQRT");
+        assert!(!is_pruefwert_valid(&anderer.k_einloeser, &t, &p));
         assert!(
-            !pruefwert_stimmt(&a.k_aussteller, &t, &p),
+            !is_pruefwert_valid(&a.k_aussteller, &t, &p),
             "Seiten getrennt"
         );
-        assert!(!pruefwert_stimmt(&a.k_einloeser, &t, "kaputt!"));
+        assert!(!is_pruefwert_valid(&a.k_einloeser, &t, "kaputt!"));
     }
 
     #[test]
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn debug_zeigt_keine_schluessel() {
-        let a = ableiten("ABCDEFGHJKMNPQRS");
+        let a = derive("ABCDEFGHJKMNPQRS");
         let text = format!("{a:?}");
         assert!(!text.contains("k_einloeser"));
     }

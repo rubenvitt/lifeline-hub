@@ -7,9 +7,9 @@
 //! Versionen weiter auseinanderliegen (D5).
 
 use super::extractor::MELDEN_PFAD;
-use super::identitaet::{self, oeffentlich_lesen, Identitaet};
+use super::identitaet::{self, parse_oeffentlich, Identitaet};
 use super::repo::{self, KopplungZeile};
-use super::signatur::{self, AnfrageEntwurf, ANTWORT_KOPF, SCHEMA};
+use super::signatur::{self, AnfrageDraft, ANTWORT_KOPF, SCHEMA};
 use super::{org_kennung, InstanzKopplungZustand, PROTOKOLL};
 use crate::auth::admin_audit::{self, AdminAktion, Ziel, ZugangsAngaben};
 use crate::auth::unterschrift::repo as unterschrift;
@@ -41,7 +41,7 @@ fn abstand_s() -> u64 {
 
 /// Abstand bis zur nächsten Meldung nach `fehlversuche` Fehlschlägen in Folge: verdoppelt bis
 /// [`ABSTAND_MAX_S`].
-pub fn naechster_abstand(grund: u64, fehlversuche: u32) -> u64 {
+pub fn next_abstand(grund: u64, fehlversuche: u32) -> u64 {
     grund
         .saturating_mul(1u64 << fehlversuche.min(16))
         .min(ABSTAND_MAX_S.max(grund))
@@ -103,7 +103,7 @@ fn client() -> &'static reqwest::Client {
 /// Normalisiert die Adresse des Gegenübers: `https://` (für Loopback auch `http://`, nur für
 /// Tests und lokale Versuche), ohne Query, Fragment und abschließenden Schrägstrich. Ein Pfad
 /// bleibt (Instanz hinter einem Proxy unter einem Präfix).
-pub fn adresse_normalisieren(eingabe: &str) -> Result<String, AppError> {
+pub fn normalize_adresse(eingabe: &str) -> Result<String, AppError> {
     let url = reqwest::Url::parse(eingabe.trim())
         .map_err(|_| AppError::Validation("Adresse ist keine gültige URL.".into()))?;
     let host = url.host_str().unwrap_or_default();
@@ -137,7 +137,7 @@ pub fn adresse_normalisieren(eingabe: &str) -> Result<String, AppError> {
 
 /// Warum eine Nachricht an das Gegenüber scheiterte.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SendeFehler {
+pub enum SendError {
     /// Nicht erreichbar oder Zeitüberschreitung.
     Netz(String),
     /// Das Gegenüber hat mit diesem Status abgelehnt.
@@ -146,42 +146,42 @@ pub enum SendeFehler {
     AntwortUngueltig(String),
 }
 
-impl std::fmt::Display for SendeFehler {
+impl std::fmt::Display for SendError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SendeFehler::Netz(t) => write!(f, "nicht erreichbar: {t}"),
-            SendeFehler::Abgelehnt(s, t) if t.is_empty() => write!(f, "abgelehnt ({s})"),
-            SendeFehler::Abgelehnt(s, t) => write!(f, "abgelehnt ({s}): {t}"),
-            SendeFehler::AntwortUngueltig(t) => write!(f, "Antwort ungültig: {t}"),
+            SendError::Netz(t) => write!(f, "nicht erreichbar: {t}"),
+            SendError::Abgelehnt(s, t) if t.is_empty() => write!(f, "abgelehnt ({s})"),
+            SendError::Abgelehnt(s, t) => write!(f, "abgelehnt ({s}): {t}"),
+            SendError::AntwortUngueltig(t) => write!(f, "Antwort ungültig: {t}"),
         }
     }
 }
 
 /// Eine geprüfte Antwort des Gegenübers.
 #[derive(Debug)]
-pub struct GepruefteAntwort<T> {
+pub struct VerifiedAntwort<T> {
     pub wert: T,
     /// Uhr des Gegenübers minus unsere, in Sekunden.
     pub uhr_abweichung_s: i64,
 }
 
 /// Schickt eine signierte Anfrage an das Gegenüber und prüft dessen signierte Antwort.
-pub async fn signiert_senden<A: Serialize, T: DeserializeOwned>(
+pub async fn send_signed<A: Serialize, T: DeserializeOwned>(
     identitaet: &Identitaet,
     kopplung: &KopplungZeile,
     pfad: &str,
     anfrage: &A,
-) -> Result<GepruefteAntwort<T>, SendeFehler> {
+) -> Result<VerifiedAntwort<T>, SendError> {
     let basis = kopplung
         .gegenueber_adresse
         .as_deref()
-        .ok_or_else(|| SendeFehler::Netz("keine Adresse".into()))?;
-    let schluessel = oeffentlich_lesen(&kopplung.gegenueber_schluessel)
-        .ok_or_else(|| SendeFehler::AntwortUngueltig("Schlüssel des Gegenübers unlesbar".into()))?;
+        .ok_or_else(|| SendError::Netz("keine Adresse".into()))?;
+    let schluessel = parse_oeffentlich(&kopplung.gegenueber_schluessel)
+        .ok_or_else(|| SendError::AntwortUngueltig("Schlüssel des Gegenübers unlesbar".into()))?;
     let body = serde_json::to_vec(anfrage).expect("Anfrage ist serialisierbar");
-    let (token, jti) = signatur::anfrage_signieren(
+    let (token, jti) = signatur::sign_anfrage(
         identitaet,
-        &AnfrageEntwurf {
+        &AnfrageDraft {
             ziel_kennung: &kopplung.gegenueber_kennung,
             methode: "POST",
             pfad,
@@ -196,7 +196,7 @@ pub async fn signiert_senden<A: Serialize, T: DeserializeOwned>(
         .body(body)
         .send()
         .await
-        .map_err(|e| SendeFehler::Netz(e.without_url().to_string()))?;
+        .map_err(|e| SendError::Netz(e.without_url().to_string()))?;
     let status = resp.status().as_u16();
     let antwort_token = resp
         .headers()
@@ -205,20 +205,20 @@ pub async fn signiert_senden<A: Serialize, T: DeserializeOwned>(
         .map(str::to_string);
     let rumpf = crate::http_begrenzt::lies_begrenzt(resp, ANTWORT_MAX)
         .await
-        .map_err(|e| SendeFehler::Netz(e.to_string()))?;
+        .map_err(|e| SendError::Netz(e.to_string()))?;
     let Some(antwort_token) = antwort_token else {
         let text = serde_json::from_slice::<serde_json::Value>(&rumpf)
             .ok()
             .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_string))
             .unwrap_or_default();
         return Err(if (200..300).contains(&status) {
-            SendeFehler::AntwortUngueltig("ohne Signatur".into())
+            SendError::AntwortUngueltig("ohne Signatur".into())
         } else {
-            SendeFehler::Abgelehnt(status, text)
+            SendError::Abgelehnt(status, text)
         });
     };
     let jetzt = Utc::now().timestamp();
-    let claims = signatur::antwort_pruefen(
+    let claims = signatur::verify_antwort(
         &antwort_token,
         &schluessel,
         &kopplung.gegenueber_kennung,
@@ -228,13 +228,13 @@ pub async fn signiert_senden<A: Serialize, T: DeserializeOwned>(
         &rumpf,
         jetzt,
     )
-    .map_err(|e| SendeFehler::AntwortUngueltig(e.to_string()))?;
+    .map_err(|e| SendError::AntwortUngueltig(e.to_string()))?;
     if !(200..300).contains(&status) {
-        return Err(SendeFehler::Abgelehnt(status, String::new()));
+        return Err(SendError::Abgelehnt(status, String::new()));
     }
     let wert = serde_json::from_slice(&rumpf)
-        .map_err(|e| SendeFehler::AntwortUngueltig(format!("Body unlesbar: {e}")))?;
-    Ok(GepruefteAntwort {
+        .map_err(|e| SendError::AntwortUngueltig(format!("Body unlesbar: {e}")))?;
+    Ok(VerifiedAntwort {
         wert,
         uhr_abweichung_s: claims.iat - jetzt,
     })
@@ -247,14 +247,14 @@ pub async fn signiert_senden<A: Serialize, T: DeserializeOwned>(
 /// Widerruf mitgehen soll (sie sind schon nicht mehr aktiv). Fehler landen an der Kopplung, nicht
 /// beim Aufrufer.
 pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Result<(), AppError> {
-    let identitaet = identitaet::laden_oder_erzeugen(pool)
+    let identitaet = identitaet::load_or_create(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     let (aktiv, offen) = {
         let mut conn = pool.acquire().await?;
         (
-            repo::orgs_aktiv(&mut conn, kopplung.id).await?,
-            repo::orgs_widerruf_offen(&mut conn, kopplung.id).await?,
+            repo::list_orgs_aktiv(&mut conn, kopplung.id).await?,
+            repo::list_orgs_widerruf_offen(&mut conn, kopplung.id).await?,
         )
     };
     let anfrage = MeldenAnfrage {
@@ -272,14 +272,14 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
-        signiert_senden::<_, MeldenAntwort>(&identitaet, kopplung, MELDEN_PFAD, &anfrage).await;
+        send_signed::<_, MeldenAntwort>(&identitaet, kopplung, MELDEN_PFAD, &anfrage).await;
     let antwort = match ergebnis {
         Ok(a) => a,
         Err(f) => {
-            let abstand = naechster_abstand(abstand_s(), kopplung.fehlversuche as u32 + 1);
-            let naechste = plus_sekunden(&jetzt, abstand as i64).unwrap_or(jetzt);
+            let abstand = next_abstand(abstand_s(), kopplung.fehlversuche as u32 + 1);
+            let naechste = add_sekunden(&jetzt, abstand as i64).unwrap_or(jetzt);
             tracing::warn!(kopplung = kopplung.id, fehler = %f, "Meldung bei gekoppelter Instanz gescheitert");
-            repo::meldeversuch(pool, kopplung.id, Some(&f.to_string()), &naechste).await?;
+            repo::save_meldeversuch(pool, kopplung.id, Some(&f.to_string()), &naechste).await?;
             return Ok(());
         }
     };
@@ -289,7 +289,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     crate::write_retry!(pool, |conn| {
         abgelehnt_alle.clear();
         vom_gegenueber_widerrufen.clear();
-        repo::gesehen(
+        repo::mark_gesehen(
             conn,
             kopplung.id,
             &a.softwarestand,
@@ -299,7 +299,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         )
         .await?;
         let ids: Vec<i64> = offen.iter().map(|o| o.id).collect();
-        repo::widerruf_als_gemeldet(conn, &ids, &jetzt).await?;
+        repo::mark_widerruf_gemeldet(conn, &ids, &jetzt).await?;
         for oa in &a.orgs {
             let Some(o) = aktiv.iter().find(|o| o.fremde_org_kennung == oa.org) else {
                 continue;
@@ -315,12 +315,14 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 org_id: o.org_id,
                 fremde_org_kennung: &o.fremde_org_kennung,
             };
-            for ab in unterschrift::annehmen(conn, &ziel, &oa.unterschrift, false, &jetzt).await? {
+            for ab in unterschrift::accept_lieferungen(conn, &ziel, &oa.unterschrift, false, &jetzt)
+                .await?
+            {
                 abgelehnt_alle.push((o.clone(), ab));
             }
         }
         if let Some((_, ab)) = abgelehnt_alle.last() {
-            repo::hinweis_setzen(
+            repo::set_hinweis(
                 conn,
                 kopplung.id,
                 &format!(
@@ -330,7 +332,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             )
             .await?;
         }
-        repo::zustand_nach_orgs(
+        repo::update_zustand_nach_orgs(
             conn,
             kopplung.id,
             InstanzKopplungZustand::VomGegenueberWiderrufen,
@@ -338,8 +340,8 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         .await?;
         Ok(())
     })?;
-    let naechste = plus_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone());
-    repo::meldeversuch(pool, kopplung.id, None, &naechste).await?;
+    let naechste = add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone());
+    repo::save_meldeversuch(pool, kopplung.id, None, &naechste).await?;
 
     for o in &vom_gegenueber_widerrufen {
         admin_audit::schreibe_ohne_akteur(
@@ -348,13 +350,13 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             o.org_id,
             &kopplung.gegenueber_name,
             Ziel::Instanz(&kopplung.gegenueber_name),
-            Some(angaben_gegenstelle(kopplung, &o.fremde_org_name)),
+            Some(build_angaben_gegenstelle(kopplung, &o.fremde_org_name)),
             None,
         )
         .await;
     }
     for (o, ab) in &abgelehnt_alle {
-        let mut angaben = angaben_gegenstelle(kopplung, &o.fremde_org_name);
+        let mut angaben = build_angaben_gegenstelle(kopplung, &o.fremde_org_name);
         angaben.fingerabdruck = Some(ab.fingerabdruck.clone());
         angaben.grund = Some(ab.grund.clone());
         admin_audit::schreibe_ohne_akteur(
@@ -372,10 +374,10 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
 }
 
 /// Angaben zur Gegenstelle für die Admin-Spur.
-pub fn angaben_gegenstelle(kopplung: &KopplungZeile, fremde_org: &str) -> ZugangsAngaben {
+pub fn build_angaben_gegenstelle(kopplung: &KopplungZeile, fremde_org: &str) -> ZugangsAngaben {
     ZugangsAngaben {
         instanz_kennung: Some(kopplung.gegenueber_kennung.clone()),
-        fingerabdruck: crate::instanz::basis32::b64_lesen(&kopplung.gegenueber_schluessel)
+        fingerabdruck: crate::instanz::basis32::parse_b64(&kopplung.gegenueber_schluessel)
             .map(|b| crate::instanz::basis32::fingerabdruck(&b)),
         adresse: kopplung.gegenueber_adresse.clone(),
         fremde_org: Some(fremde_org.to_string()),
@@ -383,33 +385,33 @@ pub fn angaben_gegenstelle(kopplung: &KopplungZeile, fremde_org: &str) -> Zugang
     }
 }
 
-fn plus_sekunden(zeit: &str, sekunden: i64) -> Option<String> {
+fn add_sekunden(zeit: &str, sekunden: i64) -> Option<String> {
     crate::zeit::parse(zeit)
         .map(|t| crate::zeit::formatiere(t + chrono::Duration::seconds(sekunden)))
 }
 
 /// Ein Durchlauf des Hintergrund-Tasks: alle fälligen Meldungen, dann angebahnte Kopplungen
 /// verwerfen, die zu lange warten.
-pub async fn durchlauf(pool: &SqlitePool) -> Result<(), AppError> {
+pub async fn run_durchlauf(pool: &SqlitePool) -> Result<(), AppError> {
     let jetzt = crate::zeit::jetzt();
-    for k in repo::faellige_meldungen(pool, &jetzt).await? {
+    for k in repo::list_faellige_meldungen(pool, &jetzt).await? {
         melden_einmal(pool, &k).await?;
     }
     if let Some(grenze) = crate::zeit::plus_minuten(&jetzt, -ANGEBAHNT_MINUTEN) {
-        repo::angebahnte_verwerfen(pool, &grenze).await?;
+        repo::discard_angebahnte(pool, &grenze).await?;
     }
     Ok(())
 }
 
 /// Startet den Hintergrund-Task: alle fünf Sekunden ein [`durchlauf`]. Ohne Kopplung baut er nie
 /// eine Verbindung auf.
-pub fn starte(pool: SqlitePool) {
+pub fn start(pool: SqlitePool) {
     tokio::spawn(async move {
         let mut takt = tokio::time::interval(Duration::from_secs(5));
         takt.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             takt.tick().await;
-            if let Err(e) = durchlauf(&pool).await {
+            if let Err(e) = run_durchlauf(&pool).await {
                 tracing::warn!(error = %e, "Instanzkopplung: Durchlauf gescheitert");
             }
         }
@@ -421,7 +423,7 @@ pub fn starte(pool: SqlitePool) {
 /// Beantwortet eine Meldung (Handler `POST /api/instanz/melden`): hält fest, was das Gegenüber
 /// über sich sagt, übernimmt dessen Widerrufe und liefert Widerrufe und Unterschriftsschlüssel
 /// je Org.
-pub async fn beantworten(
+pub async fn handle_meldung(
     pool: &SqlitePool,
     identitaet: &Identitaet,
     kopplung: &KopplungZeile,
@@ -434,7 +436,7 @@ pub async fn beantworten(
     let mut vom_gegenueber = Vec::new();
     let orgs = crate::write_retry!(pool, |conn| {
         vom_gegenueber.clear();
-        repo::gesehen(
+        repo::mark_gesehen(
             conn,
             kopplung.id,
             &anfrage.softwarestand,
@@ -443,7 +445,7 @@ pub async fn beantworten(
             &jetzt,
         )
         .await?;
-        let alle = repo::orgs_alle(conn, kopplung.id).await?;
+        let alle = repo::list_orgs(conn, kopplung.id).await?;
         let kennung = |o: &repo::OrgZeile| org_kennung(&identitaet.kennung, o.org_id);
         for w in &anfrage.widerrufen {
             if let Some(o) = alle
@@ -464,7 +466,7 @@ pub async fn beantworten(
                 o.widerrufen_at.is_none() && !vom_gegenueber.iter().any(|v| v.id == o.id)
             });
             if let Some(o) = aktiv {
-                repo::org_bestaetigen(conn, o.id).await?;
+                repo::confirm_org(conn, o.id).await?;
             }
             match aktiv {
                 Some(o) => orgs.push(MeldenOrgAntwort {
@@ -489,8 +491,8 @@ pub async fn beantworten(
                 }
             }
         }
-        repo::widerruf_als_gemeldet(conn, &gemeldet, &jetzt).await?;
-        repo::zustand_nach_orgs(
+        repo::mark_widerruf_gemeldet(conn, &gemeldet, &jetzt).await?;
+        repo::update_zustand_nach_orgs(
             conn,
             kopplung.id,
             InstanzKopplungZustand::VomGegenueberWiderrufen,
@@ -505,7 +507,7 @@ pub async fn beantworten(
             o.org_id,
             &kopplung.gegenueber_name,
             Ziel::Instanz(&kopplung.gegenueber_name),
-            Some(angaben_gegenstelle(kopplung, &o.fremde_org_name)),
+            Some(build_angaben_gegenstelle(kopplung, &o.fremde_org_name)),
             None,
         )
         .await;
@@ -524,13 +526,13 @@ mod tests {
 
     #[test]
     fn abstand_verdoppelt_sich_bis_zur_obergrenze() {
-        assert_eq!(naechster_abstand(60, 0), 60);
-        assert_eq!(naechster_abstand(60, 1), 120);
-        assert_eq!(naechster_abstand(60, 3), 480);
-        assert_eq!(naechster_abstand(60, 4), 600);
-        assert_eq!(naechster_abstand(60, 40), 600);
+        assert_eq!(next_abstand(60, 0), 60);
+        assert_eq!(next_abstand(60, 1), 120);
+        assert_eq!(next_abstand(60, 3), 480);
+        assert_eq!(next_abstand(60, 4), 600);
+        assert_eq!(next_abstand(60, 40), 600);
         assert_eq!(
-            naechster_abstand(900, 2),
+            next_abstand(900, 2),
             900,
             "Grundabstand über der Grenze bleibt"
         );
@@ -539,20 +541,20 @@ mod tests {
     #[test]
     fn adresse_wird_normalisiert() {
         assert_eq!(
-            adresse_normalisieren(" https://Hub.Example.org/ ").unwrap(),
+            normalize_adresse(" https://Hub.Example.org/ ").unwrap(),
             "https://hub.example.org"
         );
         assert_eq!(
-            adresse_normalisieren("https://hub.example.org:8443/lifeline/?x=1#y").unwrap(),
+            normalize_adresse("https://hub.example.org:8443/lifeline/?x=1#y").unwrap(),
             "https://hub.example.org:8443/lifeline"
         );
         assert_eq!(
-            adresse_normalisieren("http://127.0.0.1:3000").unwrap(),
+            normalize_adresse("http://127.0.0.1:3000").unwrap(),
             "http://127.0.0.1:3000"
         );
-        assert!(adresse_normalisieren("http://hub.example.org").is_err());
-        assert!(adresse_normalisieren("ftp://hub.example.org").is_err());
-        assert!(adresse_normalisieren("https://nutzer:pw@hub.example.org").is_err());
-        assert!(adresse_normalisieren("hub.example.org").is_err());
+        assert!(normalize_adresse("http://hub.example.org").is_err());
+        assert!(normalize_adresse("ftp://hub.example.org").is_err());
+        assert!(normalize_adresse("https://nutzer:pw@hub.example.org").is_err());
+        assert!(normalize_adresse("hub.example.org").is_err());
     }
 }

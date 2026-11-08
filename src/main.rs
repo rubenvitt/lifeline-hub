@@ -201,7 +201,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Instanzkopplung (LLH-1490): Identität beim ersten Start erzeugen, Name und Melde-Abstand
     // setzen, Hintergrund-Task starten. Ohne Kopplung baut er keine Verbindung auf.
-    let identitaet = lifeline_hub::instanz::identitaet::laden_oder_erzeugen(&pool).await?;
+    let identitaet = lifeline_hub::instanz::identitaet::load_or_create(&pool).await?;
     tracing::info!(
         kennung = %identitaet.kennung,
         fingerabdruck = %identitaet.fingerabdruck(),
@@ -209,7 +209,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     );
     lifeline_hub::instanz::set_name(config.instanz_anzeigename());
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
-    lifeline_hub::instanz::melden::starte(pool.clone());
+    lifeline_hub::instanz::melden::start(pool.clone());
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone(), live.clone());
     // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`. Das Stoppsignal setzt der

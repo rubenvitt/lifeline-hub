@@ -23,12 +23,12 @@ static RP: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
 /// Ein Unterschriftsschlüssel trägt beides, damit eine andere Instanz seine Unterschrift prüfen
 /// kann.
 pub fn set_rp(rp_id: String, origin: String) {
-    let _ = RP.set((rp_id, origin_normalisieren(&origin)));
+    let _ = RP.set((rp_id, normalize_origin(&origin)));
 }
 
 /// Herkunft so, wie der Browser sie ins `clientDataJSON` schreibt (`https://host[:port]`, klein,
 /// ohne Standardport und Schrägstrich); eine unlesbare Angabe bleibt, wie sie ist.
-pub fn origin_normalisieren(origin: &str) -> String {
+pub fn normalize_origin(origin: &str) -> String {
     reqwest::Url::parse(origin.trim())
         .map(|u| u.origin().ascii_serialization())
         .unwrap_or_else(|_| origin.to_string())
@@ -39,11 +39,11 @@ mod tests {
     #[test]
     fn origin_wie_der_browser() {
         assert_eq!(
-            super::origin_normalisieren("https://Hub.Example.org:443/"),
+            super::normalize_origin("https://Hub.Example.org:443/"),
             "https://hub.example.org"
         );
         assert_eq!(
-            super::origin_normalisieren("http://localhost:8080"),
+            super::normalize_origin("http://localhost:8080"),
             "http://localhost:8080"
         );
     }
