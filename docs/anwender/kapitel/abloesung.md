@@ -512,9 +512,9 @@ dort als Entscheidung.
 ### Aushang und Schichtzettel
 
 Der Aushang nennt je Schicht Zeit, eingeteilte Personen (bei Helfern mit Organisation) und offene
-Plätze; mit dem Modul Personal auch die Qualifikationen. Ist das Soll an allen Schichten eines
-Postens gleich, steht es im Druckkopf, sonst je Schicht in der Spalte „Soll“. Pausen und Befunde
-stehen nicht auf dem Aushang.
+Plätze, dazu die Qualifikationen der Personen; hat am Posten niemand eine, entfällt die Spalte.
+Ist das Soll an allen Schichten eines Postens gleich, steht es im Druckkopf, sonst je Schicht in
+der Spalte „Soll“. Pausen und Befunde stehen nicht auf dem Aushang.
 
 Der Schichtzettel führt auch die Pausen als Zeile; der „Umfang“ im Druckkopf zählt Schichten und
 Stunden ohne Pausen. Organisation und Telefon stehen nur bei Helfern des Plans. Läuft der Plan über

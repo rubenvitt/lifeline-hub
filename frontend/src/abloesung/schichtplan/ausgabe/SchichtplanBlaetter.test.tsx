@@ -120,6 +120,15 @@ describe('SchichtplanBlaetter (LLH-1557)', () => {
     expect(uhs.getAllByRole('row')).toHaveLength(3);
   });
 
+  it('Ohne bekannte Qualifikation am Posten keine Spalte Qualifikation', () => {
+    zeigen();
+    const streife = within(blaetter()[1]);
+    expect(streife.queryByRole('columnheader', { name: 'Qualifikation' })).toBeNull();
+    expect(
+      within(blaetter()[0]).getByRole('columnheader', { name: 'Qualifikation' }),
+    ).toBeInTheDocument();
+  });
+
   it('Auswahl zeigt nur dieses Blatt', () => {
     zeigen({ auswahl: 'einheit:4' });
     expect(blaetter().map((b) => b.dataset.blatt)).toEqual(['einheit:4']);

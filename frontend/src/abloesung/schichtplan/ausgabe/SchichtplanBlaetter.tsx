@@ -87,6 +87,10 @@ export default function SchichtplanBlaetter({
       <>
         {blaetter.map((a) => {
           const soll = a.soll ? sollText(a.soll.anzahl, a.soll.quali) : null;
+          // Eine Spalte nur aus „–“ sagt nichts: ohne bekannte Qualifikation entfällt sie.
+          const mitQuali = a.zeilen.some((z) =>
+            z.personen.some((p) => p.qualifikationen.some((q) => qualiNamen.has(q))),
+          );
           const spalten: DruckSpalte<AushangZeile>[] = [
             ...(mitTag
               ? [{ titel: 'Tag', wert: (z: AushangZeile) => tag(z.schicht), mono: true }]
@@ -116,7 +120,7 @@ export default function SchichtplanBlaetter({
                     : []),
                 ]),
             },
-            ...(plan.personen == null
+            ...(!mitQuali
               ? []
               : [
                   {
