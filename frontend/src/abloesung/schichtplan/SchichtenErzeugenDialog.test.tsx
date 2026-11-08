@@ -91,6 +91,20 @@ describe('SchichtenErzeugenDialog (LLH-1584)', () => {
     });
   });
 
+  it('lehnt Sekunden ab wie der Server', async () => {
+    const { onErzeugen, dialog } = zeige('4 h');
+    await oeffne('Posten');
+    await waehle('Posten', 'UHS Markt');
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'Beginn' }),
+      '2099-01-01 10:00:30',
+    );
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Ende' }), '2099-01-01 18:00');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schichten erzeugen' }));
+    expect(await within(dialog).findByText('Auf volle 5 Minuten')).toBeInTheDocument();
+    expect(onErzeugen).not.toHaveBeenCalled();
+  });
+
   it('nennt jeden Konflikt als Zeile', () => {
     const { dialog } = zeige('4 h', konflikt);
     expect(within(dialog).getByText('überschneidet sich mit 1000–1400')).toBeInTheDocument();

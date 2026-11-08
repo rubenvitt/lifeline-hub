@@ -10,7 +10,7 @@ import {
 import { Alert, App, Button, Flex, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { fetchEinsatzSchichtmodell } from '../../api/abloesungen';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
@@ -139,6 +139,11 @@ export default function SchichtplanAnsicht({
   const jetzt = useUhr().valueOf();
   const [spannenWahl, setSpannenWahl] = useState<SpannenWahl>('12h');
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  // Für Antworten, die nach einem Dialogwechsel eintreffen (Kopie als nächsten Block).
+  const dialogJetzt = useRef(dialog);
+  useEffect(() => {
+    dialogJetzt.current = dialog;
+  }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
 
   const freigaben = useModulFreigaben(einsatzId);
@@ -353,7 +358,9 @@ export default function SchichtplanAnsicht({
           (b) =>
             postenSchluessel(b.posten) === postenSchluessel(block.posten) && b.von === body.von,
         );
-        if (!neu) return;
+        // Nur wenn der Dialog noch den Ausgangsblock zeigt; geschlossen oder gewechselt bleibt er.
+        const d = dialogJetzt.current;
+        if (!neu || d?.art !== 'block' || d.blockId !== block.id) return;
         aendernMut.reset();
         loeschenMut.reset();
         kopierenMut.reset();

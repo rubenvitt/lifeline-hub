@@ -119,7 +119,7 @@ export default function SchichtenErzeugenDialog({
               if (!zeitraumGueltig(z)) return Promise.reject(new Error('Beginn und Ende angeben'));
               if (z[1].valueOf() - z[0].valueOf() < MINDEST_MS)
                 return Promise.reject(new Error('Mindestens 10 Minuten'));
-              if (z[0].minute() % 5 !== 0 || z[1].minute() % 5 !== 0)
+              if (z.some((t) => t.minute() % 5 !== 0 || t.second() !== 0 || t.millisecond() !== 0))
                 return Promise.reject(new Error('Auf volle 5 Minuten'));
               return Promise.resolve();
             },
