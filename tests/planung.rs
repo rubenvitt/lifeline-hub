@@ -435,7 +435,7 @@ async fn erzeugen_fuellt_den_zeitraum_ohne_laenge_422() {
 
 #[tokio::test]
 async fn befunde_ohne_ist_doppelt_und_kennzahlen() {
-    let app = setup().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = admin(&app).await;
     let mia = stammpersonal_anlegen(&app, &admin, "Mia Muster").await;
     let max = stammpersonal_anlegen(&app, &admin, "Max Muster").await;
@@ -493,7 +493,8 @@ async fn befunde_ohne_ist_doppelt_und_kennzahlen() {
         "ohne Einsatz kein Ist: {text}"
     );
 
-    // Ad-hoc-Kräfte und fremdes Personal gibt es in der Planung nicht.
+    // Ad-hoc-Kräfte, unbekannte oder fremde Helfer und fremdes Personal gibt es in der Planung
+    // nicht.
     let block_b = bloecke(&plan)
         .iter()
         .find(|x| x["posten_id"] == b)
@@ -516,6 +517,37 @@ async fn befunde_ohne_ist_doppelt_und_kennzahlen() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (fremde_org, _) =
+        fremde_org_anlegen(&pool, "Andere", "fremd", "fremdpw12", "fuehrungskraft").await;
+    let fremde_person: i64 =
+        sqlx::query_scalar("INSERT INTO personal (org_id, name) VALUES (?, 'Fremd') RETURNING id")
+            .bind(fremde_org)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let andere = planung(&app, &admin, "Herbstmarkt").await;
+    let (s, h) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{andere}/helfer"),
+        json!({"name": "Finn Platzhalter"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{h}");
+    for person in [
+        json!({"art": "stamm", "personal_id": fremde_person}),
+        json!({"art": "helfer", "helfer_id": h["id"]}),
+    ] {
+        let (s, _) = patch(
+            &app,
+            &admin,
+            &pfad,
+            json!({"version": block_b["version"], "personen": [person.clone()]}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{person}");
+    }
 
     let (s, plan) = patch(
         &app,

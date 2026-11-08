@@ -695,35 +695,45 @@ pub async fn anlegen(
     e: &KopfEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        let bisher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM planung WHERE org_id = ?")
-            .bind(org_id)
-            .fetch_one(&mut *conn)
-            .await?;
-        if bisher >= PLANUNGEN_MAX {
-            return Err(AppError::UnprocessableEntity(format!(
-                "Höchstens {PLANUNGEN_MAX} Planungen je Organisation"
-            )));
-        }
-        pruefe_bezeichnung_frei_tx(conn, org_id, &e.bezeichnung, None).await?;
-        Ok(sqlx::query_scalar(
-            "INSERT INTO planung (org_id, bezeichnung, einsatzart, ort, ort_lat, ort_lon, von, \
-                bis, max_dienst_min, min_ruhe_min, angelegt_von) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(org_id)
-        .bind(&e.bezeichnung)
-        .bind(e.einsatzart.as_str())
-        .bind(&e.ort)
-        .bind(e.koordinate.map(|k| k.0))
-        .bind(e.koordinate.map(|k| k.1))
-        .bind(&e.von)
-        .bind(&e.bis)
-        .bind(e.max_dienst)
-        .bind(e.min_ruhe)
-        .bind(benutzer_id)
-        .fetch_one(&mut *conn)
-        .await?)
+        anlegen_tx(conn, org_id, benutzer_id, e).await
     })
+}
+
+/// [`anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    benutzer_id: i64,
+    e: &KopfEingabe,
+) -> Result<i64, AppError> {
+    let bisher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM planung WHERE org_id = ?")
+        .bind(org_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    if bisher >= PLANUNGEN_MAX {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Höchstens {PLANUNGEN_MAX} Planungen je Organisation"
+        )));
+    }
+    pruefe_bezeichnung_frei_tx(conn, org_id, &e.bezeichnung, None).await?;
+    Ok(sqlx::query_scalar(
+        "INSERT INTO planung (org_id, bezeichnung, einsatzart, ort, ort_lat, ort_lon, von, \
+            bis, max_dienst_min, min_ruhe_min, angelegt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(org_id)
+    .bind(&e.bezeichnung)
+    .bind(e.einsatzart.as_str())
+    .bind(&e.ort)
+    .bind(e.koordinate.map(|k| k.0))
+    .bind(e.koordinate.map(|k| k.1))
+    .bind(&e.von)
+    .bind(&e.bis)
+    .bind(e.max_dienst)
+    .bind(e.min_ruhe)
+    .bind(benutzer_id)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 /// Ändert den Kopf mit CAS über `version` (409). Ein Zeitraum über die Grenze ist 422.
@@ -805,7 +815,9 @@ pub async fn loeschen(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), App
 
 /// Aufbewahrung (Spec `vorplanung`): löscht jede Planung, deren Ende länger als
 /// [`AUFBEWAHRUNG_TAGE`] zurückliegt, je in einer eigenen Transaktion. Liefert Organisation und
-/// Kennung der gelöschten.
+/// Kennung der gelöschten. Scheitert eine einzelne Löschung, bleibt sie für den nächsten Lauf
+/// stehen und die übrigen laufen weiter: die schon gelöschten fallen nie aus dem Ergebnis, damit
+/// der Aufrufer sie meldet und den WAL-Rückschrieb vormerkt.
 pub async fn purge_abgelaufene(
     pool: &SqlitePool,
     jetzt: DateTime<Utc>,
@@ -818,7 +830,7 @@ pub async fn purge_abgelaufene(
             .await?;
     let mut geloescht = Vec::with_capacity(faellig.len());
     for (org_id, id) in faellig {
-        let entfernt = write_retry!(pool, |conn| {
+        let entfernt: Result<bool, AppError> = write_retry!(pool, |conn| {
             // Im selben Stand noch fällig? Ein PATCH kann das Ende verschoben haben.
             let noch: bool =
                 sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM planung WHERE id = ? AND bis < ?)")
@@ -830,9 +842,16 @@ pub async fn purge_abgelaufene(
                 loeschen_tx(conn, id).await?;
             }
             Ok(noch)
-        })?;
-        if entfernt {
-            geloescht.push((org_id, id));
+        });
+        match entfernt {
+            Ok(true) => geloescht.push((org_id, id)),
+            Ok(false) => {}
+            Err(e) => {
+                tracing::warn!(
+                    planung_id = id,
+                    "Purge: Planung nicht gelöscht, nächster Lauf: {e}"
+                )
+            }
         }
     }
     Ok(geloescht)
@@ -937,49 +956,59 @@ pub async fn posten_anlegen(
     e: &PostenEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
-        let (bisher, sortier): (i64, i64) = sqlx::query_as(
-            "SELECT COUNT(*), COALESCE(MAX(sortier) + 1, 0) FROM planung_posten \
-             WHERE planung_id = ?",
-        )
-        .bind(planung_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        if bisher >= POSTEN_MAX {
-            return Err(AppError::UnprocessableEntity(format!(
-                "Höchstens {POSTEN_MAX} Posten je Planung"
-            )));
-        }
-        pruefe_posten_bezeichnung_tx(conn, planung_id, &e.bezeichnung, None).await?;
-        let (vorgabe_anzahl, vorgabe_quali) = herkunft_soll_tx(conn, org_id, e.herkunft).await?;
-        let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
-        let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
-        crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
-        let (vorlage, fahrzeug, uhs_typ) = match e.herkunft {
-            Herkunft::Frei => (None, None, None),
-            Herkunft::Vorlage(v) => (Some(v), None, None),
-            Herkunft::Fahrzeug(f) => (None, Some(f), None),
-            Herkunft::Uhs(t) => (None, None, Some(t.as_str())),
-        };
-        Ok(sqlx::query_scalar(
-            "INSERT INTO planung_posten (planung_id, bezeichnung, abschnitt, art, \
-                einheit_vorlage_id, fahrzeug_id, uhs_typ, sortier, schichtlaenge_min, \
-                soll_anzahl, quali_soll) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(planung_id)
-        .bind(&e.bezeichnung)
-        .bind(&e.abschnitt)
-        .bind(e.herkunft.art().as_str())
-        .bind(vorlage)
-        .bind(fahrzeug)
-        .bind(uhs_typ)
-        .bind(sortier)
-        .bind(e.schichtlaenge)
-        .bind(soll_anzahl)
-        .bind(&quali_soll)
-        .fetch_one(&mut *conn)
-        .await?)
+        posten_anlegen_tx(conn, org_id, planung_id, e).await
     })
+}
+
+/// [`posten_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn posten_anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    planung_id: i64,
+    e: &PostenEingabe,
+) -> Result<i64, AppError> {
+    kopf_tx(conn, org_id, planung_id).await?;
+    let (bisher, sortier): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COALESCE(MAX(sortier) + 1, 0) FROM planung_posten \
+         WHERE planung_id = ?",
+    )
+    .bind(planung_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if bisher >= POSTEN_MAX {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Höchstens {POSTEN_MAX} Posten je Planung"
+        )));
+    }
+    pruefe_posten_bezeichnung_tx(conn, planung_id, &e.bezeichnung, None).await?;
+    let (vorgabe_anzahl, vorgabe_quali) = herkunft_soll_tx(conn, org_id, e.herkunft).await?;
+    let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
+    let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
+    crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
+    let (vorlage, fahrzeug, uhs_typ) = match e.herkunft {
+        Herkunft::Frei => (None, None, None),
+        Herkunft::Vorlage(v) => (Some(v), None, None),
+        Herkunft::Fahrzeug(f) => (None, Some(f), None),
+        Herkunft::Uhs(t) => (None, None, Some(t.as_str())),
+    };
+    Ok(sqlx::query_scalar(
+        "INSERT INTO planung_posten (planung_id, bezeichnung, abschnitt, art, \
+            einheit_vorlage_id, fahrzeug_id, uhs_typ, sortier, schichtlaenge_min, \
+            soll_anzahl, quali_soll) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(planung_id)
+    .bind(&e.bezeichnung)
+    .bind(&e.abschnitt)
+    .bind(e.herkunft.art().as_str())
+    .bind(vorlage)
+    .bind(fahrzeug)
+    .bind(uhs_typ)
+    .bind(sortier)
+    .bind(e.schichtlaenge)
+    .bind(soll_anzahl)
+    .bind(&quali_soll)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 /// Ändert einen Posten; bestehende Blöcke behalten ihr Soll (Kopie beim Anlegen).
@@ -1339,31 +1368,41 @@ pub async fn block_anlegen(
     e: &BlockEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
-        let (vorgabe_anzahl, vorgabe_quali, _, _) =
-            posten_tx(conn, planung_id, e.posten_id).await?;
-        pruefe_anzahl_tx(conn, planung_id, 1).await?;
-        let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
-        let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
-        pause_ohne_soll(e.posten_id, soll_anzahl, quali_soll.as_deref())?;
-        crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
-        pruefe_personen_tx(conn, org_id, planung_id, &e.personen).await?;
-        pruefe_frei_tx(conn, org_id, planung_id, e.posten_id, &e.von, &e.bis, None).await?;
-        let bid = insert_block_tx(
-            conn,
-            planung_id,
-            benutzer_id,
-            e.posten_id,
-            &e.von,
-            &e.bis,
-            soll_anzahl,
-            quali_soll.as_deref(),
-            e.notiz.as_deref(),
-        )
-        .await?;
-        schreibe_personen_tx(conn, bid, &e.personen).await?;
-        Ok(bid)
+        block_anlegen_tx(conn, org_id, planung_id, benutzer_id, e).await
     })
+}
+
+/// [`block_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn block_anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    planung_id: i64,
+    benutzer_id: i64,
+    e: &BlockEingabe,
+) -> Result<i64, AppError> {
+    kopf_tx(conn, org_id, planung_id).await?;
+    let (vorgabe_anzahl, vorgabe_quali, _, _) = posten_tx(conn, planung_id, e.posten_id).await?;
+    pruefe_anzahl_tx(conn, planung_id, 1).await?;
+    let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
+    let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
+    pause_ohne_soll(e.posten_id, soll_anzahl, quali_soll.as_deref())?;
+    crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
+    pruefe_personen_tx(conn, org_id, planung_id, &e.personen).await?;
+    pruefe_frei_tx(conn, org_id, planung_id, e.posten_id, &e.von, &e.bis, None).await?;
+    let bid = insert_block_tx(
+        conn,
+        planung_id,
+        benutzer_id,
+        e.posten_id,
+        &e.von,
+        &e.bis,
+        soll_anzahl,
+        quali_soll.as_deref(),
+        e.notiz.as_deref(),
+    )
+    .await?;
+    schreibe_personen_tx(conn, bid, &e.personen).await?;
+    Ok(bid)
 }
 
 /// Ändert einen Block mit CAS über `version` (409). Verschieben in die Pause löscht das Soll.
@@ -1626,32 +1665,43 @@ pub async fn helfer_anlegen(
     e: &HelferEingabe,
 ) -> Result<PlanHelferAnzeige, AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
-        pruefe_qualifikationen_tx(conn, org_id, &e.qualifikationen).await?;
-        let bisher: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM planung_helfer WHERE planung_id = ?")
-                .bind(planung_id)
-                .fetch_one(&mut *conn)
-                .await?;
-        if bisher >= PLAN_HELFER_MAX {
-            return Err(AppError::UnprocessableEntity(format!(
-                "Höchstens {PLAN_HELFER_MAX} Helfer je Planung"
-            )));
-        }
-        let hid: i64 = sqlx::query_scalar(
-            "INSERT INTO planung_helfer (planung_id, name, telefon, organisation, \
-                qualifikationen, angelegt_von) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(planung_id)
-        .bind(&e.name)
-        .bind(&e.telefon)
-        .bind(&e.organisation)
-        .bind(quals_json(&e.qualifikationen))
-        .bind(benutzer_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        helfer_laden_tx(conn, planung_id, hid).await
+        helfer_anlegen_tx(conn, org_id, planung_id, benutzer_id, e).await
     })
+}
+
+/// [`helfer_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn helfer_anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    planung_id: i64,
+    benutzer_id: i64,
+    e: &HelferEingabe,
+) -> Result<PlanHelferAnzeige, AppError> {
+    kopf_tx(conn, org_id, planung_id).await?;
+    pruefe_qualifikationen_tx(conn, org_id, &e.qualifikationen).await?;
+    let bisher: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM planung_helfer WHERE planung_id = ?")
+            .bind(planung_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if bisher >= PLAN_HELFER_MAX {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Höchstens {PLAN_HELFER_MAX} Helfer je Planung"
+        )));
+    }
+    let hid: i64 = sqlx::query_scalar(
+        "INSERT INTO planung_helfer (planung_id, name, telefon, organisation, \
+            qualifikationen, angelegt_von) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(planung_id)
+    .bind(&e.name)
+    .bind(&e.telefon)
+    .bind(&e.organisation)
+    .bind(quals_json(&e.qualifikationen))
+    .bind(benutzer_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    helfer_laden_tx(conn, planung_id, hid).await
 }
 
 pub async fn helfer_aendern(

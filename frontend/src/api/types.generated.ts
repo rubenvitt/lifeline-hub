@@ -5914,7 +5914,7 @@ export interface components {
              * Format: int64
              * @description Der Posten; `null` = die Zeile „Pause“.
              */
-            posten_id?: number | null;
+            posten_id: number | null;
             quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
             /** Format: int64 */
             soll_anzahl?: number | null;

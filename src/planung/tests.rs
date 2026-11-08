@@ -87,3 +87,49 @@ fn nicht_verfuegbarer_posten_ist_ein_konflikt() {
     a.posten_aufgeloest = true;
     assert_eq!(rechne(&[a]).konflikte, 1);
 }
+
+/// Scheitert die Löschung einer fälligen Planung, löscht der Lauf die übrigen weiter und meldet
+/// die schon gelöschten; die gescheiterte bleibt für den nächsten Lauf.
+#[tokio::test]
+async fn purge_meldet_geloeschte_auch_wenn_eine_scheitert() {
+    let pool = crate::db::test_pool().await;
+    let org: i64 = sqlx::query_scalar(
+        "INSERT INTO organisation (name, tz_organisation) VALUES ('Org', 'hilfsorganisation') \
+         RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let mut ids = Vec::new();
+    for name in ["A", "B", "C"] {
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis) \
+             VALUES (?, ?, '2026-01-10 08:00:00', '2026-01-10 18:00:00') RETURNING id",
+        )
+        .bind(org)
+        .bind(name)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        ids.push(id);
+    }
+    sqlx::query(
+        "CREATE TRIGGER sperre_b BEFORE DELETE ON planung WHEN OLD.bezeichnung = 'B' \
+         BEGIN SELECT RAISE(ABORT, 'gesperrt'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let weg = repo::purge_abgelaufene(&pool, t("15:00")).await.unwrap();
+    assert_eq!(weg, vec![(org, ids[0]), (org, ids[2])]);
+    let rest: Vec<i64> = sqlx::query_scalar("SELECT id FROM planung ORDER BY id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        rest,
+        vec![ids[1]],
+        "die gescheiterte bleibt für den nächsten Lauf"
+    );
+}

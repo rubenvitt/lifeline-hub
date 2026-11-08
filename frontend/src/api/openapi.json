@@ -14633,6 +14633,7 @@
         "required": [
           "id",
           "version",
+          "posten_id",
           "von",
           "bis",
           "personen_anzahl",

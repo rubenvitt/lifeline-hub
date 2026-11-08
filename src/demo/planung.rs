@@ -14,8 +14,12 @@ use sqlx::SqliteConnection;
 
 use super::stammdaten::StammdatenErgebnis;
 use super::DemoStammdatenArt;
+use crate::abloesung::schichtplan::repo::HelferEingabe;
 use crate::abloesung::schichtplan::zerlegung::{self, Teilung};
+use crate::abloesung::schichtplan::PlanPerson;
+use crate::einsatz::Einsatzart;
 use crate::error::AppError;
+use crate::planung::repo;
 use crate::uhs::UhsTyp;
 
 /// Woraus ein Posten der Demo-Planung bei der Übernahme wird.
@@ -142,6 +146,47 @@ fn quali_soll_json(
     Ok(Some(serde_json::Value::Array(eintraege).to_string()))
 }
 
+/// Planung und Benutzer, unter denen die Blöcke der Demo-Planung entstehen.
+struct Ziel {
+    org_id: i64,
+    planung_id: i64,
+    admin_id: i64,
+}
+
+impl Ziel {
+    /// Ein Block am Posten (Schlüssel, Kennung) oder in der Pause, mit den Personen seiner
+    /// Einteilung (die damit verbraucht ist).
+    async fn block_tx(
+        &self,
+        conn: &mut SqliteConnection,
+        einteilung: &mut BTreeMap<(Option<&'static str>, i64), Vec<PlanPerson>>,
+        posten: Option<(&'static str, i64)>,
+        von: chrono::DateTime<Utc>,
+        bis: chrono::DateTime<Utc>,
+    ) -> Result<(), AppError> {
+        let personen = einteilung
+            .remove(&(posten.map(|p| p.0), von.timestamp()))
+            .unwrap_or_default();
+        repo::block_anlegen_tx(
+            conn,
+            self.org_id,
+            self.planung_id,
+            self.admin_id,
+            &repo::BlockEingabe {
+                posten_id: posten.map(|p| p.1),
+                von: crate::zeit::formatiere_utc(von),
+                bis: crate::zeit::formatiere_utc(bis),
+                soll_anzahl: None,
+                quali_soll: None,
+                personen,
+                notiz: None,
+            },
+        )
+        .await?;
+        Ok(())
+    }
+}
+
 /// Legt die Demo-Planung an oder benutzt eine gleichnamige mit. Liefert `(angelegt,
 /// mitbenutzt)` für den Bericht. Die Funktion committet nicht.
 pub async fn planung_importieren_tx(
@@ -184,17 +229,22 @@ pub async fn planung_importieren_tx(
         }
     }
 
-    let planung_id: i64 = sqlx::query_scalar(
-        "INSERT INTO planung (org_id, bezeichnung, einsatzart, ort, von, bis, angelegt_von) \
-         VALUES (?, ?, 'sanitaetsdienst', ?, ?, ?, ?) RETURNING id",
+    // Geschrieben wird über die Wege der Routen (`planung::repo::*_tx`), mit ihren Prüfungen.
+    let planung_id = repo::anlegen_tx(
+        conn,
+        org_id,
+        admin_id,
+        &repo::KopfEingabe {
+            bezeichnung: vorlage.bezeichnung.to_string(),
+            einsatzart: Einsatzart::Sanitaetsdienst,
+            ort: Some(vorlage.ort.to_string()),
+            koordinate: None,
+            von: crate::zeit::formatiere_utc(um(vorlage.von_stunde)?),
+            bis: crate::zeit::formatiere_utc(um(vorlage.bis_stunde)?),
+            max_dienst: None,
+            min_ruhe: None,
+        },
     )
-    .bind(org_id)
-    .bind(vorlage.bezeichnung)
-    .bind(vorlage.ort)
-    .bind(crate::zeit::formatiere_utc(um(vorlage.von_stunde)?))
-    .bind(crate::zeit::formatiere_utc(um(vorlage.bis_stunde)?))
-    .bind(admin_id)
-    .fetch_one(&mut *conn)
     .await?;
     sqlx::query("INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (?, ?, ?)")
         .bind(import_id)
@@ -205,62 +255,69 @@ pub async fn planung_importieren_tx(
 
     let mut helfer = BTreeMap::new();
     for h in vorlage.helfer {
-        let quals: Vec<i64> = h
+        let qualifikationen: Vec<i64> = h
             .qualifikationen
             .iter()
             .filter_map(|l| quali_ids.get(l).copied())
             .collect();
-        let id: i64 = sqlx::query_scalar(
-            "INSERT INTO planung_helfer (planung_id, name, organisation, qualifikationen, \
-                angelegt_von) VALUES (?, ?, ?, ?, ?) RETURNING id",
+        let neu = repo::helfer_anlegen_tx(
+            conn,
+            org_id,
+            planung_id,
+            admin_id,
+            &HelferEingabe {
+                name: h.name.to_string(),
+                telefon: None,
+                organisation: Some(h.organisation.to_string()),
+                qualifikationen,
+            },
         )
-        .bind(planung_id)
-        .bind(h.name)
-        .bind(h.organisation)
-        .bind((!quals.is_empty()).then(|| serde_json::json!(quals).to_string()))
-        .bind(admin_id)
-        .fetch_one(&mut *conn)
         .await?;
-        helfer.insert(h.schluessel, id);
+        helfer.insert(h.schluessel, neu.id);
     }
 
-    // Posten und ihre Schichten; je Posten die Blöcke nach Beginnstunde.
-    let mut bloecke: BTreeMap<(&'static str, i64), i64> = BTreeMap::new();
-    for (sortier, p) in vorlage.posten.iter().enumerate() {
-        let (art, fahrzeug, uhs_typ) = match p.herkunft {
-            PostenHerkunft::Frei => ("einheit", None, None),
-            PostenHerkunft::Fahrzeug(s) => ("einheit", Some(stamm.fahrzeug(s)?), None),
-            PostenHerkunft::Uhs(t) => ("uhs", None, Some(t.as_str())),
+    // Die Einteilung je Block: Posten (oder Pause) und Beginn.
+    let mut einteilung: BTreeMap<(Option<&'static str>, i64), Vec<PlanPerson>> = BTreeMap::new();
+    for e in vorlage.einteilung {
+        let mut personen = Vec::with_capacity(e.personen.len());
+        for person in e.personen {
+            personen.push(match person {
+                PlanungPerson::Stamm(s) => PlanPerson::Stamm(stamm.personal(s)?),
+                PlanungPerson::Helfer(s) => {
+                    PlanPerson::Helfer(helfer.get(s).copied().ok_or_else(|| {
+                        AppError::Internal(format!("Demo-Planung: kein Helfer {s}"))
+                    })?)
+                }
+            });
+        }
+        einteilung.insert((e.posten, um(e.ab_stunde)?.timestamp()), personen);
+    }
+    let ziel = Ziel {
+        org_id,
+        planung_id,
+        admin_id,
+    };
+
+    // Posten und ihre Schichten aus der Schichtlänge; das Soll kommt bei `None` aus der Herkunft.
+    for p in vorlage.posten {
+        let herkunft = match p.herkunft {
+            PostenHerkunft::Frei => repo::Herkunft::Frei,
+            PostenHerkunft::Fahrzeug(s) => repo::Herkunft::Fahrzeug(stamm.fahrzeug(s)?),
+            PostenHerkunft::Uhs(t) => repo::Herkunft::Uhs(t),
         };
-        let soll = match (p.soll_anzahl, fahrzeug) {
-            (Some(n), _) => Some(n),
-            (None, Some(f)) => sqlx::query_scalar::<_, Option<i64>>(
-                "SELECT staerke_fuehrer + staerke_unterfuehrer + staerke_mannschaft \
-                 FROM fahrzeug WHERE id = ?",
-            )
-            .bind(f)
-            .fetch_one(&mut *conn)
-            .await?
-            .filter(|n| *n > 0),
-            (None, None) => None,
-        };
-        let quali = quali_soll_json(&quali_ids, p.quali_soll)?;
-        let posten_id: i64 = sqlx::query_scalar(
-            "INSERT INTO planung_posten (planung_id, bezeichnung, abschnitt, art, fahrzeug_id, \
-                uhs_typ, sortier, schichtlaenge_min, soll_anzahl, quali_soll) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        let posten_id = repo::posten_anlegen_tx(
+            conn,
+            org_id,
+            planung_id,
+            &repo::PostenEingabe {
+                bezeichnung: p.bezeichnung.to_string(),
+                abschnitt: p.abschnitt.map(str::to_string),
+                herkunft,
+                schichtlaenge: Some(p.schichtlaenge_min),
+                soll_anzahl: p.soll_anzahl.map(Some),
+                quali_soll: Some(quali_soll_json(&quali_ids, p.quali_soll)?),
+            },
         )
-        .bind(planung_id)
-        .bind(p.bezeichnung)
-        .bind(p.abschnitt)
-        .bind(art)
-        .bind(fahrzeug)
-        .bind(uhs_typ)
-        .bind(sortier as i64)
-        .bind(p.schichtlaenge_min)
-        .bind(soll)
-        .bind(&quali)
-        .fetch_one(&mut *conn)
         .await?;
         let teile = zerlegung::zerlege(
             um(p.von_stunde)?,
@@ -268,62 +325,26 @@ pub async fn planung_importieren_tx(
             &Teilung::Laenge(p.schichtlaenge_min),
         )?;
         for (a, b) in teile {
-            let bid: i64 = sqlx::query_scalar(
-                "INSERT INTO planung_schicht (planung_id, posten_id, von, bis, soll_anzahl, \
-                    quali_soll, angelegt_von) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
-            )
-            .bind(planung_id)
-            .bind(posten_id)
-            .bind(crate::zeit::formatiere_utc(a))
-            .bind(crate::zeit::formatiere_utc(b))
-            .bind(soll)
-            .bind(&quali)
-            .bind(admin_id)
-            .fetch_one(&mut *conn)
-            .await?;
-            bloecke.insert((p.schluessel, a.timestamp()), bid);
+            ziel.block_tx(conn, &mut einteilung, Some((p.schluessel, posten_id)), a, b)
+                .await?;
         }
     }
-
-    for e in vorlage.einteilung {
-        let ab = um(e.ab_stunde)?;
-        let bid = match e.posten {
-            Some(p) => *bloecke.get(&(p, ab.timestamp())).ok_or_else(|| {
-                AppError::Internal(format!("Demo-Planung: kein Block {p} ab {}", e.ab_stunde))
-            })?,
-            None => {
-                sqlx::query_scalar(
-                    "INSERT INTO planung_schicht (planung_id, von, bis, angelegt_von) \
-                 VALUES (?, ?, ?, ?) RETURNING id",
-                )
-                .bind(planung_id)
-                .bind(crate::zeit::formatiere_utc(ab))
-                .bind(crate::zeit::formatiere_utc(um(e.bis_stunde)?))
-                .bind(admin_id)
-                .fetch_one(&mut *conn)
-                .await?
-            }
-        };
-        for person in e.personen {
-            let (personal_id, helfer_id) = match person {
-                PlanungPerson::Stamm(s) => (Some(stamm.personal(s)?), None),
-                PlanungPerson::Helfer(s) => (
-                    None,
-                    Some(helfer.get(s).copied().ok_or_else(|| {
-                        AppError::Internal(format!("Demo-Planung: kein Helfer {s}"))
-                    })?),
-                ),
-            };
-            sqlx::query(
-                "INSERT INTO planung_schicht_person (schicht_id, personal_id, helfer_id) \
-                 VALUES (?, ?, ?)",
-            )
-            .bind(bid)
-            .bind(personal_id)
-            .bind(helfer_id)
-            .execute(&mut *conn)
-            .await?;
-        }
+    // Die Pause entsteht nur aus der Einteilung.
+    for e in vorlage.einteilung.iter().filter(|e| e.posten.is_none()) {
+        ziel.block_tx(
+            conn,
+            &mut einteilung,
+            None,
+            um(e.ab_stunde)?,
+            um(e.bis_stunde)?,
+        )
+        .await?;
+    }
+    if let Some(((posten, _), _)) = einteilung.iter().next() {
+        return Err(AppError::Internal(format!(
+            "Demo-Planung: Einteilung ohne Block an {}",
+            posten.unwrap_or("Pause")
+        )));
     }
     Ok((1, 0))
 }

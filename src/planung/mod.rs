@@ -193,6 +193,7 @@ pub struct PlanungBlockAnzeige {
     /// CAS-Zähler: PATCH und DELETE senden ihn mit (409 bei einem anderen Stand).
     pub version: i64,
     /// Der Posten; `null` = die Zeile „Pause“.
+    #[schema(required)]
     pub posten_id: Option<i64>,
     pub von: String,
     pub bis: String,
