@@ -46,6 +46,7 @@ import SchichtplanBlockDialog, { type BlockSpeichern } from './SchichtplanBlockD
 import SchichtplanListe from './SchichtplanListe';
 import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen';
 import SchichtplanRaster, { type BlockZielDaten } from './SchichtplanRaster';
+import SchichtplanWechselDialog from './SchichtplanWechselDialog';
 import {
   baueZeilen,
   mitPerson,
@@ -83,7 +84,8 @@ interface SchichtplanAnsichtProps {
 
 type Dialog =
   | { art: 'anlegen'; vorbelegt?: { zeile?: string; von?: number; bis?: number } }
-  | { art: 'block'; blockId: number };
+  | { art: 'block'; blockId: number }
+  | { art: 'wechsel'; blockId: number };
 
 const SPANNEN: { wert: SpannenWahl; label: string }[] = [
   { wert: '6h', label: '6 h' },
@@ -311,6 +313,12 @@ export default function SchichtplanAnsicht({
     setDialog({ art: 'block', blockId });
   };
   const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
+  // Wechsel aus dem Plan (LLH-1555): an der UHS mit Unfallhilfsstellen, immer mit Personal.
+  const wechselMoeglich = (b: SchichtplanBlock) =>
+    darfSchreiben &&
+    personalFrei &&
+    !b.posten.aufgeloest &&
+    (b.posten.art === 'pause' || (b.posten.art === 'uhs' && uhsFrei));
   const mitSeitenleiste = !istSchmal && darfSchreiben;
 
   return (
@@ -428,6 +436,19 @@ export default function SchichtplanAnsicht({
           loeschFehler={loeschenMut.error}
           onSpeichern={speichern}
           onLoeschen={(b) => loeschenMut.mutate(b)}
+          onWechsel={
+            dialogBlock && wechselMoeglich(dialogBlock)
+              ? (b) => setDialog({ art: 'wechsel', blockId: b.id })
+              : undefined
+          }
+          onSchliessen={() => setDialog(null)}
+        />
+      )}
+      {dialog?.art === 'wechsel' && (
+        <SchichtplanWechselDialog
+          key={`w-${dialog.blockId}`}
+          einsatzId={einsatzId}
+          blockId={dialog.blockId}
           onSchliessen={() => setDialog(null)}
         />
       )}

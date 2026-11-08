@@ -5805,6 +5805,8 @@ export interface components {
             id: number;
             kategorie: components["schemas"]["StatusKategorie"];
             label: string;
+            /** @description LLH-1555: der Status „Pause“ des Schichtplans (höchstens einer je Organisation). */
+            pause: boolean;
             /** Format: int64 */
             sortier: number;
             zeitachse_marke?: components["schemas"]["ZeitachseMarke"] | null;
@@ -5948,6 +5950,23 @@ export interface components {
              * @description `einsatz_personal.id`
              */
             personal_id: number;
+        };
+        /** @description Ein vollzogener Wechsel. */
+        PlanWechselAnzeige: {
+            art: components["schemas"]["WechselArt"];
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description `null`, wenn der Block inzwischen gelöscht ist.
+             */
+            planschicht_id?: number | null;
+            /** Format: int64 */
+            uhs_id?: number | null;
+            vollzogen_at: string;
+            /** @description Zeitpunkt laut Plan (Beginn, beim Pausenende das Ende des Blocks). */
+            zeitpunkt: string;
+            zurueckgenommen_at?: string | null;
         };
         /**
          * @description Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab
@@ -7598,6 +7617,62 @@ export interface components {
              *     Abo leer.
              */
             stumm: components["schemas"]["BenachrichtigungArt"][];
+        };
+        /**
+         * @description Art eines Wechsels aus dem Plan (`einsatz_plan_wechsel.art`). Wire == `as_str()`.
+         * @enum {string}
+         */
+        WechselArt: "uhs" | "pause_beginn" | "pause_ende";
+        /** @description Der nächste Wechsel eines Blocks zum Vorbelegen des Dialogs. */
+        WechselVorlage: {
+            art?: components["schemas"]["WechselArt"] | null;
+            /** @description UHS: Kräfte an dieser UHS, die im Block stehen. */
+            bleiben: components["schemas"]["WechselVorlagePerson"][];
+            /** Format: int64 */
+            block_id: number;
+            /** @description UHS: Kräfte an dieser UHS, die nicht im Block stehen. */
+            gehen: components["schemas"]["WechselVorlagePerson"][];
+            /**
+             * @description Warum der Wechsel gerade nicht geht (kein Pausenstatus, die Pause hat nicht begonnen, die
+             *     UHS ist aufgelöst).
+             */
+            gesperrt?: string | null;
+            /** @description UHS: Personen des Blocks, die nicht an dieser UHS stehen. Pause: wer den Status wechselt. */
+            kommen: components["schemas"]["WechselVorlagePerson"][];
+            /** @description Pause: das Label des gekennzeichneten Status. */
+            pause_status?: string | null;
+            /**
+             * @description Pause: Personen des Blocks, die nicht im Einsatz sind (beim Ende: die nicht mehr in Pause
+             *     sind).
+             */
+            uebersprungen: components["schemas"]["WechselVorlagePerson"][];
+            uhs?: string | null;
+            /** Format: int64 */
+            uhs_id?: number | null;
+            /** @description Die vollzogenen Wechsel des Blocks, die nicht zurückgenommen sind. */
+            wechsel: components["schemas"]["PlanWechselAnzeige"][];
+            /** @description Zeitpunkt laut Plan des nächsten Wechsels. */
+            zeitpunkt: string;
+        };
+        /** @description Eine Person der Vorlage: aus dem Block (mit ihrer Herkunft im Plan) oder eine Kraft an der UHS. */
+        WechselVorlagePerson: {
+            /** @description Eine andere UHS, an der die Kraft gerade steht (sie wechselt). */
+            andere_uhs?: string | null;
+            art?: components["schemas"]["PlanPersonArt"] | null;
+            /**
+             * Format: int64
+             * @description Die Kraft des Einsatzes; `null` = nicht im Einsatz (kommt erst mit dem Wechsel).
+             */
+            einsatz_personal_id?: number | null;
+            /** Format: int64 */
+            helfer_id?: number | null;
+            name: string;
+            /** Format: int64 */
+            personal_id?: number | null;
+            /** @description Ihr Status jetzt (Pause). */
+            status?: string | null;
+            /** @description Beim Pausenende: der gemerkte Status, den sie zurückbekommt. */
+            status_zurueck?: string | null;
         };
         /**
          * @description Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle

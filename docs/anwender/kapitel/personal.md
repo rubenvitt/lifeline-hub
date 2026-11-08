@@ -240,7 +240,8 @@ disponiert, behält die Person ihre Einsatzfunktion.
 Die Statuswerte pflegt die Organisation selbst; jeder gehört zu einer Kategorie (verfügbar,
 gebunden, nicht verfügbar). Eine neue Organisation beginnt mit „verfügbar“, „alarmiert“, „auf
 Anfahrt“, „im Einsatz“, „Pause“ und „abgemeldet“. „alarmiert“, „im Einsatz“ und „abgemeldet“
-schreiben dabei Alarmierung, Eintreffen und Entlassung in die Kräfte-Zeitachse.
+schreiben dabei Alarmierung, Eintreffen und Entlassung in die Kräfte-Zeitachse. „Pause“ ist
+der Status, den der Schichtplan zum Beginn einer Pause setzt.
 
 ### Einheit, Fahrzeug und Position
 

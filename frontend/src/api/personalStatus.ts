@@ -8,6 +8,8 @@ export interface StatusEingabe {
   sortier: number;
   /** LFH-552: fehlt = unverändert, `null` = Marke entfernen. */
   zeitachse_marke?: ZeitachseMarke | null;
+  /** LLH-1555: der Status „Pause“ des Schichtplans; setzen nimmt ihn jedem anderen. */
+  pause?: boolean;
 }
 
 const api = katalogApi<PersonalStatus, StatusEingabe>('/api/personal-status');

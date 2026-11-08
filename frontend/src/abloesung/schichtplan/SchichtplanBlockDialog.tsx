@@ -71,6 +71,8 @@ interface SchichtplanBlockDialogProps {
   loeschFehler?: unknown;
   onSpeichern: (s: BlockSpeichern) => Promise<unknown>;
   onLoeschen?: (block: SchichtplanBlock) => void;
+  /** Wechsel aus dem Plan an einer UHS oder in der Pause (LLH-1555); fehlt = nicht möglich. */
+  onWechsel?: (block: SchichtplanBlock) => void;
   onSchliessen: () => void;
 }
 
@@ -93,6 +95,7 @@ export default function SchichtplanBlockDialog({
   loeschFehler,
   onSpeichern,
   onLoeschen,
+  onWechsel,
   onSchliessen,
 }: SchichtplanBlockDialogProps) {
   const [form] = Form.useForm<BlockWerte>();
@@ -319,6 +322,15 @@ export default function SchichtplanBlockDialog({
       />
       {loeschFehler != null && (
         <SpeicherFehler fehler={loeschFehler} titel="Block nicht gelöscht" />
+      )}
+      {block && onWechsel && (
+        <Button
+          data-lfh="schichtplan-block-wechsel"
+          onClick={() => onWechsel(block)}
+          style={{ marginTop: 8, marginInlineEnd: 8 }}
+        >
+          Wechsel vollziehen
+        </Button>
       )}
       {block && onLoeschen && darfSchreiben && (
         <Popconfirm
