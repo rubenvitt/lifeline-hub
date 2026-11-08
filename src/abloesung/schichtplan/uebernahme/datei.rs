@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz;
 
 use super::abgleich::{herkunft_norm, norm, telefon_norm};
@@ -451,9 +451,9 @@ const ORTSZEIT: &[&str] = &[
 /// Fehler.
 fn ortszeit(t: NaiveDateTime, zone: Tz) -> Result<DateTime<Utc>, String> {
     match zone.from_local_datetime(&t) {
-        chrono::LocalResult::Single(z) => Ok(z.with_timezone(&Utc)),
-        chrono::LocalResult::Ambiguous(a, _) => Ok(a.with_timezone(&Utc)),
-        chrono::LocalResult::None => Err(format!(
+        LocalResult::Single(z) => Ok(z.with_timezone(&Utc)),
+        LocalResult::Ambiguous(a, _) => Ok(a.with_timezone(&Utc)),
+        LocalResult::None => Err(format!(
             "{} gibt es in der Zone {zone} nicht (Zeitumstellung)",
             t.format("%d.%m.%Y %H:%M")
         )),
