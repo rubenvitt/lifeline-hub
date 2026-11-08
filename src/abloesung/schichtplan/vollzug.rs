@@ -1201,13 +1201,16 @@ async fn uhs_zuruecknehmen_tx(
     wirkung: &mut WechselWirkung,
 ) -> Result<Vec<String>, AppError> {
     use crate::zeitachse::repo::{streiche_tx, Kraft};
+    // Das Eintreffen eines Kommenden nur, solange er noch hier steht: ist er weitergewechselt,
+    // trägt der spätere Wechsel seine Periode (er legt kein zweites Eintreffen an).
     let ereignisse: Vec<(i64, i64, String)> = sqlx::query_as(
         "SELECT w.einsatz_personal_id, z.id, p.snap_name FROM einsatz_plan_wechsel_person w \
          JOIN einsatz_kraft_zeitachse z ON z.id = w.zeitachse_id AND z.gestrichen_at IS NULL \
          JOIN einsatz_personal p ON p.id = w.einsatz_personal_id \
-         WHERE w.wechsel_id = ? ORDER BY w.rowid",
+         WHERE w.wechsel_id = ?1 AND (w.rolle <> 'neu' OR p.uhs_id = ?2) ORDER BY w.rowid",
     )
     .bind(wid)
+    .bind(uhs_id)
     .fetch_all(&mut *conn)
     .await?;
     for (person, ereignis, name) in ereignisse {
