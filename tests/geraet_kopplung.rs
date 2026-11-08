@@ -2052,6 +2052,61 @@ async fn person_in(app: &axum::Router, cookie: &str, einsatz: i64, uhs: Option<i
     v
 }
 
+/// LLH-1572 (design.md D6): ein leichter Fall am Tablet geht in die eigene UHS und gleich wieder
+/// hinaus, er bleibt in der Liste des Tablets („ausgetreten“, entlassen) und trägt die Maßnahmen.
+#[tokio::test]
+async fn tablet_erfasst_leichten_fall_in_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({
+            "status": "betroffen",
+            "anlass": "verletzung",
+            "massnahmen": ["wundversorgung"],
+            "entlassen": true,
+            "antreff_ort": "UHS Nord",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["aktuelle_verbleib_art"], "entlassung");
+    assert!(v["aktuelle_uhs_id"].is_null(), "{v}");
+    let pid = v["id"].as_i64().unwrap();
+
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste}");
+    let ids: Vec<i64> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![pid], "der leichte Fall lag in der eigenen UHS");
+    let (s, d) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+    assert_eq!(d["massnahmen"][0]["art"], "wundversorgung");
+    assert_eq!(d["aufenthalt"], Value::Null, "ausgetreten aus UHS {nord}");
+}
+
 #[tokio::test]
 async fn tablet_bekommt_rettungsmittel_nur_aus_verbleiben_der_eigenen_uhs() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -5497,11 +5552,14 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     assert_eq!(v["stellen"][0]["belegung"]["belegt"], 40, "{v}");
     assert_eq!(v["namentlich"], json!([{"stelle_id": nord, "anzahl": 1}]));
 
-    // Keine Erst-Sichtung, kein Anlass (LLH-1566), keine UHS, keine vermisste Person.
+    // Keine Erst-Sichtung, kein Anlass (LLH-1566), keine UHS, keine vermisste Person, keine
+    // Maßnahme und kein leichter Fall (LLH-1572).
     for body in [
         json!({"name": "A", "sichtung": "SK3"}),
         json!({"name": "B", "uhs_id": 1}),
         json!({"name": "D", "anlass": "verletzung"}),
+        json!({"name": "E", "massnahmen": ["kuehlung"]}),
+        json!({"name": "F", "entlassen": true}),
     ] {
         let (s, v) = anfrage_json(
             &app,

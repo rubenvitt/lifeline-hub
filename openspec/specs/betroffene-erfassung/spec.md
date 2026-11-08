@@ -99,3 +99,34 @@ Stornierte, mit Abgeschlossenen, absteigend nach Zahl. Die Zählung MUST eine re
 #### Scenario: Zwei Patienten einer Streife
 - **WHEN** zwei Personen „Streife 2“ als Einheit tragen, eine davon abgeschlossen
 - **THEN** zeigt „Versorgt von“ „Streife 2 · Bühne“ mit 2
+
+### Requirement: Leichter Fall in einem Schritt
+
+Die Betroffenenliste und das UHS-Gerät SHALL mit Schreibrecht den Dialog „Versorgt und entlassen“
+anbieten (Liste: als Nebenweg des Kopfes, ab `md` neben „Vermisst melden“, unter `md` im Menü
+„Weitere“; Gerät: neben „Patient aufnehmen“); die
+Kurzeingabe SHALL dasselbe mit `+Kürzel` für Maßnahmen und `>entl` können. Der Dialog MUST den
+Anlass verlangen, bis zu drei Maßnahmen als Flächen und Name und Alter optional anbieten. In der
+Liste MUST „Versorgt von“ (aktive UHS und Einheiten) den Fundort vorbelegen (UHS: Bezeichnung und
+Koordinate; Einheit: Abschnitt, sonst Name) und für den nächsten Fall stehen bleiben; am Gerät
+MUST die eigene UHS feststehen.
+
+Der Server MUST eine Anlage mit `massnahmen` und `entlassen: true` in EINER Transaktion schreiben:
+Person mit Registriernummer und Status `betroffen`, ohne Sichtung (der Dialog bietet keine an; eine
+in der Kurzeingabe ausdrücklich genannte gilt als Erst-Sichtung), die Maßnahmen und den Verbleib
+„Entlassung“ zur Erfassungszeit, mit `uhs_id` Eintritt und Austritt zur Erfassungszeit, und genau
+einen ETB-Eintrag „Person R-… versorgt und entlassen“ (an einer UHS „Person R-…: in … versorgt und
+entlassen“). Ein Replay derselben `client_id` MUST nichts doppelt schreiben. Unbekannte oder
+doppelte Maßnahmen MUST 400 ergeben, `massnahmen` oder `entlassen` an einer vermissten oder
+abgemeldeten Anlage 422, an der Betreuungsstelle 403; in allen Fällen MUST nichts geschrieben
+werden. Ohne `entlassen` MUST eine Anlage mit `massnahmen` eine gewöhnliche Anlage bleiben.
+
+#### Scenario: Pflaster an der Bühne
+- **WHEN** jemand in der Liste „Versorgt und entlassen“ wählt, „Allergie / Insektenstich“ antippt
+  und „Entlassen“ wählt
+- **THEN** steht die Person mit Registriernummer, Status „betroffen“, ohne Sichtung und mit dem
+  Verbleib „entlassen“ in der Liste, und das Einsatztagebuch hat einen Eintrag für sie
+
+#### Scenario: Leichter Fall am UHS-Tablet ohne Netz
+- **WHEN** das UHS-Tablet ohne Netz einen leichten Fall entlässt und das Netz zurückkehrt
+- **THEN** geht genau ein POST mit Erfassungszeit hinaus, Eintritt und Austritt tragen diese Zeit

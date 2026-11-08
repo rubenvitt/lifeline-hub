@@ -1,10 +1,10 @@
-import { Alert, Button, Typography } from 'antd';
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { Alert, App, Button, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { IconPersonPlus } from '../icons';
 import { useAuth } from '../auth/AuthContext';
-import { listePersonen } from '../api/einsatzPerson';
+import { listePersonen, registrierAnzeige, type PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { ladeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person, UhsDetail } from '../api/types';
@@ -26,6 +26,8 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useHalteQuellen } from '../components/useHalteQuellen';
 import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import { useGeraetDarf } from './geraetSicht';
+import LeichterFallModal, { LEICHTER_FALL_TITEL } from '../personen/LeichterFallModal';
+import { erfassePersonOfflineFaehig } from '../offline/schreiben';
 
 /**
  * Spalten des Registers, die das Tablet zeigt; Fundort und Vermerk stehen im Detail. Der Zustand
@@ -83,6 +85,32 @@ export default function GeraetPatientenPage() {
     enabled: geraet != null && uhsId != null,
   });
   const uhs = uhsQuery.data;
+
+  /*
+   * Der leichte Fall am Tablet (LLH-1572, design.md D2/D6): die eigene UHS steht fest, Eintritt
+   * und Austritt gehen mit der Anlage. Ohne Netz merkt die Anlage vor; die Quittung nennt es.
+   */
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const [leichterFallOffen, setLeichterFallOffen] = useState(false);
+  const leichterFall = useMutation({
+    networkMode: 'always',
+    mutationFn: (daten: PersonAnlegenEingabe) => {
+      if (!benutzer) return Promise.reject(new Error('Nicht angemeldet'));
+      return erfassePersonOfflineFaehig(benutzer.id, einsatzId, daten);
+    },
+    onSuccess: (ergebnis) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        void message.warning('Offline vorgemerkt · R-…');
+        return;
+      }
+      void message.success(`Entlassen als ${registrierAnzeige(ergebnis.daten.registrier_nr)}`);
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+      if (uhsId != null) {
+        void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
+      }
+    },
+  });
 
   /*
    * Nachsichten aus der Zeile (LLH-1130, Spec `betroffene-lagedaten`): das UHS-Gerät darf sichten
@@ -163,9 +191,14 @@ export default function GeraetPatientenPage() {
       dataUpdatedAt={gemeinsamerDatenstand(personenQuery.dataUpdatedAt, uhsQuery.dataUpdatedAt)}
       aktionen={
         aufnahme && (
-          <Button type="primary" icon={<IconPersonPlus />} onClick={() => navigate(aufnahme)}>
-            Patient aufnehmen
-          </Button>
+          <>
+            <Button type="primary" icon={<IconPersonPlus />} onClick={() => navigate(aufnahme)}>
+              Patient aufnehmen
+            </Button>
+            {uhs && darf('person-behandlung') && (
+              <Button onClick={() => setLeichterFallOffen(true)}>{LEICHTER_FALL_TITEL}</Button>
+            )}
+          </>
         )
       }
     >
@@ -196,6 +229,18 @@ export default function GeraetPatientenPage() {
             // Höchstens drei Felder: der Zustand steht in der Kartenform nicht (Tablet zeigt die Tabelle).
             sekundaer: ['person', 'sk', 'ort'],
           }}
+        />
+      )}
+      {uhs && (
+        <LeichterFallModal
+          einsatzId={einsatzId}
+          offen={leichterFallOffen}
+          stelle={{ art: 'uhs', uhs }}
+          laeuft={leichterFall.isPending}
+          speicherung={leichterFall}
+          onErfassen={(daten) => leichterFall.mutateAsync(daten)}
+          onFertig={() => setLeichterFallOffen(false)}
+          onAbbrechen={() => setLeichterFallOffen(false)}
         />
       )}
     </EinsatzSeite>
