@@ -766,6 +766,94 @@ async fn schichten_erzeugen_aus_laenge_und_schichtmodell() {
     assert_eq!(pausen[1]["von"], "2026-11-06 18:00:00");
 }
 
+/// Die Zeilen eines 422 als Paare (Kennung, Grund).
+fn zeilen(json: &Value) -> Vec<(i64, String)> {
+    json["zeilen"]
+        .as_array()
+        .unwrap_or_else(|| panic!("ohne Zeilen: {json}"))
+        .iter()
+        .map(|z| {
+            assert_eq!(z["art"], "planschicht", "{z}");
+            (
+                z["id"].as_i64().unwrap(),
+                z["grund"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect()
+}
+
+/// LLH-1594: Eine erzeugte Schicht nennt jeden Block, mit dem sie sich überschneidet, nicht nur
+/// den frühesten; ein Block, den mehrere erzeugte Schichten treffen, steht einmal da.
+#[tokio::test]
+async fn schichten_erzeugen_nennt_jeden_ueberschnittenen_block_einmal() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let markt = uhs_anlegen(&app, &admin, e, "UHS Markt").await;
+    let posten = json!({"art": "uhs", "uhs_id": markt});
+    let erzeugen = format!("{}/erzeugen", pfad(e));
+
+    let mut ids = Vec::new();
+    for (von, bis) in [
+        ("2026-11-06 10:00:00", "2026-11-06 11:00:00"),
+        ("2026-11-06 12:00:00", "2026-11-06 14:00:00"),
+    ] {
+        let (s, plan) = block(
+            &app,
+            &admin,
+            e,
+            json!({"posten": posten, "von": von, "bis": bis}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{plan}");
+        ids.push(finde(&plan, "uhs", von)["id"].as_i64().unwrap());
+    }
+
+    // Eine Schicht 10–14 über beide Blöcke: zwei Zeilen, früheste zuerst.
+    let (s, json) = anfrage_json(
+        &app,
+        "POST",
+        &erzeugen,
+        &admin,
+        Some(&json!({"posten": posten, "von": "2026-11-06 10:00:00",
+                     "bis": "2026-11-06 14:00:00", "laenge_minuten": 240})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    let z = zeilen(&json);
+    assert_eq!(
+        z.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+        ids,
+        "{json}"
+    );
+    assert!(
+        z.iter().all(|(_, g)| g.starts_with("überschneidet sich mit ")),
+        "{json}"
+    );
+
+    // Vier Schichten zu 1 h: 12–13 und 13–14 treffen denselben Block, er steht einmal da.
+    let (s, json) = anfrage_json(
+        &app,
+        "POST",
+        &erzeugen,
+        &admin,
+        Some(&json!({"posten": posten, "von": "2026-11-06 10:00:00",
+                     "bis": "2026-11-06 14:00:00", "laenge_minuten": 60})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        zeilen(&json)
+            .iter()
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>(),
+        ids,
+        "{json}"
+    );
+    let (_, plan) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(plan["bloecke"].as_array().unwrap().len(), 2, "nichts angelegt");
+}
+
 #[tokio::test]
 async fn grenzwerte_mit_etb_und_vorgabe() {
     let app = setup().await;
