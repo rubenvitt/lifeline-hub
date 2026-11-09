@@ -38,6 +38,29 @@ function Traeger({ mitFormular }: { mitFormular: boolean }) {
   );
 }
 
+/** Ein Serverstand mit fester Identität wie Query-Data, die sich nicht geändert hat. */
+const STABIL: Daten = { titel: 'Server 1' };
+
+function StabilerTraeger({ mitFormular }: { mitFormular: boolean }) {
+  const [form] = Form.useForm<Daten>();
+  const schutz = useEntwurfVerlustschutz<Daten, Daten>({
+    daten: STABIL,
+    istEntwurf: true,
+    form,
+    werteAus: (d) => ({ titel: d.titel }),
+    speichern: () => Promise.resolve(),
+  });
+  if (!mitFormular) return <p>nur lesen</p>;
+  return (
+    <Form form={form} clearOnDestroy onValuesChange={schutz.markiereGeaendert}>
+      <Form.Item label="Titel" name="titel">
+        <Input />
+      </Form.Item>
+      <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
+    </Form>
+  );
+}
+
 /** Die Prüfung von rc-field-form läuft in einem `setTimeout(…, 0)` nach dem Aufruf. */
 const naechsterMakrotask = () => new Promise((r) => setTimeout(r, 0));
 
@@ -56,6 +79,16 @@ describe('useEntwurfVerlustschutz · Formularbindung (LFH-627)', () => {
 
     // Kommt das Formular später (Schreibrecht, Entwurf), holt der Effekt den Serverstand nach.
     rerender(<Traeger mitFormular />);
+    expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
+  });
+
+  it('schreibt einem neu eingehängten Formular auch einen schon bekannten Serverstand (LLH-1607)', async () => {
+    // Geschrieben wird nur ein NEUER Serverstand; ein neu eingehängtes Formular zählt dafür als
+    // leer. `clearOnDestroy` macht das Aushängen sichtbar: ohne leerte nichts den Speicher.
+    const { rerender } = render(<StabilerTraeger mitFormular />);
+    expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
+    rerender(<StabilerTraeger mitFormular={false} />);
+    rerender(<StabilerTraeger mitFormular />);
     expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
   });
 });

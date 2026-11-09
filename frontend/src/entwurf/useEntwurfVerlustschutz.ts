@@ -118,9 +118,23 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const uhrzeitRef = useRef(() => uhrzeit(dayjs(), konventionen));
   uhrzeitRef.current = () => uhrzeit(dayjs(), konventionen);
 
+  /**
+   * Welcher Serverstand steht schon im Formular oder wurde vom Riegel abgewiesen? Geschrieben wird
+   * nur ein NEUER (LLH-1607): fällt der Riegel mit einer Quittung, ist `daten` bis zum Refetch noch
+   * der Stand VOR dem PATCH. Ihn zu schreiben setzte die eigene, eben gesicherte Fassung zurück, und
+   * schlösse eine Füllung den Riegel vor dem Refetch, bliebe es dabei. Ein abgewiesener Stand ist
+   * mit dem eigenen PATCH überholt; der Refetch nach der Invalidierung bringt den nächsten.
+   */
+  const abgeglichenRef = useRef<D | undefined>(undefined);
   useEffect(() => {
+    if (!formular.da) {
+      // (4) Hängt das Formular neu ein, braucht es den Serverstand, auch einen schon bekannten.
+      abgeglichenRef.current = undefined;
+      return;
+    }
     if (!daten) return;
-    if (!formular.da) return; // (4)
+    if (daten === abgeglichenRef.current) return;
+    abgeglichenRef.current = daten;
     if (ungespeichert) return; // DER RIEGEL (1)
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
   }, [daten, form, formular.da, ungespeichert]);

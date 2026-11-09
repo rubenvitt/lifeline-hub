@@ -86,6 +86,58 @@ function Huelle({
   );
 }
 
+interface DatenMitNotiz extends Daten {
+  notiz?: string;
+}
+
+/**
+ * Träger mit einem zweiten Feld und einer Füllung, die es wie „Leere Abschnitte aus dem Lagebild
+ * füllen“ setzt: `setFieldValue` (kein `onValuesChange`) und EINMAL `markiereGeaendert`. Der
+ * Serverstand bleibt beim Test der alte, wie zwischen Quittung und Refetch.
+ */
+function HuelleMitFuellung({ speichern }: { speichern: (w: DatenMitNotiz) => Promise<unknown> }) {
+  const [form] = Form.useForm<DatenMitNotiz>();
+  const [daten] = useState<DatenMitNotiz>({ titel: 'Server 1' });
+  const schutz = useEntwurfVerlustschutz<DatenMitNotiz, DatenMitNotiz>({
+    daten,
+    istEntwurf: true,
+    form,
+    werteAus: (d) => ({ titel: d.titel, notiz: d.notiz }),
+    speichern,
+  });
+  return (
+    <>
+      <Form
+        form={form}
+        onValuesChange={schutz.markiereGeaendert}
+        onBlur={schutz.autosaveJetzt}
+        onFinish={(w) => void schutz.speichereJetzt(w).catch(() => {})}
+      >
+        <Form.Item label="Titel" name="titel">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Notiz" name="notiz">
+          <Input />
+        </Form.Item>
+        <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
+      </Form>
+      <button
+        type="button"
+        onClick={() => {
+          form.setFieldValue('notiz', 'gefüllt');
+          schutz.markiereGeaendert();
+        }}
+      >
+        füllen
+      </button>
+      <button type="button" onClick={() => form.submit()}>
+        Entwurf speichern
+      </button>
+      <output>{schutz.ungespeichert ? 'offen' : 'sauber'}</output>
+    </>
+  );
+}
+
 const speichernKnopf = () => screen.getByRole('button', { name: 'Entwurf speichern' });
 
 /**
@@ -124,6 +176,45 @@ describe('useEntwurfVerlustschutz', () => {
     expect(speichern).toHaveBeenCalledWith({ titel: 'Server 1x' });
     expect(await screen.findByText('sauber')).toBeInTheDocument();
     expect(screen.getByText(/zuletzt gespeichert \d{4}/)).toBeInTheDocument();
+  });
+
+  it('setzt das Formular mit der Quittung NICHT auf den Serverstand vor dem PATCH zurück (LLH-1607)', async () => {
+    // Bis der Refetch nach der Invalidierung kommt, ist `daten` der Stand VOR dem PATCH. Fällt der
+    // Riegel mit der Quittung, darf er diesen alten Stand nicht ins Formular schreiben.
+    const speichern = vi.fn().mockResolvedValue(undefined);
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('sauber')).toBeInTheDocument();
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x');
+  });
+
+  it('hält die eigene Fassung, wenn nach der Quittung eine Füllung den Riegel schließt (LLH-1607)', async () => {
+    // Der Ablauf des Lagevortrags: Blur-Autosave mit dem Klick auf „Leere Abschnitte … füllen“,
+    // die Füllung kommt nach der Quittung und vor dem Refetch. Danach muss „Entwurf speichern“
+    // die eigene Fassung schicken, nicht den alten Serverstand.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
+    render(<HuelleMitFuellung speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab(); // Blur-Autosave mit „Server 1x“ hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      aufloesen();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('füllen')); // ändert ein anderes Feld, Riegel zu
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x');
+
+    speichern.mockResolvedValue(undefined);
+    await userEvent.click(speichernKnopf());
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1x', notiz: 'gefüllt' });
   });
 
   it('lässt den Merker stehen, wenn während des laufenden Autosave weitergetippt wurde', async () => {

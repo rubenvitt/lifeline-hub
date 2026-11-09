@@ -126,6 +126,65 @@ test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leer
   await expect(page.getByText(/^zuletzt gespeichert \d{4}/)).toBeVisible();
 });
 
+interface PatchBody {
+  abschnitte: { schluessel: string; text: string }[];
+}
+
+test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird gespeichert (LLH-1607)', async ({
+  page,
+}) => {
+  // Der Klick auf die Sammelfüllung blurrt den Editor: der Autosave startet mit ihm. Seine Quittung
+  // setzte das Formular auf den Stand VOR dem PATCH zurück, und die Füllung schloss danach den
+  // Riegel vor dem Refetch (`entwurf/useEntwurfVerlustschutz.ts`). Die Lageentwicklung lädt das
+  // ETB und ist damit die langsame Quelle; von Hand gefüllt fällt sie aus dem Abruf, die Füllung
+  // kommt schnell und gewinnt das Rennen gegen den Refetch.
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag LLH-1607 ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
+  await expect(page.getByText('Noch keine Lageberichte')).toBeVisible();
+  await page.getByRole('button', { name: 'Andere Vorlage wählen' }).click();
+  await page
+    .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+    .getByRole('menuitem', { name: 'Leerer Lagevortrag' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
+  const berichtPfad = new URL(page.url()).pathname.replace(/^\/einsaetze/, '/api/einsaetze');
+
+  const patches: PatchBody[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'PATCH' && new URL(r.url()).pathname === berichtPfad) {
+      patches.push(r.postDataJSON() as PatchBody);
+    }
+  });
+
+  const eigeneLage = page.getByRole('textbox', { name: 'Eigene Lage' });
+  const lageentwicklung = page.getByRole('textbox', { name: 'Lageentwicklung' });
+  await expect(eigeneLage).toHaveValue('');
+  await lageentwicklung.fill('Von Hand');
+  await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
+  await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
+  // Der Blur-Autosave des Klicks ist zurück und der Refetch danach auch: erst dann ist das
+  // Verlustfenster vorbei, in dem der alte Serverstand ins Formular fiel.
+  await expect.poll(() => patches.length).toBeGreaterThanOrEqual(1);
+  await expect(page.getByText('ungespeicherte Änderungen')).toBeVisible();
+  await expect(lageentwicklung).toHaveValue('Von Hand');
+
+  // „Entwurf speichern“ schickt die eigene Fassung mit beiden Abschnitten.
+  const vorher = patches.length;
+  await page.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await expect(page.getByText(/^zuletzt gespeichert \d{4}/)).toBeVisible();
+  expect(patches.length).toBeGreaterThan(vorher);
+  const text = (b: PatchBody, s: string) => b.abschnitte.find((a) => a.schluessel === s)?.text;
+  const letzter = patches[patches.length - 1];
+  expect(text(letzter, 'lageentwicklung')).toBe('Von Hand');
+  expect(text(letzter, 'eigene_lage')).toMatch(/Kräftemeldebild/);
+
+  // Auch der Server hat beides.
+  await page.reload();
+  await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
+  await expect(lageentwicklung).toHaveValue('Von Hand');
+});
+
 test('der Pfeil legt einen freien Bericht an, die Übersicht zeigt ihn in Arbeit', async ({
   page,
 }) => {
