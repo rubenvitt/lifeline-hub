@@ -34,6 +34,13 @@ function gleicherZeitpunkt(a: Dayjs | null, b: Dayjs | null): boolean {
   return a === null || b === null ? a === b : a.valueOf() === b.valueOf();
 }
 
+/** Schreibwege des Ablaufs: am Einsatz oder an einer Planung (LLH-1583). */
+export interface AblaufSchreiben {
+  anlegen: (daten: ProgrammpunktEingabe) => Promise<unknown>;
+  aendern: (id: number, daten: Partial<ProgrammpunktEingabe>) => Promise<unknown>;
+  loeschen: (id: number) => Promise<unknown>;
+}
+
 /**
  * Paneel „Ablauf“ der Einsatzdaten (LLH-1570, Spec `ablaufplan`, design.md D2): die Programmpunkte
  * der Veranstaltung nach Zeit. Uhrzeit und Bezeichnung werden je Zeile in der Ansicht bearbeitet
@@ -47,42 +54,83 @@ export default function AblaufPaneel({
   einsatzId: number;
   darfSchreiben: boolean;
 }) {
-  const { token } = useRollen();
-  const { message } = App.useApp();
   const qc = useQueryClient();
-  const jetzt = useUhr(30_000);
-  const [anlegenOffen, setAnlegenOffen] = useState(false);
-  const [form] = Form.useForm<FormWerte>();
-
   const query = useQuery({
     queryKey: einsatzKeys.programmpunkte(einsatzId),
     queryFn: () => ladeProgrammpunkte(einsatzId),
   });
   const auffrischen = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.programmpunkte(einsatzId) });
+  const schreiben: AblaufSchreiben = {
+    anlegen: (daten) => legeProgrammpunktAn(einsatzId, daten).then(auffrischen),
+    aendern: (id, daten) =>
+      aendereProgrammpunkt(einsatzId, id, daten).then((p) => {
+        void auffrischen();
+        return p;
+      }),
+    loeschen: (id) => loescheProgrammpunkt(einsatzId, id).then(auffrischen),
+  };
+  const punkte = query.data ?? [];
+  return (
+    <AblaufListe
+      punkte={punkte}
+      zustand={
+        query.isPending
+          ? 'laden'
+          : query.isError
+            ? 'fehler'
+            : punkte.length === 0
+              ? 'leer'
+              : 'daten'
+      }
+      onNeuladen={() => void query.refetch()}
+      darfSchreiben={darfSchreiben}
+      schreiben={schreiben}
+    />
+  );
+}
+
+/**
+ * Das Paneel „Ablauf“ ohne Datenquelle: dieselbe Ansicht für den Einsatz und für die Planung
+ * (LLH-1583), die Programmpunkte und Schreibwege kommen von außen.
+ */
+export function AblaufListe({
+  punkte,
+  zustand,
+  onNeuladen,
+  darfSchreiben,
+  schreiben,
+}: {
+  punkte: readonly Programmpunkt[];
+  zustand: 'laden' | 'fehler' | 'leer' | 'daten';
+  onNeuladen: () => void;
+  darfSchreiben: boolean;
+  schreiben: AblaufSchreiben;
+}) {
+  const { token } = useRollen();
+  const { message } = App.useApp();
+  const jetzt = useUhr(30_000);
+  const [anlegenOffen, setAnlegenOffen] = useState(false);
+  const [form] = Form.useForm<FormWerte>();
 
   const anlegen = useMutation({
     mutationFn: (w: FormWerte) =>
-      legeProgrammpunktAn(einsatzId, {
+      schreiben.anlegen({
         bezeichnung: w.bezeichnung.trim(),
         zeitpunkt_at: alsBackendZeit(w.zeitpunkt!),
       }),
-    onSuccess: () => auffrischen(),
   });
   const aendern = useMutation({
     mutationFn: ({ id, daten }: { id: number; daten: Partial<ProgrammpunktEingabe> }) =>
-      aendereProgrammpunkt(einsatzId, id, daten),
+      schreiben.aendern(id, daten),
     onSuccess: () => {
-      void auffrischen();
       message.success('Programmpunkt gespeichert');
     },
   });
   const loeschen = useMutation({
-    mutationFn: (id: number) => loescheProgrammpunkt(einsatzId, id),
-    onSuccess: () => auffrischen(),
+    mutationFn: (id: number) => schreiben.loeschen(id),
   });
 
-  const punkte = query.data ?? [];
   return (
     <Paneel
       titel="Ablauf"
@@ -94,19 +142,11 @@ export default function AblaufPaneel({
       }
     >
       <PaneelZustand
-        zustand={
-          query.isPending
-            ? 'laden'
-            : query.isError
-              ? 'fehler'
-              : punkte.length === 0
-                ? 'leer'
-                : 'daten'
-        }
+        zustand={zustand}
         titel="Ablauf"
         // Ohne Aktion: der Ausweg „Programmpunkt“ steht im Paneelkopf.
         leerText="Kein Programmpunkt"
-        onNeuladen={() => void query.refetch()}
+        onNeuladen={onNeuladen}
       >
         {punkte.map((p) => (
           <AblaufZeile

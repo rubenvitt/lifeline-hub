@@ -28,6 +28,7 @@ use crate::personal::qualifikation_deckung::OffeneAnforderung;
 use crate::uhs::UhsTyp;
 use crate::wire_enum::wire_enum;
 
+pub mod programm;
 pub mod repo;
 pub mod uebernahme;
 pub mod zugriff;
@@ -244,6 +245,9 @@ pub struct PlanungAnzeige {
     /// Nach Posten (Reihenfolge, Pause zuletzt) und Beginn.
     pub bloecke: Vec<PlanungBlockAnzeige>,
     pub helfer: Vec<PlanHelferAnzeige>,
+    /// Programmpunkte der Veranstaltung nach Zeitpunkt (LLH-1583); die Übernahme legt sie im
+    /// Einsatz an.
+    pub programmpunkte: Vec<crate::programmpunkt::Programmpunkt>,
     pub kennzahlen: PlanungKennzahlen,
 }
 

@@ -177,6 +177,15 @@ pub struct PaketGrenzwerte {
     pub min_ruhe_min: Option<i64>,
 }
 
+/// Ein Programmpunkt der Veranstaltung aus der Vorplanung (LLH-1583); eine Datei bringt keine.
+/// Beides ist schon geprüft: Bezeichnung getrimmt und höchstens
+/// `programmpunkt::PROGRAMMPUNKT_BEZEICHNUNG_MAX`, Zeitpunkt kanonisch in UTC.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaketProgrammpunkt {
+    pub bezeichnung: String,
+    pub zeitpunkt_at: String,
+}
+
 /// Ein Plan, noch ohne Bezug zum Einsatz.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PlanPaket {
@@ -184,6 +193,9 @@ pub struct PlanPaket {
     pub posten: Vec<PaketPosten>,
     pub bloecke: Vec<PaketBlock>,
     pub personen: Vec<PaketPerson>,
+    /// Programmpunkte, die der Einsatz bekommt (LLH-1583): ein Punkt mit gleicher Bezeichnung
+    /// (ohne Groß und klein) und gleichem Zeitpunkt, den der Einsatz schon hat, bleibt aus.
+    pub programmpunkte: Vec<PaketProgrammpunkt>,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -453,6 +465,11 @@ pub struct ImportZaehlung {
     pub einteilungen_neu: i64,
     /// Grenzwerte des Dienst-Befunds, die die Vorplanung setzt (LLH-1561); aus einer Datei 0.
     pub grenzwerte_neu: i64,
+    /// Programmpunkte der Vorplanung, die der Einsatz neu bekommt (LLH-1583); aus einer Datei 0.
+    pub programmpunkte_neu: i64,
+    /// Programmpunkte der Vorplanung, die der Einsatz schon hat (gleiche Bezeichnung und
+    /// Zeitpunkt); sie bleiben aus und zählen nicht als Änderung.
+    pub programmpunkte_vorhanden: i64,
     /// Summe aller Änderungen; 0 = das Übernehmen schreibt nichts.
     pub aenderungen: i64,
 }
@@ -465,7 +482,8 @@ impl ImportZaehlung {
             + self.bloecke_ergaenzt
             + self.helfer_neu
             + self.einteilungen_neu
-            + self.grenzwerte_neu;
+            + self.grenzwerte_neu
+            + self.programmpunkte_neu;
     }
 }
 

@@ -1,4 +1,5 @@
 import { apiDatei, apiGet, apiSend } from './client';
+import type { ProgrammpunktEingabe } from './programmpunkte';
 import type {
   Planung,
   PlanungAendernBody,
@@ -11,6 +12,7 @@ import type {
   PlanungPostenBody,
   PlanungUebernahmeBody,
   PlanungUebernahmeErgebnis,
+  Programmpunkt,
   SchichtplanHelfer,
   SchichtplanImportVorschau,
   SchichtplanHelferAendernBody,
@@ -115,6 +117,29 @@ export function aenderePlanungHelfer(
 /** Nimmt den Helfer aus allen Blöcken. */
 export function loeschePlanungHelfer(id: number, helferId: number): Promise<void> {
   return apiSend<void>(`${basis(id)}/helfer/${helferId}`, 'DELETE');
+}
+
+/**
+ * Programmpunkte der Planung (LLH-1583): dieselben Grenzen wie am Einsatz (höchstens 50, sonst
+ * 422). Die Übernahme legt sie im Einsatz an; danach ist jeder Schreibweg 409.
+ */
+export function legePlanungProgrammpunktAn(
+  id: number,
+  daten: ProgrammpunktEingabe,
+): Promise<Programmpunkt> {
+  return apiSend<Programmpunkt>(`${basis(id)}/programmpunkte`, 'POST', daten);
+}
+
+export function aenderePlanungProgrammpunkt(
+  id: number,
+  punktId: number,
+  daten: Partial<ProgrammpunktEingabe>,
+): Promise<Programmpunkt> {
+  return apiSend<Programmpunkt>(`${basis(id)}/programmpunkte/${punktId}`, 'PATCH', daten);
+}
+
+export function loeschePlanungProgrammpunkt(id: number, punktId: number): Promise<void> {
+  return apiSend<void>(`${basis(id)}/programmpunkte/${punktId}`, 'DELETE');
 }
 
 /**

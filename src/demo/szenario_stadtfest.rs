@@ -15,8 +15,8 @@
 //! Einheiten-Vorlage und kein Schichtmodell (Sanitätsdienst ohne Schichten).
 
 use super::planung::{
-    PlanungEinteilung, PlanungHelferVorlage, PlanungPerson, PlanungPostenVorlage, PlanungVorlage,
-    PostenHerkunft,
+    PlanungEinteilung, PlanungHelferVorlage, PlanungPerson, PlanungPostenVorlage,
+    PlanungProgrammpunkt, PlanungVorlage, PostenHerkunft,
 };
 use super::szenario::{
     abschnitt, besatzung, dispo_fahrzeug, dispo_personal, einheit, entscheidung, fms, lage,
@@ -811,7 +811,8 @@ pub const DREHBUCH: &[Schritt] = &[
 /// Bezeichnung der Demo-Planung (LLH-1585, Spec `vorplanung`, „Stadtfest in neuen Einsatz“).
 pub const PLANUNG_BEZEICHNUNG: &str = "Stadtfest Musterstadt";
 
-/// Die Demo-Planung (design.md D8): fünf Posten, Schichten aus der Schichtlänge, zwei Helfer.
+/// Die Demo-Planung (design.md D8): fünf Posten, Schichten aus der Schichtlänge, zwei Helfer,
+/// vier Programmpunkte (LLH-1583).
 /// Mia Muster steht in „UHS Marktplatz“ 10–17 und in „Streife 2“ 15–18 (Befund „doppelt“),
 /// „Streife 2“ 21–24 bleibt leer (die Lücke). Emil Probe dient genau 12 Stunden, also ohne
 /// Befund „Dienst“.
@@ -965,6 +966,29 @@ pub const PLANUNG: PlanungVorlage = {
                 ab_stunde: 12,
                 bis_stunde: 17,
                 personen: &[Stamm("einsatzleiter"), Stamm("streife2_fuehrer")],
+            },
+        ],
+        // LLH-1583: das Programm des Festes, wie es die Übernahme in den Einsatz bringt.
+        programm: &[
+            PlanungProgrammpunkt {
+                stunde: 12,
+                minute: 0,
+                bezeichnung: "Festbeginn",
+            },
+            PlanungProgrammpunkt {
+                stunde: 18,
+                minute: 0,
+                bezeichnung: "Einlass Bühne",
+            },
+            PlanungProgrammpunkt {
+                stunde: 19,
+                minute: 0,
+                bezeichnung: "Bühnenprogramm",
+            },
+            PlanungProgrammpunkt {
+                stunde: 22,
+                minute: 30,
+                bezeichnung: "Feuerwerk",
             },
         ],
     }

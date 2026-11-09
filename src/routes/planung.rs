@@ -28,15 +28,17 @@ use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::planung::repo::{
     self, BlockEingabe, BlockPatch, Herkunft, KopfEingabe, KopfPatch, PostenEingabe, PostenPatch,
 };
-use crate::planung::uebernahme;
 use crate::planung::zugriff::{Planer, PlanungsZugriff};
+use crate::planung::{programm, uebernahme};
 use crate::planung::{
     PlanungAnzeige, PlanungListeneintrag, PlanungPostenArt, PlanungUebernahmeErgebnis,
     ABSCHNITT_MAX, BEZEICHNUNG_MAX, ORT_MAX, POSTEN_MAX,
 };
+use crate::programmpunkt::{Programmpunkt, PROGRAMMPUNKT_BEZEICHNUNG_MAX};
 use crate::routes::abloesung_schichtplan::{
     grenzwert, planzeit, qualifikationen, soll_anzahl, zeitraum,
 };
+use crate::routes::programmpunkt::{parse_zeitpunkt, NeuerProgrammpunkt, ProgrammpunktPatch};
 use crate::routes::support;
 use crate::uhs::UhsTyp;
 use crate::zeit::jetzt;
@@ -735,6 +737,78 @@ pub async fn helfer_loeschen(
     PfadParam((_id, hid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     repo::helfer_loeschen(&state.pool, z.benutzer.org_id, z.planung_id, hid).await?;
+    melde(&state, z.benutzer.org_id, z.planung_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Programmpunkte (LLH-1583)
+// ---------------------------------------------------------------------------------------------
+
+/// POST /api/planungen/{id}/programmpunkte (201, der Programmpunkt). Grenzen wie am Einsatz:
+/// Bezeichnung Pflicht und höchstens 100 Zeichen, Zeitpunkt im Jahresbereich (400), höchstens 50
+/// je Planung (422).
+pub async fn programmpunkt_anlegen(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+    JsonBody(req): JsonBody<NeuerProgrammpunkt>,
+) -> Result<(StatusCode, Json<Programmpunkt>), AppError> {
+    let bezeichnung = support::pflicht_max(
+        &req.bezeichnung,
+        "Bezeichnung",
+        PROGRAMMPUNKT_BEZEICHNUNG_MAX,
+    )?;
+    let zeitpunkt = parse_zeitpunkt(&req.zeitpunkt_at)?;
+    let p = programm::anlegen(
+        &state.pool,
+        z.benutzer.org_id,
+        z.planung_id,
+        z.benutzer.id,
+        &bezeichnung,
+        &zeitpunkt,
+    )
+    .await?;
+    melde(&state, z.benutzer.org_id, z.planung_id);
+    Ok((StatusCode::CREATED, Json(p)))
+}
+
+/// PATCH /api/planungen/{id}/programmpunkte/{pid} — Bezeichnung und/oder Zeitpunkt.
+pub async fn programmpunkt_aendern(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+    PfadParam((_id, pid)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<ProgrammpunktPatch>,
+) -> Result<Json<Programmpunkt>, AppError> {
+    let bezeichnung = support::pflicht_max_tri(
+        req.bezeichnung.as_deref(),
+        "Bezeichnung",
+        PROGRAMMPUNKT_BEZEICHNUNG_MAX,
+    )?;
+    let zeitpunkt = req
+        .zeitpunkt_at
+        .as_deref()
+        .map(parse_zeitpunkt)
+        .transpose()?;
+    let p = programm::aendern(
+        &state.pool,
+        z.benutzer.org_id,
+        z.planung_id,
+        pid,
+        bezeichnung.as_deref(),
+        zeitpunkt.as_deref(),
+    )
+    .await?;
+    melde(&state, z.benutzer.org_id, z.planung_id);
+    Ok(Json(p))
+}
+
+/// DELETE /api/planungen/{id}/programmpunkte/{pid} (204).
+pub async fn programmpunkt_loeschen(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+    PfadParam((_id, pid)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    programm::loeschen(&state.pool, z.benutzer.org_id, z.planung_id, pid).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(StatusCode::NO_CONTENT)
 }

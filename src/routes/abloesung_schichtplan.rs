@@ -820,6 +820,13 @@ pub(crate) fn publish_uebernahme(
         super::einsatz_uhs::sse_uhs(state, einsatz_id, *id);
     }
     super::abloesung::sse(state, einsatz_id);
+    // Programmpunkte der Vorplanung (LLH-1583): Einsatzdaten, Überblick und Lagemonitor laden
+    // über das Ereignis `einsatz` nach, wie nach jedem Schreibweg der Programmpunkte.
+    if geschrieben.zaehlung.programmpunkte_neu > 0 {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Einsatz);
+    }
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/import — wie die Vorschau, schreibt aber in

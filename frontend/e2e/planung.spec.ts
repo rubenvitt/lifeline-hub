@@ -145,8 +145,9 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
 
 /**
  * „In Einsatz übernehmen“ (LLH-1587): eine Stadtfest-Planung mit einem Posten, einem Helfer und
- * einem Block per API, dann über die Oberfläche in einen neuen Einsatz. Danach ist die Planung
- * schreibgeschützt, ein zweiter Aufruf antwortet 409, und der Block steht im Schichtplan des neuen
+ * einem Block per API, dazu ein Programmpunkt über den Reiter „Ablauf“ (LLH-1583), dann über die
+ * Oberfläche in einen neuen Einsatz. Danach ist die Planung schreibgeschützt, ein zweiter Aufruf
+ * antwortet 409, der Block steht im Schichtplan und der Programmpunkt im Ablauf des neuen
  * Einsatzes. Die Demo-Planung „Stadtfest Musterstadt“ prüft `tests/planung_uebernahme.rs`; das
  * e2e-Backend läuft ohne Demo-Daten.
  */
@@ -188,12 +189,27 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
 
   await page.goto(`/planungen/${planungId}`);
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+
+  // ── Programmpunkt im Reiter „Ablauf“ (LLH-1583), 22:30 in der Zone der Organisation ──────────
+  await page.getByRole('tab', { name: 'Ablauf · 0' }).click();
+  const ablauf = page.getByRole('region', { name: 'Ablauf' });
+  await ablauf.getByRole('button', { name: 'Programmpunkt', exact: true }).click();
+  const punktDialog = page.getByRole('dialog', { name: 'Programmpunkt anlegen' });
+  await punktDialog.getByLabel('Bezeichnung').fill('Feuerwerk');
+  const zeit = punktDialog.getByLabel('Zeitpunkt');
+  await zeit.fill('122230jun27');
+  await zeit.press('Enter');
+  await expect(punktDialog).toBeHidden();
+  await expect(page.getByRole('tab', { name: 'Ablauf · 1' })).toBeVisible();
+  await expect(ablauf.getByText('Feuerwerk')).toBeVisible();
+
   await page.getByRole('button', { name: 'In Einsatz übernehmen' }).click();
   const dialog = page.getByRole('dialog', { name: 'In Einsatz übernehmen' });
   const zaehlung = dialog.locator('[data-lfh="einlesen-zaehlung"]');
   await expect(zaehlung).toContainText('1 Einheit neu');
   await expect(zaehlung).toContainText('1 Schicht neu');
   await expect(zaehlung).toContainText('1 Helfer neu');
+  await expect(zaehlung).toContainText('1 Programmpunkt neu');
   await dialog.getByRole('button', { name: 'Übernehmen' }).click();
   await expect(dialog.locator('[data-lfh="uebernahme-ergebnis"]')).toContainText(
     'Einsatz angelegt, Plan übernommen',
@@ -207,6 +223,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(page.getByRole('button', { name: 'In Einsatz übernehmen' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Planung bearbeiten' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Block anlegen' })).toHaveCount(0);
+  await expect(ablauf.getByRole('button', { name: 'Programmpunkt', exact: true })).toHaveCount(0);
   const nochmal = await page.request.post(`/api/planungen/${planungId}/uebernahme`, {
     data: { ziel: { art: 'neu' } },
   });
@@ -222,6 +239,16 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   expect(schichtplan.bloecke).toHaveLength(1);
   expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');
   expect(schichtplan.helfer.map((h: { name: string }) => h.name)).toEqual(['Hanna Stadtfest']);
+  // Derselbe Zeitpunkt wie in der Planung; welche UTC-Zeit 22:30 ist, hängt an der Zone.
+  const paar = (punkte: { bezeichnung: string; zeitpunkt_at: string }[]) =>
+    punkte.map((p) => [p.bezeichnung, p.zeitpunkt_at]);
+  const geplant = await (await page.request.get(`/api/planungen/${planungId}`)).json();
+  const programm = await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/programmpunkte`)
+  ).json();
+  expect(paar(geplant.programmpunkte)).toHaveLength(1);
+  expect(paar(geplant.programmpunkte)[0][1]).toMatch(/^2027-06-12 2\d:30:00$/);
+  expect(paar(programm)).toEqual(paar(geplant.programmpunkte));
 });
 
 /**
