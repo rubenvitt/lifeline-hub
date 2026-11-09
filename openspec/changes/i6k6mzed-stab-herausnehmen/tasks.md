@@ -69,7 +69,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 - [x] 5.2 `benachrichtigung::aufloesung` (`besetzung_nutzer`, `funktionen_der_nutzer`) liest nur noch die Mitgliedschaft und den EL der Führungsstelle. Die `tests/benachrichtigung*.rs` (Setup auf Mitgliedschaft), `tests/dokument_verteiler.rs` und `tests/lagebesprechung.rs` sind grün.
 - [x] 5.3 `einsatz::funktion`, `meine_sachgebiete`/`meine_funktion` (`einsatz/mod.rs`, `routes/einsatz.rs`), `fuehrungsstelle::absender_tx` und den ETB-Funktions-Snapshot auf die Mitgliedschaft umstellen. `tests/einsatz_funktion.rs`, `tests/einsatz_live.rs` und `tests/org_live.rs` sind grün.
 - [x] 5.4 Live-Ereignis `mitglieder` (Wire `mitglieder`, Gate Einsatz-Lesezugriff) bei `PUT`/`DELETE …/mitglieder/…`. Ein Leser des Einsatzes erhält es. Eine fremde Organisation erhält nichts. Außerdem entsteht keine Auflösung für geschwärzte Einsätze. Grün sind `gate_mengen_sind_gepinnt`, `tests/enum_wire_kontrakt.rs`, `tests/einsatz_live.rs` und der Codegen. Frontend: `EINSATZ_STREAM_EVENTS.mitglieder` invalidiert Mitglieder, Aufträge, Erinnerungen und Modulzähler; dazu `useEinsatzLiveStream.test.tsx` und `liveEvent.contract.test.ts`.
-- [ ] 5.5 Frontend: gemeinsame Ableitung `fuehrung/besetzungAusMitgliedern.ts` aus `GET …/mitglieder`. Folgende Stellen lesen sie:
+- [x] 5.5 Frontend: gemeinsame Ableitung `fuehrung/besetzungAusMitgliedern.ts` aus `GET …/mitglieder`. Folgende Stellen lesen sie:
   - Organigramm (Stabsstelle ohne Stab-Freigabe)
   - `fuehrungsorganisation.ts`
   - Fernmeldeskizze (`useNetzQuellen`, Quelle „Mitglieder“)
@@ -154,7 +154,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 ## 8. Gesamtprüfung
 
 - [ ] 8.1 `./scripts/check-all.sh` ist grün, mit `scripts/check-migrationen.sh` gegen ein frisches `origin/alpha`.
-- [ ] 8.2 Lauf mit einer DB aus dem Bestand: Einsatz mit Besetzung, Presse-Log, Pressemitteilung und Checkliste, Organisation mit ausgeblendetem Stab, Vorlage MANV. Nach dem Start fehlen Tabellen und Spalte, das Informationstelefon ist dort ausgeblendet, wo der Stab es war, und das ETB bleibt lesbar und beschreibbar.
+- [x] 8.2 Lauf mit einer DB aus dem Bestand: Einsatz mit Besetzung, Presse-Log, Pressemitteilung und Checkliste, Organisation mit ausgeblendetem Stab, Vorlage MANV. Nach dem Start fehlen Tabellen und Spalte, das Informationstelefon ist dort ausgeblendet, wo der Stab es war, und das ETB bleibt lesbar und beschreibbar.
 - [ ] 8.3 Bilder der Änderung für PR und Meldung aufnehmen (Wegwerf-Spec `zz-i6k6mzed.bilder.ts`): Modulliste ohne Stab und mit Informationstelefon, Organigramm mit Führungsfunktionen aus den Mitgliedern, Kommunikationsplan-Spalte „Besetzung“.
 
 ## 9. Spec-Nachzug

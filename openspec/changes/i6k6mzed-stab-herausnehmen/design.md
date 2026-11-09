@@ -163,6 +163,20 @@ Entscheidung Ruben, 08.11.2026. Neue Migrationen werden angehängt, Nummern grö
     (Test `db::tests::etb_spalte_pressemitteilung_und_presse_tabellen_lassen_sich_loeschen`,
     22 ms auf der Test-DB). Der Rückfall wird nicht gebraucht. Die Messung in Demo-Größe folgt in
     Aufgabe 8.2.
+  - **Ergebnis Aufgabe 8.2 (09.11.2026):** Bestands-DB auf Stand 0301 (Migrationen bis 0301 mit
+    den echten Prüfsummen, darin beide Demo-Lagen Starkregen und Stadtfest: 2 Einsätze, 284
+    ETB-Einträge, 2,5 MB). Dazu Besetzung S2/S5, zwei Checklistenpunkte, ein Presse-Log-Eintrag,
+    eine freigegebene Pressemitteilung mit ETB-Eintrag, der auf sie zeigt, `stab` in der
+    Organisation ausgeblendet, in Einsatz 2 auf Admin beschränkt und in allen sechs Startvorlagen
+    (MANV eingeschlossen) ausgeblendet. Das Binary dieses Stands spielt beim Start 0302 in 1,6 ms
+    und 0303 in 25 ms ein (`_sqlx_migrations.execution_time`), bereit nach 121 ms. Danach fehlen
+    die vier Tabellen und `etb_eintrag.pressemitteilung_id`, `infotelefon` steht genau dort, wo
+    `stab` stand (Organisation `sichtbar = 0`, Einsatz 2 `admin`, sechs Vorlagen), keine Zeile mit
+    `stab` bleibt, `GET …/modul-freigaben` meldet das Informationstelefon ausgeblendet und
+    `GET …/stab` 404. Das ETB ist lesbar (`GET …/etb` 200, der Eintrag der Pressemitteilung steht
+    als Text) und beschreibbar (`POST …/etb` 201); `foreign_key_check` leer, `integrity_check`
+    `ok`. Mit 50 000 zusätzlichen ETB-Einträgen (17,3 MB) braucht 0303 127 ms, bereit nach
+    227 ms; die WAL ist nach dem Beenden zurückgeschrieben.
 - **Schwärzung und Aufbewahrung:** Die Registry-Einträge der vier Tabellen und der Spalte fallen
   weg. Ebenso entfallen `PERSONENBEZUEGE` für Stabsfunktion und Medienkontakt, die Personensuche
   über Medienkontakte und die Ausnahmen in `tests/aufbewahrung_e2e.rs`. Die DB-getriebenen Guards
