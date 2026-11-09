@@ -1977,6 +1977,26 @@ describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
     expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeInTheDocument();
   });
 
+  it('ist die Schicht der Leiste noch nicht unter den laufenden, sagt der Vollzug das, statt stumm zu bleiben (LLH-1555)', async () => {
+    const minute = 29_000_000;
+    laufendLiefert([]);
+    fetchSchichtplan.mockResolvedValue({
+      ...PLAN,
+      wechsel: [
+        {
+          zeitpunkt: PLAN.bloecke[0].bis,
+          minute,
+          eintraege: [{ art: 'einheit', stand: 'offen', block_id: 1, abloesung_id: 40 }],
+        },
+      ],
+    });
+    renderPage(`/einsaetze/1/abloesung?ansicht=plan&wechsel=${minute}`);
+    const leiste = await screen.findByRole('region', { name: 'Wechsel laut Plan' });
+    await userEvent.click(within(leiste).getByRole('button', { name: 'Ablösung vollziehen' }));
+    expect(await screen.findByText('Schicht wird noch geladen')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('auf dem Handschirm steht je Posten „jetzt“ und „als Nächstes“', async () => {
     setzeViewportBreite(390);
     renderPage();

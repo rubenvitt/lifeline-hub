@@ -935,7 +935,13 @@ export default function AbloesungPage() {
           wechselSprungKennung={location.key}
           onVollziehen={(id) => {
             const x = laufende.find((s) => s.id === id);
-            if (!x) return;
+            // Die Leiste kennt die Schicht vor der Liste der laufenden (eigener Abruf): nicht
+            // stumm bleiben, sondern sagen, dass die Schicht nachgeladen wird.
+            if (!x) {
+              message.warning('Schicht wird noch geladen');
+              void laufendQuery.refetch();
+              return;
+            }
             vollzugMut.reset();
             setVollzugSchicht(x);
           }}
