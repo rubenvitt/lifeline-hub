@@ -162,6 +162,13 @@ describe('useKontextMenue — ohne langen Druck (LLH-1597, D1)', () => {
     expect(onOeffnen).toHaveBeenCalledTimes(2);
   });
 
+  it('die Rechtsklick-Taste am Stift öffnet wie die Maus', () => {
+    const { onOeffnen, text } = ohneDruck();
+    fireEvent.pointerDown(text, { ...touch, pointerType: 'pen', button: 2 });
+    expect(rechtsklick(text)).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+
   it('ohne vorheriges `pointerdown` gilt der Rechtsklick als Maus', () => {
     const { onOeffnen, text } = ohneDruck();
     expect(rechtsklick(text)).toBe(false);

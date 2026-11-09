@@ -281,7 +281,9 @@ export function useKontextMenue<S>(
         },
 
         onPointerDown: (e) => {
-          letzterZeiger.current = e.pointerType;
+          // Die Rechtsklick-Taste am Stift (`button` 2) ist ein Rechtsklick, kein Halten.
+          letzterZeiger.current =
+            e.pointerType === 'pen' && e.button === 2 ? 'mouse' : e.pointerType;
           if (optionenRef.current.langerDruck === false) return;
           if (e.pointerType === 'mouse' || !ausEigenemBaum(e)) return;
           loesen();
