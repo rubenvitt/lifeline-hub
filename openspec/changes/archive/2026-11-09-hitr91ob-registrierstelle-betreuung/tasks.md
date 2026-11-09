@@ -33,7 +33,7 @@
 
 - [x] 5.1 `frontend/src/betreuung/AGENTS.md`: Absatz „Registrierstelle“ (D1–D8 als Regeln, eine Wahrheit „in Betreuung“ auch bei namentlicher Führung); Verweis in `frontend/src/personen/AGENTS.md`. Nachweis: Prettier grün, `scripts/adr-fuer.sh` für die berührten Pfade geprüft.
 - [x] 5.2 Anwenderdoku `docs/anwender/kapitel/betreuung.md`, `geraet-betreuungsstelle.md`, `verpflegung.md`, `betroffene.md` samt Bildern im Bildlauf (Regeln `docs/anwender/AGENTS.md`). Nachweis: Doku-Wächter grün.
-- [ ] 5.3 `./scripts/check-all.sh` grün; Bilder der Änderung für PR und Meldung.
+- [x] 5.3 `./scripts/check-all.sh` grün; Bilder der Änderung für PR und Meldung.
 
 ## Workflow follow-up
 

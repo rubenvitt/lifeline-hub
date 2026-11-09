@@ -181,7 +181,9 @@ Die Fehlmenge MUST immer als Zahl dastehen, auch bei „offen“. Nichts davon d
 
 Die Oberfläche SHALL beim Anlegen eines Zeitfensters den Bedarf vorbelegen: die
 Einsatzkräfte mit der aktuellen Personalstärke des Einsatzes, die Betreuten mit der Kopfzahl
-„in Betreuung“ zum Beginn des Zeitfensters. Der Bedarf wird gespeichert und danach nicht
+„in Betreuung“ zum Beginn des Zeitfensters, die Sonderkost je Kostform mit der Zählung der
+Registrierten (Kostformen ohne Personenbezug, Stand jetzt), sofern mindestens eine Person mit
+Sonderkost registriert ist. Der Bedarf wird gespeichert und danach nicht
 mehr aus den Quellen nachgerechnet. Jeder Vorschlag MUST sichtbar beschriftet und
 überschreibbar sein. Liefert eine Quelle nichts, MUST das Feld leer bleiben statt 0 zu
 zeigen. Eine Quelle, deren Modul der Person nicht zugänglich ist (ausgeblendet, per Rolle
@@ -211,6 +213,14 @@ entfallen.
 #### Scenario: Späterer Personalzuwachs
 - **WHEN** nach dem Anlegen eines Zeitfensters weiteres Personal in den Einsatz kommt
 - **THEN** bleiben Bedarf und Fehlmenge des Zeitfensters unverändert
+
+#### Scenario: Sonderkost aus der Registrierung
+- **WHEN** im Einsatz 40 Personen registriert sind, davon 6 vegetarisch und 2 vegan, und ein Zeitfenster angelegt wird
+- **THEN** stehen 6 bei vegetarisch und 2 bei vegan vorbelegt, mit dem Hinweis „aus 40 Registrierten, Stand jetzt“, und die übrigen Sonderkost-Felder bleiben leer
+
+#### Scenario: Keine Registrierten
+- **WHEN** im Einsatz niemand registriert ist
+- **THEN** bleiben die Sonderkost-Felder leer und ohne Hinweis
 
 ### Requirement: Bezug zur Nachforderung
 
