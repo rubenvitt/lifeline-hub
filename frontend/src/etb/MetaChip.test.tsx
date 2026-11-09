@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { LANGDRUCK_MS } from '../components/useKontextMenue';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
@@ -549,5 +550,96 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
       />,
     );
     expect(screen.getByLabelText('Von')).toHaveAttribute('maxlength', '500');
+  });
+});
+
+/**
+ * Kontextmenü am Chip (LLH-1597, Spec `datensatz-aktionsmenue`, „Chips der ETB-Erfassung tragen
+ * das Kontextmenü“, `openspec/changes/j161rpsm-kontextmenue-etb/design.md` D5).
+ */
+describe('MetaChip — Kontextmenü (LLH-1597)', () => {
+  const offenesKontextmenue = () =>
+    document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label^="Aktionen zu"]',
+    );
+  const kontextAnker = () => document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]');
+  const punkte = (menue: HTMLElement) =>
+    [...menue.querySelectorAll('[role="menuitem"]')].map((m) => m.textContent);
+
+  function chip(extra: Partial<React.ComponentProps<typeof MetaChip>> = {}) {
+    const wege = { onRemove: vi.fn(), onEdit: vi.fn(), onStandardAendern: vi.fn() };
+    renderMitProviders(
+      <MetaChip
+        feld="an"
+        editing={false}
+        wert="S2"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={wege.onRemove}
+        onEdit={wege.onEdit}
+        {...extra}
+      />,
+    );
+    return wege;
+  }
+
+  it('Rechtsklick zeigt Bearbeiten, Trenner und rot Entfernen; die Wahl ruft denselben Weg', async () => {
+    const { onRemove, onEdit } = chip();
+    const text = screen.getByText('An: S2');
+    expect(fireEvent.contextMenu(text, { clientX: 10, clientY: 20, button: 2 })).toBe(false);
+    const menue = await waitFor(() => offenesKontextmenue()!);
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu An');
+    expect(punkte(menue)).toEqual(['Bearbeiten', 'Entfernen']);
+    expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Entfernen' }));
+    expect(onRemove).toHaveBeenCalledWith('an');
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it('ein Chip aus dem Standard-Rufnamen zeigt dessen Einträge, kein Entfernen', async () => {
+    const onStandardAendern = vi.fn();
+    chip({ feld: 'von', ausStandard: true, onStandardAendern });
+    fireEvent.contextMenu(screen.getByText(/^Von:/), { button: 2 });
+    const menue = await waitFor(() => offenesKontextmenue()!);
+    expect(punkte(menue)).toEqual(['Nur für diesen Eintrag ändern', 'Standard-Rufname ändern']);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Standard-Rufname ändern' }));
+    expect(onStandardAendern).toHaveBeenCalledTimes(1);
+  });
+
+  it('während des Sendens stehen die Einträge gesperrt da', async () => {
+    const { onRemove } = chip({ gesperrt: true });
+    fireEvent.contextMenu(screen.getByText('An: S2'), { button: 2 });
+    const menue = await waitFor(() => offenesKontextmenue()!);
+    const entfernen = within(menue).getByRole('menuitem', { name: 'Entfernen' });
+    expect(entfernen).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(entfernen);
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it('im Bearbeiten-Zustand bleibt das Browsermenü', () => {
+    chip({ editing: true });
+    expect(fireEvent.contextMenu(screen.getByLabelText('An'), { button: 2 })).toBe(true);
+    expect(kontextAnker()).toBeNull();
+  });
+
+  it('Umschalt+F10 auf dem ⋮ öffnet das Menü am Chip', async () => {
+    chip();
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu An' });
+    knopf.focus();
+    expect(fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true })).toBe(false);
+    await waitFor(() => expect(kontextAnker()).not.toBeNull());
+  });
+
+  it('ein langer Touchdruck öffnet kein Menü', () => {
+    vi.useFakeTimers();
+    try {
+      chip();
+      const text = screen.getByText('An: S2');
+      fireEvent.pointerDown(text, { isPrimary: true, pointerId: 2, pointerType: 'touch' });
+      act(() => vi.advanceTimersByTime(LANGDRUCK_MS * 2));
+      expect(kontextAnker()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

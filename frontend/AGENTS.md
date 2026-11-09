@@ -657,7 +657,9 @@ anwendbar), „nicht geprüft" ist keins.
   `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Auf Link,
   Eingabefeld und markiertem Text und ohne Einträge bleibt das Browsermenü; die Taste öffnet auch auf
   dem Titel-Link. Kein eigenes `onContextMenu` (`kontextMenue.guard.test.ts`); die Lagekarte bleibt
-  beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`.
+  beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`. Eine Lesefläche
+  ohne langen Druck setzt `langerDruck: false` (ETB, LLH-1597): Finger und Stift behalten Markieren
+  und Systemmenü, Rechtsklick und Tasten öffnen weiter.
 - **Ein Sprung ist keine Handlung** (LFH-616): gezählt werden nur ändernde Aktionen; Deeplinks
   („… ↗") stehen als eine Zeile (`data-lfh="inspector-sprung"`), rote Handlung abgesetzt.
 - **Drag & Drop zieht nur mit `ZugPointerSensor`** (LFH-519, `components/zugPointerSensor.ts`):

@@ -19,13 +19,16 @@ type Oeffnen = (schluessel: string, oeffnung: KontextOeffnung) => boolean;
 function Probe({
   onOeffnen,
   kannOeffnen,
+  langerDruck,
 }: {
   onOeffnen: Oeffnen;
   kannOeffnen?: (schluessel: string) => boolean;
+  langerDruck?: boolean;
 }) {
   const ausloeser = useKontextMenue<string>({
     onOeffnen,
     ...(kannOeffnen ? { kannOeffnen } : {}),
+    ...(langerDruck != null ? { langerDruck } : {}),
   });
   return (
     <ul>
@@ -119,6 +122,49 @@ describe('useKontextMenue — Rechtsklick (LLH-1596, D1/D2)', () => {
   it('lässt das Browsermenü, wenn der Datensatz keine Einträge meldet', () => {
     const { onOeffnen } = aufbau(false);
     expect(rechtsklick(screen.getByTestId('text'))).toBe(true);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useKontextMenue — ohne langen Druck (LLH-1597, D1)', () => {
+  function ohneDruck() {
+    const onOeffnen = vi.fn<Oeffnen>(() => true);
+    render(<Probe onOeffnen={onOeffnen} langerDruck={false} />);
+    return { onOeffnen, zeile: screen.getByTestId('zeile'), text: screen.getByTestId('text') };
+  }
+
+  it('ein Touchdruck startet keinen Zeitgeber und sperrt das Markieren nicht', () => {
+    vi.useFakeTimers();
+    const { onOeffnen, zeile, text } = ohneDruck();
+    fireEvent.pointerDown(text, { ...touch, clientX: 50, clientY: 60 });
+    expect(zeile.hasAttribute(DRUCK_ATTRIBUT)).toBe(false);
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS * 2));
+    expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it.each(['touch', 'pen'])(
+    'das native `contextmenu` nach einem Druck mit %s lässt das Systemmenü',
+    (pointerType) => {
+      const { onOeffnen, text } = ohneDruck();
+      fireEvent.pointerDown(text, { ...touch, pointerType });
+      expect(rechtsklick(text)).toBe(true);
+      expect(onOeffnen).not.toHaveBeenCalled();
+    },
+  );
+
+  it('Rechtsklick mit der Maus und die Taste öffnen weiter', () => {
+    const { onOeffnen, zeile, text } = ohneDruck();
+    fireEvent.pointerDown(text, { ...touch, pointerType: 'touch' });
+    fireEvent.pointerDown(text, { ...touch, pointerType: 'mouse', button: 2 });
+    expect(rechtsklick(text)).toBe(false);
+    zeile.focus();
+    expect(fireEvent.keyDown(zeile, { key: 'F10', shiftKey: true })).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(2);
+  });
+
+  it('ohne vorheriges `pointerdown` gilt der Rechtsklick als Maus', () => {
+    const { onOeffnen, text } = ohneDruck();
+    expect(rechtsklick(text)).toBe(false);
     expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 });
