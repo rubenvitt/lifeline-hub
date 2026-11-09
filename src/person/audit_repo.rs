@@ -12,7 +12,9 @@ pub enum ZugriffArt {
     Detail,
     Export,
     /// LFH-727: Abruf der Personen-Druckansicht (`GET …/personen/druck`), ohne Person; LLH-1120:
-    /// Druckansicht einer Person (`GET …/personen/{pid}/druck`), mit Person.
+    /// Druckansicht einer Person (`GET …/personen/{pid}/druck`), mit Person; LLH-1616:
+    /// Registrierliste einer Betreuungsstelle (`GET …/stellen/{sid}/registrierungen/druck`), je
+    /// Person ein Eintrag.
     Druck,
     /// LFH-757: Abruf der Datei eines Personen-Anhangs (`GET …/personen/{pid}/anhaenge/{aid}/datei`),
     /// mit Person, ohne Bezug auf die Datei. Auch 304 und Original schreiben eine Zeile.
@@ -49,6 +51,28 @@ pub async fn anlegen(
     .bind(benutzer_id)
     .bind(art)
     .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Wie [`anlegen`], aber in einer offenen Transaktion: der Registrierlistendruck (LLH-1616)
+/// schreibt je Person einen Eintrag und liefert nur, wenn alle stehen.
+pub async fn anlegen_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    person_id: Option<i64>,
+    benutzer_id: i64,
+    art: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+         VALUES (?, ?, ?, ?)",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .bind(benutzer_id)
+    .bind(art)
+    .execute(conn)
     .await?;
     Ok(())
 }

@@ -3,6 +3,8 @@
 //!
 //! - `POST …/betreuung/stellen/{sid}/registrierungen` — Haushalt registrieren (design.md D2).
 //! - `GET  …/betreuung/stellen/{sid}/registrierungen` — Registrierliste der Stelle.
+//! - `GET  …/betreuung/stellen/{sid}/registrierungen/druck` — dieselbe Liste für den Druck, je
+//!   Person protokolliert (LLH-1616, Change `iw8hjb93-registrierliste-drucken`).
 //! - `POST …/betreuung/stellen/{sid}/abmeldungen` — Personen oder Haushalt abmelden (D6).
 //! - `GET  …/betreuung/kostformen` — Kostformen der Registrierten ohne Personenbezug (D7).
 //!
@@ -17,7 +19,7 @@
 //! **Live** nach dem Commit: ETB-Kurzruf je Eintrag, dann `LiveEvent::Betreuung` mit der Stelle
 //! und `LiveEvent::Person` je Person.
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::Deserialize;
@@ -260,6 +262,42 @@ pub async fn liste(
     ctx.fordere_modul_zugriff(&state.pool, "personen").await?;
     Ok(Json(
         registrierung::liste(&state.pool, ctx.einsatz.id, sid, ctx.geraet.is_some()).await?,
+    ))
+}
+
+/// Query von `GET …/registrierungen/druck`: `unvertraeglichkeiten=1` (oder `true`) nimmt die
+/// Gesundheitsangabe auf das Blatt (design.md D3); alles andere lässt sie weg.
+#[derive(Debug, Default, Deserialize)]
+pub struct DruckQuery {
+    #[serde(default)]
+    unvertraeglichkeiten: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen/druck — die Registrierliste
+/// für die Druckansicht (LLH-1616, Spec `betreuung-registrierung`, „Druck der Registrierliste
+/// wird je Person protokolliert“). Prüfkette wie [`liste`]: Gerät nur eigene Stelle (403) →
+/// Modul Personen (403) → Stelle unbekannt oder fremd (404), dann lesen und je Person ein Eintrag
+/// `druck` in derselben Transaktion; erst danach die Daten.
+pub async fn druck(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Betreuung>,
+    PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
+    Query(q): Query<DruckQuery>,
+) -> Result<Json<RegistrierListe>, AppError> {
+    fordere_eigene_stelle(ctx.geraet.as_ref(), sid)?;
+    ctx.fordere_modul_zugriff(&state.pool, "personen").await?;
+    let mit_unvertraeglichkeiten =
+        matches!(q.unvertraeglichkeiten.as_deref(), Some("1") | Some("true"));
+    Ok(Json(
+        registrierung::liste_fuer_druck(
+            &state.pool,
+            ctx.einsatz.id,
+            sid,
+            ctx.geraet.is_some(),
+            ctx.benutzer.id,
+            mit_unvertraeglichkeiten,
+        )
+        .await?,
     ))
 }
 

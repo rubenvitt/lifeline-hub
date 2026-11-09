@@ -576,3 +576,201 @@ async fn abmeldung_begrenzt_und_entdoppelt_die_personen() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["person_ids"], json!([tom]));
 }
+
+// ---------- Registrierliste drucken (LLH-1616, Change `iw8hjb93-registrierliste-drucken`) ----------
+
+fn druck(e: i64, sid: i64) -> String {
+    format!("{}/druck", reg(e, sid))
+}
+
+/// Einträge `druck` im Zugriffsprotokoll je Person (`None` = listenweit).
+async fn druck_eintraege(pool: &sqlx::SqlitePool, e: i64, person: Option<i64>) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit \
+         WHERE einsatz_id = ? AND art = 'druck' AND person_id IS ?",
+    )
+    .bind(e)
+    .bind(person)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+fn person_ids(liste: &Value) -> Vec<i64> {
+    let mut ids: Vec<i64> = liste["haushalte"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|h| h["personen"].as_array().unwrap().iter())
+        .chain(liste["ohne_haushalt"].as_array().unwrap().iter())
+        .map(|p| p["id"].as_i64().unwrap())
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// Spec „Druck der Registrierliste wird je Person protokolliert“ und „Gesundheitsangaben nur auf
+/// Wunsch“: je Person ein Eintrag, nur an dieser Stelle, Unverträglichkeiten nur mit Parameter.
+#[tokio::test]
+async fn druck_protokolliert_je_person_und_liefert_gesundheitsangaben_nur_auf_wunsch() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ost = stelle(&app, &admin, e, "Turnhalle Ost", "namentlich").await;
+    let west = stelle(&app, &admin, e, "Weserstadion", "gezaehlt").await;
+    let (s, h) = post(&app, &admin, &reg(e, ost), familie(None)).await;
+    assert_eq!(s, StatusCode::CREATED, "{h}");
+    let (s, fremd) = post(
+        &app,
+        &admin,
+        &reg(e, west),
+        json!({"personen": [{"name": "Kaya", "vorname": "Emre", "kostform": "vegan"}]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fremd}");
+    let fremd_id = fremd["personen"][0]["id"].as_i64().unwrap();
+
+    let (s, blatt) = anfrage(&app, "GET", &druck(e, ost), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{blatt}");
+    assert_eq!(blatt["stelle_id"], ost);
+    assert_eq!(blatt["haushalte"][0]["nummer"], 1);
+    assert_eq!(
+        blatt["haushalte"][0]["personen"][0]["kostform"],
+        "vegetarisch"
+    );
+    assert!(
+        !blatt.to_string().contains("unvertraeglichkeiten"),
+        "ohne Wahl verlässt keine Gesundheitsangabe den Server: {blatt}"
+    );
+    let ids = person_ids(&blatt);
+    assert_eq!(ids.len(), 3);
+    for id in &ids {
+        assert_eq!(druck_eintraege(&pool, e, Some(*id)).await, 1, "Person {id}");
+    }
+    assert_eq!(druck_eintraege(&pool, e, Some(fremd_id)).await, 0);
+    assert_eq!(
+        druck_eintraege(&pool, e, None).await,
+        0,
+        "kein listenweiter Eintrag"
+    );
+
+    // Neu laden: je Person ein weiterer Eintrag.
+    let (s, _) = anfrage(&app, "GET", &druck(e, ost), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    for id in &ids {
+        assert_eq!(druck_eintraege(&pool, e, Some(*id)).await, 2, "Person {id}");
+    }
+
+    // Bewusst gewählt: die Unverträglichkeit steht in der Zeile.
+    let (s, mit) = anfrage(
+        &app,
+        "GET",
+        &format!("{}?unvertraeglichkeiten=1", druck(e, ost)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{mit}");
+    assert_eq!(
+        mit["haushalte"][0]["personen"][0]["unvertraeglichkeiten"],
+        "Erdnüsse"
+    );
+    for id in &ids {
+        assert_eq!(druck_eintraege(&pool, e, Some(*id)).await, 3, "Person {id}");
+    }
+
+    // Die Bildschirmliste bleibt unprotokolliert.
+    let (s, _) = anfrage(&app, "GET", &reg(e, ost), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(druck_eintraege(&pool, e, Some(ids[0])).await, 3);
+}
+
+/// Spec „Leere Stelle“: leere Liste, kein Eintrag. Unbekannte Stelle 404 ohne Eintrag.
+#[tokio::test]
+async fn druck_einer_leeren_oder_unbekannten_stelle_schreibt_nichts() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ost = stelle(&app, &admin, e, "Turnhalle Ost", "namentlich").await;
+
+    let (s, blatt) = anfrage(&app, "GET", &druck(e, ost), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{blatt}");
+    assert!(blatt["haushalte"].as_array().unwrap().is_empty());
+    assert!(blatt["ohne_haushalt"].as_array().unwrap().is_empty());
+    let (s, _) = anfrage(&app, "GET", &druck(e, ost + 999), &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let alle: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(alle, 0);
+}
+
+/// Spec „Ohne Personenrecht“: 403, bevor etwas gelesen oder protokolliert wird.
+#[tokio::test]
+async fn druck_ohne_personenrecht_ist_403_ohne_eintrag() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let (s, _) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, _) = anfrage(&app, "GET", &druck(e, sid), &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(druck_eintraege(&pool, e, None).await, 0);
+    let alle: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(alle, 0);
+}
+
+/// Spec „Protokoll nicht schreibbar“: scheitert der Eintrag der zweiten Person, geht keine Person
+/// hinaus, und der Eintrag der ersten bleibt nicht stehen.
+#[tokio::test]
+async fn druck_ohne_vollstaendiges_protokoll_liefert_nichts_und_laesst_nichts_stehen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "namentlich").await;
+    let (s, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    assert_eq!(s, StatusCode::CREATED, "{h}");
+    // Der erste Eintrag gelingt, der zweite scheitert (wie bei voller Platte mitten im Abruf).
+    sqlx::query(
+        "CREATE TRIGGER druck_audit_kaputt BEFORE INSERT ON person_zugriff_audit \
+         WHEN NEW.art = 'druck' \
+          AND (SELECT COUNT(*) FROM person_zugriff_audit WHERE art = 'druck') >= 1 \
+         BEGIN SELECT RAISE(ABORT, 'kaputt'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (s, body) = anfrage(&app, "GET", &druck(e, sid), &admin, None).await;
+    assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert!(!body.to_string().contains("Weber"), "{body}");
+    let alle: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(alle, 0, "kein Eintrag dieses Abrufs bleibt stehen");
+}

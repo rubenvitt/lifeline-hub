@@ -5480,6 +5480,63 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     }
 }
 
+/// Registrierliste drucken (LLH-1616, Spec `betreuung-registrierung`, „Registrierliste drucken am
+/// Gerät“): die eigene Stelle mit Eintrag des Gerätekontos, eine fremde 403 ohne Eintrag, ein
+/// UHS-Gerät erreicht den Abruf nicht.
+#[tokio::test]
+async fn betreuungsstelle_druckt_nur_die_eigene_registrierliste() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, kopplung_id, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
+    let person = person_in_stelle(&app, &admin, einsatz, nord).await;
+    let pfad = |stelle: i64| {
+        format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}/registrierungen/druck")
+    };
+    let eintraege = || async {
+        sqlx::query_as::<_, (Option<i64>, i64)>(
+            "SELECT person_id, benutzer_id FROM person_zugriff_audit \
+             WHERE einsatz_id = ? AND art = 'druck'",
+        )
+        .bind(einsatz)
+        .fetch_all(&pool)
+        .await
+        .unwrap()
+    };
+
+    let (s, v) = anfrage_json(&app, "GET", &pfad(sued), &geraet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert!(
+        eintraege().await.is_empty(),
+        "fremde Stelle protokolliert nichts"
+    );
+
+    let (s, v) = anfrage_json(&app, "GET", &pfad(nord), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ohne_haushalt"][0]["id"], person);
+    let konto: i64 = sqlx::query_scalar("SELECT benutzer_id FROM geraet_kopplung WHERE id = ?")
+        .bind(kopplung_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(eintraege().await, vec![(Some(person), konto)]);
+
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "uhs-laptop", "stelle_id": uhs, "bezeichnung": "Laptop"}),
+    )
+    .await;
+    let laptop = koppeln(&app, &code, None)
+        .await
+        .cookie
+        .expect("Sitzungscookie");
+    let (s, _) = anfrage_json(&app, "GET", &pfad(nord), &laptop, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(eintraege().await.len(), 1);
+}
+
 #[tokio::test]
 async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

@@ -533,11 +533,58 @@ pub async fn liste(
     stelle_id: i64,
     stellensicht: bool,
 ) -> Result<RegistrierListe, AppError> {
+    let mut conn = pool.acquire().await?;
+    liste_in(&mut conn, einsatz_id, stelle_id, stellensicht).await
+}
+
+/// Die Registrierliste für den Druck (LLH-1616, Change `iw8hjb93-registrierliste-drucken`
+/// design.md D2/D3): in EINER Transaktion lesen und je Person einen Eintrag `druck` ins
+/// Zugriffsprotokoll schreiben; erst nach dem Commit verlässt die Liste den Server. Scheitert ein
+/// Eintrag, bleibt keiner stehen und keine Person geht hinaus. Ohne `mit_unvertraeglichkeiten`
+/// fehlt die Gesundheitsangabe in der Antwort (Spec „Gesundheitsangaben nur auf Wunsch“).
+pub async fn liste_fuer_druck(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    stelle_id: i64,
+    stellensicht: bool,
+    benutzer_id: i64,
+    mit_unvertraeglichkeiten: bool,
+) -> Result<RegistrierListe, AppError> {
+    let mut tx = pool.begin().await?;
+    let mut l = liste_in(&mut tx, einsatz_id, stelle_id, stellensicht).await?;
+    let personen = l
+        .haushalte
+        .iter_mut()
+        .flat_map(|h| h.personen.iter_mut())
+        .chain(l.ohne_haushalt.iter_mut());
+    for p in personen {
+        crate::person::audit_repo::anlegen_tx(
+            &mut tx,
+            einsatz_id,
+            Some(p.id),
+            benutzer_id,
+            "druck",
+        )
+        .await?;
+        if !mit_unvertraeglichkeiten {
+            p.unvertraeglichkeiten = None;
+        }
+    }
+    tx.commit().await?;
+    Ok(l)
+}
+
+async fn liste_in(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    stellensicht: bool,
+) -> Result<RegistrierListe, AppError> {
     let gibt_es: Option<i64> =
         sqlx::query_scalar("SELECT id FROM betreuungsstelle WHERE id = ? AND einsatz_id = ?")
             .bind(stelle_id)
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(&mut *conn)
             .await?;
     gibt_es.ok_or(AppError::NotFound)?;
     let zeilen: Vec<ListenZeile> = sqlx::query_as(
@@ -561,7 +608,7 @@ pub async fn liste(
     .bind(stellensicht)
     .bind(einsatz_id)
     .bind(stelle_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
     let mut haushalte: Vec<HaushaltAnzeige> = Vec::new();
     let mut ohne_haushalt = Vec::new();
