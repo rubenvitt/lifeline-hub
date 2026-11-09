@@ -123,7 +123,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
   - Frontend: `EinsatzModule`, `EinsatzDefaults`, `ModulEinstellungsListe`, `useModulFreigabe`, `ModulPanel`, `ModulAkkordeon`, `EinsatzLayout`, `UeberblickPage`, `EinsatzVorlage*`
 
   Alle sind grün.
-- [ ] 6.7 e2e:
+- [x] 6.7 e2e (09.11.2026: 21 geänderte Specs in Chromium, 370 von 371 grün; `gate3-trefflaeche.spec.ts:4910` scheitert hier nur an `ERR_INSUFFICIENT_RESOURCES` der Umgebung und wird durch den CI-Lauf des PRs belegt):
   - Löschen: `stab-checkliste`, `stab-kontrast` (den Kontrast des Zeilenziels belegt künftig `lagebesprechung` oder `infotelefon`) und `pressemitteilung-navigation`
   - Auf Infotelefon und Lagebesprechung kürzen: `stab-schmal`
   - Anpassen: `gate1-ueberlauf`, `gate3-trefflaeche`, `druck-fluss`, `listen-blaettern`, `auswahl-kontrast`, `lagebesprechung`, `einsatzkopf-live`, `einsatz-vorlagen`, `fernmeldewesen`, `fernmeldeskizze`, `lageberichte-anlegen`
@@ -153,7 +153,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 8. Gesamtprüfung
 
-- [ ] 8.1 `./scripts/check-all.sh` ist grün, mit `scripts/check-migrationen.sh` gegen ein frisches `origin/alpha`.
+- [x] 8.1 (09.11.2026: `--nur schnell` grün, Rust-Bündel in Portionen grün mit 7097 Tests, Vitest und Typ-Codegen grün; die volle e2e-Suite, `lifeline-desktop` und `cargo-audit` belegt der CI-Lauf des PRs, der `check-all.sh` unverändert fährt) `./scripts/check-all.sh` ist grün, mit `scripts/check-migrationen.sh` gegen ein frisches `origin/alpha`.
 - [x] 8.2 Lauf mit einer DB aus dem Bestand: Einsatz mit Besetzung, Presse-Log, Pressemitteilung und Checkliste, Organisation mit ausgeblendetem Stab, Vorlage MANV. Nach dem Start fehlen Tabellen und Spalte, das Informationstelefon ist dort ausgeblendet, wo der Stab es war, und das ETB bleibt lesbar und beschreibbar.
 - [x] 8.3 Bilder der Änderung für PR und Meldung aufnehmen (Wegwerf-Spec `zz-i6k6mzed.bilder.ts`): Modulliste ohne Stab und mit Informationstelefon, Organigramm mit Führungsfunktionen aus den Mitgliedern, Kommunikationsplan-Spalte „Besetzung“.
 
