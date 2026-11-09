@@ -346,3 +346,78 @@ test('Schichtplan: Kopie per Zug und per Dialog, Schichten erzeugen mit Konflikt
   await expect(zweiter).toBeVisible();
   expect((await bloecke()).filter((b) => b.posten.einheit_id === ktw.id)).toHaveLength(1);
 });
+
+/** Wire-Zeit des Servers (`YYYY-MM-DD HH:mm:ss`, UTC), auf 5 Minuten abgerundet. */
+function wireZeit5(msZeit: number): string {
+  const d = new Date(Math.floor(msZeit / (5 * MIN)) * 5 * MIN);
+  const zwei = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getUTCFullYear()}-${zwei(d.getUTCMonth() + 1)}-${zwei(d.getUTCDate())} ` +
+    `${zwei(d.getUTCHours())}:${zwei(d.getUTCMinutes())}:00`
+  );
+}
+
+/**
+ * Kriterium 12 der Prüfliste (LLH-1586) für die Zeilen des Schichtplans im Einsatz, Spec
+ * `kraefte-schichtplan`, „Zeilen ohne Sprung“ (LLH-1604): die Pause steht immer zuletzt, jede neue
+ * Einheit kommt also VOR ihr ins Raster. Der Zeiger steht über einem Pausenblock; eine Einheit,
+ * die der „andere Schirm“ (`page.request`, dasselbe Konto) anlegt, wartet hinter dem Sammelbanner,
+ * der Block bleibt stehen. „anzeigen“ stellt die Einheit in ihre Zeile.
+ */
+test('Schichtplan (LLH-1604): eine fremde Einheit wartet hinter dem Banner, nichts springt', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Schichtplan Schleuse ${Date.now()}` },
+  });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const sende = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`${basis}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  await sende('einheiten', { name: 'Streife 2' });
+  await sende('abloesungen/schichtplan/bloecke', {
+    posten: { art: 'pause' },
+    von: wireZeit5(Date.now()),
+    bis: wireZeit5(Date.now() + 2 * 60 * MIN),
+  });
+
+  const strom = page.waitForResponse(
+    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+  );
+  await page.goto(`/einsaetze/${einsatzId}/abloesung?ansicht=plan`);
+  await strom;
+  const raster = page.getByRole('region', { name: 'Schichtplan' });
+  const zeilen = raster.locator('[data-lfh="schichtplan-zeile"]');
+  const unterZeiger = raster.locator('[data-raster-zeile="pause"] [data-lfh="schichtplan-block"]');
+  await expect(unterZeiger).toBeVisible();
+  await expect(zeilen).toHaveCount(2); // Streife 2, Pause
+  await unterZeiger.hover();
+  const vorher = (await unterZeiger.boundingBox())!;
+
+  const ktw = await sende('einheiten', { name: 'KTW 9' });
+
+  const banner = page.locator('[data-lfh="schichtplan-schleuse"] [data-lfh="sammelbanner"]');
+  await expect(banner, 'die neue Einheit wartet hinter dem Banner').toContainText('1 neuer Posten');
+  await expect(zeilen).toHaveCount(2);
+  const nachher = (await unterZeiger.boundingBox())!;
+  expect(
+    { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },
+    'der Block unter dem Zeiger bleibt, wo er war',
+  ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
+
+  await banner.getByRole('button', { name: 'anzeigen' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(raster.locator(`[data-raster-zeile="einheit:${ktw.id}"]`)).toBeVisible();
+  await expect(zeilen).toHaveCount(3);
+});

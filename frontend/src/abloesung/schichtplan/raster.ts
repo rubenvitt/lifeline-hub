@@ -30,6 +30,16 @@ export interface RasterZeile {
   gruppe: string | null;
   /** Blöcke dieser Zeile dürfen sich überschneiden (die Pause). */
   ueberlappungErlaubt?: boolean;
+  /**
+   * Der Posten ist entfallen, die Zeilenschleuse hält seine leere Zeile, bis sie öffnet
+   * (LLH-1604, `zeilenSchleuse.ts`). In ihr wird nichts angelegt und nichts abgelegt.
+   */
+  entfallen?: boolean;
+}
+
+/** Titel einer Zeile; eine entfallene trägt den Zusatz (LLH-1604). */
+export function titelVon(z: RasterZeile): string {
+  return z.entfallen ? `${z.titel} (entfallen)` : z.titel;
 }
 
 /** Ampel eines Blocks; das Wort daneben ist der zweite Kanal (WCAG 1.4.1). */
@@ -164,7 +174,8 @@ export function pruefeZug(
   kopie = false,
 ): ZugPruefung {
   const zeile = zeilen.find((z) => z.schluessel === stand.zeile);
-  if (!zeile) return 'keine-zeile';
+  // Eine entfallene Zeile hält nur die Schleuse (LLH-1604): ihren Posten gibt es nicht mehr.
+  if (!zeile || zeile.entfallen) return 'keine-zeile';
   if (stand.bis - stand.von < MINDEST_MS) return 'zu-kurz';
   const alsKopie = kopie && zug.art === 'verschieben';
   if (zug.art !== 'anlegen' && !alsKopie) {
