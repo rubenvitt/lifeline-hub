@@ -305,8 +305,8 @@ pub async fn registrieren_tx(
         }
     };
 
-    let mut person_ids = Vec::with_capacity(eingabe.personen.len());
-    let mut registriernummern = Vec::with_capacity(eingabe.personen.len());
+    let mut person_ids = Vec::new();
+    let mut registriernummern = Vec::new();
     for (n, p) in eingabe.personen.iter().enumerate() {
         let client_id = eingabe.client_id.as_deref().map(|c| person_client_id(c, n));
         let (id, reg, _) = crate::person::repo::anlegen_tx_mit_optionen(
@@ -462,7 +462,7 @@ pub async fn abmelden_tx(
             belegung_nachgefuehrt: false,
         });
     }
-    let mut registriernummern = Vec::with_capacity(kandidaten.len());
+    let mut registriernummern = Vec::new();
     for (pid, reg) in &kandidaten {
         let client_id = eingabe.client_id.as_deref().map(|c| format!("{c}#{pid}"));
         verbleib_repo::erfassen_tx(

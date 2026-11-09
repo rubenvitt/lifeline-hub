@@ -202,9 +202,9 @@ pub async fn registrieren(
         chrono::Utc::now(),
         &ctx.einsatz.begonnen_at,
     )?;
-    // Reserviert nie mehr als die Grenze (CodeQL: Größe aus dem Body); die Grenze selbst prüft
-    // der Zusammenhang unten (422).
-    let mut gelesen = Vec::with_capacity(body.personen.len().min(REGISTRIERUNG_PERSONEN_MAX + 1));
+    // Ohne Vorab-Reservierung aus der Länge des Bodys (CodeQL „Uncontrolled allocation size“);
+    // die Grenze selbst prüft der Zusammenhang unten (422).
+    let mut gelesen = Vec::new();
     for p in body.personen {
         gelesen.push(person_lesen(p)?);
     }
@@ -220,7 +220,7 @@ pub async fn registrieren(
             "Höchstens {REGISTRIERUNG_PERSONEN_MAX} Personen je Registrierung"
         )));
     }
-    let mut personen = Vec::with_capacity(gelesen.len());
+    let mut personen = Vec::new();
     for (n, (name, mut p)) in gelesen.into_iter().enumerate() {
         let Some(name) = name else {
             return Err(AppError::UnprocessableEntity(format!(
