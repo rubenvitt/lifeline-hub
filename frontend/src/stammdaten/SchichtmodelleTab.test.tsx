@@ -7,6 +7,12 @@ import { meHandler, server } from '../test/server';
 import { adminFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import { waehleMenueEintrag } from '../test/menue';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  oeffneKontextmenue,
+  trennerVon,
+} from '../test/kontextmenue';
 import type { Schichtmodell } from '../api/types';
 import SchichtmodelleTab from './SchichtmodelleTab';
 
@@ -244,5 +250,27 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
     ).toBeInTheDocument();
     expect(rueckfrage).toHaveTextContent('Laufende Einsätze behalten ihre Kopie.');
     expect(within(rueckfrage).queryByText(/Unwetter/)).toBeNull();
+  });
+
+  describe('Kontextmenü (LLH-1599)', () => {
+    it('Rechtsklick auf eine Zeile zeigt die Aktionen des ⋮; die Wahl wirkt wie dort', async () => {
+      const aufrufe = stelleBereit();
+      renderMitProviders(<SchichtmodelleTab />);
+      const zeile = (await screen.findByText('12-h-Schicht Hochwasser')).closest('tr')!;
+      const menue = await oeffneKontextmenue(within(zeile).getByText('45 min'));
+      expect(menue).toHaveAttribute('aria-label', 'Aktionen zu 12-h-Schicht Hochwasser');
+      expect(eintraegeVon(menue)).toEqual(['Bearbeiten', 'Als Vorgabe setzen', 'rot:Löschen']);
+      expect(trennerVon(menue)).toBe(1);
+      await userEvent.click(within(menue).getByRole('menuitem', { name: 'Als Vorgabe setzen' }));
+      await waitFor(() => expect(aufrufe.some((a) => a.startsWith('PUT 2'))).toBe(true));
+    });
+
+    it('ohne Verwaltungsrecht bleibt das Browsermenü', async () => {
+      stelleBereit();
+      server.use(meHandler(adminFixture({ system_rolle: 'keiner' })));
+      renderMitProviders(<SchichtmodelleTab />);
+      const zeile = (await screen.findByText('Sanitätsdienst')).closest('tr')!;
+      erwarteBrowsermenue(within(zeile).getByText('Rhythmus 6 h'));
+    });
   });
 });

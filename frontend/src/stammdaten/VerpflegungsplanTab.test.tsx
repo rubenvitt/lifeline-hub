@@ -8,6 +8,13 @@ import { VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { adminFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  knopfreiheVon,
+  oeffneKontextmenue,
+} from '../test/kontextmenue';
+import { setzeViewportBreite } from '../test/viewport';
 import { mahlzeit, verpflegungsplan } from '../test/verpflegungVorlageDaten';
 import VerpflegungsplanTab from './VerpflegungsplanTab';
 
@@ -209,5 +216,36 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
     expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+  });
+});
+
+describe('VerpflegungsplanTab · Kontextmenü (LLH-1599)', () => {
+  it('am breiten Schirm zeigt das Kontextmenü die Knöpfe der Zeile, die Wahl wirkt wie der Knopf', async () => {
+    setzeViewportBreite(1280);
+    const plan = [...verpflegungsplan(), mahlzeit({ id: 5, bezeichnung: 'Kaffee', aktiv: false })];
+    const { anfragen } = render(admin, plan);
+    for (const name of ['Mittag', 'Kaffee']) {
+      const z = await zeile(name);
+      const menue = await oeffneKontextmenue(z.querySelector('td')!);
+      expect(menue).toHaveAttribute('aria-label', `Aktionen zu Mahlzeit ${name}`);
+      expect(eintraegeVon(menue)).toEqual(knopfreiheVon(z));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]')).toBeNull(),
+      );
+    }
+    const menue = await oeffneKontextmenue((await zeile('Kaffee')).querySelector('td')!);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aktivieren' }));
+    await waitFor(() =>
+      expect(anfragen).toContainEqual(
+        expect.objectContaining({ methode: 'PATCH', pfad: '/api/verpflegung-vorlagen/5' }),
+      ),
+    );
+  });
+
+  it('ohne Verwaltungsrecht bleibt das Browsermenü', async () => {
+    setzeViewportBreite(1280);
+    render(nichtAdmin);
+    erwarteBrowsermenue((await zeile('Mittag')).querySelector('td')!);
   });
 });

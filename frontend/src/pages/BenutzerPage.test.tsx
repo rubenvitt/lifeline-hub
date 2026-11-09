@@ -10,6 +10,7 @@ import BenutzerPage from './BenutzerPage';
 import { globalKeys } from '../api/queryKeys';
 import { adminFixture } from '../test/fixtures';
 import { warteAufMenueFokus } from '../test/menue';
+import { eintraegeVon, oeffneKontextmenue, trennerVon } from '../test/kontextmenue';
 import {
   EIGENES_KONTO,
   EIGENES_PASSWORT,
@@ -1448,5 +1449,50 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
     const bearbeiten = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
     expect(within(bearbeiten).getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(within(bearbeiten).getByRole('button', { name: /Einmalpasswort/ })).toBeEnabled();
+  });
+
+  describe('Kontextmenü (LLH-1599)', () => {
+    it('Rechtsklick auf eine Zeile zeigt die Einträge des ⋮; die Wahl wirkt wie dort', async () => {
+      const eva = benutzer({
+        id: 2,
+        anzeigename: 'Eva',
+        benutzername: 'eva',
+        system_rolle: 'keiner',
+        totp_aktiviert: true,
+      });
+      let deaktiviert = false;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva])),
+        http.post('/api/benutzer/2/deaktivieren', () => {
+          deaktiviert = true;
+          return HttpResponse.json({ ...eva, aktiv: false });
+        }),
+      );
+      renderMitProviders(<BenutzerPage />);
+      const zeile = (await screen.findByText('@eva')).closest('tr')!;
+      const menue = await oeffneKontextmenue(within(zeile).getByText('@eva'));
+      expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Benutzer Eva (@eva)');
+      expect(eintraegeVon(menue)).toEqual([
+        'Bearbeiten',
+        'Anmeldungen',
+        'rot:Zweiten Faktor zurücksetzen …',
+        'rot:Deaktivieren',
+      ]);
+      expect(trennerVon(menue)).toBe(1);
+      await userEvent.click(within(menue).getByRole('menuitem', { name: 'Deaktivieren' }));
+      await waitFor(() => expect(deaktiviert).toBe(true));
+    });
+
+    it('eigenes Konto: „Deaktivieren“ steht gesperrt mit Grund, wie im ⋮', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      );
+      renderMitProviders(<BenutzerPage />);
+      const zeile = (await screen.findByText('@admin')).closest('tr')!;
+      const kontext = eintraegeVon(await oeffneKontextmenue(within(zeile).getByText('@admin')));
+      expect(kontext[kontext.length - 1]).toMatch(/^Deaktivieren gesperrt: .* \(gesperrt\)$/);
+    });
   });
 });

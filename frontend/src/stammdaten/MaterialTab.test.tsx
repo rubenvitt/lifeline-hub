@@ -6,6 +6,12 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
 import MaterialTab from './MaterialTab';
 import { adminFixture } from '../test/fixtures';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  knopfreiheVon,
+  oeffneKontextmenue,
+} from '../test/kontextmenue';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
@@ -387,5 +393,36 @@ describe('MaterialTab · Sortieren und Filtern (LLH-1096)', () => {
     expect(
       screen.getByRole('button', { name: 'Filter Träger: DRK entfernen' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('MaterialTab · Kontextmenü (LLH-1599)', () => {
+  it('am breiten Schirm zeigt das Kontextmenü die Knöpfe der Zeile', async () => {
+    setzeViewportBreite(1280);
+    render(admin, [
+      material,
+      { ...material, id: 2, bezeichnung: 'Feldbett', dienststatus: 'ausser_dienst' },
+    ]);
+    for (const [name, erwartet] of [
+      ['Wolldecke', ['Bearbeiten', 'rot:Außer Dienst nehmen']],
+      ['Feldbett', ['Bearbeiten', 'Wieder in Dienst nehmen']],
+    ] as const) {
+      const zeile = (await screen.findByText(name)).closest('tr')!;
+      expect(knopfreiheVon(zeile)).toEqual(erwartet);
+      const menue = await oeffneKontextmenue(within(zeile).getAllByRole('cell')[1]);
+      expect(menue).toHaveAttribute('aria-label', `Aktionen zu Material ${name}`);
+      expect(eintraegeVon(menue)).toEqual(erwartet);
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]')).toBeNull(),
+      );
+    }
+  });
+
+  it('ohne Verwaltungsrecht bleibt das Browsermenü', async () => {
+    setzeViewportBreite(1280);
+    render(nichtAdmin);
+    const zeile = (await screen.findByText('Wolldecke')).closest('tr')!;
+    erwarteBrowsermenue(within(zeile).getAllByRole('cell')[1]);
   });
 });

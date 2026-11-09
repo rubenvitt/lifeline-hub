@@ -57,12 +57,7 @@ describe('KatalogTabelle · zeilenMenue (LLH-1599, D2)', () => {
   it('Rechtsklick auf eine Zeile öffnet ihr Menü; die Wahl geht mit der Zeile an `onWahl`', async () => {
     const m = menue();
     renderMitProviders(
-      <KatalogTabelle<Stelle>
-        rowKey="id"
-        columns={SPALTEN}
-        dataSource={ZEILEN}
-        zeilenMenue={m}
-      />,
+      <KatalogTabelle<Stelle> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} zeilenMenue={m} />,
     );
     expect(fireEvent.contextMenu(zelle('Polizei'), { button: 2 })).toBe(false);
     const liste = await waitFor(() => offenesMenue()!);
@@ -94,7 +89,9 @@ describe('KatalogTabelle · zeilenMenue (LLH-1599, D2)', () => {
   });
 
   it('ohne `zeilenMenue` bleibt das Browsermenü', () => {
-    renderMitProviders(<KatalogTabelle<Stelle> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} />);
+    renderMitProviders(
+      <KatalogTabelle<Stelle> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} />,
+    );
     expect(fireEvent.contextMenu(zelle('Polizei'), { button: 2 })).toBe(true);
     expect(kontextAnker()).toBeNull();
   });
@@ -138,7 +135,12 @@ describe('KatalogTabelle · zeilenMenue (LLH-1599, D2)', () => {
 
   it('verschwindet die Zeile aus den Daten, schließt das Menü', async () => {
     const { rerender } = renderMitProviders(
-      <KatalogTabelle<Stelle> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} zeilenMenue={menue()} />,
+      <KatalogTabelle<Stelle>
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={ZEILEN}
+        zeilenMenue={menue()}
+      />,
     );
     fireEvent.contextMenu(zelle('Polizei'), { button: 2 });
     await waitFor(() => expect(offenesMenue()).not.toBeNull());

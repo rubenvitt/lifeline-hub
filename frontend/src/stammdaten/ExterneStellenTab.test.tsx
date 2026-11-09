@@ -1,10 +1,16 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
 import { adminFixture } from '../test/fixtures';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  knopfreiheVon,
+  oeffneKontextmenue,
+} from '../test/kontextmenue';
 import type { ExterneStelle } from '../api/types';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import ExterneStellenTab from './ExterneStellenTab';
@@ -169,5 +175,41 @@ describe('ExterneStellenTab · Sortieren (LLH-1096)', () => {
       'Polizei Musterstadt',
       'ILS Musterkreis zuständig',
     ]);
+  });
+});
+
+describe('ExterneStellenTab · Kontextmenü (LLH-1599)', () => {
+  it('am breiten Schirm zeigt das Kontextmenü die Knöpfe der Zeile, die Wahl wirkt wie der Knopf', async () => {
+    setzeViewportBreite(1280);
+    let geschaltet: unknown = null;
+    server.use(
+      http.patch('/api/externe-stellen/:id', async ({ request, params }) => {
+        geschaltet = { id: params.id, ...((await request.json()) as object) };
+        return HttpResponse.json(KATALOG[2]);
+      }),
+    );
+    render(admin);
+    for (const name of ['Polizei Musterstadt', 'Ordnungsamt']) {
+      const zeile = (await screen.findByText(name)).closest('tr')!;
+      const menue = await oeffneKontextmenue(zeile.querySelector('td')!);
+      expect(menue).toHaveAttribute('aria-label', `Aktionen zu ${name}`);
+      expect(eintraegeVon(menue)).toEqual(knopfreiheVon(zeile));
+      fireEvent.keyDown(menue, { key: 'Escape' });
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]')).toBeNull(),
+      );
+    }
+    const ordnungsamt = (await screen.findByText('Ordnungsamt')).closest('tr')!;
+    expect(knopfreiheVon(ordnungsamt)).toEqual(['Bearbeiten', 'Aktivieren']);
+    const menue = await oeffneKontextmenue(ordnungsamt.querySelector('td')!);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aktivieren' }));
+    await waitFor(() => expect(geschaltet).toEqual({ id: '3', aktiv: true }));
+  });
+
+  it('ohne Verwaltungsrecht bleibt das Browsermenü', async () => {
+    setzeViewportBreite(1280);
+    render(nichtAdmin);
+    const zeile = (await screen.findByText('Ordnungsamt')).closest('tr')!;
+    erwarteBrowsermenue(zeile.querySelector('td')!);
   });
 });

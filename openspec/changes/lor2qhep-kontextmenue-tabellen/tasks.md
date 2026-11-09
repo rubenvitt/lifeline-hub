@@ -16,11 +16,11 @@
 
 ## 4. Tabellen der Stammdaten und Benutzer (D2, D4, D5)
 
-- [ ] 4.1 Schichtmodelle: Beschreibung per `useMemo`, Spalte über `ZeilenMenueAusloeser`, Tabelle mit `zeilenMenue`; `laeuft` je Zeile über `vorgabe.variables`; TDD Rechtsklick zeigt „Bearbeiten“, „Als Vorgabe setzen“/„Vorgabe aufheben“, Trenner, rot „Löschen“
-- [ ] 4.2 Benutzer: dasselbe; TDD Rechtsklick zeigt die Einträge des ⋮ samt gesperrter Hub-Einträge
-- [ ] 4.3 Externe Stellen, Sprechgruppen, Verpflegungsplan: Beschreibung für ⋮ (schmal) und Tabelle; TDD je Seite am breiten Schirm: Kontextmenü-Einträge gleich den Knopfetiketten (Reihenfolge, Gefahr rot)
-- [ ] 4.4 `dienststatus.tsx`: `dienststatusMenue(…)` neben `dienststatusSpalten`; Fahrzeuge-, Personal- und Material-Tab der Stammdaten reichen es als `zeilenMenue`; TDD breit: Einträge gleich den Knöpfen, bei laufendem Wechsel gesperrt, vom Hub kein eigenes Menü
-- [ ] 4.5 Bestehende Tests grün: `verwaltungstabellen.test.tsx`, `SchichtmodelleTab.test.tsx`, `BenutzerPage.test.tsx`, `SprechgruppenTab.test.tsx`, Tabs Fahrzeuge/Personal/Material
+- [x] 4.1 Schichtmodelle: Beschreibung per `useMemo`, Spalte über `ZeilenMenueAusloeser`, Tabelle mit `zeilenMenue`; `laeuft` je Zeile über `vorgabe.variables`; TDD Rechtsklick zeigt „Bearbeiten“, „Als Vorgabe setzen“/„Vorgabe aufheben“, Trenner, rot „Löschen“
+- [x] 4.2 Benutzer: dasselbe; TDD Rechtsklick zeigt die Einträge des ⋮ samt gesperrter Hub-Einträge
+- [x] 4.3 Externe Stellen, Sprechgruppen, Verpflegungsplan: Beschreibung für ⋮ (schmal) und Tabelle; TDD je Seite am breiten Schirm: Kontextmenü-Einträge gleich den Knopfetiketten (Reihenfolge, Gefahr rot)
+- [x] 4.4 `dienststatus.tsx`: `dienststatusMenue(…)` neben `dienststatusSpalten`; Fahrzeuge-, Personal- und Material-Tab der Stammdaten reichen es als `zeilenMenue`; TDD breit: Einträge gleich den Knöpfen, bei laufendem Wechsel gesperrt, vom Hub kein eigenes Menü
+- [x] 4.5 Bestehende Tests grün: `verwaltungstabellen.test.tsx`, `SchichtmodelleTab.test.tsx`, `BenutzerPage.test.tsx`, `SprechgruppenTab.test.tsx`, Tabs Fahrzeuge/Personal/Material
 
 ## 5. Listen und eigene Zeilen (D3, D6)
 
