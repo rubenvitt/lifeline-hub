@@ -222,7 +222,7 @@ function SchichtmodelleInhalt() {
             immerSichtbar: true,
             fixed: 'right' as const,
             render: (_: unknown, m: Schichtmodell) => (
-              <ZeilenMenueAusloeser menue={zeilenMenue} zeile={m} />
+              <ZeilenMenueAusloeser menue={zeilenMenue} zeile={m} gesperrt={vorgabe.isPending} />
             ),
           },
         ]

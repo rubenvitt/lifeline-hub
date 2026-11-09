@@ -47,6 +47,13 @@ describe('ZeilenMenueAusloeser (LLH-1599, D2)', () => {
     expect(screen.getByRole('button', { name: 'Aktionen zu Leitstelle Nord' })).toBeDisabled();
   });
 
+  it('`gesperrt` sperrt den Auslöser ohne Ladezustand', () => {
+    renderMitProviders(<ZeilenMenueAusloeser menue={menue()} zeile={S} gesperrt />);
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu Leitstelle Nord' });
+    expect(knopf).toBeDisabled();
+    expect(knopf.querySelector('.ant-btn-loading-icon')).toBeNull();
+  });
+
   it('ohne Einträge kein Auslöser', () => {
     renderMitProviders(<ZeilenMenueAusloeser menue={menue({ eintraege: () => [] })} zeile={S} />);
     expect(screen.queryByRole('button')).toBeNull();

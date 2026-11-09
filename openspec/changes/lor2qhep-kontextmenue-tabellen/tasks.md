@@ -24,10 +24,10 @@
 
 ## 5. Listen und eigene Zeilen (D3, D6)
 
-- [ ] 5.1 Pegel: Hülle um `ListenEintrag`, Beschreibung mit Index aus der Zeile; TDD Rechtsklick auf den ersten Pegel zeigt „Nach oben“ gesperrt; `EinsatzPegel.test.tsx` grün
-- [ ] 5.2 Geräte und Lagemonitor-Zugänge: dasselbe; TDD Rechtsklick zeigt die Einträge des ⋮, beendete/widerrufene Zeilen ohne eigenes Menü; Bestandstests grün
-- [ ] 5.3 Fahrzeuge/Besatzung: Handler an `einheit-person`, ⋮ aus derselben Beschreibung; TDD Rechtsklick zeigt die Einträge, Rechtsklick auf den Namens-Link öffnet kein eigenes Menü; `FahrzeugeBesatzung.test.tsx` grün
-- [ ] 5.4 Bild-Hintergründe: Handler am Namensteil; TDD Rechtsklick auf den Namen öffnet das Menü, auf Schalter und Regler nicht, ohne Schreibrecht nicht; `Sidebar.test.tsx` grün
+- [x] 5.1 Pegel: Hülle um `ListenEintrag`, Beschreibung mit Index aus der Zeile; TDD Rechtsklick auf den ersten Pegel zeigt „Nach oben“ gesperrt; `EinsatzPegel.test.tsx` grün
+- [x] 5.2 Geräte und Lagemonitor-Zugänge: dasselbe; TDD Rechtsklick zeigt die Einträge des ⋮, beendete/widerrufene Zeilen ohne eigenes Menü; Bestandstests grün
+- [x] 5.3 Fahrzeuge/Besatzung: Handler an `einheit-person`, ⋮ aus derselben Beschreibung; TDD Rechtsklick zeigt die Einträge, Rechtsklick auf den Namens-Link öffnet kein eigenes Menü; `FahrzeugeBesatzung.test.tsx` grün
+- [x] 5.4 Bild-Hintergründe: Handler am Namensteil; TDD Rechtsklick auf den Namen öffnet das Menü, auf Schalter und Regler nicht, ohne Schreibrecht nicht; `Sidebar.test.tsx` grün
 
 ## 6. Kommunikationsplan und Personen (D7)
 

@@ -11,6 +11,8 @@
  */
 import { useState, type Key, type ReactNode } from 'react';
 import { KontextMenue, type KontextMenueOffen } from './KontextMenue';
+import type { WeitereAktionen } from './Datensicht';
+import { kontextEintraege } from './datensichtKontext';
 import type { MenueEintrag } from './MenueAusloeser';
 import { useKontextMenue, type KontextHandler } from './useKontextMenue';
 
@@ -64,4 +66,23 @@ export function useDatensatzKontextMenue<T>(
     ) : null;
 
   return { ausloeser, menue, offen: kontext != null };
+}
+
+/**
+ * Kontextmenü aus einer Zeilenbeschreibung (`WeitereAktionen`, dieselbe Form wie `weitere` der
+ * `Datensicht` und `KatalogTabelle.zeilenMenue`), für Listen und eigene Zeilen (LLH-1599 D3).
+ * Dieselbe Beschreibung speist das ⋮ (`ZeilenMenueAusloeser`). Bei `laeuft` stehen alle Einträge
+ * gesperrt; ohne Beschreibung (`undefined`, etwa ohne Schreibrecht) gibt es kein Menü.
+ */
+export function useZeilenMenueKontext<T>(
+  menue: WeitereAktionen<T> | undefined,
+  { finde, schluessel }: Pick<DatensatzKontextOptionen<T>, 'finde' | 'schluessel'>,
+): DatensatzKontext<T> {
+  return useDatensatzKontextMenue<T>({
+    finde,
+    schluessel,
+    eintraege: (zeile) => (menue ? kontextEintraege({ weitere: menue }, zeile) : []),
+    zugaenglicherName: (zeile) => menue?.zugaenglicherName(zeile) ?? '',
+    onWahl: (key, zeile) => menue?.onWahl(key, zeile),
+  });
 }

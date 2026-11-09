@@ -11,8 +11,7 @@ import {
   type RefObject,
 } from 'react';
 import type { WeitereAktionen } from './Datensicht';
-import { kontextEintraege } from './datensichtKontext';
-import { useDatensatzKontextMenue } from './useDatensatzKontextMenue';
+import { useZeilenMenueKontext } from './useDatensatzKontextMenue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import {
@@ -824,12 +823,9 @@ export default function KatalogTabelle<T extends object>({
 
   // ── Kontextmenü der Zeilen (LLH-1599, D2) ─────────────────────────────────────────
   const zeilenSchluessel = (zeile: T): Key => schluesselVon(zeile, rest.rowKey);
-  const kontext = useDatensatzKontextMenue<T>({
+  const kontext = useZeilenMenueKontext<T>(zeilenMenue, {
     finde: (k) => dataSource?.find((zeile) => zeilenSchluessel(zeile) === k),
     schluessel: zeilenSchluessel,
-    eintraege: (zeile) => (zeilenMenue ? kontextEintraege({ weitere: zeilenMenue }, zeile) : []),
-    zugaenglicherName: (zeile) => zeilenMenue?.zugaenglicherName(zeile) ?? '',
-    onWahl: (key, zeile) => zeilenMenue?.onWahl(key, zeile),
   });
   const aufruferOnRow = rest.onRow;
   const zeilenProps: TableProps<T>['onRow'] = zeilenMenue

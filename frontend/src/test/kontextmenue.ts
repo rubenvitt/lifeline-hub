@@ -5,12 +5,17 @@
 import { fireEvent, waitFor, within } from '@testing-library/react';
 import { expect } from 'vitest';
 
-/** Das offene Kontextmenü (Anker `datensatz-kontextmenue-anker`), sonst `null`. */
+/**
+ * Das offene Kontextmenü (Anker `datensatz-kontextmenue-anker`), sonst `null`. Das Kontextmenü
+ * trägt seinen zugänglichen Namen am Menü (`KontextMenue`); ein eben geschlossenes ⋮ blendet in
+ * jsdom noch aus und zählt nicht.
+ */
 export function offenesKontextmenue(): HTMLElement | null {
   if (document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]') == null) return null;
-  return document.querySelector<HTMLElement>(
-    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+  const offen = document.querySelectorAll<HTMLElement>(
+    '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) [role="menu"][aria-label]',
   );
+  return offen.length > 0 ? offen[offen.length - 1] : null;
 }
 
 /**

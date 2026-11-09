@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { freigabenFixture } from '../../test/fixtures';
 import { warteAufMenueFokus } from '../../test/menue';
 import type { ComponentProps } from 'react';
@@ -672,5 +673,38 @@ describe('FahrzeugeBesatzung · ohne Schreibrecht (D14)', () => {
     expect(within(paneel()).queryByRole('button', { name: /^Status von/ })).toBeNull();
     expect(fahrzeugZeile('83-1')).toHaveTextContent('Frei auf Wache');
     expect(within(paneel()).getByRole('link', { name: 'Anna Führer' })).toBeInTheDocument();
+  });
+});
+
+describe('FahrzeugeBesatzung · Kontextmenü (LLH-1599)', () => {
+  it('Rechtsklick auf eine Person zeigt die Einträge ihres ⋮; die Wahl wirkt wie dort', async () => {
+    const bodies: string[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/:efId/besatzung', ({ params }) => {
+        bodies.push(String(params.efId));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    zeige();
+    const ausDemMenue = eintraegeVon(await oeffneMenue('Dora Ohne'));
+    await userEvent.keyboard('{Escape}');
+
+    const zeile = personZeile('Dora Ohne');
+    const kontext = await oeffneKontextmenue(zeile);
+    expect(kontext).toHaveAttribute('aria-label', 'Aktionen zu Person Dora Ohne');
+    expect(eintraegeVon(kontext)).toEqual(ausDemMenue);
+    await userEvent.click(within(kontext).getByRole('menuitem', { name: 'Auf 83-2' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+  });
+
+  it('Rechtsklick auf den Namens-Link lässt das Browsermenü', () => {
+    zeige();
+    const link = within(personZeile('Dora Ohne')).queryByRole('link');
+    if (link) erwarteBrowsermenue(link);
+  });
+
+  it('ohne Schreibrecht hat die Person keine Aktion, das Browsermenü bleibt', () => {
+    zeige({ darfSchreiben: false });
+    erwarteBrowsermenue(personZeile('Dora Ohne'));
   });
 });
