@@ -100,19 +100,21 @@ describe('ModulEinstellungsListe', () => {
       <ModulEinstellungsListe
         {...einsatzProps()}
         zusatzVon={(key) =>
-          key === 'stab' ? <span>Vorgabe der Organisation: ausgeblendet</span> : undefined
+          key === 'lagebesprechung' ? (
+            <span>Vorgabe der Organisation: ausgeblendet</span>
+          ) : undefined
         }
       />,
     );
 
     const zusatz = screen.getByText('Vorgabe der Organisation: ausgeblendet');
     const zeile = zusatz.closest('[data-modul-zeile]') as HTMLElement;
-    expect(zeile.getAttribute('data-modul-zeile')).toBe('stab');
+    expect(zeile.getAttribute('data-modul-zeile')).toBe('lagebesprechung');
     // Nicht im Label des Schalters (ein Klick darin legte ihn sonst um), aber in derselben Zelle
     // wie der Name — nicht unter der Rollenauswahl.
     expect(zusatz.closest('label')).toBeNull();
     const zelle = zeile.firstElementChild as HTMLElement;
-    expect(within(zelle).getByText('Stab')).toBeInTheDocument();
+    expect(within(zelle).getByText('Lagebesprechung')).toBeInTheDocument();
     expect(within(zelle).getByText('Vorgabe der Organisation: ausgeblendet')).toBeInTheDocument();
     expect(within(zelle).queryByRole('combobox')).toBeNull();
   });
@@ -124,7 +126,7 @@ describe('ModulEinstellungsListe', () => {
       <ModulEinstellungsListe
         {...props}
         zusatzVon={(key) =>
-          key === 'stab' ? (
+          key === 'lagebesprechung' ? (
             <button type="button" onClick={aufZusatz}>
               Vorgabe übernehmen
             </button>
@@ -138,9 +140,9 @@ describe('ModulEinstellungsListe', () => {
     expect(aufZusatz).toHaveBeenCalledTimes(1);
     expect(props.sichtbarSpalte.aufSichtbar).not.toHaveBeenCalled();
     // Der Klick auf den Namen schaltet weiter.
-    fireEvent.click(screen.getByText('Stab'));
+    fireEvent.click(screen.getByText('Lagebesprechung'));
     await waitFor(() =>
-      expect(props.sichtbarSpalte.aufSichtbar).toHaveBeenCalledWith('stab', false),
+      expect(props.sichtbarSpalte.aufSichtbar).toHaveBeenCalledWith('lagebesprechung', false),
     );
   });
 

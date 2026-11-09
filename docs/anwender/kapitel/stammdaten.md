@@ -149,7 +149,7 @@ Sanitätsdienst. Wer einen Einsatz anlegt, wählt sie im Dialog „Neuen Einsatz
 4. Unter „Sichtbare Module“ die Häkchen der Module entfernen, die der Einsatz nicht zeigen soll.
    Die Module stehen nach den Kategorien der Navigation.
 
-   ![Dialog „Einsatz-Vorlage anlegen“ mit Bezeichnung „Großbrand“, Einsatzart „Realeinsatz“, daneben Schichtmodell „keins“, und den sichtbaren Modulen nach Kategorien, „Stab“ und „Tiere“ ohne Häkchen](../bilder/stammdaten/einsatz-vorlage-anlegen.png)
+   ![Dialog „Einsatz-Vorlage anlegen“ mit Bezeichnung „Großbrand“, Einsatzart „Realeinsatz“, daneben Schichtmodell „keins“, und den sichtbaren Modulen nach Kategorien, „Informationstelefon“ und „Tiere“ ohne Häkchen](../bilder/stammdaten/einsatz-vorlage-anlegen.png)
 
 5. „Speichern“ wählen.
 
@@ -305,7 +305,8 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 - Jede Organisation bringt sechs Vorlagen mit: „Kleinlage“ (14 sichtbare Module),
   „Sanitätsdienst“ (24), „MANV“ (27), „Personensuche“ (25), „Evakuierung und Betreuung“ (30) und
   „Unwetter“ (28). „Sanitätsdienst“ belegt die Einsatzart „Sanitätsdienst“ vor, die übrigen
-  „Realeinsatz“. „Stab“ zeigt keine von ihnen. Die Liste lässt sich ändern und löschen.
+  „Realeinsatz“. „Informationstelefon“ zeigt keine von ihnen. Die Liste lässt sich ändern und
+  löschen.
 - „Sanitätsdienst“ zeigt „Fernmeldewesen“ und „Wetter & Pegel“, weil jeder Sanitätsdienst einen
   Funkplan hat und Veranstaltungen im Freien am Wetter hängen; „Lagemeldungen“ bleibt abgewählt.
   Eine Organisation, die es vor dieser Änderung schon gab, behält ihre Vorlage „Sanitätsdienst“

@@ -116,10 +116,9 @@ describe('istLagebildOfflineKey', () => {
     expect(istLagebildOfflineKey(['einsatz-fernmeldewesen', 7])).toBe(false);
   });
 
-  it('nimmt vom Stab nichts offline (LLH-1180: der Kommunikationsplan gehört dem Fernmeldewesen)', () => {
+  it('nimmt unter dem alten Stab-Prefix nichts offline (LLH-1180, i6k6mzed)', () => {
     expect(istLagebildOfflineKey(['einsatz-stab', 7, 'kommunikationsplan'])).toBe(false);
-    expect(istLagebildOfflineKey(einsatzKeys.stab(7))).toBe(false);
-    expect(istLagebildOfflineKey(einsatzKeys.stabCheckliste(7))).toBe(false);
+    expect(istLagebildOfflineKey(['einsatz-stab', 7])).toBe(false);
   });
 
   it('nimmt den Verlauf der Benachrichtigungen offline (LLH-1422)', () => {

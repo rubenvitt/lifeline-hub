@@ -20,7 +20,7 @@ struct Welt {
     live: lifeline_hub::live::LiveHub,
     admin: String,
     einsatz: i64,
-    /// S2 über die Stab-Besetzung und S4 über die Mitgliedschaft.
+    /// Einsatzleiter an der Führungsstelle (EL) und S2 über die Mitgliedschaft.
     anna: i64,
     /// S2 über die Mitgliedschaft.
     bert: i64,
@@ -44,18 +44,18 @@ async fn welt() -> Welt {
         anna,
         bert,
     };
-    w.funktion_setzen(w.anna, "s4").await;
+    w.funktion_setzen(w.anna, "s2").await;
     w.funktion_setzen(w.bert, "s2").await;
     let ep = w.personal("Anna", w.anna).await;
     let (s, v) = anfrage_json(
         &w.app,
-        "PUT",
-        &format!("/api/einsaetze/{}/stab/besetzung/s2", w.einsatz),
+        "PATCH",
+        &format!("/api/einsaetze/{}/fuehrungsstelle", w.einsatz),
         &w.admin,
-        Some(&json!({ "besetzung_art": "personal", "personal_id": ep })),
+        Some(&json!({ "einsatzleiter": { "art": "personal", "personal_id": ep } })),
     )
     .await;
-    assert!(s.is_success(), "besetzen: {s} {v}");
+    assert!(s.is_success(), "Einsatzleiter erfassen: {s} {v}");
     // Die Aufnahmen oben melden `einsatz_aufnahme`; die Tests beginnen mit leerer Tabelle.
     sqlx::query("DELETE FROM benachrichtigung")
         .execute(&w.pool)
@@ -302,38 +302,22 @@ async fn statuscodes_und_rechte() {
 }
 
 /// Spec „Still für S2“: der Auftrag steht bei S2 still (gelesen, zählt nicht) im Verlauf.
-/// Spec „Zwei Funktionen“: wer S2 und S4 ist, bekommt ihn als Eingang.
+/// Spec „Zwei Funktionen“: wer als Einsatzleiter erfasst ist und S2 trägt, bekommt ihn als
+/// Eingang.
 #[tokio::test]
 async fn still_fuer_s2_und_lauter_gewinnt() {
     let w = welt().await;
     let (s, v) = w.setzen(&w.admin, "auftrag_erteilt", json!(["s2"])).await;
     assert_eq!(s, StatusCode::OK, "{v}");
 
-    let id = w.erteilen(json!([funktion("s2")])).await;
-    // S2 ist Anna über die Besetzung; Bert nur über die Mitgliedschaft und damit kein Empfänger.
-    assert_eq!(
-        w.zeilen("auftrag_erteilt", id).await,
-        vec![(w.anna, "hinweis".to_string(), false)],
-        "Anna ist auch S4: lauter gewinnt"
-    );
-
-    // Ohne die Besetzung ist Bert S2 (Mitgliedschaft) und bekommt den Auftrag still.
-    let (s, v) = anfrage(
-        &w.app,
-        "DELETE",
-        &format!("/api/einsaetze/{}/stab/besetzung/s2", w.einsatz),
-        &w.admin,
-        None,
-    )
-    .await;
-    assert!(s.is_success(), "Besetzung lösen: {s} {v}");
-    let id = w.erteilen(json!([funktion("s2"), funktion("s4")])).await;
+    let id = w.erteilen(json!([funktion("el"), funktion("s2")])).await;
     assert_eq!(
         w.zeilen("auftrag_erteilt", id).await,
         vec![
             (w.anna, "hinweis".to_string(), false),
             (w.bert, "still".to_string(), true),
-        ]
+        ],
+        "Anna ist auch EL: lauter gewinnt; Bert ist nur S2"
     );
     let bert = w.cookie("bertram").await;
     let (s, v) = anfrage(

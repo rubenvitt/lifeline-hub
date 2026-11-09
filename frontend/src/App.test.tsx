@@ -176,6 +176,23 @@ describe('App-Routing', () => {
     });
   });
 
+  // i6k6mzed (design.md D8, Spec `modul-freigabe`, „Alte Adressen des Stabs führen in den
+  // Einsatz“): das Modul Stab ist entfernt; seine Adressen landen im Einsatz statt in der Liste.
+  it.each([
+    '/einsaetze/7/stab',
+    '/einsaetze/7/stab/presse',
+    '/einsaetze/7/stab/presse/mitteilungen/3',
+  ])('%s führt in den Einsatz', async (alt) => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    );
+    const { router } = renderApp(alt);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
+    expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
+  });
+
   // LFH-734: ein Tab, eine Live-Verbindung. Im Einsatz trägt der Einsatz-Strom die
   // Org-Ereignisse mit, außerhalb öffnet die Betriebszeile den Org-Strom, ohne Anmeldung keiner.
   describe('Live-Verbindung je Route (LFH-734)', () => {

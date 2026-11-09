@@ -19,7 +19,7 @@ const MANV: EinsatzVorlage = {
   id: 3,
   bezeichnung: 'MANV',
   einsatzart: 'realeinsatz',
-  ausgeblendet: ['stab', 'tiere'],
+  ausgeblendet: ['lagebesprechung', 'tiere'],
   sortier: 30,
 };
 
@@ -103,7 +103,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
       expect(k).toBeDisabled();
       expect(k.closest('label')?.textContent).toContain('immer sichtbar');
     }
-    expect(kaestchen('Stab')).toBeEnabled();
+    expect(kaestchen('Lagebesprechung')).toBeEnabled();
   });
 
   it('Anlegen schickt das Komplement der Häkchen als `ausgeblendet`, ohne Einsatzart `null`', async () => {
@@ -112,7 +112,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     await screen.findByRole('dialog');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), '  Großbrand ');
     await userEvent.click(kaestchen('Tiere'));
-    await userEvent.click(kaestchen('Stab'));
+    await userEvent.click(kaestchen('Lagebesprechung'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(anfragen).toHaveLength(1));
@@ -123,7 +123,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
         bezeichnung: 'Großbrand',
         einsatzart: null,
         schichtmodell_id: null,
-        ausgeblendet: inRegistryFolge(['stab', 'tiere']),
+        ausgeblendet: inRegistryFolge(['lagebesprechung', 'tiere']),
       },
     });
     await waitFor(() => expect(screen.getByTestId('offen')).toHaveTextContent('zu'));
@@ -134,11 +134,11 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     renderMitProviders(<Harness vorlage={MANV} />);
     await screen.findByRole('dialog', { name: 'Einsatz-Vorlage bearbeiten' });
     await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue('MANV'));
-    expect(kaestchen('Stab')).not.toBeChecked();
+    expect(kaestchen('Lagebesprechung')).not.toBeChecked();
     expect(kaestchen('Tiere')).not.toBeChecked();
     expect(kaestchen('Unfallhilfsstellen')).toBeChecked();
 
-    await userEvent.click(kaestchen('Stab'));
+    await userEvent.click(kaestchen('Lagebesprechung'));
     await userEvent.click(kaestchen('Betreuung'));
     await waehle('Einsatzart', 'Sanitätsdienst');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

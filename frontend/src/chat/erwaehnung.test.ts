@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EinsatzAnzeige, FuehrungsfunktionEintrag, MitgliedAnzeige, Stab } from '../api/types';
+import type { EinsatzAnzeige, FuehrungsfunktionEintrag, MitgliedAnzeige } from '../api/types';
 import {
   besetzteFunktionen,
   erwaehnungenAusText,
@@ -46,26 +46,21 @@ function mitglied(
 }
 
 describe('besetzteFunktionen', () => {
-  it('nimmt Einsatzleiter, Stab-Besetzung und Mitgliedschaft, nicht extern', () => {
-    const stab = {
-      besetzung: [
-        { sachgebiet: 's2', besetzung_art: 'personal' },
-        { sachgebiet: 's1', besetzung_art: 'einsatzleitung' },
-        { sachgebiet: 's3', besetzung_art: 'extern' },
-      ],
-    } as unknown as Stab;
+  // i6k6mzed (design.md D2): die Wege, über die der Server eine Funktion auflöst — Einsatzleiter
+  // der Führungsstelle und die Funktion der Mitgliedschaft.
+  it('nimmt Einsatzleiter und Mitgliedschaft', () => {
     const einsatz = { einsatzleiter: { art: 'personal' } } as unknown as EinsatzAnzeige;
-    const mitglieder = [mitglied(1, 'Anna', { fuehrungsfunktion: 's4' })];
-    expect([...besetzteFunktionen(mitglieder, stab, einsatz)].sort()).toEqual([
-      'el',
-      's1',
-      's2',
-      's4',
-    ]);
+    const mitglieder = [
+      mitglied(1, 'Anna', { fuehrungsfunktion: 's4' }),
+      mitglied(2, 'Bert', { fuehrungsfunktion: 's2' }),
+    ];
+    expect([...besetzteFunktionen(mitglieder, einsatz)].sort()).toEqual(['el', 's2', 's4']);
   });
 
-  it('ohne Stab-Recht und ohne Einsatzleiter zählen nur die Mitgliedschaften', () => {
-    expect([...besetzteFunktionen([mitglied(1, 'Anna')], undefined, undefined)]).toEqual([]);
+  it('ohne Einsatzleiter und ohne Funktion zählt nichts', () => {
+    expect([...besetzteFunktionen([mitglied(1, 'Anna')], undefined)]).toEqual([]);
+    const extern = { einsatzleiter: { art: 'extern' } } as unknown as EinsatzAnzeige;
+    expect([...besetzteFunktionen([], extern)]).toEqual([]);
   });
 });
 

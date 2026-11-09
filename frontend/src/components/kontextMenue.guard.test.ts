@@ -30,7 +30,7 @@ const BAUSTEIN = '/src/components/useKontextMenue.ts';
 const AUSNAHMEN: Record<string, string> = {
   '/src/geraet/LagemonitorPage.tsx':
     'Unterdrückt das Browsermenü auf dem Wandbildschirm nur, öffnet kein eigenes Menü.',
-  '/src/stab/skizze/SkizzenFlaeche.tsx':
+  '/src/fernmeldewesen/skizze/SkizzenFlaeche.tsx':
     'Unterdrückt das Browsermenü der Übersicht (dort ist kein Element Ziel); die Elemente nutzen ' +
     'den Baustein.',
 };

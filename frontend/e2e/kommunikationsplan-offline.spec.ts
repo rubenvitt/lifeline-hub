@@ -9,8 +9,9 @@ import { fileURLToPath } from 'node:url';
 // DIE VORBEDINGUNGEN SIND TEIL DER AUSSAGE:
 //  - Der Plan liegt in der IndexedDB, BEVOR das Netz weggeht (gelesen, nicht erwartet).
 //  - `/api/health` scheitert offline; sonst zeigte die Seite schlicht frisch geladene Daten.
-// Danach: die Nummer steht, die Besetzung sagt „nicht geladen“ (der Rest des Stabs bleibt von
-// der Platte fern), und „Stelle hinzufügen“ ist gesperrt, nicht versteckt.
+// Danach: die Nummer steht, die Besetzung sagt „—“ mit dem Grund „nicht geladen“ (die Mitglieder,
+// aus denen sie kommt, bleiben von der Platte fern; i6k6mzed D7), und „Stelle hinzufügen“ ist
+// gesperrt, nicht versteckt.
 //
 // Mutationsprobe (Prüfliste): ohne den Unter-Key in `LAGEBILD_OFFLINE.einsatzUnterKeys` wird
 // die Vorbedingung rot.
@@ -128,6 +129,7 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     const keys = await vorgehalteneKeys(page);
     expect(keys.filter((k) => k.startsWith('einsatz-fernmeldewesen/'))).toEqual([planKey]);
     expect(keys.filter((k) => k.startsWith('einsatz-stab/'))).toEqual([]);
+    expect(keys.filter((k) => k.startsWith('einsatz-mitglieder/'))).toEqual([]);
 
     // (2) Netz weg — und nachweislich weg.
     await page.context().setOffline(true);
@@ -140,11 +142,11 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
       ),
     ).toBe('scheitert');
 
-    // (3) Neu laden: Plan da, Besetzung „nicht geladen“, Bedienung gesperrt.
+    // (3) Neu laden: Plan da, Besetzung „—“ mit Grund „nicht geladen“, Bedienung gesperrt.
     await page.goto(pfad);
     await expect(page).not.toHaveURL(/\/login/);
     await expect(tabelle.getByRole('link', { name: NUMMER })).toBeVisible();
-    await expect(tabelle.getByText('Besetzung nicht geladen')).toBeVisible();
+    await expect(tabelle.getByTitle('nicht geladen')).toHaveText(/—/);
     await expect(page.getByText(/^Stand \d{4} · offline$/).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stelle hinzufügen' })).toBeDisabled();
     await expect(

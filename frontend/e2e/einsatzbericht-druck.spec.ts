@@ -247,8 +247,8 @@ test('Einsatzbericht: Einstieg, acht Blöcke, nicht genutztes Modul, kein Person
 });
 
 /** Die Module, aus denen der Bericht schöpft (`druck/einsatzbericht/quellen.ts`). */
+// Die Führungsfunktionen kommen seit i6k6mzed (D7) aus den Mitgliedern, an keinem Modul.
 const BERICHT_MODULE = [
-  'stab',
   // Die Lagebesprechungen schöpfen seit LLH-1111 aus dem eigenen Modul, nicht mehr aus dem Stab.
   'lagebesprechung',
   'einheiten',
@@ -282,10 +282,10 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
   await expect(drucken).toBeEnabled({ timeout: 60_000 });
   await expect(page.getByText('Kein Zugriff auf den Einsatzbericht')).toHaveCount(0);
   const wurzel = page.locator('[data-lfh="druckwurzel"]');
-  // Stab, Lagebesprechungen, Lage, vier Bilanz-Abschnitte, zwei ETB-Abschnitte und die
-  // Zeilen der Kräfte tragen den Vermerk.
+  // Lagebesprechungen, Lage, vier Bilanz-Abschnitte, zwei ETB-Abschnitte und die Zeilen der
+  // Kräfte tragen den Vermerk; die Führungsfunktionen hängen an keinem Modul.
   expect(await wurzel.getByText('In diesem Einsatz nicht genutzt').count()).toBeGreaterThanOrEqual(
-    10,
+    9,
   );
 
   // ── Rollensperre auf Personen (zurück zum Admin, dann wieder Beobachter).

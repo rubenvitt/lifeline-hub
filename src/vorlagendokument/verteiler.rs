@@ -400,7 +400,7 @@ pub fn build_an(verteiler: &[VerteilerEintragAnzeige]) -> Option<String> {
     Some(crate::auftrag::kappe_an(&namen))
 }
 
-/// Die Verteiler-Tabelle der Art; eine Art ohne Verteiler (Pressemitteilung) → 400.
+/// Die Verteiler-Tabelle der Art; eine Art ohne Verteiler → 400.
 pub fn table<T: Dokumentart>() -> Result<&'static VerteilerTabelle, AppError> {
     T::VERTEILER.ok_or_else(|| {
         AppError::Validation(format!("{} trägt keinen Verteiler", T::NOMEN_MIT_ARTIKEL))

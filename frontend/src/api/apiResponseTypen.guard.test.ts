@@ -41,6 +41,9 @@ const AUSNAHMEN: Record<string, string> = {
   'client.ts#UploadMitFortschrittOptionen':
     'FE-lokale Transportoptionen des Uploads mit Fortschritt (Timeout, Rückruf, LFH-654) — ' +
     'weder Request- noch Response-Wire-DTO.',
+  'abrufZustand.ts#Quelle':
+    'FE-lokale Hülle „geladene Liste + Abrufzustand“ neben `AbrufZustand` (LLH-1602, aus ' +
+    '`stab/luecken.ts` umgezogen) — kein Wire-Typ, die Liste selbst ist ein generierter Typ.',
 
   // ── Request-/Eingabe-DTOs, die die Namenskonvention nicht treffen. ──
   'meldungen.ts#AbschlussCursor':

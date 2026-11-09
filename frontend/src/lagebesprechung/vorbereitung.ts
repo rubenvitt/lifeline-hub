@@ -12,7 +12,8 @@ import type { KennzahlEtikett, Lagebild } from '../pages/lage-dashboard/lagebild
 import { stufenText } from '../nachforderungen/nachforderungStufen';
 import { SK_WORT } from '../personen/personMeta';
 import { sichtung as SK_META, warnstufeKennzahl } from '../theme/statusFarben';
-import { md, ZUSTAND_GRUND } from '../stab/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import { md } from '../lib/markdown';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**

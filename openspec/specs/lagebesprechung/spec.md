@@ -2,20 +2,19 @@
 
 ## Purpose
 Die Lagebesprechung ist ein eigenes Einsatzmodul unter Führung: Termin der nächsten Besprechung,
-Vorbereitung, Abschluss mit Entschluss und Verlauf an einem Ort, mit eigener Freigabe und
-unabhängig vom Modul Stab (FwDV 100, 3.3.3.2).
+Vorbereitung, Abschluss mit Entschluss und Verlauf an einem Ort, mit eigener Freigabe
+(FwDV 100, 3.3.3.2).
 
 ## Requirements
 
 ### Requirement: Eigenes Modul mit eigener Freigabe
 Das System SHALL ein Einsatzmodul mit dem Key `lagebesprechung` in der Kategorie Führung führen, mit
 dem Namen „Lagebesprechung“ und der Seite `/einsaetze/<id>/lagebesprechung`. Seine Freigabe MUST
-allein nach den Regeln der Fähigkeit `modul-freigabe` für diesen Key entschieden werden. Die
-Freigabe des Moduls Stab MUST NOT darauf wirken, weder auf Seite und Einstiege noch auf die
-Endpunkte.
+allein nach den Regeln der Fähigkeit `modul-freigabe` für diesen Key entschieden werden, für Seite,
+Einstiege und Endpunkte.
 
 #### Scenario: Stab ausgeblendet
-- **WHEN** im Einsatz das Modul Stab ausgeblendet ist und die Lagebesprechung nicht
+- **WHEN** im Einsatz das Modul Lagebesprechung sichtbar ist
 - **THEN** öffnet ein Mitglied die Seite Lagebesprechung, sieht Termin, Vorbereitung und Verlauf, und mit Schreibrecht kann es eine Lagebesprechung abschließen
 
 #### Scenario: Lagebesprechung ausgeblendet
@@ -35,20 +34,6 @@ Ohne Schreibrecht MUST die Seite Schreibaktionen gesperrt mit Grund zeigen.
 #### Scenario: Abgeschlossener Einsatz
 - **WHEN** an einem abgeschlossenen Einsatz der Termin gesetzt oder eine Lagebesprechung abgeschlossen wird
 - **THEN** antwortet der Server mit 409, und nichts wird gespeichert
-
-### Requirement: Übernahme der Stab-Rollen bei Einführung
-Bei Einführung des Moduls SHALL jede Rollen-Vorgabe, die für das Modul Stab gesetzt ist, für die
-Lagebesprechung übernommen werden. Das gilt je Einsatz und je Organisation. Eine Ausblendung von
-Stab MUST NOT übernommen werden. Ohne Rollen-Vorgabe für Stab MUST für die Lagebesprechung keine
-Vorgabe entstehen. Spätere Änderungen an Stab MUST NOT auf die Lagebesprechung wirken.
-
-#### Scenario: Stab auf Führungskräfte beschränkt
-- **WHEN** vor der Einführung Stab in Einsatz 7 auf die Rolle `fuehrungskraft` beschränkt war
-- **THEN** ist danach auch die Lagebesprechung in Einsatz 7 auf `fuehrungskraft` beschränkt
-
-#### Scenario: Stab ausgeblendet
-- **WHEN** vor der Einführung Stab in Einsatz 8 ausgeblendet war
-- **THEN** ist danach die Lagebesprechung in Einsatz 8 sichtbar
 
 ### Requirement: Termin der nächsten Lagebesprechung
 Die Seite SHALL den Termin der nächsten Lagebesprechung als taktische Zeit groß im Kopf zeigen,
@@ -130,31 +115,29 @@ Paneel sagen, dass noch keine abgeschlossen ist.
 ### Requirement: Live-Verteilung der Lagebesprechung
 Nach Abschluss oder Terminänderung SHALL das System nach dem Commit das Ereignis `lagebesprechung`
 verteilen, nur an Abonnenten mit Freigabe des Moduls. Ein Abschluss SHALL daneben `etb`
-verteilen. Das Ereignis `stab` MUST dabei nicht verteilt werden. Andere offene Schirme MUST Termin,
-Zustand und Verlauf ohne Neuladen zeigen.
+verteilen. Andere offene Schirme MUST Termin, Zustand und Verlauf ohne Neuladen zeigen.
 
 #### Scenario: Zweiter Schirm
 - **WHEN** Schirm B die Seite Lagebesprechung offen hat und auf Schirm A eine Lagebesprechung abgeschlossen wird
 - **THEN** zeigt Schirm B die neue Besprechung im Verlauf und den neuen Termin ohne Neuladen
 
 #### Scenario: Leser nur mit Stab-Recht
-- **WHEN** ein Mitglied mit Stab-Recht, aber ohne Freigabe der Lagebesprechung, den Strom geöffnet hat und eine Lagebesprechung ohne Terminänderung abgeschlossen wird
-- **THEN** erhält es weder `lagebesprechung` noch `stab` noch `einsatz`
+- **WHEN** ein Mitglied ohne Freigabe der Lagebesprechung den Strom geöffnet hat und eine Lagebesprechung ohne Terminänderung abgeschlossen wird
+- **THEN** erhält es weder `lagebesprechung` noch `einsatz`
 
 ### Requirement: Einstiege in die Lagebesprechung
-Stab-Seite, Fristenliste des Führungsüberblicks und die Schnellaktion „Lagebesprechung
-abschließen“ SHALL in die Seite Lagebesprechung führen und deren Freigabe prüfen. Die Stab-Seite
-MUST Termin und Zustand als kompakte Zeile mit Sprung zeigen und MUST NOT Abschluss, Verlauf oder
-Vorbereitung selbst tragen. Ist das Modul gesperrt, MUST ein Einstieg gesperrt mit Grund stehen
-oder fehlen.
+Fristenliste des Führungsüberblicks und die Schnellaktion „Lagebesprechung abschließen“ SHALL in
+die Seite Lagebesprechung führen und deren Freigabe prüfen. Ist das Modul gesperrt, MUST ein
+Einstieg gesperrt mit Grund stehen oder fehlen.
 
 #### Scenario: Schnellaktion
 - **WHEN** eine Person mit Schreibrecht und Freigabe der Lagebesprechung in der Palette „Lagebesprechung abschließen“ wählt
-- **THEN** öffnet sich die Seite Lagebesprechung mit dem Abschlussdialog, auch wenn Stab ausgeblendet ist
+- **THEN** öffnet sich die Seite Lagebesprechung mit dem Abschlussdialog
 
 #### Scenario: Stab-Seite
-- **WHEN** eine Person die Stab-Seite öffnet
-- **THEN** zeigt sie eine Zeile mit Termin und Zustand der nächsten Lagebesprechung, die auf die Seite Lagebesprechung springt, und kein Paneel „Vorbereitung“ und keinen Verlauf
+- **WHEN** eine Person die alte Adresse `/einsaetze/:id/stab` aufruft
+- **THEN** zeigt die App keine Stab-Seite und keine Zeile zur Lagebesprechung, sondern die Seite
+  des Einsatzes
 
 #### Scenario: Marke im Überblick ohne Freigabe
 - **WHEN** eine Person ohne Freigabe der Lagebesprechung den Führungsüberblick mit einem gesetzten Termin öffnet

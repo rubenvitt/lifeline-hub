@@ -54,11 +54,13 @@ Vermerk stehen bleiben („keine Einträge“) und MUST NOT wegfallen.
 
 Stammdaten SHALL Bezeichnung, Einsatznummer, Leitstellennummer, Einsatzart, Stichwort,
 Einsatzort, meldende Stelle und Sachverhalt nennen, Zeiten SHALL Beginn, Ende und Dauer nennen.
-Führung SHALL die Einsatzleitung, die Stabsbesetzung S1–S6 und die abgehaltenen
+Führung SHALL die Einsatzleitung, die Führungsfunktionen und die abgehaltenen
 Lagebesprechungen mit Zeitpunkt und Entschluss nennen. Als Einsatzleitung SHALL der an der eigenen
 Führungsstelle erfasste Einsatzleiter mit seinem „seit“ stehen, in derselben Darstellung wie die
 Kopfleiste der Einsatzdaten, sonst „nicht erfasst“. Die Konten mit der App-Rolle Einsatzleitung
-MUST NOT als Einsatzleitung erscheinen. Lage SHALL ein Verzeichnis aller
+MUST NOT als Einsatzleitung erscheinen. Unter „Führungsfunktionen“ SHALL je Funktion EL und S1–S7
+stehen, welche Mitglieder sie in ihrer Mitgliedschaft tragen (Spec `fuehrungsfunktionen`, „Mehrere
+Mitglieder mit derselben Führungsfunktion“). Lage SHALL ein Verzeichnis aller
 freigegebenen Lageberichte und den letzten im Volltext zeigen. Der ETB-Auszug SHALL die Zahl der
 Einträge je Typ und alle Entscheidungen zeigen.
 
@@ -73,6 +75,13 @@ Einträge je Typ und alle Entscheidungen zeigen.
 
 - **WHEN** an der Führungsstelle kein Einsatzleiter erfasst ist
 - **THEN** steht unter „Einsatzleitung“ „nicht erfasst“
+
+#### Scenario: Führungsfunktionen aus der Mitgliedschaft
+
+- **WHEN** Müller und Schulz als Mitglieder S2 tragen und Weber S4
+- **THEN** nennt der Block Führung unter „Führungsfunktionen“ bei S2 „Müller, Schulz“ und bei S4
+  „Weber“
+- **AND** es gibt keinen Abschnitt „Stab“
 
 #### Scenario: Lage mit drei Berichten
 
@@ -136,8 +145,8 @@ Eine Kraft ohne Ereignis MUST NOT mit 0 in die Helferstunden eingehen.
 Die Blöcke Bilanz und Hilfeleistungen SHALL Betroffene, Patienten, Schäden, Betreuung,
 Evakuierung und Verpflegung ausschließlich als Zählung zeigen. Der Bericht MUST keine Namen,
 Vornamen, Geburtsdaten oder Registriernummern betroffener Personen und keine Namen Geschädigter
-enthalten. Namen der Führungskräfte (Einsatzleitung, Stab, freigebende Personen) SHALL genannt
-werden.
+enthalten. Namen der Führungskräfte (Einsatzleitung, Führungsfunktionen, freigebende Personen)
+SHALL genannt werden.
 
 #### Scenario: Patienten in der Bilanz
 
@@ -423,7 +432,7 @@ MUST ohne Zeiten stehen statt mit 0.
 
 - **WHEN** der Bericht ohne Auswahl gedruckt wird
 - **THEN** enthält er keine Namen von Einsatzkräften außer denen der Führung (Einsatzleitung,
-  Stab, freigebende Personen)
+  Führungsfunktionen, freigebende Personen)
 
 #### Scenario: Einsatzfunktion statt Qualifikation
 

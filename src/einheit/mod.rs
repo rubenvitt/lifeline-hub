@@ -230,7 +230,7 @@ pub struct EinheitAnzeige {
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
     /// Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
     /// Personenbezogen: geschwärzt, nie im Lagebericht.
-    pub verbindungen: Vec<crate::stab::kommunikation::KommunikationsVerbindung>,
+    pub verbindungen: Vec<crate::fernmeldewesen::kommunikation::KommunikationsVerbindung>,
     /// Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus.
     pub status: EinheitStatus,
     /// Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur

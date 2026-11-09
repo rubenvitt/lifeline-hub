@@ -231,7 +231,7 @@ test('Schnellaktion „Anruf erfassen“ öffnet das Informationstelefon mit Fok
   await page.getByRole('option', { name: /^Anruf erfassen/ }).click();
 
   // Der Auftrag ist verbraucht: die Adresse trägt kein `neu` mehr.
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/stab/infotelefon$`));
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/infotelefon$`));
   await expect(page.getByRole('combobox', { name: 'Anliegen' })).toBeFocused();
 });
 

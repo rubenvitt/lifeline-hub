@@ -581,7 +581,7 @@ pub struct Entlassen {
 
 /// Entlässt eine Person aus dem Einsatz (design.md D4/D5): die Zeile bleibt mit Zeitpunkt und
 /// entlassender Person stehen. Gelöst werden Einheit, Fahrzeug, UHS, die Führung einer Einheit,
-/// die Leitung eines Abschnitts, Stab und Einsatzleitung (Spec `einsatz-fuehrungsstelle`:
+/// die Leitung eines Abschnitts und die Einsatzleitung (Spec `einsatz-fuehrungsstelle`:
 /// „nicht mehr disponiert“). Auftragsempfänger, Schadensbezug und Bestätigungen bleiben. In die
 /// Zeitachse geht die Entlassung mit Quelle `disposition`, sofern eine Periode offen ist.
 /// `NotFound`/`Conflict` wie [`require_aktiv_tx`].
@@ -644,8 +644,6 @@ async fn release_bindungen_tx(
     for sql in [
         "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
         "UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ? AND einsatz_id = ?",
-        "UPDATE einsatz_stabsfunktion SET personal_id = NULL \
-         WHERE personal_id = ? AND einsatz_id = ?",
         "UPDATE einsatz_fuehrungsstelle SET einsatzleiter_personal_id = NULL \
          WHERE einsatzleiter_personal_id = ? AND einsatz_id = ?",
         "UPDATE einsatz_personal SET einheit_id = NULL, fahrzeug_id = NULL, uhs_id = NULL \
@@ -797,7 +795,7 @@ async fn find_storno_hindernis_tx(
         return Ok(Some(format!("{b}; erst lösen oder die Person entlassen")));
     }
     // Rollen und Spuren außerhalb der eigenen Zeile, in fester Reihenfolge.
-    const SPUREN: [(&str, &str); 7] = [
+    const SPUREN: [(&str, &str); 6] = [
         (
             "SELECT EXISTS(SELECT 1 FROM einsatz_einheit \
                            WHERE fuehrer_id = ?1 AND einsatz_id = ?2 AND aufgeloest_at IS NULL)",
@@ -806,11 +804,6 @@ async fn find_storno_hindernis_tx(
         (
             "SELECT EXISTS(SELECT 1 FROM einsatzabschnitt WHERE leiter_id = ?1 AND einsatz_id = ?2)",
             "Die Person leitet einen Einsatzabschnitt",
-        ),
-        (
-            "SELECT EXISTS(SELECT 1 FROM einsatz_stabsfunktion \
-                           WHERE personal_id = ?1 AND einsatz_id = ?2)",
-            "Die Person besetzt eine Stabsfunktion",
         ),
         (
             "SELECT EXISTS(SELECT 1 FROM einsatz_fuehrungsstelle \

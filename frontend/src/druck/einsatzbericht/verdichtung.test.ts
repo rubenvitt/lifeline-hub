@@ -134,15 +134,18 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     expect(wert(a, 'Dauer')).toBe('00:40 h');
   });
 
-  it('Führung: Einsatzleiter der Führungsstelle, Stab S1–S6, Lagebesprechungen', () => {
+  // Spec `einsatzbericht`, „Führungsfunktionen aus der Mitgliedschaft“ (i6k6mzed, D7).
+  it('Führung: Einsatzleiter der Führungsstelle, Führungsfunktionen EL und S1–S6, Lagebesprechungen', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     const leitung = abschnitt(b, 'fuehrung', 'Einsatzleitung');
     expect(wert(leitung, 'Einsatzleiter')).toBe('Max Leiter');
     expect(wert(leitung, 'Seit')).toBe('290140mrz26');
-    const stab = abschnitt(b, 'fuehrung', 'Stab');
-    expect(wert(stab, 'S1')).toBe('bei der Einsatzleitung');
-    expect(wert(stab, 'S2')).toBe('Sven Lage');
-    expect(wert(stab, 'S6')).toBe('nicht vergeben');
+    const funktionen = abschnitt(b, 'fuehrung', 'Führungsfunktionen');
+    expect(wert(funktionen, 'EL')).toBe('Max Leiter');
+    expect(wert(funktionen, 'S1')).toBe('nicht vergeben');
+    expect(wert(funktionen, 'S2')).toBe('Sven Lage, Ute Lage');
+    expect(wert(funktionen, 'S6')).toBe('nicht vergeben');
+    expect(() => abschnitt(b, 'fuehrung', 'Stab')).toThrow();
     const lb = tabelle(abschnitt(b, 'fuehrung', 'Lagebesprechungen'));
     expect(lb.zeilen).toEqual([['1', '290315mrz26', 'Riegelstellung halten']]);
   });
@@ -162,15 +165,11 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     ]);
   });
 
-  it('Stab im Einsatz ausgeblendet: Vermerk statt Besetzung', () => {
+  it('Lagebesprechung im Einsatz ausgeblendet: Vermerk statt Verlauf', () => {
     const b = verdichteEinsatzbericht(
-      rohBericht({
-        stab: { zustand: 'nicht-genutzt' },
-        lagebesprechungen: { zustand: 'nicht-genutzt' },
-      }),
+      rohBericht({ lagebesprechungen: { zustand: 'nicht-genutzt' } }),
       konv,
     );
-    expect(vermerke(abschnitt(b, 'fuehrung', 'Stab'))).toEqual([NICHT_GENUTZT]);
     expect(vermerke(abschnitt(b, 'fuehrung', 'Lagebesprechungen'))).toEqual([NICHT_GENUTZT]);
   });
 });

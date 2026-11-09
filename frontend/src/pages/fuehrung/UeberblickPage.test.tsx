@@ -2065,9 +2065,9 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
     await waitFor(() => expect(marke.closest('a')).toBeNull());
   });
 
-  // LLH-1111: die Marke hängt an der Lagebesprechung, nicht mehr am Stab.
-  it('gesperrter Stab, freie Lagebesprechung: die Marke führt in das Modul', async () => {
-    mitFreigaben({ stab: { zugriff: false } });
+  // LLH-1111: die Marke hängt an der Lagebesprechung.
+  it('freie Lagebesprechung: die Marke führt in das Modul', async () => {
+    mitFreigaben({});
     rendern();
     const p = await waitFor(() => paneel('Nächste Marken'));
     const marke = await within(p).findByText('Lagebesprechung');

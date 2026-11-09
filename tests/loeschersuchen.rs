@@ -179,6 +179,50 @@ async fn antrag_stellen_zugriff_und_statuscodes() {
     assert_eq!(s, StatusCode::CONFLICT);
 }
 
+/// i6k6mzed (Spec `aufbewahrung-loeschersuchen`, „Ziel eines Antrags“, Szenarien „Medienkontakt
+/// als Ziel“ und „Alter Antrag für einen Medienkontakt“): Das Modul Presse und Medienarbeit ist
+/// entfernt. Ein neuer Antrag für einen Medienkontakt ist 422 und legt nichts an; ein alter steht
+/// mit Zielart, Kennung, Aktenzeichen und Stand in der Akte.
+#[tokio::test]
+async fn medienkontakt_als_ziel_ist_422_und_ein_alter_antrag_bleibt_lesbar() {
+    let l = lage().await;
+    let uri = antraege_uri(l.einsatz);
+    let (s, v) = anfrage_json(
+        &l.app,
+        "POST",
+        &uri,
+        &l.admin,
+        Some(&json!({
+            "ziel": {"art": "medienkontakt", "id": 3},
+            "aktenzeichen": "DS-2026-020",
+            "bestaetigung": "MK-3",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(antrag_anzahl(&l.pool).await, 0);
+
+    // Ein Antrag aus der Zeit vor dem Update, so wie ihn die Migration hinterlässt.
+    sqlx::query(
+        "INSERT INTO schwaerzung_antrag (einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+            beantragt_von, beantragt_at, faellig_at, vollzogen_at) \
+         SELECT ?, 'medienkontakt', 3, 'DS-2026-007', id, '2026-01-01 10:00:00', \
+            '2026-01-02 10:00:00', '2026-01-02 10:05:00' \
+         FROM benutzer WHERE benutzername = 'admin'",
+    )
+    .bind(l.einsatz)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+    let (s, v) = anfrage(&l.app, "GET", &uri, &l.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let alt = &v.as_array().unwrap()[0];
+    assert_eq!(alt["ziel_art"], "medienkontakt", "{alt}");
+    assert_eq!(alt["ziel_kennung"], "MK-3", "{alt}");
+    assert_eq!(alt["aktenzeichen"], "DS-2026-007", "{alt}");
+    assert_eq!(alt["stand"], "vollzogen", "{alt}");
+}
+
 #[tokio::test]
 async fn aktiver_und_geschwaerzter_einsatz_sind_409() {
     let l = lage().await;

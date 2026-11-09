@@ -69,7 +69,7 @@ export interface KontextHandler<E extends Element = Element> {
   onKeyDown: (e: ReactKeyboardEvent<E>) => void;
 }
 
-/** Kontextmenü-Taste oder Umschalt+F10 (geteilt mit der Skizze, `stab/skizze/bedienung.ts`). */
+/** Kontextmenü-Taste oder Umschalt+F10 (geteilt mit der Skizze, `fernmeldewesen/skizze/bedienung.ts`). */
 export function istKontextTaste(e: { key: string; shiftKey: boolean }): boolean {
   return e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey);
 }

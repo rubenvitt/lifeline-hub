@@ -41,7 +41,7 @@ export function istEinsatzLeitung(einsatz?: EinsatzSchreibkontext): boolean {
 }
 
 /** Leitungs-Schreibrecht: aktiver Einsatz UND Einsatzleitung — für Leitungsaktionen (Mitglieder
-    verwalten, Einsatz abschließen, Abgleich entscheiden, Pressemitteilung freigeben). Kein
+    verwalten, Einsatz abschließen, Abgleich entscheiden). Kein
     Admin-Zweig und darum kein Benutzer-Parameter: der Server (`EinsatzLeitungszugriff`) fragt
     allein die Einsatzrolle (LFH-1118). */
 export function darfEinsatzLeiten(einsatz?: EinsatzSchreibkontext): boolean {

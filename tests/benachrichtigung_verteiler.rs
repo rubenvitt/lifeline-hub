@@ -47,9 +47,9 @@ struct Welt {
     admin: String,
     admin_id: i64,
     einsatz: i64,
-    /// S3 über die Stab-Besetzung.
+    /// S3 über die Mitgliedschaft.
     anna: i64,
-    /// S4 über die Mitgliedschaft (Ersatz, S4 ist in der Besetzung frei).
+    /// S4 über die Mitgliedschaft.
     bert: i64,
     /// S2 über die Mitgliedschaft; steht in keinem Verteiler.
     carl: i64,
@@ -85,12 +85,7 @@ async fn welt() -> Welt {
         bert,
         carl,
     };
-    let ep = w.personal("Anna", w.anna).await;
-    w.besetzen(
-        "s3",
-        json!({ "besetzung_art": "personal", "personal_id": ep }),
-    )
-    .await;
+    w.funktion_setzen(w.anna, "s3").await;
     w.funktion_setzen(w.bert, "s4").await;
     w.funktion_setzen(w.carl, "s2").await;
     w
@@ -99,44 +94,6 @@ async fn welt() -> Welt {
 impl Welt {
     async fn cookie(&self, name: &str) -> String {
         login_cookie(&self.app, name, &format!("{name}pw1")).await
-    }
-
-    /// Stamm-Person mit verknüpftem Konto, disponiert; liefert die `einsatz_personal.id`.
-    async fn personal(&self, name: &str, benutzer_id: i64) -> i64 {
-        let (s, v) = anfrage_json(
-            &self.app,
-            "POST",
-            "/api/personal",
-            &self.admin,
-            Some(&json!({ "name": name, "benutzer_id": benutzer_id })),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage_json(
-            &self.app,
-            "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
-            &self.admin,
-            Some(&json!({ "personal_id": v["id"] })),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        v["id"].as_i64().unwrap()
-    }
-
-    async fn besetzen(&self, sachgebiet: &str, body: Value) {
-        let (s, v) = anfrage_json(
-            &self.app,
-            "PUT",
-            &format!(
-                "/api/einsaetze/{}/stab/besetzung/{sachgebiet}",
-                self.einsatz
-            ),
-            &self.admin,
-            Some(&body),
-        )
-        .await;
-        assert!(s.is_success(), "besetzen {sachgebiet}: {s} {v}");
     }
 
     async fn funktion_setzen(&self, benutzer_id: i64, funktion: &str) {
@@ -243,7 +200,7 @@ fn funktion(code: &str) -> Value {
 }
 
 /// Spec-Szenario „Befehl an S3 und S4“ (und dasselbe für den Lagebericht): die Nutzer von S3
-/// (Stab-Besetzung) und S4 (Mitgliedschaft) bekommen den Hinweis, S2 und der Freigebende nicht.
+/// und S4 (beide über die Mitgliedschaft) bekommen den Hinweis, S2 und der Freigebende nicht.
 /// Erst die Freigabe meldet, Anlegen und Bearbeiten des Entwurfs bleiben still.
 #[tokio::test]
 async fn freigabe_meldet_an_die_funktionen_im_verteiler() {

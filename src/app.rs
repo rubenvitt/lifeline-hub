@@ -790,46 +790,6 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/lagebesprechungen",
             get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
         )
-        .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
-        .route(
-            "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",
-            put(routes::stab::besetzung_setzen).delete(routes::stab::besetzung_entfernen),
-        )
-        // LFH-554: Presse- und Medienarbeit S5; Stab-Sperre per Präfix (`PFAD_KEY`).
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte",
-            get(routes::presse::medienkontakte_liste).post(routes::presse::medienkontakt_anlegen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte/kennzahlen",
-            get(routes::presse::medienkontakte_kennzahlen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte/{kid}",
-            get(routes::presse::medienkontakt_detail).patch(routes::presse::medienkontakt_aendern),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte/{kid}/status",
-            post(routes::presse::medienkontakt_status),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen",
-            get(routes::presse::pressemitteilungen_liste)
-                .post(routes::presse::pressemitteilung_anlegen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}",
-            get(routes::presse::pressemitteilung_detail)
-                .patch(routes::presse::pressemitteilung_aktualisieren),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}/freigeben",
-            post(routes::presse::pressemitteilung_freigeben),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}/fortschreiben",
-            post(routes::presse::pressemitteilung_fortschreiben),
-        )
         .route(
             "/api/einsaetze/{id}/stab/infotelefon",
             get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
@@ -847,89 +807,81 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::infotelefon::status_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/stab/checkliste",
-            get(routes::stab::checkliste_laden),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/checkliste/{punkt}",
-            put(routes::stab::checkliste_setzen),
-        )
-        .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan",
-            get(routes::stab::kommunikationsplan_laden),
+            get(routes::fernmeldewesen::kommunikationsplan_laden),
         )
         .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan/stellen",
-            post(routes::stab::kommunikationsplan_stelle_anlegen),
+            post(routes::fernmeldewesen::kommunikationsplan_stelle_anlegen),
         )
         .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}",
-            patch(routes::stab::kommunikationsplan_stelle_aendern)
-                .delete(routes::stab::kommunikationsplan_stelle_entfernen),
+            patch(routes::fernmeldewesen::kommunikationsplan_stelle_aendern)
+                .delete(routes::fernmeldewesen::kommunikationsplan_stelle_entfernen),
         )
         .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/verbindungen",
-            post(routes::stab::kommunikationsplan_verbindung_anlegen),
+            post(routes::fernmeldewesen::kommunikationsplan_verbindung_anlegen),
         )
         .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}",
-            patch(routes::stab::kommunikationsplan_verbindung_aendern)
-                .delete(routes::stab::kommunikationsplan_verbindung_entfernen),
+            patch(routes::fernmeldewesen::kommunikationsplan_verbindung_aendern)
+                .delete(routes::fernmeldewesen::kommunikationsplan_verbindung_entfernen),
         )
         // LFH-893: Kanäle externer Stellen und taktische Fernmeldeskizze (design.md D14).
         .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}",
-            put(routes::stab::kommunikationsplan_kanal_setzen)
-                .delete(routes::stab::kommunikationsplan_kanal_loesen),
+            put(routes::fernmeldewesen::kommunikationsplan_kanal_setzen)
+                .delete(routes::fernmeldewesen::kommunikationsplan_kanal_loesen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze",
-            get(routes::stab::fernmeldeskizze_laden),
+            get(routes::fernmeldewesen::fernmeldeskizze_laden),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/lage",
-            delete(routes::stab::fernmeldeskizze_lage_verwerfen),
+            delete(routes::fernmeldewesen::fernmeldeskizze_lage_verwerfen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/lage/{element}",
-            put(routes::stab::fernmeldeskizze_lage_setzen)
-                .delete(routes::stab::fernmeldeskizze_lage_entfernen),
+            put(routes::fernmeldewesen::fernmeldeskizze_lage_setzen)
+                .delete(routes::fernmeldewesen::fernmeldeskizze_lage_entfernen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/schriftfeld",
-            put(routes::stab::fernmeldeskizze_schriftfeld_setzen),
+            put(routes::fernmeldewesen::fernmeldeskizze_schriftfeld_setzen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten",
-            post(routes::stab::fernmeldeskizze_komponente_anlegen),
+            post(routes::fernmeldewesen::fernmeldeskizze_komponente_anlegen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}",
-            patch(routes::stab::fernmeldeskizze_komponente_aendern)
-                .delete(routes::stab::fernmeldeskizze_komponente_entfernen),
+            patch(routes::fernmeldewesen::fernmeldeskizze_komponente_aendern)
+                .delete(routes::fernmeldewesen::fernmeldeskizze_komponente_entfernen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}/sprechgruppen/{sg}",
-            put(routes::stab::fernmeldeskizze_komponente_kanal_setzen)
-                .delete(routes::stab::fernmeldeskizze_komponente_kanal_loesen),
+            put(routes::fernmeldewesen::fernmeldeskizze_komponente_kanal_setzen)
+                .delete(routes::fernmeldewesen::fernmeldeskizze_komponente_kanal_loesen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen",
-            post(routes::stab::fernmeldeskizze_verbindung_anlegen),
+            post(routes::fernmeldewesen::fernmeldeskizze_verbindung_anlegen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen/{vid}",
-            patch(routes::stab::fernmeldeskizze_verbindung_aendern)
-                .delete(routes::stab::fernmeldeskizze_verbindung_entfernen),
+            patch(routes::fernmeldewesen::fernmeldeskizze_verbindung_aendern)
+                .delete(routes::fernmeldewesen::fernmeldeskizze_verbindung_entfernen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche",
-            post(routes::stab::fernmeldeskizze_bereich_anlegen),
+            post(routes::fernmeldewesen::fernmeldeskizze_bereich_anlegen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}",
-            patch(routes::stab::fernmeldeskizze_bereich_aendern)
-                .delete(routes::stab::fernmeldeskizze_bereich_entfernen),
+            patch(routes::fernmeldewesen::fernmeldeskizze_bereich_aendern)
+                .delete(routes::fernmeldewesen::fernmeldeskizze_bereich_entfernen),
         )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(

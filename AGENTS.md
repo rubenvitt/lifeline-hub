@@ -23,7 +23,8 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
 | `frontend/src/entwurf/AGENTS.md` | Entwürfe, gegliederte Dokumente (`DokumentEntwurf`) |
 | `frontend/src/personen/AGENTS.md` | Personen und Sichtung |
-| `frontend/src/stab/AGENTS.md` | Stab und Fernmeldewesen: eigenes Modul für Funkplan, Skizze und Kommunikationsplan (S6), Stab-Weiche, Checkliste Arbeitsaufnahme, Presse S5 |
+| `frontend/src/fernmeldewesen/AGENTS.md` | Fernmeldewesen: Funkplan, Fernmeldeskizze, Sprechgruppen, Kommunikationsplan (S6), Einsatzleiter |
+| `frontend/src/infotelefon/AGENTS.md` | Informationstelefon: eigenes Modul, Fenster und Zählung, Funkprotokoll-Ordnung, Handschirm |
 | `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server |
 | `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
@@ -155,6 +156,7 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
 
 `./scripts/check-all.sh` vor dem Merge (Schritte und Bündel im Skriptkopf, Mechanik in
 `scripts/AGENTS.md`).
+
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
 - **Ein rot geborenes Gate wird abgeschaltet statt befolgt** — erst sweepen, dann scharf schalten

@@ -59,7 +59,7 @@ import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SprungKnopf } from '../components/Sprung';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
-import type { Quelle } from '../stab/luecken';
+import type { Quelle } from '../api/abrufZustand';
 import Organigramm from './einsatzabschnitte/Organigramm';
 import { modulName } from '../einsatz/modulRegistry';
 import { ZugPointerSensor } from '../components/zugPointerSensor';

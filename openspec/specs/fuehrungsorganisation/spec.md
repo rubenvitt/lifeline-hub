@@ -129,16 +129,18 @@ Die Wurzel „Einsatzleitung“ SHALL den an der eigenen Führungsstelle erfasst
 seinem „seit“ zeigen, in derselben Darstellung wie die Kopfleiste der Einsatzdaten. Ist kein
 Einsatzleiter erfasst, SHALL sie „Leitung nicht erfasst“ zeigen. Kann die Führungsstelle nicht
 geladen werden, SHALL sie den Grund nennen. Die Wurzel MUST NOT eine Leitung aus der App-Rolle
-Einsatzleitung, aus der Stab-Besetzung oder aus anderen Daten ableiten.
+Einsatzleitung, aus den Führungsfunktionen der Mitglieder oder aus anderen Daten ableiten.
 
 Die Übernahme in den Lagebericht SHALL unter „Einsatzleitung“ dieselbe Angabe tragen. Solange die
 Führungsstelle lädt, MUST die Übernahme gesperrt sein. Das gilt für beide Wege: „In Lagebericht
 übernehmen“ am Organigramm und „Aus Meldebild und Führungsorganisation übernehmen“.
 
-Ist das Modul Stab für die betrachtende Person freigegeben, SHALL neben der Wurzel eine Stabsstelle
-„Stab“ mit den besetzten Sachgebieten und ihrer Besetzung stehen. Ist der Stab nicht freigegeben
-oder seine Freigabe noch nicht ermittelt, MUST die Stabsstelle fehlen, und es MUST kein Name aus dem
-Stab erscheinen.
+Führt mindestens ein Mitglied des Einsatzes in seiner Mitgliedschaft ein Sachgebiet S1–S6, SHALL
+neben der Wurzel eine Stabsstelle „Stab“ stehen, mit jedem so geführten Sachgebiet und den Namen
+seiner Mitglieder (Spec `fuehrungsfunktionen`, „Mehrere Mitglieder mit derselben Führungsfunktion“).
+Ein Sachgebiet ohne Mitglied MUST fehlen; einen Zustand „nicht besetzt“ gibt es dort nicht. Führt
+kein Mitglied ein Sachgebiet oder sind die Mitglieder noch nicht oder nicht geladen, MUST die
+Stabsstelle fehlen. Eine Modulfreigabe MUST dafür nicht nötig sein.
 
 #### Scenario: Einsatzleiter erfasst
 
@@ -157,14 +159,13 @@ Stab erscheinen.
 
 #### Scenario: Stab freigegeben
 
-- **WHEN** der Stab freigegeben ist und S2 mit einer Person besetzt ist
-- **THEN** zeigt die Stabsstelle „S2“ mit dem Namen dieser Person
+- **WHEN** ein Mitglied in seiner Mitgliedschaft S2 führt und kein Mitglied S1, S3, S4, S5 oder S6
+- **THEN** zeigt die Stabsstelle nur „S2“ mit dem Namen dieses Mitglieds
 
 #### Scenario: Stab gesperrt
 
-- **WHEN** das Modul Stab für die Person nicht freigegeben ist
-- **THEN** zeigt das Organigramm keine Stabsstelle, und es wird kein Abruf der Stabsbesetzung
-  ausgelöst
+- **WHEN** kein Mitglied des Einsatzes ein Sachgebiet S1–S6 führt
+- **THEN** zeigt das Organigramm keine Stabsstelle
 
 ### Requirement: Lesbar ohne waagerechtes Scrollen
 

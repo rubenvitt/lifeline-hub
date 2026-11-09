@@ -6,10 +6,10 @@ Server-Gegenstück `src/lagebesprechung/`, `src/routes/lagebesprechung.rs`; erg�
 
 **Eigenes Modul** (LLH-1111,
 `openspec/changes/archive/2026-10-13-llj8s2rt-lagebesprechung-eigenes-modul/design.md`): Key
-`lagebesprechung` unter Führung, eigene Freigabe, eigenes Live-Ereignis `lagebesprechung` (Gate nur dieses Modul,
-nie `stab`). Die Stab-Freigabe wirkt hier nirgends — weder auf Seite, Einstiege, Endpunkte noch
-auf Zeilen der Vorbereitung. Stab-Seite, Überblick-Marke und Palette-Schnellaktion sind nur
-Einstiege und prüfen `istSprungGesperrt('lagebesprechung')`.
+`lagebesprechung` unter Führung, eigene Freigabe, eigenes Live-Ereignis `lagebesprechung` (Gate nur dieses Modul).
+Überblick-Marke und Palette-Schnellaktion sind nur Einstiege und prüfen
+`istSprungGesperrt('lagebesprechung')`; die alte Adresse `…/stab` führt in den Einsatz (i6k6mzed,
+design.md D8).
 
 **Ein Termin, ein Schreibweg** (LLH-1111, D3): Wahrheit ist die Spalte
 `einsatz.naechste_lagebesprechung_at`; der Einsatzkopf liest sie für alle Mitglieder (LFH-555).
@@ -20,7 +20,10 @@ Beide Wege setzen den Termin über `SQL_TERMIN_SETZEN` in `src/lagebesprechung/r
 Anweisung leert bei einer echten Änderung auch die Merker der Ankündigung
 (`lagebesprechung_angekuendigt_*_at`, LLH-1215). Ein neuer Schreibweg nimmt sie mit, sonst gilt
 die Ankündigung dem alten Termin. Angekündigt wird nur im Erinnerungs-Scheduler
-(`src/lagebesprechung/ankuendigung.rs`), je Termin einmal und nur im Zeitfenster.
+(`src/lagebesprechung/ankuendigung.rs`), je Termin einmal und nur im Zeitfenster, an die Nutzer
+der Funktionen EL und S1–S7. Wer sie trägt, sagt allein die Mitgliedschaft (EL zuerst der
+Einsatzleiter der Führungsstelle; `frontend/src/fuehrung/AGENTS.md`, i6k6mzed D2), nie das Modul
+Stab.
 
 **Vorbereitung der Lagebesprechung** (LFH-550, `lagebesprechung/VorbereitungPaneel.tsx`,
 `lagebesprechung/vorbereitung.ts`): Paneel der Seite Lagebesprechung, rechnet keine Zahl selbst
@@ -34,6 +37,6 @@ Freitext).
 oder verstrichener Termin trägt `achtung`, nie `alarm` (keine Gefahr, Alarmbudget EEMUA 191), mit
 dem Wort „jetzt fällig“ bzw. „seit 5 min überfällig“. Ton und Wort nur aus
 `lagebesprechung/lagebesprechungZustand.ts:lagebesprechungUeberfaellig`; die Seite
-Lagebesprechung, die Termin-Zeile der Stab-Seite und die Marke „Lagebesprechung“ der Fristenliste
-im Überblick (`markenBewertung`) lesen alle dort. Überfällige Aufträge und Erinnerungen dort
+Lagebesprechung und die Marke „Lagebesprechung“ der Fristenliste im Überblick (`markenBewertung`)
+lesen beide dort. Überfällige Aufträge und Erinnerungen dort
 bleiben `alarm`, das „knapp“ unter 30 min bleibt der Fristenliste.

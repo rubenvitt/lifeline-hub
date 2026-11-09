@@ -160,7 +160,7 @@ pub async fn freigeben(
         // Der Extractor sah den Stand vor der Transaktion; ein Abschluss dazwischen darf keine
         // Freigabe an einem geschlossenen Einsatz hinterlassen (409, src/AGENTS.md,
         // „Backend — Statuscode-Konvention“).
-        crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let bezeichnung = zugang::gueltige_bezeichnung(conn, org_id, zugang_id).await?;
         let mut etb_ids = Vec::new();
         match zugang::freigeben_tx(conn, zugang_id, einsatz_id, von).await? {

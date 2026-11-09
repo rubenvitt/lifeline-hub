@@ -4,8 +4,8 @@ import type {
   Fuehrungsfunktion,
   FuehrungsfunktionEintrag,
   MitgliedAnzeige,
-  Stab,
 } from '../api/types';
+import { traegerJeFunktion } from '../fuehrung/besetzungAusMitgliedern';
 
 /**
  * `@`-Erwähnungen in der Chat-Eingabe (LLH-1220, Change `kcjecn9e-benachrichtigungskonzept`,
@@ -24,23 +24,16 @@ export interface ErwaehnungVorschlag {
 }
 
 /**
- * Die Funktionen, die im Einsatz jemand trägt: Einsatzleiter der Führungsstelle, Stab-Besetzung
- * (eine Person oder „bei der Einsatzleitung“) und die Funktion einer Mitgliedschaft. Das sind die
- * Wege, über die der Server eine Funktion in Nutzer auflöst.
+ * Die Funktionen, die im Einsatz jemand trägt: Einsatzleiter der Führungsstelle und die Funktion
+ * einer Mitgliedschaft (`fuehrung/besetzungAusMitgliedern.ts`, i6k6mzed D2). Das sind die Wege,
+ * über die der Server eine Funktion in Nutzer auflöst.
  */
 export function besetzteFunktionen(
   mitglieder: readonly MitgliedAnzeige[],
-  stab: Stab | undefined,
   einsatz: EinsatzAnzeige | undefined,
 ): Set<Fuehrungsfunktion> {
-  const besetzt = new Set<Fuehrungsfunktion>();
+  const besetzt = new Set<Fuehrungsfunktion>(traegerJeFunktion(mitglieder).keys());
   if (einsatz?.einsatzleiter?.art === 'personal') besetzt.add('el');
-  for (const z of stab?.besetzung ?? []) {
-    if (z.besetzung_art === 'personal' || z.besetzung_art === 'einsatzleitung') {
-      besetzt.add(z.sachgebiet);
-    }
-  }
-  for (const m of mitglieder) if (m.fuehrungsfunktion) besetzt.add(m.fuehrungsfunktion);
   return besetzt;
 }
 

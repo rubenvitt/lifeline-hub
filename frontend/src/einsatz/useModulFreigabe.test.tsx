@@ -21,9 +21,9 @@ function Probe() {
  * die Seite rendert.
  */
 describe('useModulFreigabe', () => {
-  it('zeigt den Inhalt, wenn das Fernmeldewesen frei ist, auch bei ausgeblendetem Stab', async () => {
+  it('zeigt den Inhalt, wenn das Fernmeldewesen frei ist, auch bei ausgeblendetem anderem Modul', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
-      freigabenFixture({ stab: { sichtbar: false } }),
+      freigabenFixture({ lagebesprechung: { sichtbar: false } }),
     );
     renderMitProviders(<Probe />);
     expect(await screen.findByText('Inhalt der Seite')).toBeInTheDocument();

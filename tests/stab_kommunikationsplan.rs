@@ -2,7 +2,7 @@
 //!
 //! Spec: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/specs/stab-kommunikationsplan/spec.md`.
 //! Die tragenden Aussagen: eine Funktion je Einsatz höchstens einmal (409), die Verbindung
-//! gehört der Stelle, Antwort ist immer der ganze Plan, jede Schreibaktion sendet `stab` und
+//! gehört der Stelle, Antwort ist immer der ganze Plan, jede Schreibaktion sendet `fernmeldewesen` und
 //! nie `etb`, die Schwärzung nimmt Name und Nummer und lässt das Skelett stehen.
 
 use axum::http::StatusCode;
@@ -723,14 +723,13 @@ async fn jede_schreibaktion_sendet_fernmeldewesen_und_nie_stab_oder_etb() {
     let vor = system_etb_anzahl(&app, &admin, einsatz).await;
 
     let zaehle = |rx: &mut tokio::sync::broadcast::Receiver<_>| {
-        // LLH-1180: der Kommunikationsplan gehört dem Fernmeldewesen; `stab` kommt nie.
+        // LLH-1180: der Kommunikationsplan gehört dem Fernmeldewesen.
         let (mut fernmeldewesen, mut etb) = (0, 0);
         while let Ok(n) = rx.try_recv() {
             let n: lifeline_hub::live::LiveNachricht = n;
             match n.event.as_str() {
                 "fernmeldewesen" => fernmeldewesen += 1,
                 "etb" => etb += 1,
-                "stab" => panic!("Kommunikationsplan sendet nie `stab`"),
                 _ => {}
             }
         }

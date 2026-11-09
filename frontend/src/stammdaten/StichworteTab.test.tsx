@@ -257,7 +257,13 @@ describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () =>
  */
 describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
   const VORLAGEN = [
-    { id: 3, bezeichnung: 'MANV', einsatzart: 'realeinsatz', ausgeblendet: ['stab'], sortier: 30 },
+    {
+      id: 3,
+      bezeichnung: 'MANV',
+      einsatzart: 'realeinsatz',
+      ausgeblendet: ['lagebesprechung'],
+      sortier: 30,
+    },
     { id: 4, bezeichnung: 'Kleinlage', ausgeblendet: [], sortier: 10 },
   ];
 

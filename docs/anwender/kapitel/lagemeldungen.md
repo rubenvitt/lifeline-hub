@@ -144,8 +144,7 @@ Mit Koordinate steht die Lagemeldung danach auf der Lagekarte, ohne nicht mehr.
 - „Neu“ gilt für alle gleich: Sobald eine Person eine Lagemeldung als gesehen markiert, ist sie
   für alle gesehen. Es zählt die erste Markierung; eine zweite ändert Zeit und Namen nicht.
 - Die Zahl der neuen Lagemeldungen steht im Modulmenü am Modul „Lagemeldungen“ („2 neue
-  Lagemeldungen“) und auf der Stab-Seite in der Kachel S2, beide mit derselben Zahl. Steht keine
-  neue an, zeigt das Modulmenü keine Zahl.
+  Lagemeldungen“). Steht keine neue an, zeigt das Modulmenü keine Zahl.
 - „Alle als gesehen markieren“ erfasst nur die Lagemeldungen, die beim Wählen angezeigt waren.
   Eine, die in diesem Moment eingeht, bleibt neu.
 - Wird eine schon gesehene Meldung mit geändertem Lage-Text erneut übernommen oder ihr Lage-Text

@@ -14,8 +14,8 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, anfrage_json, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einheit_bilden,
-    einsatz_anlegen, einsatz_anlegen_mit, login_cookie, plan_hochladen, png_bytes, rolle_setzen,
-    setup_mit_pool_und_live, system_etb_inhalte,
+    einsatz_anlegen, einsatz_anlegen_mit, login_cookie, mitglied_mit_funktion, plan_hochladen,
+    png_bytes, rolle_setzen, setup_mit_pool_und_live, system_etb_inhalte,
 };
 
 // ---------- Helfer ----------
@@ -705,33 +705,16 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
-/// LLH-1156: Ein Abschnittsgerät liest `auftraege`, aber nicht `stab`. Auch wenn das Stab-Modul
-/// im Einsatz für alle frei ist, zeigt ein Auftrag an S3 dem Gerät keine Besetzung; die
-/// Einsatzleitung sieht sie wie bisher.
+/// LLH-1156, i6k6mzed (design.md D2): Ein gekoppeltes Gerät erhält keine Auflösung. Ein Auftrag
+/// an S3 zeigt dem Abschnittsgerät nur den Snapshot, auch wenn ein Mitglied S3 führt; die
+/// Einsatzleitung sieht den Namen.
 #[tokio::test]
-async fn abschnittsgeraet_sieht_keine_stab_besetzung() {
+async fn abschnittsgeraet_erhaelt_keine_aufloesung() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let basis = format!("/api/einsaetze/{}", l.einsatz);
-    let (s, v) = anfrage_json(
-        &app,
-        "PUT",
-        &format!("{basis}/stab/besetzung/s3"),
-        &admin,
-        Some(&json!({"besetzung_art": "extern", "bezeichnung": "Müller"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "{v}");
-    let (s, v) = anfrage_json(
-        &app,
-        "PUT",
-        &format!("{basis}/modul-overrides/stab"),
-        &admin,
-        Some(&json!({"sichtbar": true, "benoetigte_rolle": null})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "{v}");
+    mitglied_mit_funktion(&app, &admin, l.einsatz, "Müller", "mueller", "s3").await;
     let auftrag = auftrag_an(
         &app,
         &admin,
@@ -766,14 +749,14 @@ async fn abschnittsgeraet_sieht_keine_stab_besetzung() {
     assert_eq!(e["snap_anzeige"], "S3 Einsatz");
     assert!(
         e.get("aktuelle_besetzung").is_none(),
-        "Gerät ohne stab: {e}"
+        "Gerät ohne Auflösung: {e}"
     );
     let (s, v) = anfrage(&app, "GET", &format!("{basis}/auftraege"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let e = s3(&v.as_array().unwrap()[0]);
     assert!(
         e.get("aktuelle_besetzung").is_none(),
-        "Gerät ohne stab (Liste): {e}"
+        "Gerät ohne Auflösung (Liste): {e}"
     );
 }
 

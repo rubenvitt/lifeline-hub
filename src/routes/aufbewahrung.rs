@@ -193,14 +193,22 @@ pub struct NeuerSchwaerzungsantrag {
     pub ziel: AntragZielEingabe,
     /// Aktenzeichen des Löschersuchens, nach dem Trimmen 1 bis 64 Zeichen, ohne Namen.
     pub aktenzeichen: String,
-    /// Eingetippte Kennung: Einsatznummer bzw. `R-042`, `EK-17`, `IT-5`, `MK-3`.
+    /// Eingetippte Kennung: Einsatznummer bzw. `R-042`, `EK-17`, `IT-5`.
     pub bestaetigung: String,
 }
 
-/// Formprüfung des Ziels (400): bekannte Art, `id` genau bei einer Person.
+/// Formprüfung des Ziels (400): bekannte Art, `id` genau bei einer Person. Ein Medienkontakt ist
+/// eine bekannte Zielart ohne Gegenstand mehr (422, i6k6mzed, design.md D4): das Modul Presse und
+/// Medienarbeit ist entfernt, alte Anträge mit diesem Ziel bleiben lesbar.
 fn ziel_aus(eingabe: &AntragZielEingabe) -> Result<AntragZiel, AppError> {
     let art = AntragZielArt::parse(eingabe.art.trim())
         .ok_or_else(|| AppError::Validation(format!("Unbekannte Zielart {}", eingabe.art)))?;
+    if art == AntragZielArt::Medienkontakt {
+        return Err(AppError::UnprocessableEntity(
+            "Medienkontakte gibt es nicht mehr: das Modul Presse und Medienarbeit ist entfernt"
+                .into(),
+        ));
+    }
     match (art.person(), eingabe.id) {
         (None, None) => Ok(AntragZiel::Einsatz),
         (None, Some(_)) => Err(AppError::Validation(
@@ -226,7 +234,7 @@ pub async fn antraege(
 
 /// POST /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege — Löschersuchen stellen (201).
 /// 400 Form (Zielart, `ziel.id`, Aktenzeichen, leere Bestätigung), 404 Person nicht in diesem
-/// Einsatz, 422 Bestätigung falsch oder Stammkraft, 409 aktiv, geschwärzt oder schon ein
+/// Einsatz, 422 Bestätigung falsch, Stammkraft oder Medienkontakt, 409 aktiv, geschwärzt oder schon ein
 /// offener bzw. vollzogener Antrag. Schwärzt NICHT: das tut der Purge-Lauf nach 24 Stunden.
 pub async fn antrag_stellen(
     State(state): State<AppState>,

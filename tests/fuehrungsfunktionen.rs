@@ -212,10 +212,6 @@ fn erinnerung_pfad(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/erinnerungen")
 }
 
-fn besetzung_pfad(einsatz: i64, sachgebiet: &str) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/besetzung/{sachgebiet}")
-}
-
 async fn auftrag_an(
     app: &axum::Router,
     cookie: &str,
@@ -230,18 +226,16 @@ async fn auftrag_an(
     anfrage(app, "POST", &auftrag_pfad(einsatz), cookie, Some(&body)).await
 }
 
-async fn stab_extern(app: &axum::Router, cookie: &str, einsatz: i64, sg: &str, name: &str) {
-    let (status, json) = anfrage(
-        app,
-        "PUT",
-        &besetzung_pfad(einsatz, sg),
-        cookie,
-        Some(&format!(
-            r#"{{"besetzung_art":"extern","bezeichnung":"{name}"}}"#
-        )),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "Besetzung setzen: {json:?}");
+/// Ein Mitglied mit Anzeigenamen `name` führt `sg` in seiner Mitgliedschaft (i6k6mzed, D2).
+async fn mitglied_fuehrt(
+    app: &axum::Router,
+    admin: &str,
+    einsatz: i64,
+    sg: &str,
+    name: &str,
+) -> i64 {
+    let kennung = name.to_lowercase().replace('ü', "ue");
+    mitglied_mit_funktion(app, admin, einsatz, name, &kennung, sg).await
 }
 
 async fn erster_auftrag(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -255,7 +249,7 @@ async fn auftrag_an_s3_mit_snapshot_ohne_person() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Müller").await;
 
     let (status, json) = auftrag_an(
         &app,
@@ -291,14 +285,14 @@ async fn auftrag_an_s3_mit_snapshot_ohne_person() {
     assert!(!anordnung["an"].as_str().unwrap().contains("Müller"));
 }
 
-/// Paar-Test (Akzeptanzkriterium LFH-549): der Snapshot bleibt, die Auflösung folgt der
-/// Besetzung.
+/// Paar-Test (Akzeptanzkriterium LFH-549, Spec `fuehrungsfunktionen`, „Paar-Test
+/// Besetzungswechsel“): der Snapshot bleibt, die Auflösung folgt der Mitgliedschaft.
 #[tokio::test]
 async fn auftrag_an_s3_loest_zur_lesezeit_auf_die_aktuelle_besetzung_auf() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
+    let mueller = mitglied_fuehrt(&app, &admin, einsatz, "s3", "Müller").await;
     let (status, _) = auftrag_an(
         &app,
         &admin,
@@ -311,10 +305,11 @@ async fn auftrag_an_s3_loest_zur_lesezeit_auf_die_aktuelle_besetzung_auf() {
     let vorher = erster_auftrag(&app, &admin, einsatz).await;
     let e = &vorher["empfaenger"][0];
     assert_eq!(e["snap_anzeige"], "S3 Einsatz");
-    assert_eq!(e["aktuelle_besetzung"]["zustand"], "extern");
+    assert_eq!(e["aktuelle_besetzung"]["zustand"], "personal");
     assert_eq!(e["aktuelle_besetzung"]["name"], "Müller");
 
-    stab_extern(&app, &admin, einsatz, "s3", "Schulz").await;
+    funktion_setzen(&app, &admin, einsatz, mueller, "fuehrungspersonal", None).await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Schulz").await;
 
     let nachher = erster_auftrag(&app, &admin, einsatz).await;
     let e = &nachher["empfaenger"][0];
@@ -323,7 +318,7 @@ async fn auftrag_an_s3_loest_zur_lesezeit_auf_die_aktuelle_besetzung_auf() {
 }
 
 #[tokio::test]
-async fn nicht_vergeben_und_bei_der_einsatzleitung() {
+async fn nicht_vergeben() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -338,21 +333,28 @@ async fn nicht_vergeben_und_bei_der_einsatzleitung() {
     let bes = &a["empfaenger"][0]["aktuelle_besetzung"];
     assert_eq!(bes["zustand"], "nicht_vergeben");
     assert!(!bes.as_object().unwrap().contains_key("name"));
+}
 
-    let (status, _) = anfrage(
+/// Spec `fuehrungsfunktionen`, „Mehrere Mitglieder mit derselben Führungsfunktion“: beide
+/// gelten, die Namen stehen alphabetisch mit „, “.
+#[tokio::test]
+async fn zwei_mitglieder_mit_s3_nennen_beide_alphabetisch() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Schulz").await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Müller").await;
+    auftrag_an(
         &app,
-        "PUT",
-        &besetzung_pfad(einsatz, "s4"),
         &admin,
-        Some(r#"{"besetzung_art":"einsatzleitung"}"#),
+        einsatz,
+        serde_json::json!({"empfaenger_typ": "funktion", "funktion": "s3"}),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
     let a = erster_auftrag(&app, &admin, einsatz).await;
-    assert_eq!(
-        a["empfaenger"][0]["aktuelle_besetzung"]["zustand"],
-        "einsatzleitung"
-    );
+    let bes = &a["empfaenger"][0]["aktuelle_besetzung"];
+    assert_eq!(bes["zustand"], "personal");
+    assert_eq!(bes["name"], "Müller, Schulz");
 }
 
 #[tokio::test]
@@ -360,7 +362,7 @@ async fn keine_aufloesung_fuer_freitext_el_und_fachberater() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Müller").await;
 
     for (empf, snap) in [
         (
@@ -473,56 +475,15 @@ async fn mandantenlabel_im_snapshot() {
     );
 }
 
-/// Ohne Freigabe des Stab-Moduls fehlt die Auflösung, der Snapshot bleibt.
+/// Spec `fuehrungsfunktionen`, „Ohne Stab-Recht“: die Auflösung braucht nur das Leserecht am
+/// Auftrag, kein weiteres Modul. Ein Beobachter sieht sie wie das Führungspersonal (i6k6mzed,
+/// design.md D2; vorher hing sie an der Stab-Freigabe, LFH-1150).
 #[tokio::test]
-async fn ohne_stab_recht_keine_aufloesung() {
+async fn aufloesung_ohne_weiteres_modulrecht() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
-    auftrag_an(
-        &app,
-        &admin,
-        einsatz,
-        serde_json::json!({"empfaenger_typ": "funktion", "funktion": "s3"}),
-    )
-    .await;
-
-    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
-    rolle_setzen(&app, &admin, einsatz, frieda, "fuehrungspersonal").await;
-    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-
-    // Gegenprobe mit Recht: Auflösung da.
-    let a = erster_auftrag(&app, &frieda, einsatz).await;
-    assert_eq!(a["empfaenger"][0]["aktuelle_besetzung"]["name"], "Müller");
-
-    let (status, _) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/stab"),
-        &admin,
-        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-
-    let a = erster_auftrag(&app, &frieda, einsatz).await;
-    let e = &a["empfaenger"][0];
-    assert_eq!(e["snap_anzeige"], "S3 Einsatz");
-    assert!(
-        !e.as_object().unwrap().contains_key("aktuelle_besetzung"),
-        "ohne Stab-Recht keine Besetzung: {e:?}"
-    );
-}
-
-/// LFH-1150: Die Stab-Auflösung in Aufträgen rechnet mit der Einsatzrolle. Steht `stab` auf
-/// „Führung im Einsatz“, sieht Führungspersonal ohne Org-Rolle die Besetzung, ein Beobachter nicht.
-#[tokio::test]
-async fn besetzung_unter_einsatzfuehrung_folgt_der_einsatzrolle() {
-    let app = setup().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Müller").await;
     auftrag_an(
         &app,
         &admin,
@@ -536,26 +497,13 @@ async fn besetzung_unter_einsatzfuehrung_folgt_der_einsatzrolle() {
     let berta = benutzer_anlegen(&app, &admin, "berta", "keine").await;
     rolle_setzen(&app, &admin, einsatz, berta, "beobachter").await;
     let berta = login_cookie(&app, "berta", "bertapw1").await;
-    let (status, _) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/stab"),
-        &admin,
-        Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
 
-    let a = erster_auftrag(&app, &frieda, einsatz).await;
-    assert_eq!(a["empfaenger"][0]["aktuelle_besetzung"]["name"], "Müller");
-    let a = erster_auftrag(&app, &berta, einsatz).await;
-    assert!(
-        !a["empfaenger"][0]
-            .as_object()
-            .unwrap()
-            .contains_key("aktuelle_besetzung"),
-        "Beobachter ohne Stab-Recht: {a:?}"
-    );
+    for cookie in [&frieda, &berta] {
+        let a = erster_auftrag(&app, cookie, einsatz).await;
+        let e = &a["empfaenger"][0];
+        assert_eq!(e["snap_anzeige"], "S3 Einsatz");
+        assert_eq!(e["aktuelle_besetzung"]["name"], "Müller", "{e:?}");
+    }
 }
 
 #[tokio::test]
@@ -563,7 +511,7 @@ async fn erinnerung_an_katalogwert_und_freitext() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s2", "Müller").await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s2", "Müller").await;
 
     let (status, json) = anfrage(
         &app,
@@ -730,8 +678,8 @@ async fn fuehrungsstelle_als_katalogwert() {
 }
 
 #[tokio::test]
-async fn mandantenlabel_in_kopf_und_system_etb() {
-    let (app, pool) = setup_mit_pool().await;
+async fn mandantenlabel_in_mitgliederliste_und_kopf() {
+    let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     anfrage(
@@ -742,15 +690,32 @@ async fn mandantenlabel_in_kopf_und_system_etb() {
         Some(r#"{"label":"Versorgung (Logistik)"}"#),
     )
     .await;
-    stab_extern(&app, &admin, einsatz, "s4", "Müller").await;
-    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
-    assert!(
-        inhalte
-            .iter()
-            .any(|i| i.starts_with("S4 Versorgung (Logistik): Besetzung → Müller")),
-        "{inhalte:?}"
-    );
-    let _ = pool;
+    let mueller = mitglied_fuehrt(&app, &admin, einsatz, "s4", "Müller").await;
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/mitglieder"),
+        &admin,
+        None,
+    )
+    .await;
+    let m = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["benutzer_id"] == mueller)
+        .unwrap();
+    assert_eq!(m["fuehrungsstelle_anzeige"], "S4 Versorgung (Logistik)");
+    let cookie = login_cookie(&app, "mueller", "muellerpw1").await;
+    let (_, kopf) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(kopf["meine_funktion"], "S4 Versorgung (Logistik)");
 }
 
 /// Nach der Schwärzung liefert die Auflösung keinen Namen mehr; der Code bleibt, der Snapshot
@@ -760,7 +725,7 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
+    mitglied_fuehrt(&app, &admin, einsatz, "s3", "Müller").await;
     auftrag_an(
         &app,
         &admin,
@@ -801,13 +766,18 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
 
     let aufl = {
         let mut conn = pool.acquire().await.unwrap();
-        lifeline_hub::fuehrung::aufloesung::Aufloeser::laden(&mut conn, einsatz, true)
+        lifeline_hub::fuehrung::aufloesung::Aufloeser::laden(&mut conn, einsatz)
             .await
             .unwrap()
     };
     let bes = aufl
         .aufloesen(Some(lifeline_hub::fuehrung::Fuehrungsfunktion::S3))
         .unwrap();
+    // Die Mitgliedschaft mit S3 überlebt die Schwärzung (i6k6mzed, D2); der Name fehlt trotzdem.
+    assert_eq!(
+        bes.zustand,
+        lifeline_hub::fuehrung::aufloesung::BesetzungsZustand::Personal
+    );
     assert_eq!(bes.name, None, "Name nach der Schwärzung weg");
 
     let (snap, funktion): (String, Option<String>) = sqlx::query_as(

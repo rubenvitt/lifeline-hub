@@ -405,7 +405,7 @@ test('Informationstelefon (LFH-1067): auf 390 × 844 stehen beim Öffnen zwei An
 
   const gemessen: string[] = [];
   for (const dichte of DICHTEN) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
     await stelleDichte(page, dichte);
     const zeilen = page.locator('[data-anruf]');
     await expect(zeilen).toHaveCount(10);

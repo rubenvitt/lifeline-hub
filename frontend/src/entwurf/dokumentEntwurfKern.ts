@@ -5,7 +5,7 @@
 
 /**
  * Ein Abschnitt eines gegliederten Dokuments, wie ihn die Vorlagen der Arten liefern
- * (`lageberichte/vorlagen.ts`, `befehle/vorlagen.ts`, `presse/vorlagen.ts`). Der Hilfetext ist
+ * (`lageberichte/vorlagen.ts`, `befehle/vorlagen.ts`). Der Hilfetext ist
  * eine reine Eingabehilfe des Befehls (SKK-Unterpunkte).
  */
 export interface DokumentAbschnitt {

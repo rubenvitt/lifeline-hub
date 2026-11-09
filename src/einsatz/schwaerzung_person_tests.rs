@@ -327,14 +327,14 @@ fn guard_markierungen_erkennt_luecke_retain_und_ohne_an_der_wurzel() {
         .any(|x| x.contains("rufname ist Retain")));
 
     let mut v = PERSONENBEZUEGE.to_vec();
-    let w = v.iter().position(|b| b.tabelle == "medienkontakt").unwrap();
+    let w = v
+        .iter()
+        .position(|b| b.tabelle == "infotelefon_anruf")
+        .unwrap();
     v[w].spalten = &[
-        ("medium", Mit),
-        ("thema", Mit),
-        ("kontakt_name", Mit),
-        ("kontaktweg", Ohne("x")),
-        ("antwort", Mit),
-        ("freigabe_durch", Mit),
+        ("notiz", Mit),
+        ("anrufer_name", Mit),
+        ("rueckruf", Ohne("x")),
     ];
     assert!(befund_markierungen(&v)
         .iter()
@@ -346,7 +346,6 @@ fn kennungen_und_wire() {
     assert_eq!(PersonenArt::Betroffene.kennung(9, Some(42)), "R-042");
     assert_eq!(PersonenArt::ExterneKraft.kennung(17, None), "EK-17");
     assert_eq!(PersonenArt::InfotelefonAnruf.kennung(5, None), "IT-5");
-    assert_eq!(PersonenArt::Medienkontakt.kennung(3, None), "MK-3");
     assert_eq!(
         PersonenArt::parse("externe_kraft"),
         Some(PersonenArt::ExterneKraft)
@@ -379,7 +378,7 @@ async fn fk_check_leer(pool: &SqlitePool) {
     assert_eq!(n, 0, "Fremdschlüsselprüfung meldet Verstöße");
 }
 
-/// Alle vier Zielpersonen nacheinander: danach steht kein Ziel-Klartext mehr, jeder
+/// Alle drei Zielpersonen nacheinander: danach steht kein Ziel-Klartext mehr, jeder
 /// Nachbar-Klartext steht noch, die Skelettspalten sind unverändert.
 #[tokio::test]
 async fn scrub_je_art_trifft_nur_die_zielperson() {
@@ -388,7 +387,6 @@ async fn scrub_je_art_trifft_nur_die_zielperson() {
     scrub(&pool, b.e1, PersonenArt::Betroffene, b.p1).await;
     scrub(&pool, b.e1, PersonenArt::ExterneKraft, b.k1).await;
     scrub(&pool, b.e1, PersonenArt::InfotelefonAnruf, b.anruf1).await;
-    scrub(&pool, b.e1, PersonenArt::Medienkontakt, b.medien1).await;
 
     let texte = testdaten::alle_texte(&pool).await;
     assert_eq!(
@@ -440,9 +438,8 @@ async fn scrub_im_falschen_einsatz_aendert_nichts() {
     scrub(&pool, b.e2, PersonenArt::Betroffene, b.p1).await;
     scrub(&pool, b.e2, PersonenArt::ExterneKraft, b.k1).await;
     scrub(&pool, b.e2, PersonenArt::InfotelefonAnruf, b.anruf1).await;
-    scrub(&pool, b.e2, PersonenArt::Medienkontakt, b.medien1).await;
     assert_eq!(testdaten::alle_texte(&pool).await, vorher);
-    let _ = (b.p_e2, b.p2, b.k2, b.anruf2, b.medien2);
+    let _ = (b.p_e2, b.p2, b.k2, b.anruf2);
 }
 
 /// Eine Stammkraft ist keine externe Kraft: der Zeilenfilter der Registry
@@ -518,10 +515,11 @@ async fn anhang_da(pool: &SqlitePool, anhang_id: i64) -> bool {
     datei == 1
 }
 
-/// Spec `aufbewahrung-loeschersuchen`, „Vollzug für eine Person“: die Dateien an der Person
-/// sind personengebunden (Registry: `ZeileLoeschen`) und gehören über `person_id` zu ihr. Der
-/// Vollzug löscht sie samt Linker, auch eine schon entfernte; die Dateien der Nachbarperson und
-/// eines anderen Einsatzes bleiben, und ein Scrub im falschen Einsatz löscht nichts.
+/// Spec `aufbewahrung-loeschersuchen`, „Vollzug für eine Betroffene, externe Kraft oder anrufende
+/// Person“: die Dateien an der Person sind personengebunden (Registry: `ZeileLoeschen`) und
+/// gehören über `person_id` zu ihr. Der Vollzug löscht sie samt Linker, auch eine schon
+/// entfernte; die Dateien der Nachbarperson und eines anderen Einsatzes bleiben, und ein Scrub im
+/// falschen Einsatz löscht nichts.
 #[tokio::test]
 async fn scrub_betroffene_loescht_ihre_anhaenge_und_nur_ihre() {
     let pool = crate::db::test_pool().await;

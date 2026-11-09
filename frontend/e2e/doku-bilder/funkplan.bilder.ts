@@ -21,9 +21,9 @@ import {
  * (`pnpm doku:bilder --grep funkplan`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   tabelle.png             frontend/src/pages/FunkplanPage.tsx (Tabelle, Lücken),
  *                           frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx
- *   skizze.png              frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/FernmeldeskizzeBild.tsx
+ *   skizze.png              frontend/src/pages/FunkplanPage.tsx, frontend/src/fernmeldewesen/FernmeldeskizzeBild.tsx
  *   kommunikationsplan.png  frontend/src/pages/KommunikationsplanPage.tsx
- *   verbindung.png          frontend/src/stab/KommunikationsplanDialoge.tsx
+ *   verbindung.png          frontend/src/fernmeldewesen/KommunikationsplanDialoge.tsx
  *
  * Füllung (D3): der Demo-Einsatz kennt keine Sprechgruppen und keinen Kommunikationsplan. Drei
  * einsatzlokale Sprechgruppen, die eigene Führungsstelle, Funkangaben an zwei Abschnitten und

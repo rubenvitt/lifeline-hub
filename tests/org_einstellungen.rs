@@ -476,13 +476,13 @@ async fn modul_sichtbarkeit_setzen_rolle_allein_und_zuruecknehmen() {
     let (status, body) = put_modul_einstellung(
         &app,
         &admin_cookie,
-        "stab",
+        "lagebesprechung",
         serde_json::json!({"benoetigte_rolle": null, "sichtbar": false}),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "body={body}");
     assert_eq!(
-        modul_vorgaben(&app, &admin_cookie).await["stab"],
+        modul_vorgaben(&app, &admin_cookie).await["lagebesprechung"],
         serde_json::json!({"benoetigte_rolle": null, "sichtbar": false})
     );
 
@@ -490,26 +490,26 @@ async fn modul_sichtbarkeit_setzen_rolle_allein_und_zuruecknehmen() {
     let (status, _) = put_modul_einstellung(
         &app,
         &admin_cookie,
-        "stab",
+        "lagebesprechung",
         serde_json::json!({"benoetigte_rolle": "admin"}),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
-        modul_vorgaben(&app, &admin_cookie).await["stab"],
+        modul_vorgaben(&app, &admin_cookie).await["lagebesprechung"],
         serde_json::json!({"benoetigte_rolle": "admin", "sichtbar": false})
     );
 
     let (status, _) = put_modul_einstellung(
         &app,
         &admin_cookie,
-        "stab",
+        "lagebesprechung",
         serde_json::json!({"benoetigte_rolle": "admin", "sichtbar": true}),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
-        modul_vorgaben(&app, &admin_cookie).await["stab"]["sichtbar"],
+        modul_vorgaben(&app, &admin_cookie).await["lagebesprechung"]["sichtbar"],
         true
     );
 }
@@ -525,12 +525,15 @@ async fn modul_sichtbarkeit_als_fuehrungskraft_ist_403() {
     let (status, _) = put_modul_einstellung(
         &app,
         &fk_cookie,
-        "stab",
+        "lagebesprechung",
         serde_json::json!({"benoetigte_rolle": null, "sichtbar": false}),
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(modul_vorgaben(&app, &fk_cookie).await.get("stab").is_none());
+    assert!(modul_vorgaben(&app, &fk_cookie)
+        .await
+        .get("lagebesprechung")
+        .is_none());
 }
 
 /// Ein Nicht-Boolean wird abgewiesen, ohne etwas zu speichern.
@@ -542,14 +545,14 @@ async fn modul_sichtbarkeit_ungueltiger_wert_ist_400() {
     let (status, _) = put_modul_einstellung(
         &app,
         &admin_cookie,
-        "stab",
+        "lagebesprechung",
         serde_json::json!({"benoetigte_rolle": null, "sichtbar": "nein"}),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(modul_vorgaben(&app, &admin_cookie)
         .await
-        .get("stab")
+        .get("lagebesprechung")
         .is_none());
 }
 

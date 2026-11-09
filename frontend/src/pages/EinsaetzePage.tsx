@@ -50,7 +50,7 @@ import {
   useZuflussSteuerung,
 } from '../components/useZuflussSchleuse';
 import { einsaetzeBannerText, einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
-import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../stab/einsatzleiter';
+import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../einsatz/einsatzleiter';
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
@@ -477,7 +477,7 @@ function EinsaetzeInhalt() {
               {e.einsatzort}
             </span>
           )}
-          {/* Der Einsatzleiter der Führungsstelle (LLH-1168), nur über `stab/einsatzleiter.ts`,
+          {/* Der Einsatzleiter der Führungsstelle (LLH-1168), nur über `einsatz/einsatzleiter.ts`,
               nie die eigene App-Rolle darüber. „EL“ nach FwDV 100, ausgeschrieben im `abbr`;
               ohne Unterstreichung, die trägt hier nur ein Link. */}
           <span data-lfh="einsatzleiter" style={{ color: rollen.text2, overflowWrap: 'anywhere' }}>

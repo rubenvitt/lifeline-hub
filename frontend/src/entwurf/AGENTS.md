@@ -1,7 +1,7 @@
 # Entwürfe — Regeln
 
-Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDetailPage.tsx`,
-`pages/LageberichtDetailPage.tsx` und `pages/PressemitteilungDetailPage.tsx`, ergänzt
+Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDetailPage.tsx` und
+`pages/LageberichtDetailPage.tsx`, ergänzt
 `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
 - **Verlustschutz ist ein Hook:** `entwurf/useEntwurfVerlustschutz.ts` (Riegel gegen
@@ -23,8 +23,8 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   Entwurfsseite, `e2e/lagebericht-schmal.spec.ts`).
   Live über `anlagen` am Ereignis des Dokuments, eigene Keys außerhalb des Offline-Lagebilds.
 - **Gegliederte Dokumente: ein Baustein `entwurf/DokumentEntwurf.tsx`** (LLH-1074, Spec
-  `dokument-entwurf`; ersetzt das Akkordeon des Lageberichts aus LFH-348). Lagebericht, Befehl
-  und Pressemitteilung schreiben ihre Abschnitte nur darüber, keine Seite baut eine eigene
+  `dokument-entwurf`; ersetzt das Akkordeon des Lageberichts aus LFH-348). Lagebericht und Befehl
+  schreiben ihre Abschnitte nur darüber, keine Seite baut eine eigene
   Abschnittsmechanik. Paneel „Entwurf“ mit Füllstand und Umschalter „Bearbeiten | Lesefassung“
   für das GANZE Dokument; der Kopfblock (`kopf`) trägt die Felder der Seite. Die Gliederung ist
   eine Sprungleiste mit Leer-Marke (Zeichen und Wort „leer“), ab `xl` links und klebend, darunter

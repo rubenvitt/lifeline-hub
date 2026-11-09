@@ -11,7 +11,7 @@ import type { EinsatzStatus } from '../api/types';
  * die Systemrolle Führungskraft hat und im Einsatz Beobachter ist, darf sich nicht gemeint fühlen.
  */
 export const NUR_ADMIN = 'nur System-Admin';
-/** Freigaben, die nur die Einsatzleitung erteilt (etwa einer Pressemitteilung, LFH-554). */
+/** Aktionen, die nur die Einsatzleitung ausführt. */
 export const NUR_LEITUNG = 'nur Einsatzleitung';
 export const NUR_LEITUNG_FUEHRUNG = 'nur Einsatzleitung und Führungspersonal';
 /** Kopfdaten, Einstellungen und Führungsstelle (LFH-1066): der Admin nur der Org des Einsatzes. */

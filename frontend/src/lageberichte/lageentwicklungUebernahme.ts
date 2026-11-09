@@ -7,7 +7,7 @@ import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { DRUCK_SEITE } from '../etb/druckAbruf';
 import { berichtigtText } from '../etb/berichtigung';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { etbTypMehrzahl } from '../theme/statusFarben';
 import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebernahmeQuelle';
 

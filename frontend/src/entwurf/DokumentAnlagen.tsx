@@ -17,7 +17,7 @@ import { Paneel, PaneelZeile, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { IconMuelleimer } from '../icons';
 import { useOhneVerbindung } from '../offline/verbindung';
-import SkizzenAufnahme, { type SkizzenBild } from '../stab/SkizzenAufnahme';
+import SkizzenAufnahme, { type SkizzenBild } from '../fernmeldewesen/SkizzenAufnahme';
 import { useModulFreigabe } from '../einsatz/useModulFreigabe';
 import './dokumentAnlagen.css';
 

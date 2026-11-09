@@ -9,7 +9,7 @@ import { freiesRueckwegModul, istKeyFreigegeben, modulName, modulZielRoute } fro
 
 /**
  * Freigabe eines Moduls für eine Seite, deren Quellen das Modul nicht selbst prüfen: die
- * Unterseiten des Stabs (Pressearbeit, Informationstelefon, LFH-554) und die Seiten des
+ * Seite des Informationstelefons (LFH-554) und die Seiten des
  * Fernmeldewesens (Funkplan, Kommunikationsplan, LLH-1180, design.md D6), deren Listen an anderen
  * Modulen hängen. Die Freigabe rechnet der Server (`GET …/modul-freigaben`, LFH-669); `frei`
  * reicht die Freigaben weiter, damit die Seite weitere Module (Lageberichte, Personen, Stab) ohne

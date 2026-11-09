@@ -6,7 +6,7 @@ import AbschnittsText from '../entwurf/AbschnittsText';
  * Die Abschnitte eines Befehls als Lesefassung: Vollseite (freigegeben oder ohne Schreibrecht) und
  * Detailpaneel der Liste nutzen dieselbe (Change `oxgob5gk-auftraege-befehle-angleichen`, D5).
  * Leere Abschnitte stehen mit „—“, damit das Schema vollständig bleibt. Die Mechanik teilt der
- * Befehl mit Lagebericht und Pressemitteilung (`entwurf/AbschnittsText.tsx`).
+ * Befehl mit dem Lagebericht (`entwurf/AbschnittsText.tsx`).
  *
  * `ebene` ist die Überschriftenebene der Abschnittsköpfe: unter dem Paneel der Vollseite (h2) h3,
  * im Detail unter dem Paneel (h4) h5.

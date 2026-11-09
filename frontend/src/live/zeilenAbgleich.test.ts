@@ -1,29 +1,25 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Medienkontakt, Schaden, SchadenMarker } from '../api/types';
+import type { Schaden, SchadenMarker } from '../api/types';
 import { erzeugeLiveSammler, LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { einsortieren, erzeugeZeilenSammler, ZEILEN_GRENZE } from './zeilenAbgleich';
 
-const api = vi.hoisted(() => ({ ladeSchaden: vi.fn(), ladeMedienkontakt: vi.fn() }));
+const api = vi.hoisted(() => ({ ladeSchaden: vi.fn() }));
 
 vi.mock('../api/einsatzSchaden', async (orig) => ({
   ...(await orig<typeof import('../api/einsatzSchaden')>()),
   ladeSchaden: api.ladeSchaden,
 }));
-vi.mock('../api/presse', async (orig) => ({
-  ...(await orig<typeof import('../api/presse')>()),
-  ladeMedienkontakt: api.ladeMedienkontakt,
-}));
 
 const E = 7;
+
+/** Die Prefixe, mit denen der Sammler alle Listen der Schäden auf einmal abgleicht. */
+const SAMMEL_KEYS = [einsatzKeys.schaeden(E), einsatzKeys.schadenMarker(E)];
 
 function sichtbarkeit(wert: DocumentVisibilityState) {
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => wert });
 }
-
-const kontakt = (id: number, status: string, eingang_at: string) =>
-  ({ id, status, eingang_at, thema: `Thema ${id}` }) as unknown as Medienkontakt;
 
 const schaden = (id: number, registrier_nr: number, extra: Partial<Schaden> = {}) =>
   ({
@@ -64,7 +60,6 @@ beforeEach(() => {
   vi.useFakeTimers();
   sichtbarkeit('visible');
   api.ladeSchaden.mockReset();
-  api.ladeMedienkontakt.mockReset();
 });
 
 afterEach(() => {
@@ -86,59 +81,36 @@ describe('einsortieren (LFH-931)', () => {
 describe('erzeugeZeilenSammler (LFH-931)', () => {
   it('lädt nur die geänderte Zeile und sortiert sie ein, ohne die Liste abzurufen', async () => {
     const { qc, inval, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakte(E), [
-      kontakt(2, 'offen', '2026-10-06T10:00:00Z'),
-      kontakt(1, 'offen', '2026-10-06T09:00:00Z'),
-    ]);
-    api.ladeMedienkontakt.mockResolvedValue(kontakt(2, 'beantwortet', '2026-10-06T10:00:00Z'));
+    qc.setQueryData(einsatzKeys.schaeden(E), [schaden(2, 2), schaden(1, 1)]);
+    api.ladeSchaden.mockResolvedValue(schaden(2, 2, { ausmass: 'gross' }));
 
-    zeilen.vormerken('medienkontakte', 2);
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
 
-    expect(api.ladeMedienkontakt).toHaveBeenCalledTimes(1);
-    expect(api.ladeMedienkontakt).toHaveBeenCalledWith(E, 2);
-    // Beantwortet rückt hinter die offenen.
+    expect(api.ladeSchaden).toHaveBeenCalledTimes(1);
+    expect(api.ladeSchaden).toHaveBeenCalledWith(E, 2);
     expect(
-      qc.getQueryData<Medienkontakt[]>(einsatzKeys.medienkontakte(E))?.map((k) => [k.id, k.status]),
+      qc.getQueryData<Schaden[]>(einsatzKeys.schaeden(E))?.map((s) => [s.id, s.ausmass]),
     ).toEqual([
-      [1, 'offen'],
-      [2, 'beantwortet'],
+      [2, 'gross'],
+      [1, 'gering'],
     ]);
     await vi.advanceTimersByTimeAsync(LIVE_SAMMELFENSTER_MS);
     expect(inval).not.toHaveBeenCalled();
   });
 
-  it('eine Rücknahme sortiert die Zeile zu den offenen zurück', async () => {
+  it('ordnet eine neue Zeile nach der Registriernummer absteigend wie das SQL', async () => {
     const { qc, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakte(E), [
-      kontakt(1, 'offen', '2026-10-06T09:00:00Z'),
-      kontakt(2, 'beantwortet', '2026-10-06T10:00:00Z'),
-    ]);
-    api.ladeMedienkontakt.mockResolvedValue(kontakt(2, 'offen', '2026-10-06T10:00:00Z'));
+    qc.setQueryData(einsatzKeys.schaeden(E), [schaden(5, 5), schaden(3, 3)]);
+    api.ladeSchaden.mockResolvedValue(schaden(4, 4));
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 4);
     await fenster();
 
-    expect(
-      qc.getQueryData<Medienkontakt[]>(einsatzKeys.medienkontakte(E))?.map((k) => k.id),
-    ).toEqual([2, 1]);
-  });
-
-  it('ordnet bei gleichem Eingang nach der Kennung absteigend wie das SQL', async () => {
-    const { qc, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakte(E), [
-      kontakt(5, 'offen', '2026-10-06T09:00:00Z'),
-      kontakt(3, 'offen', '2026-10-06T09:00:00Z'),
+    expect(qc.getQueryData<Schaden[]>(einsatzKeys.schaeden(E))?.map((s) => s.id)).toEqual([
+      5, 4, 3,
     ]);
-    api.ladeMedienkontakt.mockResolvedValue(kontakt(4, 'offen', '2026-10-06T09:00:00Z'));
-
-    zeilen.vormerken('medienkontakte', 4);
-    await fenster();
-
-    expect(
-      qc.getQueryData<Medienkontakt[]>(einsatzKeys.medienkontakte(E))?.map((k) => k.id),
-    ).toEqual([5, 4, 3]);
   });
 
   it('aktualisiert Schadenliste und Marker aus einem Abruf; der Marker trägt keine Freitexte', async () => {
@@ -203,14 +175,14 @@ describe('erzeugeZeilenSammler (LFH-931)', () => {
   it('ist keine geladene Liste aktuell, lädt sie keine Zeile', async () => {
     const { qc, sammler, zeilen } = aufbau();
     const vormerken = vi.spyOn(sammler, 'vormerken');
-    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
-    markieren(qc, einsatzKeys.medienkontakte(E));
+    qc.setQueryData(einsatzKeys.schaeden(E), []);
+    markieren(qc, einsatzKeys.schaeden(E));
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
 
-    expect(api.ladeMedienkontakt).not.toHaveBeenCalled();
-    expect(vormerken.mock.calls.map((c) => c[0])).toEqual([einsatzKeys.medienkontakte(E)]);
+    expect(api.ladeSchaden).not.toHaveBeenCalled();
+    expect(vormerken.mock.calls.map((c) => c[0])).toEqual(SAMMEL_KEYS);
   });
 
   it('lässt eine nicht geladene Liste ungeladen', async () => {
@@ -230,117 +202,113 @@ describe('erzeugeZeilenSammler (LFH-931)', () => {
   it('ohne geladene Liste geht das Ereignis als Prefix an den Sammler', async () => {
     const { inval, zeilen } = aufbau();
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
     await vi.advanceTimersByTimeAsync(LIVE_SAMMELFENSTER_MS);
 
-    expect(api.ladeMedienkontakt).not.toHaveBeenCalled();
-    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.medienkontakte(E)]);
+    expect(api.ladeSchaden).not.toHaveBeenCalled();
+    expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 
   it('im verdeckten Tab lädt sie keine Zeile, sondern merkt die Listen vor', async () => {
     const { qc, inval, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
+    qc.setQueryData(einsatzKeys.schaeden(E), []);
     sichtbarkeit('hidden');
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
 
-    expect(api.ladeMedienkontakt).not.toHaveBeenCalled();
+    expect(api.ladeSchaden).not.toHaveBeenCalled();
     // Der Sammler merkt im verdeckten Tab nur (`refetchType: 'none'`); abgerufen wird beim Zurückkehren.
     await vi.advanceTimersByTimeAsync(LIVE_SAMMELFENSTER_MS);
-    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.medienkontakte(E)]);
+    expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 
   it(`über ${ZEILEN_GRENZE} Kennungen im Fenster ruft sie die Liste einmal ab`, async () => {
     const { qc, inval, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
+    qc.setQueryData(einsatzKeys.schaeden(E), []);
 
-    for (let id = 1; id <= ZEILEN_GRENZE + 1; id += 1) zeilen.vormerken('medienkontakte', id);
+    for (let id = 1; id <= ZEILEN_GRENZE + 1; id += 1) zeilen.vormerken('schaeden', id);
     await fenster();
     await vi.advanceTimersByTimeAsync(LIVE_SAMMELFENSTER_MS);
 
-    expect(api.ladeMedienkontakt).not.toHaveBeenCalled();
-    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.medienkontakte(E)]);
+    expect(api.ladeSchaden).not.toHaveBeenCalled();
+    expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 
   it('bis zur Grenze lädt sie jede Zeile einzeln', async () => {
     const { qc, inval, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
-    api.ladeMedienkontakt.mockImplementation((_e: number, id: number) =>
-      Promise.resolve(kontakt(id, 'offen', '2026-10-06T09:00:00Z')),
+    qc.setQueryData(einsatzKeys.schaeden(E), []);
+    api.ladeSchaden.mockImplementation((_e: number, id: number) =>
+      Promise.resolve(schaden(id, id)),
     );
 
-    for (let id = 1; id <= ZEILEN_GRENZE; id += 1) zeilen.vormerken('medienkontakte', id);
+    for (let id = 1; id <= ZEILEN_GRENZE; id += 1) zeilen.vormerken('schaeden', id);
     await fenster();
 
-    expect(api.ladeMedienkontakt).toHaveBeenCalledTimes(ZEILEN_GRENZE);
-    expect(qc.getQueryData<Medienkontakt[]>(einsatzKeys.medienkontakte(E))).toHaveLength(
-      ZEILEN_GRENZE,
-    );
+    expect(api.ladeSchaden).toHaveBeenCalledTimes(ZEILEN_GRENZE);
+    expect(qc.getQueryData<Schaden[]>(einsatzKeys.schaeden(E))).toHaveLength(ZEILEN_GRENZE);
     expect(inval).not.toHaveBeenCalled();
   });
 
   it('scheitert ein Zeilenabruf, gleicht sie die Liste als Ganzes ab', async () => {
     const { qc, inval, zeilen } = aufbau();
-    const vorher = [kontakt(1, 'offen', '2026-10-06T09:00:00Z')];
-    qc.setQueryData(einsatzKeys.medienkontakte(E), vorher);
-    api.ladeMedienkontakt.mockRejectedValue(new Error('404'));
+    const vorher = [schaden(1, 1)];
+    qc.setQueryData(einsatzKeys.schaeden(E), vorher);
+    api.ladeSchaden.mockRejectedValue(new Error('404'));
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
     await vi.advanceTimersByTimeAsync(LIVE_SAMMELFENSTER_MS);
 
-    expect(qc.getQueryData(einsatzKeys.medienkontakte(E))).toBe(vorher);
-    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.medienkontakte(E)]);
+    expect(qc.getQueryData(einsatzKeys.schaeden(E))).toBe(vorher);
+    expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 
   it('läuft ein Listenabruf, wartet die Kennung auf das nächste Fenster', async () => {
     const { qc, zeilen } = aufbau();
-    let freigeben: (l: Medienkontakt[]) => void = () => {};
-    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
+    let freigeben: (l: Schaden[]) => void = () => {};
+    qc.setQueryData(einsatzKeys.schaeden(E), []);
     void qc.fetchQuery({
-      queryKey: einsatzKeys.medienkontakte(E),
-      queryFn: () => new Promise<Medienkontakt[]>((r) => (freigeben = r)),
+      queryKey: einsatzKeys.schaeden(E),
+      queryFn: () => new Promise<Schaden[]>((r) => (freigeben = r)),
     });
-    api.ladeMedienkontakt.mockResolvedValue(kontakt(2, 'offen', '2026-10-06T10:00:00Z'));
+    api.ladeSchaden.mockResolvedValue(schaden(2, 2));
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
-    expect(api.ladeMedienkontakt).not.toHaveBeenCalled();
+    expect(api.ladeSchaden).not.toHaveBeenCalled();
 
     // Die Liste kommt ohne die Zeile zurück (vor der Änderung gelesen); das nächste Fenster holt sie.
-    freigeben([kontakt(1, 'offen', '2026-10-06T09:00:00Z')]);
+    freigeben([schaden(1, 1)]);
     await vi.advanceTimersByTimeAsync(0);
     await fenster();
 
-    expect(api.ladeMedienkontakt).toHaveBeenCalledTimes(1);
-    expect(
-      qc.getQueryData<Medienkontakt[]>(einsatzKeys.medienkontakte(E))?.map((k) => k.id),
-    ).toEqual([2, 1]);
+    expect(api.ladeSchaden).toHaveBeenCalledTimes(1);
+    expect(qc.getQueryData<Schaden[]>(einsatzKeys.schaeden(E))?.map((s) => s.id)).toEqual([2, 1]);
   });
 
   it('beginnt während des Zeilenabrufs ein Listenabruf, überlässt sie der Liste das Ergebnis', async () => {
     const { qc, sammler, zeilen } = aufbau();
     const vormerken = vi.spyOn(sammler, 'vormerken');
-    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
-    let zeileFreigeben: (k: Medienkontakt) => void = () => {};
-    api.ladeMedienkontakt.mockReturnValue(new Promise<Medienkontakt>((r) => (zeileFreigeben = r)));
+    qc.setQueryData(einsatzKeys.schaeden(E), []);
+    let zeileFreigeben: (s: Schaden) => void = () => {};
+    api.ladeSchaden.mockReturnValue(new Promise<Schaden>((r) => (zeileFreigeben = r)));
 
-    zeilen.vormerken('medienkontakte', 2);
+    zeilen.vormerken('schaeden', 2);
     await fenster();
-    expect(api.ladeMedienkontakt).toHaveBeenCalledTimes(1);
+    expect(api.ladeSchaden).toHaveBeenCalledTimes(1);
 
     void qc.fetchQuery({
-      queryKey: einsatzKeys.medienkontakte(E),
-      queryFn: () => new Promise<Medienkontakt[]>(() => {}),
+      queryKey: einsatzKeys.schaeden(E),
+      queryFn: () => new Promise<Schaden[]>(() => {}),
     });
-    zeileFreigeben(kontakt(2, 'offen', '2026-10-06T10:00:00Z'));
+    zeileFreigeben(schaden(2, 2));
     await vi.advanceTimersByTimeAsync(0);
 
     // Die Zeile landet nicht im Cache; der Sammler gleicht die Liste nach ihrem Abruf ab.
-    expect(qc.getQueryData(einsatzKeys.medienkontakte(E))).toEqual([]);
-    expect(vormerken.mock.calls.map((c) => c[0])).toEqual([einsatzKeys.medienkontakte(E)]);
+    expect(qc.getQueryData(einsatzKeys.schaeden(E))).toEqual([]);
+    expect(vormerken.mock.calls.map((c) => c[0])).toEqual([einsatzKeys.schaeden(E)]);
   });
 
   it('raeumen gibt offene Ziele als Listen an den Sammler und lädt danach nichts mehr', async () => {

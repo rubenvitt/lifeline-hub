@@ -124,13 +124,15 @@ describe('berichtFreigabe', () => {
     expect(f.gesperrteModule).toEqual(['Betroffene']);
   });
 
-  it('Einsatz und Führungsstelle hängen an keinem Modul und werden immer abgerufen', () => {
+  it('Einsatz, Führungsstelle und Mitglieder hängen an keinem Modul und werden immer abgerufen', () => {
     const alleAus = Object.fromEntries(
       modulRegistry.map((m) => [m.key, { sichtbar: false, zugriff: false }]),
     ) as ModulFreigaben;
     const f = berichtFreigabe(alleAus);
     expect(f.je.einsatz).toBe('abrufen');
     expect(f.je.fuehrungsstelle).toBe('abrufen');
+    // Die Führungsfunktionen kommen aus den Mitgliedern (i6k6mzed, D7), ohne Stab-Freigabe.
+    expect(f.je.mitglieder).toBe('abrufen');
   });
 });
 
