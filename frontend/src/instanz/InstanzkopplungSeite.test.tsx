@@ -14,6 +14,8 @@ vi.mock('../api/instanz', () => ({
   issueKopplungscode: vi.fn(),
   redeemKopplungscode: vi.fn(),
   widerrufeKopplung: vi.fn(),
+  meldeElwVerloren: vi.fn(),
+  gleicheStammdatenNeuAb: vi.fn(),
   registriereUnterschriftsschluessel: vi.fn(),
   gegenzeichne: vi.fn(),
   widerrufeUnterschriftsschluessel: vi.fn(),
@@ -24,6 +26,7 @@ import {
   gegenzeichne,
   loadInstanzUebersicht,
   issueKopplungscode,
+  meldeElwVerloren,
   widerrufeKopplung,
   widerrufeUnterschriftsschluessel,
 } from '../api/instanz';
@@ -37,6 +40,7 @@ const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht =>
   softwarestand: '1.0.0',
   passkeys_eingerichtet: true,
   eigener_schluessel: true,
+  datentraeger_bestaetigt: true,
   kopplungen: [
     {
       id: 1,
@@ -53,6 +57,12 @@ const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht =>
         fremde_org_name: 'DRK LV',
         fremde_org_kennung: 'k-hub/1',
         angelegt_at: '2026-11-08 11:00:00',
+        stammdaten: {
+          stand: 0,
+          hinweise: [],
+          geheimnisse_verteilt: false,
+          konten_mit_geheimnis: 0,
+        },
       },
     },
   ],
@@ -176,4 +186,67 @@ describe('InstanzkopplungSeite', () => {
     expect(screen.getByText('Bea Admin · Stick B')).toBeInTheDocument();
     expect(screen.queryByText('Instanzkopplung nicht ladbar')).not.toBeInTheDocument();
   });
+
+  it('ELW verloren: Rückfrage nennt die Konten, Bestätigen meldet (LLH-1493)', async () => {
+    const elw = {
+      ...uebersicht().kopplungen[0],
+      id: 9,
+      gegenueber_name: 'ELW 1',
+      richtung: 'wird_gemeldet' as const,
+      protokoll: 'passt' as const,
+      org: {
+        ...uebersicht().kopplungen[0].org,
+        stammdaten: { stand: 0, hinweise: [], geheimnisse_verteilt: true, konten_mit_geheimnis: 3 },
+      },
+    };
+    vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht({ kopplungen: [elw] }));
+    vi.mocked(meldeElwVerloren).mockResolvedValue({ kopplung: elw, konten: 3 });
+    renderMitProviders(<InstanzkopplungSeite />);
+    expect(await screen.findByText('Kontogeheimnisse dort: 3 Konten')).toBeInTheDocument();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zur Kopplung mit ELW 1' }),
+    );
+    await userEvent.click(await screen.findByText('ELW verloren …'));
+    const dialog = await screen.findByRole('dialog', { name: 'ELW 1 als verloren melden?' });
+    expect(within(dialog).getByText(/Die 3 Konten, deren Passwort dort lag/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als verloren melden' }));
+    await waitFor(() => expect(meldeElwVerloren).toHaveBeenCalledWith(9));
+  });
+
+  it.each([
+    { konten: 2, verloren: true },
+    { konten: 0, verloren: false },
+  ])(
+    'nach dem Widerruf: „ELW verloren“ nur, solange dort Passwörter gelten ($konten Konten)',
+    async ({ konten, verloren }) => {
+      const elw = {
+        ...uebersicht().kopplungen[0],
+        id: 9,
+        gegenueber_name: 'ELW 1',
+        richtung: 'wird_gemeldet' as const,
+        protokoll: 'passt' as const,
+        org: {
+          ...uebersicht().kopplungen[0].org,
+          widerrufen_at: '2026-11-09 10:00:00',
+          stammdaten: {
+            stand: 0,
+            hinweise: [],
+            geheimnisse_verteilt: true,
+            konten_mit_geheimnis: konten,
+          },
+        },
+      };
+      vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht({ kopplungen: [elw] }));
+      renderMitProviders(<InstanzkopplungSeite />);
+      expect((await screen.findAllByText(/ELW 1/)).length).toBeGreaterThan(0);
+      const menue = screen.queryByRole('button', { name: 'Aktionen zur Kopplung mit ELW 1' });
+      if (!verloren) {
+        expect(menue).not.toBeInTheDocument();
+        return;
+      }
+      await userEvent.click(menue!);
+      expect(await screen.findByText('ELW verloren …')).toBeInTheDocument();
+      expect(screen.queryByText('Widerrufen …')).not.toBeInTheDocument();
+    },
+  );
 });

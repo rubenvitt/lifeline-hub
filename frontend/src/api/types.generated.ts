@@ -382,7 +382,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "instanz_elw_verloren";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -2854,6 +2854,12 @@ export interface components {
          * @enum {string}
          */
         EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /** @description Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind. */
+        ElwVerlorenAntwort: {
+            /** Format: int64 */
+            konten: number;
+            kopplung: components["schemas"]["InstanzKopplungAnzeige"];
+        };
         /** @description Ein Abschnitt der Empfängerliste (Ziel einer Zuführung). */
         EmpfaengerAbschnitt: {
             /** Format: int64 */
@@ -3879,6 +3885,12 @@ export interface components {
             fremde_org_name: string;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Stammdaten (LLH-1493). Meldende Seite: übernommener Stand und Hinweise aus der
+             *     Übernahme. Erreichte Seite: ob Kontogeheimnisse hinausgehen und an wie viele Konten sie
+             *     gingen.
+             */
+            stammdaten: components["schemas"]["InstanzStammdatenStand"];
             widerrufen_at?: string | null;
         };
         /**
@@ -3886,8 +3898,28 @@ export interface components {
          * @enum {string}
          */
         InstanzProtokoll: "passt" | "update_hier" | "update_gegenueber";
+        /** @description Stand der Stammdaten-Verteilung an einer Org-Zuordnung (design.md D9). */
+        InstanzStammdatenStand: {
+            /** @description Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt). */
+            geheimnisse_verteilt: boolean;
+            hinweise: string[];
+            /**
+             * Format: int64
+             * @description Nur erreichte Seite: Konten, deren Geheimnisse an diese Kopplung gingen, über alle
+             *     Zuordnungen der Org, und dort noch gelten („ELW verloren“ räumt sie).
+             */
+            konten_mit_geheimnis: number;
+            /** Format: int64 */
+            stand: number;
+        };
         /** @description Alles, was die Admin-Seite „Instanzkopplung“ zeigt. */
         InstanzUebersicht: {
+            /**
+             * @description Der Betreiber hat die Datenträgerverschlüsselung bestätigt
+             *     (`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine
+             *     Kontogeheimnisse (LLH-1493, D6).
+             */
+            datentraeger_bestaetigt: boolean;
             /**
              * @description Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
              *     „Code ausstellen“).
@@ -6950,6 +6982,29 @@ export interface components {
             vorlage_id: number;
         };
         /**
+         * @description Eine verteilte Stammdatenart (design.md D1). Auf der Leitung steht der Wert als Text, damit
+         *     eine ältere Instanz eine neue Art überspringen kann (D2).
+         * @enum {string}
+         */
+        StammdatenArt: "konto" | "org_einstellungen" | "modul_einstellung" | "fuehrungsfunktion" | "fahrzeug_status" | "personal_status" | "qualifikation" | "einheit_typ" | "fahrzeug" | "material" | "personal" | "einheit_vorlage";
+        /** @description Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9). */
+        StammdatenHerkunftAnzeige: {
+            /**
+             * @description Nur für Admins und nur, wenn diese Instanz die Geheimnisse der Org verteilt: System-Admins
+             *     ohne Anmelde-Passkey; ihre Geheimnisse gehen nicht hinaus (design.md D7).
+             */
+            admins_ohne_passkey: number[];
+            /**
+             * @description Name der Gegenstelle, aus der die Org ihre Stammdaten bezieht; ohne Quelle fehlt das Feld
+             *     (dann gibt es weder „vom Hub“ noch „nur hier“).
+             */
+            quelle?: string | null;
+            /** @description Je Art (Wire-Wert von `StammdatenArt`) die lokalen Schlüssel der übernommenen Zeilen. */
+            vom_hub: {
+                [key: string]: string[];
+            };
+        };
+        /**
          * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
          *     `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
          */
@@ -8527,7 +8582,8 @@ export interface components {
          *     - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
          *     - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
          *     - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
-         *     - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.
+         *     - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;
+         *       `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
          *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
          *       Gegenstelle.
          */
@@ -8536,6 +8592,11 @@ export interface components {
             adresse?: string | null;
             /** @description Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`. */
             angemeldet_at?: string | null;
+            /**
+             * Format: int64
+             * @description „ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden.
+             */
+            anzahl?: number | null;
             /** @description Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels. */
             fingerabdruck?: string | null;
             /** @description Org der Gegenstelle. */
@@ -8548,6 +8609,12 @@ export interface components {
             instanz_kennung?: string | null;
             org_rolle?: components["schemas"]["OrgRolle"] | null;
             org_rolle_vorher?: components["schemas"]["OrgRolle"] | null;
+            /**
+             * Format: int64
+             * @description Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten
+             *     Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
+             */
+            passkeys_entfernt?: number | null;
             system_rolle?: components["schemas"]["SystemRolle"] | null;
             system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
         };

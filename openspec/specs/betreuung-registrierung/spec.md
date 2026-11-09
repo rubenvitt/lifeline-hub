@@ -5,7 +5,7 @@ Wie eine Betreuungsstelle Betroffene namentlich aufnimmt (LLH-1612): Haushalte m
 Kostform und Unverträglichkeiten registrieren, die Registrierliste mit den Kostformen führen,
 abmelden, und die Kostformen ohne Personenbezug für die Verpflegung zählen. Die Belegung
 namentlich geführter Stellen regelt `betreuung-evakuierung`; Herleitung in
-`openspec/changes/archive/2026-11-09-hitr91ob-registrierstelle-betreuung/design.md` und ADR-0016.
+`openspec/changes/archive/2026-11-09-hitr91ob-registrierstelle-betreuung/design.md` und ADR-0017.
 
 ## Requirements
 

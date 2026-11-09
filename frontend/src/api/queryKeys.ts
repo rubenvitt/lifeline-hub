@@ -1025,6 +1025,8 @@ export const GLOBAL_KEYS = {
   lagemonitorZugaenge: 'lagemonitor-zugaenge',
   // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
   instanzkopplung: 'instanzkopplung',
+  // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
+  stammdatenHerkunft: 'stammdaten-herkunft',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
   // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
@@ -1140,6 +1142,7 @@ export const globalKeys = {
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
+  stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
   /**
    * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
    * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).
@@ -1294,6 +1297,8 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.unterkunftRichtwerte,
     GLOBAL_KEYS.schichtmodelle,
     GLOBAL_KEYS.organisation,
+    // Eine übernommene Nachlieferung vom Hub (LLH-1493) ändert, was „vom Hub“ ist.
+    GLOBAL_KEYS.stammdatenHerkunft,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
     GLOBAL_KEYS.einsaetze,
   ],

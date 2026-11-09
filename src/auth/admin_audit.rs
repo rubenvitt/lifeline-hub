@@ -80,6 +80,9 @@ wire_enum! {
         /// Ein vom Gegenüber gelieferter Unterschriftsschlüssel wurde verworfen (ohne gültige
         /// Gegenzeichnung eines bekannten Schlüssels).
         UnterschriftAbgelehnt => "unterschrift_abgelehnt",
+        /// LLH-1493: „ELW verloren“ — Kopplung widerrufen, Geheimnisse der dorthin verteilten
+        /// Konten ungültig (Migration 0307).
+        InstanzElwVerloren => "instanz_elw_verloren",
     }
 }
 
@@ -106,7 +109,8 @@ pub enum Ziel<'a> {
 /// - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
 /// - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
 /// - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
-/// - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.
+/// - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;
+///   `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -140,6 +144,13 @@ pub struct ZugangsAngaben {
     /// Warum ein Unterschriftsschlüssel verworfen wurde.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grund: Option<String>,
+    /// „ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anzahl: Option<i64>,
+    /// Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten
+    /// Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passkeys_entfernt: Option<i64>,
 }
 
 impl ZugangsAngaben {
@@ -235,9 +246,11 @@ pub async fn schreibe_ohne_akteur(
     angaben: Option<ZugangsAngaben>,
     peer_ip: Option<IpAddr>,
 ) {
-    let ziel = match ziel {
-        Ziel::Benutzer { benutzername, .. } => benutzername,
-        Ziel::Anmeldeweg(t) | Ziel::Lesezugang(t) | Ziel::Instanz(t) | Ziel::Unterschrift(t) => t,
+    let (ziel_benutzer_id, ziel) = match ziel {
+        Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
+        Ziel::Anmeldeweg(t) | Ziel::Lesezugang(t) | Ziel::Instanz(t) | Ziel::Unterschrift(t) => {
+            (None, t)
+        }
     };
     let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
     let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);
@@ -253,10 +266,11 @@ pub async fn schreibe_ohne_akteur(
     );
     let ergebnis = sqlx::query(
         "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
-         VALUES (?, NULL, ?, NULL, ?, ?, ?, ?)",
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
     )
     .bind(aktion.as_str())
     .bind(&akteur_name)
+    .bind(ziel_benutzer_id)
     .bind(&ziel)
     .bind(detail.as_deref())
     .bind(peer_ip.map(|ip| ip.to_string()))

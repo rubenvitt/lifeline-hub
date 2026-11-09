@@ -155,7 +155,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | --- | --- | --- |
 | `src/person` | Betroffene: Sichtung, Verbleib, Transport, Maßnahmen, Verletzungen, Vermisstenabgleich, Anhänge | `…/{id}/personen`, `…/personen/{pid}/…`; Live `person` |
 | `src/uhs` | Unfallhilfsstellen mit Plätzen, Belegung, Kräften, Grundriss und Anhängen | `…/{id}/uhs`; Live `uhs` |
-| `src/betreuung` | Evakuierungsbezirke und Betreuungsstellen als Mengen mit append-only Meldereihen; Registrierstelle mit Haushalten und Kostform, namentlich geführte Belegung ([ADR-0016](entscheidungen/ADR-0016-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md)) | `…/{id}/betreuung`, `…/betreuung/stellen/{sid}/registrierungen`, `…/abmeldungen`, `…/betreuung/kostformen`, `…/{id}/evakuierung`; Live `betreuung`, `evakuierung`, `person` |
+| `src/betreuung` | Evakuierungsbezirke und Betreuungsstellen als Mengen mit append-only Meldereihen; Registrierstelle mit Haushalten und Kostform, namentlich geführte Belegung ([ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md)) | `…/{id}/betreuung`, `…/betreuung/stellen/{sid}/registrierungen`, `…/abmeldungen`, `…/betreuung/kostformen`, `…/{id}/evakuierung`; Live `betreuung`, `evakuierung`, `person` |
 | `src/unterkunft` | Richtwerte des Unterkunftsrechners: Basis aus `richtwerte_basis.json`, Werte je Organisation und Einsatz | `/api/unterkunft-richtwerte`, `/api/org-unterkunft-richtwerte/{schluessel}`, `…/{id}/unterkunft-richtwerte` |
 | `src/verpflegung` | Verpflegungszeitfenster, erfasster Bedarf, Ausgaben, Stellen und Org-Vorlagen | `…/{id}/verpflegung`, `/api/verpflegung-vorlagen`; Live `verpflegung` |
 
@@ -203,7 +203,7 @@ Regeln: [frontend/src/geraet/AGENTS.md](../../frontend/src/geraet/AGENTS.md).
 | --- | --- | --- |
 | `src/geraet` | Gerätekopplung per Code, Gerätekonto, Funktionsansicht, Stellenbindung, Routen-Whitelist | `…/{id}/geraete`, `POST /api/geraete/koppeln`, `…/{id}/lagemonitor` |
 | `src/lagemonitor_zugang` | Lesezugang externer Lagemonitore: Schlüssel (nur Hash), Freigabe je Einsatz durch die Einsatzleitung, Extractor `LagemonitorZugriff` nur für den Abruf | `/api/lagemonitor-zugaenge`, `…/{id}/lagemonitor-zugaenge`, `GET /api/lagemonitor/v1/lage` (Bearer) |
-| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)) | `/api/admin/instanz/…`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden` (signiert); Unterschriftsschlüssel in `src/auth/unterschrift` |
+| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)); `src/instanz/stammdaten` verteilt die Stammdaten einer Org von der erreichten zur meldenden Instanz (LLH-1493: Änderungslog und Schreibschutz per Trigger, Nachlieferung mit jeder Meldung, Kontogeheimnisse mit age) | `/api/admin/instanz/…`, `GET /api/instanz/stammdaten/herkunft`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden` (signiert); Unterschriftsschlüssel in `src/auth/unterschrift` |
 
 ### Auth & Organisation
 
@@ -385,7 +385,7 @@ flowchart TB
 | --- | --- | --- |
 | `frontend/src/geraet` | Gerätehülle, Funktionsansichten, Koppeln, Lagemonitor ([AGENTS.md](../../frontend/src/geraet/AGENTS.md)) | `src/geraet` |
 | `frontend/src/admin` | Verwaltungslayout, Datenträgerwarnung, Demo-Daten | `src/datentraeger`, `src/demo` |
-| `frontend/src/instanz` | Verwaltungsseite „Instanzkopplung“: Identität, Kopplungen, Unterschriftsschlüssel (WebAuthn) | `src/instanz`, `src/auth/unterschrift` |
+| `frontend/src/instanz` | Verwaltungsseite „Instanzkopplung“: Identität, Kopplungen, Unterschriftsschlüssel (WebAuthn), Stammdaten-Stand, „ELW verloren“; Herkunfts-Abzeichen und Sperre „Wird am Hub gepflegt“ für die Stammdaten-Seiten (`herkunft.tsx`) | `src/instanz`, `src/auth/unterschrift` |
 | `frontend/src/zugangsprotokoll` | Anmelde- und Admin-Spur | `src/auth` (`/api/zugangsprotokoll`) |
 | `frontend/src/aufbewahrung` | Aufbewahrungsübersicht, Archivakte, Fristen, Schwärzungsantrag | `src/aufbewahrung`, `src/org` |
 

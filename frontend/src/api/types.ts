@@ -34,6 +34,10 @@ export type LesezugangMitSchluessel = S['LesezugangMitSchluessel'];
 // Instanzkopplung (LLH-1490)
 export type InstanzUebersicht = S['InstanzUebersicht'];
 export type InstanzKopplungAnzeige = S['InstanzKopplungAnzeige'];
+export type InstanzStammdatenStand = S['InstanzStammdatenStand'];
+export type StammdatenHerkunftAnzeige = S['StammdatenHerkunftAnzeige'];
+export type StammdatenArt = S['StammdatenArt'];
+export type ElwVerlorenAntwort = S['ElwVerlorenAntwort'];
 export type InstanzKopplungRichtung = S['InstanzKopplungRichtung'];
 export type InstanzKopplungZustand = S['InstanzKopplungZustand'];
 export type InstanzProtokoll = S['InstanzProtokoll'];

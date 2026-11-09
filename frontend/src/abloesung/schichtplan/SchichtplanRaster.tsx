@@ -21,6 +21,7 @@ import {
   pxJeStunde,
   STUNDE_MS,
   stundenMarken,
+  titelVon,
   xAusZeit,
   zeitAusX,
   zugStand,
@@ -92,6 +93,11 @@ export interface SchichtplanRasterProps {
   personenZiel?: boolean;
   /** Zugänglicher Name der Fläche. */
   beschriftung: string;
+  /**
+   * Ein Zug beginnt (`true`, schon beim Druck) oder endet (`false`). Die Zeilenschleuse hält
+   * damit, auch wenn der Zeiger das Raster mitten im Zug verlässt (LLH-1604, `SchichtplanSchleuse`).
+   */
+  onZug?: (laeuft: boolean) => void;
 }
 
 /** Breite der Titelspalte. */
@@ -170,6 +176,7 @@ export default function SchichtplanRaster({
   onOeffnen,
   personenZiel = false,
   beschriftung,
+  onZug,
 }: SchichtplanRasterProps) {
   const { token, rollen } = useRollen();
   const [aussenRef, aussenBreite] = useBreite<HTMLDivElement>(960);
@@ -220,6 +227,17 @@ export default function SchichtplanRaster({
 
   // Der Zug folgt dem Zeiger am Dokument, damit er über Zeilen und Blöcke hinweg läuft.
   const laeuft = lauf != null;
+
+  // Beginn und Ende des Zugs an den Aufrufer; endet er durch Abbau, zuletzt `false`.
+  const onZugJetzt = useRef(onZug);
+  useLayoutEffect(() => {
+    onZugJetzt.current = onZug;
+  });
+  useLayoutEffect(() => {
+    if (!laeuft) return;
+    onZugJetzt.current?.(true);
+    return () => onZugJetzt.current?.(false);
+  }, [laeuft]);
   useEffect(() => {
     if (!laeuft) return;
     const bewegen = (e: PointerEvent) => {
@@ -393,13 +411,21 @@ export default function SchichtplanRaster({
               <div
                 data-raster-zeile={z.schluessel}
                 data-lfh="schichtplan-zeile"
+                data-entfallen={z.entfallen || undefined}
                 style={{ display: 'flex', borderBottom: `1px solid ${rollen.linie}` }}
               >
-                <div style={{ ...titelZelle, minHeight: zeilenHoehe }} title={z.titel}>
+                <div
+                  style={{
+                    ...titelZelle,
+                    minHeight: zeilenHoehe,
+                    color: z.entfallen ? rollen.gedaempft : undefined,
+                  }}
+                  title={titelVon(z)}
+                >
                   <span
                     style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                   >
-                    {z.titel}
+                    {titelVon(z)}
                   </span>
                 </div>
                 <div
@@ -407,6 +433,8 @@ export default function SchichtplanRaster({
                   data-lfh="schichtplan-spur"
                   onPointerDown={(e) => {
                     if (e.target !== e.currentTarget) return;
+                    // Den Posten gibt es nicht mehr; die Schleuse hält nur seine Zeile (LLH-1604).
+                    if (z.entfallen) return;
                     starte(
                       e,
                       { art: 'anlegen', zeile: z.schluessel, start: zeitAmZeiger(e.clientX) },
@@ -417,7 +445,7 @@ export default function SchichtplanRaster({
                     position: 'relative',
                     width: zeitBreite,
                     height: zeilenHoehe,
-                    cursor: darfSchreiben ? 'crosshair' : undefined,
+                    cursor: darfSchreiben && !z.entfallen ? 'crosshair' : undefined,
                     backgroundImage: marken.length
                       ? `linear-gradient(to right, ${rollen.rasterLinie} 1px, transparent 1px)`
                       : undefined,

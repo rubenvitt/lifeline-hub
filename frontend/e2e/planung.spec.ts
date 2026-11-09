@@ -257,9 +257,9 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
  * gleich daneben; der Block unter dem Zeiger behält Lage, Größe und Ampel. Dass andere Zeilen
  * nicht springen, folgt aus der festen Zeilenhöhe und ist hier nicht eigens belegt.
  *
- * Bewusst NICHT abgedeckt: ein fremder Posten, der VOR anderen einsortiert wird, und eine fremde
- * Umsortierung schieben die Zeilen darunter um eine Zeilenhöhe. Die Zeilenschleuse mit
- * Sammelbanner für das gemeinsame Raster (Einsatz und Planung) ist eine eigene Aufgabe (LLH-1604).
+ * Ein fremder Posten, der VOR anderen einsortiert wird, und eine fremde Umsortierung warten hinter
+ * der Zeilenschleuse (LLH-1604); das belegt der Test „ein fremder Posten vorn wartet hinter dem
+ * Banner“ unten.
  */
 test('Vorplanung (LLH-1595): ein fremder Block verschiebt im Raster nichts unter dem Zeiger', async ({
   page,
@@ -311,4 +311,111 @@ test('Vorplanung (LLH-1595): ein fremder Block verschiebt im Raster nichts unter
     'der Block unter dem Zeiger bleibt, wo er war',
   ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
   await expect(unterZeiger).toHaveAttribute('data-ampel', 'ohne-soll');
+});
+
+// ── Zeilenschleuse (LLH-1604) ──────────────────────────────────────────────────────────────────
+
+/** Eine Woche voraus zur lokalen Wanduhr `stunde:00` (Browser und Lauf teilen die Zeitzone). */
+function wocheVorausUm(stunde: number): string {
+  const d = new Date(Date.now() + 7 * 24 * 3_600_000);
+  d.setHours(stunde, 0, 0, 0);
+  return wireZeit(d);
+}
+
+async function sende<T>(page: Page, methode: 'post' | 'put', pfad: string, data: unknown) {
+  const r = await page.request[methode](pfad, { data });
+  expect(r.ok(), `${methode} ${pfad}: ${r.status()} ${await r.text()}`).toBeTruthy();
+  return (await r.json()) as T;
+}
+
+interface PlanungAntwort {
+  kopf: { id: number };
+  posten: { id: number; bezeichnung: string }[];
+}
+
+/**
+ * Kriterium 12 der Prüfliste (LLH-1586) für die Zeilen, Spec `vorplanung`, „Raster der Planung
+ * ohne Sprung“: ein fremder Posten, der VOR den anderen einsortiert wird, und eine fremde
+ * Umsortierung schieben nichts unter dem Zeiger. Beides wartet hinter dem Sammelbanner; „anzeigen“
+ * stellt den neuen Posten an die erste Stelle. Die Umsortierung (RTW 2 vor RTW 1) belegt im Banner,
+ * dass auch die zweite Schreibung angekommen ist, bevor „anzeigen“ übernimmt: die Live-Abrufe
+ * bündeln, und „1 neuer Posten“ allein stünde schon nach der ersten.
+ *
+ * Gesät per API, eigener Stand statt `seedPlanung` (dort stehen Abschnitte, und hier zählt nur die
+ * Folge): zwei Posten ohne Abschnitt mit je einem Block 08–12 Uhr eine Woche voraus. Der Zeiger steht über dem Block der
+ * letzten Postenzeile; der „andere Schirm“ ist `page.request` mit demselben Konto.
+ */
+test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, nichts springt', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+  const bezeichnung = `E2E Planung Schleuse ${Date.now()}`;
+  const p = await sende<PlanungAntwort>(page, 'post', '/api/planungen', {
+    bezeichnung,
+    von: wocheVorausUm(6),
+    bis: wocheVorausUm(22),
+  });
+  const id = p.kopf.id;
+  const postenIds: number[] = [];
+  for (const name of ['RTW 1', 'RTW 2']) {
+    const a = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+      bezeichnung: name,
+      art: 'einheit',
+    });
+    const postenId = a.posten.find((x) => x.bezeichnung === name)!.id;
+    postenIds.push(postenId);
+    await sende(page, 'post', `/api/planungen/${id}/bloecke`, {
+      posten_id: postenId,
+      von: wocheVorausUm(8),
+      bis: wocheVorausUm(12),
+    });
+  }
+
+  // Der Org-Strom abonniert erst mit der Antwort auf `/api/live` (wie LLH-1317 für den Einsatz).
+  const strom = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/live');
+  await page.goto(`/planungen/${id}`);
+  await strom;
+  await expect(page.getByRole('heading', { level: 1, name: bezeichnung })).toBeVisible();
+  const bloecke = page.locator('[data-lfh="schichtplan-block"]');
+  await expect(bloecke).toHaveCount(2);
+
+  const zeilen = page.locator('[data-lfh="schichtplan-zeile"]');
+  const unterZeiger = page
+    .locator(`[data-lfh="schichtplan-zeile"][data-raster-zeile="einheit:${postenIds[1]}"]`)
+    .locator('[data-lfh="schichtplan-block"]');
+  await unterZeiger.hover();
+  const vorher = (await unterZeiger.boundingBox())!;
+
+  // Der andere Schirm legt „KTW 9“ an, setzt ihn an die erste Stelle und RTW 2 vor RTW 1.
+  const neu = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+    bezeichnung: 'KTW 9',
+    art: 'einheit',
+  });
+  const ktw = neu.posten.find((x) => x.bezeichnung === 'KTW 9')!.id;
+  await sende(page, 'put', `/api/planungen/${id}/posten/reihenfolge`, {
+    posten_ids: [ktw, postenIds[1], postenIds[0]],
+  });
+
+  const banner = page.locator('[data-lfh="schichtplan-schleuse"] [data-lfh="sammelbanner"]');
+  await expect(banner, 'neuer Posten und Umsortierung warten hinter dem Banner').toContainText(
+    '1 neuer Posten · Reihenfolge geändert',
+  );
+  await expect(zeilen.first()).toHaveAttribute('data-raster-zeile', `einheit:${postenIds[0]}`);
+  const nachher = (await unterZeiger.boundingBox())!;
+  expect(
+    { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },
+    'der Block unter dem Zeiger bleibt, wo er war',
+  ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
+
+  await banner.getByRole('button', { name: 'anzeigen' }).click();
+  await expect(banner).toHaveCount(0);
+  const folge = await zeilen.evaluateAll((z) => z.map((e) => e.getAttribute('data-raster-zeile')));
+  expect(folge, 'nach „anzeigen“ stehen die Zeilen in der neuen Folge').toEqual([
+    `einheit:${ktw}`,
+    `einheit:${postenIds[1]}`,
+    `einheit:${postenIds[0]}`,
+    'pause',
+  ]);
 });

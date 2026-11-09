@@ -830,6 +830,8 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         // Richtwerte des Unterkunftsrechners (LLH-1520).
         'unterkunft-richtwerte',
         'organisation',
+        // Herkunft der Stammdaten (LLH-1493): eine Nachlieferung vom Hub ändert „vom Hub“.
+        'stammdaten-herkunft',
         // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
         'einsaetze',
       ].sort(),

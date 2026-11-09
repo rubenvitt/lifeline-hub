@@ -1,5 +1,5 @@
 ---
-id: ADR-0016
+id: ADR-0017
 titel: Die Belegung einer Betreuungsstelle hat eine Meldereihe, auch wenn sie namentlich geführt wird
 status: akzeptiert
 datum: 2026-11-09
@@ -13,7 +13,7 @@ herleitung:
   - openspec/changes/archive/2026-11-09-hitr91ob-registrierstelle-betreuung/design.md
 ---
 
-# ADR-0016: Die Belegung einer Betreuungsstelle hat eine Meldereihe, auch wenn sie namentlich geführt wird
+# ADR-0017: Die Belegung einer Betreuungsstelle hat eine Meldereihe, auch wenn sie namentlich geführt wird
 
 ## Regeln
 

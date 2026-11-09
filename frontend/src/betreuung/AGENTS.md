@@ -76,7 +76,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   ändert nur die Kapazität der Stelle und legt Nachforderungen über den bestehenden Schreibweg an
   (je Posten eine, mit `betreuungsstelle_id`); Belegung und „in Betreuung“ bleiben unberührt.
   Quellenangaben nennen Vorschriften und Werke, nie Personen; ohne Quelle „Ausgangstabellen“.
-- **Registrierstelle** (LLH-1612, Spec `betreuung-registrierung`, ADR-0016, Change
+- **Registrierstelle** (LLH-1612, Spec `betreuung-registrierung`, ADR-0017, Change
   `hitr91ob-registrierstelle-betreuung`; Server `src/betreuung/registrierung.rs`,
   `src/routes/betreuung_registrierung.rs`, Oberfläche `betreuung/registrierung/`): Registrierte
   sind Betroffene (`einsatz_person`, Status `betroffen`, Verbleib „Notunterkunft“ an der Stelle),
@@ -91,7 +91,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   (`offline/lagebildKuerzung.ts`). **Belegungsart** je Stelle `gezaehlt` | `namentlich`: an einer
   namentlich geführten Stelle meldet nur der Server (`betreuung::repo::belegung_nachfuehren_tx`,
   Herkunft `registrierung`, nicht zurücknehmbar), Handmeldung 409; jeder Verbleibwechsel und
-  der Storno einer Person führen nach (ADR-0016). „in Betreuung“ bleibt EINE Wahrheit, die
+  der Storno einer Person führen nach (ADR-0017). „in Betreuung“ bleibt EINE Wahrheit, die
   Meldereihe. Die **Maske** ist kompakt ohne Einklappen (Ruben, 09.11.2026): Adresse und Kontakt
   einmal je Haushalt, je Person eine Zeile mit allen Feldern, sichtbare Beschriftungen,
   Tab-Folge Haushalt → Person, Kostform als Radiogruppe; das Feldbudget von „Betroffene

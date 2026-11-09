@@ -1046,8 +1046,6 @@ pub async fn anlegen(
                 belegung_etb_ids,
             ))
         })?;
-    // Auch nach einem Replay im Rennen (`war_neu` falsch): die Zustellung ist idempotent.
-    rtw_meldung_sicherstellen(&state, &person).await?;
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {
@@ -1078,6 +1076,10 @@ pub async fn anlegen(
             melde_vermisst(&state, einsatz_id, person.id, ctx.benutzer.id).await;
         }
     }
+    // Auch nach einem Replay im Rennen (`war_neu` falsch): die Zustellung ist idempotent. Erst
+    // nach den Live-Ereignissen der Person, damit ein Fehler sie nicht verschluckt; die
+    // Wiederholung mit derselben `client_id` holt nur die Zustellung nach.
+    rtw_meldung_sicherstellen(&state, &person).await?;
     let mut person = person;
     if einheit_name.is_some() {
         // Replay im Rennen (`war_neu` false): dieselbe Schranke wie oben.
@@ -1662,7 +1664,7 @@ pub async fn stornieren(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    // LLH-1612 (design.md D5, ADR-0016): eine stornierte Person zählt an keiner Stelle mehr; eine
+    // LLH-1612 (design.md D5, ADR-0017): eine stornierte Person zählt an keiner Stelle mehr; eine
     // namentlich geführte Stelle meldet ihre Belegung im SELBEN Vorgang neu. Die Stelle wird in der
     // Transaktion gelesen, nicht vorher: ein paralleler Verbleibwechsel könnte sie geändert haben.
     let benutzer_id = ctx.benutzer.id;
