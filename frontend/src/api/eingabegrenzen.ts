@@ -191,6 +191,12 @@ export const SCHICHTMODELL_MINDESTDAUER_MAX_MINUTEN = 1_440;
 export const SCHICHTMODELL_VORLAUF_MAX_MINUTEN = 1_440;
 /** Rhythmus einer Schicht und eines Schichtmodells in Minuten: sieben Tage (LFH-635). */
 export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
+/** Höchstdienst des Einsatzes in Minuten, untere Grenze (LLH-1552, Schichtplan-Grenzwerte). */
+export const SCHICHTPLAN_MAX_DIENST_MIN_MINUTEN = 60;
+/** Höchstdienst des Einsatzes in Minuten, obere Grenze: ein Tag. */
+export const SCHICHTPLAN_MAX_DIENST_MAX_MINUTEN = 1_440;
+/** Mindestruhe des Einsatzes in Minuten, obere Grenze: ein Tag (die untere ist 0). */
+export const SCHICHTPLAN_MIN_RUHE_MAX_MINUTEN = 1_440;
 /** Ablöser je Schicht im Request, gezählt vor dem Entdoppeln (LLH-1132). */
 export const ABLOESUNG_ABLOESER_MAX = 8;
 /** Neue Besatzung beim Besatzungswechsel im Request, gezählt vor dem Entdoppeln (LLH-1150). */

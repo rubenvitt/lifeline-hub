@@ -4,7 +4,8 @@ Gilt für `kraefte/zeitachse.ts`, `kraefte/KraftZeitachse.tsx`, `src/zeitachse/`
 `src/routes/zeitachse.rs` und jede Stelle, die einen Statuswechsel, eine Disposition, die
 Ablösung oder das Eintreffen am Bereitstellungsraum schreibt (sie schreiben die Zeitachse mit);
 der Absatz „Ablösung“ gilt für `abloesung/`, `pages/AbloesungPage.tsx`,
-`pages/einstellungen/EinsatzAbloesung.tsx`, `stammdaten/SchichtmodelleTab.tsx`,
+`pages/einstellungen/EinsatzAbloesung.tsx`, `pages/einstellungen/EinsatzGrenzwerte.tsx`,
+`stammdaten/SchichtmodelleTab.tsx`,
 `src/abloesung/` und `src/schichtmodell/`. Ergänzt `frontend/AGENTS.md`. Pfade relativ zu
 `frontend/src/`, sofern nicht `src/…` (Server).
 
@@ -187,6 +188,15 @@ als Art „Laut Plan“ ab und rechnet Bleibende, Übernahme und Folgeblock nie 
 Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
 `schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
 `personen` und `helfer` als `null`.
+**Grenzwerte bedienen** (LLH-1603, `openspec/changes/archive/2026-11-09-z11srqhq-grenzwerte-bedienstelle/design.md`): Höchstdienst und
+Mindestruhe setzt nur das Paneel „Dienst und Ruhe“ in Einstellungen › Ablösung
+(`pages/einstellungen/EinsatzGrenzwerte.tsx`). Die Ansicht „Schichtplan“ nennt sie nur in einer Zeile
+mit Sprung dorthin, ohne zweiten Schreibweg. Das Paneel liest den Plan unter dem Key `schichtplan`.
+Die PATCH-Antwort ersetzt ihn, und `kraefteZeitachseGrenzwerte` wird für Einheiten und Personal
+neu geholt. Den Text und die Bodies bildet nur `abloesung/grenzwerte.ts`. „(Vorgabe)“ folgt nur den
+Merkern `*_eigen`, nie dem Wert. Ein Body trägt nur geänderte Felder (fehlt = unverändert, `null` =
+Vorgabe). Die Vorgaben 12 h/8 h stehen dort als Spiegel des Servers, die Grenzen in
+`api/eingabegrenzen.ts`.
 
 **Schichtplan einlesen** (LLH-1556, `abloesung/schichtplan/SchichtplanEinlesen.tsx`): Datei und
 Wahl gehen bei Vorschau UND Übernehmen als Multipart an den Server, der jedes Mal neu liest und
