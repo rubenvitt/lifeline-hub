@@ -91,9 +91,7 @@ const rueckfrage = () => screen.queryByRole('dialog', { name: 'Block löschen?' 
  * (`ant-zoom-leave`), beendet es aber nie (wie in `stammdaten/verwaltungstabellen.test.tsx`).
  */
 const rueckfrageZu = () =>
-  [...document.querySelectorAll('.ant-modal')].every((m) =>
-    m.classList.contains('ant-zoom-leave'),
-  );
+  [...document.querySelectorAll('.ant-modal')].every((m) => m.classList.contains('ant-zoom-leave'));
 
 describe('useBlockMenue', () => {
   it('Bearbeiten, Kopieren und Wechsel rufen ihren Weg mit dem Block', async () => {
