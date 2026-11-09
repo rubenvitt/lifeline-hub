@@ -31,8 +31,8 @@
 
 ## 6. Kommunikationsplan und Personen (D7)
 
-- [ ] 6.1 Kommunikationsplan: Primäraktion und ⋮ einmal beschrieben, als `karte.aktion`/`karte.weitere` an die `Datensicht`, Spalte rendert daraus; TDD Rechtsklick auf eine gepflegte Stelle zeigt „+ Verbindung“, die ⋮-Einträge und rot „Stelle entfernen“; ohne Netz alle gesperrt; Gruppen- und abgeleitete Zeilen ohne eigenes Menü; `KommunikationsplanPage.test.tsx` grün
-- [ ] 6.2 Personen: Test in `PersonenPage.zeilenaktionen.test.tsx`, dass Rechtsklick auf eine Personenzeile die Einträge des Zeilenmenüs zeigt (keine Codeänderung)
+- [x] 6.1 Kommunikationsplan: Primäraktion und ⋮ einmal beschrieben, als `karte.aktion`/`karte.weitere` an die `Datensicht`, Spalte rendert daraus; TDD Rechtsklick auf eine gepflegte Stelle zeigt „+ Verbindung“, die ⋮-Einträge und rot „Stelle entfernen“; ohne Netz alle gesperrt; Gruppen- und abgeleitete Zeilen ohne eigenes Menü; `KommunikationsplanPage.test.tsx` grün
+- [x] 6.2 Personen: Test in `PersonenPage.zeilenaktionen.test.tsx`, dass Rechtsklick auf eine Personenzeile die Einträge des Zeilenmenüs zeigt (keine Codeänderung)
 
 ## 7. Regel, Doku, Nachweis
 

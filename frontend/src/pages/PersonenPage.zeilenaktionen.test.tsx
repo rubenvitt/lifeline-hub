@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
+import { eintraegeVon, oeffneKontextmenue } from '../test/kontextmenue';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
@@ -625,5 +626,26 @@ describe('Ohne Schreibrecht (LLH-1130, 2.5)', () => {
     await screen.findByText('R-007');
     expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     ohneBedienung();
+  });
+});
+
+/**
+ * Kontextmenü (LLH-1599, design.md Kontext): Personen speisen `karte.weitere` der `Datensicht` aus
+ * dem Zeilenmenü und haben das Kontextmenü seit LLH-1596. Hier nur der Nachweis.
+ */
+describe('Kontextmenü der Personenzeile (LLH-1599)', () => {
+  it('Rechtsklick zeigt die Einträge des Zeilenmenüs; die Wahl öffnet nicht die Detailseite', async () => {
+    const user = userEvent.setup();
+    render(() => [r007]);
+    await screen.findByRole('button', { name: 'Aktionen zu R-007' });
+    const zellen = within(zeile('R-007')).getAllByRole('cell');
+    const menue = await oeffneKontextmenue(zellen[zellen.length - 2]);
+    expect(eintraegeVon(menue).slice(-3)).toEqual([
+      'Sichten',
+      'Verbleib erfassen',
+      'Auf Lagekarte verorten',
+    ]);
+    await user.click(within(menue).getByRole('menuitem', { name: 'Verbleib erfassen' }));
+    expect(screen.queryByText('Detailseite')).toBeNull();
   });
 });
