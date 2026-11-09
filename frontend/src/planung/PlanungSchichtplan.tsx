@@ -214,8 +214,10 @@ export default function PlanungSchichtplan({
   });
   const loeschenMut = useMutation({
     mutationFn: (b: SchichtplanBlock) => loeschePlanungBlock(planungId, b.id, b.version),
-    onSuccess: () => {
-      setDialog(null);
+    // Nur der Dialog des gelöschten Blocks schließt: ein Löschen aus dem Kontextmenü (LLH-1600)
+    // kehrt womöglich erst zurück, wenn schon der Dialog eines anderen Blocks offen ist.
+    onSuccess: (_antwort, b) => {
+      setDialog((d) => (d?.art === 'block' && d.blockId === b.id ? null : d));
       void qc.invalidateQueries({ queryKey: globalKeys.planung(planungId) });
     },
   });
@@ -331,8 +333,10 @@ export default function PlanungSchichtplan({
   };
   const oeffneBlock = (blockId: number) => {
     aendernMut.reset();
-    loeschenMut.reset();
-    kopierenMut.reset();
+    // Ein Löschen oder Kopieren aus dem Kontextmenü kann noch laufen (LLH-1600); `reset()` hängte
+    // es ab, `isPending` fiele weg, und Menü wie Dialog sendeten es ein zweites Mal.
+    if (!loeschenMut.isPending) loeschenMut.reset();
+    if (!kopierenMut.isPending) kopierenMut.reset();
     setDialog({ art: 'block', blockId });
   };
   const oeffneErzeugen = () => {
