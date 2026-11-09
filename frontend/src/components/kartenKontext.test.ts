@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fuehreKartenWahlAus, kartenKontextEintraege, type KartenAktion } from './kartenKontext';
+import { runKartenWahl, kartenKontextEintraege, type KartenAktion } from './kartenKontext';
 
 const AKTIONEN: KartenAktion[] = [
   { key: 'bestaetigen', label: 'Bestätigen', onWahl: vi.fn() },
@@ -29,13 +29,13 @@ describe('kartenKontextEintraege (LLH-1598, D3)', () => {
   });
 });
 
-describe('fuehreKartenWahlAus (LLH-1598, D3)', () => {
+describe('runKartenWahl (LLH-1598, D3)', () => {
   const modal = () => ({ confirm: vi.fn() });
 
   it('ohne Rückfrage ruft die Wahl die Aktion sofort', () => {
     const onWahl = vi.fn();
     const m = modal();
-    fuehreKartenWahlAus([{ key: 'a', label: 'A', onWahl }], 'a', m);
+    runKartenWahl([{ key: 'a', label: 'A', onWahl }], 'a', m);
     expect(onWahl).toHaveBeenCalledTimes(1);
     expect(m.confirm).not.toHaveBeenCalled();
   });
@@ -43,7 +43,7 @@ describe('fuehreKartenWahlAus (LLH-1598, D3)', () => {
   it('mit Rückfrage öffnet ein Dialog mit Titel, Knopf und Gefahrfarbe; erst OK löst aus', () => {
     const onWahl = vi.fn();
     const m = modal();
-    fuehreKartenWahlAus(
+    runKartenWahl(
       [
         {
           key: 'ab',
@@ -70,8 +70,8 @@ describe('fuehreKartenWahlAus (LLH-1598, D3)', () => {
   it('eine gesperrte oder unbekannte Aktion löst nichts aus', () => {
     const onWahl = vi.fn();
     const m = modal();
-    fuehreKartenWahlAus([{ key: 'a', label: 'A', gesperrt: true, onWahl }], 'a', m);
-    fuehreKartenWahlAus([{ key: 'a', label: 'A', onWahl }], 'weg', m);
+    runKartenWahl([{ key: 'a', label: 'A', gesperrt: true, onWahl }], 'a', m);
+    runKartenWahl([{ key: 'a', label: 'A', onWahl }], 'weg', m);
     expect(onWahl).not.toHaveBeenCalled();
     expect(m.confirm).not.toHaveBeenCalled();
   });
@@ -88,7 +88,7 @@ describe('fuehreKartenWahlAus (LLH-1598, D3)', () => {
       rueckfrage: { titel: 'Auftrag abnehmen?', knopf: 'Auftrag abnehmen' },
       ...(gesperrt ? { gesperrt } : {}),
     });
-    fuehreKartenWahlAus([ab(alt)], 'ab', m, () => aktuell);
+    runKartenWahl([ab(alt)], 'ab', m, () => aktuell);
     const onOk = m.confirm.mock.calls[0][0].onOk;
 
     // Ein anderer Platz hat den Auftrag inzwischen abgenommen: die Aktion ist weg.

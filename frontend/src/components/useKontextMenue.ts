@@ -142,8 +142,8 @@ export const DRUCK_ATTRIBUT = 'data-kontext-druck';
  * Satz Fensterhörer und einen Nachklick-Riegel anzulegen, kostete bei 200 Karten 200 Sätze. Die
  * Hörer hängen mit der ersten eingehängten Fläche an und mit der letzten ab.
  */
-let nutzer = 0;
-let abbauen: (() => void) | null = null;
+let mountCount = 0;
+let teardown: (() => void) | null = null;
 let riegel: NachklickRiegel | null = null;
 /** Zeitpunkt der letzten Kontextmenü-Taste (Tasten-Nachlauf, D4). */
 let tasteZeit = -Infinity;
@@ -153,18 +153,18 @@ let tasteZeit = -Infinity;
  */
 let stiftRiegel: { bis: number } | null = null;
 /** Ende-Rückrufe der Flächen, die gerade einen Druck halten (nicht alle Flächen). */
-const haltende = new Set<() => void>();
+const activePresses = new Set<() => void>();
 
 /** Stift-Riegel nach dem Abheben: ab jetzt läuft er nur noch nach. */
-function stiftAbgehoben() {
+function releasePenLock() {
   if (stiftRiegel != null && stiftRiegel.bis === Infinity) {
     stiftRiegel = { bis: performance.now() + NACHLAUF_MS };
   }
 }
 
-function anmelden() {
-  nutzer += 1;
-  if (nutzer > 1) return;
+function mountShared() {
+  mountCount += 1;
+  if (mountCount > 1) return;
   // Der Riegel (LFH-776 D3) hängt vor jedem Dropdown am `window` und schluckt nach einem langen
   // Druck die Ereignisse des Abhebens. Scharf erst, wenn eine Fläche wirklich öffnet.
   const r = erzeugeNachklickRiegel(document.documentElement);
@@ -197,15 +197,15 @@ function anmelden() {
   // Druck liegt das Menü (Portal) unter der Spitze; sein `pointerup` erreicht den Datensatz
   // dann nicht. Ohne diesen Hörer bliebe der Stift-Riegel scharf und schluckte jeden Klick.
   const abgehoben = () => {
-    for (const ende of [...haltende]) ende();
-    stiftAbgehoben();
+    for (const ende of [...activePresses]) ende();
+    releasePenLock();
   };
   window.addEventListener('contextmenu', tasteNachlauf, true);
   window.addEventListener('pointerdown', neuerZeiger, true);
   for (const t of GESCHLUCKT_NACH_STIFT) window.addEventListener(t, stiftNachlauf, true);
   window.addEventListener('pointerup', abgehoben, true);
   window.addEventListener('pointercancel', abgehoben, true);
-  abbauen = () => {
+  teardown = () => {
     r.abbauen();
     window.removeEventListener('contextmenu', tasteNachlauf, true);
     window.removeEventListener('pointerdown', neuerZeiger, true);
@@ -215,15 +215,15 @@ function anmelden() {
   };
 }
 
-function abmelden() {
-  nutzer -= 1;
-  if (nutzer > 0) return;
-  abbauen?.();
-  abbauen = null;
+function unmountShared() {
+  mountCount -= 1;
+  if (mountCount > 0) return;
+  teardown?.();
+  teardown = null;
   riegel = null;
   tasteZeit = -Infinity;
   stiftRiegel = null;
-  haltende.clear();
+  activePresses.clear();
 }
 
 export function useKontextMenue<S>(
@@ -240,8 +240,8 @@ export function useKontextMenue<S>(
   const touchAktiv = useRef(false);
 
   useEffect(() => {
-    anmelden();
-    return abmelden;
+    mountShared();
+    return unmountShared;
   }, []);
 
   const loesen = useCallback(() => {
@@ -256,14 +256,14 @@ export function useKontextMenue<S>(
   const druckEnde = useCallback(() => {
     loesen();
     touchAktiv.current = false;
-    haltende.delete(druckEnde);
-    stiftAbgehoben();
+    activePresses.delete(druckEnde);
+    releasePenLock();
   }, [loesen]);
 
   useEffect(
     () => () => {
       loesen();
-      haltende.delete(druckEnde);
+      activePresses.delete(druckEnde);
     },
     [loesen, druckEnde],
   );
@@ -308,7 +308,7 @@ export function useKontextMenue<S>(
           const x = e.clientX;
           const y = e.clientY;
           touchAktiv.current = true;
-          haltende.add(druckEnde);
+          activePresses.add(druckEnde);
           const timer = window.setTimeout(() => {
             const d = druck.current;
             if (d?.timer !== timer) return;

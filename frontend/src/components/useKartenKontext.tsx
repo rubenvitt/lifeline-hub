@@ -10,7 +10,7 @@
 import { App } from 'antd';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { KontextMenue, type KontextMenueOffen } from './KontextMenue';
-import { fuehreKartenWahlAus, kartenKontextEintraege, type KartenAktion } from './kartenKontext';
+import { runKartenWahl, kartenKontextEintraege, type KartenAktion } from './kartenKontext';
 import { useKontextMenue, type KontextHandler } from './useKontextMenue';
 
 export interface KartenKontextOptionen<K extends string> {
@@ -25,7 +25,7 @@ export function useKartenKontext<K extends string, E extends Element = HTMLEleme
   zugaenglicherName,
 }: KartenKontextOptionen<K>): { ausloeser: KontextHandler<E>; menue: ReactNode } {
   const { modal } = App.useApp();
-  // Der jüngste Stand für die Bestätigung einer Rückfrage (`fuehreKartenWahlAus`).
+  // Der jüngste Stand für die Bestätigung einer Rückfrage (`runKartenWahl`).
   const aktuell = useRef(aktionen);
   useEffect(() => {
     aktuell.current = aktionen;
@@ -49,7 +49,7 @@ export function useKartenKontext<K extends string, E extends Element = HTMLEleme
         offen={offen}
         eintraege={kartenKontextEintraege(aktionen)}
         zugaenglicherName={zugaenglicherName}
-        onWahl={(key) => fuehreKartenWahlAus(aktionen, key, modal, () => aktuell.current)}
+        onWahl={(key) => runKartenWahl(aktionen, key, modal, () => aktuell.current)}
         onSchliessen={() => setOffen(null)}
       />
     ),

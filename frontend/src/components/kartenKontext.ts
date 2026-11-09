@@ -52,7 +52,7 @@ interface Rueckfrage {
  * (Live-Ereignis, anderer Platz), löst die Bestätigung nichts aus, wie ein `Popconfirm`, das mit
  * seinem Knopf verschwindet (LLH-1598, Befund aus dem Review).
  */
-export function fuehreKartenWahlAus<K extends string>(
+export function runKartenWahl<K extends string>(
   aktionen: readonly KartenAktion<K>[],
   key: string,
   modal: Rueckfrage,
