@@ -42,6 +42,10 @@ export default function ExterneStellenTab() {
     queryKey: globalKeys.externeStellenListe('alle'),
     queryFn: () => fetchExterneStellen('alle'),
   });
+  // Kommt die zuständige Leitstelle vom Hub, folgt die Markierung dem Hub (kjezbk06, D4).
+  const zustaendigVomHub = (stellenQuery.data ?? []).some(
+    (s) => s.zustaendig && herkunft.istVomHub('externe_stelle', s.id),
+  );
 
   // KEIN `onError`-Toast (LFH-473): der Fehler steht im `SeitenHinweise`-Slot.
   const aktivMutation = useMutation({
@@ -256,6 +260,7 @@ export default function ExterneStellenTab() {
       <ExterneStelleFormModal
         offen={modalOffen}
         stelle={bearbeite}
+        zustaendigVomHub={zustaendigVomHub}
         onClose={() => setModalOffen(false)}
       />
     </AdminPage>

@@ -189,4 +189,16 @@ describe('ExterneStellenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
     expect(within(lokal).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Externe Stelle anlegen' })).toBeEnabled();
   });
+
+  it('bietet keine eigene zuständige Leitstelle an, solange sie vom Hub kommt', async () => {
+    server.use(herkunftHandler({ externe_stelle: ['1'] }));
+    const nutzer = userEvent.setup();
+    render(admin);
+    await waitFor(() => expect(screen.getByText('vom Hub')).toBeInTheDocument());
+    await nutzer.click(screen.getByRole('button', { name: 'Externe Stelle anlegen' }));
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.click(within(dialog).getByLabelText('Art'));
+    await nutzer.click(await screen.findByTitle('Leitstelle'));
+    expect(await within(dialog).findByLabelText('Zuständige Leitstelle')).toBeDisabled();
+  });
 });
