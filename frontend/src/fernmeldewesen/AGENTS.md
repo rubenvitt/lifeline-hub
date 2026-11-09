@@ -19,15 +19,15 @@ unter `einsatzKeys.fernmeldewesen*`. Reiter nur über `fernmeldewesen/Fernmeldew
 Darstellung des Funkplans ist Zustand der Adresse (`?ansicht=`, per `replace`, Vorgabe „Funkplan“
 ohne Parameter, wie `?reiter=` der Aufträge, LLH-1432), Zurück landet im selben Reiter. Die
 Altadressen `stab/funkplan` und `stab/kommunikationsplan` leiten dauerhaft um und gehören über
-`ALTPFAD_MODUL` (`einsatz/modulRegistry.ts`) dem Fernmeldewesen; Einstiege von der Stab-Seite,
-Sprungmarken und Palette prüfen dessen Freigabe (`istSprungGesperrt('fernmeldewesen')`).
+`ALTPFAD_MODUL` (`einsatz/modulRegistry.ts`) dem Fernmeldewesen; Sprungmarken und Palette prüfen
+dessen Freigabe (`istSprungGesperrt('fernmeldewesen')`).
 
 **Funkplan S6** (LFH-548, `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`):
-Startseite des Moduls Fernmeldewesen (`funkplanPfad`), Einstieg in der S6-Kachel; die Seite prüft
+Startseite des Moduls Fernmeldewesen (`funkplanPfad`); die Seite prüft
 die Freigabe des Fernmeldewesens selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
 Abschnitten, Einheiten, Fahrzeugen, Personal, Sprechgruppen (`fernmeldewesen/funkplan.ts`), kein Endpunkt;
 jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit Grund. Lücken nur über
-`fernmeldewesen/luecken.ts`, ihre Zahl im Kopf des Paneels und an der S6-Kachel nur über `countLuecken`. Spalte Telefon (Festnetz/Mobil aus `verbindungen`, LLH-1134): Schirm ab `xl`, Druck immer (`useDruckModus`),
+`fernmeldewesen/luecken.ts`, ihre Zahl im Kopf des Paneels nur über `countLuecken`. Spalte Telefon (Festnetz/Mobil aus `verbindungen`, LLH-1134): Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Sechste Quelle ist die eigene Führungsstelle (LFH-849, `einsatz/fuehrungsstelle.ts`,
 gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungsstelleErfasst`, die
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle
@@ -131,8 +131,7 @@ Datenhaltung). Die Besetzung ist nur Nebentext (Namen der Mitglieder mit der Fun
 alphabetisch, sonst „nicht vergeben“), **Kontaktangaben des Personals kommen nie vor**.
 Kern `fernmeldewesen/kommunikationsplan.ts`, Lücke „Leitstelle“ nur über `fernmeldewesen/luecken.ts`. `tel:` nur
 Festnetz/Mobil, `mailto:` nur mit `@`. **Kein Lagebericht**, Druck ja (im Druck flach, ohne
-Aktionsspalte). **Offline lesbar** als einziger Unter-Key des Fernmeldewesens in `LAGEBILD_OFFLINE` (der Stab hat
-keinen); ohne Netz Bedienung gesperrt, nicht versteckt, Besetzung „—“ mit Grund „nicht geladen“ (die Mitglieder liegen nicht auf der Platte). Schreibantworten tragen den ganzen
+Aktionsspalte). **Offline lesbar** als einziger Unter-Key des Fernmeldewesens in `LAGEBILD_OFFLINE`; ohne Netz Bedienung gesperrt, nicht versteckt, Besetzung „—“ mit Grund „nicht geladen“ (die Mitglieder liegen nicht auf der Platte). Schreibantworten tragen den ganzen
 Plan (`setQueryData`). **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist abgeleitet wie
 Abschnitte und Einheiten: erfasst (`fuehrungsstelleErfasst`, die eine Regel) erste Zeile `fs` in
 „Einsatzleitung und Stab“ (Rufname, alle ihre `verbindungen`, führt zu

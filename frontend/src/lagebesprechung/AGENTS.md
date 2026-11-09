@@ -37,6 +37,6 @@ Freitext).
 oder verstrichener Termin trägt `achtung`, nie `alarm` (keine Gefahr, Alarmbudget EEMUA 191), mit
 dem Wort „jetzt fällig“ bzw. „seit 5 min überfällig“. Ton und Wort nur aus
 `lagebesprechung/lagebesprechungZustand.ts:lagebesprechungUeberfaellig`; die Seite
-Lagebesprechung, die Termin-Zeile der Stab-Seite und die Marke „Lagebesprechung“ der Fristenliste
-im Überblick (`markenBewertung`) lesen alle dort. Überfällige Aufträge und Erinnerungen dort
+Lagebesprechung und die Marke „Lagebesprechung“ der Fristenliste im Überblick (`markenBewertung`)
+lesen beide dort. Überfällige Aufträge und Erinnerungen dort
 bleiben `alarm`, das „knapp“ unter 30 min bleibt der Fristenliste.

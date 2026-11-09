@@ -56,7 +56,7 @@ die Anlässe der Hinweise zur ablösenden Einheit `Beruehrt::hinweise` (LLH-1131
 Zeitachse schreibt (Abruf, Eintreffen am Bereitstellungsraum, Auflösen), bildet seine Anlässe
 in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
 Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl, keine Grenzwerte
-(LFH-860). Anzeige im Meldebild/Personal/Einheit-Detail, **nicht im Stab**. Bewusster Bruch von
+(LFH-860). Anzeige im Meldebild/Personal/Einheit-Detail. Bewusster Bruch von
 LFH-46 E17 (Feldbefund) auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
 
 **Ablösung** (LFH-635, LLH-1122, Spec `kraefte-abloesung`): Der Rhythmus einer Schicht folgt

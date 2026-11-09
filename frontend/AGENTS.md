@@ -1072,8 +1072,8 @@ Spec `bedien-arbeitsplatz`).
   jede Route in ein gesperrtes Modul ab (`ModulGesperrt`, LFH-888,
   `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`) und wartet
   beim Kaltstart auf die Freigaben; die Zielseite prüft weiter ihren Datensatz. Verweise in
-  Datenzeilen bleiben offen, für sie gilt der Rahmen. Stabsfunktionen und Fernmeldewesen ebenso
-  (LFH-46, LLH-1180).
+  Datenzeilen bleiben offen, für sie gilt der Rahmen. Fernmeldewesen und Informationstelefon
+  ebenso (LLH-1180, i6k6mzed).
 - **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
   (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
   Palette führt „Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.
