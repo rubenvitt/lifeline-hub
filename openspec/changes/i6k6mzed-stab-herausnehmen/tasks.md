@@ -155,7 +155,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 - [ ] 8.1 `./scripts/check-all.sh` ist grün, mit `scripts/check-migrationen.sh` gegen ein frisches `origin/alpha`.
 - [x] 8.2 Lauf mit einer DB aus dem Bestand: Einsatz mit Besetzung, Presse-Log, Pressemitteilung und Checkliste, Organisation mit ausgeblendetem Stab, Vorlage MANV. Nach dem Start fehlen Tabellen und Spalte, das Informationstelefon ist dort ausgeblendet, wo der Stab es war, und das ETB bleibt lesbar und beschreibbar.
-- [ ] 8.3 Bilder der Änderung für PR und Meldung aufnehmen (Wegwerf-Spec `zz-i6k6mzed.bilder.ts`): Modulliste ohne Stab und mit Informationstelefon, Organigramm mit Führungsfunktionen aus den Mitgliedern, Kommunikationsplan-Spalte „Besetzung“.
+- [x] 8.3 Bilder der Änderung für PR und Meldung aufnehmen (Wegwerf-Spec `zz-i6k6mzed.bilder.ts`): Modulliste ohne Stab und mit Informationstelefon, Organigramm mit Führungsfunktionen aus den Mitgliedern, Kommunikationsplan-Spalte „Besetzung“.
 
 ## 9. Spec-Nachzug
 
