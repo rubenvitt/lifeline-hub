@@ -1,5 +1,5 @@
 //! Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`, Herleitung
-//! `openspec/changes/v6hj7xl2-fuehrung-epoche/design.md`): Bedienung an einem lokalen Einsatz
+//! `openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md`): Bedienung an einem lokalen Einsatz
 //! (`/api/einsaetze/{id}/fuehrung/…`, Einsatzleitung oder Admin der Einsatz-Org) und an einer Akte
 //! des Gegenübers (`/api/admin/instanz/fuehrung/{akte}/…`, Admin der Org). Regeln und
 //! Transaktionen liegen in `instanz::fuehrung::dienst`. Ohne Schalter `LIFELINE_FUEHRUNG` 404.

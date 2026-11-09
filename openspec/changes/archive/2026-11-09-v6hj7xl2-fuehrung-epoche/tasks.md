@@ -67,7 +67,7 @@ ADR-0012 treffen die Kernstellen).
 
 ## 9. Abschluss
 
-- [ ] 9.1 Gates: Bündel `schnell` lokal grün, dazu die betroffenen Rust-Suiten (`instanz::`, `einsatz::`, `auth::`, `db::`, `tests/instanz_kopplung.rs`, `tests/einsatz_kontext_guard.rs`, Wire-Kontrakt) und Vitest; den vollen `./scripts/check-all.sh` bringt die CI des PRs
+- [x] 9.1 Gates: Bündel `schnell` lokal grün, dazu die betroffenen Rust-Suiten (`instanz::`, `einsatz::`, `auth::`, `db::`, `tests/instanz_kopplung.rs`, `tests/einsatz_kontext_guard.rs`, Wire-Kontrakt) und Vitest; den vollen `./scripts/check-all.sh` bringt die CI des PRs (Bündel `schnell` am 09.11.2026 grün)
 
 ## Workflow follow-up
 
