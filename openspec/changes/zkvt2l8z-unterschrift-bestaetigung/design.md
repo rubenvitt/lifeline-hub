@@ -75,7 +75,7 @@ Gegenzeichnung `wartet_auf_bestaetigung` statt `gueltig`; mit `grundstock = true
 ### D3 Bestätigen und Ablehnen
 
 - `POST /api/admin/instanz/unterschrift/{id}/bestaetigen` mit `{ "fingerabdruck_ende": "Q7KM" }`
-- `POST /api/admin/instanz/unterschrift/{id}/ablehnen` ohne Body
+- `POST /api/admin/instanz/unterschrift/{id}/zurueckweisen` ohne Body
 - Beide `AdminUser`. Gefunden wird der Schlüssel nur in der eigenen Org, sonst 404.
 - Fehlt `fingerabdruck_ende` oder ist es leer: 400. Der Vergleich ignoriert Groß- und
   Kleinschreibung und Trennzeichen und gilt gegen die letzten vier Zeichen des Fingerabdrucks
@@ -85,7 +85,7 @@ Gegenzeichnung `wartet_auf_bestaetigung` statt `gueltig`; mit `grundstock = true
 - Bestätigen setzt `gueltig`, Ablehnen `abgelehnt`, beide mit `entschieden_at` und
   `entschieden_von`. Ein bedingtes `UPDATE … WHERE zustand = 'wartet_auf_bestaetigung'` macht
   einen doppelten Klick zu einem 422 statt zu zwei Spureinträgen.
-- Spur: `UnterschriftSchluesselBestaetigt` und `UnterschriftSchluesselAbgelehnt` mit Fingerabdruck,
+- Spur: `UnterschriftBestaetigt` und `UnterschriftZurueckgewiesen` mit Fingerabdruck,
   Inhaber und Kopplung (Muster `build_angaben_gegenstelle`).
 
 ### D4 Anzeige

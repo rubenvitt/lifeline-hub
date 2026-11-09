@@ -80,6 +80,11 @@ wire_enum! {
         /// Ein vom Gegenüber gelieferter Unterschriftsschlüssel wurde verworfen (ohne gültige
         /// Gegenzeichnung eines bekannten Schlüssels).
         UnterschriftAbgelehnt => "unterschrift_abgelehnt",
+        /// Ein Admin hat einen vom Gegenüber gelieferten Unterschriftsschlüssel bestätigt
+        /// (LLH-1605).
+        UnterschriftBestaetigt => "unterschrift_bestaetigt",
+        /// Ein Admin hat einen vom Gegenüber gelieferten Unterschriftsschlüssel zurückgewiesen.
+        UnterschriftZurueckgewiesen => "unterschrift_zurueckgewiesen",
     }
 }
 

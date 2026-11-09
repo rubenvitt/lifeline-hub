@@ -7,19 +7,19 @@ die nächste freie Nummer über `origin/alpha` (`scripts/check-migrationen.sh`, 
 
 ## 1. Datenmodell (D1)
 
-- [ ] 1.1 Migration: `unterschrift_schluessel` neu aufbauen mit den Zuständen `wartet_auf_bestaetigung` und `abgelehnt` (CHECK: nur bei Herkunft `gegenueber`), Spalten `entschieden_at` und `entschieden_von` (`ON DELETE SET NULL`), alle Indizes; `admin_audit` neu aufbauen mit `unterschrift_schluessel_bestaetigt` und `unterschrift_schluessel_abgelehnt`; prüfen mit `cargo test --lib db::` und `tests/instanz_kopplung.rs` über die neue Migration
-- [ ] 1.2 `UnterschriftSchluesselZustand` und `AdminAktion` um die neuen Werte erweitern, je ein Fall in `tests/enum_wire_kontrakt.rs`; `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten
+- [x] 1.1 Migrationen 0305/0306: `unterschrift_schluessel` neu aufbauen mit den Zuständen `wartet_auf_bestaetigung` und `abgelehnt` (CHECK: nur bei Herkunft `gegenueber`), Spalten `entschieden_at` und `entschieden_von` (`ON DELETE SET NULL`), alle Indizes; `admin_audit` neu aufbauen mit `unterschrift_bestaetigt` und `unterschrift_zurueckgewiesen` (`unterschrift_abgelehnt` gibt es schon für das automatische Verwerfen); prüfen mit `cargo test --lib db::` und `tests/instanz_kopplung.rs` über die neue Migration
+- [x] 1.2 `UnterschriftSchluesselZustand` und `AdminAktion` um die neuen Werte erweitern, je ein Fall in `tests/enum_wire_kontrakt.rs`; `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten
 
 ## 2. Übernahme (D2)
 
-- [ ] 2.1 `accept_lieferungen`: gültig gegengezeichneter neuer Schlüssel → `wartet_auf_bestaetigung`, Grundstock → `gueltig`; Repo-Tests: Nachlieferung wartet, Grundstock gilt sofort, Widerruf trifft auch einen wartenden, erneute Lieferung ändert einen wartenden oder abgelehnten nicht, derselbe Schlüssel unter neuer id lebt nach `abgelehnt` nicht wieder auf
-- [ ] 2.2 Ein wartender Schlüssel taugt nicht als Unterzeichner; Repo-Test: Lieferung, gegengezeichnet vom wartenden Schlüssel, wird verworfen
+- [x] 2.1 `accept_lieferungen`: gültig gegengezeichneter neuer Schlüssel → `wartet_auf_bestaetigung`, Grundstock → `gueltig`; Repo-Tests: Nachlieferung wartet, Grundstock gilt sofort, Widerruf trifft auch einen wartenden, erneute Lieferung ändert einen wartenden oder abgelehnten nicht, derselbe Schlüssel unter neuer id lebt nach `abgelehnt` nicht wieder auf
+- [x] 2.2 Ein wartender Schlüssel taugt nicht als Unterzeichner; Repo-Test: Lieferung, gegengezeichnet vom wartenden Schlüssel, wird verworfen
 
 ## 3. Bestätigen und Ablehnen (D3)
 
-- [ ] 3.1 Repo: `confirm` und `reject` mit bedingtem `UPDATE` auf `wartet_auf_bestaetigung`, Vergleich der letzten vier Zeichen (ohne Trennzeichen, Groß- und Kleinschreibung egal) als reine Funktion; Unit-Tests: passende und unpassende Zeichen, Kleinschreibung, mit Bindestrich
-- [ ] 3.2 Routen `POST /api/admin/instanz/unterschrift/{id}/bestaetigen` und `/ablehnen` (`AdminUser`, eigene Org) samt Spur und OpenAPI; Integrationstests in `tests/instanz_kopplung.rs`: Bestätigen mit den richtigen Zeichen → gültig, mit falschen → 422 und wartet weiter, ohne Feld → 400, fremde Org → 404, nicht wartend → 422, Nicht-Admin → 403, Ablehnen → abgelehnt und bleibt es nach der nächsten Meldung; Fälle in `tests/fehler_vertrag.rs`
-- [ ] 3.3 Ende-zu-Ende über zwei Instanzen: neuer Schlüssel am Hub, gegengezeichnet, ELW meldet sich → wartet; Admin am ELW bestätigt → gültig (ersetzt die Erwartung in `neuer_schluessel_braucht_gegenzeichnung_und_wird_nachgeliefert`)
+- [x] 3.1 Repo: `confirm` und `reject` mit bedingtem `UPDATE` auf `wartet_auf_bestaetigung`, Vergleich der letzten vier Zeichen (ohne Trennzeichen, Groß- und Kleinschreibung egal) als reine Funktion; Unit-Tests: passende und unpassende Zeichen, Kleinschreibung, mit Bindestrich
+- [x] 3.2 Routen `POST /api/admin/instanz/unterschrift/{id}/bestaetigen` und `/zurueckweisen` (`AdminUser`, eigene Org) samt Spur und OpenAPI; Integrationstests in `tests/instanz_kopplung.rs`: Bestätigen mit den richtigen Zeichen → gültig, mit falschen → 422 und wartet weiter, ohne Feld → 400, fremde Org → 404, nicht wartend → 422, Nicht-Admin → 403, Ablehnen → abgelehnt und bleibt es nach der nächsten Meldung; der Fehlerumschlag der 422 ist dort geprüft, `tests/fehler_vertrag.rs` deckt nur die öffentlichen Instanzrouten ab
+- [x] 3.3 Ende-zu-Ende über zwei Instanzen: neuer Schlüssel am Hub, gegengezeichnet, ELW meldet sich → wartet; Admin am ELW bestätigt → gültig (ersetzt die Erwartung in `neuer_schluessel_braucht_gegenzeichnung_und_wird_nachgeliefert`)
 
 ## 4. Anzeige und Warnung (D4, D5)
 

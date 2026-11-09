@@ -933,6 +933,103 @@ pub async fn gegenzeichnen_abschluss(
     Ok(Json(anzeige))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct BestaetigenBody {
+    /// Die letzten vier Zeichen des Fingerabdrucks, wie der Inhaber sie nennt.
+    pub fingerabdruck_ende: String,
+}
+
+/// POST /api/admin/instanz/unterschrift/{id}/bestaetigen — bestätigt einen vom Gegenüber
+/// nachgelieferten, wartenden Schlüssel (LLH-1605, design.md D3). Verlangt die letzten vier
+/// Zeichen des Fingerabdrucks (422, wenn sie nicht passen); ein eigener Unterschriftsschlüssel ist
+/// nicht nötig.
+pub async fn unterschrift_bestaetigen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+    JsonBody(body): JsonBody<BestaetigenBody>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    let eingabe = crate::routes::support::pflicht(&body.fingerabdruck_ende, "fingerabdruck_ende")?;
+    decide_unterschrift(&state, &admin, peer_ip, id, Some(&eingabe)).await
+}
+
+/// POST /api/admin/instanz/unterschrift/{id}/zurueckweisen — weist einen vom Gegenüber
+/// nachgelieferten, wartenden Schlüssel zurück; er wird nie gültig.
+pub async fn unterschrift_zurueckweisen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    decide_unterschrift(&state, &admin, peer_ip, id, None).await
+}
+
+/// Bestätigt (`eingabe` gesetzt) oder weist zurück (`None`).
+async fn decide_unterschrift(
+    state: &AppState,
+    admin: &crate::auth::Benutzer,
+    peer_ip: Option<std::net::IpAddr>,
+    id: i64,
+    eingabe: Option<&str>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    let jetzt = crate::zeit::jetzt();
+    let zeile = crate::write_retry!(&state.pool, |conn| {
+        let zeile = unterschrift::load(conn, admin.org_id, id).await?;
+        if zeile.zustand() != UnterschriftSchluesselZustand::WartetAufBestaetigung {
+            return Err(AppError::UnprocessableEntity(
+                "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
+            ));
+        }
+        let wirkung = match eingabe {
+            Some(e) => {
+                if !unterschrift::is_fingerabdruck_ende(&zeile.fingerabdruck, e) {
+                    return Err(AppError::UnprocessableEntity(
+                        "Die Zeichen passen nicht zum Fingerabdruck. Bitte die letzten vier \
+                         Zeichen beim Inhaber erfragen."
+                            .into(),
+                    ));
+                }
+                unterschrift::confirm(conn, admin.org_id, id, admin.id, &jetzt).await?
+            }
+            None => unterschrift::reject(conn, admin.org_id, id, admin.id, &jetzt).await?,
+        };
+        if !wirkung {
+            return Err(AppError::UnprocessableEntity(
+                "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
+            ));
+        }
+        Ok(zeile)
+    })?;
+    let gegenstelle = match zeile.kopplung_org_id {
+        Some(ko) => repo::load_zuordnung_gegenstelle(&state.pool, ko).await?,
+        None => None,
+    };
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: if eingabe.is_some() {
+                AdminAktion::UnterschriftBestaetigt
+            } else {
+                AdminAktion::UnterschriftZurueckgewiesen
+            },
+            akteur: admin,
+            ziel: Ziel::Unterschrift(&format!("{} · {}", zeile.benutzer_name, zeile.bezeichnung)),
+            angaben: Some(ZugangsAngaben {
+                fingerabdruck: Some(zeile.fingerabdruck.clone()),
+                instanz_kennung: gegenstelle.as_ref().map(|(k, _)| k.clone()),
+                fremde_org: gegenstelle.map(|(_, o)| o),
+                ..ZugangsAngaben::default()
+            }),
+            peer_ip,
+        },
+    )
+    .await;
+    Ok(Json(
+        unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?,
+    ))
+}
+
 /// POST /api/admin/instanz/unterschrift/{id}/widerrufen — widerruft einen lokalen
 /// Unterschriftsschlüssel der Org. Der letzte gültige einer Org, die ihre Schlüssel an eine
 /// gekoppelte Instanz verteilt, bleibt (409). Idempotent.

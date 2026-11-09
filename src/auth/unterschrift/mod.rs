@@ -77,8 +77,13 @@ wire_enum! {
     pub enum UnterschriftSchluesselZustand {
         /// Registriert, die Gegenzeichnung eines bekannten Admins steht aus; wird nicht verteilt.
         WartetAufGegenzeichnung => "wartet_auf_gegenzeichnung",
+        /// Vom Gegenüber gegengezeichnet nachgeliefert, die Bestätigung eines Admins hier steht
+        /// aus (LLH-1605, R24); zählt weder als Unterschrift noch als Gegenzeichnung.
+        WartetAufBestaetigung => "wartet_auf_bestaetigung",
         Gueltig => "gueltig",
         Widerrufen => "widerrufen",
+        /// Ein Admin hier hat den nachgelieferten Schlüssel zurückgewiesen; er wird nie gültig.
+        Abgelehnt => "abgelehnt",
     }
 }
 

@@ -812,7 +812,9 @@
           "unterschrift_registriert",
           "unterschrift_gegengezeichnet",
           "unterschrift_widerrufen",
-          "unterschrift_abgelehnt"
+          "unterschrift_abgelehnt",
+          "unterschrift_bestaetigt",
+          "unterschrift_zurueckgewiesen"
         ]
       },
       "AdressatKategorie": {
@@ -18396,8 +18398,10 @@
         "description": "Zustand eines Unterschriftsschlüssels.",
         "enum": [
           "wartet_auf_gegenzeichnung",
+          "wartet_auf_bestaetigung",
           "gueltig",
-          "widerrufen"
+          "widerrufen",
+          "abgelehnt"
         ]
       },
       "Verbindungsart": {

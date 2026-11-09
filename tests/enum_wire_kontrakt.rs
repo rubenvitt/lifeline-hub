@@ -651,6 +651,8 @@ fn serde_wire_gleich_as_str() {
         UnterschriftGegengezeichnet,
         UnterschriftWiderrufen,
         UnterschriftAbgelehnt,
+        UnterschriftBestaetigt,
+        UnterschriftZurueckgewiesen,
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
@@ -674,8 +676,10 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(
         lifeline_hub::auth::unterschrift::UnterschriftSchluesselZustand {
             WartetAufGegenzeichnung,
+            WartetAufBestaetigung,
             Gueltig,
             Widerrufen,
+            Abgelehnt,
         }
     );
 }

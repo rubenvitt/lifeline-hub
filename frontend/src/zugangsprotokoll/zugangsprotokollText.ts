@@ -42,6 +42,8 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   unterschrift_gegengezeichnet: 'Unterschriftsschlüssel gegengezeichnet',
   unterschrift_widerrufen: 'Unterschriftsschlüssel widerrufen',
   unterschrift_abgelehnt: 'Unterschriftsschlüssel abgelehnt',
+  unterschrift_bestaetigt: 'Unterschriftsschlüssel bestätigt',
+  unterschrift_zurueckgewiesen: 'Unterschriftsschlüssel zurückgewiesen',
 };
 
 /**

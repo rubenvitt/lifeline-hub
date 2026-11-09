@@ -21,8 +21,12 @@ export const KOPPLUNG_ZUSTAND_TEXT: Record<InstanzKopplungZustand, string> = {
 
 export const SCHLUESSEL_ZUSTAND_TEXT: Record<UnterschriftSchluesselZustand, string> = {
   wartet_auf_gegenzeichnung: 'wartet auf Gegenzeichnung',
+  wartet_auf_bestaetigung: 'wartet auf Bestätigung',
   gueltig: 'gültig',
   widerrufen: 'widerrufen',
+  // Von einem Admin hier zurückgewiesen; „abgelehnt“ heißt in der Spur schon das automatische
+  // Verwerfen eines Schlüssels ohne gültige Gegenzeichnung.
+  abgelehnt: 'zurückgewiesen',
 };
 
 /** Ab dieser Abweichung der Uhren (Sekunden) steht ein Hinweis an der Kopplung. */

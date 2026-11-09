@@ -158,6 +158,21 @@ pub async fn find_kopplung(
     .await?)
 }
 
+/// Kennung der Gegenstelle und Name der Org dort für eine Org-Zuordnung (für die Admin-Spur);
+/// `None`, wenn es die Zuordnung nicht mehr gibt.
+pub async fn load_zuordnung_gegenstelle(
+    pool: &SqlitePool,
+    kopplung_org_id: i64,
+) -> Result<Option<(String, String)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT k.gegenueber_kennung, o.fremde_org_name FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
+    )
+    .bind(kopplung_org_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
 pub async fn load_kopplung(pool: &SqlitePool, id: i64) -> Result<KopplungZeile, AppError> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung WHERE id = ?"

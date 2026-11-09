@@ -955,12 +955,132 @@ async fn neuer_schluessel_braucht_gegenzeichnung_und_wird_nachgeliefert() {
     assert_eq!(v["zustand"], "gueltig");
 
     elw_meldet(&elw).await;
+    // Am ELW wartet B auf die Bestätigung eines Admins dort (LLH-1605, R24).
+    assert_eq!(gueltige_fremde(&uebersicht(&elw).await).len(), 1);
+    let (id_elw, fp_b) = wartender(&elw).await;
+    assert_eq!(fp_b, zeile_b["fingerabdruck"].as_str().unwrap());
+    let (s, v) = bestaetigen(&elw, &elw.admin, id_elw, &ende(&fp_b)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
     let fremde = gueltige_fremde(&uebersicht(&elw).await);
     assert_eq!(fremde.len(), 2);
-    assert!(fremde.contains(&zeile_b["fingerabdruck"].as_str().unwrap().to_string()));
+    assert!(fremde.contains(&fp_b));
     assert!(aktionen(&hub.pool)
         .await
         .contains(&"unterschrift_gegengezeichnet".to_string()));
+}
+
+/// Der wartende Schlüssel vom Gegenüber: id hier und Fingerabdruck.
+async fn wartender(i: &Instanz) -> (i64, String) {
+    let u = uebersicht(i).await;
+    let s = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["zustand"] == "wartet_auf_bestaetigung")
+        .unwrap_or_else(|| panic!("kein wartender Schlüssel: {u}"))
+        .clone();
+    (
+        s["id"].as_i64().unwrap(),
+        s["fingerabdruck"].as_str().unwrap().to_string(),
+    )
+}
+
+/// Die letzten vier Zeichen eines Fingerabdrucks.
+fn ende(fp: &str) -> String {
+    fp.replace('-', "")[fp.replace('-', "").len() - 4..].to_string()
+}
+
+async fn bestaetigen(i: &Instanz, wer: &str, id: i64, zeichen: &str) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/admin/instanz/unterschrift/{id}/bestaetigen"),
+        wer,
+        Some(&json!({"fingerabdruck_ende": zeichen})),
+    )
+    .await
+}
+
+/// Hub mit gekoppeltem ELW; am Hub ein zweiter Schlüssel B, von A gegengezeichnet und am ELW
+/// nachgeliefert, wo er wartet.
+async fn mit_wartendem_schluessel() -> (Instanz, Instanz, i64, String) {
+    let (hub, elw) = gekoppelt().await;
+    let id_b = schluessel(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
+    let (s, v) = gegenzeichnen(&hub, id_b, &SoftwarePasskey::new("a", [1u8; 32])).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    let (id, fp) = wartender(&elw).await;
+    (hub, elw, id, fp)
+}
+
+#[tokio::test]
+async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
+    let (_hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let pfad = format!("/api/admin/instanz/unterschrift/{id}/bestaetigen");
+    // Ohne Feld oder leer: 400.
+    let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &elw.admin, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = bestaetigen(&elw, &elw.admin, id, " ").await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    // Falsche Zeichen: 422, der Schlüssel wartet weiter.
+    let falsch = if ende(&fp) == "0000" { "1111" } else { "0000" };
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, falsch).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(
+        v["error"].as_str().unwrap().contains("Fingerabdruck"),
+        "{v}"
+    );
+    assert_eq!(wartender(&elw).await.0, id);
+    // Kein Admin: 403; Admin einer anderen Org: 404.
+    common::benutzer_anlegen(&elw.app, &elw.admin, "helfer", "keine").await;
+    let helfer = common::login_cookie(&elw.app, "helfer", "helferpw1").await;
+    assert_eq!(
+        bestaetigen(&elw, &helfer, id, &ende(&fp)).await.0,
+        StatusCode::FORBIDDEN
+    );
+    org_admin(&elw.pool, "Fremde Org", "fremd").await;
+    let fremd = common::login_cookie(&elw.app, "fremd", "fremdpw1").await;
+    assert_eq!(
+        bestaetigen(&elw, &fremd, id, &ende(&fp)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    // Richtig, auch klein geschrieben: gültig; ein zweites Mal: 422.
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, &ende(&fp).to_lowercase()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zustand"], "gueltig");
+    let (s, _) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(aktionen(&elw.pool)
+        .await
+        .contains(&"unterschrift_bestaetigt".to_string()));
+}
+
+#[tokio::test]
+async fn zurueckgewiesener_schluessel_bleibt_es_nach_der_naechsten_meldung() {
+    let (_hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let pfad = format!("/api/admin/instanz/unterschrift/{id}/zurueckweisen");
+    let (s, v) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zustand"], "abgelehnt");
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    let zeile = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == id)
+        .unwrap();
+    assert_eq!(zeile["zustand"], "abgelehnt");
+    // Nicht wartend: weder bestätigen noch noch einmal zurückweisen.
+    assert_eq!(
+        bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (s, _) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(aktionen(&elw.pool)
+        .await
+        .contains(&"unterschrift_zurueckgewiesen".to_string()));
 }
 
 #[tokio::test]
@@ -1025,7 +1145,9 @@ async fn letzter_schluessel_bleibt_solange_gekoppelt_und_widerruf_wandert() {
         .filter(|s| s["herkunft"] == "gegenueber" && s["zustand"] == "widerrufen")
         .count();
     assert_eq!(widerrufen, 1);
-    assert_eq!(gueltige_fremde(&u).len(), 1);
+    // B kam in derselben Meldung, gegengezeichnet von A, als A noch galt; er wartet am ELW.
+    assert!(gueltige_fremde(&u).is_empty());
+    wartender(&elw).await;
 }
 
 #[tokio::test]

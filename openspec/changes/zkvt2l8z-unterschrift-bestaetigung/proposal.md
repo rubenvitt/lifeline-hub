@@ -49,7 +49,7 @@ Keine.
   `src/routes/instanz.rs` (zwei Routen, Übersicht), `src/routes/benutzer.rs` (Anzeige „hält den
   letzten Schlüssel“), `src/auth/admin_audit.rs`.
 - **API:** `POST /api/admin/instanz/unterschrift/{id}/bestaetigen` und
-  `/ablehnen`. Ein neues Feld an der Benutzeranzeige, neue Enum-Werte, generierte Typen.
+  `/zurueckweisen`. Ein neues Feld an der Benutzeranzeige, neue Enum-Werte, generierte Typen.
 - **Frontend:** `frontend/src/instanz/` (Bestätigungsdialog, Hinweise),
   `frontend/src/pages/BenutzerPage.tsx` (Warnung), Zugangsprotokoll-Texte.
 - **Doku:** Anwenderkapitel Instanzkopplung, Architektur Kapitel 8 und 11.

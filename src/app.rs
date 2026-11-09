@@ -1836,6 +1836,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::instanz::unterschrift_widerrufen),
         )
         .route(
+            "/api/admin/instanz/unterschrift/{id}/bestaetigen",
+            post(routes::instanz::unterschrift_bestaetigen),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/zurueckweisen",
+            post(routes::instanz::unterschrift_zurueckweisen),
+        )
+        .route(
             "/api/instanz/koppeln",
             post(routes::instanz::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )

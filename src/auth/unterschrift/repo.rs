@@ -247,6 +247,82 @@ pub async fn is_letzter_bei_kopplung(
     Ok(andere == 0)
 }
 
+/// Passen `eingabe` und die letzten vier Zeichen des Fingerabdrucks zusammen? Trennzeichen,
+/// Leerraum und Groß- und Kleinschreibung zählen nicht (design.md D3).
+pub fn is_fingerabdruck_ende(fingerabdruck: &str, eingabe: &str) -> bool {
+    let norm = |t: &str| -> String {
+        t.chars()
+            .filter(char::is_ascii_alphanumeric)
+            .map(|c| c.to_ascii_uppercase())
+            .collect()
+    };
+    let eingabe = norm(eingabe);
+    eingabe.len() == 4 && norm(fingerabdruck).ends_with(&eingabe)
+}
+
+/// Bestätigt einen vom Gegenüber gelieferten, wartenden Schlüssel der Org (LLH-1605); `false`,
+/// wenn er nicht (mehr) wartet. Der bedingte `UPDATE` macht einen doppelten Klick wirkungslos.
+pub async fn confirm(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    decide(
+        conn,
+        org_id,
+        id,
+        UnterschriftSchluesselZustand::Gueltig,
+        benutzer_id,
+        jetzt,
+    )
+    .await
+}
+
+/// Weist einen vom Gegenüber gelieferten, wartenden Schlüssel der Org zurück; er wird nie gültig.
+pub async fn reject(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    decide(
+        conn,
+        org_id,
+        id,
+        UnterschriftSchluesselZustand::Abgelehnt,
+        benutzer_id,
+        jetzt,
+    )
+    .await
+}
+
+async fn decide(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+    zustand: UnterschriftSchluesselZustand,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let n = sqlx::query(
+        "UPDATE unterschrift_schluessel SET zustand = ?, entschieden_at = ?, entschieden_von = ? \
+         WHERE id = ? AND org_id = ? AND herkunft = 'gegenueber' \
+         AND zustand = 'wartet_auf_bestaetigung'",
+    )
+    .bind(zustand.as_str())
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(id)
+    .bind(org_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
+}
+
 /// Widerruft einen lokalen Schlüssel; `false`, wenn er schon widerrufen war.
 pub async fn widerrufen(
     conn: &mut SqliteConnection,
@@ -443,9 +519,13 @@ pub async fn accept_lieferungen(
                 .await?;
             }
             // Ein unbekannter widerrufener oder ein noch wartender Schlüssel ändert nichts; ein
-            // hier schon bekannter gültiger auch nicht. Ein widerrufener lebt nie wieder auf.
+            // hier schon bekannter gültiger auch nicht, gleich ob er hier gilt, wartet oder
+            // abgelehnt ist. Ein widerrufener oder abgelehnter lebt nie wieder auf. Die Zustände
+            // der Bestätigung gibt es nur hier, ein Gegenüber liefert sie nicht.
             (UnterschriftSchluesselZustand::Widerrufen, None)
             | (UnterschriftSchluesselZustand::WartetAufGegenzeichnung, _)
+            | (UnterschriftSchluesselZustand::WartetAufBestaetigung, _)
+            | (UnterschriftSchluesselZustand::Abgelehnt, _)
             | (UnterschriftSchluesselZustand::Gueltig, Some(_)) => {}
             (UnterschriftSchluesselZustand::Gueltig, None) => {
                 // Derselbe Schlüssel unter anderer id: ein widerrufener lebt nie wieder auf, ein
@@ -453,7 +533,7 @@ pub async fn accept_lieferungen(
                 let schon: Option<String> = sqlx::query_scalar(
                     "SELECT zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
                      AND (credential_id = ? OR schluessel = ?) \
-                     ORDER BY zustand = 'widerrufen' DESC LIMIT 1",
+                     ORDER BY zustand IN ('widerrufen', 'abgelehnt') DESC LIMIT 1",
                 )
                 .bind(ziel.kopplung_org_id)
                 .bind(&l.credential_id)
@@ -461,11 +541,15 @@ pub async fn accept_lieferungen(
                 .fetch_optional(&mut *conn)
                 .await?;
                 match schon.as_deref() {
-                    Some("widerrufen") => {
+                    Some(z @ ("widerrufen" | "abgelehnt")) => {
                         abgelehnt.push(Abgelehnt {
                             fingerabdruck: fp,
                             benutzer_name: l.benutzer_name.clone(),
-                            grund: "Schlüssel war widerrufen".into(),
+                            grund: if z == "widerrufen" {
+                                "Schlüssel war widerrufen".into()
+                            } else {
+                                "Schlüssel war zurückgewiesen".into()
+                            },
                         });
                         continue;
                     }
@@ -502,7 +586,7 @@ pub async fn accept_lieferungen(
                     "INSERT INTO unterschrift_schluessel (org_id, herkunft, kopplung_org_id, \
                      fremde_id, benutzer_name, credential_id, alg, schluessel, rp_id, origin, \
                      bezeichnung, fingerabdruck, zustand, gegenzeichnung, stand) \
-                     VALUES (?, 'gegenueber', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gueltig', ?, ?)",
+                     VALUES (?, 'gegenueber', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 )
                 .bind(ziel.org_id)
                 .bind(ziel.kopplung_org_id)
@@ -515,6 +599,13 @@ pub async fn accept_lieferungen(
                 .bind(&l.origin)
                 .bind(&l.bezeichnung)
                 .bind(&fp)
+                // Der Grundstock gilt sofort, das Koppeln ist der Anker; was danach kommt,
+                // wartet auf die Bestätigung eines Admins hier (design.md D2, R24).
+                .bind(if grundstock {
+                    UnterschriftSchluesselZustand::Gueltig.as_str()
+                } else {
+                    UnterschriftSchluesselZustand::WartetAufBestaetigung.as_str()
+                })
                 .bind(
                     l.gegenzeichnung
                         .as_ref()
