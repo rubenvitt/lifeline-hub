@@ -348,6 +348,16 @@ Migrationen.
   bis zur nächsten Meldung der meldenden Seite. Sicher bleibt die meldende Seite: Sie nimmt nur den
   passenden Code an.
 
+**Aus dem Review von CodeRabbit (PR #1243):**
+
+- Die erreichte Seite nimmt eine Epoche der meldenden nur an, wenn die Führung bisher bei ihr
+  selbst oder bei dieser meldenden Seite lag; sonst Hinweis an der Kopplung. So nimmt ein ELW
+  keinem anderen ELW derselben Org die Führung.
+- Der Widerruf räumt auch offene Übernahmen dieses Gegenübers; Bestätigen verlangt ein noch
+  gekoppeltes Gegenüber.
+- Die Schwärzung setzt `offen` und `offen_bruch_at` gemeinsam auf NULL (CHECK der Tabelle).
+- Sofort wieder melden nur, wenn das Gegenüber quittiert hat.
+
 ## Migration Plan
 
 - Die Migration ist rein additiv: zwei neue Tabellen, neue Spalten an `einsatz` und

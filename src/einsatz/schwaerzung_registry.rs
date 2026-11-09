@@ -3159,7 +3159,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("erklaerung", Strategie::NullSetzen, Z_EINSATZ),
             retain("beweis", G_FUEHRUNG),
             scrub("offen", Strategie::NullSetzen, Z_EINSATZ),
-            retain("offen_bruch_at", G_ZEIT),
+            // CHECK (offen IS NULL) = (offen_bruch_at IS NULL): beide fallen gemeinsam.
+            scrub("offen_bruch_at", Strategie::NullSetzen, Z_EINSATZ),
             retain("abgabe_schluessel", G_FUEHRUNG),
             retain("anfrage_at", G_ZEIT),
             retain("bruch_at", G_ZEIT),

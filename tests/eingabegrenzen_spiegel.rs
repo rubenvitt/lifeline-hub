@@ -149,6 +149,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("EXTERNE_STELLE_KURZ_MAX", externe_stelle::KURZ_MAX),
         ("MELDENDE_STELLE_MAX", einsatz::MELDENDE_STELLE_MAX),
         (
+            "FUEHRUNG_GRUND_MAX",
+            lifeline_hub::instanz::fuehrung::GRUND_MAX,
+        ),
+        (
             "EINSATZLEITER_NAME_MAX",
             fuehrungsstelle::EINSATZLEITER_NAME_MAX,
         ),

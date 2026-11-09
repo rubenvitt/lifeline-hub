@@ -229,7 +229,7 @@ async fn run_abschluss(
         ));
     };
     if akte_id != a.id {
-        return Err(AppError::Validation(
+        return Err(AppError::UnprocessableEntity(
             "Unterschrift gehört zu einem anderen Einsatz".into(),
         ));
     }

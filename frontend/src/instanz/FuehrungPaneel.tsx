@@ -26,12 +26,10 @@ import {
   widersprecheUebernahme,
   type FuehrungOrt,
 } from '../api/fuehrung';
+import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { FuehrungAnzeige, FuehrungCodeAntwort, FuehrungVerlaufEintrag } from '../api/types';
 import { FUEHRUNG_ART_TEXT, fuehrungMoeglich } from './fuehrungText';
-
-/** Höchstlänge des Grundes (`instanz::fuehrung::GRUND_MAX`). */
-const GRUND_MAX = 500;
 
 /** Folge der Übergabe und der Abgabe per Code: steht in der Rückfrage, nicht neben dem Knopf. */
 const ABGABE_FOLGE = 'Danach ist der Einsatz hier nur noch zu lesen.';
@@ -361,12 +359,12 @@ export default function FuehrungPaneel({
           name="grund"
           rules={[
             { required: true, whitespace: true, message: 'Grund angeben' },
-            { max: GRUND_MAX, message: `Höchstens ${GRUND_MAX} Zeichen` },
+            { max: FUEHRUNG_GRUND_MAX, message: `Höchstens ${FUEHRUNG_GRUND_MAX} Zeichen` },
           ]}
         >
           <Input.TextArea
             autoSize={{ minRows: 2, maxRows: 5 }}
-            maxLength={GRUND_MAX}
+            maxLength={FUEHRUNG_GRUND_MAX}
             placeholder="ohne Verbindung seit 40 min"
           />
         </Form.Item>

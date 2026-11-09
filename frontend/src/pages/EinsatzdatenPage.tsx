@@ -1487,7 +1487,21 @@ function FuehrungAbschnitt({
     queryKey: einsatzKeys.fuehrung(einsatzId),
     queryFn: () => loadFuehrung(einsatzId),
   });
-  if (!q.data) return null;
+  if (!q.data) {
+    // Ein gescheiterter Abruf steht am Platz des Paneels, mit „Erneut laden“ (PaneelZustand).
+    return (
+      <Paneel titel="Führung" style={{ marginTop: token.marginLG }}>
+        <PaneelZustand
+          zustand={q.isError ? 'fehler' : 'laden'}
+          titel="Führung"
+          leerText=""
+          onNeuladen={() => void q.refetch()}
+        >
+          {null}
+        </PaneelZustand>
+      </Paneel>
+    );
+  }
   return (
     <FuehrungPaneel
       fuehrung={q.data}

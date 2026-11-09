@@ -889,3 +889,98 @@ async fn ueberhoehte_epoche_wird_nicht_uebernommen() {
     .await;
     assert_eq!(s, StatusCode::OK);
 }
+
+// ── Befunde aus dem Review von CodeRabbit (PR #1243) ─────────────────────────────────────────
+
+#[tokio::test]
+async fn widerruf_raeumt_eine_offene_uebernahme() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    elw_meldet(&elw).await;
+    assert!(fuehrung(&elw, e).await["offen"].is_object());
+    let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    let id = u["kopplungen"][0]["id"].as_i64().unwrap();
+    let (s, _) = post(
+        &elw,
+        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let f = fuehrung(&elw, e).await;
+    assert!(
+        f["offen"].is_null(),
+        "offene Übernahme verfällt mit der Kopplung"
+    );
+    assert_eq!(f["fuehrend"], true);
+    let (s, _) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
+    let (hub, elw1) = gekoppelt().await;
+    // Zweiter ELW derselben Hub-Org.
+    let elw2 = instanz(true).await;
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw2.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw2.admin,
+        Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    // Der Hub führt einen eigenen Einsatz und gibt ihn auf Anfrage an ELW 2.
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw2).await;
+    let akte2 = fremde(&elw2).await[0]["id"].as_i64().unwrap();
+    let (s, _) = post(
+        &elw2,
+        &format!("/api/admin/instanz/fuehrung/{akte2}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    elw_meldet(&elw2).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], elw2.kennung);
+    // ELW 1 kennt die Akte und beansprucht sie mit einer hohen Epoche für sich.
+    elw_meldet(&elw1).await;
+    let stand: i64 = sqlx::query_scalar(
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+         RETURNING fuehrung_stand",
+    )
+    .fetch_one(&elw1.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE einsatz_fuehrung SET epoche_zaehler = 9, epoche_instanz = ?, \
+         fuehrer_kennung = ?, fuehrer_name = 'ELW 1', stand = ?",
+    )
+    .bind(&elw1.kennung)
+    .bind(&elw1.kennung)
+    .bind(stand)
+    .execute(&elw1.pool)
+    .await
+    .unwrap();
+    elw_meldet(&elw1).await;
+    let f = fuehrung(&hub, h).await;
+    assert_eq!(f["fuehrer_kennung"], elw2.kennung, "ELW 2 führt weiter");
+}

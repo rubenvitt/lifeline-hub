@@ -418,6 +418,21 @@ pub async fn release_nach_widerruf(
     .bind(gegenueber_kennung)
     .fetch_all(&mut *conn)
     .await?;
+    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung.
+    let offene: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_fuehrung WHERE org_id = ? AND offen IS NOT NULL \
+         AND json_extract(offen, '$.fuehrer') = ?",
+    )
+    .bind(org_id)
+    .bind(gegenueber_kennung)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in offene {
+        let mut a = load(conn, id).await?;
+        a.offen = None;
+        a.offen_bruch_at = None;
+        save(conn, &mut a, true).await?;
+    }
     if ids.is_empty() {
         return Ok(());
     }

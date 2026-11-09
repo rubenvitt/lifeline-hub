@@ -526,6 +526,19 @@ pub async fn apply_eingang(
                     // Weitergereicht von einer dritten Instanz: nur zur Anzeige.
                     continue;
                 }
+                // Die erreichte Seite nimmt eine Epoche der meldenden nur an, wenn die Führung
+                // bisher bei ihr selbst oder bei dieser meldenden Seite lag: Ein ELW kann so keinem
+                // anderen ELW derselben Org die Führung nehmen (CodeRabbit, PR #1243).
+                if richtung == InstanzKopplungRichtung::WirdGemeldet
+                    && a.fuehrer_kennung != ich.kennung
+                    && a.fuehrer_kennung != sender
+                {
+                    aus.hinweis = Some(format!(
+                        "{} beansprucht die Führung von „{}“, die bei {} liegt: abgelehnt",
+                        kopplung.gegenueber_name, a.bezeichnung, a.fuehrer_name
+                    ));
+                    continue;
+                }
                 if !nimmt_mir {
                     let gewinne = m.fuehrer == ich.kennung && !ich_fuehre;
                     let von = a.fuehrer_name.clone();

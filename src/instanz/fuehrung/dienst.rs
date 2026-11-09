@@ -384,6 +384,15 @@ pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(
                 "Die Führung hat sich inzwischen geändert.".into(),
             ));
         }
+        if !repo::list_gegenueber(conn, a.org_id)
+            .await?
+            .iter()
+            .any(|g| g.kennung == m.fuehrer)
+        {
+            return Err(AppError::Conflict(
+                "Die übernehmende Instanz ist nicht mehr gekoppelt.".into(),
+            ));
+        }
         let bruch = a.offen_bruch_at.clone();
         a.set_epoche(&m.epoche);
         a.fuehrer_kennung = m.fuehrer.clone();

@@ -527,7 +527,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
          Gefahr vorbehalten ist. Nur der Zustand und der Knopf, keine Folgenerklärung (LFH-1078). */}
       {/* LLH-1491: eine gültige Notübernahme wartet auf die Einsatzleitung. */}
-      {einsatz?.fuehrung?.offen && <FuehrungHinweisband einsatz={einsatz} />}
+      {einsatz?.fuehrung?.offen && (
+        <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+          <FuehrungHinweisband einsatz={einsatz} />
+        </EinsatzAnzeigeProvider>
+      )}
       {modulFreigabenQuery.isError && (
         <Alert
           type="warning"

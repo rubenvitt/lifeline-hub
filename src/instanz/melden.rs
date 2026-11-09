@@ -401,7 +401,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     };
     // Führung je Einsatz (LLH-1491, D3): Akten seit der letzten Quittung des Gegenübers.
     let fuehrung_an = super::fuehrung::is_enabled(pool).await?;
-    let (fuehrung_ausgang, fuehrung_empfangen) = if fuehrung_an {
+    let (fuehrung_ausgang, fuehrung_gesendet, fuehrung_empfangen) = if fuehrung_an {
         crate::write_retry!(pool, |conn| {
             fuehrung_repo::ensure_akten(conn).await?;
             let (gesendet, empfangen) =
@@ -413,10 +413,10 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 fuehrung_austausch::MELDUNG_BYTES,
             )
             .await?;
-            Ok((ausgang, empfangen))
+            Ok((ausgang, gesendet, empfangen))
         })?
     } else {
-        (fuehrung_austausch::Ausgang::default(), 0)
+        (fuehrung_austausch::Ausgang::default(), 0, 0)
     };
     let anfrage = MeldenAnfrage {
         name: super::name().to_string(),
@@ -557,7 +557,10 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         Ok(())
     })?;
     // Bleibt mehr Führung, als in diese Meldung passte, meldet sie sich gleich wieder (D3).
-    let naechste = if fuehrung_an && (fuehrung_ausgang.mehr || a.fuehrung_mehr) {
+    // Eigener Rest nur, wenn das Gegenüber quittiert hat (sonst hörte ein Gegenüber ohne Schalter
+    // die Meldung jede fünf Sekunden).
+    let fortschritt = a.fuehrung_bis > fuehrung_gesendet;
+    let naechste = if fuehrung_an && ((fuehrung_ausgang.mehr && fortschritt) || a.fuehrung_mehr) {
         jetzt.clone()
     } else {
         add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone())
