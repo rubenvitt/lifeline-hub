@@ -83,8 +83,9 @@ describe('useEntwurfVerlustschutz · Formularbindung (LFH-627)', () => {
   });
 
   it('schreibt einem neu eingehängten Formular auch einen schon bekannten Serverstand (LLH-1607)', async () => {
-    // Geschrieben wird nur ein NEUER Serverstand; ein neu eingehängtes Formular zählt dafür als
-    // leer. `clearOnDestroy` macht das Aushängen sichtbar: ohne leerte nichts den Speicher.
+    // Übersprungen wird nur der vom eigenen PATCH überholte Stand; ein unveränderter Serverstand
+    // geht beim Einhängen trotzdem ins Formular. `clearOnDestroy` macht das Aushängen sichtbar:
+    // ohne leerte nichts den Speicher.
     const { rerender } = render(<StabilerTraeger mitFormular />);
     expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
     rerender(<StabilerTraeger mitFormular={false} />);

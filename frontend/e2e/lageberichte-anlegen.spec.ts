@@ -134,10 +134,10 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
   page,
 }) => {
   // Der Klick auf die Sammelfüllung blurrt den Editor: der Autosave startet mit ihm. Seine Quittung
-  // setzte das Formular auf den Stand VOR dem PATCH zurück, und die Füllung schloss danach den
-  // Riegel vor dem Refetch (`entwurf/useEntwurfVerlustschutz.ts`). Die Lageentwicklung lädt das
-  // ETB und ist damit die langsame Quelle; von Hand gefüllt fällt sie aus dem Abruf, die Füllung
-  // kommt schnell und gewinnt das Rennen gegen den Refetch.
+  // setzte das Formular auf den Stand VOR dem PATCH zurück, und kam die Füllung vor dem Refetch,
+  // schloss sie den Riegel und hielt den alten Stand fest (`entwurf/useEntwurfVerlustschutz.ts`).
+  // Der Test legt diese Reihenfolge fest, statt auf sie zu hoffen: die Abrufe der Quellen warten
+  // auf die Antwort des PATCH, der Refetch des Berichts auf die Füllung.
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag LLH-1607 ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
@@ -156,16 +156,43 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
       patches.push(r.postDataJSON() as PatchBody);
     }
   });
+  let patchZurueck: () => void = () => {};
+  const patchAntwort = new Promise<void>((r) => (patchZurueck = r));
+  page.on('response', (r) => {
+    if (r.request().method() === 'PATCH' && new URL(r.url()).pathname === berichtPfad) {
+      patchZurueck();
+    }
+  });
+  let fuellungDa: () => void = () => {};
+  const fuellung = new Promise<void>((r) => (fuellungDa = r));
+  let reihenfolgeFest = false;
+  await page.route(
+    (u) => u.pathname.startsWith(`/api/einsaetze/${einsatzId}/`),
+    async (route) => {
+      const anfrage = route.request();
+      const pfad = new URL(anfrage.url()).pathname;
+      if (reihenfolgeFest && anfrage.method() === 'GET' && !pfad.endsWith('/live')) {
+        await (pfad === berichtPfad ? fuellung : patchAntwort);
+      }
+      await route.continue();
+    },
+  );
 
   const eigeneLage = page.getByRole('textbox', { name: 'Eigene Lage' });
   const lageentwicklung = page.getByRole('textbox', { name: 'Lageentwicklung' });
   await expect(eigeneLage).toHaveValue('');
   await lageentwicklung.fill('Von Hand');
+  reihenfolgeFest = true;
   await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
   await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
-  // Der Blur-Autosave des Klicks ist zurück und der Refetch danach auch: erst dann ist das
-  // Verlustfenster vorbei, in dem der alte Serverstand ins Formular fiel.
-  await expect.poll(() => patches.length).toBeGreaterThanOrEqual(1);
+  expect(patches).toHaveLength(1);
+  // Erst jetzt darf der Refetch nach der Quittung durch; danach ist das Verlustfenster vorbei.
+  const refetch = page.waitForResponse(
+    (r) => r.request().method() === 'GET' && new URL(r.url()).pathname === berichtPfad,
+  );
+  fuellungDa();
+  await refetch;
+  reihenfolgeFest = false;
   await expect(page.getByText('ungespeicherte Änderungen')).toBeVisible();
   await expect(lageentwicklung).toHaveValue('Von Hand');
 

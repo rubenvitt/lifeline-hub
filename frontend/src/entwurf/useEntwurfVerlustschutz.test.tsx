@@ -217,6 +217,31 @@ describe('useEntwurfVerlustschutz', () => {
     expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1x', notiz: 'gefüllt' });
   });
 
+  it('schreibt mit der Quittung einen Serverstand, der WÄHREND des PATCH kam (LLH-1607, Gegenaussage)', async () => {
+    // Übersprungen wird nur der Stand von vor dem PATCH. Ein Refetch, der während des PATCH
+    // eintraf, kann ihn schon enthalten (samt fremder Änderung); ihn für immer abzuweisen ließe
+    // das Formular still veraltet, denn nach der Invalidierung kommt bei gleichem Inhalt dieselbe
+    // Referenz zurück.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab(); // Blur-Autosave hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText('fremd')); // Riegel hält
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x');
+    await act(async () => {
+      aufloesen();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 2');
+  });
+
   it('lässt den Merker stehen, wenn während des laufenden Autosave weitergetippt wurde', async () => {
     // Verlustfenster: der PATCH trägt S1, im Formular steht S2 — eine Quittung für S1 darf nicht
     // „alles gespeichert" bedeuten.
