@@ -558,7 +558,7 @@ pub async fn liste_fuer_druck(
         .flat_map(|h| h.personen.iter_mut())
         .chain(l.ohne_haushalt.iter_mut());
     for p in personen {
-        crate::person::audit_repo::anlegen_tx(
+        crate::person::audit_repo::create_tx(
             &mut tx,
             einsatz_id,
             Some(p.id),

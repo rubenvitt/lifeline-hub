@@ -35,7 +35,7 @@ pub struct ZugriffAnzeige {
 
 /// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export oder Druck der
 /// gesamten Liste. `art` ist 'detail', 'export', 'druck' oder 'anhang'.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: Option<i64>,
@@ -55,9 +55,9 @@ pub async fn anlegen(
     Ok(())
 }
 
-/// Wie [`anlegen`], aber in einer offenen Transaktion: der Registrierlistendruck (LLH-1616)
+/// Wie [`create`], aber in einer offenen Transaktion: der Registrierlistendruck (LLH-1616)
 /// schreibt je Person einen Eintrag und liefert nur, wenn alle stehen.
-pub async fn anlegen_tx(
+pub async fn create_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     person_id: Option<i64>,
@@ -164,8 +164,8 @@ mod tests {
     async fn anlegen_und_liste_je_person() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        anlegen(&pool, e, Some(p), b, "detail").await.unwrap();
-        anlegen(&pool, e, Some(p), b, "detail").await.unwrap();
+        create(&pool, e, Some(p), b, "detail").await.unwrap();
+        create(&pool, e, Some(p), b, "detail").await.unwrap();
         let eintraege = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(eintraege.len(), 2);
         assert_eq!(eintraege[0].art, "detail");
@@ -176,7 +176,7 @@ mod tests {
     async fn export_eintrag_ohne_person() {
         let pool = test_pool().await;
         let (b, e, _p) = setup(&pool).await;
-        anlegen(&pool, e, None, b, "export").await.unwrap();
+        create(&pool, e, None, b, "export").await.unwrap();
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'export'",
         )
@@ -192,7 +192,7 @@ mod tests {
     async fn druck_eintrag_ohne_person() {
         let pool = test_pool().await;
         let (b, e, _p) = setup(&pool).await;
-        anlegen(&pool, e, None, b, "druck").await.unwrap();
+        create(&pool, e, None, b, "druck").await.unwrap();
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM person_zugriff_audit \
              WHERE einsatz_id = ? AND art = 'druck' AND person_id IS NULL",
@@ -359,7 +359,7 @@ mod tests {
     async fn anhang_eintrag_mit_person() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        anlegen(&pool, e, Some(p), b, "anhang").await.unwrap();
+        create(&pool, e, Some(p), b, "anhang").await.unwrap();
         let eintraege = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(eintraege.len(), 1);
         assert_eq!(eintraege[0].art, "anhang");
