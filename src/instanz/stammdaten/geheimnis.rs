@@ -115,9 +115,9 @@ pub async fn check_passkey_pflicht(
 }
 
 /// Ob für dieses Konto die Passkey-Pflicht gilt, sobald es einen Passkey hat: ein System-Admin
-/// einer verteilenden Org, oder einer, dessen Hash je an einen ELW ging. Auch nach einem
-/// Widerruf: der Hash bleibt dort (die Zeilen gehören danach der Instanz), also bleibt er hier
-/// wertlos.
+/// einer verteilenden Org, oder einer, dessen Hash an einen ELW ging. Auch nach einem Widerruf:
+/// der Hash bleibt dort (die Zeilen gehören danach der Instanz), also bleibt er hier wertlos. Erst
+/// „ELW verloren“ räumt die Lieferspur, weil der gelieferte Hash dann ohnehin nicht mehr gilt.
 pub async fn is_passkey_pflichtig(
     pool: &SqlitePool,
     benutzer: &crate::auth::Benutzer,

@@ -9572,7 +9572,7 @@
           "konten_mit_geheimnis": {
             "type": "integer",
             "format": "int64",
-            "description": "Nur erreichte Seite: Konten, deren Geheimnisse an diese Zuordnung gingen."
+            "description": "Nur erreichte Seite: Konten, deren Geheimnisse an diese Kopplung gingen, über alle\nZuordnungen der Org, und dort noch gelten („ELW verloren“ räumt sie)."
           },
           "stand": {
             "type": "integer",

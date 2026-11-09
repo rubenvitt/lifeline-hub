@@ -699,6 +699,13 @@ pub async fn elw_verloren(
             "„ELW verloren“ gibt es nur an der Instanz, bei der sich der ELW meldet.".into(),
         ));
     }
+    // Nach einem normalen Widerruf bleibt die Aktion, solange dort gelieferte Geheimnisse
+    // gelten; ein zweites Mal setzte sie wiederhergestellte Zugänge erneut zurück.
+    if vorher.org.widerrufen_at.is_some() && vorher.org.stammdaten.konten_mit_geheimnis == 0 {
+        return Err(AppError::Conflict(
+            "Dort gilt kein Passwort von hier mehr; die Kopplung ist schon widerrufen.".into(),
+        ));
+    }
     let jetzt = crate::zeit::jetzt();
     let zuordnung_id = vorher.org.id;
     let (konten, beendet) = crate::write_retry!(&state.pool, |conn| {
@@ -732,6 +739,16 @@ pub async fn elw_verloren(
             crate::auth::totp::storage::loesche_recovery_codes(&mut *conn, *id).await?;
             beendet.extend(crate::auth::session::alle_loeschen(conn, *id).await?);
         }
+        // Was dorthin ging, ist jetzt wertlos: die Spur fällt, damit die Aktion nicht erneut
+        // greift und die Passkey-Pflicht nicht mehr an diesen Lieferungen hängt.
+        sqlx::query(
+            "DELETE FROM instanz_geheimnis_lieferung WHERE kopplung_org_id IN \
+             (SELECT id FROM instanz_kopplung_org WHERE kopplung_id = ? AND org_id = ?)",
+        )
+        .bind(kopplung_id)
+        .bind(admin.org_id)
+        .execute(&mut *conn)
+        .await?;
         Ok((konten.len() as i64, beendet))
     })?;
     state.live.melde_sitzung_ende(beendet);

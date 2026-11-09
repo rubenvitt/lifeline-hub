@@ -10,8 +10,9 @@ quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/in
 Zwei Lifeline-Hub-Installationen lassen sich **koppeln**, etwa der Server im
 Einsatzleitwagen und ein öffentlich erreichbarer Server der Organisation. Die Kopplung legt
 fest, dass beide einander vertrauen. Über sie kommen die **Stammdaten** der Organisation vom
-Hub zum ELW: Konten, Fahrzeuge, Personal, Material, Kataloge und Org-Einstellungen. Einsatzdaten
-fließen darüber noch nicht.
+Hub zum ELW: Konten, Fahrzeuge, Personal, Material, Qualifikationen, Fahrzeug- und
+Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen und Org-Einstellungen.
+Einsatzdaten fließen nicht darüber.
 
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
@@ -69,6 +70,10 @@ verloren ist:
 3. Die Kopplung ist widerrufen. Die Konten, deren Passwort auf dem ELW lag, haben kein gültiges
    Passwort und keinen zweiten Faktor mehr, ihre Sitzungen sind beendet. Für jede Person in der
    Benutzerverwaltung ein Einmalpasswort vergeben, sofern sie keinen Passkey hat.
+
+Das geht auch, wenn die Kopplung schon vorher widerrufen wurde: Die Passwörter, die dorthin
+gingen, liegen dann noch auf dem ELW. Ist der ELW einmal als verloren gemeldet, fehlt der Eintrag
+im Menü.
 
 ### Stammdaten erneut abgleichen
 

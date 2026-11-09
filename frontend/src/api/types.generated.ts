@@ -3864,7 +3864,8 @@ export interface components {
             hinweise: string[];
             /**
              * Format: int64
-             * @description Nur erreichte Seite: Konten, deren Geheimnisse an diese Zuordnung gingen.
+             * @description Nur erreichte Seite: Konten, deren Geheimnisse an diese Kopplung gingen, über alle
+             *     Zuordnungen der Org, und dort noch gelten („ELW verloren“ räumt sie).
              */
             konten_mit_geheimnis: number;
             /** Format: int64 */

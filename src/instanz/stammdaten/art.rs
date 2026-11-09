@@ -454,6 +454,12 @@ mod tests {
                 assert!(hat(&format!("{t}_{endung}")), "Trigger {t}_{endung} fehlt");
             }
         }
+        // Unterlisten brauchen zusätzlich den Schutz beim Einfügen: sonst hängte jeder lokale
+        // Schreibweg Einträge an eine Zeile vom Hub.
+        for u in BESCHREIBUNGEN.iter().flat_map(|b| b.unterlisten) {
+            let t = u.tabelle;
+            assert!(hat(&format!("{t}_schutz_i")), "Trigger {t}_schutz_i fehlt");
+        }
         for b in BESCHREIBUNGEN {
             let spalten: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "SELECT name FROM pragma_table_info('{}')",

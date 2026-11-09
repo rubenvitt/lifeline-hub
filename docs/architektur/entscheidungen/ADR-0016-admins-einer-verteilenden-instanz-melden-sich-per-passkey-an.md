@@ -31,7 +31,8 @@ herleitung:
   seiner Org verteilt, nicht per Passwort an: `routes::auth::login` ruft nach der
   Passwortprüfung `instanz::stammdaten::geheimnis::check_passkey_pflicht` (403, kein
   Fehlversuch). Ob die Pflicht gilt, sagt allein `geheimnis::is_passkey_pflichtig`; sie bleibt
-  nach einem Widerruf, wenn der Hash je an einen ELW ging. Ein Admin ohne Passkey behält den
+  nach einem Widerruf, solange ein an einen ELW gelieferter Hash dort gilt (bis „ELW verloren“).
+  Ein Admin ohne Passkey behält den
   Passwortweg; seine Geheimnisse gehen dann nicht hinaus (`liefern::load_geheimnis`).
 - MUST: Unter der Pflicht entfernt ein Einmalpasswort (`routes::benutzer::einmalpasswort`) die
   Anmelde-Passkeys des Ziels. Für den letzten Admin gibt es den Startbefehl

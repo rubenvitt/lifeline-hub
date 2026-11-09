@@ -212,4 +212,41 @@ describe('InstanzkopplungSeite', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Als verloren melden' }));
     await waitFor(() => expect(meldeElwVerloren).toHaveBeenCalledWith(9));
   });
+
+  it.each([
+    { konten: 2, verloren: true },
+    { konten: 0, verloren: false },
+  ])(
+    'nach dem Widerruf: „ELW verloren“ nur, solange dort Passwörter gelten ($konten Konten)',
+    async ({ konten, verloren }) => {
+      const elw = {
+        ...uebersicht().kopplungen[0],
+        id: 9,
+        gegenueber_name: 'ELW 1',
+        richtung: 'wird_gemeldet' as const,
+        protokoll: 'passt' as const,
+        org: {
+          ...uebersicht().kopplungen[0].org,
+          widerrufen_at: '2026-11-09 10:00:00',
+          stammdaten: {
+            stand: 0,
+            hinweise: [],
+            geheimnisse_verteilt: true,
+            konten_mit_geheimnis: konten,
+          },
+        },
+      };
+      vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht({ kopplungen: [elw] }));
+      renderMitProviders(<InstanzkopplungSeite />);
+      expect((await screen.findAllByText(/ELW 1/)).length).toBeGreaterThan(0);
+      const menue = screen.queryByRole('button', { name: 'Aktionen zur Kopplung mit ELW 1' });
+      if (!verloren) {
+        expect(menue).not.toBeInTheDocument();
+        return;
+      }
+      await userEvent.click(menue!);
+      expect(await screen.findByText('ELW verloren …')).toBeInTheDocument();
+      expect(screen.queryByText('Widerrufen …')).not.toBeInTheDocument();
+    },
+  );
 });

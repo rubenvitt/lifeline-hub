@@ -492,6 +492,9 @@ export default function BenutzerPage() {
         titel="Benutzer bearbeiten"
         form={editForm}
         erfassenText="Speichern"
+        // Konto vom Hub (LLH-1493): nichts im Formular ist hier änderbar, ein PATCH bekäme nur
+        // 409. Das Einmalpasswort ist eine eigene Aktion und bleibt.
+        gesperrt={kontoVomHub(zuBearbeiten)}
         laeuft={bearbeiten.isPending}
         // Sperrt jeden Ausweg, solange gespeichert oder ein Einmalpasswort vergeben wird (LFH-1121):
         // schlösse der Dialog vorher, ginge das schon gesetzte Passwort verloren. Die Fehler

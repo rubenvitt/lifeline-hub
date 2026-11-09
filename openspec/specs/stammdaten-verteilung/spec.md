@@ -158,7 +158,9 @@ Geheimnisse an diese Kopplung geliefert wurden, MUST das Passwort ungültig werd
 Faktor zurückgesetzt sein und jede Sitzung beendet sein. Das alte Passwort MUST NOT mehr zu einer
 Sitzung oder zu einem Passwortwechsel führen. Wieder hinein kommt die Person per Passkey oder mit
 einem Einmalpasswort eines Admins. Die Aktion MUST genau einen Eintrag in der Admin-Spur
-schreiben, mit der Zahl der betroffenen Konten.
+schreiben, mit der Zahl der betroffenen Konten. Nach einem normalen Widerruf MUST sie verfügbar
+bleiben, solange dort gelieferte Geheimnisse gelten. Ein zweites Mal MUST sie abgelehnt werden
+(409), damit sie wiederhergestellte Zugänge nicht erneut zurücksetzt.
 
 #### Scenario: ELW gestohlen
 - **WHEN** der Admin am Hub für den ELW „ELW 1“ „ELW verloren“ auslöst und dorthin die Geheimnisse von „max“ und „anna“ gingen
@@ -167,6 +169,10 @@ schreiben, mit der Zahl der betroffenen Konten.
 #### Scenario: Altes Passwort am Hub
 - **WHEN** nach „ELW verloren“ jemand das alte Passwort von „max“ am Hub benutzt
 - **THEN** scheitert die Anmeldung wie mit einem falschen Passwort
+
+#### Scenario: Nach einem normalen Widerruf gestohlen
+- **WHEN** die Kopplung zu „ELW 1“ schon widerrufen ist und der ELW danach gestohlen wird
+- **THEN** kann der Admin „ELW verloren“ noch auslösen, und ein zweiter Versuch wird abgelehnt
 
 #### Scenario: Zurück per Einmalpasswort
 - **WHEN** ein Admin für „max“ danach ein Einmalpasswort vergibt

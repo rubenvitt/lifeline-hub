@@ -1295,5 +1295,11 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
     expect(
       within(menue).getByRole('menuitem', { name: 'Deaktivieren gesperrt: Wird am Hub gepflegt' }),
     ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Escape}');
+    // Bearbeiten: „Speichern“ gesperrt (ein PATCH bekäme nur 409), das Einmalpasswort bleibt.
+    await waehle('Max', 'Bearbeiten');
+    const bearbeiten = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
+    expect(within(bearbeiten).getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    expect(within(bearbeiten).getByRole('button', { name: /Einmalpasswort/ })).toBeEnabled();
   });
 });

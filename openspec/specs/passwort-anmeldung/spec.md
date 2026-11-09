@@ -170,8 +170,9 @@ richtigem Passwort und richtigem zweiten Faktor. Bei richtigem Passwort MUST die
 Abweisung 403 mit dem Text „Admins melden sich hier per Passkey an“ sein. Sie MUST NOT als
 Fehlversuch zählen. Ein falsches Passwort MUST wie bisher mit 401 scheitern. Ein System-Admin ohne
 Anmelde-Passkey MUST sich weiter per Passwort anmelden können. Für Orgs, deren Geheimnisse die
-Instanz nicht verteilt, MUST sich nichts ändern. Ging der Passwort-Hash eines System-Admins je an
-eine andere Instanz, MUST die Abweisung auch nach dem Widerruf der Zuordnung gelten.
+Instanz nicht verteilt, MUST sich nichts ändern. Ging der Passwort-Hash eines System-Admins an
+eine andere Instanz, MUST die Abweisung auch nach dem Widerruf der Zuordnung gelten, bis diese
+Instanz als verloren gemeldet ist.
 
 #### Scenario: Admin mit Passkey am Hub
 - **WHEN** der Hub die Org von „anna“ an einen ELW verteilt, „anna“ System-Admin ist, einen Anmelde-Passkey hat und sich am Hub mit richtigem Passwort anmelden will

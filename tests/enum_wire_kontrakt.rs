@@ -664,7 +664,7 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
-    // Stammdaten-Verteilung (LLH-1493): Wire = `art` in stammdaten_aenderung/-herkunft (0305).
+    // Stammdaten-Verteilung (LLH-1493): Wire = `art` in stammdaten_aenderung/-herkunft (0306).
     enum_wire_as_str!(lifeline_hub::instanz::stammdaten::StammdatenArt {
         Konto,
         OrgEinstellungen,

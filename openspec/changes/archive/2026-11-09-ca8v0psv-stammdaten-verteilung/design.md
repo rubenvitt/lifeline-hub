@@ -283,6 +283,16 @@ gilt danach ebenfalls kein altes Passwort mehr. Der Weg zurück ist das Einmalpa
   sonst die alte Zeile, auf die noch Einsatzdaten zeigen.
 - **Demo-Daten:** Die Demo-Entfernung lässt eine Zeile vom Hub stehen wie eine noch verwiesene.
 
+## Nachträge aus dem PR-Review (09.11.2026)
+
+- **„ELW verloren“ nach einem normalen Widerruf (D8):** Der Widerruf lässt die gelieferten Hashes
+  am ELW gelten, also bleibt die Aktion verfügbar, solange es Lieferungen gibt
+  (`konten_mit_geheimnis`, jetzt über alle Zuordnungen der Org an der Kopplung gezählt). Die
+  Aktion räumt danach die Lieferspur: ein zweites Mal gibt 409, statt wiederhergestellte Zugänge
+  erneut zurückzusetzen, und die Passkey-Pflicht hängt nicht mehr an diesen Lieferungen.
+- **Benutzerverwaltung:** „Speichern“ ist für Konten vom Hub gesperrt; das Einmalpasswort bleibt.
+- Der Wächter `art::tests` verlangt an jeder Unterliste auch `_schutz_i`.
+
 ## Risks / Trade-offs
 
 - **Gestohlener ELW ohne Plattenverschlüsselung, die aber bestätigt wurde.** → Die Bestätigung ist

@@ -771,7 +771,8 @@ pub struct InstanzStammdatenStand {
     pub hinweise: Vec<String>,
     /// Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt).
     pub geheimnisse_verteilt: bool,
-    /// Nur erreichte Seite: Konten, deren Geheimnisse an diese Zuordnung gingen.
+    /// Nur erreichte Seite: Konten, deren Geheimnisse an diese Kopplung gingen, über alle
+    /// Zuordnungen der Org, und dort noch gelten („ELW verloren“ räumt sie).
     pub konten_mit_geheimnis: i64,
 }
 
@@ -792,9 +793,12 @@ pub async fn list_fuer_org(
     for o in orgs {
         let k = load_kopplung(pool, o.kopplung_id).await?;
         let konten: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM instanz_geheimnis_lieferung WHERE kopplung_org_id = ?",
+            "SELECT COUNT(DISTINCT l.benutzer_id) FROM instanz_geheimnis_lieferung l \
+             JOIN instanz_kopplung_org z ON z.id = l.kopplung_org_id \
+             WHERE z.kopplung_id = ? AND z.org_id = ?",
         )
-        .bind(o.id)
+        .bind(o.kopplung_id)
+        .bind(o.org_id)
         .fetch_one(pool)
         .await?;
         aus.push(to_anzeige(k, o, konten));

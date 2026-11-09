@@ -81,7 +81,7 @@ wire_enum! {
         /// Gegenzeichnung eines bekannten Schlüssels).
         UnterschriftAbgelehnt => "unterschrift_abgelehnt",
         /// LLH-1493: „ELW verloren“ — Kopplung widerrufen, Geheimnisse der dorthin verteilten
-        /// Konten ungültig (Migration 0306).
+        /// Konten ungültig (Migration 0307).
         InstanzElwVerloren => "instanz_elw_verloren",
     }
 }

@@ -1167,3 +1167,40 @@ async fn admin_vom_hub_ist_am_elw_admin_nur_wenn_er_eine_org_traegt() {
     .await
     .contains("„annaadmin“ ist am Hub Admin, hier nicht"));
 }
+
+#[tokio::test]
+async fn elw_verloren_geht_auch_nach_dem_widerruf_aber_nur_einmal() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    konto_bereit(&hub, "maxmuster").await;
+    melden(&elw).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let k = v["kopplungen"][0]["id"].as_i64().unwrap();
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // Der Widerruf lässt die Passwörter dort gelten, also zählt die Kopplung sie weiter.
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    assert_eq!(
+        v["kopplungen"][0]["org"]["stammdaten"]["konten_mit_geheimnis"],
+        1
+    );
+    let pfad = format!("/api/admin/instanz/kopplungen/{k}/verloren");
+    let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["konten"], 1, "{v}");
+    assert_eq!(
+        v["kopplung"]["org"]["stammdaten"]["konten_mit_geheimnis"],
+        0
+    );
+    let (s, _) = login(&hub, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    // Ein zweites Mal setzte es wiederhergestellte Zugänge erneut zurück.
+    let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}

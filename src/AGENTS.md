@@ -323,7 +323,7 @@ Herleitung in
   `openspec/changes/archive/2026-11-09-ca8v0psv-stammdaten-verteilung/design.md`:
   - **Eine verteilte Art hat einen Eintrag in `instanz::stammdaten::art::BESCHREIBUNGEN` und ihre
     Trigger** (`<tabelle>_log_i/_u/_d`, `<tabelle>_schutz_u/_d`, Unterlisten auch `_schutz_i`,
-    Muster `migrations/0305`). Wer eine dieser Tabellen in einer Migration neu baut, legt die
+    Muster `migrations/0306`). Wer eine dieser Tabellen in einer Migration neu baut, legt die
     Trigger wieder an; Guard `art::tests::trigger_und_spalten_passen_zur_beschreibung`. Kein
     Schreibweg in Rust schreibt ins Änderungslog.
   - **Übernommene Zeilen ändert nur die Übernahme** (`stammdaten::uebernehmen`, Merker

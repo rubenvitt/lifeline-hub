@@ -193,7 +193,7 @@ impl AppError {
         let AppError::Database(sqlx::Error::Database(db)) = self else {
             return None;
         };
-        // Schreibschutz übernommener Stammdaten (LLH-1493, `migrations/0305`): der Trigger
+        // Schreibschutz übernommener Stammdaten (LLH-1493, `migrations/0306`): der Trigger
         // bricht mit dieser Nachricht ab.
         if db
             .message()

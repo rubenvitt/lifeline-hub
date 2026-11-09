@@ -220,28 +220,36 @@ export default function InstanzkopplungSeite() {
                 const hinweise = kopplungHinweise(k, u.datentraeger_bestaetigt);
                 const stammdaten = stammdatenZeile(k);
                 const aktiv = k.org.widerrufen_at == null;
-                // Stammdaten (LLH-1493): an der meldenden Seite neu abgleichen, an der erreichten
-                // „ELW verloren“, beides vor dem Widerruf.
+                // Stammdaten (LLH-1493): an der meldenden Seite neu abgleichen, solange die
+                // Zuordnung gilt. An der erreichten „ELW verloren“ auch nach dem Widerruf, solange
+                // dort gelieferte Passwörter gelten; danach räumt die Meldung sie.
+                const verlorenMoeglich =
+                  k.richtung === 'wird_gemeldet' &&
+                  (aktiv || k.org.stammdaten.konten_mit_geheimnis > 0);
                 const eintraege: MenueEintrag[] = [
-                  ...(k.richtung === 'meldet_sich'
+                  ...(aktiv && k.richtung === 'meldet_sich'
                     ? [{ key: 'abgleichen', label: 'Stammdaten erneut abgleichen' }]
                     : []),
-                  ...(k.richtung === 'wird_gemeldet'
+                  ...(verlorenMoeglich
                     ? [{ key: 'verloren', label: 'ELW verloren …', gefahr: true as const }]
                     : []),
-                  {
-                    key: 'widerrufen',
-                    icon: <IconKreuz />,
-                    label: 'Widerrufen …',
-                    gefahr: true,
-                  },
+                  ...(aktiv
+                    ? [
+                        {
+                          key: 'widerrufen',
+                          icon: <IconKreuz />,
+                          label: 'Widerrufen …',
+                          gefahr: true as const,
+                        },
+                      ]
+                    : []),
                 ];
                 const laeuft =
                   kopplungWiderrufen.isPending || stammdatenNeu.isPending || elwVerloren.isPending;
                 return (
                   <ListenEintrag
                     actions={
-                      isAdmin && aktiv
+                      isAdmin && eintraege.length > 0
                         ? [
                             <MenueAusloeser
                               key="aktionen"
