@@ -32,6 +32,9 @@ pub const ANTWORT_BYTES: usize = 256 * 1024;
 /// Obergrenzen der Textfelder einer gelieferten Akte (Zeichen).
 const TEXT_MAX: usize = 500;
 const ERKLAERUNG_MAX: usize = 4096;
+/// Größter Zähler einer gelieferten Epoche: weit über jedem echten Verlauf, weit unter dem
+/// Überlauf (`Epoche::naechste` rechnet plus eins).
+const ZAEHLER_MAX: i64 = 1 << 40;
 
 /// Eine Akte auf der Leitung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,7 +101,7 @@ impl AkteMeldung {
             && kurz(&self.fuehrer)
             && kurz(&self.fuehrer_name)
             && kurz(&self.epoche.instanz)
-            && self.epoche.zaehler >= 1
+            && (1..=ZAEHLER_MAX).contains(&self.epoche.zaehler)
             && matches!(self.status.as_str(), "aktiv" | "abgeschlossen")
             && FuehrungWechselArt::parse(&self.art).is_some()
             && self
@@ -339,6 +342,7 @@ async fn verwerfen(
     a.fuehrer_kennung = ich.kennung.clone();
     a.fuehrer_name = ich.name.clone();
     a.set_art(FuehrungWechselArt::Verworfen);
+    a.anfrage_at = None;
     a.erklaerung = None;
     a.beweis = None;
     a.offen = None;
@@ -508,7 +512,14 @@ pub async fn apply_eingang(
                     }
                     continue;
                 }
-                if von_sender && m.fuehrer != sender && m.fuehrer != ich.kennung {
+                // Die erreichte Seite nimmt von der meldenden nur sie selbst oder sich als Führer
+                // an; die meldende sieht auch eine Übergabe an eine dritte Instanz (mehrere ELW an
+                // einem Hub), nimmt sie aber nur zur Anzeige oder mit Beweis an (unten).
+                if von_sender
+                    && m.fuehrer != sender
+                    && m.fuehrer != ich.kennung
+                    && richtung == InstanzKopplungRichtung::WirdGemeldet
+                {
                     continue;
                 }
                 if !von_sender && (nimmt_mir || richtung == InstanzKopplungRichtung::WirdGemeldet) {
@@ -686,6 +697,8 @@ pub async fn apply_eingang(
                     .await?;
                     continue;
                 }
+                // Eine Anfrage gilt nur dem Stand, den sie sah (Review LLH-1491: ein alter
+                // Merker gäbe die Führung sonst ohne Menschen zurück).
                 if m.anfrage && ich_fuehre && richtung == InstanzKopplungRichtung::WirdGemeldet {
                     erfuelle_anfrage(conn, &ich, kopplung, &mut a, m, &mut aus).await?;
                     continue;
@@ -698,9 +711,10 @@ pub async fn apply_eingang(
                 }
             }
             std::cmp::Ordering::Less => {
-                if m.anfrage && ich_fuehre && richtung == InstanzKopplungRichtung::WirdGemeldet {
-                    erfuelle_anfrage(conn, &ich, kopplung, &mut a, m, &mut aus).await?;
-                }
+                // Das Gegenüber ist hinter dieser Seite zurück: die eigene Akte geht mit einem
+                // neuen Stand noch einmal hinaus, damit beide wieder gleich stehen. Eine Anfrage
+                // auf einen alten Stand wird nicht erfüllt.
+                repo::save(conn, &mut a, true).await?;
             }
         }
     }

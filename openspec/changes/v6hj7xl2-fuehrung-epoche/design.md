@@ -328,6 +328,26 @@ Migrationen.
   prüft jeden Lauf. Was übrig bleibt, wird ein Nachzug zu LLH-1492.
 - **[Der Rumpf wächst über 64 KiB]** → Delta und höchstens 50 Akten je Nachricht (D3).
 
+## Nachträge aus dem Review (09.11.2026)
+
+- **Widerruf löst die Sperre:** Wird eine Org-Zuordnung widerrufen (hier oder vom Gegenüber),
+  holt diese Instanz ihre lokalen Einsätze, die das Gegenüber führte, mit der nächsten Epoche
+  zurück (`repo::release_nach_widerruf`). Sonst bliebe ein Einsatz gesperrt, ohne dass ihn jemand
+  übergeben oder zurückholen könnte.
+- **Zähler begrenzt:** Eine gelieferte Epoche über 2^40 wird nicht übernommen; ein Überlauf beim
+  Weiterzählen hätte jede Meldung der Kopplung scheitern lassen.
+- **Anfrage nur auf den gesehenen Stand:** Eine Anfrage wird nur bei gleicher Epoche erfüllt, und
+  jeder Wechsel löscht den eigenen Merker. Ist das Gegenüber zurück, geht die eigene Akte mit
+  neuem Stand noch einmal hinaus.
+- **Mehrere ELW an einem Hub:** Die meldende Seite übernimmt eine Übergabe an eine dritte Instanz
+  zur Anzeige (nimmt sie ihr die Führung, braucht sie wie jede Übernahme einen Beweis).
+- **Kennung mit Zufallsteil:** `<Ursprung>/<Einsatz-ID>-<8 Hex>`, weil eine Einsatz-ID nach
+  endgültigem Löschen wieder vergeben werden kann.
+- **Bestätigen prüft den Stand:** Die offene Übernahme muss noch der geltenden Epoche gelten.
+- **Code am Hub beweist nichts:** Die Seite, die den Code eingibt, kann ihn nicht prüfen und führt
+  bis zur nächsten Meldung der meldenden Seite. Sicher bleibt die meldende Seite: Sie nimmt nur den
+  passenden Code an.
+
 ## Migration Plan
 
 - Die Migration ist rein additiv: zwei neue Tabellen, neue Spalten an `einsatz` und

@@ -105,6 +105,7 @@ pub async fn uebergeben(
         a.fuehrer_kennung = g.kennung.clone();
         a.fuehrer_name = g.name.clone();
         a.set_art(FuehrungWechselArt::Uebergabe);
+        a.anfrage_at = None;
         a.erklaerung = None;
         a.beweis = None;
         a.abgabe_schluessel = None;
@@ -152,6 +153,7 @@ pub async fn code_abgeben(
         a.fuehrer_kennung = g.kennung.clone();
         a.fuehrer_name = g.name.clone();
         a.set_art(FuehrungWechselArt::CodeAbgabe);
+        a.anfrage_at = None;
         a.erklaerung = None;
         a.beweis = None;
         a.abgabe_schluessel = Some(erklaerung::schluessel_text(&schluessel));
@@ -376,6 +378,12 @@ pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse);
+        // Die Übernahme muss noch dem Stand gelten, gegen den sie erklärt wurde.
+        if m.epoche <= a.epoche() || e.as_ref().is_some_and(|e| e.epoche_alt != a.epoche()) {
+            return Err(AppError::Conflict(
+                "Die Führung hat sich inzwischen geändert.".into(),
+            ));
+        }
         let bruch = a.offen_bruch_at.clone();
         a.set_epoche(&m.epoche);
         a.fuehrer_kennung = m.fuehrer.clone();
@@ -425,6 +433,7 @@ pub async fn widersprechen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result
         a.fuehrer_kennung = ich.kennung.clone();
         a.fuehrer_name = ich.name.clone();
         a.set_art(FuehrungWechselArt::Widerspruch);
+        a.anfrage_at = None;
         a.erklaerung = None;
         a.beweis = None;
         a.offen = None;

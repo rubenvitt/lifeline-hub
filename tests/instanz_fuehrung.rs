@@ -823,3 +823,69 @@ async fn gleichstand_entscheidet_die_groessere_kennung_an_beiden_seiten() {
         assert_eq!(am_elw["art"], "verworfen");
     }
 }
+
+// ── Befunde aus dem Review ───────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn nach_dem_widerruf_holt_der_elw_seinen_einsatz_zurueck() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    let id = u["kopplungen"][0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "nach dem Widerruf schreibt der ELW wieder"
+    );
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["fuehrend"], true);
+    assert_eq!(f["epoche"], 3);
+}
+
+#[tokio::test]
+async fn ueberhoehte_epoche_wird_nicht_uebernommen() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let stand: i64 = sqlx::query_scalar(
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+         RETURNING fuehrung_stand",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_fuehrung SET epoche_zaehler = ?, stand = ? WHERE id = ?")
+        .bind(i64::MAX)
+        .bind(stand)
+        .bind(akte)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["epoche"], 1, "über der Grenze verworfen");
+    // Die Kopplung lebt weiter: eine Übergabe geht noch durch.
+    let (s, _) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+}

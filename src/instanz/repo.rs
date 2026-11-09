@@ -418,6 +418,15 @@ pub async fn org_widerrufen(
             .await?;
         // Übernommene Stammdaten gehören danach der Instanz (LLH-1493, design.md D3).
         crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
+        // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491).
+        let (org_id, gegenueber): (i64, String) = sqlx::query_as(
+            "SELECT o.org_id, k.gegenueber_kennung FROM instanz_kopplung_org o \
+             JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
+        )
+        .bind(org_zeile_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        crate::instanz::fuehrung::repo::release_nach_widerruf(conn, org_id, &gegenueber).await?;
     }
     Ok(n == 1)
 }

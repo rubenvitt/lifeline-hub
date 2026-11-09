@@ -350,7 +350,7 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
         "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, nummer, bezeichnung, \
          stichwort, status, epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, \
          stand, geaendert_at) \
-         SELECT ? || '/' || e.id, e.id, e.org_id, e.einsatznummer_intern, e.bezeichnung, \
+         SELECT ? || '/' || e.id || '-' || lower(hex(randomblob(4))), e.id, e.org_id, e.einsatznummer_intern, e.bezeichnung, \
                 e.stichwort, e.status, 1, ?, ?, ?, 'angelegt', 0, ? \
          FROM einsatz e \
          WHERE (e.geloescht_at IS NULL OR e.geloescht_at = '') \
@@ -398,6 +398,57 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
         a.stichwort = stichwort;
         a.status = status;
         save(conn, &mut a, true).await?;
+    }
+    Ok(())
+}
+
+/// Nach dem Widerruf einer Org-Zuordnung (hier oder vom Gegenüber): lokale Einsätze der Org, die
+/// dieses Gegenüber führt, holt diese Instanz mit der nächsten Epoche zurück. Sonst bliebe ein Einsatz
+/// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491).
+pub async fn release_nach_widerruf(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    gegenueber_kennung: &str,
+) -> Result<(), AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_fuehrung WHERE org_id = ? AND fuehrer_kennung = ? \
+         AND einsatz_id IS NOT NULL",
+    )
+    .bind(org_id)
+    .bind(gegenueber_kennung)
+    .fetch_all(&mut *conn)
+    .await?;
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let ich = ich(conn).await?;
+    for id in ids {
+        let mut a = load(conn, id).await?;
+        let von = a.fuehrer_name.clone();
+        a.set_epoche(&Epoche::naechste([&a.epoche()], &ich.kennung));
+        a.fuehrer_kennung = ich.kennung.clone();
+        a.fuehrer_name = ich.name.clone();
+        a.set_art(FuehrungWechselArt::Notuebernahme);
+        a.erklaerung = None;
+        a.beweis = None;
+        a.offen = None;
+        a.offen_bruch_at = None;
+        a.abgabe_schluessel = None;
+        a.anfrage_at = None;
+        a.bruch_at = Some(crate::zeit::jetzt());
+        save(conn, &mut a, true).await?;
+        add_verlauf(
+            conn,
+            &a,
+            VerlaufNeu {
+                von_name: Some(&von),
+                nach_name: &ich.name,
+                grund: Some("Kopplung widerrufen"),
+                bruch_at: a.bruch_at.as_deref(),
+                ..VerlaufNeu::default()
+            },
+        )
+        .await?;
     }
     Ok(())
 }
@@ -616,7 +667,10 @@ pub(crate) mod tests {
         let mut conn = pool.acquire().await.unwrap();
         let ich = ich(&mut conn).await.unwrap();
         assert_eq!(a[0].einsatz_id, Some(id));
-        assert_eq!(a[0].kennung, format!("{}/{id}", ich.kennung));
+        assert!(
+            a[0].kennung.starts_with(&format!("{}/{id}-", ich.kennung)),
+            "Kennung mit Zufallsteil, damit eine wieder vergebene Einsatz-ID keine alte Akte trifft"
+        );
         assert_eq!(a[0].epoche(), Epoche::neu(1, &ich.kennung));
         assert_eq!(a[0].fuehrer_kennung, ich.kennung);
         assert!(a[0].stand > 0);
