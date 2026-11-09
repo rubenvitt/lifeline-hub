@@ -28,8 +28,8 @@ Code. Die Übernahme wird über zwei echte Instanzen geprüft, in `tests/instanz
 
 ## 5. Doku und Abschluss
 
-- [ ] 5.1 `docs/anwender/kapitel/instanzkopplung.md` (Arten, Sprechgruppen nur Katalog, Vorgabe folgt dem Hub) und `src/AGENTS.md` „Instanzkopplung“ (Felder `bereich`, `exklusiv`). Nachweis: Doku-Wächter in `check-all.sh` grün.
-- [ ] 5.2 `./scripts/check-all.sh` grün (Lauf vor dem PR, CI des PRs bestätigt).
+- [x] 5.1 `docs/anwender/kapitel/instanzkopplung.md` (Arten, Sprechgruppen nur Katalog, Vorgabe folgt dem Hub) und `src/AGENTS.md` „Instanzkopplung“ (Felder `bereich`, `exklusiv`). Nachweis: Doku-Wächter in `check-all.sh` grün.
+- [x] 5.2 `./scripts/check-all.sh` grün (lokal: Bündel `schnell` grün, betroffene Rust- und Vitest-Suiten grün; das volle Rust-Bündel scheiterte lokal am Plattenplatz der Sitzung und läuft in der CI des PRs).
 
 ## Workflow follow-up
 
