@@ -72,7 +72,6 @@ export default function ExterneStellenTab() {
       else if (aktion === 'deaktivieren') setZuDeaktivieren(s);
       else aktivMutation.mutate({ id: s.id, aktiv: true });
     },
-    laeuft: (s) => aktivMutation.isPending && aktivMutation.variables?.id === s.id,
   };
 
   const spalten: KatalogSpalte<ExterneStelle>[] = [

@@ -887,6 +887,16 @@ export default function KatalogTabelle<T extends object>({
     );
   }, [abBreiteOhneSchalter]);
 
+  // `zeilenMenue` sucht die Zeile über `rowKey` (LLH-1599 D2). Ohne ihn fiele jede Zeile ohne
+  // `key`-Feld auf `undefined`, und das Menü hinge an der ersten Zeile.
+  const menueOhneRowKey = zeilenMenue != null && rest.rowKey == null;
+  useEffect(() => {
+    if (!import.meta.env.DEV || !menueOhneRowKey) return;
+    console.error(
+      '[KatalogTabelle] zeilenMenue ohne rowKey — das Kontextmenü fände die Zeile nicht sicher.',
+    );
+  }, [menueOhneRowKey]);
+
   const filterZuruecksetzen = useCallback(() => {
     setSuchbegriff('');
     setFilterStand({});

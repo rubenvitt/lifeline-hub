@@ -38,9 +38,9 @@
 
 - [x] 7.1 `frontend/AGENTS.md`, „Kontextmenü nur über den Baustein“: Tabellen über `KatalogTabelle.zeilenMenue`, Listen und eigene Zeilen über `useDatensatzKontextMenue`, eine Beschreibung für ⋮ und Kontextmenü (D8)
 - [x] 7.2 Anwenderdoku: `docs/anwender/kapitel/einsatz-oberflaeche.md` — der Absatz zum Kontextmenü nennt auch Verwaltungstabellen und Einstellungslisten; `quellen:` ergänzt; Doku-Wächter grün
-- [ ] 7.3 e2e `frontend/e2e/kontextmenue-datensatz.spec.ts` um eine Verwaltungstabelle erweitern: Rechtsklick auf eine Zeile der externen Stellen am breiten Schirm zeigt die Aktionen der Knopfreihe; Umschalt+F10 vom Knopf „Bearbeiten“ öffnet es
+- [x] 7.3 e2e `frontend/e2e/kontextmenue-datensatz.spec.ts` um eine Verwaltungstabelle erweitern: Rechtsklick auf eine Zeile der externen Stellen am breiten Schirm zeigt die Aktionen der Knopfreihe; Umschalt+F10 vom Knopf „Bearbeiten“ öffnet es
 - [ ] 7.4 `./scripts/check-all.sh` grün (lokal mindestens `--nur schnell` und `--nur frontend`, dazu die e2e-Spec aus 7.3)
-- [ ] 7.5 Bilder der Änderung (Kontextmenü in einer Stammdaten-Tabelle breit, in der Pegelliste, im Kommunikationsplan) per Wegwerf-Spec aufnehmen
+- [x] 7.5 Bilder der Änderung (Kontextmenü in einer Stammdaten-Tabelle breit, in der Pegelliste, im Kommunikationsplan) per Wegwerf-Spec aufnehmen
 
 ## Workflow follow-up
 
