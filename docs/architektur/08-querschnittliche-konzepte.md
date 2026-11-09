@@ -76,7 +76,7 @@ Schema wächst nur über Migrationen in `migrations/`, eingespielt beim Start
 regelt die [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Migrationsvergabe“.
 
 Zwei Regeln sitzen als SQLite-Trigger in der Datenbank statt im Code, damit kein Schreibweg sie
-umgeht (LLH-1493, `migrations/0305_stammdaten_verteilung.sql`): Jede Änderung an einer
+umgeht (LLH-1493, `migrations/0306_stammdaten_verteilung.sql`): Jede Änderung an einer
 verteilten Stammdatentabelle schreibt ihren Stand ins Änderungslog `stammdaten_aenderung`, und
 an einer Instanz, die Stammdaten aus einer Kopplung übernimmt, bricht jeder Schreibversuch auf
 eine übernommene Zeile mit `stammdaten_vom_hub` ab (409 „Wird am Hub gepflegt.“, `src/error.rs`).

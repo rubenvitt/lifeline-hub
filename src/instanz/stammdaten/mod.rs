@@ -7,7 +7,7 @@
 //! - [`uebernehmen`]: Übernahme an der meldenden Seite (D3, D4, D5, D6).
 //! - [`geheimnis`]: Passwort-Hash und TOTP, Ende-zu-Ende verschlüsselt (D6).
 //!
-//! Änderungslog und Schreibschutz sitzen in Triggern (`migrations/0305_stammdaten_verteilung.sql`),
+//! Änderungslog und Schreibschutz sitzen in Triggern (`migrations/0306_stammdaten_verteilung.sql`),
 //! damit kein Schreibweg sie umgeht.
 
 pub mod art;
