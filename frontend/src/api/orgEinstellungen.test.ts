@@ -135,7 +135,7 @@ describe('ladeOrgModulEinstellungen', () => {
   it('sendet GET an /api/org-modul-einstellungen und liefert die Map', async () => {
     const map = {
       etb: { benoetigte_rolle: 'admin', sichtbar: true },
-      stab: { benoetigte_rolle: null, sichtbar: false },
+      lagebesprechung: { benoetigte_rolle: null, sichtbar: false },
     };
     server.use(http.get('/api/org-modul-einstellungen', () => HttpResponse.json(map)));
     await expect(ladeOrgModulEinstellungen()).resolves.toEqual(map);

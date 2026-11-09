@@ -53,14 +53,14 @@ Label stellt das Standardlabel wieder her. S7 SHALL je Organisation ein- und aus
 Vorgabe aus. Ist S7 aus, MUST ein neuer Empfänger oder eine neue Führungsstelle mit `s7` mit 422
 abgelehnt werden. Bestehende Datensätze mit `s7` bleiben lesbar. Labels und Schalter pflegt nur ein
 Admin der eigenen Organisation. Das wirksame Label MUST in allen neu erzeugten Anzeigen und Texten
-gelten: Snapshot des Empfängers, Stabseite, abgeleitete Funktion im Kopf, System-ETB-Text der
-Besetzung.
+gelten: Snapshot des Empfängers, Führungsstelle in der Mitgliederliste, abgeleitete Funktion im
+Kopf.
 
 #### Scenario: THW-Label
 - **WHEN** ein Admin das Label von `s4` auf „Versorgung (Logistik)“ setzt und danach ein Auftrag an
   `s4` erteilt wird
-- **THEN** trägt der Empfänger den Snapshot „S4 Versorgung (Logistik)“, und die Stabseite zeigt
-  die S4-Zeile mit diesem Label
+- **THEN** trägt der Empfänger den Snapshot „S4 Versorgung (Logistik)“, und die Mitgliederliste
+  zeigt bei einem Mitglied mit der Führungsstelle `s4` „S4 Versorgung (Logistik)“
 
 #### Scenario: Label zurücksetzen
 - **WHEN** ein Admin das Label von `s4` leert
@@ -104,27 +104,34 @@ hinweg im Wortlaut erhalten.
 
 ### Requirement: Auflösung zur Lesezeit auf die aktuelle Besetzung
 Beim Lesen eines Auftrags oder einer Erinnerung, deren Empfänger ein Sachgebiet `s1`–`s6` ist,
-SHALL das System die aktuelle Besetzung dieses Sachgebiets im Einsatz mitliefern: Name der
-disponierten oder externen Person, rückwärtige Stelle, „bei der Einsatzleitung“ oder „nicht
-vergeben“. Für `el`, `s7`, Führungshilfspersonal, Fachberater und Freitext MUST keine Auflösung
-erscheinen. Das Feld fehlt, es gibt keinen Platzhalter. Wer das Stab-Modul im Einsatz nicht lesen
-darf, MUST die Auflösung nicht erhalten. Ein Besetzungswechsel SHALL die Anzeige von Aufträgen und
-Erinnerungen live aktualisieren.
+SHALL das System die aktuelle Besetzung dieses Sachgebiets im Einsatz mitliefern: die Namen der
+Mitglieder, deren Mitgliedschaft im Einsatz diese Führungsfunktion trägt (Requirement „Mehrere
+Mitglieder mit derselben Führungsfunktion“), oder „nicht vergeben“. Für `el`, `s7`,
+Führungshilfspersonal, Fachberater und Freitext MUST keine Auflösung erscheinen. Das Feld fehlt, es
+gibt keinen Platzhalter. Die Auflösung MUST jedem gelten, der den Auftrag bzw. die Erinnerung lesen
+darf, ohne weiteres Modulrecht. Ein gekoppeltes Gerät MUST die Auflösung nicht erhalten. Ein Wechsel
+der Führungsfunktion eines Mitglieds SHALL die Anzeige von Aufträgen und Erinnerungen live
+aktualisieren.
 
 #### Scenario: Paar-Test Besetzungswechsel
-- **WHEN** ein Auftrag an `s3` erteilt wird, während Müller S3 besetzt, und danach S3 auf Schulz
-  wechselt
+- **WHEN** ein Auftrag an `s3` erteilt wird, während Müller als Mitglied S3 trägt, und die
+  Einsatzleitung danach S3 bei Müller entfernt und bei Schulz setzt
 - **THEN** liefert der Auftrag vorher den Snapshot „S3 Einsatz“ mit der Besetzung „Müller“ und
   nachher denselben Snapshot „S3 Einsatz“ mit der Besetzung „Schulz“
 
 #### Scenario: Nicht vergeben
-- **WHEN** eine Erinnerung an `s4` gelesen wird und S4 keine Besetzung hat
+- **WHEN** eine Erinnerung an `s4` gelesen wird und kein Mitglied S4 trägt
 - **THEN** lautet die Auflösung „nicht vergeben“
 
 #### Scenario: Ohne Stab-Recht
-- **WHEN** eine Person mit Leserecht auf Aufträge, aber ohne Freigabe des Stab-Moduls, einen
-  Auftrag an `s3` liest
-- **THEN** sieht sie den Snapshot „S3 Einsatz“ und keine Besetzung
+- **WHEN** eine Person mit Leserecht auf Aufträge einen Auftrag an `s3` liest und Müller als
+  Mitglied S3 trägt
+- **THEN** sieht sie den Snapshot „S3 Einsatz“ und die Besetzung „Müller“, ohne dass ein weiteres
+  Modul für sie freigegeben sein muss
+
+#### Scenario: Gekoppeltes Gerät
+- **WHEN** ein gekoppeltes Gerät einen Auftrag an `s3` liest
+- **THEN** erhält es den Snapshot „S3 Einsatz“ und keine Besetzung
 
 #### Scenario: Nach der Schwärzung
 - **WHEN** ein Einsatz geschwärzt wurde
@@ -147,9 +154,7 @@ Die Abfrage des Standard-Rufnamens im ETB (Fähigkeit `etb-absender-empfaenger`)
 ersten Vorschlag so bilden:
 1. aus der gesetzten Führungsstelle (Katalogwert als Kürzel, bei Führungshilfspersonal und
    Fachberater als „<Label>: <Bezeichnung>“, sonst der Freitext);
-2. sonst aus dem Kürzel des ersten Sachgebiets in S1–S6-Folge, das die mit dem Benutzer über
-   `personal.benutzer_id` verknüpfte Person besetzt;
-3. sonst gar nicht.
+2. sonst gar nicht.
 
 Der Vorschlag MUST übernommen werden können, ohne ihn zu tippen, und MUST NOT ohne Zutun der
 Person zum Standard werden. Eine neue ETB-Erfassung MUST NOT „An“ nach dieser Regel vorbelegen;
@@ -157,17 +162,15 @@ vorbelegt wird nur aus dem Standard-Rufnamen.
 
 #### Scenario: Führungsstelle gewinnt
 - **WHEN** ein Mitglied ohne Standard-Rufnamen die Führungsstelle Fachberater mit der
-  Bezeichnung „THW“ hat und zugleich S2 besetzt
+  Bezeichnung „THW“ hat
 - **THEN** schlägt die Abfrage zuerst „Fachberater: THW“ vor
 
 #### Scenario: Ableitung aus der Besetzung
-- **WHEN** ein Mitglied ohne Standard-Rufnamen keine Führungsstelle hat und über sein Konto S2
-  und S3 besetzt
+- **WHEN** ein Mitglied ohne Standard-Rufnamen die Führungsstelle `s2` hat
 - **THEN** schlägt die Abfrage zuerst „S2“ vor
 
 #### Scenario: Weder noch
-- **WHEN** ein Mitglied ohne Standard-Rufnamen keine Führungsstelle hat und kein Sachgebiet
-  besetzt
+- **WHEN** ein Mitglied ohne Standard-Rufnamen keine Führungsstelle hat
 - **THEN** steht in der Abfrage kein vorgewählter Vorschlag
 
 #### Scenario: Kein stilles Vorbelegen
@@ -194,3 +197,17 @@ zu den Funkrufnamen vorschlagen. Übernommen wird dort das Kürzel als Freitext.
 #### Scenario: ETB-Vorschlag
 - **WHEN** jemand im ETB-Feld „An“ den Vorschlag „S2 – Lage (Müller)“ wählt
 - **THEN** steht im Feld „S2“
+
+### Requirement: Mehrere Mitglieder mit derselben Führungsfunktion
+Mehrere Mitglieder eines Einsatzes SHALL dieselbe Führungsfunktion tragen dürfen; das Setzen MUST
+NOT deshalb abgelehnt werden. Jedes von ihnen MUST als Träger der Funktion gelten. Wo das System zu
+einer Funktion Personen nennt (Auflösung, Vorschläge, Organigramm, Kommunikationsplan,
+Einsatzbericht), SHALL es alle Namen alphabetisch nennen, getrennt durch „, “.
+
+#### Scenario: Zwei Mitglieder mit S3
+- **WHEN** Schulz und Müller als Mitglieder beide S3 tragen und ein Auftrag an `s3` gelesen wird
+- **THEN** lautet die Besetzung „Müller, Schulz“
+
+#### Scenario: Zweites Mitglied bekommt S3
+- **WHEN** die Einsatzleitung einem Mitglied S3 setzt, das ein anderes Mitglied schon trägt
+- **THEN** wird die Führungsstelle gespeichert, und beide tragen S3

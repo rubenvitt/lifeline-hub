@@ -245,6 +245,41 @@ sequenceDiagram
   (`src/routes/geraet.rs`). Regeln:
   [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md).
 
+## 6.6a Instanzen koppeln und melden
+
+Zwei Instanzen (etwa ELW und Hub) koppeln sich per Einmal-Code (LLH-1490,
+[ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)).
+A stellt aus und wird gemeldet, E löst ein und meldet sich; das Protokoll kennt nur diese
+Richtung, nicht Hub und ELW.
+
+```mermaid
+sequenceDiagram
+  participant AA as frontend Admin A
+  participant A as Instanz A (src/routes/instanz.rs)
+  participant E as Instanz E (src/instanz/melden.rs)
+  participant AE as frontend Admin E
+  AA->>A: POST /api/admin/instanz/codes (nur mit eigenem Unterschriftsschlüssel)
+  A-->>AA: Code (16 Zeichen, 15 min), Fingerabdruck A
+  AE->>E: POST /api/admin/instanz/einloesen {adresse, code}
+  E->>A: POST /api/instanz/koppeln {suche, Schlüssel E, Prüfwert E}
+  A->>A: Prüfwert E, Code verbrauchen, Kopplung angebahnt
+  A-->>E: Schlüssel A, Org, Unterschriftsschlüssel, Prüfwert A (signiert)
+  E->>E: Prüfwert A und Signatur, Kopplung aktiv
+  loop alle 60 s (bei Fehlern verdoppelt bis 10 min)
+    E->>A: POST /api/instanz/melden (Anfrage-JWT)
+    A->>A: Extractor: Signatur, Ziel, Pfad, Body-Hash, Zeit, jti
+    A-->>E: Stand, Widerrufe, neue Unterschriftsschlüssel (signiert)
+  end
+```
+
+- Der Code geht nie über die Leitung: HKDF leitet `suche` und die Schlüssel beider Prüfwerte ab
+  (`src/instanz/code.rs`). Ein Angreifer in der Mitte, der einen Schlüssel tauscht, fällt am
+  Prüfwert auf (`tests/instanz_kopplung.rs`, `angreifer_in_der_mitte_faellt_auf`).
+- Eine angebahnte Kopplung ohne erste Meldung verfällt nach 15 Minuten; einen Widerruf der
+  meldenden Seite trägt eine letzte Meldung, den der erreichten Seite die Antwort auf die nächste.
+- Neue Unterschriftsschlüssel nimmt E nur mit Gegenzeichnung eines bekannten an
+  (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
+
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 
 ```mermaid

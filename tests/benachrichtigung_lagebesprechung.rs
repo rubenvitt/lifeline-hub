@@ -25,7 +25,7 @@ struct Welt {
     einsatz: i64,
     /// Trägt EL in der Mitgliedschaft.
     anna: i64,
-    /// Besetzt S1 in der Stab-Besetzung (verknüpftes Personal).
+    /// Trägt S1 in der Mitgliedschaft.
     bert: i64,
     /// Fachberaterin: Führungsfunktion, aber nicht Stab; bekommt nichts.
     carla: i64,
@@ -75,16 +75,8 @@ async fn welt() -> Welt {
         json!({ "fuehrungsfunktion": "fachberater", "fuehrungsstelle": "THW" }),
     )
     .await;
-    let ep = w.personal("Bertram", bert).await;
-    let (s, v) = anfrage(
-        &w.app,
-        "PUT",
-        &format!("/api/einsaetze/{}/stab/besetzung/s1", w.einsatz),
-        &w.admin,
-        Some(&json!({ "besetzung_art": "personal", "personal_id": ep }).to_string()),
-    )
-    .await;
-    assert!(s.is_success(), "S1 besetzen: {s} {v}");
+    w.funktion_setzen(bert, json!({ "fuehrungsfunktion": "s1" }))
+        .await;
     w
 }
 
@@ -101,29 +93,6 @@ impl Welt {
         )
         .await;
         assert_eq!(s, StatusCode::OK, "{v}");
-    }
-
-    /// Stamm-Person mit verknüpftem Konto, disponiert; liefert die `einsatz_personal.id`.
-    async fn personal(&self, name: &str, benutzer_id: i64) -> i64 {
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            "/api/personal",
-            &self.admin,
-            Some(&json!({ "name": name, "benutzer_id": benutzer_id }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
-            &self.admin,
-            Some(&json!({ "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        v["id"].as_i64().unwrap()
     }
 
     /// Setzt den Termin über den einen Schreibweg ohne Abschluss (`null` = kein Termin).

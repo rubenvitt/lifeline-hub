@@ -8,9 +8,10 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  *
  * Nachgewiesen im echten Browser gegen den echten Server:
  * - die Katalogwahl „S3 – Einsatz (Müller)“ im Empfängerfeld erzeugt einen Katalogempfänger,
- * - die Karte zeigt den Snapshot und dahinter die aktuelle Besetzung,
- * - ein Besetzungswechsel kommt live an (Stab-Ereignis invalidiert die Aufträge),
- * - ohne Stab-Freigabe steht nur der Snapshot da (Rollenzweig nach LFH-435).
+ * - die Karte zeigt den Snapshot und dahinter die aktuelle Besetzung, aus der Führungsfunktion
+ *   der Mitglieder (i6k6mzed, design.md D2),
+ * - ein Funktionswechsel kommt live an (`mitglieder` invalidiert die Aufträge),
+ * - auch ohne Stab-Freigabe steht die Besetzung da (Rollenzweig nach LFH-435).
  *
  * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
@@ -23,18 +24,40 @@ async function einsatzAnlegen(page: Page): Promise<number> {
   return ((await antwort.json()) as { id: number }).id;
 }
 
-async function besetzeExtern(page: Page, einsatzId: number, sachgebiet: string, name: string) {
-  const antwort = await page.request.put(
-    `/api/einsaetze/${einsatzId}/stab/besetzung/${sachgebiet}`,
-    { data: { besetzung_art: 'extern', bezeichnung: name } },
-  );
-  expect(antwort.ok(), `Besetzung: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+/**
+ * Legt ein Konto `name` an und nimmt es mit der Führungsfunktion `funktion` in den Einsatz auf;
+ * liefert seine Kennung. Das Konto meldet sich nie an, braucht also keinen Erstwechsel.
+ */
+async function mitgliedMitFunktion(
+  page: Page,
+  einsatzId: number,
+  funktion: string | null,
+  name: string,
+  benutzerId?: number,
+): Promise<number> {
+  let id = benutzerId;
+  if (id == null) {
+    const konto = await page.request.post('/api/benutzer', {
+      data: {
+        anzeigename: name,
+        benutzername: `e2e-funktion-${Date.now()}-${name.toLowerCase().replace(/\W/g, '')}`,
+        passwort: 'e2e-funktion-pw-123',
+      },
+    });
+    expect(konto.ok(), `Konto: ${konto.status()} ${await konto.text()}`).toBeTruthy();
+    id = ((await konto.json()) as { id: number }).id;
+  }
+  const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/mitglieder/${id}`, {
+    data: { einsatz_rolle: 'fuehrungspersonal', fuehrungsfunktion: funktion },
+  });
+  expect(antwort.ok(), `Mitglied: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  return id;
 }
 
 test('Auftrag an S3 zeigt die aktuelle Besetzung und folgt ihr live', async ({ page }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
-  await besetzeExtern(page, einsatzId, 's3', 'Müller');
+  const mueller = await mitgliedMitFunktion(page, einsatzId, 's3', 'Müller');
 
   await page.goto(auftraegePfad(einsatzId));
   // Der Kopfknopf öffnet den Dialog „Auftrag erteilen“ (oxgob5gk D10); die leere Liste trägt
@@ -55,17 +78,20 @@ test('Auftrag an S3 zeigt die aktuelle Besetzung und folgt ihr live', async ({ p
   const offen = page.getByText('S3 Einsatz · Müller', { exact: true });
   await expect(liste.getByText('S3 Einsatz · Müller', { exact: true })).toBeVisible();
 
-  // Umbesetzen über die API: das Stab-Ereignis kommt über den Live-Strom und invalidiert die
+  // Funktionswechsel über die API: `mitglieder` kommt über den Live-Strom und invalidiert die
   // Aufträge — die Karte folgt ohne Neuladen, der Snapshot bleibt.
-  await besetzeExtern(page, einsatzId, 's3', 'Schulz');
+  await mitgliedMitFunktion(page, einsatzId, null, 'Müller', mueller);
+  await mitgliedMitFunktion(page, einsatzId, 's3', 'Schulz');
   await expect(liste.getByText('S3 Einsatz · Schulz', { exact: true })).toBeVisible();
   await expect(offen).toHaveCount(0);
 });
 
-test('Ohne Stab-Freigabe steht nur der Snapshot da (Führungspersonal)', async ({ page }) => {
+test('Ohne Modulrecht steht die Besetzung aus den Mitgliedern da (Führungspersonal)', async ({
+  page,
+}) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
-  await besetzeExtern(page, einsatzId, 's3', 'Müller');
+  await mitgliedMitFunktion(page, einsatzId, 's3', 'Müller');
   const erteilt = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
     data: {
       auftrag_text: 'Lage erkunden',
@@ -73,18 +99,14 @@ test('Ohne Stab-Freigabe steht nur der Snapshot da (Führungspersonal)', async (
     },
   });
   expect(erteilt.ok(), `Auftrag: ${erteilt.status()} ${await erteilt.text()}`).toBeTruthy();
-  // Stab nur für Admins: Führungspersonal liest Aufträge, aber nicht die Besetzung.
-  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/modul-overrides/stab`, {
-    data: { sichtbar: true, benoetigte_rolle: 'admin' },
-  });
-  expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();
+  // Die Besetzung hängt seit i6k6mzed an keinem Modulrecht mehr, nur am Leserecht am Einsatz.
 
   await wechsleZuRolle(page, 'fuehrungspersonal', String(einsatzId));
   await page.goto(auftraegePfad(einsatzId));
-  // Vorbedingung des Rollenzweigs: der Auftrag steht da, die Besetzung nicht.
+  // Spec `fuehrungsfunktionen`, „Ohne Stab-Recht“: Snapshot und Besetzung stehen da.
   await expect(
-    page.getByRole('list', { name: 'Offene Aufträge' }).getByText('S3 Einsatz', { exact: true }),
+    page
+      .getByRole('list', { name: 'Offene Aufträge' })
+      .getByText('S3 Einsatz · Müller', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText(/S3 Einsatz · /)).toHaveCount(0);
-  await expect(page.getByText('Müller')).toHaveCount(0);
 });

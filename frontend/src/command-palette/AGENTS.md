@@ -62,7 +62,5 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   LFH-1170). Liegt das Ziel in einer Sektion der Einstellungen, liest das Layout
   `EinsatzEinstellungenPage.tsx` den Parameter (Zuordnung über den Dateinamen) und reicht ihn per
   `Outlet`-Context weiter.
-  Unterseiten aus `stab/unterseiten.ts` gehören zum Modul, das ihr Eintrag nennt (S5 `stab`,
-  S6 `fernmeldewesen`, LLH-1180); zeigt eine Zeile auf `…/stab/<unterseite>`, muss genau diese
-  Seite den Parameter lesen, nicht die Stab-Seite („Anruf erfassen“ → `InfotelefonPage.tsx`,
-  LLH-1127); ein Ziel auf den Stab selbst deckt nur `StabPage.tsx`.
+  Funkplan und Kommunikationsplan gehören zum Fernmeldewesen (LLH-1180, `SEITE_MODUL` im Guard).
+  „Anruf erfassen“ trägt seit i6k6mzed das eigene Modul `infotelefon` (`InfotelefonPage.tsx`).

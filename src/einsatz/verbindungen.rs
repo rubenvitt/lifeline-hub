@@ -1,6 +1,6 @@
 //! Verbindungen außerhalb des Funks an Abschnitt, Einheit und eigener Führungsstelle (LLH-1134,
 //! Entscheidung LLH-1126 Option B): typisiert wie die Stellen des Kommunikationsplans
-//! (`stab::kommunikation`, Mittel festnetz | mobil | fax | email | messenger | melder |
+//! (`fernmeldewesen::kommunikation`, Mittel festnetz | mobil | fax | email | messenger | melder |
 //! sonstiges, Wert, Hinweis). Funk zeigt sich am Datensatz über Rufname und Sprechgruppen.
 //!
 //! Eine Tabelle `einsatz_verbindung` (Migration 0248) mit typisiertem Bezug und echten
@@ -19,7 +19,7 @@ use serde::Deserialize;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::error::AppError;
-use crate::stab::kommunikation::{KommunikationsVerbindung, Verbindungsmittel, TEXT_MAX};
+use crate::fernmeldewesen::kommunikation::{KommunikationsVerbindung, Verbindungsmittel, TEXT_MAX};
 
 /// Höchstzahl der Verbindungen je Datensatz (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel:
 /// `VERBINDUNGEN_MAX` in `frontend/src/api/eingabegrenzen.ts`.

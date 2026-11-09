@@ -47,7 +47,7 @@ export interface DokumentEntwurfProps {
 }
 
 /**
- * Die Schreibfläche jedes gegliederten Führungsdokuments — Lagebericht, Befehl, Pressemitteilung
+ * Die Schreibfläche jedes gegliederten Führungsdokuments — Lagebericht und Befehl
  * (`entwurf/AGENTS.md`, „Gegliederte Dokumente“; Herleitung LLH-1074, vorher LFH-348). EIN
  * Baustein, damit dasselbe Dokument nicht zwei Bedienformen hat.
  *

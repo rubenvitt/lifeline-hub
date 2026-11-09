@@ -67,12 +67,10 @@ describe('Statusfarb-Vertrag', () => {
       'kartenBauStatus',
       'luftqualitaetIndex',
       'materialStatus',
-      'medienkontaktStatus',
       'odlStufe',
       'offlineKarteStatus',
       'pegelZustand',
       'personStatus',
-      'pressemitteilungStatus',
       'raeumungszustand',
       'schadenAusmass',
       'schadenStatus',
@@ -235,7 +233,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(39);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(37);
   });
 });
 

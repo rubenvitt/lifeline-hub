@@ -4,8 +4,6 @@ import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import { einsatzModulPfad, parseZeichnenAuftrag } from '../routing/deeplinks';
 import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
-import { SACHGEBIETE } from '../stab/sachgebiete';
-import { unterseitenFuer } from '../stab/unterseiten';
 
 /**
  * Guard: die Schnellaktionen der Kommandopalette zeigen auf ein fertiges Modul der Registry und
@@ -35,12 +33,10 @@ import { unterseitenFuer } from '../stab/unterseiten';
  *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN; ein Leser ohne passenden Registry-Eintrag wird gemeldet,
  *     nicht zugeordnet.
  *
- * STAB-UNTERSEITEN (LLH-1127): Pressearbeit und Informationstelefon sind kein Modul, sondern
- * Unterrouten des Stabs (`stab/unterseiten.ts`). Ihre Seiten zählen zum Träger `stab`
- * (`InfotelefonPage.tsx` → `stab`); Funkplan und Kommunikationsplan zählen zum Fernmeldewesen
- * (LLH-1180), dem Modul, das ihre Unterseite in `stab/unterseiten.ts` nennt. Zeigt eine Schnellaktion auf `…/stab/<unterseite>`, muss
- * der Leser in GENAU dieser Seite stehen: ein Leser auf der Stab-Seite selbst deckte sie sonst, und
- * die Aktion liefe ins Leere. (Die Lagebesprechung hat seit LLH-1111 ein eigenes Modul.)
+ * SEITEN MIT ANDEREM NAMEN ALS IHR MODUL: Funkplan und Kommunikationsplan zählen zum
+ * Fernmeldewesen (LLH-1180, {@link SEITE_MODUL}). Das Informationstelefon ist seit i6k6mzed ein
+ * eigenes Modul (`InfotelefonPage.tsx` → `infotelefon`, design.md D3), die Lagebesprechung seit
+ * LLH-1111. Den Stab samt Pressearbeit gibt es nicht mehr (i6k6mzed, design.md D1).
  */
 
 /** Eine Fundstelle `X.get('<parameter>')` / `X.has('<parameter>')`. */
@@ -122,51 +118,15 @@ const LESER = new Map<SchnellaktionParameter, Leser[]>(
 /** Vergleichsform für die Dateiname-↔-Registry-Zuordnung: nur Buchstaben und Ziffern. */
 const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** Basisname einer Datei in Vergleichsform, ohne Endung und ohne `Page` (`InfotelefonPage.tsx` → `infotelefon`). */
+/** Basisname einer Datei in Vergleichsform, ohne Endung und ohne `Page` (`FunkplanPage.tsx` → `funkplan`). */
 const fileBase = (pfad: string): string =>
   normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
 
-/** Schlüssel jeder Unterseite der Stab-Seite (Vergleichsform) → das Modul, das sie trägt. */
-const UNTERSEITE_MODUL = new Map(
-  SACHGEBIETE.flatMap(({ sachgebiet }) => unterseitenFuer(sachgebiet)).map((u) => [
-    normal(u.key),
-    u.modul,
-  ]),
-);
-
-/** Die Schlüssel der Unterseiten, die unter `…/stab/` liegen (Vergleichsform). */
-const STAB_UNTERSEITEN = new Set(
-  [...UNTERSEITE_MODUL].filter(([, modul]) => modul === 'stab').map(([key]) => key),
-);
-
-/**
- * Die Stab-Unterseite, auf die ein Ziel zeigt (`/einsaetze/1/stab/infotelefon?neu=1` →
- * `infotelefon`), oder `null`. Nur für den Träger `stab`.
- */
-export function findStabUnterseite(modulKey: string, ziel: string, basis: string): string | null {
-  if (modulKey !== 'stab') return null;
-  const [pfadTeil] = ziel.split('?');
-  if (!pfadTeil.startsWith(`${basis}/`)) return null;
-  const segment = normal(pfadTeil.slice(basis.length + 1).split('/')[0] ?? '');
-  return STAB_UNTERSEITEN.has(segment) ? segment : null;
-}
-
-/**
- * Die Leser-Dateien eines Trägermoduls, die einen Eintrag DECKEN (Kopfkommentar, Stab-Unterseiten):
- * zeigt das Ziel auf eine Stab-Unterseite, nur deren Seite; zeigt es auf den Stab selbst, nur
- * Dateien, die keine Unterseite sind — sonst deckte das Informationstelefon die Stab-Seite.
- */
-export function findCoveringFiles(
-  modulKey: string,
-  ziel: string,
-  basis: string,
-  dateien: readonly string[],
-): string[] {
-  const unterseite = findStabUnterseite(modulKey, ziel, basis);
-  if (unterseite) return dateien.filter((pfad) => fileBase(pfad) === unterseite);
-  if (modulKey === 'stab') return dateien.filter((pfad) => !STAB_UNTERSEITEN.has(fileBase(pfad)));
-  return [...dateien];
-}
+/** Seiten, deren Dateiname nicht ihr Modul nennt (Vergleichsform) → das Modul, das sie trägt. */
+const SEITE_MODUL: ReadonlyMap<string, string> = new Map([
+  ['funkplan', 'fernmeldewesen'],
+  ['kommunikationsplan', 'fernmeldewesen'],
+]);
 
 /**
  * Modulschlüssel zu einer Leser-Datei über ihren Dateinamen (`pages/PersonenPage.tsx` →
@@ -176,8 +136,8 @@ export function findCoveringFiles(
 export function modulZuLeserDatei(pfad: string): string[] {
   const basis = fileBase(pfad);
   if (!basis) return [];
-  const unterseitenModul = UNTERSEITE_MODUL.get(basis);
-  if (unterseitenModul) return [unterseitenModul];
+  const seitenModul = SEITE_MODUL.get(basis);
+  if (seitenModul) return [seitenModul];
   return modulRegistry
     .filter((m) => [m.key, m.route, modulZielRoute(m)].some((s) => normal(s) === basis))
     .map((m) => m.key);
@@ -239,28 +199,13 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     expect(findeLeser('/src/synthetisch.ts', quelle, 'zeichnen').map((l) => l.zeile)).toEqual([9]);
   });
 
-  it('ordnet die Seiten der Unterseiten ihrem Modul zu und erkennt die Ziele unter dem Stab (LLH-1127, LLH-1180)', () => {
-    expect(modulZuLeserDatei('/src/pages/InfotelefonPage.tsx')).toEqual(['stab']);
+  it('ordnet Seiten mit anderem Namen ihrem Modul zu (LLH-1180, i6k6mzed)', () => {
     expect(modulZuLeserDatei('/src/pages/FunkplanPage.tsx')).toEqual(['fernmeldewesen']);
-    expect(modulZuLeserDatei('/src/pages/StabPage.tsx')).toEqual(['stab']);
-    const basis = '/einsaetze/1/stab';
-    expect(findStabUnterseite('stab', `${basis}/infotelefon?neu=1`, basis)).toBe('infotelefon');
-    expect(findStabUnterseite('stab', `${basis}?neu=1`, basis)).toBeNull();
-    expect(findStabUnterseite('stab', `${basis}/unbekannt?neu=1`, basis)).toBeNull();
-    expect(
-      findStabUnterseite('etb', '/einsaetze/1/etb/infotelefon', '/einsaetze/1/etb'),
-    ).toBeNull();
-    // Selbstbeweis der Deckung: kein Leser der falschen Seite deckt.
-    const stabSeite = '/src/pages/StabPage.tsx';
-    const infotelefon = '/src/pages/InfotelefonPage.tsx';
-    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [infotelefon])).toEqual([]);
-    expect(findCoveringFiles('stab', `${basis}/presse?neu=1`, basis, [stabSeite])).toEqual([]);
-    expect(
-      findCoveringFiles('stab', `${basis}/infotelefon?neu=1`, basis, [stabSeite, infotelefon]),
-    ).toEqual([infotelefon]);
-    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [stabSeite, infotelefon])).toEqual([
-      stabSeite,
-    ]);
+    expect(modulZuLeserDatei('/src/pages/KommunikationsplanPage.tsx')).toEqual(['fernmeldewesen']);
+    // Das Informationstelefon ist ein eigenes Modul (i6k6mzed, design.md D3).
+    expect(modulZuLeserDatei('/src/pages/InfotelefonPage.tsx')).toEqual(['infotelefon']);
+    // Den Stab gibt es nicht mehr: eine Seite dieses Namens gehörte keinem Modul.
+    expect(modulZuLeserDatei('/src/pages/StabPage.tsx')).toEqual([]);
   });
 
   it('prüft das Ziel je Parameter', () => {
@@ -320,10 +265,8 @@ describe('Schnellaktionen-Guard: Deckung', () => {
     for (const a of SCHNELLAKTIONEN) {
       const leser = LESER.get(a.parameter) ?? [];
       const module = LESER_MODULE.get(a.parameter) ?? new Map<string, string[]>();
-      const m = modulRegistry.find((x) => x.key === a.modulKey)!;
-      const basis = einsatzModulPfad(4711, modulZielRoute(m));
       expect(
-        findCoveringFiles(a.modulKey, a.pfad(4711), basis, module.get(a.modulKey) ?? []),
+        module.get(a.modulKey) ?? [],
         `Schnellaktion „${a.label}" (${a.pfad(4711)}) zeigt auf das Modul '${a.modulKey}', aber ` +
           `KEINE Seite dieses Ziels liest ?${a.parameter}. Gefundene Leser:\n` +
           `${leser.map(zeige).join('\n')}\n` +

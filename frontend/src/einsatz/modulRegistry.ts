@@ -6,7 +6,6 @@ import {
   IconBesteck,
   IconDokument,
   IconDokumente,
-  IconGebaeudegruppe,
   IconGewitterwolke,
   IconGlocke,
   IconHaus,
@@ -37,6 +36,7 @@ import {
   IconSprechblaseGefuellt,
   IconSprechblaseRund,
   IconFunkmast,
+  IconTelefon,
   IconWarndreieck,
   IconZahnrad,
   IconZahnradGefuellt,
@@ -198,7 +198,7 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Aufträge, Befehle, Quittungen',
     zaehlerQuelle: 'auftraege',
   },
-  // LLH-1111: eigenes Modul, unabhängig von der Stab-Freigabe (Führungsstufe B/C ohne Stab).
+  // LLH-1111: eigenes Modul (Führungsstufe B/C).
   {
     key: 'lagebesprechung',
     kategorie: 'fuehrung',
@@ -207,15 +207,6 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'lagebesprechung',
     status: 'fertig',
     beschreibung: 'Termin, Vorbereitung, Entschluss',
-  },
-  {
-    key: 'stab',
-    kategorie: 'fuehrung',
-    label: 'Stab',
-    icon: IconGebaeudegruppe,
-    route: 'stab',
-    status: 'fertig',
-    beschreibung: 'S1–S6, Besetzung',
   },
   {
     key: 'dokumente',
@@ -483,7 +474,7 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Eingang, Ausgang, Bearbeitung',
     zaehlerQuelle: 'meldungen',
   },
-  // LLH-1180: S6 als eigenes Modul, unabhängig von der Stab-Freigabe (ELW 1 ohne Stab). Die
+  // LLH-1180: S6 als eigenes Modul (auch im ELW 1). Die
   // Beschreibung trägt „Funkplan“ vorn, damit „Funk“ in der Palette trifft (40 Zeichen, D1).
   {
     key: 'fernmeldewesen',
@@ -493,6 +484,17 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'fernmeldewesen',
     status: 'fertig',
     beschreibung: 'Funkplan, Skizze, Kommunikationsplan',
+  },
+  {
+    // i6k6mzed (design.md D3): eigenes Modul, ohne Modulzähler. Die
+    // API bleibt unter `…/stab/infotelefon`, `PFAD_KEY` ordnet sie `infotelefon` zu.
+    key: 'infotelefon',
+    kategorie: 'kommunikation',
+    label: 'Informationstelefon',
+    icon: IconTelefon,
+    route: 'infotelefon',
+    status: 'fertig',
+    beschreibung: 'Bürgeranrufe, Rückrufe, Anliegen',
   },
   // Einstellungen
   {
@@ -561,14 +563,14 @@ export function modulAusPfad(
 
 /**
  * Altpfade, die auf ein anderes Modul umleiten (LLH-1180, design.md D7): Sie gehören dem Ziel der
- * Weiterleitung, damit der Rahmen sie nach dessen Freigabe gatet. Sonst finge ein ausgeblendeter
- * Stab `stab/funkplan` ab, bevor die Weiterleitung ins Fernmeldewesen läuft. Spiegel von
+ * Weiterleitung, damit der Rahmen sie nach dessen Freigabe gatet. Spiegel von
  * `PFAD_KEY` im Backend (`src/einsatz/modul.rs`), wo dieselben Pfade per längstem Präfix
- * `fernmeldewesen` gehören.
+ * `fernmeldewesen` bzw. `infotelefon` gehören (i6k6mzed, design.md D3).
  */
 const ALTPFAD_MODUL: Readonly<Record<string, string>> = {
   'stab/funkplan': 'fernmeldewesen',
   'stab/kommunikationsplan': 'fernmeldewesen',
+  'stab/infotelefon': 'infotelefon',
 };
 
 /** Module, die nicht ausgeblendet werden dürfen (Spiegel von `NICHT_AUSBLENDBAR` im Backend). */
@@ -666,7 +668,7 @@ export function istPfadGesperrt(pfad: string, freigaben?: ModulFreigaben): boole
 }
 
 /**
- * Rückweg aus einer Sackgasse (Modulwächter, Platzhalter, Stab ohne Freigabe; LFH-888): das
+ * Rückweg aus einer Sackgasse (Modulwächter, Platzhalter; LFH-888): das
  * Standardmodul des Einsatzes, wenn es frei ist, sonst der Überblick, sonst das erste freie Modul
  * in Registry-Reihenfolge, zuletzt die Einsatzdaten (nie gesperrt). „Frei" in der strengen Lesart
  * ({@link istModulFreigegeben}), damit der Rückweg nie selbst in den Wächter führt. Den Pfad baut

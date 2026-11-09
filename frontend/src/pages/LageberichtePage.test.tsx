@@ -15,7 +15,6 @@ import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { mitProzessZone } from '../test/prozessZone';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
-import { MEDIENLAGE_QUELLE } from '../stab/medienlageQuelle';
 import { EIGENE_LAGE_QUELLE } from '../lageberichte/eigeneLageUebernahme';
 import { FUEHRUNGSPROBLEME_QUELLE } from '../lageberichte/fuehrungsproblemeUebernahme';
 import { LAGEENTWICKLUNG_QUELLE } from '../lageberichte/lageentwicklungUebernahme';
@@ -364,8 +363,8 @@ describe('LageberichtDetailPage — Leere Abschnitte aus dem Lagebild füllen (L
       ),
     );
     expect(screen.getByLabelText('Eigene Lage')).toHaveValue('Eigene Fassung');
-    expect(screen.getByLabelText('Medienlage')).toHaveValue('Text medienlage');
-    // Abschnitte ohne Quelle bleiben von Hand.
+    // Abschnitte ohne Quelle bleiben von Hand, auch die Medienlage (i6k6mzed, design.md D6).
+    expect(screen.getByLabelText('Medienlage')).toHaveValue('');
     expect(screen.getByLabelText('Auftrag')).toHaveValue('');
     expect(screen.getByLabelText('Zusammenfassung')).toHaveValue('');
     for (const [s, spion] of erzeuge) {
@@ -707,13 +706,13 @@ function DetailOrt() {
   return <p>Entwurf {lbId} geöffnet</p>;
 }
 
-/** Die fünf Quellen des Lagevortrags zur Information, in der Reihenfolge der Vorlage. */
+/** Die vier Quellen des Lagevortrags zur Information, in der Reihenfolge der Vorlage. Die
+ *  Medienlage ist Freitext ohne Quelle (i6k6mzed, design.md D6). */
 const QUELLEN: ReadonlyArray<readonly [string, UebernahmeQuelle]> = [
   ['gefahren_schadenlage', SCHADENLAGE_QUELLE],
   ['eigene_lage', EIGENE_LAGE_QUELLE],
   ['lageentwicklung', LAGEENTWICKLUNG_QUELLE],
   ['fuehrungsprobleme', FUEHRUNGSPROBLEME_QUELLE],
-  ['medienlage', MEDIENLAGE_QUELLE],
 ];
 
 /** Der Startinhalt, den die gestubbten Quellen liefern (`zaehlePosts`). */
@@ -859,16 +858,17 @@ describe('LageberichtePage — Anlegen ohne Dialog (LLH-1064)', () => {
   });
 
   it('nennt eine gesperrte Quelle im Startinhalt „— (Grund)“ und fragt sie nicht an (LLH-1081)', async () => {
-    const posts = zaehlePosts(undefined, freigabenFixture({ stab: { zugriff: false } }));
+    const posts = zaehlePosts(undefined, freigabenFixture({ etb: { zugriff: false } }));
     setupListe();
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Lagevortrag' }));
     expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
     expect(posts).toHaveLength(1);
     expect(posts[0].abschnitte).toEqual([
-      ...STARTINHALT.slice(0, 4),
-      { schluessel: 'medienlage', text: '— (Stab nicht freigegeben)', uebernommen_at: STAND },
+      ...STARTINHALT.slice(0, 2),
+      { schluessel: 'lageentwicklung', text: '— (ETB nicht freigegeben)', uebernommen_at: STAND },
+      STARTINHALT[3],
     ]);
-    expect(posts.erzeuge.medienlage).not.toHaveBeenCalled();
+    expect(posts.erzeuge.lageentwicklung).not.toHaveBeenCalled();
   });
 
   it('legt bei 400 mit Startinhalt keinen Entwurf an und fragt nicht nach (LLH-1081)', async () => {

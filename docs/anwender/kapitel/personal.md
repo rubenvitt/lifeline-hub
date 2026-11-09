@@ -231,8 +231,8 @@ Zeichen lang sein, eine Bemerkung bis zu 2 000.
 
 Wo eine Person mit nur einer Angabe steht, nennt die App die Einsatzfunktion, ohne sie die
 Qualifikation: im Meldebild und seiner Übernahme in einen Lagebericht, im Block „Entlassen“, in
-der Anlage „Personal je Kopf“ des Einsatzberichts, in den Personenauswahlen von Stab-Besetzung,
-Einsatzleitung, Schäden und UHS, bei „Bestätigt von“ am UHS-Gerät, unter dem Namen einer auf der
+der Anlage „Personal je Kopf“ des Einsatzberichts, in den Personenauswahlen von Einsatzleitung,
+Schäden und UHS, bei „Bestätigt von“ am UHS-Gerät, unter dem Namen einer auf der
 Lagekarte gewählten Person und im Einsatztagebuch. Die Vorschau in der Sprungpalette und die Leiste
 der Lagekarte zeigen beide. Das taktische Zeichen einer Person auf der Lagekarte folgt nur der
 Qualifikation: eine Einsatzfunktion wie „Sprechfunker“ ändert es nicht. Entlassen und erneut
@@ -270,7 +270,8 @@ Einheitsführer ist ein eigenes Merkmal der Einheit.
 
 ### Entlassen und Stornieren
 
-Entlassen ist der Normalweg: Die Person verlässt Einheit, Fahrzeug, UHS, Stab und Führungsstelle.
+Entlassen ist der Normalweg: Die Person verlässt Einheit, Fahrzeug, UHS und Führungsstelle. Eine
+Führungsfunktion als Mitglied des Einsatzes bleibt (siehe [Rechte im Einsatz](rechte-im-einsatz.md)).
 War sie Einheitsführer oder Leiter eines Einsatzabschnitts, ist diese Stelle danach leer. Ihre
 Zeitachse bleibt, mit offener Periode endet sie mit einer „Entlassung“ (Herkunft „aus dem Einsatz
 entlassen“). In Stärke, Statusband, Lagemonitor und Auswahllisten zählt sie nicht mehr. Im Nachweis

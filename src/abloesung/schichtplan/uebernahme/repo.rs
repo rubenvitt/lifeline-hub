@@ -11,12 +11,13 @@
 //! Transaktion, sodass Vorschau und Schreiben denselben Stand sehen. LLH-1561 (Vorplanung) legt
 //! den Einsatz an und ruft die drei Schritte in derselben Transaktion.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use sqlx::{SqliteConnection, SqlitePool};
 
 use super::abgleich::{
-    self, norm, BestandAbschnitt, BestandEinheit, BestandHelfer, BestandStamm, BestandUhs,
+    self, norm, BestandAbschnitt, BestandEinheit, BestandEinsatzkraft, BestandHelfer, BestandStamm,
+    BestandUhs,
 };
 use super::{
     BlockZustand, Entscheidungen, ImportAuswahl, ImportMeldung, ImportVorschau, ImportZaehlung,
@@ -87,6 +88,11 @@ pub struct Bestand {
     pub vorlagen: Vec<BestandVorlage>,
     /// Stamm-Personal im Dienst.
     pub stamm: Vec<BestandStamm>,
+    /// Stamm-Personal außer Dienst, das schon im Plan dieses Einsatzes steht: nur für eigene
+    /// Bezüge (Regel 0, LLH-1557), damit eine Mappe es wieder trifft.
+    pub stamm_im_plan: Vec<BestandStamm>,
+    /// Ad-hoc-Kräfte dieses Einsatzes, nur für eigene Bezüge (Regel 0, LLH-1557).
+    pub einsatzkraefte: Vec<BestandEinsatzkraft>,
     pub helfer: Vec<BestandHelfer>,
     /// Aktive Qualifikationen der Organisation (Kennung, Bezeichnung).
     pub qualifikationen: Vec<(i64, String)>,
@@ -97,6 +103,17 @@ pub struct Bestand {
 type HelferRoh = (i64, String, Option<String>, Option<String>, Option<String>);
 /// planschicht_id, personal_id, einsatz_personal_id, helfer_id.
 type PersonRoh = (i64, Option<i64>, Option<i64>, Option<i64>);
+
+fn bestand_stamm(
+    (id, name, personalnummer, telefon): (i64, String, Option<String>, Option<String>),
+) -> BestandStamm {
+    BestandStamm {
+        id,
+        name,
+        personalnummer,
+        telefon,
+    }
+}
 
 /// Liest den Bestand des Einsatzes auf der offenen Verbindung.
 pub async fn bestand_tx(
@@ -143,6 +160,25 @@ pub async fn bestand_tx(
          WHERE org_id = ? AND dienststatus = 'in_dienst' ORDER BY name COLLATE NOCASE, id",
     )
     .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let stamm_im_plan: Vec<(i64, String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT id, name, personalnummer, telefon FROM personal \
+         WHERE org_id = ?1 AND dienststatus <> 'in_dienst' \
+           AND id IN (SELECT pp.personal_id FROM einsatz_planschicht_person pp \
+                      JOIN einsatz_planschicht p ON p.id = pp.planschicht_id \
+                      WHERE p.einsatz_id = ?2 AND pp.personal_id IS NOT NULL) \
+         ORDER BY name COLLATE NOCASE, id",
+    )
+    .bind(org_id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let einsatzkraefte: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, snap_name FROM einsatz_personal \
+         WHERE einsatz_id = ? AND personal_id IS NULL ORDER BY snap_name COLLATE NOCASE, id",
+    )
+    .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
     let helfer: Vec<HelferRoh> = sqlx::query_as(
@@ -238,14 +274,11 @@ pub async fn bestand_tx(
             })
             .collect(),
         vorlagen,
-        stamm: stamm
+        stamm: stamm.into_iter().map(bestand_stamm).collect(),
+        stamm_im_plan: stamm_im_plan.into_iter().map(bestand_stamm).collect(),
+        einsatzkraefte: einsatzkraefte
             .into_iter()
-            .map(|(id, name, personalnummer, telefon)| BestandStamm {
-                id,
-                name,
-                personalnummer,
-                telefon,
-            })
+            .map(|(id, name)| BestandEinsatzkraft { id, name })
             .collect(),
         helfer: helfer
             .into_iter()
@@ -283,6 +316,8 @@ enum Ziel {
 enum Wer {
     Stamm(i64),
     Helfer(i64),
+    /// Eine Ad-hoc-Kraft des Einsatzes (nur über einen eigenen Bezug, LLH-1557).
+    Einsatz(i64),
     /// Index in [`Planung::neue_helfer`].
     NeuerHelfer(usize),
     Fehler,
@@ -326,9 +361,10 @@ struct GeplanterBlock {
     bis: String,
     zustand: BlockZustand,
     block_id: Option<i64>,
-    /// Soll aus dem Paket; fehlt = Vorgabe des Postens.
+    /// Soll aus dem Paket; fehlt = Vorgabe des Postens, außer bei `ohne_vorgabe`.
     soll_anzahl: Option<i64>,
     quali_soll: Option<String>,
+    ohne_vorgabe: bool,
     notiz: Option<String>,
     /// Alle Personen laut Paket, entdoppelt.
     personen: Vec<Wer>,
@@ -344,6 +380,10 @@ pub struct Planung {
     neue_einheiten: Vec<NeueEinheit>,
     neue_uhs: Vec<NeueUhs>,
     neue_helfer: Vec<NeuerHelfer>,
+    /// Indizes in `neue_einheiten` bzw. `neue_uhs`, die das Übernehmen anlegt: gebraucht von
+    /// einem wirksamen Block oder ein Posten mit `ohne_block_anlegen`. Aufsteigend.
+    anlegen_einheiten: Vec<usize>,
+    anlegen_uhs: Vec<usize>,
     bloecke: Vec<GeplanterBlock>,
     /// Grenzwerte, die das Übernehmen setzt (je Wert nur ohne eigenen des Einsatzes).
     grenzwerte: Option<(Option<i64>, Option<i64>)>,
@@ -437,7 +477,18 @@ fn uhs_bezeichnung(b: &Bestand, id: i64) -> Option<&str> {
 }
 
 fn stamm_name(b: &Bestand, id: i64) -> Option<&str> {
-    b.stamm.iter().find(|s| s.id == id).map(|s| s.name.as_str())
+    b.stamm
+        .iter()
+        .chain(&b.stamm_im_plan)
+        .find(|s| s.id == id)
+        .map(|s| s.name.as_str())
+}
+
+fn einsatzkraft_name(b: &Bestand, id: i64) -> Option<&str> {
+    b.einsatzkraefte
+        .iter()
+        .find(|k| k.id == id)
+        .map(|k| k.name.as_str())
 }
 
 fn helfer_name(b: &Bestand, id: i64) -> Option<&str> {
@@ -488,6 +539,13 @@ pub fn planen(
     }
     let mut qualis = Qualis::neu(&bestand.qualifikationen);
     let mut fehlende_rechte = false;
+    // Für eigene Bezüge (Regel 0) zählt auch Stamm-Personal außer Dienst, das schon im Plan steht.
+    let stamm_bezug: Vec<BestandStamm> = bestand
+        .stamm
+        .iter()
+        .chain(&bestand.stamm_im_plan)
+        .cloned()
+        .collect();
 
     // --- Posten (D4) ---
     let mut neue_einheiten: Vec<NeueEinheit> = Vec::new();
@@ -603,14 +661,14 @@ pub fn planen(
             }
             z => z,
         };
-        if let Some(fid) = p.fahrzeug_id {
+        if p.fahrzeug_id.is_some() {
             if matches!(
                 ziel,
                 Ziel::NeueEinheit(_) | Ziel::Bestehend(Posten::Einheit(_))
             ) {
                 meldungen.push(ImportMeldung::hinweis(
                     zeile,
-                    format!("Posten «{}»: Fahrzeug #{fid} nicht disponiert", p.name),
+                    format!("Posten «{}»: Stamm-Fahrzeug nicht disponiert", p.name),
                 ));
             }
         }
@@ -672,6 +730,7 @@ pub fn planen(
             }
             PaketPerson::Angabe(a) => person_planen(
                 bestand,
+                &stamm_bezug,
                 a,
                 entscheidungen.personen.get(&a.schluessel).copied(),
                 &mut qualis,
@@ -750,6 +809,7 @@ pub fn planen(
                     block_id: None,
                     soll_anzahl: b.soll_anzahl,
                     quali_soll,
+                    ohne_vorgabe: b.ohne_vorgabe,
                     notiz: b.notiz.clone(),
                     personen,
                     neue: Vec::new(),
@@ -811,6 +871,7 @@ pub fn planen(
                     .filter(|w| match w {
                         Wer::Stamm(id) => !x.personen.contains(&PlanPerson::Stamm(*id)),
                         Wer::Helfer(id) => !x.personen.contains(&PlanPerson::Helfer(*id)),
+                        Wer::Einsatz(id) => !x.personen.contains(&PlanPerson::Einsatz(*id)),
                         _ => true,
                     })
                     .collect();
@@ -906,18 +967,29 @@ pub fn planen(
             format!("Höchstens {PLAN_HELFER_MAX} Helfer je Einsatz"),
         ));
     }
-    let gebraucht_einheiten: HashSet<usize> = gruppen
+    // Ein Posten mit `ohne_block_anlegen` braucht keinen Block (Vorplanung, LLH-1587).
+    let ohne_block: Vec<Ziel> = paket
+        .posten
+        .iter()
+        .filter(|p| p.ohne_block_anlegen)
+        .filter_map(|p| posten_ziel.get(p.schluessel.as_str()).copied())
+        .collect();
+    let gebraucht_einheiten: BTreeSet<usize> = gruppen
         .iter()
         .filter(wirksam)
-        .filter_map(|g| match g.ziel {
+        .map(|g| g.ziel)
+        .chain(ohne_block.iter().copied())
+        .filter_map(|z| match z {
             Ziel::NeueEinheit(i) => Some(i),
             _ => None,
         })
         .collect();
-    let gebraucht_uhs: HashSet<usize> = gruppen
+    let gebraucht_uhs: BTreeSet<usize> = gruppen
         .iter()
         .filter(wirksam)
-        .filter_map(|g| match g.ziel {
+        .map(|g| g.ziel)
+        .chain(ohne_block.iter().copied())
+        .filter_map(|z| match z {
             Ziel::NeueUhs(i) => Some(i),
             _ => None,
         })
@@ -1045,6 +1117,8 @@ pub fn planen(
         neue_einheiten,
         neue_uhs,
         neue_helfer,
+        anlegen_einheiten: gebraucht_einheiten.into_iter().collect(),
+        anlegen_uhs: gebraucht_uhs.into_iter().collect(),
         bloecke: gruppen,
         grenzwerte,
         fehlende_rechte,
@@ -1146,6 +1220,7 @@ fn neuer_posten(
 /// Eine Person mit Angaben: Vorschlag, Wahl, neuer Helfer.
 fn person_planen(
     bestand: &Bestand,
+    stamm_bezug: &[BestandStamm],
     a: &PersonAngabe,
     entscheidung: Option<PersonEntscheidung>,
     qualis: &mut Qualis<'_>,
@@ -1154,7 +1229,9 @@ fn person_planen(
 ) -> (Wer, VorschauPerson) {
     let zeile = erste(&a.zeilen);
     let name = a.anzeigename();
-    let vorschlag = abgleich::person_vorschlag(a, &bestand.stamm, &bestand.helfer);
+    let vorschlag =
+        abgleich::eigener_treffer(a, stamm_bezug, &bestand.einsatzkraefte, &bestand.helfer)
+            .unwrap_or_else(|| abgleich::person_vorschlag(a, &bestand.stamm, &bestand.helfer));
     let (mut ziel, mut treffer, mut grund) = (vorschlag.ziel, vorschlag.treffer, vorschlag.grund);
     match entscheidung {
         Some(PersonEntscheidung::Stamm { personal_id }) => {
@@ -1170,6 +1247,17 @@ fn person_planen(
             ziel = PersonZiel::Helfer {
                 helfer_id,
                 name: helfer_name(bestand, helfer_id)
+                    .unwrap_or_default()
+                    .to_string(),
+            };
+            (treffer, grund) = (Treffer::Sicher, Some(TrefferGrund::Wahl));
+        }
+        Some(PersonEntscheidung::Einsatz {
+            einsatz_personal_id,
+        }) => {
+            ziel = PersonZiel::Einsatz {
+                einsatz_personal_id,
+                name: einsatzkraft_name(bestand, einsatz_personal_id)
                     .unwrap_or_default()
                     .to_string(),
             };
@@ -1207,6 +1295,20 @@ fn person_planen(
                 meldungen.push(ImportMeldung::fehler(
                     zeile,
                     format!("«{name}»: Helfer nicht wählbar"),
+                ));
+                Wer::Fehler
+            }
+        }
+        PersonZiel::Einsatz {
+            einsatz_personal_id,
+            ..
+        } => {
+            if einsatzkraft_name(bestand, *einsatz_personal_id).is_some() {
+                Wer::Einsatz(*einsatz_personal_id)
+            } else {
+                meldungen.push(ImportMeldung::fehler(
+                    zeile,
+                    format!("«{name}»: Einsatzkraft nicht wählbar"),
                 ));
                 Wer::Fehler
             }
@@ -1308,9 +1410,14 @@ fn fehler_als_zeilen(planung: &Planung) -> AppError {
     }
 }
 
+/// Anlass im ETB, wenn eine Datei eingelesen wird.
+pub const ANLASS_DATEI: &str = "Schichtplan eingelesen";
+
 /// Schreibt eine fehlerfreie Planung auf der offenen Verbindung (öffnet und committet nichts).
 /// Mit Fehlern 422 (Zeilen), mit fehlenden Rechten 403. Ohne Änderung schreibt es nichts, auch
-/// kein ETB.
+/// kein ETB. `anlass` beginnt den ETB-Eintrag ([`etb_text`]); der Aufrufer hält ihn in den
+/// ETB-Grenzen.
+#[allow(clippy::too_many_arguments)]
 pub async fn schreiben_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -1319,6 +1426,7 @@ pub async fn schreiben_tx(
     planung: &Planung,
     etb_startwert: i64,
     jetzt: &str,
+    anlass: &str,
 ) -> Result<Geschrieben, AppError> {
     if planung.fehlende_rechte {
         return Err(AppError::Forbidden);
@@ -1337,11 +1445,16 @@ pub async fn schreiben_tx(
     let wirksam =
         |g: &GeplanterBlock| matches!(g.zustand, BlockZustand::Neu | BlockZustand::Ergaenzt);
 
-    // Neue Einheiten und UHS, nur die gebrauchten.
+    // Neue Einheiten und UHS, nur die gebrauchten (`Planung::anlegen_einheiten`, `anlegen_uhs`).
     let mut einheit_id: HashMap<usize, i64> = HashMap::new();
     let mut uhs_id: HashMap<usize, i64> = HashMap::new();
-    for g in planung.bloecke.iter().filter(|g| wirksam(g)) {
-        match g.ziel {
+    let anlegen = planung
+        .anlegen_einheiten
+        .iter()
+        .map(|&i| Ziel::NeueEinheit(i))
+        .chain(planung.anlegen_uhs.iter().map(|&i| Ziel::NeueUhs(i)));
+    for ziel in anlegen {
+        match ziel {
             Ziel::NeueEinheit(i) if !einheit_id.contains_key(&i) => {
                 let e = &planung.neue_einheiten[i];
                 let sortier = match e.sortier {
@@ -1449,6 +1562,7 @@ pub async fn schreiben_tx(
         match *w {
             Wer::Stamm(id) => Some(PlanPerson::Stamm(id)),
             Wer::Helfer(id) => Some(PlanPerson::Helfer(id)),
+            Wer::Einsatz(id) => Some(PlanPerson::Einsatz(id)),
             Wer::NeuerHelfer(i) => helfer_id.get(&i).map(|id| PlanPerson::Helfer(*id)),
             Wer::Fehler => None,
         }
@@ -1495,6 +1609,8 @@ pub async fn schreiben_tx(
                     plan_repo::soll_vorgabe_tx(&mut *conn, posten).await?;
                 let (soll, quali) = if posten == Posten::Pause {
                     (None, None)
+                } else if g.ohne_vorgabe {
+                    (g.soll_anzahl, g.quali_soll.clone())
                 } else {
                     (
                         g.soll_anzahl.or(vorgabe_anzahl),
@@ -1563,15 +1679,16 @@ pub async fn schreiben_tx(
             einsatz_id,
             benutzer_id,
             etb_startwert,
-            &etb_text(&zaehlung),
+            &etb_text(anlass, &zaehlung),
         )
         .await?,
     );
     Ok(ergebnis)
 }
 
-/// „Schichtplan eingelesen: 24 Schichten neu, 3 ergänzt, 12 Helfer neu, 3 Einheiten neu.“
-pub fn etb_text(z: &ImportZaehlung) -> String {
+/// „Schichtplan eingelesen: 24 Schichten neu, 3 ergänzt, 12 Helfer neu, 3 Einheiten neu.“ —
+/// `anlass` vor dem Doppelpunkt.
+pub fn etb_text(anlass: &str, z: &ImportZaehlung) -> String {
     let mut teile: Vec<String> = Vec::new();
     let mehrzahl =
         |n: i64, eins: &str, viele: &str| format!("{n} {}", if n == 1 { eins } else { viele });
@@ -1608,7 +1725,7 @@ pub fn etb_text(z: &ImportZaehlung) -> String {
             mehrzahl(z.einteilungen_neu, "Person", "Personen")
         ));
     }
-    format!("Schichtplan eingelesen: {}.", teile.join(", "))
+    format!("{anlass}: {}.", teile.join(", "))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1655,6 +1772,7 @@ pub async fn uebernehmen(
             &planung,
             startwert,
             jetzt,
+            ANLASS_DATEI,
         )
         .await
     })
@@ -1694,6 +1812,8 @@ mod tests {
                 personalnummer: Some("DEMO-S-002".into()),
                 telefon: None,
             }],
+            stamm_im_plan: vec![],
+            einsatzkraefte: vec![],
             helfer: vec![],
             qualifikationen: vec![(7, "Sanitäter".into())],
             bloecke: vec![BestandBlock {
@@ -1719,6 +1839,7 @@ mod tests {
             uhs_typ: None,
             sortier: None,
             zeilen: vec![zeile],
+            ohne_block_anlegen: false,
         }
     }
 
@@ -1729,6 +1850,7 @@ mod tests {
             bis: bis.into(),
             soll_anzahl: None,
             quali_soll: None,
+            ohne_vorgabe: false,
             notiz: None,
             personen: personen.iter().map(|s| s.to_string()).collect(),
             zeile: Some(zeile),
@@ -1787,6 +1909,132 @@ mod tests {
         assert_eq!(v.zaehlung.helfer_neu, 1);
         assert_eq!(v.zaehlung.einteilungen_neu, 2);
         assert_eq!(v.zaehlung.aenderungen, 1 + 1 + 1 + 2);
+    }
+
+    fn eigene(s: &str, name: &str, kennung: &str) -> PaketPerson {
+        PaketPerson::Angabe(PersonAngabe {
+            schluessel: s.into(),
+            nachname: name.into(),
+            kennung: Some(kennung.into()),
+            herkunft: Some(abgleich::EIGENE_HERKUNFT.into()),
+            zeilen: vec![2],
+            ..Default::default()
+        })
+    }
+
+    /// LLH-1557, Regel 0: eigene Bezüge treffen Stamm (auch außer Dienst, wenn schon im Plan),
+    /// Ad-hoc-Kraft und Helfer dieses Einsatzes; der Block bleibt unverändert.
+    #[test]
+    fn eigene_bezuege_treffen_den_bestand_und_aendern_nichts() {
+        let mut b = bestand();
+        b.stamm_im_plan = vec![BestandStamm {
+            id: 2,
+            name: "Otto Ruhend".into(),
+            personalnummer: None,
+            telefon: None,
+        }];
+        b.einsatzkraefte = vec![BestandEinsatzkraft {
+            id: 30,
+            name: "Ali Adhoc".into(),
+        }];
+        b.helfer = vec![BestandHelfer {
+            id: 40,
+            name: "Nina Neu".into(),
+            telefon: None,
+            kennung: None,
+            herkunft: None,
+        }];
+        b.bloecke[0].personen = vec![
+            PlanPerson::Stamm(1),
+            PlanPerson::Stamm(2),
+            PlanPerson::Einsatz(30),
+            PlanPerson::Helfer(40),
+        ];
+        let paket = PlanPaket {
+            posten: vec![posten("p1", PaketPostenArt::Einheit, "Streife 1", 2)],
+            bloecke: vec![block(
+                "p1",
+                "2026-07-04T08:00:00Z",
+                "2026-07-04T12:00:00Z",
+                &["m1", "m2", "m3", "m4"],
+                2,
+            )],
+            personen: vec![
+                eigene("m1", "Ida Platzhalter", "personal-1"),
+                eigene("m2", "Otto Ruhend", "personal-2"),
+                eigene("m3", "Ali Adhoc", "einsatzkraft-30"),
+                eigene("m4", "Nina Neu", "helfer-40"),
+            ],
+            ..Default::default()
+        };
+        let p = planen(&b, &paket, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        let v = &p.vorschau;
+        assert!(v.meldungen.is_empty(), "{:?}", v.meldungen);
+        assert!(v
+            .personen
+            .iter()
+            .all(|x| x.treffer == Treffer::Sicher && x.grund == Some(TrefferGrund::Bezug)));
+        assert!(matches!(
+            v.personen[2].ziel,
+            PersonZiel::Einsatz {
+                einsatz_personal_id: 30,
+                ..
+            }
+        ));
+        assert_eq!(v.bloecke[0].zustand, BlockZustand::Unveraendert);
+        assert_eq!(v.zaehlung.aenderungen, 0);
+
+        // Eine fremde Ad-hoc-Kraft (anderer Einsatz) läuft durch die übrigen Regeln: neuer Helfer
+        // mit der Kennung, ein zweiter Lauf trifft ihn über Regel 1.
+        let mut fremd = paket.clone();
+        fremd.personen[2] = eigene("m3", "Ali Adhoc", "einsatzkraft-99");
+        let p = planen(&b, &fremd, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        assert_eq!(p.vorschau.personen[2].ziel, PersonZiel::Neu);
+        assert_eq!(p.neue_helfer[0].kennung.as_deref(), Some("einsatzkraft-99"));
+        assert_eq!(
+            p.neue_helfer[0].herkunft.as_deref(),
+            Some(abgleich::EIGENE_HERKUNFT)
+        );
+        assert_eq!(p.vorschau.bloecke[0].zustand, BlockZustand::Ergaenzt);
+    }
+
+    #[test]
+    fn entscheidung_fuer_eine_einsatzkraft() {
+        let mut b = bestand();
+        b.einsatzkraefte = vec![BestandEinsatzkraft {
+            id: 30,
+            name: "Ali Adhoc".into(),
+        }];
+        let paket = PlanPaket {
+            posten: vec![posten("p1", PaketPostenArt::Einheit, "Streife 1", 2)],
+            bloecke: vec![block(
+                "p1",
+                "2026-07-04T08:00:00Z",
+                "2026-07-04T12:00:00Z",
+                &["m1"],
+                2,
+            )],
+            personen: vec![person("m1", "Adhoc", "Ali", None)],
+            ..Default::default()
+        };
+        let mut e = Entscheidungen::default();
+        e.personen.insert(
+            "m1".into(),
+            PersonEntscheidung::Einsatz {
+                einsatz_personal_id: 30,
+            },
+        );
+        let p = planen(&b, &paket, vec![], &e, ALLE).unwrap();
+        assert!(p.vorschau.uebernehmbar, "{:?}", p.vorschau.meldungen);
+        assert_eq!(p.vorschau.bloecke[0].zustand, BlockZustand::Ergaenzt);
+        e.personen.insert(
+            "m1".into(),
+            PersonEntscheidung::Einsatz {
+                einsatz_personal_id: 31,
+            },
+        );
+        let p = planen(&b, &paket, vec![], &e, ALLE).unwrap();
+        assert!(!p.vorschau.uebernehmbar);
     }
 
     #[test]
@@ -2040,7 +2288,7 @@ mod tests {
         };
         z.summe();
         assert_eq!(
-            etb_text(&z),
+            etb_text(ANLASS_DATEI, &z),
             "Schichtplan eingelesen: 24 Schichten neu, 12 Helfer neu, 1 Einheit neu."
         );
     }

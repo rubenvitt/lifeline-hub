@@ -82,6 +82,9 @@ pub struct PaketPosten {
     pub sortier: Option<i64>,
     /// Zeilen der Datei, die den Posten nennen (für die Vorschau).
     pub zeilen: Vec<u32>,
+    /// Ein neuer Posten entsteht auch ohne Block (LLH-1587): jeder Posten der Vorplanung wird
+    /// eine Einheit oder UHS. Aus der Datei `false`: dort entsteht ein Posten nur mit einem Block.
+    pub ohne_block_anlegen: bool,
 }
 
 /// Eine Qualifikation im Paket: aus dem Katalog der Organisation (LLH-1561) oder als
@@ -111,6 +114,9 @@ pub struct PaketBlock {
     pub soll_anzahl: Option<i64>,
     /// Fehlt = Vorgabe des Postens.
     pub quali_soll: Option<Vec<PaketQualiSoll>>,
+    /// Ein fehlendes Soll heißt „kein Soll“, nicht „Vorgabe des Postens“ (LLH-1587): die
+    /// Vorplanung trägt ihr Soll je Block schon fertig. Aus der Datei `false`.
+    pub ohne_vorgabe: bool,
     pub notiz: Option<String>,
     /// Schlüssel der Personen.
     pub personen: Vec<String>,
@@ -245,8 +251,16 @@ pub enum PostenEntscheidung {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(tag = "art", rename_all = "lowercase", deny_unknown_fields)]
 pub enum PersonEntscheidung {
-    Stamm { personal_id: i64 },
-    Helfer { helfer_id: i64 },
+    Stamm {
+        personal_id: i64,
+    },
+    Helfer {
+        helfer_id: i64,
+    },
+    /// Eine Ad-hoc-Kraft des Einsatzes (LLH-1557).
+    Einsatz {
+        einsatz_personal_id: i64,
+    },
     Neu,
 }
 
@@ -292,7 +306,8 @@ wire_enum! {
         NameTelefon => "name_telefon",
         /// Nur der Name.
         Name => "name",
-        /// Fester Bezug aus dem Paket.
+        /// Fester Bezug aus dem Paket oder ein eigener Bezug aus einer Mappe von Lifeline Hub
+        /// (Regel 0, LLH-1557).
         Bezug => "bezug",
         /// Von Hand gewählt.
         Wahl => "wahl",
@@ -347,8 +362,19 @@ pub struct VorschauPosten {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(tag = "art", rename_all = "lowercase")]
 pub enum PersonZiel {
-    Stamm { personal_id: i64, name: String },
-    Helfer { helfer_id: i64, name: String },
+    Stamm {
+        personal_id: i64,
+        name: String,
+    },
+    Helfer {
+        helfer_id: i64,
+        name: String,
+    },
+    /// Eine Ad-hoc-Kraft des Einsatzes; nur über einen eigenen Bezug (LLH-1557, Regel 0).
+    Einsatz {
+        einsatz_personal_id: i64,
+        name: String,
+    },
     Neu,
 }
 

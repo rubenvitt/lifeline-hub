@@ -102,15 +102,14 @@ fn alle_routen(einsatz: i64) -> Vec<(&'static str, String, Option<&'static str>)
     ]
 }
 
-/// Spec `fernmeldewesen`, „Bestehende Schnittstellen gehören dem Fernmeldewesen“: Stab aus,
-/// Fernmeldewesen an.
+/// Spec `fernmeldewesen`, „Bestehende Schnittstellen gehören dem Fernmeldewesen“: Das Modul Stab
+/// gibt es nicht mehr (i6k6mzed), das Fernmeldewesen bleibt unter seinen Pfaden nutzbar.
 #[tokio::test]
 async fn ohne_stab_bleibt_das_fernmeldewesen_voll_nutzbar() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let kraft = fuehrungskraft(&app, &admin, einsatz).await;
-    ausblenden(&app, &admin, einsatz, "stab").await;
 
     let (status, _) = anfrage(
         &app,
@@ -120,7 +119,7 @@ async fn ohne_stab_bleibt_das_fernmeldewesen_voll_nutzbar() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "Stab ist zu");
+    assert_eq!(status, StatusCode::NOT_FOUND, "der Stab ist entfernt");
 
     let (status, _) = anfrage(&app, "GET", &plan_pfad(einsatz), &kraft, None).await;
     assert_eq!(
@@ -172,46 +171,18 @@ async fn ausgeblendetes_fernmeldewesen_sperrt_lesen_und_schreiben() {
         let (status, _) = anfrage(&app, methode, &pfad, &kraft, body).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{methode} {pfad}");
     }
-
-    // Der Stab bleibt davon unberührt.
-    let (status, _) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/stab"),
-        &kraft,
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "Stab offen");
 }
 
-/// Eine Rollensperre am Fernmeldewesen gilt, auch wenn der Stab frei ist; eine am Stab nicht.
+/// Eine Rollensperre am Fernmeldewesen gilt auf jeder Route des Moduls.
 #[tokio::test]
-async fn rollensperre_folgt_dem_fernmeldewesen_nicht_dem_stab() {
+async fn rollensperre_folgt_dem_fernmeldewesen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let kraft = fuehrungskraft(&app, &admin, einsatz).await;
 
-    override_setzen(
-        &app,
-        &admin,
-        einsatz,
-        "stab",
-        r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#,
-    )
-    .await;
     let (status, _) = anfrage(&app, "GET", &skizze_pfad(einsatz), &kraft, None).await;
-    assert_eq!(status, StatusCode::OK, "Stab gesperrt, Fernmeldewesen frei");
-
-    override_setzen(
-        &app,
-        &admin,
-        einsatz,
-        "stab",
-        r#"{"sichtbar":true,"benoetigte_rolle":null}"#,
-    )
-    .await;
+    assert_eq!(status, StatusCode::OK, "ohne Sperre frei");
     override_setzen(
         &app,
         &admin,
@@ -224,15 +195,6 @@ async fn rollensperre_folgt_dem_fernmeldewesen_nicht_dem_stab() {
         let (status, _) = anfrage(&app, methode, &pfad, &kraft, body).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{methode} {pfad}");
     }
-    let (status, _) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/stab"),
-        &kraft,
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "Stab frei");
 }
 
 /// Fremde Organisation: 403 oder 404 auf jeder Route (wie `tests/cross_org.rs`); ein Einsatz,
@@ -264,10 +226,9 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
     rolle_setzen(&app, &admin, einsatz, beob, "beobachter").await;
     let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
-    ausblenden(&app, &admin, einsatz, "stab").await;
 
     let (status, _) = anfrage(&app, "GET", &plan_pfad(einsatz), &beob, None).await;
-    assert_eq!(status, StatusCode::OK, "Beobachter liest ohne Stab");
+    assert_eq!(status, StatusCode::OK, "Beobachter liest");
     let (status, _) = anfrage(
         &app,
         "POST",
@@ -281,42 +242,15 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 
 // ---------- Live ----------
 
-/// Spec `fernmeldewesen`, „Live-Verteilung mit dem Gate des Fernmeldewesens“: wer nur den Stab
-/// lesen darf, erfährt von keiner Änderung an Kommunikationsplan oder Skizze.
+/// Spec `fernmeldewesen`, „Live-Verteilung mit dem Gate des Fernmeldewesens“: wer den Einsatz,
+/// aber nicht das Fernmeldewesen lesen darf, erfährt von keiner Änderung an Kommunikationsplan
+/// oder Skizze.
 #[test]
-fn stab_leser_ohne_fernmeldewesen_erhaelt_kein_ereignis() {
+fn leser_ohne_fernmeldewesen_erhaelt_kein_ereignis() {
     use lifeline_hub::live::LiveEvent;
     use std::collections::HashSet;
-    let nur_stab: HashSet<&'static str> = HashSet::from(["stab"]);
-    assert!(!LiveEvent::Fernmeldewesen.sichtbar_fuer(&nur_stab));
+    let ohne: HashSet<&'static str> = HashSet::from(["etb", "einsatzdaten"]);
+    assert!(!LiveEvent::Fernmeldewesen.sichtbar_fuer(&ohne));
     let nur_fernmeldewesen: HashSet<&'static str> = HashSet::from(["fernmeldewesen"]);
     assert!(LiveEvent::Fernmeldewesen.sichtbar_fuer(&nur_fernmeldewesen));
-    assert!(!LiveEvent::Stab.sichtbar_fuer(&nur_fernmeldewesen));
-}
-
-/// Besetzung und Checkliste bleiben Stab: sie senden `stab`, nie `fernmeldewesen`.
-#[tokio::test]
-async fn besetzung_sendet_stab_und_kein_fernmeldewesen() {
-    let (app, _pool, live) = setup_mit_pool_und_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let mut rx = live.abonniere(einsatz);
-    let (status, json) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/stab/besetzung/s2"),
-        &admin,
-        Some(r#"{"besetzung_art":"einsatzleitung"}"#),
-    )
-    .await;
-    assert!(status.is_success(), "besetzen: {status} {json:?}");
-    let (mut stab, mut fernmeldewesen) = (0, 0);
-    while let Ok(n) = rx.try_recv() {
-        match n.event.as_str() {
-            "stab" => stab += 1,
-            "fernmeldewesen" => fernmeldewesen += 1,
-            _ => {}
-        }
-    }
-    assert_eq!((stab, fernmeldewesen), (1, 0));
 }

@@ -25,6 +25,8 @@ export const ZIEL_ART: Record<AntragZielArt, string> = {
   betroffene: 'Betroffene Person',
   externe_kraft: 'Externe Kraft',
   infotelefon_anruf: 'Anruf am Informationstelefon',
+  // Nur noch in alten Anträgen: das Modul Presse und Medienarbeit ist entfernt (i6k6mzed,
+  // design.md D4), ein solcher Antrag bleibt in der Akte lesbar.
   medienkontakt: 'Medienkontakt',
 };
 

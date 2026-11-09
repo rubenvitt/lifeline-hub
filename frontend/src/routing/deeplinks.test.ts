@@ -34,12 +34,9 @@ import {
   personenPfad,
   schaedenPfad,
   lagebesprechungPfad,
-  stabPfad,
   funkplanPfad,
   kommunikationsplanPfad,
   infotelefonPfad,
-  pressePfad,
-  pressemitteilungPfad,
   dokumentePfad,
   abloesungPfad,
   parseAbloesungAnsicht,
@@ -686,18 +683,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(pegelZielPfad(E, false)).toBe('/einsaetze/5/einstellungen/pegel');
   });
 
-  it('stabPfad ohne Optionen', () => {
-    expect(stabPfad(E)).toBe('/einsaetze/5/stab');
-  });
-  it('Presse- und Infotelefon-Seiten liegen unter dem Stab (LFH-554)', () => {
-    expect(pressePfad(E)).toBe('/einsaetze/5/stab/presse');
-    expect(pressePfad(E, { kontakt: 12 })).toBe('/einsaetze/5/stab/presse?kontakt=12');
-    expect(pressemitteilungPfad(E, 4)).toBe('/einsaetze/5/stab/presse/mitteilungen/4');
-    expect(infotelefonPfad(E)).toBe('/einsaetze/5/stab/infotelefon');
-    expect(infotelefonPfad(E, { anruf: 9 })).toBe('/einsaetze/5/stab/infotelefon?anruf=9');
-    // Round-Trip: der Query-Wert liest sich über URLSearchParams unverändert zurück.
-    const q = new URLSearchParams(pressePfad(E, { kontakt: 12 }).split('?')[1]);
-    expect(parseRouteId(q.get('kontakt') ?? undefined)).toBe(12);
+  it('das Informationstelefon ist ein eigenes Modul (i6k6mzed, design.md D3)', () => {
+    expect(infotelefonPfad(E)).toBe('/einsaetze/5/infotelefon');
+    expect(infotelefonPfad(E, { anruf: 9 })).toBe('/einsaetze/5/infotelefon?anruf=9');
+    expect(infotelefonPfad(E, { neu: true })).toBe('/einsaetze/5/infotelefon?neu=1');
   });
 
   it('kommunikationsplanPfad liegt im Fernmeldewesen (LFH-848, LLH-1180)', () => {

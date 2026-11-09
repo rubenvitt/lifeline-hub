@@ -408,17 +408,6 @@ Sonderkost-Anzahlen, Stellen- und Nachforderungsverweise sowie die Verweise auf 
 - **WHEN** ein Einsatz mit einer Ausgabe an die Einheit „2. Gruppe“ geschwärzt wird
 - **THEN** verweist die Ausgabe weiter auf die Einheit
 
-### Requirement: Stab-Werkzeug S4
-
-Das Sachgebiet S4 „Versorgung“ SHALL Verpflegung als Werkzeug führen, zusammen mit
-Nachforderungen und Material. Fahrzeuge MUST NOT zu den Werkzeugen von S4 gehören: S4 führt, was
-die Versorgung trägt, nicht die Kräfte. Eine Grenze für die Zahl der Werkzeuge je Sachgebiet gibt es
-nicht (Spec `stab-uebersicht`).
-
-#### Scenario: S4 im Stab
-- **WHEN** eine Person die Stabsseite öffnet und das Modul Verpflegung zugänglich ist
-- **THEN** führt die Kachel S4 die Werkzeuge Nachforderungen, Verpflegung und Material
-
 ### Requirement: Idempotente Erfassung einer Ausgabe
 
 Eine Ausgabe SHALL optional einen Idempotenzschlüssel `client_id` tragen (höchstens 64 Zeichen,

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { modulRegistry } from '../einsatz/modulRegistry';
-import { MEDIENLAGE_QUELLE } from '../stab/medienlageQuelle';
 import { freigabenFixture } from '../test/fixtures';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
 import { FUEHRUNGSPROBLEME_QUELLE } from './fuehrungsproblemeUebernahme';
@@ -32,13 +31,13 @@ function probe(text: string, modul = 'etb'): UebernahmeQuelle {
   };
 }
 
-/** Alle fünf Quellen des Lagevortrags zur Information, je mit fester Rückgabe. */
+/** Alle vier Quellen des Lagevortrags zur Information, je mit fester Rückgabe. Die Medienlage
+ *  ist Freitext ohne Quelle (i6k6mzed, design.md D6). */
 const QUELLEN = [
   ['gefahren_schadenlage', SCHADENLAGE_QUELLE],
   ['eigene_lage', EIGENE_LAGE_QUELLE],
   ['lageentwicklung', LAGEENTWICKLUNG_QUELLE],
   ['fuehrungsprobleme', FUEHRUNGSPROBLEME_QUELLE],
-  ['medienlage', MEDIENLAGE_QUELLE],
 ] as const;
 
 beforeEach(() => {
@@ -81,13 +80,15 @@ describe('loadAbschnittTexte (LLH-1081)', () => {
   });
 
   it('nennt eine gesperrte Quelle „— (Grund)“ und fragt sie nicht an', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ lagebesprechung: { zugriff: false } }),
+    );
     const a = probe('A');
-    const s = probe('S', 'stab');
+    const s = probe('S', 'lagebesprechung');
     const texte = await loadAbschnittTexte({ a, s }, ['a', 's'], ctx());
     expect(texte).toEqual([
       { schluessel: 'a', text: '# A', uebernommen_at: STAND },
-      { schluessel: 's', text: '— (stab nicht freigegeben)', uebernommen_at: STAND },
+      { schluessel: 's', text: '— (lagebesprechung nicht freigegeben)', uebernommen_at: STAND },
     ]);
     expect(s.erzeuge).not.toHaveBeenCalled();
   });
@@ -125,7 +126,7 @@ describe('loadAbschnittTexte (LLH-1081)', () => {
 });
 
 describe('loadStartinhalt (LLH-1081)', () => {
-  it('füllt im Lagevortrag zur Information die fünf Abschnitte mit Quelle, in Vorlagenreihenfolge', async () => {
+  it('füllt im Lagevortrag zur Information die vier Abschnitte mit Quelle, in Vorlagenreihenfolge', async () => {
     for (const [schluessel, quelle] of QUELLEN) {
       vi.spyOn(quelle, 'erzeuge').mockResolvedValue(`Text ${schluessel}`);
     }
@@ -147,7 +148,6 @@ describe('loadStartinhalt (LLH-1081)', () => {
     ['eigene_lage', ['einsatzabschnitte']],
     ['lageentwicklung', ['etb']],
     ['fuehrungsprobleme', ['auftraege', 'meldungen', 'fernmeldewesen']],
-    ['medienlage', ['stab']],
   ])(
     '%s gesperrt: „— (Grund)“ ohne Zahl und ohne Abruf, die übrigen bleiben',
     async (gesperrt, module) => {
@@ -164,18 +164,18 @@ describe('loadStartinhalt (LLH-1081)', () => {
         if (s === gesperrt) expect(spion).not.toHaveBeenCalled();
         else expect(spion).toHaveBeenCalledTimes(1);
       }
-      expect(texte).toHaveLength(5);
+      expect(texte).toHaveLength(4);
     },
   );
 
-  it('ohne jede Freigabe: fünfmal „—“ mit Grund, keine Zahl, kein Abruf außer den Freigaben', async () => {
+  it('ohne jede Freigabe: viermal „—“ mit Grund, keine Zahl, kein Abruf außer den Freigaben', async () => {
     const keine = freigabenFixture(
       Object.fromEntries(modulRegistry.map((m) => [m.key, { zugriff: false }])),
     );
     vi.mocked(ladeModulFreigaben).mockResolvedValue(keine);
     const abrufe = vi.spyOn(qc, 'fetchQuery');
     const texte = await loadStartinhalt('lagebericht', ctx());
-    expect(texte).toHaveLength(5);
+    expect(texte).toHaveLength(4);
     for (const { text } of texte!) {
       expect(text).toMatch(/^— \(.+\)$/);
       expect(text).not.toMatch(/\d/);

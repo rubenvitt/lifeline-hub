@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiDatei, apiGet, apiSend } from './client';
 import type {
   Planung,
   PlanungAendernBody,
@@ -9,7 +9,10 @@ import type {
   PlanungListeneintrag,
   PlanungPostenAendernBody,
   PlanungPostenBody,
+  PlanungUebernahmeBody,
+  PlanungUebernahmeErgebnis,
   SchichtplanHelfer,
+  SchichtplanImportVorschau,
   SchichtplanHelferAendernBody,
   SchichtplanHelferBody,
 } from './types';
@@ -112,4 +115,36 @@ export function aenderePlanungHelfer(
 /** Nimmt den Helfer aus allen Blöcken. */
 export function loeschePlanungHelfer(id: number, helferId: number): Promise<void> {
   return apiSend<void>(`${basis(id)}/helfer/${helferId}`, 'DELETE');
+}
+
+/**
+ * Vorschau der Übernahme in einen neuen oder laufenden Einsatz (LLH-1587): schreibt nichts,
+ * Fehler stehen in der Antwort (`uebernehmbar: false`). Ein fremder Einsatz ist 404, ohne
+ * Schreibrecht 403, ein abgeschlossener oder eine schon übernommene Planung 409.
+ */
+export function planungUebernahmeVorschau(
+  id: number,
+  body: PlanungUebernahmeBody,
+): Promise<SchichtplanImportVorschau> {
+  return apiSend<SchichtplanImportVorschau>(`${basis(id)}/uebernahme/vorschau`, 'POST', body);
+}
+
+/** Übernimmt in EINER Transaktion; danach ist die Planung schreibgeschützt (jeder Schreibweg 409). */
+export function planungUebernehmen(
+  id: number,
+  body: PlanungUebernahmeBody,
+): Promise<PlanungUebernahmeErgebnis> {
+  return apiSend<PlanungUebernahmeErgebnis>(`${basis(id)}/uebernahme`, 'POST', body);
+}
+
+/** Zeit für das Schreiben einer großen Mappe, wie beim Schichtplan eines Einsatzes. */
+const MAPPE_TIMEOUT_MS = 60_000;
+
+/**
+ * Die Planung als Excel-Mappe (LLH-1557 Teil B, Spec `vorplanung`): dieselben Blätter wie der
+ * Schichtplan eines Einsatzes, Zeiten in der Zone der Organisation. Der Server schickt keinen
+ * Dateinamen.
+ */
+export function loadPlanungMappe(id: number): Promise<Blob> {
+  return apiDatei(`${basis(id)}/export`, { timeoutMs: MAPPE_TIMEOUT_MS });
 }

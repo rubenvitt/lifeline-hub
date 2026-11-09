@@ -9,7 +9,7 @@ Einsatzdauer wächst. (LFH-931)
 
 ### Requirement: Dokumentlisten liefern Kopfdaten ohne Abschnittstexte
 
-Die Listen der Lageberichte, Befehle und Pressemitteilungen eines Einsatzes SHALL je Dokument nur
+Die Listen der Lageberichte und Befehle eines Einsatzes SHALL je Dokument nur
 Kopfdaten liefern: Kennung, Vorlage, Titel, Zeitstand, Status, Version, Vorgänger, Ersteller mit
 Namen, Erstellungszeitpunkt, Freigabe mit Person und Zeitpunkt und den ETB-Eintrag der Freigabe.
 Sie MUST NOT die Abschnittstexte enthalten. Den Volltext SHALL nur der Einzelabruf eines

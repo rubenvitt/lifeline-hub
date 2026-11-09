@@ -14,9 +14,12 @@ import type { AusgabePerson, AusgabePlan, AusgabePosten } from './ausgabePlan';
  * Der Schichtplan eines Einsatzes als Ausgabeplan (LLH-1557, design D1). Posten, Abschnitt und
  * Reihenfolge kommen aus den Zeilen der Ansicht (`baueZeilen`), damit Aushang und Raster dieselbe
  * Folge haben. Helfer tragen Organisation und Telefon aus dem Plan; Stamm-Personal und Ad-hoc-Kräfte
- * nur den Namen.
+ * nur den Namen. Die Vorplanung kommt über `ausPlanung.ts` in derselben Form herein.
  */
-export function ausEinsatzPlan(plan: Schichtplan, zeilen: readonly RasterZeile[]): AusgabePlan {
+export function ausEinsatzPlan(
+  plan: Pick<Schichtplan, 'bloecke' | 'helfer'>,
+  zeilen: readonly RasterZeile[],
+): AusgabePlan {
   const posten: AusgabePosten[] = zeilen.map((z) => ({
     schluessel: z.schluessel,
     titel: z.titel,

@@ -36,8 +36,8 @@ export function loeschHinweisTag(loeschungAt: string, jetzt: number): dayjs.Dayj
 /**
  * Liste der Planungen ohne Einsatz (LLH-1586, Spec `vorplanung`): offene zuerst, dann nach Beginn
  * (Reihenfolge des Servers, deshalb kein `defaultSortOrder`). Soll, Ist, Offen und Konflikte
- * rechnet der Server; ältere Planungen tragen keine. 14 Tage vor dem Löschen nennt die Zeile den
- * Tag. Erreichbar nur für wer planen darf (Kopfleiste, Server 403).
+ * rechnet der Server; ältere Planungen tragen keine, eine übernommene die von damals (LLH-1587).
+ * Eine übernommene Zeile nennt ihren Einsatz; 14 Tage vor dem Löschen nennt die Zeile den Tag. Erreichbar nur für wer planen darf (Kopfleiste, Server 403).
  */
 export default function PlanungenPage() {
   const { konventionen } = useAnzeigeKonventionen();
@@ -71,6 +71,18 @@ export default function PlanungenPage() {
             <KennungsLink to={planungPfad(p.id)} style={{ overflowWrap: 'anywhere' }}>
               {p.bezeichnung}
             </KennungsLink>
+            {p.uebernahme && (
+              <Typography.Text
+                type="secondary"
+                data-lfh="planung-uebernommen"
+                style={{ display: 'block' }}
+              >
+                übernommen in{' '}
+                <span style={monoStil(12)}>
+                  {p.uebernahme.einsatznummer ?? `Einsatz ${p.uebernahme.einsatz_id}`}
+                </span>
+              </Typography.Text>
+            )}
             {loeschTag && (
               <Typography.Text
                 type="secondary"

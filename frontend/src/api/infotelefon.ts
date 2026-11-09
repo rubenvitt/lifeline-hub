@@ -8,8 +8,9 @@ import type {
 } from './types';
 
 /**
- * Informationstelefon S5 (LFH-554): Anrufprotokoll unter dem Stab. Name, Rückrufnummer und
- * Notiz sind personenbezogen; sie erscheinen in keiner Ableitung (Medienlage, Lagebericht).
+ * Informationstelefon (LFH-554): Anrufprotokoll, seit i6k6mzed ein eigenes Modul. Die Adresse
+ * bleibt unter `…/stab/infotelefon` (Grenzwert-Regel, design.md D3). Name, Rückrufnummer und
+ * Notiz sind personenbezogen; sie erscheinen in keiner Ableitung (Lagebericht, Druck).
  *
  * Seit LLH-732 ist die Liste immer geblättert, und alle Zahlen kommen aus `…/zaehler` über den
  * ganzen Bestand, nie aus den geladenen Seiten.

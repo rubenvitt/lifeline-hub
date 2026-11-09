@@ -13,6 +13,9 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
+use crate::abloesung::schichtplan::uebernahme::{
+    Entscheidungen, ImportVorschau, ENTSCHEIDUNGEN_MAX,
+};
 use crate::abloesung::schichtplan::{
     zerlegung, PlanHelferAnzeige, PlanPerson, BLOCK_MIN_MINUTEN, HELFER_TELEFON_MAX,
     HELFER_TEXT_MAX, MAX_DIENST_BEREICH, MIN_RUHE_BEREICH, NOTIZ_MAX, PLAN_PERSONEN_MAX,
@@ -25,10 +28,11 @@ use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::planung::repo::{
     self, BlockEingabe, BlockPatch, Herkunft, KopfEingabe, KopfPatch, PostenEingabe, PostenPatch,
 };
+use crate::planung::uebernahme;
 use crate::planung::zugriff::{Planer, PlanungsZugriff};
 use crate::planung::{
-    PlanungAnzeige, PlanungListeneintrag, PlanungPostenArt, ABSCHNITT_MAX, BEZEICHNUNG_MAX,
-    ORT_MAX, POSTEN_MAX,
+    PlanungAnzeige, PlanungListeneintrag, PlanungPostenArt, PlanungUebernahmeErgebnis,
+    ABSCHNITT_MAX, BEZEICHNUNG_MAX, ORT_MAX, POSTEN_MAX,
 };
 use crate::routes::abloesung_schichtplan::{
     grenzwert, planzeit, qualifikationen, soll_anzahl, zeitraum,
@@ -44,6 +48,22 @@ fn melde(state: &AppState, org_id: i64, planung_id: i64) {
 
 async fn planung(state: &AppState, z: &PlanungsZugriff) -> Result<PlanungAnzeige, AppError> {
     repo::laden(&state.pool, z.benutzer.org_id, z.planung_id).await
+}
+
+/// GET /api/planungen/{id}/export — die Planung als Excel-Mappe (LLH-1557, design.md D5): wer
+/// die Planung lesen darf. Helfer der Planung sind immer sichtbar (keine Modulsperre).
+pub async fn export(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+) -> Result<axum::response::Response, AppError> {
+    let plan = crate::abloesung::schichtplan::ausgabe::repo::planung(
+        &state.pool,
+        z.benutzer.org_id,
+        z.planung_id,
+        &jetzt(),
+    )
+    .await?;
+    crate::routes::abloesung_schichtplan::mappe_antwort(plan).await
 }
 
 /// Ein Zeitpunkt des Zeitraums einer Planung: normalisiert, im Jahresbereich (400).
@@ -719,9 +739,85 @@ pub async fn helfer_loeschen(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ---------------------------------------------------------------------------------------------
+// Übernahme (LLH-1587)
+// ---------------------------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UebernahmeAnfrage {
+    ziel: uebernahme::Ziel,
+    /// Die Wahl in der Vorschau je Schlüssel; fehlt ein Schlüssel, gilt der Vorschlag.
+    #[serde(default)]
+    entscheidungen: Entscheidungen,
+}
+
+/// Entscheidungen je Art höchstens [`ENTSCHEIDUNGEN_MAX`] (400), wie beim Einlesen einer Datei.
+fn check_entscheidungen(e: Entscheidungen) -> Result<Entscheidungen, AppError> {
+    if e.posten.len() > ENTSCHEIDUNGEN_MAX || e.personen.len() > ENTSCHEIDUNGEN_MAX {
+        return Err(AppError::Validation(format!(
+            "entscheidungen: höchstens {ENTSCHEIDUNGEN_MAX} je Art"
+        )));
+    }
+    Ok(e)
+}
+
+/// POST /api/planungen/{id}/uebernahme/vorschau — gleicht die Planung mit dem Ziel ab und
+/// schreibt nichts; Fehler stehen in der Antwort (200). Ein laufender Einsatz: fremd oder
+/// unbekannt 404, ohne Schreibrecht, Ablösung oder Personal 403, abgeschlossen 409. Eine schon
+/// übernommene Planung 409.
+pub async fn uebernahme_vorschau(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+    JsonBody(req): JsonBody<UebernahmeAnfrage>,
+) -> Result<Json<ImportVorschau>, AppError> {
+    let e = check_entscheidungen(req.entscheidungen)?;
+    Ok(Json(
+        uebernahme::vorschau(&state.pool, &z.benutzer, z.planung_id, req.ziel, &e).await?,
+    ))
+}
+
+/// POST /api/planungen/{id}/uebernahme — wie die Vorschau, schreibt aber in EINER Transaktion:
+/// neuer Einsatz (wenn gewählt), Plan des Einsatzes und Vermerk an der Planung. Danach ist die
+/// Planung schreibgeschützt, ein zweiter Aufruf 409. Fehler des Abgleichs 422 (Zeilen).
+pub async fn uebernehmen(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+    JsonBody(req): JsonBody<UebernahmeAnfrage>,
+) -> Result<Json<PlanungUebernahmeErgebnis>, AppError> {
+    let e = check_entscheidungen(req.entscheidungen)?;
+    let u = uebernahme::uebernehmen(&state.pool, &z.benutzer, z.planung_id, req.ziel, &e).await?;
+    if u.neu {
+        super::einsatz::publish_neuer_einsatz(&state, u.einsatz_id, z.benutzer.id).await;
+    }
+    super::abloesung_schichtplan::publish_uebernahme(&state, u.einsatz_id, &u.geschrieben);
+    melde(&state, z.benutzer.org_id, z.planung_id);
+    Ok(Json(PlanungUebernahmeErgebnis {
+        einsatz_id: u.einsatz_id,
+        einsatz_neu: u.neu,
+        zaehlung: u.geschrieben.zaehlung,
+        planung: planung(&state, &z).await?,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zu_viele_entscheidungen_sind_400() {
+        let mut e = Entscheidungen::default();
+        for i in 0..=ENTSCHEIDUNGEN_MAX {
+            e.personen.insert(
+                format!("p{i}"),
+                crate::abloesung::schichtplan::uebernahme::PersonEntscheidung::Neu,
+            );
+        }
+        assert_eq!(
+            check_entscheidungen(e).unwrap_err().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
 
     fn posten(json: serde_json::Value) -> Result<Herkunft, AppError> {
         herkunft(&serde_json::from_value(json).unwrap())

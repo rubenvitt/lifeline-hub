@@ -12,9 +12,10 @@ import { einsatzDialogOeffnen } from './einsatz-kern';
  * dasselbe in `src/theme/auswahlKontrast.test.ts`; hier zählt, was der Browser zeichnet.
  *
  * GEMESSEN:
- *  · Statuswahl: der gewählte Eintrag im Menü „Status von NDR 1 · Evakuierte ändern“ (Presse S5,
- *    Medienkontakt per API), in Ruhe und unter dem Zeiger. Die Fläche wechselt unter dem Zeiger
- *    bewusst nicht (design.md E3), gemessen wird trotzdem beides.
+ *  · Statuswahl: der gewählte Eintrag im Menü „Status von Anruf … ändern“ (Informationstelefon,
+ *    Anruf per API; bis i6k6mzed der Medienkontakt des Presse-Logs), in Ruhe und unter dem Zeiger.
+ *    Die Fläche wechselt unter dem Zeiger bewusst nicht (design.md E3), gemessen wird trotzdem
+ *    beides.
  *  · Auswahlliste: die gewählte Option „Realeinsatz“ der Einsatzart im Dialog „Neuer Einsatz“,
  *    ruhend (Zeiger auf „Übung“) und aktiv (Zeiger auf ihr selbst).
  *  · Filtermarke (LLH-1086): Linie und Trichter der gefilterten Kopfzelle der Schadenliste,
@@ -64,12 +65,20 @@ for (const modus of ['light', 'dark'] as const) {
       await anlegen(
         page,
         einsatzId,
-        'stab/medienkontakte',
-        { art: 'anfrage', medium: 'NDR 1', thema: 'Evakuierte' },
-        'Medienkontakt',
+        'stab/infotelefon',
+        {
+          anliegen: 'vermisstensuche',
+          notiz: 'sucht Vater',
+          rueckruf: '0171 000',
+          rueckruf_noetig: true,
+        },
+        'Anruf',
       );
-      await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
-      await page.getByRole('button', { name: 'Status von NDR 1 · Evakuierte ändern' }).click();
+      await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
+      await expect(page.getByText('sucht Vater')).toHaveCount(1);
+      await page
+        .getByRole('button', { name: /^Status von Anruf Vermisstensuche .* ändern$/ })
+        .click();
 
       const gewaehlt = page.locator(
         '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item-selected',

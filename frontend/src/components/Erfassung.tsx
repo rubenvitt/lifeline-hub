@@ -476,7 +476,8 @@ export function ErfassungsFormular<T extends object>({
                 alignItems: 'center',
                 gap: token.marginXS,
                 flexWrap: 'wrap',
-                marginBottom: token.marginXS,
+                // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 7 / 11 / 16 px.
+                marginBottom: token.marginSM,
               }}
             >
               {uebernahme != null && uebernahme.length > 0 && (

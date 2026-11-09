@@ -42,13 +42,7 @@ function zaehleAnlegen(page: Page, einsatzId: string): { anzahl: number; bodies:
 }
 
 /** Die Abschnitte mit Quelle im Lagevortrag zur Information, in der Reihenfolge der Vorlage. */
-const MIT_QUELLE = [
-  'gefahren_schadenlage',
-  'eigene_lage',
-  'lageentwicklung',
-  'fuehrungsprobleme',
-  'medienlage',
-];
+const MIT_QUELLE = ['gefahren_schadenlage', 'eigene_lage', 'lageentwicklung', 'fuehrungsprobleme'];
 
 test.setTimeout(90_000);
 
@@ -114,12 +108,15 @@ test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leer
 
   const eigeneLage = page.getByRole('textbox', { name: 'Eigene Lage' });
   await expect(eigeneLage).toHaveValue('');
-  // Ein Abschnitt von Hand vorweg: die Sammelfüllung lässt ihn stehen.
-  await page.getByRole('textbox', { name: 'Medienlage' }).fill('Von Hand');
+  // Ein Abschnitt mit Quelle von Hand vorweg: die Sammelfüllung lässt ihn stehen.
+  const probleme = page.getByRole('textbox', { name: 'Besondere (Führungs-)Probleme' });
+  await probleme.fill('Von Hand');
   await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
   await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
-  await expect(page.getByRole('textbox', { name: 'Medienlage' })).toHaveValue('Von Hand');
+  await expect(probleme).toHaveValue('Von Hand');
+  // Ohne Quelle bleiben von Hand: Auftrag und die Medienlage (i6k6mzed, design.md D6).
   await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Medienlage' })).toHaveValue('');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }),

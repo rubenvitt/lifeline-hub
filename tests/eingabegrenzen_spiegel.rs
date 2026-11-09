@@ -10,8 +10,8 @@ use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
     einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
     kraefte_disposition, lage_zone, lagebesprechung, lagemonitor_zugang, material, nachforderung,
-    person, personal, planung, presse, programmpunkt, schaden, schichtmodell, sprechgruppe,
-    verpflegung, vorlagendokument, zeitachse,
+    person, personal, planung, programmpunkt, schaden, schichtmodell, sprechgruppe, verpflegung,
+    vorlagendokument, zeitachse,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -107,9 +107,6 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("INFOTELEFON_NOTIZ_MAX", infotelefon::NOTIZ_MAX),
         ("INFOTELEFON_KURZ_MAX", infotelefon::KURZ_MAX),
-        ("PRESSE_KURZ_MAX", presse::KURZ_MAX),
-        ("PRESSE_THEMA_MAX", presse::THEMA_MAX),
-        ("PRESSE_ANTWORT_MAX", presse::ANTWORT_MAX),
         ("SCHADEN_ORT_MAX", schaden::ORT_MAX),
         ("EINSATZORT_MAX", einsatz::EINSATZORT_MAX),
         ("SCHADEN_BESCHREIBUNG_MAX", schaden::BESCHREIBUNG_MAX),
@@ -224,6 +221,18 @@ fn backend() -> BTreeMap<&'static str, usize> {
         (
             "ABLOESUNG_RHYTHMUS_MAX_MINUTEN",
             usize::try_from(abloesung::RHYTHMUS_MAX_MINUTEN).unwrap(),
+        ),
+        (
+            "SCHICHTPLAN_MAX_DIENST_MIN_MINUTEN",
+            usize::try_from(*schichtplan::MAX_DIENST_BEREICH.start()).unwrap(),
+        ),
+        (
+            "SCHICHTPLAN_MAX_DIENST_MAX_MINUTEN",
+            usize::try_from(*schichtplan::MAX_DIENST_BEREICH.end()).unwrap(),
+        ),
+        (
+            "SCHICHTPLAN_MIN_RUHE_MAX_MINUTEN",
+            usize::try_from(*schichtplan::MIN_RUHE_BEREICH.end()).unwrap(),
         ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),

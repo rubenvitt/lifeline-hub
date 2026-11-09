@@ -523,7 +523,6 @@ fn serde_wire_gleich_as_str() {
         Betroffene,
         ExterneKraft,
         InfotelefonAnruf,
-        Medienkontakt,
     });
     enum_wire_as_str!(lifeline_hub::aufbewahrung::antrag::AntragZielArt {
         Einsatz,
@@ -643,7 +642,42 @@ fn serde_wire_gleich_as_str() {
         EinmalpasswortVergeben,
         LesezugangAngelegt,
         LesezugangWiderrufen,
+        InstanzCodeAusgestellt,
+        InstanzCodeEingeloest,
+        InstanzGekoppelt,
+        InstanzKopplungWiderrufen,
+        InstanzKopplungVomGegenueberWiderrufen,
+        UnterschriftRegistriert,
+        UnterschriftGegengezeichnet,
+        UnterschriftWiderrufen,
+        UnterschriftAbgelehnt,
     });
+    // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
+    enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
+        MeldetSich,
+        WirdGemeldet,
+    });
+    enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungZustand {
+        Angebahnt,
+        Aktiv,
+        Widerrufen,
+        VomGegenueberWiderrufen,
+    });
+    enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzProtokoll {
+        Passt,
+        UpdateHier,
+        UpdateGegenueber,
+    });
+    enum_wire_as_str!(
+        lifeline_hub::auth::unterschrift::UnterschriftSchluesselHerkunft { Lokal, Gegenueber }
+    );
+    enum_wire_as_str!(
+        lifeline_hub::auth::unterschrift::UnterschriftSchluesselZustand {
+            WartetAufGegenzeichnung,
+            Gueltig,
+            Widerrufen,
+        }
+    );
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —
@@ -773,12 +807,12 @@ fn orphan_enums_wire() {
     });
 }
 
-/// LFH-46: Führungsorganisation. `Sachgebiet` trägt die DB-CHECK-Werte `'s1'..'s6'` aus
-/// `migrations/0102_stab.sql` — ein Drift zwischen Enum und CHECK endet in einem 500 aus dem
-/// Constraint-Sicherheitsnetz statt in einer fachlichen Antwort. `BesetzungArt` ebenso.
+/// LFH-46: Führungsorganisation. `Sachgebiet` trägt die Werte `'s1'..'s6'` (einst CHECK von
+/// `einsatz_stabsfunktion`, `migrations/0102_stab.sql`); Labels, Funktionskatalog und
+/// `meine_sachgebiete` lesen sie weiter (i6k6mzed).
 #[test]
-fn stab_sachgebiet_wire() {
-    enum_wire_as_str!(lifeline_hub::stab::Sachgebiet {
+fn sachgebiet_wire() {
+    enum_wire_as_str!(lifeline_hub::fuehrung::Sachgebiet {
         S1,
         S2,
         S3,
@@ -802,23 +836,6 @@ fn einsatz_lagekennzahl_wire() {
     });
 }
 
-/// LFH-551: Checkliste Arbeitsaufnahme. Die Werte stehen als CHECK in
-/// `migrations/0127_stab_checkliste.sql`, das Frontend führt Text und Quelle je Wert in
-/// `stab/checkliste.ts`. Als Literal gepinnt, damit ein falscher `rename` hart auffällt; `ALLE`
-/// ist zugleich die Anzeigereihenfolge.
-#[test]
-fn stab_checklisten_punkt_wire() {
-    enum_wire!(lifeline_hub::stab::checkliste::ChecklistenPunkt {
-        Aufstellort => "aufstellort",
-        Einweisung => "einweisung",
-        Lageskizze => "lageskizze",
-        Funkarbeitsplaetze => "funkarbeitsplaetze",
-        Sprechgruppen => "sprechgruppen",
-        EtbEroeffnet => "etb_eroeffnet",
-        LeitstelleGemeldet => "leitstelle_gemeldet",
-    } in lifeline_hub::stab::checkliste::ChecklistenPunkt::ALLE);
-}
-
 /// Art der eigenen Führungsstelle (LFH-1181). Die CHECK-Liste in
 /// `migrations/0179_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
 #[test]
@@ -831,18 +848,18 @@ fn einsatz_fuehrungsstellen_art_wire() {
 
 #[test]
 fn stab_kommunikation_stellenart_wire() {
-    enum_wire!(lifeline_hub::stab::kommunikation::Stellenart {
+    enum_wire!(lifeline_hub::fernmeldewesen::kommunikation::Stellenart {
         Funktion => "funktion",
         Leitstelle => "leitstelle",
         Behoerde => "behoerde",
         Verbindungsperson => "verbindungsperson",
         Sonstige => "sonstige",
-    } in lifeline_hub::stab::kommunikation::Stellenart::ALLE);
+    } in lifeline_hub::fernmeldewesen::kommunikation::Stellenart::ALLE);
 }
 
 #[test]
 fn stab_kommunikation_verbindungsmittel_wire() {
-    enum_wire!(lifeline_hub::stab::kommunikation::Verbindungsmittel {
+    enum_wire!(lifeline_hub::fernmeldewesen::kommunikation::Verbindungsmittel {
         Festnetz => "festnetz",
         Mobil => "mobil",
         Fax => "fax",
@@ -850,22 +867,22 @@ fn stab_kommunikation_verbindungsmittel_wire() {
         Messenger => "messenger",
         Melder => "melder",
         Sonstiges => "sonstiges",
-    } in lifeline_hub::stab::kommunikation::Verbindungsmittel::ALLE);
+    } in lifeline_hub::fernmeldewesen::kommunikation::Verbindungsmittel::ALLE);
 }
 
 /// LFH-893: taktische Fernmeldeskizze. Die Werte stehen als CHECK in
 /// `migrations/0148_fernmeldeskizze.sql`; der Client zeichnet je Wert ein Zeichen (J.1–J.3).
 #[test]
 fn stab_fernmeldeskizze_wire() {
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Komponentenart {
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Komponentenart {
         Repeater => "repeater",
         Gateway => "gateway",
         Basisstation => "basisstation",
         MobileBasisstation => "mobile_basisstation",
         Antenne => "antenne",
         Vermittlung => "vermittlung",
-    } in lifeline_hub::stab::fernmeldeskizze::Komponentenart::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsart {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Komponentenart::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsart {
         Telefon => "telefon",
         Fax => "fax",
         Daten => "daten",
@@ -875,30 +892,30 @@ fn stab_fernmeldeskizze_wire() {
         Richtfunk => "richtfunk",
         Satellit => "satellit",
         Sonstige => "sonstige",
-    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsart::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsmedium {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsart::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsmedium {
         Funk => "funk",
         Leitung => "leitung",
-    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsmedium::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsstatus {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsmedium::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsstatus {
         Bestehend => "bestehend",
         Geplant => "geplant",
-    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsstatus::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verkehrsart {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsstatus::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verkehrsart {
         Wechsel => "wechsel",
         Gegen => "gegen",
-    } in lifeline_hub::stab::fernmeldeskizze::Verkehrsart::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::VsVermerk {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verkehrsart::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::VsVermerk {
         Keiner => "keiner",
         VsNfd => "vs_nfd",
-    } in lifeline_hub::stab::fernmeldeskizze::VsVermerk::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::VsVermerk::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::SkizzenBezugArt {
         Fuehrungsstelle => "fuehrungsstelle",
         Abschnitt => "abschnitt",
         Einheit => "einheit",
         Stelle => "stelle",
         Komponente => "komponente",
-    } in lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt::ALLE);
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::SkizzenBezugArt::ALLE);
 }
 
 /// LFH-1199: Art des Einsatzleiters an der eigenen Führungsstelle; die Werte trägt der CHECK von
@@ -909,16 +926,6 @@ fn einsatzleiter_art_wire() {
         Personal => "personal",
         Extern => "extern",
     } in lifeline_hub::einsatz::fuehrungsstelle::EinsatzleiterArt::ALLE);
-}
-
-#[test]
-fn stab_besetzung_art_wire() {
-    enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {
-        Einsatzleitung,
-        Personal,
-        Extern,
-        Rueckwaertig,
-    });
 }
 
 /// LFH-549: Funktionskatalog. `Fuehrungsfunktion` trägt die DB-CHECK-Werte der vier Spalten
@@ -1282,28 +1289,8 @@ fn zeitachse_marke_wire() {
     } in lifeline_hub::zeitachse::ZeitachseMarke::ALLE);
 }
 
-/// LFH-554: Presse und Medienarbeit S5. Art, Status und Anliegen tragen die DB-CHECK-Werte aus
-/// `migrations/0129_presse.sql`; Vorlage und Status der Pressemitteilung sind Schema-Anker wie
-/// beim Lagebericht.
-#[test]
-fn medienkontakt_art_wire() {
-    enum_wire!(lifeline_hub::presse::MedienkontaktArt {
-        Anfrage => "anfrage",
-        Abstimmung => "abstimmung",
-        Termin => "termin",
-    } in lifeline_hub::presse::MedienkontaktArt::ALLE);
-}
-
-#[test]
-fn medienkontakt_status_wire() {
-    enum_wire!(lifeline_hub::presse::MedienkontaktStatus {
-        Offen => "offen",
-        Beantwortet => "beantwortet",
-        Abgelehnt => "abgelehnt",
-        Erledigt => "erledigt",
-    } in lifeline_hub::presse::MedienkontaktStatus::ALLE);
-}
-
+/// LFH-554: Informationstelefon. Anliegen und Status tragen die DB-CHECK-Werte aus
+/// `migrations/0129_presse.sql`.
 #[test]
 fn infotelefon_anliegen_wire() {
     enum_wire!(lifeline_hub::infotelefon::InfotelefonAnliegen {
@@ -1323,24 +1310,6 @@ fn infotelefon_status_wire() {
         Offen => "offen",
         Erledigt => "erledigt",
     } in lifeline_hub::infotelefon::InfotelefonStatus::ALLE);
-}
-
-#[test]
-fn pressemitteilung_vorlage_wire() {
-    enum_wire!(lifeline_hub::presse::mitteilung::PressemitteilungVorlage {
-        Erstinformation => "erstinformation",
-        Folgeinformation => "folgeinformation",
-        Bevoelkerungshinweis => "bevoelkerungshinweis",
-        Freitext => "freitext",
-    });
-}
-
-#[test]
-fn pressemitteilung_status_wire() {
-    enum_wire!(lifeline_hub::presse::mitteilung::PressemitteilungStatus {
-        Entwurf => "entwurf",
-        Freigegeben => "freigegeben",
-    });
 }
 
 /// LFH-639: Betreuung. Die vier Enums tragen die DB-CHECK-Werte aus
@@ -1438,7 +1407,6 @@ fn live_event_wire() {
         KarteBild => "karte_bild",
         Etb => "etb",
         Befehl => "befehl",
-        Stab => "stab",
         Lagebesprechung => "lagebesprechung",
         Fernmeldewesen => "fernmeldewesen",
         Dokument => "dokument",
@@ -1446,12 +1414,12 @@ fn live_event_wire() {
         Betreuung => "betreuung",
         Evakuierung => "evakuierung",
         Verpflegung => "verpflegung",
-        Presse => "presse",
         Infotelefon => "infotelefon",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Einsatz => "einsatz",
+        Mitglieder => "mitglieder",
         Benachrichtigung => "benachrichtigung",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);

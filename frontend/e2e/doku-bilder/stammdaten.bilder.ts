@@ -161,7 +161,7 @@ test.describe(KAPITEL, () => {
     await dialog.getByRole('textbox', { name: 'Bezeichnung' }).fill('Großbrand');
     await waehleIn(dialog.getByRole('combobox', { name: 'Einsatzart' }), 'Realeinsatz');
     // Nicht gespeichert: das Bild zeigt den Dialog, die Stammdaten bleiben unverändert.
-    await dialog.getByRole('checkbox', { name: 'Stab', exact: true }).uncheck();
+    await dialog.getByRole('checkbox', { name: 'Informationstelefon', exact: true }).uncheck();
     await dialog.getByRole('checkbox', { name: 'Tiere', exact: true }).uncheck();
     await page.mouse.move(0, 0);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

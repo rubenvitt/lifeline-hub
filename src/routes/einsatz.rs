@@ -48,6 +48,16 @@ pub(crate) async fn kopf_geaendert_fuer(state: &AppState, einsatz_id: i64, betro
     crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, betroffene).await;
 }
 
+/// Nach einer Änderung der Mitgliedschaft (Aufnahme, Rolle, Führungsfunktion, Entfernen): der
+/// Kopf (`meine_*`, Schreibrecht, Einsatzliste der betroffenen Person; LFH-854) und die
+/// Mitgliederliste, aus der S1–S6 auflösen (`mitglieder`, i6k6mzed D2).
+async fn mitglieder_geaendert(state: &AppState, einsatz_id: i64, betroffen: i64) {
+    kopf_geaendert_fuer(state, einsatz_id, &[betroffen]).await;
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Mitglieder);
+}
+
 #[derive(Debug, Deserialize)]
 pub struct NeuerEinsatz {
     pub bezeichnung: String,
@@ -94,6 +104,26 @@ pub(crate) fn pruefe_koordinate(
             "Breite und Länge des Einsatzorts nur gemeinsam setzen oder leeren".into(),
         )),
     }
+}
+
+/// Nach dem Anlegen eines Einsatzes: Einsatzliste und Benachrichtigung „Neuer Einsatz“. Auch für
+/// einen Einsatz, der mit der Übernahme einer Planung entsteht (`routes::planung`, LLH-1587).
+pub(crate) async fn publish_neuer_einsatz(state: &AppState, einsatz_id: i64, benutzer_id: i64) {
+    einsatzliste_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+    // Spec `benachrichtigungen`, „Neuer Einsatz“: an die Führungskräfte der Org, die ihn lesen
+    // dürfen; wer ihn nicht lesen darf, erfährt nichts (Auflösung, `src/AGENTS.md`).
+    benachrichtigung::melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(
+            einsatz_id,
+            BenachrichtigungArt::EinsatzNeu,
+            Bezug::neu(BenachrichtigungBezugTyp::Einsatz, einsatz_id),
+        )
+        .von(benutzer_id)
+        .an(Adressat::Fuehrungskraefte),
+    )
+    .await;
 }
 
 /// POST /api/einsaetze — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
@@ -151,28 +181,13 @@ pub async fn anlegen(
         benutzer.id,
     )
     .await?;
-    einsatzliste_melden(&state.pool, &state.live, einsatz.id, &[]).await;
-    // Spec `benachrichtigungen`, „Neuer Einsatz“: an die Führungskräfte der Org, die ihn lesen
-    // dürfen; wer ihn nicht lesen darf, erfährt nichts (Auflösung, `src/AGENTS.md`).
-    benachrichtigung::melden(
-        &state.pool,
-        &state.live,
-        Anlass::neu(
-            einsatz.id,
-            BenachrichtigungArt::EinsatzNeu,
-            Bezug::neu(BenachrichtigungBezugTyp::Einsatz, einsatz.id),
-        )
-        .von(benutzer.id)
-        .an(Adressat::Fuehrungskraefte),
-    )
-    .await;
+    publish_neuer_einsatz(&state, einsatz.id, benutzer.id).await;
     Ok((
         StatusCode::CREATED,
         Json(einsatz.anzeige(
             Some(EINSATZ_ROLLE_LEITUNG.to_string()),
+            // Ein frisch angelegter Einsatz hat keine Führungsstelle — Literal statt Abfrage.
             None,
-            // Ein frisch angelegter Einsatz hat keine Besetzung — Literal statt Abfrage.
-            Vec::new(),
             &repo::labelkarte(&state.pool, einsatz.id).await?,
         )),
     ))
@@ -197,7 +212,6 @@ pub async fn detail(
     let mut anzeige = ctx.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
     );
     // Lagemonitor und Verpflegung erhalten keine Freitexte, die Personen nennen können (LFH-892,
@@ -240,7 +254,6 @@ pub async fn abschliessen(
     Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
     )))
 }
@@ -307,7 +320,6 @@ pub async fn aufbewahrungsfrist_setzen(
         let anzeige = ctx.einsatz.anzeige(
             ctx.rolle.map(|r| r.as_str().to_string()),
             repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
-            crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
             &repo::labelkarte(&state.pool, id).await?,
         );
         return Ok(Json(ohne_kopf_pii_wenn_gesperrt(
@@ -342,7 +354,6 @@ pub async fn aufbewahrungsfrist_setzen(
     let anzeige = aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
     );
     Ok(Json(ohne_kopf_pii_wenn_gesperrt(
@@ -999,8 +1010,9 @@ pub async fn mitglied_setzen(
     )
     .await?;
     // Die Liste des neuen Mitglieds bekommt den Einsatz, die der übrigen eine neue `meine_*`-Lage;
-    // der Kopf auf dem Schirm der betroffenen Person ihr neues Schreibrecht (LFH-854).
-    kopf_geaendert_fuer(&state, id, &[ziel_id]).await;
+    // der Kopf auf dem Schirm der betroffenen Person ihr neues Schreibrecht (LFH-854), jeder
+    // Leser die neue Mitgliederliste.
+    mitglieder_geaendert(&state, id, ziel_id).await;
     // Nur eine neue Mitgliedschaft ist eine Aufnahme (Spec `benachrichtigungen`, „Aufnahme in
     // einen Einsatz“); Rollenwechsel und Wiederholung bleiben still. Org-Art: erreicht die
     // Person auch auf der Einsatzliste (`src/AGENTS.md`, Benachrichtigungen).
@@ -1045,7 +1057,7 @@ pub async fn mitglied_entfernen(
     repo::entferne(&state.pool, id, ziel_id).await?;
     // Die entfernte Person ist kein Mitglied mehr, ihre Liste verliert den Einsatz trotzdem;
     // ihr offener Kopf verliert das Schreibrecht (LFH-854).
-    kopf_geaendert_fuer(&state, id, &[ziel_id]).await;
+    mitglieder_geaendert(&state, id, ziel_id).await;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
@@ -1186,7 +1198,6 @@ pub async fn aktualisieren(
     Ok(Json(aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
     )))
 }

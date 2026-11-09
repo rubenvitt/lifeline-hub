@@ -4,7 +4,6 @@
 use super::*;
 use crate::befehl::Befehl;
 use crate::lagebericht::Lagebericht;
-use crate::presse::mitteilung::Pressemitteilung;
 
 fn eintrag(snap: &str) -> VerteilerEintragAnzeige {
     VerteilerEintragAnzeige {
@@ -23,7 +22,7 @@ fn eintrag(snap: &str) -> VerteilerEintragAnzeige {
 }
 
 #[test]
-fn befehl_und_lagebericht_tragen_einen_verteiler_die_pressemitteilung_nicht() {
+fn befehl_und_lagebericht_tragen_einen_verteiler() {
     assert_eq!(
         Befehl::VERTEILER,
         Some(&VerteilerTabelle {
@@ -38,8 +37,6 @@ fn befehl_und_lagebericht_tragen_einen_verteiler_die_pressemitteilung_nicht() {
             dokument_spalte: "lagebericht_id",
         })
     );
-    assert_eq!(Pressemitteilung::VERTEILER, None);
-    assert_eq!(json_column::<Pressemitteilung>("l"), "'[]'");
 }
 
 #[test]
@@ -114,7 +111,6 @@ fn json_traegt_die_quittung() {
 fn quittung_traegt_nur_der_befehl() {
     assert_eq!(Befehl::QUITTUNG, Some("Einsatzbefehl"));
     assert_eq!(Lagebericht::QUITTUNG, None);
-    assert_eq!(Pressemitteilung::QUITTUNG, None);
 }
 
 #[test]

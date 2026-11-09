@@ -79,6 +79,12 @@ async function freigabenAngekommen() {
   expect(await screen.findByTestId('freigaben-da')).toBeInTheDocument();
 }
 
+/** Inhalt des Informationstelefons: zeigt, welchen Anruf die Adresse ansteuert. */
+function AnrufSonde() {
+  const { search } = useLocation();
+  return <div>{`Anruf ${new URLSearchParams(search).get('anruf') ?? '—'}`}</div>;
+}
+
 /** Liest den aktuellen Pfad aus der `PfadAnzeige`-Sonde. */
 function pfad(): string {
   return screen.getByTestId('pfad').textContent ?? '';
@@ -987,7 +993,8 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
                 <AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />
               }
             />
-            <Route path="stab/presse" element={<div>Presse-Inhalt</div>} />
+            <Route path="infotelefon" element={<AnrufSonde />} />
+            <Route path="stab/infotelefon" element={<AltpfadWeiterleitung modul="infotelefon" />} />
             <Route
               path="verpflegung/:zeitfensterId/ausgabe"
               element={<div>Ausgabeansicht-Inhalt</div>}
@@ -1072,12 +1079,6 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(screen.queryByText('Kommunikationsplan-Inhalt')).not.toBeInTheDocument();
   });
 
-  it('Unterroute eines gesperrten Stabs (Stab › Pressearbeit) zeigt den Hinweis für „Stab“', async () => {
-    setupWaechter('/einsaetze/7/stab/presse', freigabenFixture({ stab: { zugriff: false } }));
-    expect(await screen.findByRole('heading', { level: 1, name: /Stab/ })).toBeInTheDocument();
-    expect(screen.queryByText('Presse-Inhalt')).not.toBeInTheDocument();
-  });
-
   it('Ausgabeansicht eines ausgeblendeten Moduls Verpflegung zeigt die Sperre wie die Modulseite (LLH-1032)', async () => {
     setupWaechter(
       '/einsaetze/7/verpflegung/3/ausgabe',
@@ -1091,14 +1092,31 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
   });
 
   // LLH-1180, design.md D7: die Altadresse gehört dem Ziel ihrer Weiterleitung.
-  it('Altadresse des Funkplans leitet bei ausgeblendetem Stab ins Fernmeldewesen, samt Darstellung', async () => {
-    setupWaechter(
-      '/einsaetze/7/stab/funkplan?ansicht=skizze',
-      freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
-    );
+  it('Altadresse des Funkplans leitet ins Fernmeldewesen, samt Darstellung', async () => {
+    setupWaechter('/einsaetze/7/stab/funkplan?ansicht=skizze', freigabenFixture());
     expect(await screen.findByText('Funkplan-Inhalt')).toBeInTheDocument();
     expect(pfad()).toBe('/einsaetze/7/fernmeldewesen');
     expect(screen.getByTestId('pfad')).toHaveAttribute('data-suche', '?ansicht=skizze');
+  });
+
+  // i6k6mzed, design.md D3/D8: die Altadresse des Informationstelefons leitet dauerhaft um, mit
+  // Query, und gehört dem neuen Modul.
+  it('Altadresse des Informationstelefons leitet um, samt Anruf', async () => {
+    setupWaechter('/einsaetze/7/stab/infotelefon?anruf=42', freigabenFixture());
+    expect(await screen.findByText('Anruf 42')).toBeInTheDocument();
+    expect(pfad()).toBe('/einsaetze/7/infotelefon');
+    expect(screen.getByTestId('pfad')).toHaveAttribute('data-suche', '?anruf=42');
+  });
+
+  it('Altadresse bei gesperrtem Informationstelefon zeigt den Hinweis für „Informationstelefon“', async () => {
+    setupWaechter(
+      '/einsaetze/7/stab/infotelefon?neu=1',
+      freigabenFixture({ infotelefon: { zugriff: false } }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Informationstelefon/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Anruf/)).not.toBeInTheDocument();
   });
 
   it('Altadresse des Kommunikationsplans leitet ins Fernmeldewesen', async () => {
@@ -1107,7 +1125,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(pfad()).toBe('/einsaetze/7/fernmeldewesen/kommunikationsplan');
   });
 
-  it('Altadresse bei gesperrtem Fernmeldewesen zeigt den Hinweis für „Fernmeldewesen“, nicht „Stab“', async () => {
+  it('Altadresse bei gesperrtem Fernmeldewesen zeigt den Hinweis für „Fernmeldewesen“', async () => {
     setupWaechter(
       '/einsaetze/7/stab/funkplan',
       freigabenFixture({ fernmeldewesen: { zugriff: false } }),

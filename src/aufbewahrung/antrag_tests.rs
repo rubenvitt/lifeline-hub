@@ -149,8 +149,8 @@ async fn ablehnungen_schreiben_nichts() {
             "422",
         ),
         (
-            AntragZiel::Person(PersonenArt::Medienkontakt, 999_999),
-            "MK-999999",
+            AntragZiel::Person(PersonenArt::InfotelefonAnruf, 999_999),
+            "IT-999999",
             b.e1,
             b.org_id,
             "404",
@@ -540,6 +540,60 @@ async fn antrag_an_fristbasiert_geschwaerztem_einsatz_wird_ohne_scrub_erledigt()
         .last()
         .unwrap()
         .contains("bereits geschwärzt"));
+}
+
+/// i6k6mzed (design.md D4): Ein Ersuchen für einen Medienkontakt, das trotz Migration noch offen
+/// wäre, schwärzt beim Vollzug nichts, schon gar nicht den ganzen Einsatz. Es gilt als
+/// vollzogen, das ETB nennt den Grund, und die Akte liest es mit seiner alten Kennung.
+#[tokio::test]
+async fn medienkontakt_antrag_wird_ohne_scrub_erledigt() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    let a: i64 = sqlx::query_scalar(
+        "INSERT INTO schwaerzung_antrag (einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+            beantragt_von, beantragt_at, faellig_at) \
+         VALUES (?, 'medienkontakt', 3, 'DS-2026-007', ?, ?, ?) RETURNING id",
+    )
+    .bind(b.e1)
+    .bind(b.admin)
+    .bind(T0)
+    .bind(crate::zeit::formatiere_utc(t(T0) + Duration::hours(24)))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let texte_vorher = testdaten::alle_texte(&pool).await;
+
+    let vollzug = vollziehen_ergebnis(&pool, a, t(T0) + Duration::hours(24))
+        .await
+        .unwrap();
+    assert_eq!(vollzug, Vollzug::Nichts);
+    let geschwaerzt: Option<String> =
+        sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+            .bind(b.e1)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(geschwaerzt, None, "der Einsatz bleibt ungeschwärzt");
+    let texte_nachher = testdaten::alle_texte(&pool).await;
+    for n in NACHBAR_KLARTEXTE.iter().chain(ZIEL_KLARTEXTE) {
+        assert_eq!(
+            texte_vorher.contains(n),
+            texte_nachher.contains(n),
+            "{n}: kein Scrub"
+        );
+    }
+    let letzter = etb_texte(&pool, b.e1).await.pop().unwrap();
+    assert!(
+        letzter.contains("Medienkontakt MK-3") && letzter.contains("Presse und Medienarbeit"),
+        "{letzter}"
+    );
+    let l = liste(&pool, b.e1, t(T0) + Duration::hours(24))
+        .await
+        .unwrap();
+    assert_eq!(
+        (l[0].ziel_art, l[0].ziel_kennung.as_str(), l[0].stand),
+        (AntragZielArt::Medienkontakt, "MK-3", AntragStand::Vollzogen)
+    );
 }
 
 #[tokio::test]

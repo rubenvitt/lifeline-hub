@@ -737,6 +737,45 @@ async fn einlesen_vorbereiten(
     Ok((paket, meldungen, entscheidungen, rechte))
 }
 
+/// Die Mappe als Antwort: Medientyp XLSX, ohne Dateinamen (den bildet das Frontend). Das
+/// Schreiben läuft außerhalb der Async-Worker.
+pub(crate) async fn mappe_antwort(
+    plan: crate::abloesung::schichtplan::ausgabe::plan::AusgabePlan,
+) -> Result<axum::response::Response, AppError> {
+    use crate::abloesung::schichtplan::ausgabe::mappe;
+    use axum::response::IntoResponse;
+    let bytes = tokio::task::spawn_blocking(move || mappe::write_mappe(&plan))
+        .await
+        .map_err(|e| AppError::Internal(format!("Excel-Mappe des Schichtplans: {e}")))??;
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, mappe::MEDIENTYP)],
+        bytes,
+    )
+        .into_response())
+}
+
+/// GET /api/einsaetze/{id}/abloesungen/schichtplan/export — der Plan als Excel-Mappe (LLH-1557,
+/// design.md D4/D5): Lesen der Ablösung und das Modul Personal (403 ohne), auch im
+/// abgeschlossenen Einsatz. Kein ETB, kein Live-Ereignis.
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Abloesung>,
+) -> Result<axum::response::Response, AppError> {
+    ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
+    let sicht = crate::abloesung::schichtplan::ausgabe::repo::Sicht {
+        einheiten: darf::<Einheiten>(&state, &ctx).await?,
+        uhs: darf::<Unfallhilfsstellen>(&state, &ctx).await?,
+    };
+    let plan = crate::abloesung::schichtplan::ausgabe::repo::einsatz(
+        &state.pool,
+        &ctx.einsatz,
+        sicht,
+        &jetzt(),
+    )
+    .await?;
+    mappe_antwort(plan).await
+}
+
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/import/vorschau — Multipart mit `datei` und
 /// optional `entscheidungen`. Gleicht ab und schreibt nichts; Fehler stehen in der Antwort (200).
 /// Eine unlesbare Datei ist 400.
@@ -759,6 +798,28 @@ pub async fn import_vorschau(
         )
         .await?,
     ))
+}
+
+/// Live-Ereignisse nach einer wirksamen Übernahme in den Plan: ETB, neue Einheiten und UHS, die
+/// Ablösung. Ohne Änderung keine. Auch für die Übernahme einer Planung (`routes::planung`).
+pub(crate) fn publish_uebernahme(
+    state: &AppState,
+    einsatz_id: i64,
+    geschrieben: &uebernahme::repo::Geschrieben,
+) {
+    if geschrieben.zaehlung.aenderungen == 0 {
+        return;
+    }
+    for etb_id in &geschrieben.etb_ids {
+        state.live.publiziere(einsatz_id, *etb_id);
+    }
+    for id in &geschrieben.einheit_ids {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, *id);
+    }
+    for id in &geschrieben.uhs_ids {
+        super::einsatz_uhs::sse_uhs(state, einsatz_id, *id);
+    }
+    super::abloesung::sse(state, einsatz_id);
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/import — wie die Vorschau, schreibt aber in
@@ -785,18 +846,7 @@ pub async fn import_uebernehmen(
         &jetzt(),
     )
     .await?;
-    if geschrieben.zaehlung.aenderungen > 0 {
-        for etb_id in &geschrieben.etb_ids {
-            state.live.publiziere(einsatz_id, *etb_id);
-        }
-        for id in &geschrieben.einheit_ids {
-            super::einsatz_einheit::sse_einheit(&state, einsatz_id, *id);
-        }
-        for id in &geschrieben.uhs_ids {
-            super::einsatz_uhs::sse_uhs(&state, einsatz_id, *id);
-        }
-        super::abloesung::sse(&state, einsatz_id);
-    }
+    publish_uebernahme(&state, einsatz_id, &geschrieben);
     Ok(Json(ImportErgebnis {
         zaehlung: geschrieben.zaehlung,
         plan: plan(&state, &ctx).await?,

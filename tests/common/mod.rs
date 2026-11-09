@@ -462,6 +462,73 @@ pub async fn rolle_setzen(
     assert_eq!(status, StatusCode::OK);
 }
 
+/// Setzt Rolle und Führungsfunktion (Katalogcode, `None` leert sie) eines Mitglieds über
+/// `PUT …/mitglieder/{benutzer_id}` — die eine Quelle der Auflösung S1–S6 → Person (i6k6mzed,
+/// design.md D2).
+pub async fn funktion_setzen(
+    app: &axum::Router,
+    leit_cookie: &str,
+    einsatz: i64,
+    benutzer_id: i64,
+    rolle: &str,
+    funktion: Option<&str>,
+) {
+    let body = serde_json::json!({
+        "einsatz_rolle": rolle,
+        "fuehrungsfunktion": funktion,
+        "fuehrungsstelle": null,
+    });
+    let (status, json) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
+        leit_cookie,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Funktion setzen: {json:?}");
+}
+
+/// Legt ein Konto mit eigenem Anzeigenamen an (Passwort `{benutzername}pw1`) und nimmt es als
+/// Führungspersonal mit der Führungsfunktion `funktion` in den Einsatz auf. Liefert die
+/// Benutzer-ID.
+pub async fn mitglied_mit_funktion(
+    app: &axum::Router,
+    admin_cookie: &str,
+    einsatz: i64,
+    anzeigename: &str,
+    benutzername: &str,
+    funktion: &str,
+) -> i64 {
+    let body = serde_json::json!({
+        "anzeigename": anzeigename,
+        "benutzername": benutzername,
+        "passwort": format!("{benutzername}pw1"),
+        "org_rolle": "keine",
+    });
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        "/api/benutzer",
+        admin_cookie,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "Konto anlegen: {json:?}");
+    zwang_aufheben(benutzername).await;
+    let id = json["id"].as_i64().unwrap();
+    funktion_setzen(
+        app,
+        admin_cookie,
+        einsatz,
+        id,
+        "fuehrungspersonal",
+        Some(funktion),
+    )
+    .await;
+    id
+}
+
 /// Zählt ETB-Einträge mit typ='system'.
 pub async fn system_etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
     let (_, json) = anfrage(

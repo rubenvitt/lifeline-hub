@@ -542,10 +542,10 @@ pub async fn aufloesen_tx(
     .execute(&mut *conn)
     .await?;
     // Polymorphe Bezüge der Fernmeldeskizze haben keinen FK (LFH-893, design.md D3).
-    crate::stab::fernmeldeskizze::vergiss(
+    crate::fernmeldewesen::fernmeldeskizze::vergiss(
         conn,
         einsatz_id,
-        crate::stab::fernmeldeskizze::Element::Abschnitt(id),
+        crate::fernmeldewesen::fernmeldeskizze::Element::Abschnitt(id),
     )
     .await?;
     sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
@@ -793,7 +793,7 @@ mod tests {
     #[tokio::test]
     async fn anzeige_traegt_eigene_verbindungen() {
         use crate::einsatz::verbindungen::{ersetzen, Bezug, Verbindung};
-        use crate::stab::kommunikation::Verbindungsmittel;
+        use crate::fernmeldewesen::kommunikation::Verbindungsmittel;
         let pool = crate::db::test_pool().await;
         let (einsatz, nord) = seed_abschnitt(&pool).await;
         let sued = create(&pool, einsatz, daten("Süd", None, None))

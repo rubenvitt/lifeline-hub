@@ -26,7 +26,7 @@ const VORLAGEN: EinsatzVorlage[] = [
     id: 1,
     bezeichnung: 'Kleinlage',
     einsatzart: 'realeinsatz',
-    ausgeblendet: ['stab', 'tiere'],
+    ausgeblendet: ['lagebesprechung', 'tiere'],
     sortier: 10,
   },
   { id: 2, bezeichnung: 'Großbrand', ausgeblendet: [], sortier: 20 },
@@ -92,7 +92,7 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
     await waitFor(() =>
       expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('Kleinlage'),
     );
-    expect(screen.getByRole('checkbox', { name: 'Stab' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Lagebesprechung' })).not.toBeChecked();
   });
 
   it('Löschen fragt zurück und löscht erst nach der Bestätigung', async () => {
@@ -151,12 +151,12 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
 
 describe('einsatzVorlageModule', () => {
   it('Häkchen und Ausblendungen sind Komplemente in Registry-Reihenfolge', () => {
-    const sichtbar = sichtbarAus(['tiere', 'stab']);
+    const sichtbar = sichtbarAus(['tiere', 'lagebesprechung']);
     expect(sichtbar).toHaveLength(modulRegistry.length - 2);
-    expect(sichtbar).not.toContain('stab');
+    expect(sichtbar).not.toContain('lagebesprechung');
     const aus = ausgeblendetAus(sichtbar);
     expect(aus).toEqual(
-      modulRegistry.map((m) => m.key).filter((k) => k === 'stab' || k === 'tiere'),
+      modulRegistry.map((m) => m.key).filter((k) => k === 'lagebesprechung' || k === 'tiere'),
     );
   });
 
@@ -170,6 +170,6 @@ describe('einsatzVorlageModule', () => {
   it('unbekannte Schlüssel zählen nicht', () => {
     const n = modulRegistry.length;
     expect(moduleText(['gibt-es-nicht'])).toBe(`${n} von ${n} Modulen`);
-    expect(moduleText(['stab'])).toBe(`${n - 1} von ${n} Modulen`);
+    expect(moduleText(['lagebesprechung'])).toBe(`${n - 1} von ${n} Modulen`);
   });
 });

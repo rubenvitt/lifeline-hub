@@ -37,20 +37,16 @@ Text ohne Überschriftenrolle erscheinen. Seine Optik MUST dabei dieselbe bleibe
 - **THEN** führt die Überschriftenliste des Vorlesers diesen Titel nicht
 - **AND** steht der Titel in derselben Schriftgröße und -stärke da wie ein Überschriften-Titel
 
-### Requirement: Eintragstitel als Überschrift nur bei eigenständigen Gegenständen
+### Requirement: Nur eigenständige Gegenstände tragen ihren Eintragstitel als Überschrift
 
 Ein Eintragstitel SHALL nur dann eine Überschrift sein, wenn der Eintrag ein eigener Gegenstand
 mit Inhalt darunter ist, zwischen dem jemand springen will. Bei Auswahl-, Einstellungs- und
 Stromlisten MUST der Titel keine Überschrift sein. Dort trägt der Listenpunkt die Navigation.
 Ein Titel, der ein Bedienelement enthält (etwa ein Eingabefeld), MUST NOT eine Überschrift sein.
 
-#### Scenario: Stab und Presse
-- **WHEN** die Seite Lagebesprechung den Verlauf der abgeschlossenen Lagebesprechungen und die Presse-Seite die Pressemitteilungen zeigt, jeweils in einem Paneel mit Überschrift `h2`
+#### Scenario: Verlauf der Lagebesprechungen
+- **WHEN** die Seite Lagebesprechung den Verlauf der abgeschlossenen Lagebesprechungen in einem Paneel mit Überschrift `h2` zeigt
 - **THEN** ist jeder Eintragstitel dort eine Überschrift der Ebene 3
-
-#### Scenario: Kacheln der Stab-Seite
-- **WHEN** die Stab-Seite die Sachgebiete S1–S6 als Kacheln zeigt
-- **THEN** ist jede Kachel ein Paneel mit einer Überschrift der Ebene 2, und die Arbeitsaufnahme folgt als eigenes Paneel der Ebene 2
 
 #### Scenario: Chat
 - **WHEN** ein Kanal im Chat 50 Nachrichten zeigt

@@ -171,8 +171,11 @@ sequenceDiagram
 
 - **Schmale Leitung:** Reihenfolge beim Nachholen (Führung und Anträge vor ETB vor Lage vor
   Anhängen?), Budget bei Satellit, Anhänge verzögert oder nur auf Abruf.
-- **Protokollversion:** ELW und Hub laufen in verschiedenen Ständen. Wie weit darf der Abstand
-  sein, wer verweigert was?
+- ~~**Protokollversion:**~~ beantwortet am 08.11.2026 (LLH-1490): ganzzahlig, beide Seiten
+  sprechen N und N−1, bei größerem Abstand nur Melden und der Hinweis „Update nötig“. Ebenso
+  festgelegt: Schlüsselverfahren und Einmal-Code
+  ([ADR-0014](../architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
+  `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`).
 - **Anmeldung am ELW ohne Netz:** Wie kommt ein Konto aus der Hub-Kopie zu einer lokalen
   Anmeldung (Passwort-Hash mitverteilen, eigener Passkey je ELW, Kopplung des Geräts)?
 - **Gleichzeitige Notübernahmen** mit derselben Epoche (zwei Seiten ohne Verbindung): Gleichstand

@@ -18,6 +18,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, InfotelefonAnruf, InfotelefonZaehler } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
 import { freigabenFixture } from '../test/fixtures';
+import { modulName } from '../einsatz/modulRegistry';
 import { setzeViewportBreite } from '../test/viewport';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
@@ -86,10 +87,10 @@ function serve(anrufe: InfotelefonAnruf[]) {
   );
 }
 
-function setup(route = '/einsaetze/1/stab/infotelefon') {
+function setup(route = '/einsaetze/1/infotelefon') {
   return renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/stab/infotelefon" element={<InfotelefonPage />} />
+      <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
     </Routes>,
     { route },
   );
@@ -188,7 +189,7 @@ describe('InfotelefonPage (LFH-554)', () => {
 
   it('holt einen per ?anruf= angesteuerten Anruf außerhalb des Fensters einzeln', async () => {
     vi.mocked(loadAnruf).mockResolvedValue(anruf({ id: 77, notiz: 'alter Anruf' }));
-    setup('/einsaetze/1/stab/infotelefon?anruf=77');
+    setup('/einsaetze/1/infotelefon?anruf=77');
     await waitFor(() => expect(loadAnruf).toHaveBeenCalledWith(1, 77));
     const ziel = await waitFor(() => {
       const el = document.querySelector<HTMLElement>('[data-anruf="77"]');
@@ -205,7 +206,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     // `Zeitachseneintrag` setzt seinen Grund inline; die Klassenregel in `index.css` liefert nur
     // die Linie. Ohne eigenen Inline-Grund bliebe der Anruf ohne `bedienFlaeche` (Spec
     // `deeplink-hervorhebung`, zwei Kanäle) — so wie im ETB gelöst.
-    setup('/einsaetze/1/stab/infotelefon?anruf=1');
+    setup('/einsaetze/1/infotelefon?anruf=1');
     const ziel = await waitFor(() => {
       const el = document.querySelector<HTMLElement>('[data-anruf="1"]');
       expect(el).toHaveClass('zeile-hervorgehoben');
@@ -229,7 +230,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     function NavigateButton() {
       const navigate = useNavigate();
       return (
-        <button type="button" onClick={() => navigate('/einsaetze/1/stab/infotelefon?anruf=900')}>
+        <button type="button" onClick={() => navigate('/einsaetze/1/infotelefon?anruf=900')}>
           springen
         </button>
       );
@@ -237,7 +238,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     renderMitProviders(
       <Routes>
         <Route
-          path="/einsaetze/:id/stab/infotelefon"
+          path="/einsaetze/:id/infotelefon"
           element={
             <>
               <InfotelefonPage />
@@ -246,7 +247,7 @@ describe('InfotelefonPage (LFH-554)', () => {
           }
         />
       </Routes>,
-      { route: '/einsaetze/1/stab/infotelefon' },
+      { route: '/einsaetze/1/infotelefon' },
     );
     await screen.findByText('Sperrung B 3');
     await userEvent.click(screen.getByRole('radio', { name: 'offene Rückrufe' }));
@@ -268,10 +269,10 @@ describe('InfotelefonPage (LFH-554)', () => {
     renderMitProviders(
       <AdresseSteht>
         <Routes>
-          <Route path="/einsaetze/:id/stab/infotelefon" element={<InfotelefonPage />} />
+          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
         </Routes>
       </AdresseSteht>,
-      { route: '/einsaetze/1/stab/infotelefon?anruf=1' },
+      { route: '/einsaetze/1/infotelefon?anruf=1' },
     );
     await waitFor(() =>
       expect(document.querySelector('[data-anruf="1"]')).toHaveClass('zeile-hervorgehoben'),
@@ -461,7 +462,7 @@ describe('InfotelefonPage · ?neu=1', () => {
     return renderMitProviders(
       <Routes>
         <Route
-          path="/einsaetze/:id/stab/infotelefon"
+          path="/einsaetze/:id/infotelefon"
           element={
             <>
               <InfotelefonPage />
@@ -475,14 +476,14 @@ describe('InfotelefonPage · ?neu=1', () => {
   }
 
   it('fokussiert das Anliegen und räumt den Auftrag aus der Adresse', async () => {
-    setupWithLocation('/einsaetze/1/stab/infotelefon?neu=1');
+    setupWithLocation('/einsaetze/1/infotelefon?neu=1');
     const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
     await waitFor(() => expect(anliegen).toHaveFocus());
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
   });
 
   it('lässt ohne Auftrag den Fokus, wo er ist', async () => {
-    setupWithLocation('/einsaetze/1/stab/infotelefon');
+    setupWithLocation('/einsaetze/1/infotelefon');
     const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
     await screen.findByText('Sperrung B 3');
     expect(anliegen).not.toHaveFocus();
@@ -490,7 +491,7 @@ describe('InfotelefonPage · ?neu=1', () => {
 
   it('räumt den Auftrag auch ohne Schreibrecht, ohne eine Erfassung zu zeigen', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
-    setupWithLocation('/einsaetze/1/stab/infotelefon?neu=1');
+    setupWithLocation('/einsaetze/1/infotelefon?neu=1');
     await screen.findByText('Sperrung B 3');
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
@@ -505,10 +506,10 @@ describe('InfotelefonPage · ?neu=1', () => {
     const { client } = renderMitProviders(
       <AdresseSteht>
         <Routes>
-          <Route path="/einsaetze/:id/stab/infotelefon" element={<InfotelefonPage />} />
+          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
         </Routes>
       </AdresseSteht>,
-      { route: '/einsaetze/1/stab/infotelefon?neu=1' },
+      { route: '/einsaetze/1/infotelefon?neu=1' },
     );
     const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
     await waitFor(() => expect(anliegen).toHaveFocus());
@@ -529,7 +530,7 @@ describe('InfotelefonPage · ?neu=1', () => {
       <>
         <Routes>
           <Route
-            path="/einsaetze/:id/stab/infotelefon"
+            path="/einsaetze/:id/infotelefon"
             element={
               <>
                 <InfotelefonPage />
@@ -538,9 +539,9 @@ describe('InfotelefonPage · ?neu=1', () => {
             }
           />
         </Routes>
-        <Link to="/einsaetze/1/stab/infotelefon?neu=1">neuer-link</Link>
+        <Link to="/einsaetze/1/infotelefon?neu=1">neuer-link</Link>
       </>,
-      { route: '/einsaetze/1/stab/infotelefon?neu=1' },
+      { route: '/einsaetze/1/infotelefon?neu=1' },
     );
     const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
     await waitFor(() => expect(anliegen).toHaveFocus());
@@ -551,11 +552,43 @@ describe('InfotelefonPage · ?neu=1', () => {
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
   });
 
-  it('räumt den Auftrag bei gesperrtem Stab und zeigt keine Daten', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
-    setupWithLocation('/einsaetze/1/stab/infotelefon?neu=1');
+  it('räumt den Auftrag bei gesperrtem Informationstelefon und zeigt keine Daten', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ infotelefon: { zugriff: false } }),
+    );
+    setupWithLocation('/einsaetze/1/infotelefon?neu=1');
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
     expect(loadAnrufe).not.toHaveBeenCalled();
+  });
+});
+
+describe('InfotelefonPage als eigenes Modul (i6k6mzed, design.md D3)', () => {
+  it('folgt allein der Freigabe des Informationstelefons, nicht der des Stabs', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    );
+    setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    await waitFor(() => expect(within(liste).getAllByRole('listitem')).toHaveLength(2));
+  });
+
+  it('gesperrt nennt sie das Modul Informationstelefon und lädt nichts', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ infotelefon: { zugriff: false } }),
+    );
+    setup();
+    expect(await screen.findByText('Modul Informationstelefon nicht freigegeben')).toBeVisible();
+    expect(loadAnrufe).not.toHaveBeenCalled();
+  });
+
+  it('Titel aus der Registry, Ortspfad ohne Stab', async () => {
+    setup();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: modulName('infotelefon') }),
+    ).toBeInTheDocument();
+    const ortspfad = document.querySelector<HTMLElement>('.ant-breadcrumb')!;
+    expect(within(ortspfad).queryByText('Stab')).toBeNull();
+    expect(within(ortspfad).getByText('Informationstelefon')).toBeInTheDocument();
   });
 });

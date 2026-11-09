@@ -4,7 +4,8 @@ Gilt für `kraefte/zeitachse.ts`, `kraefte/KraftZeitachse.tsx`, `src/zeitachse/`
 `src/routes/zeitachse.rs` und jede Stelle, die einen Statuswechsel, eine Disposition, die
 Ablösung oder das Eintreffen am Bereitstellungsraum schreibt (sie schreiben die Zeitachse mit);
 der Absatz „Ablösung“ gilt für `abloesung/`, `pages/AbloesungPage.tsx`,
-`pages/einstellungen/EinsatzAbloesung.tsx`, `stammdaten/SchichtmodelleTab.tsx`,
+`pages/einstellungen/EinsatzAbloesung.tsx`, `pages/einstellungen/EinsatzGrenzwerte.tsx`,
+`stammdaten/SchichtmodelleTab.tsx`,
 `src/abloesung/` und `src/schichtmodell/`. Ergänzt `frontend/AGENTS.md`. Pfade relativ zu
 `frontend/src/`, sofern nicht `src/…` (Server).
 
@@ -56,7 +57,7 @@ die Anlässe der Hinweise zur ablösenden Einheit `Beruehrt::hinweise` (LLH-1131
 Zeitachse schreibt (Abruf, Eintreffen am Bereitstellungsraum, Auflösen), bildet seine Anlässe
 in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
 Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl. Anzeige im
-Meldebild/Personal/Einheit-Detail, **nicht im Stab**. Bewusster Bruch von LFH-46 E17 (Feldbefund)
+Meldebild/Personal/Einheit-Detail. Bewusster Bruch von LFH-46 E17 (Feldbefund)
 auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
 **Einstufung** (LLH-730, `openspec/changes/archive/2026-11-08-u1piomi1-zeitachse-grenzwerte-einstufen/design.md`):
 nur `zeitachse.ts:stufeEin` gegen die wirksamen `SchichtplanGrenzwerte` (Vorgaben 12 h/8 h
@@ -192,10 +193,24 @@ Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Ke
 Client zählt nichts nach. Der Schlüssel eines Zeitpunkts ist `minute`, derselbe Wert wie der Bezug
 `schichtplan_wechsel` des gebündelten Hinweises und der Sprung `?wechsel=`
 (`parseAbloesungWechsel`).
+**Grenzwerte bedienen** (LLH-1603, `openspec/changes/archive/2026-11-09-z11srqhq-grenzwerte-bedienstelle/design.md`): Höchstdienst und
+Mindestruhe setzt nur das Paneel „Dienst und Ruhe“ in Einstellungen › Ablösung
+(`pages/einstellungen/EinsatzGrenzwerte.tsx`). Die Ansicht „Schichtplan“ nennt sie nur in einer Zeile
+mit Sprung dorthin, ohne zweiten Schreibweg. Das Paneel liest den Plan unter dem Key `schichtplan`.
+Die PATCH-Antwort ersetzt ihn, und `kraefteZeitachseGrenzwerte` wird für Einheiten und Personal
+neu geholt. Den Text und die Bodies bildet nur `abloesung/grenzwerte.ts`. „(Vorgabe)“ folgt nur den
+Merkern `*_eigen`, nie dem Wert. Ein Body trägt nur geänderte Felder (fehlt = unverändert, `null` =
+Vorgabe). Die Vorgaben 12 h/8 h stehen dort als Spiegel des Servers, die Grenzen in
+`api/eingabegrenzen.ts`.
 
 **Schichtplan einlesen** (LLH-1556, `abloesung/schichtplan/SchichtplanEinlesen.tsx`): Datei und
 Wahl gehen bei Vorschau UND Übernehmen als Multipart an den Server, der jedes Mal neu liest und
 abgleicht; der Client hält keinen Inhalt der Datei und rechnet keinen Abgleich nach. Jede Wahl
 fragt die Vorschau neu ab. Der Plan aus der Antwort des Übernehmens ersetzt den Cache. Der
 gemeinsame Kern mit der Vorplanung (LLH-1561) ist `abloesung::schichtplan::uebernahme`
-(`PlanPaket` → `bestand_tx` → `planen` → `schreiben_tx`).
+(`PlanPaket` → `bestand_tx` → `planen` → `schreiben_tx`); „In Einsatz übernehmen“ einer Planung
+(LLH-1587, `planung/PlanungUebernahmeDialog.tsx`, Server `planung::uebernahme`) baut nur das
+Paket und zeigt die Vorschau über dieselbe `ImportVorschauAnsicht`
+(`abloesung/schichtplan/ImportVorschauAnsicht.tsx`). Eine dritte Quelle bringt ebenfalls nur ihr
+Paket und keinen eigenen Abgleich oder eine eigene Vorschau mit. Der ETB-Eintrag nennt die Quelle
+über `anlass` von `schreiben_tx`.

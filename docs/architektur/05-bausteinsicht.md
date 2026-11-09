@@ -141,7 +141,7 @@ Regeln: [frontend/src/kraefte/AGENTS.md](../../frontend/src/kraefte/AGENTS.md) (
 | `src/zeitachse` | Append-only Kräfte-Zeitachse (Alarmierung, Eintreffen, Ablösung, Entlassung), Perioden beim Lesen | `…/{id}/einheiten/zeitachse`, `…/{id}/personal/zeitachse`; feuert `einheit` |
 | `src/abloesung` | Schichten von Einheiten: Fälligkeit beim Lesen berechnet, Vollzug, Vorgaben je Abschnitt; `schichtplan/` der Schichtplan (Soll-Blöcke an Einheit, UHS, Pause, Befunde beim Lesen, LLH-1552) | `…/{id}/abloesungen`, `…/abloesungen/schichtplan`; Live `abloesung` |
 | `src/schichtmodell` | Org-Schichtmodelle (Rhythmus oder Wechselzeiten), Kopie am Einsatz | `/api/schichtmodelle` |
-| `src/planung` | Vorplanung ohne Einsatz: Planungen der Organisation mit Posten, Blöcken und Helfern, Befunde und Kennzahlen über die Schichtplan-Prüfung, Löschfrist 90 Tage (LLH-1585) | `/api/planungen`; Org-Live `planung` |
+| `src/planung` | Vorplanung ohne Einsatz: Planungen der Organisation mit Posten, Blöcken und Helfern, Befunde und Kennzahlen über die Schichtplan-Prüfung, Löschfrist 90 Tage (LLH-1585); Übernahme in einen neuen oder laufenden Einsatz über den Übernahme-Kern des Schichtplans, danach schreibgeschützt (LLH-1587) | `/api/planungen`; Org-Live `planung`; `abloesung::schichtplan::uebernahme`, `einsatz::repo::anlegen_tx` |
 | `src/bereitstellungsraum` | Bereitstellungsräume mit Statusmaschine, Belegung, Eintreffen und Abruf | `…/{id}/bereitstellungsraeume`; Live `bereitstellungsraum` |
 | `src/staerke.rs` | Taktische Stärke Führer/Unterführer/Mannschaft, Summe berechnet | genutzt u. a. von Fahrzeug, Einheiten-Vorlage, UHS, Verpflegung |
 | `src/katalog.rs` | Geteilte Grundlagen der Status-Kataloge (Dienststatus, Semantik-Kategorie, TETRA-Betriebsart) | genutzt u. a. von Fahrzeug, Personal, Material, Sprechgruppe, Einheit |
@@ -163,7 +163,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/kommunikation` | Gemeinsamer Unterbau: Quittung und Vollzug, polymorphe Bezüge, Auto-Fristen | genutzt von Chat, Erinnerung, Auftrag, Meldung, Nachforderung, Presse, Infotelefon |
+| `src/kommunikation` | Gemeinsamer Unterbau: Quittung und Vollzug, polymorphe Bezüge, Auto-Fristen | genutzt von Chat, Erinnerung, Auftrag, Meldung, Nachforderung, Infotelefon |
 | `src/chat` | Kanäle und Nachrichten je Einsatz, Erwähnungen, Tombstones | `…/{id}/chat/…`; Live `chat` |
 | `src/erinnerung` | Fristen und Wiedervorlagen, Fälligkeit beim Lesen, Scheduler | `…/{id}/erinnerungen`; Live `erinnerung`, `sofortmeldung` |
 | `src/auftrag` | Aufträge top-down: Empfänger-Quittung, Vollzug, ETB-Anordnung | `…/{id}/auftraege`; Live `auftrag` |
@@ -174,22 +174,22 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | `src/web_push` | Web Push bei geschlossenem Tab, nur mit `--web-push`, RFC-8291-Verschlüsselung | `/api/web-push`; aus `benachrichtigung::melden` |
 | `src/externe_stelle` | Org-Katalog externer Stellen als Vorschlagsquelle (Speicherform Text) | `/api/externe-stellen` |
 
-### Stab & Führung
+### Führungsorganisation
 
-Regeln: [frontend/src/stab/AGENTS.md](../../frontend/src/stab/AGENTS.md),
+Regeln: [frontend/src/infotelefon/AGENTS.md](../../frontend/src/infotelefon/AGENTS.md),
+[frontend/src/fernmeldewesen/AGENTS.md](../../frontend/src/fernmeldewesen/AGENTS.md),
 [frontend/src/fuehrung/AGENTS.md](../../frontend/src/fuehrung/AGENTS.md),
 [frontend/src/lagebesprechung/AGENTS.md](../../frontend/src/lagebesprechung/AGENTS.md).
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/stab` | Besetzung S1–S6, Checkliste, Kommunikationsplan und Fernmeldeskizze | `…/{id}/stab`; Live `stab`, `fernmeldewesen` |
-| `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels | `/api/fuehrungsfunktionen`, `/api/org-fuehrungsfunktionen/{funktion}` |
-| `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul neben dem Stab | `…/{id}/lagebesprechung[en]`; Live `lagebesprechung` |
+| `src/fernmeldewesen` | Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen | `…/{id}/stab/kommunikationsplan`, `…/{id}/stab/fernmeldeskizze`; Live `fernmeldewesen` |
+| `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels, Sachgebiete S1–S6 | `/api/fuehrungsfunktionen`, `/api/org-fuehrungsfunktionen/{funktion}` |
+| `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul | `…/{id}/lagebesprechung[en]`; Live `lagebesprechung` |
 | `src/programmpunkt` | Programmpunkte der Veranstaltung (Ablauf), Quelle der nächsten Marken und des Lagemonitors | `…/{id}/programmpunkte`, Feld `programm` von `…/{id}/lagemonitor`; Live `einsatz` |
 | `src/lagebericht` | Lageberichte nach Vorlage (Registry synchron zu `frontend/src/lageberichte/vorlagen.ts`) | `…/{id}/lageberichte`; Live `lagebericht` |
-| `src/vorlagendokument` | Gemeinsamer Kern von Befehl, Lagebericht, Pressemitteilung: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht`, `src/presse` genutzt |
-| `src/presse` | Presse-Log und Pressemitteilungen S5 | `…/{id}/stab/medienkontakte`, `…/stab/pressemitteilungen`; Live `presse` |
-| `src/infotelefon` | Bürgertelefon S5: Anrufprotokoll mit Rückrufbedarf | `…/{id}/stab/infotelefon`; Live `infotelefon` |
+| `src/vorlagendokument` | Gemeinsamer Kern von Befehl und Lagebericht: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht` genutzt |
+| `src/infotelefon` | Bürgertelefon, eigenes Modul `infotelefon`: Anrufprotokoll mit Rückrufbedarf | `…/{id}/stab/infotelefon`; Live `infotelefon` |
 | `src/sprechgruppe` | TETRA-Sprechgruppen im Stamm und einsatzlokal, Zuordnung zu Zielen | `/api/sprechgruppen`, `…/{id}/sprechgruppen` |
 
 Die Führungsstelle eines Einsatzes liegt in `src/einsatz` (`fuehrungsstelle.rs`, Routen
@@ -203,6 +203,7 @@ Regeln: [frontend/src/geraet/AGENTS.md](../../frontend/src/geraet/AGENTS.md).
 | --- | --- | --- |
 | `src/geraet` | Gerätekopplung per Code, Gerätekonto, Funktionsansicht, Stellenbindung, Routen-Whitelist | `…/{id}/geraete`, `POST /api/geraete/koppeln`, `…/{id}/lagemonitor` |
 | `src/lagemonitor_zugang` | Lesezugang externer Lagemonitore: Schlüssel (nur Hash), Freigabe je Einsatz durch die Einsatzleitung, Extractor `LagemonitorZugriff` nur für den Abruf | `/api/lagemonitor-zugaenge`, `…/{id}/lagemonitor-zugaenge`, `GET /api/lagemonitor/v1/lage` (Bearer) |
+| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)) | `/api/admin/instanz/…`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden` (signiert); Unterschriftsschlüssel in `src/auth/unterschrift` |
 
 ### Auth & Organisation
 
@@ -210,7 +211,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/auth` | Passwort, TOTP, WebAuthn, OIDC, Hüllen-Anmeldung (PKCE), Sitzungen, Drosseln, Anmelde- und Admin-Spur, Benutzerverwaltung | `/api/auth/…`, `/api/benutzer`, `/api/zugangsprotokoll/…` |
+| `src/auth` | Passwort, TOTP, WebAuthn, OIDC, Hüllen-Anmeldung (PKCE), Sitzungen, Drosseln, Anmelde- und Admin-Spur, Benutzerverwaltung, Unterschriftsschlüssel der Org-Admins (`unterschrift`, LLH-1490) | `/api/auth/…`, `/api/benutzer`, `/api/zugangsprotokoll/…` |
 | `src/org` | Org-Einstellungen, Modul-Vorgaben, Logo, Aufbewahrungsfristen je Kategorie | `/api/organisation`, `/api/org-einstellungen`, `/api/org-modul-einstellungen` |
 | `src/benutzer_einstellungen` | Schlüssel/Wert-Fach je Benutzer mit Whitelist (erster Nutzer: Sprungpalette) | `/api/benutzer-einstellungen` |
 
@@ -271,7 +272,7 @@ den Tabellen verlinkt.
 flowchart TB
   main["main.tsx<br/>QueryClientProvider, RouterProvider, registerSW"] --> app["App.tsx<br/>Routenbaum"]
   app --> routing["routing / routes<br/>Pfade, Deeplinks, RequireAuth"]
-  app --> pages["pages + Fachverzeichnisse<br/>(etb, kraefte, personen, stab …)"]
+  app --> pages["pages + Fachverzeichnisse<br/>(etb, kraefte, personen, fernmeldewesen …)"]
   pages --> ds["components, theme, icons, anzeige<br/>Gestaltungssprache"]
   pages --> api["api<br/>client.ts, queryKeys.ts, types.generated.ts"]
   live["live<br/>EventSource → Invalidierung"] --> api
@@ -349,7 +350,7 @@ flowchart TB
 | Pfad | Zweck | Gegenstück im Backend |
 | --- | --- | --- |
 | `frontend/src/personen` | Betroffene, Sichtung, Patientenkopf, Erfassung, Druck ([AGENTS.md](../../frontend/src/personen/AGENTS.md)) | `src/person`, `src/uhs` |
-| `frontend/src/planung` | Vorplanung ohne Einsatz: Liste, Planungsseite mit Kopf, Posten, Helfern und Plan; Adapter `planungZeilen.ts` auf Raster, Blockdialog und Handy-Liste des Schichtplans (LLH-1586) | `src/planung` |
+| `frontend/src/planung` | Vorplanung ohne Einsatz: Liste, Planungsseite mit Kopf, Posten, Helfern und Plan; Adapter `planungZeilen.ts` auf Raster, Blockdialog und Handy-Liste des Schichtplans (LLH-1586); Dialog „In Einsatz übernehmen“ mit der Vorschau des Einlesens (LLH-1587) | `src/planung`, `frontend/src/abloesung/schichtplan` |
 | `frontend/src/betreuung` | Evakuierungsbezirke und Betreuungsstellen ([AGENTS.md](../../frontend/src/betreuung/AGENTS.md)) | `src/betreuung` |
 | `frontend/src/verpflegung` | Zeitfenster, Deckung, Ausgabeansicht, Stellen | `src/verpflegung` |
 
@@ -365,19 +366,17 @@ flowchart TB
 | `frontend/src/meldungen` | Meldungsformular, Liste, Korrektur, Rückmeldung | `src/meldung` |
 | `frontend/src/nachforderungen` | Board, Zusage, Übernahme als Einheit oder Material | `src/nachforderung` |
 
-### Stab und Führung
+### Führungsorganisation
 
 | Pfad | Zweck | Gegenstück im Backend |
 | --- | --- | --- |
-| `frontend/src/stab` | Besetzung, Checkliste, Funkplan, Skizze, Kommunikationsplan, Medienlage ([AGENTS.md](../../frontend/src/stab/AGENTS.md)) | `src/stab`, `src/sprechgruppe` |
-| `frontend/src/fernmeldewesen` | Reiter des Moduls Fernmeldewesen | `src/stab` |
+| `frontend/src/fernmeldewesen` | Funkplan, Skizze, Sprechgruppen, Kommunikationsplan ([AGENTS.md](../../frontend/src/fernmeldewesen/AGENTS.md)) | `src/fernmeldewesen`, `src/sprechgruppe` |
 | `frontend/src/fuehrung` | Auswahl von Führungsfunktionen und Empfängern ([AGENTS.md](../../frontend/src/fuehrung/AGENTS.md)) | `src/fuehrung` |
 | `frontend/src/lagebesprechung` | Termin, Vorbereitung, Abschluss, Verlauf ([AGENTS.md](../../frontend/src/lagebesprechung/AGENTS.md)) | `src/lagebesprechung` |
 | `frontend/src/programmpunkt` | Paneel „Ablauf“ der Einsatzdaten, anstehende Programmpunkte | `src/programmpunkt` |
 | `frontend/src/lageberichte` | Lageberichte mit Übernahmen aus der Lage | `src/lagebericht` |
 | `frontend/src/entwurf` | Gegliederte Dokumente `DokumentEntwurf`, Freigabe, Anlagen, Verteiler ([AGENTS.md](../../frontend/src/entwurf/AGENTS.md)) | `src/vorlagendokument` |
-| `frontend/src/presse` | Presse-Labels und -Vorlagen | `src/presse` |
-| `frontend/src/infotelefon` | Anruferfassung | `src/infotelefon` |
+| `frontend/src/infotelefon` | Anruferfassung ([AGENTS.md](../../frontend/src/infotelefon/AGENTS.md)) | `src/infotelefon` |
 | `frontend/src/dokumente` | Dokument ablegen und bearbeiten | `src/dokument` |
 
 ### Geräte, Verwaltung und Archiv
@@ -386,6 +385,7 @@ flowchart TB
 | --- | --- | --- |
 | `frontend/src/geraet` | Gerätehülle, Funktionsansichten, Koppeln, Lagemonitor ([AGENTS.md](../../frontend/src/geraet/AGENTS.md)) | `src/geraet` |
 | `frontend/src/admin` | Verwaltungslayout, Datenträgerwarnung, Demo-Daten | `src/datentraeger`, `src/demo` |
+| `frontend/src/instanz` | Verwaltungsseite „Instanzkopplung“: Identität, Kopplungen, Unterschriftsschlüssel (WebAuthn) | `src/instanz`, `src/auth/unterschrift` |
 | `frontend/src/zugangsprotokoll` | Anmelde- und Admin-Spur | `src/auth` (`/api/zugangsprotokoll`) |
 | `frontend/src/aufbewahrung` | Aufbewahrungsübersicht, Archivakte, Fristen, Schwärzungsantrag | `src/aufbewahrung`, `src/org` |
 

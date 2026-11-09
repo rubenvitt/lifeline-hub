@@ -24,7 +24,7 @@ pub struct EinsatzModulOverride {
 /// Alle Overrides eines Einsatzes als Map `modul_key → Override`; leer heißt: der Einsatz erbt
 /// Sichtbarkeit und Rolle jedes Moduls.
 pub async fn laden_alle(
-    pool: &SqlitePool,
+    pool: impl sqlx::SqliteExecutor<'_>,
     einsatz_id: i64,
 ) -> Result<HashMap<String, EinsatzModulOverride>, AppError> {
     let zeilen = sqlx::query_as::<_, EinsatzModulOverride>(

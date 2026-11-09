@@ -715,7 +715,21 @@ mod tests {
         .await
         .unwrap();
 
-        migrate(&pool).await.expect("0186 läuft durch");
+        // Genau bis 0186: `infotelefon_modul` schriebe die Vorgaben ohne echten Einsatz bei
+        // wieder eingeschalteten Fremdschlüsseln neu.
+        Migrator {
+            migrations: Cow::Owned(
+                sqlx::migrate!("./migrations")
+                    .iter()
+                    .filter(|m| m.version <= 186)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("0186 läuft durch");
 
         let einsatz: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
             "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
@@ -836,6 +850,130 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(betreuung, 3);
+    }
+
+    /// i6k6mzed (Migration `infotelefon_modul`, design.md D3/D4): `infotelefon` übernimmt jede
+    /// Vorgabe von `stab` vollständig (Rolle und Sichtbarkeit) am Einsatz, an der Organisation und
+    /// in den Einsatz-Vorlagen; danach gibt es in keiner der drei Tabellen eine Zeile `stab` mehr.
+    /// Andere Module bleiben unberührt. Die Nummer wandert beim Umlegen (LFH-1014), deshalb über
+    /// den Namen.
+    #[tokio::test]
+    async fn migration_0302_uebernimmt_stab_freigaben_fuer_infotelefon() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let alle = sqlx::migrate!("./migrations");
+        let nummer = alle
+            .iter()
+            .find(|m| m.description == "infotelefon modul")
+            .expect("Migration infotelefon_modul")
+            .version;
+        let vorher: Vec<_> = alle
+            .iter()
+            .filter(|m| m.version < nummer)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor infotelefon_modul");
+        // Die Vorgaben hier brauchen keinen echten Einsatz, keine Organisation und keine Vorlage.
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'stab', NULL, 'fuehrungskraft'), (2, 'stab', 0, NULL), \
+                    (3, 'stab', 1, 'admin'), (4, 'etb', 0, 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'stab', 0, NULL), (2, 'etb', NULL, 'admin'), \
+                    (3, 'stab', NULL, 'einsatzfuehrung')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_vorlage_modul_aus (vorlage_id, modul_key) \
+             VALUES (1, 'stab'), (1, 'tiere'), (2, 'tiere')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migrate(&pool).await.expect("infotelefon_modul läuft durch");
+
+        let einsatz: Vec<(i64, String, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT einsatz_id, modul_key, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
+             ORDER BY einsatz_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, "infotelefon".into(), None, Some("fuehrungskraft".into())),
+                // Ausgeblendet bleibt ausgeblendet: wer den Stab nicht sah, sieht das
+                // Informationstelefon nicht.
+                (2, "infotelefon".into(), Some(0), None),
+                (3, "infotelefon".into(), Some(1), Some("admin".into())),
+                (4, "etb".into(), Some(0), Some("admin".into())),
+            ]
+        );
+        let org: Vec<(i64, String, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, modul_key, sichtbar, benoetigte_rolle FROM org_modul_einstellung \
+             ORDER BY org_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            org,
+            [
+                (1, "infotelefon".into(), Some(0), None),
+                (2, "etb".into(), None, Some("admin".into())),
+                (
+                    3,
+                    "infotelefon".into(),
+                    None,
+                    Some("einsatzfuehrung".into())
+                ),
+            ]
+        );
+        let vorlagen: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT vorlage_id, modul_key FROM einsatz_vorlage_modul_aus \
+             ORDER BY vorlage_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            vorlagen,
+            [
+                (1, "infotelefon".into()),
+                (1, "tiere".into()),
+                // Eine Vorlage, die den Stab zeigte, zeigt auch das Informationstelefon.
+                (2, "tiere".into()),
+            ]
+        );
     }
 
     /// LLH-1053 (Migration `zeitdarstellung`): Aus „Zeitformat“ wird „Zeitdarstellung“. 24h/12h hatte nie Wirkung,
@@ -10658,6 +10796,11 @@ mod tests {
                 if start.bezeichnung == "Sanitätsdienst" {
                     erwartet.extend(["fernmeldewesen".to_string(), "wetter-pegel".to_string()]);
                 }
+                // Das Informationstelefon kam erst mit `infotelefon_modul` (i6k6mzed); dort erbt es
+                // die Ausblendung des Stabs, den es seither nicht mehr gibt. 0238 blendete ihn in
+                // jeder Startvorlage aus.
+                erwartet.remove("infotelefon");
+                erwartet.insert("stab".to_string());
                 assert_eq!(aus, erwartet, "{}", start.bezeichnung);
             }
         }
@@ -13812,6 +13955,62 @@ mod tests {
             .expect_err("fehlende Herkunft zählt als leer");
     }
 
+    /// LLH-1587: eine Planung im Bestand ist nicht übernommen; die Kennzahlen sind ein Objekt.
+    #[tokio::test]
+    async fn migration_0304_planung_uebernahme() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 304;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (_, b) = bild_grundlage(&pool).await;
+        let planung: i64 = sqlx::query_scalar(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis, angelegt_von) \
+             VALUES (1, 'Stadtfest', '2026-11-14 09:00:00', '2026-11-14 23:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (Option<String>, Option<i64>, Option<String>) = sqlx::query_as(
+            "SELECT uebernommen_at, uebernahme_einsatz, uebernahme_kennzahlen \
+             FROM planung WHERE id = ?",
+        )
+        .bind(planung)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bestand, (None, None, None), "Bestand nicht übernommen");
+
+        let setzen = |kennzahlen: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "UPDATE planung SET uebernommen_at = '2026-11-14 08:00:00', \
+                        uebernommen_von = ?, uebernahme_einsatz = 999, \
+                        uebernahme_einsatznummer = 'E-2026-0001', uebernahme_kennzahlen = ? \
+                     WHERE id = ?",
+                )
+                .bind(b)
+                .bind(kennzahlen)
+                .bind(planung)
+                .execute(&pool)
+                .await
+            }
+        };
+        setzen("[1, 2]").await.expect_err("Kennzahlen als Objekt");
+        setzen("kein json").await.expect_err("Kennzahlen als JSON");
+        setzen(r#"{"soll": 4, "ist": 3, "offen": 1, "konflikte": 2}"#)
+            .await
+            .expect("Einsatz ohne Fremdschlüssel, Kennzahlen als Objekt");
+    }
+
     /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
     #[tokio::test]
     async fn migration_0298_person_rtw_angefordert() {
@@ -13850,5 +14049,162 @@ mod tests {
         };
         setze(1).await.expect("1 geht");
         setze(2).await.expect_err("nur 0 und 1");
+    }
+
+    /// i6k6mzed (Migration `stab_presse_entfernen`, design.md D4): Die Migration setzt offene
+    /// Löschersuchen für einen Medienkontakt auf den Vollzugsstand und löscht danach die Spalte
+    /// `etb_eintrag.pressemitteilung_id`, `medienkontakt`, `pressemitteilung`,
+    /// `einsatz_stab_checkliste` und `einsatz_stabsfunktion`, bei eingeschalteten
+    /// Fremdschlüsseln und mit Daten, die aufeinander zeigen (Aufgabe 1.1: das gebündelte SQLite
+    /// kann das). Danach schreibt das ETB weiter, `foreign_key_check` ist leer, und alte
+    /// Einträge bleiben als Text. Die Nummer wandert beim Umlegen (LFH-1014), deshalb über den
+    /// Namen.
+    #[tokio::test]
+    async fn migration_stab_presse_entfernen_loescht_tabellen_und_spalte() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        let alle = sqlx::migrate!("./migrations");
+        let nummer = alle
+            .iter()
+            .find(|m| m.description == "stab presse entfernen")
+            .expect("Migration stab_presse_entfernen")
+            .version;
+        let vorher: Vec<_> = alle
+            .iter()
+            .filter(|m| m.version < nummer)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor stab_presse_entfernen");
+        for sql in [
+            "INSERT INTO organisation (id, name) VALUES (1, 'Orga')",
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 1, 'Leit', 'leit', 'h')",
+            "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+            "INSERT INTO etb_eintrag (id, einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (1, 1, 1, 'meldung', 'Pressemitteilung Nr. 1 freigegeben', 1, '2026-11-08 10:00:00')",
+            "INSERT INTO pressemitteilung (id, einsatz_id, vorlage, titel, zeitstand, status, abschnitte, \
+             ersteller_id, freigegeben_von_id, freigegeben_at, etb_eintrag_id) \
+             VALUES (1, 1, 'freitext', 'PM 1', '2026-11-08 10:00:00', 'freigegeben', '[]', 1, 1, \
+             '2026-11-08 10:00:00', 1)",
+            // Fortschreibung: ein Verweis der Tabelle auf sich selbst.
+            "INSERT INTO pressemitteilung (id, einsatz_id, vorlage, titel, zeitstand, abschnitte, \
+             version, vorgaenger_id, ersteller_id) \
+             VALUES (2, 1, 'freitext', 'PM 1', '2026-11-08 11:00:00', '[]', 2, 1, 1)",
+            "UPDATE etb_eintrag SET pressemitteilung_id = 1 WHERE id = 1",
+            "INSERT INTO medienkontakt (id, einsatz_id, art, medium, thema, eingang_at, status, antwort, \
+             pressemitteilung_id, angelegt_von_id) \
+             VALUES (3, 1, 'anfrage', 'Radio', 'Deich', '2026-11-08 09:00:00', 'beantwortet', 'siehe PM', 1, 1)",
+            "INSERT INTO einsatz_stab_checkliste (einsatz_id, punkt, erledigt, erledigt_at, \
+             erledigt_von_id, geaendert_von_id) \
+             VALUES (1, 'leitstelle_gemeldet', 1, '2026-11-08 09:30:00', 1, 1)",
+            "INSERT INTO einsatz_stabsfunktion (einsatz_id, sachgebiet, besetzung_art, bezeichnung, \
+             gesetzt_von_id) VALUES (1, 's5', 'extern', 'Pressesprecherin', 1)",
+            // Löschersuchen: offen für einen Medienkontakt (wird vollzogen), schon vollzogen,
+            // zurückgenommen, und offen für eine Betroffene (bleibt offen).
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at) \
+             VALUES (1, 1, 'medienkontakt', 3, 'AZ-1', 1, '2026-11-08 12:00:00', '2026-11-09 12:00:00')",
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at, vollzogen_at) \
+             VALUES (2, 1, 'medienkontakt', 4, 'AZ-2', 1, '2026-11-01 12:00:00', '2026-11-02 12:00:00', \
+             '2026-11-02 12:05:00')",
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at, zurueckgenommen_at, zurueckgenommen_von) \
+             VALUES (3, 1, 'medienkontakt', 5, 'AZ-3', 1, '2026-11-03 12:00:00', '2026-11-04 12:00:00', \
+             '2026-11-03 13:00:00', 1)",
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at) \
+             VALUES (4, 1, 'betroffene', 9, 'AZ-4', 1, '2026-11-08 12:00:00', '2026-11-09 12:00:00')",
+        ] {
+            sqlx::query(sql)
+                .execute(&pool)
+                .await
+                .unwrap_or_else(|e| panic!("{sql}: {e}"));
+        }
+
+        let start = std::time::Instant::now();
+        migrate(&pool)
+            .await
+            .expect("stab_presse_entfernen läuft durch");
+        eprintln!("Migration dauerte {:?}", start.elapsed());
+
+        let tabellen: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN \
+             ('medienkontakt', 'pressemitteilung', 'einsatz_stab_checkliste', \
+              'einsatz_stabsfunktion')",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(tabellen.is_empty(), "Tabellen übrig: {tabellen:?}");
+        let spalten: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('etb_eintrag')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(!spalten.iter().any(|s| s == "pressemitteilung_id"));
+        sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (1, 2, 'meldung', 'Deich hält', 1, '2026-11-08 11:00:00')",
+        )
+        .execute(&pool)
+        .await
+        .expect("ETB schreibt nach dem Löschen");
+        let verletzt: Vec<sqlx::sqlite::SqliteRow> = sqlx::query("PRAGMA foreign_key_check")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(verletzt.is_empty(), "keine verwaisten Fremdschlüssel");
+        let alt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            alt, "Pressemitteilung Nr. 1 freigegeben",
+            "der alte Eintrag bleibt als Text"
+        );
+
+        let antraege: Vec<(i64, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT id, vollzogen_at, zurueckgenommen_at FROM schwaerzung_antrag ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let (_, vollzogen, zurueck) = &antraege[0];
+        assert!(
+            vollzogen.as_deref().and_then(crate::zeit::parse).is_some(),
+            "das offene Ersuchen für den Medienkontakt gilt als vollzogen: {vollzogen:?}"
+        );
+        assert_eq!(zurueck, &None);
+        assert_eq!(
+            antraege[1..],
+            [
+                (2, Some("2026-11-02 12:05:00".into()), None),
+                (3, None, Some("2026-11-03 13:00:00".into())),
+                // Andere Ziele berührt die Migration nicht.
+                (4, None, None),
+            ]
+        );
+        let version: String = sqlx::query_scalar("SELECT sqlite_version()")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        eprintln!("SQLite {version}");
     }
 }

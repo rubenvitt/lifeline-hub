@@ -46,6 +46,7 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { formatRegelKurz } from '../schichtmodellText';
 import { useUhr } from '../useUhr';
+import GrenzwerteZeile from './GrenzwerteZeile';
 import { spanneAus, type SpannenWahl, type ZugStand } from './raster';
 import SchichtenErzeugenDialog from './SchichtenErzeugenDialog';
 import SchichtplanBlockDialog, { type BlockSpeichern } from './SchichtplanBlockDialog';
@@ -81,6 +82,9 @@ import {
  *
  * LLH-1555 Welle 3: über dem Raster die Wechsel-Leiste (`SchichtplanWechselLeiste`), je Zeitpunkt
  * die Wechsel laut Plan mit ihrem Griff; ein gebündelter Hinweis springt mit `?wechsel=` hinein.
+ *
+ * LLH-1603: Unter der Werkzeugzeile nennt `GrenzwerteZeile` Höchstdienst und Mindestruhe; bedient
+ * werden sie nur in Einstellungen › Ablösung.
  *
  * LLH-1584: Strg/Alt beim Verschieben kopiert den Block (mit Personen, ohne Notiz), der Blockdialog
  * kopiert ihn als nächsten Block (ohne Personen) und öffnet die Kopie, „Schichten erzeugen“ füllt
@@ -474,6 +478,13 @@ export default function SchichtplanAnsicht({
         )}
         {werkzeuge}
       </Flex>
+      {plan && (
+        <GrenzwerteZeile
+          einsatzId={einsatzId}
+          grenzwerte={plan.grenzwerte}
+          canWrite={darfSchreiben}
+        />
+      )}
       {planQuery.isError && (
         <Alert
           type="error"

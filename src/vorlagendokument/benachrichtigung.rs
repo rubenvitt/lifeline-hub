@@ -70,7 +70,6 @@ mod tests {
     use super::*;
     use crate::befehl::Befehl;
     use crate::lagebericht::Lagebericht;
-    use crate::presse::mitteilung::Pressemitteilung;
     use crate::vorlagendokument::Dokumentart;
 
     fn eintrag(
@@ -113,7 +112,7 @@ mod tests {
     }
 
     /// Befehle gehören zum Modul Aufträge, Lageberichte zu Lageberichte (die `MODUL_KEY` ihrer
-    /// Routen); die Pressemitteilung hat keinen Verteiler und benachrichtigt nicht.
+    /// Routen).
     #[test]
     fn bezug_jeder_art_zeigt_auf_ihr_modul() {
         let befehl = Befehl::BENACHRICHTIGUNG.expect("Befehl meldet");
@@ -122,7 +121,6 @@ mod tests {
         let bericht = Lagebericht::BENACHRICHTIGUNG.expect("Lagebericht meldet");
         assert_eq!(bericht.art, BenachrichtigungArt::Lagebericht);
         assert_eq!(bericht.bezug_typ.modul(), Some("lageberichte"));
-        assert_eq!(Pressemitteilung::BENACHRICHTIGUNG, None);
         assert!(Befehl::VERTEILER.is_some() && Lagebericht::VERTEILER.is_some());
     }
 }

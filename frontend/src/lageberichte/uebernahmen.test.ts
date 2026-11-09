@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { MEDIENLAGE_QUELLE } from '../stab/medienlageQuelle';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
 import { FUEHRUNGSPROBLEME_QUELLE } from './fuehrungsproblemeUebernahme';
 import { LAGEENTWICKLUNG_QUELLE } from './lageentwicklungUebernahme';
@@ -8,9 +7,9 @@ import { UEBERNAHMEN, uebernahmeFuer } from './uebernahmen';
 import { VORLAGEN, vorlage } from './vorlagen';
 
 describe('Zuordnung Abschnitt → Quelle (LFH-870)', () => {
-  it('bindet Eigene Lage und Medienlage im Lagevortrag zur Information an', () => {
+  it('bindet die Eigene Lage an, die Medienlage bleibt Freitext (i6k6mzed, design.md D6)', () => {
     expect(uebernahmeFuer('lagebericht', 'eigene_lage')).toBe(EIGENE_LAGE_QUELLE);
-    expect(uebernahmeFuer('lagebericht', 'medienlage')).toBe(MEDIENLAGE_QUELLE);
+    expect(uebernahmeFuer('lagebericht', 'medienlage')).toBeUndefined();
     expect(uebernahmeFuer('lagebericht', 'auftrag')).toBeUndefined();
   });
 

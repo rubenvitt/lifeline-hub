@@ -1,4 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import {
+  BLOECKE_ANZAHL,
+  seedPlanung,
+  waitForPlanung,
+  waitForRaster,
+  wireZeit,
+  zeitpunktAm,
+} from './planung-kern';
 
 /**
  * Vorplanung ohne Einsatz (LLH-1586, Spec `vorplanung`): der ganze Weg über die Oberfläche gegen
@@ -133,4 +141,147 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await expect(zeile).toBeVisible();
   await zeile.getByRole('link', { name }).click();
   await expect(page).toHaveURL(new RegExp(`/planungen/${planungId}$`));
+});
+
+/**
+ * „In Einsatz übernehmen“ (LLH-1587): eine Stadtfest-Planung mit einem Posten, einem Helfer und
+ * einem Block per API, dann über die Oberfläche in einen neuen Einsatz. Danach ist die Planung
+ * schreibgeschützt, ein zweiter Aufruf antwortet 409, und der Block steht im Schichtplan des neuen
+ * Einsatzes. Die Demo-Planung „Stadtfest Musterstadt“ prüft `tests/planung_uebernahme.rs`; das
+ * e2e-Backend läuft ohne Demo-Daten.
+ */
+test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibgeschützt', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+  const tag = new Date(Date.now() + 7 * 24 * 3_600_000).toISOString().slice(0, 10);
+  const name = `E2E Stadtfest ${Date.now()}`;
+  const api = async (pfad: string, data: unknown) => {
+    const r = await page.request.post(pfad, { data });
+    expect(r.ok(), `${pfad}: ${r.status()} ${await r.text()}`).toBeTruthy();
+    return r.json();
+  };
+  const plan = await api('/api/planungen', {
+    bezeichnung: name,
+    ort: 'Marktplatz',
+    von: `${tag} 06:00:00`,
+    bis: `${tag} 22:00:00`,
+  });
+  const planungId: number = plan.kopf.id;
+  const helfer = await api(`/api/planungen/${planungId}/helfer`, {
+    name: 'Hanna Stadtfest',
+    organisation: 'Helferkreis',
+  });
+  const mitPosten = await api(`/api/planungen/${planungId}/posten`, {
+    bezeichnung: 'Streife Markt',
+    art: 'einheit',
+    soll_anzahl: 2,
+  });
+  await api(`/api/planungen/${planungId}/bloecke`, {
+    posten_id: mitPosten.posten[0].id,
+    von: `${tag} 10:00:00`,
+    bis: `${tag} 14:00:00`,
+    personen: [{ art: 'helfer', helfer_id: helfer.id }],
+  });
+
+  await page.goto(`/planungen/${planungId}`);
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  await page.getByRole('button', { name: 'In Einsatz übernehmen' }).click();
+  const dialog = page.getByRole('dialog', { name: 'In Einsatz übernehmen' });
+  const zaehlung = dialog.locator('[data-lfh="einlesen-zaehlung"]');
+  await expect(zaehlung).toContainText('1 Einheit neu');
+  await expect(zaehlung).toContainText('1 Schicht neu');
+  await expect(zaehlung).toContainText('1 Helfer neu');
+  await dialog.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(dialog.locator('[data-lfh="uebernahme-ergebnis"]')).toContainText(
+    'Einsatz angelegt, Plan übernommen',
+  );
+  await dialog.locator('.ant-modal-footer').getByRole('button', { name: 'Schließen' }).click();
+  await expect(dialog).toBeHidden();
+
+  // ── Danach schreibgeschützt: Hinweis mit Einsatz, keine Bedienung, zweiter Aufruf 409 ─────────
+  const hinweis = page.locator('[data-lfh="planung-uebernommen"]');
+  await expect(hinweis).toContainText('übernommen');
+  await expect(page.getByRole('button', { name: 'In Einsatz übernehmen' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Planung bearbeiten' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Block anlegen' })).toHaveCount(0);
+  const nochmal = await page.request.post(`/api/planungen/${planungId}/uebernahme`, {
+    data: { ziel: { art: 'neu' } },
+  });
+  expect(nochmal.status()).toBe(409);
+
+  // ── Der Block steht im Schichtplan des neuen Einsatzes ───────────────────────────────────────
+  await hinweis.getByRole('link').click();
+  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
+  const einsatzId = Number(/\/einsaetze\/(\d+)/.exec(page.url())![1]);
+  const schichtplan = await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/abloesungen/schichtplan`)
+  ).json();
+  expect(schichtplan.bloecke).toHaveLength(1);
+  expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');
+  expect(schichtplan.helfer.map((h: { name: string }) => h.name)).toEqual(['Hanna Stadtfest']);
+});
+
+/**
+ * Kriterium 12 der Prüfliste (LLH-1595, für LLH-1586): Änderungen anderer erscheinen im Raster
+ * direkt, ohne Neuladen. Der fremde Block landet in DERSELBEN Zeile wie der Block unter dem Zeiger,
+ * gleich daneben; der Block unter dem Zeiger behält Lage, Größe und Ampel. Dass andere Zeilen
+ * nicht springen, folgt aus der festen Zeilenhöhe und ist hier nicht eigens belegt.
+ *
+ * Bewusst NICHT abgedeckt: ein fremder Posten, der VOR anderen einsortiert wird, und eine fremde
+ * Umsortierung schieben die Zeilen darunter um eine Zeilenhöhe. Die Zeilenschleuse mit
+ * Sammelbanner für das gemeinsame Raster (Einsatz und Planung) ist eine eigene Aufgabe (LLH-1604).
+ */
+test('Vorplanung (LLH-1595): ein fremder Block verschiebt im Raster nichts unter dem Zeiger', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+  const planung = await seedPlanung(page, `E2E Planung live ${Date.now()}`);
+
+  // Der Org-Strom abonniert erst mit der Antwort auf `/api/live` (wie LLH-1317 für den Einsatz).
+  const strom = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/live');
+  await page.goto(`/planungen/${planung.id}`);
+  await strom;
+  await waitForPlanung(page, planung.bezeichnung);
+  await waitForRaster(page);
+
+  // Fußtrupp trägt 08–12 Uhr (`planung-kern.ts`); der Zeiger steht darauf.
+  const fussBlock = page.locator('[data-lfh="schichtplan-block"][data-ampel="ohne-soll"]');
+  await expect(fussBlock).toHaveCount(1);
+  // Über die Kennung gegriffen: der fremde Block trägt dieselbe Ampel.
+  const blockId = await fussBlock.getAttribute('data-block-id');
+  const unterZeiger = page.locator(`[data-lfh="schichtplan-block"][data-block-id="${blockId}"]`);
+  await unterZeiger.hover();
+  const vorher = (await unterZeiger.boundingBox())!;
+
+  // Der „andere Schirm“ legt am Fußtrupp gleich anschließend 12–14 Uhr an.
+  const stand = (await (await page.request.get(`/api/planungen/${planung.id}`)).json()) as {
+    posten: { id: number; bezeichnung: string }[];
+  };
+  const fusstrupp = stand.posten.find((p) => p.bezeichnung === 'Fußtrupp')!.id;
+  const antwort = await page.request.post(`/api/planungen/${planung.id}/bloecke`, {
+    data: {
+      posten_id: fusstrupp,
+      von: wireZeit(zeitpunktAm(planung.tag, 12)),
+      bis: wireZeit(zeitpunktAm(planung.tag, 14)),
+    },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+
+  const zeile = page.locator('[data-lfh="schichtplan-zeile"]').filter({ hasText: 'Fußtrupp' });
+  await expect(
+    zeile.locator('[data-lfh="schichtplan-block"]'),
+    'der fremde Block erscheint ohne Neuladen in der Zeile unter dem Zeiger',
+  ).toHaveCount(2);
+  await expect(page.locator('[data-lfh="schichtplan-block"]')).toHaveCount(BLOECKE_ANZAHL + 1);
+  const nachher = (await unterZeiger.boundingBox())!;
+  expect(
+    { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },
+    'der Block unter dem Zeiger bleibt, wo er war',
+  ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
+  await expect(unterZeiger).toHaveAttribute('data-ampel', 'ohne-soll');
 });

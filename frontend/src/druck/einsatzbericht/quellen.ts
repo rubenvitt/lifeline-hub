@@ -23,7 +23,7 @@ export { BLOECKE, type BlockSchluessel } from './auswahl';
 export type QuellenSchluessel =
   | 'einsatz'
   | 'fuehrungsstelle'
-  | 'stab'
+  | 'mitglieder'
   | 'lagebesprechungen'
   | 'einheiten'
   | 'einheitenAufgeloest'
@@ -69,8 +69,9 @@ export const QUELLEN: readonly Quelle[] = [
   // GET …/fuehrungsstelle — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
   // Sie trägt den Einsatzleiter (LFH-1199); die Mitglieder mit App-Rolle sind keine Leitung.
   { schluessel: 'fuehrungsstelle', bloecke: nur('fuehrung'), modul: null },
-  // GET …/stab — `EinsatzLesezugriff<Stab>` (src/routes/stab.rs, `laden`).
-  { schluessel: 'stab', bloecke: nur('fuehrung'), modul: 'stab' },
+  // GET …/mitglieder — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs, `mitglieder`). Sie
+  // tragen die Führungsfunktionen EL und S1–S7 (i6k6mzed, D7).
+  { schluessel: 'mitglieder', bloecke: nur('fuehrung'), modul: null },
   // GET …/lagebesprechungen — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
   // `list`), seit LLH-1111 nicht mehr am Stab.
   { schluessel: 'lagebesprechungen', bloecke: nur('fuehrung'), modul: 'lagebesprechung' },

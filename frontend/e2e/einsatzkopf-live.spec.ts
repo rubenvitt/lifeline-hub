@@ -1,18 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  einsatzModulPfad,
-  lagebesprechungPfad,
-  stabPfad,
-  ueberblickPfad,
-} from '../src/routing/deeplinks';
+import { einsatzModulPfad, lagebesprechungPfad, ueberblickPfad } from '../src/routing/deeplinks';
 import { anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
  * Neuladen. Seit LLH-1111 setzt ihn nur das Modul Lagebesprechung (`PUT …/lagebesprechung/termin`
  * oder der Abschluss `POST …/lagebesprechungen`); der Kopf-PATCH lehnt das Feld mit 400 ab. Es
- * folgen die Zeile „Nächste Lagebesprechung“ der Stab-Seite, die Marke im Führungsüberblick und
- * die Seite Lagebesprechung selbst.
+ * folgen die Marke im Führungsüberblick und die Seite Lagebesprechung selbst (die Stab-Seite gibt
+ * es seit i6k6mzed nicht mehr).
  *
  * Der „andere Schirm" schreibt über die API derselben Sitzung; was hier zählt, ist der Weg über
  * den Live-Strom in die offene Seite. Die Seite wartet auf die Antwort von `/live`, BEVOR
@@ -63,9 +58,6 @@ function terminInZweiStunden(): string {
   return t.toISOString();
 }
 
-/** Die Zeile „Nächste Lagebesprechung“ der Stab-Seite (`lagebesprechung/LagebesprechungZeile.tsx`). */
-const stabZeile = (page: Page) => page.getByRole('group', { name: 'Nächste Lagebesprechung' });
-
 /** Die Kennzahl „Nächste Lagebesprechung“ im Paneel „Termin“ der Seite Lagebesprechung. */
 const terminKennzahl = (page: Page) =>
   page
@@ -76,13 +68,13 @@ const terminKennzahl = (page: Page) =>
 /** Zustand eines Termins in rund zwei Stunden („in 1 h 59 min“ oder „in 2 h 00 min“). */
 const IN_ZWEI_STUNDEN = /in (1 h 5\d|2 h 00) min/;
 
-test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Stab-Zeile folgt', async ({
+test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Seite Lagebesprechung folgt', async ({
   page,
 }) => {
   const id = await anmeldenUndAnlegen(page);
-  await oeffnenMitStrom(page, stabPfad(id), id);
-  const zeile = stabZeile(page);
-  await expect(zeile.getByText('kein Termin', { exact: true })).toBeVisible();
+  await oeffnenMitStrom(page, lagebesprechungPfad(id), id);
+  const kennzahl = terminKennzahl(page);
+  await expect(kennzahl).toContainText('kein Termin');
 
   // Der Kopf-PATCH lehnt den Termin ab, laut statt still: es gibt nur einen Schreibweg.
   const patch = await page.request.patch(`/api/einsaetze/${id}`, {
@@ -95,8 +87,8 @@ test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Stab-Zeile folgt
   });
   expect(termin.ok()).toBeTruthy();
 
-  await expect(zeile.getByText(IN_ZWEI_STUNDEN)).toBeVisible();
-  await expect(zeile.getByText('kein Termin', { exact: true })).toHaveCount(0);
+  await expect(kennzahl).toContainText(IN_ZWEI_STUNDEN);
+  await expect(kennzahl).not.toContainText('kein Termin');
 });
 
 test('LLH-1111: der Abschluss setzt den Termin, Überblick und Seite Lagebesprechung folgen', async ({

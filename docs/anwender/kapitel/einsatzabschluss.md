@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/stab/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
 ---
 
 ## Überblick
@@ -94,6 +94,11 @@ Der Block „Führung“ nennt unter „Einsatzleitung“ den Einsatzleiter mit 
 „Einsatzdaten“ festgelegt ist (siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)), sonst
 „nicht erfasst“. Mitglieder mit der Rolle Einsatzleitung stehen dort nicht; die Rolle ist ein
 Recht, keine Führungsfunktion.
+
+Darunter nennt der Block unter „Führungsfunktionen“ für EL und S1 bis S6 die Mitglieder, die die
+Funktion in ihrer Mitgliedschaft tragen, mehrere alphabetisch, sonst „nicht vergeben“; S7 steht
+nur, wenn jemand es trägt. Gepflegt wird die Funktion im Reiter „Zugriff“ der Einstellungen (siehe
+[Rechte im Einsatz](rechte-im-einsatz.md)).
 
 ### Was die Hilfeleistungen zählen
 

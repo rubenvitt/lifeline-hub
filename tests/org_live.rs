@@ -402,7 +402,7 @@ async fn kopfaenderungen_melden_einsatz_und_einsatzliste() {
 }
 
 #[tokio::test]
-async fn besprechung_ohne_neuen_termin_und_besetzung_melden_keine_einsatzliste() {
+async fn besprechung_ohne_neuen_termin_meldet_keine_einsatzliste() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
@@ -417,15 +417,6 @@ async fn besprechung_ohne_neuen_termin_und_besetzung_melden_keine_einsatzliste()
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
-    let (status, _) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{eid}/stab/besetzung/s2"),
-        &admin,
-        Some(r#"{"besetzung_art":"einsatzleitung"}"#),
-    )
-    .await;
-    assert!(status.is_success());
 
     let alle = org_eingegangen(&mut rx);
     assert!(alle.is_empty(), "{alle:?}");

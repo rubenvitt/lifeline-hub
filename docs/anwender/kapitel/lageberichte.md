@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -32,8 +32,8 @@ sie.
 
 1. In den Lageberichten „Neuer Lagevortrag“ wählen. Es entsteht sofort ein Entwurf
    „Lagevortrag zur Information“, und er öffnet sich. Gefahren-/Schadenlage, Eigene Lage,
-   Lageentwicklung, Besondere (Führungs-)Probleme und Medienlage sind schon aus den Modulen
-   gefüllt (Tabelle unter „Übernahmen im Lagevortrag zur Information“).
+   Lageentwicklung und Besondere (Führungs-)Probleme sind schon aus den Modulen gefüllt (Tabelle
+   unter „Übernahmen im Lagevortrag zur Information“).
 2. Für einen Lagevortrag ohne diese Inhalte stattdessen den Pfeil neben dem Knopf und „Leerer
    Lagevortrag“ wählen; für eine andere Vorlage dort „Lagevortrag zur Entscheidung“ oder „Freier
    Bericht“.
@@ -97,7 +97,6 @@ sie.
 | Eigene Lage | „Aus Meldebild und Führungsorganisation übernehmen“ | Kräftemeldebild und Führungsorganisation des ganzen Einsatzes |
 | Lageentwicklung | „Aus dem ETB übernehmen“ | neue Einträge seit der letzten Lagebesprechung je Typ, neue Entscheidungen mit Nummer und Zeit, eine berichtigte mit „berichtigt → Nr. …“ |
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
-| Medienlage | „Aus S5 übernehmen“ | Presse-Log, Pressemitteilungen, Infotelefon, ohne Personenbezug |
 
 - Jeder übernommene Text nennt seinen Stand als Datum-Zeit-Gruppe. Eine Fortschreibung übernimmt
   den Text mit diesem Stand; neue Zahlen bringt erst eine neue Übernahme in den Abschnitt.
@@ -108,10 +107,10 @@ sie.
   behält ihn. Abschnitte ohne Übernahme zeigen keinen Stand, auf Papier steht er nicht.
 - Beim Anlegen und mit „Leere Abschnitte aus dem Lagebild füllen“ steht derselbe Text wie mit dem
   Knopf im Abschnitt. Die App lädt die Daten erst mit diesem Klick.
-- Ist eine Quelle für die Person ganz gesperrt, steht im Abschnitt „—“ mit Grund, etwa
-  „— (Stab nicht freigegeben)“ in der Medienlage; diese Quelle fragt die App dann gar nicht an.
-- Die Abschnitte „Auftrag“, „Anträge und Vorschläge“ und „Zusammenfassung“ und der ganze
-  Lagevortrag zur Entscheidung bleiben von Hand.
+- Ist eine Quelle für die Person ganz gesperrt, steht im Abschnitt „—“ mit Grund; diese Quelle
+  fragt die App dann gar nicht an.
+- Die Abschnitte „Auftrag“, „Anträge und Vorschläge“, „Medienlage“ und „Zusammenfassung“ und der
+  ganze Lagevortrag zur Entscheidung bleiben von Hand.
 - Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme übernehmen nur Zahlen,
   Nummern, Arten und Zeiten, keinen Freitext aus Aufträgen, Meldungen, Einsatztagebuch,
   Betroffenen oder Schäden.
@@ -163,8 +162,8 @@ bleibt „System“ der Empfänger. Auf dem Papier steht er im Kopf des Blatts.
 
 ### Benachrichtigung bei der Freigabe
 
-Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler besetzt (laut
-Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), die Benachrichtigung „Neuer
+Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler in ihrer Mitgliedschaft
+trägt (EL: zuerst der Einsatzleiter der Führungsstelle), die Benachrichtigung „Neuer
 Lagebericht“ mit der Fassung, etwa „Version 2“, und dem Sprung zum Bericht. Sie ist still: Sie
 steht unter „Eingänge“ bei „Früher“, ohne Band, Ton und Zahl. Für welche Funktionen sie als Eingang
 kommt, legt der Reiter „Benachrichtigungen“ der Einstellungen fest (Kapitel

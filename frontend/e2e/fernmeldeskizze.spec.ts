@@ -40,7 +40,7 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
  * - GLEICHZEITIG: zwei Kontexte verschieben dasselbe Element — Meldung statt stillem
  *   Überschreiben (409).
  * - RUHIGE FLÄCHE (ersetzt die Schleuse, LFH-867): unter dem Zeiger springt nichts.
- * - RECHTE: Beobachter liest (Hervorheben und Zoom gehen); Stab-Schreibrecht ohne Einheiten;
+ * - RECHTE: Beobachter liest (Hervorheben und Zoom gehen); Schreibrecht im Fernmeldewesen ohne Einheiten;
  *   390 px nur lesen.
  * - PRÜFLISTE 1, 2 und 5: Trefffläche der großen Skizze (mit externen Stellen und Komponenten)
  *   je Stufe bei 1366, 1024 (komfortabel, Handschuh) und 390 px; unter dem Mindestmaßstab ist
@@ -49,9 +49,9 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
  *
  * Druck (Format, Umbruch, Graustufen): `fernmeldeskizze-druck.spec.ts`.
  *
- * Mutationsproben (Prüfliste): `rufnamenHoehe` in `stab/fernmeldeskizzeLayout.ts` auf eine
+ * Mutationsproben (Prüfliste): `rufnamenHoehe` in `fernmeldewesen/fernmeldeskizzeLayout.ts` auf eine
  * feste Zeile → die Messung wird rot (Text unter dem Platz); `status` in `Leitungsbild`
- * (`stab/skizzenZeichen.tsx`) fest auf „bestehend“ → der Geplant-Test wird rot; `istSchmal` in der Rechteweiche weg → der 390-px-Test wird rot.
+ * (`fernmeldewesen/skizzenZeichen.tsx`) fest auf „bestehend“ → der Geplant-Test wird rot; `istSchmal` in der Rechteweiche weg → der 390-px-Test wird rot.
  */
 
 const FUEKW = { width: 1366, height: 768 };
@@ -1053,14 +1053,14 @@ test('Rechte: der Beobachter liest — kein Griff, nichts verschiebt, aber Hervo
   expect(schreibend, 'der Beobachter schreibt nichts').toEqual([]);
 });
 
-test('Rechte: Schreibrecht auf den Stab ohne Einheiten — keine Einheit greifbar, der Server lehnt mit 403 ab', async ({
+test('Rechte: Schreibrecht im Fernmeldewesen ohne Einheiten — keine Einheit greifbar, der Server lehnt mit 403 ab', async ({
   page,
 }) => {
   await page.setViewportSize(FUEKW);
   await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Skizze Stab ohne Einheiten ${Date.now()}`);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze ohne Einheiten ${Date.now()}`);
   const n = await seedeGrund(page, einsatzId);
-  // Einheiten nur für Admins (Modulsperre per Override, `e2e/AGENTS.md`); der Stab bleibt frei.
+  // Einheiten nur für Admins (Modulsperre per Override, `e2e/AGENTS.md`); das Fernmeldewesen bleibt frei.
   const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/modul-overrides/einheiten`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
@@ -1069,7 +1069,7 @@ test('Rechte: Schreibrecht auf den Stab ohne Einheiten — keine Einheit greifba
   const ea1 = element(page, `ab-${n.ea[0]}`);
   await oeffneSkizze(page, einsatzId, ea1);
 
-  // Vorbedingung des Zweigs: die Fläche schreibt (Stab), die Einheiten fehlen mit Grund.
+  // Vorbedingung des Zweigs: die Fläche schreibt (Fernmeldewesen), die Einheiten fehlen mit Grund.
   await expect(page.locator('[data-lfh="skizze-neu-anordnen"]')).toBeVisible();
   await expect(page.locator('[data-lfh="skizze-fehlend"]')).toContainText('Einheiten');
   await expect(
