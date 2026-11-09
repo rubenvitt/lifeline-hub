@@ -163,7 +163,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/kommunikation` | Gemeinsamer Unterbau: Quittung und Vollzug, polymorphe Bezüge, Auto-Fristen | genutzt von Chat, Erinnerung, Auftrag, Meldung, Nachforderung, Presse, Infotelefon |
+| `src/kommunikation` | Gemeinsamer Unterbau: Quittung und Vollzug, polymorphe Bezüge, Auto-Fristen | genutzt von Chat, Erinnerung, Auftrag, Meldung, Nachforderung, Infotelefon |
 | `src/chat` | Kanäle und Nachrichten je Einsatz, Erwähnungen, Tombstones | `…/{id}/chat/…`; Live `chat` |
 | `src/erinnerung` | Fristen und Wiedervorlagen, Fälligkeit beim Lesen, Scheduler | `…/{id}/erinnerungen`; Live `erinnerung`, `sofortmeldung` |
 | `src/auftrag` | Aufträge top-down: Empfänger-Quittung, Vollzug, ETB-Anordnung | `…/{id}/auftraege`; Live `auftrag` |
@@ -174,7 +174,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | `src/web_push` | Web Push bei geschlossenem Tab, nur mit `--web-push`, RFC-8291-Verschlüsselung | `/api/web-push`; aus `benachrichtigung::melden` |
 | `src/externe_stelle` | Org-Katalog externer Stellen als Vorschlagsquelle (Speicherform Text) | `/api/externe-stellen` |
 
-### Stab & Führung
+### Führungsorganisation
 
 Regeln: [frontend/src/infotelefon/AGENTS.md](../../frontend/src/infotelefon/AGENTS.md),
 [frontend/src/fernmeldewesen/AGENTS.md](../../frontend/src/fernmeldewesen/AGENTS.md),
@@ -271,7 +271,7 @@ den Tabellen verlinkt.
 flowchart TB
   main["main.tsx<br/>QueryClientProvider, RouterProvider, registerSW"] --> app["App.tsx<br/>Routenbaum"]
   app --> routing["routing / routes<br/>Pfade, Deeplinks, RequireAuth"]
-  app --> pages["pages + Fachverzeichnisse<br/>(etb, kraefte, personen, stab …)"]
+  app --> pages["pages + Fachverzeichnisse<br/>(etb, kraefte, personen, fernmeldewesen …)"]
   pages --> ds["components, theme, icons, anzeige<br/>Gestaltungssprache"]
   pages --> api["api<br/>client.ts, queryKeys.ts, types.generated.ts"]
   live["live<br/>EventSource → Invalidierung"] --> api
@@ -364,7 +364,7 @@ flowchart TB
 | `frontend/src/meldungen` | Meldungsformular, Liste, Korrektur, Rückmeldung | `src/meldung` |
 | `frontend/src/nachforderungen` | Board, Zusage, Übernahme als Einheit oder Material | `src/nachforderung` |
 
-### Stab und Führung
+### Führungsorganisation
 
 | Pfad | Zweck | Gegenstück im Backend |
 | --- | --- | --- |
