@@ -87,7 +87,7 @@ function normalizeBezeichnung(bezeichnung: string | null | undefined): string | 
  * zusätzlich gleiche Bezeichnung, sobald beide Seiten eine tragen (design.md D2). Bei den übrigen
  * Codes tragen Empfänger keine Bezeichnung (`fuehrung::pruefe_funktion`).
  */
-function hatFunktion(
+function hasFunktion(
   stelle: MeineStelle,
   code: Fuehrungsfunktion | null | undefined,
   bezeichnung?: string | null,
@@ -100,19 +100,19 @@ function hatFunktion(
 
 /** Meldungen gehen nie an Fachberater oder Führungshilfspersonal; `empfaenger` ist Freitext. */
 export function meldungFuerMich(m: Meldung, stelle: MeineStelle): boolean {
-  return hatFunktion(stelle, m.empfaenger_funktion) || binIch(stelle, m.erfasst_von_id);
+  return hasFunktion(stelle, m.empfaenger_funktion) || binIch(stelle, m.erfasst_von_id);
 }
 
 export function auftragFuerMich(a: Auftrag, stelle: MeineStelle): boolean {
   return (
-    (a.empfaenger ?? []).some((e) => hatFunktion(stelle, e.funktion, e.funktion_text)) ||
+    (a.empfaenger ?? []).some((e) => hasFunktion(stelle, e.funktion, e.funktion_text)) ||
     binIch(stelle, a.erstellt_von_id)
   );
 }
 
 export function erinnerungFuerMich(e: Erinnerung, stelle: MeineStelle): boolean {
   return (
-    hatFunktion(stelle, e.empfaenger_funktion_code, e.empfaenger_funktion) ||
+    hasFunktion(stelle, e.empfaenger_funktion_code, e.empfaenger_funktion) ||
     binIch(stelle, e.erstellt_von_id)
   );
 }
