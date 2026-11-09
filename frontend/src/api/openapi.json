@@ -10315,7 +10315,7 @@
       },
       "Kostform": {
         "type": "string",
-        "description": "Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben\nSchlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard\n`kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in\n`migrations/0308_registrierstelle.sql`.",
+        "description": "Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben\nSchlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard\n`kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in\n`migrations/0310_registrierstelle.sql`.",
         "enum": [
           "normal",
           "vegetarisch",
