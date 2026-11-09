@@ -189,6 +189,14 @@ impl AppError {
         let AppError::Database(sqlx::Error::Database(db)) = self else {
             return None;
         };
+        // Schreibschutz übernommener Stammdaten (LLH-1493, `migrations/0305`): der Trigger
+        // bricht mit dieser Nachricht ab.
+        if db
+            .message()
+            .contains(crate::instanz::stammdaten::SCHUTZ_NACHRICHT)
+        {
+            return Some((StatusCode::CONFLICT, "Wird am Hub gepflegt."));
+        }
         if db.is_unique_violation() {
             Some((
                 StatusCode::CONFLICT,

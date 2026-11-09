@@ -43,6 +43,13 @@ pub const ORG_ROLLE_KEINE: &str = OrgRolle::Keine.as_str();
 /// [`password::verifizieren`] mit.
 pub const PASSWORT_HASH_SSO_ONLY: &str = "!sso-kein-lokales-passwort";
 
+/// Platzhalter-`passwort_hash` für ein Konto ohne gültiges lokales Passwort (LLH-1493, Change
+/// `ca8v0psv-stammdaten-verteilung`, design.md D6/D8): ein vom Hub übernommenes Konto ohne
+/// Geheimnis und ein Konto nach „ELW verloren“. Wie [`PASSWORT_HASH_SSO_ONLY`] kein PHC-String,
+/// `password::verifizieren` liefert dafür `false` (mit Wegwerf-Lauf). Wieder hinein geht es per
+/// Einmalpasswort oder Passkey.
+pub const PASSWORT_HASH_KEIN_LOKALES: &str = "!kein-lokales-passwort";
+
 wire_enum! {
     /// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
