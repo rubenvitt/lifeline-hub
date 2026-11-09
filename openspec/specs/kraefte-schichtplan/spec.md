@@ -163,6 +163,35 @@ Pausenblock gelöscht oder nicht mehr in der Zeile „Pause“, MUST die Rückna
 sein. Eine Kraft, die in einem späteren, nicht zurückgenommenen Wechsel an einer UHS
 steht, MUST die Rücknahme an der UHS auslassen.
 
+### Requirement: Wechsel-Leiste
+Über dem Raster SHALL der Schichtplan je Zeitpunkt der nächsten 24 h einen Knopf mit der Zahl der
+Wechsel zeigen, dazu frühere Zeitpunkte der letzten 12 h, an denen noch etwas offen ist (als
+„überfällig“). Ein Wechsel ist an einer Einheit das Ende eines Blocks oder der Beginn eines Blocks
+ohne Vorgänger; ein Block, der binnen der Toleranz nach dem Ende beginnt, MUST zum Wechsel am Ende
+gehören. An einer UHS ist es der Beginn eines Blocks, in der Pause Beginn und Ende. Jeder Eintrag
+MUST seinen Stand nennen: offen, vollzogen oder, an einer Einheit ohne Schicht laut Plan, „keine
+Schicht“. Der gewählte Zeitpunkt MUST seine Wechsel mit Griff zeigen: an einer Einheit mit offener
+Schicht den Vollzug der Ablösung, an UHS und Pause den Wechsel des Blocks. Zeitpunkte, Einträge
+und Stand MUST der Server rechnen (`wechsel` im Plan). Der Sprung `?wechsel=<minute>` MUST den
+Zeitpunkt wählen.
+
+#### Scenario: Drei Wechsel um 14:00
+- **WHEN** „RTW 1“ und „RTW 2“ laut Plan um 14:00 wechseln und an der „UHS Nord“ um 14:00 ein Block beginnt
+- **THEN** zeigt die Leiste „14:00 · 3 Wechsel“, und der Knopf listet beide Einheiten mit „Ablösung vollziehen“ und die UHS mit „Wechsel vollziehen“
+
+### Requirement: Ein Hinweis je Zeitpunkt
+Schichten, die laut Plan zum selben Zeitpunkt fällig sind, SHALL das System gebündelt melden: die
+Vorwarnung und die Fälligkeit MUST es je Zeitpunkt einmal melden (Bezug `schichtplan_wechsel`, der
+Zeitpunkt in Minuten seit 1970), nicht je Schicht (EEMUA 191). Die Detailzeile MUST die Zahl der
+Wechsel und die Uhrzeit nennen („15 Wechsel um 1400“), bei einem einzigen Wechsel die Einheit wie
+bei einer Schicht. Der Sprung MUST in den Schichtplan auf den Zeitpunkt führen
+(`?ansicht=plan&wechsel=`). Schichten nach Rangfolge MUST sich weiter einzeln melden. Wechsel an
+UHS und Pause haben keine Frist und melden sich nicht.
+
+#### Scenario: 15 Posten um 14:00
+- **WHEN** 15 Einheiten laut Plan um 14:00 wechseln
+- **THEN** bekommt jeder Leser der Ablösung um 13:30 eine Vorwarnung und um 14:00 einen Alarm „Ablösung fällig“ mit „15 Wechsel um 1400“, nicht je 15
+
 ### Requirement: Austauschformat
 Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,
 höchstens 2 MB und 5.000 Zeilen. Die erste Zeile MUST die Kopfzeile sein; eine Zeile steht für
