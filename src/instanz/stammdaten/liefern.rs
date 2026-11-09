@@ -167,7 +167,20 @@ async fn build_lieferung(
     empfaenger: &Empfaenger<'_>,
 ) -> Result<StammdatenLieferung, AppError> {
     let b = art::beschreibung(art);
-    let daten = load_daten(conn, b, org_id, schluessel).await?;
+    // Gerätekonten (Lagemonitor, Funktionsansicht) hängen an einer Kopplung dieser Instanz und
+    // gehören nicht an eine andere: sie gelten dort als nicht vorhanden.
+    let geraetekonto = art == StammdatenArt::Konto
+        && sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT 1 FROM geraet_kopplung WHERE benutzer_id = ?)",
+        )
+        .bind(schluessel.parse::<i64>().unwrap_or(-1))
+        .fetch_one(&mut *conn)
+        .await?;
+    let daten = if geraetekonto {
+        None
+    } else {
+        load_daten(conn, b, org_id, schluessel).await?
+    };
     let geheimnis = match (art, &daten) {
         (StammdatenArt::Konto, Some(_)) => match schluessel.parse::<i64>() {
             Ok(id) => load_geheimnis(conn, empfaenger, id).await?,

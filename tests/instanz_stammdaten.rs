@@ -736,3 +736,275 @@ async fn sso_konto_bekommt_am_elw_ein_einmalpasswort() {
     let (s, v) = login(&elw, "sinasso", v["einmalpasswort"].as_str().unwrap()).await;
     assert_eq!(s, StatusCode::OK, "{v}");
 }
+
+// ── Nachträge aus dem Review ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn stillgelegte_zeile_verliert_ihre_herkunft_und_eine_wiederverwendete_id_trifft_sie_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO material (org_id, bezeichnung) VALUES (1, 'Decke')",
+    )
+    .await;
+    let hub_id: i64 = eine(
+        &hub.pool,
+        "SELECT id FROM material WHERE bezeichnung = 'Decke'",
+    )
+    .await;
+    melden(&elw).await;
+    let decke = lokale_id(&elw, "material", "bezeichnung", "Decke").await;
+    let einsatz = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &elw.admin,
+        Some(&json!({"material_id": decke})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    exec(&hub.pool, "DELETE FROM material").await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!(
+                "SELECT COUNT(*) FROM stammdaten_herkunft \
+                 WHERE art = 'material' AND lokaler_schluessel = '{decke}'"
+            )
+        )
+        .await,
+        0,
+        "die stillgelegte Zeile gehört jetzt dem ELW"
+    );
+    // Eine neue Zeile am Hub mit derselben id wird eine neue Zeile, nicht die stillgelegte.
+    exec(
+        &hub.pool,
+        &format!("INSERT INTO material (id, org_id, bezeichnung) VALUES ({hub_id}, 1, 'Schaufel')"),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            &format!("SELECT bezeichnung FROM material WHERE id = {decke}")
+        )
+        .await,
+        "Decke"
+    );
+    assert_ne!(
+        lokale_id(&elw, "material", "bezeichnung", "Schaufel").await,
+        decke
+    );
+}
+
+#[tokio::test]
+async fn geraetekonto_bleibt_am_hub() {
+    let (hub, elw) = gekoppelt().await;
+    let geraet = konto(&hub, "lagemonitor1").await;
+    let einsatz = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, bezeichnung, \
+             erstellt_von, laeuft_ab_at) VALUES ({einsatz}, {geraet}, 'lagemonitor', 'Monitor', 1, \
+             '2099-01-01T00:00:00Z')"
+        ),
+    )
+    .await;
+    konto(&hub, "maxmuster").await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT COUNT(*) FROM benutzer WHERE benutzername = 'maxmuster'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT COUNT(*) FROM benutzer WHERE benutzername = 'lagemonitor1'"
+        )
+        .await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn erneut_abgleichen_waehrend_einer_meldung_wird_nicht_ueberschrieben() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Hub 1')",
+    )
+    .await;
+    melden(&elw).await;
+    let (id, gemeldet): (i64, i64) =
+        sqlx::query_as("SELECT id, stammdaten_stand FROM instanz_kopplung_org")
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert!(gemeldet > 0);
+    // „Erneut abgleichen“ setzt den Stand auf 0, während eine Meldung mit dem alten Stand läuft.
+    exec(
+        &elw.pool,
+        "UPDATE instanz_kopplung_org SET stammdaten_stand = 0",
+    )
+    .await;
+    let mut conn = elw.pool.acquire().await.unwrap();
+    lifeline_hub::instanz::repo::save_stammdaten_stand(&mut conn, id, gemeldet, gemeldet + 5)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT stammdaten_stand FROM instanz_kopplung_org"
+        )
+        .await,
+        0
+    );
+    // Die passende Meldung schreibt fort, nur vorwärts.
+    let mut conn = elw.pool.acquire().await.unwrap();
+    lifeline_hub::instanz::repo::save_stammdaten_stand(&mut conn, id, 0, 7)
+        .await
+        .unwrap();
+    lifeline_hub::instanz::repo::save_stammdaten_stand(&mut conn, id, 7, 3)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT stammdaten_stand FROM instanz_kopplung_org"
+        )
+        .await,
+        7
+    );
+}
+
+#[tokio::test]
+async fn passkey_pflicht_bleibt_nach_dem_widerruf_wenn_der_hash_geliefert_wurde() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    exec(
+        &hub.pool,
+        "INSERT INTO webauthn_credential (benutzer_id, credential_id, public_key) VALUES (1, x'0102', x'0304')",
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<i64>(
+            &hub.pool,
+            "SELECT COUNT(*) FROM instanz_geheimnis_lieferung WHERE benutzer_id = 1"
+        )
+        .await,
+        1
+    );
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let k = v["kopplungen"][0]["id"].as_i64().unwrap();
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = login(&hub, "admin", "startpw12").await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+}
+
+#[tokio::test]
+async fn demo_entfernen_laesst_eine_zeile_vom_hub_stehen() {
+    let (hub, elw) = gekoppelt().await;
+    let mut tx = elw.pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    lifeline_hub::demo::import::importieren_tx(
+        &mut tx,
+        1,
+        1,
+        lifeline_hub::demo::DemoLage::Starkregen,
+        chrono::Utc::now().naive_utc(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    // Ein Demo-Fahrzeug des ELW, das der Hub mit gleichem Funkrufnamen pflegt: der Abgleich
+    // führt beide zusammen, die Zeile ist danach vom Hub.
+    let funkrufname: String = eine(
+        &elw.pool,
+        "SELECT f.funkrufname FROM fahrzeug f JOIN demo_herkunft m \
+         ON m.tabelle = 'fahrzeug' AND m.datensatz_id = f.id LIMIT 1",
+    )
+    .await;
+    sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, ?)")
+        .bind(&funkrufname)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    melden(&elw).await;
+    let id = lokale_id(&elw, "fahrzeug", "funkrufname", &funkrufname).await;
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!(
+                "SELECT COUNT(*) FROM stammdaten_herkunft \
+                 WHERE art = 'fahrzeug' AND lokaler_schluessel = '{id}'"
+            )
+        )
+        .await,
+        1
+    );
+    let mut tx = elw.pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    lifeline_hub::demo::entfernen::entfernen_tx(
+        &mut tx,
+        1,
+        lifeline_hub::demo::DemoLage::Starkregen,
+    )
+    .await
+    .expect("Entfernen scheitert nicht an der Zeile vom Hub");
+    tx.commit().await.unwrap();
+    assert_eq!(
+        lokale_id(&elw, "fahrzeug", "funkrufname", &funkrufname).await,
+        id
+    );
+}
+
+#[tokio::test]
+async fn elw_verloren_zaehlt_auch_frueher_gelieferte_geheimnisse() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    let max = konto_bereit(&hub, "maxmuster").await;
+    melden(&elw).await;
+    // Die Lieferung hängt an einer früheren, widerrufenen Zuordnung; die Org ist seitdem neu
+    // zugeordnet.
+    exec(
+        &hub.pool,
+        "UPDATE instanz_kopplung_org SET widerrufen_at = datetime('now')",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+         fremde_org_name) SELECT kopplung_id, org_id, fremde_org_kennung, fremde_org_name \
+         FROM instanz_kopplung_org LIMIT 1",
+    )
+    .await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let k = v["kopplungen"][0]["id"].as_i64().unwrap();
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{k}/verloren"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["konten"], 1, "{v}");
+    let (s, _) = login(&hub, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let _ = max;
+}

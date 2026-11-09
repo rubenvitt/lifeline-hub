@@ -111,7 +111,18 @@ pub async fn check_passkey_pflicht(
     .bind(benutzer.id)
     .fetch_one(pool)
     .await?;
-    if hat_passkey && is_org_verteilend(pool, benutzer.org_id).await? {
+    if !hat_passkey {
+        return Ok(());
+    }
+    // Auch nach einem Widerruf: liegt der Hash einmal auf einem ELW, bleibt er dort (die Zeilen
+    // gehören danach der Instanz), also bleibt er hier wertlos.
+    let je_geliefert: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_geheimnis_lieferung WHERE benutzer_id = ?)",
+    )
+    .bind(benutzer.id)
+    .fetch_one(pool)
+    .await?;
+    if je_geliefert || is_org_verteilend(pool, benutzer.org_id).await? {
         return Err(AppError::ForbiddenMit(NUR_PASSKEY.into()));
     }
     Ok(())

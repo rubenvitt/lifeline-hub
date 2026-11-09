@@ -441,6 +441,9 @@ async fn delete_zeile(
                 if n == 1 {
                     ergebnis.deaktivierte_konten.push(id);
                 }
+                // Gelöscht an der Quelle: hier ein deaktiviertes Konto der Instanz. Eine neue Zeile
+                // mit derselben id an der Quelle wird so ein neues Konto statt dieses.
+                herkunft::delete(conn, zuordnung.id, b.art, &l.schluessel).await?;
                 ergebnis.geaendert = true;
                 return Ok(());
             }
@@ -494,6 +497,9 @@ async fn delete_zeile(
                         .execute(&mut *conn)
                         .await?;
                     }
+                    // Stillgelegt, gehört der Instanz: eine wiederverwendete id an der Quelle
+                    // träfe sonst diese Zeile, auf die noch Einsatzdaten zeigen.
+                    herkunft::delete(conn, zuordnung.id, b.art, &l.schluessel).await?;
                     ergebnis.geaendert = true;
                     return Ok(());
                 }

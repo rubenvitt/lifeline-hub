@@ -511,17 +511,22 @@ pub async fn save_stammdaten_kennzeichen(
     Ok(())
 }
 
-/// Meldende Seite: übernommener Stand, nur vorwärts.
+/// Meldende Seite: übernommener Stand, nur vorwärts und nur, wenn er noch der gemeldete ist. Hat
+/// „Erneut abgleichen“ ihn inzwischen auf 0 gesetzt, bleibt es dabei.
 pub async fn save_stammdaten_stand(
     conn: &mut SqliteConnection,
     org_zeile_id: i64,
+    gemeldet: i64,
     bis: i64,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE instanz_kopplung_org SET stammdaten_stand = MAX(stammdaten_stand, ?) WHERE id = ?",
+        "UPDATE instanz_kopplung_org SET stammdaten_stand = ? \
+         WHERE id = ? AND stammdaten_stand = ? AND ? > stammdaten_stand",
     )
     .bind(bis)
     .bind(org_zeile_id)
+    .bind(gemeldet)
+    .bind(bis)
     .execute(&mut *conn)
     .await?;
     Ok(())

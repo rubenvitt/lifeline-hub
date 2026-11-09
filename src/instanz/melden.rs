@@ -463,7 +463,8 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 let ergebnis =
                     stammdaten::uebernehmen::uebernehmen(conn, o, &oa.stammdaten, Some(&age))
                         .await?;
-                repo::save_stammdaten_stand(conn, o.id, oa.stammdaten_bis).await?;
+                repo::save_stammdaten_stand(conn, o.id, o.stammdaten_stand, oa.stammdaten_bis)
+                    .await?;
                 repo::add_stammdaten_hinweise(conn, o.id, &ergebnis.hinweise).await?;
                 for konto in &ergebnis.deaktivierte_konten {
                     sitzungen_beendet

@@ -705,12 +705,16 @@ pub async fn elw_verloren(
         repo::org_widerrufen(conn, zuordnung_id, Some(admin.id), &jetzt, false).await?;
         repo::update_zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen)
             .await?;
+        // Jede Zuordnung der eigenen Org an dieser Kopplung, auch frühere: was je dorthin ging,
+        // gilt als bekannt.
         let konten: Vec<i64> = sqlx::query_scalar(
-            "SELECT l.benutzer_id FROM instanz_geheimnis_lieferung l \
+            "SELECT DISTINCT l.benutzer_id FROM instanz_geheimnis_lieferung l \
+             JOIN instanz_kopplung_org o ON o.id = l.kopplung_org_id \
              JOIN benutzer b ON b.id = l.benutzer_id \
-             WHERE l.kopplung_org_id = ? AND b.org_id = ?",
+             WHERE o.kopplung_id = ? AND o.org_id = ? AND b.org_id = ?",
         )
-        .bind(zuordnung_id)
+        .bind(kopplung_id)
+        .bind(admin.org_id)
         .bind(admin.org_id)
         .fetch_all(&mut *conn)
         .await?;
