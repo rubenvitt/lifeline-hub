@@ -1,25 +1,25 @@
 # Tasks
 
 Jede Aufgabe entsteht per TDD (`superpowers:test-driven-development`): erst der rote Test, dann der
-Code. Tests der Übernahme in `src/instanz/stammdaten/uebernehmen/tests.rs`, Ende-zu-Ende über zwei
-Instanzen in `tests/instanz_stammdaten.rs` (Helfer `tests/instanz_hilfen/mod.rs`).
+Code. Die Übernahme wird über zwei echte Instanzen geprüft, in `tests/instanz_stammdaten_kataloge.rs`
+(Helfer `tests/instanz_hilfen/mod.rs`).
 
 ## 1. Beschreibung erweitern (D2, D3, D4)
 
-- [ ] 1.1 `natuerlich` wird `&'static [&'static str]`, die zwölf bestehenden Einträge ziehen mit; Abgleich in `uebernehmen::upsert` über alle Spalten. Nachweis: bestehende Tests grün, neuer Test „Abgleich über zwei Spalten trifft nur die passende Zeile“.
-- [ ] 1.2 Feld `bereich` in `ArtBeschreibung`, angewandt in `liefern::load_daten` und im Abgleich. Nachweis: Test „Zeile außerhalb des Bereichs wird als Löschung geliefert und nie abgeglichen“.
-- [ ] 1.3 Feld `exklusiv` in `ArtBeschreibung`, angewandt in `upsert` vor dem Schreiben. Nachweis: Test „gelieferte Vorgabe nimmt der lokalen die Markierung“ (Schichtmodell).
+- [x] 1.1 `natuerlich` wird `&'static [&'static str]`, die zwölf bestehenden Einträge ziehen mit; Abgleich in `uebernehmen::upsert` über alle Spalten. Nachweis: bestehende Tests grün, neuer Test „Abgleich über zwei Spalten trifft nur die passende Zeile“.
+- [x] 1.2 Feld `bereich` in `ArtBeschreibung`, angewandt in `liefern::load_daten` und im Abgleich. Nachweis: Test „Zeile außerhalb des Bereichs wird als Löschung geliefert und nie abgeglichen“.
+- [x] 1.3 Feld `exklusiv` in `ArtBeschreibung`, angewandt in `upsert` vor dem Schreiben. Nachweis: Test „gelieferte Vorgabe nimmt der lokalen die Markierung“ (Schichtmodell).
 
 ## 2. Nachgeholte Löschung (D5)
 
-- [ ] 2.1 `delete_zeile` sammelt eine am Fremdschlüssel gescheiterte Löschung im ersten Durchgang und versucht sie nach Upserts und Verweisen in umgekehrter Rangfolge erneut; erst dann stilllegen bzw. Herkunft lösen. Nachweis: Test „Schichtmodell und Vorlage im selben Paket: Modell gelöscht, Vorlage ohne Modell“ und Test „lokale Vorlage zeigt drauf: Modell bleibt, gehört der Instanz“.
+- [x] 2.1 `delete_zeile` sammelt eine am Fremdschlüssel gescheiterte Löschung im ersten Durchgang und versucht sie nach Upserts und Verweisen in umgekehrter Rangfolge erneut; erst dann stilllegen bzw. Herkunft lösen. Nachweis: Test „Schichtmodell und Vorlage im selben Paket: Modell gelöscht, Vorlage ohne Modell“ und Test „lokale Vorlage zeigt drauf: Modell bleibt, gehört der Instanz“.
 
 ## 3. Acht Arten (D1)
 
-- [ ] 3.1 `StammdatenArt` um acht Wire-Werte, `art::BESCHREIBUNGEN` um acht Einträge (Rang laut D1), `uebernehmen::art_name` und `zeilen_name` (`text`). Nachweis: Guards in `art::tests` (Rang, Spalten) grün.
-- [ ] 3.2 Migration (nächste freie Nummer über `alpha`, `scripts/check-migrationen.sh`): Log- und Schutz-Trigger für die acht Tabellen und `einsatz_vorlage_modul_aus` (`_schutz_i`), Sprechgruppen mit `WHEN … einsatz_id IS NULL`, Grundstock ins Änderungslog. Nachweis: `art::tests::trigger_und_spalten_passen_zur_beschreibung`, Test „einsatz-lokale Sprechgruppe erhöht keinen Stand“.
-- [ ] 3.3 Typen neu erzeugen (`scripts/check-typ-codegen.sh`), beide generierten Dateien im Commit. Nachweis: Skript grün.
-- [ ] 3.4 Ende-zu-Ende in `tests/instanz_stammdaten.rs`: Einsatz-Vorlage mit Schichtmodell und ausgeblendeten Modulen samt Stichwort kommt an; je eine Zeile jeder neuen Art ist am ELW gesperrt (409); Unterkunft-Richtwert vom Hub gesperrt, eigener Richtwert eines anderen Schlüssels setzbar; Sprechgruppen-Abgleich TMO/DMO. Nachweis: Tests grün.
+- [x] 3.1 `StammdatenArt` um acht Wire-Werte, `art::BESCHREIBUNGEN` um acht Einträge (Rang laut D1), `uebernehmen::art_name` und `zeilen_name` (`text`). Nachweis: Guards in `art::tests` (Rang, Spalten) grün.
+- [x] 3.2 Migration (nächste freie Nummer über `alpha`, `scripts/check-migrationen.sh`): Log- und Schutz-Trigger für die acht Tabellen und `einsatz_vorlage_modul_aus` (`_schutz_i`), Sprechgruppen mit `WHEN … einsatz_id IS NULL`, Grundstock ins Änderungslog. Nachweis: `art::tests::trigger_und_spalten_passen_zur_beschreibung`, Test „einsatz-lokale Sprechgruppe erhöht keinen Stand“.
+- [x] 3.3 Typen neu erzeugen (`scripts/check-typ-codegen.sh`), beide generierten Dateien im Commit. Nachweis: Skript grün.
+- [x] 3.4 Ende-zu-Ende in `tests/instanz_stammdaten_kataloge.rs`: Einsatz-Vorlage mit Schichtmodell und ausgeblendeten Modulen samt Stichwort kommt an; je eine Zeile jeder neuen Art ist am ELW gesperrt (409); Unterkunft-Richtwert vom Hub gesperrt, eigener Richtwert eines anderen Schlüssels setzbar; Sprechgruppen-Abgleich TMO/DMO. Nachweis: Tests grün.
 
 ## 4. Oberfläche (D6)
 
