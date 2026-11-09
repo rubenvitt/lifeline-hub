@@ -1,5 +1,5 @@
 -- i6k6mzed: Das Informationstelefon wird das eigene Modul `infotelefon`; das Modul `stab` entfällt
--- (Herleitung openspec/changes/i6k6mzed-stab-herausnehmen/design.md, D3 und D4, Muster 0224).
+-- (Herleitung openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md, D3 und D4, Muster 0224).
 -- Ein neuer Modulschlüssel startet ohne Vorgabe und wäre damit für alle frei und sichtbar. Damit
 -- niemand durch die Trennung mehr sieht oder darf als vorher, übernimmt `infotelefon` jede
 -- bestehende Vorgabe von `stab` vollständig: die Rollenschranke UND die Sichtbarkeit (wer den Stab

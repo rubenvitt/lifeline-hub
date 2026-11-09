@@ -1,5 +1,5 @@
 -- i6k6mzed: Das Modul `stab` samt Presse und Medienarbeit (S5) entfällt (Herleitung
--- openspec/changes/i6k6mzed-stab-herausnehmen/design.md, D1 und D4). Gelöscht werden die
+-- openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md, D1 und D4). Gelöscht werden die
 -- Besetzung S1–S6, die Checkliste Arbeitsaufnahme, das Presse-Log und die Pressemitteilungen.
 -- Was davon im ETB steht, bleibt als Text: Besetzungswechsel, freigegebene Pressemitteilungen,
 -- die Meldung an die Leitstelle. Die Freigaben von `stab` hat `infotelefon_modul` übernommen

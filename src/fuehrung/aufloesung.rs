@@ -4,7 +4,7 @@
 //! Der Snapshot (`auftrag_empfaenger.snap_anzeige`) ist die historische Wahrheit und trägt nur
 //! das Funktionslabel — der Personenname kommt ausschließlich hier, zur Lesezeit, aus der
 //! Führungsfunktion der Mitgliedschaft (`einsatz_mitgliedschaft.fuehrungsfunktion`, i6k6mzed,
-//! `openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D2). Führen mehrere Mitglieder
+//! `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2). Führen mehrere Mitglieder
 //! dasselbe Sachgebiet, gelten alle: ihre Namen stehen alphabetisch, getrennt durch „, “.
 //!
 //! Die Mitgliedschaft überlebt die Schwärzung, der Name darf es nicht: an einem geschwärzten

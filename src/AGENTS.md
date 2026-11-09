@@ -365,7 +365,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Gerätekonten, inaktive Konten, kein Leserecht am Einsatz oder am Modul des Bezugs,
   abgeschaltete Hinweis-Art). Kein Aufrufer filtert selbst, keiner schreibt in die Tabelle.
 - **Eine Funktion löst nur über die Mitgliedschaft auf** (i6k6mzed,
-  `openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D2): `Adressat::Funktion` erreicht jedes
+  `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2): `Adressat::Funktion` erreicht jedes
   Mitglied, dessen `einsatz_mitgliedschaft.fuehrungsfunktion` sie trägt; für EL zuerst den
   verknüpften Nutzer des Einsatzleiters der Führungsstelle, nur ohne ihn die Mitgliedschaft.
   Dieselbe Quelle liest die Anzeige (`fuehrung::aufloesung`, Regeln in

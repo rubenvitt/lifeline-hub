@@ -14,7 +14,7 @@ Das System SHALL Personal, Fahrzeuge und Material eines Einsatzes entlassen kön
 Disposition zu löschen; Material heißt in Oberfläche, Tagebuch und Doku „aus dem Einsatz
 genommen“, auf dem Draht `entlassen`. Die entlassene Kraft MUST mit Zeitpunkt und entlassender
 Person erhalten bleiben. Entlassen MUST ihre Bindungen lösen (Einheit, Fahrzeug, Besatzung, UHS,
-Führung einer Einheit, Leitung eines Abschnitts, Stab, Einsatzleitung, Führungsstelle,
+Führung einer Einheit, Leitung eines Abschnitts, Einsatzleitung, Führungsstelle,
 Bereitstellungsraum) und MUST ihre Historie behalten (Auftragsempfänger, Schadensbezug,
 Bestätigungen). Entlassen einer Person MUST das Zeitachsen-Ereignis `entlassung` mit Quelle
 `disposition` schreiben, sofern sie eine offene Periode hat. Entlassen MUST einen ETB-Eintrag erzeugen und erfordert keine Rückfrage.

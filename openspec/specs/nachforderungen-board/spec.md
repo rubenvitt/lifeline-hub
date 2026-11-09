@@ -4,7 +4,7 @@
 Die Nachforderungen eines Einsatzes stehen als Board nach ihrer Stufe: Angefordert, Zugesagt,
 Unterwegs, Eingetroffen, Abgelehnt und Zurückgezogen. Wer Kräfte und Mittel nachfordert, sieht auf einen Blick,
 was noch aussteht, und schaltet eine Nachforderung mit einem Knopf eine Stufe weiter. Zahlen kommen
-aus dem Modulzähler des Servers, damit Modulmenü, Seitenkopf, Führungsüberblick, Stab-Seite und
+aus dem Modulzähler des Servers, damit Modulmenü, Seitenkopf, Führungsüberblick und
 Vorbereitung der Lagebesprechung dieselbe Zahl zeigen.
 
 ## Requirements

@@ -182,7 +182,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         Some("fernmeldewesen"),
     ),
     // i6k6mzed: das Informationstelefon behält seinen Pfad unter `…/stab`, ist aber das eigene
-    // Modul `infotelefon` (Herleitung `openspec/changes/i6k6mzed-stab-herausnehmen/design.md`,
+    // Modul `infotelefon` (Herleitung `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md`,
     // D3).
     ("/api/einsaetze/{id}/stab/infotelefon", Some("infotelefon")),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),

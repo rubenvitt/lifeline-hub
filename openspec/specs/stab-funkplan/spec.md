@@ -10,34 +10,30 @@ auch, was im Funkplan fehlt. Er gehört zum Modul Fernmeldewesen (Fähigkeit `fe
 ### Requirement: Startseite des Moduls Fernmeldewesen
 Der Funkplan SHALL die Startseite des Moduls Fernmeldewesen sein, unter dessen Modulroute
 `/einsaetze/:id/fernmeldewesen` als Lesezeichen tauglich erreichbar, mit dem Modul Fernmeldewesen
-als aktiv in der Navigation. Er SHALL Sichtbarkeit und Sperre des Moduls Fernmeldewesen erben, nicht
-die des Stabs; den Fall ohne Zugriff fängt der Einsatzrahmen ab (Capability `modul-freigabe`). Die
-alte Adresse `/einsaetze/:id/stab/funkplan` SHALL samt `?ansicht=` auf die neue umleiten. Die
-Sachgebietszeile S6 der Stabseite SHALL einen Verweis „Funkplan“ auf diese Adresse tragen, gesperrt,
-solange das Fernmeldewesen für die Person gesperrt ist.
+als aktiv in der Navigation. Er SHALL Sichtbarkeit und Sperre des Moduls Fernmeldewesen erben; den
+Fall ohne Zugriff fängt der Einsatzrahmen ab (Capability `modul-freigabe`). Die alte Adresse
+`/einsaetze/:id/stab/funkplan` SHALL samt `?ansicht=` auf die neue umleiten.
 
 #### Scenario: Einstieg aus der Stabseite
-- **WHEN** eine Person mit Leserecht auf Stab und Fernmeldewesen in der Zeile S6 auf „Funkplan“ tippt
+- **WHEN** eine Person mit Leserecht auf das Fernmeldewesen im Modulmenü „Fernmeldewesen“ wählt
 - **THEN** öffnet sich der Funkplan unter `/einsaetze/:id/fernmeldewesen`, und das Modul
   Fernmeldewesen ist in der Navigation als aktiv markiert
 
 #### Scenario: Direkter Aufruf als Lesezeichen
 - **WHEN** die Adresse des Funkplans direkt aufgerufen wird
-- **THEN** erscheint der Funkplan ohne Umweg über die Stabseite
+- **THEN** erscheint der Funkplan ohne Umweg über eine andere Seite
 
 #### Scenario: Altes Lesezeichen
 - **WHEN** eine Person `/einsaetze/:id/stab/funkplan` aufruft
 - **THEN** landet sie auf `/einsaetze/:id/fernmeldewesen` und sieht den Funkplan
 
 #### Scenario: Stab gesperrt
-- **WHEN** der Stab für die Person gesperrt oder im Einsatz ausgeblendet ist und das Fernmeldewesen
-  frei
-- **THEN** zeigt der Funkplan Tabelle, Skizze und Sprechgruppen wie mit Stab
+- **WHEN** das Fernmeldewesen für die Person frei ist
+- **THEN** zeigt der Funkplan Tabelle, Skizze und Sprechgruppen
 
 #### Scenario: Fernmeldewesen gesperrt
 - **WHEN** das Modul Fernmeldewesen für die Person ausgeblendet oder für ihre Rolle gesperrt ist
-- **THEN** zeigt der Rahmen den einheitlichen Hinweis für „Fernmeldewesen“ statt des Funkplans,
-  auch wenn der Stab frei ist
+- **THEN** zeigt der Rahmen den einheitlichen Hinweis für „Fernmeldewesen“ statt des Funkplans
 
 Weil die Quellen des Funkplans (Abschnitte, Einheiten, Fahrzeuge, Personal, Sprechgruppen) das
 Fernmeldewesen nicht selbst prüfen, MUST die Seite dessen Freigabe ermittelt haben, bevor sie Daten
@@ -50,9 +46,8 @@ geladene Stand der Freigaben.
 - **THEN** zeigt die Seite einen Fehler mit Wiederholen und weder Tabelle, Skizze noch Übernahme
 
 #### Scenario: Altes Lesezeichen bei ausgeblendetem Stab
-- **WHEN** der Stab im Einsatz ausgeblendet ist und eine Person `/einsaetze/:id/stab/funkplan`
-  aufruft
-- **THEN** landet sie im Funkplan des Moduls Fernmeldewesen, nicht beim Hinweis „Stab ausgeblendet“
+- **WHEN** eine Person mit Freigabe des Fernmeldewesens `/einsaetze/:id/stab/funkplan` aufruft
+- **THEN** landet sie im Funkplan des Moduls Fernmeldewesen und nicht auf der Seite des Einsatzes
 
 ### Requirement: Zeilen als Baum Abschnitt → Einheit → Fahrzeug
 Der Funkplan SHALL eine Tabelle mit einer Zeile je Abschnitt, je Einheit und je Fahrzeug im
@@ -437,12 +432,12 @@ ist die Summe der Zahlen aus „Lücken oberhalb der Tabelle“, die Leitstelle 
 dabei als eine Lücke. Die fehlende eigene Gegenstelle zählt nicht mit, sie ist ein Hinweis auf den
 Pflegeort. Ein Datensatz, der unter zwei Lücken fällt, zählt bei jeder. Zeigt auch nur eine der
 summierten Zahlen „—“, MUST die Zahl der Lücken entfallen bzw. „—“ mit dem Grund der schlechtesten
-Quelle zeigen und MUST NOT eine Teilsumme zeigen. Die Stab-Seite MUST dieselbe Zahl aus derselben
-Rechnung zeigen. Sie MUST in jeder Darstellung des Funkplans dieselbe sein.
+Quelle zeigen und MUST NOT eine Teilsumme zeigen. Sie MUST in jeder Darstellung des Funkplans
+dieselbe sein.
 
 #### Scenario: Summe
 - **WHEN** das Lücken-Paneel „1“ bei „Abschnitte ohne Sprechgruppe“, „1“ bei „Einheiten ohne Sprechgruppe“ und „1“ bei „Einheiten ohne Telefon“ zeigt, für dieselbe Einheit, und sonst keine Lücke
-- **THEN** zeigt der Kopf des Lücken-Paneels „3 Lücken“, und die S6-Kachel der Stab-Seite zeigt „3“ am Funkplan
+- **THEN** zeigt der Kopf des Lücken-Paneels „3 Lücken“
 
 #### Scenario: Keine Lücke
 - **WHEN** keine der Lücken zutrifft und alle Quellen geladen sind
@@ -450,4 +445,4 @@ Rechnung zeigen. Sie MUST in jeder Darstellung des Funkplans dieselbe sein.
 
 #### Scenario: Quelle gesperrt
 - **WHEN** die Einheitenliste mit 403 abgelehnt wird
-- **THEN** zeigt der Kopf keine Teilsumme, und die S6-Kachel zeigt „—“ mit dem Grund „nicht freigegeben“
+- **THEN** zeigt der Kopf keine Teilsumme, sondern „—“ mit dem Grund „nicht freigegeben“

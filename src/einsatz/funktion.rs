@@ -2,7 +2,7 @@
 //! ETB-Verfasser.
 //!
 //! Die Funktion ist kein eigenes Feld, sondern folgt aus der Mitgliedschaft (i6k6mzed,
-//! `openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D2):
+//! `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2):
 //!
 //! 1. **Führungsfunktion der Mitgliedschaft** (`einsatz_mitgliedschaft.fuehrungsfunktion`, der
 //!    ganze Katalog) — die stärkere Aussage, sie gewinnt.

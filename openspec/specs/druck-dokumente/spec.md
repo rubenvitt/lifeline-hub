@@ -164,8 +164,8 @@ vollständig und über den Druckkopf zuordenbar sein.
 
 ### Requirement: Druckmechanik in drei Browser-Engines automatisch belegt
 
-Das Qualitäts-Gate SHALL die Druckmechanik der Druckstücke Lagebericht, Befehl,
-Pressemitteilung, ETB-Druck und Auftrag unter Druckmedium automatisch in den Engines von
+Das Qualitäts-Gate SHALL die Druckmechanik der Druckstücke Lagebericht, Befehl, ETB-Druck und
+Auftrag unter Druckmedium automatisch in den Engines von
 Chromium, Firefox und WebKit prüfen: Druckwurzel im Fluss und oben, Rahmen ohne Platz, letzter
 Abschnitt jenseits der ersten Seitenhöhe. Scheitert eine Aussage in einer Engine, MUST das Gate
 rot sein.

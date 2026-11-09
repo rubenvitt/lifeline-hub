@@ -5,7 +5,7 @@ import { SACHGEBIETE } from './sachgebiete';
 
 /**
  * Wer welche Führungsfunktion trägt, abgeleitet aus `GET …/mitglieder` (i6k6mzed,
- * `openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D2, D7). Die EINE Zuordnung
+ * `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2, D7). Die EINE Zuordnung
  * „Funktion → Name“ im Client: Organigramm, Fernmeldeskizze, Kommunikationsplan, Eigene Lage,
  * Einsatzbericht, Empfängerfelder und Chat-Erwähnungen lesen sie hier. Gepflegt wird die Funktion
  * unter „Mitglieder“ (`pages/MitgliederAbschnitt.tsx`); jedes Mitglied darf die Liste lesen, ein

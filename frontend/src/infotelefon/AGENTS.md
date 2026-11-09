@@ -3,7 +3,7 @@
 Gilt für `frontend/src/infotelefon/`, `pages/InfotelefonPage.tsx` und `src/infotelefon/` samt
 `src/routes/infotelefon.rs`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
-**Eigenes Modul** (i6k6mzed, `openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D3): Key
+**Eigenes Modul** (i6k6mzed, `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D3): Key
 `infotelefon` in der Kategorie Kommunikation, eigene Freigabe (`useModulFreigabe('infotelefon')`),
 eigenes Live-Ereignis `infotelefon`, kein Modulzähler. Die API bleibt unter
 `…/stab/infotelefon` (`PFAD_KEY` ordnet sie `infotelefon` zu), die Altadresse

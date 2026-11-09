@@ -7,25 +7,6 @@ ETB, die Übernahme beim Fortschreiben und die Anzeige am Bildschirm und im Druc
 
 ## Requirements
 
-### Requirement: Befehl und Lagebericht tragen einen optionalen Verteiler
-Befehl und Lagebericht SHALL einen geordneten, anfangs leeren Verteiler tragen. Ein Eintrag ist
-ein Einsatzabschnitt, eine Einheit, eine Führungsfunktion (Katalogcode mit Bezeichnung, wo
-Pflicht, oder Freitext) oder eine externe Stelle (Kategorie `leitstelle`, `nachbar_ea`,
-`uebergeordnet` oder `andere_bos` und Bezeichnung). Eine Pressemitteilung MUST keinen
-Verteiler tragen.
-
-#### Scenario: Neuer Befehl
-- **WHEN** jemand einen Befehl anlegt
-- **THEN** liefert die Anzeige des Befehls einen leeren Verteiler
-
-#### Scenario: Verschiedene Empfängerarten
-- **WHEN** jemand den Verteiler eines Lageberichts auf „EA Süd“, „S3 Einsatz“ und die Leitstelle „ILS Musterstadt“ setzt
-- **THEN** liefert die Anzeige diese drei Einträge in dieser Reihenfolge, jeden mit Art, Ziel und Anzeigenamen
-
-#### Scenario: Pressemitteilung ohne Verteiler
-- **WHEN** jemand eine Pressemitteilung lädt
-- **THEN** enthält ihre Anzeige kein Feld für einen Verteiler
-
 ### Requirement: Der Verteiler wird im Entwurf als Ganzes ersetzt
 Das Ändern eines Entwurfs SHALL einen Verteiler annehmen, der den bisherigen ganz ersetzt. Fehlt
 das Feld, bleibt der Verteiler unverändert, und eine leere Liste leert ihn. Das Ändern von Titel,
@@ -182,3 +163,18 @@ Die Liste der Lageberichte MUST unverändert bleiben.
 #### Scenario: Liste mit Verteiler
 - **WHEN** ein freigegebener Befehl den Verteiler „EA Süd, S3 Einsatz“ trägt und „EA Süd“ quittiert hat
 - **THEN** nennt die Liste der Befehle für ihn „EA Süd“ mit Zeitpunkt der Quittung und „S3 Einsatz“ ohne
+
+### Requirement: Befehl und Lagebericht tragen einen geordneten Verteiler aus vier Empfängerarten
+
+Befehl und Lagebericht SHALL einen geordneten, anfangs leeren Verteiler tragen. Ein Eintrag ist
+ein Einsatzabschnitt, eine Einheit, eine Führungsfunktion (Katalogcode mit Bezeichnung, wo
+Pflicht, oder Freitext) oder eine externe Stelle (Kategorie `leitstelle`, `nachbar_ea`,
+`uebergeordnet` oder `andere_bos` und Bezeichnung).
+
+#### Scenario: Neuer Befehl
+- **WHEN** jemand einen Befehl anlegt
+- **THEN** liefert die Anzeige des Befehls einen leeren Verteiler
+
+#### Scenario: Verschiedene Empfängerarten
+- **WHEN** jemand den Verteiler eines Lageberichts auf „EA Süd“, „S3 Einsatz“ und die Leitstelle „ILS Musterstadt“ setzt
+- **THEN** liefert die Anzeige diese drei Einträge in dieser Reihenfolge, jeden mit Art, Ziel und Anzeigenamen

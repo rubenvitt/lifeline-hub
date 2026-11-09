@@ -19,7 +19,7 @@ der Server zur Lesezeit auf (`fuehrung::aufloesung`). ETB-Vorschlag: Führungsst
 (LFH-894, `etb/AGENTS.md`); `etb_eintrag.von`/`an` bleiben Freitext.
 
 **Wer eine Funktion trägt, sagt allein die Mitgliedschaft** (i6k6mzed,
-`openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D2, D7): `einsatz_mitgliedschaft.fuehrungsfunktion`,
+`openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2, D7): `einsatz_mitgliedschaft.fuehrungsfunktion`,
 gepflegt als Führungsstelle im Reiter „Zugriff“ (`pages/MitgliederAbschnitt.tsx`). Eine zweite
 Zuordnung „Funktion → Name“ gibt es nicht. Server: Auflösung (`fuehrung::aufloesung`), Empfänger
 (`benachrichtigung::aufloesung`, EL zuerst der Einsatzleiter der Führungsstelle), Kopf
