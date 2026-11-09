@@ -322,6 +322,16 @@ Herleitung in
   Bestätigung eines Admins (`wartet_auf_bestaetigung`, LLH-1605) und zählen weder als
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
+- **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
+  [ADR-0018](../docs/architektur/entscheidungen/ADR-0018-ein-einsatz-hat-genau-eine-fuehrende-instanz.md):
+  - **Ein neuer Schreibweg am Einsatz prüft `fordere_aktiv` bzw. `fordere_aktiv_in_tx`**; nur
+    dort greift die Sperre „Führung liegt bei …“ (`einsatz.fuehrung_bei`). Den Merker schreibt
+    allein `instanz::fuehrung::repo` (`save`, `sync_sperre*`), der Start richtet ihn aus.
+  - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
+    eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
+    `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 nach.
+  - Der Schalter steht in `instanz_identitaet.fuehrung_an` (je Instanz, auch im Testprozess);
+    `instanz::fuehrung::is_enabled`, nie ein prozessweiter Merker.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
   (`akteur_id` NULL, Name der Gegenstelle).
 - **Stammdaten-Verteilung (LLH-1493)**, Spec `stammdaten-verteilung`, Herleitung

@@ -214,6 +214,14 @@ sich an einer Instanz, die die Geheimnisse seiner Org verteilt, nicht mehr per P
 ([ADR-0016](entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md)).
 „ELW verloren“ macht die dorthin verteilten Passwörter und zweiten Faktoren ungültig.
 
+Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
+`LIFELINE_FUEHRUNG`,
+[ADR-0018](entscheidungen/ADR-0018-ein-einsatz-hat-genau-eine-fuehrende-instanz.md)). Jede andere
+liest nur: Der Merker `einsatz.fuehrung_bei` sperrt alle Schreibwege über `fordere_aktiv`, die
+Oberfläche über `schreibrecht.ts`. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
+Unterschrift eines Org-Admins oder einen Code, den sie selbst erzeugt hat, und gilt dort erst
+nach der Bestätigung eines Menschen (Ablauf 6.6b).
+
 ## 8.18 Konfiguration über die Umgebung
 
 Jeder Schalter des Servers ist ein Argument der clap-`Config` in `src/config.rs` mit

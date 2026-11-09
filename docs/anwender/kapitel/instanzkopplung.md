@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/auth/unterschrift/repo.rs, src/routes/auth.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
 ---
 
 ## Überblick
@@ -12,7 +12,8 @@ Einsatzleitwagen und ein öffentlich erreichbarer Server der Organisation. Die K
 fest, dass beide einander vertrauen. Über sie kommen die **Stammdaten** der Organisation vom
 Hub zum ELW: Konten, Fahrzeuge, Personal, Material, Qualifikationen, Fahrzeug- und
 Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen und Org-Einstellungen.
-Einsatzdaten fließen nicht darüber.
+Einsatzdaten fließen nicht darüber. Ist die **Führung je Einsatz** eingeschaltet, einigen sich
+beide je Einsatz darauf, welche Installation ihn schreibt.
 
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
@@ -97,6 +98,48 @@ Konto umbenannt wurde, dessen Name der Hub auch vergibt):
 1. Unter „Gekoppelte Instanzen“ im Menü der Zeile des Hubs „Stammdaten erneut abgleichen“
    wählen.
 2. Die Instanz holt alle Stammdaten neu und gleicht sie ab; die Hinweise beginnen von vorn.
+
+### Führung eines Einsatzes übergeben
+
+Nur mit eingeschalteter Führung je Einsatz. Für die Einsatzleitung oder einen Admin der
+Organisation, an der Installation, die den Einsatz führt.
+
+1. Am Einsatz „Einsatzdaten“ öffnen; das Paneel „Führung“ steht vor „Einsatzabschluss“.
+2. „Führung an … übergeben“ wählen und die Rückfrage mit „Führung übergeben“ bestätigen.
+
+Ohne Verbindung zum Hub gibt die Installation, die sich meldet, die Führung per Code ab:
+„Führung per Code abgeben“, Rückfrage mit „Code erzeugen“ bestätigen und den Code, der nur
+einmal erscheint, per Funk oder Telefon durchgeben.
+
+### Führung anfragen
+
+Für einen Admin der Organisation, an der Installation, die sich meldet, etwa am ELW bei Ankunft.
+
+1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
+2. Im Paneel „Einsätze beim Gegenüber“ am Einsatz „Führung …“ wählen.
+3. „Führung anfragen“ wählen. Mit der nächsten Meldung führt diese Installation.
+
+### Notübernahme
+
+Für einen Admin der Organisation, wenn die führende Installation nicht erreichbar ist. Liegt
+der Einsatz hier, steht der Knopf im Paneel „Führung“ auf „Einsatzdaten“, sonst unter
+„Einsätze beim Gegenüber“.
+
+1. „Notübernahme …“ wählen.
+2. Einen „Grund“ eintragen, etwa „ELW ohne Verbindung seit 40 min“.
+3. Führt eine Installation, die sich hier meldet (der ELW), unter „Beweis“ „Eigene
+   Unterschrift“ wählen und mit dem Unterschriftsschlüssel bestätigen, oder „Code des
+   Gegenübers“ wählen und den durchgegebenen Code eintragen.
+4. „Führung übernehmen“ wählen.
+
+### Übernahme bestätigen oder widersprechen
+
+Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, die sich meldet.
+
+1. Unter der Kopfleiste des Einsatzes steht „Führung übernommen von …“ mit Zeit, Unterzeichner
+   und Grund.
+2. „Übernahme bestätigen“ wählen, dann ist der Einsatz hier nur noch zu lesen; oder
+   „Widersprechen“ wählen, dann führt diese Installation weiter.
 
 ## Hintergrund
 
@@ -213,6 +256,37 @@ Admin, hilft der Betrieb des Servers mit einem Notfallbefehl.
 Ein Admin vom Hub ist am ELW Admin, solange der ELW nur seine Organisation trägt. Trägt der ELW
 mehrere Organisationen, kommt das Konto dort ohne Admin-Rolle an, und die Kopplung zeigt
 „Konto „…“ ist am Hub Admin, hier nicht: diese Instanz trägt mehrere Organisationen.“
+
+### Führung je Einsatz
+
+Die Führung je Einsatz schaltet der Betrieb mit `LIFELINE_FUEHRUNG` an beiden Installationen
+ein; ohne sie bleibt jeder Einsatz an der Installation, an der er angelegt wurde, und das Paneel
+„Führung“ fehlt. Solange Einsatzinhalte nicht zwischen den Installationen fließen, bleibt sie
+aus: eine Übergabe übergäbe sonst einen leeren Einsatz.
+
+Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
+schreibt den Einsatz; an der anderen ist er „Nur Ansicht · Führung liegt bei …“, und der
+Einsatzkopf zeigt „Führung: … · Epoche n“. Jeder Wechsel zählt die **Epoche** hoch. Erklären
+zwei Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
+der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
+
+Gegen die Installation, die sich meldet (den ELW), braucht eine Notübernahme die Unterschrift
+eines Admins oder dessen Code. Der ELW prüft die Unterschrift gegen die Unterschriftsschlüssel,
+die bei ihm gelten, und gibt nie still ab: bis jemand bestätigt oder widerspricht, schreibt er
+weiter, und die Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Widersprechen
+heißt, der ELW führt mit der nächsten Epoche weiter; die andere Installation zeigt an der
+Kopplung „… hat der Notübernahme widersprochen“. Eine Übernahme ohne gültige Unterschrift oder
+mit falschem Code verwirft der ELW: er führt weiter, die Einsatzleitung bekommt den Alarm
+„Ungültige Übernahme der Führung“, und die Admin-Spur zeigt „Ungültige Übernahme verworfen“.
+
+Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
+Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr; ein
+Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
+
+Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und
+Unterzeichner. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
+der abgelösten Installation geschrieben wurde, kennt die neue noch nicht. Die Übergabe geht
+auch nach dem Einsatzabschluss, etwa zur Verwahrung am Hub.
 
 ### Hinweise an einer Kopplung
 

@@ -61,9 +61,9 @@ ADR-0012 treffen die Kernstellen).
 
 ## 8. Doku
 
-- [ ] 8.1 Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md`: Führung, Übergabe, Notübernahme mit Unterschrift oder Code, Bestätigen und Widersprechen, Schalter; Wächter aus `docs/anwender/AGENTS.md` grün
-- [ ] 8.2 Architektur: Kapitel 6 (Ablauf Notübernahme), Kapitel 8 (Führung je Einsatz), Kapitel 11 (Risiko „erschlichene Unterschrift für eine Notübernahme“, bestätigt am ELW), neue ADR-0018 mit Regeln und Prüfung, Kapitel 9 listet sie; `src/AGENTS.md`, Abschnitt „Instanzkopplung“, um die Führungsregeln (Sperre in `fordere_aktiv`, `fuehrung_bei` nur im Modul); `scripts/check-architektur.sh` grün
-- [ ] 8.3 Konzeptnotiz: offene Frage „Gleichzeitige Notübernahmen“ als beantwortet markieren (Verweis auf diese Change)
+- [x] 8.1 Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md`: Führung, Übergabe, Notübernahme mit Unterschrift oder Code, Bestätigen und Widersprechen, Schalter; Wächter aus `docs/anwender/AGENTS.md` grün
+- [x] 8.2 Architektur: Kapitel 6 (Ablauf Notübernahme), Kapitel 8 (Führung je Einsatz), Kapitel 11 (Risiko „erschlichene Unterschrift für eine Notübernahme“, bestätigt am ELW), neue ADR-0018 mit Regeln und Prüfung, Kapitel 9 listet sie, Kapitel 5 nennt `src/instanz/fuehrung`; `src/AGENTS.md`, Abschnitt „Instanzkopplung“, um die Führungsregeln (Sperre in `fordere_aktiv`, `fuehrung_bei` nur im Modul); `scripts/check-architektur.sh` grün
+- [x] 8.3 Konzeptnotiz: offene Frage „Gleichzeitige Notübernahmen“ als beantwortet markieren (Verweis auf diese Change)
 
 ## 9. Abschluss
 

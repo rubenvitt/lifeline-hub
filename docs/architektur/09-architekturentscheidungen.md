@@ -41,6 +41,7 @@ ursprünglichen Entscheidung laut Herleitung, nicht der Tag der Niederschrift.
 | [ADR-0015](entscheidungen/ADR-0015-lifeline-hub-hat-kein-stab-modul.md) | Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft | akzeptiert | 2026-11-08 | `src/lib.rs`, `src/einsatz/modul.rs`, `src/fuehrung/**`, `src/infotelefon/**`, `src/fernmeldewesen/**`, `frontend/src/einsatz/modulRegistry.ts`, `frontend/src/fuehrung/**`, `frontend/src/infotelefon/**`, `frontend/src/fernmeldewesen/**` |
 | [ADR-0016](entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md) | Anmeldewege sind schaltbare Provider; Admins einer verteilenden Instanz melden sich per Passkey an | akzeptiert | 2026-11-09 | `src/auth/**`, `src/routes/auth.rs`, `src/instanz/stammdaten/geheimnis.rs` |
 | [ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md) | Die Belegung einer Betreuungsstelle hat eine Meldereihe, auch wenn sie namentlich geführt wird | akzeptiert | 2026-11-09 | `src/betreuung/**`, `src/person/verbleib_repo.rs`, `src/routes/betreuung.rs`, `src/routes/betreuung_registrierung.rs`, `migrations/0310_registrierstelle.sql` |
+| [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-hat-genau-eine-fuehrende-instanz.md) | Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn | akzeptiert | 2026-11-09 | `src/instanz/fuehrung/**`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs` |
 
 ## 9.2 Weitere Entscheidungen ohne eigene ADR
 

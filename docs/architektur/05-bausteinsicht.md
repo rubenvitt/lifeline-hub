@@ -203,7 +203,7 @@ Regeln: [frontend/src/geraet/AGENTS.md](../../frontend/src/geraet/AGENTS.md).
 | --- | --- | --- |
 | `src/geraet` | Gerätekopplung per Code, Gerätekonto, Funktionsansicht, Stellenbindung, Routen-Whitelist | `…/{id}/geraete`, `POST /api/geraete/koppeln`, `…/{id}/lagemonitor` |
 | `src/lagemonitor_zugang` | Lesezugang externer Lagemonitore: Schlüssel (nur Hash), Freigabe je Einsatz durch die Einsatzleitung, Extractor `LagemonitorZugriff` nur für den Abruf | `/api/lagemonitor-zugaenge`, `…/{id}/lagemonitor-zugaenge`, `GET /api/lagemonitor/v1/lage` (Bearer) |
-| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)); `src/instanz/stammdaten` verteilt die Stammdaten einer Org von der erreichten zur meldenden Instanz (LLH-1493: Änderungslog und Schreibschutz per Trigger, Nachlieferung mit jeder Meldung, Kontogeheimnisse mit age) | `/api/admin/instanz/…`, `GET /api/instanz/stammdaten/herkunft`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden` (signiert); Unterschriftsschlüssel in `src/auth/unterschrift` |
+| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)); `src/instanz/stammdaten` verteilt die Stammdaten einer Org von der erreichten zur meldenden Instanz (LLH-1493: Änderungslog und Schreibschutz per Trigger, Nachlieferung mit jeder Meldung, Kontogeheimnisse mit age); `src/instanz/fuehrung` hält je Einsatz die führende Instanz mit Epoche, tauscht die Akten in der Meldung und sperrt Einsätze, die eine andere führt (LLH-1491, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-hat-genau-eine-fuehrende-instanz.md)) | `/api/admin/instanz/…`, `/api/einsaetze/{id}/fuehrung/…`, `GET /api/instanz/stammdaten/herkunft`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden` (signiert); Unterschriftsschlüssel in `src/auth/unterschrift` |
 
 ### Auth & Organisation
 
@@ -385,7 +385,7 @@ flowchart TB
 | --- | --- | --- |
 | `frontend/src/geraet` | Gerätehülle, Funktionsansichten, Koppeln, Lagemonitor ([AGENTS.md](../../frontend/src/geraet/AGENTS.md)) | `src/geraet` |
 | `frontend/src/admin` | Verwaltungslayout, Datenträgerwarnung, Demo-Daten | `src/datentraeger`, `src/demo` |
-| `frontend/src/instanz` | Verwaltungsseite „Instanzkopplung“: Identität, Kopplungen, Unterschriftsschlüssel (WebAuthn), Stammdaten-Stand, „ELW verloren“; Herkunfts-Abzeichen und Sperre „Wird am Hub gepflegt“ für die Stammdaten-Seiten (`herkunft.tsx`) | `src/instanz`, `src/auth/unterschrift` |
+| `frontend/src/instanz` | Verwaltungsseite „Instanzkopplung“: Identität, Kopplungen, Unterschriftsschlüssel (WebAuthn), Stammdaten-Stand, „ELW verloren“; Herkunfts-Abzeichen und Sperre „Wird am Hub gepflegt“ für die Stammdaten-Seiten (`herkunft.tsx`); Führung je Einsatz: Paneel, Hinweisband, „Einsätze beim Gegenüber“ (LLH-1491) | `src/instanz`, `src/auth/unterschrift` |
 | `frontend/src/zugangsprotokoll` | Anmelde- und Admin-Spur | `src/auth` (`/api/zugangsprotokoll`) |
 | `frontend/src/aufbewahrung` | Aufbewahrungsübersicht, Archivakte, Fristen, Schwärzungsantrag | `src/aufbewahrung`, `src/org` |
 
