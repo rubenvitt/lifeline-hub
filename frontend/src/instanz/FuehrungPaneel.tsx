@@ -27,6 +27,7 @@ import {
   type FuehrungOrt,
 } from '../api/fuehrung';
 import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { FuehrungAnzeige, FuehrungCodeAntwort, FuehrungVerlaufEintrag } from '../api/types';
 import { FUEHRUNG_ART_TEXT, fuehrungMoeglich } from './fuehrungText';
@@ -359,12 +360,12 @@ export default function FuehrungPaneel({
           name="grund"
           rules={[
             { required: true, whitespace: true, message: 'Grund angeben' },
-            { max: FUEHRUNG_GRUND_MAX, message: `Höchstens ${FUEHRUNG_GRUND_MAX} Zeichen` },
+            zeichenRegel(FUEHRUNG_GRUND_MAX, 'Grund'),
           ]}
         >
           <Input.TextArea
             autoSize={{ minRows: 2, maxRows: 5 }}
-            maxLength={FUEHRUNG_GRUND_MAX}
+            count={zeichenGrenze(FUEHRUNG_GRUND_MAX)}
             placeholder="ohne Verbindung seit 40 min"
           />
         </Form.Item>

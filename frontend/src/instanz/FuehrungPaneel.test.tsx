@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import FuehrungPaneel from './FuehrungPaneel';
 import type { FuehrungAnzeige } from '../api/types';
+import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
 
 vi.mock('../api/fuehrung', () => ({
   bestaetigeUebernahme: vi.fn(),
@@ -148,6 +149,34 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     await waitFor(() =>
       expect(uebernimmFuehrung).toHaveBeenCalledWith({ einsatzId: 7 }, 'Hub weg'),
     );
+  });
+
+  it('ein zu langer Grund bleibt stehen und sperrt das Absenden', async () => {
+    renderMitProviders(
+      <FuehrungPaneel
+        fuehrung={akte({
+          fuehrend: false,
+          fuehrer_name: 'Hub Nord',
+          fuehrer_kennung: 'k-hub',
+          fuehrer_richtung: 'meldet_sich',
+        })}
+        darfBedienen
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Grund');
+    const lang = 'x'.repeat(FUEHRUNG_GRUND_MAX + 1);
+    await userEvent.click(feld);
+    await userEvent.paste(lang);
+    expect(feld).toHaveValue(lang);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
+    expect(
+      await within(dialog).findByText(
+        `Grund darf höchstens ${FUEHRUNG_GRUND_MAX} Zeichen lang sein`,
+      ),
+    ).toBeInTheDocument();
+    expect(uebernimmFuehrung).not.toHaveBeenCalled();
   });
 
   it('Notübernahme gegen die meldende Seite mit dem Code des Gegenübers', async () => {
