@@ -45,6 +45,7 @@ import SchichtplanPersonen, {
   type PersonZugDaten,
 } from '../abloesung/schichtplan/SchichtplanPersonen';
 import SchichtplanRaster, { type BlockZielDaten } from '../abloesung/schichtplan/SchichtplanRaster';
+import SchichtplanSchleuse from '../abloesung/schichtplan/SchichtplanSchleuse';
 import {
   kopieBody,
   mitPerson,
@@ -122,6 +123,9 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
     dialogJetzt.current = dialog;
   }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
+  const [zugLaeuft, setZugLaeuft] = useState(false);
+  // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
+  const schleuseHalten = zugLaeuft || gezogen != null || dialog != null;
 
   const stammQuery = useQuery({
     queryKey: globalKeys.personalListe('im-dienst'),
@@ -363,14 +367,18 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
         </div>
       )}
       {istSchmal ? (
-        <SchichtplanListe
-          zeilen={zeilen}
-          bloecke={bloecke}
-          jetzt={jetzt}
-          formatZeit={listenZeit}
-          onOeffnen={oeffneBlock}
-          alleBloecke
-        />
+        <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} schmal>
+          {(z) => (
+            <SchichtplanListe
+              zeilen={z}
+              bloecke={bloecke}
+              jetzt={jetzt}
+              formatZeit={listenZeit}
+              onOeffnen={oeffneBlock}
+              alleBloecke
+            />
+          )}
+        </SchichtplanSchleuse>
       ) : (
         <DndContext
           sensors={sensoren}
@@ -388,22 +396,27 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
               alignItems: 'start',
             }}
           >
-            <SchichtplanRaster
-              zeilen={zeilen}
-              bloecke={bloecke}
-              spanne={spanne}
-              jetzt={jetzt}
-              darfSchreiben
-              zone={konventionen.zeitzone}
-              formatMarke={markeText}
-              formatZeit={zeitText}
-              onAnlegen={onAnlegen}
-              onAendern={onAendern}
-              onKopieren={onKopieren}
-              onOeffnen={oeffneBlock}
-              personenZiel={mitSeitenleiste}
-              beschriftung="Planung"
-            />
+            <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten}>
+              {(z) => (
+                <SchichtplanRaster
+                  zeilen={z}
+                  bloecke={bloecke}
+                  spanne={spanne}
+                  jetzt={jetzt}
+                  darfSchreiben
+                  zone={konventionen.zeitzone}
+                  formatMarke={markeText}
+                  formatZeit={zeitText}
+                  onAnlegen={onAnlegen}
+                  onAendern={onAendern}
+                  onKopieren={onKopieren}
+                  onOeffnen={oeffneBlock}
+                  personenZiel={mitSeitenleiste}
+                  beschriftung="Planung"
+                  onZug={setZugLaeuft}
+                />
+              )}
+            </SchichtplanSchleuse>
             {mitSeitenleiste && <SchichtplanPersonen optionen={personen} />}
           </div>
           <DragOverlay>

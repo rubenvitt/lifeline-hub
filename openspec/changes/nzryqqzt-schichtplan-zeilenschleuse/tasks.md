@@ -1,25 +1,25 @@
 ## 1. Ableitung der Zeilen (D2)
 
-- [ ] 1.1 Tests in `abloesung/schichtplan/zeilenSchleuse.test.ts` (rot) für `schleuseZeilen`: ohne Änderung gleich; neuer Posten vorn → wartet, `neu` 1, keine Umsortierung; entfallener Posten → Zeile aus dem Gerippe mit `entfallen`, `entfallen` 1; umgekehrte Folge → gezeigte Folge, `umsortiert`; Gruppenwechsel → eingefrorene Gruppe, `umsortiert`; frischer Titel bei gleichem Schlüssel.
-- [ ] 1.2 Tests für `schleusenText`: Einzahl und Mehrzahl, Verbindung „ · “, ohne Wartendes `null`.
-- [ ] 1.3 `zeilenSchleuse.ts` umsetzen.
+- [x] 1.1 Tests in `abloesung/schichtplan/zeilenSchleuse.test.ts` (rot) für `schleuseZeilen`: ohne Änderung gleich; neuer Posten vorn → wartet, `neu` 1, keine Umsortierung; entfallener Posten → Zeile aus dem Gerippe mit `entfallen`, `entfallen` 1; umgekehrte Folge → gezeigte Folge, `umsortiert`; Gruppenwechsel → eingefrorene Gruppe, `umsortiert`; frischer Titel bei gleichem Schlüssel.
+- [x] 1.2 Tests für `schleusenText`: Einzahl und Mehrzahl, Verbindung „ · “, ohne Wartendes `null`; dazu `schleusenKurz` für die Kurzform des Banners auf dem Handschirm („2 neu“, „1 entfallen“, „umgeordnet“).
+- [x] 1.3 `zeilenSchleuse.ts` umsetzen.
 
 ## 2. Raster und Liste (D3, D4)
 
-- [ ] 2.1 `raster.test.ts` (rot): `pruefeZug` antwortet für eine Zeile mit `entfallen` `keine-zeile`. `RasterZeile.entfallen` in `raster.ts`, `pruefeZug` anpassen.
-- [ ] 2.2 `SchichtplanRaster.tsx`: entfallene Zeile gedämpft mit „(entfallen)“, kein Aufziehen in ihr; Rückruf `onZug(laeuft)` beim Beginn (ab der Schwelle) und Ende eines Zugs. Test in einer neuen oder vorhandenen Raster-Testdatei, soweit jsdom es trägt (Titel, kein `pointerdown`-Anlegen).
-- [ ] 2.3 `SchichtplanListe.tsx`: entfallene Zeile gedämpft mit „(entfallen)“ und „—“.
+- [x] 2.1 `raster.test.ts` (rot): `pruefeZug` antwortet für eine Zeile mit `entfallen` `keine-zeile`. `RasterZeile.entfallen` in `raster.ts`, `pruefeZug` anpassen.
+- [x] 2.2 `SchichtplanRaster.tsx`: entfallene Zeile gedämpft mit „(entfallen)“, kein Aufziehen in ihr; Rückruf `onZug(laeuft)` beim Beginn (ab der Schwelle) und Ende eines Zugs. Test in einer neuen oder vorhandenen Raster-Testdatei, soweit jsdom es trägt (Titel, kein `pointerdown`-Anlegen).
+- [x] 2.3 `SchichtplanListe.tsx`: entfallene Zeile gedämpft mit „(entfallen)“ und „—“.
 
 ## 3. Hülle mit Banner (D1, D5)
 
-- [ ] 3.1 Tests in `abloesung/schichtplan/SchichtplanSchleuse.test.tsx` (rot): ohne Fokus und Zeiger fließen neue Zeilen direkt; mit Fokus warten sie, Banner „1 neuer Posten“; „anzeigen“ zeigt sie und setzt den Fokus auf die Hülle; `halten` hält auch ohne Fokus; entfallene Zeile bleibt mit Banner „1 Posten entfallen“.
-- [ ] 3.2 `SchichtplanSchleuse.tsx` umsetzen (`useZuflussSteuerung`/`useZuflussSchleuse`, `mitGerippe`, Sammelbanner mit Nullhöhe).
+- [x] 3.1 Tests in `abloesung/schichtplan/SchichtplanSchleuse.test.tsx` (rot): ohne Fokus und Zeiger fließen neue Zeilen direkt; mit Fokus warten sie, Banner „1 neuer Posten“; „anzeigen“ zeigt sie und setzt den Fokus auf die Hülle; `halten` hält auch ohne Fokus; entfallene Zeile bleibt mit Banner „1 Posten entfallen“.
+- [x] 3.2 `SchichtplanSchleuse.tsx` umsetzen (`useZuflussSteuerung`/`useZuflussSchleuse`, `mitGerippe`, Sammelbanner mit Nullhöhe).
 
 ## 4. Einbau (D3, D5)
 
-- [ ] 4.1 `SchichtplanAnsicht.tsx`: Raster und Liste in die Hülle; `halten` aus laufendem Zug, gezogener Person und offenem Dialog.
-- [ ] 4.2 `planung/PlanungSchichtplan.tsx`: dasselbe.
-- [ ] 4.3 Vorhandene Tests von Ansicht und Planung grün halten.
+- [x] 4.1 `SchichtplanAnsicht.tsx`: Raster und Liste in die Hülle; `halten` aus laufendem Zug, gezogener Person und offenem Dialog.
+- [x] 4.2 `planung/PlanungSchichtplan.tsx`: dasselbe.
+- [x] 4.3 Vorhandene Tests von Ansicht und Planung grün halten.
 
 ## 5. e2e
 

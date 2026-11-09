@@ -102,6 +102,25 @@ describe('raster (LLH-1554)', () => {
       expect(zugStand({ art: 'ende', ...basis }, min(92), null).bis).toBe(min(90));
     });
 
+    it('eine entfallene Zeile nimmt nichts an (LLH-1604)', () => {
+      const zeilen = [{ ...ZEILEN[0], entfallen: true }, ...ZEILEN.slice(1)];
+      const bloecke = [block(2, 'einheit:2', 0, 60)];
+      const anlegen = { art: 'anlegen', zeile: 'einheit:1', start: min(60) } as const;
+      expect(
+        pruefeZug(anlegen, { zeile: 'einheit:1', von: min(60), bis: min(90) }, zeilen, bloecke),
+      ).toBe('keine-zeile');
+      const schieben = {
+        art: 'verschieben',
+        blockId: 2,
+        von: min(0),
+        bis: min(60),
+        griff: 0,
+      } as const;
+      expect(
+        pruefeZug(schieben, { zeile: 'einheit:1', von: min(0), bis: min(60) }, zeilen, bloecke),
+      ).toBe('keine-zeile');
+    });
+
     it('prüft Zeile, Mindestdauer, Überschneidung und Unverändertes', () => {
       const bloecke = [block(1, 'einheit:1', 0, 60), block(2, 'einheit:2', 0, 60)];
       const anlegen = { art: 'anlegen', zeile: 'einheit:1', start: min(60) } as const;

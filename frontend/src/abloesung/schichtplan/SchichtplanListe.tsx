@@ -2,7 +2,13 @@ import { Typography } from 'antd';
 import { Fragment } from 'react';
 import { monoStil, useRollen } from '../../components/instrument';
 import { statusFlaeche, type StatusTon } from '../../components/instrument/statusFlaeche';
-import { jetztUndNaechstes, type Ampel, type RasterBlock, type RasterZeile } from './raster';
+import {
+  jetztUndNaechstes,
+  titelVon,
+  type Ampel,
+  type RasterBlock,
+  type RasterZeile,
+} from './raster';
 
 /**
  * Der Schichtplan auf dem Handy (LLH-1554): statt des Rasters eine Liste je Posten mit „jetzt“
@@ -126,15 +132,22 @@ export default function SchichtplanListe({
             <div
               data-lfh="schichtplan-listen-posten"
               data-raster-zeile={z.schluessel}
+              data-entfallen={z.entfallen || undefined}
               style={{
                 borderBottom: `1px solid ${rollen.linie}`,
                 paddingBlock: token.paddingXS,
               }}
             >
-              <Typography.Text strong style={{ display: 'block' }}>
-                {z.titel}
+              <Typography.Text
+                strong
+                style={{ display: 'block', color: z.entfallen ? rollen.gedaempft : undefined }}
+              >
+                {titelVon(z)}
               </Typography.Text>
-              {alleBloecke ? (
+              {z.entfallen ? (
+                // Den Posten gibt es nicht mehr; die Schleuse hält nur seine Zeile (LLH-1604).
+                zeile(null, null)
+              ) : alleBloecke ? (
                 eigene.length === 0 ? (
                   zeile(null, null)
                 ) : (
