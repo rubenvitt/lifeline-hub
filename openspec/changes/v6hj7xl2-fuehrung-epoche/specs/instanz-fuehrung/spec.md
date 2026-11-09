@@ -71,8 +71,8 @@ Führung selbst ist kein Schreibvorgang am Einsatz.
 
 ### Requirement: Wer die Führung bedient
 
-An der Instanz, bei der ein Einsatz liegt, SHALL die Einsatzleitung dieses Einsatzes die Führung
-bedienen. Einen Einsatz, den die Instanz nur als Akte des Gegenübers kennt, SHALL ein Admin der
+An der Instanz, bei der ein Einsatz liegt, SHALL die Einsatzleitung dieses Einsatzes oder ein
+Admin der Einsatz-Org die Führung bedienen. Einen Einsatz, den die Instanz nur als Akte des Gegenübers kennt, SHALL ein Admin der
 zugeordneten Org bedienen. Andere Konten MUST 403 bekommen. Die Bedienung MUST auch an einem
 abgeschlossenen Einsatz möglich sein.
 

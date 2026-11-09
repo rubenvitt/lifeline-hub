@@ -10,7 +10,8 @@ fn t(s: &str) -> DateTime<Utc> {
 }
 
 /// Katalog LLH-1142 E1 (Entscheidung 22.10.2026): dazu Vermisstenmeldung und Unwetter, das der
-/// Browser erkennt und nur bei Warnstufe rot meldet (LLH-1425).
+/// Browser erkennt und nur bei Warnstufe rot meldet (LLH-1425), und die ungültige Übernahme der
+/// Führung (LLH-1491).
 #[test]
 fn alarm_sind_genau_die_alarme_des_katalogs() {
     let alarm: Vec<BenachrichtigungArt> = BenachrichtigungArt::ALLE
@@ -27,7 +28,14 @@ fn alarm_sind_genau_die_alarme_des_katalogs() {
             BenachrichtigungArt::AbloesungFaellig,
             BenachrichtigungArt::Vermisstenmeldung,
             BenachrichtigungArt::Unwetter,
+            BenachrichtigungArt::FuehrungUngueltig,
         ]
+    );
+    // Eine gültige Übernahme der Führung wartet auf eine Entscheidung, sie ist kein Alarm
+    // (LLH-1491).
+    assert_eq!(
+        BenachrichtigungArt::FuehrungUebernommen.stufe(),
+        BenachrichtigungStufe::Hinweis
     );
     // Die übrigen neuen Quellen aus LLH-1425 sind Eingänge.
     assert_eq!(

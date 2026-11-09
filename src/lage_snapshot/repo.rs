@@ -276,6 +276,8 @@ pub async fn erzeuge(
         // Schwärzungspfad im JSON.
         einsatz: crate::einsatz::EinsatzAnzeige {
             einsatzleiter: None,
+            // Die Führung je Einsatz ist ein Zustand der Kopplung, kein Teil des Lagebilds.
+            fuehrung: None,
             ..einsatz.anzeige(None, None, &crate::fuehrung::Labelkarte::standard())
         },
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,

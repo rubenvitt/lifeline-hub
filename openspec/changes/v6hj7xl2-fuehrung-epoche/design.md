@@ -137,13 +137,23 @@ und in den Transaktionen.
 `planung/uebernahme.rs`. Aufgabe 2.4 prüft jeden darauf, ob er Einsatzinhalt schreibt. Wenn ja,
 geht er über `fordere_aktiv_in_tx` oder überspringt einen Einsatz mit gesetztem `fuehrung_bei`.
 
-Der Schalter steht in einem prozessweiten Merker (`instanz::fuehrung::is_enabled()`, gesetzt beim
-Start). Ist er aus, ignoriert die Sperre `fuehrung_bei`. Ein Betreiber, der die Führung wieder
-ausschaltet, sperrt so keinen Einsatz dauerhaft.
+Der Schalter steht in `instanz_identitaet.fuehrung_an`, beim Start geschrieben wie
+`datentraeger_bestaetigt` (Nachtrag beim Umsetzen: ein prozessweiter Merker hätte zwei Instanzen im
+selben Testprozess denselben Schalter gegeben). `fuehrung_bei` ist ein abgeleiteter Merker: der
+Start richtet ihn aus den Akten aus, ohne Schalter überall NULL. Ein Betreiber, der die Führung
+wieder ausschaltet, sperrt so keinen Einsatz dauerhaft, und die Sperre selbst bleibt eine Prüfung
+ohne Abfrage.
+
+**Ergebnis der Prüfung der Hintergrundläufe (Aufgabe 2.4):** Keiner schreibt Einsatzinhalt. Der
+Erinnerungslauf setzt nur Merker (ausgelöst, eskaliert, angekündigt) und meldet
+Benachrichtigungen; `planung/uebernahme.rs` prüft schon `fordere_aktiv`. Sobald LLH-1492 Inhalte
+spiegelt, darf nur die führende Instanz Erinnerungen und Eskalationen auslösen (Nachzug dort).
 
 ### D5 Eigenes Gate für die Bedienung der Führung
 
-`EinsatzFuehrungszugriff` = Org-Grenze, dann Einsatzleitung, **ohne** `fordere_aktiv`. Damit
+`EinsatzFuehrungszugriff` = Schalter, Org-Grenze, dann Einsatzleitung oder Admin der
+Einsatz-Org, dann die Lese-Policy, **ohne** `fordere_aktiv`. Den Admin braucht es am Hub: die
+Notübernahme mit Unterschrift leistet ein Admin, der selten Mitglied des Einsatzes ist. Damit
 geht die Bedienung auch, wenn die Instanz gerade nicht führt oder der Einsatz abgeschlossen ist
 (Übergabe zur Verwahrung). Das Gate steht in `SANKTIONIERTE_GATES` (ADR-0005), die Routen liegen
 unter `/api/einsaetze/{id}/fuehrung/…`.

@@ -382,7 +382,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "instanz_elw_verloren";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -1186,11 +1186,11 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0255_benachrichtigung_quellen.sql`)
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0311_einsatz_fuehrung.sql`)
          *     spiegelt `ALLE`.
          * @enum {string}
          */
-        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter";
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen";
         /**
          * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
@@ -2310,6 +2310,7 @@ export interface components {
             einsatzort_lat?: number | null;
             /** Format: double */
             einsatzort_lon?: number | null;
+            fuehrung?: components["schemas"]["EinsatzFuehrung"] | null;
             /** Format: int64 */
             id: number;
             /**
@@ -2431,6 +2432,17 @@ export interface components {
             traegerorganisation?: string | null;
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
+        };
+        /** @description Die Führung im Einsatzkopf (`EinsatzAnzeige.fuehrung`): fehlt ohne Akte oder ohne Schalter. */
+        EinsatzFuehrung: {
+            /** @description Name der führenden Instanz. */
+            bei: string;
+            /** Format: int64 */
+            epoche: number;
+            /** @description Diese Instanz führt den Einsatz. */
+            fuehrend: boolean;
+            /** @description Eine Notübernahme gegen diese Instanz wartet auf die Einsatzleitung. */
+            offen: boolean;
         };
         /**
          * @description Aufgelöste Material-Dispositionszeile: Identität nach der Auflösungsregel
@@ -3431,6 +3443,89 @@ export interface components {
              */
             zeichen_spec: string;
         };
+        /** @description Die Führung einer Akte samt Verlauf (Paneel „Führung“, Seite „Instanzkopplung“). */
+        FuehrungAnzeige: {
+            /** @description Diese Instanz hat die Führung beim Gegenüber erbeten. */
+            anfrage_offen: boolean;
+            art: components["schemas"]["FuehrungWechselArt"];
+            bezeichnung: string;
+            bruch_at?: string | null;
+            /** Format: int64 */
+            einsatz_id?: number | null;
+            /** Format: int64 */
+            epoche: number;
+            /** @description Diese Instanz führt. */
+            fuehrend: boolean;
+            fuehrer_kennung: string;
+            fuehrer_name: string;
+            fuehrer_richtung?: components["schemas"]["InstanzKopplungRichtung"] | null;
+            /** @description Die Gegenüber der Org, an die die Führung gehen kann. */
+            gegenueber: components["schemas"]["FuehrungGegenueber"][];
+            /** Format: int64 */
+            id: number;
+            kennung: string;
+            nummer?: string | null;
+            offen?: components["schemas"]["FuehrungOffen"] | null;
+            status: string;
+            stichwort?: string | null;
+            verlauf: components["schemas"]["FuehrungVerlaufEintrag"][];
+        };
+        /** @description Der Abgabecode, genau einmal angezeigt. */
+        FuehrungCodeAntwort: {
+            /** @description In Vierergruppen. */
+            code: string;
+            fuehrung: components["schemas"]["FuehrungAnzeige"];
+        };
+        /**
+         * @description Ein Gegenüber, an das die Führung einer Akte gehen kann: eine aktive Kopplung, in der die Org
+         *     der Akte zugeordnet ist.
+         */
+        FuehrungGegenueber: {
+            kennung: string;
+            /** Format: int64 */
+            kopplung_id: number;
+            name: string;
+            richtung: components["schemas"]["InstanzKopplungRichtung"];
+        };
+        /** @description Eine offene Übernahme gegen diese Instanz, wie die Oberfläche sie zeigt. */
+        FuehrungOffen: {
+            bruch_at: string;
+            /** Format: int64 */
+            epoche: number;
+            grund?: string | null;
+            unterzeichner?: string | null;
+            von: string;
+            zeitpunkt?: string | null;
+        };
+        /** @description Start der Unterschrift einer Notübernahme (wie die Gegenzeichnung, LLH-1490). */
+        FuehrungUnterschriftStart: {
+            /** @description Challenge für `navigator.credentials.get` (Base64url): SHA-256 der Erklärung. */
+            challenge: string;
+            /** @description Die eigenen gültigen Unterschriftsschlüssel (Base64url), für `allowCredentials`. */
+            credential_ids: string[];
+            /** @description Die Erklärung im Wortlaut. */
+            erklaerung: string;
+            rp_id: string;
+            zeremonie: string;
+        };
+        /** @description Ein Eintrag des Verlaufs, wie die Oberfläche ihn zeigt. */
+        FuehrungVerlaufEintrag: {
+            art: components["schemas"]["FuehrungWechselArt"];
+            at: string;
+            bruch_at?: string | null;
+            /** Format: int64 */
+            epoche_zaehler: number;
+            grund?: string | null;
+            nach_name: string;
+            unterzeichner?: string | null;
+            von_name?: string | null;
+            wer?: string | null;
+        };
+        /**
+         * @description Wie die geltende Führung zustande kam (Verlauf und Akte).
+         * @enum {string}
+         */
+        FuehrungWechselArt: "angelegt" | "uebergabe" | "anfrage" | "notuebernahme" | "code_abgabe" | "bestaetigt" | "widerspruch" | "verworfen";
         /**
          * @description Führungsfunktion aus dem Katalog. Wire == `as_str()`.
          *

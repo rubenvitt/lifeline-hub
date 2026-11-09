@@ -278,6 +278,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/mitglieder", None),
     // Eigene Führungsstelle (LFH-849): Teil der Kopfdaten, modul-los wie die Wurzel.
     ("/api/einsaetze/{id}/fuehrungsstelle", None),
+    // Führung je Einsatz (LLH-1491): Zustand der Instanzkopplung, modul-los wie der Abschluss.
+    ("/api/einsaetze/{id}/fuehrung", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
     ("/api/einsaetze/{id}/geraete", None),
     // Freigabe für externe Anzeigen (LLH-1484): Verwaltung der Einsatzleitung wie die Geräte.

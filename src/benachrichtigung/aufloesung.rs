@@ -131,6 +131,15 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
                     .collect(),
                 Some(m),
             ),
+            Adressat::Einsatzleitung => (
+                recht
+                    .rollen
+                    .iter()
+                    .filter(|(_, r)| r.ist_einsatzleitung())
+                    .map(|(id, _)| *id)
+                    .collect(),
+                None,
+            ),
             Adressat::Fuehrungskraefte => (
                 org_nutzer(pool, recht.einsatz.org_id)
                     .await?

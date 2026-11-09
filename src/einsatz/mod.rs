@@ -161,6 +161,10 @@ pub struct Einsatz {
     /// `einsatzleiter_spalten!`/`einsatzleiter_joins!` in `repo`.
     #[sqlx(flatten)]
     pub einsatzleiter: fuehrungsstelle::EinsatzleiterSpalten,
+    /// Führung je Einsatz (LLH-1491): `fuehrung_bei` gesetzt heißt, eine andere Instanz führt,
+    /// und jeder Schreibweg antwortet mit 409 (`berechtigung::fordere_aktiv`).
+    #[sqlx(flatten)]
+    pub fuehrung: crate::instanz::fuehrung::FuehrungSpalten,
 }
 
 impl Einsatz {
@@ -216,6 +220,7 @@ impl Einsatz {
             ),
             teilschwaerzungen: self.teilschwaerzungen,
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
+            fuehrung: self.fuehrung.anzeige(),
         }
     }
 }
@@ -291,6 +296,11 @@ pub struct EinsatzAnzeige {
     /// `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzleiter: Option<fuehrungsstelle::EinsatzleiterAnzeige>,
+    /// Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`): welche gekoppelte Instanz den
+    /// Einsatz schreibt. Fehlt, solange der Einsatz keine Führungsakte hat oder die Führung aus
+    /// ist; in Liste und Detail dieselbe Aussage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fuehrung: Option<crate::instanz::fuehrung::EinsatzFuehrung>,
 }
 
 /// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,
@@ -432,6 +442,7 @@ mod tests {
             retention_bis: None,
             geloescht_at: None,
             einsatzleiter: Default::default(),
+            fuehrung: Default::default(),
         };
         assert!(e.ist_aktiv());
         e.status = EinsatzStatus::Abgeschlossen;
