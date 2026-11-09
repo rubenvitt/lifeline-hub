@@ -53,6 +53,7 @@ import SchichtplanListe from './SchichtplanListe';
 import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen';
 import SchichtplanRaster, { type BlockZielDaten } from './SchichtplanRaster';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
+import SchichtplanWechselLeiste from './SchichtplanWechselLeiste';
 import {
   baueZeilen,
   kopieBody,
@@ -78,6 +79,9 @@ import {
  * fehlen nur deren Posten ohne Blöcke. Personen brauchen das Modul Personal: ohne steht die
  * Seitenleiste gesperrt mit Grund, der Blockdialog ebenso (Server: 403).
  *
+ * LLH-1555 Welle 3: über dem Raster die Wechsel-Leiste (`SchichtplanWechselLeiste`), je Zeitpunkt
+ * die Wechsel laut Plan mit ihrem Griff; ein gebündelter Hinweis springt mit `?wechsel=` hinein.
+ *
  * LLH-1584: Strg/Alt beim Verschieben kopiert den Block (mit Personen, ohne Notiz), der Blockdialog
  * kopiert ihn als nächsten Block (ohne Personen) und öffnet die Kopie, „Schichten erzeugen“ füllt
  * einen Zeitraum am Posten (`SchichtenErzeugenDialog`).
@@ -92,6 +96,10 @@ interface SchichtplanAnsichtProps {
   abschnitte: readonly AbloesungVorgabe[];
   /** Weitere Werkzeuge rechts neben „Block anlegen“ (etwa „Schichtplan einlesen“, LLH-1556). */
   werkzeuge?: ReactNode;
+  /** Sprung `?wechsel=<minute>` (LLH-1555): dieser Zeitpunkt steht in der Wechsel-Leiste gewählt. */
+  wechselSprung?: number;
+  /** Vollzug einer Schicht aus der Wechsel-Leiste; die Seite öffnet ihren Vollzug-Dialog. */
+  onVollziehen?: (abloesungId: number) => void;
 }
 
 type Dialog =
@@ -132,6 +140,8 @@ export default function SchichtplanAnsicht({
   darfSchreiben,
   abschnitte,
   werkzeuge,
+  wechselSprung,
+  onVollziehen,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -147,6 +157,11 @@ export default function SchichtplanAnsicht({
     dialogJetzt.current = dialog;
   }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
+  // Gewählter Zeitpunkt der Wechsel-Leiste; ein neuer Sprung wählt seinen.
+  const [wechselGewaehlt, setWechselGewaehlt] = useState<number | null>(wechselSprung ?? null);
+  useEffect(() => {
+    if (wechselSprung != null) setWechselGewaehlt(wechselSprung);
+  }, [wechselSprung]);
 
   const freigaben = useModulFreigaben(einsatzId);
   const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
@@ -463,6 +478,23 @@ export default function SchichtplanAnsicht({
         <div style={{ marginBottom: token.marginSM }}>
           <SpeicherFehler fehler={zugFehler} titel="Schichtplan nicht geändert" />
         </div>
+      )}
+      {plan && (
+        <SchichtplanWechselLeiste
+          wechsel={plan.wechsel}
+          bloecke={plan.bloecke}
+          jetzt={jetzt}
+          formatZeit={zeitText}
+          gewaehlt={wechselGewaehlt}
+          onWaehlen={setWechselGewaehlt}
+          wechselGriff={(blockId) => {
+            const b = blockVon(blockId);
+            return b && wechselMoeglich(b)
+              ? () => setDialog({ art: 'wechsel', blockId: b.id })
+              : undefined;
+          }}
+          onVollziehen={darfSchreiben ? onVollziehen : undefined}
+        />
       )}
       {planQuery.isLoading ? (
         <Spin />

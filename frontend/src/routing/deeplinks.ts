@@ -358,12 +358,25 @@ export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): 
  */
 export function abloesungPfad(
   einsatzId: number,
-  opts: { schicht?: number; ansicht?: AbloesungAnsicht } = {},
+  opts: { schicht?: number; ansicht?: AbloesungAnsicht; wechsel?: number } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'abloesung'), {
     schicht: opts.schicht,
     ansicht: opts.ansicht,
+    wechsel: opts.wechsel,
   });
+}
+
+/**
+ * Umkehr des Parameters `wechsel` von {@link abloesungPfad}: ein Wechselzeitpunkt des
+ * Schichtplans in Minuten seit 1970 (LLH-1555 Welle 3, Bezug `schichtplan_wechsel`). Alles
+ * andere als eine ganze Zahl ≥ 0 wird verworfen.
+ */
+export function parseAbloesungWechsel(params: URLSearchParams): number | undefined {
+  const roh = params.get('wechsel');
+  if (roh === null || !/^\d+$/.test(roh)) return undefined;
+  const minute = Number(roh);
+  return Number.isSafeInteger(minute) ? minute : undefined;
 }
 
 /** Ansichten der Seite Ablösung (LLH-1128, LLH-1312, Schichtplan LLH-1554). */

@@ -870,6 +870,8 @@ export interface BesatzungZielEingabe {
 /** Der Schichtplan eines Einsatzes: Grenzwerte, Blöcke mit Befunden, Helfer (Soll, kein Ist). */
 export type Schichtplan = S['SchichtplanAnzeige'];
 export type SchichtplanBlock = S['PlanBlockAnzeige'];
+/** Ein Zeitpunkt der Wechsel-Leiste (LLH-1555 Welle 3); Stand und Einträge rechnet der Server. */
+export type SchichtplanWechselpunkt = S['PlanWechselpunkt'];
 export type SchichtplanPerson = S['PlanPersonAnzeige'];
 export type SchichtplanHelfer = S['PlanHelferAnzeige'];
 export type SchichtplanGrenzwerte = S['SchichtplanGrenzwerte'];

@@ -98,6 +98,7 @@ import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
 import {
   einsatzEinstellungenPfad,
   parseAbloesungAnsicht,
+  parseAbloesungWechsel,
   type AbloesungAnsicht,
 } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
@@ -929,6 +930,13 @@ export default function AbloesungPage() {
           einsatzBeginn={einsatz.begonnen_at}
           darfSchreiben={darfSchreiben}
           abschnitte={vorgaben}
+          wechselSprung={parseAbloesungWechsel(searchParams)}
+          onVollziehen={(id) => {
+            const x = laufende.find((s) => s.id === id);
+            if (!x) return;
+            vollzugMut.reset();
+            setVollzugSchicht(x);
+          }}
           werkzeuge={
             <>
               {darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null}
