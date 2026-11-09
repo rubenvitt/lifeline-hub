@@ -76,7 +76,7 @@ export interface AbschnittEintrag {
   gesperrt?: true;
 }
 
-export interface AbschnittZustand {
+export interface AbschnittState {
   /** Laut Leer-Kette: nichts als Leerraum. */
   leer: boolean;
   /** Zwischenablage vorhanden (`navigator.clipboard.writeText`, nur im Secure Context). */
@@ -94,7 +94,7 @@ export function abschnittEintraege({
   leer,
   kopierbar,
   ansicht,
-}: AbschnittZustand): AbschnittEintrag[] {
+}: AbschnittState): AbschnittEintrag[] {
   return [
     {
       key: 'kopieren',
@@ -115,6 +115,6 @@ export function abschnittEintraege({
 }
 
 /** Kontextmenü eines Gliederungseintrags: die Primäraktion (der Sprung) zuoberst. */
-export function gliederungEintraege(zustand: AbschnittZustand): AbschnittEintrag[] {
-  return [{ key: 'springen', label: 'Zum Abschnitt springen' }, ...abschnittEintraege(zustand)];
+export function gliederungEintraege(state: AbschnittState): AbschnittEintrag[] {
+  return [{ key: 'springen', label: 'Zum Abschnitt springen' }, ...abschnittEintraege(state)];
 }

@@ -50,7 +50,7 @@ const kopfVon = (label: string) =>
     .closest<HTMLElement>('[data-lfh="abschnitt-kopf"]')!;
 
 /** Das ⋮-Menü trägt seinen Namen am Auslöser, nicht am Menü (`MenueAusloeser`). */
-async function oeffneDreipunkt(label: string) {
+async function openDreipunkt(label: string) {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Abschnitt ${label}` }));
   return waitFor(() =>
     document.querySelector<HTMLElement>(
@@ -61,7 +61,7 @@ async function oeffneDreipunkt(label: string) {
 
 const scrollIntoView = vi.fn();
 /** Das Element des letzten `scrollIntoView` (lib ohne `Array.prototype.at`). */
-const letzterSprung = () =>
+const lastScrollTarget = () =>
   scrollIntoView.mock.instances[scrollIntoView.mock.instances.length - 1] as unknown as HTMLElement;
 const writeText = vi.fn<(text: string) => Promise<void>>();
 beforeEach(() => {
@@ -86,7 +86,7 @@ describe('DokumentEntwurf — ⋮ im Abschnittskopf', () => {
     // Kein ⋮ in der Gliederung: die trägt nur Sprünge.
     expect(within(gliederung()).getAllByRole('button')).toHaveLength(8);
 
-    const menue = await oeffneDreipunkt(erster.label);
+    const menue = await openDreipunkt(erster.label);
     expect(eintraege(menue)).toEqual([
       'Text kopieren',
       'In der Lesefassung zeigen',
@@ -105,7 +105,7 @@ describe('DokumentEntwurf — Text kopieren', () => {
     fireEvent.change(screen.getByRole('textbox', { name: erster.label }), {
       target: { value: 'Lage **ruhig**' },
     });
-    const menue = await oeffneDreipunkt(erster.label);
+    const menue = await openDreipunkt(erster.label);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Text kopieren' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('Lage **ruhig**'));
     expect(await screen.findByText(`Text von „${erster.label}“ kopiert`)).toBeInTheDocument();
@@ -114,14 +114,14 @@ describe('DokumentEntwurf — Text kopieren', () => {
   it('meldet einen Fehlschlag der Zwischenablage', async () => {
     writeText.mockRejectedValue(new Error('NotAllowedError'));
     render(<Pruefling start={{ [erster.schluessel]: 'Text' }} />);
-    const menue = await oeffneDreipunkt(erster.label);
+    const menue = await openDreipunkt(erster.label);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Text kopieren' }));
     expect(await screen.findByText('Kopieren fehlgeschlagen')).toBeInTheDocument();
   });
 
   it('sperrt Kopieren und Leeren bei leerem Abschnitt', async () => {
     render(<Pruefling />);
-    const menue = await oeffneDreipunkt(zweiter.label);
+    const menue = await openDreipunkt(zweiter.label);
     for (const name of ['Text kopieren', 'Abschnitt leeren']) {
       expect(within(menue).getByRole('menuitem', { name })).toHaveAttribute(
         'aria-disabled',
@@ -136,7 +136,7 @@ describe('DokumentEntwurf — Text kopieren', () => {
   it('sperrt den Eintrag ohne Zwischenablage', async () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
     render(<Pruefling start={{ [erster.schluessel]: 'Text' }} />);
-    const menue = await oeffneDreipunkt(erster.label);
+    const menue = await openDreipunkt(erster.label);
     expect(within(menue).getByRole('menuitem', { name: 'Text kopieren' })).toHaveAttribute(
       'aria-disabled',
       'true',
@@ -147,7 +147,7 @@ describe('DokumentEntwurf — Text kopieren', () => {
 describe('DokumentEntwurf — In der Lesefassung zeigen', () => {
   it('schaltet auf die Lesefassung, rollt zum Abschnitt und setzt den Fokus dorthin', async () => {
     render(<Pruefling />);
-    const menue = await oeffneDreipunkt(dritter.label);
+    const menue = await openDreipunkt(dritter.label);
     await userEvent.click(
       within(menue).getByRole('menuitem', { name: 'In der Lesefassung zeigen' }),
     );
@@ -160,7 +160,7 @@ describe('DokumentEntwurf — In der Lesefassung zeigen', () => {
       .getByRole('heading', { level: 3, name: dritter.label })
       .closest('section')!;
     await waitFor(() => expect(ziel).toHaveFocus());
-    expect(letzterSprung()).toBe(ziel);
+    expect(lastScrollTarget()).toBe(ziel);
   });
 });
 
@@ -175,7 +175,7 @@ describe('DokumentEntwurf — Abschnitt leeren', () => {
     );
     const feld = screen.getByRole('textbox', { name: zweiter.label });
 
-    let menue = await oeffneDreipunkt(zweiter.label);
+    let menue = await openDreipunkt(zweiter.label);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abschnitt leeren' }));
     let dialog = await screen.findByRole('dialog', {
       name: `Abschnitt „${zweiter.label}“ leeren?`,
@@ -184,7 +184,7 @@ describe('DokumentEntwurf — Abschnitt leeren', () => {
     expect(feld).toHaveValue('Auftrag steht');
     expect(onValuesChange).not.toHaveBeenCalled();
 
-    menue = await oeffneDreipunkt(zweiter.label);
+    menue = await openDreipunkt(zweiter.label);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abschnitt leeren' }));
     dialog = await screen.findByRole('dialog', { name: `Abschnitt „${zweiter.label}“ leeren?` });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschnitt leeren' }));
@@ -223,7 +223,7 @@ describe('DokumentEntwurf — Kontextmenü an Gliederung und Kopf', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Zum Abschnitt springen' }));
     const feld = screen.getByRole('textbox', { name: zweiter.label });
     await waitFor(() => expect(feld).toHaveFocus());
-    expect(letzterSprung()).toBe(feld.closest('section'));
+    expect(lastScrollTarget()).toBe(feld.closest('section'));
   });
 
   it('Rechtsklick auf den Abschnittskopf zeigt die Einträge des ⋮', async () => {
@@ -289,7 +289,7 @@ describe('DokumentEntwurf — Kontextmenü an Gliederung und Kopf', () => {
     ]);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Zum Abschnitt springen' }));
     const lesen = screen.getByRole('tabpanel', { name: 'Lesefassung' });
-    await waitFor(() => expect(lesen).toContainElement(letzterSprung()));
+    await waitFor(() => expect(lesen).toContainElement(lastScrollTarget()));
   });
 });
 

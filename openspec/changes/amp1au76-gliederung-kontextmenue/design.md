@@ -66,7 +66,7 @@ außerhalb der `memo`-Kinder. Die Einträge werden beim Rendern des offenen Men�
 mit dem aktuellen `ansicht` und der Leer-Kette. Ein offenes Menü ändert so keine Props der
 Abschnitte.
 
-Die Wahl führt `fuehreAus(key, schluessel)` aus, ein `useCallback` mit Abhängigkeiten aus Refs
+Die Wahl führt `runAktion(key, schluessel)` aus, ein `useCallback` mit Abhängigkeiten aus Refs
 (`ansicht` über Ref), damit auch das ⋮ in den Blöcken eine stabile Funktion bekommt.
 
 Handler am Abschnittskopf hängen an der Hülle `data-lfh="abschnitt-kopf"`; das Textfeld liegt

@@ -115,15 +115,15 @@ export default function PunktankerMenue({
     // die gewählte Aktion aus). `preventDefault` in der Capture-Phase nimmt dem Tastendruck nur
     // diese Folge; rc-menu wählt weiter (sein Hörer am Menü fragt `defaultPrevented` nicht, und
     // `menu.onKeyDown` erreicht es bei Enter im senkrechten Menü gar nicht).
-    const nurGewaehltes = (e: KeyboardEvent) => {
+    const preventActivation = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       if (e.target instanceof Element && e.target.closest('.ant-dropdown [role="menu"]')) {
         e.preventDefault();
       }
     };
-    window.addEventListener('keydown', nurGewaehltes, true);
+    window.addEventListener('keydown', preventActivation, true);
     return () => {
-      window.removeEventListener('keydown', nurGewaehltes, true);
+      window.removeEventListener('keydown', preventActivation, true);
       const aktiv = document.activeElement;
       if (!aktiv || aktiv === document.body || aktiv.closest('.ant-dropdown'))
         fokusZielRef.current?.()?.focus({ preventScroll: true });

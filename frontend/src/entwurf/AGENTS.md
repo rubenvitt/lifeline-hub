@@ -45,7 +45,7 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
     fest in der Vorlage, darum kein Umordnen oder Entfernen. **Leeren läuft über das `onChange` des
     Felds** (`AbschnittFeld`), nie über `form.setFieldValue`: nur so hört die Seite es an
     `onValuesChange` (Verlustschutz, Stand der Übernahme). Ein Menü gibt beim Schließen den Fokus
-    an seinen Auslöser zurück; Aktionen laufen deshalb erst danach (`ausfuehren`).
+    an seinen Auslöser zurück; Aktionen laufen deshalb erst danach (`runAktion`).
   - Tippen rendert nur das eigene `Form.Item`: die Seite beobachtet nur die Felder des
     Druckkopfs, nie `useWatch([])`; der Baustein liest die Leer-Kette über `Form.useWatch` mit
     Selektor (`dokumentEntwurfKern.ts`). `AbschnittBlock` ist `memo`, alle Props

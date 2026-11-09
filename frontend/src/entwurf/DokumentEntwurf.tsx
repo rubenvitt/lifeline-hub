@@ -37,22 +37,22 @@ import './dokumentEntwurf.css';
 type Ansicht = DokumentAnsicht;
 
 /** Wo das Kontextmenü eines Abschnitts geöffnet wurde (LLH-1601, design.md D3). */
-interface KontextZiel {
+interface KontextTarget {
   ort: 'gliederung' | 'kopf';
   schluessel: string;
 }
 
 /** Handler-Fabrik des Kontextmenüs, identitätsstabil (`useKontextMenue`). */
-type KontextFabrik = (ziel: KontextZiel) => KontextHandler<HTMLElement>;
+type KontextHandlerFactory = (target: KontextTarget) => KontextHandler<HTMLElement>;
 
 /** Führt eine Aktion eines Abschnitts aus; identitätsstabil (Render-Zähler-Gate). */
-type AktionAusfuehren = (key: AbschnittAktionKey, schluessel: string) => void;
+type RunAktion = (key: AbschnittAktionKey, schluessel: string) => void;
 
 /** Meldet das „leeren“ eines Felds an (`AbschnittFeld`); gibt die Abmeldung zurück. */
-type LeerenAnmelden = (schluessel: string, leeren: () => void) => () => void;
+type RegisterLeeren = (schluessel: string, leeren: () => void) => () => void;
 
 /** Zwischenablage da? Nur im Secure Context (wie `components/KopierbarerText.tsx`). */
-function istKopierbar(): boolean {
+function isKopierbar(): boolean {
   return typeof navigator.clipboard?.writeText === 'function';
 }
 
@@ -158,37 +158,37 @@ export default function DokumentEntwurf({
   // ---- Aktionen eines Abschnitts (LLH-1601, Spec `dokument-entwurf`, design.md D1–D7) ----
 
   /** `onChange('')` je Feld (D2): Leeren läuft den Weg des Tippens, `onValuesChange` inklusive. */
-  const leerenTabelle = useRef(new Map<string, () => void>());
-  const leerenAnmelden = useCallback<LeerenAnmelden>((schluessel, leeren) => {
-    leerenTabelle.current.set(schluessel, leeren);
+  const leerenHandlers = useRef(new Map<string, () => void>());
+  const registerLeeren = useCallback<RegisterLeeren>((schluessel, leeren) => {
+    leerenHandlers.current.set(schluessel, leeren);
     return () => {
-      if (leerenTabelle.current.get(schluessel) === leeren)
-        leerenTabelle.current.delete(schluessel);
+      if (leerenHandlers.current.get(schluessel) === leeren)
+        leerenHandlers.current.delete(schluessel);
     };
   }, []);
 
   const [leerenFrage, setLeerenFrage] = useState<DokumentAbschnitt | null>(null);
   /** Ziel von „In der Lesefassung zeigen“; der Effekt unten rollt hin, sobald sie hängt (D4). */
-  const lesenZiel = useRef<string | null>(null);
-  const [lesenAnfrage, setLesenAnfrage] = useState(0);
+  const lesenTarget = useRef<string | null>(null);
+  const [lesenRequest, setLesenRequest] = useState(0);
 
   useEffect(() => {
-    const ziel = lesenZiel.current;
-    if (ansicht !== 'lesen' || ziel == null) return;
-    lesenZiel.current = null;
-    const abschnitt = document.getElementById(leseAnker(ziel));
+    const target = lesenTarget.current;
+    if (ansicht !== 'lesen' || target == null) return;
+    lesenTarget.current = null;
+    const abschnitt = document.getElementById(leseAnker(target));
     abschnitt?.scrollIntoView?.({ block: 'start' });
     // Der Auslöser (⋮ oder Kopf) ist jetzt verborgen; der Fokus ginge sonst ins Leere.
     abschnitt?.focus({ preventScroll: true });
-  }, [ansicht, lesenAnfrage, leseAnker]);
+  }, [ansicht, lesenRequest, leseAnker]);
 
   /**
-   * Die jeweils aktuelle Ausführung; `ausfuehren` unten bleibt dabei identitätsstabil, damit das
+   * Die jeweils aktuelle Ausführung; `runAktion` unten bleibt dabei identitätsstabil, damit das
    * ⋮ in den `memo`-Blöcken nicht je Render der Seite neu rendert.
    */
-  const aktuell = useRef<AktionAusfuehren>(() => {});
+  const latestRun = useRef<RunAktion>(() => {});
   useLayoutEffect(() => {
-    aktuell.current = (key, schluessel) => {
+    latestRun.current = (key, schluessel) => {
       const abschnitt = abschnitte.find((a) => a.schluessel === schluessel);
       if (abschnitt == null) return;
       switch (key) {
@@ -197,7 +197,7 @@ export default function DokumentEntwurf({
           return;
         case 'kopieren': {
           const text = form.getFieldValue(schluessel) as unknown;
-          if (typeof text !== 'string' || !text.trim() || !istKopierbar()) return;
+          if (typeof text !== 'string' || !text.trim() || !isKopierbar()) return;
           // Beide Ausgänge melden sich: `writeText` kann vorhanden sein und trotzdem ablehnen.
           navigator.clipboard.writeText(text).then(
             () => void message.success(`Text von „${abschnitt.label}“ kopiert`),
@@ -206,9 +206,9 @@ export default function DokumentEntwurf({
           return;
         }
         case 'lesefassung':
-          lesenZiel.current = schluessel;
+          lesenTarget.current = schluessel;
           setAnsicht('lesen');
-          setLesenAnfrage((n) => n + 1);
+          setLesenRequest((n) => n + 1);
           return;
         case 'leeren':
           setLeerenFrage(abschnitt);
@@ -220,29 +220,31 @@ export default function DokumentEntwurf({
    * Nach dem Schließen des Menüs: beide Menüs geben beim Schließen den Fokus an ihren Auslöser
    * zurück, im selben Klick. Ein Sprung, der vorher fokussierte, verlöre das Feld wieder.
    */
-  const ausfuehren = useCallback<AktionAusfuehren>((key, schluessel) => {
-    window.setTimeout(() => aktuell.current(key, schluessel), 0);
+  const runAktion = useCallback<RunAktion>((key, schluessel) => {
+    window.setTimeout(() => latestRun.current(key, schluessel), 0);
   }, []);
 
-  const [kontext, setKontext] = useState<(KontextZiel & { offen: KontextMenueOffen }) | null>(null);
-  const kontextAusloeser = useKontextMenue<KontextZiel>({
-    onOeffnen: (ziel, { anker: punkt, vorherFokus }) => {
-      setKontext({ ...ziel, offen: { anker: punkt, vorherFokus } });
+  const [kontext, setKontext] = useState<(KontextTarget & { offen: KontextMenueOffen }) | null>(
+    null,
+  );
+  const kontextAusloeser = useKontextMenue<KontextTarget>({
+    onOeffnen: (target, { anker: punkt, vorherFokus }) => {
+      setKontext({ ...target, offen: { anker: punkt, vorherFokus } });
       return true;
     },
   });
-  const kontextFabrik = useCallback<KontextFabrik>(
-    (ziel) => kontextAusloeser<HTMLElement>(ziel),
+  const kontextHandlerFactory = useCallback<KontextHandlerFactory>(
+    (target) => kontextAusloeser<HTMLElement>(target),
     [kontextAusloeser],
   );
   const kontextAbschnitt =
     kontext == null ? undefined : abschnitte.find((a) => a.schluessel === kontext.schluessel);
-  const kontextZustand =
+  const kontextState =
     kontext == null || kontextAbschnitt == null
       ? null
       : {
           leer: istLeer(kette, abschnitte.indexOf(kontextAbschnitt)),
-          kopierbar: istKopierbar(),
+          kopierbar: isKopierbar(),
           ansicht,
         };
 
@@ -285,7 +287,7 @@ export default function DokumentEntwurf({
               abschnitte={abschnitte}
               kette={kette}
               onSprung={springen}
-              kontext={kontextFabrik}
+              kontext={kontextHandlerFactory}
             />
           </div>
           <div style={{ minWidth: 0 }}>
@@ -303,9 +305,9 @@ export default function DokumentEntwurf({
                   leer={istLeer(kette, i)}
                   aktion={aktion}
                   anker={anker(a.schluessel)}
-                  ausfuehren={ausfuehren}
-                  kontext={kontextFabrik}
-                  leerenAnmelden={leerenAnmelden}
+                  runAktion={runAktion}
+                  kontext={kontextHandlerFactory}
+                  registerLeeren={registerLeeren}
                 />
               ))}
             </div>
@@ -323,20 +325,20 @@ export default function DokumentEntwurf({
           </div>
         </div>
       </Paneel>
-      {kontext != null && kontextAbschnitt != null && kontextZustand != null && (
+      {kontext != null && kontextAbschnitt != null && kontextState != null && (
         <KontextMenue<AbschnittAktionKey>
           offen={kontext.offen}
           eintraege={
             kontext.ort === 'gliederung'
-              ? gliederungEintraege(kontextZustand)
-              : abschnittEintraege(kontextZustand)
+              ? gliederungEintraege(kontextState)
+              : abschnittEintraege(kontextState)
           }
           zugaenglicherName={
             kontext.ort === 'gliederung'
               ? `${aktionenName(kontextAbschnitt.label)} in der Gliederung`
               : aktionenName(kontextAbschnitt.label)
           }
-          onWahl={(key) => ausfuehren(key, kontextAbschnitt.schluessel)}
+          onWahl={(key) => runAktion(key, kontextAbschnitt.schluessel)}
           onSchliessen={() => setKontext(null)}
         />
       )}
@@ -349,7 +351,7 @@ export default function DokumentEntwurf({
         okButtonProps={{ danger: true }}
         cancelText="Abbrechen"
         onOk={() => {
-          if (leerenFrage) leerenTabelle.current.get(leerenFrage.schluessel)?.();
+          if (leerenFrage) leerenHandlers.current.get(leerenFrage.schluessel)?.();
           setLeerenFrage(null);
         }}
         onCancel={() => setLeerenFrage(null)}
@@ -391,7 +393,7 @@ interface GliederungProps {
   kette: string;
   onSprung: (schluessel: string) => void;
   /** Kontextmenü je Eintrag: „Zum Abschnitt springen“ und die Aktionen des Abschnitts. */
-  kontext: KontextFabrik;
+  kontext: KontextHandlerFactory;
 }
 
 /** Sprungleiste der Abschnitte mit Leer-Marke; rendert nur, wenn ein Abschnitt kippt. */
@@ -445,9 +447,9 @@ interface AbschnittBlockProps {
   leer: boolean;
   aktion: AbschnittAktion | undefined;
   anker: string;
-  ausfuehren: AktionAusfuehren;
-  kontext: KontextFabrik;
-  leerenAnmelden: LeerenAnmelden;
+  runAktion: RunAktion;
+  kontext: KontextHandlerFactory;
+  registerLeeren: RegisterLeeren;
 }
 
 /**
@@ -467,15 +469,15 @@ const AbschnittBlock = memo(function AbschnittBlock({
   leer,
   aktion,
   anker,
-  ausfuehren,
+  runAktion,
   kontext,
-  leerenAnmelden,
+  registerLeeren,
 }: AbschnittBlockProps) {
   const { token } = useRollen();
   const hilfeId = useId();
   const zusatz = aktion?.(a);
   // Die Blöcke stehen nur im Bearbeiten sichtbar: „In der Lesefassung zeigen“ gilt immer.
-  const kopierbar = istKopierbar();
+  const kopierbar = isKopierbar();
   const eintraege = useMemo(
     () => abschnittEintraege({ leer, kopierbar, ansicht: 'bearbeiten' }),
     [leer, kopierbar],
@@ -506,7 +508,7 @@ const AbschnittBlock = memo(function AbschnittBlock({
             <MenueAusloeser<AbschnittAktionKey>
               eintraege={eintraege}
               zugaenglicherName={aktionenName(a.label)}
-              onWahl={(key) => ausfuehren(key, a.schluessel)}
+              onWahl={(key) => runAktion(key, a.schluessel)}
             />
           </span>
         </div>
@@ -529,7 +531,7 @@ const AbschnittBlock = memo(function AbschnittBlock({
       >
         <AbschnittFeld
           schluessel={a.schluessel}
-          leerenAnmelden={leerenAnmelden}
+          registerLeeren={registerLeeren}
           umschalterAussen
           vorschauOffen={false}
           druckfassung
@@ -547,7 +549,7 @@ const AbschnittBlock = memo(function AbschnittBlock({
 
 type AbschnittFeldProps = ComponentProps<typeof MarkdownEditor> & {
   schluessel: string;
-  leerenAnmelden: LeerenAnmelden;
+  registerLeeren: RegisterLeeren;
 };
 
 /**
@@ -558,16 +560,16 @@ type AbschnittFeldProps = ComponentProps<typeof MarkdownEditor> & {
  * `form.getFieldInstance` (Sprung, `Einstiegsfokus`) ihn weiter liefert.
  */
 const AbschnittFeld = forwardRef<TextAreaRef, AbschnittFeldProps>(function AbschnittFeld(
-  { schluessel, leerenAnmelden, onChange, ...rest },
+  { schluessel, registerLeeren, onChange, ...rest },
   ref,
 ) {
-  const aenderung = useRef(onChange);
+  const onChangeRef = useRef(onChange);
   useLayoutEffect(() => {
-    aenderung.current = onChange;
+    onChangeRef.current = onChange;
   });
   useEffect(
-    () => leerenAnmelden(schluessel, () => aenderung.current?.('')),
-    [leerenAnmelden, schluessel],
+    () => registerLeeren(schluessel, () => onChangeRef.current?.('')),
+    [registerLeeren, schluessel],
   );
   return <MarkdownEditor ref={ref} onChange={onChange} {...rest} />;
 });
