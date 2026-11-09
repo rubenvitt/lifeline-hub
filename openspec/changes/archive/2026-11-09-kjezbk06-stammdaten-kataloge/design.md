@@ -105,6 +105,14 @@ läuft diese Liste in **umgekehrter** Rangfolge ein zweites Mal, jetzt mit dem b
 (stilllegen bzw. Herkunft lösen). Konten, `Schluessel::Spalte` und `Schluessel::Org` sind davon
 nicht betroffen (kein Fremdschlüssel-Fall).
 
+Solange eine Löschung wartet, trägt die Zeile noch ihre Herkunft. Legt die Quelle im selben Paket
+eine Zeile mit demselben natürlichen Schlüssel neu an (gelöscht und gleich wieder angelegt), darf
+der erste Abgleich die wartende Zeile übernehmen: Sie bekommt die neue Herkunft, ihre Löschung
+entfällt, und Einsatzdaten zeigen weiter auf sie, wie vor dieser Change, als die Zeile sofort
+stillgelegt und dann abgeglichen wurde. Unter mehreren Kandidaten gewinnt eine nicht stillgelegte
+Zeile vor einer stillgelegten (Review 09.11.2026: Sprechgruppen und Mahlzeiten sind nur unter
+aktiven Zeilen eindeutig).
+
 Alternative „alle Löschungen nach den Upserts“ verworfen: Sie ändert für jede Art die Reihenfolge,
 und ein am Hub gelöschtes und mit gleichem Namen neu angelegtes Fahrzeug liefe in die Eindeutigkeit
 des Namens. Der zweite Versuch ändert nur den Fall, der bisher in einer Leiche endete.

@@ -235,6 +235,10 @@ Zeile stillgelegt werden oder, wenn ihre Art kein Stilllegen kennt, der meldende
 - **WHEN** am Hub ein Schichtmodell gelöscht wird, das am ELW eine eigene Einsatz-Vorlage („nur hier“) vorgibt
 - **THEN** bleibt das Schichtmodell am ELW stehen, gehört dem ELW und ist dort bearbeitbar
 
+#### Scenario: Gelöscht und gleich wieder angelegt
+- **WHEN** am Hub ein Material mit der Bestandsnummer „M-1“ gelöscht und mit derselben Bestandsnummer neu angelegt wird, bevor der ELW sich meldet, und ein Einsatz am ELW das alte verwendet
+- **THEN** gibt es am ELW danach genau ein aktives Material „M-1“, es ist das, auf das der Einsatz zeigt, trägt die Daten der Neuanlage und gilt als „vom Hub“
+
 ### Requirement: Unterkunft-Richtwerte gelten je Schlüssel
 
 Die meldende Seite SHALL jeden Richtwert der Org, den der Hub setzt, als eigene Zeile übernehmen

@@ -523,3 +523,178 @@ async fn schichtmodell_einer_eigenen_vorlage_bleibt_und_gehoert_dem_elw() {
     )
     .await;
 }
+
+// ── Löschen und Neuanlage im selben Paket, Abgleich mit Dubletten (Review) ──────────────────
+
+#[tokio::test]
+async fn geloeschtes_und_neu_angelegtes_material_im_einsatz_bleibt_eine_zeile() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO material (org_id, bezeichnung, bestandsnummer) VALUES (1, 'Zelt', 'M-1')",
+    )
+    .await;
+    // Eine Zeile dahinter: sonst vergäbe der Hub der Neuanlage dieselbe id wie dem gelöschten Zelt.
+    exec(
+        &hub.pool,
+        "INSERT INTO material (org_id, bezeichnung, bestandsnummer) VALUES (1, 'Decke', 'M-2')",
+    )
+    .await;
+    melden(&elw).await;
+    let zelt = lokale_id(&elw, "material", "bestandsnummer", "M-1").await;
+    let einsatz = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &elw.admin,
+        Some(&json!({"material_id": zelt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    // Am Hub gelöscht und mit derselben Bestandsnummer neu angelegt, beides vor der Meldung.
+    exec(
+        &hub.pool,
+        "DELETE FROM material WHERE bestandsnummer = 'M-1'",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO material (org_id, bezeichnung, bestandsnummer) VALUES (1, 'Zelt neu', 'M-1')",
+    )
+    .await;
+    melden(&elw).await;
+
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT COUNT(*) FROM material WHERE bestandsnummer = 'M-1' AND dienststatus = 'in_dienst'"
+        )
+        .await,
+        1
+    );
+    let aktiv: i64 = eine(
+        &elw.pool,
+        "SELECT id FROM material WHERE bestandsnummer = 'M-1' AND dienststatus = 'in_dienst'",
+    )
+    .await;
+    assert_eq!(
+        aktiv, zelt,
+        "die Zeile, auf die der Einsatz zeigt, wird übernommen"
+    );
+    assert!(ist_vom_hub(&elw, "material", &zelt.to_string()).await);
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            &format!("SELECT bezeichnung FROM material WHERE id = {zelt}")
+        )
+        .await,
+        "Zelt neu"
+    );
+}
+
+#[tokio::test]
+async fn schichtmodell_geloescht_und_gleichnamig_neu_angelegt_bleibt_an_der_vorlage() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten) \
+         VALUES (1, 'Standard', 'rhythmus', 600)",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO einsatz_vorlage (org_id, bezeichnung, schichtmodell_id) \
+         SELECT 1, 'Mit Standard', id FROM schichtmodell WHERE bezeichnung = 'Standard'",
+    )
+    .await;
+    melden(&elw).await;
+    let alt: i64 = eine(
+        &hub.pool,
+        "SELECT id FROM schichtmodell WHERE bezeichnung = 'Standard'",
+    )
+    .await;
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "DELETE",
+        &format!("/api/schichtmodelle/{alt}"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    exec(
+        &hub.pool,
+        "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten) \
+         VALUES (1, 'Standard', 'rhythmus', 720)",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "UPDATE einsatz_vorlage SET schichtmodell_id = \
+         (SELECT id FROM schichtmodell WHERE bezeichnung = 'Standard') \
+         WHERE bezeichnung = 'Mit Standard'",
+    )
+    .await;
+    melden(&elw).await;
+
+    let modell = lokale_id(&elw, "schichtmodell", "bezeichnung", "Standard").await;
+    assert!(ist_vom_hub(&elw, "schichtmodell", &modell.to_string()).await);
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!("SELECT rhythmus_minuten FROM schichtmodell WHERE id = {modell}")
+        )
+        .await,
+        720
+    );
+    assert_eq!(
+        eine::<Option<i64>>(
+            &elw.pool,
+            "SELECT schichtmodell_id FROM einsatz_vorlage WHERE bezeichnung = 'Mit Standard'"
+        )
+        .await,
+        Some(modell)
+    );
+}
+
+#[tokio::test]
+async fn erster_abgleich_bevorzugt_die_aktive_von_zwei_gleichnamigen_zeilen() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &elw.pool,
+        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart, aktiv) VALUES (1, 'Kanal 1', 'TMO', 0)",
+    )
+    .await;
+    exec(
+        &elw.pool,
+        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart) VALUES (1, 'Kanal 1', 'TMO')",
+    )
+    .await;
+    let inaktiv: i64 = eine(
+        &elw.pool,
+        "SELECT id FROM sprechgruppe WHERE bezeichnung = 'Kanal 1' AND aktiv = 0",
+    )
+    .await;
+    let aktiv: i64 = eine(
+        &elw.pool,
+        "SELECT id FROM sprechgruppe WHERE bezeichnung = 'Kanal 1' AND aktiv = 1",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart) VALUES (1, 'Kanal 1', 'TMO')",
+    )
+    .await;
+    melden(&elw).await;
+    assert!(ist_vom_hub(&elw, "sprechgruppe", &aktiv.to_string()).await);
+    assert!(!ist_vom_hub(&elw, "sprechgruppe", &inaktiv.to_string()).await);
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!("SELECT aktiv FROM sprechgruppe WHERE id = {inaktiv}")
+        )
+        .await,
+        0
+    );
+}

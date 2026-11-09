@@ -157,15 +157,27 @@ fn bereich_sql(b: &ArtBeschreibung) -> String {
         .unwrap_or_default()
 }
 
-/// Erster Abgleich (D5): die älteste lokale Zeile der Art im Bereich, die noch nicht vom Hub stammt
-/// und in jeder Spalte des natürlichen Schlüssels gleich ist. Fehlt ein Wert oder ist er leer,
-/// wird nicht abgeglichen.
+/// Eine Löschung, die auf ihren zweiten Versuch wartet (D5 der Change
+/// `kjezbk06-stammdaten-kataloge`). Bis dahin trägt die Zeile noch ihre Herkunft.
+struct Wartend<'a> {
+    art: StammdatenArt,
+    lieferung: &'a StammdatenLieferung,
+    lokal: String,
+}
+
+/// Erster Abgleich (D5): eine lokale Zeile der Art im Bereich, die in jeder Spalte des natürlichen
+/// Schlüssels gleich ist und noch nicht vom Hub stammt, oder deren Löschung vom Hub noch wartet
+/// (gelöscht und gleich wieder angelegt: die Zeile bleibt, auf die Einsatzdaten zeigen). Unter
+/// mehreren gewinnt eine nicht stillgelegte, dann die älteste. Fehlt ein Wert oder ist er leer,
+/// wird nicht abgeglichen. Liefert den lokalen Schlüssel und, wenn die Zeile wartete, den
+/// Schlüssel an der Quelle, dessen Herkunft sie verliert.
 async fn find_natuerlich(
     conn: &mut SqliteConnection,
     b: &ArtBeschreibung,
     org_id: i64,
     daten: &Value,
-) -> Result<Option<String>, AppError> {
+    wartend: &[Wartend<'_>],
+) -> Result<Option<(String, Option<String>)>, AppError> {
     let mut werte = Vec::with_capacity(b.natuerlich.len());
     for n in b.natuerlich {
         match daten[*n].as_str().filter(|w| !w.trim().is_empty()) {
@@ -178,24 +190,37 @@ async fn find_natuerlich(
         .iter()
         .map(|n| format!(" AND t.{n} = ?"))
         .collect();
+    // Stillgelegte zuletzt: Ihr Name ist oft nur unter aktiven Zeilen eindeutig, eine zweite
+    // aktive Zeile desselben Namens stieße sich sonst am Index. Spalte und Wert sind Konstanten.
+    let stillgelegt_zuletzt = b
+        .stilllegen
+        .map(|(spalte, wert)| format!("(t.{spalte} = '{wert}'), "))
+        .unwrap_or_default();
     let sql = format!(
-        "SELECT t.id FROM {tab} t WHERE t.org_id = ?{gleich}{bereich} \
-         AND NOT EXISTS (SELECT 1 FROM stammdaten_herkunft h \
+        "SELECT t.id, EXISTS (SELECT 1 FROM stammdaten_herkunft h \
            WHERE h.art = ? AND h.org_id = t.org_id \
              AND h.lokaler_schluessel = CAST(t.id AS TEXT)) \
-         ORDER BY t.id LIMIT 1",
+         FROM {tab} t WHERE t.org_id = ?{gleich}{bereich} \
+         ORDER BY {stillgelegt_zuletzt}t.id",
         tab = b.tabelle,
         bereich = bereich_sql(b)
     );
-    let mut abfrage = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql)).bind(org_id);
+    let mut abfrage = sqlx::query_as::<_, (i64, bool)>(sqlx::AssertSqlSafe(sql))
+        .bind(b.art.as_str())
+        .bind(org_id);
     for w in werte {
         abfrage = abfrage.bind(w);
     }
-    Ok(abfrage
-        .bind(b.art.as_str())
-        .fetch_optional(&mut *conn)
-        .await?
-        .map(|id| id.to_string()))
+    for (id, vom_hub) in abfrage.fetch_all(&mut *conn).await? {
+        let lokal = id.to_string();
+        if !vom_hub {
+            return Ok(Some((lokal, None)));
+        }
+        if let Some(w) = wartend.iter().find(|w| w.art == b.art && w.lokal == lokal) {
+            return Ok(Some((lokal, Some(w.lieferung.schluessel.clone()))));
+        }
+    }
+    Ok(None)
 }
 
 /// Wie [`upsert`] ausging.
@@ -213,6 +238,7 @@ async fn upsert(
     b: &ArtBeschreibung,
     l: &StammdatenLieferung,
     daten: &Value,
+    wartend: &[Wartend<'_>],
 ) -> Result<Upsert, AppError> {
     let json = daten.to_string();
     let org_id = zuordnung.org_id;
@@ -275,7 +301,15 @@ async fn upsert(
                         )));
                     }
                 } else if !b.natuerlich.is_empty() {
-                    lokal = find_natuerlich(conn, b, org_id, daten).await?;
+                    if let Some((gefunden, alt)) =
+                        find_natuerlich(conn, b, org_id, daten, wartend).await?
+                    {
+                        // Die Löschung der alten Zeile entfällt; sie trägt ab jetzt die neue.
+                        if let Some(alt) = alt {
+                            herkunft::delete(conn, zuordnung.id, b.art, &alt).await?;
+                        }
+                        lokal = Some(gefunden);
+                    }
                 }
             }
             // Selbstverweise setzt erst der zweite Durchgang.
@@ -463,8 +497,9 @@ async fn apply_verweise(
 #[derive(Debug, PartialEq, Eq)]
 enum Loeschung {
     Erledigt,
-    /// Eine andere Zeile zeigt noch auf sie; nach dem Rest der Lieferung erneut versuchen.
-    Nachholen,
+    /// Eine andere Zeile zeigt noch auf sie; nach dem Rest der Lieferung erneut versuchen. Der
+    /// lokale Schlüssel der Zeile.
+    Nachholen(String),
 }
 
 /// Entfernt eine an der Quelle gelöschte Zeile; ist sie hier verwendet, wird sie stillgelegt.
@@ -561,7 +596,7 @@ async fn delete_zeile(
                         .execute(&mut *conn)
                         .await?;
                     if nachholen {
-                        return Ok(Loeschung::Nachholen);
+                        return Ok(Loeschung::Nachholen(lokal));
                     }
                     if let Some((spalte, wert)) = b.stilllegen {
                         sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -619,14 +654,18 @@ pub async fn uebernehmen(
         .await?;
 
     let mut zweiter: Vec<(&ArtBeschreibung, Value, i64)> = Vec::new();
-    let mut nachholen: Vec<(StammdatenArt, &StammdatenLieferung)> = Vec::new();
+    let mut nachholen: Vec<Wartend<'_>> = Vec::new();
     for (a, l) in &sortiert {
         let b = art::beschreibung(*a);
         if l.geloescht || l.daten.is_none() {
-            if delete_zeile(conn, zuordnung, b, l, &mut ergebnis, true).await?
-                == Loeschung::Nachholen
+            if let Loeschung::Nachholen(lokal) =
+                delete_zeile(conn, zuordnung, b, l, &mut ergebnis, true).await?
             {
-                nachholen.push((*a, l));
+                nachholen.push(Wartend {
+                    art: *a,
+                    lieferung: l,
+                    lokal,
+                });
             }
             continue;
         }
@@ -658,7 +697,7 @@ pub async fn uebernehmen(
         sqlx::query("SAVEPOINT stammdaten_zeile")
             .execute(&mut *conn)
             .await?;
-        let mut versuch = upsert(conn, zuordnung, b, l, &uebersetzt).await;
+        let mut versuch = upsert(conn, zuordnung, b, l, &uebersetzt, &nachholen).await;
         if let (Ok(Upsert::Ok(lokal)), StammdatenArt::Konto) = (&versuch, a) {
             let id = lokal.parse::<i64>().unwrap_or(-1);
             if let Err(e) = apply_geheimnis(conn, zuordnung, l, id, age).await {
@@ -671,6 +710,8 @@ pub async fn uebernehmen(
                     .execute(&mut *conn)
                     .await?;
                 ergebnis.geaendert = true;
+                // Hat die Zeile eine wartende Löschung übernommen, entfällt diese.
+                nachholen.retain(|w| !(w.art == *a && w.lokal == lokal));
                 if *a == StammdatenArt::Konto
                     && vorher_aktiv == Some(true)
                     && uebersetzt["aktiv"].as_i64() == Some(0)
@@ -735,13 +776,13 @@ pub async fn uebernehmen(
         }
     }
     // Zweiter Versuch der am Verweis gescheiterten Löschungen, wer verweist, zuerst (D5).
-    nachholen.sort_by_key(|(a, l)| (std::cmp::Reverse(art::rang(*a)), l.stand));
-    for (a, l) in nachholen {
+    nachholen.sort_by_key(|w| (std::cmp::Reverse(art::rang(w.art)), w.lieferung.stand));
+    for w in nachholen {
         delete_zeile(
             conn,
             zuordnung,
-            art::beschreibung(a),
-            l,
+            art::beschreibung(w.art),
+            w.lieferung,
             &mut ergebnis,
             false,
         )
