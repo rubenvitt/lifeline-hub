@@ -945,6 +945,7 @@ export default function AbloesungPage() {
             vollzugMut.reset();
             setVollzugSchicht(x);
           }}
+          abschnitteBereit={!vorgabenQuery.isPending}
           werkzeuge={
             <>
               {darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null}

@@ -319,7 +319,8 @@ async fn zeile_loeschen(
                 Ausgang::Entfernt
             })
         }
-        Err(e) if ist_fk_verletzung(&e) => {
+        // Eine Zeile vom Hub (LLH-1493) ist hier nur lesbar; sie bleibt wie eine verwiesene.
+        Err(e) if ist_fk_verletzung(&e) || ist_vom_hub(&e) => {
             // Noch verwiesen: alles aus diesem Savepoint zurück, auch die Qualifikationen.
             sqlx::query("ROLLBACK TO demo_zeile")
                 .execute(&mut *conn)
@@ -336,6 +337,11 @@ async fn zeile_loeschen(
 
 /// `true` bei einer Fremdschlüsselverletzung: sqlx 0.9 bildet den erweiterten Code
 /// `SQLITE_CONSTRAINT_FOREIGNKEY` (787) auf `ErrorKind::ForeignKeyViolation` ab.
+fn ist_vom_hub(fehler: &sqlx::Error) -> bool {
+    matches!(fehler, sqlx::Error::Database(db)
+        if db.message().contains(crate::instanz::stammdaten::SCHUTZ_NACHRICHT))
+}
+
 pub(crate) fn ist_fk_verletzung(fehler: &sqlx::Error) -> bool {
     matches!(fehler, sqlx::Error::Database(db) if db.is_foreign_key_violation())
 }

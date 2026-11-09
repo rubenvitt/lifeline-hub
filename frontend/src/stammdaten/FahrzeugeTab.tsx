@@ -22,10 +22,12 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 import { staerkeSumme, staerkeText } from '../anzeige/staerke';
+import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
 
 export default function FahrzeugeTab() {
   const { benutzer } = useAuth();
+  const herkunft = useStammdatenHerkunft();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const { istSchmal } = useViewport();
   const [modalOffen, setModalOffen] = useState(false);
@@ -82,6 +84,10 @@ export default function FahrzeugeTab() {
             {f.funkrufname}
           </KennungsLink>
           {f.ist_demo && <DemoMarke />}
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('fahrzeug', f.id)}
+            quelle={herkunft.quelle}
+          />
         </Space>
       ),
     },
@@ -120,6 +126,7 @@ export default function FahrzeugeTab() {
       render: (_, f) => <span style={monoStil(12)}>{staerkeText(f.staerke)}</span>,
     },
     ...dienststatusSpalten<Fahrzeug>({
+      vomHub: (z) => herkunft.istVomHub('fahrzeug', z.id),
       mutation: dienststatusMutation,
       istAdmin,
       schmal: istSchmal,

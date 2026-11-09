@@ -159,6 +159,7 @@ const felder = (
 export default function StatusKatalogTab() {
   return (
     <KatalogVerwaltung<FahrzeugStatus, FormWerte>
+      herkunftArt="fahrzeug_status"
       listenSeite="stammdaten-status"
       mehrzahl="Status"
       titel="Fahrzeug-Status"

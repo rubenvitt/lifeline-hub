@@ -1204,6 +1204,9 @@ const AUSNAHMEN: &[&str] = &[
     "auth_audit",
     "benutzer_einstellungen",
     "demo_import",
+    // Änderungslog der Stammdaten-Verteilung (LLH-1493): wächst nur, auch beim Entfernen; ein
+    // gekoppelter ELW sieht so, dass die Demo-Zeilen wieder weg sind.
+    "stammdaten_aenderung",
 ];
 
 /// Das Bild aller Nutzdatentabellen: die Tabellenliste aus dem Schema **entdeckt**, nicht

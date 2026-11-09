@@ -25,12 +25,14 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
 
 const POSITION_FOLGE = Object.keys(POSITION_LABELS) as StaerkePosition[];
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
+  const herkunft = useStammdatenHerkunft();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const { istSchmal } = useViewport();
   const [modalOffen, setModalOffen] = useState(false);
@@ -82,6 +84,10 @@ export default function PersonalTab() {
             {p.name}
           </KennungsLink>
           {p.ist_demo && <DemoMarke />}
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('personal', p.id)}
+            quelle={herkunft.quelle}
+          />
         </Space>
       ),
     },
@@ -138,6 +144,7 @@ export default function PersonalTab() {
       render: (t) => t ?? '—',
     },
     ...dienststatusSpalten<Personal>({
+      vomHub: (z) => herkunft.istVomHub('personal', z.id),
       mutation: dienststatusMutation,
       istAdmin,
       schmal: istSchmal,

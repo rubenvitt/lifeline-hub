@@ -1262,3 +1262,44 @@ describe('BenutzerPage', () => {
     });
   });
 });
+
+describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
+  it('Konto vom Hub: Deaktivieren gesperrt mit Grund; Admin ohne Passkey bekommt den Hinweis', async () => {
+    server.use(
+      meHandler(benutzer()),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({ id: 7, anzeigename: 'Max', benutzername: 'max' }),
+        ]),
+      ),
+      http.get('/api/instanz/stammdaten/herkunft', () =>
+        HttpResponse.json({
+          quelle: 'Hub DRK Landesverband',
+          vom_hub: { konto: ['7'] },
+          admins_ohne_passkey: [benutzer().id],
+        }),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+      </Routes>,
+      { route: '/admin/benutzer' },
+    );
+    expect(await screen.findByText('@max')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Für die Anmeldung am ELW zuerst einen Passkey einrichten'),
+    ).toBeInTheDocument();
+    const menue = await oeffneMenue('Max');
+    expect(
+      within(menue).getByRole('menuitem', { name: 'Deaktivieren gesperrt: Wird am Hub gepflegt' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Escape}');
+    // Bearbeiten: „Speichern“ gesperrt (ein PATCH bekäme nur 409), das Einmalpasswort bleibt.
+    await waehle('Max', 'Bearbeiten');
+    const bearbeiten = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
+    expect(within(bearbeiten).getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    expect(within(bearbeiten).getByRole('button', { name: /Einmalpasswort/ })).toBeEnabled();
+  });
+});

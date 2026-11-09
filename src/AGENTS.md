@@ -319,6 +319,25 @@ Herleitung in
   Admin-Konto deaktiviert oder herabstuft, widerruft dessen Schlüssel im selben Commit.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
   (`akteur_id` NULL, Name der Gegenstelle).
+- **Stammdaten-Verteilung (LLH-1493)**, Spec `stammdaten-verteilung`, Herleitung
+  `openspec/changes/archive/2026-11-09-ca8v0psv-stammdaten-verteilung/design.md`:
+  - **Eine verteilte Art hat einen Eintrag in `instanz::stammdaten::art::BESCHREIBUNGEN` und ihre
+    Trigger** (`<tabelle>_log_i/_u/_d`, `<tabelle>_schutz_u/_d`, Unterlisten auch `_schutz_i`,
+    Muster `migrations/0306`). Wer eine dieser Tabellen in einer Migration neu baut, legt die
+    Trigger wieder an; Guard `art::tests::trigger_und_spalten_passen_zur_beschreibung`. Kein
+    Schreibweg in Rust schreibt ins Änderungslog.
+  - **Übernommene Zeilen ändert nur die Übernahme** (`stammdaten::uebernehmen`, Merker
+    `stammdaten_uebernahme` in ihrer Transaktion); jeder andere Weg bekommt 409 „Wird am Hub
+    gepflegt.“ aus dem Trigger. An `benutzer` schützt der Trigger nur Name, Anzeigename, Rollen,
+    Aktivität und Org: Passwort nach Einmalpasswort, TOTP-Einrichtung und Anmeldezähler bleiben
+    lokal schreibbar.
+  - **Kontogeheimnisse nur über `stammdaten::geheimnis`** (age an den Empfänger aus der
+    Meldung, nur bei bestätigter Platte, Admins nur mit Anmelde-Passkey, keine Gerätekonten).
+    Ob die Passkey-Pflicht gilt, sagt allein `geheimnis::is_passkey_pflichtig` (Login,
+    Einmalpasswort, Notfallbefehl `auth::notfall`); die Pflicht am Login regelt [ADR-0016](../docs/architektur/entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md).
+  - **Systemrolle `admin` vom Hub nur an einer Instanz mit einer Org** (`uebernehmen`); sonst
+    `keiner` mit Hinweis an der Kopplung.
+  - Nachweis: `tests/instanz_stammdaten.rs`, `tests/instanz_stammdaten_live.rs`.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)

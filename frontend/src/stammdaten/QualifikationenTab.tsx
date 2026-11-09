@@ -93,6 +93,7 @@ export default function QualifikationenTab() {
   const spalten = spaltenMit(katalog.data ?? []);
   return (
     <KatalogVerwaltung<Qualifikation, FormWerte>
+      herkunftArt="qualifikation"
       titel="Qualifikationen"
       listenSeite="stammdaten-qualifikationen"
       mehrzahl="Qualifikationen"
