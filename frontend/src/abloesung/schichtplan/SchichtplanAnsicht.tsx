@@ -326,14 +326,26 @@ export default function SchichtplanAnsicht({
       message.success(neu === 1 ? '1 Schicht erzeugt' : `${neu} Schichten erzeugt`);
     },
   });
+  // Nur der Dialog des gelöschten Blocks schließt: ein Löschen aus dem Kontextmenü (LLH-1600)
+  // kehrt womöglich erst zurück, wenn schon der Dialog eines anderen Blocks offen ist.
+  const nachLoeschen = (_antwort: unknown, b: SchichtplanBlock) => {
+    setDialog((d) => (d != null && 'blockId' in d && d.blockId === b.id ? null : d));
+    void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) });
+  };
   const loeschenMut = useMutation({
     mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
-    // Nur der Dialog des gelöschten Blocks schließt: ein Löschen aus dem Kontextmenü (LLH-1600)
-    // kehrt womöglich erst zurück, wenn schon der Dialog eines anderen Blocks offen ist.
-    onSuccess: (_antwort, b) => {
-      setDialog((d) => (d != null && 'blockId' in d && d.blockId === b.id ? null : d));
-      void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) });
-    },
+    onSuccess: nachLoeschen,
+  });
+  // Kontextmenü (LLH-1600): eigene Mutationen, damit Lauf und Fehler eines stillen Kopierens oder
+  // Löschens nie im Dialog eines anderen Blocks stehen und `reset()` beim Öffnen eines Blocks die
+  // Sperre des Menüs nicht aufhebt. Fehler stehen über dem Raster (`zugSchreiben`).
+  const menueKopierenMut = useMutation({
+    mutationFn: (body: SchichtplanBlockBody) => legeSchichtplanBlockAn(einsatzId, body),
+    onSuccess: setzePlan,
+  });
+  const menueLoeschenMut = useMutation({
+    mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
+    onSuccess: nachLoeschen,
   });
   // Fehler eines Zugs im Raster (ohne offenen Dialog) stehen über dem Raster.
   const [zugFehler, setZugFehler] = useState<unknown>(null);
@@ -457,10 +469,8 @@ export default function SchichtplanAnsicht({
   };
   const oeffneBlock = (blockId: number) => {
     aendernMut.reset();
-    // Ein Löschen oder Kopieren aus dem Kontextmenü kann noch laufen (LLH-1600); `reset()` hängte
-    // es ab, `isPending` fiele weg, und Menü wie Dialog sendeten es ein zweites Mal.
-    if (!loeschenMut.isPending) loeschenMut.reset();
-    if (!kopierenMut.isPending) kopierenMut.reset();
+    loeschenMut.reset();
+    kopierenMut.reset();
     setDialog({ art: 'block', blockId });
   };
   const oeffneErzeugen = () => {
@@ -480,7 +490,7 @@ export default function SchichtplanAnsicht({
     const body = naechsterBlockBody(block);
     if (!body) return;
     zugSchreiben(
-      kopierenMut.mutateAsync(body).then(() => {
+      menueKopierenMut.mutateAsync(body).then(() => {
         message.success('Block kopiert');
       }),
     );
@@ -489,10 +499,10 @@ export default function SchichtplanAnsicht({
     blockVon,
     onBearbeiten: oeffneBlock,
     onKopieren: kopiereStill,
-    onLoeschen: (b) => zugSchreiben(loeschenMut.mutateAsync(b)),
+    onLoeschen: (b) => zugSchreiben(menueLoeschenMut.mutateAsync(b)),
     onWechsel: (b) => setDialog({ art: 'wechsel', blockId: b.id }),
     wechselMoeglich,
-    laeuft: kopierenMut.isPending || loeschenMut.isPending,
+    laeuft: menueKopierenMut.isPending || menueLoeschenMut.isPending,
   });
   const mitSeitenleiste = !istSchmal && darfSchreiben;
 
