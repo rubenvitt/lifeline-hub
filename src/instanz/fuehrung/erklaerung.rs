@@ -75,12 +75,11 @@ fn info(einsatz: &str, epoche: &Epoche) -> Vec<u8> {
 }
 
 /// Schlüssel aus einem normalisierten Abgabecode, gebunden an Einsatz und reservierte Epoche.
+/// HKDF (RFC 5869) mit einem Block über `code::expand_block`: dieselben Bytes wie
+/// `Hkdf::expand`, aber ohne vorbelegten Ausgabepuffer (`rust/hard-coded-cryptographic-value`).
 pub fn abgabe_schluessel(code: &str, einsatz: &str, epoche: &Epoche) -> [u8; 32] {
-    let hk = Hkdf::<Sha256>::new(Some(SALZ), code.as_bytes());
-    let mut aus = [0u8; 32];
-    hk.expand(&info(einsatz, epoche), &mut aus)
-        .expect("32 Byte sind eine gültige Länge");
-    aus
+    let (prk, _) = Hkdf::<Sha256>::extract(Some(SALZ), code.as_bytes());
+    code::expand_block(&prk, &info(einsatz, epoche))
 }
 
 /// Gespeicherte Form des Schlüssels (Base64url).
@@ -172,6 +171,16 @@ mod tests {
             abgabe_schluessel("ABCDEFGHJKMNPQRS", "elw/7", &Epoche::neu(4, "elw"))
         );
         assert_eq!(parse_schluessel(&schluessel_text(&k)), Some(k));
+    }
+
+    #[test]
+    fn abgabeschluessel_gleicht_hkdf_expand_byte_fuer_byte() {
+        let e = Epoche::neu(3, "elw");
+        let hk = Hkdf::<Sha256>::new(Some(SALZ), b"ABCDEFGHJKMNPQRS");
+        let mut erwartet = [1u8; 32];
+        hk.expand(&info("elw/7", &e), &mut erwartet)
+            .expect("32 Byte passen");
+        assert_eq!(abgabe_schluessel("ABCDEFGHJKMNPQRS", "elw/7", &e), erwartet);
     }
 
     #[test]

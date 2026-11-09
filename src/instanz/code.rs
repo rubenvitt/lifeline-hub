@@ -85,7 +85,7 @@ pub fn derive(code: &str) -> Ableitung {
 /// HKDF-Expand (RFC 5869, Abschnitt 2.3) für genau einen Block: `T(1) = HMAC(PRK, info ‖ 0x01)`,
 /// dieselben Bytes wie `Hkdf::expand` mit 32 Byte Länge. Ohne vorbelegten Ausgabepuffer, den
 /// CodeQL sonst als festen Schlüssel liest (`rust/hard-coded-cryptographic-value`).
-fn expand_block(prk: &[u8], info: &[u8]) -> [u8; 32] {
+pub(crate) fn expand_block(prk: &[u8], info: &[u8]) -> [u8; 32] {
     let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(prk).expect("jede Länge");
     mac.update(info);
     mac.update(&[1]);

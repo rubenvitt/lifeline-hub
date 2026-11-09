@@ -73,10 +73,12 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
       // Katalog LLH-1142 E1 (LLH-1425): dazu Vermisstenmeldung und Unwetter (Warnstufe rot).
       'Vermisstenmeldung',
       'Unwetterwarnung',
+      // Führung je Einsatz (LLH-1491): eine ungültige Übernahme ist ein Alarm.
+      'Ungültige Übernahme der Führung',
     ]) {
       expect(within(alarme).getByText(name)).toBeInTheDocument();
     }
-    expect(within(alarme).getAllByText(IMMER_AN)).toHaveLength(6);
+    expect(within(alarme).getAllByText(IMMER_AN)).toHaveLength(7);
     expect(within(alarme).queryByRole('switch')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Sofortmeldung' })).not.toBeInTheDocument();
   });
@@ -85,7 +87,7 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     zeige();
     const hinweise = await screen.findByRole('region', { name: 'Hinweise' });
     const alle = await within(hinweise).findAllByRole('switch');
-    expect(alle).toHaveLength(20);
+    expect(alle).toHaveLength(21);
     for (const s of alle) expect(s).toBeChecked();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Auftrag' })).toBeInTheDocument();
     // Die Hinweise der Ablösung (LLH-1131) sind je für sich abschaltbar.
@@ -94,6 +96,9 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     ).toBeInTheDocument();
     expect(within(hinweise).getByRole('switch', { name: 'Ablösende Einheit' })).toBeInTheDocument();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Einsatz' })).toBeInTheDocument();
+    expect(
+      within(hinweise).getByRole('switch', { name: 'Führung übernommen' }),
+    ).toBeInTheDocument();
     // Rückmeldung überfällig ist ein Eingang (LLH-1425); Unwetter ist seither ein Alarm.
     expect(
       within(hinweise).getByRole('switch', { name: 'Rückmeldung überfällig' }),
