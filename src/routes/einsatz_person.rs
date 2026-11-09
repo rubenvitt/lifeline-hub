@@ -1058,7 +1058,12 @@ pub async fn anlegen(
         for etb_id in uhs_etb_id.into_iter().chain(verbleib_etb_id) {
             state.live.publiziere(einsatz_id, etb_id);
         }
-        super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &belegung_etb_ids);
+        super::betreuung::publiziere_nachgefuehrt(
+            &state,
+            einsatz_id,
+            &belegung_etb_ids,
+            person.aktuelle_verbleib_betreuungsstelle_id.is_some(),
+        );
         // Die Meldung zeigt ihre Patienten (design.md D6): ohne Neuladen.
         if body.meldung_id.is_some() || rtw_meldung_id.is_some() {
             state
@@ -1460,6 +1465,7 @@ pub async fn aktualisieren(
         Some(None) => Some(None),
         None => None,
     };
+    let kostform_gesetzt = kostform.is_some();
     let unvertraeglichkeiten = optional_max_tri(
         body.unvertraeglichkeiten,
         "Unverträglichkeiten",
@@ -1562,6 +1568,16 @@ pub async fn aktualisieren(
     )
     .await?;
     sse_person(&state, einsatz_id, person.id);
+    // Die Kostform-Zählung (Sonderkost-Vorschlag, LLH-1612) zählt Personen an einer Stelle; wer
+    // Verpflegung ohne Personenrecht führt, bekommt kein `person` und braucht `betreuung`.
+    if kostform_gesetzt {
+        super::betreuung::publiziere_nachgefuehrt(
+            &state,
+            einsatz_id,
+            &[],
+            person.aktuelle_verbleib_betreuungsstelle_id.is_some(),
+        );
+    }
     Ok(Json(person))
 }
 
@@ -1651,7 +1667,7 @@ pub async fn stornieren(
     // Transaktion gelesen, nicht vorher: ein paralleler Verbleibwechsel könnte sie geändert haben.
     let benutzer_id = ctx.benutzer.id;
     let jetzt = crate::zeit::jetzt();
-    let belegung_etb_ids = crate::write_retry!(&state.pool, |conn| {
+    let (belegung_etb_ids, stelle_beruehrt) = crate::write_retry!(&state.pool, |conn| {
         repo::storniere_tx(conn, einsatz_id, person_id, benutzer_id).await?;
         let stelle: Option<i64> = sqlx::query_scalar(
             "SELECT aktuelle_verbleib_betreuungsstelle_id FROM einsatz_person \
@@ -1662,17 +1678,16 @@ pub async fn stornieren(
         .fetch_one(&mut *conn)
         .await?;
         match stelle {
-            Some(sid) => {
-                crate::betreuung::repo::belegung_nachfuehren_tx(
-                    conn,
-                    einsatz_id,
-                    sid,
-                    &jetzt,
-                    benutzer_id,
-                )
-                .await
-            }
-            None => Ok(Vec::new()),
+            Some(sid) => crate::betreuung::repo::belegung_nachfuehren_tx(
+                conn,
+                einsatz_id,
+                sid,
+                &jetzt,
+                benutzer_id,
+            )
+            .await
+            .map(|ids| (ids, true)),
+            None => Ok((Vec::new(), false)),
         }
     })?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
@@ -1697,7 +1712,12 @@ pub async fn stornieren(
         ),
     )
     .await;
-    super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &belegung_etb_ids);
+    super::betreuung::publiziere_nachgefuehrt(
+        &state,
+        einsatz_id,
+        &belegung_etb_ids,
+        stelle_beruehrt,
+    );
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -2302,9 +2322,10 @@ pub async fn verbleib(
             austritt,
             etb_id,
             belegung_etb_ids: erfasst.belegung_etb_ids,
+            stelle_beruehrt: erfasst.stelle_beruehrt,
         })
     })?;
-    let (verbleib, austritt, etb_id, belegung_etb_ids) = match ergebnis {
+    let (verbleib, austritt, etb_id, belegung_etb_ids, stelle_beruehrt) = match ergebnis {
         Verbleibt::Replay(replay) => {
             return Ok((
                 StatusCode::CREATED,
@@ -2316,7 +2337,14 @@ pub async fn verbleib(
             austritt,
             etb_id,
             belegung_etb_ids,
-        } => (verbleib, austritt, etb_id, belegung_etb_ids),
+            stelle_beruehrt,
+        } => (
+            verbleib,
+            austritt,
+            etb_id,
+            belegung_etb_ids,
+            stelle_beruehrt,
+        ),
     };
     if let Some(a) = austritt {
         state.live.publiziere(einsatz_id, a.etb_id);
@@ -2325,7 +2353,12 @@ pub async fn verbleib(
             .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", a.uhs_id);
     }
     state.live.publiziere(einsatz_id, etb_id);
-    super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &belegung_etb_ids);
+    super::betreuung::publiziere_nachgefuehrt(
+        &state,
+        einsatz_id,
+        &belegung_etb_ids,
+        stelle_beruehrt,
+    );
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
 }
@@ -2440,6 +2473,7 @@ enum Verbleibt {
         etb_id: i64,
         /// Belegungsmeldungen namentlich geführter Stellen (LLH-1612, design.md D5).
         belegung_etb_ids: Vec<i64>,
+        stelle_beruehrt: bool,
     },
 }
 

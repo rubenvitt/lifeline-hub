@@ -444,6 +444,68 @@ async fn registrieren_ist_live_ohne_namen() {
     );
 }
 
+/// CodeRabbit-Befund (Review 5829810053): die Kostform-Zählung zählt auch an gezählten Stellen.
+/// Kostform-PATCH, Verbleibwechsel und Storno einer Person dort verteilen deshalb `betreuung`,
+/// auch ohne Belegungsmeldung; wer Verpflegung ohne Personenrecht führt, bekommt kein `person`.
+/// Ein PATCH ohne Kostform verteilt kein `betreuung`.
+#[tokio::test]
+async fn kostform_zaehlung_ist_live_auch_an_gezaehlter_stelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    let anna = h["personen"][0]["id"].as_i64().unwrap();
+    let tom = h["personen"][1]["id"].as_i64().unwrap();
+    let person = |p: i64| format!("/api/einsaetze/{e}/personen/{p}");
+
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &person(tom),
+        &admin,
+        Some(&json!({"notiz": "kommt spät"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let roh = sse_anfang_lesen(feed.into_body(), 300).await;
+    assert!(roh.contains("event: person"), "{roh:?}");
+    assert!(!roh.contains("event: betreuung"), "ohne Kostform: {roh:?}");
+
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &person(tom),
+        &admin,
+        Some(&json!({"kostform": "vegan"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let roh = sse_anfang_lesen(feed.into_body(), 300).await;
+    assert!(roh.contains("event: betreuung"), "Kostform: {roh:?}");
+
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/verbleib", person(tom)),
+        &admin,
+        Some(&json!({"art": "transport", "ziel": "KH Mitte"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let roh = sse_anfang_lesen(feed.into_body(), 300).await;
+    assert!(roh.contains("event: betreuung"), "Verbleibwechsel: {roh:?}");
+
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, _) = anfrage(&app, "DELETE", &person(anna), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let roh = sse_anfang_lesen(feed.into_body(), 300).await;
+    assert!(roh.contains("event: betreuung"), "Storno: {roh:?}");
+}
+
 /// Review-Befunde 3 und 4: der Storno einer Person führt die Belegung im selben Vorgang nach; an
 /// einer geschlossenen namentlichen Stelle nimmt der Verbleib niemanden auf (422).
 #[tokio::test]

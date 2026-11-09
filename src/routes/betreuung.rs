@@ -67,11 +67,18 @@ pub(super) fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], ste
         .publiziere_event(einsatz_id, LiveEvent::Betreuung, nutzlast.to_string());
 }
 
-/// Nach dem Commit eines Vorgangs, der die Belegung namentlich geführter Stellen nachgeführt hat
-/// (LLH-1612, design.md D5): ETB-Kurzruf je Meldungseintrag, dann das Modul-Ereignis ohne
-/// Stellenkennung (der Aufrufer kennt die Stellen nicht einzeln). Ohne Einträge nichts.
-pub(crate) fn publiziere_nachgefuehrt(state: &AppState, einsatz_id: i64, etb_ids: &[i64]) {
-    if etb_ids.is_empty() {
+/// Nach dem Commit eines Personenvorgangs, der eine Betreuungsstelle berührt hat (LLH-1612,
+/// design.md D5): ETB-Kurzruf je Belegungsmeldung namentlich geführter Stellen, dann das
+/// Modul-Ereignis ohne Stellenkennung (der Aufrufer kennt die Stellen nicht einzeln). Das Ereignis
+/// geht auch ohne Meldung, sobald eine Stelle berührt ist: die Kostform-Zählung zählt auch an
+/// gezählten Stellen, und wer Verpflegung ohne Personenrecht führt, bekommt kein `person`.
+pub(crate) fn publiziere_nachgefuehrt(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_ids: &[i64],
+    stelle_beruehrt: bool,
+) {
+    if etb_ids.is_empty() && !stelle_beruehrt {
         return;
     }
     for etb_id in etb_ids {

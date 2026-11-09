@@ -111,6 +111,9 @@ pub struct ErfassterVerbleib {
     /// ETB-Einträge der Belegungsmeldungen, die der Wechsel an namentlich geführten Stellen
     /// ausgelöst hat (LLH-1612, design.md D5); der Aufrufer verteilt sie live.
     pub belegung_etb_ids: Vec<i64>,
+    /// Ob der Wechsel eine Betreuungsstelle verlassen oder betreten hat, auch eine gezählte: die
+    /// Kostform-Zählung (Sonderkost-Vorschlag) ändert sich dann, ohne dass eine Meldung entsteht.
+    pub stelle_beruehrt: bool,
 }
 
 /// Erfasst ein Verbleib-Ereignis append-only und bestimmt in DERSELBEN Transaktion den
@@ -254,6 +257,7 @@ pub async fn erfassen_tx(
         id,
         gewinnt: juengste == id,
         belegung_etb_ids,
+        stelle_beruehrt: stelle_vorher.is_some() || stelle.is_some(),
     })
 }
 
