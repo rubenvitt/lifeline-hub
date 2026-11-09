@@ -350,8 +350,8 @@ Wird die Planung
 aufgehoben oder entfällt sie, steht er wieder an, solange seine Zeit noch nicht vorbei ist. Er
 ändert die Einstufung der Karte nicht.
 
-Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal, laut Plan je
-Zeitpunkt einmal (Abschnitt „Ein Hinweis je Zeitpunkt“). Die Hinweise kann
+Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal; „Ablösung steht an“
+und „Ablösung fällig“ laut Plan je Zeitpunkt einmal (Abschnitt „Ein Hinweis je Zeitpunkt“). Die Hinweise kann
 jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“ nicht (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen steht die
 Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
