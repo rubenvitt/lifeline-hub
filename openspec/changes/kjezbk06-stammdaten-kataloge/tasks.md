@@ -23,8 +23,8 @@ Code. Die Übernahme wird über zwei echte Instanzen geprüft, in `tests/instanz
 
 ## 4. Oberfläche (D6)
 
-- [ ] 4.1 Abzeichen „vom Hub“/„nur hier“ und Sperre in `SchichtmodelleTab`, `EinsatzVorlagenTab`, `StichworteTab` (auch Vorlagen-Auswahl), `VerpflegungsplanTab`, `SprechgruppenTab`, `EtbBausteineTab`, `ExterneStellenTab`. Nachweis: je Reiter ein Vitest mit überschriebenem Herkunfts-Handler (Muster `FahrzeugeTab.test.tsx`).
-- [ ] 4.2 `UnterkunftRichtwerteTab`/`RichtwerteListe`: Abzeichen und Sperre je Schlüssel. Nachweis: Vitest „gesetzter Schlüssel vom Hub gesperrt, anderer setzbar“.
+- [x] 4.1 Abzeichen „vom Hub“/„nur hier“ und Sperre in `SchichtmodelleTab`, `EinsatzVorlagenTab`, `StichworteTab` (auch Vorlagen-Auswahl), `VerpflegungsplanTab`, `SprechgruppenTab`, `EtbBausteineTab`, `ExterneStellenTab`. Nachweis: je Reiter ein Vitest mit überschriebenem Herkunfts-Handler (Muster `FahrzeugeTab.test.tsx`).
+- [x] 4.2 `UnterkunftRichtwerteTab`/`RichtwerteListe`: Abzeichen und Sperre je Schlüssel. Nachweis: Vitest „gesetzter Schlüssel vom Hub gesperrt, anderer setzbar“.
 
 ## 5. Doku und Abschluss
 

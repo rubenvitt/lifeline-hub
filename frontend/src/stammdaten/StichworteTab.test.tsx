@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import StichworteTab from './StichworteTab';
 import { adminFixture } from '../test/fixtures';
 import { offeneRueckfrage } from '../test/rueckfrage';
@@ -337,5 +338,26 @@ describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
     expect(await within(zeile).findByText('MANV')).toBeInTheDocument();
     expect(within(screen.getByText('H1').closest('tr')!).getByText('—')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: /Vorlage zu/ })).toBeNull();
+  });
+});
+
+describe('StichworteTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt das Stichwort vom Hub samt Vorlagen-Auswahl und lässt das eigene bearbeitbar', async () => {
+    server.use(herkunftHandler({ stichwort_vorschlag: ['1'] }));
+    renderTab(admin, [
+      { id: 1, text: 'H1' },
+      { id: 2, text: 'H2' },
+    ]);
+    const hubZeile = (await screen.findByText('H1')).closest('tr')!;
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(within(hubZeile).queryByRole('button', { name: 'Löschen' })).toBeNull();
+    expect(within(hubZeile).getByRole('combobox', { name: 'Vorlage zu H1' })).toBeDisabled();
+
+    const lokal = screen.getByText('H2').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Löschen' })).toBeEnabled();
+    expect(within(lokal).getByRole('combobox', { name: 'Vorlage zu H2' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
   });
 });
