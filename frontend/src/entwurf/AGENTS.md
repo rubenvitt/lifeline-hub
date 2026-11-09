@@ -38,7 +38,7 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
     ganze Dokument steht im Steckplatz `gliederungKopf` über der Sprungleiste, nie in der
     Landmarke „Gliederung“ (LLH-1081: `LeereAbschnitteFuellen`).
   - **Aktionen eines Abschnitts** (LLH-1601, Spec `dokument-entwurf`,
-    `openspec/changes/amp1au76-gliederung-kontextmenue/design.md`): ⋮ im Abschnittskopf mit
+    `openspec/changes/archive/2026-11-09-amp1au76-gliederung-kontextmenue/design.md`): ⋮ im Abschnittskopf mit
     „Text kopieren“, „In der Lesefassung zeigen“, rot „Abschnitt leeren“; dieselben Einträge als
     Kontextmenü am Kopf, an der Gliederung mit „Zum Abschnitt springen“ davor. Eine Quelle:
     `abschnittEintraege`/`gliederungEintraege` in `dokumentEntwurfKern.ts`. Die Abschnitte stehen

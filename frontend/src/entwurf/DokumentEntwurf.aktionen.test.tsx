@@ -1,6 +1,6 @@
 /**
  * Aktionen eines Abschnitts (LLH-1601, Spec `dokument-entwurf`,
- * `openspec/changes/amp1au76-gliederung-kontextmenue/design.md`): ⋮ im Abschnittskopf mit
+ * `openspec/changes/archive/2026-11-09-amp1au76-gliederung-kontextmenue/design.md`): ⋮ im Abschnittskopf mit
  * „Text kopieren“, „In der Lesefassung zeigen“ und „Abschnitt leeren“; dieselben Einträge als
  * Kontextmenü am Kopf, in der Gliederung mit „Zum Abschnitt springen“ davor.
  */

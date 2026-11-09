@@ -3,7 +3,7 @@ import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Aktionen eines Abschnitts gegliederter Dokumente im Browser (LLH-1601, Spec `dokument-entwurf`,
- * `openspec/changes/amp1au76-gliederung-kontextmenue/design.md`). Was jsdom nicht belegt: der
+ * `openspec/changes/archive/2026-11-09-amp1au76-gliederung-kontextmenue/design.md`). Was jsdom nicht belegt: der
  * echte Rechtsklick ohne Browsermenü, die Fokusfolge nach dem Schließen des Menüs (D3) und dass
  * „Abschnitt leeren“ den Verlustschutz der Seite erreicht (D2). Seeding per `page.request`.
  */
