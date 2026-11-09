@@ -825,4 +825,65 @@ describe('NachrichtenStrom — Zeiten in der Anzeigezone (LFH-913)', () => {
     await userEvent.hover(screen.getByText('bearbeitet'));
     expect(await screen.findByText('bearbeitet am 101230jun26')).toBeInTheDocument();
   });
+
+  describe('Kontextmenü (LLH-1598, D4)', () => {
+    const strom = (props: Partial<Parameters<typeof NachrichtenStrom>[0]> = {}) =>
+      renderMitProviders(
+        <NachrichtenStrom
+          nachrichten={[
+            nachricht({
+              anhaenge: [
+                { id: 5, dateiname: 'lage.pdf', groesse: 2048, mime: 'application/pdf' },
+              ] as ChatNachricht['anhaenge'],
+            }),
+          ]}
+          eigeneBenutzerId={1}
+          darfSchreiben
+          onBearbeiten={vi.fn()}
+          onLoeschen={vi.fn()}
+          onHeraufstufen={vi.fn()}
+          onHeraufstufenAuftrag={vi.fn()}
+          {...props}
+        />,
+      );
+
+    it('Rechtsklick neben den Text zeigt dieselben Einträge wie das ⋮', async () => {
+      strom();
+      expect(
+        fireEvent.contextMenu(screen.getByText('Max'), { clientX: 10, clientY: 10, button: 2 }),
+      ).toBe(false);
+      const menue = await offenesMenue();
+      expect(menue).toHaveAttribute('aria-label', expect.stringMatching(AKTIONEN));
+      // Dieselben Einträge wie das ⋮ der Nachricht, aus derselben Funktion.
+      expect(
+        within(menue)
+          .getAllByRole('menuitem')
+          .map((e) => e.textContent),
+      ).toEqual(['Zu ETB', 'Zu Auftrag', 'Bearbeiten', 'Löschen']);
+    });
+
+    it('„Löschen“ aus dem Kontextmenü öffnet die bestehende Rückfrage', async () => {
+      strom();
+      fireEvent.contextMenu(screen.getByText('Hallo Stab'), { clientX: 1, clientY: 1, button: 2 });
+      await userEvent.click(
+        within(await offenesMenue()).getByRole('menuitem', { name: 'Löschen' }),
+      );
+      expect(await screen.findByText('Nachricht wirklich löschen?')).toBeInTheDocument();
+    });
+
+    it('auf dem Anhang bleibt das Browsermenü', () => {
+      strom();
+      const anhang = screen
+        .getAllByRole('link')
+        .find((a) => a.getAttribute('href')?.includes('/anhaenge/5'))!;
+      expect(fireEvent.contextMenu(anhang, { button: 2 })).toBe(true);
+    });
+
+    it('eine gelöschte Nachricht öffnet kein eigenes Menü', () => {
+      strom({ nachrichten: [nachricht({ geloescht_at: '2026-06-10 10:05:00' })] });
+      expect(fireEvent.contextMenu(screen.getByText('Nachricht gelöscht'), { button: 2 })).toBe(
+        true,
+      );
+    });
+  });
 });

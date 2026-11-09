@@ -13,8 +13,8 @@
 
 ## 3. Chat (D4)
 
-- [ ] 3.1 Einträge und Wahl einer Nachricht in eine Funktion ziehen, die ⋮ und Kontextmenü speist; bestehende Tests von `NachrichtenStrom` grün
-- [ ] 3.2 TDD: Rechtsklick neben den Text einer eigenen Nachricht öffnet das Menü mit denselben Einträgen wie ihr ⋮; „Löschen“ öffnet den bestehenden Dialog; Rechtsklick auf den Anhang und auf eine gelöschte Nachricht öffnet kein eigenes Menü
+- [x] 3.1 Einträge und Wahl einer Nachricht in eine Funktion ziehen, die ⋮ und Kontextmenü speist; bestehende Tests von `NachrichtenStrom` grün
+- [x] 3.2 TDD: Rechtsklick neben den Text einer eigenen Nachricht öffnet das Menü mit denselben Einträgen wie ihr ⋮; „Löschen“ öffnet den bestehenden Dialog; Rechtsklick auf den Anhang und auf eine gelöschte Nachricht öffnet kein eigenes Menü
 
 ## 4. Meldung, Nachforderung, Auftrag (D3, D6)
 

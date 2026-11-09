@@ -1,4 +1,6 @@
 import { Button, Modal, Popover, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
+import { useKontextMenue } from '../components/useKontextMenue';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -144,6 +146,69 @@ export default function NachrichtenStrom({
   const namen = useMemo(() => aktionsNamen(nachrichten, zeitKurz), [nachrichten, zeitKurz]);
   const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
 
+  /**
+   * Aktionen einer Nachricht: EINE Quelle für ihr ⋮ und ihr Kontextmenü (LLH-1598, D4). Gelöschte
+   * Nachrichten haben keine; ohne Eintrag gibt es weder Auslöser noch Kontextmenü.
+   */
+  type Aktion = 'hoch' | 'auftrag' | 'bezug' | 'edit' | 'del';
+  const aktionenZu = (n: ChatNachricht) => {
+    const eigene = eigeneBenutzerId !== null && n.autor_id === eigeneBenutzerId;
+    const hatBezug = n.bezug_typ !== null && n.bezug_id !== null;
+    const eintraege: MenueEintrag<Aktion>[] =
+      n.geloescht_at !== null
+        ? []
+        : [
+            ...(darfSchreiben && n.etb_eintrag_id === null
+              ? [zielEintrag('hoch' as const, 'Zu ETB', etbGesperrt)]
+              : []),
+            ...(darfSchreiben && n.auftrag_id === null
+              ? [zielEintrag('auftrag' as const, 'Zu Auftrag', auftragGesperrt)]
+              : []),
+            ...(darfSchreiben && onBezugSetzen
+              ? [{ key: 'bezug' as const, label: hatBezug ? 'Bezug ändern' : 'Bezug' }]
+              : []),
+            ...(eigene && darfSchreiben
+              ? [
+                  { key: 'edit' as const, label: 'Bearbeiten' },
+                  { key: 'del' as const, label: 'Löschen', gefahr: true as const },
+                ]
+              : []),
+          ];
+    const waehle = (key: Aktion) => {
+      if (key === 'hoch') onHeraufstufen(n);
+      else if (key === 'auftrag') onHeraufstufenAuftrag(n);
+      else if (key === 'bezug') onBezugSetzen?.(n);
+      else if (key === 'edit') onBearbeiten(n);
+      else if (key === 'del') fragLoeschen(n.id);
+    };
+    return { eintraege, waehle };
+  };
+
+  /**
+   * Kontextmenü (Spec `datensatz-aktionsmenue`, „Eine Chat-Nachricht öffnet ihr Kontextmenü“): EIN
+   * Hook je Strom, gemerkt nur die id; Nachricht und Einträge kommen je Render frisch aus der
+   * Live-Liste. Verschwindet die Nachricht oder verliert sie alle Einträge, schließt das Menü.
+   */
+  const [kontext, setKontext] = useState<{ id: number; offen: KontextMenueOffen } | null>(null);
+  const kontextNachricht =
+    kontext == null ? undefined : nachrichten.find((n) => n.id === kontext.id);
+  const kontextAktionen = kontextNachricht ? aktionenZu(kontextNachricht) : null;
+  if (kontext != null && (kontextAktionen == null || kontextAktionen.eintraege.length === 0)) {
+    setKontext(null);
+  }
+  const kontextAusloeser = useKontextMenue<number>({
+    kannOeffnen: (id) => {
+      const n = nachrichten.find((m) => m.id === id);
+      return n != null && aktionenZu(n).eintraege.length > 0;
+    },
+    onOeffnen: (id, { anker, vorherFokus }) => {
+      const n = nachrichten.find((m) => m.id === id);
+      if (n == null || aktionenZu(n).eintraege.length === 0) return false;
+      setKontext({ id, offen: { anker, vorherFokus } });
+      return true;
+    },
+  });
+
   /** Flankenwechsel am unteren Rand: Marke setzen bzw. räumen. */
   function beiScroll() {
     const el = behaelter.current;
@@ -213,42 +278,14 @@ export default function NachrichtenStrom({
         emptyText="Noch keine Nachrichten"
         renderItem={(n) => {
           const geloescht = n.geloescht_at !== null;
-          const eigene = eigeneBenutzerId !== null && n.autor_id === eigeneBenutzerId;
           const heraufgestuft = n.etb_eintrag_id !== null;
           const heraufgestuftZuAuftrag = n.auftrag_id !== null;
           const hatBezug = n.bezug_typ !== null && n.bezug_id !== null;
           const grund = zeilenFehler?.(n.id) ?? null;
-          // Aktionen im Menü; gelöschte Nachrichten zeigen keine, und ohne Eintrag gibt es keinen
-          // Auslöser.
-          type Aktion = 'hoch' | 'auftrag' | 'bezug' | 'edit' | 'del';
-          const eintraege: MenueEintrag<Aktion>[] = geloescht
-            ? []
-            : [
-                ...(darfSchreiben && !heraufgestuft
-                  ? [zielEintrag('hoch' as const, 'Zu ETB', etbGesperrt)]
-                  : []),
-                ...(darfSchreiben && !heraufgestuftZuAuftrag
-                  ? [zielEintrag('auftrag' as const, 'Zu Auftrag', auftragGesperrt)]
-                  : []),
-                ...(darfSchreiben && onBezugSetzen
-                  ? [{ key: 'bezug' as const, label: hatBezug ? 'Bezug ändern' : 'Bezug' }]
-                  : []),
-                ...(eigene && darfSchreiben
-                  ? [
-                      { key: 'edit' as const, label: 'Bearbeiten' },
-                      { key: 'del' as const, label: 'Löschen', gefahr: true as const },
-                    ]
-                  : []),
-              ];
-          const waehle = (key: Aktion) => {
-            if (key === 'hoch') onHeraufstufen(n);
-            else if (key === 'auftrag') onHeraufstufenAuftrag(n);
-            else if (key === 'bezug') onBezugSetzen?.(n);
-            else if (key === 'edit') onBearbeiten(n);
-            else if (key === 'del') fragLoeschen(n.id);
-          };
+          const { eintraege, waehle } = aktionenZu(n);
           return (
             <ListenEintrag
+              kontext={kontextAusloeser(n.id)}
               actions={
                 eintraege.length > 0
                   ? [
@@ -378,6 +415,15 @@ export default function NachrichtenStrom({
           );
         }}
       />
+      {kontextNachricht != null && kontextAktionen != null && (
+        <KontextMenue<Aktion>
+          offen={kontext?.offen ?? null}
+          eintraege={kontextAktionen.eintraege}
+          zugaenglicherName={namen.get(kontextNachricht.id)!}
+          onWahl={kontextAktionen.waehle}
+          onSchliessen={() => setKontext(null)}
+        />
+      )}
       <Modal
         open={loeschZiel != null}
         title="Nachricht wirklich löschen?"
