@@ -14,9 +14,9 @@ Jede Aufgabe entsteht per TDD (erst der rote Test). Zunder: LLH-1616,
 
 - [x] 2.1 API-Funktion `loadRegistrierlisteDruck` (`api/betreuungRegistrierung.ts`), nicht-live Key `registrierlisteDruck` in `api/queryKeys.ts` (nicht im Offline-Lagebild), Pfade `registrierlisteDruckPfad` (Stab) und Gerätepfad in `routing/deeplinks.ts` sowie `EinsatzPfade.registrierlisteDruck`; Unit-Tests der Pfade und der Key-Einordnung grün
 - [x] 2.2 Blatt `RegistrierlisteBlatt.tsx` (D4): Summentabelle aus `kostformBand`, je Haushalt Titelblock und Tabelle mit Abhakspalte, Block „ohne Haushalt“, Spalte Unverträglichkeiten nur mit Wahl; Vitest `RegistrierlisteBlatt.test.tsx` für Summen, Gruppen, leere Abhakspalte und die Spalte nur auf Wunsch
-- [ ] 2.3 Seite `RegistrierlisteDruckSeite.tsx` mit Schalter in der Adresse, Protokollhinweis, Zuständen (laden, Fehler, 403, 404, leer ohne Druckknopf), Druckkopf mit Stand, Umfang und „Gesundheitsangaben: mit“; Vitest für Zustände und Schalter → neuer Abruf
-- [ ] 2.4 Routen in `App.tsx` (Stab unter dem Segment `betreuung`, Gerät im `GeraetBetreuungRahmen`), `geraetDarf('registrierliste-druck')` nur für die Betreuungsstelle; Tests `geraetSicht.test.ts` grün
-- [ ] 2.5 Knopf „Registrierliste drucken“ im Kopf des `RegistrierungPaneel` (nur mit `personenFrei`, auch ohne Schreibrecht); `RegistrierungPaneel.test.tsx` und `GeraetBetreuungsstelle.test.tsx` um Sichtbarkeit und Ziel erweitert
+- [x] 2.3 Seite `RegistrierlisteDruckSeite.tsx` mit Schalter in der Adresse, Protokollhinweis, Zuständen (laden, Fehler, 403, 404, leer ohne Druckknopf), Druckkopf mit Stand, Umfang und „Gesundheitsangaben: mit“; Vitest für Zustände und Schalter → neuer Abruf
+- [x] 2.4 Routen in `App.tsx` (Stab unter dem Segment `betreuung`, Gerät im `GeraetBetreuungRahmen`), `geraetDarf('registrierliste-druck')` nur für die Betreuungsstelle; Tests `geraetSicht.test.ts` grün
+- [x] 2.5 Knopf „Registrierliste drucken“ im Kopf des `RegistrierungPaneel` (nur mit `personenFrei`, auch ohne Schreibrecht); `RegistrierungPaneel.test.tsx` und `GeraetBetreuungsstelle.test.tsx` um Sichtbarkeit und Ziel erweitert
 
 ## 3. Druck-Gate und e2e
 
