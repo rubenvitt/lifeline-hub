@@ -176,8 +176,12 @@ sequenceDiagram
   festgelegt: Schlüsselverfahren und Einmal-Code
   ([ADR-0014](../architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
   `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`).
-- **Anmeldung am ELW ohne Netz:** Wie kommt ein Konto aus der Hub-Kopie zu einer lokalen
-  Anmeldung (Passwort-Hash mitverteilen, eigener Passkey je ELW, Kopplung des Geräts)?
+- ~~**Anmeldung am ELW ohne Netz:**~~ beantwortet am 09.11.2026 (LLH-1493): Passwort-Hash und
+  TOTP gehen mit, mit age Ende-zu-Ende verschlüsselt und nur bei bestätigter
+  Plattenverschlüsselung; Passkeys je Instanz; Admins mit Passkey melden sich am verteilenden Hub
+  nur noch per Passkey an; „ELW verloren“ macht die Geheimnisse wertlos
+  ([ADR-0016](../architektur/entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md),
+  `openspec/changes/archive/2026-11-09-ca8v0psv-stammdaten-verteilung/design.md`).
 - **Gleichzeitige Notübernahmen** mit derselben Epoche (zwei Seiten ohne Verbindung): Gleichstand
   über die Instanzkennung oder Pflicht zur menschlichen Klärung?
 - **Nachbereitungsfrist:** Vorgabe, wer sie einstellt (Org am Hub?), Verhältnis zur bestehenden

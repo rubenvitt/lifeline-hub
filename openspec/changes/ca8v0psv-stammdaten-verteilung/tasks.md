@@ -33,16 +33,16 @@ Instanzen kommen nach `tests/instanz_stammdaten.rs` (Muster `tests/instanz_koppl
 
 ## 5. Oberfläche (D9)
 
-- [ ] 5.1 `GET /api/instanz/stammdaten/herkunft` samt `scripts/check-typ-codegen.sh` und beiden generierten Dateien; Hook `useStammdatenHerkunft` mit Query-Key nach `frontend/AGENTS.md`, Abzeichen `HerkunftAbzeichen`; Vitest für Hook und Abzeichen
-- [ ] 5.2 Abzeichen und Bearbeitungssperre („Wird am Hub gepflegt“) in den Reitern Fahrzeuge, Material, Fahrzeug-Status, Personal, Qualifikationen, Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen, Anzeige, Einsatz-Vorgaben und in der Benutzerverwaltung; Vitest je Reiter: übernommene Zeile gesperrt, lokale Zeile „nur hier“ und bearbeitbar
-- [ ] 5.3 Seite „Instanzkopplung“: Hinweise (Stand, Konten-Konflikt, Geheimnisse nicht verteilt, zweite Quelle), „ELW verloren“ mit Bestätigung und Zahl der Konten, „Erneut abgleichen“; Benutzerverwaltung am Hub: Hinweis an Admins ohne Passkey; Anmeldeseite zeigt den 403-Text. Vitest für Texte und Knöpfe, Wortlaut mit `design:ux-copy`
+- [x] 5.1 `GET /api/instanz/stammdaten/herkunft` samt `scripts/check-typ-codegen.sh` und beiden generierten Dateien; Hook `useStammdatenHerkunft` mit Query-Key nach `frontend/AGENTS.md`, Abzeichen `HerkunftAbzeichen`; Vitest für Hook und Abzeichen
+- [x] 5.2 Abzeichen und Bearbeitungssperre („Wird am Hub gepflegt“) in den Reitern Fahrzeuge, Material, Fahrzeug-Status, Personal, Qualifikationen, Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen, Anzeige, Einsatz-Vorgaben und in der Benutzerverwaltung; Vitest je Reiter: übernommene Zeile gesperrt, lokale Zeile „nur hier“ und bearbeitbar
+- [x] 5.3 Seite „Instanzkopplung“: Hinweise (Stand, Konten-Konflikt, Geheimnisse nicht verteilt, zweite Quelle), „ELW verloren“ mit Bestätigung und Zahl der Konten, „Erneut abgleichen“; Benutzerverwaltung am Hub: Hinweis an Admins ohne Passkey; Anmeldeseite zeigt den 403-Text. Vitest für Texte und Knöpfe, Wortlaut mit `design:ux-copy`
 - [ ] 5.4 e2e-Fall in `frontend/e2e/` für die Sperre einer übernommenen Zeile (Herkunft per Testhelfer gesetzt, zweite Instanz nicht nötig); Lauf grün
 
 ## 6. Doku und Regeln
 
-- [ ] 6.1 ADR-0016 (ersetzt ADR-0011, Ausnahme D7), ADR-0011 auf `status: ersetzt`; `scripts/check-architektur.sh` grün
-- [ ] 6.2 Architekturdoku Kapitel 5 (Baustein `instanz::stammdaten`), 8 (Schreibschutz per Trigger), 11 (Risiken aus diesem Entwurf); `src/AGENTS.md`, Abschnitt Instanzkopplung (Trigger-Pflicht für neue verteilte Arten, Merker, 409); Konzeptnotiz: offene Frage „Anmeldung am ELW ohne Netz“ beantwortet
-- [ ] 6.3 Anwenderdoku `instanzkopplung.md` (Stammdaten, Anmeldung ohne Netz, Plattenbestätigung, ELW verloren, Admins mit Passkey) und Kapitel Benutzerverwaltung; Wächter der Anwenderdoku grün
+- [x] 6.1 ADR-0016 (ersetzt ADR-0011, Ausnahme D7), ADR-0011 auf `status: ersetzt`; `scripts/check-architektur.sh` grün
+- [x] 6.2 Architekturdoku Kapitel 5 (Baustein `instanz::stammdaten`), 8 (Schreibschutz per Trigger), 11 (Risiken aus diesem Entwurf); `src/AGENTS.md`, Abschnitt Instanzkopplung (Trigger-Pflicht für neue verteilte Arten, Merker, 409); Konzeptnotiz: offene Frage „Anmeldung am ELW ohne Netz“ beantwortet
+- [x] 6.3 Anwenderdoku `instanzkopplung.md` (Stammdaten, Anmeldung ohne Netz, Plattenbestätigung, ELW verloren, Admins mit Passkey) und Kapitel Benutzerverwaltung; Wächter der Anwenderdoku grün
 - [ ] 6.4 Folgeaufgabe in Zunder für die übrigen Kataloge (`zunder-task-anlegen`), Verweis im Kommentar an LLH-1493
 
 ## 7. Abschluss

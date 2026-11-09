@@ -71,6 +71,10 @@ pub struct InstanzUebersicht {
     /// Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
     /// „Code ausstellen“).
     pub eigener_schluessel: bool,
+    /// Der Betreiber hat die Datenträgerverschlüsselung bestätigt
+    /// (`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine
+    /// Kontogeheimnisse (LLH-1493, D6).
+    pub datentraeger_bestaetigt: bool,
     pub kopplungen: Vec<InstanzKopplungAnzeige>,
     pub schluessel: Vec<UnterschriftSchluesselAnzeige>,
 }
@@ -102,6 +106,10 @@ pub async fn uebersicht(
         softwarestand: crate::instanz::softwarestand().to_string(),
         passkeys_eingerichtet: crate::auth::unterschrift::rp().is_some(),
         eigener_schluessel: eigener,
+        datentraeger_bestaetigt: crate::instanz::stammdaten::geheimnis::is_datentraeger_bestaetigt(
+            &state.pool,
+        )
+        .await?,
         kopplungen: repo::list_fuer_org(&state.pool, admin.org_id).await?,
         schluessel: unterschrift::list_fuer_org(&state.pool, admin.org_id, admin.id).await?,
     }))
@@ -750,7 +758,12 @@ pub async fn stammdaten_herkunft(
     CurrentUser(user): CurrentUser,
 ) -> Result<Json<crate::instanz::stammdaten::herkunft::StammdatenHerkunftAnzeige>, AppError> {
     Ok(Json(
-        crate::instanz::stammdaten::herkunft::load_anzeige(&state.pool, user.org_id).await?,
+        crate::instanz::stammdaten::herkunft::load_anzeige(
+            &state.pool,
+            user.org_id,
+            user.system_rolle == crate::auth::SystemRolle::Admin,
+        )
+        .await?,
     ))
 }
 

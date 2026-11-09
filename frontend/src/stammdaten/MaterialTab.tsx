@@ -20,10 +20,12 @@ import MaterialFormModal from './MaterialFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { ART_LABEL } from '../kraefte/materialPosten';
+import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 
 export default function MaterialTab() {
   const { benutzer } = useAuth();
+  const herkunft = useStammdatenHerkunft();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const { istSchmal } = useViewport();
   const [modalOffen, setModalOffen] = useState(false);
@@ -69,6 +71,10 @@ export default function MaterialTab() {
         <Space size={4} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_demo && <DemoMarke />}
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('material', m.id)}
+            quelle={herkunft.quelle}
+          />
         </Space>
       ),
     },
@@ -110,6 +116,7 @@ export default function MaterialTab() {
       render: (t) => t ?? '—',
     },
     ...dienststatusSpalten<Material>({
+      vomHub: (z) => herkunft.istVomHub('material', z.id),
       mutation: dienststatusMutation,
       istAdmin,
       schmal: istSchmal,

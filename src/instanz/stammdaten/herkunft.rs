@@ -159,11 +159,15 @@ pub struct StammdatenHerkunftAnzeige {
     pub quelle: Option<String>,
     /// Je Art (Wire-Wert von `StammdatenArt`) die lokalen Schlüssel der übernommenen Zeilen.
     pub vom_hub: BTreeMap<String, Vec<String>>,
+    /// Nur für Admins und nur, wenn diese Instanz die Geheimnisse der Org verteilt: System-Admins
+    /// ohne Anmelde-Passkey; ihre Geheimnisse gehen nicht hinaus (design.md D7).
+    pub admins_ohne_passkey: Vec<i64>,
 }
 
 pub async fn load_anzeige(
     pool: &SqlitePool,
     org_id: i64,
+    fuer_admin: bool,
 ) -> Result<StammdatenHerkunftAnzeige, AppError> {
     let mut conn = pool.acquire().await?;
     let quelle = match find_quelle(&mut conn, org_id).await? {
@@ -189,5 +193,23 @@ pub async fn load_anzeige(
     for (art, lokal) in zeilen {
         vom_hub.entry(art).or_default().push(lokal);
     }
-    Ok(StammdatenHerkunftAnzeige { quelle, vom_hub })
+    drop(conn);
+    let admins_ohne_passkey =
+        if fuer_admin && super::geheimnis::is_org_verteilend(pool, org_id).await? {
+            sqlx::query_scalar(
+                "SELECT b.id FROM benutzer b WHERE b.org_id = ? AND b.system_rolle = 'admin' \
+             AND b.aktiv = 1 AND NOT EXISTS (SELECT 1 FROM webauthn_credential w \
+               WHERE w.benutzer_id = b.id) ORDER BY b.id",
+            )
+            .bind(org_id)
+            .fetch_all(pool)
+            .await?
+        } else {
+            Vec::new()
+        };
+    Ok(StammdatenHerkunftAnzeige {
+        quelle,
+        vom_hub,
+        admins_ohne_passkey,
+    })
 }

@@ -9591,10 +9591,15 @@
           "softwarestand",
           "passkeys_eingerichtet",
           "eigener_schluessel",
+          "datentraeger_bestaetigt",
           "kopplungen",
           "schluessel"
         ],
         "properties": {
+          "datentraeger_bestaetigt": {
+            "type": "boolean",
+            "description": "Der Betreiber hat die Datenträgerverschlüsselung bestätigt\n(`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine\nKontogeheimnisse (LLH-1493, D6)."
+          },
           "eigener_schluessel": {
             "type": "boolean",
             "description": "Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für\n„Code ausstellen“)."
@@ -17197,9 +17202,18 @@
         "type": "object",
         "description": "Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9).",
         "required": [
-          "vom_hub"
+          "vom_hub",
+          "admins_ohne_passkey"
         ],
         "properties": {
+          "admins_ohne_passkey": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Nur für Admins und nur, wenn diese Instanz die Geheimnisse der Org verteilt: System-Admins\nohne Anmelde-Passkey; ihre Geheimnisse gehen nicht hinaus (design.md D7)."
+          },
           "quelle": {
             "type": [
               "string",

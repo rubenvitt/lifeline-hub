@@ -711,3 +711,28 @@ async fn elw_verloren_macht_die_verteilten_geheimnisse_wertlos() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["passwort_wechsel_erforderlich"], true);
 }
+
+#[tokio::test]
+async fn sso_konto_bekommt_am_elw_ein_einmalpasswort() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    let sina = konto_bereit(&hub, "sinasso").await;
+    sqlx::query("UPDATE benutzer SET passwort_hash = ? WHERE id = ?")
+        .bind(lifeline_hub::auth::PASSWORT_HASH_SSO_ONLY)
+        .bind(sina)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    melden(&elw).await;
+    let lokal = lokale_id(&elw, "benutzer", "benutzername", "sinasso").await;
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "POST",
+        &format!("/api/benutzer/{lokal}/einmalpasswort"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = login(&elw, "sinasso", v["einmalpasswort"].as_str().unwrap()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}

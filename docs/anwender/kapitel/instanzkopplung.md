@@ -2,14 +2,16 @@
 titel: Instanzkopplung
 gruppen: [administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/instanzText.ts, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/auth/unterschrift/repo.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/auth/unterschrift/repo.rs, src/routes/auth.rs]
 ---
 
 ## Überblick
 
 Zwei Lifeline-Hub-Installationen lassen sich **koppeln**, etwa der Server im
 Einsatzleitwagen und ein öffentlich erreichbarer Server der Organisation. Die Kopplung legt
-fest, dass beide einander vertrauen; Einsatzdaten fließen darüber noch nicht.
+fest, dass beide einander vertrauen. Über sie kommen die **Stammdaten** der Organisation vom
+Hub zum ELW: Konten, Fahrzeuge, Personal, Material, Kataloge und Org-Einstellungen. Einsatzdaten
+fließen darüber noch nicht.
 
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
@@ -57,6 +59,26 @@ Für den System-Admin:
 1. Unter „Gekoppelte Instanzen“ im Menü der Zeile „Widerrufen …“ wählen.
 2. Die Rückfrage mit „Widerrufen“ bestätigen.
 
+### ELW als verloren melden
+
+Für den System-Admin am Hub, wenn ein Einsatzleitwagen gestohlen wurde oder sein Rechner
+verloren ist:
+
+1. Unter „Gekoppelte Instanzen“ im Menü der Zeile des ELW „ELW verloren …“ wählen.
+2. Die Rückfrage nennt, wie viele Konten betroffen sind. Mit „Als verloren melden“ bestätigen.
+3. Die Kopplung ist widerrufen. Die Konten, deren Passwort auf dem ELW lag, haben kein gültiges
+   Passwort und keinen zweiten Faktor mehr, ihre Sitzungen sind beendet. Für jede Person in der
+   Benutzerverwaltung ein Einmalpasswort vergeben, sofern sie keinen Passkey hat.
+
+### Stammdaten erneut abgleichen
+
+Für den System-Admin am ELW, nachdem ein Hinweis an der Kopplung gelöst ist (etwa ein lokales
+Konto umbenannt wurde, dessen Name der Hub auch vergibt):
+
+1. Unter „Gekoppelte Instanzen“ im Menü der Zeile des Hubs „Stammdaten erneut abgleichen“
+   wählen.
+2. Die Instanz holt alle Stammdaten neu und gleicht sie ab; die Hinweise beginnen von vorn.
+
 ## Hintergrund
 
 ### Wer sich bei wem meldet
@@ -99,6 +121,51 @@ wenn ein ihnen bekannter ihn gegengezeichnet hat; sonst steht an der Kopplung ei
 „abgelehnt“. Der letzte gültige Schlüssel einer gekoppelten Organisation lässt sich nicht
 widerrufen. Wird ein Admin-Konto deaktiviert oder herabgestuft, sind seine Schlüssel widerrufen.
 Zwei Schlüssel je Organisation, damit einer verloren gehen darf.
+
+### Stammdaten vom Hub
+
+Bezieht die Organisation ihre Stammdaten aus einer Kopplung, trägt jede Zeile in den
+Stammdaten (Fahrzeuge, Material, Personal, Qualifikationen, Status-Kataloge, Einheitstypen,
+Einheiten-Vorlagen, Führungsfunktionen) und in der Benutzerverwaltung „vom Hub“ oder
+„nur hier“. Was vom Hub kommt, ist am ELW nur lesbar und zeigt „Wird am Hub gepflegt“. Ebenso
+die Anzeige- und Einsatz-Vorgaben der Organisation. Was am ELW angelegt wird, etwa ein
+geliehenes Fahrzeug oder ein Spontanhelfer, gilt sofort, trägt „nur hier“ und erscheint nicht
+am Hub. Änderungen am Hub kommen mit der nächsten Meldung, also binnen einer Minute.
+
+Beim ersten Abgleich führt der ELW Gleiches zusammen: ein Fahrzeug mit demselben Funkrufnamen,
+Personal mit derselben Personalnummer, Material mit derselben Bestandsnummer, Kataloge und
+Vorlagen mit demselben Namen. Die Daten des Hubs gelten danach, Einsätze zeigen weiter auf
+dieselbe Zeile. Konten werden nie zusammengeführt: Ist ein Benutzername am ELW schon vergeben,
+kommt das Konto vom Hub nicht an, und an der Kopplung steht „Konto „…“ ist hier schon
+vergeben.“ Löscht der Hub eine Zeile, die ein Einsatz am ELW verwendet, wird sie dort außer
+Dienst genommen oder deaktiviert statt gelöscht. Nach dem Widerruf gehören alle Zeilen dem ELW
+und sind wieder bearbeitbar.
+
+Eine Organisation bezieht Stammdaten aus genau einer Kopplung; eine weitere zeigt „Stammdaten
+dieser Org kommen schon aus einer anderen Kopplung.“
+
+### Anmeldung am ELW ohne Netz
+
+Mit dem Konto kommen Passwort und zweiter Faktor (TOTP) vom Hub: Am ELW gilt dasselbe Passwort,
+auch ohne Netz. Muss das Passwort am Hub erst geändert werden, gilt das am ELW genauso. Passkeys
+gelten nur an der Installation, an der sie eingerichtet wurden; am ELW richtet man sie dort
+ein. Wer sich nur über die Anmeldung der Organisation (SSO) anmeldet, bekommt ohne Netz ein
+Einmalpasswort vom Admin am ELW. Ein Einmalpasswort am ELW bleibt, bis das Passwort am Hub
+geändert wird.
+
+Passwort und zweiter Faktor gehen nur verschlüsselt und nur an einen ELW, dessen Betreiber die
+Verschlüsselung des Datenträgers bestätigt hat (`--datentraeger-verschluesselung-extern`).
+Fehlt die Bestätigung, steht am ELW „Geheimnisse nicht verteilt: Datenträgerverschlüsselung
+nicht bestätigt“, und Konten vom Hub brauchen dort ein Einmalpasswort.
+
+### Admins am Hub
+
+Ein System-Admin mit Passkey meldet sich am Hub, der die Organisation an einen ELW verteilt, nur
+noch per Passkey an; per Passwort erscheint „Admins melden sich hier per Passkey an.“ Am ELW
+gilt sein Passwort weiter. Ohne Passkey bleibt ihm am Hub das Passwort, sein Konto kommt dann
+aber ohne Passwort am ELW an, und die Benutzerverwaltung zeigt „Für die Anmeldung am ELW zuerst
+einen Passkey einrichten“. Verliert ein Admin seinen einzigen Passkey, vergibt ein anderer Admin
+ein Einmalpasswort.
 
 ### Hinweise an einer Kopplung
 

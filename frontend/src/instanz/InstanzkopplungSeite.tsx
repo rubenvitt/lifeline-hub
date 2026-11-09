@@ -19,6 +19,8 @@ import {
   redeemKopplungscode,
   registriereUnterschriftsschluessel,
   issueKopplungscode,
+  gleicheStammdatenNeuAb,
+  meldeElwVerloren,
   widerrufeKopplung,
   widerrufeUnterschriftsschluessel,
 } from '../api/instanz';
@@ -34,6 +36,7 @@ import {
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
+  stammdatenZeile,
 } from './instanzText';
 
 /** Längste Bezeichnung eines Unterschriftsschlüssels (`routes::instanz::BEZEICHNUNG_MAX`). */
@@ -69,6 +72,8 @@ export default function InstanzkopplungSeite() {
   const [registrierenOffen, setRegistrierenOffen] = useState(false);
   const [neuerCode, setNeuerCode] = useState<KopplungscodeAntwort | null>(null);
   const [widerrufKopplung, setWiderrufKopplung] = useState<InstanzKopplungAnzeige | null>(null);
+  // „ELW verloren“ (LLH-1493): die Kopplung, für die die Rückfrage offen ist.
+  const [verlorenKopplung, setVerlorenKopplung] = useState<InstanzKopplungAnzeige | null>(null);
   const [widerrufSchluessel, setWiderrufSchluessel] =
     useState<UnterschriftSchluesselAnzeige | null>(null);
   const [einloesenForm] = Form.useForm<EinloesenWerte>();
@@ -98,6 +103,24 @@ export default function InstanzkopplungSeite() {
       void reload();
       setWiderrufKopplung(null);
       message.success(`Kopplung mit ${k.gegenueber_name} widerrufen`);
+    },
+  });
+  const elwVerloren = useMutation({
+    mutationFn: (k: InstanzKopplungAnzeige) => meldeElwVerloren(k.id),
+    onSuccess: (a) => {
+      void reload();
+      setVerlorenKopplung(null);
+      message.success(
+        `${a.kopplung.gegenueber_name} als verloren gemeldet, ${a.konten} ${a.konten === 1 ? 'Konto' : 'Konten'} gesperrt`,
+      );
+    },
+  });
+  const stammdatenNeu = useMutation({
+    mutationFn: (k: InstanzKopplungAnzeige) => gleicheStammdatenNeuAb(k.id),
+    onSuccess: (k) => {
+      void reload();
+      void qc.invalidateQueries({ queryKey: globalKeys.stammdatenHerkunft() });
+      message.success(`Stammdaten von ${k.gegenueber_name} neu abgeglichen`);
     },
   });
   const registrieren = useMutation({
@@ -166,6 +189,7 @@ export default function InstanzkopplungSeite() {
             />
           )}
           <SpeicherFehler fehler={codeAusstellen.error} titel="Kein Code ausgestellt" />
+          <SpeicherFehler fehler={stammdatenNeu.error} titel="Nicht abgeglichen" />
 
           <Paneel titel="Diese Instanz" koerperPolster>
             <Datenraster spalten={2}>
@@ -193,8 +217,27 @@ export default function InstanzkopplungSeite() {
               rowKey={(k) => k.id}
               emptyText="Noch keine Kopplung"
               renderItem={(k) => {
-                const hinweise = kopplungHinweise(k);
+                const hinweise = kopplungHinweise(k, u.datentraeger_bestaetigt);
+                const stammdaten = stammdatenZeile(k);
                 const aktiv = k.org.widerrufen_at == null;
+                // Stammdaten (LLH-1493): an der meldenden Seite neu abgleichen, an der erreichten
+                // „ELW verloren“, beides vor dem Widerruf.
+                const eintraege: MenueEintrag[] = [
+                  ...(k.richtung === 'meldet_sich'
+                    ? [{ key: 'abgleichen', label: 'Stammdaten erneut abgleichen' }]
+                    : []),
+                  ...(k.richtung === 'wird_gemeldet'
+                    ? [{ key: 'verloren', label: 'ELW verloren …', gefahr: true as const }]
+                    : []),
+                  {
+                    key: 'widerrufen',
+                    icon: <IconKreuz />,
+                    label: 'Widerrufen …',
+                    gefahr: true,
+                  },
+                ];
+                const laeuft =
+                  kopplungWiderrufen.isPending || stammdatenNeu.isPending || elwVerloren.isPending;
                 return (
                   <ListenEintrag
                     actions={
@@ -202,20 +245,20 @@ export default function InstanzkopplungSeite() {
                         ? [
                             <MenueAusloeser
                               key="aktionen"
-                              gesperrt={kopplungWiderrufen.isPending}
-                              laeuft={kopplungWiderrufen.isPending}
+                              gesperrt={laeuft}
+                              laeuft={laeuft}
                               zugaenglicherName={`Aktionen zur Kopplung mit ${k.gegenueber_name}`}
-                              eintraege={[
-                                {
-                                  key: 'widerrufen',
-                                  icon: <IconKreuz />,
-                                  label: 'Widerrufen …',
-                                  gefahr: true,
-                                },
-                              ]}
-                              onWahl={() => {
-                                kopplungWiderrufen.reset();
-                                setWiderrufKopplung(k);
+                              eintraege={eintraege}
+                              onWahl={(wahl) => {
+                                if (wahl === 'abgleichen') {
+                                  stammdatenNeu.mutate(k);
+                                } else if (wahl === 'verloren') {
+                                  elwVerloren.reset();
+                                  setVerlorenKopplung(k);
+                                } else {
+                                  kopplungWiderrufen.reset();
+                                  setWiderrufKopplung(k);
+                                }
                               }}
                             />,
                           ]
@@ -240,6 +283,14 @@ export default function InstanzkopplungSeite() {
                             {k.gegenueber_fingerabdruck}
                             {k.gegenueber_adresse ? ` · ${k.gegenueber_adresse}` : ''}
                           </div>
+                          {stammdaten && (
+                            <div
+                              style={{ color: rollen.gedaempft }}
+                              data-lfh="instanz-kopplung-stammdaten"
+                            >
+                              {stammdaten}
+                            </div>
+                          )}
                           {hinweise.map((h) => (
                             <div
                               key={h}
@@ -471,6 +522,36 @@ export default function InstanzkopplungSeite() {
           sobald eine Meldung durchgeht; ein neuer Code koppelt wieder.
         </p>
         <SpeicherFehler fehler={kopplungWiderrufen.error} titel="Nicht widerrufen" />
+      </Modal>
+
+      <Modal
+        open={verlorenKopplung != null}
+        title={verlorenKopplung ? `${verlorenKopplung.gegenueber_name} als verloren melden?` : ''}
+        okText="Als verloren melden"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: elwVerloren.isPending }}
+        onOk={() => verlorenKopplung && elwVerloren.mutate(verlorenKopplung)}
+        // Solange die Meldung läuft, führt kein Weg hinaus: ein Fehlschlag ginge sonst still verloren.
+        onCancel={() => {
+          if (!elwVerloren.isPending) setVerlorenKopplung(null);
+        }}
+        cancelButtonProps={{ disabled: elwVerloren.isPending }}
+        closable={elwVerloren.isPending ? { disabled: true } : true}
+        mask={{ closable: !elwVerloren.isPending }}
+        keyboard={!elwVerloren.isPending}
+        destroyOnHidden
+      >
+        <p>
+          Die Kopplung wird für die eigene Organisation widerrufen.
+          {verlorenKopplung && verlorenKopplung.org.stammdaten.konten_mit_geheimnis > 0
+            ? ` Die ${verlorenKopplung.org.stammdaten.konten_mit_geheimnis} Konten, deren Passwort dort lag, verlieren Passwort und zweiten Faktor, ihre Sitzungen enden.`
+            : ' Dort lagen keine Passwörter der eigenen Organisation.'}
+        </p>
+        <p>
+          Wieder hinein kommt man per Passkey oder mit einem Einmalpasswort aus der
+          Benutzerverwaltung.
+        </p>
+        <SpeicherFehler fehler={elwVerloren.error} titel="Nicht gemeldet" />
       </Modal>
 
       <Modal

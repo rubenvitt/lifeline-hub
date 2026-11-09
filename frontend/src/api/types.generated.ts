@@ -3873,6 +3873,12 @@ export interface components {
         /** @description Alles, was die Admin-Seite „Instanzkopplung“ zeigt. */
         InstanzUebersicht: {
             /**
+             * @description Der Betreiber hat die Datenträgerverschlüsselung bestätigt
+             *     (`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine
+             *     Kontogeheimnisse (LLH-1493, D6).
+             */
+            datentraeger_bestaetigt: boolean;
+            /**
              * @description Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
              *     „Code ausstellen“).
              */
@@ -6866,6 +6872,11 @@ export interface components {
         StammdatenArt: "konto" | "org_einstellungen" | "modul_einstellung" | "fuehrungsfunktion" | "fahrzeug_status" | "personal_status" | "qualifikation" | "einheit_typ" | "fahrzeug" | "material" | "personal" | "einheit_vorlage";
         /** @description Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9). */
         StammdatenHerkunftAnzeige: {
+            /**
+             * @description Nur für Admins und nur, wenn diese Instanz die Geheimnisse der Org verteilt: System-Admins
+             *     ohne Anmelde-Passkey; ihre Geheimnisse gehen nicht hinaus (design.md D7).
+             */
+            admins_ohne_passkey: number[];
             /**
              * @description Name der Gegenstelle, aus der die Org ihre Stammdaten bezieht; ohne Quelle fehlt das Feld
              *     (dann gibt es weder „vom Hub“ noch „nur hier“).

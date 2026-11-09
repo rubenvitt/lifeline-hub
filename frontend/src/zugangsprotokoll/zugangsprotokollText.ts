@@ -42,6 +42,7 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   unterschrift_gegengezeichnet: 'Unterschriftsschlüssel gegengezeichnet',
   unterschrift_widerrufen: 'Unterschriftsschlüssel widerrufen',
   unterschrift_abgelehnt: 'Unterschriftsschlüssel abgelehnt',
+  instanz_elw_verloren: 'ELW als verloren gemeldet',
 };
 
 /**
@@ -103,7 +104,8 @@ export function rollenText(a: ZugangsAngaben): string | undefined {
 
 /**
  * Angaben der Instanzkopplung und der Unterschriftsschlüssel (LLH-1490): Gegenstelle mit Org,
- * Fingerabdruck, Adresse und bei `unterschrift_abgelehnt` der Grund. `undefined`, wenn keine
+ * Fingerabdruck, Adresse, bei `unterschrift_abgelehnt` der Grund und bei `instanz_elw_verloren` die
+ * Zahl der Konten. `undefined`, wenn keine
  * dieser Angaben steht.
  */
 export function instanzText(a: ZugangsAngaben): string | undefined {
@@ -112,6 +114,8 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
     a.fingerabdruck ? `Fingerabdruck ${a.fingerabdruck}` : null,
     a.adresse ?? null,
     a.grund ? `Grund: ${a.grund}` : null,
+    // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.
+    a.anzahl != null ? `${a.anzahl} ${a.anzahl === 1 ? 'Konto' : 'Konten'} gesperrt` : null,
   ].filter((t): t is string => t != null);
   return teile.length > 0 ? teile.join(' · ') : undefined;
 }

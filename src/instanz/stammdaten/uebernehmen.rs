@@ -304,11 +304,19 @@ async fn apply_geheimnis(
             if alt.as_deref() == Some(merkmal.as_str()) {
                 return Ok(());
             }
+            // Ein SSO-Konto hat hier keine SSO-Verknüpfung (sie wird nicht verteilt): ohne Netz
+            // kommt es nur mit einem Einmalpasswort des Admins hier hinein, und das verweigert die
+            // Benutzerverwaltung bei SSO-Konten. Also hier: kein lokales Passwort.
+            let hash = if g.passwort_hash == crate::auth::PASSWORT_HASH_SSO_ONLY {
+                PASSWORT_HASH_KEIN_LOKALES
+            } else {
+                g.passwort_hash.as_str()
+            };
             sqlx::query(
                 "UPDATE benutzer SET passwort_hash = ?, totp_secret = ?, totp_aktiviert = ?, \
                  passwort_wechsel_pflicht = ? WHERE id = ?",
             )
-            .bind(&g.passwort_hash)
+            .bind(hash)
             .bind(&g.totp_secret)
             .bind(g.totp_aktiviert)
             .bind(g.passwort_wechsel_pflicht)
