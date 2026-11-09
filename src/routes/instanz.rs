@@ -994,7 +994,9 @@ async fn decide_unterschrift(
     eingabe: Option<&str>,
 ) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
-    let zeile = crate::write_retry!(&state.pool, |conn| {
+    // Die Zuordnung für die Admin-Spur kommt aus derselben Transaktion: scheitert das Lesen,
+    // bleibt auch die Entscheidung aus, statt ohne Spureintrag zu gelten.
+    let (zeile, gegenstelle) = crate::write_retry!(&state.pool, |conn| {
         let zeile = unterschrift::load(conn, admin.org_id, id).await?;
         if zeile.zustand() != UnterschriftSchluesselZustand::WartetAufBestaetigung {
             return Err(AppError::UnprocessableEntity(
@@ -1019,12 +1021,12 @@ async fn decide_unterschrift(
                 "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
             ));
         }
-        Ok(zeile)
+        let gegenstelle = match zeile.kopplung_org_id {
+            Some(ko) => repo::load_zuordnung_gegenstelle(conn, ko).await?,
+            None => None,
+        };
+        Ok((zeile, gegenstelle))
     })?;
-    let gegenstelle = match zeile.kopplung_org_id {
-        Some(ko) => repo::load_zuordnung_gegenstelle(&state.pool, ko).await?,
-        None => None,
-    };
     admin_audit::schreibe(
         &state.pool,
         AdminEintrag {

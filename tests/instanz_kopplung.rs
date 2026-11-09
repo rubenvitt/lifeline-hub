@@ -1079,9 +1079,21 @@ async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
     );
     let (s, _) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(aktionen(&elw.pool)
-        .await
-        .contains(&"unterschrift_bestaetigt".to_string()));
+    // Der Spureintrag nennt die Gegenstelle, gelesen in derselben Transaktion wie die Entscheidung.
+    let detail: String = sqlx::query_scalar(
+        "SELECT detail FROM admin_audit WHERE aktion = 'unterschrift_bestaetigt'",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    let detail: serde_json::Value = serde_json::from_str(&detail).unwrap();
+    assert!(
+        detail["instanz_kennung"]
+            .as_str()
+            .is_some_and(|k| !k.is_empty()),
+        "{detail}"
+    );
+    assert!(detail["fremde_org"].as_str().is_some(), "{detail}");
 }
 
 #[tokio::test]
