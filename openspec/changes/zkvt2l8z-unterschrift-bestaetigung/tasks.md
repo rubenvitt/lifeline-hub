@@ -23,12 +23,12 @@ die nächste freie Nummer über `origin/alpha` (`scripts/check-migrationen.sh`, 
 
 ## 4. Anzeige und Warnung (D4, D5)
 
-- [ ] 4.1 `UnterschriftSchluesselAnzeige` um `unterzeichner_fingerabdruck` und `erklaert_at`, `InstanzKopplungAnzeige` um `wartende_schluessel` und `ohne_gueltigen_schluessel`; Integrationstests: Zähler nach Nachlieferung 1, nach Bestätigen 0; `ohne_gueltigen_schluessel` nach Deaktivieren des einzigen Schlüsselhalters am Hub
-- [ ] 4.2 `GET /api/admin/instanz/letzte-schluessel`; Integrationstests: Halter des einzigen Schlüssels einer verteilenden Org wird genannt, mit zweitem gültigem Schlüssel nicht, ohne Kopplung nicht, fremde Org nicht
-- [ ] 4.3 Deaktivieren und Herabstufen eines Halters gelingen und widerrufen den Schlüssel; Integrationstest (Vorrang statt 409)
-- [ ] 4.4 Frontend `instanz/`: Hinweise in `kopplungHinweise`, Schlüsselzeile für `wartet_auf_bestaetigung` und `abgelehnt`, Bestätigungsdialog (Angaben, Hinweis, vier Zeichen, Abbrechen gesperrt während des Speicherns, Ablehnung am Ort), Ablehnen mit Rückfrage; Vitest: Dialog schickt die eingegebenen Zeichen, 422 steht im Dialog, Ablehnen ruft die Route
-- [ ] 4.5 Frontend `BenutzerPage`: Rückfrage vor dem Deaktivieren eines Halters, `Alert` im Bearbeiten-Dialog bei Rollenverlust oder Deaktivieren; Vitest: Halter → Rückfrage mit Kopplungsnamen, Nicht-Halter → direkt wie bisher
-- [ ] 4.6 Zugangsprotokoll-Texte für die zwei neuen Aktionen; Vitest der Texte
+- [x] 4.1 `UnterschriftSchluesselAnzeige` um `unterzeichner_fingerabdruck` und `erklaert_at`, `InstanzKopplungAnzeige` um `wartende_schluessel` und `ohne_gueltigen_schluessel`; Integrationstests: Zähler nach Nachlieferung 1, nach Bestätigen 0; `ohne_gueltigen_schluessel` nach Deaktivieren des einzigen Schlüsselhalters am Hub
+- [x] 4.2 `GET /api/admin/instanz/letzte-schluessel`; Integrationstests: Halter des einzigen Schlüssels einer verteilenden Org wird genannt, mit zweitem gültigem Schlüssel nicht, ohne Kopplung nicht, fremde Org nicht
+- [x] 4.3 Deaktivieren und Herabstufen eines Halters gelingen und widerrufen den Schlüssel; Integrationstest (Vorrang statt 409)
+- [x] 4.4 Frontend `instanz/`: Hinweise in `kopplungHinweise`, Schlüsselzeile für `wartet_auf_bestaetigung` und `abgelehnt` („zurückgewiesen“), Bestätigungsdialog (Angaben, Hinweis, vier Zeichen, Abbrechen gesperrt während des Speicherns, Ablehnung am Ort), Zurückweisen mit Rückfrage; Vitest: Dialog schickt die eingegebenen Zeichen, 422 steht im Dialog, Zurückweisen ruft die Route
+- [x] 4.5 Frontend `BenutzerPage`: Rückfrage vor dem Deaktivieren eines Halters, `Alert` im Bearbeiten-Dialog bei Rollenverlust oder Deaktivieren; Vitest: Halter → Rückfrage mit Kopplungsnamen, Nicht-Halter → direkt wie bisher
+- [x] 4.6 Zugangsprotokoll-Texte für die zwei neuen Aktionen; Vitest der Texte
 
 ## 5. Doku und Abschluss
 

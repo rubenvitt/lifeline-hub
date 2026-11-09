@@ -635,6 +635,12 @@ pub struct InstanzKopplungAnzeige {
     pub uhr_abweichung_s: Option<i64>,
     /// Die Org-Zuordnung der eigenen Org (die jüngste).
     pub org: InstanzOrgZuordnung,
+    /// Vom Gegenüber nachgelieferte Unterschriftsschlüssel, die hier auf Bestätigung warten
+    /// (LLH-1605).
+    pub wartende_schluessel: i64,
+    /// Die eigene Org verteilt ihre Schlüssel an diese Kopplung, hat aber keinen gültigen mehr
+    /// (etwa nach dem Deaktivieren des letzten Halters): die Kopplung muss neu aufgebaut werden.
+    pub ohne_gueltigen_schluessel: bool,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -663,7 +669,33 @@ pub async fn list_fuer_org(
     let mut aus = Vec::with_capacity(orgs.len());
     for o in orgs {
         let k = load_kopplung(pool, o.kopplung_id).await?;
-        aus.push(to_anzeige(k, o));
+        let wartende: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
+             AND zustand = 'wartet_auf_bestaetigung'",
+        )
+        .bind(o.id)
+        .fetch_one(pool)
+        .await?;
+        let verteilt = k.richtung() == Some(InstanzKopplungRichtung::WirdGemeldet)
+            && o.widerrufen_at.is_none()
+            && matches!(
+                k.zustand(),
+                Some(InstanzKopplungZustand::Angebahnt | InstanzKopplungZustand::Aktiv)
+            );
+        let ohne_gueltigen = verteilt && {
+            let n: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM unterschrift_schluessel WHERE org_id = ? \
+                 AND herkunft = 'lokal' AND zustand = 'gueltig'",
+            )
+            .bind(org_id)
+            .fetch_one(pool)
+            .await?;
+            n == 0
+        };
+        let mut anzeige = to_anzeige(k, o);
+        anzeige.wartende_schluessel = wartende;
+        anzeige.ohne_gueltigen_schluessel = ohne_gueltigen;
+        aus.push(anzeige);
     }
     Ok(aus)
 }
@@ -721,6 +753,8 @@ fn to_anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
             angelegt_at: o.angelegt_at,
             widerrufen_at: o.widerrufen_at,
         },
+        wartende_schluessel: 0,
+        ohne_gueltigen_schluessel: false,
     }
 }
 

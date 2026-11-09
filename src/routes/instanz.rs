@@ -11,7 +11,7 @@ use crate::auth::unterschrift::pruefen::{self, UnterschriftAssertion};
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::auth::unterschrift::zeremonie::{self, Zeremonie};
 use crate::auth::unterschrift::{
-    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    AufnahmeErklaerung, Gegenzeichnung, LetzterSchluesselHalter, UnterschriftSchluesselAnzeige,
     UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand, TYP_AUFNAHME,
 };
 use crate::error::AppError;
@@ -931,6 +931,18 @@ pub async fn gegenzeichnen_abschluss(
     )
     .await;
     Ok(Json(anzeige))
+}
+
+/// GET /api/admin/instanz/letzte-schluessel — Konten der eigenen Org, deren Deaktivieren oder
+/// Herabstufen die Kopplungen ohne gültigen Unterschriftsschlüssel zurückließe; die
+/// Benutzerverwaltung warnt davor (LLH-1605, design.md D5).
+pub async fn letzte_schluessel(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+) -> Result<Json<Vec<LetzterSchluesselHalter>>, AppError> {
+    Ok(Json(
+        unterschrift::list_letzte_halter(&state.pool, admin.org_id).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]

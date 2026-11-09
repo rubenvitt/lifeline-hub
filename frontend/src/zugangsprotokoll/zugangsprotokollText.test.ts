@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ANMELDEWEG_TEXT, anmeldewegText, instanzText, rollenText } from './zugangsprotokollText';
+import {
+  AKTION_TEXT,
+  ANMELDEWEG_TEXT,
+  anmeldewegText,
+  hasNamensziel,
+  instanzText,
+  rollenText,
+} from './zugangsprotokollText';
 
 /** Klartext des Zugangsprotokolls (LFH-1152): keine interne Kennung in der Liste. */
 describe('anmeldewegText', () => {
@@ -64,5 +71,14 @@ describe('instanzText (LLH-1490)', () => {
       'Org dort: DRK LV · Fingerabdruck ABCD-EFGH · https://hub.example.org · Grund: ohne Gegenzeichnung',
     );
     expect(instanzText({})).toBeUndefined();
+  });
+});
+
+describe('Bestätigung nachgelieferter Schlüssel (LLH-1605)', () => {
+  it('nennt Bestätigen und Zurückweisen und zeigt den Inhaber als Ziel', () => {
+    expect(AKTION_TEXT.unterschrift_bestaetigt).toBe('Unterschriftsschlüssel bestätigt');
+    expect(AKTION_TEXT.unterschrift_zurueckgewiesen).toBe('Unterschriftsschlüssel zurückgewiesen');
+    expect(hasNamensziel('unterschrift_bestaetigt')).toBe(true);
+    expect(hasNamensziel('unterschrift_zurueckgewiesen')).toBe(true);
   });
 });

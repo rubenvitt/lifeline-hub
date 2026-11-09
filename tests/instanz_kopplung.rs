@@ -1016,6 +1016,25 @@ async fn mit_wartendem_schluessel() -> (Instanz, Instanz, i64, String) {
 #[tokio::test]
 async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
     let (_hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(u["kopplungen"][0]["wartende_schluessel"], 1, "{u}");
+    // Die Anzeige nennt Unterzeichner, seinen Fingerabdruck und den Zeitpunkt der Erklärung.
+    let zeile = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == id)
+        .unwrap();
+    let fp_a = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["zustand"] == "gueltig" && s["herkunft"] == "gegenueber")
+        .unwrap()["fingerabdruck"]
+        .clone();
+    assert_eq!(zeile["gegengezeichnet_von"], "Admin", "{zeile}");
+    assert_eq!(zeile["unterzeichner_fingerabdruck"], fp_a, "{zeile}");
+    assert!(zeile["erklaert_at"].as_str().is_some(), "{zeile}");
     let pfad = format!("/api/admin/instanz/unterschrift/{id}/bestaetigen");
     // Ohne Feld oder leer: 400.
     let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &elw.admin, Some(&json!({}))).await;
@@ -1048,6 +1067,10 @@ async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
     let (s, v) = bestaetigen(&elw, &elw.admin, id, &ende(&fp).to_lowercase()).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zustand"], "gueltig");
+    assert_eq!(
+        uebersicht(&elw).await["kopplungen"][0]["wartende_schluessel"],
+        0
+    );
     let (s, _) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(aktionen(&elw.pool)
@@ -1148,6 +1171,127 @@ async fn letzter_schluessel_bleibt_solange_gekoppelt_und_widerruf_wandert() {
     // B kam in derselben Meldung, gegengezeichnet von A, als A noch galt; er wartet am ELW.
     assert!(gueltige_fremde(&u).is_empty());
     wartender(&elw).await;
+}
+
+/// Konten, deren Deaktivieren die Org ohne gültigen Schlüssel zurückließe (LLH-1605, D5).
+async fn letzte_schluessel(i: &Instanz, wer: &str) -> Value {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        "/api/admin/instanz/letzte-schluessel",
+        wer,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+/// Ein zweiter Admin in Org 1 (Passwort `zweitpw1`), direkt im Pool dieser Instanz: die
+/// Helfer aus `common` wirken auf den Pool des zuletzt gebauten Routers. Liefert seine id.
+async fn zweiter_admin(i: &Instanz) -> i64 {
+    let hash = lifeline_hub::auth::password::hash("zweitpw1").unwrap();
+    sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+         org_rolle) VALUES (1, 'Zweit', 'zweit', ?, 'admin', 'keine') RETURNING id",
+    )
+    .bind(&hash)
+    .fetch_one(&i.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn letzte_schluessel_nennt_nur_halter_bei_verteilender_kopplung() {
+    // Ohne Kopplung ist niemand Halter des letzten Schlüssels.
+    let ungekoppelt = instanz().await;
+    schluessel(&ungekoppelt, &SoftwarePasskey::new("a", [1u8; 32]), "A").await;
+    assert_eq!(
+        letzte_schluessel(&ungekoppelt, &ungekoppelt.admin).await,
+        json!([])
+    );
+
+    let (hub, _elw) = gekoppelt().await;
+    let v = letzte_schluessel(&hub, &hub.admin).await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v[0]["benutzer_id"], 1);
+    assert_eq!(v[0]["kopplungen"], json!(["Lifeline Hub"]), "{v}");
+    // Ein Admin einer anderen Org sieht die Halter von Org 1 nicht.
+    org_admin(&hub.pool, "Fremde Org", "fremd").await;
+    let fremd = common::login_cookie(&hub.app, "fremd", "fremdpw1").await;
+    assert_eq!(letzte_schluessel(&hub, &fremd).await, json!([]));
+    // Mit einem gültigen Schlüssel eines zweiten Kontos ist niemand mehr der Letzte; ein
+    // zweiter Schlüssel desselben Kontos ändert daran nichts.
+    let id_a2 = schluessel(&hub, &SoftwarePasskey::new("a2", [5u8; 32]), "A2").await;
+    assert_eq!(
+        gegenzeichnen(&hub, id_a2, &SoftwarePasskey::new("a", [1u8; 32]))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        letzte_schluessel(&hub, &hub.admin).await[0]["benutzer_id"],
+        1
+    );
+    let zweit = zweiter_admin(&hub).await;
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let id_b = {
+        let oeff = b.oeffentlich();
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: zweit,
+                benutzer_name: "Zweit",
+                credential_id: "b",
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "B",
+            },
+        )
+        .await
+        .unwrap()
+    };
+    assert_eq!(
+        gegenzeichnen(&hub, id_b, &SoftwarePasskey::new("a", [1u8; 32]))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(letzte_schluessel(&hub, &hub.admin).await, json!([]));
+}
+
+/// Deaktivieren hat Vorrang vor dem Schutz „letzter Schlüssel“; die Kopplung zeigt danach, dass
+/// neu gekoppelt werden muss.
+#[tokio::test]
+async fn deaktivieren_des_letzten_schluesselhalters_gelingt() {
+    let (hub, _elw) = gekoppelt().await;
+    zweiter_admin(&hub).await;
+    let zweit = common::login_cookie(&hub.app, "zweit", "zweitpw1").await;
+    assert_eq!(
+        uebersicht(&hub).await["kopplungen"][0]["ohne_gueltigen_schluessel"],
+        false
+    );
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        "/api/benutzer/1/deaktivieren",
+        &zweit,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zustand: String =
+        sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE credential_id = 'a'")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(zustand, "widerrufen");
+    let (s, u) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &zweit, None).await;
+    assert_eq!(s, StatusCode::OK, "{u}");
+    assert_eq!(u["kopplungen"][0]["ohne_gueltigen_schluessel"], true, "{u}");
 }
 
 #[tokio::test]

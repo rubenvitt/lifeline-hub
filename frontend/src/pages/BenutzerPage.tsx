@@ -1,4 +1,4 @@
-import { App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
+import { Alert, App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -29,6 +29,7 @@ import SitzungsListe from '../auth/SitzungsListe';
 import EinmalpasswortVergeben from '../auth/EinmalpasswortVergeben';
 import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../api/sitzungen';
 import { globalKeys } from '../api/queryKeys';
+import { loadLetzteSchluessel } from '../api/instanz';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import {
   EIGENES_KONTO,
@@ -60,6 +61,22 @@ const ORG_ROLLEN = [
   { value: 'fuehrungskraft', label: `${ORG_ROLLE_TEXT.fuehrungskraft} (darf Einsätze anlegen)` },
 ];
 
+/**
+ * Warnung vor dem Deaktivieren oder Herabstufen des letzten Schlüsselhalters (LLH-1605): die
+ * Kopplungen müssen danach neu aufgebaut werden, der Weg steht dabei.
+ */
+function kopplungNeuText(kopplungen: string[]): string {
+  const mit =
+    kopplungen.length === 1
+      ? `Die Kopplung mit ${kopplungen[0]}`
+      : `Die Kopplungen mit ${kopplungen.join(', ')}`;
+  return (
+    'Danach hat die Organisation keinen gültigen Unterschriftsschlüssel mehr. ' +
+    `${mit} ${kopplungen.length === 1 ? 'muss' : 'müssen'} neu aufgebaut werden: Kopplung ` +
+    'widerrufen, einen neuen Unterschriftsschlüssel registrieren und neu koppeln.'
+  );
+}
+
 export default function BenutzerPage() {
   const { benutzer: angemeldeterBenutzer, laedt: authLaedt } = useAuth();
   const qc = useQueryClient();
@@ -71,6 +88,8 @@ export default function BenutzerPage() {
   const [anmeldungenVon, setAnmeldungenVon] = useState<BenutzerAnzeige | null>(null);
   // Die offene Rückfrage vor dem Zurücksetzen des zweiten Faktors (LFH-1122).
   const [zweitfaktorVon, setZweitfaktorVon] = useState<BenutzerAnzeige | null>(null);
+  // Die Rückfrage vor dem Deaktivieren des letzten Schlüsselhalters (LLH-1605).
+  const [deaktivierenVon, setDeaktivierenVon] = useState<BenutzerAnzeige | null>(null);
   const { message } = App.useApp();
 
   const benutzerQuery = useQuery({
@@ -78,6 +97,20 @@ export default function BenutzerPage() {
     queryFn: listeBenutzer,
   });
   const benutzerListe = benutzerQuery.data ?? [];
+
+  /*
+   * Halter des letzten Unterschriftsschlüssels (LLH-1605, Change zkvt2l8z, D5): Deaktivieren und
+   * Herabstufen gelingen auch dann, die Kopplungen der Org müssen danach aber neu aufgebaut
+   * werden. Darum warnt die Seite vorher. Scheitert der Abruf, fehlt nur die Warnung.
+   */
+  const letzteQuery = useQuery({
+    queryKey: globalKeys.instanzkopplungLetzteSchluessel(),
+    queryFn: loadLetzteSchluessel,
+    enabled: angemeldeterBenutzer?.system_rolle === 'admin',
+  });
+  const letzteKopplungen = (id: number): string[] | undefined =>
+    letzteQuery.data?.find((h) => h.benutzer_id === id)?.kopplungen;
+  const bearbeitenRolle = Form.useWatch('system_rolle', editForm);
 
   /*
    * Kein `onError`-Toast (LFH-966, `frontend/AGENTS.md`, „Speicherfehler an die Seite, Erfolg an
@@ -92,14 +125,22 @@ export default function BenutzerPage() {
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+        qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() }),
+      ]),
   });
 
   // Der Bearbeiten-Dialog. Das Schließen macht `onFertig` an der Hülle, nicht dieser Erfolgszweig.
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
       bearbeiteBenutzer(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+        qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() }),
+      ]),
   });
 
   // „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121). Hier statt in der Komponente:
@@ -307,6 +348,10 @@ export default function BenutzerPage() {
               else if (aktion === 'zweitfaktor') {
                 zweitfaktor.reset();
                 setZweitfaktorVon(b);
+              } else if (b.aktiv && letzteKopplungen(b.id)) {
+                deaktivieren.reset();
+                reaktivieren.reset();
+                setDeaktivierenVon(b);
               } else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
               else zeilenAktion('reaktivieren', b.id);
             }}
@@ -332,7 +377,8 @@ export default function BenutzerPage() {
       }
       hinweis={
         <SeitenHinweise
-          fehler={deaktivieren.error ?? reaktivieren.error}
+          // Während der Rückfrage steht ein Fehler des Deaktivierens im Dialog, nicht doppelt hier.
+          fehler={deaktivierenVon ? null : (deaktivieren.error ?? reaktivieren.error)}
           fehlerTitel={deaktivieren.isError ? 'Nicht deaktiviert' : 'Nicht reaktiviert'}
         />
       }
@@ -494,6 +540,17 @@ export default function BenutzerPage() {
         <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
           <Select options={ORG_ROLLEN} />
         </Form.Item>
+        {zuBearbeiten &&
+          bearbeitenRolle !== undefined &&
+          bearbeitenRolle !== 'admin' &&
+          letzteKopplungen(zuBearbeiten.id) && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBlockEnd: 16 }}
+              message={kopplungNeuText(letzteKopplungen(zuBearbeiten.id) ?? [])}
+            />
+          )}
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
         <SpeicherFehler fehler={bearbeiten.error} />
         {/* Passwort vergessen (LFH-1121): eine eigene Aktion neben dem Formular, kein Feld. */}
@@ -529,6 +586,31 @@ export default function BenutzerPage() {
             }
           />
         )}
+      </Modal>
+
+      {/* Rückfrage vor dem Deaktivieren des letzten Schlüsselhalters (LLH-1605). Wie beim zweiten
+          Faktor: Abbrechen ist gesperrt, solange gesendet wird, der Fehler steht im Dialog. */}
+      <Modal
+        open={deaktivierenVon !== null}
+        title={deaktivierenVon ? `${deaktivierenVon.anzeigename} deaktivieren?` : ''}
+        okText="Deaktivieren"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: deaktivieren.isPending }}
+        cancelButtonProps={{ disabled: deaktivieren.isPending }}
+        closable={deaktivieren.isPending ? { disabled: true } : true}
+        mask={{ closable: !deaktivieren.isPending }}
+        keyboard={!deaktivieren.isPending}
+        onOk={() =>
+          deaktivierenVon &&
+          deaktivieren.mutate(deaktivierenVon.id, { onSuccess: () => setDeaktivierenVon(null) })
+        }
+        onCancel={() => {
+          if (!deaktivieren.isPending) setDeaktivierenVon(null);
+        }}
+        destroyOnHidden
+      >
+        {deaktivierenVon && <p>{kopplungNeuText(letzteKopplungen(deaktivierenVon.id) ?? [])}</p>}
+        <SpeicherFehler fehler={deaktivieren.error} titel="Nicht deaktiviert" />
       </Modal>
 
       {/* Rückfrage im Dialog, nicht am Menüeintrag (Spec `datensatz-aktionsmenue`). Abbrechen ist

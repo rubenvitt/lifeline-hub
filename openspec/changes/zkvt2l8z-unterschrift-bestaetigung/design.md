@@ -100,10 +100,10 @@ Gegenzeichnung `wartet_auf_bestaetigung` statt `gueltig`; mit `grundstock = true
 - `instanzText.ts::kopplungHinweise` macht daraus die beiden Hinweise der Spec.
 - Bestätigungsdialog als `ErfassungsModal` mit:
   - Fingerabdruck in Gruppen, Inhaber, Unterzeichner mit Fingerabdruck, Zeitpunkt;
-  - Hinweis „Lass dir die letzten vier Zeichen vom Inhaber nennen, etwa am Telefon. Lies sie
-    ihm nicht vor.“;
+  - Hinweis, den Inhaber anzurufen und nach den letzten vier Zeichen zu fragen; der Inhaber
+    nennt sie, nicht umgekehrt;
   - ein Eingabefeld (4 Zeichen, Großbuchstaben).
-- Ablehnen ist ein Menüeintrag mit eigener Rückfrage.
+- Zurückweisen ist ein Menüeintrag mit eigener Rückfrage.
 - Formulierungen klärt die Umsetzung mit `bedien-wortlaut` und `design:ux-copy`.
 
 ### D5 Warnung vor dem Deaktivieren und Herabstufen

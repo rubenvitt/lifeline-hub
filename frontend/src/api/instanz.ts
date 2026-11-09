@@ -1,6 +1,7 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import type {
   InstanzKopplungAnzeige,
+  LetzterSchluesselHalter,
   InstanzUebersicht,
   KopplungscodeAntwort,
   UnterschriftAssertion,
@@ -97,4 +98,35 @@ export function widerrufeUnterschriftsschluessel(
     `/api/admin/instanz/unterschrift/${id}/widerrufen`,
     'POST',
   );
+}
+
+/**
+ * Bestätigt einen vom Gegenüber nachgelieferten, wartenden Schlüssel (LLH-1605). `ende` sind die
+ * letzten vier Zeichen des Fingerabdrucks, wie der Inhaber sie nennt; passen sie nicht, kommt 422.
+ */
+export function confirmUnterschriftsschluessel(
+  id: number,
+  ende: string,
+): Promise<UnterschriftSchluesselAnzeige> {
+  return apiSend<UnterschriftSchluesselAnzeige>(
+    `/api/admin/instanz/unterschrift/${id}/bestaetigen`,
+    'POST',
+    { fingerabdruck_ende: ende },
+  );
+}
+
+/** Weist einen vom Gegenüber nachgelieferten, wartenden Schlüssel zurück; er wird nie gültig. */
+export function rejectUnterschriftsschluessel(id: number): Promise<UnterschriftSchluesselAnzeige> {
+  return apiSend<UnterschriftSchluesselAnzeige>(
+    `/api/admin/instanz/unterschrift/${id}/zurueckweisen`,
+    'POST',
+  );
+}
+
+/**
+ * Konten, deren Deaktivieren oder Herabstufen die Kopplungen der Org ohne gültigen
+ * Unterschriftsschlüssel zurückließe (LLH-1605); die Benutzerverwaltung warnt davor.
+ */
+export function loadLetzteSchluessel(): Promise<LetzterSchluesselHalter[]> {
+  return apiGet<LetzterSchluesselHalter[]>('/api/admin/instanz/letzte-schluessel');
 }

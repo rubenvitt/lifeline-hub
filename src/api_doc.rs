@@ -205,6 +205,7 @@ use utoipa::OpenApi;
         crate::routes::instanz::KopplungscodeAntwort,
         crate::routes::instanz::UnterschriftRegistrierenStart,
         crate::routes::instanz::UnterschriftGegenzeichnenStart,
+        crate::auth::unterschrift::LetzterSchluesselHalter,
         crate::instanz::repo::InstanzKopplungAnzeige,
         crate::instanz::repo::InstanzOrgZuordnung,
         crate::instanz::repo::InstanzProtokoll,

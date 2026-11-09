@@ -66,6 +66,16 @@ export function kopplungHinweise(k: InstanzKopplungAnzeige): string[] {
   }
   if (k.letzter_fehler) aus.push(`Letzte Meldung: ${k.letzter_fehler}`);
   if (k.hinweis) aus.push(k.hinweis);
+  // LLH-1605: nachgelieferte Schlüssel warten auf einen Menschen hier; ohne gültigen eigenen
+  // Schlüssel (etwa nach dem Deaktivieren des letzten Halters) hilft nur neues Koppeln.
+  if (k.wartende_schluessel === 1) {
+    aus.push('1 neuer Unterschriftsschlüssel wartet auf Bestätigung');
+  } else if (k.wartende_schluessel > 1) {
+    aus.push(`${k.wartende_schluessel} neue Unterschriftsschlüssel warten auf Bestätigung`);
+  }
+  if (k.ohne_gueltigen_schluessel) {
+    aus.push('Kein gültiger Unterschriftsschlüssel mehr: Kopplung widerrufen und neu koppeln');
+  }
   return aus;
 }
 
@@ -86,7 +96,11 @@ export function schluesselZeile(
     s.herkunft === 'gegenueber'
       ? `von ${s.fremde_org_name ?? 'gekoppelter Instanz'}`
       : `registriert ${zeit(s.erstellt_at)}`,
-    s.gegengezeichnet_von ? `gegengezeichnet von ${s.gegengezeichnet_von}` : null,
+    s.gegengezeichnet_von
+      ? `gegengezeichnet von ${s.gegengezeichnet_von}${
+          s.unterzeichner_fingerabdruck ? ` (${s.unterzeichner_fingerabdruck})` : ''
+        }${s.erklaert_at ? ` ${zeit(s.erklaert_at)}` : ''}`
+      : null,
   ];
   return teile.filter(Boolean).join(' · ');
 }

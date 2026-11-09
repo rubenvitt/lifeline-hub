@@ -154,4 +154,18 @@ pub struct UnterschriftSchluesselAnzeige {
     /// Bei einer Gegenzeichnung: wer gegengezeichnet hat.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gegengezeichnet_von: Option<String>,
+    /// Bei einer Gegenzeichnung: Fingerabdruck des unterzeichnenden Schlüssels (LLH-1605).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unterzeichner_fingerabdruck: Option<String>,
+    /// Bei einer Gegenzeichnung: Zeitpunkt aus der Erklärung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub erklaert_at: Option<String>,
+}
+
+/// Ein Konto, dessen Deaktivieren oder Herabstufen die Org ohne gültigen Unterschriftsschlüssel
+/// zurückließe, und die Kopplungen, die dann neu aufgebaut werden müssen (LLH-1605, design.md D5).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct LetzterSchluesselHalter {
+    pub benutzer_id: i64,
+    pub kopplungen: Vec<String>,
 }

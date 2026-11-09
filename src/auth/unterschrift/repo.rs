@@ -2,7 +2,7 @@
 
 use super::pruefen::{self, VerifySchluessel};
 use super::{
-    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    AufnahmeErklaerung, Gegenzeichnung, LetzterSchluesselHalter, UnterschriftSchluesselAnzeige,
     UnterschriftSchluesselHerkunft, UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand,
     ALG_ES256, TYP_AUFNAHME,
 };
@@ -678,20 +678,25 @@ pub async fn list_fuer_org(
     };
     let mut aus = Vec::with_capacity(zeilen.len());
     for (z, fremde_org_name) in &zeilen {
-        let gegengezeichnet_von = match z.gegenzeichnung() {
-            Some(g) => {
-                let name: Option<String> = sqlx::query_scalar(
-                    "SELECT benutzer_name FROM unterschrift_schluessel WHERE credential_id = ? \
-                     AND org_id = ? LIMIT 1",
-                )
-                .bind(&g.unterzeichner_credential_id)
-                .bind(org_id)
-                .fetch_optional(pool)
-                .await?;
-                name
-            }
-            None => None,
-        };
+        let (gegengezeichnet_von, unterzeichner_fingerabdruck, erklaert_at) =
+            match z.gegenzeichnung() {
+                Some(g) => {
+                    let unterzeichner: Option<(String, String)> = sqlx::query_as(
+                        "SELECT benutzer_name, fingerabdruck FROM unterschrift_schluessel \
+                         WHERE credential_id = ? AND org_id = ? LIMIT 1",
+                    )
+                    .bind(&g.unterzeichner_credential_id)
+                    .bind(org_id)
+                    .fetch_optional(pool)
+                    .await?;
+                    let erklaert_at = serde_json::from_str::<AufnahmeErklaerung>(&g.erklaerung)
+                        .ok()
+                        .map(|e| e.zeitpunkt);
+                    let (name, fp) = unterzeichner.unzip();
+                    (name, fp, erklaert_at)
+                }
+                None => (None, None, None),
+            };
         aus.push(UnterschriftSchluesselAnzeige {
             id: z.id,
             benutzer_name: z.benutzer_name.clone(),
@@ -705,12 +710,49 @@ pub async fn list_fuer_org(
             widerrufen_at: z.widerrufen_at.clone(),
             fremde_org_name: fremde_org_name.clone(),
             gegengezeichnet_von,
+            unterzeichner_fingerabdruck,
+            erklaert_at,
         });
     }
     Ok(aus)
 }
 
 /// Eine Zeile für die Anzeige.
+/// Konten der Org, die alle gültigen lokalen Schlüssel halten, während die Org ihre Schlüssel an
+/// eine gekoppelte Instanz verteilt; ihr Deaktivieren oder Herabstufen ließe die Kopplungen ohne
+/// gültigen Schlüssel zurück (design.md D5). Höchstens ein Konto, weil „alle“ sonst niemand hält.
+pub async fn list_letzte_halter(
+    pool: &SqlitePool,
+    org_id: i64,
+) -> Result<Vec<LetzterSchluesselHalter>, AppError> {
+    let halter: Vec<i64> = sqlx::query_scalar(
+        "SELECT DISTINCT benutzer_id FROM unterschrift_schluessel WHERE org_id = ? \
+         AND herkunft = 'lokal' AND zustand = 'gueltig' AND benutzer_id IS NOT NULL",
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+    let [benutzer_id] = halter[..] else {
+        return Ok(Vec::new());
+    };
+    let kopplungen: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT k.gegenueber_name FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE o.org_id = ? AND o.widerrufen_at IS NULL AND k.richtung = 'wird_gemeldet' \
+         AND k.zustand IN ('angebahnt', 'aktiv') ORDER BY k.gegenueber_name",
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+    if kopplungen.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(vec![LetzterSchluesselHalter {
+        benutzer_id,
+        kopplungen,
+    }])
+}
+
 pub async fn load_anzeige(
     pool: &SqlitePool,
     org_id: i64,

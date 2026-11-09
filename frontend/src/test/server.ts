@@ -29,6 +29,11 @@ export const server = setupServer(
    */
   http.get('/api/benachrichtigungen', () => HttpResponse.json([])),
   /**
+   * Halter des letzten Unterschriftsschlüssels (LLH-1605) — keiner als Default. Die
+   * Benutzerverwaltung fragt sie für ihre Warnung beim Mount ab; Tests mit Halter überschreiben.
+   */
+  http.get('/api/admin/instanz/letzte-schluessel', () => HttpResponse.json([])),
+  /**
    * Verlauf der Eingänge eines Einsatzes (LLH-1143) — leer als Default. Der Knopf „Eingänge“ im
    * Einsatz-Rahmen fragt ihn beim Mount ab; Tests mit Einträgen überschreiben per `server.use()`.
    */

@@ -1124,6 +1124,12 @@ export const globalKeys = {
   lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   /**
+   * Halter des letzten Unterschriftsschlüssels (LLH-1605), für die Warnung der Benutzerverwaltung.
+   * Liegt unter dem Prefix `instanzkopplung`: wer die Kopplungen abgleicht, gleicht sie mit ab.
+   */
+  instanzkopplungLetzteSchluessel: () =>
+    [GLOBAL_KEYS.instanzkopplung, 'letzte-schluessel'] as const,
+  /**
    * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
    * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).
    */

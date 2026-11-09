@@ -801,6 +801,55 @@ describe('BenutzerPage', () => {
       expect(screen.queryByRole('tooltip')).toBeNull();
     });
 
+    it('Deaktivieren des letzten Schlüsselhalters fragt nach und nennt die Kopplungen (LLH-1605)', async () => {
+      let deaktiviert: string | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      seite();
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      expect(within(dialog).getByText(/ELW 1 DRK Nord/)).toBeInTheDocument();
+      expect(deaktiviert).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
+      await waitFor(() => expect(deaktiviert).toBe('2'));
+    });
+
+    it('Herabstufen des letzten Schlüsselhalters warnt im Dialog (LLH-1605)', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
+        ),
+      );
+      seite();
+      await waehle('Eva', 'Bearbeiten');
+      const dialog = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
+      expect(within(dialog).queryByText(/neu aufgebaut werden/)).toBeNull();
+      await userEvent.click(within(dialog).getByLabelText('System-Rolle'));
+      await userEvent.click(await screen.findByTitle('Benutzer'));
+      expect(await within(dialog).findByText(/neu aufgebaut werden/)).toBeInTheDocument();
+    });
+
     it('sperrt Deaktivieren am letzten aktiven Admin und nennt den Grund', async () => {
       server.use(
         meHandler(benutzer()),
