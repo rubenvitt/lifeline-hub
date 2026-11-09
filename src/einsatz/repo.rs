@@ -535,6 +535,8 @@ pub async fn liste_fuer(
                 fuehrungsstelle: meine_fuehrungsstelle,
                 sachgebiete: meine_sachgebiete,
                 funktion: meine_funktion,
+                funktion_code: meine_funktion_code,
+                funktion_bezeichnung: meine_funktion_bezeichnung,
             } = super::MeineFelder::ableiten(r.meine_rolle.as_deref(), stelle, &karte);
             EinsatzAnzeige {
                 id: r.id,
@@ -562,6 +564,8 @@ pub async fn liste_fuer(
                 meine_fuehrungsstelle,
                 meine_sachgebiete,
                 meine_funktion,
+                meine_funktion_code,
+                meine_funktion_bezeichnung,
                 lagekennzahlen: super::lagekennzahl::ableiten(
                     r.pegel_festgelegt,
                     r.evakuierung_angeordnet,

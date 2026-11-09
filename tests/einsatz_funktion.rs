@@ -78,11 +78,25 @@ async fn meine_funktion_in_detail_und_liste() {
         !json.as_object().unwrap().contains_key("meine_funktion"),
         "ohne Funktion fehlt das Feld: {json:?}"
     );
+    for feld in ["meine_funktion_code", "meine_funktion_bezeichnung"] {
+        assert!(
+            !json.as_object().unwrap().contains_key(feld),
+            "ohne Funktion fehlt {feld}: {json:?}"
+        );
+    }
     assert_eq!(json["meine_sachgebiete"], serde_json::json!([]));
 
     funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", Some("s2")).await;
     let json = kopf(&app, &kraft, einsatz).await;
     assert_eq!(json["meine_funktion"], "S2 Lage", "Detail-Pfad");
+    assert_eq!(json["meine_funktion_code"], "s2", "Detail-Pfad");
+    assert!(
+        !json
+            .as_object()
+            .unwrap()
+            .contains_key("meine_funktion_bezeichnung"),
+        "ein Sachgebiet trägt keine Bezeichnung: {json:?}"
+    );
     assert_eq!(json["meine_sachgebiete"], serde_json::json!(["s2"]));
 
     // Listen-Pfad baut das Struct-Literal selbst — ein fehlendes Feld dort fiele nur hier auf.
@@ -94,6 +108,7 @@ async fn meine_funktion_in_detail_und_liste() {
         .find(|e| e["id"].as_i64() == Some(einsatz))
         .unwrap();
     assert_eq!(eintrag["meine_funktion"], "S2 Lage", "Listen-Pfad");
+    assert_eq!(eintrag["meine_funktion_code"], "s2", "Listen-Pfad");
     assert_eq!(eintrag["meine_sachgebiete"], serde_json::json!(["s2"]));
 }
 
@@ -148,6 +163,18 @@ async fn fachberater_hat_kein_sachgebiet() {
     let json = kopf(&app, &kraft, einsatz).await;
     assert_eq!(json["meine_funktion"], "Fachberater: THW");
     assert_eq!(json["meine_sachgebiete"], serde_json::json!([]));
+    // Code und Bezeichnung für „meine Stelle“ (pkjvl5iy, design.md D1), in Detail und Liste.
+    assert_eq!(json["meine_funktion_code"], "fachberater");
+    assert_eq!(json["meine_funktion_bezeichnung"], "THW");
+    let (_, liste) = anfrage(&app, "GET", "/api/einsaetze", &kraft, None).await;
+    let eintrag = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(einsatz))
+        .unwrap();
+    assert_eq!(eintrag["meine_funktion_code"], "fachberater", "Listen-Pfad");
+    assert_eq!(eintrag["meine_funktion_bezeichnung"], "THW", "Listen-Pfad");
 
     let e = erfassen(
         &app,
@@ -170,6 +197,7 @@ async fn einsatzleitung_ohne_funktion_heisst_einsatzleitung() {
 
     let json = kopf(&app, &cookie, einsatz).await;
     assert_eq!(json["meine_funktion"], "Einsatzleitung");
+    assert_eq!(json["meine_funktion_code"], "el");
 
     let e = erfassen(
         &app,
@@ -184,6 +212,37 @@ async fn einsatzleitung_ohne_funktion_heisst_einsatzleitung() {
     funktion_setzen(&app, &admin, einsatz, leitung, "einsatzleitung", Some("s3")).await;
     let json = kopf(&app, &cookie, einsatz).await;
     assert_eq!(json["meine_funktion"], "S3 Einsatz");
+    assert_eq!(json["meine_funktion_code"], "s3");
+}
+
+/// Spec `einsatzkopf-live`, „Funktion ohne Sachgebiet“ (pkjvl5iy): S7 hat kein Sachgebiet, der
+/// Code steht trotzdem im Kopf — sonst erkennt „meine Stelle“ die Person nicht (LLH-1606).
+#[tokio::test]
+async fn s7_traegt_code_ohne_sachgebiet() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/org-fuehrungsfunktionen/s7",
+        &admin,
+        Some(r#"{"aktiv":true}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "S7 einschalten");
+    let (einsatz, kraft, id) = kraft_im_einsatz(&app, &admin).await;
+    funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", Some("s7")).await;
+
+    let json = kopf(&app, &kraft, einsatz).await;
+    assert_eq!(json["meine_sachgebiete"], serde_json::json!([]));
+    assert_eq!(json["meine_funktion_code"], "s7");
+    assert!(
+        !json
+            .as_object()
+            .unwrap()
+            .contains_key("meine_funktion_bezeichnung"),
+        "S7 trägt keine Bezeichnung: {json:?}"
+    );
 }
 
 #[tokio::test]

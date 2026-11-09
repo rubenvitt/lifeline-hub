@@ -31,7 +31,7 @@ dann „im Einsatz“. Ablösungen haben keinen Stellenbezug: sie bleiben ungefi
   Polizei“
 - **THEN** steht im Abschnitt „Aufträge“ nur der Auftrag an „Fachberater: thw“
 
-#### Scenario: Empfänger ohne Bezeichnung
+#### Scenario: Geschwärzte Bezeichnung
 - **WHEN** eine Person mit der Führungsfunktion Fachberater und der Bezeichnung „THW“ „meine
-  Stelle“ wählt und eine offene Meldung an die Funktion Fachberater ohne Bezeichnung geht
-- **THEN** steht diese Meldung im Abschnitt „Meldungen“
+  Stelle“ wählt und an einem offenen Auftrag an einen Fachberater die Bezeichnung geschwärzt ist
+- **THEN** steht dieser Auftrag im Abschnitt „Aufträge“

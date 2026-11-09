@@ -11,7 +11,6 @@ import type {
 } from '../../api/types';
 import type { ListenAbschnittZustand } from '../../components/instrument';
 import { einstufungOf } from '../../abloesung/einstufung';
-import { istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { istAlarmiert } from '../../meldungen/meldungKennzahlen';
 import {
   istOffen as nachforderungOffen,
@@ -31,10 +30,13 @@ dayjs.extend(utc);
  *   Listen hier wählen nur aus und ordnen.
  * - **Folge** je Abschnitt: überfällig → nächste Frist → älteste, Kennung als letzte Stufe, damit
  *   ein Neuabruf nichts umordnet.
- * - **Meine Stelle** (D5): Empfänger ist eine eigene Funktion ODER Absender bin ich. Eigene
- *   Funktionen sind die besetzten Sachgebiete, ohne Sachgebiet mit Rolle Einsatzleitung „EL“ —
- *   dieselbe Ableitung wie `src/einsatz/funktion.rs::ableiten`. Ablösungen haben keinen
- *   Stellenbezug und werden nicht gefiltert.
+ * - **Meine Stelle** (D5): Empfänger ist die eigene Funktion ODER Absender bin ich. Die eigene
+ *   Funktion liest das Frontend aus dem Einsatzkopf (`meine_funktion_code`,
+ *   `meine_funktion_bezeichnung`), abgeleitet in `src/einsatz/funktion.rs::ableiten`: ganzer
+ *   Katalog, ohne Führungsfunktion mit Rolle Einsatzleitung „el“ (Change
+ *   `pkjvl5iy-eigene-stelle-alle-funktionen`, design.md D1). Bei Fachberater und
+ *   Führungshilfspersonal muss die Bezeichnung passen, sobald beide Seiten eine tragen (D2).
+ *   Ablösungen haben keinen Stellenbezug und werden nicht gefiltert.
  */
 
 /** Wie viele Einträge ein Abschnitt zeigt; der Rest steht im Modul. */
@@ -51,47 +53,68 @@ export function sichtAusUrl(wert: string | null): VorgangsSicht {
   return wert === 'meine' ? 'meine' : 'alle';
 }
 
-/** Wer „ich“ bin: eigene Funktionen und Benutzerkennung. */
+/** Wer „ich“ bin: eigene Funktion samt Bezeichnung und Benutzerkennung. */
 export interface MeineStelle {
-  funktionen: ReadonlySet<Fuehrungsfunktion>;
+  funktion: Fuehrungsfunktion | null;
+  /** Nur bei Fachberater und Führungshilfspersonal; fehlt auch nach einer Schwärzung. */
+  bezeichnung: string | null;
   benutzerId: number | null;
 }
 
-/**
- * Eigene Funktionen im Einsatz: die besetzten Sachgebiete; ohne Sachgebiet mit Rolle
- * Einsatzleitung „EL“ (wie `funktion::ableiten`), sonst keine.
- */
+/** Eigene Funktion im Einsatz, wie der Einsatzkopf sie ableitet (design.md D1). */
 export function meineStelle(
-  einsatz: Pick<EinsatzAnzeige, 'meine_sachgebiete' | 'meine_rolle' | 'status'> | undefined,
+  einsatz: Pick<EinsatzAnzeige, 'meine_funktion_code' | 'meine_funktion_bezeichnung'> | undefined,
   benutzerId: number | null | undefined,
 ): MeineStelle {
-  const sachgebiete = einsatz?.meine_sachgebiete ?? [];
-  const funktionen = new Set<Fuehrungsfunktion>(sachgebiete);
-  if (funktionen.size === 0 && istEinsatzLeitung(einsatz)) funktionen.add('el');
-  return { funktionen, benutzerId: benutzerId ?? null };
+  return {
+    funktion: einsatz?.meine_funktion_code ?? null,
+    bezeichnung: einsatz?.meine_funktion_bezeichnung ?? null,
+    benutzerId: benutzerId ?? null,
+  };
 }
 
 function binIch(stelle: MeineStelle, id: number | null | undefined): boolean {
   return stelle.benutzerId != null && id === stelle.benutzerId;
 }
 
-function hatFunktion(stelle: MeineStelle, code: Fuehrungsfunktion | null | undefined): boolean {
-  return code != null && stelle.funktionen.has(code);
+function normalisiert(bezeichnung: string | null | undefined): string | null {
+  const b = bezeichnung?.trim().toLocaleLowerCase('de');
+  return b ? b : null;
 }
 
+/**
+ * Geht ein Vorgang an meine Funktion? Gleicher Code; bei Fachberater und Führungshilfspersonal
+ * zusätzlich gleiche Bezeichnung, sobald beide Seiten eine tragen (design.md D2). Bei den übrigen
+ * Codes tragen Empfänger keine Bezeichnung (`fuehrung::pruefe_funktion`).
+ */
+function hatFunktion(
+  stelle: MeineStelle,
+  code: Fuehrungsfunktion | null | undefined,
+  bezeichnung?: string | null,
+): boolean {
+  if (code == null || code !== stelle.funktion) return false;
+  const meine = normalisiert(stelle.bezeichnung);
+  const ihre = normalisiert(bezeichnung);
+  return meine == null || ihre == null || meine === ihre;
+}
+
+/** Meldungen gehen nie an Fachberater oder Führungshilfspersonal; `empfaenger` ist Freitext. */
 export function meldungFuerMich(m: Meldung, stelle: MeineStelle): boolean {
   return hatFunktion(stelle, m.empfaenger_funktion) || binIch(stelle, m.erfasst_von_id);
 }
 
 export function auftragFuerMich(a: Auftrag, stelle: MeineStelle): boolean {
   return (
-    (a.empfaenger ?? []).some((e) => hatFunktion(stelle, e.funktion)) ||
+    (a.empfaenger ?? []).some((e) => hatFunktion(stelle, e.funktion, e.funktion_text)) ||
     binIch(stelle, a.erstellt_von_id)
   );
 }
 
 export function erinnerungFuerMich(e: Erinnerung, stelle: MeineStelle): boolean {
-  return hatFunktion(stelle, e.empfaenger_funktion_code) || binIch(stelle, e.erstellt_von_id);
+  return (
+    hatFunktion(stelle, e.empfaenger_funktion_code, e.empfaenger_funktion) ||
+    binIch(stelle, e.erstellt_von_id)
+  );
 }
 
 /** Nachforderungen gehen an Stellen außerhalb des Stabs: nur der Absender zählt. */

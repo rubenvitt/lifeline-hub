@@ -5801,6 +5801,24 @@
             ],
             "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „Fachberater: THW\", „Einsatzleitung\"; LFH-615). Abgeleitet aus der\nFührungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,\nwenn keine Funktion folgt."
           },
+          "meine_funktion_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung der eigenen Funktion, nur bei Führungshilfspersonal und Fachberater („THW“);\nfehlt sonst und nach einer Schwärzung der Mitgliedschaft (pkjvl5iy, design.md D1/D2)."
+          },
+          "meine_funktion_code": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Katalogcode derselben Funktion wie `meine_funktion` (pkjvl5iy, design.md D1): ganzer\nKatalog, ohne Führungsfunktion mit Rolle Einsatzleitung `el`. Daran erkennt „meine\nStelle“ im Überblick die eigenen Vorgänge. Fehlt, wenn keine Funktion folgt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "meine_rolle": {
             "oneOf": [
               {

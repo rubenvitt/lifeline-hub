@@ -15,8 +15,10 @@ Siehe proposal.md, „Why“. Der Stand im Code:
   Auftrag `empfaenger[].funktion`, Meldung `empfaenger_funktion`, Erinnerung
   `empfaenger_funktion_code`.
 - Die Bezeichnung eines Empfängers bei Fachberater und Führungshilfspersonal steht beim Auftrag in
-  `empfaenger[].funktion_text`, bei der Erinnerung in `empfaenger_funktion` (Text). Die Meldung trägt
-  keine: ihr `empfaenger` ist ein eigener Freitext neben der Funktion (LLH-1214 D8).
+  `empfaenger[].funktion_text`, bei der Erinnerung in `empfaenger_funktion` (Text). Beim Anlegen ist
+  sie Pflicht (`fuehrung::pruefe_funktion`, 422); fehlen kann sie nur nach einer Schwärzung
+  (Registry: `NullSetzen`). Eine Meldung kann an Fachberater und Führungshilfspersonal gar nicht
+  gehen (422); ihr `empfaenger` ist ein eigener Freitext neben der Funktion (LLH-1214 D8).
 - Der Lage-Snapshot baut `EinsatzAnzeige` ohne abfragenden Benutzer (`anzeige(None, None, …)`).
 - Die eigene Bezeichnung (`einsatz_mitgliedschaft.fuehrungsstelle`) steht in der
   Schwärzungs-Registry auf `NullSetzen`; nach einer Schwärzung fehlt sie.
@@ -75,15 +77,15 @@ Folgen je Vorgangsart:
 - Auftrag: `funktion` + `funktion_text`.
 - Erinnerung: `empfaenger_funktion_code` + `empfaenger_funktion`.
 - Meldung: nur `empfaenger_funktion`; ihr `empfaenger` ist keine Bezeichnung und wird nicht
-  verglichen. Eine Meldung an „Fachberater“ gilt also für jeden Fachberater.
+  verglichen. Fachberater und Führungshilfspersonal kommen als Empfänger einer Meldung nicht vor.
 
 `MeineStelle` hält dafür statt einer Menge von Codes den eigenen Code und die eigene Bezeichnung;
 `hatFunktion(stelle, code, bezeichnung)` kapselt die Regel. Die exportierten Signaturen
 `meldungFuerMich`, `auftragFuerMich`, `erinnerungFuerMich` bleiben.
 
 *Verworfen:* Nur der Code (jeder Fachberater sieht jeden Fachberater-Vorgang): am Checkpoint
-verworfen. Strenger Abgleich auch bei fehlender Bezeichnung: eine Meldung an „Fachberater“ und jede
-geschwärzte Mitgliedschaft fielen dann für alle aus der Sicht.
+verworfen. Strenger Abgleich auch bei fehlender Bezeichnung: nach einer Schwärzung fiele jeder
+Fachberater-Vorgang für alle aus der Sicht.
 
 ### D3 Lage-Snapshot und Offline-Stand
 
