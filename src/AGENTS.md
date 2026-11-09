@@ -316,7 +316,12 @@ Herleitung in
 - **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
   haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
   gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::accept_lieferungen`); wer ein
-  Admin-Konto deaktiviert oder herabstuft, widerruft dessen Schlüssel im selben Commit.
+  Admin-Konto deaktiviert oder herabstuft, widerruft dessen Schlüssel im selben Commit, auch den
+  letzten (LLH-1605: Vorrang vor dem Schutz „letzter Schlüssel“).
+- **Ein Schlüssel zählt nur mit `zustand = 'gueltig'`.** Nachgelieferte warten auf die
+  Bestätigung eines Admins (`wartet_auf_bestaetigung`, LLH-1605) und zählen weder als
+  Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
+  `gueltig` ab, nie „nicht widerrufen“.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
   (`akteur_id` NULL, Name der Gegenstelle).
 - **Stammdaten-Verteilung (LLH-1493)**, Spec `stammdaten-verteilung`, Herleitung

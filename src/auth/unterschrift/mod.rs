@@ -77,8 +77,13 @@ wire_enum! {
     pub enum UnterschriftSchluesselZustand {
         /// Registriert, die Gegenzeichnung eines bekannten Admins steht aus; wird nicht verteilt.
         WartetAufGegenzeichnung => "wartet_auf_gegenzeichnung",
+        /// Vom Gegenüber gegengezeichnet nachgeliefert, die Bestätigung eines Admins hier steht
+        /// aus (LLH-1605, R24); zählt weder als Unterschrift noch als Gegenzeichnung.
+        WartetAufBestaetigung => "wartet_auf_bestaetigung",
         Gueltig => "gueltig",
         Widerrufen => "widerrufen",
+        /// Ein Admin hier hat den nachgelieferten Schlüssel zurückgewiesen; er wird nie gültig.
+        Abgelehnt => "abgelehnt",
     }
 }
 
@@ -149,4 +154,18 @@ pub struct UnterschriftSchluesselAnzeige {
     /// Bei einer Gegenzeichnung: wer gegengezeichnet hat.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gegengezeichnet_von: Option<String>,
+    /// Bei einer Gegenzeichnung: Fingerabdruck des unterzeichnenden Schlüssels (LLH-1605).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unterzeichner_fingerabdruck: Option<String>,
+    /// Bei einer Gegenzeichnung: Zeitpunkt aus der Erklärung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub erklaert_at: Option<String>,
+}
+
+/// Ein Konto, dessen Deaktivieren oder Herabstufen die Org ohne gültigen Unterschriftsschlüssel
+/// zurückließe, und die Kopplungen, die dann neu aufgebaut werden müssen (LLH-1605, design.md D5).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct LetzterSchluesselHalter {
+    pub benutzer_id: i64,
+    pub kopplungen: Vec<String>,
 }

@@ -257,6 +257,8 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   abloeser_eintreffen_gestrichen: 'abloesung',
   // Gestrichene Entlassung holt die entfallene Planung zurück (LLH-1510).
   abloeser_wiederhergestellt: 'abloesung',
+  // Gebündelter Hinweis je Wechselzeitpunkt des Schichtplans (LLH-1555 Welle 3).
+  schichtplan_wechsel: 'abloesung',
   lagebesprechung: 'lagebesprechung',
   nachforderung: 'nachforderungen',
   nachforderung_zugesagt: 'nachforderungen',
@@ -274,7 +276,8 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
  * Sprung einer Benachrichtigung, deren Text nicht zu holen war (`alarm/useBenachrichtigungen.ts`):
  * das Modul ihres Bezugs, eine Org-Art in ihren Einsatz. Eine Benachrichtigung der Ablösung
  * springt wie der Server-Pfad zu ihrer Schicht (`?schicht=`, LLH-1131 Teil II): ihr Bezug ist
- * immer die Schicht. Eine zur Meldung springt zu ihr (`?meldung=`, LLH-1052), eine zur Erinnerung
+ * die Schicht, der gebündelte Hinweis eines Wechselzeitpunkts springt in den Schichtplan
+ * (`?ansicht=plan&wechsel=`, LLH-1555). Eine zur Meldung springt zu ihr (`?meldung=`, LLH-1052), eine zur Erinnerung
  * zu deren Karte (`?erinnerung=`, LLH-1467), auch hier wie der Server-Pfad.
  */
 export function ersatzPfad(
@@ -282,6 +285,9 @@ export function ersatzPfad(
 ): string {
   if (istOrgArt(e.art)) return einsatzPfad(e.einsatz_id);
   const ziel = zielVon(e);
+  if (e.bezug_typ === 'schichtplan_wechsel') {
+    return abloesungPfad(e.einsatz_id, { ansicht: 'plan', wechsel: e.bezug_id });
+  }
   if (ziel === 'abloesung') return abloesungPfad(e.einsatz_id, { schicht: e.bezug_id });
   if (e.bezug_typ === 'meldung') return meldungenPfad(e.einsatz_id, { meldung: e.bezug_id });
   if (e.bezug_typ === 'erinnerung') {

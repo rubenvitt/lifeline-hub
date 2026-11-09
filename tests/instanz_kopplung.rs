@@ -955,12 +955,173 @@ async fn neuer_schluessel_braucht_gegenzeichnung_und_wird_nachgeliefert() {
     assert_eq!(v["zustand"], "gueltig");
 
     elw_meldet(&elw).await;
+    // Am ELW wartet B auf die Bestätigung eines Admins dort (LLH-1605, R24).
+    assert_eq!(gueltige_fremde(&uebersicht(&elw).await).len(), 1);
+    let (id_elw, fp_b) = wartender(&elw).await;
+    assert_eq!(fp_b, zeile_b["fingerabdruck"].as_str().unwrap());
+    let (s, v) = bestaetigen(&elw, &elw.admin, id_elw, &ende(&fp_b)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
     let fremde = gueltige_fremde(&uebersicht(&elw).await);
     assert_eq!(fremde.len(), 2);
-    assert!(fremde.contains(&zeile_b["fingerabdruck"].as_str().unwrap().to_string()));
+    assert!(fremde.contains(&fp_b));
     assert!(aktionen(&hub.pool)
         .await
         .contains(&"unterschrift_gegengezeichnet".to_string()));
+}
+
+/// Der wartende Schlüssel vom Gegenüber: id hier und Fingerabdruck.
+async fn wartender(i: &Instanz) -> (i64, String) {
+    let u = uebersicht(i).await;
+    let s = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["zustand"] == "wartet_auf_bestaetigung")
+        .unwrap_or_else(|| panic!("kein wartender Schlüssel: {u}"))
+        .clone();
+    (
+        s["id"].as_i64().unwrap(),
+        s["fingerabdruck"].as_str().unwrap().to_string(),
+    )
+}
+
+/// Die letzten vier Zeichen eines Fingerabdrucks.
+fn ende(fp: &str) -> String {
+    fp.replace('-', "")[fp.replace('-', "").len() - 4..].to_string()
+}
+
+async fn bestaetigen(i: &Instanz, wer: &str, id: i64, zeichen: &str) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/admin/instanz/unterschrift/{id}/bestaetigen"),
+        wer,
+        Some(&json!({"fingerabdruck_ende": zeichen})),
+    )
+    .await
+}
+
+/// Hub mit gekoppeltem ELW; am Hub ein zweiter Schlüssel B, von A gegengezeichnet und am ELW
+/// nachgeliefert, wo er wartet.
+async fn mit_wartendem_schluessel() -> (Instanz, Instanz, i64, String) {
+    let (hub, elw) = gekoppelt().await;
+    let id_b = schluessel(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
+    let (s, v) = gegenzeichnen(&hub, id_b, &SoftwarePasskey::new("a", [1u8; 32])).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    let (id, fp) = wartender(&elw).await;
+    (hub, elw, id, fp)
+}
+
+#[tokio::test]
+async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
+    let (_hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(u["kopplungen"][0]["wartende_schluessel"], 1, "{u}");
+    // Die Anzeige nennt Unterzeichner, seinen Fingerabdruck und den Zeitpunkt der Erklärung.
+    let zeile = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == id)
+        .unwrap();
+    let fp_a = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["zustand"] == "gueltig" && s["herkunft"] == "gegenueber")
+        .unwrap()["fingerabdruck"]
+        .clone();
+    assert_eq!(zeile["gegengezeichnet_von"], "Admin", "{zeile}");
+    assert_eq!(zeile["unterzeichner_fingerabdruck"], fp_a, "{zeile}");
+    assert!(zeile["erklaert_at"].as_str().is_some(), "{zeile}");
+    let pfad = format!("/api/admin/instanz/unterschrift/{id}/bestaetigen");
+    // Ohne Feld oder leer: 400.
+    let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &elw.admin, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = bestaetigen(&elw, &elw.admin, id, " ").await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = bestaetigen(&elw, &elw.admin, id, &"A".repeat(17)).await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "länger als jede sinnvolle Eingabe"
+    );
+    // Falsche Zeichen: 422, der Schlüssel wartet weiter.
+    let falsch = if ende(&fp) == "0000" { "1111" } else { "0000" };
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, falsch).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(
+        v["error"].as_str().unwrap().contains("Fingerabdruck"),
+        "{v}"
+    );
+    assert_eq!(wartender(&elw).await.0, id);
+    // Kein Admin: 403; Admin einer anderen Org: 404.
+    common::benutzer_anlegen(&elw.app, &elw.admin, "helfer", "keine").await;
+    let helfer = common::login_cookie(&elw.app, "helfer", "helferpw1").await;
+    assert_eq!(
+        bestaetigen(&elw, &helfer, id, &ende(&fp)).await.0,
+        StatusCode::FORBIDDEN
+    );
+    org_admin(&elw.pool, "Fremde Org", "fremd").await;
+    let fremd = common::login_cookie(&elw.app, "fremd", "fremdpw1").await;
+    assert_eq!(
+        bestaetigen(&elw, &fremd, id, &ende(&fp)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    // Richtig, auch klein geschrieben: gültig; ein zweites Mal: 422.
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, &ende(&fp).to_lowercase()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zustand"], "gueltig");
+    assert_eq!(
+        uebersicht(&elw).await["kopplungen"][0]["wartende_schluessel"],
+        0
+    );
+    let (s, _) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // Der Spureintrag nennt die Gegenstelle, gelesen in derselben Transaktion wie die Entscheidung.
+    let detail: String = sqlx::query_scalar(
+        "SELECT detail FROM admin_audit WHERE aktion = 'unterschrift_bestaetigt'",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    let detail: serde_json::Value = serde_json::from_str(&detail).unwrap();
+    assert!(
+        detail["instanz_kennung"]
+            .as_str()
+            .is_some_and(|k| !k.is_empty()),
+        "{detail}"
+    );
+    assert!(detail["fremde_org"].as_str().is_some(), "{detail}");
+}
+
+#[tokio::test]
+async fn zurueckgewiesener_schluessel_bleibt_es_nach_der_naechsten_meldung() {
+    let (_hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let pfad = format!("/api/admin/instanz/unterschrift/{id}/zurueckweisen");
+    let (s, v) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zustand"], "abgelehnt");
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    let zeile = u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == id)
+        .unwrap();
+    assert_eq!(zeile["zustand"], "abgelehnt");
+    // Nicht wartend: weder bestätigen noch noch einmal zurückweisen.
+    assert_eq!(
+        bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (s, _) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(aktionen(&elw.pool)
+        .await
+        .contains(&"unterschrift_zurueckgewiesen".to_string()));
 }
 
 #[tokio::test]
@@ -1025,7 +1186,188 @@ async fn letzter_schluessel_bleibt_solange_gekoppelt_und_widerruf_wandert() {
         .filter(|s| s["herkunft"] == "gegenueber" && s["zustand"] == "widerrufen")
         .count();
     assert_eq!(widerrufen, 1);
-    assert_eq!(gueltige_fremde(&u).len(), 1);
+    // B kam in derselben Meldung, gegengezeichnet von A, als A noch galt; er wartet am ELW.
+    assert!(gueltige_fremde(&u).is_empty());
+    wartender(&elw).await;
+}
+
+/// Konten, deren Deaktivieren die Org ohne gültigen Schlüssel zurückließe (LLH-1605, D5).
+async fn letzte_schluessel(i: &Instanz, wer: &str) -> Value {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        "/api/admin/instanz/letzte-schluessel",
+        wer,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+/// Ein zweiter Admin in Org 1 (Passwort `zweitpw1`), direkt im Pool dieser Instanz: die
+/// Helfer aus `common` wirken auf den Pool des zuletzt gebauten Routers. Liefert seine id.
+async fn zweiter_admin(i: &Instanz) -> i64 {
+    let hash = lifeline_hub::auth::password::hash("zweitpw1").unwrap();
+    sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+         org_rolle) VALUES (1, 'Zweit', 'zweit', ?, 'admin', 'keine') RETURNING id",
+    )
+    .bind(&hash)
+    .fetch_one(&i.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn letzte_schluessel_nennt_nur_halter_bei_verteilender_kopplung() {
+    // Ohne Kopplung ist niemand Halter des letzten Schlüssels.
+    let ungekoppelt = instanz().await;
+    schluessel(&ungekoppelt, &SoftwarePasskey::new("a", [1u8; 32]), "A").await;
+    assert_eq!(
+        letzte_schluessel(&ungekoppelt, &ungekoppelt.admin).await,
+        json!([])
+    );
+
+    let (hub, _elw) = gekoppelt().await;
+    let v = letzte_schluessel(&hub, &hub.admin).await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v[0]["benutzer_id"], 1);
+    assert_eq!(v[0]["kopplungen"], json!(["Lifeline Hub"]), "{v}");
+    // Ein Admin einer anderen Org sieht die Halter von Org 1 nicht.
+    org_admin(&hub.pool, "Fremde Org", "fremd").await;
+    let fremd = common::login_cookie(&hub.app, "fremd", "fremdpw1").await;
+    assert_eq!(letzte_schluessel(&hub, &fremd).await, json!([]));
+    // Mit einem gültigen Schlüssel eines zweiten Kontos ist niemand mehr der Letzte; ein
+    // zweiter Schlüssel desselben Kontos ändert daran nichts.
+    let id_a2 = schluessel(&hub, &SoftwarePasskey::new("a2", [5u8; 32]), "A2").await;
+    assert_eq!(
+        gegenzeichnen(&hub, id_a2, &SoftwarePasskey::new("a", [1u8; 32]))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        letzte_schluessel(&hub, &hub.admin).await[0]["benutzer_id"],
+        1
+    );
+    let zweit = zweiter_admin(&hub).await;
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let id_b = {
+        let oeff = b.oeffentlich();
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: zweit,
+                benutzer_name: "Zweit",
+                credential_id: "b",
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "B",
+            },
+        )
+        .await
+        .unwrap()
+    };
+    assert_eq!(
+        gegenzeichnen(&hub, id_b, &SoftwarePasskey::new("a", [1u8; 32]))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(letzte_schluessel(&hub, &hub.admin).await, json!([]));
+}
+
+/// Deaktivieren hat Vorrang vor dem Schutz „letzter Schlüssel“; die Kopplung zeigt danach, dass
+/// neu gekoppelt werden muss.
+#[tokio::test]
+async fn deaktivieren_des_letzten_schluesselhalters_gelingt() {
+    let (hub, _elw) = gekoppelt().await;
+    zweiter_admin(&hub).await;
+    let zweit = common::login_cookie(&hub.app, "zweit", "zweitpw1").await;
+    assert_eq!(
+        uebersicht(&hub).await["kopplungen"][0]["ohne_gueltigen_schluessel"],
+        false
+    );
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        "/api/benutzer/1/deaktivieren",
+        &zweit,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zustand: String =
+        sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE credential_id = 'a'")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(zustand, "widerrufen");
+    let (s, u) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &zweit, None).await;
+    assert_eq!(s, StatusCode::OK, "{u}");
+    assert_eq!(u["kopplungen"][0]["ohne_gueltigen_schluessel"], true, "{u}");
+    // Ein danach registrierter Schlüssel wartet auf eine Gegenzeichnung, die niemand leisten
+    // kann; er ist nicht „der letzte gültige“ und lässt sich widerrufen.
+    let zweit_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'zweit'")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let id_z = {
+        let p = SoftwarePasskey::new("z", [7u8; 32]);
+        let oeff = p.oeffentlich();
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: zweit_id,
+                benutzer_name: "Zweit",
+                credential_id: "z",
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Z",
+            },
+        )
+        .await
+        .unwrap()
+    };
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/unterschrift/{id_z}/widerrufen"),
+        &zweit,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Auch das Herabstufen des letzten Schlüsselhalters gelingt und widerruft seinen Schlüssel.
+#[tokio::test]
+async fn herabstufen_des_letzten_schluesselhalters_gelingt() {
+    let (hub, _elw) = gekoppelt().await;
+    zweiter_admin(&hub).await;
+    let zweit = common::login_cookie(&hub.app, "zweit", "zweitpw1").await;
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "PATCH",
+        "/api/benutzer/1",
+        &zweit,
+        Some(&json!({"system_rolle": "keiner"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zustand: String =
+        sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE credential_id = 'a'")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(zustand, "widerrufen");
 }
 
 #[tokio::test]

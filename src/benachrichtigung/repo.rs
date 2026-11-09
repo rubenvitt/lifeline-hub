@@ -287,6 +287,30 @@ pub async fn empfaenger_des_bezugs(
     .await?)
 }
 
+/// Ob zum Bezug `typ`/`id` der Art `art` im Einsatz noch eine unquittierte Zeile steht
+/// (LLH-1555: der gebündelte Hinweis eines Wechselzeitpunkts meldet sich nur, solange keiner
+/// offen ist).
+pub async fn offen_zum_bezug(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    typ: BenachrichtigungBezugTyp,
+    id: i64,
+) -> Result<bool, AppError> {
+    let offen: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM benachrichtigung \
+         WHERE einsatz_id = ? AND art = ? AND bezug_typ = ? AND bezug_id = ? \
+           AND quittiert_at IS NULL LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(art.as_str())
+    .bind(typ.as_str())
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(offen.is_some())
+}
+
 /// Wie [`quittieren_fuer_bezug`] für EINEN Bezug, aber nur die Zeilen der Empfänger außerhalb
 /// von `behalten` (LLH-1381: neu adressiert, die übrigen Empfänger behalten ihren Hinweis).
 /// Liefert die jetzt quittierten Zeilen.

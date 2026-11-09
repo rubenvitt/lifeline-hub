@@ -48,6 +48,7 @@ export type UnterschriftSchluesselHerkunft = S['UnterschriftSchluesselHerkunft']
 export type UnterschriftRegistrierenStart = S['UnterschriftRegistrierenStart'];
 export type UnterschriftGegenzeichnenStart = S['UnterschriftGegenzeichnenStart'];
 export type UnterschriftAssertion = S['UnterschriftAssertion'];
+export type LetzterSchluesselHalter = S['LetzterSchluesselHalter'];
 export type AnsichtSperre = S['AnsichtSperre'];
 export type AnsichtAuswahl = S['AnsichtAuswahl'];
 export type Bindungsart = S['Bindungsart'];
@@ -864,6 +865,8 @@ export interface BesatzungZielEingabe {
 /** Der Schichtplan eines Einsatzes: Grenzwerte, Blöcke mit Befunden, Helfer (Soll, kein Ist). */
 export type Schichtplan = S['SchichtplanAnzeige'];
 export type SchichtplanBlock = S['PlanBlockAnzeige'];
+/** Ein Zeitpunkt der Wechsel-Leiste (LLH-1555 Welle 3); Stand und Einträge rechnet der Server. */
+export type SchichtplanWechselpunkt = S['PlanWechselpunkt'];
 export type SchichtplanPerson = S['PlanPersonAnzeige'];
 export type SchichtplanHelfer = S['PlanHelferAnzeige'];
 export type SchichtplanGrenzwerte = S['SchichtplanGrenzwerte'];

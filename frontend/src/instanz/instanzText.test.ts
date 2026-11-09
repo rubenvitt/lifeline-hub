@@ -5,6 +5,7 @@ import {
   kopplungHinweise,
   kopplungZustandZeile,
   richtungText,
+  schluesselZeile,
   stammdatenZeile,
 } from './instanzText';
 
@@ -19,6 +20,8 @@ const kopplung = (teil: Partial<InstanzKopplungAnzeige> = {}): InstanzKopplungAn
   protokoll: 'passt',
   zuletzt_gesehen_at: '2026-11-08 12:00:00',
   gegenueber_softwarestand: '1.2.0',
+  wartende_schluessel: 0,
+  ohne_gueltigen_schluessel: false,
   org: {
     id: 1,
     fremde_org_name: 'DRK KV Nord',
@@ -74,6 +77,40 @@ describe('instanzText', () => {
     expect(kopplungHinweise(kopplung({ protokoll: 'update_hier' }))).toEqual([
       'Update nötig: diese Instanz ist zu alt',
     ]);
+  });
+
+  it('Hinweise: wartende Schlüssel und Kopplung ohne gültigen Schlüssel (LLH-1605)', () => {
+    expect(kopplungHinweise(kopplung({ wartende_schluessel: 1 }))).toEqual([
+      '1 neuer Unterschriftsschlüssel wartet auf Bestätigung',
+    ]);
+    expect(kopplungHinweise(kopplung({ wartende_schluessel: 2 }))).toEqual([
+      '2 neue Unterschriftsschlüssel warten auf Bestätigung',
+    ]);
+    expect(kopplungHinweise(kopplung({ ohne_gueltigen_schluessel: true }))).toEqual([
+      'Kein gültiger Unterschriftsschlüssel mehr: Kopplung widerrufen und neu koppeln',
+    ]);
+  });
+
+  it('Schlüsselzeile eines wartenden Schlüssels nennt Zustand und Unterzeichner', () => {
+    expect(
+      schluesselZeile(
+        {
+          id: 3,
+          benutzer_name: 'Bea',
+          bezeichnung: 'Stick',
+          fingerabdruck: 'AAAA-BBBB',
+          zustand: 'wartet_auf_bestaetigung',
+          herkunft: 'gegenueber',
+          eigen: false,
+          erstellt_at: '2026-11-09 08:00:00',
+          fremde_org_name: 'DRK LV',
+          gegengezeichnet_von: 'Anna',
+          unterzeichner_fingerabdruck: 'CCCC-DDDD',
+          erklaert_at: '2026-11-09 07:59:00',
+        },
+        zeit,
+      ),
+    ).toBe('wartet auf Bestätigung · von DRK LV · gegengezeichnet von Anna');
   });
 
   it('Widerruf, der noch nicht zugestellt ist, steht als Hinweis', () => {

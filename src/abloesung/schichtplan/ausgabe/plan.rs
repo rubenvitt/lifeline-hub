@@ -927,6 +927,7 @@ pub(crate) mod tests {
                 kennung: Some("10231".into()),
                 herkunft: Some("Helferplanung".into()),
             }]),
+            wechsel: vec![],
             naechste_pruefung_at: None,
         };
         let gliederung = EinsatzGliederung {

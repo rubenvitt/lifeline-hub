@@ -14,8 +14,10 @@ import { useAuth } from '../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
+  confirmUnterschriftsschluessel,
   gegenzeichne,
   loadInstanzUebersicht,
+  rejectUnterschriftsschluessel,
   redeemKopplungscode,
   registriereUnterschriftsschluessel,
   issueKopplungscode,
@@ -51,6 +53,10 @@ interface RegistrierenWerte {
   bezeichnung?: string;
 }
 
+interface BestaetigenWerte {
+  ende?: string;
+}
+
 /**
  * Admin-Sektion `/admin/einstellungen/instanzkopplung` (LLH-1490, Specs `instanz-kopplung` und
  * `org-admin-unterschrift`): diese Instanz mit einer anderen koppeln (etwa ELW und Hub), die
@@ -76,6 +82,11 @@ export default function InstanzkopplungSeite() {
   const [verlorenKopplung, setVerlorenKopplung] = useState<InstanzKopplungAnzeige | null>(null);
   const [widerrufSchluessel, setWiderrufSchluessel] =
     useState<UnterschriftSchluesselAnzeige | null>(null);
+  const [bestaetigenSchluessel, setBestaetigenSchluessel] =
+    useState<UnterschriftSchluesselAnzeige | null>(null);
+  const [zurueckweisenSchluessel, setZurueckweisenSchluessel] =
+    useState<UnterschriftSchluesselAnzeige | null>(null);
+  const [bestaetigenForm] = Form.useForm<BestaetigenWerte>();
   const [einloesenForm] = Form.useForm<EinloesenWerte>();
   const [registrierenForm] = Form.useForm<RegistrierenWerte>();
 
@@ -139,6 +150,23 @@ export default function InstanzkopplungSeite() {
     onSuccess: () => {
       void reload();
       setWiderrufSchluessel(null);
+    },
+  });
+
+  const bestaetigen = useMutation({
+    mutationFn: (w: { s: UnterschriftSchluesselAnzeige; ende: string }) =>
+      confirmUnterschriftsschluessel(w.s.id, w.ende),
+    onSuccess: (s) => {
+      void reload();
+      message.success(`Schlüssel von ${s.benutzer_name} bestätigt`);
+    },
+  });
+  const zurueckweisen = useMutation({
+    mutationFn: (s: UnterschriftSchluesselAnzeige) => rejectUnterschriftsschluessel(s.id),
+    onSuccess: (s) => {
+      void reload();
+      setZurueckweisenSchluessel(null);
+      message.success(`Schlüssel von ${s.benutzer_name} zurückgewiesen`);
     },
   });
 
@@ -349,6 +377,17 @@ export default function InstanzkopplungSeite() {
                 if (s.zustand === 'wartet_auf_gegenzeichnung' && u.eigener_schluessel) {
                   eintraege.push({ key: 'gegenzeichnen', label: 'Gegenzeichnen' });
                 }
+                // LLH-1605: ein nachgelieferter Schlüssel gilt erst nach dem Abgleich mit dem
+                // Inhaber; dafür braucht es keinen eigenen Unterschriftsschlüssel.
+                if (s.zustand === 'wartet_auf_bestaetigung') {
+                  eintraege.push({ key: 'bestaetigen', label: 'Bestätigen …' });
+                  eintraege.push({
+                    key: 'zurueckweisen',
+                    icon: <IconKreuz />,
+                    label: 'Zurückweisen …',
+                    gefahr: true,
+                  });
+                }
                 if (s.herkunft === 'lokal' && s.zustand !== 'widerrufen') {
                   eintraege.push({
                     key: 'widerrufen',
@@ -364,13 +403,24 @@ export default function InstanzkopplungSeite() {
                         ? [
                             <MenueAusloeser
                               key="aktionen"
-                              gesperrt={gegenzeichnen.isPending || schluesselWiderrufen.isPending}
+                              gesperrt={
+                                gegenzeichnen.isPending ||
+                                schluesselWiderrufen.isPending ||
+                                zurueckweisen.isPending
+                              }
                               laeuft={gegenzeichnen.isPending}
                               zugaenglicherName={`Aktionen zum Schlüssel ${s.bezeichnung} von ${s.benutzer_name}`}
                               eintraege={eintraege}
                               onWahl={(key) => {
                                 if (key === 'gegenzeichnen') {
                                   gegenzeichnen.mutate(s);
+                                } else if (key === 'bestaetigen') {
+                                  bestaetigen.reset();
+                                  bestaetigenForm.resetFields();
+                                  setBestaetigenSchluessel(s);
+                                } else if (key === 'zurueckweisen') {
+                                  zurueckweisen.reset();
+                                  setZurueckweisenSchluessel(s);
                                 } else {
                                   schluesselWiderrufen.reset();
                                   setWiderrufSchluessel(s);
@@ -439,6 +489,101 @@ export default function InstanzkopplungSeite() {
         </Form.Item>
         <SpeicherFehler fehler={einloesen.error} titel="Nicht gekoppelt" />
       </ErfassungsModal>
+
+      <ErfassungsModal<BestaetigenWerte>
+        offen={bestaetigenSchluessel != null}
+        titel={
+          bestaetigenSchluessel
+            ? `Schlüssel von ${bestaetigenSchluessel.benutzer_name} bestätigen`
+            : ''
+        }
+        form={bestaetigenForm}
+        erfassenText="Bestätigen"
+        laeuft={bestaetigen.isPending}
+        // Hält den Dialog bis zur Antwort offen und zeigt die Ablehnung darin (LFH-1077).
+        speicherung={bestaetigen}
+        speicherFehlerTitel="Nicht bestätigt"
+        onErfassen={(w) =>
+          bestaetigenSchluessel
+            ? bestaetigen.mutateAsync({
+                s: bestaetigenSchluessel,
+                ende: (w.ende ?? '').trim().toUpperCase(),
+              })
+            : Promise.resolve()
+        }
+        onFertig={() => setBestaetigenSchluessel(null)}
+        onAbbrechen={() => {
+          bestaetigen.reset();
+          setBestaetigenSchluessel(null);
+        }}
+      >
+        {bestaetigenSchluessel && (
+          <>
+            <Typography.Paragraph>
+              Die gekoppelte Instanz hat diesen Schlüssel geliefert. Gilt er hier, kann sein Inhaber
+              für die Organisation unterschreiben, etwa eine Notübernahme. Bitte den Inhaber anrufen
+              und nach den letzten vier Zeichen seines Fingerabdrucks fragen. Der Inhaber nennt sie,
+              nicht umgekehrt.
+            </Typography.Paragraph>
+            <Datenraster spalten={2}>
+              <Datenfeld label="Inhaber">{bestaetigenSchluessel.benutzer_name}</Datenfeld>
+              <Datenfeld label="Bezeichnung">{bestaetigenSchluessel.bezeichnung}</Datenfeld>
+              <Datenfeld label="Fingerabdruck" mono breit>
+                {bestaetigenSchluessel.fingerabdruck}
+              </Datenfeld>
+              <Datenfeld label="Gegengezeichnet von" breit>
+                {bestaetigenSchluessel.gegengezeichnet_von ?? '—'}
+                {bestaetigenSchluessel.unterzeichner_fingerabdruck
+                  ? ` (${bestaetigenSchluessel.unterzeichner_fingerabdruck})`
+                  : ''}
+              </Datenfeld>
+              <Datenfeld label="Erklärt">
+                {bestaetigenSchluessel.erklaert_at ? zeit(bestaetigenSchluessel.erklaert_at) : '—'}
+              </Datenfeld>
+            </Datenraster>
+            <Form.Item
+              label="Letzte vier Zeichen des Fingerabdrucks"
+              name="ende"
+              style={{ marginBlockStart: token.marginMD }}
+              rules={[
+                { required: true, whitespace: true, message: 'Vier Zeichen angeben' },
+                { len: 4, message: 'Genau vier Zeichen' },
+              ]}
+              normalize={(w: string) => w.toUpperCase()}
+            >
+              <Input maxLength={4} style={monoStil(14)} autoComplete="off" />
+            </Form.Item>
+          </>
+        )}
+      </ErfassungsModal>
+
+      <Modal
+        open={zurueckweisenSchluessel != null}
+        title={
+          zurueckweisenSchluessel
+            ? `Schlüssel ${zurueckweisenSchluessel.bezeichnung} von ${zurueckweisenSchluessel.benutzer_name} zurückweisen?`
+            : ''
+        }
+        okText="Zurückweisen"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: zurueckweisen.isPending }}
+        onOk={() => zurueckweisenSchluessel && zurueckweisen.mutate(zurueckweisenSchluessel)}
+        // Solange es läuft, führt kein Weg hinaus: ein Fehlschlag ginge sonst still verloren.
+        onCancel={() => {
+          if (!zurueckweisen.isPending) setZurueckweisenSchluessel(null);
+        }}
+        cancelButtonProps={{ disabled: zurueckweisen.isPending }}
+        closable={zurueckweisen.isPending ? { disabled: true } : true}
+        mask={{ closable: !zurueckweisen.isPending }}
+        keyboard={!zurueckweisen.isPending}
+        destroyOnHidden
+      >
+        <p>
+          Der Schlüssel wird hier nie gültig, auch wenn die gekoppelte Instanz ihn erneut liefert.
+          Zurückweisen, wenn der Inhaber ihn nicht kennt oder die Zeichen nicht passen.
+        </p>
+        <SpeicherFehler fehler={zurueckweisen.error} titel="Nicht zurückgewiesen" />
+      </Modal>
 
       <ErfassungsModal<RegistrierenWerte>
         offen={registrierenOffen}

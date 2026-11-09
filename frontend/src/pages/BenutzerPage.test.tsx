@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
+import { globalKeys } from '../api/queryKeys';
 import { adminFixture } from '../test/fixtures';
 import { warteAufMenueFokus } from '../test/menue';
 import {
@@ -799,6 +800,152 @@ describe('BenutzerPage', () => {
       await waehle('Eva', 'Deaktivieren');
       await waitFor(() => expect(deaktiviert).toBe('2'));
       expect(screen.queryByRole('tooltip')).toBeNull();
+    });
+
+    it('Deaktivieren des letzten Schlüsselhalters fragt nach und nennt die Kopplungen (LLH-1605)', async () => {
+      let deaktiviert: string | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      seite();
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      expect(within(dialog).getByText(/ELW 1 DRK Nord/)).toBeInTheDocument();
+      expect(deaktiviert).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
+      await waitFor(() => expect(deaktiviert).toBe('2'));
+    });
+
+    it('eine abgelehnte Rückfrage räumt ihren Fehler beim Abbrechen (LLH-1605)', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', () =>
+          HttpResponse.json({ error: 'Abgelehnt aus Gründen' }, { status: 409 }),
+        ),
+      );
+      seite();
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
+      expect(await within(dialog).findByText('Nicht deaktiviert')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Eva deaktivieren?' })).toBeNull(),
+      );
+      // Über der Tabelle steht kein Fehler mehr. Der schließende Dialog selbst bleibt in jsdom
+      // stehen (kein `transitionend`), darum zählt nur, was außerhalb von ihm steht.
+      const aufDerSeite = () =>
+        screen.queryAllByText('Nicht deaktiviert').filter((e) => !e.closest('.ant-modal-wrap'));
+      await waitFor(() => expect(aufDerSeite()).toEqual([]));
+    });
+
+    it('ohne Antwort zum letzten Schlüssel fragt Deaktivieren eines Admins allgemein nach (LLH-1605)', async () => {
+      let deaktiviert: string | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      seite();
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      expect(within(dialog).getByText(/ließ sich nicht prüfen/)).toBeInTheDocument();
+      expect(deaktiviert).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
+      await waitFor(() => expect(deaktiviert).toBe('2'));
+    });
+
+    it('veraltete Antwort zum letzten Schlüssel gilt nicht: nach gescheitertem Neuabruf fragt Deaktivieren nach (LLH-1605)', async () => {
+      let deaktiviert: string | null = null;
+      let kaputt = false;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          kaputt ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : HttpResponse.json([]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      const client = neuerQueryClient();
+      renderMitProviders(
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>,
+        { route: '/admin/benutzer', client },
+      );
+      const key = globalKeys.instanzkopplungLetzteSchluessel();
+      await waitFor(() => expect(client.getQueryState(key)?.status).toBe('success'));
+      // Etwa nach einer neuen Kopplung: der Stand ist überholt, der Neuabruf scheitert.
+      kaputt = true;
+      await client.invalidateQueries({ queryKey: key });
+      await waitFor(() => expect(client.getQueryState(key)?.status).toBe('error'));
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      expect(within(dialog).getByText(/ließ sich nicht prüfen/)).toBeInTheDocument();
+      expect(deaktiviert).toBeNull();
+    });
+
+    it('Herabstufen des letzten Schlüsselhalters warnt im Dialog (LLH-1605)', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
+        ),
+      );
+      seite();
+      await waehle('Eva', 'Bearbeiten');
+      const dialog = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
+      expect(within(dialog).queryByText(/neu aufgebaut werden/)).toBeNull();
+      await userEvent.click(within(dialog).getByLabelText('System-Rolle'));
+      await userEvent.click(await screen.findByTitle('Benutzer'));
+      expect(await within(dialog).findByText(/neu aufgebaut werden/)).toBeInTheDocument();
     });
 
     it('sperrt Deaktivieren am letzten aktiven Admin und nennt den Grund', async () => {

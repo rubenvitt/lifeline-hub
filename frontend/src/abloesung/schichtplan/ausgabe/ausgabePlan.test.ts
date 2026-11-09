@@ -47,6 +47,7 @@ const plan = (bloecke: SchichtplanBlock[], mitNamen = true): Schichtplan => ({
     min_ruhe_eigen: false,
   },
   bloecke: mitNamen ? bloecke : bloecke.map((b) => ({ ...b, personen: null })),
+  wechsel: [],
   helfer: mitNamen
     ? [
         {

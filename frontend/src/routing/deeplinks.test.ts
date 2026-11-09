@@ -40,6 +40,7 @@ import {
   dokumentePfad,
   abloesungPfad,
   parseAbloesungAnsicht,
+  parseAbloesungWechsel,
   parseSchichtplanDruckAuswahl,
   schichtplanDruckPfad,
   betreuungPfad,
@@ -569,6 +570,15 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       expect(parseAbloesungAnsicht(params) ?? 'laufend').toBe(a);
     }
     expect(parseAbloesungAnsicht(new URLSearchParams('ansicht=ohne'))).toBeUndefined();
+  });
+
+  it('abloesungPfad mit ?wechsel= wie der Server-Pfad des gebündelten Hinweises (LLH-1555), Umkehr verwirft alles außer ganzen Minuten', () => {
+    const pfad = abloesungPfad(E, { ansicht: 'plan', wechsel: 29903735 });
+    expect(pfad).toBe('/einsaetze/5/abloesung?ansicht=plan&wechsel=29903735');
+    expect(parseAbloesungWechsel(new URLSearchParams(pfad.split('?')[1]))).toBe(29903735);
+    for (const roh of ['', '-3', '1.5', 'abc', '99999999999999999999']) {
+      expect(parseAbloesungWechsel(new URLSearchParams({ wechsel: roh }))).toBeUndefined();
+    }
   });
 
   it('schichtplanDruckPfad (LLH-1557): Sicht „posten“ ist Vorgabe, Auswahl reist mit, Unbekanntes fällt weg', () => {

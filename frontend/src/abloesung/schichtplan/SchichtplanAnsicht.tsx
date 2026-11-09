@@ -55,6 +55,7 @@ import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen'
 import SchichtplanRaster, { type BlockZielDaten } from './SchichtplanRaster';
 import SchichtplanSchleuse from './SchichtplanSchleuse';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
+import SchichtplanWechselLeiste from './SchichtplanWechselLeiste';
 import {
   baueZeilen,
   kopieBody,
@@ -80,6 +81,9 @@ import {
  * fehlen nur deren Posten ohne Blöcke. Personen brauchen das Modul Personal: ohne steht die
  * Seitenleiste gesperrt mit Grund, der Blockdialog ebenso (Server: 403).
  *
+ * LLH-1555 Welle 3: über dem Raster die Wechsel-Leiste (`SchichtplanWechselLeiste`), je Zeitpunkt
+ * die Wechsel laut Plan mit ihrem Griff; ein gebündelter Hinweis springt mit `?wechsel=` hinein.
+ *
  * LLH-1603: Unter der Werkzeugzeile nennt `GrenzwerteZeile` Höchstdienst und Mindestruhe; bedient
  * werden sie nur in Einstellungen › Ablösung.
  *
@@ -102,6 +106,12 @@ interface SchichtplanAnsichtProps {
   abschnitteBereit?: boolean;
   /** Weitere Werkzeuge rechts neben „Block anlegen“ (etwa „Schichtplan einlesen“, LLH-1556). */
   werkzeuge?: ReactNode;
+  /** Sprung `?wechsel=<minute>` (LLH-1555): dieser Zeitpunkt steht in der Wechsel-Leiste gewählt. */
+  wechselSprung?: number;
+  /** Kennung des Sprungs (`location.key`): derselbe Sprung noch einmal wählt erneut. */
+  wechselSprungKennung?: string;
+  /** Vollzug einer Schicht aus der Wechsel-Leiste; die Seite öffnet ihren Vollzug-Dialog. */
+  onVollziehen?: (abloesungId: number) => void;
 }
 
 type Dialog =
@@ -143,6 +153,9 @@ export default function SchichtplanAnsicht({
   abschnitte,
   abschnitteBereit = true,
   werkzeuge,
+  wechselSprung,
+  wechselSprungKennung,
+  onVollziehen,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -158,6 +171,11 @@ export default function SchichtplanAnsicht({
     dialogJetzt.current = dialog;
   }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
+  // Gewählter Zeitpunkt der Wechsel-Leiste; ein neuer Sprung wählt seinen.
+  const [wechselGewaehlt, setWechselGewaehlt] = useState<number | null>(wechselSprung ?? null);
+  useEffect(() => {
+    if (wechselSprung != null) setWechselGewaehlt(wechselSprung);
+  }, [wechselSprung, wechselSprungKennung]);
   const [zugLaeuft, setZugLaeuft] = useState(false);
   // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
   const schleuseHalten = zugLaeuft || gezogen != null || dialog != null;
@@ -321,6 +339,12 @@ export default function SchichtplanAnsicht({
 
   const blockVon = (id: number) => plan?.bloecke.find((b) => b.id === id) ?? null;
   const zeitText = (ms: number) => uhrzeit(dayjs(ms), konventionen);
+  // Die Leiste reicht 36 h: ein Zeitpunkt an einem anderen Tag nennt sein Datum.
+  const zeitpunktText = (ms: number) => {
+    const u = uhrzeit(dayjs(ms), konventionen);
+    const tag = datum(dayjs(ms), konventionen);
+    return tag === datum(dayjs(jetzt), konventionen) ? u : `${tag} ${u}`;
+  };
   const markeText = (ms: number) => {
     const u = uhrzeit(dayjs(ms), konventionen);
     return /^00:?00$/.test(u) ? datum(dayjs(ms), konventionen) : u;
@@ -492,6 +516,23 @@ export default function SchichtplanAnsicht({
         <div style={{ marginBottom: token.marginSM }}>
           <SpeicherFehler fehler={zugFehler} titel="Schichtplan nicht geändert" />
         </div>
+      )}
+      {plan && (
+        <SchichtplanWechselLeiste
+          wechsel={plan.wechsel}
+          bloecke={plan.bloecke}
+          jetzt={jetzt}
+          formatZeit={zeitpunktText}
+          gewaehlt={wechselGewaehlt}
+          onWaehlen={setWechselGewaehlt}
+          wechselGriff={(blockId) => {
+            const b = blockVon(blockId);
+            return b && wechselMoeglich(b)
+              ? () => setDialog({ art: 'wechsel', blockId: b.id })
+              : undefined;
+          }}
+          onVollziehen={darfSchreiben ? onVollziehen : undefined}
+        />
       )}
       {planQuery.isLoading ? (
         <Spin />
