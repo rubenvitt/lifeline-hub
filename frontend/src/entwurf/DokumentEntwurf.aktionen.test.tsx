@@ -119,13 +119,18 @@ describe('DokumentEntwurf — Text kopieren', () => {
     expect(await screen.findByText('Kopieren fehlgeschlagen')).toBeInTheDocument();
   });
 
-  it('sperrt den Eintrag bei leerem Abschnitt', async () => {
+  it('sperrt Kopieren und Leeren bei leerem Abschnitt', async () => {
     render(<Pruefling />);
     const menue = await oeffneDreipunkt(zweiter.label);
-    expect(within(menue).getByRole('menuitem', { name: 'Text kopieren' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    for (const name of ['Text kopieren', 'Abschnitt leeren']) {
+      expect(within(menue).getByRole('menuitem', { name })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+    }
+    expect(
+      within(menue).getByRole('menuitem', { name: 'In der Lesefassung zeigen' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('sperrt den Eintrag ohne Zwischenablage', async () => {

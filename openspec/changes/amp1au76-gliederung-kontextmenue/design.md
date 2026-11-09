@@ -77,8 +77,8 @@ Eingabefelder zusätzlich ab.
 
 `zeigeInLesefassung(schluessel)` setzt `ansicht = 'lesen'` und merkt das Ziel. Ein Effekt nach dem
 Render (die Lesefassung hängt erst dann) rollt den Abschnitt der Lesefassung an den Anfang
-(`leseAnker`) und fokussiert ihn (`tabIndex={-1}` an der `section` von `AbschnittsText`, ohne
-Fokusrahmen beim Programmfokus). Grund: Der Auslöser (⋮ oder Kopf) ist danach verborgen, und die
+(`leseAnker`) und fokussiert ihn (`tabIndex={-1}` an der `section` von `AbschnittsText`; der
+Fokusrahmen des Browsers bleibt, damit Tastaturnutzer sehen, wo sie stehen). Grund: Der Auslöser (⋮ oder Kopf) ist danach verborgen, und die
 Fokusrückgabe des Menüs ginge ins Leere.
 
 Reihenfolge mit der Fokusrückgabe: Das Menü gibt beim Schließen den Fokus an den Auslöser zurück.

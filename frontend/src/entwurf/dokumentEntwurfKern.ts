@@ -87,7 +87,8 @@ export interface AbschnittZustand {
 /**
  * Die Aktionen eines Abschnitts, EINE Quelle für das ⋮ im Abschnittskopf und das Kontextmenü an
  * Kopf und Gliederung (LLH-1601, Spec `dokument-entwurf`; `frontend/AGENTS.md`, „Kontextmenü nur
- * über den Baustein“). „In der Lesefassung zeigen“ fehlt, wenn sie schon gewählt ist.
+ * über den Baustein“). „In der Lesefassung zeigen“ fehlt, wenn sie schon gewählt ist; ein leerer
+ * Abschnitt hat nichts zu kopieren oder zu leeren.
  */
 export function abschnittEintraege({
   leer,
@@ -103,7 +104,13 @@ export function abschnittEintraege({
     ...(ansicht === 'lesen'
       ? []
       : [{ key: 'lesefassung' as const, label: 'In der Lesefassung zeigen' }]),
-    { key: 'leeren', label: 'Abschnitt leeren', gefahr: true },
+    {
+      key: 'leeren',
+      label: 'Abschnitt leeren',
+      gefahr: true,
+      // Ein leerer Abschnitt meldete sonst eine Änderung, die keine ist (Autosave ohne Inhalt).
+      ...(leer ? { gesperrt: true as const } : {}),
+    },
   ];
 }
 

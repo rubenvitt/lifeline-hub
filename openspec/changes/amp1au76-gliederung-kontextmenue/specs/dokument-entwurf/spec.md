@@ -23,7 +23,8 @@ Zwischenablage MUST der Eintrag gesperrt stehen.
 
 #### Scenario: Leerer Abschnitt
 - **WHEN** jemand das Menü eines leeren Abschnitts öffnet
-- **THEN** steht „Text kopieren“ gesperrt darin
+- **THEN** stehen „Text kopieren“ und „Abschnitt leeren“ gesperrt darin, „In der Lesefassung
+  zeigen“ bleibt wählbar
 
 ### Requirement: Abschnitt in der Lesefassung zeigen
 
@@ -39,7 +40,8 @@ Abschnitt der Lesefassung stehen, nicht im Leeren.
 
 „Abschnitt leeren“ SHALL erst nach einer Rückfrage im Dialog wirken, deren Knopf „Abschnitt
 leeren“ heißt. Bestätigt, MUST der Abschnitt so leer werden wie nach Löschen von Hand:
-Leer-Marke und Füllstand folgen, und die Änderung zählt als ungespeichert.
+Leer-Marke und Füllstand folgen, und die Änderung zählt als ungespeichert. An einem leeren
+Abschnitt MUST der Eintrag gesperrt stehen.
 
 #### Scenario: Leeren bestätigt
 - **WHEN** jemand beim gefüllten Abschnitt „Auftrag“ „Abschnitt leeren“ wählt und im Dialog „Abschnitt leeren“ bestätigt

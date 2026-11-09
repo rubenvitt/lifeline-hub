@@ -75,12 +75,14 @@ describe('Einträge eines Abschnitts (LLH-1601, eine Quelle für ⋮ und Kontext
   });
 
   it('sperrt „Text kopieren“ bei leerem Abschnitt und ohne Zwischenablage', () => {
-    const leer = abschnittEintraege({ ...voll, leer: true });
-    expect(leer.find((e) => e.key === 'kopieren')?.gesperrt).toBe(true);
     const ohne = abschnittEintraege({ ...voll, kopierbar: false });
-    expect(ohne.find((e) => e.key === 'kopieren')?.gesperrt).toBe(true);
-    // Die übrigen bleiben wählbar.
-    expect(leer.filter((e) => e.gesperrt)).toHaveLength(1);
+    expect(ohne.filter((e) => e.gesperrt).map((e) => e.key)).toEqual(['kopieren']);
+  });
+
+  it('sperrt bei leerem Abschnitt Kopieren und Leeren, die Lesefassung bleibt', () => {
+    // Leeren eines leeren Abschnitts meldete eine Änderung, die keine ist (Autosave ohne Inhalt).
+    const leer = abschnittEintraege({ ...voll, leer: true });
+    expect(leer.filter((e) => e.gesperrt).map((e) => e.key)).toEqual(['kopieren', 'leeren']);
   });
 
   it('lässt „In der Lesefassung zeigen“ weg, wenn die Lesefassung gewählt ist', () => {
