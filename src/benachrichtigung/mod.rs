@@ -207,6 +207,12 @@ wire_enum! {
         /// Die Entlassung der ablösenden Einheit, mit der ihre Planung entfiel, ist gestrichen:
         /// die Planung ist zurückgeholt (LLH-1510), der Hinweis „entfallen“ gilt nicht mehr.
         AbloeserWiederhergestellt => "abloeser_wiederhergestellt",
+        /// Ein Wechselzeitpunkt des Schichtplans (LLH-1555 Welle 3); `bezug_id` ist der Zeitpunkt
+        /// in Minuten seit 1970 (UTC). Vorwarnung und Fälligkeit aller Schichten, die laut Plan
+        /// zu diesem Zeitpunkt wechseln, melden sich gebündelt einmal mit diesem Bezug statt je
+        /// Schicht (EEMUA 191, `erinnerung::benachrichtigung`). Die Detailzeile zählt die Wechsel
+        /// beim Lesen.
+        SchichtplanWechsel => "schichtplan_wechsel",
         /// Der Termin der Lagebesprechung am Einsatz; `bezug_id` ist die Einsatzkennung.
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
@@ -256,7 +262,8 @@ impl BenachrichtigungBezugTyp {
             | BenachrichtigungBezugTyp::AbloeserEntfallen
             | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
             | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen
-            | BenachrichtigungBezugTyp::AbloeserWiederhergestellt => Some("abloesung"),
+            | BenachrichtigungBezugTyp::AbloeserWiederhergestellt
+            | BenachrichtigungBezugTyp::SchichtplanWechsel => Some("abloesung"),
             BenachrichtigungBezugTyp::Lagebesprechung => Some("lagebesprechung"),
             BenachrichtigungBezugTyp::Nachforderung
             | BenachrichtigungBezugTyp::NachforderungZugesagt

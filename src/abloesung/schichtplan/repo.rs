@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use sqlx::{SqliteConnection, SqlitePool};
 
 use super::pruefung::{self, Block, Grundlage, Ist, PersonStand};
+use super::wechselpunkte;
 use super::zerlegung::{self, Teilung};
 use super::{
     PlanBlockAnzeige, PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, PlanPostenAnzeige, Posten,
@@ -234,6 +235,8 @@ async fn laden_mit(
         },
     );
 
+    let wechsel = wechselpunkte_laden(&mut *conn, einsatz_id, &bloecke, jetzt).await?;
+
     let mut ergebnis_je_block = ergebnis.bloecke;
     let anzeige = zeilen
         .into_iter()
@@ -289,8 +292,74 @@ async fn laden_mit(
         grenzwerte,
         bloecke: anzeige,
         helfer: mit_personen.then(|| helfer.into_iter().map(PlanHelferAnzeige::from).collect()),
+        wechsel,
         naechste_pruefung_at: ergebnis.naechste_pruefung.map(zeit::formatiere_utc),
     })
+}
+
+/// Die Wechsel-Leiste (LLH-1555 Welle 3): lädt, was Ablösung und Wechsel aus dem Plan schon
+/// wissen, und rechnet die Wechselpunkte rein (`wechselpunkte::wechselpunkte`).
+async fn wechselpunkte_laden(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    bloecke: &[Block],
+    jetzt: chrono::DateTime<chrono::Utc>,
+) -> Result<Vec<wechselpunkte::PlanWechselpunkt>, AppError> {
+    let mut stand = wechselpunkte::Stand::default();
+    let faellig: Vec<(i64, String, i64)> = sqlx::query_as(
+        "SELECT einheit_id, faellig_at, id FROM einsatz_abloesung \
+         WHERE einsatz_id = ? AND status = 'laufend' AND faellig_laut_plan = 1",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (einheit, faellig_at, id) in faellig {
+        if let Some(t) = zeit::parse_utc(&faellig_at) {
+            stand.faellig.insert((einheit, t), id);
+        }
+    }
+    let abgeschlossen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT einheit_id, faellig_at FROM einsatz_abloesung \
+         WHERE einsatz_id = ? AND status <> 'laufend' AND faellig_laut_plan = 1",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    stand.abgeschlossen = abgeschlossen
+        .into_iter()
+        .filter_map(|(e, f)| zeit::parse_utc(&f).map(|t| (e, t)))
+        .collect();
+    stand.gewechselt_in = sqlx::query_scalar(
+        "SELECT plan_block_id FROM einsatz_abloesung \
+         WHERE einsatz_id = ? AND plan_block_id IS NOT NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .collect();
+    let vollzogen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT planschicht_id, art FROM einsatz_plan_wechsel \
+         WHERE einsatz_id = ? AND planschicht_id IS NOT NULL AND zurueckgenommen_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (block, art) in vollzogen {
+        if let Some(art) = super::vollzug::WechselArt::parse(&art) {
+            stand.vollzogen.insert((block, art));
+        }
+    }
+    let grenzen: Vec<wechselpunkte::BlockGrenzen> = bloecke
+        .iter()
+        .map(|b| wechselpunkte::BlockGrenzen {
+            id: b.id,
+            posten: b.posten,
+            von: b.von,
+            bis: b.bis,
+        })
+        .collect();
+    Ok(wechselpunkte::wechselpunkte(&grenzen, &stand, jetzt))
 }
 
 /// Name, Qualifikationen und Ist jeder Person, die im Plan steht.

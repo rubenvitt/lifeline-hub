@@ -255,7 +255,9 @@ Ablösung MUST weiter nicht als eigene Erinnerung benachrichtigen.
 ### Requirement: Ablösung und Unwetter bleiben, wie sie sind
 
 Ablösung (Vorwarnung als Hinweis, Fälligkeit als Alarm, an alle mit dem Modul Ablösung) SHALL ihr
-bisheriges Verhalten behalten. Unwetter (an alle im Einsatz mit dem Modul Wetter & Pegel, im
+bisheriges Verhalten behalten; Schichten, die laut Schichtplan zum selben Zeitpunkt fällig sind,
+MUST sich je Zeitpunkt einmal melden (Spec `kraefte-schichtplan`, „Ein Hinweis je Zeitpunkt“).
+Unwetter (an alle im Einsatz mit dem Modul Wetter & Pegel, im
 Browser erkannt) SHALL ab der amtlichen Warnstufe rot (Unwetter, auch extremes Unwetter) ein Alarm
 sein: lauter Ton, Toast, OS-Meldung bei verdecktem Tab, nicht abschaltbar (Katalog LLH-1142 E1,
 LLH-1425). Geringere Warnstufen MUST NOT benachrichtigen. Beide unterliegen dem gemeinsamen Budget

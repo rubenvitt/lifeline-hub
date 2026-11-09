@@ -81,6 +81,15 @@ describe('Katalog der Benachrichtigungsarten', () => {
         '/einsaetze/4/abloesung?schicht=9',
       );
     }
+    // Der gebündelte Hinweis eines Wechselzeitpunkts springt in den Schichtplan (LLH-1555).
+    expect(
+      ersatzPfad({
+        art: 'abloesung_faellig',
+        bezug_typ: 'schichtplan_wechsel',
+        bezug_id: 29903735,
+        einsatz_id: 4,
+      }),
+    ).toBe('/einsaetze/4/abloesung?ansicht=plan&wechsel=29903735');
     // Eine Meldung springt zu sich, mit Hervorhebung (LLH-1052).
     expect(
       ersatzPfad({ art: 'sofortmeldung', bezug_typ: 'meldung', bezug_id: 7, einsatz_id: 4 }),

@@ -10,7 +10,9 @@
 //! - Quittierfrist eines Auftrags (Auto-Frist): `auftrag_ueberfaellig` an den Auftraggeber und an
 //!   die Funktionen und Personen, die noch nicht quittiert haben; nur, solange er überfällig ist.
 //! - Fristen einer Ablösungsschicht: `abloesung_vorwarnung` bzw. `abloesung_faellig` an alle mit
-//!   dem Modul Ablösung. Keine zweite Benachrichtigung als Erinnerung. Der Planungshinweis
+//!   dem Modul Ablösung. Keine zweite Benachrichtigung als Erinnerung. Ist die Schicht laut Plan
+//!   fällig (LLH-1555 Welle 3), meldet sich ihr Zeitpunkt (`schichtplan_wechsel`) statt ihrer,
+//!   einmal für alle Schichten, die zu ihm wechseln. Der Planungshinweis
 //!   (LLH-1131) meldet `abloesung_planung` ebenso, aber nur, solange die Schicht läuft und keine
 //!   ablösende Einheit geplant ist.
 //! - Jede andere Erinnerung, auch eine von Hand mit Bezug auf Meldung oder Auftrag:
@@ -89,10 +91,30 @@ async fn anlass(pool: &SqlitePool, f: &FaelligeErinnerung) -> Result<Option<Anla
             } else {
                 BenachrichtigungArt::AbloesungVorwarnung
             };
-            Some(
-                neu(art, BenachrichtigungBezugTyp::Abloesung, id)
-                    .an(Adressat::ModulLeser("abloesung")),
-            )
+            match wechsel_laut_plan(pool, f.einsatz_id, id).await? {
+                // Laut Plan: einmal je Zeitpunkt (LLH-1555 Welle 3, EEMUA 191). Die erste Frist
+                // des Zeitpunkts meldet, jede weitere findet ihn offen gemeldet und schweigt: der
+                // Text zählt sie beim Lesen mit. Ist der Hinweis schon quittiert, meldet eine
+                // später hinzugekommene Schicht ihn neu, statt ohne Alarm fällig zu werden.
+                Some(minute) => {
+                    let offen = benachrichtigung::repo::offen_zum_bezug(
+                        pool,
+                        f.einsatz_id,
+                        art,
+                        BenachrichtigungBezugTyp::SchichtplanWechsel,
+                        minute,
+                    )
+                    .await?;
+                    (!offen).then(|| {
+                        neu(art, BenachrichtigungBezugTyp::SchichtplanWechsel, minute)
+                            .an(Adressat::ModulLeser("abloesung"))
+                    })
+                }
+                None => Some(
+                    neu(art, BenachrichtigungBezugTyp::Abloesung, id)
+                        .an(Adressat::ModulLeser("abloesung")),
+                ),
+            }
         }
         _ => {
             let an = match f
@@ -113,6 +135,43 @@ async fn anlass(pool: &SqlitePool, f: &FaelligeErinnerung) -> Result<Option<Anla
             )
         }
     })
+}
+
+/// Der Wechselzeitpunkt einer Schicht, die laut Plan fällig ist (LLH-1555 Welle 3), in Minuten
+/// seit 1970: der Bezug `schichtplan_wechsel`, unter dem sich alle Schichten dieses Zeitpunkts
+/// gebündelt melden. `None` für eine Schicht nach Rangfolge oder eine, die nicht mehr läuft.
+///
+/// Wie in der Wechsel-Leiste (`wechselpunkte`) ist das das Ende des Blocks: Ist die Schicht zum
+/// Beginn eines Folgeblocks fällig, der binnen der Toleranz nach dem Ende eines Blocks ihrer
+/// Einheit beginnt (sie begann außerhalb des Plans in der Lücke), zählt dieses Ende.
+async fn wechsel_laut_plan(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<Option<i64>, AppError> {
+    let faellig: Option<String> = sqlx::query_scalar(concat!(
+        "SELECT COALESCE( \
+           (SELECT MAX(p.bis) FROM einsatz_planschicht p \
+            WHERE p.einsatz_id = a.einsatz_id AND p.posten_art = 'einheit' \
+              AND p.einheit_id = a.einheit_id AND p.bis <= a.faellig_at \
+              AND datetime(p.bis, ",
+        crate::abloesung::schichtplan::kopplung::toleranz_sql!(),
+        ") >= a.faellig_at \
+              AND EXISTS (SELECT 1 FROM einsatz_planschicht f \
+                          WHERE f.einsatz_id = a.einsatz_id AND f.posten_art = 'einheit' \
+                            AND f.einheit_id = a.einheit_id AND f.von = a.faellig_at)), \
+           a.faellig_at) \
+         FROM einsatz_abloesung a \
+         WHERE a.id = ? AND a.einsatz_id = ? AND a.status = 'laufend' AND a.faellig_laut_plan = 1"
+    ))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(faellig
+        .as_deref()
+        .and_then(crate::zeit::parse_utc)
+        .map(|t| t.timestamp().div_euclid(60)))
 }
 
 /// Ob der Planungshinweis einer Schicht noch gilt (LLH-1131): sie läuft, und weder die

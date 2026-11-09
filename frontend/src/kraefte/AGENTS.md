@@ -187,7 +187,12 @@ als Art „Laut Plan“ ab und rechnet Bleibende, Übernahme und Folgeblock nie 
 (`abloesung::schichtplan::pruefung`); der Client zeigt sie nur und rechnet nichts nach. Jeder
 Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
 `schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
-`personen` und `helfer` als `null`.
+`personen` und `helfer` als `null`. Die Wechsel-Leiste (LLH-1555 Welle 3,
+`abloesung/schichtplan/SchichtplanWechselLeiste.tsx`) zeigt nur `wechsel` aus dem Plan
+(`abloesung::schichtplan::wechselpunkte`): Zeitpunkte, Einträge und Stand rechnet der Server, der
+Client zählt nichts nach. Der Schlüssel eines Zeitpunkts ist `minute`, derselbe Wert wie der Bezug
+`schichtplan_wechsel` des gebündelten Hinweises und der Sprung `?wechsel=`
+(`parseAbloesungWechsel`).
 **Grenzwerte bedienen** (LLH-1603, `openspec/changes/archive/2026-11-09-z11srqhq-grenzwerte-bedienstelle/design.md`): Höchstdienst und
 Mindestruhe setzt nur das Paneel „Dienst und Ruhe“ in Einstellungen › Ablösung
 (`pages/einstellungen/EinsatzGrenzwerte.tsx`). Die Ansicht „Schichtplan“ nennt sie nur in einer Zeile
