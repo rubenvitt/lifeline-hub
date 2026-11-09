@@ -41,6 +41,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
       'instanzkopplung',
       'letzte-schluessel',
     ]);
+    expect(globalKeys.stammdatenHerkunft()).toEqual(['stammdaten-herkunft']);
     expect(globalKeys.zugangsprotokollSeiten('anmeldungen', { konto: 'root' })).toEqual([
       'zugangsprotokoll',
       'anmeldungen',
@@ -148,10 +149,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 42 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 43 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(42);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(42);
+    expect(werte).toHaveLength(43);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(43);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

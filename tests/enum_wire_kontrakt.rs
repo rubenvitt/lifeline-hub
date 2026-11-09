@@ -653,6 +653,7 @@ fn serde_wire_gleich_as_str() {
         UnterschriftAbgelehnt,
         UnterschriftBestaetigt,
         UnterschriftZurueckgewiesen,
+        InstanzElwVerloren,
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
@@ -664,6 +665,21 @@ fn serde_wire_gleich_as_str() {
         Aktiv,
         Widerrufen,
         VomGegenueberWiderrufen,
+    });
+    // Stammdaten-Verteilung (LLH-1493): Wire = `art` in stammdaten_aenderung/-herkunft (0306).
+    enum_wire_as_str!(lifeline_hub::instanz::stammdaten::StammdatenArt {
+        Konto,
+        OrgEinstellungen,
+        ModulEinstellung,
+        Fuehrungsfunktion,
+        FahrzeugStatus,
+        PersonalStatus,
+        Qualifikation,
+        EinheitTyp,
+        Fahrzeug,
+        Material,
+        Personal,
+        EinheitVorlage,
     });
     enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzProtokoll {
         Passt,

@@ -6,6 +6,7 @@ import {
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
+  stammdatenZeile,
 } from './instanzText';
 
 const kopplung = (teil: Partial<InstanzKopplungAnzeige> = {}): InstanzKopplungAnzeige => ({
@@ -26,6 +27,7 @@ const kopplung = (teil: Partial<InstanzKopplungAnzeige> = {}): InstanzKopplungAn
     fremde_org_name: 'DRK KV Nord',
     fremde_org_kennung: 'k/1',
     angelegt_at: '2026-11-08 11:00:00',
+    stammdaten: { stand: 0, hinweise: [], geheimnisse_verteilt: true, konten_mit_geheimnis: 0 },
   },
   ...teil,
 });
@@ -128,6 +130,37 @@ describe('instanzText', () => {
     ).toEqual(['Letzte Meldung: x']);
   });
 
+  it('Stammdaten: Hinweise aus der Übernahme und fehlende Plattenbestätigung (LLH-1493)', () => {
+    const org = (teil: Partial<InstanzKopplungAnzeige['org']['stammdaten']>) => ({
+      ...kopplung().org,
+      stammdaten: { ...kopplung().org.stammdaten, ...teil },
+    });
+    expect(
+      kopplungHinweise(
+        kopplung({ org: org({ hinweise: ['Konto „admin“ ist hier schon vergeben.'] }) }),
+      ),
+    ).toEqual(['Konto „admin“ ist hier schon vergeben.']);
+    expect(kopplungHinweise(kopplung(), false)).toEqual([
+      'Geheimnisse nicht verteilt: Datenträgerverschlüsselung nicht bestätigt',
+    ]);
+    expect(
+      kopplungHinweise(
+        kopplung({ richtung: 'wird_gemeldet', org: org({ geheimnisse_verteilt: false }) }),
+      ),
+    ).toEqual([
+      'Kontogeheimnisse gehen nicht hinaus: Datenträgerverschlüsselung dort nicht bestätigt',
+    ]);
+    expect(stammdatenZeile(kopplung({ org: org({ stand: 42 }) }))).toBe(
+      'Stammdaten übernommen bis Stand 42',
+    );
+    expect(stammdatenZeile(kopplung())).toBeNull();
+    expect(
+      stammdatenZeile(
+        kopplung({ richtung: 'wird_gemeldet', org: org({ konten_mit_geheimnis: 3 }) }),
+      ),
+    ).toBe('Kontogeheimnisse dort: 3 Konten');
+  });
+
   it('Code ausstellen ist ohne Passkeys oder eigenen Schlüssel gesperrt', () => {
     const u = (teil: Partial<InstanzUebersicht>): InstanzUebersicht => ({
       name: 'ELW',
@@ -137,6 +170,7 @@ describe('instanzText', () => {
       softwarestand: '1',
       passkeys_eingerichtet: true,
       eigener_schluessel: true,
+      datentraeger_bestaetigt: true,
       kopplungen: [],
       schluessel: [],
       ...teil,

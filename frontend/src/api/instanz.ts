@@ -1,9 +1,11 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import type {
+  ElwVerlorenAntwort,
   InstanzKopplungAnzeige,
   LetzterSchluesselHalter,
   InstanzUebersicht,
   KopplungscodeAntwort,
+  StammdatenHerkunftAnzeige,
   UnterschriftAssertion,
   UnterschriftGegenzeichnenStart,
   UnterschriftRegistrierenStart,
@@ -38,6 +40,25 @@ export function redeemKopplungscode(
 
 export function widerrufeKopplung(id: number): Promise<InstanzKopplungAnzeige> {
   return apiSend<InstanzKopplungAnzeige>(`/api/admin/instanz/kopplungen/${id}/widerrufen`, 'POST');
+}
+
+/** „ELW verloren“ an der erreichten Seite (LLH-1493): Widerruf, Geheimnisse der dorthin verteilten
+ *  Konten ungültig, Sitzungen beendet. */
+export function meldeElwVerloren(id: number): Promise<ElwVerlorenAntwort> {
+  return apiSend<ElwVerlorenAntwort>(`/api/admin/instanz/kopplungen/${id}/verloren`, 'POST');
+}
+
+/** „Erneut abgleichen“ an der meldenden Seite (LLH-1493): holt alle Stammdaten neu. */
+export function gleicheStammdatenNeuAb(id: number): Promise<InstanzKopplungAnzeige> {
+  return apiSend<InstanzKopplungAnzeige>(
+    `/api/admin/instanz/kopplungen/${id}/stammdaten-neu`,
+    'POST',
+  );
+}
+
+/** Welche Stammdaten der eigenen Org vom Hub kommen (LLH-1493, design.md D9). */
+export function loadStammdatenHerkunft(): Promise<StammdatenHerkunftAnzeige> {
+  return apiGet<StammdatenHerkunftAnzeige>('/api/instanz/stammdaten/herkunft');
 }
 
 /**

@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import { ladeFuehrungsfunktionen, setzeFuehrungsfunktion } from '../api/fuehrungsfunktionen';
 import { globalKeys } from '../api/queryKeys';
 import type { FuehrungsfunktionEintrag, FuehrungsfunktionUpdate } from '../api/types';
+import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 /**
@@ -56,6 +57,7 @@ export function verwaltungsZeilen(
 export default function FuehrungsfunktionenTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  const herkunft = useStammdatenHerkunft();
   const qc = useQueryClient();
   const katalog = useQuery({
     queryKey: globalKeys.fuehrungsfunktionen(),
@@ -93,12 +95,15 @@ export default function FuehrungsfunktionenTab() {
         emptyText={katalog.isError ? 'Katalog nicht ladbar' : undefined}
         renderItem={({ eintrag, aktiv }) => {
           const kennung = eintrag.kuerzel ?? ART_TEXT[eintrag.art];
+          // Vom Hub übernommen (LLH-1493): hier nur lesbar.
+          const vomHub = herkunft.istVomHub('fuehrungsfunktion', eintrag.funktion);
+          const darf = istAdmin && !vomHub;
           const schalter =
             eintrag.funktion === 's7' ? (
               <Switch
                 key="s7"
                 checked={aktiv}
-                disabled={!istAdmin || setzen.isPending}
+                disabled={!darf || setzen.isPending}
                 aria-label="S7 PSNV eingeschaltet"
                 checkedChildren="an"
                 unCheckedChildren="aus"
@@ -111,7 +116,11 @@ export default function FuehrungsfunktionenTab() {
                 title={
                   <span>
                     <span style={monoStil(13)}>{kennung}</span>{' '}
-                    <Typography.Text type="secondary">· {ART_TEXT[eintrag.art]}</Typography.Text>
+                    <Typography.Text type="secondary">· {ART_TEXT[eintrag.art]}</Typography.Text>{' '}
+                    <HerkunftAbzeichen
+                      herkunft={herkunft.herkunft('fuehrungsfunktion', eintrag.funktion)}
+                      quelle={herkunft.quelle}
+                    />
                   </span>
                 }
                 description={
@@ -126,7 +135,7 @@ export default function FuehrungsfunktionenTab() {
                       }
                       leer={() => false}
                       gleich={(a, b) => a.trim() === b.trim()}
-                      darfSchreiben={istAdmin}
+                      darfSchreiben={darf}
                       onSpeichern={(w) =>
                         setzen.mutateAsync({ eintrag, daten: { label: w.trim() || null } })
                       }

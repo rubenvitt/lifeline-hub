@@ -51,9 +51,36 @@ export function kopplungZustandZeile(
   return teile.filter(Boolean).join(' · ');
 }
 
-/** Hinweise, die an einer Kopplung stehen müssen; leer, wenn alles passt. */
-export function kopplungHinweise(k: InstanzKopplungAnzeige): string[] {
+/** Zeile zur Stammdaten-Verteilung (LLH-1493): an der meldenden Seite der übernommene Stand, an der
+ *  erreichten, an wie viele Konten Geheimnisse gingen. `null`, wenn es nichts zu sagen gibt. */
+export function stammdatenZeile(k: InstanzKopplungAnzeige): string | null {
+  const s = k.org.stammdaten;
+  if (k.richtung === 'meldet_sich')
+    return s.stand > 0 ? `Stammdaten übernommen bis Stand ${s.stand}` : null;
+  if (s.konten_mit_geheimnis > 0) {
+    return `Kontogeheimnisse dort: ${s.konten_mit_geheimnis} ${s.konten_mit_geheimnis === 1 ? 'Konto' : 'Konten'}`;
+  }
+  return null;
+}
+
+/** Hinweise, die an einer Kopplung stehen müssen; leer, wenn alles passt. `datentraegerBestaetigt`
+ *  sagt, ob diese Instanz ihre Datenträgerverschlüsselung bestätigt hat (LLH-1493). */
+export function kopplungHinweise(
+  k: InstanzKopplungAnzeige,
+  datentraegerBestaetigt = true,
+): string[] {
   const aus: string[] = [];
+  const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
+  // Ohne bestätigte Plattenverschlüsselung kommen Konten ohne Passwort an (D6): hier sagen, warum.
+  if (aktiv && k.richtung === 'meldet_sich' && !datentraegerBestaetigt) {
+    aus.push('Geheimnisse nicht verteilt: Datenträgerverschlüsselung nicht bestätigt');
+  }
+  if (aktiv && k.richtung === 'wird_gemeldet' && !k.org.stammdaten.geheimnisse_verteilt) {
+    aus.push(
+      'Kontogeheimnisse gehen nicht hinaus: Datenträgerverschlüsselung dort nicht bestätigt',
+    );
+  }
+  aus.push(...k.org.stammdaten.hinweise);
   // Meldet sich diese Instanz und ist widerrufen, meldet sie nur noch den Widerruf; ein Fehler
   // heißt dann, dass er noch nicht zugestellt ist (design.md D9, wird nachgestellt).
   if (k.zustand === 'widerrufen' && k.richtung === 'meldet_sich' && k.letzter_fehler) {

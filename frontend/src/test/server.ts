@@ -92,6 +92,11 @@ export const server = setupServer(
    * echter Serverzustand). Tests der Zähler überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
+  // Herkunft der Stammdaten (LLH-1493): ohne Kopplung keine Quelle, nichts gesperrt. Jeder
+  // Stammdaten-Reiter fragt sie ab; ein Test mit Hub-Zeilen überschreibt per `server.use`.
+  http.get('/api/instanz/stammdaten/herkunft', () =>
+    HttpResponse.json({ vom_hub: {}, admins_ohne_passkey: [] }),
+  ),
   /**
    * Stammdaten-Quellen des Vorschlagsfelds (LLH-1144, `stammdaten/vorschlagsquellen.ts`) —
    * leere Kataloge als Default. Die ETB-Erfassung und die Meldungsseiten fragen Fahrzeuge im

@@ -1816,6 +1816,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::instanz::widerrufen),
         )
         .route(
+            "/api/admin/instanz/kopplungen/{id}/stammdaten-neu",
+            post(routes::instanz::stammdaten_neu),
+        )
+        .route(
+            "/api/admin/instanz/kopplungen/{id}/verloren",
+            post(routes::instanz::elw_verloren),
+        )
+        .route(
+            "/api/instanz/stammdaten/herkunft",
+            get(routes::instanz::stammdaten_herkunft),
+        )
+        .route(
             "/api/admin/instanz/unterschrift/registrieren/start",
             post(routes::instanz::registrieren_start),
         )

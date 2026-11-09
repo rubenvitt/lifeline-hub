@@ -21,6 +21,7 @@ import type { EinheitVorlage } from '../api/types';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { einheitVorlageDetailPath } from './stammdatenDetail';
 import { orderAsTree, qualiSollTextVon, sollText, type VorlageRow } from './einheitVorlagenBaum';
+import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import EinheitVorlageFormModal from './EinheitVorlageFormModal';
 
 /** Einzug je Stufe der Unterstellung. */
@@ -33,6 +34,7 @@ const INDENT_PX = 20;
  * Typ, Unterstellung und Fahrzeuge. Gepflegt wird auf der Detailseite, angelegt im Dialog.
  */
 export default function EinheitVorlagenTab() {
+  const herkunft = useStammdatenHerkunft();
   const { benutzer } = useAuth();
   const isAdmin = benutzer?.system_rolle === 'admin';
   const { istSchmal } = useViewport();
@@ -70,6 +72,10 @@ export default function EinheitVorlagenTab() {
             {vorlage.name}
           </KennungsLink>
           {vorlage.ist_demo && <DemoMarke />}
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('einheit_vorlage', vorlage.id)}
+            quelle={herkunft.quelle}
+          />
         </Space>
       ),
     },

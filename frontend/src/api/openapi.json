@@ -814,7 +814,8 @@
           "unterschrift_widerrufen",
           "unterschrift_abgelehnt",
           "unterschrift_bestaetigt",
-          "unterschrift_zurueckgewiesen"
+          "unterschrift_zurueckgewiesen",
+          "instanz_elw_verloren"
         ]
       },
       "AdressatKategorie": {
@@ -7073,6 +7074,23 @@
           "keine"
         ]
       },
+      "ElwVerlorenAntwort": {
+        "type": "object",
+        "description": "Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind.",
+        "required": [
+          "kopplung",
+          "konten"
+        ],
+        "properties": {
+          "konten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kopplung": {
+            "$ref": "#/components/schemas/InstanzKopplungAnzeige"
+          }
+        }
+      },
       "EmpfaengerAbschnitt": {
         "type": "object",
         "description": "Ein Abschnitt der Empfängerliste (Ziel einer Zuführung).",
@@ -9506,7 +9524,8 @@
           "id",
           "fremde_org_name",
           "fremde_org_kennung",
-          "angelegt_at"
+          "angelegt_at",
+          "stammdaten"
         ],
         "properties": {
           "angelegt_at": {
@@ -9521,6 +9540,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "stammdaten": {
+            "$ref": "#/components/schemas/InstanzStammdatenStand",
+            "description": "Stammdaten (LLH-1493). Meldende Seite: übernommener Stand und Hinweise aus der\nÜbernahme. Erreichte Seite: ob Kontogeheimnisse hinausgehen und an wie viele Konten sie\ngingen."
           },
           "widerrufen_at": {
             "type": [
@@ -9539,6 +9562,37 @@
           "update_gegenueber"
         ]
       },
+      "InstanzStammdatenStand": {
+        "type": "object",
+        "description": "Stand der Stammdaten-Verteilung an einer Org-Zuordnung (design.md D9).",
+        "required": [
+          "stand",
+          "hinweise",
+          "geheimnisse_verteilt",
+          "konten_mit_geheimnis"
+        ],
+        "properties": {
+          "geheimnisse_verteilt": {
+            "type": "boolean",
+            "description": "Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt)."
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "konten_mit_geheimnis": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Nur erreichte Seite: Konten, deren Geheimnisse an diese Kopplung gingen, über alle\nZuordnungen der Org, und dort noch gelten („ELW verloren“ räumt sie)."
+          },
+          "stand": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "InstanzUebersicht": {
         "type": "object",
         "description": "Alles, was die Admin-Seite „Instanzkopplung“ zeigt.",
@@ -9550,10 +9604,15 @@
           "softwarestand",
           "passkeys_eingerichtet",
           "eigener_schluessel",
+          "datentraeger_bestaetigt",
           "kopplungen",
           "schluessel"
         ],
         "properties": {
+          "datentraeger_bestaetigt": {
+            "type": "boolean",
+            "description": "Der Betreiber hat die Datenträgerverschlüsselung bestätigt\n(`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine\nKontogeheimnisse (LLH-1493, D6)."
+          },
           "eigener_schluessel": {
             "type": "boolean",
             "description": "Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für\n„Code ausstellen“)."
@@ -17154,6 +17213,62 @@
           }
         }
       },
+      "StammdatenArt": {
+        "type": "string",
+        "description": "Eine verteilte Stammdatenart (design.md D1). Auf der Leitung steht der Wert als Text, damit\neine ältere Instanz eine neue Art überspringen kann (D2).",
+        "enum": [
+          "konto",
+          "org_einstellungen",
+          "modul_einstellung",
+          "fuehrungsfunktion",
+          "fahrzeug_status",
+          "personal_status",
+          "qualifikation",
+          "einheit_typ",
+          "fahrzeug",
+          "material",
+          "personal",
+          "einheit_vorlage"
+        ]
+      },
+      "StammdatenHerkunftAnzeige": {
+        "type": "object",
+        "description": "Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9).",
+        "required": [
+          "vom_hub",
+          "admins_ohne_passkey"
+        ],
+        "properties": {
+          "admins_ohne_passkey": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Nur für Admins und nur, wenn diese Instanz die Geheimnisse der Org verteilt: System-Admins\nohne Anmelde-Passkey; ihre Geheimnisse gehen nicht hinaus (design.md D7)."
+          },
+          "quelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Gegenstelle, aus der die Org ihre Stammdaten bezieht; ohne Quelle fehlt das Feld\n(dann gibt es weder „vom Hub“ noch „nur hier“)."
+          },
+          "vom_hub": {
+            "type": "object",
+            "description": "Je Art (Wire-Wert von `StammdatenArt`) die lokalen Schlüssel der übernommenen Zeilen.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "StandVerlaufEintrag": {
         "type": "object",
         "description": "Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.\n`aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.",
@@ -21231,7 +21346,7 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
         "properties": {
           "adresse": {
             "type": [
@@ -21246,6 +21361,14 @@
               "null"
             ],
             "description": "Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`."
+          },
+          "anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "„ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden."
           },
           "fingerabdruck": {
             "type": [
@@ -21301,6 +21424,14 @@
                 "type": "null"
               }
             ]
+          },
+          "passkeys_entfernt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten\nAnmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`."
           },
           "system_rolle": {
             "oneOf": [

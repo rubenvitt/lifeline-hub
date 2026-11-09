@@ -1,4 +1,4 @@
-import { Alert, App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
+import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -31,6 +31,12 @@ import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../a
 import { globalKeys } from '../api/queryKeys';
 import { loadLetzteSchluessel } from '../api/instanz';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import {
+  HerkunftAbzeichen,
+  PASSKEY_FUER_ELW_TEXT,
+  useStammdatenHerkunft,
+  VOM_HUB_TEXT,
+} from '../instanz/herkunft';
 import {
   EIGENES_KONTO,
   LETZTER_ADMIN,
@@ -89,6 +95,10 @@ export default function BenutzerPage() {
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<NeuerBenutzer>();
   const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
+  // Konten vom Hub (LLH-1493): Name, Rollen und Aktivität führt der Hub; ein Einmalpasswort für
+  // die Anmeldung vor Ort und das Zurücksetzen des zweiten Faktors gehen weiter hier.
+  const herkunft = useStammdatenHerkunft();
+  const kontoVomHub = (b: BenutzerAnzeige | null) => b != null && herkunft.istVomHub('konto', b.id);
   const [editForm] = Form.useForm<BearbeitenWerte>();
   // Die Anmeldungen einer Person (LFH-1092), im Dialog außerhalb der Zeilen.
   const [anmeldungenVon, setAnmeldungenVon] = useState<BenutzerAnzeige | null>(null);
@@ -257,7 +267,17 @@ export default function BenutzerPage() {
       // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine Voreinstellung —
       // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
-      render: (t: string) => <span style={{ overflowWrap: 'anywhere' }}>{t}</span>,
+      render: (t: string, b) => (
+        <Space size={4} wrap>
+          <span style={{ overflowWrap: 'anywhere' }}>{t}</span>
+          <HerkunftAbzeichen herkunft={herkunft.herkunft('konto', b.id)} quelle={herkunft.quelle} />
+          {herkunft.ohnePasskey(b.id) && (
+            <Typography.Text type="warning" data-lfh="benutzer-passkey-fuer-elw">
+              {PASSKEY_FUER_ELW_TEXT}
+            </Typography.Text>
+          )}
+        </Space>
+      ),
     },
     // Die Suche liest den Rohwert der Spalte: das führende „@" ist Darstellung, gesucht wird „eva".
     {
@@ -324,7 +344,17 @@ export default function BenutzerPage() {
           { key: 'bearbeiten', label: 'Bearbeiten' },
           // Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen.
           ...(b.aktiv ? [{ key: 'anmeldungen' as const, label: 'Anmeldungen' }] : []),
-          ...(b.aktiv ? [] : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
+          ...(b.aktiv
+            ? []
+            : kontoVomHub(b)
+              ? [
+                  {
+                    key: 'aktiv' as const,
+                    label: `Reaktivieren gesperrt: ${VOM_HUB_TEXT}`,
+                    gesperrt: true as const,
+                  },
+                ]
+              : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
           // Nur bei aktivem zweiten Faktor: sonst gibt es nichts zurückzusetzen (LFH-1122).
           ...(b.totp_aktiviert
             ? [
@@ -337,14 +367,20 @@ export default function BenutzerPage() {
             : []),
           ...(b.aktiv
             ? [
-                grund
-                  ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
-                    {
+                kontoVomHub(b)
+                  ? {
                       key: 'aktiv' as const,
-                      label: `Deaktivieren gesperrt: ${grund}`,
+                      label: `Deaktivieren gesperrt: ${VOM_HUB_TEXT}`,
                       gesperrt: true as const,
                     }
-                  : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
+                  : grund
+                    ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
+                      {
+                        key: 'aktiv' as const,
+                        label: `Deaktivieren gesperrt: ${grund}`,
+                        gesperrt: true as const,
+                      }
+                    : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
               ]
             : []),
         ];
@@ -522,6 +558,9 @@ export default function BenutzerPage() {
         titel="Benutzer bearbeiten"
         form={editForm}
         erfassenText="Speichern"
+        // Konto vom Hub (LLH-1493): nichts im Formular ist hier änderbar, ein PATCH bekäme nur
+        // 409. Das Einmalpasswort ist eine eigene Aktion und bleibt.
+        gesperrt={kontoVomHub(zuBearbeiten)}
         laeuft={bearbeiten.isPending}
         // Sperrt jeden Ausweg, solange gespeichert oder ein Einmalpasswort vergeben wird (LFH-1121):
         // schlösse der Dialog vorher, ginge das schon gesetzte Passwort verloren. Die Fehler
@@ -547,18 +586,26 @@ export default function BenutzerPage() {
           setZuBearbeiten(null);
         }}
       >
+        {kontoVomHub(zuBearbeiten) && (
+          <Alert
+            type="info"
+            showIcon
+            title={`Name und Rollen: ${VOM_HUB_TEXT}. Ein Einmalpasswort für die Anmeldung hier geht.`}
+            style={{ marginBlockEnd: 16 }}
+          />
+        )}
         <Form.Item
           label="Anzeigename"
           name="anzeigename"
           rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
         >
-          <Input />
+          <Input disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
         <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
-          <Select options={SYSTEM_ROLLEN} />
+          <Select options={SYSTEM_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
         <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
-          <Select options={ORG_ROLLEN} />
+          <Select options={ORG_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
         {zuBearbeiten &&
           bearbeitenRolle !== undefined &&

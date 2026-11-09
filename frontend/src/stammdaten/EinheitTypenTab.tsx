@@ -105,6 +105,7 @@ const felder = (bearbeite: EinheitTyp | null) => (
 export default function EinheitTypenTab() {
   return (
     <KatalogVerwaltung<EinheitTyp, FormWerte>
+      herkunftArt="einheit_typ"
       titel="Einheitstypen"
       listenSeite="stammdaten-einheit-typen"
       mehrzahl="Typen"

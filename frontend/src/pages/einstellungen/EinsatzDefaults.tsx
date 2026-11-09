@@ -32,6 +32,7 @@ import type {
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 import { mitVorgabe } from '../../components/vorgabeText';
+import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../../instanz/herkunft';
 import { NUR_ADMIN } from '../../components/nurAnsicht';
 
 /** Vorgabe des Servers für ein leeres Einsatznummer-Präfix (`einsatz/nummer.rs`, `PRAEFIX_VORGABE`). */
@@ -72,7 +73,11 @@ export default function EinsatzDefaults() {
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
   const istAdmin = benutzer?.system_rolle === 'admin';
-  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
+  // Org-Einstellungen vom Hub (LLH-1493): hier nur lesbar, der Hinweis nennt den Grund.
+  const herkunft = useStammdatenHerkunft();
+  const vomHub = herkunft.istVomHub('org_einstellungen', '');
+  const darf = istAdmin && !vomHub;
+  const schutz = useFormularVerlassenSchutz({ aktiv: darf });
   const [rueckfrage, setRueckfrage] = useState<OrgEinstellungenUpdate | null>(null);
   // Vor den frühen Returns: ein Hook danach bräche die Hook-Reihenfolge.
   const einsatzPraefix = Form.useWatch('einsatz_nummer_praefix', form);
@@ -137,7 +142,9 @@ export default function EinsatzDefaults() {
    * Ohne geladenen Bestand bleibt die Liste gesperrt: der PUT schickt beide Felder einer Zeile, und
    * ein erfundener Bestand (sichtbar, frei) höbe sonst eine Ausblendung oder Rolle still auf.
    */
-  const modulVerwaltbar = istAdmin && !modulQuery.isError;
+  // Bezieht die Org ihre Stammdaten aus einer Kopplung, führt der Hub auch die Modul-Vorgaben.
+  const modulVomHub = herkunft.quelle != null;
+  const modulVerwaltbar = istAdmin && !modulVomHub && !modulQuery.isError;
   /** Die Zeile mit einem geänderten Feld, das andere aus dem Bestand. */
   const modulVorgabe = (
     modulKey: string,
@@ -172,8 +179,8 @@ export default function EinsatzDefaults() {
         // schiefging.
         <SeitenHinweise
           fehler={speichernMutation.error}
-          rechteFehlt={!istAdmin}
-          rechteText={NUR_ADMIN}
+          rechteFehlt={!darf}
+          rechteText={vomHub ? `${VOM_HUB_TEXT}.` : NUR_ADMIN}
         />
       }
     >
@@ -184,7 +191,7 @@ export default function EinsatzDefaults() {
         initialValues={initialEinsatz(einstellungen)}
         onFinish={speichern}
         onValuesChange={schutz.geaendert}
-        disabled={!istAdmin}
+        disabled={!darf}
       >
         <Formularpaneel titel="Aufbewahrung">
           <Form.Item label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
@@ -282,7 +289,7 @@ export default function EinsatzDefaults() {
             type="primary"
             htmlType="submit"
             loading={speichernMutation.isPending}
-            disabled={!istAdmin}
+            disabled={!darf}
           >
             Speichern
           </Button>
@@ -321,7 +328,9 @@ export default function EinsatzDefaults() {
                 modulMutation.mutate({ modulKey, vorgabe: modulVorgabe(modulKey, { sichtbar }) }),
             }}
             darfVerwalten={modulVerwaltbar}
-            rechteGrund={istAdmin ? 'Vorgaben nicht ladbar' : NUR_ADMIN}
+            rechteGrund={
+              !istAdmin ? NUR_ADMIN : modulVomHub ? VOM_HUB_TEXT : 'Vorgaben nicht ladbar'
+            }
             // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert. `variables`
             // trägt die laufende bzw. zuletzt gescheiterte Zeile.
             laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}

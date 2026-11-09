@@ -757,6 +757,16 @@ pub enum Command {
     SqliteVersion,
     /// Den Lizenztext ausgeben (LLH-1446, Quelle: `LICENSE`).
     Lizenz,
+    /// Notfall: einem System-Admin, der seinen Passkey verloren hat, wieder Zugang geben
+    /// (LLH-1493, ADR-0016).
+    ///
+    /// Entfernt seine Anmelde-Passkeys, setzt ein Einmalpasswort mit Wechselpflicht und beendet
+    /// seine Sitzungen; die Admin-Spur hält es fest. Für den Fall, dass kein anderer Admin ihm in
+    /// der Benutzerverwaltung ein Einmalpasswort geben kann.
+    AdminZugangZuruecksetzen {
+        /// Benutzername des Admins.
+        benutzername: String,
+    },
 }
 
 #[cfg(test)]

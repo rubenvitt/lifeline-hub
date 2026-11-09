@@ -350,3 +350,25 @@ describe('FahrzeugeTab · Sortieren und Filtern (LLH-1096)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('FahrzeugeTab mit Stammdaten vom Hub (LLH-1493)', () => {
+  it('sperrt die Zeile vom Hub und lässt die Ergänzung vor Ort bearbeitbar', async () => {
+    server.use(
+      http.get('/api/instanz/stammdaten/herkunft', () =>
+        HttpResponse.json({
+          quelle: 'Hub DRK Landesverband',
+          vom_hub: { fahrzeug: ['1'] },
+          admins_ohne_passkey: [],
+        }),
+      ),
+    );
+    render(admin, [fahrzeug, { ...fahrzeug, id: 2, funkrufname: 'Geliehen 1' }]);
+    const hubZeile = (await screen.findByText('Florian 1')).closest('tr')!;
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    const lokal = screen.getByText('Geliehen 1').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+  });
+});

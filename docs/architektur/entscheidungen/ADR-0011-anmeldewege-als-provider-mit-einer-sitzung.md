@@ -1,7 +1,8 @@
 ---
 id: ADR-0011
 titel: Anmeldewege sind schaltbare Provider, die alle in dieselbe Server-Sitzung münden
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0016
 datum: 2026-07-14
 gilt_fuer:
   - src/auth/**

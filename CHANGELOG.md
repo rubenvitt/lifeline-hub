@@ -1,3 +1,23 @@
+## [1.0.0-alpha.179](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.178...v1.0.0-alpha.179) (2026-11-09)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Beim ersten Start nach dem Update legt Lifeline Hub eine neue Tabelle für die Programmpunkte der Vorplanung an. Vorhandene Daten bleiben unverändert.
+
+### Vorplanung
+
+- **Programmpunkte schon in der Vorplanung:** Eine Planung hat jetzt den Reiter „Ablauf“. Dort lässt sich das Programm einer Veranstaltung vorab erfassen. Bedienung und Grenzen sind dieselben wie bei den Einsatzdaten: höchstens 100 Zeichen je Programmpunkt und höchstens 50 Programmpunkte je Planung.
+- **Übernahme in den Einsatz:** Bei der Übernahme einer Planung gehen die Programmpunkte in den Einsatz mit. Die Vorschau zeigt vorher, welche Punkte neu sind und welche es im Einsatz schon gibt. Als vorhanden gilt ein Punkt mit derselben Bezeichnung (Groß- und Kleinschreibung zählt nicht) und demselben Zeitpunkt.
+- Hätte der Einsatz nach der Übernahme mehr als 50 Programmpunkte, bricht die Übernahme mit einer Fehlermeldung ab. Es wird nichts stillschweigend weggelassen.
+- Das Einsatztagebuch hält fest, wie viele Programmpunkte übernommen wurden.
+- Nach der Übernahme lässt sich das Programm der Planung nicht mehr ändern.
+- Die Demo-Planung „Stadtfest Musterstadt“ enthält jetzt ein Beispielprogramm.
+- Die Anwenderdokumentation hat ein neues Kapitel dazu.
+
+### Betrieb und Sicherheit
+
+- In der eingebauten SQLite-Datenbank gibt es eine bekannte Sicherheitslücke (CVE-2026-119375). Ein Update, das sie behebt, ist mit der verwendeten Datenbankbibliothek noch nicht möglich. Für einen Angriff wäre ein fremd geschriebenes Paar aus Datenbankdatei und zugehöriger Protokolldatei nötig. Lifeline Hub öffnet aber nur eigene Dateien und entfernt diese Begleitdateien vor jeder Wiederherstellung. Die Lücke ist deshalb befristet bis 30.11.2026 von der automatischen Sicherheitsprüfung ausgenommen. Sie wird geschlossen, sobald die Bibliothek ein Update erlaubt.
+
 ## [1.0.0-alpha.178](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.177...v1.0.0-alpha.178) (2026-11-09)
 
 ### Wichtige Änderungen

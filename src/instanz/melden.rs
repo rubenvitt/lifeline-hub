@@ -10,6 +10,7 @@ use super::extractor::MELDEN_PFAD;
 use super::identitaet::{self, parse_oeffentlich, Identitaet};
 use super::repo::{self, KopplungZeile};
 use super::signatur::{self, AnfrageDraft, ANTWORT_KOPF, SCHEMA};
+use super::stammdaten::{self, liefern, StammdatenArt, StammdatenLieferung};
 use super::{org_kennung, InstanzKopplungZustand, PROTOKOLL};
 use crate::auth::admin_audit::{self, AdminAktion, Ziel, ZugangsAngaben};
 use crate::auth::unterschrift::repo as unterschrift;
@@ -28,6 +29,8 @@ pub const ABSTAND_MAX_S: u64 = 600;
 /// Höchstzahl Orgs je Meldung und je Antwort, ebenso Widerrufe je Meldung (`src/AGENTS.md`,
 /// Listen von außen).
 pub const ORGS_MAX: usize = 256;
+/// Höchstlänge eines age-Empfängers (`age1…`, Bech32, 62 Zeichen) mit Luft.
+pub const AGE_EMPFAENGER_MAX: usize = 128;
 /// Wie lange eine angebahnte Kopplung auf ihre erste Meldung wartet (D2).
 pub const ANGEBAHNT_MINUTEN: i64 = 15;
 
@@ -58,6 +61,10 @@ pub fn next_abstand(grund: u64, fehlversuche: u32) -> u64 {
 pub struct MeldenOrg {
     pub org: String,
     pub unterschrift_stand: i64,
+    /// Übernommener Stand der Stammdaten (LLH-1493, D2); `-1` = aus dieser Zuordnung keine
+    /// Stammdaten (die Org hat schon eine andere Quelle).
+    #[serde(default)]
+    pub stammdaten_stand: i64,
 }
 
 /// Body von `POST /api/instanz/melden`.
@@ -70,6 +77,16 @@ pub struct MeldenAnfrage {
     /// Org-Kennungen beim Gegenüber, die die meldende Seite widerrufen hat.
     #[serde(default)]
     pub widerrufen: Vec<String>,
+    /// Stammdatenarten, die die meldende Seite übernehmen kann (LLH-1493, D2); leer = keine
+    /// Stammdaten (eine Instanz vor LLH-1493).
+    #[serde(default)]
+    pub stammdaten_arten: Vec<String>,
+    /// age-Empfänger der meldenden Seite für Kontogeheimnisse (D6).
+    #[serde(default)]
+    pub age_empfaenger: Option<String>,
+    /// Der Betreiber der meldenden Seite hat die Datenträgerverschlüsselung bestätigt (D6).
+    #[serde(default)]
+    pub datentraeger_verschluesselt: bool,
 }
 
 /// Eine Org in der Antwort.
@@ -79,6 +96,12 @@ pub struct MeldenOrgAntwort {
     pub widerrufen: bool,
     #[serde(default)]
     pub unterschrift: Vec<UnterschriftSchluesselLieferung>,
+    /// Nachlieferung der Stammdaten (LLH-1493, D2).
+    #[serde(default)]
+    pub stammdaten: Vec<StammdatenLieferung>,
+    /// Bis zu diesem Stand darf die meldende Seite ihren Stammdaten-Stand setzen.
+    #[serde(default)]
+    pub stammdaten_bis: i64,
 }
 
 /// Antwort auf eine Meldung.
@@ -251,6 +274,16 @@ fn dedupe_anfrage(anfrage: &MeldenAnfrage) -> Result<(Vec<&MeldenOrg>, Vec<&str>
             "Eine Meldung darf höchstens {ORGS_MAX} Orgs und {ORGS_MAX} Widerrufe nennen."
         )));
     }
+    if anfrage.stammdaten_arten.len() > stammdaten::ARTEN_MAX
+        || anfrage
+            .age_empfaenger
+            .as_ref()
+            .is_some_and(|a| a.len() > AGE_EMPFAENGER_MAX)
+    {
+        return Err(AppError::Validation(
+            "Stammdatenarten oder age-Empfänger über der Grenze.".into(),
+        ));
+    }
     let mut gesehen = std::collections::HashSet::new();
     let orgs = anfrage
         .orgs
@@ -282,6 +315,23 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
             unterschrift::LIEFERUNGEN_MAX
         ));
     }
+    let stammdaten: usize = antwort.orgs.iter().map(|o| o.stammdaten.len()).sum();
+    if stammdaten > stammdaten::STAMMDATEN_MAX + stammdaten::ABHAENGIGE_MAX {
+        return Err("zu viele Stammdaten in der Antwort".into());
+    }
+    let unterlisten_zu_lang = antwort
+        .orgs
+        .iter()
+        .flat_map(|o| o.stammdaten.iter())
+        .filter_map(|l| l.daten.as_ref()?.get("unterlisten")?.as_object())
+        .flat_map(|m| m.values())
+        .any(|v| {
+            v.as_array()
+                .is_some_and(|a| a.len() > stammdaten::UNTERLISTE_MAX)
+        });
+    if unterlisten_zu_lang {
+        return Err("Unterliste in den Stammdaten über der Grenze".into());
+    }
     let mut gesehen = std::collections::HashSet::new();
     if !antwort.orgs.iter().all(|o| gesehen.insert(o.org.as_str())) {
         return Err("eine Org doppelt in der Antwort".into());
@@ -299,6 +349,31 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     let identitaet = identitaet::load_or_create(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
+    // Stammdaten (LLH-1493): was diese Instanz empfangen kann; ändert es sich, beginnt die
+    // Nachlieferung bei 0. Je Org nur die Quelle (älteste Zuordnung) bekommt Stammdaten.
+    let age = stammdaten::geheimnis::load_or_create_age(pool).await?;
+    let datentraeger = stammdaten::geheimnis::is_datentraeger_bestaetigt(pool).await?;
+    let kennzeichen = stammdaten::empfangs_kennzeichen(datentraeger);
+    let quellen: Vec<i64> = crate::write_retry!(pool, |conn| {
+        let mut quellen = Vec::new();
+        for o in repo::list_orgs_aktiv(conn, kopplung.id).await? {
+            if stammdaten::herkunft::find_quelle(conn, o.org_id).await? == Some(o.id) {
+                repo::save_stammdaten_kennzeichen(conn, o.id, &kennzeichen).await?;
+                quellen.push(o.id);
+            } else {
+                repo::add_stammdaten_hinweise(
+                    conn,
+                    o.id,
+                    &[
+                        "Stammdaten dieser Org kommen schon aus einer anderen Kopplung."
+                            .to_string(),
+                    ],
+                )
+                .await?;
+            }
+        }
+        Ok(quellen)
+    })?;
     let (aktiv, offen) = {
         let mut conn = pool.acquire().await?;
         (
@@ -315,9 +390,17 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             .map(|o| MeldenOrg {
                 org: o.fremde_org_kennung.clone(),
                 unterschrift_stand: o.unterschrift_stand,
+                stammdaten_stand: if quellen.contains(&o.id) {
+                    o.stammdaten_stand
+                } else {
+                    -1
+                },
             })
             .collect(),
         widerrufen: offen.iter().map(|o| o.fremde_org_kennung.clone()).collect(),
+        stammdaten_arten: stammdaten::eigene_arten(),
+        age_empfaenger: Some(age.to_public().to_string()),
+        datentraeger_verschluesselt: datentraeger,
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
@@ -338,9 +421,13 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     let a = antwort.wert;
     let mut abgelehnt_alle = Vec::new();
     let mut vom_gegenueber_widerrufen = Vec::new();
+    let mut stammdaten_geaendert: Vec<i64> = Vec::new();
+    let mut sitzungen_beendet: Vec<String> = Vec::new();
     crate::write_retry!(pool, |conn| {
         abgelehnt_alle.clear();
         vom_gegenueber_widerrufen.clear();
+        stammdaten_geaendert.clear();
+        sitzungen_beendet.clear();
         repo::mark_gesehen(
             conn,
             kopplung.id,
@@ -372,6 +459,21 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             {
                 abgelehnt_alle.push((o.clone(), ab));
             }
+            if quellen.contains(&o.id) {
+                let ergebnis =
+                    stammdaten::uebernehmen::uebernehmen(conn, o, &oa.stammdaten, Some(&age))
+                        .await?;
+                repo::save_stammdaten_stand(conn, o.id, o.stammdaten_stand, oa.stammdaten_bis)
+                    .await?;
+                repo::add_stammdaten_hinweise(conn, o.id, &ergebnis.hinweise).await?;
+                for konto in &ergebnis.deaktivierte_konten {
+                    sitzungen_beendet
+                        .extend(crate::auth::session::alle_loeschen(conn, *konto).await?);
+                }
+                if ergebnis.geaendert {
+                    stammdaten_geaendert.push(o.org_id);
+                }
+            }
         }
         if let Some((_, ab)) = abgelehnt_alle.last() {
             repo::set_hinweis(
@@ -394,6 +496,12 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     })?;
     let naechste = add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone());
     repo::save_meldeversuch(pool, kopplung.id, None, &naechste).await?;
+    if let Some(live) = stammdaten::live() {
+        for org_id in &stammdaten_geaendert {
+            live.publiziere_stammdaten(*org_id);
+        }
+        live.melde_sitzung_ende(sitzungen_beendet);
+    }
 
     for o in &vom_gegenueber_widerrufen {
         admin_audit::schreibe_ohne_akteur(
@@ -510,6 +618,20 @@ pub async fn handle_meldung(
                 }
             }
         }
+        repo::save_gegenueber_empfang(
+            conn,
+            kopplung.id,
+            anfrage.age_empfaenger.as_deref(),
+            anfrage.datentraeger_verschluesselt,
+        )
+        .await?;
+        let arten: std::collections::HashSet<StammdatenArt> = anfrage
+            .stammdaten_arten
+            .iter()
+            .filter_map(|a| StammdatenArt::parse(a))
+            .collect();
+        // Die Stammdaten bekommen, was Unterschriftsschlüssel und Reserve übrig lassen (D2).
+        let mut stammdaten_budget = liefern::Budget::neu(ANTWORT_MAX - stammdaten::ANTWORT_RESERVE);
         let mut orgs = Vec::with_capacity(anfrage_orgs.len());
         let mut gemeldet = Vec::new();
         // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
@@ -530,10 +652,35 @@ pub async fn handle_meldung(
                         unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
                             .await?;
                     budget -= lieferung.len();
+                    let unterschrift_bytes: usize = lieferung
+                        .iter()
+                        .map(|l| serde_json::to_vec(l).map(|v| v.len()).unwrap_or(0))
+                        .sum();
+                    stammdaten_budget.bytes =
+                        stammdaten_budget.bytes.saturating_sub(unterschrift_bytes);
+                    let nach = if mo.stammdaten_stand < 0 {
+                        liefern::Nachlieferung::default()
+                    } else {
+                        liefern::nachlieferung(
+                            conn,
+                            o.org_id,
+                            mo.stammdaten_stand,
+                            &mut stammdaten_budget,
+                            &arten,
+                            &liefern::Empfaenger {
+                                kopplung_org_id: o.id,
+                                age: anfrage.age_empfaenger.as_deref(),
+                                datentraeger_bestaetigt: anfrage.datentraeger_verschluesselt,
+                            },
+                        )
+                        .await?
+                    };
                     orgs.push(MeldenOrgAntwort {
                         org: mo.org.clone(),
                         widerrufen: false,
                         unterschrift: lieferung,
+                        stammdaten: nach.zeilen,
+                        stammdaten_bis: nach.bis.max(mo.stammdaten_stand),
                     });
                 }
                 None => {
@@ -544,6 +691,8 @@ pub async fn handle_meldung(
                         org: mo.org.clone(),
                         widerrufen: true,
                         unterschrift: Vec::new(),
+                        stammdaten: Vec::new(),
+                        stammdaten_bis: 0,
                     });
                 }
             }
@@ -592,9 +741,13 @@ mod tests {
                 .map(|(i, o)| MeldenOrg {
                     org: (*o).into(),
                     unterschrift_stand: i as i64,
+                    stammdaten_stand: 0,
                 })
                 .collect(),
             widerrufen: widerrufen.iter().map(|w| (*w).into()).collect(),
+            stammdaten_arten: Vec::new(),
+            age_empfaenger: None,
+            datentraeger_verschluesselt: false,
         }
     }
 
@@ -642,6 +795,8 @@ mod tests {
                     org: format!("h/{i}"),
                     widerrufen: false,
                     unterschrift: vec![lieferung.clone(); lieferungen],
+                    stammdaten: Vec::new(),
+                    stammdaten_bis: 0,
                 })
                 .collect(),
         }
@@ -705,7 +860,14 @@ mod tests {
             o.org = "k".repeat(88);
         }
         a.orgs[0].unterschrift = vec![lieferung; unterschrift::LIEFERUNGEN_MAX];
+        // Stammdaten (LLH-1493, D2) füllen nur auf, was Unterschriftsschlüssel und Reserve übrig
+        // lassen; die Reserve trägt Hülle und Org-Einträge (hier schon mitgezählt) und eine
+        // einzelne übergroße Zeile (höchstens die halbe Reserve).
         let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        assert!(
+            groesse + stammdaten::ANTWORT_RESERVE / 2 < ANTWORT_MAX,
+            "{groesse} Byte lassen keinen Platz für eine übergroße Stammdatenzeile"
+        );
         assert!(
             groesse < ANTWORT_MAX,
             "{groesse} Byte passen nicht in {ANTWORT_MAX}"

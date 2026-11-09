@@ -1,7 +1,6 @@
 -- no-transaction
--- LLH-1605 (Change zkvt2l8z-unterschrift-bestaetigung, design.md D3): neu im aktion-CHECK
--- 'unterschrift_bestaetigt' und 'unterschrift_zurueckgewiesen' (ein Admin bestätigt oder weist
--- einen vom Gegenüber gelieferten Unterschriftsschlüssel zurück). Rebuild nach Muster 0301.
+-- LLH-1493: Admin-Spur „ELW verloren“ (Change ca8v0psv-stammdaten-verteilung, design.md D8). Neu
+-- im aktion-CHECK 'instanz_elw_verloren'. Rebuild nach Muster 0301.
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     zeitpunkt        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -17,21 +16,13 @@ CREATE TABLE admin_audit_neu (
                          'instanz_kopplung_vom_gegenueber_widerrufen',
                          'unterschrift_registriert', 'unterschrift_gegengezeichnet',
                          'unterschrift_widerrufen', 'unterschrift_abgelehnt',
-                         'unterschrift_bestaetigt', 'unterschrift_zurueckgewiesen')),
-    -- Handelnde Person. Der Name steht als Schnappschuss daneben, damit der Eintrag ohne Join
-    -- lesbar bleibt. ON DELETE SET NULL wie in auth_audit: die Spur überlebt ihren Benutzer.
-    -- NULL bei Einträgen, die eine gekoppelte Instanz ausgelöst hat (0300).
+                         'instanz_elw_verloren')),
     akteur_id        INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     akteur_name      TEXT,
-    -- Betroffenes Konto; NULL, wenn das Ziel ein Anmeldeweg ist.
     ziel_benutzer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
-    -- Benutzername des Zielkontos oder id des Anmeldewegs ('passwort', 'oidc', …).
     ziel             TEXT NOT NULL,
-    -- Was genau, wo die Aktion allein es nicht sagt: Rollen beim Anlegen, alt → neu beim Ändern.
     detail           TEXT,
-    -- Socket-Adresse des Aufrufers. NULL, wenn sie nicht ermittelbar war.
     peer_ip          TEXT,
-    -- Org der handelnden Person als Schnappschuss (0191); NULL = serverweit.
     org_id           INTEGER
 );
 
@@ -52,13 +43,9 @@ DROP TABLE admin_audit;
 
 ALTER TABLE admin_audit_neu RENAME TO admin_audit;
 
--- No-op, falls SQLite den Eintrag beim RENAME bereits mitzieht (wie in 0082).
 UPDATE sqlite_sequence SET name = 'admin_audit' WHERE name = 'admin_audit_neu';
 
--- Die Indizes aus 0156/0170/0191 fallen mit dem DROP; wortgleich neu.
--- Purge nach Alter und „letzte Aktionen“.
+-- Die Indizes fallen mit dem DROP; wortgleich neu (0301).
 CREATE INDEX idx_admin_audit_zeitpunkt ON admin_audit (zeitpunkt);
--- „Was ist mit diesem Konto passiert?“
 CREATE INDEX idx_admin_audit_ziel ON admin_audit (ziel_benutzer_id, zeitpunkt);
--- Die Liste liest neueste zuerst je Org.
 CREATE INDEX idx_admin_audit_org ON admin_audit (org_id, id);
