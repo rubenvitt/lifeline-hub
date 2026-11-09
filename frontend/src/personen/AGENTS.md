@@ -95,6 +95,10 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Transportpriorität ist ein neutraler Tag mit Wort (`personen/PrioritaetMarke.tsx`): die Sichtung
   bleibt die einzige Farbachse an der Person. Sie sortiert nach der Sichtungskategorie
   (`pages/uhs/dringlichkeit.ts`, D10), nie davor.
+- **Kostform, Unverträglichkeiten, Haushalt** (LLH-1612): Kostform und Unverträglichkeiten sind
+  Personendaten wie die übrigen (feldweise `InlineAngabe`, Feld-CAS), der Haushalt eine Lesezeile;
+  angelegt werden sie an der Registrierstelle (`frontend/src/betreuung/AGENTS.md`,
+  „Registrierstelle“).
 - **PAT-Nummer und Kontamination** (LLH-1326): Stammdaten der Person, je einzeln inline über den
   PATCH, nie ohne Netz (gesperrt mit Grund). „kontaminiert“ kommt aus dem Statusvertrag
   (`theme/statusFarben.ts`, Rolle `achtung`, nie `alarm`); „nicht kontaminiert“ trägt keine Marke.

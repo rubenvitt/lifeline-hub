@@ -39,6 +39,7 @@ ursprünglichen Entscheidung laut Herleitung, nicht der Tag der Niederschrift.
 | [ADR-0013](entscheidungen/ADR-0013-openspec-traegt-den-aenderungszyklus.md) | OpenSpec trägt den Änderungszyklus, Fähigkeits-Specs liegen unter openspec/specs | akzeptiert | 2026-09-20 | `openspec/**`, `scripts/check-openspec-archiv.sh` |
 | [ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md) | Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus | akzeptiert | 2026-11-08 | `src/instanz/**`, `src/routes/instanz.rs`, `src/auth/unterschrift/**` |
 | [ADR-0015](entscheidungen/ADR-0015-lifeline-hub-hat-kein-stab-modul.md) | Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft | akzeptiert | 2026-11-08 | `src/lib.rs`, `src/einsatz/modul.rs`, `src/fuehrung/**`, `src/infotelefon/**`, `src/fernmeldewesen/**`, `frontend/src/einsatz/modulRegistry.ts`, `frontend/src/fuehrung/**`, `frontend/src/infotelefon/**`, `frontend/src/fernmeldewesen/**` |
+| [ADR-0016](entscheidungen/ADR-0016-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md) | Die Belegung einer Betreuungsstelle hat eine Meldereihe, auch wenn sie namentlich geführt wird | akzeptiert | 2026-11-09 | `src/betreuung/**`, `src/person/verbleib_repo.rs`, `src/routes/betreuung.rs`, `src/routes/betreuung_registrierung.rs`, `migrations/0305_registrierstelle.sql` |
 
 ## 9.2 Weitere Entscheidungen ohne eigene ADR
 
