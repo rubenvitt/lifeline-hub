@@ -93,7 +93,7 @@ test('Registrierliste: Einstieg im Paneel, Gesundheitsangaben nur nach Wahl, Hau
   // Bewusst gewählt: die Fassung mit Unverträglichkeiten, die Wahl reist in der Adresse.
   await page.getByRole('switch', { name: 'Unverträglichkeiten mitdrucken' }).click();
   await expect(page).toHaveURL(/registrierliste\/druck\?unvertraeglichkeiten=1$/);
-  await expect(tabelle.getByRole('row', { name: /Haus1, P1/ })).toContainText('Erdnüsse');
+  await expect(tabelle.getByRole('row', { name: /^R-\d{3} Haus1, P1 / })).toContainText('Erdnüsse');
   await expect(wurzel.locator('[data-lfh="druckkopf"]')).toContainText('Gesundheitsangaben');
 
   await drucke(page);

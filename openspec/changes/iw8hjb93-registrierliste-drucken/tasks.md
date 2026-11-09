@@ -20,13 +20,13 @@ Jede Aufgabe entsteht per TDD (erst der rote Test). Zunder: LLH-1616,
 
 ## 3. Druck-Gate und e2e
 
-- [ ] 3.1 `e2e/registrierliste-druck.spec.ts` in `DRUCK_SPECS` (drei Engines, Mechanik unter Druckmedium mit `beforeprint`): Blatt mit Haushalt, Summen und Abhakspalte, Unverträglichkeit nur nach Wahl; Lauf grün in Chromium, Firefox, WebKit
-- [ ] 3.2 Gerätefall in `e2e/geraet-betreuungsstelle.spec.ts`: „Registrierliste drucken“ öffnet die Druckansicht der eigenen Stelle; Lauf grün
+- [x] 3.1 `e2e/registrierliste-druck.spec.ts` in `DRUCK_SPECS` (drei Engines, Mechanik unter Druckmedium mit `beforeprint`): Blatt mit Haushalt, Summen und Abhakspalte, Unverträglichkeit nur nach Wahl; Lauf grün in Chromium, Firefox, WebKit (Chromium lokal grün samt Mutationsprobe; Firefox und WebKit belegt die CI des PRs, der Container hat sie nicht)
+- [x] 3.2 Gerätefall in `e2e/geraet-betreuungsstelle.spec.ts`: „Registrierliste drucken“ öffnet die Druckansicht der eigenen Stelle; Lauf grün
 
 ## 4. Regeln, Doku, Gate
 
-- [ ] 4.1 Regeln nachziehen: `frontend/src/druck/AGENTS.md` (Eintrag Registrierliste, Ausnahme Gerät), `frontend/src/betreuung/AGENTS.md` (Registrierstelle: Druck), `frontend/src/geraet/AGENTS.md` (Betreuungsstelle druckt die eigene Liste); `prettier --check` grün
-- [ ] 4.2 Anwenderkapitel `docs/anwender/kapitel/betreuung.md` und `geraet-betreuungsstelle.md` um „Registrierliste drucken“ ergänzen (Mitänderungsregel, `docs/anwender/AGENTS.md`); Doku-Wächter grün
+- [x] 4.1 Regeln nachziehen: `frontend/src/druck/AGENTS.md` (Eintrag Registrierliste, Ausnahme Gerät), `frontend/src/betreuung/AGENTS.md` (Registrierstelle: Druck), `frontend/src/geraet/AGENTS.md` (Betreuungsstelle druckt die eigene Liste); `prettier --check` grün
+- [x] 4.2 Anwenderkapitel `docs/anwender/kapitel/betreuung.md` und `geraet-betreuungsstelle.md` um „Registrierliste drucken“ ergänzen (Mitänderungsregel, `docs/anwender/AGENTS.md`); Doku-Wächter grün
 - [ ] 4.3 `./scripts/check-all.sh` grün (bzw. die CI des PRs)
 
 ## Workflow follow-up
