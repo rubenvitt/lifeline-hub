@@ -192,7 +192,7 @@ Module. Sind Ablösung oder Personal im neuen Einsatz nicht freigegeben, etwa we
 Einsatz-Vorlage oder die Organisation sie ausblendet, lehnt der Server die Übernahme ab. Planungen einer anderen
 Organisation gibt es für niemanden. Was jemand an einer Planung ändert, sehen alle, die sie offen
 haben, ohne neu zu laden. Blöcke stehen sofort in ihrer Zeile, sofern die Zeile schon zu sehen ist; neue, entfallene und umsortierte
-Posten warten dagegen, solange die Maus über dem Schichtplan steht, der Fokus darin liegt, gezogen
+Posten warten dagegen, solange die Maus über dem Schichtplan bewegt wurde und ihn nicht verlassen hat, der Fokus darin liegt, gezogen
 wird oder ein Dialog offen ist. Ein Hinweis über dem Raster nennt sie, etwa „1 neuer Posten“, und
 „anzeigen“ übernimmt sie; ein entfallener Posten steht bis dahin als leere Zeile mit „(entfallen)“.
 Die Vorplanung gehört nicht zu dem, was die App für die Arbeit ohne Netz

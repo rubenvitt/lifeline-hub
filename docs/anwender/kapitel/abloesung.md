@@ -366,8 +366,9 @@ erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
 
 Was andere am Schichtplan ändern, erscheint ohne Neuladen. Neue und geänderte Blöcke stehen sofort
 in ihrer Zeile, sofern die Zeile schon zu sehen ist. Neue Posten, entfallene Posten und eine geänderte Reihenfolge warten dagegen,
-solange die Maus über dem Schichtplan steht, der Fokus darin liegt, ein Block oder eine Person
-gezogen wird oder ein Dialog des Schichtplans offen ist; sonst rückten die Zeilen unter dem Zeiger
+solange die Maus über dem Schichtplan bewegt wurde und ihn nicht verlassen hat, der Fokus darin liegt, ein Block oder eine Person
+gezogen wird oder ein Dialog des Schichtplans offen ist (nach dem Schließen noch bis zur nächsten
+Bewegung, zum nächsten Klick oder zur nächsten Taste); sonst rückten die Zeilen unter dem Zeiger
 weg. Ein Hinweis über dem Raster nennt, was wartet, etwa „1 neuer Posten · Reihenfolge geändert“,
 und „anzeigen“ übernimmt es. Ein entfallener Posten steht bis dahin als leere Zeile mit
 „(entfallen)“; in ihr lässt sich nichts anlegen. Auf dem Handy steht der Hinweis kurz, etwa

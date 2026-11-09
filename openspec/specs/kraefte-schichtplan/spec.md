@@ -333,7 +333,9 @@ eines wartenden Postens erscheinen mit ihm. Das Sammelbanner MUST das
 Wartende nennen („1 neuer Posten“, „2 neue Posten“, „1 Posten entfallen“, „Reihenfolge
 geändert“, verbunden mit „ · “) und es mit „anzeigen“ übernehmen; danach stehen die Zeilen in der
 frischen Folge. Das Banner MUST selbst keine Zeile verschieben. Ein Touch-Tipp zählt nicht als
-Zeiger. Ohne gezeigte Zeile und solange die Quellen der Zeilen (Einheiten, UHS, Abschnitte)
+Zeiger. Schließt ein Dialog des Schichtplans, MUST die Schleuse bis zur nächsten Zeigerbewegung,
+zum nächsten Druck oder zur nächsten Taste weiter halten (Nachlauf): ein ruhender Zeiger über dem
+Raster meldet sich sonst nicht. Ohne gezeigte Zeile und solange die Quellen der Zeilen (Einheiten, UHS, Abschnitte)
 noch laden, hält die Schleuse nichts zurück.
 
 #### Scenario: Neuer Posten unter dem Zeiger
@@ -353,5 +355,5 @@ noch laden, hält die Schleuse nichts zurück.
 - **THEN** erscheint der Block sofort in der Zeile RTW 1, und es gibt kein Banner
 
 #### Scenario: Ohne Zeiger und Fokus
-- **WHEN** weder Zeiger noch Fokus im Schichtplan stehen und kein Zug und kein Dialog läuft
+- **WHEN** weder Zeiger noch Fokus im Schichtplan stehen, kein Zug und kein Dialog läuft und kein Nachlauf nach einem Dialog hält
 - **THEN** erscheinen neue, entfallene und umsortierte Posten sofort, ohne Banner
