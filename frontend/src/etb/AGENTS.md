@@ -131,7 +131,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `?eintrag=`). Ein neuer `KARTEN_EIGENBAU` wird gegen den Plan-Modus begründet (Titel, Status,
   ≤ 3 Sekundärfelder, eine Primäraktion, optional Menü `weitere`) und setzt Marke/Klasse selbst.
 - **Kontextmenü an Zeile und Chip** (LLH-1597, Spec `datensatz-aktionsmenue`, Herleitung
-  `openspec/changes/j161rpsm-kontextmenue-etb/design.md`): ⋮, Knöpfe der abgelehnten Zeile und
+  `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md`): ⋮, Knöpfe der abgelehnten Zeile und
   Kontextmenü lesen EINE Liste (`etb/zeilenAktionen.ts`, `zeilenAktionen` + `fuehreZeilenWahlAus`);
   ein Hook und ein `KontextMenue` je Zeitachse, die gemerkte Zeile bekommt nur die stabile Fabrik.
   Vorgemerkte Zeilen, Bündelzeilen und Zeilen ohne Einträge tragen keine Handler (Browsermenü).

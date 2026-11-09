@@ -3,7 +3,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Kontextmenü im Einsatztagebuch (LLH-1597, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/j161rpsm-kontextmenue-etb/design.md`) im echten Browser: Rechtsklick auf einen
+ * `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md`) im echten Browser: Rechtsklick auf einen
  * Eintrag zeigt dieselben Einträge wie sein ⋮ und wirkt wie dieses; der Chip der Erfassung ebenso.
  * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */

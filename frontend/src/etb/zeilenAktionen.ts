@@ -1,6 +1,6 @@
 /**
  * Aktionen einer Zeile der ETB-Zeitachse aus EINER Quelle (LLH-1597, Spec
- * `datensatz-aktionsmenue`, `openspec/changes/j161rpsm-kontextmenue-etb/design.md` D2): das ⋮ eines
+ * `datensatz-aktionsmenue`, `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D2): das ⋮ eines
  * gesendeten Eintrags, die Knöpfe einer abgelehnten Zeile und das Kontextmenü beider lesen dieselbe
  * Liste und wählen über dieselbe Funktion. So steht kein Weg nur an einem Ort.
  */

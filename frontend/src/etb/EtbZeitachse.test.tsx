@@ -482,7 +482,7 @@ describe('EtbZeitachse – gepufferte Einträge', () => {
 
 /**
  * Kontextmenü an der Zeitachse (LLH-1597, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/j161rpsm-kontextmenue-etb/design.md` D2–D4).
+ * `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D2–D4).
  */
 describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
   const offenesKontextmenue = () =>

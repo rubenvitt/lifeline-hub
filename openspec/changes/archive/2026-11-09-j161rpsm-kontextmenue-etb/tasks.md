@@ -29,8 +29,8 @@
 ## 6. Browser-Nachweis und Gate
 
 - [x] 6.1 e2e `frontend/e2e/kontextmenue-etb.spec.ts`: Rechtsklick auf einen ETB-Eintrag zeigt die ⋮-Einträge, „Berichtigen“ öffnet die Berichtigung; Rechtsklick auf einen Chip der Erfassung zeigt dessen Einträge
-- [ ] 6.2 `./scripts/check-all.sh` grün (lokal die Bündel `schnell` und `frontend`, Rest belegt die CI des PRs)
-- [ ] 6.3 Bilder der Änderung (Kontextmenü am Eintrag, an abgelehnter Zeile, am Chip) per Wegwerf-Spec aufnehmen
+- [x] 6.2 `./scripts/check-all.sh` grün — lokal Bündel `schnell` grün, dazu die berührten Vitest-Dateien (etb, Kontextmenü-Baustein, Datensicht, Fernmeldewesen; 1426 Tests) und die e2e-Specs `kontextmenue-etb`, `kontextmenue-datensatz`; volle Vitest-, Rust- und e2e-Suite belegt die CI des PRs
+- [x] 6.3 Bilder der Änderung (Kontextmenü am Eintrag, an abgelehnter Zeile, am Chip) per Wegwerf-Spec aufnehmen
 
 ## Workflow follow-up
 

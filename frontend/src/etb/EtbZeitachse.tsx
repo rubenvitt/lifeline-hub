@@ -488,7 +488,7 @@ export default function EtbZeitachse({
 
   /*
    * Kontextmenü (LLH-1597, Spec `datensatz-aktionsmenue`,
-   * `openspec/changes/j161rpsm-kontextmenue-etb/design.md` D3/D4): ein Hook und ein Menü je
+   * `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D3/D4): ein Hook und ein Menü je
    * Zeitachse, die Einträge aus derselben Liste wie ⋮ und Knöpfe. Kein langer Druck: am Tablet
    * bleibt Text markierbar (abgestimmt mit Ruben am 09.11.2026).
    */

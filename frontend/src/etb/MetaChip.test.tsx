@@ -555,7 +555,7 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
 
 /**
  * Kontextmenü am Chip (LLH-1597, Spec `datensatz-aktionsmenue`, „Chips der ETB-Erfassung tragen
- * das Kontextmenü“, `openspec/changes/j161rpsm-kontextmenue-etb/design.md` D5).
+ * das Kontextmenü“, `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D5).
  */
 describe('MetaChip — Kontextmenü (LLH-1597)', () => {
   const offenesKontextmenue = () =>

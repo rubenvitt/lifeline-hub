@@ -2,13 +2,11 @@
 
 ### Requirement: Langer Druck öffnet das Kontextmenü am Touchgerät
 
-Am Touchgerät SHALL ein Druck auf einen Datensatz mit Aktionen, der ohne nennenswerte Bewegung
-mindestens 550 ms liegt, dessen Kontextmenü an der Druckstelle öffnen. Bewegt sich der Finger
-vorher, MUST kein Menü öffnen, damit Wischen und Blättern ungestört bleiben. Das Abheben des
-Fingers danach MUST weder das Menü schließen noch als Tipp auf den Datensatz wirken. Im
-Einsatztagebuch (Einträge der Zeitachse und Chips der Erfassung) MUST ein langer Druck kein
-Kontextmenü öffnen, damit Text am Touchgerät markierbar bleibt; dort führt das ⋮-Menü zu den
-Aktionen.
+Am Touchgerät SHALL außerhalb des Einsatztagebuchs ein Druck auf einen Datensatz mit Aktionen, der
+ohne nennenswerte Bewegung mindestens 550 ms liegt, dessen Kontextmenü an der Druckstelle öffnen.
+Bewegt sich der Finger vorher, MUST kein Menü öffnen, damit Wischen und Blättern ungestört bleiben.
+Das Abheben des Fingers danach MUST weder das Menü schließen noch als Tipp auf den Datensatz
+wirken.
 
 #### Scenario: Langer Druck auf eine Karte
 - **WHEN** eine Person am Tablet unter 768 px Breite 600 ms auf die Karte eines Fahrzeugs drückt, ohne den Finger zu bewegen, und dann abhebt
@@ -18,11 +16,17 @@ Aktionen.
 - **WHEN** eine Person den Finger auf eine Karte legt und die Liste innerhalb von 550 ms um mehr als 8 px verschiebt
 - **THEN** öffnet kein Kontextmenü
 
+## ADDED Requirements
+
+### Requirement: Im Einsatztagebuch öffnet ein langer Druck kein Kontextmenü
+
+Im Einsatztagebuch (Einträge der Zeitachse und Chips der Erfassung) SHALL ein langer Druck am
+Touchgerät kein Kontextmenü öffnen, damit Text markierbar bleibt; das ⋮-Menü führt dort zu den
+Aktionen. Rechtsklick und Tasten MUST das Kontextmenü weiter öffnen.
+
 #### Scenario: Langer Druck im Einsatztagebuch
 - **WHEN** eine Person mit Schreibrecht am Tablet 600 ms auf den Text eines ETB-Eintrags drückt, ohne den Finger zu bewegen
 - **THEN** öffnet kein Kontextmenü, und das Gerät darf den Text wie gewohnt markieren
-
-## ADDED Requirements
 
 ### Requirement: ETB-Einträge tragen das Kontextmenü
 
