@@ -1100,8 +1100,8 @@ async fn notfallbefehl_gibt_dem_letzten_admin_wieder_zugang() {
     let (s, v) = login(&hub, "admin", &z.einmalpasswort).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["passwort_wechsel_erforderlich"], true);
-    let (akteur, akteur_id): (String, Option<i64>) = sqlx::query_as(
-        "SELECT akteur_name, akteur_id FROM admin_audit \
+    let (akteur, akteur_id, ziel_id): (String, Option<i64>, Option<i64>) = sqlx::query_as(
+        "SELECT akteur_name, akteur_id, ziel_benutzer_id FROM admin_audit \
          WHERE aktion = 'einmalpasswort_vergeben' ORDER BY id DESC LIMIT 1",
     )
     .fetch_one(&hub.pool)
@@ -1109,6 +1109,11 @@ async fn notfallbefehl_gibt_dem_letzten_admin_wieder_zugang() {
     .unwrap();
     assert_eq!(akteur, lifeline_hub::auth::notfall::AKTEUR);
     assert_eq!(akteur_id, None);
+    assert_eq!(
+        ziel_id,
+        Some(1),
+        "der Kontofilter der Admin-Spur findet den Eintrag"
+    );
     // Nur für System-Admins.
     assert!(
         lifeline_hub::auth::notfall::admin_zugang_zuruecksetzen(&hub.pool, "maxmuster")

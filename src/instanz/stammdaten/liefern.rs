@@ -142,8 +142,21 @@ async fn load_geheimnis(
         totp_aktiviert,
         passwort_wechsel_pflicht,
     };
-    let Some(text) = geheimnis::encrypt(age, &g) else {
-        return Ok(None);
+    Ok(geheimnis::encrypt(age, &g))
+}
+
+/// Hält fest, dass die Geheimnisse eines Kontos an diese Zuordnung gingen. Erst, wenn die Zeile
+/// in der Antwort steht: ein Paket, das nicht mehr ins Budget passt, gilt nicht als geliefert.
+async fn save_lieferung(
+    conn: &mut SqliteConnection,
+    empfaenger: &Empfaenger<'_>,
+    l: &StammdatenLieferung,
+) -> Result<(), AppError> {
+    if l.geheimnis.is_none() || StammdatenArt::parse(&l.art) != Some(StammdatenArt::Konto) {
+        return Ok(());
+    }
+    let Ok(konto_id) = l.schluessel.parse::<i64>() else {
+        return Ok(());
     };
     sqlx::query(
         "INSERT INTO instanz_geheimnis_lieferung (kopplung_org_id, benutzer_id, geliefert_at) \
@@ -155,7 +168,7 @@ async fn load_geheimnis(
     .bind(crate::zeit::jetzt())
     .execute(&mut *conn)
     .await?;
-    Ok(Some(text))
+    Ok(())
 }
 
 async fn build_lieferung(
@@ -385,6 +398,7 @@ pub async fn nachlieferung(
             if let Some(a) = StammdatenArt::parse(&l.art) {
                 drin.insert((a, l.schluessel.clone()));
             }
+            save_lieferung(conn, empfaenger, &l).await?;
             aus.zeilen.push(l);
         }
         aus.bis = stand;

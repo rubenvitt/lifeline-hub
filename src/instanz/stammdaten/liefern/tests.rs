@@ -390,3 +390,45 @@ async fn admin_geheimnis_nur_mit_anmelde_passkey() {
     .await;
     assert!(geheimnis_von(&pool, &mit, 9).await.is_some());
 }
+
+#[tokio::test]
+async fn nur_ein_konto_in_der_antwort_gilt_als_geliefert() {
+    let pool = pool_mit_org().await;
+    konto_mit_hash(&pool, 9, "keiner").await;
+    konto_mit_hash(&pool, 10, "keiner").await;
+    let age = age::x25519::Identity::generate();
+    let empfaenger = age.to_public().to_string();
+    let mit = Empfaenger {
+        kopplung_org_id: 0,
+        age: Some(&empfaenger),
+        datentraeger_bestaetigt: true,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    // Kein Platz: die erste Zeile geht trotzdem (leere Antwort), das zweite Konto wird gebaut,
+    // passt nicht mehr und bleibt für die nächste Antwort.
+    let mut b = Budget::neu(1);
+    let arten: HashSet<_> = [StammdatenArt::Konto].into_iter().collect();
+    let n = nachlieferung(&mut conn, 1, 0, &mut b, &arten, &mit)
+        .await
+        .unwrap();
+    let konten: Vec<_> = n
+        .zeilen
+        .iter()
+        .filter(|l| l.art == "konto")
+        .map(|l| l.schluessel.clone())
+        .collect();
+    let geliefert: Vec<i64> = sqlx::query_scalar(
+        "SELECT benutzer_id FROM instanz_geheimnis_lieferung ORDER BY benutzer_id",
+    )
+    .fetch_all(&mut *conn)
+    .await
+    .unwrap();
+    assert_eq!(konten.len(), 1, "{konten:?}");
+    assert_eq!(
+        geliefert,
+        konten
+            .iter()
+            .map(|s| s.parse::<i64>().unwrap())
+            .collect::<Vec<_>>()
+    );
+}

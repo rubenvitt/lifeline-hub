@@ -246,9 +246,11 @@ pub async fn schreibe_ohne_akteur(
     angaben: Option<ZugangsAngaben>,
     peer_ip: Option<IpAddr>,
 ) {
-    let ziel = match ziel {
-        Ziel::Benutzer { benutzername, .. } => benutzername,
-        Ziel::Anmeldeweg(t) | Ziel::Lesezugang(t) | Ziel::Instanz(t) | Ziel::Unterschrift(t) => t,
+    let (ziel_benutzer_id, ziel) = match ziel {
+        Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
+        Ziel::Anmeldeweg(t) | Ziel::Lesezugang(t) | Ziel::Instanz(t) | Ziel::Unterschrift(t) => {
+            (None, t)
+        }
     };
     let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
     let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);
@@ -264,10 +266,11 @@ pub async fn schreibe_ohne_akteur(
     );
     let ergebnis = sqlx::query(
         "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
-         VALUES (?, NULL, ?, NULL, ?, ?, ?, ?)",
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
     )
     .bind(aktion.as_str())
     .bind(&akteur_name)
+    .bind(ziel_benutzer_id)
     .bind(&ziel)
     .bind(detail.as_deref())
     .bind(peer_ip.map(|ip| ip.to_string()))
