@@ -85,27 +85,39 @@ Stelle registriert oder abgemeldet wird.
 ### Requirement: Registrieren in der Oberfläche
 
 Die Oberfläche SHALL „Registrieren“ an der Detailseite der Betreuungsstelle und am Gerät
-„Betreuungsstelle“ anbieten. Die Maske MUST je Person höchstens vier Felder sichtbar zeigen:
-Nachname, Vorname, Geburtsdatum und die Kostform als Flächenwahl mit „Normalkost“ vorgewählt;
-Geschlecht, Herkunftsadresse, Kontakt und Unverträglichkeiten MUST unter „Weitere Angaben“
-stehen. „Person hinzufügen“ MUST eine weitere Person anhängen und Nachname, Herkunftsadresse
-und Kontakt der ersten Person vorbelegen (überschreibbar). „Registrieren“ MUST den ganzen
-Haushalt in einem Vorgang senden. Ohne Netz MUST der Vorgang vorgemerkt und beim nächsten
-Abgleich genau einmal angelegt werden (Wiederholung mit derselben Kennung liefert den ersten
-Stand). Ohne Schreibrecht oder bei geschlossener Stelle MUST „Registrieren“ gesperrt mit Grund
-stehen. Nach dem Registrieren MUST die Maske leer für den nächsten Haushalt bereitstehen.
+„Betreuungsstelle“ anbieten. Die Maske MUST kompakt sein, ohne Angaben zu verstecken: sie MUST NOT ein
+Feld der Registrierung hinter einen Aufklappbereich, ein Menü oder einen zweiten Schritt legen. Kompakt wird sie durch Aufteilung: Herkunftsadresse und Kontakt MUST einmal je Haushalt
+oben in der Maske stehen und für jede Person des Haushalts gespeichert werden; je Person MUST
+eine Zeile Nachname, Vorname, Geburtsdatum, Geschlecht, Kostform (Flächenwahl, „Normalkost“
+vorgewählt) und Unverträglichkeiten zeigen. „Person hinzufügen“ MUST eine weitere Zeile mit dem
+Nachnamen der ersten Person vorbelegen (überschreibbar). Jedes Feld MUST eine sichtbare
+Beschriftung tragen (kein Platzhalter als einzige Beschriftung), in der Lesereihenfolge per
+Tastatur erreichbar sein und im Handschuh-Modus Trefferhöhe haben; die Kostform MUST als
+Gruppe mit Pfeiltasten bedienbar sein. „Registrieren“ MUST den ganzen Haushalt in einem
+Vorgang senden. Ohne Netz MUST der Vorgang vorgemerkt und beim nächsten Abgleich genau einmal
+angelegt werden (Wiederholung mit derselben Kennung liefert den ersten Stand). Ohne
+Schreibrecht oder bei geschlossener Stelle MUST „Registrieren“ gesperrt mit Grund stehen. Nach
+dem Registrieren MUST die Maske leer für den nächsten Haushalt bereitstehen.
 
-#### Scenario: Zweite Person übernimmt Haushaltsangaben
-- **WHEN** für „Weber, Anna“ die Adresse „Lindenweg 3“ eingetragen und „Person hinzufügen“ gewählt wird
-- **THEN** steht in der zweiten Person der Nachname „Weber“ und unter „Weitere Angaben“ die Adresse „Lindenweg 3“
+#### Scenario: Haushaltsangaben einmal
+- **WHEN** oben in der Maske die Adresse „Lindenweg 3“ steht und drei Personen registriert werden
+- **THEN** trägt jede der drei Personen die Herkunftsadresse „Lindenweg 3“
+
+#### Scenario: Zweite Person übernimmt den Nachnamen
+- **WHEN** für „Weber, Anna“ „Person hinzufügen“ gewählt wird
+- **THEN** steht in der zweiten Zeile der Nachname „Weber“
+
+#### Scenario: Nichts eingeklappt
+- **WHEN** die Maske geöffnet ist
+- **THEN** sind alle Felder der Registrierung ohne weiteres Aufklappen sichtbar und per Tabulator in der Reihenfolge Haushalt, dann Person für Person erreichbar
+
+#### Scenario: Erste Person am Handy
+- **WHEN** die Maske bei 390 px Breite geöffnet ist
+- **THEN** stehen die Haushaltsangaben und die erste Person vollständig untereinander, ohne waagerechten Bildlauf
 
 #### Scenario: Ohne Netz registrieren
 - **WHEN** am Gerät ohne Verbindung ein Haushalt mit zwei Personen registriert wird
 - **THEN** steht er als vorgemerkt in der Liste, und nach dem Abgleich gibt es genau einen Haushalt mit zwei Personen
-
-#### Scenario: Feldbudget
-- **WHEN** die Maske geöffnet ist
-- **THEN** sind je Person höchstens vier Eingaben sichtbar, und nach dem Aufklappen von „Weitere Angaben“ sind es mehr
 
 ### Requirement: Abmelden
 

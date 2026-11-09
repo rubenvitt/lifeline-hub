@@ -9,12 +9,13 @@ muss die Sonderkost schätzen (Zunder LLH-1612).
 ## What Changes
 
 - **Registrierstelle an der Betreuungsstelle:** Auf der Detailseite der Stelle und am Gerät
-  „Betreuungsstelle“ gibt es „Registrieren“. Eine Maske nimmt einen Haushalt in einem Zug auf:
-  je Person Nachname (Pflicht), Vorname, Geburtsdatum und Kostform (Pflicht, „Normalkost“
-  vorgewählt), unter „Weitere Angaben“ Geschlecht, Herkunftsadresse, Kontakt und
-  Unverträglichkeiten. „Person hinzufügen“ übernimmt Nachname, Adresse und Kontakt des
-  Haushalts. Ein Speichern legt alle Personen als Betroffene mit Verbleib „Notunterkunft“ an
-  dieser Stelle an, auch ohne Netz.
+  „Betreuungsstelle“ gibt es „Registrieren“. Eine kompakte Maske nimmt einen Haushalt in einem
+  Zug auf, ohne etwas einzuklappen: oben einmal Herkunftsadresse und Kontakt des Haushalts,
+  darunter je Person eine Zeile mit Nachname (Pflicht), Vorname, Geburtsdatum, Geschlecht,
+  Kostform (Pflicht, „Normalkost“ vorgewählt) und Unverträglichkeiten. „Person hinzufügen“
+  übernimmt den Nachnamen. Alle Felder sind beschriftet und per Tastatur erreichbar. Ein
+  Speichern legt alle Personen als Betroffene mit Verbleib „Notunterkunft“ an dieser Stelle an,
+  auch ohne Netz.
 - **Haushalt:** Personen, die zusammen ankommen, bilden einen Haushalt mit Nummer („H-7“) und
   einer Bezugsperson. Weitere Personen lassen sich später anhängen, abgemeldet wird ein
   Haushalt ganz oder einzeln.

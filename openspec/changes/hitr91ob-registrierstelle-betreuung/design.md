@@ -128,10 +128,23 @@ einer Sonderkost; der Dialog belegt die Sonderkost-Felder vor wie die beiden and
   „Abmelden“, je Person „Abmelden“ im Zeilenmenü). Belegungsart in den Stammdaten der Stelle
   (Datenraster), bei `namentlich` trägt „Belegung melden“ den Sperrgrund „Belegung kommt aus der
   Registrierung“.
-- Maske `betreuung/registrierung/RegistrierMaske.tsx` auf `ErfassungsModal`, je Person ein
-  Block mit vier sichtbaren Feldern, Kostform über `personen/FlaechenWahl.tsx`,
-  Wörter aus `KOSTFORMEN` plus „Normalkost“. Am Handy (390 px) bleibt die erste Person ohne
-  Bildlauf im ersten Bild; im Handschuh-Modus Flächen in Trefferhöhe.
+- Maske `betreuung/registrierung/RegistrierMaske.tsx` auf `ErfassungsModal`. **Kompakt durch
+  Aufteilung, nicht durch Einklappen** (Ruben, 09.11.2026): Herkunftsadresse und Kontakt stehen
+  einmal je Haushalt oben (gespeichert an jeder Person, D3; eine abweichende Adresse wird
+  danach auf der Personen-Detailseite geändert), je Person eine Zeile mit Nachname, Vorname,
+  Geburtsdatum, Geschlecht (Segment „m · w · d · ?“), Kostform und Unverträglichkeiten.
+  Ab `md` ist die Personenzeile ein Raster mit einer Spaltenkopfzeile (Beschriftung per
+  `aria-labelledby` je Feld, nicht nur optisch); darunter je Person ein Block in zwei Spalten,
+  Kostform über die ganze Breite. Kostform als Radiogruppe über `personen/FlaechenWahl.tsx` mit
+  Kurzwörtern („Normal“, „Veg.“, „Vegan“, „o. Schwein“, „Diät“, „Kleinkind“) und vollem Wort im
+  zugänglichen Namen, Wörter aus `KOSTFORMEN` plus „Normalkost“. Tab-Reihenfolge Haushalt →
+  Person 1 → Person 2 …, „Person hinzufügen“ setzt den Fokus in den Vornamen der neuen Zeile
+  (Nachname vorbelegt), „Entfernen“ je Zeile mit Fokus auf die Zeile davor. Fehler stehen am
+  Feld und werden per `aria-describedby` verknüpft. Handschuh-Modus: Trefferhöhe für alle
+  Felder und Flächen, die Zeile bricht dann in den Block um.
+  *Abweichung:* Das Feldbudget „vier sichtbar, Rest unter ‚Weitere Angaben‘“ der Maske
+  „Betroffene erfassen“ (Spec `betroffene-erfassung`) gilt hier ausdrücklich nicht; an der
+  Registrierstelle zählt Vollständigkeit ohne versteckte Felder.
 - Gerät „Betreuungsstelle“: dieselbe Maske und Liste auf `GeraetBetreuungsstellePage`; die
   Allow-Liste `BETREUUNGSSTELLE` bekommt Registrieren, Abmelden und Kostformen.
 - Personen-Detail: Kostform und Unverträglichkeiten als `InlineAngabe` in den Personendaten,
