@@ -14066,9 +14066,9 @@ mod tests {
     /// LLH-1612 (design.md D3–D5): der Bestand bleibt unverändert — Stellen `gezaehlt`,
     /// Meldungen `meldung`, Personen ohne Haushalt und Kostform; die CHECKs nehmen nur den Satz.
     #[tokio::test]
-    async fn migration_0308_registrierstelle() {
+    async fn migration_0310_registrierstelle() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 308;
+        const VERSION: i64 = 310;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
