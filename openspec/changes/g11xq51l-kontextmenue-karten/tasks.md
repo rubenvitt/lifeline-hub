@@ -24,10 +24,10 @@
 
 ## 5. Ablösung und Verpflegung (D3, D6)
 
-- [ ] 5.1 `AbloesungKarte`: „Ablösung vollziehen“, ⋮-Einträge und „Vollzug zurücknehmen“ als `KartenAktion[]`, Kontextmenü am `<article>`; TDD: laufende Schicht zeigt alle Einträge, beendete mit Rücknahme nur „Vollzug zurücknehmen“; Bestandstests grün
-- [ ] 5.2 `verpflegung/StellenListe`: Kontextmenü je Stelle aus der bestehenden Aktionsliste; TDD: aktive Stelle zeigt „Bearbeiten …“, Trenner, rot „Auflösen …“; läuft die Inbetriebnahme, stehen die Einträge gesperrt; Bestandstests grün
-- [ ] 5.3 `ZeitfensterKarte`: Kontextmenü aus `aktionen` ohne „Ausgabe öffnen“; „Bedarf bearbeiten“ gesperrt mit Grund, solange eine andere Bearbeitung offen ist; TDD dazu; Bestandstests grün
-- [ ] 5.4 `AusgabeAnsicht`: Kommentar am ⋮ „Weitere Kostform“ verweist auf die Spec „Ein Zählschirm hat kein Kontextmenü“; Test, dass ein Rechtsklick auf eine Zähltaste kein eigenes Menü öffnet
+- [x] 5.1 `AbloesungKarte`: „Ablösung vollziehen“, ⋮-Einträge und „Vollzug zurücknehmen“ als `KartenAktion[]`, Kontextmenü am `<article>`; TDD: laufende Schicht zeigt alle Einträge, beendete mit Rücknahme nur „Vollzug zurücknehmen“; Bestandstests grün
+- [x] 5.2 `verpflegung/StellenListe`: Kontextmenü je Stelle aus der bestehenden Aktionsliste; TDD: aktive Stelle zeigt „Bearbeiten …“, Trenner, rot „Auflösen …“; läuft die Inbetriebnahme, stehen die Einträge gesperrt; Bestandstests grün
+- [x] 5.3 `ZeitfensterKarte`: Kontextmenü aus `aktionen` ohne „Ausgabe öffnen“; „Bedarf bearbeiten“ gesperrt mit Grund, solange eine andere Bearbeitung offen ist; TDD dazu; Bestandstests grün
+- [x] 5.4 `AusgabeAnsicht`: Kommentar am ⋮ „Weitere Kostform“ verweist auf die Spec „Ein Zählschirm hat kein Kontextmenü“; Test, dass ein Rechtsklick auf eine Zähltaste kein eigenes Menü öffnet
 
 ## 6. Betreuung über den Kartenplan (D5)
 
