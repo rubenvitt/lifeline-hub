@@ -15,6 +15,7 @@ import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte-sperre-fixture';
 import { einsatzAnlegen } from './einsatz-kern';
 import { seedeVorlage } from './vorlage-kern';
+import { seedPlanung, waitForPlanung, waitForRaster } from './planung-kern';
 import { oeffneZeichenWahl, waehleWerkzeug } from './leisten-kern';
 
 /**
@@ -2599,7 +2600,8 @@ async function markiereTabZiele(wurzel: Locator): Promise<string[]> {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (el instanceof HTMLInputElement && el.type === 'hidden') continue;
       if (el instanceof HTMLInputElement && el.type === 'radio' && !el.checked) continue;
-      if (!el.checkVisibility()) continue;
+      // `visibility: hidden` läuft der Browser nicht an (antds verborgenes Löschkreuz einer Suche).
+      if (!el.checkVisibility({ visibilityProperty: true })) continue;
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       const name = `ziel-${namen.length}:${(el.getAttribute('aria-label') ?? el.textContent ?? el.getAttribute('type') ?? el.tagName).trim().slice(0, 32)}`;
@@ -2702,3 +2704,176 @@ test('Unterkunft planen (LLH-1525): kein Ziel verdeckt im Dialog „Nachforderun
     description: `Dialog 390×844 handschuh: ${ziele.length} Ziele, ${befund.stoppsGesamt} Stopps, ${befund.fixierteKandidaten} fixierte Kandidaten, Dialog scrollt: ${scrollt}, 0 verdeckt`,
   });
 });
+
+/**
+ * Vorplanung (LLH-1595, Prüfliste LLH-1586 Kriterium 13): Liste `/planungen` und die
+ * Planungsseite mit den Reitern Plan, Posten und Helfer und dem Kopf im Bearbeiten, im vollsten
+ * Stand aus `planung-kern.ts` (drei Posten, alle vier Ampelstufen, zwei Helfer). Je Fläche
+ * vorwärts gegen stehende Flächen am unteren Rand und rückwärts gegen den klebenden Kopf; die
+ * Ziele werden generisch markiert wie beim Unterkunftsrechner, und der Lauf muss jedes besuchen.
+ * Auf dem Handy steht statt des Rasters die Liste je Posten. Danach die beiden Dialoge
+ * „Posten anlegen“ und „Schichten erzeugen“ bei 390 px im Handschuh.
+ */
+type PlanungFlaeche = 'liste' | 'plan' | 'posten' | 'helfer' | 'kopf';
+
+async function openPlanungFlaeche(
+  page: Page,
+  flaeche: PlanungFlaeche,
+  planung: { id: number; bezeichnung: string },
+) {
+  if (flaeche === 'liste') {
+    await page.goto('/planungen');
+    await expect(page.getByRole('link', { name: planung.bezeichnung, exact: true })).toBeVisible();
+    return;
+  }
+  const reiter = flaeche === 'posten' || flaeche === 'helfer' ? `?reiter=${flaeche}` : '';
+  await page.goto(`/planungen/${planung.id}${reiter}`);
+  await waitForPlanung(page, planung.bezeichnung);
+  if (flaeche === 'plan') {
+    if ((page.viewportSize()?.width ?? 0) >= 768) await waitForRaster(page);
+    else await expect(page.locator('[data-lfh="schichtplan-listen-block"]')).toHaveCount(5);
+  } else if (flaeche === 'posten') {
+    await expect(page.locator('[data-lfh="planung-posten"]').getByText('Fußtrupp')).toBeVisible();
+  } else if (flaeche === 'helfer') {
+    await expect(
+      page.locator('[data-lfh="planung-helfer"]').getByText('Hanna Messweg'),
+    ).toBeVisible();
+  } else {
+    await page.getByRole('button', { name: 'Planung bearbeiten', exact: true }).click();
+    await expect(page.getByLabel('Höchstens im Dienst')).toBeVisible();
+  }
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+}
+
+/** Mindestzahl der Tab-Ziele je Fläche: was sicher dasteht, ohne Rahmen und Seitenleiste. */
+const PLANUNG_ZIELE_MINDESTENS: Record<PlanungFlaeche, number> = {
+  // Planung anlegen, Suche, Spaltenschalter, je Zeile die Bezeichnung.
+  liste: 4,
+  // ⋮, Planung bearbeiten, Reiter, Block anlegen, Schichten erzeugen, fünf Blöcke.
+  plan: 10,
+  // ⋮, Bearbeiten, Reiter, Posten anlegen, drei Zeilenmenüs.
+  posten: 7,
+  // ⋮, Bearbeiten, Reiter, Helfer anlegen, Suche, je Helfer Bearbeiten und Löschen.
+  helfer: 9,
+  // Sechs Felder, Speichern, Abbrechen.
+  kopf: 8,
+};
+
+for (const viewport of [
+  { width: 1366, height: 520 },
+  { width: 390, height: 600 },
+]) {
+  for (const dichte of ['kompakt', 'handschuh']) {
+    test(`Vorplanung (LLH-1595): kein Ziel verdeckt bei ${viewport.width}px, ${dichte}, vorwärts und rückwärts`, async ({
+      page,
+    }) => {
+      test.setTimeout(240_000);
+      await ohneDevtoolsKnopf(page);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      const planung = await seedPlanung(page, `Fokusplanung ${Date.now()}`);
+      await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+
+      const gemessen: string[] = [];
+      let groessteReserve = 0;
+      for (const flaeche of ['liste', 'plan', 'posten', 'helfer', 'kopf'] as const) {
+        await openPlanungFlaeche(page, flaeche, planung);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const ziele = await markiereTabZiele(page.getByRole('main'));
+        expect(ziele.length, `${flaeche}: ${ziele.join(' | ')}`).toBeGreaterThanOrEqual(
+          PLANUNG_ZIELE_MINDESTENS[flaeche],
+        );
+        const reserve = await page.evaluate(
+          () => document.documentElement.scrollHeight - innerHeight,
+        );
+        groessteReserve = Math.max(groessteReserve, reserve);
+
+        const markiert = page.getByRole('main').locator('[data-e2e-fokus]');
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await markiert.first().focus();
+        await page.keyboard.press('Shift+Tab');
+        const vor = await pruefeFokusVerdeckung(page, ziele.length + 2);
+        expect([...vor.besuchteZiele].sort(), `${flaeche} vorwärts: jedes Ziel besucht`).toEqual(
+          [...ziele].sort(),
+        );
+        expect(vor.verdeckt, `${flaeche} vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await markiert.last().focus();
+        await page.keyboard.press('Tab');
+        const zurueck = await pruefeFokusVerdeckung(page, ziele.length + 2, 'Shift+Tab');
+        expect(
+          [...zurueck.besuchteZiele].sort(),
+          `${flaeche} rückwärts: jedes Ziel besucht`,
+        ).toEqual([...ziele].sort());
+        if (viewport.width >= 768 && reserve > 0) {
+          expect(
+            zurueck.fixierteKandidaten,
+            `${flaeche}: Vorbedingung: der Kopf klebt`,
+          ).toBeGreaterThan(0);
+        }
+        expect(zurueck.verdeckt, `${flaeche} rückwärts:\n${zurueck.verdeckt.join('\n')}`).toEqual(
+          [],
+        );
+        gemessen.push(
+          `${flaeche}: ${ziele.length} Ziele, Reserve ${reserve}px, ` +
+            `${vor.stoppsBeruehrt}/${zurueck.stoppsBeruehrt} Stopps an einer stehenden Fläche vor/rück, ` +
+            `${vor.fixierteKandidaten}/${zurueck.fixierteKandidaten} fixierte Kandidaten`,
+        );
+      }
+      // Mindestens eine Fläche rollt, sonst prüfte der Lauf den klebenden Kopf nirgends.
+      expect(groessteReserve, 'Vorbedingung: eine Fläche rollt').toBeGreaterThan(200);
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `${viewport.width}×${viewport.height} ${dichte}: ${gemessen.join(' | ')}, 0 verdeckt`,
+      });
+    });
+  }
+}
+
+for (const dialog of ['Posten anlegen', 'Schichten erzeugen'] as const) {
+  test(`Vorplanung (LLH-1595): kein Ziel verdeckt im Dialog „${dialog}“ bei 390 px, handschuh`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await ohneDevtoolsKnopf(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await anmelden(page);
+    const planung = await seedPlanung(page, `Fokusdialog ${Date.now()}`);
+    await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+    await openPlanungFlaeche(page, dialog === 'Posten anlegen' ? 'posten' : 'plan', planung);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+
+    await page.getByRole('button', { name: dialog, exact: true }).click();
+    const modal = page.getByRole('dialog', { name: dialog });
+    await expect(modal).toBeVisible();
+    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+
+    const ziele = await markiereTabZiele(modal);
+    await expect(modal.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);
+    await expect(modal.locator('button.ant-btn-primary[data-e2e-fokus]')).toHaveCount(1);
+    // Posten: Herkunft, Bezeichnung, Abschnitt, Schichtlänge, Soll, Qualifikation hinzufügen,
+    // Kreuz, Werte behalten und drei Fußknöpfe. Erzeugen: Posten, Beginn, Ende, Länge, Kreuz
+    // und zwei Fußknöpfe.
+    expect(ziele.length, ziele.join(' | ')).toBeGreaterThanOrEqual(
+      dialog === 'Posten anlegen' ? 11 : 7,
+    );
+
+    await modal.locator('[data-e2e-fokus]').first().focus();
+    const befund = await pruefeFokusVerdeckung(page, ziele.length * 2 + 4);
+    const scrollt = await page
+      .locator('.ant-modal-wrap')
+      .filter({ has: modal })
+      .evaluate((w) => w.scrollHeight > w.clientHeight);
+    expect(
+      [...befund.besuchteZiele].sort(),
+      'jedes Dialogziel muss per Tab besucht werden',
+    ).toEqual([...ziele].sort());
+    expect(befund.fixierteKandidaten, 'Vorbedingung: es gibt fixierte Flächen').toBeGreaterThan(0);
+    expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `Dialog „${dialog}“ 390×844 handschuh: ${ziele.length} Ziele, ${befund.stoppsGesamt} Stopps, ${befund.fixierteKandidaten} fixierte Kandidaten, Dialog scrollt: ${scrollt}, 0 verdeckt`,
+    });
+  });
+}

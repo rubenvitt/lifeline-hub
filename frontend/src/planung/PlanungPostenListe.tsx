@@ -10,7 +10,7 @@ import {
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungPosten } from '../api/types';
 import { formatDauer } from '../abloesung/dauer';
-import { monoStil, StatusChip } from '../components/instrument';
+import { monoStil, StatusChip, useRollen } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -42,6 +42,7 @@ export function verschobeneFolge(
 export default function PlanungPostenListe({ planung }: { planung: Planung }) {
   const planungId = planung.kopf.id;
   const qc = useQueryClient();
+  const { token } = useRollen();
   const [dialog, setDialog] = useState<{ posten: PlanungPosten | null } | null>(null);
   const [zuLoeschen, setZuLoeschen] = useState<PlanungPosten | null>(null);
   const posten = [...planung.posten].sort((a, b) => a.sortier - b.sortier);
@@ -166,7 +167,8 @@ export default function PlanungPostenListe({ planung }: { planung: Planung }) {
   // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
   return (
     <div data-lfh="planung-posten">
-      <Space style={{ marginBottom: 12 }}>
+      {/* Zielabstand zur Werkzeugzeile der Tabelle darunter (LLH-1595): 7 / 11 / 16 px. */}
+      <Space style={{ marginBottom: token.marginSM }}>
         <Button
           onClick={() => {
             speichernMut.reset();
