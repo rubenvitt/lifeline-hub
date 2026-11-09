@@ -14,7 +14,7 @@ gilt_fuer:
   - frontend/src/infotelefon/**
   - frontend/src/fernmeldewesen/**
 herleitung:
-  - openspec/changes/archive/2026-11-08-i6k6mzed-stab-herausnehmen/design.md
+  - openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md
 ---
 
 # ADR-0014: Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft
