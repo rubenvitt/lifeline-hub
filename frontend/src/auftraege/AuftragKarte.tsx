@@ -11,11 +11,14 @@ import {
   AuftragSchema,
   AuftragVollzug,
   AuftragZeit,
+  auftragAktionen,
+  auftragAktionsKennung,
   auftragKante,
   auftragKennung,
   gefuellteFelder,
 } from './AuftragTeile';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { useKartenKontext } from '../components/useKartenKontext';
 
 const { Text } = Typography;
 
@@ -75,10 +78,25 @@ function AuftragKarte({
 }: AuftragKarteProps) {
   const { zeitpunkt } = useAnzeigeKonventionen();
   const hasSchema = gefuellteFelder(a, zeitpunkt).length > 0;
+  // Kontextmenü aus denselben Daten wie Knöpfe und ⋮ der `AuftragHandlungen` (LLH-1598).
+  const { knoepfe, weitere } = auftragAktionen({
+    auftrag: a,
+    darfSchreiben,
+    onInArbeit,
+    onVollzugMelden,
+    onAbnehmen,
+    onBerichtigen,
+    onAufheben,
+  });
+  const { ausloeser, menue } = useKartenKontext({
+    aktionen: [...knoepfe, ...weitere],
+    zugaenglicherName: `Aktionen zu ${auftragAktionsKennung(a)}`,
+  });
 
   return (
     // Erteilungszeit links in Mono, darunter die Nummer; überfällig schlägt „offen" am Rand.
     <KommKarte
+      {...ausloeser}
       data-auftrag-id={a.id}
       data-ueberfaellig={a.ist_ueberfaellig ? 'true' : undefined}
       {...auftragKante(a)}
@@ -131,6 +149,7 @@ function AuftragKarte({
         onAufheben={onAufheben}
         fehlerGrund={fehlerGrund}
       />
+      {menue}
     </KommKarte>
   );
 }

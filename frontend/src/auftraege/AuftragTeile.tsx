@@ -11,7 +11,8 @@ import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { KartenAktion } from '../components/kartenKontext';
 import EmpfaengerQuittung, { Quittungsstand } from './EmpfaengerQuittung';
 import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
 
@@ -283,8 +284,21 @@ export interface AuftragHandlungenProps {
   ausrichtung?: 'flex-start' | 'flex-end';
 }
 
-/** Die Knöpfe je Phase, mit Schreibrecht; der Grund einer Ablehnung steht darüber. */
-export function AuftragHandlungen({
+type WeitereAuftragAktion = 'berichtigen' | 'aufheben';
+
+/** Kennung im Namen von ⋮ und Kontextmenü („Auftrag #9“). */
+export function auftragAktionsKennung(a: Pick<Auftrag, 'lfd_nr'>): string {
+  return a.lfd_nr != null ? `Auftrag #${a.lfd_nr}` : 'Auftrag';
+}
+
+/**
+ * Die Handlungen eines Auftrags als Daten (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine Karte
+ * mit mehreren Knöpfen …“): `knoepfe` je Phase, `weitere` (Berichtigen, Aufheben) gebündelt ab
+ * drei Aktionen. `AuftragHandlungen` zeichnet daraus Knöpfe und ⋮, `AuftragKarte` ihr
+ * Kontextmenü (`[...knoepfe, ...weitere]`). Der `darfSchreiben`-Riegel steht hier, ein Callback
+ * ist kein Rechtebeleg.
+ */
+export function auftragAktionen({
   auftrag: a,
   darfSchreiben,
   onInArbeit,
@@ -292,81 +306,105 @@ export function AuftragHandlungen({
   onAbnehmen,
   onBerichtigen,
   onAufheben,
-  fehlerGrund,
-  ausrichtung = 'flex-end',
-}: AuftragHandlungenProps) {
-  const aktionen: ReactNode[] = darfSchreiben
-    ? [
-        // EIN Klick; der Rückweg steht im Rückgängig-Toast (`POST …/vollzug` mit `status: 'offen'`, nur
-        // aus `in_arbeit`). „Abnehmen" behält seine Rückfrage: die Abnahme hat keinen Rückweg.
-        // Der Knopf nennt die Handlung, das Etikett daneben sagt „Offen" (LFH-959).
-        a.bearbeitungsstatus === 'offen' && onInArbeit ? (
-          <Button key="ia" onClick={() => onInArbeit(a.id)}>
-            {AUFTRAG_HANDLUNG.in_arbeit}
-          </Button>
-        ) : null,
-        // „Vollzug melden" öffnet ein Modal (eigene Bestätigung).
-        (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') &&
-        onVollzugMelden ? (
-          <Button key="vm" onClick={() => onVollzugMelden(a.id)}>
-            Vollzug melden
-          </Button>
-        ) : null,
-        a.bearbeitungsstatus === 'vollzogen' && onAbnehmen ? (
-          <Popconfirm
-            key="ab"
-            title="Auftrag abnehmen?"
-            okText="Auftrag abnehmen"
-            cancelText="Abbrechen"
-            onConfirm={() => onAbnehmen(a.id)}
-          >
-            <Button type="primary" ghost>
-              Abnehmen
-            </Button>
-          </Popconfirm>
-        ) : null,
-      ].filter(Boolean)
-    : [];
+}: Omit<AuftragHandlungenProps, 'fehlerGrund' | 'ausrichtung'>): {
+  knoepfe: KartenAktion[];
+  weitere: KartenAktion<WeitereAuftragAktion>[];
+} {
+  if (!darfSchreiben) return { knoepfe: [], weitere: [] };
+  const knoepfe: KartenAktion[] = [
+    // EIN Klick; der Rückweg steht im Rückgängig-Toast (`POST …/vollzug` mit `status: 'offen'`, nur
+    // aus `in_arbeit`). „Abnehmen" behält seine Rückfrage: die Abnahme hat keinen Rückweg.
+    // Der Knopf nennt die Handlung, das Etikett daneben sagt „Offen" (LFH-959).
+    ...(a.bearbeitungsstatus === 'offen' && onInArbeit
+      ? [{ key: 'ia', label: AUFTRAG_HANDLUNG.in_arbeit, onWahl: () => onInArbeit(a.id) }]
+      : []),
+    // „Vollzug melden" öffnet ein Modal (eigene Bestätigung).
+    ...((a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') &&
+    onVollzugMelden
+      ? [{ key: 'vm', label: 'Vollzug melden', onWahl: () => onVollzugMelden(a.id) }]
+      : []),
+    ...(a.bearbeitungsstatus === 'vollzogen' && onAbnehmen
+      ? [
+          {
+            key: 'ab',
+            label: 'Abnehmen',
+            rueckfrage: { titel: 'Auftrag abnehmen?', knopf: 'Auftrag abnehmen' },
+            onWahl: () => onAbnehmen(a.id),
+          },
+        ]
+      : []),
+  ];
 
   /*
-   * Berichtigen und Aufheben (LLH-1098). Der `darfSchreiben`-Riegel steht hier, ein Callback ist
-   * kein Rechtebeleg. Berichtigen nur an einem offenen Auftrag; nach der ersten Quittung steht es
-   * gesperrt mit Grund (LFH-966), der Server liefert die Regel als `berichtigbar`. Aufheben bis
-   * zur Abnahme.
+   * Berichtigen und Aufheben (LLH-1098). Berichtigen nur an einem offenen Auftrag; nach der ersten
+   * Quittung steht es gesperrt mit Grund (LFH-966), der Server liefert die Regel als
+   * `berichtigbar`. Aufheben bis zur Abnahme.
    */
   const kannAufheben =
     a.bearbeitungsstatus === 'offen' ||
     a.bearbeitungsstatus === 'in_arbeit' ||
     a.bearbeitungsstatus === 'vollzogen';
-  const weitere: MenueEintrag<'berichtigen' | 'aufheben'>[] = darfSchreiben
-    ? [
-        ...(a.bearbeitungsstatus === 'offen' && onBerichtigen
-          ? [
-              a.berichtigbar
-                ? { key: 'berichtigen' as const, label: 'Berichtigen' }
-                : {
-                    key: 'berichtigen' as const,
-                    label: 'Berichtigen (schon quittiert)',
-                    gesperrt: true as const,
-                  },
-            ]
-          : []),
-        ...(kannAufheben && onAufheben
-          ? [
-              {
-                key: 'aufheben' as const,
-                label: AUFTRAG_HANDLUNG.aufgehoben,
-                gefahr: true as const,
+  const weitere: KartenAktion<WeitereAuftragAktion>[] = [
+    ...(a.bearbeitungsstatus === 'offen' && onBerichtigen
+      ? [
+          a.berichtigbar
+            ? {
+                key: 'berichtigen' as const,
+                label: 'Berichtigen',
+                onWahl: () => onBerichtigen(a.id),
+              }
+            : {
+                key: 'berichtigen' as const,
+                label: 'Berichtigen (schon quittiert)',
+                gesperrt: true as const,
+                onWahl: () => {},
               },
-            ]
-          : []),
-      ]
-    : [];
-  const waehle = (key: 'berichtigen' | 'aufheben') =>
-    key === 'berichtigen' ? onBerichtigen?.(a.id) : onAufheben?.(a.id);
+        ]
+      : []),
+    ...(kannAufheben && onAufheben
+      ? [
+          {
+            key: 'aufheben' as const,
+            label: AUFTRAG_HANDLUNG.aufgehoben,
+            gefahr: true as const,
+            onWahl: () => onAufheben(a.id),
+          },
+        ]
+      : []),
+  ];
+  return { knoepfe, weitere };
+}
+
+/** Die Knöpfe je Phase, mit Schreibrecht; der Grund einer Ablehnung steht darüber. */
+export function AuftragHandlungen({
+  fehlerGrund,
+  ausrichtung = 'flex-end',
+  ...props
+}: AuftragHandlungenProps) {
+  const { knoepfe, weitere } = auftragAktionen(props);
+  const aktionen: ReactNode[] = knoepfe.map((k) =>
+    k.rueckfrage ? (
+      <Popconfirm
+        key={k.key}
+        title={k.rueckfrage.titel}
+        okText={k.rueckfrage.knopf}
+        cancelText="Abbrechen"
+        onConfirm={k.onWahl}
+      >
+        <Button type="primary" ghost>
+          {k.label}
+        </Button>
+      </Popconfirm>
+    ) : (
+      <Button key={k.key} onClick={k.onWahl}>
+        {k.label}
+      </Button>
+    ),
+  );
+  const waehle = (key: WeitereAuftragAktion) => weitere.find((w) => w.key === key)?.onWahl();
   // Gebündelt ab drei Aktionen nach der Rechteprüfung (LFH-365); darunter wäre ein Menü ein Umweg.
   const buendeln = aktionen.length + weitere.length >= 3;
-  const kennung = a.lfd_nr != null ? `Auftrag #${a.lfd_nr}` : 'Auftrag';
+  const kennung = auftragAktionsKennung(props.auftrag);
 
   return (
     <>

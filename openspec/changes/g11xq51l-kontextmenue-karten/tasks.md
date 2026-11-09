@@ -18,9 +18,9 @@
 
 ## 4. Meldung, Nachforderung, Auftrag (D3, D6)
 
-- [ ] 4.1 `MeldungKarte`: Aktionen als `KartenAktion[]` (Bestätigen mit Rückfrage „Sofortmeldung bestätigen?“, Fortschaltung, `weitere`), Knopfzeile und ⋮ daraus; TDD: Kontextmenü zeigt Knöpfe vor ⋮-Einträgen, auch unter drei Aktionen, ohne Zuweisung; Bestandstests grün
-- [ ] 4.2 `NachforderungKarte`: Fortschaltung, Übernahmen (gesperrt mit Grund), Zuordnen und ⋮-Einträge (Bearbeiten, Zurückziehen, Ablehnen, Eintreffen zurücknehmen) als `KartenAktion[]`; TDD: Reihenfolge, gesperrte Übernahme mit Grund, rote Abschlüsse hinter dem Trenner; Bestandstests grün
-- [ ] 4.3 `AuftragTeile`: `auftragAktionen(…)` als reine Funktion (In Bearbeitung, Vollzug melden, Abnehmen mit Rückfrage „Auftrag abnehmen?“, Berichtigen, Aufheben); `AuftragHandlungen` rendert daraus, `AuftragKarte` bindet `useKartenKontext` an, `AuftragDetail` nicht; TDD: Kontextmenü der Karte und Rückfrage „Abnehmen“; Bestandstests grün
+- [x] 4.1 `MeldungKarte`: Aktionen als `KartenAktion[]` (Bestätigen mit Rückfrage „Sofortmeldung bestätigen?“, Fortschaltung, `weitere`), Knopfzeile und ⋮ daraus; TDD: Kontextmenü zeigt Knöpfe vor ⋮-Einträgen, auch unter drei Aktionen, ohne Zuweisung; Bestandstests grün
+- [x] 4.2 `NachforderungKarte`: Fortschaltung, Übernahmen (gesperrt mit Grund), Zuordnen und ⋮-Einträge (Bearbeiten, Zurückziehen, Ablehnen, Eintreffen zurücknehmen) als `KartenAktion[]`; TDD: Reihenfolge, gesperrte Übernahme mit Grund, rote Abschlüsse hinter dem Trenner; Bestandstests grün
+- [x] 4.3 `AuftragTeile`: `auftragAktionen(…)` als reine Funktion (In Bearbeitung, Vollzug melden, Abnehmen mit Rückfrage „Auftrag abnehmen?“, Berichtigen, Aufheben); `AuftragHandlungen` rendert daraus, `AuftragKarte` bindet `useKartenKontext` an, `AuftragDetail` nicht; TDD: Kontextmenü der Karte und Rückfrage „Abnehmen“; Bestandstests grün
 
 ## 5. Ablösung und Verpflegung (D3, D6)
 

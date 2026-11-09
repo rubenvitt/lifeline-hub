@@ -1,8 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { warteAufMenueFokus } from '../test/menue';
 import type { Auftrag } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import AuftragKarte from './AuftragKarte';
@@ -99,5 +101,67 @@ describe('AuftragKarte — Schema in Formularfolge (LLH-1091)', () => {
     renderKarte(auftrag({ ort: 'Halle 3', absicht: 'Brand eindämmen' }));
     await userEvent.click(screen.getByText('Auftragsdetails (Schema)'));
     expect(etiketten()).toEqual(['Ziel / Ort', 'Absicht', 'Erteilt am']);
+  });
+});
+
+describe('AuftragKarte — Kontextmenü (LLH-1598)', () => {
+  const offenesKontextmenue = async () => {
+    await warteAufMenueFokus();
+    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+    );
+    expect(offen).toHaveLength(1);
+    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+  };
+  const rechtsklick = (el: Element) =>
+    fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });
+  const zeige = (a: Auftrag, props: Partial<ComponentProps<typeof AuftragKarte>>) =>
+    render(
+      <AntApp>
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <MemoryRouter>
+            <AuftragKarte auftrag={a} einsatzId={5} darfSchreiben {...props} />
+          </MemoryRouter>
+        </AnzeigeKonventionenProvider>
+      </AntApp>,
+    );
+
+  it('offener Auftrag: Knöpfe vor Berichtigen, „Auftrag aufheben“ rot hinter dem Trenner', async () => {
+    zeige(auftrag(), {
+      onInArbeit: vi.fn(),
+      onVollzugMelden: vi.fn(),
+      onBerichtigen: vi.fn(),
+      onAufheben: vi.fn(),
+    });
+    expect(rechtsklick(screen.getByText('Stromerzeuger 8 kVA bereitstellen'))).toBe(false);
+    const menue = await offenesKontextmenue();
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Auftrag #9');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Bearbeitung beginnen', 'Vollzug melden', 'Berichtigen', 'Auftrag aufheben']);
+    expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
+  });
+
+  it('„Abnehmen“ fragt im Dialog nach wie sein Knopf', async () => {
+    const onAbnehmen = vi.fn();
+    zeige(auftrag({ bearbeitungsstatus: 'vollzogen', vollzug_status: 'vollzogen' }), {
+      onAbnehmen,
+    });
+    rechtsklick(screen.getByText('Stromerzeuger 8 kVA bereitstellen'));
+    await userEvent.click(
+      within(await offenesKontextmenue()).getByRole('menuitem', { name: 'Abnehmen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByText('Auftrag abnehmen?').length).toBeGreaterThan(0);
+    expect(onAbnehmen).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag abnehmen' }));
+    expect(onAbnehmen).toHaveBeenCalledWith(31);
+  });
+
+  it('ohne Schreibrecht bleibt das Browsermenü', () => {
+    zeige(auftrag(), { darfSchreiben: false, onInArbeit: vi.fn() });
+    expect(rechtsklick(screen.getByText('Stromerzeuger 8 kVA bereitstellen'))).toBe(true);
   });
 });

@@ -1,6 +1,8 @@
 import { IconUhr } from '../icons';
 import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { KartenAktion } from '../components/kartenKontext';
+import { useKartenKontext } from '../components/useKartenKontext';
 import { Select } from '../components/Select';
 import { memo, useState, type ReactNode } from 'react';
 import { auftraegePfad, lagekartePfad, personDetailPfad } from '../routing/deeplinks';
@@ -283,10 +285,52 @@ function MeldungKarte({
   const buendeln = gesamt >= 3;
   const zuweisbar = !!(darfSchreiben && onZuweisen);
 
+  /*
+   * Die Handlungen der Aktionszeile als Daten (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine
+   * Karte mit mehreren Knöpfen …“): Knöpfe und ⋮ unten lesen Etikett, Rückfrage und Wirkung von
+   * hier, das Kontextmenü zeigt alle. Die Zuweisung ist eine Auswahl, keine Handlung.
+   */
+  const bestaetigen: KartenAktion | null = kannBestaetigen
+    ? {
+        key: 'bestaetigen',
+        label: 'Bestätigen',
+        rueckfrage: { titel: 'Sofortmeldung bestätigen?', knopf: 'Bestätigen' },
+        onWahl: () => onBestaetigen?.(m.id),
+      }
+    : null;
+  const fortschalten: KartenAktion | null =
+    naechster && onStatus
+      ? {
+          key: 'naechster',
+          label: naechster.label,
+          onWahl:
+            naechster.ziel === 'erledigt'
+              ? () => setErledigtOffen(true)
+              : () => onStatus(m.id, naechster.ziel),
+        }
+      : null;
+  const kartenAktionen: KartenAktion[] = bearbeiten
+    ? []
+    : [
+        ...(bestaetigen ? [bestaetigen] : []),
+        ...(fortschalten ? [fortschalten] : []),
+        ...weitere.map((w) => ({
+          key: w.key,
+          label: w.label,
+          onWahl: w.onClick,
+          ...(w.gesperrt ? { gesperrt: w.gesperrt } : {}),
+        })),
+      ];
+  const { ausloeser, menue: kontextMenue } = useKartenKontext({
+    aktionen: kartenAktionen,
+    zugaenglicherName: `Aktionen zu Meldung ${m.lfd_nr}`,
+  });
+
   return (
     // Die Ereigniszeit führt links in Mono, darunter die laufende Nummer; der Rand folgt dem
     // Kartenrand-Vertrag von `KommKarte`.
     <KommKarte
+      {...ausloeser}
       data-meldung-id={m.id}
       alarm={alarmiert}
       unbearbeitet={unbearbeitet}
@@ -435,24 +479,23 @@ function MeldungKarte({
           )}
           {gesamt > 0 && (
             <Space size="middle" wrap style={{ marginLeft: 'auto', justifyContent: 'flex-end' }}>
-              {kannBestaetigen && (
+              {bestaetigen?.rueckfrage && (
                 <Popconfirm
-                  title="Sofortmeldung bestätigen?"
-                  okText="Bestätigen"
+                  title={bestaetigen.rueckfrage.titel}
+                  okText={bestaetigen.rueckfrage.knopf}
                   cancelText="Abbrechen"
-                  onConfirm={() => onBestaetigen?.(m.id)}
+                  onConfirm={bestaetigen.onWahl}
                 >
-                  <Button type="primary">Bestätigen</Button>
+                  <Button type="primary">{bestaetigen.label}</Button>
                 </Popconfirm>
               )}
-              {naechster &&
-                onStatus &&
-                (naechster.ziel === 'erledigt' ? (
-                  <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>
-                    {naechster.label}
+              {fortschalten &&
+                (naechster?.ziel === 'erledigt' ? (
+                  <Button type="primary" ghost onClick={fortschalten.onWahl}>
+                    {fortschalten.label}
                   </Button>
                 ) : (
-                  <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
+                  <Button onClick={fortschalten.onWahl}>{fortschalten.label}</Button>
                 ))}
               {buendeln ? (
                 // Die Zuordnung hängt am Menü: die Einträge tragen ihre Handlung, der Baustein
@@ -503,6 +546,7 @@ function MeldungKarte({
       >
         Lage-Text und Verortung gehen verloren, der Wortlaut bleibt.
       </Modal>
+      {kontextMenue}
     </KommKarte>
   );
 }

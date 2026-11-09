@@ -10,6 +10,7 @@ import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { warteAufMenueFokus } from '../test/menue';
 import type { Meldung } from '../api/types';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { renderMitProviders } from '../test/utils';
 
 // Gerätekontext (Standort ohne Lagekarte): vorgabe wie ohne Gerät, ein Test schaltet ab.
 const geraet = vi.hoisted(() => ({ darf: true }));
@@ -798,5 +799,85 @@ describe('MeldungKarte — Patient aus der Meldung (LLH-1567)', () => {
     );
     expect(screen.queryByRole('link', { name: /R-012/ })).toBeNull();
     expect(screen.getByText('R-012')).toBeInTheDocument();
+  });
+});
+
+describe('MeldungKarte — Kontextmenü (LLH-1598)', () => {
+  /** Das offene Kontextmenü (Fensterpunkt-Schale), nicht ein ⋮-Dropdown. */
+  const kontextMenue = async () => {
+    await warteAufMenueFokus();
+    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+    );
+    expect(offen).toHaveLength(1);
+    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+  };
+  const rechtsklick = (el: Element) =>
+    fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });
+
+  it('zeigt die Knöpfe der Karte vor den Einträgen des ⋮, ohne Zuweisung', async () => {
+    const cb = alleCallbacks();
+    renderMitProviders(
+      <MeldungKarte
+        meldung={schlimmstenfalls()}
+        einsatzId={7}
+        {...cb}
+        onZuweisen={vi.fn()}
+        mitglieder={[{ benutzer_id: 3, anzeigename: 'Meier' }] as never}
+      />,
+    );
+    expect(rechtsklick(screen.getByText('Deich instabil'))).toBe(false);
+    const menue = await kontextMenue();
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Meldung 1');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((i) => i.textContent),
+    ).toEqual([
+      'Bestätigen',
+      'Sichten',
+      'Bearbeitung beginnen',
+      'Als erledigt melden',
+      'In die Lage übernehmen',
+      'Auftrag erteilen',
+    ]);
+  });
+
+  it('unter drei Aktionen ohne ⋮: das Kontextmenü zeigt die Knöpfe', async () => {
+    renderMitProviders(
+      <MeldungKarte
+        meldung={meldung({ status: 'in_bearbeitung', lagerelevant: true })}
+        einsatzId={7}
+        darfSchreiben
+        onStatus={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Meldung 1' })).toBeNull();
+    rechtsklick(screen.getByText('Deich instabil'));
+    const menue = await kontextMenue();
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((i) => i.textContent),
+    ).toEqual(['Als erledigt melden']);
+  });
+
+  it('„Bestätigen“ fragt im Dialog nach wie sein Knopf', async () => {
+    const cb = alleCallbacks();
+    renderMitProviders(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);
+    rechtsklick(screen.getByText('Deich instabil'));
+    await userEvent.click(
+      within(await kontextMenue()).getByRole('menuitem', { name: 'Bestätigen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByText('Sofortmeldung bestätigen?').length).toBeGreaterThan(0);
+    expect(cb.onBestaetigen).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    expect(cb.onBestaetigen).toHaveBeenCalledWith(1);
+  });
+
+  it('ohne Schreibrecht bleibt das Browsermenü', () => {
+    renderMitProviders(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} />);
+    expect(rechtsklick(screen.getByText('Deich instabil'))).toBe(true);
   });
 });
