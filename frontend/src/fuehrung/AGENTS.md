@@ -25,7 +25,7 @@ Zuordnung „Funktion → Name“ gibt es nicht. Server: Auflösung (`fuehrung::
 (`benachrichtigung::aufloesung`, EL zuerst der Einsatzleiter der Führungsstelle), Kopf
 (`meine_funktion`/`meine_funktion_code`/`meine_funktion_bezeichnung`/`meine_sachgebiete`,
 `einsatz::MeineFelder`; „meine Stelle“ im Überblick liest die eigene Funktion von dort,
-`openspec/changes/pkjvl5iy-eigene-stelle-alle-funktionen/design.md` D1), ETB-Snapshot (`einsatz::funktion`,
+`openspec/changes/archive/2026-11-10-pkjvl5iy-eigene-stelle-alle-funktionen/design.md` D1), ETB-Snapshot (`einsatz::funktion`,
 nur Kürzel bzw. Standardlabel, nie die Bezeichnung). Client: nur über
 `fuehrung/besetzungAusMitgliedern.ts` aus `GET …/mitglieder` (Organigramm, Fernmeldeskizze,
 Kommunikationsplan, Eigene Lage, Einsatzbericht, Empfängerfelder, Chat-Erwähnungen). Kein

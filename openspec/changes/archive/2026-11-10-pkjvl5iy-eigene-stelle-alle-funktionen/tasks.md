@@ -40,8 +40,12 @@
 
 ## 4. Integration
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die die Umgebung trägt, mit Vermerk, was
-      erst die CI des PRs belegt)
+- [x] 4.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die die Umgebung trägt, mit Vermerk, was
+      erst die CI des PRs belegt) — lokal grün: Bündel `schnell`; Vitest-Shards 1/3 und 2/3, Shard
+      3/3 bis auf zwei vorbestehende Fehler in `RegistrierungPaneel.test.tsx` (auch ohne diese
+      Change rot, LLH-1622); `cargo test --lib` sowie `einsatz_funktion`, `einsatz_live`,
+      `lage_snapshot`, `fuehrungsfunktionen`, `enum_wire_kontrakt`, `einsatz_fuehrungsstelle`.
+      Volle Rust-Suite und e2e belegt die CI des PRs (Plattenkontingent der Cloud-Sitzung).
 
 ## Workflow follow-up
 
