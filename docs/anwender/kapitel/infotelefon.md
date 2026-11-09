@@ -2,7 +2,7 @@
 titel: Informationstelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/useModulFreigabe.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/api/queryKeys.ts, frontend/src/command-palette/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/modul.rs, src/einsatz/schwaerzung_registry.rs, migrations/0300_infotelefon_modul.sql]
+quellen: [frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/useModulFreigabe.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/api/queryKeys.ts, frontend/src/command-palette/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/modul.rs, src/einsatz/schwaerzung_registry.rs, migrations/0302_infotelefon_modul.sql]
 ---
 
 ## Überblick

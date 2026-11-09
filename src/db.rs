@@ -858,7 +858,7 @@ mod tests {
     /// Andere Module bleiben unberührt. Die Nummer wandert beim Umlegen (LFH-1014), deshalb über
     /// den Namen.
     #[tokio::test]
-    async fn migration_0300_uebernimmt_stab_freigaben_fuer_infotelefon() {
+    async fn migration_0302_uebernimmt_stab_freigaben_fuer_infotelefon() {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 
