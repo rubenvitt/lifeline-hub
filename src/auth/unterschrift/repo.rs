@@ -724,7 +724,6 @@ pub async fn list_fuer_org(
     Ok(aus)
 }
 
-/// Eine Zeile für die Anzeige.
 /// Konten der Org, die alle gültigen lokalen Schlüssel halten, während die Org ihre Schlüssel an
 /// eine gekoppelte Instanz verteilt; ihr Deaktivieren oder Herabstufen ließe die Kopplungen ohne
 /// gültigen Schlüssel zurück (design.md D5). Höchstens ein Konto, weil „alle“ sonst niemand hält.
@@ -760,6 +759,7 @@ pub async fn list_letzte_halter(
     }])
 }
 
+/// Eine Zeile für die Anzeige.
 pub async fn load_anzeige(
     pool: &SqlitePool,
     org_id: i64,

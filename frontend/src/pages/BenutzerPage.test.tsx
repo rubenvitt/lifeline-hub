@@ -860,6 +860,33 @@ describe('BenutzerPage', () => {
       await waitFor(() => expect(aufDerSeite()).toEqual([]));
     });
 
+    it('ohne Antwort zum letzten Schlüssel fragt Deaktivieren eines Admins allgemein nach (LLH-1605)', async () => {
+      let deaktiviert: string | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      seite();
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      expect(within(dialog).getByText(/ließ sich nicht prüfen/)).toBeInTheDocument();
+      expect(deaktiviert).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
+      await waitFor(() => expect(deaktiviert).toBe('2'));
+    });
+
     it('Herabstufen des letzten Schlüsselhalters warnt im Dialog (LLH-1605)', async () => {
       server.use(
         meHandler(benutzer()),

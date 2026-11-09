@@ -77,6 +77,12 @@ function kopplungNeuText(kopplungen: string[]): string {
   );
 }
 
+/** Warnung, wenn unbekannt ist, wer den letzten Unterschriftsschlüssel hält (LLH-1605). */
+const HALTER_UNBEKANNT_TEXT =
+  'Ob die Organisation danach noch einen gültigen Unterschriftsschlüssel hat, ließ sich nicht ' +
+  'prüfen. Hält dieses Konto den letzten, müssen die Kopplungen danach neu aufgebaut werden: ' +
+  'Kopplung widerrufen, einen neuen Unterschriftsschlüssel registrieren und neu koppeln.';
+
 export default function BenutzerPage() {
   const { benutzer: angemeldeterBenutzer, laedt: authLaedt } = useAuth();
   const qc = useQueryClient();
@@ -110,6 +116,18 @@ export default function BenutzerPage() {
   });
   const letzteKopplungen = (id: number): string[] | undefined =>
     letzteQuery.data?.find((h) => h.benutzer_id === id)?.kopplungen;
+  /*
+   * Ohne Antwort (lädt noch, Abruf gescheitert) ist unbekannt, wer den letzten Schlüssel hält:
+   * dann fragt die Seite bei jedem Admin-Konto allgemein nach, statt still zu deaktivieren. Konten
+   * ohne Admin-Rolle halten keine Schlüssel.
+   */
+  const brauchtWarnung = (b: BenutzerAnzeige): boolean =>
+    letzteKopplungen(b.id) !== undefined ||
+    (b.system_rolle === 'admin' && letzteQuery.data === undefined);
+  const warnText = (b: BenutzerAnzeige): string => {
+    const kopplungen = letzteKopplungen(b.id);
+    return kopplungen ? kopplungNeuText(kopplungen) : HALTER_UNBEKANNT_TEXT;
+  };
   const bearbeitenRolle = Form.useWatch('system_rolle', editForm);
 
   /*
@@ -348,7 +366,7 @@ export default function BenutzerPage() {
               else if (aktion === 'zweitfaktor') {
                 zweitfaktor.reset();
                 setZweitfaktorVon(b);
-              } else if (b.aktiv && letzteKopplungen(b.id)) {
+              } else if (b.aktiv && brauchtWarnung(b)) {
                 deaktivieren.reset();
                 reaktivieren.reset();
                 setDeaktivierenVon(b);
@@ -543,12 +561,12 @@ export default function BenutzerPage() {
         {zuBearbeiten &&
           bearbeitenRolle !== undefined &&
           bearbeitenRolle !== 'admin' &&
-          letzteKopplungen(zuBearbeiten.id) && (
+          brauchtWarnung(zuBearbeiten) && (
             <Alert
               type="warning"
               showIcon
               style={{ marginBlockEnd: 16 }}
-              message={kopplungNeuText(letzteKopplungen(zuBearbeiten.id) ?? [])}
+              message={warnText(zuBearbeiten)}
             />
           )}
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
@@ -613,7 +631,7 @@ export default function BenutzerPage() {
         }}
         destroyOnHidden
       >
-        {deaktivierenVon && <p>{kopplungNeuText(letzteKopplungen(deaktivierenVon.id) ?? [])}</p>}
+        {deaktivierenVon && <p>{warnText(deaktivierenVon)}</p>}
         <SpeicherFehler fehler={deaktivieren.error} titel="Nicht deaktiviert" />
       </Modal>
 
