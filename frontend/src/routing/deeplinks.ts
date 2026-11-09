@@ -33,6 +33,41 @@ export function einsaetzePfad(): string {
   return '/einsaetze';
 }
 
+/** Reiter einer Planung (LLH-1586): Raster, Posten, Helfer. */
+export type PlanungReiter = 'plan' | 'posten' | 'helfer';
+
+/** Liste der Planungen ohne Einsatz (LLH-1561, Ebene 1). */
+export function planungenPfad(): string {
+  return '/planungen';
+}
+
+/** Eine Planung; der Reiter `plan` ist die Vorgabe und steht nicht in der Adresse. */
+export function planungPfad(planungId: number, reiter?: PlanungReiter): string {
+  const basis = `/planungen/${planungId}`;
+  return reiter && reiter !== 'plan' ? `${basis}?reiter=${reiter}` : basis;
+}
+
+/**
+ * Druckansicht einer Planung (LLH-1593): Aushang je Posten oder Zettel je Person, Auswahl wie
+ * beim Schichtplan eines Einsatzes ({@link schichtplanDruckPfad}, gelesen mit
+ * {@link parseSchichtplanDruckAuswahl}). Ein Posten der Planung heißt dort `einheit:<posten_id>`.
+ */
+export function planungDruckPfad(
+  planungId: number,
+  opts: Partial<SchichtplanDruckAuswahl> = {},
+): string {
+  return mitQuery(`/planungen/${planungId}/druck`, {
+    sicht: opts.sicht === 'person' ? 'person' : undefined,
+    auswahl: opts.auswahl ?? undefined,
+  });
+}
+
+/** Reiter aus `?reiter=`; Unbekanntes ist `plan`. */
+export function parsePlanungReiter(params: URLSearchParams): PlanungReiter {
+  const r = params.get('reiter');
+  return r === 'posten' || r === 'helfer' ? r : 'plan';
+}
+
 /** Zentrale Route zum Einsatz-Workspace. */
 export function einsatzPfad(einsatzId: number): string {
   return `/einsaetze/${einsatzId}`;

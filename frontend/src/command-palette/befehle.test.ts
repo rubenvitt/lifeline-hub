@@ -101,11 +101,13 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
     const b = baueBefehle(kontext({ benutzer: fuehrungskraft }));
     expect(b.some((x) => x.id === 'nav:admin')).toBe(true);
     expect(b.some((x) => x.id === 'nav:stammdaten')).toBe(true);
+    expect(b.some((x) => x.id === 'nav:planungen')).toBe(true);
   });
   it('verbirgt Verwaltung und Stammdaten vor Benutzern ohne Org-Rolle', () => {
     const b = baueBefehle(kontext({ benutzer: sichter }));
     expect(b.some((x) => x.id === 'nav:admin')).toBe(false);
     expect(b.some((x) => x.id === 'nav:stammdaten')).toBe(false);
+    expect(b.some((x) => x.id === 'nav:planungen')).toBe(false);
   });
   it('bietet immer Abmelden + Alle Einsätze', () => {
     const b = baueBefehle(kontext({ einsatzId: null, benutzer: sichter }));

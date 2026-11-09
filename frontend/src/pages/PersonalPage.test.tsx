@@ -1172,6 +1172,74 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     await zeigeRuhe();
     await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('2 h 05'));
     expect(zelleDerSpalte('Ruhe')).toHaveTextContent('—');
+    // Unter den Grenzwerten keine Einstufung (LLH-730).
+    expect(
+      zelleDerSpalte('Einsatzdauer').querySelector('[data-lfh="dauer-einstufung"]'),
+    ).toBeNull();
+  });
+
+  // Spec `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“ (LLH-730).
+  const vor = (minuten: number) =>
+    new Date(Date.now() - minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+
+  it('„Ruhe zu kurz": Wiedereinsatz nach 2 h Ruhe, die Einsatzdauer trägt das Wort', async () => {
+    setzeViewportBreite(1440);
+    server.use(
+      http.get('/api/einsaetze/7/personal/zeitachse', () =>
+        HttpResponse.json([
+          {
+            personal_id: 10,
+            perioden: [
+              {
+                beginn_at: vor(9 * 60),
+                anker: 'alarmierung',
+                ende_at: vor(3 * 60),
+                ende_art: 'entlassung',
+              },
+              { beginn_at: vor(60), anker: 'alarmierung' },
+            ],
+          },
+        ]),
+      ),
+    );
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await zeigeRuhe();
+    await waitFor(() =>
+      expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('1 h 00 Ruhe zu kurz'),
+    );
+    expect(zelleDerSpalte('Einsatzdauer').querySelector('[title]')?.getAttribute('title')).toMatch(
+      /^Ruhe davor 2 h 00, Mindestruhe 8 h · Im Dienst seit /,
+    );
+    // „Ruhe“ bleibt neutral: ohne Wort.
+    expect(zelleDerSpalte('Ruhe').querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
+  });
+
+  it('nach dem Ende einer langen Periode: keine Einstufung, Ruhe neutral', async () => {
+    setzeViewportBreite(1440);
+    server.use(
+      http.get('/api/einsaetze/7/personal/zeitachse', () =>
+        HttpResponse.json([
+          {
+            personal_id: 10,
+            perioden: [
+              {
+                beginn_at: vor(14 * 60),
+                anker: 'alarmierung',
+                ende_at: vor(60),
+                ende_art: 'entlassung',
+              },
+            ],
+          },
+        ]),
+      ),
+    );
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await zeigeRuhe();
+    await waitFor(() => expect(zelleDerSpalte('Ruhe')).toHaveTextContent('1 h 00'));
+    expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('—');
+    expect(document.querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 ---
-id: ADR-0014
+id: ADR-0015
 titel: Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft
 status: akzeptiert
 datum: 2026-11-08
@@ -17,7 +17,7 @@ herleitung:
   - openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md
 ---
 
-# ADR-0014: Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft
+# ADR-0015: Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft
 
 ## Regeln
 
@@ -32,7 +32,7 @@ herleitung:
   (Fernmeldewesen, Informationstelefon, Lagebesprechung, Verpflegung), keine Unterseite einer
   Sammelseite.
 - SHOULD: Wer den Stab zurückholen will, löst diese ADR mit einer neuen Change und einer neuen
-  ADR (`ersetzt: ADR-0014`) ab.
+  ADR (`ersetzt: ADR-0015`) ab.
 
 ## Prüfung
 

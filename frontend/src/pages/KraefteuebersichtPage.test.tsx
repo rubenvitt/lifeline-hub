@@ -26,7 +26,7 @@ import { listeOffeneAuftraege } from '../api/auftraege';
 import { ApiError } from '../api/client';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { holeRueckmeldungen } from '../api/meldungen';
-import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
+import { ladeZeitachseGrenzwerte, listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { listeNachforderungen } from '../api/nachforderungen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -63,7 +63,10 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/auftraege', () => ({ listeOffeneAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ holeRueckmeldungen: vi.fn() }));
-vi.mock('../api/kraefteZeitachse', () => ({ listeEinheitenPerioden: vi.fn() }));
+vi.mock('../api/kraefteZeitachse', () => ({
+  listeEinheitenPerioden: vi.fn(),
+  ladeZeitachseGrenzwerte: vi.fn(),
+}));
 vi.mock('../api/nachforderungen', () => ({ listeNachforderungen: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
@@ -239,6 +242,12 @@ beforeEach(() => {
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
   vi.mocked(holeRueckmeldungen).mockResolvedValue(KEINE_RUECKMELDUNGEN);
   vi.mocked(listeEinheitenPerioden).mockResolvedValue([]);
+  vi.mocked(ladeZeitachseGrenzwerte).mockResolvedValue({
+    max_dienst_minuten: 720,
+    min_ruhe_minuten: 480,
+    max_dienst_eigen: false,
+    min_ruhe_eigen: false,
+  });
   vi.mocked(listeNachforderungen).mockResolvedValue([]);
 });
 
@@ -1627,6 +1636,77 @@ describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
     expect(zelle).toHaveTextContent(/seit Alarmierung/);
     expect(zelle.getAttribute('title')).toMatch(/^seit Alarmierung /);
     expect(zelle.style.fontVariantNumeric).toBe('tabular-nums');
+    // Unter dem Höchstwert keine Einstufung (LLH-730).
+    expect(zelle.querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
+  });
+
+  // Spec `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“ (LLH-730).
+  const seit = (stunden: number, minuten: number) => [
+    {
+      einheit_id: 20,
+      perioden: [
+        {
+          beginn_at: dayjs
+            .utc()
+            .subtract(stunden, 'hour')
+            .subtract(minuten, 'minute')
+            .format('YYYY-MM-DD HH:mm:ss'),
+          anker: 'alarmierung' as const,
+        },
+      ],
+    },
+  ];
+
+  it('„Zu lang in einer Periode": 12 h 20 mit dem Wort „zu lang“ und Begründung', async () => {
+    mitEinheit();
+    vi.mocked(listeEinheitenPerioden).mockResolvedValue(seit(12, 20));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const wort = await waitFor(() => {
+      const w = imEinsatz(container)?.querySelector('[data-lfh="dauer-einstufung"]');
+      expect(w).not.toBeNull();
+      return w as HTMLElement;
+    });
+    expect(wort).toHaveTextContent('zu lang');
+    const zelle = imEinsatz(container) as HTMLElement;
+    expect(zelle).toHaveTextContent('12 h 20');
+    expect(zelle.getAttribute('title')).toMatch(
+      /^seit Alarmierung .* · Im Dienst seit .*: 12 h 20, Höchstwert 12 h$/,
+    );
+    expect(ladeZeitachseGrenzwerte).toHaveBeenCalledWith(1, 'einheiten');
+  });
+
+  it('„Eigener Wert des Einsatzes": 6 h aus dem Schichtplan stuft 6 h 20 ein', async () => {
+    mitEinheit();
+    vi.mocked(listeEinheitenPerioden).mockResolvedValue(seit(6, 20));
+    vi.mocked(ladeZeitachseGrenzwerte).mockResolvedValue({
+      max_dienst_minuten: 360,
+      min_ruhe_minuten: 480,
+      max_dienst_eigen: true,
+      min_ruhe_eigen: false,
+    });
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() =>
+      expect(imEinsatz(container)?.querySelector('[data-lfh="dauer-einstufung"]')).not.toBeNull(),
+    );
+    expect(imEinsatz(container)!.getAttribute('title')).toMatch(/Höchstwert 6 h$/);
+  });
+
+  it('„Grenzwerte nicht geladen": die Dauer steht ohne Einstufung', async () => {
+    mitEinheit();
+    vi.mocked(listeEinheitenPerioden).mockResolvedValue(seit(14, 0));
+    vi.mocked(ladeZeitachseGrenzwerte).mockRejectedValue(new Error('kaputt'));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const zelle = await waitFor(() => {
+      const z = imEinsatz(container);
+      expect(z).not.toBeNull();
+      return z as HTMLElement;
+    });
+    await waitFor(() => expect(ladeZeitachseGrenzwerte).toHaveBeenCalled());
+    expect(zelle).toHaveTextContent('14 h 00');
+    expect(zelle.querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
   });
 
   // Kein `abBreite`: die Spalte hängt nicht an der Fensterbreite und geht deshalb auch aufs

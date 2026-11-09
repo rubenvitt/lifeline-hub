@@ -22,6 +22,7 @@ const status: {
   farbe: string | null;
   sortier: number;
   zeitachse_marke?: string;
+  pause?: boolean;
 }[] = [
   { id: 1, label: 'dienstbereit', kategorie: 'verfuegbar', farbe: null, sortier: 10 },
   { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -260,5 +261,28 @@ describe('PersonalStatusTab', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(ruempf).not.toBeNull());
     expect(ruempf).toMatchObject({ label: 'alarmiert', zeitachse_marke: 'alarmierung' });
+  });
+
+  /** LLH-1555: der Schalter „Pause im Schichtplan“ liegt bei der Marke und geht im Vollersatz mit. */
+  it('zeigt den Pausenstatus und schaltet ihn um', async () => {
+    let ruempf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/personal-status/1', async ({ request }) => {
+        ruempf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
+    render(admin, [status[0], { ...status[1], pause: true }]);
+    await screen.findByText('dienstbereit');
+    expect(screen.getByText('Pause')).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByText('Weitere Angaben'));
+    await userEvent.click(
+      await within(dialog).findByRole('switch', { name: 'Pause im Schichtplan' }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(ruempf).not.toBeNull());
+    expect(ruempf).toMatchObject({ label: 'dienstbereit', pause: true });
   });
 });

@@ -46,6 +46,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Kräfte | [Bereitstellungsräume](kapitel/bereitstellungsraeume.md) | Führung |
 | Kräfte | [Ablösung](kapitel/abloesung.md) | Führung |
 | Kräfte | [Verpflegung](kapitel/verpflegung.md) | Führung |
+| Kräfte | [Vorplanung](kapitel/vorplanung.md) | Führung, Administration |
 | Führungsorganisation | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
 | Führungsorganisation | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
 | Führungsorganisation | [Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
@@ -67,6 +68,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstellungen und Verwaltung | [Aufbewahrung](kapitel/aufbewahrung.md) | Administration |
 | Einstellungen und Verwaltung | [Demo-Daten](kapitel/demo-daten.md) | Administration |
 | Einstellungen und Verwaltung | [Zugangsprotokoll](kapitel/zugangsprotokoll.md) | Administration |
+| Einstellungen und Verwaltung | [Instanzkopplung](kapitel/instanzkopplung.md) | Administration |
 | Gekoppelte Geräte | [Geräte koppeln](kapitel/geraete-koppeln.md) | Führung, Gekoppelte Geräte |
 | Gekoppelte Geräte | [Gerät bedienen](kapitel/geraet-bedienen.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [UHS-Tablet und UHS-Laptop](kapitel/geraet-uhs.md) | Gekoppelte Geräte |

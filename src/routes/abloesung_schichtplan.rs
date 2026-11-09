@@ -7,7 +7,8 @@
 //! Einheiten-Posten, Unfallhilfsstellen für einen UHS-Posten, Personal sobald Personen oder
 //! Helfer geschrieben werden (403). Lesen ohne Personal liefert keine Namen (`personen: null`).
 //! Jeder wirksame Schreibweg veröffentlicht `LiveEvent::Abloesung`; ETB nur für „Schichten
-//! erzeugen“ und geänderte Grenzwerte.
+//! erzeugen“ und geänderte Grenzwerte. Geänderte Grenzwerte melden zusätzlich `Einheit` und
+//! `Personal`, weil die Kräfte-Zeitachse sie auch ohne das Modul Ablösung einstuft (LLH-730).
 
 use axum::extract::{Multipart, Query, State};
 use axum::http::StatusCode;
@@ -20,6 +21,9 @@ use crate::abloesung::schichtplan::repo::{
 use crate::abloesung::schichtplan::uebernahme::{
     self, repo::Rechte, Entscheidungen, ImportErgebnis, ImportMeldung, ImportVorschau, PlanPaket,
     ENTSCHEIDUNGEN_MAX,
+};
+use crate::abloesung::schichtplan::vollzug::{
+    self, PlanWechselAnzeige, WechselArt, WechselEingabe, WechselVorlage, WechselWirkung,
 };
 use crate::abloesung::schichtplan::{
     zerlegung, PlanHelferAnzeige, PlanPerson, PlanPersonEingabe, Posten, PostenEingabe,
@@ -410,6 +414,15 @@ pub async fn grenzwerte_setzen(
     .await?;
     if etb_id.is_some() {
         publiziere(&state, ctx.einsatz.id, etb_id);
+        // Dieselben Werte stuft die Kräfte-Zeitachse in Meldebild und Personalliste ein (LLH-730).
+        // `abloesung` erreicht nur Leser des Moduls Ablösung; `einheit` und `personal` frischen
+        // die Grenzwerte (Prefix der Kräfte-Zeitachse im Client) auch für alle anderen auf.
+        state
+            .live
+            .publiziere_einsatz(ctx.einsatz.id, crate::live::LiveEvent::Einheit);
+        state
+            .live
+            .publiziere_einsatz(ctx.einsatz.id, crate::live::LiveEvent::Personal);
     }
     Ok(Json(plan(&state, &ctx).await?))
 }
@@ -492,6 +505,145 @@ pub async fn helfer_loeschen(
     repo::helfer_loeschen(&state.pool, ctx.einsatz.id, hid, ctx.benutzer.id, &jetzt()).await?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Live nach einem Wechsel oder seiner Rücknahme: ETB, Plan und Ablösung, UHS und Kräfte.
+fn publiziere_wechsel(state: &AppState, einsatz_id: i64, wirkung: &WechselWirkung) {
+    publiziere(state, einsatz_id, Some(wirkung.etb_id));
+    for uhs_id in crate::kraefte_disposition::dedupe(&wirkung.uhs, |id| *id) {
+        super::einsatz_uhs::sse_uhs(state, einsatz_id, uhs_id);
+    }
+    for ep_id in crate::kraefte_disposition::dedupe(&wirkung.personen, |id| *id) {
+        super::einsatz_personal::sse_personal(state, einsatz_id, ep_id);
+    }
+}
+
+/// Die Module eines Wechsels: Personal immer (er nennt und ändert Kräfte), an der UHS dazu
+/// Unfallhilfsstellen (403).
+async fn fordere_wechsel_module(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    art: WechselArt,
+) -> Result<(), AppError> {
+    if art == WechselArt::Uhs {
+        ctx.fordere_zielmodul::<Unfallhilfsstellen>(&state.pool)
+            .await?;
+    }
+    ctx.fordere_zielmodul::<Personal>(&state.pool).await
+}
+
+/// GET /api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}/wechsel — der nächste Wechsel
+/// eines UHS- oder Pausenblocks zum Vorbelegen (LLH-1555). Nennt Personen: Personal, an der UHS
+/// dazu Unfallhilfsstellen (403); ein Block an einer Einheit ist 422.
+pub async fn wechsel_vorlage(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Abloesung>,
+    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
+) -> Result<Json<WechselVorlage>, AppError> {
+    let art = match repo::posten_von(&state.pool, ctx.einsatz.id, bid).await? {
+        Posten::Uhs(_) => WechselArt::Uhs,
+        _ => WechselArt::PauseBeginn,
+    };
+    fordere_wechsel_module(&state, &ctx, art).await?;
+    Ok(Json(
+        vollzug::vorlage(&state.pool, ctx.einsatz.id, bid).await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WechselVollziehen {
+    /// `uhs` | `pause_beginn` | `pause_ende`; als `String`, damit ein unbekannter Wert eine
+    /// benannte 400 liefert.
+    art: String,
+    /// Nur an der UHS; fehlt = jetzt.
+    #[serde(default)]
+    vollzogen_at: Option<String>,
+    /// Nur an der UHS: Personen aus dem Plan, die kommen.
+    #[serde(default)]
+    kommen: Vec<PlanPersonEingabe>,
+    /// Nur an der UHS: Kräfte des Einsatzes, die gehen.
+    #[serde(default)]
+    gehen: Vec<i64>,
+}
+
+/// Der Body eines Wechsels als Eingabe (400 bei falscher Art, Feldern an der Pause oder zu vielen
+/// Personen).
+fn wechsel_eingabe(req: WechselVollziehen, jetzt: &str) -> Result<WechselEingabe, AppError> {
+    let art = WechselArt::parse(&req.art).ok_or_else(|| {
+        AppError::Validation(format!("Ungültige Art eines Wechsels: {}", req.art))
+    })?;
+    if art != WechselArt::Uhs
+        && (req.vollzogen_at.is_some() || !req.kommen.is_empty() || !req.gehen.is_empty())
+    {
+        return Err(AppError::Validation(
+            "vollzogen_at, kommen und gehen gelten nur an der UHS".into(),
+        ));
+    }
+    Ok(match art {
+        WechselArt::Uhs => {
+            if req.gehen.len() > PLAN_PERSONEN_MAX {
+                return Err(AppError::Validation(format!(
+                    "gehen: höchstens {PLAN_PERSONEN_MAX} Personen"
+                )));
+            }
+            let vollzogen_at = match req.vollzogen_at.as_deref().map(str::trim) {
+                Some(s) if !s.is_empty() => {
+                    crate::zeit::im_jahresbereich(crate::etb::normalisiere_zeit(s)?, "Vollzug")?
+                }
+                _ => jetzt.to_string(),
+            };
+            WechselEingabe::Uhs {
+                vollzogen_at,
+                kommen: personen(req.kommen)?,
+                gehen: crate::kraefte_disposition::dedupe(&req.gehen, |id| *id),
+            }
+        }
+        WechselArt::PauseBeginn => WechselEingabe::PauseBeginn,
+        WechselArt::PauseEnde => WechselEingabe::PauseEnde,
+    })
+}
+
+/// POST /api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}/wechsel — vollzieht den
+/// Wechsel an der UHS, Beginn oder Ende der Pause (LLH-1555, design.md D6/D7). 409, wenn er
+/// schon vollzogen ist; 422, wenn der Posten nicht passt, kein Status als Pause gekennzeichnet
+/// ist oder die Pause nicht begonnen hat.
+pub async fn wechsel_vollziehen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Abloesung>,
+    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<WechselVollziehen>,
+) -> Result<(StatusCode, Json<PlanWechselAnzeige>), AppError> {
+    let jetzt = jetzt();
+    let eingabe = wechsel_eingabe(req, &jetzt)?;
+    repo::posten_von(&state.pool, ctx.einsatz.id, bid).await?;
+    fordere_wechsel_module(&state, &ctx, eingabe.art()).await?;
+    let (anzeige, wirkung) = vollzug::vollziehen(
+        &state.pool,
+        ctx.einsatz.id,
+        bid,
+        ctx.benutzer.id,
+        &eingabe,
+        &jetzt,
+    )
+    .await?;
+    publiziere_wechsel(&state, ctx.einsatz.id, &wirkung);
+    Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+/// POST /api/einsaetze/{id}/abloesungen/schichtplan/wechsel/{wid}/zuruecknehmen — legt zurück,
+/// was noch den Stand des Wechsels trägt (409, wenn schon zurückgenommen).
+pub async fn wechsel_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Abloesung>,
+    PfadParam((_eid, wid)): PfadParam<(i64, i64)>,
+) -> Result<Json<PlanWechselAnzeige>, AppError> {
+    let art = vollzug::art_von(&state.pool, ctx.einsatz.id, wid).await?;
+    fordere_wechsel_module(&state, &ctx, art).await?;
+    let (anzeige, wirkung) =
+        vollzug::zuruecknehmen(&state.pool, ctx.einsatz.id, wid, ctx.benutzer.id, &jetzt()).await?;
+    publiziere_wechsel(&state, ctx.einsatz.id, &wirkung);
+    Ok(Json(anzeige))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -583,6 +735,45 @@ async fn einlesen_vorbereiten(
         uhs: darf::<Unfallhilfsstellen>(state, ctx).await?,
     };
     Ok((paket, meldungen, entscheidungen, rechte))
+}
+
+/// Die Mappe als Antwort: Medientyp XLSX, ohne Dateinamen (den bildet das Frontend). Das
+/// Schreiben läuft außerhalb der Async-Worker.
+pub(crate) async fn mappe_antwort(
+    plan: crate::abloesung::schichtplan::ausgabe::plan::AusgabePlan,
+) -> Result<axum::response::Response, AppError> {
+    use crate::abloesung::schichtplan::ausgabe::mappe;
+    use axum::response::IntoResponse;
+    let bytes = tokio::task::spawn_blocking(move || mappe::write_mappe(&plan))
+        .await
+        .map_err(|e| AppError::Internal(format!("Excel-Mappe des Schichtplans: {e}")))??;
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, mappe::MEDIENTYP)],
+        bytes,
+    )
+        .into_response())
+}
+
+/// GET /api/einsaetze/{id}/abloesungen/schichtplan/export — der Plan als Excel-Mappe (LLH-1557,
+/// design.md D4/D5): Lesen der Ablösung und das Modul Personal (403 ohne), auch im
+/// abgeschlossenen Einsatz. Kein ETB, kein Live-Ereignis.
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Abloesung>,
+) -> Result<axum::response::Response, AppError> {
+    ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
+    let sicht = crate::abloesung::schichtplan::ausgabe::repo::Sicht {
+        einheiten: darf::<Einheiten>(&state, &ctx).await?,
+        uhs: darf::<Unfallhilfsstellen>(&state, &ctx).await?,
+    };
+    let plan = crate::abloesung::schichtplan::ausgabe::repo::einsatz(
+        &state.pool,
+        &ctx.einsatz,
+        sicht,
+        &jetzt(),
+    )
+    .await?;
+    mappe_antwort(plan).await
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/import/vorschau — Multipart mit `datei` und

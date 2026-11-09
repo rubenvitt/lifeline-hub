@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs, src/abloesung/schichtplan/ausgabe/, src/routes/abloesung_schichtplan.rs]
 ---
 
 ## Überblick
@@ -213,8 +213,8 @@ Für Einsatzleitung und Führungspersonal:
    Einsatzes den Zeitraum, im Feld steht es als Vorgabe, etwa „4 h (Vorgabe Einsatz)“; hat der
    Einsatz keins, ist die Länge Pflicht. Die Blöcke bekommen das Soll des Postens und keine
    Personen. Überschneidet sich auch nur eine erzeugte Schicht mit einem Block, entsteht keine,
-   und der Dialog nennt je erzeugter Schicht den frühesten Block, mit dem sie sich überschneidet,
-   etwa „überschneidet sich mit 1000–1400“. Weitere Blöcke derselben Schicht nennt er nicht.
+   und der Dialog nennt jeden Block, mit dem sich eine erzeugte Schicht überschneidet, einmal,
+   etwa „überschneidet sich mit 1000–1400“.
 9. Ohne Maus: „Block anlegen“ öffnet denselben Dialog leer. Ein Block im Raster ist ein Knopf und
    öffnet mit der Eingabetaste seinen Dialog.
 
@@ -244,6 +244,34 @@ Für Einsatzleitung und Führungspersonal:
 
 Soll es anders laufen, unter „Art“ „Besatzungswechsel“ oder „Ganze Einheit“ wählen. Endet der
 Posten, steht „Ganze Einheit“ ohne ablösende Einheit bereit, und der Knopf heißt „Abziehen“.
+
+### An der UHS wechseln
+
+Blöcke an einer Unfallhilfsstelle wechseln im Schichtplan selbst. Für Einsatzleitung und
+Führungspersonal mit den Modulen Personal und Unfallhilfsstellen:
+
+1. Im Schichtplan den Block öffnen und „Wechsel vollziehen“ wählen.
+2. Unter „Kommt“, „Geht“ und „Bleibt“ stehen die Kräfte, vorbelegt aus dem Block und der UHS. Wer
+   nicht wechseln soll, abwählen. „neu im Einsatz“ kommt erst mit dem Wechsel in den Einsatz,
+   „von …“ wechselt von einer anderen UHS.
+3. „Wechsel vollziehen“ wählen.
+
+Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
+
+### In der Pause wechseln
+
+Blöcke in der Zeile „Pause“ wechseln ebenfalls im Schichtplan. Für Einsatzleitung und
+Führungspersonal mit dem Modul Personal:
+
+1. Im Schichtplan den Pausenblock öffnen und „Wechsel vollziehen“ wählen.
+2. „Pause beginnen“ wählen. Wer im Block steht und im Einsatz ist, bekommt den Status „Pause“;
+   „Nicht im Einsatz“ nennt, wer übersprungen wird. Wer schon „Pause“ trägt, erfasst der Beginn
+   nicht; beim Ende bekommt er deshalb keinen früheren Status zurück, sein Status ist danach von
+   Hand zu prüfen.
+3. Zum Ende der Pause den Block wieder öffnen, „Wechsel vollziehen“ und dann „Pause beenden“
+   wählen. Unter „Zurück“ steht, wer seinen vorigen Status wiederbekommt.
+
+Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
 
 ### Einen Schichtplan einlesen
 
@@ -283,6 +311,19 @@ Für Einsatzleitung und Führungspersonal:
 Die Druckansicht ist ein fester Stand: Änderungen am Plan holt „Neu laden“. „Zurück zum
 Schichtplan“ führt zur Ansicht zurück.
 
+### Den Schichtplan als Excel ausgeben
+
+Für alle, die die Ablösung sehen und das Modul Personal freigegeben haben, auch im
+abgeschlossenen Einsatz:
+
+1. In der Ansicht „Schichtplan“ „Excel“ wählen.
+2. Die Mappe wird als Datei gespeichert, etwa `schichtplan-stadtfest-2027-06-26.xlsx`. Der Name
+   folgt dem Einsatz und dem Tag des Abrufs.
+
+Scheitert der Abruf, steht der Grund unter den Knöpfen; der nächste Versuch nimmt ihn weg. Ohne das
+Modul Personal ist „Excel“ gesperrt, daneben steht der Grund. Was in der Mappe steht, beschreibt
+der Abschnitt „Die Excel-Mappe“ weiter unten.
+
 ## Hintergrund
 
 ### Fälligkeit und Hinweise
@@ -320,6 +361,26 @@ einer solchen Schicht ändert nur der Block. Fällt der letzte Block weg, gilt w
 Wer laut Plan wechselt, gehört bis zu 15 Minuten vor dem nächsten Block schon zu ihm: Die
 Folgeschicht ist dann zum Ende dieses Blocks fällig. Die Rücknahme legt die Besatzung zurück; wer
 erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
+
+### Wechsel an der UHS und in der Pause
+
+An der UHS bekommt, wer kommt, die UHS, und wer geht, verliert sie; die Einheit einer Kraft bleibt
+dabei, wie sie ist. Wer ohne Einheit kommt, bekommt in der Kräfte-Zeitachse ein Eintreffen, wer
+ohne Einheit geht, eine Ablösung; wer zu einer Einheit gehört, folgt deren Zeitachse.
+
+Welcher Status „Pause“ ist, legen die Stammdaten fest (Schalter „Pause im Schichtplan“ am
+Personal-Status). Trägt ihn keiner, lässt sich keine Pause beginnen; eine begonnene Pause lässt
+sich trotzdem beenden. Das Ende gibt nur
+zurück, wer dann noch „Pause“ trägt; wer zwischendurch einen anderen Status bekam, behält ihn. Ein
+Block mit begonnener Pause lässt sich erst löschen oder in eine andere Zeile schieben, wenn die
+Pause beendet oder ihr Beginn zurückgenommen ist.
+
+Jeder Block wechselt einmal je Art: an der UHS einmal, in der Pause einmal zum Beginn und einmal
+zum Ende. Ist ein Wechsel zurückgenommen, lässt sich dieselbe Art erneut vollziehen. Die Rücknahme legt nur zurück, was noch so steht, wie der Wechsel es hinterließ; den
+Beginn einer Pause erst, wenn ihr Ende zurückgenommen ist. Ist der Pausenblock gelöscht oder in
+eine andere Zeile geschoben, lassen sich seine Wechsel nicht mehr zurücknehmen. Wer seither an einer UHS erneut gewechselt hat, bleibt bei der Rücknahme, wo er ist. Wer erst mit dem Wechsel in den
+Einsatz kam, bleibt im Einsatz. Jeder Wechsel und jede Rücknahme steht im Einsatztagebuch, etwa
+„Wechsel UHS «Markt»: Geht «Anna». Kommt «Ben». Bleibt «Dana».“
 
 ### Hinweise zur ablösenden Einheit
 
@@ -601,6 +662,26 @@ der Organisation, nicht der Wahl des Geräts.
 Ohne das Modul Personal stehen auf dem Aushang keine Namen, nur die Besetzung, etwa „3 von 4
 besetzt“; „Je Person“ ist dann gesperrt.
 
+### Die Excel-Mappe
+
+Die Mappe hat fünf Blätter:
+
+| Blatt | Inhalt |
+|---|---|
+| Austausch | der Plan im Format der Schichtplan-Datei, eine Zeile je Person und Schicht, eine Schicht ohne Person als Zeile ohne Namen |
+| Übersicht | Einsatz, Ort, Zeitraum, Besetzung (etwa „18 von 22 Plätzen“), Zahl der Befunde, Stand |
+| Je Posten | Abschnitt, Posten, Tag, Von, Bis, Soll, Soll-Qualifikationen, Ist, Offen, Eingeteilt |
+| Je Person | Name, Organisation und Telefon (bei Helfern), Posten, Abschnitt, Tag, Von, Bis, Stunden |
+| Befunde | Art wie in der Ampel, Posten, Zeit, Person, Beschreibung |
+
+„Austausch“ ist das erste Blatt, damit die Mappe sich wieder einlesen lässt, in denselben oder
+einen anderen Einsatz. Dort stehen die Zeiten mit Versatz, etwa `2027-06-26T14:00+02:00`. Die
+übrigen Blätter nennen Tag, Von und Bis als Text in der Zone des Einsatzes, damit Excel sie nicht
+in die Zone des öffnenden Rechners umrechnet; die Stunden sind eine Zahl, die Pause zählt nicht.
+Ein Name steht ungeteilt in der Spalte „Nachname“.
+
+Die Mappe ist ein Stand zum Zeitpunkt des Abrufs. Der Abruf schreibt nichts ins Einsatztagebuch.
+
 ### Ampel im Schichtplan
 
 Jeder Block nennt seinen Stand als Wort und Farbe: „besetzt“, wenn das Soll erreicht ist, „1
@@ -608,6 +689,9 @@ offen“ (oder mehr), solange Plätze oder Qualifikationen fehlen, und bei einem
 „doppelt verplant“, „Qualifikation fehlt“, „zu lange im Dienst“, „nicht verfügbar“ oder „nicht am
 Posten“. Ein Befund geht der Lücke vor. Ohne Soll steht „ohne Soll“ oder „unbesetzt“, in der Pause
 „Pause“. Die Befunde rechnet der Server; der Plan prüft sie neu, sobald eine Grenze erreicht ist.
+„zu lange im Dienst“ prüft gegen Höchstdienst und Mindestruhe des Einsatzes, ohne eigenen Wert 12 h
+und 8 h. Mit denselben Werten stuft das Meldebild die Kräfte ein, die tatsächlich im Einsatz sind
+(„zu lang“, „Ruhe zu kurz“, Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 
 In der Zeile eines Postens liegen Blöcke nicht übereinander; ein Zug, der einen anderen Block
 überdecken würde, wird nicht übernommen. In der Pause dürfen Blöcke gleichzeitig laufen. Ein
@@ -634,7 +718,7 @@ Person in einer Schicht. Zeilen mit gleichem Posten, Beginn und Ende bilden eine
 | Soll-Qualifikationen | nein | etwa „1 Notfallsanitäter, 2 Sanitäter“ |
 | Nachname, Vorname | nein | ohne Namen ein Block ohne Person |
 | Telefon, Organisation, Qualifikationen | nein | für neue Helfer; Qualifikationen durch Komma getrennt |
-| Kennung, Herkunft | nein | externe Kennung der Person und der Name ihrer Quelle, etwa „Helferplanung“ |
+| Kennung, Herkunft | nein | Kennung der Person und der Name ihrer Quelle, etwa „Helferplanung“; in einer Mappe aus Lifeline Hub der eigene Bezug (siehe unten) |
 
 Eine Zeit mit Versatz (`+02:00`) gilt, wie sie ist. Eine Zeit ohne Versatz und eine Datumszelle
 aus Excel gelten als Ortszeit in der Zone des Einsatzes; die Vorschau nennt das als Hinweis. In
@@ -643,12 +727,22 @@ Fehler. Beginn und Ende liegen auf 5 Minuten, ein Block dauert 10 Minuten bis 24
 Unbekannte Spalten und Qualifikationen, die der Katalog der Organisation nicht kennt, sind
 Hinweise und fallen weg.
 
-**Wer wer ist.** Eine Person der Datei wird in dieser Reihenfolge gesucht: Kennung und Herkunft
-gleich einem Helfer des Plans; Kennung gleich der Personalnummer einer Person im Dienst (mit
+**Wer wer ist.** Eine Person der Datei wird in dieser Reihenfolge gesucht: der eigene Bezug
+(Herkunft „Lifeline Hub“, siehe unten); Kennung und Herkunft gleich einem Helfer des Plans; Kennung gleich der Personalnummer einer Person im Dienst (mit
 passendem Namen gefunden, sonst unsicher); Name und Telefon; der Name allein (unsicher). Sonst
 wird sie Helfer des Plans mit Kennung und Herkunft und steht damit nicht in den Stammdaten der
 Organisation. Ein Posten wird über den Namen gefunden, im genannten Abschnitt zuerst, ein
 Fahrzeug auch über den Funkrufnamen.
+
+**Eigene Bezüge.** Eine Mappe aus Lifeline Hub nennt in „Kennung“ und „Herkunft“, wer die Person
+hier ist. Hat sie eine Kennung aus einer eingelesenen Datei, bleibt diese mit ihrer Herkunft.
+Sonst steht die Herkunft „Lifeline Hub“ mit `personal-17` (Stamm-Personal), `einsatzkraft-9`
+(Einsatzkraft ohne Stammdaten) oder `helfer-4` (Helfer des Plans); ein Helfer einer Planung trägt
+seine Nummer und die Herkunft `vorplanung`. Beim Einlesen trifft ein solcher Bezug sicher, wenn
+die Person dieser Organisation bzw. dieses Einsatzes so heißt; trägt schon ein Helfer des Plans
+genau diese Kennung mit der Herkunft „Lifeline Hub“, bleibt es bei ihm. Sonst, etwa in einem anderen
+Einsatz, wird die Person wie jede andere gesucht und, wenn nötig, Helfer mit Kennung und
+Herkunft; ein zweiter Lauf trifft sie dann wieder.
 
 **Was das Einlesen ändert.** Es legt Blöcke, Helfer und fehlende Einheiten oder UHS an und
 trägt Personen in bestehende Blöcke nach. Es löscht nichts, ändert kein Soll und keine Notiz,

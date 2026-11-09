@@ -2,7 +2,7 @@ use super::PersonalStatus;
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-const SPALTEN: &str = "id, label, kategorie, farbe, sortier, zeitachse_marke";
+const SPALTEN: &str = "id, label, kategorie, farbe, sortier, zeitachse_marke, pause";
 
 /// Editierbare Katalog-Felder. `kategorie` ist bereits gegen das Enum validiert.
 #[derive(Debug)]
@@ -13,6 +13,9 @@ pub struct StatusDaten<'a> {
     pub sortier: i64,
     /// Bereits gegen [`crate::zeitachse::ZeitachseMarke`] geprüft.
     pub zeitachse_marke: Option<&'a str>,
+    /// LLH-1555: der Status „Pause“ des Schichtplans. Setzen nimmt das Kennzeichen jedem anderen
+    /// Status der Organisation (höchstens einer, Teilindex 0299).
+    pub pause: bool,
 }
 
 fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
@@ -55,9 +58,14 @@ pub async fn anlegen(
     org_id: i64,
     daten: StatusDaten<'_>,
 ) -> Result<PersonalStatus, AppError> {
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    if daten.pause {
+        pause_abgeben_tx(&mut tx, org_id).await?;
+    }
     let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO personal_status (org_id, label, kategorie, farbe, sortier, zeitachse_marke) \
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO personal_status \
+            (org_id, label, kategorie, farbe, sortier, zeitachse_marke, pause) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.label)
@@ -65,14 +73,41 @@ pub async fn anlegen(
     .bind(daten.farbe)
     .bind(daten.sortier)
     .bind(daten.zeitachse_marke)
-    .fetch_one(pool)
+    .bind(daten.pause)
+    .fetch_one(&mut *tx)
     .await;
 
     let id = match ergebnis {
         Ok(id) => id,
         Err(e) => return label_conflict(e),
     };
+    tx.commit().await?;
     laden(pool, org_id, id).await
+}
+
+/// Nimmt das Kennzeichen „Pause“ jedem Status der Organisation (LLH-1555): vor dem Setzen an
+/// einem anderen, damit der Teilindex hält.
+async fn pause_abgeben_tx(conn: &mut sqlx::SqliteConnection, org_id: i64) -> Result<(), AppError> {
+    sqlx::query("UPDATE personal_status SET pause = 0 WHERE org_id = ? AND pause = 1")
+        .bind(org_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Der aktive Status „Pause“ der Organisation (LLH-1555): (id, Label); `None`, wenn keiner das
+/// Kennzeichen trägt.
+pub async fn pause_status_tx(
+    conn: &mut sqlx::SqliteConnection,
+    org_id: i64,
+) -> Result<Option<(i64, String)>, AppError> {
+    sqlx::query_as(
+        "SELECT id, label FROM personal_status WHERE org_id = ? AND aktiv = 1 AND pause = 1",
+    )
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await
+    .map_err(Into::into)
 }
 
 /// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei der nullable Spalte `farbe` setzt
@@ -85,6 +120,8 @@ pub struct StatusPatch<'a> {
     pub sortier: Option<i64>,
     /// LFH-552: `Some(None)` entfernt die Marke.
     pub zeitachse_marke: Option<Option<&'a str>>,
+    /// LLH-1555: `Some(true)` setzt das Kennzeichen „Pause“ und nimmt es jedem anderen Status.
+    pub pause: Option<bool>,
 }
 
 /// Teil-Patch der editierbaren Felder (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
@@ -99,13 +136,33 @@ pub async fn patche(
     id: i64,
     patch: StatusPatch<'_>,
 ) -> Result<PersonalStatus, AppError> {
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    if patch.pause == Some(true) {
+        // Nur ein aktiver Status trägt „Pause“: sonst verlöre die Org ihr Kennzeichen still.
+        let aktiv: Option<bool> =
+            sqlx::query_scalar("SELECT aktiv FROM personal_status WHERE id = ? AND org_id = ?")
+                .bind(id)
+                .bind(org_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        match aktiv {
+            None => return Err(AppError::NotFound),
+            Some(false) => {
+                return Err(AppError::UnprocessableEntity(
+                    "Ein deaktivierter Status kann nicht „Pause“ sein.".into(),
+                ))
+            }
+            Some(true) => pause_abgeben_tx(&mut tx, org_id).await?,
+        }
+    }
     let ergebnis = sqlx::query(
         "UPDATE personal_status SET \
             label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
             kategorie = CASE WHEN ?3 IS NULL THEN kategorie ELSE ?4 END, \
             farbe = CASE WHEN ?5 IS NULL THEN farbe ELSE ?6 END, \
             sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END, \
-            zeitachse_marke = CASE WHEN ?11 IS NULL THEN zeitachse_marke ELSE ?12 END \
+            zeitachse_marke = CASE WHEN ?11 IS NULL THEN zeitachse_marke ELSE ?12 END, \
+            pause = CASE WHEN ?13 IS NULL THEN pause ELSE ?14 END \
          WHERE id = ?9 AND org_id = ?10",
     )
     .bind(patch.label.map(|_| 1_i64))
@@ -120,7 +177,9 @@ pub async fn patche(
     .bind(org_id)
     .bind(patch.zeitachse_marke.map(|_| 1_i64))
     .bind(patch.zeitachse_marke.and_then(|v| v))
-    .execute(pool)
+    .bind(patch.pause.map(|_| 1_i64))
+    .bind(patch.pause)
+    .execute(&mut *tx)
     .await;
 
     let resultat = match ergebnis {
@@ -130,6 +189,7 @@ pub async fn patche(
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    tx.commit().await?;
     laden(pool, org_id, id).await
 }
 
@@ -197,6 +257,7 @@ mod tests {
             farbe: None,
             sortier,
             zeitachse_marke: None,
+            pause: false,
         }
     }
 
@@ -306,6 +367,7 @@ mod tests {
                 farbe: Some(Some("#00ff00")),
                 sortier: Some(42),
                 zeitachse_marke: None,
+                pause: None,
             },
         )
         .await
@@ -331,6 +393,7 @@ mod tests {
                 farbe: Some("#ff0000"),
                 sortier: 10,
                 zeitachse_marke: None,
+                pause: false,
             },
         )
         .await
@@ -374,6 +437,7 @@ mod tests {
                 farbe: Some("#ff0000"),
                 sortier: 10,
                 zeitachse_marke: None,
+                pause: false,
             },
         )
         .await
@@ -429,5 +493,46 @@ mod tests {
             laden(&pool, 2, s.id).await.unwrap_err(),
             AppError::NotFound
         ));
+    }
+
+    #[tokio::test]
+    async fn pause_auf_deaktiviertem_status_ist_422_und_laesst_kennzeichen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let pause = anlegen(
+            &pool,
+            1,
+            StatusDaten {
+                pause: true,
+                ..daten("Rast", KATEGORIE_GEBUNDEN, 10)
+            },
+        )
+        .await
+        .unwrap();
+        let alt = anlegen(&pool, 1, daten("alt", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        deaktivieren(&pool, 1, alt.id).await.unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                1,
+                alt.id,
+                StatusPatch {
+                    pause: Some(true),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
+        let mut conn = pool.acquire().await.unwrap();
+        let jetzt = pause_status_tx(&mut conn, 1).await.unwrap();
+        assert_eq!(
+            jetzt.map(|(id, _)| id),
+            Some(pause.id),
+            "Kennzeichen bleibt"
+        );
     }
 }

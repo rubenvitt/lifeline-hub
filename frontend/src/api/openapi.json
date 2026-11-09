@@ -791,7 +791,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql` und `0269_admin_audit_lesezugang.sql` — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -803,7 +803,16 @@
           "sitzung_beendet",
           "einmalpasswort_vergeben",
           "lesezugang_angelegt",
-          "lesezugang_widerrufen"
+          "lesezugang_widerrufen",
+          "instanz_code_ausgestellt",
+          "instanz_code_eingeloest",
+          "instanz_gekoppelt",
+          "instanz_kopplung_widerrufen",
+          "instanz_kopplung_vom_gegenueber_widerrufen",
+          "unterschrift_registriert",
+          "unterschrift_gegengezeichnet",
+          "unterschrift_widerrufen",
+          "unterschrift_abgelehnt"
         ]
       },
       "AdressatKategorie": {
@@ -9362,6 +9371,203 @@
           }
         }
       },
+      "InstanzKopplungAnzeige": {
+        "type": "object",
+        "description": "Eine Kopplung, wie die Admin-Seite sie zeigt: aus Sicht einer Org.",
+        "required": [
+          "id",
+          "gegenueber_name",
+          "gegenueber_kennung",
+          "gegenueber_fingerabdruck",
+          "richtung",
+          "zustand",
+          "protokoll",
+          "org"
+        ],
+        "properties": {
+          "gegenueber_adresse": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gegenueber_fingerabdruck": {
+            "type": "string"
+          },
+          "gegenueber_kennung": {
+            "type": "string"
+          },
+          "gegenueber_name": {
+            "type": "string"
+          },
+          "gegenueber_protokoll": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "gegenueber_softwarestand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "letzter_fehler": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org": {
+            "$ref": "#/components/schemas/InstanzOrgZuordnung",
+            "description": "Die Org-Zuordnung der eigenen Org (die jüngste)."
+          },
+          "protokoll": {
+            "$ref": "#/components/schemas/InstanzProtokoll"
+          },
+          "richtung": {
+            "$ref": "#/components/schemas/InstanzKopplungRichtung"
+          },
+          "uhr_abweichung_s": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "zuletzt_gesehen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/InstanzKopplungZustand"
+          }
+        }
+      },
+      "InstanzKopplungRichtung": {
+        "type": "string",
+        "description": "Richtung einer Kopplung aus Sicht dieser Instanz (design.md D6). Die einlösende Seite meldet\nsich, die ausstellende wird gemeldet und baut nie selbst eine Verbindung auf.",
+        "enum": [
+          "meldet_sich",
+          "wird_gemeldet"
+        ]
+      },
+      "InstanzKopplungZustand": {
+        "type": "string",
+        "description": "Zustand einer Kopplung (design.md D6, D9).",
+        "enum": [
+          "angebahnt",
+          "aktiv",
+          "widerrufen",
+          "vom_gegenueber_widerrufen"
+        ]
+      },
+      "InstanzOrgZuordnung": {
+        "type": "object",
+        "required": [
+          "id",
+          "fremde_org_name",
+          "fremde_org_kennung",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "fremde_org_kennung": {
+            "type": "string"
+          },
+          "fremde_org_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "InstanzProtokoll": {
+        "type": "string",
+        "description": "Wie weit die Protokollversionen auseinanderliegen, für die Anzeige (design.md D5).",
+        "enum": [
+          "passt",
+          "update_hier",
+          "update_gegenueber"
+        ]
+      },
+      "InstanzUebersicht": {
+        "type": "object",
+        "description": "Alles, was die Admin-Seite „Instanzkopplung“ zeigt.",
+        "required": [
+          "name",
+          "kennung",
+          "fingerabdruck",
+          "protokoll",
+          "softwarestand",
+          "passkeys_eingerichtet",
+          "eigener_schluessel",
+          "kopplungen",
+          "schluessel"
+        ],
+        "properties": {
+          "eigener_schluessel": {
+            "type": "boolean",
+            "description": "Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für\n„Code ausstellen“)."
+          },
+          "fingerabdruck": {
+            "type": "string"
+          },
+          "kennung": {
+            "type": "string"
+          },
+          "kopplungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanzKopplungAnzeige"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "passkeys_eingerichtet": {
+            "type": "boolean",
+            "description": "Passkeys sind eingerichtet (`--webauthn-rp-id`); ohne sie gibt es keine\nUnterschriftsschlüssel und damit keinen Kopplungscode."
+          },
+          "protokoll": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "schluessel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnterschriftSchluesselAnzeige"
+            }
+          },
+          "softwarestand": {
+            "type": "string"
+          }
+        }
+      },
       "JetztAktualisierenAntwort": {
         "type": "object",
         "required": [
@@ -9921,6 +10127,28 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          }
+        }
+      },
+      "KopplungscodeAntwort": {
+        "type": "object",
+        "description": "Ein frisch ausgestellter Kopplungscode. Der Code verlässt den Server nur hier, einmal.",
+        "required": [
+          "code",
+          "laeuft_ab_at",
+          "fingerabdruck"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`."
+          },
+          "fingerabdruck": {
+            "type": "string",
+            "description": "Fingerabdruck dieser Instanz zum Abgleich an der einlösenden Seite."
           },
           "laeuft_ab_at": {
             "type": "string"
@@ -14313,7 +14541,8 @@
           "id",
           "label",
           "kategorie",
-          "sortier"
+          "sortier",
+          "pause"
         ],
         "properties": {
           "farbe": {
@@ -14331,6 +14560,10 @@
           },
           "label": {
             "type": "string"
+          },
+          "pause": {
+            "type": "boolean",
+            "description": "LLH-1555: der Status „Pause“ des Schichtplans (höchstens einer je Organisation)."
           },
           "sortier": {
             "type": "integer",
@@ -14727,6 +14960,54 @@
             "type": "integer",
             "format": "int64",
             "description": "`einsatz_personal.id`"
+          }
+        }
+      },
+      "PlanWechselAnzeige": {
+        "type": "object",
+        "description": "Ein vollzogener Wechsel.",
+        "required": [
+          "id",
+          "art",
+          "planschicht_id",
+          "zeitpunkt",
+          "vollzogen_at"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/WechselArt"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "planschicht_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`null`, wenn der Block inzwischen gelöscht ist."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vollzogen_at": {
+            "type": "string"
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt laut Plan (Beginn, beim Pausenende das Ende des Blocks)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -17873,6 +18154,158 @@
           "verweigert"
         ]
       },
+      "UnterschriftAssertion": {
+        "type": "object",
+        "description": "Eine UnterschriftAssertion, wie der Browser sie aus `navigator.credentials.get` liefert (Base64url).",
+        "required": [
+          "credential_id",
+          "authenticator_data",
+          "client_data_json",
+          "signatur"
+        ],
+        "properties": {
+          "authenticator_data": {
+            "type": "string"
+          },
+          "client_data_json": {
+            "type": "string"
+          },
+          "credential_id": {
+            "type": "string"
+          },
+          "signatur": {
+            "type": "string"
+          }
+        }
+      },
+      "UnterschriftGegenzeichnenStart": {
+        "type": "object",
+        "required": [
+          "zeremonie",
+          "challenge",
+          "rp_id",
+          "credential_ids",
+          "erklaerung"
+        ],
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "Challenge für `navigator.credentials.get` (Base64url): SHA-256 der Erklärung."
+          },
+          "credential_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Die eigenen gültigen Unterschriftsschlüssel (Base64url), für `allowCredentials`."
+          },
+          "erklaerung": {
+            "type": "string",
+            "description": "Die Erklärung im Wortlaut, zur Anzeige."
+          },
+          "rp_id": {
+            "type": "string"
+          },
+          "zeremonie": {
+            "type": "string"
+          }
+        }
+      },
+      "UnterschriftRegistrierenStart": {
+        "type": "object",
+        "required": [
+          "zeremonie",
+          "optionen"
+        ],
+        "properties": {
+          "optionen": {
+            "type": "object",
+            "description": "Optionen für `navigator.credentials.create` (`publicKey`)."
+          },
+          "zeremonie": {
+            "type": "string"
+          }
+        }
+      },
+      "UnterschriftSchluesselAnzeige": {
+        "type": "object",
+        "description": "Ein Schlüssel, wie die Admin-Seite ihn zeigt.",
+        "required": [
+          "id",
+          "benutzer_name",
+          "bezeichnung",
+          "fingerabdruck",
+          "zustand",
+          "herkunft",
+          "eigen",
+          "erstellt_at"
+        ],
+        "properties": {
+          "benutzer_name": {
+            "type": "string"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "eigen": {
+            "type": "boolean",
+            "description": "Gehört dem anfragenden Admin."
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "fingerabdruck": {
+            "type": "string"
+          },
+          "fremde_org_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei `herkunft = gegenueber`: Name der Org dort."
+          },
+          "gegengezeichnet_von": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei einer Gegenzeichnung: wer gegengezeichnet hat."
+          },
+          "herkunft": {
+            "$ref": "#/components/schemas/UnterschriftSchluesselHerkunft"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/UnterschriftSchluesselZustand"
+          }
+        }
+      },
+      "UnterschriftSchluesselHerkunft": {
+        "type": "string",
+        "description": "Woher ein Unterschriftsschlüssel stammt.",
+        "enum": [
+          "lokal",
+          "gegenueber"
+        ]
+      },
+      "UnterschriftSchluesselZustand": {
+        "type": "string",
+        "description": "Zustand eines Unterschriftsschlüssels.",
+        "enum": [
+          "wartet_auf_gegenzeichnung",
+          "gueltig",
+          "widerrufen"
+        ]
+      },
       "Verbindungsart": {
         "type": "string",
         "description": "Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die\nErreichbarkeit steht im Kommunikationsplan.",
@@ -19129,6 +19562,30 @@
                 },
                 {
                   "type": "object",
+                  "description": "Eine Ad-hoc-Kraft des Einsatzes; nur über einen eigenen Bezug (LLH-1557, Regel 0).",
+                  "required": [
+                    "einsatz_personal_id",
+                    "name",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "einsatz"
+                      ]
+                    },
+                    "einsatz_personal_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
                   "required": [
                     "art"
                   ],
@@ -19215,6 +19672,30 @@
                     ]
                   },
                   "helfer_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "description": "Eine Ad-hoc-Kraft des Einsatzes; nur über einen eigenen Bezug (LLH-1557, Regel 0).",
+                "required": [
+                  "einsatz_personal_id",
+                  "name",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "einsatz"
+                    ]
+                  },
+                  "einsatz_personal_id": {
                     "type": "integer",
                     "format": "int64"
                   },
@@ -19635,6 +20116,180 @@
               "$ref": "#/components/schemas/BenachrichtigungArt"
             },
             "description": "Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne\nAbo leer."
+          }
+        }
+      },
+      "WechselArt": {
+        "type": "string",
+        "description": "Art eines Wechsels aus dem Plan (`einsatz_plan_wechsel.art`). Wire == `as_str()`.",
+        "enum": [
+          "uhs",
+          "pause_beginn",
+          "pause_ende"
+        ]
+      },
+      "WechselVorlage": {
+        "type": "object",
+        "description": "Der nächste Wechsel eines Blocks zum Vorbelegen des Dialogs.",
+        "required": [
+          "block_id",
+          "art",
+          "zeitpunkt",
+          "kommen",
+          "gehen",
+          "bleiben",
+          "uebersprungen",
+          "wechsel"
+        ],
+        "properties": {
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WechselArt",
+                "description": "Die Art des nächsten Wechsels; `null`, wenn alle Wechsel des Blocks vollzogen sind."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bleiben": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "UHS: Kräfte an dieser UHS, die im Block stehen."
+          },
+          "block_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gehen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "UHS: Kräfte an dieser UHS, die nicht im Block stehen."
+          },
+          "gesperrt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Warum der Wechsel gerade nicht geht (kein Pausenstatus, die Pause hat nicht begonnen, die\nUHS ist aufgelöst)."
+          },
+          "kommen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "UHS: Personen des Blocks, die nicht an dieser UHS stehen. Pause: wer den Status wechselt."
+          },
+          "pause_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pause: das Label des gekennzeichneten Status."
+          },
+          "uebersprungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "Pause: Personen des Blocks, die nicht im Einsatz sind (beim Ende: die nicht mehr in Pause\nsind)."
+          },
+          "uhs": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "wechsel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanWechselAnzeige"
+            },
+            "description": "Die vollzogenen Wechsel des Blocks, die nicht zurückgenommen sind."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt laut Plan des nächsten Wechsels."
+          }
+        }
+      },
+      "WechselVorlagePerson": {
+        "type": "object",
+        "description": "Eine Person der Vorlage: aus dem Block (mit ihrer Herkunft im Plan) oder eine Kraft an der UHS.",
+        "required": [
+          "art",
+          "einsatz_personal_id",
+          "name"
+        ],
+        "properties": {
+          "andere_uhs": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eine andere UHS, an der die Kraft gerade steht (sie wechselt)."
+          },
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlanPersonArt",
+                "description": "Herkunft im Plan; `null` bei einer Kraft, die nur an der UHS steht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "einsatz_personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Kraft des Einsatzes; `null` = nicht im Einsatz (kommt erst mit dem Wechsel)."
+          },
+          "helfer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ihr Status jetzt (Pause)."
+          },
+          "status_zurueck": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Beim Pausenende: der gemerkte Status, den sie zurückbekommt."
           }
         }
       },
@@ -20433,8 +21088,15 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
         "properties": {
+          "adresse": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Adresse der Gegenstelle (nur auf der Seite, die sich meldet)."
+          },
           "angemeldet_at": {
             "type": [
               "string",
@@ -20442,12 +21104,40 @@
             ],
             "description": "Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`."
           },
+          "fingerabdruck": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels."
+          },
+          "fremde_org": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Org der Gegenstelle."
+          },
           "geraet": {
             "type": [
               "string",
               "null"
             ],
             "description": "Grobe Gerätebezeichnung der beendeten Sitzung."
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Warum ein Unterschriftsschlüssel verworfen wurde."
+          },
+          "instanz_kennung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Instanzkopplung (LLH-1490): Kennung der Gegenstelle."
           },
           "org_rolle": {
             "oneOf": [

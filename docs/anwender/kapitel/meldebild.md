@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs]
 ---
 
 ## Überblick
@@ -252,9 +252,26 @@ wenn danach keine Periode mehr offen ist.
 
 Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „gesamt“ addiert alle
 Einsatzabschnitte der Kraft, „Ruhe“ zählt seit dem Ende des letzten. Ohne Ereignis steht keine Zahl,
-sondern „—“. Grenzwerte und Warnungen gibt es nicht; die Zahl steht neutral da. Die Dauer erscheint
-im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im Paneel „Zeitachse“ ihrer Ansicht und
-in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“ (diese unter „Spalten“).
+sondern „—“. Die Dauer erscheint im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im
+Paneel „Zeitachse“ ihrer Ansicht und in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“
+(diese unter „Spalten“).
+
+Im Meldebild unter „Im Einsatz“ und in der Personalliste unter „Einsatzdauer“ steht neben der Zahl
+ein Wort, wenn eine Kraft die Grenzwerte des Schichtplans reißt (Kapitel [Ablösung](abloesung.md)):
+Höchstdienst und Mindestruhe des Einsatzes, ohne eigenen Wert 12 h und 8 h. Der Plan prüft mit
+denselben Werten.
+
+- **„zu lang“:** Die Kraft ist länger als der Höchstdienst im Dienst. Gezählt wird ab dem Beginn
+  des Einsatzabschnitts, mit dem ihr Dienst begann: Eine Pause, die kürzer als die Mindestruhe war,
+  zählt mit. Die Zahl daneben bleibt die Dauer des laufenden Abschnitts.
+- **„Ruhe zu kurz“:** Die Kraft ist wieder im Einsatz, obwohl ihre Ruhe davor kürzer als die
+  Mindestruhe war.
+
+Wer mit der Maus auf die Zelle zeigt, liest die Begründung, etwa „Im Dienst seit 08:00: 14 h 30,
+Höchstwert 12 h · Ruhe davor 2 h 00, Mindestruhe 8 h“. Die Spalte „Ruhe“ bleibt ohne Wort, denn
+wer ruht, braucht nichts. Ohne Ereignis, nach der Entlassung und solange die Grenzwerte nicht
+geladen sind, steht kein Wort. Die Einstufung löst keinen Hinweis in der AlarmZentrale und keinen
+Zähler aus; sie steht nur in der Zelle und auf dem Meldeblatt.
 
 ### Rechte
 

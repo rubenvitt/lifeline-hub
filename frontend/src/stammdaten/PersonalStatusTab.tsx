@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, type TableColumnsType } from 'antd';
+import { Collapse, Form, Input, InputNumber, Switch, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
@@ -22,6 +22,7 @@ interface FormWerte {
   farbe?: string;
   sortier: number;
   zeitachse_marke?: ZeitachseMarke;
+  pause?: boolean;
 }
 
 const kategorien = Object.keys(statusKategorie) as StatusKategorie[];
@@ -64,6 +65,13 @@ const spalten: TableColumnsType<PersonalStatus> = [
   },
   markeSpalte,
   {
+    // LLH-1555: welcher Status im Schichtplan „Pause“ ist (höchstens einer).
+    title: 'Schichtplan',
+    dataIndex: 'pause',
+    key: 'pause',
+    render: (p: boolean) => (p ? 'Pause' : '—'),
+  },
+  {
     title: 'Sortierung',
     dataIndex: 'sortier',
     key: 'sortier',
@@ -78,6 +86,7 @@ const vorbelegung = (s: PersonalStatus): FormWerte => ({
   farbe: s.farbe ?? undefined,
   sortier: s.sortier,
   zeitachse_marke: s.zeitachse_marke ?? undefined,
+  pause: s.pause,
 });
 
 /**
@@ -95,6 +104,7 @@ const aktualisiere = (id: number, werte: FormWerte) =>
     sortier: werte.sortier ?? 0,
     // Vollersatz: leer entfernt die Marke (LFH-552).
     zeitachse_marke: werte.zeitachse_marke ?? null,
+    pause: werte.pause ?? false,
   });
 
 const felder = (
@@ -111,12 +121,26 @@ const felder = (
     <Form.Item label="Sortierung" name="sortier">
       <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
     </Form.Item>
-    {/* Die Marke (LFH-552) liegt eingeklappt: vier Felder stehen schon offen, ein fünftes sprengte
-        das Feldbudget. Ohne `forceRender` — die Vorbelegung erreicht sie trotzdem. */}
+    {/* Die Marke (LFH-552) und der Schalter „Pause“ (LLH-1555) liegen eingeklappt: vier Felder
+        stehen schon offen, ein fünftes sprengte das Feldbudget. Ohne `forceRender` — die
+        Vorbelegung erreicht sie trotzdem. */}
     <Collapse
       ghost
       style={{ marginInline: -8 }}
-      items={[{ key: 'weitere', label: 'Weitere Angaben', children: markeFeld }]}
+      items={[
+        {
+          key: 'weitere',
+          label: 'Weitere Angaben',
+          children: (
+            <>
+              {markeFeld}
+              <Form.Item label="Pause im Schichtplan" name="pause" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            </>
+          ),
+        },
+      ]}
     />
   </>
 );

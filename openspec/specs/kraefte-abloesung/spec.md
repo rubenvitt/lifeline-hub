@@ -1165,7 +1165,7 @@ mit Übernahme oder mit Bleibenden und dem Folgeblock (Requirement „Vollzug au
 - **THEN** antwortet das System mit 422, und die Schicht bleibt laufend
 
 #### Scenario: Ohne neue Besatzung
-- **WHEN** ein Besatzungswechsel ohne `besatzung_ids`, ohne Übernahme und ohne Folgeblock abgeschickt wird
+- **WHEN** ein Besatzungswechsel ohne `besatzung_ids` und `besatzung` (fehlend oder leer), ohne Übernahme und ohne Folgeblock abgeschickt wird
 - **THEN** antwortet das System mit 400
 
 #### Scenario: Einer von zweien wechselt

@@ -95,8 +95,8 @@ import {
 } from './klickziel';
 import { fachebeneQuelleVon, flaechenKennung } from './flaechenwahl';
 import FlaechenwahlMenue from './FlaechenwahlMenue';
-import PunktankerMenue, { type PunktankerMenueProps } from './PunktankerMenue';
-import { erzeugeNachklickRiegel } from './nachklickRiegel';
+import PunktankerMenue, { type PunktankerMenueProps } from '../../components/PunktankerMenue';
+import { erzeugeNachklickRiegel } from '../../components/nachklickRiegel';
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';

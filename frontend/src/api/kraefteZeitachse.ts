@@ -2,6 +2,7 @@ import { apiGet, apiSend } from './client';
 import type {
   EinheitPerioden,
   PersonPerioden,
+  SchichtplanGrenzwerte,
   Zeitachse,
   ZeitachseNachtragBody,
   ZeitachsePeriodeBody,
@@ -26,6 +27,17 @@ export function listeEinheitenPerioden(einsatzId: number): Promise<EinheitPeriod
 /** Perioden je Person (nur Personen mit Ereignissen) — Personal-Seite. */
 export function listePersonalPerioden(einsatzId: number): Promise<PersonPerioden[]> {
   return apiGet<PersonPerioden[]>(`/api/einsaetze/${einsatzId}/personal/zeitachse`);
+}
+
+/**
+ * Wirksame Grenzwerte des Schichtplans für die Einstufung (LLH-730): dieselben Werte wie der
+ * Plan-Befund `dienst`, gelesen unter dem Modul Einheiten bzw. Personal, ohne das Modul Ablösung.
+ */
+export function ladeZeitachseGrenzwerte(
+  einsatzId: number,
+  modul: 'einheiten' | 'personal',
+): Promise<SchichtplanGrenzwerte> {
+  return apiGet<SchichtplanGrenzwerte>(`/api/einsaetze/${einsatzId}/${modul}/zeitachse/grenzwerte`);
 }
 
 export function ladeZeitachse(einsatzId: number, art: KraftArt, id: number): Promise<Zeitachse> {

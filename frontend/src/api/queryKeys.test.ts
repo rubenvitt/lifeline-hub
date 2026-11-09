@@ -481,6 +481,19 @@ describe('einsatzKeys (Factory-Output)', () => {
       1,
       'personal',
     ]);
+    // Grenzwerte (LLH-730) im Unterbereich des Moduls: die Modulsperre räumt sie mit.
+    expect(einsatzKeys.kraefteZeitachseGrenzwerte(1, 'einheiten')).toEqual([
+      'einsatz-kraefte-zeitachse',
+      1,
+      'einheiten',
+      'grenzwerte',
+    ]);
+    expect(einsatzKeys.kraefteZeitachseGrenzwerte(1, 'personal')).toEqual([
+      'einsatz-kraefte-zeitachse',
+      1,
+      'personal',
+      'grenzwerte',
+    ]);
     expect(einsatzKeys.kraefteZeitachseEinheit(1, 7)).toEqual([
       'einsatz-kraefte-zeitachse',
       1,

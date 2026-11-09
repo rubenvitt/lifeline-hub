@@ -10,8 +10,10 @@
 //! Schicht die Fälligkeit ([`kopplung`], LLH-1555); das Raster zeichnet LLH-1554.
 //!
 //! **Prüfbefunde** ([`pruefung`]) rechnet der Server beim Lesen, rein und an einer Stelle. Sie
-//! blockieren nie. Der Dienst-Befund liest nur Planblöcke: die Kräfte-Zeitachse stuft weiter
-//! nicht ein (LFH-860, Spec `kraefte-zeitachse`).
+//! blockieren nie. Der Dienst-Befund liest nur Planblöcke. Das Ist der Kräfte-Zeitachse stuft
+//! dieselbe Regel gegen dieselben [`SchichtplanGrenzwerte`] im Client ein (LLH-730, Spec
+//! `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“); gelesen werden sie dafür
+//! über `routes::zeitachse::{einheiten,personal}_grenzwerte`, ohne das Modul Ablösung.
 //!
 //! **Schichten erzeugen** ([`zerlegung`]) füllt einen Zeitraum an einem Posten aus einer Länge
 //! oder dem Schichtmodell des Einsatzes; alles oder nichts.
@@ -23,10 +25,12 @@ use crate::personal::quali_soll::QualiSoll;
 use crate::personal::qualifikation_deckung::OffeneAnforderung;
 use crate::wire_enum::wire_enum;
 
+pub mod ausgabe;
 pub mod kopplung;
 pub mod pruefung;
 pub mod repo;
 pub mod uebernahme;
+pub mod vollzug;
 pub mod zerlegung;
 
 /// Personen je Block, gezählt vor dem Entdoppeln (wie `abloesung::BESATZUNG_MAX`). Spiegel:

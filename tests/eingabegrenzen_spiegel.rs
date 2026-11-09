@@ -240,6 +240,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX",
             schichtplan::HELFER_QUALIFIKATIONEN_MAX,
         ),
+        (
+            "SCHICHTPLAN_SOLL_ANZAHL_MAX",
+            usize::try_from(schichtplan::SOLL_ANZAHL_MAX).unwrap(),
+        ),
         ("PLANUNG_BEZEICHNUNG_MAX", planung::BEZEICHNUNG_MAX),
         ("PLANUNG_ABSCHNITT_MAX", planung::ABSCHNITT_MAX),
         ("PLANUNG_ORT_MAX", planung::ORT_MAX),

@@ -125,3 +125,12 @@ type BenutzerVerwaltungskontext =
 export function darfVerwaltung(benutzer?: BenutzerVerwaltungskontext): boolean {
   return benutzer?.system_rolle === 'admin' || benutzer?.org_rolle === 'fuehrungskraft';
 }
+
+/**
+ * Vorplanung ohne Einsatz (LLH-1561, Spec `vorplanung`): Planungen lesen und schreiben dieselben
+ * Personen, die einen Einsatz anlegen dürfen (System-Admin oder org-weite Führungskraft; Server
+ * `darf_einsatz_anlegen`). Ohne das Recht fehlt „Planungen“ in der Kopfleiste.
+ */
+export function darfPlanen(benutzer?: BenutzerVerwaltungskontext): boolean {
+  return darfVerwaltung(benutzer);
+}

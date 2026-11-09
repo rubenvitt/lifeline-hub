@@ -187,7 +187,10 @@ fn posten_schluessel(posten_id: Option<i64>) -> Posten {
 }
 
 /// Zone und Darstellung der Organisation für Servertexte.
-async fn zeitstil_org(conn: &mut SqliteConnection, org_id: i64) -> Result<Zeitstil, AppError> {
+pub(crate) async fn zeitstil_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<Zeitstil, AppError> {
     let zeile: Option<(Option<String>, Option<String>)> =
         sqlx::query_as("SELECT zeitzone, zeitdarstellung FROM org_einstellungen WHERE org_id = ?")
             .bind(org_id)
@@ -1171,30 +1174,31 @@ async fn posten_tx(
     Ok((anzahl, quali, Some(bezeichnung), laenge))
 }
 
-/// Ein Block am Posten, der sich mit `[von, bis)` überschneidet (außer `ausser`); die Pause darf
-/// überlappen.
-async fn ueberschneidung_tx(
+/// Alle Blöcke am Posten, die sich mit `[von, bis)` überschneiden (außer `ausser`), früheste
+/// zuerst; die Pause darf überlappen. Anlegen und Ändern nennen den ersten, „Schichten erzeugen“
+/// alle (LLH-1594).
+async fn ueberschneidungen_tx(
     conn: &mut SqliteConnection,
     planung_id: i64,
     posten_id: Option<i64>,
     von: &str,
     bis: &str,
     ausser: Option<i64>,
-) -> Result<Option<(i64, String, String)>, AppError> {
+) -> Result<Vec<(i64, String, String)>, AppError> {
     let Some(pid) = posten_id else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
     Ok(sqlx::query_as(
         "SELECT id, von, bis FROM planung_schicht \
          WHERE planung_id = ? AND posten_id = ? AND von < ? AND bis > ? AND id IS NOT ? \
-         ORDER BY von LIMIT 1",
+         ORDER BY von, id",
     )
     .bind(planung_id)
     .bind(pid)
     .bind(bis)
     .bind(von)
     .bind(ausser)
-    .fetch_optional(&mut *conn)
+    .fetch_all(&mut *conn)
     .await?)
 }
 
@@ -1208,8 +1212,10 @@ async fn pruefe_frei_tx(
     bis: &str,
     ausser: Option<i64>,
 ) -> Result<(), AppError> {
-    if let Some((_, a, b)) =
-        ueberschneidung_tx(conn, planung_id, posten_id, von, bis, ausser).await?
+    if let Some((_, a, b)) = ueberschneidungen_tx(conn, planung_id, posten_id, von, bis, ausser)
+        .await?
+        .into_iter()
+        .next()
     {
         let stil = zeitstil_org(conn, org_id).await?;
         return Err(AppError::UnprocessableEntity(format!(
@@ -1561,8 +1567,8 @@ pub async fn erzeugen(
         let mut stil = None;
         for (a, b) in &teile {
             let (a, b) = (zeit::formatiere_utc(*a), zeit::formatiere_utc(*b));
-            if let Some((id, x, y)) =
-                ueberschneidung_tx(conn, planung_id, posten_id, &a, &b, None).await?
+            for (id, x, y) in
+                ueberschneidungen_tx(conn, planung_id, posten_id, &a, &b, None).await?
             {
                 if !konflikte.iter().any(|k| k.id == id) {
                     if stil.is_none() {

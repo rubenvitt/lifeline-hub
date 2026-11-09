@@ -20,10 +20,19 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { einsatzkraftPfad, kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
-import { dauerText, kraftDauern, type KraftDauern } from '../kraefte/zeitachse';
-import { listePersonalPerioden } from '../api/kraefteZeitachse';
+import DauerMitEinstufung from '../kraefte/DauerMitEinstufung';
+import {
+  dauerText,
+  kraftDauern,
+  stufeEin,
+  type Einstufung,
+  type KraftDauern,
+} from '../kraefte/zeitachse';
+import { ladeZeitachseGrenzwerte, listePersonalPerioden } from '../api/kraefteZeitachse';
 import { abrufZustand } from '../api/abrufZustand';
 import { useUhr } from '../abloesung/useUhr';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { monoStil } from '../components/instrument';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
 import PersonalDisponierenModal from '../kraefte/PersonalDisponierenModal';
@@ -170,7 +179,14 @@ export default function PersonalPage() {
     queryKey: einsatzKeys.kraefteZeitachsePersonal(einsatzId),
     queryFn: () => listePersonalPerioden(einsatzId),
   });
+  // Grenzwerte des Schichtplans für die Einstufung der Einsatzdauer (LLH-730). Scheitert der
+  // Abruf, fehlt nur die Einstufung.
+  const grenzwerteQuery = useQuery({
+    queryKey: einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, 'personal'),
+    queryFn: () => ladeZeitachseGrenzwerte(einsatzId, 'personal'),
+  });
   const uhr = useUhr(60_000);
+  const { konventionen } = useAnzeigeKonventionen();
 
   // `?personal=<id>` bleibt Zeilenmarke (D2): Lagekarte und Schaden springen hierher, um die Person
   // im Vergleich zu sehen; die Zeile wird hervorgehoben und ins Bild gerollt (best-effort).
@@ -327,6 +343,14 @@ export default function PersonalPage() {
   const dauernJePerson = new Map<number, KraftDauern>(
     (periodenQuery.data ?? []).map((p) => [p.personal_id, kraftDauern(p.perioden, uhr.valueOf())]),
   );
+  // Einstufung nur der Einsatzdauer; die Spalte „Ruhe“ bleibt neutral (LLH-730, design.md D3).
+  const einstufungJePerson = new Map<number, Einstufung | null>(
+    (periodenQuery.data ?? []).map((p) => [
+      p.personal_id,
+      stufeEin(p.perioden, grenzwerteQuery.data, uhr.valueOf()),
+    ]),
+  );
+  const zeit = (utc: string) => zeitKurz(utc, konventionen);
   /** Dauerzelle: leer ohne Daten, „—" ohne Ereignis (keine erfundene 0). */
   const dauerZelle = (minuten: number | null | undefined) =>
     periodenBereit ? (
@@ -518,7 +542,18 @@ export default function PersonalPage() {
       key: 'einsatzdauer',
       width: 104,
       sortWert: (ep) => (periodenBereit ? dauernJePerson.get(ep.id)?.laufend?.minuten : null),
-      render: (_, ep) => dauerZelle(dauernJePerson.get(ep.id)?.laufend?.minuten),
+      render: (_, ep) => {
+        const minuten = dauernJePerson.get(ep.id)?.laufend?.minuten;
+        if (!periodenBereit || minuten == null) return dauerZelle(minuten);
+        return (
+          <DauerMitEinstufung
+            minuten={minuten}
+            einstufung={einstufungJePerson.get(ep.id) ?? null}
+            grenzwerte={grenzwerteQuery.data}
+            zeit={zeit}
+          />
+        );
+      },
     },
     {
       title: 'Ruhe',

@@ -40,8 +40,15 @@ import {
   rueckmeldungJeEinheit,
 } from '../meldungen/rueckmeldung';
 import { abrufZustand, zustandNachFreigabe, type AbrufZustand } from '../api/abrufZustand';
-import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
-import { ankerText, dauerText, kraftDauern, type LaufendeDauer } from '../kraefte/zeitachse';
+import { ladeZeitachseGrenzwerte, listeEinheitenPerioden } from '../api/kraefteZeitachse';
+import DauerMitEinstufung from '../kraefte/DauerMitEinstufung';
+import {
+  ankerText,
+  kraftDauern,
+  stufeEin,
+  type Einstufung,
+  type LaufendeDauer,
+} from '../kraefte/zeitachse';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { staerkeText } from '../anzeige/staerke';
 import {
@@ -79,7 +86,7 @@ import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
-import type { StatusKategorie } from '../api/types';
+import type { SchichtplanGrenzwerte, StatusKategorie } from '../api/types';
 import StatusWahl from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
@@ -240,11 +247,13 @@ interface StatusKontext {
 /**
  * Spalte „Im Einsatz" (LFH-552): laufende Einsatzdauer je Einheit aus der Kräfte-Zeitachse.
  * `gesperrt` (403) nimmt die Spalte weg; solange die Perioden laden oder scheitern, bleibt die
- * Zelle leer — ein „—" behauptete sonst „nicht im Einsatz" für eine ungeprüfte Lage.
+ * Zelle leer — ein „—" behauptete sonst „nicht im Einsatz" für eine ungeprüfte Lage. Die
+ * Einstufung gegen die Grenzwerte (LLH-730) fehlt, solange diese nicht geladen sind.
  */
 interface ImEinsatzSpalte {
   zustand: AbrufZustand;
-  jeEinheit: ReadonlyMap<number, LaufendeDauer>;
+  jeEinheit: ReadonlyMap<number, { dauer: LaufendeDauer; einstufung: Einstufung | null }>;
+  grenzwerte: SchichtplanGrenzwerte | undefined;
 }
 
 function rasterSpalten(
@@ -361,7 +370,8 @@ function rasterSpalten(
               z.art === 'einheit' && z.einheitId != null ? (
                 <ImEinsatzZelle
                   zustand={imEinsatz.zustand}
-                  dauer={imEinsatz.jeEinheit.get(z.einheitId) ?? null}
+                  eintrag={imEinsatz.jeEinheit.get(z.einheitId) ?? null}
+                  grenzwerte={imEinsatz.grenzwerte}
                   zeit={kontext.zeit}
                 />
               ) : null,
@@ -399,33 +409,30 @@ function rasterSpalten(
   ]);
 }
 
-/** Nur für Screenreader: der Anker der Dauer, sehend steht er im `title`. */
-const NUR_VORGELESEN: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-};
-
 function ImEinsatzZelle({
   zustand,
-  dauer,
+  eintrag,
+  grenzwerte,
   zeit,
 }: {
   zustand: AbrufZustand;
-  dauer: LaufendeDauer | null;
+  eintrag: { dauer: LaufendeDauer; einstufung: Einstufung | null } | null;
+  grenzwerte: SchichtplanGrenzwerte | undefined;
   zeit: (utc: string) => string;
 }) {
   if (zustand !== 'daten') return null;
-  if (!dauer) return <span style={monoStil(12)}>—</span>;
-  const anker = ankerText(dauer.anker, zeit(dauer.beginnAt));
+  if (!eintrag) return <span style={monoStil(12)}>—</span>;
+  const { dauer, einstufung } = eintrag;
+  // Der Anker steht sehend im `title`, vorgelesen hinter der Zahl; die Einstufung dahinter.
   return (
-    <span data-lfh="im-einsatz" title={anker} style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
-      {dauerText(dauer.minuten)}
-      <span style={NUR_VORGELESEN}>, {anker}</span>
-    </span>
+    <DauerMitEinstufung
+      lfh="im-einsatz"
+      minuten={dauer.minuten}
+      einstufung={einstufung}
+      grenzwerte={grenzwerte}
+      zeit={zeit}
+      zusatz={ankerText(dauer.anker, zeit(dauer.beginnAt))}
+    />
   );
 }
 
@@ -791,6 +798,13 @@ export default function KraefteuebersichtPage() {
     queryFn: () => listeEinheitenPerioden(einsatzId),
     enabled: frei.einheiten === true,
   });
+  // Grenzwerte des Schichtplans für die Einstufung (LLH-730). Scheitert der Abruf, fehlt nur die
+  // Einstufung; die Dauer steht trotzdem.
+  const grenzwerteQuery = useQuery({
+    queryKey: einsatzKeys.kraefteZeitachseGrenzwerte(einsatzId, 'einheiten'),
+    queryFn: () => ladeZeitachseGrenzwerte(einsatzId, 'einheiten'),
+    enabled: frei.einheiten === true,
+  });
   // Fünfter Zusatzabruf (LLH-1384): derselbe Cache wie das Board, live über `nachforderung`.
   // Scheitert er, fehlt nur die Kennzahl „Zulauf“.
   const nachforderungenQuery = useQuery({
@@ -944,14 +958,16 @@ export default function KraefteuebersichtPage() {
   );
   const periodenZustand = zustandNachFreigabe(periodenQuery, frei.einheiten, freigabenGescheitert);
   const jetztMs = jetzt.valueOf();
+  const grenzwerte = grenzwerteQuery.data;
   const imEinsatzJeEinheit = useMemo(() => {
-    const m = new Map<number, LaufendeDauer>();
+    const m = new Map<number, { dauer: LaufendeDauer; einstufung: Einstufung | null }>();
     for (const e of periodenQuery.data ?? []) {
       const d = kraftDauern(e.perioden, jetztMs).laufend;
-      if (d) m.set(e.einheit_id, d);
+      if (d)
+        m.set(e.einheit_id, { dauer: d, einstufung: stufeEin(e.perioden, grenzwerte, jetztMs) });
     }
     return m;
-  }, [periodenQuery.data, jetztMs]);
+  }, [periodenQuery.data, grenzwerte, jetztMs]);
   const darfSchreibenFrueh = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   const statusOptionen = useMemo(
     () => handStatusOptionen(statusKatalogQuery.data ?? []),
@@ -1010,7 +1026,7 @@ export default function KraefteuebersichtPage() {
           handFehler: handFehler.grund,
         },
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
-        { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
+        { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit, grenzwerte },
         sprungGesperrt,
         personalBekannt,
       ).filter((spalte) => !druckt || !NUR_AM_SCHIRM.has(spalte.key)),
@@ -1025,6 +1041,7 @@ export default function KraefteuebersichtPage() {
       rueckmeldungJeZeile,
       periodenZustand,
       imEinsatzJeEinheit,
+      grenzwerte,
       sprungGesperrt,
       personalBekannt,
     ],

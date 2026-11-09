@@ -615,6 +615,79 @@ async fn rechte_und_modulsperre() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
+// ── Grenzwerte (LLH-730) ────────────────────────────────────────────────────────────────────
+
+async fn grenzwerte(w: &Welt, cookie: &str, modul: &str) -> (StatusCode, Value) {
+    anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/{modul}/zeitachse/grenzwerte", w.e),
+        cookie,
+        None,
+    )
+    .await
+}
+
+async fn modul_sichtbar(w: &Welt, modul: &str, sichtbar: bool) {
+    let (s, _) = anfrage(
+        &w.app,
+        "PUT",
+        &format!("/api/einsaetze/{}/modul-overrides/{modul}", w.e),
+        &w.admin,
+        Some(&format!(
+            r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":null}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+/// Die Einstufung des Ist liest dieselben wirksamen Grenzwerte wie der Plan: ohne eigenen Wert
+/// die Vorgaben, sonst den Wert des Schichtplans, unter Einheiten und Personal, ohne das Modul
+/// Ablösung (Spec `kraefte-zeitachse`, „Grenzwerte lesen“).
+#[tokio::test]
+async fn grenzwerte_lesen_ohne_modul_abloesung() {
+    let w = welt().await;
+    let bid = benutzer_anlegen(&w.app, &w.admin, "beatrix", "keine").await;
+    rolle_setzen(&w.app, &w.admin, w.e, bid, "beobachter").await;
+    let bea = login_cookie(&w.app, "beatrix", "beatrixpw1").await;
+
+    for modul in ["einheiten", "personal"] {
+        let (s, g) = grenzwerte(&w, &bea, modul).await;
+        assert_eq!(s, StatusCode::OK, "{modul}: {g:?}");
+        assert_eq!(g["max_dienst_minuten"], 720);
+        assert_eq!(g["min_ruhe_minuten"], 480);
+        assert_eq!(g["max_dienst_eigen"], false);
+        assert_eq!(g["min_ruhe_eigen"], false);
+    }
+
+    let (s, _) = anfrage(
+        &w.app,
+        "PATCH",
+        &format!("/api/einsaetze/{}/abloesungen/schichtplan/grenzwerte", w.e),
+        &w.admin,
+        Some(r#"{"max_dienst_minuten":360}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    modul_sichtbar(&w, "abloesung", false).await;
+
+    let (s, g) = grenzwerte(&w, &bea, "einheiten").await;
+    assert_eq!(s, StatusCode::OK, "{g:?}");
+    assert_eq!(g["max_dienst_minuten"], 360);
+    assert_eq!(g["max_dienst_eigen"], true);
+    assert_eq!(g["min_ruhe_minuten"], 480);
+
+    modul_sichtbar(&w, "personal", false).await;
+    let (s, _) = grenzwerte(&w, &bea, "personal").await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = grenzwerte(&w, &bea, "einheiten").await;
+    assert_eq!(s, StatusCode::OK);
+    modul_sichtbar(&w, "einheiten", false).await;
+    let (s, _) = grenzwerte(&w, &bea, "einheiten").await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
 // ── Live (Task 5.2) ─────────────────────────────────────────────────────────────────────────
 
 /// Ein Nachtrag an der Einheit sendet `einheit` und — für die per Fan-out berührte Person —
@@ -651,6 +724,28 @@ async fn nachtrag_sendet_live_events() {
     recv_until_tag(&mut rx, "einheit", Duration::from_secs(2)).await;
     let n = recv_until_tag(&mut rx, "personal", Duration::from_secs(2)).await;
     assert!(n.data.contains(&ep.to_string()), "{}", n.data);
+}
+
+/// Neue Grenzwerte erreichen auch Leser ohne das Modul Ablösung (LLH-730): `abloesung` allein
+/// filtert das Modul-Gate für sie weg, deshalb melden `einheit` und `personal` mit, die den Prefix
+/// der Kräfte-Zeitachse im Client invalidieren.
+#[tokio::test]
+async fn grenzwerte_setzen_meldet_einheit_und_personal() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(e);
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/abloesungen/schichtplan/grenzwerte"),
+        &admin,
+        Some(r#"{"max_dienst_minuten":360}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    recv_until_tag(&mut rx, "einheit", Duration::from_secs(2)).await;
+    recv_until_tag(&mut rx, "personal", Duration::from_secs(2)).await;
 }
 
 const PERSONAL: &[(&str, &str)] = &[("personal", "personal_id")];

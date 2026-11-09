@@ -41,6 +41,7 @@ pub mod geocoding;
 pub mod geraet;
 pub mod http_begrenzt;
 pub mod infotelefon;
+pub mod instanz;
 pub mod karte;
 pub mod karte_hintergrundbild;
 pub mod karten_ansicht;

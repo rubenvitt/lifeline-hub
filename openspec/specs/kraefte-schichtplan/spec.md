@@ -6,9 +6,7 @@ eingeteilten Personen. Der Plan ist Soll und ändert kein Ist. Prüfbefunde zeig
 blockieren nie (LLH-1552, Konzept LLH-1523). Er gibt einer laufenden Schicht die Fälligkeit und
 belegt den Wechsel vor (`kraefte-abloesung`, „Fälligkeit laut Plan“ und „Vollzug aus dem Plan“,
 LLH-1555); der Wechsel selbst ist ein Griff, kein Automatismus. Das Raster regelt LLH-1554, das Einlesen aus einer Datei LLH-1556.
-
 ## Requirements
-
 ### Requirement: Planschicht
 Ein Einsatz SHALL Planschichten an einer Einheit, einer UHS oder der Pause führen können, mit
 Beginn, Ende, Soll-Anzahl, Qualifikationssoll, Personen und Notiz. Beginn und Ende MUST auf vollen
@@ -71,8 +69,9 @@ Das Lesen des Plans MUST je Block und Person Befunde liefern, ohne Schreiben zu 
 - `abweichung`: ab Blockbeginn plus 10 Minuten bis Blockende ist eine eingeteilte Person nicht am
   Posten.
 
-Die Kräfte-Zeitachse MUST weiterhin nicht gegen Grenzwerte einstufen; der Dienst-Befund liest
-nur Planblöcke.
+Der Dienst-Befund liest nur Planblöcke. Das Ist der Kräfte-Zeitachse stuft dieselbe Regel gegen
+dieselben Grenzwerte ein (Capability `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des
+Einsatzes“); ein Befund des Plans entsteht daraus nicht.
 
 #### Scenario: Doppelt
 - **WHEN** Anna in Streife 2 14:00–16:00 und an der UHS 15:00–19:00 steht
@@ -101,7 +100,16 @@ nur Planblöcke.
 ### Requirement: Grenzwerte des Einsatzes
 Ein Einsatz SHALL einen Höchstwert für den Dienst (60 bis 1440 Minuten) und eine Mindestruhe (0
 bis 1440 Minuten) tragen. Ohne eigenen Wert MUST 12 Stunden bzw. 8 Stunden gelten. Eine Änderung
-MUST einen ETB-Systemsatz schreiben.
+MUST einen ETB-Systemsatz schreiben. Dieselben wirksamen Werte MUST auch die Einstufung der
+Kräfte-Zeitachse lesen; es gibt keine zweite Einstellung.
+
+#### Scenario: Vorgabe ohne eigenen Wert
+- **WHEN** ein Einsatz keinen eigenen Höchstwert und keine eigene Mindestruhe setzt
+- **THEN** gelten 12 h und 8 h im Plan und in der Einstufung der Kräfte-Zeitachse
+
+#### Scenario: Eigener Wert gilt für Plan und Ist
+- **WHEN** jemand den Höchstwert des Einsatzes auf 10 h setzt
+- **THEN** entsteht ein ETB-Systemsatz, und Plan-Befund `dienst` und Einstufung der Kräfte-Zeitachse prüfen gegen 10 h
 
 ### Requirement: Schichten erzeugen
 Das System SHALL einen Zeitraum an einem Posten mit Blöcken füllen: mit angegebener Länge oder
@@ -117,6 +125,43 @@ einen ETB-Systemsatz schreiben; einzelne Blöcke schreiben keinen.
 #### Scenario: Eigene Länge
 - **WHEN** jemand an der Streife 2 18:00–00:00 mit 2 h erzeugt
 - **THEN** entstehen drei Blöcke zu 2 h mit dem Soll der Streife
+
+### Requirement: Wechsel an der UHS
+Das System SHALL zu einem UHS-Block einen Wechsel vollziehen: Kommende bekommen die UHS, Gehende
+verlieren sie, Bleibende bleiben; die Mitgliedschaft in einer Einheit MUST unberührt bleiben.
+Vorbelegt MUST kommen, wer im Block steht und nicht an der UHS ist, und gehen, wer an der UHS ist
+und nicht im Block steht; beide Listen lassen sich abwählen. Stamm-Personen und Helfer MUST dabei
+in den Einsatz übernommen werden. Kommende ohne Einheit MUST ein Eintreffen bekommen, Gehende ohne
+Einheit eine Ablösung (Quelle `abloesung`). Ein ETB-Eintrag MUST UHS, Gehende, Kommende und
+Bleibende nennen. Kommen MUST nur, wer beim Vollzug im Block steht (sonst 422). Der Wechsel MUST die Freigaben der Module Unfallhilfsstellen und Personal
+verlangen (403); eine aufgelöste oder stornierte UHS MUST 409 sein.
+
+#### Scenario: UHS Markt um 18:00
+- **WHEN** an der „UHS Markt“ „Anna“ und „Dana“ arbeiten, der Block ab 18:00 „Dana“ und „Ben“ hat und der Wechsel vollzogen wird
+- **THEN** arbeiten „Dana“ und „Ben“ an der UHS, „Anna“ nicht mehr, und das ETB nennt „Geht «Anna». Kommt «Ben». Bleibt «Dana».“
+
+### Requirement: Pause aus dem Plan
+Das System SHALL zum Beginn eines Pausenblocks den Kräften des Blocks den Status setzen, den der
+Katalog als Pause kennzeichnet (höchstens einer je Organisation), und zum Ende den vorigen Status
+zurückgeben (auch einen leeren), wenn die Kraft dann noch den Pausenstatus trägt. Ohne gekennzeichneten Status MUST
+der Beginn gesperrt sein (422 mit Grund), das Ende einer begonnenen Pause MUST weiter gehen; ein Ende ohne Beginn MUST 422 sein. Wer nicht im
+Einsatz ist, MUST übersprungen und genannt werden. Der Wechsel MUST die Freigabe des Moduls
+Personal verlangen (403).
+
+#### Scenario: Pause zurück
+- **WHEN** „Anna“ „im Einsatz“ war, ihre Pause 16:00–16:30 begonnen und um 16:30 beendet wird
+- **THEN** trägt sie wieder „im Einsatz“
+
+### Requirement: Wechsel zurücknehmen
+Ein Wechsel aus dem Plan MUST je Block und Art höchstens einmal offen vollzogen sein (sonst 409).
+Die Rücknahme MUST nur zurücklegen, was noch den Stand des Wechsels trägt: an der UHS die Zuordnung
+der Kraft, in der Pause den Status. Sie MUST die Ereignisse der Zeitachse streichen und einen
+ETB-Eintrag schreiben. Den Beginn einer Pause MUST sie erst nach Rücknahme ihres Endes zulassen
+(409). Danach lässt sich der Wechsel erneut vollziehen. Einen Pausenblock mit begonnener, nicht
+beendeter Pause MUST das System weder löschen noch aus der Zeile „Pause“ verschieben (409). Ist der
+Pausenblock gelöscht oder nicht mehr in der Zeile „Pause“, MUST die Rücknahme seiner Wechsel 409
+sein. Eine Kraft, die in einem späteren, nicht zurückgenommenen Wechsel an einer UHS
+steht, MUST die Rücknahme an der UHS auslassen.
 
 ### Requirement: Austauschformat
 Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,
@@ -199,3 +244,43 @@ geschnitten werden.
 - **WHEN** ein Posten mehr Schichten hat, als auf eine Seite passen
 - **THEN** läuft die Tabelle auf der nächsten Seite mit wiederholtem Tabellenkopf weiter, und
   keine Zeile ist abgeschnitten
+
+### Requirement: Schichtplan als Excel-Mappe
+Das System SHALL den Schichtplan eines Einsatzes als Excel-Mappe ausgeben
+(`GET …/abloesungen/schichtplan/export`) mit den Blättern „Austausch“ (zuerst), „Übersicht“,
+„Je Posten“, „Je Person“ und „Befunde“. Das Blatt „Austausch“ MUST dem Austauschformat folgen,
+Zeiten MUST dort als ISO 8601 mit Versatz stehen und in den übrigen Blättern als Text in der Zone
+des Einsatzes. Der Abruf MUST Leserecht in der Ablösung und die Freigabe des Moduls Personal
+verlangen (403 sonst) und auch im abgeschlossenen Einsatz gehen. Er MUST NOT ins Einsatztagebuch
+schreiben. Eine exportierte Mappe, in denselben Einsatz wieder eingelesen, MUST nur unveränderte
+Posten, Blöcke und Personen ergeben.
+
+#### Scenario: Rundweg
+- **WHEN** jemand die Mappe eines Einsatzes exportiert und sie in denselben Einsatz einliest
+- **THEN** zeigt die Vorschau nur „unverändert“ und keinen unsicheren Treffer, und Übernehmen
+  schreibt nichts
+
+#### Scenario: Ohne Modul Personal
+- **WHEN** jemand ohne Freigabe des Moduls Personal die Mappe abruft
+- **THEN** antwortet das System mit 403, und in der Ansicht ist „Excel“ mit Grund gesperrt
+
+### Requirement: Eigene Bezüge im Austauschformat
+Das Austauschformat SHALL zusätzlich zu externen Kennungen eigene Bezüge kennen: Herkunft
+„Lifeline Hub“ mit einer Kennung `personal-<id>`, `einsatzkraft-<id>` oder `helfer-<id>`. Helfer
+einer Planung ohne eigene Kennung MUST ihre Helfer-ID als Kennung und die Herkunft `vorplanung`
+tragen, wie die Übernahme einer Planung sie anlegt. Beim Abgleich der Personen MUST eine Zeile mit
+Herkunft „Lifeline Hub“ zuerst gegen den Bezug geprüft werden: Stamm-Personal derselben
+Organisation bzw. Ad-hoc-Kraft oder Helfer desselben Einsatzes mit passendem Namen trifft sicher.
+Trifft der Bezug nicht, MUST die Zeile wie jede andere abgeglichen werden. Externe Kennungen MUST
+das Format ohne Bezug auf ein bestimmtes Fremdsystem beschreiben.
+
+#### Scenario: Bezug auf eine Ad-hoc-Kraft
+- **WHEN** eine Zeile `Kennung = einsatzkraft-9`, `Herkunft = Lifeline Hub` trägt und die
+  Ad-hoc-Kraft 9 in diesem Einsatz denselben Namen hat
+- **THEN** trifft der Abgleich diese Kraft sicher und legt keinen Helfer an
+
+#### Scenario: Bezug aus einem anderen Einsatz
+- **WHEN** eine Zeile `Kennung = helfer-4`, `Herkunft = Lifeline Hub` in einen anderen Einsatz
+  eingelesen wird
+- **THEN** läuft der Abgleich über Kennung, Name und Telefon weiter, und ein neuer Helfer speichert
+  Kennung und Herkunft, sodass ein zweiter Lauf ihn trifft

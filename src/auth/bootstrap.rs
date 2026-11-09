@@ -4,8 +4,8 @@ use crate::error::AppError;
 use crate::etb_baustein::ETB_BAUSTEIN_STARTLISTE;
 use crate::fahrzeug::STATUS_STARTLISTE;
 use crate::personal::{
-    PERSONAL_STATUS_STARTLISTE, PERSONAL_STATUS_STARTMARKEN, QUALIFIKATION_EINSCHLUSS_STARTLISTE,
-    QUALIFIKATION_STARTLISTE,
+    PERSONAL_STATUS_STARTLISTE, PERSONAL_STATUS_STARTMARKEN, PERSONAL_STATUS_STARTPAUSE,
+    QUALIFIKATION_EINSCHLUSS_STARTLISTE, QUALIFIKATION_STARTLISTE,
 };
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
@@ -156,14 +156,16 @@ pub async fn bootstrap_admin(
             .find(|(l, _)| *l == label)
             .map(|(_, m)| *m);
         sqlx::query(
-            "INSERT INTO personal_status (org_id, label, kategorie, sortier, zeitachse_marke) \
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO personal_status \
+                (org_id, label, kategorie, sortier, zeitachse_marke, pause) \
+             VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(org_id)
         .bind(label)
         .bind(kategorie)
         .bind(sortier)
         .bind(marke)
+        .bind(label == PERSONAL_STATUS_STARTPAUSE)
         .execute(&mut *tx)
         .await?;
     }
@@ -406,6 +408,13 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(kat, "gebunden");
+        // LLH-1555: genau „Pause“ trägt das Kennzeichen für den Schichtplan.
+        let pause: Vec<String> =
+            sqlx::query_scalar("SELECT label FROM personal_status WHERE pause = 1")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(pause, ["Pause"]);
     }
 
     #[tokio::test]

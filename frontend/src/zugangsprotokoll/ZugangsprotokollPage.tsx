@@ -42,7 +42,8 @@ import {
   anmeldewegText,
   istAktion,
   istEreignis,
-  istLesezugang,
+  hasNamensziel,
+  instanzText,
   rollenText,
 } from './zugangsprotokollText';
 
@@ -164,7 +165,7 @@ const ANMELDE_KARTE: Kartenplan<AnmeldeEintrag, (typeof anmeldeSpalten)[number][
  */
 function AngabenAnzeige({ angaben }: { angaben: ZugangsAngaben }) {
   const rollen = rollenText(angaben);
-  if (angaben.angemeldet_at == null) return <>{rollen ?? leer}</>;
+  if (angaben.angemeldet_at == null) return <>{rollen ?? instanzText(angaben) ?? leer}</>;
   return (
     <>
       {angaben.geraet ?? 'unbekanntes Gerät'}, angemeldet{' '}
@@ -203,7 +204,7 @@ const aenderungsSpalten = spaltenFuer<Zugangsaenderung>()([
     // Ohne Konto ist das Ziel ein Anmeldeweg, beim Lagemonitor-Zugang (LLH-1484) seine
     // Bezeichnung.
     render: (_, e) =>
-      e.ziel_benutzer_id == null && !istLesezugang(e.aktion) ? anmeldewegText(e.ziel) : e.ziel,
+      e.ziel_benutzer_id == null && !hasNamensziel(e.aktion) ? anmeldewegText(e.ziel) : e.ziel,
   },
   {
     key: 'detail',

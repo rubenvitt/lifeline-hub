@@ -31,6 +31,19 @@ export type GeraeteUebersicht = S['GeraeteUebersicht'];
 export type LesezugangAnzeige = S['LesezugangAnzeige'];
 export type LesezugangFreigabe = S['LesezugangFreigabe'];
 export type LesezugangMitSchluessel = S['LesezugangMitSchluessel'];
+// Instanzkopplung (LLH-1490)
+export type InstanzUebersicht = S['InstanzUebersicht'];
+export type InstanzKopplungAnzeige = S['InstanzKopplungAnzeige'];
+export type InstanzKopplungRichtung = S['InstanzKopplungRichtung'];
+export type InstanzKopplungZustand = S['InstanzKopplungZustand'];
+export type InstanzProtokoll = S['InstanzProtokoll'];
+export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
+export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
+export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];
+export type UnterschriftSchluesselHerkunft = S['UnterschriftSchluesselHerkunft'];
+export type UnterschriftRegistrierenStart = S['UnterschriftRegistrierenStart'];
+export type UnterschriftGegenzeichnenStart = S['UnterschriftGegenzeichnenStart'];
+export type UnterschriftAssertion = S['UnterschriftAssertion'];
 export type AnsichtSperre = S['AnsichtSperre'];
 export type AnsichtAuswahl = S['AnsichtAuswahl'];
 export type Bindungsart = S['Bindungsart'];
@@ -875,7 +888,10 @@ export type SchichtplanPostenWahlEingabe =
 
 /** Kein Backend-Schema: Wahl einer Person beim Einlesen (`uebernahme::PersonEntscheidung`). */
 export type SchichtplanPersonWahlEingabe =
-  { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number } | { art: 'neu' };
+  | { art: 'stamm'; personal_id: number }
+  | { art: 'helfer'; helfer_id: number }
+  | { art: 'einsatz'; einsatz_personal_id: number }
+  | { art: 'neu' };
 
 /**
  * Kein Backend-Schema: Teil `entscheidungen` beim Einlesen (`uebernahme::Entscheidungen`), je
@@ -950,6 +966,121 @@ export interface SchichtplanHelferBody {
 
 /** Kein Backend-Schema: `PATCH …/schichtplan/helfer/{hid}` (fehlt = unverändert). */
 export type SchichtplanHelferAendernBody = Partial<SchichtplanHelferBody>;
+
+/** Der nächste Wechsel eines UHS- oder Pausenblocks zum Vorbelegen (LLH-1555). */
+export type SchichtplanWechselVorlage = S['WechselVorlage'];
+export type SchichtplanWechselPerson = S['WechselVorlagePerson'];
+export type SchichtplanWechsel = S['PlanWechselAnzeige'];
+export type SchichtplanWechselArt = S['WechselArt'];
+
+/**
+ * Kein Backend-Schema: `POST …/schichtplan/bloecke/{bid}/wechsel`. `kommen` und `gehen` nur an der
+ * UHS (sonst 400); fehlt `vollzogen_at`, gilt jetzt.
+ */
+export interface SchichtplanWechselBody {
+  art: SchichtplanWechselArt;
+  vollzogen_at?: string;
+  kommen?: SchichtplanPersonEingabe[];
+  gehen?: number[];
+}
+
+// ============================== LLH-1561 Vorplanung ohne Einsatz ==============================
+/** Eine Planung der Organisation: Kopf, Posten, Blöcke mit Befunden, Helfer, Kennzahlen. */
+export type Planung = S['PlanungAnzeige'];
+export type PlanungKopf = S['PlanungKopf'];
+export type PlanungListeneintrag = S['PlanungListeneintrag'];
+export type PlanungKennzahlen = S['PlanungKennzahlen'];
+export type PlanungPosten = S['PlanungPostenAnzeige'];
+export type PlanungPostenArt = S['PlanungPostenArt'];
+/** Ein Block der Planung in der Form des Einsatz-Blocks, der Posten als `posten_id`. */
+export type PlanungBlock = S['PlanungBlockAnzeige'];
+
+/** Kein Backend-Schema: `POST /api/planungen`; Einsatzart fehlt = Sanitätsdienst. */
+export interface PlanungBody {
+  bezeichnung: string;
+  einsatzart?: Einsatzart;
+  ort?: string;
+  von: string;
+  bis: string;
+  max_dienst_minuten?: number;
+  min_ruhe_minuten?: number;
+}
+
+/** Kein Backend-Schema: `PATCH /api/planungen/{id}`; `version` Pflicht (409), `null` = leeren. */
+export interface PlanungAendernBody {
+  version: number;
+  bezeichnung?: string;
+  einsatzart?: Einsatzart;
+  ort?: string | null;
+  von?: string;
+  bis?: string;
+  /** `null` = Vorgabe (720 min). */
+  max_dienst_minuten?: number | null;
+  /** `null` = Vorgabe (480 min). */
+  min_ruhe_minuten?: number | null;
+}
+
+/**
+ * Kein Backend-Schema: `POST …/posten`. Bei `einheit` höchstens eins von Vorlage und Fahrzeug,
+ * bei `uhs` Pflicht der Typ. `soll_anzahl`/`quali_soll` fehlen = die der Vorlage bzw. des
+ * Fahrzeugs, `null` = keins.
+ */
+export interface PlanungPostenBody {
+  bezeichnung: string;
+  abschnitt?: string;
+  art: PlanungPostenArt;
+  einheit_vorlage_id?: number;
+  fahrzeug_id?: number;
+  uhs_typ?: UhsTyp;
+  schichtlaenge_minuten?: number;
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollEingabe[] | null;
+}
+
+/** Kein Backend-Schema: `PATCH …/posten/{pid}`; die Herkunft bleibt, `null` = leeren. */
+export interface PlanungPostenAendernBody {
+  bezeichnung?: string;
+  abschnitt?: string | null;
+  schichtlaenge_minuten?: number | null;
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollEingabe[] | null;
+}
+
+/** Kein Backend-Schema: eine Person der Planung, Stamm-Personal oder ein Helfer der Planung. */
+export type PlanungPersonEingabe =
+  { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number };
+
+/** Kein Backend-Schema: `POST …/bloecke`; `posten_id` `null` = die Pause. */
+export interface PlanungBlockBody {
+  posten_id: number | null;
+  von: string;
+  bis: string;
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollEingabe[] | null;
+  personen?: PlanungPersonEingabe[];
+  notiz?: string;
+}
+
+/** Kein Backend-Schema: `PATCH …/bloecke/{bid}`; `version` Pflicht (409), `posten_id: null` = Pause. */
+export interface PlanungBlockAendernBody {
+  version: number;
+  posten_id?: number | null;
+  von?: string;
+  bis?: string;
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollEingabe[] | null;
+  /** Die ganze Liste. */
+  personen?: PlanungPersonEingabe[];
+  notiz?: string | null;
+}
+
+/** Kein Backend-Schema: `POST …/erzeugen`; ohne Länge gilt die Schichtlänge des Postens. */
+export interface PlanungErzeugenBody {
+  posten_id: number | null;
+  von: string;
+  bis: string;
+  laenge_minuten?: number;
+}
 
 // ============================== LLH-1375 Einsatz-Vorlagen ==============================
 /**

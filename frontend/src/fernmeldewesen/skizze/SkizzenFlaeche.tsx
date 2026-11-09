@@ -51,6 +51,7 @@ import {
   type Zeigerziel,
 } from './ansicht';
 import { naechsterFokus, tastenBefehl, type TastenBefehl } from './bedienung';
+import { useKontextMenue, type KontextHandler } from '../../components/useKontextMenue';
 import type { ZiehDaten } from './wirkung';
 import { SCHRIFTFELD, stichleitungen, type Stichleitung } from './ebenen';
 import { stichleitungsPunkte, zeichenMitte, type Rechteck } from './geometrie';
@@ -69,9 +70,6 @@ import {
   type Zustand,
 } from './SkizzenElemente';
 
-/** Ab dieser Dauer öffnet ein Druck ohne Bewegung das Kontextmenü (Touch). */
-export const LANGDRUCK_MS = 550;
-const LANGDRUCK_WEG = 8;
 /** Größe, falls die Fläche (noch) nicht gemessen ist (jsdom, erster Render). */
 export const FLAECHE_VORGABE: Groesse = { breite: 960, hoehe: 540 };
 
@@ -162,6 +160,8 @@ interface ElementProps {
   tastatur: { current: boolean };
   domFokus: string | null;
   setDomFokus: (k: string | null) => void;
+  /** Rechtsklick, langer Druck und Tasten aus dem gemeinsamen Baustein (LLH-1596, D3/D4). */
+  kontext: KontextHandler<SVGGElement>;
 }
 
 /** Ein bedienbares Element: Fokus, Wahl, Zeiger, Langdruck, Ziehen. */
@@ -183,6 +183,7 @@ function Element({
   tastatur,
   domFokus,
   setDomFokus,
+  kontext,
 }: ElementProps) {
   // Ohne `attributes`: Rolle, Name und `tabindex` setzt das Element selbst (roving tabindex).
   const { listeners, setNodeRef, transform } = useDraggable({
@@ -190,12 +191,6 @@ function Element({
     data: daten,
     disabled: !ziehbar || druck,
   });
-  const lang = useRef<{ timer: number; x: number; y: number } | null>(null);
-  const abbrechen = () => {
-    if (lang.current) window.clearTimeout(lang.current.timer);
-    lang.current = null;
-  };
-  useEffect(() => abbrechen, []);
   const ref = useCallback(
     (el: SVGGElement | null) => {
       setNodeRef(el as unknown as HTMLElement | null);
@@ -238,30 +233,18 @@ function Element({
       onPointerLeave={(e) => {
         if (e.pointerType !== 'touch') f.onZeiger(null);
       }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        f.onKontext(elementKey, { x: e.clientX, y: e.clientY });
-      }}
+      // Rechtsklick und langer Druck aus dem Baustein; Zeigerdruck und Tasten ergänzen ihn unten.
+      {...kontext}
       onPointerDown={(e: ReactPointerEvent<SVGGElement>) => {
         tastatur.current = false;
         listeners?.onPointerDown?.(e);
-        if (e.pointerType === 'mouse') return;
-        abbrechen();
-        const timer = window.setTimeout(() => {
-          lang.current = null;
-          f.onKontext(elementKey, { x: e.clientX, y: e.clientY });
-        }, LANGDRUCK_MS);
-        lang.current = { timer, x: e.clientX, y: e.clientY };
+        kontext.onPointerDown(e);
       }}
-      onPointerMove={(e) => {
-        const l = lang.current;
-        if (l && Math.hypot(e.clientX - l.x, e.clientY - l.y) > LANGDRUCK_WEG) abbrechen();
-      }}
-      onPointerUp={abbrechen}
-      onPointerCancel={abbrechen}
       onKeyDown={(e: KeyboardEvent<SVGGElement>) => {
         tastatur.current = true;
+        // Kontextmenü-Taste und Umschalt+F10 öffnen über den Baustein (Anker: Mitte des Elements).
+        kontext.onKeyDown(e);
+        if (e.defaultPrevented) return;
         const befehl = tastenBefehl(e);
         if (!befehl) return;
         if (befehl.art === 'wandere') {
@@ -420,6 +403,17 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
   const elemente = useRef(new Map<string, SVGGElement>());
   const tastatur = useRef(false);
   const [domFokus, setDomFokus] = useState<string | null>(null);
+  const onKontext = props.onKontext;
+  const kontextAusloeser = useKontextMenue<string>({
+    onOeffnen: (key, { anker }) => {
+      onKontext(key, anker);
+      return true;
+    },
+    tastaturAnker: (el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    },
+  });
   const zieht = useDndContext().active != null;
 
   const setRef = useCallback((key: string, el: SVGGElement | null) => {
@@ -601,6 +595,7 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
       tastatur={tastatur}
       domFokus={domFokus}
       setDomFokus={setDomFokus}
+      kontext={kontextAusloeser<SVGGElement>(key)}
     />
   );
 

@@ -55,9 +55,18 @@ die Anlässe der Hinweise zur ablösenden Einheit `Beruehrt::hinweise` (LLH-1131
 `routes::abloesung::publish_kopplung`. Ein Weg, der ein Ereignis der ablösenden Einheit ohne
 Zeitachse schreibt (Abruf, Eintreffen am Bereitstellungsraum, Auflösen), bildet seine Anlässe
 in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
-Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl, keine Grenzwerte
-(LFH-860). Anzeige im Meldebild/Personal/Einheit-Detail. Bewusster Bruch von
-LFH-46 E17 (Feldbefund) auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
+Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl. Anzeige im
+Meldebild/Personal/Einheit-Detail. Bewusster Bruch von LFH-46 E17 (Feldbefund)
+auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
+**Einstufung** (LLH-730, `openspec/changes/archive/2026-11-08-u1piomi1-zeitachse-grenzwerte-einstufen/design.md`):
+nur `zeitachse.ts:stufeEin` gegen die wirksamen `SchichtplanGrenzwerte` (Vorgaben 12 h/8 h
+eingeschlossen, keine zweite Einstellung), mit derselben Trennregel wie der Plan-Befund `dienst`
+(`src/abloesung/schichtplan/pruefung.rs`, `dienststrecken`; wer eine ändert, ändert beide). Gelesen
+werden die Werte über `…/{einheiten,personal}/zeitachse/grenzwerte` (Key
+`kraefteZeitachseGrenzwerte`), nie über den Schichtplan-GET (Modul Ablösung). Angezeigt nur über
+`DauerMitEinstufung` in Meldebild „Im Einsatz“ und Personal „Einsatzdauer“, Rolle `achtung` mit
+Wort; „Ruhe“, Einheit-Detail, Personenkopf, Überblick und Druck des Berichts bleiben neutral. Kein
+Hinweis in der AlarmZentrale, kein Modulzähler, keine Benachrichtigung (Alarmbudget).
 
 **Ablösung** (LFH-635, LLH-1122, Spec `kraefte-abloesung`): Der Rhythmus einer Schicht folgt
 der Rangfolge eigener Wert → Vorgabe des Abschnitts → Vorgabe des Einsatzes
@@ -150,8 +159,8 @@ nur von `abloesung::repo::vollziehen_besatzung_tx`. Die alte Besatzung ist die Z
 `einsatz_personal.einheit_id` der Einheit und ihrer erbenden Untereinheiten beim Vollzug (dieselbe
 Menge wie der Fan-out der ganzen Einheit); sie verliert Einheit, Fahrzeug dieser Einheiten und
 Führung. Die Zeitachse bekommt nur Personen-Ereignisse (alt `abloesung`, neu `eintreffen`, Quelle
-`abloesung`), keine an der Einheit; **keine Grenzwerte, keine Ruhezeit je Person** (LFH-860 bleibt
-dafür zuständig). Der Wechsel verlangt die Freigabe des Moduls Einheiten (Server) und im Dialog
+`abloesung`), keine an der Einheit; **keine Grenzwerte, keine Ruhezeit je Person** (eingestuft wird
+nur in der Kräfte-Zeitachse, Absatz „Einstufung“ oben, LLH-730). Der Wechsel verlangt die Freigabe des Moduls Einheiten (Server) und im Dialog
 dazu die des Moduls Personal (Auswahl); die bisherige Besatzung und die wählbaren Personen bildet
 nur `abloesung/besatzung.ts`. Die Rücknahme legt nur zurück, was noch den Stand des Vollzugs
 trägt. **Verteilung und Planung** (LLH-1319): je neuer Person optional Ziel-Einheit (die Einheit

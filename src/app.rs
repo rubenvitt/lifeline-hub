@@ -620,6 +620,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             patch(routes::abloesung_schichtplan::block_aendern)
                 .delete(routes::abloesung_schichtplan::block_loeschen),
         )
+        // Wechsel aus dem Plan an einer UHS und in der Pause (LLH-1555).
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}/wechsel",
+            get(routes::abloesung_schichtplan::wechsel_vorlage)
+                .post(routes::abloesung_schichtplan::wechsel_vollziehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/wechsel/{wid}/zuruecknehmen",
+            post(routes::abloesung_schichtplan::wechsel_zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/erzeugen",
             post(routes::abloesung_schichtplan::erzeugen),
@@ -631,6 +641,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
             post(routes::abloesung_schichtplan::helfer_anlegen),
+        )
+        // Schichtplan als Excel-Mappe (LLH-1557): nur Lesen.
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/export",
+            get(routes::abloesung_schichtplan::export),
         )
         // Schichtplan einlesen (LLH-1556): Multipart mit der Datei (höchstens 2 MiB) und den
         // Entscheidungen; die Datei-Grenze selbst prüft `uebernahme::datei` (400).
@@ -1045,6 +1060,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personal/zeitachse",
             get(routes::zeitachse::personal_perioden),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/zeitachse/grenzwerte",
+            get(routes::zeitachse::personal_grenzwerte),
         )
         .route(
             "/api/einsaetze/{id}/personal/{ep_id}/zeitachse",
@@ -1781,6 +1800,49 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/lagemonitor/v1/lage",
             get(routes::lagemonitor_v1::lage),
         )
+        // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
+        // (IP-Sperre wie die Gerätekopplung), Melden signiert (`instanz::extractor`).
+        .route("/api/admin/instanz", get(routes::instanz::uebersicht))
+        .route(
+            "/api/admin/instanz/codes",
+            post(routes::instanz::code_ausstellen),
+        )
+        .route(
+            "/api/admin/instanz/einloesen",
+            post(routes::instanz::einloesen),
+        )
+        .route(
+            "/api/admin/instanz/kopplungen/{id}/widerrufen",
+            post(routes::instanz::widerrufen),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/registrieren/start",
+            post(routes::instanz::registrieren_start),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/registrieren/abschluss",
+            post(routes::instanz::registrieren_abschluss),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/start",
+            post(routes::instanz::gegenzeichnen_start),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/gegenzeichnen/abschluss",
+            post(routes::instanz::gegenzeichnen_abschluss),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/widerrufen",
+            post(routes::instanz::unterschrift_widerrufen),
+        )
+        .route(
+            "/api/instanz/koppeln",
+            post(routes::instanz::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        .route(
+            crate::instanz::extractor::MELDEN_PFAD,
+            post(routes::instanz::melden),
+        )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(
             "/api/organisation",
@@ -1887,6 +1949,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/planungen/{id}/erzeugen",
             post(routes::planung::erzeugen),
         )
+        .route("/api/planungen/{id}/export", get(routes::planung::export))
         .route(
             "/api/planungen/{id}/helfer",
             post(routes::planung::helfer_anlegen),
@@ -2111,6 +2174,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/zeitachse",
             get(routes::zeitachse::einheiten_perioden),
+        )
+        // Grenzwerte des Schichtplans für die Einstufung (LLH-730).
+        .route(
+            "/api/einsaetze/{id}/einheiten/zeitachse/grenzwerte",
+            get(routes::zeitachse::einheiten_grenzwerte),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/zeitachse",

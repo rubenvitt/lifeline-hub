@@ -11,31 +11,31 @@ Die Regeln liegen bei dem Code, den sie betreffen. **Bevor du eine Datei änders
 Bereichsdatei selbst, sobald es eine Datei darunter liest. Pfade ohne Präfix sind im
 Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
-| Datei                                    | Inhalt                                                                                                                                             |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `frontend/AGENTS.md`                     | Gestaltungssprache, UI-Form, Bedien-Leitlinie, Erfassung, Deeplinks, Query-Keys, Lint, Browserspeicher                                             |
-| `frontend/src/etb/AGENTS.md`             | ETB: Zeitachse, Erfassung, Kopfzahl und Modulzähler, Entwurfsspeicher                                                                              |
-| `frontend/src/pages/lagekarte/AGENTS.md` | Lagekarte, Zeichnen und Messen                                                                                                                     |
-| `frontend/src/offline/AGENTS.md`         | Lagebild ohne Netz (LFH-723), Schreiben ohne Netz (LFH-705)                                                                                        |
-| `frontend/src/auth/AGENTS.md`            | Sitzung über mehrere Tabs (LFH-387), Sitzungen beenden (LFH-1092), Client und Server                                                               |
-| `frontend/src/betreuung/AGENTS.md`       | Betreuung und Verpflegung, Client und Server                                                                                                       |
-| `frontend/src/command-palette/AGENTS.md` | Sprungpalette                                                                                                                                      |
-| `frontend/src/druck/AGENTS.md`           | Druck (LFH-71/LFH-22)                                                                                                                              |
-| `frontend/src/entwurf/AGENTS.md`         | Entwürfe, gegliederte Dokumente (`DokumentEntwurf`)                                                                                                |
-| `frontend/src/personen/AGENTS.md`        | Personen und Sichtung                                                                                                                              |
-| `frontend/src/fernmeldewesen/AGENTS.md`  | Fernmeldewesen: Funkplan, Fernmeldeskizze, Sprechgruppen, Kommunikationsplan (S6), Einsatzleiter                                                   |
-| `frontend/src/infotelefon/AGENTS.md`     | Informationstelefon: eigenes Modul, Fenster und Zählung, Funkprotokoll-Ordnung, Handschirm                                                         |
-| `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server                              |
-| `frontend/src/fuehrung/AGENTS.md`        | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server                                                                             |
-| `frontend/src/kraefte/AGENTS.md`         | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server                         |
-| `frontend/src/geraet/AGENTS.md`          | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server                                                       |
-| `frontend/e2e/AGENTS.md`                 | e2e-Suite                                                                                                                                          |
-| `docs/architektur/AGENTS.md`             | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs) und ihre Prüfungen                                             |
-| `docs/anwender/AGENTS.md`                | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App                               |
-| `src/AGENTS.md`                          | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Admin-Schreibwege am Einsatz, Org-Ereignisse, Benachrichtigungen, Demo-Daten, Aufbewahrung, ClamAV |
-| `src-tauri/AGENTS.md`                    | Desktop-Hülle                                                                                                                                      |
-| `website/AGENTS.md`                      | Marketing-Seite (Astro), Kopien aus dem Frontend                                                                                                   |
-| `scripts/AGENTS.md`                      | Sammel-Gate im Detail, Werkzeugversionen, Bauziel, Advisories, Release                                                                             |
+| Datei | Inhalt |
+| --- | --- |
+| `frontend/AGENTS.md` | Gestaltungssprache, UI-Form, Bedien-Leitlinie, Erfassung, Deeplinks, Query-Keys, Lint, Browserspeicher |
+| `frontend/src/etb/AGENTS.md` | ETB: Zeitachse, Erfassung, Kopfzahl und Modulzähler, Entwurfsspeicher |
+| `frontend/src/pages/lagekarte/AGENTS.md` | Lagekarte, Zeichnen und Messen |
+| `frontend/src/offline/AGENTS.md` | Lagebild ohne Netz (LFH-723), Schreiben ohne Netz (LFH-705) |
+| `frontend/src/auth/AGENTS.md` | Sitzung über mehrere Tabs (LFH-387), Sitzungen beenden (LFH-1092), Client und Server |
+| `frontend/src/betreuung/AGENTS.md` | Betreuung und Verpflegung, Client und Server |
+| `frontend/src/command-palette/AGENTS.md` | Sprungpalette |
+| `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
+| `frontend/src/entwurf/AGENTS.md` | Entwürfe, gegliederte Dokumente (`DokumentEntwurf`) |
+| `frontend/src/personen/AGENTS.md` | Personen und Sichtung |
+| `frontend/src/fernmeldewesen/AGENTS.md` | Fernmeldewesen: Funkplan, Fernmeldeskizze, Sprechgruppen, Kommunikationsplan (S6), Einsatzleiter |
+| `frontend/src/infotelefon/AGENTS.md` | Informationstelefon: eigenes Modul, Fenster und Zählung, Funkprotokoll-Ordnung, Handschirm |
+| `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server |
+| `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
+| `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
+| `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
+| `frontend/e2e/AGENTS.md` | e2e-Suite |
+| `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs) und ihre Prüfungen |
+| `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |
+| `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, Benachrichtigungen, Demo-Daten, Aufbewahrung, ClamAV |
+| `src-tauri/AGENTS.md` | Desktop-Hülle |
+| `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
+| `scripts/AGENTS.md` | Sammel-Gate im Detail, Werkzeugversionen, Bauziel, Advisories, Release |
 
 - **Vor einer Änderung `scripts/adr-fuer.sh <pfad>…`**: nennt die Architekturentscheidungen
   (`docs/architektur/entscheidungen/`), die für die Dateien gelten, mit ihren Regeln.
