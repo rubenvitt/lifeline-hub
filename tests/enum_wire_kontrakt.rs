@@ -643,7 +643,42 @@ fn serde_wire_gleich_as_str() {
         EinmalpasswortVergeben,
         LesezugangAngelegt,
         LesezugangWiderrufen,
+        InstanzCodeAusgestellt,
+        InstanzCodeEingeloest,
+        InstanzGekoppelt,
+        InstanzKopplungWiderrufen,
+        InstanzKopplungVomGegenueberWiderrufen,
+        UnterschriftRegistriert,
+        UnterschriftGegengezeichnet,
+        UnterschriftWiderrufen,
+        UnterschriftAbgelehnt,
     });
+    // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
+    enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
+        MeldetSich,
+        WirdGemeldet,
+    });
+    enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungZustand {
+        Angebahnt,
+        Aktiv,
+        Widerrufen,
+        VomGegenueberWiderrufen,
+    });
+    enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzProtokoll {
+        Passt,
+        UpdateHier,
+        UpdateGegenueber,
+    });
+    enum_wire_as_str!(
+        lifeline_hub::auth::unterschrift::UnterschriftSchluesselHerkunft { Lokal, Gegenueber }
+    );
+    enum_wire_as_str!(
+        lifeline_hub::auth::unterschrift::UnterschriftSchluesselZustand {
+            WartetAufGegenzeichnung,
+            Gueltig,
+            Widerrufen,
+        }
+    );
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —

@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, frontend/src/abloesung/schichtplan/GrenzwerteZeile.tsx, frontend/src/abloesung/grenzwerte.ts, src/abloesung/schichtplan/vollzug.rs]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs, src/abloesung/schichtplan/ausgabe/, src/routes/abloesung_schichtplan.rs, frontend/src/abloesung/schichtplan/GrenzwerteZeile.tsx, frontend/src/abloesung/grenzwerte.ts]
 ---
 
 ## Überblick
@@ -310,6 +310,19 @@ Für Einsatzleitung und Führungspersonal:
 
 Die Druckansicht ist ein fester Stand: Änderungen am Plan holt „Neu laden“. „Zurück zum
 Schichtplan“ führt zur Ansicht zurück.
+
+### Den Schichtplan als Excel ausgeben
+
+Für alle, die die Ablösung sehen und das Modul Personal freigegeben haben, auch im
+abgeschlossenen Einsatz:
+
+1. In der Ansicht „Schichtplan“ „Excel“ wählen.
+2. Die Mappe wird als Datei gespeichert, etwa `schichtplan-stadtfest-2027-06-26.xlsx`. Der Name
+   folgt dem Einsatz und dem Tag des Abrufs.
+
+Scheitert der Abruf, steht der Grund unter den Knöpfen; der nächste Versuch nimmt ihn weg. Ohne das
+Modul Personal ist „Excel“ gesperrt, daneben steht der Grund. Was in der Mappe steht, beschreibt
+der Abschnitt „Die Excel-Mappe“ weiter unten.
 
 ## Hintergrund
 
@@ -649,6 +662,26 @@ der Organisation, nicht der Wahl des Geräts.
 Ohne das Modul Personal stehen auf dem Aushang keine Namen, nur die Besetzung, etwa „3 von 4
 besetzt“; „Je Person“ ist dann gesperrt.
 
+### Die Excel-Mappe
+
+Die Mappe hat fünf Blätter:
+
+| Blatt | Inhalt |
+|---|---|
+| Austausch | der Plan im Format der Schichtplan-Datei, eine Zeile je Person und Schicht, eine Schicht ohne Person als Zeile ohne Namen |
+| Übersicht | Einsatz, Ort, Zeitraum, Besetzung (etwa „18 von 22 Plätzen“), Zahl der Befunde, Stand |
+| Je Posten | Abschnitt, Posten, Tag, Von, Bis, Soll, Soll-Qualifikationen, Ist, Offen, Eingeteilt |
+| Je Person | Name, Organisation und Telefon (bei Helfern), Posten, Abschnitt, Tag, Von, Bis, Stunden |
+| Befunde | Art wie in der Ampel, Posten, Zeit, Person, Beschreibung |
+
+„Austausch“ ist das erste Blatt, damit die Mappe sich wieder einlesen lässt, in denselben oder
+einen anderen Einsatz. Dort stehen die Zeiten mit Versatz, etwa `2027-06-26T14:00+02:00`. Die
+übrigen Blätter nennen Tag, Von und Bis als Text in der Zone des Einsatzes, damit Excel sie nicht
+in die Zone des öffnenden Rechners umrechnet; die Stunden sind eine Zahl, die Pause zählt nicht.
+Ein Name steht ungeteilt in der Spalte „Nachname“.
+
+Die Mappe ist ein Stand zum Zeitpunkt des Abrufs. Der Abruf schreibt nichts ins Einsatztagebuch.
+
 ### Ampel im Schichtplan
 
 Jeder Block nennt seinen Stand als Wort und Farbe: „besetzt“, wenn das Soll erreicht ist, „1
@@ -690,7 +723,7 @@ Person in einer Schicht. Zeilen mit gleichem Posten, Beginn und Ende bilden eine
 | Soll-Qualifikationen | nein | etwa „1 Notfallsanitäter, 2 Sanitäter“ |
 | Nachname, Vorname | nein | ohne Namen ein Block ohne Person |
 | Telefon, Organisation, Qualifikationen | nein | für neue Helfer; Qualifikationen durch Komma getrennt |
-| Kennung, Herkunft | nein | externe Kennung der Person und der Name ihrer Quelle, etwa „Helferplanung“ |
+| Kennung, Herkunft | nein | Kennung der Person und der Name ihrer Quelle, etwa „Helferplanung“; in einer Mappe aus Lifeline Hub der eigene Bezug (siehe unten) |
 
 Eine Zeit mit Versatz (`+02:00`) gilt, wie sie ist. Eine Zeit ohne Versatz und eine Datumszelle
 aus Excel gelten als Ortszeit in der Zone des Einsatzes; die Vorschau nennt das als Hinweis. In
@@ -699,12 +732,22 @@ Fehler. Beginn und Ende liegen auf 5 Minuten, ein Block dauert 10 Minuten bis 24
 Unbekannte Spalten und Qualifikationen, die der Katalog der Organisation nicht kennt, sind
 Hinweise und fallen weg.
 
-**Wer wer ist.** Eine Person der Datei wird in dieser Reihenfolge gesucht: Kennung und Herkunft
-gleich einem Helfer des Plans; Kennung gleich der Personalnummer einer Person im Dienst (mit
+**Wer wer ist.** Eine Person der Datei wird in dieser Reihenfolge gesucht: der eigene Bezug
+(Herkunft „Lifeline Hub“, siehe unten); Kennung und Herkunft gleich einem Helfer des Plans; Kennung gleich der Personalnummer einer Person im Dienst (mit
 passendem Namen gefunden, sonst unsicher); Name und Telefon; der Name allein (unsicher). Sonst
 wird sie Helfer des Plans mit Kennung und Herkunft und steht damit nicht in den Stammdaten der
 Organisation. Ein Posten wird über den Namen gefunden, im genannten Abschnitt zuerst, ein
 Fahrzeug auch über den Funkrufnamen.
+
+**Eigene Bezüge.** Eine Mappe aus Lifeline Hub nennt in „Kennung“ und „Herkunft“, wer die Person
+hier ist. Hat sie eine Kennung aus einer eingelesenen Datei, bleibt diese mit ihrer Herkunft.
+Sonst steht die Herkunft „Lifeline Hub“ mit `personal-17` (Stamm-Personal), `einsatzkraft-9`
+(Einsatzkraft ohne Stammdaten) oder `helfer-4` (Helfer des Plans); ein Helfer einer Planung trägt
+seine Nummer und die Herkunft `vorplanung`. Beim Einlesen trifft ein solcher Bezug sicher, wenn
+die Person dieser Organisation bzw. dieses Einsatzes so heißt; trägt schon ein Helfer des Plans
+genau diese Kennung mit der Herkunft „Lifeline Hub“, bleibt es bei ihm. Sonst, etwa in einem anderen
+Einsatz, wird die Person wie jede andere gesucht und, wenn nötig, Helfer mit Kennung und
+Herkunft; ein zweiter Lauf trifft sie dann wieder.
 
 **Was das Einlesen ändert.** Es legt Blöcke, Helfer und fehlende Einheiten oder UHS an und
 trägt Personen in bestehende Blöcke nach. Es löscht nichts, ändert kein Soll und keine Notiz,

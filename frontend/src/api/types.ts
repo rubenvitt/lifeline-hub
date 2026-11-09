@@ -31,6 +31,19 @@ export type GeraeteUebersicht = S['GeraeteUebersicht'];
 export type LesezugangAnzeige = S['LesezugangAnzeige'];
 export type LesezugangFreigabe = S['LesezugangFreigabe'];
 export type LesezugangMitSchluessel = S['LesezugangMitSchluessel'];
+// Instanzkopplung (LLH-1490)
+export type InstanzUebersicht = S['InstanzUebersicht'];
+export type InstanzKopplungAnzeige = S['InstanzKopplungAnzeige'];
+export type InstanzKopplungRichtung = S['InstanzKopplungRichtung'];
+export type InstanzKopplungZustand = S['InstanzKopplungZustand'];
+export type InstanzProtokoll = S['InstanzProtokoll'];
+export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
+export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
+export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];
+export type UnterschriftSchluesselHerkunft = S['UnterschriftSchluesselHerkunft'];
+export type UnterschriftRegistrierenStart = S['UnterschriftRegistrierenStart'];
+export type UnterschriftGegenzeichnenStart = S['UnterschriftGegenzeichnenStart'];
+export type UnterschriftAssertion = S['UnterschriftAssertion'];
 export type AnsichtSperre = S['AnsichtSperre'];
 export type AnsichtAuswahl = S['AnsichtAuswahl'];
 export type Bindungsart = S['Bindungsart'];
@@ -898,7 +911,10 @@ export type SchichtplanPostenWahlEingabe =
 
 /** Kein Backend-Schema: Wahl einer Person beim Einlesen (`uebernahme::PersonEntscheidung`). */
 export type SchichtplanPersonWahlEingabe =
-  { art: 'stamm'; personal_id: number } | { art: 'helfer'; helfer_id: number } | { art: 'neu' };
+  | { art: 'stamm'; personal_id: number }
+  | { art: 'helfer'; helfer_id: number }
+  | { art: 'einsatz'; einsatz_personal_id: number }
+  | { art: 'neu' };
 
 /**
  * Kein Backend-Schema: Teil `entscheidungen` beim Einlesen (`uebernahme::Entscheidungen`), je

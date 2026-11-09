@@ -1,4 +1,4 @@
-import { apiGet, apiSend, apiUpload } from './client';
+import { apiDatei, apiGet, apiSend, apiUpload } from './client';
 import type {
   Schichtplan,
   SchichtplanEntscheidungenEingabe,
@@ -163,4 +163,15 @@ export function schichtplanEinlesen(
     einleseDaten(datei, entscheidungen),
     { timeoutMs: EINLESEN_TIMEOUT_MS },
   );
+}
+
+/** Zeit für das Schreiben einer großen Mappe (bis 2.000 Schichten). */
+const MAPPE_TIMEOUT_MS = 60_000;
+
+/**
+ * Der Schichtplan als Excel-Mappe (LLH-1557): Austausch, Übersicht, Je Posten, Je Person,
+ * Befunde. Ohne Freigabe des Moduls Personal 403. Der Server schickt keinen Dateinamen.
+ */
+export function loadSchichtplanMappe(einsatzId: number): Promise<Blob> {
+  return apiDatei(`${basis(einsatzId)}/export`, { timeoutMs: MAPPE_TIMEOUT_MS });
 }

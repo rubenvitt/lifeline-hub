@@ -649,6 +649,15 @@ anwendbar), „nicht geprüft" ist keins.
   `aktionen != null`, gibt er bei leerer Menge selbst `null` zurück. Test über
   `.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`. Kartenmodus: `Datensicht`
   baut `weitere`.
+- **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
+  `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,
+  8 px) und Kontextmenü-Taste/Umschalt+F10 kommen aus **`components/useKontextMenue.ts`**, das Menü
+  eines Datensatzes ist **`components/KontextMenue.tsx`** in der Schale `PunktankerMenue`. Die
+  Einträge kommen aus derselben Quelle wie Primärknopf und ⋮-Menü (`Datensicht`:
+  `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Auf Link,
+  Eingabefeld und markiertem Text und ohne Einträge bleibt das Browsermenü; die Taste öffnet auch auf
+  dem Titel-Link. Kein eigenes `onContextMenu` (`kontextMenue.guard.test.ts`); die Lagekarte bleibt
+  beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`.
 - **Ein Sprung ist keine Handlung** (LFH-616): gezählt werden nur ändernde Aktionen; Deeplinks
   („… ↗") stehen als eine Zeile (`data-lfh="inspector-sprung"`), rote Handlung abgesetzt.
 - **Drag & Drop zieht nur mit `ZugPointerSensor`** (LFH-519, `components/zugPointerSensor.ts`):

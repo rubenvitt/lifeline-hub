@@ -370,12 +370,13 @@ export interface components {
         /**
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
          *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
-         *     `0174_admin_audit_einmalpasswort.sql` und `0269_admin_audit_lesezugang.sql` — beide Seiten
+         *     `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
+         *     `0301_admin_audit_instanz.sql` — beide Seiten
          *     müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -3817,6 +3818,73 @@ export interface components {
              */
             offen: number;
         };
+        /** @description Eine Kopplung, wie die Admin-Seite sie zeigt: aus Sicht einer Org. */
+        InstanzKopplungAnzeige: {
+            gegenueber_adresse?: string | null;
+            gegenueber_fingerabdruck: string;
+            gegenueber_kennung: string;
+            gegenueber_name: string;
+            /** Format: int64 */
+            gegenueber_protokoll?: number | null;
+            gegenueber_softwarestand?: string | null;
+            hinweis?: string | null;
+            /** Format: int64 */
+            id: number;
+            letzter_fehler?: string | null;
+            /** @description Die Org-Zuordnung der eigenen Org (die jüngste). */
+            org: components["schemas"]["InstanzOrgZuordnung"];
+            protokoll: components["schemas"]["InstanzProtokoll"];
+            richtung: components["schemas"]["InstanzKopplungRichtung"];
+            /** Format: int64 */
+            uhr_abweichung_s?: number | null;
+            zuletzt_gesehen_at?: string | null;
+            zustand: components["schemas"]["InstanzKopplungZustand"];
+        };
+        /**
+         * @description Richtung einer Kopplung aus Sicht dieser Instanz (design.md D6). Die einlösende Seite meldet
+         *     sich, die ausstellende wird gemeldet und baut nie selbst eine Verbindung auf.
+         * @enum {string}
+         */
+        InstanzKopplungRichtung: "meldet_sich" | "wird_gemeldet";
+        /**
+         * @description Zustand einer Kopplung (design.md D6, D9).
+         * @enum {string}
+         */
+        InstanzKopplungZustand: "angebahnt" | "aktiv" | "widerrufen" | "vom_gegenueber_widerrufen";
+        InstanzOrgZuordnung: {
+            angelegt_at: string;
+            fremde_org_kennung: string;
+            fremde_org_name: string;
+            /** Format: int64 */
+            id: number;
+            widerrufen_at?: string | null;
+        };
+        /**
+         * @description Wie weit die Protokollversionen auseinanderliegen, für die Anzeige (design.md D5).
+         * @enum {string}
+         */
+        InstanzProtokoll: "passt" | "update_hier" | "update_gegenueber";
+        /** @description Alles, was die Admin-Seite „Instanzkopplung“ zeigt. */
+        InstanzUebersicht: {
+            /**
+             * @description Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
+             *     „Code ausstellen“).
+             */
+            eigener_schluessel: boolean;
+            fingerabdruck: string;
+            kennung: string;
+            kopplungen: components["schemas"]["InstanzKopplungAnzeige"][];
+            name: string;
+            /**
+             * @description Passkeys sind eingerichtet (`--webauthn-rp-id`); ohne sie gibt es keine
+             *     Unterschriftsschlüssel und damit keinen Kopplungscode.
+             */
+            passkeys_eingerichtet: boolean;
+            /** Format: int32 */
+            protokoll: number;
+            schluessel: components["schemas"]["UnterschriftSchluesselAnzeige"][];
+            softwarestand: string;
+        };
         JetztAktualisierenAntwort: {
             phase: components["schemas"]["JetztPhase"];
         };
@@ -4015,6 +4083,14 @@ export interface components {
         /** @description Ein frisch ausgestellter Kopplungscode. Der Klartext verlässt den Server nur hier, einmal. */
         KopplungsCode: {
             code: string;
+            laeuft_ab_at: string;
+        };
+        /** @description Ein frisch ausgestellter Kopplungscode. Der Code verlässt den Server nur hier, einmal. */
+        KopplungscodeAntwort: {
+            /** @description In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`. */
+            code: string;
+            /** @description Fingerabdruck dieser Instanz zum Abgleich an der einlösenden Seite. */
+            fingerabdruck: string;
             laeuft_ab_at: string;
         };
         /** @description Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`. */
@@ -7360,6 +7436,56 @@ export interface components {
          * @enum {string}
          */
         Unterschrift: "liegt_vor" | "verweigert";
+        /** @description Eine UnterschriftAssertion, wie der Browser sie aus `navigator.credentials.get` liefert (Base64url). */
+        UnterschriftAssertion: {
+            authenticator_data: string;
+            client_data_json: string;
+            credential_id: string;
+            signatur: string;
+        };
+        UnterschriftGegenzeichnenStart: {
+            /** @description Challenge für `navigator.credentials.get` (Base64url): SHA-256 der Erklärung. */
+            challenge: string;
+            /** @description Die eigenen gültigen Unterschriftsschlüssel (Base64url), für `allowCredentials`. */
+            credential_ids: string[];
+            /** @description Die Erklärung im Wortlaut, zur Anzeige. */
+            erklaerung: string;
+            rp_id: string;
+            zeremonie: string;
+        };
+        UnterschriftRegistrierenStart: {
+            /** @description Optionen für `navigator.credentials.create` (`publicKey`). */
+            optionen: Record<string, never>;
+            zeremonie: string;
+        };
+        /** @description Ein Schlüssel, wie die Admin-Seite ihn zeigt. */
+        UnterschriftSchluesselAnzeige: {
+            benutzer_name: string;
+            bezeichnung: string;
+            /** @description Gehört dem anfragenden Admin. */
+            eigen: boolean;
+            erstellt_at: string;
+            fingerabdruck: string;
+            /** @description Bei `herkunft = gegenueber`: Name der Org dort. */
+            fremde_org_name?: string | null;
+            /** @description Bei einer Gegenzeichnung: wer gegengezeichnet hat. */
+            gegengezeichnet_von?: string | null;
+            herkunft: components["schemas"]["UnterschriftSchluesselHerkunft"];
+            /** Format: int64 */
+            id: number;
+            widerrufen_at?: string | null;
+            zustand: components["schemas"]["UnterschriftSchluesselZustand"];
+        };
+        /**
+         * @description Woher ein Unterschriftsschlüssel stammt.
+         * @enum {string}
+         */
+        UnterschriftSchluesselHerkunft: "lokal" | "gegenueber";
+        /**
+         * @description Zustand eines Unterschriftsschlüssels.
+         * @enum {string}
+         */
+        UnterschriftSchluesselZustand: "wartet_auf_gegenzeichnung" | "gueltig" | "widerrufen";
         /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
          *     Erreichbarkeit steht im Kommunikationsplan.
@@ -7852,6 +7978,12 @@ export interface components {
                 name: string;
             } | {
                 /** @enum {string} */
+                art: "einsatz";
+                /** Format: int64 */
+                einsatz_personal_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
                 art: "neu";
             })[];
             kennung?: string | null;
@@ -7872,6 +8004,12 @@ export interface components {
                 art: "helfer";
                 /** Format: int64 */
                 helfer_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
+                art: "einsatz";
+                /** Format: int64 */
+                einsatz_personal_id: number;
                 name: string;
             } | {
                 /** @enum {string} */
@@ -8425,12 +8563,25 @@ export interface components {
          *     - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
          *     - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
          *     - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
+         *     - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.
+         *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
+         *       Gegenstelle.
          */
         ZugangsAngaben: {
+            /** @description Adresse der Gegenstelle (nur auf der Seite, die sich meldet). */
+            adresse?: string | null;
             /** @description Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`. */
             angemeldet_at?: string | null;
+            /** @description Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels. */
+            fingerabdruck?: string | null;
+            /** @description Org der Gegenstelle. */
+            fremde_org?: string | null;
             /** @description Grobe Gerätebezeichnung der beendeten Sitzung. */
             geraet?: string | null;
+            /** @description Warum ein Unterschriftsschlüssel verworfen wurde. */
+            grund?: string | null;
+            /** @description Instanzkopplung (LLH-1490): Kennung der Gegenstelle. */
+            instanz_kennung?: string | null;
             org_rolle?: components["schemas"]["OrgRolle"] | null;
             org_rolle_vorher?: components["schemas"]["OrgRolle"] | null;
             system_rolle?: components["schemas"]["SystemRolle"] | null;

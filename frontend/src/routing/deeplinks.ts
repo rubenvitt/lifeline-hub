@@ -47,6 +47,21 @@ export function planungPfad(planungId: number, reiter?: PlanungReiter): string {
   return reiter && reiter !== 'plan' ? `${basis}?reiter=${reiter}` : basis;
 }
 
+/**
+ * Druckansicht einer Planung (LLH-1593): Aushang je Posten oder Zettel je Person, Auswahl wie
+ * beim Schichtplan eines Einsatzes ({@link schichtplanDruckPfad}, gelesen mit
+ * {@link parseSchichtplanDruckAuswahl}). Ein Posten der Planung heißt dort `einheit:<posten_id>`.
+ */
+export function planungDruckPfad(
+  planungId: number,
+  opts: Partial<SchichtplanDruckAuswahl> = {},
+): string {
+  return mitQuery(`/planungen/${planungId}/druck`, {
+    sicht: opts.sicht === 'person' ? 'person' : undefined,
+    auswahl: opts.auswahl ?? undefined,
+  });
+}
+
 /** Reiter aus `?reiter=`; Unbekanntes ist `plan`. */
 export function parsePlanungReiter(params: URLSearchParams): PlanungReiter {
   const r = params.get('reiter');
