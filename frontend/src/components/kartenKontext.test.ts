@@ -75,4 +75,33 @@ describe('fuehreKartenWahlAus (LLH-1598, D3)', () => {
     expect(onWahl).not.toHaveBeenCalled();
     expect(m.confirm).not.toHaveBeenCalled();
   });
+
+  it('beim OK zählt der aktuelle Stand: weggefallen oder gesperrt löst nichts aus', () => {
+    const alt = vi.fn();
+    const neu = vi.fn();
+    const m = modal();
+    let aktuell: KartenAktion[] = [];
+    const ab = (onWahl: () => void, gesperrt?: true): KartenAktion => ({
+      key: 'ab',
+      label: 'Abnehmen',
+      onWahl,
+      rueckfrage: { titel: 'Auftrag abnehmen?', knopf: 'Auftrag abnehmen' },
+      ...(gesperrt ? { gesperrt } : {}),
+    });
+    fuehreKartenWahlAus([ab(alt)], 'ab', m, () => aktuell);
+    const onOk = m.confirm.mock.calls[0][0].onOk;
+
+    // Ein anderer Platz hat den Auftrag inzwischen abgenommen: die Aktion ist weg.
+    onOk();
+    aktuell = [ab(neu, true)];
+    onOk();
+    expect(alt).not.toHaveBeenCalled();
+    expect(neu).not.toHaveBeenCalled();
+
+    // Noch da: es wirkt die aktuelle Fassung der Aktion.
+    aktuell = [ab(neu)];
+    onOk();
+    expect(neu).toHaveBeenCalledTimes(1);
+    expect(alt).not.toHaveBeenCalled();
+  });
 });

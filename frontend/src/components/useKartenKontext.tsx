@@ -8,7 +8,7 @@
  * Karte (es rendert per Portal).
  */
 import { App } from 'antd';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { KontextMenue, type KontextMenueOffen } from './KontextMenue';
 import { fuehreKartenWahlAus, kartenKontextEintraege, type KartenAktion } from './kartenKontext';
 import { useKontextMenue, type KontextHandler } from './useKontextMenue';
@@ -25,6 +25,11 @@ export function useKartenKontext<K extends string, E extends Element = HTMLEleme
   zugaenglicherName,
 }: KartenKontextOptionen<K>): { ausloeser: KontextHandler<E>; menue: ReactNode } {
   const { modal } = App.useApp();
+  // Der jüngste Stand für die Bestätigung einer Rückfrage (`fuehreKartenWahlAus`).
+  const aktuell = useRef(aktionen);
+  useEffect(() => {
+    aktuell.current = aktionen;
+  });
   const [offen, setOffen] = useState<KontextMenueOffen | null>(null);
   const hatAktionen = aktionen.length > 0;
   // Verliert die Karte alle Aktionen, schließt das Menü (abgeleiteter Zustand wie `Datensicht`).
@@ -44,7 +49,7 @@ export function useKartenKontext<K extends string, E extends Element = HTMLEleme
         offen={offen}
         eintraege={kartenKontextEintraege(aktionen)}
         zugaenglicherName={zugaenglicherName}
-        onWahl={(key) => fuehreKartenWahlAus(aktionen, key, modal)}
+        onWahl={(key) => fuehreKartenWahlAus(aktionen, key, modal, () => aktuell.current)}
         onSchliessen={() => setOffen(null)}
       />
     ),

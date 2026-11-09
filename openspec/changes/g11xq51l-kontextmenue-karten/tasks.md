@@ -45,7 +45,7 @@
 ## 8. Befunde aus dem Review (09.11.2026)
 
 - [x] 8.1 TDD: Rechtsklick auf das Vorschaubild eines Chat-Anhangs lässt das Browsermenü (`browsermenueBleibt` nimmt `img` aus); Test im Hook und im Chat
-- [ ] 8.2 TDD: Die Rückfrage aus dem Kontextmenü schlägt die Aktion beim OK neu nach; weggefallen oder gesperrt löst sie nichts aus
+- [x] 8.2 TDD: Die Rückfrage aus dem Kontextmenü schlägt die Aktion beim OK neu nach; weggefallen oder gesperrt löst sie nichts aus
 - [ ] 8.3 `refactor`: neue technische Bezeichner englisch (LFH-1312) in `useKontextMenue.ts`, `kartenKontext.ts`; Tests grün
 
 ## Workflow follow-up

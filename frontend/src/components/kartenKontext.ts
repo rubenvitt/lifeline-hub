@@ -46,11 +46,17 @@ interface Rueckfrage {
   }) => unknown;
 }
 
-/** Führt die Wahl aus; eine Aktion mit `rueckfrage` fragt erst im Dialog. */
+/**
+ * Führt die Wahl aus; eine Aktion mit `rueckfrage` fragt erst im Dialog. Beim OK zählt der Stand
+ * von `aktuelle()`, nicht der beim Öffnen: ist die Aktion inzwischen weggefallen oder gesperrt
+ * (Live-Ereignis, anderer Platz), löst die Bestätigung nichts aus, wie ein `Popconfirm`, das mit
+ * seinem Knopf verschwindet (LLH-1598, Befund aus dem Review).
+ */
 export function fuehreKartenWahlAus<K extends string>(
   aktionen: readonly KartenAktion<K>[],
   key: string,
   modal: Rueckfrage,
+  aktuelle: () => readonly KartenAktion<K>[] = () => aktionen,
 ): void {
   const aktion = aktionen.find((a) => a.key === key);
   if (aktion == null || aktion.gesperrt) return;
@@ -63,6 +69,9 @@ export function fuehreKartenWahlAus<K extends string>(
     okText: aktion.rueckfrage.knopf,
     cancelText: 'Abbrechen',
     ...(aktion.rueckfrage.gefahr ? { okButtonProps: { danger: true as const } } : {}),
-    onOk: () => aktion.onWahl(),
+    onOk: () => {
+      const jetzt = aktuelle().find((a) => a.key === key);
+      if (jetzt != null && !jetzt.gesperrt) jetzt.onWahl();
+    },
   });
 }
