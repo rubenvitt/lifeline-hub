@@ -4119,7 +4119,7 @@ export interface components {
          * @description Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben
          *     Schlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard
          *     `kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in
-         *     `migrations/0306_registrierstelle.sql`.
+         *     `migrations/0308_registrierstelle.sql`.
          * @enum {string}
          */
         Kostform: "normal" | "vegetarisch" | "vegan" | "ohne_schwein" | "diaet_allergenarm" | "saeugling_kleinkind";
