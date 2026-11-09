@@ -657,7 +657,16 @@ anwendbar), „nicht geprüft" ist keins.
   `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Auf Link,
   Eingabefeld und markiertem Text und ohne Einträge bleibt das Browsermenü; die Taste öffnet auch auf
   dem Titel-Link. Kein eigenes `onContextMenu` (`kontextMenue.guard.test.ts`); die Lagekarte bleibt
-  beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`.
+  beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`. Hörer, Riegel und
+  Tasten-Nachlauf teilen sich alle Flächen, ein Hook je Karte ist also billig (LLH-1598,
+  `openspec/changes/g11xq51l-kontextmenue-karten/design.md`).
+- **Karten mit eigenen Knöpfen beschreiben ihre Handlungen einmal als `KartenAktion[]`**
+  (`components/kartenKontext.ts`, LLH-1598): erst die Knöpfe der Aktionszeile in ihrer Reihenfolge,
+  dann die ⋮-Einträge. Knöpfe und ⋮ lesen Etikett, Sperre (`sperrgrund`), Rückfrage (`rueckfrage`,
+  im Menü als Dialog) und Wirkung von dort; das Kontextmenü zeigt alle, über
+  **`components/useKartenKontext.tsx`** an der Karte bzw. einen Hook je Liste, wenn die Zeilen eine
+  Renderfunktion sind (Chat, Verpflegungsstellen). Sprünge und Auswahlfelder stehen nicht darin.
+  Ein Zählschirm (Verpflegungsausgabe) hat bewusst kein Kontextmenü.
 - **Ein Sprung ist keine Handlung** (LFH-616): gezählt werden nur ändernde Aktionen; Deeplinks
   („… ↗") stehen als eine Zeile (`data-lfh="inspector-sprung"`), rote Handlung abgesetzt.
 - **Drag & Drop zieht nur mit `ZugPointerSensor`** (LFH-519, `components/zugPointerSensor.ts`):
