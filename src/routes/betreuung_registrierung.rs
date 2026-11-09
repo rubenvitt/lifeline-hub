@@ -200,6 +200,8 @@ pub async fn registrieren(
     for p in body.personen {
         gelesen.push(person_lesen(p)?);
     }
+    // 404/409 der Stelle vor den 422 des Zusammenhangs (Statuscode-Konvention).
+    registrierung::stelle_pruefen(&state.pool, einsatz_id, sid).await?;
     if gelesen.is_empty() {
         return Err(AppError::UnprocessableEntity(
             "Eine Registrierung braucht mindestens eine Person".into(),

@@ -732,8 +732,24 @@ pub async fn storniere(
     person_id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    crate::storno::storniere(
+    storniere_tx(
         &mut *pool.acquire().await?,
+        einsatz_id,
+        person_id,
+        geaendert_von,
+    )
+    .await
+}
+
+/// [`storniere`] in einer laufenden Transaktion (LLH-1612: samt Nachführen der Belegung).
+pub async fn storniere_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    crate::storno::storniere(
+        conn,
         "einsatz_person",
         "einsatz_id",
         einsatz_id,

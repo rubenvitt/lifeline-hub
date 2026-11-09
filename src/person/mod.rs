@@ -768,7 +768,12 @@ impl PersonAnzeige {
         self.transport_art = None;
         self.transport_fachrichtung = None;
         self.transport_at = None;
+        // LLH-1612: Kostform und Haushalt sind Angaben zur Person (eine Kostform kann auf Religion
+        // oder Gesundheit schließen lassen); das Einheitengerät braucht sie nicht.
         self.unvertraeglichkeiten = None;
+        self.kostform = None;
+        self.haushalt_id = None;
+        self.haushalt_nummer = None;
     }
 
     /// Setzt den abgeleiteten Versorgungszustand aus den Verbleib-Caches.

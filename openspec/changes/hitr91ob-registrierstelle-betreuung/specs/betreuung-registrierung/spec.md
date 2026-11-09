@@ -49,7 +49,8 @@ Personen-Detailseite feldweise wie die übrigen Personendaten ändern lassen. Un
 MUST als Gesundheitsangabe gelten: sie gehören zur Aufbewahrungskategorie „Behandlung“, die
 Schwärzung leert sie, und sie erscheinen weder im ETB noch in einem gesicherten Lagestand. Eine
 Änderung der Kostform oder der Unverträglichkeiten MUST im ETB höchstens als „weitere Angaben“
-erscheinen.
+erscheinen. Am Gerät einer Einheit MUST Kostform, Unverträglichkeiten und Haushalt fehlen wie die
+übrigen Personalien.
 
 #### Scenario: Kostform ändern
 - **WHEN** auf der Detailseite von „Weber, Tom“ die Kostform auf „ohne Schwein“ gesetzt wird
@@ -96,8 +97,9 @@ Tastatur erreichbar sein und im Handschuh-Modus Trefferhöhe haben; die Kostform
 Gruppe mit Pfeiltasten bedienbar sein. „Registrieren“ MUST den ganzen Haushalt in einem
 Vorgang senden. Ohne Netz MUST der Vorgang vorgemerkt und beim nächsten Abgleich genau einmal
 angelegt werden (Wiederholung mit derselben Kennung liefert den ersten Stand). Ohne
-Schreibrecht oder bei geschlossener Stelle MUST „Registrieren“ gesperrt mit Grund stehen. Nach
-dem Registrieren MUST die Maske leer für den nächsten Haushalt bereitstehen.
+Schreibrecht oder bei geschlossener Stelle MUST „Registrieren“ gesperrt mit Grund stehen.
+„Speichern und nächste“ MUST die Maske nach dem Registrieren leer für den nächsten Haushalt
+offen halten; „Registrieren“ schließt sie.
 
 #### Scenario: Haushaltsangaben einmal
 - **WHEN** oben in der Maske die Adresse „Lindenweg 3“ steht und drei Personen registriert werden

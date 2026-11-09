@@ -603,6 +603,7 @@ pub async fn anlegen(
                 "Die Betreuungsstelle ist storniert".into(),
             ));
         }
+        crate::betreuung::fordere_aufnahme_namentlich(&stelle)?;
     }
 
     // Erst-Sichtung: das Feld für sich → 400, die Kombination mit dem Status → 422
@@ -1645,24 +1646,35 @@ pub async fn stornieren(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    repo::storniere(&state.pool, einsatz_id, person_id, ctx.benutzer.id).await?;
-    // LLH-1612 (design.md D5): eine stornierte Person zählt an keiner Stelle mehr; eine namentlich
-    // geführte Stelle meldet ihre Belegung neu. Eigene Transaktion wie der Storno selbst.
-    if let Some(stelle_id) = person.aktuelle_verbleib_betreuungsstelle_id {
-        let benutzer_id = ctx.benutzer.id;
-        let jetzt = crate::zeit::jetzt();
-        let etb_ids = crate::write_retry!(&state.pool, |conn| {
-            crate::betreuung::repo::belegung_nachfuehren_tx(
-                conn,
-                einsatz_id,
-                stelle_id,
-                &jetzt,
-                benutzer_id,
-            )
-            .await
-        })?;
-        super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &etb_ids);
-    }
+    // LLH-1612 (design.md D5, ADR-0016): eine stornierte Person zählt an keiner Stelle mehr; eine
+    // namentlich geführte Stelle meldet ihre Belegung im SELBEN Vorgang neu. Die Stelle wird in der
+    // Transaktion gelesen, nicht vorher: ein paralleler Verbleibwechsel könnte sie geändert haben.
+    let benutzer_id = ctx.benutzer.id;
+    let jetzt = crate::zeit::jetzt();
+    let belegung_etb_ids = crate::write_retry!(&state.pool, |conn| {
+        repo::storniere_tx(conn, einsatz_id, person_id, benutzer_id).await?;
+        let stelle: Option<i64> = sqlx::query_scalar(
+            "SELECT aktuelle_verbleib_betreuungsstelle_id FROM einsatz_person \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(person_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        match stelle {
+            Some(sid) => {
+                crate::betreuung::repo::belegung_nachfuehren_tx(
+                    conn,
+                    einsatz_id,
+                    sid,
+                    &jetzt,
+                    benutzer_id,
+                )
+                .await
+            }
+            None => Ok(Vec::new()),
+        }
+    })?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
     if let Some(effekt) = crate::uhs::auto_austritt(
         &state.pool,
@@ -1685,6 +1697,7 @@ pub async fn stornieren(
         ),
     )
     .await;
+    super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &belegung_etb_ids);
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -2143,6 +2156,7 @@ pub async fn verbleib(
                 "Die Betreuungsstelle ist storniert".into(),
             ));
         }
+        crate::betreuung::fordere_aufnahme_namentlich(&stelle)?;
     }
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     let zeitpunkt_at = crate::routes::support::erfassungszeitpunkt(

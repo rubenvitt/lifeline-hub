@@ -1512,10 +1512,16 @@ pub async fn stelle_aendern_tx(
         });
     }
     if status_neu && status == BetreuungsstelleStatus::Geschlossen {
-        if let Some(belegt) = roh.belegung_belegt.filter(|n| *n > 0) {
+        // Wird die Stelle im selben PATCH namentlich geführt, zählen die Registrierten (D5).
+        let belegt_dann = if belegungsart == Belegungsart::Namentlich {
+            Some(registrierte_tx(conn, einsatz_id, id).await?)
+        } else {
+            roh.belegung_belegt
+        };
+        if let Some(belegt) = belegt_dann.filter(|n| *n > 0) {
             // An einer namentlich geführten Stelle meldet niemand 0 von Hand (D5): dort leert
             // das Abmelden die Stelle.
-            let weg = match roh.belegungsart {
+            let weg = match belegungsart {
                 Belegungsart::Gezaehlt => "erst Belegung 0 melden",
                 Belegungsart::Namentlich => "erst alle Personen abmelden",
             };
@@ -1574,7 +1580,7 @@ pub async fn stelle_aendern_tx(
     // zurück auf `gezaehlt` bleibt die aktuelle Belegung stehen.
     if belegungsart_neu && belegungsart == Belegungsart::Namentlich {
         let jetzt = crate::zeit::jetzt();
-        etb_ids.extend(belegung_nachfuehren_tx(conn, einsatz_id, id, &jetzt, benutzer_id).await?);
+        etb_ids.extend(nachfuehren_tx(conn, einsatz_id, id, &jetzt, benutzer_id, true).await?);
     }
     Ok(Geschrieben {
         id,
@@ -1748,12 +1754,34 @@ pub async fn belegung_nachfuehren_tx(
     zeitpunkt_at: &str,
     benutzer_id: i64,
 ) -> Result<Vec<i64>, AppError> {
+    nachfuehren_tx(
+        conn,
+        einsatz_id,
+        stelle_id,
+        zeitpunkt_at,
+        benutzer_id,
+        false,
+    )
+    .await
+}
+
+/// `immer`: auch bei gleicher Zahl melden — beim Wechsel auf `namentlich` (Spec „Betreuungsstelle“:
+/// der Wechsel MUST eine Meldung schreiben), damit die aktuelle Meldung die Herkunft
+/// `registrierung` trägt.
+async fn nachfuehren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    zeitpunkt_at: &str,
+    benutzer_id: i64,
+    immer: bool,
+) -> Result<Vec<i64>, AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
     if roh.storniert_at.is_some() || roh.belegungsart != Belegungsart::Namentlich {
         return Ok(Vec::new());
     }
     let anzahl = registrierte_tx(conn, einsatz_id, stelle_id).await?;
-    if roh.belegung_belegt == Some(anzahl) {
+    if !immer && roh.belegung_belegt == Some(anzahl) {
         return Ok(Vec::new());
     }
     let zeitpunkt = match roh.belegung_zeitpunkt_at {

@@ -168,6 +168,17 @@ async fn stelle_tx(
     Ok((bezeichnung, status))
 }
 
+/// Prüfkette vor den Zusammenhängen (404 fremd/unbekannt, 409 storniert), damit eine Route
+/// sie vor ihren 422-Prüfungen auslösen kann (Statuscode-Konvention).
+pub async fn stelle_pruefen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    stelle_id: i64,
+) -> Result<(), AppError> {
+    stelle_tx(&mut *pool.acquire().await?, einsatz_id, stelle_id).await?;
+    Ok(())
+}
+
 /// Nummer eines Haushalts des Einsatzes; fremd oder unbekannt → 404.
 async fn haushalt_nummer_tx(
     conn: &mut SqliteConnection,
@@ -242,6 +253,25 @@ pub async fn registrieren_tx(
     startwert: i64,
     eingabe: &RegistrierEingabe,
 ) -> Result<Registriert, AppError> {
+    // Replay in der Transaktion (BEGIN IMMEDIATE): zwei gleichzeitige Wiederholungen kommen an der
+    // Prüfung der Route vorbei; die zweite findet hier die erste Person und schreibt nichts.
+    if let Some(cid) = eingabe.client_id.as_deref() {
+        let schon: Option<(i64, Option<i64>)> = sqlx::query_as(
+            "SELECT id, haushalt_id FROM einsatz_person WHERE einsatz_id = ? AND client_id = ?",
+        )
+        .bind(einsatz_id)
+        .bind(person_client_id(cid, 0))
+        .fetch_optional(&mut *conn)
+        .await?;
+        if let Some((_, haushalt_id)) = schon {
+            return Ok(Registriert {
+                haushalt_id,
+                person_ids: Vec::new(),
+                etb_ids: Vec::new(),
+                belegung_nachgefuehrt: false,
+            });
+        }
+    }
     let (bezeichnung, status) = stelle_tx(conn, einsatz_id, stelle_id).await?;
     let bestehend = match eingabe.haushalt_id {
         Some(h) => Some((h, haushalt_nummer_tx(conn, einsatz_id, h).await?)),
@@ -507,7 +537,8 @@ pub async fn liste(
                 (SELECT NULLIF(TRIM(COALESCE(b.name, '') || \
                         CASE WHEN b.vorname IS NOT NULL AND b.vorname <> '' \
                              THEN ', ' || b.vorname ELSE '' END), '') \
-                   FROM einsatz_person b WHERE b.id = h.bezugsperson_id) AS bezugsperson_name \
+                   FROM einsatz_person b \
+                  WHERE b.id = h.bezugsperson_id AND b.storniert_at IS NULL) AS bezugsperson_name \
          FROM einsatz_person p LEFT JOIN haushalt h ON h.id = p.haushalt_id \
          WHERE p.einsatz_id = ? AND p.storniert_at IS NULL \
            AND p.aktuelle_verbleib_art = 'notunterkunft' \

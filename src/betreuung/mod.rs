@@ -451,6 +451,21 @@ pub struct BelegungKopfzahl {
     pub stellen: Vec<BelegungKopfzahlStelle>,
 }
 
+/// 422, wenn eine namentlich geführte Stelle geschlossen ist (LLH-1612, design.md D5): eine
+/// Aufnahme dort meldete eine Belegung an eine geschlossene Stelle. Eine gezählte geschlossene Stelle
+/// nimmt wie bisher einen Verbleib an; ihre Belegung meldet niemand von selbst.
+pub fn fordere_aufnahme_namentlich(stelle: &BetreuungsstelleAnzeige) -> Result<(), AppError> {
+    if stelle.belegungsart == Belegungsart::Namentlich
+        && stelle.status == BetreuungsstelleStatus::Geschlossen
+    {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Betreuungsstelle ‚{}‘ ist geschlossen — erst wieder in Betrieb setzen",
+            stelle.bezeichnung
+        )));
+    }
+    Ok(())
+}
+
 // ── ETB-Texte ───────────────────────────────────────────────────────────────────────────────
 
 /// Reine Textfunktionen für die ETB-Sätze (design.md D5). Sie nehmen **keine** Freitexte

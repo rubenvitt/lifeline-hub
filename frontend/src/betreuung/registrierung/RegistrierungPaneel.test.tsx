@@ -228,4 +228,22 @@ describe('Vorgemerkt ohne Netz', () => {
       within(band()).getByText('vegan').closest('[data-lfh="kennzahl"]')?.textContent,
     ).toContain('0');
   });
+
+  it('ohne geladene Liste (ohne Netz) stehen die vorgemerkten Haushalte trotzdem da (Review LLH-1612)', async () => {
+    await schreibaktionEinreihen(11, 7, {
+      art: 'registrierung',
+      stelle_id: 8,
+      bezeichnung: 'Turnhalle Ost',
+      daten: {
+        personen: [{ name: 'Krause', vorname: 'Jan', kostform: 'vegan' }],
+        client_id: 'reg-y',
+        zeitpunkt_at: '2026-11-09 09:00:00',
+      },
+    });
+    rendere();
+    // Die Liste antwortet nie: das Paneel bleibt im Laden, die Vormerkung steht trotzdem.
+    server.use(http.get(LISTE, () => new Promise(() => {})));
+    const vorgemerkt = await screen.findByRole('list', { name: 'Vorgemerkte Registrierungen' });
+    expect(vorgemerkt).toHaveTextContent('Krause, Jan');
+  });
 });

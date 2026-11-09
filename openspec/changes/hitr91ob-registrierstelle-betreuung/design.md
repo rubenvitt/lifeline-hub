@@ -125,7 +125,7 @@ einer Sonderkost; der Dialog belegt die Sonderkost-Felder vor wie die beiden and
 
 - Detailseite der Stelle: Abschnitt „Registrierung“ mit Kopfaktion „Registrieren“, Band
   „Kostformen“ und Registrierliste (Haushalte aufklappbar, je Haushalt „Person hinzufügen“ und
-  „Abmelden“, je Person „Abmelden“ im Zeilenmenü). Belegungsart in den Stammdaten der Stelle
+  „Abmelden“, je Person „Abmelden“ als Knopf). Belegungsart in den Stammdaten der Stelle
   (Datenraster), bei `namentlich` trägt „Belegung melden“ den Sperrgrund „Belegung kommt aus der
   Registrierung“.
 - Maske `betreuung/registrierung/RegistrierMaske.tsx` auf `ErfassungsModal`. **Kompakt durch
@@ -133,7 +133,7 @@ einer Sonderkost; der Dialog belegt die Sonderkost-Felder vor wie die beiden and
   einmal je Haushalt oben (gespeichert an jeder Person, D3; eine abweichende Adresse wird
   danach auf der Personen-Detailseite geändert), je Person eine Zeile mit Nachname, Vorname,
   Geburtsdatum, Geschlecht (Segment „m · w · d · ?“), Kostform und Unverträglichkeiten.
-  Ab `md` ist die Personenzeile ein Raster mit einer Spaltenkopfzeile (Beschriftung per
+  Ab `lg` (erst dort trägt die Dialogbreite sieben Spalten) ist die Personenzeile ein Raster mit einer Spaltenkopfzeile (Beschriftung per
   `aria-labelledby` je Feld, nicht nur optisch); darunter je Person ein Block in zwei Spalten,
   Kostform über die ganze Breite. Kostform als Radiogruppe über `personen/FlaechenWahl.tsx` mit
   Kurzwörtern („Normal“, „Veg.“, „Vegan“, „o. Schwein“, „Diät“, „Kleinkind“) und vollem Wort im
@@ -145,13 +145,28 @@ einer Sonderkost; der Dialog belegt die Sonderkost-Felder vor wie die beiden and
   *Abweichung:* Das Feldbudget „vier sichtbar, Rest unter ‚Weitere Angaben‘“ der Maske
   „Betroffene erfassen“ (Spec `betroffene-erfassung`) gilt hier ausdrücklich nicht; an der
   Registrierstelle zählt Vollständigkeit ohne versteckte Felder.
-- Gerät „Betreuungsstelle“: dieselbe Maske und Liste auf `GeraetBetreuungsstellePage`; die
-  Allow-Liste `BETREUUNGSSTELLE` bekommt Registrieren, Abmelden und Kostformen.
+- Gerät „Betreuungsstelle“: dieselbe Maske und Liste auf `GeraetBetreuungsstellePage` (Reiter
+  „Registrierung“); die Allow-Liste `BETREUUNGSSTELLE` bekommt Registrieren, Liste und Abmelden.
+  Das Band rechnet aus der Liste, die Kostform-Zählung des Einsatzes braucht das Gerät nicht.
 - Personen-Detail: Kostform und Unverträglichkeiten als `InlineAngabe` in den Personendaten,
-  Haushalt als Lesezeile „Haushalt H-1 · Bezugsperson Weber, Anna“ mit Sprung zur Stelle.
+  Haushalt als Lesezeile „Haushalt H-1“ mit Sprung zur Stelle (die Bezugsperson nennt die
+  Registrierliste). Am Gerät einer Einheit fehlen Kostform und Haushalt wie die Personalien.
 - Offline: neue Queue-Arten `registrierung` und `abmeldung` in `offline/schreiben.ts` mit
   `client_id` und Erfassungszeit; vorgemerkte Haushalte stehen als „vorgemerkt“ oben in der
   Liste und zählen nicht im Band.
+
+### Nachträge aus Umsetzung und Review (09.11.2026)
+
+- Ein Replay derselben Registrierung wird zusätzlich IN der Transaktion erkannt (erste Person
+  `<cid>#0`): zwei gleichzeitige Wiederholungen schreiben nur einmal.
+- Storno einer Person und Nachführen der Belegung laufen in EINER Transaktion; die Stelle wird
+  darin gelesen.
+- Der Wechsel auf `namentlich` meldet auch bei gleicher Zahl (Herkunft `registrierung`).
+- Eine geschlossene, namentlich geführte Stelle nimmt keinen Verbleib „Notunterkunft“ an (422);
+  wer im selben PATCH schließt und auf `namentlich` stellt, schließt nur ohne Registrierte.
+- Der leere Nachname bleibt 422 (Zusammenhang „Person n“, Spec); 404/409 der Stelle kommen vorher.
+- Die Segmentleiste markiert ohne passenden Wert kein Segment mehr als gewählt (vorher wirkte
+  „m“ beim Geschlecht ohne Angabe gewählt).
 
 ## Risks / Trade-offs
 

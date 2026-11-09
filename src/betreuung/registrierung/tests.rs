@@ -647,3 +647,94 @@ async fn replay_ueber_den_schluessel() {
         .unwrap()
         .is_empty());
 }
+
+/// Review-Befund 1: zwei gleichzeitige Wiederholungen derselben Registrierung kommen beide an der
+/// Prüfung der Route vorbei; die zweite Transaktion schreibt nichts.
+#[tokio::test]
+async fn zweite_gleiche_registrierung_in_der_transaktion_schreibt_nichts() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Namentlich).await;
+    let eingabe = RegistrierEingabe {
+        haushalt_id: None,
+        personen: familie(),
+        zeitpunkt_at: ZEIT.into(),
+        client_id: Some("doppelt".into()),
+    };
+    let (pool, b, e) = (&w.pool, w.b, w.e);
+    let erst = write_retry!(pool, |conn| {
+        registrieren_tx(conn, e, sid, b, STARTWERT, &eingabe).await
+    })
+    .unwrap();
+    let etb_vorher = etb_inhalte(&w).await.len();
+    let zweit = write_retry!(pool, |conn| {
+        registrieren_tx(conn, e, sid, b, STARTWERT, &eingabe).await
+    })
+    .unwrap();
+    assert_eq!(zweit.haushalt_id, erst.haushalt_id);
+    assert!(zweit.person_ids.is_empty() && zweit.etb_ids.is_empty());
+    assert_eq!(etb_inhalte(&w).await.len(), etb_vorher);
+    let haushalte: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM haushalt")
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(haushalte, 1);
+    assert_eq!(belegung(&w, sid).await, Some(3));
+}
+
+/// Review-Befund 6: der Wechsel auf `namentlich` meldet auch bei gleicher Zahl, damit die
+/// aktuelle Meldung die Herkunft `registrierung` trägt.
+#[tokio::test]
+async fn wechsel_auf_namentlich_meldet_auch_bei_gleicher_zahl() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    registrieren(&w, sid, None, familie()).await.unwrap();
+    let (pool, b, e) = (&w.pool, w.b, w.e);
+    let m3 = BelegungEingabe {
+        belegt: 3,
+        zeitpunkt_at: "2026-11-09 09:00:00".into(),
+        client_id: None,
+    };
+    write_retry!(pool, |conn| {
+        stellen_repo::belegung_melden_tx(conn, e, sid, b, STARTWERT, &m3).await
+    })
+    .unwrap();
+    aendern(
+        &w,
+        sid,
+        StelleAenderung {
+            belegungsart: Some(Belegungsart::Namentlich),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let verlauf = stellen_repo::belegung_verlauf(&w.pool, w.e, sid)
+        .await
+        .unwrap();
+    assert_eq!(
+        (verlauf[0].belegt, verlauf[0].quelle),
+        (3, BelegungQuelle::Registrierung)
+    );
+    assert!(verlauf[0].aktuell);
+}
+
+/// Review-Befund 4: wer im selben PATCH schließt und auf `namentlich` stellt, schließt nur ohne
+/// Registrierte.
+#[tokio::test]
+async fn schliessen_und_namentlich_im_selben_patch_prueft_die_registrierten() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    registrieren(&w, sid, None, familie()).await.unwrap();
+    let fehler = aendern(
+        &w,
+        sid,
+        StelleAenderung {
+            status: Some(Status::Geschlossen),
+            belegungsart: Some(Belegungsart::Namentlich),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(status(fehler), StatusCode::UNPROCESSABLE_ENTITY);
+}

@@ -200,10 +200,13 @@ describe('RegistrierMaske — Prüfungen und Abschluss', () => {
     const { dialog, onErfassen } = rendere();
     await user.click(within(dialog).getByRole('button', { name: 'Registrieren' }));
     const nachname = feld(dialog, 'Nachname Person 1');
-    await waitFor(() => expect(nachname).toHaveAttribute('aria-invalid', 'true'));
-    const ids = (nachname.getAttribute('aria-describedby') ?? '').split(' ');
-    const grund = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-    expect(grund).toContain('Nachname fehlt');
+    // Ungültig-Marke und Fehlerzeile erscheinen nicht im selben Takt: beides in EINEM waitFor.
+    await waitFor(() => {
+      expect(nachname).toHaveAttribute('aria-invalid', 'true');
+      const ids = (nachname.getAttribute('aria-describedby') ?? '').split(' ');
+      const grund = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+      expect(grund).toContain('Nachname fehlt');
+    });
     expect(onErfassen).not.toHaveBeenCalled();
   });
 

@@ -443,3 +443,57 @@ async fn registrieren_ist_live_ohne_namen() {
         "Replay verteilt nichts: {roh:?}"
     );
 }
+
+/// Review-Befunde 3 und 4: der Storno einer Person führt die Belegung im selben Vorgang nach; an
+/// einer geschlossenen namentlichen Stelle nimmt der Verbleib niemanden auf (422).
+#[tokio::test]
+async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "namentlich").await;
+    let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    let belegt = |ue: &Value| ue["stellen"][0]["belegung"]["belegt"].clone();
+    let (_, ue) = anfrage(&app, "GET", &b(e), &admin, None).await;
+    assert_eq!(belegt(&ue), 3);
+
+    let tom = h["personen"][1]["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/personen/{tom}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, ue) = anfrage(&app, "GET", &b(e), &admin, None).await;
+    assert_eq!(belegt(&ue), 2);
+
+    let (s, _) = post(
+        &app,
+        &admin,
+        &format!("{}/stellen/{sid}/abmeldungen", b(e)),
+        json!({"haushalt_id": h["id"]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", b(e)),
+        &admin,
+        Some(r#"{"status":"geschlossen"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let neu = person_anlegen(&app, &admin, e, r#"{"name":"Schulz"}"#).await;
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen/{neu}/verbleib"),
+        json!({"art": "notunterkunft", "betreuungsstelle_id": sid}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+}

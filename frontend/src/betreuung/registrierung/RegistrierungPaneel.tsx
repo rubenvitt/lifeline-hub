@@ -331,6 +331,24 @@ export default function RegistrierungPaneel({
         </span>
       }
     >
+      {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
+          nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
+      {vorgemerkteRegistrierungen.length > 0 && (
+        <ul
+          aria-label="Vorgemerkte Registrierungen"
+          style={{ listStyle: 'none', margin: 0, padding: 0 }}
+        >
+          {vorgemerkteRegistrierungen.map((r) => (
+            <li key={r.id} data-lfh="registrierung-vorgemerkt">
+              <Typography.Text strong>vorgemerkt</Typography.Text>
+              {' · '}
+              {r.daten.personen.map((p) => personName(p)).join('; ')}
+              {' · '}
+              {personenWort(r.daten.personen.length)}
+            </li>
+          ))}
+        </ul>
+      )}
       <PaneelZustand
         zustand={zustand}
         titel="Registrierung"
@@ -352,22 +370,6 @@ export default function RegistrierungPaneel({
               ))}
               <Kennzahl groesse="klein" titel="ohne Angabe" wert={band.ohne_angabe} />
             </Kennzahlenband>
-          )}
-          {vorgemerkteRegistrierungen.length > 0 && (
-            <ul
-              aria-label="Vorgemerkte Registrierungen"
-              style={{ listStyle: 'none', margin: 0, padding: 0 }}
-            >
-              {vorgemerkteRegistrierungen.map((r) => (
-                <li key={r.id} data-lfh="registrierung-vorgemerkt">
-                  <Typography.Text strong>vorgemerkt</Typography.Text>
-                  {' · '}
-                  {r.daten.personen.map((p) => personName(p)).join('; ')}
-                  {' · '}
-                  {personenWort(r.daten.personen.length)}
-                </li>
-              ))}
-            </ul>
           )}
           {daten && daten.haushalte.length > 0 && (
             <Collapse
