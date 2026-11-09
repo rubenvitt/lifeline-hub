@@ -180,9 +180,13 @@ des Hubs gelten danach, Einsätze zeigen weiter auf dieselbe Zeile. Gibt der Hub
 als Vorgabe vor oder eine Leitstelle als zuständig, gilt das auch am ELW; eine eigene Vorgabe
 oder zuständige Leitstelle des ELW verliert diese Markierung und bleibt sonst erhalten. Konten werden nie zusammengeführt: Ist ein Benutzername am ELW schon vergeben,
 kommt das Konto vom Hub nicht an, und an der Kopplung steht „Konto „…“ ist hier schon
-vergeben.“ Löscht der Hub eine Zeile, die ein Einsatz am ELW verwendet, wird sie dort außer
-Dienst genommen oder deaktiviert statt gelöscht. Nach dem Widerruf gehören alle Zeilen dem ELW
-und sind wieder bearbeitbar.
+vergeben.“ Löscht der Hub eine Zeile, die am ELW noch verwendet wird, wird sie dort außer
+Dienst genommen oder deaktiviert statt gelöscht. Schichtmodelle, Einsatz-Vorlagen,
+Stichwort-Vorschläge und Unterkunft-Richtwerte kennen das nicht: Zeigt eine eigene Einsatz-Vorlage
+des ELW auf ein am Hub gelöschtes Schichtmodell, bleibt es stehen, gehört dem ELW und ist dort
+bearbeitbar. Was der Hub im selben Zug selbst nicht mehr verwendet, etwa ein Schichtmodell, das er
+erst aus seinen Vorlagen nimmt und dann löscht, löscht auch der ELW. Nach dem Widerruf gehören
+alle Zeilen dem ELW und sind wieder bearbeitbar.
 
 Eine Organisation bezieht Stammdaten aus genau einer Kopplung; eine weitere zeigt „Stammdaten
 dieser Org kommen schon aus einer anderen Kopplung.“
