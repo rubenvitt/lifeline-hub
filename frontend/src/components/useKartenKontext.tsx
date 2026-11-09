@@ -1,0 +1,52 @@
+/**
+ * Kontextmenü eines einzelnen Datensatzes, der sich selbst zeichnet (Karte, Nachricht; LLH-1598,
+ * `openspec/changes/g11xq51l-kontextmenue-karten/design.md` D2).
+ *
+ * Fasst `useKontextMenue` (Auslöser, geteilte Hörer) und `KontextMenue` (Schale) zusammen. Die
+ * Einträge kommen aus den `KartenAktion[]` der Karte, aus denen sie auch Knöpfe und ⋮ zeichnet.
+ * Die Handler gehören an das Element des Datensatzes (`{...ausloeser}`), `menue` irgendwo in die
+ * Karte (es rendert per Portal).
+ */
+import { App } from 'antd';
+import { useState, type ReactNode } from 'react';
+import { KontextMenue, type KontextMenueOffen } from './KontextMenue';
+import { fuehreKartenWahlAus, kartenKontextEintraege, type KartenAktion } from './kartenKontext';
+import { useKontextMenue, type KontextHandler } from './useKontextMenue';
+
+export interface KartenKontextOptionen<K extends string> {
+  /** Alle Handlungen der Karte in Reihenfolge: Knöpfe, dann ⋮. Leer ⇒ Browsermenü. */
+  aktionen: readonly KartenAktion<K>[];
+  /** Name des Menüs mit Kennung des Datensatzes („Aktionen zu Meldung 7“). */
+  zugaenglicherName: string;
+}
+
+export function useKartenKontext<K extends string, E extends Element = HTMLElement>({
+  aktionen,
+  zugaenglicherName,
+}: KartenKontextOptionen<K>): { ausloeser: KontextHandler<E>; menue: ReactNode } {
+  const { modal } = App.useApp();
+  const [offen, setOffen] = useState<KontextMenueOffen | null>(null);
+  const hatAktionen = aktionen.length > 0;
+  // Verliert die Karte alle Aktionen, schließt das Menü (abgeleiteter Zustand wie `Datensicht`).
+  if (offen != null && !hatAktionen) setOffen(null);
+  const fabrik = useKontextMenue<null>({
+    kannOeffnen: () => hatAktionen,
+    onOeffnen: (_s, { anker, vorherFokus }) => {
+      if (!hatAktionen) return false;
+      setOffen({ anker, vorherFokus });
+      return true;
+    },
+  });
+  return {
+    ausloeser: fabrik<E>(null),
+    menue: (
+      <KontextMenue<K>
+        offen={offen}
+        eintraege={kartenKontextEintraege(aktionen)}
+        zugaenglicherName={zugaenglicherName}
+        onWahl={(key) => fuehreKartenWahlAus(aktionen, key, modal)}
+        onSchliessen={() => setOffen(null)}
+      />
+    ),
+  };
+}

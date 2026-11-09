@@ -1,15 +1,15 @@
 ## 1. Geteilte Hörer in `useKontextMenue` (D1)
 
-- [ ] 1.1 TDD: zwei eingehängte Flächen teilen einen Satz Fensterhörer und einen Nachklick-Riegel (Zählung über `addEventListener`-Spione); nach dem Aushängen der letzten Fläche hängt kein Hörer mehr
-- [ ] 1.2 TDD: Tasten-Nachlauf, Stift-Riegel und Abheben am `window` wirken mit zwei Flächen genau einmal; das Abheben beendet nur den Druck der Fläche, die ihn hält
-- [ ] 1.3 Umbau auf Modulzustand mit Zählung; alle bestehenden Tests von `useKontextMenue`, `Datensicht.kontextmenue`, `KontextMenue` und Skizze bleiben grün, Schnittstelle unverändert
+- [x] 1.1 TDD: zwei eingehängte Flächen teilen einen Satz Fensterhörer und einen Nachklick-Riegel (Zählung über `addEventListener`-Spione); nach dem Aushängen der letzten Fläche hängt kein Hörer mehr
+- [x] 1.2 TDD: Tasten-Nachlauf, Stift-Riegel und Abheben am `window` wirken mit zwei Flächen genau einmal; das Abheben beendet nur den Druck der Fläche, die ihn hält
+- [x] 1.3 Umbau auf Modulzustand mit Zählung; alle bestehenden Tests von `useKontextMenue`, `Datensicht.kontextmenue`, `KontextMenue` und Skizze bleiben grün, Schnittstelle unverändert
 
 ## 2. Kartenbaustein (D2, D3)
 
-- [ ] 2.1 TDD: `kartenKontextEintraege(aktionen)` liefert die Einträge in Lieferreihenfolge, gesperrte mit Grund im Etikett, rote über `menueEintraege()` hinter einem Trenner
-- [ ] 2.2 TDD: `useKartenKontext` — Rechtsklick auf das Element öffnet `KontextMenue` mit allen Aktionen; ohne Aktion bleibt das Browsermenü; verliert die Karte alle Aktionen, schließt das Menü
-- [ ] 2.3 TDD: Wahl ohne `rueckfrage` ruft `onWahl` sofort; mit `rueckfrage` öffnet ein Dialog mit Titel, Knopf und Gefahrfarbe, erst OK ruft `onWahl`; Abbrechen löst nichts aus
-- [ ] 2.4 `ListenEintrag` nimmt `kontext?: KontextHandler<HTMLLIElement>` und spreizt ihn an das `<li>`; `Liste.test.tsx` um einen Test ergänzt
+- [x] 2.1 TDD: `kartenKontextEintraege(aktionen)` liefert die Einträge in Lieferreihenfolge, gesperrte mit Grund im Etikett, rote über `menueEintraege()` hinter einem Trenner
+- [x] 2.2 TDD: `useKartenKontext` — Rechtsklick auf das Element öffnet `KontextMenue` mit allen Aktionen; ohne Aktion bleibt das Browsermenü; verliert die Karte alle Aktionen, schließt das Menü
+- [x] 2.3 TDD: Wahl ohne `rueckfrage` ruft `onWahl` sofort; mit `rueckfrage` öffnet ein Dialog mit Titel, Knopf und Gefahrfarbe, erst OK ruft `onWahl`; Abbrechen löst nichts aus
+- [x] 2.4 `ListenEintrag` nimmt `kontext?: KontextHandler<HTMLLIElement>` und spreizt ihn an das `<li>`; `Liste.test.tsx` um einen Test ergänzt
 
 ## 3. Chat (D4)
 
