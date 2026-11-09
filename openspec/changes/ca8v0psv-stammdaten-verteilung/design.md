@@ -227,6 +227,32 @@ gilt danach ebenfalls kein altes Passwort mehr. Der Weg zurück ist das Einmalpa
 - **Benutzerverwaltung am Hub:** Hinweis an Admins ohne Passkey (Spec). **Anmeldung:** Text der
   403-Abweisung.
 
+## Nachträge aus der Umsetzung (09.11.2026)
+
+- **Byte-Budget statt fester Zeilenzahl allein (D2):** Schon die Unterschriftsschlüssel einer
+  Antwort können im schlimmsten Fall rund 770 KB belegen. Die Stammdaten bekommen deshalb, was
+  `melden::ANTWORT_MAX` abzüglich der Unterschriftsschlüssel und einer Reserve von 128 KiB
+  (`stammdaten::ANTWORT_RESERVE`) übrig lässt (`liefern::Budget`). Jede Zeile kommt als Paket mit
+  ihren Abhängigkeiten. Passt das Paket nicht mehr, endet die Lieferung davor. Nur die erste Zeile
+  einer Antwort geht notfalls allein über die Grenze, ohne Abhängigkeiten.
+- **Kennzeichen des Empfangs (D2):** Die meldende Seite merkt sich je Zuordnung, welche Arten sie
+  kannte und ob Geheimnisse kommen durften (`stammdaten_arten`). Ändert sich das (Update,
+  Plattenbestätigung), beginnt die Nachlieferung bei 0.
+- **Wechselpflicht im Geheimnis (D6):** `passwort_wechsel_pflicht` geht mit. Wer am Hub erst ein
+  eigenes Passwort festlegen muss, muss es am ELW auch.
+- **SSO-Konten (D6):** Der SSO-Platzhalter wird am ELW zu `PASSWORT_HASH_KEIN_LOKALES`. Die
+  SSO-Verknüpfung wird nicht verteilt, und beim SSO-Platzhalter verweigerte die
+  Benutzerverwaltung das Einmalpasswort, das die Spec ohne Netz verlangt.
+- **Passkeys melden das Konto (D7):** Trigger an `webauthn_credential` erhöhen den Stand des
+  Kontos, damit die Geheimnisse eines Admins hinausgehen, sobald er einen Passkey hat.
+- **403 mit Text:** neue Variante `AppError::ForbiddenMit`; die Prüfung steht in
+  `routes::auth::login` nach der Passwortprüfung, nicht im Provider, weil dieser auch das eigene
+  Passwort in einer Sitzung prüft (Passwortwechsel, TOTP-Einrichtung).
+- **Herkunftsabfrage (D9):** Sie nennt Admins nur auf Admin-Anfrage die System-Admins ohne Passkey
+  (`admins_ohne_passkey`), für den Hinweis in der Benutzerverwaltung. Die Modul-Vorgaben sind
+  gesperrt, solange die Org eine Quelle hat. Eine Sperre je Modul hätte einen Umbau der
+  Modul-Liste verlangt.
+
 ## Risks / Trade-offs
 
 - **Gestohlener ELW ohne Plattenverschlüsselung, die aber bestätigt wurde.** → Die Bestätigung ist

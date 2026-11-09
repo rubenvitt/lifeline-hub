@@ -43,7 +43,7 @@ Instanzen kommen nach `tests/instanz_stammdaten.rs` (Muster `tests/instanz_koppl
 - [x] 6.1 ADR-0016 (ersetzt ADR-0011, Ausnahme D7), ADR-0011 auf `status: ersetzt`; `scripts/check-architektur.sh` grün
 - [x] 6.2 Architekturdoku Kapitel 5 (Baustein `instanz::stammdaten`), 8 (Schreibschutz per Trigger), 11 (Risiken aus diesem Entwurf); `src/AGENTS.md`, Abschnitt Instanzkopplung (Trigger-Pflicht für neue verteilte Arten, Merker, 409); Konzeptnotiz: offene Frage „Anmeldung am ELW ohne Netz“ beantwortet
 - [x] 6.3 Anwenderdoku `instanzkopplung.md` (Stammdaten, Anmeldung ohne Netz, Plattenbestätigung, ELW verloren, Admins mit Passkey) und Kapitel Benutzerverwaltung; Wächter der Anwenderdoku grün
-- [ ] 6.4 Folgeaufgabe in Zunder für die übrigen Kataloge (`zunder-task-anlegen`), Verweis im Kommentar an LLH-1493
+- [x] 6.4 Folgeaufgabe in Zunder für die übrigen Kataloge (`zunder-task-anlegen`), Verweis im Kommentar an LLH-1493
 
 ## 7. Abschluss
 
