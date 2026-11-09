@@ -78,9 +78,14 @@ Bausteins sieht einen Hook je Fläche vor.
 
 `KontextMenue` wird innerhalb der Wurzel der Zeitachse gerendert. React lässt den Fokus aus dem
 Portal (`autoFocus` des Menüs) durch den Komponentenbaum aufsteigen; `betreten` friert die Achse
-ein wie bei jedem Fokus in ihr. Beim Schließen geht der Fokus an das Ursprungselement zurück oder
-fällt heraus; `verlassen` taut wie bisher auf. Zusätzlich friert `onOeffnen` sofort ein, denn der
-Fokus kommt erst einen Commit später ins Menü, und ein Eintrag dazwischen verschöbe die Zeile.
+ein wie bei jedem Fokus in ihr. Zusätzlich friert `onOeffnen` sofort ein, denn der Fokus kommt
+erst einen Commit später ins Menü, und ein Eintrag dazwischen verschöbe die Zeile.
+
+Beim Schließen taut die Achse selbst auf, wenn der Fokus nicht in sie zurückkehrt; das bestimmt
+`onOeffnen` aus `vorherFokus` (in der Wurzel oder nicht). Auf `verlassen` ist dabei kein Verlass:
+Kam der Rechtsklick ohne Fokus in der Achse, fällt der Fokus mit dem ausgehängten Menü heraus, und
+ein entfernter fokussierter Knoten feuert kein `blur` (Firefox, Safari). Dasselbe gilt, wenn die
+Zeile bei offenem Menü verschwindet (Nachtrag aus dem Review, 09.11.2026).
 
 ### D5 MetaChip: Hook im Chip
 

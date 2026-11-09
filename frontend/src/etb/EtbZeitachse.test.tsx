@@ -618,6 +618,49 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
   });
 
+  it('nach Rechtsklick ohne Fokus in der Achse taut das Schließen wieder auf (Escape und Wahl)', async () => {
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const zeilenAus = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const wege = alle();
+    const { container, neu: setze } = renderZeitachse({ zeilen: zeilenAus([alt]), ...wege });
+    // Escape: der Fokus kam von außerhalb (body) und fällt aus dem Menü heraus, ohne `blur`.
+    fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
+    let menue = await waitFor(() => offenesKontextmenue()!);
+    await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    setze(zeilenAus([neu, alt]));
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+    // Wahl eines Eintrags ebenso.
+    const neuer = eintrag({ id: 3, lfd_nr: 3, inhalt: 'Neuer' });
+    fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
+    menue = await waitFor(() => offenesKontextmenue()!);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' }));
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    setze(zeilenAus([neuer, neu, alt]));
+    expect(screen.getByText('Neuer')).toBeInTheDocument();
+  });
+
+  it('verschwindet die Zeile bei offenem Menü, taut die Achse wieder auf', async () => {
+    const puffer = abgelehnt();
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const { container, neu: setze } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [alt], ausstehend: [], abgelehnt: [puffer] }),
+      onErneutSenden: vi.fn(),
+      onVerwerfen: vi.fn(),
+    });
+    fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
+    await waitFor(() => offenesKontextmenue()!);
+    setze(baueZeilen({ eintraege: [alt], ausstehend: [], abgelehnt: [] }));
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    setze(baueZeilen({ eintraege: [neu, alt], ausstehend: [], abgelehnt: [] }));
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+  });
+
   it('verschwindet die Zeile, schließt das Menü', async () => {
     const puffer = abgelehnt();
     const { container, neu: setze } = renderZeitachse({

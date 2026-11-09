@@ -496,9 +496,12 @@ export default function EtbZeitachse({
     () => new Map(sichtbar.map((z) => [z.schluessel, z])),
     [sichtbar],
   );
-  const [kontext, setKontext] = useState<{ schluessel: string; offen: KontextMenueOffen } | null>(
-    null,
-  );
+  const [kontext, setKontext] = useState<{
+    schluessel: string;
+    offen: KontextMenueOffen;
+    /** Geht der Fokus beim Schließen in die Achse zurück? Beim Öffnen bestimmt (Ref im Handler). */
+    zurueckInAchse: boolean;
+  } | null>(null);
   const kontextAusloeser = useKontextMenue<string>({
     langerDruck: false,
     onOeffnen: (schluessel, { anker, vorherFokus }) => {
@@ -507,20 +510,32 @@ export default function EtbZeitachse({
       // Sofort einfrieren: der Fokus kommt erst einen Commit später ins Menü (`betreten`), und ein
       // Eintrag dazwischen verschöbe die Zeile unter dem Menü (D4).
       setGefroren((vorher) => vorher ?? einfrieren(zeilen));
-      setKontext({ schluessel, offen: { anker, vorherFokus } });
+      const zurueckInAchse =
+        vorherFokus instanceof HTMLElement &&
+        vorherFokus !== document.body &&
+        (wurzel.current?.contains(vorherFokus) ?? false);
+      setKontext({ schluessel, offen: { anker, vorherFokus }, zurueckInAchse });
       return true;
     },
   });
   const kontextZeile = kontext == null ? undefined : sichtbarNachSchluessel.get(kontext.schluessel);
   const kontextListe = kontextZeile == null ? [] : zeilenAktionen(kontextZeile, rechte);
+  /*
+   * Schließen taut auf, wenn der Fokus nicht in die Achse zurückkehrt. Auf `verlassen` ist dabei
+   * kein Verlass: kam der Rechtsklick ohne Fokus in der Achse (Fokus auf `body`), fällt der Fokus
+   * mit dem ausgehängten Menü heraus, und dabei feuert kein `blur` (Firefox, Safari). `fokusDrin`
+   * bliebe wahr und die Achse eingefroren, auch nach dem Zurückrollen ans Ende.
+   */
+  const kontextZu = (zurueckInAchse: boolean) => {
+    setKontext(null);
+    if (zurueckInAchse) return;
+    setFokusDrin(false);
+    if (amEnde) setGefroren(null);
+  };
   // Verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü (abgeleiteter
   // Zustand wie in `Datensicht`).
-  if (kontext != null && kontextListe.length === 0) setKontext(null);
-  const kontextSchliessen = () => {
-    setKontext(null);
-    // Ohne Fokus in der Achse taut sie am Ende wieder auf; liegt er drin, tut es `verlassen`.
-    if (amEnde && !fokusDrin) setGefroren(null);
-  };
+  if (kontext != null && kontextListe.length === 0) kontextZu(kontext.zurueckInAchse);
+  const kontextSchliessen = () => kontextZu(kontext?.zurueckInAchse ?? false);
 
   const zeile = (z: EtbZeile) => (
     <EtbZeitachsenZeile

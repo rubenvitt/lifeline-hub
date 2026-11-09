@@ -46,10 +46,12 @@ test('Rechtsklick auf einen Eintrag zeigt die Einträge des ⋮; „Berichtigen�
   const knopf = zeile.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
   const name = (await knopf.getAttribute('aria-label'))!;
   await knopf.click();
-  const punkte = await eintraegeVon(menueMitName(page, name));
+  const dreipunkt = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  await expect(dreipunkt.getByRole('menuitem').first()).toBeVisible();
+  const punkte = await eintraegeVon(dreipunkt);
   expect(punkte).toContain('Berichtigen');
   await page.keyboard.press('Escape');
-  await expect(menueMitName(page, name)).toHaveCount(0);
+  await expect(dreipunkt).toHaveCount(0);
 
   await zeile.getByText('Wasserentnahme an Hydrant 4 bereit').click({ button: 'right' });
   const menue = menueMitName(page, name);
@@ -77,5 +79,5 @@ test('Rechtsklick auf den Chip „An“ zeigt dessen Menü; „Bearbeiten“ öf
   const punkte = await eintraegeVon(menue);
   expect(punkte[0]).toMatch(/Bearbeiten|Nur für diesen Eintrag ändern/);
   await menue.getByRole('menuitem').first().click();
-  await expect(page.getByRole('combobox', { name: 'An' }).or(page.getByLabel('An'))).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'An', exact: true })).toBeVisible();
 });

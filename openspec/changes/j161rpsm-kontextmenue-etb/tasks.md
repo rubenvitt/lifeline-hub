@@ -13,7 +13,7 @@
 - [x] 3.1 TDD: Rechtsklick auf den Text eines gesendeten Eintrags öffnet das Menü mit denselben Einträgen wie das ⋮ (auch gesperrt); Wahl ruft den Handler genau einmal; Rechtsklick auf vorgemerkte Zeile, Bündelzeile, Eintrag ohne Aktion, Link: kein `preventDefault`, kein Menü
 - [x] 3.2 TDD: abgelehnte Zeile zeigt Erneut senden / Nur protokollieren / Trenner / rot Verwerfen; „Verwerfen“ ruft `onVerwerfen` ohne Rückfrage
 - [x] 3.3 TDD: Umschalt+F10 bei Fokus auf dem ⋮ einer Zeile öffnet das Menü dieser Zeile; Escape gibt den Fokus zurück; langer Touchdruck öffnet nicht
-- [x] 3.4 TDD: offenes Menü hält neue Einträge zurück (Sammelbanner); verschwindet die Zeile, schließt das Menü
+- [x] 3.4 TDD: offenes Menü hält neue Einträge zurück (Sammelbanner); verschwindet die Zeile, schließt das Menü; nach dem Schließen ohne Fokus in der Achse (Rechtsklick, Escape oder Wahl, Zeile weg) taut sie wieder auf
 - [x] 3.5 `EtbZeitachse.render.test.tsx` grün: ein neuer Eintrag rendert keine bestehende Zeile neu (stabile Fabrik)
 
 ## 4. Kontextmenü am MetaChip (D5)
@@ -28,7 +28,7 @@
 
 ## 6. Browser-Nachweis und Gate
 
-- [ ] 6.1 e2e `frontend/e2e/kontextmenue-etb.spec.ts`: Rechtsklick auf einen ETB-Eintrag zeigt die ⋮-Einträge, „Berichtigen“ öffnet die Berichtigung; Rechtsklick auf einen Chip der Erfassung zeigt dessen Einträge
+- [x] 6.1 e2e `frontend/e2e/kontextmenue-etb.spec.ts`: Rechtsklick auf einen ETB-Eintrag zeigt die ⋮-Einträge, „Berichtigen“ öffnet die Berichtigung; Rechtsklick auf einen Chip der Erfassung zeigt dessen Einträge
 - [ ] 6.2 `./scripts/check-all.sh` grün (lokal die Bündel `schnell` und `frontend`, Rest belegt die CI des PRs)
 - [ ] 6.3 Bilder der Änderung (Kontextmenü am Eintrag, an abgelehnter Zeile, am Chip) per Wegwerf-Spec aufnehmen
 
