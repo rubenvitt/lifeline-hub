@@ -813,6 +813,8 @@
           "unterschrift_gegengezeichnet",
           "unterschrift_widerrufen",
           "unterschrift_abgelehnt",
+          "unterschrift_bestaetigt",
+          "unterschrift_zurueckgewiesen",
           "instanz_elw_verloren"
         ]
       },
@@ -9413,7 +9415,9 @@
           "richtung",
           "zustand",
           "protokoll",
-          "org"
+          "org",
+          "wartende_schluessel",
+          "ohne_gueltigen_schluessel"
         ],
         "properties": {
           "gegenueber_adresse": {
@@ -9460,6 +9464,10 @@
               "null"
             ]
           },
+          "ohne_gueltigen_schluessel": {
+            "type": "boolean",
+            "description": "Die eigene Org verteilt ihre Schlüssel an diese Kopplung, hat aber keinen gültigen mehr\n(etwa nach dem Deaktivieren des letzten Halters): die Kopplung muss neu aufgebaut werden."
+          },
           "org": {
             "$ref": "#/components/schemas/InstanzOrgZuordnung",
             "description": "Die Org-Zuordnung der eigenen Org (die jüngste)."
@@ -9476,6 +9484,11 @@
               "null"
             ],
             "format": "int64"
+          },
+          "wartende_schluessel": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Vom Gegenüber nachgelieferte Unterschriftsschlüssel, die hier auf Bestätigung warten\n(LLH-1605)."
           },
           "zuletzt_gesehen_at": {
             "type": [
@@ -11653,6 +11666,26 @@
           "meldung_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "LetzterSchluesselHalter": {
+        "type": "object",
+        "description": "Ein Konto, dessen Deaktivieren oder Herabstufen die Org ohne gültigen Unterschriftsschlüssel\nzurückließe, und die Kopplungen, die dann neu aufgebaut werden müssen (LLH-1605, design.md D5).",
+        "required": [
+          "benutzer_id",
+          "kopplungen"
+        ],
+        "properties": {
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kopplungen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -18565,6 +18598,13 @@
             "type": "boolean",
             "description": "Gehört dem anfragenden Admin."
           },
+          "erklaert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei einer Gegenzeichnung: Zeitpunkt aus der Erklärung."
+          },
           "erstellt_at": {
             "type": "string"
           },
@@ -18592,6 +18632,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "unterzeichner_fingerabdruck": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei einer Gegenzeichnung: Fingerabdruck des unterzeichnenden Schlüssels (LLH-1605)."
+          },
           "widerrufen_at": {
             "type": [
               "string",
@@ -18616,8 +18663,10 @@
         "description": "Zustand eines Unterschriftsschlüssels.",
         "enum": [
           "wartet_auf_gegenzeichnung",
+          "wartet_auf_bestaetigung",
           "gueltig",
-          "widerrufen"
+          "widerrufen",
+          "abgelehnt"
         ]
       },
       "Verbindungsart": {

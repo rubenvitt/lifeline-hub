@@ -376,7 +376,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "instanz_elw_verloren";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "instanz_elw_verloren";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -3818,12 +3818,23 @@ export interface components {
             /** Format: int64 */
             id: number;
             letzter_fehler?: string | null;
+            /**
+             * @description Die eigene Org verteilt ihre Schlüssel an diese Kopplung, hat aber keinen gültigen mehr
+             *     (etwa nach dem Deaktivieren des letzten Halters): die Kopplung muss neu aufgebaut werden.
+             */
+            ohne_gueltigen_schluessel: boolean;
             /** @description Die Org-Zuordnung der eigenen Org (die jüngste). */
             org: components["schemas"]["InstanzOrgZuordnung"];
             protokoll: components["schemas"]["InstanzProtokoll"];
             richtung: components["schemas"]["InstanzKopplungRichtung"];
             /** Format: int64 */
             uhr_abweichung_s?: number | null;
+            /**
+             * Format: int64
+             * @description Vom Gegenüber nachgelieferte Unterschriftsschlüssel, die hier auf Bestätigung warten
+             *     (LLH-1605).
+             */
+            wartende_schluessel: number;
             zuletzt_gesehen_at?: string | null;
             zustand: components["schemas"]["InstanzKopplungZustand"];
         };
@@ -4703,6 +4714,15 @@ export interface components {
             meldeweg: components["schemas"]["MeldeWeg"];
             /** Format: int64 */
             meldung_id: number;
+        };
+        /**
+         * @description Ein Konto, dessen Deaktivieren oder Herabstufen die Org ohne gültigen Unterschriftsschlüssel
+         *     zurückließe, und die Kopplungen, die dann neu aufgebaut werden müssen (LLH-1605, design.md D5).
+         */
+        LetzterSchluesselHalter: {
+            /** Format: int64 */
+            benutzer_id: number;
+            kopplungen: string[];
         };
         /** @description Ein Fahrzeug der letzten Besetzung. */
         LetztesFahrzeug: {
@@ -7416,6 +7436,8 @@ export interface components {
             bezeichnung: string;
             /** @description Gehört dem anfragenden Admin. */
             eigen: boolean;
+            /** @description Bei einer Gegenzeichnung: Zeitpunkt aus der Erklärung. */
+            erklaert_at?: string | null;
             erstellt_at: string;
             fingerabdruck: string;
             /** @description Bei `herkunft = gegenueber`: Name der Org dort. */
@@ -7425,6 +7447,8 @@ export interface components {
             herkunft: components["schemas"]["UnterschriftSchluesselHerkunft"];
             /** Format: int64 */
             id: number;
+            /** @description Bei einer Gegenzeichnung: Fingerabdruck des unterzeichnenden Schlüssels (LLH-1605). */
+            unterzeichner_fingerabdruck?: string | null;
             widerrufen_at?: string | null;
             zustand: components["schemas"]["UnterschriftSchluesselZustand"];
         };
@@ -7437,7 +7461,7 @@ export interface components {
          * @description Zustand eines Unterschriftsschlüssels.
          * @enum {string}
          */
-        UnterschriftSchluesselZustand: "wartet_auf_gegenzeichnung" | "gueltig" | "widerrufen";
+        UnterschriftSchluesselZustand: "wartet_auf_gegenzeichnung" | "wartet_auf_bestaetigung" | "gueltig" | "widerrufen" | "abgelehnt";
         /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
          *     Erreichbarkeit steht im Kommunikationsplan.

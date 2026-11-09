@@ -19,11 +19,15 @@ vi.mock('../api/instanz', () => ({
   registriereUnterschriftsschluessel: vi.fn(),
   gegenzeichne: vi.fn(),
   widerrufeUnterschriftsschluessel: vi.fn(),
+  confirmUnterschriftsschluessel: vi.fn(),
+  rejectUnterschriftsschluessel: vi.fn(),
 }));
 
 import { useAuth } from '../auth/AuthContext';
 import {
+  confirmUnterschriftsschluessel,
   gegenzeichne,
+  rejectUnterschriftsschluessel,
   loadInstanzUebersicht,
   issueKopplungscode,
   meldeElwVerloren,
@@ -52,6 +56,8 @@ const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht =>
       zustand: 'aktiv',
       protokoll: 'update_hier',
       zuletzt_gesehen_at: '2026-11-08 12:00:00',
+      wartende_schluessel: 0,
+      ohne_gueltigen_schluessel: false,
       org: {
         id: 1,
         fremde_org_name: 'DRK LV',
@@ -164,6 +170,79 @@ describe('InstanzkopplungSeite', () => {
     expect(within(dialog).getByRole('button', { name: /close|schließen/i })).toBeDisabled();
     ablehnen(new Error('Gegenstelle lehnt ab'));
     expect(await within(dialog).findByText('Nicht widerrufen')).toBeInTheDocument();
+  });
+
+  describe('wartender Schlüssel vom Gegenüber (LLH-1605)', () => {
+    const wartend = {
+      id: 9,
+      benutzer_name: 'Carl Hub',
+      bezeichnung: 'Stick C',
+      fingerabdruck: 'ABCD-EFGH-JKMN-PQRS',
+      zustand: 'wartet_auf_bestaetigung' as const,
+      herkunft: 'gegenueber' as const,
+      eigen: false,
+      erstellt_at: '2026-11-09 08:00:00',
+      fremde_org_name: 'DRK LV',
+      gegengezeichnet_von: 'Anna Hub',
+      unterzeichner_fingerabdruck: 'WXYZ-1234',
+      erklaert_at: '2026-11-09 07:59:00',
+    };
+    beforeEach(() => {
+      vi.mocked(loadInstanzUebersicht).mockResolvedValue(
+        uebersicht({ schluessel: [...uebersicht().schluessel, wartend] }),
+      );
+    });
+
+    const oeffneBestaetigen = async () => {
+      renderMitProviders(<InstanzkopplungSeite />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zum Schlüssel Stick C von Carl Hub' }),
+      );
+      await userEvent.click(await screen.findByText('Bestätigen …'));
+      return screen.findByRole('dialog', { name: 'Schlüssel von Carl Hub bestätigen' });
+    };
+
+    it('Bestätigen zeigt die Angaben und schickt die vier Zeichen', async () => {
+      vi.mocked(confirmUnterschriftsschluessel).mockResolvedValue({
+        ...wartend,
+        zustand: 'gueltig',
+      });
+      const dialog = await oeffneBestaetigen();
+      expect(within(dialog).getByText('ABCD-EFGH-JKMN-PQRS')).toBeInTheDocument();
+      expect(within(dialog).getByText(/Anna Hub/)).toBeInTheDocument();
+      expect(within(dialog).getByText(/WXYZ-1234/)).toBeInTheDocument();
+      await userEvent.type(within(dialog).getByLabelText(/Letzte vier Zeichen/), 'pqrs');
+      await userEvent.click(within(dialog).getByRole('button', { name: /Bestätigen/ }));
+      await waitFor(() => expect(confirmUnterschriftsschluessel).toHaveBeenCalledWith(9, 'PQRS'));
+    });
+
+    it('falsche Zeichen: der Grund steht im Dialog', async () => {
+      vi.mocked(confirmUnterschriftsschluessel).mockRejectedValue(
+        new Error('Die Zeichen passen nicht zum Fingerabdruck.'),
+      );
+      const dialog = await oeffneBestaetigen();
+      await userEvent.type(within(dialog).getByLabelText(/Letzte vier Zeichen/), 'AAAA');
+      await userEvent.click(within(dialog).getByRole('button', { name: /Bestätigen/ }));
+      expect(await within(dialog).findByText('Nicht bestätigt')).toBeInTheDocument();
+    });
+
+    it('Zurückweisen fragt nach und ruft die Route', async () => {
+      vi.mocked(rejectUnterschriftsschluessel).mockResolvedValue({
+        ...wartend,
+        zustand: 'abgelehnt',
+      });
+      renderMitProviders(<InstanzkopplungSeite />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zum Schlüssel Stick C von Carl Hub' }),
+      );
+      await userEvent.click(await screen.findByText('Zurückweisen …'));
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Schlüssel Stick C von Carl Hub zurückweisen?',
+      });
+      expect(rejectUnterschriftsschluessel).not.toHaveBeenCalled();
+      await userEvent.click(within(dialog).getByRole('button', { name: /Zurückweisen/ }));
+      await waitFor(() => expect(rejectUnterschriftsschluessel).toHaveBeenCalledWith(9));
+    });
   });
 
   it('ohne Admin-Rolle nur Ansicht', async () => {

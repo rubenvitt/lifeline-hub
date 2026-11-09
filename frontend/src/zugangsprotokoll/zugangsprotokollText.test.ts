@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ANMELDEWEG_TEXT, anmeldewegText, instanzText, rollenText } from './zugangsprotokollText';
+import {
+  AKTION_TEXT,
+  ANMELDEWEG_TEXT,
+  anmeldewegText,
+  hasNamensziel,
+  instanzText,
+  rollenText,
+} from './zugangsprotokollText';
 
 /** Klartext des Zugangsprotokolls (LFH-1152): keine interne Kennung in der Liste. */
 describe('anmeldewegText', () => {
@@ -70,5 +77,14 @@ describe('instanzText (LLH-1490)', () => {
     expect(instanzText({ anzahl: 2 })).toBe('2 Konten gesperrt');
     expect(instanzText({ passkeys_entfernt: 1 })).toBe('1 Passkey entfernt');
     expect(instanzText({ passkeys_entfernt: 3 })).toBe('3 Passkeys entfernt');
+  });
+});
+
+describe('Bestätigung nachgelieferter Schlüssel (LLH-1605)', () => {
+  it('nennt Bestätigen und Zurückweisen und zeigt den Inhaber als Ziel', () => {
+    expect(AKTION_TEXT.unterschrift_bestaetigt).toBe('Unterschriftsschlüssel bestätigt');
+    expect(AKTION_TEXT.unterschrift_zurueckgewiesen).toBe('Unterschriftsschlüssel zurückgewiesen');
+    expect(hasNamensziel('unterschrift_bestaetigt')).toBe(true);
+    expect(hasNamensziel('unterschrift_zurueckgewiesen')).toBe(true);
   });
 });

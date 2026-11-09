@@ -11,7 +11,7 @@ use crate::auth::unterschrift::pruefen::{self, UnterschriftAssertion};
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::auth::unterschrift::zeremonie::{self, Zeremonie};
 use crate::auth::unterschrift::{
-    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    AufnahmeErklaerung, Gegenzeichnung, LetzterSchluesselHalter, UnterschriftSchluesselAnzeige,
     UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand, TYP_AUFNAHME,
 };
 use crate::error::AppError;
@@ -1086,6 +1086,125 @@ pub async fn gegenzeichnen_abschluss(
     Ok(Json(anzeige))
 }
 
+/// GET /api/admin/instanz/letzte-schluessel — Konten der eigenen Org, deren Deaktivieren oder
+/// Herabstufen die Kopplungen ohne gültigen Unterschriftsschlüssel zurückließe; die
+/// Benutzerverwaltung warnt davor (LLH-1605, design.md D5).
+pub async fn letzte_schluessel(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+) -> Result<Json<Vec<LetzterSchluesselHalter>>, AppError> {
+    Ok(Json(
+        unterschrift::list_letzte_halter(&state.pool, admin.org_id).await?,
+    ))
+}
+
+/// Obergrenze der Eingabe beim Bestätigen (`src/AGENTS.md`, Eingabegrenzen): vier Zeichen,
+/// großzügig mit Trennzeichen und Leerraum.
+const FINGERABDRUCK_ENDE_MAX: usize = 16;
+
+#[derive(Debug, Deserialize)]
+pub struct BestaetigenBody {
+    /// Die letzten vier Zeichen des Fingerabdrucks, wie der Inhaber sie nennt.
+    pub fingerabdruck_ende: String,
+}
+
+/// POST /api/admin/instanz/unterschrift/{id}/bestaetigen — bestätigt einen vom Gegenüber
+/// nachgelieferten, wartenden Schlüssel (LLH-1605, design.md D3). Verlangt die letzten vier
+/// Zeichen des Fingerabdrucks (422, wenn sie nicht passen); ein eigener Unterschriftsschlüssel ist
+/// nicht nötig.
+pub async fn unterschrift_bestaetigen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+    JsonBody(body): JsonBody<BestaetigenBody>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    let eingabe = crate::routes::support::pflicht_max(
+        &body.fingerabdruck_ende,
+        "fingerabdruck_ende",
+        FINGERABDRUCK_ENDE_MAX,
+    )?;
+    decide_unterschrift(&state, &admin, peer_ip, id, Some(&eingabe)).await
+}
+
+/// POST /api/admin/instanz/unterschrift/{id}/zurueckweisen — weist einen vom Gegenüber
+/// nachgelieferten, wartenden Schlüssel zurück; er wird nie gültig.
+pub async fn unterschrift_zurueckweisen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    decide_unterschrift(&state, &admin, peer_ip, id, None).await
+}
+
+/// Bestätigt (`eingabe` gesetzt) oder weist zurück (`None`).
+async fn decide_unterschrift(
+    state: &AppState,
+    admin: &crate::auth::Benutzer,
+    peer_ip: Option<std::net::IpAddr>,
+    id: i64,
+    eingabe: Option<&str>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    let jetzt = crate::zeit::jetzt();
+    // Die Zuordnung für die Admin-Spur kommt aus derselben Transaktion: scheitert das Lesen,
+    // bleibt auch die Entscheidung aus, statt ohne Spureintrag zu gelten.
+    let (zeile, gegenstelle) = crate::write_retry!(&state.pool, |conn| {
+        let zeile = unterschrift::load(conn, admin.org_id, id).await?;
+        if zeile.zustand() != UnterschriftSchluesselZustand::WartetAufBestaetigung {
+            return Err(AppError::UnprocessableEntity(
+                "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
+            ));
+        }
+        let wirkung = match eingabe {
+            Some(e) => {
+                if !unterschrift::is_fingerabdruck_ende(&zeile.fingerabdruck, e) {
+                    return Err(AppError::UnprocessableEntity(
+                        "Die Zeichen passen nicht zum Fingerabdruck. Bitte die letzten vier \
+                         Zeichen beim Inhaber erfragen."
+                            .into(),
+                    ));
+                }
+                unterschrift::confirm(conn, admin.org_id, id, admin.id, &jetzt).await?
+            }
+            None => unterschrift::reject(conn, admin.org_id, id, admin.id, &jetzt).await?,
+        };
+        if !wirkung {
+            return Err(AppError::UnprocessableEntity(
+                "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
+            ));
+        }
+        let gegenstelle = match zeile.kopplung_org_id {
+            Some(ko) => repo::load_zuordnung_gegenstelle(conn, ko).await?,
+            None => None,
+        };
+        Ok((zeile, gegenstelle))
+    })?;
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: if eingabe.is_some() {
+                AdminAktion::UnterschriftBestaetigt
+            } else {
+                AdminAktion::UnterschriftZurueckgewiesen
+            },
+            akteur: admin,
+            ziel: Ziel::Unterschrift(&format!("{} · {}", zeile.benutzer_name, zeile.bezeichnung)),
+            angaben: Some(ZugangsAngaben {
+                fingerabdruck: Some(zeile.fingerabdruck.clone()),
+                instanz_kennung: gegenstelle.as_ref().map(|(k, _)| k.clone()),
+                fremde_org: gegenstelle.map(|(_, o)| o),
+                ..ZugangsAngaben::default()
+            }),
+            peer_ip,
+        },
+    )
+    .await;
+    Ok(Json(
+        unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?,
+    ))
+}
+
 /// POST /api/admin/instanz/unterschrift/{id}/widerrufen — widerruft einen lokalen
 /// Unterschriftsschlüssel der Org. Der letzte gültige einer Org, die ihre Schlüssel an eine
 /// gekoppelte Instanz verteilt, bleibt (409). Idempotent.
@@ -1103,7 +1222,9 @@ pub async fn unterschrift_widerrufen(
                 "Schlüssel einer gekoppelten Instanz widerruft diese selbst.".into(),
             ));
         }
-        if zeile.zustand() != UnterschriftSchluesselZustand::Widerrufen
+        // Nur ein gültiger Schlüssel kann der letzte gültige sein; ein wartender (etwa nach dem
+        // Deaktivieren des letzten Halters, LLH-1605) bliebe sonst unwiderrufbar hängen.
+        if zeile.zustand() == UnterschriftSchluesselZustand::Gueltig
             && unterschrift::is_letzter_bei_kopplung(conn, admin.org_id, id).await?
         {
             return Err(AppError::Conflict(

@@ -48,6 +48,7 @@ export type UnterschriftSchluesselHerkunft = S['UnterschriftSchluesselHerkunft']
 export type UnterschriftRegistrierenStart = S['UnterschriftRegistrierenStart'];
 export type UnterschriftGegenzeichnenStart = S['UnterschriftGegenzeichnenStart'];
 export type UnterschriftAssertion = S['UnterschriftAssertion'];
+export type LetzterSchluesselHalter = S['LetzterSchluesselHalter'];
 export type AnsichtSperre = S['AnsichtSperre'];
 export type AnsichtAuswahl = S['AnsichtAuswahl'];
 export type Bindungsart = S['Bindungsart'];

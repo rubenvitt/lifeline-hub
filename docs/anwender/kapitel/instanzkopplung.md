@@ -53,6 +53,20 @@ Für den System-Admin der anderen Installation (etwa im Einsatzleitwagen):
 3. Die neue Zeile unter „Gekoppelte Instanzen“ nennt den Fingerabdruck der anderen
    Installation. Er muss mit dem übereinstimmen, den deren Dialog gezeigt hat.
 
+### Nachgelieferten Unterschriftsschlüssel bestätigen
+
+Für den System-Admin der Installation, die sich meldet (etwa im Einsatzleitwagen), wenn an der
+Kopplung „neuer Unterschriftsschlüssel wartet auf Bestätigung“ steht:
+
+1. Im Paneel „Unterschriftsschlüssel“ im Menü des wartenden Schlüssels „Bestätigen …“ wählen.
+2. Den Inhaber anrufen und nach den letzten vier Zeichen seines Fingerabdrucks fragen. Der
+   Inhaber nennt sie, nicht umgekehrt.
+3. Die vier Zeichen unter „Letzte vier Zeichen des Fingerabdrucks“ eintragen und „Bestätigen“
+   wählen. Passen sie nicht, nennt der Dialog den Grund, und der Schlüssel wartet weiter.
+
+Kennt der Inhaber den Schlüssel nicht, im Menü „Zurückweisen …“ wählen und die Rückfrage
+bestätigen.
+
 ### Kopplung widerrufen
 
 Für den System-Admin:
@@ -123,9 +137,28 @@ das Koppeln scheitert.
 Ein Unterschriftsschlüssel ist ein Passkey nur zum Unterschreiben, nicht zur Anmeldung.
 Gekoppelte Installationen bekommen die Schlüssel der Organisation und nehmen einen neuen nur an,
 wenn ein ihnen bekannter ihn gegengezeichnet hat; sonst steht an der Kopplung ein Hinweis
-„abgelehnt“. Der letzte gültige Schlüssel einer gekoppelten Organisation lässt sich nicht
-widerrufen. Wird ein Admin-Konto deaktiviert oder herabgestuft, sind seine Schlüssel widerrufen.
-Zwei Schlüssel je Organisation, damit einer verloren gehen darf.
+„abgelehnt“. Zwei Schlüssel je Organisation, damit einer verloren gehen darf.
+
+Die Schlüssel, die beim Koppeln mitkommen, gelten sofort. Ein Schlüssel, der später nachkommt,
+wartet zuerst: an der Kopplung steht „1 neuer Unterschriftsschlüssel wartet auf Bestätigung“,
+der Schlüssel selbst „wartet auf Bestätigung“. Bis ein Admin hier ihn bestätigt, zählt seine
+Unterschrift nicht. So kann eine kompromittierte andere Installation keinen fremden Schlüssel
+unterschieben, ohne dass hier jemand nachfragt. Hat jemand einen neuen Schlüssel mit einem
+gegengezeichnet, der hier selbst noch wartet, erscheint der neue erst, wenn der erste bestätigt ist.
+
+Der Dialog zum Bestätigen zeigt Inhaber, Fingerabdruck, wer gegengezeichnet hat und wann. Der
+Inhaber liest seinen Fingerabdruck an seinem eigenen Schlüssel ab. Hat er gerade selbst keinen
+Schlüssel registriert, ist der wartende nicht seiner. Ein zurückgewiesener Schlüssel wird hier
+nie gültig, auch wenn die andere Installation ihn erneut liefert. Einen eigenen
+Unterschriftsschlüssel braucht man zum Bestätigen nicht.
+
+Der letzte gültige Schlüssel einer gekoppelten Organisation lässt sich nicht einzeln widerrufen.
+Wird ein Admin-Konto deaktiviert oder herabgestuft, sind seine Schlüssel trotzdem widerrufen,
+auch der letzte: die Benutzerverwaltung fragt dann vorher nach und nennt die Kopplungen. Danach
+steht an der Kopplung „Kein gültiger Unterschriftsschlüssel mehr: Kopplung widerrufen und neu
+koppeln“. Der Weg: die Kopplung widerrufen, einen neuen Unterschriftsschlüssel registrieren
+(ohne Kopplung gilt er sofort), einen neuen Code ausstellen und an der anderen Installation
+einlösen.
 
 ### Stammdaten vom Hub
 
