@@ -40,7 +40,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/amp1au76496lxigr9gaux4rn (LLH-1601)
 - [x] 4.1 Lagebericht: Leeren eines übernommenen Abschnitts verwirft den Stand der Übernahme, der
   Verlustschutz merkt die Änderung; Test an `LageberichtDetailPage` (bestehende Testdatei) oder
   e2e
-- [ ] 4.2 e2e im Browser (`frontend/e2e/`): Rechtsklick auf einen Gliederungseintrag im
+- [x] 4.2 e2e im Browser (`frontend/e2e/`): Rechtsklick auf einen Gliederungseintrag im
   Lagebericht-Entwurf, „Abschnitt leeren“ bestätigen, Feld leer und Rückfrage beim Verlassen;
   Befehl: ⋮ im Kopf öffnet dieselben Einträge
 - [x] 4.3 Regel in `frontend/src/entwurf/AGENTS.md` („Gegliederte Dokumente“) um ⋮ und
