@@ -148,3 +148,29 @@ test('Befehl: ⋮ und Rechtsklick auf den Abschnittskopf zeigen dieselben Eintr�
   const kontext = page.getByRole('menu', { name: 'Aktionen zu Abschnitt Lage', exact: true });
   await expect(kontext.getByRole('menuitem')).toHaveText(erwartet);
 });
+
+test('Enter im Kontextmenü löst nur den gewählten Eintrag aus, nicht den Gliederungseintrag', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const { detail } = await lageberichtMitText(page);
+  await page.goto(detail);
+  const feld = page.getByRole('textbox', { name: 'Auftrag', exact: true });
+  await expect(feld).toHaveValue('Auftrag steht');
+
+  const eintrag = gliederung(page).getByRole('button', { name: 'Auftrag', exact: true });
+  await eintrag.focus();
+  await page.keyboard.press('Shift+F10');
+  const menue = page.getByRole('menu', { name: 'Aktionen zu Abschnitt Auftrag in der Gliederung' });
+  await expect(menue).toBeVisible();
+  // Erster Eintrag ist „Zum Abschnitt springen“; einer weiter steht „Text kopieren“.
+  await page.keyboard.press('ArrowDown');
+  await expect(menue.getByRole('menuitem', { name: 'Text kopieren' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(menue).toBeHidden();
+  await expect(page.getByText('Text von „Auftrag“ kopiert')).toBeVisible();
+  // Das Enter darf nicht am zurückgegebenen Fokus ankommen: kein Sprung ins Feld.
+  await expect(eintrag).toBeFocused();
+  await expect(feld).not.toBeFocused();
+});

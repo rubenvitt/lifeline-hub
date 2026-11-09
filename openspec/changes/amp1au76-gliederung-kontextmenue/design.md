@@ -105,6 +105,18 @@ steht der Eintrag gesperrt (Secure Context, wie `KopierbarerText`). Der Text kom
 „Aktionen zu Abschnitt <Name> in der Gliederung“. Die Spec `datensatz-aktionsmenue` verlangt die
 Kennung des Datensatzes im Namen.
 
+### D8 Enter im Kontextmenü löst nur den Eintrag aus (Befund aus dem Review)
+
+Die Schale `components/PunktankerMenue.tsx` gibt den Fokus beim Schließen synchron an den
+Auslöser zurück, noch im `keydown` des Enter, mit dem ein Eintrag gewählt wurde. Der Browser
+aktivierte danach das Element mit dem Fokus: In der Gliederung sprang der Knopf zusätzlich zum
+Abschnitt, am Kopf öffnete das ⋮ von selbst. Die Gliederung ist der erste Auslöser mit eigener
+Klickaktion, an der Datensicht wäre es der Titel-Link gewesen. Behoben in der Schale: Solange
+das Menü offen ist, nimmt ein Capture-Hörer am `window` einem Enter oder Leerzeichen aus dem Menü
+die Standardaktion. Das gilt für alle Nutzer der Schale (Datensicht, Lagekarte, Skizze).
+`menu.onKeyDown` reicht nicht, weil rc-menu ihn bei Enter im senkrechten Menü nicht aufruft.
+Beleg: `e2e/dokument-entwurf-kontextmenue.spec.ts`, „Enter im Kontextmenü …“.
+
 ## Risks / Trade-offs
 
 - [Hülle um den Editor bricht `getFieldInstance` oder Autosize] → Test: Sprung fokussiert weiter
