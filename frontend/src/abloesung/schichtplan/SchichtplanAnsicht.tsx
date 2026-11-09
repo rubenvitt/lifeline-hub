@@ -49,6 +49,7 @@ import { useUhr } from '../useUhr';
 import GrenzwerteZeile from './GrenzwerteZeile';
 import { spanneAus, type SpannenWahl, type ZugStand } from './raster';
 import SchichtenErzeugenDialog from './SchichtenErzeugenDialog';
+import { useBlockMenue } from './blockMenue';
 import SchichtplanBlockDialog, { type BlockSpeichern } from './SchichtplanBlockDialog';
 import SchichtplanListe from './SchichtplanListe';
 import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen';
@@ -177,8 +178,10 @@ export default function SchichtplanAnsicht({
     if (wechselSprung != null) setWechselGewaehlt(wechselSprung);
   }, [wechselSprung, wechselSprungKennung]);
   const [zugLaeuft, setZugLaeuft] = useState(false);
+  // Ein offenes Kontextmenü eines Blocks hält wie ein Zug (LLH-1600, Spec `datensatz-aktionsmenue`).
+  const [menueOffen, setMenueOffen] = useState(false);
   // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
-  const schleuseHalten = zugLaeuft || gezogen != null || dialog != null;
+  const schleuseHalten = zugLaeuft || menueOffen || gezogen != null || dialog != null;
 
   const freigaben = useModulFreigaben(einsatzId);
   const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
@@ -467,6 +470,26 @@ export default function SchichtplanAnsicht({
     personalFrei &&
     !b.posten.aufgeloest &&
     (b.posten.art === 'pause' || (b.posten.art === 'uhs' && uhsFrei));
+  // Kontextmenü eines Blocks (LLH-1600): „Als nächsten Block kopieren“ ohne Dialog, die Kopie
+  // erscheint im Raster; ein Fehler steht über dem Raster wie bei einem Zug.
+  const kopiereStill = (block: SchichtplanBlock) => {
+    const body = naechsterBlockBody(block);
+    if (!body) return;
+    zugSchreiben(
+      kopierenMut.mutateAsync(body).then(() => {
+        message.success('Block kopiert');
+      }),
+    );
+  };
+  const blockMenue = useBlockMenue({
+    blockVon,
+    onBearbeiten: oeffneBlock,
+    onKopieren: kopiereStill,
+    onLoeschen: (b) => zugSchreiben(loeschenMut.mutateAsync(b)),
+    onWechsel: (b) => setDialog({ art: 'wechsel', blockId: b.id }),
+    wechselMoeglich,
+    laeuft: kopierenMut.isPending || loeschenMut.isPending,
+  });
   const mitSeitenleiste = !istSchmal && darfSchreiben;
 
   return (
@@ -583,6 +606,8 @@ export default function SchichtplanAnsicht({
                   personenZiel={mitSeitenleiste && !personenGesperrt}
                   beschriftung="Schichtplan"
                   onZug={setZugLaeuft}
+                  blockMenue={darfSchreiben ? blockMenue : undefined}
+                  onMenue={setMenueOffen}
                 />
               )}
             </SchichtplanSchleuse>

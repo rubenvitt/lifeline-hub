@@ -11,6 +11,9 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { monoStil, useRollen } from '../../components/instrument';
+import { KontextMenue, type KontextMenueOffen } from '../../components/KontextMenue';
+import type { MenueEintrag } from '../../components/MenueAusloeser';
+import { useKontextMenue, type KontextHandler } from '../../components/useKontextMenue';
 import { statusFlaeche, type StatusTon } from '../../components/instrument/statusFlaeche';
 import {
   griffAn,
@@ -62,6 +65,13 @@ function blockEinzug(marginSM: number): number {
  * gezeichnet“). Jeder Block ist ein Knopf; den Weg ohne Ziehen tragen der Blockdialog und „Block
  * anlegen“ der Ansicht (WCAG 2.5.7).
  *
+ * Kontextmenü eines Blocks (LLH-1600): mit `blockMenue` öffnen Rechtsklick, langer Druck (Touch,
+ * Stift) und Kontextmenü-Taste/Umschalt+F10 ein Menü am Block, über den Baustein `useKontextMenue`
+ * und `KontextMenue` (`frontend/AGENTS.md`, „Kontextmenü nur über den Baustein“). Die Einträge
+ * kommen vom Aufrufer (`blockMenue.ts`); ohne `blockMenue` oder ohne Einträge bleibt das
+ * Browsermenü. Ein Druck, der noch kein Zug ist, endet mit dem Menü (Strg-Klick am Mac, Stift);
+ * während eines Zugs öffnet keins.
+ *
  * Personen zieht der Aufrufer mit dnd-kit (`ZugPointerSensor`) auf die Blöcke: mit
  * `personenZiel` meldet sich jeder Block als Ziel mit `{ blockId }` in seinen Daten.
  *
@@ -69,6 +79,13 @@ function blockEinzug(marginSM: number): number {
  * rechnet `raster.ts`, die Zeile liest `elementFromPoint`. Was der Server ablehnte
  * (Überschneidung, unter 10 Minuten), sendet das Raster nicht; der Schatten nennt den Grund.
  */
+
+/** Kontextmenü der Blöcke (LLH-1600); die Einträge baut der Aufrufer (`blockMenue.ts`). */
+export interface RasterBlockMenue {
+  /** Einträge eines Blocks; leer ⇒ kein Menü, das Browsermenü bleibt. */
+  eintraege: (blockId: number) => readonly MenueEintrag[];
+  onWahl: (blockId: number, key: string) => void;
+}
 
 export interface SchichtplanRasterProps {
   zeilen: readonly RasterZeile[];
@@ -98,6 +115,10 @@ export interface SchichtplanRasterProps {
    * damit, auch wenn der Zeiger das Raster mitten im Zug verlässt (LLH-1604, `SchichtplanSchleuse`).
    */
   onZug?: (laeuft: boolean) => void;
+  /** Kontextmenü der Blöcke; ohne (etwa ohne Schreibrecht) bleibt das Browsermenü. */
+  blockMenue?: RasterBlockMenue;
+  /** Das Kontextmenü eines Blocks öffnet (`true`) oder schließt (`false`); die Schleuse hält. */
+  onMenue?: (offen: boolean) => void;
 }
 
 /** Breite der Titelspalte. */
@@ -177,6 +198,8 @@ export default function SchichtplanRaster({
   personenZiel = false,
   beschriftung,
   onZug,
+  blockMenue,
+  onMenue,
 }: SchichtplanRasterProps) {
   const { token, rollen } = useRollen();
   const [aussenRef, aussenBreite] = useBreite<HTMLDivElement>(960);
@@ -311,6 +334,42 @@ export default function SchichtplanRaster({
     };
   }, [laeuft, zeitAmZeiger, zeilen, bloecke, onAnlegen, onAendern, onKopieren, alsKopie]);
 
+  // ── Kontextmenü eines Blocks (LLH-1600) ──
+  const [menue, setMenue] = useState<{ blockId: number; offen: KontextMenueOffen } | null>(null);
+  const hatEintraege = (blockId: number) =>
+    blockMenue != null && blockMenue.eintraege(blockId).length > 0;
+  const kontextAusloeser = useKontextMenue<number>({
+    kannOeffnen: (blockId) => !laufRef.current?.aktiv && hatEintraege(blockId),
+    onOeffnen: (blockId, { anker, vorherFokus }) => {
+      if (laufRef.current?.aktiv || !hatEintraege(blockId)) return false;
+      // Ein Druck, der noch kein Zug ist, endet hier: sonst würde er unter dem Menü zum Zug.
+      setLauf(null);
+      setMenue({ blockId, offen: { anker, vorherFokus } });
+      return true;
+    },
+  });
+  const menueBlock = menue == null ? undefined : bloecke.find((b) => b.id === menue.blockId);
+  const menueEintraege =
+    menueBlock != null && blockMenue != null ? blockMenue.eintraege(menueBlock.id) : [];
+  // Verschwindet der Block oder verliert er seine Einträge, schließt das Menü (abgeleitet).
+  if (menue != null && menueEintraege.length === 0) setMenue(null);
+  const menueOffen = menue != null;
+  const onMenueJetzt = useRef(onMenue);
+  useLayoutEffect(() => {
+    onMenueJetzt.current = onMenue;
+  });
+  useLayoutEffect(() => {
+    if (!menueOffen) return;
+    onMenueJetzt.current?.(true);
+    return () => onMenueJetzt.current?.(false);
+  }, [menueOffen]);
+  const menueName = (() => {
+    if (menueBlock == null) return '';
+    const titel = zeilen.find((z) => z.schluessel === menueBlock.zeile)?.titel;
+    const zeit = `${formatZeit(menueBlock.von)}–${formatZeit(menueBlock.bis)}`;
+    return `Aktionen zu ${titel != null ? `${titel} ` : ''}${zeit}`;
+  })();
+
   const schatten = lauf?.aktiv ? lauf : null;
   // Bei einer Kopie bleibt das Original voll sichtbar.
   const gezogenerBlock =
@@ -334,214 +393,237 @@ export default function SchichtplanRaster({
 
   let letzteGruppe: string | null | undefined;
   return (
-    <div
-      ref={aussenRef}
-      role="region"
-      aria-label={beschriftung}
-      data-lfh="schichtplan-raster"
-      data-zug={schatten ? (schatten.kopie ? 'kopieren' : schatten.zug.art) : undefined}
-      style={{
-        overflowX: 'auto',
-        border: `1px solid ${rollen.linie}`,
-        background: rollen.paneel,
-        // Ein Zug markiert keinen Text.
-        userSelect: lauf ? 'none' : undefined,
-      }}
-    >
-      <div style={{ width: TITEL_BREITE + zeitBreite, position: 'relative' }}>
-        {/* Achse */}
-        <div style={{ display: 'flex', borderBottom: `1px solid ${rollen.linie}` }}>
-          <div style={{ ...titelZelle, minHeight: token.controlHeightSM }} />
-          <div
-            aria-hidden="true"
-            data-lfh="schichtplan-achse"
-            style={{ position: 'relative', width: zeitBreite, height: token.controlHeightSM }}
-          >
-            {marken.map((m) => (
-              <span
-                key={m}
-                style={{
-                  position: 'absolute',
-                  left: x(m),
-                  // Am Rand bündig statt mittig: sonst läge die halbe Marke unter der Titelspalte.
-                  transform:
-                    x(m) < RAND_PX
-                      ? 'translateX(2px)'
-                      : x(m) > zeitBreite - RAND_PX
-                        ? 'translateX(calc(-100% - 2px))'
-                        : 'translateX(-50%)',
-                  bottom: 2,
-                  color: rollen.gedaempft,
-                  ...monoStil(11),
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {formatMarke(m)}
-              </span>
-            ))}
-          </div>
-        </div>
-        {zeilen.map((z) => {
-          const kopf = z.gruppe !== letzteGruppe && z.gruppe != null;
-          letzteGruppe = z.gruppe;
-          // Nur was die Spanne berührt: ein Block davor oder danach läge sonst als Streifen am Rand
-          // oder machte die Rollfläche breiter als die Achse.
-          const eigene = bloecke.filter(
-            (b) => b.zeile === z.schluessel && b.bis > spanne.von && b.von < spanne.bis,
-          );
-          return (
-            <Fragment key={z.schluessel}>
-              {kopf && (
-                <div
-                  data-lfh="schichtplan-gruppe"
+    <>
+      <div
+        ref={aussenRef}
+        role="region"
+        aria-label={beschriftung}
+        data-lfh="schichtplan-raster"
+        data-zug={schatten ? (schatten.kopie ? 'kopieren' : schatten.zug.art) : undefined}
+        style={{
+          overflowX: 'auto',
+          border: `1px solid ${rollen.linie}`,
+          background: rollen.paneel,
+          // Ein Zug markiert keinen Text.
+          userSelect: lauf ? 'none' : undefined,
+        }}
+      >
+        <div style={{ width: TITEL_BREITE + zeitBreite, position: 'relative' }}>
+          {/* Achse */}
+          <div style={{ display: 'flex', borderBottom: `1px solid ${rollen.linie}` }}>
+            <div style={{ ...titelZelle, minHeight: token.controlHeightSM }} />
+            <div
+              aria-hidden="true"
+              data-lfh="schichtplan-achse"
+              style={{ position: 'relative', width: zeitBreite, height: token.controlHeightSM }}
+            >
+              {marken.map((m) => (
+                <span
+                  key={m}
                   style={{
-                    ...titelZelle,
-                    width: TITEL_BREITE + zeitBreite,
-                    position: 'relative',
-                    minHeight: token.controlHeightSM,
+                    position: 'absolute',
+                    left: x(m),
+                    // Am Rand bündig statt mittig: sonst läge die halbe Marke unter der Titelspalte.
+                    transform:
+                      x(m) < RAND_PX
+                        ? 'translateX(2px)'
+                        : x(m) > zeitBreite - RAND_PX
+                          ? 'translateX(calc(-100% - 2px))'
+                          : 'translateX(-50%)',
+                    bottom: 2,
                     color: rollen.gedaempft,
-                    fontWeight: 600,
-                    borderBottom: `1px solid ${rollen.linie}`,
-                    background: rollen.flaeche3,
+                    ...monoStil(11),
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <span style={{ position: 'sticky', left: token.paddingSM }}>{z.gruppe}</span>
-                </div>
-              )}
-              <div
-                data-raster-zeile={z.schluessel}
-                data-lfh="schichtplan-zeile"
-                data-entfallen={z.entfallen || undefined}
-                style={{ display: 'flex', borderBottom: `1px solid ${rollen.linie}` }}
-              >
-                <div
-                  style={{
-                    ...titelZelle,
-                    minHeight: zeilenHoehe,
-                    color: z.entfallen ? rollen.gedaempft : undefined,
-                  }}
-                  title={titelVon(z)}
-                >
-                  <span
-                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  {formatMarke(m)}
+                </span>
+              ))}
+            </div>
+          </div>
+          {zeilen.map((z) => {
+            const kopf = z.gruppe !== letzteGruppe && z.gruppe != null;
+            letzteGruppe = z.gruppe;
+            // Nur was die Spanne berührt: ein Block davor oder danach läge sonst als Streifen am Rand
+            // oder machte die Rollfläche breiter als die Achse.
+            const eigene = bloecke.filter(
+              (b) => b.zeile === z.schluessel && b.bis > spanne.von && b.von < spanne.bis,
+            );
+            return (
+              <Fragment key={z.schluessel}>
+                {kopf && (
+                  <div
+                    data-lfh="schichtplan-gruppe"
+                    style={{
+                      ...titelZelle,
+                      width: TITEL_BREITE + zeitBreite,
+                      position: 'relative',
+                      minHeight: token.controlHeightSM,
+                      color: rollen.gedaempft,
+                      fontWeight: 600,
+                      borderBottom: `1px solid ${rollen.linie}`,
+                      background: rollen.flaeche3,
+                    }}
                   >
-                    {titelVon(z)}
-                  </span>
-                </div>
+                    <span style={{ position: 'sticky', left: token.paddingSM }}>{z.gruppe}</span>
+                  </div>
+                )}
                 <div
-                  ref={spurRef}
-                  data-lfh="schichtplan-spur"
-                  onPointerDown={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    // Den Posten gibt es nicht mehr; die Schleuse hält nur seine Zeile (LLH-1604).
-                    if (z.entfallen) return;
-                    starte(
-                      e,
-                      { art: 'anlegen', zeile: z.schluessel, start: zeitAmZeiger(e.clientX) },
-                      z.schluessel,
-                    );
-                  }}
-                  style={{
-                    position: 'relative',
-                    width: zeitBreite,
-                    height: zeilenHoehe,
-                    cursor: darfSchreiben && !z.entfallen ? 'crosshair' : undefined,
-                    backgroundImage: marken.length
-                      ? `linear-gradient(to right, ${rollen.rasterLinie} 1px, transparent 1px)`
-                      : undefined,
-                    backgroundSize: `${pxStunde}px 100%`,
-                    backgroundPositionX: x(Math.ceil(spanne.von / STUNDE_MS) * STUNDE_MS),
-                  }}
+                  data-raster-zeile={z.schluessel}
+                  data-lfh="schichtplan-zeile"
+                  data-entfallen={z.entfallen || undefined}
+                  style={{ display: 'flex', borderBottom: `1px solid ${rollen.linie}` }}
                 >
-                  {eigene.map((b) => {
-                    const breite = Math.max(
-                      2,
-                      x(Math.min(b.bis, spanne.bis)) - x(Math.max(b.von, spanne.von)),
-                    );
-                    return (
-                      <BlockKachel
-                        key={b.id}
-                        block={b}
-                        zeileTitel={z.titel}
-                        links={x(Math.max(b.von, spanne.von))}
-                        breite={breite}
-                        kanten={darfSchreiben ? griffKanten(b, spanne, breite) : KEINE_KANTEN}
-                        hoehe={zeilenHoehe}
-                        laeuft={jetzt != null && b.von <= jetzt && jetzt < b.bis}
-                        gezogen={gezogenerBlock === b.id}
-                        darfSchreiben={darfSchreiben}
-                        personenZiel={personenZiel}
-                        formatZeit={formatZeit}
-                        onDruck={(e, art) => {
-                          const zeit = zeitAmZeiger(e.clientX);
-                          const zug: Zug =
-                            art === 'verschieben'
-                              ? { art, blockId: b.id, von: b.von, bis: b.bis, griff: zeit - b.von }
-                              : { art, blockId: b.id, zeile: b.zeile, von: b.von, bis: b.bis };
-                          starte(e, zug, b.zeile);
-                        }}
-                        onKlick={() => {
-                          if (klickSchlucken.current) return;
-                          onOeffnen(b.id);
-                        }}
-                      />
-                    );
-                  })}
-                  {schatten && schatten.stand.zeile === z.schluessel && (
-                    <div
-                      data-lfh="schichtplan-schatten"
-                      data-pruefung={schatten.pruefung}
-                      data-kopie={schatten.kopie || undefined}
-                      aria-hidden="true"
-                      style={{
-                        position: 'absolute',
-                        left: x(schatten.stand.von),
-                        width: Math.max(2, x(schatten.stand.bis) - x(schatten.stand.von)),
-                        top: einzug,
-                        bottom: einzug,
-                        border: `2px dashed ${schatten.pruefung === 'ok' || schatten.pruefung === 'unveraendert' ? rollen.bedien : rollen.alarm}`,
-                        background: rollen.auswahlFlaeche,
-                        pointerEvents: 'none',
-                        zIndex: 3,
-                        ...monoStil(11),
-                        color: rollen.text,
-                        paddingInline: 4,
-                        whiteSpace: 'nowrap',
-                        overflow: 'visible',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
+                  <div
+                    style={{
+                      ...titelZelle,
+                      minHeight: zeilenHoehe,
+                      color: z.entfallen ? rollen.gedaempft : undefined,
+                    }}
+                    title={titelVon(z)}
+                  >
+                    <span
+                      style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     >
-                      {`${formatZeit(schatten.stand.von)}–${formatZeit(schatten.stand.bis)}`}
-                      {schatten.kopie ? ' · Kopie' : ''}
-                      {schatten.pruefung !== 'ok' && schatten.pruefung !== 'unveraendert'
-                        ? ` · ${PRUEFUNG_TEXT[schatten.pruefung]}`
-                        : ''}
-                    </div>
-                  )}
+                      {titelVon(z)}
+                    </span>
+                  </div>
+                  <div
+                    ref={spurRef}
+                    data-lfh="schichtplan-spur"
+                    onPointerDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      // Den Posten gibt es nicht mehr; die Schleuse hält nur seine Zeile (LLH-1604).
+                      if (z.entfallen) return;
+                      starte(
+                        e,
+                        { art: 'anlegen', zeile: z.schluessel, start: zeitAmZeiger(e.clientX) },
+                        z.schluessel,
+                      );
+                    }}
+                    style={{
+                      position: 'relative',
+                      width: zeitBreite,
+                      height: zeilenHoehe,
+                      cursor: darfSchreiben && !z.entfallen ? 'crosshair' : undefined,
+                      backgroundImage: marken.length
+                        ? `linear-gradient(to right, ${rollen.rasterLinie} 1px, transparent 1px)`
+                        : undefined,
+                      backgroundSize: `${pxStunde}px 100%`,
+                      backgroundPositionX: x(Math.ceil(spanne.von / STUNDE_MS) * STUNDE_MS),
+                    }}
+                  >
+                    {eigene.map((b) => {
+                      const breite = Math.max(
+                        2,
+                        x(Math.min(b.bis, spanne.bis)) - x(Math.max(b.von, spanne.von)),
+                      );
+                      return (
+                        <BlockKachel
+                          key={b.id}
+                          block={b}
+                          zeileTitel={z.titel}
+                          links={x(Math.max(b.von, spanne.von))}
+                          breite={breite}
+                          kanten={darfSchreiben ? griffKanten(b, spanne, breite) : KEINE_KANTEN}
+                          hoehe={zeilenHoehe}
+                          laeuft={jetzt != null && b.von <= jetzt && jetzt < b.bis}
+                          gezogen={gezogenerBlock === b.id}
+                          darfSchreiben={darfSchreiben}
+                          personenZiel={personenZiel}
+                          formatZeit={formatZeit}
+                          kontext={
+                            blockMenue ? kontextAusloeser<HTMLButtonElement>(b.id) : undefined
+                          }
+                          onDruck={(e, art) => {
+                            const zeit = zeitAmZeiger(e.clientX);
+                            const zug: Zug =
+                              art === 'verschieben'
+                                ? {
+                                    art,
+                                    blockId: b.id,
+                                    von: b.von,
+                                    bis: b.bis,
+                                    griff: zeit - b.von,
+                                  }
+                                : { art, blockId: b.id, zeile: b.zeile, von: b.von, bis: b.bis };
+                            starte(e, zug, b.zeile);
+                          }}
+                          onKlick={() => {
+                            if (klickSchlucken.current) return;
+                            onOeffnen(b.id);
+                          }}
+                        />
+                      );
+                    })}
+                    {schatten && schatten.stand.zeile === z.schluessel && (
+                      <div
+                        data-lfh="schichtplan-schatten"
+                        data-pruefung={schatten.pruefung}
+                        data-kopie={schatten.kopie || undefined}
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          left: x(schatten.stand.von),
+                          width: Math.max(2, x(schatten.stand.bis) - x(schatten.stand.von)),
+                          top: einzug,
+                          bottom: einzug,
+                          border: `2px dashed ${schatten.pruefung === 'ok' || schatten.pruefung === 'unveraendert' ? rollen.bedien : rollen.alarm}`,
+                          background: rollen.auswahlFlaeche,
+                          pointerEvents: 'none',
+                          zIndex: 3,
+                          ...monoStil(11),
+                          color: rollen.text,
+                          paddingInline: 4,
+                          whiteSpace: 'nowrap',
+                          overflow: 'visible',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {`${formatZeit(schatten.stand.von)}–${formatZeit(schatten.stand.bis)}`}
+                        {schatten.kopie ? ' · Kopie' : ''}
+                        {schatten.pruefung !== 'ok' && schatten.pruefung !== 'unveraendert'
+                          ? ` · ${PRUEFUNG_TEXT[schatten.pruefung]}`
+                          : ''}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Fragment>
-          );
-        })}
-        {jetztX != null && (
-          <div
-            aria-hidden="true"
-            data-lfh="schichtplan-jetzt"
-            style={{
-              position: 'absolute',
-              left: TITEL_BREITE + jetztX,
-              top: 0,
-              bottom: 0,
-              width: 2,
-              background: rollen.bedien,
-              pointerEvents: 'none',
-              zIndex: 1,
-            }}
-          />
-        )}
+              </Fragment>
+            );
+          })}
+          {jetztX != null && (
+            <div
+              aria-hidden="true"
+              data-lfh="schichtplan-jetzt"
+              style={{
+                position: 'absolute',
+                left: TITEL_BREITE + jetztX,
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: rollen.bedien,
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      {menueBlock != null && blockMenue != null && (
+        <KontextMenue
+          offen={menue?.offen ?? null}
+          eintraege={menueEintraege}
+          zugaenglicherName={menueName}
+          onWahl={(key) => {
+            setMenue(null);
+            blockMenue.onWahl(menueBlock.id, key);
+          }}
+          onSchliessen={() => setMenue(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -558,6 +640,8 @@ interface BlockKachelProps {
   darfSchreiben: boolean;
   personenZiel: boolean;
   formatZeit: (ms: number) => string;
+  /** Handler des Kontextmenüs (`useKontextMenue`); ohne bleibt das Browsermenü. */
+  kontext?: KontextHandler<HTMLButtonElement>;
   onDruck: (e: ReactPointerEvent, art: 'verschieben' | 'anfang' | 'ende') => void;
   onKlick: () => void;
 }
@@ -580,6 +664,7 @@ function BlockKachel({
   darfSchreiben,
   personenZiel,
   formatZeit,
+  kontext,
   onDruck,
   onKlick,
 }: BlockKachelProps) {
@@ -604,10 +689,12 @@ function BlockKachel({
       data-laeuft={laeuft || undefined}
       aria-label={`${name}, ${block.text}, ${block.ampelWort}`}
       title={`${zeit} · ${block.text} · ${block.ampelWort}`}
+      {...kontext}
       onClick={onKlick}
       onPointerDown={(e) => {
         const rand = e.currentTarget.getBoundingClientRect();
         onDruck(e, griffAn(e.clientX - rand.left, rand.width, kanten));
+        kontext?.onPointerDown(e);
       }}
       style={{
         position: 'absolute',

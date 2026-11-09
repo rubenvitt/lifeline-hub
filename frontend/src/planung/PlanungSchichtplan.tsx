@@ -43,6 +43,7 @@ import SchichtenErzeugenDialog from '../abloesung/schichtplan/SchichtenErzeugenD
 import SchichtplanBlockDialog, {
   type BlockSpeichern,
 } from '../abloesung/schichtplan/SchichtplanBlockDialog';
+import { useBlockMenue } from '../abloesung/schichtplan/blockMenue';
 import SchichtplanListe from '../abloesung/schichtplan/SchichtplanListe';
 import SchichtplanPersonen, {
   type PersonZugDaten,
@@ -135,8 +136,10 @@ export default function PlanungSchichtplan({
   }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
   const [zugLaeuft, setZugLaeuft] = useState(false);
+  // Ein offenes Kontextmenü eines Blocks hält wie ein Zug (LLH-1600, Spec `datensatz-aktionsmenue`).
+  const [menueOffen, setMenueOffen] = useState(false);
   // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
-  const schleuseHalten = zugLaeuft || gezogen != null || dialog != null;
+  const schleuseHalten = zugLaeuft || menueOffen || gezogen != null || dialog != null;
 
   const stammQuery = useQuery({
     queryKey: globalKeys.personalListe('im-dienst'),
@@ -337,6 +340,25 @@ export default function PlanungSchichtplan({
     setDialog({ art: 'erzeugen' });
   };
   const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
+  // Kontextmenü eines Blocks (LLH-1600): „Als nächsten Block kopieren“ ohne Dialog, die Kopie
+  // erscheint im Raster; ein Fehler steht über dem Raster wie bei einem Zug.
+  const kopiereStill = (block: SchichtplanBlock) => {
+    const body = naechsterBlockBody(block);
+    if (!body) return;
+    zugSchreiben(
+      kopierenMut.mutateAsync(body).then(() => {
+        message.success('Block kopiert');
+      }),
+    );
+  };
+  // Die Vorplanung kennt keinen Wechsel aus dem Plan.
+  const blockMenue = useBlockMenue({
+    blockVon,
+    onBearbeiten: oeffneBlock,
+    onKopieren: kopiereStill,
+    onLoeschen: (b) => zugSchreiben(loeschenMut.mutateAsync(b)),
+    laeuft: kopierenMut.isPending || loeschenMut.isPending,
+  });
   const mitSeitenleiste = !istSchmal && !readOnly;
   const ohnePosten = planung.posten.length === 0;
 
@@ -438,6 +460,8 @@ export default function PlanungSchichtplan({
                   personenZiel={mitSeitenleiste}
                   beschriftung="Planung"
                   onZug={setZugLaeuft}
+                  blockMenue={readOnly ? undefined : blockMenue}
+                  onMenue={setMenueOffen}
                 />
               )}
             </SchichtplanSchleuse>
