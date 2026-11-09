@@ -373,6 +373,28 @@ describe('ZeitfensterDialog — anlegen', () => {
       expect(within(dialog).getByLabelText('vegan')).toHaveValue('5');
     });
 
+    it('fällt der Vorschlag weg, leeren sich die unberührten Felder; eigene Zahlen bleiben (CodeRabbit)', async () => {
+      let mitVorschlag = true;
+      vorschlag.liefere = () => ({
+        kraefte: LEER,
+        betreute: LEER,
+        sonderkost: mitVorschlag
+          ? { werte: { vegan: 2, vegetarisch: 6 }, hinweis: SK_HINWEIS }
+          : { werte: null, hinweis: null },
+      });
+      zeigeAnlegen();
+      const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Personen/ }));
+      await waitFor(() => expect(within(dialog).getByLabelText('vegetarisch')).toHaveValue('6'));
+      await userEvent.clear(within(dialog).getByLabelText('vegan'));
+      await userEvent.type(within(dialog).getByLabelText('vegan'), '5');
+      mitVorschlag = false;
+      await waehleZeitraum(dialog, '2026-09-24 12:00', '2026-09-24 13:30');
+      await waitFor(() => expect(within(dialog).getByLabelText('vegetarisch')).toHaveValue(''));
+      expect(within(dialog).getByLabelText('vegan')).toHaveValue('5');
+      expect(within(dialog).queryByText(SK_HINWEIS)).toBeNull();
+    });
+
     it('keine Registrierten: Sonderkost-Felder leer und ohne Hinweis', async () => {
       zeigeAnlegen();
       const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });

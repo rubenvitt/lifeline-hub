@@ -199,8 +199,9 @@ Meldung davor. Das lässt sich nicht umkehren.
   Säugling/Kleinkind) und die Unverträglichkeiten lassen sich danach auf der Seite der Person
   ändern. Aus den Kostformen aller Registrierten schlägt die [Verpflegung](verpflegung.md) die
   Sonderkost eines neuen Zeitfensters vor.
-- Unverträglichkeiten gelten als Gesundheitsangabe: Sie stehen nie im Einsatztagebuch, liegen
-  ohne Netz nicht auf dem Gerät und werden beim Schwärzen geleert.
+- Unverträglichkeiten gelten als Gesundheitsangabe: Sie stehen nie im Einsatztagebuch und werden
+  beim Schwärzen geleert. Das Lagebild hält sie ohne Netz nicht auf dem Gerät; eine ohne Netz
+  vorgemerkte Registrierung trägt sie aber bis zum Senden mit.
 - Ins Einsatztagebuch kommt je Registrierung und je Abmeldung ein Eintrag mit Stelle,
   Haushaltsnummer und Registriernummern, ohne Namen.
 - Die Registrierung braucht Zugriff auf „Betroffene“; ohne ihn fehlt „Registrieren“, und statt

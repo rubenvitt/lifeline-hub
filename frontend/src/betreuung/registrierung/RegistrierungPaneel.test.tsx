@@ -246,4 +246,11 @@ describe('Vorgemerkt ohne Netz', () => {
     const vorgemerkt = await screen.findByRole('list', { name: 'Vorgemerkte Registrierungen' });
     expect(vorgemerkt).toHaveTextContent('Krause, Jan');
   });
+
+  it('ohne Netz und ohne Cache: „Registrierliste ohne Netz nicht geladen“ statt „wird abgerufen“ (CodeRabbit)', async () => {
+    setzeOnline(false);
+    rendere();
+    expect(await screen.findByText('Registrierliste ohne Netz nicht geladen')).toBeInTheDocument();
+    expect(screen.queryByText(/wird abgerufen/)).not.toBeInTheDocument();
+  });
 });

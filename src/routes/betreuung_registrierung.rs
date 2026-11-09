@@ -25,7 +25,8 @@ use serde::Deserialize;
 use crate::app::AppState;
 use crate::betreuung::registrierung::{
     self, AbmeldeEingabe, AbmeldungAnzeige, HaushaltAnzeige, KostformZaehlung, RegistrierEingabe,
-    RegistrierListe, RegistrierPerson, Registriert, ABMELDUNG_ZIEL_MAX, REGISTRIERUNG_PERSONEN_MAX,
+    RegistrierListe, RegistrierPerson, Registriert, ABMELDUNG_PERSONEN_MAX, ABMELDUNG_ZIEL_MAX,
+    REGISTRIERUNG_PERSONEN_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe};
@@ -152,12 +153,14 @@ async fn haushalt_antwort(
     einsatz_id: i64,
     stelle_id: i64,
     haushalt_id: Option<i64>,
+    stellensicht: bool,
 ) -> Result<HaushaltAnzeige, AppError> {
     registrierung::haushalt(
         &state.pool,
         einsatz_id,
         stelle_id,
         haushalt_id.ok_or(AppError::NotFound)?,
+        stellensicht,
     )
     .await
 }
@@ -186,7 +189,10 @@ pub async fn registrieren(
             }
             return Ok((
                 StatusCode::CREATED,
-                Json(haushalt_antwort(&state, einsatz_id, sid, haushalt_id).await?),
+                Json(
+                    haushalt_antwort(&state, einsatz_id, sid, haushalt_id, ctx.geraet.is_some())
+                        .await?,
+                ),
             ));
         }
     }
@@ -196,7 +202,9 @@ pub async fn registrieren(
         chrono::Utc::now(),
         &ctx.einsatz.begonnen_at,
     )?;
-    let mut gelesen = Vec::with_capacity(body.personen.len());
+    // Reserviert nie mehr als die Grenze (CodeQL: Größe aus dem Body); die Grenze selbst prüft
+    // der Zusammenhang unten (422).
+    let mut gelesen = Vec::with_capacity(body.personen.len().min(REGISTRIERUNG_PERSONEN_MAX + 1));
     for p in body.personen {
         gelesen.push(person_lesen(p)?);
     }
@@ -238,7 +246,7 @@ pub async fn registrieren(
     publiziere(&state, einsatz_id, sid, &r);
     Ok((
         StatusCode::CREATED,
-        Json(haushalt_antwort(&state, einsatz_id, sid, r.haushalt_id).await?),
+        Json(haushalt_antwort(&state, einsatz_id, sid, r.haushalt_id, ctx.geraet.is_some()).await?),
     ))
 }
 
@@ -251,7 +259,7 @@ pub async fn liste(
     fordere_eigene_stelle(ctx.geraet.as_ref(), sid)?;
     ctx.fordere_modul_zugriff(&state.pool, "personen").await?;
     Ok(Json(
-        registrierung::liste(&state.pool, ctx.einsatz.id, sid).await?,
+        registrierung::liste(&state.pool, ctx.einsatz.id, sid, ctx.geraet.is_some()).await?,
     ))
 }
 
@@ -301,7 +309,16 @@ pub async fn abmelden(
         chrono::Utc::now(),
         &ctx.einsatz.begonnen_at,
     )?;
-    let person_ids = body.person_ids.unwrap_or_default();
+    // Liste von außen: Grenze vor dem Entdoppeln, dann entdoppeln (src/AGENTS.md,
+    // „Eingabegrenzen“); die Prüfung je Person in `abmelden_tx` bleibt so gedeckelt.
+    let mut person_ids = body.person_ids.unwrap_or_default();
+    if person_ids.len() > ABMELDUNG_PERSONEN_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {ABMELDUNG_PERSONEN_MAX} Personen je Abmeldung"
+        )));
+    }
+    person_ids.sort_unstable();
+    person_ids.dedup();
     match (body.haushalt_id.is_some(), person_ids.is_empty()) {
         (true, true) | (false, false) => {}
         _ => {

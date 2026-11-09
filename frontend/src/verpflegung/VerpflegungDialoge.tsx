@@ -400,8 +400,11 @@ export function ZeitfensterDialog({
   // Als Zeichenkette: das Objekt des Vorschlags ist je Render neu.
   const skSchluessel = skWerte ? JSON.stringify(skWerte) : null;
   useEffect(() => {
-    if (skSchluessel == null) return;
-    const werte = JSON.parse(skSchluessel) as Partial<Record<Kostform, number>>;
+    // Fällt der Vorschlag später weg (alle abgemeldet, Quelle gesperrt), leeren sich die
+    // unberührten Felder wieder: eine Zahl ohne Herkunftshinweis stünde sonst als Vorschlag da.
+    const werte = (skSchluessel ? JSON.parse(skSchluessel) : {}) as Partial<
+      Record<Kostform, number>
+    >;
     for (const k of KOSTFORMEN) {
       if (skBeruehrt.current[k]) continue;
       form.setFieldValue(['sonderkost', k], werte[k] ?? undefined);

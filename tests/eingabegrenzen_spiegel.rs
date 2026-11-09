@@ -72,6 +72,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             lifeline_hub::betreuung::registrierung::REGISTRIERUNG_PERSONEN_MAX,
         ),
         (
+            "ABMELDUNG_PERSONEN_MAX",
+            lifeline_hub::betreuung::registrierung::ABMELDUNG_PERSONEN_MAX,
+        ),
+        (
             "BETREUUNG_ABMELDUNG_ZIEL_MAX",
             lifeline_hub::betreuung::registrierung::ABMELDUNG_ZIEL_MAX,
         ),

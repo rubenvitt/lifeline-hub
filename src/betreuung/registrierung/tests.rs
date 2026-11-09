@@ -177,7 +177,7 @@ async fn familie_registrieren() {
         "genau ein ETB-Eintrag, keine Belegung (gezählt)"
     );
 
-    let liste = liste(&w.pool, w.e, sid).await.unwrap();
+    let liste = liste(&w.pool, w.e, sid, false).await.unwrap();
     assert_eq!(liste.haushalte.len(), 1);
     let h = &liste.haushalte[0];
     assert_eq!(h.nummer, 1);
@@ -223,7 +223,7 @@ async fn person_anhaengen_und_neuer_haushalt() {
     registrieren(&w, sid, None, vec![person("Yilmaz", Kostform::OhneSchwein)])
         .await
         .unwrap();
-    let liste = liste(&w.pool, w.e, sid).await.unwrap();
+    let liste = liste(&w.pool, w.e, sid, false).await.unwrap();
     assert_eq!(liste.haushalte.len(), 2);
     assert_eq!(liste.haushalte[0].personen.len(), 4);
     assert_eq!(
@@ -492,7 +492,11 @@ async fn abmelden_haushalt_und_person() {
         "die schon abgemeldete wird übersprungen"
     );
     assert_eq!(belegung(&w, sid).await, Some(0));
-    assert!(liste(&w.pool, w.e, sid).await.unwrap().haushalte.is_empty());
+    assert!(liste(&w.pool, w.e, sid, false)
+        .await
+        .unwrap()
+        .haushalte
+        .is_empty());
     let etb = etb_inhalte(&w).await;
     let abmeldung = etb.iter().rev().find(|t| t.contains("abgemeldet")).unwrap();
     assert!(
@@ -589,7 +593,7 @@ async fn kostformen_zaehlen() {
     assert_eq!(z.normal, 1);
     assert_eq!(z.ohne_angabe, 1);
 
-    let liste = liste(&w.pool, w.e, west).await.unwrap();
+    let liste = liste(&w.pool, w.e, west, false).await.unwrap();
     assert_eq!(liste.ohne_haushalt.len(), 1);
     assert_eq!(liste.ohne_haushalt[0].id, ohne);
     assert_eq!(liste.haushalte.len(), 1);
@@ -737,4 +741,33 @@ async fn schliessen_und_namentlich_im_selben_patch_prueft_die_registrierten() {
     .await
     .unwrap_err();
     assert_eq!(status(fehler), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// CodeRabbit (CWE-200): das Gerät einer Stelle sieht den Namen der Bezugsperson nur, wenn sie je
+/// an seiner Stelle war; ohne Stellensicht (Stab mit Personenrecht) immer.
+#[tokio::test]
+async fn bezugsperson_einer_fremden_stelle_bleibt_dem_geraet_verborgen() {
+    let w = welt().await;
+    let ost = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let west = stelle(&w, w.e, "Turnhalle West", Belegungsart::Gezaehlt).await;
+    let h = registrieren(&w, west, None, vec![person("Weber", Kostform::Normal)])
+        .await
+        .unwrap()
+        .haushalt_id;
+    registrieren(&w, ost, h, vec![person("Weber", Kostform::Vegan)])
+        .await
+        .unwrap();
+    let stab = liste(&w.pool, w.e, ost, false).await.unwrap();
+    assert_eq!(
+        stab.haushalte[0].bezugsperson_name.as_deref(),
+        Some("Weber")
+    );
+    let geraet = liste(&w.pool, w.e, ost, true).await.unwrap();
+    assert_eq!(geraet.haushalte[0].bezugsperson_name, None);
+    assert_eq!(geraet.haushalte[0].personen.len(), 1);
+    let eigene = liste(&w.pool, w.e, west, true).await.unwrap();
+    assert_eq!(
+        eigene.haushalte[0].bezugsperson_name.as_deref(),
+        Some("Weber")
+    );
 }

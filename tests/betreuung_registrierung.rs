@@ -497,3 +497,20 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
 }
+
+/// CodeRabbit: `person_ids` von außen haben eine Grenze (400) und werden entdoppelt.
+#[tokio::test]
+async fn abmeldung_begrenzt_und_entdoppelt_die_personen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    let ab = format!("{}/stellen/{sid}/abmeldungen", b(e));
+    let (s, _) = post(&app, &admin, &ab, json!({"person_ids": vec![1; 51]})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let tom = h["personen"][1]["id"].clone();
+    let (s, v) = post(&app, &admin, &ab, json!({"person_ids": [tom, tom, tom]})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["person_ids"], json!([tom]));
+}

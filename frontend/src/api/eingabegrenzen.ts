@@ -235,6 +235,8 @@ export const BETREUUNG_KONTAKTWEG_MAX = 200;
 export const PERSON_UNVERTRAEGLICHKEITEN_MAX = 200;
 /** Personen je Registrierung an einer Betreuungsstelle (LLH-1612). */
 export const REGISTRIERUNG_PERSONEN_MAX = 30;
+/** Personen-Kennungen je Abmeldung an einer Betreuungsstelle (LLH-1612). */
+export const ABMELDUNG_PERSONEN_MAX = 50;
 /** Ziel beim Abmelden von der Betreuungsstelle, Freitext (LLH-1612); nie im ETB. */
 export const BETREUUNG_ABMELDUNG_ZIEL_MAX = 200;
 /**

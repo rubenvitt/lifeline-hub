@@ -192,6 +192,9 @@ export default function RegistrierungPaneel({
     vorgemerkteRegistrierungen.length === 0;
   const zustand =
     liste.isError && daten == null ? 'fehler' : liste.isPending ? 'laden' : leer ? 'leer' : 'daten';
+  // Ohne Netz und ohne Cache bleibt die Abfrage pausiert (die Liste liegt bewusst nicht auf der
+  // Platte): dann sagt das Paneel das, statt „wird abgerufen“ zu behaupten.
+  const ohneNetzUngeladen = daten == null && liste.isPending && liste.fetchStatus === 'paused';
 
   function oeffneAbmelden(z: Ziel) {
     abmeldenMut.reset();
@@ -349,56 +352,66 @@ export default function RegistrierungPaneel({
           ))}
         </ul>
       )}
-      <PaneelZustand
-        zustand={zustand}
-        titel="Registrierung"
-        leerText="Niemand registriert"
-        onNeuladen={() => void liste.refetch()}
-      >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: token.margin,
-            padding: token.padding,
-          }}
+      {ohneNetzUngeladen ? (
+        <Typography.Text
+          type="secondary"
+          data-lfh="registrierliste-offline"
+          style={{ display: 'block', padding: token.padding }}
         >
-          {band && (
-            <Kennzahlenband beschriftung="Kostformen">
-              {KOSTFORM_REIHE.map((k) => (
-                <Kennzahl key={k} groesse="klein" titel={KOSTFORM_WORT[k]} wert={band[k]} />
-              ))}
-              <Kennzahl groesse="klein" titel="ohne Angabe" wert={band.ohne_angabe} />
-            </Kennzahlenband>
-          )}
-          {daten && daten.haushalte.length > 0 && (
-            <Collapse
-              items={daten.haushalte.map((h) => ({
-                key: h.id,
-                label: [
-                  haushaltKennung(h.nummer),
-                  h.bezugsperson_name,
-                  personenWort(h.personen.length),
-                ]
-                  .filter(Boolean)
-                  .join(' · '),
-                children: haushaltInhalt(h),
-              }))}
-            />
-          )}
-          {daten && daten.ohne_haushalt.length > 0 && (
-            <div>
-              <Typography.Text type="secondary">Ohne Haushalt</Typography.Text>
-              <ul
-                aria-label="Personen ohne Haushalt"
-                style={{ listStyle: 'none', margin: 0, padding: 0 }}
-              >
-                {daten.ohne_haushalt.map((p) => personZeile(p, false))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </PaneelZustand>
+          Registrierliste ohne Netz nicht geladen
+        </Typography.Text>
+      ) : (
+        <PaneelZustand
+          zustand={zustand}
+          titel="Registrierung"
+          leerText="Niemand registriert"
+          onNeuladen={() => void liste.refetch()}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: token.margin,
+              padding: token.padding,
+            }}
+          >
+            {band && (
+              <Kennzahlenband beschriftung="Kostformen">
+                {KOSTFORM_REIHE.map((k) => (
+                  <Kennzahl key={k} groesse="klein" titel={KOSTFORM_WORT[k]} wert={band[k]} />
+                ))}
+                <Kennzahl groesse="klein" titel="ohne Angabe" wert={band.ohne_angabe} />
+              </Kennzahlenband>
+            )}
+            {daten && daten.haushalte.length > 0 && (
+              <Collapse
+                items={daten.haushalte.map((h) => ({
+                  key: h.id,
+                  label: [
+                    haushaltKennung(h.nummer),
+                    h.bezugsperson_name,
+                    personenWort(h.personen.length),
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                  children: haushaltInhalt(h),
+                }))}
+              />
+            )}
+            {daten && daten.ohne_haushalt.length > 0 && (
+              <div>
+                <Typography.Text type="secondary">Ohne Haushalt</Typography.Text>
+                <ul
+                  aria-label="Personen ohne Haushalt"
+                  style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                >
+                  {daten.ohne_haushalt.map((p) => personZeile(p, false))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </PaneelZustand>
+      )}
 
       {maske && (
         <RegistrierMaske

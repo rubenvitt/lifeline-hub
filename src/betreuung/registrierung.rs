@@ -22,6 +22,11 @@ use crate::verpflegung::Sonderkost;
 /// Höchstzahl der Personen je Registrierung (Spec `betreuung-registrierung`).
 pub const REGISTRIERUNG_PERSONEN_MAX: usize = 30;
 
+/// Höchstzahl der Personen-Kennungen je Abmeldung (`src/AGENTS.md`, „Eingabegrenzen“: Listen von
+/// außen haben ein `*_MAX`, gezählt vor dem Entdoppeln). Die Prüfung je Person bleibt dadurch
+/// gedeckelt.
+pub const ABMELDUNG_PERSONEN_MAX: usize = 50;
+
 /// Höchstlänge des Ziels einer Abmeldung (Spec „Abmelden“), nach dem Trimmen.
 pub const ABMELDUNG_ZIEL_MAX: usize = 200;
 
@@ -518,10 +523,15 @@ struct ListenZeile {
 /// Die Registrierliste einer Stelle des Einsatzes (fremd oder unbekannt → 404). Enthält jede
 /// nicht stornierte Person, deren jüngster Verbleib „Notunterkunft“ an dieser Stelle ist —
 /// dieselbe Menge wie „davon namentlich“ und die Belegung einer namentlich geführten Stelle.
+///
+/// `stellensicht` (Gerät „Betreuungsstelle“): den Namen der Bezugsperson nur, wenn sie je an
+/// dieser Stelle war — ein Haushalt kann Mitglieder an mehreren Stellen haben, und das Gerät
+/// sieht nur Personen seiner Stelle (`geraet::stelle::sichtbare_personen`).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     stelle_id: i64,
+    stellensicht: bool,
 ) -> Result<RegistrierListe, AppError> {
     let gibt_es: Option<i64> =
         sqlx::query_scalar("SELECT id FROM betreuungsstelle WHERE id = ? AND einsatz_id = ?")
@@ -538,13 +548,17 @@ pub async fn liste(
                         CASE WHEN b.vorname IS NOT NULL AND b.vorname <> '' \
                              THEN ', ' || b.vorname ELSE '' END), '') \
                    FROM einsatz_person b \
-                  WHERE b.id = h.bezugsperson_id AND b.storniert_at IS NULL) AS bezugsperson_name \
+                  WHERE b.id = h.bezugsperson_id AND b.storniert_at IS NULL \
+                    AND (?1 = 0 OR EXISTS (SELECT 1 FROM person_verbleib v \
+                         WHERE v.person_id = b.id AND v.betreuungsstelle_id = ?3))) \
+                  AS bezugsperson_name \
          FROM einsatz_person p LEFT JOIN haushalt h ON h.id = p.haushalt_id \
-         WHERE p.einsatz_id = ? AND p.storniert_at IS NULL \
+         WHERE p.einsatz_id = ?2 AND p.storniert_at IS NULL \
            AND p.aktuelle_verbleib_art = 'notunterkunft' \
-           AND p.aktuelle_verbleib_betreuungsstelle_id = ? \
+           AND p.aktuelle_verbleib_betreuungsstelle_id = ?3 \
          ORDER BY h.nummer IS NULL, h.nummer, p.registrier_nr",
     )
+    .bind(stellensicht)
     .bind(einsatz_id)
     .bind(stelle_id)
     .fetch_all(pool)
@@ -580,8 +594,9 @@ pub async fn haushalt(
     einsatz_id: i64,
     stelle_id: i64,
     haushalt_id: i64,
+    stellensicht: bool,
 ) -> Result<HaushaltAnzeige, AppError> {
-    if let Some(h) = liste(pool, einsatz_id, stelle_id)
+    if let Some(h) = liste(pool, einsatz_id, stelle_id, stellensicht)
         .await?
         .haushalte
         .into_iter()
