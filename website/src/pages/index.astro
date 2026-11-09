@@ -6,7 +6,10 @@ import Paneel from '../components/Paneel.astro';
 import Kennzahl from '../components/Kennzahl.astro';
 import StatusChip from '../components/StatusChip.astro';
 import Zeitachseneintrag from '../components/Zeitachseneintrag.astro';
+import { getCollection } from 'astro:content';
 import { bereiche, modulAnzahl } from '../daten/module';
+
+const kapitelAnzahl = (await getCollection('kapitel')).length;
 
 const repo = 'https://github.com/rubenvitt/lifeline-hub';
 
@@ -18,8 +21,8 @@ const leitsaetze = [
   },
   {
     titel: 'Nach Führungslogik',
-    kennung: 'ETB · STÄRKE · S1–S6',
-    text: 'Das ETB lässt sich nicht ändern, nur berichtigen. Stärken stehen als F/UF/M//Ges, Betroffene mit Sichtungskategorie, der Stab in S1 bis S6. Funkplan und Fernmeldeskizze nennen ihre Lücken.',
+    kennung: 'ETB · STÄRKE · SICHTUNG',
+    text: 'Das ETB lässt sich nicht ändern, nur berichtigen. Stärken stehen als F/UF/M//Ges, Betroffene mit Sichtungskategorie. Funkplan und Fernmeldeskizze nennen ihre Lücken.',
   },
   {
     titel: 'Bedienbar unter Stress',
@@ -74,8 +77,8 @@ const meldebild = [
         <p class="einleitung">
           Lifeline Hub bündelt Einsatztagebuch, Lagekarte, Meldebild, Betroffenen- und
           Schadenserfassung, Meldungen und Aufträge in einer Anwendung. Sie arbeitet weiter, wenn
-          das Netz ausfällt, folgt der Führungslogik vom Einsatztagebuch bis zum Stab und bleibt
-          mit Handschuhen bedienbar.
+          das Netz ausfällt, folgt der Führungslogik vom Einsatztagebuch bis zur
+          Führungsorganisation und bleibt mit Handschuhen bedienbar.
         </p>
         <div class="aktionen">
           <Knopf href="#funktionen">Module ansehen</Knopf>
@@ -113,7 +116,7 @@ const meldebild = [
   <section class="abschnitt eckdaten-abschnitt" aria-label="Eckdaten">
     <div class="fugenraster eckdaten">
       <Kennzahl augenbraue="Module" zahl={String(modulAnzahl)} gross notiz="In fünf Bereichen von Führung bis Kommunikation" />
-      <Kennzahl augenbraue="Sachgebiete" zahl="6" gross notiz="S1 bis S6, je mit den Werkzeugen des Stabs" />
+      <Kennzahl augenbraue="Kapitel" zahl={String(kapitelAnzahl)} gross notiz="Anwenderdoku in der App, auch ohne Netz, und hier unter Doku" />
       <Kennzahl augenbraue="Dichten" zahl="3" gross notiz="Kompakt, komfortabel, Handschuh" />
       <Kennzahl augenbraue="Namen" zahl="0" gross notiz="Auf dem Lagemonitor: Das Großbild zeigt Zahlen und Karte, keine Personendaten" />
     </div>
