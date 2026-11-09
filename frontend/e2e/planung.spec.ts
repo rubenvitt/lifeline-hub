@@ -144,6 +144,87 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
 });
 
 /**
+ * „In Einsatz übernehmen“ (LLH-1587): eine Stadtfest-Planung mit einem Posten, einem Helfer und
+ * einem Block per API, dann über die Oberfläche in einen neuen Einsatz. Danach ist die Planung
+ * schreibgeschützt, ein zweiter Aufruf antwortet 409, und der Block steht im Schichtplan des neuen
+ * Einsatzes. Die Demo-Planung „Stadtfest Musterstadt“ prüft `tests/planung_uebernahme.rs`; das
+ * e2e-Backend läuft ohne Demo-Daten.
+ */
+test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibgeschützt', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+  const tag = new Date(Date.now() + 7 * 24 * 3_600_000).toISOString().slice(0, 10);
+  const name = `E2E Stadtfest ${Date.now()}`;
+  const api = async (pfad: string, data: unknown) => {
+    const r = await page.request.post(pfad, { data });
+    expect(r.ok(), `${pfad}: ${r.status()} ${await r.text()}`).toBeTruthy();
+    return r.json();
+  };
+  const plan = await api('/api/planungen', {
+    bezeichnung: name,
+    ort: 'Marktplatz',
+    von: `${tag} 06:00:00`,
+    bis: `${tag} 22:00:00`,
+  });
+  const planungId: number = plan.kopf.id;
+  const helfer = await api(`/api/planungen/${planungId}/helfer`, {
+    name: 'Hanna Stadtfest',
+    organisation: 'Helferkreis',
+  });
+  const mitPosten = await api(`/api/planungen/${planungId}/posten`, {
+    bezeichnung: 'Streife Markt',
+    art: 'einheit',
+    soll_anzahl: 2,
+  });
+  await api(`/api/planungen/${planungId}/bloecke`, {
+    posten_id: mitPosten.posten[0].id,
+    von: `${tag} 10:00:00`,
+    bis: `${tag} 14:00:00`,
+    personen: [{ art: 'helfer', helfer_id: helfer.id }],
+  });
+
+  await page.goto(`/planungen/${planungId}`);
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  await page.getByRole('button', { name: 'In Einsatz übernehmen' }).click();
+  const dialog = page.getByRole('dialog', { name: 'In Einsatz übernehmen' });
+  const zaehlung = dialog.locator('[data-lfh="einlesen-zaehlung"]');
+  await expect(zaehlung).toContainText('1 Einheit neu');
+  await expect(zaehlung).toContainText('1 Schicht neu');
+  await expect(zaehlung).toContainText('1 Helfer neu');
+  await dialog.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(dialog.locator('[data-lfh="uebernahme-ergebnis"]')).toContainText(
+    'Einsatz angelegt, Plan übernommen',
+  );
+  await dialog.locator('.ant-modal-footer').getByRole('button', { name: 'Schließen' }).click();
+  await expect(dialog).toBeHidden();
+
+  // ── Danach schreibgeschützt: Hinweis mit Einsatz, keine Bedienung, zweiter Aufruf 409 ─────────
+  const hinweis = page.locator('[data-lfh="planung-uebernommen"]');
+  await expect(hinweis).toContainText('übernommen');
+  await expect(page.getByRole('button', { name: 'In Einsatz übernehmen' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Planung bearbeiten' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Block anlegen' })).toHaveCount(0);
+  const nochmal = await page.request.post(`/api/planungen/${planungId}/uebernahme`, {
+    data: { ziel: { art: 'neu' } },
+  });
+  expect(nochmal.status()).toBe(409);
+
+  // ── Der Block steht im Schichtplan des neuen Einsatzes ───────────────────────────────────────
+  await hinweis.getByRole('link').click();
+  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
+  const einsatzId = Number(/\/einsaetze\/(\d+)/.exec(page.url())![1]);
+  const schichtplan = await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/abloesungen/schichtplan`)
+  ).json();
+  expect(schichtplan.bloecke).toHaveLength(1);
+  expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');
+  expect(schichtplan.helfer.map((h: { name: string }) => h.name)).toEqual(['Hanna Stadtfest']);
+});
+
+/**
  * Kriterium 12 der Prüfliste (LLH-1595, für LLH-1586): Änderungen anderer erscheinen im Raster
  * direkt, ohne Neuladen. Der fremde Block landet in DERSELBEN Zeile wie der Block unter dem Zeiger,
  * gleich daneben; der Block unter dem Zeiger behält Lage, Größe und Ampel. Dass andere Zeilen

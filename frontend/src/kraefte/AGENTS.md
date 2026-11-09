@@ -203,4 +203,9 @@ Wahl gehen bei Vorschau UND Übernehmen als Multipart an den Server, der jedes M
 abgleicht; der Client hält keinen Inhalt der Datei und rechnet keinen Abgleich nach. Jede Wahl
 fragt die Vorschau neu ab. Der Plan aus der Antwort des Übernehmens ersetzt den Cache. Der
 gemeinsame Kern mit der Vorplanung (LLH-1561) ist `abloesung::schichtplan::uebernahme`
-(`PlanPaket` → `bestand_tx` → `planen` → `schreiben_tx`).
+(`PlanPaket` → `bestand_tx` → `planen` → `schreiben_tx`); „In Einsatz übernehmen“ einer Planung
+(LLH-1587, `planung/PlanungUebernahmeDialog.tsx`, Server `planung::uebernahme`) baut nur das
+Paket und zeigt die Vorschau über dieselbe `ImportVorschauAnsicht`
+(`abloesung/schichtplan/ImportVorschauAnsicht.tsx`). Eine dritte Quelle bringt ebenfalls nur ihr
+Paket und keinen eigenen Abgleich oder eine eigene Vorschau mit. Der ETB-Eintrag nennt die Quelle
+über `anlass` von `schreiben_tx`.

@@ -112,7 +112,14 @@ const ANSAGEN: Announcements = {
   onDragCancel: ({ active }) => `Ziehen von ${personName(active.data.current)} abgebrochen.`,
 };
 
-export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
+export default function PlanungSchichtplan({
+  planung,
+  readOnly = false,
+}: {
+  planung: Planung;
+  /** Übernommen (LLH-1587): Raster und Blöcke nur zum Ansehen, ohne Anlegen und Ziehen. */
+  readOnly?: boolean;
+}) {
   const planungId = planung.kopf.id;
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -326,7 +333,7 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
     setDialog({ art: 'erzeugen' });
   };
   const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
-  const mitSeitenleiste = !istSchmal;
+  const mitSeitenleiste = !istSchmal && !readOnly;
   const ohnePosten = planung.posten.length === 0;
 
   return (
@@ -356,10 +363,14 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
               style={{ minWidth: 160 }}
             />
           ))}
-        <Button onClick={oeffneAnlegen}>Block anlegen</Button>
-        <Button onClick={oeffneErzeugen} disabled={ohnePosten}>
-          Schichten erzeugen
-        </Button>
+        {!readOnly && (
+          <>
+            <Button onClick={oeffneAnlegen}>Block anlegen</Button>
+            <Button onClick={oeffneErzeugen} disabled={ohnePosten}>
+              Schichten erzeugen
+            </Button>
+          </>
+        )}
         {/* Ausgabe wie im Einsatz (LLH-1593): Aushang und Zettel, Excel-Mappe. Wer die Planung
             lesen darf, sieht auch das Personal; „Excel“ ist deshalb nie gesperrt. */}
         <AusgabeKnoepfe
@@ -406,7 +417,7 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
               bloecke={bloecke}
               spanne={spanne}
               jetzt={jetzt}
-              darfSchreiben
+              darfSchreiben={!readOnly}
               zone={konventionen.zeitzone}
               formatMarke={markeText}
               formatZeit={zeitText}
@@ -441,7 +452,7 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
           zeilen={zeilen}
           schichtmodell={null}
           laengeVorgabe={laengeVorgabe}
-          darfSchreiben
+          darfSchreiben={!readOnly}
           laeuft={erzeugenMut.isPending}
           speicherung={erzeugenMut}
           onErzeugen={(body) => erzeugenMut.mutateAsync(body)}
@@ -457,7 +468,7 @@ export default function PlanungSchichtplan({ planung }: { planung: Planung }) {
           sollVorgabe={sollVorgabe}
           qualiVorgabe={qualiVorgabe}
           qualiNamen={qualiNamen}
-          darfSchreiben
+          darfSchreiben={!readOnly}
           laeuft={anlegenMut.isPending || aendernMut.isPending}
           speicherung={dialog.art === 'anlegen' ? anlegenMut : aendernMut}
           loeschenLaeuft={loeschenMut.isPending}

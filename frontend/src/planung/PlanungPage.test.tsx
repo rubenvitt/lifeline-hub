@@ -3,11 +3,11 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Planung, PlanungPosten } from '../api/types';
+import type { Planung, PlanungPosten, SchichtplanImportVorschau } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { adminFixture } from '../test/fixtures';
-import { waehle } from '../test/auswahlListe';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { waehleMenueEintrag } from '../test/menue';
 import { setzeViewportBreite } from '../test/viewport';
 import * as dateiSpeichern from '../components/dateiSpeichern';
@@ -342,5 +342,207 @@ describe('PlanungPage (LLH-1586)', () => {
     const [datei, name] = speichern.mock.calls[0];
     expect(await (datei as Blob).text()).toBe('PK-planung');
     expect(name).toMatch(/^schichtplan-stadtfest-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  });
+
+  describe('In Einsatz übernehmen (LLH-1587)', () => {
+    const vorschau = (
+      ueber: Partial<SchichtplanImportVorschau> = {},
+    ): SchichtplanImportVorschau => ({
+      posten: [
+        {
+          schluessel: 'posten-1',
+          art: 'einheit',
+          name: 'RTW 1',
+          ziel: { art: 'neu' },
+          treffer: 'neu',
+          kandidaten: [],
+          zeilen: [],
+          bloecke: 1,
+        },
+      ],
+      personen: [],
+      bloecke: [],
+      meldungen: [],
+      zaehlung: {
+        einheiten_neu: 1,
+        uhs_neu: 0,
+        bloecke_neu: 1,
+        bloecke_ergaenzt: 0,
+        bloecke_unveraendert: 0,
+        helfer_neu: 0,
+        einteilungen_neu: 0,
+        grenzwerte_neu: 0,
+        aenderungen: 2,
+      },
+      auswahl: { einheiten: [], uhs: [], vorlagen: [], abschnitte: [] },
+      uebernehmbar: true,
+      ...ueber,
+    });
+    const uebernommen = planung({
+      kopf: {
+        ...planung().kopf,
+        version: 4,
+        uebernahme: {
+          at: '2027-06-12 05:30:00',
+          einsatz_id: 42,
+          einsatznummer: 'E-2027-0042',
+        },
+      },
+    });
+
+    it('fragt die Vorschau für einen neuen Einsatz ab und übernimmt mit Ziel und Wahl', async () => {
+      const anfragen: unknown[] = [];
+      let uebernahmeBody: unknown;
+      setup();
+      server.use(
+        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
+          anfragen.push(await request.json());
+          return HttpResponse.json(vorschau());
+        }),
+        http.post('/api/planungen/5/uebernahme', async ({ request }) => {
+          uebernahmeBody = await request.json();
+          return HttpResponse.json({
+            einsatz_id: 42,
+            einsatz_neu: true,
+            zaehlung: vorschau().zaehlung,
+            planung: uebernommen,
+          });
+        }),
+      );
+      expect(await screen.findByRole('button', { name: 'Planung bearbeiten' })).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole('button', { name: 'In Einsatz übernehmen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'In Einsatz übernehmen' });
+      expect(await within(dialog).findByText('1 Einheit neu')).toBeInTheDocument();
+      expect(anfragen[0]).toEqual({
+        ziel: { art: 'neu' },
+        entscheidungen: { posten: {}, personen: {} },
+      });
+      expect(
+        within(dialog).getByText('Neuer Einsatz: „Stadtfest“ · Sanitätsdienst · Marktplatz'),
+      ).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+      expect(
+        await within(dialog).findByText('Einsatz angelegt, Plan übernommen · E-2027-0042'),
+      ).toBeInTheDocument();
+      expect(uebernahmeBody).toEqual({
+        ziel: { art: 'neu' },
+        entscheidungen: { posten: {}, personen: {} },
+      });
+      expect(
+        within(dialog).getByRole('button', { name: 'Zum Schichtplan des Einsatzes' }),
+      ).toBeInTheDocument();
+    });
+
+    it('ein laufender Einsatz muss erst gewählt werden; ohne Schreibrecht oder fremd steht er nicht zur Wahl', async () => {
+      const anfragen: unknown[] = [];
+      setup();
+      server.use(
+        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/einsaetze', () =>
+          HttpResponse.json([
+            {
+              id: 7,
+              org_id: 1,
+              bezeichnung: 'Konzert',
+              einsatznummer_intern: 'E-2027-0007',
+              status: 'aktiv',
+              meine_rolle: 'einsatzleitung',
+            },
+            {
+              id: 8,
+              org_id: 1,
+              bezeichnung: 'Nur lesen',
+              status: 'aktiv',
+              meine_rolle: 'beobachter',
+            },
+            {
+              id: 9,
+              org_id: 1,
+              bezeichnung: 'Vorbei',
+              status: 'abgeschlossen',
+              meine_rolle: 'einsatzleitung',
+            },
+            {
+              id: 10,
+              org_id: 2,
+              bezeichnung: 'Fremde Organisation',
+              status: 'aktiv',
+              meine_rolle: 'fuehrungspersonal',
+            },
+          ]),
+        ),
+        http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
+          anfragen.push(await request.json());
+          return HttpResponse.json(vorschau());
+        }),
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'In Einsatz übernehmen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'In Einsatz übernehmen' });
+      await within(dialog).findByText('1 Einheit neu');
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Laufender Einsatz' }));
+      expect(
+        within(dialog).getByText('Einsatz wählen', {
+          selector: '[data-lfh="uebernahme-gesperrt"]',
+        }),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+      await oeffne('Laufender Einsatz');
+      expect(optionenVon('Laufender Einsatz')).toEqual(['E-2027-0007 · Konzert']);
+      await waehle('Laufender Einsatz', 'E-2027-0007 · Konzert');
+      await waitFor(() =>
+        expect(anfragen[anfragen.length - 1]).toEqual({
+          ziel: { art: 'einsatz', einsatz_id: 7 },
+          entscheidungen: { posten: {}, personen: {} },
+        }),
+      );
+      // Ein zweiter Klick auf das aktive Ziel lässt Einsatz und Vorschau stehen.
+      const bisher = anfragen.length;
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Laufender Einsatz' }));
+      expect(within(dialog).getByText('E-2027-0007 · Konzert')).toBeInTheDocument();
+      expect(anfragen).toHaveLength(bisher);
+    });
+
+    it('Fehler in der Vorschau sperren das Übernehmen', async () => {
+      setup();
+      server.use(
+        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.post('/api/planungen/5/uebernahme/vorschau', () =>
+          HttpResponse.json(
+            vorschau({
+              uebernehmbar: false,
+              meldungen: [{ stufe: 'fehler', text: 'Person #3 nicht im Dienst' }],
+            }),
+          ),
+        ),
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'In Einsatz übernehmen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'In Einsatz übernehmen' });
+      expect(await within(dialog).findByText('Person #3 nicht im Dienst')).toBeInTheDocument();
+      expect(within(dialog).getByText('Fehler in der Planung')).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+    });
+
+    it('eine übernommene Planung nennt ihren Einsatz und ist nur noch lesbar', async () => {
+      setup(uebernommen);
+      const hinweis = await screen.findByText(/in Einsatz/, { selector: '.ant-alert-title' });
+      expect(within(hinweis).getByRole('link', { name: 'E-2027-0042' })).toHaveAttribute(
+        'href',
+        '/einsaetze/42',
+      );
+      expect(screen.queryByRole('button', { name: 'In Einsatz übernehmen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Planung bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Block anlegen' })).toBeNull();
+      await userEvent.click(screen.getByRole('tab', { name: 'Posten · 2' }));
+      expect(await screen.findByText('UHS · Behandlungsplatz')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Posten anlegen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Aktionen zu RTW 1/ })).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Aktionen zu Stadtfest' }),
+        'Löschen bleibt',
+      ).toBeInTheDocument();
+    });
   });
 });

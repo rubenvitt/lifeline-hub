@@ -106,6 +106,26 @@ pub(crate) fn pruefe_koordinate(
     }
 }
 
+/// Nach dem Anlegen eines Einsatzes: Einsatzliste und Benachrichtigung „Neuer Einsatz“. Auch für
+/// einen Einsatz, der mit der Übernahme einer Planung entsteht (`routes::planung`, LLH-1587).
+pub(crate) async fn publish_neuer_einsatz(state: &AppState, einsatz_id: i64, benutzer_id: i64) {
+    einsatzliste_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+    // Spec `benachrichtigungen`, „Neuer Einsatz“: an die Führungskräfte der Org, die ihn lesen
+    // dürfen; wer ihn nicht lesen darf, erfährt nichts (Auflösung, `src/AGENTS.md`).
+    benachrichtigung::melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(
+            einsatz_id,
+            BenachrichtigungArt::EinsatzNeu,
+            Bezug::neu(BenachrichtigungBezugTyp::Einsatz, einsatz_id),
+        )
+        .von(benutzer_id)
+        .an(Adressat::Fuehrungskraefte),
+    )
+    .await;
+}
+
 /// POST /api/einsaetze — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
 /// Erfordert Anlege-Berechtigung (System-Admin oder org-weite Führungskraft).
 pub async fn anlegen(
@@ -161,21 +181,7 @@ pub async fn anlegen(
         benutzer.id,
     )
     .await?;
-    einsatzliste_melden(&state.pool, &state.live, einsatz.id, &[]).await;
-    // Spec `benachrichtigungen`, „Neuer Einsatz“: an die Führungskräfte der Org, die ihn lesen
-    // dürfen; wer ihn nicht lesen darf, erfährt nichts (Auflösung, `src/AGENTS.md`).
-    benachrichtigung::melden(
-        &state.pool,
-        &state.live,
-        Anlass::neu(
-            einsatz.id,
-            BenachrichtigungArt::EinsatzNeu,
-            Bezug::neu(BenachrichtigungBezugTyp::Einsatz, einsatz.id),
-        )
-        .von(benutzer.id)
-        .an(Adressat::Fuehrungskraefte),
-    )
-    .await;
+    publish_neuer_einsatz(&state, einsatz.id, benutzer.id).await;
     Ok((
         StatusCode::CREATED,
         Json(einsatz.anzeige(

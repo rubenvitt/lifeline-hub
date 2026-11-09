@@ -41,7 +41,7 @@ impl From<OrgModulVorgabe> for OrgModulEinstellung {
 /// Existiert keine Zeile, ist die Map leer (= alle Module sichtbar und frei zugänglich).
 /// Strikt per `org_id` (Org-Isolation).
 pub async fn laden_alle(
-    pool: &SqlitePool,
+    pool: impl sqlx::SqliteExecutor<'_>,
     org_id: i64,
 ) -> Result<HashMap<String, OrgModulVorgabe>, AppError> {
     let zeilen = sqlx::query_as::<_, (String, Option<String>, Option<bool>)>(

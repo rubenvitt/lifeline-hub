@@ -2,7 +2,7 @@
 titel: Vorplanung
 gruppen: [fuehrung, administration]
 reihenfolge: 380
-quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md, frontend/src/planung/PlanungDruckPage.tsx, frontend/src/planung/ausPlanung.ts, frontend/src/abloesung/schichtplan/ausgabe/, src/abloesung/schichtplan/ausgabe/]
+quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md, frontend/src/planung/PlanungDruckPage.tsx, frontend/src/planung/ausPlanung.ts, frontend/src/abloesung/schichtplan/ausgabe/, src/abloesung/schichtplan/ausgabe/, frontend/src/planung/PlanungUebernahmeDialog.tsx, frontend/src/abloesung/schichtplan/ImportVorschauAnsicht.tsx, src/planung/uebernahme.rs, src/abloesung/schichtplan/uebernahme/repo.rs]
 ---
 
 ## Überblick
@@ -87,6 +87,22 @@ Uhrzeit. Ein Eintrag öffnet den Dialog des Blocks.
 Die Druckansicht ist ein fester Stand: Änderungen an der Planung holt „Neu laden“. „Zurück zur
 Planung“ führt zur Planung zurück.
 
+### Eine Planung in einen Einsatz übernehmen
+
+1. In der Planung oben rechts „In Einsatz übernehmen“ wählen.
+2. Das Ziel wählen: „Neuer Einsatz“, wahlweise mit einer Einsatz-Vorlage, oder „Laufender
+   Einsatz“ und darunter den Einsatz. Ein neuer Einsatz trägt Bezeichnung, Einsatzart und Ort der
+   Planung, beginnt mit der Übernahme und wird von der Person geleitet, die übernimmt. Zur Wahl
+   stehen nur laufende Einsätze, in denen man schreiben darf.
+3. Die Vorschau zeigt, was entsteht („1 Einheit neu“, „4 Schichten neu“ …), je Posten und Person
+   das Ziel mit „Gefunden“, „Unsicher“ oder „Neu“ und darunter Fehler und Hinweise. Über die
+   Auswahl einer Zeile lässt sich ein Posten einer anderen Einheit oder UHS zuordnen oder neu
+   anlegen und eine Person einer anderen zuordnen; die Vorschau rechnet danach neu.
+4. „Übernehmen“ schreibt alles auf einmal. Bei Fehlern in der Vorschau, in einem laufenden Einsatz
+   auch ohne jede Änderung, bleibt der Knopf gesperrt und nennt den Grund.
+5. Nach der Übernahme führt „Zum Schichtplan des Einsatzes“ in die Ablösung des Einsatzes, Ansicht
+   „Schichtplan“.
+
 ### Eine Planung löschen
 
 1. In der Planung oben rechts das Menü ⋮ öffnen und „Planung löschen“ wählen.
@@ -120,6 +136,33 @@ Stunden. Die Zeiten stehen in der Zone der Organisation, die Übersicht der Mapp
 Zeitraum der Planung. Das Blatt „Austausch“ lässt sich in einen Einsatz einlesen; ein zweites
 Einlesen derselben Mappe ändert dort nichts mehr.
 
+### Was die Übernahme anlegt
+
+Jeder Posten wird eine Einheit oder eine UHS im Einsatz, auch einer ohne Block; in einem laufenden Einsatz schlägt die
+Vorschau eine vorhandene Einheit oder UHS gleichen Namens vor. Ein Posten aus einer
+Einheitenvorlage wird eine Einheit nach dieser Vorlage, ein Posten mit Stamm-Fahrzeug eine Einheit
+ohne das Fahrzeug: disponiert wird es nicht, die Vorschau nennt es als Hinweis „Stamm-Fahrzeug
+nicht disponiert“. Ein Abschnitt der
+Planung, den es im Einsatz nicht gibt, bleibt als Hinweis stehen, die Einheit kommt ohne Abschnitt.
+Stamm-Personal kommt als feste Zuordnung in den Plan; wer inzwischen außer Dienst ist, macht die
+Übernahme mit einem Fehler unmöglich, bis er aus der Planung genommen ist. Helfer der Planung
+werden Helfer im Plan des Einsatzes mit der Herkunft „vorplanung“. Jeder Block nimmt sein Soll
+und Qualifikationssoll aus der Planung mit; ein Block ohne Soll bleibt auch im Einsatz ohne. Die
+Grenzwerte der Planung gelten im Einsatz, solange er keine eigenen
+hat. Niemand wird alarmiert oder disponiert, und niemand ist damit schon im Einsatz: wer im Plan
+steht, kommt wie bei jeder Schicht erst mit dem Wechsel in den Einsatz (Kapitel
+[Ablösung](abloesung.md)). Das ETB des Einsatzes vermerkt „Planung „…“ übernommen“ mit der
+Zählung.
+
+### Nach der Übernahme
+
+Eine übernommene Planung ist schreibgeschützt: oben steht, wann und in welchen Einsatz sie ging,
+mit einem Link dorthin. Kopf, Posten, Helfer und Blöcke lassen sich nur noch ansehen, und eine
+zweite Übernahme gibt es nicht. „Soll“, „Ist“, „Offen“ und „Konflikte“ bleiben auf dem Stand der
+Übernahme, auch in der Liste, die „übernommen in …“ mit der Einsatznummer nennt. Löschen geht
+weiter, und die Löschfrist bleibt dieselbe. Wird der Einsatz später endgültig gelöscht, führt der
+Link ins Leere.
+
 ### Aufbewahrung
 
 Eine Planung wird 90 Tage nach ihrem Ende gelöscht. Ab 14 Tagen vorher nennt die Liste den Tag:
@@ -128,7 +171,11 @@ Eine Planung wird 90 Tage nach ihrem Ende gelöscht. Ab 14 Tagen vorher nennt di
 ### Rechte, Live-Stand und ohne Netz
 
 Lesen und schreiben dürfen nur der System-Admin und die Führungskräfte der Organisation; allen
-anderen fehlt „Planungen“ in der Kopfleiste, und der Server lehnt ab. Planungen einer anderen
+anderen fehlt „Planungen“ in der Kopfleiste, und der Server lehnt ab. Übernehmen in einen
+laufenden Einsatz verlangt dort zusätzlich das Schreibrecht (Einsatzleitung oder
+Führungspersonal) und die Module Ablösung und Personal; neue Einheiten und UHS verlangen ihre
+Module. Sind Ablösung oder Personal im neuen Einsatz nicht freigegeben, etwa weil die gewählte
+Einsatz-Vorlage oder die Organisation sie ausblendet, lehnt der Server die Übernahme ab. Planungen einer anderen
 Organisation gibt es für niemanden. Was jemand an einer Planung ändert, sehen alle, die sie offen
 haben, ohne neu zu laden. Die Vorplanung gehört nicht zu dem, was die App für die Arbeit ohne Netz
 vorhält (Kapitel [Ohne Netz](ohne-netz.md)).

@@ -6090,7 +6090,7 @@ export interface components {
         PlanungEntfallenGrund: "aufloesung" | "entlassung";
         /**
          * @description Soll, Ist, Offen und Konflikte einer Planung (design.md D7), gerechnet aus denselben Befunden
-         *     wie die Planung selbst.
+         *     wie die Planung selbst. Nach der Übernahme gespeichert (`planung.uebernahme_kennzahlen`).
          */
         PlanungKennzahlen: {
             /**
@@ -6130,6 +6130,7 @@ export interface components {
             ort_lat?: number | null;
             /** Format: double */
             ort_lon?: number | null;
+            uebernahme?: components["schemas"]["PlanungUebernahme"] | null;
             /**
              * Format: int64
              * @description CAS-Zähler des Kopfs: PATCH sendet ihn mit (409 bei einem anderen Stand).
@@ -6151,6 +6152,7 @@ export interface components {
             ort?: string | null;
             /** Format: int64 */
             posten_anzahl: number;
+            uebernahme?: components["schemas"]["PlanungUebernahme"] | null;
             von: string;
         };
         /** @description Ein Posten der Planung. */
@@ -6184,6 +6186,33 @@ export interface components {
          * @enum {string}
          */
         PlanungPostenArt: "einheit" | "uhs";
+        /**
+         * @description Die Übernahme einer Planung in einen Einsatz (LLH-1587). Danach ist die Planung
+         *     schreibgeschützt und zeigt die Kennzahlen von diesem Zeitpunkt.
+         */
+        PlanungUebernahme: {
+            /** @description Zeitpunkt der Übernahme. */
+            at: string;
+            /**
+             * Format: int64
+             * @description Der Einsatz, in den sie ging. Er kann inzwischen gelöscht sein.
+             */
+            einsatz_id: number;
+            /** @description Seine Einsatznummer zum Zeitpunkt der Übernahme. */
+            einsatznummer?: string | null;
+        };
+        /**
+         * @description Antwort der Übernahme einer Planung (LLH-1587): der Einsatz, die Zählung des Kerns und die
+         *     nun schreibgeschützte Planung.
+         */
+        PlanungUebernahmeErgebnis: {
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Der Einsatz ist mit der Übernahme entstanden. */
+            einsatz_neu: boolean;
+            planung: components["schemas"]["PlanungAnzeige"];
+            zaehlung: components["schemas"]["ImportZaehlung"];
+        };
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;

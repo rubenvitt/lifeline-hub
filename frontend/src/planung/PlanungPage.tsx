@@ -1,8 +1,10 @@
-import { Modal, Tabs } from 'antd';
+import { Alert, Button, Flex, Modal, Tabs } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { tagUndUhrzeit } from '../anzeige/zeitDarstellung';
 import { ladePlanung, loeschePlanung } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import AdminPage from '../components/AdminPage';
@@ -13,6 +15,7 @@ import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZu
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import {
   parsePlanungReiter,
+  einsatzPfad,
   parseRouteId,
   planungenPfad,
   type PlanungReiter,
@@ -21,12 +24,15 @@ import PlanungHelferListe from './PlanungHelferListe';
 import PlanungKopf from './PlanungKopf';
 import PlanungPostenListe from './PlanungPostenListe';
 import PlanungSchichtplan from './PlanungSchichtplan';
+import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
 
 /**
  * Eine Planung ohne Einsatz (LLH-1586, Spec `vorplanung`): der Kopf wird in der Ansicht
  * bearbeitet, darunter die Reiter „Plan“, „Posten“ und „Helfer“ (Abstimmung 08.11.2026). Der
  * Reiter steht als `?reiter=` in der Adresse, ohne Verlaufsschritt. „Planung löschen“ liegt im
  * Menü des Kopfs und fragt einmal nach. Live kommt die Planung über das Org-Ereignis `planung`.
+ * „In Einsatz übernehmen“ (LLH-1587) öffnet den Dialog mit Vorschau; danach ist die Planung
+ * schreibgeschützt und nennt oben, wann und in welchen Einsatz sie ging.
  */
 export default function PlanungPage() {
   const { planungId: roh } = useParams();
@@ -36,7 +42,9 @@ export default function PlanungPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { token } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
   const [loeschenOffen, setLoeschenOffen] = useState(false);
+  const [isUebernahmeOpen, setUebernahmeOpen] = useState(false);
 
   const query = useQuery({
     queryKey: globalKeys.planung(planungId ?? 0),
@@ -89,10 +97,13 @@ export default function PlanungPage() {
     );
   }
 
+  // Übernommen (LLH-1587): nur noch lesen und löschen.
+  const uebernahme = planung.kopf.uebernahme;
+  const readOnly = uebernahme != null;
   const reiterInhalt: Record<PlanungReiter, ReactNode> = {
-    plan: <PlanungSchichtplan planung={planung} />,
-    posten: <PlanungPostenListe planung={planung} />,
-    helfer: <PlanungHelferListe planung={planung} />,
+    plan: <PlanungSchichtplan planung={planung} readOnly={readOnly} />,
+    posten: <PlanungPostenListe planung={planung} readOnly={readOnly} />,
+    helfer: <PlanungHelferListe planung={planung} readOnly={readOnly} />,
   };
 
   return (
@@ -100,22 +111,51 @@ export default function PlanungPage() {
       titel={planung.kopf.bezeichnung}
       pfad={pfad}
       aktionen={
-        <MenueAusloeser<'loeschen'>
-          eintraege={[{ key: 'loeschen', label: 'Planung löschen', gefahr: true }]}
-          zugaenglicherName={`Aktionen zu ${planung.kopf.bezeichnung}`}
-          laeuft={loeschenMut.isPending}
-          onWahl={() => {
-            loeschenMut.reset();
-            setLoeschenOffen(true);
-          }}
-        />
+        <Flex gap={token.marginSM} align="center">
+          {!readOnly && (
+            <Button type="primary" onClick={() => setUebernahmeOpen(true)}>
+              In Einsatz übernehmen
+            </Button>
+          )}
+          <MenueAusloeser<'loeschen'>
+            eintraege={[{ key: 'loeschen', label: 'Planung löschen', gefahr: true }]}
+            zugaenglicherName={`Aktionen zu ${planung.kopf.bezeichnung}`}
+            laeuft={loeschenMut.isPending}
+            onWahl={() => {
+              loeschenMut.reset();
+              setLoeschenOffen(true);
+            }}
+          />
+        </Flex>
       }
     >
+      {uebernahme && (
+        <Alert
+          type="info"
+          showIcon
+          data-lfh="planung-uebernommen"
+          style={{ marginBottom: token.margin }}
+          title={
+            <>
+              Am {tagUndUhrzeit(uebernahme.at, konventionen)} in Einsatz{' '}
+              <Link to={einsatzPfad(uebernahme.einsatz_id)}>
+                {uebernahme.einsatznummer ?? uebernahme.einsatz_id}
+              </Link>{' '}
+              übernommen
+            </>
+          }
+          description="Schreibgeschützt · Soll, Ist, Offen und Konflikte vom Stand der Übernahme"
+        />
+      )}
       {/* Eine offene Bearbeitung je Seite: der Kopf sperrt, solange er offen ist, nichts anderes
           in Dialogen; der Merker schützt vor dem Verlassen mit Ungespeichertem. */}
       <OffeneBearbeitungProvider aktiv>
         <div style={{ marginBottom: token.margin }}>
-          <PlanungKopf planung={planung} onNeuLaden={() => void query.refetch()} />
+          <PlanungKopf
+            planung={planung}
+            readOnly={readOnly}
+            onNeuLaden={() => void query.refetch()}
+          />
         </div>
         <Tabs
           activeKey={reiter}
@@ -136,6 +176,9 @@ export default function PlanungPage() {
           ]}
         />
       </OffeneBearbeitungProvider>
+      {isUebernahmeOpen && (
+        <PlanungUebernahmeDialog planung={planung} onClose={() => setUebernahmeOpen(false)} />
+      )}
       <Modal
         open={loeschenOffen}
         title={`${planung.kopf.bezeichnung} löschen?`}

@@ -800,6 +800,28 @@ pub async fn import_vorschau(
     ))
 }
 
+/// Live-Ereignisse nach einer wirksamen Übernahme in den Plan: ETB, neue Einheiten und UHS, die
+/// Ablösung. Ohne Änderung keine. Auch für die Übernahme einer Planung (`routes::planung`).
+pub(crate) fn publish_uebernahme(
+    state: &AppState,
+    einsatz_id: i64,
+    geschrieben: &uebernahme::repo::Geschrieben,
+) {
+    if geschrieben.zaehlung.aenderungen == 0 {
+        return;
+    }
+    for etb_id in &geschrieben.etb_ids {
+        state.live.publiziere(einsatz_id, *etb_id);
+    }
+    for id in &geschrieben.einheit_ids {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, *id);
+    }
+    for id in &geschrieben.uhs_ids {
+        super::einsatz_uhs::sse_uhs(state, einsatz_id, *id);
+    }
+    super::abloesung::sse(state, einsatz_id);
+}
+
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/import — wie die Vorschau, schreibt aber in
 /// EINER Transaktion (alles oder nichts). Fehler der Planung: 422 mit Zeilen der Datei; ein
 /// neuer Posten ohne Freigabe seines Moduls: 403. Ein zweiter Lauf derselben Datei ändert
@@ -824,18 +846,7 @@ pub async fn import_uebernehmen(
         &jetzt(),
     )
     .await?;
-    if geschrieben.zaehlung.aenderungen > 0 {
-        for etb_id in &geschrieben.etb_ids {
-            state.live.publiziere(einsatz_id, *etb_id);
-        }
-        for id in &geschrieben.einheit_ids {
-            super::einsatz_einheit::sse_einheit(&state, einsatz_id, *id);
-        }
-        for id in &geschrieben.uhs_ids {
-            super::einsatz_uhs::sse_uhs(&state, einsatz_id, *id);
-        }
-        super::abloesung::sse(&state, einsatz_id);
-    }
+    publish_uebernahme(&state, einsatz_id, &geschrieben);
     Ok(Json(ImportErgebnis {
         zaehlung: geschrieben.zaehlung,
         plan: plan(&state, &ctx).await?,

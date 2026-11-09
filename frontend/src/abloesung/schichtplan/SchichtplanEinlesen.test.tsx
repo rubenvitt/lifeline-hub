@@ -10,7 +10,8 @@ import type {
   SchichtplanImportZaehlung,
 } from '../../api/types';
 import { waehle } from '../../test/auswahlListe';
-import SchichtplanEinlesen, { zaehlungMarken } from './SchichtplanEinlesen';
+import { zaehlungMarken } from './ImportVorschauAnsicht';
+import SchichtplanEinlesen from './SchichtplanEinlesen';
 
 const vorschauApi = vi.fn();
 const einlesenApi = vi.fn();

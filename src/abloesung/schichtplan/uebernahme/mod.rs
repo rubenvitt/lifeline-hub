@@ -82,6 +82,9 @@ pub struct PaketPosten {
     pub sortier: Option<i64>,
     /// Zeilen der Datei, die den Posten nennen (für die Vorschau).
     pub zeilen: Vec<u32>,
+    /// Ein neuer Posten entsteht auch ohne Block (LLH-1587): jeder Posten der Vorplanung wird
+    /// eine Einheit oder UHS. Aus der Datei `false`: dort entsteht ein Posten nur mit einem Block.
+    pub ohne_block_anlegen: bool,
 }
 
 /// Eine Qualifikation im Paket: aus dem Katalog der Organisation (LLH-1561) oder als
@@ -111,6 +114,9 @@ pub struct PaketBlock {
     pub soll_anzahl: Option<i64>,
     /// Fehlt = Vorgabe des Postens.
     pub quali_soll: Option<Vec<PaketQualiSoll>>,
+    /// Ein fehlendes Soll heißt „kein Soll“, nicht „Vorgabe des Postens“ (LLH-1587): die
+    /// Vorplanung trägt ihr Soll je Block schon fertig. Aus der Datei `false`.
+    pub ohne_vorgabe: bool,
     pub notiz: Option<String>,
     /// Schlüssel der Personen.
     pub personen: Vec<String>,
