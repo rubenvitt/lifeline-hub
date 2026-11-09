@@ -47,7 +47,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/amp1au76496lxigr9gaux4rn (LLH-1601)
   Kontextmenü ergänzen (eine Quelle im Kern, Leeren über das Feld); Prettier grün
 - [x] 4.4 Anwenderkapitel `docs/anwender/kapitel/lageberichte.md` und `auftraege-befehle.md`
   um das Menü des Abschnitts ergänzen (Mitänderungsregel); Wächter der Anwenderdoku grün
-- [ ] 4.5 `./scripts/check-all.sh` (Bündel des Frontends) grün; Lint, Typen, Vitest
+- [x] 4.5 `./scripts/check-all.sh` (Bündel des Frontends) grün; Lint, Typen, Vitest. Lauf vom
+  09.11.2026: 19 239 Tests grün; rot nur zwei Tests in `betreuung/registrierung/RegistrierungPaneel.test.tsx`,
+  die auf `origin/alpha` (8176add9) ebenso rot sind (LLH-1620). Bündel `schnell` grün.
 
 ## Workflow follow-up
 
