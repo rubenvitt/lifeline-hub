@@ -1277,6 +1277,7 @@ impl Ablauf<'_> {
                         // Verortet wird die Stelle mit der Inbetriebnahme (`StelleInBetrieb`).
                         lat: None,
                         lon: None,
+                        belegungsart: None,
                     },
                 )
                 .await?;

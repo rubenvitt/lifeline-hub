@@ -745,7 +745,7 @@ pub async fn anlegen(
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id) =
+    let (person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id, belegung_etb_ids) =
         crate::write_retry!(&state.pool, |conn| {
             let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
                 conn,
@@ -775,6 +775,7 @@ pub async fn anlegen(
             .await?;
             let mut uhs_etb_id = None;
             let mut verbleib_etb_id = None;
+            let mut belegung_etb_ids = Vec::new();
             if war_neu {
                 // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
                 // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
@@ -967,7 +968,7 @@ pub async fn anlegen(
                 }
                 if let Some(stelle_id) = betreuungsstelle {
                     let art = VerbleibArt::Notunterkunft;
-                    verbleib_repo::erfassen_tx(
+                    belegung_etb_ids = verbleib_repo::erfassen_tx(
                         conn,
                         einsatz_id,
                         id,
@@ -980,7 +981,8 @@ pub async fn anlegen(
                         },
                         ctx.benutzer.id,
                     )
-                    .await?;
+                    .await?
+                    .belegung_etb_ids;
                     let text = format!(
                         "Person {}: {}",
                         registrier_anzeige(reg),
@@ -1034,7 +1036,14 @@ pub async fn anlegen(
             // `erfasst`, `aktuelle_sichtung` leer —, und der Client zeigte die Quittung zu
             // einem Datensatz, den es so nie gab.
             let person = repo::laden_tx(conn, einsatz_id, id).await?;
-            Ok((person, war_neu, uhs_etb_id, verbleib_etb_id, rtw_meldung_id))
+            Ok((
+                person,
+                war_neu,
+                uhs_etb_id,
+                verbleib_etb_id,
+                rtw_meldung_id,
+                belegung_etb_ids,
+            ))
         })?;
     // Auch nach einem Replay im Rennen (`war_neu` falsch): die Zustellung ist idempotent.
     rtw_meldung_sicherstellen(&state, &person).await?;
@@ -1048,6 +1057,7 @@ pub async fn anlegen(
         for etb_id in uhs_etb_id.into_iter().chain(verbleib_etb_id) {
             state.live.publiziere(einsatz_id, etb_id);
         }
+        super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &belegung_etb_ids);
         // Die Meldung zeigt ihre Patienten (design.md D6): ohne Neuladen.
         if body.meldung_id.is_some() || rtw_meldung_id.is_some() {
             state
@@ -1193,6 +1203,12 @@ pub struct PatchBody {
     /// aufgelöst (422).
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub versorgende_einheit_id: Option<Option<i64>>,
+    /// LLH-1612 (design.md D4): Kostform (Tri-State; `null` leert, unbekannt 400).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kostform: Option<Option<String>>,
+    /// LLH-1612: Unverträglichkeiten (Tri-State; höchstens 200 Zeichen, darüber 400).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub unvertraeglichkeiten: Option<Option<String>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -1244,6 +1260,10 @@ pub struct ErwartetBody {
     pub kontamination: Option<Option<bool>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub versorgende_einheit_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kostform: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub unvertraeglichkeiten: Option<Option<String>>,
 }
 
 /// Ein Text-Altwert: `""` (auch nur Leerraum) heißt leer wie `null`. Sonst bleibt der Wert, wie
@@ -1335,6 +1355,16 @@ fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppE
             erwartet.versorgende_einheit_id.is_some(),
             body.versorgende_einheit_id.is_some(),
         ),
+        (
+            "kostform",
+            erwartet.kostform.is_some(),
+            body.kostform.is_some(),
+        ),
+        (
+            "unvertraeglichkeiten",
+            erwartet.unvertraeglichkeiten.is_some(),
+            body.unvertraeglichkeiten.is_some(),
+        ),
     ];
     if let Some((feld, _, _)) = felder.iter().find(|(_, alt, neu)| *alt && !*neu) {
         return Err(AppError::UnprocessableEntity(format!(
@@ -1351,7 +1381,7 @@ const GEBURTSDATUM_SPIELRAUM: chrono::Duration = chrono::Duration::days(1);
 /// Prüft ein zu SETZENDES Geburtsdatum (LLH-1103, design.md D6), beim Anlegen und im PATCH: genau
 /// `YYYY-MM-DD`, ein gültiger Kalendertag und nicht nach `heute` (UTC) plus Spielraum, sonst 400.
 /// Ein schon gespeicherter Wert in anderer Form wird nicht geprüft, nur ein geschriebener.
-fn pruefe_geburtsdatum(roh: &str, heute: chrono::NaiveDate) -> Result<String, AppError> {
+pub(crate) fn pruefe_geburtsdatum(roh: &str, heute: chrono::NaiveDate) -> Result<String, AppError> {
     let zeichen = roh.as_bytes();
     let form = zeichen.len() == 10
         && zeichen.iter().enumerate().all(|(i, z)| match i {
@@ -1421,6 +1451,19 @@ pub async fn aktualisieren(
     let notiz = optional_max_tri(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
     let zustand = optional_max_tri(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
     let pat_nummer = optional_max_tri(body.pat_nummer, "PAT-Nummer", PAT_NUMMER_MAX)?;
+    // LLH-1612 (design.md D4): Kostform aus dem festen Satz (400), Unverträglichkeiten begrenzt.
+    let kostform = match trimme_tri(body.kostform) {
+        Some(Some(roh)) => Some(Some(
+            crate::person::Kostform::try_from(roh).map_err(AppError::Validation)?,
+        )),
+        Some(None) => Some(None),
+        None => None,
+    };
+    let unvertraeglichkeiten = optional_max_tri(
+        body.unvertraeglichkeiten,
+        "Unverträglichkeiten",
+        crate::person::PERSON_UNVERTRAEGLICHKEITEN_MAX,
+    )?;
     // LLH-1567: eine neue Einheit muss im Einsatz stehen und aktiv sein (422); leeren geht immer.
     if let Some(Some(einheit_id)) = body.versorgende_einheit_id {
         repo::pruefe_versorgende_einheit(&state.pool, einsatz_id, einheit_id).await?;
@@ -1466,6 +1509,8 @@ pub async fn aktualisieren(
     let alt_zustand = leer_als_null(erwartet.zustand);
     let alt_vermisst_seit = leer_als_null(erwartet.vermisst_seit);
     let alt_pat_nummer = leer_als_null(erwartet.pat_nummer);
+    let alt_kostform = leer_als_null(erwartet.kostform);
+    let alt_unvertraeglichkeiten = leer_als_null(erwartet.unvertraeglichkeiten);
 
     let person = repo::aktualisiere(
         &state.pool,
@@ -1490,6 +1535,8 @@ pub async fn aktualisieren(
             pat_nummer: alt_pat_nummer.as_ref().map(|o| o.as_deref()),
             kontamination: erwartet.kontamination,
             versorgende_einheit_id: erwartet.versorgende_einheit_id,
+            kostform: alt_kostform.as_ref().map(|o| o.as_deref()),
+            unvertraeglichkeiten: alt_unvertraeglichkeiten.as_ref().map(|o| o.as_deref()),
         },
         repo::PatchDaten {
             name: name.as_ref().map(|o| o.as_deref()),
@@ -1508,6 +1555,8 @@ pub async fn aktualisieren(
             pat_nummer: pat_nummer.as_ref().map(|o| o.as_deref()),
             kontamination: body.kontamination,
             versorgende_einheit_id: body.versorgende_einheit_id,
+            kostform: kostform.map(|o| o.map(|k| k.as_str())),
+            unvertraeglichkeiten: unvertraeglichkeiten.as_ref().map(|o| o.as_deref()),
         },
     )
     .await?;
@@ -1597,6 +1646,23 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     repo::storniere(&state.pool, einsatz_id, person_id, ctx.benutzer.id).await?;
+    // LLH-1612 (design.md D5): eine stornierte Person zählt an keiner Stelle mehr; eine namentlich
+    // geführte Stelle meldet ihre Belegung neu. Eigene Transaktion wie der Storno selbst.
+    if let Some(stelle_id) = person.aktuelle_verbleib_betreuungsstelle_id {
+        let benutzer_id = ctx.benutzer.id;
+        let jetzt = crate::zeit::jetzt();
+        let etb_ids = crate::write_retry!(&state.pool, |conn| {
+            crate::betreuung::repo::belegung_nachfuehren_tx(
+                conn,
+                einsatz_id,
+                stelle_id,
+                &jetzt,
+                benutzer_id,
+            )
+            .await
+        })?;
+        super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &etb_ids);
+    }
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
     if let Some(effekt) = crate::uhs::auto_austritt(
         &state.pool,
@@ -2150,6 +2216,7 @@ pub async fn verbleib(
         entlassen_an: angaben.entlassen_an,
         gegen_rat: angaben.gegen_rat,
         unterschrift: angaben.unterschrift,
+        ohne_belegung_nachfuehren: false,
     };
     let ergebnis = crate::write_retry!(&state.pool, |conn| {
         if let Some(cid) = client_id.as_deref() {
@@ -2220,9 +2287,10 @@ pub async fn verbleib(
             verbleib,
             austritt,
             etb_id,
+            belegung_etb_ids: erfasst.belegung_etb_ids,
         })
     })?;
-    let (verbleib, austritt, etb_id) = match ergebnis {
+    let (verbleib, austritt, etb_id, belegung_etb_ids) = match ergebnis {
         Verbleibt::Replay(replay) => {
             return Ok((
                 StatusCode::CREATED,
@@ -2233,7 +2301,8 @@ pub async fn verbleib(
             verbleib,
             austritt,
             etb_id,
-        } => (verbleib, austritt, etb_id),
+            belegung_etb_ids,
+        } => (verbleib, austritt, etb_id, belegung_etb_ids),
     };
     if let Some(a) = austritt {
         state.live.publiziere(einsatz_id, a.etb_id);
@@ -2242,6 +2311,7 @@ pub async fn verbleib(
             .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", a.uhs_id);
     }
     state.live.publiziere(einsatz_id, etb_id);
+    super::betreuung::publiziere_nachgefuehrt(&state, einsatz_id, &belegung_etb_ids);
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
 }
@@ -2354,6 +2424,8 @@ enum Verbleibt {
         verbleib: VerbleibAnzeige,
         austritt: Option<crate::uhs::AutoAustrittTx>,
         etb_id: i64,
+        /// Belegungsmeldungen namentlich geführter Stellen (LLH-1612, design.md D5).
+        belegung_etb_ids: Vec<i64>,
     },
 }
 

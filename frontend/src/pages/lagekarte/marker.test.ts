@@ -209,6 +209,7 @@ function stelle(partial: Partial<Betreuungsstelle>): Betreuungsstelle {
   return {
     id: 3,
     einsatz_id: 1,
+    belegungsart: 'gezaehlt',
     bezeichnung: 'NU Turnhalle Nord',
     art: 'notunterkunft',
     status: 'in_betrieb',

@@ -1348,6 +1348,27 @@ fn betreuung_betreuungsstelle_art_wire() {
     } in lifeline_hub::betreuung::BetreuungsstelleArt::ALLE);
 }
 
+/// LLH-1612 (design.md D4/D5): Belegungsart, Herkunft einer Belegungsmeldung und Kostform.
+#[test]
+fn registrierstelle_wire() {
+    enum_wire!(lifeline_hub::betreuung::Belegungsart {
+        Gezaehlt => "gezaehlt",
+        Namentlich => "namentlich",
+    } in lifeline_hub::betreuung::Belegungsart::ALLE);
+    enum_wire!(lifeline_hub::betreuung::BelegungQuelle {
+        Meldung => "meldung",
+        Registrierung => "registrierung",
+    } in lifeline_hub::betreuung::BelegungQuelle::ALLE);
+    enum_wire!(lifeline_hub::person::Kostform {
+        Normal => "normal",
+        Vegetarisch => "vegetarisch",
+        Vegan => "vegan",
+        OhneSchwein => "ohne_schwein",
+        DiaetAllergenarm => "diaet_allergenarm",
+        SaeuglingKleinkind => "saeugling_kleinkind",
+    } in lifeline_hub::person::Kostform::ALLE);
+}
+
 #[test]
 fn betreuung_betreuungsstelle_status_wire() {
     enum_wire!(lifeline_hub::betreuung::BetreuungsstelleStatus {

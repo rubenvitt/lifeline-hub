@@ -20,6 +20,7 @@ function stelle(
   return {
     id,
     einsatz_id: 1,
+    belegungsart: 'gezaehlt',
     bezeichnung: `Stelle ${id}`,
     art: 'notunterkunft',
     status: opt.status ?? 'in_betrieb',

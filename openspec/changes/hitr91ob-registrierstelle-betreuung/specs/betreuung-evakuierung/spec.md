@@ -86,8 +86,8 @@ die Kapazität übersteigen dürfen. Belegungsmeldungen MUST sich wie Standmeldu
 zurücknehmen lassen.
 
 An einer Stelle mit Belegungsart `namentlich` MUST das System die Belegung selbst melden: Ändert
-sich die Zahl der dort registrierten Personen (Registrierung, Abmelden, Verbleibwechsel,
-Storno oder Entstornierung einer Person), schreibt es in derselben Transaktion eine Meldung mit
+sich die Zahl der dort registrierten Personen (Registrierung, Abmelden, Verbleibwechsel
+oder Storno einer Person), schreibt es in derselben Transaktion eine Meldung mit
 der neuen Zahl, der Erfassungszeit des auslösenden Vorgangs und der Herkunft „Registrierung“;
 eine unveränderte Zahl schreibt keine Meldung. Der ETB-Eintrag dieser Meldung MUST die Herkunft
 nennen. Eine Handmeldung oder die Rücknahme einer Meldung an einer namentlich geführten Stelle

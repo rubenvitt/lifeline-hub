@@ -71,6 +71,7 @@ const BELEGUNGEN: BelegungVerlaufEintrag[] = [
   {
     id: 9,
     belegt: 0,
+    quelle: 'meldung',
     zeitpunkt_at: '2026-09-23 12:00:00',
     erfasst_at: '2026-09-23 12:00:00',
     erfasst_von: 'Leitung',
@@ -79,6 +80,7 @@ const BELEGUNGEN: BelegungVerlaufEintrag[] = [
   {
     id: 8,
     belegt: 89,
+    quelle: 'meldung',
     zeitpunkt_at: '2026-09-23 11:00:00',
     erfasst_at: '2026-09-23 11:00:00',
     erfasst_von: 'Leitung',

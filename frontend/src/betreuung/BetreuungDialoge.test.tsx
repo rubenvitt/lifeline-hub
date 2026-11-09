@@ -99,6 +99,7 @@ const bezirk = (over: Partial<Evakuierungsbezirk> = {}): Evakuierungsbezirk => (
 const stelle = (over: Partial<Betreuungsstelle> = {}): Betreuungsstelle => ({
   id: 8,
   einsatz_id: 1,
+  belegungsart: 'gezaehlt',
   bezeichnung: 'Turnhalle Ost',
   art: 'notunterkunft',
   status: 'in_betrieb',

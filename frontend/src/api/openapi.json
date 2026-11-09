@@ -768,6 +768,27 @@
           "im_einsatz"
         ]
       },
+      "AbmeldungAnzeige": {
+        "type": "object",
+        "description": "Antwort auf „Abmelden“: wer abgemeldet wurde (übersprungene fehlen).",
+        "required": [
+          "stelle_id",
+          "person_ids"
+        ],
+        "properties": {
+          "person_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "stelle_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AbschlussGrund": {
         "type": "string",
         "description": "Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).\nString = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur\n(\"Tier T-001 (Hund): an Tierarzt übergeben\").",
@@ -2801,6 +2822,14 @@
           }
         }
       },
+      "BelegungQuelle": {
+        "type": "string",
+        "description": "Herkunft einer Belegungsmeldung (LLH-1612): von Hand gemeldet oder vom Server aus der\nRegistrierung einer namentlich geführten Stelle geschrieben. Wire == `as_str()`.",
+        "enum": [
+          "meldung",
+          "registrierung"
+        ]
+      },
       "BelegungVerlaufEintrag": {
         "type": "object",
         "description": "Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie\n[`StandVerlaufEintrag`].",
@@ -2810,7 +2839,8 @@
           "zeitpunkt_at",
           "erfasst_at",
           "erfasst_von",
-          "aktuell"
+          "aktuell",
+          "quelle"
         ],
         "properties": {
           "aktuell": {
@@ -2832,6 +2862,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "quelle": {
+            "$ref": "#/components/schemas/BelegungQuelle",
+            "description": "Von Hand gemeldet oder vom Server aus der Registrierung (LLH-1612); eine Meldung aus\nder Registrierung lässt sich nicht zurücknehmen."
           },
           "zeitpunkt_at": {
             "type": "string",
@@ -2858,6 +2892,14 @@
           "eintritt",
           "wechsel",
           "austritt"
+        ]
+      },
+      "Belegungsart": {
+        "type": "string",
+        "description": "Wie eine Betreuungsstelle ihre Belegung führt (LLH-1612, design.md D5). `gezaehlt`: die\nBelegung wird gemeldet (Vorgabe, Bestand). `namentlich`: der Server meldet sie aus den\ndort registrierten Personen, eine Handmeldung ist 409. Wire == `as_str()`.",
+        "enum": [
+          "gezaehlt",
+          "namentlich"
         ]
       },
       "BelegungsmeldungAnzeige": {
@@ -3316,6 +3358,7 @@
           "bezeichnung",
           "art",
           "status",
+          "belegungsart",
           "angelegt_at"
         ],
         "properties": {
@@ -3348,6 +3391,10 @@
                 "type": "null"
               }
             ]
+          },
+          "belegungsart": {
+            "$ref": "#/components/schemas/Belegungsart",
+            "description": "Gezählt oder namentlich geführt (LLH-1612, design.md D5)."
           },
           "bezeichnung": {
             "type": "string"
@@ -8955,6 +9002,46 @@
           "unbekannt"
         ]
       },
+      "HaushaltAnzeige": {
+        "type": "object",
+        "description": "Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind.",
+        "required": [
+          "id",
+          "nummer",
+          "personen"
+        ],
+        "properties": {
+          "bezugsperson_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezugsperson_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "„Nachname, Vorname“ der Bezugsperson, auch wenn sie nicht (mehr) an dieser Stelle ist."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nummer": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Nummer im Einsatz, angezeigt als „H-n“."
+          },
+          "personen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistriertePerson"
+            }
+          }
+        }
+      },
       "HintergrundbildAnzeige": {
         "type": "object",
         "description": "Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe.",
@@ -10152,6 +10239,49 @@
           },
           "laeuft_ab_at": {
             "type": "string"
+          }
+        }
+      },
+      "Kostform": {
+        "type": "string",
+        "description": "Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben\nSchlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard\n`kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in\n`migrations/0305_registrierstelle.sql`.",
+        "enum": [
+          "normal",
+          "vegetarisch",
+          "vegan",
+          "ohne_schwein",
+          "diaet_allergenarm",
+          "saeugling_kleinkind"
+        ]
+      },
+      "KostformZaehlung": {
+        "type": "object",
+        "description": "Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`).",
+        "required": [
+          "registriert",
+          "sonderkost",
+          "normal",
+          "ohne_angabe"
+        ],
+        "properties": {
+          "normal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon mit Kostform `normal`."
+          },
+          "ohne_angabe": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon ohne Kostform."
+          },
+          "registriert": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Alle jetzt an einer nicht stornierten Stelle registrierten Personen."
+          },
+          "sonderkost": {
+            "$ref": "#/components/schemas/Sonderkost",
+            "description": "Davon je Sonderkost-Form."
           }
         }
       },
@@ -14070,6 +14200,22 @@
               }
             ]
           },
+          "haushalt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Haushalt der Registrierstelle (LLH-1612, design.md D3); fehlt ohne Haushalt."
+          },
+          "haushalt_nummer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nummer dieses Haushalts im Einsatz, angezeigt als „H-n“."
+          },
           "herkunft_adresse": {
             "type": [
               "string",
@@ -14086,6 +14232,17 @@
               "null"
             ],
             "description": "Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,\nausdrücklich nicht „nein“."
+          },
+          "kostform": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Kostform",
+                "description": "Kostform (LLH-1612, design.md D4); fehlt ohne Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "melder_kontakt": {
             "type": [
@@ -14193,6 +14350,13 @@
                 "type": "null"
               }
             ]
+          },
+          "unvertraeglichkeiten": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Unverträglichkeiten, Freitext bis [`PERSON_UNVERTRAEGLICHKEITEN_MAX`]. Gesundheitsangabe:\nKategorie Behandlung, nie im ETB."
           },
           "vermisst_seit": {
             "type": [
@@ -15718,6 +15882,116 @@
           },
           "slug": {
             "type": "string"
+          }
+        }
+      },
+      "RegistrierListe": {
+        "type": "object",
+        "description": "Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`).",
+        "required": [
+          "stelle_id",
+          "haushalte",
+          "ohne_haushalt"
+        ],
+        "properties": {
+          "haushalte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HaushaltAnzeige"
+            },
+            "description": "Haushalte mit mindestens einer hier registrierten Person, nach Nummer."
+          },
+          "ohne_haushalt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistriertePerson"
+            },
+            "description": "Hier registrierte Personen ohne Haushalt (etwa über einen Verbleib aufgenommen)."
+          },
+          "stelle_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "RegistriertePerson": {
+        "type": "object",
+        "description": "Eine an der Stelle registrierte Person (Registrierliste und Antworten). Personenbezogen: nur\nmit Zugriff auf das Modul Personen.",
+        "required": [
+          "id",
+          "registrier_nr",
+          "erfasst_at"
+        ],
+        "properties": {
+          "alter_geschaetzt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Erfassungszeit der Person."
+          },
+          "geburtsdatum": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geschlecht": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Geschlecht"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "haushalt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kostform": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Kostform"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unvertraeglichkeiten": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vorname": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

@@ -61,6 +61,7 @@ vi.mock('../anzeige/Kartenausschnitt', () => ({
 
 const stelle = (over: Partial<Betreuungsstelle> & { id: number }): Betreuungsstelle => ({
   einsatz_id: 1,
+  belegungsart: 'gezaehlt',
   bezeichnung: `Stelle ${over.id}`,
   art: 'notunterkunft',
   status: 'in_betrieb',

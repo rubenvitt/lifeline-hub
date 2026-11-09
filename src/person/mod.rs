@@ -459,6 +459,53 @@ where
 }
 
 wire_enum! {
+    /// Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben
+    /// Schlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard
+    /// `kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in
+    /// `migrations/0305_registrierstelle.sql`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
+    pub enum Kostform {
+        Normal => "normal",
+        Vegetarisch => "vegetarisch",
+        Vegan => "vegan",
+        OhneSchwein => "ohne_schwein",
+        DiaetAllergenarm => "diaet_allergenarm",
+        SaeuglingKleinkind => "saeugling_kleinkind",
+    }
+    try_from = |s| {
+        format!(
+            "Unbekannte Kostform '{s}' (erlaubt: normal, vegetarisch, vegan, ohne_schwein, \
+             diaet_allergenarm, saeugling_kleinkind)"
+        )
+    };
+}
+
+// Nullable Spalte `einsatz_person.kostform` — gleiches Muster wie `VerbleibArt`.
+impl<DB: sqlx::Database> sqlx::Type<DB> for Kostform
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Kostform
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Kostform::parse(s).ok_or_else(|| format!("Ungültige Kostform: {s}").into())
+    }
+}
+
+/// Höchstlänge der Unverträglichkeiten an der Person (LLH-1612, design.md D4).
+pub const PERSON_UNVERTRAEGLICHKEITEN_MAX: usize = 200;
+
+wire_enum! {
     /// Abgleich-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AbgleichStatus {
@@ -657,6 +704,19 @@ pub struct PersonAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<RettungsmittelStand>)]
     pub rettungsmittel: Option<sqlx::types::Json<RettungsmittelStand>>,
+    /// Haushalt der Registrierstelle (LLH-1612, design.md D3); fehlt ohne Haushalt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub haushalt_id: Option<i64>,
+    /// Nummer dieses Haushalts im Einsatz, angezeigt als „H-n“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub haushalt_nummer: Option<i64>,
+    /// Kostform (LLH-1612, design.md D4); fehlt ohne Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kostform: Option<Kostform>,
+    /// Unverträglichkeiten, Freitext bis [`PERSON_UNVERTRAEGLICHKEITEN_MAX`]. Gesundheitsangabe:
+    /// Kategorie Behandlung, nie im ETB.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unvertraeglichkeiten: Option<String>,
 }
 
 /// Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus
@@ -708,6 +768,7 @@ impl PersonAnzeige {
         self.transport_art = None;
         self.transport_fachrichtung = None;
         self.transport_at = None;
+        self.unvertraeglichkeiten = None;
     }
 
     /// Setzt den abgeleiteten Versorgungszustand aus den Verbleib-Caches.

@@ -7,8 +7,11 @@
 //! Zwei Objekte mit je einer append-only Meldereihe: der **Evakuierungsbezirk** (Plangröße,
 //! Räumungszustand) mit Standmeldungen „evakuiert“ und die **Betreuungsstelle** (Art,
 //! Kapazität, Status) mit Belegungsmeldungen „untergebracht“. Gezählt wird dort, wo Menschen
-//! durch eine Tür kommen; einzelne Personen kennt das Modul nicht (keine Verknüpfung mit der
-//! Personenauskunft, design.md Non-Goals).
+//! durch eine Tür kommen. Seit LLH-1612 kann eine Stelle ihre Belegung auch **namentlich**
+//! führen: die Registrierstelle ([`registrierung`]) legt Betroffene mit Verbleib an der Stelle
+//! an, und der Server schreibt daraus die Belegungsmeldung selbst ([`repo::belegung_nachfuehren_tx`]).
+//! Die Meldereihe bleibt die eine Quelle für Kopfzahl, Verlauf und Verpflegung. Eine
+//! Personenauskunft gibt es weiterhin nicht.
 //!
 //! **„Aktuell“ ist die nicht zurückgenommene Meldung mit dem jüngsten Zeitpunkt**, bei
 //! Gleichstand die größere `id` (design.md D2). Eine nachgetragene ältere Meldung dreht den
@@ -27,6 +30,7 @@ use utoipa::ToSchema;
 use crate::error::AppError;
 use crate::etb::{TYP_ENTSCHEIDUNG, TYP_MELDUNG};
 
+pub mod registrierung;
 pub mod repo;
 
 wire_enum! {
@@ -113,6 +117,39 @@ impl BetreuungsstelleArt {
             BetreuungsstelleArt::Notunterkunft => "Notunterkunft",
         }
     }
+}
+
+wire_enum! {
+    /// Wie eine Betreuungsstelle ihre Belegung führt (LLH-1612, design.md D5). `gezaehlt`: die
+    /// Belegung wird gemeldet (Vorgabe, Bestand). `namentlich`: der Server meldet sie aus den
+    /// dort registrierten Personen, eine Handmeldung ist 409. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Belegungsart {
+        Gezaehlt => "gezaehlt",
+        Namentlich => "namentlich",
+    }
+    try_from = |s| format!("Unbekannte Belegungsart '{s}' (erlaubt: gezaehlt, namentlich)");
+}
+
+impl Belegungsart {
+    /// Wortlaut im ETB.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Belegungsart::Gezaehlt => "gezählt",
+            Belegungsart::Namentlich => "namentlich geführt",
+        }
+    }
+}
+
+wire_enum! {
+    /// Herkunft einer Belegungsmeldung (LLH-1612): von Hand gemeldet oder vom Server aus der
+    /// Registrierung einer namentlich geführten Stelle geschrieben. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BelegungQuelle {
+        Meldung => "meldung",
+        Registrierung => "registrierung",
+    }
+    try_from = |s| format!("Unbekannte Herkunft '{s}' (erlaubt: meldung, registrierung)");
 }
 
 wire_enum! {
@@ -263,6 +300,8 @@ pub struct BetreuungsstelleAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kapazitaet_personen: Option<i64>,
     pub status: BetreuungsstelleStatus,
+    /// Gezählt oder namentlich geführt (LLH-1612, design.md D5).
+    pub belegungsart: Belegungsart,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub standort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -387,6 +426,9 @@ pub struct BelegungVerlaufEintrag {
     pub erfasst_von: String,
     /// Diese Meldung ist die aktuelle Belegung der Stelle.
     pub aktuell: bool,
+    /// Von Hand gemeldet oder vom Server aus der Registrierung (LLH-1612); eine Meldung aus
+    /// der Registrierung lässt sich nicht zurücknehmen.
+    pub quelle: BelegungQuelle,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zurueckgenommen_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -415,7 +457,9 @@ pub struct BelegungKopfzahl {
 /// (Sammelstelle, Standort, Notiz) entgegen; eine Änderung daran erscheint nur als
 /// „weitere Angaben“.
 pub mod etb_text {
-    use super::{BetreuungsstelleArt, BetreuungsstelleStatus, Erhebung, Raeumungszustand};
+    use super::{
+        Belegungsart, BetreuungsstelleArt, BetreuungsstelleStatus, Erhebung, Raeumungszustand,
+    };
 
     /// Bezeichnung in deutschen einfachen Anführungszeichen.
     fn q(bezeichnung: &str) -> String {
@@ -693,6 +737,76 @@ pub mod etb_text {
                 "Meldung zurückgenommen, Betreuungsstelle {} ohne Belegungsmeldung.",
                 q(bezeichnung)
             ),
+        }
+    }
+
+    /// Die Belegungsart einer Stelle wurde umgestellt (LLH-1612, design.md D5).
+    pub fn stelle_belegungsart(bezeichnung: &str, art: Belegungsart) -> String {
+        format!(
+            "Betreuungsstelle {}: Belegung wird jetzt {}.",
+            q(bezeichnung),
+            art.label()
+        )
+    }
+
+    /// Eine Belegungsmeldung, die der Server aus der Registrierung einer namentlich geführten
+    /// Stelle schreibt (LLH-1612, design.md D5). Nennt die Herkunft, sonst wie
+    /// [`belegung_gemeldet`].
+    pub fn belegung_aus_registrierung(
+        bezeichnung: &str,
+        belegt: i64,
+        vorher: Option<i64>,
+        kapazitaet: Option<i64>,
+    ) -> String {
+        let vorher = vorher.map(|v| format!(", vorher {v}")).unwrap_or_default();
+        let kapazitaet = kapazitaet
+            .map(|k| format!(", Kapazität {k}"))
+            .unwrap_or_default();
+        format!(
+            "Betreuungsstelle {}: {belegt} untergebracht (aus der Registrierung){vorher}\
+             {kapazitaet}.",
+            q(bezeichnung)
+        )
+    }
+
+    /// Registrierung eines Haushalts (LLH-1612): Stelle, Haushaltsnummer, Anzahl und
+    /// Registriernummern, nie Namen, Kostform oder Unverträglichkeiten.
+    pub fn registriert(
+        bezeichnung: &str,
+        haushalt_nr: i64,
+        registriernummern: &[String],
+    ) -> String {
+        format!(
+            "Betreuungsstelle {}: Haushalt H-{haushalt_nr} mit {} registriert ({}).",
+            q(bezeichnung),
+            personen(registriernummern.len()),
+            registriernummern.join(", ")
+        )
+    }
+
+    /// Abmeldung an einer Stelle (LLH-1612), ohne Namen und ohne Ziel. `haushalt_nr` fehlt,
+    /// wenn die Personen keinem Haushalt angehören.
+    pub fn abgemeldet(
+        bezeichnung: &str,
+        haushalt_nr: Option<i64>,
+        registriernummern: &[String],
+    ) -> String {
+        let haushalt = haushalt_nr
+            .map(|n| format!("Haushalt H-{n}: "))
+            .unwrap_or_default();
+        format!(
+            "Betreuungsstelle {}: {haushalt}{} abgemeldet ({}).",
+            q(bezeichnung),
+            personen(registriernummern.len()),
+            registriernummern.join(", ")
+        )
+    }
+
+    fn personen(n: usize) -> String {
+        if n == 1 {
+            "1 Person".to_string()
+        } else {
+            format!("{n} Personen")
         }
     }
 }

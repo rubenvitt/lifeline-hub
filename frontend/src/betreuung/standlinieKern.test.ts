@@ -85,6 +85,7 @@ const belegung = (
 ): BelegungVerlaufEintrag => ({
   aktuell: false,
   belegt: 0,
+  quelle: 'meldung',
   erfasst_at: over.zeitpunkt_at,
   erfasst_von: 'Leitung',
   ...over,

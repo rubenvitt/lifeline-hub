@@ -16,10 +16,10 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
 use super::{
-    etb_text, BelegungKopfzahl, BelegungKopfzahlStelle, BelegungsmeldungAnzeige,
-    BetreuungUebersicht, BetreuungsstelleAnzeige, BetreuungsstelleArt, BetreuungsstelleStatus,
-    Erhebung, EvakuierungsbezirkAnzeige, EvakuierungsstandAnzeige, Raeumungszustand,
-    BEZIRK_BEZEICHNUNG_MAX, BEZIRK_NOTIZ_MAX, BEZIRK_SAMMELSTELLE_MAX,
+    etb_text, BelegungKopfzahl, BelegungKopfzahlStelle, BelegungQuelle, Belegungsart,
+    BelegungsmeldungAnzeige, BetreuungUebersicht, BetreuungsstelleAnzeige, BetreuungsstelleArt,
+    BetreuungsstelleStatus, Erhebung, EvakuierungsbezirkAnzeige, EvakuierungsstandAnzeige,
+    Raeumungszustand, BEZIRK_BEZEICHNUNG_MAX, BEZIRK_NOTIZ_MAX, BEZIRK_SAMMELSTELLE_MAX,
 };
 use crate::error::AppError;
 use crate::etb::repo::EintragDaten;
@@ -73,6 +73,8 @@ pub struct StelleEingabe {
     /// gegen den Bereich geprüft (422) wie beim Ändern.
     pub lat: Option<f64>,
     pub lon: Option<f64>,
+    /// Gezählt oder namentlich geführt (LLH-1612); fehlt = `gezaehlt`.
+    pub belegungsart: Option<Belegungsart>,
 }
 
 /// Eingabe „Stelle ändern“ — tri-state wie [`BezirkAenderung`].
@@ -91,6 +93,8 @@ pub struct StelleAenderung {
     /// Koordinate (LFH-673), tri-state je Wert; gegen den Bestand als Paar geprüft.
     pub lat: Option<Option<f64>>,
     pub lon: Option<Option<f64>>,
+    /// Belegungsart (LLH-1612, design.md D5); fehlt = unverändert.
+    pub belegungsart: Option<Belegungsart>,
 }
 
 /// Eingabe „Stand melden“. `zeitpunkt_at` hat die Route normalisiert (UTC,
@@ -181,8 +185,8 @@ macro_rules! bezirk_select {
 macro_rules! stelle_select {
     () => {
         "SELECT s.id, s.einsatz_id, s.abschnitt_id, a.name AS abschnitt_name, s.bezeichnung, \
-                s.art, s.kapazitaet_personen, s.status, s.standort, s.notiz, s.leitung, \
-                s.kontaktweg, s.lat, s.lon, m.id AS belegung_id, m.belegt AS belegung_belegt, \
+                s.art, s.kapazitaet_personen, s.status, s.belegungsart, s.standort, s.notiz, \
+                s.leitung, s.kontaktweg, s.lat, s.lon, m.id AS belegung_id, m.belegt AS belegung_belegt, \
                 m.zeitpunkt_at AS belegung_zeitpunkt_at, \
                 s.storniert_at, s.angelegt_at, s.geaendert_at \
          FROM betreuungsstelle s \
@@ -271,6 +275,7 @@ struct StelleZeile {
     art: String,
     kapazitaet_personen: Option<i64>,
     status: String,
+    belegungsart: String,
     standort: Option<String>,
     notiz: Option<String>,
     leitung: Option<String>,
@@ -306,6 +311,7 @@ impl TryFrom<StelleZeile> for BetreuungsstelleAnzeige {
             art: aus_db(z.art)?,
             kapazitaet_personen: z.kapazitaet_personen,
             status: aus_db(z.status)?,
+            belegungsart: aus_db(z.belegungsart)?,
             standort: z.standort,
             notiz: z.notiz,
             leitung: z.leitung,
@@ -496,6 +502,8 @@ struct BelegungVerlaufZeile {
     erfasst_at: String,
     erfasst_von: String,
     aktuell: bool,
+    #[sqlx(try_from = "String")]
+    quelle: BelegungQuelle,
     zurueckgenommen_at: Option<String>,
     zurueckgenommen_von: Option<String>,
 }
@@ -570,7 +578,7 @@ pub async fn belegung_verlauf(
         "SELECT id, belegt, zeitpunkt_at, erfasst_at, \
                 (SELECT anzeigename FROM benutzer WHERE benutzer.id = erfasst_von_id) \
                     AS erfasst_von, \
-                id IS ? AS aktuell, zurueckgenommen_at, \
+                id IS ? AS aktuell, zurueckgenommen_at, quelle, \
                 (SELECT anzeigename FROM benutzer WHERE benutzer.id = zurueckgenommen_von_id) \
                     AS zurueckgenommen_von \
          FROM betreuungsstelle_belegung WHERE stelle_id = ? AND einsatz_id = ? ",
@@ -589,6 +597,7 @@ pub async fn belegung_verlauf(
         erfasst_at: z.erfasst_at,
         erfasst_von: z.erfasst_von,
         aktuell: z.aktuell,
+        quelle: z.quelle,
         zurueckgenommen_at: z.zurueckgenommen_at,
         zurueckgenommen_von: z.zurueckgenommen_von,
     })
@@ -801,6 +810,8 @@ struct StelleRoh {
     kapazitaet_personen: Option<i64>,
     #[sqlx(try_from = "String")]
     status: BetreuungsstelleStatus,
+    #[sqlx(try_from = "String")]
+    belegungsart: Belegungsart,
     standort: Option<String>,
     notiz: Option<String>,
     leitung: Option<String>,
@@ -821,7 +832,7 @@ async fn stelle_roh_tx(
 ) -> Result<StelleRoh, AppError> {
     sqlx::query_as(
         "SELECT s.bezeichnung, s.art, s.abschnitt_id, s.kapazitaet_personen, s.status, \
-                s.standort, s.notiz, s.leitung, s.kontaktweg, s.lat, s.lon, s.belegung_id, m.belegt AS belegung_belegt, \
+                s.belegungsart, s.standort, s.notiz, s.leitung, s.kontaktweg, s.lat, s.lon, s.belegung_id, m.belegt AS belegung_belegt, \
                 m.zeitpunkt_at AS belegung_zeitpunkt_at, s.storniert_at \
          FROM betreuungsstelle s LEFT JOIN betreuungsstelle_belegung m ON m.id = s.belegung_id \
          WHERE s.id = ? AND s.einsatz_id = ?",
@@ -831,6 +842,17 @@ async fn stelle_roh_tx(
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)
+}
+
+/// 409 an einer namentlich geführten Stelle (LLH-1612, design.md D5): ihre Belegung meldet der
+/// Server aus der Registrierung, eine Handmeldung oder Rücknahme stünde daneben.
+fn nicht_namentlich(roh: &StelleRoh) -> Result<(), AppError> {
+    match roh.belegungsart {
+        Belegungsart::Namentlich => {
+            Err(AppError::Conflict("Stelle wird namentlich geführt".into()))
+        }
+        Belegungsart::Gezaehlt => Ok(()),
+    }
 }
 
 fn stelle_lebt(roh: &StelleRoh) -> Result<(), AppError> {
@@ -1371,8 +1393,8 @@ pub async fn stelle_anlegen_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO betreuungsstelle \
             (einsatz_id, abschnitt_id, bezeichnung, art, kapazitaet_personen, standort, notiz, \
-             leitung, kontaktweg, lat, lon, angelegt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             leitung, kontaktweg, lat, lon, angelegt_von_id, belegungsart) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(eingabe.abschnitt_id)
@@ -1386,8 +1408,16 @@ pub async fn stelle_anlegen_tx(
     .bind(eingabe.lat)
     .bind(eingabe.lon)
     .bind(benutzer_id)
+    .bind(
+        eingabe
+            .belegungsart
+            .unwrap_or(Belegungsart::Gezaehlt)
+            .as_str(),
+    )
     .fetch_one(&mut *conn)
     .await?;
+    // Eine neu angelegte Stelle hat niemanden registriert: ihre erste Meldung schreibt die erste
+    // Registrierung (D5), nicht die Anlage.
     let etb_id = crate::etb::system_audit_tx(
         conn,
         einsatz_id,
@@ -1472,7 +1502,9 @@ pub async fn stelle_aendern_tx(
     // UPDATE, schnitte der Leerlauf-Riegel einen reinen Karten-PATCH still ab (200, nichts
     // gespeichert).
     let verortung_neu = lat != roh.lat || lon != roh.lon;
-    if stammdaten.leer() && !status_neu && !verortung_neu {
+    let belegungsart = eingabe.belegungsart.unwrap_or(roh.belegungsart);
+    let belegungsart_neu = belegungsart != roh.belegungsart;
+    if stammdaten.leer() && !status_neu && !verortung_neu && !belegungsart_neu {
         return Ok(Geschrieben {
             id,
             etb_ids: Vec::new(),
@@ -1481,9 +1513,14 @@ pub async fn stelle_aendern_tx(
     }
     if status_neu && status == BetreuungsstelleStatus::Geschlossen {
         if let Some(belegt) = roh.belegung_belegt.filter(|n| *n > 0) {
+            // An einer namentlich geführten Stelle meldet niemand 0 von Hand (D5): dort leert
+            // das Abmelden die Stelle.
+            let weg = match roh.belegungsart {
+                Belegungsart::Gezaehlt => "erst Belegung 0 melden",
+                Belegungsart::Namentlich => "erst alle Personen abmelden",
+            };
             return Err(AppError::UnprocessableEntity(format!(
-                "Betreuungsstelle ‚{}‘ ist mit {belegt} Personen belegt — erst Belegung 0 \
-                 melden, dann schließen",
+                "Betreuungsstelle ‚{}‘ ist mit {belegt} Personen belegt — {weg}, dann schließen",
                 roh.bezeichnung
             )));
         }
@@ -1498,7 +1535,7 @@ pub async fn stelle_aendern_tx(
     sqlx::query(
         "UPDATE betreuungsstelle SET bezeichnung = ?, art = ?, abschnitt_id = ?, \
             kapazitaet_personen = ?, status = ?, standort = ?, notiz = ?, leitung = ?, \
-            kontaktweg = ?, lat = ?, lon = ?, geaendert_at = datetime('now') \
+            kontaktweg = ?, lat = ?, lon = ?, belegungsart = ?, geaendert_at = datetime('now') \
          WHERE id = ?",
     )
     .bind(&bezeichnung)
@@ -1512,6 +1549,7 @@ pub async fn stelle_aendern_tx(
     .bind(&kontaktweg)
     .bind(lat)
     .bind(lon)
+    .bind(belegungsart.as_str())
     .bind(id)
     .execute(&mut *conn)
     .await?;
@@ -1523,11 +1561,20 @@ pub async fn stelle_aendern_tx(
     if status_neu {
         inhalte.push(etb_text::stelle_status(&bezeichnung, status, roh.status));
     }
-    let mut etb_ids = Vec::with_capacity(inhalte.len());
+    if belegungsart_neu {
+        inhalte.push(etb_text::stelle_belegungsart(&bezeichnung, belegungsart));
+    }
+    let mut etb_ids = Vec::with_capacity(inhalte.len() + 1);
     for inhalt in &inhalte {
         etb_ids.push(
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, inhalt).await?,
         );
+    }
+    // D5: der Wechsel auf `namentlich` meldet die Zahl der hier Registrierten im selben Vorgang;
+    // zurück auf `gezaehlt` bleibt die aktuelle Belegung stehen.
+    if belegungsart_neu && belegungsart == Belegungsart::Namentlich {
+        let jetzt = crate::zeit::jetzt();
+        etb_ids.extend(belegung_nachfuehren_tx(conn, einsatz_id, id, &jetzt, benutzer_id).await?);
     }
     Ok(Geschrieben {
         id,
@@ -1604,6 +1651,7 @@ pub async fn belegung_melden_tx(
     zeitpunkt_pruefen(&eingabe.zeitpunkt_at)?;
     let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
     stelle_lebt(&roh)?;
+    nicht_namentlich(&roh)?;
     if roh.status == BetreuungsstelleStatus::Geschlossen {
         return Err(AppError::UnprocessableEntity(format!(
             "Betreuungsstelle ‚{}‘ ist geschlossen — erst wieder in Betrieb setzen",
@@ -1661,6 +1709,89 @@ pub async fn belegung_melden_tx(
     })
 }
 
+/// Zahl der Personen, die jetzt an der Stelle registriert sind (LLH-1612): nicht storniert, ihr
+/// jüngster Verbleib ist „Notunterkunft“ an dieser Stelle. Dieselbe Menge wie „davon
+/// namentlich“ (`person::repo::namentlich_je_stelle`), gelesen aus dem Verbleib-Cache.
+pub async fn registrierte_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_person \
+         WHERE einsatz_id = ? AND storniert_at IS NULL \
+           AND aktuelle_verbleib_art = 'notunterkunft' \
+           AND aktuelle_verbleib_betreuungsstelle_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(stelle_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Führt die Belegung einer namentlich geführten Stelle nach (LLH-1612, design.md D5): weicht die
+/// Zahl der dort Registrierten von der aktuellen Belegung ab, schreibt der Server in DERSELBEN
+/// Transaktion eine Meldung mit Herkunft `registrierung` samt ETB-Meldungseintrag. An einer
+/// gezählten oder stornierten Stelle und bei unveränderter Zahl geschieht nichts. Liefert die
+/// geschriebenen ETB-Einträge für die Live-Verteilung des Aufrufers.
+///
+/// Der Zeitpunkt ist der des auslösenden Vorgangs, aber nie vor der aktuellen Meldung: sonst
+/// wäre die neue Zahl ein Nachtrag, und die aktuelle Belegung bliebe auf dem alten Stand.
+///
+/// Aufgerufen von jedem Weg, der den Verbleib-Cache einer Person ändert
+/// (`person::verbleib_repo::erfassen_tx`, Storno der Person), von Registrierung und Abmeldung
+/// (einmal je Vorgang) und vom Wechsel der Belegungsart auf `namentlich`.
+pub async fn belegung_nachfuehren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    zeitpunkt_at: &str,
+    benutzer_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
+    if roh.storniert_at.is_some() || roh.belegungsart != Belegungsart::Namentlich {
+        return Ok(Vec::new());
+    }
+    let anzahl = registrierte_tx(conn, einsatz_id, stelle_id).await?;
+    if roh.belegung_belegt == Some(anzahl) {
+        return Ok(Vec::new());
+    }
+    let zeitpunkt = match roh.belegung_zeitpunkt_at {
+        Some(aktuell) if aktuell.as_str() > zeitpunkt_at => aktuell,
+        _ => zeitpunkt_at.to_string(),
+    };
+    let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
+    let inhalt = etb_text::belegung_aus_registrierung(
+        &roh.bezeichnung,
+        anzahl,
+        roh.belegung_belegt,
+        roh.kapazitaet_personen,
+    );
+    let etb_id = crate::etb::repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        startwert,
+        daten(TYP_MELDUNG, &inhalt, Some(&zeitpunkt), None),
+    )
+    .await?;
+    sqlx::query(
+        "INSERT INTO betreuungsstelle_belegung \
+            (stelle_id, einsatz_id, belegt, zeitpunkt_at, erfasst_von_id, etb_eintrag_id, quelle) \
+         VALUES (?, ?, ?, ?, ?, ?, 'registrierung')",
+    )
+    .bind(stelle_id)
+    .bind(einsatz_id)
+    .bind(anzahl)
+    .bind(&zeitpunkt)
+    .bind(benutzer_id)
+    .bind(etb_id)
+    .execute(&mut *conn)
+    .await?;
+    belegung_zeiger_neu_tx(conn, stelle_id).await?;
+    Ok(vec![etb_id])
+}
+
 /// Die Stelle einer Belegungsmeldung des Einsatzes; `None`, wenn es sie dort nicht gibt. Für die
 /// Stellenbindung eines Geräts vor der Rücknahme (LFH-1041).
 pub async fn stelle_der_belegung(
@@ -1688,17 +1819,26 @@ pub async fn belegung_zuruecknehmen_tx(
     benutzer_id: i64,
     startwert: i64,
 ) -> Result<Gemeldet, AppError> {
-    let (stelle_id, meldung_etb, zurueckgenommen_at): (i64, i64, Option<String>) = sqlx::query_as(
-        "SELECT stelle_id, etb_eintrag_id, zurueckgenommen_at FROM betreuungsstelle_belegung \
-             WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(belegung_id)
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
+    let (stelle_id, meldung_etb, zurueckgenommen_at, quelle): (i64, i64, Option<String>, String) =
+        sqlx::query_as(
+            "SELECT stelle_id, etb_eintrag_id, zurueckgenommen_at, quelle \
+         FROM betreuungsstelle_belegung WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(belegung_id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
     let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
     stelle_lebt(&roh)?;
+    nicht_namentlich(&roh)?;
+    // Eine Meldung aus der Registrierung gibt die Zahl der Registrierten wieder; zurückgenommen
+    // machte sie eine ältere Handmeldung wieder aktuell (D5).
+    if aus_db::<BelegungQuelle>(quelle)? == BelegungQuelle::Registrierung {
+        return Err(AppError::Conflict(
+            "Die Meldung kommt aus der Registrierung und lässt sich nicht zurücknehmen".into(),
+        ));
+    }
     if roh.status == BetreuungsstelleStatus::Geschlossen {
         return Err(AppError::UnprocessableEntity(format!(
             "Betreuungsstelle ‚{}‘ ist geschlossen — erst wieder in Betrieb setzen, dann die \

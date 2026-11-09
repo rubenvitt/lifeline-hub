@@ -93,7 +93,7 @@ nicht stornierten Personen mit aktuellem Verbleib „Notunterkunft“ an der Ste
 nur wenn die Stelle `namentlich` ist und die Zahl von der aktuellen Belegung abweicht, eine
 Meldung mit `quelle = 'registrierung'` samt ETB-Meldungseintrag. Aufgerufen wird sie von jedem
 Weg, der den Verbleib-Cache einer Person ändert: am Ende von `verbleib_repo::erfassen_tx` für
-alte und neue Stelle, beim Storno und bei der Entstornierung einer Person, beim Registrieren
+alte und neue Stelle, beim Storno einer Person (eine Entstornierung gibt es nicht), beim Registrieren
 und Abmelden (einmal je Vorgang, nach allen Personen), beim Wechsel der Belegungsart auf
 `namentlich`. Handmeldung und Rücknahme an einer namentlichen Stelle: 409. Das Schließen prüft
 wie bisher die aktuelle Belegung.
@@ -157,7 +157,7 @@ einer Sonderkost; der Dialog belegt die Sonderkost-Felder vor wie die beiden and
 
 - [Verbleibwechsel auf anderen Wegen vergessen D5 aufzurufen → Belegung driftet] → Aufruf
   innerhalb von `verbleib_repo::erfassen_tx` statt in den Routen; Integrationstest je Weg
-  (Registrieren, Abmelden, Verbleib-Route, Storno, Entstornierung, Belegungsart-Wechsel).
+  (Registrieren, Abmelden, Verbleib-Route, Storno, Belegungsart-Wechsel).
 - [Großer Haushalt offline, Replay nach Stellenschließung] → Replay vor der Zustandsprüfung;
   neu nach Schließung 422 mit Grund am vorgemerkten Eintrag.
 - [Sonderkost-Vorschlag größer als die Gesamtzahl bei untergemeldeten gezählten Stellen] → die
