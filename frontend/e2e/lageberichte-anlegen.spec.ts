@@ -109,10 +109,11 @@ test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leer
   const eigeneLage = page.getByRole('textbox', { name: 'Eigene Lage' });
   await expect(eigeneLage).toHaveValue('');
   // Ein Abschnitt mit Quelle von Hand vorweg: die Sammelfüllung lässt ihn stehen.
-  await page.getByRole('textbox', { name: 'Lageentwicklung' }).fill('Von Hand');
+  const probleme = page.getByRole('textbox', { name: 'Besondere (Führungs-)Probleme' });
+  await probleme.fill('Von Hand');
   await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
   await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
-  await expect(page.getByRole('textbox', { name: 'Lageentwicklung' })).toHaveValue('Von Hand');
+  await expect(probleme).toHaveValue('Von Hand');
   // Ohne Quelle bleiben von Hand: Auftrag und die Medienlage (i6k6mzed, design.md D6).
   await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
   await expect(page.getByRole('textbox', { name: 'Medienlage' })).toHaveValue('');
