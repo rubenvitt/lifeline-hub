@@ -293,7 +293,7 @@ Das Kontextmenü zeigt genau die Aktionen, die die Zeile auch als Knopf und im M
 fehlt das Schreibrecht, fehlen sie hier ebenso. Eine Zeile ohne Aktion, ein Link (etwa der Titel
 der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers mit „In neuem Tab
 öffnen“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer Zeile mit Kontextmenü nicht
-durch langes Drücken markieren.
+durch langes Drücken markieren, außer im Einsatztagebuch (siehe unten).
 
 Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, dazu im
 Einsatztagebuch an den Einträgen und an den Chips der Erfassung. Im Einsatztagebuch öffnen es nur

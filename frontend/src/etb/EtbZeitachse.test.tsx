@@ -661,6 +661,20 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     expect(screen.getByText('Neu')).toBeInTheDocument();
   });
 
+  it('„Nur protokollieren“ wirkt auch, wenn die Seite den Weg erst nach dem Einhängen anbietet', async () => {
+    const puffer = abgelehnt();
+    puffer.eintrag = { ...puffer.eintrag, in_meldungseingang: true };
+    const zeilen = baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [puffer] });
+    const onNurProtokollieren = vi.fn();
+    const props = { einsatzId: 1, zeilen, onErneutSenden: vi.fn(), onVerwerfen: vi.fn() };
+    const { container, rerender } = renderMitProviders(<EtbZeitachse {...props} />);
+    rerender(<EtbZeitachse {...props} onNurProtokollieren={onNurProtokollieren} />);
+    fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
+    const menue = await waitFor(() => offenesKontextmenue()!);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Nur protokollieren' }));
+    expect(onNurProtokollieren).toHaveBeenCalledWith(puffer);
+  });
+
   it('verschwindet die Zeile, schließt das Menü', async () => {
     const puffer = abgelehnt();
     const { container, neu: setze } = renderZeitachse({

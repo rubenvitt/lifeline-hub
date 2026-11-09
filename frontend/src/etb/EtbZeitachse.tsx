@@ -457,9 +457,9 @@ export default function EtbZeitachse({
       auftragErteilen: (e) => handler.current.onAuftragErteilen?.(e),
       erneutSenden: (p) => handler.current.onErneutSenden?.(p),
       verwerfen: (p) => handler.current.onVerwerfen?.(p),
-      nurProtokollieren: handler.current.onNurProtokollieren
-        ? (p) => handler.current.onNurProtokollieren?.(p)
-        : undefined,
+      // Immer gesetzt: ob der Weg angeboten wird, sagt `rechte` (aktuelle Prop). Ein beim
+      // Einhängen eingefrorenes `undefined` stünde sonst als Eintrag ohne Wirkung da.
+      nurProtokollieren: (p) => handler.current.onNurProtokollieren?.(p),
     }),
     [],
   );
