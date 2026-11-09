@@ -462,7 +462,7 @@ wire_enum! {
     /// Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben
     /// Schlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard
     /// `kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in
-    /// `migrations/0305_registrierstelle.sql`.
+    /// `migrations/0306_registrierstelle.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Kostform {
         Normal => "normal",

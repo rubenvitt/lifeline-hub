@@ -169,7 +169,7 @@ einer Sonderkost; der Dialog belegt die Sonderkost-Felder vor wie die beiden and
 
 ## Migration Plan
 
-Eine Migration 0305 (Nummer vor dem Merge gegen `origin/alpha` prüfen,
+Eine Migration 0306 (Nummer vor dem Merge gegen `origin/alpha` prüfen,
 `scripts/check-migrationen.sh`): Tabelle `haushalt`, drei Spalten an `einsatz_person`, je eine
 an `betreuungsstelle` und `betreuungsstelle_belegung`, alle mit Vorgaben, die den Bestand
 unverändert lassen (`gezaehlt`, `meldung`, NULL). Kein Datenumbau. Rückweg: Belegungsart auf

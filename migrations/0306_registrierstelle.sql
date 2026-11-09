@@ -12,7 +12,7 @@
 --   an einer namentlich geführten Stelle).
 --
 -- Alle Vorgaben lassen den Bestand unverändert. Abgesichert von
--- db::tests::migration_0305_registrierstelle.
+-- db::tests::migration_0306_registrierstelle.
 CREATE TABLE haushalt (
     id              INTEGER PRIMARY KEY,
     einsatz_id      INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

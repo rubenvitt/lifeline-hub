@@ -8,6 +8,8 @@
 //! UHS ihres Typs; Stamm-Personal kommt mit festem Bezug, Helfer der Planung als Angabe mit der
 //! Herkunft [`HERKUNFT`] und einer Kennung je Helfer (eindeutig über alle Planungen, nie eine
 //! Personalnummer). Jeder Block trägt sein Soll fertig (`ohne_vorgabe`): leer bleibt leer.
+//! Programmpunkte der Planung werden Programmpunkte des Einsatzes (LLH-1583); einen gleichen
+//! Punkt, den der Einsatz schon hat, lässt der Kern aus.
 //!
 //! **Zwei Ziele.** Ein **neuer Einsatz** entsteht in derselben Transaktion wie Abgleich und
 //! Schreiben (`einsatz::repo::anlegen_tx`): alles oder nichts. Seine Vorschau legt ihn in einer
@@ -296,6 +298,7 @@ async fn build_paket_tx(
             min_ruhe_min: quelle.min_ruhe_min,
         },
     );
+    let programmpunkte = super::programm::paket_tx(conn, planung_id).await?;
     Ok((
         quelle,
         PlanPaket {
@@ -303,6 +306,7 @@ async fn build_paket_tx(
             posten,
             bloecke,
             personen,
+            programmpunkte,
         },
     ))
 }

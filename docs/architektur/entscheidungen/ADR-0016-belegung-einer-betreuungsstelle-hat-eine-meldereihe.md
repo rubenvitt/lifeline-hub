@@ -8,7 +8,7 @@ gilt_fuer:
   - src/person/verbleib_repo.rs
   - src/routes/betreuung.rs
   - src/routes/betreuung_registrierung.rs
-  - migrations/0305_registrierstelle.sql
+  - migrations/0306_registrierstelle.sql
 herleitung:
   - openspec/changes/archive/2026-11-09-hitr91ob-registrierstelle-betreuung/design.md
 ---
@@ -36,7 +36,7 @@ herleitung:
 ```sh
 verlange 'belegung_nachfuehren_tx' src/person/verbleib_repo.rs src/routes/einsatz_person.rs
 verlange 'fn nicht_namentlich' src/betreuung/repo.rs
-verlange "'registrierung'" migrations/0305_registrierstelle.sql
+verlange "'registrierung'" migrations/0306_registrierstelle.sql
 verbiete 'CREATE TABLE (betreute|registrierte|betreuungsperson)' 'migrations/*.sql'
 ```
 

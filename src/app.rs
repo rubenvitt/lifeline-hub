@@ -1972,6 +1972,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/planungen/{id}/helfer/{hid}",
             patch(routes::planung::helfer_aendern).delete(routes::planung::helfer_loeschen),
         )
+        // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
+        .route(
+            "/api/planungen/{id}/programmpunkte",
+            post(routes::planung::programmpunkt_anlegen),
+        )
+        .route(
+            "/api/planungen/{id}/programmpunkte/{pid}",
+            patch(routes::planung::programmpunkt_aendern)
+                .delete(routes::planung::programmpunkt_loeschen),
+        )
         // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
         .route(
             "/api/planungen/{id}/uebernahme/vorschau",

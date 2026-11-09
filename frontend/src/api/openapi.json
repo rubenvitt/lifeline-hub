@@ -9250,6 +9250,8 @@
           "helfer_neu",
           "einteilungen_neu",
           "grenzwerte_neu",
+          "programmpunkte_neu",
+          "programmpunkte_vorhanden",
           "aenderungen"
         ],
         "properties": {
@@ -9287,6 +9289,16 @@
           "helfer_neu": {
             "type": "integer",
             "format": "int64"
+          },
+          "programmpunkte_neu": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Programmpunkte der Vorplanung, die der Einsatz neu bekommt (LLH-1583); aus einer Datei 0."
+          },
+          "programmpunkte_vorhanden": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Programmpunkte der Vorplanung, die der Einsatz schon hat (gleiche Bezeichnung und\nZeitpunkt); sie bleiben aus und zählen nicht als Änderung."
           },
           "uhs_neu": {
             "type": "integer",
@@ -15183,6 +15195,7 @@
           "posten",
           "bloecke",
           "helfer",
+          "programmpunkte",
           "kennzahlen"
         ],
         "properties": {
@@ -15211,6 +15224,13 @@
               "$ref": "#/components/schemas/PlanungPostenAnzeige"
             },
             "description": "Nach `sortier`."
+          },
+          "programmpunkte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Programmpunkt"
+            },
+            "description": "Programmpunkte der Veranstaltung nach Zeitpunkt (LLH-1583); die Übernahme legt sie im\nEinsatz an."
           }
         }
       },

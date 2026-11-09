@@ -54,7 +54,7 @@ muss die Sonderkost schätzen (Zunder LLH-1612).
 
 ## Impact
 
-- **Backend:** Migration 0305 (Tabelle `haushalt`; an `einsatz_person` die Spalten
+- **Backend:** Migration 0306 (Tabelle `haushalt`; an `einsatz_person` die Spalten
   `haushalt_id`, `kostform`, `unvertraeglichkeiten`; an `betreuungsstelle` die Spalte
   `belegungsart`; an `betreuungsstelle_belegung` die Spalte `quelle`). Neue Routen unter
   `…/betreuung/` (Registrierung, Haushalte, Abmelden, Kostformen) in `src/routes/betreuung.rs`,

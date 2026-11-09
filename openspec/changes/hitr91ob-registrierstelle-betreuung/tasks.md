@@ -1,6 +1,6 @@
 ## 1. Datenmodell und Typen
 
-- [x] 1.1 Migration 0305 (`haushalt`; `einsatz_person.haushalt_id`, `kostform`, `unvertraeglichkeiten`; `betreuungsstelle.belegungsart`; `betreuungsstelle_belegung.quelle`) mit Vorgaben, die den Bestand unverändert lassen. Nachweis: `scripts/check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün, ein Test liest eine Bestandsstelle als `gezaehlt` und eine Bestandsmeldung als `meldung`.
+- [x] 1.1 Migration 0306 (`haushalt`; `einsatz_person.haushalt_id`, `kostform`, `unvertraeglichkeiten`; `betreuungsstelle.belegungsart`; `betreuungsstelle_belegung.quelle`) mit Vorgaben, die den Bestand unverändert lassen. Nachweis: `scripts/check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün, ein Test liest eine Bestandsstelle als `gezaehlt` und eine Bestandsmeldung als `meldung`.
 - [x] 1.2 Wire-Enums `Kostform`, `Belegungsart`, `BelegungQuelle` (`wire_enum!`) und Guard-Test „Sonderkost-Werte von `Kostform` = Felder von `Sonderkost`“. Nachweis: `cargo test` des Guards, `scripts/check-typ-codegen.sh` mit beiden generierten Dateien im Commit.
 - [x] 1.3 Kostform, Unverträglichkeiten und Haushalt im Personen-DTO und im Personen-PATCH (Feld-CAS, 400 bei unbekannter Kostform und > 200 Zeichen, ETB nur „weitere Angaben“). Nachweis: Integrationstests in `tests/` für PATCH, 400 und ETB-Wortlaut.
 - [x] 1.4 Unverträglichkeiten in Aufbewahrungskategorie „Behandlung“, Schwärzung leert sie, Lagestand ohne sie. Nachweis: Tests in Schwärzung und Aufbewahrung analog zu `melder_kontakt`.

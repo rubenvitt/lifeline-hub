@@ -589,6 +589,7 @@ async fn laden_mit(
         None => kennzahlen(&g.bloecke, &g.ergebnis),
     };
     let helfer = helfer_liste(conn, id).await?;
+    let programmpunkte = super::programm::liste_tx(conn, id).await?;
 
     let mut ergebnis_je_block = g.ergebnis.bloecke;
     let personen = g.personen;
@@ -643,6 +644,7 @@ async fn laden_mit(
             .collect::<Result<_, _>>()?,
         bloecke,
         helfer,
+        programmpunkte,
         kennzahlen,
     })
 }

@@ -21,9 +21,9 @@ use super::abgleich::{
 };
 use super::{
     BlockZustand, Entscheidungen, ImportAuswahl, ImportMeldung, ImportVorschau, ImportZaehlung,
-    MeldungStufe, PaketPerson, PaketPostenArt, PersonAngabe, PersonEntscheidung, PersonZiel,
-    PlanPaket, PostenEntscheidung, PostenZiel, QualiAngabe, Treffer, TrefferGrund, VorschauBlock,
-    VorschauPerson, VorschauPosten, WahlEintrag,
+    MeldungStufe, PaketPerson, PaketPostenArt, PaketProgrammpunkt, PersonAngabe,
+    PersonEntscheidung, PersonZiel, PlanPaket, PostenEntscheidung, PostenZiel, QualiAngabe,
+    Treffer, TrefferGrund, VorschauBlock, VorschauPerson, VorschauPosten, WahlEintrag,
 };
 use crate::abloesung::schichtplan::repo as plan_repo;
 use crate::abloesung::schichtplan::{
@@ -97,6 +97,8 @@ pub struct Bestand {
     /// Aktive Qualifikationen der Organisation (Kennung, Bezeichnung).
     pub qualifikationen: Vec<(i64, String)>,
     pub bloecke: Vec<BestandBlock>,
+    /// Programmpunkte des Einsatzes (Bezeichnung, Zeitpunkt), auch verstrichene (LLH-1583).
+    pub programmpunkte: Vec<(String, String)>,
 }
 
 /// id, name, telefon, kennung, herkunft eines Plan-Helfers.
@@ -193,6 +195,13 @@ pub async fn bestand_tx(
          ORDER BY sortier, label COLLATE NOCASE, id",
     )
     .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let programmpunkte: Vec<(String, String)> = sqlx::query_as(
+        "SELECT bezeichnung, zeitpunkt_at FROM programmpunkt WHERE einsatz_id = ? \
+         ORDER BY zeitpunkt_at, id",
+    )
+    .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
 
@@ -292,6 +301,7 @@ pub async fn bestand_tx(
             .collect(),
         qualifikationen,
         bloecke,
+        programmpunkte,
     })
 }
 
@@ -387,6 +397,8 @@ pub struct Planung {
     bloecke: Vec<GeplanterBlock>,
     /// Grenzwerte, die das Übernehmen setzt (je Wert nur ohne eigenen des Einsatzes).
     grenzwerte: Option<(Option<i64>, Option<i64>)>,
+    /// Programmpunkte, die das Übernehmen anlegt (ohne die, die der Einsatz schon hat).
+    programmpunkte: Vec<PaketProgrammpunkt>,
     /// Ein neuer Posten verlangt ein Modul, das der Benutzer nicht hat (403 beim Übernehmen).
     pub fehlende_rechte: bool,
 }
@@ -1006,6 +1018,10 @@ pub fn planen(
         (max.is_some() || ruhe.is_some()).then_some((max, ruhe))
     });
 
+    // --- Programmpunkte aus der Vorplanung (LLH-1583) ---
+    let (programmpunkte, programmpunkte_vorhanden) =
+        programm_planen(bestand, paket, &mut meldungen);
+
     // --- Zählung und Vorschau ---
     let mut zaehlung = ImportZaehlung {
         einheiten_neu: gebraucht_einheiten.len() as i64,
@@ -1027,6 +1043,8 @@ pub fn planen(
             .sum(),
         grenzwerte_neu: grenzwerte
             .map_or(0, |(a, b)| i64::from(a.is_some()) + i64::from(b.is_some())),
+        programmpunkte_neu: programmpunkte.len() as i64,
+        programmpunkte_vorhanden,
         aenderungen: 0,
     };
     zaehlung.summe();
@@ -1121,8 +1139,47 @@ pub fn planen(
         anlegen_uhs: gebraucht_uhs.into_iter().collect(),
         bloecke: gruppen,
         grenzwerte,
+        programmpunkte,
         fehlende_rechte,
     })
+}
+
+/// Die Programmpunkte des Pakets, die der Einsatz noch nicht hat, und wie viele er schon hat.
+/// Gleich heißt gleiche Bezeichnung (ohne Groß und klein, Leerraum zusammengezogen) und gleicher
+/// Zeitpunkt. Kämen mehr als `PROGRAMMPUNKTE_MAX` zusammen, sperrt ein Fehler das Übernehmen:
+/// abgeschnitten wird nichts (Freigabe Ruben 08.11.2026).
+fn programm_planen(
+    bestand: &Bestand,
+    paket: &PlanPaket,
+    meldungen: &mut Vec<ImportMeldung>,
+) -> (Vec<PaketProgrammpunkt>, i64) {
+    use crate::programmpunkt::PROGRAMMPUNKTE_MAX;
+    let mut gesehen: HashSet<(String, &str)> = bestand
+        .programmpunkte
+        .iter()
+        .map(|(b, z)| (norm(b), z.as_str()))
+        .collect();
+    let mut neu = Vec::new();
+    let mut vorhanden = 0;
+    for p in &paket.programmpunkte {
+        if gesehen.insert((norm(&p.bezeichnung), p.zeitpunkt_at.as_str())) {
+            neu.push(p.clone());
+        } else {
+            vorhanden += 1;
+        }
+    }
+    let gesamt = bestand.programmpunkte.len() as i64 + neu.len() as i64;
+    if !neu.is_empty() && gesamt > PROGRAMMPUNKTE_MAX {
+        meldungen.push(ImportMeldung::fehler(
+            None,
+            format!(
+                "Mit {} neuen Programmpunkten hätte der Einsatz {gesamt}; höchstens \
+                 {PROGRAMMPUNKTE_MAX}",
+                neu.len()
+            ),
+        ));
+    }
+    (neu, vorhanden)
 }
 
 fn zeitraum(stil: &Zeitstil, von: &str, bis: &str) -> String {
@@ -1673,6 +1730,21 @@ pub async fn schreiben_tx(
         .await?;
     }
 
+    // Programmpunkte der Vorplanung (LLH-1583); die Obergrenze hat `planen` auf demselben
+    // Stand der Transaktion geprüft.
+    for p in &planung.programmpunkte {
+        sqlx::query(
+            "INSERT INTO programmpunkt (einsatz_id, bezeichnung, zeitpunkt_at, erstellt_von_id) \
+             VALUES (?, ?, ?, ?)",
+        )
+        .bind(einsatz_id)
+        .bind(&p.bezeichnung)
+        .bind(&p.zeitpunkt_at)
+        .bind(benutzer_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+
     ergebnis.etb_ids.push(
         crate::etb::system_audit_tx(
             &mut *conn,
@@ -1718,6 +1790,12 @@ pub fn etb_text(anlass: &str, z: &ImportZaehlung) -> String {
     }
     if z.grenzwerte_neu > 0 {
         teile.push("Grenzwerte gesetzt".into());
+    }
+    if z.programmpunkte_neu > 0 {
+        teile.push(format!(
+            "{} neu",
+            mehrzahl(z.programmpunkte_neu, "Programmpunkt", "Programmpunkte")
+        ));
     }
     if teile.is_empty() {
         teile.push(format!(
@@ -1825,6 +1903,7 @@ mod tests {
                 quali_soll: None,
                 personen: vec![PlanPerson::Stamm(1)],
             }],
+            programmpunkte: vec![],
         }
     }
 
@@ -2291,5 +2370,71 @@ mod tests {
             etb_text(ANLASS_DATEI, &z),
             "Schichtplan eingelesen: 24 Schichten neu, 12 Helfer neu, 1 Einheit neu."
         );
+    }
+
+    fn programmpunkt(b: &str, z: &str) -> PaketProgrammpunkt {
+        PaketProgrammpunkt {
+            bezeichnung: b.into(),
+            zeitpunkt_at: z.into(),
+        }
+    }
+
+    /// LLH-1583: gleich ist gleiche Bezeichnung ohne Groß und klein und gleicher Zeitpunkt; ein
+    /// anderer Zeitpunkt ist ein anderer Punkt. Programmpunkte allein sind eine Änderung.
+    #[test]
+    fn programmpunkte_ohne_die_vorhandenen() {
+        let mut b = bestand();
+        b.programmpunkte = vec![("Einlass".into(), "2026-07-04 16:00:00".into())];
+        let paket = PlanPaket {
+            programmpunkte: vec![
+                programmpunkt("EINLASS", "2026-07-04 16:00:00"),
+                programmpunkt("Einlass", "2026-07-04 17:00:00"),
+                programmpunkt("Feuerwerk", "2026-07-04 22:30:00"),
+            ],
+            ..Default::default()
+        };
+        let p = planen(&b, &paket, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        let z = p.vorschau.zaehlung;
+        assert_eq!(z.programmpunkte_neu, 2);
+        assert_eq!(z.programmpunkte_vorhanden, 1);
+        assert_eq!(z.aenderungen, 2);
+        assert!(p.uebernehmbar());
+        assert_eq!(
+            p.programmpunkte,
+            [
+                programmpunkt("Einlass", "2026-07-04 17:00:00"),
+                programmpunkt("Feuerwerk", "2026-07-04 22:30:00"),
+            ]
+        );
+        assert_eq!(
+            etb_text("Planung „Konzert“ übernommen", &z),
+            "Planung „Konzert“ übernommen: 2 Programmpunkte neu."
+        );
+    }
+
+    /// Mehr als `PROGRAMMPUNKTE_MAX` sperren das Übernehmen; genau so viele gehen.
+    #[test]
+    fn programmpunkte_ueber_der_grenze_sind_ein_fehler() {
+        let max = crate::programmpunkt::PROGRAMMPUNKTE_MAX;
+        let mut b = bestand();
+        b.programmpunkte = (1..max)
+            .map(|i| (format!("Punkt {i}"), "2026-07-04 12:00:00".to_string()))
+            .collect();
+        let eins = PlanPaket {
+            programmpunkte: vec![programmpunkt("Feuerwerk", "2026-07-04 22:30:00")],
+            ..Default::default()
+        };
+        let p = planen(&b, &eins, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        assert!(p.uebernehmbar(), "{max} gehen");
+        let zwei = PlanPaket {
+            programmpunkte: vec![
+                programmpunkt("Feuerwerk", "2026-07-04 22:30:00"),
+                programmpunkt("Zugabe", "2026-07-04 23:00:00"),
+            ],
+            ..Default::default()
+        };
+        let p = planen(&b, &zwei, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        assert!(!p.uebernehmbar());
+        assert_eq!(p.vorschau.meldungen[0].stufe, MeldungStufe::Fehler);
     }
 }

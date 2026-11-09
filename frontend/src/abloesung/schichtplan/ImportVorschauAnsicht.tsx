@@ -48,6 +48,13 @@ export function zaehlungMarken(z: SchichtplanImportZaehlung): string[] {
   if (z.helfer_neu > 0) marken.push(`${mehrzahl(z.helfer_neu, 'Helfer', 'Helfer')} neu`);
   if (z.einheiten_neu > 0) marken.push(`${mehrzahl(z.einheiten_neu, 'Einheit', 'Einheiten')} neu`);
   if (z.uhs_neu > 0) marken.push(`${mehrzahl(z.uhs_neu, 'UHS', 'UHS')} neu`);
+  // Nur aus der Vorplanung (LLH-1583); eine Datei bringt keine Programmpunkte.
+  if (z.programmpunkte_neu > 0)
+    marken.push(`${mehrzahl(z.programmpunkte_neu, 'Programmpunkt', 'Programmpunkte')} neu`);
+  if (z.programmpunkte_vorhanden > 0)
+    marken.push(
+      `${mehrzahl(z.programmpunkte_vorhanden, 'Programmpunkt', 'Programmpunkte')} vorhanden`,
+    );
   return marken;
 }
 
