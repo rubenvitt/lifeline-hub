@@ -7,7 +7,7 @@
 ## 2. Raster und Liste (D3, D4)
 
 - [x] 2.1 `raster.test.ts` (rot): `pruefeZug` antwortet für eine Zeile mit `entfallen` `keine-zeile`. `RasterZeile.entfallen` in `raster.ts`, `pruefeZug` anpassen.
-- [x] 2.2 `SchichtplanRaster.tsx`: entfallene Zeile gedämpft mit „(entfallen)“, kein Aufziehen in ihr; Rückruf `onZug(laeuft)` beim Beginn (ab der Schwelle) und Ende eines Zugs. Test in einer neuen oder vorhandenen Raster-Testdatei, soweit jsdom es trägt (Titel, kein `pointerdown`-Anlegen).
+- [x] 2.2 `SchichtplanRaster.tsx`: entfallene Zeile gedämpft mit „(entfallen)“, kein Aufziehen in ihr; Rückruf `onZug(laeuft)` schon beim Druck und beim Ende eines Zugs. Test in einer neuen oder vorhandenen Raster-Testdatei, soweit jsdom es trägt (Titel, kein `pointerdown`-Anlegen).
 - [x] 2.3 `SchichtplanListe.tsx`: entfallene Zeile gedämpft mit „(entfallen)“ und „—“.
 
 ## 3. Hülle mit Banner (D1, D5)
@@ -28,8 +28,8 @@
 
 ## 6. Regeln und Doku
 
-- [ ] 6.1 `frontend/src/kraefte/AGENTS.md`, Absatz Schichtplan: Zeilenschleuse über `SchichtplanSchleuse` (eine Hülle für Einsatz und Vorplanung), Blöcke fließen direkt, entfallene Zeile, Bedingungen.
-- [ ] 6.2 Anwenderdoku: `docs/anwender/kapitel/abloesung.md` („Den Schichtplan führen“) und `vorplanung.md` je ein Absatz zum Banner; `quellen:` um die neuen Dateien ergänzen; Wächter der Anwenderdoku grün.
+- [x] 6.1 `frontend/src/kraefte/AGENTS.md`, Absatz Schichtplan: Zeilenschleuse über `SchichtplanSchleuse` (eine Hülle für Einsatz und Vorplanung), Blöcke fließen direkt, entfallene Zeile, Bedingungen.
+- [x] 6.2 Anwenderdoku: `docs/anwender/kapitel/abloesung.md` („Den Schichtplan führen“) und `vorplanung.md` je ein Absatz zum Banner; `quellen:` um die neuen Dateien ergänzen; Wächter der Anwenderdoku grün.
 
 ## 7. Abschluss
 

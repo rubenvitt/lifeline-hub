@@ -134,3 +134,113 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await zeile.getByRole('link', { name }).click();
   await expect(page).toHaveURL(new RegExp(`/planungen/${planungId}$`));
 });
+
+// ── Zeilenschleuse (LLH-1604) ──────────────────────────────────────────────────────────────────
+
+const zwei = (n: number) => String(n).padStart(2, '0');
+
+/** Wire-Zeit des Servers (`YYYY-MM-DD HH:mm:ss`, UTC), wie `alsBackendZeit`. */
+function wireZeit(d: Date): string {
+  return (
+    `${d.getUTCFullYear()}-${zwei(d.getUTCMonth() + 1)}-${zwei(d.getUTCDate())} ` +
+    `${zwei(d.getUTCHours())}:${zwei(d.getUTCMinutes())}:00`
+  );
+}
+
+/** Eine Woche voraus zur lokalen Wanduhr `stunde:00` (Browser und Lauf teilen die Zeitzone). */
+function wocheVorausUm(stunde: number): string {
+  const d = new Date(Date.now() + 7 * 24 * 3_600_000);
+  d.setHours(stunde, 0, 0, 0);
+  return wireZeit(d);
+}
+
+async function sende<T>(page: Page, methode: 'post' | 'put', pfad: string, data: unknown) {
+  const r = await page.request[methode](pfad, { data });
+  expect(r.ok(), `${methode} ${pfad}: ${r.status()} ${await r.text()}`).toBeTruthy();
+  return (await r.json()) as T;
+}
+
+interface PlanungAntwort {
+  kopf: { id: number };
+  posten: { id: number; bezeichnung: string }[];
+}
+
+/**
+ * Kriterium 12 der Prüfliste (LLH-1586) für die Zeilen, Spec `vorplanung`, „Raster der Planung
+ * ohne Sprung“: ein fremder Posten, der VOR den anderen einsortiert wird, schiebt nichts unter dem
+ * Zeiger. Er wartet hinter dem Sammelbanner; „anzeigen“ stellt ihn an die erste Stelle.
+ *
+ * Gesät per API (eigener Seed, LLH-1595 bringt dafür später `planung-kern.ts`): zwei Posten ohne
+ * Abschnitt mit je einem Block 08–12 Uhr eine Woche voraus. Der Zeiger steht über dem Block der
+ * letzten Postenzeile; der „andere Schirm“ ist `page.request` mit demselben Konto.
+ */
+test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, nichts springt', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+  const bezeichnung = `E2E Planung Schleuse ${Date.now()}`;
+  const p = await sende<PlanungAntwort>(page, 'post', '/api/planungen', {
+    bezeichnung,
+    von: wocheVorausUm(6),
+    bis: wocheVorausUm(22),
+  });
+  const id = p.kopf.id;
+  const postenIds: number[] = [];
+  for (const name of ['RTW 1', 'RTW 2']) {
+    const a = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+      bezeichnung: name,
+      art: 'einheit',
+    });
+    const postenId = a.posten.find((x) => x.bezeichnung === name)!.id;
+    postenIds.push(postenId);
+    await sende(page, 'post', `/api/planungen/${id}/bloecke`, {
+      posten_id: postenId,
+      von: wocheVorausUm(8),
+      bis: wocheVorausUm(12),
+    });
+  }
+
+  // Der Org-Strom abonniert erst mit der Antwort auf `/api/live` (wie LLH-1317 für den Einsatz).
+  const strom = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/live');
+  await page.goto(`/planungen/${id}`);
+  await strom;
+  await expect(page.getByRole('heading', { level: 1, name: bezeichnung })).toBeVisible();
+  const bloecke = page.locator('[data-lfh="schichtplan-block"]');
+  await expect(bloecke).toHaveCount(2);
+
+  const zeilen = page.locator('[data-lfh="schichtplan-zeile"]');
+  const unterZeiger = page
+    .locator(`[data-lfh="schichtplan-zeile"][data-raster-zeile="einheit:${postenIds[1]}"]`)
+    .locator('[data-lfh="schichtplan-block"]');
+  await unterZeiger.hover();
+  const vorher = (await unterZeiger.boundingBox())!;
+
+  // Der andere Schirm legt „KTW 9“ an und setzt ihn an die erste Stelle.
+  const neu = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
+    bezeichnung: 'KTW 9',
+    art: 'einheit',
+  });
+  const ktw = neu.posten.find((x) => x.bezeichnung === 'KTW 9')!.id;
+  await sende(page, 'put', `/api/planungen/${id}/posten/reihenfolge`, {
+    posten_ids: [ktw, ...postenIds],
+  });
+
+  const banner = page.locator('[data-lfh="schichtplan-schleuse"] [data-lfh="sammelbanner"]');
+  await expect(banner, 'der neue Posten wartet hinter dem Banner').toContainText('1 neuer Posten');
+  await expect(zeilen.first()).toHaveAttribute('data-raster-zeile', `einheit:${postenIds[0]}`);
+  const nachher = (await unterZeiger.boundingBox())!;
+  expect(
+    { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },
+    'der Block unter dem Zeiger bleibt, wo er war',
+  ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
+
+  await banner.getByRole('button', { name: 'anzeigen' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(zeilen.first(), 'nach „anzeigen“ steht der neue Posten vorn').toHaveAttribute(
+    'data-raster-zeile',
+    `einheit:${ktw}`,
+  );
+  await expect(zeilen).toHaveCount(4); // KTW 9, RTW 1, RTW 2, Pause
+});

@@ -2,7 +2,7 @@
 titel: Vorplanung
 gruppen: [fuehrung, administration]
 reihenfolge: 380
-quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md]
+quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanSchleuse.tsx, frontend/src/abloesung/schichtplan/zeilenSchleuse.ts, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md]
 ---
 
 ## Überblick
@@ -108,5 +108,9 @@ Eine Planung wird 90 Tage nach ihrem Ende gelöscht. Ab 14 Tagen vorher nennt di
 Lesen und schreiben dürfen nur der System-Admin und die Führungskräfte der Organisation; allen
 anderen fehlt „Planungen“ in der Kopfleiste, und der Server lehnt ab. Planungen einer anderen
 Organisation gibt es für niemanden. Was jemand an einer Planung ändert, sehen alle, die sie offen
-haben, ohne neu zu laden. Die Vorplanung gehört nicht zu dem, was die App für die Arbeit ohne Netz
+haben, ohne neu zu laden. Blöcke stehen sofort in ihrer Zeile; neue, entfallene und umsortierte
+Posten warten dagegen, solange die Maus über dem Schichtplan steht, der Fokus darin liegt, gezogen
+wird oder ein Dialog offen ist. Ein Hinweis über dem Raster nennt sie, etwa „1 neuer Posten“, und
+„anzeigen“ übernimmt sie; ein entfallener Posten steht bis dahin als leere Zeile mit „(entfallen)“.
+Die Vorplanung gehört nicht zu dem, was die App für die Arbeit ohne Netz
 vorhält (Kapitel [Ohne Netz](ohne-netz.md)).
