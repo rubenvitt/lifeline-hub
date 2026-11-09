@@ -745,6 +745,26 @@ describe('LFH-681: Mehrfeld-Dialoge vergleichen dreiseitig', () => {
     };
     expect(stellePatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ status: 'geschlossen' });
   });
+
+  it('LLH-1612: die Belegungsart geht nur bei eigenem Wechsel hinaus, fehlt sie im Formular, bleibt sie', () => {
+    const gezaehlt = stelle({ belegungsart: 'gezaehlt' });
+    const w = {
+      bezeichnung: 'Turnhalle Ost',
+      art: 'notunterkunft' as const,
+      kapazitaet_personen: 150,
+    };
+    expect(stellePatchDreiseitig(gezaehlt, gezaehlt, w)).toEqual({});
+    expect(
+      stellePatchDreiseitig(gezaehlt, gezaehlt, { ...w, belegungsart: 'namentlich' as const }),
+    ).toEqual({ belegungsart: 'namentlich' });
+    // Schon fremd auf namentlich gestellt: nichts mehr zu senden.
+    expect(
+      stellePatchDreiseitig(gezaehlt, stelle({ belegungsart: 'namentlich' }), {
+        ...w,
+        belegungsart: 'namentlich' as const,
+      }),
+    ).toEqual({});
+  });
 });
 
 describe('StelleAnlegenDialog', () => {

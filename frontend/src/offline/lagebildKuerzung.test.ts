@@ -51,6 +51,10 @@ const ERWARTET_BEHALTEN = [
   'rtw_angefordert',
   'anlass',
   'rettungsmittel',
+  // LLH-1612: Haushalt (Verweis) und Kostform (Katalogwert) halten die Registrierliste ohne Netz.
+  'haushalt_id',
+  'haushalt_nummer',
+  'kostform',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -64,6 +68,8 @@ const ERWARTET_AUSGELASSEN = [
   'transport_fachrichtung',
   'transport_at',
   'anlass_at',
+  // LLH-1612: Freitext und Gesundheitsangabe.
+  'unvertraeglichkeiten',
 ].sort();
 
 /** Eine Person mit JEDEM Feld gesetzt — ein ausgelassenes Feld fiele sonst nicht auf. */
@@ -124,6 +130,10 @@ const VOLL: Person = {
     rufnamen: ['RTW 1/83-1'],
     leitstelle_einsatznummer: '2611-0815',
   },
+  haushalt_id: 3,
+  haushalt_nummer: 1,
+  kostform: 'vegetarisch',
+  unvertraeglichkeiten: 'Erdnüsse',
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {
@@ -176,6 +186,8 @@ describe('lagebildKuerzen', () => {
       // LLH-1573: Rufnamen (Freitext) und Einsatznummer der Leitstelle bleiben vom Gerät fern.
       'RTW 1/83-1',
       '2611-0815',
+      // LLH-1612: Unverträglichkeiten sind eine Gesundheitsangabe.
+      'Erdnüsse',
     ]) {
       expect(text).not.toContain(wert);
     }

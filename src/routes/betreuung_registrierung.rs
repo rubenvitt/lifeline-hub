@@ -25,7 +25,7 @@ use serde::Deserialize;
 use crate::app::AppState;
 use crate::betreuung::registrierung::{
     self, AbmeldeEingabe, AbmeldungAnzeige, HaushaltAnzeige, KostformZaehlung, RegistrierEingabe,
-    RegistrierListe, RegistrierPerson, Registriert, REGISTRIERUNG_PERSONEN_MAX,
+    RegistrierListe, RegistrierPerson, Registriert, ABMELDUNG_ZIEL_MAX, REGISTRIERUNG_PERSONEN_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe};
@@ -293,7 +293,7 @@ pub async fn abmelden(
         }
     }
     ctx.fordere_aktiv()?;
-    let ziel = optional_max(body.ziel, "Ziel", PERSON_ANGABE_MAX.min(200))?;
+    let ziel = optional_max(body.ziel, "Ziel", ABMELDUNG_ZIEL_MAX)?;
     let zeitpunkt_at = support::erfassungszeitpunkt(
         body.zeitpunkt_at.as_deref(),
         chrono::Utc::now(),

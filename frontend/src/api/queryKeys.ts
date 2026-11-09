@@ -99,6 +99,10 @@ export const EINSATZ_KEYS = {
   // `einheit`, `personal`, `fahrzeug` oder `abloesung` ohnehin sendet.
   kraefteZeitachse: 'einsatz-kraefte-zeitachse',
   betreuung: 'einsatz-betreuung',
+  // Registrierliste einer Betreuungsstelle (LLH-1612): eigener Prefix, damit sie NICHT mit der
+  // Betreuung auf die Platte geht (Namen, Geburtsdaten, Unverträglichkeiten). Live über
+  // `betreuung` (Registrieren, Abmelden) und `person` (Kostform, Verbleib, Storno).
+  registrierliste: 'einsatz-registrierliste',
   // Evakuierungsbezirke (LLH-1034): eigenes Modul neben der Betreuung, eigener Prefix.
   evakuierung: 'einsatz-evakuierung',
   verpflegung: 'einsatz-verpflegung',
@@ -301,6 +305,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.betreuung,
     EINSATZ_KEYS.personAnhaenge,
     EINSATZ_KEYS.personenTransportmittel,
+    // Registrierliste (LLH-1612): Kostform, Verbleib oder Storno einer Person ändert sie.
+    EINSATZ_KEYS.registrierliste,
   ],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
@@ -375,7 +381,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // trifft. Nutzlast nur Kennungen. Den Modulzähler rechnet der Client aus der Übersicht
   // (`ClientZaehlerQuelle`), er hängt am selben Prefix. Dazu die Verpflegung (LLH-1295): ihre
   // Empfängerliste trägt die Betreuungsstellen, und ein Storno löst den Bezug von Ausgaben.
-  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung],
+  // Registrieren und Abmelden (LLH-1612) senden `betreuung` mit der Stelle: die Registrierliste
+  // hängt mit daran.
+  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung, EINSATZ_KEYS.registrierliste],
   // Bezirke und ihre Standreihen (LLH-1034), wie `betreuung`. Die Kennzahl „Evakuiert“ und der
   // Modulzähler lesen dieselbe Übersicht.
   evakuierung: [EINSATZ_KEYS.evakuierung],
@@ -841,6 +849,15 @@ export const einsatzKeys = {
    *  und jede eigene Mutation treffen den offenen Verlauf mit. */
   betreuungVerlauf: (einsatzId: number, stelleId: number) =>
     [EINSATZ_KEYS.betreuung, einsatzId, 'verlauf', stelleId] as const,
+  /** Kostformen der Registrierten ohne Personenbezug (LLH-1612), Sub-Key unter dem
+   *  Betreuungs-Prefix: nur Zahlen, darf mit der Betreuung auf die Platte. */
+  betreuungKostformen: (einsatzId: number) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'kostformen'] as const,
+  /** Registrierliste einer Stelle (LLH-1612). */
+  registrierliste: (einsatzId: number, stelleId: number) =>
+    [EINSATZ_KEYS.registrierliste, einsatzId, stelleId] as const,
+  /** Invalidierungs-Prefix aller Registrierlisten des Einsatzes. */
+  registrierlisteAlle: (einsatzId: number) => [EINSATZ_KEYS.registrierliste, einsatzId] as const,
   // Evakuierung (LLH-1034): argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und
   // Kennzahl „Evakuiert“ teilen ihn).
   evakuierung: (einsatzId: number) => [EINSATZ_KEYS.evakuierung, einsatzId] as const,

@@ -21,18 +21,18 @@
 
 ## 4. Oberfläche
 
-- [ ] 4.1 API-Client und Query-Keys (`api/betreuung.ts`, `einsatzKeys`), Offline-Arten `registrierung` und `abmeldung` in `offline/schreiben.ts` mit `client_id` und Erfassungszeit, Räumung beim Abgleich. Nachweis: Vitest analog zu `offline/standReplay.test.tsx`.
-- [ ] 4.2 Maske „Registrieren“ (`betreuung/registrierung/`): Haushaltsangaben oben, je Person eine Zeile (ab `md` Raster mit Spaltenkopf, schmal Block in zwei Spalten), nichts eingeklappt, sichtbare Beschriftungen, Tab-Reihenfolge und Fokusführung bei „Person hinzufügen“/„Entfernen“, Kostform als Radiogruppe mit Pfeiltasten, Fehler per `aria-describedby`, Hinweis bei Unverträglichkeit und Normalkost, Sperrgrund ohne Schreibrecht oder bei geschlossener Stelle. Nachweis: Vitest „Haushaltsangaben einmal“, „Zweite Person übernimmt den Nachnamen“, „Nichts eingeklappt“ (inkl. Tab-Folge), axe-Prüfung der Maske ohne Befund; Playwright bei 390 px ohne waagerechten Bildlauf und im Handschuh-Modus mit Trefferhöhe.
-- [ ] 4.3 Registrierliste mit Band „Kostformen“, Haushalte aufklappbar, Abmelden mit Rückfrage für den Haushalt, vorgemerkte Einträge, Grund ohne Personenrecht; eingebaut in `BetreuungsstelleDetailPage` und `GeraetBetreuungsstellePage`. Nachweis: Vitest „Liste mit Band“, „Ohne Personenrecht“, Abmelden.
-- [ ] 4.4 Belegungsart im Datenraster der Stelle; „Belegung melden“ an namentlicher Stelle gesperrt mit Grund; Meldeverlauf zeigt Herkunft „Registrierung“ ohne „Zurücknehmen“. Nachweis: Vitest an `MeldeVerlauf` und `StelleBelegung`.
-- [ ] 4.5 Personen-Detail: Kostform und Unverträglichkeiten als `InlineAngabe`, Lesezeile Haushalt. Nachweis: Vitest an `Personendaten`.
-- [ ] 4.6 Verpflegung: `useBedarfsvorschlag` mit Quelle `sonderkost`, Vorbelegung der Sonderkost-Felder in `VerpflegungDialoge.tsx` mit `beruehrt`-Schutz und Hinweis. Nachweis: Vitest „Sonderkost aus der Registrierung“ und „Keine Registrierten“.
-- [ ] 4.7 e2e: Familie an der Stelle registrieren (Desktop und 390 px), Belegung der namentlichen Stelle steigt, Zeitfenster schlägt Sonderkost vor. Nachweis: neue Spec unter `frontend/e2e/` grün.
+- [x] 4.1 API-Client und Query-Keys (`api/betreuung.ts`, `einsatzKeys`), Offline-Arten `registrierung` und `abmeldung` in `offline/schreiben.ts` mit `client_id` und Erfassungszeit, Räumung beim Abgleich. Nachweis: Vitest analog zu `offline/standReplay.test.tsx`.
+- [x] 4.2 Maske „Registrieren“ (`betreuung/registrierung/`): Haushaltsangaben oben, je Person eine Zeile (ab `md` Raster mit Spaltenkopf, schmal Block in zwei Spalten), nichts eingeklappt, sichtbare Beschriftungen, Tab-Reihenfolge und Fokusführung bei „Person hinzufügen“/„Entfernen“, Kostform als Radiogruppe mit Pfeiltasten, Fehler per `aria-describedby`, Hinweis bei Unverträglichkeit und Normalkost, Sperrgrund ohne Schreibrecht oder bei geschlossener Stelle. Nachweis: Vitest „Haushaltsangaben einmal“, „Zweite Person übernimmt den Nachnamen“, „Nichts eingeklappt“ (inkl. Tab-Folge), axe-Prüfung der Maske ohne Befund; Playwright bei 390 px ohne waagerechten Bildlauf und im Handschuh-Modus mit Trefferhöhe.
+- [x] 4.3 Registrierliste mit Band „Kostformen“, Haushalte aufklappbar, Abmelden mit Rückfrage für den Haushalt, vorgemerkte Einträge, Grund ohne Personenrecht; eingebaut in `BetreuungsstelleDetailPage` und `GeraetBetreuungsstellePage`. Nachweis: Vitest „Liste mit Band“, „Ohne Personenrecht“, Abmelden.
+- [x] 4.4 Belegungsart im Datenraster der Stelle; „Belegung melden“ an namentlicher Stelle gesperrt mit Grund; Meldeverlauf zeigt Herkunft „Registrierung“ ohne „Zurücknehmen“. Nachweis: Vitest an `MeldeVerlauf` und `StelleBelegung`.
+- [x] 4.5 Personen-Detail: Kostform und Unverträglichkeiten als `InlineAngabe`, Lesezeile Haushalt. Nachweis: Vitest an `Personendaten`.
+- [x] 4.6 Verpflegung: `useBedarfsvorschlag` mit Quelle `sonderkost`, Vorbelegung der Sonderkost-Felder in `VerpflegungDialoge.tsx` mit `beruehrt`-Schutz und Hinweis. Nachweis: Vitest „Sonderkost aus der Registrierung“ und „Keine Registrierten“.
+- [x] 4.7 e2e: Familie an der Stelle registrieren (Desktop und 390 px), Belegung der namentlichen Stelle steigt, Zeitfenster schlägt Sonderkost vor. Nachweis: neue Spec unter `frontend/e2e/` grün.
 
 ## 5. Regeln, Doku, Gate
 
-- [ ] 5.1 `frontend/src/betreuung/AGENTS.md`: Absatz „Registrierstelle“ (D1–D8 als Regeln, eine Wahrheit „in Betreuung“ auch bei namentlicher Führung); Verweis in `frontend/src/personen/AGENTS.md`. Nachweis: Prettier grün, `scripts/adr-fuer.sh` für die berührten Pfade geprüft.
-- [ ] 5.2 Anwenderdoku `docs/anwender/kapitel/betreuung.md`, `geraet-betreuungsstelle.md`, `verpflegung.md`, `betroffene.md` samt Bildern im Bildlauf (Regeln `docs/anwender/AGENTS.md`). Nachweis: Doku-Wächter grün.
+- [x] 5.1 `frontend/src/betreuung/AGENTS.md`: Absatz „Registrierstelle“ (D1–D8 als Regeln, eine Wahrheit „in Betreuung“ auch bei namentlicher Führung); Verweis in `frontend/src/personen/AGENTS.md`. Nachweis: Prettier grün, `scripts/adr-fuer.sh` für die berührten Pfade geprüft.
+- [x] 5.2 Anwenderdoku `docs/anwender/kapitel/betreuung.md`, `geraet-betreuungsstelle.md`, `verpflegung.md`, `betroffene.md` samt Bildern im Bildlauf (Regeln `docs/anwender/AGENTS.md`). Nachweis: Doku-Wächter grün.
 - [ ] 5.3 `./scripts/check-all.sh` grün; Bilder der Änderung für PR und Meldung.
 
 ## Workflow follow-up

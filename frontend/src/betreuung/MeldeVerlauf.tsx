@@ -162,7 +162,10 @@ export default function MeldeVerlauf({
       <ol style={{ margin: 0, padding: 0 }}>
         {abfrage.data.map((z) => {
           const zurueck = z.zurueckgenommen_at != null;
+          // Vom Server aus der Registrierung gemeldet (LLH-1612): Herkunft als Wort, keine Rücknahme.
+          const ausRegistrierung = z.quelle === 'registrierung';
           const hinweise = [
+            ausRegistrierung && <span key="herkunft">Herkunft Registrierung</span>,
             istNachgetragenMeldung(z) && (
               <span key="nachtrag">
                 <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
@@ -195,7 +198,7 @@ export default function MeldeVerlauf({
               }
               verfasser={z.erfasst_von}
               aktionen={
-                darfZuruecknehmen && !zurueck ? (
+                darfZuruecknehmen && !zurueck && !ausRegistrierung ? (
                   // Neutral: rot ist erst der Bestätigungsknopf; drei rote Knöpfe untereinander machten aus einer
                   // Liste eine Alarmfläche.
                   <Button

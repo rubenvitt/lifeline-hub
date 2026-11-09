@@ -22,6 +22,9 @@ use crate::verpflegung::Sonderkost;
 /// Höchstzahl der Personen je Registrierung (Spec `betreuung-registrierung`).
 pub const REGISTRIERUNG_PERSONEN_MAX: usize = 30;
 
+/// Höchstlänge des Ziels einer Abmeldung (Spec „Abmelden“), nach dem Trimmen.
+pub const ABMELDUNG_ZIEL_MAX: usize = 200;
+
 /// Eine Person in der Registrierung; Freitexte getrimmt und begrenzt, Geburtsdatum geprüft.
 #[derive(Debug, Clone)]
 pub struct RegistrierPerson {

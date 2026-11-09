@@ -438,5 +438,8 @@ async fn registrieren_ist_live_ohne_namen() {
     let (s, _) = post(&app, &admin, &reg(e, sid), familie(Some("live-1"))).await;
     assert_eq!(s, StatusCode::CREATED);
     let roh = sse_anfang_lesen(feed.into_body(), 300).await;
-    assert!(!roh.contains("event: betreuung"), "Replay verteilt nichts: {roh:?}");
+    assert!(
+        !roh.contains("event: betreuung"),
+        "Replay verteilt nichts: {roh:?}"
+    );
 }

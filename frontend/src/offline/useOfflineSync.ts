@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { meldeBelegung } from '../api/betreuung';
+import { sendAbmeldung, sendRegistrierung } from '../api/betreuungRegistrierung';
 import { meldeStand } from '../api/evakuierung';
 import {
   markiereBenachrichtigungenGelesen,
@@ -168,6 +169,29 @@ export function useOfflineSync(benutzerId?: number): void {
                   : einsatzKeys.betreuung(element.wert.einsatz_id),
             });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+          } else if (aktion.art === 'registrierung' || aktion.art === 'abmeldung') {
+            // LLH-1612: der ganze Haushalt bzw. die Abmeldung als EIN Request mit derselben
+            // `client_id`; nach einer abgerissenen Antwort liefert der Server den ersten Stand,
+            // auch nach dem Einsatzende. Ablehnungen (Stelle geschlossen 422, storniert 409,
+            // Rechte 403) gehen unten in den Wiederherstellungsbereich.
+            const einsatzId = element.wert.einsatz_id;
+            const optionen = { offlineQueueBenutzerId: aktuellerBenutzerId };
+            if (aktion.art === 'registrierung') {
+              await sendRegistrierung(einsatzId, aktion.stelle_id, aktion.daten, optionen);
+            } else {
+              await sendAbmeldung(einsatzId, aktion.stelle_id, aktion.daten, optionen);
+            }
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Die Liste trägt den Haushalt, BEVOR „vorgemerkt“ verschwindet (wie beim Eintreffen).
+            // Der Abruf wirft nicht.
+            await qc.invalidateQueries({
+              queryKey: einsatzKeys.registrierliste(einsatzId, aktion.stelle_id),
+            });
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personenAuswahl(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
           } else if (aktion.art === 'ausgabe') {
             // LFH-688, design.md D7: das bestätigte Zeitfenster steht im Cache, BEVOR die
             // ausstehende Zeile verschwindet — sonst fehlte die Ausgabe einen Takt lang auf der

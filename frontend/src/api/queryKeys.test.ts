@@ -60,6 +60,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.personAnhaenge,
       // Bisher verwendete Rettungsmittel (LLH-1332).
       EINSATZ_KEYS.personenTransportmittel,
+      // Registrierliste der Betreuungsstelle (LLH-1612): Kostform, Verbleib, Storno.
+      EINSATZ_KEYS.registrierliste,
     ]);
   });
 
@@ -126,6 +128,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.betreuung).toEqual([
       EINSATZ_KEYS.betreuung,
       EINSATZ_KEYS.verpflegung,
+      // Registrieren und Abmelden senden `betreuung` (LLH-1612).
+      EINSATZ_KEYS.registrierliste,
     ]);
   });
 
@@ -939,5 +943,35 @@ describe('einsatzKeys.einheitAusVorlage (LLH-1049)', () => {
 
   it('steht nicht im Lagebild offline: Bilden geht nur mit Server', () => {
     expect(istLagebildOfflineKey(einsatzKeys.einheitAusVorlage(1, 7))).toBe(false);
+  });
+});
+
+describe('Registrierliste und Kostformen (LLH-1612)', () => {
+  it('baut die Keys mit handgeschriebenem Prefix', () => {
+    expect(EINSATZ_KEYS.registrierliste).toBe('einsatz-registrierliste');
+    expect(einsatzKeys.registrierliste(1, 8)).toEqual(['einsatz-registrierliste', 1, 8]);
+    expect(einsatzKeys.registrierlisteAlle(1)).toEqual(['einsatz-registrierliste', 1]);
+    expect(einsatzKeys.betreuungKostformen(1)).toEqual(['einsatz-betreuung', 1, 'kostformen']);
+  });
+
+  it('die Registrierliste steht nicht im Lagebild offline, die Kostformen (nur Zahlen) schon', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.registrierliste(1, 8))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.betreuungKostformen(1))).toBe(true);
+  });
+
+  // `new QueryClient()`: siehe `einsatzKeys.schadenAnhaenge`.
+  it('betreuung und person treffen die Registrierliste des Einsatzes, keine fremde', async () => {
+    for (const ereignis of ['betreuung', 'person'] as const) {
+      const qc = new QueryClient();
+      qc.setQueryData(['einsatz-registrierliste', 1, 8], {});
+      qc.setQueryData(['einsatz-registrierliste', 9, 8], {});
+      for (const prefix of EINSATZ_STREAM_EVENTS[ereignis]) {
+        await qc.invalidateQueries({ queryKey: [prefix, 1] });
+      }
+      expect(qc.getQueryState(['einsatz-registrierliste', 1, 8])?.isInvalidated, ereignis).toBe(
+        true,
+      );
+      expect(qc.getQueryState(['einsatz-registrierliste', 9, 8])?.isInvalidated).toBe(false);
+    }
   });
 });

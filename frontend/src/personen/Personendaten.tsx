@@ -11,9 +11,21 @@ import {
   type PersonFeld,
   type PersonFeldEingabe,
 } from '../api/einsatzPerson';
-import { PERSON_ANGABE_MAX, PERSON_NAME_MAX, PERSON_NOTIZ_MAX } from '../api/eingabegrenzen';
+import {
+  PERSON_ANGABE_MAX,
+  PERSON_NAME_MAX,
+  PERSON_NOTIZ_MAX,
+  PERSON_UNVERTRAEGLICHKEITEN_MAX,
+} from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person, PersonDetail } from '../api/types';
+import type { Person, PersonDetail, PersonKostform } from '../api/types';
+import { Link } from 'react-router';
+import {
+  KOSTFORM_REIHE,
+  KOSTFORM_WORT,
+  haushaltKennung,
+} from '../betreuung/registrierung/registrierKern';
+import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { formatKalenderdatum, parseKalenderdatum } from '../anzeige/kalenderdatum';
 import { Ortsfeld } from '../anzeige/Ortsfeld';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -70,10 +82,16 @@ dayjs.extend(utc);
  *   folgt ihr auf ihren neuen Auslöser, statt auf `<body>` zu fallen.
  *
  * „Zustand / Verdacht“, PAT-Nummer und Kontamination stehen nur im Patientenkopf.
+ *
+ * Kostform und Unverträglichkeiten (LLH-1612) sind Angaben wie die übrigen; der Haushalt der
+ * Registrierstelle ist eine Lesezeile über dem Raster, mit Sprung zur Stelle des Verbleibs, wo es
+ * eine Stellenseite gibt (nicht am Gerät).
  */
 
 /** Wie das Backend: „vermisst seit“ höchstens fünf Minuten in der Zukunft (vorgehende Uhr). */
 const ZUKUNFT_TOLERANZ_MS = 5 * 60_000;
+
+const KOSTFORM_OPTIONEN = KOSTFORM_REIHE.map((k) => ({ value: k, label: KOSTFORM_WORT[k] }));
 
 const GESCHLECHT_OPTIONEN = (
   Object.entries(GESCHLECHT_WORT) as [keyof typeof GESCHLECHT_WORT, string][]
@@ -243,6 +261,7 @@ function PersonendatenInhalt({
   const { token, rollen } = useRollen();
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
+  const pfade = useEinsatzPfade();
   const { zone } = useZeitEingabe();
   const { zeitpunkt } = useAnzeigeKonventionen();
   const ohneNetz = useOhneVerbindung();
@@ -356,7 +375,14 @@ function PersonendatenInhalt({
   const gemeinsam = { person, schreiben };
 
   const textFeld = (
-    feld: 'name' | 'vorname' | 'herkunft_adresse' | 'antreff_ort' | 'melder_kontakt' | 'notiz',
+    feld:
+      | 'name'
+      | 'vorname'
+      | 'herkunft_adresse'
+      | 'antreff_ort'
+      | 'melder_kontakt'
+      | 'notiz'
+      | 'unvertraeglichkeiten',
     etikett: string,
     max: number,
     breit = false,
@@ -443,6 +469,36 @@ function PersonendatenInhalt({
             options={GESCHLECHT_OPTIONEN}
             onChange={(w) => onChange(w ?? null)}
             style={{ minWidth: 200 }}
+          />
+        )}
+      />
+    ),
+  };
+
+  const kostform: Angabe = {
+    etikett: 'Kostform',
+    isLeer: !person.kostform,
+    lesen: person.kostform ? KOSTFORM_WORT[person.kostform] : null,
+    schreiben: (inZeileOhneAngabe) => (
+      <PersonFeldAngabe<PersonKostform | null, 'kostform'>
+        {...gemeinsam}
+        feld="kostform"
+        etikett="Kostform"
+        inZeileOhneAngabe={inZeileOhneAngabe}
+        wert={person.kostform ?? null}
+        anzeige={person.kostform ? KOSTFORM_WORT[person.kostform] : null}
+        leer={(w) => !w}
+        zuWire={(w) => w ?? null}
+        text={(w) => (w ? KOSTFORM_WORT[w] : '')}
+        eingabe={({ feld: f, popup, value, onChange }) => (
+          <Select<PersonKostform>
+            {...f}
+            {...popup}
+            allowClear
+            value={value ?? undefined}
+            options={KOSTFORM_OPTIONEN}
+            onChange={(w) => onChange(w ?? null)}
+            style={{ minWidth: 220 }}
           />
         )}
       />
@@ -635,6 +691,8 @@ function PersonendatenInhalt({
     geschlecht,
     geburtsdatum,
     alter,
+    kostform,
+    textFeld('unvertraeglichkeiten', 'Unverträglichkeiten', PERSON_UNVERTRAEGLICHKEITEN_MAX, true),
     textFeld('herkunft_adresse', 'Herkunft / Adresse', PERSON_ANGABE_MAX, true),
     textFeld('antreff_ort', 'Fundort', PERSON_ANGABE_MAX),
     // Koordinate beschreibt eine angetroffene Person; „vermisst seit“ nur eine vermisste. Ein
@@ -654,8 +712,29 @@ function PersonendatenInhalt({
   // Ohne Schreibrecht steht die Koordinate leer nur mit Verorten-Weg im Raster; den gibt es ohne
   // Schreibrecht nicht.
 
+  const stellePfad =
+    pfade.betreuungsstelle && person.aktuelle_verbleib_betreuungsstelle_id != null
+      ? pfade.betreuungsstelle(einsatzId, person.aktuelle_verbleib_betreuungsstelle_id)
+      : null;
+
   return (
     <div ref={behaelterRef} data-lfh="personendaten">
+      {person.haushalt_nummer != null && (
+        // Lesezeile (LLH-1612): der Haushalt entsteht an der Registrierstelle und wechselt nicht hier.
+        <div data-lfh="haushalt-zeile" style={{ marginBottom: token.marginXS }}>
+          <span style={{ fontFamily: token.fontFamilyCode }}>
+            Haushalt {haushaltKennung(person.haushalt_nummer)}
+          </span>
+          {stellePfad && (
+            <>
+              {' · '}
+              <Link to={stellePfad}>
+                Zur Betreuungsstelle <span aria-hidden="true">↗</span>
+              </Link>
+            </>
+          )}
+        </div>
+      )}
       {grund && (
         <div id={grundId} data-lfh="personendaten-grund" style={{ color: rollen.text2 }}>
           {grund}

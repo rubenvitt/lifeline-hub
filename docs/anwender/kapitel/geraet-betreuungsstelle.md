@@ -2,7 +2,7 @@
 titel: Betreuungsstelle am Gerät
 gruppen: [geraete]
 reihenfolge: 730
-quellen: [frontend/src/geraet/GeraetBetroffenePage.tsx, frontend/src/geraet/GeraetBetreuungsstellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/StellenBlock.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/betreuung/registrierung/, frontend/src/geraet/GeraetBetroffenePage.tsx, frontend/src/geraet/GeraetBetreuungsstellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/StellenBlock.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -41,6 +41,19 @@ Wer die Stelle verlassen hat, steht in der Gruppe „Weitergezogen“ mit seinem
 Die Bestätigung lautet etwa „Erfasst als R-016 · untergebracht“: Die Person ist in dieser
 Betreuungsstelle untergebracht.
 
+### Haushalte registrieren und abmelden
+
+1. Unten „Stelle“ öffnen und oben „Registrierung“ wählen.
+2. „Registrieren“ wählen und den Haushalt eintragen: oben „Herkunft / Adresse“ und „Kontakt“, je
+   Person „Nachname“, die übrigen Angaben und die „Kostform“; „Person hinzufügen“ für jedes
+   weitere Mitglied.
+3. „Registrieren“ wählen. Der Haushalt steht danach in der Liste, das Band „Kostformen“ zählt
+   ihn mit.
+4. Zum Abmelden den Haushalt aufklappen und „Abmelden“ am Haushalt oder an einer Person wählen,
+   ein „Ziel“ angeben und bestätigen.
+
+Die Maske und die Liste sind dieselben wie auf der Seite der Stelle ([Betreuung](betreuung.md)).
+
 ### Belegung melden
 
 1. Unten „Stelle“ öffnen. Der Bereich „Belegung“ zeigt „Belegt“, „Kapazität“, „Frei“ und „Davon
@@ -55,6 +68,9 @@ Betreuungsstelle untergebracht.
 4. „Melden“ wählen. Die Bestätigung lautet „Belegung gemeldet: …“.
 
 Eine falsche Meldung lässt sich im Meldeverlauf zurücknehmen.
+
+Ist die Stelle namentlich geführt, ist „Belegung melden“ gesperrt („Belegung kommt aus der
+Registrierung“): Die Belegung ergibt sich aus den registrierten Personen.
 
 ### Meldung an die Einsatzleitung
 
@@ -81,5 +97,6 @@ geschlossen: Zurücknehmen gesperrt“.
 
 ### Ohne Netz
 
-Aufnahmen, Belegungsmeldungen und Meldungen merkt das Gerät ohne Netz vor und sendet sie nach
+Aufnahmen, Registrierungen, Abmeldungen, Belegungsmeldungen und Meldungen merkt das Gerät ohne
+Netz vor und sendet sie nach
 (siehe [Arbeiten ohne Netz](ohne-netz.md)).

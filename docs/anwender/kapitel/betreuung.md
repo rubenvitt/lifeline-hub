@@ -2,13 +2,15 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 530
-quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/]
+quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs]
 ---
 
 ## Überblick
 
 Das Modul „Betreuung“ führt die **Betreuungsstellen**: wie viele Personen dort untergebracht sind
-und wie viel Platz noch frei ist. Gezählt wird ohne Namen: Meldungen nennen nur Zahlen. Die
+und wie viel Platz noch frei ist. Eine Stelle wird entweder gezählt (Meldungen nennen nur
+Zahlen) oder namentlich geführt: Dann nimmt die **Registrierung** jeden Haushalt mit Namen und
+Kostform auf, und die Belegung ergibt sich daraus. Die
 Räumungsbezirke und den Stand „evakuiert“ führt das Modul „Evakuierung“
 ([Evakuierung](evakuierung.md)).
 
@@ -56,6 +58,40 @@ anlegen“.
    Berechtigung“.
 5. Unter „Verpflegung“ steht, wie viele der Personen „in Betreuung“ in dieser Stelle
    untergebracht sind; „Zur Verpflegung“ öffnet das Modul.
+
+### Einen Haushalt registrieren
+
+1. Auf der Seite der Stelle unter „Registrierung“ „Registrieren“ wählen.
+2. Unter „Haushalt“ einmal „Herkunft / Adresse“ und „Kontakt“ eintragen; beides gilt für jede
+   Person des Haushalts.
+3. Unter „Personen“ je Person „Nachname“ eintragen, dazu „Vorname“, „Geburtsdatum“,
+   „Geschlecht“ und „Unverträglichkeiten“, soweit bekannt. Unter „Kostform“ ist „Normal“
+   vorgewählt; „Veg.“, „Vegan“, „o. Schwein“, „Diät“ oder „Kleinkind“ wählen, wo es zutrifft.
+4. „Person hinzufügen“ für jedes weitere Mitglied wählen; der Nachname steht schon da.
+   „Entfernen“ nimmt eine Zeile wieder heraus.
+
+   ![Maske „Registrieren · Turnhalle Ost“ mit Adresse des Haushalts und zwei Personen, eine vegetarisch, eine Kleinkind](../bilder/betreuung/registrieren.png)
+
+5. „Registrieren“ wählen. Die Maske steht danach leer für den nächsten Haushalt bereit;
+   „Speichern und nächste“ hält sie offen.
+
+Alle Personen sind danach Betroffene mit dem Verbleib „Notunterkunft“ an dieser Stelle und
+stehen auch unter [Betroffene und Sichtung](betroffene.md).
+
+### Registrierte ablesen und abmelden
+
+1. Unter „Registrierung“ zeigt das Band „Kostformen“, wie viele der hier Registrierten welche
+   Kostform haben, mit „ohne Angabe“.
+
+   ![Paneel „Registrierung“ mit dem Band Kostformen und dem aufgeklappten Haushalt H-1 mit zwei Personen](../bilder/betreuung/registrierung.png)
+
+2. Einen Haushalt („H-1 · Name der Bezugsperson · Zahl der Personen“) aufklappen, um seine
+   Personen zu sehen; ein Klick auf die Registriernummer öffnet die Person.
+3. „Person hinzufügen“ im Haushalt registriert ein weiteres Mitglied zu diesem Haushalt.
+4. „Abmelden“ am Haushalt meldet alle Personen ab, die noch hier sind, „Abmelden“ an einer
+   Person nur sie. Die Rückfrage nimmt ein „Ziel“ auf (etwa „zu Verwandten“); bestätigen.
+
+Abgemeldete Personen tragen den Verbleib „entlassen“ und stehen nicht mehr in der Liste.
 
 ### Bedarf einer Stelle anfordern
 
@@ -122,6 +158,9 @@ setzen; „Zurück zu …“ führt danach auf die Seite der Stelle.
    eine Leitung mit mehr als 200 Zeichen.
 3. „Speichern“ wählen, oder „Abbrechen“, um nichts zu ändern.
 
+Unter „Belegungsart“ steht, ob die Stelle „gezählt“ oder „namentlich geführt“ wird; das lässt
+sich hier umstellen.
+
 Der „Standort“ zeigt beim Bearbeiten den gespeicherten Punkt als Kartenausschnitt. Eine Korrektur
 am Text behält den Punkt; ein neuer Treffer der Ortssuche ersetzt ihn, die gezogene Nadel
 berichtigt ihn, ein geleertes Feld nimmt Standort und Koordinate weg. Wie die Ortssuche
@@ -140,6 +179,33 @@ Meldung davor. Das lässt sich nicht umkehren.
 
 ## Hintergrund
 
+### Namentlich geführte Stellen
+
+- An einer namentlich geführten Stelle meldet das Programm die Belegung selbst: Sie ist die Zahl
+  der dort registrierten Personen. „Belegung melden“ ist dort gesperrt („Belegung kommt aus der
+  Registrierung“), im Meldeverlauf steht „Herkunft Registrierung“, und diese Meldungen lassen
+  sich nicht zurücknehmen.
+- Jede Änderung zählt mit: Registrieren und Abmelden, aber auch ein anderer Verbleib auf der
+  Seite einer Person (etwa ein Transport ins Krankenhaus) oder ihr Storno.
+- Wird eine gezählte Stelle auf „namentlich geführt“ umgestellt, gilt ab dann die Zahl der
+  Registrierten; zurück auf „gezählt“ bleibt die letzte Belegung stehen und wird wieder von Hand
+  gemeldet.
+- Schließen lässt sich eine namentlich geführte Stelle erst, wenn alle Personen abgemeldet sind.
+
+### Registrierung und Kostform
+
+- Pflicht ist nur der Nachname; die Kostform ist „Normal“, bis eine andere gewählt wird.
+- Die Kostform (Normalkost, vegetarisch, vegan, ohne Schweinefleisch, Diät/allergenarm,
+  Säugling/Kleinkind) und die Unverträglichkeiten lassen sich danach auf der Seite der Person
+  ändern. Aus den Kostformen aller Registrierten schlägt die [Verpflegung](verpflegung.md) die
+  Sonderkost eines neuen Zeitfensters vor.
+- Unverträglichkeiten gelten als Gesundheitsangabe: Sie stehen nie im Einsatztagebuch, liegen
+  ohne Netz nicht auf dem Gerät und werden beim Schwärzen geleert.
+- Ins Einsatztagebuch kommt je Registrierung und je Abmeldung ein Eintrag mit Stelle,
+  Haushaltsnummer und Registriernummern, ohne Namen.
+- Die Registrierung braucht Zugriff auf „Betroffene“; ohne ihn fehlt „Registrieren“, und statt
+  der Liste steht der Grund.
+
 ### Wie gezählt wird
 
 - Gemeldet wird immer die **Gesamtzahl**. Sie darf die Kapazität übersteigen; die Stelle ist dann
@@ -157,8 +223,9 @@ Meldung davor. Das lässt sich nicht umkehren.
 - Ein Zeitpunkt in der Zukunft wird abgelehnt. Eine Meldung mit einem älteren Zeitpunkt als die
   aktuelle wird als nachgetragen geführt („nachgetragen um …“), die aktuelle bleibt stehen.
 - „davon namentlich“ an einer Stelle zählt die Betroffenen, deren Verbleib „Notunterkunft“ auf
-  diese Stelle zeigt ([Betroffene und Sichtung](betroffene.md)). Die Zahl ist ein Hinweis und
-  kein Teil der Belegung.
+  diese Stelle zeigt ([Betroffene und Sichtung](betroffene.md)). An einer gezählten Stelle ist
+  die Zahl ein Hinweis und kein Teil der Belegung; an einer namentlich geführten ist sie die
+  Belegung.
 
 ### Schließen und Stornieren
 
@@ -215,7 +282,9 @@ Einstellungen ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md
 
 ### Ohne Netz
 
-Die Betreuung bleibt ohne Netz lesbar. Belegungsmeldungen lassen sich vormerken; sie tragen den
+Die Betreuung bleibt ohne Netz lesbar. Belegungsmeldungen, Registrierungen und Abmeldungen
+lassen sich vormerken; ein vorgemerkter Haushalt steht als „vorgemerkt“ in der Liste und zählt
+noch nicht im Band „Kostformen“. Vormerkungen tragen den
 Zeitpunkt der Erfassung und gehen hinaus, sobald Netz da ist. Anlegen und Status gehen nur mit Netz.
 Mehr in [Arbeiten ohne Netz](ohne-netz.md).
 

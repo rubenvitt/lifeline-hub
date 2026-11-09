@@ -52,6 +52,11 @@ export interface SegmentOption<W extends string | number> {
   wert: W;
   /** Sichtbarer Wortlaut — Pflicht, auch neben einem Farbpunkt. Ein `\n` bricht um (WORTLAUT). */
   label: string;
+  /**
+   * Zugänglicher Name, wo der Wortlaut ein Kurzwort ist („m“ → „männlich“, LLH-1612); ohne ihn
+   * nennt das Segment seinen Wortlaut.
+   */
+  name?: string;
   /** Aufgelöste Farbe für den 6-px-Punkt (z. B. `etbTypFarbe(typ, token).kante`). */
   punkt?: string;
   /** Nur `tablist`: Id der Fläche, die dieses Segment zeigt. */
@@ -153,10 +158,10 @@ export default function Segmentleiste<W extends string | number>({
   const { token } = useRollen();
   const grundId = useId();
   const knoepfe = useRef<(HTMLButtonElement | null)[]>([]);
-  const aktivIndex = Math.max(
-    0,
-    optionen.findIndex((o) => o.wert === wert),
-  );
+  // Ohne passenden Wert ist kein Segment gewählt (LLH-1612: „Geschlecht“ der Registriermaske ohne
+  // Angabe); den Tabulatorhalt trägt dann das erste, damit die Gruppe erreichbar bleibt.
+  const gewaehltIndex = optionen.findIndex((o) => o.wert === wert);
+  const aktivIndex = Math.max(0, gewaehltIndex);
   const alsTab = rolle === 'tablist';
 
   const taste = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -176,7 +181,7 @@ export default function Segmentleiste<W extends string | number>({
       style={style}
     >
       {optionen.map((o, i) => {
-        const aktiv = i === aktivIndex;
+        const aktiv = i === gewaehltIndex;
         const gesperrt = o.gesperrt != null && o.gesperrt !== '';
         const beschreibungId = gesperrt ? `${grundId}-${i}` : undefined;
         const knopf = (
@@ -189,10 +194,11 @@ export default function Segmentleiste<W extends string | number>({
             aria-checked={alsTab ? undefined : aktiv}
             aria-selected={alsTab ? aktiv : undefined}
             aria-controls={alsTab ? o.steuert : undefined}
+            aria-label={o.name}
             aria-disabled={gesperrt || undefined}
             aria-describedby={beschreibungId}
             data-gesperrt={gesperrt || undefined}
-            tabIndex={aktiv ? 0 : -1}
+            tabIndex={i === aktivIndex ? 0 : -1}
             className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
             onClick={() => {
               if (!gesperrt) onWechsel(o.wert);

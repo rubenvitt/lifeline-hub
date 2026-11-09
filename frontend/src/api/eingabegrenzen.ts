@@ -231,6 +231,12 @@ export const PLANUNG_ZEITRAUM_MAX_TAGE = 14;
 export const BETREUUNG_LEITUNG_MAX = 200;
 /** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `kontaktweg`). */
 export const BETREUUNG_KONTAKTWEG_MAX = 200;
+/** Unverträglichkeiten einer Person, Gesundheitsangabe (LLH-1612). */
+export const PERSON_UNVERTRAEGLICHKEITEN_MAX = 200;
+/** Personen je Registrierung an einer Betreuungsstelle (LLH-1612). */
+export const REGISTRIERUNG_PERSONEN_MAX = 30;
+/** Ziel beim Abmelden von der Betreuungsstelle, Freitext (LLH-1612); nie im ETB. */
+export const BETREUUNG_ABMELDUNG_ZIEL_MAX = 200;
 /**
  * Bezeichnung eines Evakuierungsbezirks (LLH-1560); die Lagekarte übernimmt sie beim Zeichnen als
  * Bezeichnung der Zone, darf also nie über `ZONE_LABEL_MAX` liegen.

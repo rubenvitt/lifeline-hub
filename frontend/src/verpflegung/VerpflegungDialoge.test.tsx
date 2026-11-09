@@ -36,17 +36,20 @@ dayjs.extend(utc);
 
 // Der Hook ist eigens getestet (`useBedarfsvorschlag.test.tsx`). Hier zählt, WAS der Dialog
 // hineingibt (Beginn als Wire, Freigaben unverändert) und was er mit der Antwort tut.
+/** Ohne Sonderkost-Vorschlag ergänzt die Attrappe die leere Quelle (LLH-1612). */
+type Lieferung = Omit<Bedarfsvorschlag, 'sonderkost'> &
+  Partial<Pick<Bedarfsvorschlag, 'sonderkost'>>;
 const vorschlag = vi.hoisted(() => ({
   aufrufe: [] as BedarfsvorschlagArgs[],
   liefere: (() => ({
     kraefte: { wert: null, hinweis: null },
     betreute: { wert: null, hinweis: null },
-  })) as (a: BedarfsvorschlagArgs) => Bedarfsvorschlag,
+  })) as (a: BedarfsvorschlagArgs) => Lieferung,
 }));
 vi.mock('./useBedarfsvorschlag', () => ({
-  useBedarfsvorschlag: (a: BedarfsvorschlagArgs) => {
+  useBedarfsvorschlag: (a: BedarfsvorschlagArgs): Bedarfsvorschlag => {
     vorschlag.aufrufe.push(a);
-    return vorschlag.liefere(a);
+    return { sonderkost: { werte: null, hinweis: null }, ...vorschlag.liefere(a) };
   },
 }));
 
@@ -317,6 +320,68 @@ describe('ZeitfensterDialog — anlegen', () => {
     expect(await within(dialog).findByText('keine Belegung gemeldet')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Einsatzkräfte (EP)')).toHaveValue('');
     expect(within(dialog).getByLabelText('Betreute (EP)')).toHaveValue('');
+  });
+
+  describe('Sonderkost aus der Registrierung (LLH-1612, design.md D7)', () => {
+    const SK_HINWEIS = 'Vorschlag: aus 40 Registrierten, Stand jetzt';
+
+    it('6 vegetarisch und 2 vegan vorbelegt, mit Hinweis; die übrigen bleiben leer; der Kopf nennt sie', async () => {
+      vorschlag.liefere = () => ({
+        kraefte: LEER,
+        betreute: LEER,
+        sonderkost: { werte: { vegetarisch: 6, vegan: 2 }, hinweis: SK_HINWEIS },
+      });
+      const { onErfassen } = zeigeAnlegen();
+      const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+      // Zugeklappt nennt der Kopf die Vorbelegung (LFH-974).
+      const kopf = await within(dialog).findByRole('button', {
+        name: /Weitere Personen und Sonderkost · davon 6 vegetarisch, 2 vegan/,
+      });
+      await userEvent.click(kopf);
+      expect(within(dialog).getByLabelText('vegetarisch')).toHaveValue('6');
+      expect(within(dialog).getByLabelText('vegan')).toHaveValue('2');
+      expect(within(dialog).getByLabelText('ohne Schweinefleisch')).toHaveValue('');
+      expect(within(dialog).getByLabelText('Säugling/Kleinkind')).toHaveValue('');
+      expect(within(dialog).getByText(SK_HINWEIS)).toBeInTheDocument();
+
+      await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Mittag');
+      await waehleZeitraum(dialog, '2026-09-24 12:00', '2026-09-24 13:30');
+      await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '10');
+      await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '40');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+      expect(onErfassen.mock.calls[0][0].sonderkost).toEqual({ vegetarisch: 6, vegan: 2 });
+    });
+
+    it('eine eigene Zahl bleibt stehen, wenn der Vorschlag später kommt (`beruehrt`)', async () => {
+      let mitVorschlag = false;
+      vorschlag.liefere = () => ({
+        kraefte: LEER,
+        betreute: LEER,
+        sonderkost: mitVorschlag
+          ? { werte: { vegan: 2, vegetarisch: 6 }, hinweis: SK_HINWEIS }
+          : { werte: null, hinweis: null },
+      });
+      zeigeAnlegen();
+      const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Personen/ }));
+      await userEvent.type(within(dialog).getByLabelText('vegan'), '5');
+      mitVorschlag = true;
+      // Ein neuer Render bringt den Vorschlag (hier: der Zeitraum, den der Dialog beobachtet).
+      await waehleZeitraum(dialog, '2026-09-24 12:00', '2026-09-24 13:30');
+      await waitFor(() => expect(within(dialog).getByLabelText('vegetarisch')).toHaveValue('6'));
+      expect(within(dialog).getByLabelText('vegan')).toHaveValue('5');
+    });
+
+    it('keine Registrierten: Sonderkost-Felder leer und ohne Hinweis', async () => {
+      zeigeAnlegen();
+      const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Weitere Personen und Sonderkost' }),
+      );
+      expect(within(dialog).getByLabelText('vegetarisch')).toHaveValue('');
+      expect(within(dialog).queryByText(/Registrierten/)).toBeNull();
+    });
   });
 
   describe('Betreuungsvorschlag folgt dem Beginn (D8, eigener Merker)', () => {

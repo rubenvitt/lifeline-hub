@@ -269,6 +269,56 @@ describe('Betreuungsstelle — Bereich „Stelle“', () => {
   });
 });
 
+describe('Betreuungsstelle — Registrierung (LLH-1612)', () => {
+  it('Bereich „Registrierung“: Liste der eigenen Stelle und „Registrieren“; namentlich ist „Belegung melden“ gesperrt', async () => {
+    bereit();
+    let gelesen = 0;
+    server.use(
+      http.get('/api/einsaetze/7/betreuung', () =>
+        HttpResponse.json({
+          stellen: [{ ...stelle, belegungsart: 'namentlich' }],
+          namentlich: [{ stelle_id: 3, anzahl: 2 }],
+        } as BetreuungUebersicht),
+      ),
+      http.get('/api/einsaetze/7/betreuung/stellen/3/registrierungen', () => {
+        gelesen += 1;
+        return HttpResponse.json({
+          stelle_id: 3,
+          haushalte: [
+            {
+              id: 5,
+              nummer: 2,
+              bezugsperson_name: 'Muster, Max',
+              personen: [
+                {
+                  id: 10,
+                  registrier_nr: 1,
+                  name: 'Muster',
+                  vorname: 'Max',
+                  kostform: 'vegan',
+                  erfasst_at: '2026-10-08 09:00:00',
+                },
+              ],
+            },
+          ],
+          ohne_haushalt: [],
+        });
+      }),
+    );
+    renderApp('/geraet/7/betreuung');
+    const melden = await screen.findByRole('button', { name: 'Belegung melden' });
+    expect(melden).toBeDisabled();
+    expect(melden).toHaveAccessibleDescription('Belegung kommt aus der Registrierung');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Registrierung' }));
+    expect(
+      await screen.findByRole('button', { name: /H-2 · Muster, Max · 1 Person/ }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Registrieren' })).toBeEnabled();
+    expect(gelesen).toBeGreaterThan(0);
+  });
+});
+
 describe('Bausteine', () => {
   it('istHier: nur der jüngste Verbleib Notunterkunft an der eigenen Stelle', () => {
     expect(istHier(hier, 3)).toBe(true);

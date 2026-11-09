@@ -180,6 +180,30 @@ describe('MeldeVerlauf · Kennzeichnung', () => {
   });
 });
 
+describe('MeldeVerlauf · Herkunft Registrierung (LLH-1612)', () => {
+  it('eine Meldung aus der Registrierung nennt die Herkunft und bietet kein „Zurücknehmen“', async () => {
+    liefere('/stellen/9/belegungen', [
+      {
+        id: 12,
+        belegt: 15,
+        quelle: 'registrierung',
+        zeitpunkt_at: '2026-09-23 13:00:00',
+        erfasst_at: '2026-09-23 13:00:00',
+        erfasst_von: 'Leitung',
+        aktuell: true,
+      },
+      ...BELEGUNGEN.map((b) => ({ ...b, aktuell: false })),
+    ]);
+    renderMitProviders(<MeldeVerlauf einsatzId={7} art="stelle" objektId={9} darfZuruecknehmen />);
+    await screen.findByText('15 untergebracht');
+    expect(eintraege()[0]).toHaveTextContent('Herkunft Registrierung');
+    expect(within(eintraege()[0]).queryByRole('button')).not.toBeInTheDocument();
+    // Von Hand gemeldete tragen keine Herkunft und bleiben zurücknehmbar.
+    expect(eintraege()[1]).not.toHaveTextContent('Registrierung');
+    expect(within(eintraege()[1]).getByRole('button', { name: /zurücknehmen$/ })).toBeEnabled();
+  });
+});
+
 describe('MeldeVerlauf · Zurücknehmen', () => {
   it('Auslöser nur an nicht zurückgenommenen Meldungen, mit Anzahl und Uhrzeit im Namen', async () => {
     liefere('/bezirke/5/staende', STAENDE);

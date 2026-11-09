@@ -1,4 +1,5 @@
 import { meldeBelegung } from '../api/betreuung';
+import { sendAbmeldung, sendRegistrierung } from '../api/betreuungRegistrierung';
 import { meldeStand } from '../api/evakuierung';
 import {
   markiereBenachrichtigungenGelesen,
@@ -9,14 +10,18 @@ import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import type {
+  Abmeldung,
+  AbmeldungEingabe,
   AusgabeEingabe,
   BelegungsmeldungEingabe,
   BezirkMeldung,
   EintreffenEingabe,
   EintreffenErgebnis,
+  Haushalt,
   Meldung,
   NeueMeldung,
   Person,
+  RegistrierungEingabe,
   StandmeldungEingabe,
   StelleMeldung,
   VerpflegungAusgabeErgebnis,
@@ -191,6 +196,49 @@ export function erfasseBelegungOfflineFaehig(
     eingabe,
     (daten) => meldeBelegung(einsatzId, stelle.id, daten, { offlineQueueBenutzerId: benutzerId }),
     (daten) => ({ art: 'belegung', stelle_id: stelle.id, bezeichnung: stelle.bezeichnung, daten }),
+  );
+}
+
+/**
+ * Einen Haushalt an einer Betreuungsstelle registrieren oder mit Erfassungszeit vormerken (LLH-1612,
+ * design.md D2/D8). Der ganze Haushalt ist EINE Aktion mit EINER `client_id`: der Server liefert
+ * bei jeder Wiederholung den angelegten Haushalt (auch nach dem Einsatzende), offline kommt nie ein
+ * halber Haushalt an.
+ */
+export function saveRegistrierungOfflineCapable(
+  benutzerId: number,
+  einsatzId: number,
+  stelle: SchreibZiel,
+  eingabe: RegistrierungEingabe,
+): Promise<OfflineSchreibErgebnis<Haushalt>> {
+  return mitErfassungszeitOfflineFaehig(
+    benutzerId,
+    einsatzId,
+    eingabe,
+    (daten) =>
+      sendRegistrierung(einsatzId, stelle.id, daten, { offlineQueueBenutzerId: benutzerId }),
+    (daten) => ({
+      art: 'registrierung',
+      stelle_id: stelle.id,
+      bezeichnung: stelle.bezeichnung,
+      daten,
+    }),
+  );
+}
+
+/** Einen Haushalt oder einzelne Personen abmelden oder mit Erfassungszeit vormerken (LLH-1612, D6). */
+export function saveAbmeldungOfflineCapable(
+  benutzerId: number,
+  einsatzId: number,
+  stelle: SchreibZiel,
+  eingabe: AbmeldungEingabe,
+): Promise<OfflineSchreibErgebnis<Abmeldung>> {
+  return mitErfassungszeitOfflineFaehig(
+    benutzerId,
+    einsatzId,
+    eingabe,
+    (daten) => sendAbmeldung(einsatzId, stelle.id, daten, { offlineQueueBenutzerId: benutzerId }),
+    (daten) => ({ art: 'abmeldung', stelle_id: stelle.id, bezeichnung: stelle.bezeichnung, daten }),
   );
 }
 

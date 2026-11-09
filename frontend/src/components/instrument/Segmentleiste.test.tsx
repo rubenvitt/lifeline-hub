@@ -267,4 +267,23 @@ describe('SegmentUmschalter (LLH-1065)', () => {
       'true',
     );
   });
+
+  it('ohne passenden Wert ist kein Segment gewählt, das erste bleibt per Tabulator erreichbar (LLH-1612)', () => {
+    renderMitProviders(
+      <Segmentleiste<string>
+        beschriftung="Geschlecht"
+        wert=""
+        onWechsel={() => {}}
+        optionen={[
+          { wert: 'maennlich', label: 'm', name: 'männlich' },
+          { wert: 'weiblich', label: 'w', name: 'weiblich' },
+        ]}
+      />,
+    );
+    const radios = screen.getAllByRole('radio');
+    for (const r of radios) expect(r).toHaveAttribute('aria-checked', 'false');
+    expect(radios[0]).toHaveAttribute('tabindex', '0');
+    expect(radios[1]).toHaveAttribute('tabindex', '-1');
+    expect(radios[0]).not.toHaveClass('lfh-segment--aktiv');
+  });
 });

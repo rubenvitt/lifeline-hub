@@ -47,6 +47,7 @@ import {
   KOSTFORMEN,
   VERPFLEGUNGSART_LABEL,
   sonderkostText,
+  sonderkostVoll,
   uhrzeit,
   zitat,
 } from './verpflegungText';
@@ -233,17 +234,33 @@ function eingeklappt(
 
 /**
  * Sonderkost ist eine Teilmenge der Essensportionen (bzw. der Menge), kein Zuschlag — das sagt
- * die Gruppenbeschriftung „davon“; die Obergrenze prüft der Server (422 im Dialog).
+ * die Gruppenbeschriftung „davon“; die Obergrenze prüft der Server (422 im Dialog). Beim Anlegen
+ * eines Zeitfensters steht darunter die Herkunft des Vorschlags aus der Registrierung (LLH-1612),
+ * und `beruehrt` merkt, welche Kostform die Person selbst gesetzt hat.
  */
-function sonderkostFelder() {
+function sonderkostFelder(vorschlag?: { hinweis: string | null; beruehrt: (k: Kostform) => void }) {
   return (
     <>
       <Augenbraue als="div" style={{ marginBottom: 8 }}>
         davon Sonderkost (EP)
       </Augenbraue>
+      {vorschlag?.hinweis && (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+          {vorschlag.hinweis}
+        </Typography.Paragraph>
+      )}
       {KOSTFORMEN.map((k) => (
         <Form.Item key={k} name={['sonderkost', k]} label={KOSTFORM_LABEL[k]}>
-          {anzahlFeld()}
+          {vorschlag ? (
+            <InputNumber
+              min={0}
+              precision={0}
+              style={{ width: '100%' }}
+              onChange={() => vorschlag.beruehrt(k)}
+            />
+          ) : (
+            anzahlFeld()
+          )}
         </Form.Item>
       ))}
     </>
@@ -376,6 +393,24 @@ export function ZeitfensterDialog({
     beruehrt.current[feld] = true;
   };
 
+  // Sonderkost aus der Registrierung (LLH-1612, design.md D7): vorbelegt wie die Bedarfe, je
+  // Kostform mit eigenem Merker; nur die belegten Kostformen, die übrigen bleiben leer.
+  const skBeruehrt = useRef<Partial<Record<Kostform, boolean>>>({});
+  const { werte: skWerte, hinweis: skHinweis } = vorschlag.sonderkost;
+  // Als Zeichenkette: das Objekt des Vorschlags ist je Render neu.
+  const skSchluessel = skWerte ? JSON.stringify(skWerte) : null;
+  useEffect(() => {
+    if (skSchluessel == null) return;
+    const werte = JSON.parse(skSchluessel) as Partial<Record<Kostform, number>>;
+    for (const k of KOSTFORMEN) {
+      if (skBeruehrt.current[k]) continue;
+      form.setFieldValue(['sonderkost', k], werte[k] ?? undefined);
+    }
+  }, [form, skSchluessel]);
+  // Zugeklappt nennt der Kopf jede Abweichung von der Vorgabe (LFH-974), auch den Vorschlag.
+  const sonderkostWerte = Form.useWatch('sonderkost', form) as SonderkostWerte | undefined;
+  const sonderkostKopf = sonderkostText(sonderkostVoll(sonderkostAnlegen(sonderkostWerte)));
+
   return (
     <ErfassungsModal<ZeitfensterWerte>
       offen
@@ -444,12 +479,19 @@ export function ZeitfensterDialog({
         />
       </Form.Item>
       {eingeklappt(
-        'Weitere Personen und Sonderkost',
+        sonderkostKopf
+          ? `Weitere Personen und Sonderkost · ${sonderkostKopf}`
+          : 'Weitere Personen und Sonderkost',
         <>
           <Form.Item<ZeitfensterWerte> name="bedarf_weitere" label="Weitere Personen (EP)">
             {anzahlFeld()}
           </Form.Item>
-          {sonderkostFelder()}
+          {sonderkostFelder({
+            hinweis: skHinweis,
+            beruehrt: (k) => {
+              skBeruehrt.current[k] = true;
+            },
+          })}
         </>,
       )}
       {eingeklappt(

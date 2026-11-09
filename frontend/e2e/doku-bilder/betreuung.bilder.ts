@@ -14,9 +14,12 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   stelle.png           frontend/src/pages/BetreuungsstelleDetailPage.tsx,
  *                        frontend/src/betreuung/StelleBelegung.tsx,
  *                        frontend/src/betreuung/StelleBelegungslinie.tsx
+ *   registrieren.png     frontend/src/betreuung/registrierung/RegistrierMaske.tsx
+ *   registrierung.png    frontend/src/betreuung/registrierung/RegistrierungPaneel.tsx
  *
  * Daten: der Demo-Einsatz hat eine Betreuungsstelle. Eine fast volle Notunterkunft kommt per API
- * dazu (D3), damit die Auslastung zu sehen ist.
+ * dazu (D3), damit die Auslastung zu sehen ist, und eine namentlich geführte Notunterkunft mit
+ * zwei registrierten Haushalten (LLH-1612).
  */
 
 const KAPITEL = 'betreuung';
@@ -57,6 +60,33 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
   return lage.stellen.find((s) => s.bezeichnung === 'Sporthalle Nord')!.id;
 }
 
+/** Namentlich geführte Notunterkunft mit zwei Haushalten (LLH-1612), einmal je Lauf. */
+async function registrierstelle(page: Page, einsatzId: number): Promise<number> {
+  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+  const lage = (await (await page.request.get(basis)).json()) as Uebersicht;
+  const da = lage.stellen.find((s) => s.bezeichnung === 'Turnhalle Ost');
+  if (da) return da.id;
+  const stelle = await fuelle<{ id: number }>(page, 'post', `${basis}/stellen`, {
+    bezeichnung: 'Turnhalle Ost',
+    art: 'notunterkunft',
+    kapazitaet_personen: 120,
+    belegungsart: 'namentlich',
+  });
+  await fuelle(page, 'patch', `${basis}/stellen/${stelle.id}`, { status: 'in_betrieb' });
+  for (const personen of [
+    [
+      { name: 'Yilmaz', vorname: 'Emre', kostform: 'ohne_schwein' },
+      { name: 'Yilmaz', vorname: 'Selin', kostform: 'vegetarisch' },
+    ],
+    [{ name: 'Brandt', vorname: 'Helga', kostform: 'diaet_allergenarm' }],
+  ]) {
+    await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/registrierungen`, {
+      personen: personen.map((p) => ({ ...p, herkunft_adresse: 'Am Deich 7' })),
+    });
+  }
+  return stelle.id;
+}
+
 test.describe(KAPITEL, () => {
   test('Übersicht mit Betreuungsstellen', async ({ page }) => {
     await anmelden(page);
@@ -93,5 +123,45 @@ test.describe(KAPITEL, () => {
     await expect(page.getByText('Hallenwart Meyer')).toBeVisible();
     await expect(page.locator('[data-lfh="stelle-belegungslinie"]')).toBeVisible();
     await fotografiere(page, KAPITEL, 'stelle');
+  });
+
+  test('Maske „Registrieren“ mit einer Familie', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const stelle = await registrierstelle(page, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/betreuung/${stelle}`);
+    const paneel = page.getByRole('region', { name: 'Registrierung', exact: true });
+    await paneel.getByRole('button', { name: 'Registrieren', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Registrieren · Turnhalle Ost' });
+    await dialog
+      .getByRole('textbox', { name: 'Herkunft / Adresse des Haushalts' })
+      .fill('Lindenweg 3');
+    await dialog.getByRole('textbox', { name: 'Nachname Person 1' }).fill('Weber');
+    await dialog.getByRole('textbox', { name: 'Vorname Person 1' }).fill('Anna');
+    await dialog
+      .getByRole('radiogroup', { name: 'Kostform, Person 1' })
+      .getByRole('radio', { name: 'vegetarisch' })
+      .click();
+    await dialog.getByRole('button', { name: 'Person hinzufügen', exact: true }).click();
+    await page.keyboard.type('Lea');
+    await dialog
+      .getByRole('radiogroup', { name: 'Kostform, Person 2' })
+      .getByRole('radio', { name: 'Säugling/Kleinkind' })
+      .click();
+    await fotografiere(dialog, KAPITEL, 'registrieren');
+  });
+
+  test('Paneel „Registrierung“ mit Kostformen und Haushalten', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const stelle = await registrierstelle(page, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/betreuung/${stelle}`);
+    const paneel = page.getByRole('region', { name: 'Registrierung', exact: true });
+    await expect(paneel.getByRole('group', { name: 'Kostformen' })).toContainText('vegetarisch');
+    await paneel.getByRole('button', { name: /^H-1 · Yilmaz, Emre/ }).click();
+    await expect(paneel.getByRole('list', { name: 'Personen in H-1' })).toBeVisible();
+    await fotografiere(paneel, KAPITEL, 'registrierung');
   });
 });
