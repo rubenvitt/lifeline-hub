@@ -323,3 +323,25 @@ async fn snapshot_auch_auf_dem_client_id_weg() {
         "Replay trägt den Original-Snapshot"
     );
 }
+
+/// Spec `einsatzkopf-live` (pkjvl5iy): auch Führungshilfspersonal trägt seine Bezeichnung im
+/// Kopf, getrimmt wie beim Speichern.
+#[tokio::test]
+async fn fuehrungshilfspersonal_traegt_bezeichnung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, kraft, id) = kraft_im_einsatz(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/mitglieder/{id}"),
+        &admin,
+        Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"fuehrungshilfspersonal","fuehrungsstelle":"  Lotse  "}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let json = kopf(&app, &kraft, einsatz).await;
+    assert_eq!(json["meine_funktion_code"], "fuehrungshilfspersonal");
+    assert_eq!(json["meine_funktion_bezeichnung"], "Lotse");
+}

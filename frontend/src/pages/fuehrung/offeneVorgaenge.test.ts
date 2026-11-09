@@ -204,6 +204,15 @@ describe('Meine Stelle (LLH-1145 D5, pkjvl5iy)', () => {
       7,
     );
     expect(auftragFuerMich(an('fuehrungshilfspersonal', null), thw)).toBe(true);
+    expect(
+      erinnerungFuerMich(
+        erinnerung({
+          empfaenger_funktion_code: 'fuehrungshilfspersonal',
+          empfaenger_funktion: null,
+        }),
+        thw,
+      ),
+    ).toBe(true);
     const geschwaerzt = meineStelle({ meine_funktion_code: 'fuehrungshilfspersonal' }, 7);
     expect(auftragFuerMich(an('fuehrungshilfspersonal', 'Lotse'), geschwaerzt)).toBe(true);
     expect(auftragFuerMich(an('fachberater', 'Lotse'), geschwaerzt)).toBe(false);

@@ -77,7 +77,7 @@ function binIch(stelle: MeineStelle, id: number | null | undefined): boolean {
   return stelle.benutzerId != null && id === stelle.benutzerId;
 }
 
-function normalisiert(bezeichnung: string | null | undefined): string | null {
+function normalizeBezeichnung(bezeichnung: string | null | undefined): string | null {
   const b = bezeichnung?.trim().toLocaleLowerCase('de');
   return b ? b : null;
 }
@@ -93,8 +93,8 @@ function hatFunktion(
   bezeichnung?: string | null,
 ): boolean {
   if (code == null || code !== stelle.funktion) return false;
-  const meine = normalisiert(stelle.bezeichnung);
-  const ihre = normalisiert(bezeichnung);
+  const meine = normalizeBezeichnung(stelle.bezeichnung);
+  const ihre = normalizeBezeichnung(bezeichnung);
   return meine == null || ihre == null || meine === ihre;
 }
 

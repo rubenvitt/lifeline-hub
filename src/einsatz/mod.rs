@@ -327,13 +327,13 @@ impl MeineFelder {
             funktion: None,
             text: None,
         });
-        let abgeleitet = funktion::ableiten(
+        let derived = funktion::ableiten(
             stelle.funktion,
             stelle.text.as_deref(),
             rolle.and_then(EinsatzRolle::parse),
             karte,
         );
-        let funktion_code = abgeleitet.as_ref().map(|f| f.code);
+        let funktion_code = derived.as_ref().map(|f| f.code);
         // Die Bezeichnung nur, wo der Katalog eine verlangt (Führungshilfspersonal, Fachberater);
         // ein Text neben einem Sachgebiet wäre keine (`fuehrung::pruefe_funktion`).
         let funktion_bezeichnung = funktion_code
@@ -342,7 +342,7 @@ impl MeineFelder {
             .map(str::trim)
             .filter(|t| !t.is_empty())
             .map(str::to_string);
-        let funktion = abgeleitet.map(|f| f.bezeichnung);
+        let funktion = derived.map(|f| f.bezeichnung);
         Self {
             sachgebiete: stelle
                 .funktion
