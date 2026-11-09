@@ -6058,6 +6058,11 @@ export interface components {
             zeitpunkt: string;
             zurueckgenommen_at?: string | null;
         };
+        /**
+         * @description Was an einer Einheit geschieht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanWechselEinheit: "wechsel" | "beginn" | "ende";
         /** @description Ein Eintrag eines Wechselpunkts. */
         PlanWechselEintrag: {
             /**
@@ -6071,6 +6076,7 @@ export interface components {
              * @description Der Block, um den es geht: an einer Einheit der Folgeblock, ohne ihn der endende Block.
              */
             block_id: number;
+            einheit?: components["schemas"]["PlanWechselEinheit"] | null;
             stand: components["schemas"]["PlanWechselStand"];
         };
         /**

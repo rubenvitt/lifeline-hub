@@ -59,8 +59,8 @@ const WECHSEL: SchichtplanWechselpunkt[] = [
     zeitpunkt: '2026-11-09 14:00:00',
     minute: minute('2026-11-09 14:00:00'),
     eintraege: [
-      { art: 'einheit', stand: 'offen', block_id: 2, abloesung_id: 40 },
-      { art: 'einheit', stand: 'ohne_schicht', block_id: 3 },
+      { art: 'einheit', stand: 'offen', block_id: 2, einheit: 'wechsel', abloesung_id: 40 },
+      { art: 'einheit', stand: 'ohne_schicht', block_id: 3, einheit: 'ende' },
       { art: 'uhs', stand: 'vollzogen', block_id: 4 },
     ],
   },

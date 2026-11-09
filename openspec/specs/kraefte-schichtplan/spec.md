@@ -170,7 +170,8 @@ Wechsel zeigen, dazu frühere Zeitpunkte der letzten 12 h, an denen noch etwas o
 ohne Vorgänger; ein Block, der binnen der Toleranz nach dem Ende beginnt, MUST zum Wechsel am Ende
 gehören. An einer UHS ist es der Beginn eines Blocks, in der Pause Beginn und Ende. Jeder Eintrag
 MUST seinen Stand nennen: offen, vollzogen oder, an einer Einheit ohne Schicht laut Plan, „keine
-Schicht“. Der gewählte Zeitpunkt MUST seine Wechsel mit Griff zeigen: an einer Einheit mit offener
+Schicht“; eine abgezogene oder vollzogene Schicht laut Plan macht den Eintrag „vollzogen“, auch
+wenn der Posten endet. Der gewählte Zeitpunkt MUST seine Wechsel mit Griff zeigen: an einer Einheit mit offener
 Schicht den Vollzug der Ablösung, an UHS und Pause den Wechsel des Blocks. Zeitpunkte, Einträge
 und Stand MUST der Server rechnen (`wechsel` im Plan). Der Sprung `?wechsel=<minute>` MUST den
 Zeitpunkt wählen.
@@ -185,7 +186,11 @@ Vorwarnung und die Fälligkeit MUST es je Zeitpunkt einmal melden (Bezug `schich
 Zeitpunkt in Minuten seit 1970), nicht je Schicht (EEMUA 191). Die Detailzeile MUST die Zahl der
 Wechsel und die Uhrzeit nennen („15 Wechsel um 1400“), bei einem einzigen Wechsel die Einheit wie
 bei einer Schicht. Der Sprung MUST in den Schichtplan auf den Zeitpunkt führen
-(`?ansicht=plan&wechsel=`). Schichten nach Rangfolge MUST sich weiter einzeln melden. Wechsel an
+(`?ansicht=plan&wechsel=`). Kommt eine Schicht zu einem Zeitpunkt hinzu, dessen Hinweis noch
+offen ist, MUST sie schweigen; ist er quittiert, MUST sie ihn neu melden. Ist eine Schicht zum
+Beginn eines Folgeblocks fällig, der binnen der Toleranz nach dem Ende eines Blocks beginnt, MUST
+das Ende dieses Blocks ihr Zeitpunkt sein, wie in der Leiste. Schichten nach Rangfolge MUST sich
+weiter einzeln melden. Wechsel an
 UHS und Pause haben keine Frist und melden sich nicht.
 
 #### Scenario: 15 Posten um 14:00

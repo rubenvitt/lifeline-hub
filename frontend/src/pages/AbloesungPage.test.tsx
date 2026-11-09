@@ -1962,7 +1962,9 @@ describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
         {
           zeitpunkt,
           minute,
-          eintraege: [{ art: 'einheit', stand: 'offen', block_id: 1, abloesung_id: 40 }],
+          eintraege: [
+            { art: 'einheit', stand: 'offen', block_id: 1, einheit: 'ende', abloesung_id: 40 },
+          ],
         },
       ],
     });

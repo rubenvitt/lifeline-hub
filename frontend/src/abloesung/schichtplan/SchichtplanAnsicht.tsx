@@ -98,6 +98,8 @@ interface SchichtplanAnsichtProps {
   werkzeuge?: ReactNode;
   /** Sprung `?wechsel=<minute>` (LLH-1555): dieser Zeitpunkt steht in der Wechsel-Leiste gewählt. */
   wechselSprung?: number;
+  /** Kennung des Sprungs (`location.key`): derselbe Sprung noch einmal wählt erneut. */
+  wechselSprungKennung?: string;
   /** Vollzug einer Schicht aus der Wechsel-Leiste; die Seite öffnet ihren Vollzug-Dialog. */
   onVollziehen?: (abloesungId: number) => void;
 }
@@ -141,6 +143,7 @@ export default function SchichtplanAnsicht({
   abschnitte,
   werkzeuge,
   wechselSprung,
+  wechselSprungKennung,
   onVollziehen,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
@@ -161,7 +164,7 @@ export default function SchichtplanAnsicht({
   const [wechselGewaehlt, setWechselGewaehlt] = useState<number | null>(wechselSprung ?? null);
   useEffect(() => {
     if (wechselSprung != null) setWechselGewaehlt(wechselSprung);
-  }, [wechselSprung]);
+  }, [wechselSprung, wechselSprungKennung]);
 
   const freigaben = useModulFreigaben(einsatzId);
   const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
@@ -314,6 +317,12 @@ export default function SchichtplanAnsicht({
 
   const blockVon = (id: number) => plan?.bloecke.find((b) => b.id === id) ?? null;
   const zeitText = (ms: number) => uhrzeit(dayjs(ms), konventionen);
+  // Die Leiste reicht 36 h: ein Zeitpunkt an einem anderen Tag nennt sein Datum.
+  const zeitpunktText = (ms: number) => {
+    const u = uhrzeit(dayjs(ms), konventionen);
+    const tag = datum(dayjs(ms), konventionen);
+    return tag === datum(dayjs(jetzt), konventionen) ? u : `${tag} ${u}`;
+  };
   const markeText = (ms: number) => {
     const u = uhrzeit(dayjs(ms), konventionen);
     return /^00:?00$/.test(u) ? datum(dayjs(ms), konventionen) : u;
@@ -484,7 +493,7 @@ export default function SchichtplanAnsicht({
           wechsel={plan.wechsel}
           bloecke={plan.bloecke}
           jetzt={jetzt}
-          formatZeit={zeitText}
+          formatZeit={zeitpunktText}
           gewaehlt={wechselGewaehlt}
           onWaehlen={setWechselGewaehlt}
           wechselGriff={(blockId) => {

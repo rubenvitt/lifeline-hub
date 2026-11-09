@@ -280,8 +280,9 @@ Knopf, etwa „1400 · 3 Wechsel“. Ein Zeitpunkt, an dem noch etwas offen ist,
 trägt „überfällig“. Für Einsatzleitung und Führungspersonal:
 
 1. Den Knopf des Zeitpunkts wählen. Darunter steht jeder Wechsel mit Posten, Art („Schichtwechsel“,
-   „Posten endet“, „Wechsel an der UHS“, „Pause beginnt“, „Pause endet“) und Stand („offen“,
-   „vollzogen“, „keine Schicht“).
+   „Posten beginnt“, „Posten endet“, „Wechsel an der UHS“, „Pause beginnt“, „Pause endet“) und
+   Stand („offen“, „vollzogen“, „keine Schicht“). Liegt der Zeitpunkt nicht heute, nennt der Knopf
+   auch das Datum.
 2. An einer Einheit „Ablösung vollziehen“ wählen: Es öffnet sich derselbe Dialog wie auf der Karte
    der Schicht (Ablauf „Den Wechsel laut Plan vollziehen“).
 3. An einer UHS oder in der Pause „Wechsel vollziehen“ wählen: Es öffnet sich der Wechsel des
@@ -378,10 +379,15 @@ steht beim Lesen fest, ein später verschobener Block ändert sie. Schichten nac
 sich weiter einzeln. Wechsel an UHS und Pause haben keine Frist: Sie stehen in der Leiste, melden
 sich aber nicht.
 
+Kommt eine Schicht später zu einem Zeitpunkt hinzu, etwa weil ein Block verschoben wurde, zählt der
+noch offene Hinweis sie mit. Ist er schon quittiert, kommt er für sie noch einmal. Beginnt der
+nächste Block bis zu 15 Minuten nach dem Ende des vorigen, gehört der Wechsel zum Ende des vorigen
+Blocks, auch wenn die Schicht selbst erst zum Beginn des nächsten fällig ist.
+
 Die Leiste zeigt die Zeitpunkte der nächsten 24 Stunden und die der letzten 12 Stunden, an denen
 noch etwas offen ist. „keine Schicht“ heißt: Die Einheit hat zu diesem Zeitpunkt keine laufende
-Schicht laut Plan, in der Ablösung ist nichts zu vollziehen. Ein Block, der bis zu 15 Minuten nach
-dem Ende des vorigen derselben Einheit beginnt, gehört zum Wechsel am Ende.
+Schicht laut Plan, in der Ablösung ist nichts zu vollziehen. „vollzogen“ steht auch dort, wo der
+Posten endet und die Einheit abgezogen ist.
 
 ### Wechsel an der UHS und in der Pause
 

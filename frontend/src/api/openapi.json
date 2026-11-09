@@ -15030,6 +15030,15 @@
           }
         }
       },
+      "PlanWechselEinheit": {
+        "type": "string",
+        "description": "Was an einer Einheit geschieht. Wire == `as_str()`.",
+        "enum": [
+          "wechsel",
+          "beginn",
+          "ende"
+        ]
+      },
       "PlanWechselEintrag": {
         "type": "object",
         "description": "Ein Eintrag eines Wechselpunkts.",
@@ -15054,6 +15063,17 @@
             "type": "integer",
             "format": "int64",
             "description": "Der Block, um den es geht: an einer Einheit der Folgeblock, ohne ihn der endende Block."
+          },
+          "einheit": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlanWechselEinheit",
+                "description": "Nur an einer Einheit: Wechsel, Beginn oder Ende des Postens."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "stand": {
             "$ref": "#/components/schemas/PlanWechselStand"

@@ -1168,6 +1168,11 @@ fn schichtplan_wire() {
         PauseBeginn => "pause_beginn",
         PauseEnde => "pause_ende",
     } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEintragArt::ALLE);
+    enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEinheit {
+        Wechsel => "wechsel",
+        Beginn => "beginn",
+        Ende => "ende",
+    } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEinheit::ALLE);
     enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselStand {
         Offen => "offen",
         Vollzogen => "vollzogen",

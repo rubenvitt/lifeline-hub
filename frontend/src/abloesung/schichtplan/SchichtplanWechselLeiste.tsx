@@ -45,8 +45,8 @@ function standTon(e: Eintrag, vorbei: boolean): StatusTon {
   return 'neutral';
 }
 
-/** Was an diesem Zeitpunkt geschieht, aus Bediensicht. */
-function artWort(e: Eintrag, block: SchichtplanBlock | undefined, zeitpunkt: string): string {
+/** Was an diesem Zeitpunkt geschieht, aus Bediensicht; an einer Einheit sagt es der Server. */
+function artWort(e: Eintrag): string {
   switch (e.art) {
     case 'uhs':
       return 'Wechsel an der UHS';
@@ -55,9 +55,11 @@ function artWort(e: Eintrag, block: SchichtplanBlock | undefined, zeitpunkt: str
     case 'pause_ende':
       return 'Pause endet';
     case 'einheit':
-      // Der Block ist der Folgeblock; ohne ihn der endende Block, der Posten endet.
-      if (block && block.bis === zeitpunkt) return 'Posten endet';
-      return 'Schichtwechsel';
+      return e.einheit === 'beginn'
+        ? 'Posten beginnt'
+        : e.einheit === 'ende'
+          ? 'Posten endet'
+          : 'Schichtwechsel';
   }
 }
 
@@ -174,7 +176,7 @@ export default function SchichtplanWechselLeiste({
                   <span style={{ color: rollen.text }}>{name}</span>
                   <span style={{ color: rollen.gedaempft }}>
                     {' · '}
-                    {artWort(e, block, punkt.zeitpunkt)}
+                    {artWort(e)}
                   </span>
                 </span>
                 <StatusChip ton={standTon(e, ms(punkt) < jetzt)} wort={STAND_WORT[e.stand]} />

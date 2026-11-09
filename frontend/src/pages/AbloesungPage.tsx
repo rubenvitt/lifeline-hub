@@ -2,7 +2,7 @@ import { IconStift } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLinkClickHandler, useParams, useSearchParams } from 'react-router';
+import { Link, useLinkClickHandler, useLocation, useParams, useSearchParams } from 'react-router';
 import {
   aendereSchicht,
   beginneSchicht,
@@ -199,6 +199,7 @@ export default function AbloesungPage() {
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   // Ohne Parameter die Vorgabe der Seite: im Sanitätsdienst (Einsatz-Vorlage „Sanitätsdienst“)
   // der Schichtplan, sonst die laufenden Schichten (LLH-1554). Die Seite zeigt erst mit dem
   // Einsatz etwas, die Vorgabe steht also, bevor eine Ansicht gerendert wird.
@@ -931,6 +932,7 @@ export default function AbloesungPage() {
           darfSchreiben={darfSchreiben}
           abschnitte={vorgaben}
           wechselSprung={parseAbloesungWechsel(searchParams)}
+          wechselSprungKennung={location.key}
           onVollziehen={(id) => {
             const x = laufende.find((s) => s.id === id);
             if (!x) return;

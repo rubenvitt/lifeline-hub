@@ -318,6 +318,17 @@ async fn wechselpunkte_laden(
             stand.faellig.insert((einheit, t), id);
         }
     }
+    let abgeschlossen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT einheit_id, faellig_at FROM einsatz_abloesung \
+         WHERE einsatz_id = ? AND status <> 'laufend' AND faellig_laut_plan = 1",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    stand.abgeschlossen = abgeschlossen
+        .into_iter()
+        .filter_map(|(e, f)| zeit::parse_utc(&f).map(|t| (e, t)))
+        .collect();
     stand.gewechselt_in = sqlx::query_scalar(
         "SELECT plan_block_id FROM einsatz_abloesung \
          WHERE einsatz_id = ? AND plan_block_id IS NOT NULL",

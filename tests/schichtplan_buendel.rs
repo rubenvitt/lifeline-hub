@@ -152,6 +152,26 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     // Ein späterer Tick meldet den Zeitpunkt nicht noch einmal.
     tick_einmal(&pool, &live, z + Duration::minutes(2)).await;
     assert_eq!(bezuege(&pool, "abloesung_faellig", admin_id).await.len(), 2);
+    // Kommt nach der Quittung eine Schicht zu diesem Zeitpunkt hinzu, meldet sie ihn neu, statt
+    // ohne Alarm fällig zu werden; solange der Alarm offen ist, schweigt sie (siehe oben).
+    sqlx::query(
+        "UPDATE benachrichtigung SET quittiert_at = ? WHERE bezug_typ = 'schichtplan_wechsel'",
+    )
+    .bind(f(z + Duration::minutes(3)))
+    .execute(&pool)
+    .await
+    .unwrap();
+    posten(&app, &admin, e, "RTW 16", beginn, z).await;
+    tick_einmal(&pool, &live, z + Duration::minutes(4)).await;
+    assert_eq!(
+        bezuege(&pool, "abloesung_faellig", admin_id).await,
+        vec![
+            ("abloesung".to_string(), einzeln),
+            wechsel.clone(),
+            wechsel.clone()
+        ],
+        "nach der Quittung ein neuer Alarm für den Nachzügler"
+    );
 
     let b: i64 = sqlx::query_scalar(
         "SELECT id FROM benachrichtigung WHERE art = 'abloesung_faellig' \
@@ -172,7 +192,7 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["titel"], "Ablösung fällig");
     let detail = v["detail"].as_str().unwrap_or_default();
-    assert!(detail.starts_with("15 Wechsel um "), "{v}");
+    assert!(detail.starts_with("16 Wechsel um "), "{v}");
     assert_eq!(
         v["pfad"],
         format!("/einsaetze/{e}/abloesung?ansicht=plan&wechsel={minute}").as_str()

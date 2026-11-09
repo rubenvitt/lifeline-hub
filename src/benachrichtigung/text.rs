@@ -148,9 +148,9 @@ async fn detail_abloesung(
 }
 
 /// Die Spalten der Detailzeile eines Wechselzeitpunkts (LLH-1555 Welle 3): die Blöcke an
-/// Einheiten, die zu diesem Zeitpunkt beginnen oder enden, und der Name ihrer Einheit, alle
-/// Retain (Guard `detail_liest_nur_retain_spalten`).
-pub const DETAIL_SCHICHTPLAN_WECHSEL_SPALTEN: [(&str, &str); 5] = [
+/// Einheiten und der Name ihrer Einheit, alle Retain (Guard `detail_liest_nur_retain_spalten`).
+pub const DETAIL_SCHICHTPLAN_WECHSEL_SPALTEN: [(&str, &str); 6] = [
+    ("einsatz_planschicht", "id"),
     ("einsatz_planschicht", "posten_art"),
     ("einsatz_planschicht", "einheit_id"),
     ("einsatz_planschicht", "von"),
@@ -166,29 +166,43 @@ pub fn wechsel_zeitpunkt(minute: i64) -> Option<chrono::DateTime<chrono::Utc>> {
 }
 
 /// Detailzeile eines Wechselzeitpunkts: „15 Wechsel um 1400“, bei einem einzigen Wechsel die
-/// Einheit wie bei einer Schicht („RTW 1, 1400“). Gezählt werden beim Lesen die Einheiten, deren
-/// Block laut Plan zu diesem Zeitpunkt beginnt oder endet, wie in der Wechsel-Leiste; Uhrzeit in
-/// Zone und Zeitdarstellung des Einsatzes.
+/// Einheit wie bei einer Schicht („RTW 1, 1400“). Gezählt werden beim Lesen die Einheiten, die
+/// laut Plan zu diesem Zeitpunkt wechseln, beginnen oder enden, wie in der Wechsel-Leiste
+/// (`wechselpunkte::einheiten_am_zeitpunkt`); Uhrzeit in Zone und Zeitdarstellung des Einsatzes.
 async fn detail_schichtplan_wechsel(
     pool: &SqlitePool,
     einsatz_id: i64,
     minute: i64,
 ) -> Result<Option<String>, AppError> {
+    use crate::abloesung::schichtplan::{wechselpunkte, Posten};
     let Some(z) = wechsel_zeitpunkt(minute) else {
         return Ok(None);
     };
-    let zs = crate::zeit::formatiere_utc(z);
-    let namen: Vec<String> = sqlx::query_scalar(
-        "SELECT ee.name FROM einsatz_einheit ee \
-         WHERE ee.einsatz_id = ? AND ee.id IN ( \
-           SELECT p.einheit_id FROM einsatz_planschicht p \
-           WHERE p.einsatz_id = ? AND p.posten_art = 'einheit' AND (p.von = ? OR p.bis = ?)) \
-         ORDER BY ee.name, ee.id",
+    let zeilen: Vec<(i64, i64, String, String)> = sqlx::query_as(
+        "SELECT id, einheit_id, von, bis FROM einsatz_planschicht \
+         WHERE einsatz_id = ? AND posten_art = 'einheit' AND einheit_id IS NOT NULL",
     )
     .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let bloecke: Vec<wechselpunkte::BlockGrenzen> = zeilen
+        .into_iter()
+        .filter_map(|(id, einheit, von, bis)| {
+            Some(wechselpunkte::BlockGrenzen {
+                id,
+                posten: Posten::Einheit(einheit),
+                von: crate::zeit::parse_utc(&von)?,
+                bis: crate::zeit::parse_utc(&bis)?,
+            })
+        })
+        .collect();
+    let einheiten = wechselpunkte::einheiten_am_zeitpunkt(&bloecke, z);
+    let namen: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND id IN (SELECT value FROM json_each(?)) ORDER BY name, id",
+    )
     .bind(einsatz_id)
-    .bind(&zs)
-    .bind(&zs)
+    .bind(serde_json::to_string(&einheiten).expect("ID-Liste serialisierbar"))
     .fetch_all(pool)
     .await?;
     let uhr = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id)

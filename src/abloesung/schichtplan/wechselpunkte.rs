@@ -52,6 +52,20 @@ wire_enum! {
 }
 
 wire_enum! {
+    /// Was an einer Einheit geschieht. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
+    pub enum PlanWechselEinheit {
+        /// Der Block endet, der Folgeblock beginnt (binnen der Toleranz).
+        Wechsel => "wechsel",
+        /// Ein Block ohne Vorgänger beginnt: der Posten beginnt.
+        Beginn => "beginn",
+        /// Der Block endet ohne Folgeblock: der Posten endet.
+        Ende => "ende",
+    }
+    try_from = |s| format!("Ungültiger Wechsel an einer Einheit: {s}");
+}
+
+wire_enum! {
     /// Stand eines Eintrags der Wechsel-Leiste. Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum PlanWechselStand {
@@ -75,6 +89,10 @@ pub struct PlanWechselEintrag {
     pub stand: PlanWechselStand,
     /// Der Block, um den es geht: an einer Einheit der Folgeblock, ohne ihn der endende Block.
     pub block_id: i64,
+    /// Nur an einer Einheit: Wechsel, Beginn oder Ende des Postens.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<PlanWechselEinheit>)]
+    pub einheit: Option<PlanWechselEinheit>,
     /// Nur an einer Einheit mit Stand `offen`: die Schicht, die zu vollziehen ist.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abloesung_id: Option<i64>,
@@ -108,6 +126,9 @@ pub struct Stand {
     pub faellig: HashMap<(i64, DateTime<Utc>), i64>,
     /// Blöcke, in die ein Vollzug aus dem Plan gewechselt hat (`einsatz_abloesung.plan_block_id`).
     pub gewechselt_in: HashSet<i64>,
+    /// Schichten laut Plan, die nicht mehr laufen (vollzogen, abgezogen): (Einheit, Fälligkeit).
+    /// Trägt „vollzogen“ dort, wo kein Folgeblock das Ziel ist (der Posten endet).
+    pub abgeschlossen: HashSet<(i64, DateTime<Utc>)>,
     /// Vollzogene, nicht zurückgenommene Wechsel an UHS und Pause: (Block, Art).
     pub vollzogen: HashSet<(i64, WechselArt)>,
 }
@@ -123,11 +144,12 @@ pub fn wechselpunkte(
     jetzt: DateTime<Utc>,
 ) -> Vec<PlanWechselpunkt> {
     let mut je_zeitpunkt: BTreeMap<DateTime<Utc>, Vec<PlanWechselEintrag>> = BTreeMap::new();
-    let mut eintrag = |t: DateTime<Utc>, art, stand, block_id, abloesung_id| {
+    let mut eintrag = |t: DateTime<Utc>, art, stand, block_id, einheit, abloesung_id| {
         je_zeitpunkt.entry(t).or_default().push(PlanWechselEintrag {
             art,
             stand,
             block_id,
+            einheit,
             abloesung_id,
         });
     };
@@ -154,10 +176,19 @@ pub fn wechselpunkte(
                 ist_folgeblock.insert(f.id);
             }
         }
-        let einheit_stand = |t: DateTime<Utc>, ziel: Option<i64>| {
-            if let Some(&schicht) = stand.faellig.get(&(einheit, t)) {
+        // Die Schicht ist zum Wechselpunkt fällig oder, nach `kopplung`, zum Beginn des
+        // Folgeblocks, wenn sie außerhalb des Plans in der Lücke davor begann.
+        let einheit_stand = |zeiten: &[DateTime<Utc>], ziel: Option<i64>| {
+            if let Some(&schicht) = zeiten
+                .iter()
+                .find_map(|t| stand.faellig.get(&(einheit, *t)))
+            {
                 (PlanWechselStand::Offen, Some(schicht))
-            } else if ziel.is_some_and(|z| stand.gewechselt_in.contains(&z)) {
+            } else if ziel.is_some_and(|z| stand.gewechselt_in.contains(&z))
+                || zeiten
+                    .iter()
+                    .any(|t| stand.abgeschlossen.contains(&(einheit, *t)))
+            {
                 (PlanWechselStand::Vollzogen, None)
             } else {
                 (PlanWechselStand::OhneSchicht, None)
@@ -166,14 +197,22 @@ pub fn wechselpunkte(
         for b in &liste {
             // Beginn eines Postens ohne Vorgänger: die erste Schicht beginnt.
             if !ist_folgeblock.contains(&b.id) {
-                let (s, a) = einheit_stand(b.von, Some(b.id));
-                eintrag(b.von, PlanWechselEintragArt::Einheit, s, b.id, a);
+                let (s, a) = einheit_stand(&[b.von], Some(b.id));
+                let art = Some(PlanWechselEinheit::Beginn);
+                eintrag(b.von, PlanWechselEintragArt::Einheit, s, b.id, art, a);
             }
             // Ende des Blocks: Wechsel in den Folgeblock oder der Posten endet.
             let f = folgeblock(b.bis);
-            let (s, a) = einheit_stand(b.bis, f.map(|f| f.id));
+            let zeiten: Vec<DateTime<Utc>> =
+                std::iter::once(b.bis).chain(f.map(|f| f.von)).collect();
+            let (s, a) = einheit_stand(&zeiten, f.map(|f| f.id));
             let block = f.map_or(b.id, |f| f.id);
-            eintrag(b.bis, PlanWechselEintragArt::Einheit, s, block, a);
+            let art = Some(if f.is_some() {
+                PlanWechselEinheit::Wechsel
+            } else {
+                PlanWechselEinheit::Ende
+            });
+            eintrag(b.bis, PlanWechselEintragArt::Einheit, s, block, art, a);
         }
     }
 
@@ -193,6 +232,7 @@ pub fn wechselpunkte(
                 stand_von(WechselArt::Uhs),
                 b.id,
                 None,
+                None,
             ),
             Posten::Pause => {
                 eintrag(
@@ -201,12 +241,14 @@ pub fn wechselpunkte(
                     stand_von(WechselArt::PauseBeginn),
                     b.id,
                     None,
+                    None,
                 );
                 eintrag(
                     b.bis,
                     PlanWechselEintragArt::PauseEnde,
                     stand_von(WechselArt::PauseEnde),
                     b.id,
+                    None,
                     None,
                 );
             }
@@ -234,6 +276,25 @@ pub fn wechselpunkte(
             }
         })
         .collect()
+}
+
+/// Die Einheiten, die laut Plan zum Zeitpunkt `t` wechseln, beginnen oder enden, wie die Leiste
+/// sie zählt (ohne Stand): die Detailzeile des gebündelten Hinweises (`benachrichtigung::text`).
+pub fn einheiten_am_zeitpunkt(bloecke: &[BlockGrenzen], t: DateTime<Utc>) -> Vec<i64> {
+    let einheit_von: HashMap<i64, i64> = bloecke
+        .iter()
+        .filter_map(|b| b.posten.einheit_id().map(|e| (b.id, e)))
+        .collect();
+    let mut einheiten: Vec<i64> = wechselpunkte(bloecke, &Stand::default(), t)
+        .into_iter()
+        .filter(|p| p.minute == minute(t))
+        .flat_map(|p| p.eintraege)
+        .filter(|e| e.art == PlanWechselEintragArt::Einheit)
+        .filter_map(|e| einheit_von.get(&e.block_id).copied())
+        .collect();
+    einheiten.sort_unstable();
+    einheiten.dedup();
+    einheiten
 }
 
 #[cfg(test)]
@@ -335,6 +396,52 @@ mod tests {
             )],
             "Posten endet"
         );
+    }
+
+    #[test]
+    fn schicht_faellig_zum_folgeblock_in_der_luecke_steht_am_ende() {
+        // Die Schicht begann außerhalb des Plans in der Lücke: `kopplung` macht sie zum Beginn
+        // des Folgeblocks (14:10) fällig; die Leiste führt sie am Ende des Blocks (14:00).
+        let bloecke = [
+            block(1, Posten::Einheit(10), "08:00", "14:00"),
+            block(2, Posten::Einheit(10), "14:10", "20:00"),
+        ];
+        let mut stand = Stand::default();
+        stand.faellig.insert((10, t("14:10")), 100);
+        let p = wechselpunkte(&bloecke, &stand, t("09:00"));
+        let um_14 = p.iter().find(|p| p.zeitpunkt.contains("14:00")).unwrap();
+        assert_eq!(um_14.eintraege[0].stand, PlanWechselStand::Offen);
+        assert_eq!(um_14.eintraege[0].abloesung_id, Some(100));
+        assert_eq!(
+            um_14.eintraege[0].einheit,
+            Some(PlanWechselEinheit::Wechsel)
+        );
+    }
+
+    #[test]
+    fn abgezogener_posten_ist_vollzogen() {
+        let bloecke = [block(1, Posten::Einheit(10), "08:00", "14:00")];
+        let mut stand = Stand::default();
+        stand.abgeschlossen.insert((10, t("14:00")));
+        let p = wechselpunkte(&bloecke, &stand, t("09:00"));
+        let ende = p.iter().find(|p| p.zeitpunkt.contains("14:00")).unwrap();
+        assert_eq!(ende.eintraege[0].stand, PlanWechselStand::Vollzogen);
+        assert_eq!(ende.eintraege[0].einheit, Some(PlanWechselEinheit::Ende));
+    }
+
+    #[test]
+    fn einheiten_am_zeitpunkt_wie_die_leiste() {
+        let bloecke = [
+            block(1, Posten::Einheit(10), "08:00", "14:00"),
+            block(2, Posten::Einheit(10), "14:00", "20:00"),
+            // Endet 13:55, Folgeblock um 14:00: wechselt um 13:55, nicht um 14:00.
+            block(3, Posten::Einheit(11), "08:00", "13:55"),
+            block(4, Posten::Einheit(11), "14:00", "20:00"),
+            block(5, Posten::Einheit(12), "14:00", "16:00"),
+            block(6, Posten::Uhs(7), "14:00", "16:00"),
+        ];
+        assert_eq!(einheiten_am_zeitpunkt(&bloecke, t("14:00")), vec![10, 12]);
+        assert_eq!(einheiten_am_zeitpunkt(&bloecke, t("13:55")), vec![11]);
     }
 
     #[test]
