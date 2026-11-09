@@ -147,12 +147,13 @@ Demo-Daten neu abrufen.
 - **WHEN** eine Führungskraft eine Planung ändert
 - **THEN** erhält ein Benutzer ohne Org-Rolle derselben Organisation kein Ereignis `planung`
 
-### Requirement: Bewusst nicht live in der Organisation
-Folgende Änderungen SHALL kein Org-Ereignis auslösen und werden erst beim nächsten Abruf sichtbar:
-der zeitgesteuerte Ablauf der Nachlauffrist oder der Aufbewahrungsfrist, Stab-Besetzungen
-(`meine_sachgebiete`, `meine_funktion`), die Lagekennzahlen, Org-Einstellungen und
-Org-Modul-Einstellungen, die Benutzerverwaltung und die instanzweite Kartenkonfiguration.
+### Requirement: Fristablauf, Lagekennzahlen, Einstellungen und Verwaltung sind in der Organisation nicht live
 
-#### Scenario: Stab-Besetzung
-- **WHEN** ein Sachgebiet im Stab besetzt wird
+Folgende Änderungen SHALL kein Org-Ereignis auslösen und werden erst beim nächsten Abruf sichtbar:
+der zeitgesteuerte Ablauf der Nachlauffrist oder der Aufbewahrungsfrist, die Lagekennzahlen,
+Org-Einstellungen und Org-Modul-Einstellungen, die Benutzerverwaltung und die instanzweite
+Kartenkonfiguration.
+
+#### Scenario: Org-Modul-Einstellung
+- **WHEN** ein System-Admin die Sichtbarkeits-Vorgabe eines Moduls ändert
 - **THEN** wird kein Ereignis `einsatzliste` verteilt

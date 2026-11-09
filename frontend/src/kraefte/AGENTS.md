@@ -57,7 +57,7 @@ die Anlässe der Hinweise zur ablösenden Einheit `Beruehrt::hinweise` (LLH-1131
 Zeitachse schreibt (Abruf, Eintreffen am Bereitstellungsraum, Auflösen), bildet seine Anlässe
 in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
 Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl. Anzeige im
-Meldebild/Personal/Einheit-Detail, **nicht im Stab**. Bewusster Bruch von LFH-46 E17 (Feldbefund)
+Meldebild/Personal/Einheit-Detail. Bewusster Bruch von LFH-46 E17 (Feldbefund)
 auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
 **Einstufung** (LLH-730, `openspec/changes/archive/2026-11-08-u1piomi1-zeitachse-grenzwerte-einstufen/design.md`):
 nur `zeitachse.ts:stufeEin` gegen die wirksamen `SchichtplanGrenzwerte` (Vorgaben 12 h/8 h

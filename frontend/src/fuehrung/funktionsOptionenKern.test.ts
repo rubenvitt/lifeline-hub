@@ -3,7 +3,6 @@ import type { FuehrungsfunktionEintrag, Sachgebiet } from '../api/types';
 import {
   mitBesetzung,
   anVorbelegung,
-  besetzungAusStab,
   etbStabVorschlaege,
   besetzungText,
   dekodiere,
@@ -99,32 +98,6 @@ describe('Besetzung', () => {
     expect(besetzungText({ zustand: 'personal' })).toBeUndefined();
     expect(besetzungText(undefined)).toBeUndefined();
   });
-
-  it('besetzungAusStab kennt nur belegte Zeilen', () => {
-    const karte = besetzungAusStab({
-      besetzung: [
-        {
-          sachgebiet: 's2',
-          besetzung_art: 'extern',
-          name: 'Müller',
-          personal_noch_disponiert: true,
-          gesetzt_von_id: 1,
-          gesetzt_at: 'x',
-        },
-        {
-          sachgebiet: 's4',
-          besetzung_art: 'einsatzleitung',
-          personal_noch_disponiert: true,
-          gesetzt_von_id: 1,
-          gesetzt_at: 'x',
-        },
-      ],
-    });
-    expect([...karte]).toEqual([
-      ['s2', 'Müller'],
-      ['s4', 'bei der Einsatzleitung'],
-    ]);
-  });
 });
 
 describe('ETB (Nachzug LFH-545)', () => {
@@ -135,18 +108,16 @@ describe('ETB (Nachzug LFH-545)', () => {
     ]);
   });
 
-  it('Vorbelegung: Führungsstelle gewinnt gegen die Besetzung', () => {
-    expect(
-      anVorbelegung({ meine_fuehrungsstelle: 'Fachberater: THW', meine_sachgebiete: ['s2'] }),
-    ).toBe('Fachberater: THW');
+  it('Vorbelegung: die Führungsstelle', () => {
+    expect(anVorbelegung({ meine_fuehrungsstelle: 'Fachberater: THW' })).toBe('Fachberater: THW');
+    expect(anVorbelegung({ meine_fuehrungsstelle: 'S2' })).toBe('S2');
   });
 
-  it('Vorbelegung: sonst das erste eigene Sachgebiet in S1–S6-Folge', () => {
-    expect(anVorbelegung({ meine_sachgebiete: ['s3', 's2'] })).toBe('S2');
-  });
-
-  it('Vorbelegung: weder noch bleibt leer', () => {
-    expect(anVorbelegung({ meine_fuehrungsstelle: '  ', meine_sachgebiete: [] })).toBeUndefined();
+  // Spec `fuehrungsfunktionen`, „Vorrangregel der ETB-Vorbelegung“ (i6k6mzed): das Sachgebiet
+  // steht in der Führungsstelle, einen zweiten Weg gibt es nicht.
+  it('Vorbelegung: ohne Führungsstelle bleibt sie leer', () => {
+    expect(anVorbelegung({ meine_fuehrungsstelle: '  ' })).toBeUndefined();
+    expect(anVorbelegung({})).toBeUndefined();
   });
 });
 

@@ -1,5 +1,5 @@
-/** Was eine Kette braucht: Kennung und Vorgänger. Lagebericht, Befehl und Pressemitteilung
- *  (LFH-554) teilen dieselbe Fortschreibung. */
+/** Was eine Kette braucht: Kennung und Vorgänger. Lagebericht und Befehl teilen dieselbe
+ *  Fortschreibung. */
 interface Glied {
   id: number;
   vorgaenger_id?: number | null;

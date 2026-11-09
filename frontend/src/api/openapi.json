@@ -1179,7 +1179,7 @@
       },
       "AntragZielArt": {
         "type": "string",
-        "description": "Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die vier\nPersonenarten tragen dieselben Werte wie [`PersonenArt`].",
+        "description": "Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die\nPersonenarten tragen dieselben Werte wie [`PersonenArt`]. `medienkontakt` steht nur noch\nin alten Anträgen: das Modul Presse und Medienarbeit ist entfernt (i6k6mzed, design.md\nD4), ein neuer Antrag mit diesem Ziel ist 422.",
         "enum": [
           "einsatz",
           "betroffene",
@@ -3239,19 +3239,9 @@
           "neu"
         ]
       },
-      "BesetzungArt": {
-        "type": "string",
-        "description": "Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.\n\n**Keine Zeile = „nicht vergeben\"** — das ist der im Fükw der Führungsstufe B\ndokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.\nDer Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion\n(„haben wir S4 bedacht?\").",
-        "enum": [
-          "einsatzleitung",
-          "personal",
-          "extern",
-          "rueckwaertig"
-        ]
-      },
       "BesetzungsZustand": {
         "type": "string",
-        "description": "Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als\n[`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer\nZeile eine Auskunft, kein fehlendes Feld.",
+        "description": "Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers, mit „nicht vergeben“ als\neigenem Wert — hier ist die Abwesenheit eines Mitglieds eine Auskunft, kein fehlendes\nFeld. Erzeugt werden nur noch `personal` und `nicht_vergeben` (i6k6mzed, D2);\n`einsatzleitung`, `extern` und `rueckwaertig` bleiben als Wire-Werte der früheren\nStab-Besetzung stehen (Grenzwert-Regel, `AGENTS.md`).",
         "enum": [
           "nicht_vergeben",
           "einsatzleitung",
@@ -4384,63 +4374,6 @@
             "format": "int64"
           }
         }
-      },
-      "ChecklistenEintrag": {
-        "type": "object",
-        "description": "Ein gespeicherter Punkt der Checkliste.\n\n`erledigt_at`/`erledigt_von_id` sind genau dann gesetzt, wenn `erledigt` (CHECK in der\nTabelle); `bemerkung` fehlt, wenn keine gesetzt ist.",
-        "required": [
-          "punkt",
-          "erledigt",
-          "geaendert_von_id",
-          "geaendert_at"
-        ],
-        "properties": {
-          "bemerkung": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "erledigt": {
-            "type": "boolean"
-          },
-          "erledigt_at": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "erledigt_von_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "geaendert_at": {
-            "type": "string"
-          },
-          "geaendert_von_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "punkt": {
-            "$ref": "#/components/schemas/ChecklistenPunkt"
-          }
-        }
-      },
-      "ChecklistenPunkt": {
-        "type": "string",
-        "description": "Punkt der Checkliste. Wire == `as_str()`.\n\n`ALLE` ist die Anzeigereihenfolge und Teil des Vertrags: das Frontend prüft seine Vorlage\ngegen den generierten Typ in derselben Reihenfolge.",
-        "enum": [
-          "aufstellort",
-          "einweisung",
-          "lageskizze",
-          "funkarbeitsplaetze",
-          "sprechgruppen",
-          "etb_eroeffnet",
-          "leitstelle_gemeldet"
-        ]
       },
       "Datenkategorie": {
         "type": "string",
@@ -5815,7 +5748,7 @@
               "string",
               "null"
             ],
-            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „S2/S3\", „Einsatzleitung\"; LFH-615). Abgeleitet aus `meine_sachgebiete`\nund `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt."
+            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „Fachberater: THW\", „Einsatzleitung\"; LFH-615). Abgeleitet aus der\nFührungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,\nwenn keine Funktion folgt."
           },
           "meine_rolle": {
             "oneOf": [
@@ -5832,7 +5765,7 @@
             "items": {
               "$ref": "#/components/schemas/Sachgebiet"
             },
-            "description": "Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in\ndiesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.\n\n**Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und\nKEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über\n`Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein\nPfad, der auslässt, während der andere `[]` schickt, wäre nach der\nOptionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung."
+            "description": "Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;\nseit i6k6mzed aus `einsatz_mitgliedschaft.fuehrungsfunktion`, design.md D2).\n\n**Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und\nKEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über\n`Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein\nPfad, der auslässt, während der andere `[]` schickt, wäre nach der\nOptionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung."
           },
           "meldende_stelle": {
             "type": [
@@ -11724,7 +11657,6 @@
           "karte_bild",
           "etb",
           "befehl",
-          "stab",
           "lagebesprechung",
           "fernmeldewesen",
           "dokument",
@@ -11732,12 +11664,12 @@
           "betreuung",
           "evakuierung",
           "verpflegung",
-          "presse",
           "infotelefon",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
           "einsatz",
+          "mitglieder",
           "benachrichtigung",
           "lagged"
         ]
@@ -11936,183 +11868,6 @@
           }
         ],
         "description": "Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich\ndie Kopplung. Eine Person bekommt `geraet: null`."
-      },
-      "MedienkontaktAnzeige": {
-        "type": "object",
-        "description": "Öffentliche Darstellung eines Medienkontakts.",
-        "required": [
-          "id",
-          "einsatz_id",
-          "art",
-          "medium",
-          "thema",
-          "eingang_at",
-          "status",
-          "angelegt_von_id",
-          "angelegt_at"
-        ],
-        "properties": {
-          "angelegt_at": {
-            "type": "string"
-          },
-          "angelegt_von_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "antwort": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Die gegebene Antwort. Bleibt bei einer Rücknahme nach `offen` stehen."
-          },
-          "art": {
-            "$ref": "#/components/schemas/MedienkontaktArt"
-          },
-          "bearbeitet_at": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "bearbeitet_von_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64",
-            "description": "Wer den Status zuletzt gesetzt hat, und wann."
-          },
-          "bearbeitet_von_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "eingang_at": {
-            "type": "string"
-          },
-          "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "freigabe_durch": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Wer die Aussage freigegeben hat (Freitext, etwa „EL mündlich 14:20“)."
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "kontakt_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "kontaktweg": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "medium": {
-            "type": "string"
-          },
-          "pressemitteilung_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64",
-            "description": "Freigegebene Pressemitteilung desselben Einsatzes, auf die die Antwort verweist."
-          },
-          "status": {
-            "$ref": "#/components/schemas/MedienkontaktStatus"
-          },
-          "thema": {
-            "type": "string"
-          }
-        }
-      },
-      "MedienkontaktArt": {
-        "type": "string",
-        "description": "Art eines Medienkontakts. Wire == `as_str()`.",
-        "enum": [
-          "anfrage",
-          "abstimmung",
-          "termin"
-        ]
-      },
-      "MedienkontaktJeArt": {
-        "type": "object",
-        "description": "Zahl der Medienkontakte je Art (LFH-1075).",
-        "required": [
-          "anfrage",
-          "abstimmung",
-          "termin"
-        ],
-        "properties": {
-          "abstimmung": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "anfrage": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "termin": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "MedienkontaktKennzahlen": {
-        "type": "object",
-        "description": "Kennzahlen des Presse-Logs über den ganzen Bestand (LFH-1075, Spec `stab-presse-log`): die\nGrundlage der Medienlage und der Zahlen über der Liste. `medien` sind die Namen der Medien\n(Redaktionen, keine Personen), jedes einmal, in der Folge der Liste.",
-        "required": [
-          "gesamt",
-          "offen",
-          "offene_anfragen",
-          "je_art",
-          "medien"
-        ],
-        "properties": {
-          "gesamt": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "je_art": {
-            "$ref": "#/components/schemas/MedienkontaktJeArt"
-          },
-          "medien": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "offen": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "offene_anfragen": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "MedienkontaktStatus": {
-        "type": "string",
-        "description": "Status eines Medienkontakts. Wire == `as_str()`.",
-        "enum": [
-          "offen",
-          "beantwortet",
-          "abgelehnt",
-          "erledigt"
-        ]
       },
       "MeldeWeg": {
         "type": "string",
@@ -14686,7 +14441,7 @@
           },
           "kennung": {
             "type": "string",
-            "description": "`R-042`, `EK-17`, `IT-5`, `MK-3` — dieselbe Kennung bestätigt den Antrag."
+            "description": "`R-042`, `EK-17`, `IT-5` — dieselbe Kennung bestätigt den Antrag."
           },
           "person_status": {
             "oneOf": [
@@ -14848,8 +14603,7 @@
         "enum": [
           "betroffene",
           "externe_kraft",
-          "infotelefon_anruf",
-          "medienkontakt"
+          "infotelefon_anruf"
         ]
       },
       "PlanBefund": {
@@ -15831,221 +15585,6 @@
           "einheit",
           "uhs",
           "pause"
-        ]
-      },
-      "PressemitteilungAbschnitt": {
-        "type": "object",
-        "description": "Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).",
-        "required": [
-          "schluessel",
-          "text"
-        ],
-        "properties": {
-          "schluessel": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          }
-        }
-      },
-      "PressemitteilungAnzeige": {
-        "type": "object",
-        "description": "Öffentliche Anzeige einer Pressemitteilung.",
-        "required": [
-          "id",
-          "einsatz_id",
-          "vorlage",
-          "titel",
-          "zeitstand",
-          "status",
-          "abschnitte",
-          "version",
-          "ersteller_id",
-          "ersteller_name",
-          "erstellt_at",
-          "aktualisiert_at"
-        ],
-        "properties": {
-          "abschnitte": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PressemitteilungAbschnitt"
-            }
-          },
-          "aktualisiert_at": {
-            "type": "string"
-          },
-          "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "ersteller_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "ersteller_name": {
-            "type": "string"
-          },
-          "erstellt_at": {
-            "type": "string"
-          },
-          "etb_eintrag_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "freigegeben_at": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "freigegeben_von_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "freigegeben_von_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "status": {
-            "$ref": "#/components/schemas/PressemitteilungStatus"
-          },
-          "titel": {
-            "type": "string"
-          },
-          "version": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "vorgaenger_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "vorlage": {
-            "$ref": "#/components/schemas/PressemitteilungVorlage"
-          },
-          "zeitstand": {
-            "type": "string"
-          }
-        }
-      },
-      "PressemitteilungKopf": {
-        "type": "object",
-        "description": "Listenzeile einer Pressemitteilung: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie\nin der Anzeige als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.",
-        "required": [
-          "id",
-          "einsatz_id",
-          "vorlage",
-          "titel",
-          "zeitstand",
-          "status",
-          "version",
-          "ersteller_id",
-          "ersteller_name",
-          "erstellt_at"
-        ],
-        "properties": {
-          "einsatz_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "ersteller_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "ersteller_name": {
-            "type": "string"
-          },
-          "erstellt_at": {
-            "type": "string"
-          },
-          "etb_eintrag_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "freigegeben_at": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "freigegeben_von_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "freigegeben_von_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "status": {
-            "$ref": "#/components/schemas/PressemitteilungStatus"
-          },
-          "titel": {
-            "type": "string"
-          },
-          "version": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "vorgaenger_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "vorlage": {
-            "$ref": "#/components/schemas/PressemitteilungVorlage"
-          },
-          "zeitstand": {
-            "type": "string"
-          }
-        }
-      },
-      "PressemitteilungStatus": {
-        "type": "string",
-        "description": "Status einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `status`.",
-        "enum": [
-          "entwurf",
-          "freigegeben"
-        ]
-      },
-      "PressemitteilungVorlage": {
-        "type": "string",
-        "description": "Vorlage einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `vorlage`.",
-        "enum": [
-          "erstinformation",
-          "folgeinformation",
-          "bevoelkerungshinweis",
-          "freitext"
         ]
       },
       "Prioritaet": {
@@ -17451,63 +16990,6 @@
           "sortier": {
             "type": "integer",
             "format": "int64"
-          }
-        }
-      },
-      "StabAnzeige": {
-        "type": "object",
-        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden. Termin und Lagebesprechungen\nträgt seit LLH-1111 das Modul Lagebesprechung (`lagebesprechung::LagebesprechungStand`).",
-        "required": [
-          "besetzung"
-        ],
-        "properties": {
-          "besetzung": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StabsfunktionAnzeige"
-            }
-          }
-        }
-      },
-      "StabsfunktionAnzeige": {
-        "type": "object",
-        "description": "Eine belegte Sachgebietszeile.\n\n`name` trägt je Art `snap_name` (Personal) bzw. `bezeichnung` (extern/rückwärtig) und ist\nbei [`BesetzungArt::Einsatzleitung`] absent. `personal_noch_disponiert` unterscheidet\n„Person ist weg\" von „Name war nie gesetzt\": der Führungsnachweis überlebt das Entfernen\nder Disposition (`ON DELETE SET NULL` + eingefrorener `snap_name`).",
-        "required": [
-          "sachgebiet",
-          "besetzung_art",
-          "personal_noch_disponiert",
-          "gesetzt_von_id",
-          "gesetzt_at"
-        ],
-        "properties": {
-          "besetzung_art": {
-            "$ref": "#/components/schemas/BesetzungArt"
-          },
-          "gesetzt_at": {
-            "type": "string"
-          },
-          "gesetzt_von_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "personal_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "personal_noch_disponiert": {
-            "type": "boolean"
-          },
-          "sachgebiet": {
-            "$ref": "#/components/schemas/Sachgebiet"
           }
         }
       },

@@ -63,7 +63,7 @@ pub struct FuehrungsstelleAnzeige {
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
     /// Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
     /// Personenbezogen: wird geschwärzt und steht nie im Lagebericht.
-    pub verbindungen: Vec<crate::stab::kommunikation::KommunikationsVerbindung>,
+    pub verbindungen: Vec<crate::fernmeldewesen::kommunikation::KommunikationsVerbindung>,
     /// Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
     /// Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
     /// Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
@@ -87,8 +87,7 @@ wire_enum! {
     try_from = |s| format!("Ungültige Art des Einsatzleiters: {s}");
 }
 
-/// Höchstlänge des Freitexts eines externen Einsatzleiters, wie `stab::BEZEICHNUNG_MAX`
-/// (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+/// Höchstlänge des Freitexts eines externen Einsatzleiters (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
 pub const EINSATZLEITER_NAME_MAX: usize = 200;
 
 /// Der Einsatzleiter, wie der Client ihn liest.
@@ -284,8 +283,8 @@ struct Zeile {
 /// Absender eines Eintrags, mit dem die Führung nach außen geht, etwa einer Nachforderung
 /// (LLH-1104 D5): der Rufname der eigenen Führungsstelle, sonst ihre Bezeichnung. Ist keine
 /// gepflegt, der ETB-Vorschlag des Erstellers (`anVorbelegung`, `frontend/src/fuehrung/AGENTS.md`):
-/// seine Führungsstelle aus der Mitgliedschaft, sonst sein erstes Sachgebiet als Kürzel. `None`,
-/// wenn nichts davon bekannt ist; dann setzt `etb::repo` die Systemkennung (LFH-894).
+/// seine Führungsstelle aus der Mitgliedschaft, die seit i6k6mzed (D2) auch sein Sachgebiet trägt.
+/// `None`, wenn nichts davon bekannt ist; dann setzt `etb::repo` die Systemkennung (LFH-894).
 pub async fn absender_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -314,16 +313,9 @@ pub async fn absender_tx(
         let vorschlag = super::repo::vorbelegung(&karte, code.as_deref(), text)
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        if vorschlag.is_some() {
-            return Ok(vorschlag);
-        }
+        return Ok(vorschlag);
     }
-    let sachgebiete =
-        crate::stab::repo::sachgebiete_von_conn(&mut *conn, einsatz_id, benutzer_id).await?;
-    Ok(sachgebiete
-        .into_iter()
-        .min()
-        .map(|sg| sg.as_str().to_uppercase()))
+    Ok(None)
 }
 
 /// Lädt die Führungsstelle; ohne Zeile alle Angaben leer.
@@ -455,7 +447,7 @@ fn uebergabe_text(vorher: &Stand, nachher: &Stand) -> Option<String> {
 }
 
 /// Prüft, dass `personal_id` eine Disposition **dieses** Einsatzes ist (sonst 422), und liefert
-/// ihren `snap_name` zum Einfrieren — Muster `stab::repo::snap_name_von`.
+/// ihren `snap_name` zum Einfrieren.
 async fn load_snap_name(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -489,7 +481,7 @@ async fn save_einsatzleiter_tx(
 ) -> Result<Option<i64>, AppError> {
     // Ein abgeschlossener Einsatz bekommt keinen Eintrag mehr: der Extractor prüft vor der
     // Transaktion, ein konkurrierender Abschluss kann dazwischenliegen (D3).
-    crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+    crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
     let vorher = einsatzleiter_stand(conn, einsatz_id).await?;
     let (nachher, seit): (Stand, Option<&str>) = match eingabe {
         None => (None, None),

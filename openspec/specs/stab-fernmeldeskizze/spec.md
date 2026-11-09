@@ -18,8 +18,7 @@ Die Fernmeldeskizze SHALL als zweite Darstellung der Funkplan-Seite im Modul Fer
 erreichbar sein, als Reiter „Fernmeldeskizze“ neben „Funkplan“, „Sprechgruppen“ und
 „Kommunikationsplan“. Die Sichtvorgabe `?ansicht=skizze` öffnet die Skizze, danach wird der
 Parameter aus der Adresse entfernt, ein unbrauchbarer Wert ebenso. Die Skizze MUST NOT als eigenes
-Modul erscheinen. Sie MUST Sichtbarkeit und Sperre des Moduls Fernmeldewesen erben, nicht die des
-Stabs.
+Modul erscheinen. Sie MUST Sichtbarkeit und Sperre des Moduls Fernmeldewesen erben.
 
 #### Scenario: Umschalten
 
@@ -45,8 +44,7 @@ Stabs.
 
 #### Scenario: Stab gesperrt
 
-- **WHEN** der Stab für die Person gesperrt oder im Einsatz ausgeblendet ist und das
-  Fernmeldewesen frei
+- **WHEN** das Fernmeldewesen für die Person frei ist
 - **THEN** zeigt die Skizze alle Elemente, und eine Person mit Schreibrecht kann sie bearbeiten
 
 #### Scenario: Fernmeldewesen gesperrt
@@ -132,9 +130,9 @@ Sachgebiete stehen nur als Funktionszeichen im Kasten „Einsatzleitung“.
 
 Sind die Abschnitte gesperrt oder nicht geladen, SHALL die Skizze statt der Fläche den Grund nennen
 und MUST NOT Einheiten ohne Abschnitt zeigen. Fehlen nur die Einheiten, die Fahrzeuge, die
-Stab-Besetzung, die externen Stellen oder die Daten der Skizze, SHALL die Skizze das Übrige zeigen
+Mitglieder, die externen Stellen oder die Daten der Skizze, SHALL die Skizze das Übrige zeigen
 und je fehlender Quelle den Grund nennen. Eine fehlende Quelle MUST NOT als leerer Bestand
-erscheinen. Die Stab-Besetzung SHALL die Skizze nur abrufen, wenn der Stab für die Person frei ist.
+erscheinen. Die Mitglieder SHALL die Skizze ohne eigenes Modulrecht abrufen.
 
 #### Scenario: Abschnitte gesperrt
 
@@ -161,10 +159,9 @@ erscheinen. Die Stab-Besetzung SHALL die Skizze nur abrufen, wenn der Stab für 
 
 #### Scenario: Stab nicht frei
 
-- **WHEN** das Fernmeldewesen frei ist, der Stab aber ausgeblendet oder gesperrt
+- **WHEN** das Fernmeldewesen frei ist, der Abruf der Mitglieder aber scheitert
 - **THEN** zeigt der Kasten „Einsatzleitung“ keine Sachgebietszeichen, die Skizze nennt
-  „Stab-Besetzung: nicht freigegeben“, alles Übrige steht vollständig, und es geht keine Anfrage
-  an den Stab
+  „Mitglieder: nicht geladen“, und alles Übrige steht vollständig
 
 ### Requirement: Lesbar ohne waagerechtes Scrollen
 
@@ -311,9 +308,9 @@ Führungsmittel.
   Angabe.
 - Ein Abschnitt mit eingetragener Leitung SHALL das Zeichen „EAL“ tragen, ein Unterabschnitt
   „UEAL“.
-- Der Kasten „Einsatzleitung“ SHALL je Sachgebiet S1 bis S6 ein Zeichen mit dem Kürzel tragen,
-  wenn es bei der Einsatzleitung, durch disponiertes Personal oder extern besetzt ist; ein
-  rückwärtig wahrgenommenes Sachgebiet MUST NOT im Kasten stehen.
+- Der Kasten „Einsatzleitung“ SHALL je Sachgebiet S1 bis S6 genau ein Zeichen mit dem Kürzel
+  tragen, wenn mindestens ein Mitglied des Einsatzes dieses Sachgebiet in seiner Mitgliedschaft
+  führt; ein Sachgebiet ohne Mitglied MUST NOT im Kasten stehen.
 - Personennamen MUST NOT erscheinen. Die Zeichen sind keine Elemente: sie tragen keine
   Stichleitung, keine Lücke und keinen eigenen Fokus.
 - Der Kasten SHALL um die Zeilen dieser Zeichen wachsen, auf dem Bildschirm, im Auto-Layout und im
@@ -357,9 +354,9 @@ Führungsmittel.
 
 #### Scenario: Stab der Einsatzleitung
 
-- **WHEN** S2 durch disponiertes Personal, S3 bei der Einsatzleitung und S6 rückwärtig besetzt ist
-- **THEN** zeigt der Kasten „Einsatzleitung“ die Zeichen „S2“ und „S3“ in dieser Folge, kein „S6“
-  und keinen Namen
+- **WHEN** ein Mitglied S3 und zwei Mitglieder S2 in ihrer Mitgliedschaft führen und kein Mitglied S6
+- **THEN** zeigt der Kasten „Einsatzleitung“ die Zeichen „S2“ und „S3“ je einmal in dieser Folge,
+  kein „S6“ und keinen Namen
 
 #### Scenario: Druck in Graustufen
 

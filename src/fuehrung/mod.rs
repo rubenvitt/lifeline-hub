@@ -16,7 +16,6 @@
 //! Herleitung: `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md`.
 
 use crate::error::AppError;
-use crate::stab::Sachgebiet;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -24,6 +23,9 @@ use utoipa::ToSchema;
 
 pub mod aufloesung;
 pub mod repo;
+pub mod sachgebiet;
+
+pub use sachgebiet::Sachgebiet;
 
 wire_enum! {
     /// Führungsfunktion aus dem Katalog. Wire == `as_str()`.

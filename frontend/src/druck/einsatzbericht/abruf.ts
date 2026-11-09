@@ -1,7 +1,7 @@
 import { ApiError } from '../../api/client';
 import { ladeBetreuung } from '../../api/betreuung';
 import { ladeEvakuierung } from '../../api/evakuierung';
-import { ladeEinsatz, ladeFuehrungsstelle } from '../../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle, ladeMitglieder } from '../../api/einsaetze';
 import { listAufgeloesteEinheiten, listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { ladeVerbleibAngaben, listePersonen } from '../../api/einsatzPerson';
@@ -12,7 +12,6 @@ import { ladeEtbZaehler } from '../../api/etb';
 import { listeEinheitenPerioden, listePersonalPerioden } from '../../api/kraefteZeitachse';
 import { ladeLagebericht, listeLageberichte } from '../../api/lageberichte';
 import { fetchLagebesprechungen } from '../../api/lagebesprechung';
-import { ladeStab } from '../../api/stab';
 import { ladeVerpflegung } from '../../api/verpflegung';
 import { ladeEtbVollstaendig } from '../../etb/druckAbruf';
 import { QUELLEN, modulLabel, type QuellenFreigabe, type QuellenSchluessel } from './quellen';
@@ -41,7 +40,7 @@ async function ladeLageberichtQuelle(einsatzId: number): Promise<LageberichtQuel
 const ABRUF = {
   einsatz: ladeEinsatz,
   fuehrungsstelle: ladeFuehrungsstelle,
-  stab: ladeStab,
+  mitglieder: ladeMitglieder,
   lagebesprechungen: fetchLagebesprechungen,
   einheiten: listeEinheiten,
   einheitenAufgeloest: listAufgeloesteEinheiten,

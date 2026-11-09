@@ -82,7 +82,8 @@ gerechnet wurde. Die Übernahme MUST keine zweite Verdichtung rechnen.
 ### Requirement: Weitere Abschnitte des Lagevortrags zur Information
 Im Lagevortrag zur Information SHALL je eine Übernahme in den Abschnitten „Besondere
 (Führungs-)Probleme“, „Gefahren-/Schadenlage“ und „Lageentwicklung“ stehen. Die Abschnitte
-„Auftrag“, „Anträge und Vorschläge“ und „Zusammenfassung“ MUST ohne Übernahme bleiben.
+„Auftrag“, „Anträge und Vorschläge“, „Zusammenfassung“ und „Medienlage“ MUST ohne Übernahme
+bleiben; die Medienlage ist Freitext.
 
 #### Scenario: Knopf in der Gefahren-/Schadenlage
 - **WHEN** eine Person mit Schreibrecht einen Entwurf „Lagevortrag zur Information“ öffnet
@@ -92,6 +93,10 @@ Im Lagevortrag zur Information SHALL je eine Übernahme in den Abschnitten „Be
 #### Scenario: Kein Knopf im Auftrag
 - **WHEN** eine Person einen Entwurf „Lagevortrag zur Information“ öffnet
 - **THEN** zeigt der Abschnitt „Auftrag“ keinen Übernahme-Knopf
+
+#### Scenario: Medienlage als Freitext
+- **WHEN** eine Person mit Schreibrecht einen Entwurf „Lagevortrag zur Information“ öffnet
+- **THEN** zeigt der Abschnitt „Medienlage“ ein Textfeld ohne Übernahme-Knopf und ohne Hinweis auf eine Quelle
 
 ### Requirement: Stand und kein Freitext in den weiteren Abschnitten
 Der übernommene Text dieser Abschnitte MUST mit dem Stand als taktische DTG beginnen; der Stand
@@ -218,8 +223,8 @@ kein Entwurf entstehen und MUST der Grund an der Seite stehen.
 #### Scenario: Anlegen mit Startinhalt
 - **WHEN** eine Person mit Schreibrecht „Neuer Lagevortrag“ wählt
 - **THEN** sendet der Client genau eine anlegende Anfrage mit Texten für Gefahren-/Schadenlage,
-  Eigene Lage, Lageentwicklung, Besondere (Führungs-)Probleme und Medienlage, und der Entwurf
-  öffnet sich
+  Eigene Lage, Lageentwicklung und Besondere (Führungs-)Probleme, die Medienlage bleibt leer, und
+  der Entwurf öffnet sich
 
 #### Scenario: Anlegen abgelehnt
 - **WHEN** der Server das Anlegen mit 400 ablehnt
@@ -233,9 +238,9 @@ die Freigaben nicht ermittelbar sind oder eine Quelle ihren Text nicht erzeugen 
 Abschnitt mit Quelle MUST leer bleiben oder für Fehlendes eine 0 tragen.
 
 #### Scenario: Gesperrte Quelle
-- **WHEN** der Stab für die Person nicht freigegeben ist und sie „Neuer Lagevortrag“ wählt
-- **THEN** trägt die Medienlage „— (Stab nicht freigegeben)“ ohne Zahl, und keine Liste der
-  Medienlage wurde angefragt
+- **WHEN** das ETB für die Person nicht freigegeben ist und sie „Neuer Lagevortrag“ wählt
+- **THEN** trägt die Lageentwicklung „— (ETB nicht freigegeben)“ ohne Zahl, und keine Liste des
+  ETB wurde angefragt
 
 #### Scenario: Freigaben nicht ermittelbar
 - **WHEN** die Modulfreigaben beim Klick nicht geladen werden können

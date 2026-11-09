@@ -486,7 +486,7 @@ mod tests {
             ]
         );
         let manv = liste.iter().find(|v| v.bezeichnung == "MANV").unwrap();
-        assert!(manv.ausgeblendet.iter().any(|k| k == "stab"));
+        assert!(manv.ausgeblendet.iter().any(|k| k == "infotelefon"));
         assert!(manv.ausgeblendet.iter().any(|k| k == "tiere"));
         let gekoppelt: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM einsatz_stichwort_vorschlag WHERE vorlage_id IS NOT NULL",

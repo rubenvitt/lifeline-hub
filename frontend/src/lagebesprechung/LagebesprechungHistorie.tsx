@@ -9,7 +9,7 @@ import type { Lagebesprechung } from '../api/types';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { etbPfad } from '../routing/deeplinks';
-import { stabZeilenzielStil } from '../stab/zeilenziel';
+import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { kuerzeEntschluss } from './lagebesprechungAbschluss';
 
 /** Ab dieser Länge steht der Entschluss gekürzt da, mit „ganz zeigen“. */
@@ -89,7 +89,7 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
             </span>
             <Link
               to={etbPfad(einsatzId, { eintrag: l.etb_eintrag_id })}
-              style={stabZeilenzielStil(token)}
+              style={linkZeilenzielStil(token)}
               aria-label={`ETB-Eintrag zu Lagebesprechung Nr. ${l.lfd_nr}`}
             >
               ETB-Eintrag

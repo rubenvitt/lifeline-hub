@@ -343,14 +343,14 @@ pub async fn rolle_von(
     Ok(rolle.and_then(|s| EinsatzRolle::parse(&s)))
 }
 
-/// Eigene Führungsstelle, ausdrücklich auf Benutzer UND Einsatz begrenzt — als
-/// Vorbelegungstext der ETB-Erfassung (LFH-549): Kürzel eines Katalogwerts („S2“),
-/// „Fachberater: THW“ oder der Freitext.
+/// Eigene Führungsstelle (Code und Text), ausdrücklich auf Benutzer UND Einsatz begrenzt —
+/// Quelle von `meine_fuehrungsstelle`, `meine_sachgebiete` und `meine_funktion`
+/// (`MeineFelder`, i6k6mzed D2). `None` ohne Mitgliedschaft.
 pub async fn fuehrungsstelle_von(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
-) -> Result<Option<String>, AppError> {
+) -> Result<Option<crate::fuehrung::Funktionsangabe>, AppError> {
     let zeile: Option<(Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT fuehrungsfunktion, fuehrungsstelle FROM einsatz_mitgliedschaft \
          WHERE einsatz_id = ? AND benutzer_id = ?",
@@ -359,11 +359,7 @@ pub async fn fuehrungsstelle_von(
     .bind(benutzer_id)
     .fetch_optional(pool)
     .await?;
-    let Some((code, text)) = zeile else {
-        return Ok(None);
-    };
-    let karte = labelkarte(pool, einsatz_id).await?;
-    Ok(vorbelegung(&karte, code.as_deref(), text))
+    Ok(zeile.map(|(code, text)| crate::fuehrung::aus_spalten(code.as_deref(), text)))
 }
 
 /// Vorbelegungstext aus Code und Text einer Führungsstelle (LFH-549).
@@ -492,12 +488,6 @@ pub async fn liste_fuer(
     }
     let rows: Vec<Row> = q.fetch_all(pool).await?;
 
-    // ZWEITE, ebenfalls EINMALIGE Abfrage (LFH-46): die Sachgebiete des Benutzers über ALLE
-    // Einsätze. Die Detail-Abfrage (`stab::repo::sachgebiete_von`) je Zeile zu rufen wäre N+1
-    // auf `GET /api/einsaetze` — der Route hinter der Einsatzauswahl. Zwei Statements bleiben
-    // O(1) in der Zahl der Einsätze; genau das sichert `liste_fuer` zu.
-    let mut sachgebiete = crate::stab::repo::sachgebiete_je_einsatz(pool, benutzer.id).await?;
-
     let rows: Vec<Row> = rows
         .into_iter()
         .filter(|r| {
@@ -532,21 +522,20 @@ pub async fn liste_fuer(
     Ok(rows
         .into_iter()
         .map(|r| {
-            let meine_sachgebiete = sachgebiete.remove(&r.id).unwrap_or_default();
             let karte = karten.get(&r.org_id).cloned().unwrap_or_default();
-            // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus Werten, die diese
-            // Funktion ohnehin schon geladen hat, also ohne dritte Abfrage.
-            let meine_funktion = super::funktion::ableiten(
-                &meine_sachgebiete,
-                r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
-                &karte,
-            )
-            .map(|f| f.bezeichnung);
-            let meine_fuehrungsstelle = vorbelegung(
-                &karte,
-                r.meine_fuehrungsfunktion.as_deref(),
-                r.meine_fuehrungsstelle,
-            );
+            // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus der Mitgliedschaft, die die
+            // Listenabfrage ohnehin mitliest, also ohne zweite Abfrage (i6k6mzed D2).
+            let stelle = r.meine_rolle.as_ref().map(|_| {
+                crate::fuehrung::aus_spalten(
+                    r.meine_fuehrungsfunktion.as_deref(),
+                    r.meine_fuehrungsstelle.clone(),
+                )
+            });
+            let super::MeineFelder {
+                fuehrungsstelle: meine_fuehrungsstelle,
+                sachgebiete: meine_sachgebiete,
+                funktion: meine_funktion,
+            } = super::MeineFelder::ableiten(r.meine_rolle.as_deref(), stelle, &karte);
             EinsatzAnzeige {
                 id: r.id,
                 org_id: r.org_id,
@@ -571,8 +560,6 @@ pub async fn liste_fuer(
                 retention_bis: r.retention_bis,
                 meine_rolle: r.meine_rolle,
                 meine_fuehrungsstelle,
-                // `remove` statt `get` (oben): jede Einsatz-id kommt genau einmal vor, der
-                // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
                 meine_sachgebiete,
                 meine_funktion,
                 lagekennzahlen: super::lagekennzahl::ableiten(
@@ -591,8 +578,7 @@ pub async fn liste_fuer(
 /// Ergebnis einer Einsatz-Mutation, die System-ETB-Einträge schreibt (LFH-858): der neu
 /// geladene Einsatz und die Kennungen der Einträge, in Schreibreihenfolge. Die Route meldet
 /// jede Kennung nach dem Commit als `etb`-Ereignis (`LiveHub::publiziere`), damit offene
-/// ETB-Schirme, die Kopfzahl und der Modulzähler ohne Neuladen nachziehen — Muster
-/// `stab::repo::AbschlussErgebnis`.
+/// ETB-Schirme, die Kopfzahl und der Modulzähler ohne Neuladen nachziehen.
 #[derive(Debug)]
 pub struct MitEtbEintraegen {
     pub einsatz: Einsatz,
@@ -1136,8 +1122,7 @@ pub(crate) fn schwaerzungs_audit(grund: &str) -> String {
          Foto-/Datei-Anhänge, Bilder der Lagekarte, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
          die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
          Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
-         Befehle, Pressemitteilungen, Lagebesprechungen) und des Presse-Logs) wurden \
-         unwiderruflich entfernt. \
+         Befehle, Lagebesprechungen)) wurden unwiderruflich entfernt. \
          Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
          operative Objekte, die Struktur von Chat, Erinnerungen und Führungsmodulen mit \
          Nummern, Zeitpunkten, Verfassern und Status), die Führungsdokumentation im ETB im \
@@ -1216,8 +1201,8 @@ async fn scrubbe_einsatz_ganz_tx(
 /// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz-Struktur,
 /// ETB im Wortlaut, Zähler/registrier_nr, anonymisierte Triage) bleibt erhalten.
 /// Chat- und Erinnerungs-Freitexte werden seit LFH-290 mitgeschwärzt, die Freitexte der
-/// Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl, Pressemitteilung,
-/// Lagebesprechung) seit LFH-701: Die Führungsdokumentation ist allein der ETB-Wortlaut
+/// Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl, Lagebesprechung) seit
+/// LFH-701: Die Führungsdokumentation ist allein der ETB-Wortlaut
 /// (`etb_eintrag.inhalt`/`von`/`an` sind Retain), dort bleiben auch heraufgestufte
 /// Chat-Nachrichten stehen.
 ///
@@ -1557,6 +1542,33 @@ pub async fn zaehle_einsatzleitung(pool: &SqlitePool, einsatz_id: i64) -> Result
     .fetch_one(pool)
     .await
     .map_err(Into::into)
+}
+
+/// Riegel gegen den Lebenszyklus INNERHALB einer Schreibtransaktion.
+///
+/// `fordere_aktiv` läuft im Extractor und liest einen Stand von VOR der Transaktion.
+/// `write_retry!` wartet bei BUSY am `BEGIN IMMEDIATE` mit Backoff — hält ein
+/// konkurrierendes „Einsatz abschliessen" gerade den Schreib-Lock, wartet der Aufruf also
+/// absichtlich, bis jenes committet hat, und schriebe danach in einen geschlossenen Einsatz.
+/// Der Retry-Pfad VERBREITERT das Fenster, statt es zu schliessen.
+///
+/// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, src/AGENTS.md) — zwei Codes für dieselbe
+/// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
+pub(crate) async fn fordere_aktiv_in_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
+    let aktiv: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    if aktiv.is_none() {
+        return Err(AppError::Conflict(
+            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2814,7 +2826,7 @@ mod tests {
         .await
         .unwrap();
         let liste = [crate::einsatz::verbindungen::Verbindung {
-            mittel: crate::stab::kommunikation::Verbindungsmittel::Mobil,
+            mittel: crate::fernmeldewesen::kommunikation::Verbindungsmittel::Mobil,
             wert: "0170 98765".into(),
             hinweis: Some("nur Anna".into()),
         }];
@@ -3044,7 +3056,7 @@ mod tests {
     async fn schwaerzung_entfernt_fuehrungs_freitexte_und_haelt_das_etb() {
         // LFH-701, Linie A: Die Führungsdokumentation ist das ETB. Die Freitexte der
         // Führungsmodule (Meldung, Auftrag samt Empfänger, Nachforderung, Lagebericht, Befehl,
-        // Pressemitteilung, Lagebesprechung) werden geschwärzt, auch die, die nie ins ETB
+        // Lagebesprechung) werden geschwärzt, auch die, die nie ins ETB
         // gelangt sind (Fünf-Punkte-Felder, Entwürfe), samt Ablehnungsgrund und Ziel als Freitext
         // (LLH-1385). Struktur bleibt, der ETB-Wortlaut auch.
         let pool = crate::db::test_pool().await;
@@ -3118,7 +3130,6 @@ mod tests {
             ("lagebericht", "lagebericht", "freigegeben"),
             ("lagebericht", "lagebericht", "entwurf"),
             ("befehl", "befehl_lad", "entwurf"),
-            ("pressemitteilung", "freitext", "entwurf"),
         ] {
             let id: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "INSERT INTO {tabelle} (einsatz_id, vorlage, titel, zeitstand, status, \
@@ -3325,10 +3336,9 @@ mod tests {
         assert!(
             audit.contains(
                 "Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, \
-                 Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen) und des \
-                 Presse-Logs"
+                 Lageberichte, Befehle, Lagebesprechungen))"
             ),
-            "Audit nennt die Führungs- und Presse-Log-Freitexte als entfernt: {audit}"
+            "Audit nennt die Führungs-Freitexte als entfernt: {audit}"
         );
         assert!(
             audit.contains("die Führungsdokumentation im ETB im Wortlaut"),

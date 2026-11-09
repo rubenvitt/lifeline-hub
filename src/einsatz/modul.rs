@@ -16,7 +16,6 @@ pub const MODUL_KEYS: [&str; 34] = [
     "einsatzabschnitte",
     "auftraege",
     "lagebesprechung",
-    "stab",
     "dokumente",
     // Kräfte & Mittel (Meldebild = `kraefteuebersicht`, bis 21.09.2026 unter Lage)
     "kraefteuebersicht",
@@ -49,6 +48,8 @@ pub const MODUL_KEYS: [&str; 34] = [
     "erinnerungen",
     "meldungen",
     "fernmeldewesen",
+    // i6k6mzed: das Informationstelefon ist ein eigenes Modul statt einer Unterseite des Stabs.
+    "infotelefon",
     // Einstellungen
     "einsatz-einstellungen",
 ];
@@ -119,8 +120,8 @@ modul_marker! {
     Auftraege => "auftraege",
     Lagebesprechung => "lagebesprechung",
     Lagekarte => "lagekarte",
-    Stab => "stab",
     Fernmeldewesen => "fernmeldewesen",
+    Infotelefon => "infotelefon",
     Dokumente => "dokumente",
     Abloesung => "abloesung",
     Betreuung => "betreuung",
@@ -169,10 +170,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         "/api/einsaetze/{id}/lagebesprechungen",
         Some("lagebesprechung"),
     ),
-    ("/api/einsaetze/{id}/stab", Some("stab")),
     // LLH-1180: Kommunikationsplan und Fernmeldeskizze behalten ihre Pfade unter `…/stab`, gehören
-    // aber dem Modul Fernmeldewesen (Herleitung `wgnb0am2-stab-abwaehlbar`, D4) — der längere
-    // Präfix gewinnt.
+    // aber dem Modul Fernmeldewesen (Herleitung `wgnb0am2-stab-abwaehlbar`, D4). Das Modul `stab`
+    // gibt es nicht mehr (i6k6mzed, design.md D1); `…/stab` selbst ist kein Präfix.
     (
         "/api/einsaetze/{id}/stab/kommunikationsplan",
         Some("fernmeldewesen"),
@@ -181,6 +181,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         "/api/einsaetze/{id}/stab/fernmeldeskizze",
         Some("fernmeldewesen"),
     ),
+    // i6k6mzed: das Informationstelefon behält seinen Pfad unter `…/stab`, ist aber das eigene
+    // Modul `infotelefon` (Herleitung `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md`,
+    // D3).
+    ("/api/einsaetze/{id}/stab/infotelefon", Some("infotelefon")),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
@@ -372,8 +376,8 @@ mod tests {
         assert_eq!(Lagemeldungen::KEY, Some("lagemeldungen"));
         assert_eq!(Auftraege::KEY, Some("auftraege"));
         assert_eq!(Lagebesprechung::KEY, Some("lagebesprechung"));
-        assert_eq!(Stab::KEY, Some("stab"));
         assert_eq!(Fernmeldewesen::KEY, Some("fernmeldewesen"));
+        assert_eq!(Infotelefon::KEY, Some("infotelefon"));
         assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(Abloesung::KEY, Some("abloesung"));
         assert_eq!(Betreuung::KEY, Some("betreuung"));
@@ -423,7 +427,7 @@ mod tests {
             key_fuer_pfad("/api/einsaetze/{id}/verpflegung/stellen/{sid}/status"),
             Some(Some("verpflegung"))
         );
-        // Lagebesprechung (LLH-1111): eigener Key, nicht `stab`; beide Präfixe.
+        // Lagebesprechung (LLH-1111): eigener Key; beide Präfixe.
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/lagebesprechung/termin"),
             Some(Some("lagebesprechung"))
@@ -433,7 +437,7 @@ mod tests {
             Some(Some("lagebesprechung"))
         );
         // Fernmeldewesen (LLH-1180): die S6-Pfade bleiben unter `…/stab`, gehören aber dem
-        // eigenen Modul; der Rest des Stabs bleibt `stab`.
+        // eigenen Modul.
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/stab/kommunikationsplan"),
             Some(Some("fernmeldewesen"))
@@ -448,14 +452,22 @@ mod tests {
             key_fuer_pfad("/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}"),
             Some(Some("fernmeldewesen"))
         );
+        // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul unter dem alten Pfad.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/infotelefon"),
+            Some(Some("infotelefon"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/infotelefon/{aid}/status"),
+            Some(Some("infotelefon"))
+        );
+        // Das Modul Stab ist entfernt (i6k6mzed, design.md D1): seine Pfade sind nicht
+        // registriert, auch nicht über einen kürzeren Präfix.
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/stab/besetzung/{sachgebiet}"),
-            Some(Some("stab"))
+            None
         );
-        assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/stab/checkliste"),
-            Some(Some("stab"))
-        );
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/stab"), None);
         // Modul-lose Route: registriert, aber kein Key.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));
         assert_eq!(

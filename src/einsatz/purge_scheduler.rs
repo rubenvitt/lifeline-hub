@@ -1767,18 +1767,14 @@ mod tests {
         );
     }
 
-    /// LFH-554/LFH-901, Spec-Szenarien „Schwärzung“ von Presse-Log und Informationstelefon:
-    /// Ansprechperson, Kontaktweg, Freigabeangabe, Anrufername und Notiz leer; Medium, Thema
-    /// und eine gesetzte Antwort tragen den Platzhalter (Linie A, LFH-901 design.md D1/D2), eine
-    /// gesetzte Rückrufnummer auch (ein CHECK verlangt sie bei offenem Rückruf). Art, Status,
-    /// Eingang und Anliegen bleiben. Eine fehlende Antwort und ein offener Rückruf brechen die
-    /// Schwärzung nicht.
+    /// LFH-554/LFH-901, Spec-Szenario „Schwärzung“ des Informationstelefons: Anrufername und
+    /// Notiz leer, eine gesetzte Rückrufnummer trägt den Platzhalter (ein CHECK verlangt sie bei
+    /// offenem Rückruf). Status und Anliegen bleiben. Ein offener Rückruf bricht die Schwärzung
+    /// nicht.
     #[tokio::test]
-    async fn schwaerzung_presse_und_infotelefon_leert_freitexte_und_haelt_struktur() {
+    async fn schwaerzung_infotelefon_leert_freitexte_und_haelt_struktur() {
         use crate::infotelefon::repo as tel;
         use crate::infotelefon::{InfotelefonAnliegen, InfotelefonStatus};
-        use crate::presse::repo as presse;
-        use crate::presse::{MedienkontaktArt, MedienkontaktStatus};
 
         let pool = crate::db::test_pool().await;
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -1804,51 +1800,6 @@ mod tests {
         .unwrap();
 
         let mut tx = pool.begin().await.unwrap();
-        let kontakt = presse::anlegen_tx(
-            &mut tx,
-            e,
-            nutzer,
-            &presse::KontaktEingabe {
-                art: MedienkontaktArt::Anfrage,
-                medium: "NDR 1".into(),
-                thema: "Anfrage zu Fam. Yilmaz".into(),
-                kontakt_name: Some("Maria Beispiel".into()),
-                kontaktweg: Some("+49 511 1234567".into()),
-                eingang_at: "2026-01-01 10:00:00".into(),
-            },
-        )
-        .await
-        .unwrap();
-        presse::status_tx(
-            &mut tx,
-            e,
-            kontakt,
-            nutzer,
-            &presse::StatusWechsel {
-                ziel: MedienkontaktStatus::Beantwortet,
-                antwort: Some("Familie Yilmaz ist wohlauf".into()),
-                freigabe_durch: Some("EL Müller".into()),
-                pressemitteilung_id: None,
-            },
-        )
-        .await
-        .unwrap();
-        // Ein offener Termin ohne Antwort: die Antwort bleibt leer, die Schwärzung läuft durch.
-        let termin = presse::anlegen_tx(
-            &mut tx,
-            e,
-            nutzer,
-            &presse::KontaktEingabe {
-                art: MedienkontaktArt::Termin,
-                medium: "Freie Journalistin Petra Feder".into(),
-                thema: "Drehtermin am Deich".into(),
-                kontakt_name: None,
-                kontaktweg: None,
-                eingang_at: "2026-01-01 10:30:00".into(),
-            },
-        )
-        .await
-        .unwrap();
         let mut anrufe = Vec::new();
         for (noetig, nummer) in [(true, Some("0171 7654321")), (false, None)] {
             anrufe.push(
@@ -1876,29 +1827,6 @@ mod tests {
                 .await
                 .unwrap()
         );
-
-        let p = super::repo::SCHWAERZUNG_PLATZHALTER;
-        let k = presse::laden(&pool, e, kontakt).await.unwrap();
-        assert_eq!(
-            (k.kontakt_name, k.kontaktweg, k.freigabe_durch),
-            (None, None, None)
-        );
-        assert_eq!(
-            (k.medium.as_str(), k.thema.as_str(), k.antwort.as_deref()),
-            (p, p, Some(p))
-        );
-        assert_eq!(
-            (k.art, k.status, k.eingang_at.as_str()),
-            (
-                MedienkontaktArt::Anfrage,
-                MedienkontaktStatus::Beantwortet,
-                "2026-01-01 10:00:00"
-            )
-        );
-        let t = presse::laden(&pool, e, termin).await.unwrap();
-        assert_eq!((t.medium.as_str(), t.thema.as_str()), (p, p));
-        assert_eq!(t.antwort, None, "eine fehlende Antwort bleibt leer");
-        assert_eq!(t.status, MedienkontaktStatus::Offen);
 
         let offen = tel::laden(&pool, e, anrufe[0]).await.unwrap();
         assert_eq!((offen.anrufer_name, offen.notiz), (None, None));

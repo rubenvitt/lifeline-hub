@@ -8,33 +8,6 @@ benannte Lücke da und wird nicht erfunden.
 
 ## Requirements
 
-### Requirement: Jeder Versorgungsbereich hat genau einen Träger
-
-Jeder Versorgungsbereich von S4 SHALL genau einem bestehenden Modul zugeordnet sein:
-
-- Verpflegung → Modul Verpflegung
-- Einsatzmittel, Verbrauchsgüter und Betriebsstoffe anfordern → Modul Nachforderungen
-- Materialerhaltung → Modul Material, über den Status einer Materialzeile
-
-Die Zeile S4 der Stabseite SHALL genau diese Träger als Werkzeuge führen, und zwar
-Nachforderungen, Verpflegung und Material. Das System MUST NOT ein eigenes Modul, eine eigene
-Seite oder eine eigene Tabelle „Versorgung“ führen, die einen dieser Bereiche ein zweites Mal
-trägt.
-
-#### Scenario: S4 führt die Träger
-- **WHEN** eine Person die Stabseite öffnet und die Module Nachforderungen, Verpflegung und
-  Material zugänglich sind
-- **THEN** führt die Zeile S4 genau die Werkzeuge Nachforderungen, Verpflegung und Material
-
-#### Scenario: Es gibt kein Modul Versorgung
-- **WHEN** eine Person Rail, Modulpanel oder Modulfreigabe eines Einsatzes durchsieht
-- **THEN** findet sie kein Modul „Versorgung“ neben Nachforderungen, Verpflegung und Material
-
-#### Scenario: Materialerhaltung am Material
-- **WHEN** ein Gerät im Einsatz ausfällt
-- **THEN** wird das an seiner Materialzeile mit dem Status `defekt` festgehalten und nicht in
-  einer eigenen Versorgungsliste
-
 ### Requirement: Eine Mengenwahrheit für Beschafftes
 
 Ein Versorgungsgut, das von außen beschafft wird, SHALL als Nachforderung geführt werden. Kein
@@ -105,3 +78,23 @@ aus dieser Spec erhalten oder ausdrücklich ablösen.
 - **WHEN** ein Ticket eine Versorgungsfläche, eine Tabelle für Versorgungsposten oder eine
   Betriebsstoff-Deckung ohne Feldbefund verlangt
 - **THEN** wird es gegen diese Spec zurückgestellt und nicht umgesetzt
+
+### Requirement: Versorgungsbereiche liegen bei Verpflegung, Nachforderungen und Material
+
+Jeder Versorgungsbereich von S4 SHALL genau einem bestehenden Modul zugeordnet sein:
+
+- Verpflegung → Modul Verpflegung
+- Einsatzmittel, Verbrauchsgüter und Betriebsstoffe anfordern → Modul Nachforderungen
+- Materialerhaltung → Modul Material, über den Status einer Materialzeile
+
+Das System MUST NOT ein eigenes Modul, eine eigene Seite oder eine eigene Tabelle „Versorgung“
+führen, die einen dieser Bereiche ein zweites Mal trägt.
+
+#### Scenario: Es gibt kein Modul Versorgung
+- **WHEN** eine Person Rail, Modulpanel oder Modulfreigabe eines Einsatzes durchsieht
+- **THEN** findet sie kein Modul „Versorgung“ neben Nachforderungen, Verpflegung und Material
+
+#### Scenario: Materialerhaltung am Material
+- **WHEN** ein Gerät im Einsatz ausfällt
+- **THEN** wird das an seiner Materialzeile mit dem Status `defekt` festgehalten und nicht in
+  einer eigenen Versorgungsliste

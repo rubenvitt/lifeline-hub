@@ -16,10 +16,10 @@ import type {
   Lagebesprechung,
   Fuehrungsstelle,
   EinsatzMaterial,
+  MitgliedAnzeige,
   Person,
   PersonPerioden,
   Schaden,
-  Stab,
   VerbleibAngaben,
   Verpflegung,
 } from '../../api/types';
@@ -29,7 +29,7 @@ import { evakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import { einsatzDauer } from '../../einsatz/einsatzDauer';
 import { EINSATZART_LABELS } from '../../einsatz/einsatzart';
 import { typBilanz } from '../../etb/zeitachseModell';
-import { besetzungAusStab } from '../../fuehrung/funktionsOptionenKern';
+import { fuehrungsfunktionZeilen } from '../../fuehrung/besetzungAusMitgliedern';
 import { dauerText, kraftDauern } from '../../kraefte/zeitachse';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { kettenKoepfe } from '../../lageberichte/ketten';
@@ -53,8 +53,7 @@ import {
   GEGEN_RAT_WORT,
   UNTERSCHRIFT_WORT,
 } from '../../personen/personMeta';
-import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../stab/einsatzleiter';
-import { SACHGEBIETE } from '../../stab/sachgebiete';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../einsatz/einsatzleiter';
 import { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL } from '../../pages/schaeden/gefahrWorte';
 import {
   etbTyp,
@@ -209,14 +208,13 @@ function zeiten(e: EinsatzAnzeige, standMs: number, konv: AnzeigeKonventionen): 
 
 function fuehrung(
   fuehrungsstelle: Fuehrungsstelle | null,
-  stab: Stab | null,
+  mitglieder: MitgliedAnzeige[] | null,
   besprechungen: Lagebesprechung[] | null,
   konv: AnzeigeKonventionen,
 ): Abschnitt[] {
   // Der Einsatzleiter der Führungsstelle (LFH-1199), dargestellt wie in Kopfleiste und
   // Organigramm; nie die Konten mit der App-Rolle `einsatzleitung`.
   const leiter = einsatzleiterDarstellung({ zustand: 'daten', daten: fuehrungsstelle });
-  const besetzung = besetzungAusStab(stab ?? undefined);
   return [
     {
       titel: 'Einsatzleitung',
@@ -230,15 +228,17 @@ function fuehrung(
             ]
           : [vermerk(einsatzleiterKurz(leiter))],
     },
+    // EL und S1–S7 aus der Mitgliedschaft (i6k6mzed, D7; Spec `einsatzbericht`), mehrere
+    // Träger alphabetisch. S7 steht nur, wenn es jemand trägt.
     abschnittAus(
-      'Stab',
-      stab,
+      'Führungsfunktionen',
+      mitglieder,
       () => false,
-      () => [
+      (m) => [
         zeilen(
-          SACHGEBIETE.map((s) => ({
-            etikett: s.kuerzel,
-            wert: besetzung.get(s.sachgebiet) ?? 'nicht vergeben',
+          fuehrungsfunktionZeilen(m, true).map((z) => ({
+            etikett: z.kuerzel,
+            wert: z.namen || 'nicht vergeben',
           })),
         ),
       ],
@@ -950,7 +950,7 @@ export function verdichteEinsatzbericht(
     stammdaten: () => stammdaten(einsatz),
     zeiten: () => zeiten(einsatz, standMs, konv),
     fuehrung: () =>
-      fuehrung(daten(q.fuehrungsstelle), daten(q.stab), daten(q.lagebesprechungen), konv),
+      fuehrung(daten(q.fuehrungsstelle), daten(q.mitglieder), daten(q.lagebesprechungen), konv),
     kraefte: () =>
       kraefte(
         daten(q.einheiten),

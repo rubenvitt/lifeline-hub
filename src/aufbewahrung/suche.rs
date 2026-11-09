@@ -3,7 +3,7 @@
 //!
 //! Wer ein Löschersuchen bearbeitet, kennt den Namen oder die Rufnummer der antragstellenden
 //! Person; die Archivakte zeigt beides bewusst nicht. Die Suche liest deshalb als einzige Stelle
-//! des Archivs **Scrub-Spalten** (Namen und Kontakte der vier Personenarten), gleicht sie in Rust
+//! des Archivs **Scrub-Spalten** (Namen und Kontakte der drei Personenarten), gleicht sie in Rust
 //! ab und liefert nur pseudonyme Treffer zurück: Art, Kennung, Erfassungszeitpunkt, Status, Stand
 //! eines Antrags. Sie schreibt nichts und loggt den Suchtext nicht.
 //!
@@ -12,8 +12,7 @@
 //! Einheiten, die sie führt (LLH-1134): dieselbe Zuordnung wie der Personen-Scrub
 //! (`schwaerzung_person`, `Bezug::Ueber`).
 //! Kein Treffer heißt nicht „keine Daten“: Namens-Schnappschüsse entfernter Dispositionen
-//! (`auftrag_empfaenger.snap_anzeige`, `einsatz_stabsfunktion.snap_name` mit verwaistem Verweis)
-//! findet die Suche nicht — dafür ist der Einsatz-Antrag da.
+//! (`auftrag_empfaenger.snap_anzeige` mit verwaistem Verweis) findet die Suche nicht — dafür ist der Einsatz-Antrag da.
 //!
 //! **Nur ganze Wörter:** jedes Wort des Suchtexts muss als ganzes Wort im Namen stehen, sonst
 //! wäre die Suche ein Orakel für Namensanfänge. Eine Rufnummer trifft, wenn der Suchtext
@@ -38,7 +37,7 @@ pub const MIN_ZIFFERN: usize = 6;
 pub struct PersonTrefferAnzeige {
     pub art: PersonenArt,
     pub id: i64,
-    /// `R-042`, `EK-17`, `IT-5`, `MK-3` — dieselbe Kennung bestätigt den Antrag.
+    /// `R-042`, `EK-17`, `IT-5` — dieselbe Kennung bestätigt den Antrag.
     pub kennung: String,
     /// Erfassung bzw. Eingang (UTC, DB-Format).
     pub erfasst_at: String,
@@ -117,7 +116,7 @@ async fn antraege(
     Ok(aus)
 }
 
-/// Sucht im Einsatz `einsatz_id` nach `suchtext` über alle vier Personenarten. Liest nur.
+/// Sucht im Einsatz `einsatz_id` nach `suchtext` über alle drei Personenarten. Liest nur.
 /// Der Aufrufer prüft Archivzugriff, Zustand und Mindestlänge.
 pub async fn personensuche(
     pool: &SqlitePool,
@@ -200,20 +199,15 @@ pub async fn personensuche(
         }
     }
 
-    for (art, sql) in [
-        (
-            PersonenArt::InfotelefonAnruf,
+    {
+        let art = PersonenArt::InfotelefonAnruf;
+        let zeilen: Vec<(i64, Option<String>, Option<String>, String)> = sqlx::query_as(
             "SELECT id, anrufer_name, rueckruf, eingang_at FROM infotelefon_anruf \
              WHERE einsatz_id = ? ORDER BY id",
-        ),
-        (
-            PersonenArt::Medienkontakt,
-            "SELECT id, kontakt_name, kontaktweg, eingang_at FROM medienkontakt \
-             WHERE einsatz_id = ? ORDER BY id",
-        ),
-    ] {
-        let zeilen: Vec<(i64, Option<String>, Option<String>, String)> =
-            sqlx::query_as(sql).bind(einsatz_id).fetch_all(pool).await?;
+        )
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?;
         for (id, name, kontakt, eingang_at) in zeilen {
             if trifft(suchtext, &[name.as_deref()], &[kontakt.as_deref()]) {
                 treffer.push(PersonTrefferAnzeige {
@@ -305,8 +299,6 @@ mod tests {
             t.iter().map(|x| x.kennung.clone()).collect::<Vec<_>>(),
             vec![format!("EK-{}", b.k1)]
         );
-        let t = personensuche(&pool, b.e1, "Maria Beispiel").await.unwrap();
-        assert_eq!(t[0].art, PersonenArt::Medienkontakt);
         // Stammkräfte und andere Einsätze werden nicht gefunden.
         assert!(personensuche(&pool, b.e1, "Stamm-Dora")
             .await

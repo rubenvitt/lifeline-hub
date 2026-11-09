@@ -226,36 +226,39 @@ mod tests {
         let bid = fixture(&pool).await;
         async fn roh(pool: &SqlitePool) -> Option<i64> {
             sqlx::query_scalar(
-                "SELECT sichtbar FROM org_modul_einstellung WHERE org_id = 1 AND modul_key = 'stab'",
+                "SELECT sichtbar FROM org_modul_einstellung WHERE org_id = 1 AND modul_key = 'lagebesprechung'",
             )
             .fetch_one(pool)
             .await
             .unwrap()
         }
 
-        setzen(&pool, 1, "stab", None, Some(false), bid)
+        setzen(&pool, 1, "lagebesprechung", None, Some(false), bid)
             .await
             .unwrap();
         assert_eq!(roh(&pool).await, Some(0));
         assert_eq!(
-            laden_alle(&pool, 1).await.unwrap()["stab"].sichtbar,
+            laden_alle(&pool, 1).await.unwrap()["lagebesprechung"].sichtbar,
             Some(false)
         );
 
         // Nur die Rolle: die Ausblendung bleibt.
-        setzen(&pool, 1, "stab", Some("admin"), None, bid)
+        setzen(&pool, 1, "lagebesprechung", Some("admin"), None, bid)
             .await
             .unwrap();
-        let v = &laden_alle(&pool, 1).await.unwrap()["stab"];
+        let v = &laden_alle(&pool, 1).await.unwrap()["lagebesprechung"];
         assert_eq!(v.sichtbar, Some(false));
         assert_eq!(v.benoetigte_rolle.as_deref(), Some("admin"));
 
         // Wieder einblenden: NULL, nicht 1.
-        setzen(&pool, 1, "stab", Some("admin"), Some(true), bid)
+        setzen(&pool, 1, "lagebesprechung", Some("admin"), Some(true), bid)
             .await
             .unwrap();
         assert_eq!(roh(&pool).await, None);
-        assert_eq!(laden_alle(&pool, 1).await.unwrap()["stab"].sichtbar, None);
+        assert_eq!(
+            laden_alle(&pool, 1).await.unwrap()["lagebesprechung"].sichtbar,
+            None
+        );
     }
 
     /// Eine neue Zeile mit `Some(true)` schreibt ebenfalls `NULL`.

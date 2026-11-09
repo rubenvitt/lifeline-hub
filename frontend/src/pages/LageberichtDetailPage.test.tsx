@@ -572,8 +572,9 @@ describe('LageberichtDetailPage — Übernahmen (LFH-869)', () => {
       // Zugeklappte Abschnitte sind gerendert, aber verborgen (`forceRender`).
       expect(await screen.findByRole('button', { name, hidden: true })).toBeInTheDocument();
     }
-    // Acht Abschnitte, fünf mit Übernahme: Auftrag, Anträge und Zusammenfassung tragen keine.
-    expect(screen.getAllByRole('button', { name: /übernehmen$/, hidden: true })).toHaveLength(5);
+    // Acht Abschnitte, vier mit Übernahme: Auftrag, Anträge, Medienlage (i6k6mzed, design.md D6)
+    // und Zusammenfassung tragen keine.
+    expect(screen.getAllByRole('button', { name: /übernehmen$/, hidden: true })).toHaveLength(4);
   });
 });
 
@@ -910,8 +911,14 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
           uebernommen_at: '2026-06-02 09:55:00',
         },
         { schluessel: 'lageentwicklung', text: '' },
-        { schluessel: 'fuehrungsprobleme', text: '' },
+        {
+          schluessel: 'fuehrungsprobleme',
+          text: 'Funk ruhig',
+          uebernommen_at: '2026-06-02 12:05:00',
+        },
         { schluessel: 'antraege_vorschlaege', text: '' },
+        // Die Medienlage ist Freitext ohne Quelle (i6k6mzed, design.md D6): ihr Stand zeigt sich
+        // nicht und geht beim Speichern verloren wie am Auftrag.
         { schluessel: 'medienlage', text: 'Presse ruhig', uebernommen_at: '2026-06-02 12:05:00' },
         { schluessel: 'zusammenfassung', text: '' },
       ],
@@ -946,8 +953,10 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
         'Stand der Übernahme 021155jun26 · aus der Vorfassung',
       ),
     );
-    expect(marke('Medienlage')).toHaveTextContent('Stand der Übernahme 021405jun26');
-    expect(marke('Medienlage')).not.toHaveTextContent('aus der Vorfassung');
+    const probleme = 'Besondere (Führungs-)Probleme';
+    expect(marke(probleme)).toHaveTextContent('Stand der Übernahme 021405jun26');
+    expect(marke(probleme)).not.toHaveTextContent('aus der Vorfassung');
+    expect(marke('Medienlage')).toBeNull();
     expect(marke('Auftrag')).toBeNull();
     expect(marke('Lageentwicklung')).toBeNull();
     expect(document.querySelectorAll('[data-lfh="uebernahme-stand"]')).toHaveLength(2);
@@ -966,7 +975,12 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
           text: 'Stand: 021155jun26',
           uebernommen_at: '2026-06-02 09:55:00',
         },
-        { schluessel: 'medienlage', text: 'Presse ruhig', uebernommen_at: '2026-06-02 12:05:00' },
+        {
+          schluessel: 'fuehrungsprobleme',
+          text: 'Funk ruhig',
+          uebernommen_at: '2026-06-02 12:05:00',
+        },
+        { schluessel: 'medienlage', text: 'Presse ruhig' },
         { schluessel: 'auftrag', text: 'Von Hand' },
         { schluessel: 'lageentwicklung', text: '' },
       ]),

@@ -104,7 +104,7 @@ pub async fn set_termin(
     termin: Option<&str>,
 ) -> Result<bool, AppError> {
     write_retry!(pool, |conn| {
-        crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let geaendert = sqlx::query(SQL_TERMIN_SETZEN)
             .bind(termin)
             .bind(einsatz_id)
@@ -254,7 +254,7 @@ pub async fn abschliessen(
         // `write_retry!` mit `BEGIN IMMEDIATE` den Schreib-Lock schon am BEGIN hält: ein
         // konkurrierender Abschluss committet entweder vor unserem BEGIN (dann sieht dieses
         // SELECT ihn) oder erst nach unserem COMMIT.
-        crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
 
         // 6. Der Einsatztermin — nur bei gesetztem Schlüssel (Tri-State). Ohne
         //    `status`-Prädikat: Schritt 5 hat es in derselben Transaktion bereits belegt, ein

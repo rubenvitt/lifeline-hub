@@ -4,7 +4,6 @@ import type {
   Fuehrungsfunktion,
   FuehrungsfunktionEintrag,
   Sachgebiet,
-  Stab,
 } from '../api/types';
 
 /**
@@ -21,10 +20,10 @@ import type {
 
 export const FUNKTIONS_PRAEFIX = 'funktion:';
 
-/** Katalog plus lesbare Besetzung (Name je Sachgebiet), falls der Stab freigegeben ist. */
+/** Katalog plus lesbare Besetzung (Namen je Sachgebiet aus den Mitgliedern, i6k6mzed D2). */
 export interface FunktionsVorschlaege {
   katalog: readonly FuehrungsfunktionEintrag[];
-  /** Kurztext der Besetzung je Sachgebiet; leer ohne Stab-Recht. */
+  /** Namen der Träger je Sachgebiet (`besetzungAusMitgliedern.ts`); leer, solange sie fehlen. */
   besetzung: ReadonlyMap<Sachgebiet, string>;
 }
 
@@ -151,17 +150,6 @@ export function besetzungText(b: AktuelleBesetzung | undefined): string | undefi
   }
 }
 
-/** Besetzungskarte aus dem Stab (nur belegte Zeilen; „nicht vergeben“ bleibt ohne Angabe). */
-export function besetzungAusStab(stab: Stab | undefined): ReadonlyMap<Sachgebiet, string> {
-  const karte = new Map<Sachgebiet, string>();
-  for (const z of stab?.besetzung ?? []) {
-    const text =
-      z.besetzung_art === 'einsatzleitung' ? 'bei der Einsatzleitung' : (z.name ?? undefined);
-    if (text) karte.set(z.sachgebiet, text);
-  }
-  return karte;
-}
-
 /**
  * Vorschläge für die ETB-Felder „Von“/„An“ (LFH-545/549): die Sachgebiete mit Besetzung im
  * Label, übernommen wird das Kürzel als Freitext — das ETB bekommt keinen Code, es bildet den
@@ -174,18 +162,15 @@ export function etbStabVorschlaege(vorschlaege: FunktionsVorschlaege): Funktions
 }
 
 /**
- * Vorrangregel der ETB-Vorbelegung „An“ (Stab-Spec LFH-46, Entscheidung 13): die gesetzte
- * Führungsstelle gewinnt immer; sonst das Kürzel des ersten eigenen Sachgebiets in S1–S6-Folge
- * (über `personal.benutzer_id`); sonst nichts. Seit LFH-894 nur noch der erste Vorschlag der
- * Rufname-Abfrage (`etb/RufnameAbfrage.tsx`); vorbelegt wird kein Eintrag mehr.
+ * Vorrangregel der ETB-Vorbelegung „An“ (Spec `fuehrungsfunktionen`): die gesetzte Führungsstelle
+ * der Mitgliedschaft, sonst nichts. Das Sachgebiet steht seit i6k6mzed (design.md D2) in ihr; den
+ * Rückfall auf die Stab-Besetzung gibt es nicht mehr. Seit LFH-894 nur noch der erste Vorschlag
+ * der Rufname-Abfrage (`etb/RufnameAbfrage.tsx`); vorbelegt wird kein Eintrag mehr.
  */
 export function anVorbelegung(
-  einsatz: Pick<EinsatzAnzeige, 'meine_fuehrungsstelle' | 'meine_sachgebiete'>,
+  einsatz: Pick<EinsatzAnzeige, 'meine_fuehrungsstelle'>,
 ): string | undefined {
-  const stelle = einsatz.meine_fuehrungsstelle?.trim();
-  if (stelle) return stelle;
-  const erstes = [...(einsatz.meine_sachgebiete ?? [])].sort()[0];
-  return erstes ? erstes.toUpperCase() : undefined;
+  return einsatz.meine_fuehrungsstelle?.trim() || undefined;
 }
 
 /**

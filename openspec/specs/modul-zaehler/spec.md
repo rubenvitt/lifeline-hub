@@ -109,11 +109,11 @@ Der Navigationsrahmen des Einsatzes (Modulpanel und Akkordeon) SHALL die Zähler
 
 #### Scenario: Wortlaut der Lagemeldungen
 - **WHEN** der Endpunkt `lagemeldungen.neu: 2` liefert
-- **THEN** zeigt das Modul „Lagemeldungen“ die Zahl 2 mit der Beschreibung „2 neue Lagemeldungen“, und das Werkzeug „Lagemeldungen“ der Kachel S2 auf der Stab-Seite zeigt dieselbe Zahl
+- **THEN** zeigt das Modul „Lagemeldungen“ die Zahl 2 mit der Beschreibung „2 neue Lagemeldungen“
 
 #### Scenario: Wortlaut der Nachforderungen
 - **WHEN** der Endpunkt `nachforderungen.offen: 5` und `nachforderungen.unterwegs: 2` liefert
-- **THEN** zeigt das Modul „Nachforderungen“ die Zahl 5 mit der Beschreibung „5 offene Nachforderungen, davon 2 unterwegs“, und die Werkzeuge „Nachforderungen“ der Kacheln S1 und S4 auf der Stab-Seite zeigen dieselbe Zahl
+- **THEN** zeigt das Modul „Nachforderungen“ die Zahl 5 mit der Beschreibung „5 offene Nachforderungen, davon 2 unterwegs“
 
 #### Scenario: Keine Listenabfragen
 - **WHEN** der Navigationsrahmen eines Einsatzes angezeigt wird, ohne dass ein Kommunikationsmodul, die Dokumentenablage, die Lagemeldungen oder die Nachforderungen geöffnet sind

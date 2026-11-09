@@ -60,14 +60,14 @@ async fn fuehrungskraft(app: &axum::Router, admin: &str, einsatz: i64) -> String
 
 // ---------- Freigabe und Rechte ----------
 
-/// Spec `lagebesprechung`, „Eigenes Modul mit eigener Freigabe“: Stab aus, Lagebesprechung an.
+/// Spec `lagebesprechung`, „Eigenes Modul mit eigener Freigabe“: Das Modul Stab gibt es nicht
+/// mehr (i6k6mzed), die Lagebesprechung ist allein nutzbar.
 #[tokio::test]
 async fn ohne_stab_bleibt_die_lagebesprechung_voll_nutzbar() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let kraft = fuehrungskraft(&app, &admin, einsatz).await;
-    ausblenden(&app, &admin, einsatz, "stab").await;
 
     let (status, _) = anfrage(
         &app,
@@ -77,7 +77,7 @@ async fn ohne_stab_bleibt_die_lagebesprechung_voll_nutzbar() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "Stab ist zu");
+    assert_eq!(status, StatusCode::NOT_FOUND, "der Stab ist entfernt");
 
     let (status, _) = anfrage(&app, "GET", &stand_pfad(einsatz), &kraft, None).await;
     assert_eq!(status, StatusCode::OK, "Stand lesbar ohne Stab");
@@ -124,17 +124,6 @@ async fn ausgeblendete_lagebesprechung_sperrt_lesen_und_schreiben() {
         let (status, _) = anfrage(&app, methode, &pfad, &kraft, body).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{methode} {pfad}");
     }
-
-    // Stab bleibt davon unberührt.
-    let (status, _) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/stab"),
-        &kraft,
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "Stab offen");
 }
 
 /// Fremde Organisation: 403 oder 404 auf jeder Route (wie `tests/cross_org.rs`); ein Einsatz,
@@ -336,19 +325,16 @@ async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
     .await;
     assert_eq!(kopf["naechste_lagebesprechung_at"], "2026-09-12 16:30:00");
 
-    // Beide Live-Ereignisse: `lagebesprechung` und der ETB-Kurzruf — und NICHT `stab`
-    // (design.md D6: Stab-Leser ohne dieses Recht erführen sonst von jeder Besprechung).
-    let (mut sah_lb, mut sah_etb, mut sah_stab) = (false, false, false);
+    // Beide Live-Ereignisse: `lagebesprechung` und der ETB-Kurzruf.
+    let (mut sah_lb, mut sah_etb) = (false, false);
     while let Ok(n) = rx.try_recv() {
         match n.event.as_str() {
             "lagebesprechung" => sah_lb = true,
             "etb" => sah_etb = true,
-            "stab" => sah_stab = true,
             _ => {}
         }
     }
     assert!(sah_lb, "`lagebesprechung`-Ereignis fehlt");
-    assert!(!sah_stab, "kein `stab`-Ereignis mehr");
     assert!(
         sah_etb,
         "ETB-Kurzruf fehlt — der Eintrag entstand im selben Commit"

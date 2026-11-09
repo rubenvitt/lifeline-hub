@@ -2,7 +2,7 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs]
+quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts]
 ---
 
 ## Überblick
@@ -80,7 +80,32 @@ Anzeigenamen; Personen anderer Organisationen, deaktivierte Konten und gekoppelt
 nicht darin. Ist niemand mehr übrig, zeigt sie „Keine weitere Person der Organisation“.
 
 Die **Führungsstelle eines Mitglieds** ist der erste Vorschlag, wenn das Einsatztagebuch die
-Person nach ihrem Rufnamen fragt, noch vor ihrem eigenen Sachgebiet im Stab.
+Person nach ihrem Rufnamen fragt.
+
+### Führungsfunktionen der Mitglieder
+
+Eine Führungsstelle aus dem Katalog (EL, S1 bis S7, Führungshilfspersonal, Fachberater) ist die
+Führungsfunktion des Mitglieds im Einsatz, die eine Quelle für „wer ist S2?“:
+
+- Der Kopf des Einsatzes nennt die eigene Funktion, etwa „S2 Lage“; die Einsatzleitung ohne
+  Funktion heißt „Einsatzleitung“.
+- Aufträge und Erinnerungen an S1 bis S6 zeigen hinter der Funktion die Namen der Mitglieder, die
+  sie tragen, sonst „nicht vergeben“. Benachrichtigungen an eine Funktion erreichen diese
+  Mitglieder; für EL zuerst den Einsatzleiter der Führungsstelle.
+- Das Organigramm zeigt den Kasten „Stab“ mit den geführten Sachgebieten, die Fernmeldeskizze ihre
+  Zeichen im Kasten „Einsatzleitung“, der Kommunikationsplan die Namen in der Spalte „Besetzung“,
+  Eigene Lage und Einsatzbericht die „Führungsfunktionen“.
+
+Mehrere Mitglieder dürfen dieselbe Funktion tragen; dann gelten alle, und ihre Namen stehen
+alphabetisch, getrennt durch Komma. Ein Modul braucht es dafür nicht: Wer den Einsatz liest, sieht
+die Mitglieder samt Funktion. Ändert die Einsatzleitung eine Funktion, folgen diese Anzeigen auf
+jedem offenen Schirm ohne Neuladen. Eine Funktion trägt nur, wer ein Konto hat und Mitglied ist;
+ein gekoppeltes Gerät sieht keine Namen. Nach der Schwärzung eines Einsatzes nennt die App keine
+Namen mehr.
+
+Entlassen im Personal berührt die Mitgliedschaft nicht: Wer entlassen ist und keine Funktion mehr
+führen soll, dem nimmt die Einsatzleitung sie im Reiter „Zugriff“ (Führungsstelle leeren) oder
+entfernt ihn als Mitglied.
 
 ### Ohne Rolle im Einsatz
 

@@ -202,7 +202,7 @@ async fn snapshot_friert_fachdaten_ein_umbenennen_aendert_stand_nicht() {
 #[tokio::test]
 async fn snapshot_friert_keine_verbindungen_ein() {
     use lifeline_hub::einsatz::verbindungen::{ersetzen, Bezug, Verbindung};
-    use lifeline_hub::stab::kommunikation::Verbindungsmittel;
+    use lifeline_hub::fernmeldewesen::kommunikation::Verbindungsmittel;
     let (pool, einsatz_id, benutzer_id, org_id) = setup().await;
     let einheit_id = seed_einheit(&pool, einsatz_id, org_id, benutzer_id, "Zug A").await;
     let abschnitt_id: i64 = sqlx::query_scalar(

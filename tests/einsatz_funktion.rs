@@ -1,70 +1,16 @@
 //! Funktion des Mitglieds im Einsatz (LFH-615): `EinsatzAnzeige.meine_funktion` für den Kopf
 //! und `etb_eintrag.erfasser_funktion` als Snapshot am ETB-Verfasser.
 //!
-//! Die Ableitungsregel selbst prüfen die Unit-Tests in `src/einsatz/funktion.rs`; hier geht es
-//! um die Verdrahtung: beide Einsatz-Pfade, der ETB-Snapshot auf beiden Anlegewegen (mit und
-//! ohne `client_id`) und dass eine spätere Umbesetzung einen geschriebenen Eintrag nicht
-//! umdeutet.
+//! Quelle ist allein die Führungsfunktion der Mitgliedschaft (i6k6mzed, design.md D2). Die
+//! Ableitungsregel selbst prüfen die Unit-Tests in `src/einsatz/funktion.rs`; hier geht es um die
+//! Verdrahtung: beide Einsatz-Pfade, der ETB-Snapshot auf beiden Anlegewegen (mit und ohne
+//! `client_id`) und dass ein späterer Funktionswechsel einen geschriebenen Eintrag nicht umdeutet.
 
 use axum::http::StatusCode;
 use serde_json::Value;
 
 mod common;
 use common::*;
-
-fn besetzung_pfad(einsatz: i64, sachgebiet: &str) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/besetzung/{sachgebiet}")
-}
-
-/// Stamm-Person mit Konto-Kopplung anlegen und in den Einsatz disponieren;
-/// liefert die `einsatz_personal.id`.
-async fn person_disponieren(
-    app: &axum::Router,
-    admin: &str,
-    einsatz: i64,
-    name: &str,
-    benutzer_id: i64,
-) -> i64 {
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        "/api/personal",
-        admin,
-        Some(&format!(
-            r#"{{"name":"{name}","benutzer_id":{benutzer_id}}}"#
-        )),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "Person anlegen: {json:?}");
-    let person = json["id"].as_i64().unwrap();
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
-        admin,
-        Some(&format!(r#"{{"personal_id":{person}}}"#)),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "disponieren: {json:?}");
-    json["id"].as_i64().unwrap()
-}
-
-async fn besetzen(app: &axum::Router, admin: &str, einsatz: i64, sachgebiet: &str, ep: i64) {
-    let (status, json) = anfrage(
-        app,
-        "PUT",
-        &besetzung_pfad(einsatz, sachgebiet),
-        admin,
-        Some(&format!(
-            r#"{{"besetzung_art":"personal","personal_id":{ep}}}"#
-        )),
-    )
-    .await;
-    assert!(
-        status.is_success(),
-        "besetzen {sachgebiet}: {status} {json:?}"
-    );
-}
 
 async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> Value {
     let (status, json) = anfrage(
@@ -97,58 +43,47 @@ async fn etb_eintrag(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) ->
         .expect("Eintrag in der Liste")
 }
 
-/// Führungskraft mit Konto, Rolle `fuehrungspersonal`, Person disponiert.
-/// Liefert (Einsatz, Cookie der Kraft, einsatz_personal.id).
+async fn kopf(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
+    let (status, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    json
+}
+
+/// Führungskraft mit Konto und Rolle `fuehrungspersonal`, ohne Funktion.
+/// Liefert (Einsatz, Cookie der Kraft, Benutzer-ID).
 async fn kraft_im_einsatz(app: &axum::Router, admin: &str) -> (i64, String, i64) {
     let einsatz = einsatz_anlegen(app, admin).await;
     let kraft = benutzer_anlegen(app, admin, "kraft", "fuehrungskraft").await;
     rolle_setzen(app, admin, einsatz, kraft, "fuehrungspersonal").await;
-    let ep = person_disponieren(app, admin, einsatz, "Vitt", kraft).await;
     let cookie = login_cookie(app, "kraft", "kraftpw1").await;
-    (einsatz, cookie, ep)
+    (einsatz, cookie, kraft)
 }
 
 #[tokio::test]
 async fn meine_funktion_in_detail_und_liste() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (einsatz, kraft, ep) = kraft_im_einsatz(&app, &admin).await;
+    let (einsatz, kraft, id) = kraft_im_einsatz(&app, &admin).await;
 
-    // Ohne Besetzung und ohne Leitungsrolle: keine Funktion — ABSENT, nicht null.
-    let (_, json) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}"),
-        &kraft,
-        None,
-    )
-    .await;
+    // Ohne Funktion und ohne Leitungsrolle: keine Funktion — ABSENT, nicht null.
+    let json = kopf(&app, &kraft, einsatz).await;
     assert!(
         !json.as_object().unwrap().contains_key("meine_funktion"),
         "ohne Funktion fehlt das Feld: {json:?}"
     );
+    assert_eq!(json["meine_sachgebiete"], serde_json::json!([]));
 
-    besetzen(&app, &admin, einsatz, "s2", ep).await;
-    let (_, json) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}"),
-        &kraft,
-        None,
-    )
-    .await;
-    assert_eq!(json["meine_funktion"], "S2 Lage");
-
-    besetzen(&app, &admin, einsatz, "s3", ep).await;
-    let (_, json) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}"),
-        &kraft,
-        None,
-    )
-    .await;
-    assert_eq!(json["meine_funktion"], "S2/S3", "Detail-Pfad");
+    funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", Some("s2")).await;
+    let json = kopf(&app, &kraft, einsatz).await;
+    assert_eq!(json["meine_funktion"], "S2 Lage", "Detail-Pfad");
+    assert_eq!(json["meine_sachgebiete"], serde_json::json!(["s2"]));
 
     // Listen-Pfad baut das Struct-Literal selbst — ein fehlendes Feld dort fiele nur hier auf.
     let (_, liste) = anfrage(&app, "GET", "/api/einsaetze", &kraft, None).await;
@@ -158,11 +93,74 @@ async fn meine_funktion_in_detail_und_liste() {
         .iter()
         .find(|e| e["id"].as_i64() == Some(einsatz))
         .unwrap();
-    assert_eq!(eintrag["meine_funktion"], "S2/S3", "Listen-Pfad");
+    assert_eq!(eintrag["meine_funktion"], "S2 Lage", "Listen-Pfad");
+    assert_eq!(eintrag["meine_sachgebiete"], serde_json::json!(["s2"]));
+}
+
+/// Listen-Pfad (`GET /api/einsaetze`) mit ZWEI Einsätzen, in denen derselbe Benutzer
+/// verschiedene Funktionen trägt. **Nur diese Hälfte** fängt einen stillen Platzhalter im
+/// Struct-Literal von `liste_fuer` (vorher in `tests/stab.rs`, LFH-46).
+#[tokio::test]
+async fn meine_sachgebiete_im_listen_pfad_ueber_zwei_einsaetze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let kraft = benutzer_anlegen(&app, &admin, "kraft", "fuehrungskraft").await;
+    let mut erwartet = std::collections::HashMap::new();
+    for sg in ["s1", "s4"] {
+        let einsatz = einsatz_anlegen(&app, &admin).await;
+        funktion_setzen(&app, &admin, einsatz, kraft, "fuehrungspersonal", Some(sg)).await;
+        erwartet.insert(einsatz, sg);
+    }
+    let cookie = login_cookie(&app, "kraft", "kraftpw1").await;
+    let (status, json) = anfrage(&app, "GET", "/api/einsaetze", &cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 2, "beide Einsätze sind lesbar");
+    for eintrag in liste {
+        let id = eintrag["id"].as_i64().unwrap();
+        let soll = erwartet.get(&id).expect("unerwarteter Einsatz");
+        assert_eq!(
+            eintrag["meine_sachgebiete"],
+            serde_json::json!([soll]),
+            "Einsatz {id}: der Listen-Pfad muss dieselben Sachgebiete liefern wie der Detail-Pfad"
+        );
+    }
+}
+
+/// Spec `einsatzkopf-live`, „Höchstens ein Sachgebiet“: ein Fachberater hat kein Sachgebiet,
+/// seine Funktion nennt das Label mit der Bezeichnung (i6k6mzed, design.md D2). Der ETB-Snapshot
+/// trägt nur das Label, nie die Bezeichnung: sie wird geschwärzt.
+#[tokio::test]
+async fn fachberater_hat_kein_sachgebiet() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, kraft, id) = kraft_im_einsatz(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/mitglieder/{id}"),
+        &admin,
+        Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"fachberater","fuehrungsstelle":"THW"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let json = kopf(&app, &kraft, einsatz).await;
+    assert_eq!(json["meine_funktion"], "Fachberater: THW");
+    assert_eq!(json["meine_sachgebiete"], serde_json::json!([]));
+
+    let e = erfassen(
+        &app,
+        &kraft,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Statik geprüft"}"#,
+    )
+    .await;
+    assert_eq!(e["erfasser_funktion"], "Fachberater");
 }
 
 #[tokio::test]
-async fn einsatzleitung_ohne_sachgebiet_heisst_einsatzleitung() {
+async fn einsatzleitung_ohne_funktion_heisst_einsatzleitung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -170,14 +168,7 @@ async fn einsatzleitung_ohne_sachgebiet_heisst_einsatzleitung() {
     rolle_setzen(&app, &admin, einsatz, leitung, "einsatzleitung").await;
     let cookie = login_cookie(&app, "leitung", "leitungpw1").await;
 
-    let (_, json) = anfrage(
-        &app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}"),
-        &cookie,
-        None,
-    )
-    .await;
+    let json = kopf(&app, &cookie, einsatz).await;
     assert_eq!(json["meine_funktion"], "Einsatzleitung");
 
     let e = erfassen(
@@ -188,15 +179,20 @@ async fn einsatzleitung_ohne_sachgebiet_heisst_einsatzleitung() {
     )
     .await;
     assert_eq!(e["erfasser_funktion"], "EL");
+
+    // Die Funktion der Mitgliedschaft gewinnt gegen die Rolle.
+    funktion_setzen(&app, &admin, einsatz, leitung, "einsatzleitung", Some("s3")).await;
+    let json = kopf(&app, &cookie, einsatz).await;
+    assert_eq!(json["meine_funktion"], "S3 Einsatz");
 }
 
 #[tokio::test]
-async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
+async fn etb_snapshot_bleibt_beim_funktionswechsel_stehen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (einsatz, kraft, ep) = kraft_im_einsatz(&app, &admin).await;
+    let (einsatz, kraft, id) = kraft_im_einsatz(&app, &admin).await;
 
-    // Vor jeder Besetzung: kein Snapshot, und das Feld fehlt statt null zu sein.
+    // Ohne Funktion: kein Snapshot, und das Feld fehlt statt null zu sein.
     let ohne = erfassen(
         &app,
         &kraft,
@@ -209,7 +205,7 @@ async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
         "ohne Funktion fehlt das Feld: {ohne:?}"
     );
 
-    besetzen(&app, &admin, einsatz, "s2", ep).await;
+    funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", Some("s2")).await;
     let s2 = erfassen(
         &app,
         &kraft,
@@ -219,9 +215,8 @@ async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
     .await;
     assert_eq!(s2["erfasser_funktion"], "S2");
 
-    // Umbesetzung auf S3: der schon geschriebene Eintrag behält „S2".
-    anfrage(&app, "DELETE", &besetzung_pfad(einsatz, "s2"), &admin, None).await;
-    besetzen(&app, &admin, einsatz, "s3", ep).await;
+    // Wechsel auf S3: der schon geschriebene Eintrag behält „S2".
+    funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", Some("s3")).await;
     let s3 = erfassen(
         &app,
         &kraft,
@@ -246,14 +241,14 @@ async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
 async fn snapshot_auch_auf_dem_client_id_weg() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (einsatz, kraft, ep) = kraft_im_einsatz(&app, &admin).await;
-    besetzen(&app, &admin, einsatz, "s1", ep).await;
+    let (einsatz, kraft, id) = kraft_im_einsatz(&app, &admin).await;
+    funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", Some("s1")).await;
 
     let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"offline","client_id":"6f1c2a9e-0000-4000-8000-000000000615"}"#;
     let erst = erfassen(&app, &kraft, einsatz, body).await;
     assert_eq!(erst["erfasser_funktion"], "S1");
 
-    anfrage(&app, "DELETE", &besetzung_pfad(einsatz, "s1"), &admin, None).await;
+    funktion_setzen(&app, &admin, einsatz, id, "fuehrungspersonal", None).await;
     let (status, replay) = anfrage(
         &app,
         "POST",

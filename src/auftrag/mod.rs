@@ -375,25 +375,16 @@ pub async fn nach_erteilung(
 }
 
 /// Setzt `aktuelle_besetzung` an Funktionsempfängern mit Sachgebietscode (LFH-549). Die
-/// Besetzung wird einmal je Anfrage geladen, nur mit Stab-Recht (`fuehrung::aufloesung`).
+/// Besetzung wird einmal je Anfrage aus der Mitgliedschaft geladen, nie für ein gekoppeltes
+/// Gerät (`fuehrung::aufloesung`).
 pub async fn anreichern_alle(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
-    org_id: i64,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_rolle: Option<crate::einsatz::EinsatzRolle>,
     geraet: Option<&crate::geraet::GeraetKontext>,
     auftraege: &mut [AuftragDetail],
 ) -> Result<(), crate::error::AppError> {
-    let aufloeser = crate::fuehrung::aufloesung::Aufloeser::laden_fuer(
-        pool,
-        einsatz_id,
-        org_id,
-        benutzer,
-        einsatz_rolle,
-        geraet,
-    )
-    .await?;
+    let aufloeser =
+        crate::fuehrung::aufloesung::Aufloeser::laden_fuer(pool, einsatz_id, geraet).await?;
     for d in auftraege.iter_mut() {
         for e in d.empfaenger.iter_mut() {
             e.aktuelle_besetzung = aufloeser.aufloesen(

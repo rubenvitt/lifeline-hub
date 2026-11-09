@@ -26,13 +26,6 @@ pub const ZIEL_KLARTEXTE: &[&str] = &[
     "Yilmaz-Wunde.jpg",
     "Yilmaz-Ausweis-alt.pdf",
     "0151 1112223",
-    "Maria Beispiel",
-    "+49 511 1234567",
-    // LFH-901: alle Freitexte des Medienkontakts hängen an der Ansprechperson (Wurzel).
-    "NDR 1",
-    "Pegelstand Deichstraße",
-    "Pegel sinkt seit Mittag",
-    "EL Brandt",
     // LLH-1134: Verbindungen an Abschnitt und Einheit der Zielperson.
     "Hans Mobil 0173",
     "Hans nur tagsüber",
@@ -47,8 +40,6 @@ pub const NACHBAR_KLARTEXTE: &[&str] = &[
     "Externe Grete",
     "Stamm-Dora",
     "Anrufer Tom",
-    "Paul Presse",
-    "Sperrung Brücke",
     "Anderer Einsatz Meier",
     "Mustermann-Ausweis.pdf",
     "Meier-Foto-E2.jpg",
@@ -72,8 +63,6 @@ pub struct Bestand {
     pub k_stamm: i64,
     pub anruf1: i64,
     pub anruf2: i64,
-    pub medien1: i64,
-    pub medien2: i64,
 }
 
 async fn id(pool: &SqlitePool, sql: &str, binds: &[i64]) -> i64 {
@@ -286,13 +275,6 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
     .await;
     exec(
         pool,
-        "INSERT INTO einsatz_stabsfunktion (einsatz_id, sachgebiet, besetzung_art, personal_id, \
-            snap_name, gesetzt_von_id) VALUES (?, 's1', 'personal', ?, 'Externer Hans', ?)",
-        &[e1, k1, leitung],
-    )
-    .await;
-    exec(
-        pool,
         "INSERT INTO einsatz_kraft_zeitachse (einsatz_id, personal_id, art, zeitpunkt_at, \
             quelle, notiz, erfasst_von) \
          VALUES (?, ?, 'eintreffen', '2026-01-01 00:00:00', 'nachtrag', 'Hans Funk 0172', ?)",
@@ -344,7 +326,7 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
     )
     .await;
 
-    // ---------- Anrufe und Medienkontakte ----------
+    // ---------- Anrufe ----------
     let anruf1 = id(
         pool,
         "INSERT INTO infotelefon_anruf (einsatz_id, anliegen, notiz, anrufer_name, rueckruf, \
@@ -363,27 +345,6 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
         &[e1, leitung],
     )
     .await;
-    let medien1 = id(
-        pool,
-        "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, kontakt_name, \
-            kontaktweg, eingang_at, status, antwort, freigabe_durch, \
-            angelegt_von_id) \
-         VALUES (?, 'anfrage', 'NDR 1', 'Pegelstand Deichstraße', 'Maria Beispiel', \
-            '+49 511 1234567', '2026-01-01 00:00:00', 'beantwortet', \
-            'Pegel sinkt seit Mittag', 'EL Brandt', ?) RETURNING id",
-        &[e1, leitung],
-    )
-    .await;
-    let medien2 = id(
-        pool,
-        "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, kontakt_name, eingang_at, \
-            angelegt_von_id) \
-         VALUES (?, 'anfrage', 'HAZ', 'Sperrung Brücke', 'Paul Presse', '2026-01-01 00:00:00', ?) \
-         RETURNING id",
-        &[e1, leitung],
-    )
-    .await;
-
     // LFH-757: Personen-Anhänge — Ziel (einer davon schon entfernt), Nachbar im selben Einsatz,
     // und die Person im anderen Einsatz.
     for (einsatz, person, datei, entfernt) in [
@@ -435,8 +396,6 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
         k_stamm,
         anruf1,
         anruf2,
-        medien1,
-        medien2,
     }
 }
 

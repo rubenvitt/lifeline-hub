@@ -87,12 +87,9 @@ import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
 import DokumentePage from './pages/DokumentePage';
 import LagebesprechungPage from './pages/LagebesprechungPage';
-import StabPage from './pages/StabPage';
 import FunkplanPage from './pages/FunkplanPage';
 import KommunikationsplanPage from './pages/KommunikationsplanPage';
 import InfotelefonPage from './pages/InfotelefonPage';
-import PressePage from './pages/PressePage';
-import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import BetreuungsstelleDetailPage from './pages/BetreuungsstelleDetailPage';
@@ -184,10 +181,11 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,
   lagebesprechung: <LagebesprechungPage />,
-  stab: <StabPage />,
   // LLH-1180: die Modulroute des Fernmeldewesens zeigt den Funkplan (Reiter Funkplan,
   // Fernmeldeskizze, Sprechgruppen); der Kommunikationsplan ist die Unterroute daneben.
   fernmeldewesen: <FunkplanPage />,
+  // i6k6mzed: das Informationstelefon ist ein eigenes Modul (design.md D3).
+  infotelefon: <InfotelefonPage />,
   dokumente: <DokumentePage />,
   abloesung: <AbloesungPage />,
   'wetter-pegel': <WetterPegelPage />,
@@ -468,7 +466,7 @@ export const appRouten = createRoutesFromElements(
           {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,
               `modulAusPfad` gatet sie über das Segment `verpflegung`. */}
           <Route path="verpflegung/:zeitfensterId/ausgabe" element={<AusgabeAnsicht />} />
-          {/* Tag aus Vorlage anlegen (LLH-1058): Unterroute des Moduls, nur am Stab; `modulAusPfad`
+          {/* Tag aus Vorlage anlegen (LLH-1058): Unterroute des Moduls; `modulAusPfad`
               gatet sie über das Segment `verpflegung`. */}
           <Route path="verpflegung/aus-vorlage" element={<TagAusVorlage />} />
           {/* Altadressen der S6-Werkzeuge unter dem Stab leiten dauerhaft um, samt `?ansicht=`
@@ -478,13 +476,18 @@ export const appRouten = createRoutesFromElements(
             path="stab/kommunikationsplan"
             element={<AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />}
           />
-          {/* Presse- und Medienarbeit S5 (LFH-554): Unterrouten des Stabs, kein eigenes Modul. */}
-          <Route path="stab/presse" element={<PressePage />} />
+          {/* Altadresse des Informationstelefons (i6k6mzed, design.md D3/D8): leitet dauerhaft auf
+              das eigene Modul um, samt `?anruf=` und `?neu=1`; `modulAusPfad` gatet sie danach. */}
+          <Route path="stab/infotelefon" element={<AltpfadWeiterleitung modul="infotelefon" />} />
+          {/* Altadressen des entfernten Stabs samt Presse (i6k6mzed, design.md D8): führen in den
+              Einsatz statt auf die Einsatzliste, ohne eigene Hinweisseite. `..` ist relativ zur
+              Route, also `/einsaetze/:id`. */}
+          <Route path="stab" element={<Navigate to=".." replace />} />
+          <Route path="stab/presse" element={<Navigate to=".." replace />} />
           <Route
             path="stab/presse/mitteilungen/:mitteilungId"
-            element={<PressemitteilungDetailPage />}
+            element={<Navigate to=".." replace />}
           />
-          <Route path="stab/infotelefon" element={<InfotelefonPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />

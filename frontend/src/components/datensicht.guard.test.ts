@@ -195,9 +195,6 @@ const KONSUMENTEN = [
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
-  // Das Presse-Log S5 (LFH-554): Karten, weil die Frage „was ist mit diesem?“ lautet; Status an
-  // der Statusanzeige, „Beantworten“ als Primäraktion.
-  '/src/pages/PressePage.tsx',
   '/src/pages/SchaedenPage.tsx',
   '/src/pages/TierePage.tsx',
   '/src/pages/uhs/BewegungenTab.tsx',

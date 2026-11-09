@@ -254,7 +254,7 @@ Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „ges
 Einsatzabschnitte der Kraft, „Ruhe“ zählt seit dem Ende des letzten. Ohne Ereignis steht keine Zahl,
 sondern „—“. Die Dauer erscheint im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im
 Paneel „Zeitachse“ ihrer Ansicht und in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“
-(diese unter „Spalten“). Der Stab zeigt sie nicht.
+(diese unter „Spalten“).
 
 Im Meldebild unter „Im Einsatz“ und in der Personalliste unter „Einsatzdauer“ steht neben der Zahl
 ein Wort, wenn eine Kraft die Grenzwerte des Schichtplans reißt (Kapitel [Ablösung](abloesung.md)):

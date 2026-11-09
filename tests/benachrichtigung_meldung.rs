@@ -27,7 +27,7 @@ struct Welt {
 /// Eine gespeicherte Benachrichtigung: (Empfänger, Art, Bezugstyp, Bezugskennung).
 type Zeile = (i64, String, String, i64);
 
-/// Einsatz mit S2 = Anna und S3 = Bert in der Stab-Besetzung, Carla ohne Funktion.
+/// Einsatz mit S2 = Anna und S3 = Bert in der Mitgliedschaft, Carla ohne Funktion.
 async fn welt() -> Welt {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
@@ -53,10 +53,8 @@ async fn welt() -> Welt {
         bert,
         carla,
     };
-    let ep_anna = w.personal("Anna Albers", w.anna).await;
-    w.besetzen("s2", ep_anna).await;
-    let ep_bert = w.personal("Bert Brandt", w.bert).await;
-    w.besetzen("s3", ep_bert).await;
+    w.besetzen("s2", w.anna).await;
+    w.besetzen("s3", w.bert).await;
     w
 }
 
@@ -65,44 +63,18 @@ impl Welt {
         login_cookie(&self.app, name, &format!("{name}pw1")).await
     }
 
-    /// Legt eine Stamm-Person mit verknüpftem Konto an und disponiert sie; liefert die
-    /// `einsatz_personal.id`.
-    async fn personal(&self, name: &str, benutzer_id: i64) -> i64 {
-        let (s, v) = anfrage(
+    /// Gibt dem Mitglied `benutzer_id` die Führungsfunktion `sachgebiet` (Mitgliedschaft,
+    /// i6k6mzed D2).
+    async fn besetzen(&self, sachgebiet: &str, benutzer_id: i64) {
+        common::funktion_setzen(
             &self.app,
-            "POST",
-            "/api/personal",
             &self.admin,
-            Some(&json!({ "name": name, "benutzer_id": benutzer_id }).to_string()),
+            self.einsatz,
+            benutzer_id,
+            "fuehrungspersonal",
+            Some(sachgebiet),
         )
         .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
-            &self.admin,
-            Some(&json!({ "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        v["id"].as_i64().unwrap()
-    }
-
-    /// Besetzt ein Sachgebiet mit dem Einsatzpersonal `ep`.
-    async fn besetzen(&self, sachgebiet: &str, ep: i64) {
-        let (s, v) = anfrage(
-            &self.app,
-            "PUT",
-            &format!(
-                "/api/einsaetze/{}/stab/besetzung/{sachgebiet}",
-                self.einsatz
-            ),
-            &self.admin,
-            Some(&json!({ "besetzung_art": "personal", "personal_id": ep }).to_string()),
-        )
-        .await;
-        assert!(s.is_success(), "besetzen {sachgebiet}: {s} {v}");
     }
 
     /// Erfasst als `cookie` eine Meldung; `zusatz` ergänzt oder überschreibt Felder des Bodys.
@@ -266,10 +238,10 @@ async fn meldung_an_s2_erreicht_die_nutzer_von_s2() {
     assert!(w.lesen(&w.admin).await.is_empty(), "Erfasser");
 }
 
-/// Ersatz über die Mitgliedschaft (Spec „Meine Funktion“): ist S4 nicht besetzt, erreicht die
-/// Meldung an S4 das Mitglied, das S4 in seiner Mitgliedschaft trägt.
+/// Spec „Meine Funktion“, Szenario „Ersatz über die Mitgliedschaft“: die Meldung an S4 erreicht
+/// das Mitglied, das S4 in seiner Mitgliedschaft trägt.
 #[tokio::test]
-async fn meldung_an_unbesetzte_funktion_erreicht_die_mitgliedschaft() {
+async fn meldung_an_s4_erreicht_die_mitgliedschaft() {
     let w = welt().await;
     sqlx::query(
         "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = 's4' \

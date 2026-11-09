@@ -24,8 +24,7 @@ zeigen. Es enthält den Lagestand für die nächste Besprechung:
 Jede Zahl MUST denselben Wert haben, den das Lage-Dashboard für diesen Einsatz zur selben Zeit
 zeigt. Das Paneel MUST keine Zahl selbst rechnen, die das Dashboard schon zeigt. Der Lagestand
 MUST den Zeitpunkt nennen, auf dem er beruht („Stand HH:MM“, den ältesten Stand seiner Quellen).
-Er MUST sich live aktualisieren wie das Dashboard. Die Stab-Seite MUST das Paneel nicht mehr
-tragen.
+Er MUST sich live aktualisieren wie das Dashboard.
 
 #### Scenario: Gleiche Zahlen wie das Dashboard
 - **WHEN** das Lage-Dashboard 248 Betroffene, davon 3 vermisst, und 5 offene Aufträge, davon 1
@@ -57,7 +56,7 @@ Die Vorbereitung SHALL jede Quelle einzeln laden. Wird eine Quelle abgelehnt ode
 Abruf, MUST die Zeile „—“ mit dem Grund zeigen, „nicht freigegeben“ bzw. „nicht geladen“. Die
 übrigen Zeilen MUST sie weiter zeigen. Eine fehlende Quelle MUST NOT als 0 erscheinen. Die Seite
 Lagebesprechung prüft ihre eigene Freigabe; die Vorbereitung ist keine Freigabe für die
-Quellmodule. Die Freigabe des Moduls Stab MUST keine Zeile der Vorbereitung sperren.
+Quellmodule.
 
 #### Scenario: Betroffene gesperrt
 - **WHEN** die Person das Modul Betroffene nicht sehen darf
@@ -65,7 +64,7 @@ Quellmodule. Die Freigabe des Moduls Stab MUST keine Zeile der Vorbereitung sper
   Zeilen zeigen ihre Werte
 
 #### Scenario: Stab gesperrt
-- **WHEN** die Person das Modul Stab nicht sehen darf, die Lagebesprechung aber schon
+- **WHEN** die Person die Lagebesprechung sehen darf
 - **THEN** zeigen die Zeilen „Letzte Lagebesprechung“ und „Nächster Termin“ ihre Werte
 
 ### Requirement: In Lagebericht übernehmen
@@ -104,11 +103,11 @@ durch die Übernahme in einen Lagebericht.
 ### Requirement: Ein Ton für den überfälligen Besprechungstermin
 
 Ist der Termin der nächsten Lagebesprechung erreicht oder verstrichen, SHALL die Seite
-Lagebesprechung, die Termin-Zeile der Stab-Seite und die Fristenliste des Führungsüberblicks ihn
-mit demselben Ton und demselben Wort zeigen. Der Ton MUST `achtung` sein und MUST NOT `alarm` sein,
-denn eine Besprechung ist kein Gefahrenereignis. Das Wort MUST in der ersten Minute ab dem Termin
-„jetzt fällig“ lauten und danach „seit <Dauer> überfällig“, die Dauer auf ganze Minuten
-abgerundet. Die Farbe MUST NOT der einzige Kanal sein; das Wort trägt den Zustand auch ohne sie.
+Lagebesprechung und die Fristenliste des Führungsüberblicks ihn mit demselben Ton und demselben
+Wort zeigen. Der Ton MUST `achtung` sein und MUST NOT `alarm` sein, denn eine Besprechung ist kein
+Gefahrenereignis. Das Wort MUST in der ersten Minute ab dem Termin „jetzt fällig“ lauten und danach
+„seit <Dauer> überfällig“, die Dauer auf ganze Minuten abgerundet. Die Farbe MUST NOT der einzige
+Kanal sein; das Wort trägt den Zustand auch ohne sie.
 
 Überfällige Aufträge und Erinnerungen in derselben Fristenliste MUST von dieser Anforderung
 unberührt bleiben.
@@ -120,7 +119,7 @@ unberührt bleiben.
 
 #### Scenario: Termin gerade erreicht
 - **WHEN** der Termin vor weniger als einer Minute erreicht wurde
-- **THEN** zeigen Seite Lagebesprechung, Stab-Zeile und Überblick „jetzt fällig“ im Ton `achtung`
+- **THEN** zeigen Seite Lagebesprechung und Überblick „jetzt fällig“ im Ton `achtung`
 
 #### Scenario: Überfälliger Auftrag daneben
 - **WHEN** in der Fristenliste ein überfälliger Auftrag neben der überfälligen Lagebesprechung steht

@@ -83,36 +83,18 @@ impl Welt {
         format!("/api/einsaetze/{}/{rest}", self.einsatz)
     }
 
-    /// Besetzt ein Sachgebiet der Stab-Besetzung mit einer Stamm-Person, die mit `benutzer_id`
-    /// verknüpft ist.
-    async fn besetzen(&self, sachgebiet: &str, name: &str, benutzer_id: i64) {
-        let (s, v) = anfrage(
+    /// Gibt dem Mitglied `benutzer_id` die Führungsfunktion `funktion` (Mitgliedschaft,
+    /// i6k6mzed D2).
+    async fn funktion(&self, funktion: &str, benutzer_id: i64) {
+        common::funktion_setzen(
             &self.app,
-            "POST",
-            "/api/personal",
             &self.admin,
-            Some(&json!({ "name": name, "benutzer_id": benutzer_id }).to_string()),
+            self.einsatz,
+            benutzer_id,
+            "fuehrungspersonal",
+            Some(funktion),
         )
         .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            &self.pfad("personal"),
-            &self.admin,
-            Some(&json!({ "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "PUT",
-            &self.pfad(&format!("stab/besetzung/{sachgebiet}")),
-            &self.admin,
-            Some(&json!({ "besetzung_art": "personal", "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert!(s.is_success(), "besetzen {sachgebiet}: {s} {v}");
     }
 
     async fn modul_nur_fuer_admins(&self, modul: &str) {
@@ -363,7 +345,7 @@ async fn bestaetigte_sofortmeldung_eskaliert_nicht() {
 #[tokio::test]
 async fn auftrag_an_s2_ueberfaellig_alarmiert_auftraggeberin_und_s2() {
     let w = welt().await;
-    w.besetzen("s2", "Bert", w.bert).await;
+    w.funktion("s2", w.bert).await;
     let a = w.auftrag_mit_frist("annika", &["s2"]).await;
 
     w.tick(Utc::now() + Duration::minutes(30)).await;
@@ -395,8 +377,8 @@ async fn auftrag_an_s2_ueberfaellig_alarmiert_auftraggeberin_und_s2() {
 #[tokio::test]
 async fn quittierter_empfaenger_bekommt_den_ueberfaelligen_auftrag_nicht() {
     let w = welt().await;
-    w.besetzen("s2", "Bert", w.bert).await;
-    w.besetzen("s3", "Carl", w.carl).await;
+    w.funktion("s2", w.bert).await;
+    w.funktion("s3", w.carl).await;
     let a = w.auftrag_mit_frist("annika", &["s2", "s3"]).await;
     let s3_zeile = a["empfaenger"]
         .as_array()
@@ -430,7 +412,7 @@ async fn quittierter_empfaenger_bekommt_den_ueberfaelligen_auftrag_nicht() {
 #[tokio::test]
 async fn voll_quittierter_auftrag_alarmiert_niemanden() {
     let w = welt().await;
-    w.besetzen("s2", "Bert", w.bert).await;
+    w.funktion("s2", w.bert).await;
     let a = w.auftrag_mit_frist("annika", &["s2"]).await;
     let zeile = a["empfaenger"][0]["id"].as_i64().unwrap();
     let (s, v) = anfrage(
@@ -456,7 +438,7 @@ async fn voll_quittierter_auftrag_alarmiert_niemanden() {
 #[tokio::test]
 async fn erinnerung_an_s1_erreicht_nur_s1() {
     let w = welt().await;
-    w.besetzen("s1", "Bert", w.bert).await;
+    w.funktion("s1", w.bert).await;
     let id = w.erinnerung("annika", Some("s1")).await;
 
     w.tick(Utc::now() + Duration::hours(2)).await;
@@ -489,7 +471,7 @@ async fn erinnerung_ohne_empfaenger_erreicht_die_erstellerin() {
 #[tokio::test]
 async fn erinnerung_von_hand_zu_meldung_oder_auftrag_bleibt_eine_erinnerung() {
     let w = welt().await;
-    w.besetzen("s1", "Bert", w.bert).await;
+    w.funktion("s1", w.bert).await;
     let cookie = w.cookie("annika").await;
     let (s, meldung) = anfrage(
         &w.app,

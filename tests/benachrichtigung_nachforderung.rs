@@ -66,36 +66,17 @@ impl Welt {
         login_cookie(&self.app, name, &format!("{name}pw1")).await
     }
 
-    /// Besetzt S4 in der Stab-Besetzung mit einer Stamm-Person, die mit `benutzer_id`
-    /// verknüpft ist.
+    /// Gibt dem Mitglied `benutzer_id` die Führungsfunktion S4 (Mitgliedschaft, i6k6mzed D2).
     async fn s4_besetzen(&self, benutzer_id: i64) {
-        let (s, v) = anfrage(
+        common::funktion_setzen(
             &self.app,
-            "POST",
-            "/api/personal",
             &self.admin,
-            Some(&json!({ "name": "Stab S4", "benutzer_id": benutzer_id }).to_string()),
+            self.einsatz,
+            benutzer_id,
+            "fuehrungspersonal",
+            Some("s4"),
         )
         .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
-            &self.admin,
-            Some(&json!({ "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "PUT",
-            &format!("/api/einsaetze/{}/stab/besetzung/s4", self.einsatz),
-            &self.admin,
-            Some(&json!({ "besetzung_art": "personal", "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert!(s.is_success(), "besetzen s4: {s} {v}");
     }
 
     /// Legt als `cookie` die Nachforderung „2 RTW“ an die Leitstelle an; liefert ihre Kennung.

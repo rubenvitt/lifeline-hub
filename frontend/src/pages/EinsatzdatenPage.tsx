@@ -72,7 +72,7 @@ import type {
 } from '../api/types';
 import Segmentleiste from '../components/instrument/Segmentleiste';
 import { mitVorgabe } from '../components/vorgabeText';
-import { fuehrungsstelleErfasst } from '../stab/fuehrungsstelle';
+import { fuehrungsstelleErfasst } from '../einsatz/fuehrungsstelle';
 import {
   FUEHRUNGSSTELLE_ADRESSE_MAX,
   FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
@@ -80,13 +80,13 @@ import {
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import {
   rufnameFilter,
   rufnameOptions,
   rufnamePlaceholder,
   rufnameVorschlaege,
-} from '../stab/rufnameVorschlaege';
+} from '../fernmeldewesen/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import SprechgruppenAngabe, {
   schreibeSprechgruppen,
@@ -95,7 +95,7 @@ import SprechgruppenAngabe, {
 } from '../components/SprechgruppenAngabe';
 import { VerbindungenAngabe } from '../components/VerbindungenFeld';
 import EinsatzleiterAngabe from './EinsatzleiterAngabe';
-import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzleiter';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -943,7 +943,7 @@ function FuehrungsfahrzeugeZeile({
 
 /**
  * Zeile „Rufname“ der Führungsstelle mit Vorschlägen aus den Stammdaten (LFH-1187,
- * `stab/rufnameVorschlaege.tsx`): Funkrufnamen der Führungsfahrzeuge, Freitext bleibt erlaubt.
+ * `fernmeldewesen/rufnameVorschlaege.tsx`): Funkrufnamen der Führungsfahrzeuge, Freitext bleibt erlaubt.
  */
 function RufnameAngabe({
   rufname,

@@ -5,8 +5,8 @@ import FormularEingehaengt from '../components/FormularEingehaengt';
 import { useEntwurfVerlustschutz } from './useEntwurfVerlustschutz';
 
 /**
- * LFH-627: „Instance created by `useForm` is not connected to any Form element". Befehl,
- * Lagebericht und Pressemitteilung rendern ihr `<Form>` nur im bearbeitbaren Entwurf; freigegeben
+ * LFH-627: „Instance created by `useForm` is not connected to any Form element". Befehl und
+ * Lagebericht rendern ihr `<Form>` nur im bearbeitbaren Entwurf; freigegeben
  * oder ohne Schreibrecht schrieb der Verlustschutz den Serverstand trotzdem per `setFieldsValue`
  * in die Instanz.
  *

@@ -19,7 +19,7 @@ pub mod skelett_loeschung;
 pub mod verbindungen;
 pub mod zaehler;
 
-use crate::stab::Sachgebiet;
+use crate::fuehrung::Sachgebiet;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -170,20 +170,18 @@ impl Einsatz {
     }
 
     /// API-Darstellung inkl. der Einsatz-Rolle des abfragenden Benutzers
-    /// (`None`, wenn dieser kein Mitglied ist).
+    /// (`None`, wenn dieser kein Mitglied ist) und der Führungsstelle seiner Mitgliedschaft.
     pub fn anzeige(
         &self,
         meine_rolle: Option<String>,
-        meine_fuehrungsstelle: Option<String>,
-        meine_sachgebiete: Vec<Sachgebiet>,
+        meine_stelle: Option<crate::fuehrung::Funktionsangabe>,
         karte: &crate::fuehrung::Labelkarte,
     ) -> EinsatzAnzeige {
-        let meine_funktion = funktion::ableiten(
-            &meine_sachgebiete,
-            meine_rolle.as_deref().and_then(EinsatzRolle::parse),
-            karte,
-        )
-        .map(|f| f.bezeichnung);
+        let MeineFelder {
+            fuehrungsstelle: meine_fuehrungsstelle,
+            sachgebiete: meine_sachgebiete,
+            funktion: meine_funktion,
+        } = MeineFelder::ableiten(meine_rolle.as_deref(), meine_stelle, karte);
         EinsatzAnzeige {
             id: self.id,
             org_id: self.org_id,
@@ -256,8 +254,8 @@ pub struct EinsatzAnzeige {
     /// (LFH-549): Kürzel eines Katalogwerts („S2“), „Fachberater: THW“ oder der Freitext.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_fuehrungsstelle: Option<String>,
-    /// Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
-    /// diesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.
+    /// Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;
+    /// seit i6k6mzed aus `einsatz_mitgliedschaft.fuehrungsfunktion`, design.md D2).
     ///
     /// **Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und
     /// KEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über
@@ -267,8 +265,9 @@ pub struct EinsatzAnzeige {
     #[schema(required)]
     pub meine_sachgebiete: Vec<Sachgebiet>,
     /// Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
-    /// („S2 Lage", „S2/S3", „Einsatzleitung"; LFH-615). Abgeleitet aus `meine_sachgebiete`
-    /// und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
+    /// („S2 Lage", „Fachberater: THW", „Einsatzleitung"; LFH-615). Abgeleitet aus der
+    /// Führungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,
+    /// wenn keine Funktion folgt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_funktion: Option<String>,
     /// Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
@@ -292,6 +291,48 @@ pub struct EinsatzAnzeige {
     /// `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzleiter: Option<fuehrungsstelle::EinsatzleiterAnzeige>,
+}
+
+/// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,
+/// design.md D2; Spec `einsatzkopf-live`, „Funktionsfelder folgen der Mitgliedschaft“). Eine
+/// Ableitung für Detail (`Einsatz::anzeige`) und Liste (`repo::liste_fuer`).
+pub(crate) struct MeineFelder {
+    pub fuehrungsstelle: Option<String>,
+    pub sachgebiete: Vec<Sachgebiet>,
+    pub funktion: Option<String>,
+}
+
+impl MeineFelder {
+    pub(crate) fn ableiten(
+        rolle: Option<&str>,
+        stelle: Option<crate::fuehrung::Funktionsangabe>,
+        karte: &crate::fuehrung::Labelkarte,
+    ) -> Self {
+        let stelle = stelle.unwrap_or(crate::fuehrung::Funktionsangabe {
+            funktion: None,
+            text: None,
+        });
+        let funktion = funktion::ableiten(
+            stelle.funktion,
+            stelle.text.as_deref(),
+            rolle.and_then(EinsatzRolle::parse),
+            karte,
+        )
+        .map(|f| f.bezeichnung);
+        Self {
+            sachgebiete: stelle
+                .funktion
+                .and_then(|f| f.sachgebiet())
+                .into_iter()
+                .collect(),
+            fuehrungsstelle: repo::vorbelegung(
+                karte,
+                stelle.funktion.map(|f| f.as_str()),
+                stelle.text,
+            ),
+            funktion,
+        }
+    }
 }
 
 /// Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec

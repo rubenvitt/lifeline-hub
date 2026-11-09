@@ -517,8 +517,10 @@ export interface components {
          */
         AntragStand: "offen" | "zurueckgenommen" | "vollzogen";
         /**
-         * @description Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die vier
-         *     Personenarten tragen dieselben Werte wie [`PersonenArt`].
+         * @description Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die
+         *     Personenarten tragen dieselben Werte wie [`PersonenArt`]. `medienkontakt` steht nur noch
+         *     in alten Anträgen: das Modul Presse und Medienarbeit ist entfernt (i6k6mzed, design.md
+         *     D4), ein neuer Antrag mit diesem Ziel ist 422.
          * @enum {string}
          */
         AntragZielArt: "einsatz" | "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
@@ -1300,19 +1302,11 @@ export interface components {
          */
         BesatzungRolle: "alt" | "neu";
         /**
-         * @description Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
-         *
-         *     **Keine Zeile = „nicht vergeben"** — das ist der im Fükw der Führungsstufe B
-         *     dokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.
-         *     Der Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion
-         *     („haben wir S4 bedacht?").
-         * @enum {string}
-         */
-        BesetzungArt: "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
-        /**
-         * @description Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als
-         *     [`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer
-         *     Zeile eine Auskunft, kein fehlendes Feld.
+         * @description Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers, mit „nicht vergeben“ als
+         *     eigenem Wert — hier ist die Abwesenheit eines Mitglieds eine Auskunft, kein fehlendes
+         *     Feld. Erzeugt werden nur noch `personal` und `nicht_vergeben` (i6k6mzed, D2);
+         *     `einsatzleitung`, `extern` und `rueckwaertig` bleiben als Wire-Werte der früheren
+         *     Stab-Besetzung stehen (Grenzwert-Regel, `AGENTS.md`).
          * @enum {string}
          */
         BesetzungsZustand: "nicht_vergeben" | "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
@@ -1785,31 +1779,6 @@ export interface components {
             /** Format: int64 */
             ungelesen: number;
         };
-        /**
-         * @description Ein gespeicherter Punkt der Checkliste.
-         *
-         *     `erledigt_at`/`erledigt_von_id` sind genau dann gesetzt, wenn `erledigt` (CHECK in der
-         *     Tabelle); `bemerkung` fehlt, wenn keine gesetzt ist.
-         */
-        ChecklistenEintrag: {
-            bemerkung?: string | null;
-            erledigt: boolean;
-            erledigt_at?: string | null;
-            /** Format: int64 */
-            erledigt_von_id?: number | null;
-            geaendert_at: string;
-            /** Format: int64 */
-            geaendert_von_id: number;
-            punkt: components["schemas"]["ChecklistenPunkt"];
-        };
-        /**
-         * @description Punkt der Checkliste. Wire == `as_str()`.
-         *
-         *     `ALLE` ist die Anzeigereihenfolge und Teil des Vertrags: das Frontend prüft seine Vorlage
-         *     gegen den generierten Typ in derselben Reihenfolge.
-         * @enum {string}
-         */
-        ChecklistenPunkt: "aufstellort" | "einweisung" | "lageskizze" | "funkarbeitsplaetze" | "sprechgruppen" | "etb_eroeffnet" | "leitstelle_gemeldet";
         /**
          * @description Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,
          *     design.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry
@@ -2334,14 +2303,15 @@ export interface components {
             meine_fuehrungsstelle?: string | null;
             /**
              * @description Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
-             *     („S2 Lage", „S2/S3", „Einsatzleitung"; LFH-615). Abgeleitet aus `meine_sachgebiete`
-             *     und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
+             *     („S2 Lage", „Fachberater: THW", „Einsatzleitung"; LFH-615). Abgeleitet aus der
+             *     Führungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,
+             *     wenn keine Funktion folgt.
              */
             meine_funktion?: string | null;
             meine_rolle?: components["schemas"]["EinsatzRolle"] | null;
             /**
-             * @description Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
-             *     diesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.
+             * @description Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;
+             *     seit i6k6mzed aus `einsatz_mitgliedschaft.fuehrungsfunktion`, design.md D2).
              *
              *     **Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und
              *     KEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über
@@ -4717,7 +4687,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -4791,73 +4761,6 @@ export interface components {
              */
             sitzung?: string | null;
         };
-        /** @description Öffentliche Darstellung eines Medienkontakts. */
-        MedienkontaktAnzeige: {
-            angelegt_at: string;
-            /** Format: int64 */
-            angelegt_von_id: number;
-            /** @description Die gegebene Antwort. Bleibt bei einer Rücknahme nach `offen` stehen. */
-            antwort?: string | null;
-            art: components["schemas"]["MedienkontaktArt"];
-            bearbeitet_at?: string | null;
-            /**
-             * Format: int64
-             * @description Wer den Status zuletzt gesetzt hat, und wann.
-             */
-            bearbeitet_von_id?: number | null;
-            bearbeitet_von_name?: string | null;
-            eingang_at: string;
-            /** Format: int64 */
-            einsatz_id: number;
-            /** @description Wer die Aussage freigegeben hat (Freitext, etwa „EL mündlich 14:20“). */
-            freigabe_durch?: string | null;
-            /** Format: int64 */
-            id: number;
-            kontakt_name?: string | null;
-            kontaktweg?: string | null;
-            medium: string;
-            /**
-             * Format: int64
-             * @description Freigegebene Pressemitteilung desselben Einsatzes, auf die die Antwort verweist.
-             */
-            pressemitteilung_id?: number | null;
-            status: components["schemas"]["MedienkontaktStatus"];
-            thema: string;
-        };
-        /**
-         * @description Art eines Medienkontakts. Wire == `as_str()`.
-         * @enum {string}
-         */
-        MedienkontaktArt: "anfrage" | "abstimmung" | "termin";
-        /** @description Zahl der Medienkontakte je Art (LFH-1075). */
-        MedienkontaktJeArt: {
-            /** Format: int64 */
-            abstimmung: number;
-            /** Format: int64 */
-            anfrage: number;
-            /** Format: int64 */
-            termin: number;
-        };
-        /**
-         * @description Kennzahlen des Presse-Logs über den ganzen Bestand (LFH-1075, Spec `stab-presse-log`): die
-         *     Grundlage der Medienlage und der Zahlen über der Liste. `medien` sind die Namen der Medien
-         *     (Redaktionen, keine Personen), jedes einmal, in der Folge der Liste.
-         */
-        MedienkontaktKennzahlen: {
-            /** Format: int64 */
-            gesamt: number;
-            je_art: components["schemas"]["MedienkontaktJeArt"];
-            medien: string[];
-            /** Format: int64 */
-            offen: number;
-            /** Format: int64 */
-            offene_anfragen: number;
-        };
-        /**
-         * @description Status eines Medienkontakts. Wire == `as_str()`.
-         * @enum {string}
-         */
-        MedienkontaktStatus: "offen" | "beantwortet" | "abgelehnt" | "erledigt";
         /**
          * @description Meldeweg eines Eintrags (optional).
          * @enum {string}
@@ -5935,7 +5838,7 @@ export interface components {
             erfasst_at: string;
             /** Format: int64 */
             id: number;
-            /** @description `R-042`, `EK-17`, `IT-5`, `MK-3` — dieselbe Kennung bestätigt den Antrag. */
+            /** @description `R-042`, `EK-17`, `IT-5` — dieselbe Kennung bestätigt den Antrag. */
             kennung: string;
             person_status?: components["schemas"]["PersonStatus"] | null;
         };
@@ -5983,7 +5886,7 @@ export interface components {
          *     `tests/enum_wire_kontrakt.rs`.
          * @enum {string}
          */
-        PersonenArt: "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
+        PersonenArt: "betroffene" | "externe_kraft" | "infotelefon_anruf";
         /** @description Ein Prüfbefund an einem Block oder an einer Person in einem Block. */
         PlanBefund: {
             /**
@@ -6345,76 +6248,6 @@ export interface components {
          * @enum {string}
          */
         PostenArt: "einheit" | "uhs" | "pause";
-        /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
-        PressemitteilungAbschnitt: {
-            schluessel: string;
-            text: string;
-        };
-        /** @description Öffentliche Anzeige einer Pressemitteilung. */
-        PressemitteilungAnzeige: {
-            abschnitte: components["schemas"]["PressemitteilungAbschnitt"][];
-            aktualisiert_at: string;
-            /** Format: int64 */
-            einsatz_id: number;
-            /** Format: int64 */
-            ersteller_id: number;
-            ersteller_name: string;
-            erstellt_at: string;
-            /** Format: int64 */
-            etb_eintrag_id?: number | null;
-            freigegeben_at?: string | null;
-            /** Format: int64 */
-            freigegeben_von_id?: number | null;
-            freigegeben_von_name?: string | null;
-            /** Format: int64 */
-            id: number;
-            status: components["schemas"]["PressemitteilungStatus"];
-            titel: string;
-            /** Format: int64 */
-            version: number;
-            /** Format: int64 */
-            vorgaenger_id?: number | null;
-            vorlage: components["schemas"]["PressemitteilungVorlage"];
-            zeitstand: string;
-        };
-        /**
-         * @description Listenzeile einer Pressemitteilung: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie
-         *     in der Anzeige als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.
-         */
-        PressemitteilungKopf: {
-            /** Format: int64 */
-            einsatz_id: number;
-            /** Format: int64 */
-            ersteller_id: number;
-            ersteller_name: string;
-            erstellt_at: string;
-            /** Format: int64 */
-            etb_eintrag_id?: number | null;
-            freigegeben_at?: string | null;
-            /** Format: int64 */
-            freigegeben_von_id?: number | null;
-            freigegeben_von_name?: string | null;
-            /** Format: int64 */
-            id: number;
-            status: components["schemas"]["PressemitteilungStatus"];
-            titel: string;
-            /** Format: int64 */
-            version: number;
-            /** Format: int64 */
-            vorgaenger_id?: number | null;
-            vorlage: components["schemas"]["PressemitteilungVorlage"];
-            zeitstand: string;
-        };
-        /**
-         * @description Status einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `status`.
-         * @enum {string}
-         */
-        PressemitteilungStatus: "entwurf" | "freigegeben";
-        /**
-         * @description Vorlage einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `vorlage`.
-         * @enum {string}
-         */
-        PressemitteilungVorlage: "erstinformation" | "folgeinformation" | "bevoelkerungshinweis" | "freitext";
         /**
          * @description Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
          *     LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.
@@ -6936,36 +6769,6 @@ export interface components {
             sicherheit?: string | null;
             /** Format: int64 */
             sortier: number;
-        };
-        /**
-         * @description Die Führungsorganisation eines Einsatzes.
-         *
-         *     `besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen
-         *     Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
-         *     schicken hiesse, „nicht vergeben" als Datensatz zu erfinden. Termin und Lagebesprechungen
-         *     trägt seit LLH-1111 das Modul Lagebesprechung (`lagebesprechung::LagebesprechungStand`).
-         */
-        StabAnzeige: {
-            besetzung: components["schemas"]["StabsfunktionAnzeige"][];
-        };
-        /**
-         * @description Eine belegte Sachgebietszeile.
-         *
-         *     `name` trägt je Art `snap_name` (Personal) bzw. `bezeichnung` (extern/rückwärtig) und ist
-         *     bei [`BesetzungArt::Einsatzleitung`] absent. `personal_noch_disponiert` unterscheidet
-         *     „Person ist weg" von „Name war nie gesetzt": der Führungsnachweis überlebt das Entfernen
-         *     der Disposition (`ON DELETE SET NULL` + eingefrorener `snap_name`).
-         */
-        StabsfunktionAnzeige: {
-            besetzung_art: components["schemas"]["BesetzungArt"];
-            gesetzt_at: string;
-            /** Format: int64 */
-            gesetzt_von_id: number;
-            name?: string | null;
-            /** Format: int64 */
-            personal_id?: number | null;
-            personal_noch_disponiert: boolean;
-            sachgebiet: components["schemas"]["Sachgebiet"];
         };
         /**
          * @description Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.

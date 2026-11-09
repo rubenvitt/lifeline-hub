@@ -34,17 +34,23 @@ const VORLAGEN: EinsatzVorlage[] = [
     id: 1,
     bezeichnung: 'Kleinlage',
     einsatzart: 'realeinsatz',
-    ausgeblendet: ['stab'],
+    ausgeblendet: ['lagebesprechung'],
     sortier: 10,
   },
   {
     id: 2,
     bezeichnung: 'Sanitätsdienst',
     einsatzart: 'sanitaetsdienst',
-    ausgeblendet: ['stab', 'tiere'],
+    ausgeblendet: ['lagebesprechung', 'tiere'],
     sortier: 20,
   },
-  { id: 3, bezeichnung: 'MANV', einsatzart: 'realeinsatz', ausgeblendet: ['stab'], sortier: 30 },
+  {
+    id: 3,
+    bezeichnung: 'MANV',
+    einsatzart: 'realeinsatz',
+    ausgeblendet: ['lagebesprechung'],
+    sortier: 30,
+  },
   { id: 4, bezeichnung: 'Ohne Art', ausgeblendet: [], sortier: 40 },
 ];
 

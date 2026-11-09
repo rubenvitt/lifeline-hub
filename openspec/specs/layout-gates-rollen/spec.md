@@ -68,8 +68,8 @@ werden, statt still aus der Messmenge zu fallen.
 - **THEN** ist die Primäraktion sichtbar gesperrt und misst mindestens 72 px in der Höhe
 
 #### Scenario: Versteckte Aktion
-- **WHEN** der Beobachter die Stabsseite öffnet
-- **THEN** gibt es keinen Knopf „Besetzung ändern“, und die übrigen Ziele der Seite halten die Stufe
+- **WHEN** der Beobachter die Fahrzeugliste öffnet
+- **THEN** gibt es keinen Knopf „Ad-hoc-Fahrzeug“, und die übrigen Ziele der Seite halten die Stufe
 
 ### Requirement: Nachweis trägt die Rolle als Ursache
 

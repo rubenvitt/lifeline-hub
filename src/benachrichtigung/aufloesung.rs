@@ -1,10 +1,9 @@
 //! Empfängerauflösung (design.md D3): aus den Adressaten eines [`Anlass`] die Menge der Nutzer,
 //! die eine Benachrichtigung bekommen. Alle Ausschlüsse stehen hier und nur hier:
 //!
-//! 1. `Funktion` → Stab-Besetzung (S1–S6: `einsatz_stabsfunktion` → `einsatz_personal` →
-//!    `personal.benutzer_id`; EL: Einsatzleiter der Führungsstelle; ein Sachgebiet „bei der
-//!    Einsatzleitung“ löst wie EL auf). Bringt sie keinen Nutzer, gilt
-//!    `einsatz_mitgliedschaft.fuehrungsfunktion`.
+//! 1. `Funktion` → alle Mitglieder, deren `einsatz_mitgliedschaft.fuehrungsfunktion` sie trägt
+//!    (i6k6mzed, design.md D2). Für EL gilt zuerst der Einsatzleiter der Führungsstelle
+//!    (`einsatz_personal` → `personal.benutzer_id`); nur ohne ihn die Mitgliedschaft.
 //! 2. `Person` → `personal.benutzer_id` des Einsatzpersonals; ohne Verknüpfung niemand.
 //! 3. `ModulLeser` → Mitglieder mit Leserecht am Modul; `ModulSchreiber` → nur die mit
 //!    Schreibrecht im Einsatz (Einsatzleitung, Führungspersonal), ebenso mit Zugriff aufs Modul.
@@ -13,8 +12,8 @@
 //!    abgeschaltet hat (D6), bekommt sie still: nur im Verlauf (LLH-1143, design.md D2).
 //! 5. Ebenso still wird sie, wenn die Vorgabe des Einsatzes ([`super::vorgabe`], LLH-1421,
 //!    design.md D3) sie für JEDE Funktion des Empfängers still stellt: lauter gewinnt. Seine
-//!    Funktionen sind die Stab-Besetzung (wie 1.) und die Funktion seiner Mitgliedschaft; hat er
-//!    keine, zählt er als „ohne Funktion“.
+//!    Funktionen sind EL, wenn er als Einsatzleiter an der Führungsstelle erfasst ist, und die
+//!    Funktion seiner Mitgliedschaft; hat er keine, zählt er als „ohne Funktion“.
 //!
 //! Dieselbe Rechteprüfung ([`Leserecht`]) gilt erneut beim Lesen einer Benachrichtigung.
 
@@ -183,15 +182,18 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
     })
 }
 
-/// Die Nutzer einer Funktion: Stab-Besetzung, ersatzweise Mitgliedschaft (Spec „Meine Funktion“).
+/// Die Nutzer einer Funktion (Spec „Meine Funktion“): alle Mitglieder mit dieser Funktion; für
+/// EL zuerst der Einsatzleiter der Führungsstelle, ersatzweise die Mitgliedschaft.
 async fn funktion_nutzer(
     pool: &SqlitePool,
     einsatz_id: i64,
     funktion: Fuehrungsfunktion,
 ) -> Result<Vec<i64>, AppError> {
-    let besetzt = besetzung_nutzer(pool, einsatz_id, funktion).await?;
-    if !besetzt.is_empty() {
-        return Ok(besetzt);
+    if funktion == Fuehrungsfunktion::El {
+        let einsatzleiter = einsatzleiter_nutzer(pool, einsatz_id).await?;
+        if !einsatzleiter.is_empty() {
+            return Ok(einsatzleiter);
+        }
     }
     Ok(sqlx::query_scalar(
         "SELECT benutzer_id FROM einsatz_mitgliedschaft \
@@ -203,52 +205,18 @@ async fn funktion_nutzer(
     .await?)
 }
 
-/// Die verknüpften Nutzer der Stab-Besetzung einer Funktion. EL ist der Einsatzleiter der
-/// Führungsstelle; ein Sachgebiet „bei der Einsatzleitung“ (Zusammenlegung) löst wie EL auf.
-/// S7, Führungshilfspersonal und Fachberater haben keine Besetzung.
-async fn besetzung_nutzer(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    funktion: Fuehrungsfunktion,
-) -> Result<Vec<i64>, AppError> {
-    if funktion == Fuehrungsfunktion::El {
-        return Ok(sqlx::query_scalar(
-            "SELECT p.benutzer_id FROM einsatz_fuehrungsstelle f \
-             JOIN einsatz_personal ep ON ep.id = f.einsatzleiter_personal_id \
-             JOIN personal p ON p.id = ep.personal_id \
-             WHERE f.einsatz_id = ? AND f.einsatzleiter_art = 'personal' \
-               AND p.benutzer_id IS NOT NULL",
-        )
-        .bind(einsatz_id)
-        .fetch_all(pool)
-        .await?);
-    }
-    let Some(sg) = funktion.sachgebiet() else {
-        return Ok(Vec::new());
-    };
-    let art: Option<String> = sqlx::query_scalar(
-        "SELECT besetzung_art FROM einsatz_stabsfunktion WHERE einsatz_id = ? AND sachgebiet = ?",
+/// Der verknüpfte Nutzer des Einsatzleiters der Führungsstelle, sofern er aus dem Personal kommt.
+async fn einsatzleiter_nutzer(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT p.benutzer_id FROM einsatz_fuehrungsstelle f \
+         JOIN einsatz_personal ep ON ep.id = f.einsatzleiter_personal_id \
+         JOIN personal p ON p.id = ep.personal_id \
+         WHERE f.einsatz_id = ? AND f.einsatzleiter_art = 'personal' \
+           AND p.benutzer_id IS NOT NULL",
     )
     .bind(einsatz_id)
-    .bind(sg.as_str())
-    .fetch_optional(pool)
-    .await?;
-    match art.as_deref() {
-        Some("einsatzleitung") => {
-            Box::pin(besetzung_nutzer(pool, einsatz_id, Fuehrungsfunktion::El)).await
-        }
-        Some("personal") => Ok(sqlx::query_scalar(
-            "SELECT p.benutzer_id FROM einsatz_stabsfunktion s \
-             JOIN einsatz_personal ep ON ep.id = s.personal_id \
-             JOIN personal p ON p.id = ep.personal_id \
-             WHERE s.einsatz_id = ? AND s.sachgebiet = ? AND p.benutzer_id IS NOT NULL",
-        )
-        .bind(einsatz_id)
-        .bind(sg.as_str())
-        .fetch_all(pool)
-        .await?),
-        _ => Ok(Vec::new()),
-    }
+    .fetch_all(pool)
+    .await?)
 }
 
 /// Wer von `ids` die Art nach der Vorgabe des Einsatzes still bekommt (LLH-1421, design.md D3):
@@ -275,39 +243,15 @@ async fn still_per_vorgabe(
         .collect())
 }
 
-/// Die Funktionen der Nutzer im Einsatz (LLH-1421, design.md D1): Stab-Besetzung (EL über die
-/// Führungsstelle, S1–S6 über `einsatz_stabsfunktion`, ein Sachgebiet „bei der Einsatzleitung“
-/// zählt für den Einsatzleiter) und die Funktion der Mitgliedschaft. Wer fehlt, hat keine.
+/// Die Funktionen der Nutzer im Einsatz (LLH-1421, design.md D1; i6k6mzed D2): EL für den
+/// Einsatzleiter der Führungsstelle und die Funktion der Mitgliedschaft. Wer fehlt, hat keine.
 async fn funktionen_der_nutzer(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<HashMap<i64, BTreeSet<VorgabeFunktion>>, AppError> {
     let mut aus: HashMap<i64, BTreeSet<VorgabeFunktion>> = HashMap::new();
-    let einsatzleiter = besetzung_nutzer(pool, einsatz_id, Fuehrungsfunktion::El).await?;
-    for id in &einsatzleiter {
-        aus.entry(*id).or_default().insert(VorgabeFunktion::El);
-    }
-    let stab = sqlx::query_as::<_, (String, String, Option<i64>)>(
-        "SELECT s.sachgebiet, s.besetzung_art, p.benutzer_id FROM einsatz_stabsfunktion s \
-         LEFT JOIN einsatz_personal ep ON ep.id = s.personal_id \
-         LEFT JOIN personal p ON p.id = ep.personal_id \
-         WHERE s.einsatz_id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
-    for (sachgebiet, besetzung, benutzer) in stab {
-        let Some(f) = Fuehrungsfunktion::parse(&sachgebiet).map(VorgabeFunktion::aus) else {
-            continue;
-        };
-        let nutzer: Vec<i64> = match (besetzung.as_str(), benutzer) {
-            ("einsatzleitung", _) => einsatzleiter.clone(),
-            ("personal", Some(id)) => vec![id],
-            _ => Vec::new(),
-        };
-        for id in nutzer {
-            aus.entry(id).or_default().insert(f);
-        }
+    for id in einsatzleiter_nutzer(pool, einsatz_id).await? {
+        aus.entry(id).or_default().insert(VorgabeFunktion::El);
     }
     let mitglieder = sqlx::query_as::<_, (i64, String)>(
         "SELECT benutzer_id, fuehrungsfunktion FROM einsatz_mitgliedschaft \

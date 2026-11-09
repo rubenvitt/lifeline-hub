@@ -80,13 +80,13 @@ fn startliste_traegt_einsatzart_und_sortierung() {
 }
 
 #[test]
-fn manv_blendet_stab_und_tiere_aus_und_zeigt_unfallhilfsstellen() {
+fn manv_blendet_infotelefon_und_tiere_aus_und_zeigt_unfallhilfsstellen() {
     let manv = EINSATZ_VORLAGE_STARTLISTE
         .iter()
         .find(|s| s.bezeichnung == "MANV")
         .unwrap();
     let aus = manv.ausgeblendet();
-    assert!(aus.contains(&"stab"));
+    assert!(aus.contains(&"infotelefon"));
     assert!(aus.contains(&"tiere"));
     assert!(!aus.contains(&"unfallhilfsstellen"));
 }
@@ -103,11 +103,13 @@ fn sanitaetsdienst_zeigt_funk_und_wetter_aber_keine_lagemeldungen() {
     assert!(aus.contains(&"lagemeldungen"));
 }
 
+/// Das Informationstelefon erbt die Ausblendung des Stabs (i6k6mzed, design.md D3): keine
+/// mitgelieferte Vorlage zeigt es.
 #[test]
-fn stab_steht_in_keiner_vorlage() {
+fn infotelefon_steht_in_keiner_vorlage() {
     for start in EINSATZ_VORLAGE_STARTLISTE {
         assert!(
-            start.ausgeblendet().contains(&"stab"),
+            start.ausgeblendet().contains(&"infotelefon"),
             "{}",
             start.bezeichnung
         );
@@ -116,8 +118,9 @@ fn stab_steht_in_keiner_vorlage() {
 
 #[test]
 fn normalize_ausgeblendet_prueft_und_ordnet() {
-    let ok = normalize_ausgeblendet(&["tiere".into(), "stab".into(), "tiere".into()]).unwrap();
-    assert_eq!(ok, ["stab", "tiere"]);
+    let ok = normalize_ausgeblendet(&["tiere".into(), "lagebesprechung".into(), "tiere".into()])
+        .unwrap();
+    assert_eq!(ok, ["lagebesprechung", "tiere"]);
 
     let err = normalize_ausgeblendet(&["gibtsnicht".into()]).unwrap_err();
     assert!(matches!(err, AppError::Validation(_)), "{err:?}");
@@ -178,7 +181,7 @@ async fn anlegen_aendern_loeschen_je_organisation() {
             bezeichnung: "Großbrand groß",
             einsatzart: Some(Einsatzart::Uebung),
             schichtmodell_id: None,
-            ausgeblendet: &["stab", "chat"],
+            ausgeblendet: &["lagebesprechung", "chat"],
         },
     )
     .await
@@ -187,7 +190,7 @@ async fn anlegen_aendern_loeschen_je_organisation() {
     assert_eq!(geaendert.einsatzart, Some(Einsatzart::Uebung));
     assert_eq!(
         geaendert.ausgeblendet,
-        ["stab", "chat"],
+        ["lagebesprechung", "chat"],
         "Ordnung wie MODUL_KEYS"
     );
     assert_eq!(geaendert.sortier, 10);

@@ -10,7 +10,7 @@ export const BEREICHE = [
   'Führungsmittel',
   'Lage',
   'Kräfte',
-  'Stab',
+  'Führungsorganisation',
   'Betroffene',
   'Einstellungen und Verwaltung',
   'Gekoppelte Geräte',

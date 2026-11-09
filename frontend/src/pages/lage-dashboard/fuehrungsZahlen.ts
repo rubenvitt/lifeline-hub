@@ -73,8 +73,8 @@ export function auftraegeNotiz(z: AuftragsZaehler): string {
 }
 
 /**
- * „2 unterwegs" — die unterwegs UNTER den offenen Nachforderungen. Eine Formulierung für die
- * Werkzeugkachel (`stab/werkzeugZahlen.ts`) und die Lagekennzahl im Band (LLH-1371).
+ * „2 unterwegs" — die unterwegs UNTER den offenen Nachforderungen. Die Formulierung der
+ * Lagekennzahl im Band (LLH-1371).
  */
 export function nachforderungenNotiz(z: NachforderungsZaehler): string {
   return `${z.unterwegs} unterwegs`;

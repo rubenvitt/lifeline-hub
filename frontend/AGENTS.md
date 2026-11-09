@@ -275,8 +275,9 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
   `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
-  „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `stab/einsatzleiter.ts`
-  (LFH-1199); Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
+  „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `einsatz/einsatzleiter.ts`
+  (LFH-1199); die Stabsstelle nur aus den Mitgliedern (`fuehrung/besetzungAusMitgliedern.ts`,
+  i6k6mzed D7). Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
   `SPALTE_MIN_PX` gemessen, tiefer senkrecht) — keine
   Graph-Bibliothek, kein zweites Gerüst. **Live-Zufluss nur über die Schleuse des Gerüsts**
@@ -441,16 +442,15 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 `?filter=vermisst`. Kein Registry-Eintrag, kein `verweistAuf`; Marke erbt Sichtbarkeit/Sperre,
 nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
-Die Arbeitsseiten des Stabs (LLH-1127) sind Marken hinter „Stab“ (Ziel `stab`, nach Sachgebiet;
-Name und Pfad aus `stab/unterseiten.ts`); Fernmeldeskizze und Kommunikationsplan sind Marken
+Fernmeldeskizze und Kommunikationsplan sind Marken
 hinter „Fernmeldewesen“ (Ziel `fernmeldewesen`, LLH-1180), eine Marke „Funkplan“ gibt es nicht. Gesperrt
 heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
 `frontend/src/command-palette/AGENTS.md`) und trägt dafür `schlagworte`.
 
-**Stab und Fernmeldewesen** (Fernmeldewesen mit Funkplan, Skizze und Kommunikationsplan,
-Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5; auch `pages/StabPage.tsx`,
-`pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, `fernmeldewesen/`, die S5-Seiten,
-`src/stab/`, `src/presse/`, `src/infotelefon/`): `frontend/src/stab/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
+**Fernmeldewesen** (Funkplan, Skizze, Sprechgruppen, Kommunikationsplan, Einsatzleiter; auch
+`pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`): `frontend/src/fernmeldewesen/AGENTS.md`.
+**Informationstelefon** (eigenes Modul; auch `pages/InfotelefonPage.tsx`, `src/infotelefon/`):
+`frontend/src/infotelefon/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
 Vorbereitung, überfälliger Termin; auch `pages/LagebesprechungPage.tsx`, `src/lagebesprechung/`):
 `frontend/src/lagebesprechung/AGENTS.md`.
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch
@@ -673,8 +673,8 @@ anwendbar), „nicht geprüft" ist keins.
   Öffnen-Wege stehen ab `md` als sekundäre Knöpfe, unter `md` hinter EINEM Auslöser „Weitere“
   (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
   muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
-  melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht,
-  Pressemitteilung, Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
+  melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
+  Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
   Kräfteübersicht, Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
   Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
@@ -1029,8 +1029,7 @@ und `pages/personen/`.
 
 **Entwürfe** (Verlustschutz, Navigationsschutz, „Entwurf speichern“, gegliederte Dokumente über
 `entwurf/DokumentEntwurf`): `frontend/src/entwurf/AGENTS.md` — gilt auch für `lageberichte/`,
-`pages/BefehlDetailPage.tsx`, `pages/LageberichtDetailPage.tsx` und
-`pages/PressemitteilungDetailPage.tsx`.
+`pages/BefehlDetailPage.tsx` und `pages/LageberichtDetailPage.tsx`.
 
 **Layout und Live**
 
@@ -1082,8 +1081,8 @@ Spec `bedien-arbeitsplatz`).
   jede Route in ein gesperrtes Modul ab (`ModulGesperrt`, LFH-888,
   `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`) und wartet
   beim Kaltstart auf die Freigaben; die Zielseite prüft weiter ihren Datensatz. Verweise in
-  Datenzeilen bleiben offen, für sie gilt der Rahmen. Stabsfunktionen und Fernmeldewesen ebenso
-  (LFH-46, LLH-1180).
+  Datenzeilen bleiben offen, für sie gilt der Rahmen. Fernmeldewesen und Informationstelefon
+  ebenso (LLH-1180, i6k6mzed).
 - **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
   (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
   Palette führt „Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.
@@ -1199,9 +1198,11 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   `EINSATZ_STREAM_EVENTS` oder `NICHT_LIVE_KEYS`. `globalKeys` (`GLOBAL_KEYS`) für alles darüber.
 - **Der Einsatzkopf ist live** (LFH-555, `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`):
   Ereignis `einsatz` mit leerer Gate-Menge (Tür des Stroms = Tür des Kopf-GET; leer steht nur
-  `einsatz`, `lagged` und der empfängergebundenen `benachrichtigung` zu, Guard
-  `ungegatet_sind_nur_lagged_einsatz_und_benachrichtigung`), invalidiert Kopf und
-  Stand der Lagebesprechung. Es feuern PATCH, Abschluss, Frist und Termin oder Abschluss der
+  `einsatz`, `mitglieder`, `lagged` und der empfängergebundenen `benachrichtigung` zu, Guard
+  `ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung`), invalidiert Kopf und
+  Stand der Lagebesprechung. **`mitglieder`** (i6k6mzed, D2) feuert bei `PUT`/`DELETE
+…/mitglieder/…` neben `einsatz` und invalidiert Mitglieder, Aufträge, Erinnerungen und
+  Modulzähler: die Mitgliedschaft ist die eine Quelle der Auflösung S1–S6 → Person. Es feuern PATCH, Abschluss, Frist und Termin oder Abschluss der
   Lagebesprechung **nur bei geändertem Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
 - **Einsatzliste und Stammdaten sind live** (LFH-734, Spec `org-live`): `globalKeys` sind wie die
   Einsatz-Keys genau einmal klassifiziert — live über `ORG_STREAM_EVENTS` (Ereignisse

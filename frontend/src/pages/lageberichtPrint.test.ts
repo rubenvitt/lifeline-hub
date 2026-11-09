@@ -100,7 +100,7 @@ describe('lageberichtPrint.css — Bedienung aus dem Druck', () => {
         /markdown-editor|ant-collapse|ant-form-item/,
       );
     }
-    for (const datei of ['LageberichtDetailPage.tsx', 'PressemitteilungDetailPage.tsx']) {
+    for (const datei of ['LageberichtDetailPage.tsx']) {
       const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), datei), 'utf8');
       expect(seite, datei).toMatch(/<DokumentEntwurf\b/);
       expect(seite, datei).not.toMatch(/<MarkdownEditor\b/);
