@@ -879,6 +879,21 @@ describe('NachrichtenStrom — Zeiten in der Anzeigezone (LFH-913)', () => {
       expect(fireEvent.contextMenu(anhang, { button: 2 })).toBe(true);
     });
 
+    it('auf dem Vorschaubild eines Bildanhangs bleibt das Browsermenü', () => {
+      strom({
+        nachrichten: [
+          nachricht({
+            anhaenge: [
+              { id: 6, dateiname: 'pegel.jpg', groesse: 4096, mime: 'image/jpeg' },
+            ] as ChatNachricht['anhaenge'],
+          }),
+        ],
+      });
+      const bild = document.querySelector('[data-lfh="anhang-vorschau"] img');
+      expect(bild).not.toBeNull();
+      expect(fireEvent.contextMenu(bild!, { button: 2 })).toBe(true);
+    });
+
     it('eine gelöschte Nachricht öffnet kein eigenes Menü', () => {
       strom({ nachrichten: [nachricht({ geloescht_at: '2026-06-10 10:05:00' })] });
       expect(fireEvent.contextMenu(screen.getByText('Nachricht gelöscht'), { button: 2 })).toBe(

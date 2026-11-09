@@ -40,11 +40,11 @@
 - [x] 7.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`, „Wo das Kontextmenü gilt“: Chat, Meldungen, Nachforderungen, Aufträge, Ablösung, Betreuung, Verpflegung ergänzt, Zählschirm ausgenommen; `quellen:` um die neuen Bausteine ergänzt; Doku-Wächter grün
 - [x] 7.3 e2e `frontend/e2e/kontextmenue-karten.spec.ts`: Rechtsklick auf eine Meldung zeigt Knöpfe und ⋮-Einträge; Umschalt+F10 mit Fokus auf einem Knopf der Karte öffnet es, Escape gibt den Fokus zurück; langer Druck per CDP-Touch bei 390 px auf eine Chat-Nachricht öffnet ihr Menü
 - [ ] 7.4 `./scripts/check-all.sh` grün (lokal mindestens `--nur schnell` und `--nur frontend`, dazu die neuen e2e-Specs; den Rest belegt die CI des PRs)
-- [ ] 7.5 Bilder der Änderung (Kontextmenü an Meldung, Nachforderung, Chat, Betreuungstabelle) per Wegwerf-Spec aufnehmen
+- [x] 7.5 Bilder der Änderung (Kontextmenü an Meldung, Nachforderung, Chat, Betreuungstabelle) per Wegwerf-Spec aufnehmen
 
 ## 8. Befunde aus dem Review (09.11.2026)
 
-- [ ] 8.1 TDD: Rechtsklick auf das Vorschaubild eines Chat-Anhangs lässt das Browsermenü (`browsermenueBleibt` nimmt `img` aus); Test im Hook und im Chat
+- [x] 8.1 TDD: Rechtsklick auf das Vorschaubild eines Chat-Anhangs lässt das Browsermenü (`browsermenueBleibt` nimmt `img` aus); Test im Hook und im Chat
 - [ ] 8.2 TDD: Die Rückfrage aus dem Kontextmenü schlägt die Aktion beim OK neu nach; weggefallen oder gesperrt löst sie nichts aus
 - [ ] 8.3 `refactor`: neue technische Bezeichner englisch (LFH-1312) in `useKontextMenue.ts`, `kartenKontext.ts`; Tests grün
 

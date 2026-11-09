@@ -32,6 +32,10 @@ function Probe({
       <li data-testid="zeile" tabIndex={-1} {...ausloeser('z1')}>
         <a href="/ziel">Titel-Link</a>
         <span data-testid="text">Freitext der Zeile</span>
+        {/* Ein Vorschaubild in einem Knopf, wie der Bildanhang im Chat (LLH-1598). */}
+        <button type="button" data-testid="bildknopf">
+          <img data-testid="bild" alt="Vorschau" src="data:," />
+        </button>
         <input aria-label="Feld" />
         <textarea aria-label="Notiz" />
         <select aria-label="Wahl">
@@ -87,6 +91,7 @@ describe('useKontextMenue — Rechtsklick (LLH-1596, D1/D2)', () => {
     ['Textbereich', () => screen.getByRole('textbox', { name: 'Notiz' })],
     ['Auswahlfeld', () => screen.getByRole('combobox', { name: 'Wahl' })],
     ['editierbarer Bereich', () => screen.getByTestId('editierbar')],
+    ['Bild (LLH-1598)', () => screen.getByTestId('bild')],
   ])('lässt das Browsermenü auf %s', (_name, ziel) => {
     const { onOeffnen } = aufbau();
     expect(rechtsklick(ziel())).toBe(true);
@@ -172,6 +177,21 @@ describe('useKontextMenue — langer Druck (D3)', () => {
     fireEvent.pointerDown(screen.getByTestId('text'), { ...touch, pointerType: 'mouse' });
     act(() => vi.advanceTimersByTime(LANGDRUCK_MS * 2));
     expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it('ein langer Druck auf ein Bild öffnet nicht (Bildblase des Systems, LLH-1598)', () => {
+    vi.useFakeTimers();
+    const { onOeffnen, zeile } = aufbau();
+    fireEvent.pointerDown(screen.getByTestId('bild'), { ...touch, clientX: 5, clientY: 5 });
+    expect(zeile).not.toHaveAttribute(DRUCK_ATTRIBUT);
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it('ein Knopf ohne Bild öffnet weiter das eigene Menü', () => {
+    const { onOeffnen } = aufbau();
+    expect(rechtsklick(screen.getByTestId('bildknopf'))).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 
   it('ein langer Druck auf einen Link öffnet nicht (Linkmenü des Systems)', () => {

@@ -290,20 +290,20 @@ führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft
 ### Wo das Kontextmenü gilt
 
 Das Kontextmenü zeigt genau die Aktionen, die die Zeile auch als Knopf und im Menü „⋮“ anbietet;
-fehlt das Schreibrecht, fehlen sie hier ebenso. Eine Zeile ohne Aktion, ein Link (etwa der Titel
-der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers mit „In neuem Tab
-öffnen“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer Zeile mit Kontextmenü nicht
-durch langes Drücken markieren.
+fehlt das Schreibrecht, fehlen sie hier ebenso. Eine Zeile ohne Aktion, ein Link (etwa der Titel der
+Zeile), ein Bild, ein Eingabefeld und markierter Text behalten das Menü des Browsers mit „In neuem
+Tab öffnen“, „Bild speichern unter“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer
+Zeile mit Kontextmenü nicht durch langes Drücken markieren.
 
 Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, in den
 Tabellen der Betreuungsstellen und Evakuierungsbezirke, an den Karten von Meldungen,
 Nachforderungen, Aufträgen, Ablösungen, Verpflegungsstellen und Zeitfenstern und an den Nachrichten
 im Chat. Trägt eine Karte mehrere Knöpfe, stehen alle im Menü, danach die Einträge des Menüs „⋮“;
 Sprünge wie „Ausgabe öffnen“ und Auswahlfelder wie „Bearbeiter zuweisen“ bleiben an der Karte. Ein
-Knopf, der vorher nachfragt, fragt aus dem Kontextmenü in einem Dialog nach. Auf einem Anhang im
-Chat bleibt das Menü des Browsers. Der Zählschirm der Verpflegungsausgabe hat kein Kontextmenü,
-damit ein langer Druck auf eine Zähltaste nichts anderes auslöst. Lagekarte und Fernmeldeskizze
-haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
+Knopf, der vorher nachfragt, fragt aus dem Kontextmenü in einem Dialog nach. Der Zählschirm der
+Verpflegungsausgabe hat kein Kontextmenü, damit ein langer Druck auf eine Zähltaste nichts anderes
+auslöst. Lagekarte und Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt
+wurde.
 
 ### Was die Sprungpalette kennt
 

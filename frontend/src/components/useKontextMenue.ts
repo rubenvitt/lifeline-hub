@@ -87,12 +87,13 @@ function inEingabe(ziel: EventTarget | null): boolean {
 }
 
 /**
- * Bleibt das Browsermenü (D2)? Auf einem Link („In neuem Tab öffnen“), in einem Eingabefeld und
- * auf markiertem Text, der das Ziel enthält.
+ * Bleibt das Browsermenü (D2)? Auf einem Link („In neuem Tab öffnen“), auf einem Bild („Bild
+ * speichern unter“, etwa das Vorschaubild eines Anhangs; LLH-1598), in einem Eingabefeld und auf
+ * markiertem Text, der das Ziel enthält.
  */
 export function browsermenueBleibt(ziel: EventTarget | null): boolean {
   if (!istElement(ziel)) return false;
-  if (ziel.closest('a[href]') != null || inEingabe(ziel)) return true;
+  if (ziel.closest('a[href], img') != null || inEingabe(ziel)) return true;
   const markierung = typeof window.getSelection === 'function' ? window.getSelection() : null;
   if (markierung == null || markierung.isCollapsed) return false;
   // Über die Bereiche statt `containsNode`: jsdom rechnet `containsNode` falsch, und mehrere
