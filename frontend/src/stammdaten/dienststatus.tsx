@@ -5,6 +5,7 @@ import type { KatalogSpalte } from '../components/KatalogTabelle';
 import { nachZahl } from '../components/katalogVergleich';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import type { Dienststatus } from '../api/types';
+import { VomHubGesperrt } from '../instanz/herkunft';
 import { dienststatus } from '../theme/statusFarben';
 
 interface DienststatusVariablen {
@@ -71,6 +72,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
   onBearbeiten,
   schmal,
   kennung,
+  vomHub,
 }: {
   mutation: DienststatusMutation;
   istAdmin: boolean;
@@ -78,6 +80,8 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
   schmal: boolean;
   /** Menschenlesbare Kennung der Zeile für den zugänglichen Namen des Aktionsmenüs. */
   kennung: (eintrag: T) => string;
+  /** Zeile kommt vom Hub (LLH-1493): statt der Knöpfe steht der Grund, warum es hier nicht geht. */
+  vomHub?: (eintrag: T) => boolean;
 }): KatalogSpalte<T>[] {
   const status: KatalogSpalte<T> = {
     title: 'Status',
@@ -102,6 +106,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
       immerSichtbar: true,
       fixed: 'right',
       render: (_, t) => {
+        if (vomHub?.(t)) return <VomHubGesperrt />;
         /**
          * Eine laufende Mutation sperrt GENAU EINE Zeile, nicht die ganze Tabelle. Der
          * Observer kennt nur den jüngsten Aufruf, die Marke wandert also beim Klick auf

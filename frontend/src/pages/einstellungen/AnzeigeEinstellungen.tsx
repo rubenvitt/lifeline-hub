@@ -26,6 +26,7 @@ import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
+import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../../instanz/herkunft';
 import { teilwortSuche } from '../../components/teilwortSuche';
 
 /**
@@ -39,9 +40,13 @@ export default function AnzeigeEinstellungen() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteAnzeige>();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  // Org-Einstellungen vom Hub (LLH-1493): hier nur lesbar, der Hinweis nennt den Grund.
+  const herkunft = useStammdatenHerkunft();
+  const vomHub = herkunft.istVomHub('org_einstellungen', '');
+  const darf = istAdmin && !vomHub;
   const speicherLeiste = useSpeicherLeiste();
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“).
-  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
+  const schutz = useFormularVerlassenSchutz({ aktiv: darf });
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -92,8 +97,8 @@ export default function AnzeigeEinstellungen() {
       hinweis={
         <SeitenHinweise
           fehler={speichernMutation.error}
-          rechteFehlt={!istAdmin}
-          rechteText={NUR_ADMIN}
+          rechteFehlt={!darf}
+          rechteText={vomHub ? `${VOM_HUB_TEXT}.` : NUR_ADMIN}
         />
       }
     >
@@ -107,7 +112,7 @@ export default function AnzeigeEinstellungen() {
         initialValues={initialAnzeige(einstellungen)}
         onValuesChange={schutz.geaendert}
         onFinish={speichern}
-        disabled={!istAdmin}
+        disabled={!darf}
       >
         <Formularpaneel titel="Darstellung">
           <Form.Item label="Zeitzone" name="zeitzone">
@@ -156,7 +161,7 @@ export default function AnzeigeEinstellungen() {
             type="primary"
             htmlType="submit"
             loading={speichernMutation.isPending}
-            disabled={!istAdmin}
+            disabled={!darf}
           >
             Speichern
           </Button>

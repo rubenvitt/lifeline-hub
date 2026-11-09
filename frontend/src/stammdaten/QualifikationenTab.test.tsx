@@ -330,3 +330,25 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
     expect(ruempfe[0]).toEqual({ label: 'Sanitäter', sortier: 10, schliesst_ein_id: 4 });
   });
 });
+
+describe('QualifikationenTab mit Stammdaten vom Hub (LLH-1493)', () => {
+  it('Herkunft als Spalte, Zeile vom Hub ohne Bearbeiten und Deaktivieren', async () => {
+    server.use(
+      http.get('/api/instanz/stammdaten/herkunft', () =>
+        HttpResponse.json({
+          quelle: 'Hub DRK Landesverband',
+          vom_hub: { qualifikation: ['1'] },
+          admins_ohne_passkey: [],
+        }),
+      ),
+    );
+    render(admin);
+    const hub = (await screen.findByText('Sanitäter')).closest('tr')!;
+    await waitFor(() => expect(within(hub).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hub).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(within(hub).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+    const lokal = screen.getByText('Gruppenführer').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+  });
+});

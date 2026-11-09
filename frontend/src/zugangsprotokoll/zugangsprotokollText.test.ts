@@ -65,4 +65,10 @@ describe('instanzText (LLH-1490)', () => {
     );
     expect(instanzText({})).toBeUndefined();
   });
+
+  it('nennt gesperrte Konten und entfernte Passkeys (LLH-1493)', () => {
+    expect(instanzText({ anzahl: 2 })).toBe('2 Konten gesperrt');
+    expect(instanzText({ passkeys_entfernt: 1 })).toBe('1 Passkey entfernt');
+    expect(instanzText({ passkeys_entfernt: 3 })).toBe('3 Passkeys entfernt');
+  });
 });

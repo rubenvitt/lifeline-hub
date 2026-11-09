@@ -40,6 +40,7 @@ import { parseRouteId } from '../routing/deeplinks';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { einheitVorlageDetailPath, einheitVorlageListPath } from './stammdatenDetail';
 import { orderAsTree, subtreeIds } from './einheitVorlagenBaum';
+import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import {
   FahrzeugeSection,
   MaterialSection,
@@ -186,7 +187,10 @@ export default function EinheitVorlageDetailPage() {
   const { vorlageId } = useParams();
   const id = parseRouteId(vorlageId);
   const { benutzer } = useAuth();
-  const isAdmin = benutzer?.system_rolle === 'admin';
+  const herkunft = useStammdatenHerkunft();
+  // Vom Hub übernommen (LLH-1493): nur lesbar, der Hinweis nennt den Grund statt fehlender Rechte.
+  const vomHub = herkunft.istVomHub('einheit_vorlage', id ?? '');
+  const darfBearbeiten = benutzer?.system_rolle === 'admin' && !vomHub;
 
   const vorlagenQuery = useQuery({
     queryKey: globalKeys.einheitVorlagenListe('alle'),
@@ -233,7 +237,8 @@ export default function EinheitVorlageDetailPage() {
       vorlagen={vorlagen}
       typen={typenQuery.data ?? []}
       dataUpdatedAt={vorlagenQuery.dataUpdatedAt}
-      isAdmin={isAdmin}
+      darfBearbeiten={darfBearbeiten}
+      vomHub={vomHub}
     />
   );
 }
@@ -243,20 +248,22 @@ function DetailContent({
   vorlagen,
   typen,
   dataUpdatedAt,
-  isAdmin,
+  darfBearbeiten,
+  vomHub,
 }: {
   vorlage: EinheitVorlage;
   vorlagen: EinheitVorlage[];
   typen: EinheitTyp[];
   dataUpdatedAt: number;
-  isAdmin: boolean;
+  darfBearbeiten: boolean;
+  vomHub: boolean;
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
-  const schutz = useFormularVerlassenSchutz({ aktiv: isAdmin, schluessel: vorlage.id });
+  const schutz = useFormularVerlassenSchutz({ aktiv: darfBearbeiten, schluessel: vorlage.id });
   // Stand beim Öffnen, nach jedem Speichern der gespeicherte: dagegen wird verglichen.
   const [base, setBase] = useState<Head>(() => headOf(vorlage));
 
@@ -314,14 +321,14 @@ function DetailContent({
         hinweis={
           <SeitenHinweise
             fehler={save.error}
-            rechteFehlt={!isAdmin}
-            rechteText={STAMMDATEN_RECHTE_TEXT}
+            rechteFehlt={!darfBearbeiten}
+            rechteText={vomHub ? `${VOM_HUB_TEXT}.` : STAMMDATEN_RECHTE_TEXT}
           />
         }
       >
         <Form<FormValues>
           layout="vertical"
-          disabled={!isAdmin}
+          disabled={!darfBearbeiten}
           onValuesChange={schutz.geaendert}
           initialValues={toFormValues(base)}
           onFinish={submit}
@@ -425,12 +432,12 @@ function DetailContent({
         <UntereinheitenSection
           vorlage={vorlage}
           vorlagen={vorlagen}
-          isAdmin={isAdmin}
+          isAdmin={darfBearbeiten}
           onCreated={(v) => void navigate(einheitVorlageDetailPath(v.id))}
         />
-        <FahrzeugeSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={isAdmin} />
-        <StammbesetzungSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={isAdmin} />
-        <MaterialSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={isAdmin} />
+        <FahrzeugeSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={darfBearbeiten} />
+        <StammbesetzungSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={darfBearbeiten} />
+        <MaterialSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={darfBearbeiten} />
       </AdminPage>
     </div>
   );

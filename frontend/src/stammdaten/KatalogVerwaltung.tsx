@@ -10,6 +10,8 @@ import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useAuth } from '../auth/AuthContext';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import type { StammdatenArt } from '../api/types';
+import { HerkunftAbzeichen, useStammdatenHerkunft, VomHubGesperrt } from '../instanz/herkunft';
 
 export interface KatalogEintrag {
   id: number;
@@ -54,6 +56,9 @@ export interface KatalogVerwaltungProps<T extends KatalogEintrag, W extends obje
   /** Optionaler Hinweis über der Tabelle, abgeleitet aus dem geladenen Katalog (erst nach dem
    *  Abruf, nie aus einem leeren Ladezustand). */
   vorTabelle?: (eintraege: readonly T[]) => ReactNode;
+  /** Art der verteilten Stammdaten (LLH-1493): Zeilen „vom Hub“ sind hier nur lesbar, und jede
+   *  Zeile trägt ihre Herkunft, solange die Org eine Quelle hat. */
+  herkunftArt?: StammdatenArt;
 }
 
 export default function KatalogVerwaltung<T extends KatalogEintrag, W extends object>({
@@ -75,8 +80,12 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
   deaktivierenKnopf,
   felder,
   vorTabelle,
+  herkunftArt,
 }: KatalogVerwaltungProps<T, W>) {
   const { benutzer } = useAuth();
+  const herkunft = useStammdatenHerkunft();
+  const herkunftVon = (eintrag: T) =>
+    herkunftArt ? herkunft.herkunft(herkunftArt, eintrag.id) : null;
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const [form] = Form.useForm<W>();
@@ -134,27 +143,45 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
         {
           title: 'Aktionen',
           key: 'aktionen',
-          render: (_, eintrag: T) => (
-            <Space size="middle">
-              <Button onClick={() => setBearbeite(eintrag)}>Bearbeiten</Button>
-              <Popconfirm
-                title={deaktivierenFrage}
-                okText={deaktivierenKnopf}
-                okButtonProps={{ danger: true }}
-                onConfirm={() => {
-                  schnellAnlegen.reset();
-                  deaktivieren.mutate(eintrag.id);
-                }}
-              >
-                <Button danger>Deaktivieren</Button>
-              </Popconfirm>
-            </Space>
-          ),
+          render: (_, eintrag: T) =>
+            herkunftVon(eintrag) === 'vom_hub' ? (
+              <VomHubGesperrt />
+            ) : (
+              <Space size="middle">
+                <Button onClick={() => setBearbeite(eintrag)}>Bearbeiten</Button>
+                <Popconfirm
+                  title={deaktivierenFrage}
+                  okText={deaktivierenKnopf}
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => {
+                    schnellAnlegen.reset();
+                    deaktivieren.mutate(eintrag.id);
+                  }}
+                >
+                  <Button danger>Deaktivieren</Button>
+                </Popconfirm>
+              </Space>
+            ),
         },
       ]
     : [];
 
-  const spaltenGesamt = [...spalten, ...aktionsSpalte];
+  // Die Herkunft steht nur, solange die Org eine Quelle hat (sonst gibt es weder „vom Hub“ noch
+  // „nur hier“).
+  const herkunftSpalte: TableColumnsType<T> =
+    herkunftArt && herkunft.quelle
+      ? [
+          {
+            title: 'Herkunft',
+            key: 'herkunft',
+            render: (_, eintrag: T) => (
+              <HerkunftAbzeichen herkunft={herkunftVon(eintrag)} quelle={herkunft.quelle} />
+            ),
+          },
+        ]
+      : [];
+
+  const spaltenGesamt = [...spalten, ...herkunftSpalte, ...aktionsSpalte];
   // Einstieg bleibt die fachliche Reihenfolge des Servers (`sortier`), keine Vorgabesortierung.
   const gedaechtnis = useListenGedaechtnis(listenSeite, spaltenGesamt);
 
