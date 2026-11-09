@@ -3,7 +3,11 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { fetchSchichtplan, setzeSchichtplanGrenzwerte } from '../../api/schichtplan';
-import type { Schichtplan, SchichtplanGrenzwerteBody } from '../../api/types';
+import type {
+  Schichtplan,
+  SchichtplanGrenzwerte,
+  SchichtplanGrenzwerteBody,
+} from '../../api/types';
 import GrenzwerteModal from '../../abloesung/GrenzwerteModal';
 import { grenzwertText, rueckgaengigBody, vorgabenBody } from '../../abloesung/grenzwerte';
 import { Datenfeld, Datenraster, Formularpaneel, useRollen } from '../../components/instrument';
@@ -32,10 +36,14 @@ interface EinsatzGrenzwerteProps {
   canWrite: boolean;
 }
 
-/** `isRueckgaengig` markiert den Weg zurück; er bietet selbst kein Rückgängig an. */
+/**
+ * `previous` ist der Stand beim Klick: aus ihm entstehen Reset- und Rückgängig-Body, damit ein
+ * Live-Refetch dazwischen sie nicht auseinanderlaufen lässt. Ohne `previous` ist es der Weg
+ * zurück, der selbst kein Rückgängig anbietet.
+ */
 interface ResetVariables {
   body: SchichtplanGrenzwerteBody;
-  isRueckgaengig?: boolean;
+  previous?: SchichtplanGrenzwerte;
 }
 
 export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzwerteProps) {
@@ -62,15 +70,14 @@ export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzw
   // Dialogs steht im Dialog.
   const reset = useMutation({
     mutationFn: ({ body }: ResetVariables) => setzeSchichtplanGrenzwerte(einsatzId, body),
-    onMutate: () => qc.getQueryData<Schichtplan>(planKey)?.grenzwerte,
-    onSuccess: (plan, { isRueckgaengig }, alt) => {
+    onSuccess: (plan, { previous }) => {
       applyPlan(plan);
-      if (isRueckgaengig || !alt) {
+      if (!previous) {
         message.success('Dienst und Ruhe gespeichert');
         return;
       }
       zeigeRueckgaengig(message, 'Vorgaben wiederhergestellt', () =>
-        reset.mutate({ body: rueckgaengigBody(alt), isRueckgaengig: true }),
+        reset.mutate({ body: rueckgaengigBody(previous) }),
       );
     },
   });
@@ -128,7 +135,7 @@ export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzw
             <Button
               disabled={isPending}
               loading={reset.isPending}
-              onClick={() => reset.mutate({ body: resetBody })}
+              onClick={() => g && reset.mutate({ body: resetBody, previous: g })}
             >
               Vorgaben wiederherstellen
             </Button>
