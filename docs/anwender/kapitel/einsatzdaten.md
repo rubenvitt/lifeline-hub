@@ -74,7 +74,8 @@ anderer Text eintragen.
 
 ### Den Ablauf der Veranstaltung pflegen
 
-Bei einem Sanitätsdienst steht hier das Programm: Einlass, Feuerwerk, Ende.
+Bei einem Sanitätsdienst steht hier das Programm: Einlass, Feuerwerk, Ende. Kommt der Einsatz aus
+einer Vorplanung, steht ihr Ablauf schon hier (Kapitel [Vorplanung](vorplanung.md)).
 
 1. Im Paneel „Ablauf“ oben rechts „Programmpunkt“ wählen.
 2. Im Dialog „Programmpunkt anlegen“ den „Zeitpunkt“ und die „Bezeichnung“ eintragen, etwa

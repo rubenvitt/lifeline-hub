@@ -14011,6 +14011,58 @@ mod tests {
             .expect("Einsatz ohne Fremdschlüssel, Kennzahlen als Objekt");
     }
 
+    /// LLH-1583: Programmpunkte der Planung gehen mit der Planung, ohne Verweis auf einen Einsatz.
+    #[tokio::test]
+    async fn migration_0305_planung_programmpunkt() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 305;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (_, b) = bild_grundlage(&pool).await;
+        let planung: i64 = sqlx::query_scalar(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis, angelegt_von) \
+             VALUES (1, 'Stadtfest', '2026-11-14 09:00:00', '2026-11-14 23:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        sqlx::query(
+            "INSERT INTO planung_programmpunkt (planung_id, bezeichnung, zeitpunkt_at, angelegt_von) \
+             VALUES (?, 'Feuerwerk', '2026-11-14 21:30:00', ?)",
+        )
+        .bind(planung)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .expect("Programmpunkt an der Planung");
+        sqlx::query(
+            "INSERT INTO planung_programmpunkt (planung_id, bezeichnung, zeitpunkt_at) \
+             VALUES (9999, 'Einlass', '2026-11-14 17:00:00')",
+        )
+        .execute(&pool)
+        .await
+        .expect_err("nur an einer Planung");
+
+        sqlx::query("DELETE FROM planung WHERE id = ?")
+            .bind(planung)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM planung_programmpunkt")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "geht mit der Planung");
+    }
+
     /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
     #[tokio::test]
     async fn migration_0298_person_rtw_angefordert() {

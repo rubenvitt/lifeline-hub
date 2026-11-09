@@ -29,6 +29,8 @@ const NULL: SchichtplanImportZaehlung = {
   helfer_neu: 0,
   einteilungen_neu: 0,
   grenzwerte_neu: 0,
+  programmpunkte_neu: 0,
+  programmpunkte_vorhanden: 0,
   aenderungen: 0,
 };
 
@@ -242,5 +244,14 @@ describe('SchichtplanEinlesen', () => {
       '7 Helfer neu',
       '1 Einheit neu',
     ]);
+    // LLH-1583: Programmpunkte nur aus der Vorplanung.
+    expect(
+      zaehlungMarken({
+        ...NULL,
+        programmpunkte_neu: 3,
+        programmpunkte_vorhanden: 1,
+        aenderungen: 3,
+      }),
+    ).toEqual(['3 Programmpunkte neu', '1 Programmpunkt vorhanden']);
   });
 });

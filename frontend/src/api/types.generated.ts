@@ -3721,6 +3721,17 @@ export interface components {
             grenzwerte_neu: number;
             /** Format: int64 */
             helfer_neu: number;
+            /**
+             * Format: int64
+             * @description Programmpunkte der Vorplanung, die der Einsatz neu bekommt (LLH-1583); aus einer Datei 0.
+             */
+            programmpunkte_neu: number;
+            /**
+             * Format: int64
+             * @description Programmpunkte der Vorplanung, die der Einsatz schon hat (gleiche Bezeichnung und
+             *     Zeitpunkt); sie bleiben aus und zählen nicht als Änderung.
+             */
+            programmpunkte_vorhanden: number;
             /** Format: int64 */
             uhs_neu: number;
         };
@@ -6046,6 +6057,11 @@ export interface components {
             kopf: components["schemas"]["PlanungKopf"];
             /** @description Nach `sortier`. */
             posten: components["schemas"]["PlanungPostenAnzeige"][];
+            /**
+             * @description Programmpunkte der Veranstaltung nach Zeitpunkt (LLH-1583); die Übernahme legt sie im
+             *     Einsatz an.
+             */
+            programmpunkte: components["schemas"]["Programmpunkt"][];
         };
         /** @description Ein Block der Planung, in der Form von `PlanBlockAnzeige` des Einsatzes. */
         PlanungBlockAnzeige: {

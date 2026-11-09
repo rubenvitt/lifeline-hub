@@ -67,6 +67,22 @@ ab“ MUST in einer Planung entfallen. Befunde MUST NOT blockieren.
 - **WHEN** Mia Muster in „Streife 2“ 14–17 Uhr und in „UHS Marktplatz“ 16–20 Uhr eingeteilt ist
 - **THEN** zeigen beide Blöcke an ihr den Befund „doppelt“ und beide Einteilungen bleiben bestehen
 
+### Requirement: Programmpunkte der Planung
+Eine Planung SHALL das Programm der Veranstaltung als Programmpunkte führen (Bezeichnung höchstens
+100 Zeichen, Zeitpunkt), höchstens 50 je Planung, in einem Reiter „Ablauf“ mit demselben Paneel wie
+der Ablauf eines Einsatzes. Ein Zeitpunkt MAY außerhalb des Zeitraums der Planung liegen. Anlegen,
+Ändern und Löschen MUST das Schreibrecht der Planung verlangen; eine fremde oder unbekannte Planung
+MUST 404 ergeben, eine übernommene 409, ein 51. Punkt 422. Das Löschen der Planung MUST ihre
+Programmpunkte mitnehmen.
+
+#### Scenario: Programmpunkt anlegen
+- **WHEN** jemand in der Planung „Feuerwerk“ um 22:30 anlegt
+- **THEN** steht der Punkt im Reiter „Ablauf“, nach Zeitpunkt sortiert
+
+#### Scenario: Grenze
+- **WHEN** eine Planung schon 50 Programmpunkte hat und jemand einen weiteren anlegt
+- **THEN** antwortet das System mit 422 und legt nichts an
+
 ### Requirement: Liste der Planungen
 Die Liste SHALL je Planung Soll, Ist, Offen und Konflikte zeigen, gerechnet aus denselben Befunden
 wie die Planung selbst. Die Pause MUST NOT zum Soll zählen, und Ist MUST je Block höchstens das
@@ -90,8 +106,9 @@ Helfern gelöscht werden. Kopf und Liste MUST den Löschzeitpunkt nennen.
 ### Requirement: Demo-Planung der Lage „Stadtfest“
 Der Import der Lage „Stadtfest“ SHALL die Planung „Stadtfest Musterstadt“ für den Samstag nach
 dem Importtag mit Demo-Marke anlegen: die Posten UHS Marktplatz, Streife 1, Streife 2,
-Sanitätswache Bühne und den Demo-KTW, zwei Helfer und eine Einteilung mit einem doppelt
-verplanten Menschen. Besteht schon eine Planung dieser Bezeichnung, MUST sie unberührt bleiben.
+Sanitätswache Bühne und den Demo-KTW, zwei Helfer, eine Einteilung mit einem doppelt
+verplanten Menschen und das Programm Festbeginn 12:00, Einlass Bühne 18:00, Bühnenprogramm 19:00
+und Feuerwerk 22:30. Besteht schon eine Planung dieser Bezeichnung, MUST sie unberührt bleiben.
 Das Entfernen der Lage MUST die markierte Planung löschen, bevor es das Demo-Personal löscht.
 
 #### Scenario: Demo-Planung
@@ -107,7 +124,10 @@ Bezug, ein Helfer der Planung als Helfer des Plans mit der Herkunft `vorplanung`
 je Helfer. Die Vorschau MUST nichts schreiben; für einen neuen Einsatz MUST sie dieselbe Rechnung
 sehen wie das Übernehmen. Das Übernehmen MUST in EINER Transaktion laufen, ein neuer Einsatz
 (Bezeichnung, Einsatzart und Ort der Planung, wahlweise mit Einsatz-Vorlage, Ersteller als
-Einsatzleitung) eingeschlossen; Fehler des Abgleichs MUST es mit 422 ablehnen, ohne etwas zu
+Einsatzleitung) eingeschlossen. Die Programmpunkte der Planung MUST als Programmpunkte des Einsatzes
+kommen, auch vergangene; einen Punkt mit gleicher Bezeichnung (ohne Groß- und Kleinschreibung) und
+gleichem Zeitpunkt, den der Einsatz schon hat, MUST die Übernahme auslassen. Hätte der Einsatz
+danach mehr als 50 Programmpunkte, MUST die Vorschau das als Fehler nennen, ohne zu kürzen. Fehler des Abgleichs MUST es mit 422 ablehnen, ohne etwas zu
 schreiben, ebenso eine Übernahme in einen laufenden Einsatz ohne jede Änderung. Jeder Posten MUST
 eine Einheit oder UHS werden oder einer vorhandenen zugeordnet sein, auch ohne Block. Ein laufender Einsatz MUST zur eigenen Organisation gehören (404 sonst) und verlangt
 Schreibrecht und die Module Ablösung und Personal (403), aktiv (409). Niemand wird alarmiert oder
@@ -126,6 +146,14 @@ Einsatznummer der Übernahme nennen und die Kennzahlen vom Zeitpunkt der Überna
 #### Scenario: Laufender Einsatz
 - **WHEN** eine Planung mit dem Posten „Streife 2“ in einen laufenden Einsatz mit der Einheit „Streife 2“ übernommen wird
 - **THEN** schlägt die Vorschau diese Einheit vor, und ihre Blöcke kommen an sie, ohne neue Einheit
+
+#### Scenario: Programm der Planung
+- **WHEN** die Demo-Planung „Stadtfest Musterstadt“ in einen neuen Einsatz übernommen wird
+- **THEN** nennt die Vorschau „4 Programmpunkte neu“, und der Ablauf des Einsatzes zeigt Festbeginn, Einlass Bühne, Bühnenprogramm und Feuerwerk
+
+#### Scenario: Programmpunkt schon im Einsatz
+- **WHEN** ein laufender Einsatz schon „feuerwerk“ zur selben Zeit wie der Punkt „Feuerwerk“ der Planung hat
+- **THEN** nennt die Vorschau ihn als vorhanden, und die Übernahme legt ihn nicht ein zweites Mal an
 
 ### Requirement: Planung als Excel-Mappe
 Eine Planung SHALL dieselbe Excel-Mappe wie der Schichtplan eines Einsatzes ausgeben
