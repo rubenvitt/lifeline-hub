@@ -441,6 +441,9 @@ export default function InstanzkopplungSeite() {
         form={bestaetigenForm}
         erfassenText="Bestätigen"
         laeuft={bestaetigen.isPending}
+        // Hält den Dialog bis zur Antwort offen und zeigt die Ablehnung darin (LFH-1077).
+        speicherung={bestaetigen}
+        speicherFehlerTitel="Nicht bestätigt"
         onErfassen={(w) =>
           bestaetigenSchluessel
             ? bestaetigen.mutateAsync({
@@ -493,7 +496,6 @@ export default function InstanzkopplungSeite() {
             </Form.Item>
           </>
         )}
-        <SpeicherFehler fehler={bestaetigen.error} titel="Nicht bestätigt" />
       </ErfassungsModal>
 
       <Modal

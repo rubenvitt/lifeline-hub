@@ -439,19 +439,32 @@ pub struct Ziel<'a> {
     pub fremde_org_kennung: &'a str,
 }
 
-/// Prüft eine Gegenzeichnung gegen die schon bekannten, gültigen Schlüssel dieser Org-Zuordnung.
+/// Warum eine Gegenzeichnung nicht trägt.
+enum Unbelegt {
+    /// Endgültig: der Schlüssel wird verworfen und als abgelehnt gemeldet.
+    Verwerfen(String),
+    /// Echt unterschrieben von einem hier bekannten Schlüssel, der noch auf Bestätigung wartet:
+    /// der Schlüssel kommt mit der nächsten Meldung wieder und trägt, sobald der Unterzeichner
+    /// hier bestätigt ist. Ein wartender zählt dabei nie als Gegenzeichnung.
+    Zurueckstellen,
+}
+
+/// Prüft eine Gegenzeichnung gegen die schon bekannten Schlüssel dieser Org-Zuordnung. Tragen
+/// kann nur ein gültiger Unterzeichner.
 fn check_gegenzeichnung(
     l: &UnterschriftSchluesselLieferung,
     ziel: &Ziel<'_>,
     bekannte: &[SchluesselZeile],
-) -> Result<(), String> {
+) -> Result<(), Unbelegt> {
+    let verwerfen = |grund: &str| Unbelegt::Verwerfen(grund.to_string());
     let g = l
         .gegenzeichnung
         .as_ref()
-        .ok_or_else(|| "ohne Gegenzeichnung".to_string())?;
+        .ok_or_else(|| verwerfen("ohne Gegenzeichnung"))?;
     let e: AufnahmeErklaerung =
-        serde_json::from_str(&g.erklaerung).map_err(|_| "Erklärung unlesbar".to_string())?;
-    let schluessel_bytes = parse_b64(&l.schluessel).ok_or("Schlüssel unlesbar")?;
+        serde_json::from_str(&g.erklaerung).map_err(|_| verwerfen("Erklärung unlesbar"))?;
+    let schluessel_bytes =
+        parse_b64(&l.schluessel).ok_or_else(|| verwerfen("Schlüssel unlesbar"))?;
     if e.typ != TYP_AUFNAHME
         || e.org != ziel.fremde_org_kennung
         || e.credential_id != l.credential_id
@@ -460,21 +473,31 @@ fn check_gegenzeichnung(
         || e.origin != l.origin
         || e.alg != l.alg
     {
-        return Err("Erklärung passt nicht zum Schlüssel".into());
+        return Err(verwerfen("Erklärung passt nicht zum Schlüssel"));
     }
-    let unterzeichner = bekannte
-        .iter()
-        .find(|b| {
-            b.credential_id == g.unterzeichner_credential_id
-                && b.zustand() == UnterschriftSchluesselZustand::Gueltig
-        })
-        .ok_or_else(|| "gegengezeichnet von einem unbekannten Schlüssel".to_string())?;
+    let mit_credential = |zustand: UnterschriftSchluesselZustand| {
+        bekannte
+            .iter()
+            .find(|b| b.credential_id == g.unterzeichner_credential_id && b.zustand() == zustand)
+    };
+    let (unterzeichner, wartet) = match (
+        mit_credential(UnterschriftSchluesselZustand::Gueltig),
+        mit_credential(UnterschriftSchluesselZustand::WartetAufBestaetigung),
+    ) {
+        (Some(u), _) => (u, false),
+        (None, Some(u)) => (u, true),
+        (None, None) => return Err(verwerfen("gegengezeichnet von einem unbekannten Schlüssel")),
+    };
     pruefen::verify(
         &g.erklaerung,
         &g.assertion,
         &unterzeichner.pruef_schluessel(),
     )
-    .map_err(|f| format!("Gegenzeichnung ungültig: {f}"))
+    .map_err(|f| Unbelegt::Verwerfen(format!("Gegenzeichnung ungültig: {f}")))?;
+    if wartet {
+        return Err(Unbelegt::Zurueckstellen);
+    }
+    Ok(())
 }
 
 /// Übernimmt gelieferte Schlüssel (design.md D7). `grundstock = true` nur beim Koppeln: dann
@@ -495,6 +518,9 @@ pub async fn accept_lieferungen(
     // Nicht entdoppelt: jede Zeile wird über ihre id nachgeschlagen, eine doppelte ändert nichts,
     // und ein späterer Widerruf derselben id soll greifen. Die Grenze deckelt die Arbeit.
     let mut abgelehnt = Vec::new();
+    // Kleinster Stand eines zurückgestellten Schlüssels: bis davor gilt die Lieferung als bekannt,
+    // ab dort liefert das Gegenüber erneut.
+    let mut zurueckgestellt: Option<i64> = None;
     for l in lieferungen {
         let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
@@ -570,18 +596,26 @@ pub async fn accept_lieferungen(
                     let bekannte: Vec<SchluesselZeile> =
                         sqlx::query_as(sqlx::AssertSqlSafe(format!(
                         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
-                         AND zustand = 'gueltig'"
+                         AND zustand IN ('gueltig', 'wartet_auf_bestaetigung')"
                     )))
                         .bind(ziel.kopplung_org_id)
                         .fetch_all(&mut *conn)
                         .await?;
-                    if let Err(grund) = check_gegenzeichnung(l, ziel, &bekannte) {
-                        abgelehnt.push(Abgelehnt {
-                            fingerabdruck: fp,
-                            benutzer_name: l.benutzer_name.clone(),
-                            grund,
-                        });
-                        continue;
+                    match check_gegenzeichnung(l, ziel, &bekannte) {
+                        Ok(()) => {}
+                        Err(Unbelegt::Zurueckstellen) => {
+                            zurueckgestellt =
+                                Some(zurueckgestellt.map_or(l.stand, |z: i64| z.min(l.stand)));
+                            continue;
+                        }
+                        Err(Unbelegt::Verwerfen(grund)) => {
+                            abgelehnt.push(Abgelehnt {
+                                fingerabdruck: fp,
+                                benutzer_name: l.benutzer_name.clone(),
+                                grund,
+                            });
+                            continue;
+                        }
                     }
                 }
                 sqlx::query(
@@ -619,7 +653,10 @@ pub async fn accept_lieferungen(
             }
         }
     }
-    let hoechster = lieferungen.iter().map(|l| l.stand).max().unwrap_or(0);
+    let hoechster = match zurueckgestellt {
+        Some(z) => z - 1,
+        None => lieferungen.iter().map(|l| l.stand).max().unwrap_or(0),
+    };
     sqlx::query(
         "UPDATE instanz_kopplung_org SET unterschrift_stand = MAX(unterschrift_stand, ?) WHERE id = ?",
     )

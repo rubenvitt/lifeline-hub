@@ -107,23 +107,25 @@ export default function BenutzerPage() {
   /*
    * Halter des letzten Unterschriftsschlüssels (LLH-1605, Change zkvt2l8z, D5): Deaktivieren und
    * Herabstufen gelingen auch dann, die Kopplungen der Org müssen danach aber neu aufgebaut
-   * werden. Darum warnt die Seite vorher. Scheitert der Abruf, fehlt nur die Warnung.
+   * werden. Darum warnt die Seite vorher.
    */
   const letzteQuery = useQuery({
     queryKey: globalKeys.instanzkopplungLetzteSchluessel(),
     queryFn: loadLetzteSchluessel,
     enabled: angemeldeterBenutzer?.system_rolle === 'admin',
   });
-  const letzteKopplungen = (id: number): string[] | undefined =>
-    letzteQuery.data?.find((h) => h.benutzer_id === id)?.kopplungen;
   /*
-   * Ohne Antwort (lädt noch, Abruf gescheitert) ist unbekannt, wer den letzten Schlüssel hält:
-   * dann fragt die Seite bei jedem Admin-Konto allgemein nach, statt still zu deaktivieren. Konten
-   * ohne Admin-Rolle halten keine Schlüssel.
+   * Nur eine frische Antwort zählt. Lädt die Abfrage noch, ist sie gescheitert oder läuft ein
+   * Neuabruf (etwa nach einer neuen Kopplung, `instanzkopplung` invalidiert), kann die alte Antwort
+   * überholt sein: dann ist unbekannt, wer den letzten Schlüssel hält, und die Seite fragt bei jedem
+   * Admin-Konto allgemein nach, statt still zu deaktivieren. Konten ohne Admin-Rolle halten keine
+   * Schlüssel.
    */
+  const halterBekannt = letzteQuery.isSuccess && !letzteQuery.isFetching;
+  const letzteKopplungen = (id: number): string[] | undefined =>
+    halterBekannt ? letzteQuery.data.find((h) => h.benutzer_id === id)?.kopplungen : undefined;
   const brauchtWarnung = (b: BenutzerAnzeige): boolean =>
-    letzteKopplungen(b.id) !== undefined ||
-    (b.system_rolle === 'admin' && letzteQuery.data === undefined);
+    letzteKopplungen(b.id) !== undefined || (b.system_rolle === 'admin' && !halterBekannt);
   const warnText = (b: BenutzerAnzeige): string => {
     const kopplungen = letzteKopplungen(b.id);
     return kopplungen ? kopplungNeuText(kopplungen) : HALTER_UNBEKANNT_TEXT;

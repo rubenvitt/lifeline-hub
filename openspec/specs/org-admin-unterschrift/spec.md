@@ -43,15 +43,22 @@ schon gültigen Unterschriftsschlüssel unterschrieben hat. Die empfangende Inst
 neuen Schlüssel nur übernehmen, wenn die Unterschrift von einem ihr bekannten, gültigen Schlüssel
 derselben Org stammt; sonst MUST sie ihn verwerfen und den Vorfall anzeigen. Einen übernommenen
 neuen Schlüssel MUST sie als „wartet auf Bestätigung“ führen, bis ein Admin dort ihn bestätigt.
-Ein wartender Schlüssel MUST NOT als Unterschrift oder Gegenzeichnung anerkannt werden.
+Ein wartender Schlüssel MUST NOT als Unterschrift oder Gegenzeichnung anerkannt werden. Stammt die
+Gegenzeichnung nachweislich von einem dort noch wartenden Schlüssel, SHALL die empfangende Instanz
+den neuen Schlüssel zurückstellen statt ihn zu verwerfen: das Gegenüber liefert ihn erneut, bis der
+Unterzeichner dort bestätigt oder zurückgewiesen ist.
 
 #### Scenario: Gegengezeichneter Schlüssel
 - **WHEN** Admin B einen Schlüssel registriert, Admin A ihn mit seinem Unterschriftsschlüssel gegenzeichnet und der ELW sich meldet
 - **THEN** führt der ELW den Schlüssel von B als „wartet auf Bestätigung“
 
 #### Scenario: Wartender Schlüssel zählt nicht
-- **WHEN** eine Erklärung mit dem noch wartenden Schlüssel von B gegengezeichnet am ELW ankommt
-- **THEN** verwirft der ELW sie wie die Unterschrift eines unbekannten Schlüssels
+- **WHEN** ein Schlüssel C, mit dem noch wartenden Schlüssel von B gegengezeichnet, am ELW ankommt
+- **THEN** übernimmt der ELW C nicht, sondern stellt ihn zurück; nach der Bestätigung von B übernimmt er C bei der nächsten Meldung als „wartet auf Bestätigung“
+
+#### Scenario: Gegenzeichnung nicht von B oder B zurückgewiesen
+- **WHEN** die Gegenzeichnung von C nicht mit dem Schlüssel von B prüfbar ist oder B am ELW zurückgewiesen ist
+- **THEN** verwirft der ELW C wie die Unterschrift eines unbekannten Schlüssels
 
 #### Scenario: Hub schiebt einen fremden Schlüssel unter
 - **WHEN** ein Hub einem ELW einen Schlüssel ohne gültige Gegenzeichnung eines dem ELW bekannten Schlüssels liefert

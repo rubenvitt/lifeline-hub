@@ -619,6 +619,27 @@ fn ziel_zu(ko: i64) -> Ziel<'static> {
     }
 }
 
+/// Lieferstand der Org-Zuordnung: bis wohin diese Instanz die Schlüssel des Gegenübers kennt.
+async fn lieferstand(conn: &mut SqliteConnection, ko: i64) -> i64 {
+    sqlx::query_scalar("SELECT unterschrift_stand FROM instanz_kopplung_org WHERE id = ?")
+        .bind(ko)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap()
+}
+
+async fn gibt_es(conn: &mut SqliteConnection, fremde_id: i64) -> bool {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM unterschrift_schluessel WHERE herkunft = 'gegenueber' \
+         AND fremde_id = ?",
+    )
+    .bind(fremde_id)
+    .fetch_one(&mut *conn)
+    .await
+    .unwrap()
+        > 0
+}
+
 #[tokio::test]
 async fn wartender_schluessel_taugt_nicht_als_unterzeichner() {
     let pool = pool_mit_admin().await;
@@ -634,8 +655,114 @@ async fn wartender_schluessel_taugt_nicht_als_unterzeichner() {
     let ab = accept_lieferungen(&mut conn, &ziel_zu(ko), &[von_b], false, JETZT)
         .await
         .unwrap();
-    assert_eq!(ab.len(), 1, "von einem wartenden Schlüssel gegengezeichnet");
+    // Zurückgestellt, nicht verworfen: c wartet, bis b hier bestätigt ist.
+    assert!(ab.is_empty(), "{ab:?}");
+    assert!(
+        !gibt_es(&mut conn, 12).await,
+        "c gilt und wartet noch nicht"
+    );
     assert_eq!(gueltige_fremde(&mut conn).await, vec!["a"]);
+    assert_eq!(lieferstand(&mut conn, ko).await, 2, "c kommt wieder");
+}
+
+#[tokio::test]
+async fn von_wartendem_gegengezeichneter_kommt_nach_dessen_bestaetigung_durch() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let ziel = ziel_zu(ko);
+    let mut conn = pool.acquire().await.unwrap().detach();
+    accept_lieferungen(
+        &mut conn,
+        &ziel,
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    // b (von a) und c (von b) kommen in derselben Meldung.
+    let b_von_a = || {
+        gegengezeichnet(
+            lieferung(11, &b, UnterschriftSchluesselZustand::Gueltig, 2),
+            &a,
+            FREMDE_ORG,
+        )
+    };
+    let c_von_b = || {
+        gegengezeichnet(
+            lieferung(12, &c, UnterschriftSchluesselZustand::Gueltig, 3),
+            &b,
+            FREMDE_ORG,
+        )
+    };
+    let ab = accept_lieferungen(&mut conn, &ziel, &[b_von_a(), c_von_b()], false, JETZT)
+        .await
+        .unwrap();
+    assert!(ab.is_empty(), "{ab:?}");
+    assert_eq!(zustand_von(&mut conn, 11).await, "wartet_auf_bestaetigung");
+    assert!(!gibt_es(&mut conn, 12).await);
+    assert_eq!(lieferstand(&mut conn, ko).await, 2);
+    // Solange b wartet, ändert die erneute Lieferung nichts.
+    accept_lieferungen(&mut conn, &ziel, &[c_von_b()], false, JETZT)
+        .await
+        .unwrap();
+    assert!(!gibt_es(&mut conn, 12).await);
+    // b ist hier bestätigt: c kommt durch und wartet seinerseits auf Bestätigung.
+    let b_id: i64 =
+        sqlx::query_scalar("SELECT id FROM unterschrift_schluessel WHERE fremde_id = 11")
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+    assert!(confirm(&mut conn, 1, b_id, 1, JETZT).await.unwrap());
+    let ab = accept_lieferungen(&mut conn, &ziel, &[c_von_b()], false, JETZT)
+        .await
+        .unwrap();
+    assert!(ab.is_empty(), "{ab:?}");
+    assert_eq!(zustand_von(&mut conn, 12).await, "wartet_auf_bestaetigung");
+    assert_eq!(lieferstand(&mut conn, ko).await, 3);
+}
+
+#[tokio::test]
+async fn gefaelschte_oder_zurueckgewiesene_gegenzeichnung_wird_nicht_zurueckgestellt() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let (ko, mut conn) = mit_wartendem_b(&pool, &a, &b).await;
+    // Angeblich von b, unterschrieben aber mit c selbst.
+    let mut gefaelscht = gegengezeichnet(
+        lieferung(12, &c, UnterschriftSchluesselZustand::Gueltig, 3),
+        &c,
+        FREMDE_ORG,
+    );
+    gefaelscht
+        .gegenzeichnung
+        .as_mut()
+        .unwrap()
+        .unterzeichner_credential_id = b.credential_id.clone();
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(ko), &[gefaelscht], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "falsche Unterschrift wird verworfen");
+    assert_eq!(lieferstand(&mut conn, ko).await, 3);
+    // Ist b hier zurückgewiesen, wartet ein von b gegengezeichneter auf nichts mehr.
+    sqlx::query("UPDATE unterschrift_schluessel SET zustand = 'abgelehnt' WHERE fremde_id = 11")
+        .execute(&mut conn)
+        .await
+        .unwrap();
+    let von_b = gegengezeichnet(
+        lieferung(13, &c, UnterschriftSchluesselZustand::Gueltig, 4),
+        &b,
+        FREMDE_ORG,
+    );
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(ko), &[von_b], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1);
+    assert_eq!(lieferstand(&mut conn, ko).await, 4);
 }
 
 #[tokio::test]

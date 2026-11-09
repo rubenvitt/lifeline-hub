@@ -158,3 +158,21 @@ gültig zählt. Behoben, jeweils mit Test:
   Schlüssel.
 - **Testlücken:** fremde Org vor dem Bestätigen, Herabstufen des letzten Halters per PATCH.
 
+## Nachträge aus dem PR-Review
+
+CodeRabbit im PR rubenvitt/lifeline-hub#1234; behoben, jeweils mit Test:
+
+- **Ein von einem wartenden Schlüssel gegengezeichneter Schlüssel wird zurückgestellt, nicht
+  verworfen.** Registriert ein Admin am Hub B (von A gegengezeichnet) und gleich danach C (von B
+  gegengezeichnet), kamen beide in einer Meldung an: B wartete, C fiel als „unbekannter
+  Unterzeichner“ heraus, und der Lieferstand ging über C hinweg; der Hub lieferte C nie wieder.
+  Jetzt prüft der ELW die Unterschrift gegen den wartenden B. Stimmt sie, hält er den Lieferstand
+  vor C an und meldet nichts als abgelehnt; nach der Bestätigung von B kommt C durch und wartet
+  seinerseits. Eine falsche Unterschrift oder ein zurückgewiesener B verwerfen C wie bisher. Ein
+  wartender Schlüssel zählt weiterhin nie als Gegenzeichnung.
+- **Die Warnung vor dem Deaktivieren nutzt nur eine frische Antwort.** Während eines Neuabrufs
+  oder nach einem gescheiterten gilt der Halter des letzten Schlüssels als unbekannt; die Seite
+  fragt dann bei jedem Admin-Konto allgemein nach.
+- **Die Gegenstelle für die Admin-Spur** wird in derselben Transaktion gelesen wie die
+  Entscheidung.
+- **Der Bestätigungsdialog bleibt bis zur Antwort offen** (`speicherung`, LFH-1077).

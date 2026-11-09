@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
+import { globalKeys } from '../api/queryKeys';
 import { adminFixture } from '../test/fixtures';
 import { warteAufMenueFokus } from '../test/menue';
 import {
@@ -885,6 +886,44 @@ describe('BenutzerPage', () => {
       expect(deaktiviert).toBeNull();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
       await waitFor(() => expect(deaktiviert).toBe('2'));
+    });
+
+    it('veraltete Antwort zum letzten Schlüssel gilt nicht: nach gescheitertem Neuabruf fragt Deaktivieren nach (LLH-1605)', async () => {
+      let deaktiviert: string | null = null;
+      let kaputt = false;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          kaputt ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : HttpResponse.json([]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      const client = neuerQueryClient();
+      renderMitProviders(
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>,
+        { route: '/admin/benutzer', client },
+      );
+      const key = globalKeys.instanzkopplungLetzteSchluessel();
+      await waitFor(() => expect(client.getQueryState(key)?.status).toBe('success'));
+      // Etwa nach einer neuen Kopplung: der Stand ist überholt, der Neuabruf scheitert.
+      kaputt = true;
+      await client.invalidateQueries({ queryKey: key });
+      await waitFor(() => expect(client.getQueryState(key)?.status).toBe('error'));
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      expect(within(dialog).getByText(/ließ sich nicht prüfen/)).toBeInTheDocument();
+      expect(deaktiviert).toBeNull();
     });
 
     it('Herabstufen des letzten Schlüsselhalters warnt im Dialog (LLH-1605)', async () => {

@@ -116,7 +116,8 @@ Die Schlüssel, die beim Koppeln mitkommen, gelten sofort. Ein Schlüssel, der s
 wartet zuerst: an der Kopplung steht „1 neuer Unterschriftsschlüssel wartet auf Bestätigung“,
 der Schlüssel selbst „wartet auf Bestätigung“. Bis ein Admin hier ihn bestätigt, zählt seine
 Unterschrift nicht. So kann eine kompromittierte andere Installation keinen fremden Schlüssel
-unterschieben, ohne dass hier jemand nachfragt.
+unterschieben, ohne dass hier jemand nachfragt. Hat jemand einen neuen Schlüssel mit einem
+gegengezeichnet, der hier selbst noch wartet, erscheint der neue erst, wenn der erste bestätigt ist.
 
 Der Dialog zum Bestätigen zeigt Inhaber, Fingerabdruck, wer gegengezeichnet hat und wann. Der
 Inhaber liest seinen Fingerabdruck an seinem eigenen Schlüssel ab. Hat er gerade selbst keinen
