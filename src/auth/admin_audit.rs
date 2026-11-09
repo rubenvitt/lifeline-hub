@@ -147,6 +147,10 @@ pub struct ZugangsAngaben {
     /// „ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anzahl: Option<i64>,
+    /// Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten
+    /// Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passkeys_entfernt: Option<i64>,
 }
 
 impl ZugangsAngaben {

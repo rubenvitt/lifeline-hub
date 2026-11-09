@@ -160,6 +160,23 @@ und bootstrappt das Admin-Konto.
 > Einzige Quelle ist `LICENSE` im Repo; das Binary bettet die Datei beim Bauen ein,
 > ein Lizenzwechsel ändert also nur diese Datei.
 
+### Notfall: Admin ohne Passkey (LLH-1493)
+
+Ein System-Admin mit Passkey meldet sich an einer Installation, die Stammdaten an einen ELW
+verteilt, nicht per Passwort an (ADR-0016). Verliert er seinen Passkey, gibt ihm ein anderer Admin
+in der Benutzerverwaltung ein Einmalpasswort; das entfernt dabei seine Passkeys. Gibt es keinen
+anderen Admin, hilft der Startbefehl am Server:
+
+```bash
+./target/release/lifeline-hub --db-path /var/lib/lifeline/lifeline.db admin-zugang-zuruecksetzen anna
+```
+
+Er entfernt die Anmelde-Passkeys des Admins, beendet seine Sitzungen und gibt ein Einmalpasswort
+aus. Mit diesem meldet er sich an, legt ein eigenes Passwort fest und richtet einen neuen Passkey
+ein. Das Zugangsprotokoll hält den Vorgang mit „Notfallbefehl am Server“ fest. Der Befehl gilt nur
+für System-Admins und braucht Zugang zur Maschine; andere Konten setzt ein Admin in der
+Benutzerverwaltung zurück.
+
 ## Lokaler Betrieb (ELW / Mini-PC)
 
 `--bind 0.0.0.0:8080` macht den Server im lokalen WLAN erreichbar. Eine Eingabe

@@ -102,30 +102,36 @@ pub async fn check_passkey_pflicht(
     pool: &SqlitePool,
     benutzer: &crate::auth::Benutzer,
 ) -> Result<(), AppError> {
-    if benutzer.system_rolle != crate::auth::SystemRolle::Admin {
-        return Ok(());
-    }
     let hat_passkey: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM webauthn_credential WHERE benutzer_id = ?)",
     )
     .bind(benutzer.id)
     .fetch_one(pool)
     .await?;
-    if !hat_passkey {
-        return Ok(());
+    if hat_passkey && is_passkey_pflichtig(pool, benutzer).await? {
+        return Err(AppError::ForbiddenMit(NUR_PASSKEY.into()));
     }
-    // Auch nach einem Widerruf: liegt der Hash einmal auf einem ELW, bleibt er dort (die Zeilen
-    // gehören danach der Instanz), also bleibt er hier wertlos.
+    Ok(())
+}
+
+/// Ob für dieses Konto die Passkey-Pflicht gilt, sobald es einen Passkey hat: ein System-Admin
+/// einer verteilenden Org, oder einer, dessen Hash je an einen ELW ging. Auch nach einem
+/// Widerruf: der Hash bleibt dort (die Zeilen gehören danach der Instanz), also bleibt er hier
+/// wertlos.
+pub async fn is_passkey_pflichtig(
+    pool: &SqlitePool,
+    benutzer: &crate::auth::Benutzer,
+) -> Result<bool, AppError> {
+    if benutzer.system_rolle != crate::auth::SystemRolle::Admin {
+        return Ok(false);
+    }
     let je_geliefert: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM instanz_geheimnis_lieferung WHERE benutzer_id = ?)",
     )
     .bind(benutzer.id)
     .fetch_one(pool)
     .await?;
-    if je_geliefert || is_org_verteilend(pool, benutzer.org_id).await? {
-        return Err(AppError::ForbiddenMit(NUR_PASSKEY.into()));
-    }
-    Ok(())
+    Ok(je_geliefert || is_org_verteilend(pool, benutzer.org_id).await?)
 }
 
 /// Verschlüsselt an einen Empfänger (`age1…`); `None`, wenn der Empfänger unlesbar ist.

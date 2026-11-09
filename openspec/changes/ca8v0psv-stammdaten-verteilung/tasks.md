@@ -47,7 +47,7 @@ Instanzen kommen nach `tests/instanz_stammdaten.rs` (Muster `tests/instanz_koppl
 
 ## 7. Abschluss
 
-- [ ] 7.1 Review-Fan-out (Sicherheit, Korrektheit, Konventionen) und `superpowers:requesting-code-review`; bestätigte Befunde behoben
+- [x] 7.1 Review-Fan-out (Sicherheit, Korrektheit, Konventionen) und `superpowers:requesting-code-review`; bestätigte Befunde behoben
 - [ ] 7.2 Bilder der Änderung (Abzeichen und Sperre, Seite „Instanzkopplung“ mit Hinweisen und Dialog „ELW verloren“) für PR und Meldung
 - [ ] 7.3 `./scripts/check-all.sh` grün (lokal das Bündel `schnell` und die betroffenen Suiten, voll über die CI des PRs)
 

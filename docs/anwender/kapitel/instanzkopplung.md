@@ -164,8 +164,17 @@ Ein System-Admin mit Passkey meldet sich am Hub, der die Organisation an einen E
 noch per Passkey an; per Passwort erscheint „Admins melden sich hier per Passkey an.“ Am ELW
 gilt sein Passwort weiter. Ohne Passkey bleibt ihm am Hub das Passwort, sein Konto kommt dann
 aber ohne Passwort am ELW an, und die Benutzerverwaltung zeigt „Für die Anmeldung am ELW zuerst
-einen Passkey einrichten“. Verliert ein Admin seinen einzigen Passkey, vergibt ein anderer Admin
-ein Einmalpasswort.
+einen Passkey einrichten“. Das gilt weiter, wenn die Kopplung später widerrufen wird, denn das
+Passwort liegt dann noch auf dem ELW.
+
+Verliert ein Admin seinen einzigen Passkey, vergibt ein anderer Admin ein Einmalpasswort. Dabei
+fallen seine Passkeys weg, und das Zugangsprotokoll zeigt „1 Passkey entfernt“. Nach der Anmeldung
+legt er ein eigenes Passwort fest und richtet einen neuen Passkey ein. Gibt es keinen anderen
+Admin, hilft der Betrieb des Servers mit einem Notfallbefehl.
+
+Ein Admin vom Hub ist am ELW Admin, solange der ELW nur seine Organisation trägt. Trägt der ELW
+mehrere Organisationen, kommt das Konto dort ohne Admin-Rolle an, und die Kopplung zeigt
+„Konto „…“ ist am Hub Admin, hier nicht: diese Instanz trägt mehrere Organisationen.“
 
 ### Hinweise an einer Kopplung
 

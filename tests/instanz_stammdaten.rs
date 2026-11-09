@@ -1008,3 +1008,162 @@ async fn elw_verloren_zaehlt_auch_frueher_gelieferte_geheimnisse() {
     assert_eq!(s, StatusCode::UNAUTHORIZED);
     let _ = max;
 }
+
+// ── Rettungsweg und Admin-Rolle (Entscheidungen 09.11.2026) ──────────────────────────────────
+
+/// Ein zweiter System-Admin am Hub mit Anmelde-Passkey.
+async fn admin_mit_passkey(hub: &Instanz, name: &str) -> i64 {
+    let id = konto_bereit(hub, name).await;
+    exec(
+        &hub.pool,
+        &format!(
+            "UPDATE benutzer SET system_rolle = 'admin' WHERE id = {id};
+             INSERT INTO webauthn_credential (benutzer_id, credential_id, public_key)
+             VALUES ({id}, x'0a{id:02x}', x'0b')"
+        ),
+    )
+    .await;
+    id
+}
+
+#[tokio::test]
+async fn einmalpasswort_fuer_einen_admin_unter_passkey_pflicht_entfernt_seine_passkeys() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    let anna = admin_mit_passkey(&hub, "annaadmin").await;
+    let (s, _) = login(&hub, "annaadmin", "annaadmin-pw-123").await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Pflicht gilt");
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/benutzer/{anna}/einmalpasswort"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        eine::<i64>(
+            &hub.pool,
+            &format!("SELECT COUNT(*) FROM webauthn_credential WHERE benutzer_id = {anna}")
+        )
+        .await,
+        0
+    );
+    let (s, w) = login(&hub, "annaadmin", v["einmalpasswort"].as_str().unwrap()).await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert_eq!(w["passwort_wechsel_erforderlich"], true);
+    assert_eq!(
+        eine::<String>(
+            &hub.pool,
+            "SELECT detail FROM admin_audit WHERE aktion = 'einmalpasswort_vergeben' \
+             ORDER BY id DESC LIMIT 1"
+        )
+        .await,
+        r#"{"passkeys_entfernt":1}"#
+    );
+    // Am ELW, der nichts verteilt, bleibt der Passkey eines Admins beim Einmalpasswort.
+    let berta = admin_mit_passkey(&elw, "bertaadmin").await;
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "POST",
+        &format!("/api/benutzer/{berta}/einmalpasswort"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!("SELECT COUNT(*) FROM webauthn_credential WHERE benutzer_id = {berta}")
+        )
+        .await,
+        1
+    );
+}
+
+#[tokio::test]
+async fn notfallbefehl_gibt_dem_letzten_admin_wieder_zugang() {
+    let (hub, _elw) = gekoppelt_mit_platte(true).await;
+    exec(
+        &hub.pool,
+        "INSERT INTO webauthn_credential (benutzer_id, credential_id, public_key) VALUES (1, x'0102', x'0304')",
+    )
+    .await;
+    konto(&hub, "maxmuster").await;
+    let (s, _) = login(&hub, "admin", "startpw12").await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let z = lifeline_hub::auth::notfall::admin_zugang_zuruecksetzen(&hub.pool, "admin")
+        .await
+        .unwrap();
+    assert_eq!(z.passkeys_entfernt, 1);
+    let (s, v) = login(&hub, "admin", &z.einmalpasswort).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["passwort_wechsel_erforderlich"], true);
+    let (akteur, akteur_id): (String, Option<i64>) = sqlx::query_as(
+        "SELECT akteur_name, akteur_id FROM admin_audit \
+         WHERE aktion = 'einmalpasswort_vergeben' ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(akteur, lifeline_hub::auth::notfall::AKTEUR);
+    assert_eq!(akteur_id, None);
+    // Nur für System-Admins.
+    assert!(
+        lifeline_hub::auth::notfall::admin_zugang_zuruecksetzen(&hub.pool, "maxmuster")
+            .await
+            .is_err()
+    );
+    assert!(
+        lifeline_hub::auth::notfall::admin_zugang_zuruecksetzen(&hub.pool, "niemand")
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn admin_vom_hub_ist_am_elw_admin_nur_wenn_er_eine_org_traegt() {
+    let (hub, elw) = gekoppelt().await;
+    let anna = konto(&hub, "annaadmin").await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET system_rolle = 'admin' WHERE id = {anna}"),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            "SELECT system_rolle FROM benutzer WHERE benutzername = 'annaadmin'"
+        )
+        .await,
+        "admin"
+    );
+    // Eine zweite Org am ELW: mit der nächsten Lieferung kommt sie als `keiner`.
+    exec(
+        &elw.pool,
+        "INSERT INTO organisation (name) VALUES ('Zweite Org')",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET anzeigename = 'Anna A.' WHERE id = {anna}"),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            "SELECT system_rolle FROM benutzer WHERE benutzername = 'annaadmin'"
+        )
+        .await,
+        "keiner"
+    );
+    assert!(eine::<String>(
+        &elw.pool,
+        "SELECT stammdaten_hinweis FROM instanz_kopplung_org"
+    )
+    .await
+    .contains("„annaadmin“ ist am Hub Admin, hier nicht"));
+}

@@ -253,6 +253,36 @@ gilt danach ebenfalls kein altes Passwort mehr. Der Weg zurück ist das Einmalpa
   gesperrt, solange die Org eine Quelle hat. Eine Sperre je Modul hätte einen Umbau der
   Modul-Liste verlangt.
 
+## Nachträge aus dem Review (09.11.2026)
+
+- **Pflicht über den Widerruf hinaus (D7):** Ging der Hash eines Admins je an einen ELW
+  (`instanz_geheimnis_lieferung`), gilt die Passkey-Pflicht weiter, auch wenn die Org nicht mehr
+  verteilt. Der Hash liegt nach dem Widerruf weiter auf dem ELW, denn die Zeilen gehören dann der
+  Instanz. `geheimnis::is_passkey_pflichtig` ist die eine Quelle der Regel.
+- **Rettungsweg bei verlorenem Passkey (D7, Entscheidung 09.11.2026):** Gilt für das Ziel die
+  Pflicht, entfernt das Einmalpasswort einer anderen Person seine Anmelde-Passkeys; die
+  Admin-Spur nennt ihre Zahl (`passkeys_entfernt`). Sonst wäre es wertlos, und keine Route
+  entfernt einen Anmelde-Passkey. Für den letzten Admin gibt es den Startbefehl
+  `lifeline-hub admin-zugang-zuruecksetzen <benutzername>` (`auth::notfall`): Passkeys weg,
+  Einmalpasswort mit Wechselpflicht am Terminal, Sitzungen beendet, Eintrag in der Admin-Spur
+  ohne Akteur („Notfallbefehl am Server“). Er braucht Zugang zur Maschine, nie HTTP.
+- **Admin-Rolle am ELW (D6, Entscheidung 09.11.2026):** `system_rolle` gilt für die ganze
+  Instanz. Trägt die meldende Seite mehr als eine Org, kommt ein Admin vom Hub als `keiner` an,
+  mit Hinweis an der Kopplung. Bei einer Org bleibt er Admin, damit die Hub-Admins ihren ELW ohne
+  Netz verwalten. Die Kappung greift bei jeder Lieferung des Kontos; kommt eine zweite Org
+  später dazu, setzt „Erneut abgleichen“ sie für alle Konten durch.
+- **Gerätekonten (D6):** Konten einer Gerätekopplung (Lagemonitor, Funktionsansicht) gehen nicht
+  hinaus; sie hängen an einer Kopplung dieser Instanz.
+- **„ELW verloren“ (D8):** erfasst die Lieferungen aller Zuordnungen der Org an der Kopplung,
+  auch früherer, nicht nur der aktuellen.
+- **Stand nur bei gleichem Ausgang (D2):** Die Übernahme schreibt `stammdaten_stand` nur fort,
+  wenn er noch der gemeldete ist. „Erneut abgleichen“ während einer laufenden Meldung bleibt so
+  bei 0.
+- **Stillgelegt heißt übergeben (D3):** Eine an der Quelle gelöschte Zeile, die hier stillgelegt
+  oder deaktiviert bleibt, verliert ihre Herkunft. Eine an der Quelle wiederverwendete id trifft
+  sonst die alte Zeile, auf die noch Einsatzdaten zeigen.
+- **Demo-Daten:** Die Demo-Entfernung lässt eine Zeile vom Hub stehen wie eine noch verwiesene.
+
 ## Risks / Trade-offs
 
 - **Gestohlener ELW ohne Plattenverschlüsselung, die aber bestätigt wurde.** → Die Bestätigung ist

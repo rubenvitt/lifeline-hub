@@ -5,6 +5,7 @@ pub mod benutzername;
 pub mod bootstrap;
 pub mod geraet_bezeichnung;
 pub mod huelle;
+pub mod notfall;
 pub mod oidc;
 pub mod password;
 pub mod passwort_wechsel;

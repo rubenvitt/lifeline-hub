@@ -136,6 +136,21 @@ ELW zuerst einen Passkey einrichten“ zeigen.
 - **WHEN** der Admin „anna“ am Hub keinen Anmelde-Passkey hat
 - **THEN** kommt ihr Konto am ELW ohne Geheimnisse an
 
+### Requirement: Die Admin-Rolle vom Hub gilt nur an einer Instanz mit einer Org
+
+Die Systemrolle gilt für die ganze Instanz. Trägt die meldende Seite mehr als eine Org, MUST ein
+Konto, das an der Quelle System-Admin ist, dort ohne Systemrolle ankommen, und die Kopplung MUST
+einen Hinweis zeigen. Trägt sie nur diese Org, MUST die Rolle wie geliefert gelten. Konten von
+Gerätekopplungen MUST NOT verteilt werden.
+
+#### Scenario: ELW einer Org
+- **WHEN** „anna“ am Hub System-Admin ist und der ELW nur ihre Org trägt
+- **THEN** ist sie am ELW System-Admin
+
+#### Scenario: ELW mehrerer Orgs
+- **WHEN** der ELW zwei Orgs trägt
+- **THEN** kommt „anna“ ohne Systemrolle an, und die Kopplung nennt den Grund
+
 ### Requirement: Ein verlorener ELW macht verteilte Geheimnisse wertlos
 
 Ein Admin der erreichten Seite SHALL für eine Kopplung seiner Org „ELW verloren“ auslösen können.

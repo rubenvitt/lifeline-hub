@@ -21376,6 +21376,14 @@
               }
             ]
           },
+          "passkeys_entfernt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten\nAnmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`."
+          },
           "system_rolle": {
             "oneOf": [
               {

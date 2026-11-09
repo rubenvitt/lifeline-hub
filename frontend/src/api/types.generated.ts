@@ -8492,6 +8492,12 @@ export interface components {
             instanz_kennung?: string | null;
             org_rolle?: components["schemas"]["OrgRolle"] | null;
             org_rolle_vorher?: components["schemas"]["OrgRolle"] | null;
+            /**
+             * Format: int64
+             * @description Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten
+             *     Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
+             */
+            passkeys_entfernt?: number | null;
             system_rolle?: components["schemas"]["SystemRolle"] | null;
             system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
         };

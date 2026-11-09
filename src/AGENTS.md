@@ -332,8 +332,11 @@ Herleitung in
     Aktivität und Org: Passwort nach Einmalpasswort, TOTP-Einrichtung und Anmeldezähler bleiben
     lokal schreibbar.
   - **Kontogeheimnisse nur über `stammdaten::geheimnis`** (age an den Empfänger aus der
-    Meldung, nur bei bestätigter Platte, Admins nur mit Anmelde-Passkey); die Passkey-Pflicht
-    am Login regelt [ADR-0016](../docs/architektur/entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md).
+    Meldung, nur bei bestätigter Platte, Admins nur mit Anmelde-Passkey, keine Gerätekonten).
+    Ob die Passkey-Pflicht gilt, sagt allein `geheimnis::is_passkey_pflichtig` (Login,
+    Einmalpasswort, Notfallbefehl `auth::notfall`); die Pflicht am Login regelt [ADR-0016](../docs/architektur/entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md).
+  - **Systemrolle `admin` vom Hub nur an einer Instanz mit einer Org** (`uebernehmen`); sonst
+    `keiner` mit Hinweis an der Kopplung.
   - Nachweis: `tests/instanz_stammdaten.rs`, `tests/instanz_stammdaten_live.rs`.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 

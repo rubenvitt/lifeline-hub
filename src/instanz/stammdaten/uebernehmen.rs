@@ -536,6 +536,11 @@ pub async fn uebernehmen(
         .filter_map(|l| StammdatenArt::parse(&l.art).map(|a| (a, l)))
         .collect();
     sortiert.sort_by_key(|(a, l)| (art::rang(*a), l.stand));
+    // Die System-Rolle gilt für die ganze Instanz. Trägt sie mehrere Orgs, verwaltete ein Admin
+    // vom Hub sonst auch die anderen (Entscheidung 09.11.2026): dann kommt er als `keiner`.
+    let mehrere_orgs: bool = sqlx::query_scalar("SELECT COUNT(*) > 1 FROM organisation")
+        .fetch_one(&mut *conn)
+        .await?;
 
     let mut zweiter: Vec<(&ArtBeschreibung, Value, i64)> = Vec::new();
     for (a, l) in &sortiert {
@@ -545,7 +550,17 @@ pub async fn uebernehmen(
             continue;
         }
         let daten = l.daten.as_ref().expect("geprüft");
-        let uebersetzt = translate(conn, zuordnung, b, daten).await?;
+        let mut uebersetzt = translate(conn, zuordnung, b, daten).await?;
+        if *a == StammdatenArt::Konto
+            && mehrere_orgs
+            && uebersetzt["system_rolle"].as_str() == Some(crate::auth::ROLLE_ADMIN)
+        {
+            uebersetzt["system_rolle"] = Value::from(crate::auth::ROLLE_KEINER);
+            ergebnis.hinweise.push(format!(
+                "Konto „{}“ ist am Hub Admin, hier nicht: diese Instanz trägt mehrere Organisationen.",
+                zeilen_name(l)
+            ));
+        }
         let vorher_aktiv: Option<bool> = if *a == StammdatenArt::Konto {
             match herkunft::find_lokal(conn, zuordnung.id, *a, &l.schluessel).await? {
                 Some(lokal) => {
