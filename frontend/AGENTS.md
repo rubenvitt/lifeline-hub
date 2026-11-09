@@ -655,7 +655,7 @@ anwendbar), „nicht geprüft" ist keins.
   eines Datensatzes ist **`components/KontextMenue.tsx`** in der Schale `PunktankerMenue`. Die
   Einträge kommen aus derselben Quelle wie Primärknopf und ⋮-Menü (`Datensicht`:
   `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Außerhalb der
-  `Datensicht` (LLH-1599, `openspec/changes/lor2qhep-kontextmenue-tabellen/design.md`) beschreibt
+  `Datensicht` (LLH-1599, `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md`) beschreibt
   die Seite die Aktionen einer Zeile EINMAL als `WeitereAktionen` und reicht sie an
   `KatalogTabelle.zeilenMenue` bzw. `useZeilenMenueKontext` (Listen, eigene Zeilen) UND an das ⋮
   (`ZeilenMenueAusloeser`); eine Knopfreihe am breiten Schirm hält ein Seitentest gleich. Eine Zeile

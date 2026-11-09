@@ -1,6 +1,6 @@
 /**
  * Kontextmenü der `KatalogTabelle` über `zeilenMenue` (LLH-1599, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/lor2qhep-kontextmenue-tabellen/design.md` D2).
+ * `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md` D2).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';

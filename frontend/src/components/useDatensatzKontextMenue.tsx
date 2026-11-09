@@ -1,6 +1,6 @@
 /**
  * Offenes Kontextmenü einer Fläche mit Datensätzen (LLH-1599, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/lor2qhep-kontextmenue-tabellen/design.md` D1), herausgezogen aus der
+ * `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md` D1), herausgezogen aus der
  * `Datensicht` (LLH-1596 D7).
  *
  * EIN Menü je Fläche: gemerkt wird nur der Schlüssel des Datensatzes; Zeile und Einträge kommen je

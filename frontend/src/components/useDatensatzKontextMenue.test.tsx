@@ -1,6 +1,6 @@
 /**
  * Zustand des offenen Kontextmenüs eines Datensatzes (LLH-1599, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/lor2qhep-kontextmenue-tabellen/design.md` D1): ein Menü je Fläche, die Zeile
+ * `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md` D1): ein Menü je Fläche, die Zeile
  * je Render frisch, Schließen bei Wegfall.
  */
 import { describe, expect, it, vi } from 'vitest';

@@ -1,6 +1,6 @@
 /**
  * ⋮ einer Zeile aus ihrer Beschreibung (LLH-1599, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/lor2qhep-kontextmenue-tabellen/design.md` D2/D3).
+ * `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md` D2/D3).
  *
  * Dieselbe Beschreibung (`WeitereAktionen`) speist das Kontextmenü der Zeile
  * (`KatalogTabelle.zeilenMenue`, `useDatensatzKontextMenue`); so zeigen ⋮ und Kontextmenü dieselben

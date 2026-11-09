@@ -1,5 +1,5 @@
 /**
- * ⋮ einer Zeile aus ihrer Beschreibung (LLH-1599, `openspec/changes/lor2qhep-kontextmenue-tabellen/
+ * ⋮ einer Zeile aus ihrer Beschreibung (LLH-1599, `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/
  * design.md` D2): dieselbe Quelle wie das Kontextmenü.
  */
 import { describe, expect, it, vi } from 'vitest';

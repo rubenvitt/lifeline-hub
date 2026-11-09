@@ -218,7 +218,7 @@ export type KatalogTabelleProps<T> = Omit<
   mehrzahl?: string;
   /**
    * Aktionen jeder Zeile (LLH-1599, Spec `datensatz-aktionsmenue`,
-   * `openspec/changes/lor2qhep-kontextmenue-tabellen/design.md` D2): Rechtsklick, langer Druck und
+   * `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md` D2): Rechtsklick, langer Druck und
    * die Tasten öffnen damit das Kontextmenü der Zeile. DIESELBE Beschreibung speist das ⋮ der
    * Aktionsspalte (`ZeilenMenueAusloeser`), eine Quelle für beide. Bei `laeuft` stehen alle
    * Einträge gesperrt. Ohne Einträge bleibt das Browsermenü. `Datensicht` setzt es NIE, sie bindet
