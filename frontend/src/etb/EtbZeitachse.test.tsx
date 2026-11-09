@@ -485,10 +485,14 @@ describe('EtbZeitachse – gepufferte Einträge', () => {
  * `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D2–D4).
  */
 describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
-  const offenesKontextmenue = () =>
-    document.querySelector<HTMLElement>(
+  /** Das offene Kontextmenü; wirft, solange es fehlt, damit `waitFor` wirklich darauf wartet. */
+  const offenesKontextmenue = (): HTMLElement => {
+    const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label^="Aktionen zu"]',
     );
+    if (menue == null) throw new Error('Kontextmenü nicht offen');
+    return menue;
+  };
   const kontextAnker = () => document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]');
   const punkte = (menue: HTMLElement) =>
     within(menue)
@@ -510,7 +514,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     });
     const text = within(zeileVon(container, 'eintrag-4')).getByText('Wasserentnahme bereit');
     expect(fireEvent.contextMenu(text, { clientX: 40, clientY: 50, button: 2 })).toBe(false);
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Eintrag 12');
     expect(punkte(menue)).toEqual(['Berichtigen', 'Wiedervorlage', 'Auftrag erteilen']);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' }));
@@ -527,7 +531,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
       berichtigenGesperrt: 'erst nach dem Senden',
     });
     fireEvent.contextMenu(zeileVon(container, 'eintrag-4'), { button: 2 });
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
     expect(punkt).toHaveTextContent('Berichtigen (erst nach dem Senden)');
     expect(punkt).toHaveAttribute('aria-disabled', 'true');
@@ -569,7 +573,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
       onNurProtokollieren: vi.fn(),
     });
     expect(fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 })).toBe(false);
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     expect(punkte(menue)).toEqual(['Erneut senden', 'Nur protokollieren', 'Verwerfen']);
     expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
     expect(within(menue).getByRole('menuitem', { name: 'Verwerfen' })).toHaveClass(
@@ -585,7 +589,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     const knopf = screen.getByRole('button', { name: 'Aktionen zu Eintrag 12' });
     act(() => knopf.focus());
     expect(fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true })).toBe(false);
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     expect(kontextAnker()).not.toBeNull();
     await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
     await userEvent.keyboard('{Escape}');
@@ -612,7 +616,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
       baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
     const { container, neu: setze } = renderZeitachse({ zeilen: zeilenAus([alt]), ...alle() });
     fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
-    await waitFor(() => offenesKontextmenue()!);
+    await waitFor(offenesKontextmenue);
     setze(zeilenAus([neu, alt]));
     expect(screen.queryByText('Neu')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
@@ -627,7 +631,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     const { container, neu: setze } = renderZeitachse({ zeilen: zeilenAus([alt]), ...wege });
     // Escape: der Fokus kam von außerhalb (body) und fällt aus dem Menü heraus, ohne `blur`.
     fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
-    let menue = await waitFor(() => offenesKontextmenue()!);
+    let menue = await waitFor(offenesKontextmenue);
     await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(kontextAnker()).toBeNull());
@@ -637,7 +641,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     // Wahl eines Eintrags ebenso.
     const neuer = eintrag({ id: 3, lfd_nr: 3, inhalt: 'Neuer' });
     fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
-    menue = await waitFor(() => offenesKontextmenue()!);
+    menue = await waitFor(offenesKontextmenue);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' }));
     await waitFor(() => expect(kontextAnker()).toBeNull());
     setze(zeilenAus([neuer, neu, alt]));
@@ -654,7 +658,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
       onVerwerfen: vi.fn(),
     });
     fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
-    await waitFor(() => offenesKontextmenue()!);
+    await waitFor(offenesKontextmenue);
     setze(baueZeilen({ eintraege: [alt], ausstehend: [], abgelehnt: [] }));
     await waitFor(() => expect(kontextAnker()).toBeNull());
     setze(baueZeilen({ eintraege: [neu, alt], ausstehend: [], abgelehnt: [] }));
@@ -670,7 +674,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     const { container, rerender } = renderMitProviders(<EtbZeitachse {...props} />);
     rerender(<EtbZeitachse {...props} onNurProtokollieren={onNurProtokollieren} />);
     fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Nur protokollieren' }));
     expect(onNurProtokollieren).toHaveBeenCalledWith(puffer);
   });
@@ -686,7 +690,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     const knopf = screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' });
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true });
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
     // Die Rechte fallen weg: Menü und ⋮-Knopf verschwinden, der Fokus hat kein Ziel mehr.
     rerender(<EtbZeitachse einsatzId={1} zeilen={zeilenAus([alt])} />);
@@ -704,7 +708,7 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
       onVerwerfen: vi.fn(),
     });
     fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
-    await waitFor(() => offenesKontextmenue()!);
+    await waitFor(offenesKontextmenue);
     setze(baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [] }));
     await waitFor(() => expect(kontextAnker()).toBeNull());
   });

@@ -558,10 +558,14 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
  * das Kontextmenü“, `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D5).
  */
 describe('MetaChip — Kontextmenü (LLH-1597)', () => {
-  const offenesKontextmenue = () =>
-    document.querySelector<HTMLElement>(
+  /** Das offene Kontextmenü; wirft, solange es fehlt, damit `waitFor` wirklich darauf wartet. */
+  const offenesKontextmenue = (): HTMLElement => {
+    const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label^="Aktionen zu"]',
     );
+    if (menue == null) throw new Error('Kontextmenü nicht offen');
+    return menue;
+  };
   const kontextAnker = () => document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]');
   const punkte = (menue: HTMLElement) =>
     [...menue.querySelectorAll('[role="menuitem"]')].map((m) => m.textContent);
@@ -587,7 +591,7 @@ describe('MetaChip — Kontextmenü (LLH-1597)', () => {
     const { onRemove, onEdit } = chip();
     const text = screen.getByText('An: S2');
     expect(fireEvent.contextMenu(text, { clientX: 10, clientY: 20, button: 2 })).toBe(false);
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     expect(menue).toHaveAttribute('aria-label', 'Aktionen zu An');
     expect(punkte(menue)).toEqual(['Bearbeiten', 'Entfernen']);
     expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
@@ -600,7 +604,7 @@ describe('MetaChip — Kontextmenü (LLH-1597)', () => {
     const onStandardAendern = vi.fn();
     chip({ feld: 'von', ausStandard: true, onStandardAendern });
     fireEvent.contextMenu(screen.getByText(/^Von:/), { button: 2 });
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     expect(punkte(menue)).toEqual(['Nur für diesen Eintrag ändern', 'Standard-Rufname ändern']);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Standard-Rufname ändern' }));
     expect(onStandardAendern).toHaveBeenCalledTimes(1);
@@ -609,7 +613,7 @@ describe('MetaChip — Kontextmenü (LLH-1597)', () => {
   it('während des Sendens stehen die Einträge gesperrt da', async () => {
     const { onRemove } = chip({ gesperrt: true });
     fireEvent.contextMenu(screen.getByText('An: S2'), { button: 2 });
-    const menue = await waitFor(() => offenesKontextmenue()!);
+    const menue = await waitFor(offenesKontextmenue);
     const entfernen = within(menue).getByRole('menuitem', { name: 'Entfernen' });
     expect(entfernen).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(entfernen);
