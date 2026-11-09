@@ -81,6 +81,8 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
         | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen
         | BenachrichtigungBezugTyp::AbloeserWiederhergestellt => None,
+        // Der Zeitpunkt hat keine Zeile: eigener Weg über `DETAIL_SCHICHTPLAN_WECHSEL_SPALTEN`.
+        BenachrichtigungBezugTyp::SchichtplanWechsel => None,
         // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
         BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
         BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
@@ -142,6 +144,60 @@ async fn detail_abloesung(
     Ok(Some(match crate::zeit::parse_utc(&faellig_at) {
         Some(t) => format!("{einheit}, {}", stil.uhrzeit(t)),
         None => einheit,
+    }))
+}
+
+/// Die Spalten der Detailzeile eines Wechselzeitpunkts (LLH-1555 Welle 3): die Blöcke an
+/// Einheiten, die zu diesem Zeitpunkt beginnen oder enden, und der Name ihrer Einheit, alle
+/// Retain (Guard `detail_liest_nur_retain_spalten`).
+pub const DETAIL_SCHICHTPLAN_WECHSEL_SPALTEN: [(&str, &str); 5] = [
+    ("einsatz_planschicht", "posten_art"),
+    ("einsatz_planschicht", "einheit_id"),
+    ("einsatz_planschicht", "von"),
+    ("einsatz_planschicht", "bis"),
+    ("einsatz_einheit", "name"),
+];
+
+/// Der Zeitpunkt eines Bezugs `schichtplan_wechsel` (Minuten seit 1970, UTC).
+pub fn wechsel_zeitpunkt(minute: i64) -> Option<chrono::DateTime<chrono::Utc>> {
+    minute
+        .checked_mul(60)
+        .and_then(|s| chrono::DateTime::from_timestamp(s, 0))
+}
+
+/// Detailzeile eines Wechselzeitpunkts: „15 Wechsel um 1400“, bei einem einzigen Wechsel die
+/// Einheit wie bei einer Schicht („RTW 1, 1400“). Gezählt werden beim Lesen die Einheiten, deren
+/// Block laut Plan zu diesem Zeitpunkt beginnt oder endet, wie in der Wechsel-Leiste; Uhrzeit in
+/// Zone und Zeitdarstellung des Einsatzes.
+async fn detail_schichtplan_wechsel(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    minute: i64,
+) -> Result<Option<String>, AppError> {
+    let Some(z) = wechsel_zeitpunkt(minute) else {
+        return Ok(None);
+    };
+    let zs = crate::zeit::formatiere_utc(z);
+    let namen: Vec<String> = sqlx::query_scalar(
+        "SELECT ee.name FROM einsatz_einheit ee \
+         WHERE ee.einsatz_id = ? AND ee.id IN ( \
+           SELECT p.einheit_id FROM einsatz_planschicht p \
+           WHERE p.einsatz_id = ? AND p.posten_art = 'einheit' AND (p.von = ? OR p.bis = ?)) \
+         ORDER BY ee.name, ee.id",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .bind(&zs)
+    .bind(&zs)
+    .fetch_all(pool)
+    .await?;
+    let uhr = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id)
+        .await?
+        .uhrzeit(z);
+    Ok(Some(match namen.as_slice() {
+        [] => format!("Wechsel um {uhr}"),
+        [einheit] => format!("{einheit}, {uhr}"),
+        alle => format!("{} Wechsel um {uhr}", alle.len()),
     }))
 }
 
@@ -295,6 +351,10 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen
         | BenachrichtigungBezugTyp::AbloeserWiederhergestellt => {
             format!("{basis}/abloesung?schicht={id}")
+        }
+        // Der Schichtplan mit dem Zeitpunkt in der Wechsel-Leiste (LLH-1555 Welle 3).
+        BenachrichtigungBezugTyp::SchichtplanWechsel => {
+            format!("{basis}/abloesung?ansicht=plan&wechsel={id}")
         }
         BenachrichtigungBezugTyp::Lagebesprechung => format!("{basis}/lagebesprechung"),
         BenachrichtigungBezugTyp::Nachforderung
@@ -551,6 +611,9 @@ pub async fn bilden_mit_einheit(
     let detail = match detail_quelle(bezug.typ) {
         None if bezug.typ == BenachrichtigungBezugTyp::Abloesung => {
             detail_abloesung(pool, einsatz_id, bezug.id).await?
+        }
+        None if bezug.typ == BenachrichtigungBezugTyp::SchichtplanWechsel => {
+            detail_schichtplan_wechsel(pool, einsatz_id, bezug.id).await?
         }
         None if bezug.typ == BenachrichtigungBezugTyp::Fahrzeug => {
             let wert: Option<String> = sqlx::query_scalar(FAHRZEUG_DETAIL_SQL)

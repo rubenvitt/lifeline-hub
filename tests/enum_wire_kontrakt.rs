@@ -1161,6 +1161,18 @@ fn schichtplan_wire() {
         PauseBeginn => "pause_beginn",
         PauseEnde => "pause_ende",
     } in lifeline_hub::abloesung::schichtplan::vollzug::WechselArt::ALLE);
+    // Wechsel-Leiste (LLH-1555 Welle 3): nur Wire, keine Spalte.
+    enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEintragArt {
+        Einheit => "einheit",
+        Uhs => "uhs",
+        PauseBeginn => "pause_beginn",
+        PauseEnde => "pause_ende",
+    } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEintragArt::ALLE);
+    enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselStand {
+        Offen => "offen",
+        Vollzogen => "vollzogen",
+        OhneSchicht => "ohne_schicht",
+    } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselStand::ALLE);
 }
 
 #[test]
@@ -1528,6 +1540,7 @@ fn benachrichtigung_wire() {
         AbloeserAlarmierungGestrichen => "abloeser_alarmierung_gestrichen",
         AbloeserEintreffenGestrichen => "abloeser_eintreffen_gestrichen",
         AbloeserWiederhergestellt => "abloeser_wiederhergestellt",
+        SchichtplanWechsel => "schichtplan_wechsel",
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
         NachforderungZugesagt => "nachforderung_zugesagt",

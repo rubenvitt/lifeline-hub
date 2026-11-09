@@ -2989,6 +2989,7 @@
           "abloeser_alarmierung_gestrichen",
           "abloeser_eintreffen_gestrichen",
           "abloeser_wiederhergestellt",
+          "schichtplan_wechsel",
           "lagebesprechung",
           "nachforderung",
           "nachforderung_zugesagt",
@@ -15029,6 +15030,82 @@
           }
         }
       },
+      "PlanWechselEintrag": {
+        "type": "object",
+        "description": "Ein Eintrag eines Wechselpunkts.",
+        "required": [
+          "art",
+          "stand",
+          "block_id"
+        ],
+        "properties": {
+          "abloesung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur an einer Einheit mit Stand `offen`: die Schicht, die zu vollziehen ist."
+          },
+          "art": {
+            "$ref": "#/components/schemas/PlanWechselEintragArt"
+          },
+          "block_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Der Block, um den es geht: an einer Einheit der Folgeblock, ohne ihn der endende Block."
+          },
+          "stand": {
+            "$ref": "#/components/schemas/PlanWechselStand"
+          }
+        }
+      },
+      "PlanWechselEintragArt": {
+        "type": "string",
+        "description": "Was an einem Wechselpunkt zu tun ist. Wire == `as_str()`.",
+        "enum": [
+          "einheit",
+          "uhs",
+          "pause_beginn",
+          "pause_ende"
+        ]
+      },
+      "PlanWechselStand": {
+        "type": "string",
+        "description": "Stand eines Eintrags der Wechsel-Leiste. Wire == `as_str()`.",
+        "enum": [
+          "offen",
+          "vollzogen",
+          "ohne_schicht"
+        ]
+      },
+      "PlanWechselpunkt": {
+        "type": "object",
+        "description": "Ein Zeitpunkt der Wechsel-Leiste.",
+        "required": [
+          "zeitpunkt",
+          "minute",
+          "eintraege"
+        ],
+        "properties": {
+          "eintraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanWechselEintrag"
+            },
+            "description": "Nach Art, dann nach Block."
+          },
+          "minute": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Derselbe Zeitpunkt in Minuten seit 1970: Schlüssel des gebündelten Hinweises\n(Bezug `schichtplan_wechsel`) und des Sprungs `?wechsel=`."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt laut Plan (UTC)."
+          }
+        }
+      },
       "PlanungAnzeige": {
         "type": "object",
         "description": "Die ganze Planung mit Befunden und Kennzahlen.",
@@ -16511,7 +16588,8 @@
         "description": "Der ganze Plan eines Einsatzes mit Befunden.",
         "required": [
           "grenzwerte",
-          "bloecke"
+          "bloecke",
+          "wechsel"
         ],
         "properties": {
           "bloecke": {
@@ -16540,6 +16618,13 @@
               "null"
             ],
             "description": "Nächster Zeitpunkt, an dem sich ein uhrabhängiger Befund ändert; der Client fragt dann neu."
+          },
+          "wechsel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanWechselpunkt"
+            },
+            "description": "Die Wechsel-Leiste (LLH-1555 Welle 3): Zeitpunkte mit dem, was laut Plan zu tun ist,\naufsteigend (`wechselpunkte`)."
           }
         }
       },

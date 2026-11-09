@@ -30,6 +30,7 @@ pub mod pruefung;
 pub mod repo;
 pub mod uebernahme;
 pub mod vollzug;
+pub mod wechselpunkte;
 pub mod zerlegung;
 
 /// Personen je Block, gezählt vor dem Entdoppeln (wie `abloesung::BESATZUNG_MAX`). Spiegel:
@@ -400,6 +401,9 @@ pub struct SchichtplanAnzeige {
     pub bloecke: Vec<PlanBlockAnzeige>,
     /// Ohne Freigabe des Moduls Personal `null`.
     pub helfer: Option<Vec<PlanHelferAnzeige>>,
+    /// Die Wechsel-Leiste (LLH-1555 Welle 3): Zeitpunkte mit dem, was laut Plan zu tun ist,
+    /// aufsteigend (`wechselpunkte`).
+    pub wechsel: Vec<wechselpunkte::PlanWechselpunkt>,
     /// Nächster Zeitpunkt, an dem sich ein uhrabhängiger Befund ändert; der Client fragt dann neu.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub naechste_pruefung_at: Option<String>,

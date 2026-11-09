@@ -1169,7 +1169,7 @@ export interface components {
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "schichtplan_wechsel" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
@@ -6058,6 +6058,44 @@ export interface components {
             zeitpunkt: string;
             zurueckgenommen_at?: string | null;
         };
+        /** @description Ein Eintrag eines Wechselpunkts. */
+        PlanWechselEintrag: {
+            /**
+             * Format: int64
+             * @description Nur an einer Einheit mit Stand `offen`: die Schicht, die zu vollziehen ist.
+             */
+            abloesung_id?: number | null;
+            art: components["schemas"]["PlanWechselEintragArt"];
+            /**
+             * Format: int64
+             * @description Der Block, um den es geht: an einer Einheit der Folgeblock, ohne ihn der endende Block.
+             */
+            block_id: number;
+            stand: components["schemas"]["PlanWechselStand"];
+        };
+        /**
+         * @description Was an einem Wechselpunkt zu tun ist. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanWechselEintragArt: "einheit" | "uhs" | "pause_beginn" | "pause_ende";
+        /**
+         * @description Stand eines Eintrags der Wechsel-Leiste. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanWechselStand: "offen" | "vollzogen" | "ohne_schicht";
+        /** @description Ein Zeitpunkt der Wechsel-Leiste. */
+        PlanWechselpunkt: {
+            /** @description Nach Art, dann nach Block. */
+            eintraege: components["schemas"]["PlanWechselEintrag"][];
+            /**
+             * Format: int64
+             * @description Derselbe Zeitpunkt in Minuten seit 1970: Schlüssel des gebündelten Hinweises
+             *     (Bezug `schichtplan_wechsel`) und des Sprungs `?wechsel=`.
+             */
+            minute: number;
+            /** @description Zeitpunkt laut Plan (UTC). */
+            zeitpunkt: string;
+        };
         /** @description Die ganze Planung mit Befunden und Kennzahlen. */
         PlanungAnzeige: {
             /** @description Nach Posten (Reihenfolge, Pause zuletzt) und Beginn. */
@@ -6607,6 +6645,11 @@ export interface components {
             helfer?: components["schemas"]["PlanHelferAnzeige"][] | null;
             /** @description Nächster Zeitpunkt, an dem sich ein uhrabhängiger Befund ändert; der Client fragt dann neu. */
             naechste_pruefung_at?: string | null;
+            /**
+             * @description Die Wechsel-Leiste (LLH-1555 Welle 3): Zeitpunkte mit dem, was laut Plan zu tun ist,
+             *     aufsteigend (`wechselpunkte`).
+             */
+            wechsel: components["schemas"]["PlanWechselpunkt"][];
         };
         /** @description Grenzwerte des Dienst-Befunds. */
         SchichtplanGrenzwerte: {
