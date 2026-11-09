@@ -71,8 +71,22 @@ Fokus und Zeiger wie in der Datensicht. Dazu `halten`, wenn
   läuft über Zeiger-Ereignisse am Dokument und darf das Raster verlassen; ohne `halten` taute die
   Schleuse beim Verlassen mitten im Zug.
 - eine Person aus der Seitenleiste gezogen wird (`gezogen != null` beim Aufrufer).
-- ein Dialog des Schichtplans offen ist (`dialog != null` beim Aufrufer). Er liegt im Portal; der
-  Fokus wandert dorthin, und nach dem Schließen kehrt er auf den Block zurück.
+- ein Dialog des Schichtplans offen ist (`dialog != null` beim Aufrufer). Er liegt im Portal;
+  Fokus und Zeiger verlassen dabei die Hülle.
+
+**Nachlauf** (Befund aus dem Review): Der Dialog wird beim Schließen sofort abgebaut, der Fokus
+fällt auf `<body>` (rc-dialog stellt ihn erst nach der Schließanimation zurück), und der Zeiger
+ruht womöglich über dem Raster, ohne dass ein Ereignis es meldet. Fiele `halten` einfach weg,
+öffnete die Schleuse genau unter dem ruhenden Zeiger. Deshalb hält die Hülle nach dem Wegfall
+weiter bis zur nächsten Zeigerbewegung, zum nächsten Druck oder zur nächsten Taste; bewegt sich der
+Zeiger über der Hülle, übernimmt deren Zeigerbedingung. Der Nachlauf wird im Render nachgesetzt,
+nicht im Effekt, sonst sähe die Schleuse einen Bildaufbau lang kein `halten`.
+
+**Bereit** (Befund aus dem Review): Im Einsatz steht die Pause sofort da, Einheiten, UHS und
+Abschnitte kommen aus eigenen Abfragen nach. Die Regel der gemeinsamen Schleuse „die leere
+Ladeansicht friert nicht ein“ greift nicht, weil die Pause nie fehlt. Die Hülle nimmt deshalb
+`bereit` (an `aktiv` der Schleuse): erst wenn Freigaben, Einheiten, UHS (je mit Freigabe) und
+Abschnitte geantwortet haben, friert sie ein.
 
 ### D4 Die entfallene Zeile
 
@@ -89,8 +103,11 @@ Neu `abloesung/schichtplan/SchichtplanSchleuse.tsx`, eine Hülle mit Render-Funk
 Sie trägt den Wurzelknoten und die Handler der Schleuse und das Banner. Das Banner ist das
 `Sammelbanner` aus `components/instrument` als Überlagerung mit Nullhöhe, `position: sticky` unter
 dem Rahmen (Muster `ErfassungsAnhaenge`, LFH-952); es nimmt keinen Platz im Fluss. Nach
-„anzeigen“ geht der Fokus auf die Hülle (`tabIndex={-1}`, zugänglicher Name „Schichtplan“), statt
-mit dem verschwundenen Knopf auf `<body>` zu fallen.
+„anzeigen“ geht der Fokus auf den obersten Block (`preventScroll`, das klebende Banner steht gerade
+dann, wenn der Kopf weggerollt ist), statt mit dem verschwundenen Knopf auf `<body>` zu fallen; ohne
+Block bleibt er, wo er ist. Die Hülle selbst ist nicht fokussierbar: mit `tabIndex={-1}` hielte ein
+Klick auf eine leere Spur die Schleuse über den Fokus geschlossen, bis jemand woanders hinklickt
+(Befund aus dem Review).
 
 Die Hülle umfasst nur Raster bzw. Liste, nicht die Personen-Seitenleiste und nicht die
 Werkzeugzeile. Die Dialoge des Schichtplans bekommen weiter die frischen Zeilen: sie zeigen die
@@ -111,6 +128,10 @@ nachrücken lassen.
 
 - **Blöcke eines wartenden Postens sind unsichtbar**, bis jemand „anzeigen“ wählt → das Banner
   nennt den Posten; der Hinweis ist dieselbe Abwägung wie in der Datensicht.
+- **Das Banner deckt die obere Kante des Rasters** (Achse und, ohne Gruppenkopf, einen Teil der
+  ersten Zeile), solange es steht. Es verschiebt nichts, kann aber einen Block unter dem Zeiger
+  verdecken. Angenommen wie in `ErfassungsAnhaenge`; die Alternative (fester Platz über dem Raster)
+  kostete immer eine Zeile Höhe.
 - **Lang gehaltene Schleuse** (Zeiger ruht über dem Raster) → das Banner bleibt stehen, bis der
   Zeiger das Raster verlässt oder jemand „anzeigen“ wählt; kein Zeitgeber.
 - **LLH-1595 ändert dieselben Dateien** (Zielabstand in Raster und Liste) → kleine, getrennte

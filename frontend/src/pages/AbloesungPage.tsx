@@ -929,6 +929,7 @@ export default function AbloesungPage() {
           einsatzBeginn={einsatz.begonnen_at}
           darfSchreiben={darfSchreiben}
           abschnitte={vorgaben}
+          abschnitteBereit={!vorgabenQuery.isPending}
           werkzeuge={
             <>
               {darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null}

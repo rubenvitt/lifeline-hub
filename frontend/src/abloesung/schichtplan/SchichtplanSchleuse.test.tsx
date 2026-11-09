@@ -21,16 +21,26 @@ function Inhalt({ zeilen }: { zeilen: readonly RasterZeile[] }) {
     <ul aria-label="Zeilen">
       {zeilen.map((r) => (
         <li key={r.schluessel} data-entfallen={r.entfallen || undefined}>
-          <button type="button">{r.titel}</button>
+          <button type="button" data-lfh="schichtplan-block">
+            {r.titel}
+          </button>
         </li>
       ))}
     </ul>
   );
 }
 
-function Huelle({ zeilen, halten = false }: { zeilen: RasterZeile[]; halten?: boolean }) {
+function Huelle({
+  zeilen,
+  halten = false,
+  bereit = true,
+}: {
+  zeilen: RasterZeile[];
+  halten?: boolean;
+  bereit?: boolean;
+}) {
   return (
-    <SchichtplanSchleuse zeilen={zeilen} halten={halten}>
+    <SchichtplanSchleuse zeilen={zeilen} halten={halten} bereit={bereit}>
       {(gezeigt) => <Inhalt zeilen={gezeigt} />}
     </SchichtplanSchleuse>
   );
@@ -51,7 +61,7 @@ describe('SchichtplanSchleuse (LLH-1604)', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('mit Fokus wartet ein neuer Posten, „anzeigen“ übernimmt ihn und fokussiert die Hülle', () => {
+  it('mit Fokus wartet ein neuer Posten, „anzeigen“ übernimmt ihn und fokussiert den obersten Block', () => {
     const { rerender } = renderMitProviders(<Huelle zeilen={[RTW, STREIFE]} />);
     fireEvent.focus(screen.getByRole('button', { name: 'Streife 2' }));
     rerender(<Huelle zeilen={[KTW, RTW, STREIFE]} />);
@@ -61,7 +71,7 @@ describe('SchichtplanSchleuse (LLH-1604)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'anzeigen' }));
     expect(titel()).toBe('KTW 9,RTW 1,Streife 2');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Schichtplan' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'KTW 9' })).toHaveFocus();
   });
 
   it('ein Mauszeiger über dem Schichtplan hält auch eine Umsortierung', () => {
@@ -71,7 +81,7 @@ describe('SchichtplanSchleuse (LLH-1604)', () => {
     expect(titel()).toBe('RTW 1,Streife 2');
     expect(screen.getByRole('status')).toHaveTextContent('Reihenfolge geändert');
 
-    fireEvent.pointerLeave(screen.getByRole('group', { name: 'Schichtplan' }), {
+    fireEvent.pointerLeave(document.querySelector('[data-lfh="schichtplan-schleuse"]')!, {
       pointerType: 'mouse',
     });
     expect(titel()).toBe('Streife 2,RTW 1');
@@ -86,14 +96,36 @@ describe('SchichtplanSchleuse (LLH-1604)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 Posten entfallen');
   });
 
-  it('`halten` hält ohne Fokus und Zeiger und gibt beim Wegfall frei', () => {
+  it('`halten` hält ohne Fokus und Zeiger, und nach dem Wegfall bis zur nächsten Bewegung', () => {
     const { rerender } = renderMitProviders(<Huelle zeilen={[RTW, STREIFE]} />);
     rerender(<Huelle zeilen={[RTW, STREIFE]} halten />);
     rerender(<Huelle zeilen={[KTW, RTW, STREIFE]} halten />);
     expect(titel()).toBe('RTW 1,Streife 2');
     expect(screen.getByRole('status')).toHaveTextContent('1 neuer Posten');
 
+    // Ein Dialog schließt: der Zeiger ruht womöglich über dem Raster, ohne dass ein Ereignis es
+    // sagt. Erst die nächste Bewegung entscheidet.
     rerender(<Huelle zeilen={[KTW, RTW, STREIFE]} />);
+    expect(titel()).toBe('RTW 1,Streife 2');
+    fireEvent.pointerMove(document.body, { pointerType: 'mouse' });
     expect(titel()).toBe('KTW 9,RTW 1,Streife 2');
+  });
+
+  it('nach `halten` hält eine Bewegung über dem Schichtplan weiter', () => {
+    const { rerender } = renderMitProviders(<Huelle zeilen={[RTW, STREIFE]} />);
+    rerender(<Huelle zeilen={[RTW, STREIFE]} halten />);
+    rerender(<Huelle zeilen={[KTW, RTW, STREIFE]} halten />);
+    rerender(<Huelle zeilen={[KTW, RTW, STREIFE]} />);
+    fireEvent.pointerMove(screen.getByRole('list', { name: 'Zeilen' }), { pointerType: 'mouse' });
+    expect(titel()).toBe('RTW 1,Streife 2');
+  });
+
+  it('solange die Quellen der Zeilen laden, friert nichts ein', () => {
+    const PAUSE: RasterZeile = { schluessel: 'pause', titel: 'Pause', gruppe: null };
+    const { rerender } = renderMitProviders(<Huelle zeilen={[PAUSE]} bereit={false} />);
+    fireEvent.pointerMove(screen.getByRole('list', { name: 'Zeilen' }), { pointerType: 'mouse' });
+    rerender(<Huelle zeilen={[RTW, STREIFE, PAUSE]} />);
+    expect(titel()).toBe('RTW 1,Streife 2,Pause');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

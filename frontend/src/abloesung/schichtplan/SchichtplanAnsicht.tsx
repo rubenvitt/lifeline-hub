@@ -91,6 +91,11 @@ interface SchichtplanAnsichtProps {
   darfSchreiben: boolean;
   /** Abschnitte in der Reihenfolge der Gliederung (Vorgaben der Ablösung). */
   abschnitte: readonly AbloesungVorgabe[];
+  /**
+   * Die Abschnitte sind geladen (oder gescheitert). Vorher friert die Zeilenschleuse nicht ein
+   * (LLH-1604, `SchichtplanSchleuse`, `bereit`). Vorgabe `true`.
+   */
+  abschnitteBereit?: boolean;
   /** Weitere Werkzeuge rechts neben „Block anlegen“ (etwa „Schichtplan einlesen“, LLH-1556). */
   werkzeuge?: ReactNode;
 }
@@ -132,6 +137,7 @@ export default function SchichtplanAnsicht({
   einsatzBeginn,
   darfSchreiben,
   abschnitte,
+  abschnitteBereit = true,
   werkzeuge,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
@@ -219,6 +225,14 @@ export default function SchichtplanAnsicht({
       }),
     [einheitenFrei, einheitenQuery.data, uhsFrei, uhsQuery.data, abschnitte, plan],
   );
+  // Die Zeilen kommen aus vier Quellen; die Pause steht sofort da. Erst wenn alle geantwortet
+  // haben, darf die Zeilenschleuse einfrieren (LLH-1604). Eine abgeschaltete Abfrage bleibt in
+  // TanStack `isPending`, deshalb zählt sie nur mit Freigabe.
+  const zeilenBereit =
+    freigaben != null &&
+    (!einheitenFrei || !einheitenQuery.isPending) &&
+    (!uhsFrei || !uhsQuery.isPending) &&
+    abschnitteBereit;
   const personen = useMemo(
     () =>
       personenGesperrt || !darfSchreiben
@@ -471,7 +485,7 @@ export default function SchichtplanAnsicht({
       {planQuery.isLoading ? (
         <Spin />
       ) : istSchmal ? (
-        <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} schmal>
+        <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} bereit={zeilenBereit} schmal>
           {(z) => (
             <SchichtplanListe
               zeilen={z}
@@ -499,7 +513,7 @@ export default function SchichtplanAnsicht({
               alignItems: 'start',
             }}
           >
-            <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten}>
+            <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} bereit={zeilenBereit}>
               {(z) => (
                 <SchichtplanRaster
                   zeilen={z}

@@ -23,8 +23,8 @@
 
 ## 5. e2e
 
-- [ ] 5.1 `e2e/planung.spec.ts`: Planung über die API säen (eigener Seed, zwei Posten mit Blöcken), Zeiger über einen Block der letzten Postenzeile, über die API einen Posten anlegen und per `PUT …/posten/reihenfolge` an die erste Stelle setzen → Block steht unverändert, Banner „1 neuer Posten“; „anzeigen“ → neuer Posten ist die erste Zeile.
-- [ ] 5.2 `e2e/abloesung-schichtplan.spec.ts`: Zeiger über einem Block, über die API eine Einheit anlegen, die vor dem Block einsortiert wird → Block steht unverändert, Banner; „anzeigen“ → Einheit steht in ihrer Zeile.
+- [x] 5.1 `e2e/planung.spec.ts`: Planung über die API säen (eigener Seed, zwei Posten mit Blöcken), Zeiger über einen Block der letzten Postenzeile, über die API einen Posten anlegen und per `PUT …/posten/reihenfolge` an die erste Stelle setzen, dazu RTW 2 vor RTW 1 → Block steht unverändert, Banner „1 neuer Posten · Reihenfolge geändert“ (belegt, dass beide Schreibungen angekommen sind); „anzeigen“ → Zeilen in der neuen Folge.
+- [x] 5.2 `e2e/abloesung-schichtplan.spec.ts`: Zeiger über einem Block, über die API eine Einheit anlegen, die vor dem Block einsortiert wird → Block steht unverändert, Banner; „anzeigen“ → Einheit steht in ihrer Zeile.
 
 ## 6. Regeln und Doku
 

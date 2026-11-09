@@ -167,8 +167,11 @@ interface PlanungAntwort {
 
 /**
  * Kriterium 12 der Prüfliste (LLH-1586) für die Zeilen, Spec `vorplanung`, „Raster der Planung
- * ohne Sprung“: ein fremder Posten, der VOR den anderen einsortiert wird, schiebt nichts unter dem
- * Zeiger. Er wartet hinter dem Sammelbanner; „anzeigen“ stellt ihn an die erste Stelle.
+ * ohne Sprung“: ein fremder Posten, der VOR den anderen einsortiert wird, und eine fremde
+ * Umsortierung schieben nichts unter dem Zeiger. Beides wartet hinter dem Sammelbanner; „anzeigen“
+ * stellt den neuen Posten an die erste Stelle. Die Umsortierung (RTW 2 vor RTW 1) belegt im Banner,
+ * dass auch die zweite Schreibung angekommen ist, bevor „anzeigen“ übernimmt: die Live-Abrufe
+ * bündeln, und „1 neuer Posten“ allein stünde schon nach der ersten.
  *
  * Gesät per API (eigener Seed, LLH-1595 bringt dafür später `planung-kern.ts`): zwei Posten ohne
  * Abschnitt mit je einem Block 08–12 Uhr eine Woche voraus. Der Zeiger steht über dem Block der
@@ -217,18 +220,20 @@ test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, n
   await unterZeiger.hover();
   const vorher = (await unterZeiger.boundingBox())!;
 
-  // Der andere Schirm legt „KTW 9“ an und setzt ihn an die erste Stelle.
+  // Der andere Schirm legt „KTW 9“ an, setzt ihn an die erste Stelle und RTW 2 vor RTW 1.
   const neu = await sende<PlanungAntwort>(page, 'post', `/api/planungen/${id}/posten`, {
     bezeichnung: 'KTW 9',
     art: 'einheit',
   });
   const ktw = neu.posten.find((x) => x.bezeichnung === 'KTW 9')!.id;
   await sende(page, 'put', `/api/planungen/${id}/posten/reihenfolge`, {
-    posten_ids: [ktw, ...postenIds],
+    posten_ids: [ktw, postenIds[1], postenIds[0]],
   });
 
   const banner = page.locator('[data-lfh="schichtplan-schleuse"] [data-lfh="sammelbanner"]');
-  await expect(banner, 'der neue Posten wartet hinter dem Banner').toContainText('1 neuer Posten');
+  await expect(banner, 'neuer Posten und Umsortierung warten hinter dem Banner').toContainText(
+    '1 neuer Posten · Reihenfolge geändert',
+  );
   await expect(zeilen.first()).toHaveAttribute('data-raster-zeile', `einheit:${postenIds[0]}`);
   const nachher = (await unterZeiger.boundingBox())!;
   expect(
@@ -238,9 +243,11 @@ test('Vorplanung (LLH-1604): ein fremder Posten vorn wartet hinter dem Banner, n
 
   await banner.getByRole('button', { name: 'anzeigen' }).click();
   await expect(banner).toHaveCount(0);
-  await expect(zeilen.first(), 'nach „anzeigen“ steht der neue Posten vorn').toHaveAttribute(
-    'data-raster-zeile',
+  const folge = await zeilen.evaluateAll((z) => z.map((e) => e.getAttribute('data-raster-zeile')));
+  expect(folge, 'nach „anzeigen“ stehen die Zeilen in der neuen Folge').toEqual([
     `einheit:${ktw}`,
-  );
-  await expect(zeilen).toHaveCount(4); // KTW 9, RTW 1, RTW 2, Pause
+    `einheit:${postenIds[1]}`,
+    `einheit:${postenIds[0]}`,
+    'pause',
+  ]);
 });
