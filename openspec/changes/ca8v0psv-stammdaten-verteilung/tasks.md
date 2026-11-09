@@ -36,7 +36,7 @@ Instanzen kommen nach `tests/instanz_stammdaten.rs` (Muster `tests/instanz_koppl
 - [x] 5.1 `GET /api/instanz/stammdaten/herkunft` samt `scripts/check-typ-codegen.sh` und beiden generierten Dateien; Hook `useStammdatenHerkunft` mit Query-Key nach `frontend/AGENTS.md`, Abzeichen `HerkunftAbzeichen`; Vitest für Hook und Abzeichen
 - [x] 5.2 Abzeichen und Bearbeitungssperre („Wird am Hub gepflegt“) in den Reitern Fahrzeuge, Material, Fahrzeug-Status, Personal, Qualifikationen, Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen, Anzeige, Einsatz-Vorgaben und in der Benutzerverwaltung; Vitest je Reiter: übernommene Zeile gesperrt, lokale Zeile „nur hier“ und bearbeitbar
 - [x] 5.3 Seite „Instanzkopplung“: Hinweise (Stand, Konten-Konflikt, Geheimnisse nicht verteilt, zweite Quelle), „ELW verloren“ mit Bestätigung und Zahl der Konten, „Erneut abgleichen“; Benutzerverwaltung am Hub: Hinweis an Admins ohne Passkey; Anmeldeseite zeigt den 403-Text. Vitest für Texte und Knöpfe, Wortlaut mit `design:ux-copy`
-- [ ] 5.4 e2e-Fall in `frontend/e2e/` für die Sperre einer übernommenen Zeile (Herkunft per Testhelfer gesetzt, zweite Instanz nicht nötig); Lauf grün
+- [x] 5.4 e2e-Fall in `frontend/e2e/` für die Sperre einer übernommenen Zeile (Herkunft per Testhelfer gesetzt, zweite Instanz nicht nötig); Lauf grün
 
 ## 6. Doku und Regeln
 
