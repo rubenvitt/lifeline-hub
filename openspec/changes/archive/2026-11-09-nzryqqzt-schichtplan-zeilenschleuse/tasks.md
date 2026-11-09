@@ -33,6 +33,6 @@
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` grün (Lint, Prettier, Vitest, e2e der berührten Specs).
-- [ ] 7.2 Review (`requesting-code-review`), Bilder der Änderung (Banner über dem Raster, entfallene Zeile) für PR und Meldung.
-- [ ] 7.3 `/opsx:archive`.
+- [x] 7.1 `./scripts/check-all.sh` grün (Lint, Prettier, Vitest, e2e der berührten Specs). Lokal: Bündel `schnell` grün, Vitest ganz grün (1202 Dateien), e2e `planung.spec.ts` und `abloesung-schichtplan.spec.ts` grün; der volle Lauf belegt die CI des PRs.
+- [x] 7.2 Review (`requesting-code-review`), Bilder der Änderung (Banner über dem Raster, entfallene Zeile) für PR und Meldung. Review: drei Befunde behoben (Nachlauf nach Dialog, Einfrieren erst geladen, Hülle nicht fokussierbar samt `preventScroll`), dazu ein e2e-Flake; das Banner über der ersten Zeile bleibt als Zielkonflikt in design.md.
+- [x] 7.3 `/opsx:archive`.
