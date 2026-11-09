@@ -127,6 +127,8 @@ Kein `KatalogVerwaltung` unter den acht Reitern; jeder bekommt dasselbe Muster w
 - `SchichtmodelleTab`: auch „Als Vorgabe setzen“ und „Vorgabe aufheben“ eines Modells vom Hub.
   Ist die Vorgabe vom Hub, bietet kein eigenes Modell „Als Vorgabe setzen“ an: der Wechsel höbe
   die Vorgabe vom Hub auf, und das lehnt der Server ab (D4: die Vorgabe folgt dem Hub).
+- `ExterneStellenTab`: Kommt die zuständige Leitstelle vom Hub, ist die Markierung im Formular
+  einer eigenen Stelle gesperrt (gleicher Grund wie bei der Vorgabe der Schichtmodelle).
 - `SprechgruppenTab`: nur der Katalog; die Sprechgruppen im Einsatz bleiben unberührt.
 - `UnterkunftRichtwerteTab`/`RichtwerteListe`: Sperre und Abzeichen je Schlüssel; ein nicht
   gesetzter Schlüssel bleibt setzbar und trägt kein Abzeichen, „nur hier“ nur ein hier gesetzter. Die Ebene „Organisation“ der bestehenden Herkunftsanzeige
