@@ -254,8 +254,7 @@ Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „ges
 Einsatzabschnitte der Kraft, „Ruhe“ zählt seit dem Ende des letzten. Ohne Ereignis steht keine Zahl,
 sondern „—“. Grenzwerte und Warnungen gibt es nicht; die Zahl steht neutral da. Die Dauer erscheint
 im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im Paneel „Zeitachse“ ihrer Ansicht und
-in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“ (diese unter „Spalten“). Der Stab
-zeigt sie nicht.
+in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“ (diese unter „Spalten“).
 
 ### Rechte
 

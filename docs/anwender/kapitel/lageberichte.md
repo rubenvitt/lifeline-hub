@@ -32,8 +32,8 @@ sie.
 
 1. In den Lageberichten „Neuer Lagevortrag“ wählen. Es entsteht sofort ein Entwurf
    „Lagevortrag zur Information“, und er öffnet sich. Gefahren-/Schadenlage, Eigene Lage,
-   Lageentwicklung, Besondere (Führungs-)Probleme und Medienlage sind schon aus den Modulen
-   gefüllt (Tabelle unter „Übernahmen im Lagevortrag zur Information“).
+   Lageentwicklung und Besondere (Führungs-)Probleme sind schon aus den Modulen gefüllt (Tabelle
+   unter „Übernahmen im Lagevortrag zur Information“).
 2. Für einen Lagevortrag ohne diese Inhalte stattdessen den Pfeil neben dem Knopf und „Leerer
    Lagevortrag“ wählen; für eine andere Vorlage dort „Lagevortrag zur Entscheidung“ oder „Freier
    Bericht“.
@@ -97,7 +97,6 @@ sie.
 | Eigene Lage | „Aus Meldebild und Führungsorganisation übernehmen“ | Kräftemeldebild und Führungsorganisation des ganzen Einsatzes |
 | Lageentwicklung | „Aus dem ETB übernehmen“ | neue Einträge seit der letzten Lagebesprechung je Typ, neue Entscheidungen mit Nummer und Zeit, eine berichtigte mit „berichtigt → Nr. …“ |
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
-| Medienlage | „Aus S5 übernehmen“ | Presse-Log, Pressemitteilungen, Infotelefon, ohne Personenbezug |
 
 - Jeder übernommene Text nennt seinen Stand als Datum-Zeit-Gruppe. Eine Fortschreibung übernimmt
   den Text mit diesem Stand; neue Zahlen bringt erst eine neue Übernahme in den Abschnitt.
@@ -108,10 +107,10 @@ sie.
   behält ihn. Abschnitte ohne Übernahme zeigen keinen Stand, auf Papier steht er nicht.
 - Beim Anlegen und mit „Leere Abschnitte aus dem Lagebild füllen“ steht derselbe Text wie mit dem
   Knopf im Abschnitt. Die App lädt die Daten erst mit diesem Klick.
-- Ist eine Quelle für die Person ganz gesperrt, steht im Abschnitt „—“ mit Grund, etwa
-  „— (Stab nicht freigegeben)“ in der Medienlage; diese Quelle fragt die App dann gar nicht an.
-- Die Abschnitte „Auftrag“, „Anträge und Vorschläge“ und „Zusammenfassung“ und der ganze
-  Lagevortrag zur Entscheidung bleiben von Hand.
+- Ist eine Quelle für die Person ganz gesperrt, steht im Abschnitt „—“ mit Grund; diese Quelle
+  fragt die App dann gar nicht an.
+- Die Abschnitte „Auftrag“, „Anträge und Vorschläge“, „Medienlage“ und „Zusammenfassung“ und der
+  ganze Lagevortrag zur Entscheidung bleiben von Hand.
 - Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme übernehmen nur Zahlen,
   Nummern, Arten und Zeiten, keinen Freitext aus Aufträgen, Meldungen, Einsatztagebuch,
   Betroffenen oder Schäden.

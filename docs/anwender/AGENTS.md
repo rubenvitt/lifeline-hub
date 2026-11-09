@@ -138,9 +138,9 @@ würde abgeschaltet.
 
 Jedes Modul bekommt ein Kapitel, geschrieben in acht Paketen. Jedes Paket vergibt `reihenfolge`
 nur in seinem Block, damit parallele PRs nicht kollidieren: 1 Einstieg 0–99, 2 Führungsmittel
-100–199, 3 Lage 200–299, 4 Kräfte 300–399, 5 Stab 400–499, 6 Betroffene 500–599, 7 Einstellungen
-und Verwaltung 600–699, 8 Gekoppelte Geräte 700–799. Die Kapitelübersicht steht in
-`README.md`, nach `reihenfolge` geordnet.
+100–199, 3 Lage 200–299, 4 Kräfte 300–399, 5 Führungsorganisation 400–499, 6 Betroffene
+500–599, 7 Einstellungen und Verwaltung 600–699, 8 Gekoppelte Geräte 700–799. Die
+Kapitelübersicht steht in `README.md`, nach `reihenfolge` geordnet.
 
 ## Lesergruppen (D8)
 

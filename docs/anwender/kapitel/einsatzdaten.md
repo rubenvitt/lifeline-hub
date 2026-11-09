@@ -150,9 +150,9 @@ Für die Einsatzleitung:
   Einsatzbericht arbeiten.
 - Die **eigene Führungsstelle** ist der Ort, an dem die Einsatzleitung arbeitet: mobil in einem
   Führungsfahrzeug oder ortsfest in einem Gebäude. Ihre Bezeichnung erscheint in Funkplan,
-  Fernmeldeskizze und Organigramm, ihr Standort auf der Lagekarte und am Punkt „Standort der
-  Führungsstelle festgelegt“ der Checkliste Arbeitsaufnahme (siehe
-  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); bearbeitet wird sie nur hier.
+  Fernmeldeskizze und Organigramm (siehe
+  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)), ihr Standort auf der
+  Lagekarte; bearbeitet wird sie nur hier.
   „Führungsfahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.
 - Der **Einsatzleiter** ist die Person, die den Einsatz nach FwDV 100 führt. Die Rolle

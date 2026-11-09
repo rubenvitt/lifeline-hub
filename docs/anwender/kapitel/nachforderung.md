@@ -384,8 +384,7 @@ Nachforderung bearbeiten“) bleibt Sache der Führung.
 Offen ist eine Nachforderung, solange sie angefordert, zugesagt oder unterwegs ist. Die Zahl der
 offenen zählt der Server; dieselbe Zahl steht im Seitenkopf, am Modul im Menü (etwa „5 offene
 Nachforderungen, davon 2 unterwegs“), in den „Offenen Vorgängen“ des
-[Führungsüberblicks](ueberblick.md) samt der überfälligen, an den Werkzeugen S1 und S4 der [Stab-Seite](stab.md) und in
-der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene, abgelehnte und
+[Führungsüberblicks](ueberblick.md) samt der überfälligen und in der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene, abgelehnte und
 zurückgezogene zählen nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
 innerhalb eines Filters „Für Stelle“.
 

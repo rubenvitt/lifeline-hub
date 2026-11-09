@@ -9,9 +9,8 @@ quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechu
 
 Die Seite „Lagebesprechung“ trägt den Rhythmus der Lagebesprechungen: den Termin der nächsten
 Besprechung, ihre Vorbereitung, den Abschluss mit dem Entschluss und den Verlauf aller
-Besprechungen. Sie ist ein eigenes Modul unter Führung und steht auch dann zur Verfügung, wenn der
-Einsatz ohne Stab geführt wird. Lesen können alle Mitglieder des Einsatzes, bedienen Einsatzleitung
-und Führungspersonal.
+Besprechungen. Sie ist ein eigenes Modul unter Führung. Lesen können alle Mitglieder des
+Einsatzes, bedienen Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
@@ -64,16 +63,14 @@ das nicht darf, sieht „Lagebesprechung abschließen“ und die Schnellwahl ges
 darunter. „In Lagebericht übernehmen“ erscheint nur für sie und nur, wenn das Modul Lageberichte
 freigegeben ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
-Die Lagebesprechung hat ihre eigene Freigabe. Ist der Stab ausgeblendet oder gesperrt, bleibt sie
-voll nutzbar. Ist sie selbst gesperrt, fehlen die Seite und die Schnellaktion „Lagebesprechung
-abschließen“ in der Befehlspalette; die Zeile auf der Seite Stab zeigt den Termin mit gesperrtem
-„Zur Lagebesprechung“, die Marke im Führungsüberblick den Termin ohne Sprung.
+Die Lagebesprechung hat ihre eigene Freigabe. Ist sie gesperrt, fehlen die Seite und die
+Schnellaktion „Lagebesprechung abschließen“ in der Befehlspalette; die Marke im Führungsüberblick
+zeigt den Termin ohne Sprung.
 
 ### Ein Termin für den ganzen Einsatz
 
 Der Termin der nächsten Lagebesprechung gilt für den ganzen Einsatz. Ihn zeigen auch die Marken im
-[Führungsüberblick](ueberblick.md), die Zeile „Nächste Lagebesprechung“ auf der Seite
-[Stab](stab.md) und die Schnellwahl der Wiedervorlage im
+[Führungsüberblick](ueberblick.md) und die Schnellwahl der Wiedervorlage im
 [Einsatztagebuch](einsatztagebuch.md), auch für Mitglieder ohne Freigabe der Lagebesprechung.
 Gesetzt wird er nur hier.
 
@@ -96,8 +93,8 @@ Stand gibt es nur über „In Lagebericht übernehmen“.
 ### Fälliger Termin
 
 Erreicht die Uhr den Termin, zeigt das Paneel „Termin“ „jetzt fällig“, danach „seit … min
-überfällig“, als Hinweis, nicht als Alarm. Dasselbe Wort steht in der Zeile der Stab-Seite und an
-der Marke im Führungsüberblick.
+überfällig“, als Hinweis, nicht als Alarm. Dasselbe Wort steht an der Marke im
+Führungsüberblick.
 
 ### Hinweise vor dem Termin
 

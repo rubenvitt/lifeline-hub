@@ -218,8 +218,8 @@ export async function fuelle<T = unknown>(
 
 /**
  * Bezeichnung und Standort der eigenen Führungsstelle des Demo-Einsatzes (LFH-1181), nur wenn sie
- * fehlen. Eine Quelle für alle Kapitel, die sie zeigen (Einsatzdaten, Funkplan, Stab,
- * Organigramm, Lagekarte): der Lauf teilt eine Datenbank, und jedes Kapitel soll dieselbe Stelle
+ * fehlen. Eine Quelle für alle Kapitel, die sie zeigen (Einsatzdaten, Funkplan, Organigramm,
+ * Lagekarte): der Lauf teilt eine Datenbank, und jedes Kapitel soll dieselbe Stelle
  * zeigen, gleich in welcher Reihenfolge die Kapitel laufen. Der ELW steht neben der Einsatzstelle.
  */
 export async function fuehrungsstelleOrtFuellen(

@@ -412,5 +412,4 @@ Anmeldung räumt die App diesen Eintrag. Ein gekoppeltes Gerät merkt sich keine
 ## Grundlagen und Quellen
 
 Die Verpflegung gehört zu den Versorgungsaufgaben des Sachgebiets S4 „Versorgung“ nach FwDV 100,
-Anlage 2. Im Stab führt die Kachel S4 die Verpflegung deshalb als Werkzeug, zusammen mit
-Nachforderungen und Material.
+Anlage 2.

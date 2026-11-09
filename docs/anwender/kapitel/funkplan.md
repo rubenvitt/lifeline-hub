@@ -73,9 +73,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Eine Stelle in den Kommunikationsplan aufnehmen
 
-1. Im Fernmeldewesen den Reiter „Kommunikationsplan“ wählen, in der Modulliste unter
-   „Fernmeldewesen“ gleich „Kommunikationsplan“, oder „Stab“ öffnen und in der Zeile S6
-   „Kommunikationsplan“ wählen.
+1. Im Fernmeldewesen den Reiter „Kommunikationsplan“ wählen oder in der Modulliste unter
+   „Fernmeldewesen“ gleich „Kommunikationsplan“.
 
    ![Kommunikationsplan mit Einsatzleitung und Stab, abgeleiteten Abschnitten und externen Stellen](../bilder/funkplan/kommunikationsplan.png)
 
@@ -109,17 +108,15 @@ Bezeichnung und Rufnummer vorbelegt.
 
 ### Wer was darf
 
-Das Fernmeldewesen hat eine eigene Freigabe, unabhängig vom Stab: Ist der Stab ausgeblendet oder
-gesperrt, bleibt das Fernmeldewesen voll nutzbar; ist das Fernmeldewesen gesperrt, hilft auch ein
-freier Stab nicht. Die Namen in der Spalte „Besetzung“ des Kommunikationsplans und die
-Sachgebiete im Kasten „Einsatzleitung“ der Skizze kommen aus den Führungsfunktionen der Mitglieder
-(Reiter „Zugriff“ der Einstellungen, siehe [Rechte im Einsatz](rechte-im-einsatz.md)); dafür
-braucht es kein weiteres Modul. Tragen mehrere Mitglieder dieselbe Funktion, nennt der
-Kommunikationsplan alle Namen alphabetisch, die Skizze das Sachgebiet einmal. Lassen sich die
-Mitglieder nicht laden, steht als Besetzung „—“ mit dem Grund, und die Skizze nennt
-„Mitglieder: nicht geladen“. Bei Einführung des Moduls galt die Rollen-Vorgabe des Stabs
-auch für das Fernmeldewesen, eine Ausblendung des Stabs nicht. Kommunikationsplan und
-Fernmeldeskizze pflegen Einsatzleitung und Führungspersonal, solange der Einsatz läuft. „In Lagebericht übernehmen“ braucht zusätzlich das Modul Lageberichte, „In Befehl
+Das Fernmeldewesen hat eine eigene Freigabe. Die Namen in der Spalte „Besetzung“ des
+Kommunikationsplans und die Sachgebiete im Kasten „Einsatzleitung“ der Skizze kommen aus den
+Führungsfunktionen der Mitglieder (Reiter „Zugriff“ der Einstellungen, siehe
+[Rechte im Einsatz](rechte-im-einsatz.md)); dafür braucht es kein weiteres Modul. Tragen mehrere
+Mitglieder dieselbe Funktion, nennt der Kommunikationsplan alle Namen alphabetisch, die Skizze
+das Sachgebiet einmal. Lassen sich die Mitglieder nicht laden, steht als Besetzung „—“ mit dem
+Grund, und die Skizze nennt „Mitglieder: nicht geladen“. Bei Einführung des Moduls galt die
+Rollen-Vorgabe des früheren Moduls „Stab“ auch für das Fernmeldewesen, eine Ausblendung des
+Stabs nicht. Kommunikationsplan und Fernmeldeskizze pflegen Einsatzleitung und Führungspersonal, solange der Einsatz läuft. „In Lagebericht übernehmen“ braucht zusätzlich das Modul Lageberichte, „In Befehl
 übernehmen“ das Modul Aufträge. Auf schmalen Bildschirmen und ohne Netz ist die Skizze nur
 lesbar. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
@@ -173,7 +170,7 @@ Zuordnung, Sprechgruppen mit nur einem Teilnehmer, eine fehlende Verbindung zur 
 eine nicht erfasste eigene Führungsstelle. Fehlt eine Quelle, steht „—“ mit Grund statt einer 0.
 Der Kopf des Paneels zählt alle Lücken zusammen, etwa „6 Lücken“; eine Einheit ohne Sprechgruppe
 und ohne Telefon zählt dabei zweimal, die fehlende eigene Führungsstelle nicht. Fehlt eine
-Quelle, steht dort keine Zahl. Dieselbe Zahl steht auf der Seite „Stab“ am Werkzeug „Funkplan“.
+Quelle, steht dort keine Zahl.
 
 ### Was nicht vorkommt
 
