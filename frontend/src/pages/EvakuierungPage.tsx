@@ -102,7 +102,7 @@ export default function EvakuierungPage() {
       hinweis={
         <SeitenHinweise
           rechteFehlt={!darfSchreiben}
-          rechteText={einsatzRechteGrund(einsatz.status)}
+          rechteText={einsatzRechteGrund(einsatz)}
           fehler={handlungen.ruecknahmeFehler}
           fehlerTitel="Meldung konnte nicht zurückgenommen werden"
         />

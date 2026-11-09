@@ -184,9 +184,7 @@ export default function AufnahmePage() {
           />
         )
       }
-      hinweis={
-        !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-      }
+      hinweis={!darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />}
     >
       {quittung?.einsatzId === einsatzId && (
         // Stehende Quittung statt Toast: an ihr wird die Registriernummer abgelesen.

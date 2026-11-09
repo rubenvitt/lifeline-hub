@@ -51,12 +51,12 @@ ADR-0012 treffen die Kernstellen).
 
 ## 7. Oberfläche
 
-- [ ] 7.1 `einsatz/schreibrecht.ts`: Führung als weitere Achse, `darfFuehrungBedienen` neu; `components/nurAnsicht.ts`: Grund „Führung liegt bei …“; Vitest: fremde Führung → Schreiben, Leiten, Verwalten falsch, Bedienen wahr; Guard `schreibrecht.guard.test.ts` grün
-- [ ] 7.2 `api/instanz.ts`: `unterschreibeErklaerung(start, abschluss)` aus `gegenzeichne` herauslösen, Gegenzeichnung nutzt es; Vitest beider Aufrufer
-- [ ] 7.3 Chip „Führung: <Instanz> · E<n>“ in `einsatz/EinsatzLayout.tsx` (nur mit Akte) und Hinweisband unter der Kopfleiste bei offener Übernahme mit „Übernahme bestätigen“ (Rückfrage) und „Widersprechen“ (Rückfrage, `danger`); Vitest: Band nur bei `offen`, Knöpfe rufen die Routen, Speicherfehler am Ort
-- [ ] 7.4 Paneel „Führung“ auf `pages/EinsatzdatenPage.tsx` vor „Einsatzabschluss“: Stand, Verlauf, „Führung an <Gegenüber> übergeben“, „Führung per Code abgeben“ (Code-Anzeige wie beim Kopplungscode, nicht per Esc schließbar), „Notübernahme“ mit Grund, wenn das Gegenüber führt; Vitest der Zustände und Rückfragen (`rueckfrage.guard.test.ts`, `erklaertext.guard.test.ts` grün)
-- [ ] 7.5 Seite „Instanzkopplung“: Abschnitt „Einsätze beim Gegenüber“ mit Führung, Epoche und Aktionen „Führung übernehmen“ (ELW), „Notübernahme“ mit Grund und Wahl Unterschrift oder Code (`OtpEingabe` bzw. Codefeld, Hub), Hinweise „widersprochen“/„verworfen“; Vitest der Aktionen
-- [ ] 7.6 Texte der neuen Benachrichtigungsarten (`alarm/benachrichtigungKatalog.ts`) und der Admin-Spur (Zugangsprotokoll); Vitest der Texte; Query-Keys klassifiziert (Guard grün)
+- [x] 7.1 `einsatz/schreibrecht.ts`: Führung als weitere Achse, `darfFuehrungBedienen` neu; `components/nurAnsicht.ts`: Grund „Führung liegt bei …“; Vitest: fremde Führung → Schreiben, Leiten, Verwalten falsch, Bedienen wahr; Guard `schreibrecht.guard.test.ts` grün
+- [x] 7.2 `api/instanz.ts`: `unterschreibeErklaerung(start, abschluss)` aus `gegenzeichne` herauslösen, Gegenzeichnung nutzt es; Vitest beider Aufrufer
+- [x] 7.3 Chip „Führung: <Instanz> · E<n>“ in `einsatz/EinsatzLayout.tsx` (nur mit Akte) und Hinweisband unter der Kopfleiste bei offener Übernahme mit „Übernahme bestätigen“ (Rückfrage) und „Widersprechen“ (Rückfrage, `danger`); Vitest: Band nur bei `offen`, Knöpfe rufen die Routen, Speicherfehler am Ort
+- [x] 7.4 Paneel „Führung“ auf `pages/EinsatzdatenPage.tsx` vor „Einsatzabschluss“: Stand, Verlauf, „Führung an <Gegenüber> übergeben“, „Führung per Code abgeben“ (Code-Anzeige wie beim Kopplungscode, nicht per Esc schließbar), „Notübernahme“ mit Grund, wenn das Gegenüber führt; Vitest der Zustände und Rückfragen (`rueckfrage.guard.test.ts`, `erklaertext.guard.test.ts` grün)
+- [x] 7.5 Seite „Instanzkopplung“: Abschnitt „Einsätze beim Gegenüber“ mit Führung, Epoche und Aktionen „Führung übernehmen“ (ELW), „Notübernahme“ mit Grund und Wahl Unterschrift oder Code (`OtpEingabe` bzw. Codefeld, Hub), Hinweise „widersprochen“/„verworfen“; Vitest der Aktionen
+- [x] 7.6 Texte der neuen Benachrichtigungsarten (`alarm/benachrichtigungKatalog.ts`) und der Admin-Spur (Zugangsprotokoll); Vitest der Texte; Query-Keys klassifiziert (Guard grün)
 - [ ] 7.7 Bilder der Änderung für PR und Meldung (Chip, Hinweisband, Paneel, Abschnitt an der Kopplung, Code-Anzeige) per Wegwerf-Spec im Bildlauf
 
 ## 8. Doku

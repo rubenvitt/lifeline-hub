@@ -171,9 +171,7 @@ export default function GeraetBetreuungsstellePage() {
                 stelle={stelle}
                 personenFrei={personenFrei}
                 darfSchreiben={darfSchreiben}
-                rechteGrund={
-                  einsatzQuery.data ? einsatzRechteGrund(einsatzQuery.data.status) : undefined
-                }
+                rechteGrund={einsatzQuery.data ? einsatzRechteGrund(einsatzQuery.data) : undefined}
               />
             ) : (
               <GeraetMeldungen

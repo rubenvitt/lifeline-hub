@@ -227,6 +227,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       'einsatz',
       'einsatz-lagebesprechung',
       'einsatz-fuehrungsstelle',
+      // LLH-1491: Führung je Einsatz, jeder Wechsel meldet den Kopf.
+      'einsatz-fuehrung',
       // LLH-1421: die Vorgabe je Funktion meldet sich über `kopf_geaendert`.
       'einsatz-benachrichtigung-vorgaben',
       // LLH-1570: Programmpunkte der Veranstaltung und der Lagemonitor, der die nächsten zeigt.

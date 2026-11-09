@@ -280,7 +280,7 @@ export default function EinsatzkraftPage() {
    * Zeitachse (LLH-1263, Spec `kraefte-entlassung`): die bekommt `imEinsatzSchreiben`.
    */
   const darfSchreiben = imEinsatzSchreiben && !isEntlassen;
-  const rechteText = isEntlassen ? 'entlassen' : einsatzRechteGrund(einsatz.status);
+  const rechteText = isEntlassen ? 'entlassen' : einsatzRechteGrund(einsatz);
 
   const einheiten = einheitenQuery.data ?? [];
   const einheitOptionen = buildEinheitOptions(einheiten, abschnitteQuery.data ?? []);
@@ -616,7 +616,7 @@ export default function EinsatzkraftPage() {
             id={ep.id}
             kennung={ep.name}
             darfSchreiben={imEinsatzSchreiben}
-            rechteText={einsatzRechteGrund(einsatz.status)}
+            rechteText={einsatzRechteGrund(einsatz)}
             isBeendet={isEntlassen}
           />
         </Paneel>

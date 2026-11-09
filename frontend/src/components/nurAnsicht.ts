@@ -1,4 +1,4 @@
-import type { EinsatzStatus } from '../api/types';
+import type { EinsatzAnzeige, EinsatzStatus } from '../api/types';
 
 /**
  * Gründe der Zeile „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078; `frontend/AGENTS.md`,
@@ -49,7 +49,21 @@ export function modulSperre(namen: readonly string[]): string | null {
   return `Module ${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]} gesperrt`;
 }
 
-/** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. */
-export function einsatzRechteGrund(einsatzStatus: EinsatzStatus): string {
-  return einsatzStatus !== 'aktiv' ? EINSATZ_ABGESCHLOSSEN : NUR_LEITUNG_FUEHRUNG;
+/** Führt eine gekoppelte Instanz den Einsatz (LLH-1491), schreibt hier niemand. */
+export function fuehrungBei(name: string): string {
+  return `Führung liegt bei ${name}`;
+}
+
+/** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben: abgeschlossen, dann
+    die Führung einer anderen Instanz (LLH-1491), sonst die Rollen. Nimmt den Einsatz oder nur
+    seinen Status. */
+export function einsatzRechteGrund(
+  einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'fuehrung'>,
+): string {
+  const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
+  if (status !== 'aktiv') return EINSATZ_ABGESCHLOSSEN;
+  if (typeof einsatz !== 'string' && einsatz.fuehrung && !einsatz.fuehrung.fuehrend) {
+    return fuehrungBei(einsatz.fuehrung.bei);
+  }
+  return NUR_LEITUNG_FUEHRUNG;
 }

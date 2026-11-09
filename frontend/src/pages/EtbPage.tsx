@@ -1001,9 +1001,7 @@ export default function EtbPage() {
       aktionen={kopfAktionen}
       // Nur mit Inhalt gesetzt: ein leerer Slot hielte Abstand (LFH-1078, Erfahrung aus P1).
       hinweis={
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-        )
+        darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
       fuss={erfassung}
     >

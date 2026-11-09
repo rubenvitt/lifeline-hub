@@ -113,6 +113,10 @@ export const EINSATZ_KEYS = {
   einsatz: 'einsatz',
   // Eigene Führungsstelle (LFH-849): eigener Endpunkt, live über dasselbe `einsatz`-Ereignis.
   fuehrungsstelle: 'einsatz-fuehrungsstelle',
+  // Führung je Einsatz (LLH-1491): Akte und Verlauf, live über das `einsatz`-Ereignis (jeder
+  // Wechsel meldet den Kopf). Nicht im Lagebild offline: ohne Netz ändert sich die Führung hier
+  // nur durch eigene Bedienung, und die braucht den Server.
+  fuehrung: 'einsatz-fuehrung',
   // Programmpunkte der Veranstaltung (LLH-1570): eigener Endpunkt, live über das `einsatz`-Ereignis.
   programmpunkte: 'einsatz-programmpunkte',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
@@ -401,6 +405,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.einsatz,
     EINSATZ_KEYS.lagebesprechung,
     EINSATZ_KEYS.fuehrungsstelle,
+    // Führung je Einsatz (LLH-1491): jeder Wechsel meldet den Kopf.
+    EINSATZ_KEYS.fuehrung,
     EINSATZ_KEYS.benachrichtigungVorgaben,
     // Programmpunkte (LLH-1570) melden ihre Änderung über dasselbe Ereignis; der Lagemonitor
     // zeigt die nächsten davon.
@@ -622,6 +628,8 @@ export const einsatzKeys = {
   einsatz: (einsatzId: number | null) => [EINSATZ_KEYS.einsatz, einsatzId] as const,
   /** Eigene Führungsstelle (LFH-849), live über `einsatz`. */
   fuehrungsstelle: (einsatzId: number) => [EINSATZ_KEYS.fuehrungsstelle, einsatzId] as const,
+  /** Führung je Einsatz (LLH-1491), live über `einsatz`. */
+  fuehrung: (einsatzId: number) => [EINSATZ_KEYS.fuehrung, einsatzId] as const,
   programmpunkte: (einsatzId: number) => [EINSATZ_KEYS.programmpunkte, einsatzId] as const,
   einstellungen: (einsatzId: number) => [EINSATZ_KEYS.einstellungen, einsatzId] as const,
   /** Aufbewahrung je Datenkategorie (LFH-749) — Unter-Key der Einstellungen: dieselbe Seite,
@@ -1149,6 +1157,8 @@ export const globalKeys = {
    */
   instanzkopplungLetzteSchluessel: () =>
     [GLOBAL_KEYS.instanzkopplung, 'letzte-schluessel'] as const,
+  /** Einsätze beim Gegenüber (LLH-1491), unter dem Prefix `instanzkopplung` wie die Kopplungen. */
+  instanzkopplungFuehrung: () => [GLOBAL_KEYS.instanzkopplung, 'fuehrung'] as const,
   /**
    * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
    * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).

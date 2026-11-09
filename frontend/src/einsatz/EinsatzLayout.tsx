@@ -20,6 +20,9 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
+import { StatusChip } from '../components/instrument';
+import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
+import { fuehrungKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -442,6 +445,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 {EINSATZNUMMER_PLATZHALTER}
               </span>
             )}
+            {/* Führung je Einsatz (LLH-1491): nur mit Akte (gekoppelte Org, Schalter an). Führt
+                eine andere Instanz, ist hier alles nur zu lesen: `achtung` mit Wort. */}
+            {mittel && einsatz?.fuehrung && (
+              <span data-lfh="kopf-fuehrung">
+                <StatusChip
+                  ton={einsatz.fuehrung.fuehrend ? 'neutral' : 'achtung'}
+                  wort={fuehrungKurz(einsatz.fuehrung)}
+                />
+              </span>
+            )}
             <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
               {einsatzQuery.isLoading ? (
                 <span
@@ -515,6 +528,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
          Gefahr vorbehalten ist. Nur der Zustand und der Knopf, keine Folgenerklärung (LFH-1078). */}
+      {/* LLH-1491: eine gültige Notübernahme wartet auf die Einsatzleitung. */}
+      {einsatz?.fuehrung?.offen && <FuehrungHinweisband einsatz={einsatz} />}
       {modulFreigabenQuery.isError && (
         <Alert
           type="warning"

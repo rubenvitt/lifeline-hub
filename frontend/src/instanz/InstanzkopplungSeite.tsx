@@ -32,6 +32,7 @@ import type {
   KopplungscodeAntwort,
   UnterschriftSchluesselAnzeige,
 } from '../api/types';
+import { EinsaetzeBeimGegenueber } from './EinsaetzeBeimGegenueber';
 import {
   codeAusstellenSperre,
   kopplungHinweise,
@@ -452,6 +453,8 @@ export default function InstanzkopplungSeite() {
             />
             <SpeicherFehler fehler={gegenzeichnen.error} titel="Nicht gegengezeichnet" />
           </Paneel>
+
+          <EinsaetzeBeimGegenueber darfBedienen={isAdmin} />
         </>
       )}
 

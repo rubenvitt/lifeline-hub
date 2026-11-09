@@ -49,6 +49,14 @@ export type UnterschriftRegistrierenStart = S['UnterschriftRegistrierenStart'];
 export type UnterschriftGegenzeichnenStart = S['UnterschriftGegenzeichnenStart'];
 export type UnterschriftAssertion = S['UnterschriftAssertion'];
 export type LetzterSchluesselHalter = S['LetzterSchluesselHalter'];
+// Führung je Einsatz (LLH-1491)
+export type EinsatzFuehrung = S['EinsatzFuehrung'];
+export type FuehrungAnzeige = S['FuehrungAnzeige'];
+export type FuehrungOffen = S['FuehrungOffen'];
+export type FuehrungGegenueber = S['FuehrungGegenueber'];
+export type FuehrungVerlaufEintrag = S['FuehrungVerlaufEintrag'];
+export type FuehrungWechselArt = S['FuehrungWechselArt'];
+export type FuehrungCodeAntwort = S['FuehrungCodeAntwort'];
 export type AnsichtSperre = S['AnsichtSperre'];
 export type AnsichtAuswahl = S['AnsichtAuswahl'];
 export type Bindungsart = S['Bindungsart'];

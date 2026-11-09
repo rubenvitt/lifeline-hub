@@ -1067,7 +1067,7 @@ export default function PersonenPage() {
           sichtungFort.length > 0) && (
           <Flex vertical gap={token.marginSM}>
             <SeitenHinweise
-              rechteText={einsatzRechteGrund(einsatz.status)}
+              rechteText={einsatzRechteGrund(einsatz)}
               rechteFehlt={nurAnsicht}
               fehler={csvExport.fehler}
               fehlerTitel="Export fehlgeschlagen"

@@ -191,7 +191,7 @@ export default function EvakuierungsbezirkPage() {
           <>
             <SeitenHinweise
               rechteFehlt={!darfSchreiben}
-              rechteText={einsatzRechteGrund(einsatz.status)}
+              rechteText={einsatzRechteGrund(einsatz)}
               fehler={fehlerOben}
               fehlerTitel="Räumung nicht geändert"
             />

@@ -274,7 +274,7 @@ export default function LagemeldungenPage() {
   // Erfassen schreibt eine Meldung: Schreibrecht im Einsatz UND Modul Meldungen.
   const darfErfassen = darfSchreiben && !meldungenGesperrt;
   const rechteGrund = !darfSchreiben
-    ? einsatzRechteGrund(einsatz.status)
+    ? einsatzRechteGrund(einsatz)
     : meldungenGesperrt
       ? MODUL_MELDUNGEN_GESPERRT
       : undefined;

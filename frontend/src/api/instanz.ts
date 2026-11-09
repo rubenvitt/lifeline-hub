@@ -7,7 +7,6 @@ import type {
   KopplungscodeAntwort,
   StammdatenHerkunftAnzeige,
   UnterschriftAssertion,
-  UnterschriftGegenzeichnenStart,
   UnterschriftRegistrierenStart,
   UnterschriftSchluesselAnzeige,
 } from './types';
@@ -82,15 +81,26 @@ export async function registriereUnterschriftsschluessel(
   );
 }
 
+/** Was jede Unterschrift über eine Erklärung vom Server braucht (Start der Zeremonie). */
+interface UnterschriftStart {
+  zeremonie: string;
+  challenge: string;
+  rp_id: string;
+  credential_ids: string[];
+}
+
 /**
- * Zeichnet einen wartenden Schlüssel gegen: der Server bildet die Erklärung, der Browser
- * unterschreibt ihren Hash mit einem eigenen Unterschriftsschlüssel.
+ * Unterschreibt eine Erklärung, die der Server bildet (LLH-1490, Muster für LLH-1491): Start am
+ * Server liefert die Challenge (Hash der Erklärung), der Browser unterschreibt sie mit einem
+ * eigenen Unterschriftsschlüssel, der Abschluss reicht die Assertion durch. Der Browser bildet nie
+ * selbst eine Challenge.
  */
-export async function gegenzeichne(id: number): Promise<UnterschriftSchluesselAnzeige> {
-  const start = await apiSend<UnterschriftGegenzeichnenStart>(
-    `/api/admin/instanz/unterschrift/${id}/gegenzeichnen/start`,
-    'POST',
-  );
+export async function unterschreibeErklaerung<R>(
+  startPfad: string,
+  abschlussPfad: string,
+  startBody?: unknown,
+): Promise<R> {
+  const start = await apiSend<UnterschriftStart>(startPfad, 'POST', startBody);
   const antwort = await startAuthentication({
     optionsJSON: {
       challenge: start.challenge,
@@ -105,10 +115,17 @@ export async function gegenzeichne(id: number): Promise<UnterschriftSchluesselAn
     client_data_json: antwort.response.clientDataJSON,
     signatur: antwort.response.signature,
   };
-  return apiSend<UnterschriftSchluesselAnzeige>(
+  return apiSend<R>(abschlussPfad, 'POST', { zeremonie: start.zeremonie, assertion });
+}
+
+/**
+ * Zeichnet einen wartenden Schlüssel gegen: der Server bildet die Erklärung, der Browser
+ * unterschreibt ihren Hash mit einem eigenen Unterschriftsschlüssel.
+ */
+export function gegenzeichne(id: number): Promise<UnterschriftSchluesselAnzeige> {
+  return unterschreibeErklaerung<UnterschriftSchluesselAnzeige>(
+    `/api/admin/instanz/unterschrift/${id}/gegenzeichnen/start`,
     `/api/admin/instanz/unterschrift/${id}/gegenzeichnen/abschluss`,
-    'POST',
-    { zeremonie: start.zeremonie, assertion },
   );
 }
 

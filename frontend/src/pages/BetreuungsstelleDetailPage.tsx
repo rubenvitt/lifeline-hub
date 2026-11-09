@@ -546,7 +546,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       hinweis={
         <SeitenHinweise
           rechteFehlt={!darfSchreiben}
-          rechteText={einsatzRechteGrund(einsatz.status)}
+          rechteText={einsatzRechteGrund(einsatz)}
           fehler={fehlerHinweis.fehler}
           fehlerTitel={fehlerHinweis.titel}
         />
@@ -573,7 +573,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           stelle={s}
           personenFrei={personenFrei}
           darfSchreiben={darfSchreiben}
-          rechteGrund={einsatzRechteGrund(einsatz.status)}
+          rechteGrund={einsatzRechteGrund(einsatz)}
         />
 
         <Paneel

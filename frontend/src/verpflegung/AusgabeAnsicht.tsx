@@ -380,7 +380,7 @@ export default function AusgabeAnsicht() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const rechteText = einsatzRechteGrund(einsatz.status);
+  const rechteText = einsatzRechteGrund(einsatz);
   const verpflegungPfad = pfade.verpflegung(einsatzId);
 
   const ortspfad = (titel: string) =>
