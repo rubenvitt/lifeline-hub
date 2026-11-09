@@ -1,12 +1,11 @@
 import type { AbrufZustand } from '../api/abrufZustand';
-import { ladeFuehrungsstelle } from '../api/einsaetze';
+import { ladeFuehrungsstelle, ladeMitglieder } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeStab } from '../api/stab';
 import type { ModulFreigaben } from '../api/types';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -22,8 +21,9 @@ import {
   rendereFuehrungsorganisationMarkdown,
   wurzelFuehrungsstelle,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
-import { einsatzleiterDarstellung } from '../stab/einsatzleiter';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { einsatzleiterDarstellung } from '../einsatz/einsatzleiter';
+import { fuehrungsfunktionZeilen } from '../fuehrung/besetzungAusMitgliedern';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebernahmeQuelle';
 
 /**
@@ -43,7 +43,7 @@ type Liste = keyof typeof LISTE;
 /**
  * Das Kräftemeldebild braucht alle fünf Listen (in der Reihenfolge von `LISTE`): sein Renderer rechnete eine fehlende als 0 und
  * bleibt unverändert („gleicher Text wie die Einzelübernahme“, design.md D3). Die
- * Führungsorganisation braucht nur die Abschnitte; fehlende Einheiten und den Stab führt ihr
+ * Führungsorganisation braucht nur die Abschnitte; fehlende Einheiten und Mitglieder führt ihr
  * Renderer selbst.
  */
 const MELDEBILD = Object.keys(LISTE) as readonly Liste[];
@@ -96,7 +96,6 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
     // `modul-freigabe`). Abschnitte und Einheiten teilen sich beide Teile.
     const lade = <T>(l: Liste, key: readonly unknown[], fn: () => Promise<T[]>) =>
       frei(l) ? ladeListe<T[]>(qc, key, fn, []) : Promise.resolve(gesperrt<T[]>([]));
-    const stabFrei = istKeyFreigegeben('stab', freigaben);
     const [
       abschnitte,
       einheiten,
@@ -106,7 +105,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
       fahrzeugeEntlassene,
       material,
       materialEntlassen,
-      stab,
+      mitglieder,
       fuehrungsstelle,
     ] = await Promise.all([
       lade('abschnitte', einsatzKeys.abschnitte(einsatzId), () => listeAbschnitte(einsatzId)),
@@ -125,9 +124,8 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
       lade('material', einsatzKeys.materialEntlassene(einsatzId), () =>
         listEntlassenesMaterial(einsatzId),
       ),
-      stabFrei
-        ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
-        : Promise.resolve(null),
+      // Die Führungsfunktionen EL und S1–S7 aus den Mitgliedern (i6k6mzed, D7): kein Modul.
+      ladeListe(qc, einsatzKeys.mitglieder(einsatzId), () => ladeMitglieder(einsatzId), null),
       // Die Führungsstelle braucht kein Modul (LFH-849); sie trägt den Einsatzleiter (LFH-1199)
       // und die Wurzel (LFH-1181). Gescheitert bleibt die Wurzel wie ohne sie, wie im Organigramm.
       ladeListe(
@@ -178,14 +176,16 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
               einheiten.zustand === 'daten' ? einheiten.daten : null,
             ),
             {
-              stand: stand(abschnitte, einheiten.zustand === 'daten' ? einheiten : null, stab),
-              // Wie im Organigramm: ohne Freigabe kein Wort, gescheitert „nicht geladen“.
-              stab:
-                stab == null || stab.zustand === 'gesperrt'
-                  ? null
-                  : stab.zustand === 'daten' && stab.daten != null
-                    ? stab.daten.besetzung
-                    : 'fehler',
+              stand: stand(
+                abschnitte,
+                einheiten.zustand === 'daten' ? einheiten : null,
+                mitglieder,
+              ),
+              // Wie im Organigramm: gescheitert „nicht geladen“, ohne Träger keine Zeile.
+              fuehrungsfunktionen:
+                mitglieder.zustand === 'daten' && mitglieder.daten != null
+                  ? fuehrungsfunktionZeilen(mitglieder.daten)
+                  : 'fehler',
               einheitenZustand: einheiten.zustand,
               fuehrungsstelle: wurzelFuehrungsstelle(fuehrungsstelle.daten),
               einsatzleiter: einsatzleiterDarstellung(fuehrungsstelle),

@@ -21,8 +21,8 @@ import { istZuLang, Zeichenzaehler } from '../components/zeichenGrenze';
 import { monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
-import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzleiter';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { personLabel } from '../kraefte/einsatzfunktionKern';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 

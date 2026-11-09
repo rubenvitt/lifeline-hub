@@ -321,11 +321,6 @@ async fn lagebesprechung_mit_neuem_termin_feuert_einsatz_neben_lagebesprechung_u
 
     let alle = eingegangen(&mut rx);
     assert_eq!(anzahl(&alle, LiveEvent::Lagebesprechung), 1);
-    assert_eq!(
-        anzahl(&alle, LiveEvent::Stab),
-        0,
-        "kein `stab` mehr (design.md D6)"
-    );
     assert_eq!(anzahl(&alle, LiveEvent::Etb), 1);
     assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 1, "{alle:?}");
 }
@@ -489,30 +484,6 @@ async fn kopf_patch_mit_termin_feuert_nichts() {
     assert!(kopf_events(&eingegangen(&mut rx)).is_empty());
 }
 
-// ---------- Bewusst nicht live (design.md D5) ----------
-
-#[tokio::test]
-async fn besetzung_eines_sachgebiets_feuert_kein_einsatz() {
-    let (app, _pool, live) = setup_mit_pool_und_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let mut rx = live.abonniere(einsatz);
-
-    let (status, json) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/stab/besetzung/s2"),
-        &admin,
-        Some(r#"{"besetzung_art":"einsatzleitung"}"#),
-    )
-    .await;
-    assert!(status.is_success(), "Vorbedingung: {status} {json:?}");
-
-    let alle = eingegangen(&mut rx);
-    assert_eq!(anzahl(&alle, LiveEvent::Stab), 1, "Vorbedingung: {alle:?}");
-    assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 0, "{alle:?}");
-}
-
 // ---------- Mitgliedschaft (LFH-854) ----------
 
 fn mitglied_pfad(einsatz: i64, benutzer: i64) -> String {
@@ -644,6 +615,141 @@ async fn abgelehnte_mitgliedschaftsaenderung_feuert_nichts() {
 
     let alle = eingegangen(&mut rx);
     assert!(kopf_events(&alle).is_empty(), "{alle:?}");
+    assert_eq!(anzahl(&alle, LiveEvent::Mitglieder), 0, "{alle:?}");
+}
+
+/// Spec `einsatzkopf-live`, „Funktionsfelder folgen der Mitgliedschaft“, Szenario
+/// „Führungsfunktion gesetzt“ (i6k6mzed, design.md D2): das Setzen der Führungsstelle verteilt
+/// `einsatz` und `mitglieder`, und der Kopf des Mitglieds trägt danach S2.
+#[tokio::test]
+async fn fuehrungsfunktion_setzen_feuert_einsatz_und_mitglieder() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let mitglied = benutzer_anlegen(&app, &admin, "mitglied", "keine").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, einsatz, mitglied, "fuehrungspersonal").await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &mitglied_pfad(einsatz, mitglied),
+        &admin,
+        Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"s2"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 1, "{alle:?}");
+    assert_eq!(anzahl(&alle, LiveEvent::Mitglieder), 1, "{alle:?}");
+    let ereignis = alle
+        .iter()
+        .find(|n| n.event == LiveEvent::Mitglieder)
+        .unwrap();
+    assert_eq!(
+        ereignis.data,
+        format!(r#"{{"einsatz_id":{einsatz}}}"#),
+        "die Nutzlast trägt nur die Kennung"
+    );
+
+    let cookie = login_cookie(&app, "mitglied", "mitgliedpw1").await;
+    let (_, kopf) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(kopf["meine_sachgebiete"], serde_json::json!(["s2"]));
+    assert_eq!(kopf["meine_funktion"], "S2 Lage");
+}
+
+/// i6k6mzed, design.md D2: Aufnahme, Rollenwechsel und Entfernen verteilen `mitglieder` je
+/// einmal; ein abgelehnter Versuch nichts (unten, `abgelehnte_mitgliedschaftsaenderung_…`).
+#[tokio::test]
+async fn jede_mitgliedschaftsaenderung_feuert_mitglieder() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let mitglied = benutzer_anlegen(&app, &admin, "mitglied", "keine").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    rolle_setzen(&app, &admin, einsatz, mitglied, "beobachter").await;
+    assert_eq!(
+        anzahl(&eingegangen(&mut rx), LiveEvent::Mitglieder),
+        1,
+        "Aufnahme"
+    );
+    rolle_setzen(&app, &admin, einsatz, mitglied, "fuehrungspersonal").await;
+    assert_eq!(
+        anzahl(&eingegangen(&mut rx), LiveEvent::Mitglieder),
+        1,
+        "Rollenwechsel"
+    );
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &mitglied_pfad(einsatz, mitglied),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        anzahl(&eingegangen(&mut rx), LiveEvent::Mitglieder),
+        1,
+        "Entfernen"
+    );
+}
+
+/// i6k6mzed, design.md D2: `mitglieder` hat das Gate des Einsatz-Lesezugriffs. Ein Beobachter,
+/// dem jedes ausblendbare Modul entzogen ist, erhält es auf seinem Strom; eine fremde
+/// Organisation öffnet den Strom gar nicht (403, Org-Grenze).
+#[tokio::test]
+async fn mitglieder_erreicht_jeden_leser_und_keine_fremde_org() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let leser = benutzer_anlegen(&app, &admin, "leser", "keine").await;
+    let ziel = benutzer_anlegen(&app, &admin, "zielkonto", "keine").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, einsatz, leser, "beobachter").await;
+    // Jedes ausblendbare Modul aus; ein nicht ausblendbares lehnt der Server ab, das ist hier gleich.
+    for modul in lifeline_hub::einsatz::modul::MODUL_KEYS {
+        anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+            &admin,
+            Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+        )
+        .await;
+    }
+    let leser_cookie = login_cookie(&app, "leser", "leserpw1").await;
+    let antwort = live_oeffnen(&app, &leser_cookie, einsatz).await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &mitglied_pfad(einsatz, ziel),
+        &admin,
+        Some(r#"{"einsatz_rolle":"beobachter","fuehrungsfunktion":"s3"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let text = sse_anfang_lesen(antwort.into_body(), 300).await;
+    assert!(text.contains("event: mitglieder"), "{text}");
+
+    fremde_org_anlegen(&pool, "Fremde Orga", "fremd", "fremdpw12", "fuehrungskraft").await;
+    let fremd_cookie = login_cookie(&app, "fremd", "fremdpw12").await;
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/live"),
+        &fremd_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
 // ---------- Umschalten einer Lagekennzahl (LFH-855) ----------

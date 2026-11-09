@@ -23,6 +23,7 @@ import {
   type ModulEintrag,
 } from './modulRegistry';
 import { freigabenFixture } from '../test/fixtures';
+import { IconTelefon } from '../icons';
 
 const offen: ModulEintrag = {
   key: 'x',
@@ -80,6 +81,19 @@ describe('modulName (LFH-965)', () => {
 });
 
 describe('modulRegistry', () => {
+  it('führt das Informationstelefon als eigenes Modul der Kommunikation (i6k6mzed, design.md D3)', () => {
+    expect(modulRegistry.find((m) => m.key === 'infotelefon')).toMatchObject({
+      kategorie: 'kommunikation',
+      label: 'Informationstelefon',
+      icon: IconTelefon,
+      route: 'infotelefon',
+      status: 'fertig',
+      beschreibung: 'Bürgeranrufe, Rückrufe, Anliegen',
+    });
+    // Kein Modulzähler (Spec `stab-infotelefon`).
+    expect(modulRegistry.find((m) => m.key === 'infotelefon')?.zaehlerQuelle).toBeUndefined();
+  });
+
   it('enthaelt das fertige ETB-Modul in der Kategorie Erfassung', () => {
     const etb = modulRegistry.find((m) => m.key === 'etb');
     expect(etb).toBeDefined();
@@ -201,7 +215,6 @@ describe('modulRegistry', () => {
       'einsatzabschnitte',
       'auftraege',
       'lagebesprechung',
-      'stab',
       'dokumente',
     ]);
     const kraefte = moduleNachKategorie('kraefte');
@@ -211,12 +224,14 @@ describe('modulRegistry', () => {
     expect(kraefte[0].route).toBe('kraefteuebersicht');
     expect(moduleNachKategorie('lage').map((m) => m.key)).not.toContain('kraefteuebersicht');
     expect(moduleNachKategorie('kommunikation').map((m) => m.key)).not.toContain('auftraege');
-    // Fernmeldewesen (LLH-1180) steht am Ende der Kategorie; der Chat bleibt ihr Kopf.
+    // Fernmeldewesen (LLH-1180) und Informationstelefon (i6k6mzed) stehen am Ende der
+    // Kategorie; der Chat bleibt ihr Kopf.
     expect(moduleNachKategorie('kommunikation').map((m) => m.key)).toEqual([
       'chat',
       'erinnerungen',
       'meldungen',
       'fernmeldewesen',
+      'infotelefon',
     ]);
     // LLH-1078: die Nachforderungen stehen bei Kräfte & Mittel, Schlüssel und Route bleiben.
     const nf = kraefte.find((m) => m.key === 'nachforderungen');
@@ -408,12 +423,18 @@ describe('modulZuRoute / modulAusPfad', () => {
     expect(modulAusPfad('/einsaetze/7/fernmeldewesen/kommunikationsplan')?.key).toBe(
       'fernmeldewesen',
     );
-    // Die Altpfade unter dem Stab gehören dem Ziel ihrer Weiterleitung (design.md D7): sonst
-    // finge der Rahmen sie bei ausgeblendetem Stab ab, bevor sie umleiten.
+    // Die Altpfade unter `stab/` gehören dem Ziel ihrer Weiterleitung (design.md D7), damit der
+    // Rahmen sie nach dessen Freigabe gatet.
     expect(modulAusPfad('/einsaetze/7/stab/funkplan')?.key).toBe('fernmeldewesen');
     expect(modulAusPfad('/einsaetze/7/stab/kommunikationsplan')?.key).toBe('fernmeldewesen');
-    expect(modulAusPfad('/einsaetze/7/stab/funkplanung')?.key).toBe('stab');
-    expect(modulAusPfad('/einsaetze/7/stab/presse')?.key).toBe('stab');
+    // Den Stab gibt es nicht mehr (i6k6mzed, design.md D8): seine übrigen Adressen gehören keinem
+    // Modul und leiten in den Einsatz.
+    expect(modulAusPfad('/einsaetze/7/stab/funkplanung')).toBeNull();
+    // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul, die Altadresse gehört ihm.
+    expect(modulAusPfad('/einsaetze/7/infotelefon')?.key).toBe('infotelefon');
+    expect(modulAusPfad('/einsaetze/7/stab/infotelefon')?.key).toBe('infotelefon');
+    expect(modulAusPfad('/einsaetze/7/stab/presse')).toBeNull();
+    expect(modulAusPfad('/einsaetze/7/stab')).toBeNull();
     // Der Einsatzbericht (LFH-726) erbt die Einsatzdaten: nie ausgeblendet, nie gesperrt.
     expect(modulAusPfad('/einsaetze/7/einsatzdaten/bericht')?.key).toBe('einsatzdaten');
     expect(modulAusPfad('/einsaetze/7/verpflegung/3/ausgabe')?.key).toBe('verpflegung');

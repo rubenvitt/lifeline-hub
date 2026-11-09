@@ -106,7 +106,7 @@ function FuehrungsstelleModal({
         getValueFromEvent={letzterWert}
         // Vorrangregel (Spec `fuehrungsfunktionen`): nur der erste Vorschlag der Rufname-Abfrage,
         // kein vorbelegter Eintrag (LFH-894). Kein „Leer lassen …“ (LFH-1078).
-        extra="Erster Vorschlag für den ETB-Rufnamen, vor dem eigenen Sachgebiet"
+        extra="Führungsfunktion im Einsatz und erster Vorschlag für den ETB-Rufnamen"
       >
         <EinWertAuswahl
           vorschlaege={funktionen}

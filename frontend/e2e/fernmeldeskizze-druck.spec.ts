@@ -26,7 +26,7 @@ import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
  *   und das Wort „geplant“ steht mit Textkontrast da.
  *
  * Mutationsproben: `page: fernmeldeskizze-a3` in `skizzeDruck.css` weg → Seite 1 ist A4 hoch,
- * rot; `status` in `Leitungsbild` (`stab/skizzenZeichen.tsx`) fest auf „bestehend“ → keine
+ * rot; `status` in `Leitungsbild` (`fernmeldewesen/skizzenZeichen.tsx`) fest auf „bestehend“ → keine
  * Wechsel entlang der Linie, rot.
  */
 

@@ -1,3 +1,93 @@
+## [1.0.0-alpha.178](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.177...v1.0.0-alpha.178) (2026-11-09)
+
+### Wichtige Änderungen
+
+- **Das Modul „Stab“ entfällt, samt Presse- und Medienarbeit (S5).** Mit dem Update werden die Stab-Seite, die Besetzung, die Checkliste, das Presse-Log, die Pressemitteilungen und die Medienkontakte entfernt. **Diese Daten werden beim Start aus der Datenbank gelöscht.** Pressemitteilung gibt es nicht mehr als Dokumentart. Wer alte Adressen der Stab- oder Presseseiten aufruft, landet im Einsatz. Offene Löschersuchen für Medienkontakte gelten als erledigt. Ein neues Löschersuchen für einen Medienkontakt wird abgelehnt, alte bleiben in der Akte lesbar. **Vor dem Update eine Sicherung anlegen.**
+- **Führungsfunktionen (EL, S1–S7) kommen jetzt aus den Mitgliedern des Einsatzes.** Gepflegt werden sie unter Einstellungen → Zugriff, nicht mehr über die Stab-Besetzung. Nach dem Update müssen die Funktionen dort neu vergeben werden. Ein eigenes Modulrecht braucht man dafür nicht mehr. Eine Funktion kann mehrere Träger haben, die Namen stehen dann alphabetisch.
+- **Das Informationstelefon ist ein eigenes Modul.** Es hat eine eigene Adresse, die alte Adresse leitet weiter. Rollen und Sichtbarkeiten werden vom bisherigen Stab-Modul übernommen, auch in Einsatz-, Organisations- und Startvorlagen.
+- **Mehrere neue Datenbank-Migrationen** für Vorplanung, Instanzkopplung, Wechsel aus dem Schichtplan, RTW-Anforderung und den erweiterten Maßnahmenkatalog. Sie laufen beim ersten Start automatisch.
+- **Neue Startoptionen** für die Instanzkopplung: `--instanz-name` und `--instanz-melden-sekunden`.
+
+### Vorplanung
+
+- **Neu: Dienste planen, bevor es einen Einsatz gibt.** Eine Planung hat eine Liste, einen Kopf, der sich direkt in der Ansicht bearbeiten lässt, und die Reiter Plan, Posten und Helfer. Der Plan bietet dasselbe Raster, denselben Blockdialog und „Schichten erzeugen“ wie der Schichtplan im Einsatz. Auf dem Handy erscheinen alle Blöcke je Posten als Liste.
+- Posten und Helfer lassen sich in Serie anlegen („Speichern und nächste“, wahlweise mit „Werte behalten“).
+- Die Liste zeigt je Planung Soll, Ist, Offen und Konflikte.
+- **Planen dürfen** System-Admins und organisationsweite Führungskräfte. „Planungen“ erscheint in der Kopfleiste und in der Befehlspalette nur für sie.
+- **Drucken und Excel:** Eine Planung druckt dieselben Aushänge und Schichtzettel wie der Schichtplan eines Einsatzes und lässt sich als Excel-Mappe ausgeben.
+- **Übernahme in einen Einsatz:** „In Einsatz übernehmen“ legt einen neuen Einsatz an (wahlweise mit Einsatz-Vorlage) oder ergänzt einen laufenden Einsatz der eigenen Organisation. Vor dem Schreiben zeigt eine Vorschau, was entsteht:
+  - Posten werden Einheiten oder UHS.
+  - Stamm-Personal und Helfer kommen in den Plan des Einsatzes.
+  - Das Einsatztagebuch nennt die Planung.
+  - Danach ist die Planung nur noch lesbar, und die Liste zeigt „übernommen in …“.
+  - Eine Übernahme ohne jede Änderung in einen laufenden Einsatz wird abgelehnt.
+- Planungen werden 90 Tage nach ihrem Ende automatisch gelöscht.
+- Die Demo-Lage „Stadtfest“ bringt die Planung „Stadtfest Musterstadt“ mit.
+- Korrigiert: Bei der Zeitumstellung beginnen die Tage jetzt richtig. Das Soll eines Postens reicht bis 200 Personen.
+
+### Kräfte und Mittel – Schichtplan und Ablösung
+
+- **Schichtplan drucken:**
+  - „Je Posten“ druckt einen Aushang je Einheit oder UHS mit Zeiten, Eingeteilten und offenen Plätzen.
+  - „Je Person“ druckt einen Schichtzettel mit Pausen und Stunden ohne Pausen.
+  - Jedes Blatt beginnt auf einer neuen Seite.
+  - Ohne das Modul Personal erscheint nur die Besetzung als Zahl.
+- **Excel-Mappe:** Der Schichtplan lässt sich mit den Blättern Austausch, Übersicht, Je Posten, Je Person und Befunde ausgeben. Liest man die Mappe wieder in denselben Einsatz ein, ergibt sich „unverändert“.
+- **Schichtplan-Datei einlesen (Excel oder CSV):**
+  - Eine Vorschau ordnet Posten (Einheit, UHS, Pause) und Personen zu, jede Zuordnung lässt sich ändern.
+  - Geschrieben wird erst mit „Übernehmen“. Ein zweiter Lauf derselben Datei ändert nichts.
+  - Unbekannte Personen werden Helfer des Plans.
+  - Eine Beispieldatei „Stadtfest“ liegt bei.
+- **Schneller planen:**
+  - Mit Strg oder Alt beim Loslassen wird aus dem Verschieben eine Kopie.
+  - „Als nächsten Block kopieren“ legt einen Block mit gleicher Dauer direkt im Anschluss an.
+  - Das Qualifikationssoll lässt sich im Blockdialog einstellen.
+  - „Schichten erzeugen“ steht neben „Block anlegen“ und nennt jeden überschnittenen Block.
+- **Fälligkeit laut Schichtplan:** Die Ablösung richtet Fälligkeit und Vorwarnung nach dem Plan. Beim Vollzug übernimmt die Art „Laut Plan“ die Besetzung des Folgeblocks. Endet ein Posten, wird das Abziehen vorgeschlagen.
+- **Wechsel an der UHS und Pausen aus dem Plan vollziehen:**
+  - „Wechsel vollziehen“ im Blockdialog bringt Kommende an die UHS und nimmt sie den Gehenden.
+  - Ein Pausenblock setzt einen Status, den man im Statuskatalog als „Pause im Schichtplan“ kennzeichnet.
+  - Wechsel lassen sich zurücknehmen.
+- **Höchstdienst und Mindestruhe einstellen:** Das neue Paneel „Dienst und Ruhe“ liegt unter Einstellungen › Ablösung und hat „Vorgaben wiederherstellen“ mit Rückgängig. Der Schichtplan zeigt die Werte in einer Lesezeile.
+- **Einsatzdauer im Blick:** Meldebild und Personal-Seite kennzeichnen „zu lang“ und „Ruhe zu kurz“ gegen diese Grenzwerte. Es gibt keinen Alarm. Geänderte Grenzwerte erreichen auch Nutzer ohne das Modul Ablösung sofort.
+
+### Betroffene
+
+- **Leichte Fälle in einem Schritt:**
+  - „Versorgt und entlassen“ gibt es in der Betroffenenliste und am UHS-Tablet.
+  - Erfasst werden Anlass, bis zu drei Maßnahmen und optional Name und Alter.
+  - Die Kurzeingabe kennt dafür z. B. „+kuehl“ und „>entl“.
+  - Ohne Netz wird der Fall vorgemerkt.
+- Der Maßnahmenkatalog enthält neu Wundversorgung, Kühlung, Lagerung und Betreuung/Gespräch.
+- **Kontakte am Handy der Einheit:** Der neue Reiter „Kontakte“ bietet die Ausgänge Entlassen, Zur UHS und RTW nötig. „RTW nötig“ erzeugt sofort eine Meldung „RTW angefordert“, die bestätigt werden muss. Am Gerät erscheinen keine Personalien.
+
+### Führung
+
+- Das Organigramm zeigt eine Stabsstelle, sobald ein Mitglied S1–S6 führt.
+- Der Kommunikationsplan füllt die Spalte „Besetzung“ aus den Mitgliedern.
+- Eigene Lage und Einsatzbericht haben jetzt „Führungsfunktionen“ statt „Stab“.
+- Empfängerfelder, Vorschläge im Einsatztagebuch und Chat-Erwähnungen nehmen die Namen aus den Mitgliedern.
+
+### Einsatzbericht
+
+- Der neue Block „Hilfeleistungen“ zählt Kontakte nach Anlass, Stunde, Verbleib, Transporten, Verweigerungen gegen ärztlichen Rat und versorgender Einheit.
+- Neue Voreinstellung „Kurzbericht für den Auftraggeber“.
+- Neue Anlage „Materialverbrauch“ mit den ausgegebenen Mengen der Verbrauchsgüter.
+
+### Bedienung
+
+- **Kontextmenü an Datensätzen:** Rechtsklick, langer Druck oder Umschalt+F10 öffnen an Listenzeilen, Karten und Elementen der Fernmeldeskizze dieselben Aktionen wie das ⋮-Menü.
+
+### Verwaltung
+
+- **Neu: Instanzkopplung.** Zwei Lifeline-Hub-Installationen lassen sich über einen Einmal-Code koppeln und tauschen danach signierte Meldungen aus. Die neue Seite unter Einstellungen zeigt:
+  - die Identität mit Fingerabdruck,
+  - gekoppelte Instanzen mit Zustand und Hinweisen,
+  - die Unterschriftsschlüssel der Org-Admins (per Passkey, mit Gegenzeichnung und Widerruf).
+- Einen Widerruf reicht die Instanz nach, bis die Gegenseite ihn bestätigt.
+- Lesen darf, wer die Verwaltung sieht, handeln nur der System-Admin.
+- Das Zugangsprotokoll zeigt die Vorgänge der Instanzkopplung.
+
 ## [1.0.0-alpha.177](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.176...v1.0.0-alpha.177) (2026-11-08)
 
 ### Wichtige Änderungen

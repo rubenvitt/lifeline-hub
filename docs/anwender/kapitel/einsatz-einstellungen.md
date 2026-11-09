@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, frontend/src/pages/einstellungen/EinsatzUnterkunft.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/routes/unterkunft_richtwerte.rs, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzGrenzwerte.tsx, frontend/src/abloesung/GrenzwerteModal.tsx, frontend/src/abloesung/grenzwerte.ts, src/routes/abloesung_schichtplan.rs, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, frontend/src/pages/einstellungen/EinsatzUnterkunft.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/routes/unterkunft_richtwerte.rs, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -15,7 +15,8 @@ fehlt auch die, die Vorgabe des Systems.
 
 Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
 „Zugriff“ nur von der Einsatzleitung. Der Reiter „Ablösung“ legt das Schichtmodell fest, nach dem
-die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)). Der Reiter „Kennzahlen“
+die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)), dazu Höchstdienst und
+Mindestruhe, gegen die Schichtplan, Meldebild und Personalliste prüfen. Der Reiter „Kennzahlen“
 wählt, was Platz 3 der Kennzahlen im Lagebild zeigt, und schaltet die Reihe für den
 Sanitätsdienst. Der Reiter „Benachrichtigungen“ legt fest,
 welche Eingänge für welche Funktion still bleiben. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
@@ -72,6 +73,24 @@ Für Einsatzleitung und Führungspersonal:
 
 Jede Änderung gilt sofort, ohne Speichern-Leiste. Die App meldet „Vorgabe des Einsatzes
 gespeichert“.
+
+### Dienst und Ruhe festlegen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Reiter „Ablösung“ öffnen. Unter „Dienst und Ruhe“ stehen „Höchstdienst“ und
+   „Mindestruhe“. Gilt die Vorgabe, steht sie mit dem Zusatz, etwa „12 h (Vorgabe)“.
+
+   ![Paneel „Dienst und Ruhe“ mit Höchstdienst 10 h und Mindestruhe 8 h (Vorgabe), darüber das Schichtmodell des Einsatzes](../bilder/einsatz-einstellungen/dienst-und-ruhe.png)
+
+2. „Werte ändern“ wählen. Im Dialog „Dienst und Ruhe“ unter „Höchstdienst“ und „Mindestruhe“ eine
+   Dauer eintragen, etwa „10 h“, „7:30 h“ oder „90 min“. Ein leeres Feld heißt Vorgabe; der
+   graue Text im Feld nennt sie. „Speichern“ wählen.
+3. Um alle eigenen Werte auf die Vorgabe zu setzen, „Vorgaben wiederherstellen“ wählen. Der Knopf
+   steht nur, solange ein eigener Wert gilt. War das ein Versehen, in der Meldung „Rückgängig“
+   wählen.
+
+Die App meldet „Dienst und Ruhe gespeichert“ bzw. „Vorgaben wiederhergestellt“.
 
 ### Richtwerte für die Unterkunft anpassen
 
@@ -166,6 +185,21 @@ stehen, die Vorwarnung fällt auf 30 Minuten. Jede Änderung steht im Einsatztag
 Entscheidung. Ist das Modul Ablösung im Einsatz nicht freigegeben, zeigt der Reiter nur „Modul
 „Ablösung“ nicht freigegeben“.
 
+### Dienst und Ruhe
+
+„Höchstdienst“ ist die längste Zeit, die eine Kraft am Stück im Dienst sein soll, 1 h bis 24 h.
+„Mindestruhe“ ist die Ruhe, die sie zwischen zwei Diensten braucht, 0 min bis 24 h. Eine Pause,
+die kürzer als die Mindestruhe ist, unterbricht den Dienst nicht. Bei „0 min“ trennt jede Lücke.
+Ohne eigenen Wert gelten 12 h und 8 h.
+
+Gegen beide Werte prüfen der Befund „zu lange im Dienst“ im Schichtplan und die Wörter „zu lang“
+und „Ruhe zu kurz“ im Meldebild und in der Personalliste (Kapitel
+[Meldebild und Kräfte-Zeitachse](meldebild.md)). Eine Änderung wirkt dort sofort, auch auf
+anderen Geräten und ohne Neuladen, auch für Personen, die die Ablösung nicht sehen. Die Ansicht
+„Schichtplan“ nennt die Werte über dem Raster; wer sie ändern darf, kommt mit „ändern“ hierher.
+Das Einsatztagebuch hält jede Änderung fest, etwa „Schichtplan: höchstens 10 h im Dienst,
+mindestens 8 h Ruhe (Vorgabe).“
+
 ### Nummern
 
 Präfix und Startwert eines Nummernkreises lassen sich nur ändern, solange darin noch keine
@@ -201,11 +235,11 @@ Zahl, wie eine Art, die jemand für sich abgeschaltet hat (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Sie geht an dieselben Personen wie sonst; die
 Einstellung ändert nur, wie laut sie bei ihnen ankommt.
 
-Die Funktionen einer Person sind ihre Besetzung im Stab (EL über die Führungsstelle, S1 bis S6
-über die Sachgebiete; ein Sachgebiet „bei der Einsatzleitung“ zählt für die Einsatzleitung) und die
-Funktion ihrer Mitgliedschaft im Einsatz. Hat sie keine, gilt „ohne Funktion“. Still wird ein
-Eingang nur, wenn er für jede ihrer Funktionen still steht: Wer S2 und S4 ist, bekommt einen
-Auftrag als Eingang, solange nur S2 still steht. Wer eine Art unter „Benachrichtigungen“ im
+Die Funktionen einer Person sind die Funktion ihrer Mitgliedschaft im Einsatz (gepflegt unter
+„Mitglieder“) und EL, wenn sie als Einsatzleiter an der eigenen Führungsstelle erfasst ist. Hat
+sie keine, gilt „ohne Funktion“. Still wird ein Eingang nur, wenn er für jede ihrer Funktionen
+still steht: Wer als Einsatzleiter erfasst ist und S2 trägt, bekommt einen Auftrag als Eingang,
+solange nur S2 still steht. Wer eine Art unter „Benachrichtigungen“ im
 Benutzermenü selbst abgeschaltet hat, bekommt sie weiter still, gleich was hier steht.
 
 Ohne Einstellung ist „Neuer Lagebericht“ still, alle anderen Eingänge sind laut. Alarme, die
@@ -255,6 +289,7 @@ die Organisation selbst ausblendet, bleibt auch mit Vorlage ausgeblendet.
   mit dieser Rolle.
 - „Ablösung“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
   die Rhythmus-Vorgabe eines Abschnitts; ein System-Admin ohne Rolle im Einsatz sieht sie nur.
+  Das gilt für das Schichtmodell wie für „Dienst und Ruhe“.
 - „Unterkunft“ ändern die Einsatzleitung, das Führungspersonal und System-Admins der
   Organisation des Einsatzes, solange er läuft; alle anderen sehen die Werte nur.
 - „Kennzahlen“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie

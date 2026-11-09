@@ -14,7 +14,8 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { baueLagebild, kennzahlReihe, type Lagebild } from '../pages/lage-dashboard/lagebild';
 import { ladeLagebasis, type GeladeneLagebasis } from '../pages/lage-dashboard/useLagebild';
 import { pegelZeile, wasserstandMeter } from '../pegel/pegelKennzahl';
-import { ZUSTAND_GRUND, md } from '../stab/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import { md } from '../lib/markdown';
 import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/vorbereitung';
 import { NICHT_BEURTEILT, istBeurteilt } from '../pages/gefahren/beurteilung';
 import {

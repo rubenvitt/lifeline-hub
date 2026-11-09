@@ -121,15 +121,6 @@ JSON und ein unpassender Geometrietyp MUST weiterhin 422 ergeben.
 - **WHEN** eine Zone, wie sie das Zeichenwerkzeug der Lagekarte erzeugt, angelegt wird
 - **THEN** wird sie unverändert angenommen
 
-### Requirement: Freitexte in Infotelefon, Presse und Schaden sind begrenzt
-Die Freitexte der Anruferfassung, der Medienkontakte (Anlegen, Ändern, Status) und der
-Schäden (Anlegen, Ändern) MUST die Grenzen der Tabelle in `design.md` (D6) einhalten, sonst
-400. Bestehende 422 für fehlende Rückrufnummer und fehlende Antwort MUST bleiben.
-
-#### Scenario: Zu lange Schadensbeschreibung beim Ändern
-- **WHEN** ein Schaden mit einer Beschreibung von 8 001 Zeichen geändert wird
-- **THEN** antwortet der Server mit 400, und der Schaden bleibt unverändert
-
 ### Requirement: Masken lassen nicht mehr zu als der Server
 Jede Eingabemaske eines begrenzten Feldes MUST verhindern, dass ein Wert über der Grenze des
 Servers gesendet wird, und MUST NOT einen Text dabei still kürzen. Ab 80 % der Grenze MUST eine
@@ -389,3 +380,16 @@ kennen und einen längeren Wert nicht senden.
 #### Scenario: Maske hält die Grenze
 - **WHEN** jemand in der Materialmaske eine Bemerkung über 2 000 Zeichen eingibt
 - **THEN** nennt das Feld die Überlänge, kürzt nicht und sendet nichts
+
+### Requirement: Freitexte in Infotelefon und Schaden sind begrenzt
+Die Freitexte der Anruferfassung und der Schäden (Anlegen, Ändern) MUST die Grenzen der Tabelle
+in `design.md` (D6) einhalten, sonst 400. Die bestehende 422 für eine fehlende Rückrufnummer MUST
+bleiben.
+
+#### Scenario: Zu lange Schadensbeschreibung beim Ändern
+- **WHEN** ein Schaden mit einer Beschreibung von 8 001 Zeichen geändert wird
+- **THEN** antwortet der Server mit 400, und der Schaden bleibt unverändert
+
+#### Scenario: Rückruf ohne Nummer bleibt 422
+- **WHEN** ein Anruf mit „Rückruf nötig“ ohne Rückrufnummer und mit einer Notiz innerhalb der Grenze erfasst wird
+- **THEN** antwortet der Server mit 422

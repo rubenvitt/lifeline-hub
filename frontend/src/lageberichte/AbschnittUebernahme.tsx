@@ -41,7 +41,7 @@ export default function AbschnittUebernahme({
   feld: string;
   onGeaendert: () => void;
 }) {
-  // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache).
+  // Dieselbe Abfrage wie `useModulFreigabe` (gemeinsamer Cache).
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),

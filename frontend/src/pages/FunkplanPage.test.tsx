@@ -7,7 +7,12 @@ import { QueryClient } from '@tanstack/react-query';
 import { renderMitProviders, sortTarget } from '../test/utils';
 import { server } from '../test/server';
 import FunkplanPage from './FunkplanPage';
-import { ladeEinsatz, ladeFuehrungsstelle, ladeModulFreigaben } from '../api/einsaetze';
+import {
+  ladeEinsatz,
+  ladeFuehrungsstelle,
+  ladeMitglieder,
+  ladeModulFreigaben,
+} from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -17,7 +22,6 @@ import { legeBefehlAn } from '../api/befehle';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
-import { ladeStab } from '../api/stab';
 import { ApiError } from '../api/client';
 import { freigabenFixture } from '../test/fixtures';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
@@ -31,13 +35,14 @@ import type {
   KommunikationsStelle,
   Sprechgruppe,
 } from '../api/types';
-import type { Fernmeldenetz } from '../stab/fernmeldeskizze';
-import type { SkizzenAktionen } from '../stab/skizzenAktionen';
+import type { Fernmeldenetz } from '../fernmeldewesen/fernmeldeskizze';
+import type { SkizzenAktionen } from '../fernmeldewesen/skizzenAktionen';
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeModulFreigaben: vi.fn(),
   ladeFuehrungsstelle: vi.fn(),
+  ladeMitglieder: vi.fn(),
 }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
@@ -52,13 +57,9 @@ vi.mock('../api/befehle', () => ({
 }));
 vi.mock('../api/kommunikationsplan', () => ({ ladeKommunikationsplan: vi.fn() }));
 vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
-vi.mock('../api/stab', async (orig) => ({
-  ...(await orig<typeof import('../api/stab')>()),
-  ladeStab: vi.fn(),
-}));
 
 /**
- * Die Zeichenfläche (LFH-893, `stab/FernmeldeskizzeBild.tsx`) hat eigene Tests. Hier zählt, was
+ * Die Zeichenfläche (LFH-893, `fernmeldewesen/FernmeldeskizzeBild.tsx`) hat eigene Tests. Hier zählt, was
  * die Seite ihr gibt: das Netz, die Aktionen, die Wahl. Der Stub nennt die Stellen als Text.
  */
 interface BildProps {
@@ -70,7 +71,7 @@ interface BildProps {
   druckt?: boolean;
 }
 const { bild } = vi.hoisted(() => ({ bild: { props: null as BildProps | null } }));
-vi.mock('../stab/FernmeldeskizzeBild', () => ({
+vi.mock('../fernmeldewesen/FernmeldeskizzeBild', () => ({
   default: (p: BildProps) => {
     bild.props = p;
     return (
@@ -198,7 +199,7 @@ beforeEach(() => {
   });
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
-  vi.mocked(ladeStab).mockResolvedValue({ besetzung: [] });
+  vi.mocked(ladeMitglieder).mockResolvedValue([]);
   bild.props = null;
 });
 
@@ -1610,19 +1611,17 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
       ...FAHRZEUGE,
       { ...FAHRZEUGE[0], id: 102, fahrzeugtyp: 'ELW 1', funkrufname: 'Florian 1/11-1' },
     ]);
-    vi.mocked(ladeStab).mockResolvedValue({
-      besetzung: [
-        {
-          sachgebiet: 's2',
-          besetzung_art: 'personal',
-          name: 'Clara Führerin',
-          personal_id: 1,
-          personal_noch_disponiert: true,
-          gesetzt_at: '2026-09-30T10:00:00',
-          gesetzt_von_id: 1,
-        },
-      ],
-    });
+    // Die Sachgebiete kommen aus den Mitgliedern (i6k6mzed, D7).
+    vi.mocked(ladeMitglieder).mockResolvedValue([
+      {
+        benutzer_id: 1,
+        anzeigename: 'Clara Führerin',
+        benutzername: 'clara',
+        einsatz_rolle: 'fuehrungspersonal',
+        zugewiesen_at: '2026-09-30T10:00:00',
+        fuehrungsfunktion: 's2',
+      },
+    ]);
     rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     await waitFor(() => expect(ausstattung('fs')).toEqual(['S2']));

@@ -38,11 +38,19 @@ import {
   stelleDichte,
 } from './trefflaeche-kern';
 import { oeffneAlleFachebenen, oeffneObjektGruppe, oeffneWerkzeugmenue } from './leisten-kern';
+import {
+  BLOECKE_ANZAHL,
+  HELFER,
+  POSTEN,
+  seedPlanung,
+  waitForPlanung,
+  waitForRaster,
+} from './planung-kern';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
  * Einsatzauswahl, Einheiten-Detailroute, Einsatz-Navigationsrahmen, Kräfteübersicht mit
- * Verdichtungszeile, Stab- und Lagebesprechungs-Route. Alle Blöcke teilen die Helfer aus
+ * Verdichtungszeile und Lagebesprechungs-Route. Alle Blöcke teilen die Helfer aus
  * `trefflaeche-kern.ts` (LFH-724); wer etwas anhängt, nimmt dieselben Helfer statt einer Kopie.
  *
  * Browser statt Vitest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout. Ein
@@ -1338,194 +1346,9 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Stab ────────────────────────────────────────────────────────────────────────────
-//
-// Vitest belegt für `werkzeugZelleStil` nur den Inline-Style, nicht dass die Werkzeugzelle im
-// Fugenraster der Kachel die Höhe im Layout ERREICHT (LLH-1124). Gemessen werden:
-//  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `stab/sachgebiete.ts`
-//    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
-//  - die sechs Knöpfe „Besetzung ändern" und die Zeilen der Arbeitsaufnahme.
-//  - der Sprung „Zur Lagebesprechung" in der Zeile „Nächste Lagebesprechung" (LLH-1111): Termin,
-//    Vorbereitung, Abschluss und Verlauf trägt seit LLH-1111 die Seite Lagebesprechung (Block
-//    darunter); die Stab-Seite hat keine Kopfaktion mehr.
-// Der Boden ist für alle die Staffel. Die Locator sind gescopt, sonst zögen Breadcrumb und
-// Kopfzeilen-Links in die Zählungen; die Brotkrume misst der Block „Ortspfad“ (LFH-909).
-
-/**
- * 4 + 3 + 3 + 3 + 2 + 4 Werkzeuge aus `stab/sachgebiete.ts` (LLH-1124): Registry-Module, alle
- * `fertig`, dazu die Unterseiten aus `stab/unterseiten.ts` — „Pressearbeit“ und
- * „Informationstelefon“ in der Kachel S5 (LFH-554), Funkplan, Fernmeldeskizze, Sprechgruppen und
- * Kommunikationsplan in der Kachel S6 (LLH-1180). Alle in derselben Werkzeugzelle.
- */
-const STAB_WERKZEUG_LINKS = 19;
-/** Jede Kachel trägt eine Gruppe „Werkzeuge S…“. */
-const STAB_WERKZEUG_GRUPPEN = 6;
-/** Sechs feste Kacheln, je ein Knopf. */
-const STAB_BESETZUNG_KNOEPFE = 6;
-/**
- * Sieben feste Punkte der Arbeitsaufnahme (LFH-551), je ein Zeilen-Label um Box und Text. Die
- * antd-Box selbst erbt keine Steuerhöhe; das Label trägt den Boden (`checklistenZeileStil`).
- */
-const STAB_CHECKLISTE_ZEILEN = 7;
-
-/** Die Zeilen-Labels der Arbeitsaufnahme — antd rendert Box und Text als EIN `<label>`. */
-function checklistenZeilen(page: Page): Locator {
-  return page
-    .getByRole('region', { name: 'Arbeitsaufnahme', exact: true })
-    .locator('label.ant-checkbox-wrapper');
-}
-
-/**
- * Der Sprung in die Lagebesprechung (`SprungKnopf`, ein antd-`Button` mit `href`, also ein Link).
- * Der Beobachter liest die Lagebesprechung ebenfalls; für ihn steht der Sprung frei wie für den
- * Admin.
- */
-function lagebesprechungSprung(page: Page): Locator {
-  return page
-    .getByRole('group', { name: 'Nächste Lagebesprechung', exact: true })
-    .getByRole('link', { name: 'Zur Lagebesprechung', exact: true });
-}
-
-test('Stab: Werkzeug-Links, „Besetzung ändern", Arbeitsaufnahme und der Sprung „Zur Lagebesprechung" folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
-  page,
-}) => {
-  // Drei Stufen mit je einem Neuladen und 32 gemessenen Knoten je Stufe.
-  test.setTimeout(90_000);
-  await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung`);
-
-  const gemessen: string[] = [];
-
-  for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab`);
-    await stelleDichte(page, dichte);
-
-    // Anker: die Kacheln stehen (LLH-1124); die Locator bleiben auf die Kacheln gescopt.
-    const besetzung = page.getByRole('main');
-    await expect(page.getByRole('region', { name: /^S\d · / })).toHaveCount(6);
-
-    // (1) Werkzeug-Links, über ihre Gruppen gescopt.
-    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
-    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
-    const werkzeugLinks = gruppen.getByRole('link');
-    await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
-    const werkzeug = await alleHaltenStufe(
-      werkzeugLinks,
-      soll,
-      `Werkzeug-Link (${dichte})`,
-      STAB_WERKZEUG_LINKS,
-    );
-
-    // (2) „Besetzung ändern" — der zugängliche Name trägt die Zeilenkennung.
-    const aendern = besetzung.getByRole('button', { name: /^Besetzung ändern – S\d / });
-    await expect(aendern).toHaveCount(STAB_BESETZUNG_KNOEPFE);
-    const knopf = await alleHaltenStufe(
-      aendern,
-      soll,
-      `„Besetzung ändern" (${dichte})`,
-      STAB_BESETZUNG_KNOEPFE,
-    );
-
-    // (3) Die Zeilen der Arbeitsaufnahme (LFH-551): erst bedienbar, dann gemessen.
-    const zeilen = checklistenZeilen(page);
-    await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
-    await expect(zeilen.getByRole('checkbox').first()).toBeEnabled();
-    const checkliste = await alleHaltenStufe(
-      zeilen,
-      soll,
-      `Arbeitsaufnahme-Zeile (${dichte})`,
-      STAB_CHECKLISTE_ZEILEN,
-    );
-
-    // (4) Der Sprung in die Lagebesprechung (LLH-1111); er muss auch dorthin zeigen.
-    const sprungZiel = lagebesprechungSprung(page);
-    await expect(sprungZiel).toHaveAttribute('href', `/einsaetze/${einsatzId}/lagebesprechung`);
-    const sprung = await haeltStufe(sprungZiel, soll, `„Zur Lagebesprechung" (${dichte})`);
-
-    gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Werkzeug-Link ${werkzeug}, Besetzung ändern ${knopf}, ` +
-        `Arbeitsaufnahme-Zeile ${checkliste}, Zur Lagebesprechung ${sprung}`,
-    );
-  }
-
-  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
-});
-
-test('Stab (Beobachter): Werkzeug-Links, Arbeitsaufnahme und der Sprung „Zur Lagebesprechung" folgen der Staffel', async ({
-  page,
-}) => {
-  // LFH-435: im Nur-Lese-Zweig des Stabs fehlt „Besetzung ändern" (versteckt), darüber steht der
-  // Rechtehinweis. Gemessen wird, was bleibt: Lese-Links, die gesperrte Arbeitsaufnahme und der
-  // Sprung in die Lagebesprechung, die der Beobachter lesen darf.
-  test.setTimeout(120_000);
-  await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung Lesend`);
-  await wechsleZuRolle(page, 'beobachter', einsatzId);
-
-  const gemessen: string[] = [];
-
-  for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab`);
-    await stelleDichte(page, dichte);
-
-    // Datenanker: die Kacheln und ihre Werkzeug-Gruppen stehen. Erst danach ist die Abwesenheit
-    // von „Besetzung ändern" eine Aussage.
-    const besetzung = page.getByRole('main');
-    await expect(page.getByRole('region', { name: /^S\d · / })).toHaveCount(6);
-    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
-    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
-
-    // ── VORBEDINGUNGEN: Rechtehinweis steht, „Besetzung ändern" fehlt.
-    await rechteHinweisSteht(page);
-    await expect(
-      besetzung.getByRole('button', { name: /^Besetzung ändern/ }),
-      'Vorbedingung: ohne Schreibrecht kein „Besetzung ändern"',
-    ).toHaveCount(0);
-
-    // ── Was bleibt.
-    const werkzeugLinks = gruppen.getByRole('link');
-    await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
-    const werkzeug = await alleHaltenStufe(
-      werkzeugLinks,
-      soll,
-      `Werkzeug-Link (${dichte})`,
-      STAB_WERKZEUG_LINKS,
-    );
-
-    // Die Arbeitsaufnahme (LFH-551) steht lesend da: Vorbedingung gesperrte Boxen, dann die
-    // Zeilenhöhe — ein gesperrtes Ziel ist ein sichtbares Ziel.
-    const zeilen = checklistenZeilen(page);
-    await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
-    for (const box of await zeilen.getByRole('checkbox').all()) {
-      await expect(box, 'Vorbedingung: ohne Schreibrecht ist jeder Haken gesperrt').toBeDisabled();
-    }
-    const checkliste = await alleHaltenStufe(
-      zeilen,
-      soll,
-      `Arbeitsaufnahme-Zeile gesperrt (${dichte})`,
-      STAB_CHECKLISTE_ZEILEN,
-    );
-
-    const sprung = await haeltStufe(
-      lagebesprechungSprung(page),
-      soll,
-      `„Zur Lagebesprechung" (${dichte})`,
-    );
-
-    gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Werkzeug-Link ${werkzeug}, ` +
-        `Arbeitsaufnahme-Zeile gesperrt ${checkliste}, Zur Lagebesprechung ${sprung}`,
-    );
-  }
-
-  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
-});
-
 // ── Lagebesprechung (LLH-1111) ──────────────────────────────────────────────────────
 //
-// Die Teile, die bis LLH-1111 auf der Stab-Seite standen. Gemessen werden:
+// Termin, Vorbereitung, Abschluss und Verlauf der Seite Lagebesprechung. Gemessen werden:
 //  - die ETB-Links des Verlaufs, einer je Besprechung. ZWEI gesäte Lagebesprechungen → genau
 //    zwei Links, damit der Verlauf als Schleife belegt ist.
 //  - die Schnellwahl im Paneel „Termin" („+30 min", „+1 h", „+2 h", „kein Termin") und das Feld
@@ -1711,30 +1534,16 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
 // ── Funkplan (LFH-548) ──────────────────────────────────────────────────────────────────
 //
 // Handgebaute Ziele: die Titel-Links der Baumtabelle (`Datensicht`, `minHeight`
-// `controlHeight`) und die Verweise der Lücken (`stabZeilenzielStil`). Dazu die antd-Knöpfe der
+// `controlHeight`) und die Verweise der Lücken (`linkZeilenzielStil`). Dazu die antd-Knöpfe der
 // Werkzeugzeile. Gesät wird je Ebene eine Zeile und je Lücke ein Treffer mit Verweis.
 
-// ── Presse und Informationstelefon S5 (LFH-554) ──────────────────────────────────────
+// ── Informationstelefon (LFH-554) ────────────────────────────────────────────────────
 //
-// Gemessen werden die Ziele, die Vitest nur als Stil belegt: der Titel-Link der
-// Pressemitteilung (`stabZeilenzielStil`), der Sprung „Vermisste ↗“, die Statusanzeigen als
-// Auslöser (`StatusWahl`) und die antd-Knöpfe (Kopfaktionen, „Beantworten“, „Erfassen“).
+// Gemessen werden die Ziele, die Vitest nur als Stil belegt: der Sprung „Vermisste ↗“, die
+// Statusanzeige als Auslöser (`StatusWahl`) und der antd-Knopf „Erfassen“. Das Presse-Log ist mit
+// dem Modul Stab entfallen (i6k6mzed, design.md D1).
 
-async function presseSaeen(page: Page, einsatzId: string) {
-  await anlegen(
-    page,
-    einsatzId,
-    'stab/medienkontakte',
-    { art: 'anfrage', medium: 'NDR 1', thema: 'Evakuierte' },
-    'Medienkontakt',
-  );
-  await anlegen(
-    page,
-    einsatzId,
-    'stab/pressemitteilungen',
-    { vorlage: 'freitext', titel: 'Hochwasser Musterstadt' },
-    'Pressemitteilung',
-  );
+async function infotelefonSaeen(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
@@ -1749,44 +1558,19 @@ async function presseSaeen(page: Page, einsatzId: string) {
   );
 }
 
-test('Presse S5: Kopfaktionen, Titel-Link, Statusauslöser, „Beantworten“ und die Telefon-Erfassung folgen der Staffel', async ({
+test('Informationstelefon: Erfassung, Statusauslöser und „Vermisste ↗“ folgen der Staffel', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Presse`);
-  await presseSaeen(page, einsatzId);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Infotelefon`);
+  await infotelefonSaeen(page, einsatzId);
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
+    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
     await stelleDichte(page, dichte);
-    await expect(page.getByText('NDR 1 · Evakuierte')).toHaveCount(1);
-    const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
-    const aktionen = await alleHaltenStufe(
-      kopf.getByRole('button'),
-      soll,
-      `Kopfaktion (${dichte})`,
-      2,
-    );
-    const titel = await haeltStufe(
-      page.getByRole('link', { name: 'Hochwasser Musterstadt', exact: true }),
-      soll,
-      `Titel-Link (${dichte})`,
-    );
-    const status = await haeltStufe(
-      page.getByRole('button', { name: 'Status von NDR 1 · Evakuierte ändern' }),
-      soll,
-      `Statusauslöser (${dichte})`,
-    );
-    const beantworten = await haeltStufe(
-      page.getByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
-      soll,
-      `Beantworten (${dichte})`,
-    );
-
-    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
     const erfassen = await haeltStufe(
       page.getByRole('button', { name: 'Erfassen', exact: true }),
@@ -1804,41 +1588,29 @@ test('Presse S5: Kopfaktionen, Titel-Link, Statusauslöser, „Beantworten“ un
       `Vermisste (${dichte})`,
     );
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Kopf ${aktionen}, Titel ${titel}, Status ${status}, ` +
-        `Beantworten ${beantworten}, Erfassen ${erfassen}, Anruf-Status ${anrufStatus}, Vermisste ${vermisste}`,
+      `${dichte} (Soll ≥ ${soll}): Erfassen ${erfassen}, Anruf-Status ${anrufStatus}, ` +
+        `Vermisste ${vermisste}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staffel, Auslöser fehlen', async ({
+test('Informationstelefon (Beobachter): „Vermisste ↗“ folgt der Staffel, die Erfassung fehlt', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Presse Lesend`);
-  await presseSaeen(page, einsatzId);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Infotelefon Lesend`);
+  await infotelefonSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
+    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
     await stelleDichte(page, dichte);
-    await expect(page.getByText('NDR 1 · Evakuierte')).toHaveCount(1);
-    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-    await expect(
-      page.getByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
-      'Vorbedingung: ohne Schreibrecht kein „Beantworten“',
-    ).toHaveCount(0);
-    const titel = await haeltStufe(
-      page.getByRole('link', { name: 'Hochwasser Musterstadt', exact: true }),
-      soll,
-      `Titel-Link (${dichte})`,
-    );
-
-    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
+    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
     await expect(
       page.getByRole('button', { name: 'Erfassen', exact: true }),
       'Vorbedingung: ohne Schreibrecht keine Erfassung',
@@ -1848,7 +1620,7 @@ test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staf
       soll,
       `Vermisste (${dichte})`,
     );
-    gemessen.push(`${dichte} (Soll ≥ ${soll}): Titel ${titel}, Vermisste ${vermisste}`);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Vermisste ${vermisste}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
@@ -2060,7 +1832,7 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
 
 // ── Kommunikationsplan S6 (LFH-848) ──────────────────────────────────────────────────
 //
-// Wählbare Nummern (`tel:`) als handgebaute Bedienziele (`stabZeilenzielStil`), die Titel-Links
+// Wählbare Nummern (`tel:`) als handgebaute Bedienziele (`linkZeilenzielStil`), die Titel-Links
 // abgeleiteter Zeilen, „+ Verbindung“, der Menüauslöser und die Seitenknöpfe. Der Beobachter
 // misst ohne Aktionsspalte und ohne „Stelle hinzufügen“.
 
@@ -2242,7 +2014,7 @@ for (const schreibend of [true, false]) {
 //
 // Die Bedienung um die Zeichenfläche: Werkzeugleiste (antd-`Button`, zwei `Segmentleiste`n),
 // Palette (Einträge mit „Setzen“/„Zeigen“, die drei Anlegen-Knöpfe), Eigenschaftspaneel des
-// gewählten Elements, die Wahlknöpfe des Lücken-Paneels (handgebaut, `stabZeilenzielStil`) und
+// gewählten Elements, die Wahlknöpfe des Lücken-Paneels (handgebaut, `linkZeilenzielStil`) und
 // der Umschalter der Darstellung. Die Elemente AUF der Fläche skalieren mit dem Maßstab, nicht
 // mit der Dichte; unter dem Mindestmaßstab der Stufe ist die Fläche Übersicht, und das erste
 // Tippen zoomt (LFH-1038). Ihre Trefffläche misst `fernmeldeskizze.spec.ts` („Prüfliste 1 und 2“).
@@ -3229,6 +3001,415 @@ test('Richtwerte Unterkunft (LLH-1525): die Felder in Stammdaten und Einsatz-Ein
     }
     gemessen.push(`${dichte} (Soll ≥ ${soll}): ${je.join(', ')}`);
   }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Vorplanung (LLH-1595, Prüfliste LLH-1586 Kriterien 1 und 2) ───────────────────────────
+//
+// Gemessen im vollsten Stand aus `planung-kern.ts` (drei Posten in zwei Abschnitten, zwei Helfer,
+// fünf Blöcke mit jeder Ampelstufe). Eine Nur-Lese-Ansicht gibt es nicht: wer nicht planen darf,
+// sieht die Seiten gar nicht (`NurMitPlanungsrecht`), und wer planen darf (Admin und
+// Org-Führungskraft), sieht dieselben Ziele. Deshalb kein Geschwister „(Beobachter)“.
+//
+// Felder werden generisch gegriffen: jedes äußerste Eingabeelement (`PLANUNG_FELD`), damit ein
+// Feld ohne Staffel nicht durch eine Lücke in einer Liste fällt.
+
+const PLANUNG_FELD =
+  ':is(.ant-input-affix-wrapper, .ant-select, .ant-picker, .ant-input-number, input.ant-input)' +
+  ':not(:is(.ant-input-affix-wrapper, .ant-select, .ant-picker, .ant-input-number) *)';
+
+/** Abstand nach Stufe, falls die Stufe einen fordert; liefert den gemessenen Wert. */
+function checkAbstand(abstand: number, dichte: keyof typeof ZIELABSTAND, was: string): number {
+  const soll = ZIELABSTAND[dichte];
+  if (soll != null) {
+    expect(abstand, `${was} (${dichte}, Soll ≥ ${soll})`).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+  }
+  return abstand;
+}
+
+/** Kleinster Abstand einer Menge von Zielen zu ihren Nachbarn in `bereich`. */
+async function minAbstand(bereich: Locator, ziele: Locator): Promise<number> {
+  let min = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < (await ziele.count()); i += 1) {
+    min = Math.min(min, await abstandZuNachbarn(bereich, ziele.nth(i)));
+  }
+  return min;
+}
+
+/**
+ * Abstände der Blöcke im Raster: zwischen Blöcken VERSCHIEDENER Zeilen (`zeilen`, Zielabstand)
+ * und zwischen Blöcken derselben Zeile (`inZeile`, nur gemeldet). Zwei Schichten an einem Posten
+ * stoßen an der Schichtgrenze bündig aneinander: das Raster bildet die Uhrzeit ab, ein Spalt
+ * verfälschte sie. Das ist die begründete Ausnahme vom Zielabstand (Abstimmung 08.11.2026);
+ * gezielt wird dort über die Kante, nicht über den Spalt.
+ */
+async function measureRasterAbstaende(
+  raster: Locator,
+): Promise<{ zeilen: number; inZeile: number }> {
+  return raster.evaluate((r) => {
+    const bloecke = [...r.querySelectorAll<HTMLElement>('[data-lfh="schichtplan-block"]')];
+    let zeilen = Number.POSITIVE_INFINITY;
+    let inZeile = Number.POSITIVE_INFINITY;
+    for (const a of bloecke) {
+      for (const b of bloecke) {
+        if (a === b) continue;
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        const dx = Math.max(rb.left - ra.right, ra.left - rb.right, 0);
+        const dy = Math.max(rb.top - ra.bottom, ra.top - rb.bottom, 0);
+        const d = Math.max(dx, dy);
+        const gleich =
+          a.closest('[data-raster-zeile]')?.getAttribute('data-raster-zeile') ===
+          b.closest('[data-raster-zeile]')?.getAttribute('data-raster-zeile');
+        if (gleich) inZeile = Math.min(inZeile, d);
+        else zeilen = Math.min(zeilen, d);
+      }
+    }
+    return { zeilen, inZeile };
+  });
+}
+
+test('Vorplanung (LLH-1595): Liste und Kopf im Bearbeiten folgen der Dichte-Staffel, Abstand nach Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung`);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    // ── Liste: Kopfaktion, Suche, Spaltenschalter, die Bezeichnung als Link.
+    await page.goto('/planungen');
+    await stelleDichte(page, dichte);
+    const main = page.getByRole('main');
+    await main.getByPlaceholder('Bezeichnung, Ort oder Zeitraum').fill(planung.bezeichnung);
+    const link = main.getByRole('link', { name: planung.bezeichnung, exact: true });
+    const hLink = await haeltStufe(link, soll, `Bezeichnung als Link (${dichte})`);
+    const anlegen = await haeltStufe(
+      page.locator('[data-lfh="adminpage-aktionen"]').getByRole('button'),
+      soll,
+      `Planung anlegen (${dichte})`,
+    );
+    const suche = await haeltStufe(
+      main.locator('.ant-input-affix-wrapper'),
+      soll,
+      `Suche (${dichte})`,
+    );
+    const spalten = await haeltStufe(
+      main.getByRole('button', { name: 'Spalten — Planungen', exact: true }),
+      soll,
+      `Spaltenschalter (${dichte})`,
+    );
+
+    // ── Planungsseite: Kopfaktion ⋮, „Planung bearbeiten“, Reiter.
+    await page.goto(`/planungen/${planung.id}`);
+    await waitForPlanung(page, planung.bezeichnung);
+    const menue = page.getByRole('button', { name: `Aktionen zu ${planung.bezeichnung}` });
+    const bearbeiten = page.getByRole('button', { name: 'Planung bearbeiten', exact: true });
+    const hMenue = await haeltStufe(menue, soll, `⋮ der Planung (${dichte})`);
+    const hBearbeiten = await haeltStufe(bearbeiten, soll, `Planung bearbeiten (${dichte})`);
+    const reiter = await alleHaltenStufe(
+      main.getByRole('tablist').locator('.ant-tabs-tab'),
+      soll,
+      `Reiter (${dichte})`,
+      3,
+    );
+
+    // ── Kopf im Bearbeiten: sechs Felder (der Zeitraum als zwei), Kalenderknöpfe, Speichern,
+    //    Abbrechen.
+    await bearbeiten.click();
+    const form = page.getByRole('form', { name: 'Planung bearbeiten' });
+    await expect(form.getByLabel('Höchstens im Dienst')).toBeVisible();
+    const felder = form.locator(PLANUNG_FELD);
+    const feld = await alleHaltenStufe(felder, soll, `Feld im Kopf (${dichte})`, 7);
+    const knoepfe = form.getByRole('button');
+    const knopf = await alleHaltenStufe(knoepfe, soll, `Knopf im Kopf (${dichte})`, 4);
+    const abstandKopf = checkAbstand(
+      await minAbstand(form, form.getByRole('button', { name: /^(Speichern|Abbrechen)$/ })),
+      dichte,
+      'Speichern und Abbrechen zum Nachbarziel',
+    );
+    await form.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+    await expect(form).toBeHidden();
+
+    je.set(`${dichte} Feld`, feld);
+    je.set(`${dichte} Reiter`, reiter);
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Liste Link ${hLink}, Anlegen ${anlegen}, Suche ${suche}, ` +
+        `Spalten ${spalten}; Seite ⋮ ${hMenue}, Bearbeiten ${hBearbeiten}, Reiter ${reiter}; ` +
+        `Kopf Feld ${feld}, Knopf ${knopf} (Abstand ${abstandKopf})`,
+    );
+  }
+  for (const sorte of ['Feld', 'Reiter']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Vorplanung (LLH-1595): Raster, Werkzeugzeile, Personenleiste und Dialog „Schichten erzeugen“ folgen der Dichte-Staffel, Zeilen halten den Zielabstand', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung Plan`);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/planungen/${planung.id}`);
+    await stelleDichte(page, dichte);
+    await waitForPlanung(page, planung.bezeichnung);
+    await waitForRaster(page);
+
+    const werkzeug = page.locator('[data-lfh="schichtplan-werkzeugzeile"]');
+    const segmente = await alleHaltenStufe(
+      werkzeug.locator('[data-lfh="segmentleiste"] button'),
+      soll,
+      `Zeitspanne (${dichte})`,
+      2,
+    );
+    const aktionen = werkzeug.getByRole('button', {
+      name: /^(Block anlegen|Schichten erzeugen)$/,
+    });
+    const aktion = await alleHaltenStufe(aktionen, soll, `Werkzeug (${dichte})`, 2);
+    const abstandWerkzeug = checkAbstand(
+      await minAbstand(werkzeug, aktionen),
+      dichte,
+      'Block anlegen und Schichten erzeugen zum Nachbarziel',
+    );
+
+    const raster = page.locator('[data-lfh="schichtplan-raster"]');
+    const bloecke = raster.locator('[data-lfh="schichtplan-block"]');
+    const block = await alleHaltenStufe(bloecke, soll, `Block (${dichte})`, BLOECKE_ANZAHL);
+    const { zeilen, inZeile } = await measureRasterAbstaende(raster);
+    checkAbstand(zeilen, dichte, 'Blöcke benachbarter Zeilen');
+
+    // Die Zeilen der Personenleiste sind Griffe zum Ziehen, keine Tastaturziele (den Weg ohne
+    // Ziehen trägt das Feld „Personen“ im Blockdialog): gemessen wird ihre Höhe.
+    const leiste = page.getByRole('complementary', { name: 'Personen zum Einteilen' });
+    const person = await alleHaltenStufe(
+      leiste.locator('[data-lfh="schichtplan-person"]'),
+      soll,
+      `Person (${dichte})`,
+      HELFER.length,
+    );
+    const personSuche = await haeltStufe(
+      leiste.locator('.ant-input-affix-wrapper'),
+      soll,
+      `Personen suchen (${dichte})`,
+    );
+
+    // ── Dialog „Schichten erzeugen“: Posten, Zeit (zwei Felder), Länge; Fuß und Kreuz.
+    await werkzeug.getByRole('button', { name: 'Schichten erzeugen', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Schichten erzeugen' });
+    await expect(dialog).toBeVisible();
+    await modalRuht(page);
+    const feld = await alleHaltenStufe(
+      dialog.locator(PLANUNG_FELD),
+      soll,
+      `Feld „Schichten erzeugen“ (${dichte})`,
+      4,
+    );
+    const dialogAktion = dialog.locator('[data-lfh="erfassung-aktion"]');
+    const fuss = dialogAktion.getByRole('button');
+    const fussKnopf = await alleHaltenStufe(fuss, soll, `Fuß (${dichte})`, 2);
+    const kreuz = await haeltStufe(dialog.locator('.ant-modal-close'), soll, `Kreuz (${dichte})`);
+    const abstandFuss = checkAbstand(
+      await minAbstand(dialogAktion, fuss),
+      dichte,
+      'Fußknöpfe „Schichten erzeugen“',
+    );
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    je.set(`${dichte} Block`, block);
+    je.set(`${dichte} Person`, person);
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Zeitspanne ${segmente}, Werkzeug ${aktion} (Abstand ${abstandWerkzeug}), ` +
+        `Block ${block} (Zeilen ${zeilen}, in der Zeile ${inZeile}), Person ${person}, Suche ${personSuche}; ` +
+        `Dialog Feld ${feld}, Fuß ${fussKnopf} (Abstand ${abstandFuss}), Kreuz ${kreuz}`,
+    );
+  }
+  for (const sorte of ['Block', 'Person']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten anlegen“, Reiter Helfer folgen der Dichte-Staffel, Abstand nach Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung Posten`);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    // ── Reiter Posten: „Posten anlegen“, Spaltenschalter, je Zeile ⋮.
+    await page.goto(`/planungen/${planung.id}?reiter=posten`);
+    await stelleDichte(page, dichte);
+    await waitForPlanung(page, planung.bezeichnung);
+    const posten = page.locator('[data-lfh="planung-posten"]');
+    await expect(posten.getByText('Fußtrupp', { exact: true })).toBeVisible();
+    const anlegen = posten.getByRole('button', { name: 'Posten anlegen', exact: true });
+    const hAnlegen = await haeltStufe(anlegen, soll, `Posten anlegen (${dichte})`);
+    const abstandAnlegen = checkAbstand(
+      await abstandZuNachbarn(posten, anlegen),
+      dichte,
+      '„Posten anlegen“ zum Nachbarziel',
+    );
+    const zeilenMenues = posten.getByRole('button', { name: /^Aktionen zu / });
+    const zeilenMenue = await alleHaltenStufe(
+      zeilenMenues,
+      soll,
+      `⋮ je Posten (${dichte})`,
+      POSTEN.length,
+    );
+    const abstandZeilenMenue = checkAbstand(
+      await minAbstand(posten, zeilenMenues),
+      dichte,
+      '⋮ je Posten zum Nachbarziel',
+    );
+
+    // Menü des ersten Postens („Nach oben“ gesperrt) und des mittleren (beide frei).
+    let eintrag = Number.POSITIVE_INFINITY;
+    for (const [name, gesperrt] of [
+      ['RTW 1', 'Nach oben'],
+      ['RTW 2', null],
+    ] as const) {
+      await posten.getByRole('button', { name: `Aktionen zu ${name}`, exact: true }).click();
+      const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+      await expect(menue).toHaveCount(1);
+      for (const wahl of ['Bearbeiten', 'Nach oben', 'Nach unten', 'Löschen']) {
+        const item = menue.getByRole('menuitem', { name: wahl, exact: true });
+        await expect(item).toHaveCount(1);
+        if (wahl === gesperrt) await expect(item).toHaveAttribute('aria-disabled', 'true');
+        const h = await ruhigeHoehe(item, `Menüeintrag ${wahl} an ${name} (${dichte})`);
+        expect(
+          h,
+          `Menüeintrag ${wahl} an ${name} (${dichte}), Soll ≥ ${BODEN_MENUE[dichte]}`,
+        ).toBeGreaterThanOrEqual(BODEN_MENUE[dichte] - SUBPIXEL);
+        eintrag = Math.min(eintrag, h);
+      }
+      await page.keyboard.press('Escape');
+      await expect(menue).toHaveCount(0);
+    }
+
+    // ── Dialog „Posten anlegen“ (Serie): Herkunft, Bezeichnung, Abschnitt, Schichtlänge, Soll,
+    //    „Qualifikation fordern“, „Werte behalten“, Fuß und Kreuz.
+    await anlegen.click();
+    const dialog = page.getByRole('dialog', { name: 'Posten anlegen' });
+    await expect(dialog).toBeVisible();
+    await modalRuht(page);
+    const feld = await alleHaltenStufe(
+      dialog.locator(PLANUNG_FELD),
+      soll,
+      `Feld „Posten anlegen“ (${dichte})`,
+      5,
+    );
+    const fordern = await haeltStufe(
+      dialog.getByRole('button', { name: 'Qualifikation fordern', exact: true }),
+      soll,
+      `Qualifikation fordern (${dichte})`,
+    );
+    const behalten = await haeltStufe(
+      dialog.locator('label.ant-checkbox-wrapper'),
+      BODEN_KAESTCHEN[dichte],
+      `Werte behalten (${dichte}, Boden ${BODEN_KAESTCHEN[dichte]})`,
+    );
+    const aktion = dialog.locator('[data-lfh="erfassung-aktion"]');
+    const fuss = aktion.getByRole('button');
+    const fussKnopf = await alleHaltenStufe(fuss, soll, `Fuß (${dichte})`, 3);
+    const kreuz = await haeltStufe(dialog.locator('.ant-modal-close'), soll, `Kreuz (${dichte})`);
+    const abstandFuss = checkAbstand(
+      await minAbstand(aktion, fuss),
+      dichte,
+      'Fußknöpfe „Posten anlegen“',
+    );
+    // „Werte behalten“ steht in der Zeile über dem Fuß.
+    const k = (await dialog.locator('label.ant-checkbox-wrapper').boundingBox())!;
+    const f = (await fuss.first().boundingBox())!;
+    const abstandBehalten = checkAbstand(
+      f.y - (k.y + k.height),
+      dichte,
+      '„Werte behalten“ über dem Fuß',
+    );
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    // ── Reiter Helfer: „Helfer anlegen“, je Helfer Bearbeiten und Löschen.
+    await page.getByRole('tab', { name: /^Helfer/ }).click();
+    const helfer = page.locator('[data-lfh="planung-helfer"]');
+    await expect(helfer.getByText(HELFER[1], { exact: true })).toBeVisible();
+    const helferAnlegen = helfer.getByRole('button', { name: 'Helfer anlegen', exact: true });
+    const hHelferAnlegen = await haeltStufe(helferAnlegen, soll, `Helfer anlegen (${dichte})`);
+    const abstandHelferAnlegen = checkAbstand(
+      await abstandZuNachbarn(helfer, helferAnlegen),
+      dichte,
+      '„Helfer anlegen“ zum Nachbarziel',
+    );
+    const zeilenKnoepfe = helfer.getByRole('button', { name: / (bearbeiten|löschen)$/ });
+    const zeilenKnopf = await alleHaltenStufe(
+      zeilenKnoepfe,
+      soll,
+      `Bearbeiten/Löschen je Helfer (${dichte})`,
+      2 * HELFER.length,
+    );
+    const abstandZeile = checkAbstand(
+      await minAbstand(helfer, zeilenKnoepfe),
+      dichte,
+      'Bearbeiten und Löschen je Helfer',
+    );
+
+    je.set(`${dichte} Feld`, feld);
+    je.set(`${dichte} Menüeintrag`, eintrag);
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Posten anlegen ${hAnlegen} (Abstand ${abstandAnlegen}), ` +
+        `⋮ ${zeilenMenue} (Abstand ${abstandZeilenMenue}), Menüeintrag ${eintrag}; ` +
+        `Dialog Feld ${feld}, Qualifikation ${fordern}, Werte behalten ${behalten}, ` +
+        `Fuß ${fussKnopf} (Abstand ${abstandFuss}, zu „Werte behalten“ ${abstandBehalten}), Kreuz ${kreuz}; ` +
+        `Helfer anlegen ${hHelferAnlegen} (Abstand ${abstandHelferAnlegen}), Zeile ${zeilenKnopf} (Abstand ${abstandZeile})`,
+    );
+  }
+  for (const sorte of ['Feld', 'Menüeintrag']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Vorplanung (LLH-1595): die Handy-Liste des Plans folgt auf 390 px der Dichte-Staffel, Blöcke halten den Zielabstand', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(HANDSCHIRM);
+  await anmelden(page);
+  const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung Handy`);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/planungen/${planung.id}`);
+    await stelleDichte(page, dichte);
+    await waitForPlanung(page, planung.bezeichnung);
+    const liste = page.locator('[data-lfh="schichtplan-liste"]');
+    const bloecke = liste.locator('[data-lfh="schichtplan-listen-block"]');
+    await expect(bloecke).toHaveCount(BLOECKE_ANZAHL);
+    const block = await alleHaltenStufe(bloecke, soll, `Block (${dichte})`, BLOECKE_ANZAHL);
+    // Zwei Blöcke an RTW 1 und zwei an RTW 2 stehen untereinander.
+    const abstand = checkAbstand(
+      await minAbstand(liste, bloecke),
+      dichte,
+      'Blöcke der Handy-Liste',
+    );
+    const werkzeug = page
+      .locator('[data-lfh="schichtplan-werkzeugzeile"]')
+      .getByRole('button', { name: /^(Block anlegen|Schichten erzeugen)$/ });
+    const aktion = await alleHaltenStufe(werkzeug, soll, `Werkzeug (${dichte})`, 2);
+    je.set(`${dichte} Block`, block);
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Block ${block} (Abstand ${abstand}), Werkzeug ${aktion}`,
+    );
+  }
+  gegenprobe(je, 'Block');
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
@@ -5057,7 +5238,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
 const TABLET_HOCH = { width: 820, height: 1180 };
 const TABLET_QUER = { width: 1180, height: 820 };
 
-/** Lagebericht, Befehl und Pressemitteilung, je freigegeben: erst dann trägt die Seite den Sprung. */
+/** Lagebericht und Befehl, je freigegeben: erst dann trägt die Seite den Sprung. */
 async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
   // Die Freigabe verlangt jeden Abschnitt der Vorlage mit Text (sonst 422).
@@ -5115,17 +5296,6 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       // verankerte Leiste nur die Handlungen.
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
       fortschreiben: 'Fortschreiben',
-    },
-    {
-      name: 'Pressemitteilung',
-      pfad: `${R}/stab/presse/mitteilungen/${await freigegeben(
-        'stab/pressemitteilungen',
-        { vorlage: 'erstinformation', titel: 'Presse 968' },
-        ['sachverhalt', 'massnahmen', 'hinweise', 'naechste_information', 'rueckfragen'],
-        'Pressemitteilung',
-      )}`,
-      aktionen: '[data-lfh="seitenkopf-aktionen"]',
-      fortschreiben: 'Folgemeldung schreiben',
     },
   ];
 }

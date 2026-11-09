@@ -77,26 +77,18 @@ impl ErinnerungAnzeige {
     }
 }
 
-/// Reichert Erinnerungen für die Antwort an: Labelkarte der Einsatz-Org, Besetzung nur mit
-/// Stab-Recht (`fuehrung::aufloesung`). Einmal je Anfrage geladen.
+/// Reichert Erinnerungen für die Antwort an: Labelkarte der Einsatz-Org, Besetzung aus der
+/// Mitgliedschaft, nie für ein gekoppeltes Gerät (`fuehrung::aufloesung`). Einmal je Anfrage
+/// geladen.
 pub async fn anreichern_alle(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     org_id: i64,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_rolle: Option<crate::einsatz::EinsatzRolle>,
     geraet: Option<&crate::geraet::GeraetKontext>,
     erinnerungen: &mut [ErinnerungAnzeige],
 ) -> Result<(), crate::error::AppError> {
-    let aufloeser = crate::fuehrung::aufloesung::Aufloeser::laden_fuer(
-        pool,
-        einsatz_id,
-        org_id,
-        benutzer,
-        einsatz_rolle,
-        geraet,
-    )
-    .await?;
+    let aufloeser =
+        crate::fuehrung::aufloesung::Aufloeser::laden_fuer(pool, einsatz_id, geraet).await?;
     let mut conn = pool.acquire().await?;
     let karte = crate::fuehrung::repo::labelkarte(&mut conn, org_id).await?;
     for e in erinnerungen.iter_mut() {

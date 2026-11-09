@@ -527,11 +527,12 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("dokumente", "dokumente"),
     ("lagebesprechung", "lagebesprechung"),
     ("lagebesprechung", "lagebesprechungen"),
-    // Stab stand bis LLH-1111 irrtümlich unter `OHNE_EIGENE_ROUTEN`, obwohl er eigene Routen hat.
-    ("stab", "stab"),
     // LLH-1180: die S6-Pfade bleiben unter `…/stab`, gehören aber dem Fernmeldewesen.
     ("fernmeldewesen", "stab/kommunikationsplan"),
     ("fernmeldewesen", "stab/fernmeldeskizze"),
+    // i6k6mzed (design.md D3): das Informationstelefon behält seinen Pfad unter `…/stab`, ist
+    // aber ein eigenes Modul.
+    ("infotelefon", "stab/infotelefon"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
@@ -1288,12 +1289,12 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
 
 // ----------------------------- LLH-1183: Modul-Vorgaben am Einsatz -----------------------------
 
-/// Org-Vorgaben für die Tests: `stab` ausgeblendet, `lagemeldungen` nur für die Führung im
+/// Org-Vorgaben für die Tests: `lagebesprechung` ausgeblendet, `lagemeldungen` nur für die Führung im
 /// Einsatz.
 async fn set_org_vorgaben(app: &axum::Router, admin: &str) {
     for (pfad, body) in [
         (
-            "/api/org-modul-einstellungen/stab",
+            "/api/org-modul-einstellungen/lagebesprechung",
             r#"{"benoetigte_rolle":null,"sichtbar":false}"#,
         ),
         (
@@ -1329,7 +1330,7 @@ async fn einsatzleitung_ohne_org_rolle_liest_die_modul_vorgaben_ihres_einsatzes(
 
     let (status, v) = load_modul_vorgaben(&app, &lotta, eid).await;
     assert_eq!(status, StatusCode::OK, "{v}");
-    assert_eq!(v["stab"]["sichtbar"], false, "{v}");
+    assert_eq!(v["lagebesprechung"]["sichtbar"], false, "{v}");
     assert_eq!(
         v["lagemeldungen"]["benoetigte_rolle"], "einsatzfuehrung",
         "{v}"
@@ -1371,7 +1372,7 @@ async fn beobachter_liest_die_modul_vorgaben() {
 
     let (status, v) = load_modul_vorgaben(&app, &bruno, eid).await;
     assert_eq!(status, StatusCode::OK, "{v}");
-    assert_eq!(v["stab"]["sichtbar"], false, "{v}");
+    assert_eq!(v["lagebesprechung"]["sichtbar"], false, "{v}");
 }
 
 #[tokio::test]
@@ -1415,7 +1416,10 @@ async fn einsatzleitung_aus_fremder_org_liest_die_vorgaben_der_einsatz_org() {
 
     let (status, v) = load_modul_vorgaben(&app, &gerda, eid).await;
     assert_eq!(status, StatusCode::OK, "{v}");
-    assert_eq!(v["stab"]["sichtbar"], false, "Vorgabe der Einsatz-Org: {v}");
+    assert_eq!(
+        v["lagebesprechung"]["sichtbar"], false,
+        "Vorgabe der Einsatz-Org: {v}"
+    );
 }
 
 #[tokio::test]
@@ -1446,5 +1450,5 @@ async fn fuehrungskraft_der_einsatz_org_liest_die_modul_vorgaben_ohne_mitgliedsc
 
     let (status, v) = load_modul_vorgaben(&app, &fiona, eid).await;
     assert_eq!(status, StatusCode::OK, "{v}");
-    assert_eq!(v["stab"]["sichtbar"], false, "{v}");
+    assert_eq!(v["lagebesprechung"]["sichtbar"], false, "{v}");
 }

@@ -8,14 +8,14 @@ import type {
   Einheit,
   EinsatzFahrzeug,
   Einsatzabschnitt,
+  Fuehrungsfunktion,
   Fuehrungsstelle,
   KommunikationsStelle,
-  Sachgebiet,
+  MitgliedAnzeige,
   Sprechgruppe,
-  Stabsfunktion,
 } from '../api/types';
-import type { FernmeldenetzQuellen } from '../stab/fernmeldeskizze';
-import type { Quelle } from '../stab/luecken';
+import type { FernmeldenetzQuellen } from '../fernmeldewesen/fernmeldeskizze';
+import type { Quelle } from '../api/abrufZustand';
 
 /**
  * Datenfabriken für Tests der Fernmeldeskizze (LFH-893): Quellen für `baueFernmeldenetz` mit
@@ -73,18 +73,19 @@ export function fahrzeug(id: number, p: Partial<EinsatzFahrzeug> = {}): EinsatzF
   };
 }
 
-export function besetzt(
-  sachgebiet: Sachgebiet,
-  besetzung_art: Stabsfunktion['besetzung_art'],
-  name: string | null = null,
-): Stabsfunktion {
+/** Ein Mitglied mit Führungsfunktion (i6k6mzed, D7): Quelle der Sachgebiete im Kasten. */
+export function mitglied(
+  id: number,
+  anzeigename: string,
+  fuehrungsfunktion?: Fuehrungsfunktion,
+): MitgliedAnzeige {
   return {
-    sachgebiet,
-    besetzung_art,
-    name,
-    gesetzt_at: '2026-10-08T08:00:00Z',
-    gesetzt_von_id: 1,
-    personal_noch_disponiert: true,
+    benutzer_id: id,
+    anzeigename,
+    benutzername: `konto${id}`,
+    einsatz_rolle: 'fuehrungspersonal',
+    zugewiesen_at: '2026-10-08T08:00:00Z',
+    ...(fuehrungsfunktion ? { fuehrungsfunktion } : {}),
   };
 }
 
@@ -160,7 +161,7 @@ export function quellen(
     sprechgruppen: daten([]),
     stellen: daten([]),
     fahrzeuge: daten([]),
-    besetzung: daten([]),
+    mitglieder: daten([]),
     skizze: { zustand: 'daten', daten: { ...LEER_SKIZZE, ...skizze } },
     ...rest,
   };

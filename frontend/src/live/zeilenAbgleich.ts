@@ -10,14 +10,8 @@ import {
   type SchaedenFilter,
   type SchadenSortierung,
 } from '../api/einsatzSchaden';
-import {
-  ladeMedienkontakt,
-  MEDIENKONTAKTE_SEITE,
-  vergleicheMedienkontakte,
-  vergleicheNachEingang,
-} from '../api/presse';
 import { einsatzKeys, type ZeilenZiel } from '../api/queryKeys';
-import type { Medienkontakt, Schaden, SchadenMarker } from '../api/types';
+import type { Schaden, SchadenMarker } from '../api/types';
 import { LIVE_SAMMELFENSTER_MS, type LiveSammler } from './liveInvalidierung';
 
 /**
@@ -105,32 +99,6 @@ function ziel<Z>(
 const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? s : null);
 
 const ZIELE: Record<ZeilenZiel, Ziel> = {
-  // Alle Listen der Medienkontakte liegen unter `medienkontakte(e)`.
-  medienkontakte: ziel<Medienkontakt>(ladeMedienkontakt, (e) => [einsatzKeys.medienkontakte(e)], [
-    // Vollliste ohne Phase (Altbestand der Abrufer); die Presseseite liest die Phasen.
-    liste(einsatzKeys.medienkontakte, (k: Medienkontakt) => k, vergleicheMedienkontakte),
-    liste(
-      einsatzKeys.medienkontakteOffen,
-      (k: Medienkontakt) => (k.status === 'offen' ? k : null),
-      vergleicheNachEingang,
-    ),
-    // Je Kopffilter „Art“ eine Kette (LLH-1096): ihr letztes Key-Glied nennt die Arten, eine
-    // Kette ohne Filter endet mit `abgeschlossen`.
-    fenster(
-      (e) => einsatzKeys.medienkontakteErledigt(e),
-      true,
-      (k: Medienkontakt, cacheKey) => {
-        const arten = cacheKey.length > 4 ? String(cacheKey[4]).split(',') : null;
-        const passt = k.status !== 'offen' && (arten == null || arten.includes(k.art));
-        return {
-          zeile: passt ? k : null,
-          vergleich: vergleicheNachEingang,
-          seite: MEDIENKONTAKTE_SEITE,
-        };
-      },
-    ),
-    einzeln<Medienkontakt>(einsatzKeys.medienkontaktEinzelnAlle),
-  ]),
   // Auswahl, Seitenketten und Einzelabrufe liegen unter `schaeden(e)`, die Marker daneben.
   schaeden: ziel<Schaden>(
     ladeSchaden,
@@ -219,7 +187,7 @@ export interface ZeilenSammler {
 
 /**
  * Zeilenabgleich einer Live-Verbindung (LFH-931, Spec `live-abgleich`, design.md D3): Ereignisse
- * zu einem Medienkontakt oder Schaden laden nur diese Zeile und sortieren sie in die geladenen
+ * zu einem Schaden laden nur diese Zeile und sortieren sie in die geladenen
  * Listen ein, statt den Gesamtbestand neu abzurufen.
  *
  * Wo sich das nicht lohnt oder nicht sicher ist, gehen die Listen an den Sammler der Verbindung

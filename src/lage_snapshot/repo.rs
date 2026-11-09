@@ -276,12 +276,7 @@ pub async fn erzeuge(
         // Schwärzungspfad im JSON.
         einsatz: crate::einsatz::EinsatzAnzeige {
             einsatzleiter: None,
-            ..einsatz.anzeige(
-                None,
-                None,
-                Vec::new(),
-                &crate::fuehrung::Labelkarte::standard(),
-            )
+            ..einsatz.anzeige(None, None, &crate::fuehrung::Labelkarte::standard())
         },
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,

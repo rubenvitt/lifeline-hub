@@ -73,42 +73,7 @@ impl Welt {
         login_cookie(&self.app, name, &format!("{name}pw1")).await
     }
 
-    /// Legt eine Stamm-Person mit verknüpftem Konto an, disponiert sie und besetzt mit ihr ein
-    /// Sachgebiet.
-    async fn besetzen(&self, sachgebiet: &str, benutzer_id: i64) {
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            "/api/personal",
-            &self.admin,
-            Some(&json!({ "name": "Anna Albers", "benutzer_id": benutzer_id }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
-            &self.admin,
-            Some(&json!({ "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert_eq!(s, StatusCode::CREATED, "{v}");
-        let (s, v) = anfrage(
-            &self.app,
-            "PUT",
-            &format!(
-                "/api/einsaetze/{}/stab/besetzung/{sachgebiet}",
-                self.einsatz
-            ),
-            &self.admin,
-            Some(&json!({ "besetzung_art": "personal", "personal_id": v["id"] }).to_string()),
-        )
-        .await;
-        assert!(s.is_success(), "besetzen {sachgebiet}: {s} {v}");
-    }
-
-    /// Setzt die Funktion einer Mitgliedschaft (Ersatz, wenn die Stab-Besetzung leer ist).
+    /// Setzt die Funktion einer Mitgliedschaft (i6k6mzed D2: die eine Quelle der Funktion).
     async fn funktion_setzen(&self, benutzer_id: i64, rolle: &str, funktion: &str) {
         let (s, v) = anfrage(
             &self.app,
@@ -216,7 +181,7 @@ fn zeile(benutzer: i64, nachricht: i64) -> Zeile {
 #[tokio::test]
 async fn erwaehnung_einer_funktion_erreicht_ihre_nutzer() {
     let w = welt().await;
-    w.besetzen("s4", w.anna).await;
+    w.funktion_setzen(w.anna, "fuehrungspersonal", "s4").await;
     w.funktion_setzen(w.bert, "fuehrungspersonal", "s2").await;
     let n = w
         .gesendet(
@@ -242,9 +207,9 @@ async fn erwaehnung_einer_funktion_erreicht_ihre_nutzer() {
     assert!(w.lesen(&w.admin).await.is_empty());
 }
 
-/// Ohne Stab-Besetzung gilt die Funktion der Mitgliedschaft (Spec „Meine Funktion“).
+/// Spec „Meine Funktion“, Szenario „Ersatz über die Mitgliedschaft“.
 #[tokio::test]
-async fn erwaehnung_einer_funktion_erreicht_ersatzweise_die_mitgliedschaft() {
+async fn erwaehnung_einer_funktion_erreicht_die_mitgliedschaft() {
     let w = welt().await;
     w.funktion_setzen(w.bert, "fuehrungspersonal", "s4").await;
     let n = w
@@ -275,7 +240,7 @@ async fn erwaehnung_eines_nutzers_erreicht_nur_ihn() {
 #[tokio::test]
 async fn der_autor_bekommt_nichts_auch_als_erwaehnter() {
     let w = welt().await;
-    w.besetzen("s4", w.anna).await;
+    w.funktion_setzen(w.anna, "fuehrungspersonal", "s4").await;
     let anna = w.cookie("annika").await;
     let n = w
         .gesendet(
@@ -296,7 +261,7 @@ async fn der_autor_bekommt_nichts_auch_als_erwaehnter() {
 #[tokio::test]
 async fn nachricht_ohne_erwaehnung_bleibt_still() {
     let w = welt().await;
-    w.besetzen("s4", w.anna).await;
+    w.funktion_setzen(w.anna, "fuehrungspersonal", "s4").await;
     w.gesendet(
         &w.admin,
         json!({ "inhalt": "@S4 bitte Verpflegung klären" }),

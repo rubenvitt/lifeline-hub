@@ -92,19 +92,6 @@ gemerkt werden.
 - **WHEN** die Adresse `…/fahrzeuge?f.traeger=ASB` neu geladen wird, bevor die Fahrzeuge geladen sind
 - **THEN** bleibt der Filter stehen und zeigt nach dem Laden nur die Fahrzeuge des ASB
 
-### Requirement: Servermodus filtert nicht doppelt
-Im Servermodus SHALL die Sicht Kopffilter, Suche und Sortierung an die Seite melden und MUST NOT
-selbst filtern oder sortieren. Das Kopfmenü MUST NOT zählen. Die Zahlen des Filterhinweises MUST
-aus einer Serverzählung kommen; fehlt sie, steht keine Zahl.
-
-#### Scenario: Kopffilter am Server
-- **WHEN** in der seitenweise geladenen Schadenliste im Kopf „Ausmaß“ „katastrophal“ gewählt wird
-- **THEN** fragt die Seite den Server mit diesem Filter und zeigt einen Schaden weit hinten ohne Nachladen
-
-#### Scenario: Presse-Log nach Art
-- **WHEN** im Presse-Log mit vielen erledigten Terminen im Auswahlfeld „Art“ „Termin“ gewählt wird
-- **THEN** fragt die Seite die erledigten mit `art=termin` am Server ab, filtert die vollständig geladenen offenen selbst, und der Filterhinweis nennt die Zahl der Termine aus den Kennzahlen
-
 ### Requirement: KatalogTabelle übernimmt das Muster
 Eine `KatalogTabelle` mit Spaltenfiltern SHALL dieselben Chips und denselben Filterhinweis
 zeigen, sofern der Aufrufer Filter und Sortierung nicht selbst kontrolliert. Mit `gedaechtnis`
@@ -120,3 +107,13 @@ Teilen sich mehrere Listen eine Seite (Archivakte), MUST NOT eine davon die Adre
 #### Scenario: Zähler im Kopfmenü der Stammdaten
 - **WHEN** in den Stammdaten „Fahrzeuge“ nach „RTW“ gesucht und das Kopfmenü „Träger“ geöffnet wird
 - **THEN** nennt jeder Träger die Zahl der RTW, die er trägt
+
+### Requirement: Im Servermodus filtert, sortiert und zählt nur der Server
+
+Im Servermodus SHALL die Sicht Kopffilter, Suche und Sortierung an die Seite melden und MUST NOT
+selbst filtern oder sortieren. Das Kopfmenü MUST NOT zählen. Die Zahlen des Filterhinweises MUST
+aus einer Serverzählung kommen; fehlt sie, steht keine Zahl.
+
+#### Scenario: Kopffilter am Server
+- **WHEN** in der seitenweise geladenen Schadenliste im Kopf „Ausmaß“ „katastrophal“ gewählt wird
+- **THEN** fragt die Seite den Server mit diesem Filter und zeigt einen Schaden weit hinten ohne Nachladen

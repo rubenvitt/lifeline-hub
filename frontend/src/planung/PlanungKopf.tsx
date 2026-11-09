@@ -81,9 +81,12 @@ export function kopfPatch(vorher: KopfWerte, nachher: KopfWerte): KopfPatch {
 export default function PlanungKopf({
   planung,
   onNeuLaden,
+  readOnly = false,
 }: {
   planung: Planung;
   onNeuLaden: () => void;
+  /** Übernommen (LLH-1587): ohne „Bearbeiten“. */
+  readOnly?: boolean;
 }) {
   const { kopf, kennzahlen } = planung;
   const qc = useQueryClient();
@@ -170,7 +173,7 @@ export default function PlanungKopf({
       patch={kopfPatch}
       onSpeichern={speichern}
       onNeuLaden={onNeuLaden}
-      darfSchreiben
+      darfSchreiben={!readOnly}
     />
   );
 }

@@ -2,19 +2,15 @@ import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SCHADEN_SORTIERUNG_VORGABE } from '../api/einsatzSchaden';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Medienkontakt, Schaden } from '../api/types';
+import type { Schaden } from '../api/types';
 import { erzeugeLiveSammler, LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { erzeugeZeilenSammler, fensterEinsortieren } from './zeilenAbgleich';
 
-const api = vi.hoisted(() => ({ ladeSchaden: vi.fn(), ladeMedienkontakt: vi.fn() }));
+const api = vi.hoisted(() => ({ ladeSchaden: vi.fn() }));
 
 vi.mock('../api/einsatzSchaden', async (orig) => ({
   ...(await orig<typeof import('../api/einsatzSchaden')>()),
   ladeSchaden: api.ladeSchaden,
-}));
-vi.mock('../api/presse', async (orig) => ({
-  ...(await orig<typeof import('../api/presse')>()),
-  ladeMedienkontakt: api.ladeMedienkontakt,
 }));
 
 const E = 7;
@@ -32,9 +28,6 @@ const schaden = (id: number, registrier_nr: number, extra: Partial<Schaden> = {}
     storniert_at: null,
     ...extra,
   }) as unknown as Schaden;
-
-const kontakt = (id: number, status: string, eingang_at: string) =>
-  ({ id, status, eingang_at, thema: `Thema ${id}` }) as unknown as Medienkontakt;
 
 const ketten = <T>(...pages: T[][]): InfiniteData<T[]> => ({
   pages,
@@ -147,7 +140,6 @@ const invalidierteKeys = (inval: ReturnType<typeof aufbau>['inval']) =>
 beforeEach(() => {
   vi.useFakeTimers();
   api.ladeSchaden.mockReset();
-  api.ladeMedienkontakt.mockReset();
 });
 
 afterEach(() => {
@@ -238,51 +230,5 @@ describe('Zeilenabgleich in Seitenketten (LFH-1075)', () => {
     expect(qc.getQueryData(einsatzKeys.schaedenAuswahl(E))).toEqual([
       expect.objectContaining({ id: 3, registrier_nr: 3, ort: 'neu', frei: true }),
     ]);
-  });
-
-  it('ein Medienkontakt wechselt bei Rücknahme von den erledigten zu den offenen', async () => {
-    const { qc, inval, zeilen } = aufbau();
-    qc.setQueryData(einsatzKeys.medienkontakteOffen(E), [
-      kontakt(5, 'offen', '2026-10-08T06:00:00'),
-    ]);
-    qc.setQueryData(
-      einsatzKeys.medienkontakteErledigt(E),
-      ketten([
-        kontakt(4, 'erledigt', '2026-10-08T05:00:00'),
-        kontakt(3, 'erledigt', '2026-10-08T04:00:00'),
-      ]),
-    );
-    api.ladeMedienkontakt.mockResolvedValue(kontakt(4, 'offen', '2026-10-08T05:00:00'));
-
-    zeilen.vormerken('medienkontakte', 4);
-    await fenster();
-
-    expect(
-      qc.getQueryData<Medienkontakt[]>(einsatzKeys.medienkontakteOffen(E))?.map((k) => k.id),
-    ).toEqual([5, 4]);
-    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E)))).toEqual([[3]]);
-    expect(inval).not.toHaveBeenCalled();
-  });
-
-  it('ein erledigter Termin kommt nur in die Kette ohne Filter und die der Termine (LLH-1096)', async () => {
-    const { qc, zeilen } = aufbau();
-    const termin = { ...kontakt(6, 'erledigt', '2026-10-08T07:00:00'), art: 'termin' };
-    qc.setQueryData(einsatzKeys.medienkontakteOffen(E), []);
-    for (const arten of [[], ['termin'], ['anfrage']]) {
-      qc.setQueryData(
-        einsatzKeys.medienkontakteErledigt(E, arten),
-        ketten([kontakt(3, 'erledigt', '2026-10-08T04:00:00')]),
-      );
-    }
-    api.ladeMedienkontakt.mockResolvedValue(termin);
-
-    zeilen.vormerken('medienkontakte', 6);
-    await fenster();
-
-    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E)))).toEqual([[6, 3]]);
-    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E, ['termin'])))).toEqual([
-      [6, 3],
-    ]);
-    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E, ['anfrage'])))).toEqual([[3]]);
   });
 });

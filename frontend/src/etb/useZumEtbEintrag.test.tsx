@@ -9,7 +9,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { useZumEtbEintrag } from './useZumEtbEintrag';
 
 /**
- * Nebenweg „Zum ETB-Eintrag" der Detailseiten (Befehl, Lagebericht, Pressemitteilung; LFH-888,
+ * Nebenweg „Zum ETB-Eintrag" der Detailseiten (Befehl, Lagebericht; LFH-888,
  * design.md D4): freies ETB → Sprung auf den Eintrag, gesperrtes → gesperrter Weg mit Grund.
  * Ab `md` im Sprung-Muster (LFH-968): Knopfform, „↗“, Grund im sichtbaren Text.
  */

@@ -1,7 +1,7 @@
 # lage-verdichtung Specification
 
 ## Purpose
-Jede Zahl, die das Lage-Dashboard, der Führungsüberblick und der Stab zeigen, hat genau einen
+Jede Zahl, die das Lage-Dashboard und der Führungsüberblick zeigen, hat genau einen
 Rechenweg. Dieselbe Zahl zeigt an jeder Stelle denselben Wert, damit eine Lagebesprechung nicht
 zwei Wahrheiten vorträgt.
 

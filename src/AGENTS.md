@@ -246,10 +246,6 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   Cursor falsch.
 - **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`,
   `…/schaeden/auswahl`), nicht die Vollliste.
-- **Das Presse-Log trennt nach Phase wie die Meldungen** (LFH-1075), Ordnung und Cursor über
-  `eingang_at`; offen ist nur `offen`. `…/medienkontakte/kennzahlen` trägt Zahlen und Namen der
-  Medien, nie Personenbezug. `art=` (kommagetrennt, nur mit `phase`) engt beide Phasen vor dem
-  `LIMIT` ein (LLH-1096, Kopffilter „Art“).
 - **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
   gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.
   `…/infotelefon` liefert immer eine Seite (`kommunikation::parse_page`, Cursor `eingang_at` + `id`),
@@ -302,6 +298,29 @@ Spec `passwort-anmeldung`, Herleitung
   serverweit (versuchter Name ohne Konto). Ein Rebuild einer der Tabellen nimmt die Spalte mit.
   Nachweis `tests/zugangsprotokoll.rs` (`jede_org_liest_nur_ihre_spur`).
 
+## Backend — Instanzkopplung (LLH-1490)
+
+Zwei Instanzen (ELW und Hub) sprechen nur signiert miteinander; Regeln des Verfahrens in
+[ADR-0014](../docs/architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
+Herleitung in
+`openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`.
+
+- **Eine Route, die eine andere Instanz ruft, nimmt `instanz::extractor::GekoppelteInstanz`**
+  und antwortet über dessen `antwort` (signiert); nie `CurrentUser`, nie ein eigener
+  Token-Vergleich. Nur `POST /api/instanz/koppeln` ist öffentlich (IP-Sperre, einheitlich 401).
+- **Das Protokoll kennt Richtung, nicht Hub und ELW** (`InstanzKopplungRichtung`): wer einlöst,
+  meldet sich; die erreichte Seite baut nie eine Verbindung auf.
+- **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
+  kommt; Melden geht über alle Versionen (`extractor::check_protokoll`) und sein Schema
+  (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv.
+- **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
+  haben einen eigenen User-Handle: der Anmeldeweg liest sie nie. Neue Schlüssel nimmt eine
+  gekoppelte Instanz nur mit Gegenzeichnung eines bekannten an (`repo::accept_lieferungen`); wer ein
+  Admin-Konto deaktiviert oder herabstuft, widerruft dessen Schlüssel im selben Commit.
+- Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
+  (`akteur_id` NULL, Name der Gegenstelle).
+- Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
+
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
 
 - **Ein System-Admin schreibt ohne Mitgliedschaft nur an Einsätzen seiner eigenen Org**; lesen
@@ -345,6 +364,12 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   entscheidet allein `aufloesung::empfaenger`: dort stehen alle Ausschlüsse (Auslöser,
   Gerätekonten, inaktive Konten, kein Leserecht am Einsatz oder am Modul des Bezugs,
   abgeschaltete Hinweis-Art). Kein Aufrufer filtert selbst, keiner schreibt in die Tabelle.
+- **Eine Funktion löst nur über die Mitgliedschaft auf** (i6k6mzed,
+  `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md` D2): `Adressat::Funktion` erreicht jedes
+  Mitglied, dessen `einsatz_mitgliedschaft.fuehrungsfunktion` sie trägt; für EL zuerst den
+  verknüpften Nutzer des Einsatzleiters der Führungsstelle, nur ohne ihn die Mitgliedschaft.
+  Dieselbe Quelle liest die Anzeige (`fuehrung::aufloesung`, Regeln in
+  `frontend/src/fuehrung/AGENTS.md`); eine zweite Zuordnung „Funktion → Person“ gibt es nicht.
 - **Kein Text in der Tabelle:** eine Zeile je Empfänger mit Art, Stufe und Bezug. Titel,
   Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
   (Guard `detail_liest_nur_retain_spalten`). Trägt der Bezug die gemeinte Einheit nicht allein
@@ -376,8 +401,8 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
 - **Vorgabe je Funktion nur in der Auflösung** (LLH-1421, Entwurf
   `/mnt/project-files/llh-1421/design.md`, D1–D4): `aufloesung::empfaenger` stellt einen
   Hinweis auch still, wenn `benachrichtigung_vorgabe` ihn für JEDE Funktion des Empfängers still
-  stellt (Stab-Besetzung ∪ Funktion der Mitgliedschaft, leer = `ohne`); lauter gewinnt. Ohne
-  Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
+  stellt (EL als Einsatzleiter der Führungsstelle ∪ Funktion der Mitgliedschaft, leer = `ohne`);
+  lauter gewinnt. Ohne Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
   `vorgabe_einstellbar()`. Lesen und Schreiben nur über `benachrichtigung::vorgabe`.
   Verlauf `GET …/einsaetze/{id}/benachrichtigungen` (≤ 200, `ungelesen` = unquittierte Eingänge
   nach der Rechteprüfung), „alle gelesen“ `POST …/benachrichtigungen/gelesen` nur über
@@ -558,8 +583,8 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Kopf. Herleitung: `openspec/changes/archive/2026-10-05-lfh-996-schwaerzung-clients-raeumen/design.md`.
 - **Personen-Scrub nur über `PERSONENBEZUEGE`** (`einsatz/schwaerzung_person.rs`): je
   Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
-  eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,
-  `infotelefon_anruf` oder `medienkontakt` braucht dort einen Eintrag (Guard
+  eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal` oder
+  `infotelefon_anruf` braucht dort einen Eintrag (Guard
   `jeder_personenverweis_ist_als_bezug_deklariert`); ein Datei-Linker an einer Person (Registry
   `ZeileLoeschen`) steht stattdessen in `PERSONENANHAENGE`, der Vollzug löscht seine Dateien
   (LFH-769). Freitexte, die eine Person nur erwähnen, bleiben bis zur Einsatz-Schwärzung.

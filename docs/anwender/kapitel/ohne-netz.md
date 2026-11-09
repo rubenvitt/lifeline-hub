@@ -59,7 +59,8 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 - Rückmeldungen und der Kommunikationsplan des Fernmeldewesens
 - „Eingänge“, der Verlauf der eigenen Benachrichtigungen
 
-Nicht vorgehalten werden unter anderem die übrigen Meldungen, die Besetzung des Stabs und die
+Nicht vorgehalten werden unter anderem die übrigen Meldungen, die Mitglieder des Einsatzes samt
+ihrer Führungsfunktionen (der Kommunikationsplan nennt die Besetzung dann „nicht geladen“) und die
 Lagebesprechungen.
 
 **Grenze: 24 Stunden.** Ein vorgehaltener Stand gilt höchstens 24 Stunden nach der letzten

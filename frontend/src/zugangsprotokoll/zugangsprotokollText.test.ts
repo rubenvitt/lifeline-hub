@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANMELDEWEG_TEXT, anmeldewegText, rollenText } from './zugangsprotokollText';
+import { ANMELDEWEG_TEXT, anmeldewegText, instanzText, rollenText } from './zugangsprotokollText';
 
 /** Klartext des Zugangsprotokolls (LFH-1152): keine interne Kennung in der Liste. */
 describe('anmeldewegText', () => {
@@ -48,5 +48,21 @@ describe('rollenText', () => {
 
   it('ist leer ohne Rollen', () => {
     expect(rollenText({ geraet: 'iPad', angemeldet_at: '2026-10-10 12:13:34' })).toBeUndefined();
+  });
+});
+
+describe('instanzText (LLH-1490)', () => {
+  it('nennt Org, Fingerabdruck, Adresse und Grund', () => {
+    expect(
+      instanzText({
+        fremde_org: 'DRK LV',
+        fingerabdruck: 'ABCD-EFGH',
+        adresse: 'https://hub.example.org',
+        grund: 'ohne Gegenzeichnung',
+      }),
+    ).toBe(
+      'Org dort: DRK LV · Fingerabdruck ABCD-EFGH · https://hub.example.org · Grund: ohne Gegenzeichnung',
+    );
+    expect(instanzText({})).toBeUndefined();
   });
 });

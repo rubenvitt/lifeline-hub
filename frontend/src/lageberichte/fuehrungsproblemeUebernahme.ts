@@ -15,8 +15,9 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { MELDUNGSART_LABEL, istAlarmiert } from '../meldungen/meldungKennzahlen';
 import { istOffen } from '../pages/fuehrung/ueberblickDaten';
 import { auftraegeNotiz } from '../pages/lage-dashboard/fuehrungsZahlen';
-import { ZUSTAND_GRUND, funkplanLuecken, funkplanLueckenZeilen } from '../stab/funkplan';
-import type { Quelle } from '../stab/luecken';
+import { funkplanLuecken, funkplanLueckenZeilen } from '../fernmeldewesen/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import type { Quelle } from '../api/abrufZustand';
 import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebernahmeQuelle';
 
 /** Höchstens so viele Einzelzeilen je Liste; der Rest als „und n weitere“. */

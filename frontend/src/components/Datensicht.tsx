@@ -1,5 +1,5 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
-import { Button, ConfigProvider, Popconfirm, Typography, theme } from 'antd';
+import { App, Button, ConfigProvider, Popconfirm, Typography, theme } from 'antd';
 import type { CSSProperties, HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
 import type { TableColumnType } from 'antd';
 import {
@@ -29,6 +29,14 @@ import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { zielEinzug } from './instrument/zielEinzug';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
+import { KontextMenue, type KontextMenueOffen } from './KontextMenue';
+import { useKontextMenue } from './useKontextMenue';
+import {
+  fuehreKontextWahlAus,
+  kontextEintraege,
+  kontextName,
+  type ZeilenAktionen,
+} from './datensichtKontext';
 import { ZeilenFehler } from './SpeicherHinweis';
 import type { ZeilenGrund } from './useZeilenFehler';
 import {
@@ -1069,6 +1077,23 @@ const GemerkteKarte = memo(
 
 // ── Die Komponente ───────────────────────────────────────────────────────────────────
 
+/** Zeile zum Schlüssel, im Baum auch unter den Kindern (Kontextmenü, LLH-1596). */
+function findeZeile<T>(
+  zeilen: readonly T[],
+  k: Key,
+  schluessel: (zeile: T) => Key,
+  kinder: keyof T | undefined,
+): T | undefined {
+  for (const zeile of zeilen) {
+    if (schluessel(zeile) === k) return zeile;
+    const unter = kinder != null ? (zeile[kinder] as readonly T[] | undefined) : undefined;
+    const treffer =
+      unter && unter.length > 0 ? findeZeile(unter, k, schluessel, kinder) : undefined;
+    if (treffer !== undefined) return treffer;
+  }
+  return undefined;
+}
+
 export default function Datensicht<T extends object, const K extends string>(
   props: DatensichtProps<T, K>,
 ): ReactNode {
@@ -1468,9 +1493,43 @@ export default function Datensicht<T extends object, const K extends string>(
     nachBenutzeraktion();
   }, [serverStand, nachBenutzeraktion]);
 
+  // ── Kontextmenü (LLH-1596, Spec `datensatz-aktionsmenue`, design.md D7) ─────────────────────
+  /**
+   * EIN Menü je Sicht. Quelle der Einträge ist der Kartenplan (`aktion` + `weitere`), in BEIDEN
+   * Zweigen: die Seiten speisen ihre Tabellenspalte aus denselben Daten. Gemerkt wird nur der
+   * Schlüssel; Zeile und Einträge kommen je Render frisch, damit Live-Daten und Rechte gelten.
+   */
+  const zeilenAktionen: ZeilenAktionen<T> | null =
+    karte.art === 'plan' && (karte.aktion != null || karte.weitere != null)
+      ? { aktion: karte.aktion, weitere: karte.weitere }
+      : null;
+  const [kontext, setKontext] = useState<{ k: Key; offen: KontextMenueOffen } | null>(null);
+  const kontextAusloeser = useKontextMenue<T>({
+    kannOeffnen: (zeile) =>
+      zeilenAktionen != null && kontextEintraege(zeilenAktionen, zeile).length > 0,
+    onOeffnen: (zeile, { anker, vorherFokus }) => {
+      if (zeilenAktionen == null || kontextEintraege(zeilenAktionen, zeile).length === 0) {
+        return false;
+      }
+      setKontext({ k: schluessel(zeile), offen: { anker, vorherFokus } });
+      return true;
+    },
+  });
+  const kontextZeile =
+    kontext == null ? undefined : findeZeile(daten, kontext.k, schluessel, baum?.kinder);
+  const kontextListe =
+    kontextZeile != null && zeilenAktionen != null
+      ? kontextEintraege(zeilenAktionen, kontextZeile)
+      : [];
+  // Verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü. Im Render
+  // zurückgesetzt (abgeleiteter Zustand), wie in `MenueAusloeser`.
+  if (kontext != null && kontextListe.length === 0) setKontext(null);
+  const { modal } = App.useApp();
+
   /**
    * Offene Menüs des Kartenfußs (`weitere`) halten die Sicht wie `halten` der Seite. Ein Schlüssel
-   * je Karte; der Auslöser meldet „zu“, auch wenn er mit offenem Menü aushängt.
+   * je Karte; der Auslöser meldet „zu“, auch wenn er mit offenem Menü aushängt. Das offene
+   * Kontextmenü hält ebenso (LLH-1596).
    */
   const [kartenMenueOffen, setKartenMenueOffen] = useState<ReadonlySet<Key>>(() => new Set());
   const reportKartenMenue = useCallback((k: Key, offen: boolean) => {
@@ -1491,7 +1550,7 @@ export default function Datensicht<T extends object, const K extends string>(
     gruppeVon: gruppen?.schluessel,
     mitGerippe: baumKinder != null,
     wurzel,
-    halten: halten || kartenMenueOffen.size > 0,
+    halten: halten || kartenMenueOffen.size > 0 || kontext != null,
   });
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
@@ -2332,8 +2391,12 @@ export default function Datensicht<T extends object, const K extends string>(
            * selbst bauen.
            */
           onRow={
-            zeilenKlick || zeilenImFenster
-              ? (zeile) => ({ ...zeilenImFenster?.(zeile), ...zeilenKlick?.(zeile) })
+            zeilenKlick || zeilenImFenster || zeilenAktionen
+              ? (zeile) => ({
+                  ...zeilenImFenster?.(zeile),
+                  ...zeilenKlick?.(zeile),
+                  ...(zeilenAktionen ? kontextAusloeser<HTMLElement>(zeile) : {}),
+                })
               : undefined
           }
           /**
@@ -2471,6 +2534,7 @@ export default function Datensicht<T extends object, const K extends string>(
       <div
         data-lfh="datensicht-karte"
         className={zeilenKlasse?.(zeile)}
+        {...(zeilenAktionen ? kontextAusloeser<HTMLDivElement>(zeile) : {})}
         style={{ paddingInlineStart: token.padding * Math.min(tiefe, TIEFE_DECKEL) }}
       >
         <ListenEintrag
@@ -2768,6 +2832,15 @@ export default function Datensicht<T extends object, const K extends string>(
       {verdeckteFehlerBlock}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
       {alsTabelle ? tabelle : kartenZweig}
+      {kontextZeile != null && zeilenAktionen != null ? (
+        <KontextMenue
+          offen={kontext?.offen ?? null}
+          eintraege={kontextListe}
+          zugaenglicherName={kontextName(zeilenAktionen, kontextZeile)}
+          onWahl={(key) => fuehreKontextWahlAus(zeilenAktionen, kontextZeile, key, modal)}
+          onSchliessen={() => setKontext(null)}
+        />
+      ) : null}
     </section>
   );
 }

@@ -5,7 +5,7 @@
  * Die Mechanik (Portal, `autoFocus`, Punktanker, Schließen nur über `onOpenChange`, Fokus zurück an
  * die Karte, Eintragshöhe der Dichtestufe) trägt die gemeinsame Schale `PunktankerMenue` (LFH-776).
  */
-import PunktankerMenue from './PunktankerMenue';
+import PunktankerMenue from '../../components/PunktankerMenue';
 
 export interface Flaechenwahl {
   /** Tipppunkt in Pixeln relativ zum Kartencontainer. */

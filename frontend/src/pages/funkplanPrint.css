@@ -12,7 +12,7 @@
   }
 
   /* Die Beschreibung darunter ist Bildschirmhilfe. In der Skizze stand sie vor dem quer benannten
-     Blatt (`stab/skizze/skizzeDruck.css`) und erzwang eine eigene, fast leere erste Seite im
+     Blatt (`fernmeldewesen/skizze/skizzeDruck.css`) und erzwang eine eigene, fast leere erste Seite im
      Hochformat (LFH-893, e2e `fernmeldeskizze-druck.spec.ts`). */
   .funkplan-print-root [data-lfh='seiten-beschreibung'] {
     display: none !important;

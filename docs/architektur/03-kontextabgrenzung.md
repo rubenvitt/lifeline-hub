@@ -14,7 +14,7 @@ es nicht (kein SMTP-Crate in [`Cargo.toml`](../../Cargo.toml)).
 
 | Partner | Was ausgetauscht wird |
 | --- | --- |
-| Einsatzleitung, Führungspersonal, Stab, Beobachter | Erfassen und lesen Einsatzdaten in Browser, PWA oder Desktop-Hülle; Rechte nach Rolle im Einsatz ([Kapitel 1](01-einfuehrung-und-ziele.md), Stakeholder) |
+| Einsatzleitung, Führungspersonal, Beobachter | Erfassen und lesen Einsatzdaten in Browser, PWA oder Desktop-Hülle; Rechte nach Rolle im Einsatz ([Kapitel 1](01-einfuehrung-und-ziele.md), Stakeholder) |
 | Einsatzkräfte an gekoppelten Geräten | Erfassen für genau eine Stelle eines Einsatzes ohne Personenkonto (Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md)) |
 | Lagemonitor | Zeigt das Lagebild ohne Bedienung und ohne personenbezogene Daten (Spec [`lagemonitor`](../../openspec/specs/lagemonitor/spec.md)) |
 | Administration | Benutzer, Organisation, Karten, Aufbewahrung, Zugangsprotokoll |

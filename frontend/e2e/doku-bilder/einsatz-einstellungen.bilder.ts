@@ -14,6 +14,10 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   abloesung.png   frontend/src/pages/einstellungen/EinsatzAbloesung.tsx,
  *                   frontend/src/abloesung/schichtmodellText.ts (Vorgabe des Einsatzes aus den
  *                   Demo-Daten, LLH-1122)
+ *   dienst-und-ruhe.png
+ *                   frontend/src/pages/einstellungen/EinsatzGrenzwerte.tsx,
+ *                   frontend/src/abloesung/grenzwerte.ts (Höchstdienst 10 h, Mindestruhe als
+ *                   Vorgabe, LLH-1603)
  */
 
 const KAPITEL = 'einsatz-einstellungen';
@@ -41,6 +45,26 @@ test.describe(KAPITEL, () => {
     ).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(reiter, KAPITEL, 'abloesung');
+  });
+
+  test('Paneel „Dienst und Ruhe“ mit eigenem Höchstdienst', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const pfad = `/api/einsaetze/${demo.id}/abloesungen/schichtplan/grenzwerte`;
+    // Nur für die Aufnahme: ein eigener Höchstdienst neben der Vorgabe der Mindestruhe, danach
+    // zurück auf die Vorgabe. Andere Kapitel zeigen den Demo-Einsatz mit den Vorgaben.
+    await fuelle(page, 'patch', pfad, { max_dienst_minuten: 600 });
+    try {
+      await uhrAnhalten(page);
+      await page.goto(`/einsaetze/${demo.id}/einstellungen/abloesung`);
+      const paneel = page.getByRole('region', { name: 'Dienst und Ruhe' });
+      await expect(paneel.getByText('8 h (Vorgabe)')).toBeVisible();
+      await expect(paneel.getByText('10 h', { exact: true })).toBeVisible();
+      await page.mouse.move(0, 0);
+      await fotografiere(paneel, KAPITEL, 'dienst-und-ruhe');
+    } finally {
+      await fuelle(page, 'patch', pfad, { max_dienst_minuten: null });
+    }
   });
 
   test('Reiter „Verhalten & Automatik“', async ({ page }) => {

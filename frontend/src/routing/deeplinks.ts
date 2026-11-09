@@ -47,6 +47,21 @@ export function planungPfad(planungId: number, reiter?: PlanungReiter): string {
   return reiter && reiter !== 'plan' ? `${basis}?reiter=${reiter}` : basis;
 }
 
+/**
+ * Druckansicht einer Planung (LLH-1593): Aushang je Posten oder Zettel je Person, Auswahl wie
+ * beim Schichtplan eines Einsatzes ({@link schichtplanDruckPfad}, gelesen mit
+ * {@link parseSchichtplanDruckAuswahl}). Ein Posten der Planung heißt dort `einheit:<posten_id>`.
+ */
+export function planungDruckPfad(
+  planungId: number,
+  opts: Partial<SchichtplanDruckAuswahl> = {},
+): string {
+  return mitQuery(`/planungen/${planungId}/druck`, {
+    sicht: opts.sicht === 'person' ? 'person' : undefined,
+    auswahl: opts.auswahl ?? undefined,
+  });
+}
+
 /** Reiter aus `?reiter=`; Unbekanntes ist `plan`. */
 export function parsePlanungReiter(params: URLSearchParams): PlanungReiter {
   const r = params.get('reiter');
@@ -511,11 +526,6 @@ export function evakuierungsbezirkPfad(einsatzId: number, bezirkId: number): str
   return `${einsatzModulPfad(einsatzId, 'evakuierung')}/${bezirkId}`;
 }
 
-/** Stab-Modul. Den Abschluss der Lagebesprechung trägt seit LLH-1111 `lagebesprechungPfad`. */
-export function stabPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'stab');
-}
-
 /**
  * Modul Lagebesprechung (LLH-1111). `?neu=1` liest und räumt die Seite (Abschluss der
  * Lagebesprechung, Schnellaktion der Palette).
@@ -528,7 +538,7 @@ export function lagebesprechungPfad(einsatzId: number, opts: { neu?: boolean } =
 
 /**
  * Funkplan des Sachgebiets S6 (LFH-548): die Startseite des Moduls Fernmeldewesen (LLH-1180),
- * Sperre und Sichtbarkeit erbt die Seite von diesem Modul, nicht vom Stab. Die Altadresse
+ * Sperre und Sichtbarkeit erbt die Seite von diesem Modul. Die Altadresse
  * `…/stab/funkplan` leitet hierher (`einsatz/AltpfadWeiterleitung.tsx`).
  */
 export function funkplanPfad(einsatzId: number, opts: { ansicht?: FunkplanAnsicht } = {}): string {
@@ -568,29 +578,16 @@ export function kommunikationsplanPfad(einsatzId: number): string {
 }
 
 /**
- * Pressearbeit des Sachgebiets S5 (LFH-554): Presse-Log, Pressemitteilungen und Medienlage. Eine
- * Unterroute des Stabs, kein eigenes Modul. `?kontakt=<id>` rollt zu einem
- * Medienkontakt (Auslesen über `parseRouteId`).
- */
-export function pressePfad(einsatzId: number, opts: { kontakt?: number } = {}): string {
-  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/presse`, { kontakt: opts.kontakt });
-}
-
-/** Detailseite einer Pressemitteilung (Item-Route unter der Presseseite). */
-export function pressemitteilungPfad(einsatzId: number, mitteilungId: number): string {
-  return `${pressePfad(einsatzId)}/mitteilungen/${mitteilungId}`;
-}
-
-/**
- * Anrufprotokoll des Informationstelefons (S5, LFH-554), Unterroute des Stabs. `?anruf=<id>`
- * rollt zu einem Anruf; `?neu=1` setzt den Fokus in die Anruferfassung (Schnellaktion „Anruf
- * erfassen“, LLH-1127; apply-then-clean).
+ * Anrufprotokoll des Informationstelefons (LFH-554), seit i6k6mzed ein eigenes Modul (design.md
+ * D3; die Altadresse `…/stab/infotelefon` leitet um). `?anruf=<id>` rollt zu einem Anruf;
+ * `?neu=1` setzt den Fokus in die Anruferfassung (Schnellaktion „Anruf erfassen“, LLH-1127;
+ * apply-then-clean).
  */
 export function infotelefonPfad(
   einsatzId: number,
   opts: { anruf?: number; neu?: boolean } = {},
 ): string {
-  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, {
+  return mitQuery(einsatzModulPfad(einsatzId, 'infotelefon'), {
     anruf: opts.anruf,
     neu: opts.neu ? 1 : undefined,
   });

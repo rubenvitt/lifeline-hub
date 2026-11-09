@@ -515,6 +515,22 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_WEB_PUSH_KONTAKT")]
     pub web_push_kontakt: Option<String>,
 
+    /// Name dieser Instanz, wie gekoppelte Instanzen sie anzeigen (LLH-1490, Spec
+    /// `instanz-kopplung`), z. B. „ELW 1 DRK Nord“ oder „Hub DRK Landesverband“. Ohne Angabe die
+    /// WebAuthn-RP-ID, sonst „Lifeline Hub“.
+    #[arg(long, env = "LIFELINE_INSTANZ_NAME")]
+    pub instanz_name: Option<String>,
+
+    /// Abstand in Sekunden, in dem sich eine gekoppelte Instanz beim Gegenüber meldet (LLH-1490,
+    /// design.md D4). Bei Fehlern verdoppelt er sich bis zehn Minuten.
+    #[arg(
+        long,
+        env = "LIFELINE_INSTANZ_MELDEN_SEKUNDEN",
+        default_value_t = 60,
+        value_parser = clap::value_parser!(u64).range(10..=3600)
+    )]
+    pub instanz_melden_sekunden: u64,
+
     /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
     /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
     #[arg(long, env = "LIFELINE_TLS_CERT")]
@@ -652,6 +668,20 @@ impl clap::builder::TypedValueParser for BackupEmpfaengerParser {
 }
 
 impl Config {
+    /// Name dieser Instanz für gekoppelte Instanzen (LLH-1490): `--instanz-name`, sonst die
+    /// WebAuthn-RP-ID, sonst „Lifeline Hub“.
+    pub fn instanz_anzeigename(&self) -> String {
+        [self.instanz_name.as_deref(), self.webauthn_rp_id.as_deref()]
+            .into_iter()
+            .flatten()
+            .map(str::trim)
+            .find(|n| !n.is_empty())
+            .unwrap_or("Lifeline Hub")
+            .chars()
+            .take(120)
+            .collect()
+    }
+
     /// Der Kontakt für Web Push, wenn `--web-push` an ist (LLH-1223, design.md D1); `None` ohne
     /// Schalter. Mit Schalter ohne gültigen Kontakt bricht der Start mit Text ab.
     pub fn web_push_kontakt(&self) -> anyhow::Result<Option<String>> {
@@ -819,6 +849,26 @@ mod tests {
             "nur parse_hermetisch/parse_mit_env/try_parse_mit_env dürfen Config parsen — \
              neue Tests nehmen parse_hermetisch"
         );
+    }
+
+    /// Instanzkopplung (LLH-1490): ohne Angabe meldet sich eine Instanz alle 60 s; unter zehn
+    /// Sekunden ist kein gültiger Wert.
+    #[test]
+    fn instanz_melden_vorgabe_und_untergrenze() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert_eq!(c.instanz_melden_sekunden, 60);
+        assert_eq!(c.instanz_name, None);
+        assert_eq!(c.instanz_anzeigename(), "Lifeline Hub");
+        let c = parse_hermetisch(["lifeline-hub", "--webauthn-rp-id", "hub.example.org"]);
+        assert_eq!(c.instanz_anzeigename(), "hub.example.org");
+        let c = parse_hermetisch(["lifeline-hub", "--instanz-name", "  ELW 1  "]);
+        assert_eq!(c.instanz_anzeigename(), "ELW 1");
+        assert!(
+            try_parse_mit_env("LIFELINE_INSTANZ_MELDEN_SEKUNDEN", "9", &["lifeline-hub"]).is_err()
+        );
+        let c =
+            try_parse_mit_env("LIFELINE_INSTANZ_MELDEN_SEKUNDEN", "10", &["lifeline-hub"]).unwrap();
+        assert_eq!(c.instanz_melden_sekunden, 10);
     }
 
     /// Web Push ist per Vorgabe aus (LLH-1223); mit Schalter ist der Kontakt Pflicht und muss

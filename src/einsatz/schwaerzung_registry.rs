@@ -163,9 +163,8 @@ const G_OP_LABEL: &str =
 const G_OP_SNAP: &str =
     "Disponier-Snapshot von Betriebsmittel-Stammdaten (Fahrzeug/Material/Einheit der eigenen Org, kein Betroffenen-Bezug)";
 // Die Freitexte der Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl,
-// Pressemitteilung, Lagebesprechung) und des Presse-Logs werden gescrubbt: Die
-// Führungsdokumentation ist allein der ETB-Wortlaut (G_ETB), die Module sind Arbeitsstand
-// (LFH-701, Linie A; Presse-Log LFH-901).
+// Lagebesprechung) werden gescrubbt: Die Führungsdokumentation ist allein der ETB-Wortlaut
+// (G_ETB), die Module sind Arbeitsstand (LFH-701, Linie A).
 const G_ETB: &str =
     "ETB — rechtsverbindliche Führungs-/Einsatzdokumentation, gesetzliches Aufbewahrungs-Skelett";
 const G_TRIAGE: &str =
@@ -1246,26 +1245,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zugewiesen_at", G_ZEIT),
         ],
     },
-    // Besetzung der Sachgebiete S1–S6. `snap_name`/`bezeichnung` sind PII und werden genullt (wie
-    // `einsatz_mitgliedschaft.fuehrungsstelle`); das Skelett (welches Sachgebiet wie, von wem und
-    // wann besetzt) bleibt als anonymer Führungsnachweis.
-    TabellenRegel {
-        tabelle: "einsatz_stabsfunktion",
-        scoping: Scoping::EinsatzId,
-        zeilenfilter: None,
-        person_bezug: None,
-        spalten: &[
-            retain("id", G_PK),
-            retain("einsatz_id", G_SCOPE),
-            retain("sachgebiet", G_ENUM),
-            retain("besetzung_art", G_ENUM),
-            retain("personal_id", G_FK),
-            scrub("snap_name", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name der disponierten Person
-            scrub("bezeichnung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name/Stelle extern bzw. rückwärtig
-            retain("gesetzt_von_id", G_FK),
-            retain("gesetzt_at", G_ZEIT),
-        ],
-    },
     // Ablösungsschichten: kein Freitext, Namen kommen per Join aus `einsatz_einheit`/
     // `einsatzabschnitt`, nur der Vermerk der entfallenen Planung kopiert einen Einheitsnamen.
     // Alles Struktur, Zeit, Enum oder Einheitsname → RETAIN.
@@ -1640,8 +1619,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             scrub("standort", Strategie::NullSetzen, Z_EINSATZ),
             scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
-            // Leitung (ein Name) und Kontaktweg (eine Rufnummer) der Stelle (LLH-1044), wie
-            // `medienkontakt.kontakt_name`/`kontaktweg`.
+            // Leitung (ein Name) und Kontaktweg (eine Rufnummer) der Stelle (LLH-1044).
             scrub("leitung", Strategie::NullSetzen, Z_EINSATZ),
             scrub("kontaktweg", Strategie::NullSetzen, Z_EINSATZ),
             // Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
@@ -1796,29 +1774,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
         ],
     },
-    // Checkliste Arbeitsaufnahme (LFH-551): ein Arbeitsmittel, kein Führungsnachweis. Die
-    // `bemerkung` ist Freitext und kann Namen tragen („Einweisung durch BI Müller“) → genullt;
-    // Punkt, Haken und Zeitpunkte bleiben als Skelett. Der eine Nachweis steht im ETB.
-    TabellenRegel {
-        tabelle: "einsatz_stab_checkliste",
-        scoping: Scoping::EinsatzId,
-        zeilenfilter: None,
-        person_bezug: None,
-        spalten: &[
-            retain("id", G_PK),
-            retain("einsatz_id", G_SCOPE),
-            retain("punkt", G_ENUM),
-            retain("erledigt", G_ENUM),
-            retain("erledigt_at", G_ZEIT),
-            retain("erledigt_von_id", G_FK),
-            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext am Punkt
-            retain("geaendert_von_id", G_FK),
-            retain("geaendert_at", G_ZEIT),
-        ],
-    },
     // Kommunikationsplan des S6 (LFH-848, design.md D10): die Bezeichnung kann eine Person
-    // nennen („Verbindungsperson Herr Beispiel“, dieselbe Linie wie
-    // `einsatz_stabsfunktion.bezeichnung`), Wert und Hinweis tragen Rufnummern und Adressen.
+    // nennen („Verbindungsperson Herr Beispiel“), Wert und Hinweis tragen Rufnummern und Adressen.
     // Art, Funktion und Mittel bleiben als Skelett: erkennbar bleibt, DASS S2 ein Mobiltelefon
     // hatte, nicht welches.
     TabellenRegel {
@@ -2298,7 +2255,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("standort_lat", Strategie::NullSetzen, Z_EINSATZ),
             scrub("standort_lon", Strategie::NullSetzen, Z_EINSATZ),
             // Einsatzleiter (LFH-1199): Art, Person (FK) und „seit“ bleiben als anonymer
-            // Führungsnachweis wie bei der Stab-Besetzung; der Name ist PII.
+            // Führungsnachweis; der Name ist PII.
             retain("einsatzleiter_art", G_ENUM),
             retain("einsatzleiter_personal_id", G_FK),
             scrub("einsatzleiter_name", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name der Person bzw. des externen Einsatzleiters
@@ -2358,7 +2315,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("meldung_id", G_FK),
             retain("nachforderung_id", G_FK),
             retain("befehl_id", G_FK),
-            retain("pressemitteilung_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -2581,63 +2537,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("freigegeben_von_id", G_FK),
             retain("freigegeben_at", G_ZEIT),
             retain("etb_eintrag_id", G_FK),
-        ],
-    },
-    // ---------- Presse- und Medienarbeit S5 (LFH-554) ----------
-    // Die Pressemitteilung folgt `lagebericht`/`befehl` (gemeinsamer Kern `vorlagendokument`,
-    // LFH-701, Linie A): Die freigegebene Fassung steht im ETB-Wortlaut, Entwürfe nirgends.
-    TabellenRegel {
-        tabelle: "pressemitteilung",
-        scoping: Scoping::EinsatzId,
-        zeilenfilter: None,
-        person_bezug: None,
-        spalten: &[
-            retain("id", G_PK),
-            retain("einsatz_id", G_SCOPE),
-            retain("vorlage", G_ENUM),
-            scrub("titel", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
-            retain("zeitstand", G_ZEIT),
-            retain("status", G_ENUM),
-            scrub("abschnitte", Strategie::LeeresJsonArray, Z_EINSATZ), // NOT NULL, JSON
-            retain("version", G_ZAEHLER),
-            retain("vorgaenger_id", G_FK),
-            retain("ersteller_id", G_FK),
-            retain("erstellt_at", G_ZEIT),
-            retain("aktualisiert_at", G_ZEIT),
-            retain("freigegeben_von_id", G_FK),
-            retain("freigegeben_at", G_ZEIT),
-            retain("etb_eintrag_id", G_FK),
-        ],
-    },
-    // Presse-Log: folgt Linie A wie die Führungsmodule (LFH-901). Nach der Sperre liest es keine
-    // Funktion; nachgewiesen wird die freigegebene Pressemitteilung im ETB, der Verweis darauf
-    // bleibt. Jeder Freitext geht, auch Medium (kann eine Person sein) und Freigabeangabe
-    // (nennt oft einen Namen). `antwort` nimmt den Platzhalter nur, wenn sie gesetzt ist: ein
-    // CHECK verlangt sie bei `beantwortet`. Herleitung
-    // `openspec/changes/archive/2026-10-05-lfh-901-presse-log-schwaerzung/design.md`, D1/D2.
-    TabellenRegel {
-        tabelle: "medienkontakt",
-        scoping: Scoping::EinsatzId,
-        zeilenfilter: None,
-        person_bezug: None,
-        spalten: &[
-            retain("id", G_PK),
-            retain("einsatz_id", G_SCOPE),
-            retain("art", G_ENUM),
-            scrub("medium", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
-            scrub("thema", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
-            scrub("kontakt_name", Strategie::NullSetzen, Z_EINSATZ),
-            scrub("kontaktweg", Strategie::NullSetzen, Z_EINSATZ),
-            retain("eingang_at", G_ZEIT),
-            retain("status", G_ENUM),
-            scrub("antwort", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
-            scrub("freigabe_durch", Strategie::NullSetzen, Z_EINSATZ),
-            retain("pressemitteilung_id", G_FK),
-            retain("bearbeitet_von_id", G_FK),
-            retain("bearbeitet_at", G_ZEIT),
-            retain("angelegt_von_id", G_FK),
-            retain("angelegt_at", G_ZEIT),
-            retain("geaendert_at", G_ZEIT),
         ],
     },
     // Informationstelefon: Name, Rückrufnummer und Notiz der Anrufenden sind personenbezogen.

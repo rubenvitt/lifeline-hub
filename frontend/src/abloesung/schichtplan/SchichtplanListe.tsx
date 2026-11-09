@@ -90,7 +90,8 @@ export default function SchichtplanListe({
                 padding: 0,
                 paddingInline: token.paddingXS,
                 margin: 0,
-                marginBottom: 2,
+                // Zielabstand zum nächsten Block desselben Postens (LLH-1595): 7 / 11 / 16 px.
+                marginBottom: token.marginSM,
                 // Ohne Kurzform: `border` neben `borderLeftWidth` warnt React beim Wechsel der Farbe.
                 borderStyle: 'solid',
                 borderColor: ton.kante,

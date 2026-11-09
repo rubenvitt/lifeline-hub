@@ -286,7 +286,7 @@ struct Anreicherung {
     fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
     material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
     sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
-    verbindungen: HashMap<i64, Vec<crate::stab::kommunikation::KommunikationsVerbindung>>,
+    verbindungen: HashMap<i64, Vec<crate::fernmeldewesen::kommunikation::KommunikationsVerbindung>>,
 }
 
 /// Kumulierte Ist-Stärke einer Einheit: eigene plus alle unterstellten, rein im Speicher.
@@ -1604,10 +1604,10 @@ pub async fn aufloesen_tx(
     .await?;
     ergebnis.kinder.sort_unstable();
     // Polymorphe Bezüge der Fernmeldeskizze haben keinen FK (LFH-893, design.md D3).
-    crate::stab::fernmeldeskizze::vergiss(
+    crate::fernmeldewesen::fernmeldeskizze::vergiss(
         conn,
         einsatz_id,
-        crate::stab::fernmeldeskizze::Element::Einheit(id),
+        crate::fernmeldewesen::fernmeldeskizze::Element::Einheit(id),
     )
     .await?;
     sqlx::query("DELETE FROM einsatz_einheit_sprechgruppe WHERE einheit_id = ?")

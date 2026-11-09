@@ -22,7 +22,7 @@ import {
 
 /**
  * Client der taktischen Fernmeldeskizze (LFH-893, Vertrag D14). Geprüft wird, was beim Server
- * ANKOMMT — Pfad, Methode, Body (Muster `presse.test.ts`).
+ * ANKOMMT — Pfad, Methode, Body.
  */
 
 interface Anfrage {

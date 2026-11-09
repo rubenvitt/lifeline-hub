@@ -1,7 +1,7 @@
 pub mod repo;
 
+use crate::fernmeldewesen::kommunikation::KommunikationsVerbindung;
 use crate::sprechgruppe::SprechgruppeAnzeige;
-use crate::stab::kommunikation::KommunikationsVerbindung;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;

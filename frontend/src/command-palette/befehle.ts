@@ -209,9 +209,9 @@ export const SCHNELLAKTIONEN: {
   },
   {
     // Ans ENDE (LLH-1127): ein Bürgeranruf geht ein, die Erfassung soll in einem Griff offen sein.
-    // Träger ist der Stab (das Informationstelefon ist seine Unterseite, kein Modul). Leser:
-    // `pages/InfotelefonPage.tsx`; der Guard verlangt den Leser auf GENAU dieser Unterseite.
-    modulKey: 'stab',
+    // Träger ist das eigene Modul Informationstelefon (i6k6mzed, design.md D3). Leser:
+    // `pages/InfotelefonPage.tsx`.
+    modulKey: 'infotelefon',
     parameter: 'neu',
     kennung: 'infotelefon-anruf',
     pfad: (id) => infotelefonPfad(id, { neu: true }),

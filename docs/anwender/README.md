@@ -47,13 +47,12 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Kräfte | [Ablösung](kapitel/abloesung.md) | Führung |
 | Kräfte | [Verpflegung](kapitel/verpflegung.md) | Führung |
 | Kräfte | [Vorplanung](kapitel/vorplanung.md) | Führung, Administration |
-| Stab | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
-| Stab | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
-| Stab | [Stab und Checkliste](kapitel/stab.md) | Führung |
-| Stab | [Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
-| Stab | [Presse und Infotelefon](kapitel/presse-infotelefon.md) | Führung |
-| Stab | [Dokumente](kapitel/dokumente.md) | Führung |
-| Stab | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |
+| Führungsorganisation | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
+| Führungsorganisation | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
+| Führungsorganisation | [Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
+| Führungsorganisation | [Informationstelefon](kapitel/infotelefon.md) | Führung |
+| Führungsorganisation | [Dokumente](kapitel/dokumente.md) | Führung |
+| Führungsorganisation | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |
 | Betroffene | [Betroffene und Sichtung](kapitel/betroffene.md) | Alle, Führung |
 | Betroffene | [Unfallhilfsstellen](kapitel/unfallhilfsstellen.md) | Alle, Führung |
 | Betroffene | [Evakuierung](kapitel/evakuierung.md) | Alle, Führung |
@@ -69,6 +68,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstellungen und Verwaltung | [Aufbewahrung](kapitel/aufbewahrung.md) | Administration |
 | Einstellungen und Verwaltung | [Demo-Daten](kapitel/demo-daten.md) | Administration |
 | Einstellungen und Verwaltung | [Zugangsprotokoll](kapitel/zugangsprotokoll.md) | Administration |
+| Einstellungen und Verwaltung | [Instanzkopplung](kapitel/instanzkopplung.md) | Administration |
 | Gekoppelte Geräte | [Geräte koppeln](kapitel/geraete-koppeln.md) | Führung, Gekoppelte Geräte |
 | Gekoppelte Geräte | [Gerät bedienen](kapitel/geraet-bedienen.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [UHS-Tablet und UHS-Laptop](kapitel/geraet-uhs.md) | Gekoppelte Geräte |
@@ -81,9 +81,10 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Gekoppelte Geräte | [Externe Lagemonitore](kapitel/externe-lagemonitore.md) | Führung, Administration |
 
 Jeder Bereich ordnet seine Kapitel in einem eigenen Hunderterblock der `reihenfolge`
-(Einstieg 0–99, Führungsmittel 100–199, Lage 200–299, Kräfte 300–399, Stab 400–499,
-Betroffene 500–599, Einstellungen und Verwaltung 600–699, Gekoppelte Geräte 700–799). Ein neues
-Kapitel nimmt die nächste freie Zehnerstelle seines Bereichs und bekommt hier eine Zeile.
+(Einstieg 0–99, Führungsmittel 100–199, Lage 200–299, Kräfte 300–399, Führungsorganisation
+400–499, Betroffene 500–599, Einstellungen und Verwaltung 600–699, Gekoppelte Geräte 700–799).
+Ein neues Kapitel nimmt die nächste freie Zehnerstelle seines Bereichs und bekommt hier eine
+Zeile.
 
 ## Lesergruppen
 

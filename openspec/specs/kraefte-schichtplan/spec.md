@@ -111,6 +111,37 @@ Kräfte-Zeitachse lesen; es gibt keine zweite Einstellung.
 - **WHEN** jemand den Höchstwert des Einsatzes auf 10 h setzt
 - **THEN** entsteht ein ETB-Systemsatz, und Plan-Befund `dienst` und Einstufung der Kräfte-Zeitachse prüfen gegen 10 h
 
+### Requirement: Grenzwerte bedienen
+Die Einstellungen des Einsatzes SHALL Höchstdienst und Mindestruhe zeigen, ändern und auf die
+Vorgabe zurücksetzen. Wer in der Ablösung schreiben darf, darf das auch; für alle anderen ist es
+nur lesbar. Ein Wert, für den die Vorgabe gilt, MUST als Vorgabe gekennzeichnet sein. Dauern
+MUST in derselben Form wie in der Ablösung stehen, nie dezimal. Die Ansicht „Schichtplan“ MUST
+die wirksamen Werte nennen und SHALL keine zweite Bedienstelle haben.
+
+#### Scenario: Vorgabe gekennzeichnet
+- **WHEN** ein Einsatz keinen eigenen Höchstdienst und keine eigene Mindestruhe setzt
+- **THEN** stehen in den Einstellungen „12 h (Vorgabe)“ und „8 h (Vorgabe)“, und der Schichtplan nennt dieselben Werte
+
+#### Scenario: Eigenen Wert setzen
+- **WHEN** die Einsatzleitung den Höchstdienst auf „10 h“ setzt
+- **THEN** steht „10 h“ ohne Kennzeichnung, ein ETB-Systemsatz entsteht, und Schichtplan, Meldebild und Personalliste prüfen ohne Neuladen gegen 10 h
+
+#### Scenario: Leeres Feld heißt Vorgabe
+- **WHEN** jemand im Dialog das Feld „Mindestruhe“ leert und speichert
+- **THEN** gilt für die Mindestruhe wieder die Vorgabe 8 h, und der Höchstdienst bleibt, wie er war
+
+#### Scenario: Vorgaben wiederherstellen
+- **WHEN** ein eigener Wert gilt und jemand „Vorgaben wiederherstellen“ wählt
+- **THEN** gelten für beide Werte die Vorgaben, ohne Rückfrage, und „Rückgängig“ stellt die vorherigen Werte wieder her
+
+#### Scenario: Grenzen der Eingabe
+- **WHEN** jemand als Höchstdienst „45 min“ oder als Mindestruhe „25 h“ eingibt
+- **THEN** nennt das Feld den erlaubten Bereich in Dauerform, und es wird nichts gespeichert
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** jemand ohne Schreibrecht in der Ablösung die Einstellungen oder den Schichtplan öffnet
+- **THEN** sieht er die wirksamen Werte, aber weder „Werte ändern“ noch „Vorgaben wiederherstellen“ noch den Sprung „ändern“
+
 ### Requirement: Schichten erzeugen
 Das System SHALL einen Zeitraum an einem Posten mit Blöcken füllen: mit angegebener Länge oder
 nach dem Schichtmodell des Einsatzes (Rhythmus oder Wechselzeiten in der Zone des Einsatzes).
@@ -245,6 +276,45 @@ geschnitten werden.
 - **THEN** läuft die Tabelle auf der nächsten Seite mit wiederholtem Tabellenkopf weiter, und
   keine Zeile ist abgeschnitten
 
+### Requirement: Schichtplan als Excel-Mappe
+Das System SHALL den Schichtplan eines Einsatzes als Excel-Mappe ausgeben
+(`GET …/abloesungen/schichtplan/export`) mit den Blättern „Austausch“ (zuerst), „Übersicht“,
+„Je Posten“, „Je Person“ und „Befunde“. Das Blatt „Austausch“ MUST dem Austauschformat folgen,
+Zeiten MUST dort als ISO 8601 mit Versatz stehen und in den übrigen Blättern als Text in der Zone
+des Einsatzes. Der Abruf MUST Leserecht in der Ablösung und die Freigabe des Moduls Personal
+verlangen (403 sonst) und auch im abgeschlossenen Einsatz gehen. Er MUST NOT ins Einsatztagebuch
+schreiben. Eine exportierte Mappe, in denselben Einsatz wieder eingelesen, MUST nur unveränderte
+Posten, Blöcke und Personen ergeben.
+
+#### Scenario: Rundweg
+- **WHEN** jemand die Mappe eines Einsatzes exportiert und sie in denselben Einsatz einliest
+- **THEN** zeigt die Vorschau nur „unverändert“ und keinen unsicheren Treffer, und Übernehmen
+  schreibt nichts
+
+#### Scenario: Ohne Modul Personal
+- **WHEN** jemand ohne Freigabe des Moduls Personal die Mappe abruft
+- **THEN** antwortet das System mit 403, und in der Ansicht ist „Excel“ mit Grund gesperrt
+
+### Requirement: Eigene Bezüge im Austauschformat
+Das Austauschformat SHALL zusätzlich zu externen Kennungen eigene Bezüge kennen: Herkunft
+„Lifeline Hub“ mit einer Kennung `personal-<id>`, `einsatzkraft-<id>` oder `helfer-<id>`. Helfer
+einer Planung ohne eigene Kennung MUST ihre Helfer-ID als Kennung und die Herkunft `vorplanung`
+tragen, wie die Übernahme einer Planung sie anlegt. Beim Abgleich der Personen MUST eine Zeile mit
+Herkunft „Lifeline Hub“ zuerst gegen den Bezug geprüft werden: Stamm-Personal derselben
+Organisation bzw. Ad-hoc-Kraft oder Helfer desselben Einsatzes mit passendem Namen trifft sicher.
+Trifft der Bezug nicht, MUST die Zeile wie jede andere abgeglichen werden. Externe Kennungen MUST
+das Format ohne Bezug auf ein bestimmtes Fremdsystem beschreiben.
+
+#### Scenario: Bezug auf eine Ad-hoc-Kraft
+- **WHEN** eine Zeile `Kennung = einsatzkraft-9`, `Herkunft = Lifeline Hub` trägt und die
+  Ad-hoc-Kraft 9 in diesem Einsatz denselben Namen hat
+- **THEN** trifft der Abgleich diese Kraft sicher und legt keinen Helfer an
+
+#### Scenario: Bezug aus einem anderen Einsatz
+- **WHEN** eine Zeile `Kennung = helfer-4`, `Herkunft = Lifeline Hub` in einen anderen Einsatz
+  eingelesen wird
+- **THEN** läuft der Abgleich über Kennung, Name und Telefon weiter, und ein neuer Helfer speichert
+  Kennung und Herkunft, sodass ein zweiter Lauf ihn trifft
 
 ### Requirement: Zeilen ohne Sprung
 Raster und Handy-Liste des Schichtplans MUST Änderungen anderer ohne Sprung unter dem Zeiger

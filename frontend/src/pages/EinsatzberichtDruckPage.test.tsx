@@ -55,7 +55,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     meHandler(kraft),
     json('', 'einsatz'),
     json('/fuehrungsstelle', 'fuehrungsstelle'),
-    json('/stab', 'stab'),
+    json('/mitglieder', 'mitglieder'),
     json('/lagebesprechungen', 'lagebesprechungen'),
     mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/einheiten/zeitachse', 'einheitenPerioden'),

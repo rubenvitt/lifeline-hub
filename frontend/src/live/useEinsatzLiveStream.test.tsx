@@ -316,6 +316,28 @@ describe('useEinsatzLiveStream', () => {
     expect(calls).not.toContainEqual(['einsatz-modul-zaehler', 3]);
   });
 
+  // i6k6mzed (design.md D2): Aus der Mitgliedschaft lösen Aufträge und Erinnerungen S1–S6 auf.
+  it('invalidiert Mitglieder, Aufträge, Erinnerungen und Modulzähler bei mitglieder-Event', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('mitglieder', JSON.stringify({ einsatz_id: 3 }));
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-mitglieder', 3]);
+      expect(calls).toContainEqual(['einsatz-auftraege', 3]);
+      expect(calls).toContainEqual(['einsatz-erinnerungen', 3]);
+      expect(calls).toContainEqual(['einsatz-modul-zaehler', 3]);
+    });
+    const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(calls).not.toContainEqual(['einsatz-stab', 3]);
+  });
+
   it('nimmt den Einsatzkopf in den lagged-Vollabgleich auf (LFH-555)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

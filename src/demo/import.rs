@@ -579,7 +579,7 @@ impl Ablauf<'_> {
                         self.einsatz_id,
                         crate::einsatz::verbindungen::Bezug::Abschnitt(id),
                         &[crate::einsatz::verbindungen::Verbindung {
-                            mittel: crate::stab::kommunikation::Verbindungsmittel::Mobil,
+                            mittel: crate::fernmeldewesen::kommunikation::Verbindungsmittel::Mobil,
                             wert: nummer.to_string(),
                             hinweis: None,
                         }],

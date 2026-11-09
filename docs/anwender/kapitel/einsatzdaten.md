@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
 ---
 
 ## Überblick
@@ -150,9 +150,9 @@ Für die Einsatzleitung:
   Einsatzbericht arbeiten.
 - Die **eigene Führungsstelle** ist der Ort, an dem die Einsatzleitung arbeitet: mobil in einem
   Führungsfahrzeug oder ortsfest in einem Gebäude. Ihre Bezeichnung erscheint in Funkplan,
-  Fernmeldeskizze und Organigramm, ihr Standort auf der Lagekarte und am Punkt „Standort der
-  Führungsstelle festgelegt“ der Checkliste Arbeitsaufnahme (siehe
-  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); bearbeitet wird sie nur hier.
+  Fernmeldeskizze und Organigramm (siehe
+  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)), ihr Standort auf der
+  Lagekarte; bearbeitet wird sie nur hier.
   „Führungsfahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.
 - Der **Einsatzleiter** ist die Person, die den Einsatz nach FwDV 100 führt. Die Rolle

@@ -14,8 +14,8 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use super::{
     kennzahlen, PlanungAnzeige, PlanungBlockAnzeige, PlanungKennzahlen, PlanungKopf,
-    PlanungListeneintrag, PlanungPostenAnzeige, PlanungPostenArt, AUFBEWAHRUNG_TAGE,
-    KENNZAHLEN_TAGE, PLANUNGEN_MAX, POSTEN_MAX, ZEITRAUM_MAX_TAGE,
+    PlanungListeneintrag, PlanungPostenAnzeige, PlanungPostenArt, PlanungUebernahme,
+    AUFBEWAHRUNG_TAGE, KENNZAHLEN_TAGE, PLANUNGEN_MAX, POSTEN_MAX, ZEITRAUM_MAX_TAGE,
 };
 use crate::abloesung::schichtplan::pruefung::{self, Block, Ergebnis, Grundlage, PersonStand};
 use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
@@ -187,7 +187,10 @@ fn posten_schluessel(posten_id: Option<i64>) -> Posten {
 }
 
 /// Zone und Darstellung der Organisation für Servertexte.
-async fn zeitstil_org(conn: &mut SqliteConnection, org_id: i64) -> Result<Zeitstil, AppError> {
+pub(crate) async fn zeitstil_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<Zeitstil, AppError> {
     let zeile: Option<(Option<String>, Option<String>)> =
         sqlx::query_as("SELECT zeitzone, zeitdarstellung FROM org_einstellungen WHERE org_id = ?")
             .bind(org_id)
@@ -225,10 +228,37 @@ struct KopfZeile {
     max_dienst_min: Option<i64>,
     min_ruhe_min: Option<i64>,
     angelegt_at: String,
+    uebernommen_at: Option<String>,
+    uebernahme_einsatz: Option<i64>,
+    uebernahme_einsatznummer: Option<String>,
+    uebernahme_kennzahlen: Option<String>,
 }
 
 const SELECT_KOPF: &str = "SELECT id, version, bezeichnung, einsatzart, ort, ort_lat, ort_lon, \
-     von, bis, max_dienst_min, min_ruhe_min, angelegt_at FROM planung WHERE id = ? AND org_id = ?";
+     von, bis, max_dienst_min, min_ruhe_min, angelegt_at, uebernommen_at, uebernahme_einsatz, \
+     uebernahme_einsatznummer, uebernahme_kennzahlen FROM planung WHERE id = ? AND org_id = ?";
+
+/// Die Übernahme aus den Spalten von 0304; fehlt, solange die Planung nicht übernommen ist.
+fn build_uebernahme(
+    at: Option<String>,
+    einsatz: Option<i64>,
+    einsatznummer: Option<String>,
+) -> Option<PlanungUebernahme> {
+    Some(PlanungUebernahme {
+        at: at?,
+        einsatz_id: einsatz?,
+        einsatznummer,
+    })
+}
+
+/// Die bei der Übernahme gespeicherten Kennzahlen (0304).
+fn parse_kennzahlen(json: Option<&str>) -> Result<Option<PlanungKennzahlen>, AppError> {
+    json.map(|j| {
+        serde_json::from_str(j)
+            .map_err(|e| AppError::Internal(format!("Kennzahlen der Übernahme: {e}")))
+    })
+    .transpose()
+}
 
 impl KopfZeile {
     fn grenzwerte(&self) -> SchichtplanGrenzwerte {
@@ -252,6 +282,11 @@ impl KopfZeile {
             bis: self.bis,
             grenzwerte,
             angelegt_at: self.angelegt_at,
+            uebernahme: build_uebernahme(
+                self.uebernommen_at,
+                self.uebernahme_einsatz,
+                self.uebernahme_einsatznummer,
+            ),
         })
     }
 }
@@ -263,6 +298,33 @@ async fn kopf_tx(conn: &mut SqliteConnection, org_id: i64, id: i64) -> Result<Ko
         .fetch_optional(&mut *conn)
         .await?
         .ok_or(AppError::NotFound)
+}
+
+/// Der Kopf einer Planung, die noch geschrieben werden darf: eine übernommene ist
+/// schreibgeschützt (409, Spec `vorplanung`, „Übernahme in einen Einsatz“). Jeder Schreibweg
+/// außer dem Löschen prüft hier, in seiner Transaktion.
+async fn schreibbar_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+) -> Result<KopfZeile, AppError> {
+    let k = kopf_tx(conn, org_id, id).await?;
+    if k.uebernommen_at.is_some() {
+        return Err(AppError::Conflict(
+            "Die Planung ist in einen Einsatz übernommen und schreibgeschützt".into(),
+        ));
+    }
+    Ok(k)
+}
+
+/// [`schreibbar_tx`] für die Übernahme (`super::uebernahme`): fremd oder unbekannt 404,
+/// übernommen 409.
+pub(crate) async fn check_schreibbar_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+) -> Result<(), AppError> {
+    schreibbar_tx(conn, org_id, id).await.map(|_| ())
 }
 
 #[derive(sqlx::FromRow)]
@@ -521,7 +583,11 @@ async fn laden_mit(
         .map(|p| (p.id, p.nicht_verfuegbar))
         .collect();
     let g = pruefe_planung(conn, org_id, id, kopf.grenzwerte(), &nicht_verfuegbar).await?;
-    let kennzahlen = kennzahlen(&g.bloecke, &g.ergebnis);
+    // Nach der Übernahme gelten die Kennzahlen von damals (Spec `vorplanung`).
+    let kennzahlen = match parse_kennzahlen(kopf.uebernahme_kennzahlen.as_deref())? {
+        Some(k) => k,
+        None => kennzahlen(&g.bloecke, &g.ergebnis),
+    };
     let helfer = helfer_liste(conn, id).await?;
 
     let mut ergebnis_je_block = g.ergebnis.bloecke;
@@ -582,7 +648,7 @@ async fn laden_mit(
 }
 
 /// Kennzahlen einer Planung aus derselben Prüfung wie [`laden`].
-async fn kennzahlen_von(
+pub(crate) async fn kennzahlen_von(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
@@ -611,23 +677,30 @@ pub async fn liste(
     jetzt: DateTime<Utc>,
 ) -> Result<Vec<PlanungListeneintrag>, AppError> {
     let mut conn = pool.acquire().await?;
-    type Zeile = (
-        i64,
-        String,
-        String,
-        Option<String>,
-        String,
-        String,
-        Option<i64>,
-        Option<i64>,
-        i64,
-        i64,
-    );
+    #[derive(sqlx::FromRow)]
+    struct Zeile {
+        id: i64,
+        bezeichnung: String,
+        einsatzart: String,
+        ort: Option<String>,
+        von: String,
+        bis: String,
+        max_dienst_min: Option<i64>,
+        min_ruhe_min: Option<i64>,
+        posten: i64,
+        bloecke: i64,
+        uebernommen_at: Option<String>,
+        uebernahme_einsatz: Option<i64>,
+        uebernahme_einsatznummer: Option<String>,
+        uebernahme_kennzahlen: Option<String>,
+    }
     let zeilen: Vec<Zeile> = sqlx::query_as(
         "SELECT p.id, p.bezeichnung, p.einsatzart, p.ort, p.von, p.bis, p.max_dienst_min, \
                 p.min_ruhe_min, \
-                (SELECT COUNT(*) FROM planung_posten pp WHERE pp.planung_id = p.id), \
-                (SELECT COUNT(*) FROM planung_schicht s WHERE s.planung_id = p.id) \
+                (SELECT COUNT(*) FROM planung_posten pp WHERE pp.planung_id = p.id) AS posten, \
+                (SELECT COUNT(*) FROM planung_schicht s WHERE s.planung_id = p.id) AS bloecke, \
+                p.uebernommen_at, p.uebernahme_einsatz, p.uebernahme_einsatznummer, \
+                p.uebernahme_kennzahlen \
          FROM planung p WHERE p.org_id = ? \
          ORDER BY p.bis < ?, p.von, p.id",
     )
@@ -637,15 +710,37 @@ pub async fn liste(
     .await?;
     let grenze = zeit::formatiere_utc(jetzt - Duration::days(KENNZAHLEN_TAGE));
     let mut aus = Vec::with_capacity(zeilen.len());
-    for (id, bezeichnung, art, ort, von, bis, max, ruhe, posten, bloecke) in zeilen {
-        let kennzahlen = if bis >= grenze {
-            Some(
-                kennzahlen_von(&mut conn, org_id, id, SchichtplanGrenzwerte::aus(max, ruhe))
-                    .await?,
-            )
-        } else {
-            None
+    for z in zeilen {
+        let Zeile {
+            id,
+            bezeichnung,
+            einsatzart: art,
+            ort,
+            von,
+            bis,
+            posten,
+            bloecke,
+            ..
+        } = z;
+        // Eine übernommene Planung zeigt die Kennzahlen von damals, auch nach sieben Tagen.
+        let kennzahlen = match parse_kennzahlen(z.uebernahme_kennzahlen.as_deref())? {
+            Some(k) => Some(k),
+            None if bis >= grenze => Some(
+                kennzahlen_von(
+                    &mut conn,
+                    org_id,
+                    id,
+                    SchichtplanGrenzwerte::aus(z.max_dienst_min, z.min_ruhe_min),
+                )
+                .await?,
+            ),
+            None => None,
         };
+        let uebernahme = build_uebernahme(
+            z.uebernommen_at,
+            z.uebernahme_einsatz,
+            z.uebernahme_einsatznummer,
+        );
         aus.push(PlanungListeneintrag {
             id,
             einsatzart: Einsatzart::parse(&art)
@@ -658,6 +753,7 @@ pub async fn liste(
             posten_anzahl: posten,
             bloecke_anzahl: bloecke,
             kennzahlen,
+            uebernahme,
         });
     }
     Ok(aus)
@@ -749,7 +845,7 @@ pub async fn aendern(
     jetzt: &str,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        let k = kopf_tx(conn, org_id, id).await?;
+        let k = schreibbar_tx(conn, org_id, id).await?;
         if k.version != p.version {
             return Err(AppError::Conflict(
                 "Die Planung wurde zwischenzeitlich geändert".into(),
@@ -970,7 +1066,7 @@ pub async fn posten_anlegen_tx(
     planung_id: i64,
     e: &PostenEingabe,
 ) -> Result<i64, AppError> {
-    kopf_tx(conn, org_id, planung_id).await?;
+    schreibbar_tx(conn, org_id, planung_id).await?;
     let (bisher, sortier): (i64, i64) = sqlx::query_as(
         "SELECT COUNT(*), COALESCE(MAX(sortier) + 1, 0) FROM planung_posten \
          WHERE planung_id = ?",
@@ -1023,7 +1119,7 @@ pub async fn posten_aendern(
     p: &PostenPatch,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         type Stand = (
             String,
             Option<String>,
@@ -1073,7 +1169,7 @@ pub async fn posten_loeschen(
     mit_bloecken: bool,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         let da: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM planung_posten WHERE id = ? AND planung_id = ?)",
         )
@@ -1116,7 +1212,7 @@ pub async fn reihenfolge(
 ) -> Result<(), AppError> {
     let json = serde_json::to_string(ids).unwrap_or_else(|_| "[]".into());
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         let (gesamt, getroffen): (i64, i64) = sqlx::query_as(
             "SELECT (SELECT COUNT(*) FROM planung_posten WHERE planung_id = ?1), \
                     (SELECT COUNT(DISTINCT p.id) FROM json_each(?2) j \
@@ -1386,7 +1482,7 @@ pub async fn block_anlegen_tx(
     benutzer_id: i64,
     e: &BlockEingabe,
 ) -> Result<i64, AppError> {
-    kopf_tx(conn, org_id, planung_id).await?;
+    schreibbar_tx(conn, org_id, planung_id).await?;
     let (vorgabe_anzahl, vorgabe_quali, _, _) = posten_tx(conn, planung_id, e.posten_id).await?;
     pruefe_anzahl_tx(conn, planung_id, 1).await?;
     let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
@@ -1422,7 +1518,7 @@ pub async fn block_aendern(
     jetzt: &str,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         type Stand = (
             i64,
             Option<i64>,
@@ -1510,7 +1606,7 @@ pub async fn block_loeschen(
     version: i64,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         let stand: Option<i64> = sqlx::query_scalar(
             "SELECT version FROM planung_schicht WHERE id = ? AND planung_id = ?",
         )
@@ -1550,7 +1646,7 @@ pub async fn erzeugen(
 ) -> Result<Vec<i64>, AppError> {
     let (von_t, bis_t) = (utc(von)?, utc(bis)?);
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         let (anzahl, quali, _, schichtlaenge) = posten_tx(conn, planung_id, posten_id).await?;
         let laenge = laenge_minuten.or(schichtlaenge).ok_or_else(|| {
             AppError::UnprocessableEntity(
@@ -1685,7 +1781,7 @@ pub async fn helfer_anlegen_tx(
     benutzer_id: i64,
     e: &HelferEingabe,
 ) -> Result<PlanHelferAnzeige, AppError> {
-    kopf_tx(conn, org_id, planung_id).await?;
+    schreibbar_tx(conn, org_id, planung_id).await?;
     pruefe_qualifikationen_tx(conn, org_id, &e.qualifikationen).await?;
     let bisher: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM planung_helfer WHERE planung_id = ?")
@@ -1720,7 +1816,7 @@ pub async fn helfer_aendern(
     p: &HelferPatch,
 ) -> Result<PlanHelferAnzeige, AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         let mut h = helfer_laden_tx(conn, planung_id, hid).await?;
         if let Some(ids) = &p.qualifikationen {
             pruefe_qualifikationen_tx(conn, org_id, ids).await?;
@@ -1758,7 +1854,7 @@ pub async fn helfer_loeschen(
     hid: i64,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        kopf_tx(conn, org_id, planung_id).await?;
+        schreibbar_tx(conn, org_id, planung_id).await?;
         let geloescht = sqlx::query("DELETE FROM planung_helfer WHERE id = ? AND planung_id = ?")
             .bind(hid)
             .bind(planung_id)

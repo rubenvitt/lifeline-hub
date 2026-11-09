@@ -16,6 +16,7 @@ import type {
   SchichtplanHelferBody,
 } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
+import { useRollen } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachText, werteAus } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
@@ -150,9 +151,17 @@ function HelferDialog({
  * etwa von einer anderen Organisation. Sie stehen in der Seitenleiste des Plans unter „Helfer“.
  * Ein gelöschter Helfer verschwindet aus allen Blöcken; die Rückfrage nennt, aus wie vielen.
  */
-export default function PlanungHelferListe({ planung }: { planung: Planung }) {
+export default function PlanungHelferListe({
+  planung,
+  readOnly = false,
+}: {
+  planung: Planung;
+  /** Übernommen (LLH-1587): ohne Anlegen und Aktionen. */
+  readOnly?: boolean;
+}) {
   const planungId = planung.kopf.id;
   const qc = useQueryClient();
+  const { token } = useRollen();
   const [dialog, setDialog] = useState<{ helfer: SchichtplanHelfer | null } | null>(null);
   const [zuLoeschen, setZuLoeschen] = useState<SchichtplanHelfer | null>(null);
   const qualiQuery = useQuery({
@@ -254,24 +263,28 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
       ),
     },
   ];
+  const sichtbareSpalten = readOnly ? spalten.filter((sp) => sp.key !== 'aktionen') : spalten;
 
   // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
   return (
     <div data-lfh="planung-helfer">
-      <Space style={{ marginBottom: 12 }}>
-        <Button
-          onClick={() => {
-            speichernMut.reset();
-            setDialog({ helfer: null });
-          }}
-        >
-          Helfer anlegen
-        </Button>
-      </Space>
+      {/* Zielabstand zur Werkzeugzeile der Tabelle darunter (LLH-1595): 7 / 11 / 16 px. */}
+      {!readOnly && (
+        <Space style={{ marginBottom: token.marginSM }}>
+          <Button
+            onClick={() => {
+              speichernMut.reset();
+              setDialog({ helfer: null });
+            }}
+          >
+            Helfer anlegen
+          </Button>
+        </Space>
+      )}
       <KatalogTabelle
         rowKey="id"
         dataSource={planung.helfer}
-        columns={spalten}
+        columns={sichtbareSpalten}
         spaltenSchalter={{ bezeichnung: 'Helfer' }}
         mehrzahl="Helfern"
         suche={{ platzhalter: 'Name, Organisation oder Qualifikation' }}

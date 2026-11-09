@@ -547,11 +547,10 @@ pub async fn reaktivieren(
 /// Fan-out für das Entlassen (LLH-1079) und das Ändern der Angaben (LLH-1067, design.md D5).
 #[derive(Debug, Default)]
 struct Betroffen {
-    /// Den Vermerk „nicht mehr disponiert“ lesen Führungsstelle und Stab; sie hängen an
-    /// `einsatz` bzw. `stab` (wie das getragene Fahrzeug in LFH-1106). Ihren Namen frieren beide
-    /// selbst ein, ein geänderter Name erreicht sie nicht.
+    /// Den Vermerk „nicht mehr disponiert“ liest die Führungsstelle; sie hängt an `einsatz`
+    /// (wie das getragene Fahrzeug in LFH-1106). Ihren Namen friert sie selbst ein, ein
+    /// geänderter Name erreicht sie nicht.
     einsatzleiter: bool,
-    stab: bool,
     /// Einheiten (Mitglieder mit Name und Funktion, Führer mit Name).
     einheiten: Vec<i64>,
     /// Abschnitte, die die Kraft leitet (Name).
@@ -578,7 +577,6 @@ impl Betroffen {
                 conn, einsatz_id, ep_id,
             )
             .await?,
-            stab: crate::stab::repo::is_besetzt_tx(conn, einsatz_id, ep_id).await?,
             einheiten: crate::einheit::mitglied_repo::load_betroffene_einheiten_tx(
                 conn, einsatz_id, ep_id,
             )
@@ -624,9 +622,6 @@ impl Betroffen {
     async fn melden(&self, state: &AppState, einsatz_id: i64) {
         if self.einsatzleiter {
             crate::routes::einsatz::kopf_geaendert(state, einsatz_id).await;
-        }
-        if self.stab {
-            state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
         }
         for einheit_id in &self.einheiten {
             super::einsatz_einheit::sse_einheit(state, einsatz_id, *einheit_id);

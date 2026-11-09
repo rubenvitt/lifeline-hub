@@ -97,7 +97,7 @@ pub struct NeueAnlage<'a> {
     pub daten: &'a [u8],
 }
 
-/// Die Anlagen-Tabelle der Art; eine Art ohne Anlagen (Pressemitteilung) → `NotFound`.
+/// Die Anlagen-Tabelle der Art; eine Art ohne Anlagen → `NotFound`.
 pub fn tabelle<T: Dokumentart>() -> Result<&'static AnlagenTabelle, AppError> {
     T::ANLAGEN.ok_or(AppError::NotFound)
 }
@@ -402,7 +402,6 @@ mod tests {
     use super::*;
     use crate::befehl::Befehl;
     use crate::lagebericht::Lagebericht;
-    use crate::presse::mitteilung::Pressemitteilung;
     use crate::vorlagendokument::repo::{
         aktualisiere, anlegen, fortschreiben, freigeben_gerendert, laden, Patch,
     };
@@ -623,7 +622,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fremder_einsatz_und_pressemitteilung_sind_404() {
+    async fn fremder_einsatz_ist_404() {
         let pool = crate::db::test_pool().await;
         let (einsatz, benutzer) = setup(&pool).await;
         let d = entwurf::<Lagebericht>(&pool, einsatz, benutzer).await;
@@ -651,10 +650,6 @@ mod tests {
         // Die Linker-id eines Lageberichts gilt nicht am Befehl gleicher id.
         assert!(matches!(
             entfernen::<Befehl>(&pool, einsatz, d, a.id).await,
-            Err(AppError::NotFound)
-        ));
-        assert!(matches!(
-            liste::<Pressemitteilung>(&pool, einsatz, d).await,
             Err(AppError::NotFound)
         ));
     }

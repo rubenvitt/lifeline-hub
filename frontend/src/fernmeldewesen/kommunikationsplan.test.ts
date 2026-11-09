@@ -1,0 +1,688 @@
+import { describe, expect, it } from 'vitest';
+import type {
+  Einheit,
+  Einsatzabschnitt,
+  Einsatzleiter,
+  ExterneStelle,
+  Fuehrungsstelle,
+  KommunikationsStelle,
+  SkizzenVerbindung,
+  Sprechgruppe,
+} from '../api/types';
+import {
+  baueKommunikationsplan,
+  brauchtRueckfrage,
+  entfernText,
+  entfernUmfang,
+  katalogStellenFuer,
+  leitstellenVorschlag,
+  STELLENART_AUS_KATALOG,
+  verbindungAusRufnummer,
+  verbindungsVerweis,
+  type KommunikationsplanQuellen,
+} from './kommunikationsplan';
+import type { Quelle } from '../api/abrufZustand';
+import { mitglied } from '../test/fernmeldenetz';
+
+function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
+}
+
+function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Einheit ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    fahrzeug_mitglieder: [],
+    material_mitglieder: [],
+    personal_mitglieder: [],
+    ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
+    ...p,
+  } as Einheit;
+}
+
+function stelle(id: number, p: Partial<KommunikationsStelle> = {}): KommunikationsStelle {
+  return {
+    id,
+    stellenart: 'leitstelle',
+    bezeichnung: `Stelle ${id}`,
+    verbindungen: [],
+    sprechgruppen: [],
+    ...p,
+  };
+}
+
+const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
+
+function quellen(p: Partial<KommunikationsplanQuellen> = {}): KommunikationsplanQuellen {
+  return {
+    einsatzId: 7,
+    stellen: daten([]),
+    abschnitte: daten([]),
+    einheiten: daten([]),
+    mitglieder: daten([]),
+    fuehrungsstelle: { zustand: 'daten', daten: null },
+    ...p,
+  };
+}
+
+function fs(p: Partial<Fuehrungsstelle> = {}): KommunikationsplanQuellen['fuehrungsstelle'] {
+  return {
+    zustand: 'daten',
+    daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [], ...p },
+  };
+}
+
+describe('baueKommunikationsplan', () => {
+  it('liefert die vier Gruppen in fester Folge', () => {
+    const plan = baueKommunikationsplan(quellen());
+    expect(plan.map((g) => [g.art, g.titel])).toEqual([
+      ['stab', 'Einsatzleitung und Stab'],
+      ['abschnitte', 'Abschnitte'],
+      ['einheiten', 'Einheiten'],
+      ['extern', 'Externe Stellen'],
+    ]);
+  });
+
+  it('trennt gepflegte Funktionen von externen Stellen und behält die Serverfolge', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(3, {
+            stellenart: 'funktion',
+            funktion: 'el',
+            funktion_label: 'Einsatzleitung',
+            bezeichnung: undefined,
+          }),
+          stelle(1, {
+            stellenart: 'funktion',
+            funktion: 's4',
+            funktion_label: 'S4 Versorgung',
+            bezeichnung: undefined,
+          }),
+          stelle(2, { stellenart: 'leitstelle', bezeichnung: 'ILS Nord' }),
+          stelle(4, { stellenart: 'behoerde', bezeichnung: 'Polizei PI Nord' }),
+        ]),
+      }),
+    );
+    expect(plan[0].zeilen.map((z) => z.kennung)).toEqual(['Einsatzleitung', 'S4 Versorgung']);
+    expect(plan[3].zeilen.map((z) => [z.kennung, z.nebentext])).toEqual([
+      ['ILS Nord', 'Leitstelle'],
+      ['Polizei PI Nord', 'Behörde'],
+    ]);
+  });
+
+  it('nennt bei Fachberater und FHP Label und Bezeichnung', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(1, {
+            stellenart: 'funktion',
+            funktion: 'fachberater',
+            funktion_label: 'Fachberater',
+            bezeichnung: 'THW',
+          }),
+        ]),
+      }),
+    );
+    expect(plan[0].zeilen[0].kennung).toBe('Fachberater · THW');
+    expect(plan[0].zeilen[0].nebentext).toBeNull();
+  });
+
+  // Spec `stab-kommunikationsplan`, „Verbindung an der Stelle, Besetzung nur als Nebentext“
+  // (i6k6mzed, D7): die Namen aus der Mitgliedschaft, mehrere alphabetisch.
+  it('zeigt die Besetzung nur bei S1–S6 als Nebentext, aus den Mitgliedern', () => {
+    const f = (id: number, funktion: KommunikationsStelle['funktion']) =>
+      stelle(id, {
+        stellenart: 'funktion',
+        funktion,
+        funktion_label: funktion,
+        bezeichnung: undefined,
+      });
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([f(1, 'el'), f(2, 's2'), f(3, 's3'), f(4, 's4'), f(5, 's7')]),
+        mitglieder: daten([
+          mitglied(1, 'Schulz', 's2'),
+          mitglied(2, 'Müller', 's2'),
+          mitglied(3, 'Erika Muster', 's3'),
+          mitglied(4, 'Lea Leitung', 'el'),
+          mitglied(5, 'Paula Psnv', 's7'),
+        ]),
+      }),
+    );
+    expect(plan[0].zeilen.map((z) => z.nebentext)).toEqual([
+      null,
+      'Müller, Schulz',
+      'Erika Muster',
+      'nicht vergeben',
+      null,
+    ]);
+  });
+
+  // Spec `stab-kommunikationsplan`, „Rechteweiche je Quelle“, Szenario „Stab nicht frei“.
+  it('sagt beim Nebentext mit „—“ und Grund, warum die Besetzung fehlt; die Verbindung bleibt', () => {
+    for (const [zustand, grund] of [
+      ['fehler', 'nicht geladen'],
+      ['laden', 'lädt'],
+    ] as const) {
+      const plan = baueKommunikationsplan(
+        quellen({
+          stellen: daten([
+            stelle(1, {
+              stellenart: 'funktion',
+              funktion: 's2',
+              funktion_label: 'S2 Lage',
+              bezeichnung: undefined,
+              verbindungen: [{ id: 9, mittel: 'mobil', wert: '0170 111', hinweis: null }],
+            }),
+          ]),
+          mitglieder: { zustand, daten: [] },
+        }),
+      );
+      expect(plan[0].zeilen[0].nebentext).toBe('—');
+      expect(plan[0].zeilen[0].nebentextGrund).toBe(grund);
+      expect(plan[0].zeilen[0].verbindungen.map((v) => v.wert)).toEqual(['0170 111']);
+    }
+  });
+
+  it('übernimmt keine Telefonnummer aus dem Personal', () => {
+    // Die Quellen kennen gar kein Personal; der Test hält fest, dass die Besetzung nur den Namen
+    // trägt, auch wenn ihr Datensatz mehr Felder hätte.
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(1, {
+            stellenart: 'funktion',
+            funktion: 's2',
+            funktion_label: 'S2 Lage',
+            bezeichnung: undefined,
+          }),
+        ]),
+        mitglieder: daten([
+          { ...mitglied(1, 'Erika Muster', 's2'), telefon: '0170 555' } as ReturnType<
+            typeof mitglied
+          >,
+        ]),
+      }),
+    );
+    expect(JSON.stringify(plan)).not.toContain('0170 555');
+    expect(plan[0].zeilen[0].verbindungen).toEqual([]);
+  });
+
+  it('leitet Abschnitte und Einheiten nur mit Angaben ab und verweist auf ihren Datensatz', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        abschnitte: daten([
+          abschnitt(1, {
+            name: 'EA Nord',
+            kurzbezeichnung: 'EA N',
+            verbindungen: [
+              { id: 11, mittel: 'festnetz', wert: '0421 77' },
+              { id: 12, mittel: 'email', wert: 'ea-nord@example.org', hinweis: 'Lagezentrum' },
+            ],
+          }),
+          abschnitt(2),
+        ]),
+        einheiten: daten([
+          einheit(5, {
+            name: '1. Zug',
+            funkrufname: 'Florian 1',
+            verbindungen: [{ id: 21, mittel: 'mobil', wert: '0151 23456' }],
+          }),
+          einheit(6, { name: '2. Zug', funkrufname: 'Florian 2' }),
+        ]),
+      }),
+    );
+    const [ab] = plan[1].zeilen;
+    expect(plan[1].zeilen).toHaveLength(1);
+    expect(ab).toMatchObject({ art: 'abschnitt', kennung: 'EA Nord', nebentext: 'EA N' });
+    expect(ab.art === 'abschnitt' && ab.ziel).toBe('/einsaetze/7/einsatzabschnitte?abschnitt=1');
+    // LLH-1134: alle Verbindungen des Datensatzes, nicht eine abgeleitete.
+    expect(ab.verbindungen).toHaveLength(2);
+    expect(ab.verbindungen[0]).toMatchObject({
+      mittelLabel: 'Festnetz',
+      wert: '0421 77',
+      verweis: 'tel:042177',
+    });
+    expect(ab.verbindungen[1]).toMatchObject({
+      mittelLabel: 'E-Mail',
+      hinweis: 'Lagezentrum',
+      verweis: 'mailto:ea-nord@example.org',
+    });
+
+    // Ein Funkrufname allein ist keine Verbindung: der 2. Zug fehlt.
+    expect(plan[2].zeilen.map((z) => z.kennung)).toEqual(['1. Zug']);
+    const [zug1] = plan[2].zeilen;
+    expect(zug1.art === 'einheit' && zug1.ziel).toBe('/einsaetze/7/einheiten/5');
+    expect(zug1.verbindungen[0]).toMatchObject({
+      mittelLabel: 'Mobil',
+      wert: '0151 23456',
+      verweis: 'tel:015123456',
+    });
+  });
+
+  it('macht aus einer gesperrten oder ladenden Quelle keinen leeren Bestand', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: { zustand: 'laden', daten: [] },
+        einheiten: {
+          zustand: 'gesperrt',
+          daten: [einheit(1, { verbindungen: [{ id: 1, mittel: 'mobil', wert: '1' }] })],
+        },
+      }),
+    );
+    expect(plan.map((g) => g.zustand)).toEqual(['laden', 'daten', 'gesperrt', 'laden']);
+    expect(plan[2].zeilen).toEqual([]);
+  });
+
+  it('erfindet keine Zeile für eine nicht erfasste Führungsstelle', () => {
+    for (const fuehrungsstelle of [
+      { zustand: 'daten', daten: null },
+      fs({ rufname: '  ', verbindungen: [] }),
+    ] as const) {
+      const plan = baueKommunikationsplan(quellen({ fuehrungsstelle }));
+      expect(plan.flatMap((g) => g.zeilen)).toEqual([]);
+      expect(JSON.stringify(plan)).not.toMatch(/Führungsstelle/);
+    }
+  });
+
+  // LFH-1148: wie im Funkplan steht die erfasste Führungsstelle vor den Funktionen (LFH-848 D7).
+  it('stellt die erfasste Führungsstelle als erste Zeile vor die Funktionen', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(3, {
+            stellenart: 'funktion',
+            funktion: 'el',
+            funktion_label: 'Einsatzleitung',
+            bezeichnung: undefined,
+          }),
+        ]),
+        fuehrungsstelle: fs({
+          rufname: 'Florian Bremen 11/1',
+          verbindungen: [{ id: 3, mittel: 'mobil', wert: '0170 1234567' }],
+        }),
+      }),
+    );
+    expect(plan[0].zeilen.map((z) => z.kennung)).toEqual(['Führungsstelle', 'Einsatzleitung']);
+    expect(plan[0].zeilen[0]).toEqual({
+      art: 'fuehrungsstelle',
+      schluessel: 'fs',
+      kennung: 'Führungsstelle',
+      nebentext: 'Florian Bremen 11/1 · Einsatzleiter nicht erfasst',
+      kanaele: [],
+      ziel: '/einsaetze/7/einsatzdaten',
+      verbindungen: [
+        {
+          schluessel: 'fs-v3',
+          mittel: 'mobil',
+          mittelLabel: 'Mobil',
+          wert: '0170 1234567',
+          hinweis: null,
+          verweis: 'tel:01701234567',
+        },
+      ],
+    });
+  });
+
+  it('zeigt die Führungsstelle auch ohne gepflegte Stellen und ohne Verbindung', () => {
+    const plan = baueKommunikationsplan(
+      quellen({ fuehrungsstelle: fs({ sprechgruppen: [{ id: 5 } as Sprechgruppe] }) }),
+    );
+    expect(plan[0].zeilen).toHaveLength(1);
+    expect(plan[0].zeilen[0]).toMatchObject({
+      kennung: 'Führungsstelle',
+      nebentext: 'Einsatzleiter nicht erfasst',
+    });
+    expect(plan[0].zeilen[0].verbindungen).toEqual([]);
+  });
+
+  // LLH-1168: der Einsatzleiter steht im Nebentext nach dem Rufnamen, wie die Besetzung von S1–S6.
+  describe('Einsatzleiter im Nebentext', () => {
+    const anna: Einsatzleiter = {
+      art: 'personal',
+      name: 'Anna Schulz',
+      personal_id: 17,
+      personal_noch_disponiert: true,
+      seit: '2026-10-12 12:30:00',
+    };
+    const nebentext = (p: Partial<Fuehrungsstelle>) =>
+      baueKommunikationsplan(quellen({ fuehrungsstelle: fs(p) }))[0].zeilen[0].nebentext;
+
+    it('nennt Rufname und Einsatzleiter', () => {
+      expect(nebentext({ rufname: 'Florian Kreis 10-1', einsatzleiter: anna })).toBe(
+        'Florian Kreis 10-1 · Einsatzleiter Anna Schulz',
+      );
+    });
+
+    it('ohne Rufname nur den Einsatzleiter, extern mit Zusatz', () => {
+      expect(
+        nebentext({
+          einsatzleiter: {
+            art: 'extern',
+            name: 'KBM Weber',
+            personal_noch_disponiert: false,
+            seit: anna.seit,
+          },
+        }),
+      ).toBe('Einsatzleiter KBM Weber (extern)');
+    });
+
+    it('geschwärzt und entlassen wie an der Führungsstelle', () => {
+      expect(nebentext({ einsatzleiter: { ...anna, name: undefined } })).toBe(
+        'Einsatzleiter Name geschwärzt',
+      );
+      expect(nebentext({ einsatzleiter: { ...anna, personal_noch_disponiert: false } })).toBe(
+        'Einsatzleiter Anna Schulz · nicht mehr disponiert',
+      );
+    });
+
+    it('nimmt nie die Besetzung oder eine App-Rolle als Einsatzleiter', () => {
+      const plan = baueKommunikationsplan(
+        quellen({
+          stellen: daten([
+            stelle(3, {
+              stellenart: 'funktion',
+              funktion: 's2',
+              funktion_label: 'S2',
+              bezeichnung: undefined,
+            }),
+          ]),
+          fuehrungsstelle: fs({ rufname: 'Florian Kreis 10-1' }),
+          mitglieder: daten([mitglied(1, 'Max Muster', 's2')]),
+        }),
+      );
+      const [fuehrung, s2] = plan[0].zeilen;
+      expect(fuehrung.nebentext).toBe('Florian Kreis 10-1 · Einsatzleiter nicht erfasst');
+      // Die Besetzung steht an S2, nicht an der Führungsstelle.
+      expect(s2.nebentext).toContain('Max Muster');
+    });
+  });
+
+  it('nennt eine nicht geladene Führungsstelle mit Grund statt sie wegzulassen', () => {
+    for (const [zustand, grund] of [
+      ['fehler', 'nicht geladen'],
+      ['gesperrt', 'nicht freigegeben'],
+    ] as const) {
+      const plan = baueKommunikationsplan(quellen({ fuehrungsstelle: { zustand, daten: null } }));
+      expect(plan[0].zustand).toBe('daten');
+      expect(plan[0].zeilen).toHaveLength(1);
+      expect(plan[0].zeilen[0]).toMatchObject({
+        kennung: 'Führungsstelle',
+        nebentext: grund,
+        verbindungen: [],
+      });
+    }
+    // Lädt sie noch, steht keine Zeile: kein Flackern einer Lücke beim Seitenaufbau.
+    const laedt = baueKommunikationsplan(
+      quellen({ fuehrungsstelle: { zustand: 'laden', daten: null } }),
+    );
+    expect(laedt[0].zeilen).toEqual([]);
+  });
+
+  it('folgt dem Zustand der Gruppe, wenn die Stellen fehlen', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: { zustand: 'fehler', daten: [] },
+        fuehrungsstelle: fs({ rufname: 'Florian Bremen 11/1' }),
+      }),
+    );
+    expect(plan[0].zustand).toBe('fehler');
+    expect(plan[0].zeilen).toEqual([]);
+  });
+
+  it('übernimmt gepflegte Verbindungen in Serverfolge mit Label, Hinweis und Verweis', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(1, {
+            bezeichnung: 'ILS Nord',
+            verbindungen: [
+              { id: 10, mittel: 'festnetz', wert: '0421 1234', hinweis: 'Lagedienst' },
+              { id: 11, mittel: 'fax', wert: '0421 1235' },
+              { id: 12, mittel: 'email', wert: 'lagedienst@ils.example' },
+            ],
+          }),
+        ]),
+      }),
+    );
+    expect(plan[3].zeilen[0].verbindungen).toEqual([
+      {
+        schluessel: 'st-1-v10',
+        id: 10,
+        mittel: 'festnetz',
+        mittelLabel: 'Festnetz',
+        wert: '0421 1234',
+        hinweis: 'Lagedienst',
+        verweis: 'tel:04211234',
+      },
+      {
+        schluessel: 'st-1-v11',
+        id: 11,
+        mittel: 'fax',
+        mittelLabel: 'Fax',
+        wert: '0421 1235',
+        hinweis: null,
+        verweis: null,
+      },
+      {
+        schluessel: 'st-1-v12',
+        id: 12,
+        mittel: 'email',
+        mittelLabel: 'E-Mail',
+        wert: 'lagedienst@ils.example',
+        hinweis: null,
+        verweis: 'mailto:lagedienst@ils.example',
+      },
+    ]);
+  });
+});
+
+describe('verbindungsVerweis', () => {
+  it('wählt nur bei Festnetz und Mobil, mit führendem Plus', () => {
+    expect(verbindungsVerweis('mobil', '+49 (170) 123-45')).toBe('tel:+4917012345');
+    expect(verbindungsVerweis('festnetz', '0421/1234')).toBe('tel:04211234');
+    expect(verbindungsVerweis('fax', '0421 1234')).toBeNull();
+    expect(verbindungsVerweis('messenger', '0170 1')).toBeNull();
+    expect(verbindungsVerweis(null, '0170 1')).toBeNull();
+  });
+
+  it('macht Text ohne Ziffern nicht wählbar', () => {
+    expect(verbindungsVerweis('mobil', 'über Lagedienst')).toBeNull();
+    expect(verbindungsVerweis('mobil', '12')).toBeNull();
+  });
+
+  it('nimmt E-Mail nur mit @ und ohne Leerzeichen', () => {
+    expect(verbindungsVerweis('email', 'a@b.de')).toBe('mailto:a@b.de');
+    expect(verbindungsVerweis('email', 'Postfach Lage')).toBeNull();
+    expect(verbindungsVerweis('email', 'a @b.de')).toBeNull();
+  });
+});
+
+// ── LFH-893: Kanäle externer Stellen und Entfernen mit Skizzen-Verbindungen ──────────────────
+
+const TMO_SL_AS: Sprechgruppe = {
+  id: 31,
+  bezeichnung: 'SL AS',
+  betriebsart: 'TMO',
+  aktiv: true,
+  einsatz_lokal: false,
+  sortier: 1,
+};
+const DMO_505: Sprechgruppe = { ...TMO_SL_AS, id: 32, bezeichnung: '505', betriebsart: 'DMO' };
+
+function skizzenVerbindung(id: number, stelleId: number): SkizzenVerbindung {
+  return {
+    id,
+    von: { art: 'fuehrungsstelle', id: null },
+    nach: { art: 'stelle', id: stelleId },
+    art: 'daten',
+    medium: 'leitung',
+    status: 'bestehend',
+    verkehr: null,
+    hinweis: null,
+  };
+}
+
+describe('Kanäle externer Stellen (LFH-893)', () => {
+  it('nennt die Kanäle einer externen Stelle mit Betriebsart, geplante mit dem Wort', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(2, {
+            bezeichnung: 'ILS Musterhausen',
+            sprechgruppen: [
+              { sprechgruppe: TMO_SL_AS, status: 'geplant' },
+              { sprechgruppe: DMO_505, status: 'bestehend' },
+            ],
+          }),
+        ]),
+      }),
+    );
+    expect(plan[3].zeilen[0].kanaele).toEqual(['TMO SL AS (geplant)', 'DMO 505']);
+  });
+
+  it('hat an Funktionen, Abschnitten und Einheiten keine Kanäle', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([stelle(1, { stellenart: 'funktion', funktion: 's2' })]),
+        abschnitte: daten([
+          abschnitt(4, { verbindungen: [{ id: 4, mittel: 'festnetz', wert: '0421 1' }] }),
+        ]),
+      }),
+    );
+    expect(plan[0].zeilen[0].kanaele).toEqual([]);
+    expect(plan[1].zeilen[0].kanaele).toEqual([]);
+  });
+});
+
+describe('entfernUmfang / entfernText (LFH-893)', () => {
+  const ils = stelle(3, {
+    bezeichnung: 'ILS',
+    verbindungen: [],
+    sprechgruppen: [{ sprechgruppe: TMO_SL_AS, status: 'bestehend' }],
+  });
+
+  it('zählt Verbindungen, Sprechgruppen und Skizzen-Verbindungen der Stelle', () => {
+    const u = entfernUmfang(ils, {
+      zustand: 'daten',
+      daten: [skizzenVerbindung(1, 3), skizzenVerbindung(2, 9)],
+    });
+    expect(u).toEqual({ verbindungen: 0, sprechgruppen: 1, skizzenVerbindungen: 1 });
+    expect(brauchtRueckfrage(u)).toBe(true);
+    expect(entfernText('ILS', u)).toBe(
+      '„ILS“ wird aus dem Kommunikationsplan entfernt, mit 1 Sprechgruppe und 1 Skizzen-Verbindung.',
+    );
+  });
+
+  it('zählt eine Verbindung von der Stelle aus ebenso', () => {
+    const v = { ...skizzenVerbindung(1, 9), von: { art: 'stelle' as const, id: 3 } };
+    expect(entfernUmfang(ils, { zustand: 'daten', daten: [v] }).skizzenVerbindungen).toBe(1);
+  });
+
+  it('fragt ohne Verbindungen, Kanäle und Skizzen-Verbindungen nicht nach', () => {
+    const leer = stelle(4, { verbindungen: [], sprechgruppen: [] });
+    const u = entfernUmfang(leer, { zustand: 'daten', daten: [skizzenVerbindung(1, 3)] });
+    expect(brauchtRueckfrage(u)).toBe(false);
+  });
+
+  it('fragt nach, wenn die Skizze nicht geladen ist, und sagt das', () => {
+    const leer = stelle(4, { verbindungen: [], sprechgruppen: [] });
+    const u = entfernUmfang(leer, { zustand: 'fehler', daten: [] });
+    expect(u.skizzenVerbindungen).toBeNull();
+    expect(brauchtRueckfrage(u)).toBe(true);
+    expect(entfernText('Polizei', u)).toBe(
+      '„Polizei“ wird aus dem Kommunikationsplan entfernt, samt etwaiger Verbindungen in der ' +
+        'Fernmeldeskizze (nicht geladen).',
+    );
+  });
+
+  it('nennt mehrere Verbindungen in der Mehrzahl', () => {
+    expect(
+      entfernText('Polizei PI Nord', { verbindungen: 2, sprechgruppen: 0, skizzenVerbindungen: 0 }),
+    ).toBe('„Polizei PI Nord“ wird aus dem Kommunikationsplan entfernt, mit 2 Verbindungen.');
+  });
+});
+
+// ── Katalog „Externe Stellen“ (LLH-1165) ──────────────────────────────────────────────────────
+
+function katalogStelle(id: number, p: Partial<ExterneStelle>): ExterneStelle {
+  return {
+    id,
+    bezeichnung: `Stelle ${id}`,
+    art: 'sonstige',
+    aktiv: true,
+    zustaendig: false,
+    ...p,
+  };
+}
+
+function planStelle(id: number, p: Partial<KommunikationsStelle>): KommunikationsStelle {
+  return { id, stellenart: 'sonstige', verbindungen: [], sprechgruppen: [], ...p };
+}
+
+describe('Katalog „Externe Stellen“ im Kommunikationsplan (LLH-1165)', () => {
+  it('bildet Polizei auf Behörde und Hilfsorganisation auf sonstige Stelle ab (LFH-1194 D2)', () => {
+    expect(STELLENART_AUS_KATALOG).toEqual({
+      leitstelle: 'leitstelle',
+      polizei: 'behoerde',
+      behoerde: 'behoerde',
+      hilfsorganisation: 'sonstige',
+      sonstige: 'sonstige',
+    });
+  });
+
+  it('schlägt je Planart nur aktive Katalogstellen vor, die als diese Art in den Plan kommen', () => {
+    const katalog = [
+      katalogStelle(1, { bezeichnung: 'ILS Nord', art: 'leitstelle' }),
+      katalogStelle(2, { bezeichnung: 'PI Nord', art: 'polizei' }),
+      katalogStelle(3, { bezeichnung: 'Ordnungsamt', art: 'behoerde' }),
+      katalogStelle(4, { bezeichnung: 'Altes Amt', art: 'behoerde', aktiv: false }),
+      katalogStelle(5, { bezeichnung: 'DLRG', art: 'hilfsorganisation' }),
+    ];
+    const namen = (art: Parameters<typeof katalogStellenFuer>[0]) =>
+      katalogStellenFuer(art, katalog).map((s) => s.bezeichnung);
+    expect(namen('leitstelle')).toEqual(['ILS Nord']);
+    expect(namen('behoerde')).toEqual(['PI Nord', 'Ordnungsamt']);
+    expect(namen('sonstige')).toEqual(['DLRG']);
+    expect(namen('verbindungsperson')).toEqual([]);
+    expect(namen('funktion')).toEqual([]);
+  });
+
+  it('bietet die zuständige Leitstelle nur an, solange der Plan keine Leitstelle führt', () => {
+    const katalog = [
+      katalogStelle(1, { bezeichnung: 'ILS Süd', art: 'leitstelle' }),
+      katalogStelle(2, { bezeichnung: 'ILS Nord', art: 'leitstelle', zustaendig: true }),
+    ];
+    expect(leitstellenVorschlag([planStelle(9, { stellenart: 'behoerde' })], katalog)?.id).toBe(2);
+    // Eine Leitstelle ohne Verbindung im Plan: die Verbindung gehört an sie, keine zweite Stelle.
+    expect(
+      leitstellenVorschlag(
+        [planStelle(9, { stellenart: 'leitstelle', bezeichnung: 'X' })],
+        katalog,
+      ),
+    ).toBeUndefined();
+    // Ohne zuständige Leitstelle im Katalog kein Vorschlag.
+    expect(leitstellenVorschlag([], [katalogStelle(1, { art: 'leitstelle' })])).toBeUndefined();
+  });
+
+  it('macht aus der Rufnummer eine Festnetz-Verbindung, ohne Nummer keine', () => {
+    expect(verbindungAusRufnummer(' 0421 112 ')).toEqual({ mittel: 'festnetz', wert: '0421 112' });
+    expect(verbindungAusRufnummer('  ')).toBeUndefined();
+    expect(verbindungAusRufnummer(null)).toBeUndefined();
+  });
+});

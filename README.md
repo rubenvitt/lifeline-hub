@@ -31,8 +31,8 @@ Zeitdruck und mit Daten über Menschen. Daraus folgt, worauf es ankommt:
   ist ([Ohne Netz arbeiten](docs/anwender/kapitel/ohne-netz.md)).
 - **Folgt der Führungslogik.** Das Einsatztagebuch lässt sich nicht ändern, nur berichtigen:
   Die Berichtigung steht als eigener Eintrag neben dem alten. Stärken stehen als F/UF/M//Ges,
-  Betroffene mit ihrer Sichtungskategorie, der Stab arbeitet in den Sachgebieten S1 bis S6,
-  und Funkplan und Fernmeldeskizze nennen ihre Lücken. Fehlt ein Wert, steht „—“, nie 0.
+  Betroffene mit ihrer Sichtungskategorie, und Funkplan und Fernmeldeskizze nennen ihre
+  Lücken. Fehlt ein Wert, steht „—“, nie 0.
 - **Bedienbar unter Stress.** Trefflächen, Dichte und Farbrollen folgen einer ausformulierten
   Bedienleitlinie statt dem Zufall: drei Dichtestufen bis zum Handschuhbetrieb, Nachtbetrieb als
   Vorgabe, Farbe als Signal und nie als Dekoration.

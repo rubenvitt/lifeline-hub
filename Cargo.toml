@@ -59,6 +59,10 @@ calamine = { version = "0.38", default-features = false }
 # Vor dem Lesen die entpackte Größe der XLSX-Teile prüfen (Zip-Bombe): dieselbe Version, die
 # calamine mitbringt, nur mit `deflate`.
 zip = { version = "9", default-features = false, features = ["deflate"] }
+# Schichtplan als Excel-Mappe (LLH-1557, `src/abloesung/schichtplan/ausgabe/mappe.rs`): schreibt
+# XLSX, reines Rust (MIT oder Apache-2.0), ohne Vorgabe-Features; Zeiten stehen als Text, darum
+# ohne `chrono`.
+rust_xlsxwriter = { version = "0.102", default-features = false }
 # Vorschaubilder der Anhänge (LFH-759, `src/anhang/vorschau/`): nur die Decoder für JPEG, PNG,
 # GIF, WebP und TIFF plus den JPEG-Encoder. Alle reines Rust (zune-jpeg, png, gif, image-webp,
 # tiff), kein `-sys`-Crate, damit das Single-Binary ohne C-Bibliothek bleibt; ohne `rayon`, die
@@ -121,6 +125,16 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # TOTP-Zweitfaktor: "otpauth" für die otpauth://-URL (QR-Enrollment), "gen_secret" für
 # zufällige Secrets.
 totp-rs = { version = "6", features = ["otpauth", "gen_secret"] }
+# Instanzkopplung (LLH-1490, `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`,
+# D1–D3, D8):
+# Ed25519 für den Instanzschlüssel und die signierten Anfragen, P-256 zum Prüfen einer
+# Passkey-Unterschrift ohne `webauthn-rs`, HKDF/HMAC für die Bindung an den Kopplungscode. Alle
+# reines Rust und schon im Lockfile (über openidconnect, age, hpke); `hmac`/`hkdf` in der Linie
+# von `sha2 0.11`.
+ed25519-dalek = "3.0"
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+hmac = "0.13"
+hkdf = "0.13"
 
 [dev-dependencies]
 # "danger-credential-internals" schaltet `From<Credential> for Passkey` frei, damit Tests aus
@@ -157,7 +171,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.177"
+version = "1.0.0-alpha.178"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

@@ -300,9 +300,8 @@ Einheit mit ihr verknüpft, steht im Menü „Ablehnen (Einheiten verknüpft)“
 ### Benachrichtigungen zum Stand
 
 Wechselt eine Nachforderung auf „Zugesagt“, „Unterwegs“, „Eingetroffen“ oder „Abgelehnt“, erhalten
-die Person, die sie angelegt hat, und die Personen, die S4 besetzen (laut Stab-Besetzung, sonst
-laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa „Nachforderung
-eingetroffen“ mit „2× an Leitstelle“. Art, Details, Ziel, Adressat-Bezeichnung und Ablehnungsgrund
+die Person, die sie angelegt hat, und die Personen, die S4 in ihrer Mitgliedschaft tragen, einen
+Hinweis mit der neuen Stufe, etwa „Nachforderung eingetroffen“ mit „2× an Leitstelle“. Art, Details, Ziel, Adressat-Bezeichnung und Ablehnungsgrund
 stehen nie im Hinweis; er führt in das Modul „Nachforderungen“. Auch ein „Rückgängig“ zurück auf
 „Zugesagt“ oder „Unterwegs“ meldet die neue Stufe, eines zurück auf „Angefordert“ meldet nichts.
 Das Absetzen selbst meldet nichts, ebenso wenig ein Zurückziehen oder Bearbeiten.
@@ -385,8 +384,7 @@ Nachforderung bearbeiten“) bleibt Sache der Führung.
 Offen ist eine Nachforderung, solange sie angefordert, zugesagt oder unterwegs ist. Die Zahl der
 offenen zählt der Server; dieselbe Zahl steht im Seitenkopf, am Modul im Menü (etwa „5 offene
 Nachforderungen, davon 2 unterwegs“), in den „Offenen Vorgängen“ des
-[Führungsüberblicks](ueberblick.md) samt der überfälligen, an den Werkzeugen S1 und S4 der [Stab-Seite](stab.md) und in
-der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene, abgelehnte und
+[Führungsüberblicks](ueberblick.md) samt der überfälligen und in der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene, abgelehnte und
 zurückgezogene zählen nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
 innerhalb eines Filters „Für Stelle“.
 

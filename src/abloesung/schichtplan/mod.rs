@@ -25,6 +25,7 @@ use crate::personal::quali_soll::QualiSoll;
 use crate::personal::qualifikation_deckung::OffeneAnforderung;
 use crate::wire_enum::wire_enum;
 
+pub mod ausgabe;
 pub mod kopplung;
 pub mod pruefung;
 pub mod repo;

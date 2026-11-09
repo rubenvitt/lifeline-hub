@@ -1,6 +1,6 @@
 /**
  * Der reine Teil des hängenden Gerüsts (`HaengenderBaum.tsx`): Knotenform und Klappschlüssel.
- * Ohne React, damit Modelle (`fuehrungsorganisation.ts`, `stab/fernmeldeskizze.ts`) ihn nutzen
+ * Ohne React, damit Modelle (`fuehrungsorganisation.ts`, `fernmeldewesen/fernmeldeskizze.ts`) ihn nutzen
  * können, ohne die Darstellung zu laden.
  */
 export interface BaumKnoten<K> {

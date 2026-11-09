@@ -85,6 +85,16 @@ mod tests {
     /// Kräfte (`beendet_at IS NULL`, `aufgeloest_at IS NULL`) oder eine Zeile per Primärschlüssel.
     const ALLOWLIST: &[(&str, usize, &str)] = &[
         (
+            "src/abloesung/schichtplan/ausgabe/repo.rs",
+            1,
+            "Gliederung der Schichtplan-Ausgabe nimmt auch aufgelöste Einheiten: ihre Blöcke stehen noch im Plan (LLH-1557)",
+        ),
+        (
+            "src/abloesung/schichtplan/uebernahme/repo.rs",
+            1,
+            "Eigener Bezug `einsatzkraft-<id>` beim Einlesen trifft auch beendete Kräfte, die noch im Plan stehen; sonst kämen sie als neue Helfer zurück (LLH-1557)",
+        ),
+        (
             "src/aufbewahrung/suche.rs",
             1,
             "Auskunft und Schwärzung finden jede Kraft des Einsatzes, auch beendete",

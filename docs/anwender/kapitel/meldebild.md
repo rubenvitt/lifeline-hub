@@ -254,12 +254,15 @@ Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „ges
 Einsatzabschnitte der Kraft, „Ruhe“ zählt seit dem Ende des letzten. Ohne Ereignis steht keine Zahl,
 sondern „—“. Die Dauer erscheint im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im
 Paneel „Zeitachse“ ihrer Ansicht und in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“
-(diese unter „Spalten“). Der Stab zeigt sie nicht.
+(diese unter „Spalten“).
 
 Im Meldebild unter „Im Einsatz“ und in der Personalliste unter „Einsatzdauer“ steht neben der Zahl
 ein Wort, wenn eine Kraft die Grenzwerte des Schichtplans reißt (Kapitel [Ablösung](abloesung.md)):
 Höchstdienst und Mindestruhe des Einsatzes, ohne eigenen Wert 12 h und 8 h. Der Plan prüft mit
-denselben Werten.
+denselben Werten. Einsatzleitung und Führungspersonal legen sie in den Einstellungen des Einsatzes
+fest, Reiter „Ablösung“, unter „Dienst und Ruhe“ (Kapitel
+[Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Eine Änderung stuft die
+Kräfte sofort neu ein, ohne Neuladen.
 
 - **„zu lang“:** Die Kraft ist länger als der Höchstdienst im Dienst. Gezählt wird ab dem Beginn
   des Einsatzabschnitts, mit dem ihr Dienst begann: Eine Pause, die kürzer als die Mindestruhe war,
