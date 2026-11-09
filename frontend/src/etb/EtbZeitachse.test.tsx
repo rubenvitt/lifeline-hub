@@ -675,6 +675,27 @@ describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
     expect(onNurProtokollieren).toHaveBeenCalledWith(puffer);
   });
 
+  it('per Tastatur geöffnet: verliert die Zeile ihre Aktionen, taut die Achse am Ende wieder auf', async () => {
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const zeilenAus = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const { rerender } = renderMitProviders(
+      <EtbZeitachse einsatzId={1} zeilen={zeilenAus([alt])} onWiedervorlage={vi.fn()} />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true });
+    const menue = await waitFor(() => offenesKontextmenue()!);
+    await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
+    // Die Rechte fallen weg: Menü und ⋮-Knopf verschwinden, der Fokus hat kein Ziel mehr.
+    rerender(<EtbZeitachse einsatzId={1} zeilen={zeilenAus([alt])} />);
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Eintrag 1' })).toBeNull();
+    rerender(<EtbZeitachse einsatzId={1} zeilen={zeilenAus([neu, alt])} />);
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+  });
+
   it('verschwindet die Zeile, schließt das Menü', async () => {
     const puffer = abgelehnt();
     const { container, neu: setze } = renderZeitachse({

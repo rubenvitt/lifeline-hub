@@ -526,16 +526,32 @@ export default function EtbZeitachse({
    * mit dem ausgehängten Menü heraus, und dabei feuert kein `blur` (Firefox, Safari). `fokusDrin`
    * bliebe wahr und die Achse eingefroren, auch nach dem Zurückrollen ans Ende.
    */
-  const kontextZu = (zurueckInAchse: boolean) => {
+  const kontextZu = (k: { zurueckInAchse: boolean }) => {
     setKontext(null);
-    if (zurueckInAchse) return;
+    if (k.zurueckInAchse) return;
     setFokusDrin(false);
     if (amEnde) setGefroren(null);
   };
   // Verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü (abgeleiteter
   // Zustand wie in `Datensicht`).
-  if (kontext != null && kontextListe.length === 0) kontextZu(kontext.zurueckInAchse);
-  const kontextSchliessen = () => kontextZu(kontext?.zurueckInAchse ?? false);
+  if (kontext != null && kontextListe.length === 0) kontextZu(kontext);
+  const kontextSchliessen = () => {
+    if (kontext != null) kontextZu(kontext);
+  };
+  /*
+   * Kehrt der Fokus in die Achse zurück, prüft das erst der Commit: verlor die Zeile ihre
+   * Aktionen, ist ihr ⋮ (das Fokusziel) mit dem Menü ausgehängt, und der Fokus fällt heraus,
+   * ebenfalls ohne `blur`.
+   */
+  const letzterKontext = useRef(kontext);
+  useLayoutEffect(() => {
+    const vorher = letzterKontext.current;
+    letzterKontext.current = kontext;
+    if (kontext != null || vorher == null || !vorher.zurueckInAchse) return;
+    if (vorher.offen.vorherFokus?.isConnected) return;
+    setFokusDrin(false);
+    if (amEnde) setGefroren(null);
+  }, [kontext, amEnde]);
 
   const zeile = (z: EtbZeile) => (
     <EtbZeitachsenZeile
