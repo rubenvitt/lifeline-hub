@@ -10,6 +10,7 @@ import { adminFixture } from '../test/fixtures';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { waehleMenueEintrag } from '../test/menue';
 import { setzeViewportBreite } from '../test/viewport';
+import { tippeZeit } from '../test/zeitEingabe';
 import * as dateiSpeichern from '../components/dateiSpeichern';
 import { planungPfad } from '../routing/deeplinks';
 import PlanungPage from './PlanungPage';
@@ -73,6 +74,7 @@ function planung(ueber: Partial<Planung> = {}): Planung {
       },
     ],
     helfer: [{ id: 9, name: 'Bea Helfer', organisation: 'DLRG', qualifikationen: [] }],
+    programmpunkte: [{ id: 31, bezeichnung: 'Feuerwerk', zeitpunkt_at: '2027-06-12 20:30:00' }],
     kennzahlen: { soll: 2, ist: 1, offen: 1, konflikte: 0 },
     ...ueber,
   };
@@ -105,7 +107,7 @@ function setup(p: Planung = planung(), route = planungPfad(5)) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('PlanungPage (LLH-1586)', () => {
-  it('zeigt Kopf, Kennzahlen und die drei Reiter; der Reiter steht in der Adresse', async () => {
+  it('zeigt Kopf, Kennzahlen und die Reiter; der Reiter steht in der Adresse', async () => {
     setup();
     expect(await screen.findByRole('heading', { level: 1, name: 'Stadtfest' })).toBeInTheDocument();
     expect(screen.getByText('Soll 2 · Ist 1 · Offen 1 · Konflikte 0')).toBeInTheDocument();
@@ -234,6 +236,48 @@ describe('PlanungPage (LLH-1586)', () => {
     await userEvent.type(within(dialog).getByLabelText('Organisation'), 'THW');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Helfer anlegen' }));
     await waitFor(() => expect(body).toEqual({ name: 'Carl', organisation: 'THW' }));
+  });
+
+  it('Ablauf: Programmpunkt anlegen schickt Bezeichnung und Zeitpunkt an die Planung (LLH-1583)', async () => {
+    let body: unknown;
+    setup(planung(), planungPfad(5, 'ablauf'));
+    server.use(
+      http.post('/api/planungen/5/programmpunkte', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(
+          { id: 32, bezeichnung: 'Einlass', zeitpunkt_at: '2027-06-12 16:00:00' },
+          { status: 201 },
+        );
+      }),
+    );
+    expect(await screen.findByText('Feuerwerk')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Ablauf · 1' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Programmpunkt' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Programmpunkt anlegen' });
+    await user.type(within(dialog).getByLabelText('Bezeichnung'), ' Einlass ');
+    // ISO-Eingabe in der Zone der Ansicht; Enter übernimmt die Zeit und sendet.
+    await tippeZeit(user, within(dialog).getByLabelText('Zeitpunkt'), '2027-06-12 18:00');
+    await waitFor(() =>
+      expect(body).toEqual({ bezeichnung: 'Einlass', zeitpunkt_at: '2027-06-12 16:00:00' }),
+    );
+  });
+
+  it('Ablauf: Programmpunkt löschen fragt einmal nach (LLH-1583)', async () => {
+    let geloescht = false;
+    setup(planung(), planungPfad(5, 'ablauf'));
+    server.use(
+      http.delete('/api/planungen/5/programmpunkte/31', () => {
+        geloescht = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Feuerwerk löschen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Löschen' }));
+    await waitFor(() => expect(geloescht).toBe(true));
   });
 
   it('Helfer in Serie: die Organisation bleibt auf Wunsch stehen', async () => {
@@ -372,6 +416,8 @@ describe('PlanungPage (LLH-1586)', () => {
         helfer_neu: 0,
         einteilungen_neu: 0,
         grenzwerte_neu: 0,
+        programmpunkte_neu: 0,
+        programmpunkte_vorhanden: 0,
         aenderungen: 2,
       },
       auswahl: { einheiten: [], uhs: [], vorlagen: [], abschnitte: [] },
@@ -543,6 +589,10 @@ describe('PlanungPage (LLH-1586)', () => {
         screen.getByRole('button', { name: 'Aktionen zu Stadtfest' }),
         'Löschen bleibt',
       ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('tab', { name: 'Ablauf · 1' }));
+      expect(await screen.findByText('Feuerwerk')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Programmpunkt' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Feuerwerk löschen' })).toBeNull();
     });
   });
 });

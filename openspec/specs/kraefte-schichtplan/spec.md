@@ -328,7 +328,8 @@ Gruppenzugehörigkeit stehen bleiben:
 - Ein umsortierter oder in einen anderen Abschnitt umgehängter Posten SHALL an seinem Platz
   bleiben.
 
-Blöcke und der Titel einer Zeile MUST weiter sofort erscheinen. Das Sammelbanner MUST das
+Blöcke in gezeigten Zeilen und der Titel einer Zeile MUST weiter sofort erscheinen; die Blöcke
+eines wartenden Postens erscheinen mit ihm. Das Sammelbanner MUST das
 Wartende nennen („1 neuer Posten“, „2 neue Posten“, „1 Posten entfallen“, „Reihenfolge
 geändert“, verbunden mit „ · “) und es mit „anzeigen“ übernehmen; danach stehen die Zeilen in der
 frischen Folge. Das Banner MUST selbst keine Zeile verschieben. Ein Touch-Tipp zählt nicht als

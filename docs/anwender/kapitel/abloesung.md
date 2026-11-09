@@ -365,7 +365,7 @@ erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
 ### Änderungen anderer im Schichtplan
 
 Was andere am Schichtplan ändern, erscheint ohne Neuladen. Neue und geänderte Blöcke stehen sofort
-in ihrer Zeile. Neue Posten, entfallene Posten und eine geänderte Reihenfolge warten dagegen,
+in ihrer Zeile, sofern die Zeile schon zu sehen ist. Neue Posten, entfallene Posten und eine geänderte Reihenfolge warten dagegen,
 solange die Maus über dem Schichtplan steht, der Fokus darin liegt, ein Block oder eine Person
 gezogen wird oder ein Dialog des Schichtplans offen ist; sonst rückten die Zeilen unter dem Zeiger
 weg. Ein Hinweis über dem Raster nennt, was wartet, etwa „1 neuer Posten · Reihenfolge geändert“,

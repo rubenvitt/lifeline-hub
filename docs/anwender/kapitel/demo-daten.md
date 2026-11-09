@@ -77,7 +77,8 @@ bleibt, wie sie ist.
   hat. Gibt es schon ein Schichtmodell mit demselben Namen, benutzt der Import es unverändert mit.
 - Nur beim Stadtfest: die Planung „Stadtfest Musterstadt“ für den Samstag nach dem Import, mit
   der Unfallhilfsstelle, beiden Streifen, einer Sanitätswache an der Bühne und dem KTW als Posten,
-  dazu zwei Helfer und eine Einteilung, in der ein Mensch doppelt verplant ist. Gibt es schon eine
+  dazu zwei Helfer, eine Einteilung, in der ein Mensch doppelt verplant ist, und der Ablauf mit
+  Festbeginn, Einlass Bühne, Bühnenprogramm und Feuerwerk. Gibt es schon eine
   Planung mit demselben Namen, bleibt sie unverändert.
 - **Keine** Benutzerkonten. Kataloge wie Status, Einheitstypen und Qualifikationen benutzt der
   Import nur mit; fehlt ein benötigter Eintrag, bricht er mit einer Meldung ab.

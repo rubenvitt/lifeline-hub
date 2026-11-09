@@ -4,7 +4,7 @@
 Raster und Handy-Liste einer Planung MUST dieselbe Zeilenschleuse tragen wie der Schichtplan im
 Einsatz (Spec `kraefte-schichtplan`, „Zeilen ohne Sprung“): neue Posten warten hinter dem
 Sammelbanner, entfallene bleiben als leere Zeile „(entfallen)“ stehen, umsortierte bleiben an
-ihrem Platz, Blöcke erscheinen sofort.
+ihrem Platz, Blöcke in gezeigten Zeilen erscheinen sofort.
 
 #### Scenario: Fremder Posten vorn einsortiert
 - **WHEN** der Zeiger über einem Block der letzten Postenzeile steht und eine andere Sitzung einen Posten anlegt und an die erste Stelle der Reihenfolge setzt

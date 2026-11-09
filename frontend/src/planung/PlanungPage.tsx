@@ -20,6 +20,7 @@ import {
   planungenPfad,
   type PlanungReiter,
 } from '../routing/deeplinks';
+import PlanungAblauf from './PlanungAblauf';
 import PlanungHelferListe from './PlanungHelferListe';
 import PlanungKopf from './PlanungKopf';
 import PlanungPostenListe from './PlanungPostenListe';
@@ -28,7 +29,8 @@ import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
 
 /**
  * Eine Planung ohne Einsatz (LLH-1586, Spec `vorplanung`): der Kopf wird in der Ansicht
- * bearbeitet, darunter die Reiter „Plan“, „Posten“ und „Helfer“ (Abstimmung 08.11.2026). Der
+ * bearbeitet, darunter die Reiter „Plan“, „Posten“, „Helfer“ (Abstimmung 08.11.2026) und „Ablauf“
+ * mit den Programmpunkten (LLH-1583). Der
  * Reiter steht als `?reiter=` in der Adresse, ohne Verlaufsschritt. „Planung löschen“ liegt im
  * Menü des Kopfs und fragt einmal nach. Live kommt die Planung über das Org-Ereignis `planung`.
  * „In Einsatz übernehmen“ (LLH-1587) öffnet den Dialog mit Vorschau; danach ist die Planung
@@ -104,6 +106,7 @@ export default function PlanungPage() {
     plan: <PlanungSchichtplan planung={planung} readOnly={readOnly} />,
     posten: <PlanungPostenListe planung={planung} readOnly={readOnly} />,
     helfer: <PlanungHelferListe planung={planung} readOnly={readOnly} />,
+    ablauf: <PlanungAblauf planung={planung} readOnly={readOnly} />,
   };
 
   return (
@@ -173,6 +176,11 @@ export default function PlanungPage() {
               label: `Helfer · ${planung.helfer.length}`,
               children: reiterInhalt.helfer,
             },
+            {
+              key: 'ablauf',
+              label: `Ablauf · ${planung.programmpunkte.length}`,
+              children: reiterInhalt.ablauf,
+            },
           ]}
         />
       </OffeneBearbeitungProvider>
@@ -189,7 +197,7 @@ export default function PlanungPage() {
         onCancel={() => setLoeschenOffen(false)}
         destroyOnHidden
       >
-        <p style={{ margin: 0 }}>Posten, Blöcke und Helfer werden mitgelöscht.</p>
+        <p style={{ margin: 0 }}>Posten, Blöcke, Helfer und Ablauf werden mitgelöscht.</p>
         {loeschenMut.error != null && (
           <SpeicherFehler fehler={loeschenMut.error} titel="Planung nicht gelöscht" />
         )}

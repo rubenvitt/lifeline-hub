@@ -141,7 +141,7 @@ Regeln: [frontend/src/kraefte/AGENTS.md](../../frontend/src/kraefte/AGENTS.md) (
 | `src/zeitachse` | Append-only Kräfte-Zeitachse (Alarmierung, Eintreffen, Ablösung, Entlassung), Perioden beim Lesen | `…/{id}/einheiten/zeitachse`, `…/{id}/personal/zeitachse`; feuert `einheit` |
 | `src/abloesung` | Schichten von Einheiten: Fälligkeit beim Lesen berechnet, Vollzug, Vorgaben je Abschnitt; `schichtplan/` der Schichtplan (Soll-Blöcke an Einheit, UHS, Pause, Befunde beim Lesen, LLH-1552) | `…/{id}/abloesungen`, `…/abloesungen/schichtplan`; Live `abloesung` |
 | `src/schichtmodell` | Org-Schichtmodelle (Rhythmus oder Wechselzeiten), Kopie am Einsatz | `/api/schichtmodelle` |
-| `src/planung` | Vorplanung ohne Einsatz: Planungen der Organisation mit Posten, Blöcken und Helfern, Befunde und Kennzahlen über die Schichtplan-Prüfung, Löschfrist 90 Tage (LLH-1585); Übernahme in einen neuen oder laufenden Einsatz über den Übernahme-Kern des Schichtplans, danach schreibgeschützt (LLH-1587) | `/api/planungen`; Org-Live `planung`; `abloesung::schichtplan::uebernahme`, `einsatz::repo::anlegen_tx` |
+| `src/planung` | Vorplanung ohne Einsatz: Planungen der Organisation mit Posten, Blöcken und Helfern, Befunde und Kennzahlen über die Schichtplan-Prüfung, Löschfrist 90 Tage (LLH-1585); Programmpunkte der Planung (LLH-1583); Übernahme in einen neuen oder laufenden Einsatz über den Übernahme-Kern des Schichtplans, danach schreibgeschützt (LLH-1587), mit den Programmpunkten | `/api/planungen`; Org-Live `planung`; `abloesung::schichtplan::uebernahme`, `einsatz::repo::anlegen_tx` |
 | `src/bereitstellungsraum` | Bereitstellungsräume mit Statusmaschine, Belegung, Eintreffen und Abruf | `…/{id}/bereitstellungsraeume`; Live `bereitstellungsraum` |
 | `src/staerke.rs` | Taktische Stärke Führer/Unterführer/Mannschaft, Summe berechnet | genutzt u. a. von Fahrzeug, Einheiten-Vorlage, UHS, Verpflegung |
 | `src/katalog.rs` | Geteilte Grundlagen der Status-Kataloge (Dienststatus, Semantik-Kategorie, TETRA-Betriebsart) | genutzt u. a. von Fahrzeug, Personal, Material, Sprechgruppe, Einheit |
@@ -350,7 +350,7 @@ flowchart TB
 | Pfad | Zweck | Gegenstück im Backend |
 | --- | --- | --- |
 | `frontend/src/personen` | Betroffene, Sichtung, Patientenkopf, Erfassung, Druck ([AGENTS.md](../../frontend/src/personen/AGENTS.md)) | `src/person`, `src/uhs` |
-| `frontend/src/planung` | Vorplanung ohne Einsatz: Liste, Planungsseite mit Kopf, Posten, Helfern und Plan; Adapter `planungZeilen.ts` auf Raster, Blockdialog und Handy-Liste des Schichtplans (LLH-1586); Dialog „In Einsatz übernehmen“ mit der Vorschau des Einlesens (LLH-1587) | `src/planung`, `frontend/src/abloesung/schichtplan` |
+| `frontend/src/planung` | Vorplanung ohne Einsatz: Liste, Planungsseite mit Kopf, Posten, Helfern und Plan; Adapter `planungZeilen.ts` auf Raster, Blockdialog und Handy-Liste des Schichtplans (LLH-1586); Dialog „In Einsatz übernehmen“ mit der Vorschau des Einlesens (LLH-1587); Reiter „Ablauf“ über `AblaufListe` (LLH-1583) | `src/planung`, `frontend/src/abloesung/schichtplan` |
 | `frontend/src/betreuung` | Evakuierungsbezirke und Betreuungsstellen ([AGENTS.md](../../frontend/src/betreuung/AGENTS.md)) | `src/betreuung` |
 | `frontend/src/verpflegung` | Zeitfenster, Deckung, Ausgabeansicht, Stellen | `src/verpflegung` |
 
@@ -373,7 +373,7 @@ flowchart TB
 | `frontend/src/fernmeldewesen` | Funkplan, Skizze, Sprechgruppen, Kommunikationsplan ([AGENTS.md](../../frontend/src/fernmeldewesen/AGENTS.md)) | `src/fernmeldewesen`, `src/sprechgruppe` |
 | `frontend/src/fuehrung` | Auswahl von Führungsfunktionen und Empfängern ([AGENTS.md](../../frontend/src/fuehrung/AGENTS.md)) | `src/fuehrung` |
 | `frontend/src/lagebesprechung` | Termin, Vorbereitung, Abschluss, Verlauf ([AGENTS.md](../../frontend/src/lagebesprechung/AGENTS.md)) | `src/lagebesprechung` |
-| `frontend/src/programmpunkt` | Paneel „Ablauf“ der Einsatzdaten, anstehende Programmpunkte | `src/programmpunkt` |
+| `frontend/src/programmpunkt` | Paneel „Ablauf“ der Einsatzdaten, `AblaufListe` ohne Datenquelle auch für die Planung, anstehende Programmpunkte | `src/programmpunkt` |
 | `frontend/src/lageberichte` | Lageberichte mit Übernahmen aus der Lage | `src/lagebericht` |
 | `frontend/src/entwurf` | Gegliederte Dokumente `DokumentEntwurf`, Freigabe, Anlagen, Verteiler ([AGENTS.md](../../frontend/src/entwurf/AGENTS.md)) | `src/vorlagendokument` |
 | `frontend/src/infotelefon` | Anruferfassung ([AGENTS.md](../../frontend/src/infotelefon/AGENTS.md)) | `src/infotelefon` |

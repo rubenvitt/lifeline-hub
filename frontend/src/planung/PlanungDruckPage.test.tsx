@@ -81,6 +81,7 @@ const PLANUNG: Planung = {
     }),
   ],
   helfer: [{ id: 9, name: 'Bea Helfer', organisation: 'DLRG', qualifikationen: [] }],
+  programmpunkte: [],
   kennzahlen: { soll: 2, ist: 1, offen: 1, konflikte: 0 },
 };
 
