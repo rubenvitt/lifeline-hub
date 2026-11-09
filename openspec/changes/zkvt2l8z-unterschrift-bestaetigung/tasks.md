@@ -32,9 +32,9 @@ die nächste freie Nummer über `origin/alpha` (`scripts/check-migrationen.sh`, 
 
 ## 5. Doku und Abschluss
 
-- [ ] 5.1 Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md`: Bestätigen, Ablehnen, warum abgleichen, Vorrang beim Deaktivieren und Ausweg; Wächter aus `docs/anwender/AGENTS.md` grün
-- [ ] 5.2 Architektur: R24 in Kapitel 11 verengt nachführen, Kapitel 8 (Querschnitt Sicherheit) um die Bestätigung; `scripts/check-architektur.sh` grün
-- [ ] 5.3 Bilder der Änderung für PR und Meldung (Bestätigungsdialog, Hinweis an der Kopplung, Rückfrage beim Deaktivieren)
+- [x] 5.1 Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md`: Bestätigen, Ablehnen, warum abgleichen, Vorrang beim Deaktivieren und Ausweg; Wächter aus `docs/anwender/AGENTS.md` grün
+- [x] 5.2 Architektur: R24 in Kapitel 11 verengt nachführen, Kapitel 8 (Querschnitt Sicherheit) um die Bestätigung; `scripts/check-architektur.sh` grün
+- [x] 5.3 Bilder der Änderung für PR und Meldung (Bestätigungsdialog, Hinweis an der Kopplung, Rückfrage beim Deaktivieren)
 - [ ] 5.4 `./scripts/check-all.sh` vollständig grün
 
 ## Workflow follow-up

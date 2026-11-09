@@ -193,7 +193,9 @@ mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code
 ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
 `src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“).
 Erklärungen eines Org-Admins, die eine andere Instanz prüfen soll, unterschreibt er mit einem
-eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`).
+eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`). Einen nachgelieferten neuen
+Schlüssel nimmt die übernehmende Instanz erst nach der Bestätigung eines Admins dort an, der die
+letzten vier Zeichen des Fingerabdrucks beim Inhaber erfragt (LLH-1605).
 
 ## 8.18 Konfiguration über die Umgebung
 

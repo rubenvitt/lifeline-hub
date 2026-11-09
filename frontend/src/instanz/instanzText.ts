@@ -96,11 +96,8 @@ export function schluesselZeile(
     s.herkunft === 'gegenueber'
       ? `von ${s.fremde_org_name ?? 'gekoppelter Instanz'}`
       : `registriert ${zeit(s.erstellt_at)}`,
-    s.gegengezeichnet_von
-      ? `gegengezeichnet von ${s.gegengezeichnet_von}${
-          s.unterzeichner_fingerabdruck ? ` (${s.unterzeichner_fingerabdruck})` : ''
-        }${s.erklaert_at ? ` ${zeit(s.erklaert_at)}` : ''}`
-      : null,
+    // Fingerabdruck des Unterzeichners und Zeitpunkt zeigt der Bestätigungsdialog (LLH-1605).
+    s.gegengezeichnet_von ? `gegengezeichnet von ${s.gegengezeichnet_von}` : null,
   ];
   return teile.filter(Boolean).join(' · ');
 }

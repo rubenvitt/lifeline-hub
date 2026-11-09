@@ -89,7 +89,7 @@ describe('instanzText', () => {
     ]);
   });
 
-  it('Schlüsselzeile eines wartenden Schlüssels nennt Unterzeichner und Zeitpunkt', () => {
+  it('Schlüsselzeile eines wartenden Schlüssels nennt Zustand und Unterzeichner', () => {
     expect(
       schluesselZeile(
         {
@@ -108,9 +108,7 @@ describe('instanzText', () => {
         },
         zeit,
       ),
-    ).toBe(
-      'wartet auf Bestätigung · von DRK LV · gegengezeichnet von Anna (CCCC-DDDD) [2026-11-09 07:59:00]',
-    );
+    ).toBe('wartet auf Bestätigung · von DRK LV · gegengezeichnet von Anna');
   });
 
   it('Widerruf, der noch nicht zugestellt ist, steht als Hinweis', () => {
