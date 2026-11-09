@@ -19,7 +19,7 @@
 ## 2. Frontend: „meine Stelle“ über den Code
 
 - [x] 2.1 `meineStelle` liest `meine_funktion_code` und `meine_funktion_bezeichnung` (kein
-      `meine_sachgebiete`, kein eigener EL-Fallback mehr); `hatFunktion` vergleicht bei
+      `meine_sachgebiete`, kein eigener EL-Fallback mehr); `hasFunktion` vergleicht bei
       Fachberater/Führungshilfspersonal die Bezeichnungen nur, wenn beide Seiten eine tragen
       (`trim`, ohne Groß-/Kleinschreibung). Auftrag mit `funktion_text`, Erinnerung mit
       `empfaenger_funktion`, Meldung nur über den Code. Tests in `offeneVorgaenge.test.ts`: S7,

@@ -80,7 +80,7 @@ Folgen je Vorgangsart:
   verglichen. Fachberater und Führungshilfspersonal kommen als Empfänger einer Meldung nicht vor.
 
 `MeineStelle` hält dafür statt einer Menge von Codes den eigenen Code und die eigene Bezeichnung;
-`hatFunktion(stelle, code, bezeichnung)` kapselt die Regel. Die exportierten Signaturen
+`hasFunktion(stelle, code, bezeichnung)` kapselt die Regel. Die exportierten Signaturen
 `meldungFuerMich`, `auftragFuerMich`, `erinnerungFuerMich` bleiben.
 
 *Verworfen:* Nur der Code (jeder Fachberater sieht jeden Fachberater-Vorgang): am Checkpoint
