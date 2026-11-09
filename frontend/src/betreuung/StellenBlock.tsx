@@ -10,7 +10,12 @@ import type {
   StelleNamentlich,
 } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, {
+  spaltenFuer,
+  type Kartenplan,
+  type PrimaerAktion,
+  type WeitereAktionen,
+} from '../components/Datensicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -124,16 +129,43 @@ const STATUS = Object.keys(betreuungsstelleStatus) as BetreuungsstelleStatus[];
 
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
+/**
+ * „Belegung melden“ als Primäraktion der Zeile (LLH-1598, design.md D5): EINE Quelle für den Knopf
+ * der Spalte und das Kontextmenü. Eine namentliche Stelle meldet der Server aus der Registrierung
+ * (LLH-1612), eine geschlossene gar nicht.
+ */
+function belegungMelden(
+  darfSchreiben: boolean,
+  onBelegungMelden: (s: Betreuungsstelle) => void,
+): PrimaerAktion<Betreuungsstelle> {
+  return {
+    etikett: 'Belegung melden',
+    zugaenglicherName: (s) => `Belegung melden für ${s.bezeichnung}`,
+    sichtbar: (s) => darfSchreiben && s.status !== 'geschlossen' && s.belegungsart !== 'namentlich',
+    onKlick: onBelegungMelden,
+  };
+}
+
+/** Das ⋮ der Zeile, für Spalte und Kontextmenü (LLH-1598, design.md D5). */
+function stellenWeitere(
+  karteGesperrt: boolean,
+  onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
+): WeitereAktionen<Betreuungsstelle> {
+  return {
+    eintraege: (s) => stellenMenue(s, karteGesperrt),
+    zugaenglicherName: (s) => `Aktionen zu Stelle ${s.bezeichnung}`,
+    onWahl: (key, s) => onAktion(key as StelleAktion, s),
+  };
+}
+
 const stellenSpalten = (
   einsatzId: number,
   darfSchreiben: boolean,
-  onBelegungMelden: (s: Betreuungsstelle) => void,
-  onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
+  aktion: PrimaerAktion<Betreuungsstelle>,
+  weitere: WeitereAktionen<Betreuungsstelle>,
   namentlich: ReadonlyMap<number, number> | undefined,
   /** Mono-Stil der Zahl in „davon namentlich n". */
   zahlStil: CSSProperties,
-  /** Lagekarte für den Benutzer gesperrt (LFH-888): „Auf Karte verorten" gesperrt mit Grund. */
-  karteGesperrt: boolean,
   /** Unter `md`: „Belegung melden" reitet in der fixierten Kennung mit (LFH-967). */
   meldenInKennung: boolean,
   /** Abstand zwischen Name und Meldeknopf in der Kennung. */
@@ -145,11 +177,8 @@ const stellenSpalten = (
       // der Zeile statt eines Knopfs, der nur 409 brächte.
       <Typography.Text type="secondary">{BELEGUNGSART_LABEL.namentlich}</Typography.Text>
     ) : (
-      <Button
-        aria-label={`Belegung melden für ${s.bezeichnung}`}
-        onClick={() => onBelegungMelden(s)}
-      >
-        Belegung melden
+      <Button aria-label={aktion.zugaenglicherName?.(s)} onClick={() => aktion.onKlick(s)}>
+        {aktion.etikett}
       </Button>
     );
   return spaltenFuer<Betreuungsstelle>()([
@@ -295,9 +324,9 @@ const stellenSpalten = (
               <Space wrap size="middle">
                 {!meldenInKennung && meldeKnopf(s)}
                 <MenueAusloeser
-                  eintraege={stellenMenue(s, karteGesperrt)}
-                  zugaenglicherName={`Aktionen zu Stelle ${s.bezeichnung}`}
-                  onWahl={(aktion) => onAktion(aktion, s)}
+                  eintraege={weitere.eintraege(s)}
+                  zugaenglicherName={weitere.zugaenglicherName(s)}
+                  onWahl={(key) => weitere.onWahl(key, s)}
                 />
               </Space>
             ),
@@ -308,17 +337,6 @@ const stellenSpalten = (
 };
 
 type StelleSpalte = ReturnType<typeof stellenSpalten>[number]['key'];
-
-/**
- * Der Kartenplan ist Pflicht am Primitiv, greift bei `form="tabelle"` aber nie; ehrlich belegt,
- * falls die Form je auf `auto` wechselt.
- */
-const KARTE: Kartenplan<Betreuungsstelle, StelleSpalte> = {
-  art: 'plan',
-  titel: { spalte: 'bezeichnung' },
-  status: (s) => betreuungsstelleStatus[s.status],
-  sekundaer: ['belegt', 'frei', 'art'],
-};
 
 export default function StellenBlock({
   einsatzId,
@@ -348,27 +366,46 @@ export default function StellenBlock({
     () => (namentlich ? new Map(namentlich.map((n) => [n.stelle_id, n.anzahl])) : undefined),
     [namentlich],
   );
+  const aktion = useMemo(
+    () => belegungMelden(darfSchreiben, onBelegungMelden),
+    [darfSchreiben, onBelegungMelden],
+  );
+  const weitere = useMemo(() => stellenWeitere(karteGesperrt, onAktion), [karteGesperrt, onAktion]);
+  /*
+   * Der Kartenplan ist Pflicht am Primitiv und greift bei `form="tabelle"` für die Darstellung nie.
+   * Primäraktion und ⋮ stehen trotzdem darin: aus ihnen baut die `Datensicht` das Kontextmenü der
+   * Zeile (LLH-1598), und die Spalte „Aktionen“ liest dieselben Daten.
+   */
+  const karte = useMemo<Kartenplan<Betreuungsstelle, StelleSpalte>>(
+    () => ({
+      art: 'plan',
+      titel: { spalte: 'bezeichnung' },
+      status: (s) => betreuungsstelleStatus[s.status],
+      sekundaer: ['belegt', 'frei', 'art'],
+      aktion,
+      ...(darfSchreiben ? { weitere } : {}),
+    }),
+    [aktion, weitere, darfSchreiben],
+  );
   const spalten = useMemo(
     () =>
       stellenSpalten(
         einsatzId,
         darfSchreiben,
-        onBelegungMelden,
-        onAktion,
+        aktion,
+        weitere,
         namentlichJeStelle,
         monoStil(token.fontSize),
-        karteGesperrt,
         istSchmal,
         token.marginXS,
       ),
     [
       einsatzId,
       darfSchreiben,
-      onBelegungMelden,
-      onAktion,
+      aktion,
+      weitere,
       namentlichJeStelle,
       token.fontSize,
-      karteGesperrt,
       istSchmal,
       token.marginXS,
     ],
@@ -400,7 +437,7 @@ export default function StellenBlock({
         zeilenSchluessel={(s) => `stelle-${s.id}`}
         ladend={ladend}
         leerText="Keine Betreuungsstellen"
-        karte={KARTE}
+        karte={karte}
         aufklappen={aufklappen}
         onZeileKlick={(s) => navigate(betreuungsstellePfad(einsatzId, s.id))}
       />

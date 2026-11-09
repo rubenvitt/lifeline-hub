@@ -31,8 +31,8 @@
 
 ## 6. Betreuung über den Kartenplan (D5)
 
-- [ ] 6.1 `StellenBlock`: Kartenplan mit `aktion` „Belegung melden“ und `weitere` aus `stellenMenue`; Spalte und Kennungsknopf aus derselben `aktion`; TDD: Rechtsklick auf eine unverortete Stelle zeigt „Belegung melden“, „Auf Karte verorten“, Trenner, rot „Stornieren“; namentliche Stelle ohne „Belegung melden“; Bestandstests grün
-- [ ] 6.2 `BezirkTabelle`: Kartenplan mit `aktion` „Stand melden“ und `weitere` aus `bezirkMenue`; Spalte aus derselben Quelle; TDD analog; Bestandstests grün
+- [x] 6.1 `StellenBlock`: Kartenplan mit `aktion` „Belegung melden“ und `weitere` aus `stellenMenue`; Spalte und Kennungsknopf aus derselben `aktion`; TDD: Rechtsklick auf eine unverortete Stelle zeigt „Belegung melden“, „Auf Karte verorten“, Trenner, rot „Stornieren“; namentliche Stelle ohne „Belegung melden“; Bestandstests grün
+- [x] 6.2 `BezirkTabelle`: Kartenplan mit `aktion` „Stand melden“ und `weitere` aus `bezirkMenue`; Spalte aus derselben Quelle; TDD analog; Bestandstests grün
 
 ## 7. Regeln, Doku, Nachweis
 
