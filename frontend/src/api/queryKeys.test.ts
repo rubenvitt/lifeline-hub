@@ -699,7 +699,7 @@ describe('einsatzKeys.personDruck (LLH-1120)', () => {
  * Die Wahl „Unverträglichkeiten“ ist Teil des Keys: eine andere Fassung ist ein anderer Abruf.
  */
 describe('einsatzKeys.registrierlisteDruck (LLH-1616)', () => {
-  it('baut den Key als [prefix, einsatzId, stelleId, mitUnvertraeglichkeiten]', () => {
+  it('baut den Key als [prefix, einsatzId, stelleId, hasUnvertraeglichkeiten]', () => {
     expect(einsatzKeys.registrierlisteDruck(5, 3, false)).toEqual([
       'einsatz-registrierliste-druck',
       5,

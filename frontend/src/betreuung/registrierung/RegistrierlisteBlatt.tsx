@@ -18,7 +18,7 @@ export interface RegistrierlisteBlattProps {
   /** Kalendertag `YYYY-MM-DD` der Anzeigezone, für das Alter aus dem Geburtsdatum. */
   heute: string;
   /** Spalte „Unverträglichkeiten“ (Gesundheitsangabe), nur wenn bewusst gewählt. */
-  mitUnvertraeglichkeiten: boolean;
+  hasUnvertraeglichkeiten: boolean;
 }
 
 const personenWort = (n: number) => `${n} ${n === 1 ? 'Person' : 'Personen'}`;
@@ -39,7 +39,7 @@ const personenWort = (n: number) => `${n} ${n === 1 ? 'Person' : 'Personen'}`;
 export default function RegistrierlisteBlatt({
   liste,
   heute,
-  mitUnvertraeglichkeiten,
+  hasUnvertraeglichkeiten,
 }: RegistrierlisteBlattProps) {
   const { token } = theme.useToken();
   const band = kostformBand(liste);
@@ -53,7 +53,7 @@ export default function RegistrierlisteBlatt({
   };
   const kopfzelle: CSSProperties = { ...zelle, borderBlockEnd: rand, fontWeight: 600 };
   const mono: CSSProperties = { ...monoStil(token.fontSize), whiteSpace: 'nowrap' };
-  const spalten = mitUnvertraeglichkeiten ? 6 : 5;
+  const spalten = hasUnvertraeglichkeiten ? 6 : 5;
 
   const personZeile = (p: RegistriertePerson) => (
     <tr key={p.id}>
@@ -61,7 +61,7 @@ export default function RegistrierlisteBlatt({
       <td style={zelle}>{personName(p)}</td>
       <td style={{ ...zelle, ...mono }}>{alterText(p, heute)}</td>
       <td style={zelle}>{p.kostform ? KOSTFORM_WORT[p.kostform] : 'ohne Angabe'}</td>
-      {mitUnvertraeglichkeiten && <td style={zelle}>{p.unvertraeglichkeiten ?? ''}</td>}
+      {hasUnvertraeglichkeiten && <td style={zelle}>{p.unvertraeglichkeiten ?? ''}</td>}
       <td style={{ ...zelle, borderInline: rand, borderBlockEnd: rand }} />
     </tr>
   );
@@ -140,8 +140,8 @@ export default function RegistrierlisteBlatt({
           <col style={{ width: '6em' }} />
           <col />
           <col style={{ width: '10em' }} />
-          <col style={{ width: mitUnvertraeglichkeiten ? '9em' : '11em' }} />
-          {mitUnvertraeglichkeiten && <col style={{ width: '12em' }} />}
+          <col style={{ width: hasUnvertraeglichkeiten ? '9em' : '11em' }} />
+          {hasUnvertraeglichkeiten && <col style={{ width: '12em' }} />}
           <col style={{ width: '2.5em' }} />
         </colgroup>
         <thead>
@@ -158,7 +158,7 @@ export default function RegistrierlisteBlatt({
             <th scope="col" style={kopfzelle}>
               Kostform
             </th>
-            {mitUnvertraeglichkeiten && (
+            {hasUnvertraeglichkeiten && (
               <th scope="col" style={kopfzelle}>
                 Unverträglichkeiten
               </th>

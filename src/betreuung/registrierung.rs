@@ -538,39 +538,50 @@ pub async fn liste(
 }
 
 /// Die Registrierliste für den Druck (LLH-1616, Change `iw8hjb93-registrierliste-drucken`
-/// design.md D2/D3): in EINER Transaktion lesen und je Person einen Eintrag `druck` ins
+/// design.md D2/D3): in EINER Schreibtransaktion lesen und je Person einen Eintrag `druck` ins
 /// Zugriffsprotokoll schreiben; erst nach dem Commit verlässt die Liste den Server. Scheitert ein
-/// Eintrag, bleibt keiner stehen und keine Person geht hinaus. Ohne `mit_unvertraeglichkeiten`
-/// fehlt die Gesundheitsangabe in der Antwort (Spec „Gesundheitsangaben nur auf Wunsch“).
-pub async fn liste_fuer_druck(
+/// Eintrag, bleibt keiner stehen und keine Person geht hinaus. `write_retry!` öffnet mit
+/// `BEGIN IMMEDIATE`: ein deferred `BEGIN` mit Lesen vor dem ersten Eintrag scheiterte beim
+/// Lock-Upgrade sofort, sobald gleichzeitig registriert wird (`src/tx.rs`). Ohne
+/// `has_unvertraeglichkeiten` fehlt die Gesundheitsangabe in der Antwort (Spec
+/// „Gesundheitsangaben nur auf Wunsch“).
+pub async fn liste_for_druck(
     pool: &SqlitePool,
     einsatz_id: i64,
     stelle_id: i64,
     stellensicht: bool,
     benutzer_id: i64,
-    mit_unvertraeglichkeiten: bool,
+    has_unvertraeglichkeiten: bool,
 ) -> Result<RegistrierListe, AppError> {
-    let mut tx = pool.begin().await?;
-    let mut l = liste_in(&mut tx, einsatz_id, stelle_id, stellensicht).await?;
-    let personen = l
-        .haushalte
-        .iter_mut()
-        .flat_map(|h| h.personen.iter_mut())
-        .chain(l.ohne_haushalt.iter_mut());
-    for p in personen {
-        crate::person::audit_repo::create_tx(
-            &mut tx,
-            einsatz_id,
-            Some(p.id),
-            benutzer_id,
-            "druck",
-        )
-        .await?;
-        if !mit_unvertraeglichkeiten {
+    let mut l = crate::write_retry!(pool, |conn| {
+        let l = liste_in(conn, einsatz_id, stelle_id, stellensicht).await?;
+        let personen = l
+            .haushalte
+            .iter()
+            .flat_map(|h| h.personen.iter())
+            .chain(l.ohne_haushalt.iter());
+        for p in personen {
+            crate::person::audit_repo::create_tx(
+                conn,
+                einsatz_id,
+                Some(p.id),
+                benutzer_id,
+                "druck",
+            )
+            .await?;
+        }
+        Ok(l)
+    })?;
+    if !has_unvertraeglichkeiten {
+        let personen = l
+            .haushalte
+            .iter_mut()
+            .flat_map(|h| h.personen.iter_mut())
+            .chain(l.ohne_haushalt.iter_mut());
+        for p in personen {
             p.unvertraeglichkeiten = None;
         }
     }
-    tx.commit().await?;
     Ok(l)
 }
 

@@ -59,7 +59,7 @@ export default function RegistrierlisteDruckSeite({
   const { zone } = useZeitEingabe();
   const [suche, setSuche] = useSearchParams();
   const schalterId = useId();
-  const mitUnvertraeglichkeiten = suche.get('unvertraeglichkeiten') === '1';
+  const hasUnvertraeglichkeiten = suche.get('unvertraeglichkeiten') === '1';
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -67,8 +67,8 @@ export default function RegistrierlisteDruckSeite({
   });
   const druckQuery = useQuery({
     ...DRUCK_ABFRAGE,
-    queryKey: einsatzKeys.registrierlisteDruck(einsatzId, stelleId, mitUnvertraeglichkeiten),
-    queryFn: () => loadRegistrierlisteDruck(einsatzId, stelleId, mitUnvertraeglichkeiten),
+    queryKey: einsatzKeys.registrierlisteDruck(einsatzId, stelleId, hasUnvertraeglichkeiten),
+    queryFn: () => loadRegistrierlisteDruck(einsatzId, stelleId, hasUnvertraeglichkeiten),
     gcTime: 0,
   });
 
@@ -132,7 +132,7 @@ export default function RegistrierlisteDruckSeite({
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
             <Switch
               id={schalterId}
-              checked={mitUnvertraeglichkeiten}
+              checked={hasUnvertraeglichkeiten}
               disabled={druckQuery.isFetching}
               onChange={(an) =>
                 setSuche(
@@ -194,7 +194,7 @@ export default function RegistrierlisteDruckSeite({
                 etikett: 'Stand',
                 wert: zeitpunkt(new Date(druckQuery.dataUpdatedAt).toISOString(), konventionen),
               },
-              ...(mitUnvertraeglichkeiten
+              ...(hasUnvertraeglichkeiten
                 ? [{ etikett: 'Gesundheitsangaben', wert: 'mit Unverträglichkeiten' }]
                 : []),
             ]}
@@ -202,7 +202,7 @@ export default function RegistrierlisteDruckSeite({
           <RegistrierlisteBlatt
             liste={liste}
             heute={heuteInZone(zone, serverJetzt())}
-            mitUnvertraeglichkeiten={mitUnvertraeglichkeiten}
+            hasUnvertraeglichkeiten={hasUnvertraeglichkeiten}
           />
         </div>
       )}

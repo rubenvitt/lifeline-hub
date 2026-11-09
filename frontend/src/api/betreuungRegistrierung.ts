@@ -42,14 +42,14 @@ export function loadRegistrierListe(einsatzId: number, stelleId: number): Promis
 /**
  * Registrierliste für den Druck (LLH-1616): jeder Abruf schreibt je Person einen `druck`-Eintrag
  * ins Zugriffsprotokoll; nur über diesen Weg drucken (`druck/AGENTS.md`). Unverträglichkeiten
- * liefert der Server nur mit `mitUnvertraeglichkeiten`.
+ * liefert der Server nur mit `hasUnvertraeglichkeiten`.
  */
 export function loadRegistrierlisteDruck(
   einsatzId: number,
   stelleId: number,
-  mitUnvertraeglichkeiten: boolean,
+  hasUnvertraeglichkeiten: boolean,
 ): Promise<RegistrierListe> {
-  const query = mitUnvertraeglichkeiten ? '?unvertraeglichkeiten=1' : '';
+  const query = hasUnvertraeglichkeiten ? '?unvertraeglichkeiten=1' : '';
   return apiGet<RegistrierListe>(
     `${basis(einsatzId)}/stellen/${stelleId}/registrierungen/druck${query}`,
   );

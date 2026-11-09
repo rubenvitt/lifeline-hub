@@ -864,8 +864,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.registrierliste, einsatzId, stelleId] as const,
   /** Invalidierungs-Prefix aller Registrierlisten des Einsatzes. */
   registrierlisteAlle: (einsatzId: number) => [EINSATZ_KEYS.registrierliste, einsatzId] as const,
-  registrierlisteDruck: (einsatzId: number, stelleId: number, mitUnvertraeglichkeiten: boolean) =>
-    [EINSATZ_KEYS.registrierlisteDruck, einsatzId, stelleId, mitUnvertraeglichkeiten] as const,
+  registrierlisteDruck: (einsatzId: number, stelleId: number, hasUnvertraeglichkeiten: boolean) =>
+    [EINSATZ_KEYS.registrierlisteDruck, einsatzId, stelleId, hasUnvertraeglichkeiten] as const,
   // Evakuierung (LLH-1034): argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und
   // Kennzahl „Evakuiert“ teilen ihn).
   evakuierung: (einsatzId: number) => [EINSATZ_KEYS.evakuierung, einsatzId] as const,

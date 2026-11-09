@@ -63,7 +63,7 @@ const HEUTE = '2026-11-09';
 
 describe('RegistrierlisteBlatt (LLH-1616)', () => {
   it('summiert je Kostform samt „ohne Angabe“ und gesamt', () => {
-    render(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} mitUnvertraeglichkeiten={false} />);
+    render(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} hasUnvertraeglichkeiten={false} />);
     const summen = screen.getByRole('table', { name: 'Kostformen' });
     const zeile = (wort: string) =>
       within(summen).getByRole('row', { name: new RegExp(`^${wort} `) });
@@ -76,7 +76,7 @@ describe('RegistrierlisteBlatt (LLH-1616)', () => {
   });
 
   it('gruppiert je Haushalt mit Kopf und leerer Abhakspalte', () => {
-    render(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} mitUnvertraeglichkeiten={false} />);
+    render(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} hasUnvertraeglichkeiten={false} />);
     const tabelle = screen.getByRole('table', { name: 'Registrierte Personen' });
     expect(within(tabelle).getByRole('columnheader', { name: 'abgehakt' })).toBeInTheDocument();
     const kopf = within(tabelle).getByRole('rowheader', { name: /H-1/ });
@@ -95,7 +95,7 @@ describe('RegistrierlisteBlatt (LLH-1616)', () => {
   });
 
   it('stellt Personen ohne Haushalt in einen eigenen Block, Kostform ohne Angabe', () => {
-    render(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} mitUnvertraeglichkeiten={false} />);
+    render(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} hasUnvertraeglichkeiten={false} />);
     const tabelle = screen.getByRole('table', { name: 'Registrierte Personen' });
     expect(within(tabelle).getByRole('rowheader', { name: /ohne Haushalt/ })).toHaveTextContent(
       'ohne Haushalt · 1 Person',
@@ -105,14 +105,14 @@ describe('RegistrierlisteBlatt (LLH-1616)', () => {
 
   it('zeigt Unverträglichkeiten nur mit Wahl', () => {
     const { rerender } = render(
-      <RegistrierlisteBlatt liste={LISTE} heute={HEUTE} mitUnvertraeglichkeiten={false} />,
+      <RegistrierlisteBlatt liste={LISTE} heute={HEUTE} hasUnvertraeglichkeiten={false} />,
     );
     expect(
       screen.queryByRole('columnheader', { name: 'Unverträglichkeiten' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Erdnüsse')).not.toBeInTheDocument();
 
-    rerender(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} mitUnvertraeglichkeiten />);
+    rerender(<RegistrierlisteBlatt liste={LISTE} heute={HEUTE} hasUnvertraeglichkeiten />);
     expect(screen.getByRole('columnheader', { name: 'Unverträglichkeiten' })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /R-012/ })).toHaveTextContent('Erdnüsse');
   });

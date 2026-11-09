@@ -286,16 +286,16 @@ pub async fn druck(
 ) -> Result<Json<RegistrierListe>, AppError> {
     fordere_eigene_stelle(ctx.geraet.as_ref(), sid)?;
     ctx.fordere_modul_zugriff(&state.pool, "personen").await?;
-    let mit_unvertraeglichkeiten =
+    let has_unvertraeglichkeiten =
         matches!(q.unvertraeglichkeiten.as_deref(), Some("1") | Some("true"));
     Ok(Json(
-        registrierung::liste_fuer_druck(
+        registrierung::liste_for_druck(
             &state.pool,
             ctx.einsatz.id,
             sid,
             ctx.geraet.is_some(),
             ctx.benutzer.id,
-            mit_unvertraeglichkeiten,
+            has_unvertraeglichkeiten,
         )
         .await?,
     ))
