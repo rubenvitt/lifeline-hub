@@ -14,7 +14,7 @@ export type AbschnittsTextUnterEbene = 1 | 2 | 3 | 4;
  *
  * `unterEbene` wie an `components/Markdown.tsx`: die Ebene der nächsten Überschrift ÜBER dem
  * Bauteil. Der Rahmen bleibt beim Aufrufer. `anker` gibt jedem Abschnitt eine Kennung, auf die
- * die Gliederung des Entwurfs springt.
+ * die Gliederung des Entwurfs springt, und macht ihn per Programm fokussierbar.
  */
 export default function AbschnittsText({
   gliederung,
@@ -41,7 +41,13 @@ export default function AbschnittsText({
           </Typography.Title>
         );
         return (
-          <section key={a.schluessel} id={anker?.(a.schluessel)} style={{ marginBottom: 16 }}>
+          <section
+            key={a.schluessel}
+            id={anker?.(a.schluessel)}
+            // Sprungziel mit Fokus („In der Lesefassung zeigen“, LLH-1601): nur mit Anker.
+            tabIndex={anker ? -1 : undefined}
+            style={{ marginBottom: 16 }}
+          >
             {text.trim() ? (
               <Markdown variante="dokument" unterEbene={abschnittEbene} titel={titel}>
                 {text}

@@ -61,3 +61,53 @@ export function fuellstandText(kette: string): string {
   const gefuellt = [...kette].filter((z) => z === '1').length;
   return `${gefuellt}/${kette.length} Abschnitte`;
 }
+
+/** Ansicht des ganzen Dokuments: Textfelder oder gesetzte Lesefassung. */
+export type DokumentAnsicht = 'bearbeiten' | 'lesen';
+
+/** Schlüssel der Aktionen eines Abschnitts (LLH-1601). */
+export type AbschnittAktionKey = 'springen' | 'kopieren' | 'lesefassung' | 'leeren';
+
+/** Ein Eintrag im ⋮ oder Kontextmenü eines Abschnitts (Form von `MenueEintrag`). */
+export interface AbschnittEintrag {
+  key: AbschnittAktionKey;
+  label: string;
+  gefahr?: true;
+  gesperrt?: true;
+}
+
+export interface AbschnittZustand {
+  /** Laut Leer-Kette: nichts als Leerraum. */
+  leer: boolean;
+  /** Zwischenablage vorhanden (`navigator.clipboard.writeText`, nur im Secure Context). */
+  kopierbar: boolean;
+  ansicht: DokumentAnsicht;
+}
+
+/**
+ * Die Aktionen eines Abschnitts, EINE Quelle für das ⋮ im Abschnittskopf und das Kontextmenü an
+ * Kopf und Gliederung (LLH-1601, Spec `dokument-entwurf`; `frontend/AGENTS.md`, „Kontextmenü nur
+ * über den Baustein“). „In der Lesefassung zeigen“ fehlt, wenn sie schon gewählt ist.
+ */
+export function abschnittEintraege({
+  leer,
+  kopierbar,
+  ansicht,
+}: AbschnittZustand): AbschnittEintrag[] {
+  return [
+    {
+      key: 'kopieren',
+      label: 'Text kopieren',
+      ...(leer || !kopierbar ? { gesperrt: true as const } : {}),
+    },
+    ...(ansicht === 'lesen'
+      ? []
+      : [{ key: 'lesefassung' as const, label: 'In der Lesefassung zeigen' }]),
+    { key: 'leeren', label: 'Abschnitt leeren', gefahr: true },
+  ];
+}
+
+/** Kontextmenü eines Gliederungseintrags: die Primäraktion (der Sprung) zuoberst. */
+export function gliederungEintraege(zustand: AbschnittZustand): AbschnittEintrag[] {
+  return [{ key: 'springen', label: 'Zum Abschnitt springen' }, ...abschnittEintraege(zustand)];
+}

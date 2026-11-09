@@ -1,20 +1,65 @@
-import { Button, Form, Typography, type FormInstance } from 'antd';
-import { memo, useCallback, useId, useState, type ReactNode } from 'react';
+import { App, Button, Form, Modal, Typography, type FormInstance } from 'antd';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import { IconHakenKreis, IconMinusKreis } from '../icons';
 import MarkdownEditor from '../components/MarkdownEditor';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
+import { useKontextMenue, type KontextHandler } from '../components/useKontextMenue';
 import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
 import AbschnittsText from './AbschnittsText';
 import Einstiegsfokus from './Einstiegsfokus';
 import {
+  abschnittEintraege,
   befuellungsKette,
   EDITOR_ZEILEN,
   fuellstandText,
+  gliederungEintraege,
   istLeer,
+  type AbschnittAktionKey,
   type DokumentAbschnitt,
+  type DokumentAnsicht,
 } from './dokumentEntwurfKern';
 import './dokumentEntwurf.css';
 
-type Ansicht = 'bearbeiten' | 'lesen';
+type Ansicht = DokumentAnsicht;
+
+/** Wo das Kontextmenü eines Abschnitts geöffnet wurde (LLH-1601, design.md D3). */
+interface KontextZiel {
+  ort: 'gliederung' | 'kopf';
+  schluessel: string;
+}
+
+/** Handler-Fabrik des Kontextmenüs, identitätsstabil (`useKontextMenue`). */
+type KontextFabrik = (ziel: KontextZiel) => KontextHandler<HTMLElement>;
+
+/** Führt eine Aktion eines Abschnitts aus; identitätsstabil (Render-Zähler-Gate). */
+type AktionAusfuehren = (key: AbschnittAktionKey, schluessel: string) => void;
+
+/** Meldet das „leeren“ eines Felds an (`AbschnittFeld`); gibt die Abmeldung zurück. */
+type LeerenAnmelden = (schluessel: string, leeren: () => void) => () => void;
+
+/** Zwischenablage da? Nur im Secure Context (wie `components/KopierbarerText.tsx`). */
+function istKopierbar(): boolean {
+  return typeof navigator.clipboard?.writeText === 'function';
+}
+
+/** Name des ⋮ und des Kontextmenüs am Kopf, mit Kennung des Abschnitts (design.md D7). */
+export function aktionenName(label: string): string {
+  return `Aktionen zu Abschnitt ${label}`;
+}
 
 /**
  * Was im Kopf eines Abschnitts neben Name und Hilfetext steht (Lagebericht: der Übernahme-Knopf,
@@ -78,6 +123,7 @@ export default function DokumentEntwurf({
   einstieg,
 }: DokumentEntwurfProps) {
   const { token } = useRollen();
+  const { message } = App.useApp();
   const [ansicht, setAnsicht] = useState<Ansicht>('bearbeiten');
   const basis = useId();
   const bearbeitenId = `${basis}-bearbeiten`;
@@ -108,6 +154,97 @@ export default function DokumentEntwurf({
     },
     [ansicht, anker, leseAnker, form],
   );
+
+  // ---- Aktionen eines Abschnitts (LLH-1601, Spec `dokument-entwurf`, design.md D1–D7) ----
+
+  /** `onChange('')` je Feld (D2): Leeren läuft den Weg des Tippens, `onValuesChange` inklusive. */
+  const leerenTabelle = useRef(new Map<string, () => void>());
+  const leerenAnmelden = useCallback<LeerenAnmelden>((schluessel, leeren) => {
+    leerenTabelle.current.set(schluessel, leeren);
+    return () => {
+      if (leerenTabelle.current.get(schluessel) === leeren)
+        leerenTabelle.current.delete(schluessel);
+    };
+  }, []);
+
+  const [leerenFrage, setLeerenFrage] = useState<DokumentAbschnitt | null>(null);
+  /** Ziel von „In der Lesefassung zeigen“; der Effekt unten rollt hin, sobald sie hängt (D4). */
+  const lesenZiel = useRef<string | null>(null);
+  const [lesenAnfrage, setLesenAnfrage] = useState(0);
+
+  useEffect(() => {
+    const ziel = lesenZiel.current;
+    if (ansicht !== 'lesen' || ziel == null) return;
+    lesenZiel.current = null;
+    const abschnitt = document.getElementById(leseAnker(ziel));
+    abschnitt?.scrollIntoView?.({ block: 'start' });
+    // Der Auslöser (⋮ oder Kopf) ist jetzt verborgen; der Fokus ginge sonst ins Leere.
+    abschnitt?.focus({ preventScroll: true });
+  }, [ansicht, lesenAnfrage, leseAnker]);
+
+  /**
+   * Die jeweils aktuelle Ausführung; `ausfuehren` unten bleibt dabei identitätsstabil, damit das
+   * ⋮ in den `memo`-Blöcken nicht je Render der Seite neu rendert.
+   */
+  const aktuell = useRef<AktionAusfuehren>(() => {});
+  useLayoutEffect(() => {
+    aktuell.current = (key, schluessel) => {
+      const abschnitt = abschnitte.find((a) => a.schluessel === schluessel);
+      if (abschnitt == null) return;
+      switch (key) {
+        case 'springen':
+          springen(schluessel);
+          return;
+        case 'kopieren': {
+          const text = form.getFieldValue(schluessel) as unknown;
+          if (typeof text !== 'string' || !text.trim() || !istKopierbar()) return;
+          // Beide Ausgänge melden sich: `writeText` kann vorhanden sein und trotzdem ablehnen.
+          navigator.clipboard.writeText(text).then(
+            () => void message.success(`Text von „${abschnitt.label}“ kopiert`),
+            () => void message.error('Kopieren fehlgeschlagen'),
+          );
+          return;
+        }
+        case 'lesefassung':
+          lesenZiel.current = schluessel;
+          setAnsicht('lesen');
+          setLesenAnfrage((n) => n + 1);
+          return;
+        case 'leeren':
+          setLeerenFrage(abschnitt);
+          return;
+      }
+    };
+  });
+  /**
+   * Nach dem Schließen des Menüs: beide Menüs geben beim Schließen den Fokus an ihren Auslöser
+   * zurück, im selben Klick. Ein Sprung, der vorher fokussierte, verlöre das Feld wieder.
+   */
+  const ausfuehren = useCallback<AktionAusfuehren>((key, schluessel) => {
+    window.setTimeout(() => aktuell.current(key, schluessel), 0);
+  }, []);
+
+  const [kontext, setKontext] = useState<(KontextZiel & { offen: KontextMenueOffen }) | null>(null);
+  const kontextAusloeser = useKontextMenue<KontextZiel>({
+    onOeffnen: (ziel, { anker: punkt, vorherFokus }) => {
+      setKontext({ ...ziel, offen: { anker: punkt, vorherFokus } });
+      return true;
+    },
+  });
+  const kontextFabrik = useCallback<KontextFabrik>(
+    (ziel) => kontextAusloeser<HTMLElement>(ziel),
+    [kontextAusloeser],
+  );
+  const kontextAbschnitt =
+    kontext == null ? undefined : abschnitte.find((a) => a.schluessel === kontext.schluessel);
+  const kontextZustand =
+    kontext == null || kontextAbschnitt == null
+      ? null
+      : {
+          leer: istLeer(kette, abschnitte.indexOf(kontextAbschnitt)),
+          kopierbar: istKopierbar(),
+          ansicht,
+        };
 
   return (
     <div data-lfh="dokument-entwurf" className="dokument-entwurf">
@@ -144,7 +281,12 @@ export default function DokumentEntwurf({
                 {gliederungKopf}
               </div>
             )}
-            <DokumentGliederung abschnitte={abschnitte} kette={kette} onSprung={springen} />
+            <DokumentGliederung
+              abschnitte={abschnitte}
+              kette={kette}
+              onSprung={springen}
+              kontext={kontextFabrik}
+            />
           </div>
           <div style={{ minWidth: 0 }}>
             <div
@@ -161,6 +303,9 @@ export default function DokumentEntwurf({
                   leer={istLeer(kette, i)}
                   aktion={aktion}
                   anker={anker(a.schluessel)}
+                  ausfuehren={ausfuehren}
+                  kontext={kontextFabrik}
+                  leerenAnmelden={leerenAnmelden}
                 />
               ))}
             </div>
@@ -178,6 +323,39 @@ export default function DokumentEntwurf({
           </div>
         </div>
       </Paneel>
+      {kontext != null && kontextAbschnitt != null && kontextZustand != null && (
+        <KontextMenue<AbschnittAktionKey>
+          offen={kontext.offen}
+          eintraege={
+            kontext.ort === 'gliederung'
+              ? gliederungEintraege(kontextZustand)
+              : abschnittEintraege(kontextZustand)
+          }
+          zugaenglicherName={
+            kontext.ort === 'gliederung'
+              ? `${aktionenName(kontextAbschnitt.label)} in der Gliederung`
+              : aktionenName(kontextAbschnitt.label)
+          }
+          onWahl={(key) => ausfuehren(key, kontextAbschnitt.schluessel)}
+          onSchliessen={() => setKontext(null)}
+        />
+      )}
+      {/* Rückfrage außerhalb der Abschnitte (`frontend/AGENTS.md`, „Datensatz-Aktionen werden
+          gebündelt“): aus ⋮ und Kontextmenü dieselbe (design.md D5). */}
+      <Modal
+        open={leerenFrage != null}
+        title={leerenFrage ? `Abschnitt „${leerenFrage.label}“ leeren?` : undefined}
+        okText="Abschnitt leeren"
+        okButtonProps={{ danger: true }}
+        cancelText="Abbrechen"
+        onOk={() => {
+          if (leerenFrage) leerenTabelle.current.get(leerenFrage.schluessel)?.();
+          setLeerenFrage(null);
+        }}
+        onCancel={() => setLeerenFrage(null)}
+      >
+        Der Text dieses Abschnitts wird entfernt. Der Entwurf speichert danach von selbst.
+      </Modal>
       {/* Als letztes Kind: beim Mount-Effekt stehen alle Felder im DOM. */}
       <Einstiegsfokus form={form} feld={einstieg} />
     </div>
@@ -212,6 +390,8 @@ interface GliederungProps {
   abschnitte: readonly DokumentAbschnitt[];
   kette: string;
   onSprung: (schluessel: string) => void;
+  /** Kontextmenü je Eintrag: „Zum Abschnitt springen“ und die Aktionen des Abschnitts. */
+  kontext: KontextFabrik;
 }
 
 /** Sprungleiste der Abschnitte mit Leer-Marke; rendert nur, wenn ein Abschnitt kippt. */
@@ -219,6 +399,7 @@ const DokumentGliederung = memo(function DokumentGliederung({
   abschnitte,
   kette,
   onSprung,
+  kontext,
 }: GliederungProps) {
   const { token } = useRollen();
   return (
@@ -236,6 +417,7 @@ const DokumentGliederung = memo(function DokumentGliederung({
                 // (`height: auto` für umbrechende Namen, `dokumentEntwurf.css`).
                 style={{ minHeight: token.controlHeight }}
                 onClick={() => onSprung(a.schluessel)}
+                {...kontext({ ort: 'gliederung', schluessel: a.schluessel })}
               >
                 <LeerZeichen leer={leer} />
                 {/* Das Leerzeichen steht im Inline-Fluss der Beschriftung, nicht zwischen den
@@ -263,6 +445,9 @@ interface AbschnittBlockProps {
   leer: boolean;
   aktion: AbschnittAktion | undefined;
   anker: string;
+  ausfuehren: AktionAusfuehren;
+  kontext: KontextFabrik;
+  leerenAnmelden: LeerenAnmelden;
 }
 
 /**
@@ -282,15 +467,29 @@ const AbschnittBlock = memo(function AbschnittBlock({
   leer,
   aktion,
   anker,
+  ausfuehren,
+  kontext,
+  leerenAnmelden,
 }: AbschnittBlockProps) {
   const { token } = useRollen();
   const hilfeId = useId();
   const zusatz = aktion?.(a);
+  // Die Blöcke stehen nur im Bearbeiten sichtbar: „In der Lesefassung zeigen“ gilt immer.
+  const kopierbar = istKopierbar();
+  const eintraege = useMemo(
+    () => abschnittEintraege({ leer, kopierbar, ansicht: 'bearbeiten' }),
+    [leer, kopierbar],
+  );
   return (
     // Ohne Namen: acht benannte `section` wären acht Landmarken „region“; die Gliederung trägt
     // das h3, das Feld seinen Namen über das Etikett.
     <section id={anker} data-lfh="entwurf-abschnitt" style={{ marginBottom: token.margin }}>
-      <div data-lfh="abschnitt-kopf" style={{ marginBottom: token.marginXXS }}>
+      {/* Das Kontextmenü hängt am Kopf, nicht am Feld: im Textfeld bleibt das Browsermenü. */}
+      <div
+        data-lfh="abschnitt-kopf"
+        style={{ marginBottom: token.marginXXS }}
+        {...kontext({ ort: 'kopf', schluessel: a.schluessel })}
+      >
         <div
           style={{
             display: 'flex',
@@ -303,6 +502,13 @@ const AbschnittBlock = memo(function AbschnittBlock({
             {a.label}
           </Typography.Title>
           {leer && <LeerMarke />}
+          <span style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+            <MenueAusloeser<AbschnittAktionKey>
+              eintraege={eintraege}
+              zugaenglicherName={aktionenName(a.label)}
+              onWahl={(key) => ausfuehren(key, a.schluessel)}
+            />
+          </span>
         </div>
         {a.hilfetext && (
           <Typography.Text type="secondary" id={hilfeId} style={{ display: 'block' }}>
@@ -321,7 +527,9 @@ const AbschnittBlock = memo(function AbschnittBlock({
         labelCol={{ style: { display: 'none' } }}
         style={{ marginBottom: 0 }}
       >
-        <MarkdownEditor
+        <AbschnittFeld
+          schluessel={a.schluessel}
+          leerenAnmelden={leerenAnmelden}
           umschalterAussen
           vorschauOffen={false}
           druckfassung
@@ -335,6 +543,33 @@ const AbschnittBlock = memo(function AbschnittBlock({
       </Form.Item>
     </section>
   );
+});
+
+type AbschnittFeldProps = ComponentProps<typeof MarkdownEditor> & {
+  schluessel: string;
+  leerenAnmelden: LeerenAnmelden;
+};
+
+/**
+ * Das Kind des `Form.Item`: der Editor, dazu meldet es sein `onChange` zum Leeren an (design.md
+ * D2). „Abschnitt leeren“ ruft `onChange('')` und läuft damit den Weg des Tippens:
+ * `onValuesChange` der Seite (Verlustschutz, Stand der Übernahme) und die Leer-Kette folgen.
+ * `form.setFieldValue` löste `onValuesChange` nicht aus. Der Ref geht an den Editor, damit
+ * `form.getFieldInstance` (Sprung, `Einstiegsfokus`) ihn weiter liefert.
+ */
+const AbschnittFeld = forwardRef<TextAreaRef, AbschnittFeldProps>(function AbschnittFeld(
+  { schluessel, leerenAnmelden, onChange, ...rest },
+  ref,
+) {
+  const aenderung = useRef(onChange);
+  useLayoutEffect(() => {
+    aenderung.current = onChange;
+  });
+  useEffect(
+    () => leerenAnmelden(schluessel, () => aenderung.current?.('')),
+    [leerenAnmelden, schluessel],
+  );
+  return <MarkdownEditor ref={ref} onChange={onChange} {...rest} />;
 });
 
 /** Die Lesefassung aus den aktuellen Formularwerten — nur eingehängt, solange sie gezeigt wird. */

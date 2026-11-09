@@ -4,35 +4,35 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/amp1au76496lxigr9gaux4rn (LLH-1601)
 
 ## 1. Einträge im Kern (D1)
 
-- [ ] 1.1 `abschnittEintraege` und `gliederungEintraege` in `entwurf/dokumentEntwurfKern.ts` per
+- [x] 1.1 `abschnittEintraege` und `gliederungEintraege` in `entwurf/dokumentEntwurfKern.ts` per
   TDD: Reihenfolge, „Text kopieren“ gesperrt bei leer oder ohne Zwischenablage, „In der
   Lesefassung zeigen“ fehlt in der Lesefassung, „Abschnitt leeren“ als Gefahr; belegt durch
   `dokumentEntwurfKern.test.ts`
 
 ## 2. ⋮ im Abschnittskopf mit Kopieren, Lesefassung, Leeren (D2, D4, D5, D6, D7)
 
-- [ ] 2.1 Feldhülle `AbschnittFeld` mit Ref-Durchreichung und Leeren-Tabelle; Test in
+- [x] 2.1 Feldhülle `AbschnittFeld` mit Ref-Durchreichung und Leeren-Tabelle; Test in
   `DokumentEntwurf.test.tsx`: Sprung fokussiert weiter das Feld, `Einstiegsfokus.test.tsx` grün
-- [ ] 2.2 ⋮ „Aktionen zu Abschnitt <Name>“ im Kopf (`MenueAusloeser`, nicht im Druck); Test:
+- [x] 2.2 ⋮ „Aktionen zu Abschnitt <Name>“ im Kopf (`MenueAusloeser`, nicht im Druck); Test:
   Einträge, Trenner, Gefahr rot, Fokus im Menü
-- [ ] 2.3 „Text kopieren“ mit Meldung; Test mit gestellter Zwischenablage (Erfolg, Fehlschlag,
+- [x] 2.3 „Text kopieren“ mit Meldung; Test mit gestellter Zwischenablage (Erfolg, Fehlschlag,
   gesperrt bei leer und ohne `navigator.clipboard`)
-- [ ] 2.4 „In der Lesefassung zeigen“: Ansicht, Rollen, Fokus auf dem Abschnitt der Lesefassung;
+- [x] 2.4 „In der Lesefassung zeigen“: Ansicht, Rollen, Fokus auf dem Abschnitt der Lesefassung;
   Test prüft `scrollIntoView` am Ziel und `document.activeElement`
-- [ ] 2.5 „Abschnitt leeren“ mit `<Modal>`-Rückfrage; Test: Abbrechen lässt den Text, Bestätigen
+- [x] 2.5 „Abschnitt leeren“ mit `<Modal>`-Rückfrage; Test: Abbrechen lässt den Text, Bestätigen
   leert, Leer-Marke und Füllstand folgen, `onValuesChange` des `<Form>` feuert mit `{schluessel: ''}`
-- [ ] 2.6 Render-Zähler-Gate erweitern: Seite rendert neu mit ⋮ im Kopf, kein Abschnitt läuft mit;
+- [x] 2.6 Render-Zähler-Gate erweitern: Seite rendert neu mit ⋮ im Kopf, kein Abschnitt läuft mit;
   Tippen rendert nur den kippenden Abschnitt
 
 ## 3. Kontextmenü an Gliederung und Kopf (D3)
 
-- [ ] 3.1 Ein `useKontextMenue` im Baustein, Handler am Gliederungseintrag und an der Kopfhülle,
+- [x] 3.1 Ein `useKontextMenue` im Baustein, Handler am Gliederungseintrag und an der Kopfhülle,
   ein `KontextMenue`; Test: Rechtsklick in der Gliederung zeigt „Zum Abschnitt springen“ und die
   Abschnittseinträge, am Kopf die Einträge des ⋮, im Textfeld kein eigenes Menü
-- [ ] 3.2 Wahl im Kontextmenü führt dieselbe Aktion aus wie das ⋮ (Springen, Kopieren,
+- [x] 3.2 Wahl im Kontextmenü führt dieselbe Aktion aus wie das ⋮ (Springen, Kopieren,
   Lesefassung, Leeren mit Rückfrage); Umschalt+F10 auf dem Gliederungseintrag öffnet, Escape gibt
   den Fokus zurück; Test in `DokumentEntwurf.test.tsx`
-- [ ] 3.3 In der Lesefassung: Kontextmenü der Gliederung ohne „In der Lesefassung zeigen“,
+- [x] 3.3 In der Lesefassung: Kontextmenü der Gliederung ohne „In der Lesefassung zeigen“,
   „Zum Abschnitt springen“ rollt zur Lesefassung; Test
 
 ## 4. Seiten, Regeln, Doku, Browser
