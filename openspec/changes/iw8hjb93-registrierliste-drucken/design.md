@@ -88,8 +88,11 @@ ein neuer Protokolleintrag je Person — gewollt, denn er liefert andere Daten.
   Papier). Die Stabsseite liest die Stellenbezeichnung aus `einsatzKeys.betreuung`, das Gerät aus
   seinem Rahmen.
 - Blatt `betreuung/registrierung/RegistrierlisteBlatt.tsx`: schlichte `<table>`-Elemente (keine
-  antd-Tabelle), je Haushalt ein Titelblock (`data-lfh="titelblock"`) mit „H-n · Bezugsperson ·
-  n Personen“ und der Tabelle; Spalten „Reg.-Nr.“, „Name“, „Geb. / Alter“, „Kostform“,
+  antd-Tabelle). EINE Tabelle mit einem Kopf für alle, damit die Spalten über alle Haushalte gleich
+  breit bleiben; je Haushalt ein `tbody` mit Kopfzeile „H-n · Bezugsperson · n Personen“, der im
+  Druck nicht bricht (`registrierlisteDruck.css`; ein Haushalt hat höchstens 30 Personen). Ein
+  Titelblock je Haushalt mit eigener Tabelle hätte die Spaltenbreiten je Haushalt springen lassen.
+  Spalten „Reg.-Nr.“, „Name“, „Geb. / Alter“, „Kostform“,
   optional „Unverträglichkeiten“, „✓“ (leer, schmal, mit Rand). Summen oben als kleine Tabelle
   aus `kostformBand` in der Reihenfolge `KOSTFORM_REIHE` plus „ohne Angabe“ und „gesamt“.
   Schwarz auf Weiß, keine Farbe als Bedeutungsträger.

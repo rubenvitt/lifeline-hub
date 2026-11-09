@@ -12,7 +12,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
-  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `gefahren-druck`, `schichtplan-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `gefahren-druck`, `schichtplan-druck`,
+  `registrierliste-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium). Druck-Specs mit Lagekarte (`lagekarte-druck`) stehen in `KARTEN_DRUCK_SPECS`:
   Chromium und WebKit, denn der headless Firefox hat kein WebGL2 (LLH-1051).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
@@ -128,13 +129,28 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Muster Auftragsdruck): `/einsaetze/:id/personen/:pid/druck` (`pages/PersonDruckPage.tsx`, Pfad
   `personDruckPfad`), Einstieg als Nebenweg „Druckansicht“ des Personendetails, auch ohne
   Schreibrecht, nie am Gerät (`geraetDarf('person-druck')` ist überall falsch, die Route steht in
-  keiner Routenliste). Geladen nur über `GET …/personen/{pid}/druck`, das jeden Abruf als `druck`
+  keiner Routenliste; einzige Ausnahme beim Personendruck ist die Registrierliste, unten).
+  Geladen nur über `GET …/personen/{pid}/druck`, das jeden Abruf als `druck`
   mit `person_id` ins Zugriffsprotokoll schreibt; Optionen wie beim Listendruck
   (`DRUCK_ABFRAGE`, `gcTime: 0`), eigener nicht-live Key `personDruck`, „Neu laden“ holt neu.
   Eine unbekannte Person steht als solche da, ohne Druckknopf. Das Blatt
   (`personen/PersonDruckBlatt.tsx`) zeichnet das Körperschema mit `modus="druck"` ohne Fläche in
   `currentColor`: Sternchen und Liste unterscheiden sich durch Nummer und Form, nie durch Farbe
   (Nachweis `e2e/koerperschema-druck.spec.ts`, schwarz-weiß).
+- **Registrierliste einer Betreuungsstelle** (LLH-1616, Spec `betreuung-registrierung`,
+  Herleitung `openspec/changes/iw8hjb93-registrierliste-drucken/design.md`):
+  `/einsaetze/:id/betreuung/:stelleId/registrierliste/druck` (`pages/RegistrierlisteDruckPage.tsx`)
+  und am Gerät `/geraet/:id/betreuung/registrierliste/druck`, beide über
+  `betreuung/registrierung/RegistrierlisteDruckSeite.tsx` und `EinsatzPfade.registrierlisteDruck`;
+  Einstieg „Registrierliste drucken“ im Paneel „Registrierung“, auch ohne Schreibrecht. Geladen nur
+  über `GET …/stellen/{sid}/registrierungen/druck`, das in EINER Transaktion je Person einen
+  `druck`-Eintrag schreibt (nie listenweit) und erst nach dem Commit liefert. Unverträglichkeiten
+  nur mit `?unvertraeglichkeiten=1` (Schalter in der Adresse, im Key, im Druckkopf
+  „Gesundheitsangaben“); ohne liefert der Server das Feld nicht. Nicht-live Key
+  `registrierlisteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0`. **Einzige Ausnahme zu „Personendruck nie am
+  Gerät“:** die Betreuungsstelle druckt die Liste ihrer eigenen Stelle
+  (`geraetDarf('registrierliste-druck')`, `geraet/AGENTS.md`). Ein Haushalt ist ein `tbody`, der
+  nicht bricht (`registrierlisteDruck.css`). Nachweis `e2e/registrierliste-druck.spec.ts`.
 - **Gefahrenseite** (LLH-1364, Spec `gefahrenmatrix`, „Die Gefahrenseite druckt das gewählte
   Gebiet“): die Seite druckt sich selbst (`gefahren-print-root`, Nebenweg
   „Drucken / als PDF“ erst mit geladener Matrix, auch ohne Schreibrecht), das gewählte Gebiet mit
