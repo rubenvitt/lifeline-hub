@@ -54,4 +54,24 @@ ignore = [
     # Schlüssel signiert oder entschlüsselt (etwa private_key_jwt beim IdP, eigene JWTs,
     # ECDH), (c) das age-Feature `plugin` eingeschaltet wird.
     "RUSTSEC-2026-0387",
+
+    # RUSTSEC-2026-0459 (LLH-1617, BEFRISTET bis 30.11.2026) — SQLite < 3.54.0 (CVE-2026-119375)
+    # liefert uninitialisierten Page-Cache, wenn ein Prozess eine DB-Datei zusammen mit einer
+    # `-wal`-Datei anderer Seitengröße öffnet. Gefixt in `libsqlite3-sys` >= 0.39.0.
+    #
+    # Kein Upgrade möglich: `sqlx-sqlite` 0.9.0 verlangt `libsqlite3-sys >=0.30.1, <0.38.0`. Die
+    # Schranke ist upstream angehoben (transact-rs/sqlx#4502, gemergt 08.11.2026), aber noch in
+    # keinem Release (Stand 09.11.2026).
+    #
+    # Warum das Risiko hier nicht trägt: der Angriff braucht ein präpariertes Paar aus DB und
+    # `-wal`, das ein weniger vertrauenswürdiger Dritter geschrieben hat. lifeline-hub öffnet nur
+    # eigene Dateien im Datenverzeichnis; wer dort schreiben kann, hat die Datenbank ohnehin.
+    # `restore` spielt eine einzelne Sicherungsdatei ein und entfernt `-wal`/`-shm` vorher
+    # (`src/backup/restore.rs`); `deserialize` dient nur `db::test_pool` mit einem selbst
+    # erzeugten Abbild.
+    #
+    # Neu bewerten, wenn: (a) ein sqlx-Release `libsqlite3-sys` 0.39 erlaubt (dann heben und
+    # Ignore streichen), (b) lifeline-hub SQLite-Dateien von außen annimmt (Upload, Import einer
+    # DB mit `-wal`), (c) spätestens am 30.11.2026 (LLH-1617).
+    "RUSTSEC-2026-0459",
 ]
