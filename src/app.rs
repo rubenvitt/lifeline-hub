@@ -1820,6 +1820,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::instanz::stammdaten_neu),
         )
         .route(
+            "/api/admin/instanz/kopplungen/{id}/verloren",
+            post(routes::instanz::elw_verloren),
+        )
+        .route(
             "/api/instanz/stammdaten/herkunft",
             get(routes::instanz::stammdaten_herkunft),
         )

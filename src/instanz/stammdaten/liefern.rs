@@ -113,15 +113,22 @@ async fn load_geheimnis(
     if !empfaenger.datentraeger_bestaetigt {
         return Ok(None);
     }
-    let zeile: Option<(String, Option<String>, bool, String, bool)> = sqlx::query_as(
+    let zeile: Option<(String, Option<String>, bool, String, bool, bool)> = sqlx::query_as(
         "SELECT passwort_hash, totp_secret, totp_aktiviert, system_rolle, \
-         EXISTS (SELECT 1 FROM webauthn_credential w WHERE w.benutzer_id = b.id) \
-         FROM benutzer b WHERE id = ?",
+         EXISTS (SELECT 1 FROM webauthn_credential w WHERE w.benutzer_id = b.id), \
+         passwort_wechsel_pflicht FROM benutzer b WHERE id = ?",
     )
     .bind(konto_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let Some((passwort_hash, totp_secret, totp_aktiviert, system_rolle, hat_passkey)) = zeile
+    let Some((
+        passwort_hash,
+        totp_secret,
+        totp_aktiviert,
+        system_rolle,
+        hat_passkey,
+        passwort_wechsel_pflicht,
+    )) = zeile
     else {
         return Ok(None);
     };
@@ -133,6 +140,7 @@ async fn load_geheimnis(
         passwort_hash,
         totp_secret,
         totp_aktiviert,
+        passwort_wechsel_pflicht,
     };
     let Some(text) = geheimnis::encrypt(age, &g) else {
         return Ok(None);

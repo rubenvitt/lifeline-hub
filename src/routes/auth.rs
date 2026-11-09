@@ -305,6 +305,9 @@ pub async fn login(
         &crate::auth::provider::password::Schranken::produktiv(),
     )
     .await?;
+    // Passkey-Pflicht für Admins an einer Instanz, die Geheimnisse verteilt (LLH-1493, D7): nach
+    // der Prüfung, damit nur wer das Passwort kennt den Grund erfährt; kein Fehlversuch.
+    crate::instanz::stammdaten::geheimnis::check_passkey_pflicht(&state.pool, &benutzer).await?;
 
     let (totp_aktiviert, wechsel_pflicht): (bool, bool) = sqlx::query_as(
         "SELECT totp_aktiviert, passwort_wechsel_pflicht FROM benutzer WHERE id = ?",

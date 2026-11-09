@@ -469,3 +469,245 @@ async fn zweite_quelle_fuer_dieselbe_org_liefert_nichts() {
     .await;
     assert_eq!(hinweise, 1);
 }
+
+// ── Geheimnisse, Passkey-Pflicht, ELW verloren ───────────────────────────────────────────────
+
+async fn login(i: &Instanz, name: &str, passwort: &str) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        "/api/auth/login",
+        "",
+        Some(&json!({"benutzername": name, "passwort": passwort})),
+    )
+    .await
+}
+
+/// Hub und ELW gekoppelt; der ELW bestätigt seine Plattenverschlüsselung, wenn `platte`.
+async fn gekoppelt_mit_platte(platte: bool) -> (Instanz, Instanz) {
+    let hub = instanz().await;
+    let elw = instanz().await;
+    schluessel(&hub).await;
+    lifeline_hub::instanz::stammdaten::geheimnis::save_datentraeger_bestaetigt(&elw.pool, platte)
+        .await
+        .unwrap();
+    koppeln(&hub, &elw).await;
+    (hub, elw)
+}
+
+/// Ein Konto am Hub ohne Wechselpflicht, damit die Anmeldung gleich eine Sitzung ergibt.
+async fn konto_bereit(hub: &Instanz, name: &str) -> i64 {
+    let id = konto(hub, name).await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET passwort_wechsel_pflicht = 0 WHERE id = {id}"),
+    )
+    .await;
+    id
+}
+
+#[tokio::test]
+async fn anmeldung_am_elw_ohne_netz_mit_passwort_und_totp_vom_hub() {
+    let (mut hub, elw) = gekoppelt_mit_platte(true).await;
+    let max = konto_bereit(&hub, "maxmuster").await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET totp_secret = 'JBSWY3DPEHPK3PXP', totp_aktiviert = 1 WHERE id = {max}"),
+    )
+    .await;
+    melden(&elw).await;
+    hub._server.abort();
+    let (s, v) = login(&elw, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["mfa_erforderlich"], "totp", "{v}");
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            "SELECT totp_secret FROM benutzer WHERE benutzername = 'maxmuster'"
+        )
+        .await,
+        "JBSWY3DPEHPK3PXP"
+    );
+    let (s, _) = login(&elw, "maxmuster", "falsch-falsch").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let _ = &mut hub;
+}
+
+#[tokio::test]
+async fn ohne_plattenbestaetigung_kommt_das_konto_ohne_geheimnis() {
+    let (hub, elw) = gekoppelt_mit_platte(false).await;
+    konto_bereit(&hub, "maxmuster").await;
+    melden(&elw).await;
+    let (s, _) = login(&elw, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            "SELECT passwort_hash FROM benutzer WHERE benutzername = 'maxmuster'"
+        )
+        .await,
+        lifeline_hub::auth::PASSWORT_HASH_KEIN_LOKALES
+    );
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    assert_eq!(
+        v["kopplungen"][0]["org"]["stammdaten"]["geheimnisse_verteilt"],
+        false
+    );
+    assert_eq!(
+        v["kopplungen"][0]["org"]["stammdaten"]["konten_mit_geheimnis"],
+        0
+    );
+}
+
+#[tokio::test]
+async fn einmalpasswort_am_elw_bleibt_bis_der_hub_das_passwort_aendert() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    let max = konto_bereit(&hub, "maxmuster").await;
+    melden(&elw).await;
+    let lokal = lokale_id(&elw, "benutzer", "benutzername", "maxmuster").await;
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "POST",
+        &format!("/api/benutzer/{lokal}/einmalpasswort"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let einmal = eine::<String>(
+        &elw.pool,
+        &format!("SELECT passwort_hash FROM benutzer WHERE id = {lokal}"),
+    )
+    .await;
+    // Eine andere Änderung am Konto überschreibt das Einmalpasswort nicht.
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET anzeigename = 'Max M.' WHERE id = {max}"),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            &format!("SELECT passwort_hash FROM benutzer WHERE id = {lokal}")
+        )
+        .await,
+        einmal
+    );
+    // Ein neues Passwort am Hub gilt danach auch am ELW.
+    let neu = lifeline_hub::auth::password::hash("ganz-neues-pw-1").unwrap();
+    sqlx::query("UPDATE benutzer SET passwort_hash = ? WHERE id = ?")
+        .bind(&neu)
+        .bind(max)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            &format!("SELECT passwort_hash FROM benutzer WHERE id = {lokal}")
+        )
+        .await,
+        neu
+    );
+}
+
+#[tokio::test]
+async fn admin_mit_passkey_meldet_sich_am_verteilenden_hub_nicht_per_passwort_an() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    // Vor der Kopplung ging es, und ohne Passkey geht es weiter.
+    let (s, v) = login(&hub, "admin", "startpw12").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    exec(
+        &hub.pool,
+        "INSERT INTO webauthn_credential (benutzer_id, credential_id, public_key) VALUES (1, x'0102', x'0304')",
+    )
+    .await;
+    let (s, v) = login(&hub, "admin", "startpw12").await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["error"], "Admins melden sich hier per Passkey an.");
+    let (s, _) = login(&hub, "admin", "falsches-pw").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    // Am ELW, der nichts verteilt, gilt die Regel nicht.
+    exec(
+        &elw.pool,
+        "INSERT INTO webauthn_credential (benutzer_id, credential_id, public_key) VALUES (1, x'0506', x'0708')",
+    )
+    .await;
+    let (s, v) = login(&elw, "admin", "startpw12").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+#[tokio::test]
+async fn elw_verloren_macht_die_verteilten_geheimnisse_wertlos() {
+    let (hub, elw) = gekoppelt_mit_platte(true).await;
+    let max = konto_bereit(&hub, "maxmuster").await;
+    let elw2 = instanz().await;
+    lifeline_hub::instanz::stammdaten::geheimnis::save_datentraeger_bestaetigt(&elw2.pool, true)
+        .await
+        .unwrap();
+    koppeln(&hub, &elw2).await;
+    melden(&elw).await;
+    melden(&elw2).await;
+    let (s, _) = login(&hub, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let k = v["kopplungen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|k| k["org"]["stammdaten"]["konten_mit_geheimnis"].as_i64() > Some(0))
+        .unwrap()
+        .clone();
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{}/verloren", k["id"]),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["konten"].as_i64().unwrap() >= 1);
+    assert_eq!(v["kopplung"]["zustand"], "widerrufen");
+    assert_eq!(
+        eine::<i64>(
+            &hub.pool,
+            &format!("SELECT COUNT(*) FROM session WHERE benutzer_id = {max}")
+        )
+        .await,
+        0
+    );
+    let (s, _) = login(&hub, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(
+        s,
+        StatusCode::UNAUTHORIZED,
+        "das alte Passwort führt zu nichts"
+    );
+    assert_eq!(
+        eine::<String>(
+            &hub.pool,
+            "SELECT aktion FROM admin_audit ORDER BY id DESC LIMIT 1"
+        )
+        .await,
+        "instanz_elw_verloren"
+    );
+    // Der andere ELW bekommt das Konto mit ungültigem Passwort.
+    melden(&elw2).await;
+    let (s, _) = login(&elw2, "maxmuster", "maxmuster-pw-123").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    // Zurück per Einmalpasswort.
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/benutzer/{max}/einmalpasswort"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = login(&hub, "maxmuster", v["einmalpasswort"].as_str().unwrap()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["passwort_wechsel_erforderlich"], true);
+}

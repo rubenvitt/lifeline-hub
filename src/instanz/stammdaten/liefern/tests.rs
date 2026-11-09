@@ -312,3 +312,81 @@ async fn byte_grenze_endet_vor_dem_paket_das_nicht_mehr_passt() {
     assert_eq!(n.zeilen.len(), 1);
     assert!(!b.leer);
 }
+
+async fn konto_mit_hash(pool: &SqlitePool, id: i64, rolle: &str) {
+    // Die Lieferliste zeigt auf eine Org-Zuordnung, die es hier nicht gibt.
+    exec(pool, "PRAGMA foreign_keys = OFF").await;
+    exec(
+        pool,
+        &format!(
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+             totp_secret, totp_aktiviert) VALUES ({id}, 1, 'K{id}', 'k{id}', \
+             '$argon2id$v=19$m=19456,t=2,p=1$geheimersalt$geheimerhash', '{rolle}', 'JBSWY3DPEHPK3PXP', 1)"
+        ),
+    )
+    .await;
+}
+
+async fn geheimnis_von(pool: &SqlitePool, empfaenger: &Empfaenger<'_>, id: i64) -> Option<String> {
+    let mut conn = pool.acquire().await.unwrap();
+    let mut b = Budget::neu(1 << 20);
+    let arten: HashSet<_> = [StammdatenArt::Konto].into_iter().collect();
+    let n = nachlieferung(&mut conn, 1, 0, &mut b, &arten, empfaenger)
+        .await
+        .unwrap();
+    let l = n
+        .zeilen
+        .into_iter()
+        .find(|l| l.schluessel == id.to_string())
+        .unwrap();
+    let text = serde_json::to_string(&l).unwrap();
+    assert!(
+        !text.contains("argon2") && !text.contains("JBSWY3DP"),
+        "kein Geheimnis im Klartext auf der Leitung: {text}"
+    );
+    l.geheimnis
+}
+
+#[tokio::test]
+async fn geheimnis_nur_verschluesselt_mit_empfaenger_und_bestaetigter_platte() {
+    let pool = pool_mit_org().await;
+    konto_mit_hash(&pool, 9, "keiner").await;
+    let age = age::x25519::Identity::generate();
+    let empfaenger = age.to_public().to_string();
+    let mit = Empfaenger {
+        kopplung_org_id: 0,
+        age: Some(&empfaenger),
+        datentraeger_bestaetigt: true,
+    };
+    let text = geheimnis_von(&pool, &mit, 9)
+        .await
+        .expect("Geheimnis geliefert");
+    let g = super::super::geheimnis::decrypt(&age, &text).unwrap();
+    assert!(g.passwort_hash.contains("geheimerhash") && g.totp_aktiviert);
+    let ohne_platte = Empfaenger {
+        datentraeger_bestaetigt: false,
+        ..mit
+    };
+    assert!(geheimnis_von(&pool, &ohne_platte, 9).await.is_none());
+    assert!(geheimnis_von(&pool, &OHNE, 9).await.is_none());
+}
+
+#[tokio::test]
+async fn admin_geheimnis_nur_mit_anmelde_passkey() {
+    let pool = pool_mit_org().await;
+    konto_mit_hash(&pool, 9, "admin").await;
+    let age = age::x25519::Identity::generate();
+    let empfaenger = age.to_public().to_string();
+    let mit = Empfaenger {
+        kopplung_org_id: 0,
+        age: Some(&empfaenger),
+        datentraeger_bestaetigt: true,
+    };
+    assert!(geheimnis_von(&pool, &mit, 9).await.is_none());
+    exec(
+        &pool,
+        "INSERT INTO webauthn_credential (benutzer_id, credential_id, public_key) VALUES (9, x'01', x'02')",
+    )
+    .await;
+    assert!(geheimnis_von(&pool, &mit, 9).await.is_some());
+}

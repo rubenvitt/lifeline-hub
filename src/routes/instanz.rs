@@ -667,6 +667,81 @@ pub async fn stammdaten_neu(
     ))
 }
 
+/// Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ElwVerlorenAntwort {
+    pub kopplung: InstanzKopplungAnzeige,
+    pub konten: i64,
+}
+
+/// POST /api/admin/instanz/kopplungen/{id}/verloren — „ELW verloren“ an der erreichten Seite
+/// (LLH-1493, design.md D8): widerruft die Org-Zuordnung des Admins, macht Passwort und zweiten
+/// Faktor jedes Kontos ungültig, dessen Geheimnisse dorthin gingen, und beendet dessen Sitzungen.
+/// Wieder hinein geht es per Passkey oder Einmalpasswort. 422 an der meldenden Seite.
+pub async fn elw_verloren(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(kopplung_id): PfadParam<i64>,
+) -> Result<Json<ElwVerlorenAntwort>, AppError> {
+    let vorher = repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
+    let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
+    if kopplung.richtung() != Some(InstanzKopplungRichtung::WirdGemeldet) {
+        return Err(AppError::UnprocessableEntity(
+            "„ELW verloren“ gibt es nur an der Instanz, bei der sich der ELW meldet.".into(),
+        ));
+    }
+    let jetzt = crate::zeit::jetzt();
+    let zuordnung_id = vorher.org.id;
+    let (konten, beendet) = crate::write_retry!(&state.pool, |conn| {
+        repo::org_widerrufen(conn, zuordnung_id, Some(admin.id), &jetzt, false).await?;
+        repo::update_zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen)
+            .await?;
+        let konten: Vec<i64> = sqlx::query_scalar(
+            "SELECT l.benutzer_id FROM instanz_geheimnis_lieferung l \
+             JOIN benutzer b ON b.id = l.benutzer_id \
+             WHERE l.kopplung_org_id = ? AND b.org_id = ?",
+        )
+        .bind(zuordnung_id)
+        .bind(admin.org_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        let mut beendet = Vec::new();
+        for id in &konten {
+            sqlx::query(
+                "UPDATE benutzer SET passwort_hash = ?, totp_secret = NULL, totp_aktiviert = 0, \
+                 totp_letzter_schritt = NULL, totp_fehlversuche = 0, totp_gesperrt_bis = NULL \
+                 WHERE id = ?",
+            )
+            .bind(crate::auth::PASSWORT_HASH_KEIN_LOKALES)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+            crate::auth::totp::storage::loesche_recovery_codes(&mut *conn, *id).await?;
+            beendet.extend(crate::auth::session::alle_loeschen(conn, *id).await?);
+        }
+        Ok((konten.len() as i64, beendet))
+    })?;
+    state.live.melde_sitzung_ende(beendet);
+    let mut angaben = melden::build_angaben_gegenstelle(&kopplung, &vorher.org.fremde_org_name);
+    angaben.anzahl = Some(konten);
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::InstanzElwVerloren,
+            akteur: &admin,
+            ziel: Ziel::Instanz(&kopplung.gegenueber_name),
+            angaben: Some(angaben),
+            peer_ip,
+        },
+    )
+    .await;
+    Ok(Json(ElwVerlorenAntwort {
+        kopplung: repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?,
+        konten,
+    }))
+}
+
 /// GET /api/instanz/stammdaten/herkunft — welche Stammdaten der eigenen Org vom Hub kommen
 /// (design.md D9). Lesen darf jede angemeldete Person: die Oberfläche sperrt danach die
 /// Bearbeitung, verrät aber nichts, was die Listen nicht ohnehin zeigen.

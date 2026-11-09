@@ -88,7 +88,11 @@ mod tests {
             start.elapsed()
         };
 
-        for unparsbar in [crate::auth::PASSWORT_HASH_SSO_ONLY, "kein-gueltiger-hash"] {
+        for unparsbar in [
+            crate::auth::PASSWORT_HASH_SSO_ONLY,
+            crate::auth::PASSWORT_HASH_KEIN_LOKALES,
+            "kein-gueltiger-hash",
+        ] {
             let mut echte_pruefung = std::time::Duration::MAX;
             let mut gemessen = std::time::Duration::MAX;
             for _ in 0..5 {

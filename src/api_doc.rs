@@ -203,6 +203,7 @@ use utoipa::OpenApi;
         crate::lagemonitor_zugang::LesezugangFreigabe,
         crate::routes::instanz::InstanzUebersicht,
         crate::routes::instanz::KopplungscodeAntwort,
+        crate::routes::instanz::ElwVerlorenAntwort,
         crate::routes::instanz::UnterschriftRegistrierenStart,
         crate::routes::instanz::UnterschriftGegenzeichnenStart,
         crate::instanz::repo::InstanzKopplungAnzeige,

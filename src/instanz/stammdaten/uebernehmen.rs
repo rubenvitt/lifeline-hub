@@ -306,11 +306,12 @@ async fn apply_geheimnis(
             }
             sqlx::query(
                 "UPDATE benutzer SET passwort_hash = ?, totp_secret = ?, totp_aktiviert = ?, \
-                 passwort_wechsel_pflicht = 0 WHERE id = ?",
+                 passwort_wechsel_pflicht = ? WHERE id = ?",
             )
             .bind(&g.passwort_hash)
             .bind(&g.totp_secret)
             .bind(g.totp_aktiviert)
+            .bind(g.passwort_wechsel_pflicht)
             .bind(lokal_id)
             .execute(&mut *conn)
             .await?;

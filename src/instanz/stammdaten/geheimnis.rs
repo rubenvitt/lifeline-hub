@@ -14,6 +14,10 @@ pub struct Geheimnis {
     pub passwort_hash: String,
     pub totp_secret: Option<String>,
     pub totp_aktiviert: bool,
+    /// Wer am Hub das Passwort erst wechseln muss (neues Konto, Einmalpasswort), muss es am ELW
+    /// auch.
+    #[serde(default)]
+    pub passwort_wechsel_pflicht: bool,
 }
 
 impl std::fmt::Debug for Geheimnis {
@@ -63,10 +67,53 @@ pub async fn is_datentraeger_bestaetigt(pool: &SqlitePool) -> Result<bool, AppEr
 
 /// Schreibt beim Start, was die Konfiguration über die Datenträgerverschlüsselung sagt.
 pub async fn save_datentraeger_bestaetigt(pool: &SqlitePool, wert: bool) -> Result<(), AppError> {
+    // Die Zeile muss bestehen, sonst ginge der Wert still verloren.
+    crate::instanz::identitaet::load_or_create(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     sqlx::query("UPDATE instanz_identitaet SET datentraeger_bestaetigt = ?")
         .bind(wert)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+/// Ob die Org eines Kontos hier ihre Geheimnisse verteilt: diese Instanz ist für sie die
+/// erreichte Seite einer aktiven Kopplung (Spec `passwort-anmeldung`, design.md D7).
+pub async fn is_org_verteilend(pool: &SqlitePool, org_id: i64) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE o.org_id = ? AND o.widerrufen_at IS NULL \
+           AND k.richtung = 'wird_gemeldet' AND k.zustand IN ('aktiv', 'angebahnt'))",
+    )
+    .bind(org_id)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// Text der Abweisung, wenn ein Admin mit Passkey hier ein Passwort nimmt (D7).
+pub const NUR_PASSKEY: &str = "Admins melden sich hier per Passkey an.";
+
+/// Passkey-Pflicht (D7): ein System-Admin mit Anmelde-Passkey meldet sich an einer Instanz, die
+/// die Geheimnisse seiner Org verteilt, nicht per Passwort an. Ohne Passkey gehen seine
+/// Geheimnisse nicht hinaus, also bleibt ihm das Passwort.
+pub async fn check_passkey_pflicht(
+    pool: &SqlitePool,
+    benutzer: &crate::auth::Benutzer,
+) -> Result<(), AppError> {
+    if benutzer.system_rolle != crate::auth::SystemRolle::Admin {
+        return Ok(());
+    }
+    let hat_passkey: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM webauthn_credential WHERE benutzer_id = ?)",
+    )
+    .bind(benutzer.id)
+    .fetch_one(pool)
+    .await?;
+    if hat_passkey && is_org_verteilend(pool, benutzer.org_id).await? {
+        return Err(AppError::ForbiddenMit(NUR_PASSKEY.into()));
+    }
     Ok(())
 }
 
@@ -94,6 +141,7 @@ mod tests {
             passwort_hash: "$argon2id$v=19$m=19456,t=2,p=1$abc$def".into(),
             totp_secret: Some("JBSWY3DPEHPK3PXP".into()),
             totp_aktiviert: true,
+            passwort_wechsel_pflicht: false,
         }
     }
 

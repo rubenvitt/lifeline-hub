@@ -19,6 +19,9 @@ pub enum AppError {
     SitzungsBenutzerMismatch,
     /// Angemeldet, aber keine Berechtigung (403).
     Forbidden,
+    /// Verweigert mit Begründung (403), wo der Aufrufer wissen muss, welcher Weg stattdessen geht,
+    /// etwa „Admins melden sich hier per Passkey an“ (LLH-1493).
+    ForbiddenMit(String),
     /// Ressource nicht gefunden (404).
     NotFound,
     /// Eingabe ungültig (400) — Meldung wird ausgegeben.
@@ -108,6 +111,7 @@ impl std::fmt::Display for AppError {
                 write!(f, "Die Sitzung gehört inzwischen einem anderen Benutzer")
             }
             AppError::Forbidden => write!(f, "Keine Berechtigung"),
+            AppError::ForbiddenMit(m) => write!(f, "{m}"),
             AppError::NotFound => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
             AppError::Conflict(m) => write!(f, "{m}"),
@@ -140,7 +144,7 @@ impl AppError {
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::OfflineQueueBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
             AppError::SitzungsBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
-            AppError::Forbidden => StatusCode::FORBIDDEN,
+            AppError::Forbidden | AppError::ForbiddenMit(_) => StatusCode::FORBIDDEN,
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) => StatusCode::CONFLICT,

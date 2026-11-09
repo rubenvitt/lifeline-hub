@@ -812,7 +812,8 @@
           "unterschrift_registriert",
           "unterschrift_gegengezeichnet",
           "unterschrift_widerrufen",
-          "unterschrift_abgelehnt"
+          "unterschrift_abgelehnt",
+          "instanz_elw_verloren"
         ]
       },
       "AdressatKategorie": {
@@ -7071,6 +7072,23 @@
           "keine"
         ]
       },
+      "ElwVerlorenAntwort": {
+        "type": "object",
+        "description": "Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind.",
+        "required": [
+          "kopplung",
+          "konten"
+        ],
+        "properties": {
+          "konten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kopplung": {
+            "$ref": "#/components/schemas/InstanzKopplungAnzeige"
+          }
+        }
+      },
       "EmpfaengerAbschnitt": {
         "type": "object",
         "description": "Ein Abschnitt der Empfängerliste (Ziel einer Zuführung).",
@@ -9493,7 +9511,8 @@
           "id",
           "fremde_org_name",
           "fremde_org_kennung",
-          "angelegt_at"
+          "angelegt_at",
+          "stammdaten"
         ],
         "properties": {
           "angelegt_at": {
@@ -9508,6 +9527,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "stammdaten": {
+            "$ref": "#/components/schemas/InstanzStammdatenStand",
+            "description": "Stammdaten (LLH-1493). Meldende Seite: übernommener Stand und Hinweise aus der\nÜbernahme. Erreichte Seite: ob Kontogeheimnisse hinausgehen und an wie viele Konten sie\ngingen."
           },
           "widerrufen_at": {
             "type": [
@@ -9525,6 +9548,37 @@
           "update_hier",
           "update_gegenueber"
         ]
+      },
+      "InstanzStammdatenStand": {
+        "type": "object",
+        "description": "Stand der Stammdaten-Verteilung an einer Org-Zuordnung (design.md D9).",
+        "required": [
+          "stand",
+          "hinweise",
+          "geheimnisse_verteilt",
+          "konten_mit_geheimnis"
+        ],
+        "properties": {
+          "geheimnisse_verteilt": {
+            "type": "boolean",
+            "description": "Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt)."
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "konten_mit_geheimnis": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Nur erreichte Seite: Konten, deren Geheimnisse an diese Zuordnung gingen."
+          },
+          "stand": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "InstanzUebersicht": {
         "type": "object",
@@ -17121,6 +17175,53 @@
           }
         }
       },
+      "StammdatenArt": {
+        "type": "string",
+        "description": "Eine verteilte Stammdatenart (design.md D1). Auf der Leitung steht der Wert als Text, damit\neine ältere Instanz eine neue Art überspringen kann (D2).",
+        "enum": [
+          "konto",
+          "org_einstellungen",
+          "modul_einstellung",
+          "fuehrungsfunktion",
+          "fahrzeug_status",
+          "personal_status",
+          "qualifikation",
+          "einheit_typ",
+          "fahrzeug",
+          "material",
+          "personal",
+          "einheit_vorlage"
+        ]
+      },
+      "StammdatenHerkunftAnzeige": {
+        "type": "object",
+        "description": "Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9).",
+        "required": [
+          "vom_hub"
+        ],
+        "properties": {
+          "quelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Gegenstelle, aus der die Org ihre Stammdaten bezieht; ohne Quelle fehlt das Feld\n(dann gibt es weder „vom Hub“ noch „nur hier“)."
+          },
+          "vom_hub": {
+            "type": "object",
+            "description": "Je Art (Wire-Wert von `StammdatenArt`) die lokalen Schlüssel der übernommenen Zeilen.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "StandVerlaufEintrag": {
         "type": "object",
         "description": "Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.\n`aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.",
@@ -21182,7 +21283,7 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
         "properties": {
           "adresse": {
             "type": [
@@ -21197,6 +21298,14 @@
               "null"
             ],
             "description": "Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`."
+          },
+          "anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "„ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden."
           },
           "fingerabdruck": {
             "type": [

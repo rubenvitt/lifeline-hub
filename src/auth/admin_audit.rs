@@ -80,6 +80,9 @@ wire_enum! {
         /// Ein vom Gegenüber gelieferter Unterschriftsschlüssel wurde verworfen (ohne gültige
         /// Gegenzeichnung eines bekannten Schlüssels).
         UnterschriftAbgelehnt => "unterschrift_abgelehnt",
+        /// LLH-1493: „ELW verloren“ — Kopplung widerrufen, Geheimnisse der dorthin verteilten
+        /// Konten ungültig (Migration 0306).
+        InstanzElwVerloren => "instanz_elw_verloren",
     }
 }
 
@@ -106,7 +109,8 @@ pub enum Ziel<'a> {
 /// - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
 /// - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
 /// - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
-/// - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.
+/// - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;
+///   `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -140,6 +144,9 @@ pub struct ZugangsAngaben {
     /// Warum ein Unterschriftsschlüssel verworfen wurde.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grund: Option<String>,
+    /// „ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anzahl: Option<i64>,
 }
 
 impl ZugangsAngaben {
