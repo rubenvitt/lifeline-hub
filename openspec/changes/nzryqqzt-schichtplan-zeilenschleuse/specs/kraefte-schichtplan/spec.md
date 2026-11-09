@@ -16,7 +16,8 @@ Blöcke und der Titel einer Zeile MUST weiter sofort erscheinen. Das Sammelbanne
 Wartende nennen („1 neuer Posten“, „2 neue Posten“, „1 Posten entfallen“, „Reihenfolge
 geändert“, verbunden mit „ · “) und es mit „anzeigen“ übernehmen; danach stehen die Zeilen in der
 frischen Folge. Das Banner MUST selbst keine Zeile verschieben. Ein Touch-Tipp zählt nicht als
-Zeiger. Ohne gezeigte Zeile hält die Schleuse nichts zurück.
+Zeiger. Ohne gezeigte Zeile und solange die Quellen der Zeilen (Einheiten, UHS, Abschnitte)
+noch laden, hält die Schleuse nichts zurück.
 
 #### Scenario: Neuer Posten unter dem Zeiger
 - **WHEN** der Zeiger über einem Block der Streife 2 steht und eine andere Sitzung eine Einheit im ersten Abschnitt anlegt
