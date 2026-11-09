@@ -180,11 +180,7 @@ export default function SchichtplanWechselLeiste({
                   </span>
                 </span>
                 <StatusChip ton={standTon(e, ms(punkt) < jetzt)} wort={STAND_WORT[e.stand]} />
-                {griff && (
-                  <Button size="small" onClick={griff.los}>
-                    {griff.text}
-                  </Button>
-                )}
+                {griff && <Button onClick={griff.los}>{griff.text}</Button>}
               </li>
             );
           })}
