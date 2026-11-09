@@ -11,7 +11,7 @@
 -- - `uebernahme_kennzahlen`: Soll, Ist, Offen und Konflikte zum Zeitpunkt der Übernahme als
 --   JSON-Objekt; Kopf und Liste zeigen danach diese Werte.
 --
--- Abgesichert von db::tests::migration_0302_planung_uebernahme.
+-- Abgesichert von db::tests::migration_0304_planung_uebernahme.
 ALTER TABLE planung ADD COLUMN uebernommen_at TEXT;
 ALTER TABLE planung ADD COLUMN uebernommen_von INTEGER REFERENCES benutzer(id);
 ALTER TABLE planung ADD COLUMN uebernahme_einsatz INTEGER;
