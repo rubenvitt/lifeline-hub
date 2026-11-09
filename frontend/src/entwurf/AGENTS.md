@@ -37,6 +37,15 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
     Füllwege setzen an derselben Stelle an, der Baustein kennt keine Quelle. Eine Aktion für das
     ganze Dokument steht im Steckplatz `gliederungKopf` über der Sprungleiste, nie in der
     Landmarke „Gliederung“ (LLH-1081: `LeereAbschnitteFuellen`).
+  - **Aktionen eines Abschnitts** (LLH-1601, Spec `dokument-entwurf`,
+    `openspec/changes/amp1au76-gliederung-kontextmenue/design.md`): ⋮ im Abschnittskopf mit
+    „Text kopieren“, „In der Lesefassung zeigen“, rot „Abschnitt leeren“; dieselben Einträge als
+    Kontextmenü am Kopf, an der Gliederung mit „Zum Abschnitt springen“ davor. Eine Quelle:
+    `abschnittEintraege`/`gliederungEintraege` in `dokumentEntwurfKern.ts`. Die Abschnitte stehen
+    fest in der Vorlage, darum kein Umordnen oder Entfernen. **Leeren läuft über das `onChange` des
+    Felds** (`AbschnittFeld`), nie über `form.setFieldValue`: nur so hört die Seite es an
+    `onValuesChange` (Verlustschutz, Stand der Übernahme). Ein Menü gibt beim Schließen den Fokus
+    an seinen Auslöser zurück; Aktionen laufen deshalb erst danach (`ausfuehren`).
   - Tippen rendert nur das eigene `Form.Item`: die Seite beobachtet nur die Felder des
     Druckkopfs, nie `useWatch([])`; der Baustein liest die Leer-Kette über `Form.useWatch` mit
     Selektor (`dokumentEntwurfKern.ts`). `AbschnittBlock` ist `memo`, alle Props

@@ -143,7 +143,9 @@ Für Einsatzleitung und Führungspersonal:
 4. Die Abschnitte des Schemas ausfüllen. Sie stehen offen untereinander, unter dem Namen eines
    Abschnitts stehen die Unterpunkte des Schemas. Die „Gliederung“ springt zu einem Abschnitt und
    nennt leere mit „leer“. „Lesefassung“ zeigt den ganzen Befehl gesetzt, so wie er gedruckt
-   wird; „Bearbeiten“ führt zurück. Der Entwurf ist derselbe wie beim Lagebericht
+   wird; „Bearbeiten“ führt zurück. Das ⋮ im Kopf eines Abschnitts kopiert seinen Text, zeigt
+   ihn in der Lesefassung oder leert ihn nach Rückfrage; ein Rechtsklick auf Kopf oder Gliederung
+   öffnet dieselben Einträge. Der Entwurf ist derselbe wie beim Lagebericht
    ([Lageberichte](lageberichte.md)).
 
    ![Befehlsentwurf mit Gliederung, Titel, Verteiler samt externer Stelle und den offenen Abschnitten „Lage“, „Auftrag“ und „Durchführung“, darüber „Entwurf speichern“, „Freigeben“ und „Drucken / als PDF“](../bilder/auftraege-befehle/befehl-entwurf.png)

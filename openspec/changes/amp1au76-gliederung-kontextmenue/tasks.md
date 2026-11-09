@@ -37,15 +37,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/amp1au76496lxigr9gaux4rn (LLH-1601)
 
 ## 4. Seiten, Regeln, Doku, Browser
 
-- [ ] 4.1 Lagebericht: Leeren eines übernommenen Abschnitts verwirft den Stand der Übernahme, der
+- [x] 4.1 Lagebericht: Leeren eines übernommenen Abschnitts verwirft den Stand der Übernahme, der
   Verlustschutz merkt die Änderung; Test an `LageberichtDetailPage` (bestehende Testdatei) oder
   e2e
 - [ ] 4.2 e2e im Browser (`frontend/e2e/`): Rechtsklick auf einen Gliederungseintrag im
   Lagebericht-Entwurf, „Abschnitt leeren“ bestätigen, Feld leer und Rückfrage beim Verlassen;
   Befehl: ⋮ im Kopf öffnet dieselben Einträge
-- [ ] 4.3 Regel in `frontend/src/entwurf/AGENTS.md` („Gegliederte Dokumente“) um ⋮ und
+- [x] 4.3 Regel in `frontend/src/entwurf/AGENTS.md` („Gegliederte Dokumente“) um ⋮ und
   Kontextmenü ergänzen (eine Quelle im Kern, Leeren über das Feld); Prettier grün
-- [ ] 4.4 Anwenderkapitel `docs/anwender/kapitel/lageberichte.md` und `auftraege-befehle.md`
+- [x] 4.4 Anwenderkapitel `docs/anwender/kapitel/lageberichte.md` und `auftraege-befehle.md`
   um das Menü des Abschnitts ergänzen (Mitänderungsregel); Wächter der Anwenderdoku grün
 - [ ] 4.5 `./scripts/check-all.sh` (Bündel des Frontends) grün; Lint, Typen, Vitest
 
