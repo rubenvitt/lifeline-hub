@@ -43,13 +43,16 @@ Wächter verbietet es zu Recht, und die Fallen (Tasten-Nachlauf, Portal-Aufsteig
 
 ### D2 Eine Quelle je Zeilenart: `etb/zeilenAktionen.ts`
 
-Neues Modul mit zwei reinen Funktionen:
+Neues Modul mit einer reinen Funktion `zeilenAktionen(z, rechte)` →
+`MenueEintrag<ZeilenAktion>[]` je Zeilenart:
 
-- `eintragMenue(rechte)` → `MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[]` aus
-  `kannBerichtigen`, `berichtigenGesperrt`, `kannWiedervorlage`, `kannAuftrag`,
-  `auftragGesperrt`, genau wie bisher inline in `aktionen()`.
-- `abgelehntAktionen(puffer, nurProtokollierenAngeboten)` →
-  `MenueEintrag<'erneut' | 'nurProtokollieren' | 'verwerfen'>[]`, „Verwerfen“ mit `gefahr`.
+- gesendeter Eintrag: Berichtigen (gesperrt mit Grund), Wiedervorlage, Auftrag erteilen (gesperrt
+  ohne Freigabe), genau wie bisher inline in `aktionen()`;
+- abgelehnte Zeile: Erneut senden, Nur protokollieren (bei Kopplung und angebotenem Weg),
+  Verwerfen mit `gefahr`;
+- vorgemerkte Zeile: keine.
+
+Dazu `zeilenMenueName(z)` für den gemeinsamen zugänglichen Namen.
 
 Das ⋮ (`MenueAusloeser`), die Knöpfe der abgelehnten Zeile (je Eintrag ein `Button`, `danger`
 aus `gefahr`) und das Kontextmenü lesen dieselbe Liste; die Wahl läuft über eine gemeinsame

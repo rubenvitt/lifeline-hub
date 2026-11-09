@@ -5,7 +5,7 @@
 
 ## 2. Eine Quelle der Zeilenaktionen (D2)
 
-- [x] 2.1 TDD `etb/zeilenAktionen.test.ts`: `eintragMenue` liefert Berichtigen (gesperrt mit Grund), Wiedervorlage, Auftrag erteilen (gesperrt ohne Freigabe) wie bisher; `abgelehntAktionen` liefert Erneut senden, Nur protokollieren (nur bei Kopplung und angebotenem Weg), Verwerfen mit `gefahr`
+- [x] 2.1 TDD `etb/zeilenAktionen.test.ts`: `zeilenAktionen` liefert für einen Eintrag Berichtigen (gesperrt mit Grund), Wiedervorlage, Auftrag erteilen (gesperrt ohne Freigabe) wie bisher, für eine abgelehnte Zeile Erneut senden, Nur protokollieren (nur bei Kopplung und angebotenem Weg), Verwerfen mit `gefahr`
 - [x] 2.2 `EtbZeitachsenZeile` baut ⋮ und Knöpfe der abgelehnten Zeile aus diesen Funktionen, Wahl über `fuehreZeilenWahlAus`; Bestandstests `EtbZeitachse.test.tsx` grün
 
 ## 3. Kontextmenü an der Zeitachse (D3, D4)
@@ -23,8 +23,8 @@
 
 ## 5. Regeln und Anwenderdoku
 
-- [ ] 5.1 `frontend/src/etb/AGENTS.md`: Kontextmenü an Zeile und Chip, eine Quelle (`etb/zeilenAktionen.ts`), kein langer Druck im ETB; Prettier grün
-- [ ] 5.2 `docs/anwender/kapitel/einsatz-oberflaeche.md` („Wo das Kontextmenü gilt“: ETB, kein langer Druck dort) und `docs/anwender/kapitel/einsatztagebuch.md` (Rechtsklick auf Eintrag und Chip); `quellen:` nachziehen; Doku-Wächter grün
+- [x] 5.1 `frontend/src/etb/AGENTS.md`: Kontextmenü an Zeile und Chip, eine Quelle (`etb/zeilenAktionen.ts`), kein langer Druck im ETB; Prettier grün
+- [x] 5.2 `docs/anwender/kapitel/einsatz-oberflaeche.md` („Wo das Kontextmenü gilt“: ETB, kein langer Druck dort) und `docs/anwender/kapitel/einsatztagebuch.md` (Rechtsklick auf Eintrag und Chip); `quellen:` nachziehen; Doku-Wächter grün
 
 ## 6. Browser-Nachweis und Gate
 
