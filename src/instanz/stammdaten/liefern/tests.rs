@@ -42,7 +42,9 @@ const OHNE: Empfaenger<'static> = Empfaenger {
 
 async fn liefere(pool: &SqlitePool, seit: i64, budget: usize) -> Nachlieferung {
     let mut conn = pool.acquire().await.unwrap();
-    nachlieferung(&mut conn, 1, seit, budget, &alle_arten(), &OHNE)
+    let mut b = Budget::neu(1 << 20);
+    b.zeilen = budget;
+    nachlieferung(&mut conn, 1, seit, &mut b, &alle_arten(), &OHNE)
         .await
         .unwrap()
 }
@@ -232,7 +234,9 @@ async fn abhaengigkeit_mit_spaeterem_stand_kommt_mit() {
     let vorlage = stand(&pool, "einheit_vorlage", "3").await.unwrap();
     let mut conn = pool.acquire().await.unwrap();
     let nur_vorlage: HashSet<_> = alle_arten();
-    let n = nachlieferung(&mut conn, 1, vorlage - 1, 1, &nur_vorlage, &OHNE)
+    let mut b = Budget::neu(1 << 20);
+    b.zeilen = 1;
+    let n = nachlieferung(&mut conn, 1, vorlage - 1, &mut b, &nur_vorlage, &OHNE)
         .await
         .unwrap();
     let arten: Vec<&str> = n.zeilen.iter().map(|l| l.art.as_str()).collect();
@@ -259,7 +263,8 @@ async fn unbekannte_arten_werden_nicht_geliefert() {
     .await;
     let mut conn = pool.acquire().await.unwrap();
     let nur: HashSet<_> = [StammdatenArt::Material].into_iter().collect();
-    let n = nachlieferung(&mut conn, 1, 0, 100, &nur, &OHNE)
+    let mut b = Budget::neu(1 << 20);
+    let n = nachlieferung(&mut conn, 1, 0, &mut b, &nur, &OHNE)
         .await
         .unwrap();
     assert!(n.zeilen.iter().all(|l| l.art == "material"));
@@ -273,4 +278,37 @@ async fn quali_soll_verweist_auf_qualifikationen() {
         &serde_json::json!({"quali_soll": "[{\"q\":4,\"n\":2}]"}),
     );
     assert_eq!(v, [(StammdatenArt::Qualifikation, "4".to_string())]);
+}
+
+#[tokio::test]
+async fn byte_grenze_endet_vor_dem_paket_das_nicht_mehr_passt() {
+    let pool = pool_mit_org().await;
+    let lang = "x".repeat(4000);
+    for i in 1..=10 {
+        exec(
+            &pool,
+            &format!("INSERT INTO fahrzeug (id, org_id, funkrufname, bemerkung) VALUES ({i}, 1, 'F{i}', '{lang}')"),
+        )
+        .await;
+    }
+    let mut conn = pool.acquire().await.unwrap();
+    // Platz für etwa drei Zeilen; schon etwas in der Antwort, also keine Ausnahme mehr.
+    let mut b = Budget::neu(3 * 4100);
+    b.leer = false;
+    let n = nachlieferung(&mut conn, 1, 0, &mut b, &alle_arten(), &OHNE)
+        .await
+        .unwrap();
+    assert!((1..=3).contains(&n.zeilen.len()), "{}", n.zeilen.len());
+    let letzter: i64 = n.zeilen.last().unwrap().stand;
+    assert_eq!(
+        n.bis, letzter,
+        "der Stand bleibt vor der ersten nicht gelieferten Zeile"
+    );
+    // Die erste Zeile einer Antwort geht auch allein über die Grenze.
+    let mut b = Budget::neu(10);
+    let n = nachlieferung(&mut conn, 1, 0, &mut b, &alle_arten(), &OHNE)
+        .await
+        .unwrap();
+    assert_eq!(n.zeilen.len(), 1);
+    assert!(!b.leer);
 }

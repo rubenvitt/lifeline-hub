@@ -25,6 +25,11 @@ pub const SCHUTZ_NACHRICHT: &str = "stammdaten_vom_hub";
 
 /// Höchstzahl Zeilen je Antwort über alle Orgs (D2), ohne die mitgelieferten Abhängigkeiten.
 pub const STAMMDATEN_MAX: usize = 200;
+/// Platz, den eine Antwort auf eine Meldung neben den Stammdaten braucht: Hülle, Org-Einträge
+/// und eine einzelne übergroße Zeile (siehe [`liefern::Budget`]). Die Stammdaten bekommen, was
+/// `melden::ANTWORT_MAX` abzüglich dieser Reserve und der Unterschriftsschlüssel übrig lässt (D2;
+/// Test `melden::tests::groesste_antwort_passt_in_die_lesegrenze`).
+pub const ANTWORT_RESERVE: usize = 128 * 1024;
 /// Höchstzahl mitgelieferter Abhängigkeiten je Antwort (D2).
 pub const ABHAENGIGE_MAX: usize = 200;
 /// Höchstzahl Einträge je Unterliste einer Zeile.
@@ -69,6 +74,19 @@ pub struct StammdatenLieferung {
     /// Nur Konten: Passwort-Hash und TOTP, mit age an den Empfänger verschlüsselt (D6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub geheimnis: Option<String>,
+}
+
+static LIVE: std::sync::OnceLock<crate::live::LiveHub> = std::sync::OnceLock::new();
+
+/// Setzt beim Start den Live-Verteiler, über den eine übernommene Nachlieferung das Ereignis
+/// `stammdaten` auslöst (Spec `org-live`) und Sitzungen deaktivierter Konten beendet. Der
+/// Melde-Task läuft ohne `AppState`.
+pub fn set_live(live: crate::live::LiveHub) {
+    let _ = LIVE.set(live);
+}
+
+pub(crate) fn live() -> Option<&'static crate::live::LiveHub> {
+    LIVE.get()
 }
 
 /// Die Arten, die diese Instanz übernehmen kann, wie sie in einer Meldung stehen.

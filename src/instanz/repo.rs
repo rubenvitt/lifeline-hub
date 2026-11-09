@@ -28,6 +28,10 @@ pub struct KopplungZeile {
     pub naechste_meldung_at: Option<String>,
     pub angebahnt_at: Option<String>,
     pub erstellt_at: String,
+    /// Erreichte Seite: age-Empfänger des Gegenübers aus seiner letzten Meldung (LLH-1493, D6).
+    pub gegenueber_age_empfaenger: Option<String>,
+    /// Erreichte Seite: das Gegenüber hat die Datenträgerverschlüsselung bestätigt.
+    pub gegenueber_datentraeger_verschluesselt: bool,
 }
 
 impl KopplungZeile {
@@ -42,7 +46,8 @@ impl KopplungZeile {
 const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
      richtung, gegenueber_adresse, zustand, zuletzt_gesehen_at, gegenueber_softwarestand, \
      gegenueber_protokoll, letzter_fehler, hinweis, uhr_abweichung_s, fehlversuche, \
-     naechste_meldung_at, angebahnt_at, erstellt_at";
+     naechste_meldung_at, angebahnt_at, erstellt_at, gegenueber_age_empfaenger, \
+     gegenueber_datentraeger_verschluesselt";
 
 /// Eine Org-Zuordnung einer Kopplung.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -56,10 +61,18 @@ pub struct OrgZeile {
     pub widerrufen_at: Option<String>,
     pub widerruf_gemeldet_at: Option<String>,
     pub unterschrift_stand: i64,
+    /// Meldende Seite: übernommener Stand der Stammdaten (LLH-1493, D2).
+    pub stammdaten_stand: i64,
+    /// Meldende Seite: was diese Instanz beim letzten Melden empfangen konnte
+    /// (`stammdaten::empfangs_kennzeichen`).
+    pub stammdaten_arten: Option<String>,
+    /// Meldende Seite: Hinweise aus der Übernahme, zeilenweise.
+    pub stammdaten_hinweis: Option<String>,
 }
 
 const ORG_SPALTEN: &str = "id, kopplung_id, org_id, fremde_org_kennung, fremde_org_name, \
-     angelegt_at, widerrufen_at, widerruf_gemeldet_at, unterschrift_stand";
+     angelegt_at, widerrufen_at, widerruf_gemeldet_at, unterschrift_stand, stammdaten_stand, \
+     stammdaten_arten, stammdaten_hinweis";
 
 // ── Kopplungscodes ───────────────────────────────────────────────────────────────────────────
 
@@ -388,6 +401,8 @@ pub async fn org_widerrufen(
     if n == 1 {
         crate::auth::unterschrift::repo::fremde_der_zuordnung_widerrufen(conn, org_zeile_id, jetzt)
             .await?;
+        // Übernommene Stammdaten gehören danach der Instanz (LLH-1493, design.md D3).
+        crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
     }
     Ok(n == 1)
 }
@@ -473,6 +488,114 @@ pub async fn list_faellige_meldungen(
     .bind(jetzt)
     .fetch_all(pool)
     .await?)
+}
+
+// ── Stammdaten (LLH-1493) ────────────────────────────────────────────────────────────────────
+
+/// Meldende Seite: was diese Instanz empfangen kann, hat sich geändert (Update,
+/// Plattenbestätigung) — die Nachlieferung beginnt bei 0 (design.md D2).
+pub async fn save_stammdaten_kennzeichen(
+    conn: &mut SqliteConnection,
+    org_zeile_id: i64,
+    kennzeichen: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung_org SET stammdaten_arten = ?, stammdaten_stand = 0 \
+         WHERE id = ? AND stammdaten_arten IS NOT ?",
+    )
+    .bind(kennzeichen)
+    .bind(org_zeile_id)
+    .bind(kennzeichen)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Meldende Seite: übernommener Stand, nur vorwärts.
+pub async fn save_stammdaten_stand(
+    conn: &mut SqliteConnection,
+    org_zeile_id: i64,
+    bis: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung_org SET stammdaten_stand = MAX(stammdaten_stand, ?) WHERE id = ?",
+    )
+    .bind(bis)
+    .bind(org_zeile_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Höchstzahl gemerkter Hinweise je Org-Zuordnung (die jüngsten bleiben).
+pub const STAMMDATEN_HINWEISE_MAX: usize = 20;
+
+/// Meldende Seite: hängt Hinweise an (ohne Doppel). Sie bleiben, bis „Erneut abgleichen“ sie
+/// leert, weil die betroffene Zeile erst dann wieder kommt.
+pub async fn add_stammdaten_hinweise(
+    conn: &mut SqliteConnection,
+    org_zeile_id: i64,
+    hinweise: &[String],
+) -> Result<(), AppError> {
+    if hinweise.is_empty() {
+        return Ok(());
+    }
+    let alt: Option<String> =
+        sqlx::query_scalar("SELECT stammdaten_hinweis FROM instanz_kopplung_org WHERE id = ?")
+            .bind(org_zeile_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .flatten();
+    let mut zeilen: Vec<String> = alt
+        .as_deref()
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    for h in hinweise {
+        if !zeilen.contains(h) {
+            zeilen.push(h.clone());
+        }
+    }
+    let ueberzaehlig = zeilen.len().saturating_sub(STAMMDATEN_HINWEISE_MAX);
+    zeilen.drain(..ueberzaehlig);
+    sqlx::query("UPDATE instanz_kopplung_org SET stammdaten_hinweis = ? WHERE id = ?")
+        .bind(zeilen.join("\n"))
+        .bind(org_zeile_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Meldende Seite, „Erneut abgleichen“: Stand auf 0, Hinweise leer.
+pub async fn reset_stammdaten(pool: &SqlitePool, org_zeile_id: i64) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung_org SET stammdaten_stand = 0, stammdaten_hinweis = NULL \
+         WHERE id = ?",
+    )
+    .bind(org_zeile_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Erreichte Seite: age-Empfänger und Plattenbestätigung aus der letzten Meldung (D6).
+pub async fn save_gegenueber_empfang(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    age: Option<&str>,
+    datentraeger_verschluesselt: bool,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung SET gegenueber_age_empfaenger = ?, \
+         gegenueber_datentraeger_verschluesselt = ? WHERE id = ?",
+    )
+    .bind(age)
+    .bind(datentraeger_verschluesselt)
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Ausstellende Seite: Kopplungen, die länger als `minuten` auf ihre erste Meldung warten, werden
@@ -630,6 +753,21 @@ pub struct InstanzOrgZuordnung {
     pub angelegt_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub widerrufen_at: Option<String>,
+    /// Stammdaten (LLH-1493). Meldende Seite: übernommener Stand und Hinweise aus der
+    /// Übernahme. Erreichte Seite: ob Kontogeheimnisse hinausgehen und an wie viele Konten sie
+    /// gingen.
+    pub stammdaten: InstanzStammdatenStand,
+}
+
+/// Stand der Stammdaten-Verteilung an einer Org-Zuordnung (design.md D9).
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
+pub struct InstanzStammdatenStand {
+    pub stand: i64,
+    pub hinweise: Vec<String>,
+    /// Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt).
+    pub geheimnisse_verteilt: bool,
+    /// Nur erreichte Seite: Konten, deren Geheimnisse an diese Zuordnung gingen.
+    pub konten_mit_geheimnis: i64,
 }
 
 /// Die Kopplungen, an denen `org_id` beteiligt ist oder war, jüngste Zuordnung je Kopplung.
@@ -648,7 +786,13 @@ pub async fn list_fuer_org(
     let mut aus = Vec::with_capacity(orgs.len());
     for o in orgs {
         let k = load_kopplung(pool, o.kopplung_id).await?;
-        aus.push(to_anzeige(k, o));
+        let konten: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM instanz_geheimnis_lieferung WHERE kopplung_org_id = ?",
+        )
+        .bind(o.id)
+        .fetch_one(pool)
+        .await?;
+        aus.push(to_anzeige(k, o, konten));
     }
     Ok(aus)
 }
@@ -666,7 +810,10 @@ pub async fn load_anzeige_fuer_org(
         .ok_or(AppError::NotFound)
 }
 
-fn to_anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
+fn to_anzeige(k: KopplungZeile, o: OrgZeile, konten_mit_geheimnis: i64) -> InstanzKopplungAnzeige {
+    let geheimnisse_verteilt = k.richtung() == Some(InstanzKopplungRichtung::WirdGemeldet)
+        && k.gegenueber_age_empfaenger.is_some()
+        && k.gegenueber_datentraeger_verschluesselt;
     let protokoll = match k.gegenueber_protokoll.and_then(|p| u32::try_from(p).ok()) {
         Some(fremd) => match super::protokollfenster(super::PROTOKOLL, fremd) {
             super::Protokollfenster::Voll => InstanzProtokoll::Passt,
@@ -705,6 +852,18 @@ fn to_anzeige(k: KopplungZeile, o: OrgZeile) -> InstanzKopplungAnzeige {
             fremde_org_kennung: o.fremde_org_kennung,
             angelegt_at: o.angelegt_at,
             widerrufen_at: o.widerrufen_at,
+            stammdaten: InstanzStammdatenStand {
+                stand: o.stammdaten_stand,
+                hinweise: o
+                    .stammdaten_hinweis
+                    .as_deref()
+                    .unwrap_or_default()
+                    .lines()
+                    .map(str::to_string)
+                    .collect(),
+                geheimnisse_verteilt,
+                konten_mit_geheimnis,
+            },
         },
     }
 }

@@ -208,6 +208,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         "Instanzidentität"
     );
     lifeline_hub::instanz::set_name(config.instanz_anzeigename());
+    // Stammdaten-Verteilung (LLH-1493): ob Kontogeheimnisse hierher dürfen, sagt die bestätigte
+    // Datenträgerverschlüsselung; der Live-Verteiler meldet übernommene Stammdaten.
+    lifeline_hub::instanz::stammdaten::geheimnis::save_datentraeger_bestaetigt(
+        &pool,
+        config.datentraeger_verschluesselung_extern,
+    )
+    .await?;
+    lifeline_hub::instanz::stammdaten::set_live(live.clone());
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).

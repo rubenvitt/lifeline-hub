@@ -220,53 +220,29 @@ pub fn parse_quali_soll(wert: &Value) -> Vec<(i64, i64)> {
         .collect()
 }
 
-/// Nachlieferung der Org `org_id` seit `seit`, höchstens `budget` Zeilen, nur `arten` (D2).
-pub async fn nachlieferung(
+/// Größe einer Lieferung auf der Leitung.
+fn groesse(l: &StammdatenLieferung) -> usize {
+    serde_json::to_vec(l).map(|v| v.len()).unwrap_or(usize::MAX)
+}
+
+/// Die Zeilen, auf die `paket` verweist und die die Gegenseite noch nicht haben kann (Stand über
+/// `seit`, noch nicht geliefert). Ein Durchgang je Ebene; Verweise reichen höchstens drei Ebenen
+/// tief (Vorlage → Personal → Konto/Qualifikation → Qualifikation).
+async fn load_abhaengige(
     conn: &mut SqliteConnection,
     org_id: i64,
     seit: i64,
-    budget: usize,
     arten: &HashSet<StammdatenArt>,
     empfaenger: &Empfaenger<'_>,
-) -> Result<Nachlieferung, AppError> {
-    if budget == 0 || arten.is_empty() {
-        return Ok(Nachlieferung {
-            zeilen: Vec::new(),
-            bis: seit,
-        });
-    }
-    let arten_json = serde_json::to_string(&arten.iter().map(|a| a.as_str()).collect::<Vec<_>>())
-        .expect("Arten sind serialisierbar");
-    let log: Vec<(i64, String, String)> = sqlx::query_as(
-        "SELECT stand, art, schluessel FROM stammdaten_aenderung \
-         WHERE org_id = ? AND stand > ? AND art IN (SELECT value FROM json_each(?)) \
-         ORDER BY stand LIMIT ?",
-    )
-    .bind(org_id)
-    .bind(seit)
-    .bind(&arten_json)
-    .bind(budget as i64)
-    .fetch_all(&mut *conn)
-    .await?;
-    let mut aus = Nachlieferung {
-        zeilen: Vec::with_capacity(log.len()),
-        bis: seit,
-    };
-    let mut drin: HashSet<(StammdatenArt, String)> = HashSet::new();
-    for (stand, art_text, schluessel) in log {
-        aus.bis = stand;
-        let Some(art) = StammdatenArt::parse(&art_text) else {
-            continue;
-        };
-        let l = build_lieferung(conn, org_id, art, &schluessel, stand, empfaenger).await?;
-        drin.insert((art, schluessel));
-        aus.zeilen.push(l);
-    }
-    // Abhängigkeiten, die die Gegenseite noch nicht haben kann (Stand über `seit`), kommen mit.
-    // Ein Durchgang je Ebene; Verweise reichen höchstens drei Ebenen tief (Vorlage → Personal →
-    // Konto/Qualifikation → Qualifikation).
-    let mut offen: Vec<StammdatenLieferung> = aus.zeilen.clone();
-    let mut abhaengige = 0usize;
+    paket: &[StammdatenLieferung],
+    drin: &HashSet<(StammdatenArt, String)>,
+) -> Result<Vec<StammdatenLieferung>, AppError> {
+    let mut gesehen: HashSet<(StammdatenArt, String)> = paket
+        .iter()
+        .filter_map(|l| Some((StammdatenArt::parse(&l.art)?, l.schluessel.clone())))
+        .collect();
+    let mut aus = Vec::new();
+    let mut offen: Vec<StammdatenLieferung> = paket.to_vec();
     for _ in 0..4 {
         let mut neu = Vec::new();
         for l in &offen {
@@ -274,7 +250,8 @@ pub async fn nachlieferung(
                 continue;
             };
             for (ziel, schluessel) in verweise(art, daten) {
-                if !arten.contains(&ziel) || drin.contains(&(ziel, schluessel.clone())) {
+                let k = (ziel, schluessel.clone());
+                if !arten.contains(&ziel) || drin.contains(&k) || !gesehen.insert(k) {
                     continue;
                 }
                 let stand: Option<i64> = sqlx::query_scalar(
@@ -287,22 +264,112 @@ pub async fn nachlieferung(
                 .bind(seit)
                 .fetch_optional(&mut *conn)
                 .await?;
-                drin.insert((ziel, schluessel.clone()));
-                let Some(stand) = stand else { continue };
-                if abhaengige >= ABHAENGIGE_MAX {
-                    continue;
+                if let Some(stand) = stand {
+                    neu.push(
+                        build_lieferung(conn, org_id, ziel, &schluessel, stand, empfaenger).await?,
+                    );
                 }
-                abhaengige += 1;
-                neu.push(
-                    build_lieferung(conn, org_id, ziel, &schluessel, stand, empfaenger).await?,
-                );
             }
         }
         if neu.is_empty() {
             break;
         }
-        aus.zeilen.extend(neu.iter().cloned());
+        aus.extend(neu.iter().cloned());
         offen = neu;
+    }
+    Ok(aus)
+}
+
+/// Was eine Antwort über alle Orgs hinweg noch an Stammdaten aufnehmen darf (D2).
+#[derive(Debug, Clone, Copy)]
+pub struct Budget {
+    /// Zeilen ohne mitgelieferte Abhängigkeiten.
+    pub zeilen: usize,
+    pub bytes: usize,
+    /// Abhängigkeiten.
+    pub abhaengige: usize,
+    /// Noch keine Stammdaten in dieser Antwort: die erste Zeile geht auch dann, wenn sie allein
+    /// über `bytes` läge (ohne Abhängigkeiten, sie passt in die Reserve), sonst käme sie nie.
+    pub leer: bool,
+}
+
+impl Budget {
+    pub fn neu(bytes: usize) -> Self {
+        Budget {
+            zeilen: super::STAMMDATEN_MAX,
+            bytes,
+            abhaengige: ABHAENGIGE_MAX,
+            leer: true,
+        }
+    }
+}
+
+/// Nachlieferung der Org `org_id` seit `seit` innerhalb von `budget`, nur `arten` (D2). Jede
+/// Zeile kommt mit den Zeilen, auf die sie verweist und die die Gegenseite noch nicht kennen kann;
+/// passt das Paket nicht mehr, endet die Lieferung davor, und der Stand bleibt dort stehen.
+pub async fn nachlieferung(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    seit: i64,
+    budget: &mut Budget,
+    arten: &HashSet<StammdatenArt>,
+    empfaenger: &Empfaenger<'_>,
+) -> Result<Nachlieferung, AppError> {
+    let mut aus = Nachlieferung {
+        zeilen: Vec::new(),
+        bis: seit,
+    };
+    if budget.zeilen == 0 || arten.is_empty() {
+        return Ok(aus);
+    }
+    let arten_json = serde_json::to_string(&arten.iter().map(|a| a.as_str()).collect::<Vec<_>>())
+        .expect("Arten sind serialisierbar");
+    let log: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT stand, art, schluessel FROM stammdaten_aenderung \
+         WHERE org_id = ? AND stand > ? AND art IN (SELECT value FROM json_each(?)) \
+         ORDER BY stand LIMIT ?",
+    )
+    .bind(org_id)
+    .bind(seit)
+    .bind(&arten_json)
+    .bind(budget.zeilen as i64)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut drin: HashSet<(StammdatenArt, String)> = HashSet::new();
+    for (stand, art_text, schluessel) in log {
+        let Some(art) = StammdatenArt::parse(&art_text) else {
+            aus.bis = stand;
+            continue;
+        };
+        if drin.contains(&(art, schluessel.clone())) {
+            // Schon als Abhängigkeit mitgekommen, mit dem jetzigen Inhalt.
+            aus.bis = stand;
+            continue;
+        }
+        let zeile = build_lieferung(conn, org_id, art, &schluessel, stand, empfaenger).await?;
+        let mut paket = vec![zeile];
+        let dazu = load_abhaengige(conn, org_id, seit, arten, empfaenger, &paket, &drin).await?;
+        let mit: usize = paket.iter().chain(dazu.iter()).map(groesse).sum();
+        if mit <= budget.bytes && dazu.len() <= budget.abhaengige {
+            budget.abhaengige -= dazu.len();
+            paket.extend(dazu);
+        } else if !budget.leer || groesse(&paket[0]) > super::ANTWORT_RESERVE / 2 {
+            break;
+        }
+        let g: usize = paket.iter().map(groesse).sum();
+        budget.bytes = budget.bytes.saturating_sub(g);
+        budget.zeilen = budget.zeilen.saturating_sub(1);
+        budget.leer = false;
+        for l in paket {
+            if let Some(a) = StammdatenArt::parse(&l.art) {
+                drin.insert((a, l.schluessel.clone()));
+            }
+            aus.zeilen.push(l);
+        }
+        aus.bis = stand;
+        if budget.zeilen == 0 {
+            break;
+        }
     }
     Ok(aus)
 }

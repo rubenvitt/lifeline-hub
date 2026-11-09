@@ -635,6 +635,50 @@ pub async fn widerrufen(
     ))
 }
 
+// ── Stammdaten (LLH-1493) ────────────────────────────────────────────────────────────────────
+
+/// POST /api/admin/instanz/kopplungen/{id}/stammdaten-neu — „Erneut abgleichen“ an der meldenden
+/// Seite (design.md D5): Stand der Org-Zuordnung des Admins auf 0, Hinweise leer; die nächste
+/// Meldung holt alles neu und gleicht ab. 422 an der erreichten Seite.
+pub async fn stammdaten_neu(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PfadParam(kopplung_id): PfadParam<i64>,
+) -> Result<Json<InstanzKopplungAnzeige>, AppError> {
+    repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
+    let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
+    if kopplung.richtung() != Some(InstanzKopplungRichtung::MeldetSich) {
+        return Err(AppError::UnprocessableEntity(
+            "Stammdaten kommen nur in der Kopplung, in der sich diese Instanz meldet.".into(),
+        ));
+    }
+    let zuordnung = {
+        let mut conn = state.pool.acquire().await?;
+        repo::list_orgs_aktiv(&mut conn, kopplung_id)
+            .await?
+            .into_iter()
+            .find(|o| o.org_id == admin.org_id)
+            .ok_or(AppError::NotFound)?
+    };
+    repo::reset_stammdaten(&state.pool, zuordnung.id).await?;
+    melden::melden_einmal(&state.pool, &kopplung).await?;
+    Ok(Json(
+        repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?,
+    ))
+}
+
+/// GET /api/instanz/stammdaten/herkunft — welche Stammdaten der eigenen Org vom Hub kommen
+/// (design.md D9). Lesen darf jede angemeldete Person: die Oberfläche sperrt danach die
+/// Bearbeitung, verrät aber nichts, was die Listen nicht ohnehin zeigen.
+pub async fn stammdaten_herkunft(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<crate::instanz::stammdaten::herkunft::StammdatenHerkunftAnzeige>, AppError> {
+    Ok(Json(
+        crate::instanz::stammdaten::herkunft::load_anzeige(&state.pool, user.org_id).await?,
+    ))
+}
+
 // ── Unterschriftsschlüssel ───────────────────────────────────────────────────────────────────
 
 fn passkeys_missing() -> AppError {
