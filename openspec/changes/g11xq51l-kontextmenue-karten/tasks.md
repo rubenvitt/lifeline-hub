@@ -42,6 +42,12 @@
 - [ ] 7.4 `./scripts/check-all.sh` grün (lokal mindestens `--nur schnell` und `--nur frontend`, dazu die neuen e2e-Specs; den Rest belegt die CI des PRs)
 - [ ] 7.5 Bilder der Änderung (Kontextmenü an Meldung, Nachforderung, Chat, Betreuungstabelle) per Wegwerf-Spec aufnehmen
 
+## 8. Befunde aus dem Review (09.11.2026)
+
+- [ ] 8.1 TDD: Rechtsklick auf das Vorschaubild eines Chat-Anhangs lässt das Browsermenü (`browsermenueBleibt` nimmt `img` aus); Test im Hook und im Chat
+- [ ] 8.2 TDD: Die Rückfrage aus dem Kontextmenü schlägt die Aktion beim OK neu nach; weggefallen oder gesperrt löst sie nichts aus
+- [ ] 8.3 `refactor`: neue technische Bezeichner englisch (LFH-1312) in `useKontextMenue.ts`, `kartenKontext.ts`; Tests grün
+
 ## Workflow follow-up
 
 - `/opsx:archive g11xq51l-kontextmenue-karten` im selben Branch vor dem PR

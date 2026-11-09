@@ -87,15 +87,20 @@ interface KartenAktion<K extends string> extends MenueEintrag<K> {
 ```
 
 Jede Karte baut eine geordnete Liste `KartenAktion[]`: erst die Knöpfe der Aktionszeile in ihrer
-Reihenfolge, dann die ⋮-Einträge. Ein Feld `ort: 'knopf' | 'menue'` sagt, wo der Eintrag auf der
-Karte steht; die Bündelregel (ab drei ins ⋮) bleibt in der Karte und setzt nur `ort`. Die
-Knopfzeile rendert die `knopf`-Einträge, Sonderformen (gefüllter Ghost-Knopf, `Popconfirm`,
-`GesperrterKnopf`) wählt die Karte am Schlüssel, Etikett, Sperre und Wirkung kommen aus dem
-Eintrag. Das ⋮ rendert die `menue`-Einträge. Das Kontextmenü nimmt alle.
+Reihenfolge, dann die ⋮-Einträge. Wo ein Eintrag auf der Karte steht, entscheidet die Karte wie
+bisher (Bündelregel ab drei ins ⋮); ein Feld dafür braucht es nicht, weil die Karten Knöpfe und ⋮
+schon getrennt führen (etwa `knoepfe`/`weitere` in `auftragAktionen`). Die Knopfzeile liest
+Etikett, Sperre, Rückfrage und Wirkung aus dem Eintrag; Sonderformen (gefüllter Ghost-Knopf,
+`Popconfirm`, `GesperrterKnopf`) wählt die Karte. Das Kontextmenü nimmt alle. Knöpfe einzelner
+Unterzeilen (Quittieren je Empfänger, Zurücknehmen je Ausgabe) gehören nicht dazu: sie handeln an
+einem anderen Datensatz.
 
 `kartenKontextEintraege(aktionen)` macht daraus `MenueEintrag[]`: gesperrt mit Grund im Etikett
 („Als Material übernehmen (kein Zugriff)“), wie die Karte ihn zeigt. Die Wahl ruft `onWahl`, mit
-`rueckfrage` vorher `modal.confirm` (Titel, Knopf, `danger` aus `gefahr`). Die Gefahr-Regel kommt
+`rueckfrage` vorher `modal.confirm` (Titel, Knopf, `danger` aus `gefahr`). Die Bestätigung schlägt
+die Aktion beim OK in den aktuellen Aktionen der Karte neu nach: ist sie inzwischen weggefallen
+oder gesperrt (Live-Ereignis, anderer Platz), löst sie nichts aus, wie ein `Popconfirm`, das mit
+seinem Knopf verschwindet. Die Gefahr-Regel kommt
 unverändert aus `menueEintraege()`: rote Einträge hinter einem Trenner, auch wenn sie auf der
 Karte als Knopf vorn stehen.
 
@@ -113,7 +118,10 @@ Nachricht gespeist wird (heute inline im `renderItem`), samt `waehle`. `ListenEi
 eine Prop `kontext?: KontextHandler<HTMLLIElement>` und spreizt sie an sein `<li>`.
 „Löschen“ öffnet wie bisher den eigenen Dialog (`fragLoeschen`), sein Bestand bleibt.
 
-Der Anhang ist ein Link: `browsermenueBleibt` greift schon (Spec, Chat-Anforderung).
+Der Anhang ist ein Link, sein Vorschaubild ein `<img>` in einem Knopf. `browsermenueBleibt` nimmt
+deshalb neben Link, Eingabefeld und Markierung auch `img` aus: ein Bild in einem Datensatz ist nie
+selbst eine Aktion, und „Bild speichern unter“ bzw. die Bildblase von iOS bleiben erreichbar. Das
+gilt auch für die Listen aus LLH-1596 (Befund aus dem Review, 09.11.2026).
 
 ### D5 Betreuung über den Kartenplan der `Datensicht`
 

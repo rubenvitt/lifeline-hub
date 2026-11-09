@@ -32,10 +32,11 @@ demselben Titel und derselben Knopfbeschriftung tun.
 
 ### Requirement: Eine Karte mit mehreren Knöpfen zeigt alle ihre Handlungen
 
-Trägt eine Karte mehrere Knöpfe, SHALL ihr Kontextmenü alle Knöpfe zeigen, die etwas tun, in der
-Reihenfolge der Knopfzeile, danach die Einträge ihres ⋮-Menüs. Das MUST auch gelten, wenn die Karte
-unter drei Aktionen kein ⋮-Menü zeigt. Ein gesperrter Knopf MUST gesperrt mit seinem Grund im Menü
-stehen. Sprünge zu einer anderen Ansicht und Auswahlfelder der Karte MUST NOT im Menü stehen.
+Trägt die Aktionszeile einer Karte mehrere Knöpfe, SHALL ihr Kontextmenü alle Knöpfe dieser Zeile
+zeigen, die etwas tun, in ihrer Reihenfolge, danach die Einträge des ⋮-Menüs. Das MUST auch gelten,
+wenn die Karte unter drei Aktionen kein ⋮-Menü zeigt. Ein gesperrter Knopf MUST gesperrt mit Grund
+im Menü stehen. Sprünge, Auswahlfelder und Knöpfe einzelner Unterzeilen (Empfänger, Ausgabe) MUST
+NOT im Menü stehen.
 
 #### Scenario: Neue Sofortmeldung
 - **WHEN** eine Person mit Schreibrecht auf eine neue, unbestätigte Sofortmeldung rechtsklickt, deren Karte „Bestätigen“, „Sichten“ und das ⋮-Menü trägt
@@ -57,6 +58,10 @@ stehen. Sprünge zu einer anderen Ansicht und Auswahlfelder der Karte MUST NOT i
 - **WHEN** jemand auf ein laufendes Zeitfenster rechtsklickt, dessen Karte „Ausgabe öffnen“ und „Ausgabe nachtragen“ trägt
 - **THEN** steht „Ausgabe nachtragen“ im Menü und „Ausgabe öffnen“ nicht
 
+#### Scenario: Knopf einer Unterzeile bleibt an der Zeile
+- **WHEN** jemand auf ein Zeitfenster rechtsklickt, in dessen Ausgabenliste eine Ausgabe den Knopf „Zurücknehmen“ trägt
+- **THEN** enthält das Menü die Aktionen des Zeitfensters und kein „Zurücknehmen“
+
 #### Scenario: Zuweisung bleibt an der Karte
 - **WHEN** jemand das Kontextmenü einer Meldung öffnet, an der die Auswahl „Bearbeiter zuweisen“ steht
 - **THEN** enthält das Menü keinen Eintrag zur Zuweisung
@@ -64,8 +69,9 @@ stehen. Sprünge zu einer anderen Ansicht und Auswahlfelder der Karte MUST NOT i
 ### Requirement: Eine Chat-Nachricht öffnet ihr Kontextmenü
 
 Eine Nachricht im Chat mit Aktionen SHALL per Rechtsklick, langem Druck und Tastatur dasselbe Menü
-öffnen wie ihr ⋮-Auslöser. Auf einem Anhang MUST das Browsermenü bleiben, weil er ein Link zum
-Herunterladen ist.
+öffnen wie ihr ⋮-Auslöser. Auf einem Anhang, dem Link wie dem Vorschaubild, MUST das Browsermenü
+bleiben. Auf einem Bild in einem Datensatz bleibt es überall, damit „Bild speichern unter“ erreichbar
+ist.
 
 #### Scenario: Rechtsklick auf eine eigene Nachricht
 - **WHEN** eine Person mit Schreibrecht neben den Text ihrer eigenen Nachricht rechtsklickt
@@ -74,6 +80,10 @@ Herunterladen ist.
 #### Scenario: Rechtsklick auf einen Anhang
 - **WHEN** jemand auf den Anhang einer Nachricht rechtsklickt
 - **THEN** erscheint das Browsermenü mit „Link speichern unter“
+
+#### Scenario: Rechtsklick auf das Vorschaubild eines Anhangs
+- **WHEN** jemand auf das Vorschaubild eines Bildanhangs einer Nachricht rechtsklickt
+- **THEN** erscheint das Browsermenü mit „Bild speichern unter“ und kein eigenes Menü
 
 #### Scenario: Gelöschte Nachricht
 - **WHEN** jemand auf eine gelöschte Nachricht rechtsklickt
