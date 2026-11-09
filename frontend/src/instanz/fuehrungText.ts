@@ -17,9 +17,14 @@ export const FUEHRUNG_ART_TEXT: Record<FuehrungWechselArt, string> = {
   verworfen: 'Übernahme verworfen',
 };
 
-/** Kurzform im Einsatzkopf: „Führung: hier · Epoche 1“ oder „Führung: Hub Nord · Epoche 3“. */
+/** Kurzform in Listen: „Führung: hier · Epoche 1“ oder „Führung: Hub Nord · Epoche 3“. */
 export function fuehrungKurz(f: Pick<EinsatzFuehrung, 'fuehrend' | 'bei' | 'epoche'>): string {
   return `Führung: ${f.fuehrend ? 'hier' : f.bei} · Epoche ${f.epoche}`;
+}
+
+/** Chip im Einsatzkopf, wenn eine andere Instanz führt: „Führung: Hub Nord“. */
+export function fuehrungBeiKurz(bei: string): string {
+  return `Führung: ${bei}`;
 }
 
 /** Was an einer Akte zu bedienen ist, aus Sicht dieser Instanz. */

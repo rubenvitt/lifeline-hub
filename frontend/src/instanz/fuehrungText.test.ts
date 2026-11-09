@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FuehrungAnzeige, FuehrungGegenueber } from '../api/types';
-import { FUEHRUNG_ART_TEXT, fuehrungKurz, fuehrungMoeglich } from './fuehrungText';
+import { FUEHRUNG_ART_TEXT, fuehrungBeiKurz, fuehrungKurz, fuehrungMoeglich } from './fuehrungText';
 
 const hub: FuehrungGegenueber = {
   kopplung_id: 1,
@@ -40,6 +40,10 @@ describe('fuehrungKurz (LLH-1491)', () => {
     expect(fuehrungKurz({ fuehrend: false, bei: 'Hub Nord', epoche: 3 })).toBe(
       'Führung: Hub Nord · Epoche 3',
     );
+  });
+
+  it('der Kopf nennt nur die fremde führende Instanz', () => {
+    expect(fuehrungBeiKurz('Hub Nord')).toBe('Führung: Hub Nord');
   });
 
   it('kennt jede Art', () => {

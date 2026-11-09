@@ -86,7 +86,7 @@ export function UebernahmeEntscheidung({
   });
   const von = fuehrung.offen?.von ?? '';
   return (
-    <Space direction="vertical" size="small">
+    <Space orientation="vertical" size="small">
       <Space wrap>
         <Popconfirm
           title={`Übernahme durch ${von} bestätigen?`}

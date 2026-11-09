@@ -266,7 +266,9 @@ Log-Position und macht alles danach zu Anträgen. Die Spalte bleibt als Anzeige.
 **Anzeige:**
 
 - Die Einsatzanzeige bekommt `fuehrung: { fuehrend, bei, epoche, offen }`. Sie fehlt, wenn es
-  keine Akte gibt.
+  keine Akte gibt. Der Chip im Kopf erscheint nur, wenn eine andere Instanz führt
+  („Führung: Hub Nord“, Nachtrag nach den Bildern: mit eigener Führung drückte er den
+  Einsatznamen weg und sagte nichts, was das Paneel nicht zeigt).
 - Jede Änderung sendet das `einsatz`-Ereignis, damit das Hinweisband live erscheint. Der
   Query-Key ist schon live.
 

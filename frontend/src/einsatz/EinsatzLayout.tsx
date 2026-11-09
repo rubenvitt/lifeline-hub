@@ -22,7 +22,7 @@ import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
 import { StatusChip } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
-import { fuehrungKurz } from '../instanz/fuehrungText';
+import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -445,14 +445,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 {EINSATZNUMMER_PLATZHALTER}
               </span>
             )}
-            {/* Führung je Einsatz (LLH-1491): nur mit Akte (gekoppelte Org, Schalter an). Führt
-                eine andere Instanz, ist hier alles nur zu lesen: `achtung` mit Wort. */}
-            {mittel && einsatz?.fuehrung && (
+            {/* Führung je Einsatz (LLH-1491): nur, wenn eine andere Instanz führt. Dann ist hier
+                alles nur zu lesen: `achtung` mit Wort. Führt diese Instanz, zeigt den Stand das
+                Paneel „Führung“ auf Einsatzdaten; der Kopf bleibt dem Einsatznamen. */}
+            {mittel && einsatz?.fuehrung && !einsatz.fuehrung.fuehrend && (
               <span data-lfh="kopf-fuehrung">
-                <StatusChip
-                  ton={einsatz.fuehrung.fuehrend ? 'neutral' : 'achtung'}
-                  wort={fuehrungKurz(einsatz.fuehrung)}
-                />
+                <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
               </span>
             )}
             <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>

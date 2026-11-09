@@ -57,7 +57,7 @@ ADR-0012 treffen die Kernstellen).
 - [x] 7.4 Paneel „Führung“ auf `pages/EinsatzdatenPage.tsx` vor „Einsatzabschluss“: Stand, Verlauf, „Führung an <Gegenüber> übergeben“, „Führung per Code abgeben“ (Code-Anzeige wie beim Kopplungscode, nicht per Esc schließbar), „Notübernahme“ mit Grund, wenn das Gegenüber führt; Vitest der Zustände und Rückfragen (`rueckfrage.guard.test.ts`, `erklaertext.guard.test.ts` grün)
 - [x] 7.5 Seite „Instanzkopplung“: Abschnitt „Einsätze beim Gegenüber“ mit Führung, Epoche und Aktionen „Führung übernehmen“ (ELW), „Notübernahme“ mit Grund und Wahl Unterschrift oder Code (`OtpEingabe` bzw. Codefeld, Hub), Hinweise „widersprochen“/„verworfen“; Vitest der Aktionen
 - [x] 7.6 Texte der neuen Benachrichtigungsarten (`alarm/benachrichtigungKatalog.ts`) und der Admin-Spur (Zugangsprotokoll); Vitest der Texte; Query-Keys klassifiziert (Guard grün)
-- [ ] 7.7 Bilder der Änderung für PR und Meldung (Chip, Hinweisband, Paneel, Abschnitt an der Kopplung, Code-Anzeige) per Wegwerf-Spec im Bildlauf
+- [x] 7.7 Bilder der Änderung für PR und Meldung (Chip, Hinweisband, Paneel, Abschnitt an der Kopplung, Code-Anzeige) per Wegwerf-Spec im Bildlauf
 
 ## 8. Doku
 
