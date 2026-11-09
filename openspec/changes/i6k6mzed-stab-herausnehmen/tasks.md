@@ -61,7 +61,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
   Vitest grün: `modulRegistry.test.ts` (Reihenfolge-Pin, 40 Zeichen), `InfotelefonPage.test.tsx`, `deeplinks.test.ts`, `befehle.test.ts`, `schnellaktionen.guard.test.ts`, `sprungmarken.test.ts`, `websiteModule.guard.test.ts` (mit `website/src/daten/module.json`).
 - [x] 4.5 Typ-Codegen (`scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts` mitcommittet), `liveEvent.contract.test.ts` grün.
-- [ ] 4.6 Anwenderdoku: `presse-infotelefon.md` wird `infotelefon.md` (Bereich, `quellen:`, Adresse). `e2e/doku-bilder/presse-infotelefon.bilder.ts` wird `infotelefon.bilder.ts`, die Bilder neu aufnehmen. Die e2e-Specs mit dem Pfad `/stab/infotelefon` umstellen (`leisten-flaeche`, `fokus-verdeckung`, `command-palette`, `stab-schmal`). Grün sind `anwenderdoku.guard.test.ts`, der Bildlauf des Kapitels und die betroffenen e2e-Specs.
+- [x] 4.6 Anwenderdoku: `presse-infotelefon.md` wird `infotelefon.md` (Bereich, `quellen:`, Adresse). `e2e/doku-bilder/presse-infotelefon.bilder.ts` wird `infotelefon.bilder.ts`, die Bilder neu aufnehmen. Die e2e-Specs mit dem Pfad `/stab/infotelefon` umstellen (`leisten-flaeche`, `fokus-verdeckung`, `command-palette`, `stab-schmal`). Grün sind `anwenderdoku.guard.test.ts`, der Bildlauf des Kapitels und die betroffenen e2e-Specs.
 
 ## 5. Auflösung über die Mitgliedschaft (D2, D7)
 
@@ -133,16 +133,16 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 7. Doku, Hilfe, Website, ADR (D9)
 
-- [ ] 7.1 Anwenderdoku:
+- [x] 7.1 Anwenderdoku:
   - `kapitel/stab.md`, `bilder/stab/` und `e2e/doku-bilder/stab.bilder.ts` löschen
   - Hilfe-Bereich „Stab“ wird „Führungsorganisation“ (`hilfe/bereiche.ts`, `website/src/daten/bereiche.ts`, `docs/anwender/AGENTS.md`, `README.md`)
   - Stab-Erwähnungen in den übrigen Kapiteln nachziehen
   - `stammdaten.bilder.ts` auf ein anderes Modul umstellen
 
   `anwenderdoku.guard.test.ts` und der Bildlauf der geänderten Kapitel sind grün.
-- [ ] 7.2 Website: Text „Stab in S1 bis S6“ und Kennzahl „6 Sachgebiete“ in `website/src/pages/index.astro` und `DokuSuche.astro` entfernen. Der Website-Build und Prettier sind grün.
-- [ ] 7.3 Neue ADR „Lifeline Hub hat kein Stab-Modul“ nach `docs/architektur/entscheidungen/VORLAGE.md`. Die Prüfung verbietet `src/stab/`, `src/presse/`, `frontend/src/stab/`, `frontend/src/presse/` und den Modul-Key `stab` in `MODUL_KEYS`. Dazu Kapitel 9 und die Kapitel 1 und 3 ohne Stab und Presse. `scripts/adr-fuer.sh` und `scripts/check-architektur.sh` sind grün.
-- [ ] 7.4 Regeldateien:
+- [x] 7.2 Website: Text „Stab in S1 bis S6“ und Kennzahl „6 Sachgebiete“ in `website/src/pages/index.astro` und `DokuSuche.astro` entfernen. Der Website-Build und Prettier sind grün.
+- [x] 7.3 Neue ADR „Lifeline Hub hat kein Stab-Modul“ nach `docs/architektur/entscheidungen/VORLAGE.md`. Die Prüfung verbietet `src/stab/`, `src/presse/`, `frontend/src/stab/`, `frontend/src/presse/` und den Modul-Key `stab` in `MODUL_KEYS`. Dazu Kapitel 9 und die Kapitel 1 und 3 ohne Stab und Presse. `scripts/adr-fuer.sh` und `scripts/check-architektur.sh` sind grün.
+- [x] 7.4 Regeldateien:
   - Abschnitt „Stab“ aus `frontend/AGENTS.md` entfernen (Organigramm, Sprungmarken)
   - `src/AGENTS.md` (Presse-Log, Infotelefon-Pfad, `PERSONENBEZUEGE`)
   - `command-palette/AGENTS.md`, `lagebesprechung/AGENTS.md`, `offline/AGENTS.md`
@@ -159,7 +159,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 9. Spec-Nachzug
 
-- [ ] 9.1 Die Deltas der Specs liegen unter `specs/` dieser Change. `openspec validate i6k6mzed-stab-herausnehmen --strict` ist grün. Die Specs, die den Stab nur beispielhaft nennen und nicht geändert wurden, sind im Bericht der Change-Vorlage aufgeführt. Nach der Umsetzung `grep -rn "Stab-Besetzung\|Presse-Log\|Pressemitteilung" openspec/specs` prüfen und für jeden normativen Rest ein Delta ergänzen.
+- [x] 9.1 Die Deltas der Specs liegen unter `specs/` dieser Change. `openspec validate i6k6mzed-stab-herausnehmen --strict` ist grün. Die Specs, die den Stab nur beispielhaft nennen und nicht geändert wurden, sind im Bericht der Change-Vorlage aufgeführt. Nach der Umsetzung `grep -rn "Stab-Besetzung\|Presse-Log\|Pressemitteilung" openspec/specs` prüfen und für jeden normativen Rest ein Delta ergänzen.
 
 ## Workflow follow-up
 
