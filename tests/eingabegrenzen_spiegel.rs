@@ -225,6 +225,18 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "ABLOESUNG_RHYTHMUS_MAX_MINUTEN",
             usize::try_from(abloesung::RHYTHMUS_MAX_MINUTEN).unwrap(),
         ),
+        (
+            "SCHICHTPLAN_MAX_DIENST_MIN_MINUTEN",
+            usize::try_from(*schichtplan::MAX_DIENST_BEREICH.start()).unwrap(),
+        ),
+        (
+            "SCHICHTPLAN_MAX_DIENST_MAX_MINUTEN",
+            usize::try_from(*schichtplan::MAX_DIENST_BEREICH.end()).unwrap(),
+        ),
+        (
+            "SCHICHTPLAN_MIN_RUHE_MAX_MINUTEN",
+            usize::try_from(*schichtplan::MIN_RUHE_BEREICH.end()).unwrap(),
+        ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
         ("SCHICHTPLAN_PERSONEN_MAX", schichtplan::PLAN_PERSONEN_MAX),
