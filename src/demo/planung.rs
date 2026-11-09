@@ -74,6 +74,14 @@ pub struct PlanungEinteilung {
     pub personen: &'static [PlanungPerson],
 }
 
+/// Ein Programmpunkt der Demo-Planung (LLH-1583) am Planungstag.
+#[derive(Debug, Clone, Copy)]
+pub struct PlanungProgrammpunkt {
+    pub stunde: u32,
+    pub minute: u32,
+    pub bezeichnung: &'static str,
+}
+
 /// Die Demo-Planung einer Lage.
 #[derive(Debug, Clone, Copy)]
 pub struct PlanungVorlage {
@@ -84,6 +92,7 @@ pub struct PlanungVorlage {
     pub posten: &'static [PlanungPostenVorlage],
     pub helfer: &'static [PlanungHelferVorlage],
     pub einteilung: &'static [PlanungEinteilung],
+    pub programm: &'static [PlanungProgrammpunkt],
 }
 
 impl PlanungVorlage {
@@ -337,6 +346,18 @@ pub async fn planung_importieren_tx(
             None,
             um(e.ab_stunde)?,
             um(e.bis_stunde)?,
+        )
+        .await?;
+    }
+    for p in vorlage.programm {
+        let zeitpunkt = um(p.stunde)? + Duration::minutes(i64::from(p.minute));
+        crate::planung::programm::anlegen_tx(
+            conn,
+            org_id,
+            planung_id,
+            admin_id,
+            p.bezeichnung,
+            &crate::zeit::formatiere_utc(zeitpunkt),
         )
         .await?;
     }

@@ -2,7 +2,7 @@
 titel: Vorplanung
 gruppen: [fuehrung, administration]
 reihenfolge: 380
-quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md, frontend/src/planung/PlanungDruckPage.tsx, frontend/src/planung/ausPlanung.ts, frontend/src/abloesung/schichtplan/ausgabe/, src/abloesung/schichtplan/ausgabe/, frontend/src/planung/PlanungUebernahmeDialog.tsx, frontend/src/abloesung/schichtplan/ImportVorschauAnsicht.tsx, src/planung/uebernahme.rs, src/abloesung/schichtplan/uebernahme/repo.rs]
+quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md, frontend/src/planung/PlanungDruckPage.tsx, frontend/src/planung/ausPlanung.ts, frontend/src/abloesung/schichtplan/ausgabe/, src/abloesung/schichtplan/ausgabe/, frontend/src/planung/PlanungUebernahmeDialog.tsx, frontend/src/planung/PlanungAblauf.tsx, src/planung/programm.rs, frontend/src/abloesung/schichtplan/ImportVorschauAnsicht.tsx, src/planung/uebernahme.rs, src/abloesung/schichtplan/uebernahme/repo.rs]
 ---
 
 ## Überblick
@@ -73,6 +73,17 @@ Planen dürfen der System-Admin und die Führungskräfte der Organisation. Für 
 Auf dem Handy steht statt des Rasters je Posten eine Liste aller Blöcke nach Beginn, mit Tag und
 Uhrzeit. Ein Eintrag öffnet den Dialog des Blocks.
 
+### Den Ablauf der Veranstaltung planen
+
+1. Den Reiter „Ablauf“ öffnen. Der Reiter nennt die Zahl der Programmpunkte.
+2. „Programmpunkt“ wählen, „Zeitpunkt“ und „Bezeichnung“ eintragen, etwa „Feuerwerk“ um 22:30,
+   und „Anlegen“ wählen.
+3. Ändern und Löschen gehen wie im Paneel „Ablauf“ der Einsatzdaten (Kapitel
+   [Einsatzdaten](einsatzdaten.md)).
+
+Ein Punkt darf vor oder nach dem Zeitraum der Planung liegen, etwa der Aufbau am Vortag. Eine
+Planung hat höchstens 50 Programmpunkte.
+
 ### Eine Planung drucken oder als Excel ausgeben
 
 1. Im Reiter „Plan“ „Drucken“ wählen. Die Druckansicht der Planung öffnet sich.
@@ -106,7 +117,7 @@ Planung“ führt zur Planung zurück.
 ### Eine Planung löschen
 
 1. In der Planung oben rechts das Menü ⋮ öffnen und „Planung löschen“ wählen.
-2. Die Rückfrage mit „Planung löschen“ bestätigen. Posten, Blöcke und Helfer gehen mit.
+2. Die Rückfrage mit „Planung löschen“ bestätigen. Posten, Blöcke, Helfer und Ablauf gehen mit.
 
 ## Hintergrund
 
@@ -149,7 +160,10 @@ Stamm-Personal kommt als feste Zuordnung in den Plan; wer inzwischen außer Dien
 werden Helfer im Plan des Einsatzes mit der Herkunft „vorplanung“. Jeder Block nimmt sein Soll
 und Qualifikationssoll aus der Planung mit; ein Block ohne Soll bleibt auch im Einsatz ohne. Die
 Grenzwerte der Planung gelten im Einsatz, solange er keine eigenen
-hat. Niemand wird alarmiert oder disponiert, und niemand ist damit schon im Einsatz: wer im Plan
+hat. Die Programmpunkte der Planung kommen in den Ablauf des Einsatzes, auch solche, deren Zeit
+schon vorbei ist. Hat ein laufender Einsatz schon einen Punkt mit derselben Bezeichnung zur
+selben Zeit, zählt die Vorschau ihn als „vorhanden“ und legt ihn nicht noch einmal an. Hätte der
+Einsatz danach mehr als 50 Programmpunkte, nennt die Vorschau das als Fehler. Niemand wird alarmiert oder disponiert, und niemand ist damit schon im Einsatz: wer im Plan
 steht, kommt wie bei jeder Schicht erst mit dem Wechsel in den Einsatz (Kapitel
 [Ablösung](abloesung.md)). Das ETB des Einsatzes vermerkt „Planung „…“ übernommen“ mit der
 Zählung.
@@ -157,7 +171,7 @@ Zählung.
 ### Nach der Übernahme
 
 Eine übernommene Planung ist schreibgeschützt: oben steht, wann und in welchen Einsatz sie ging,
-mit einem Link dorthin. Kopf, Posten, Helfer und Blöcke lassen sich nur noch ansehen, und eine
+mit einem Link dorthin. Kopf, Posten, Helfer, Blöcke und Ablauf lassen sich nur noch ansehen, und eine
 zweite Übernahme gibt es nicht. „Soll“, „Ist“, „Offen“ und „Konflikte“ bleiben auf dem Stand der
 Übernahme, auch in der Liste, die „übernommen in …“ mit der Einsatznummer nennt. Löschen geht
 weiter, und die Löschfrist bleibt dieselbe. Wird der Einsatz später endgültig gelöscht, führt der

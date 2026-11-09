@@ -30,8 +30,9 @@ pub struct ProgrammpunktPatch {
     pub zeitpunkt_at: Option<String>,
 }
 
-/// Formulareingabe → kanonischer UTC-Zeitstempel mit Jahr im Bereich (400, LFH-924).
-fn parse_zeitpunkt(roh: &str) -> Result<String, AppError> {
+/// Formulareingabe → kanonischer UTC-Zeitstempel mit Jahr im Bereich (400, LFH-924). Auch für
+/// die Programmpunkte der Planung (LLH-1583).
+pub(crate) fn parse_zeitpunkt(roh: &str) -> Result<String, AppError> {
     let normal = crate::zeit::normalisiere_eingabe(roh)
         .ok_or_else(|| AppError::Validation("Ungültiger Zeitpunkt".into()))?;
     crate::zeit::im_jahresbereich(normal, "Zeitpunkt")

@@ -34,7 +34,7 @@ export function einsaetzePfad(): string {
 }
 
 /** Reiter einer Planung (LLH-1586): Raster, Posten, Helfer. */
-export type PlanungReiter = 'plan' | 'posten' | 'helfer';
+export type PlanungReiter = 'plan' | 'posten' | 'helfer' | 'ablauf';
 
 /** Liste der Planungen ohne Einsatz (LLH-1561, Ebene 1). */
 export function planungenPfad(): string {
@@ -65,7 +65,7 @@ export function planungDruckPfad(
 /** Reiter aus `?reiter=`; Unbekanntes ist `plan`. */
 export function parsePlanungReiter(params: URLSearchParams): PlanungReiter {
   const r = params.get('reiter');
-  return r === 'posten' || r === 'helfer' ? r : 'plan';
+  return r === 'posten' || r === 'helfer' || r === 'ablauf' ? r : 'plan';
 }
 
 /** Zentrale Route zum Einsatz-Workspace. */
