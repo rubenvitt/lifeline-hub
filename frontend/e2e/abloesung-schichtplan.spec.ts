@@ -405,6 +405,8 @@ test('Schichtplan (LLH-1600): Kontextmenü eines Blocks — kopieren, bearbeiten
   expect(ms(folge.bis)).toBe(stunde + 120 * MIN);
 
   // ── Tastatur: Umschalt+F10 am fokussierten Block, „Bearbeiten“ öffnet den Blockdialog ─────
+  // Die Maus weg: stünde sie über dem neuen Menü, machte ihr Hover einen anderen Eintrag aktiv.
+  await page.mouse.move(0, 0);
   await bloeckeImRaster.first().focus();
   await page.keyboard.press('Shift+F10');
   await expect(menue).toBeVisible();
