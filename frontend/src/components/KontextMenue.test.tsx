@@ -152,6 +152,18 @@ describe('kontextEintraege (D6)', () => {
     expect(e.slice(1).every((x) => x.gesperrt)).toBe(true);
   });
 
+  it('eine gesperrte Primäraktion steht gesperrt im Menü (LLH-1599 D7)', () => {
+    const aktion = primaer({ gesperrt: () => true });
+    expect(kontextEintraege({ aktion, weitere: weitere() }, ZEILE)[0]).toEqual({
+      key: PRIMAER_SCHLUESSEL,
+      label: 'Aus dem Einsatz nehmen',
+      gesperrt: true,
+    });
+    expect(
+      kontextEintraege({ aktion: primaer({ gesperrt: () => false }) }, ZEILE)[0].gesperrt,
+    ).toBeUndefined();
+  });
+
   it('ohne Aktionen eine leere Liste', () => {
     expect(kontextEintraege({}, ZEILE)).toEqual([]);
     expect(kontextEintraege({ weitere: weitere({ eintraege: () => [] }) }, ZEILE)).toEqual([]);
@@ -199,6 +211,14 @@ describe('fuehreKontextWahlAus (D6)', () => {
     const config = modal.confirm.mock.calls[0][0];
     expect(config.okText).toBe('Aus dem Einsatz nehmen');
     expect(config.okButtonProps).toBeUndefined();
+  });
+
+  it('eine gesperrte Primäraktion löst nicht aus (LLH-1599 D7)', () => {
+    const aktion = primaer({ gesperrt: () => true, bestaetigung: 'Wirklich?' });
+    const modal = { confirm: vi.fn() };
+    fuehreKontextWahlAus({ aktion }, ZEILE, PRIMAER_SCHLUESSEL, modal);
+    expect(aktion.onKlick).not.toHaveBeenCalled();
+    expect(modal.confirm).not.toHaveBeenCalled();
   });
 
   it('andere Schlüssel gehen an `weitere.onWahl`', () => {

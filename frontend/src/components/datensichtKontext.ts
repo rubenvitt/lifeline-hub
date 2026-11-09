@@ -14,9 +14,10 @@ export interface ZeilenAktionen<T> {
 }
 
 /**
- * Primäraktion (wenn gesetzt und für die Zeile sichtbar) vor den `weitere`-Einträgen. Läuft eine
- * Aktion aus dem ⋮-Menü, stehen dessen Einträge gesperrt da (der Auslöser ist dann gesperrt); die
- * Primäraktion bleibt wählbar wie ihr Knopf. Leere Liste ⇒ kein Menü, das Browsermenü bleibt.
+ * Primäraktion (wenn gesetzt und für die Zeile sichtbar, gesperrt wie ihr Knopf, LLH-1599) vor den
+ * `weitere`-Einträgen. Läuft eine Aktion aus dem ⋮-Menü, stehen dessen Einträge gesperrt da (der
+ * Auslöser ist dann gesperrt); die Primäraktion bleibt wählbar wie ihr Knopf. Leere Liste ⇒ kein
+ * Menü, das Browsermenü bleibt.
  */
 export function kontextEintraege<T>(
   { aktion, weitere }: ZeilenAktionen<T>,
@@ -24,7 +25,11 @@ export function kontextEintraege<T>(
 ): MenueEintrag[] {
   const eintraege: MenueEintrag[] = [];
   if (aktion && (aktion.sichtbar?.(zeile) ?? true)) {
-    eintraege.push({ key: PRIMAER_SCHLUESSEL, label: aktion.etikett });
+    eintraege.push(
+      aktion.gesperrt?.(zeile)
+        ? { key: PRIMAER_SCHLUESSEL, label: aktion.etikett, gesperrt: true }
+        : { key: PRIMAER_SCHLUESSEL, label: aktion.etikett },
+    );
   }
   if (weitere) {
     const laeuft = weitere.laeuft?.(zeile) ?? false;
@@ -60,7 +65,8 @@ export function fuehreKontextWahlAus<T>(
   modal: Rueckfrage,
 ): void {
   if (key === PRIMAER_SCHLUESSEL) {
-    if (!aktion) return;
+    // Gesperrt wie ihr Knopf (LLH-1599 D7); das Menü sperrt den Eintrag schon, dies ist der Riegel.
+    if (!aktion || aktion.gesperrt?.(zeile)) return;
     if (aktion.bestaetigung == null) {
       aktion.onKlick(zeile);
       return;

@@ -1,18 +1,18 @@
 ## 1. Hook `useDatensatzKontextMenue` (D1)
 
-- [ ] 1.1 TDD: `components/useDatensatzKontextMenue.test.tsx` — Rechtsklick auf ein Element mit `ausloeser(zeile)` öffnet `menue` mit `eintraege(zeile)` und `zugaenglicherName(zeile)`, `offen` wird wahr; Wahl ruft `onWahl(key, zeile)` genau einmal und schließt
-- [ ] 1.2 TDD: ohne Einträge kein Menü (Browsermenü); verschwindet die Zeile (`finde` liefert nichts) oder verliert sie alle Einträge, schließt das offene Menü im nächsten Render
-- [ ] 1.3 `Datensicht.tsx` auf den Hook umstellen (Abschnitt „Kontextmenü“), `offen` hält die Zeilenschleuse; `Datensicht.kontextmenue.test.tsx` und übrige Datensicht-Tests grün
+- [x] 1.1 TDD: `components/useDatensatzKontextMenue.test.tsx` — Rechtsklick auf ein Element mit `ausloeser(zeile)` öffnet `menue` mit `eintraege(zeile)` und `zugaenglicherName(zeile)`, `offen` wird wahr; Wahl ruft `onWahl(key, zeile)` genau einmal und schließt
+- [x] 1.2 TDD: ohne Einträge kein Menü (Browsermenü); verschwindet die Zeile (`finde` liefert nichts) oder verliert sie alle Einträge, schließt das offene Menü im nächsten Render
+- [x] 1.3 `Datensicht.tsx` auf den Hook umstellen (Abschnitt „Kontextmenü“), `offen` hält die Zeilenschleuse; `Datensicht.kontextmenue.test.tsx` und übrige Datensicht-Tests grün
 
 ## 2. Primäraktion gesperrt (D7)
 
-- [ ] 2.1 TDD: `PrimaerAktion.gesperrt(zeile)` — `kontextEintraege` setzt den Eintrag `__primaer` gesperrt, die Wahl löst nicht aus; der Knopf im Kartenfuß der `Datensicht` ist `disabled`
+- [x] 2.1 TDD: `PrimaerAktion.gesperrt(zeile)` — `kontextEintraege` setzt den Eintrag `__primaer` gesperrt, die Wahl löst nicht aus; der Knopf im Kartenfuß der `Datensicht` ist `disabled`
 
 ## 3. `KatalogTabelle.zeilenMenue` und `ZeilenMenueAusloeser` (D2)
 
-- [ ] 3.1 TDD: `ZeilenMenueAusloeser({ menue, zeile })` rendert das ⋮ aus `eintraege`, `zugaenglicherName`, `onWahl`; `laeuft(zeile)` sperrt und zeigt den Ladezustand; ohne Einträge nichts
-- [ ] 3.2 TDD: `KatalogTabelle` mit `zeilenMenue` — Rechtsklick auf eine Zeile öffnet das Menü dieser Zeile; bei `laeuft` stehen alle Einträge gesperrt; ohne `zeilenMenue` kein Kontextmenü und unverändertes `onRow`
-- [ ] 3.3 TDD: ein `onRow` des Aufrufers wirkt weiter neben den Handlern des Hooks (beide gerufen); `rowKey` als String und als Funktion findet die Zeile
+- [x] 3.1 TDD: `ZeilenMenueAusloeser({ menue, zeile })` rendert das ⋮ aus `eintraege`, `zugaenglicherName`, `onWahl`; `laeuft(zeile)` sperrt und zeigt den Ladezustand; ohne Einträge nichts
+- [x] 3.2 TDD: `KatalogTabelle` mit `zeilenMenue` — Rechtsklick auf eine Zeile öffnet das Menü dieser Zeile; bei `laeuft` stehen alle Einträge gesperrt; ohne `zeilenMenue` kein Kontextmenü und unverändertes `onRow`
+- [x] 3.3 TDD: ein `onRow` des Aufrufers wirkt weiter neben den Handlern des Hooks (beide gerufen); `rowKey` als String und als Funktion findet die Zeile
 
 ## 4. Tabellen der Stammdaten und Benutzer (D2, D4, D5)
 
