@@ -113,7 +113,9 @@ Für Einsatzleitung und Führungspersonal:
    ![Dialog „Zeitfenster anlegen“ mit Bezeichnung, Zeitraum und den vorgeschlagenen Zahlen für Einsatzkräfte und Betreute samt Herkunft](../bilder/verpflegung/zeitfenster-anlegen.png)
 
 4. Für weitere Personen oder Sonderkost „Weitere Personen und Sonderkost“ aufklappen und unter
-   „davon Sonderkost (EP)“ die Portionen je Kostform eintragen.
+   „davon Sonderkost (EP)“ die Portionen je Kostform eintragen. Sind an Betreuungsstellen
+   Personen registriert, stehen dort schon ihre Kostformen mit „Vorschlag: aus … Registrierten,
+   Stand jetzt“.
 5. Für Art und Stellen „Art und Stellen“ aufklappen (Ablauf „Ein Zeitfenster Stellen zuordnen“).
 6. „Anlegen“ wählen.
 
@@ -332,7 +334,9 @@ Säugling/Kleinkind. Zeitfenster dürfen sich überschneiden.
 
 Beim Anlegen schlägt die App für Einsatzkräfte die Stärke des Personals im Einsatz vor und für
 Betreute die Kopfzahl „in Betreuung“ zum Beginn, soweit das Modul Betreuung im Einsatz bedient
-werden kann. Ohne Quelle bleibt das Feld leer. Beim Bearbeiten überschreibt der Vorschlag nichts;
+werden kann. Die Sonderkost schlägt sie aus den Kostformen der an Betreuungsstellen registrierten
+Personen vor, ohne Namen und mit dem heutigen Stand, auch für ein späteres Zeitfenster
+([Betreuung](betreuung.md)). Ohne Quelle bleibt das Feld leer. Beim Bearbeiten überschreibt der Vorschlag nichts;
 die Zahl steht dann als „Aktuell …“ unter dem Feld.
 
 ### Wie gezählt wird

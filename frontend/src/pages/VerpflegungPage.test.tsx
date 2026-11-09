@@ -93,6 +93,7 @@ vi.mock('../verpflegung/useBedarfsvorschlag', () => ({
   useBedarfsvorschlag: () => ({
     kraefte: { wert: null, hinweis: null },
     betreute: { wert: null, hinweis: null },
+    sonderkost: { werte: null, hinweis: null },
   }),
 }));
 

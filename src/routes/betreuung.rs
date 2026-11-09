@@ -67,6 +67,28 @@ pub(super) fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], ste
         .publiziere_event(einsatz_id, LiveEvent::Betreuung, nutzlast.to_string());
 }
 
+/// Nach dem Commit eines Personenvorgangs, der eine Betreuungsstelle berührt hat (LLH-1612,
+/// design.md D5): ETB-Kurzruf je Belegungsmeldung namentlich geführter Stellen, dann das
+/// Modul-Ereignis ohne Stellenkennung (der Aufrufer kennt die Stellen nicht einzeln). Das Ereignis
+/// geht auch ohne Meldung, sobald eine Stelle berührt ist: die Kostform-Zählung zählt auch an
+/// gezählten Stellen, und wer Verpflegung ohne Personenrecht führt, bekommt kein `person`.
+pub(crate) fn publiziere_nachgefuehrt(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_ids: &[i64],
+    stelle_beruehrt: bool,
+) {
+    if etb_ids.is_empty() && !stelle_beruehrt {
+        return;
+    }
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, *etb_id);
+    }
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Betreuung);
+}
+
 /// Wie [`publiziere`], aber nur nach einer wirksamen Änderung (Leerlauf-Riegel: ein PATCH
 /// ohne neuen Wert schreibt keinen ETB-Eintrag und soll auch niemanden neu laden lassen).
 /// Wirksam ist auch eine Änderung ohne ETB-Eintrag — die Verortung einer Stelle
@@ -198,6 +220,9 @@ pub struct StelleAnlegen {
     lat: Option<f64>,
     #[serde(default)]
     lon: Option<f64>,
+    /// `gezaehlt` | `namentlich` (LLH-1612); fehlt = `gezaehlt`.
+    #[serde(default)]
+    belegungsart: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/betreuung/stellen
@@ -223,6 +248,7 @@ pub async fn stelle_anlegen(
         kontaktweg: optional_max(req.kontaktweg, "Kontakt", KONTAKTWEG_MAX)?,
         lat: req.lat,
         lon: req.lon,
+        belegungsart: enum_opt(req.belegungsart)?,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
@@ -271,6 +297,10 @@ pub struct StelleAendern {
     lat: Option<Option<f64>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     lon: Option<Option<f64>>,
+    /// `gezaehlt` | `namentlich` (LLH-1612, design.md D5); fehlt = unverändert. Der Wechsel auf
+    /// `namentlich` meldet die Zahl der Registrierten im selben Vorgang.
+    #[serde(default)]
+    belegungsart: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/betreuung/stellen/{sid}
@@ -299,6 +329,7 @@ pub async fn stelle_aendern(
         kontaktweg: optional_max_tri(req.kontaktweg, "Kontakt", KONTAKTWEG_MAX)?,
         lat: req.lat,
         lon: req.lon,
+        belegungsart: enum_opt(req.belegungsart)?,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;

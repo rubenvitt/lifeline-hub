@@ -23,6 +23,11 @@ import { useRollen } from '../components/instrument';
 export interface FlaechenOption<W extends string> {
   wert: W;
   label: string;
+  /**
+   * Zugänglicher Name, wo die Fläche ein Kurzwort trägt (Kostform „Veg.“ → „vegetarisch“,
+   * LLH-1612); ohne ihn nennt die Fläche ihren Wortlaut.
+   */
+  name?: string;
 }
 
 export interface FlaechenWahlProps<W extends string> {
@@ -34,6 +39,11 @@ export interface FlaechenWahlProps<W extends string> {
   disabled?: boolean;
   id?: string;
   'aria-label': string;
+  /**
+   * Mindestbreite einer Fläche; Vorgabe {@link FLAECHE_BREITE}. Schmaler nur für Kurzwörter in
+   * einer Zeile neben anderen Feldern (Kostform der Registrierung, LLH-1612), nie unter 48 px.
+   */
+  breite?: number;
 }
 
 /** Boden einer Fläche: 48 px, darüber die Steuerhöhe der Stufe (Handschuh 72). */
@@ -44,14 +54,17 @@ export const FLAECHE_BREITE = 112;
  * Maße einer Fläche aus den aufgelösten Tokens — rein und exportiert (Muster „Handgebautes
  * Bedienziel“, LFH-365), Böden als Literale geprüft in `FlaechenWahl.test.tsx`.
  */
-export function flaecheStil(token: {
-  controlHeight: number;
-  paddingXS: number;
-  paddingSM: number;
-}): CSSProperties {
+export function flaecheStil(
+  token: {
+    controlHeight: number;
+    paddingXS: number;
+    paddingSM: number;
+  },
+  breite: number = FLAECHE_BREITE,
+): CSSProperties {
   return {
     minHeight: Math.max(FLAECHE_BODEN, token.controlHeight),
-    minWidth: FLAECHE_BREITE,
+    minWidth: Math.max(FLAECHE_BODEN, breite),
     paddingBlock: token.paddingXS,
     paddingInline: token.paddingSM,
   };
@@ -100,10 +113,12 @@ export default function FlaechenWahl<W extends string>({
   disabled = false,
   id,
   'aria-label': ariaLabel,
+  breite = FLAECHE_BREITE,
 }: FlaechenWahlProps<W>) {
   const { token, rollen } = useRollen();
   const knoepfe = useRef<(HTMLButtonElement | null)[]>([]);
-  const masse = flaecheStil(token);
+  const masse = flaecheStil(token, breite);
+  const spalte = Math.max(FLAECHE_BODEN, breite);
   const gewaehltIndex = optionen.findIndex((o) => o.wert === value);
   const fokusIndex = Math.max(0, gewaehltIndex);
 
@@ -128,7 +143,7 @@ export default function FlaechenWahl<W extends string>({
       data-lfh="flaechenwahl"
       style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(auto-fill, minmax(${FLAECHE_BREITE}px, 1fr))`,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${spalte}px, 1fr))`,
         gap: flaechenLuecke(token),
       }}
     >
@@ -144,7 +159,7 @@ export default function FlaechenWahl<W extends string>({
             type="button"
             role="radio"
             aria-checked={gewaehlt}
-            aria-label={o.label}
+            aria-label={o.name ?? o.label}
             disabled={disabled}
             tabIndex={index === fokusIndex ? 0 : -1}
             data-erfassung-fokus={index === fokusIndex ? '' : undefined}

@@ -79,6 +79,10 @@ pub struct VerbleibDaten<'a> {
     pub entlassen_an: Option<EntlassenAn>,
     pub gegen_rat: Option<GegenRat>,
     pub unterschrift: Option<Unterschrift>,
+    /// Die Belegung namentlich geführter Stellen NICHT hier nachführen (LLH-1612, design.md D5):
+    /// nur für Vorgänge, die viele Personen auf einmal bewegen (Registrierung, Abmeldung) und
+    /// danach einmal je Stelle nachführen. Vorgabe `false`: jeder andere Weg führt nach.
+    pub ohne_belegung_nachfuehren: bool,
 }
 
 const SELECT_VERBLEIB: &str = "\
@@ -100,10 +104,16 @@ macro_rules! verbleibfolge {
 
 /// Ergebnis einer Erfassung: die Kennung des Ereignisses und ob es der aktuelle Verbleib ist.
 /// Ein nachgereichtes älteres gewinnt nicht; der Auto-Austritt unterbleibt dann.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ErfassterVerbleib {
     pub id: i64,
     pub gewinnt: bool,
+    /// ETB-Einträge der Belegungsmeldungen, die der Wechsel an namentlich geführten Stellen
+    /// ausgelöst hat (LLH-1612, design.md D5); der Aufrufer verteilt sie live.
+    pub belegung_etb_ids: Vec<i64>,
+    /// Ob der Wechsel eine Betreuungsstelle verlassen oder betreten hat, auch eine gezählte: die
+    /// Kostform-Zählung (Sonderkost-Vorschlag) ändert sich dann, ohne dass eine Meldung entsteht.
+    pub stelle_beruehrt: bool,
 }
 
 /// Erfasst ein Verbleib-Ereignis append-only und bestimmt in DERSELBEN Transaktion den
@@ -132,6 +142,17 @@ pub async fn erfassen_tx(
     daten: VerbleibDaten<'_>,
     erfasst_von: i64,
 ) -> Result<ErfassterVerbleib, AppError> {
+    // Die Stelle VOR dem Wechsel: verlässt die Person eine namentlich geführte Stelle, sinkt
+    // deren Belegung (D5).
+    let stelle_vorher: Option<i64> = sqlx::query_scalar(
+        "SELECT aktuelle_verbleib_betreuungsstelle_id FROM einsatz_person \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(person_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .flatten();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO person_verbleib \
             (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
@@ -211,9 +232,32 @@ pub async fn erfassen_tx(
     .bind(fahrzeug)
     .execute(&mut *conn)
     .await?;
+    let mut belegung_etb_ids = Vec::new();
+    if !daten.ohne_belegung_nachfuehren {
+        let zeitpunkt = daten
+            .zeitpunkt_at
+            .map(str::to_string)
+            .unwrap_or_else(crate::zeit::jetzt);
+        let mut stellen = vec![stelle_vorher, stelle];
+        stellen.dedup();
+        for stelle_id in stellen.into_iter().flatten() {
+            belegung_etb_ids.extend(
+                crate::betreuung::repo::belegung_nachfuehren_tx(
+                    conn,
+                    einsatz_id,
+                    stelle_id,
+                    &zeitpunkt,
+                    erfasst_von,
+                )
+                .await?,
+            );
+        }
+    }
     Ok(ErfassterVerbleib {
         id,
         gewinnt: juengste == id,
+        belegung_etb_ids,
+        stelle_beruehrt: stelle_vorher.is_some() || stelle.is_some(),
     })
 }
 

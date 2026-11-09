@@ -15,6 +15,7 @@ import type {
   BetreuungsstellePatch,
   BetreuungsstelleStatus,
   BelegungsmeldungEingabe,
+  Belegungsart,
   Erhebung,
   Evakuierungsbezirk,
   EvakuierungsbezirkEingabe,
@@ -212,6 +213,8 @@ export interface StelleWerte {
   notiz?: string | null;
   leitung?: string | null;
   kontaktweg?: string | null;
+  /** Nur in den Stammdaten der Detailseite (LLH-1612); der Anlegedialog lässt die Vorgabe. */
+  belegungsart?: Belegungsart;
 }
 
 function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
@@ -251,6 +254,9 @@ export function stellePatch(vorher: Betreuungsstelle, w: StelleWerte): Betreuung
   if ('leitung' in w) wennGeaendert(patch, 'leitung', vorher.leitung, text(w.leitung));
   if ('kontaktweg' in w) {
     wennGeaendert(patch, 'kontaktweg', vorher.kontaktweg, text(w.kontaktweg));
+  }
+  if (w.belegungsart != null) {
+    wennGeaendert(patch, 'belegungsart', vorher.belegungsart, w.belegungsart);
   }
   return patch;
 }

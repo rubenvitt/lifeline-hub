@@ -297,6 +297,10 @@ nicht, sagt die Seite „Person nicht gefunden“.
    Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand. Wer die Rückfrage mit Escape
    schließt, entscheidet nichts: die Eingabe bleibt offen.
 
+„Kostform“ und „Unverträglichkeiten“ stehen ebenfalls unter „Personendaten“; an einer
+Betreuungsstelle registrierte Personen tragen dazu die Zeile „Haushalt H-…“
+([Betreuung](betreuung.md)).
+
 ### Den Fundort auf der Lagekarte verorten
 
 1. Die Person öffnen und bei „Koordinate“ „Auf Lagekarte verorten“ wählen, oder in der Liste im

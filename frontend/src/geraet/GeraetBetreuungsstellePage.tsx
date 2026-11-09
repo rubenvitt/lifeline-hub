@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, App, Button, Space, Spin } from 'antd';
+import { Alert, App, Button, Space, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ladeBetreuung } from '../api/betreuung';
@@ -8,17 +8,23 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Betreuungsstelle, BelegungsmeldungEingabe } from '../api/types';
 import { BelegungMeldenDialog } from '../betreuung/BetreuungDialoge';
 import MeldeVerlauf from '../betreuung/MeldeVerlauf';
-import { GESCHLOSSEN_HINWEIS } from '../betreuung/StellenBlock';
+import { verlaufRuecknahme } from '../betreuung/StellenBlock';
 import StelleBelegung from '../betreuung/StelleBelegung';
-import { personenZahl } from '../betreuung/betreuungText';
+import { NAMENTLICH_SPERRE, personenZahl } from '../betreuung/betreuungText';
+import RegistrierungPaneel from '../betreuung/registrierung/RegistrierungPaneel';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Paneel, Segmentleiste } from '../components/instrument';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import GeraetMeldungen from './GeraetMeldungen';
 
-const BEREICH_NAME = { belegung: 'Belegung', meldungen: 'Meldungen' } as const;
+const BEREICH_NAME = {
+  belegung: 'Belegung',
+  registrierung: 'Registrierung',
+  meldungen: 'Meldungen',
+} as const;
 type Bereich = keyof typeof BEREICH_NAME;
 const BEREICHE = Object.keys(BEREICH_NAME) as Bereich[];
 
@@ -33,7 +39,6 @@ function BelegungBereich({
   namentlich: number | undefined;
   darfSchreiben: boolean;
 }) {
-  const geschlossen = stelle.status === 'geschlossen';
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <StelleBelegung stelle={stelle} namentlich={namentlich} />
@@ -42,8 +47,7 @@ function BelegungBereich({
           einsatzId={einsatzId}
           art="stelle"
           objektId={stelle.id}
-          darfZuruecknehmen={darfSchreiben && !geschlossen}
-          sperrHinweis={darfSchreiben && geschlossen ? GESCHLOSSEN_HINWEIS : undefined}
+          {...verlaufRuecknahme(stelle, darfSchreiben)}
         />
       </Paneel>
     </Space>
@@ -52,7 +56,10 @@ function BelegungBereich({
 
 /**
  * Bereich „Stelle“ der Betreuungsstelle (LFH-1041, Spec `funktionsansichten`): Belegung der eigenen
- * Stelle in Zahlen mit Meldeverlauf und „Belegung melden“, dazu Meldungen an die Einsatzleitung.
+ * Stelle in Zahlen mit Meldeverlauf und „Belegung melden“, die Registrierung der eigenen Stelle
+ * (LLH-1612, derselbe Baustein wie an der Detailseite; der Server lässt nur die eigene Stelle zu),
+ * dazu Meldungen an die Einsatzleitung. An einer namentlich geführten Stelle ist „Belegung melden“
+ * gesperrt mit Grund: die Belegung kommt aus der Registrierung.
  * Stammdaten und Status der Stelle bleiben bei der Einsatzleitung. Die Mengenmeldung ist führend;
  * „davon namentlich“ zählt nur die hier Aufgenommenen.
  */
@@ -65,6 +72,7 @@ export default function GeraetBetreuungsstellePage() {
   const [bereich, setBereich] = useState<Bereich>('belegung');
   const [meldenOffen, setMeldenOffen] = useState(false);
   const feld = useId();
+  const meldenGrundId = useId();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -81,6 +89,8 @@ export default function GeraetBetreuungsstellePage() {
     ? (betreuungQuery.data.namentlich.find((n) => n.stelle_id === stelleId)?.anzahl ?? 0)
     : undefined;
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
+  const personenFrei = betreuungQuery.data?.namentlich != null;
+  const namentlichGefuehrt = stelle?.belegungsart === 'namentlich';
 
   const belegungMut = useMutation({
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
@@ -112,9 +122,22 @@ export default function GeraetBetreuungsstellePage() {
         darfSchreiben &&
         stelle &&
         stelle.status !== 'geschlossen' && (
-          <Button type="primary" onClick={() => setMeldenOffen(true)}>
-            Belegung melden
-          </Button>
+          <Space size="middle" wrap>
+            <Button
+              type="primary"
+              disabled={namentlichGefuehrt}
+              aria-describedby={namentlichGefuehrt ? meldenGrundId : undefined}
+              onClick={() => setMeldenOffen(true)}
+            >
+              Belegung melden
+            </Button>
+            {/* Der Grund steht sichtbar daneben (LFH-1078). */}
+            {namentlichGefuehrt && (
+              <Typography.Text id={meldenGrundId} type="secondary">
+                {NAMENTLICH_SPERRE}
+              </Typography.Text>
+            )}
+          </Space>
         )
       }
     >
@@ -128,7 +151,7 @@ export default function GeraetBetreuungsstellePage() {
         <>
           <Segmentleiste
             rolle="tablist"
-            beschriftung="Belegung und Meldungen"
+            beschriftung="Belegung, Registrierung und Meldungen"
             wert={bereich}
             onWechsel={setBereich}
             optionen={BEREICHE.map((b) => ({ wert: b, label: BEREICH_NAME[b], steuert: feld }))}
@@ -141,6 +164,16 @@ export default function GeraetBetreuungsstellePage() {
                 stelle={stelle}
                 namentlich={namentlich}
                 darfSchreiben={darfSchreiben}
+              />
+            ) : bereich === 'registrierung' ? (
+              <RegistrierungPaneel
+                einsatzId={einsatzId}
+                stelle={stelle}
+                personenFrei={personenFrei}
+                darfSchreiben={darfSchreiben}
+                rechteGrund={
+                  einsatzQuery.data ? einsatzRechteGrund(einsatzQuery.data.status) : undefined
+                }
               />
             ) : (
               <GeraetMeldungen

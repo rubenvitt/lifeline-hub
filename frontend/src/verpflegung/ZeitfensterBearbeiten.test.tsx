@@ -36,17 +36,20 @@ dayjs.extend(utc);
  *   Karte gesperrt“.
  */
 
+/** Ohne Sonderkost-Vorschlag ergänzt die Attrappe die leere Quelle (LLH-1612). */
+type Lieferung = Omit<Bedarfsvorschlag, 'sonderkost'> &
+  Partial<Pick<Bedarfsvorschlag, 'sonderkost'>>;
 const vorschlag = vi.hoisted(() => ({
   aufrufe: [] as BedarfsvorschlagArgs[],
   liefere: (() => ({
     kraefte: { wert: null, hinweis: null },
     betreute: { wert: null, hinweis: null },
-  })) as (a: BedarfsvorschlagArgs) => Bedarfsvorschlag,
+  })) as (a: BedarfsvorschlagArgs) => Lieferung,
 }));
 vi.mock('./useBedarfsvorschlag', () => ({
-  useBedarfsvorschlag: (a: BedarfsvorschlagArgs) => {
+  useBedarfsvorschlag: (a: BedarfsvorschlagArgs): Bedarfsvorschlag => {
     vorschlag.aufrufe.push(a);
-    return vorschlag.liefere(a);
+    return { sonderkost: { werte: null, hinweis: null }, ...vorschlag.liefere(a) };
   },
 }));
 

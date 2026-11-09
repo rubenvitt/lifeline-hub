@@ -1,4 +1,5 @@
 import type {
+  Belegungsart,
   BetreuungsstelleArt,
   Erhebung,
   Evakuierungsbezirk,
@@ -132,6 +133,21 @@ export const ART_LABEL: Record<BetreuungsstelleArt, string> = {
   betreuungsplatz: 'Betreuungsplatz',
   notunterkunft: 'Notunterkunft',
 };
+
+/** Wie eine Stelle ihre Belegung führt (LLH-1612, design.md D5); eine Kategorie, kein Status. */
+export const BELEGUNGSART_LABEL: Record<Belegungsart, string> = {
+  gezaehlt: 'gezählt',
+  namentlich: 'namentlich geführt',
+};
+
+/**
+ * Sperrgrund von „Belegung melden“ an einer namentlich geführten Stelle (LLH-1612): der Server
+ * meldet die Belegung dort selbst und lehnt eine Handmeldung mit 409 ab.
+ */
+export const NAMENTLICH_SPERRE = 'Belegung kommt aus der Registrierung';
+
+/** Steht EINMAL über dem Meldeverlauf einer namentlich geführten Stelle: jede Rücknahme ist 409. */
+export const NAMENTLICH_RUECKNAHME = 'Namentlich geführt: Zurücknehmen gesperrt';
 
 /** Reihenfolge der Räumungszustände in Auswahl und Filter (Ablauf, nicht Alphabet). */
 export const RAEUMUNG_FOLGE: readonly Raeumungszustand[] = [

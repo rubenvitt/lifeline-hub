@@ -353,6 +353,12 @@ export interface components {
          * @enum {string}
          */
         AbloesungWarnungArt: "schon_geplant" | "im_einsatz";
+        /** @description Antwort auf „Abmelden“: wer abgemeldet wurde (übersprungene fehlen). */
+        AbmeldungAnzeige: {
+            person_ids: number[];
+            /** Format: int64 */
+            stelle_id: number;
+        };
         /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).
          *     String = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur
@@ -1105,6 +1111,12 @@ export interface components {
             zeitpunkt_at?: string | null;
         };
         /**
+         * @description Herkunft einer Belegungsmeldung (LLH-1612): von Hand gemeldet oder vom Server aus der
+         *     Registrierung einer namentlich geführten Stelle geschrieben. Wire == `as_str()`.
+         * @enum {string}
+         */
+        BelegungQuelle: "meldung" | "registrierung";
+        /**
          * @description Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
          *     [`StandVerlaufEintrag`].
          */
@@ -1119,6 +1131,11 @@ export interface components {
             erfasst_von: string;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Von Hand gemeldet oder vom Server aus der Registrierung (LLH-1612); eine Meldung aus
+             *     der Registrierung lässt sich nicht zurücknehmen.
+             */
+            quelle: components["schemas"]["BelegungQuelle"];
             /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
             zurueckgenommen_at?: string | null;
@@ -1130,6 +1147,13 @@ export interface components {
          * @enum {string}
          */
         BelegungsArt: "eintritt" | "wechsel" | "austritt";
+        /**
+         * @description Wie eine Betreuungsstelle ihre Belegung führt (LLH-1612, design.md D5). `gezaehlt`: die
+         *     Belegung wird gemeldet (Vorgabe, Bestand). `namentlich`: der Server meldet sie aus den
+         *     dort registrierten Personen, eine Handmeldung ist 409. Wire == `as_str()`.
+         * @enum {string}
+         */
+        Belegungsart: "gezaehlt" | "namentlich";
         /** @description Die aktuelle Belegungsmeldung einer Stelle. */
         BelegungsmeldungAnzeige: {
             /** Format: int64 */
@@ -1346,6 +1370,8 @@ export interface components {
             angelegt_at: string;
             art: components["schemas"]["BetreuungsstelleArt"];
             belegung?: components["schemas"]["BelegungsmeldungAnzeige"] | null;
+            /** @description Gezählt oder namentlich geführt (LLH-1612, design.md D5). */
+            belegungsart: components["schemas"]["Belegungsart"];
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
@@ -3643,6 +3669,21 @@ export interface components {
          * @enum {string}
          */
         Geschlecht: "maennlich" | "weiblich" | "divers" | "unbekannt";
+        /** @description Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind. */
+        HaushaltAnzeige: {
+            /** Format: int64 */
+            bezugsperson_id?: number | null;
+            /** @description „Nachname, Vorname“ der Bezugsperson, auch wenn sie nicht (mehr) an dieser Stelle ist. */
+            bezugsperson_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Nummer im Einsatz, angezeigt als „H-n“.
+             */
+            nummer: number;
+            personen: components["schemas"]["RegistriertePerson"][];
+        };
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
             /**
@@ -4116,6 +4157,34 @@ export interface components {
             /** @description Fingerabdruck dieser Instanz zum Abgleich an der einlösenden Seite. */
             fingerabdruck: string;
             laeuft_ab_at: string;
+        };
+        /**
+         * @description Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben
+         *     Schlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard
+         *     `kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in
+         *     `migrations/0310_registrierstelle.sql`.
+         * @enum {string}
+         */
+        Kostform: "normal" | "vegetarisch" | "vegan" | "ohne_schwein" | "diaet_allergenarm" | "saeugling_kleinkind";
+        /** @description Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`). */
+        KostformZaehlung: {
+            /**
+             * Format: int64
+             * @description Davon mit Kostform `normal`.
+             */
+            normal: number;
+            /**
+             * Format: int64
+             * @description Davon ohne Kostform.
+             */
+            ohne_angabe: number;
+            /**
+             * Format: int64
+             * @description Alle jetzt an einer nicht stornierten Stelle registrierten Personen.
+             */
+            registriert: number;
+            /** @description Davon je Sonderkost-Form. */
+            sonderkost: components["schemas"]["Sonderkost"];
         };
         /** @description Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`. */
         KraftAngabe: {
@@ -5774,6 +5843,16 @@ export interface components {
             geaendert_von: number;
             geburtsdatum?: string | null;
             geschlecht?: components["schemas"]["Geschlecht"] | null;
+            /**
+             * Format: int64
+             * @description Haushalt der Registrierstelle (LLH-1612, design.md D3); fehlt ohne Haushalt.
+             */
+            haushalt_id?: number | null;
+            /**
+             * Format: int64
+             * @description Nummer dieses Haushalts im Einsatz, angezeigt als „H-n“.
+             */
+            haushalt_nummer?: number | null;
             herkunft_adresse?: string | null;
             /** Format: int64 */
             id: number;
@@ -5782,6 +5861,7 @@ export interface components {
              *     ausdrücklich nicht „nein“.
              */
             kontamination?: boolean | null;
+            kostform?: components["schemas"]["Kostform"] | null;
             melder_kontakt?: string | null;
             /**
              * Format: int64
@@ -5812,6 +5892,11 @@ export interface components {
             transport_at?: string | null;
             transport_fachrichtung?: components["schemas"]["Fachrichtung"] | null;
             transport_prioritaet?: components["schemas"]["TransportPrioritaet"] | null;
+            /**
+             * @description Unverträglichkeiten, Freitext bis [`PERSON_UNVERTRAEGLICHKEITEN_MAX`]. Gesundheitsangabe:
+             *     Kategorie Behandlung, nie im ETB.
+             */
+            unvertraeglichkeiten?: string | null;
             /**
              * @description Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status
              *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
@@ -6423,6 +6508,37 @@ export interface components {
             name: string;
             region: string;
             slug: string;
+        };
+        /** @description Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`). */
+        RegistrierListe: {
+            /** @description Haushalte mit mindestens einer hier registrierten Person, nach Nummer. */
+            haushalte: components["schemas"]["HaushaltAnzeige"][];
+            /** @description Hier registrierte Personen ohne Haushalt (etwa über einen Verbleib aufgenommen). */
+            ohne_haushalt: components["schemas"]["RegistriertePerson"][];
+            /** Format: int64 */
+            stelle_id: number;
+        };
+        /**
+         * @description Eine an der Stelle registrierte Person (Registrierliste und Antworten). Personenbezogen: nur
+         *     mit Zugriff auf das Modul Personen.
+         */
+        RegistriertePerson: {
+            /** Format: int64 */
+            alter_geschaetzt?: number | null;
+            /** @description Erfassungszeit der Person. */
+            erfasst_at: string;
+            geburtsdatum?: string | null;
+            geschlecht?: components["schemas"]["Geschlecht"] | null;
+            /** Format: int64 */
+            haushalt_id?: number | null;
+            /** Format: int64 */
+            id: number;
+            kostform?: components["schemas"]["Kostform"] | null;
+            name?: string | null;
+            /** Format: int64 */
+            registrier_nr: number;
+            unvertraeglichkeiten?: string | null;
+            vorname?: string | null;
         };
         /**
          * @description Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus

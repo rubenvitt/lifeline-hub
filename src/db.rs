@@ -14063,6 +14063,134 @@ mod tests {
         assert_eq!(rest, 0, "geht mit der Planung");
     }
 
+    /// LLH-1612 (design.md D3–D5): der Bestand bleibt unverändert — Stellen `gezaehlt`,
+    /// Meldungen `meldung`, Personen ohne Haushalt und Kostform; die CHECKs nehmen nur den Satz.
+    #[tokio::test]
+    async fn migration_0310_registrierstelle() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 310;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let s: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Turnhalle Ost', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let etb: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'meldung', 'x', ?, '2026-11-09 10:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let m: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle_belegung \
+                (stelle_id, einsatz_id, belegt, zeitpunkt_at, erfasst_von_id, etb_eintrag_id) \
+             VALUES (?, ?, 12, '2026-11-09 10:00:00', ?, ?) RETURNING id",
+        )
+        .bind(s)
+        .bind(e)
+        .bind(b)
+        .bind(etb)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let person: (Option<i64>, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT haushalt_id, kostform, unvertraeglichkeiten FROM einsatz_person WHERE id = ?",
+        )
+        .bind(p)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            person,
+            (None, None, None),
+            "Person ohne Haushalt und Kostform"
+        );
+        let art: String =
+            sqlx::query_scalar("SELECT belegungsart FROM betreuungsstelle WHERE id = ?")
+                .bind(s)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(art, "gezaehlt");
+        let quelle: String =
+            sqlx::query_scalar("SELECT quelle FROM betreuungsstelle_belegung WHERE id = ?")
+                .bind(m)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(quelle, "meldung");
+
+        let kostform = |wert: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query("UPDATE einsatz_person SET kostform = ? WHERE id = ?")
+                    .bind(wert)
+                    .bind(p)
+                    .execute(&pool)
+                    .await
+            }
+        };
+        kostform("halal_streng")
+            .await
+            .expect_err("unbekannte Kostform");
+        kostform("saeugling_kleinkind")
+            .await
+            .expect("Kostform aus dem Satz");
+        sqlx::query("UPDATE betreuungsstelle SET belegungsart = 'geschaetzt' WHERE id = ?")
+            .bind(s)
+            .execute(&pool)
+            .await
+            .expect_err("unbekannte Belegungsart");
+
+        let h: i64 = sqlx::query_scalar(
+            "INSERT INTO haushalt (einsatz_id, nummer, bezugsperson_id, angelegt_von_id) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO haushalt (einsatz_id, nummer, angelegt_von_id) VALUES (?, 1, ?)")
+            .bind(e)
+            .bind(b)
+            .execute(&pool)
+            .await
+            .expect_err("Haushaltsnummer je Einsatz eindeutig");
+        sqlx::query("UPDATE einsatz_person SET haushalt_id = ? WHERE id = ?")
+            .bind(h)
+            .bind(p)
+            .execute(&pool)
+            .await
+            .expect("Person im Haushalt");
+    }
+
     /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
     #[tokio::test]
     async fn migration_0298_person_rtw_angefordert() {

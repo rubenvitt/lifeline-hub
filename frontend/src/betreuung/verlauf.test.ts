@@ -24,6 +24,7 @@ const STAND: StandVerlaufEintrag = {
 const BELEGUNG: BelegungVerlaufEintrag = {
   id: 9,
   belegt: 89,
+  quelle: 'meldung',
   zeitpunkt_at: '2026-09-23 11:00:00',
   erfasst_at: '2026-09-23 11:00:00',
   erfasst_von: 'Leitung',

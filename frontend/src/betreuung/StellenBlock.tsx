@@ -19,7 +19,14 @@ import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
-import { ART_LABEL, freiePlaetze, namentlichTeile, personenZahl } from './betreuungText';
+import {
+  ART_LABEL,
+  BELEGUNGSART_LABEL,
+  NAMENTLICH_RUECKNAHME,
+  freiePlaetze,
+  namentlichTeile,
+  personenZahl,
+} from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
@@ -68,6 +75,27 @@ export type StelleAktion = 'verorten' | 'stornieren';
  */
 export const GESCHLOSSEN_HINWEIS = 'Stelle geschlossen: Zurücknehmen gesperrt';
 
+/**
+ * Wer am Meldeverlauf einer Stelle zurücknehmen darf und welcher Grund EINMAL darüber steht:
+ * geschlossen (422) oder namentlich geführt (409, LLH-1612). Ohne Schreibrecht kein eigener
+ * Grund, den nennt der Rechtehinweis über der Seite. Für Übersicht, Detailseite und Gerät.
+ */
+export function verlaufRuecknahme(
+  s: Pick<Betreuungsstelle, 'status' | 'belegungsart'>,
+  darfSchreiben: boolean,
+): { darfZuruecknehmen: boolean; sperrHinweis: string | undefined } {
+  const sperre =
+    s.status === 'geschlossen'
+      ? GESCHLOSSEN_HINWEIS
+      : s.belegungsart === 'namentlich'
+        ? NAMENTLICH_RUECKNAHME
+        : undefined;
+  return {
+    darfZuruecknehmen: darfSchreiben && sperre == null,
+    sperrHinweis: darfSchreiben ? sperre : undefined,
+  };
+}
+
 const MENUE: readonly MenueEintrag<StelleAktion>[] = [
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
@@ -112,14 +140,18 @@ const stellenSpalten = (
   kennungAbstand: number,
 ) => {
   const meldeKnopf = (s: Betreuungsstelle) =>
-    darfSchreiben && s.status !== 'geschlossen' ? (
+    !darfSchreiben || s.status === 'geschlossen' ? null : s.belegungsart === 'namentlich' ? (
+      // Der Server meldet die Belegung aus der Registrierung (LLH-1612): der Kurzgrund steht in
+      // der Zeile statt eines Knopfs, der nur 409 brächte.
+      <Typography.Text type="secondary">{BELEGUNGSART_LABEL.namentlich}</Typography.Text>
+    ) : (
       <Button
         aria-label={`Belegung melden für ${s.bezeichnung}`}
         onClick={() => onBelegungMelden(s)}
       >
         Belegung melden
       </Button>
-    ) : null;
+    );
   return spaltenFuer<Betreuungsstelle>()([
     {
       key: 'bezeichnung',
@@ -345,19 +377,14 @@ export default function StellenBlock({
     () => ({
       etikett: 'Verlauf',
       zugaenglicherName: (s: Betreuungsstelle) => `Verlauf zu Stelle ${s.bezeichnung}`,
-      inhalt: (s: Betreuungsstelle) => {
-        const geschlossen = s.status === 'geschlossen';
-        return (
-          <MeldeVerlauf
-            einsatzId={einsatzId}
-            art="stelle"
-            objektId={s.id}
-            darfZuruecknehmen={darfSchreiben && !geschlossen}
-            // Ohne Schreibrecht nennt der Rechtehinweis über der Seite den Grund.
-            sperrHinweis={darfSchreiben && geschlossen ? GESCHLOSSEN_HINWEIS : undefined}
-          />
-        );
-      },
+      inhalt: (s: Betreuungsstelle) => (
+        <MeldeVerlauf
+          einsatzId={einsatzId}
+          art="stelle"
+          objektId={s.id}
+          {...verlaufRuecknahme(s, darfSchreiben)}
+        />
+      ),
     }),
     [einsatzId, darfSchreiben],
   );

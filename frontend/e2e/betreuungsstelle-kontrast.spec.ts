@@ -19,7 +19,9 @@ import {
  * Verbleib „Notunterkunft“ an der Stelle (Zeile unter „Betroffene hier“).
  *
  * SCHRANKEN (Literale): Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 für JEDEN sichtbaren Text in Seitenkopf
- * und Inhalt, über den Textbaum gefunden. Die Beschriftung der Stufenlinie ist `aria-hidden` (das
+ * und Inhalt, über den Textbaum gefunden; Text eines gesperrten Knopfs ≥ 4,5 : 1 (Rolle
+ * `gesperrt`, `frontend/AGENTS.md`, „Gesperrte Steuerelemente“, LLH-1228), etwa „Registrieren“
+ * beim Beobachter (LLH-1612). Die Beschriftung der Stufenlinie ist `aria-hidden` (das
  * Bild trägt die Aussage) und wird deshalb ausdrücklich gemessen. Strich, Punkte und die
  * gestrichelte Kapazität der Linie ≥ 3 : 1 gegen die Paneelfläche (WCAG 1.4.11).
  *
@@ -28,6 +30,8 @@ import {
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
+/** Gesperrtes trägt die Sperre auch ohne Farbe und hält den eigenen Boden (LLH-1228). */
+const GESPERRT = 4.5;
 const GRAFIK = 3;
 const STELLE = 'Grundschule Kontrast';
 
@@ -45,6 +49,7 @@ async function senden<T = { id: number }>(
 interface Textknoten {
   ziel: Locator;
   text: string;
+  gesperrt: boolean;
 }
 
 /** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text (Muster `betreuung-pruefliste`). */
@@ -52,7 +57,7 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string }[] = [];
+    const liste: { text: string; gesperrt: boolean }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (!el.checkVisibility()) continue;
@@ -63,7 +68,7 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
         .trim();
       if (!eigen) continue;
       el.setAttribute('data-kontrastprobe', String(liste.length));
-      liste.push({ text: eigen });
+      liste.push({ text: eigen, gesperrt: el.closest('button[disabled]') != null });
     }
     return liste;
   });
@@ -134,16 +139,17 @@ for (const modus of ['light', 'dark'] as const) {
         ['inhalt', page.locator('[data-lfh="seiten-inhalt"]')],
         ...(rolle === 'beobachter' ? ([['hinweis', hinweis]] as const) : []),
       ] as const) {
-        for (const { ziel, text } of await textknoten(wurzel)) {
+        for (const { ziel, text, gesperrt } of await textknoten(wurzel)) {
           const m = await kontrast(ziel);
-          messwerte.push({ modus, rolle, flaeche, art: 'text', wortlaut: text, ...m });
+          const schranke = gesperrt ? GESPERRT : TEXT[modus];
+          messwerte.push({ modus, rolle, flaeche, art: 'text', wortlaut: text, gesperrt, ...m });
           gemessen.push(text);
           expect
             .soft(
               m.verhaeltnis,
-              `${modus}, ${rolle}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`,
+              `${modus}, ${rolle}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${schranke}) ${JSON.stringify(m)}`,
             )
-            .toBeGreaterThanOrEqual(TEXT[modus]);
+            .toBeGreaterThanOrEqual(schranke);
         }
       }
 

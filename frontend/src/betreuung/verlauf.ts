@@ -1,5 +1,5 @@
 import type { BetreuungVerlaufArt } from '../api/queryKeys';
-import type { BelegungVerlaufEintrag, StandVerlaufEintrag } from '../api/types';
+import type { BelegungQuelle, BelegungVerlaufEintrag, StandVerlaufEintrag } from '../api/types';
 import { istNachgetragen } from '../etb/typFarben';
 import { ERHEBUNG_LABEL, personenZahl } from './betreuungText';
 
@@ -21,6 +21,8 @@ export interface VerlaufZeile {
   aktuell: boolean;
   zurueckgenommen_at?: string | null;
   zurueckgenommen_von?: string | null;
+  /** Nur Belegung (LLH-1612): aus der Registrierung gemeldet, nicht zurücknehmbar. */
+  quelle?: BelegungQuelle;
 }
 
 export function standZeile(e: StandVerlaufEintrag): VerlaufZeile {
@@ -48,6 +50,7 @@ export function belegungZeile(e: BelegungVerlaufEintrag): VerlaufZeile {
     aktuell: e.aktuell,
     zurueckgenommen_at: e.zurueckgenommen_at,
     zurueckgenommen_von: e.zurueckgenommen_von,
+    quelle: e.quelle,
   };
 }
 

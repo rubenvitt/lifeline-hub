@@ -12,6 +12,7 @@ import type {
   PersonAnlass,
   PersonAuswahl,
   PersonDetail,
+  PersonKostform,
   PersonStatus,
   PersonZugriff,
   Sichtung,
@@ -85,6 +86,10 @@ export interface PersonEingabe {
   versorgende_einheit_id?: number | null;
   /** Meldung, aus der die Person angelegt wird (LLH-1567, D5). Nur beim Anlegen. */
   meldung_id?: number;
+  /** Kostform (LLH-1612); `null` leert. Nur im PATCH, angelegt wird sie an der Registrierstelle. */
+  kostform?: PersonKostform | null;
+  /** Unverträglichkeiten, höchstens `PERSON_UNVERTRAEGLICHKEITEN_MAX`; `null` leert. Nur im PATCH. */
+  unvertraeglichkeiten?: string | null;
 }
 
 /**
@@ -231,6 +236,9 @@ export interface PersonFeldEingabe {
   notiz: string | null;
   koordinate: { lat: number; lon: number } | null;
   vermisst_seit: string;
+  /** LLH-1612. */
+  kostform: PersonKostform | null;
+  unvertraeglichkeiten: string | null;
 }
 export type PersonFeld = keyof PersonFeldEingabe;
 

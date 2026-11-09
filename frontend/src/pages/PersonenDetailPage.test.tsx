@@ -923,7 +923,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     // „Zustand / Verdacht“ steht im Patientenkopf (LLH-1094), nicht ein zweites Mal hier.
     expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
-      'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, Koordinate, Melder / Kontakt, Notiz',
+      'Ohne Angabe: Geburtsdatum, Kostform, Unverträglichkeiten, Herkunft / Adresse, Koordinate, Melder / Kontakt, Notiz',
     );
     for (const leer of ['Geburtsdatum', 'Herkunft / Adresse', 'Koordinate', 'Notiz']) {
       expect(begriffe()).not.toContain(leer);
@@ -967,7 +967,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
     } as PersonDetail);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
-      'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, vermisst seit, Melder / Kontakt, Notiz',
+      'Ohne Angabe: Geburtsdatum, Kostform, Unverträglichkeiten, Herkunft / Adresse, vermisst seit, Melder / Kontakt, Notiz',
     );
   });
 
@@ -981,6 +981,9 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
       antreff_lon: 9.1,
       melder_kontakt: 'Nachbar',
       notiz: 'ruhig',
+      // LLH-1612: Kostform und Unverträglichkeiten sind Personendaten wie die übrigen.
+      kostform: 'normal',
+      unvertraeglichkeiten: 'keine bekannt',
     } as PersonDetail);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByText(/^Ohne Angabe:/)).toBeNull();

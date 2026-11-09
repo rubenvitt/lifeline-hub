@@ -735,6 +735,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
             post(routes::betreuung::belegung_zuruecknehmen),
         )
+        // Registrierstelle (LLH-1612, Spec `betreuung-registrierung`).
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen",
+            get(routes::betreuung_registrierung::liste)
+                .post(routes::betreuung_registrierung::registrieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
+            post(routes::betreuung_registrierung::abmelden),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/kostformen",
+            get(routes::betreuung_registrierung::kostformen),
+        )
         // Verpflegung: Zeitfenster mit Bedarf, Ausgaben dagegen.
         .route(
             "/api/einsaetze/{id}/verpflegung",

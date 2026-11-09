@@ -297,6 +297,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("transport_at", G_ZEIT),
             // LLH-1567 (design.md D1/D9): versorgende Einheit und Herkunftsmeldung sind Verweise
             // ohne Personenbezug; der Bericht zählt Kontakte je Einheit auch nach der Schwärzung.
+            // LLH-1612 (design.md D3/D4): Haushalt ist Struktur, die Kostform eine Katalogangabe
+            // ohne Namen (bleibt für die Verpflegungszahlen); Unverträglichkeiten sind eine
+            // Gesundheitsangabe und fallen mit der Behandlung.
+            retain("haushalt_id", G_FK),
+            retain("kostform", G_ENUM),
+            scrub("unvertraeglichkeiten", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("versorgende_einheit_id", G_FK),
             retain("meldung_id", G_FK),
             // LLH-1580 (K1): ob `meldung_id` die RTW-Anforderung des Einheitengeräts ist; ein
@@ -1603,6 +1609,22 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zurueckgenommen_von_id", G_FK),
         ],
     },
+    // LLH-1612 (design.md D3): Haushalt der Registrierstelle — Nummer, Bezugsperson (Verweis)
+    // und Anlage; Namen und Adressen stehen an der Person und fallen dort.
+    TabellenRegel {
+        tabelle: "haushalt",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("nummer", G_ZAEHLER),
+            retain("bezugsperson_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("angelegt_von_id", G_FK),
+        ],
+    },
     TabellenRegel {
         tabelle: "betreuungsstelle",
         scoping: Scoping::EinsatzId,
@@ -1625,6 +1647,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // LLH-1612 (design.md D5): gezählt oder namentlich geführt.
+            retain("belegungsart", G_ENUM),
             retain("belegung_id", G_FK),
             retain("storniert_at", G_ZEIT),
             retain("storniert_von_id", G_FK),
@@ -1644,6 +1668,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             // Technische UUID der Offline-Queue, kein Personenbezug.
             retain("client_id", G_IDEMPOTENZ),
+            // LLH-1612 (design.md D5): von Hand gemeldet oder vom Server aus der Registrierung.
+            retain("quelle", G_ENUM),
             retain("belegt", G_ZAEHLER),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_at", G_ZEIT),
@@ -3966,6 +3992,7 @@ mod tests {
                     "einsatz_person.anlass",
                     "einsatz_person.pat_nummer",
                     "einsatz_person.transport_fachrichtung",
+                    "einsatz_person.unvertraeglichkeiten",
                     "einsatz_person.zustand",
                     "person_anlass.anlass",
                     "person_sichtung.notiz",
@@ -4077,6 +4104,11 @@ mod tests {
                 "uhs_platz",
                 "Reservierung ohne Belegung ist kein Behandlungsnachweis; eine Belegung steht in \
                  person_uhs_belegung",
+            ),
+            (
+                "haushalt",
+                "Haushalt der Registrierstelle (LLH-1612): Bezugsperson als Verweis, kein \
+                 Behandlungsnachweis",
             ),
         ];
         let pool = crate::db::test_pool().await;

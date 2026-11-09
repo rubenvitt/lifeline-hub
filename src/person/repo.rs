@@ -31,7 +31,11 @@ const SELECT_ALLE: &str = "\
                    'leitstelle_einsatznummer', n.leitstelle_einsatznummer) \
               FROM nachforderung n \
              WHERE n.person_id = einsatz_person.id AND n.status <> 'zurueckgezogen' \
-             ORDER BY n.id DESC LIMIT 1) AS rettungsmittel \
+             ORDER BY n.id DESC LIMIT 1) AS rettungsmittel, \
+           haushalt_id, \
+           (SELECT h.nummer FROM haushalt h WHERE h.id = einsatz_person.haushalt_id) \
+             AS haushalt_nummer, \
+           kostform, unvertraeglichkeiten \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
@@ -95,6 +99,10 @@ pub struct PatchDaten<'a> {
     pub kontamination: Option<Option<bool>>,
     // LLH-1567 (design.md D4): versorgende Einheit, dreiwertig; Zugehörigkeit prüft der Handler.
     pub versorgende_einheit_id: Option<Option<i64>>,
+    // LLH-1612 (design.md D4): Kostform (Wire-Wert, vom Handler geprüft) und Unverträglichkeiten
+    // (Grenze prüft der Handler), je dreiwertig.
+    pub kostform: Option<Option<&'a str>>,
+    pub unvertraeglichkeiten: Option<Option<&'a str>>,
 }
 
 /// Ein erwarteter Spaltenwert des Feld-CAS, getypt für den Bind (`None` = leer erwartet).
@@ -129,6 +137,11 @@ impl<'a> ExpectedValue<'a> {
             (
                 "versorgende_einheit_id",
                 erwartet.versorgende_einheit_id.map(Integer),
+            ),
+            ("kostform", erwartet.kostform.map(Text)),
+            (
+                "unvertraeglichkeiten",
+                erwartet.unvertraeglichkeiten.map(Text),
             ),
         ]
         .into_iter()
@@ -523,13 +536,15 @@ pub async fn aktualisiere(
             kontamination = CASE WHEN ?29 IS NULL THEN kontamination ELSE ?30 END, \
             versorgende_einheit_id = \
                 CASE WHEN ?31 IS NULL THEN versorgende_einheit_id ELSE ?32 END, \
+            kostform = CASE WHEN ?33 IS NULL THEN kostform ELSE ?34 END, \
+            unvertraeglichkeiten = CASE WHEN ?35 IS NULL THEN unvertraeglichkeiten ELSE ?36 END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_von = ?33 \
-         WHERE id = ?34 AND einsatz_id = ?35",
+            geaendert_von = ?37 \
+         WHERE id = ?38 AND einsatz_id = ?39",
     );
-    let mut nummer = 36;
+    let mut nummer = 40;
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?36");
+        sql.push_str(" AND geaendert_at = ?40");
         nummer += 1;
     }
     // Spaltennamen nur aus der festen Liste in `ExpectedValue::aus`, nie aus der Anfrage: das
@@ -582,6 +597,10 @@ pub async fn aktualisiere(
         .bind(daten.kontamination.and_then(|v| v))
         .bind(daten.versorgende_einheit_id.map(|_| 1_i64))
         .bind(daten.versorgende_einheit_id.and_then(|v| v))
+        .bind(daten.kostform.map(|_| 1_i64))
+        .bind(daten.kostform.and_then(|v| v))
+        .bind(daten.unvertraeglichkeiten.map(|_| 1_i64))
+        .bind(daten.unvertraeglichkeiten.and_then(|v| v))
         .bind(geaendert_von)
         .bind(person_id)
         .bind(einsatz_id);
@@ -713,8 +732,24 @@ pub async fn storniere(
     person_id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    crate::storno::storniere(
+    storniere_tx(
         &mut *pool.acquire().await?,
+        einsatz_id,
+        person_id,
+        geaendert_von,
+    )
+    .await
+}
+
+/// [`storniere`] in einer laufenden Transaktion (LLH-1612: samt Nachführen der Belegung).
+pub async fn storniere_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    crate::storno::storniere(
+        conn,
         "einsatz_person",
         "einsatz_id",
         einsatz_id,
@@ -989,6 +1024,8 @@ mod tests {
             antreff_lon: Some(Some(9.125)),
             vermisst_seit: Some(Some("2026-09-22 06:00:00")),
             pat_nummer: Some(Some("W-pat")),
+            kostform: Some(Some("vegan")),
+            unvertraeglichkeiten: Some(Some("W-unvertraeglichkeiten")),
             kontamination: Some(Some(true)),
             // Ein Verweis braucht eine Einheit im Einsatz; Feld-CAS mit dem Nachbarn `kontamination` in
             // `tests/person_einheit_meldung.rs` (LLH-1567).
@@ -1263,6 +1300,11 @@ mod tests {
         assert_eq!(a.vermisst_seit.as_deref(), Some("2026-09-22 06:00:00"));
         assert_eq!(a.pat_nummer.as_deref(), Some("W-pat"));
         assert_eq!(a.kontamination, Some(true));
+        assert_eq!(a.kostform, Some(crate::person::Kostform::Vegan));
+        assert_eq!(
+            a.unvertraeglichkeiten.as_deref(),
+            Some("W-unvertraeglichkeiten")
+        );
     }
 
     /// LFH-266/F12: `Some(None)` leert eine Spalte, `None` lässt sie unverändert.

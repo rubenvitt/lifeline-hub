@@ -1243,6 +1243,70 @@ export type StelleMeldung = S['StelleMeldungAnzeige'];
 export type StandVerlaufEintrag = S['StandVerlaufEintrag'];
 /** Eine Belegungsmeldung im Verlauf einer Stelle. */
 export type BelegungVerlaufEintrag = S['BelegungVerlaufEintrag'];
+/** Gezählt (Belegung wird gemeldet) oder namentlich geführt (der Server meldet sie aus der
+ *  Registrierung, LLH-1612, design.md D5). */
+export type Belegungsart = S['Belegungsart'];
+/** Herkunft einer Belegungsmeldung: von Hand oder aus der Registrierung (nicht zurücknehmbar). */
+export type BelegungQuelle = S['BelegungQuelle'];
+
+// ============================== LLH-1612 Registrierstelle ==============================
+/** Kostform einer Person: `normal` und die fünf Sonderkost-Formen der Verpflegung. Nicht
+ *  {@link Kostform}: der Name trägt die fünf Sonderkost-Schlüssel der Verpflegung. */
+export type PersonKostform = S['Kostform'];
+/** Geschlecht einer Person (Wire-Werte). */
+export type Geschlecht = S['Geschlecht'];
+/** Ein Haushalt mit den an DIESER Stelle registrierten Personen. */
+export type Haushalt = S['HaushaltAnzeige'];
+/** Eine an der Stelle registrierte Person (Registrierliste, Antwort der Registrierung). */
+export type RegistriertePerson = S['RegistriertePerson'];
+/** Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`), nur mit Personenrecht. */
+export type RegistrierListe = S['RegistrierListe'];
+/** Antwort auf „Abmelden“: die abgemeldeten Personen (übersprungene fehlen). */
+export type Abmeldung = S['AbmeldungAnzeige'];
+/** Kostformen der Registrierten ohne Personenbezug (`GET …/betreuung/kostformen`). */
+export type KostformZaehlung = S['KostformZaehlung'];
+
+/** Kein Backend-Schema: eine Person im Body von `POST …/stellen/{sid}/registrierungen`. */
+export interface RegistrierPersonEingabe {
+  /** Nachname, Pflicht (leer → 422 „Person n: Nachname fehlt“). */
+  name: string;
+  vorname?: string;
+  /** Kalenderdatum `YYYY-MM-DD`. */
+  geburtsdatum?: string;
+  geschlecht?: Geschlecht;
+  herkunft_adresse?: string;
+  kontakt?: string;
+  /** Pflicht; „Normalkost“ ist `normal`. */
+  kostform: PersonKostform;
+  unvertraeglichkeiten?: string;
+  notiz?: string;
+}
+
+/**
+ * Kein Backend-Schema: Body von `POST …/betreuung/stellen/{sid}/registrierungen`. Ohne
+ * `haushalt_id` entsteht ein neuer Haushalt (die erste Person ist die Bezugsperson), mit ihm
+ * werden die Personen angehängt. Höchstens `REGISTRIERUNG_PERSONEN_MAX` Personen.
+ */
+export interface RegistrierungEingabe {
+  haushalt_id?: number;
+  personen: RegistrierPersonEingabe[];
+  /** Erfassungszeit; nur an der vorgemerkten Kopie (LFH-705). */
+  zeitpunkt_at?: string;
+  /** Idempotenzschlüssel; ein Replay liefert den angelegten Haushalt. */
+  client_id?: string;
+}
+
+/**
+ * Kein Backend-Schema: Body von `POST …/betreuung/stellen/{sid}/abmeldungen`. Genau eins von
+ * `haushalt_id` und `person_ids` (sonst 422); `ziel` geht nie ins ETB.
+ */
+export interface AbmeldungEingabe {
+  haushalt_id?: number;
+  person_ids?: number[];
+  ziel?: string;
+  zeitpunkt_at?: string;
+  client_id?: string;
+}
 
 /** Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke` (`BezirkAnlegen`), FE-lokal. */
 export interface EvakuierungsbezirkEingabe {
@@ -1308,6 +1372,8 @@ export interface BetreuungsstelleEingabe {
   leitung?: string;
   /** Wie die Stelle erreichbar ist, höchstens `BETREUUNG_KONTAKTWEG_MAX` Zeichen. */
   kontaktweg?: string;
+  /** Vorgabe `gezaehlt` (LLH-1612). */
+  belegungsart?: Belegungsart;
 }
 
 /**
@@ -1330,6 +1396,8 @@ export interface BetreuungsstellePatch {
   /** Koordinate: als Paar senden; `null`/`null` entfernt die Verortung. */
   lat?: number | null;
   lon?: number | null;
+  /** Auf `namentlich` schreibt der Server eine Meldung mit der Zahl der Registrierten (LLH-1612). */
+  belegungsart?: Belegungsart;
 }
 
 /**

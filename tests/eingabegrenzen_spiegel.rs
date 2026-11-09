@@ -63,6 +63,22 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("PERSON_ANGABE_MAX", person::PERSON_ANGABE_MAX),
         ("PERSON_ZUSTAND_MAX", person::PERSON_ZUSTAND_MAX),
         ("PERSON_NOTIZ_MAX", person::PERSON_NOTIZ_MAX),
+        (
+            "PERSON_UNVERTRAEGLICHKEITEN_MAX",
+            person::PERSON_UNVERTRAEGLICHKEITEN_MAX,
+        ),
+        (
+            "REGISTRIERUNG_PERSONEN_MAX",
+            lifeline_hub::betreuung::registrierung::REGISTRIERUNG_PERSONEN_MAX,
+        ),
+        (
+            "ABMELDUNG_PERSONEN_MAX",
+            lifeline_hub::betreuung::registrierung::ABMELDUNG_PERSONEN_MAX,
+        ),
+        (
+            "BETREUUNG_ABMELDUNG_ZIEL_MAX",
+            lifeline_hub::betreuung::registrierung::ABMELDUNG_ZIEL_MAX,
+        ),
         ("VERLAUFSNOTIZ_MAX", person::VERLAUFSNOTIZ_MAX),
         ("PERSONAL_ADHOC_TEXT_MAX", personal::ADHOC_TEXT_MAX),
         (
