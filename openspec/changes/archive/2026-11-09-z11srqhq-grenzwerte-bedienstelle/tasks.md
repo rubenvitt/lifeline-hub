@@ -20,7 +20,7 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die Frontend, Spiegeltest und Doku decken). Prüfen mit dem Lauf ohne `| tail`.
+- [x] 5.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die Frontend, Spiegeltest und Doku decken). Prüfen mit dem Lauf ohne `| tail`. Lokal grün: Bündel `schnell` und `frontend` (19 207 Tests), Spiegeltest `eingabegrenzen_spiegel`, die e2e-Specs `abloesung-*` und `kraefte-zeitachse` (21). Die volle Rust-Suite und e2e passen nicht in den Platz der Cloud-Sitzung (Linken bricht mit „No space left on device“ ab); sie belegt die CI des PRs.
 - [x] 5.2 Bilder der Änderung (Paneel, Dialog, Lesezeile im Plan) per Wegwerf-Spec aufnehmen und für PR und Meldung bereitlegen. Prüfen: Die Bilder liegen außerhalb von `docs/anwender/bilder/`, die Spec ist gelöscht.
 
 ## Workflow follow-up

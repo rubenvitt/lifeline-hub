@@ -188,7 +188,7 @@ als Art „Laut Plan“ ab und rechnet Bleibende, Übernahme und Folgeblock nie 
 Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
 `schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
 `personen` und `helfer` als `null`.
-**Grenzwerte bedienen** (LLH-1603, Change `z11srqhq-grenzwerte-bedienstelle`): Höchstdienst und
+**Grenzwerte bedienen** (LLH-1603, `openspec/changes/archive/2026-11-09-z11srqhq-grenzwerte-bedienstelle/design.md`): Höchstdienst und
 Mindestruhe setzt nur das Paneel „Dienst und Ruhe“ in Einstellungen › Ablösung
 (`pages/einstellungen/EinsatzGrenzwerte.tsx`). Die Ansicht „Schichtplan“ nennt sie nur in einer Zeile
 mit Sprung dorthin, ohne zweiten Schreibweg. Das Paneel liest den Plan unter dem Key `schichtplan`.
