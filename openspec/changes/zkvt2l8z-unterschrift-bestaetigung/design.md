@@ -141,3 +141,20 @@ Stellen geteilt wird, auch an `/api/auth/me`, und die Information nur die Verwal
   Zeitfenster überdeckt. Eine vom Hub unabhängige Quelle für den Fingerabdruck gibt es im Browser
   nicht. R24 bleibt darum in Kapitel 11, verengt auf genau diesen Fall, mit der Bestätigung als
   Gegenmaßnahme.
+
+## Nachträge aus dem Review
+
+Ein Review vor dem PR fand keinen Weg, auf dem ein wartender oder zurückgewiesener Schlüssel als
+gültig zählt. Behoben, jeweils mit Test:
+
+- **Die Sperre „letzter Schlüssel“ greift nur an einem gültigen Schlüssel.** Nach dem
+  Deaktivieren des letzten Halters wartet ein neu registrierter Schlüssel auf eine
+  Gegenzeichnung, die niemand leisten kann; er ließ sich nicht widerrufen (409).
+- **„Zurückgewiesen“ bleibt stehen.** Weder ein Widerruf vom Gegenüber noch der Widerruf der
+  Org-Zuordnung überschreibt die Entscheidung eines Menschen hier mit „widerrufen“.
+- **Abbrechen der Rückfrage räumt ihren Fehler** (`frontend/AGENTS.md`, Speicherfehler).
+- **`fingerabdruck_ende` hat eine Obergrenze** von 16 Zeichen (`src/AGENTS.md`, Eingabegrenzen).
+- **Der Unterzeichner in der Anzeige** stammt bevorzugt aus derselben Org-Zuordnung wie der
+  Schlüssel.
+- **Testlücken:** fremde Org vor dem Bestätigen, Herabstufen des letzten Halters per PATCH.
+

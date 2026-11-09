@@ -945,6 +945,10 @@ pub async fn letzte_schluessel(
     ))
 }
 
+/// Obergrenze der Eingabe beim Bestätigen (`src/AGENTS.md`, Eingabegrenzen): vier Zeichen,
+/// großzügig mit Trennzeichen und Leerraum.
+const FINGERABDRUCK_ENDE_MAX: usize = 16;
+
 #[derive(Debug, Deserialize)]
 pub struct BestaetigenBody {
     /// Die letzten vier Zeichen des Fingerabdrucks, wie der Inhaber sie nennt.
@@ -962,7 +966,11 @@ pub async fn unterschrift_bestaetigen(
     PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<BestaetigenBody>,
 ) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
-    let eingabe = crate::routes::support::pflicht(&body.fingerabdruck_ende, "fingerabdruck_ende")?;
+    let eingabe = crate::routes::support::pflicht_max(
+        &body.fingerabdruck_ende,
+        "fingerabdruck_ende",
+        FINGERABDRUCK_ENDE_MAX,
+    )?;
     decide_unterschrift(&state, &admin, peer_ip, id, Some(&eingabe)).await
 }
 
@@ -1059,7 +1067,9 @@ pub async fn unterschrift_widerrufen(
                 "Schlüssel einer gekoppelten Instanz widerruft diese selbst.".into(),
             ));
         }
-        if zeile.zustand() != UnterschriftSchluesselZustand::Widerrufen
+        // Nur ein gültiger Schlüssel kann der letzte gültige sein; ein wartender (etwa nach dem
+        // Deaktivieren des letzten Halters, LLH-1605) bliebe sonst unwiderrufbar hängen.
+        if zeile.zustand() == UnterschriftSchluesselZustand::Gueltig
             && unterschrift::is_letzter_bei_kopplung(conn, admin.org_id, id).await?
         {
             return Err(AppError::Conflict(

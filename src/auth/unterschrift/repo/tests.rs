@@ -721,6 +721,11 @@ async fn bestaetigen_und_zurueckweisen_nur_aus_dem_wartezustand() {
         .fetch_one(&mut conn)
         .await
         .unwrap();
+    assert!(
+        !confirm(&mut conn, 2, id, 1, JETZT).await.unwrap(),
+        "fremde Org, solange er noch wartet"
+    );
+    assert_eq!(zustand_von(&mut conn, 11).await, "wartet_auf_bestaetigung");
     assert!(confirm(&mut conn, 1, id, 1, JETZT).await.unwrap());
     assert_eq!(zustand_von(&mut conn, 11).await, "gueltig");
     let (am, von): (Option<String>, Option<i64>) = sqlx::query_as(
@@ -740,10 +745,6 @@ async fn bestaetigen_und_zurueckweisen_nur_aus_dem_wartezustand() {
         "schon gültig"
     );
     assert_eq!(gueltige_fremde(&mut conn).await, vec!["a", "b"]);
-    assert!(
-        !confirm(&mut conn, 2, id, 1, JETZT).await.unwrap(),
-        "fremde Org"
-    );
 }
 
 #[tokio::test]
@@ -760,4 +761,32 @@ async fn zurueckgewiesener_schluessel_bleibt_es() {
     assert_eq!(zustand_von(&mut conn, 11).await, "abgelehnt");
     assert!(!confirm(&mut conn, 1, id, 1, JETZT).await.unwrap());
     assert_eq!(zustand_von(&mut conn, 11).await, "abgelehnt");
+    // Ein späterer Widerruf vom Gegenüber oder der Widerruf der Zuordnung überschreibt die
+    // Entscheidung hier nicht: der Schlüssel bleibt „zurückgewiesen“ (design.md D1).
+    let ko: i64 =
+        sqlx::query_scalar("SELECT kopplung_org_id FROM unterschrift_schluessel WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(ko),
+        &[lieferung(
+            11,
+            &b,
+            UnterschriftSchluesselZustand::Widerrufen,
+            9,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(zustand_von(&mut conn, 11).await, "abgelehnt");
+    fremde_der_zuordnung_widerrufen(&mut conn, ko, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(zustand_von(&mut conn, 11).await, "abgelehnt");
+    assert_eq!(zustand_von(&mut conn, 10).await, "widerrufen");
 }

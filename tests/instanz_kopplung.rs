@@ -1041,6 +1041,12 @@ async fn bestaetigen_verlangt_das_ende_des_fingerabdrucks() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
     let (s, _) = bestaetigen(&elw, &elw.admin, id, " ").await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = bestaetigen(&elw, &elw.admin, id, &"A".repeat(17)).await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "länger als jede sinnvolle Eingabe"
+    );
     // Falsche Zeichen: 422, der Schlüssel wartet weiter.
     let falsch = if ende(&fp) == "0000" { "1111" } else { "0000" };
     let (s, v) = bestaetigen(&elw, &elw.admin, id, falsch).await;
@@ -1292,6 +1298,64 @@ async fn deaktivieren_des_letzten_schluesselhalters_gelingt() {
     let (s, u) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &zweit, None).await;
     assert_eq!(s, StatusCode::OK, "{u}");
     assert_eq!(u["kopplungen"][0]["ohne_gueltigen_schluessel"], true, "{u}");
+    // Ein danach registrierter Schlüssel wartet auf eine Gegenzeichnung, die niemand leisten
+    // kann; er ist nicht „der letzte gültige“ und lässt sich widerrufen.
+    let zweit_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'zweit'")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let id_z = {
+        let p = SoftwarePasskey::new("z", [7u8; 32]);
+        let oeff = p.oeffentlich();
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: zweit_id,
+                benutzer_name: "Zweit",
+                credential_id: "z",
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Z",
+            },
+        )
+        .await
+        .unwrap()
+    };
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/unterschrift/{id_z}/widerrufen"),
+        &zweit,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Auch das Herabstufen des letzten Schlüsselhalters gelingt und widerruft seinen Schlüssel.
+#[tokio::test]
+async fn herabstufen_des_letzten_schluesselhalters_gelingt() {
+    let (hub, _elw) = gekoppelt().await;
+    zweiter_admin(&hub).await;
+    let zweit = common::login_cookie(&hub.app, "zweit", "zweitpw1").await;
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "PATCH",
+        "/api/benutzer/1",
+        &zweit,
+        Some(&json!({"system_rolle": "keiner"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zustand: String =
+        sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE credential_id = 'a'")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(zustand, "widerrufen");
 }
 
 #[tokio::test]

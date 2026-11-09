@@ -828,6 +828,38 @@ describe('BenutzerPage', () => {
       await waitFor(() => expect(deaktiviert).toBe('2'));
     });
 
+    it('eine abgelehnte Rückfrage räumt ihren Fehler beim Abbrechen (LLH-1605)', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva' }),
+          ]),
+        ),
+        http.get('/api/admin/instanz/letzte-schluessel', () =>
+          HttpResponse.json([{ benutzer_id: 2, kopplungen: ['ELW 1 DRK Nord'] }]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', () =>
+          HttpResponse.json({ error: 'Abgelehnt aus Gründen' }, { status: 409 }),
+        ),
+      );
+      seite();
+      await waehle('Eva', 'Deaktivieren');
+      const dialog = await screen.findByRole('dialog', { name: 'Eva deaktivieren?' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Deaktivieren' }));
+      expect(await within(dialog).findByText('Nicht deaktiviert')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Eva deaktivieren?' })).toBeNull(),
+      );
+      // Über der Tabelle steht kein Fehler mehr. Der schließende Dialog selbst bleibt in jsdom
+      // stehen (kein `transitionend`), darum zählt nur, was außerhalb von ihm steht.
+      const aufDerSeite = () =>
+        screen.queryAllByText('Nicht deaktiviert').filter((e) => !e.closest('.ant-modal-wrap'));
+      await waitFor(() => expect(aufDerSeite()).toEqual([]));
+    });
+
     it('Herabstufen des letzten Schlüsselhalters warnt im Dialog (LLH-1605)', async () => {
       server.use(
         meHandler(benutzer()),

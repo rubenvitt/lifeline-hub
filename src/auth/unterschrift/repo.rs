@@ -507,6 +507,8 @@ pub async fn accept_lieferungen(
         .fetch_optional(&mut *conn)
         .await?;
         match (l.zustand, vorhanden) {
+            // Ein hier zurückgewiesener bleibt es: die Entscheidung eines Menschen hier geht vor.
+            (UnterschriftSchluesselZustand::Widerrufen, Some((_, z))) if z == "abgelehnt" => {}
             (UnterschriftSchluesselZustand::Widerrufen, Some((id, _))) => {
                 sqlx::query(
                     "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
@@ -636,7 +638,8 @@ pub async fn fremde_der_zuordnung_widerrufen(
 ) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
-         widerrufen_at = COALESCE(widerrufen_at, ?) WHERE kopplung_org_id = ? AND zustand <> 'widerrufen'",
+         widerrufen_at = COALESCE(widerrufen_at, ?) WHERE kopplung_org_id = ? \
+         AND zustand NOT IN ('widerrufen', 'abgelehnt')",
     )
     .bind(jetzt)
     .bind(kopplung_org_id)
@@ -681,12 +684,16 @@ pub async fn list_fuer_org(
         let (gegengezeichnet_von, unterzeichner_fingerabdruck, erklaert_at) =
             match z.gegenzeichnung() {
                 Some(g) => {
+                    // Der Unterzeichner stammt aus derselben Org-Zuordnung wie der Schlüssel
+                    // (bei einem lokalen: lokal); erst danach irgendeine Zeile der Org.
                     let unterzeichner: Option<(String, String)> = sqlx::query_as(
                         "SELECT benutzer_name, fingerabdruck FROM unterschrift_schluessel \
-                         WHERE credential_id = ? AND org_id = ? LIMIT 1",
+                         WHERE credential_id = ? AND org_id = ? \
+                         ORDER BY kopplung_org_id IS ? DESC, id DESC LIMIT 1",
                     )
                     .bind(&g.unterzeichner_credential_id)
                     .bind(org_id)
+                    .bind(z.kopplung_org_id)
                     .fetch_optional(pool)
                     .await?;
                     let erklaert_at = serde_json::from_str::<AufnahmeErklaerung>(&g.erklaerung)

@@ -604,8 +604,12 @@ export default function BenutzerPage() {
           deaktivierenVon &&
           deaktivieren.mutate(deaktivierenVon.id, { onSuccess: () => setDeaktivierenVon(null) })
         }
+        // Abbrechen räumt den Fehler (`frontend/AGENTS.md`, Speicherfehler): er stünde sonst
+        // danach noch über der Tabelle.
         onCancel={() => {
-          if (!deaktivieren.isPending) setDeaktivierenVon(null);
+          if (deaktivieren.isPending) return;
+          deaktivieren.reset();
+          setDeaktivierenVon(null);
         }}
         destroyOnHidden
       >
