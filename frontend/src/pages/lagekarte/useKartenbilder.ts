@@ -103,9 +103,18 @@ export function useKartenbilder({
   const invalidiereBilder = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
-  // Ein Bild am Spiegel wird geholt (LLH-1492): dann zählt jeder Abruf der Liste als neuer Versuch.
+  // Bilder, die am Spiegel geholt werden (LLH-1492): solange eines aussteht, zählt jeder Abruf der
+  // Liste als neuer Versuch, aber nur für diese Bilder.
+  const ausstehendRef = useRef<Set<number>>(new Set());
   const [wirdGeholt, setWirdGeholt] = useState(false);
   const nachholTakt = wirdGeholt ? bilderQuery.dataUpdatedAt : 0;
+  // Die Liste des letzten Ladelaufs: ist sie unverändert, kam der Lauf nur vom `nachholTakt`.
+  const letzteListeRef = useRef<unknown>(undefined);
+  const merkeAusstehend = (id: number, aussteht: boolean) => {
+    if (aussteht) ausstehendRef.current.add(id);
+    else ausstehendRef.current.delete(id);
+    setWirdGeholt(ausstehendRef.current.size > 0);
+  };
 
   // Laufende Downloads (Bild-IDs) und die zuletzt gezeigten Bilder. Ein Download lebt unabhängig
   // vom Lauf des Ladeeffekts: jeder Refetch der Bilderliste (Live-Kanal, Opazität, Zeitraffer) ließe
@@ -121,6 +130,8 @@ export function useKartenbilder({
     const ctrl = new AbortController();
     abbruchRef.current = ctrl;
     imFlugRef.current = new Set();
+    ausstehendRef.current = new Set();
+    letzteListeRef.current = undefined;
     setWirdGeholt(false);
     return () => ctrl.abort();
   }, [einsatzId]);
@@ -136,8 +147,12 @@ export function useKartenbilder({
     aktiveIdsRef.current = aktiveIds;
     const abbruch = abbruchRef.current.signal;
     const imFlug = imFlugRef.current;
+    const nurNachholen = bilderRoh === letzteListeRef.current;
+    letzteListeRef.current = bilderRoh;
+    for (const id of [...ausstehendRef.current]) if (!aktiveIds.has(id)) merkeAusstehend(id, false);
     for (const b of bilder) {
       if (blobUrlsRef.current[b.id] || imFlug.has(b.id)) continue;
+      if (nurNachholen && !ausstehendRef.current.has(b.id)) continue;
       imFlug.add(b.id);
       ladeBildBlobUrl(einsatzId, b.id, abbruch)
         .then((url) => {
@@ -149,13 +164,14 @@ export function useKartenbilder({
           }
           blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
           setBlobUrls(blobUrlsRef.current);
+          merkeAusstehend(b.id, false);
         })
         .catch((e) => {
           // Lade-Fehler sichtbar machen statt schlucken; ein Abbruch ist keiner.
           if (abbruch.aborted || !aktiveIdsRef.current.has(b.id)) return;
           // Am Spiegel (LLH-1492): der Inhalt wird geholt; der nächste Abruf der Liste versucht
           // es erneut (`nachholTakt`).
-          if (isAnhangWirdGeholt(e)) setWirdGeholt(true);
+          merkeAusstehend(b.id, isAnhangWirdGeholt(e));
           ladeFehler(e);
         })
         .finally(() => imFlug.delete(b.id));
@@ -174,14 +190,9 @@ export function useKartenbilder({
     }
     // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
     // Nur solange ein Bild „wird geholt“ (am Spiegel, LLH-1492), versucht jeder Abruf der Liste
-    // (`nachholTakt`) fehlende Bilder erneut: es kommt nach dem nächsten Abgleich, dessen `lagged`
-    // die Liste neu holt. Ein gewöhnlich defektes Bild lädt so nicht bei jedem Abruf neu.
+    // (`nachholTakt`) genau diese Bilder erneut: sie kommen nach dem nächsten Abgleich, dessen
+    // `lagged` die Liste neu holt. Ein gewöhnlich defektes Bild lädt so nicht bei jedem Abruf neu.
   }, [bilderRoh, einsatzId, ladeFehler, nachholTakt]);
-
-  // Steht kein Bild mehr aus, endet das Nachholen: weitere Abrufe der Liste laden nichts neu.
-  useEffect(() => {
-    if (wirdGeholt && (bilderRoh ?? []).every((b) => blobUrls[b.id])) setWirdGeholt(false);
-  }, [wirdGeholt, bilderRoh, blobUrls]);
 
   // Unmount-only: beim Verlassen der Karte alle dann aktuellen Blob-URLs freigeben.
   useEffect(

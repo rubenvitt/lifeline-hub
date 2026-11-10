@@ -441,6 +441,119 @@ async fn die_volltextsuche_findet_gespiegelte_eintraege() {
     assert_eq!(treffer, 1);
 }
 
+/// CodeRabbit auf #1266: eine Zeile, deren Abhängigkeit das Restbudget sprengt, geht nur als
+/// erste des Pakets. Nach einer früheren Lieferung wartet der Einsatz, ohne das Budget zu
+/// verbrauchen; mit frischem Budget kommt er voran.
+#[tokio::test]
+async fn grosse_abhaengigkeit_nach_einer_frueheren_lieferung_wartet() {
+    use super::paket::ZEILEN_MAX;
+    let (f, _) = zwei_seiten().await;
+    let erika = konto(&f, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    let meldung: i64 = eine(
+        &f,
+        &format!(
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, \
+             eingang_at, erfasst_von_id) VALUES ({einsatz}, 1, 'A', 'funk', 'M', \
+             '2026-11-10 00:00:00', '2026-11-10 00:00:00', {erika}) RETURNING id"
+        ),
+    )
+    .await;
+    let eintrag = etb(&f, einsatz, 1, erika).await;
+    exec(
+        &f,
+        &format!("UPDATE etb_eintrag SET meldung_id = {meldung} WHERE id = {eintrag}"),
+    )
+    .await;
+    // Die Meldung wächst danach weit über das Restbudget; ihr Stand liegt über dem des Eintrags.
+    exec(
+        &f,
+        &format!(
+            "UPDATE meldung SET inhalt = '{}' WHERE id = {meldung}",
+            "x".repeat(20_000)
+        ),
+    )
+    .await;
+    let a = Absender {
+        kennung: "elw",
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        meldend: true,
+    };
+    let mut fc = f.begin().await.unwrap();
+    let e = liefern::list_gefuehrt(&mut fc, 1, &HashMap::new())
+        .await
+        .unwrap()
+        .remove(0);
+    let k = liefern::ensure_kennung(&mut fc, "elw", &e).await.unwrap();
+    let groesse = |l: &super::paket::EinsatzLieferung| {
+        l.zeilen
+            .iter()
+            .map(|z| serde_json::to_vec(z).unwrap().len())
+            .sum::<usize>()
+    };
+
+    // Eine frühere Lieferung hat das Paket angebrochen: höchstens die Zeilen vor der Meldung,
+    // und nie mehr Bytes, als übrig waren.
+    let mut seit = 0;
+    let mut runden = 0;
+    loop {
+        let mut budget = Budget::neu(4_000);
+        budget.zeilen = ZEILEN_MAX - 1;
+        let vorher = budget.clone();
+        let Some(l) = liefern::liefere_einsatz(&mut fc, &a, &e, &k, "hub/1", seit, &mut budget)
+            .await
+            .unwrap()
+        else {
+            assert_eq!(budget.bytes, vorher.bytes, "Budget unverbraucht zurück");
+            assert_eq!(budget.zeilen, vorher.zeilen);
+            break;
+        };
+        assert!(groesse(&l) <= vorher.bytes, "Lieferung bleibt im Budget");
+        assert!(l.bis > seit);
+        seit = l.bis;
+        runden += 1;
+        assert!(runden < 10, "Liefern endet nicht");
+    }
+    let rest: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_aenderung WHERE einsatz_id = ? AND stand > ?",
+    )
+    .bind(einsatz)
+    .bind(seit)
+    .fetch_one(&mut *fc)
+    .await
+    .unwrap();
+    assert!(rest > 0, "die Meldung steht noch aus");
+
+    // Als erste des Pakets geht es weiter, bis nichts mehr aussteht.
+    loop {
+        let mut budget = Budget::neu(4_000);
+        let Some(l) = liefern::liefere_einsatz(&mut fc, &a, &e, &k, "hub/1", seit, &mut budget)
+            .await
+            .unwrap()
+        else {
+            break;
+        };
+        assert!(l.bis > seit, "Fortschritt");
+        seit = l.bis;
+        runden += 1;
+        assert!(runden < 20, "Liefern endet nicht");
+    }
+    let rest: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_aenderung WHERE einsatz_id = ? AND stand > ?",
+    )
+    .bind(einsatz)
+    .bind(seit)
+    .fetch_one(&mut *fc)
+    .await
+    .unwrap();
+    assert_eq!(rest, 0, "alles geliefert");
+}
+
 /// CodeRabbit auf #1266: `gegen_id` trifft nur ein echtes Konto der Org des Einsatzes. Ein Konto
 /// einer anderen Org und ein Stellvertreter (auch einer anderen Kopplung) zählen nicht; dann
 /// greift der Stellvertreter dieser Kopplung.

@@ -454,11 +454,19 @@ pub async fn liefere_einsatz(
             .iter()
             .map(|z| serde_json::to_vec(z).map(|v| v.len()).unwrap_or(0))
             .sum();
-        if mehr <= budget.bytes || anzahl == 1 {
+        // Eine einzelne Zeile mit übergroßen Abhängigkeiten geht nur als erste des Pakets; nach
+        // einer früheren Lieferung wartet der Einsatz auf den nächsten Abgleich.
+        let erste_des_pakets = budget.zeilen + anzahl == super::paket::ZEILEN_MAX;
+        if mehr <= budget.bytes || (anzahl == 1 && erste_des_pakets) {
             versuch_budget.bytes = budget.bytes.saturating_sub(mehr);
             *budget = versuch_budget;
             zeilen = versuch;
             break;
+        }
+        if anzahl == 1 {
+            budget.bytes += groessen[0];
+            budget.zeilen += 1;
+            return Ok(None);
         }
         let neu = anzahl / 2;
         budget.bytes += groessen[neu..anzahl].iter().sum::<usize>();
