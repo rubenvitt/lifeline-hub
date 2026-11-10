@@ -83,7 +83,8 @@ pub async fn stellvertreter_fremd(
 }
 
 /// Lokales Konto für ein Konto des Gegenübers (D5, Nachtrag 10.11.2026): die Kennung, die der
-/// Absender kennt (nur ein echtes Konto der Org des Einsatzes), sonst die Herkunft der Stammdaten (nur meldende Seite), sonst ein
+/// Absender kennt (nur ein echtes Konto einer Org dieser Kopplung), sonst die Herkunft der
+/// Stammdaten (nur meldende Seite), sonst ein
 /// Stellvertreter. Der Stellvertreter kann sich nie anmelden (`aktiv = 0`, Platzhalter-Hash) und
 /// trägt den Anzeigenamen des Gegenübers, auch nach einer Umbenennung dort.
 pub async fn konto_lokal(
@@ -94,15 +95,18 @@ pub async fn konto_lokal(
     meldend: bool,
     angabe: &KontoAngabe,
 ) -> Result<i64, sqlx::Error> {
-    // Die Kennung des Absenders zählt nur für ein echtes Konto der Org des Einsatzes: nie für ein
-    // Konto einer anderen Org und nie für einen Stellvertreter (auch nicht einer anderen Kopplung).
+    // Die Kennung des Absenders zählt nur für ein echtes Konto einer Org, die diese Kopplung teilt:
+    // nie für ein Konto einer anderen Org und nie für einen Stellvertreter (auch nicht einer anderen
+    // Kopplung). Ein Mitglied aus einer zweiten gekoppelten Org bleibt so es selbst.
     if let Some(id) = angabe.gegen_id {
         let gibt: Option<i64> = sqlx::query_scalar(
-            "SELECT b.id FROM benutzer b WHERE b.id = ? AND b.org_id = ? \
+            "SELECT b.id FROM benutzer b WHERE b.id = ? \
+             AND b.org_id IN (SELECT ko.org_id FROM instanz_kopplung_org ko \
+                              WHERE ko.kopplung_id = ? AND ko.widerrufen_at IS NULL) \
              AND NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)",
         )
         .bind(id)
-        .bind(org_id)
+        .bind(kopplung_id)
         .fetch_optional(&mut *conn)
         .await?;
         if let Some(id) = gibt {

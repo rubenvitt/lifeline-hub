@@ -440,8 +440,8 @@ async fn die_volltextsuche_findet_gespiegelte_eintraege() {
     .await;
     assert_eq!(treffer, 1);
 }
-
-/// CodeRabbit auf #1266: `gegen_id` trifft nur ein echtes Konto der Org des Einsatzes. Ein Konto
+/// CodeRabbit auf #1266: `gegen_id` trifft nur ein echtes Konto einer Org dieser Kopplung. Ein Konto
+/// einer nicht gekoppelten Org und ein Stellvertreter (auch einer anderen Kopplung) zählen nicht; dann
 /// einer anderen Org und ein Stellvertreter (auch einer anderen Kopplung) zählen nicht; dann
 /// greift der Stellvertreter dieser Kopplung.
 #[tokio::test]
@@ -489,4 +489,33 @@ async fn gegen_id_auf_ein_fremdes_konto_wird_stellvertreter() {
         .await
         .unwrap();
     assert_ne!(lokal, stellvertreter, "ein Stellvertreter nie");
+    drop(conn);
+
+    // Ein Mitglied aus einer zweiten Org derselben Kopplung bleibt es selbst.
+    exec(
+        &s,
+        "INSERT INTO organisation (id, name) VALUES (3, 'Partner')",
+    )
+    .await;
+    exec(
+        &s,
+        "INSERT INTO instanz_kopplung_org (id, kopplung_id, org_id, fremde_org_kennung, \
+         fremde_org_name) VALUES (2, 1, 3, 'hub/3', 'Partner')",
+    )
+    .await;
+    let partner: i64 = eine(
+        &s,
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+         aktiv, erstellt_at, org_rolle) VALUES (3, 'partner', 'partner', 'x', 'keiner', 1, \
+         '2026-11-10 00:00:00', 'keine') RETURNING id",
+    )
+    .await;
+    let mut conn = s.acquire().await.unwrap();
+    let lokal = konto_lokal(&mut conn, 1, 1, 1, false, &angabe(13, partner))
+        .await
+        .unwrap();
+    assert_eq!(
+        lokal, partner,
+        "ein Konto einer gekoppelten Partner-Org gilt"
+    );
 }
