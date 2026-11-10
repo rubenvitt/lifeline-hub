@@ -404,15 +404,15 @@ pub struct Config {
     pub datentraeger_verschluesselung_extern: bool,
 
     /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
-    /// **Default AN** — auch im Dev-Betrieb, damit die Ebene überall bundesweit zeigt, was
-    /// sie zeigen soll. Jeder Lauf lädt rund 4–5 GB (nur, wenn der Extrakt neu ist);
-    /// abschalten mit `--kritis-extrakt false` bzw. `LIFELINE_KRITIS_EXTRAKT=false` — so
-    /// startet die e2e-Suite. Abgeschaltet und ohne früheren Bestand meldet die Ebene
-    /// `offline`.
+    /// **Vorgabe aus** (LLH-1546): Jeder Lauf lädt rund 4–5 GB, sobald der Extrakt neu ist,
+    /// und das soll keine Installation ungefragt tun. Einschalten mit `--kritis-extrakt true`
+    /// bzw. `LIFELINE_KRITIS_EXTRAKT=true`, bei vielen Instanzen besser mit eigenem Spiegel
+    /// (`--kritis-extrakt-url`). Abgeschaltet und ohne früheren Bestand meldet die Ebene
+    /// `offline`; ein vorhandener Bestand bleibt gültig.
     #[arg(
         long,
         env = "LIFELINE_KRITIS_EXTRAKT",
-        default_value_t = true,
+        default_value_t = false,
         action = clap::ArgAction::Set
     )]
     pub kritis_extrakt: bool,
@@ -993,18 +993,17 @@ mod tests {
 
     /// Der KRITIS-Import ist per Vorgabe an und auf beiden Wegen abschaltbar.
     #[test]
-    fn kritis_extrakt_default_an_und_abschaltbar() {
+    fn kritis_extrakt_default_aus_und_einschaltbar() {
         let c = parse_hermetisch(["lifeline-hub"]);
-        assert!(c.kritis_extrakt);
+        assert!(!c.kritis_extrakt);
         assert_eq!(
             c.kritis_extrakt_url,
             "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
         );
         assert_eq!(c.kritis_extrakt_intervall_stunden, 168);
+        assert!(parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "true"]).kritis_extrakt);
+        assert!(parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "true", &["lifeline-hub"]).kritis_extrakt);
         assert!(!parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "false"]).kritis_extrakt);
-        assert!(
-            !parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "false", &["lifeline-hub"]).kritis_extrakt
-        );
         let c = parse_mit_env(
             "LIFELINE_KRITIS_EXTRAKT_INTERVALL_STUNDEN",
             "24",

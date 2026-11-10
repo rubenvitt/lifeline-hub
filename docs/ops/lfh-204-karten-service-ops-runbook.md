@@ -121,9 +121,10 @@ Erzeuge für AWS einen IAM-User/eine Rolle mit minimalen Rechten (`s3:PutObject`
   `karten-service/src/config.rs`), der Service-Prozess muss also mit `cwd` = Repo-Wurzel
   gestartet werden, **oder** `KS_KARTEN_BUILD_DIR` auf einen absoluten Pfad setzen.
 
-Image vorab ziehen (einmalig, spart Zeit beim ersten Build):
+Image vorab ziehen (einmalig, spart Zeit beim ersten Build). Der Tag mit Digest steht in
+`karten-build/Makefile` (`IMAGE`, gepinnt seit LLH-1546):
 ```bash
-docker pull versatiles/versatiles-planetiler:latest
+docker pull "$(sed -n 's/^IMAGE *:= *//p' karten-build/Makefile)"
 ```
 
 ### 2.2 Plattenplatz

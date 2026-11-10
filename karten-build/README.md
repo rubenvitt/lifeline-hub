@@ -46,8 +46,10 @@ Host-URL), `groesse` (Bytes), `sha256` (aus `out/result/osm*.mbtiles.sha256`). `
 bleibt `"shortbread"`.
 
 ## Reproduzierbarkeit
-Image-Digest (`docker inspect versatiles/versatiles-planetiler:latest`) + Geofabrik-Extract-Datum
-im Release-Text festhalten. Update = erneut `make tiles`, neues Release, Katalog-URL/-SHA anheben.
+Das Image ist im `Makefile` per Datums-Tag und Digest gepinnt (`IMAGE`, LLH-1546). Heben: neuen
+Datums-Tag wählen, Digest mit `docker buildx imagetools inspect
+versatiles/versatiles-planetiler:<tag>` lesen, beides in `IMAGE` ersetzen und eine kleine Region
+probebauen. Das Geofabrik-Extract-Datum steht im Stand der Region.
 
 ## Assets (Glyphs/Sprite)
 Der Offline-Style braucht lokal gebündelte **Glyphs (OFL)** + **Sprite (CC0)** unter

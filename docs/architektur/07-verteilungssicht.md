@@ -128,7 +128,7 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 
 | Ziel | Schalter, Vorgabe |
 | --- | --- |
-| Geofabrik-Extrakt für KRITIS (rund 4–5 GB je neuem Stand) | `--kritis-extrakt` an, alle 168 h |
+| Geofabrik-Extrakt für KRITIS (rund 4–5 GB je neuem Stand) | `--kritis-extrakt` aus; eingeschaltet alle 168 h |
 | Katalog und neue Stände der Offline-Karten | `--karten-auto-aktualisierung` an, alle 6 h |
 | `karten-service` | `--karten-service-url` und `--karten-service-token`, beide nötig |
 | clamd | `--clamav-addr`, ohne Angabe ungescannt; nicht erreichbar → 503 außer `--clamav-fail-open` |

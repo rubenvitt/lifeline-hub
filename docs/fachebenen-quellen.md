@@ -458,13 +458,15 @@ Fair-Use-Instanz. Jetzt:
   `power=substation` (Umspannwerk), `amenity=fire_station` (Feuerwehr), `amenity=police`
   (Polizei). Flächen (Ways, Multipolygon-Relations) werden zur Mitte ihrer Bounding-Box,
   wie Overpass `out center`.
-- **Takt:** Default-an in jeder Instanz, **auch im Dev-Stack**. 60 s nach dem Start, danach
+- **Takt:** Seit LLH-1546 per Vorgabe **aus**, damit keine Installation ungefragt Gigabytes
+  zieht. Eingeschaltet (`--kritis-extrakt true`) wird 60 s nach dem Start, danach
   stündlich wird geprüft, ob der Bestand älter als das Intervall ist (Vorgabe 168 h,
   `--kritis-extrakt-intervall-stunden`). Vor dem Download ein `HEAD`: gleiche `ETag`
   bzw. `Last-Modified` → kein Download, nur der Zeitpunkt wird fortgeschrieben. Die Datei
   liegt nur während des Imports unter `<karten-dir>/kritis/` und wird danach immer gelöscht.
-- **Abschalten:** `--kritis-extrakt false` / `LIFELINE_KRITIS_EXTRAKT=false`. So startet die
-  Playwright-Suite; ohne früheren Bestand meldet die Ebene dann `offline`.
+- **Einschalten:** `--kritis-extrakt true` / `LIFELINE_KRITIS_EXTRAKT=true`. Abgeschaltet
+  (Vorgabe, auch in der Playwright-Suite) und ohne früheren Bestand meldet die Ebene `offline`;
+  ein vorhandener Bestand bleibt gültig, wird aber nicht mehr erneuert.
 - **Ausfall:** Scheitert ein Lauf (Netz, Platte, kaputte Datei, Extrakt ohne ein einziges
   Objekt), bleibt der bisherige Bestand samt `stand` stehen, und der nächste stündliche Tick
   versucht es erneut. Getauscht wird atomar über Staging-Tabellen.
