@@ -184,6 +184,7 @@ function LageberichtDetail() {
    */
   const schutz = useEntwurfVerlustschutz<LageberichtAnzeige, FormWerte>({
     daten: berichtQuery.data,
+    geladenAm: berichtQuery.dataUpdatedAt,
     istEntwurf: berichtQuery.data?.status === 'entwurf',
     form,
     werteAus: (b) => {
