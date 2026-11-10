@@ -398,6 +398,20 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
 - **Admin-Spur:** Neue `admin_audit`-Aktionen gibt es nur für „Spiegel beendet“; das Liefern
   selbst ist kein Admin-Vorgang.
 
+## Nachträge aus der Umsetzung
+
+- **10.11.2026, Messung D1** (Aufgaben 1.1 und 1.5): Auf einer Kopie des Schemas mit den
+  Pragmas der Instanz (WAL, `synchronous = FULL`, `secure_delete = ON`), je Erfassung ein Commit,
+  Median aus fünf Läufen: 50 ETB-Einträge 9,5 ms vorher, 8,9 ms nachher; 50 Personen 10,2 ms
+  vorher, 11,4 ms nachher. Der Unterschied liegt im Rauschen des fsync. Ohne fsync
+  (`synchronous = NORMAL`) kostet ein Trigger rund 18 µs je Zeile.
+- **10.11.2026, D9/D10:** Die Schicht vor den Einsatzrouten fängt nur die beantragbaren
+  Erfassungen ab. Jede andere Schreibanfrage läuft bis zum Handler, und der Schutz-Trigger
+  antwortet mit 409. Eine Sperre aller schreibenden Methoden in der Schicht hätte auch Wege
+  getroffen, die am Spiegel nur lokale, nicht gespiegelte Tabellen schreiben (Lesemarke des ETB,
+  Zugriffsprotokolle). Der Text der 409 nennt deshalb nicht die Gegenstelle; die steht im
+  Hinweisband.
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.

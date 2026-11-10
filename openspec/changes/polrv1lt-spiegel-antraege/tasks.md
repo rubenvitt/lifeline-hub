@@ -9,17 +9,17 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 ## 1. Beschreibung und Änderungslog (D1, D2, D3)
 
-- [ ] 1.1 Messung vorher: ETB-Einfügen (50 Einträge) und Personenerfassung auf einer Demo-DB, Werte in design.md „Nachträge“ notieren
-- [ ] 1.2 `instanz::spiegel::art`: `TABELLEN` (gespiegelt mit Kategorie, Schlüssel, Scoping, `blob`; ausgenommen mit Grund), Wire-Enums `SpiegelKategorie` und `Freigabestufe` per `wire_enum!` mit Fällen in `tests/enum_wire_kontrakt.rs`. Wächter `jede_einsatztabelle_ist_eingeordnet` (gegen `schwaerzung_registry::TABELLEN`) rot, dann grün
+- [x] 1.1 Messung vorher: ETB-Einfügen (50 Einträge) und Personenerfassung auf einer Demo-DB, Werte in design.md „Nachträge“ notieren
+- [x] 1.2 `instanz::spiegel::art`: `TABELLEN` (gespiegelt mit Kategorie, Schlüssel, Scoping, `blob`; ausgenommen mit Grund), Wire-Enums `SpiegelKategorie` und `Freigabestufe` per `wire_enum!` mit Fällen in `tests/enum_wire_kontrakt.rs`. Wächter `jede_einsatztabelle_ist_eingeordnet` (gegen `schwaerzung_registry::TABELLEN`) rot, dann grün
 - [ ] 1.3 Verweise aus `PRAGMA foreign_key_list` einordnen (Einsatz, Stammdaten, Org) plus `VERWEISE_OHNE_FK` (polymorphe Bezüge, IDs in JSON). Wächter `jede_id_spalte_ist_eingeordnet` über alle `*_id`-Spalten der gespiegelten Tabellen
-- [ ] 1.4 Generator für Log-Trigger (`_spiegel_log_i/_u/_d`, Elternzeile bei `UeberParent`) und Migration mit `einsatz_aenderung`, `einsatz.kennung`, `einsatz.freigabestufe` und Grundstock. Wächter `trigger_passen_zur_beschreibung` gegen `sqlite_master`. Tests: Anlegen, Ändern, Schwärzen, weiches und hartes Löschen erhöhen den Stand; je Zeile eine Logzeile; Kind per CASCADE ohne Fehler
-- [ ] 1.5 Messung nachher wie 1.1; Abweichung über 20 % → mit Ruben klären, sonst Wert in die Nachträge
+- [x] 1.4 Generator für Log-Trigger (`_spiegel_log_i/_u/_d`, Elternzeile bei `UeberParent`) und Migration mit `einsatz_aenderung`, `einsatz.kennung`, `einsatz.freigabestufe` und Grundstock. Wächter `trigger_passen_zur_beschreibung` gegen `sqlite_master`. Tests: Anlegen, Ändern, Schwärzen, weiches und hartes Löschen erhöhen den Stand; je Zeile eine Logzeile; Kind per CASCADE ohne Fehler
+- [x] 1.5 Messung nachher wie 1.1; Abweichung über 20 % → mit Ruben klären, sonst Wert in die Nachträge
 - [ ] 1.6 `src/AGENTS.md`, Abschnitt Instanzkopplung: Regel „neue Einsatztabelle = Eintrag in `spiegel::art` + Trigger in ihrer Migration“, Verweis auf die Wächter; `scripts/adr-fuer.sh` für die berührten Pfade geprüft
 
 ## 2. Spiegel, Schutz und Fehlerbild (D4, D10)
 
-- [ ] 2.1 Migration `einsatz_spiegel`, `spiegel_herkunft`, `spiegel_uebernahme` (Merker), `spiegel_ziel` und Schutz-Trigger aus dem Generator (`_spiegel_schutz_i/_u/_d`). `AppError`: Nachricht `einsatz_ist_spiegel` → 409 „Dieser Einsatz ist ein Spiegel“, Fall in `tests/fehler_vertrag.rs`. Tests: Schreibroute auf Spiegel → 409, auf eigenen Einsatz → 2xx; unter Merker schreibbar
-- [ ] 2.2 Schicht vor `/api/einsaetze/{id}/…`: schreibende Methode am Spiegel außerhalb `BEANTRAGBAR` → 409 mit Gegenstelle, bevor der Handler läuft. Test über eine Auswahl Routen je Modul (PATCH, DELETE, POST)
+- [x] 2.1 Migration `einsatz_spiegel`, `spiegel_herkunft`, `spiegel_uebernahme` (Merker), `spiegel_ziel` und Schutz-Trigger aus dem Generator (`_spiegel_schutz_i/_u/_d`). `AppError`: Nachricht `einsatz_ist_spiegel` → 409 „Dieser Einsatz ist ein Spiegel“, Fall in `tests/fehler_vertrag.rs`. Tests: Schreibroute auf Spiegel → 409, auf eigenen Einsatz → 2xx; unter Merker schreibbar
+- [x] 2.2 Schreibende Routen am Spiegel enden mit 409 aus dem Schutz-Trigger (Nachtrag D9/D10: keine Sperrschicht für alle Methoden). Test über eine Auswahl Routen je Modul (PATCH, DELETE, POST); die Lesemarke des ETB bleibt am Spiegel schreibbar
 - [ ] 2.3 Hintergrundläufe durchgehen (Erinnerungen, Ablösung-Vorwarnung, Pegel, Benachrichtigungen, Aufbewahrung, Schwärzungsjobs, weitere per `grep tokio::spawn`): Spiegel auslassen. Test je Lauf mit einem Spiegel-Einsatz ohne 409 im Log
 
 ## 3. Liefern und Übernehmen (D5, D6, D7)

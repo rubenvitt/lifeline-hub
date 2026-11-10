@@ -15,6 +15,7 @@ pub mod identitaet;
 pub mod melden;
 pub mod repo;
 pub mod signatur;
+pub mod spiegel;
 pub mod stammdaten;
 
 use crate::wire_enum::wire_enum;
