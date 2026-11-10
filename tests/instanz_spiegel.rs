@@ -294,10 +294,26 @@ async fn mit_einem_gegenueber_ohne_spiegel_wird_nicht_abgeglichen() {
         "UPDATE instanz_kopplung SET gegenueber_protokoll = 1",
     )
     .await;
+    exec(
+        &hub.pool,
+        "UPDATE instanz_kopplung SET gegenueber_protokoll = 1",
+    )
+    .await;
     common::einsatz_anlegen(&elw.app, &elw.admin).await;
     abgleichen(&elw).await;
     let anzahl: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM einsatz_spiegel").await;
     assert_eq!(anzahl, 0);
+    // Beide Seiten sagen es auf der Seite „Instanzkopplung“.
+    for i in [&hub, &elw] {
+        let (s, v) =
+            common::anfrage_json(&i.app, "GET", "/api/admin/instanz", &i.admin, None).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(
+            v["kopplungen"][0]["spiegel"]["hinweis"],
+            "Gegenüber spiegelt noch nicht (Update nötig).",
+            "{v}"
+        );
+    }
 }
 
 #[tokio::test]
