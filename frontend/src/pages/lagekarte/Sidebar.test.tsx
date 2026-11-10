@@ -1,7 +1,13 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  oeffneKontextmenue,
+  offenesKontextmenue,
+} from '../../test/kontextmenue';
 import Sidebar, {
   bedienzielStil,
   ebenenZeileStil,
@@ -1734,5 +1740,55 @@ describe('platzierObjekt (LFH-765)', () => {
     expect(platzierObjekt({ typ: 'uhs', id: 9 }, liste)).toBe('UHS');
     expect(platzierObjekt({ typ: 'person', id: 3 }, liste)).toBe('Betroffene Person');
     expect(platzierObjekt({ typ: 'einsatzort', id: 0 }, liste)).toBe('Einsatzort');
+  });
+});
+
+describe('Sidebar · Bild-Hintergründe · Kontextmenü (LLH-1599, D6)', () => {
+  beforeEach(paneeleOffen);
+  const namensteil = () => document.querySelector<HTMLElement>('[data-lfh="bild-namensteil"]')!;
+
+  it('Rechtsklick auf den Namen zeigt die Einträge des ⋮; Zentrieren wirkt', async () => {
+    const onBildZentrieren = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        onBildZentrieren={onBildZentrieren}
+      />,
+    );
+    const menue = await oeffneKontextmenue(namensteil());
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Lageplan');
+    expect(eintraegeVon(menue)).toEqual([
+      'Auf Bild zentrieren',
+      'Auf der Karte platzieren',
+      'rot:Bild entfernen …',
+    ]);
+    fireEvent.click(within(menue).getByRole('menuitem', { name: /Auf Bild zentrieren/ }));
+    expect(onBildZentrieren).toHaveBeenCalledWith(1);
+  });
+
+  it('Umschalt+F10 auf dem ⋮ öffnet das Kontextmenü des Bildes', async () => {
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben bilder={[bildLageplan]} />);
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu Lageplan' });
+    knopf.focus();
+    fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true });
+    const menue = await waitFor(() => {
+      const m = offenesKontextmenue();
+      if (!m) throw new Error('kein Kontextmenü');
+      return m;
+    });
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Lageplan');
+  });
+
+  it('Schalter und Deckkraft-Regler öffnen kein Kontextmenü', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben bilder={[bildLageplan]} />);
+    erwarteBrowsermenue(screen.getByRole('switch', { name: 'Lageplan' }));
+    erwarteBrowsermenue(screen.getAllByRole('slider')[0]);
+  });
+
+  it('ohne Schreibrecht kein Kontextmenü', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben={false} bilder={[bildLageplan]} />);
+    erwarteBrowsermenue(namensteil());
   });
 });

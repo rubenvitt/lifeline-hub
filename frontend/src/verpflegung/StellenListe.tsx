@@ -8,7 +8,9 @@ import type {
   VerpflegungsstelleStatus,
   VerpflegungZeitfenster,
 } from '../api/types';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
+import { useKontextMenue } from '../components/useKontextMenue';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
@@ -95,6 +97,69 @@ export default function StellenListe({
   /** Stellen, deren Inbetriebnahme auf die Serverantwort wartet. */
   const [inBetriebnahme, setInBetriebnahme] = useState<ReadonlySet<number>>(() => new Set());
 
+  /**
+   * Aktionen einer Stelle: EINE Quelle für Knöpfe, ⋮ und Kontextmenü (LLH-1598, Spec
+   * `datensatz-aktionsmenue`, „Eine Karte mit mehreren Knöpfen …“).
+   */
+  const aktionenZu = (s: Verpflegungsstelle) => {
+    const aktionen: { key: Aktion; label: string; gefahr?: true; gesperrt?: true }[] = !darfPlanen
+      ? []
+      : s.status === 'geplant'
+        ? [
+            { key: 'aktiv', label: 'In Betrieb nehmen' },
+            { key: 'bearbeiten', label: 'Bearbeiten …' },
+            { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
+            ...(hasAusgabe(s.id, zeitfenster)
+              ? []
+              : s.geraet_gekoppelt
+                ? // LLH-1048: der Server lehnt mit 409 ab; gesperrt mit Grund statt weg, denn
+                  // erst der Widerruf der Kopplung macht es möglich.
+                  [
+                    {
+                      key: 'stornieren' as const,
+                      label: `Stornieren … (${GERAET_GEKOPPELT})`,
+                      gefahr: true as const,
+                      gesperrt: true as const,
+                    },
+                  ]
+                : [{ key: 'stornieren' as const, label: 'Stornieren …', gefahr: true as const }]),
+          ]
+        : s.status === 'aktiv'
+          ? [
+              { key: 'bearbeiten', label: 'Bearbeiten …' },
+              { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
+            ]
+          : [{ key: 'bearbeiten', label: 'Bearbeiten …' }];
+    return aktionen;
+  };
+
+  /*
+   * Kontextmenü je Stelle: EIN Hook für die Liste, gemerkt nur die id; Stelle und Einträge kommen
+   * je Render frisch. Läuft die Inbetriebnahme, stehen die Einträge gesperrt wie der Auslöser.
+   */
+  const [kontext, setKontext] = useState<{ id: number; offen: KontextMenueOffen } | null>(null);
+  const kontextEintraege = (s: Verpflegungsstelle): MenueEintrag<Aktion>[] => {
+    const laeuft = inBetriebnahme.has(s.id);
+    return aktionenZu(s).map((a) => (laeuft ? { ...a, gesperrt: true as const } : a));
+  };
+  const kontextStelle = kontext == null ? undefined : stellen.find((s) => s.id === kontext.id);
+  const kontextListe = kontextStelle ? kontextEintraege(kontextStelle) : [];
+  // Zustand aus den Daten abgeleitet (wie `Datensicht`): im selben Render zurückgesetzt, danach ist
+  // die Bedingung falsch, es folgt kein weiterer Durchlauf.
+  if (kontext != null && kontextListe.length === 0) setKontext(null);
+  const kontextAusloeser = useKontextMenue<number>({
+    kannOeffnen: (id) => {
+      const s = stellen.find((x) => x.id === id);
+      return s != null && aktionenZu(s).length > 0;
+    },
+    onOeffnen: (id, { anker, vorherFokus }) => {
+      const s = stellen.find((x) => x.id === id);
+      if (s == null || aktionenZu(s).length === 0) return false;
+      setKontext({ id, offen: { anker, vorherFokus } });
+      return true;
+    },
+  });
+
   if (stellen.length === 0) {
     return (
       <SeitenLeer
@@ -150,39 +215,13 @@ export default function StellenListe({
   const zeile = (s: Verpflegungsstelle) => {
     const kennung = `Stelle ${s.bezeichnung}`;
     const laufend = laufendeZeitfensterDerStelle(s.id, zeitfenster, jetzt);
-    const aktionen: { key: Aktion; label: string; gefahr?: true; gesperrt?: true }[] = !darfPlanen
-      ? []
-      : s.status === 'geplant'
-        ? [
-            { key: 'aktiv', label: 'In Betrieb nehmen' },
-            { key: 'bearbeiten', label: 'Bearbeiten …' },
-            { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
-            ...(hasAusgabe(s.id, zeitfenster)
-              ? []
-              : s.geraet_gekoppelt
-                ? // LLH-1048: der Server lehnt mit 409 ab; gesperrt mit Grund statt weg, denn
-                  // erst der Widerruf der Kopplung macht es möglich.
-                  [
-                    {
-                      key: 'stornieren' as const,
-                      label: `Stornieren … (${GERAET_GEKOPPELT})`,
-                      gefahr: true as const,
-                      gesperrt: true as const,
-                    },
-                  ]
-                : [{ key: 'stornieren' as const, label: 'Stornieren …', gefahr: true as const }]),
-          ]
-        : s.status === 'aktiv'
-          ? [
-              { key: 'bearbeiten', label: 'Bearbeiten …' },
-              { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
-            ]
-          : [{ key: 'bearbeiten', label: 'Bearbeiten …' }];
+    const aktionen = aktionenZu(s);
     const grund = zeilen.grund(s.id);
     const laeuft = inBetriebnahme.has(s.id);
     return (
       <article
         key={s.id}
+        {...kontextAusloeser<HTMLElement>(s.id)}
         data-lfh="verpflegungsstelle"
         data-status={s.status}
         aria-label={kennung}
@@ -274,6 +313,15 @@ export default function StellenListe({
               children: aufgeloest.map(zeile),
             },
           ]}
+        />
+      )}
+      {kontextStelle != null && (
+        <KontextMenue<Aktion>
+          offen={kontext?.offen ?? null}
+          eintraege={kontextListe}
+          zugaenglicherName={`Aktionen zu Stelle ${kontextStelle.bezeichnung}`}
+          onWahl={(key) => fuehreAus(kontextStelle, key)}
+          onSchliessen={() => setKontext(null)}
         />
       )}
       {rueckfrage && (

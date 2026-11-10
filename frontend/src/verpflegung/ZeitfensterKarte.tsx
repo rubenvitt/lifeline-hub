@@ -11,6 +11,7 @@ import type {
   ZeitfensterPatch,
 } from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
+import { useKartenKontext } from '../components/useKartenKontext';
 import { useOffeneBearbeitungGrund } from '../components/offeneBearbeitung';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
@@ -251,9 +252,28 @@ export default function ZeitfensterKarte({
     if (key === 'nachfordern') onNachfordern?.(zf);
     if (key === 'loeschen') onLoeschen?.(zf);
   };
+  /*
+   * Kontextmenü (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine Karte mit mehreren Knöpfen …“):
+   * dieselben `aktionen` wie Knöpfe und ⋮, ohne den Sprung „Ausgabe öffnen“. Während der eigenen
+   * Bearbeitung sind die Aktionen ausgeblendet, also auch das Menü.
+   */
+  const { ausloeser, menue: kontextMenue } = useKartenKontext<Aktionsschluessel>({
+    aktionen:
+      bearbeiten && onBedarfSpeichern
+        ? []
+        : aktionen.map((a) => ({
+            key: a.key,
+            label: a.label,
+            onWahl: () => fuehreAus(a.key),
+            ...(a.danger ? { gefahr: true as const } : {}),
+            ...(a.gesperrt != null ? { gesperrt: true as const, sperrgrund: a.gesperrt } : {}),
+          })),
+    zugaenglicherName: `Aktionen zu Zeitfenster ${kennung}`,
+  });
 
   return (
     <article
+      {...ausloeser}
       data-lfh="verpflegung-karte"
       data-einstufung={stufe}
       data-alarm={stufe === 'unterdeckung' ? 'true' : undefined}
@@ -598,6 +618,7 @@ export default function ZeitfensterKarte({
           )}
         </>
       )}
+      {kontextMenue}
     </article>
   );
 }

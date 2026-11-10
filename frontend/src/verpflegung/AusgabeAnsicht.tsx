@@ -897,6 +897,9 @@ export default function AusgabeAnsicht() {
                     : { display: 'contents' }
                 }
               >
+                {/* Eine Auswahl, kein Menü eines Datensatzes: der Zählschirm hat bewusst kein
+                    Kontextmenü (Spec `datensatz-aktionsmenue`, „Ein Zählschirm hat kein
+                    Kontextmenü“, LLH-1598). */}
                 <MenueAusloeser<Kostform>
                   eintraege={ohneBedarf.map((k) => ({ key: k, label: KOSTFORM_LABEL[k] }))}
                   zugaenglicherName="Weitere Kostform …"

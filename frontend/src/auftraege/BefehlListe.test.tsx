@@ -380,13 +380,9 @@ describe('BefehlListe — Zeitstand (LFH-350 · H60)', () => {
 describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
   async function oeffneDialog(nutzer: ReturnType<typeof userEvent.setup>) {
     await nutzer.click(await screen.findByRole('button', { name: 'Befehl entwerfen' }));
-    // Ohne Namen: das rohe `render` vergibt jede `useId` als `test-id`, `aria-labelledby` des
-    // Dialogs zeigt deshalb nicht verlässlich auf den Titel. Der Titel wird stattdessen geprüft.
     // Kein Warten aufs Verschwinden beim Schliessen: jsdom beendet antds Ausblendung nicht, der
     // Dialog bleibt im Baum. Gerade dann zeigt das erneute Öffnen, was der Formularspeicher hält.
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Neuer Befehlsentwurf')).toBeInTheDocument();
-    return dialog;
+    return screen.findByRole('dialog', { name: 'Neuer Befehlsentwurf' });
   }
 
   async function waehleSchema(nutzer: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {

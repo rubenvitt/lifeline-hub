@@ -2,7 +2,12 @@ import { Button, Space, Typography, theme } from 'antd';
 import { useMemo } from 'react';
 import type { Evakuierungsbezirk, Raeumungszustand } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, {
+  spaltenFuer,
+  type Kartenplan,
+  type PrimaerAktion,
+  type WeitereAktionen,
+} from '../components/Datensicht';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -131,14 +136,37 @@ const KENNUNG_MAX_PX = 150;
 
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
-const bezirkSpalten = (
-  einsatzId: number,
-  darfSchreiben: boolean,
-  /** „Stand melden“: am Spiegel ein Antrag, auch ohne Schreibrecht (LLH-1492). */
+/** „Stand melden“ als Primäraktion der Zeile: EINE Quelle für Spalte und Kontextmenü (LLH-1598). */
+function standMelden(
+  /** Am Spiegel ein Antrag, auch ohne Schreibrecht (LLH-1492). */
   darfMelden: boolean,
   onStandMelden: (b: Evakuierungsbezirk) => void,
-  onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void,
+): PrimaerAktion<Evakuierungsbezirk> {
+  return {
+    etikett: 'Stand melden',
+    zugaenglicherName: (b) => `Stand melden für Bezirk ${b.bezeichnung}`,
+    sichtbar: () => darfMelden,
+    onKlick: onStandMelden,
+  };
+}
+
+/** Das ⋮ der Zeile, für Spalte und Kontextmenü (LLH-1598, design.md D5). */
+function bezirkWeitere(
+  darfSchreiben: boolean,
   karteGesperrt: boolean,
+  onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void,
+): WeitereAktionen<Evakuierungsbezirk> {
+  return {
+    eintraege: (b) => bezirkMenue(b, darfSchreiben, karteGesperrt),
+    zugaenglicherName: (b) => `Aktionen zu Bezirk ${b.bezeichnung}`,
+    onWahl: (key, b) => onAktion(key as BezirkAktion, b),
+  };
+}
+
+const bezirkSpalten = (
+  einsatzId: number,
+  aktion: PrimaerAktion<Evakuierungsbezirk>,
+  weitere: WeitereAktionen<Evakuierungsbezirk>,
   /** Unter `md`: „Stand melden" reitet in der fixierten Kennung mit. */
   meldenInKennung: boolean,
   kennungAbstand: number,
@@ -147,12 +175,9 @@ const bezirkSpalten = (
   abschnittWerte: readonly { text: string; value: string }[],
 ) => {
   const meldeKnopf = (b: Evakuierungsbezirk) =>
-    darfMelden ? (
-      <Button
-        aria-label={`Stand melden für Bezirk ${b.bezeichnung}`}
-        onClick={() => onStandMelden(b)}
-      >
-        Stand melden
+    (aktion.sichtbar?.(b) ?? true) ? (
+      <Button aria-label={aktion.zugaenglicherName?.(b)} onClick={() => aktion.onKlick(b)}>
+        {aktion.etikett}
       </Button>
     ) : null;
   return spaltenFuer<Evakuierungsbezirk>()([
@@ -275,7 +300,7 @@ const bezirkSpalten = (
       title: 'Aktionen',
       immerSichtbar: true,
       render: (_: unknown, b: Evakuierungsbezirk) => {
-        const eintraege = bezirkMenue(b, darfSchreiben, karteGesperrt);
+        const eintraege = weitere.eintraege(b);
         return (
           // `middle`: hält ≥ 16 px zwischen Knopf und Dreipunkt im Handschuh-Betrieb.
           <Space wrap size="middle">
@@ -283,8 +308,8 @@ const bezirkSpalten = (
             {eintraege.length > 0 && (
               <MenueAusloeser
                 eintraege={eintraege}
-                zugaenglicherName={`Aktionen zu Bezirk ${b.bezeichnung}`}
-                onWahl={(aktion) => onAktion(aktion, b)}
+                zugaenglicherName={weitere.zugaenglicherName(b)}
+                onWahl={(key) => weitere.onWahl(key, b)}
               />
             )}
           </Space>
@@ -295,17 +320,6 @@ const bezirkSpalten = (
 };
 
 type BezirkSpalte = ReturnType<typeof bezirkSpalten>[number]['key'];
-
-/**
- * Der Kartenplan ist Pflicht am Primitiv, greift bei `form="tabelle"` aber nie; ehrlich belegt,
- * falls die Form je auf `auto` wechselt.
- */
-const KARTE: Kartenplan<Evakuierungsbezirk, BezirkSpalte> = {
-  art: 'plan',
-  titel: { spalte: 'bezeichnung' },
-  status: (b) => raeumungszustand[b.raeumung],
-  sekundaer: ['evakuiert', 'stand', 'abschnitt'],
-};
 
 export default function BezirkTabelle({
   einsatzId,
@@ -344,32 +358,42 @@ export default function BezirkTabelle({
     () => (abschnittNamen ? abschnittNamen.split('\n').map((n) => ({ text: n, value: n })) : []),
     [abschnittNamen],
   );
+  const aktion = useMemo(
+    () => standMelden(darfMelden, onStandMelden),
+    [darfMelden, onStandMelden],
+  );
+  const weitere = useMemo(
+    () => bezirkWeitere(darfSchreiben, karteGesperrt, onAktion),
+    [darfSchreiben, karteGesperrt, onAktion],
+  );
+  /*
+   * Der Kartenplan ist Pflicht am Primitiv und greift bei `form="tabelle"` für die Darstellung nie.
+   * Primäraktion und ⋮ stehen trotzdem darin: aus ihnen baut die `Datensicht` das Kontextmenü der
+   * Zeile (LLH-1598), und die Spalte „Aktionen“ liest dieselben Daten.
+   */
+  const karte = useMemo<Kartenplan<Evakuierungsbezirk, BezirkSpalte>>(
+    () => ({
+      art: 'plan',
+      titel: { spalte: 'bezeichnung' },
+      status: (b) => raeumungszustand[b.raeumung],
+      sekundaer: ['evakuiert', 'stand', 'abschnitt'],
+      aktion,
+      weitere,
+    }),
+    [aktion, weitere],
+  );
   const spalten = useMemo(
     () =>
       bezirkSpalten(
         einsatzId,
-        darfSchreiben,
-        darfMelden,
-        onStandMelden,
-        onAktion,
-        karteGesperrt,
+        aktion,
+        weitere,
         istSchmal,
         token.marginXS,
         rollen.gedaempft,
         abschnittWerte,
       ),
-    [
-      einsatzId,
-      darfSchreiben,
-      darfMelden,
-      onStandMelden,
-      onAktion,
-      karteGesperrt,
-      istSchmal,
-      token.marginXS,
-      rollen.gedaempft,
-      abschnittWerte,
-    ],
+    [einsatzId, aktion, weitere, istSchmal, token.marginXS, rollen.gedaempft, abschnittWerte],
   );
   const aufklappen = useMemo(
     () => ({
@@ -399,7 +423,7 @@ export default function BezirkTabelle({
       leerText="Keine Evakuierungsbezirke"
       mehrzahl="Bezirken"
       gedaechtnis={gedaechtnis}
-      karte={KARTE}
+      karte={karte}
       aufklappen={aufklappen}
     />
   );

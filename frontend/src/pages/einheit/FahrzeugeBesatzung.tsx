@@ -20,7 +20,9 @@ import {
   useRollen,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
-import { MenueAusloeser } from '../../components/MenueAusloeser';
+import type { WeitereAktionen } from '../../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
+import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
 import { RechteHinweis, ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
@@ -278,6 +280,31 @@ export default function FahrzeugeBesatzung({
     funkrufname: f.fahrzeug.funkrufname,
   }));
 
+  /**
+   * Aktionen einer Person, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, design.md D3). Ohne
+   * Einträge (Rechte, Zustand) kein ⋮, und das Browsermenü bleibt.
+   */
+  const personMenue: WeitereAktionen<PersonRow> = {
+    eintraege: (p) =>
+      buildPersonMenuItems({ isFuehrer: p.isFuehrer, fahrzeugId: p.fahrzeugId }, menuFahrzeuge, {
+        canEditEinheit: rechte.canEditEinheit,
+        canEditBesatzung: canBesatzung,
+      }),
+    zugaenglicherName: (p) => `Aktionen zu Person ${p.name}`,
+    laeuft: (p) => pending.has(`p${p.epId}`),
+    onWahl: (key, p) => handleSelect(p, key as PersonMenuKey),
+  };
+  const allePersonen: readonly PersonRow[] = mittel
+    ? [
+        ...mittel.fahrzeuge.flatMap((f) => f.besatzung.map(fromBaum)),
+        ...mittel.ohneFahrzeug.map(fromBaum),
+      ]
+    : einheit.personal_mitglieder.map(fromMitglied);
+  const kontext = useZeilenMenueKontext(personMenue, {
+    finde: (k) => allePersonen.find((p) => p.epId === k),
+    schluessel: (p) => p.epId,
+  });
+
   /** Der Grund unter einer Zeile, über die ganze Breite. */
   const errorRow = (g: ZeilenGrund | null) =>
     g && (
@@ -306,7 +333,7 @@ export default function FahrzeugeBesatzung({
   };
 
   const renderPersonRow = (p: PersonRow) => (
-    <div key={p.epId} data-lfh="einheit-person" style={rowStyle}>
+    <div key={p.epId} data-lfh="einheit-person" style={rowStyle} {...kontext.ausloeser(p)}>
       <span style={{ display: 'inline-flex', gap: token.marginXXS }}>
         <PositionsMarken
           person={{ position: p.position, isFuehrer: p.isFuehrer, faehrtAuf: p.faehrtAuf }}
@@ -321,16 +348,7 @@ export default function FahrzeugeBesatzung({
       </span>
       {secondaryText([p.funktion, p.faehrtAuf ? `fährt auf ${p.faehrtAuf}` : null])}
       <span style={{ marginInlineStart: 'auto' }}>
-        <MenueAusloeser<PersonMenuKey>
-          eintraege={buildPersonMenuItems(
-            { isFuehrer: p.isFuehrer, fahrzeugId: p.fahrzeugId },
-            menuFahrzeuge,
-            { canEditEinheit: rechte.canEditEinheit, canEditBesatzung: canBesatzung },
-          )}
-          zugaenglicherName={`Aktionen zu Person ${p.name}`}
-          laeuft={pending.has(`p${p.epId}`)}
-          onWahl={(key) => handleSelect(p, key)}
-        />
+        <ZeilenMenueAusloeser menue={personMenue} zeile={p} />
       </span>
       {errorRow(personErrors.grund(p.epId))}
     </div>
@@ -557,6 +575,7 @@ export default function FahrzeugeBesatzung({
       ) : (
         content
       )}
+      {kontext.menue}
       {children}
       {canBesatzung && personal && (
         <BesatzungUebernehmenDialog

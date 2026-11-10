@@ -5,6 +5,7 @@ import { KlickbareZeile } from './Klickbar';
 import type { UnterEbene } from './Markdown';
 import { SeitenLeer } from './SeitenZustand';
 import { useRollen } from './instrument/rollenwerte';
+import type { KontextHandler } from './useKontextMenue';
 
 /**
  * Schlanker Ersatz für antds deprecated `<List>` (LFH-167; Entfernung in antd v7).
@@ -245,12 +246,18 @@ interface ListenEintragAuswahlProps extends ListenEintragBasisProps {
   /** Button-semantische Auswahl der Zeile; Navigation bleibt ein nativer Link. */
   onClick: () => void;
   actions?: never;
+  kontext?: never;
 }
 
 interface ListenEintragAnzeigeProps extends ListenEintragBasisProps {
   /** Aktionen rechts, mit `gestapelt` darunter (analog antd `List.Item` `actions`). */
   actions?: ReactNode[];
   onClick?: never;
+  /**
+   * Handler des Kontextmenüs aus `useKontextMenue` (LLH-1598): Rechtsklick, langer Druck und Taste
+   * öffnen das Menü des Eintrags. Nur für Anzeigezeilen; eine Auswahlzeile ist selbst ein Knopf.
+   */
+  kontext?: KontextHandler<HTMLElement>;
 }
 
 type ListenEintragProps = ListenEintragAuswahlProps | ListenEintragAnzeigeProps;
@@ -263,6 +270,7 @@ export function ListenEintrag({
   style,
   className,
   'aria-current': ariaCurrent,
+  kontext,
 }: ListenEintragProps) {
   const { token, rollen } = useRollen();
   const { size, bordered } = useContext(ListeContext);
@@ -338,7 +346,9 @@ export function ListenEintrag({
       {inhalt}
     </KlickbareZeile>
   ) : (
-    <div {...eintragProps}>{inhalt}</div>
+    <div {...eintragProps} {...kontext}>
+      {inhalt}
+    </div>
   );
 }
 

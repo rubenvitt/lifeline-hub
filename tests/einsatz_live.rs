@@ -663,6 +663,7 @@ async fn fuehrungsfunktion_setzen_feuert_einsatz_und_mitglieder() {
     .await;
     assert_eq!(kopf["meine_sachgebiete"], serde_json::json!(["s2"]));
     assert_eq!(kopf["meine_funktion"], "S2 Lage");
+    assert_eq!(kopf["meine_funktion_code"], "s2");
 }
 
 /// i6k6mzed, design.md D2: Aufnahme, Rollenwechsel und Entfernen verteilen `mitglieder` je

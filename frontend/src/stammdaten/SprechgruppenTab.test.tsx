@@ -11,6 +11,12 @@ import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
 import { setzeViewportBreite } from '../test/viewport';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  knopfreiheVon,
+  oeffneKontextmenue,
+} from '../test/kontextmenue';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -330,6 +336,39 @@ describe('SprechgruppenTab · Sortieren und Filtern (LLH-1096)', () => {
   });
 });
 
+describe('SprechgruppenTab · Kontextmenü (LLH-1599)', () => {
+  it('am breiten Schirm zeigt das Kontextmenü die Knöpfe der Zeile', async () => {
+    setzeViewportBreite(1280);
+    render(admin, aktivPaar);
+    for (const name of ['412_F_DRK', '208_D_DRK']) {
+      const zeile = (await screen.findByText(name)).closest('tr')!;
+      const menue = await oeffneKontextmenue(within(zeile).getAllByRole('cell')[1]);
+      expect(menue).toHaveAttribute('aria-label', `Aktionen zu Sprechgruppe ${name}`);
+      expect(eintraegeVon(menue)).toEqual(knopfreiheVon(zeile));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]')).toBeNull(),
+      );
+    }
+  });
+
+  it('„Deaktivieren“ im Kontextmenü fragt wie der Knopf nach', async () => {
+    setzeViewportBreite(1280);
+    render(admin, aktivPaar);
+    const zeile = (await screen.findByText('412_F_DRK')).closest('tr')!;
+    const menue = await oeffneKontextmenue(within(zeile).getAllByRole('cell')[1]);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Deaktivieren' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('412_F_DRK');
+  });
+
+  it('ohne Verwaltungsrecht bleibt das Browsermenü', async () => {
+    setzeViewportBreite(1280);
+    render(nichtAdmin, aktivPaar);
+    const zeile = (await screen.findByText('412_F_DRK')).closest('tr')!;
+    erwarteBrowsermenue(within(zeile).getAllByRole('cell')[1]);
+  });
+});
+
 describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
   it('sperrt die Sprechgruppe vom Hub und lässt die eigene bearbeitbar', async () => {
     server.use(herkunftHandler({ sprechgruppe: ['1'] }));
@@ -340,6 +379,8 @@ describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
     const hubZeile = (await screen.findByText('412_F_DRK')).closest('tr')!;
     await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
     expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    // Gesperrt heißt auch: kein eigenes Kontextmenü (LLH-1599 × kjezbk06).
+    erwarteBrowsermenue(within(hubZeile).getAllByRole('cell')[1]);
     expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
 

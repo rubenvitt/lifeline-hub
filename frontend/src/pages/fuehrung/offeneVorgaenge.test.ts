@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { Abloesung, Auftrag, Erinnerung, Meldung, Nachforderung } from '../../api/types';
+import type {
+  Abloesung,
+  Auftrag,
+  EinsatzAnzeige,
+  Erinnerung,
+  Meldung,
+  Nachforderung,
+} from '../../api/types';
 import {
   auftragFuerMich,
   erinnerungFuerMich,
@@ -123,42 +130,34 @@ describe('Folge je Abschnitt (LLH-1145)', () => {
   });
 });
 
-describe('Meine Stelle (LLH-1145 D5)', () => {
-  it('eigene Funktionen sind die Sachgebiete; ohne Sachgebiet EL nur mit Rolle Einsatzleitung', () => {
-    expect([
-      ...meineStelle(
-        { status: 'aktiv', meine_sachgebiete: ['s2', 's3'], meine_rolle: 'einsatzleitung' },
-        1,
-      ).funktionen,
-    ]).toEqual(['s2', 's3']);
-    expect([
-      ...meineStelle({ status: 'aktiv', meine_sachgebiete: [], meine_rolle: 'einsatzleitung' }, 1)
-        .funktionen,
-    ]).toEqual(['el']);
+describe('Meine Stelle (LLH-1145 D5, pkjvl5iy)', () => {
+  it('eigene Funktion ist der Code aus dem Einsatzkopf, nicht das Sachgebiet', () => {
+    const s7 = meineStelle({ meine_funktion_code: 's7' }, 1);
+    expect(s7.funktion).toBe('s7');
+    expect(s7.bezeichnung).toBeNull();
+    // Den EL-Fallback leitet das Backend ab (`funktion::ableiten`); das Frontend liest nur.
+    expect(meineStelle({ meine_funktion_code: 'el' }, 1).funktion).toBe('el');
+    // Ein Kopf nur mit Sachgebiet (etwa ein alter Offline-Stand) ergibt keine Funktion (D3).
+    const nurSachgebiet = { meine_sachgebiete: ['s2'] } as unknown as EinsatzAnzeige;
+    expect(meineStelle(nurSachgebiet, 1).funktion).toBeNull();
     expect(
-      meineStelle({ status: 'aktiv', meine_sachgebiete: [], meine_rolle: 'fuehrungspersonal' }, 1)
-        .funktionen.size,
-    ).toBe(0);
+      meineStelle({ meine_funktion_code: 'fachberater', meine_funktion_bezeichnung: ' THW ' }, 1)
+        .bezeichnung,
+    ).toBe(' THW ');
   });
 
-  const s2 = meineStelle(
-    { status: 'aktiv', meine_sachgebiete: ['s2'], meine_rolle: 'fuehrungspersonal' },
-    7,
-  );
+  const s2 = meineStelle({ meine_funktion_code: 's2' }, 7);
+  const auftrag = (over: Partial<Auftrag>) =>
+    ({ erstellt_von_id: 9, empfaenger: [], ...over }) as unknown as Auftrag;
+  const an = (funktion: string, funktion_text?: string | null) =>
+    auftrag({ empfaenger: [{ funktion, funktion_text }] as unknown as Auftrag['empfaenger'] });
 
   it('Empfänger ist eine eigene Funktion oder Absender bin ich', () => {
     expect(meldungFuerMich(meldung({ empfaenger_funktion: 's2' }), s2)).toBe(true);
     expect(meldungFuerMich(meldung({ erfasst_von_id: 7 }), s2)).toBe(true);
     expect(meldungFuerMich(meldung({ empfaenger_funktion: 's4' }), s2)).toBe(false);
 
-    const auftrag = (over: Partial<Auftrag>) =>
-      ({ erstellt_von_id: 9, empfaenger: [], ...over }) as unknown as Auftrag;
-    expect(
-      auftragFuerMich(
-        auftrag({ empfaenger: [{ funktion: 's2' }] as unknown as Auftrag['empfaenger'] }),
-        s2,
-      ),
-    ).toBe(true);
+    expect(auftragFuerMich(an('s2'), s2)).toBe(true);
     expect(auftragFuerMich(auftrag({ erstellt_von_id: 7 }), s2)).toBe(true);
     expect(auftragFuerMich(auftrag({}), s2)).toBe(false);
 
@@ -167,6 +166,56 @@ describe('Meine Stelle (LLH-1145 D5)', () => {
 
     expect(nachforderungFuerMich(nf({ erstellt_von_id: 7 }), s2)).toBe(true);
     expect(nachforderungFuerMich(nf({}), s2)).toBe(false);
+  });
+
+  it('S7 erkennt den Auftrag an S7 (LLH-1606)', () => {
+    const s7 = meineStelle({ meine_funktion_code: 's7' }, 7);
+    expect(auftragFuerMich(an('s7'), s7)).toBe(true);
+    expect(auftragFuerMich(an('s2'), s7)).toBe(false);
+    expect(meldungFuerMich(meldung({ empfaenger_funktion: 's7' }), s7)).toBe(true);
+    expect(erinnerungFuerMich(erinnerung({ empfaenger_funktion_code: 's7' }), s7)).toBe(true);
+  });
+
+  it('Fachberater: die Bezeichnung muss passen, ohne Groß-/Kleinschreibung und Rand', () => {
+    const thw = meineStelle(
+      { meine_funktion_code: 'fachberater', meine_funktion_bezeichnung: 'THW' },
+      7,
+    );
+    expect(auftragFuerMich(an('fachberater', ' thw '), thw)).toBe(true);
+    expect(auftragFuerMich(an('fachberater', 'Polizei'), thw)).toBe(false);
+    expect(auftragFuerMich(an('fuehrungshilfspersonal', 'THW'), thw)).toBe(false);
+    expect(
+      erinnerungFuerMich(
+        erinnerung({ empfaenger_funktion_code: 'fachberater', empfaenger_funktion: 'Thw' }),
+        thw,
+      ),
+    ).toBe(true);
+    expect(
+      erinnerungFuerMich(
+        erinnerung({ empfaenger_funktion_code: 'fachberater', empfaenger_funktion: 'Polizei' }),
+        thw,
+      ),
+    ).toBe(false);
+  });
+
+  it('fehlt eine Bezeichnung (geschwärzt), genügt der Code', () => {
+    const thw = meineStelle(
+      { meine_funktion_code: 'fuehrungshilfspersonal', meine_funktion_bezeichnung: 'Lotse' },
+      7,
+    );
+    expect(auftragFuerMich(an('fuehrungshilfspersonal', null), thw)).toBe(true);
+    expect(
+      erinnerungFuerMich(
+        erinnerung({
+          empfaenger_funktion_code: 'fuehrungshilfspersonal',
+          empfaenger_funktion: null,
+        }),
+        thw,
+      ),
+    ).toBe(true);
+    const geschwaerzt = meineStelle({ meine_funktion_code: 'fuehrungshilfspersonal' }, 7);
+    expect(auftragFuerMich(an('fuehrungshilfspersonal', 'Lotse'), geschwaerzt)).toBe(true);
+    expect(auftragFuerMich(an('fachberater', 'Lotse'), geschwaerzt)).toBe(false);
   });
 
   it('ohne Anmeldung ist nichts „von mir“', () => {

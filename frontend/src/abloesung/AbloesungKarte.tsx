@@ -3,6 +3,8 @@ import type { Dayjs } from 'dayjs';
 import type { Abloesung, BeendetGrund, RhythmusQuelle } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import type { KartenAktion } from '../components/kartenKontext';
+import { useKartenKontext } from '../components/useKartenKontext';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
@@ -165,8 +167,37 @@ export default function AbloesungKarte({
       : []),
   ];
 
+  /*
+   * Die Handlungen der Karte als Daten (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine Karte mit
+   * mehreren Knöpfen …“): Knöpfe und ⋮ unten lesen sie von hier, das Kontextmenü zeigt alle.
+   */
+  const vollziehen: KartenAktion | null =
+    darfSchreiben && laufend && onVollziehen
+      ? { key: 'vollziehen', label: 'Ablösung vollziehen', onWahl: () => onVollziehen(s) }
+      : null;
+  const menueAktionen: KartenAktion<'abloeser' | 'rhythmus'>[] =
+    darfSchreiben && laufend
+      ? menue.map((e) => ({
+          ...e,
+          onWahl: e.key === 'abloeser' ? () => onAbloeserPlanen?.(s) : () => onRhythmusAendern?.(s),
+        }))
+      : [];
+  const zuruecknehmen: KartenAktion | null =
+    darfSchreiben && !laufend && s.ruecknehmbar && onZuruecknehmen
+      ? { key: 'zuruecknehmen', label: 'Vollzug zurücknehmen', onWahl: () => onZuruecknehmen(s) }
+      : null;
+  const { ausloeser, menue: kontextMenue } = useKartenKontext({
+    aktionen: [
+      ...(vollziehen ? [vollziehen] : []),
+      ...menueAktionen,
+      ...(zuruecknehmen ? [zuruecknehmen] : []),
+    ],
+    zugaenglicherName: `Aktionen zu ${s.einheit_name}`,
+  });
+
   return (
     <article
+      {...ausloeser}
       data-lfh="abloesung-karte"
       data-einstufung={stufe ?? undefined}
       data-alarm={stufe === 'ueberfaellig' ? 'true' : undefined}
@@ -455,18 +486,15 @@ export default function AbloesungKarte({
           // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen
           // (MIL-STD-1472F Fig. 24).
           <Flex justify="flex-end" gap={token.marginSM} style={{ marginTop: token.marginXS }}>
-            {onVollziehen && (
+            {vollziehen && (
               // Kein `type="primary"`: die eine Primäraktion der Seite steht im Kopf; n blaue Kartenknöpfe
               // nähmen der Einstufung am Rand die Aufmerksamkeit.
-              <Button onClick={() => onVollziehen(s)}>Ablösung vollziehen</Button>
+              <Button onClick={vollziehen.onWahl}>{vollziehen.label}</Button>
             )}
             <MenueAusloeser
-              eintraege={menue}
+              eintraege={menueAktionen}
               zugaenglicherName={`Aktionen zu ${s.einheit_name}`}
-              onWahl={(key) => {
-                if (key === 'abloeser') onAbloeserPlanen?.(s);
-                if (key === 'rhythmus') onRhythmusAendern?.(s);
-              }}
+              onWahl={(key) => menueAktionen.find((a) => a.key === key)?.onWahl()}
             />
           </Flex>
         )}
@@ -476,12 +504,13 @@ export default function AbloesungKarte({
             <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
           </div>
         )}
-        {darfSchreiben && !laufend && s.ruecknehmbar && onZuruecknehmen && (
+        {zuruecknehmen && (
           <Flex justify="flex-end" style={{ marginTop: token.marginXS }}>
-            <Button onClick={() => onZuruecknehmen(s)}>Vollzug zurücknehmen</Button>
+            <Button onClick={zuruecknehmen.onWahl}>{zuruecknehmen.label}</Button>
           </Flex>
         )}
       </div>
+      {kontextMenue}
     </article>
   );
 }

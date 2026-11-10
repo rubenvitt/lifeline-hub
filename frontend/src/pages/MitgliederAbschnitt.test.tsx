@@ -397,11 +397,7 @@ describe('MitgliederAbschnitt', () => {
     const zeile = async (name: string) =>
       (await screen.findByText(name)).closest('tr') as HTMLElement;
     /** Öffnet das Rollenfeld einer Zeile und liefert die Option `name` der offenen Liste. */
-    /** Die Rückfrage; über den Titel, weil antd im Test `aria-labelledby="test-id"` mehrfach vergibt. */
-    const rueckfrage = async () =>
-      (await screen.findByText('Eigene Rolle herabstufen?')).closest(
-        '[role="dialog"]',
-      ) as HTMLElement;
+    const rueckfrage = () => screen.findByRole('dialog', { name: 'Eigene Rolle herabstufen?' });
     async function rollenOption(name: string, option: string): Promise<HTMLElement> {
       await userEvent.click(screen.getByRole('combobox', { name: `Rolle von ${name}` }));
       const treffer = await screen.findAllByTitle(option);

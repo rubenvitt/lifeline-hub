@@ -156,6 +156,7 @@ function BefehlDetail() {
    */
   const schutz = useEntwurfVerlustschutz<BefehlAnzeige, FormWerte>({
     daten: befehlQuery.data,
+    geladenAm: befehlQuery.dataUpdatedAt,
     istEntwurf: befehlQuery.data?.status === 'entwurf',
     form,
     werteAus: (b) => {
