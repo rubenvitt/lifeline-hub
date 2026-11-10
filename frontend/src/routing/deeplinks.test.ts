@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   personDruckPfad,
+  registrierlisteDruckPfad,
+  geraetRegistrierlisteDruckPfad,
   personenDruckPfad,
   parsePersonenDruckAuswahl,
   tiereDruckPfad,
@@ -135,6 +137,21 @@ describe('deeplinks — Item-Routes (Vollseiten-Detail)', () => {
   });
   it('personDruckPfad: Druckansicht einer Person unter personen/<id>/druck (LLH-1120)', () => {
     expect(personDruckPfad(E, 10)).toBe('/einsaetze/5/personen/10/druck');
+  });
+  it('registrierlisteDruckPfad: Registrierliste einer Stelle unter betreuung/<id>/registrierliste/druck (LLH-1616)', () => {
+    expect(registrierlisteDruckPfad(E, 3)).toBe('/einsaetze/5/betreuung/3/registrierliste/druck');
+    expect(registrierlisteDruckPfad(E, 3, { unvertraeglichkeiten: true })).toBe(
+      '/einsaetze/5/betreuung/3/registrierliste/druck?unvertraeglichkeiten=1',
+    );
+    expect(registrierlisteDruckPfad(E, 3, { unvertraeglichkeiten: false })).toBe(
+      '/einsaetze/5/betreuung/3/registrierliste/druck',
+    );
+  });
+  it('geraetRegistrierlisteDruckPfad: am Gerät ohne Stelle, es gilt die gebundene (LLH-1616)', () => {
+    expect(geraetRegistrierlisteDruckPfad(E)).toBe('/geraet/5/betreuung/registrierliste/druck');
+    expect(geraetRegistrierlisteDruckPfad(E, { unvertraeglichkeiten: true })).toBe(
+      '/geraet/5/betreuung/registrierliste/druck?unvertraeglichkeiten=1',
+    );
   });
   it('personDetailPfad', () => {
     expect(personDetailPfad(E, 10)).toBe('/einsaetze/5/personen/10');

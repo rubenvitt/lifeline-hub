@@ -296,14 +296,14 @@ Tab öffnen“, „Bild speichern unter“, „Kopieren“ und „Einfügen“. 
 Zeile mit Kontextmenü nicht durch langes Drücken markieren.
 
 Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, in den
-Tabellen der Betreuungsstellen und Evakuierungsbezirke, an den Karten von Meldungen,
-Nachforderungen, Aufträgen, Ablösungen, Verpflegungsstellen und Zeitfenstern und an den Nachrichten
-im Chat. Trägt eine Karte mehrere Knöpfe, stehen alle im Menü, danach die Einträge des Menüs „⋮“;
-Sprünge wie „Ausgabe öffnen“ und Auswahlfelder wie „Bearbeiter zuweisen“ bleiben an der Karte. Ein
-Knopf, der vorher nachfragt, fragt aus dem Kontextmenü in einem Dialog nach. Der Zählschirm der
-Verpflegungsausgabe hat kein Kontextmenü, damit ein langer Druck auf eine Zähltaste nichts anderes
-auslöst. Lagekarte und Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt
-wurde.
+Tabellen der Betreuungsstellen und Evakuierungsbezirke, an den Blöcken im Raster des Schichtplans
+(Kapitel [Ablösung](abloesung.md)), an den Karten von Meldungen, Nachforderungen, Aufträgen,
+Ablösungen, Verpflegungsstellen und Zeitfenstern und an den Nachrichten im Chat. Trägt eine Karte
+mehrere Knöpfe, stehen alle im Menü, danach die Einträge des Menüs „⋮“; Sprünge wie „Ausgabe öffnen“
+und Auswahlfelder wie „Bearbeiter zuweisen“ bleiben an der Karte. Ein Knopf, der vorher nachfragt,
+fragt aus dem Kontextmenü in einem Dialog nach. Der Zählschirm der Verpflegungsausgabe hat kein
+Kontextmenü, damit ein langer Druck auf eine Zähltaste nichts anderes auslöst. Lagekarte und
+Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 
 ### Was die Sprungpalette kennt
 

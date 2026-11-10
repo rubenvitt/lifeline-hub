@@ -560,10 +560,17 @@ test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „
   );
 });
 
-/** Dichte setzen und neu laden (Schlüssel aus `theme/ThemeModeProvider.tsx`, literal als Vertrag). */
-async function stelleDichte(page: Page, dichte: 'kompakt' | 'komfortabel' | 'handschuh') {
+type Dichte = 'kompakt' | 'komfortabel' | 'handschuh';
+
+/**
+ * Seite in einer Dichte öffnen: die Wahl in den Speicher, dann EINE Ladung (Schlüssel aus
+ * `theme/ThemeModeProvider.tsx`, literal als Vertrag). Der Provider liest die Dichte nur beim
+ * Montieren; `goto` und danach `reload` kostete je Fall zwei volle Ladungen des Dev-Bundles.
+ * Braucht eine Seite derselben Herkunft, also nach `anmelden`.
+ */
+async function oeffneInDichte(page: Page, pfad: string, dichte: Dichte) {
   await page.evaluate((w) => window.localStorage.setItem('lifeline-hub.dichte', w), dichte);
-  await page.reload();
+  await page.goto(pfad);
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
@@ -572,60 +579,69 @@ async function stelleDichte(page: Page, dichte: 'kompakt' | 'komfortabel' | 'han
  * Art nach dem Tipp auf eine Region ohne Bildlauf im Bild, auch in der Handschuh-Stufe am
  * Führungs-Tablet (1280 × 800 mit Rail und Modulpanel, 1024 × 768). Reicht die Breite nicht für
  * vorn, hinten und die Wahl nebeneinander, schaltet eine Segmentleiste die Ansicht um.
+ * Am Handy (390 × 844) nur die Handschuh-Stufe: die Figur (480 px) ist breiter als der Schirm
+ * und rollt, statt zu schrumpfen; die Wahl steht darunter und rückt nach dem Tipp ins Bild.
+ *
+ * Ein Test je Breite, höchstens vier volle Ladungen (LLH-1614): alle sieben Fälle in einem Test
+ * waren 15 Ladungen in einem Browserkontext. Ab der achten bis neunten brach Chromium die
+ * Modulabrufe des Dev-Servers mit `net::ERR_INSUFFICIENT_RESOURCES` ab, die Seite blieb leer
+ * und `data-dichte` fehlte (unter `--workers=4 --repeat-each=4` gemessen, vier von vier rot).
  *
  * Mutationsprobe: in `Koerperschema.tsx` beide Ansichten immer nebeneinander (`sichtbar =
  * ANSICHTEN`) → bei 1280 × 800 im Handschuh ist die Wahl nach dem Tipp nicht zu sehen (rot,
  * gemessen).
  */
-test('Körperschema: Wahl der Art nach dem Tipp im Bild, auch im Handschuh am Tablet', async ({
-  page,
-}) => {
-  test.slow();
-  await anmelden(page);
-  const e = await einsatzPerApi(page, `E2E Körperschema Wahl ${Date.now()}`);
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
-    name: 'Wahltest',
-    geschlecht: 'maennlich',
-    sichtung: 'sk2',
-  });
-  // Am Handy (390 × 844) nur die Handschuh-Stufe: die Figur (480 px) ist breiter als der Schirm
-  // und rollt, statt zu schrumpfen; die Wahl steht darunter und rückt nach dem Tipp ins Bild.
-  const faelle = [
-    ...[TABLET_QUER, { width: 1024, height: 768 }].flatMap((viewport) =>
-      (['kompakt', 'komfortabel', 'handschuh'] as const).map((dichte) => ({ viewport, dichte })),
-    ),
-    { viewport: { width: 390, height: 844 }, dichte: 'handschuh' as const },
-  ];
-  for (const { viewport, dichte } of faelle) {
-    const was = `${viewport.width} × ${viewport.height}, ${dichte}`;
-    const handy = viewport.width < 768;
+const KOERPERSCHEMA_WAHL_FAELLE: {
+  viewport: { width: number; height: number };
+  dichten: Dichte[];
+}[] = [
+  { viewport: TABLET_QUER, dichten: ['kompakt', 'komfortabel', 'handschuh'] },
+  { viewport: { width: 1024, height: 768 }, dichten: ['kompakt', 'komfortabel', 'handschuh'] },
+  { viewport: { width: 390, height: 844 }, dichten: ['handschuh'] },
+];
+
+for (const { viewport, dichten } of KOERPERSCHEMA_WAHL_FAELLE) {
+  test(`Körperschema: Wahl der Art nach dem Tipp im Bild, auch im Handschuh (${viewport.width} × ${viewport.height})`, async ({
+    page,
+  }) => {
+    test.slow();
+    await anmelden(page);
+    const e = await einsatzPerApi(page, `E2E Körperschema Wahl ${Date.now()}`);
+    const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+      name: 'Wahltest',
+      geschlecht: 'maennlich',
+      sichtung: 'sk2',
+    });
     await page.setViewportSize(viewport);
-    await page.goto(`/einsaetze/${e}/personen/${person.id}`);
-    await stelleDichte(page, dichte);
-    await patientenkopf(page).getByRole('button', { name: 'Verletzung markieren' }).click();
-    const paneel = page.getByRole('region', { name: 'Verletzung markieren' });
-    const zone = paneel.getByRole('button', { name: 'Unterarm links, vorn' });
-    await zone.scrollIntoViewIfNeeded();
-    await zone.click();
-    const wahl = paneel.getByRole('group', { name: 'Verletzung an Unterarm links, vorn' });
-    await expect(wahl, `${was}: Wahl offen`).toBeVisible();
-    // Der zweite Tipp braucht keinen Bildlauf: jede Art steht ganz im Bild.
-    const arten = wahl.getByRole('radiogroup', { name: 'Art der Verletzung' }).getByRole('radio');
-    await expect(arten).toHaveCount(7);
-    for (const art of await arten.all()) {
-      const name = await art.getAttribute('aria-label');
-      await expect(art, `${was}: ${name} im Bild`).toBeInViewport({ ratio: 1 });
+    for (const dichte of dichten) {
+      const was = `${viewport.width} × ${viewport.height}, ${dichte}`;
+      const handy = viewport.width < 768;
+      await oeffneInDichte(page, `/einsaetze/${e}/personen/${person.id}`, dichte);
+      await patientenkopf(page).getByRole('button', { name: 'Verletzung markieren' }).click();
+      const paneel = page.getByRole('region', { name: 'Verletzung markieren' });
+      const zone = paneel.getByRole('button', { name: 'Unterarm links, vorn' });
+      await zone.scrollIntoViewIfNeeded();
+      await zone.click();
+      const wahl = paneel.getByRole('group', { name: 'Verletzung an Unterarm links, vorn' });
+      await expect(wahl, `${was}: Wahl offen`).toBeVisible();
+      // Der zweite Tipp braucht keinen Bildlauf: jede Art steht ganz im Bild.
+      const arten = wahl.getByRole('radiogroup', { name: 'Art der Verletzung' }).getByRole('radio');
+      await expect(arten).toHaveCount(7);
+      for (const art of await arten.all()) {
+        const name = await art.getAttribute('aria-label');
+        await expect(art, `${was}: ${name} im Bild`).toBeInViewport({ ratio: 1 });
+      }
+      if (!handy) {
+        await expect(zone, `${was}: die getippte Zone bleibt im Bild`).toBeInViewport();
+      }
+      // Zonen schrumpfen nie unter die Stufe (Spec „Jede Region ist erreichbar“).
+      const k = (await zone.boundingBox())!;
+      const boden = { kompakt: 30, komfortabel: 48, handschuh: 72 }[dichte];
+      expect(k.height + 0.5, `${was}: Zonenhöhe`).toBeGreaterThanOrEqual(boden);
+      expect(k.width + 0.5, `${was}: Zonenbreite`).toBeGreaterThanOrEqual(boden);
     }
-    if (!handy) {
-      await expect(zone, `${was}: die getippte Zone bleibt im Bild`).toBeInViewport();
-    }
-    // Zonen schrumpfen nie unter die Stufe (Spec „Jede Region ist erreichbar“).
-    const k = (await zone.boundingBox())!;
-    const boden = { kompakt: 30, komfortabel: 48, handschuh: 72 }[dichte];
-    expect(k.height + 0.5, `${was}: Zonenhöhe`).toBeGreaterThanOrEqual(boden);
-    expect(k.width + 0.5, `${was}: Zonenbreite`).toBeGreaterThanOrEqual(boden);
-  }
-});
+  });
+}
 
 /**
  * Spec `personen-detail`, „Patientenkopf beantwortet die Patientenfragen“ (390 × 844): mit

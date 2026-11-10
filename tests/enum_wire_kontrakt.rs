@@ -666,7 +666,8 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
-    // Stammdaten-Verteilung (LLH-1493): Wire = `art` in stammdaten_aenderung/-herkunft (0306).
+    // Stammdaten-Verteilung (LLH-1493, LLH-1613): Wire = `art` in stammdaten_aenderung/-herkunft
+    // (0306, 0312).
     enum_wire_as_str!(lifeline_hub::instanz::stammdaten::StammdatenArt {
         Konto,
         OrgEinstellungen,
@@ -680,6 +681,14 @@ fn serde_wire_gleich_as_str() {
         Material,
         Personal,
         EinheitVorlage,
+        Schichtmodell,
+        EinsatzVorlage,
+        StichwortVorschlag,
+        VerpflegungVorlage,
+        Sprechgruppe,
+        EtbBaustein,
+        ExterneStelle,
+        UnterkunftRichtwert,
     });
     enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzProtokoll {
         Passt,
@@ -711,6 +720,7 @@ fn orphan_enums_wire() {
         Export => "export",
         Druck => "druck",
         Anhang => "anhang",
+        Registrierliste => "registrierliste",
     });
     // LFH-758: Fassung im Lese-Audit der UHS-Dateien; Wire = DB-CHECK in 0138.
     enum_wire!(lifeline_hub::anhang::audit_repo::ZugriffFassung {
