@@ -188,13 +188,29 @@ describe('Registrierliste drucken (LLH-1616)', () => {
   });
 });
 
+/**
+ * Das Rückfrage-Modal an seiner sichtbaren Überschrift. Über den zugänglichen Namen geht es seit
+ * antd 6.7 nicht: `useId` aus `@rc-component/util` liefert unter `NODE_ENV=test` die Konstante
+ * `'test-id'`, `aria-labelledby` zeigt dann auf das erste Element mit dieser Kennung (Muster
+ * `pages/BenutzerPage.test.tsx`).
+ */
+async function dialogMitTitel(titel: RegExp): Promise<HTMLElement> {
+  return waitFor(() => {
+    const treffer = screen
+      .getAllByRole('dialog')
+      .filter((d) => titel.test(d.querySelector('.ant-modal-title')?.textContent ?? ''));
+    expect(treffer).toHaveLength(1);
+    return treffer[0];
+  });
+}
+
 describe('Abmelden', () => {
   it('Haushalt: Rückfrage nennt Haushalt und Zahl, Ziel optional, ein Request mit haushalt_id', async () => {
     const user = userEvent.setup();
     const draht = rendere();
     await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
     await user.click(await screen.findByRole('button', { name: 'H-1 abmelden' }));
-    const dialog = await screen.findByRole('dialog', { name: /H-1 abmelden/ });
+    const dialog = await dialogMitTitel(/^H-1 abmelden\?$/);
     expect(dialog).toHaveTextContent('3 Personen');
     await user.type(within(dialog).getByRole('textbox', { name: 'Ziel' }), 'zu Verwandten');
     await user.click(within(dialog).getByRole('button', { name: 'Haushalt abmelden' }));
@@ -212,7 +228,7 @@ describe('Abmelden', () => {
     const draht = rendere();
     await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
     await user.click(await screen.findByRole('button', { name: 'R-013 Weber, Tom abmelden' }));
-    const dialog = await screen.findByRole('dialog', { name: /R-013 Weber, Tom abmelden/ });
+    const dialog = await dialogMitTitel(/^R-013 Weber, Tom abmelden\?$/);
     await user.click(within(dialog).getByRole('button', { name: 'Person abmelden' }));
 
     await waitFor(() => expect(draht.abmeldungen).toHaveLength(1));

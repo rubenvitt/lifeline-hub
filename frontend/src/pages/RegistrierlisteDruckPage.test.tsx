@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
@@ -128,7 +129,7 @@ describe('RegistrierlisteDruckPage (LLH-1616)', () => {
   it('der Schalter lädt die Fassung mit Unverträglichkeiten neu und nennt sie im Kopf', async () => {
     const draht = renderPage();
     await fertig();
-    fireEvent.click(screen.getByRole('switch', { name: 'Unverträglichkeiten mitdrucken' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Unverträglichkeiten mitdrucken' }));
     await waitFor(() => expect(within(wurzel()).getByText('Erdnüsse')).toBeInTheDocument());
     expect(draht.abrufe).toEqual(['', '?unvertraeglichkeiten=1']);
     expect(wurzel().querySelector('[data-lfh="druckkopf"]')).toHaveTextContent(
@@ -149,7 +150,7 @@ describe('RegistrierlisteDruckPage (LLH-1616)', () => {
   it('„Neu laden“ ruft erneut ab', async () => {
     const draht = renderPage();
     await fertig();
-    fireEvent.click(screen.getByRole('button', { name: 'Neu laden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Neu laden' }));
     await waitFor(() => expect(draht.abrufe).toHaveLength(2));
   });
 
