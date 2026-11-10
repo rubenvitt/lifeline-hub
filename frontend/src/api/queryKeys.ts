@@ -103,6 +103,8 @@ export const EINSATZ_KEYS = {
   // Betreuung auf die Platte geht (Namen, Geburtsdaten, Unverträglichkeiten). Live über
   // `betreuung` (Registrieren, Abmelden) und `person` (Kostform, Verbleib, Storno).
   registrierliste: 'einsatz-registrierliste',
+  // Registrierliste drucken (LLH-1616): Schnappschuss, nicht live, nicht auf der Platte.
+  registrierlisteDruck: 'einsatz-registrierliste-druck',
   // Evakuierungsbezirke (LLH-1034): eigenes Modul neben der Betreuung, eigener Prefix.
   evakuierung: 'einsatz-evakuierung',
   verpflegung: 'einsatz-verpflegung',
@@ -531,6 +533,9 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Ereignis `auftrag` per Präfix mit.
  * - `personDruck` (LLH-1120): derselbe Schnappschuss-Grundsatz für das Blatt einer Person; jeder
  *   Abruf schreibt einen `druck`-Eintrag ins Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
+ * - `registrierlisteDruck` (LLH-1616): derselbe Schnappschuss-Grundsatz für die Registrierliste
+ *   einer Betreuungsstelle; jeder Abruf schreibt je Person einen Protokolleintrag, ein
+ *   Live-Refetch schriebe weitere.
  * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
  *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
@@ -570,6 +575,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.auftragDruck,
   EINSATZ_KEYS.personDruck,
+  EINSATZ_KEYS.registrierlisteDruck,
   EINSATZ_KEYS.schichtplanDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
@@ -858,6 +864,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.registrierliste, einsatzId, stelleId] as const,
   /** Invalidierungs-Prefix aller Registrierlisten des Einsatzes. */
   registrierlisteAlle: (einsatzId: number) => [EINSATZ_KEYS.registrierliste, einsatzId] as const,
+  registrierlisteDruck: (einsatzId: number, stelleId: number, hasUnvertraeglichkeiten: boolean) =>
+    [EINSATZ_KEYS.registrierlisteDruck, einsatzId, stelleId, hasUnvertraeglichkeiten] as const,
   // Evakuierung (LLH-1034): argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und
   // Kennzahl „Evakuiert“ teilen ihn).
   evakuierung: (einsatzId: number) => [EINSATZ_KEYS.evakuierung, einsatzId] as const,
