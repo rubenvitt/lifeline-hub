@@ -29,6 +29,13 @@ Jede Aufgabe entsteht per TDD (erst der rote Test). Zunder: LLH-1616,
 - [x] 4.2 Anwenderkapitel `docs/anwender/kapitel/betreuung.md` und `geraet-betreuungsstelle.md` um „Registrierliste drucken“ ergänzen (Mitänderungsregel, `docs/anwender/AGENTS.md`); Doku-Wächter grün
 - [ ] 4.3 `./scripts/check-all.sh` grün (bzw. die CI des PRs)
 
+## 5. Review-Nachzüge (Entscheidungen 09.11.2026)
+
+- [x] 5.1 Druckabruf in `write_retry!` (`BEGIN IMMEDIATE`) statt deferred `BEGIN`; Repo-Test `druck_wartet_auf_einen_fremden_schreiber` (gehaltener fremder Schreiber auf der Datei-DB) rot vorher, grün danach
+- [x] 5.2 Eigene Protokollart `registrierliste` (Migration 0311, `ZugriffArt`, Enum-Kontrakt, generierte Typen, Klartext „Registrierliste gedruckt“); `db::tests::migration_0311_*`, `zugriffArt.test.ts` grün
+- [x] 5.3 Bezugsperson, die nicht auf der Liste steht, fällt im Druck aus dem Haushaltskopf; Repo-Test `druck_nennt_eine_abgemeldete_bezugsperson_nicht` grün
+- [x] 5.4 Bezeichner nach LFH-1312: `audit_repo::anlegen` → `create` als eigener `refactor`-Commit, neue Wahrheitswerte `has_…`
+
 ## Workflow follow-up
 
 - `/opsx:archive iw8hjb93-registrierliste-drucken` im selben Branch vor dem PR.

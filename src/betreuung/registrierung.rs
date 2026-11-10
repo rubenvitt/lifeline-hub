@@ -538,13 +538,13 @@ pub async fn liste(
 }
 
 /// Die Registrierliste für den Druck (LLH-1616, Change `iw8hjb93-registrierliste-drucken`
-/// design.md D2/D3): in EINER Schreibtransaktion lesen und je Person einen Eintrag `druck` ins
-/// Zugriffsprotokoll schreiben; erst nach dem Commit verlässt die Liste den Server. Scheitert ein
-/// Eintrag, bleibt keiner stehen und keine Person geht hinaus. `write_retry!` öffnet mit
-/// `BEGIN IMMEDIATE`: ein deferred `BEGIN` mit Lesen vor dem ersten Eintrag scheiterte beim
-/// Lock-Upgrade sofort, sobald gleichzeitig registriert wird (`src/tx.rs`). Ohne
-/// `has_unvertraeglichkeiten` fehlt die Gesundheitsangabe in der Antwort (Spec
-/// „Gesundheitsangaben nur auf Wunsch“).
+/// design.md D2/D3): in EINER Schreibtransaktion lesen und je Person einen Eintrag
+/// `registrierliste` ins Zugriffsprotokoll schreiben; erst nach dem Commit verlässt die Liste den
+/// Server. Scheitert ein Eintrag, bleibt keiner stehen und keine Person geht hinaus.
+/// `write_retry!` öffnet mit `BEGIN IMMEDIATE`: ein deferred `BEGIN` mit Lesen vor dem ersten
+/// Eintrag scheiterte beim Lock-Upgrade sofort, sobald gleichzeitig registriert wird
+/// (`src/tx.rs`). Ohne `has_unvertraeglichkeiten` fehlt die Gesundheitsangabe in der Antwort
+/// (Spec „Gesundheitsangaben nur auf Wunsch“).
 pub async fn liste_for_druck(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -566,12 +566,23 @@ pub async fn liste_for_druck(
                 einsatz_id,
                 Some(p.id),
                 benutzer_id,
-                "druck",
+                "registrierliste",
             )
             .await?;
         }
         Ok(l)
     })?;
+    // Nur wer gedruckt (und protokolliert) wird, steht auf dem Blatt: eine Bezugsperson, die nicht
+    // (mehr) an der Stelle registriert ist, fällt aus dem Haushaltskopf (Review, 09.11.2026).
+    for h in &mut l.haushalte {
+        let gelistet = h
+            .bezugsperson_id
+            .is_some_and(|b| h.personen.iter().any(|p| p.id == b));
+        if !gelistet {
+            h.bezugsperson_id = None;
+            h.bezugsperson_name = None;
+        }
+    }
     if !has_unvertraeglichkeiten {
         let personen = l
             .haushalte

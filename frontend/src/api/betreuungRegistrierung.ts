@@ -40,7 +40,7 @@ export function loadRegistrierListe(einsatzId: number, stelleId: number): Promis
 }
 
 /**
- * Registrierliste für den Druck (LLH-1616): jeder Abruf schreibt je Person einen `druck`-Eintrag
+ * Registrierliste für den Druck (LLH-1616): jeder Abruf schreibt je Person einen Eintrag `registrierliste`
  * ins Zugriffsprotokoll; nur über diesen Weg drucken (`druck/AGENTS.md`). Unverträglichkeiten
  * liefert der Server nur mit `hasUnvertraeglichkeiten`.
  */

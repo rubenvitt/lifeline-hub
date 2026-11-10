@@ -143,8 +143,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   und am Gerät `/geraet/:id/betreuung/registrierliste/druck`, beide über
   `betreuung/registrierung/RegistrierlisteDruckSeite.tsx` und `EinsatzPfade.registrierlisteDruck`;
   Einstieg „Registrierliste drucken“ im Paneel „Registrierung“, auch ohne Schreibrecht. Geladen nur
-  über `GET …/stellen/{sid}/registrierungen/druck`, das in EINER Transaktion je Person einen
-  `druck`-Eintrag schreibt (nie listenweit) und erst nach dem Commit liefert. Unverträglichkeiten
+  über `GET …/stellen/{sid}/registrierungen/druck`, das in EINER Transaktion (`write_retry!`) je Person einen
+  Eintrag der eigenen Art `registrierliste` schreibt (nie listenweit, nie `druck`: das Protokoll
+  trennt ihn vom Personenblatt) und erst nach dem Commit liefert. Eine Bezugsperson, die nicht auf
+  der Liste steht, fällt aus dem Haushaltskopf. Unverträglichkeiten
   nur mit `?unvertraeglichkeiten=1` (Schalter in der Adresse, im Key, im Druckkopf
   „Gesundheitsangaben“); ohne liefert der Server das Feld nicht. Nicht-live Key
   `registrierlisteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0`. **Einzige Ausnahme zu „Personendruck nie am

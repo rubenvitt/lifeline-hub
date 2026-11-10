@@ -53,14 +53,21 @@ während des Druckens verändern könnte.
 
 ### D2 Protokoll je Person, in einer Transaktion vor der Antwort
 
-Abgestimmt mit Ruben (09.11.2026): je gedruckter Person ein Eintrag `druck` mit `person_id`,
-nicht ein listenweiter. Ein listenweiter Eintrag erschiene über das Erfassungsfenster bei jeder
+Abgestimmt mit Ruben (09.11.2026): je gedruckter Person ein Eintrag mit `person_id`, nicht ein
+listenweiter. Die Art ist eine eigene, `registrierliste` (Migration 0311, `ZugriffArt`,
+Klartext „Registrierliste gedruckt“): im Protokoll der Person war der Listendruck mit `druck`
+nicht vom Personenblatt (LLH-1120) zu unterscheiden (Review, Entscheidung 09.11.2026). Ein listenweiter Eintrag erschiene über das Erfassungsfenster bei jeder
 Person des Einsatzes (`audit_repo::liste_je_person`), auch an anderen Stellen; je Person ist
-genau. Ablauf: Transaktion öffnen, Liste in der Transaktion lesen (dieselbe Abfrage wie
+genau. Ablauf: Schreibtransaktion über `write_retry!` öffnen (`BEGIN IMMEDIATE`: ein deferred `BEGIN`
+scheiterte beim Lock-Upgrade, sobald ein Tablet gleichzeitig registriert), Liste in der
+Transaktion lesen (dieselbe Abfrage wie
 `registrierung::liste`, als Variante über einen `Executor`), je Person `INSERT` in
 `person_zugriff_audit`, Commit, dann die Antwort. Scheitert ein Insert oder der Commit, geht
 keine Person hinaus und kein Eintrag bleibt stehen. Leere Stelle: keine Einträge (es wird
-niemand gedruckt). `audit_repo` bekommt dafür eine Variante `anlegen_tx`.
+niemand gedruckt). `audit_repo` bekommt dafür eine Variante `create_tx` (die Familie heißt nach LFH-1312 englisch,
+`anlegen` → `create` im eigenen `refactor`-Commit). **Bezugsperson:** steht sie nicht unter den
+gelisteten Personen (abgemeldet, verlegt), fallen Name und Kennung im Druck weg; auf dem Blatt
+steht nur, wer protokolliert ist (Review, Entscheidung 09.11.2026).
 
 *Alternative:* ein listenweiter Eintrag wie bei `…/personen/druck` — verworfen (siehe oben).
 

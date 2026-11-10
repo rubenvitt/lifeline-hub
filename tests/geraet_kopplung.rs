@@ -5495,7 +5495,7 @@ async fn betreuungsstelle_druckt_nur_die_eigene_registrierliste() {
     let eintraege = || async {
         sqlx::query_as::<_, (Option<i64>, i64)>(
             "SELECT person_id, benutzer_id FROM person_zugriff_audit \
-             WHERE einsatz_id = ? AND art = 'druck'",
+             WHERE einsatz_id = ? AND art = 'registrierliste'",
         )
         .bind(einsatz)
         .fetch_all(&pool)

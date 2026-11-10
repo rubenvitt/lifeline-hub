@@ -4,21 +4,22 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-/// `art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,
-/// zuvor 0132 und 0021).
+/// `art IN ('detail','export','druck','anhang','registrierliste')`
+/// (migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ZugriffArt {
     Detail,
     Export,
     /// LFH-727: Abruf der Personen-Druckansicht (`GET …/personen/druck`), ohne Person; LLH-1120:
-    /// Druckansicht einer Person (`GET …/personen/{pid}/druck`), mit Person; LLH-1616:
-    /// Registrierliste einer Betreuungsstelle (`GET …/stellen/{sid}/registrierungen/druck`), je
-    /// Person ein Eintrag.
+    /// Druckansicht einer Person (`GET …/personen/{pid}/druck`), mit Person.
     Druck,
     /// LFH-757: Abruf der Datei eines Personen-Anhangs (`GET …/personen/{pid}/anhaenge/{aid}/datei`),
     /// mit Person, ohne Bezug auf die Datei. Auch 304 und Original schreiben eine Zeile.
     Anhang,
+    /// LLH-1616: Druck der Registrierliste einer Betreuungsstelle
+    /// (`GET …/stellen/{sid}/registrierungen/druck`), je gedruckter Person ein Eintrag.
+    Registrierliste,
 }
 
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
@@ -34,7 +35,7 @@ pub struct ZugriffAnzeige {
 }
 
 /// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export oder Druck der
-/// gesamten Liste. `art` ist 'detail', 'export', 'druck' oder 'anhang'.
+/// gesamten Liste. `art` ist 'detail', 'export', 'druck', 'anhang' oder 'registrierliste'.
 pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,

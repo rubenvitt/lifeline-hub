@@ -38,7 +38,7 @@ const zahl = (n: number, eins: string, viele: string) => `${n} ${n === 1 ? eins 
  * (`geraet/GeraetRegistrierlisteDruckPage.tsx`) derselbe Baustein. Muster `PersonDruckPage`:
  *
  * - **Nur über den Druckabruf** (`GET …/registrierungen/druck`), der je Person einen
- *   `druck`-Eintrag ins Zugriffsprotokoll schreibt (`druck/AGENTS.md`, Personendruck). Deshalb
+ *   Eintrag `registrierliste` ins Zugriffsprotokoll schreibt (`druck/AGENTS.md`, Personendruck). Deshalb
  *   `DRUCK_ABFRAGE` (kein stiller Retry, offline scheitern), ein eigener, nicht live geführter Key
  *   und `gcTime: 0`: das Blatt ist ein Schnappschuss, „Neu laden“ holt den neuen Stand.
  * - **Gesundheitsangaben nur auf Wunsch:** der Schalter „Unverträglichkeiten mitdrucken“ steht in

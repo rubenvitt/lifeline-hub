@@ -583,11 +583,11 @@ fn druck(e: i64, sid: i64) -> String {
     format!("{}/druck", reg(e, sid))
 }
 
-/// Einträge `druck` im Zugriffsprotokoll je Person (`None` = listenweit).
+/// Einträge `registrierliste` im Zugriffsprotokoll je Person (`None` = listenweit).
 async fn druck_eintraege(pool: &sqlx::SqlitePool, e: i64, person: Option<i64>) -> i64 {
     sqlx::query_scalar(
         "SELECT COUNT(*) FROM person_zugriff_audit \
-         WHERE einsatz_id = ? AND art = 'druck' AND person_id IS ?",
+         WHERE einsatz_id = ? AND art = 'registrierliste' AND person_id IS ?",
     )
     .bind(e)
     .bind(person)
@@ -755,8 +755,8 @@ async fn druck_ohne_vollstaendiges_protokoll_liefert_nichts_und_laesst_nichts_st
     // Der erste Eintrag gelingt, der zweite scheitert (wie bei voller Platte mitten im Abruf).
     sqlx::query(
         "CREATE TRIGGER druck_audit_kaputt BEFORE INSERT ON person_zugriff_audit \
-         WHEN NEW.art = 'druck' \
-          AND (SELECT COUNT(*) FROM person_zugriff_audit WHERE art = 'druck') >= 1 \
+         WHEN NEW.art = 'registrierliste' \
+          AND (SELECT COUNT(*) FROM person_zugriff_audit WHERE art = 'registrierliste') >= 1 \
          BEGIN SELECT RAISE(ABORT, 'kaputt'); END",
     )
     .execute(&pool)

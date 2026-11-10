@@ -277,7 +277,7 @@ pub struct DruckQuery {
 /// für die Druckansicht (LLH-1616, Spec `betreuung-registrierung`, „Druck der Registrierliste
 /// wird je Person protokolliert“). Prüfkette wie [`liste`]: Gerät nur eigene Stelle (403) →
 /// Modul Personen (403) → Stelle unbekannt oder fremd (404), dann lesen und je Person ein Eintrag
-/// `druck` in derselben Transaktion; erst danach die Daten.
+/// `registrierliste` in derselben Transaktion; erst danach die Daten.
 pub async fn druck(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Betreuung>,

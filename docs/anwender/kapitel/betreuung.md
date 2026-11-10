@@ -109,7 +109,7 @@ Für Stromausfall, Schichtübergabe und Essensausgabe gibt es die Registrierlist
 
 Das Blatt ist ein Stand zum Zeitpunkt des Öffnens; was danach registriert oder abgemeldet wird,
 kommt erst mit „Neu laden“ dazu. Jedes Öffnen, jedes „Neu laden“ und jedes Umschalten steht im
-Zugriffsprotokoll jeder Person auf dem Blatt als „Druck“. Ist niemand registriert, gibt es nichts
+Zugriffsprotokoll jeder Person auf dem Blatt als „Registrierliste gedruckt“. Ist niemand registriert, gibt es nichts
 zu drucken.
 
 ### Bedarf einer Stelle anfordern

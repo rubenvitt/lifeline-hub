@@ -11,6 +11,8 @@ export const ZUGRIFF_ART_TEXT: Record<PersonZugriffArt, string> = {
   druck: 'Liste gedruckt',
   // LFH-757: Abruf der Datei eines Personen-Anhangs (auch aus dem Browser-Cache und das Original).
   anhang: 'Datei geladen',
+  // LLH-1616: Druck der Registrierliste einer Betreuungsstelle, je gedruckter Person.
+  registrierliste: 'Registrierliste gedruckt',
 };
 
 /**

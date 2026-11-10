@@ -28,19 +28,19 @@ leeren Spalte zum Abhaken. Es MUST ein Schnappschuss sein, der sich erst mit „
 
 ### Requirement: Druck der Registrierliste wird je Person protokolliert
 
-Jeder Druckabruf der Registrierliste MUST für jede Person auf dem Blatt genau einen Eintrag der
-Art `druck` mit Bezug auf diese Person ins Zugriffsprotokoll schreiben. Der Server MUST die
-Daten nur ausliefern, wenn alle Einträge geschrieben sind. Die Druckansicht MUST ihre Daten nur
-über diesen Abruf beziehen, ohne zwischengespeicherte Liste und ohne automatische Wiederholung,
-und am Bildschirm sagen, dass der Abruf protokolliert wird.
+Jeder Druckabruf der Registrierliste MUST für jede Person auf dem Blatt genau einen Eintrag
+„Registrierliste gedruckt“ in ihr Zugriffsprotokoll schreiben, unterscheidbar vom Druck ihres
+Personenblatts. Der Server MUST die Daten nur ausliefern, wenn alle Einträge geschrieben sind.
+Die Druckansicht MUST ihre Daten nur über diesen Abruf beziehen, ohne zwischengespeicherte Liste
+und ohne automatische Wiederholung, und am Bildschirm sagen, dass protokolliert wird.
 
 #### Scenario: Druckansicht öffnen
 - **WHEN** eine Einsatzkraft die Registrierliste einer Stelle mit drei registrierten Personen öffnet
-- **THEN** steht im Zugriffsprotokoll jeder dieser drei Personen ein neuer Eintrag `druck` mit ihrem Benutzer, und bei Personen anderer Stellen keiner
+- **THEN** steht im Zugriffsprotokoll jeder dieser drei Personen ein neuer Eintrag „Registrierliste gedruckt“ mit ihrem Benutzer, und bei Personen anderer Stellen keiner
 
 #### Scenario: Neu laden
 - **WHEN** dieselbe Einsatzkraft „Neu laden“ wählt
-- **THEN** entsteht je Person ein weiterer Eintrag `druck`
+- **THEN** entsteht je Person ein weiterer Eintrag „Registrierliste gedruckt“
 
 #### Scenario: Protokoll nicht schreibbar
 - **WHEN** ein Protokolleintrag nicht geschrieben werden kann
@@ -49,6 +49,16 @@ und am Bildschirm sagen, dass der Abruf protokolliert wird.
 #### Scenario: Leere Stelle
 - **WHEN** an der Stelle niemand registriert ist
 - **THEN** zeigt die Druckansicht das als leere Liste ohne Druckknopf, und es entsteht kein Eintrag
+
+### Requirement: Auf dem Blatt steht nur, wer protokolliert ist
+
+Die gedruckte Registrierliste MUST nur Personen mit Namen nennen, die als registrierte Personen
+der Stelle auf dem Blatt stehen und deshalb protokolliert sind. Eine Bezugsperson, die nicht
+(mehr) an der Stelle registriert ist, MUST im Kopf ihres Haushalts fehlen.
+
+#### Scenario: Bezugsperson nicht mehr an der Stelle
+- **WHEN** „Weber, Anna“, Bezugsperson von „H-1“, abgemeldet ist und jemand die Registrierliste druckt
+- **THEN** zeigt der Kopf von „H-1“ ihren Namen nicht, und ihr Zugriffsprotokoll bekommt keinen Eintrag
 
 ### Requirement: Gesundheitsangaben nur auf Wunsch
 

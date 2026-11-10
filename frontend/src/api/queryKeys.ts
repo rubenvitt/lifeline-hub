@@ -534,7 +534,7 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  * - `personDruck` (LLH-1120): derselbe Schnappschuss-Grundsatz für das Blatt einer Person; jeder
  *   Abruf schreibt einen `druck`-Eintrag ins Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
  * - `registrierlisteDruck` (LLH-1616): derselbe Schnappschuss-Grundsatz für die Registrierliste
- *   einer Betreuungsstelle; jeder Abruf schreibt je Person einen `druck`-Eintrag, ein
+ *   einer Betreuungsstelle; jeder Abruf schreibt je Person einen Protokolleintrag, ein
  *   Live-Refetch schriebe weitere.
  * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
  *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
