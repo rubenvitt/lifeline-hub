@@ -91,6 +91,34 @@ CREATE TABLE spiegel_konto (
     PRIMARY KEY (kopplung_id, fremde_id)
 );
 
+-- Inhalte auf Abruf (D8): je Zeile mit BLOB am Spiegel, was noch fehlt. `art` und
+-- `lokaler_schluessel` wie in `spiegel_herkunft`; `empfangen` zählt die Bytes in
+-- `spiegel_anhang_teil`. Erst mit voller Länge und passender Prüfsumme wird der Inhalt in die
+-- Zeile geschrieben (`fertig_at`).
+CREATE TABLE spiegel_anhang (
+    einsatz_id         INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,
+    art                TEXT NOT NULL,
+    lokaler_schluessel TEXT NOT NULL,
+    fremder_schluessel TEXT NOT NULL,
+    sha256             TEXT NOT NULL,
+    groesse            INTEGER NOT NULL,
+    empfangen          INTEGER NOT NULL DEFAULT 0,
+    angefordert_at     TEXT,
+    fertig_at          TEXT,
+    PRIMARY KEY (art, lokaler_schluessel)
+);
+CREATE INDEX idx_spiegel_anhang_offen ON spiegel_anhang (einsatz_id) WHERE fertig_at IS NULL;
+CREATE TABLE spiegel_anhang_teil (
+    einsatz_id         INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,
+    art                TEXT NOT NULL,
+    lokaler_schluessel TEXT NOT NULL,
+    ab                 INTEGER NOT NULL,
+    daten              BLOB NOT NULL,
+    PRIMARY KEY (art, lokaler_schluessel, ab),
+    FOREIGN KEY (art, lokaler_schluessel) REFERENCES spiegel_anhang (art, lokaler_schluessel)
+        ON DELETE CASCADE
+);
+
 -- Log- und Schutz-Trigger je gespiegelter Tabelle (D1, D10), erzeugt von
 -- `instanz::spiegel::art::trigger_sql`. Schutz: an einem Spiegel schreibt nur die Übernahme.
 -- einsatz

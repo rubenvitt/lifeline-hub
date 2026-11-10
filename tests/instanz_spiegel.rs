@@ -157,15 +157,22 @@ async fn elw_fuehrt_und_der_hub_spiegelt() {
     )
     .await;
     assert_eq!(hinweis, None, "jede Zeile übernommen");
-    // Jede Zeile des Führers hat ihr Gegenstück im Spiegel.
+    // Jede Zeile des Führers hat ihr Gegenstück im Spiegel; Mitgliedschaften nur gemeinsamer
+    // Konten (der Admin des ELW gibt es am Hub nicht).
     let fuehrer: i64 = eine(
         &elw.pool,
-        &format!("SELECT COUNT(*) FROM einsatz_aenderung WHERE einsatz_id = {e}"),
+        &format!(
+            "SELECT COUNT(*) FROM einsatz_aenderung WHERE einsatz_id = {e} \
+             AND art <> 'einsatz_mitgliedschaft'"
+        ),
     )
     .await;
     let gespiegelt: i64 = eine(
         &hub.pool,
-        &format!("SELECT COUNT(*) FROM spiegel_herkunft WHERE einsatz_id = {s}"),
+        &format!(
+            "SELECT COUNT(*) FROM spiegel_herkunft WHERE einsatz_id = {s} \
+             AND art <> 'einsatz_mitgliedschaft'"
+        ),
     )
     .await;
     assert_eq!(fuehrer, gespiegelt);
@@ -393,4 +400,180 @@ async fn konten_nur_einer_seite_werden_stellvertreter_ohne_anmeldung_und_ohne_mi
     )
     .await;
     assert_eq!(am_elw, 0);
+}
+
+// ── Anhänge auf Abruf (D8) ───────────────────────────────────────────────────────────────────
+
+/// Legt am ELW einen Anhang mit `n` Bytes an; liefert `(id, bytes)`.
+async fn anhang_am_elw(elw: &Instanz, einsatz: i64, n: usize) -> (i64, Vec<u8>) {
+    let bytes: Vec<u8> = (0..n).map(|i| (i * 7 % 251) as u8).collect();
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'foto.bin', 'application/octet-stream', ?, 'x', ?, 1) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(n as i64)
+    .bind(&bytes)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    (id, bytes)
+}
+
+#[tokio::test]
+async fn ein_anhang_kommt_erst_als_metadaten_und_auf_abruf_in_stuecken() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    // Drei Stücke à 256 KiB und ein Rest.
+    let (_, bytes) = anhang_am_elw(&elw, e, 3 * 256 * 1024 + 1000).await;
+    etb_eintrag(&elw, e, "Foto vom Deich").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    assert!(
+        etb_inhalte(&hub, s)
+            .await
+            .contains(&"Foto vom Deich".to_string()),
+        "ETB wartet nicht auf das Foto"
+    );
+    let (hub_id, laenge): (i64, i64) =
+        sqlx::query_as("SELECT id, length(daten) FROM anhang WHERE einsatz_id = ?")
+            .bind(s)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(laenge, 0, "zuerst nur Metadaten");
+    let groesse: i64 = eine(&hub.pool, "SELECT groesse FROM spiegel_anhang").await;
+    assert_eq!(groesse as usize, bytes.len());
+
+    // Öffnen am Hub: 409 „wird geholt“, die Anforderung steht.
+    let f = lifeline_hub::instanz::spiegel::anhang::pruefe_vorhanden(
+        &hub.pool,
+        "anhang",
+        &hub_id.to_string(),
+    )
+    .await;
+    assert!(
+        matches!(f, Err(lifeline_hub::error::AppError::Conflict(ref t)) if t == lifeline_hub::instanz::spiegel::anhang::WIRD_GEHOLT)
+    );
+    let angefordert: Option<String> =
+        eine(&hub.pool, "SELECT angefordert_at FROM spiegel_anhang").await;
+    assert!(angefordert.is_some());
+
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let am_hub: Vec<u8> = eine(
+        &hub.pool,
+        &format!("SELECT daten FROM anhang WHERE id = {hub_id}"),
+    )
+    .await;
+    assert_eq!(am_hub, bytes, "vollständig und gleich");
+    lifeline_hub::instanz::spiegel::anhang::pruefe_vorhanden(
+        &hub.pool,
+        "anhang",
+        &hub_id.to_string(),
+    )
+    .await
+    .expect("jetzt da");
+    let teile: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM spiegel_anhang_teil").await;
+    assert_eq!(teile, 0, "Stücke aufgeräumt");
+}
+
+#[tokio::test]
+async fn ein_verfaelschtes_stueck_beginnt_neu_und_ein_geaenderter_anhang_auch() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (elw_id, _) = anhang_am_elw(&elw, e, 1000).await;
+    abgleichen(&elw).await;
+    let kennung: String = eine(&hub.pool, "SELECT fremde_kennung FROM einsatz_spiegel").await;
+    let sha: String = eine(&hub.pool, "SELECT sha256 FROM spiegel_anhang").await;
+    // Das Vorabladen hat den Inhalt schon geholt; für den Fall setzen wir ihn zurück.
+    exec(
+        &hub.pool,
+        "UPDATE spiegel_anhang SET empfangen = 0, fertig_at = NULL",
+    )
+    .await;
+    // Ein Stück mit falschem Inhalt, aber richtiger Länge.
+    let mut conn = hub.pool.acquire().await.unwrap();
+    use base64::Engine;
+    let falsch = lifeline_hub::instanz::spiegel::paket::AnhangTeil {
+        kennung: kennung.clone(),
+        art: "anhang".into(),
+        schluessel: elw_id.to_string(),
+        sha256: sha.clone(),
+        ab: 0,
+        daten: base64::engine::general_purpose::STANDARD.encode(vec![0u8; 1000]),
+    };
+    lifeline_hub::instanz::spiegel::anhang::uebernehme_teile(&mut conn, &[falsch])
+        .await
+        .unwrap();
+    drop(conn);
+    let (empfangen, fertig): (i64, Option<String>) =
+        sqlx::query_as("SELECT empfangen, fertig_at FROM spiegel_anhang")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (empfangen, fertig),
+        (0, None),
+        "falsche Prüfsumme beginnt neu"
+    );
+    // Der Führer ändert den Inhalt: neue Prüfsumme, neuer Abruf.
+    let neu: Vec<u8> = vec![9u8; 500];
+    sqlx::query("UPDATE anhang SET daten = ?, groesse = 500 WHERE id = ?")
+        .bind(&neu)
+        .bind(elw_id)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    abgleichen(&elw).await;
+    let neue_sha: String = eine(&hub.pool, "SELECT sha256 FROM spiegel_anhang").await;
+    assert_ne!(neue_sha, sha);
+    exec(
+        &hub.pool,
+        "UPDATE spiegel_anhang SET angefordert_at = '2026-11-10 00:00:00'",
+    )
+    .await;
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let am_hub: Vec<u8> = eine(&hub.pool, "SELECT daten FROM anhang").await;
+    assert_eq!(am_hub, neu);
+}
+
+#[tokio::test]
+async fn der_uhs_plan_kommt_ebenso_auf_abruf() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let uhs: i64 = eine(
+        &elw.pool,
+        &format!(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES ({e}, 'sonstige', 'UHS 1', 1, 1) RETURNING id"
+        ),
+    )
+    .await;
+    let bild: Vec<u8> = (0..300_000u32).map(|i| (i % 256) as u8).collect();
+    sqlx::query(
+        "INSERT INTO uhs_plan (uhs_id, einsatz_id, daten, mime, groesse, sha256, bild_breite, \
+         bild_hoehe, breite, hinterlegt_von) VALUES (?, ?, ?, 'image/png', ?, 'x', 10, 10, 100, 1)",
+    )
+    .bind(uhs)
+    .bind(e)
+    .bind(&bild)
+    .bind(bild.len() as i64)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    abgleichen(&elw).await;
+    exec(
+        &hub.pool,
+        "UPDATE spiegel_anhang SET angefordert_at = '2026-11-10 00:00:00'",
+    )
+    .await;
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let am_hub: Vec<u8> = eine(&hub.pool, "SELECT daten FROM uhs_plan").await;
+    assert_eq!(am_hub, bild);
 }

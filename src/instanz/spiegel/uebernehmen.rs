@@ -190,6 +190,9 @@ async fn uebernehme_zeilen(
             .bind(&lokal)
             .execute(&mut *conn)
             .await?;
+            if t.blob.is_some() {
+                super::anhang::vergiss(conn, t.name, &lokal).await?;
+            }
             sqlx::query(
                 "DELETE FROM spiegel_herkunft WHERE einsatz_id = ? AND art = ? AND fremder_schluessel = ?",
             )
@@ -287,6 +290,7 @@ async fn uebernehme_zeilen(
         .execute(&mut *conn)
         .await?;
     }
+    super::anhang::merke_inhalte(conn, einsatz_id, &ergebnis.inhalte).await?;
     sqlx::query(
         "UPDATE einsatz_spiegel SET stand = MAX(stand, ?), letzter_abgleich_at = ?, \
          freigabestufe = ? WHERE einsatz_id = ?",

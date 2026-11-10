@@ -39,8 +39,8 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 ## 5. Anhänge auf Abruf (D8)
 
-- [ ] 5.1 Migration `spiegel_anhang`, `spiegel_anhang_teil`; Liefern ohne BLOB (Größe, Prüfsumme), Spiegel legt leeren Inhalt an. Test: ETB-Abgleich mit 20-MiB-Anhang braucht ein Paket, nicht die Anhangsgröße
-- [ ] 5.2 Abruf am Spiegel → 409 `ANHANG_WIRD_GEHOLT` (Fall in `tests/fehler_vertrag.rs`), `angefordert_at`, Wecken; Stücke à 256 KiB, Angeforderte vor Vorabladen, Prüfsumme vor Gültigkeit, falsche Prüfsumme → verwerfen und neu, geänderter Anhang → neu. Integrationstests für jeden Fall, auch `karte_hintergrundbild_daten` und `uhs_plan`
+- [x] 5.1 Migration `spiegel_anhang`, `spiegel_anhang_teil`; Liefern ohne BLOB (Größe, Prüfsumme), Spiegel legt leeren Inhalt an. Test: ETB-Abgleich mit 20-MiB-Anhang braucht ein Paket, nicht die Anhangsgröße
+- [x] 5.2 Abruf am Spiegel → 409 `ANHANG_WIRD_GEHOLT` (Fall in `tests/fehler_vertrag.rs`), `angefordert_at`, Wecken; Stücke à 256 KiB, Angeforderte vor Vorabladen, Prüfsumme vor Gültigkeit, falsche Prüfsumme → verwerfen und neu, geänderter Anhang → neu. Integrationstests für jeden Fall, auch `karte_hintergrundbild_daten` und `uhs_plan`
 - [ ] 5.3 Vorschau und Download im Frontend: „wird geholt“, erneuter Versuch nach Live-Ereignis. Vitest
 
 ## 6. Anträge (D9, D11)

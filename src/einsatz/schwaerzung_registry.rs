@@ -3175,6 +3175,37 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        tabelle: "spiegel_anhang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("lokaler_schluessel", G_SPIEGEL),
+            retain("fremder_schluessel", G_SPIEGEL),
+            retain("sha256", G_SPIEGEL),
+            retain("groesse", G_ZAEHLER),
+            retain("empfangen", G_ZAEHLER),
+            retain("angefordert_at", G_ZEIT),
+            retain("fertig_at", G_ZEIT),
+        ],
+    },
+    // Stücke eines Inhalts auf dem Weg: Bytes eines Anhangs, darum mit ihm weg.
+    TabellenRegel {
+        tabelle: "spiegel_anhang_teil",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("art", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("lokaler_schluessel", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("ab", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    TabellenRegel {
         tabelle: "spiegel_ziel",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,

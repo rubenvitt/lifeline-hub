@@ -51,7 +51,10 @@ pub async fn ist_aktiv(pool: &SqlitePool, kopplung_id: i64) -> Result<bool, AppE
             AND e.spiegel = 0) \
          OR EXISTS (SELECT 1 FROM einsatz_spiegel s JOIN einsatz e ON e.id = s.einsatz_id \
             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-            WHERE o.kopplung_id = ?1 AND s.beendet_at IS NULL AND e.status = 'aktiv')",
+            WHERE o.kopplung_id = ?1 AND s.beendet_at IS NULL AND e.status = 'aktiv') \
+         OR EXISTS (SELECT 1 FROM spiegel_anhang a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
+            JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+            WHERE o.kopplung_id = ?1 AND a.fertig_at IS NULL AND a.angefordert_at IS NOT NULL)",
     )
     .bind(kopplung_id)
     .fetch_one(pool)

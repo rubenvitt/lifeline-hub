@@ -336,6 +336,9 @@ pub async fn anhang_antwort(
     req_headers: &HeaderMap,
     fassung: Fassung,
 ) -> Result<Response, AppError> {
+    // Am Spiegel kommt der Inhalt auf Abruf (LLH-1492, D8): fehlt er, 409 „wird geholt“.
+    crate::instanz::spiegel::anhang::pruefe_vorhanden(pool, "anhang", &anhang_id.to_string())
+        .await?;
     let (dateiname, mime, sha256) = anhang::repo::meta_fuer_download(pool, anhang_id).await?;
 
     let mut headers = HeaderMap::new();

@@ -186,6 +186,11 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("einsatz_spiegel", "Verwaltung des Spiegels selbst"),
     ("spiegel_herkunft", "Verwaltung des Spiegels selbst"),
     ("spiegel_ziel", "Verwaltung des Spiegels selbst"),
+    ("spiegel_anhang", "Verwaltung des Spiegels selbst"),
+    (
+        "spiegel_anhang_teil",
+        "Inhalt auf dem Weg; gilt erst in seiner Zeile",
+    ),
 ];
 
 /// Die Kategorie einer gespiegelten Tabelle.

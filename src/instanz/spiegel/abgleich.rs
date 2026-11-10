@@ -202,11 +202,18 @@ pub async fn handle_abgleich(
             .iter()
             .map(|s| (s.kennung.clone(), s.stand))
             .collect();
+        let fertig = super::anhang::uebernehme_teile(conn, &anfrage.anhang_teile).await?;
+        uebernommen.einsaetze.extend(fertig);
         let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE);
         let lieferungen = liefere_alle(conn, eigen, kopplung, &orgs, &staende, &mut budget).await?;
+        let anhang_teile =
+            super::anhang::liefere_teile(conn, &anfrage.abrufe, budget.bytes).await?;
+        let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
         Ok(SpiegelPaket {
             staende: staende_antwort,
             lieferungen,
+            abrufe,
+            anhang_teile,
             ..Default::default()
         })
     })?;
@@ -223,71 +230,91 @@ pub fn kann_spiegeln(kopplung: &KopplungZeile) -> bool {
         .is_some_and(|p| p >= i64::from(PROTOKOLL_SPIEGEL))
 }
 
-/// Gleicht einmal mit einer Kopplung ab, in der diese Instanz sich meldet.
+/// Höchstzahl Runden eines Abgleichs, wenn das Gegenüber Inhalte abruft (D8, Push).
+const RUNDEN_MAX: usize = 4;
+
+/// Gleicht einmal mit einer Kopplung ab, in der diese Instanz sich meldet. Ruft die erreichte
+/// Seite Inhalte ab, folgen ihre Stücke in weiteren Runden desselben Abgleichs.
 pub async fn abgleich_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Result<(), SendError> {
     let fehler = |e: AppError| SendError::Netz(e.to_string());
     let eigen = identitaet::load_or_create(pool)
         .await
         .map_err(|e| SendError::Netz(e.to_string()))?;
-    let anfrage = crate::write_retry!(pool, |conn| {
-        let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
-        let staende = eigene_staende(conn, kopplung.id).await?;
-        let ziele: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT e.kennung, z.stand FROM spiegel_ziel z JOIN einsatz e ON e.id = z.einsatz_id \
-             JOIN instanz_kopplung_org o ON o.id = z.kopplung_org_id \
-             WHERE o.kopplung_id = ? AND e.kennung IS NOT NULL",
-        )
-        .bind(kopplung.id)
-        .fetch_all(&mut *conn)
-        .await?;
-        let ziele: HashMap<String, i64> = ziele.into_iter().collect();
-        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE);
-        let lieferungen = liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
-        Ok(SpiegelPaket {
-            staende,
-            lieferungen,
-            ..Default::default()
-        })
-    })
-    .map_err(fehler)?;
-    let antwort = melden::send_signed_bis::<_, SpiegelPaket>(
-        &eigen,
-        kopplung,
-        SPIEGEL_PFAD,
-        &anfrage,
-        SPIEGEL_MAX,
-    )
-    .await?
-    .wert;
-    antwort.check().map_err(SendError::AntwortUngueltig)?;
-    let mut uebernommen = Uebernommen::default();
-    crate::write_retry!(pool, |conn| {
-        uebernommen = Uebernommen::default();
-        let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
-        // Push: was die erreichte Seite übernommen hat. Ein niedrigerer Stand (Wiederherstellung,
-        // verlorener Spiegel) setzt zurück.
-        for s in &antwort.staende {
-            let Some(l) = anfrage.lieferungen.iter().find(|l| l.kennung == s.kennung) else {
-                continue;
-            };
-            let Some(o) = orgs.iter().find(|o| o.fremde_org_kennung == l.org) else {
-                continue;
-            };
-            sqlx::query(
-                "INSERT INTO spiegel_ziel (kopplung_org_id, einsatz_id, stand) \
-                 SELECT ?, id, ? FROM einsatz WHERE kennung = ? \
-                 ON CONFLICT (kopplung_org_id, einsatz_id) DO UPDATE SET stand = excluded.stand",
+    let mut abgerufen: Vec<super::paket::AnhangAbruf> = Vec::new();
+    for runde in 0..RUNDEN_MAX {
+        let anfrage = crate::write_retry!(pool, |conn| {
+            let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+            let staende = eigene_staende(conn, kopplung.id).await?;
+            let ziele: Vec<(String, i64)> = sqlx::query_as(
+                "SELECT e.kennung, z.stand FROM spiegel_ziel z JOIN einsatz e ON e.id = z.einsatz_id \
+                 JOIN instanz_kopplung_org o ON o.id = z.kopplung_org_id \
+                 WHERE o.kopplung_id = ? AND e.kennung IS NOT NULL",
             )
-            .bind(o.id)
-            .bind(s.stand)
-            .bind(&s.kennung)
-            .execute(&mut *conn)
+            .bind(kopplung.id)
+            .fetch_all(&mut *conn)
             .await?;
+            let ziele: HashMap<String, i64> = ziele.into_iter().collect();
+            let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE);
+            let lieferungen =
+                liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
+            let anhang_teile =
+                super::anhang::liefere_teile(conn, &abgerufen, budget.bytes).await?;
+            let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
+            Ok(SpiegelPaket {
+                staende,
+                lieferungen,
+                abrufe,
+                anhang_teile,
+                ..Default::default()
+            })
+        })
+        .map_err(fehler)?;
+        let antwort = melden::send_signed_bis::<_, SpiegelPaket>(
+            &eigen,
+            kopplung,
+            SPIEGEL_PFAD,
+            &anfrage,
+            SPIEGEL_MAX,
+        )
+        .await?
+        .wert;
+        antwort.check().map_err(SendError::AntwortUngueltig)?;
+        let mut uebernommen = Uebernommen::default();
+        crate::write_retry!(pool, |conn| {
+            uebernommen = Uebernommen::default();
+            let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+            // Push: was die erreichte Seite übernommen hat. Ein niedrigerer Stand
+            // (Wiederherstellung, verlorener Spiegel) setzt zurück.
+            for s in &antwort.staende {
+                let Some(l) = anfrage.lieferungen.iter().find(|l| l.kennung == s.kennung) else {
+                    continue;
+                };
+                let Some(o) = orgs.iter().find(|o| o.fremde_org_kennung == l.org) else {
+                    continue;
+                };
+                sqlx::query(
+                    "INSERT INTO spiegel_ziel (kopplung_org_id, einsatz_id, stand) \
+                     SELECT ?, id, ? FROM einsatz WHERE kennung = ? \
+                     ON CONFLICT (kopplung_org_id, einsatz_id) DO UPDATE SET stand = excluded.stand",
+                )
+                .bind(o.id)
+                .bind(s.stand)
+                .bind(&s.kennung)
+                .execute(&mut *conn)
+                .await?;
+            }
+            uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
+            let fertig = super::anhang::uebernehme_teile(conn, &antwort.anhang_teile).await?;
+            uebernommen.einsaetze.extend(fertig);
+            Ok(())
+        })
+        .map_err(fehler)?;
+        melde_live(pool, &uebernommen).await;
+        abgerufen = antwort.abrufe;
+        let weiter = !abgerufen.is_empty() || !antwort.anhang_teile.is_empty();
+        if !weiter || runde + 1 == RUNDEN_MAX {
+            break;
         }
-        uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
-        Ok(())
-    })
-    .map_err(fehler)?;
-    melde_live(pool, &uebernommen).await;
+    }
     Ok(())
 }
