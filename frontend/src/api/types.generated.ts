@@ -2334,6 +2334,12 @@ export interface components {
              *     wenn keine Funktion folgt.
              */
             meine_funktion?: string | null;
+            /**
+             * @description Bezeichnung der eigenen Funktion, nur bei Führungshilfspersonal und Fachberater („THW“);
+             *     fehlt sonst und nach einer Schwärzung der Mitgliedschaft (pkjvl5iy, design.md D1/D2).
+             */
+            meine_funktion_bezeichnung?: string | null;
+            meine_funktion_code?: components["schemas"]["Fuehrungsfunktion"] | null;
             meine_rolle?: components["schemas"]["EinsatzRolle"] | null;
             /**
              * @description Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;

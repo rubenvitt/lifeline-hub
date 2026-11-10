@@ -160,3 +160,47 @@ test.describe('am Tablet (Karte, Touch)', () => {
     );
   });
 });
+
+/**
+ * Verwaltungstabelle außerhalb der Datensicht (LLH-1599, Spec `datensatz-aktionsmenue`,
+ * „Kontextmenü zeigt die Aktionen der Knopfreihe“): am breiten Schirm stehen „Bearbeiten“ und
+ * „Deaktivieren“ als Knöpfe; das Kontextmenü zeigt dieselben, auch per Umschalt+F10 vom Knopf aus.
+ */
+test.describe('Verwaltungstabelle mit Knopfreihe (LLH-1599)', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('Rechtsklick und Umschalt+F10 zeigen die Handlungen der Knöpfe', async ({ page }) => {
+    const name = `PI Kontextprobe ${Date.now()}`;
+    const angelegt = await page.request.post('/api/externe-stellen', {
+      data: { bezeichnung: name, art: 'polizei' },
+    });
+    expect(angelegt.status(), await angelegt.text()).toBe(201);
+    const id = ((await angelegt.json()) as { id: number }).id;
+    try {
+      await page.goto('/admin/stammdaten/externe-stellen');
+      const zeile = page.getByRole('row').filter({ hasText: name });
+      await expect(zeile).toBeVisible();
+      const knoepfe = await zeile.getByRole('button').allInnerTexts();
+      expect(knoepfe).toEqual(['Bearbeiten', 'Deaktivieren']);
+
+      const menue = page.locator(
+        `.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label="Aktionen zu ${name}"]`,
+      );
+      await zeile.getByText('Polizei', { exact: true }).click({ button: 'right' });
+      await expect(menue).toBeVisible();
+      expect(await eintraegeVon(menue)).toEqual(knoepfe);
+      await page.keyboard.press('Escape');
+      await expect(menue).toHaveCount(0);
+
+      // Tastatur: vom Knopf „Bearbeiten“ der Zeile aus.
+      await zeile.getByRole('button', { name: 'Bearbeiten' }).focus();
+      await page.keyboard.press('Shift+F10');
+      await expect(menue).toBeVisible();
+      await expect(menue.getByRole('menuitem', { name: 'Bearbeiten' })).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(zeile.getByRole('button', { name: 'Bearbeiten' })).toBeFocused();
+    } finally {
+      await page.request.patch(`/api/externe-stellen/${id}`, { data: { aktiv: false } });
+    }
+  });
+});

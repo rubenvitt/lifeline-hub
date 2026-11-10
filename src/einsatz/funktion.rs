@@ -27,6 +27,9 @@ use sqlx::SqliteConnection;
 /// Abgeleitete Funktion in zwei Schreibweisen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Funktion {
+    /// Katalogcode, auch beim Fallback „EL“ (`el`): Quelle von `meine_funktion_code`, mit dem
+    /// „meine Stelle“ im Überblick abgleicht (pkjvl5iy, design.md D1).
+    pub code: Fuehrungsfunktion,
     /// Kurzform für den ETB-Verfasser: „S2", „EL", „Fachberater".
     pub kurz: String,
     /// Klartext für den Kopf: „S2 Lage", „Einsatzleitung", „Fachberater: THW".
@@ -46,6 +49,7 @@ pub fn ableiten(
 ) -> Option<Funktion> {
     match funktion {
         Some(f) => Some(Funktion {
+            code: f,
             kurz: f
                 .kuerzel()
                 .unwrap_or_else(|| f.standard_label())
@@ -54,6 +58,7 @@ pub fn ableiten(
         }),
         None => match rolle {
             Some(EinsatzRolle::Einsatzleitung) => Some(Funktion {
+                code: Fuehrungsfunktion::El,
                 kurz: "EL".into(),
                 bezeichnung: karte.label(Fuehrungsfunktion::El).to_string(),
             }),
@@ -99,8 +104,9 @@ mod tests {
         Labelkarte::standard()
     }
 
-    fn f(kurz: &str, bezeichnung: &str) -> Option<Funktion> {
+    fn f(code: Fuehrungsfunktion, kurz: &str, bezeichnung: &str) -> Option<Funktion> {
         Some(Funktion {
+            code,
             kurz: kurz.into(),
             bezeichnung: bezeichnung.into(),
         })
@@ -114,7 +120,7 @@ mod tests {
             .insert(Fuehrungsfunktion::S4, "Versorgung (Logistik)".into());
         assert_eq!(
             ableiten(Some(Fuehrungsfunktion::S4), None, None, &karte),
-            f("S4", "S4 Versorgung (Logistik)")
+            f(Fuehrungsfunktion::S4, "S4", "S4 Versorgung (Logistik)")
         );
     }
 
@@ -122,7 +128,7 @@ mod tests {
     fn ein_sachgebiet_traegt_klartext() {
         assert_eq!(
             ableiten(Some(Fuehrungsfunktion::S2), None, None, &std()),
-            f("S2", "S2 Lage")
+            f(Fuehrungsfunktion::S2, "S2", "S2 Lage")
         );
     }
 
@@ -135,7 +141,7 @@ mod tests {
                 Some(EinsatzRolle::Einsatzleitung),
                 &std()
             ),
-            f("S3", "S3 Einsatz")
+            f(Fuehrungsfunktion::S3, "S3", "S3 Einsatz")
         );
     }
 
@@ -143,11 +149,11 @@ mod tests {
     fn einsatzleitung_ohne_funktion_ist_el() {
         assert_eq!(
             ableiten(None, None, Some(EinsatzRolle::Einsatzleitung), &std()),
-            f("EL", "Einsatzleitung")
+            f(Fuehrungsfunktion::El, "EL", "Einsatzleitung")
         );
         assert_eq!(
             ableiten(Some(Fuehrungsfunktion::El), None, None, &std()),
-            f("EL", "Einsatzleitung")
+            f(Fuehrungsfunktion::El, "EL", "Einsatzleitung")
         );
     }
 
@@ -157,7 +163,11 @@ mod tests {
     fn s7_und_fachberater_sind_funktionen() {
         assert_eq!(
             ableiten(Some(Fuehrungsfunktion::S7), None, None, &std()),
-            f("S7", "S7 Psychosoziale Notfallversorgung")
+            f(
+                Fuehrungsfunktion::S7,
+                "S7",
+                "S7 Psychosoziale Notfallversorgung"
+            )
         );
         assert_eq!(
             ableiten(
@@ -166,7 +176,11 @@ mod tests {
                 None,
                 &std()
             ),
-            f("Fachberater", "Fachberater: THW")
+            f(
+                Fuehrungsfunktion::Fachberater,
+                "Fachberater",
+                "Fachberater: THW"
+            )
         );
     }
 

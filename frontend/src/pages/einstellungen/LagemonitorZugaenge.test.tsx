@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { waehleMenueEintrag } from '../../test/menue';
 import LagemonitorZugaenge, { zugangZustand } from './LagemonitorZugaenge';
 
@@ -108,5 +109,35 @@ describe('LagemonitorZugaenge (LLH-1484)', () => {
     expect(zugangZustand(zugang(1, { zuletzt_genutzt_at: '2026-11-05 09:05:00' }), zeit)).toBe(
       'kein Einsatz freigegeben · zuletzt 09:05 · angelegt von Ada Admin',
     );
+  });
+});
+
+describe('LagemonitorZugaenge · Kontextmenü (LLH-1599)', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
+  });
+  const eintragVon = (name: string) =>
+    [...document.querySelectorAll<HTMLElement>('[data-lfh="lagemonitor-eintrag"]')].find((e) =>
+      e.textContent?.includes(name),
+    )!;
+
+  it('Rechtsklick zeigt „Widerrufen …“, die Wahl fragt nach; widerrufene ohne eigenes Menü', async () => {
+    stelleBereit([zugang(1), zugang(3, { widerrufen_at: '2026-11-05 09:00:00' })]);
+    renderMitProviders(<LagemonitorZugaenge />);
+    await screen.findByText('FüKW 1');
+    const menue = await oeffneKontextmenue(eintragVon('FüKW 1'));
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Lagemonitor FüKW 1');
+    expect(eintraegeVon(menue)).toEqual(['rot:Widerrufen …']);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Widerrufen/ }));
+    expect(await screen.findByRole('dialog', { name: 'FüKW 1 widerrufen?' })).toBeInTheDocument();
+    erwarteBrowsermenue(eintragVon('FüKW 3'));
+  });
+
+  it('ohne System-Admin bleibt das Browsermenü', async () => {
+    vi.mocked(useAuth).mockReturnValue(authWertFixture(benutzerFixture()));
+    stelleBereit();
+    renderMitProviders(<LagemonitorZugaenge />);
+    await screen.findByText('FüKW 1');
+    erwarteBrowsermenue(eintragVon('FüKW 1'));
   });
 });

@@ -880,12 +880,17 @@ describe('UeberblickPage', () => {
     );
   });
 
-  describe('Offene Vorgänge · meine Stelle (LLH-1145 D5)', () => {
-    const fuerS2 = () => {
+  describe('Offene Vorgänge · meine Stelle (LLH-1145 D5, pkjvl5iy)', () => {
+    /** Der Kopf trägt die eigene Funktion als Code; ein Auftrag geht an genau diese. */
+    const fuerStelle = (code: 's2' | 's7') => {
       server.use(meHandler(benutzerFixture({ id: 9 }) as never));
       stelleBereit(volleDaten, [
         http.get('/api/einsaetze/1', () =>
-          HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s2'] }),
+          HttpResponse.json({
+            ...einsatz,
+            meine_sachgebiete: code === 's2' ? ['s2'] : [],
+            meine_funktion_code: code,
+          }),
         ),
         http.get('/api/einsaetze/1/auftraege', () =>
           HttpResponse.json([
@@ -898,8 +903,8 @@ describe('UeberblickPage', () => {
                   id: 2,
                   auftrag_id: 25,
                   empfaenger_typ: 'funktion',
-                  funktion: 's2',
-                  snap_anzeige: 'S2',
+                  funktion: code,
+                  snap_anzeige: code.toUpperCase(),
                 },
               ],
             }),
@@ -907,6 +912,7 @@ describe('UeberblickPage', () => {
         ),
       ]);
     };
+    const fuerS2 = () => fuerStelle('s2');
 
     it('„meine Stelle“ filtert die Einträge, die Zahl bleibt die des Einsatzes', async () => {
       fuerS2();
@@ -946,6 +952,21 @@ describe('UeberblickPage', () => {
         'aria-checked',
         'true',
       );
+      await within(abschnitt('Aufträge')).findByRole('link', { name: /Lagekarte führen/ });
+      expect(
+        within(abschnitt('Aufträge')).queryByRole('link', { name: /Trupps verlegen/ }),
+      ).toBeNull();
+    });
+
+    it('S7 sieht unter „meine Stelle“ den Auftrag an S7 (LLH-1606)', async () => {
+      fuerStelle('s7');
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/ueberblick" element={<UeberblickPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/ueberblick?vorgaenge=meine' },
+      );
+      await waitFor(() => vorgaenge());
       await within(abschnitt('Aufträge')).findByRole('link', { name: /Lagekarte führen/ });
       expect(
         within(abschnitt('Aufträge')).queryByRole('link', { name: /Trupps verlegen/ }),

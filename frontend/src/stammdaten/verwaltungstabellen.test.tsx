@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { adminFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
+import { eintraegeVon, knopfreiheVon, oeffneKontextmenue } from '../test/kontextmenue';
 import BenutzerPage from '../pages/BenutzerPage';
 import FahrzeugeTab from './FahrzeugeTab';
 import PersonalTab from './PersonalTab';
@@ -276,4 +277,50 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
       await waitFor(() => expect(rueckfrageZu()).toBe(true));
     },
   );
+});
+
+/**
+ * Kontextmenü (LLH-1599, Spec `datensatz-aktionsmenue`, „Kontextmenü zeigt die Aktionen der
+ * Knopfreihe“): am breiten Schirm zeigt es dieselben Handlungen wie die Knöpfe der Zeile.
+ */
+describe('Verwaltungstabellen: Kontextmenü am breiten Schirm (LLH-1599)', () => {
+  it.each([
+    [FAELLE[1], ['Bearbeiten', 'rot:Außer Dienst nehmen']],
+    [FAELLE[2], ['Bearbeiten', 'rot:Außer Dienst nehmen']],
+    [FAELLE[3], ['Bearbeiten', 'rot:Deaktivieren']],
+  ])('$name: Einträge gleich den Knöpfen', async (fall, erwartet) => {
+    setzeViewportBreite(1280);
+    fall.render();
+    const zeile = (await screen.findByText(fall.zeile)).closest('tr')!;
+    expect(knopfreiheVon(zeile)).toEqual(erwartet);
+    const menue = await oeffneKontextmenue(within(zeile).getAllByRole('cell')[1]);
+    expect(menue).toHaveAttribute('aria-label', fall.menue);
+    expect(eintraegeVon(menue)).toEqual(erwartet);
+  });
+
+  it('Fahrzeuge: läuft der Statuswechsel, stehen die Einträge gesperrt wie die Knöpfe', async () => {
+    setzeViewportBreite(1280);
+    let freigeben: () => void = () => {};
+    server.use(
+      http.post(
+        '/api/fahrzeuge/:id/:ziel',
+        () =>
+          new Promise<Response>((r) => {
+            freigeben = () => r(HttpResponse.json({}));
+          }),
+      ),
+    );
+    FAELLE[1].render();
+    const zeile = (await screen.findByText('Florian 1')).closest('tr')!;
+    await userEvent.click(within(zeile).getByRole('button', { name: 'Außer Dienst nehmen' }));
+    await waitFor(() =>
+      expect(within(zeile).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled(),
+    );
+    const menue = await oeffneKontextmenue(within(zeile).getAllByRole('cell')[1]);
+    expect(eintraegeVon(menue)).toEqual([
+      'Bearbeiten (gesperrt)',
+      'rot:Außer Dienst nehmen (gesperrt)',
+    ]);
+    freigeben();
+  });
 });
