@@ -388,7 +388,10 @@ Das System SHALL je Einsatz Betreuungsstellen führen. Eine Stelle trägt eine B
 Einsatzabschnitt desselben Einsatzes, optional eine Kapazität in Personen (ganzzahlig ≥ 1),
 optional Standort und Notiz, optional Leitung und Kontaktweg (`kontaktweg`; Freitext, je höchstens
 200 Zeichen nach dem Trimmen, darüber 400; der alte Feldname `erreichbarkeit` ergibt 400) sowie einen Status (`vorbereitet`, `in_betrieb`,
-`geschlossen`; Vorgabe `vorbereitet`). Anlage, Änderung, Statuswechsel und Stornierung
+`geschlossen`; Vorgabe `vorbereitet`) sowie eine Belegungsart (`gezaehlt` oder `namentlich`;
+Vorgabe `gezaehlt`; eine unbekannte Art ergibt 400). Ein Wechsel auf `namentlich` MUST in
+derselben Transaktion eine Belegungsmeldung mit der Zahl der dort registrierten Personen
+schreiben; ein Wechsel auf `gezaehlt` MUST die aktuelle Belegung unverändert lassen. Anlage, Änderung, Statuswechsel und Stornierung
 MUST je einen ETB-Eintrag schreiben, sofern sich ein Wert tatsächlich ändert. Eine Änderung
 von Leitung oder Kontaktweg MUST im ETB nur als „weitere Angaben“ erscheinen, nie mit
 ihrem Wert. Ein gesicherter Lagestand MUST Leitung und Kontaktweg nicht einfrieren. Eine
@@ -435,6 +438,18 @@ Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre akt
 #### Scenario: Lagestand ohne Leitung
 - **WHEN** ein Lagestand gesichert wird, während eine Stelle Leitung und Kontaktweg trägt
 - **THEN** enthält der gesicherte Stand die Stelle ohne Leitung und Kontaktweg
+
+#### Scenario: Auf namentlich umstellen
+- **WHEN** „Turnhalle Ost“ mit gemeldeter Belegung 89 und 12 registrierten Personen auf `namentlich` gestellt wird
+- **THEN** ist die aktuelle Belegung 12, und der Meldeverlauf zeigt 89 und danach 12
+
+#### Scenario: Zurück auf gezählt
+- **WHEN** eine namentlich geführte Stelle mit Belegung 12 auf `gezaehlt` gestellt wird
+- **THEN** bleibt die aktuelle Belegung 12 und nimmt wieder Handmeldungen an
+
+#### Scenario: Namentliche Stelle schließen
+- **WHEN** eine namentlich geführte Stelle mit noch registrierten Personen auf `geschlossen` gesetzt wird
+- **THEN** antwortet das System mit 422, bis alle Personen abgemeldet sind
 
 ### Requirement: Detailseite einer Betreuungsstelle
 
@@ -516,6 +531,14 @@ Eine Meldung an eine Stelle im Status `geschlossen` MUST abgelehnt werden. Die A
 die Kapazität übersteigen dürfen. Belegungsmeldungen MUST sich wie Standmeldungen
 zurücknehmen lassen.
 
+An einer Stelle mit Belegungsart `namentlich` MUST das System die Belegung selbst melden: Ändert
+sich die Zahl der dort registrierten Personen (Registrierung, Abmelden, Verbleibwechsel
+oder Storno einer Person), schreibt es in derselben Transaktion eine Meldung mit
+der neuen Zahl, der Erfassungszeit des auslösenden Vorgangs und der Herkunft „Registrierung“;
+eine unveränderte Zahl schreibt keine Meldung. Der ETB-Eintrag dieser Meldung MUST die Herkunft
+nennen. Eine Handmeldung oder die Rücknahme einer Meldung an einer namentlich geführten Stelle
+MUST mit 409 „Stelle wird namentlich geführt“ abgelehnt werden.
+
 #### Scenario: Belegung melden
 - **WHEN** für „Turnhalle Ost“ (Kapazität 150) eine Belegung von 89 gemeldet wird
 - **THEN** ist die aktuelle Belegung 89
@@ -528,6 +551,18 @@ zurücknehmen lassen.
 #### Scenario: Geschlossene Stelle
 - **WHEN** für eine geschlossene Stelle eine Belegung gemeldet oder eine Belegungsmeldung zurückgenommen wird
 - **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Registrierung meldet die Belegung
+- **WHEN** an der namentlich geführten „Turnhalle Ost“ mit Belegung 12 ein Haushalt mit drei Personen registriert wird
+- **THEN** ist die aktuelle Belegung 15, und das ETB enthält einen Meldungseintrag mit „15“ und der Herkunft „Registrierung“
+
+#### Scenario: Verbleibwechsel an anderer Stelle
+- **WHEN** eine an der namentlich geführten „Turnhalle Ost“ registrierte Person auf der Personen-Detailseite den Verbleib „Transport“ erhält
+- **THEN** sinkt die Belegung von „Turnhalle Ost“ um 1
+
+#### Scenario: Handmeldung an namentlicher Stelle
+- **WHEN** für eine namentlich geführte Stelle eine Belegung von 40 gemeldet wird
+- **THEN** antwortet das System mit 409 „Stelle wird namentlich geführt“ und ändert nichts
 
 ### Requirement: Obergrenze der Personenzahlen
 

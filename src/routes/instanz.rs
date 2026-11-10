@@ -11,7 +11,7 @@ use crate::auth::unterschrift::pruefen::{self, UnterschriftAssertion};
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::auth::unterschrift::zeremonie::{self, Zeremonie};
 use crate::auth::unterschrift::{
-    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    AufnahmeErklaerung, Gegenzeichnung, LetzterSchluesselHalter, UnterschriftSchluesselAnzeige,
     UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand, TYP_AUFNAHME,
 };
 use crate::error::AppError;
@@ -71,6 +71,10 @@ pub struct InstanzUebersicht {
     /// Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
     /// „Code ausstellen“).
     pub eigener_schluessel: bool,
+    /// Der Betreiber hat die Datenträgerverschlüsselung bestätigt
+    /// (`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine
+    /// Kontogeheimnisse (LLH-1493, D6).
+    pub datentraeger_bestaetigt: bool,
     pub kopplungen: Vec<InstanzKopplungAnzeige>,
     pub schluessel: Vec<UnterschriftSchluesselAnzeige>,
 }
@@ -102,6 +106,10 @@ pub async fn uebersicht(
         softwarestand: crate::instanz::softwarestand().to_string(),
         passkeys_eingerichtet: crate::auth::unterschrift::rp().is_some(),
         eigener_schluessel: eigener,
+        datentraeger_bestaetigt: crate::instanz::stammdaten::geheimnis::is_datentraeger_bestaetigt(
+            &state.pool,
+        )
+        .await?,
         kopplungen: repo::list_fuer_org(&state.pool, admin.org_id).await?,
         schluessel: unterschrift::list_fuer_org(&state.pool, admin.org_id, admin.id).await?,
     }))
@@ -635,6 +643,151 @@ pub async fn widerrufen(
     ))
 }
 
+// ── Stammdaten (LLH-1493) ────────────────────────────────────────────────────────────────────
+
+/// POST /api/admin/instanz/kopplungen/{id}/stammdaten-neu — „Erneut abgleichen“ an der meldenden
+/// Seite (design.md D5): Stand der Org-Zuordnung des Admins auf 0, Hinweise leer; die nächste
+/// Meldung holt alles neu und gleicht ab. 422 an der erreichten Seite.
+pub async fn stammdaten_neu(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PfadParam(kopplung_id): PfadParam<i64>,
+) -> Result<Json<InstanzKopplungAnzeige>, AppError> {
+    repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
+    let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
+    if kopplung.richtung() != Some(InstanzKopplungRichtung::MeldetSich) {
+        return Err(AppError::UnprocessableEntity(
+            "Stammdaten kommen nur in der Kopplung, in der sich diese Instanz meldet.".into(),
+        ));
+    }
+    let zuordnung = {
+        let mut conn = state.pool.acquire().await?;
+        repo::list_orgs_aktiv(&mut conn, kopplung_id)
+            .await?
+            .into_iter()
+            .find(|o| o.org_id == admin.org_id)
+            .ok_or(AppError::NotFound)?
+    };
+    repo::reset_stammdaten(&state.pool, zuordnung.id).await?;
+    melden::melden_einmal(&state.pool, &kopplung).await?;
+    Ok(Json(
+        repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?,
+    ))
+}
+
+/// Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ElwVerlorenAntwort {
+    pub kopplung: InstanzKopplungAnzeige,
+    pub konten: i64,
+}
+
+/// POST /api/admin/instanz/kopplungen/{id}/verloren — „ELW verloren“ an der erreichten Seite
+/// (LLH-1493, design.md D8): widerruft die Org-Zuordnung des Admins, macht Passwort und zweiten
+/// Faktor jedes Kontos ungültig, dessen Geheimnisse dorthin gingen, und beendet dessen Sitzungen.
+/// Wieder hinein geht es per Passkey oder Einmalpasswort. 422 an der meldenden Seite.
+pub async fn elw_verloren(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(kopplung_id): PfadParam<i64>,
+) -> Result<Json<ElwVerlorenAntwort>, AppError> {
+    let vorher = repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?; // 404
+    let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
+    if kopplung.richtung() != Some(InstanzKopplungRichtung::WirdGemeldet) {
+        return Err(AppError::UnprocessableEntity(
+            "„ELW verloren“ gibt es nur an der Instanz, bei der sich der ELW meldet.".into(),
+        ));
+    }
+    // Nach einem normalen Widerruf bleibt die Aktion, solange dort gelieferte Geheimnisse
+    // gelten; ein zweites Mal setzte sie wiederhergestellte Zugänge erneut zurück.
+    if vorher.org.widerrufen_at.is_some() && vorher.org.stammdaten.konten_mit_geheimnis == 0 {
+        return Err(AppError::Conflict(
+            "Dort gilt kein Passwort von hier mehr; die Kopplung ist schon widerrufen.".into(),
+        ));
+    }
+    let jetzt = crate::zeit::jetzt();
+    let zuordnung_id = vorher.org.id;
+    let (konten, beendet) = crate::write_retry!(&state.pool, |conn| {
+        repo::org_widerrufen(conn, zuordnung_id, Some(admin.id), &jetzt, false).await?;
+        repo::update_zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen)
+            .await?;
+        // Jede Zuordnung der eigenen Org an dieser Kopplung, auch frühere: was je dorthin ging,
+        // gilt als bekannt.
+        let konten: Vec<i64> = sqlx::query_scalar(
+            "SELECT DISTINCT l.benutzer_id FROM instanz_geheimnis_lieferung l \
+             JOIN instanz_kopplung_org o ON o.id = l.kopplung_org_id \
+             JOIN benutzer b ON b.id = l.benutzer_id \
+             WHERE o.kopplung_id = ? AND o.org_id = ? AND b.org_id = ?",
+        )
+        .bind(kopplung_id)
+        .bind(admin.org_id)
+        .bind(admin.org_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        let mut beendet = Vec::new();
+        for id in &konten {
+            sqlx::query(
+                "UPDATE benutzer SET passwort_hash = ?, totp_secret = NULL, totp_aktiviert = 0, \
+                 totp_letzter_schritt = NULL, totp_fehlversuche = 0, totp_gesperrt_bis = NULL \
+                 WHERE id = ?",
+            )
+            .bind(crate::auth::PASSWORT_HASH_KEIN_LOKALES)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+            crate::auth::totp::storage::loesche_recovery_codes(&mut *conn, *id).await?;
+            beendet.extend(crate::auth::session::alle_loeschen(conn, *id).await?);
+        }
+        // Was dorthin ging, ist jetzt wertlos: die Spur fällt, damit die Aktion nicht erneut
+        // greift und die Passkey-Pflicht nicht mehr an diesen Lieferungen hängt.
+        sqlx::query(
+            "DELETE FROM instanz_geheimnis_lieferung WHERE kopplung_org_id IN \
+             (SELECT id FROM instanz_kopplung_org WHERE kopplung_id = ? AND org_id = ?)",
+        )
+        .bind(kopplung_id)
+        .bind(admin.org_id)
+        .execute(&mut *conn)
+        .await?;
+        Ok((konten.len() as i64, beendet))
+    })?;
+    state.live.melde_sitzung_ende(beendet);
+    let mut angaben = melden::build_angaben_gegenstelle(&kopplung, &vorher.org.fremde_org_name);
+    angaben.anzahl = Some(konten);
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::InstanzElwVerloren,
+            akteur: &admin,
+            ziel: Ziel::Instanz(&kopplung.gegenueber_name),
+            angaben: Some(angaben),
+            peer_ip,
+        },
+    )
+    .await;
+    Ok(Json(ElwVerlorenAntwort {
+        kopplung: repo::load_anzeige_fuer_org(&state.pool, kopplung_id, admin.org_id).await?,
+        konten,
+    }))
+}
+
+/// GET /api/instanz/stammdaten/herkunft — welche Stammdaten der eigenen Org vom Hub kommen
+/// (design.md D9). Lesen darf jede angemeldete Person: die Oberfläche sperrt danach die
+/// Bearbeitung, verrät aber nichts, was die Listen nicht ohnehin zeigen.
+pub async fn stammdaten_herkunft(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> Result<Json<crate::instanz::stammdaten::herkunft::StammdatenHerkunftAnzeige>, AppError> {
+    Ok(Json(
+        crate::instanz::stammdaten::herkunft::load_anzeige(
+            &state.pool,
+            user.org_id,
+            user.system_rolle == crate::auth::SystemRolle::Admin,
+        )
+        .await?,
+    ))
+}
+
 // ── Unterschriftsschlüssel ───────────────────────────────────────────────────────────────────
 
 fn passkeys_missing() -> AppError {
@@ -933,6 +1086,125 @@ pub async fn gegenzeichnen_abschluss(
     Ok(Json(anzeige))
 }
 
+/// GET /api/admin/instanz/letzte-schluessel — Konten der eigenen Org, deren Deaktivieren oder
+/// Herabstufen die Kopplungen ohne gültigen Unterschriftsschlüssel zurückließe; die
+/// Benutzerverwaltung warnt davor (LLH-1605, design.md D5).
+pub async fn letzte_schluessel(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+) -> Result<Json<Vec<LetzterSchluesselHalter>>, AppError> {
+    Ok(Json(
+        unterschrift::list_letzte_halter(&state.pool, admin.org_id).await?,
+    ))
+}
+
+/// Obergrenze der Eingabe beim Bestätigen (`src/AGENTS.md`, Eingabegrenzen): vier Zeichen,
+/// großzügig mit Trennzeichen und Leerraum.
+const FINGERABDRUCK_ENDE_MAX: usize = 16;
+
+#[derive(Debug, Deserialize)]
+pub struct BestaetigenBody {
+    /// Die letzten vier Zeichen des Fingerabdrucks, wie der Inhaber sie nennt.
+    pub fingerabdruck_ende: String,
+}
+
+/// POST /api/admin/instanz/unterschrift/{id}/bestaetigen — bestätigt einen vom Gegenüber
+/// nachgelieferten, wartenden Schlüssel (LLH-1605, design.md D3). Verlangt die letzten vier
+/// Zeichen des Fingerabdrucks (422, wenn sie nicht passen); ein eigener Unterschriftsschlüssel ist
+/// nicht nötig.
+pub async fn unterschrift_bestaetigen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+    JsonBody(body): JsonBody<BestaetigenBody>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    let eingabe = crate::routes::support::pflicht_max(
+        &body.fingerabdruck_ende,
+        "fingerabdruck_ende",
+        FINGERABDRUCK_ENDE_MAX,
+    )?;
+    decide_unterschrift(&state, &admin, peer_ip, id, Some(&eingabe)).await
+}
+
+/// POST /api/admin/instanz/unterschrift/{id}/zurueckweisen — weist einen vom Gegenüber
+/// nachgelieferten, wartenden Schlüssel zurück; er wird nie gültig.
+pub async fn unterschrift_zurueckweisen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    decide_unterschrift(&state, &admin, peer_ip, id, None).await
+}
+
+/// Bestätigt (`eingabe` gesetzt) oder weist zurück (`None`).
+async fn decide_unterschrift(
+    state: &AppState,
+    admin: &crate::auth::Benutzer,
+    peer_ip: Option<std::net::IpAddr>,
+    id: i64,
+    eingabe: Option<&str>,
+) -> Result<Json<UnterschriftSchluesselAnzeige>, AppError> {
+    let jetzt = crate::zeit::jetzt();
+    // Die Zuordnung für die Admin-Spur kommt aus derselben Transaktion: scheitert das Lesen,
+    // bleibt auch die Entscheidung aus, statt ohne Spureintrag zu gelten.
+    let (zeile, gegenstelle) = crate::write_retry!(&state.pool, |conn| {
+        let zeile = unterschrift::load(conn, admin.org_id, id).await?;
+        if zeile.zustand() != UnterschriftSchluesselZustand::WartetAufBestaetigung {
+            return Err(AppError::UnprocessableEntity(
+                "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
+            ));
+        }
+        let wirkung = match eingabe {
+            Some(e) => {
+                if !unterschrift::is_fingerabdruck_ende(&zeile.fingerabdruck, e) {
+                    return Err(AppError::UnprocessableEntity(
+                        "Die Zeichen passen nicht zum Fingerabdruck. Bitte die letzten vier \
+                         Zeichen beim Inhaber erfragen."
+                            .into(),
+                    ));
+                }
+                unterschrift::confirm(conn, admin.org_id, id, admin.id, &jetzt).await?
+            }
+            None => unterschrift::reject(conn, admin.org_id, id, admin.id, &jetzt).await?,
+        };
+        if !wirkung {
+            return Err(AppError::UnprocessableEntity(
+                "Der Schlüssel wartet nicht auf eine Bestätigung.".into(),
+            ));
+        }
+        let gegenstelle = match zeile.kopplung_org_id {
+            Some(ko) => repo::load_zuordnung_gegenstelle(conn, ko).await?,
+            None => None,
+        };
+        Ok((zeile, gegenstelle))
+    })?;
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: if eingabe.is_some() {
+                AdminAktion::UnterschriftBestaetigt
+            } else {
+                AdminAktion::UnterschriftZurueckgewiesen
+            },
+            akteur: admin,
+            ziel: Ziel::Unterschrift(&format!("{} · {}", zeile.benutzer_name, zeile.bezeichnung)),
+            angaben: Some(ZugangsAngaben {
+                fingerabdruck: Some(zeile.fingerabdruck.clone()),
+                instanz_kennung: gegenstelle.as_ref().map(|(k, _)| k.clone()),
+                fremde_org: gegenstelle.map(|(_, o)| o),
+                ..ZugangsAngaben::default()
+            }),
+            peer_ip,
+        },
+    )
+    .await;
+    Ok(Json(
+        unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?,
+    ))
+}
+
 /// POST /api/admin/instanz/unterschrift/{id}/widerrufen — widerruft einen lokalen
 /// Unterschriftsschlüssel der Org. Der letzte gültige einer Org, die ihre Schlüssel an eine
 /// gekoppelte Instanz verteilt, bleibt (409). Idempotent.
@@ -950,7 +1222,9 @@ pub async fn unterschrift_widerrufen(
                 "Schlüssel einer gekoppelten Instanz widerruft diese selbst.".into(),
             ));
         }
-        if zeile.zustand() != UnterschriftSchluesselZustand::Widerrufen
+        // Nur ein gültiger Schlüssel kann der letzte gültige sein; ein wartender (etwa nach dem
+        // Deaktivieren des letzten Halters, LLH-1605) bliebe sonst unwiderrufbar hängen.
+        if zeile.zustand() == UnterschriftSchluesselZustand::Gueltig
             && unterschrift::is_letzter_bei_kopplung(conn, admin.org_id, id).await?
         {
             return Err(AppError::Conflict(

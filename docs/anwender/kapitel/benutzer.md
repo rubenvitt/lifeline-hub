@@ -2,7 +2,7 @@
 titel: Benutzer
 gruppen: [administration]
 reihenfolge: 650
-quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs]
+quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/instanz/herkunft.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs]
 ---
 
 ## Überblick
@@ -146,6 +146,16 @@ Anmeldung.
 Einen eingerichteten zweiten Faktor setzt die Verwaltung zurück (oben). Dabei enden alle
 Anmeldungen der Person, auch die eigene, wenn ein System-Admin das eigene Konto zurücksetzt, und
 alle Wiederherstellungscodes verfallen. Bis zur neuen Einrichtung im Profil genügt das Passwort.
+
+### Konten vom Hub
+
+Bezieht die Organisation ihre Stammdaten aus einer Kopplung (siehe
+[Instanzkopplung](instanzkopplung.md)), trägt jedes Konto „vom Hub“ oder „nur hier“. Bei einem
+Konto vom Hub sind Name, Rollen, Deaktivieren und Reaktivieren gesperrt („Wird am Hub
+gepflegt“); ein Einmalpasswort für die Anmeldung vor Ort, das Zurücksetzen des zweiten Faktors
+und das Beenden von Anmeldungen gehen weiter. Am Hub zeigt die Liste bei einem System-Admin ohne
+Passkey „Für die Anmeldung am ELW zuerst einen Passkey einrichten“: ohne Passkey kommt sein
+Passwort nicht am ELW an.
 
 ### Nachvollziehbarkeit
 

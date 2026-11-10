@@ -56,6 +56,9 @@ async fn main() -> anyhow::Result<()> {
             .await
         }
         Some(Command::SqliteVersion) => cmd_sqlite_version().await,
+        Some(Command::AdminZugangZuruecksetzen { benutzername }) => {
+            cmd_admin_zugang_zuruecksetzen(&config.db_path, &benutzername).await
+        }
         Some(Command::Lizenz) => {
             print!("{}", lifeline_hub::lizenz::TEXT);
             Ok(())
@@ -208,6 +211,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         "Instanzidentität"
     );
     lifeline_hub::instanz::set_name(config.instanz_anzeigename());
+    // Stammdaten-Verteilung (LLH-1493): ob Kontogeheimnisse hierher dürfen, sagt die bestätigte
+    // Datenträgerverschlüsselung; der Live-Verteiler meldet übernommene Stammdaten.
+    lifeline_hub::instanz::stammdaten::geheimnis::save_datentraeger_bestaetigt(
+        &pool,
+        config.datentraeger_verschluesselung_extern,
+    )
+    .await?;
+    lifeline_hub::instanz::stammdaten::set_live(live.clone());
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
@@ -555,6 +566,28 @@ async fn cmd_sqlite_version() -> anyhow::Result<()> {
         .fetch_one(&pool)
         .await?;
     println!("{version}");
+    Ok(())
+}
+
+/// Subkommando `admin-zugang-zuruecksetzen` (LLH-1493): Einmalpasswort für einen Admin ohne
+/// Passkey. Das Passwort steht nur hier am Terminal.
+async fn cmd_admin_zugang_zuruecksetzen(db_path: &str, benutzername: &str) -> anyhow::Result<()> {
+    if !Path::new(db_path).exists() {
+        anyhow::bail!("Datenbank nicht gefunden: {db_path} — Server wurde noch nicht gestartet?");
+    }
+    let pool = db::connect(db_path).await?;
+    let ergebnis =
+        lifeline_hub::auth::notfall::admin_zugang_zuruecksetzen(&pool, benutzername).await;
+    pool.close().await;
+    let z = ergebnis.map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!(
+        "Zugang zurückgesetzt: {} Passkey(s) entfernt, Sitzungen beendet.",
+        z.passkeys_entfernt
+    );
+    println!(
+        "Einmalpasswort (nach der Anmeldung zu ändern): {}",
+        z.einmalpasswort
+    );
     Ok(())
 }
 

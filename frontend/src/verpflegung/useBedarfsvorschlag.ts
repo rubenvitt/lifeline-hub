@@ -1,12 +1,15 @@
 /**
  * Verpflegung — Bedarfsvorschläge für ein Zeitfenster.
  *
- * Zwei Quellen, beide nur, wenn das Quellmodul laut Server-Freigabe BEDIENBAR ist
+ * Drei Quellen, alle nur, wenn das Quellmodul laut Server-Freigabe BEDIENBAR ist
  * (`istKeyFreigegeben`) — sichtbar allein reicht nicht, eine Rollensperre ist 403. Ein Fehler
  * lässt die Quelle leer: kein Vorschlag, keine Fehleranzeige, kein Wiederholungsversuch.
  *
  * - Einsatzkräfte: `verdichte(personal, [], []).staerke.gesamt`.
  * - Betreute: Kopfzahl „in Betreuung“ zum Beginn (`ladeBelegungKopfzahl`).
+ * - Sonderkost (LLH-1612, design.md D7): die Kostformen der Registrierten ohne Personenbezug
+ *   (`loadKostformZaehlung`, Stand jetzt), nur wenn jemand registriert ist und mindestens eine
+ *   Sonderkost belegt ist; vorgeschlagen werden nur die belegten Kostformen.
  *
  * Vorbelegt wird nur beim ANLEGEN (Sache des Dialogs). `vonAt` ist ein Wire-String (UTC ohne
  * Zone), nur über `dayjs.utc` gelesen und unverändert als `zeitpunkt` an die Kopfzahl gegeben.
@@ -17,11 +20,13 @@ import utc from 'dayjs/plugin/utc';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { ladeBelegungKopfzahl } from '../api/betreuung';
+import { loadKostformZaehlung } from '../api/betreuungRegistrierung';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BelegungKopfzahl, ModulFreigaben } from '../api/types';
+import type { BelegungKopfzahl, Kostform, KostformZaehlung, ModulFreigaben } from '../api/types';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { verdichte } from '../kraefte/kraeftebild';
+import { KOSTFORMEN } from './verpflegungText';
 
 dayjs.extend(utc);
 
@@ -34,9 +39,17 @@ export interface Vorschlag {
   hinweis: string | null;
 }
 
+/** Vorschlag für die Sonderkost-Felder: nur belegte Kostformen, die übrigen bleiben leer. */
+export interface SonderkostVorschlag {
+  /** `null` = kein Vorschlag. */
+  werte: Partial<Record<Kostform, number>> | null;
+  hinweis: string | null;
+}
+
 export interface Bedarfsvorschlag {
   kraefte: Vorschlag;
   betreute: Vorschlag;
+  sonderkost: SonderkostVorschlag;
 }
 
 export interface BedarfsvorschlagArgs {
@@ -54,6 +67,20 @@ export interface BedarfsvorschlagArgs {
 }
 
 const LEER: Vorschlag = { wert: null, hinweis: null };
+const KEINE_SONDERKOST: SonderkostVorschlag = { werte: null, hinweis: null };
+
+/**
+ * Reine Ableitung des Sonderkost-Vorschlags (design.md D7): ohne Registrierte oder nur mit
+ * Normalkost kein Vorschlag und kein Hinweis. Die Zählung ist der Stand jetzt, nicht zum Beginn.
+ */
+export function sonderkostVorschlag(k: KostformZaehlung): SonderkostVorschlag {
+  const belegt = KOSTFORMEN.filter((f) => k.sonderkost[f] > 0);
+  if (k.registriert <= 0 || belegt.length === 0) return KEINE_SONDERKOST;
+  return {
+    werte: Object.fromEntries(belegt.map((f) => [f, k.sonderkost[f]])),
+    hinweis: `Vorschlag: aus ${k.registriert} Registrierten, Stand jetzt`,
+  };
+}
 
 /** Reine Ableitung des Betreuungsvorschlags aus der Kopfzahl. */
 function betreuteVorschlag(
@@ -104,6 +131,12 @@ export function useBedarfsvorschlag({
     enabled: betreuungFrei,
     retry: false,
   });
+  const kostformQ = useQuery({
+    queryKey: einsatzKeys.betreuungKostformen(einsatzId),
+    queryFn: () => loadKostformZaehlung(einsatzId),
+    enabled: betreuungFrei,
+    retry: false,
+  });
 
   // „Stand“ ist in beiden Feldern die Zeit des Abrufs in der Anzeigezone, wie jede andere
   // Zeit im Dialog (LFH-692), in der Rolle „kurz“ (LLH-1061); vorher stand beim Betreuten-Feld
@@ -133,5 +166,10 @@ export function useBedarfsvorschlag({
     );
   }
 
-  return { kraefte, betreute };
+  const sonderkost =
+    betreuungFrei && kostformQ.data && !kostformQ.isError
+      ? sonderkostVorschlag(kostformQ.data)
+      : KEINE_SONDERKOST;
+
+  return { kraefte, betreute, sonderkost };
 }

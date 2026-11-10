@@ -588,6 +588,11 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
   titel: ReactNode;
   /** Abbrechen ist im Dialog Pflicht — sonst gäbe es keinen Weg heraus. */
   onAbbrechen: () => void;
+  /**
+   * Breite des Dialogs; Vorgabe antds 520 px. Breiter nur für eine Maske, deren Zeilen nebeneinander
+   * stehen müssen (Registrierung, LLH-1612: je Person eine Zeile).
+   */
+  breite?: string | number;
 }
 
 /**
@@ -668,6 +673,7 @@ export function ErfassungsModal<T extends object>({
   offen,
   titel,
   onAbbrechen,
+  breite,
   ...rest
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
@@ -692,6 +698,7 @@ export function ErfassungsModal<T extends object>({
       footer={null}
       destroyOnHidden
       keyboard={false}
+      width={breite}
       styles={{ header: { minHeight: kopfBoden(token) } }}
     >
       <ErfassungsFormular<T>

@@ -29,6 +29,11 @@ export const server = setupServer(
    */
   http.get('/api/benachrichtigungen', () => HttpResponse.json([])),
   /**
+   * Halter des letzten Unterschriftsschlüssels (LLH-1605) — keiner als Default. Die
+   * Benutzerverwaltung fragt sie für ihre Warnung beim Mount ab; Tests mit Halter überschreiben.
+   */
+  http.get('/api/admin/instanz/letzte-schluessel', () => HttpResponse.json([])),
+  /**
    * Verlauf der Eingänge eines Einsatzes (LLH-1143) — leer als Default. Der Knopf „Eingänge“ im
    * Einsatz-Rahmen fragt ihn beim Mount ab; Tests mit Einträgen überschreiben per `server.use()`.
    */
@@ -87,6 +92,11 @@ export const server = setupServer(
    * echter Serverzustand). Tests der Zähler überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
+  // Herkunft der Stammdaten (LLH-1493): ohne Kopplung keine Quelle, nichts gesperrt. Jeder
+  // Stammdaten-Reiter fragt sie ab; ein Test mit Hub-Zeilen überschreibt per `server.use`.
+  http.get('/api/instanz/stammdaten/herkunft', () =>
+    HttpResponse.json({ vom_hub: {}, admins_ohne_passkey: [] }),
+  ),
   /**
    * Stammdaten-Quellen des Vorschlagsfelds (LLH-1144, `stammdaten/vorschlagsquellen.ts`) —
    * leere Kataloge als Default. Die ETB-Erfassung und die Meldungsseiten fragen Fahrzeuge im

@@ -391,3 +391,22 @@ fn stelle_ids_grenze_vor_dem_entdoppeln() {
         StatusCode::BAD_REQUEST
     );
 }
+
+/// LLH-1612 (design.md D4): die Kostform an der Person deckt die Sonderkost der Verpflegung ab —
+/// jede Sonderkost-Form ist eine Kostform mit demselben Schlüssel, und darüber hinaus gibt es nur
+/// `normal`. Eine sechste Sonderkost-Form ohne Kostform (oder umgekehrt) macht diesen Test rot.
+#[test]
+fn kostform_deckt_die_sonderkost() {
+    use crate::person::Kostform;
+    let sonderkost: Vec<&str> = Sonderkost::default()
+        .felder()
+        .iter()
+        .map(|(feld, _)| *feld)
+        .collect();
+    let kostformen: Vec<&str> = Kostform::ALLE
+        .iter()
+        .filter(|k| **k != Kostform::Normal)
+        .map(Kostform::as_str)
+        .collect();
+    assert_eq!(kostformen, sonderkost);
+}

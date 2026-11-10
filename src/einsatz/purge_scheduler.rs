@@ -1267,6 +1267,7 @@ mod tests {
                     kontaktweg: Some("0171 2345678".into()),
                     lat: None,
                     lon: None,
+                    belegungsart: None,
                 },
             )
             .await

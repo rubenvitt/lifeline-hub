@@ -119,8 +119,12 @@ async fn detail_liest_nur_retain_spalten() {
             "abloesung: {tabelle}.{spalte} ist kein Retain-Wert"
         );
     }
-    // Hinweise zur ablösenden Einheit (LLH-1131): beide Einheiten der Schicht.
-    for (tabelle, spalte) in text::DETAIL_ABLOESER_SPALTEN {
+    // Hinweise zur ablösenden Einheit (LLH-1131): beide Einheiten der Schicht; der gebündelte
+    // Wechselzeitpunkt (LLH-1555): Blöcke an Einheiten und ihr Name.
+    for (tabelle, spalte) in text::DETAIL_ABLOESER_SPALTEN
+        .iter()
+        .chain(text::DETAIL_SCHICHTPLAN_WECHSEL_SPALTEN.iter())
+    {
         assert!(
             matches!(
                 klassifikation_von(tabelle, spalte),

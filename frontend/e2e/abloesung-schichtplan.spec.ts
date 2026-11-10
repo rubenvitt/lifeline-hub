@@ -346,3 +346,164 @@ test('Schichtplan: Kopie per Zug und per Dialog, Schichten erzeugen mit Konflikt
   await expect(zweiter).toBeVisible();
   expect((await bloecke()).filter((b) => b.posten.einheit_id === ktw.id)).toHaveLength(1);
 });
+
+test('Schichtplan (LLH-1600): Kontextmenü eines Blocks — kopieren, bearbeiten, löschen', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Schichtplan Kontextmenü ${Date.now()}` },
+  });
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const sende = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`${basis}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const streife = await sende('einheiten', { name: 'Streife 6' });
+  const bloecke = async () => {
+    const antwort = await page.request.get(`${basis}/abloesungen/schichtplan`);
+    return ((await antwort.json()) as { bloecke: Block[] }).bloecke;
+  };
+  const wire = (t: number) => new Date(t).toISOString().slice(0, 19).replace('T', ' ');
+  const stunde = Math.ceil(Date.now() / (60 * MIN)) * 60 * MIN;
+  await sende('abloesungen/schichtplan/bloecke', {
+    posten: { art: 'einheit', einheit_id: streife.id },
+    von: wire(stunde),
+    bis: wire(stunde + 60 * MIN),
+  });
+
+  await page.goto(`/einsaetze/${einsatzId}/abloesung?ansicht=plan`);
+  const raster = page.getByRole('region', { name: 'Schichtplan' });
+  const bloeckeImRaster = raster.locator(
+    `[data-raster-zeile="einheit:${streife.id}"] [data-lfh="schichtplan-block"]`,
+  );
+  await expect(bloeckeImRaster).toHaveCount(1);
+  const menue = page.getByRole('menu', { name: /^Aktionen zu Streife 6/ });
+
+  // ── Rechtsklick: Menü am Block, „Als nächsten Block kopieren“ kopiert ohne Dialog ──────────
+  await bloeckeImRaster.first().click({ button: 'right' });
+  await expect(menue).toBeVisible();
+  await expect(menue.getByRole('menuitem')).toHaveText([
+    'Bearbeiten',
+    'Als nächsten Block kopieren',
+    'Block löschen …',
+  ]);
+  await menue.getByRole('menuitem', { name: 'Als nächsten Block kopieren' }).click();
+  await expect(menue).toBeHidden();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(async () => (await bloecke()).length).toBe(2);
+  await expect(bloeckeImRaster).toHaveCount(2);
+  const folge = (await bloecke()).find((b) => ms(b.von) === stunde + 60 * MIN)!;
+  expect(ms(folge.bis)).toBe(stunde + 120 * MIN);
+
+  // ── Tastatur: Umschalt+F10 am fokussierten Block, „Bearbeiten“ öffnet den Blockdialog ─────
+  // Die Maus weg: stünde sie über dem neuen Menü, machte ihr Hover einen anderen Eintrag aktiv.
+  await page.mouse.move(0, 0);
+  await bloeckeImRaster.first().focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(menue).toBeVisible();
+  await expect(menue.getByRole('menuitem', { name: 'Bearbeiten' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Block Streife 6' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect(dialog).toBeHidden();
+
+  // ── Löschen fragt im Dialog nach; „Behalten“ lässt ihn stehen, „Block löschen“ löscht ──────
+  const zweiter = raster.locator(`[data-lfh="schichtplan-block"][data-block-id="${folge.id}"]`);
+  await zweiter.click({ button: 'right' });
+  await menue.getByRole('menuitem', { name: 'Block löschen …' }).click();
+  const rueckfrage = page.getByRole('dialog', { name: 'Block löschen?' });
+  await expect(rueckfrage).toBeVisible();
+  await rueckfrage.getByRole('button', { name: 'Behalten' }).click();
+  await expect(rueckfrage).toBeHidden();
+  expect(await bloecke()).toHaveLength(2);
+  await zweiter.click({ button: 'right' });
+  await menue.getByRole('menuitem', { name: 'Block löschen …' }).click();
+  await rueckfrage.getByRole('button', { name: 'Block löschen' }).click();
+  await expect.poll(async () => (await bloecke()).map((b) => b.id)).not.toContain(folge.id);
+  await expect(bloeckeImRaster).toHaveCount(1);
+});
+
+/** Wire-Zeit des Servers (`YYYY-MM-DD HH:mm:ss`, UTC), auf 5 Minuten abgerundet. */
+function wireZeit5(msZeit: number): string {
+  const d = new Date(Math.floor(msZeit / (5 * MIN)) * 5 * MIN);
+  const zwei = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getUTCFullYear()}-${zwei(d.getUTCMonth() + 1)}-${zwei(d.getUTCDate())} ` +
+    `${zwei(d.getUTCHours())}:${zwei(d.getUTCMinutes())}:00`
+  );
+}
+
+/**
+ * Kriterium 12 der Prüfliste (LLH-1586) für die Zeilen des Schichtplans im Einsatz, Spec
+ * `kraefte-schichtplan`, „Zeilen ohne Sprung“ (LLH-1604): die Pause steht immer zuletzt, jede neue
+ * Einheit kommt also VOR ihr ins Raster. Der Zeiger steht über einem Pausenblock; eine Einheit,
+ * die der „andere Schirm“ (`page.request`, dasselbe Konto) anlegt, wartet hinter dem Sammelbanner,
+ * der Block bleibt stehen. „anzeigen“ stellt die Einheit in ihre Zeile.
+ */
+test('Schichtplan (LLH-1604): eine fremde Einheit wartet hinter dem Banner, nichts springt', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await anmelden(page);
+
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Schichtplan Schleuse ${Date.now()}` },
+  });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const sende = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`${basis}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  await sende('einheiten', { name: 'Streife 2' });
+  await sende('abloesungen/schichtplan/bloecke', {
+    posten: { art: 'pause' },
+    von: wireZeit5(Date.now()),
+    bis: wireZeit5(Date.now() + 2 * 60 * MIN),
+  });
+
+  const strom = page.waitForResponse(
+    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+  );
+  await page.goto(`/einsaetze/${einsatzId}/abloesung?ansicht=plan`);
+  await strom;
+  const raster = page.getByRole('region', { name: 'Schichtplan' });
+  const zeilen = raster.locator('[data-lfh="schichtplan-zeile"]');
+  const unterZeiger = raster.locator('[data-raster-zeile="pause"] [data-lfh="schichtplan-block"]');
+  await expect(unterZeiger).toBeVisible();
+  await expect(zeilen).toHaveCount(2); // Streife 2, Pause
+  await unterZeiger.hover();
+  const vorher = (await unterZeiger.boundingBox())!;
+
+  const ktw = await sende('einheiten', { name: 'KTW 9' });
+
+  const banner = page.locator('[data-lfh="schichtplan-schleuse"] [data-lfh="sammelbanner"]');
+  await expect(banner, 'die neue Einheit wartet hinter dem Banner').toContainText('1 neuer Posten');
+  await expect(zeilen).toHaveCount(2);
+  const nachher = (await unterZeiger.boundingBox())!;
+  expect(
+    { x: nachher.x, y: nachher.y, breite: nachher.width, hoehe: nachher.height },
+    'der Block unter dem Zeiger bleibt, wo er war',
+  ).toEqual({ x: vorher.x, y: vorher.y, breite: vorher.width, hoehe: vorher.height });
+
+  await banner.getByRole('button', { name: 'anzeigen' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(raster.locator(`[data-raster-zeile="einheit:${ktw.id}"]`)).toBeVisible();
+  await expect(zeilen).toHaveCount(3);
+});

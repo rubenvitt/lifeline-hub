@@ -182,6 +182,7 @@ fn stelle_eingabe(bezeichnung: &str, art: Art, kapazitaet: Option<i64>) -> Stell
         kontaktweg: None,
         lat: None,
         lon: None,
+        belegungsart: None,
     }
 }
 

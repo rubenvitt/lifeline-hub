@@ -38,6 +38,7 @@ const PLAN: Schichtplan = {
     },
   ],
   helfer: [],
+  wechsel: [],
 };
 
 function zeigen(handler: Parameters<typeof server.use>, client = neuerQueryClient()) {

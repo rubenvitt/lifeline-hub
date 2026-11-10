@@ -1,4 +1,4 @@
-import { App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
+import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -29,7 +29,14 @@ import SitzungsListe from '../auth/SitzungsListe';
 import EinmalpasswortVergeben from '../auth/EinmalpasswortVergeben';
 import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../api/sitzungen';
 import { globalKeys } from '../api/queryKeys';
+import { loadLetzteSchluessel } from '../api/instanz';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import {
+  HerkunftAbzeichen,
+  PASSKEY_FUER_ELW_TEXT,
+  useStammdatenHerkunft,
+  VOM_HUB_TEXT,
+} from '../instanz/herkunft';
 import {
   EIGENES_KONTO,
   LETZTER_ADMIN,
@@ -60,17 +67,45 @@ const ORG_ROLLEN = [
   { value: 'fuehrungskraft', label: `${ORG_ROLLE_TEXT.fuehrungskraft} (darf Einsätze anlegen)` },
 ];
 
+/**
+ * Warnung vor dem Deaktivieren oder Herabstufen des letzten Schlüsselhalters (LLH-1605): die
+ * Kopplungen müssen danach neu aufgebaut werden, der Weg steht dabei.
+ */
+function kopplungNeuText(kopplungen: string[]): string {
+  const mit =
+    kopplungen.length === 1
+      ? `Die Kopplung mit ${kopplungen[0]}`
+      : `Die Kopplungen mit ${kopplungen.join(', ')}`;
+  return (
+    'Danach hat die Organisation keinen gültigen Unterschriftsschlüssel mehr. ' +
+    `${mit} ${kopplungen.length === 1 ? 'muss' : 'müssen'} neu aufgebaut werden: Kopplung ` +
+    'widerrufen, einen neuen Unterschriftsschlüssel registrieren und neu koppeln.'
+  );
+}
+
+/** Warnung, wenn unbekannt ist, wer den letzten Unterschriftsschlüssel hält (LLH-1605). */
+const HALTER_UNBEKANNT_TEXT =
+  'Ob die Organisation danach noch einen gültigen Unterschriftsschlüssel hat, ließ sich nicht ' +
+  'prüfen. Hält dieses Konto den letzten, müssen die Kopplungen danach neu aufgebaut werden: ' +
+  'Kopplung widerrufen, einen neuen Unterschriftsschlüssel registrieren und neu koppeln.';
+
 export default function BenutzerPage() {
   const { benutzer: angemeldeterBenutzer, laedt: authLaedt } = useAuth();
   const qc = useQueryClient();
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<NeuerBenutzer>();
   const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
+  // Konten vom Hub (LLH-1493): Name, Rollen und Aktivität führt der Hub; ein Einmalpasswort für
+  // die Anmeldung vor Ort und das Zurücksetzen des zweiten Faktors gehen weiter hier.
+  const herkunft = useStammdatenHerkunft();
+  const kontoVomHub = (b: BenutzerAnzeige | null) => b != null && herkunft.istVomHub('konto', b.id);
   const [editForm] = Form.useForm<BearbeitenWerte>();
   // Die Anmeldungen einer Person (LFH-1092), im Dialog außerhalb der Zeilen.
   const [anmeldungenVon, setAnmeldungenVon] = useState<BenutzerAnzeige | null>(null);
   // Die offene Rückfrage vor dem Zurücksetzen des zweiten Faktors (LFH-1122).
   const [zweitfaktorVon, setZweitfaktorVon] = useState<BenutzerAnzeige | null>(null);
+  // Die Rückfrage vor dem Deaktivieren des letzten Schlüsselhalters (LLH-1605).
+  const [deaktivierenVon, setDeaktivierenVon] = useState<BenutzerAnzeige | null>(null);
   const { message } = App.useApp();
 
   const benutzerQuery = useQuery({
@@ -78,6 +113,34 @@ export default function BenutzerPage() {
     queryFn: listeBenutzer,
   });
   const benutzerListe = benutzerQuery.data ?? [];
+
+  /*
+   * Halter des letzten Unterschriftsschlüssels (LLH-1605, Change zkvt2l8z, D5): Deaktivieren und
+   * Herabstufen gelingen auch dann, die Kopplungen der Org müssen danach aber neu aufgebaut
+   * werden. Darum warnt die Seite vorher.
+   */
+  const letzteQuery = useQuery({
+    queryKey: globalKeys.instanzkopplungLetzteSchluessel(),
+    queryFn: loadLetzteSchluessel,
+    enabled: angemeldeterBenutzer?.system_rolle === 'admin',
+  });
+  /*
+   * Nur eine frische Antwort zählt. Lädt die Abfrage noch, ist sie gescheitert oder läuft ein
+   * Neuabruf (etwa nach einer neuen Kopplung, `instanzkopplung` invalidiert), kann die alte Antwort
+   * überholt sein: dann ist unbekannt, wer den letzten Schlüssel hält, und die Seite fragt bei jedem
+   * Admin-Konto allgemein nach, statt still zu deaktivieren. Konten ohne Admin-Rolle halten keine
+   * Schlüssel.
+   */
+  const halterBekannt = letzteQuery.isSuccess && !letzteQuery.isFetching;
+  const letzteKopplungen = (id: number): string[] | undefined =>
+    halterBekannt ? letzteQuery.data.find((h) => h.benutzer_id === id)?.kopplungen : undefined;
+  const brauchtWarnung = (b: BenutzerAnzeige): boolean =>
+    letzteKopplungen(b.id) !== undefined || (b.system_rolle === 'admin' && !halterBekannt);
+  const warnText = (b: BenutzerAnzeige): string => {
+    const kopplungen = letzteKopplungen(b.id);
+    return kopplungen ? kopplungNeuText(kopplungen) : HALTER_UNBEKANNT_TEXT;
+  };
+  const bearbeitenRolle = Form.useWatch('system_rolle', editForm);
 
   /*
    * Kein `onError`-Toast (LFH-966, `frontend/AGENTS.md`, „Speicherfehler an die Seite, Erfolg an
@@ -92,14 +155,22 @@ export default function BenutzerPage() {
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+        qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() }),
+      ]),
   });
 
   // Der Bearbeiten-Dialog. Das Schließen macht `onFertig` an der Hülle, nicht dieser Erfolgszweig.
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
       bearbeiteBenutzer(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+        qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() }),
+      ]),
   });
 
   // „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121). Hier statt in der Komponente:
@@ -196,7 +267,17 @@ export default function BenutzerPage() {
       // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine Voreinstellung —
       // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
-      render: (t: string) => <span style={{ overflowWrap: 'anywhere' }}>{t}</span>,
+      render: (t: string, b) => (
+        <Space size={4} wrap>
+          <span style={{ overflowWrap: 'anywhere' }}>{t}</span>
+          <HerkunftAbzeichen herkunft={herkunft.herkunft('konto', b.id)} quelle={herkunft.quelle} />
+          {herkunft.ohnePasskey(b.id) && (
+            <Typography.Text type="warning" data-lfh="benutzer-passkey-fuer-elw">
+              {PASSKEY_FUER_ELW_TEXT}
+            </Typography.Text>
+          )}
+        </Space>
+      ),
     },
     // Die Suche liest den Rohwert der Spalte: das führende „@" ist Darstellung, gesucht wird „eva".
     {
@@ -263,7 +344,17 @@ export default function BenutzerPage() {
           { key: 'bearbeiten', label: 'Bearbeiten' },
           // Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen.
           ...(b.aktiv ? [{ key: 'anmeldungen' as const, label: 'Anmeldungen' }] : []),
-          ...(b.aktiv ? [] : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
+          ...(b.aktiv
+            ? []
+            : kontoVomHub(b)
+              ? [
+                  {
+                    key: 'aktiv' as const,
+                    label: `Reaktivieren gesperrt: ${VOM_HUB_TEXT}`,
+                    gesperrt: true as const,
+                  },
+                ]
+              : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
           // Nur bei aktivem zweiten Faktor: sonst gibt es nichts zurückzusetzen (LFH-1122).
           ...(b.totp_aktiviert
             ? [
@@ -276,14 +367,20 @@ export default function BenutzerPage() {
             : []),
           ...(b.aktiv
             ? [
-                grund
-                  ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
-                    {
+                kontoVomHub(b)
+                  ? {
                       key: 'aktiv' as const,
-                      label: `Deaktivieren gesperrt: ${grund}`,
+                      label: `Deaktivieren gesperrt: ${VOM_HUB_TEXT}`,
                       gesperrt: true as const,
                     }
-                  : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
+                  : grund
+                    ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
+                      {
+                        key: 'aktiv' as const,
+                        label: `Deaktivieren gesperrt: ${grund}`,
+                        gesperrt: true as const,
+                      }
+                    : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
               ]
             : []),
         ];
@@ -307,6 +404,10 @@ export default function BenutzerPage() {
               else if (aktion === 'zweitfaktor') {
                 zweitfaktor.reset();
                 setZweitfaktorVon(b);
+              } else if (b.aktiv && brauchtWarnung(b)) {
+                deaktivieren.reset();
+                reaktivieren.reset();
+                setDeaktivierenVon(b);
               } else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
               else zeilenAktion('reaktivieren', b.id);
             }}
@@ -332,7 +433,8 @@ export default function BenutzerPage() {
       }
       hinweis={
         <SeitenHinweise
-          fehler={deaktivieren.error ?? reaktivieren.error}
+          // Während der Rückfrage steht ein Fehler des Deaktivierens im Dialog, nicht doppelt hier.
+          fehler={deaktivierenVon ? null : (deaktivieren.error ?? reaktivieren.error)}
           fehlerTitel={deaktivieren.isError ? 'Nicht deaktiviert' : 'Nicht reaktiviert'}
         />
       }
@@ -456,6 +558,9 @@ export default function BenutzerPage() {
         titel="Benutzer bearbeiten"
         form={editForm}
         erfassenText="Speichern"
+        // Konto vom Hub (LLH-1493): nichts im Formular ist hier änderbar, ein PATCH bekäme nur
+        // 409. Das Einmalpasswort ist eine eigene Aktion und bleibt.
+        gesperrt={kontoVomHub(zuBearbeiten)}
         laeuft={bearbeiten.isPending}
         // Sperrt jeden Ausweg, solange gespeichert oder ein Einmalpasswort vergeben wird (LFH-1121):
         // schlösse der Dialog vorher, ginge das schon gesetzte Passwort verloren. Die Fehler
@@ -481,19 +586,38 @@ export default function BenutzerPage() {
           setZuBearbeiten(null);
         }}
       >
+        {kontoVomHub(zuBearbeiten) && (
+          <Alert
+            type="info"
+            showIcon
+            title={`Name und Rollen: ${VOM_HUB_TEXT}. Ein Einmalpasswort für die Anmeldung hier geht.`}
+            style={{ marginBlockEnd: 16 }}
+          />
+        )}
         <Form.Item
           label="Anzeigename"
           name="anzeigename"
           rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
         >
-          <Input />
+          <Input disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
         <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
-          <Select options={SYSTEM_ROLLEN} />
+          <Select options={SYSTEM_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
         <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
-          <Select options={ORG_ROLLEN} />
+          <Select options={ORG_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
+        {zuBearbeiten &&
+          bearbeitenRolle !== undefined &&
+          bearbeitenRolle !== 'admin' &&
+          brauchtWarnung(zuBearbeiten) && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBlockEnd: 16 }}
+              message={warnText(zuBearbeiten)}
+            />
+          )}
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
         <SpeicherFehler fehler={bearbeiten.error} />
         {/* Passwort vergessen (LFH-1121): eine eigene Aktion neben dem Formular, kein Feld. */}
@@ -529,6 +653,35 @@ export default function BenutzerPage() {
             }
           />
         )}
+      </Modal>
+
+      {/* Rückfrage vor dem Deaktivieren des letzten Schlüsselhalters (LLH-1605). Wie beim zweiten
+          Faktor: Abbrechen ist gesperrt, solange gesendet wird, der Fehler steht im Dialog. */}
+      <Modal
+        open={deaktivierenVon !== null}
+        title={deaktivierenVon ? `${deaktivierenVon.anzeigename} deaktivieren?` : ''}
+        okText="Deaktivieren"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: deaktivieren.isPending }}
+        cancelButtonProps={{ disabled: deaktivieren.isPending }}
+        closable={deaktivieren.isPending ? { disabled: true } : true}
+        mask={{ closable: !deaktivieren.isPending }}
+        keyboard={!deaktivieren.isPending}
+        onOk={() =>
+          deaktivierenVon &&
+          deaktivieren.mutate(deaktivierenVon.id, { onSuccess: () => setDeaktivierenVon(null) })
+        }
+        // Abbrechen räumt den Fehler (`frontend/AGENTS.md`, Speicherfehler): er stünde sonst
+        // danach noch über der Tabelle.
+        onCancel={() => {
+          if (deaktivieren.isPending) return;
+          deaktivieren.reset();
+          setDeaktivierenVon(null);
+        }}
+        destroyOnHidden
+      >
+        {deaktivierenVon && <p>{warnText(deaktivierenVon)}</p>}
+        <SpeicherFehler fehler={deaktivieren.error} titel="Nicht deaktiviert" />
       </Modal>
 
       {/* Rückfrage im Dialog, nicht am Menüeintrag (Spec `datensatz-aktionsmenue`). Abbrechen ist

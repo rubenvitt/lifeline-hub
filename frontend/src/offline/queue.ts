@@ -4,11 +4,13 @@ import { neueClientId } from './clientId';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import type { PersonEintragAktion } from './personEintrag';
 import type {
+  AbmeldungEingabe,
   AusgabeEingabe,
   BelegungsmeldungEingabe,
   EintreffenEingabe,
   NeueMeldung,
   Person,
+  RegistrierungEingabe,
   StandmeldungEingabe,
 } from '../api/types';
 
@@ -29,6 +31,11 @@ export type OfflineSchreibaktion =
   | { art: 'meldung'; daten: NeueMeldung }
   | { art: 'stand'; bezirk_id: number; bezeichnung: string; daten: StandmeldungEingabe }
   | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe }
+  /** Ein ganzer Haushalt an einer Betreuungsstelle (LLH-1612): EINE Aktion, damit nie ein halber
+   *  Haushalt ankommt. Die Personendaten liegen bis zum Senden auf dem Gerät wie bei `person`. */
+  | { art: 'registrierung'; stelle_id: number; bezeichnung: string; daten: RegistrierungEingabe }
+  /** Abmelden eines Haushalts oder einzelner Personen an einer Betreuungsstelle (LLH-1612). */
+  | { art: 'abmeldung'; stelle_id: number; bezeichnung: string; daten: AbmeldungEingabe }
   | { art: 'ausgabe'; zeitfenster_id: number; bezeichnung: string; daten: AusgabeEingabe }
   | {
       art: 'eintreffen';

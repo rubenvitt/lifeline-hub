@@ -43,11 +43,13 @@ import SchichtenErzeugenDialog from '../abloesung/schichtplan/SchichtenErzeugenD
 import SchichtplanBlockDialog, {
   type BlockSpeichern,
 } from '../abloesung/schichtplan/SchichtplanBlockDialog';
+import { useBlockMenue } from '../abloesung/schichtplan/blockMenue';
 import SchichtplanListe from '../abloesung/schichtplan/SchichtplanListe';
 import SchichtplanPersonen, {
   type PersonZugDaten,
 } from '../abloesung/schichtplan/SchichtplanPersonen';
 import SchichtplanRaster, { type BlockZielDaten } from '../abloesung/schichtplan/SchichtplanRaster';
+import SchichtplanSchleuse from '../abloesung/schichtplan/SchichtplanSchleuse';
 import {
   kopieBody,
   mitPerson,
@@ -133,6 +135,11 @@ export default function PlanungSchichtplan({
     dialogJetzt.current = dialog;
   }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
+  const [zugLaeuft, setZugLaeuft] = useState(false);
+  // Ein offenes Kontextmenü eines Blocks hält wie ein Zug (LLH-1600, Spec `datensatz-aktionsmenue`).
+  const [menueOffen, setMenueOffen] = useState(false);
+  // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
+  const schleuseHalten = zugLaeuft || menueOffen || gezogen != null || dialog != null;
 
   const stammQuery = useQuery({
     queryKey: globalKeys.personalListe('im-dienst'),
@@ -205,12 +212,26 @@ export default function PlanungSchichtplan({
       message.success(neu === 1 ? '1 Schicht erzeugt' : `${neu} Schichten erzeugt`);
     },
   });
+  // Nur der Dialog des gelöschten Blocks schließt: ein Löschen aus dem Kontextmenü (LLH-1600)
+  // kehrt womöglich erst zurück, wenn schon der Dialog eines anderen Blocks offen ist.
+  const nachLoeschen = (_antwort: unknown, b: SchichtplanBlock) => {
+    setDialog((d) => (d?.art === 'block' && d.blockId === b.id ? null : d));
+    void qc.invalidateQueries({ queryKey: globalKeys.planung(planungId) });
+  };
   const loeschenMut = useMutation({
     mutationFn: (b: SchichtplanBlock) => loeschePlanungBlock(planungId, b.id, b.version),
-    onSuccess: () => {
-      setDialog(null);
-      void qc.invalidateQueries({ queryKey: globalKeys.planung(planungId) });
-    },
+    onSuccess: nachLoeschen,
+  });
+  // Kontextmenü (LLH-1600): eigene Mutationen, damit Lauf und Fehler eines stillen Kopierens oder
+  // Löschens nie im Dialog eines anderen Blocks stehen und `reset()` beim Öffnen eines Blocks die
+  // Sperre des Menüs nicht aufhebt. Fehler stehen über dem Raster (`zugSchreiben`).
+  const menueKopierenMut = useMutation({
+    mutationFn: (body: SchichtplanBlockBody) => legePlanungBlockAn(planungId, blockBody(body)),
+    onSuccess: setzePlanung,
+  });
+  const menueLoeschenMut = useMutation({
+    mutationFn: (b: SchichtplanBlock) => loeschePlanungBlock(planungId, b.id, b.version),
+    onSuccess: nachLoeschen,
   });
   const [zugFehler, setZugFehler] = useState<unknown>(null);
   const zugSchreiben = (p: Promise<unknown>) => {
@@ -333,6 +354,25 @@ export default function PlanungSchichtplan({
     setDialog({ art: 'erzeugen' });
   };
   const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
+  // Kontextmenü eines Blocks (LLH-1600): „Als nächsten Block kopieren“ ohne Dialog, die Kopie
+  // erscheint im Raster; ein Fehler steht über dem Raster wie bei einem Zug.
+  const kopiereStill = (block: SchichtplanBlock) => {
+    const body = naechsterBlockBody(block);
+    if (!body) return;
+    zugSchreiben(
+      menueKopierenMut.mutateAsync(body).then(() => {
+        message.success('Block kopiert');
+      }),
+    );
+  };
+  // Die Vorplanung kennt keinen Wechsel aus dem Plan.
+  const blockMenue = useBlockMenue({
+    blockVon,
+    onBearbeiten: oeffneBlock,
+    onKopieren: kopiereStill,
+    onLoeschen: (b) => zugSchreiben(menueLoeschenMut.mutateAsync(b)),
+    laeuft: menueKopierenMut.isPending || menueLoeschenMut.isPending,
+  });
   const mitSeitenleiste = !istSchmal && !readOnly;
   const ohnePosten = planung.posten.length === 0;
 
@@ -387,14 +427,18 @@ export default function PlanungSchichtplan({
         </div>
       )}
       {istSchmal ? (
-        <SchichtplanListe
-          zeilen={zeilen}
-          bloecke={bloecke}
-          jetzt={jetzt}
-          formatZeit={listenZeit}
-          onOeffnen={oeffneBlock}
-          alleBloecke
-        />
+        <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} schmal>
+          {(z) => (
+            <SchichtplanListe
+              zeilen={z}
+              bloecke={bloecke}
+              jetzt={jetzt}
+              formatZeit={listenZeit}
+              onOeffnen={oeffneBlock}
+              alleBloecke
+            />
+          )}
+        </SchichtplanSchleuse>
       ) : (
         <DndContext
           sensors={sensoren}
@@ -412,22 +456,29 @@ export default function PlanungSchichtplan({
               alignItems: 'start',
             }}
           >
-            <SchichtplanRaster
-              zeilen={zeilen}
-              bloecke={bloecke}
-              spanne={spanne}
-              jetzt={jetzt}
-              darfSchreiben={!readOnly}
-              zone={konventionen.zeitzone}
-              formatMarke={markeText}
-              formatZeit={zeitText}
-              onAnlegen={onAnlegen}
-              onAendern={onAendern}
-              onKopieren={onKopieren}
-              onOeffnen={oeffneBlock}
-              personenZiel={mitSeitenleiste}
-              beschriftung="Planung"
-            />
+            <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten}>
+              {(z) => (
+                <SchichtplanRaster
+                  zeilen={z}
+                  bloecke={bloecke}
+                  spanne={spanne}
+                  jetzt={jetzt}
+                  darfSchreiben={!readOnly}
+                  zone={konventionen.zeitzone}
+                  formatMarke={markeText}
+                  formatZeit={zeitText}
+                  onAnlegen={onAnlegen}
+                  onAendern={onAendern}
+                  onKopieren={onKopieren}
+                  onOeffnen={oeffneBlock}
+                  personenZiel={mitSeitenleiste}
+                  beschriftung="Planung"
+                  onZug={setZugLaeuft}
+                  blockMenue={readOnly ? undefined : blockMenue}
+                  onMenue={setMenueOffen}
+                />
+              )}
+            </SchichtplanSchleuse>
             {mitSeitenleiste && <SchichtplanPersonen optionen={personen} />}
           </div>
           <DragOverlay>

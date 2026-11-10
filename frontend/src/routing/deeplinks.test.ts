@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   personDruckPfad,
+  registrierlisteDruckPfad,
+  geraetRegistrierlisteDruckPfad,
   personenDruckPfad,
   parsePersonenDruckAuswahl,
   tiereDruckPfad,
@@ -40,6 +42,7 @@ import {
   dokumentePfad,
   abloesungPfad,
   parseAbloesungAnsicht,
+  parseAbloesungWechsel,
   parseSchichtplanDruckAuswahl,
   schichtplanDruckPfad,
   betreuungPfad,
@@ -134,6 +137,21 @@ describe('deeplinks — Item-Routes (Vollseiten-Detail)', () => {
   });
   it('personDruckPfad: Druckansicht einer Person unter personen/<id>/druck (LLH-1120)', () => {
     expect(personDruckPfad(E, 10)).toBe('/einsaetze/5/personen/10/druck');
+  });
+  it('registrierlisteDruckPfad: Registrierliste einer Stelle unter betreuung/<id>/registrierliste/druck (LLH-1616)', () => {
+    expect(registrierlisteDruckPfad(E, 3)).toBe('/einsaetze/5/betreuung/3/registrierliste/druck');
+    expect(registrierlisteDruckPfad(E, 3, { unvertraeglichkeiten: true })).toBe(
+      '/einsaetze/5/betreuung/3/registrierliste/druck?unvertraeglichkeiten=1',
+    );
+    expect(registrierlisteDruckPfad(E, 3, { unvertraeglichkeiten: false })).toBe(
+      '/einsaetze/5/betreuung/3/registrierliste/druck',
+    );
+  });
+  it('geraetRegistrierlisteDruckPfad: am Gerät ohne Stelle, es gilt die gebundene (LLH-1616)', () => {
+    expect(geraetRegistrierlisteDruckPfad(E)).toBe('/geraet/5/betreuung/registrierliste/druck');
+    expect(geraetRegistrierlisteDruckPfad(E, { unvertraeglichkeiten: true })).toBe(
+      '/geraet/5/betreuung/registrierliste/druck?unvertraeglichkeiten=1',
+    );
   });
   it('personDetailPfad', () => {
     expect(personDetailPfad(E, 10)).toBe('/einsaetze/5/personen/10');
@@ -569,6 +587,15 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       expect(parseAbloesungAnsicht(params) ?? 'laufend').toBe(a);
     }
     expect(parseAbloesungAnsicht(new URLSearchParams('ansicht=ohne'))).toBeUndefined();
+  });
+
+  it('abloesungPfad mit ?wechsel= wie der Server-Pfad des gebündelten Hinweises (LLH-1555), Umkehr verwirft alles außer ganzen Minuten', () => {
+    const pfad = abloesungPfad(E, { ansicht: 'plan', wechsel: 29903735 });
+    expect(pfad).toBe('/einsaetze/5/abloesung?ansicht=plan&wechsel=29903735');
+    expect(parseAbloesungWechsel(new URLSearchParams(pfad.split('?')[1]))).toBe(29903735);
+    for (const roh of ['', '-3', '1.5', 'abc', '99999999999999999999']) {
+      expect(parseAbloesungWechsel(new URLSearchParams({ wechsel: roh }))).toBeUndefined();
+    }
   });
 
   it('schichtplanDruckPfad (LLH-1557): Sicht „posten“ ist Vorgabe, Auswahl reist mit, Unbekanntes fällt weg', () => {

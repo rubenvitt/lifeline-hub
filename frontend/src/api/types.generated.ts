@@ -353,6 +353,12 @@ export interface components {
          * @enum {string}
          */
         AbloesungWarnungArt: "schon_geplant" | "im_einsatz";
+        /** @description Antwort auf „Abmelden“: wer abgemeldet wurde (übersprungene fehlen). */
+        AbmeldungAnzeige: {
+            person_ids: number[];
+            /** Format: int64 */
+            stelle_id: number;
+        };
         /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).
          *     String = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur
@@ -376,7 +382,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "instanz_elw_verloren";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -1105,6 +1111,12 @@ export interface components {
             zeitpunkt_at?: string | null;
         };
         /**
+         * @description Herkunft einer Belegungsmeldung (LLH-1612): von Hand gemeldet oder vom Server aus der
+         *     Registrierung einer namentlich geführten Stelle geschrieben. Wire == `as_str()`.
+         * @enum {string}
+         */
+        BelegungQuelle: "meldung" | "registrierung";
+        /**
          * @description Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
          *     [`StandVerlaufEintrag`].
          */
@@ -1119,6 +1131,11 @@ export interface components {
             erfasst_von: string;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Von Hand gemeldet oder vom Server aus der Registrierung (LLH-1612); eine Meldung aus
+             *     der Registrierung lässt sich nicht zurücknehmen.
+             */
+            quelle: components["schemas"]["BelegungQuelle"];
             /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
             zurueckgenommen_at?: string | null;
@@ -1130,6 +1147,13 @@ export interface components {
          * @enum {string}
          */
         BelegungsArt: "eintritt" | "wechsel" | "austritt";
+        /**
+         * @description Wie eine Betreuungsstelle ihre Belegung führt (LLH-1612, design.md D5). `gezaehlt`: die
+         *     Belegung wird gemeldet (Vorgabe, Bestand). `namentlich`: der Server meldet sie aus den
+         *     dort registrierten Personen, eine Handmeldung ist 409. Wire == `as_str()`.
+         * @enum {string}
+         */
+        Belegungsart: "gezaehlt" | "namentlich";
         /** @description Die aktuelle Belegungsmeldung einer Stelle. */
         BelegungsmeldungAnzeige: {
             /** Format: int64 */
@@ -1172,7 +1196,7 @@ export interface components {
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "abloeser_wiederhergestellt" | "schichtplan_wechsel" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
@@ -1346,6 +1370,8 @@ export interface components {
             angelegt_at: string;
             art: components["schemas"]["BetreuungsstelleArt"];
             belegung?: components["schemas"]["BelegungsmeldungAnzeige"] | null;
+            /** @description Gezählt oder namentlich geführt (LLH-1612, design.md D5). */
+            belegungsart: components["schemas"]["Belegungsart"];
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
@@ -2828,6 +2854,12 @@ export interface components {
          * @enum {string}
          */
         EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /** @description Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind. */
+        ElwVerlorenAntwort: {
+            /** Format: int64 */
+            konten: number;
+            kopplung: components["schemas"]["InstanzKopplungAnzeige"];
+        };
         /** @description Ein Abschnitt der Empfängerliste (Ziel einer Zuführung). */
         EmpfaengerAbschnitt: {
             /** Format: int64 */
@@ -3637,6 +3669,21 @@ export interface components {
          * @enum {string}
          */
         Geschlecht: "maennlich" | "weiblich" | "divers" | "unbekannt";
+        /** @description Ein Haushalt mit den Personen, die an DIESER Stelle registriert sind. */
+        HaushaltAnzeige: {
+            /** Format: int64 */
+            bezugsperson_id?: number | null;
+            /** @description „Nachname, Vorname“ der Bezugsperson, auch wenn sie nicht (mehr) an dieser Stelle ist. */
+            bezugsperson_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Nummer im Einsatz, angezeigt als „H-n“.
+             */
+            nummer: number;
+            personen: components["schemas"]["RegistriertePerson"][];
+        };
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
             /**
@@ -3812,12 +3859,23 @@ export interface components {
             /** Format: int64 */
             id: number;
             letzter_fehler?: string | null;
+            /**
+             * @description Die eigene Org verteilt ihre Schlüssel an diese Kopplung, hat aber keinen gültigen mehr
+             *     (etwa nach dem Deaktivieren des letzten Halters): die Kopplung muss neu aufgebaut werden.
+             */
+            ohne_gueltigen_schluessel: boolean;
             /** @description Die Org-Zuordnung der eigenen Org (die jüngste). */
             org: components["schemas"]["InstanzOrgZuordnung"];
             protokoll: components["schemas"]["InstanzProtokoll"];
             richtung: components["schemas"]["InstanzKopplungRichtung"];
             /** Format: int64 */
             uhr_abweichung_s?: number | null;
+            /**
+             * Format: int64
+             * @description Vom Gegenüber nachgelieferte Unterschriftsschlüssel, die hier auf Bestätigung warten
+             *     (LLH-1605).
+             */
+            wartende_schluessel: number;
             zuletzt_gesehen_at?: string | null;
             zustand: components["schemas"]["InstanzKopplungZustand"];
         };
@@ -3838,6 +3896,12 @@ export interface components {
             fremde_org_name: string;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Stammdaten (LLH-1493). Meldende Seite: übernommener Stand und Hinweise aus der
+             *     Übernahme. Erreichte Seite: ob Kontogeheimnisse hinausgehen und an wie viele Konten sie
+             *     gingen.
+             */
+            stammdaten: components["schemas"]["InstanzStammdatenStand"];
             widerrufen_at?: string | null;
         };
         /**
@@ -3845,8 +3909,28 @@ export interface components {
          * @enum {string}
          */
         InstanzProtokoll: "passt" | "update_hier" | "update_gegenueber";
+        /** @description Stand der Stammdaten-Verteilung an einer Org-Zuordnung (design.md D9). */
+        InstanzStammdatenStand: {
+            /** @description Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt). */
+            geheimnisse_verteilt: boolean;
+            hinweise: string[];
+            /**
+             * Format: int64
+             * @description Nur erreichte Seite: Konten, deren Geheimnisse an diese Kopplung gingen, über alle
+             *     Zuordnungen der Org, und dort noch gelten („ELW verloren“ räumt sie).
+             */
+            konten_mit_geheimnis: number;
+            /** Format: int64 */
+            stand: number;
+        };
         /** @description Alles, was die Admin-Seite „Instanzkopplung“ zeigt. */
         InstanzUebersicht: {
+            /**
+             * @description Der Betreiber hat die Datenträgerverschlüsselung bestätigt
+             *     (`--datentraeger-verschluesselung-extern`); ohne sie bekommt diese Instanz keine
+             *     Kontogeheimnisse (LLH-1493, D6).
+             */
+            datentraeger_bestaetigt: boolean;
             /**
              * @description Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
              *     „Code ausstellen“).
@@ -4073,6 +4157,34 @@ export interface components {
             /** @description Fingerabdruck dieser Instanz zum Abgleich an der einlösenden Seite. */
             fingerabdruck: string;
             laeuft_ab_at: string;
+        };
+        /**
+         * @description Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben
+         *     Schlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard
+         *     `kostform_deckt_die_sonderkost`), `normal` ist der Rest. String = CHECK-Constraint in
+         *     `migrations/0310_registrierstelle.sql`.
+         * @enum {string}
+         */
+        Kostform: "normal" | "vegetarisch" | "vegan" | "ohne_schwein" | "diaet_allergenarm" | "saeugling_kleinkind";
+        /** @description Kostformen der Registrierten ohne Personenbezug (D7, `GET …/betreuung/kostformen`). */
+        KostformZaehlung: {
+            /**
+             * Format: int64
+             * @description Davon mit Kostform `normal`.
+             */
+            normal: number;
+            /**
+             * Format: int64
+             * @description Davon ohne Kostform.
+             */
+            ohne_angabe: number;
+            /**
+             * Format: int64
+             * @description Alle jetzt an einer nicht stornierten Stelle registrierten Personen.
+             */
+            registriert: number;
+            /** @description Davon je Sonderkost-Form. */
+            sonderkost: components["schemas"]["Sonderkost"];
         };
         /** @description Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`. */
         KraftAngabe: {
@@ -4671,6 +4783,15 @@ export interface components {
             meldeweg: components["schemas"]["MeldeWeg"];
             /** Format: int64 */
             meldung_id: number;
+        };
+        /**
+         * @description Ein Konto, dessen Deaktivieren oder Herabstufen die Org ohne gültigen Unterschriftsschlüssel
+         *     zurückließe, und die Kopplungen, die dann neu aufgebaut werden müssen (LLH-1605, design.md D5).
+         */
+        LetzterSchluesselHalter: {
+            /** Format: int64 */
+            benutzer_id: number;
+            kopplungen: string[];
         };
         /** @description Ein Fahrzeug der letzten Besetzung. */
         LetztesFahrzeug: {
@@ -5722,6 +5843,16 @@ export interface components {
             geaendert_von: number;
             geburtsdatum?: string | null;
             geschlecht?: components["schemas"]["Geschlecht"] | null;
+            /**
+             * Format: int64
+             * @description Haushalt der Registrierstelle (LLH-1612, design.md D3); fehlt ohne Haushalt.
+             */
+            haushalt_id?: number | null;
+            /**
+             * Format: int64
+             * @description Nummer dieses Haushalts im Einsatz, angezeigt als „H-n“.
+             */
+            haushalt_nummer?: number | null;
             herkunft_adresse?: string | null;
             /** Format: int64 */
             id: number;
@@ -5730,6 +5861,7 @@ export interface components {
              *     ausdrücklich nicht „nein“.
              */
             kontamination?: boolean | null;
+            kostform?: components["schemas"]["Kostform"] | null;
             melder_kontakt?: string | null;
             /**
              * Format: int64
@@ -5760,6 +5892,11 @@ export interface components {
             transport_at?: string | null;
             transport_fachrichtung?: components["schemas"]["Fachrichtung"] | null;
             transport_prioritaet?: components["schemas"]["TransportPrioritaet"] | null;
+            /**
+             * @description Unverträglichkeiten, Freitext bis [`PERSON_UNVERTRAEGLICHKEITEN_MAX`]. Gesundheitsangabe:
+             *     Kategorie Behandlung, nie im ETB.
+             */
+            unvertraeglichkeiten?: string | null;
             /**
              * @description Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status
              *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
@@ -6048,6 +6185,50 @@ export interface components {
             zeitpunkt: string;
             zurueckgenommen_at?: string | null;
         };
+        /**
+         * @description Was an einer Einheit geschieht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanWechselEinheit: "wechsel" | "beginn" | "ende";
+        /** @description Ein Eintrag eines Wechselpunkts. */
+        PlanWechselEintrag: {
+            /**
+             * Format: int64
+             * @description Nur an einer Einheit mit Stand `offen`: die Schicht, die zu vollziehen ist.
+             */
+            abloesung_id?: number | null;
+            art: components["schemas"]["PlanWechselEintragArt"];
+            /**
+             * Format: int64
+             * @description Der Block, um den es geht: an einer Einheit der Folgeblock, ohne ihn der endende Block.
+             */
+            block_id: number;
+            einheit?: components["schemas"]["PlanWechselEinheit"] | null;
+            stand: components["schemas"]["PlanWechselStand"];
+        };
+        /**
+         * @description Was an einem Wechselpunkt zu tun ist. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanWechselEintragArt: "einheit" | "uhs" | "pause_beginn" | "pause_ende";
+        /**
+         * @description Stand eines Eintrags der Wechsel-Leiste. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanWechselStand: "offen" | "vollzogen" | "ohne_schicht";
+        /** @description Ein Zeitpunkt der Wechsel-Leiste. */
+        PlanWechselpunkt: {
+            /** @description Nach Art, dann nach Block. */
+            eintraege: components["schemas"]["PlanWechselEintrag"][];
+            /**
+             * Format: int64
+             * @description Derselbe Zeitpunkt in Minuten seit 1970: Schlüssel des gebündelten Hinweises
+             *     (Bezug `schichtplan_wechsel`) und des Sprungs `?wechsel=`.
+             */
+            minute: number;
+            /** @description Zeitpunkt laut Plan (UTC). */
+            zeitpunkt: string;
+        };
         /** @description Die ganze Planung mit Befunden und Kennzahlen. */
         PlanungAnzeige: {
             /** @description Nach Posten (Reihenfolge, Pause zuletzt) und Beginn. */
@@ -6328,6 +6509,37 @@ export interface components {
             region: string;
             slug: string;
         };
+        /** @description Die Registrierliste einer Stelle (`GET …/stellen/{sid}/registrierungen`). */
+        RegistrierListe: {
+            /** @description Haushalte mit mindestens einer hier registrierten Person, nach Nummer. */
+            haushalte: components["schemas"]["HaushaltAnzeige"][];
+            /** @description Hier registrierte Personen ohne Haushalt (etwa über einen Verbleib aufgenommen). */
+            ohne_haushalt: components["schemas"]["RegistriertePerson"][];
+            /** Format: int64 */
+            stelle_id: number;
+        };
+        /**
+         * @description Eine an der Stelle registrierte Person (Registrierliste und Antworten). Personenbezogen: nur
+         *     mit Zugriff auf das Modul Personen.
+         */
+        RegistriertePerson: {
+            /** Format: int64 */
+            alter_geschaetzt?: number | null;
+            /** @description Erfassungszeit der Person. */
+            erfasst_at: string;
+            geburtsdatum?: string | null;
+            geschlecht?: components["schemas"]["Geschlecht"] | null;
+            /** Format: int64 */
+            haushalt_id?: number | null;
+            /** Format: int64 */
+            id: number;
+            kostform?: components["schemas"]["Kostform"] | null;
+            name?: string | null;
+            /** Format: int64 */
+            registrier_nr: number;
+            unvertraeglichkeiten?: string | null;
+            vorname?: string | null;
+        };
         /**
          * @description Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus
          *     einem `json_object` in `repo::SELECT_ALLE`. Nur, was Kopf, UHS und die Vorbelegung des
@@ -6561,6 +6773,11 @@ export interface components {
             helfer?: components["schemas"]["PlanHelferAnzeige"][] | null;
             /** @description Nächster Zeitpunkt, an dem sich ein uhrabhängiger Befund ändert; der Client fragt dann neu. */
             naechste_pruefung_at?: string | null;
+            /**
+             * @description Die Wechsel-Leiste (LLH-1555 Welle 3): Zeitpunkte mit dem, was laut Plan zu tun ist,
+             *     aufsteigend (`wechselpunkte`).
+             */
+            wechsel: components["schemas"]["PlanWechselpunkt"][];
         };
         /** @description Grenzwerte des Dienst-Befunds. */
         SchichtplanGrenzwerte: {
@@ -6832,6 +7049,29 @@ export interface components {
             untereinheiten: number;
             /** Format: int64 */
             vorlage_id: number;
+        };
+        /**
+         * @description Eine verteilte Stammdatenart (design.md D1). Auf der Leitung steht der Wert als Text, damit
+         *     eine ältere Instanz eine neue Art überspringen kann (D2).
+         * @enum {string}
+         */
+        StammdatenArt: "konto" | "org_einstellungen" | "modul_einstellung" | "fuehrungsfunktion" | "fahrzeug_status" | "personal_status" | "qualifikation" | "einheit_typ" | "fahrzeug" | "material" | "personal" | "einheit_vorlage" | "schichtmodell" | "einsatz_vorlage" | "stichwort_vorschlag" | "verpflegung_vorlage" | "sprechgruppe" | "etb_baustein" | "externe_stelle" | "unterkunft_richtwert";
+        /** @description Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9). */
+        StammdatenHerkunftAnzeige: {
+            /**
+             * @description Nur für Admins und nur, wenn diese Instanz die Geheimnisse der Org verteilt: System-Admins
+             *     ohne Anmelde-Passkey; ihre Geheimnisse gehen nicht hinaus (design.md D7).
+             */
+            admins_ohne_passkey: number[];
+            /**
+             * @description Name der Gegenstelle, aus der die Org ihre Stammdaten bezieht; ohne Quelle fehlt das Feld
+             *     (dann gibt es weder „vom Hub“ noch „nur hier“).
+             */
+            quelle?: string | null;
+            /** @description Je Art (Wire-Wert von `StammdatenArt`) die lokalen Schlüssel der übernommenen Zeilen. */
+            vom_hub: {
+                [key: string]: string[];
+            };
         };
         /**
          * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
@@ -7312,6 +7552,8 @@ export interface components {
             bezeichnung: string;
             /** @description Gehört dem anfragenden Admin. */
             eigen: boolean;
+            /** @description Bei einer Gegenzeichnung: Zeitpunkt aus der Erklärung. */
+            erklaert_at?: string | null;
             erstellt_at: string;
             fingerabdruck: string;
             /** @description Bei `herkunft = gegenueber`: Name der Org dort. */
@@ -7321,6 +7563,8 @@ export interface components {
             herkunft: components["schemas"]["UnterschriftSchluesselHerkunft"];
             /** Format: int64 */
             id: number;
+            /** @description Bei einer Gegenzeichnung: Fingerabdruck des unterzeichnenden Schlüssels (LLH-1605). */
+            unterzeichner_fingerabdruck?: string | null;
             widerrufen_at?: string | null;
             zustand: components["schemas"]["UnterschriftSchluesselZustand"];
         };
@@ -7333,7 +7577,7 @@ export interface components {
          * @description Zustand eines Unterschriftsschlüssels.
          * @enum {string}
          */
-        UnterschriftSchluesselZustand: "wartet_auf_gegenzeichnung" | "gueltig" | "widerrufen";
+        UnterschriftSchluesselZustand: "wartet_auf_gegenzeichnung" | "wartet_auf_bestaetigung" | "gueltig" | "widerrufen" | "abgelehnt";
         /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
          *     Erreichbarkeit steht im Kommunikationsplan.
@@ -8411,7 +8655,8 @@ export interface components {
          *     - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
          *     - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
          *     - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
-         *     - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`.
+         *     - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;
+         *       `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
          *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
          *       Gegenstelle.
          */
@@ -8420,6 +8665,11 @@ export interface components {
             adresse?: string | null;
             /** @description Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`. */
             angemeldet_at?: string | null;
+            /**
+             * Format: int64
+             * @description „ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden.
+             */
+            anzahl?: number | null;
             /** @description Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels. */
             fingerabdruck?: string | null;
             /** @description Org der Gegenstelle. */
@@ -8432,6 +8682,12 @@ export interface components {
             instanz_kennung?: string | null;
             org_rolle?: components["schemas"]["OrgRolle"] | null;
             org_rolle_vorher?: components["schemas"]["OrgRolle"] | null;
+            /**
+             * Format: int64
+             * @description Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten
+             *     Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
+             */
+            passkeys_entfernt?: number | null;
             system_rolle?: components["schemas"]["SystemRolle"] | null;
             system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
         };
@@ -8472,11 +8728,11 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,
-         *     zuvor 0132 und 0021).
+         *     `art IN ('detail','export','druck','anhang','registrierliste')`
+         *     (migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).
          * @enum {string}
          */
-        ZugriffArt: "detail" | "export" | "druck" | "anhang";
+        ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste";
         /**
          * @description Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.
          * @enum {string}

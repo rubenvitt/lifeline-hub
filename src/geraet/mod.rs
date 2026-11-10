@@ -473,6 +473,27 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
+    // Registrierstelle (LLH-1612): Haushalte an der eigenen Stelle registrieren, ihre Liste
+    // lesen und abmelden; der Handler prüft die eigene Stelle (fremd 403).
+    (
+        "GET",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
+    ),
+    // Registrierliste drucken (LLH-1616): nur die eigene Stelle (der Handler prüft, fremd 403),
+    // je Person protokolliert. Bewusste Ausnahme zu „Personendruck nie am Gerät“
+    // (`frontend/src/druck/AGENTS.md`); die Personendruckansicht bleibt draußen.
+    (
+        "GET",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen/druck",
+    ),
 ];
 
 /// Zusätzliche Einsatzrouten des Verpflegungsgeräts (LFH-1044), einsatzweit oder an einer

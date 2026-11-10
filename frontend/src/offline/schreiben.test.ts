@@ -15,6 +15,7 @@ import {
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
+import { sendAbmeldung, sendRegistrierung } from '../api/betreuungRegistrierung';
 import {
   markiereBenachrichtigungenGelesen,
   quittiereBenachrichtigung,
@@ -29,9 +30,11 @@ import {
   erfasseStandOfflineFaehig,
   erfasseVerpflegungsausgabeOfflineFaehig,
   merkeVerpflegungsausgabeVor,
+  saveAbmeldungOfflineCapable,
   saveBenachrichtigungQuittiertOfflineCapable,
   saveEingaengeGelesenOfflineCapable,
   savePersonEintragOfflineCapable,
+  saveRegistrierungOfflineCapable,
 } from './schreiben';
 
 vi.mock('../api/einsatzPerson', async (importOriginal) => {
@@ -53,6 +56,10 @@ vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
 vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
+vi.mock('../api/betreuungRegistrierung', () => ({
+  sendRegistrierung: vi.fn(),
+  sendAbmeldung: vi.fn(),
+}));
 vi.mock('../api/benachrichtigungen', () => ({
   markiereBenachrichtigungenGelesen: vi.fn(),
   quittiereBenachrichtigung: vi.fn(),
@@ -776,5 +783,95 @@ describe('Einzelnen Eingang ohne Netz quittieren (LLH-1477)', () => {
       status: 404,
     });
     expect((await schreibaktionenLaden(11, 7)).map((z) => z.aktion)).toEqual([quittiert]);
+  });
+});
+
+describe('Registrieren und Abmelden ohne Netz (LLH-1612, design.md D8)', () => {
+  const turnhalle = { id: 8, bezeichnung: 'Turnhalle Ost' };
+  const haushalt = {
+    personen: [
+      { name: 'Weber', vorname: 'Anna', kostform: 'vegetarisch' as const },
+      { name: 'Weber', vorname: 'Lea', kostform: 'saeugling_kleinkind' as const },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-09T09:15:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('ohne Netz: der ganze Haushalt geht als EINE Aktion mit client_id und Erfassungszeit in die Queue', async () => {
+    online(false);
+    const ergebnis = await saveRegistrierungOfflineCapable(11, 7, turnhalle, {
+      ...haushalt,
+      client_id: 'reg-1',
+    });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'reg-1' });
+    expect(sendRegistrierung).not.toHaveBeenCalled();
+    expect(await schreibaktionenLaden(11, 7)).toEqual([
+      expect.objectContaining({
+        aktion: {
+          art: 'registrierung',
+          stelle_id: 8,
+          bezeichnung: 'Turnhalle Ost',
+          daten: { ...haushalt, client_id: 'reg-1', zeitpunkt_at: '2026-11-09 09:15:00' },
+        },
+      }),
+    ]);
+  });
+
+  it('online ohne Zeitpunkt, nach abgerissener Antwort vorgemerkt mit DERSELBEN client_id', async () => {
+    vi.mocked(sendRegistrierung).mockRejectedValueOnce(new NetzFehler());
+    const ergebnis = await saveRegistrierungOfflineCapable(11, 7, turnhalle, haushalt);
+    const [einsatz, stelle, gesendet, optionen] = vi.mocked(sendRegistrierung).mock.calls[0];
+    expect([einsatz, stelle, optionen]).toEqual([7, 8, { offlineQueueBenutzerId: 11 }]);
+    expect(gesendet.client_id).toEqual(expect.any(String));
+    expect(gesendet).not.toHaveProperty('zeitpunkt_at');
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-11-09 09:15:00' });
+  });
+
+  it('eine fachliche Ablehnung (Stelle geschlossen) wirft und merkt nichts vor', async () => {
+    vi.mocked(sendRegistrierung).mockRejectedValueOnce(new ApiError(422, 'Stelle geschlossen'));
+    await expect(saveRegistrierungOfflineCapable(11, 7, turnhalle, haushalt)).rejects.toMatchObject(
+      { status: 422 },
+    );
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+  });
+
+  it('Abmelden eines Haushalts merkt ohne Netz mit Ziel, client_id und Erfassungszeit vor', async () => {
+    online(false);
+    const ergebnis = await saveAbmeldungOfflineCapable(11, 7, turnhalle, {
+      haushalt_id: 3,
+      ziel: 'zu Verwandten',
+      client_id: 'ab-1',
+    });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'ab-1' });
+    expect(sendAbmeldung).not.toHaveBeenCalled();
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion).toEqual({
+      art: 'abmeldung',
+      stelle_id: 8,
+      bezeichnung: 'Turnhalle Ost',
+      daten: {
+        haushalt_id: 3,
+        ziel: 'zu Verwandten',
+        client_id: 'ab-1',
+        zeitpunkt_at: '2026-11-09 09:15:00',
+      },
+    });
+  });
+
+  it('Abmelden online sendet mit client_id und ohne Zeitpunkt', async () => {
+    const antwort = { stelle_id: 8, person_ids: [21] };
+    vi.mocked(sendAbmeldung).mockResolvedValue(antwort);
+    const ergebnis = await saveAbmeldungOfflineCapable(11, 7, turnhalle, { person_ids: [21] });
+    expect(ergebnis).toEqual({ zustand: 'gesendet', daten: antwort });
+    const gesendet = vi.mocked(sendAbmeldung).mock.calls[0][2];
+    expect(gesendet).toEqual({ person_ids: [21], client_id: expect.any(String) });
   });
 });

@@ -1888,6 +1888,7 @@ describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
       min_ruhe_minuten: 600,
     },
     helfer: [],
+    wechsel: [],
   };
 
   beforeEach(() => {
@@ -1949,6 +1950,51 @@ describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
     const leiste = await screen.findByRole('complementary', { name: 'Personen zum Einteilen' });
     expect(within(leiste).getByText('Modul Personal gesperrt')).toBeInTheDocument();
     expect(leiste.querySelector('[data-lfh="schichtplan-person"]')).toBeNull();
+  });
+
+  it('ein gebündelter Hinweis springt mit ?wechsel= in die Leiste, von dort in den Vollzug (LLH-1555)', async () => {
+    const zeitpunkt = PLAN.bloecke[0].bis;
+    const minute = 29_000_000;
+    laufendLiefert([schicht({ id: 40, einheit_id: 11, einheit_name: 'Florian 1' })]);
+    fetchSchichtplan.mockResolvedValue({
+      ...PLAN,
+      wechsel: [
+        {
+          zeitpunkt,
+          minute,
+          eintraege: [
+            { art: 'einheit', stand: 'offen', block_id: 1, einheit: 'ende', abloesung_id: 40 },
+          ],
+        },
+      ],
+    });
+    renderPage(`/einsaetze/1/abloesung?ansicht=plan&wechsel=${minute}`);
+    const leiste = await screen.findByRole('region', { name: 'Wechsel laut Plan' });
+    const liste = await within(leiste).findByRole('list');
+    expect(within(liste).getByRole('listitem')).toHaveTextContent('Florian 1 · Posten endet');
+    await userEvent.click(within(liste).getByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeInTheDocument();
+  });
+
+  it('ist die Schicht der Leiste noch nicht unter den laufenden, sagt der Vollzug das, statt stumm zu bleiben (LLH-1555)', async () => {
+    const minute = 29_000_000;
+    laufendLiefert([]);
+    fetchSchichtplan.mockResolvedValue({
+      ...PLAN,
+      wechsel: [
+        {
+          zeitpunkt: PLAN.bloecke[0].bis,
+          minute,
+          eintraege: [{ art: 'einheit', stand: 'offen', block_id: 1, abloesung_id: 40 }],
+        },
+      ],
+    });
+    renderPage(`/einsaetze/1/abloesung?ansicht=plan&wechsel=${minute}`);
+    const leiste = await screen.findByRole('region', { name: 'Wechsel laut Plan' });
+    await userEvent.click(within(leiste).getByRole('button', { name: 'Ablösung vollziehen' }));
+    expect(await screen.findByText('Schicht wird noch geladen')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('auf dem Handschirm steht je Posten „jetzt“ und „als Nächstes“', async () => {

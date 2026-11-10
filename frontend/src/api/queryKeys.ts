@@ -99,6 +99,12 @@ export const EINSATZ_KEYS = {
   // `einheit`, `personal`, `fahrzeug` oder `abloesung` ohnehin sendet.
   kraefteZeitachse: 'einsatz-kraefte-zeitachse',
   betreuung: 'einsatz-betreuung',
+  // Registrierliste einer Betreuungsstelle (LLH-1612): eigener Prefix, damit sie NICHT mit der
+  // Betreuung auf die Platte geht (Namen, Geburtsdaten, Unverträglichkeiten). Live über
+  // `betreuung` (Registrieren, Abmelden) und `person` (Kostform, Verbleib, Storno).
+  registrierliste: 'einsatz-registrierliste',
+  // Registrierliste drucken (LLH-1616): Schnappschuss, nicht live, nicht auf der Platte.
+  registrierlisteDruck: 'einsatz-registrierliste-druck',
   // Evakuierungsbezirke (LLH-1034): eigenes Modul neben der Betreuung, eigener Prefix.
   evakuierung: 'einsatz-evakuierung',
   verpflegung: 'einsatz-verpflegung',
@@ -301,6 +307,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.betreuung,
     EINSATZ_KEYS.personAnhaenge,
     EINSATZ_KEYS.personenTransportmittel,
+    // Registrierliste (LLH-1612): Kostform, Verbleib oder Storno einer Person ändert sie.
+    EINSATZ_KEYS.registrierliste,
   ],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
@@ -375,7 +383,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // trifft. Nutzlast nur Kennungen. Den Modulzähler rechnet der Client aus der Übersicht
   // (`ClientZaehlerQuelle`), er hängt am selben Prefix. Dazu die Verpflegung (LLH-1295): ihre
   // Empfängerliste trägt die Betreuungsstellen, und ein Storno löst den Bezug von Ausgaben.
-  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung],
+  // Registrieren und Abmelden (LLH-1612) senden `betreuung` mit der Stelle: die Registrierliste
+  // hängt mit daran.
+  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung, EINSATZ_KEYS.registrierliste],
   // Bezirke und ihre Standreihen (LLH-1034), wie `betreuung`. Die Kennzahl „Evakuiert“ und der
   // Modulzähler lesen dieselbe Übersicht.
   evakuierung: [EINSATZ_KEYS.evakuierung],
@@ -523,6 +533,9 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Ereignis `auftrag` per Präfix mit.
  * - `personDruck` (LLH-1120): derselbe Schnappschuss-Grundsatz für das Blatt einer Person; jeder
  *   Abruf schreibt einen `druck`-Eintrag ins Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
+ * - `registrierlisteDruck` (LLH-1616): derselbe Schnappschuss-Grundsatz für die Registrierliste
+ *   einer Betreuungsstelle; jeder Abruf schreibt je Person einen Protokolleintrag, ein
+ *   Live-Refetch schriebe weitere.
  * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
  *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
@@ -562,6 +575,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.auftragDruck,
   EINSATZ_KEYS.personDruck,
+  EINSATZ_KEYS.registrierlisteDruck,
   EINSATZ_KEYS.schichtplanDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
@@ -841,6 +855,17 @@ export const einsatzKeys = {
    *  und jede eigene Mutation treffen den offenen Verlauf mit. */
   betreuungVerlauf: (einsatzId: number, stelleId: number) =>
     [EINSATZ_KEYS.betreuung, einsatzId, 'verlauf', stelleId] as const,
+  /** Kostformen der Registrierten ohne Personenbezug (LLH-1612), Sub-Key unter dem
+   *  Betreuungs-Prefix: nur Zahlen, darf mit der Betreuung auf die Platte. */
+  betreuungKostformen: (einsatzId: number) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'kostformen'] as const,
+  /** Registrierliste einer Stelle (LLH-1612). */
+  registrierliste: (einsatzId: number, stelleId: number) =>
+    [EINSATZ_KEYS.registrierliste, einsatzId, stelleId] as const,
+  /** Invalidierungs-Prefix aller Registrierlisten des Einsatzes. */
+  registrierlisteAlle: (einsatzId: number) => [EINSATZ_KEYS.registrierliste, einsatzId] as const,
+  registrierlisteDruck: (einsatzId: number, stelleId: number, hasUnvertraeglichkeiten: boolean) =>
+    [EINSATZ_KEYS.registrierlisteDruck, einsatzId, stelleId, hasUnvertraeglichkeiten] as const,
   // Evakuierung (LLH-1034): argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und
   // Kennzahl „Evakuiert“ teilen ihn).
   evakuierung: (einsatzId: number) => [EINSATZ_KEYS.evakuierung, einsatzId] as const,
@@ -1008,6 +1033,8 @@ export const GLOBAL_KEYS = {
   lagemonitorZugaenge: 'lagemonitor-zugaenge',
   // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
   instanzkopplung: 'instanzkopplung',
+  // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
+  stammdatenHerkunft: 'stammdaten-herkunft',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
   // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
@@ -1123,6 +1150,13 @@ export const globalKeys = {
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
+  stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
+  /**
+   * Halter des letzten Unterschriftsschlüssels (LLH-1605), für die Warnung der Benutzerverwaltung.
+   * Liegt unter dem Prefix `instanzkopplung`: wer die Kopplungen abgleicht, gleicht sie mit ab.
+   */
+  instanzkopplungLetzteSchluessel: () =>
+    [GLOBAL_KEYS.instanzkopplung, 'letzte-schluessel'] as const,
   /**
    * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
    * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).
@@ -1277,6 +1311,8 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.unterkunftRichtwerte,
     GLOBAL_KEYS.schichtmodelle,
     GLOBAL_KEYS.organisation,
+    // Eine übernommene Nachlieferung vom Hub (LLH-1493) ändert, was „vom Hub“ ist.
+    GLOBAL_KEYS.stammdatenHerkunft,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
     GLOBAL_KEYS.einsaetze,
   ],

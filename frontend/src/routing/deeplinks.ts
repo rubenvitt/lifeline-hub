@@ -373,12 +373,25 @@ export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): 
  */
 export function abloesungPfad(
   einsatzId: number,
-  opts: { schicht?: number; ansicht?: AbloesungAnsicht } = {},
+  opts: { schicht?: number; ansicht?: AbloesungAnsicht; wechsel?: number } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'abloesung'), {
     schicht: opts.schicht,
     ansicht: opts.ansicht,
+    wechsel: opts.wechsel,
   });
+}
+
+/**
+ * Umkehr des Parameters `wechsel` von {@link abloesungPfad}: ein Wechselzeitpunkt des
+ * Schichtplans in Minuten seit 1970 (LLH-1555 Welle 3, Bezug `schichtplan_wechsel`). Alles
+ * andere als eine ganze Zahl ≥ 0 wird verworfen.
+ */
+export function parseAbloesungWechsel(params: URLSearchParams): number | undefined {
+  const roh = params.get('wechsel');
+  if (roh === null || !/^\d+$/.test(roh)) return undefined;
+  const minute = Number(roh);
+  return Number.isSafeInteger(minute) ? minute : undefined;
 }
 
 /** Ansichten der Seite Ablösung (LLH-1128, LLH-1312, Schichtplan LLH-1554). */
@@ -505,6 +518,26 @@ export function betreuungPfad(einsatzId: number, opts: { stelle?: number } = {})
 /** Detailseite einer Betreuungsstelle (LLH-1044), unter dem Modul Betreuung. */
 export function betreuungsstellePfad(einsatzId: number, stelleId: number): string {
   return `${einsatzModulPfad(einsatzId, 'betreuung')}/${stelleId}`;
+}
+
+/** Wahl der Druckansicht „Registrierliste“: Unverträglichkeiten nur, wenn bewusst gewählt. */
+export interface RegistrierlisteDruckWahl {
+  unvertraeglichkeiten?: boolean;
+}
+
+/**
+ * Druckansicht der Registrierliste einer Betreuungsstelle (LLH-1616, Change
+ * `iw8hjb93-registrierliste-drucken` design.md D4): unter der Stelle, gegatet über das Segment
+ * `betreuung`. Die Wahl „Unverträglichkeiten“ reist in der Adresse, fehlend = ohne.
+ */
+export function registrierlisteDruckPfad(
+  einsatzId: number,
+  stelleId: number,
+  wahl: RegistrierlisteDruckWahl = {},
+): string {
+  return mitQuery(`${betreuungsstellePfad(einsatzId, stelleId)}/registrierliste/druck`, {
+    unvertraeglichkeiten: wahl.unvertraeglichkeiten ? 1 : undefined,
+  });
 }
 
 /** Rechner „Unterkunft planen“ einer Betreuungsstelle (LLH-1520), Unterroute der Detailseite. */
@@ -1543,6 +1576,19 @@ export function geraetBetroffenAufnahmePfad(einsatzId: number): string {
 /** Bereich „Stelle“ der Betreuungsstelle: Belegung, Meldeverlauf, Meldungen. */
 export function geraetBetreuungPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/betreuung`;
+}
+
+/**
+ * Registrierliste drucken am Gerät „Betreuungsstelle“ (LLH-1616): ohne Stelle in der Adresse,
+ * es gilt die gebundene. Wahl wie {@link registrierlisteDruckPfad}.
+ */
+export function geraetRegistrierlisteDruckPfad(
+  einsatzId: number,
+  wahl: RegistrierlisteDruckWahl = {},
+): string {
+  return mitQuery(`${geraetBetreuungPfad(einsatzId)}/registrierliste/druck`, {
+    unvertraeglichkeiten: wahl.unvertraeglichkeiten ? 1 : undefined,
+  });
 }
 
 /** Eigener Bereitstellungsraum eines BR-Geräts (LFH-1042), Startseite der Ansicht. */

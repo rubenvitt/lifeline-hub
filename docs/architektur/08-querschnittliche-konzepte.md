@@ -75,6 +75,16 @@ Schema wächst nur über Migrationen in `migrations/`, eingespielt beim Start
 (`sqlx::migrate!` in `src/db.rs`). Wie sie nummeriert werden und dass sie unveränderlich sind,
 regelt die [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Migrationsvergabe“.
 
+Zwei Regeln sitzen als SQLite-Trigger in der Datenbank statt im Code, damit kein Schreibweg sie
+umgeht (LLH-1493, `migrations/0306_stammdaten_verteilung.sql`): Jede Änderung an einer
+verteilten Stammdatentabelle schreibt ihren Stand ins Änderungslog `stammdaten_aenderung`, und
+an einer Instanz, die Stammdaten aus einer Kopplung übernimmt, bricht jeder Schreibversuch auf
+eine übernommene Zeile mit `stammdaten_vom_hub` ab (409 „Wird am Hub gepflegt.“, `src/error.rs`).
+Nur die Übernahme selbst setzt den Merker `stammdaten_uebernahme` für ihre Transaktion.
+Wer eine solche Tabelle neu baut, legt ihre Trigger wieder an; ein Test vergleicht sie mit
+`src/instanz/stammdaten/art.rs` ([`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt
+„Instanzkopplung“).
+
 ## 8.8 Nebenläufigkeit und Transaktionen
 
 Schreibende Transaktionen holen den Schreib-Lock am Beginn (`BEGIN IMMEDIATE`) und wiederholen
@@ -193,7 +203,16 @@ mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code
 ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
 `src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“).
 Erklärungen eines Org-Admins, die eine andere Instanz prüfen soll, unterschreibt er mit einem
-eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`).
+eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`). Einen nachgelieferten neuen
+Schlüssel nimmt die übernehmende Instanz erst nach der Bestätigung eines Admins dort an, der die
+letzten vier Zeichen des Fingerabdrucks beim Inhaber erfragt (LLH-1605).
+
+Gekoppelte ELW bekommen Konten samt Passwort-Hash und TOTP-Geheimnis, damit die Anmeldung ohne
+Netz geht (LLH-1493). Die Geheimnisse gehen mit age Ende-zu-Ende an den Schlüssel des ELW und nur,
+wenn sein Betreiber die Datenträgerverschlüsselung bestätigt hat. Ein Admin mit Passkey meldet
+sich an einer Instanz, die die Geheimnisse seiner Org verteilt, nicht mehr per Passwort an
+([ADR-0016](entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md)).
+„ELW verloren“ macht die dorthin verteilten Passwörter und zweiten Faktoren ungültig.
 
 ## 8.18 Konfiguration über die Umgebung
 

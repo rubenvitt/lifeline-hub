@@ -57,6 +57,13 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
       return `Abgelehnte Standmeldung: ${aktion.bezeichnung}`;
     case 'belegung':
       return `Abgelehnte Belegungsmeldung: ${aktion.bezeichnung}`;
+    case 'registrierung':
+      // LLH-1612: Stelle und Zahl der Personen; Namen stehen im Inhalt darunter.
+      return `Abgelehnte Registrierung: ${aktion.bezeichnung} · ${aktion.daten.personen.length} ${
+        aktion.daten.personen.length === 1 ? 'Person' : 'Personen'
+      }`;
+    case 'abmeldung':
+      return `Abgelehnte Abmeldung: ${aktion.bezeichnung}`;
     case 'ausgabe':
       return `Abgelehnte Verpflegungsausgabe: ${aktion.bezeichnung}`;
     case 'eintreffen':

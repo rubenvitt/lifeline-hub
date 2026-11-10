@@ -49,11 +49,14 @@ import { useUhr } from '../useUhr';
 import GrenzwerteZeile from './GrenzwerteZeile';
 import { spanneAus, type SpannenWahl, type ZugStand } from './raster';
 import SchichtenErzeugenDialog from './SchichtenErzeugenDialog';
+import { useBlockMenue } from './blockMenue';
 import SchichtplanBlockDialog, { type BlockSpeichern } from './SchichtplanBlockDialog';
 import SchichtplanListe from './SchichtplanListe';
 import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen';
 import SchichtplanRaster, { type BlockZielDaten } from './SchichtplanRaster';
+import SchichtplanSchleuse from './SchichtplanSchleuse';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
+import SchichtplanWechselLeiste from './SchichtplanWechselLeiste';
 import {
   baueZeilen,
   kopieBody,
@@ -79,6 +82,9 @@ import {
  * fehlen nur deren Posten ohne Blöcke. Personen brauchen das Modul Personal: ohne steht die
  * Seitenleiste gesperrt mit Grund, der Blockdialog ebenso (Server: 403).
  *
+ * LLH-1555 Welle 3: über dem Raster die Wechsel-Leiste (`SchichtplanWechselLeiste`), je Zeitpunkt
+ * die Wechsel laut Plan mit ihrem Griff; ein gebündelter Hinweis springt mit `?wechsel=` hinein.
+ *
  * LLH-1603: Unter der Werkzeugzeile nennt `GrenzwerteZeile` Höchstdienst und Mindestruhe; bedient
  * werden sie nur in Einstellungen › Ablösung.
  *
@@ -94,8 +100,19 @@ interface SchichtplanAnsichtProps {
   darfSchreiben: boolean;
   /** Abschnitte in der Reihenfolge der Gliederung (Vorgaben der Ablösung). */
   abschnitte: readonly AbloesungVorgabe[];
+  /**
+   * Die Abschnitte sind geladen (oder gescheitert). Vorher friert die Zeilenschleuse nicht ein
+   * (LLH-1604, `SchichtplanSchleuse`, `bereit`). Vorgabe `true`.
+   */
+  abschnitteBereit?: boolean;
   /** Weitere Werkzeuge rechts neben „Block anlegen“ (etwa „Schichtplan einlesen“, LLH-1556). */
   werkzeuge?: ReactNode;
+  /** Sprung `?wechsel=<minute>` (LLH-1555): dieser Zeitpunkt steht in der Wechsel-Leiste gewählt. */
+  wechselSprung?: number;
+  /** Kennung des Sprungs (`location.key`): derselbe Sprung noch einmal wählt erneut. */
+  wechselSprungKennung?: string;
+  /** Vollzug einer Schicht aus der Wechsel-Leiste; die Seite öffnet ihren Vollzug-Dialog. */
+  onVollziehen?: (abloesungId: number) => void;
 }
 
 type Dialog =
@@ -135,7 +152,11 @@ export default function SchichtplanAnsicht({
   einsatzBeginn,
   darfSchreiben,
   abschnitte,
+  abschnitteBereit = true,
   werkzeuge,
+  wechselSprung,
+  wechselSprungKennung,
+  onVollziehen,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -151,6 +172,16 @@ export default function SchichtplanAnsicht({
     dialogJetzt.current = dialog;
   }, [dialog]);
   const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
+  // Gewählter Zeitpunkt der Wechsel-Leiste; ein neuer Sprung wählt seinen.
+  const [wechselGewaehlt, setWechselGewaehlt] = useState<number | null>(wechselSprung ?? null);
+  useEffect(() => {
+    if (wechselSprung != null) setWechselGewaehlt(wechselSprung);
+  }, [wechselSprung, wechselSprungKennung]);
+  const [zugLaeuft, setZugLaeuft] = useState(false);
+  // Ein offenes Kontextmenü eines Blocks hält wie ein Zug (LLH-1600, Spec `datensatz-aktionsmenue`).
+  const [menueOffen, setMenueOffen] = useState(false);
+  // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
+  const schleuseHalten = zugLaeuft || menueOffen || gezogen != null || dialog != null;
 
   const freigaben = useModulFreigaben(einsatzId);
   const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
@@ -219,6 +250,14 @@ export default function SchichtplanAnsicht({
       }),
     [einheitenFrei, einheitenQuery.data, uhsFrei, uhsQuery.data, abschnitte, plan],
   );
+  // Die Zeilen kommen aus vier Quellen; die Pause steht sofort da. Erst wenn alle geantwortet
+  // haben, darf die Zeilenschleuse einfrieren (LLH-1604). Eine abgeschaltete Abfrage bleibt in
+  // TanStack `isPending`, deshalb zählt sie nur mit Freigabe.
+  const zeilenBereit =
+    freigaben != null &&
+    (!einheitenFrei || !einheitenQuery.isPending) &&
+    (!uhsFrei || !uhsQuery.isPending) &&
+    abschnitteBereit;
   const personen = useMemo(
     () =>
       personenGesperrt || !darfSchreiben
@@ -287,12 +326,26 @@ export default function SchichtplanAnsicht({
       message.success(neu === 1 ? '1 Schicht erzeugt' : `${neu} Schichten erzeugt`);
     },
   });
+  // Nur der Dialog des gelöschten Blocks schließt: ein Löschen aus dem Kontextmenü (LLH-1600)
+  // kehrt womöglich erst zurück, wenn schon der Dialog eines anderen Blocks offen ist.
+  const nachLoeschen = (_antwort: unknown, b: SchichtplanBlock) => {
+    setDialog((d) => (d != null && 'blockId' in d && d.blockId === b.id ? null : d));
+    void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) });
+  };
   const loeschenMut = useMutation({
     mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
-    onSuccess: () => {
-      setDialog(null);
-      void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) });
-    },
+    onSuccess: nachLoeschen,
+  });
+  // Kontextmenü (LLH-1600): eigene Mutationen, damit Lauf und Fehler eines stillen Kopierens oder
+  // Löschens nie im Dialog eines anderen Blocks stehen und `reset()` beim Öffnen eines Blocks die
+  // Sperre des Menüs nicht aufhebt. Fehler stehen über dem Raster (`zugSchreiben`).
+  const menueKopierenMut = useMutation({
+    mutationFn: (body: SchichtplanBlockBody) => legeSchichtplanBlockAn(einsatzId, body),
+    onSuccess: setzePlan,
+  });
+  const menueLoeschenMut = useMutation({
+    mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
+    onSuccess: nachLoeschen,
   });
   // Fehler eines Zugs im Raster (ohne offenen Dialog) stehen über dem Raster.
   const [zugFehler, setZugFehler] = useState<unknown>(null);
@@ -303,6 +356,12 @@ export default function SchichtplanAnsicht({
 
   const blockVon = (id: number) => plan?.bloecke.find((b) => b.id === id) ?? null;
   const zeitText = (ms: number) => uhrzeit(dayjs(ms), konventionen);
+  // Die Leiste reicht 36 h: ein Zeitpunkt an einem anderen Tag nennt sein Datum.
+  const zeitpunktText = (ms: number) => {
+    const u = uhrzeit(dayjs(ms), konventionen);
+    const tag = datum(dayjs(ms), konventionen);
+    return tag === datum(dayjs(jetzt), konventionen) ? u : `${tag} ${u}`;
+  };
   const markeText = (ms: number) => {
     const u = uhrzeit(dayjs(ms), konventionen);
     return /^00:?00$/.test(u) ? datum(dayjs(ms), konventionen) : u;
@@ -425,6 +484,26 @@ export default function SchichtplanAnsicht({
     personalFrei &&
     !b.posten.aufgeloest &&
     (b.posten.art === 'pause' || (b.posten.art === 'uhs' && uhsFrei));
+  // Kontextmenü eines Blocks (LLH-1600): „Als nächsten Block kopieren“ ohne Dialog, die Kopie
+  // erscheint im Raster; ein Fehler steht über dem Raster wie bei einem Zug.
+  const kopiereStill = (block: SchichtplanBlock) => {
+    const body = naechsterBlockBody(block);
+    if (!body) return;
+    zugSchreiben(
+      menueKopierenMut.mutateAsync(body).then(() => {
+        message.success('Block kopiert');
+      }),
+    );
+  };
+  const blockMenue = useBlockMenue({
+    blockVon,
+    onBearbeiten: oeffneBlock,
+    onKopieren: kopiereStill,
+    onLoeschen: (b) => zugSchreiben(menueLoeschenMut.mutateAsync(b)),
+    onWechsel: (b) => setDialog({ art: 'wechsel', blockId: b.id }),
+    wechselMoeglich,
+    laeuft: menueKopierenMut.isPending || menueLoeschenMut.isPending,
+  });
   const mitSeitenleiste = !istSchmal && darfSchreiben;
 
   return (
@@ -475,16 +554,37 @@ export default function SchichtplanAnsicht({
           <SpeicherFehler fehler={zugFehler} titel="Schichtplan nicht geändert" />
         </div>
       )}
+      {plan && (
+        <SchichtplanWechselLeiste
+          wechsel={plan.wechsel}
+          bloecke={plan.bloecke}
+          jetzt={jetzt}
+          formatZeit={zeitpunktText}
+          gewaehlt={wechselGewaehlt}
+          onWaehlen={setWechselGewaehlt}
+          wechselGriff={(blockId) => {
+            const b = blockVon(blockId);
+            return b && wechselMoeglich(b)
+              ? () => setDialog({ art: 'wechsel', blockId: b.id })
+              : undefined;
+          }}
+          onVollziehen={darfSchreiben ? onVollziehen : undefined}
+        />
+      )}
       {planQuery.isLoading ? (
         <Spin />
       ) : istSchmal ? (
-        <SchichtplanListe
-          zeilen={zeilen}
-          bloecke={bloecke}
-          jetzt={jetzt}
-          formatZeit={zeitText}
-          onOeffnen={oeffneBlock}
-        />
+        <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} bereit={zeilenBereit} schmal>
+          {(z) => (
+            <SchichtplanListe
+              zeilen={z}
+              bloecke={bloecke}
+              jetzt={jetzt}
+              formatZeit={zeitText}
+              onOeffnen={oeffneBlock}
+            />
+          )}
+        </SchichtplanSchleuse>
       ) : (
         <DndContext
           sensors={sensoren}
@@ -502,22 +602,29 @@ export default function SchichtplanAnsicht({
               alignItems: 'start',
             }}
           >
-            <SchichtplanRaster
-              zeilen={zeilen}
-              bloecke={bloecke}
-              spanne={spanne}
-              jetzt={jetzt}
-              darfSchreiben={darfSchreiben}
-              zone={konventionen.zeitzone}
-              formatMarke={markeText}
-              formatZeit={zeitText}
-              onAnlegen={onAnlegen}
-              onAendern={onAendern}
-              onKopieren={onKopieren}
-              onOeffnen={oeffneBlock}
-              personenZiel={mitSeitenleiste && !personenGesperrt}
-              beschriftung="Schichtplan"
-            />
+            <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} bereit={zeilenBereit}>
+              {(z) => (
+                <SchichtplanRaster
+                  zeilen={z}
+                  bloecke={bloecke}
+                  spanne={spanne}
+                  jetzt={jetzt}
+                  darfSchreiben={darfSchreiben}
+                  zone={konventionen.zeitzone}
+                  formatMarke={markeText}
+                  formatZeit={zeitText}
+                  onAnlegen={onAnlegen}
+                  onAendern={onAendern}
+                  onKopieren={onKopieren}
+                  onOeffnen={oeffneBlock}
+                  personenZiel={mitSeitenleiste && !personenGesperrt}
+                  beschriftung="Schichtplan"
+                  onZug={setZugLaeuft}
+                  blockMenue={darfSchreiben ? blockMenue : undefined}
+                  onMenue={setMenueOffen}
+                />
+              )}
+            </SchichtplanSchleuse>
             {mitSeitenleiste && (
               <SchichtplanPersonen optionen={personen} gesperrt={personenGesperrt} />
             )}

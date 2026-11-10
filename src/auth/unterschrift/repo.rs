@@ -2,7 +2,7 @@
 
 use super::pruefen::{self, VerifySchluessel};
 use super::{
-    AufnahmeErklaerung, Gegenzeichnung, UnterschriftSchluesselAnzeige,
+    AufnahmeErklaerung, Gegenzeichnung, LetzterSchluesselHalter, UnterschriftSchluesselAnzeige,
     UnterschriftSchluesselHerkunft, UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand,
     ALG_ES256, TYP_AUFNAHME,
 };
@@ -247,6 +247,82 @@ pub async fn is_letzter_bei_kopplung(
     Ok(andere == 0)
 }
 
+/// Passen `eingabe` und die letzten vier Zeichen des Fingerabdrucks zusammen? Trennzeichen,
+/// Leerraum und Groß- und Kleinschreibung zählen nicht (design.md D3).
+pub fn is_fingerabdruck_ende(fingerabdruck: &str, eingabe: &str) -> bool {
+    let norm = |t: &str| -> String {
+        t.chars()
+            .filter(char::is_ascii_alphanumeric)
+            .map(|c| c.to_ascii_uppercase())
+            .collect()
+    };
+    let eingabe = norm(eingabe);
+    eingabe.len() == 4 && norm(fingerabdruck).ends_with(&eingabe)
+}
+
+/// Bestätigt einen vom Gegenüber gelieferten, wartenden Schlüssel der Org (LLH-1605); `false`,
+/// wenn er nicht (mehr) wartet. Der bedingte `UPDATE` macht einen doppelten Klick wirkungslos.
+pub async fn confirm(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    decide(
+        conn,
+        org_id,
+        id,
+        UnterschriftSchluesselZustand::Gueltig,
+        benutzer_id,
+        jetzt,
+    )
+    .await
+}
+
+/// Weist einen vom Gegenüber gelieferten, wartenden Schlüssel der Org zurück; er wird nie gültig.
+pub async fn reject(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    decide(
+        conn,
+        org_id,
+        id,
+        UnterschriftSchluesselZustand::Abgelehnt,
+        benutzer_id,
+        jetzt,
+    )
+    .await
+}
+
+async fn decide(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+    zustand: UnterschriftSchluesselZustand,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let n = sqlx::query(
+        "UPDATE unterschrift_schluessel SET zustand = ?, entschieden_at = ?, entschieden_von = ? \
+         WHERE id = ? AND org_id = ? AND herkunft = 'gegenueber' \
+         AND zustand = 'wartet_auf_bestaetigung'",
+    )
+    .bind(zustand.as_str())
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .bind(id)
+    .bind(org_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
+}
+
 /// Widerruft einen lokalen Schlüssel; `false`, wenn er schon widerrufen war.
 pub async fn widerrufen(
     conn: &mut SqliteConnection,
@@ -363,19 +439,32 @@ pub struct Ziel<'a> {
     pub fremde_org_kennung: &'a str,
 }
 
-/// Prüft eine Gegenzeichnung gegen die schon bekannten, gültigen Schlüssel dieser Org-Zuordnung.
+/// Warum eine Gegenzeichnung nicht trägt.
+enum Unbelegt {
+    /// Endgültig: der Schlüssel wird verworfen und als abgelehnt gemeldet.
+    Verwerfen(String),
+    /// Echt unterschrieben von einem hier bekannten Schlüssel, der noch auf Bestätigung wartet:
+    /// der Schlüssel kommt mit der nächsten Meldung wieder und trägt, sobald der Unterzeichner
+    /// hier bestätigt ist. Ein wartender zählt dabei nie als Gegenzeichnung.
+    Zurueckstellen,
+}
+
+/// Prüft eine Gegenzeichnung gegen die schon bekannten Schlüssel dieser Org-Zuordnung. Tragen
+/// kann nur ein gültiger Unterzeichner.
 fn check_gegenzeichnung(
     l: &UnterschriftSchluesselLieferung,
     ziel: &Ziel<'_>,
     bekannte: &[SchluesselZeile],
-) -> Result<(), String> {
+) -> Result<(), Unbelegt> {
+    let verwerfen = |grund: &str| Unbelegt::Verwerfen(grund.to_string());
     let g = l
         .gegenzeichnung
         .as_ref()
-        .ok_or_else(|| "ohne Gegenzeichnung".to_string())?;
+        .ok_or_else(|| verwerfen("ohne Gegenzeichnung"))?;
     let e: AufnahmeErklaerung =
-        serde_json::from_str(&g.erklaerung).map_err(|_| "Erklärung unlesbar".to_string())?;
-    let schluessel_bytes = parse_b64(&l.schluessel).ok_or("Schlüssel unlesbar")?;
+        serde_json::from_str(&g.erklaerung).map_err(|_| verwerfen("Erklärung unlesbar"))?;
+    let schluessel_bytes =
+        parse_b64(&l.schluessel).ok_or_else(|| verwerfen("Schlüssel unlesbar"))?;
     if e.typ != TYP_AUFNAHME
         || e.org != ziel.fremde_org_kennung
         || e.credential_id != l.credential_id
@@ -384,21 +473,31 @@ fn check_gegenzeichnung(
         || e.origin != l.origin
         || e.alg != l.alg
     {
-        return Err("Erklärung passt nicht zum Schlüssel".into());
+        return Err(verwerfen("Erklärung passt nicht zum Schlüssel"));
     }
-    let unterzeichner = bekannte
-        .iter()
-        .find(|b| {
-            b.credential_id == g.unterzeichner_credential_id
-                && b.zustand() == UnterschriftSchluesselZustand::Gueltig
-        })
-        .ok_or_else(|| "gegengezeichnet von einem unbekannten Schlüssel".to_string())?;
+    let mit_credential = |zustand: UnterschriftSchluesselZustand| {
+        bekannte
+            .iter()
+            .find(|b| b.credential_id == g.unterzeichner_credential_id && b.zustand() == zustand)
+    };
+    let (unterzeichner, wartet) = match (
+        mit_credential(UnterschriftSchluesselZustand::Gueltig),
+        mit_credential(UnterschriftSchluesselZustand::WartetAufBestaetigung),
+    ) {
+        (Some(u), _) => (u, false),
+        (None, Some(u)) => (u, true),
+        (None, None) => return Err(verwerfen("gegengezeichnet von einem unbekannten Schlüssel")),
+    };
     pruefen::verify(
         &g.erklaerung,
         &g.assertion,
         &unterzeichner.pruef_schluessel(),
     )
-    .map_err(|f| format!("Gegenzeichnung ungültig: {f}"))
+    .map_err(|f| Unbelegt::Verwerfen(format!("Gegenzeichnung ungültig: {f}")))?;
+    if wartet {
+        return Err(Unbelegt::Zurueckstellen);
+    }
+    Ok(())
 }
 
 /// Übernimmt gelieferte Schlüssel (design.md D7). `grundstock = true` nur beim Koppeln: dann
@@ -419,6 +518,9 @@ pub async fn accept_lieferungen(
     // Nicht entdoppelt: jede Zeile wird über ihre id nachgeschlagen, eine doppelte ändert nichts,
     // und ein späterer Widerruf derselben id soll greifen. Die Grenze deckelt die Arbeit.
     let mut abgelehnt = Vec::new();
+    // Kleinster Stand eines zurückgestellten Schlüssels: bis davor gilt die Lieferung als bekannt,
+    // ab dort liefert das Gegenüber erneut.
+    let mut zurueckgestellt: Option<i64> = None;
     for l in lieferungen {
         let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
@@ -431,6 +533,8 @@ pub async fn accept_lieferungen(
         .fetch_optional(&mut *conn)
         .await?;
         match (l.zustand, vorhanden) {
+            // Ein hier zurückgewiesener bleibt es: die Entscheidung eines Menschen hier geht vor.
+            (UnterschriftSchluesselZustand::Widerrufen, Some((_, z))) if z == "abgelehnt" => {}
             (UnterschriftSchluesselZustand::Widerrufen, Some((id, _))) => {
                 sqlx::query(
                     "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
@@ -443,9 +547,13 @@ pub async fn accept_lieferungen(
                 .await?;
             }
             // Ein unbekannter widerrufener oder ein noch wartender Schlüssel ändert nichts; ein
-            // hier schon bekannter gültiger auch nicht. Ein widerrufener lebt nie wieder auf.
+            // hier schon bekannter gültiger auch nicht, gleich ob er hier gilt, wartet oder
+            // abgelehnt ist. Ein widerrufener oder abgelehnter lebt nie wieder auf. Die Zustände
+            // der Bestätigung gibt es nur hier, ein Gegenüber liefert sie nicht.
             (UnterschriftSchluesselZustand::Widerrufen, None)
             | (UnterschriftSchluesselZustand::WartetAufGegenzeichnung, _)
+            | (UnterschriftSchluesselZustand::WartetAufBestaetigung, _)
+            | (UnterschriftSchluesselZustand::Abgelehnt, _)
             | (UnterschriftSchluesselZustand::Gueltig, Some(_)) => {}
             (UnterschriftSchluesselZustand::Gueltig, None) => {
                 // Derselbe Schlüssel unter anderer id: ein widerrufener lebt nie wieder auf, ein
@@ -453,7 +561,7 @@ pub async fn accept_lieferungen(
                 let schon: Option<String> = sqlx::query_scalar(
                     "SELECT zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
                      AND (credential_id = ? OR schluessel = ?) \
-                     ORDER BY zustand = 'widerrufen' DESC LIMIT 1",
+                     ORDER BY zustand IN ('widerrufen', 'abgelehnt') DESC LIMIT 1",
                 )
                 .bind(ziel.kopplung_org_id)
                 .bind(&l.credential_id)
@@ -461,11 +569,15 @@ pub async fn accept_lieferungen(
                 .fetch_optional(&mut *conn)
                 .await?;
                 match schon.as_deref() {
-                    Some("widerrufen") => {
+                    Some(z @ ("widerrufen" | "abgelehnt")) => {
                         abgelehnt.push(Abgelehnt {
                             fingerabdruck: fp,
                             benutzer_name: l.benutzer_name.clone(),
-                            grund: "Schlüssel war widerrufen".into(),
+                            grund: if z == "widerrufen" {
+                                "Schlüssel war widerrufen".into()
+                            } else {
+                                "Schlüssel war zurückgewiesen".into()
+                            },
                         });
                         continue;
                     }
@@ -484,25 +596,33 @@ pub async fn accept_lieferungen(
                     let bekannte: Vec<SchluesselZeile> =
                         sqlx::query_as(sqlx::AssertSqlSafe(format!(
                         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
-                         AND zustand = 'gueltig'"
+                         AND zustand IN ('gueltig', 'wartet_auf_bestaetigung')"
                     )))
                         .bind(ziel.kopplung_org_id)
                         .fetch_all(&mut *conn)
                         .await?;
-                    if let Err(grund) = check_gegenzeichnung(l, ziel, &bekannte) {
-                        abgelehnt.push(Abgelehnt {
-                            fingerabdruck: fp,
-                            benutzer_name: l.benutzer_name.clone(),
-                            grund,
-                        });
-                        continue;
+                    match check_gegenzeichnung(l, ziel, &bekannte) {
+                        Ok(()) => {}
+                        Err(Unbelegt::Zurueckstellen) => {
+                            zurueckgestellt =
+                                Some(zurueckgestellt.map_or(l.stand, |z: i64| z.min(l.stand)));
+                            continue;
+                        }
+                        Err(Unbelegt::Verwerfen(grund)) => {
+                            abgelehnt.push(Abgelehnt {
+                                fingerabdruck: fp,
+                                benutzer_name: l.benutzer_name.clone(),
+                                grund,
+                            });
+                            continue;
+                        }
                     }
                 }
                 sqlx::query(
                     "INSERT INTO unterschrift_schluessel (org_id, herkunft, kopplung_org_id, \
                      fremde_id, benutzer_name, credential_id, alg, schluessel, rp_id, origin, \
                      bezeichnung, fingerabdruck, zustand, gegenzeichnung, stand) \
-                     VALUES (?, 'gegenueber', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gueltig', ?, ?)",
+                     VALUES (?, 'gegenueber', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 )
                 .bind(ziel.org_id)
                 .bind(ziel.kopplung_org_id)
@@ -515,6 +635,13 @@ pub async fn accept_lieferungen(
                 .bind(&l.origin)
                 .bind(&l.bezeichnung)
                 .bind(&fp)
+                // Der Grundstock gilt sofort, das Koppeln ist der Anker; was danach kommt,
+                // wartet auf die Bestätigung eines Admins hier (design.md D2, R24).
+                .bind(if grundstock {
+                    UnterschriftSchluesselZustand::Gueltig.as_str()
+                } else {
+                    UnterschriftSchluesselZustand::WartetAufBestaetigung.as_str()
+                })
                 .bind(
                     l.gegenzeichnung
                         .as_ref()
@@ -526,7 +653,10 @@ pub async fn accept_lieferungen(
             }
         }
     }
-    let hoechster = lieferungen.iter().map(|l| l.stand).max().unwrap_or(0);
+    let hoechster = match zurueckgestellt {
+        Some(z) => z - 1,
+        None => lieferungen.iter().map(|l| l.stand).max().unwrap_or(0),
+    };
     sqlx::query(
         "UPDATE instanz_kopplung_org SET unterschrift_stand = MAX(unterschrift_stand, ?) WHERE id = ?",
     )
@@ -545,7 +675,8 @@ pub async fn fremde_der_zuordnung_widerrufen(
 ) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
-         widerrufen_at = COALESCE(widerrufen_at, ?) WHERE kopplung_org_id = ? AND zustand <> 'widerrufen'",
+         widerrufen_at = COALESCE(widerrufen_at, ?) WHERE kopplung_org_id = ? \
+         AND zustand NOT IN ('widerrufen', 'abgelehnt')",
     )
     .bind(jetzt)
     .bind(kopplung_org_id)
@@ -587,20 +718,29 @@ pub async fn list_fuer_org(
     };
     let mut aus = Vec::with_capacity(zeilen.len());
     for (z, fremde_org_name) in &zeilen {
-        let gegengezeichnet_von = match z.gegenzeichnung() {
-            Some(g) => {
-                let name: Option<String> = sqlx::query_scalar(
-                    "SELECT benutzer_name FROM unterschrift_schluessel WHERE credential_id = ? \
-                     AND org_id = ? LIMIT 1",
-                )
-                .bind(&g.unterzeichner_credential_id)
-                .bind(org_id)
-                .fetch_optional(pool)
-                .await?;
-                name
-            }
-            None => None,
-        };
+        let (gegengezeichnet_von, unterzeichner_fingerabdruck, erklaert_at) =
+            match z.gegenzeichnung() {
+                Some(g) => {
+                    // Der Unterzeichner stammt aus derselben Org-Zuordnung wie der Schlüssel
+                    // (bei einem lokalen: lokal); erst danach irgendeine Zeile der Org.
+                    let unterzeichner: Option<(String, String)> = sqlx::query_as(
+                        "SELECT benutzer_name, fingerabdruck FROM unterschrift_schluessel \
+                         WHERE credential_id = ? AND org_id = ? \
+                         ORDER BY kopplung_org_id IS ? DESC, id DESC LIMIT 1",
+                    )
+                    .bind(&g.unterzeichner_credential_id)
+                    .bind(org_id)
+                    .bind(z.kopplung_org_id)
+                    .fetch_optional(pool)
+                    .await?;
+                    let erklaert_at = serde_json::from_str::<AufnahmeErklaerung>(&g.erklaerung)
+                        .ok()
+                        .map(|e| e.zeitpunkt);
+                    let (name, fp) = unterzeichner.unzip();
+                    (name, fp, erklaert_at)
+                }
+                None => (None, None, None),
+            };
         aus.push(UnterschriftSchluesselAnzeige {
             id: z.id,
             benutzer_name: z.benutzer_name.clone(),
@@ -614,9 +754,46 @@ pub async fn list_fuer_org(
             widerrufen_at: z.widerrufen_at.clone(),
             fremde_org_name: fremde_org_name.clone(),
             gegengezeichnet_von,
+            unterzeichner_fingerabdruck,
+            erklaert_at,
         });
     }
     Ok(aus)
+}
+
+/// Konten der Org, die alle gültigen lokalen Schlüssel halten, während die Org ihre Schlüssel an
+/// eine gekoppelte Instanz verteilt; ihr Deaktivieren oder Herabstufen ließe die Kopplungen ohne
+/// gültigen Schlüssel zurück (design.md D5). Höchstens ein Konto, weil „alle“ sonst niemand hält.
+pub async fn list_letzte_halter(
+    pool: &SqlitePool,
+    org_id: i64,
+) -> Result<Vec<LetzterSchluesselHalter>, AppError> {
+    let halter: Vec<i64> = sqlx::query_scalar(
+        "SELECT DISTINCT benutzer_id FROM unterschrift_schluessel WHERE org_id = ? \
+         AND herkunft = 'lokal' AND zustand = 'gueltig' AND benutzer_id IS NOT NULL",
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+    let [benutzer_id] = halter[..] else {
+        return Ok(Vec::new());
+    };
+    let kopplungen: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT k.gegenueber_name FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE o.org_id = ? AND o.widerrufen_at IS NULL AND k.richtung = 'wird_gemeldet' \
+         AND k.zustand IN ('angebahnt', 'aktiv') ORDER BY k.gegenueber_name",
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+    if kopplungen.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(vec![LetzterSchluesselHalter {
+        benutzer_id,
+        kopplungen,
+    }])
 }
 
 /// Eine Zeile für die Anzeige.

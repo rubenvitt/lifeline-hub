@@ -74,6 +74,9 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   „davon namentlich“. Eine Notunterkunft nur an der eigenen Stelle (sonst 403). Eigene Pfade
   (`GERAET_BETREUUNG_PFADE`, `geraetBetroffene*Pfad`), Meldungen über `geraet/GeraetMeldungen.tsx`
   wie am UHS-Laptop; der Betreuungszähler fehlt wie Personen- und Meldungszähler.
+  Die Registrierliste der eigenen Stelle druckt sie (LLH-1616, `GET …/registrierungen/druck` in
+  der Routenliste, fremde Stelle 403 vor dem Protokoll, `geraetDarf('registrierliste-druck')`,
+  Seite `geraet/GeraetRegistrierlisteDruckPage.tsx`); die Druckansicht einer Person bleibt draußen.
 - **Eigene Hülle** (`geraet/GeraeteLayout.tsx`): keine Modulleiste, kein Benutzermenü, keine
   Sprungpalette (`CommandPaletteProvider` öffnet bei `geraet` nicht), kein Org-Strom (`/api/live`
   steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403), kein Ton

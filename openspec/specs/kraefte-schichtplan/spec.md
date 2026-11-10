@@ -194,6 +194,40 @@ Pausenblock gelöscht oder nicht mehr in der Zeile „Pause“, MUST die Rückna
 sein. Eine Kraft, die in einem späteren, nicht zurückgenommenen Wechsel an einer UHS
 steht, MUST die Rücknahme an der UHS auslassen.
 
+### Requirement: Wechsel-Leiste
+Über dem Raster SHALL der Schichtplan je Zeitpunkt der nächsten 24 h einen Knopf mit der Zahl der
+Wechsel zeigen, dazu frühere Zeitpunkte der letzten 12 h, an denen noch etwas offen ist (als
+„überfällig“). Ein Wechsel ist an einer Einheit das Ende eines Blocks oder der Beginn eines Blocks
+ohne Vorgänger; ein Block, der binnen der Toleranz nach dem Ende beginnt, MUST zum Wechsel am Ende
+gehören. An einer UHS ist es der Beginn eines Blocks, in der Pause Beginn und Ende. Jeder Eintrag
+MUST seinen Stand nennen: offen, vollzogen oder, an einer Einheit ohne Schicht laut Plan, „keine
+Schicht“; eine abgezogene oder vollzogene Schicht laut Plan macht den Eintrag „vollzogen“, auch
+wenn der Posten endet. Der gewählte Zeitpunkt MUST seine Wechsel mit Griff zeigen: an einer Einheit mit offener
+Schicht den Vollzug der Ablösung, an UHS und Pause den Wechsel des Blocks. Zeitpunkte, Einträge
+und Stand MUST der Server rechnen (`wechsel` im Plan). Der Sprung `?wechsel=<minute>` MUST den
+Zeitpunkt wählen.
+
+#### Scenario: Drei Wechsel um 14:00
+- **WHEN** „RTW 1“ und „RTW 2“ laut Plan um 14:00 wechseln und an der „UHS Nord“ um 14:00 ein Block beginnt
+- **THEN** zeigt die Leiste „14:00 · 3 Wechsel“, und der Knopf listet beide Einheiten mit „Ablösung vollziehen“ und die UHS mit „Wechsel vollziehen“
+
+### Requirement: Ein Hinweis je Zeitpunkt
+Schichten, die laut Plan zum selben Zeitpunkt fällig sind, SHALL das System gebündelt melden: die
+Vorwarnung und die Fälligkeit MUST es je Zeitpunkt einmal melden (Bezug `schichtplan_wechsel`, der
+Zeitpunkt in Minuten seit 1970), nicht je Schicht (EEMUA 191). Die Detailzeile MUST die Zahl der
+Wechsel und die Uhrzeit nennen („15 Wechsel um 1400“), bei einem einzigen Wechsel die Einheit wie
+bei einer Schicht. Der Sprung MUST in den Schichtplan auf den Zeitpunkt führen
+(`?ansicht=plan&wechsel=`). Kommt eine Schicht zu einem Zeitpunkt hinzu, dessen Hinweis noch
+offen ist, MUST sie schweigen; ist er quittiert, MUST sie ihn neu melden. Ist eine Schicht zum
+Beginn eines Folgeblocks fällig, der binnen der Toleranz nach dem Ende eines Blocks beginnt, MUST
+das Ende dieses Blocks ihr Zeitpunkt sein, wie in der Leiste. Schichten nach Rangfolge MUST sich
+weiter einzeln melden. Wechsel an
+UHS und Pause haben keine Frist und melden sich nicht.
+
+#### Scenario: 15 Posten um 14:00
+- **WHEN** 15 Einheiten laut Plan um 14:00 wechseln
+- **THEN** bekommt jeder Leser der Ablösung um 13:30 eine Vorwarnung und um 14:00 einen Alarm „Ablösung fällig“ mit „15 Wechsel um 1400“, nicht je 15
+
 ### Requirement: Austauschformat
 Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,
 höchstens 2 MB und 5.000 Zeilen. Die erste Zeile MUST die Kopfzeile sein; eine Zeile steht für
@@ -315,3 +349,45 @@ das Format ohne Bezug auf ein bestimmtes Fremdsystem beschreiben.
   eingelesen wird
 - **THEN** läuft der Abgleich über Kennung, Name und Telefon weiter, und ein neuer Helfer speichert
   Kennung und Herkunft, sodass ein zweiter Lauf ihn trifft
+
+### Requirement: Zeilen ohne Sprung
+Raster und Handy-Liste des Schichtplans MUST Änderungen anderer ohne Sprung unter dem Zeiger
+zeigen. Solange der Fokus im Schichtplan steht, ein Maus- oder Stiftzeiger über ihm bewegt wurde
+und ihn nicht verlassen hat, ein Zug im Raster läuft, eine Person auf einen Block gezogen wird oder
+ein Dialog des Schichtplans offen ist, MUST die Menge der Zeilen, ihre Folge und ihre
+Gruppenzugehörigkeit stehen bleiben:
+- Ein neuer Posten SHALL hinter einem Sammelbanner warten.
+- Ein entfallener Posten SHALL als leere, gedämpfte Zeile mit dem Zusatz „(entfallen)“ stehen
+  bleiben. In ihr MUST weder ein Block angelegt noch ein Block abgelegt werden können.
+- Ein umsortierter oder in einen anderen Abschnitt umgehängter Posten SHALL an seinem Platz
+  bleiben.
+
+Blöcke in gezeigten Zeilen und der Titel einer Zeile MUST weiter sofort erscheinen; die Blöcke
+eines wartenden Postens erscheinen mit ihm. Das Sammelbanner MUST das
+Wartende nennen („1 neuer Posten“, „2 neue Posten“, „1 Posten entfallen“, „Reihenfolge
+geändert“, verbunden mit „ · “) und es mit „anzeigen“ übernehmen; danach stehen die Zeilen in der
+frischen Folge. Das Banner MUST selbst keine Zeile verschieben. Ein Touch-Tipp zählt nicht als
+Zeiger. Schließt ein Dialog des Schichtplans, MUST die Schleuse bis zur nächsten Zeigerbewegung,
+zum nächsten Druck oder zur nächsten Taste weiter halten (Nachlauf): ein ruhender Zeiger über dem
+Raster meldet sich sonst nicht. Ohne gezeigte Zeile und solange die Quellen der Zeilen (Einheiten, UHS, Abschnitte)
+noch laden, hält die Schleuse nichts zurück.
+
+#### Scenario: Neuer Posten unter dem Zeiger
+- **WHEN** der Zeiger über einem Block der Streife 2 steht und eine andere Sitzung eine Einheit im ersten Abschnitt anlegt
+- **THEN** bleibt der Block an seiner Stelle, die neue Einheit erscheint nicht, und das Banner zeigt „1 neuer Posten“
+
+#### Scenario: Übernehmen
+- **WHEN** das Banner „1 neuer Posten“ zeigt und jemand „anzeigen“ wählt
+- **THEN** steht die neue Einheit in ihrer Zeile im ersten Abschnitt und das Banner ist weg
+
+#### Scenario: Entfallener Posten
+- **WHEN** der Fokus im Raster steht und eine andere Sitzung eine Einheit ohne Blöcke auflöst
+- **THEN** bleibt ihre Zeile leer und gedämpft mit „(entfallen)“ stehen, und das Banner zeigt „1 Posten entfallen“
+
+#### Scenario: Block fließt direkt
+- **WHEN** der Zeiger über dem Raster steht und eine andere Sitzung an RTW 1 einen Block anlegt
+- **THEN** erscheint der Block sofort in der Zeile RTW 1, und es gibt kein Banner
+
+#### Scenario: Ohne Zeiger und Fokus
+- **WHEN** weder Zeiger noch Fokus im Schichtplan stehen, kein Zug und kein Dialog läuft und kein Nachlauf nach einem Dialog hält
+- **THEN** erscheinen neue, entfallene und umsortierte Posten sofort, ohne Banner

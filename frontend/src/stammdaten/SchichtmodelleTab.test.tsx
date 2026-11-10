@@ -6,7 +6,9 @@ import { setzeZeitdarstellung } from '../anzeige/zeitDarstellungStore';
 import { meHandler, server } from '../test/server';
 import { adminFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import { waehleMenueEintrag } from '../test/menue';
+import { offenesMenue, warteAufMenueFokus } from '../test/menue';
 import type { Schichtmodell } from '../api/types';
 import SchichtmodelleTab from './SchichtmodelleTab';
 
@@ -244,5 +246,32 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
     ).toBeInTheDocument();
     expect(rueckfrage).toHaveTextContent('Laufende Einsätze behalten ihre Kopie.');
     expect(within(rueckfrage).queryByText(/Unwetter/)).toBeNull();
+  });
+});
+
+describe('SchichtmodelleTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt das Modell vom Hub samt Vorgabe und lässt das eigene bearbeitbar', async () => {
+    stelleBereit();
+    server.use(herkunftHandler({ schichtmodell: ['1'] }));
+    renderMitProviders(<SchichtmodelleTab />);
+    const hubZeile = (await screen.findByText('Sanitätsdienst')).closest('tr')!;
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(
+      within(hubZeile).queryByRole('button', { name: 'Aktionen zu Sanitätsdienst' }),
+    ).toBeNull();
+
+    const lokal = screen.getByText('12-h-Schicht Hochwasser').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    await userEvent.click(
+      within(lokal).getByRole('button', { name: 'Aktionen zu 12-h-Schicht Hochwasser' }),
+    );
+    await warteAufMenueFokus();
+    const menue = offenesMenue();
+    expect(within(menue).getByRole('menuitem', { name: 'Bearbeiten' })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: 'Löschen' })).toBeInTheDocument();
+    // Die Vorgabe kommt vom Hub: „Als Vorgabe setzen“ höbe sie erst auf, und das lehnt der Server
+    // ab (409). Die Vorgabe folgt dem Hub.
+    expect(within(menue).queryByRole('menuitem', { name: 'Als Vorgabe setzen' })).toBeNull();
   });
 });

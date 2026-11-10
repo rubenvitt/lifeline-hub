@@ -83,6 +83,12 @@ export const PERSON_AUF_DER_PLATTE = {
   // UHS auch ohne Netz. Behalten werden nur Art, Status und Zeit (`rettungsmittelKuerzen`): die
   // Rufnamen sind Freitext, die Einsatznummer der Leitstelle hängt an der Person.
   rettungsmittel: 'behalten',
+  // LLH-1612: Haushalt und Kostform sind Verweis bzw. Katalogwert und halten die Registrierliste
+  // ohne Netz lesbar; die Unverträglichkeiten sind Freitext und Gesundheitsangabe.
+  haushalt_id: 'behalten',
+  haushalt_nummer: 'behalten',
+  kostform: 'behalten',
+  unvertraeglichkeiten: 'auslassen',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 /**

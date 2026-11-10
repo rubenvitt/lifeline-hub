@@ -187,7 +187,12 @@ als Art „Laut Plan“ ab und rechnet Bleibende, Übernahme und Folgeblock nie 
 (`abloesung::schichtplan::pruefung`); der Client zeigt sie nur und rechnet nichts nach. Jeder
 Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
 `schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
-`personen` und `helfer` als `null`.
+`personen` und `helfer` als `null`. Die Wechsel-Leiste (LLH-1555 Welle 3,
+`abloesung/schichtplan/SchichtplanWechselLeiste.tsx`) zeigt nur `wechsel` aus dem Plan
+(`abloesung::schichtplan::wechselpunkte`): Zeitpunkte, Einträge und Stand rechnet der Server, der
+Client zählt nichts nach. Der Schlüssel eines Zeitpunkts ist `minute`, derselbe Wert wie der Bezug
+`schichtplan_wechsel` des gebündelten Hinweises und der Sprung `?wechsel=`
+(`parseAbloesungWechsel`).
 **Grenzwerte bedienen** (LLH-1603, `openspec/changes/archive/2026-11-09-z11srqhq-grenzwerte-bedienstelle/design.md`): Höchstdienst und
 Mindestruhe setzt nur das Paneel „Dienst und Ruhe“ in Einstellungen › Ablösung
 (`pages/einstellungen/EinsatzGrenzwerte.tsx`). Die Ansicht „Schichtplan“ nennt sie nur in einer Zeile
@@ -197,6 +202,16 @@ neu geholt. Den Text und die Bodies bildet nur `abloesung/grenzwerte.ts`. „(Vo
 Merkern `*_eigen`, nie dem Wert. Ein Body trägt nur geänderte Felder (fehlt = unverändert, `null` =
 Vorgabe). Die Vorgaben 12 h/8 h stehen dort als Spiegel des Servers, die Grenzen in
 `api/eingabegrenzen.ts`.
+
+**Zeilen ohne Sprung** (LLH-1604, Spec `kraefte-schichtplan`, „Zeilen ohne Sprung“; Vorplanung
+ebenso): Raster und Handy-Liste stehen immer in `abloesung/schichtplan/SchichtplanSchleuse.tsx`,
+im Einsatz wie in `planung/PlanungSchichtplan.tsx`; keine zweite Schleuse. Die Bedingungen kommen
+aus `components/useZuflussSchleuse.ts` (Fokus, Maus- oder Stiftzeiger); dazu `halten`, solange ein
+Zug läuft (`SchichtplanRaster`, `onZug`), eine Person gezogen wird oder ein Dialog offen ist. Was
+gezeigt wird, rechnet nur `zeilenSchleuse.ts`: neue Posten warten hinter dem Sammelbanner,
+entfallene stehen als leere Zeile (`RasterZeile.entfallen`, `pruefeZug` → `keine-zeile`),
+umsortierte und umgehängte bleiben am gezeigten Platz. Blöcke gehen nicht durch die Schleuse.
+Dialoge bekommen die frischen Zeilen.
 
 **Schichtplan einlesen** (LLH-1556, `abloesung/schichtplan/SchichtplanEinlesen.tsx`): Datei und
 Wahl gehen bei Vorschau UND Übernehmen als Multipart an den Server, der jedes Mal neu liest und

@@ -99,6 +99,7 @@ const bezirk = (over: Partial<Evakuierungsbezirk> = {}): Evakuierungsbezirk => (
 const stelle = (over: Partial<Betreuungsstelle> = {}): Betreuungsstelle => ({
   id: 8,
   einsatz_id: 1,
+  belegungsart: 'gezaehlt',
   bezeichnung: 'Turnhalle Ost',
   art: 'notunterkunft',
   status: 'in_betrieb',
@@ -743,6 +744,26 @@ describe('LFH-681: Mehrfeld-Dialoge vergleichen dreiseitig', () => {
       kapazitaet_personen: 150,
     };
     expect(stellePatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ status: 'geschlossen' });
+  });
+
+  it('LLH-1612: die Belegungsart geht nur bei eigenem Wechsel hinaus, fehlt sie im Formular, bleibt sie', () => {
+    const gezaehlt = stelle({ belegungsart: 'gezaehlt' });
+    const w = {
+      bezeichnung: 'Turnhalle Ost',
+      art: 'notunterkunft' as const,
+      kapazitaet_personen: 150,
+    };
+    expect(stellePatchDreiseitig(gezaehlt, gezaehlt, w)).toEqual({});
+    expect(
+      stellePatchDreiseitig(gezaehlt, gezaehlt, { ...w, belegungsart: 'namentlich' as const }),
+    ).toEqual({ belegungsart: 'namentlich' });
+    // Schon fremd auf namentlich gestellt: nichts mehr zu senden.
+    expect(
+      stellePatchDreiseitig(gezaehlt, stelle({ belegungsart: 'namentlich' }), {
+        ...w,
+        belegungsart: 'namentlich' as const,
+      }),
+    ).toEqual({});
   });
 });
 

@@ -76,6 +76,31 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   ändert nur die Kapazität der Stelle und legt Nachforderungen über den bestehenden Schreibweg an
   (je Posten eine, mit `betreuungsstelle_id`); Belegung und „in Betreuung“ bleiben unberührt.
   Quellenangaben nennen Vorschriften und Werke, nie Personen; ohne Quelle „Ausgangstabellen“.
+- **Registrierstelle** (LLH-1612, Spec `betreuung-registrierung`, ADR-0017, Change
+  `hitr91ob-registrierstelle-betreuung`; Server `src/betreuung/registrierung.rs`,
+  `src/routes/betreuung_registrierung.rs`, Oberfläche `betreuung/registrierung/`): Registrierte
+  sind Betroffene (`einsatz_person`, Status `betroffen`, Verbleib „Notunterkunft“ an der Stelle),
+  kein eigenes Register. Ein Vorgang registriert einen Haushalt (`haushalt`, „H-n“, erste Person
+  ist Bezugsperson) in EINEM `POST …/stellen/{sid}/registrierungen` mit EINEM ETB-Eintrag ohne
+  Namen, Kostform und Unverträglichkeiten; Abmelden ist der Verbleib „entlassen“
+  (`…/abmeldungen`, Haushalt oder Personen). Prüfkette 403 (Module Betreuung UND Personen, Gerät
+  nur eigene Stelle, fremd 403) → Replay über `client_id` (Personen `<cid>#<n>`, Verbleib
+  `<cid>#<person_id>`) → 400 → 404 → 409 → 422. **Kostform** genau eine aus `normal` und den
+  fünf Sonderkost-Schlüsseln (Guard `kostform_deckt_die_sonderkost`), Unverträglichkeiten ≤ 200
+  Zeichen, Kategorie Behandlung, nie im ETB, ohne Netz nicht auf der Platte
+  (`offline/lagebildKuerzung.ts`). **Belegungsart** je Stelle `gezaehlt` | `namentlich`: an einer
+  namentlich geführten Stelle meldet nur der Server (`betreuung::repo::belegung_nachfuehren_tx`,
+  Herkunft `registrierung`, nicht zurücknehmbar), Handmeldung 409; jeder Verbleibwechsel und
+  der Storno einer Person führen nach (ADR-0017). „in Betreuung“ bleibt EINE Wahrheit, die
+  Meldereihe. Die **Maske** ist kompakt ohne Einklappen (Ruben, 09.11.2026): Adresse und Kontakt
+  einmal je Haushalt, je Person eine Zeile mit allen Feldern, sichtbare Beschriftungen,
+  Tab-Folge Haushalt → Person, Kostform als Radiogruppe; das Feldbudget von „Betroffene
+  erfassen“ gilt hier nicht. Kostformen ohne Personenbezug liest `GET …/betreuung/kostformen`
+  (nur Modul Betreuung); daraus belegt die Verpflegung die Sonderkost beim Anlegen eines
+  Zeitfensters vor (`useBedarfsvorschlag`, Stand jetzt, nie als 0 ohne Registrierte).
+  **Registrierliste drucken** (LLH-1616): nur über den je Person protokollierten Druckabruf,
+  Gesundheitsangaben nur auf Wunsch; Regel in `druck/AGENTS.md`, „Registrierliste einer
+  Betreuungsstelle“.
 - **Übersicht als Lagebild** (LLH-1050, Spec `betreuung-evakuierung`, „Übersicht der
   Betreuung“): das Band „Unterbringung in Zahlen“ (`betreuung/UnterbringungKennzahlen.tsx`) rechnet
   nur über `betreuung/unterbringungKennzahl.ts`, und die nur mit `inBetreuung`, `freiePlaetze` und

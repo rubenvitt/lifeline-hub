@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
   type ReactElement,
@@ -31,6 +32,7 @@ import {
 import { einsatzKeys } from '../api/queryKeys';
 import type {
   BelegungsmeldungEingabe,
+  Belegungsart,
   Betreuungsstelle,
   BetreuungsstellePatch,
   BetreuungsstelleStatus,
@@ -51,8 +53,15 @@ import StelleBelegung from '../betreuung/StelleBelegung';
 import StelleBelegungslinie from '../betreuung/StelleBelegungslinie';
 import StelleBetroffene from '../betreuung/StelleBetroffene';
 import StelleUnterkunft from '../betreuung/StelleUnterkunft';
-import { GESCHLOSSEN_HINWEIS } from '../betreuung/StellenBlock';
-import { ART_LABEL, inBetreuung, personenZahl } from '../betreuung/betreuungText';
+import { verlaufRuecknahme } from '../betreuung/StellenBlock';
+import {
+  ART_LABEL,
+  BELEGUNGSART_LABEL,
+  NAMENTLICH_SPERRE,
+  inBetreuung,
+  personenZahl,
+} from '../betreuung/betreuungText';
+import RegistrierungPaneel from '../betreuung/registrierung/RegistrierungPaneel';
 import { STATUS_HANDLUNG, schliessenBrauchtLeermeldung } from '../betreuung/stelleStatus';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
@@ -94,6 +103,11 @@ interface Sitzung {
 
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
+const BELEGUNGSART_OPTIONEN = (Object.keys(BELEGUNGSART_LABEL) as Belegungsart[]).map((a) => ({
+  value: a,
+  label: BELEGUNGSART_LABEL[a],
+}));
+
 /** Pflicht, nicht nur Leerzeichen — wie im Anlegen-Dialog. */
 const bezeichnungRegel: FormRule = {
   required: true,
@@ -113,6 +127,7 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
     leitung: s.leitung ?? undefined,
     kontaktweg: s.kontaktweg ?? undefined,
     notiz: s.notiz ?? undefined,
+    belegungsart: s.belegungsart,
   };
 }
 
@@ -146,6 +161,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   const freigaben = useModulFreigaben(einsatzId);
   const [form] = Form.useForm<StelleWerte>();
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const meldenGrundId = useId();
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
   const bearbeiten = sitzung != null;
   const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
@@ -295,6 +311,9 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   const einsatz = einsatzQuery.data;
   const s = stelle;
   const geschlossen = s.status === 'geschlossen';
+  // Namentlich geführt (LLH-1612, design.md D5): die Belegung meldet der Server aus der
+  // Registrierung; Handmeldung, Leermeldung und Rücknahme lehnt er mit 409 ab.
+  const namentlichGefuehrt = s.belegungsart === 'namentlich';
   const verortet = s.lat != null && s.lon != null;
   const karteGesperrt = gesperrt('lagekarte');
   const handlung = STATUS_HANDLUNG[s.status];
@@ -302,7 +321,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
 
   function statusWechsel() {
     resetStatus();
-    if (schliessenBrauchtLeermeldung(handlung.ziel, s.belegung?.belegt)) {
+    if (!namentlichGefuehrt && schliessenBrauchtLeermeldung(handlung.ziel, s.belegung?.belegt)) {
       leermeldungMut.reset();
       schliessenMut.reset();
       setDialog('schliessen');
@@ -346,7 +365,8 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     <Space wrap size="middle">
       <Button
         type="primary"
-        disabled={geschlossen}
+        disabled={geschlossen || namentlichGefuehrt}
+        aria-describedby={geschlossen || namentlichGefuehrt ? meldenGrundId : undefined}
         onClick={() => {
           belegungMut.reset();
           setDialog('belegung');
@@ -355,7 +375,11 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         Belegung melden
       </Button>
       {/* Der Grund steht sichtbar daneben, nicht nur im Tooltip (LFH-1078). */}
-      {geschlossen && <Typography.Text type="secondary">Stelle geschlossen</Typography.Text>}
+      {(geschlossen || namentlichGefuehrt) && (
+        <Typography.Text id={meldenGrundId} type="secondary">
+          {geschlossen ? 'Stelle geschlossen' : NAMENTLICH_SPERRE}
+        </Typography.Text>
+      )}
       <Button loading={statusMut.isPending} onClick={statusWechsel}>
         {handlung.text}
       </Button>
@@ -403,6 +427,13 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       {zelle('art', 'Art', <Select options={ART_OPTIONEN} />, ART_LABEL[s.art], {
         rules: [{ required: true, message: 'Bitte eine Art wählen' }],
       })}
+      {zelle(
+        'belegungsart',
+        'Belegungsart',
+        <Select options={BELEGUNGSART_OPTIONEN} />,
+        BELEGUNGSART_LABEL[s.belegungsart],
+        { rules: [{ required: true, message: 'Bitte eine Belegungsart wählen' }] },
+      )}
       {zelle(
         'kapazitaet_personen',
         'Kapazität (Personen)',
@@ -537,6 +568,13 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           stelleId={s.id}
           kapazitaet={s.kapazitaet_personen ?? null}
         />
+        <RegistrierungPaneel
+          einsatzId={einsatzId}
+          stelle={s}
+          personenFrei={personenFrei}
+          darfSchreiben={darfSchreiben}
+          rechteGrund={einsatzRechteGrund(einsatz.status)}
+        />
 
         <Paneel
           titel="Stelle"
@@ -608,9 +646,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
             einsatzId={einsatzId}
             art="stelle"
             objektId={s.id}
-            darfZuruecknehmen={darfSchreiben && !geschlossen}
-            // Ohne Schreibrecht nennt der Rechtehinweis über der Seite den Grund.
-            sperrHinweis={darfSchreiben && geschlossen ? GESCHLOSSEN_HINWEIS : undefined}
+            {...verlaufRuecknahme(s, darfSchreiben)}
           />
         </Paneel>
 
@@ -682,7 +718,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                   text: 'Stattdessen schließen',
                   onKlick: () => {
                     setDialog(null);
-                    if (schliessenBrauchtLeermeldung('geschlossen', s.belegung?.belegt)) {
+                    if (
+                      !namentlichGefuehrt &&
+                      schliessenBrauchtLeermeldung('geschlossen', s.belegung?.belegt)
+                    ) {
                       leermeldungMut.reset();
                       schliessenMut.reset();
                       setDialog('schliessen');

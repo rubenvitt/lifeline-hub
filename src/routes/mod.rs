@@ -10,6 +10,7 @@ pub mod benachrichtigung;
 pub mod benutzer;
 pub mod benutzer_einstellungen;
 pub mod betreuung;
+pub mod betreuung_registrierung;
 pub mod chat;
 pub mod demo_daten;
 #[cfg(feature = "dev-seeds")]

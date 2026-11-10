@@ -651,6 +651,9 @@ fn serde_wire_gleich_as_str() {
         UnterschriftGegengezeichnet,
         UnterschriftWiderrufen,
         UnterschriftAbgelehnt,
+        UnterschriftBestaetigt,
+        UnterschriftZurueckgewiesen,
+        InstanzElwVerloren,
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
@@ -663,6 +666,30 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
+    // Stammdaten-Verteilung (LLH-1493, LLH-1613): Wire = `art` in stammdaten_aenderung/-herkunft
+    // (0306, 0312).
+    enum_wire_as_str!(lifeline_hub::instanz::stammdaten::StammdatenArt {
+        Konto,
+        OrgEinstellungen,
+        ModulEinstellung,
+        Fuehrungsfunktion,
+        FahrzeugStatus,
+        PersonalStatus,
+        Qualifikation,
+        EinheitTyp,
+        Fahrzeug,
+        Material,
+        Personal,
+        EinheitVorlage,
+        Schichtmodell,
+        EinsatzVorlage,
+        StichwortVorschlag,
+        VerpflegungVorlage,
+        Sprechgruppe,
+        EtbBaustein,
+        ExterneStelle,
+        UnterkunftRichtwert,
+    });
     enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzProtokoll {
         Passt,
         UpdateHier,
@@ -674,8 +701,10 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(
         lifeline_hub::auth::unterschrift::UnterschriftSchluesselZustand {
             WartetAufGegenzeichnung,
+            WartetAufBestaetigung,
             Gueltig,
             Widerrufen,
+            Abgelehnt,
         }
     );
 }
@@ -691,6 +720,7 @@ fn orphan_enums_wire() {
         Export => "export",
         Druck => "druck",
         Anhang => "anhang",
+        Registrierliste => "registrierliste",
     });
     // LFH-758: Fassung im Lese-Audit der UHS-Dateien; Wire = DB-CHECK in 0138.
     enum_wire!(lifeline_hub::anhang::audit_repo::ZugriffFassung {
@@ -1168,6 +1198,23 @@ fn schichtplan_wire() {
         PauseBeginn => "pause_beginn",
         PauseEnde => "pause_ende",
     } in lifeline_hub::abloesung::schichtplan::vollzug::WechselArt::ALLE);
+    // Wechsel-Leiste (LLH-1555 Welle 3): nur Wire, keine Spalte.
+    enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEintragArt {
+        Einheit => "einheit",
+        Uhs => "uhs",
+        PauseBeginn => "pause_beginn",
+        PauseEnde => "pause_ende",
+    } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEintragArt::ALLE);
+    enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEinheit {
+        Wechsel => "wechsel",
+        Beginn => "beginn",
+        Ende => "ende",
+    } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselEinheit::ALLE);
+    enum_wire!(lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselStand {
+        Offen => "offen",
+        Vollzogen => "vollzogen",
+        OhneSchicht => "ohne_schicht",
+    } in lifeline_hub::abloesung::schichtplan::wechselpunkte::PlanWechselStand::ALLE);
 }
 
 #[test]
@@ -1348,6 +1395,27 @@ fn betreuung_betreuungsstelle_art_wire() {
     } in lifeline_hub::betreuung::BetreuungsstelleArt::ALLE);
 }
 
+/// LLH-1612 (design.md D4/D5): Belegungsart, Herkunft einer Belegungsmeldung und Kostform.
+#[test]
+fn registrierstelle_wire() {
+    enum_wire!(lifeline_hub::betreuung::Belegungsart {
+        Gezaehlt => "gezaehlt",
+        Namentlich => "namentlich",
+    } in lifeline_hub::betreuung::Belegungsart::ALLE);
+    enum_wire!(lifeline_hub::betreuung::BelegungQuelle {
+        Meldung => "meldung",
+        Registrierung => "registrierung",
+    } in lifeline_hub::betreuung::BelegungQuelle::ALLE);
+    enum_wire!(lifeline_hub::person::Kostform {
+        Normal => "normal",
+        Vegetarisch => "vegetarisch",
+        Vegan => "vegan",
+        OhneSchwein => "ohne_schwein",
+        DiaetAllergenarm => "diaet_allergenarm",
+        SaeuglingKleinkind => "saeugling_kleinkind",
+    } in lifeline_hub::person::Kostform::ALLE);
+}
+
 #[test]
 fn betreuung_betreuungsstelle_status_wire() {
     enum_wire!(lifeline_hub::betreuung::BetreuungsstelleStatus {
@@ -1496,6 +1564,7 @@ fn benachrichtigung_wire() {
         AbloeserAlarmierungGestrichen => "abloeser_alarmierung_gestrichen",
         AbloeserEintreffenGestrichen => "abloeser_eintreffen_gestrichen",
         AbloeserWiederhergestellt => "abloeser_wiederhergestellt",
+        SchichtplanWechsel => "schichtplan_wechsel",
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
         NachforderungZugesagt => "nachforderung_zugesagt",

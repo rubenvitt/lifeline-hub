@@ -14,11 +14,15 @@ import { useAuth } from '../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
+  confirmUnterschriftsschluessel,
   gegenzeichne,
   loadInstanzUebersicht,
+  rejectUnterschriftsschluessel,
   redeemKopplungscode,
   registriereUnterschriftsschluessel,
   issueKopplungscode,
+  gleicheStammdatenNeuAb,
+  meldeElwVerloren,
   widerrufeKopplung,
   widerrufeUnterschriftsschluessel,
 } from '../api/instanz';
@@ -34,6 +38,7 @@ import {
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
+  stammdatenZeile,
 } from './instanzText';
 
 /** Längste Bezeichnung eines Unterschriftsschlüssels (`routes::instanz::BEZEICHNUNG_MAX`). */
@@ -46,6 +51,10 @@ interface EinloesenWerte {
 
 interface RegistrierenWerte {
   bezeichnung?: string;
+}
+
+interface BestaetigenWerte {
+  ende?: string;
 }
 
 /**
@@ -69,8 +78,15 @@ export default function InstanzkopplungSeite() {
   const [registrierenOffen, setRegistrierenOffen] = useState(false);
   const [neuerCode, setNeuerCode] = useState<KopplungscodeAntwort | null>(null);
   const [widerrufKopplung, setWiderrufKopplung] = useState<InstanzKopplungAnzeige | null>(null);
+  // „ELW verloren“ (LLH-1493): die Kopplung, für die die Rückfrage offen ist.
+  const [verlorenKopplung, setVerlorenKopplung] = useState<InstanzKopplungAnzeige | null>(null);
   const [widerrufSchluessel, setWiderrufSchluessel] =
     useState<UnterschriftSchluesselAnzeige | null>(null);
+  const [bestaetigenSchluessel, setBestaetigenSchluessel] =
+    useState<UnterschriftSchluesselAnzeige | null>(null);
+  const [zurueckweisenSchluessel, setZurueckweisenSchluessel] =
+    useState<UnterschriftSchluesselAnzeige | null>(null);
+  const [bestaetigenForm] = Form.useForm<BestaetigenWerte>();
   const [einloesenForm] = Form.useForm<EinloesenWerte>();
   const [registrierenForm] = Form.useForm<RegistrierenWerte>();
 
@@ -100,6 +116,24 @@ export default function InstanzkopplungSeite() {
       message.success(`Kopplung mit ${k.gegenueber_name} widerrufen`);
     },
   });
+  const elwVerloren = useMutation({
+    mutationFn: (k: InstanzKopplungAnzeige) => meldeElwVerloren(k.id),
+    onSuccess: (a) => {
+      void reload();
+      setVerlorenKopplung(null);
+      message.success(
+        `${a.kopplung.gegenueber_name} als verloren gemeldet, ${a.konten} ${a.konten === 1 ? 'Konto' : 'Konten'} gesperrt`,
+      );
+    },
+  });
+  const stammdatenNeu = useMutation({
+    mutationFn: (k: InstanzKopplungAnzeige) => gleicheStammdatenNeuAb(k.id),
+    onSuccess: (k) => {
+      void reload();
+      void qc.invalidateQueries({ queryKey: globalKeys.stammdatenHerkunft() });
+      message.success(`Stammdaten von ${k.gegenueber_name} neu abgeglichen`);
+    },
+  });
   const registrieren = useMutation({
     mutationFn: (bezeichnung: string) => registriereUnterschriftsschluessel(bezeichnung),
     onSuccess: () => void reload(),
@@ -116,6 +150,23 @@ export default function InstanzkopplungSeite() {
     onSuccess: () => {
       void reload();
       setWiderrufSchluessel(null);
+    },
+  });
+
+  const bestaetigen = useMutation({
+    mutationFn: (w: { s: UnterschriftSchluesselAnzeige; ende: string }) =>
+      confirmUnterschriftsschluessel(w.s.id, w.ende),
+    onSuccess: (s) => {
+      void reload();
+      message.success(`Schlüssel von ${s.benutzer_name} bestätigt`);
+    },
+  });
+  const zurueckweisen = useMutation({
+    mutationFn: (s: UnterschriftSchluesselAnzeige) => rejectUnterschriftsschluessel(s.id),
+    onSuccess: (s) => {
+      void reload();
+      setZurueckweisenSchluessel(null);
+      message.success(`Schlüssel von ${s.benutzer_name} zurückgewiesen`);
     },
   });
 
@@ -166,6 +217,7 @@ export default function InstanzkopplungSeite() {
             />
           )}
           <SpeicherFehler fehler={codeAusstellen.error} titel="Kein Code ausgestellt" />
+          <SpeicherFehler fehler={stammdatenNeu.error} titel="Nicht abgeglichen" />
 
           <Paneel titel="Diese Instanz" koerperPolster>
             <Datenraster spalten={2}>
@@ -193,29 +245,56 @@ export default function InstanzkopplungSeite() {
               rowKey={(k) => k.id}
               emptyText="Noch keine Kopplung"
               renderItem={(k) => {
-                const hinweise = kopplungHinweise(k);
+                const hinweise = kopplungHinweise(k, u.datentraeger_bestaetigt);
+                const stammdaten = stammdatenZeile(k);
                 const aktiv = k.org.widerrufen_at == null;
+                // Stammdaten (LLH-1493): an der meldenden Seite neu abgleichen, solange die
+                // Zuordnung gilt. An der erreichten „ELW verloren“ auch nach dem Widerruf, solange
+                // dort gelieferte Passwörter gelten; danach räumt die Meldung sie.
+                const verlorenMoeglich =
+                  k.richtung === 'wird_gemeldet' &&
+                  (aktiv || k.org.stammdaten.konten_mit_geheimnis > 0);
+                const eintraege: MenueEintrag[] = [
+                  ...(aktiv && k.richtung === 'meldet_sich'
+                    ? [{ key: 'abgleichen', label: 'Stammdaten erneut abgleichen' }]
+                    : []),
+                  ...(verlorenMoeglich
+                    ? [{ key: 'verloren', label: 'ELW verloren …', gefahr: true as const }]
+                    : []),
+                  ...(aktiv
+                    ? [
+                        {
+                          key: 'widerrufen',
+                          icon: <IconKreuz />,
+                          label: 'Widerrufen …',
+                          gefahr: true as const,
+                        },
+                      ]
+                    : []),
+                ];
+                const laeuft =
+                  kopplungWiderrufen.isPending || stammdatenNeu.isPending || elwVerloren.isPending;
                 return (
                   <ListenEintrag
                     actions={
-                      isAdmin && aktiv
+                      isAdmin && eintraege.length > 0
                         ? [
                             <MenueAusloeser
                               key="aktionen"
-                              gesperrt={kopplungWiderrufen.isPending}
-                              laeuft={kopplungWiderrufen.isPending}
+                              gesperrt={laeuft}
+                              laeuft={laeuft}
                               zugaenglicherName={`Aktionen zur Kopplung mit ${k.gegenueber_name}`}
-                              eintraege={[
-                                {
-                                  key: 'widerrufen',
-                                  icon: <IconKreuz />,
-                                  label: 'Widerrufen …',
-                                  gefahr: true,
-                                },
-                              ]}
-                              onWahl={() => {
-                                kopplungWiderrufen.reset();
-                                setWiderrufKopplung(k);
+                              eintraege={eintraege}
+                              onWahl={(wahl) => {
+                                if (wahl === 'abgleichen') {
+                                  stammdatenNeu.mutate(k);
+                                } else if (wahl === 'verloren') {
+                                  elwVerloren.reset();
+                                  setVerlorenKopplung(k);
+                                } else {
+                                  kopplungWiderrufen.reset();
+                                  setWiderrufKopplung(k);
+                                }
                               }}
                             />,
                           ]
@@ -240,6 +319,14 @@ export default function InstanzkopplungSeite() {
                             {k.gegenueber_fingerabdruck}
                             {k.gegenueber_adresse ? ` · ${k.gegenueber_adresse}` : ''}
                           </div>
+                          {stammdaten && (
+                            <div
+                              style={{ color: rollen.gedaempft }}
+                              data-lfh="instanz-kopplung-stammdaten"
+                            >
+                              {stammdaten}
+                            </div>
+                          )}
                           {hinweise.map((h) => (
                             <div
                               key={h}
@@ -290,6 +377,17 @@ export default function InstanzkopplungSeite() {
                 if (s.zustand === 'wartet_auf_gegenzeichnung' && u.eigener_schluessel) {
                   eintraege.push({ key: 'gegenzeichnen', label: 'Gegenzeichnen' });
                 }
+                // LLH-1605: ein nachgelieferter Schlüssel gilt erst nach dem Abgleich mit dem
+                // Inhaber; dafür braucht es keinen eigenen Unterschriftsschlüssel.
+                if (s.zustand === 'wartet_auf_bestaetigung') {
+                  eintraege.push({ key: 'bestaetigen', label: 'Bestätigen …' });
+                  eintraege.push({
+                    key: 'zurueckweisen',
+                    icon: <IconKreuz />,
+                    label: 'Zurückweisen …',
+                    gefahr: true,
+                  });
+                }
                 if (s.herkunft === 'lokal' && s.zustand !== 'widerrufen') {
                   eintraege.push({
                     key: 'widerrufen',
@@ -305,13 +403,24 @@ export default function InstanzkopplungSeite() {
                         ? [
                             <MenueAusloeser
                               key="aktionen"
-                              gesperrt={gegenzeichnen.isPending || schluesselWiderrufen.isPending}
+                              gesperrt={
+                                gegenzeichnen.isPending ||
+                                schluesselWiderrufen.isPending ||
+                                zurueckweisen.isPending
+                              }
                               laeuft={gegenzeichnen.isPending}
                               zugaenglicherName={`Aktionen zum Schlüssel ${s.bezeichnung} von ${s.benutzer_name}`}
                               eintraege={eintraege}
                               onWahl={(key) => {
                                 if (key === 'gegenzeichnen') {
                                   gegenzeichnen.mutate(s);
+                                } else if (key === 'bestaetigen') {
+                                  bestaetigen.reset();
+                                  bestaetigenForm.resetFields();
+                                  setBestaetigenSchluessel(s);
+                                } else if (key === 'zurueckweisen') {
+                                  zurueckweisen.reset();
+                                  setZurueckweisenSchluessel(s);
                                 } else {
                                   schluesselWiderrufen.reset();
                                   setWiderrufSchluessel(s);
@@ -380,6 +489,101 @@ export default function InstanzkopplungSeite() {
         </Form.Item>
         <SpeicherFehler fehler={einloesen.error} titel="Nicht gekoppelt" />
       </ErfassungsModal>
+
+      <ErfassungsModal<BestaetigenWerte>
+        offen={bestaetigenSchluessel != null}
+        titel={
+          bestaetigenSchluessel
+            ? `Schlüssel von ${bestaetigenSchluessel.benutzer_name} bestätigen`
+            : ''
+        }
+        form={bestaetigenForm}
+        erfassenText="Bestätigen"
+        laeuft={bestaetigen.isPending}
+        // Hält den Dialog bis zur Antwort offen und zeigt die Ablehnung darin (LFH-1077).
+        speicherung={bestaetigen}
+        speicherFehlerTitel="Nicht bestätigt"
+        onErfassen={(w) =>
+          bestaetigenSchluessel
+            ? bestaetigen.mutateAsync({
+                s: bestaetigenSchluessel,
+                ende: (w.ende ?? '').trim().toUpperCase(),
+              })
+            : Promise.resolve()
+        }
+        onFertig={() => setBestaetigenSchluessel(null)}
+        onAbbrechen={() => {
+          bestaetigen.reset();
+          setBestaetigenSchluessel(null);
+        }}
+      >
+        {bestaetigenSchluessel && (
+          <>
+            <Typography.Paragraph>
+              Die gekoppelte Instanz hat diesen Schlüssel geliefert. Gilt er hier, kann sein Inhaber
+              für die Organisation unterschreiben, etwa eine Notübernahme. Bitte den Inhaber anrufen
+              und nach den letzten vier Zeichen seines Fingerabdrucks fragen. Der Inhaber nennt sie,
+              nicht umgekehrt.
+            </Typography.Paragraph>
+            <Datenraster spalten={2}>
+              <Datenfeld label="Inhaber">{bestaetigenSchluessel.benutzer_name}</Datenfeld>
+              <Datenfeld label="Bezeichnung">{bestaetigenSchluessel.bezeichnung}</Datenfeld>
+              <Datenfeld label="Fingerabdruck" mono breit>
+                {bestaetigenSchluessel.fingerabdruck}
+              </Datenfeld>
+              <Datenfeld label="Gegengezeichnet von" breit>
+                {bestaetigenSchluessel.gegengezeichnet_von ?? '—'}
+                {bestaetigenSchluessel.unterzeichner_fingerabdruck
+                  ? ` (${bestaetigenSchluessel.unterzeichner_fingerabdruck})`
+                  : ''}
+              </Datenfeld>
+              <Datenfeld label="Erklärt">
+                {bestaetigenSchluessel.erklaert_at ? zeit(bestaetigenSchluessel.erklaert_at) : '—'}
+              </Datenfeld>
+            </Datenraster>
+            <Form.Item
+              label="Letzte vier Zeichen des Fingerabdrucks"
+              name="ende"
+              style={{ marginBlockStart: token.marginMD }}
+              rules={[
+                { required: true, whitespace: true, message: 'Vier Zeichen angeben' },
+                { len: 4, message: 'Genau vier Zeichen' },
+              ]}
+              normalize={(w: string) => w.toUpperCase()}
+            >
+              <Input maxLength={4} style={monoStil(14)} autoComplete="off" />
+            </Form.Item>
+          </>
+        )}
+      </ErfassungsModal>
+
+      <Modal
+        open={zurueckweisenSchluessel != null}
+        title={
+          zurueckweisenSchluessel
+            ? `Schlüssel ${zurueckweisenSchluessel.bezeichnung} von ${zurueckweisenSchluessel.benutzer_name} zurückweisen?`
+            : ''
+        }
+        okText="Zurückweisen"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: zurueckweisen.isPending }}
+        onOk={() => zurueckweisenSchluessel && zurueckweisen.mutate(zurueckweisenSchluessel)}
+        // Solange es läuft, führt kein Weg hinaus: ein Fehlschlag ginge sonst still verloren.
+        onCancel={() => {
+          if (!zurueckweisen.isPending) setZurueckweisenSchluessel(null);
+        }}
+        cancelButtonProps={{ disabled: zurueckweisen.isPending }}
+        closable={zurueckweisen.isPending ? { disabled: true } : true}
+        mask={{ closable: !zurueckweisen.isPending }}
+        keyboard={!zurueckweisen.isPending}
+        destroyOnHidden
+      >
+        <p>
+          Der Schlüssel wird hier nie gültig, auch wenn die gekoppelte Instanz ihn erneut liefert.
+          Zurückweisen, wenn der Inhaber ihn nicht kennt oder die Zeichen nicht passen.
+        </p>
+        <SpeicherFehler fehler={zurueckweisen.error} titel="Nicht zurückgewiesen" />
+      </Modal>
 
       <ErfassungsModal<RegistrierenWerte>
         offen={registrierenOffen}
@@ -471,6 +675,36 @@ export default function InstanzkopplungSeite() {
           sobald eine Meldung durchgeht; ein neuer Code koppelt wieder.
         </p>
         <SpeicherFehler fehler={kopplungWiderrufen.error} titel="Nicht widerrufen" />
+      </Modal>
+
+      <Modal
+        open={verlorenKopplung != null}
+        title={verlorenKopplung ? `${verlorenKopplung.gegenueber_name} als verloren melden?` : ''}
+        okText="Als verloren melden"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: elwVerloren.isPending }}
+        onOk={() => verlorenKopplung && elwVerloren.mutate(verlorenKopplung)}
+        // Solange die Meldung läuft, führt kein Weg hinaus: ein Fehlschlag ginge sonst still verloren.
+        onCancel={() => {
+          if (!elwVerloren.isPending) setVerlorenKopplung(null);
+        }}
+        cancelButtonProps={{ disabled: elwVerloren.isPending }}
+        closable={elwVerloren.isPending ? { disabled: true } : true}
+        mask={{ closable: !elwVerloren.isPending }}
+        keyboard={!elwVerloren.isPending}
+        destroyOnHidden
+      >
+        <p>
+          Die Kopplung wird für die eigene Organisation widerrufen.
+          {verlorenKopplung && verlorenKopplung.org.stammdaten.konten_mit_geheimnis > 0
+            ? ` Die ${verlorenKopplung.org.stammdaten.konten_mit_geheimnis} Konten, deren Passwort dort lag, verlieren Passwort und zweiten Faktor, ihre Sitzungen enden.`
+            : ' Dort lagen keine Passwörter der eigenen Organisation.'}
+        </p>
+        <p>
+          Wieder hinein kommt man per Passkey oder mit einem Einmalpasswort aus der
+          Benutzerverwaltung.
+        </p>
+        <SpeicherFehler fehler={elwVerloren.error} titel="Nicht gemeldet" />
       </Modal>
 
       <Modal

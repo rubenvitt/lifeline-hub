@@ -153,6 +153,8 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("pat_nummer", Mit),
             ("transport_fachrichtung", Mit),
             ("anlass", Mit),
+            // LLH-1612: Gesundheitsangabe der Registrierung.
+            ("unvertraeglichkeiten", Mit),
         ],
     },
     PersonenBezug {
@@ -239,6 +241,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         art: PersonenArt::Betroffene,
         tabelle: "uhs_platz",
         bezug: Bezug::Spalte("reserviert_fuer_person_id"),
+        spalten: KEINE,
+    },
+    // LLH-1612: Bezugsperson eines Haushalts der Registrierstelle; der Haushalt trägt nur Nummer
+    // und Verweis, Namen und Adressen stehen an den Personen.
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
+        tabelle: "haushalt",
+        bezug: Bezug::Spalte("bezugsperson_id"),
         spalten: KEINE,
     },
     // Die Chip-/Tätowierungsnummer ist im Haustierregister auf den Halter registriert.

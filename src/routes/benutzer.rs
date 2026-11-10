@@ -579,12 +579,27 @@ pub async fn einmalpasswort(
     let einmalpasswort = crate::auth::passwort_wechsel::erzeuge_einmalpasswort();
     let hash = crate::auth::provider::password::hash_gedrosselt(&einmalpasswort).await?;
 
+    // Rettungsweg bei verlorenem Passkey (LLH-1493, ADR-0016): wo für das Ziel die
+    // Passkey-Pflicht gilt, wäre das Einmalpasswort sonst wertlos. Seine Anmelde-Passkeys fallen
+    // mit; den neuen legt er nach der Anmeldung selbst an.
+    let passkeys_entfernen =
+        crate::instanz::stammdaten::geheimnis::is_passkey_pflichtig(&state.pool, &ziel).await?;
+
     let mut tx = state.pool.begin().await?;
     sqlx::query("UPDATE benutzer SET passwort_hash = ?, passwort_wechsel_pflicht = 1 WHERE id = ?")
         .bind(&hash)
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    let passkeys_entfernt = if passkeys_entfernen {
+        sqlx::query("DELETE FROM webauthn_credential WHERE benutzer_id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected() as i64
+    } else {
+        0
+    };
     let beendet = session::alle_loeschen(&mut tx, id).await?;
     tx.commit().await?;
     state.live.melde_sitzung_ende(beendet);
@@ -598,7 +613,10 @@ pub async fn einmalpasswort(
                 id,
                 benutzername: &ziel.benutzername,
             },
-            angaben: None,
+            angaben: (passkeys_entfernt > 0).then(|| ZugangsAngaben {
+                passkeys_entfernt: Some(passkeys_entfernt),
+                ..Default::default()
+            }),
             peer_ip,
         },
     )

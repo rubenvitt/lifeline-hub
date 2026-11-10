@@ -735,6 +735,25 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
             post(routes::betreuung::belegung_zuruecknehmen),
         )
+        // Registrierstelle (LLH-1612, Spec `betreuung-registrierung`).
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen",
+            get(routes::betreuung_registrierung::liste)
+                .post(routes::betreuung_registrierung::registrieren),
+        )
+        // Registrierliste drucken (LLH-1616): je Person protokolliert.
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen/druck",
+            get(routes::betreuung_registrierung::druck),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
+            post(routes::betreuung_registrierung::abmelden),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/kostformen",
+            get(routes::betreuung_registrierung::kostformen),
+        )
         // Verpflegung: Zeitfenster mit Bedarf, Ausgaben dagegen.
         .route(
             "/api/einsaetze/{id}/verpflegung",
@@ -1816,6 +1835,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::instanz::widerrufen),
         )
         .route(
+            "/api/admin/instanz/kopplungen/{id}/stammdaten-neu",
+            post(routes::instanz::stammdaten_neu),
+        )
+        .route(
+            "/api/admin/instanz/kopplungen/{id}/verloren",
+            post(routes::instanz::elw_verloren),
+        )
+        .route(
+            "/api/instanz/stammdaten/herkunft",
+            get(routes::instanz::stammdaten_herkunft),
+        )
+        .route(
             "/api/admin/instanz/unterschrift/registrieren/start",
             post(routes::instanz::registrieren_start),
         )
@@ -1834,6 +1865,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/admin/instanz/unterschrift/{id}/widerrufen",
             post(routes::instanz::unterschrift_widerrufen),
+        )
+        .route(
+            "/api/admin/instanz/letzte-schluessel",
+            get(routes::instanz::letzte_schluessel),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/bestaetigen",
+            post(routes::instanz::unterschrift_bestaetigen),
+        )
+        .route(
+            "/api/admin/instanz/unterschrift/{id}/zurueckweisen",
+            post(routes::instanz::unterschrift_zurueckweisen),
         )
         .route(
             "/api/instanz/koppeln",

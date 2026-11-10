@@ -99,6 +99,17 @@ function setup(route = '/einsaetze/1/infotelefon') {
 const kennzahl = (titel: string) =>
   screen.getAllByText(titel)[0].closest('[data-lfh="kennzahl"], div') as HTMLElement;
 
+/** „Nach Anliegen“ je Listenpunkt als [Anliegen, Zahl]: getrennte Elemente, kein „Vermisstensuche1“ (LLH-1608). */
+const anliegenZeilen = () =>
+  within(screen.getByRole('list', { name: 'Nach Anliegen' }))
+    .getAllByRole('listitem')
+    .map((zeile) => {
+      const teile = zeile.querySelectorAll('span');
+      expect(teile).toHaveLength(2);
+      expect(teile[0].parentElement).toHaveStyle({ display: 'flex' });
+      return [...teile].map((t) => t.textContent);
+    });
+
 beforeEach(() => {
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
@@ -129,9 +140,10 @@ describe('InfotelefonPage (LFH-554)', () => {
     await waitFor(() => expect(within(liste).getAllByRole('listitem')).toHaveLength(2));
     expect(await within(kennzahl('Anrufe').parentElement!).findByText('2000')).toBeInTheDocument();
     expect(within(kennzahl('offene Rückrufe').parentElement!).getByText('200')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Nach Anliegen' })).toHaveTextContent(
-      /Vermisstensuche1500Auskunft zur Lage500/,
-    );
+    expect(anliegenZeilen()).toEqual([
+      ['Vermisstensuche', '1500'],
+      ['Auskunft zur Lage', '500'],
+    ]);
   });
 
   it('zeigt ohne Zählung keine Zahl, auch nicht die des geladenen Fensters', async () => {
@@ -434,9 +446,10 @@ describe('InfotelefonPage auf dem Handschirm (LFH-1067)', () => {
     expect(knopf).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(knopf);
     expect(knopf).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('region', { name: 'Nach Anliegen' })).toHaveTextContent(
-      /Vermisstensuche1Auskunft zur Lage1/,
-    );
+    expect(anliegenZeilen()).toEqual([
+      ['Vermisstensuche', '1'],
+      ['Auskunft zur Lage', '1'],
+    ]);
   });
 
   it('klappt die Erfassung mit dem Fokus auf und ohne Inhalt wieder zu', async () => {

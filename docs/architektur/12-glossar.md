@@ -15,6 +15,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | --- | --- | --- |
 | Ablösung | Ablösen einer Einheit nach ihrer Schicht; eine Zeile ist eine Schicht mit Fälligkeit, geplanter ablösender Einheit und Vollzug. | `src/abloesung/mod.rs`, Spec [`kraefte-abloesung`](../../openspec/specs/kraefte-abloesung/spec.md) |
 | Auftrag | Top-down-Strang des Führungsvorgangs (Befehlsgebung, Vollzug, Kontrolle) mit Quittung je Empfänger. | `src/auftrag/mod.rs`, Spec [`auftraege-befehle`](../../openspec/specs/auftraege-befehle/spec.md) |
+| Belegungsart (gezählt, namentlich geführt) | Wie eine Betreuungsstelle ihre Belegung führt: gemeldet oder vom Server aus den dort Registrierten. | [ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md), `src/betreuung/repo.rs` |
 | Bereitstellungsraum (BR) | Ort, an dem Einheiten und Fahrzeuge auf ihren Einsatz warten; Status `geplant`, `aktiv`, `aufgeloest`. | `BrStatus` in `src/bereitstellungsraum/mod.rs`, Spec [`bereitstellungsraum-belegung`](../../openspec/specs/bereitstellungsraum-belegung/spec.md) |
 | Betreuungsstelle | Stelle zur Betreuung und Unterbringung Betroffener. | Modul „Betreuung“ in `frontend/src/einsatz/modulRegistry.ts`, [`frontend/src/betreuung/AGENTS.md`](../../frontend/src/betreuung/AGENTS.md) |
 | Betroffene | Modul für Vermisste, Betroffene und Patienten eines Einsatzes. | `frontend/src/einsatz/modulRegistry.ts`, [`frontend/src/personen/AGENTS.md`](../../frontend/src/personen/AGENTS.md) |
@@ -34,6 +35,8 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Führungsstelle | Die eigene Führungsstelle eines Einsatzes (ELW, Einsatzleitung) als Gegenstelle für Funkplan und Skizze. | `src/einsatz/fuehrungsstelle.rs`, Spec [`einsatz-fuehrungsstelle`](../../openspec/specs/einsatz-fuehrungsstelle/spec.md) |
 | Funkplan | Aus Abschnitten, Einheiten, Fahrzeugen und Sprechgruppen abgeleitete Tabelle nach FwDV 100 Anlage 5. | Spec [`stab-funkplan`](../../openspec/specs/stab-funkplan/spec.md) |
 | Gefahren | Gefahrenmatrix und Warnstufen eines Einsatzes. | Spec [`gefahrenmatrix`](../../openspec/specs/gefahrenmatrix/spec.md) |
+| Haushalt | Personen, die zusammen an einer Betreuungsstelle ankommen, mit Nummer „H-n“ und Bezugsperson. | `src/betreuung/registrierung.rs`, [`frontend/src/betreuung/AGENTS.md`](../../frontend/src/betreuung/AGENTS.md) |
+| Kostform | Essensform einer Person (Normalkost oder eine der fünf Sonderkost-Formen der Verpflegung); Grundlage des Sonderkost-Vorschlags. | `Kostform` in `src/person/mod.rs`, Spec `betreuung-registrierung` |
 | Lagebericht, Lagemeldung, lagerelevant, Meldung | Festgelegt im Meldungsmodell. | [`docs/design/2026-10-21-meldungsmodell/README.md`](../design/2026-10-21-meldungsmodell/README.md), Abschnitt „Begriffe“; Spec [`meldungseingang`](../../openspec/specs/meldungseingang/spec.md) |
 | Lagebesprechung | Termin mit Vorbereitung und Entschluss; eigenes Modul. | [`frontend/src/lagebesprechung/AGENTS.md`](../../frontend/src/lagebesprechung/AGENTS.md), Spec [`lagebesprechung`](../../openspec/specs/lagebesprechung/spec.md) |
 | Lagebild | Die Lage in Zahlen und die jüngsten ETB-Einträge; jede Zahl hat genau einen Rechenweg. | Modul „Lagebild“ in `frontend/src/einsatz/modulRegistry.ts`, Spec [`lage-verdichtung`](../../openspec/specs/lage-verdichtung/spec.md) |
@@ -43,6 +46,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Nachforderung | Anforderung weiterer Kräfte oder Mittel mit Zusage, Anmarsch und Eintreffen, jeder Schritt im ETB. | `src/nachforderung/`, Specs [`nachforderung-erfassung`](../../openspec/specs/nachforderung-erfassung/spec.md), [`etb-vorgaenge`](../../openspec/specs/etb-vorgaenge/spec.md) |
 | Organisation | Der Mandant: Träger der Stammdaten, Einstellungen und Einsätze. | `src/org/`, [Querschnitt 8.1](08-querschnittliche-konzepte.md) |
 | PAT-Nummer | Kennung eines Patienten im Patientenkopf. | [`frontend/src/personen/AGENTS.md`](../../frontend/src/personen/AGENTS.md) |
+| Registrierstelle | Aufnahme von Haushalten an einer Betreuungsstelle mit Personendaten und Kostform. | `src/betreuung/registrierung.rs`, [`frontend/src/betreuung/AGENTS.md`](../../frontend/src/betreuung/AGENTS.md), Abschnitt „Registrierstelle“ |
 | Schichtmodell | Stammdatum der Organisation: wie lange eine Schicht läuft (Rhythmus oder Wechselzeiten) samt Vorwarnung. | `src/schichtmodell/mod.rs` |
 | Sichtung | Einstufung eines Patienten in SK I bis SK IV, dazu `tot` und `unverletzt`. | `Sichtungskategorie` in `src/person/mod.rs`, Spec [`sichtungswahl`](../../openspec/specs/sichtungswahl/spec.md) |
 | Sprechgruppe | Funk-Sprechgruppe der Organisation oder eines Einsatzes. | `src/sprechgruppe/mod.rs`, `tests/sprechgruppe_katalog.rs` |

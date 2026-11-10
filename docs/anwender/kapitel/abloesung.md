@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs, src/abloesung/schichtplan/ausgabe/, src/routes/abloesung_schichtplan.rs, frontend/src/abloesung/schichtplan/GrenzwerteZeile.tsx, frontend/src/abloesung/grenzwerte.ts]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanSchleuse.tsx, frontend/src/abloesung/schichtplan/zeilenSchleuse.ts, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/blockMenue.ts, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs, src/abloesung/schichtplan/ausgabe/, src/routes/abloesung_schichtplan.rs, frontend/src/abloesung/schichtplan/GrenzwerteZeile.tsx, frontend/src/abloesung/grenzwerte.ts, frontend/src/abloesung/schichtplan/SchichtplanWechselLeiste.tsx, src/abloesung/schichtplan/wechselpunkte.rs]
 ---
 
 ## Überblick
@@ -208,15 +208,20 @@ Für Einsatzleitung und Führungspersonal:
    beginnt am Ende des gewählten, dauert gleich lang und übernimmt Soll und Qualifikationssoll, aber
    keine Personen, denn er ist die Ablösung. Der Dialog zeigt danach den neuen Block. Mit
    ungespeicherten Änderungen im Dialog ist der Knopf gesperrt.
-8. Viele Schichten auf einmal: „Schichten erzeugen“ öffnet einen Dialog mit „Posten“, „Beginn“ und
+8. Schneller über das Kontextmenü: mit der rechten Maustaste auf einen Block klicken (am Tablet
+   lange auf ihn drücken, mit Fokus auf dem Block die Kontextmenü-Taste oder **Umschalt+F10**).
+   Es bietet „Bearbeiten“ (öffnet den Dialog), „Als nächsten Block kopieren“, wo möglich „Wechsel
+   vollziehen …“ und rot unter einem Strich „Block löschen …“. Aus dem Menü kopiert, erscheint der
+   neue Block im Raster, ohne dass ein Dialog öffnet; „Block löschen …“ fragt vorher nach.
+9. Viele Schichten auf einmal: „Schichten erzeugen“ öffnet einen Dialog mit „Posten“, „Beginn“ und
    „Ende“ und „Länge je Schicht“, etwa „4 h“ oder „90 min“. Ohne Länge teilt das Schichtmodell des
    Einsatzes den Zeitraum, im Feld steht es als Vorgabe, etwa „4 h (Vorgabe Einsatz)“; hat der
    Einsatz keins, ist die Länge Pflicht. Die Blöcke bekommen das Soll des Postens und keine
    Personen. Überschneidet sich auch nur eine erzeugte Schicht mit einem Block, entsteht keine,
    und der Dialog nennt jeden Block, mit dem sich eine erzeugte Schicht überschneidet, einmal,
    etwa „überschneidet sich mit 1000–1400“.
-9. Ohne Maus: „Block anlegen“ öffnet denselben Dialog leer. Ein Block im Raster ist ein Knopf und
-   öffnet mit der Eingabetaste seinen Dialog.
+10. Ohne Maus: „Block anlegen“ öffnet denselben Dialog leer. Ein Block im Raster ist ein Knopf und
+    öffnet mit der Eingabetaste seinen Dialog.
 
 Ein neuer Block ohne eigenes Soll übernimmt das des Postens: die Soll-Stärke der Einheit oder ihres
 Typs bzw. die Soll-Anzahl der UHS, ebenso das Qualifikationssoll. Im Dialog steht dieser Wert mit
@@ -272,6 +277,25 @@ Führungspersonal mit dem Modul Personal:
    wählen. Unter „Zurück“ steht, wer seinen vorigen Status wiederbekommt.
 
 Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
+
+### Die Wechsel eines Zeitpunkts abarbeiten
+
+Über dem Schichtplan steht unter „Wechsel laut Plan“ je Zeitpunkt der nächsten 24 Stunden ein
+Knopf, etwa „1400 · 3 Wechsel“. Ein Zeitpunkt, an dem noch etwas offen ist, obwohl er vorbei ist,
+trägt „überfällig“. Für Einsatzleitung und Führungspersonal:
+
+1. Den Knopf des Zeitpunkts wählen. Darunter steht jeder Wechsel mit Posten, Art („Schichtwechsel“,
+   „Posten beginnt“, „Posten endet“, „Wechsel an der UHS“, „Pause beginnt“, „Pause endet“) und
+   Stand („offen“, „vollzogen“, „keine Schicht“). Liegt der Zeitpunkt nicht heute, nennt der Knopf
+   auch das Datum.
+2. An einer Einheit „Ablösung vollziehen“ wählen: Es öffnet sich derselbe Dialog wie auf der Karte
+   der Schicht (Ablauf „Den Wechsel laut Plan vollziehen“).
+3. An einer UHS oder in der Pause „Wechsel vollziehen“ wählen: Es öffnet sich der Wechsel des
+   Blocks (Abläufe „An der UHS wechseln“ und „In der Pause wechseln“). Ein vollzogener Wechsel
+   steht dort mit „Wechsel ansehen“ und lässt sich zurücknehmen.
+
+Der Hinweis „Ablösung steht an“ oder der Alarm „Ablösung fällig“ eines Zeitpunkts führt mit „Öffnen“
+direkt zu diesem Knopf.
 
 ### Einen Schichtplan einlesen
 
@@ -345,7 +369,8 @@ Wird die Planung
 aufgehoben oder entfällt sie, steht er wieder an, solange seine Zeit noch nicht vorbei ist. Er
 ändert die Einstufung der Karte nicht.
 
-Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal. Die Hinweise kann
+Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal; „Ablösung steht an“
+und „Ablösung fällig“ laut Plan je Zeitpunkt einmal (Abschnitt „Ein Hinweis je Zeitpunkt“). Die Hinweise kann
 jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“ nicht (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen steht die
 Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
@@ -361,6 +386,38 @@ einer solchen Schicht ändert nur der Block. Fällt der letzte Block weg, gilt w
 Wer laut Plan wechselt, gehört bis zu 15 Minuten vor dem nächsten Block schon zu ihm: Die
 Folgeschicht ist dann zum Ende dieses Blocks fällig. Die Rücknahme legt die Besatzung zurück; wer
 erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
+
+### Ein Hinweis je Zeitpunkt
+
+Schichten, die laut Plan zum selben Zeitpunkt fällig sind, melden sich gemeinsam: je Zeitpunkt
+einmal „Ablösung steht an“ und einmal „Ablösung fällig“, etwa mit „15 Wechsel um 1400“, statt je
+Schicht. Wechselt um diese Zeit nur eine Einheit, nennt der Hinweis sie wie gewohnt („Florian 1,
+1400“). Gezählt werden die Einheiten, deren Block zu diesem Zeitpunkt beginnt oder endet; die Zahl
+steht beim Lesen fest, ein später verschobener Block ändert sie. Schichten nach Rhythmus melden
+sich weiter einzeln. Wechsel an UHS und Pause haben keine Frist: Sie stehen in der Leiste, melden
+sich aber nicht.
+
+Kommt eine Schicht später zu einem Zeitpunkt hinzu, etwa weil ein Block verschoben wurde, zählt der
+noch offene Hinweis sie mit. Ist er schon quittiert, kommt er für sie noch einmal. Beginnt der
+nächste Block bis zu 15 Minuten nach dem Ende des vorigen, gehört der Wechsel zum Ende des vorigen
+Blocks, auch wenn die Schicht selbst erst zum Beginn des nächsten fällig ist.
+
+Die Leiste zeigt die Zeitpunkte der nächsten 24 Stunden und die der letzten 12 Stunden, an denen
+noch etwas offen ist. „keine Schicht“ heißt: Die Einheit hat zu diesem Zeitpunkt keine laufende
+Schicht laut Plan, in der Ablösung ist nichts zu vollziehen. „vollzogen“ steht auch dort, wo der
+Posten endet und die Einheit abgezogen ist.
+
+### Änderungen anderer im Schichtplan
+
+Was andere am Schichtplan ändern, erscheint ohne Neuladen. Neue und geänderte Blöcke stehen sofort
+in ihrer Zeile, sofern die Zeile schon zu sehen ist. Neue Posten, entfallene Posten und eine geänderte Reihenfolge warten dagegen,
+solange die Maus über dem Schichtplan bewegt wurde und ihn nicht verlassen hat, der Fokus darin liegt, ein Block oder eine Person
+gezogen wird oder ein Dialog oder das Kontextmenü eines Blocks offen ist (nach dem Schließen noch bis zur nächsten
+Bewegung, zum nächsten Klick oder zur nächsten Taste); sonst rückten die Zeilen unter dem Zeiger
+weg. Ein Hinweis über dem Raster nennt, was wartet, etwa „1 neuer Posten · Reihenfolge geändert“,
+und „anzeigen“ übernimmt es. Ein entfallener Posten steht bis dahin als leere Zeile mit
+„(entfallen)“; in ihr lässt sich nichts anlegen. Auf dem Handy steht der Hinweis kurz, etwa
+„1 neu“.
 
 ### Wechsel an der UHS und in der Pause
 

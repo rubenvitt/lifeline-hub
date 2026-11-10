@@ -148,6 +148,7 @@ const felder = (
 export default function PersonalStatusTab() {
   return (
     <KatalogVerwaltung<PersonalStatus, FormWerte>
+      herkunftArt="personal_status"
       listenSeite="stammdaten-personal-status"
       mehrzahl="Status"
       titel="Personal-Status"

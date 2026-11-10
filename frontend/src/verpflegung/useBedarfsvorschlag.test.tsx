@@ -9,7 +9,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { neuerQueryClient } from '../test/utils';
 import { erzeugeQueryClient } from '../api/queryClient';
-import type { BelegungKopfzahl, EinsatzPersonal } from '../api/types';
+import type { BelegungKopfzahl, EinsatzPersonal, KostformZaehlung } from '../api/types';
 import { useBedarfsvorschlag, type BedarfsvorschlagArgs } from './useBedarfsvorschlag';
 import { freigabenFixture } from '../test/fixtures';
 
@@ -20,6 +20,7 @@ import { freigabenFixture } from '../test/fixtures';
 
 const P_PERSONAL = '/api/einsaetze/7/personal';
 const P_KOPFZAHL = '/api/einsaetze/7/betreuung/belegung';
+const P_KOSTFORMEN = '/api/einsaetze/7/betreuung/kostformen';
 
 /** Beginn 10:00 UTC (12:00 in Berlin), jetzt 10:30 UTC → hat begonnen. */
 const VON = '2026-09-24 10:00:00';
@@ -45,15 +46,37 @@ function kopfzahl(teil: Partial<BelegungKopfzahl>): BelegungKopfzahl {
 interface Zaehler {
   personal: number;
   kopfzahl: number;
+  kostformen: number;
   zeitpunkte: (string | null)[];
 }
+
+/** Niemand registriert: die Vorgabe der Kostform-Zählung in allen übrigen Fällen. */
+const KEINE_REGISTRIERTEN: KostformZaehlung = {
+  registriert: 0,
+  normal: 0,
+  ohne_angabe: 0,
+  sonderkost: {
+    vegetarisch: 0,
+    vegan: 0,
+    ohne_schwein: 0,
+    diaet_allergenarm: 0,
+    saeugling_kleinkind: 0,
+  },
+};
 
 function antworte(
   personalAntwort: EinsatzPersonal[] | 403,
   kopfzahlAntwort: BelegungKopfzahl | 403,
+  kostformAntwort: KostformZaehlung | 403 = KEINE_REGISTRIERTEN,
 ): Zaehler {
-  const z: Zaehler = { personal: 0, kopfzahl: 0, zeitpunkte: [] };
+  const z: Zaehler = { personal: 0, kopfzahl: 0, kostformen: 0, zeitpunkte: [] };
   server.use(
+    http.get(P_KOSTFORMEN, () => {
+      z.kostformen += 1;
+      return kostformAntwort === 403
+        ? HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 })
+        : HttpResponse.json(kostformAntwort);
+    }),
     http.get(P_PERSONAL, () => {
       z.personal += 1;
       return personalAntwort === 403
@@ -296,28 +319,82 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
     const z = antworte(personal(5), kopfzahl({ summe: 70 }));
     const { result } = rendere({ freigaben: undefined });
     await einTakt();
-    expect(z).toMatchObject({ personal: 0, kopfzahl: 0 });
+    expect(z).toMatchObject({ personal: 0, kopfzahl: 0, kostformen: 0 });
     expect(result.current).toEqual({
       kraefte: { wert: null, hinweis: null },
       betreute: { wert: null, hinweis: null },
+      sonderkost: { werte: null, hinweis: null },
     });
   });
 
   it('403 trotz Freigabe: Felder leer, keine Fehlermeldung, kein Wiederholungsversuch', async () => {
     const fehlerAusgabe = vi.spyOn(console, 'error');
-    const z = antworte(403, 403);
+    const z = antworte(403, 403, 403);
     // Ein Client, der wiederholen WÜRDE — mit `neuerQueryClient()` (retry: false global) belegte
     // der Zähler nichts.
     const client = erzeugeQueryClient({ queries: { retry: 2, retryDelay: 0, gcTime: 0 } });
     const { result } = rendere({}, client);
-    await waitFor(() => expect(z).toMatchObject({ personal: 1, kopfzahl: 1 }));
+    await waitFor(() => expect(z).toMatchObject({ personal: 1, kopfzahl: 1, kostformen: 1 }));
     await new Promise((r) => setTimeout(r, 60));
-    expect(z).toMatchObject({ personal: 1, kopfzahl: 1 });
+    expect(z).toMatchObject({ personal: 1, kopfzahl: 1, kostformen: 1 });
     expect(result.current).toEqual({
       kraefte: { wert: null, hinweis: null },
       betreute: { wert: null, hinweis: null },
+      sonderkost: { werte: null, hinweis: null },
     });
     expect(fehlerAusgabe).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBedarfsvorschlag — Sonderkost aus der Registrierung (LLH-1612)', () => {
+  it('40 registriert, 6 vegetarisch und 2 vegan: nur diese vorbelegt, mit „aus 40 Registrierten, Stand jetzt“', async () => {
+    const z = antworte(personal(3), kopfzahl({}), {
+      registriert: 40,
+      normal: 29,
+      ohne_angabe: 3,
+      sonderkost: {
+        vegetarisch: 6,
+        vegan: 2,
+        ohne_schwein: 0,
+        diaet_allergenarm: 0,
+        saeugling_kleinkind: 0,
+      },
+    });
+    const { result } = rendere();
+    await waitFor(() => expect(result.current.sonderkost.werte).not.toBeNull());
+    expect(result.current.sonderkost).toEqual({
+      werte: { vegetarisch: 6, vegan: 2 },
+      hinweis: 'Vorschlag: aus 40 Registrierten, Stand jetzt',
+    });
+    expect(z.kostformen).toBe(1);
+  });
+
+  it('keine Registrierten: kein Vorschlag und kein Hinweis', async () => {
+    const z = antworte(personal(3), kopfzahl({}));
+    const { result } = rendere();
+    await waitFor(() => expect(z.kostformen).toBe(1));
+    await einTakt();
+    expect(result.current.sonderkost).toEqual({ werte: null, hinweis: null });
+  });
+
+  it('Registrierte nur mit Normalkost: kein Vorschlag, kein Hinweis', async () => {
+    const z = antworte(personal(3), kopfzahl({}), {
+      ...KEINE_REGISTRIERTEN,
+      registriert: 5,
+      normal: 5,
+    });
+    const { result } = rendere();
+    await waitFor(() => expect(z.kostformen).toBe(1));
+    await einTakt();
+    expect(result.current.sonderkost).toEqual({ werte: null, hinweis: null });
+  });
+
+  it('Betreuung nicht bedienbar: die Zählung wird nicht gefragt', async () => {
+    const z = antworte(personal(3), kopfzahl({}));
+    rendere({ freigaben: freigabenFixture({ betreuung: { zugriff: false } }) });
+    await waitFor(() => expect(z.personal).toBe(1));
+    await einTakt();
+    expect(z.kostformen).toBe(0);
   });
 });
 

@@ -42,6 +42,9 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   unterschrift_gegengezeichnet: 'Unterschriftsschlüssel gegengezeichnet',
   unterschrift_widerrufen: 'Unterschriftsschlüssel widerrufen',
   unterschrift_abgelehnt: 'Unterschriftsschlüssel abgelehnt',
+  unterschrift_bestaetigt: 'Unterschriftsschlüssel bestätigt',
+  unterschrift_zurueckgewiesen: 'Unterschriftsschlüssel zurückgewiesen',
+  instanz_elw_verloren: 'ELW als verloren gemeldet',
 };
 
 /**
@@ -103,8 +106,9 @@ export function rollenText(a: ZugangsAngaben): string | undefined {
 
 /**
  * Angaben der Instanzkopplung und der Unterschriftsschlüssel (LLH-1490): Gegenstelle mit Org,
- * Fingerabdruck, Adresse und bei `unterschrift_abgelehnt` der Grund. `undefined`, wenn keine
- * dieser Angaben steht.
+ * Fingerabdruck, Adresse, bei `unterschrift_abgelehnt` der Grund, bei `instanz_elw_verloren` die
+ * Zahl der Konten und beim Einmalpasswort für einen Admin unter Passkey-Pflicht die entfernten
+ * Passkeys. `undefined`, wenn keine dieser Angaben steht.
  */
 export function instanzText(a: ZugangsAngaben): string | undefined {
   const teile = [
@@ -112,6 +116,12 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
     a.fingerabdruck ? `Fingerabdruck ${a.fingerabdruck}` : null,
     a.adresse ?? null,
     a.grund ? `Grund: ${a.grund}` : null,
+    // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.
+    a.anzahl != null ? `${a.anzahl} ${a.anzahl === 1 ? 'Konto' : 'Konten'} gesperrt` : null,
+    // Einmalpasswort unter Passkey-Pflicht oder Notfallbefehl (LLH-1493).
+    a.passkeys_entfernt != null
+      ? `${a.passkeys_entfernt} ${a.passkeys_entfernt === 1 ? 'Passkey' : 'Passkeys'} entfernt`
+      : null,
   ].filter((t): t is string => t != null);
   return teile.length > 0 ? teile.join(' · ') : undefined;
 }

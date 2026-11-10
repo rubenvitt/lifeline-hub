@@ -21,8 +21,12 @@ export const KOPPLUNG_ZUSTAND_TEXT: Record<InstanzKopplungZustand, string> = {
 
 export const SCHLUESSEL_ZUSTAND_TEXT: Record<UnterschriftSchluesselZustand, string> = {
   wartet_auf_gegenzeichnung: 'wartet auf Gegenzeichnung',
+  wartet_auf_bestaetigung: 'wartet auf Bestätigung',
   gueltig: 'gültig',
   widerrufen: 'widerrufen',
+  // Von einem Admin hier zurückgewiesen; „abgelehnt“ heißt in der Spur schon das automatische
+  // Verwerfen eines Schlüssels ohne gültige Gegenzeichnung.
+  abgelehnt: 'zurückgewiesen',
 };
 
 /** Ab dieser Abweichung der Uhren (Sekunden) steht ein Hinweis an der Kopplung. */
@@ -47,9 +51,36 @@ export function kopplungZustandZeile(
   return teile.filter(Boolean).join(' · ');
 }
 
-/** Hinweise, die an einer Kopplung stehen müssen; leer, wenn alles passt. */
-export function kopplungHinweise(k: InstanzKopplungAnzeige): string[] {
+/** Zeile zur Stammdaten-Verteilung (LLH-1493): an der meldenden Seite der übernommene Stand, an der
+ *  erreichten, an wie viele Konten Geheimnisse gingen. `null`, wenn es nichts zu sagen gibt. */
+export function stammdatenZeile(k: InstanzKopplungAnzeige): string | null {
+  const s = k.org.stammdaten;
+  if (k.richtung === 'meldet_sich')
+    return s.stand > 0 ? `Stammdaten übernommen bis Stand ${s.stand}` : null;
+  if (s.konten_mit_geheimnis > 0) {
+    return `Kontogeheimnisse dort: ${s.konten_mit_geheimnis} ${s.konten_mit_geheimnis === 1 ? 'Konto' : 'Konten'}`;
+  }
+  return null;
+}
+
+/** Hinweise, die an einer Kopplung stehen müssen; leer, wenn alles passt. `datentraegerBestaetigt`
+ *  sagt, ob diese Instanz ihre Datenträgerverschlüsselung bestätigt hat (LLH-1493). */
+export function kopplungHinweise(
+  k: InstanzKopplungAnzeige,
+  datentraegerBestaetigt = true,
+): string[] {
   const aus: string[] = [];
+  const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
+  // Ohne bestätigte Plattenverschlüsselung kommen Konten ohne Passwort an (D6): hier sagen, warum.
+  if (aktiv && k.richtung === 'meldet_sich' && !datentraegerBestaetigt) {
+    aus.push('Geheimnisse nicht verteilt: Datenträgerverschlüsselung nicht bestätigt');
+  }
+  if (aktiv && k.richtung === 'wird_gemeldet' && !k.org.stammdaten.geheimnisse_verteilt) {
+    aus.push(
+      'Kontogeheimnisse gehen nicht hinaus: Datenträgerverschlüsselung dort nicht bestätigt',
+    );
+  }
+  aus.push(...k.org.stammdaten.hinweise);
   // Meldet sich diese Instanz und ist widerrufen, meldet sie nur noch den Widerruf; ein Fehler
   // heißt dann, dass er noch nicht zugestellt ist (design.md D9, wird nachgestellt).
   if (k.zustand === 'widerrufen' && k.richtung === 'meldet_sich' && k.letzter_fehler) {
@@ -62,6 +93,16 @@ export function kopplungHinweise(k: InstanzKopplungAnzeige): string[] {
   }
   if (k.letzter_fehler) aus.push(`Letzte Meldung: ${k.letzter_fehler}`);
   if (k.hinweis) aus.push(k.hinweis);
+  // LLH-1605: nachgelieferte Schlüssel warten auf einen Menschen hier; ohne gültigen eigenen
+  // Schlüssel (etwa nach dem Deaktivieren des letzten Halters) hilft nur neues Koppeln.
+  if (k.wartende_schluessel === 1) {
+    aus.push('1 neuer Unterschriftsschlüssel wartet auf Bestätigung');
+  } else if (k.wartende_schluessel > 1) {
+    aus.push(`${k.wartende_schluessel} neue Unterschriftsschlüssel warten auf Bestätigung`);
+  }
+  if (k.ohne_gueltigen_schluessel) {
+    aus.push('Kein gültiger Unterschriftsschlüssel mehr: Kopplung widerrufen und neu koppeln');
+  }
   return aus;
 }
 
@@ -82,6 +123,7 @@ export function schluesselZeile(
     s.herkunft === 'gegenueber'
       ? `von ${s.fremde_org_name ?? 'gekoppelter Instanz'}`
       : `registriert ${zeit(s.erstellt_at)}`,
+    // Fingerabdruck des Unterzeichners und Zeitpunkt zeigt der Bestätigungsdialog (LLH-1605).
     s.gegengezeichnet_von ? `gegengezeichnet von ${s.gegengezeichnet_von}` : null,
   ];
   return teile.filter(Boolean).join(' · ');

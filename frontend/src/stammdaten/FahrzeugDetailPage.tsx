@@ -38,6 +38,7 @@ import type { Fahrzeug, Staerke } from '../api/types';
 import { fahrzeugListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Formularpaneel } from '../components/instrument';
+import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 
 interface FormWerte {
@@ -76,14 +77,17 @@ export default function FahrzeugDetailPage() {
   const { fahrzeugId } = useParams();
   const id = parseRouteId(fahrzeugId);
   const { benutzer } = useAuth();
-  const istAdmin = benutzer?.system_rolle === 'admin';
+  const herkunft = useStammdatenHerkunft();
+  // Vom Hub übernommen (LLH-1493): nur lesbar, der Hinweis nennt den Grund statt fehlender Rechte.
+  const vomHub = herkunft.istVomHub('fahrzeug', id ?? '');
+  const darfBearbeiten = benutzer?.system_rolle === 'admin' && !vomHub;
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“); `schluessel` wie `key={id}`
   // am Formular.
-  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin, schluessel: id });
+  const schutz = useFormularVerlassenSchutz({ aktiv: darfBearbeiten, schluessel: id });
 
   const fahrzeugeQuery = useQuery({
     queryKey: globalKeys.fahrzeugeListe('alle'),
@@ -165,8 +169,8 @@ export default function FahrzeugDetailPage() {
         hinweis={
           <SeitenHinweise
             fehler={speichern.error}
-            rechteFehlt={!istAdmin}
-            rechteText={STAMMDATEN_RECHTE_TEXT}
+            rechteFehlt={!darfBearbeiten}
+            rechteText={vomHub ? `${VOM_HUB_TEXT}.` : STAMMDATEN_RECHTE_TEXT}
           />
         }
       >
@@ -192,7 +196,7 @@ export default function FahrzeugDetailPage() {
         <Form<FormWerte>
           key={id}
           layout="vertical"
-          disabled={!istAdmin}
+          disabled={!darfBearbeiten}
           onValuesChange={schutz.geaendert}
           initialValues={zuFormWerten(fahrzeug)}
           onFinish={(werte) => {

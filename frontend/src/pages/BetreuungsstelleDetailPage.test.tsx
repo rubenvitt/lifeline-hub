@@ -14,6 +14,7 @@ import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { waehleMenueEintrag } from '../test/menue';
+import { waehle } from '../test/auswahlListe';
 import {
   BETREUUNG_STELLE_BEZEICHNUNG_MAX,
   BETREUUNG_STELLE_NOTIZ_MAX,
@@ -61,6 +62,7 @@ vi.mock('../anzeige/Kartenausschnitt', () => ({
 
 const stelle = (over: Partial<Betreuungsstelle> & { id: number }): Betreuungsstelle => ({
   einsatz_id: 1,
+  belegungsart: 'gezaehlt',
   bezeichnung: `Stelle ${over.id}`,
   art: 'notunterkunft',
   status: 'in_betrieb',
@@ -423,6 +425,89 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     renderPage();
     expect(await screen.findByRole('button', { name: 'Belegung melden' })).toBeDisabled();
     expect(screen.getByText('Stelle geschlossen')).toBeVisible();
+  });
+
+  it('LLH-1612: an einer namentlich geführten Stelle ist „Belegung melden“ gesperrt, der Grund steht daneben', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      ...MIT_DATEN,
+      stellen: [{ ...TURNHALLE, belegungsart: 'namentlich' }, STADION],
+    });
+    api.ladeBelegungVerlauf.mockResolvedValue([
+      {
+        id: 30,
+        belegt: 89,
+        quelle: 'meldung',
+        zeitpunkt_at: '2026-09-23 10:00:00',
+        erfasst_at: '2026-09-23 10:00:00',
+        erfasst_von: 'Leitung',
+        aktuell: true,
+      },
+    ]);
+    renderPage();
+    const knopf = await screen.findByRole('button', { name: 'Belegung melden' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('Belegung kommt aus der Registrierung');
+    expect(screen.getByText('Belegung kommt aus der Registrierung')).toBeVisible();
+    // Auch eine Handmeldung von früher nimmt der Server an der namentlichen Stelle nicht zurück.
+    expect(await screen.findByText('Namentlich geführt: Zurücknehmen gesperrt')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /zurücknehmen$/ })).toBeNull();
+    // Die Stammdaten nennen die Art.
+    expect(screen.getByText('namentlich geführt', { selector: 'dd *, dd' })).toBeInTheDocument();
+  });
+
+  it('LLH-1612: die Belegungsart wird in den Stammdaten bearbeitet, nur sie geht hinaus', async () => {
+    api.aendereStelle.mockResolvedValue({ ...TURNHALLE, belegungsart: 'namentlich' });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Belegungsart', 'namentlich geführt');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, { belegungsart: 'namentlich' }),
+    );
+  });
+
+  it('LLH-1612: Abschnitt „Registrierung“ mit Liste der Stelle; „Registrieren“ öffnet die Maske', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/betreuung/stellen/8/registrierungen', () =>
+        HttpResponse.json({
+          stelle_id: 8,
+          haushalte: [
+            {
+              id: 3,
+              nummer: 1,
+              bezugsperson_name: 'Weber, Anna',
+              personen: [
+                {
+                  id: 21,
+                  registrier_nr: 12,
+                  name: 'Weber',
+                  vorname: 'Anna',
+                  kostform: 'vegetarisch',
+                  erfasst_at: '2026-09-23 09:00:00',
+                },
+              ],
+            },
+          ],
+          ohne_haushalt: [],
+        }),
+      ),
+    );
+    renderPage();
+    expect(
+      await screen.findByRole('button', { name: /H-1 · Weber, Anna · 1 Person/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Kostformen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Registrieren' }));
+    expect(
+      await screen.findByRole('dialog', { name: /Registrieren · Turnhalle Ost/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('LLH-1612: ohne Personenrecht steht statt der Registrierung ein Grund, „Registrieren“ fehlt', async () => {
+    api.ladeBetreuung.mockResolvedValue({ stellen: [TURNHALLE, STADION] });
+    renderPage();
+    expect(await screen.findByText('Registrierung · Keine Berechtigung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Registrieren' })).toBeNull();
   });
 
   it('Belegung melden: Dialog, Meldung an DIESE Stelle, Rückgängig im Toast', async () => {
