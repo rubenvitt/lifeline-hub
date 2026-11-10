@@ -7,8 +7,12 @@
 //!
 //! Änderungslog und Schreibschutz sitzen in Triggern, damit kein Schreibweg sie umgeht.
 
+pub mod abbildung;
 pub mod art;
+pub mod liefern;
+pub mod paket;
 pub mod schema;
+pub mod uebernehmen;
 
 use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};
@@ -21,7 +25,7 @@ wire_enum! {
     /// Kategorie einer gespiegelten Zeile (Spec `einsatz-spiegel`, „Kategorie je Zeile“). Auf der
     /// Leitung steht sie an jeder Zeile, damit sparsamere Freigabestufen später ohne Protokollbruch
     /// kommen können (Entscheidung 14).
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
     pub enum SpiegelKategorie {
         Fuehrung => "fuehrung",
         Etb => "etb",
@@ -42,3 +46,6 @@ wire_enum! {
         Alles => "alles",
     }
 }
+
+#[cfg(test)]
+mod tests;

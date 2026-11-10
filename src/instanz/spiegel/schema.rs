@@ -179,10 +179,17 @@ pub const VERWEISE_OHNE_FK: &[VerweisOhneFk] = &[
         "objekt_id",
         ZielOhneFk::Polymorph {
             typ_spalte: "objekt_typ",
-            ziele: &[("einheit", "einsatz_einheit"), ("fahrzeug", "einsatz_fahrzeug")],
+            ziele: &[
+                ("einheit", "einsatz_einheit"),
+                ("fahrzeug", "einsatz_fahrzeug"),
+            ],
         },
     ),
-    v("br_belegung", "mit_abruf_id", ZielOhneFk::Tabelle("br_belegung")),
+    v(
+        "br_belegung",
+        "mit_abruf_id",
+        ZielOhneFk::Tabelle("br_belegung"),
+    ),
     v(
         "einsatz_einheit",
         "rueckmeldung_ueberfaellig_meldung_id",
@@ -204,7 +211,11 @@ pub const VERWEISE_OHNE_FK: &[VerweisOhneFk] = &[
             ziele: SKIZZE_ZIELE,
         },
     ),
-    v("fernmeldeskizze_lage", "element", ZielOhneFk::SkizzenElement),
+    v(
+        "fernmeldeskizze_lage",
+        "element",
+        ZielOhneFk::SkizzenElement,
+    ),
     v("einsatz_einheit", "quali_soll", ZielOhneFk::QualiSoll),
     v("uhs", "quali_soll", ZielOhneFk::QualiSoll),
     v("einsatz_planschicht", "quali_soll", ZielOhneFk::QualiSoll),
@@ -402,7 +413,11 @@ mod tests {
                 }
             }
         }
-        assert!(fehlend.is_empty(), "Unbekannte Verweisziele:\n  {}", fehlend.join("\n  "));
+        assert!(
+            fehlend.is_empty(),
+            "Unbekannte Verweisziele:\n  {}",
+            fehlend.join("\n  ")
+        );
     }
 
     /// Jede Spalte, die wie ein Verweis heißt (`*_id`) und keinen Fremdschlüssel hat, steht in
@@ -440,7 +455,12 @@ mod tests {
         );
         for v in VERWEISE_OHNE_FK {
             if let ZielOhneFk::Tabelle(z) = v.ziel {
-                assert!(ziel_fuer_fk(z).is_some(), "{}.{} → {z}", v.tabelle, v.spalte);
+                assert!(
+                    ziel_fuer_fk(z).is_some(),
+                    "{}.{} → {z}",
+                    v.tabelle,
+                    v.spalte
+                );
             }
         }
     }
@@ -454,11 +474,19 @@ mod tests {
         assert_eq!(s.tabelle("anhang").unwrap().blob.as_deref(), Some("daten"));
         assert!(s.tabelle("einsatz").unwrap().spalte("spiegel").is_none());
         assert_eq!(
-            s.tabelle("etb_eintrag").unwrap().spalte("erfasser_id").unwrap().verweis,
+            s.tabelle("etb_eintrag")
+                .unwrap()
+                .spalte("erfasser_id")
+                .unwrap()
+                .verweis,
             Some(Ziel::Konto)
         );
         assert_eq!(
-            s.tabelle("uhs_platz").unwrap().spalte("uhs_id").unwrap().verweis,
+            s.tabelle("uhs_platz")
+                .unwrap()
+                .spalte("uhs_id")
+                .unwrap()
+                .verweis,
             Some(Ziel::Einsatz("uhs"))
         );
     }
