@@ -21,7 +21,13 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { ART_LABEL } from '../kraefte/materialPosten';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
-import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import {
+  DIENSTSTATUS_FEHLER,
+  dienststatusMenue,
+  dienststatusSpalten,
+  useDienststatusMutation,
+  type DienststatusOptionen,
+} from './dienststatus';
 
 export default function MaterialTab() {
   const { benutzer } = useAuth();
@@ -47,6 +53,19 @@ export default function MaterialTab() {
   const kategorieWerte = werteAus(posten, (m) => m.kategorie);
   const traegerWerte = werteAus(posten, (m) => m.traegerorganisation);
   const artFolge = Object.keys(ART_LABEL) as MaterialArt[];
+
+  // Eine Beschreibung für Aktionsspalte und Kontextmenü (LLH-1599, `dienststatus.tsx`).
+  const dienstOptionen: DienststatusOptionen<Material> = {
+    vomHub: (z) => herkunft.istVomHub('material', z.id),
+    mutation: dienststatusMutation,
+    istAdmin,
+    schmal: istSchmal,
+    kennung: (m) => `Material ${m.bezeichnung}`,
+    onBearbeiten: (m) => {
+      setBearbeite(m);
+      setModalOffen(true);
+    },
+  };
 
   // Gleiche Bauform wie Fahrzeuge und Personal (LFH-980): Träger fällt unter `lg` weg, der
   // Spaltenschalter zählt ihn.
@@ -115,17 +134,7 @@ export default function MaterialTab() {
       onFilter: (wert, m) => m.traegerorganisation === wert,
       render: (t) => t ?? '—',
     },
-    ...dienststatusSpalten<Material>({
-      vomHub: (z) => herkunft.istVomHub('material', z.id),
-      mutation: dienststatusMutation,
-      istAdmin,
-      schmal: istSchmal,
-      kennung: (m) => `Material ${m.bezeichnung}`,
-      onBearbeiten: (m) => {
-        setBearbeite(m);
-        setModalOffen(true);
-      },
-    }),
+    ...dienststatusSpalten<Material>(dienstOptionen),
   ];
 
   // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers.
@@ -173,6 +182,7 @@ export default function MaterialTab() {
       ) : (
         <KatalogTabelle
           rowKey="id"
+          zeilenMenue={dienststatusMenue(dienstOptionen)}
           loading={materialQuery.isLoading}
           dataSource={posten}
           columns={spalten}

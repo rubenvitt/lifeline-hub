@@ -24,7 +24,13 @@ import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
-import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import {
+  DIENSTSTATUS_FEHLER,
+  dienststatusMenue,
+  dienststatusSpalten,
+  useDienststatusMutation,
+  type DienststatusOptionen,
+} from './dienststatus';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
 
@@ -53,6 +59,19 @@ export default function PersonalTab() {
   // Qualifikationen und Träger filtern mit den Werten der Zeilen (LLH-1096); ohne Wert kein Trichter.
   const qualifikationWerte = werteAus(personen, (p) => p.qualifikationen.map((q) => q.label));
   const traegerWerte = werteAus(personen, (p) => p.traegerorganisation);
+
+  // Eine Beschreibung für Aktionsspalte und Kontextmenü (LLH-1599, `dienststatus.tsx`).
+  const dienstOptionen: DienststatusOptionen<Personal> = {
+    vomHub: (z) => herkunft.istVomHub('personal', z.id),
+    mutation: dienststatusMutation,
+    istAdmin,
+    schmal: istSchmal,
+    kennung: (p) => `Person ${p.name}`,
+    onBearbeiten: (p) => {
+      setBearbeite(p);
+      setModalOffen(true);
+    },
+  };
 
   // Stärke-Position und Träger sind nachrangig und fallen unter `lg` weg; der Spaltenschalter
   // zählt sie und holt sie zurück (LFH-980).
@@ -143,17 +162,7 @@ export default function PersonalTab() {
       onFilter: (wert, p) => p.traegerorganisation === wert,
       render: (t) => t ?? '—',
     },
-    ...dienststatusSpalten<Personal>({
-      vomHub: (z) => herkunft.istVomHub('personal', z.id),
-      mutation: dienststatusMutation,
-      istAdmin,
-      schmal: istSchmal,
-      kennung: (p) => `Person ${p.name}`,
-      onBearbeiten: (p) => {
-        setBearbeite(p);
-        setModalOffen(true);
-      },
-    }),
+    ...dienststatusSpalten<Personal>(dienstOptionen),
   ];
 
   // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers.
@@ -201,6 +210,7 @@ export default function PersonalTab() {
       ) : (
         <KatalogTabelle
           rowKey="id"
+          zeilenMenue={dienststatusMenue(dienstOptionen)}
           loading={personalQuery.isLoading}
           dataSource={personen}
           columns={spalten}

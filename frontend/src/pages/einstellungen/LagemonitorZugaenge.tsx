@@ -5,7 +5,9 @@ import { IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
 import { Paneel, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
-import { MenueAusloeser } from '../../components/MenueAusloeser';
+import type { WeitereAktionen } from '../../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
+import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
 import KopierbarerText from '../../components/KopierbarerText';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -88,6 +90,28 @@ export default function LagemonitorZugaenge() {
   });
 
   const zugaenge = zugaengeQ.data ?? [];
+  /**
+   * Aktionen eines Zugangs, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, design.md D3). Widerrufene
+   * Zugänge tragen keine Aktion.
+   */
+  const zugangMenue: WeitereAktionen<LesezugangAnzeige> | undefined = istAdmin
+    ? {
+        eintraege: (z) =>
+          z.widerrufen_at
+            ? []
+            : [{ key: 'widerrufen', icon: <IconKreuz />, label: 'Widerrufen …', gefahr: true }],
+        zugaenglicherName: (z) => `Aktionen zu Lagemonitor ${z.bezeichnung}`,
+        laeuft: () => widerrufen.isPending,
+        onWahl: (_key, z) => {
+          widerrufen.reset();
+          setWiderrufFuer(z);
+        },
+      }
+    : undefined;
+  const kontext = useZeilenMenueKontext(zugangMenue, {
+    finde: (id) => zugaenge.find((z) => z.id === id),
+    schluessel: (z) => z.id,
+  });
   const zeit = (wert: string) => zeitKurz(wert, konv);
 
   return (
@@ -119,44 +143,29 @@ export default function LagemonitorZugaenge() {
             rowKey={(z) => z.id}
             emptyText="Noch kein Lagemonitor"
             renderItem={(z) => (
-              <ListenEintrag
-                actions={
-                  istAdmin && !z.widerrufen_at
-                    ? [
-                        <MenueAusloeser
-                          key="aktionen"
-                          gesperrt={widerrufen.isPending}
-                          laeuft={widerrufen.isPending}
-                          zugaenglicherName={`Aktionen zu Lagemonitor ${z.bezeichnung}`}
-                          eintraege={[
-                            {
-                              key: 'widerrufen',
-                              icon: <IconKreuz />,
-                              label: 'Widerrufen …',
-                              gefahr: true,
-                            },
-                          ]}
-                          onWahl={() => {
-                            widerrufen.reset();
-                            setWiderrufFuer(z);
-                          }}
-                        />,
-                      ]
-                    : undefined
-                }
-              >
-                <ListenEintragMeta
-                  title={<span data-lfh="lagemonitor-titel">{z.bezeichnung}</span>}
-                  description={
-                    <span style={{ color: rollen.gedaempft }} data-lfh="lagemonitor-zustand">
-                      {zugangZustand(z, zeit)}
-                    </span>
+              // Hülle für das Kontextmenü: `ListenEintrag` nimmt keine Ereignis-Props (LLH-1599 D3).
+              <div data-lfh="lagemonitor-eintrag" {...(zugangMenue ? kontext.ausloeser(z) : {})}>
+                <ListenEintrag
+                  actions={
+                    zugangMenue && !z.widerrufen_at
+                      ? [<ZeilenMenueAusloeser key="aktionen" menue={zugangMenue} zeile={z} />]
+                      : undefined
                   }
-                />
-              </ListenEintrag>
+                >
+                  <ListenEintragMeta
+                    title={<span data-lfh="lagemonitor-titel">{z.bezeichnung}</span>}
+                    description={
+                      <span style={{ color: rollen.gedaempft }} data-lfh="lagemonitor-zustand">
+                        {zugangZustand(z, zeit)}
+                      </span>
+                    }
+                  />
+                </ListenEintrag>
+              </div>
             )}
           />
         )}
+        {kontext.menue}
       </Paneel>
 
       <ErfassungsModal<AnlegenWerte>
