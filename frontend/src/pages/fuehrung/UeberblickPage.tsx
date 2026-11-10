@@ -648,7 +648,7 @@ export default function UeberblickPage() {
         // Außenabstand.
         hinweis={
           einsatz != null &&
-          !darfSchreiben && <RechteHinweis sichtbar text={ueberblickRechteText(einsatz.status)} />
+          !darfSchreiben && <RechteHinweis sichtbar text={ueberblickRechteText(einsatz)} />
         }
         aktionen={
           <>

@@ -127,6 +127,8 @@ const leer = <Typography.Text type="secondary">—</Typography.Text>;
 const stellenSpalten = (
   einsatzId: number,
   darfSchreiben: boolean,
+  /** „Belegung melden“: am Spiegel ein Antrag, auch ohne Schreibrecht (LLH-1492). */
+  darfMelden: boolean,
   onBelegungMelden: (s: Betreuungsstelle) => void,
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
   namentlich: ReadonlyMap<number, number> | undefined,
@@ -140,7 +142,7 @@ const stellenSpalten = (
   kennungAbstand: number,
 ) => {
   const meldeKnopf = (s: Betreuungsstelle) =>
-    !darfSchreiben || s.status === 'geschlossen' ? null : s.belegungsart === 'namentlich' ? (
+    !darfMelden || s.status === 'geschlossen' ? null : s.belegungsart === 'namentlich' ? (
       // Der Server meldet die Belegung aus der Registrierung (LLH-1612): der Kurzgrund steht in
       // der Zeile statt eines Knopfs, der nur 409 brächte.
       <Typography.Text type="secondary">{BELEGUNGSART_LABEL.namentlich}</Typography.Text>
@@ -283,7 +285,7 @@ const stellenSpalten = (
       suchText: (s) => s.abschnitt_name,
       render: (_, s) => s.abschnitt_name ?? leer,
     },
-    ...(darfSchreiben
+    ...(darfSchreiben || darfMelden
       ? [
           {
             key: 'aktionen' as const,
@@ -294,11 +296,13 @@ const stellenSpalten = (
               // Dreipunkt; `middle` hält ≥ 16 px (gemessen in `e2e/gate3-trefflaeche.spec.ts`).
               <Space wrap size="middle">
                 {!meldenInKennung && meldeKnopf(s)}
-                <MenueAusloeser
-                  eintraege={stellenMenue(s, karteGesperrt)}
-                  zugaenglicherName={`Aktionen zu Stelle ${s.bezeichnung}`}
-                  onWahl={(aktion) => onAktion(aktion, s)}
-                />
+                {darfSchreiben && (
+                  <MenueAusloeser
+                    eintraege={stellenMenue(s, karteGesperrt)}
+                    zugaenglicherName={`Aktionen zu Stelle ${s.bezeichnung}`}
+                    onWahl={(aktion) => onAktion(aktion, s)}
+                  />
+                )}
               </Space>
             ),
           },
@@ -326,6 +330,7 @@ export default function StellenBlock({
   namentlich,
   ladend,
   darfSchreiben,
+  darfMelden = darfSchreiben,
   dataUpdatedAt,
   onBelegungMelden,
   onAktion,
@@ -336,6 +341,8 @@ export default function StellenBlock({
   namentlich?: readonly StelleNamentlich[] | null;
   ladend: boolean;
   darfSchreiben: boolean;
+  /** „Belegung melden“ (LLH-1492: am Spiegel ein Antrag); Vorgabe `darfSchreiben`. */
+  darfMelden?: boolean;
   dataUpdatedAt?: number;
   onBelegungMelden: (s: Betreuungsstelle) => void;
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
@@ -353,6 +360,7 @@ export default function StellenBlock({
       stellenSpalten(
         einsatzId,
         darfSchreiben,
+        darfMelden,
         onBelegungMelden,
         onAktion,
         namentlichJeStelle,
@@ -364,6 +372,7 @@ export default function StellenBlock({
     [
       einsatzId,
       darfSchreiben,
+      darfMelden,
       onBelegungMelden,
       onAktion,
       namentlichJeStelle,

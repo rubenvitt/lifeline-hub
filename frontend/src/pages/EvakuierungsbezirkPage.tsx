@@ -23,7 +23,7 @@ import { Paneel, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { evakuierungPfad, parseRouteId } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
@@ -109,6 +109,8 @@ export default function EvakuierungsbezirkPage() {
   const veraltet = evakuierungQuery.isError;
   const plan = raeumungPlan(bezirk.raeumung);
   const zeigeKopf = darfSchreiben && !bearbeiten;
+  // „Stand melden“ am Spiegel als Antrag (LLH-1492, D13); alles Übrige bleibt gesperrt.
+  const zeigeMelden = darfBeantragen(einsatz) && !bearbeiten;
 
   const menue: MenueEintrag<MenueAktion>[] = [
     ...plan.menue.map((s) => ({ key: s.key, label: s.label })),
@@ -161,12 +163,12 @@ export default function EvakuierungsbezirkPage() {
         />
       }
       aktionen={
-        zeigeKopf && (
+        (zeigeKopf || zeigeMelden) && (
           <Space wrap size="middle">
             <Button type="primary" onClick={() => handlungen.oeffneStand(bezirk)}>
               Stand melden
             </Button>
-            {plan.knopf && (
+            {zeigeKopf && plan.knopf && (
               <Button
                 loading={handlungen.raeumungLaeuft === plan.knopf.ziel}
                 onClick={() => handlungen.setzeRaeumung(bezirk, plan.knopf!.ziel)}
@@ -174,15 +176,18 @@ export default function EvakuierungsbezirkPage() {
                 {plan.knopf.label}
               </Button>
             )}
-            <Button onClick={starteBearbeiten}>Bearbeiten</Button>
-            <MenueAusloeser
-              eintraege={menue}
-              laeuft={
-                handlungen.raeumungLaeuft != null && handlungen.raeumungLaeuft !== plan.knopf?.ziel
-              }
-              zugaenglicherName={`Weitere Aktionen zu Bezirk ${bezirk.bezeichnung}`}
-              onWahl={waehle}
-            />
+            {zeigeKopf && <Button onClick={starteBearbeiten}>Bearbeiten</Button>}
+            {zeigeKopf && (
+              <MenueAusloeser
+                eintraege={menue}
+                laeuft={
+                  handlungen.raeumungLaeuft != null &&
+                  handlungen.raeumungLaeuft !== plan.knopf?.ziel
+                }
+                zugaenglicherName={`Weitere Aktionen zu Bezirk ${bezirk.bezeichnung}`}
+                onWahl={waehle}
+              />
+            )}
           </Space>
         )
       }
@@ -191,7 +196,7 @@ export default function EvakuierungsbezirkPage() {
           <>
             <SeitenHinweise
               rechteFehlt={!darfSchreiben}
-              rechteText={einsatzRechteGrund(einsatz.status)}
+              rechteText={einsatzRechteGrund(einsatz)}
               fehler={fehlerOben}
               fehlerTitel="Räumung nicht geändert"
             />

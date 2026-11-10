@@ -52,7 +52,7 @@ export function anlageSperrGrund({
   lageberichte: Freigabe;
   befehle: Freigabe;
 }): string | null {
-  if (!darfSchreiben) return einsatzRechteGrund(einsatz.status);
+  if (!darfSchreiben) return einsatzRechteGrund(einsatz);
   if (ohneVerbindung) return 'ohne Verbindung';
   if (lageberichte === 'frei' || befehle === 'frei') return null;
   if (lageberichte === 'gesperrt' && befehle === 'gesperrt')

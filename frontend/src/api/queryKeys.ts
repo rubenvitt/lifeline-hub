@@ -111,6 +111,10 @@ export const EINSATZ_KEYS = {
   infotelefon: 'einsatz-infotelefon',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
+  // Eigene Anträge am Spiegel (LLH-1492, design.md D13): live über das `einsatz`-Ereignis (die
+  // Zähler stehen im Kopf) und damit im Vollabgleich nach `lagged`, den der Spiegel je
+  // übernommenem Paket meldet. Nicht im Lagebild offline: ohne Verbindung trägt die Warteschlange.
+  antraege: 'einsatz-antraege',
   // Eigene Führungsstelle (LFH-849): eigener Endpunkt, live über dasselbe `einsatz`-Ereignis.
   fuehrungsstelle: 'einsatz-fuehrungsstelle',
   // Programmpunkte der Veranstaltung (LLH-1570): eigener Endpunkt, live über das `einsatz`-Ereignis.
@@ -406,6 +410,8 @@ export const EINSATZ_STREAM_EVENTS = {
     // zeigt die nächsten davon.
     EINSATZ_KEYS.programmpunkte,
     EINSATZ_KEYS.lagemonitor,
+    // Anträge am Spiegel (LLH-1492): ihre Zähler stehen im Kopf, ein Abgleich meldet `lagged`.
+    EINSATZ_KEYS.antraege,
   ],
   // Anrufe des Moduls Informationstelefon; der Server gatet das Ereignis nach `infotelefon`.
   infotelefon: [EINSATZ_KEYS.infotelefon],
@@ -995,6 +1001,8 @@ export const einsatzKeys = {
   // Download-Adresse der bereinigten Fassung ist der Key: ein Anhang ändert sich nie (LFH-759).
   anhangHeicVorschau: (einsatzId: number, href: string) =>
     [EINSATZ_KEYS.anhangHeicVorschau, einsatzId, href] as const,
+  /** Eigene Anträge am Spiegel (LLH-1492), live über `einsatz`. */
+  antraege: (einsatzId: number) => [EINSATZ_KEYS.antraege, einsatzId] as const,
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════

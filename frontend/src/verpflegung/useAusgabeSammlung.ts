@@ -59,6 +59,8 @@ export interface AusgabeSammlungOptionen {
   onGebucht?: (ausgabeId: number, buendel: Buendel) => void;
   /** Ohne Netz an Ort und Stelle vorgemerkt; nur, solange die Ansicht dieses Zeitfensters steht. */
   onVorgemerkt?: (buendel: Buendel) => void;
+  /** Am Spiegel als Antrag angenommen (LLH-1492); nur, solange die Ansicht steht. */
+  onBeantragt?: (buendel: Buendel) => void;
 }
 
 /** Fachlich abgelehntes Bündel (409, 404/422, 403): gezählt ist nichts. */
@@ -102,6 +104,7 @@ export function useAusgabeSammlung({
   empfaenger = null,
   onGebucht,
   onVorgemerkt,
+  onBeantragt,
 }: AusgabeSammlungOptionen): AusgabeSammlungStand {
   const qc = useQueryClient();
   const sammlung = useRef(new AusgabeSammlung()).current;
@@ -121,6 +124,7 @@ export function useAusgabeSammlung({
     empfaenger,
     onGebucht,
     onVorgemerkt,
+    onBeantragt,
   });
   aktuell.current = {
     benutzerId,
@@ -130,6 +134,7 @@ export function useAusgabeSammlung({
     empfaenger,
     onGebucht,
     onVorgemerkt,
+    onBeantragt,
   };
   /** Stelle und Empfänger des offenen Bündels: gesetzt beim ersten Tipp, nicht bei einem Wechsel. */
   const buendelZiel = useRef<{ stelle: number | null; empfaenger: EmpfaengerWahl | null }>({
@@ -176,6 +181,12 @@ export function useAusgabeSammlung({
           if (ergebnis.zustand === 'vorgemerkt') {
             entferne();
             if (amOrt()) aktuell.current.onVorgemerkt?.(buendel);
+            return;
+          }
+          // Am Spiegel (LLH-1492): ein Antrag, noch keine Ausgabe; er steht als „ausstehend“.
+          if (ergebnis.zustand === 'beantragt') {
+            entferne();
+            if (amOrt()) aktuell.current.onBeantragt?.(buendel);
             return;
           }
           // `onGebucht` VOR dem Cache: die Ansicht merkt die Ausgabe als eigene vor, sonst stünde

@@ -134,6 +134,8 @@ const leer = <Typography.Text type="secondary">—</Typography.Text>;
 const bezirkSpalten = (
   einsatzId: number,
   darfSchreiben: boolean,
+  /** „Stand melden“: am Spiegel ein Antrag, auch ohne Schreibrecht (LLH-1492). */
+  darfMelden: boolean,
   onStandMelden: (b: Evakuierungsbezirk) => void,
   onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void,
   karteGesperrt: boolean,
@@ -145,7 +147,7 @@ const bezirkSpalten = (
   abschnittWerte: readonly { text: string; value: string }[],
 ) => {
   const meldeKnopf = (b: Evakuierungsbezirk) =>
-    darfSchreiben ? (
+    darfMelden ? (
       <Button
         aria-label={`Stand melden für Bezirk ${b.bezeichnung}`}
         onClick={() => onStandMelden(b)}
@@ -310,6 +312,7 @@ export default function BezirkTabelle({
   bezirke,
   ladend,
   darfSchreiben,
+  darfMelden = darfSchreiben,
   onStandMelden,
   onAktion,
 }: {
@@ -317,6 +320,8 @@ export default function BezirkTabelle({
   bezirke: readonly Evakuierungsbezirk[];
   ladend: boolean;
   darfSchreiben: boolean;
+  /** „Stand melden“ (LLH-1492: am Spiegel ein Antrag); Vorgabe `darfSchreiben`. */
+  darfMelden?: boolean;
   onStandMelden: (b: Evakuierungsbezirk) => void;
   onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void;
 }) {
@@ -344,6 +349,7 @@ export default function BezirkTabelle({
       bezirkSpalten(
         einsatzId,
         darfSchreiben,
+        darfMelden,
         onStandMelden,
         onAktion,
         karteGesperrt,
@@ -355,6 +361,7 @@ export default function BezirkTabelle({
     [
       einsatzId,
       darfSchreiben,
+      darfMelden,
       onStandMelden,
       onAktion,
       karteGesperrt,

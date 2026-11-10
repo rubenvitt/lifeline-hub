@@ -13,7 +13,7 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { evakuierungsbezirkPfad, parseRouteId } from '../routing/deeplinks';
 
 /**
@@ -102,7 +102,7 @@ export default function EvakuierungPage() {
       hinweis={
         <SeitenHinweise
           rechteFehlt={!darfSchreiben}
-          rechteText={einsatzRechteGrund(einsatz.status)}
+          rechteText={einsatzRechteGrund(einsatz)}
           fehler={handlungen.ruecknahmeFehler}
           fehlerTitel="Meldung konnte nicht zurückgenommen werden"
         />
@@ -125,6 +125,8 @@ export default function EvakuierungPage() {
             bezirke={bezirke}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
+            // „Stand melden“ am Spiegel als Antrag (LLH-1492, D13).
+            darfMelden={darfBeantragen(einsatz)}
             onStandMelden={handlungen.oeffneStand}
             onAktion={handlungen.bezirkAktion}
           />

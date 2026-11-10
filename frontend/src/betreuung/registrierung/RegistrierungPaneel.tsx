@@ -135,6 +135,11 @@ export default function RegistrierungPaneel({
         message.warning(`Offline vorgemerkt: Registrierung ${n}`);
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch kein Haushalt.
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Registrierung ${n}`);
+        return;
+      }
       invalidiere();
       message.success(`${haushaltKennung(ergebnis.daten.nummer)} registriert: ${n}`);
     },
@@ -148,6 +153,10 @@ export default function RegistrierungPaneel({
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning(`Offline vorgemerkt: Abmeldung`);
+        return;
+      }
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Abmeldung`);
         return;
       }
       invalidiere();
@@ -180,7 +189,15 @@ export default function RegistrierungPaneel({
     if (z.aktion.daten.haushalt_id != null) haushaltVorgemerkt.add(z.aktion.daten.haushalt_id);
   }
   const vorgemerkteRegistrierungen = vorgemerkt.flatMap((z) =>
-    z.aktion.art === 'registrierung' ? [{ id: z.id, daten: z.aktion.daten }] : [],
+    z.aktion.art === 'registrierung'
+      ? [
+          {
+            schluessel: z.antrag ? `antrag-${z.antrag.id}` : z.id,
+            antrag: z.antrag != null,
+            daten: z.aktion.daten,
+          },
+        ]
+      : [],
   );
 
   const heute = heuteInZone(zone, serverJetzt());
@@ -342,8 +359,9 @@ export default function RegistrierungPaneel({
           style={{ listStyle: 'none', margin: 0, padding: 0 }}
         >
           {vorgemerkteRegistrierungen.map((r) => (
-            <li key={r.id} data-lfh="registrierung-vorgemerkt">
-              <Typography.Text strong>vorgemerkt</Typography.Text>
+            <li key={r.schluessel} data-lfh="registrierung-vorgemerkt">
+              {/* Ein Antrag am Spiegel (LLH-1492) steht an derselben Stelle. */}
+              <Typography.Text strong>{r.antrag ? 'beantragt' : 'vorgemerkt'}</Typography.Text>
               {' · '}
               {r.daten.personen.map((p) => personName(p)).join('; ')}
               {' · '}

@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { Image } from 'antd';
+import { Image, Spin } from 'antd';
 import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import { useRollen } from './instrument/rollenwerte';
 import {
@@ -21,6 +21,8 @@ import {
   vorschauPfad,
 } from '../api/anhangFassung';
 import { einsatzKeys } from '../api/queryKeys';
+import { WIRD_GEHOLT_WORT, pruefeAnhangAbruf } from '../api/anhangAbruf';
+import { useSpiegelAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 
 /**
  * Vorschaubild an Bild-Anhängen (LFH-759, Spec `anhang-vorschau`, Herleitung
@@ -31,6 +33,9 @@ import { einsatzKeys } from '../api/queryKeys';
  * - Klick oder Enter öffnet die Großansicht als Überlagerung in der App (antd `Image`), nie einen
  *   Tab: die Desktop-Hülle machte aus jeder `/api/`-Navigation einen Download.
  * - Kann das Bild nicht laden (ohne Netz, 422, Decoder-Fehler), steht ein stiller Platzhalter da.
+ * - Am Spiegel (LLH-1492, D8) kommt der Inhalt auf Abruf: scheitert das Bild dort, fragt die
+ *   Kachel einmal nach; heißt die Antwort „wird geholt“, dreht sie sich mit diesem Namen, bis ein
+ *   neuer Stand des Einsatzkopfs (nächster Abgleich) einen neuen Versuch auslöst.
  * - Nie `fassung=original`: die Anzeige nimmt die Vorschau-Fassungen bzw. bei HEIC die bereinigte.
  * - `grossansicht={false}` (Vorschau eines ETB-Eintrags in der Sprungpalette): nur das Bild, kein
  *   Bedienziel. Die Palette ist selbst eine Überlagerung ohne Bedienelemente, und Escape aus einer
@@ -279,6 +284,7 @@ function HeicKachel(props: Props) {
 }
 
 function KachelAnzeige({
+  href,
   mime,
   dateiname,
   kennung,
@@ -290,23 +296,59 @@ function KachelAnzeige({
   const id = useId();
   const knopf = useRef<HTMLButtonElement>(null);
   const [fehler, setFehler] = useState(false);
+  // Takt des Abgleichs, bei dem der Inhalt zuletzt „wird geholt“ hieß (LLH-1492); ein neuer Takt
+  // lädt das Bild neu (Schlüssel am `img`).
+  const { spiegel, abgleichTakt } = useSpiegelAusCache(einsatzIdAusPfad(href));
+  const [geholtBeiTakt, setGeholtBeiTakt] = useState<number | null>(null);
+  // Ein neuer Versuch ohne neuen Takt: die Nachfrage fand den Inhalt schon da.
+  const [versuch, setVersuch] = useState(0);
+  const wirdGeholt = geholtBeiTakt != null && geholtBeiTakt === abgleichTakt;
   const gross = quellen.gross;
 
   useEffect(() => {
-    if (gruppe == null || fehler || !grossansicht || knopf.current == null) return;
+    if (gruppe == null || fehler || wirdGeholt || !grossansicht || knopf.current == null) return;
     return gruppe.registriere(id, gross, knopf.current);
-  }, [gruppe, id, gross, fehler, grossansicht]);
+  }, [gruppe, id, gross, fehler, wirdGeholt, grossansicht]);
+
+  const ladeFehler = () => {
+    if (!spiegel) {
+      setFehler(true);
+      return;
+    }
+    const takt = abgleichTakt;
+    void pruefeAnhangAbruf(quellen.klein).then((ergebnis) => {
+      if (ergebnis === 'wird_geholt') setGeholtBeiTakt(takt);
+      else if (ergebnis === 'fehler') setFehler(true);
+      // Einmal neu laden; scheitert das Bild trotz Inhalt (Decoder), bleibt der Platzhalter.
+      else if (versuch === 0) setVersuch(1);
+      else setFehler(true);
+    });
+  };
 
   if (fehler) return <Platzhalter dateiname={dateiname} mime={mime} />;
+  if (wirdGeholt) {
+    return (
+      <span
+        role="img"
+        aria-label={`Vorschau ${WIRD_GEHOLT_WORT}: ${dateiname}`}
+        title={WIRD_GEHOLT_WORT}
+        data-lfh="anhang-vorschau-wird-geholt"
+        style={kachel}
+      >
+        <Spin size="small" />
+      </span>
+    );
+  }
 
   const name = `Vorschau: ${kennung ? `${dateiname}, ${kennung}` : dateiname}`;
   const bild = (
     <img
+      key={spiegel ? `${abgleichTakt}-${versuch}` : 'bild'}
       src={quellen.klein}
       alt=""
       loading="lazy"
       decoding="async"
-      onError={() => setFehler(true)}
+      onError={ladeFehler}
       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
     />
   );

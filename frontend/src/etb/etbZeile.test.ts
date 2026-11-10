@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { EtbEintragAnzeige } from '../api/types';
+import type { EtbEintragAnzeige, SpiegelAntragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
-import { baueZeilen } from './etbZeile';
+import { baueZeilen, etbAntraegeAlsAusstehend } from './etbZeile';
 
 const E = (id: number): EtbEintragAnzeige =>
   ({
@@ -78,5 +78,45 @@ describe('baueZeilen (LFH-342 · C7, Befund M82)', () => {
     // Die Gegenaussage zum Leerzustand: `baueZeilen` erfindet keine Zeile, wenn
     // nichts da ist — sonst wäre der leer-Zweig der Seite nie erreichbar.
     expect(baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [] })).toEqual([]);
+  });
+});
+
+describe('Anträge am Spiegel in der Chronologie (LLH-1492, Spec `spiegel-antraege`)', () => {
+  const antrag = (id: number, zustand: string, daten: Record<string, unknown>) =>
+    ({
+      id,
+      art: 'etb',
+      zustand,
+      ziel: {},
+      daten,
+      erfasst_at: '2026-11-10 08:00:00',
+    }) as unknown as SpiegelAntragAnzeige;
+
+  it('stehen wie ausstehende, ohne Nummer, mit eigenem Schlüssel; abgelehnte nicht', () => {
+    const beantragt = etbAntraegeAlsAusstehend(
+      [
+        antrag(7, 'ausstehend', {
+          typ: 'meldung',
+          inhalt: 'Lage ruhig',
+          berichtigt_eintrag_id: 99,
+        }),
+        antrag(8, 'abgelehnt', { typ: 'meldung', inhalt: 'x' }),
+        antrag(9, 'uebernommen', { typ: 'unbekannt', inhalt: 'y' }),
+      ],
+      11,
+      3,
+    );
+    expect(beantragt).toHaveLength(1);
+    expect(beantragt[0].antrag).toEqual({ id: 7, zustand: 'ausstehend' });
+    // Der Verweis trägt die Kennung der führenden Instanz und fällt weg.
+    expect(beantragt[0].eintrag).toEqual({ typ: 'meldung', inhalt: 'Lage ruhig' });
+    const zeilen = baueZeilen({ eintraege: [], ausstehend: beantragt, abgelehnt: [] });
+    expect(zeilen.map((z) => [z.art, z.schluessel])).toEqual([['ausstehend', 'beantragt-7']]);
+  });
+
+  it('ohne Benutzer keine', () => {
+    expect(
+      etbAntraegeAlsAusstehend([antrag(1, 'ausstehend', { typ: 'meldung' })], undefined, 3),
+    ).toEqual([]);
   });
 });

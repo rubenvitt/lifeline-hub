@@ -83,7 +83,7 @@ import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSc
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
@@ -181,6 +181,8 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     queryFn: () => ladeBetreuung(einsatzId),
   });
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
+  // Belegung melden, Registrieren und Abmelden: am Spiegel ein Antrag (LLH-1492, D13).
+  const darfErfassen = darfBeantragen(einsatzQuery.data);
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -225,6 +227,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     onSuccess: (ergebnis, { ziel, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning(`Offline vorgemerkt: Belegungsmeldung ${ziel.bezeichnung}`);
+        return;
+      }
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Belegungsmeldung ${ziel.bezeichnung}`);
         return;
       }
       const r = ergebnis.daten;
@@ -361,7 +367,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     }
   }
 
-  const kopfAktionen = darfSchreiben && !bearbeiten && (
+  const kopfAktionen = darfErfassen && !bearbeiten && (
     <Space wrap size="middle">
       <Button
         type="primary"
@@ -380,14 +386,18 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           {geschlossen ? 'Stelle geschlossen' : NAMENTLICH_SPERRE}
         </Typography.Text>
       )}
-      <Button loading={statusMut.isPending} onClick={statusWechsel}>
-        {handlung.text}
-      </Button>
-      <MenueAusloeser
-        eintraege={menue}
-        zugaenglicherName={`Weitere Aktionen zu Stelle ${s.bezeichnung}`}
-        onWahl={menueWahl}
-      />
+      {darfSchreiben && (
+        <>
+          <Button loading={statusMut.isPending} onClick={statusWechsel}>
+            {handlung.text}
+          </Button>
+          <MenueAusloeser
+            eintraege={menue}
+            zugaenglicherName={`Weitere Aktionen zu Stelle ${s.bezeichnung}`}
+            onWahl={menueWahl}
+          />
+        </>
+      )}
     </Space>
   );
 
@@ -546,7 +556,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       hinweis={
         <SeitenHinweise
           rechteFehlt={!darfSchreiben}
-          rechteText={einsatzRechteGrund(einsatz.status)}
+          rechteText={einsatzRechteGrund(einsatz)}
           fehler={fehlerHinweis.fehler}
           fehlerTitel={fehlerHinweis.titel}
         />
@@ -572,8 +582,8 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           einsatzId={einsatzId}
           stelle={s}
           personenFrei={personenFrei}
-          darfSchreiben={darfSchreiben}
-          rechteGrund={einsatzRechteGrund(einsatz.status)}
+          darfSchreiben={darfErfassen}
+          rechteGrund={einsatzRechteGrund(einsatz)}
         />
 
         <Paneel

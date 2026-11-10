@@ -261,3 +261,49 @@ draußen gelassen werden.
   und Terminprüfung beim Abschluss einer Lagebesprechung, Vorgabe und Schnellwahl der
   Wiedervorlage. Laufende Anzeigen und ihre Timer (Uhren, „vor 3 min“, „überfällig“, der Chip
   „Nächste Lagebesprechung“) bleiben bei der Geräteuhr. Tests: `test/vorgehendeUhr.ts`.
+
+## Anträge am Spiegel (LLH-1492)
+
+Gilt für `einsatz/spiegel/`, `api/antragEreignis.ts`, `api/spiegelAntraege.ts`,
+`offline/antragAlsVormerkung.ts` und jede Stelle, die das Ergebnis einer
+`erfasse…OfflineFaehig`/`save…OfflineCapable`-Funktion auswertet. Herleitung:
+`openspec/changes/polrv1lt-spiegel-antraege/design.md`, D9 und D13.
+
+- **Am Spiegel wird beantragt, nicht geschrieben.** Führt eine andere Instanz den Einsatz
+  (`EinsatzAnzeige.spiegel` gesetzt), antworten genau die vormerkbaren Erfassungen mit **202** und
+  `{ antrag: { id, zustand } }` statt der Ressource. „Eingänge gelesen“ und das Quittieren einer
+  Benachrichtigung sind keine Anträge, sie bleiben lokal. Die Funktionen kennen dafür das dritte
+  Ergebnis `{ zustand: 'beantragt', antrag }` (`OfflineSchreibErgebnis`); der ETB-Weg
+  (`useEtbErfassung.erfassen`) gibt wie beim Vormerken `null` zurück. Ein beantragter Eintrag hat
+  keine Zeile, keine Nummer und kein „Rückgängig“; die Seite quittiert „Beantragt: …“.
+- **Erst die Warteschlange, dann der Antrag.** Ohne Netz merkt die Funktion auch am Spiegel vor wie
+  sonst. Beim Senden (Abgleich, `useOfflineSync`, ETB-Flush) wird daraus ein Antrag: die 202 gilt
+  als angenommen, die Zeile verlässt die Warteschlange. Dieselbe `client_id` ergibt beim Server
+  denselben Antrag, ein Replay legt keinen zweiten an.
+- **Ein Ereignis für jeden Antrag:** `apiSend` meldet jede 202 mit Antrag als `ANTRAG_EREIGNIS`
+  (`api/antragEreignis.ts`), gleich ob sie aus der Erfassung oder der Warteschlange kam. Darauf
+  gleicht `useSpiegelAntraege` Antragsliste und Einsatzkopf ab (die Zähler stehen im Kopf).
+- **Anträge stehen, wo Vorgemerktes steht** (Spec `spiegel-antraege`):
+  `useVorgemerkteSchreibaktionen` hängt die offenen Anträge derselben Art aus dem Cache an
+  (`antraegeAlsSchreibaktionen`, Kennzeichen `antrag`); das ETB nimmt sie über
+  `etbAntraegeAlsAusstehend` als ausstehende Zeilen ohne Nummer. Die Seite schreibt „beantragt“
+  statt „vorgemerkt“, getrennt von den Daten und nie in deren Kennzahlen. Abgelehnte stehen mit
+  Grund nur im Hinweisband (`SpiegelBand`). Die erfassten Daten tragen die Kennungen der führenden
+  Instanz; deren Verweisfelder fallen weg (`VERWEISFELDER`), damit kein Antrag an einer lokalen
+  Zeile mit zufällig gleicher Kennung hängt. Geladen werden die Anträge vom Hinweisband im
+  Einsatzrahmen; Hooks ohne `QueryClientProvider` lesen eine leere Liste.
+- **Der Query-Key `antraege` bleibt draußen** aus `LAGEBILD_OFFLINE`
+  (`lagebildOffline.guard.test.ts`): er ist ein Stand des eigenen Servers, ohne Verbindung zu ihm
+  trägt die Warteschlange, und ein alter Stand von der Platte zeigte „ausstehend“, was längst
+  übernommen oder abgelehnt ist. Live hängt er am Ereignis `einsatz` und damit am Vollabgleich nach
+  `lagged`, den der Spiegel je übernommener Lieferung meldet.
+- **Schreibrecht:** am Spiegel liefern `darfImEinsatzSchreiben`, `darfEinsatzLeiten`,
+  `darfEinsatzVerwalten` und `darfModuleVerwalten` `false` (`einsatz/schreibrecht.ts`); die
+  Erfassungsorte fragen `darfBeantragen`, Bearbeiten und Löschen bleiben gesperrt. Den Grund nennt
+  `einsatzRechteGrund(einsatz)` („Spiegel von …“). Anhänge am ETB-Eintrag gehen am Spiegel nicht
+  (400), der Knopf fehlt dort.
+- **Inhalte auf Abruf:** fehlt am Spiegel der Inhalt eines Anhangs, Kartenhintergrunds oder
+  UHS-Plans, antwortet der Server 409 mit `ANHANG_WIRD_GEHOLT_TEXT` (`api/anhangAbruf.ts`, kein
+  eigener Fehlercode). Vorschau, Download (`useAnhangDownload`), Lagekarte und Grundriss zeigen
+  „wird geholt“ statt eines Fehlers und versuchen es nach dem nächsten Abgleich erneut
+  (`useSpiegelAusCache`: neuer Stand des Einsatzkopfs).

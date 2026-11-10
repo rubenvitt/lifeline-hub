@@ -289,6 +289,11 @@ export default function EintreffenDialog({
         message.warning(`Offline vorgemerkt: Eintreffen ${b.name}`);
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Buchung.
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Eintreffen ${b.name}`);
+        return;
+      }
       message.success(
         !ergebnis.daten.unangemeldet
           ? `${b.name} gebucht`

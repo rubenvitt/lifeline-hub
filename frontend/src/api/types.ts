@@ -41,6 +41,11 @@ export type ElwVerlorenAntwort = S['ElwVerlorenAntwort'];
 export type InstanzKopplungRichtung = S['InstanzKopplungRichtung'];
 export type InstanzKopplungZustand = S['InstanzKopplungZustand'];
 export type InstanzProtokoll = S['InstanzProtokoll'];
+// Spiegel und Anträge (LLH-1492)
+export type InstanzSpiegelStand = S['InstanzSpiegelStand'];
+export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
+export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
+export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
 export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
 export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
 export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];

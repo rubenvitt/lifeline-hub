@@ -50,6 +50,11 @@ export interface ZeitfensterKarteProps {
   jetzt: Dayjs;
   darfSchreiben: boolean;
   /**
+   * „Ausgabe nachtragen“ und der Sprung in die Ausgabe: am Spiegel ein Antrag, auch ohne
+   * Schreibrecht (LLH-1492). Vorgabe `darfSchreiben`.
+   */
+  darfAusgeben?: boolean;
+  /**
    * Modul Nachforderungen für die Person bedienbar (und Freigaben bekannt). Ohne: kein
    * „Nachfordern" und am Verweis nur „Nachforderung #n".
    */
@@ -150,6 +155,7 @@ export default function ZeitfensterKarte({
   zeitfenster: zf,
   jetzt,
   darfSchreiben,
+  darfAusgeben = darfSchreiben,
   nachforderungenFrei,
   nachforderungName,
   onAusgabeNachtragen,
@@ -211,8 +217,10 @@ export default function ZeitfensterKarte({
           },
         onLoeschen && !hatGueltigeAusgabe && { key: 'loeschen', label: 'Löschen', danger: true },
       ].filter(Boolean) as Aktion[])
-    : [];
-  const sprung = darfSchreiben && !istVergangen(zf, jetzt);
+    : darfAusgeben && onAusgabeNachtragen
+      ? [{ key: 'nachtragen', label: 'Ausgabe nachtragen' }]
+      : [];
+  const sprung = darfAusgeben && !istVergangen(zf, jetzt);
   const jeStelle = zeilenJeStelle(zf, stellen);
   const sprungJeStelle = sprung && !istSchmal;
   /** Stelle statt Ort: eine Ausgabe an einer Stelle nennt die Stelle, ohne den Ort. */
@@ -489,12 +497,13 @@ export default function ZeitfensterKarte({
                 const sk = sonderkostText(sonderkostVoll(d.sonderkost));
                 return (
                   <Zeitachseneintrag
-                    key={`ausstehend-${v.id ?? d.client_id}`}
+                    key={v.antrag ? `antrag-${v.antrag.id}` : `ausstehend-${v.id ?? d.client_id}`}
                     als="li"
                     data-lfh="verpflegung-ausgabe-ausstehend"
                     zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
                     typwort="ausstehend"
-                    hinweis="Offline vorgemerkt"
+                    // Ein Antrag am Spiegel (LLH-1492) steht wie Vorgemerktes.
+                    hinweis={v.antrag ? 'Beantragt' : 'Offline vorgemerkt'}
                   >
                     <span style={{ color: rollen.text2 }}>
                       <span style={monoStil(13, 500)}>{d.menge} EP</span>

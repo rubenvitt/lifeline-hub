@@ -20,7 +20,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { Paneel, StatusChip, monoStil, useRollen } from '../components/instrument';
 import type { StatusTon } from '../components/instrument/statusFlaeche';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen } from '../einsatz/schreibrecht';
 import { IconPersonPlus } from '../icons';
 import { navigationZeigt } from './GeraeteLayout';
 import { neueClientId } from '../offline/clientId';
@@ -179,6 +179,11 @@ export default function GeraetKontaktePage() {
         void message.warning('Offline vorgemerkt · R-…');
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+      if (ergebnis.zustand === 'beantragt') {
+        void message.info('Beantragt · R-…');
+        return;
+      }
       const reg = registrierAnzeige(ergebnis.daten.registrier_nr);
       if (daten.rtw && rtwAbweichung.current) {
         void message.warning(`${reg} · RTW angefordert · Änderung über Funk`);
@@ -203,7 +208,8 @@ export default function GeraetKontaktePage() {
   const eigeneVorgemerkt = vorgemerkt.filter(
     (v) => v.aktion.daten.versorgende_einheit_id === einheitId,
   );
-  const darfErfassen = darfImEinsatzSchreiben(einsatzQuery.data) && stelle != null;
+  // Am Spiegel wird die Erfassung zum Antrag (LLH-1492, D13).
+  const darfErfassen = darfBeantragen(einsatzQuery.data) && stelle != null;
 
   return (
     <EinsatzSeite

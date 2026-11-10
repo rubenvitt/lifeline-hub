@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
 import {
@@ -8,6 +8,38 @@ import {
   originalZugaenglicherName,
 } from '../api/anhangFassung';
 import AnhangVorschau from './AnhangVorschau';
+import { useAnhangDownload } from './useAnhangDownload';
+
+/**
+ * Ein Download-Verweis auf einen Anhang (`href`, `download`), der am Spiegel „wird geholt“ kennt
+ * (LLH-1492, `useAnhangDownload`): dort lädt der Klick erst und nennt den Stand daneben. Ohne
+ * Spiegel der native Verweis, unverändert.
+ */
+export function AnhangVerweis({
+  href,
+  download,
+  children,
+  ...rest
+}: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; download: string }) {
+  const { rollen, token } = useRollen();
+  const abruf = useAnhangDownload(href, download);
+  return (
+    <>
+      <a href={href} download={download} onClick={abruf.onClick} {...rest}>
+        {children}
+      </a>
+      {abruf.hinweis && (
+        <span
+          role="status"
+          data-lfh="anhang-download-hinweis"
+          style={{ color: rollen.text2, fontSize: token.fontSizeSM }}
+        >
+          {abruf.hinweis}
+        </span>
+      )}
+    </>
+  );
+}
 
 /**
  * Stil des Download-Ankers (LFH-21). Ein `<a>` ist ein handgebautes Bedienziel und erbt keine
@@ -103,7 +135,7 @@ export default function DownloadAnker({
   const zusatzId = useId();
   const beschrieben = zugaenglicherName != null && zusatz != null;
   const anker = (
-    <a
+    <AnhangVerweis
       href={href}
       download={dateiname}
       aria-label={zugaenglicherName}
@@ -131,7 +163,7 @@ export default function DownloadAnker({
           {zusatz}
         </span>
       )}
-    </a>
+    </AnhangVerweis>
   );
   const verweise =
     originalHref == null ? (

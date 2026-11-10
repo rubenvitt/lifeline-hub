@@ -39,7 +39,7 @@ import {
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -133,6 +133,8 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeBetreuung(einsatzId),
   });
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
+  // „Belegung melden“ am Spiegel als Antrag (LLH-1492, D13).
+  const darfMelden = darfBeantragen(einsatzQuery.data);
   // Die Abschnitte braucht nur, wer anlegen oder bearbeiten darf.
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
@@ -192,6 +194,10 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
     onSuccess: (ergebnis, { stelle, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning(`Offline vorgemerkt: Belegungsmeldung ${stelle.bezeichnung}`);
+        return;
+      }
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Belegungsmeldung ${stelle.bezeichnung}`);
         return;
       }
       const r = ergebnis.daten;
@@ -287,7 +293,7 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
       hinweis={
         <SeitenHinweise
           rechteFehlt={!darfSchreiben}
-          rechteText={betreuungRechteText(einsatz.status)}
+          rechteText={betreuungRechteText(einsatz)}
           fehler={belegungZurueckMut.error}
           fehlerTitel="Meldung konnte nicht zurückgenommen werden"
         />
@@ -308,7 +314,7 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
             aktion={{
               label: 'Betreuungsstelle anlegen',
               onClick: oeffneStelleAnlegen,
-              gesperrt: darfSchreiben ? undefined : betreuungRechteText(einsatz.status),
+              gesperrt: darfSchreiben ? undefined : betreuungRechteText(einsatz),
             }}
           />
         </>
@@ -326,6 +332,7 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
             namentlich={betreuungQuery.data?.namentlich}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
+            darfMelden={darfMelden}
             onBelegungMelden={oeffneBelegung}
             onAktion={stelleAktion}
           />

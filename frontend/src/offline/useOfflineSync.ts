@@ -7,13 +7,14 @@ import {
   markiereBenachrichtigungenGelesen,
   quittiereBenachrichtigung,
 } from '../api/benachrichtigungen';
+import { istAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
 import { ApiError, fehlerText } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person, Verpflegung } from '../api/types';
+import type { Meldung, Person, Verpflegung, VerpflegungAusgabeErgebnis } from '../api/types';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { quittiert } from '../alarm/benachrichtigungGedaechtnis';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
@@ -84,10 +85,20 @@ export function useOfflineSync(benutzerId?: number): void {
           // still im Meldungszweig zu landen. Bewusst KEIN `switch`: ein `break` darin verließe nur den
           // `switch`, und die Abbruch-Riegel unten liefen ins Leere.
           if (aktion.art === 'person') {
-            const person = await legePersonAn(element.wert.einsatz_id, aktion.daten, {
-              offlineQueueBenutzerId: aktuellerBenutzerId,
-            });
+            const person: Person | AntragAngenommen = await legePersonAn(
+              element.wert.einsatz_id,
+              aktion.daten,
+              {
+                offlineQueueBenutzerId: aktuellerBenutzerId,
+              },
+            );
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Am Spiegel (LLH-1492) wird aus der Vormerkung ein Antrag: angenommen, noch ohne
+            // Person; die Antragsliste zeigt ihn (`ANTRAG_EREIGNIS` aus `apiSend`).
+            if (istAntragAngenommen(person)) {
+              await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+              continue;
+            }
             const quittung = await schreibaktionPersonAbschliessen(
               aktuellerBenutzerId,
               element.wert,
@@ -128,11 +139,17 @@ export function useOfflineSync(benutzerId?: number): void {
               sicht: quittung.sicht,
             });
           } else if (aktion.art === 'meldung') {
-            const meldung = await legeMeldungAn(element.wert.einsatz_id, aktion.daten, {
-              offlineQueueBenutzerId: aktuellerBenutzerId,
-            });
+            const meldung: Meldung | AntragAngenommen = await legeMeldungAn(
+              element.wert.einsatz_id,
+              aktion.daten,
+              {
+                offlineQueueBenutzerId: aktuellerBenutzerId,
+              },
+            );
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            // Am Spiegel (LLH-1492): ein Antrag, noch keine Meldung, nichts zu melden.
+            if (istAntragAngenommen(meldung)) continue;
             void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(element.wert.einsatz_id) });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
             const clientId = aktion.daten.client_id;
@@ -196,13 +213,19 @@ export function useOfflineSync(benutzerId?: number): void {
             // LFH-688, design.md D7: das bestätigte Zeitfenster steht im Cache, BEVOR die
             // ausstehende Zeile verschwindet — sonst fehlte die Ausgabe einen Takt lang auf der
             // Karte. Kein ETB: eine Ausgabe schreibt keinen Eintrag.
-            const { zeitfenster, ausgabe_id } = await erfasseAusgabe(
+            const antwort: VerpflegungAusgabeErgebnis | AntragAngenommen = await erfasseAusgabe(
               element.wert.einsatz_id,
               aktion.zeitfenster_id,
               aktion.daten,
               { offlineQueueBenutzerId: aktuellerBenutzerId },
             );
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Am Spiegel (LLH-1492): ein Antrag, noch keine Ausgabe und kein Zeitfenster-Stand.
+            if (istAntragAngenommen(antwort)) {
+              await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+              continue;
+            }
+            const { zeitfenster, ausgabe_id } = antwort;
             // Vor dem Cache: die Ausgabeansicht merkt die Ausgabe als eigene vor, sonst wartete
             // sie bei gehaltener Liste hinter dem Sammelbanner (LLH-1292).
             meldeOfflineSchreibaktionGesendet({

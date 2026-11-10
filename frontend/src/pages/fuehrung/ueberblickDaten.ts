@@ -18,7 +18,6 @@ import type {
   Auftrag,
   Einheit,
   EinsatzFahrzeug,
-  EinsatzStatus,
   EinsatzMaterial,
   EinsatzPersonal,
   Einsatzabschnitt,
@@ -659,6 +658,8 @@ export function naechsteMarken(
 }
 
 /** Grund der fehlenden Schreibberechtigung für ETB-Erfassung und Abschnitte des Überblicks. */
-export function ueberblickRechteText(einsatzStatus: EinsatzStatus): string {
-  return einsatzRechteGrund(einsatzStatus);
+export function ueberblickRechteText(
+  einsatz: Parameters<typeof einsatzRechteGrund>[0],
+): string {
+  return einsatzRechteGrund(einsatz);
 }

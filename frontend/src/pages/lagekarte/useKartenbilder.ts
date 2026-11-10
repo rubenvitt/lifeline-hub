@@ -162,8 +162,10 @@ export function useKartenbilder({
         setBlobUrls(blobUrlsRef.current);
       }
     }
-    // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
-  }, [bilderRoh, einsatzId, ladeFehler]);
+    // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus. Jeder
+    // Abruf der Liste (`dataUpdatedAt`) versucht fehlende Bilder erneut: am Spiegel kommt ein Bild,
+    // das „wird geholt“, nach dem nächsten Abgleich, dessen `lagged` die Liste neu holt (LLH-1492).
+  }, [bilderRoh, einsatzId, ladeFehler, bilderQuery.dataUpdatedAt]);
 
   // Unmount-only: beim Verlassen der Karte alle dann aktuellen Blob-URLs freigeben.
   useEffect(

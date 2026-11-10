@@ -101,6 +101,11 @@ export function useAusgabeNachtragen(
         zeigeVorgemerkt(`Offline vorgemerkt: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`);
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, ohne „Rückgängig“.
+      if (ergebnis.zustand === 'beantragt') {
+        zeigeVorgemerkt(`Beantragt: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`);
+        return;
+      }
       onEigene?.(ergebnis.daten.ausgabe_id);
       invalidiere();
       zeigeGebucht(
