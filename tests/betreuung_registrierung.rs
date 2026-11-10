@@ -774,3 +774,226 @@ async fn druck_ohne_vollstaendiges_protokoll_liefert_nichts_und_laesst_nichts_st
             .unwrap();
     assert_eq!(alle, 0, "kein Eintrag dieses Abrufs bleibt stehen");
 }
+
+// ── Haushalte umbauen (LLH-1615, Change `lm62ud0b-haushalt-umbauen`) ─────────────────────────
+
+async fn put(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (StatusCode, Value) {
+    anfrage(app, "PUT", pfad, cookie, Some(&body.to_string())).await
+}
+
+fn bezugsperson_pfad(e: i64, sid: i64, hid: i64) -> String {
+    format!("{}/stellen/{sid}/haushalte/{hid}/bezugsperson", b(e))
+}
+
+fn haushalt_pfad(e: i64, sid: i64, pid: i64) -> String {
+    format!("{}/stellen/{sid}/personen/{pid}/haushalt", b(e))
+}
+
+/// Durchstich: Bezugsperson wechseln, Person in einen neuen Haushalt lösen, das Personen-Detail
+/// trägt `haushalt_bezugsperson`, das ETB keine Namen.
+#[tokio::test]
+async fn bezugsperson_wechseln_und_umhaengen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    let hid = h["id"].as_i64().unwrap();
+    let tom = h["personen"][1]["id"].as_i64().unwrap();
+    let lea = h["personen"][2]["id"].as_i64().unwrap();
+
+    let (s, v) = put(
+        &app,
+        &admin,
+        &bezugsperson_pfad(e, sid, hid),
+        json!({ "person_id": tom }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bezugsperson_id"], tom);
+    assert_eq!(v["bezugsperson_name"], "Weber, Tom");
+    let (_, p) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{tom}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(p["haushalt_bezugsperson"], true);
+
+    let (s, v) = put(
+        &app,
+        &admin,
+        &haushalt_pfad(e, sid, lea),
+        json!({ "neuer_haushalt": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["nummer"], 2);
+    assert_eq!(v["bezugsperson_id"], lea);
+    let (s, v) = put(
+        &app,
+        &admin,
+        &haushalt_pfad(e, sid, lea),
+        json!({ "haushalt_id": hid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["personen"].as_array().unwrap().len(), 3);
+
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Haushalt H-1, Bezugsperson jetzt R-")),
+        "{etb:?}"
+    );
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("von Haushalt H-1 in Haushalt H-2 umgehängt (neu, Bezugsperson)")),
+        "{etb:?}"
+    );
+    assert!(!etb.iter().any(|t| t.contains("Weber")));
+}
+
+/// Body und Prüfkette: genau ein Ziel (422), unbekannte Stelle 404 vor dem 422 des Bodys, ohne
+/// Modul Personen 403.
+#[tokio::test]
+async fn haushalt_aendern_body_und_rechte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    let tom = h["personen"][1]["id"].as_i64().unwrap();
+
+    for body in [
+        json!({}),
+        json!({ "haushalt_id": h["id"], "neuer_haushalt": true }),
+    ] {
+        let (s, v) = put(&app, &admin, &haushalt_pfad(e, sid, tom), body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    }
+    let (s, _) = put(&app, &admin, &haushalt_pfad(e, 9999, tom), json!({})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = put(
+        &app,
+        &admin,
+        &bezugsperson_pfad(e, sid, h["id"].as_i64().unwrap()),
+        json!({ "person_id": "x" }),
+    )
+    .await;
+    assert!(s.is_client_error() && s != StatusCode::OK);
+
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = put(
+        &app,
+        &frieda,
+        &haushalt_pfad(e, sid, tom),
+        json!({ "neuer_haushalt": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = put(
+        &app,
+        &frieda,
+        &bezugsperson_pfad(e, sid, h["id"].as_i64().unwrap()),
+        json!({ "person_id": tom }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Das Gerät „Betreuungsstelle“ baut nur an seiner eigenen Stelle um.
+#[tokio::test]
+async fn geraet_baut_nur_an_der_eigenen_stelle_um() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ost = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let west = stelle(&app, &admin, e, "Weserstadion", "gezaehlt").await;
+    let (_, h) = post(&app, &admin, &reg(e, ost), familie(None)).await;
+    let (_, hw) = post(&app, &admin, &reg(e, west), familie(None)).await;
+    let tablet = geraet(
+        &app,
+        &admin,
+        e,
+        json!({"ansicht": "betreuungsstelle", "stelle_id": ost, "bezeichnung": "Tablet NU"}),
+    )
+    .await;
+    let tom = h["personen"][1]["id"].as_i64().unwrap();
+    let (s, v) = put(
+        &app,
+        &tablet,
+        &bezugsperson_pfad(e, ost, h["id"].as_i64().unwrap()),
+        json!({ "person_id": tom }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = put(
+        &app,
+        &tablet,
+        &haushalt_pfad(e, ost, tom),
+        json!({ "neuer_haushalt": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let tom_west = hw["personen"][1]["id"].as_i64().unwrap();
+    let (s, _) = put(
+        &app,
+        &tablet,
+        &haushalt_pfad(e, west, tom_west),
+        json!({ "neuer_haushalt": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = put(
+        &app,
+        &tablet,
+        &bezugsperson_pfad(e, west, hw["id"].as_i64().unwrap()),
+        json!({ "person_id": tom_west }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Spec „Bezugsperson storniert“: der Storno-Eintrag nennt die nachgerückte Person ohne Namen.
+#[tokio::test]
+async fn storno_der_bezugsperson_rueckt_im_selben_eintrag_nach() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
+    let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
+    let anna = h["personen"][0]["id"].as_i64().unwrap();
+    let tom = h["personen"][1]["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/personen/{anna}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, liste) = anfrage(&app, "GET", &reg(e, sid), &admin, None).await;
+    assert_eq!(liste["haushalte"][0]["bezugsperson_id"], tom);
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("storniert; Haushalt H-1: Bezugsperson jetzt R-")),
+        "{etb:?}"
+    );
+}

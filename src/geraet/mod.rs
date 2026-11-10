@@ -487,6 +487,16 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
     ),
+    // Haushalte umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen; nur Personen der
+    // eigenen Stelle (der Handler prüft die Stelle, fremd 403).
+    (
+        "PUT",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson",
+    ),
+    (
+        "PUT",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/personen/{pid}/haushalt",
+    ),
     // Registrierliste drucken (LLH-1616): nur die eigene Stelle (der Handler prüft, fremd 403),
     // je Person protokolliert. Bewusste Ausnahme zu „Personendruck nie am Gerät“
     // (`frontend/src/druck/AGENTS.md`); die Personendruckansicht bleibt draußen.

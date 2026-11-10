@@ -1308,6 +1308,12 @@ export interface AbmeldungEingabe {
   client_id?: string;
 }
 
+/**
+ * Kein Backend-Schema: Body von `PUT …/betreuung/stellen/{sid}/personen/{pid}/haushalt`
+ * (LLH-1615). Genau eins von `haushalt_id` und `neuer_haushalt: true` (sonst 422).
+ */
+export type HaushaltZielEingabe = { haushalt_id: number } | { neuer_haushalt: true };
+
 /** Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke` (`BezirkAnlegen`), FE-lokal. */
 export interface EvakuierungsbezirkEingabe {
   bezeichnung: string;

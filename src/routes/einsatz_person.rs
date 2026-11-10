@@ -1669,29 +1669,35 @@ pub async fn stornieren(
     // Transaktion gelesen, nicht vorher: ein paralleler Verbleibwechsel könnte sie geändert haben.
     let benutzer_id = ctx.benutzer.id;
     let jetzt = crate::zeit::jetzt();
-    let (belegung_etb_ids, stelle_beruehrt) = crate::write_retry!(&state.pool, |conn| {
-        repo::storniere_tx(conn, einsatz_id, person_id, benutzer_id).await?;
-        let stelle: Option<i64> = sqlx::query_scalar(
-            "SELECT aktuelle_verbleib_betreuungsstelle_id FROM einsatz_person \
-             WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(person_id)
-        .bind(einsatz_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        match stelle {
-            Some(sid) => crate::betreuung::repo::belegung_nachfuehren_tx(
-                conn,
-                einsatz_id,
-                sid,
-                &jetzt,
-                benutzer_id,
+    let (belegung_etb_ids, stelle_beruehrt, nachgerueckt) =
+        crate::write_retry!(&state.pool, |conn| {
+            repo::storniere_tx(conn, einsatz_id, person_id, benutzer_id).await?;
+            // LLH-1615 (design.md D2): war sie Bezugsperson, rückt im selben Vorgang jemand nach.
+            let nachgerueckt = crate::betreuung::registrierung::nach_storno_nachruecken_tx(
+                conn, einsatz_id, person_id,
             )
-            .await
-            .map(|ids| (ids, true)),
-            None => Ok((Vec::new(), false)),
-        }
-    })?;
+            .await?;
+            let stelle: Option<i64> = sqlx::query_scalar(
+                "SELECT aktuelle_verbleib_betreuungsstelle_id FROM einsatz_person \
+             WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(person_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            match stelle {
+                Some(sid) => crate::betreuung::repo::belegung_nachfuehren_tx(
+                    conn,
+                    einsatz_id,
+                    sid,
+                    &jetzt,
+                    benutzer_id,
+                )
+                .await
+                .map(|ids| (ids, true, nachgerueckt)),
+                None => Ok((Vec::new(), false, nachgerueckt)),
+            }
+        })?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
     if let Some(effekt) = crate::uhs::auto_austritt(
         &state.pool,
@@ -1709,11 +1715,24 @@ pub async fn stornieren(
         einsatz_id,
         ctx.benutzer.id,
         &format!(
-            "Person {} storniert",
-            registrier_anzeige(person.registrier_nr)
+            "Person {} storniert{}",
+            registrier_anzeige(person.registrier_nr),
+            match nachgerueckt {
+                Some((nummer, Some((_, reg)))) => format!(
+                    "; {}",
+                    crate::betreuung::etb_text::bezugsperson_nachgerueckt(
+                        nummer,
+                        &registrier_anzeige(reg)
+                    )
+                ),
+                _ => String::new(),
+            }
         ),
     )
     .await;
+    if let Some((_, Some((neu, _)))) = nachgerueckt {
+        sse_person(&state, einsatz_id, neu);
+    }
     super::betreuung::publiziere_nachgefuehrt(
         &state,
         einsatz_id,

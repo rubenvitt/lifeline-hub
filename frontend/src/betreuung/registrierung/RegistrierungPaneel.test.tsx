@@ -7,6 +7,7 @@ import { queueLeerenFuerTests, schreibaktionEinreihen } from '../../offline/queu
 import { meHandler, server } from '../../test/server';
 import { benutzerFixture } from '../../test/fixtures';
 import { renderMitProviders, setzeOnline } from '../../test/utils';
+import { waehleMenueEintrag } from '../../test/menue';
 import RegistrierungPaneel from './RegistrierungPaneel';
 
 /**
@@ -278,5 +279,102 @@ describe('Vorgemerkt ohne Netz', () => {
     rendere();
     expect(await screen.findByText('Registrierliste ohne Netz nicht geladen')).toBeInTheDocument();
     expect(screen.queryByText(/wird abgerufen/)).not.toBeInTheDocument();
+  });
+});
+
+const BEZUGSPERSON = '/api/einsaetze/7/betreuung/stellen/8/haushalte/3/bezugsperson';
+
+describe('Haushalte umbauen (LLH-1615)', () => {
+  function rendereUmbau() {
+    const draht: { bezugsperson: unknown[]; haushalt: { pid: number; body: unknown }[] } = {
+      bezugsperson: [],
+      haushalt: [],
+    };
+    rendere();
+    server.use(
+      http.put(BEZUGSPERSON, async ({ request }) => {
+        draht.bezugsperson.push(await request.json());
+        return HttpResponse.json({ ...WEBER.haushalte[0], bezugsperson_id: 22 });
+      }),
+      http.put(
+        '/api/einsaetze/7/betreuung/stellen/8/personen/:pid/haushalt',
+        async ({ request, params }) => {
+          draht.haushalt.push({ pid: Number(params.pid), body: await request.json() });
+          return HttpResponse.json({ id: 9, nummer: 4, bezugsperson_id: 23, personen: [] });
+        },
+      ),
+    );
+    return draht;
+  }
+
+  it('die Bezugsperson trägt das Wort, ihr Menü bietet nur „Haushalt ändern …“', async () => {
+    const user = userEvent.setup();
+    rendereUmbau();
+    await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
+    const haushalt = await screen.findByRole('list', { name: 'Personen in H-1' });
+    const [anna, tom] = within(haushalt).getAllByRole('listitem');
+    expect(anna).toHaveTextContent('Bezugsperson');
+    expect(tom).not.toHaveTextContent('Bezugsperson');
+    await user.click(
+      within(anna).getByRole('button', { name: 'Weitere Aktionen zu R-012 Weber, Anna' }),
+    );
+    const menue = await screen.findByRole('menu');
+    expect(within(menue).queryByRole('menuitem', { name: 'Zur Bezugsperson machen' })).toBeNull();
+    expect(within(menue).getByRole('menuitem', { name: 'Haushalt ändern …' })).toBeInTheDocument();
+  });
+
+  it('„Zur Bezugsperson machen“ sendet die Person an den Haushalt', async () => {
+    const user = userEvent.setup();
+    const draht = rendereUmbau();
+    await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zu R-013 Weber, Tom' }),
+      'Zur Bezugsperson machen',
+    );
+    await waitFor(() => expect(draht.bezugsperson).toEqual([{ person_id: 22 }]));
+  });
+
+  it('„Haushalt ändern …“ bietet die übrigen Haushalte und „Neuer Haushalt“; neu sendet neuer_haushalt', async () => {
+    const user = userEvent.setup();
+    const draht = rendereUmbau();
+    await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zu R-014 Weber, Lea' }),
+      'Haushalt ändern …',
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Haushalt von R-014 Weber, Lea ändern')).toBeInTheDocument();
+    // Der eigene Haushalt steht nicht zur Wahl.
+    expect(within(dialog).queryByRole('radio', { name: /H-1/ })).toBeNull();
+    await user.click(within(dialog).getByRole('radio', { name: 'Neuer Haushalt' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Haushalt ändern' }));
+    await waitFor(() =>
+      expect(draht.haushalt).toEqual([{ pid: 23, body: { neuer_haushalt: true } }]),
+    );
+  });
+
+  it('eine Person ohne Haushalt lässt sich einem Haushalt der Stelle zuordnen', async () => {
+    const user = userEvent.setup();
+    const draht = rendereUmbau();
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zu R-020 Muster, Max' }),
+      'Haushalt ändern …',
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('radio', { name: 'H-1 · Weber, Anna · 3 Personen' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Haushalt ändern' }));
+    await waitFor(() => expect(draht.haushalt).toEqual([{ pid: 30, body: { haushalt_id: 3 } }]));
+  });
+
+  it('ohne Netz: Menü gesperrt, der Grund steht einmal', async () => {
+    const user = userEvent.setup();
+    rendereUmbau();
+    await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
+    const ausloeser = await screen.findByRole('button', {
+      name: 'Weitere Aktionen zu R-013 Weber, Tom',
+    });
+    setzeOnline(false);
+    await waitFor(() => expect(ausloeser).toBeDisabled());
+    expect(screen.getByText('Haushalte · Ohne Verbindung nicht änderbar')).toBeInTheDocument();
   });
 });

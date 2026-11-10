@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { PersonDetail } from '../api/types';
 import { server } from '../test/server';
+import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import { EinsatzPfadeProvider, GERAET_BETREUUNG_PFADE } from '../routing/EinsatzPfade';
 import Personendaten from './Personendaten';
@@ -134,8 +135,14 @@ describe('Personendaten — Haushalt (LLH-1612)', () => {
       'href',
       '/einsaetze/1/betreuung/8',
     );
-    // Lesezeile: nichts zu bearbeiten.
-    expect(screen.queryByRole('button', { name: /Haushalt/ })).toBeNull();
+  });
+
+  it('ohne Schreibrecht nur die Lesezeile, keine Aktionen (LLH-1615)', () => {
+    renderMitProviders(<Personendaten einsatzId={1} person={TOM} darfSchreiben={false} />, {
+      datenRouter: true,
+    });
+    expect(document.querySelector('[data-lfh="haushalt-zeile"]')).toHaveTextContent('Haushalt H-1');
+    expect(screen.queryByRole('button', { name: /Haushalt ändern|Bezugsperson/ })).toBeNull();
   });
 
   it('am Gerät ohne Stellenseite steht der Haushalt ohne Sprung; ohne Haushalt keine Zeile', () => {
@@ -160,5 +167,73 @@ describe('Personendaten — Haushalt (LLH-1612)', () => {
       { datenRouter: true },
     );
     expect(document.querySelector('[data-lfh="haushalt-zeile"]')).toBeNull();
+  });
+});
+
+describe('Personendaten — Haushalt umbauen (LLH-1615)', () => {
+  it('„Zur Bezugsperson machen“ sendet an die Stelle des Verbleibs', async () => {
+    const user = userEvent.setup();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.put(
+        '/api/einsaetze/1/betreuung/stellen/8/haushalte/3/bezugsperson',
+        async ({ request }) => {
+          gesendet.push(await request.json());
+          return HttpResponse.json({ id: 3, nummer: 1, bezugsperson_id: 22, personen: [] });
+        },
+      ),
+    );
+    renderMitProviders(<Personendaten einsatzId={1} person={TOM} darfSchreiben />, {
+      datenRouter: true,
+    });
+    await user.click(await screen.findByRole('button', { name: 'Zur Bezugsperson machen' }));
+    await waitFor(() => expect(gesendet).toEqual([{ person_id: 22 }]));
+  });
+
+  it('die Bezugsperson trägt das Wort und hat nur „Haushalt ändern“', async () => {
+    renderMitProviders(
+      <Personendaten
+        einsatzId={1}
+        person={{ ...TOM, haushalt_bezugsperson: true }}
+        darfSchreiben
+      />,
+      { datenRouter: true },
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="haushalt-zeile"]')!;
+    expect(zeile).toHaveTextContent('Bezugsperson');
+    expect(await within(zeile).findByRole('button', { name: 'Haushalt ändern' })).toBeEnabled();
+    expect(within(zeile).queryByRole('button', { name: 'Zur Bezugsperson machen' })).toBeNull();
+  });
+
+  it('ohne Modul Betreuung oder ohne Stelle im Verbleib keine Aktionen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
+      ),
+    );
+    renderMitProviders(<Personendaten einsatzId={1} person={TOM} darfSchreiben />, {
+      datenRouter: true,
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByRole('button', { name: 'Haushalt ändern' })).toBeNull();
+  });
+
+  it('nicht mehr in einer Notunterkunft: keine Aktionen', async () => {
+    renderMitProviders(
+      <Personendaten
+        einsatzId={1}
+        person={
+          {
+            ...TOM,
+            aktuelle_verbleib_art: 'entlassung',
+            aktuelle_verbleib_betreuungsstelle_id: null,
+          } as PersonDetail
+        }
+        darfSchreiben
+      />,
+      { datenRouter: true },
+    );
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByRole('button', { name: 'Haushalt ändern' })).toBeNull();
   });
 });

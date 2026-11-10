@@ -87,6 +87,7 @@ export const PERSON_AUF_DER_PLATTE = {
   // ohne Netz lesbar; die Unverträglichkeiten sind Freitext und Gesundheitsangabe.
   haushalt_id: 'behalten',
   haushalt_nummer: 'behalten',
+  haushalt_bezugsperson: 'behalten',
   kostform: 'behalten',
   unvertraeglichkeiten: 'auslassen',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
