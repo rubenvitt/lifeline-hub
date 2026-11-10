@@ -47,7 +47,7 @@ Erst die Verträge herausarbeiten, dann Adapter schreiben.
 | E2 | Bearer-Lesezugang für Lagemonitore (LLH-1484) | **Vor LGM-14 auf ADR-0014 umstellen.** Der Monitor hält seinen Schlüssel selbst. |
 | E3 | Stufe der Benachrichtigung | **Eingang**, nicht Alarm. Ablauf: Ein Alarm kommt herein und erscheint als Alarmmeldung; daraus legt ein Mensch einen neuen Einsatz an (Daten übernommen) oder verknüpft ihn mit einem laufenden. |
 | E4 | Nachträge nach der Annahme | **Hinweis am Einsatz** mit „übernehmen“ je Feld, Spur im ETB. |
-| E5 | Fristen | Offen → abgelaufen nach 12 h; verworfene/abgelaufene samt Rohdaten nach 7 Tagen löschen; Rohdaten bei Annahme sofort löschen. |
+| E5 | Fristen | Offen → abgelaufen nach 12 h; verworfene, abgelaufene und von der Quelle beendete samt Rohdaten nach 7 Tagen löschen; Rohdaten bei Annahme oder Verknüpfung sofort löschen. |
 | E6 | Ungekoppelte Instanz | **Eigene Alarmübernahme**; gekoppelte ELW nutzen den Hub. |
 | E7 | HiOrg-Einstieg | **EFS-API zuerst** (lesen, API-Key): Veranstaltungen als Vorschläge, Personal-Abgleich. Helferstunden danach über die Core-API (OAuth). |
 | E8 | Form im Ausgang | Zuerst **Klartext**; PDF wird mit dem Fax entschieden (Tendenz: Server). |
@@ -97,8 +97,9 @@ verworfen | abgelaufen | von der Quelle beendet.
   den Hinweis „möglicherweise derselbe Alarm“.
 - Antworten: `201` neu, `200` aktualisiert, `401` Zugang ungültig, `422` Inhalt unbrauchbar,
   `413` zu groß.
-- Annahme: Der Mensch braucht das Recht „Einsätze anlegen“ und wird Einsatzleitung. Die Org kommt
-  aus dem Zugang.
+- Annahme: Der Mensch braucht das Recht „Einsätze anlegen“ und wird Einsatzleitung. Der Vorschlag
+  gehört der Org seines Zugangs. `anlegen_tx` leitet die Org weiter aus dem Ersteller ab; annehmen
+  darf deshalb nur ein Mitglied dieser Org, sonst `404`.
 - `anlegen_tx` nimmt dann auch `leitstellen_nr`, `meldende_stelle` und `sachverhalt` an.
 - Ins ETB kommen keine geschwärzten Werte im Text.
 
