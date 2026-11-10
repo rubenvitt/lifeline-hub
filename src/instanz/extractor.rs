@@ -21,6 +21,18 @@ pub const BODY_MAX: usize = 64 * 1024;
 /// Pfad, der auch bei zu großem Abstand der Protokollversionen geht (design.md D5).
 pub const MELDEN_PFAD: &str = "/api/instanz/melden";
 
+/// Pfad des Abgleichs der Einsätze (LLH-1492, design.md D6); er trägt größere Pakete.
+pub const SPIEGEL_PFAD: &str = "/api/instanz/spiegel";
+
+/// Körpergrenze je Pfad: der Abgleich trägt Lieferungen, alles andere bleibt bei [`BODY_MAX`].
+pub fn body_max(pfad: &str) -> usize {
+    if pfad == SPIEGEL_PFAD {
+        super::spiegel::paket::SPIEGEL_MAX
+    } else {
+        BODY_MAX
+    }
+}
+
 /// Eine geprüfte Anfrage einer gekoppelten Instanz.
 #[derive(Debug)]
 pub struct GekoppelteInstanz {
@@ -61,7 +73,7 @@ impl FromRequest<AppState> for GekoppelteInstanz {
         }
         let schluessel = parse_oeffentlich(&kopplung.gegenueber_schluessel)
             .ok_or_else(|| reject("gespeicherter Schlüssel unlesbar", Some(&kopf.kid)))?;
-        let body = axum::body::to_bytes(body, BODY_MAX)
+        let body = axum::body::to_bytes(body, body_max(parts.uri.path()))
             .await
             .map_err(|_| AppError::PayloadTooLarge("Anfrage ist zu groß.".into()))?;
         let identitaet = identitaet::load_or_create(&state.pool)

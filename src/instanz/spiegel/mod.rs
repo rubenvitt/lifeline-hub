@@ -8,10 +8,12 @@
 //! Änderungslog und Schreibschutz sitzen in Triggern, damit kein Schreibweg sie umgeht.
 
 pub mod abbildung;
+pub mod abgleich;
 pub mod art;
 pub mod liefern;
 pub mod paket;
 pub mod schema;
+pub mod takt;
 pub mod uebernehmen;
 
 use crate::wire_enum::wire_enum;

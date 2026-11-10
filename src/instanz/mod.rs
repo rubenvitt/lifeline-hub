@@ -24,7 +24,11 @@ use utoipa::ToSchema;
 
 /// Protokollversion dieser Instanz (design.md D5). Wer sie erhöht, hält die vorige im Code, bis
 /// die übernächste kommt; das Schema von Melden bleibt über alle Versionen nur additiv.
-pub const PROTOKOLL: u32 = 1;
+pub const PROTOKOLL: u32 = 2;
+
+/// Ab dieser Protokollversion kennt eine Instanz den Abgleich der Einsätze (LLH-1492, design.md
+/// D6); mit einem älteren Gegenüber wird nicht gespiegelt.
+pub const PROTOKOLL_SPIEGEL: u32 = 2;
 
 /// Was zwei Instanzen mit den Protokollversionen `eigen` und `fremd` miteinander tun dürfen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

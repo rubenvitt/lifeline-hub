@@ -221,6 +221,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     lifeline_hub::instanz::stammdaten::set_live(live.clone());
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
+    // Spiegel (LLH-1492): Abgleich der Einsätze mit gekoppelten Instanzen, eigener Takt.
+    lifeline_hub::instanz::spiegel::takt::set_abstand(config.instanz_spiegel_sekunden);
+    lifeline_hub::instanz::spiegel::takt::start(pool.clone());
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone(), live.clone());
     // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`. Das Stoppsignal setzt der

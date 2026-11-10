@@ -591,6 +591,25 @@ pub async fn melden(
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
+// ── Abgleich der Einsätze (LLH-1492) ─────────────────────────────────────────────────────────
+
+/// POST /api/instanz/spiegel — eine gekoppelte Instanz gleicht Einsätze ab (signiert, design.md
+/// D6): Lieferungen ihrer Einsätze und ihre Stände der unseren hinein, unsere hinaus.
+pub async fn spiegel_abgleich(
+    State(state): State<AppState>,
+    anfrage: GekoppelteInstanz,
+) -> Result<Response, AppError> {
+    let body: crate::instanz::spiegel::paket::SpiegelPaket = anfrage.json()?;
+    let antwort = crate::instanz::spiegel::abgleich::handle_abgleich(
+        &state.pool,
+        &anfrage.identitaet,
+        &anfrage.kopplung,
+        &body,
+    )
+    .await?;
+    Ok(anfrage.antwort(StatusCode::OK, &antwort))
+}
+
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────
 
 /// POST /api/admin/instanz/kopplungen/{id}/widerrufen — nimmt die Org des Admins aus der Kopplung.

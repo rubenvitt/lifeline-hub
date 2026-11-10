@@ -1881,6 +1881,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             crate::instanz::extractor::MELDEN_PFAD,
             post(routes::instanz::melden),
         )
+        // Abgleich der Einsätze (LLH-1492): Pakete bis `SPIEGEL_MAX`, signiert wie Melden.
+        .route(
+            crate::instanz::extractor::SPIEGEL_PFAD,
+            post(routes::instanz::spiegel_abgleich).layer(DefaultBodyLimit::max(
+                crate::instanz::spiegel::paket::SPIEGEL_MAX,
+            )),
+        )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(
             "/api/organisation",

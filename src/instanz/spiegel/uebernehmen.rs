@@ -82,6 +82,11 @@ pub async fn uebernehmen(
     if let Some((id, stand)) = vorhanden {
         ergebnis.einsatz_id = Some(id);
         ergebnis.stand = stand;
+        if stand < l.seit {
+            // Lücke (etwa nach einer Wiederherstellung): nichts übernehmen, den eigenen Stand
+            // nennen; die Gegenseite liefert ab dort neu (Spec `einsatz-spiegel`).
+            return Ok(ergebnis);
+        }
     }
     if Freigabestufe::parse(&l.freigabestufe).is_none() {
         ergebnis

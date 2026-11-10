@@ -91,3 +91,204 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
 }
+
+// ── Abgleich mit zwei Instanzen (D6, D12) ────────────────────────────────────────────────────
+
+/// Gekoppelt und einmal gemeldet: beide Seiten kennen die Protokollversion des Gegenübers.
+async fn gekoppelt_gemeldet() -> (Instanz, Instanz) {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    (hub, elw)
+}
+
+async fn abgleichen(elw: &Instanz) {
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, true)
+        .await
+        .unwrap();
+}
+
+async fn etb_eintrag(i: &Instanz, einsatz: i64, inhalt: &str) {
+    let (s, v) = common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &i.admin,
+        Some(&json!({ "typ": "meldung", "inhalt": inhalt, "von": "ELW", "an": "EL" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
+async fn spiegel_von(i: &Instanz) -> i64 {
+    eine(&i.pool, "SELECT einsatz_id FROM einsatz_spiegel").await
+}
+
+async fn etb_inhalte(i: &Instanz, einsatz: i64) -> Vec<String> {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &i.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let liste = v
+        .as_array()
+        .cloned()
+        .or_else(|| v["eintraege"].as_array().cloned())
+        .unwrap_or_default();
+    liste
+        .iter()
+        .filter_map(|e| e["inhalt"].as_str().map(str::to_string))
+        .collect()
+}
+
+#[tokio::test]
+async fn elw_fuehrt_und_der_hub_spiegelt() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen_mit(&elw.app, &elw.admin, "Hochwasser").await;
+    etb_eintrag(&elw, e, "Lage erkundet").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let hinweis: Option<String> = eine(
+        &hub.pool,
+        &format!("SELECT hinweis FROM einsatz_spiegel WHERE einsatz_id = {s}"),
+    )
+    .await;
+    assert_eq!(hinweis, None, "jede Zeile übernommen");
+    // Jede Zeile des Führers hat ihr Gegenstück im Spiegel.
+    let fuehrer: i64 = eine(
+        &elw.pool,
+        &format!("SELECT COUNT(*) FROM einsatz_aenderung WHERE einsatz_id = {e}"),
+    )
+    .await;
+    let gespiegelt: i64 = eine(
+        &hub.pool,
+        &format!("SELECT COUNT(*) FROM spiegel_herkunft WHERE einsatz_id = {s}"),
+    )
+    .await;
+    assert_eq!(fuehrer, gespiegelt);
+    let (st, kopf) = common::anfrage(
+        &hub.app,
+        "GET",
+        &format!("/api/einsaetze/{s}"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{kopf}");
+    assert_eq!(kopf["bezeichnung"], "Hochwasser");
+    assert!(etb_inhalte(&hub, s)
+        .await
+        .contains(&"Lage erkundet".to_string()));
+    // Am Hub ist der Spiegel nur lesbar.
+    let (st, _) = common::anfrage_json(
+        &hub.app,
+        "PATCH",
+        &format!("/api/einsaetze/{s}"),
+        &hub.admin,
+        Some(&json!({ "bezeichnung": "X" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT);
+    // Ein zweiter Eintrag kommt mit dem nächsten Abgleich.
+    etb_eintrag(&elw, e, "Pumpen angefordert").await;
+    abgleichen(&elw).await;
+    assert!(etb_inhalte(&hub, s)
+        .await
+        .contains(&"Pumpen angefordert".to_string()));
+}
+
+#[tokio::test]
+async fn hub_fuehrt_und_der_elw_spiegelt() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Alarm Hub").await;
+    etb_eintrag(&hub, e, "Alarm eingegangen").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&elw).await;
+    assert!(etb_inhalte(&elw, s)
+        .await
+        .contains(&"Alarm eingegangen".to_string()));
+    let kennung: String = eine(
+        &hub.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let fremd: String = eine(&elw.pool, "SELECT fremde_kennung FROM einsatz_spiegel").await;
+    assert_eq!(kennung, fremd, "Kennung über Instanzen gleich");
+}
+
+#[tokio::test]
+async fn viele_eintraege_ohne_netz_kommen_vollstaendig_an() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    for n in 0..300 {
+        etb_eintrag(&elw, e, &format!("Eintrag {n}")).await;
+    }
+    for _ in 0..5 {
+        abgleichen(&elw).await;
+    }
+    let s = spiegel_von(&hub).await;
+    let (elw_zahl, hub_zahl): (i64, i64) = (
+        eine(
+            &elw.pool,
+            &format!("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = {e}"),
+        )
+        .await,
+        eine(
+            &hub.pool,
+            &format!("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = {s}"),
+        )
+        .await,
+    );
+    assert_eq!(elw_zahl, hub_zahl);
+    let doppelt: i64 = eine(
+        &hub.pool,
+        &format!(
+            "SELECT COUNT(*) - COUNT(DISTINCT lfd_nr) FROM etb_eintrag WHERE einsatz_id = {s}"
+        ),
+    )
+    .await;
+    assert_eq!(doppelt, 0);
+}
+
+#[tokio::test]
+async fn ein_niedrigerer_stand_am_spiegel_laesst_neu_liefern() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    etb_eintrag(&elw, e, "Erster").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    // Wie nach einer Wiederherstellung des Hubs: Stand zurück, der zweite Eintrag fehlt dort.
+    exec(
+        &hub.pool,
+        &format!("UPDATE einsatz_spiegel SET stand = 0 WHERE einsatz_id = {s}"),
+    )
+    .await;
+    etb_eintrag(&elw, e, "Zweiter").await;
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    let inhalte = etb_inhalte(&hub, s).await;
+    assert!(inhalte.contains(&"Zweiter".to_string()), "{inhalte:?}");
+    let stand: i64 = eine(
+        &hub.pool,
+        &format!("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = {s}"),
+    )
+    .await;
+    assert!(stand > 0);
+}
+
+#[tokio::test]
+async fn mit_einem_gegenueber_ohne_spiegel_wird_nicht_abgeglichen() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    exec(
+        &elw.pool,
+        "UPDATE instanz_kopplung SET gegenueber_protokoll = 1",
+    )
+    .await;
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    abgleichen(&elw).await;
+    let anzahl: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM einsatz_spiegel").await;
+    assert_eq!(anzahl, 0);
+}

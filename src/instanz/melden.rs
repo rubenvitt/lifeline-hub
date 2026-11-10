@@ -41,7 +41,8 @@ pub fn set_abstand(sekunden: u64) {
     let _ = ABSTAND_S.set(sekunden);
 }
 
-fn abstand_s() -> u64 {
+/// Abstand der Meldungen in Sekunden (`--instanz-melden-sekunden`).
+pub fn abstand_s() -> u64 {
     ABSTAND_S.get().copied().unwrap_or(60)
 }
 
@@ -198,6 +199,17 @@ pub async fn send_signed<A: Serialize, T: DeserializeOwned>(
     pfad: &str,
     anfrage: &A,
 ) -> Result<VerifiedAntwort<T>, SendError> {
+    send_signed_bis(identitaet, kopplung, pfad, anfrage, ANTWORT_MAX).await
+}
+
+/// Wie [`send_signed`], mit eigener Lesegrenze der Antwort (Abgleich, LLH-1492).
+pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
+    identitaet: &Identitaet,
+    kopplung: &KopplungZeile,
+    pfad: &str,
+    anfrage: &A,
+    antwort_max: usize,
+) -> Result<VerifiedAntwort<T>, SendError> {
     let basis = kopplung
         .gegenueber_adresse
         .as_deref()
@@ -229,7 +241,7 @@ pub async fn send_signed<A: Serialize, T: DeserializeOwned>(
         .get(ANTWORT_KOPF)
         .and_then(|v| v.to_str().ok())
         .map(str::to_string);
-    let rumpf = crate::http_begrenzt::lies_begrenzt(resp, ANTWORT_MAX)
+    let rumpf = crate::http_begrenzt::lies_begrenzt(resp, antwort_max)
         .await
         .map_err(|e| SendError::Netz(e.to_string()))?;
     let Some(antwort_token) = antwort_token else {
