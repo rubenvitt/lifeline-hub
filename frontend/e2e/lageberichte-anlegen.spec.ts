@@ -62,7 +62,7 @@ test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', a
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
   await expect(page.getByRole('button', { name: 'Entwurf speichern' })).toBeVisible();
   // Vorlage zur Information: ihr erster Abschnitt steht im Entwurf.
-  await expect(page.getByLabel('Auftrag')).toBeAttached();
+  await expect(page.getByLabel('Auftrag', { exact: true })).toBeAttached();
   await expect(page.getByLabel('Titel')).toHaveValue(/^Lageüberblick \d{4}$/);
   expect(posts.anzahl).toBe(1);
   // Kein Dialog auf dem Weg.
