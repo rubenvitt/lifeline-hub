@@ -4,6 +4,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -25,6 +26,8 @@ export default function EtbBausteineTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<EtbBaustein | null>(null);
   const { token } = theme.useToken();
+  // Ein Baustein vom Hub ist nur lesbar (kjezbk06, design.md D6).
+  const herkunft = useStammdatenHerkunft();
 
   const query = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
@@ -66,9 +69,15 @@ export default function EtbBausteineTab() {
       render: (label: string, b: EtbBaustein) => (
         <>
           {/* Die Marke trägt die Testabfrage: der `textContent` der Zelle enthält Label UND Inhalt. */}
-          <div data-lfh="baustein-label" style={{ fontWeight: token.fontWeightStrong }}>
-            {label}
-          </div>
+          <Space size={[8, 4]} wrap>
+            <div data-lfh="baustein-label" style={{ fontWeight: token.fontWeightStrong }}>
+              {label}
+            </div>
+            <HerkunftAbzeichen
+              herkunft={herkunft.herkunft('etb_baustein', b.id)}
+              quelle={herkunft.quelle}
+            />
+          </Space>
           <Typography.Text
             type="secondary"
             ellipsis={{ tooltip: b.inhalt }}
@@ -129,26 +138,29 @@ export default function EtbBausteineTab() {
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_, b: EtbBaustein) => (
-              <Space size="middle">
-                <Button
-                  onClick={() => {
-                    setBearbeite(b);
-                    setModalOffen(true);
-                  }}
-                >
-                  Bearbeiten
-                </Button>
-                <Popconfirm
-                  title="Baustein deaktivieren?"
-                  okText="Baustein deaktivieren"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => deaktivieren.mutate(b.id)}
-                >
-                  <Button danger>Deaktivieren</Button>
-                </Popconfirm>
-              </Space>
-            ),
+            render: (_, b: EtbBaustein) =>
+              herkunft.istVomHub('etb_baustein', b.id) ? (
+                <VomHubGesperrt />
+              ) : (
+                <Space size="middle">
+                  <Button
+                    onClick={() => {
+                      setBearbeite(b);
+                      setModalOffen(true);
+                    }}
+                  >
+                    Bearbeiten
+                  </Button>
+                  <Popconfirm
+                    title="Baustein deaktivieren?"
+                    okText="Baustein deaktivieren"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => deaktivieren.mutate(b.id)}
+                  >
+                    <Button danger>Deaktivieren</Button>
+                  </Popconfirm>
+                </Space>
+              ),
           },
         ] as KatalogSpalte<EtbBaustein>[])
       : []),

@@ -17,6 +17,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { EINSATZART_LABELS } from '../einsatz/einsatzart';
 import type { Einsatzart } from '../api/types';
 import EinsatzVorlageFormModal from './EinsatzVorlageFormModal';
@@ -27,7 +28,8 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  * Sektion „Einsatz-Vorlagen“ (LLH-1375, Spec `einsatz-vorlagen`, design.md D3a): Modulsätze der
  * Organisation, aus denen der Anlegedialog eines Einsatzes wählt. Lesen jede Person mit Zugang zur
  * Verwaltung, pflegen nur der System-Admin (Rechte-Muster wie die Nachbarsektionen, LFH-345).
- * Die Reihenfolge ist die des Servers (`sortier`), deshalb kein `defaultSortOrder`.
+ * Die Reihenfolge ist die des Servers (`sortier`), deshalb kein `defaultSortOrder`. Eine Vorlage
+ * vom Hub ist nur lesbar (kjezbk06, design.md D6).
  */
 const EINSATZART_FOLGE = Object.keys(EINSATZART_LABELS) as Einsatzart[];
 
@@ -36,6 +38,7 @@ export default function EinsatzVorlagenTab() {
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { istSchmal } = useViewport();
+  const herkunft = useStammdatenHerkunft();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<EinsatzVorlage | null>(null);
 
@@ -71,7 +74,15 @@ export default function EinsatzVorlagenTab() {
       key: 'bezeichnung',
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       sorter: nachText((v: EinsatzVorlage) => v.bezeichnung),
-      render: (text: string) => <span style={{ overflowWrap: 'anywhere' }}>{text}</span>,
+      render: (text: string, v) => (
+        <Space size={[8, 4]} wrap>
+          <span style={{ overflowWrap: 'anywhere' }}>{text}</span>
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('einsatz_vorlage', v.id)}
+            quelle={herkunft.quelle}
+          />
+        </Space>
+      ),
     },
     {
       title: 'Einsatzart',
@@ -104,37 +115,40 @@ export default function EinsatzVorlagenTab() {
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_: unknown, v: EinsatzVorlage) => (
-              <Space size="middle">
-                <Button
-                  aria-label={`${v.bezeichnung} bearbeiten`}
-                  onClick={() => {
-                    setBearbeite(v);
-                    setModalOffen(true);
-                  }}
-                >
-                  Bearbeiten
-                </Button>
-                {/* Unumkehrbar (LFH-363): Rückfrage mit benanntem Knopf; der eine Satz nennt die
-                   Folge (LFH-1078, „ein kurzer Satz zur Folge vor einem unumkehrbaren Schritt“). */}
-                <Popconfirm
-                  title={`${v.bezeichnung} löschen?`}
-                  description="Gekoppelte Stichworte verlieren die Vorlage."
-                  okText="Vorlage löschen"
-                  cancelText="Abbrechen"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => loeschen.mutate(v.id)}
-                >
+            render: (_: unknown, v: EinsatzVorlage) =>
+              herkunft.istVomHub('einsatz_vorlage', v.id) ? (
+                <VomHubGesperrt />
+              ) : (
+                <Space size="middle">
                   <Button
-                    danger
-                    aria-label={`${v.bezeichnung} löschen`}
-                    loading={loeschen.isPending && loeschen.variables === v.id}
+                    aria-label={`${v.bezeichnung} bearbeiten`}
+                    onClick={() => {
+                      setBearbeite(v);
+                      setModalOffen(true);
+                    }}
                   >
-                    Löschen
+                    Bearbeiten
                   </Button>
-                </Popconfirm>
-              </Space>
-            ),
+                  {/* Unumkehrbar (LFH-363): Rückfrage mit benanntem Knopf; der eine Satz nennt die
+                   Folge (LFH-1078, „ein kurzer Satz zur Folge vor einem unumkehrbaren Schritt“). */}
+                  <Popconfirm
+                    title={`${v.bezeichnung} löschen?`}
+                    description="Gekoppelte Stichworte verlieren die Vorlage."
+                    okText="Vorlage löschen"
+                    cancelText="Abbrechen"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => loeschen.mutate(v.id)}
+                  >
+                    <Button
+                      danger
+                      aria-label={`${v.bezeichnung} löschen`}
+                      loading={loeschen.isPending && loeschen.variables === v.id}
+                    >
+                      Löschen
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ),
           },
         ] as KatalogSpalte<EinsatzVorlage>[])
       : []),

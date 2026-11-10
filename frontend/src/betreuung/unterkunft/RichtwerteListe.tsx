@@ -5,6 +5,7 @@ import { DezimalFeld } from '../../components/DezimalFeld';
 import { MengenFeld } from '../../components/MengenFeld';
 import { Paneel, useRollen } from '../../components/instrument';
 import { mitVorgabe, orgVorgabe } from '../../components/vorgabeText';
+import { HerkunftAbzeichen, VomHubGesperrt, type Herkunft } from '../../instanz/herkunft';
 import { menge } from './ErgebnisAnzeige';
 import { RICHTWERTE_BASIS, type RichtwertBasis, type RichtwertGruppe } from './richtwerte';
 
@@ -33,6 +34,15 @@ export function richtwertText(wert: number, einheit: string): string {
 /** Welche Ebene diese Liste bearbeitet; `anzeige` liest nur. */
 export type RichtwertEbene = 'anzeige' | 'org' | 'einsatz';
 
+/**
+ * Herkunft der Org-Werte aus einer Kopplung (kjezbk06, design.md D6), je Schlüssel. Nicht zu
+ * verwechseln mit der Ebene (`RichtwertHerkunft`: Vorgabe, Organisation, Einsatz).
+ */
+export interface RichtwertStammdatenHerkunft {
+  quelle?: string;
+  herkunft: (schluessel: string) => Herkunft | null;
+}
+
 interface Props {
   ebenen: UnterkunftRichtwerte | undefined;
   ebene: RichtwertEbene;
@@ -41,6 +51,11 @@ interface Props {
   /** Schlüssel, deren Speichern gerade läuft. */
   laeuft?: string | null;
   gesperrt?: boolean;
+  /**
+   * Nur bei `org`: ein Schlüssel vom Hub ist nur lesbar und trägt „vom Hub“, ein hier gesetzter
+   * „nur hier“; ein nicht gesetzter bleibt ohne Abzeichen und setzbar.
+   */
+  stammdatenHerkunft?: RichtwertStammdatenHerkunft;
 }
 
 /**
@@ -48,7 +63,14 @@ interface Props {
  * Ergebnisses. Jede Zeile nennt den wirksamen Wert, seine Herkunft und die Vorgabe; in Stammdaten
  * und Einsatz-Einstellungen ist der Wert der eigenen Ebene ein Feld, leer erbt er.
  */
-export default function RichtwerteListe({ ebenen, ebene, onSetzen, laeuft, gesperrt }: Props) {
+export default function RichtwerteListe({
+  ebenen,
+  ebene,
+  onSetzen,
+  laeuft,
+  gesperrt,
+  stammdatenHerkunft,
+}: Props) {
   const nachSchluessel = new Map((ebenen?.werte ?? []).map((w) => [w.schluessel, w]));
   return (
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
@@ -63,6 +85,7 @@ export default function RichtwerteListe({ ebenen, ebene, onSetzen, laeuft, gespe
               onSetzen={onSetzen}
               laeuft={laeuft === b.schluessel}
               gesperrt={gesperrt}
+              stammdatenHerkunft={ebene === 'org' ? stammdatenHerkunft : undefined}
             />
           ))}
         </Paneel>
@@ -78,6 +101,7 @@ function RichtwertZeile({
   onSetzen,
   laeuft,
   gesperrt,
+  stammdatenHerkunft,
 }: {
   basis: RichtwertBasis;
   ebenen: RichtwertEbenen | undefined;
@@ -85,6 +109,7 @@ function RichtwertZeile({
   onSetzen?: (schluessel: string, wert: number | null) => void;
   laeuft: boolean;
   gesperrt?: boolean;
+  stammdatenHerkunft?: RichtwertStammdatenHerkunft;
 }) {
   const { token } = useRollen();
   const wert = e?.wert ?? b.wert;
@@ -93,6 +118,10 @@ function RichtwertZeile({
     ebene === 'org' ? (e?.org ?? null) : ebene === 'einsatz' ? (e?.einsatz ?? null) : null;
   // Was gilt, wenn das Feld leer ist: beim Einsatz die Organisation, sonst die Basis.
   const geerbt = ebene === 'einsatz' && e?.org != null ? e.org : b.wert;
+  // „nur hier“ nur an einem hier gesetzten Wert: ein leerer Schlüssel ist keine Ergänzung vor Ort.
+  const hubHerkunft = stammdatenHerkunft?.herkunft(b.schluessel) ?? null;
+  const vomHub = hubHerkunft === 'vom_hub';
+  const abzeichen = vomHub || (hubHerkunft === 'nur_hier' && eigen != null) ? hubHerkunft : null;
   const [entwurf, setEntwurf] = useState<number | null>(eigen);
   useEffect(() => setEntwurf(eigen), [eigen]);
 
@@ -120,7 +149,7 @@ function RichtwertZeile({
       ebene === 'einsatz' && e?.org != null
         ? richtwertText(geerbt, b.einheit)
         : mitVorgabe(richtwertText(b.wert, b.einheit)),
-    disabled: gesperrt || laeuft,
+    disabled: gesperrt || laeuft || vomHub,
     onChange: (v: number | null) => setEntwurf(v),
     onBlur: uebernehmen,
     onPressEnter: uebernehmen,
@@ -145,12 +174,16 @@ function RichtwertZeile({
               {orgVorgabe(richtwertText(e.org, b.einheit))}
             </Typography.Text>
           )}
+          {vomHub && <VomHubGesperrt />}
         </div>
       )}
-      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-        {HERKUNFT_LABEL[herkunft]}
-        {herkunft !== 'basis' && ` · ${mitVorgabe(richtwertText(b.wert, b.einheit))}`}
-      </Typography.Text>
+      <Space size={6} wrap>
+        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+          {HERKUNFT_LABEL[herkunft]}
+          {herkunft !== 'basis' && ` · ${mitVorgabe(richtwertText(b.wert, b.einheit))}`}
+        </Typography.Text>
+        <HerkunftAbzeichen herkunft={abzeichen} quelle={stammdatenHerkunft?.quelle} />
+      </Space>
       <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
         {b.quelle}
       </Typography.Text>
