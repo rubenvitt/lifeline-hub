@@ -149,5 +149,11 @@ Kein `KatalogVerwaltung` unter den acht Reitern; jeder bekommt dasselbe Muster w
 ## Migration Plan
 
 Eine neue Migration (Nummer über jeder auf `alpha`, beim Merge `0312`), rein additiv: Trigger für
-neun Tabellen (acht Arten plus Unterliste), Grundstock ins Änderungslog. Rücknahme: die Trigger
-fallen mit einer Folgemigration; das Log stört ohne Trigger nicht.
+neun Tabellen (acht Arten plus Unterliste), Grundstock ins Änderungslog.
+
+Rücknahme ist kein bloßes Entfernen der Trigger: Ohne sie schriebe der Hub keine Änderung mehr ins
+Log, die Nachlieferung liefe still leer, und die ELW behielten veraltete, gesperrte Kataloge.
+Zurückgenommen wird eine Art deshalb nur mit einer eigenen Change, die sie aus `StammdatenArt` und
+`BESCHREIBUNGEN` nimmt, ihre Trigger entfernt und ihre Zeilen in `stammdaten_herkunft` löst. Das
+neue Empfangskennzeichen startet die Nachlieferung dann bei 0, und die Zeilen gehören dem ELW,
+wie nach einem Widerruf.
