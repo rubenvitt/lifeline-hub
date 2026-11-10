@@ -1,6 +1,6 @@
 import { App, Button, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useId, useState } from 'react';
+import { type CSSProperties, useId, useState } from 'react';
 import { sendBezugsperson } from '../../api/betreuungRegistrierung';
 import { ladeModulFreigaben } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -17,7 +17,7 @@ import { haushaltKennung, personName } from './registrierKern';
 /**
  * Haushalt einer Person auf ihrer Detailseite umbauen (LLH-1615, Change
  * `lm62ud0b-haushalt-umbauen`, design.md D4): „Zur Bezugsperson machen“ und „Haushalt ändern“
- * neben der Zeile „Haushalt H-n“. Nur mit Schreibrecht, Modul Betreuung, an einer Person, die jetzt
+ * neben der Zeile „Haushalt H-n“; ohne Haushalt steht „Haushalt ändern“ allein und ordnet zu. Nur mit Schreibrecht, Modul Betreuung, an einer Person, die jetzt
  * an einer Stelle registriert ist (die Stelle des Verbleibs gibt die Auswahl vor), und am Gerät nur
  * an der Betreuungsstelle. Zwei Aktionen, also Knöpfe statt ⋮ (`frontend/AGENTS.md`, „Aktionen“).
  * Ohne Netz gesperrt mit Grund (D5).
@@ -28,6 +28,8 @@ export interface HaushaltAktionenProps {
   darfSchreiben: boolean;
   /** Nach jedem Schreiben (Detail, Liste und ETB abgleichen). */
   onGeschrieben?: () => void;
+  /** Zusätzlicher Stil am Behälter (ohne Haushaltszeile steht die Aktion für sich). */
+  style?: CSSProperties;
 }
 
 export default function HaushaltAktionen({
@@ -35,6 +37,7 @@ export default function HaushaltAktionen({
   person,
   darfSchreiben,
   onGeschrieben,
+  style,
 }: HaushaltAktionenProps) {
   const { message } = App.useApp();
   const { token } = useRollen();
@@ -82,6 +85,7 @@ export default function HaushaltAktionen({
         flexWrap: 'wrap',
         alignItems: 'center',
         gap: token.marginXS,
+        ...style,
       }}
     >
       {ohneNetz && (

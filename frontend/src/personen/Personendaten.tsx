@@ -756,6 +756,16 @@ function PersonendatenInhalt({
           />
         </div>
       )}
+      {person.haushalt_nummer == null && (
+        // Ohne Haushalt, aber an einer Stelle registriert: einem Haushalt zuordnen (LLH-1615).
+        <HaushaltAktionen
+          einsatzId={einsatzId}
+          person={person}
+          darfSchreiben={darfSchreiben}
+          onGeschrieben={onGeschrieben}
+          style={{ marginBottom: token.marginXS }}
+        />
+      )}
       {grund && (
         <div id={grundId} data-lfh="personendaten-grund" style={{ color: rollen.text2 }}>
           {grund}

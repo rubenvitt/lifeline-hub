@@ -102,7 +102,7 @@ Abgemeldete Personen tragen den Verbleib „entlassen“ und stehen nicht mehr i
    wählen und „Haushalt ändern“ bestätigen. In einem neuen Haushalt ist die Person Bezugsperson.
 
 Personen „Ohne Haushalt“ lassen sich so einem Haushalt zuordnen. Dieselben Aktionen stehen auf der
-Seite der Person neben „Haushalt H-n“.
+Seite der Person neben „Haushalt H-n“, ohne Haushalt dort nur „Haushalt ändern“.
 
 ### Registrierliste drucken
 

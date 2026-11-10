@@ -157,16 +157,23 @@ describe('Personendaten — Haushalt (LLH-1612)', () => {
     expect(within(zeile).queryByRole('link')).toBeNull();
   });
 
-  it('ohne Haushalt keine Zeile', () => {
-    renderMitProviders(
-      <Personendaten
-        einsatzId={1}
-        person={{ ...TOM, haushalt_id: null, haushalt_nummer: null }}
-        darfSchreiben
-      />,
+  it('ohne Haushalt keine Zeile; an einer Stelle bleibt „Haushalt ändern“ zum Zuordnen (CodeRabbit)', async () => {
+    const ohneHaushalt = { ...TOM, haushalt_id: null, haushalt_nummer: null };
+    const { unmount } = renderMitProviders(
+      <Personendaten einsatzId={1} person={ohneHaushalt} darfSchreiben />,
       { datenRouter: true },
     );
     expect(document.querySelector('[data-lfh="haushalt-zeile"]')).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Haushalt ändern' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Zur Bezugsperson machen' })).toBeNull();
+    unmount();
+    renderMitProviders(
+      <Personendaten einsatzId={1} person={ohneHaushalt} darfSchreiben={false} />,
+      {
+        datenRouter: true,
+      },
+    );
+    expect(screen.queryByRole('button', { name: 'Haushalt ändern' })).toBeNull();
   });
 });
 
