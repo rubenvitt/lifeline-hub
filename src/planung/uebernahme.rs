@@ -24,7 +24,7 @@
 //! dieses Zeitpunkts an der Planung; jeder weitere Schreibweg und eine zweite Übernahme sind 409
 //! (`repo::check_schreibbar_tx`). Lesen und Löschen bleiben.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -103,7 +103,20 @@ struct QualiPaar {
     n: i64,
 }
 
-fn parse_quali_soll(json: Option<&str>) -> Result<Option<Vec<PaketQualiSoll>>, AppError> {
+/// Bezeichnungen des Katalogs je Kennung, einschließlich deaktivierter Einträge (LLH-1611).
+type QualiNamen = HashMap<i64, String>;
+
+fn quali_angabe(id: i64, namen: &QualiNamen) -> QualiAngabe {
+    QualiAngabe::Id {
+        id,
+        name: namen.get(&id).cloned(),
+    }
+}
+
+fn parse_quali_soll(
+    json: Option<&str>,
+    namen: &QualiNamen,
+) -> Result<Option<Vec<PaketQualiSoll>>, AppError> {
     let Some(j) = json else { return Ok(None) };
     let paare: Vec<QualiPaar> = serde_json::from_str(j)
         .map_err(|e| AppError::Internal(format!("Qualifikationssoll der Planung: {e}")))?;
@@ -111,7 +124,7 @@ fn parse_quali_soll(json: Option<&str>) -> Result<Option<Vec<PaketQualiSoll>>, A
         paare
             .into_iter()
             .map(|p| PaketQualiSoll {
-                qualifikation: QualiAngabe::Id(p.q),
+                qualifikation: quali_angabe(p.q, namen),
                 anzahl: p.n,
             })
             .collect(),
@@ -197,6 +210,14 @@ async fn build_paket_tx(
     .bind(planung_id)
     .fetch_all(&mut *conn)
     .await?;
+    // Mit deaktivierten: ihr Name benennt den Hinweis, wenn der Abgleich sie auslässt (LLH-1611).
+    let quali_namen: QualiNamen =
+        sqlx::query_as::<_, (i64, String)>("SELECT id, label FROM qualifikation WHERE org_id = ?")
+            .bind(org_id)
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .collect();
 
     let mut posten: Vec<PaketPosten> = posten_roh
         .into_iter()
@@ -262,7 +283,7 @@ async fn build_paket_tx(
             von,
             bis,
             soll_anzahl: soll,
-            quali_soll: parse_quali_soll(quali.as_deref())?,
+            quali_soll: parse_quali_soll(quali.as_deref(), &quali_namen)?,
             // Die Planung trägt ihr Soll je Block fertig; leer heißt kein Soll.
             ohne_vorgabe: true,
             notiz,
@@ -289,7 +310,10 @@ async fn build_paket_tx(
             vorname: None,
             telefon,
             organisation,
-            qualifikationen: qualifikationen.into_iter().map(QualiAngabe::Id).collect(),
+            qualifikationen: qualifikationen
+                .into_iter()
+                .map(|q| quali_angabe(q, &quali_namen))
+                .collect(),
             kennung: Some(helfer_kennung(planung_id, id)),
             herkunft: Some(HERKUNFT.into()),
             zeilen: Vec::new(),
@@ -622,13 +646,23 @@ mod tests {
 
     #[test]
     fn qualifikationssoll_aus_der_gespeicherten_form() {
-        assert_eq!(parse_quali_soll(None).unwrap(), None);
+        let namen = QualiNamen::from([(7, "Sanitäter".to_string())]);
+        assert_eq!(parse_quali_soll(None, &namen).unwrap(), None);
         assert_eq!(
-            parse_quali_soll(Some(r#"[{"q":7,"n":2}]"#)).unwrap(),
-            Some(vec![PaketQualiSoll {
-                qualifikation: QualiAngabe::Id(7),
-                anzahl: 2,
-            }])
+            parse_quali_soll(Some(r#"[{"q":7,"n":2},{"q":9,"n":1}]"#), &namen).unwrap(),
+            Some(vec![
+                PaketQualiSoll {
+                    qualifikation: QualiAngabe::Id {
+                        id: 7,
+                        name: Some("Sanitäter".into()),
+                    },
+                    anzahl: 2,
+                },
+                PaketQualiSoll {
+                    qualifikation: QualiAngabe::Id { id: 9, name: None },
+                    anzahl: 1,
+                },
+            ])
         );
     }
 
