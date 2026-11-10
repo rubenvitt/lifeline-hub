@@ -53,7 +53,6 @@ interface Rueckfrage {
   abbrechen: () => void;
 }
 
-
 interface FristAenderung {
   /** Öffnet den Dialog „Frist ändern". */
   oeffnen: () => void;

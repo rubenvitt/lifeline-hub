@@ -85,7 +85,25 @@ describe('Hinweisband am Spiegel (LLH-1492, Spec `einsatz-spiegel`)', () => {
     );
     expect(
       antragDatenText({ art: 'eintreffen', daten: { kraft: { objekt_id: 9 } } as never }),
-    ).toBe('');
+    ).toBe('Kraft');
+  });
+
+  it('nennt auch Einträge an Personen, Registrierung, Abmeldung und Eintreffen', () => {
+    const text = (art: string, daten: Record<string, unknown>) =>
+      antragDatenText({ art, daten: daten as never });
+    expect(text('sichtung', { kategorie: 'sk1' })).toBe('Sichtung SK I');
+    expect(text('massnahme', { art: 'zugang' })).toMatch(/^Maßnahme /);
+    expect(text('anlass', { anlass: null })).toBe('Anlass aufgehoben');
+    expect(text('verbleib', { art: 'entlassung' })).toMatch(/^Verbleib /);
+    expect(
+      text('registrierung', { personen: [{ name: 'Weber', vorname: 'Anna' }, { name: 'Weber' }] }),
+    ).toBe('2 Personen: Weber, Anna; Weber');
+    expect(text('abmeldung', { haushalt_id: 903 })).toBe('Haushalt');
+    expect(text('abmeldung', { person_ids: [1, 2] })).toBe('2 Personen');
+    expect(text('eintreffen', { unangemeldet: { fahrzeuge: [] } })).toBe('unangemeldete Kraft');
+    expect(text('eintreffen', { kraft: { objekt_typ: 'einheit', objekt_id: 9 } })).toBe('Kraft');
+    // Unlesbare Daten ergeben nichts statt eines Fehlers.
+    expect(text('sichtung', { kategorie: 'xx' })).toBe('');
   });
 
   it('führt „Neu erfassen“ an den Ort der Erfassung, mit lokalem Ziel', () => {

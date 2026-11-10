@@ -10,7 +10,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { useAuthOptional } from '../../auth/AuthContext';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { monoStil, useRollen } from '../../components/instrument';
+import { NUR_VORLESER, monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
@@ -91,7 +91,6 @@ function BandInhalt({
   const hatAntraege = (antraege?.length ?? 0) > 0 || zaehler.length > 0;
   return (
     <div
-      role="status"
       data-lfh="spiegel-band"
       style={{
         background: rollen.bannerGrund,
@@ -119,17 +118,24 @@ function BandInhalt({
           <span aria-hidden="true">· </span>
           {stand.text}
         </span>
-        {zaehler.map((z) => (
-          <span
-            key={z}
-            data-lfh="spiegel-band-zaehler"
-            style={{ color: z.endsWith('abgelehnt') ? rollen.achtungText : rollen.text2 }}
-          >
-            <span aria-hidden="true">· </span>
-            <span style={monoStil(12)}>{z.split(' ')[0]}</span>
-            {z.slice(z.indexOf(' '))}
-          </span>
-        ))}
+        {/* Angesagt werden nur Zähler und eine Störung: die Zeit läuft im Minutentakt und
+            gehört nicht in eine Live-Region (sonst läse der Screenreader sie jede Minute). */}
+        <span role="status" style={{ display: 'contents' }}>
+          {zaehler.map((z) => (
+            <span
+              key={z}
+              data-lfh="spiegel-band-zaehler"
+              style={{ color: z.endsWith('abgelehnt') ? rollen.achtungText : rollen.text2 }}
+            >
+              <span aria-hidden="true">· </span>
+              <span style={monoStil(12)}>{z.split(' ')[0]}</span>
+              {z.slice(z.indexOf(' '))}
+            </span>
+          ))}
+          {stand.gestoert && (
+            <span style={NUR_VORLESER}>Keine Verbindung zur führenden Instanz</span>
+          )}
+        </span>
         {hatAntraege && (
           <Button
             type="link"
@@ -200,10 +206,18 @@ function AntragZeile({
     },
   });
   const ort = antragErfassungsort(einsatzId, a);
+  // Ein Plattenfehler beim Anlegen des Entwurfs steht an der Zeile; dann bleibt die Seite stehen.
+  const [entwurfFehler, setEntwurfFehler] = useState<unknown>(null);
   const neuErfassen = async () => {
+    setEntwurfFehler(null);
     // Nur das ETB nimmt die Daten als Entwurf auf; die übrigen Orte zeigen sie hier.
     if (a.art === 'etb' && benutzerId != null) {
-      await createEtbEntwurf(benutzerId, einsatzId, a.daten).catch(() => {});
+      try {
+        await createEtbEntwurf(benutzerId, einsatzId, a.daten);
+      } catch (fehler) {
+        setEntwurfFehler(fehler);
+        return;
+      }
     }
     if (ort) navigate(ort);
   };
@@ -235,6 +249,11 @@ function AntragZeile({
             Verwerfen
           </Button>
         </span>
+      )}
+      {entwurfFehler != null && (
+        <div style={{ flexBasis: '100%' }}>
+          <SpeicherFehler fehler={entwurfFehler} titel="Entwurf nicht angelegt" />
+        </div>
       )}
       {verwerfen.error != null && (
         <div style={{ flexBasis: '100%' }}>

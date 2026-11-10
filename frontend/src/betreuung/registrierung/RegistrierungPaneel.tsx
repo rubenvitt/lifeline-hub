@@ -99,6 +99,7 @@ export default function RegistrierungPaneel({
   const pfade = useEinsatzPfade();
   const { zone } = useZeitEingabe();
   const grundId = useId();
+  const abmeldungGrundId = useId();
   const [maske, setMaske] = useState<MaskeOffen>(null);
   const [abmelden, setAbmelden] = useState<Ziel | null>(null);
   const [zielForm] = Form.useForm<{ ziel?: string }>();
@@ -185,9 +186,18 @@ export default function RegistrierungPaneel({
   const haushaltVorgemerkt = new Set<number>();
   for (const z of vorgemerkt) {
     if (z.aktion.art !== 'abmeldung') continue;
+    // Ein Antrag am Spiegel trägt Haushalt und Personen nur mit fremden Kennungen: er sperrt unten
+    // jede weitere Abmeldung an dieser Stelle, bis die führende Instanz entschieden hat.
+    if (z.antrag != null) continue;
     for (const id of z.aktion.daten.person_ids ?? []) abgemeldetVorgemerkt.add(id);
     if (z.aktion.daten.haushalt_id != null) haushaltVorgemerkt.add(z.aktion.daten.haushalt_id);
   }
+  // Am Spiegel (LLH-1492): eine offene beantragte Abmeldung an dieser Stelle. Wen sie betrifft, ist
+  // hier nicht zu erkennen; deshalb steht bis zur Entscheidung jedes Abmelden gesperrt, statt eine
+  // zweite Abmeldung derselben Personen zu beantragen.
+  const abmeldungBeantragt = vorgemerkt.some(
+    (z) => z.antrag != null && z.aktion.art === 'abmeldung',
+  );
   const vorgemerkteRegistrierungen = vorgemerkt.flatMap((z) =>
     z.aktion.art === 'registrierung'
       ? [
@@ -251,6 +261,8 @@ export default function RegistrierungPaneel({
             darfSchreiben && (
               <Button
                 aria-label={`${kennung} ${name} abmelden`}
+                disabled={abmeldungBeantragt}
+                aria-describedby={abmeldungBeantragt ? abmeldungGrundId : undefined}
                 onClick={() =>
                   oeffneAbmelden({
                     art: 'person',
@@ -300,6 +312,8 @@ export default function RegistrierungPaneel({
             </Button>
             <Button
               aria-label={`${kennung} abmelden`}
+              disabled={abmeldungBeantragt}
+              aria-describedby={abmeldungBeantragt ? abmeldungGrundId : undefined}
               onClick={() =>
                 oeffneAbmelden({
                   art: 'haushalt',
@@ -353,6 +367,16 @@ export default function RegistrierungPaneel({
     >
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
           nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
+      {abmeldungBeantragt && (
+        <Typography.Text
+          id={abmeldungGrundId}
+          strong
+          data-lfh="abmeldung-beantragt"
+          style={{ display: 'block' }}
+        >
+          Abmeldung beantragt
+        </Typography.Text>
+      )}
       {vorgemerkteRegistrierungen.length > 0 && (
         <ul
           aria-label="Vorgemerkte Registrierungen"

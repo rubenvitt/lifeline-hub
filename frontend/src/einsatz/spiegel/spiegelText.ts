@@ -2,6 +2,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { formatVor } from '../../anzeige/abstand';
 import type { EinsatzSpiegelAnzeige, SpiegelAntragAnzeige } from '../../api/types';
+import type { PersonEintragAktion } from '../../offline/personEintrag';
+import { vormerkungText } from '../../personen/personEintragSpeichern';
 import {
   betreuungsstellePfad,
   bereitstellungsraumDetailPfad,
@@ -120,6 +122,10 @@ function zahl(daten: unknown, feld: string): number | null {
   return typeof wert === 'number' ? wert : null;
 }
 
+function personenAnzahl(n: number): string {
+  return n === 1 ? '1 Person' : `${n} Personen`;
+}
+
 function auszug(text: string): string {
   const eineZeile = text.replace(/\s+/g, ' ');
   return eineZeile.length > AUSZUG_MAX ? `${eineZeile.slice(0, AUSZUG_MAX)} …` : eineZeile;
@@ -155,6 +161,52 @@ export function antragDatenText(a: Pick<SpiegelAntragAnzeige, 'art' | 'daten'>):
       const n = zahl(d, 'menge');
       return n == null ? '' : `${n} EP`;
     }
+    case 'sichtung':
+    case 'anlass':
+    case 'verbleib':
+    case 'transport':
+    case 'massnahme':
+    case 'verletzung':
+      // Derselbe Wortlaut wie „Offline vorgemerkt“ am Patientenkopf. Die Daten gingen ungeprüft
+      // in den Antrag: was sich nicht lesen lässt, ergibt nichts statt eines Fehlers.
+      try {
+        const text = vormerkungText({
+          art: a.art,
+          person_id: 0,
+          bezeichnung: '',
+          daten: d,
+        } as unknown as PersonEintragAktion);
+        return text.includes('undefined') ? '' : text;
+      } catch {
+        return '';
+      }
+    case 'registrierung': {
+      const liste = (d as unknown as { personen?: unknown } | null)?.personen;
+      const personen: unknown[] = Array.isArray(liste) ? liste : [];
+      const namen = personen
+        .map((p) =>
+          [zeichenkette(p, 'name'), zeichenkette(p, 'vorname')].filter(Boolean).join(', '),
+        )
+        .filter(Boolean);
+      return personen.length === 0
+        ? ''
+        : [personenAnzahl(personen.length), namen.join('; ')].filter(Boolean).join(': ');
+    }
+    case 'abmeldung': {
+      // Haushalt und Personen tragen fremde Kennungen: nur, was abgemeldet wird.
+      if (
+        d != null &&
+        typeof d === 'object' &&
+        (d as { haushalt_id?: unknown }).haushalt_id != null
+      )
+        return 'Haushalt';
+      const ids = (d as { person_ids?: unknown } | null)?.person_ids;
+      return Array.isArray(ids) && ids.length > 0 ? personenAnzahl(ids.length) : '';
+    }
+    case 'eintreffen':
+      return d != null && typeof d === 'object' && (d as { unangemeldet?: unknown }).unangemeldet
+        ? 'unangemeldete Kraft'
+        : 'Kraft';
     default:
       return '';
   }

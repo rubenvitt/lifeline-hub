@@ -1,12 +1,15 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as entwurfStore from '../../etb/entwuerfe/entwurfStore';
 import type { EinsatzSpiegelAnzeige, SpiegelAntragAnzeige } from '../../api/types';
-import { einsatzFixture } from '../../test/fixtures';
-import { server } from '../../test/server';
+import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
+import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import SpiegelBand from './SpiegelBand';
+
+afterEach(() => vi.restoreAllMocks());
 
 const spiegel = (teil: Partial<EinsatzSpiegelAnzeige> = {}): EinsatzSpiegelAnzeige => ({
   gegenstelle: 'ELW 1 DRK Nord',
@@ -120,7 +123,9 @@ describe('SpiegelBand: Anträge folgen den Zählern im Kopf (LLH-1492)', () => {
     // Die Ablehnung kommt mit dem Abgleich: der Zähler steigt, die Liste lädt nach.
     rerender(
       <SpiegelBand
-        einsatz={einsatzFixture({ spiegel: spiegel({ antraege_ausstehend: 0, antraege_abgelehnt: 2 }) })}
+        einsatz={einsatzFixture({
+          spiegel: spiegel({ antraege_ausstehend: 0, antraege_abgelehnt: 2 }),
+        })}
       />,
     );
     await waitFor(() => expect(abrufe).toBe(2));
@@ -144,5 +149,34 @@ describe('SpiegelBand: Vorlesen (LLH-1492)', () => {
     expect(ansage).toHaveTextContent('1 Antrag ausstehend');
     expect(ansage).toHaveTextContent('Keine Verbindung zur führenden Instanz');
     expect(ansage).not.toHaveTextContent(/seit|\d+ min/);
+  });
+});
+
+describe('SpiegelBand: „Neu erfassen“ (LLH-1492)', () => {
+  it('meldet einen Fehler beim Anlegen des Entwurfs, statt ihn zu verschlucken', async () => {
+    vi.spyOn(entwurfStore, 'createAndActivateEntwurf').mockRejectedValue(new Error('Platte voll'));
+    server.use(meHandler(benutzerFixture({ id: 11 })));
+    mitServer([
+      {
+        id: 7,
+        art: 'etb',
+        zustand: 'abgelehnt',
+        grund: 'Einsatz ist abgeschlossen',
+        erfasst_at: '2026-11-10 08:00:00',
+        ziel: {} as never,
+        daten: { typ: 'meldung', inhalt: 'Pegel steigt' } as never,
+      },
+    ]);
+    const user = userEvent.setup();
+    renderMitProviders(<SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel() })} />);
+    await user.click(screen.getByRole('button', { name: /Anträge/ }));
+    const zeile = await screen.findByRole('listitem');
+    // Erst angemeldet: ohne Benutzer gäbe es keinen Entwurf.
+    await waitFor(() =>
+      expect(within(zeile).getByRole('button', { name: 'Neu erfassen' })).toBeEnabled(),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    await user.click(within(zeile).getByRole('button', { name: 'Neu erfassen' }));
+    expect(await within(zeile).findByText('Entwurf nicht angelegt')).toBeInTheDocument();
   });
 });

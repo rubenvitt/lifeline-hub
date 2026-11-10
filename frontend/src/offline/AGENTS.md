@@ -283,6 +283,8 @@ Gilt für `einsatz/spiegel/`, `api/antragEreignis.ts`, `api/spiegelAntraege.ts`,
 - **Ein Ereignis für jeden Antrag:** `apiSend` meldet jede 202 mit Antrag als `ANTRAG_EREIGNIS`
   (`api/antragEreignis.ts`), gleich ob sie aus der Erfassung oder der Warteschlange kam. Darauf
   gleicht `useSpiegelAntraege` Antragsliste und Einsatzkopf ab (die Zähler stehen im Kopf).
+  Übernahme und Ablehnung ändern die Zähler im Kopf; ändern sie sich, lädt das Band die Liste
+  neu (es holt den Kopf im Takt, auch ohne `lagged`).
 - **Anträge stehen, wo Vorgemerktes steht** (Spec `spiegel-antraege`):
   `useVorgemerkteSchreibaktionen` hängt die offenen Anträge derselben Art aus dem Cache an
   (`antraegeAlsSchreibaktionen`, Kennzeichen `antrag`); das ETB nimmt sie über
@@ -291,7 +293,10 @@ Gilt für `einsatz/spiegel/`, `api/antragEreignis.ts`, `api/spiegelAntraege.ts`,
   Grund nur im Hinweisband (`SpiegelBand`). Die erfassten Daten tragen die Kennungen der führenden
   Instanz; deren Verweisfelder fallen weg (`VERWEISFELDER`), damit kein Antrag an einer lokalen
   Zeile mit zufällig gleicher Kennung hängt. Geladen werden die Anträge vom Hinweisband im
-  Einsatzrahmen; Hooks ohne `QueryClientProvider` lesen eine leere Liste.
+  Einsatzrahmen; Hooks ohne `QueryClientProvider` lesen eine leere Liste. Wo eine Seite
+  Vorgemerktes an einem Body-Verweis erkennt (Abmeldung an Haushalt oder Person), reicht das für
+  Anträge nicht: dort sperrt ein offener Antrag derselben Art am selben Ziel weitere Erfassungen
+  mit Grund (`RegistrierungPaneel`, „Abmeldung beantragt“).
 - **Der Query-Key `antraege` bleibt draußen** aus `LAGEBILD_OFFLINE`
   (`lagebildOffline.guard.test.ts`): er ist ein Stand des eigenen Servers, ohne Verbindung zu ihm
   trägt die Warteschlange, und ein alter Stand von der Platte zeigte „ausstehend“, was längst

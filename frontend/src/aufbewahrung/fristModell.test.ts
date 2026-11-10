@@ -120,7 +120,10 @@ describe('Frist am Spiegel (LLH-1492)', () => {
 
   it('ist gesperrt, auch für Einsatzleitung und Org-Admin: der Server antwortet 409', () => {
     expect(
-      darfFristSetzen({ status: 'aktiv', meine_rolle: 'einsatzleitung', org_id: 1, spiegel }, admin),
+      darfFristSetzen(
+        { status: 'aktiv', meine_rolle: 'einsatzleitung', org_id: 1, spiegel },
+        admin,
+      ),
     ).toBe(false);
     expect(darfFristSetzen({ status: 'aktiv', meine_rolle: null, org_id: 1, spiegel }, admin)).toBe(
       false,

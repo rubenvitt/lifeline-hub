@@ -285,10 +285,14 @@ export async function entwuerfeLeerenFuerTests(): Promise<void> {
   await d.clear('entwuerfe');
 }
 
+/** Ein von außen angelegter Entwurf (`detail`: der Entwurf), für die offene Erfassung. */
+export const ENTWURF_ANGELEGT_EREIGNIS = 'lfh:etb-entwurf-angelegt';
+
 /**
  * Legt einen Entwurf mit vorgegebenem Inhalt an und macht ihn zum aktiven (LLH-1492): „Neu
- * erfassen“ eines abgelehnten Antrags am Spiegel öffnet die Erfassung mit seinen Daten. Gilt beim
- * nächsten Laden der Entwürfe (Öffnen des ETB); eine schon offene Erfassung lädt nicht nach.
+ * erfassen“ eines abgelehnten Antrags am Spiegel öffnet die Erfassung mit seinen Daten. Eine schon
+ * offene Erfassung übernimmt ihn über {@link ENTWURF_ANGELEGT_EREIGNIS}, sonst gilt er beim
+ * nächsten Laden. Ein Plattenfehler wirft an den Aufrufer.
  */
 export async function createAndActivateEntwurf(
   benutzerId: number,
@@ -297,13 +301,16 @@ export async function createAndActivateEntwurf(
 ): Promise<void> {
   const jetzt = new Date().toISOString();
   const id = neueClientId();
-  await entwurfSpeichern({
+  const entwurf: EtbEntwurf = {
     id,
     benutzer_id: benutzerId,
     einsatz_id: einsatzId,
     ...inhalt,
     erstellt_at: jetzt,
     geaendert_at: jetzt,
-  });
+  };
+  await entwurfSpeichern(entwurf);
   sicherSchreiben(aktivSchluessel(benutzerId, einsatzId), id);
+  // Eine schon offene Erfassung lädt die Entwürfe nicht nach: sie hört auf dieses Ereignis.
+  window.dispatchEvent(new CustomEvent<EtbEntwurf>(ENTWURF_ANGELEGT_EREIGNIS, { detail: entwurf }));
 }

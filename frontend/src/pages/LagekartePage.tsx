@@ -357,7 +357,11 @@ export default function LagekartePage() {
         message.info({ content: `Kartenbild ${WIRD_GEHOLT_WORT}`, key: 'kartenbild-wird-geholt' });
         return;
       }
-      message.error(fehlerText(e, 'Kartenbild nicht geladen'));
+      // Ein Schlüssel: mehrere defekte Bilder stapeln keine Toasts.
+      message.error({
+        content: fehlerText(e, 'Kartenbild nicht geladen'),
+        key: 'kartenbild-fehler',
+      });
     },
     [message],
   );

@@ -499,7 +499,12 @@ describe('AusgabeAnsicht — Zustände (D1, D7)', () => {
   it('am Spiegel: Zählen geht (als Antrag), kein „Nur Ansicht“, kein „Zurücknehmen“ (LLH-1492)', async () => {
     einsatz.wert = {
       ...einsatz.wert,
-      spiegel: { gegenstelle: 'ELW 1', beendet: false, antraege_ausstehend: 0, antraege_abgelehnt: 0 },
+      spiegel: {
+        gegenstelle: 'ELW 1',
+        beendet: false,
+        antraege_ausstehend: 0,
+        antraege_abgelehnt: 0,
+      },
     } as typeof einsatz.wert;
     zeige();
     await geladen();

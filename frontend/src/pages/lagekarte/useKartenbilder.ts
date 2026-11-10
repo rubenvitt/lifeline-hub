@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAnhangWirdGeholt } from '../../api/anhangAbruf';
 import {
   listeHintergrundbilder,
   aktualisiereHintergrundbild,
@@ -102,6 +103,10 @@ export function useKartenbilder({
   const invalidiereBilder = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
+  // Ein Bild am Spiegel wird geholt (LLH-1492): dann zählt jeder Abruf der Liste als neuer Versuch.
+  const [wirdGeholt, setWirdGeholt] = useState(false);
+  const nachholTakt = wirdGeholt ? bilderQuery.dataUpdatedAt : 0;
+
   // Laufende Downloads (Bild-IDs) und die zuletzt gezeigten Bilder. Ein Download lebt unabhängig
   // vom Lauf des Ladeeffekts: jeder Refetch der Bilderliste (Live-Kanal, Opazität, Zeitraffer) ließe
   // ihn sonst verfallen und startete ihn neu. Übernommen oder freigegeben wird bei Ankunft, nach dem
@@ -146,7 +151,11 @@ export function useKartenbilder({
         })
         .catch((e) => {
           // Lade-Fehler sichtbar machen statt schlucken; ein Abbruch ist keiner.
-          if (!abbruch.aborted && aktiveIdsRef.current.has(b.id)) ladeFehler(e);
+          if (abbruch.aborted || !aktiveIdsRef.current.has(b.id)) return;
+          // Am Spiegel (LLH-1492): der Inhalt wird geholt; der nächste Abruf der Liste versucht
+          // es erneut (`nachholTakt`).
+          if (isAnhangWirdGeholt(e)) setWirdGeholt(true);
+          ladeFehler(e);
         })
         .finally(() => imFlug.delete(b.id));
     }
@@ -163,9 +172,10 @@ export function useKartenbilder({
       }
     }
     // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus. Jeder
-    // Abruf der Liste (`dataUpdatedAt`) versucht fehlende Bilder erneut: am Spiegel kommt ein Bild,
-    // das „wird geholt“, nach dem nächsten Abgleich, dessen `lagged` die Liste neu holt (LLH-1492).
-  }, [bilderRoh, einsatzId, ladeFehler, bilderQuery.dataUpdatedAt]);
+    // Nur solange ein Bild „wird geholt“ (am Spiegel, LLH-1492), versucht jeder Abruf der Liste
+    // (`nachholTakt`) fehlende Bilder erneut: es kommt nach dem nächsten Abgleich, dessen `lagged`
+    // die Liste neu holt. Ein gewöhnlich defektes Bild lädt so nicht bei jedem Abruf neu.
+  }, [bilderRoh, einsatzId, ladeFehler, nachholTakt]);
 
   // Unmount-only: beim Verlassen der Karte alle dann aktuellen Blob-URLs freigeben.
   useEffect(

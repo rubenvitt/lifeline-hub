@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { RegistrierListe } from '../../api/types';
 import { queueLeerenFuerTests, schreibaktionEinreihen } from '../../offline/queue';
 import { meHandler, server } from '../../test/server';
@@ -252,5 +254,37 @@ describe('Vorgemerkt ohne Netz', () => {
     rendere();
     expect(await screen.findByText('Registrierliste ohne Netz nicht geladen')).toBeInTheDocument();
     expect(screen.queryByText(/wird abgerufen/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Abmeldung am Spiegel (LLH-1492)', () => {
+  it('eine beantragte Abmeldung steht da und sperrt weitere Abmeldungen an der Stelle', async () => {
+    const user = userEvent.setup();
+    server.use(
+      meHandler(benutzerFixture({ id: 11 })),
+      http.get(LISTE, () => HttpResponse.json(WEBER)),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Die Kennungen im Körper sind die der führenden Instanz; nur die Stelle (`sid`) ist lokal.
+    client.setQueryData(einsatzKeys.antraege(7), [
+      {
+        id: 4,
+        art: 'abmeldung',
+        zustand: 'ausstehend',
+        erfasst_at: '2026-11-10 08:00:00',
+        ziel: { sid: 8 },
+        daten: { haushalt_id: 903, client_id: 'a-4' },
+      },
+    ]);
+    renderMitProviders(
+      <RegistrierungPaneel einsatzId={7} stelle={TURNHALLE} personenFrei darfSchreiben />,
+      { client },
+    );
+    expect(await screen.findByText('Abmeldung beantragt')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
+    const knopf = await screen.findByRole('button', { name: 'H-1 abmelden' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('Abmeldung beantragt');
+    expect(screen.getByRole('button', { name: 'R-013 Weber, Tom abmelden' })).toBeDisabled();
   });
 });
