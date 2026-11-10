@@ -225,7 +225,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(page.getByRole('button', { name: 'Block anlegen' })).toHaveCount(0);
   await expect(ablauf.getByRole('button', { name: 'Programmpunkt', exact: true })).toHaveCount(0);
   const nochmal = await page.request.post(`/api/planungen/${planungId}/uebernahme`, {
-    data: { ziel: { art: 'neu' } },
+    data: { ziel: { art: 'neu' }, stand: 0 },
   });
   expect(nochmal.status()).toBe(409);
 

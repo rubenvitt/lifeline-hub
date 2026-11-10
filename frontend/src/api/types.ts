@@ -1004,6 +1004,8 @@ export type PlanungBlock = S['PlanungBlockAnzeige'];
 /** Übernahme in einen Einsatz (LLH-1587): danach ist die Planung schreibgeschützt. */
 export type PlanungUebernahme = S['PlanungUebernahme'];
 export type PlanungUebernahmeErgebnis = S['PlanungUebernahmeErgebnis'];
+/** Vorschau der Übernahme mit dem Stand der Planung, auf dem sie beruht (LLH-1610). */
+export type PlanungUebernahmeVorschau = S['PlanungUebernahmeVorschau'];
 /** Kein Backend-Schema: Ziel der Übernahme, ein neuer oder ein laufender Einsatz. */
 export type PlanungUebernahmeZiel =
   { art: 'neu'; vorlage_id?: number } | { art: 'einsatz'; einsatz_id: number };
@@ -1011,6 +1013,10 @@ export type PlanungUebernahmeZiel =
 export interface PlanungUebernahmeBody {
   ziel: PlanungUebernahmeZiel;
   entscheidungen?: SchichtplanEntscheidungenEingabe;
+}
+/** Kein Backend-Schema: Übernehmen schickt den Stand aus der Vorschau zurück (LLH-1610). */
+export interface PlanungUebernehmenBody extends PlanungUebernahmeBody {
+  stand: number;
 }
 
 /** Kein Backend-Schema: `POST /api/planungen`; Einsatzart fehlt = Sanitätsdienst. */

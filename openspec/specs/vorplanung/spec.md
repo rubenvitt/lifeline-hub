@@ -134,6 +134,12 @@ Schreibrecht und die Module Ablösung und Personal (403), aktiv (409). Niemand w
 disponiert. Danach MUST die Planung schreibgeschützt sein: jeder Schreibweg und eine zweite
 Übernahme antworten mit 409, Lesen und Löschen bleiben. Kopf und Liste MUST Zeitpunkt, Einsatz und
 Einsatznummer der Übernahme nennen und die Kennzahlen vom Zeitpunkt der Übernahme zeigen.
+Die Vorschau MUST den Stand der Planung nennen, auf dem sie beruht, und jede Änderung der Planung
+(Kopf, Posten, Reihenfolge, Blöcke mit Personen, Helfer, Programmpunkte) MUST diesen Stand
+erhöhen. Das Übernehmen MUST den Stand der Vorschau mitschicken (400 ohne) und MUST mit 409
+ablehnen, ohne etwas zu schreiben, wenn sich die Planung seitdem geändert hat; die Planung bleibt
+dann beschreibbar, und der Dialog MUST die Vorschau mit demselben Ziel und derselben Wahl neu holen
+und sagen, dass sich die Planung geändert hat (LLH-1610).
 
 #### Scenario: Neuer Einsatz
 - **WHEN** eine Führungskraft die Demo-Planung „Stadtfest Musterstadt“ in einen neuen Einsatz übernimmt
@@ -142,6 +148,10 @@ Einsatznummer der Übernahme nennen und die Kennzahlen vom Zeitpunkt der Überna
 #### Scenario: Zweiter Aufruf
 - **WHEN** jemand dieselbe Planung danach noch einmal übernimmt oder einen Posten anlegt
 - **THEN** antwortet das System mit 409 und legt keinen Einsatz an
+
+#### Scenario: Planung seit der Vorschau geändert
+- **WHEN** jemand einen Block der Planung ändert, nachdem die Vorschau geholt ist, und dann „Übernehmen“ gewählt wird
+- **THEN** antwortet das System mit 409, legt keinen Einsatz an, die Planung bleibt beschreibbar, und der Dialog zeigt die neu geholte Vorschau mit „Planung geändert, Vorschau neu geladen“
 
 #### Scenario: Laufender Einsatz
 - **WHEN** eine Planung mit dem Posten „Streife 2“ in einen laufenden Einsatz mit der Einheit „Streife 2“ übernommen wird

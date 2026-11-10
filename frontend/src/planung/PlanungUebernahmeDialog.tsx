@@ -1,7 +1,8 @@
-import { Button, Flex, Modal, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Flex, Modal, Spin, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { istKonflikt } from '../api/client';
 import { listeEinsaetze } from '../api/einsaetze';
 import { useAuth } from '../auth/AuthContext';
 import { listeEinsatzVorlagen } from '../api/einsatzVorlagen';
@@ -57,6 +58,10 @@ export function neuerEinsatzText(planung: Planung): string {
  * oder ein laufender, in dem man schreiben darf. Die Vorschau
  * rechnet der Server mit demselben Kern wie „Schichtplan einlesen“ und schreibt nichts; jede Wahl
  * fragt sie neu ab. Danach ist die Planung schreibgeschützt.
+ *
+ * „Übernehmen“ schickt den Stand der Planung aus der Vorschau mit (LLH-1610). Hat jemand die
+ * Planung seitdem geändert, lehnt der Server ab (409); der Dialog holt dann die Vorschau mit
+ * demselben Ziel und derselben Wahl neu und sagt, dass sich die Planung geändert hat.
  */
 export default function PlanungUebernahmeDialog({
   planung,
@@ -94,19 +99,27 @@ export default function PlanungUebernahmeDialog({
     mutationFn: (v: { ziel: PlanungUebernahmeZiel; wahl: SchichtplanEntscheidungenEingabe }) =>
       planungUebernahmeVorschau(planungId, { ziel: v.ziel, entscheidungen: v.wahl }),
   });
+  const { mutate: requestVorschau, reset: resetVorschau } = vorschauMut;
   const uebernehmenMut = useMutation({
-    mutationFn: (v: { ziel: PlanungUebernahmeZiel; wahl: SchichtplanEntscheidungenEingabe }) =>
-      planungUebernehmen(planungId, { ziel: v.ziel, entscheidungen: v.wahl }),
+    mutationFn: (v: {
+      ziel: PlanungUebernahmeZiel;
+      wahl: SchichtplanEntscheidungenEingabe;
+      stand: number;
+    }) => planungUebernehmen(planungId, { ziel: v.ziel, entscheidungen: v.wahl, stand: v.stand }),
     onSuccess: (r) => {
       uebernimmPlanung(qc, r.planung);
       void qc.invalidateQueries({ queryKey: globalKeys.planungen(), exact: true });
       if (r.einsatz_neu) void qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       setErgebnis(r);
     },
+    // Die Planung hat sich seit der Vorschau geändert: dieselbe Frage neu stellen.
+    onError: (e, v) => {
+      if (istKonflikt(e)) requestVorschau({ ziel: v.ziel, wahl: v.wahl });
+    },
   });
+  const standGeaendert = istKonflikt(uebernehmenMut.error);
 
   // Beim Öffnen gilt „Neuer Einsatz“ ohne Vorlage: die Vorschau steht gleich da.
-  const { mutate: requestVorschau, reset: resetVorschau } = vorschauMut;
   useEffect(() => {
     requestVorschau({ ziel: { art: 'neu' }, wahl: LEERE_WAHL });
   }, [requestVorschau]);
@@ -173,7 +186,9 @@ export default function PlanungUebernahmeDialog({
         disabled={ziel == null || vorschau == null || sperrGrund != null || vorschauMut.isPending}
         loading={uebernehmenMut.isPending}
         aria-describedby={sperrGrund != null ? grundId : undefined}
-        onClick={() => ziel && uebernehmenMut.mutate({ ziel, wahl })}
+        onClick={() =>
+          ziel && vorschau && uebernehmenMut.mutate({ ziel, wahl, stand: vorschau.stand })
+        }
       >
         Übernehmen
       </Button>
@@ -263,7 +278,16 @@ export default function PlanungUebernahmeDialog({
               </Typography.Text>
             )}
             <SpeicherFehler fehler={vorschauMut.error} titel="Keine Vorschau" />
-            <SpeicherFehler fehler={uebernehmenMut.error} titel="Nicht übernommen" />
+            {standGeaendert ? (
+              <Alert
+                type="warning"
+                showIcon
+                title="Planung geändert, Vorschau neu geladen"
+                data-lfh="uebernahme-stand-geaendert"
+              />
+            ) : (
+              <SpeicherFehler fehler={uebernehmenMut.error} titel="Nicht übernommen" />
+            )}
             {vorschauMut.isPending && vorschau == null && <Spin />}
             {vorschau != null && (
               <Spin spinning={vorschauMut.isPending}>

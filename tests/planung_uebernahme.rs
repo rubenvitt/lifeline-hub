@@ -32,6 +32,26 @@ async fn get(app: &axum::Router, cookie: &str, pfad: &str) -> Value {
     v
 }
 
+/// Übernimmt mit dem Stand einer frischen Vorschau desselben Ziels (LLH-1610); scheitert die
+/// Vorschau, mit Stand 0 (der Fehler der Übernahme selbst ist dann gemeint).
+async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (StatusCode, Value) {
+    let (s, v) = post(
+        app,
+        cookie,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        body.clone(),
+    )
+    .await;
+    let stand = if s == StatusCode::OK {
+        v["stand"].as_i64().expect("stand")
+    } else {
+        0
+    };
+    let mut body = body;
+    body["stand"] = json!(stand);
+    post(app, cookie, &format!("{PFAD}/{p}/uebernahme"), body).await
+}
+
 async fn einsatz_anzahl(app: &axum::Router, cookie: &str) -> usize {
     get(app, cookie, "/api/einsaetze")
         .await
@@ -131,13 +151,7 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
         "Vorschau legt keinen Einsatz an"
     );
 
-    let (s, ergebnis) = post(
-        &app,
-        &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
-        json!({"ziel": {"art": "neu"}}),
-    )
-    .await;
+    let (s, ergebnis) = uebernehmen(&app, &admin, p, json!({"ziel": {"art": "neu"}})).await;
     assert_eq!(s, StatusCode::OK, "{ergebnis}");
     let einsatz = ergebnis["einsatz_id"].as_i64().unwrap();
     assert_eq!(einsatz_anzahl(&app, &admin).await, einsaetze + 1);
@@ -218,7 +232,7 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
         (
             "POST",
             format!("{PFAD}/{p}/uebernahme"),
-            json!({"ziel": {"art": "neu"}}),
+            json!({"ziel": {"art": "neu"}, "stand": 0}),
         ),
     ] {
         let (s, v) = anfrage_json(&app, methode, &pfad, &admin, Some(&body)).await;
@@ -269,10 +283,10 @@ async fn in_laufenden_einsatz_helfer_mit_herkunft_und_bestehende_einheit() {
     assert_eq!(mia_v["ziel"]["personal_id"], mia, "{mia_v}");
     assert_eq!(mia_v["grund"], "bezug");
 
-    let (s, ergebnis) = post(
+    let (s, ergebnis) = uebernehmen(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
+        p,
         json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}}),
     )
     .await;
@@ -352,10 +366,10 @@ async fn ziel_und_rechte() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let (s, v) = post(
+    let (s, v) = uebernehmen(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
+        p,
         json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}}),
     )
     .await;
@@ -400,10 +414,10 @@ async fn entscheidung_neu_statt_bestehender_einheit() {
     )
     .await;
     let schluessel = vorschau["posten"][0]["schluessel"].as_str().unwrap();
-    let (s, ergebnis) = post(
+    let (s, ergebnis) = uebernehmen(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
+        p,
         json!({"ziel": ziel, "entscheidungen": {"posten": {schluessel: {"art": "neu"}}}}),
     )
     .await;
@@ -465,10 +479,10 @@ async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
         assert_eq!(s, StatusCode::CREATED, "{v}");
     }
 
-    let (s, ergebnis) = post(
+    let (s, ergebnis) = uebernehmen(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
+        p,
         json!({"ziel": {"art": "neu"}, "entscheidungen": {"posten": {
             format!("posten-{posten}"): {"art": "neu", "einheit_vorlage_id": vorlage}}}}),
     )
@@ -532,19 +546,13 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     .await;
     assert_eq!(s, StatusCode::OK, "{vorschau}");
     assert_eq!(vorschau["zaehlung"]["aenderungen"], 0, "{vorschau}");
-    let (s, v) = post(&app, &admin, &format!("{PFAD}/{p}/uebernahme"), ziel).await;
+    let (s, v) = uebernehmen(&app, &admin, p, ziel).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
     assert!(plan["kopf"].get("uebernahme").is_none(), "{plan}");
 
     // In einen neuen Einsatz: beide Posten entstehen, obwohl kein Block sie braucht.
-    let (s, ergebnis) = post(
-        &app,
-        &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
-        json!({"ziel": {"art": "neu"}}),
-    )
-    .await;
+    let (s, ergebnis) = uebernehmen(&app, &admin, p, json!({"ziel": {"art": "neu"}})).await;
     assert_eq!(s, StatusCode::OK, "{ergebnis}");
     assert_eq!(ergebnis["zaehlung"]["einheiten_neu"], 1, "{ergebnis}");
     assert_eq!(ergebnis["zaehlung"]["uhs_neu"], 1, "{ergebnis}");
@@ -553,4 +561,265 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     assert!(einheiten.to_string().contains("\"Reserve\""), "{einheiten}");
     let uhs = get(&app, &admin, &format!("/api/einsaetze/{neu}/uhs")).await;
     assert!(uhs.to_string().contains("\"UHS Bühne\""), "{uhs}");
+}
+
+/// Der Stand der Planung aus einer Vorschau „neuer Einsatz“ (LLH-1610).
+async fn stand(app: &axum::Router, cookie: &str, p: i64) -> i64 {
+    let (s, v) = post(
+        app,
+        cookie,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        json!({"ziel": {"art": "neu"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v["stand"].as_i64().expect("stand in der Vorschau")
+}
+
+/// LLH-1610: Ändert jemand die Planung zwischen Vorschau und „Übernehmen“, ist die Übernahme 409
+/// und schreibt nichts; die Planung bleibt beschreibbar, mit dem neuen Stand geht es.
+#[tokio::test]
+async fn geaenderte_planung_seit_der_vorschau_ist_409_und_bleibt_beschreibbar() {
+    let app = setup().await;
+    let admin = admin(&app).await;
+    let (p, _) = kleine_planung(&app, &admin, "Konzert").await;
+    let einsaetze = einsatz_anzahl(&app, &admin).await;
+    let ziel = json!({"art": "neu"});
+    let uebernahme = format!("{PFAD}/{p}/uebernahme");
+
+    let alt = stand(&app, &admin, p).await;
+
+    // Ohne Stand 400, vor allem anderen.
+    let (s, v) = post(&app, &admin, &uebernahme, json!({"ziel": ziel})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+
+    // Jemand anderes verlängert den Block nach der Vorschau.
+    let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    let block = &plan["bloecke"][0];
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{PFAD}/{p}/bloecke/{}", block["id"]),
+        &admin,
+        Some(&json!({"version": block["version"], "bis": "2027-03-13 19:00:00"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = post(
+        &app,
+        &admin,
+        &uebernahme,
+        json!({"ziel": ziel, "stand": alt}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(
+        einsatz_anzahl(&app, &admin).await,
+        einsaetze,
+        "kein Einsatz angelegt"
+    );
+    let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    assert!(plan["kopf"].get("uebernahme").is_none(), "{plan}");
+
+    // Die Planung bleibt beschreibbar.
+    let posten = plan["posten"][0]["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{PFAD}/{p}/posten/{posten}"),
+        &admin,
+        Some(&json!({"bezeichnung": "Streife 3"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    // Mit dem Stand einer neuen Vorschau übernimmt sie, was diese zeigt.
+    let neu = stand(&app, &admin, p).await;
+    assert!(neu > alt, "{neu} > {alt}");
+    let (s, v) = post(
+        &app,
+        &admin,
+        &uebernahme,
+        json!({"ziel": ziel, "stand": neu}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let einsatz = v["einsatz_id"].as_i64().unwrap();
+    let schichtplan = get(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan"),
+    )
+    .await;
+    assert_eq!(
+        schichtplan["bloecke"][0]["bis"], "2027-03-13 19:00:00",
+        "{schichtplan}"
+    );
+}
+
+/// LLH-1610: Jeder Schreibweg der Planung erhöht ihren Stand, die Vorschau selbst nicht.
+#[tokio::test]
+async fn jeder_schreibweg_erhoeht_den_stand() {
+    let app = setup().await;
+    let admin = admin(&app).await;
+    let (p, _) = kleine_planung(&app, &admin, "Konzert").await;
+    let mut zuletzt = stand(&app, &admin, p).await;
+    assert_eq!(
+        stand(&app, &admin, p).await,
+        zuletzt,
+        "Vorschau zählt nicht"
+    );
+
+    let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    let streife = plan["posten"][0]["id"].as_i64().unwrap();
+    let helfer = plan["helfer"][0]["id"].as_i64().unwrap();
+
+    // (Methode, Pfad, Körper) je Schreibweg; Kennungen, die erst entstehen, holt `plan` danach.
+    let schritte: Vec<(&str, String, Option<Value>)> = vec![
+        (
+            "PATCH",
+            format!("{PFAD}/{p}"),
+            Some(json!({"version": plan["kopf"]["version"], "ort": "Stadtpark"})),
+        ),
+        (
+            "POST",
+            format!("{PFAD}/{p}/posten"),
+            Some(json!({"bezeichnung": "Reserve", "art": "einheit", "schichtlaenge_minuten": 120})),
+        ),
+        (
+            "PATCH",
+            format!("{PFAD}/{p}/posten/{streife}"),
+            Some(json!({"abschnitt": "Nord"})),
+        ),
+        (
+            "POST",
+            format!("{PFAD}/{p}/helfer"),
+            Some(json!({"name": "Spät Dazu"})),
+        ),
+        (
+            "PATCH",
+            format!("{PFAD}/{p}/helfer/{helfer}"),
+            Some(json!({"telefon": "0170 7654321"})),
+        ),
+        (
+            "POST",
+            format!("{PFAD}/{p}/programmpunkte"),
+            Some(json!({"bezeichnung": "Einlass", "zeitpunkt_at": "2027-03-13 17:00:00"})),
+        ),
+    ];
+    for (methode, pfad, body) in schritte {
+        let (s, v) = anfrage_json(&app, methode, &pfad, &admin, body.as_ref()).await;
+        assert!(s.is_success(), "{methode} {pfad}: {s} {v}");
+        let jetzt = stand(&app, &admin, p).await;
+        assert!(jetzt > zuletzt, "{methode} {pfad}: {jetzt} > {zuletzt}");
+        zuletzt = jetzt;
+    }
+
+    // Wege mit Kennungen, die eben entstanden sind.
+    let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    let reserve = plan["posten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["bezeichnung"] == "Reserve")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let spaet = plan["helfer"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["name"] == "Spät Dazu")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let einlass = plan["programmpunkte"][0]["id"].as_i64().unwrap();
+    let schritte: Vec<(&str, String, Option<Value>)> = vec![
+        (
+            "PUT",
+            format!("{PFAD}/{p}/posten/reihenfolge"),
+            Some(json!({"posten_ids": [reserve, streife]})),
+        ),
+        (
+            "POST",
+            format!("{PFAD}/{p}/bloecke"),
+            Some(json!({"posten_id": reserve, "von": "2027-03-13 09:00:00",
+                        "bis": "2027-03-13 11:00:00"})),
+        ),
+        (
+            "POST",
+            format!("{PFAD}/{p}/erzeugen"),
+            Some(json!({"posten_id": reserve, "von": "2027-03-13 18:00:00",
+                        "bis": "2027-03-13 22:00:00"})),
+        ),
+        (
+            "PATCH",
+            format!("{PFAD}/{p}/programmpunkte/{einlass}"),
+            Some(json!({"bezeichnung": "Einlass Bühne"})),
+        ),
+        (
+            "DELETE",
+            format!("{PFAD}/{p}/programmpunkte/{einlass}"),
+            None,
+        ),
+        ("DELETE", format!("{PFAD}/{p}/helfer/{spaet}"), None),
+    ];
+    for (methode, pfad, body) in schritte {
+        let (s, v) = anfrage_json(&app, methode, &pfad, &admin, body.as_ref()).await;
+        assert!(s.is_success(), "{methode} {pfad}: {s} {v}");
+        let jetzt = stand(&app, &admin, p).await;
+        assert!(jetzt > zuletzt, "{methode} {pfad}: {jetzt} > {zuletzt}");
+        zuletzt = jetzt;
+    }
+
+    // Block ändern und löschen, zuletzt den Posten samt Blöcken.
+    let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    let block = plan["bloecke"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["von"] == "2027-03-13 09:00:00")
+        .unwrap()
+        .clone();
+    let schritte: Vec<(&str, String, Option<Value>)> = vec![
+        (
+            "PATCH",
+            format!("{PFAD}/{p}/bloecke/{}", block["id"]),
+            Some(json!({"version": block["version"], "notiz": "Funk prüfen"})),
+        ),
+        (
+            "DELETE",
+            format!(
+                "{PFAD}/{p}/bloecke/{}?version={}",
+                block["id"],
+                block["version"].as_i64().unwrap() + 1
+            ),
+            None,
+        ),
+        (
+            "DELETE",
+            format!("{PFAD}/{p}/posten/{reserve}?mit_bloecken=true"),
+            None,
+        ),
+    ];
+    for (methode, pfad, body) in schritte {
+        let (s, v) = anfrage_json(&app, methode, &pfad, &admin, body.as_ref()).await;
+        assert!(s.is_success(), "{methode} {pfad}: {s} {v}");
+        let jetzt = stand(&app, &admin, p).await;
+        assert!(jetzt > zuletzt, "{methode} {pfad}: {jetzt} > {zuletzt}");
+        zuletzt = jetzt;
+    }
+
+    // Ein abgelehnter Schreibweg (409) rollt den Stand mit zurück.
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{PFAD}/{p}"),
+        &admin,
+        Some(&json!({"version": 0, "ort": "Veraltet"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(stand(&app, &admin, p).await, zuletzt, "Fehler zählt nicht");
 }

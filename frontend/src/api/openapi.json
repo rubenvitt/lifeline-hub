@@ -15864,6 +15864,27 @@
           }
         }
       },
+      "PlanungUebernahmeVorschau": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ImportVorschau"
+          },
+          {
+            "type": "object",
+            "required": [
+              "stand"
+            ],
+            "properties": {
+              "stand": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Zählt jede Änderung der Planung; nur zum Zurückschicken, keine Anzeige."
+              }
+            }
+          }
+        ],
+        "description": "Antwort der Vorschau einer Übernahme (LLH-1587): die Vorschau des Kerns und der Stand der\nPlanung, auf dem sie beruht (LLH-1610). „Übernehmen“ schickt den Stand zurück; hat sich die\nPlanung seitdem geändert, ist es 409."
+      },
       "PlatzAnzeige": {
         "type": "object",
         "description": "Serialisierbare Platz-Anzeige (1:1 zur Tabelle).",

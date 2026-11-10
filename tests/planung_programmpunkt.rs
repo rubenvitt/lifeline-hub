@@ -34,6 +34,26 @@ async fn get(app: &axum::Router, cookie: &str, pfad: &str) -> Value {
     v
 }
 
+/// Übernimmt mit dem Stand einer frischen Vorschau desselben Ziels (LLH-1610); scheitert die
+/// Vorschau, mit Stand 0 (der Fehler der Übernahme selbst ist dann gemeint).
+async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (StatusCode, Value) {
+    let (s, v) = post(
+        app,
+        cookie,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        body.clone(),
+    )
+    .await;
+    let stand = if s == StatusCode::OK {
+        v["stand"].as_i64().expect("stand")
+    } else {
+        0
+    };
+    let mut body = body;
+    body["stand"] = json!(stand);
+    post(app, cookie, &format!("{PFAD}/{p}/uebernahme"), body).await
+}
+
 /// Eine leere Planung am 13.03.2027.
 async fn planung(app: &axum::Router, cookie: &str, name: &str) -> i64 {
     let (s, plan) = post(
@@ -246,13 +266,7 @@ async fn stadtfest_bringt_sein_programm_in_den_neuen_einsatz() {
     assert_eq!(vorschau["zaehlung"]["programmpunkte_neu"], 4, "{vorschau}");
     assert_eq!(vorschau["zaehlung"]["programmpunkte_vorhanden"], 0);
 
-    let (s, ergebnis) = post(
-        &app,
-        &admin,
-        &format!("{PFAD}/{p}/uebernahme"),
-        json!({"ziel": {"art": "neu"}}),
-    )
-    .await;
+    let (s, ergebnis) = uebernehmen(&app, &admin, p, json!({"ziel": {"art": "neu"}})).await;
     assert_eq!(s, StatusCode::OK, "{ergebnis}");
     assert_eq!(ergebnis["zaehlung"]["programmpunkte_neu"], 4);
     let einsatz = ergebnis["einsatz_id"].as_i64().unwrap();
@@ -360,7 +374,7 @@ async fn laufender_einsatz_ueberspringt_gleiche_punkte() {
     assert_eq!(z["aenderungen"], 1, "nur das Programm: {z}");
     assert_eq!(vorschau["uebernehmbar"], true);
 
-    let (s, ergebnis) = post(&app, &admin, &format!("{PFAD}/{p}/uebernahme"), ziel).await;
+    let (s, ergebnis) = uebernehmen(&app, &admin, p, ziel).await;
     assert_eq!(s, StatusCode::OK, "{ergebnis}");
     let im_einsatz = get(
         &app,
@@ -417,7 +431,7 @@ async fn mehr_als_fuenfzig_sperren_die_uebernahme() {
         "{meldung}"
     );
 
-    let (s, v) = post(&app, &admin, &format!("{PFAD}/{p}/uebernahme"), ziel).await;
+    let (s, v) = uebernehmen(&app, &admin, p, ziel).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     let anzahl = get(
         &app,
