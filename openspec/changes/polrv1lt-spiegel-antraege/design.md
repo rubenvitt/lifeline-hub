@@ -492,6 +492,14 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   Spiegel-IDs nach LFH-690, die Prüfsumme je Lieferung aus `anhang.sha256` statt aus dem Inhalt
   und eine Obergrenze für die Größe eines Inhalts auf Abruf.
 
+- **10.11.2026, Band (D13):** „keine Verbindung seit …“ steht ab einer Minute ohne Abgleich bei
+  einem laufenden Einsatz, nicht beim Dreifachen des Takts: den Takt stellt die meldende Seite ein,
+  der Spiegel an der erreichten Seite kennt ihn nicht. Bei der Vorgabe von 5 s ist das das
+  Zwölffache; wer den Takt über 20 s stellt, sieht den Hinweis zwischen zwei Abgleichen. Das Band
+  holt den Kopf alle 30 s neu, weil ein Abgleich ohne neue Zeile kein Live-Ereignis meldet.
+  „Neu erfassen“ legt beim ETB die Daten als Entwurf in die Erfassung; bei den übrigen Arten
+  springt es an den Ort der Erfassung, und das Band zeigt die erfassten Daten.
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.

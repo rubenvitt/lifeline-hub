@@ -67,7 +67,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 ## 9. Doku
 
 - [x] 9.1 Architekturdoku Kapitel 5 (Baustein `instanz::spiegel`), 6 (Laufzeitsicht Abgleich und Antrag), 8 (Schutz per Trigger, Ausführen im Namen des Kontos), 11 (Risiken aus diesem Entwurf, Art.-9-Daten am Hub); Konzeptnotiz: offene Frage „schmale Leitung“ beantwortet. `scripts/check-architektur.sh` grün
-- [ ] 9.2 Anwenderdoku `instanzkopplung.md` (Spiegel, Band, Anträge, Anhänge „wird geholt“, Widerruf) nach `docs/anwender/AGENTS.md`; Wächter der Anwenderdoku grün
+- [x] 9.2 Anwenderdoku `instanzkopplung.md` (Spiegel, Band, Anträge, Anhänge „wird geholt“, Widerruf) nach `docs/anwender/AGENTS.md`; Wächter der Anwenderdoku grün
 
 ## 10. Abschluss
 

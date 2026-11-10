@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs]
 ---
 
 ## Überblick
@@ -112,7 +112,7 @@ unter „Was am Spiegel geht“).
    Installation.
 2. Die Erfassung ausfüllen und speichern wie an einem eigenen Einsatz, etwa einen Eintrag im
    Einsatztagebuch.
-3. Der Eintrag erscheint an derselben Stelle wie vorgemerkte Einträge, als „Beantragt“: ohne
+3. Der Eintrag erscheint an derselben Stelle wie vorgemerkte Einträge, als „beantragt“: ohne
    laufende Nummer und nicht in den Zählern. Das Hinweisband zählt ihn als ausstehenden Antrag.
 4. Hat die andere Installation den Antrag übernommen, kommt der Eintrag mit dem nächsten
    Abgleich als gewöhnlicher Eintrag zurück, und der Antrag verschwindet.
@@ -121,8 +121,10 @@ unter „Was am Spiegel geht“).
 
 1. Im Hinweisband „Spiegel von …“ die Anträge aufklappen. Abgelehnte Anträge stehen mit dem
    Grund da.
-2. „Neu erfassen“ wählen, um die erfassten Daten wieder in die Erfassung zu legen, sie zu
-   berichtigen und erneut zu speichern. Daraus wird ein neuer Antrag.
+2. „Neu erfassen“ wählen. Bei einem Eintrag im Einsatztagebuch liegen die erfassten Daten dann
+   als Entwurf in der Erfassung; bei den übrigen Erfassungen öffnet sich die Seite, auf der sie
+   erfasst werden, und das Hinweisband zeigt die Daten. Berichtigen und erneut speichern: daraus
+   wird ein neuer Antrag.
 3. Oder „Verwerfen“ wählen. Der abgelehnte Antrag ist dann weg.
 
 ### Abgleich der Einsätze prüfen
@@ -273,8 +275,8 @@ das Quittieren gelten nur dort.
 ### Hinweisband und Abgleich
 
 Jede Seite eines Spiegels zeigt das Hinweisband „Spiegel von …“ mit der Zeit des letzten
-Abgleichs und der Zahl der ausstehenden und abgelehnten Anträge. Liegt der letzte Abgleich
-länger zurück als das Dreifache des Takts, steht dort „keine Verbindung seit …“.
+Abgleichs und der Zahl der ausstehenden und abgelehnten Anträge. Liegt bei einem laufenden
+Einsatz der letzte Abgleich länger als eine Minute zurück, steht dort „keine Verbindung seit …“.
 
 Abgeglichen wird alle fünf Sekunden, solange an der Kopplung ein Einsatz aktiv ist, ein Antrag
 offen ist oder ein Anhang geholt wird; sonst im Takt der Meldung. Den kurzen

@@ -191,8 +191,8 @@ geprüfter Prüfsumme gelten.
 
 An einem Spiegel SHALL jede Einsatzseite ein Hinweisband zeigen: „Spiegel von <Gegenstelle>“,
 die Zeit des letzten erfolgreichen Abgleichs und die Zahl der ausstehenden und abgelehnten
-Anträge. Liegt der letzte Abgleich länger zurück als das Dreifache des Takts, MUST das Band
-„keine Verbindung seit …“ zeigen. Nach einer Übernahme MUST der Spiegel offene Seiten über die
+Anträge. Liegt bei einem laufenden Einsatz der letzte Abgleich länger als eine Minute zurück,
+MUST das Band „keine Verbindung seit …“ zeigen. Nach einer Übernahme MUST der Spiegel offene Seiten über die
 Live-Aktualisierung neu laden lassen.
 
 #### Scenario: Leitung weg
