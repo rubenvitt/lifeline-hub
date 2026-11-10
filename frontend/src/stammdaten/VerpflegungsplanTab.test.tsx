@@ -8,6 +8,7 @@ import { VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { adminFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import { mahlzeit, verpflegungsplan } from '../test/verpflegungVorlageDaten';
 import VerpflegungsplanTab from './VerpflegungsplanTab';
 
@@ -209,5 +210,23 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
     expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+  });
+});
+
+describe('VerpflegungsplanTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt die Mahlzeit vom Hub und lässt die eigene bearbeitbar', async () => {
+    server.use(herkunftHandler({ verpflegung_vorlage: ['1'] }));
+    render(admin);
+    const hubZeile = await zeile('Frühstück');
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+
+    const lokal = await zeile('Mittag');
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+    expect(within(lokal).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Mahlzeit anlegen' })).toBeEnabled();
   });
 });

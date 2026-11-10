@@ -109,6 +109,23 @@ describe('PunktankerMenue (LFH-776, Schale aus LFH-812)', () => {
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
   });
 
+  // LLH-1600: öffnet die Wahl einen Dialog, springt der Fokus schon im `keydown` in sein erstes
+  // Feld; das `keypress` derselben Enter-Taste schickte dort das Formular ab (wie LFH-1212). Ein
+  // abgebrochenes `keydown` unterdrückt das `keypress`.
+  it('Enter wählt und bricht das keydown ab, damit kein keypress nachfolgt', async () => {
+    const { onWaehlen } = aufbau();
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    const menue = offenesMenue()!;
+    await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
+    const weiter = fireEvent.keyDown(document.activeElement!, {
+      key: 'Enter',
+      keyCode: 13,
+      which: 13,
+    });
+    expect(onWaehlen).toHaveBeenCalledOnce();
+    expect(weiter).toBe(false);
+  });
+
   it('Esc schließt ohne Wahl und gibt den Fokus zurück', async () => {
     const { onWaehlen, onSchliessen, fokusZiel } = aufbau();
     await waitFor(() => expect(offenesMenue()).not.toBeNull());

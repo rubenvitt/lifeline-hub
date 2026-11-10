@@ -295,8 +295,9 @@ der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers 
 öffnen“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer Zeile mit Kontextmenü nicht
 durch langes Drücken markieren.
 
-Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse. Lagekarte
-und Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
+Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse und an
+den Blöcken im Raster des Schichtplans (Kapitel [Ablösung](abloesung.md)). Lagekarte und
+Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 
 ### Was die Sprungpalette kennt
 

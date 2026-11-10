@@ -693,6 +693,33 @@ describe('einsatzKeys.personDruck (LLH-1120)', () => {
   });
 });
 
+/**
+ * Registrierliste drucken (LLH-1616): Schnappschuss mit eigenem Prefix außerhalb von
+ * `registrierliste`, nicht live und nicht auf der Platte; jeder Abruf protokolliert je Person.
+ * Die Wahl „Unverträglichkeiten“ ist Teil des Keys: eine andere Fassung ist ein anderer Abruf.
+ */
+describe('einsatzKeys.registrierlisteDruck (LLH-1616)', () => {
+  it('baut den Key als [prefix, einsatzId, stelleId, hasUnvertraeglichkeiten]', () => {
+    expect(einsatzKeys.registrierlisteDruck(5, 3, false)).toEqual([
+      'einsatz-registrierliste-druck',
+      5,
+      3,
+      false,
+    ]);
+    expect(einsatzKeys.registrierlisteDruck(5, 3, true)).not.toEqual(
+      einsatzKeys.registrierlisteDruck(5, 3, false),
+    );
+  });
+
+  it('ist nicht live und liegt nicht unter dem Prefix der Bildschirmliste', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-registrierliste-druck');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-registrierliste-druck');
+    }
+    expect(einsatzKeys.registrierlisteDruck(5, 3, false)[0]).not.toBe(EINSATZ_KEYS.registrierliste);
+  });
+});
+
 describe('istRueckmeldungenKey (LFH-610)', () => {
   it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
     expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);

@@ -30,6 +30,7 @@ import GeraeteLayout, {
 import GeraetPatientenPage from './geraet/GeraetPatientenPage';
 import GeraetBetroffenePage from './geraet/GeraetBetroffenePage';
 import GeraetBetreuungsstellePage from './geraet/GeraetBetreuungsstellePage';
+import GeraetRegistrierlisteDruckPage from './geraet/GeraetRegistrierlisteDruckPage';
 import GeraetAbschnittPage from './geraet/GeraetAbschnittPage';
 import GeraetAuftraegePage from './geraet/GeraetAuftraegePage';
 import GeraetMeldenPage from './geraet/GeraetMeldenPage';
@@ -93,6 +94,7 @@ import InfotelefonPage from './pages/InfotelefonPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import BetreuungsstelleDetailPage from './pages/BetreuungsstelleDetailPage';
+import RegistrierlisteDruckPage from './pages/RegistrierlisteDruckPage';
 import UnterkunftPlanenPage from './pages/UnterkunftPlanenPage';
 import EvakuierungPage from './pages/EvakuierungPage';
 import EvakuierungsbezirkPage from './pages/EvakuierungsbezirkPage';
@@ -325,6 +327,11 @@ export const appRouten = createRoutesFromElements(
             <Route path="betroffene/aufnahme" element={<GeraetBetroffenAufnahme />} />
             <Route path="betroffene/:personId" element={<PersonenDetailPage />} />
             <Route path="betreuung" element={<GeraetBetreuungsstellePage />} />
+            {/* Registrierliste der eigenen Stelle drucken (LLH-1616). */}
+            <Route
+              path="betreuung/registrierliste/druck"
+              element={<GeraetRegistrierlisteDruckPage />}
+            />
           </Route>
           {/* Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */}
           <Route element={<GeraetAbschnittRahmen />}>
@@ -494,6 +501,11 @@ export const appRouten = createRoutesFromElements(
           <Route path="betreuung/:stelleId" element={<BetreuungsstelleDetailPage />} />
           {/* Unterkunftsrechner der Stelle (LLH-1520); gegatet über das Segment `betreuung`. */}
           <Route path="betreuung/:stelleId/unterkunft" element={<UnterkunftPlanenPage />} />
+          {/* Registrierliste drucken (LLH-1616); gegatet über das Segment `betreuung`. */}
+          <Route
+            path="betreuung/:stelleId/registrierliste/druck"
+            element={<RegistrierlisteDruckPage />}
+          />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
           {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
           <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />

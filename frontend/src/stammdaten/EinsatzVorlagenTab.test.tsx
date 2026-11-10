@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import type { EinsatzVorlage } from '../api/types';
@@ -171,5 +172,28 @@ describe('einsatzVorlageModule', () => {
     const n = modulRegistry.length;
     expect(moduleText(['gibt-es-nicht'])).toBe(`${n} von ${n} Modulen`);
     expect(moduleText(['lagebesprechung'])).toBe(`${n - 1} von ${n} Modulen`);
+  });
+});
+
+describe('EinsatzVorlagenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt die Vorlage vom Hub und lässt die eigene bearbeitbar', async () => {
+    server.use(herkunftHandler({ einsatz_vorlage: ['1'] }));
+    setup(admin);
+    await screen.findByText('Kleinlage');
+    await waitFor(() =>
+      expect(within(zeile('Kleinlage')).getByText('vom Hub')).toBeInTheDocument(),
+    );
+    expect(within(zeile('Kleinlage')).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(
+      within(zeile('Kleinlage')).queryByRole('button', { name: /bearbeiten|löschen/ }),
+    ).toBeNull();
+    expect(within(zeile('Großbrand')).getByText('nur hier')).toBeInTheDocument();
+    expect(
+      within(zeile('Großbrand')).getByRole('button', { name: 'Großbrand bearbeiten' }),
+    ).toBeEnabled();
+    expect(
+      within(zeile('Großbrand')).getByRole('button', { name: 'Großbrand löschen' }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Einsatz-Vorlage anlegen' })).toBeEnabled();
   });
 });

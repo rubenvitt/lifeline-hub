@@ -38,13 +38,19 @@ async fn load_daten(
     schluessel: &str,
 ) -> Result<Option<Value>, AppError> {
     let objekt = art::json_object_sql(b.spalten, "");
+    // Eine Zeile außerhalb des Bereichs gilt als nicht vorhanden, also als Löschung (D2 der Change
+    // `kjezbk06-stammdaten-kataloge`).
+    let bereich = b
+        .bereich
+        .map(|bed| format!(" AND ({bed})"))
+        .unwrap_or_default();
     let text: Option<String> = match b.schluessel {
         Schluessel::Id => {
             let Ok(id) = schluessel.parse::<i64>() else {
                 return Ok(None);
             };
             sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT {objekt} FROM {} WHERE org_id = ? AND id = ?",
+                "SELECT {objekt} FROM {} WHERE org_id = ? AND id = ?{bereich}",
                 b.tabelle
             )))
             .bind(org_id)
@@ -54,7 +60,7 @@ async fn load_daten(
         }
         Schluessel::Spalte(spalte) => {
             sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT {objekt} FROM {} WHERE org_id = ? AND {spalte} = ?",
+                "SELECT {objekt} FROM {} WHERE org_id = ? AND {spalte} = ?{bereich}",
                 b.tabelle
             )))
             .bind(org_id)
