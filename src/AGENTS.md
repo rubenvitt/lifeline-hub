@@ -369,6 +369,11 @@ Herleitung in
     Wächter `schema::tests::jeder_fremdschluessel_ist_eingeordnet` und
     `schema::tests::jede_id_spalte_ist_eingeordnet` (sieht nur `*_id`-Spalten; Kennungen in Text
     und JSON trägt ein, wer sie anlegt).
+  - **Ein neuer Verweis auf `sprechgruppe`** (Fremdschlüssel oder Skizzen-Element) steht auch im
+    Trigger `sprechgruppe_spiegelkatalog_u` (Migration 0314), damit eine Kopie einer
+    Katalog-Sprechgruppe am Spiegel nachzieht (LLH-1629, `spiegel::katalog`). Wächter
+    `katalog::tests::der_log_trigger_kennt_jeden_verweis_auf_sprechgruppen`. Einzige Ausnahme
+    von „nur die Tabellen-Trigger schreiben ins Log“.
   - **Eine neue ohne Netz vormerkbare Erfassung** (Art in `frontend/src/offline/queue.ts`) steht
     in `spiegel::antrag::BEANTRAGBAR` (Methode, Routenvorlage, Verweise in Pfad und Body,
     `client_id`, Ergebnis) oder in `NICHT_BEANTRAGBAR` mit Grund. Wächter

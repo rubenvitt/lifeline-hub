@@ -424,7 +424,7 @@ async fn einsatz_fremd(
         .fetch_optional(&mut *conn)
         .await?);
     }
-    Ok(sqlx::query_scalar(
+    let fremd: Option<String> = sqlx::query_scalar(
         "SELECT fremder_schluessel FROM spiegel_herkunft \
          WHERE einsatz_id = ? AND art = ? AND lokaler_schluessel = ?",
     )
@@ -432,7 +432,12 @@ async fn einsatz_fremd(
     .bind(tabelle)
     .bind(lokal)
     .fetch_optional(&mut *conn)
-    .await?)
+    .await?;
+    match fremd {
+        Some(f) => Ok(Some(f)),
+        // Eine mitbenutzte Katalogzeile (LLH-1629).
+        None => Ok(super::katalog::fremd(conn, einsatz_id, tabelle, lokal).await?),
+    }
 }
 
 /// Kopplung und Rolle der Seite, an der ein Spiegel hängt.
