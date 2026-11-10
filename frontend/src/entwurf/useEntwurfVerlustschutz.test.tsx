@@ -14,6 +14,7 @@ interface Daten {
 
 interface TraegerProps {
   daten: Daten;
+  geladenAm: number;
   speichern: (w: Daten) => Promise<unknown>;
   istEntwurf?: boolean;
 }
@@ -26,12 +27,13 @@ interface TraegerProps {
  * Klick nimmt dem FELD zuerst den Fokus (Blur-Autosave), dann kommt `form.submit()` — die
  * Zähler im Bild prüfen „genau eine Quittung" ohne Mock-Zugriff.
  */
-function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
+function Traeger({ daten, geladenAm, speichern, istEntwurf = true }: TraegerProps) {
   const [form] = Form.useForm<Daten>();
   const [quittungen, setQuittungen] = useState(0);
   const [ablehnungen, setAblehnungen] = useState(0);
   const schutz = useEntwurfVerlustschutz<Daten, Daten>({
     daten,
+    geladenAm,
     istEntwurf,
     form,
     werteAus: (d) => ({ titel: d.titel }),
@@ -68,6 +70,24 @@ function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
   );
 }
 
+/** Ladezeitpunkt wie `dataUpdatedAt`: die Uhr, aber je Laden streng steigend. */
+let zuletztGeladen = 0;
+const lade = () => (zuletztGeladen = Math.max(Date.now(), zuletztGeladen + 1));
+
+/**
+ * Der Serverstand samt Ladezeitpunkt, wie die Seiten ihn aus der Query reichen. `uhrSteht`: jedes
+ * Laden bekommt denselben Zeitpunkt, wie unter Fake-Timern oder im Bilderlauf.
+ */
+function useServerstand(start: Daten, uhrSteht = false) {
+  const zeitpunkt = () => (uhrSteht ? 0 : lade());
+  const [stand, setStand] = useState(() => ({ daten: start, geladenAm: zeitpunkt() }));
+  /** Ein Laden mit neuem Inhalt. */
+  const setze = (daten: Daten) => setStand({ daten, geladenAm: zeitpunkt() });
+  /** Ein Laden mit gleichem Inhalt: React Query gäbe dieselbe Referenz zurück. */
+  const neuLaden = () => setStand((s) => ({ daten: s.daten, geladenAm: zeitpunkt() }));
+  return { ...stand, setze, neuLaden };
+}
+
 function Huelle({
   speichern = () => Promise.resolve(),
   istEntwurf,
@@ -75,15 +95,41 @@ function Huelle({
   speichern?: (w: Daten) => Promise<unknown>;
   istEntwurf?: boolean;
 }) {
-  const [daten, setDaten] = useState<Daten>({ titel: 'Server 1' });
+  const server = useServerstand({ titel: 'Server 1' });
   return (
     <>
-      <Traeger daten={daten} speichern={speichern} istEntwurf={istEntwurf} />
-      <button type="button" onClick={() => setDaten({ titel: 'Server 2' })}>
+      <Traeger
+        daten={server.daten}
+        geladenAm={server.geladenAm}
+        speichern={speichern}
+        istEntwurf={istEntwurf}
+      />
+      <button type="button" onClick={() => server.setze({ titel: 'Server 2' })}>
         fremd
+      </button>
+      <button type="button" onClick={server.neuLaden}>
+        neu laden
       </button>
     </>
   );
+}
+
+/**
+ * Hülle, deren Serverstand der Test frei setzt (`steuerung.setze`), etwa den Refetch eines
+ * eigenen älteren PATCH (LLH-1628).
+ */
+function HuelleMitServer({
+  speichern,
+  steuerung,
+  uhrSteht,
+}: {
+  speichern: (w: Daten) => Promise<unknown>;
+  steuerung: { setze: (d: Daten) => void };
+  uhrSteht?: boolean;
+}) {
+  const server = useServerstand({ titel: 'Server 1' }, uhrSteht);
+  steuerung.setze = server.setze;
+  return <Traeger daten={server.daten} geladenAm={server.geladenAm} speichern={speichern} />;
 }
 
 interface DatenMitNotiz extends Daten {
@@ -98,8 +144,10 @@ interface DatenMitNotiz extends Daten {
 function HuelleMitFuellung({ speichern }: { speichern: (w: DatenMitNotiz) => Promise<unknown> }) {
   const [form] = Form.useForm<DatenMitNotiz>();
   const [daten] = useState<DatenMitNotiz>({ titel: 'Server 1' });
+  const [geladenAm] = useState(lade);
   const schutz = useEntwurfVerlustschutz<DatenMitNotiz, DatenMitNotiz>({
     daten,
+    geladenAm,
     istEntwurf: true,
     form,
     werteAus: (d) => ({ titel: d.titel, notiz: d.notiz }),
@@ -217,11 +265,11 @@ describe('useEntwurfVerlustschutz', () => {
     expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1x', notiz: 'gefüllt' });
   });
 
-  it('schreibt mit der Quittung einen Serverstand, der WÄHREND des PATCH kam (LLH-1607, Gegenaussage)', async () => {
-    // Übersprungen wird nur der Stand von vor dem PATCH. Ein Refetch, der während des PATCH
-    // eintraf, kann ihn schon enthalten (samt fremder Änderung); ihn für immer abzuweisen ließe
-    // das Formular still veraltet, denn nach der Invalidierung kommt bei gleichem Inhalt dieselbe
-    // Referenz zurück.
+  it('schreibt die fremde Änderung aus dem PATCH-Fenster mit dem Refetch nach der Quittung (LLH-1607, Gegenaussage)', async () => {
+    // Ein Stand, der während des PATCH eintraf, gilt nach der Quittung als überholt (LLH-1628),
+    // seine fremde Änderung kommt mit dem Refetch danach. Der liefert bei gleichem Inhalt DIESELBE
+    // Referenz (structural sharing); hinge die Regel an der Referenz statt am Ladezeitpunkt,
+    // bliebe das Formular still veraltet.
     let aufloesen: () => void = () => {};
     const speichern = vi.fn(
       () =>
@@ -239,6 +287,8 @@ describe('useEntwurfVerlustschutz', () => {
       aufloesen();
     });
     expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x'); // vor der Quittung geladen
+    fireEvent.click(screen.getByText('neu laden')); // Refetch nach der Invalidierung
     expect(screen.getByLabelText('Titel')).toHaveValue('Server 2');
   });
 
@@ -491,10 +541,10 @@ describe('useEntwurfVerlustschutz', () => {
     expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument();
   });
 
-  it('nimmt als überholten Serverstand den beim START des wartenden PATCH, nicht beim Einreihen', async () => {
-    // S2 wartet hinter S1; derweil kommt ein Serverstand herein, den S2 überschreibt. Gälte der
-    // Stand beim Einreihen als überholt, schriebe die Quittung von S2 diesen Stand ins Formular
-    // und nähme die eben gesicherte Fassung zurück (LLH-1607 × LLH-1619).
+  it('schreibt mit der Quittung von S2 keinen Stand, der hereinkam, während S2 wartete', async () => {
+    // S2 wartet hinter S1; derweil kommt ein Serverstand herein, den S2 überschreibt. Schriebe
+    // die Quittung von S2 diesen Stand ins Formular, nähme sie die eben gesicherte Fassung zurück
+    // (LLH-1607 × LLH-1619).
     const aufloeser: Array<() => void> = [];
     const speichern = vi.fn(
       () =>
@@ -521,6 +571,62 @@ describe('useEntwurfVerlustschutz', () => {
     });
     expect(screen.getByText('sauber')).toBeInTheDocument();
     expect(feld).toHaveValue('Server 1ab');
+  });
+
+  it('schreibt nach der Quittung von S2 nicht den Refetch von S1 ins Formular (LLH-1628)', async () => {
+    // Die Quittung von S1 invalidiert, der Refetch R1 (Inhalt S1) kommt, während S2 noch läuft.
+    // Fällt mit der Quittung von S2 der Riegel, darf R1 nicht ins Formular: es zeigte S1, bis
+    // R2 kommt, und wer in diesem Fenster tippt, schriebe auf S1 weiter.
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
+    const steuerung: { setze: (d: Daten) => void } = { setze: () => {} };
+    render(<HuelleMitServer speichern={speichern} steuerung={steuerung} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab(); // S1 „Server 1a“ hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b');
+    await userEvent.tab(); // S2 „Server 1ab“ reiht sich ein
+
+    await act(async () => {
+      aufloeser[0]();
+    });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    act(() => steuerung.setze({ titel: 'Server 1a' })); // R1, während S2 läuft
+    expect(feld).toHaveValue('Server 1ab');
+
+    await act(async () => {
+      aufloeser[1]();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(feld).toHaveValue('Server 1ab');
+    act(() => steuerung.setze({ titel: 'Server 1ab' })); // R2 nach der Quittung von S2
+    expect(feld).toHaveValue('Server 1ab');
+  });
+
+  it('übernimmt nach der Quittung eine fremde Änderung auch bei stehender Uhr (LLH-1628)', async () => {
+    // Steht die Uhr, trägt jedes Laden denselben Zeitpunkt. Am Zeitpunkt allein bliebe dann jede
+    // spätere fremde Änderung draußen; ein neuer Serverstand ist aber eine neue Referenz.
+    const jetzt = vi.spyOn(Date, 'now').mockReturnValue(0);
+    try {
+      const speichern = vi.fn().mockResolvedValue(undefined);
+      const steuerung: { setze: (d: Daten) => void } = { setze: () => {} };
+      render(<HuelleMitServer speichern={speichern} steuerung={steuerung} uhrSteht />);
+      const feld = screen.getByLabelText('Titel');
+      await userEvent.type(feld, 'x');
+      await userEvent.tab();
+      expect(await screen.findByText('sauber')).toBeInTheDocument();
+      expect(feld).toHaveValue('Server 1x'); // der Stand vor dem PATCH bleibt draußen
+      act(() => steuerung.setze({ titel: 'Server 2' }));
+      expect(feld).toHaveValue('Server 2');
+    } finally {
+      jetzt.mockRestore();
+    }
   });
 
   it('startet nach dem Verlassen keinen vorgemerkten PATCH mehr (Speicherfolge)', async () => {

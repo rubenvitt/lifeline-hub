@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useState, type ComponentProps } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { ConfigProvider } from 'antd';
@@ -9,7 +9,8 @@ import { antdToken, farbenHell, type Dichte } from '../theme/tokens';
 import { server } from '../test/server';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
-import { waehleMenueEintrag } from '../test/menue';
+import { offenesMenue, waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { ApiError } from '../api/client';
 import type { Nachforderung } from '../api/types';
 import NachforderungKarte, {
@@ -965,5 +966,72 @@ describe('NachforderungKarte — Eintreffen zurücknehmen (LLH-1539)', () => {
       'data-fehler',
     );
     expect(menue()).toBeInTheDocument();
+  });
+});
+
+describe('NachforderungKarte — Kontextmenü (LLH-1598)', () => {
+  const offenesKontextmenue = async () => {
+    await warteAufMenueFokus();
+    return within(offenesMenue()).getByRole('menu');
+  };
+  const rechtsklick = (el: Element) =>
+    fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });
+
+  it('offene Karte: Fortschaltung vor Bearbeiten, Abschlüsse rot hinter dem Trenner', async () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf()}
+        darfSchreiben
+        onStatus={vi.fn()}
+        onFormular={vi.fn()}
+        onBearbeiten={vi.fn()}
+        onZurueckziehen={vi.fn()}
+        onAblehnen={vi.fn()}
+      />,
+    );
+    const fortschaltung = screen
+      .getAllByRole('button')
+      .find((b) => !b.getAttribute('aria-label')?.startsWith('Aktionen zu'))!;
+    expect(rechtsklick(screen.getByText(/2 RTW zur Verstärkung/))).toBe(false);
+    const menue = await offenesKontextmenue();
+    expect(menue).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/^Aktionen zu Nachforderung/),
+    );
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual([fortschaltung.textContent, 'Bearbeiten', 'Zurückziehen', 'Ablehnen']);
+    expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
+  });
+
+  it('eingetroffen: gesperrte Übernahme mit Grund, dann „Eintreffen zurücknehmen“', async () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({
+          status: 'eingetroffen',
+          ist_offen: false,
+          eingetroffen_at: '2026-06-12 09:30:00',
+        })}
+        darfSchreiben
+        materialGesperrt
+        onMaterialUebernehmen={vi.fn()}
+        onStatus={vi.fn()}
+      />,
+    );
+    rechtsklick(screen.getByText(/2 RTW zur Verstärkung/));
+    const menue = await offenesKontextmenue();
+    const punkte = within(menue).getAllByRole('menuitem');
+    expect(punkte.map((e) => e.textContent)).toEqual([
+      `Als Material übernehmen (${KEINE_BERECHTIGUNG})`,
+      'Eintreffen zurücknehmen',
+    ]);
+    expect(punkte[0]).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('ohne Schreibrecht bleibt das Browsermenü', () => {
+    renderMitProviders(<NachforderungKarte nachforderung={nf()} onStatus={vi.fn()} />);
+    expect(rechtsklick(screen.getByText(/2 RTW zur Verstärkung/))).toBe(true);
   });
 });

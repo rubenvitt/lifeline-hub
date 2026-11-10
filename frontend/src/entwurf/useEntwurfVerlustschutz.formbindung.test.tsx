@@ -22,6 +22,7 @@ function Traeger({ mitFormular }: { mitFormular: boolean }) {
   const [form] = Form.useForm<Daten>();
   const schutz = useEntwurfVerlustschutz<Daten, Daten>({
     daten: { titel: 'Server 1' },
+    geladenAm: 1,
     istEntwurf: true,
     form,
     werteAus: (d) => ({ titel: d.titel }),
@@ -45,6 +46,7 @@ function StabilerTraeger({ mitFormular }: { mitFormular: boolean }) {
   const [form] = Form.useForm<Daten>();
   const schutz = useEntwurfVerlustschutz<Daten, Daten>({
     daten: STABIL,
+    geladenAm: 1,
     istEntwurf: true,
     form,
     werteAus: (d) => ({ titel: d.titel }),
@@ -83,7 +85,7 @@ describe('useEntwurfVerlustschutz · Formularbindung (LFH-627)', () => {
   });
 
   it('schreibt einem neu eingehängten Formular auch einen schon bekannten Serverstand (LLH-1607)', async () => {
-    // Übersprungen wird nur der vom eigenen PATCH überholte Stand; ein unveränderter Serverstand
+    // Übersprungen wird nur ein vom eigenen PATCH überholter Stand; ein unveränderter Serverstand
     // geht beim Einhängen trotzdem ins Formular. `clearOnDestroy` macht das Aushängen sichtbar:
     // ohne leerte nichts den Speicher.
     const { rerender } = render(<StabilerTraeger mitFormular />);

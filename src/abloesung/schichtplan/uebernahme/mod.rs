@@ -366,6 +366,8 @@ pub struct VorschauPosten {
     /// Der gefundene Abschnitt; bei einem neuen Posten liegt er dort.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    /// Der Abschnitt entsteht mit dem Übernehmen, und der neue Posten kommt hinein (LLH-1609).
+    pub abschnitt_neu: bool,
     #[schema(inline)]
     pub ziel: PostenZiel,
     #[schema(value_type = Treffer)]
@@ -477,6 +479,8 @@ pub struct ImportZaehlung {
     /// Programmpunkte der Vorplanung, die der Einsatz schon hat (gleiche Bezeichnung und
     /// Zeitpunkt); sie bleiben aus und zählen nicht als Änderung.
     pub programmpunkte_vorhanden: i64,
+    /// Einsatzabschnitte, die die Vorplanung anlegt (LLH-1609); aus einer Datei 0.
+    pub abschnitte_neu: i64,
     /// Summe aller Änderungen; 0 = das Übernehmen schreibt nichts.
     pub aenderungen: i64,
 }
@@ -490,7 +494,8 @@ impl ImportZaehlung {
             + self.helfer_neu
             + self.einteilungen_neu
             + self.grenzwerte_neu
-            + self.programmpunkte_neu;
+            + self.programmpunkte_neu
+            + self.abschnitte_neu;
     }
 }
 
@@ -521,6 +526,9 @@ pub struct ImportVorschau {
     /// Fehler zuerst, dann Hinweise, je nach Zeile.
     pub meldungen: Vec<ImportMeldung>,
     pub zaehlung: ImportZaehlung,
+    /// Namen der Einsatzabschnitte, die das Übernehmen anlegt, in der Reihenfolge der Posten
+    /// (LLH-1609); aus einer Datei leer.
+    pub abschnitte_neu: Vec<String>,
     pub auswahl: ImportAuswahl,
     /// Ob „Übernehmen“ geht: kein Fehler.
     pub uebernehmbar: bool,

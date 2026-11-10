@@ -164,10 +164,7 @@ describe('EinsatzDefaults', () => {
       await userEvent.type(await screen.findByLabelText(FELD), '3650');
       fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
-      // Kein `name`-Filter: in der Testumgebung heißen alle Titel-IDs `test-id`, und die Seite
-      // trägt weitere — `aria-labelledby` zeigte auf das falsche Element.
-      const dialog = await screen.findByRole('dialog');
-      expect(dialog).toHaveTextContent('Skelett-Frist bestätigen?');
+      const dialog = await screen.findByRole('dialog', { name: 'Skelett-Frist bestätigen?' });
       // Genau EIN Satz zur Folge (LFH-1078): alt → neu, und was unwiderruflich geschieht.
       expect(dialog).toHaveTextContent('unbegrenzt → 3650 Tage ab Abschluss');
       expect(dialog).toHaveTextContent('unwiderruflich');

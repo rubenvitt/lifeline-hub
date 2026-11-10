@@ -17,6 +17,8 @@ import {
 } from '../kommunikation';
 import KommKarte from '../kommunikation/KommKarte';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import type { KartenAktion } from '../components/kartenKontext';
+import { useKartenKontext } from '../components/useKartenKontext';
 import { StatusChip } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { formatVor } from '../anzeige/abstand';
@@ -487,33 +489,37 @@ function NachforderungKarte({
     else onAblehnen?.(n.id);
   };
 
-  // Solange ein Formular an der Karte offen ist, stehen seine Knöpfe allein: der Öffner ist weg.
-  const aktionen: ReactNode[] =
-    darfSchreiben && n.ist_offen && offenesFormular == null
-      ? [
-          // Fortschaltung mit EINEM Klick; der Rückweg steht im Rückgängig-Toast, und
-          // `uebergang_erlaubt` nimmt die Rücknahme um genau eine Stufe an. Der Knopf nennt die
-          // Handlung („Zusage erfassen"), nicht den Zielstatus (LFH-959). Umrandet, nicht gefüllt:
-          // gefüllt ist nur die Primäraktion im Seitenkopf, sonst stünde das Board voller Blau.
-          zusageAlsFormular ? (
-            <Button key="next" loading={laeuft} onClick={() => onFormular(n.id, 'zusage')}>
-              {NACHFORDERUNG_HANDLUNG.zugesagt}
-            </Button>
-          ) : next && onStatus ? (
-            <Button key="next" loading={laeuft} onClick={() => onStatus(n.id, next)}>
-              {NACHFORDERUNG_HANDLUNG[next]}
-            </Button>
-          ) : null,
-          menue.length > 0 ? (
-            <MenueAusloeser<MenueAktion>
-              key="menue"
-              eintraege={menue}
-              zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
-              onWahl={waehle}
-            />
-          ) : null,
-        ].filter(Boolean)
-      : [];
+  /*
+   * Die Handlungen der Karte als Daten (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine Karte mit
+   * mehreren Knöpfen …“): die Knöpfe und das ⋮ unten lesen Etikett, Sperre und Wirkung von hier,
+   * das Kontextmenü zeigt alle, erst die Knöpfe, dann die Einträge der ⋮-Menüs.
+   *
+   * Solange ein Formular an der Karte offen ist, stehen seine Knöpfe allein: der Öffner ist weg.
+   *
+   * Fortschaltung mit EINEM Klick; der Rückweg steht im Rückgängig-Toast, und `uebergang_erlaubt`
+   * nimmt die Rücknahme um genau eine Stufe an. Der Knopf nennt die Handlung („Zusage erfassen"),
+   * nicht den Zielstatus (LFH-959). Umrandet, nicht gefüllt: gefüllt ist nur die Primäraktion im
+   * Seitenkopf, sonst stünde das Board voller Blau.
+   */
+  const offenSchreibbar = !!(darfSchreiben && n.ist_offen && offenesFormular == null);
+  const fortschalten: KartenAktion | null = !offenSchreibbar
+    ? null
+    : zusageAlsFormular
+      ? {
+          key: 'next',
+          label: NACHFORDERUNG_HANDLUNG.zugesagt,
+          onWahl: () => onFormular(n.id, 'zusage'),
+        }
+      : next && onStatus
+        ? {
+            key: 'next',
+            label: NACHFORDERUNG_HANDLUNG[next],
+            onWahl: () => onStatus(n.id, next),
+          }
+        : null;
+  const menueAktionen: KartenAktion<MenueAktion>[] = offenSchreibbar
+    ? menue.map((e) => ({ ...e, onWahl: () => waehle(e.key) }))
+    : [];
   /*
    * Übernahme an der eingetroffenen Karte (LLH-1226 D10, LLH-1383 D9): der Knopf nennt die
    * Handlung, „Weiteren Posten übernehmen“ bzw. „Weitere Einheit übernehmen“, sobald schon etwas
@@ -521,73 +527,114 @@ function NachforderungKarte({
    * sieht den anderen Knopf nicht mehr. Ohne Freigabe steht der Knopf gesperrt mit dem Grund
    * sichtbar daneben, nicht nur im Tooltip (M16, LFH-1078).
    */
-  if (darfSchreiben && n.status === 'eingetroffen') {
-    if (onEinheitUebernehmen && kannEinheitUebernehmen(n)) {
-      const etikett = isWeitereEinheit(n) ? 'Weitere Einheit übernehmen' : 'Als Einheit übernehmen';
-      aktionen.push(
-        einheitGesperrt ? (
-          <GesperrterKnopf key="einheit" etikett={etikett} grundId={einheitSperrgrundId} />
-        ) : (
-          <Button key="einheit" onClick={() => onEinheitUebernehmen(n.id)}>
-            {etikett}
-          </Button>
-        ),
-      );
-    }
-    if (onMaterialUebernehmen && n.einheit_ids.length === 0) {
-      const etikett = isErgaenzen(n) ? 'Weiteren Posten übernehmen' : 'Als Material übernehmen';
-      aktionen.push(
-        materialGesperrt ? (
-          <GesperrterKnopf key="material" etikett={etikett} grundId={sperrgrundId} />
-        ) : (
-          <Button key="material" onClick={() => onMaterialUebernehmen(n.id)}>
-            {etikett}
-          </Button>
-        ),
-      );
-    }
-    // Der zweite Weg (LLH-1259 D5); gesperrt nennt „Als Material übernehmen“ schon den Grund.
-    if (onPostenZuordnen && n.einheit_ids.length === 0 && !materialGesperrt) {
-      aktionen.push(
-        <Button key="zuordnen" onClick={() => onPostenZuordnen(n.id)}>
-          Erfassten Posten zuordnen …
-        </Button>,
-      );
-    }
-    /*
-     * Rückweg aus „Eingetroffen“ (LLH-1539): dauerhaft im ⋮-Menü, nicht nur im Rückgängig-Toast
-     * direkt nach dem Eintreffen. Der Server nimmt genau eine Stufe zurück (`uebergang_erlaubt`);
-     * mit übernommenem Material oder verknüpfter Einheit lehnt er ab, dann steht der Eintrag
-     * gesperrt mit dem Grund (Muster LLH-1395). Nicht rot: der Rückgängig-Toast danach führt
-     * wieder vor. Eine Ablehnung steht über den Knöpfen dieser Karte (`fehlerGrund`).
-     */
-    if (onStatus) {
-      const etikett = 'Eintreffen zurücknehmen';
-      aktionen.push(
-        <MenueAusloeser<MenueAktion>
-          key="menue"
-          eintraege={[
-            eintreffenSperre == null
-              ? { key: 'eintreffen-zuruecknehmen', label: etikett }
-              : {
-                  key: 'eintreffen-zuruecknehmen',
-                  label: `${etikett} (${eintreffenSperre})`,
-                  gesperrt: true,
-                },
-          ]}
-          zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
-          laeuft={laeuft}
-          onWahl={waehle}
-        />,
-      );
-    }
-  }
+  const eingetroffen = !!darfSchreiben && n.status === 'eingetroffen';
+  const gesperrtOhneRecht = (gesperrt: boolean) =>
+    gesperrt ? { gesperrt: true as const, sperrgrund: KEINE_BERECHTIGUNG } : {};
+  const einheitAktion: KartenAktion | null =
+    eingetroffen && onEinheitUebernehmen && kannEinheitUebernehmen(n)
+      ? {
+          key: 'einheit',
+          label: isWeitereEinheit(n) ? 'Weitere Einheit übernehmen' : 'Als Einheit übernehmen',
+          onWahl: () => onEinheitUebernehmen(n.id),
+          ...gesperrtOhneRecht(einheitGesperrt),
+        }
+      : null;
+  const materialAktion: KartenAktion | null =
+    eingetroffen && onMaterialUebernehmen && n.einheit_ids.length === 0
+      ? {
+          key: 'material',
+          label: isErgaenzen(n) ? 'Weiteren Posten übernehmen' : 'Als Material übernehmen',
+          onWahl: () => onMaterialUebernehmen(n.id),
+          ...gesperrtOhneRecht(materialGesperrt),
+        }
+      : null;
+  // Der zweite Weg (LLH-1259 D5); gesperrt nennt „Als Material übernehmen“ schon den Grund.
+  const zuordnenAktion: KartenAktion | null =
+    eingetroffen && onPostenZuordnen && n.einheit_ids.length === 0 && !materialGesperrt
+      ? {
+          key: 'zuordnen',
+          label: 'Erfassten Posten zuordnen …',
+          onWahl: () => onPostenZuordnen(n.id),
+        }
+      : null;
+  /*
+   * Rückweg aus „Eingetroffen“ (LLH-1539): dauerhaft im ⋮-Menü, nicht nur im Rückgängig-Toast
+   * direkt nach dem Eintreffen. Der Server nimmt genau eine Stufe zurück (`uebergang_erlaubt`);
+   * mit übernommenem Material oder verknüpfter Einheit lehnt er ab, dann steht der Eintrag
+   * gesperrt mit dem Grund (Muster LLH-1395). Nicht rot: der Rückgängig-Toast danach führt
+   * wieder vor. Eine Ablehnung steht über den Knöpfen dieser Karte (`fehlerGrund`).
+   */
+  const ruecknahmeEintrag: MenueEintrag<MenueAktion> | null =
+    eingetroffen && onStatus
+      ? eintreffenSperre == null
+        ? { key: 'eintreffen-zuruecknehmen', label: 'Eintreffen zurücknehmen' }
+        : {
+            key: 'eintreffen-zuruecknehmen',
+            label: `Eintreffen zurücknehmen (${eintreffenSperre})`,
+            gesperrt: true,
+          }
+      : null;
+  const kartenAktionen: KartenAktion[] = [
+    ...(fortschalten ? [{ ...fortschalten, ...(laeuft ? { gesperrt: true as const } : {}) }] : []),
+    ...[einheitAktion, materialAktion, zuordnenAktion].filter((a) => a != null),
+    ...menueAktionen,
+    ...(ruecknahmeEintrag
+      ? [
+          {
+            ...ruecknahmeEintrag,
+            ...(laeuft ? { gesperrt: true as const } : {}),
+            onWahl: () => waehle('eintreffen-zuruecknehmen'),
+          },
+        ]
+      : []),
+  ];
+  const { ausloeser, menue: kontextMenue } = useKartenKontext({
+    aktionen: kartenAktionen,
+    zugaenglicherName: `Aktionen zu Nachforderung ${name}`,
+  });
+
+  const knopf = (a: KartenAktion, grundId: string) =>
+    a.gesperrt ? (
+      <GesperrterKnopf key={a.key} etikett={a.label} grundId={grundId} />
+    ) : (
+      <Button key={a.key} onClick={a.onWahl}>
+        {a.label}
+      </Button>
+    );
+  const aktionen: ReactNode[] = [
+    fortschalten ? (
+      <Button key="next" loading={laeuft} onClick={fortschalten.onWahl}>
+        {fortschalten.label}
+      </Button>
+    ) : null,
+    menueAktionen.length > 0 ? (
+      <MenueAusloeser<MenueAktion>
+        key="menue"
+        eintraege={menue}
+        zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
+        onWahl={waehle}
+      />
+    ) : null,
+    einheitAktion ? knopf(einheitAktion, einheitSperrgrundId) : null,
+    materialAktion ? knopf(materialAktion, sperrgrundId) : null,
+    zuordnenAktion ? knopf(zuordnenAktion, sperrgrundId) : null,
+    ruecknahmeEintrag ? (
+      <MenueAusloeser<MenueAktion>
+        key="ruecknahme"
+        eintraege={[ruecknahmeEintrag]}
+        zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
+        laeuft={laeuft}
+        onWahl={waehle}
+      />
+    ) : null,
+  ].filter(Boolean);
   const posten = materialJeId ? uebernommenePosten(n, [...materialJeId.values()]) : [];
 
   return (
     // Abgelehnt trägt den Alarmrand. Ziel des Fokus, wenn die eigene Fortschaltung die Karte in
     // eine andere Spalte trägt (`tabIndex -1`, nicht in der Tab-Folge).
     <KommKarte
+      {...ausloeser}
       alarm={abgelehnt}
       hervorgehoben={hervorgehoben}
       data-nachforderung-id={n.id}
@@ -728,6 +775,7 @@ function NachforderungKarte({
           {aktionen}
         </Space>
       )}
+      {kontextMenue}
     </KommKarte>
   );
 }

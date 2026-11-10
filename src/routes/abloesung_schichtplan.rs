@@ -733,6 +733,8 @@ async fn einlesen_vorbereiten(
     let rechte = Rechte {
         einheiten: darf::<Einheiten>(state, ctx).await?,
         uhs: darf::<Unfallhilfsstellen>(state, ctx).await?,
+        // Eine Datei legt keine Abschnitte an; fehlende bleiben ein Hinweis (LLH-1609).
+        abschnitte: false,
     };
     Ok((paket, meldungen, entscheidungen, rechte))
 }
@@ -800,8 +802,8 @@ pub async fn import_vorschau(
     ))
 }
 
-/// Live-Ereignisse nach einer wirksamen Übernahme in den Plan: ETB, neue Einheiten und UHS, die
-/// Ablösung. Ohne Änderung keine. Auch für die Übernahme einer Planung (`routes::planung`).
+/// Live-Ereignisse nach einer wirksamen Übernahme in den Plan: ETB, neue Abschnitte, Einheiten
+/// und UHS, die Ablösung (sie listet auch die Abschnitte). Ohne Änderung keine. Auch für die Übernahme einer Planung (`routes::planung`).
 pub(crate) fn publish_uebernahme(
     state: &AppState,
     einsatz_id: i64,
@@ -812,6 +814,9 @@ pub(crate) fn publish_uebernahme(
     }
     for etb_id in &geschrieben.etb_ids {
         state.live.publiziere(einsatz_id, *etb_id);
+    }
+    for id in &geschrieben.abschnitt_ids {
+        super::einsatzabschnitt::sse_abschnitt(state, einsatz_id, *id);
     }
     for id in &geschrieben.einheit_ids {
         super::einsatz_einheit::sse_einheit(state, einsatz_id, *id);

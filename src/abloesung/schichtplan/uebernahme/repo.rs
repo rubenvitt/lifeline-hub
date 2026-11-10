@@ -40,6 +40,9 @@ use crate::zeitdarstellung::Zeitstil;
 pub struct Rechte {
     pub einheiten: bool,
     pub uhs: bool,
+    /// Fehlende Einsatzabschnitte anlegen (LLH-1609): nur die Übernahme einer Planung, und nur
+    /// mit Freigabe des Moduls Einsatzabschnitte. Das Einlesen einer Datei legt nie welche an.
+    pub abschnitte: bool,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -338,6 +341,8 @@ enum Wer {
 pub struct NeueEinheit {
     pub name: String,
     pub abschnitt_id: Option<i64>,
+    /// Index in [`Planung::neue_abschnitte`]: der Abschnitt entsteht mit dem Übernehmen.
+    pub neuer_abschnitt: Option<usize>,
     pub vorlage: Option<BestandVorlage>,
     pub sortier: Option<i64>,
 }
@@ -347,6 +352,8 @@ pub struct NeueEinheit {
 pub struct NeueUhs {
     pub bezeichnung: String,
     pub abschnitt_id: Option<i64>,
+    /// Index in [`Planung::neue_abschnitte`], wie bei [`NeueEinheit`].
+    pub neuer_abschnitt: Option<usize>,
     pub typ: UhsTyp,
 }
 
@@ -394,6 +401,11 @@ pub struct Planung {
     /// einem wirksamen Block oder ein Posten mit `ohne_block_anlegen`. Aufsteigend.
     anlegen_einheiten: Vec<usize>,
     anlegen_uhs: Vec<usize>,
+    /// Namen der Abschnitte, die neuen Posten fehlen (LLH-1609), entdoppelt nach [`norm`].
+    neue_abschnitte: Vec<String>,
+    /// Indizes in `neue_abschnitte`, die das Übernehmen anlegt: gebraucht von einer Einheit in
+    /// `anlegen_einheiten` oder einer UHS in `anlegen_uhs`. Aufsteigend.
+    anlegen_abschnitte: Vec<usize>,
     bloecke: Vec<GeplanterBlock>,
     /// Grenzwerte, die das Übernehmen setzt (je Wert nur ohne eigenen des Einsatzes).
     grenzwerte: Option<(Option<i64>, Option<i64>)>,
@@ -567,23 +579,19 @@ pub fn planen(
     // --- Posten (D4) ---
     let mut neue_einheiten: Vec<NeueEinheit> = Vec::new();
     let mut neue_uhs: Vec<NeueUhs> = Vec::new();
+    let mut neue_abschnitte: Vec<String> = Vec::new();
     let mut posten_ziel: HashMap<&str, Ziel> = HashMap::new();
     let mut vorschau_posten: Vec<VorschauPosten> = Vec::new();
     for p in &paket.posten {
         let zeile = erste(&p.zeilen);
-        let abschnitt_id = match p.abschnitt.as_deref().filter(|a| !a.trim().is_empty()) {
-            Some(a) => {
-                let gefunden = abgleich::finde_abschnitt(&bestand.abschnitte, a);
-                if gefunden.is_none() {
-                    meldungen.push(ImportMeldung::hinweis(
-                        zeile,
-                        format!("Abschnitt «{}» nicht gefunden", a.trim()),
-                    ));
-                }
-                gefunden
-            }
-            None => None,
-        };
+        let (abschnitt_id, neuer_abschnitt) = abschnitt_planen(
+            &bestand.abschnitte,
+            p.abschnitt.as_deref(),
+            rechte.abschnitte,
+            zeile,
+            &mut neue_abschnitte,
+            &mut meldungen,
+        );
         let vorschlag = abgleich::posten_vorschlag(
             p.art,
             &p.name,
@@ -650,6 +658,7 @@ pub fn planen(
                 bestand,
                 p,
                 abschnitt_id,
+                neuer_abschnitt,
                 *einheit_vorlage_id,
                 zeile,
                 &mut neue_einheiten,
@@ -696,6 +705,8 @@ pub fn planen(
             name: p.name.clone(),
             abschnitt: p.abschnitt.clone(),
             abschnitt_id,
+            // Erst wenn feststeht, welche neuen Posten entstehen (unten).
+            abschnitt_neu: false,
             ziel: ziel_anzeige,
             treffer,
             kandidaten,
@@ -1012,6 +1023,17 @@ pub fn planen(
         })
         .collect();
 
+    // --- Neue Abschnitte (LLH-1609): nur die, in die eine angelegte Einheit oder UHS kommt ---
+    let gebraucht_abschnitte: BTreeSet<usize> = gebraucht_einheiten
+        .iter()
+        .filter_map(|&i| neue_einheiten[i].neuer_abschnitt)
+        .chain(
+            gebraucht_uhs
+                .iter()
+                .filter_map(|&i| neue_uhs[i].neuer_abschnitt),
+        )
+        .collect();
+
     // --- Grenzwerte aus der Vorplanung: nur, wo der Einsatz keine eigenen hat ---
     let grenzwerte = paket.grenzwerte.and_then(|g| {
         let max = g
@@ -1050,6 +1072,7 @@ pub fn planen(
             .map_or(0, |(a, b)| i64::from(a.is_some()) + i64::from(b.is_some())),
         programmpunkte_neu: programmpunkte.len() as i64,
         programmpunkte_vorhanden,
+        abschnitte_neu: gebraucht_abschnitte.len() as i64,
         aenderungen: 0,
     };
     zaehlung.summe();
@@ -1059,6 +1082,15 @@ pub fn planen(
             .get(vp.schluessel.as_str())
             .copied()
             .unwrap_or(0);
+        vp.abschnitt_neu = match posten_ziel.get(vp.schluessel.as_str()) {
+            Some(Ziel::NeueEinheit(i)) if gebraucht_einheiten.contains(i) => {
+                neue_einheiten[*i].neuer_abschnitt.is_some()
+            }
+            Some(Ziel::NeueUhs(i)) if gebraucht_uhs.contains(i) => {
+                neue_uhs[*i].neuer_abschnitt.is_some()
+            }
+            _ => false,
+        };
     }
     for vp in &mut vorschau_personen {
         vp.bloecke = bloecke_je_person
@@ -1134,6 +1166,10 @@ pub fn planen(
             bloecke: vorschau_bloecke,
             meldungen,
             zaehlung,
+            abschnitte_neu: gebraucht_abschnitte
+                .iter()
+                .map(|&i| neue_abschnitte[i].clone())
+                .collect(),
             auswahl,
             uebernehmbar,
         },
@@ -1142,6 +1178,8 @@ pub fn planen(
         neue_helfer,
         anlegen_einheiten: gebraucht_einheiten.into_iter().collect(),
         anlegen_uhs: gebraucht_uhs.into_iter().collect(),
+        neue_abschnitte,
+        anlegen_abschnitte: gebraucht_abschnitte.into_iter().collect(),
         bloecke: gruppen,
         grenzwerte,
         programmpunkte,
@@ -1191,6 +1229,51 @@ fn zeitraum(stil: &Zeitstil, von: &str, bis: &str) -> String {
     plan_repo::zeitraum_text(stil, von, bis)
 }
 
+/// Der Abschnitt eines Postens: ein bestehender, ein neuer (LLH-1609) oder keiner. Ein neuer
+/// entsteht nur mit `anlegen` und nur, wenn kein Abschnitt des Einsatzes den Text als Name oder
+/// Kurzbezeichnung trägt; gleiche Texte (nach [`norm`]) teilen sich einen, in der Schreibweise der
+/// ersten Nennung. Mehrdeutig oder ohne `anlegen` bleibt es ein Hinweis.
+fn abschnitt_planen(
+    abschnitte: &[BestandAbschnitt],
+    text: Option<&str>,
+    anlegen: bool,
+    zeile: Option<u32>,
+    neue: &mut Vec<String>,
+    meldungen: &mut Vec<ImportMeldung>,
+) -> (Option<i64>, Option<usize>) {
+    let Some(a) = text.map(str::trim).filter(|a| !a.is_empty()) else {
+        return (None, None);
+    };
+    match abgleich::abschnitt_treffer(abschnitte, a) {
+        abgleich::AbschnittTreffer::Eindeutig(id) => (Some(id), None),
+        abgleich::AbschnittTreffer::Mehrdeutig => {
+            meldungen.push(ImportMeldung::hinweis(
+                zeile,
+                format!("Abschnitt «{a}» mehrdeutig"),
+            ));
+            (None, None)
+        }
+        abgleich::AbschnittTreffer::Keiner if anlegen => {
+            let n = norm(a);
+            let i = match neue.iter().position(|x| norm(x) == n) {
+                Some(i) => i,
+                None => {
+                    neue.push(a.to_string());
+                    neue.len() - 1
+                }
+            };
+            (None, Some(i))
+        }
+        abgleich::AbschnittTreffer::Keiner => {
+            meldungen.push(ImportMeldung::hinweis(
+                zeile,
+                format!("Abschnitt «{a}» nicht gefunden"),
+            ));
+            (None, None)
+        }
+    }
+}
+
 /// Ein neuer Posten: Vorlage, eindeutige Bezeichnung. Gleiche neue Posten (Name und Abschnitt)
 /// fallen zusammen. Die Rechte prüft der Aufrufer.
 #[allow(clippy::too_many_arguments)]
@@ -1198,6 +1281,7 @@ fn neuer_posten(
     bestand: &Bestand,
     p: &super::PaketPosten,
     abschnitt_id: Option<i64>,
+    neuer_abschnitt: Option<usize>,
     vorlage_id: Option<i64>,
     zeile: Option<u32>,
     neue_einheiten: &mut Vec<NeueEinheit>,
@@ -1236,15 +1320,17 @@ fn neuer_posten(
                 },
             };
             let n = norm(&name);
-            if let Some(i) = neue_einheiten
-                .iter()
-                .position(|e| norm(&e.name) == n && e.abschnitt_id == abschnitt_id)
-            {
+            if let Some(i) = neue_einheiten.iter().position(|e| {
+                norm(&e.name) == n
+                    && e.abschnitt_id == abschnitt_id
+                    && e.neuer_abschnitt == neuer_abschnitt
+            }) {
                 return Ziel::NeueEinheit(i);
             }
             neue_einheiten.push(NeueEinheit {
                 name,
                 abschnitt_id,
+                neuer_abschnitt,
                 vorlage,
                 sortier: p.sortier,
             });
@@ -1272,6 +1358,7 @@ fn neuer_posten(
             neue_uhs.push(NeueUhs {
                 bezeichnung: name,
                 abschnitt_id,
+                neuer_abschnitt,
                 typ: p.uhs_typ.unwrap_or(UhsTyp::Sonstige),
             });
             Ziel::NeueUhs(neue_uhs.len() - 1)
@@ -1448,6 +1535,8 @@ fn person_planen(
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Geschrieben {
     pub zaehlung: ImportZaehlung,
+    /// Neu angelegte Einsatzabschnitte (LLH-1609).
+    pub abschnitt_ids: Vec<i64>,
     pub einheit_ids: Vec<i64>,
     pub uhs_ids: Vec<i64>,
     pub etb_ids: Vec<i64>,
@@ -1507,6 +1596,51 @@ pub async fn schreiben_tx(
     let wirksam =
         |g: &GeplanterBlock| matches!(g.zustand, BlockZustand::Neu | BlockZustand::Ergaenzt);
 
+    // Neue Abschnitte zuerst (LLH-1609), flach und ohne Leiter, hinten angestellt in der
+    // Reihenfolge der Planung; je einer ein ETB-Eintrag wie beim Anlegen von Hand.
+    let mut abschnitt_id: HashMap<usize, i64> = HashMap::new();
+    for &i in &planung.anlegen_abschnitte {
+        let name = &planung.neue_abschnitte[i];
+        let sortier: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(sortier), 0) + 1 FROM einsatzabschnitt WHERE einsatz_id = ?",
+        )
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        let id = crate::einsatzabschnitt::repo::create_tx(
+            &mut *conn,
+            einsatz_id,
+            &crate::einsatzabschnitt::repo::AbschnittDaten {
+                name,
+                ueber_abschnitt_id: None,
+                leiter_id: None,
+                bemerkung: None,
+                rufname: None,
+                sortier,
+                kurzbezeichnung: None,
+                lagezustand: None,
+                abschnittsauftrag: None,
+            },
+        )
+        .await?;
+        ergebnis.etb_ids.push(
+            crate::etb::system_audit_tx(
+                &mut *conn,
+                einsatz_id,
+                benutzer_id,
+                etb_startwert,
+                &crate::einsatzabschnitt::etb_text_angelegt(name, None),
+            )
+            .await?,
+        );
+        abschnitt_id.insert(i, id);
+        ergebnis.abschnitt_ids.push(id);
+    }
+    // Der Abschnitt eines neuen Postens: bestehend oder eben angelegt.
+    let abschnitt_von = |bestehend: Option<i64>, neu: Option<usize>| {
+        bestehend.or_else(|| neu.and_then(|i| abschnitt_id.get(&i).copied()))
+    };
+
     // Neue Einheiten und UHS, nur die gebrauchten (`Planung::anlegen_einheiten`, `anlegen_uhs`).
     let mut einheit_id: HashMap<usize, i64> = HashMap::new();
     let mut uhs_id: HashMap<usize, i64> = HashMap::new();
@@ -1534,7 +1668,7 @@ pub async fn schreiben_tx(
                 let v = e.vorlage.as_ref();
                 let daten = crate::einheit::repo::EinheitDaten {
                     name: &e.name,
-                    abschnitt_id: e.abschnitt_id,
+                    abschnitt_id: abschnitt_von(e.abschnitt_id, e.neuer_abschnitt),
                     ueber_einheit_id: None,
                     typ_id: v.map(|v| v.typ_id),
                     soll_fuehrer: v.and_then(|v| v.soll_fuehrer),
@@ -1577,7 +1711,7 @@ pub async fn schreiben_tx(
                     &crate::uhs::repo::NeueDaten {
                         typ: u.typ.as_str(),
                         bezeichnung: &u.bezeichnung,
-                        abschnitt_id: u.abschnitt_id,
+                        abschnitt_id: abschnitt_von(u.abschnitt_id, u.neuer_abschnitt),
                         standort: None,
                         notiz: None,
                         lat: None,
@@ -1784,6 +1918,12 @@ pub fn etb_text(anlass: &str, z: &ImportZaehlung) -> String {
     if z.helfer_neu > 0 {
         teile.push(format!("{} Helfer neu", z.helfer_neu));
     }
+    if z.abschnitte_neu > 0 {
+        teile.push(format!(
+            "{} neu",
+            mehrzahl(z.abschnitte_neu, "Abschnitt", "Abschnitte")
+        ));
+    }
     if z.einheiten_neu > 0 {
         teile.push(format!(
             "{} neu",
@@ -1956,7 +2096,128 @@ mod tests {
     const ALLE: Rechte = Rechte {
         einheiten: true,
         uhs: true,
+        abschnitte: false,
     };
+
+    /// LLH-1609: Ein Paket mit Abschnitten, die der Einsatz (bis auf „EA 3“) nicht hat.
+    fn paket_mit_abschnitten() -> PlanPaket {
+        let mit = |s: &str, art, name: &str, abschnitt: &str, anlegen: bool| PaketPosten {
+            abschnitt: Some(abschnitt.into()),
+            ohne_block_anlegen: anlegen,
+            ..posten(s, art, name, 2)
+        };
+        PlanPaket {
+            posten: vec![
+                mit("a", PaketPostenArt::Einheit, "Wache A", "Bühne", true),
+                // Andere Schreibweise, derselbe neue Abschnitt.
+                mit("b", PaketPostenArt::Einheit, "Wache B", " bühne ", true),
+                // Ohne Block und ohne `ohne_block_anlegen`: kein Posten, kein Abschnitt.
+                mit("c", PaketPostenArt::Einheit, "Wache C", "Platz", false),
+                // Trifft die bestehende Einheit 10: kein leerer Abschnitt „Lager“.
+                mit("d", PaketPostenArt::Einheit, "Streife 1", "Lager", true),
+                // Die Kurzbezeichnung des bestehenden Abschnitts.
+                mit("e", PaketPostenArt::Uhs, "UHS Mitte", "ea 3", true),
+            ],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn fehlende_abschnitte_nur_fuer_angelegte_posten() {
+        let rechte = Rechte {
+            abschnitte: true,
+            ..ALLE
+        };
+        let p = planen(
+            &bestand(),
+            &paket_mit_abschnitten(),
+            vec![],
+            &Entscheidungen::default(),
+            rechte,
+        )
+        .unwrap();
+        let v = &p.vorschau;
+        assert!(v.uebernehmbar, "{:?}", v.meldungen);
+        assert!(v.meldungen.is_empty(), "{:?}", v.meldungen);
+        assert_eq!(v.abschnitte_neu, ["Bühne"]);
+        assert_eq!(v.zaehlung.abschnitte_neu, 1);
+        assert_eq!(v.zaehlung.einheiten_neu, 2);
+        assert_eq!(v.zaehlung.uhs_neu, 1);
+        assert_eq!(v.zaehlung.aenderungen, 1 + 2 + 1);
+        let neu: Vec<(&str, bool, Option<i64>)> = v
+            .posten
+            .iter()
+            .map(|x| (x.name.as_str(), x.abschnitt_neu, x.abschnitt_id))
+            .collect();
+        assert_eq!(
+            neu,
+            [
+                ("Wache A", true, None),
+                ("Wache B", true, None),
+                ("Wache C", false, None),
+                ("Streife 1", false, None),
+                ("UHS Mitte", false, Some(3)),
+            ]
+        );
+        assert_eq!(p.anlegen_abschnitte, [0]);
+        assert_eq!(
+            p.neue_abschnitte[0], "Bühne",
+            "Schreibweise der ersten Nennung"
+        );
+        assert!(etb_text(ANLASS_DATEI, &v.zaehlung).contains("1 Abschnitt neu"));
+    }
+
+    #[test]
+    fn ohne_anlegen_bleiben_fehlende_abschnitte_ein_hinweis() {
+        let p = planen(
+            &bestand(),
+            &paket_mit_abschnitten(),
+            vec![],
+            &Entscheidungen::default(),
+            ALLE,
+        )
+        .unwrap();
+        let v = &p.vorschau;
+        assert!(v.abschnitte_neu.is_empty());
+        assert_eq!(v.zaehlung.abschnitte_neu, 0);
+        assert!(v.posten.iter().all(|x| !x.abschnitt_neu));
+        let texte: Vec<&str> = v.meldungen.iter().map(|m| m.text.as_str()).collect();
+        assert!(
+            texte.contains(&"Abschnitt «bühne» nicht gefunden"),
+            "{texte:?}"
+        );
+        assert!(
+            texte.contains(&"Abschnitt «Lager» nicht gefunden"),
+            "{texte:?}"
+        );
+    }
+
+    #[test]
+    fn mehrdeutiger_abschnitt_legt_keinen_dritten_an() {
+        let mut b = bestand();
+        b.abschnitte.push(BestandAbschnitt {
+            id: 4,
+            name: "EA 3".into(),
+            kurzbezeichnung: None,
+        });
+        let paket = PlanPaket {
+            posten: vec![PaketPosten {
+                abschnitt: Some("ea 3".into()),
+                ohne_block_anlegen: true,
+                ..posten("a", PaketPostenArt::Einheit, "Wache A", 2)
+            }],
+            ..Default::default()
+        };
+        let rechte = Rechte {
+            abschnitte: true,
+            ..ALLE
+        };
+        let p = planen(&b, &paket, vec![], &Entscheidungen::default(), rechte).unwrap();
+        let v = &p.vorschau;
+        assert!(v.abschnitte_neu.is_empty());
+        assert_eq!(v.posten[0].abschnitt_id, None);
+        assert_eq!(v.meldungen[0].text, "Abschnitt «ea 3» mehrdeutig");
+    }
 
     #[test]
     fn bestehender_block_wird_ergaenzt_neuer_angelegt() {
@@ -2164,6 +2425,7 @@ mod tests {
         let ohne = Rechte {
             einheiten: false,
             uhs: true,
+            abschnitte: false,
         };
         let p = planen(&bestand(), &paket, vec![], &Entscheidungen::default(), ohne).unwrap();
         assert!(p.fehlende_rechte);
@@ -2222,6 +2484,7 @@ mod tests {
         let ohne_uhs = Rechte {
             einheiten: true,
             uhs: false,
+            abschnitte: false,
         };
         let p = planen(
             &mit_uhs,

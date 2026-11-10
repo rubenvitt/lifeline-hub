@@ -541,6 +541,19 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
 
     expect(await screen.findByRole('button', { name: 'Auflösen' })).toBeEnabled();
   });
+
+  it('frei hält der Knopf schon die Breite der gesperrten Form (LLH-1627)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    const knopf = await screen.findByRole('button', { name: 'Auflösen' });
+    // Die Reserve steht stumm im Knopf: das Ablegen des ersten Patienten macht ihn nicht breiter,
+    // und ein knapper Kopf bricht nicht nachträglich um (Sprungtest in
+    // `e2e/uhs-grundriss-menue-belegung.spec.ts`).
+    const reserve = within(knopf).getByText('Auflösen (noch 00 Personen)');
+    expect(reserve).toHaveAttribute('aria-hidden', 'true');
+  });
 });
 
 describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
