@@ -2,7 +2,7 @@
 titel: Vorplanung
 gruppen: [fuehrung, administration]
 reihenfolge: 380
-quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanSchleuse.tsx, frontend/src/abloesung/schichtplan/zeilenSchleuse.ts, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md, frontend/src/planung/PlanungDruckPage.tsx, frontend/src/planung/ausPlanung.ts, frontend/src/abloesung/schichtplan/ausgabe/, src/abloesung/schichtplan/ausgabe/, frontend/src/planung/PlanungUebernahmeDialog.tsx, frontend/src/planung/PlanungAblauf.tsx, src/planung/programm.rs, frontend/src/abloesung/schichtplan/ImportVorschauAnsicht.tsx, src/planung/uebernahme.rs, src/abloesung/schichtplan/uebernahme/repo.rs]
+quellen: [frontend/src/planung/PlanungenPage.tsx, frontend/src/planung/PlanungAnlegenDialog.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/planung/PlanungKopf.tsx, frontend/src/planung/PlanungPostenListe.tsx, frontend/src/planung/PlanungPostenDialog.tsx, frontend/src/planung/PlanungHelferListe.tsx, frontend/src/planung/PlanungSchichtplan.tsx, frontend/src/planung/planungZeilen.ts, frontend/src/planung/planungRegeln.ts, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanSchleuse.tsx, frontend/src/abloesung/schichtplan/zeilenSchleuse.ts, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/blockMenue.ts, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/components/AppLayout.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/planungen.ts, src/routes/planung.rs, src/planung/mod.rs, src/planung/repo.rs, src/planung/zugriff.rs, src/abloesung/schichtplan/pruefung.rs, openspec/specs/vorplanung/spec.md, frontend/src/planung/PlanungDruckPage.tsx, frontend/src/planung/ausPlanung.ts, frontend/src/abloesung/schichtplan/ausgabe/, src/abloesung/schichtplan/ausgabe/, frontend/src/planung/PlanungUebernahmeDialog.tsx, frontend/src/planung/PlanungAblauf.tsx, src/planung/programm.rs, frontend/src/abloesung/schichtplan/ImportVorschauAnsicht.tsx, src/planung/uebernahme.rs, src/abloesung/schichtplan/uebernahme/repo.rs]
 ---
 
 ## Überblick
@@ -68,7 +68,10 @@ Planen dürfen der System-Admin und die Führungskräfte der Organisation. Für 
 4. Personen einteilen: aus der Leiste „Personen“ einen Namen auf den Block ziehen. Die Leiste
    führt das Stamm-Personal im Dienst unter „Stamm“ und die Helfer der Planung unter „Helfer“.
 5. Einen Block wählen, um im Dialog Posten, Zeit, Personen, Soll, Qualifikationssoll und Notiz zu
-   ändern, ihn als nächsten Block zu kopieren oder zu löschen.
+   ändern, ihn als nächsten Block zu kopieren oder zu löschen. Schneller geht es über das
+   Kontextmenü des Blocks (rechte Maustaste, am Tablet langer Druck): „Bearbeiten“, „Als nächsten
+   Block kopieren“ (ohne Dialog) und rot „Block löschen …“ mit Rückfrage. Einen Wechsel aus dem
+   Plan gibt es in der Vorplanung nicht.
 
 Auf dem Handy steht statt des Rasters je Posten eine Liste aller Blöcke nach Beginn, mit Tag und
 Uhrzeit. Ein Eintrag öffnet den Dialog des Blocks.

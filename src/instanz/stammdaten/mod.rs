@@ -54,6 +54,14 @@ wire_enum! {
         Material => "material",
         Personal => "personal",
         EinheitVorlage => "einheit_vorlage",
+        Schichtmodell => "schichtmodell",
+        EinsatzVorlage => "einsatz_vorlage",
+        StichwortVorschlag => "stichwort_vorschlag",
+        VerpflegungVorlage => "verpflegung_vorlage",
+        Sprechgruppe => "sprechgruppe",
+        EtbBaustein => "etb_baustein",
+        ExterneStelle => "externe_stelle",
+        UnterkunftRichtwert => "unterkunft_richtwert",
     }
 }
 
@@ -62,8 +70,8 @@ wire_enum! {
 pub struct StammdatenLieferung {
     /// Wire-Wert von [`StammdatenArt`].
     pub art: String,
-    /// id an der Quelle als Text, bei Führungs- und Modul-Einstellungen der Schlüssel, bei den
-    /// Org-Einstellungen leer.
+    /// id an der Quelle als Text, bei Führungs-, Modul-Einstellungen und Unterkunft-Richtwerten der
+    /// Schlüssel, bei den Org-Einstellungen leer.
     pub schluessel: String,
     pub stand: i64,
     #[serde(default)]
