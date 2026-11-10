@@ -9,7 +9,9 @@
 //! Herkunft [`HERKUNFT`] und einer Kennung je Helfer (eindeutig über alle Planungen, nie eine
 //! Personalnummer). Jeder Block trägt sein Soll fertig (`ohne_vorgabe`): leer bleibt leer.
 //! Programmpunkte der Planung werden Programmpunkte des Einsatzes (LLH-1583); einen gleichen
-//! Punkt, den der Einsatz schon hat, lässt der Kern aus.
+//! Punkt, den der Einsatz schon hat, lässt der Kern aus. Fehlt dem Einsatz der Abschnitt eines
+//! neuen Postens, legt der Kern ihn an (LLH-1609, neuer wie laufender Einsatz), sofern das Modul
+//! Einsatzabschnitte freigegeben ist; sonst bleibt der Posten ohne Abschnitt mit einem Hinweis.
 //!
 //! **Zwei Ziele.** Ein **neuer Einsatz** entsteht in derselben Transaktion wie Abgleich und
 //! Schreiben (`einsatz::repo::anlegen_tx`): alles oder nichts. Seine Vorschau legt ihn in einer
@@ -37,7 +39,9 @@ use crate::abloesung::schichtplan::uebernahme::{
 };
 use crate::abloesung::schichtplan::SchichtplanGrenzwerte;
 use crate::auth::Benutzer;
-use crate::einsatz::modul::{Abloesung, Einheiten, ModulMarker, Personal, Unfallhilfsstellen};
+use crate::einsatz::modul::{
+    Abloesung, Einheiten, Einsatzabschnitte, ModulMarker, Personal, Unfallhilfsstellen,
+};
 use crate::einsatz::{berechtigung, repo as einsatz_repo, EinsatzRolle};
 use crate::error::AppError;
 use crate::uhs::UhsTyp;
@@ -362,6 +366,7 @@ async fn check_ziel(
         rechte: Rechte {
             einheiten: can_use(key::<Einheiten>()).await?,
             uhs: can_use(key::<Unfallhilfsstellen>()).await?,
+            abschnitte: can_use(key::<Einsatzabschnitte>()).await?,
         },
     })
 }
@@ -402,6 +407,15 @@ async fn load_rechte_neu_tx(
             einsatz_id,
             benutzer.org_id,
             key::<Unfallhilfsstellen>(),
+            benutzer,
+            rolle,
+        )
+        .await?,
+        abschnitte: berechtigung::can_use_modul_tx(
+            conn,
+            einsatz_id,
+            benutzer.org_id,
+            key::<Einsatzabschnitte>(),
             benutzer,
             rolle,
         )

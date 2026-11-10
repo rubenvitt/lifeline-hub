@@ -9218,10 +9218,18 @@
           "bloecke",
           "meldungen",
           "zaehlung",
+          "abschnitte_neu",
           "auswahl",
           "uebernehmbar"
         ],
         "properties": {
+          "abschnitte_neu": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Namen der Einsatzabschnitte, die das Übernehmen anlegt, in der Reihenfolge der Posten\n(LLH-1609); aus einer Datei leer."
+          },
           "auswahl": {
             "$ref": "#/components/schemas/ImportAuswahl"
           },
@@ -9273,9 +9281,15 @@
           "grenzwerte_neu",
           "programmpunkte_neu",
           "programmpunkte_vorhanden",
+          "abschnitte_neu",
           "aenderungen"
         ],
         "properties": {
+          "abschnitte_neu": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Einsatzabschnitte, die die Vorplanung anlegt (LLH-1609); aus einer Datei 0."
+          },
           "aenderungen": {
             "type": "integer",
             "format": "int64",
@@ -20456,6 +20470,7 @@
           "schluessel",
           "art",
           "name",
+          "abschnitt_neu",
           "ziel",
           "treffer",
           "kandidaten",
@@ -20476,6 +20491,10 @@
             ],
             "format": "int64",
             "description": "Der gefundene Abschnitt; bei einem neuen Posten liegt er dort."
+          },
+          "abschnitt_neu": {
+            "type": "boolean",
+            "description": "Der Abschnitt entsteht mit dem Übernehmen, und der neue Posten kommt hinein (LLH-1609)."
           },
           "art": {
             "$ref": "#/components/schemas/PaketPostenArt"

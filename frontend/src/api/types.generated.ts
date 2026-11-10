@@ -3731,6 +3731,11 @@ export interface components {
         };
         /** @description Antwort der Vorschau: nichts ist geschrieben. */
         ImportVorschau: {
+            /**
+             * @description Namen der Einsatzabschnitte, die das Übernehmen anlegt, in der Reihenfolge der Posten
+             *     (LLH-1609); aus einer Datei leer.
+             */
+            abschnitte_neu: string[];
             auswahl: components["schemas"]["ImportAuswahl"];
             bloecke: components["schemas"]["VorschauBlock"][];
             /** @description Fehler zuerst, dann Hinweise, je nach Zeile. */
@@ -3743,6 +3748,11 @@ export interface components {
         };
         /** @description Zählung der Änderungen. Alles 0 außer `*_unveraendert` heißt: nichts zu tun. */
         ImportZaehlung: {
+            /**
+             * Format: int64
+             * @description Einsatzabschnitte, die die Vorplanung anlegt (LLH-1609); aus einer Datei 0.
+             */
+            abschnitte_neu: number;
             /**
              * Format: int64
              * @description Summe aller Änderungen; 0 = das Übernehmen schreibt nichts.
@@ -8149,6 +8159,8 @@ export interface components {
              * @description Der gefundene Abschnitt; bei einem neuen Posten liegt er dort.
              */
             abschnitt_id?: number | null;
+            /** @description Der Abschnitt entsteht mit dem Übernehmen, und der neue Posten kommt hinein (LLH-1609). */
+            abschnitt_neu: boolean;
             art: components["schemas"]["PaketPostenArt"];
             /** Format: int64 */
             bloecke: number;

@@ -1,6 +1,7 @@
 //! Integrationstests „Planung übernehmen“ (LLH-1587, Spec `vorplanung`, „Übernahme in einen
 //! Einsatz“): die Demo-Planung Stadtfest in einen neuen Einsatz, eine eigene Planung in einen
 //! laufenden Einsatz, Vorschau ohne Schreiben, Schreibschutz danach (409), Rechte und Ziele.
+//! Fehlende Abschnitte neuer Posten entstehen mit (LLH-1609), im neuen wie im laufenden Einsatz.
 //! Den Abgleich selbst prüft der Übernahme-Kern (`abloesung::schichtplan::uebernahme`).
 
 use axum::http::StatusCode;
@@ -30,6 +31,33 @@ async fn get(app: &axum::Router, cookie: &str, pfad: &str) -> Value {
     let (s, v) = anfrage(app, "GET", pfad, cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
     v
+}
+
+/// Die Abschnitte eines Einsatzes nach Namen, in ihrer Reihenfolge.
+async fn abschnitt_namen(pool: &sqlx::SqlitePool, einsatz: i64) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT name FROM einsatzabschnitt WHERE einsatz_id = ? ORDER BY sortier, id",
+    )
+    .bind(einsatz)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Jede Einheit und UHS des Einsatzes mit dem Namen ihres Abschnitts, nach Namen sortiert.
+async fn posten_abschnitte(pool: &sqlx::SqlitePool, einsatz: i64) -> Vec<(String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT e.name, a.name FROM einsatz_einheit e \
+         LEFT JOIN einsatzabschnitt a ON a.id = e.abschnitt_id WHERE e.einsatz_id = ?1 \
+         UNION ALL \
+         SELECT u.bezeichnung, a.name FROM uhs u \
+         LEFT JOIN einsatzabschnitt a ON a.id = u.abschnitt_id WHERE u.einsatz_id = ?1 \
+         ORDER BY 1",
+    )
+    .bind(einsatz)
+    .fetch_all(pool)
+    .await
+    .unwrap()
 }
 
 async fn einsatz_anzahl(app: &axum::Router, cookie: &str) -> usize {
@@ -100,11 +128,18 @@ async fn kleine_planung(app: &axum::Router, cookie: &str, name: &str) -> (i64, i
 
 #[tokio::test]
 async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_409() {
-    let (app, _pool) = setup_mit_optionen(AN).await;
+    let (app, pool) = setup_mit_optionen(AN).await;
     let admin = admin(&app).await;
     let p = stadtfest_planung(&app, &admin).await;
     let vorher = get(&app, &admin, &format!("{PFAD}/{p}")).await;
     let einsaetze = einsatz_anzahl(&app, &admin).await;
+    let abschnitte_gesamt = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatzabschnitt")
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    let abschnitte_vorher = abschnitte_gesamt().await;
 
     // Die Vorschau legt probehalber an und schreibt nichts.
     let (s, vorschau) = post(
@@ -120,6 +155,29 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
     assert_eq!(z["einheiten_neu"], 4, "Streifen, Sanitätswache, KTW: {z}");
     assert_eq!(z["uhs_neu"], 1, "{z}");
     assert_eq!(z["helfer_neu"], 2, "{z}");
+    // Die Abschnitte der Planung entstehen mit, in der Reihenfolge der Posten (LLH-1609).
+    assert_eq!(z["abschnitte_neu"], 3, "{z}");
+    assert_eq!(
+        vorschau["abschnitte_neu"],
+        json!(["Marktplatz", "Festmeile", "Bühne"]),
+        "{vorschau}"
+    );
+    for posten in vorschau["posten"].as_array().unwrap() {
+        assert_eq!(
+            posten["abschnitt_neu"],
+            posten.get("abschnitt").is_some(),
+            "nur der KTW hat keinen Abschnitt: {posten}"
+        );
+    }
+    assert!(
+        !vorschau["meldungen"].to_string().contains("nicht gefunden"),
+        "{vorschau}"
+    );
+    assert_eq!(
+        abschnitte_gesamt().await,
+        abschnitte_vorher,
+        "Vorschau legt keinen Abschnitt an"
+    );
     assert_eq!(
         z["bloecke_neu"].as_i64().unwrap(),
         vorher["bloecke"].as_array().unwrap().len() as i64,
@@ -156,12 +214,34 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
         vorher["bloecke"].as_array().unwrap().len(),
         "jeder Block der Planung im Plan des Einsatzes"
     );
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(
-        system_etb_inhalte(&app, &admin, einsatz)
-            .await
-            .iter()
-            .any(|t| t.starts_with("Planung „Stadtfest Musterstadt“ übernommen:")),
-        "ETB nennt die Planung"
+        etb.iter().any(
+            |t| t.starts_with("Planung „Stadtfest Musterstadt“ übernommen:")
+                && t.contains("3 Abschnitte neu")
+        ),
+        "ETB nennt die Planung und die neuen Abschnitte: {etb:?}"
+    );
+    assert!(
+        etb.iter().any(|t| t == "Abschnitt «Festmeile» angelegt"),
+        "{etb:?}"
+    );
+
+    // Jede Einheit und UHS steht im Abschnitt ihres Postens; der KTW hat keinen.
+    assert_eq!(
+        abschnitt_namen(&pool, einsatz).await,
+        ["Marktplatz", "Festmeile", "Bühne"]
+    );
+    let s = |x: &str| Some(x.to_string());
+    assert_eq!(
+        posten_abschnitte(&pool, einsatz).await,
+        [
+            ("KTW Musterstadt 87-85".to_string(), None),
+            ("Sanitätswache Bühne".to_string(), s("Bühne")),
+            ("Streife 1".to_string(), s("Festmeile")),
+            ("Streife 2".to_string(), s("Festmeile")),
+            ("UHS Marktplatz".to_string(), s("Marktplatz")),
+        ]
     );
 
     // Die Planung trägt die Übernahme und ihre Kennzahlen von dann.
@@ -553,4 +633,171 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     assert!(einheiten.to_string().contains("\"Reserve\""), "{einheiten}");
     let uhs = get(&app, &admin, &format!("/api/einsaetze/{neu}/uhs")).await;
     assert!(uhs.to_string().contains("\"UHS Bühne\""), "{uhs}");
+}
+
+/// Legt in der Planung `p` einen Posten (ohne Block) an.
+async fn posten_anlegen(app: &axum::Router, cookie: &str, p: i64, body: Value) {
+    let (s, v) = post(app, cookie, &format!("{PFAD}/{p}/posten"), body).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
+async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = post(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        json!({"name": name, "sortier": 0}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// LLH-1609, Entscheidung Ruben 10.11.2026 (Variante A): auch ein laufender Einsatz bekommt die
+/// fehlenden Abschnitte seiner neuen Posten. Ein vorhandener Abschnitt wird genutzt (auch über
+/// andere Schreibweise), und für einen Posten, der eine bestehende Einheit trifft, entsteht kein
+/// leerer Abschnitt.
+#[tokio::test]
+async fn laufender_einsatz_bekommt_fehlende_abschnitte_neuer_posten() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let (s, plan) = post(
+        &app,
+        &admin,
+        PFAD,
+        json!({"bezeichnung": "Konzert", "von": "2027-03-13 08:00:00", "bis": "2027-03-13 23:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let p = plan["kopf"]["id"].as_i64().unwrap();
+    for body in [
+        json!({"bezeichnung": "Streife 1", "art": "einheit", "abschnitt": "Festmeile"}),
+        json!({"bezeichnung": "Streife 2", "art": "einheit", "abschnitt": " festmeile "}),
+        json!({"bezeichnung": "Streife 3", "art": "einheit", "abschnitt": "nord"}),
+        json!({"bezeichnung": "UHS Bühne", "art": "uhs", "uhs_typ": "behandlungsplatz",
+               "abschnitt": "Bühne"}),
+        json!({"bezeichnung": "Reserve", "art": "einheit", "abschnitt": "Lager"}),
+    ] {
+        posten_anlegen(&app, &admin, p, body).await;
+    }
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Konzert").await;
+    let nord = abschnitt_anlegen(&app, &admin, einsatz, "Nord").await;
+    let reserve = einheit_bilden(&app, &admin, einsatz, "Reserve").await;
+    let ziel = json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}});
+
+    let (s, vorschau) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        ziel.clone(),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{vorschau}");
+    assert_eq!(
+        vorschau["abschnitte_neu"],
+        json!(["Festmeile", "Bühne"]),
+        "{vorschau}"
+    );
+    assert_eq!(vorschau["zaehlung"]["abschnitte_neu"], 2, "{vorschau}");
+    let posten = |name: &str| {
+        vorschau["posten"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(posten("Streife 1")["abschnitt_neu"], true);
+    assert_eq!(posten("Streife 3")["abschnitt_neu"], false);
+    assert_eq!(posten("Streife 3")["abschnitt_id"], nord);
+    assert_eq!(posten("Reserve")["ziel"]["einheit_id"], reserve);
+    assert_eq!(posten("Reserve")["abschnitt_neu"], false);
+    assert_eq!(
+        abschnitt_namen(&pool, einsatz).await,
+        ["Nord"],
+        "Vorschau schreibt nichts"
+    );
+
+    let (s, ergebnis) = post(&app, &admin, &format!("{PFAD}/{p}/uebernahme"), ziel).await;
+    assert_eq!(s, StatusCode::OK, "{ergebnis}");
+    assert_eq!(ergebnis["zaehlung"]["abschnitte_neu"], 2, "{ergebnis}");
+    assert_eq!(
+        abschnitt_namen(&pool, einsatz).await,
+        ["Nord", "Festmeile", "Bühne"],
+        "kein Abschnitt „Lager“: Reserve bleibt, wo sie ist"
+    );
+    let s = |x: &str| Some(x.to_string());
+    assert_eq!(
+        posten_abschnitte(&pool, einsatz).await,
+        [
+            ("Reserve".to_string(), None),
+            ("Streife 1".to_string(), s("Festmeile")),
+            ("Streife 2".to_string(), s("Festmeile")),
+            ("Streife 3".to_string(), s("Nord")),
+            ("UHS Bühne".to_string(), s("Bühne")),
+        ]
+    );
+}
+
+/// Ohne Freigabe des Moduls Einsatzabschnitte entsteht kein Abschnitt; der Posten bleibt ohne
+/// und die Vorschau sagt es wie vor LLH-1609. Ausgeblendet trifft es nur Nicht-Admins: eine
+/// Führungskraft als Einsatzleitung.
+#[tokio::test]
+async fn ohne_modul_abschnitte_bleibt_der_hinweis() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let (s, plan) = post(
+        &app,
+        &admin,
+        PFAD,
+        json!({"bezeichnung": "Konzert", "von": "2027-03-13 08:00:00", "bis": "2027-03-13 23:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let p = plan["kopf"]["id"].as_i64().unwrap();
+    posten_anlegen(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Streife 1", "art": "einheit", "abschnitt": "Festmeile"}),
+    )
+    .await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Konzert").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/einsatzabschnitte"),
+        &admin,
+        Some(&json!({"sichtbar": false})),
+    )
+    .await;
+    assert!(s.is_success(), "{s}: {v}");
+    let kraft_id = benutzer_anlegen(&app, &admin, "kraft", "fuehrungskraft").await;
+    rolle_setzen(&app, &admin, einsatz, kraft_id, "einsatzleitung").await;
+    let kraft = login_cookie(&app, "kraft", "kraftpw1").await;
+    let ziel = json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}});
+
+    let (s, vorschau) = post(
+        &app,
+        &kraft,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        ziel.clone(),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{vorschau}");
+    assert_eq!(vorschau["abschnitte_neu"], json!([]), "{vorschau}");
+    assert!(
+        vorschau["meldungen"]
+            .to_string()
+            .contains("Abschnitt «Festmeile» nicht gefunden"),
+        "{vorschau}"
+    );
+    let (s, ergebnis) = post(&app, &kraft, &format!("{PFAD}/{p}/uebernahme"), ziel).await;
+    assert_eq!(s, StatusCode::OK, "{ergebnis}");
+    assert!(abschnitt_namen(&pool, einsatz).await.is_empty());
+    assert_eq!(
+        posten_abschnitte(&pool, einsatz).await,
+        [("Streife 1".to_string(), None)]
+    );
 }
