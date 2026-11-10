@@ -29,6 +29,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **StammdatenFeld (aus Stammdaten oder frei)** (`components/StammdatenFeld/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
+- **Kopfaktion mit wechselndem Wortlaut (frei und gesperrt)** (`components/BreiteHalten/`, Gruppe Bedienung)
 - **Dashboard-Baukasten (Abschnitte, Gliederung, Strom)** (`components/DashboardListen/`, Gruppe Flächen)
 - **Tabellenkopf mit Sortieren und Filtern, Filterhinweis** (`components/Tabelle/`, Gruppe Daten)
 - **Zeitdarstellung (taktisch und Datum mit Uhrzeit)** (`components/Zeitdarstellung/`, Gruppe Daten)

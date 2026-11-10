@@ -65,6 +65,7 @@ import {
 } from '../../src/components/instrument';
 import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
+import BreiteHalten from '../../src/components/BreiteHalten';
 import { InlineAngabe } from '../../src/components/InlineAngabe';
 import FunkUndTelefon from '../../src/components/FunkUndTelefon';
 import { VerbindungenAngabe } from '../../src/components/VerbindungenFeld';
@@ -1254,6 +1255,29 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         </div>
         <div className="ds-reihe">
           <SegmentedBeispiel />
+        </div>
+      </div>
+    ),
+  },
+  {
+    name: 'BreiteHalten',
+    title: 'Kopfaktion mit wechselndem Wortlaut (frei und gesperrt)',
+    group: 'Bedienung',
+    height: 275,
+    source: 'components/BreiteHalten.tsx',
+    content: () => (
+      <div className="ds-stapel">
+        <div className="ds-reihe">
+          <Button danger>
+            <BreiteHalten reserve={['Auflösen (noch 00 Personen)']}>Auflösen</BreiteHalten>
+          </Button>
+        </div>
+        <div className="ds-reihe">
+          <Button danger disabled>
+            <BreiteHalten reserve={['Auflösen (noch 00 Personen)']}>
+              Auflösen (noch 1 Person)
+            </BreiteHalten>
+          </Button>
         </div>
       </div>
     ),
