@@ -506,6 +506,7 @@ mod tests {
             retention_bis: None,
             geloescht_at: None,
             einsatzleiter: Default::default(),
+            spiegel: Default::default(),
         }
     }
 

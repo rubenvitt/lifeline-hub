@@ -28,6 +28,47 @@ use utoipa::ToSchema;
 pub const OHNE_STELLVERTRETER: &str =
     "NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)";
 
+/// Spiegel-Angaben eines Einsatzes aus `einsatz_spiegel` (Spec `einsatz-spiegel`, „Der Spiegel
+/// zeigt seine Herkunft und seinen Stand“), gelesen von Einsatzkopf und Einsatzliste.
+#[derive(Debug, Clone, Default, sqlx::FromRow)]
+pub struct SpiegelSpalten {
+    pub spiegel_ist: bool,
+    pub spiegel_gegenstelle: Option<String>,
+    pub spiegel_abgleich_at: Option<String>,
+    pub spiegel_beendet_at: Option<String>,
+    pub spiegel_ausstehend: i64,
+    pub spiegel_abgelehnt: i64,
+}
+
+/// Ein Spiegel, wie der Client ihn zeigt (Hinweisband).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EinsatzSpiegelAnzeige {
+    /// Name der führenden Instanz.
+    pub gegenstelle: String,
+    /// Letzter erfolgreicher Abgleich (UTC); fehlt vor dem ersten.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzter_abgleich_at: Option<String>,
+    /// Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar.
+    pub beendet: bool,
+    pub antraege_ausstehend: i64,
+    pub antraege_abgelehnt: i64,
+}
+
+impl SpiegelSpalten {
+    pub fn anzeige(&self) -> Option<EinsatzSpiegelAnzeige> {
+        self.spiegel_ist.then(|| EinsatzSpiegelAnzeige {
+            gegenstelle: self
+                .spiegel_gegenstelle
+                .clone()
+                .unwrap_or_else(|| "Gegenstelle".into()),
+            letzter_abgleich_at: self.spiegel_abgleich_at.clone(),
+            beendet: self.spiegel_beendet_at.is_some(),
+            antraege_ausstehend: self.spiegel_ausstehend,
+            antraege_abgelehnt: self.spiegel_abgelehnt,
+        })
+    }
+}
+
 /// Beendet den Abgleich der Einsätze einer widerrufenen Org-Zuordnung (D14): Spiegel bleiben
 /// lesbar und geschützt, offene Anträge an sie sind abgelehnt, gemerkte Stände des Gegenübers
 /// fallen weg. Läuft in der Transaktion des Widerrufs, an beiden Seiten.

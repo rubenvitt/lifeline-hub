@@ -291,6 +291,27 @@ macro_rules! einsatzleiter_joins {
     };
 }
 
+/// Spiegel-Angaben (LLH-1492): ob der Einsatz ein Spiegel ist, von wem, wann zuletzt abgeglichen,
+/// und die Zahl offener und abgelehnter Anträge.
+macro_rules! spiegel_spalten {
+    () => {
+        "sp.einsatz_id IS NOT NULL AS spiegel_ist, spk.gegenueber_name AS spiegel_gegenstelle, \
+         sp.letzter_abgleich_at AS spiegel_abgleich_at, sp.beendet_at AS spiegel_beendet_at, \
+         (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
+             AND sa.zustand IN ('ausstehend', 'zugestellt')) AS spiegel_ausstehend, \
+         (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
+             AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt"
+    };
+}
+
+macro_rules! spiegel_joins {
+    () => {
+        " LEFT JOIN einsatz_spiegel sp ON sp.einsatz_id = e.id \
+          LEFT JOIN instanz_kopplung_org spo ON spo.id = sp.kopplung_org_id \
+          LEFT JOIN instanz_kopplung spk ON spk.id = spo.kopplung_id "
+    };
+}
+
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     // Die vier EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607/LLH-1371/LLH-1574); sie
@@ -314,9 +335,12 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
         teilschwaerzungen_spalte!(),
         ", ",
         einsatzleiter_spalten!(),
+        ", ",
+        spiegel_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
+        spiegel_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
     ))
@@ -432,6 +456,8 @@ pub async fn liste_fuer(
         teilschwaerzungen: Option<i64>,
         #[sqlx(flatten)]
         einsatzleiter: super::fuehrungsstelle::EinsatzleiterSpalten,
+        #[sqlx(flatten)]
+        spiegel: crate::instanz::spiegel::SpiegelSpalten,
     }
 
     // Ein Zeitpunkt für SQL und `darf_lesen`, damit beide dieselbe Fristgrenze ziehen. Die
@@ -467,9 +493,12 @@ pub async fn liste_fuer(
         teilschwaerzungen_spalte!(),
         ", ",
         einsatzleiter_spalten!(),
+        ", ",
+        spiegel_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
+        spiegel_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
@@ -570,6 +599,7 @@ pub async fn liste_fuer(
                 ),
                 teilschwaerzungen: r.teilschwaerzungen,
                 einsatzleiter: r.einsatzleiter.anzeige(),
+                spiegel: r.spiegel.anzeige(),
             }
         })
         .collect())
