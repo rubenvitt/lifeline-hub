@@ -98,6 +98,10 @@ pub struct Zeile {
     /// Inhalt auf Abruf (D8): nur Größe und Prüfsumme.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blob: Option<BlobAngabe>,
+    /// Schlüssel beim Empfänger, wenn der Absender ihn kennt: eine Katalogzeile mit Herkunft der
+    /// Stammdaten (LLH-1629, [`super::katalog`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gegen: Option<String>,
 }
 
 /// Größe und SHA-256 (hex) eines Inhalts auf Abruf.

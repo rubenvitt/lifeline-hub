@@ -485,9 +485,19 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
     (`Schluessel::gleich`) statt über `CAST(… AS TEXT)`, damit SQLite den Index nimmt.
   - *Takt.* Ein Lesefehler bei einer Kopplung lässt die übrigen nicht aus; ein angeforderter
     Anhang eines beendeten Spiegels hält den kurzen Takt nicht.
-- **10.11.2026, Review, offen (Folgeaufgaben):** Sprechgruppen aus dem Katalog der Org
-  (`sprechgruppe.einsatz_id IS NULL`) stehen in keinem Einsatz-Log; Zuordnungen zu ihnen fehlen am
-  Spiegel mit Hinweis. Ebenfalls offen: das Konto eines Antrags gegen die Orgs der Kopplung
+- **10.11.2026, Katalog-Sprechgruppen (LLH-1629, Variante C mit Ruben abgestimmt):** Sprechgruppen
+  aus dem Katalog der Org (`sprechgruppe.einsatz_id IS NULL`) stehen in keinem Einsatz-Log. Der
+  Führer liefert jede genutzte Katalogzeile als Abhängigkeit mit, auch ohne Logzeile; die meldende
+  Seite nennt dazu den Schlüssel beim Gegenüber aus der Herkunft der Stammdaten (`Zeile.gegen`).
+  Der Spiegel nimmt das Gegenstück aus dem eigenen Katalog, sonst eine gleichnamige Sprechgruppe
+  des Spiegels, sonst legt er eine Kopie als Sprechgruppe des Spiegels an. Ein Gegenstück steht in
+  `spiegel_katalog` (dieselbe Katalogzeile darf zu vielen Spiegeln gehören, anders als in
+  `spiegel_herkunft`) und wird vom Spiegel nie geändert; eine Kopie zieht nach, denn der Trigger
+  `sprechgruppe_spiegelkatalog_u` schreibt eine geänderte Katalogzeile ins Log jedes nutzenden
+  Einsatzes (Wächter `katalog::tests`). `OHNE_NACHHOLEN` entfällt. Liefern folgt jetzt auch
+  Elementen der Fernmeldeskizze (`sg-12`). Grenze: Eine über den Namen gefundene Sprechgruppe des
+  Spiegels zieht eine spätere Umbenennung beim Führer nicht nach.
+- **10.11.2026, Review, offen (Folgeaufgaben):** Das Konto eines Antrags gegen die Orgs der Kopplung
   prüfen (die Route verlangt weiter eine Mitgliedschaft mit Schreibrecht), die Vergabe neuer
   Spiegel-IDs nach LFH-690, die Prüfsumme je Lieferung aus `anhang.sha256` statt aus dem Inhalt
   und eine Obergrenze für die Größe eines Inhalts auf Abruf.
