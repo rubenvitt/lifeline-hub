@@ -240,6 +240,17 @@ impl Schluessel {
             Schluessel::Rowid => format!("CAST({zeile}.rowid AS TEXT)"),
         }
     }
+
+    /// Bedingung „Zeile hat diesen Schlüssel“ mit genau einem `?` (der Schlüssel als Text). Eine
+    /// Spalte und die rowid vergleicht sie direkt, damit SQLite den Index nimmt (ein `CAST` liest
+    /// die ganze Tabelle); der Text wird dabei nach der Affinität der Spalte gewandelt.
+    pub fn gleich(&self, zeile: &str) -> String {
+        match self {
+            Schluessel::Spalte(s) => format!("{zeile}.{s} = ?"),
+            Schluessel::Rowid => format!("{zeile}.rowid = ?"),
+            Schluessel::Spalten(_) => format!("{} = ?", self.ausdruck(zeile)),
+        }
+    }
 }
 
 /// Liest den Primärschlüssel einer Tabelle aus dem Schema.
@@ -280,17 +291,20 @@ pub fn trigger_sql(tabelle: &str, sc: Scoping, k: &Schluessel, mit_schutz: bool)
     let (kn, ko) = (k.ausdruck("NEW"), k.ausdruck("OLD"));
     let gibt = |e: &str| format!("EXISTS (SELECT 1 FROM einsatz WHERE id = {e})");
     let mut sql = String::new();
+    // Das Log ist je Einsatz eindeutig: eine Kennung, die SQLite nach dem Löschen neu vergibt,
+    // verdrängt die Löschung in einem anderen Einsatz nicht.
     sql.push_str(&format!(
         "CREATE TRIGGER {t}_spiegellog_i AFTER INSERT ON {t} WHEN {gn} BEGIN\n    \
-         DELETE FROM einsatz_aenderung WHERE art = '{t}' AND schluessel = {kn};\n    \
+         DELETE FROM einsatz_aenderung WHERE einsatz_id = {en} AND art = '{t}' AND schluessel = {kn};\n    \
          INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES ({en}, '{t}', {kn});\nEND;\n",
         gn = gibt(&en)
     ));
     sql.push_str(&format!(
         "CREATE TRIGGER {t}_spiegellog_u AFTER UPDATE ON {t} BEGIN\n    \
-         DELETE FROM einsatz_aenderung WHERE art = '{t}' AND schluessel IN ({ko}, {kn});\n    \
+         DELETE FROM einsatz_aenderung WHERE art = '{t}' AND ((einsatz_id = {eo} AND schluessel = {ko}) \
+         OR (einsatz_id = {en} AND schluessel = {kn}));\n    \
          INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT {eo}, '{t}', {ko} \
-         WHERE {ko} IS NOT {kn} AND {go};\n    \
+         WHERE ({ko} IS NOT {kn} OR {eo} IS NOT {en}) AND {go};\n    \
          INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT {en}, '{t}', {kn} \
          WHERE {gn};\nEND;\n",
         go = gibt(&eo),
@@ -304,9 +318,18 @@ pub fn trigger_sql(tabelle: &str, sc: Scoping, k: &Schluessel, mit_schutz: bool)
              DELETE FROM einsatz_aenderung WHERE einsatz_id = OLD.id;\nEND;\n"
         ));
     } else {
+        // Folgt ein Kind seinem Elternteil per CASCADE, ist das Elternteil schon fort: dann
+        // nennt dessen eben geschriebene Löschung im Log den Einsatz.
+        let eo = match sc {
+            Scoping::UeberParent { fk, parent } => format!(
+                "COALESCE({eo}, (SELECT einsatz_id FROM einsatz_aenderung WHERE art = '{parent}' \
+                 AND schluessel = CAST(OLD.{fk} AS TEXT) ORDER BY stand DESC LIMIT 1))"
+            ),
+            _ => eo.clone(),
+        };
         sql.push_str(&format!(
             "CREATE TRIGGER {t}_spiegellog_d AFTER DELETE ON {t} BEGIN\n    \
-             DELETE FROM einsatz_aenderung WHERE art = '{t}' AND schluessel = {ko};\n    \
+             DELETE FROM einsatz_aenderung WHERE einsatz_id = {eo} AND art = '{t}' AND schluessel = {ko};\n    \
              INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT {eo}, '{t}', {ko} \
              WHERE {go};\nEND;\n",
             go = gibt(&eo)
@@ -547,6 +570,64 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(rest, 0);
+    }
+
+    /// Review LLH-1492: SQLite vergibt die Kennung einer gelöschten Zeile neu. Das Log ist je
+    /// Einsatz eindeutig, damit die Löschung im einen Einsatz nicht verschwindet, und ein Kind,
+    /// das seinem Elternteil per CASCADE folgt, loggt seine Löschung über dessen Logzeile.
+    #[tokio::test]
+    async fn neu_vergebene_kennung_verdraengt_keine_loeschung_und_kinder_folgen_dem_elternteil() {
+        let pool = crate::db::test_pool().await;
+        let (a, uhs_a, platz) = einsatz_mit_uhs(&pool).await;
+        let (b, uhs_b, _) = einsatz_mit_uhs(&pool).await;
+        let log = |einsatz: i64, art: &'static str, schluessel: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "SELECT COUNT(*) FROM einsatz_aenderung WHERE einsatz_id = ? AND art = ? \
+                     AND schluessel = ?",
+                )
+                .bind(einsatz)
+                .bind(art)
+                .bind(schluessel.to_string())
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        sqlx::query("DELETE FROM uhs_platz WHERE id = ?")
+            .bind(platz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO uhs_platz (id, uhs_id, typ, bezeichnung) VALUES (?, ?, 'bett', 'N')",
+        )
+        .bind(platz)
+        .bind(uhs_b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(log(a, "uhs_platz", platz).await, 1, "Löschung in A bleibt");
+        assert_eq!(log(b, "uhs_platz", platz).await, 1, "neue Zeile in B");
+
+        let kind: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs_platz (uhs_id, typ, bezeichnung) VALUES (?, 'bett', 'K') RETURNING id",
+        )
+        .bind(uhs_a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM uhs WHERE id = ?")
+            .bind(uhs_a)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            log(a, "uhs_platz", kind).await,
+            1,
+            "das Kind loggt seine Löschung beim Einsatz des Elternteils"
+        );
     }
 
     #[tokio::test]

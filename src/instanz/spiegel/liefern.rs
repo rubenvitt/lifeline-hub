@@ -121,10 +121,10 @@ fn select_sql(t: &Tabelle) -> String {
         .map(|s| format!("'{0}', \"{0}\"", s.name))
         .collect();
     format!(
-        "SELECT json_object({}) FROM {} WHERE {} = ?",
+        "SELECT json_object({}) FROM {} WHERE {}",
         teile.join(", "),
         t.name,
-        t.schluessel.ausdruck(t.name)
+        t.schluessel.gleich(t.name)
     )
 }
 
@@ -152,9 +152,9 @@ async fn load_zeile(
     let blob = match &t.blob {
         Some(spalte) => {
             let bytes: Option<Vec<u8>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT \"{spalte}\" FROM {} WHERE {} = ?",
+                "SELECT \"{spalte}\" FROM {} WHERE {}",
                 t.name,
-                t.schluessel.ausdruck(t.name)
+                t.schluessel.gleich(t.name)
             )))
             .bind(schluessel)
             .fetch_one(&mut *conn)
@@ -369,6 +369,18 @@ pub async fn liefere_einsatz(
         return Ok(None);
     }
     let schema = schema::schema(conn).await?;
+    // Liegt der genannte Stand über allem, was das Log dieses Einsatzes kennt, ist die führende
+    // Seite aus einer Sicherung zurückgekehrt: ab 0 neu liefern, der Spiegel übernimmt den Stand.
+    let hoechster: Option<i64> =
+        sqlx::query_scalar("SELECT MAX(stand) FROM einsatz_aenderung WHERE einsatz_id = ?")
+            .bind(e.id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let seit = if seit > hoechster.unwrap_or(0) {
+        0
+    } else {
+        seit
+    };
     let log: Vec<(String, String, i64)> = sqlx::query_as(
         "SELECT art, schluessel, stand FROM einsatz_aenderung \
          WHERE einsatz_id = ? AND stand > ? ORDER BY stand LIMIT ?",

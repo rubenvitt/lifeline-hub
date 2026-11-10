@@ -510,6 +510,7 @@ async fn ein_verfaelschtes_stueck_beginnt_neu_und_ein_geaenderter_anhang_auch() 
     )
     .await;
     // Ein Stück mit falschem Inhalt, aber richtiger Länge.
+    let kopplung: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung").await;
     let mut conn = hub.pool.acquire().await.unwrap();
     use base64::Engine;
     let falsch = lifeline_hub::instanz::spiegel::paket::AnhangTeil {
@@ -520,7 +521,7 @@ async fn ein_verfaelschtes_stueck_beginnt_neu_und_ein_geaenderter_anhang_auch() 
         ab: 0,
         daten: base64::engine::general_purpose::STANDARD.encode(vec![0u8; 1000]),
     };
-    lifeline_hub::instanz::spiegel::anhang::uebernehme_teile(&mut conn, &[falsch])
+    lifeline_hub::instanz::spiegel::anhang::uebernehme_teile(&mut conn, kopplung, &[falsch])
         .await
         .unwrap();
     drop(conn);
@@ -980,4 +981,202 @@ async fn widerruf_beendet_den_abgleich_der_spiegel_bleibt_lesbar() {
     assert!(!etb_inhalte(&hub, s)
         .await
         .contains(&"Nach dem Widerruf".to_string()));
+}
+
+// ── Bindung an die Kopplung (Review) ─────────────────────────────────────────────────────────
+
+/// Legt an einer Instanz eine zweite, aktive Kopplung an, der die Org des Einsatzes zugeordnet
+/// ist; liefert ihre Kennungen (Kopplung, Zuordnung).
+async fn fremde_kopplung(i: &Instanz, einsatz: i64) -> (i64, i64) {
+    exec(
+        &i.pool,
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, zustand) VALUES ('fremd', 'k', 'Fremd', 'wird_gemeldet', 'aktiv')",
+    )
+    .await;
+    let k: i64 = eine(
+        &i.pool,
+        "SELECT id FROM instanz_kopplung WHERE gegenueber_kennung = 'fremd'",
+    )
+    .await;
+    exec(
+        &i.pool,
+        &format!(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) SELECT {k}, org_id, 'fremd/1', 'Fremd' FROM einsatz WHERE id = {einsatz}"
+        ),
+    )
+    .await;
+    let o: i64 = eine(
+        &i.pool,
+        &format!("SELECT id FROM instanz_kopplung_org WHERE kopplung_id = {k}"),
+    )
+    .await;
+    (k, o)
+}
+
+#[tokio::test]
+async fn eine_fremde_kopplung_erreicht_weder_anhaenge_noch_quittungen_noch_spiegel() {
+    use lifeline_hub::instanz::spiegel::{anhang, antrag, paket, uebernehmen};
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    let (anhang_id, _) = anhang_am_elw(&elw, e, 1000).await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let kennung: String = eine(&hub.pool, "SELECT fremde_kennung FROM einsatz_spiegel").await;
+    let sha: String = eine(&hub.pool, "SELECT sha256 FROM spiegel_anhang").await;
+
+    // Anhang-Stücke: nur an die Kopplung, der die Org zugeordnet ist. Die fremde Kopplung am
+    // ELW hat keine Zuordnung dieser Org.
+    let echt: i64 = eine(&elw.pool, "SELECT id FROM instanz_kopplung").await;
+    exec(
+        &elw.pool,
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, zustand) VALUES ('fremd', 'k', 'Fremd', 'wird_gemeldet', 'aktiv')",
+    )
+    .await;
+    let fremd_elw: i64 = eine(
+        &elw.pool,
+        "SELECT id FROM instanz_kopplung WHERE gegenueber_kennung = 'fremd'",
+    )
+    .await;
+    let abruf = paket::AnhangAbruf {
+        kennung: kennung.clone(),
+        art: "anhang".into(),
+        schluessel: anhang_id.to_string(),
+        sha256: sha,
+        ab: 0,
+    };
+    let mut conn = elw.pool.acquire().await.unwrap();
+    let teile = anhang::liefere_teile(&mut conn, fremd_elw, &[abruf.clone()], 1 << 20)
+        .await
+        .unwrap();
+    assert!(teile.is_empty(), "keine Stücke an eine fremde Kopplung");
+    let teile = anhang::liefere_teile(&mut conn, echt, &[abruf], 1 << 20)
+        .await
+        .unwrap();
+    assert_eq!(teile.len(), 1);
+    drop(conn);
+
+    // Quittungen: nur für Anträge an Spiegel dieser Kopplung.
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(
+            &json!({ "typ": "meldung", "inhalt": "Vom Stab", "von": "S", "an": "EL",
+                      "client_id": "c-f" }),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    let antrag_id = v["antrag"]["id"].as_i64().unwrap();
+    let (fremd_hub, fremd_hub_org) = fremde_kopplung(&hub, s).await;
+    let falsch = paket::AntragQuittung {
+        id: antrag_id,
+        ergebnis: "abgelehnt".into(),
+        grund: Some("untergeschoben".into()),
+        ergebnis_art: None,
+        ergebnis_schluessel: None,
+    };
+    let mut conn = hub.pool.acquire().await.unwrap();
+    antrag::quittungen_uebernehmen(&mut conn, fremd_hub, &[falsch])
+        .await
+        .unwrap();
+    drop(conn);
+    let zustand: String = eine(
+        &hub.pool,
+        &format!("SELECT zustand FROM spiegel_antrag WHERE id = {antrag_id}"),
+    )
+    .await;
+    assert_eq!(zustand, "ausstehend");
+
+    // Lieferung an den Spiegel aus einer fremden Kopplung: verworfen, Stand unverändert.
+    let stand_vorher: i64 = eine(&hub.pool, "SELECT stand FROM einsatz_spiegel").await;
+    let org: i64 = eine(
+        &hub.pool,
+        &format!("SELECT org_id FROM einsatz WHERE id = {s}"),
+    )
+    .await;
+    let l = paket::EinsatzLieferung {
+        kennung,
+        freigabestufe: "alles".into(),
+        seit: 0,
+        bis: 1_000_000,
+        ..Default::default()
+    };
+    let empf = uebernehmen::Empfaenger {
+        kopplung_id: fremd_hub,
+        kopplung_org_id: fremd_hub_org,
+        org_id: org,
+        meldend: false,
+    };
+    let mut conn = hub.pool.acquire().await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut conn, &empf, &l)
+        .await
+        .unwrap();
+    drop(conn);
+    assert!(
+        erg.hinweise.iter().any(|h| h.contains("andere Kopplung")),
+        "{:?}",
+        erg.hinweise
+    );
+    let stand: i64 = eine(&hub.pool, "SELECT stand FROM einsatz_spiegel").await;
+    assert_eq!(stand, stand_vorher);
+}
+
+/// Review LLH-1492: Ein Abschnitt wird aufgelöst, seine Einheit verliert ihn vorher. Der Spiegel
+/// löscht den Abschnitt erst, nachdem die geänderte Einheit steht, statt am Verweis zu scheitern
+/// und den Abgleich anzuhalten.
+#[tokio::test]
+async fn ein_aufgeloester_abschnitt_haelt_den_abgleich_nicht_an() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let abschnitt: i64 = eine(
+        &elw.pool,
+        &format!(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES ({e}, 'Nord') RETURNING id"
+        ),
+    )
+    .await;
+    let einheit: i64 = eine(
+        &elw.pool,
+        &format!(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, abschnitt_id) \
+             VALUES ({e}, '1. Zug', {abschnitt}) RETURNING id"
+        ),
+    )
+    .await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    exec(
+        &elw.pool,
+        &format!("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE id = {einheit}"),
+    )
+    .await;
+    exec(
+        &elw.pool,
+        &format!("DELETE FROM einsatzabschnitt WHERE id = {abschnitt}"),
+    )
+    .await;
+    etb_eintrag(&elw, e, "Danach").await;
+    abgleichen(&elw).await;
+    let abschnitte: i64 = eine(
+        &hub.pool,
+        &format!("SELECT COUNT(*) FROM einsatzabschnitt WHERE einsatz_id = {s}"),
+    )
+    .await;
+    assert_eq!(abschnitte, 0);
+    let ohne: i64 = eine(
+        &hub.pool,
+        &format!(
+            "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = {s} AND abschnitt_id IS NULL"
+        ),
+    )
+    .await;
+    assert_eq!(ohne, 1);
+    assert!(etb_inhalte(&hub, s).await.contains(&"Danach".to_string()));
 }

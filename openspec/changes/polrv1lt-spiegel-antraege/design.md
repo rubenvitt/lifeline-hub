@@ -450,6 +450,48 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   der Admin-Spur gibt es nicht: Der Widerruf selbst steht dort schon (`InstanzKopplungWiderrufen`
   bzw. `…VomGegenueberWiderrufen`), ein zweiter Eintrag sagte nichts Neues.
 
+- **10.11.2026, Review (Aufgabe 10.1), behoben:**
+  - *Bindung an die Kopplung.* Anhang-Stücke gehen nur für Einsätze hinaus, deren Org der
+    anfragenden Kopplung aktiv zugeordnet ist. Quittungen ändern nur Anträge an Spiegel dieser
+    Kopplung. Eine Lieferung gilt nur, wenn die Kennung mit der Instanzkennung des Gegenübers
+    beginnt und der Spiegel (falls es ihn gibt) zu dieser Kopplung gehört. Vorher konnte jedes
+    gekoppelte Gegenüber Anhänge fremder Orgs holen, fremde Anträge quittieren und fremde
+    Spiegel überschreiben.
+  - *Wiederanbinden.* Ein beendeter oder neu zugeordneter Spiegel hängt sich bei der nächsten
+    Lieferung desselben Führers wieder an (`kopplung_org_id`, `beendet_at`).
+  - *Budget.* Anträge stehen vorn und zählen ins Budget (höchstens 512 KiB je Paket, ein Antrag
+    höchstens 64 KiB, größere lehnt der Spiegel mit 413 ab). Vorher konnten wenige große Anträge
+    jedes Paket über 2 MiB treiben und den Abgleich der Kopplung anhalten.
+  - *Erfassungszeit.* Der Spiegel trägt die Antragszeit in das Zeitfeld der Route ein (ETB
+    `ereigniszeit`, sonst `zeitpunkt_at`; Meldung bringt ihre Ereigniszeit selbst), Liste
+    `antrag::ERFASSUNGSZEIT` mit Wächter.
+  - *Wiederholte Zustellung nach Wiederherstellung des Spiegels.* Der Eingang beim Führer trägt
+    einen Fingerabdruck (Art, `client_id`, Erfassungszeit); eine andere Erfassung unter derselben
+    Antragsnummer bekommt keine fremde Quittung.
+  - *Log je Einsatz.* `einsatz_aenderung` ist je `(einsatz_id, art, schluessel)` eindeutig. Eine
+    Kennung, die SQLite nach dem Löschen neu vergibt, verdrängt so die Löschung in einem anderen
+    Einsatz nicht. Ein Kind, das seinem Elternteil per CASCADE folgt, findet seinen Einsatz über
+    die eben geschriebene Löschung des Elternteils im Log.
+  - *Übernehmen (D7).* Eine Löschung, an der noch ein Verweis hängt, folgt nach den geänderten
+    Zeilen (Abschnitt auflösen). Eine Zeile, die an einem eindeutigen Index scheitert, kommt in
+    die nächste Runde. Was danach nicht übernommen ist, steht als Hinweis da, und der Stand bleibt
+    vor ihr stehen: Der Führer liefert sie mit dem nächsten Abgleich wieder, statt dass sie still
+    fehlt. Ausgenommen sind die Zuordnungen zu Sprechgruppen (siehe unten). Scheitert eine
+    Einsatzlieferung ganz, rollt nur ihr Savepoint zurück; die übrigen Einsätze laufen weiter.
+  - *Wiederherstellung beim Führer.* Nennt der Spiegel einen Stand über allem, was das Log des
+    Einsatzes kennt, liefert der Führer ab 0, und eine Lieferung ab 0 setzt den Stand am Spiegel.
+  - *Mehr als 256 Spiegel.* Die meldende Seite nennt höchstens 256 Stände, laufende zuerst.
+  - *Schlüsselzugriffe.* Liefern und Übernehmen vergleichen eine Schlüsselspalte direkt
+    (`Schluessel::gleich`) statt über `CAST(… AS TEXT)`, damit SQLite den Index nimmt.
+  - *Takt.* Ein Lesefehler bei einer Kopplung lässt die übrigen nicht aus; ein angeforderter
+    Anhang eines beendeten Spiegels hält den kurzen Takt nicht.
+- **10.11.2026, Review, offen (Folgeaufgaben):** Sprechgruppen aus dem Katalog der Org
+  (`sprechgruppe.einsatz_id IS NULL`) stehen in keinem Einsatz-Log; Zuordnungen zu ihnen fehlen am
+  Spiegel mit Hinweis. Ebenfalls offen: das Konto eines Antrags gegen die Orgs der Kopplung
+  prüfen (die Route verlangt weiter eine Mitgliedschaft mit Schreibrecht), die Vergabe neuer
+  Spiegel-IDs nach LFH-690, die Prüfsumme je Lieferung aus `anhang.sha256` statt aus dem Inhalt
+  und eine Obergrenze für die Größe eines Inhalts auf Abruf.
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.

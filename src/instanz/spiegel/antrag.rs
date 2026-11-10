@@ -9,7 +9,9 @@
 //!   Sie entsteht nur hier, HTTP kann sie nicht setzen.
 
 use super::abbildung;
-use super::paket::{Antrag, AntragQuittung, KontoAngabe, ANTRAEGE_MAX};
+use super::paket::{
+    Antrag, AntragQuittung, KontoAngabe, ANTRAEGE_BYTES_MAX, ANTRAEGE_MAX, ANTRAG_DATEN_MAX,
+};
 use crate::app::AppState;
 use crate::error::AppError;
 use crate::instanz::repo::KopplungZeile;
@@ -481,6 +483,11 @@ async fn beantragen(
     let bytes = axum::body::to_bytes(body, crate::app::JSON_BODY_MAX)
         .await
         .map_err(|_| AppError::PayloadTooLarge("Anfrage ist zu groß.".into()))?;
+    if bytes.len() > ANTRAG_DATEN_MAX {
+        return Err(AppError::PayloadTooLarge(
+            "Für einen Antrag an die führende Instanz ist die Erfassung zu groß.".into(),
+        ));
+    }
     let mut daten: Value = serde_json::from_slice(&bytes)
         .map_err(|e| AppError::Validation(format!("Body unlesbar: {e}")))?;
     if daten
@@ -543,7 +550,11 @@ async fn beantragen(
                 let mut kopie = daten.clone();
                 let mut typen = Vec::new();
                 jeder_wert(&mut kopie, typ_pfad, &mut typen);
-                let typ = typen.first().and_then(|t| t.as_str()).map(str::to_string);
+                // Wie die Route: Leerraum zählt nicht (`objekt_typ: " einheit"`).
+                let typ = typen
+                    .first()
+                    .and_then(|t| t.as_str())
+                    .map(|t| t.trim().to_string());
                 match ziele.iter().find(|(w, _)| Some(*w) == typ.as_deref()) {
                     Some((_, t)) => AntragZiel::Einsatz(t),
                     None => continue,
@@ -626,12 +637,14 @@ fn antrag_antwort(id: i64, zustand: &str) -> Response {
         .into_response()
 }
 
-/// Die offenen Anträge an Einsätze, die das Gegenüber dieser Kopplung führt.
+/// Die offenen Anträge an Einsätze, die das Gegenüber dieser Kopplung führt, die ältesten zuerst
+/// und höchstens [`ANTRAEGE_BYTES_MAX`] (mindestens einer); dazu ihre Größe im Paket, die vor
+/// den Lieferungen vom Budget abgeht.
 pub async fn offene_antraege(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     meldend: bool,
-) -> Result<Vec<Antrag>, AppError> {
+) -> Result<(Vec<Antrag>, usize), AppError> {
     #[allow(clippy::type_complexity)]
     let zeilen: Vec<(
         i64,
@@ -660,6 +673,7 @@ pub async fn offene_antraege(
     .fetch_all(&mut *conn)
     .await?;
     let mut antraege = Vec::with_capacity(zeilen.len());
+    let mut bytes = 0usize;
     for (
         id,
         kennung,
@@ -700,8 +714,17 @@ pub async fn offene_antraege(
             client_id,
             erfasst_at: erfasst,
         });
+        let groesse = antraege
+            .last()
+            .and_then(|a| serde_json::to_vec(a).ok())
+            .map_or(0, |v| v.len());
+        if bytes + groesse > ANTRAEGE_BYTES_MAX && antraege.len() > 1 {
+            antraege.pop();
+            break;
+        }
+        bytes += groesse;
     }
-    Ok(antraege)
+    Ok((antraege, bytes))
 }
 
 /// Nach einem gelungenen Abgleich: die gesendeten Anträge sind zugestellt.
@@ -720,6 +743,7 @@ pub async fn markiere_zugestellt(conn: &mut SqliteConnection, ids: &[i64]) -> Re
 /// Übernimmt Quittungen des Führers.
 pub async fn quittungen_uebernehmen(
     conn: &mut SqliteConnection,
+    kopplung_id: i64,
     quittungen: &[AntragQuittung],
 ) -> Result<(), AppError> {
     for q in quittungen.iter().take(ANTRAEGE_MAX) {
@@ -730,7 +754,10 @@ pub async fn quittungen_uebernehmen(
         sqlx::query(
             "UPDATE spiegel_antrag SET zustand = ?, grund = ?, ergebnis_art = ?, \
              ergebnis_schluessel = ?, geaendert_at = ? \
-             WHERE id = ? AND zustand IN ('ausstehend', 'zugestellt')",
+             WHERE id = ? AND zustand IN ('ausstehend', 'zugestellt') \
+             AND einsatz_id IN (SELECT s.einsatz_id FROM einsatz_spiegel s \
+                 JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+                 WHERE o.kopplung_id = ?)",
         )
         .bind(zustand)
         .bind(
@@ -742,6 +769,7 @@ pub async fn quittungen_uebernehmen(
         .bind(&q.ergebnis_schluessel)
         .bind(crate::zeit::jetzt())
         .bind(q.id)
+        .bind(kopplung_id)
         .execute(&mut *conn)
         .await?;
     }
@@ -769,27 +797,43 @@ pub async fn ausfuehren(
     meldend: bool,
     a: &Antrag,
 ) -> Result<Option<AntragQuittung>, AppError> {
-    let gespeichert: Option<String> = sqlx::query_scalar(
-        "SELECT quittung FROM spiegel_antrag_eingang WHERE kopplung_id = ? AND fremde_antrag_id = ?",
+    let fingerabdruck = format!(
+        "{}|{}|{}",
+        a.art,
+        a.client_id.as_deref().unwrap_or(""),
+        a.erfasst_at
+    );
+    let gespeichert: Option<(String, String)> = sqlx::query_as(
+        "SELECT quittung, fingerabdruck FROM spiegel_antrag_eingang \
+         WHERE kopplung_id = ? AND fremde_antrag_id = ?",
     )
     .bind(kopplung.id)
     .bind(a.id)
     .fetch_optional(pool)
     .await?;
-    if let Some(q) = gespeichert {
-        return Ok(serde_json::from_str(&q).ok());
+    if let Some((q, f)) = &gespeichert {
+        if *f == fingerabdruck {
+            return Ok(serde_json::from_str(q).ok());
+        }
     }
     let quittung = match ausfuehren_innen(pool, router, kopplung, meldend, a).await? {
         Some(q) => q,
         None => return Ok(None),
     };
     crate::write_retry!(pool, |conn| {
+        // Eine andere Erfassung unter derselben Nummer (Spiegel wiederhergestellt) ersetzt den
+        // alten Eingang.
         sqlx::query(
-            "INSERT OR IGNORE INTO spiegel_antrag_eingang (kopplung_id, fremde_antrag_id, quittung, \
-             erstellt_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO spiegel_antrag_eingang (kopplung_id, fremde_antrag_id, fingerabdruck, \
+             quittung, erstellt_at) VALUES (?, ?, ?, ?, ?) \
+             ON CONFLICT (kopplung_id, fremde_antrag_id) DO UPDATE SET \
+             fingerabdruck = excluded.fingerabdruck, quittung = excluded.quittung, \
+             erstellt_at = excluded.erstellt_at, gemeldet_at = NULL \
+             WHERE spiegel_antrag_eingang.fingerabdruck <> excluded.fingerabdruck",
         )
         .bind(kopplung.id)
         .bind(a.id)
+        .bind(&fingerabdruck)
         .bind(serde_json::to_string(&quittung).unwrap_or_default())
         .bind(crate::zeit::jetzt())
         .execute(&mut *conn)

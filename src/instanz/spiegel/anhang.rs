@@ -152,6 +152,7 @@ pub async fn offene_abrufe(
 /// Ob der Inhalt sich inzwischen geändert hat, prüft der Spiegel am Ende über die Prüfsumme.
 pub async fn liefere_teile(
     conn: &mut SqliteConnection,
+    kopplung_id: i64,
     abrufe: &[AnhangAbruf],
     mut bytes: usize,
 ) -> Result<Vec<AnhangTeil>, AppError> {
@@ -166,11 +167,16 @@ pub async fn liefere_teile(
             continue;
         };
         let Some(spalte) = &t.blob else { continue };
-        let gefuehrt: Option<i64> =
-            sqlx::query_scalar("SELECT id FROM einsatz WHERE kennung = ? AND spiegel = 0")
-                .bind(&a.kennung)
-                .fetch_optional(&mut *conn)
-                .await?;
+        // Nur Einsätze, die diese Kopplung bekommt: geführt und ihre Org ihr aktiv zugeordnet.
+        let gefuehrt: Option<i64> = sqlx::query_scalar(
+            "SELECT e.id FROM einsatz e WHERE e.kennung = ? AND e.spiegel = 0 AND EXISTS ( \
+             SELECT 1 FROM instanz_kopplung_org o WHERE o.kopplung_id = ? \
+             AND o.org_id = e.org_id AND o.widerrufen_at IS NULL)",
+        )
+        .bind(&a.kennung)
+        .bind(kopplung_id)
+        .fetch_optional(&mut *conn)
+        .await?;
         let Some(einsatz_id) = gefuehrt else { continue };
         let besitzt: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM einsatz_aenderung WHERE einsatz_id = ? AND art = ? \
@@ -185,9 +191,9 @@ pub async fn liefere_teile(
             continue;
         }
         let stueck: Option<Vec<u8>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-            "SELECT substr(\"{spalte}\", ?, ?) FROM {} WHERE {} = ?",
+            "SELECT substr(\"{spalte}\", ?, ?) FROM {} WHERE {}",
             t.name,
-            t.schluessel.ausdruck(t.name)
+            t.schluessel.gleich(t.name)
         )))
         .bind(a.ab + 1)
         .bind(TEIL_GROESSE as i64)
@@ -215,6 +221,7 @@ pub async fn liefere_teile(
 /// Inhalte fertig wurden.
 pub async fn uebernehme_teile(
     conn: &mut SqliteConnection,
+    kopplung_id: i64,
     teile: &[AnhangTeil],
 ) -> Result<Vec<i64>, AppError> {
     let schema = schema::schema(conn).await?;
@@ -226,10 +233,12 @@ pub async fn uebernehme_teile(
         let offen: Option<(i64, String, i64, i64)> = sqlx::query_as(
             "SELECT a.einsatz_id, a.lokaler_schluessel, a.groesse, a.empfangen \
              FROM spiegel_anhang a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
-             WHERE s.fremde_kennung = ? AND a.art = ? AND a.fremder_schluessel = ? \
-             AND a.sha256 = ? AND a.fertig_at IS NULL",
+             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+             WHERE s.fremde_kennung = ? AND o.kopplung_id = ? AND a.art = ? \
+             AND a.fremder_schluessel = ? AND a.sha256 = ? AND a.fertig_at IS NULL",
         )
         .bind(&t.kennung)
+        .bind(kopplung_id)
         .bind(&t.art)
         .bind(&t.schluessel)
         .bind(&t.sha256)
@@ -297,9 +306,9 @@ pub async fn uebernehme_teile(
             .execute(&mut *conn)
             .await?;
         let geschrieben = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "UPDATE {} SET \"{spalte}\" = ? WHERE {} = ?",
+            "UPDATE {} SET \"{spalte}\" = ? WHERE {}",
             tab.name,
-            tab.schluessel.ausdruck(tab.name)
+            tab.schluessel.gleich(tab.name)
         )))
         .bind(&inhalt)
         .bind(&lokal)

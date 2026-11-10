@@ -2,7 +2,8 @@
 //! unter dem Merker `spiegel_uebernahme`. Zeilen werden über `spiegel_herkunft` abgebildet,
 //! angelegt oder geändert; Löschungen zuerst. Eine Zeile, deren Pflichtverweis noch fehlt,
 //! wartet auf die übrigen Zeilen der Lieferung; nullbare Verweise setzt ein zweiter Durchgang.
-//! Der Stand rückt nur bis `bis` vor und nur vorwärts.
+//! Der Stand rückt höchstens bis `bis` vor und bleibt vor einer Zeile stehen, die nicht
+//! übernommen wurde; eine Lieferung ab 0 setzt ihn.
 
 use super::abbildung;
 use super::art::Schluessel;
@@ -74,11 +75,39 @@ pub async fn uebernehmen(
     l: &EinsatzLieferung,
 ) -> Result<Ergebnis, AppError> {
     let mut ergebnis = Ergebnis::default();
-    let vorhanden: Option<(i64, i64)> =
-        sqlx::query_as("SELECT einsatz_id, stand FROM einsatz_spiegel WHERE fremde_kennung = ?")
-            .bind(&l.kennung)
-            .fetch_optional(&mut *conn)
+    #[allow(clippy::type_complexity)]
+    let gefunden: Option<(i64, i64, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT s.einsatz_id, s.stand, s.kopplung_org_id, o.kopplung_id, s.beendet_at \
+         FROM einsatz_spiegel s LEFT JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+         WHERE s.fremde_kennung = ?",
+    )
+    .bind(&l.kennung)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some((_, _, _, Some(k), _)) = gefunden {
+        if k != e.kopplung_id {
+            // Der Spiegel gehört zu einer anderen Kopplung: nur sein Führer liefert ihn.
+            ergebnis.hinweise.push(format!(
+                "Einsatz {} wird über eine andere Kopplung gespiegelt; Lieferung verworfen.",
+                l.kennung
+            ));
+            return Ok(ergebnis);
+        }
+    }
+    if let Some((id, _, ko, _, beendet)) = &gefunden {
+        if *ko != Some(e.kopplung_org_id) || beendet.is_some() {
+            // Neu zugeordnet oder neu gekoppelt (der Absender ist derselbe Führer, das prüft der
+            // Aufrufer an der Kennung): der Spiegel hängt sich wieder an.
+            sqlx::query(
+                "UPDATE einsatz_spiegel SET kopplung_org_id = ?, beendet_at = NULL WHERE einsatz_id = ?",
+            )
+            .bind(e.kopplung_org_id)
+            .bind(id)
+            .execute(&mut *conn)
             .await?;
+        }
+    }
+    let vorhanden = gefunden.map(|(id, stand, ..)| (id, stand));
     if let Some((id, stand)) = vorhanden {
         ergebnis.einsatz_id = Some(id);
         ergebnis.stand = stand;
@@ -170,38 +199,18 @@ async fn uebernehme_zeilen(
     };
     ergebnis.einsatz_id = Some(einsatz_id);
     // Löschungen zuerst: eine neue Zeile kann den Platz einer gelöschten einnehmen (Reihenfolge,
-    // eindeutige Paare).
+    // eindeutige Paare). Hängt an der Zeile noch ein Verweis, den erst eine geänderte Zeile dieser
+    // Lieferung löst (Abschnitt auflösen: Einheiten verlieren ihn vorher), folgt sie danach.
+    let mut spaeter_loeschen: Vec<&Zeile> = Vec::new();
     for z in l
         .zeilen
         .iter()
         .filter(|z| z.geloescht && z.art != "einsatz")
     {
-        let Some(t) = schema.tabelle(&z.art) else {
-            continue;
-        };
-        if let Some(lokal) =
-            abbildung::einsatz_lokal(conn, einsatz_id, &z.art, &z.schluessel).await?
-        {
-            sqlx::query(sqlx::AssertSqlSafe(format!(
-                "DELETE FROM {} WHERE {} = ?",
-                t.name,
-                t.schluessel.ausdruck(t.name)
-            )))
-            .bind(&lokal)
-            .execute(&mut *conn)
-            .await?;
-            if t.blob.is_some() {
-                super::anhang::vergiss(conn, t.name, &lokal).await?;
-            }
-            sqlx::query(
-                "DELETE FROM spiegel_herkunft WHERE einsatz_id = ? AND art = ? AND fremder_schluessel = ?",
-            )
-            .bind(einsatz_id)
-            .bind(&z.art)
-            .bind(&z.schluessel)
-            .execute(&mut *conn)
-            .await?;
-            ergebnis.kategorien.insert(t.kategorie);
+        match loeschen(conn, schema, einsatz_id, z, ergebnis).await {
+            Ok(()) => {}
+            Err(AppError::Database(_)) => spaeter_loeschen.push(z),
+            Err(f) => return Err(f),
         }
     }
     // Anlegen und Ändern, in Runden, bis keine wartende Zeile mehr vorankommt.
@@ -211,6 +220,7 @@ async fn uebernehme_zeilen(
         .filter(|z| !z.geloescht && z.art != "einsatz")
         .collect();
     let mut offen: Vec<Offen> = Vec::new();
+    let mut fehler: HashMap<(&str, &str), String> = HashMap::new();
     loop {
         let vorher = wartend.len();
         let mut naechste = Vec::new();
@@ -252,10 +262,10 @@ async fn uebernehme_zeilen(
                             }
                         }
                         Err(AppError::Database(f)) => {
-                            ergebnis.hinweise.push(format!(
-                                "Zeile {} {} nicht übernommen: {f}",
-                                z.art, z.schluessel
-                            ));
+                            // Etwa ein eindeutiger Index, den eine spätere Zeile der Lieferung
+                            // erst freigibt: in der nächsten Runde noch einmal.
+                            fehler.insert((z.art.as_str(), z.schluessel.as_str()), f.to_string());
+                            naechste.push(z);
                         }
                         Err(f) => return Err(f),
                     }
@@ -267,11 +277,33 @@ async fn uebernehme_zeilen(
             break;
         }
     }
+    // Ein Stand vor der ersten Zeile, die nicht übernommen wurde: der Führer liefert sie mit
+    // dem nächsten Abgleich wieder, statt dass sie still fehlt (D7).
+    let mut nachholen_ab: Option<i64> = None;
     for z in &wartend {
+        let grund = fehler
+            .get(&(z.art.as_str(), z.schluessel.as_str()))
+            .cloned()
+            .unwrap_or_else(|| "Bezug fehlt.".into());
         ergebnis.hinweise.push(format!(
-            "Zeile {} {} nicht übernommen: Bezug fehlt.",
+            "Zeile {} {} nicht übernommen: {grund}",
             z.art, z.schluessel
         ));
+        if !OHNE_NACHHOLEN.contains(&z.art.as_str()) {
+            nachholen_ab = Some(nachholen_ab.map_or(z.stand, |n| n.min(z.stand)));
+        }
+    }
+    for z in spaeter_loeschen {
+        if let Err(f) = loeschen(conn, schema, einsatz_id, z, ergebnis).await {
+            let AppError::Database(f) = f else {
+                return Err(f);
+            };
+            ergebnis.hinweise.push(format!(
+                "Zeile {} {} nicht gelöscht: {f}",
+                z.art, z.schluessel
+            ));
+            nachholen_ab = Some(nachholen_ab.map_or(z.stand, |n| n.min(z.stand)));
+        }
     }
     // Zweiter Durchgang: nullbare Verweise auf Zeilen, die erst später kamen.
     for o in offen {
@@ -280,10 +312,10 @@ async fn uebernehme_zeilen(
         };
         let t = schema.tabelle(o.tabelle).expect("Tabelle aus dem Schema");
         sqlx::query(sqlx::AssertSqlSafe(format!(
-            "UPDATE {} SET \"{}\" = ? WHERE {} = ?",
+            "UPDATE {} SET \"{}\" = ? WHERE {}",
             t.name,
             o.spalte,
-            t.schluessel.ausdruck(t.name)
+            t.schluessel.gleich(t.name)
         )))
         .bind(lokal_ziel)
         .bind(&o.lokal)
@@ -291,11 +323,16 @@ async fn uebernehme_zeilen(
         .await?;
     }
     super::anhang::merke_inhalte(conn, einsatz_id, &ergebnis.inhalte).await?;
+    // Ab 0 geliefert (neu, wieder angebunden oder der Führer nach einer Wiederherstellung):
+    // der Stand gilt, wie er kommt; sonst rückt er nur vor.
+    let bis = nachholen_ab.map_or(l.bis, |n| (n - 1).clamp(l.seit, l.bis));
     sqlx::query(
-        "UPDATE einsatz_spiegel SET stand = MAX(stand, ?), letzter_abgleich_at = ?, \
-         freigabestufe = ? WHERE einsatz_id = ?",
+        "UPDATE einsatz_spiegel SET stand = CASE WHEN ? = 0 THEN ? ELSE MAX(stand, ?) END, \
+         letzter_abgleich_at = ?, freigabestufe = ? WHERE einsatz_id = ?",
     )
-    .bind(l.bis)
+    .bind(l.seit)
+    .bind(bis)
+    .bind(bis)
     .bind(crate::zeit::jetzt())
     .bind(&l.freigabestufe)
     .bind(einsatz_id)
@@ -305,6 +342,54 @@ async fn uebernehme_zeilen(
         .bind(einsatz_id)
         .fetch_one(&mut *conn)
         .await?;
+    Ok(())
+}
+
+/// Tabellen, deren nicht übernommene Zeilen nicht nachgeholt werden: sie verweisen auch auf
+/// Sprechgruppen aus dem Katalog der Org, die kein Einsatz-Log kennt; ein Nachholen käme nie an.
+const OHNE_NACHHOLEN: &[&str] = &[
+    "einsatz_fuehrungsstelle_sprechgruppe",
+    "einsatzabschnitt_sprechgruppe",
+    "einsatz_einheit_sprechgruppe",
+    "einsatz_kommunikation_stelle_sprechgruppe",
+    "fernmeldeskizze_komponente_sprechgruppe",
+];
+
+/// Löscht die lokale Zeile einer gelieferten Löschung samt Herkunft.
+async fn loeschen(
+    conn: &mut SqliteConnection,
+    schema: &schema::Schema,
+    einsatz_id: i64,
+    z: &Zeile,
+    ergebnis: &mut Ergebnis,
+) -> Result<(), AppError> {
+    let Some(t) = schema.tabelle(&z.art) else {
+        return Ok(());
+    };
+    let Some(lokal) = abbildung::einsatz_lokal(conn, einsatz_id, &z.art, &z.schluessel).await?
+    else {
+        return Ok(());
+    };
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM {} WHERE {}",
+        t.name,
+        t.schluessel.gleich(t.name)
+    )))
+    .bind(&lokal)
+    .execute(&mut *conn)
+    .await?;
+    if t.blob.is_some() {
+        super::anhang::vergiss(conn, t.name, &lokal).await?;
+    }
+    sqlx::query(
+        "DELETE FROM spiegel_herkunft WHERE einsatz_id = ? AND art = ? AND fremder_schluessel = ?",
+    )
+    .bind(einsatz_id)
+    .bind(&z.art)
+    .bind(&z.schluessel)
+    .execute(&mut *conn)
+    .await?;
+    ergebnis.kategorien.insert(t.kategorie);
     Ok(())
 }
 

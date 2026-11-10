@@ -41,13 +41,18 @@ async fn eigene_staende(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<EinsatzStand>, AppError> {
+    // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann die jüngsten. Ein
+    // abgeschlossener Spiegel, der hier fehlt, bekommt nichts mehr (der Führer liefert nur
+    // laufende Einsätze ungenannt).
     let zeilen: Vec<(String, i64)> = sqlx::query_as(
         "SELECT s.fremde_kennung, s.stand FROM einsatz_spiegel s \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+         JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
-         ORDER BY s.einsatz_id",
+         ORDER BY e.status = 'abgeschlossen', s.einsatz_id DESC LIMIT ?",
     )
     .bind(kopplung_id)
+    .bind(super::paket::EINSAETZE_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
     Ok(zeilen
@@ -102,10 +107,16 @@ async fn uebernehme_alle(
 ) -> Result<Vec<EinsatzStand>, AppError> {
     let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
     let mut staende = Vec::new();
+    // Ein Gegenüber liefert nur Einsätze, die es selbst führt: ihre Kennung beginnt mit seiner.
+    let praefix = format!("{}/", kopplung.gegenueber_kennung);
     for l in &paket.lieferungen {
         let Some(o) = orgs.iter().find(|o| org_wire(eigen, kopplung, o) == l.org) else {
             continue;
         };
+        if !l.kennung.starts_with(&praefix) {
+            tracing::warn!(kennung = %l.kennung, "Spiegel: Lieferung eines fremden Einsatzes verworfen");
+            continue;
+        }
         let e = Empfaenger {
             kopplung_id: kopplung.id,
             kopplung_org_id: o.id,
@@ -117,7 +128,26 @@ async fn uebernehme_alle(
                 .bind(&l.kennung)
                 .fetch_optional(&mut *conn)
                 .await?;
-        let erg: Ergebnis = uebernehmen::uebernehmen(conn, &e, l).await?;
+        // Ein Einsatz, der nicht übernommen werden kann, hält die anderen nicht an: sein
+        // Savepoint ist zurückgerollt, sein Stand bleibt, der Grund steht am Spiegel.
+        let erg: Ergebnis = match uebernehmen::uebernehmen(conn, &e, l).await {
+            Ok(erg) => erg,
+            Err(f) => {
+                tracing::warn!(kennung = %l.kennung, fehler = %f, "Spiegel: Lieferung nicht übernommen");
+                let stand: Option<i64> = sqlx::query_scalar(
+                    "SELECT stand FROM einsatz_spiegel WHERE fremde_kennung = ?",
+                )
+                .bind(&l.kennung)
+                .fetch_optional(&mut *conn)
+                .await?;
+                Ergebnis {
+                    einsatz_id: vorher,
+                    stand: stand.unwrap_or(0),
+                    hinweise: vec![format!("Lieferung nicht übernommen: {f}")],
+                    ..Default::default()
+                }
+            }
+        };
         if !erg.hinweise.is_empty() {
             tracing::warn!(kennung = %l.kennung, hinweise = ?erg.hinweise, "Spiegel: Hinweise beim Übernehmen");
             if let Some(id) = erg.einsatz_id {
@@ -213,15 +243,18 @@ pub async fn handle_abgleich(
             .iter()
             .map(|s| (s.kennung.clone(), s.stand))
             .collect();
-        let fertig = super::anhang::uebernehme_teile(conn, &anfrage.anhang_teile).await?;
+        let fertig =
+            super::anhang::uebernehme_teile(conn, kopplung.id, &anfrage.anhang_teile).await?;
         uebernommen.einsaetze.extend(fertig);
-        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE);
+        super::antrag::quittungen_uebernehmen(conn, kopplung.id, &anfrage.quittungen).await?;
+        // Anträge stehen vorn (D8) und zählen ins Budget.
+        let (antraege, antrag_bytes) =
+            super::antrag::offene_antraege(conn, kopplung.id, false).await?;
+        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
         let lieferungen = liefere_alle(conn, eigen, kopplung, &orgs, &staende, &mut budget).await?;
         let anhang_teile =
-            super::anhang::liefere_teile(conn, &anfrage.abrufe, budget.bytes).await?;
+            super::anhang::liefere_teile(conn, kopplung.id, &anfrage.abrufe, budget.bytes).await?;
         let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
-        super::antrag::quittungen_uebernehmen(conn, &anfrage.quittungen).await?;
-        let antraege = super::antrag::offene_antraege(conn, kopplung.id, false).await?;
         let ids: Vec<i64> = antraege.iter().map(|a| a.id).collect();
         super::antrag::markiere_zugestellt(conn, &ids).await?;
         Ok(SpiegelPaket {
@@ -274,13 +307,15 @@ pub async fn abgleich_einmal(
             .fetch_all(&mut *conn)
             .await?;
             let ziele: HashMap<String, i64> = ziele.into_iter().collect();
-            let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE);
+            // Anträge stehen vorn (D8) und zählen ins Budget.
+            let (antraege, antrag_bytes) =
+                super::antrag::offene_antraege(conn, kopplung.id, true).await?;
+            let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
             let lieferungen =
                 liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
             let anhang_teile =
-                super::anhang::liefere_teile(conn, &abgerufen, budget.bytes).await?;
+                super::anhang::liefere_teile(conn, kopplung.id, &abgerufen, budget.bytes).await?;
             let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
-            let antraege = super::antrag::offene_antraege(conn, kopplung.id, true).await?;
             let quittungen = super::antrag::offene_quittungen(conn, kopplung.id).await?;
             Ok(SpiegelPaket {
                 staende,
@@ -327,11 +362,12 @@ pub async fn abgleich_einmal(
                 .await?;
             }
             uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
-            let fertig = super::anhang::uebernehme_teile(conn, &antwort.anhang_teile).await?;
+            let fertig =
+                super::anhang::uebernehme_teile(conn, kopplung.id, &antwort.anhang_teile).await?;
             uebernommen.einsaetze.extend(fertig);
             let gesendet: Vec<i64> = anfrage.antraege.iter().map(|a| a.id).collect();
             super::antrag::markiere_zugestellt(conn, &gesendet).await?;
-            super::antrag::quittungen_uebernehmen(conn, &antwort.quittungen).await?;
+            super::antrag::quittungen_uebernehmen(conn, kopplung.id, &antwort.quittungen).await?;
             let quittiert: Vec<i64> = anfrage.quittungen.iter().map(|q| q.id).collect();
             let offen: Vec<i64> = antwort.antraege.iter().map(|a| a.id).collect();
             super::antrag::markiere_gemeldet(conn, kopplung.id, &quittiert, &offen).await?;

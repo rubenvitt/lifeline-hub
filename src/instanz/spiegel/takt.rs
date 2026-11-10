@@ -54,7 +54,8 @@ pub async fn ist_aktiv(pool: &SqlitePool, kopplung_id: i64) -> Result<bool, AppE
             WHERE o.kopplung_id = ?1 AND s.beendet_at IS NULL AND e.status = 'aktiv') \
          OR EXISTS (SELECT 1 FROM spiegel_anhang a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-            WHERE o.kopplung_id = ?1 AND a.fertig_at IS NULL AND a.angefordert_at IS NOT NULL) \
+            WHERE o.kopplung_id = ?1 AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
+            AND a.fertig_at IS NULL AND a.angefordert_at IS NOT NULL) \
          OR EXISTS (SELECT 1 FROM spiegel_antrag a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
             WHERE o.kopplung_id = ?1 AND a.zustand IN ('ausstehend', 'zugestellt')) \
@@ -94,7 +95,11 @@ pub async fn durchlauf(
             continue;
         }
         let ergebnis = abgleich::abgleich_einmal(pool, router, &k).await;
-        let aktiv = ist_aktiv(pool, k.id).await?;
+        // Ein Lesefehler hier lässt die übrigen Kopplungen nicht aus: dann gilt der kurze Takt.
+        let aktiv = ist_aktiv(pool, k.id).await.unwrap_or_else(|e| {
+            tracing::warn!(kopplung = k.id, error = %e, "Spiegel: Takt nicht bestimmbar");
+            true
+        });
         let fehlversuche = match &ergebnis {
             Ok(()) => 0,
             Err(f) => {

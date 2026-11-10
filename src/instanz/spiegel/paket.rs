@@ -19,6 +19,11 @@ pub const ABHAENGIGE_MAX: usize = 2000;
 pub const KONTEN_MAX: usize = 1000;
 /// Höchstzahl Anträge und Quittungen je Paket.
 pub const ANTRAEGE_MAX: usize = 200;
+/// Größte erfasste Daten eines Antrags; größere lehnt der Spiegel beim Beantragen ab, damit ein
+/// Antrag das Paket nicht sprengt.
+pub const ANTRAG_DATEN_MAX: usize = 64 * 1024;
+/// Höchstens so viele Bytes Anträge je Paket; sie gehen vor den Lieferungen vom Budget ab.
+pub const ANTRAEGE_BYTES_MAX: usize = 512 * 1024;
 /// Höchstzahl Anhang-Abrufe und -Stücke je Paket.
 pub const ANHAENGE_MAX: usize = 64;
 /// Größe eines Anhang-Stücks (D8).
