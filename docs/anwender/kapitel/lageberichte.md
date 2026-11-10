@@ -51,19 +51,24 @@ sie.
    Abschnitt in der Gliederung springt zu ihm und setzt den Cursor hinein. Auf breiten Schirmen
    steht die Gliederung links und bleibt beim Rollen stehen, sonst steht sie als Zeile über den
    Abschnitten.
-3. Unter „Verteiler“ wählen, an wen der Bericht geht: Einsatzabschnitte, Einheiten, Funktionen
+3. Das ⋮ im Kopf eines Abschnitts bietet „Text kopieren“, „In der Lesefassung zeigen“ und
+   „Abschnitt leeren“. Leeren fragt vorher nach und lässt sich nicht rückgängig machen. Dieselben
+   Einträge öffnen ein Rechtsklick, ein langer Druck oder Umschalt+F10 auf den Kopf oder auf den
+   Abschnitt in der Gliederung; dort steht zusätzlich „Zum Abschnitt springen“. Im Textfeld
+   bleibt das Menü des Browsers zum Kopieren und Einfügen.
+4. Unter „Verteiler“ wählen, an wen der Bericht geht: Einsatzabschnitte, Einheiten, Funktionen
    oder eigener Text. Externe Stellen wie die übergeordnete Führung kommen mit „Externe Stelle
    hinzufügen“ dazu.
-4. Den Text in die Abschnitte schreiben. Im Lagevortrag zur Information steht im Kopf eines
+5. Den Text in die Abschnitte schreiben. Im Lagevortrag zur Information steht im Kopf eines
    Abschnitts ein Knopf, der Inhalte übernimmt, etwa „Aus Meldebild und Führungsorganisation
    übernehmen“ in „Eigene Lage“. Sind dort Abschnitte leer, füllt „Leere Abschnitte aus dem
    Lagebild füllen“ über der Gliederung alle auf einmal; gefüllte bleiben, wie sie sind.
 
    ![Entwurf mit Gliederung links und „Leere Abschnitte aus dem Lagebild füllen“ darüber, Titel, Zeitstand und Verteiler und den offenen Abschnitten, darin „Eigene Lage“ mit übernommenem Kräftemeldebild](../bilder/lageberichte/entwurf.png)
 
-5. „Lesefassung“ oben im Entwurf zeigt den ganzen Bericht gesetzt, so wie er gedruckt wird;
+6. „Lesefassung“ oben im Entwurf zeigt den ganzen Bericht gesetzt, so wie er gedruckt wird;
    „Bearbeiten“ führt zu den Textfeldern zurück. Gedruckt wird, was gerade steht.
-6. „Entwurf speichern“ wählen. Oben steht danach „zuletzt gespeichert …“ mit der Uhrzeit.
+7. „Entwurf speichern“ wählen. Oben steht danach „zuletzt gespeichert …“ mit der Uhrzeit.
 
 ### Einen Lagebericht freigeben
 

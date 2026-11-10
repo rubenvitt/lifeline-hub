@@ -563,6 +563,84 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     assert!(uhs.to_string().contains("\"UHS Bühne\""), "{uhs}");
 }
 
+/// LLH-1611: Eine Qualifikation, die nach dem Planen deaktiviert wird, nennt die Vorschau mit
+/// ihrem Namen, nicht mit ihrer Nummer; übernommen wird sie nicht.
+#[tokio::test]
+async fn deaktivierte_qualifikation_nennt_die_vorschau_mit_namen() {
+    let app = setup().await;
+    let admin = admin(&app).await;
+    let (s, q) = post(
+        &app,
+        &admin,
+        "/api/qualifikationen",
+        json!({"label": "Bootsführer"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{q}");
+    let q = q["id"].as_i64().unwrap();
+    let (s, plan) = post(
+        &app,
+        &admin,
+        PFAD,
+        json!({"bezeichnung": "Regatta", "von": "2027-03-13 08:00:00", "bis": "2027-03-13 23:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let p = plan["kopf"]["id"].as_i64().unwrap();
+    let (s, plan) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/posten"),
+        json!({"bezeichnung": "Boot 1", "art": "einheit"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let posten = plan["posten"][0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/bloecke"),
+        json!({"posten_id": posten, "von": "2027-03-13 10:00:00", "bis": "2027-03-13 12:00:00",
+               "soll_anzahl": 2, "quali_soll": [{"qualifikation_id": q, "anzahl": 1}]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/qualifikationen/{q}/deaktivieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
+    let (s, vorschau) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        json!({"ziel": {"art": "neu"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{vorschau}");
+    let texte: Vec<&str> = vorschau["meldungen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["text"].as_str().unwrap())
+        .collect();
+    assert!(
+        texte.contains(&"Qualifikation «Bootsführer» deaktiviert, ausgelassen"),
+        "{vorschau}"
+    );
+    assert!(
+        !texte.iter().any(|t| t.contains(&format!("#{q}"))),
+        "keine Nummer: {vorschau}"
+    );
+    assert_eq!(vorschau["uebernehmbar"], true, "{vorschau}");
+}
+
 /// Der Stand der Planung aus einer Vorschau „neuer Einsatz“ (LLH-1610).
 async fn stand(app: &axum::Router, cookie: &str, p: i64) -> i64 {
     let (s, v) = post(
