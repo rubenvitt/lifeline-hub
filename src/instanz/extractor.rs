@@ -203,4 +203,13 @@ mod tests {
         let fehler = check_protokoll("/api/instanz/etwas", PROTOKOLL + 2).unwrap_err();
         assert_eq!(fehler.status(), axum::http::StatusCode::UPGRADE_REQUIRED);
     }
+
+    #[test]
+    fn nur_der_abgleich_traegt_grosse_pakete() {
+        assert_eq!(
+            body_max(SPIEGEL_PFAD),
+            crate::instanz::spiegel::paket::SPIEGEL_MAX
+        );
+        assert_eq!(body_max(MELDEN_PFAD), BODY_MAX);
+    }
 }

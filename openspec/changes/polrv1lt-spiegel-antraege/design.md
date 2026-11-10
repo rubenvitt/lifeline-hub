@@ -424,6 +424,15 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   `qualifikationen`) und im eingefrorenen Lagestand nur `bilder[].id`, weil der Client das Bild
   live nachlädt. Alle übrigen IDs im Lagestand bleiben, wie sie sind: Er ist ein Dokument.
 
+- **10.11.2026, Live nach der Übernahme (D7):** Statt eines neuen Ereignisses `spiegel` mit
+  Kategorien meldet der Spiegel je Paket und Einsatz das bestehende `lagged`. Der Client gleicht
+  dann alle Abfragen des Einsatzes ab. Ein eigenes Ereignis bräuchte je Kategorie eine eigene
+  Modul-Schranke (F01); `lagged` gehört keinem Modul und verrät nichts. Ein neuer Spiegel meldet
+  dazu die Einsatzliste der Org.
+- **10.11.2026, Lücke am Spiegel (D6):** Nennt der Spiegel einen niedrigeren Stand als `seit`
+  einer Lieferung (Wiederherstellung), übernimmt er nichts und nennt seinen Stand; die
+  Gegenseite liefert ab dort neu.
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.

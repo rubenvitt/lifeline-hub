@@ -976,8 +976,9 @@ pub async fn mitglied_setzen(
     // Ein Gerätekonto (LFH-892) ist nie Mitglied: es zählt hier als unbekannt.
     let ziel_aktiv: Option<bool> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT b.aktiv FROM benutzer b JOIN einsatz e ON e.id = ? \
-         WHERE b.id = ? AND b.org_id = e.org_id AND {}",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+         WHERE b.id = ? AND b.org_id = e.org_id AND {} AND {}",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     )))
     .bind(id)
     .bind(ziel_id)

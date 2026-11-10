@@ -58,6 +58,12 @@ pub async fn ist_aktiv(pool: &SqlitePool, kopplung_id: i64) -> Result<bool, AppE
     .await?)
 }
 
+/// Abstand bis zum nächsten Abgleich (D12): kurz bei Aktivität, sonst der Takt der Meldung;
+/// Fehler verdoppeln ihn bis zehn Minuten.
+pub fn plan_abstand(aktiv: bool, fehlversuche: u32, kurz: u64, melden: u64) -> u64 {
+    melden::next_abstand(if aktiv { kurz } else { melden }, fehlversuche)
+}
+
 /// Ein Durchlauf: gleicht mit jeder fälligen Kopplung ab, deren Gegenüber den Abgleich kennt.
 /// `immer` übergeht den Plan (Tests).
 pub async fn durchlauf(pool: &SqlitePool, immer: bool) -> Result<(), AppError> {
@@ -74,11 +80,7 @@ pub async fn durchlauf(pool: &SqlitePool, immer: bool) -> Result<(), AppError> {
             continue;
         }
         let ergebnis = abgleich::abgleich_einmal(pool, &k).await;
-        let grund = if ist_aktiv(pool, k.id).await? {
-            abstand_s()
-        } else {
-            melden::abstand_s()
-        };
+        let aktiv = ist_aktiv(pool, k.id).await?;
         let fehlversuche = match &ergebnis {
             Ok(()) => 0,
             Err(f) => {
@@ -86,7 +88,7 @@ pub async fn durchlauf(pool: &SqlitePool, immer: bool) -> Result<(), AppError> {
                 plan.map_or(1, |p| p.fehlversuche + 1)
             }
         };
-        let abstand = melden::next_abstand(grund, fehlversuche);
+        let abstand = plan_abstand(aktiv, fehlversuche, abstand_s(), melden::abstand_s());
         if let Ok(mut p) = PLAN.lock() {
             p.get_or_insert_with(HashMap::new).insert(
                 k.id,
@@ -116,4 +118,66 @@ pub fn start(pool: SqlitePool) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kurzer_takt_nur_bei_aktivitaet_und_fehler_verdoppeln() {
+        assert_eq!(plan_abstand(true, 0, 5, 60), 5);
+        assert_eq!(
+            plan_abstand(false, 0, 5, 60),
+            60,
+            "ruhige Kopplung im Takt der Meldung"
+        );
+        assert_eq!(plan_abstand(true, 2, 5, 60), 20);
+        assert_eq!(plan_abstand(false, 9, 5, 60), 600, "höchstens zehn Minuten");
+    }
+
+    #[tokio::test]
+    async fn aktiv_ist_eine_kopplung_mit_aktivem_einsatz_einer_zugeordneten_org() {
+        let pool = crate::db::test_pool().await;
+        for sql in [
+            "INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Org')",
+            "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, zustand, gegenueber_adresse) \
+             VALUES (1, 'g', 'x', 'G', 'meldet_sich', 'aktiv', 'https://h')",
+            "INSERT INTO instanz_kopplung_org (id, kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (1, 1, 1, 'h/1', 'Org')",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        assert!(!ist_aktiv(&pool, 1).await.unwrap());
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(ist_aktiv(&pool, 1).await.unwrap());
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!ist_aktiv(&pool, 1).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn wecken_macht_jede_kopplung_faellig() {
+        if let Ok(mut p) = PLAN.lock() {
+            p.get_or_insert_with(HashMap::new).insert(
+                4242,
+                Plan {
+                    naechster: Instant::now() + Duration::from_secs(600),
+                    fehlversuche: 0,
+                },
+            );
+        }
+        wecken();
+        let plan = PLAN.lock().unwrap().as_ref().unwrap()[&4242];
+        assert!(plan.naechster <= Instant::now());
+    }
 }

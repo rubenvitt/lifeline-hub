@@ -1393,11 +1393,12 @@ pub async fn mitglied_auswahl(
     let sql = format!(
         "SELECT b.id AS benutzer_id, b.anzeigename \
          FROM benutzer b JOIN einsatz e ON e.id = ? \
-         WHERE b.org_id = e.org_id AND b.aktiv = 1 AND {} \
+         WHERE b.org_id = e.org_id AND b.aktiv = 1 AND {} AND {} \
            AND NOT EXISTS (SELECT 1 FROM einsatz_mitgliedschaft m \
                            WHERE m.einsatz_id = e.id AND m.benutzer_id = b.id) \
          ORDER BY b.anzeigename COLLATE NOCASE, b.id",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
     Ok(
         sqlx::query_as::<_, MitgliedAuswahl>(sqlx::AssertSqlSafe(sql))
@@ -1475,8 +1476,9 @@ pub async fn setze_mitgliedschaft(
     // gleichzeitigen Aufnahmen derselben Person gewinnt genau ein INSERT.
     let guard = format!(
         "EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
-                 WHERE b.id = ?2 AND b.org_id = e.org_id AND {})",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+                 WHERE b.id = ?2 AND b.org_id = e.org_id AND {} AND {})",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
     let eingefuegt = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO einsatz_mitgliedschaft \

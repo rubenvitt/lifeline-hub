@@ -220,6 +220,12 @@ async fn uebernehme_zeilen(
             };
             match abbilden(conn, t, e, l, einsatz_id, daten, &konten).await? {
                 Abgebildet::Wartet => naechste.push(z),
+                Abgebildet::Fertig(werte, _)
+                    if ist_mitgliedschaft_eines_stellvertreters(conn, t, &werte).await? =>
+                {
+                    // Ein Stellvertreter wird nie Mitglied (D5): die Zeile entfällt still.
+                    let _ = werte;
+                }
                 Abgebildet::Fertig(werte, spaeter) => {
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
@@ -345,6 +351,29 @@ async fn kopf_uebernehmen(
     .execute(&mut *conn)
     .await?;
     Ok(id)
+}
+
+async fn ist_mitgliedschaft_eines_stellvertreters(
+    conn: &mut SqliteConnection,
+    t: &Tabelle,
+    werte: &[(String, Value)],
+) -> Result<bool, AppError> {
+    if t.name != "einsatz_mitgliedschaft" {
+        return Ok(false);
+    }
+    let Some(id) = werte
+        .iter()
+        .find(|(s, _)| s == "benutzer_id")
+        .and_then(|(_, w)| w.as_i64())
+    else {
+        return Ok(false);
+    };
+    Ok(
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM spiegel_konto WHERE benutzer_id = ?)")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?,
+    )
 }
 
 /// Lokaler Schlüssel der Zeile `fremd` in `ziel` (der Einsatz selbst ist immer bekannt).

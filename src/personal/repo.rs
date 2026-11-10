@@ -53,8 +53,9 @@ async fn pruefe_benutzer_link(
 ) -> Result<(), AppError> {
     // Ein Gerätekonto (LFH-892) ist keine Person: es zählt hier als fremd.
     let gehoert: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT 1 FROM benutzer b WHERE b.id = ? AND b.org_id = ? AND {}",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+        "SELECT 1 FROM benutzer b WHERE b.id = ? AND b.org_id = ? AND {} AND {}",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     )))
     .bind(benutzer_id)
     .bind(org_id)

@@ -20,6 +20,12 @@ use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// Schließt Stellvertreter fremder Konten aus (design.md D5, Nachtrag 10.11.2026): sie sind keine
+/// Personen dieser Instanz, erscheinen in keiner Verwaltung und werden nie Mitglied. Erwartet den
+/// Alias `b` für `benutzer`.
+pub const OHNE_STELLVERTRETER: &str =
+    "NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)";
+
 /// Nachricht, mit der die Schutz-Trigger abbrechen; `AppError` macht daraus 409 (D10).
 pub const SCHUTZ_NACHRICHT: &str = "einsatz_ist_spiegel";
 

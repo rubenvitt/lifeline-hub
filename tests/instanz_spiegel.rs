@@ -292,3 +292,105 @@ async fn mit_einem_gegenueber_ohne_spiegel_wird_nicht_abgeglichen() {
     let anzahl: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM einsatz_spiegel").await;
     assert_eq!(anzahl, 0);
 }
+
+#[tokio::test]
+async fn konten_nur_einer_seite_werden_stellvertreter_ohne_anmeldung_und_ohne_mitgliedschaft() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    // Erika gibt es an beiden Seiten: der Hub verteilt sie an den ELW.
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        "/api/benutzer",
+        &hub.admin,
+        Some(&json!({"anzeigename": "Erika", "benutzername": "erika", "passwort": "erikapw12"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let erika_hub = v["id"].as_i64().unwrap();
+    melden(&elw).await;
+    let erika_elw = lokale_id(&elw, "benutzer", "benutzername", "erika").await;
+    // Spontanhelfer gibt es nur am ELW.
+    let spontan = common::benutzer_anlegen(&elw.app, &elw.admin, "spontan", "keine").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, spontan, "fuehrungspersonal").await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "beobachter").await;
+    let spontan_cookie = common::login_cookie(&elw.app, "spontan", "spontanpw1").await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/etb"),
+        &spontan_cookie,
+        Some(&json!({ "typ": "meldung", "inhalt": "Sandsäcke da", "von": "A", "an": "B" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    abgleichen(&elw).await;
+
+    let sp = spiegel_von(&hub).await;
+    let verfasser: String = eine(
+        &hub.pool,
+        &format!(
+            "SELECT b.anzeigename FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
+             WHERE e.einsatz_id = {sp} AND e.inhalt = 'Sandsäcke da'"
+        ),
+    )
+    .await;
+    assert_eq!(verfasser, "spontan", "ETB zeigt den Verfasser vom ELW");
+    let (s, liste) = common::anfrage(&hub.app, "GET", "/api/benutzer", &hub.admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        !liste.as_array().unwrap().iter().any(|b| b["benutzername"]
+            .as_str()
+            .unwrap_or("")
+            .starts_with("spiegel:")),
+        "Stellvertreter fehlen in der Benutzerverwaltung: {liste}"
+    );
+    let stellvertreter: String = eine(
+        &hub.pool,
+        "SELECT b.benutzername FROM spiegel_konto k JOIN benutzer b ON b.id = k.benutzer_id \
+         WHERE b.anzeigename = 'spontan'",
+    )
+    .await;
+    let (s, _) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        "/api/auth/login",
+        "",
+        Some(&json!({"benutzername": stellvertreter, "passwort": "spontanpw1"})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNAUTHORIZED,
+        "Stellvertreter meldet sich nie an"
+    );
+    let mitglieder: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT benutzer_id, einsatz_rolle FROM einsatz_mitgliedschaft WHERE einsatz_id = ? \
+         ORDER BY benutzer_id",
+    )
+    .bind(sp)
+    .fetch_all(&hub.pool)
+    .await
+    .unwrap();
+    assert!(
+        mitglieder.contains(&(erika_hub, "beobachter".to_string())),
+        "gemeinsames Konto hat dieselbe Rolle: {mitglieder:?}"
+    );
+    let stellvertreter_mitglied: i64 = eine(
+        &hub.pool,
+        &format!(
+            "SELECT COUNT(*) FROM einsatz_mitgliedschaft m JOIN spiegel_konto k \
+             ON k.benutzer_id = m.benutzer_id WHERE m.einsatz_id = {sp}"
+        ),
+    )
+    .await;
+    assert_eq!(stellvertreter_mitglied, 0, "Stellvertreter nie Mitglied");
+    // Stellvertreter werden nie als Stammdaten verteilt.
+    melden(&elw).await;
+    let am_elw: i64 = eine(
+        &elw.pool,
+        "SELECT COUNT(*) FROM benutzer WHERE benutzername LIKE 'spiegel:%'",
+    )
+    .await;
+    assert_eq!(am_elw, 0);
+}

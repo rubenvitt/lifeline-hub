@@ -300,3 +300,143 @@ async fn verweis_auf_eine_spaeter_geaenderte_zeile_kommt_vorher_mit() {
         "Meldung kam mit dem Eintrag"
     );
 }
+
+#[tokio::test]
+async fn stammdaten_bildet_die_meldende_seite_ab_und_demo_bleibt_draussen() {
+    let (f, s) = zwei_seiten().await;
+    // Ein Fahrzeug vom Hub (Herkunft am ELW) und ein geliehenes, das es nur am ELW gibt.
+    let hub_fahrzeug: i64 = eine(
+        &s,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Hub 1') RETURNING id",
+    )
+    .await;
+    let elw_fahrzeug: i64 = eine(
+        &f,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Hub 1') RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO stammdaten_herkunft (kopplung_org_id, org_id, art, fremder_schluessel, \
+             lokaler_schluessel) VALUES (1, 1, 'fahrzeug', '{hub_fahrzeug}', '{elw_fahrzeug}')"
+        ),
+    )
+    .await;
+    let geliehen: i64 = eine(
+        &f,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Leih 1') RETURNING id",
+    )
+    .await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    for (fz, name) in [(elw_fahrzeug, "Hub 1"), (geliehen, "Leih 1")] {
+        exec(
+            &f,
+            &format!(
+                "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname) \
+                 VALUES ({einsatz}, {fz}, '{name}')"
+            ),
+        )
+        .await;
+    }
+    let demo: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Übung') RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (1, {demo}, '{{}}')"
+        ),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    let anzahl: i64 = eine(&s, "SELECT COUNT(*) FROM einsatz_spiegel").await;
+    assert_eq!(anzahl, 1, "Demo-Einsatz wird nicht gespiegelt");
+    let spiegel: i64 = eine(&s, "SELECT einsatz_id FROM einsatz_spiegel").await;
+    let zeilen: Vec<(String, Option<i64>)> = sqlx::query_as(
+        "SELECT snap_funkrufname, fahrzeug_id FROM einsatz_fahrzeug WHERE einsatz_id = ? \
+         ORDER BY snap_funkrufname",
+    )
+    .bind(spiegel)
+    .fetch_all(&s)
+    .await
+    .unwrap();
+    assert_eq!(
+        zeilen,
+        vec![
+            ("Hub 1".to_string(), Some(hub_fahrzeug)),
+            ("Leih 1".to_string(), None),
+        ],
+        "Hub-Fahrzeug über die Herkunft, geliehenes leer mit Schnappschuss"
+    );
+}
+
+#[tokio::test]
+async fn unbekannte_freigabestufe_haelt_den_spiegel_an() {
+    let (f, s) = zwei_seiten().await;
+    let erika = konto(&f, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    etb(&f, einsatz, 1, erika).await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    let vorher: i64 = eine(&s, "SELECT stand FROM einsatz_spiegel").await;
+    let kennung: String = eine(&s, "SELECT fremde_kennung FROM einsatz_spiegel").await;
+    let l = super::paket::EinsatzLieferung {
+        kennung,
+        org: "hub/1".into(),
+        org_id: 1,
+        freigabestufe: "nur_lage".into(),
+        seit: vorher,
+        bis: vorher + 10,
+        ..Default::default()
+    };
+    let mut sc = s.acquire().await.unwrap();
+    let e = Empfaenger {
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        org_id: 1,
+        meldend: false,
+    };
+    let erg = uebernehmen::uebernehmen(&mut sc, &e, &l).await.unwrap();
+    assert_eq!(erg.stand, vorher, "Stand bleibt");
+    assert!(erg
+        .hinweise
+        .iter()
+        .any(|h| h.contains("Freigabestufe unbekannt")));
+}
+
+#[tokio::test]
+async fn die_volltextsuche_findet_gespiegelte_eintraege() {
+    let (f, s) = zwei_seiten().await;
+    let erika = konto(&f, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit, \
+             received_at) VALUES ({einsatz}, 1, 'meldung', 'Deichbruch bei Kilometer 4', {erika}, \
+             '2026-11-10 00:00:00', '2026-11-10 00:00:00')"
+        ),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    let treffer: i64 = eine(
+        &s,
+        "SELECT COUNT(*) FROM etb_eintrag_fts WHERE etb_eintrag_fts MATCH 'Deichbruch'",
+    )
+    .await;
+    assert_eq!(treffer, 1);
+}
