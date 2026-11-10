@@ -148,6 +148,6 @@ Kein `KatalogVerwaltung` unter den acht Reitern; jeder bekommt dasselbe Muster w
 
 ## Migration Plan
 
-Eine neue Migration (Nummer über jeder auf `alpha`, Stand heute `0311`), rein additiv: Trigger für
+Eine neue Migration (Nummer über jeder auf `alpha`, beim Merge `0312`), rein additiv: Trigger für
 neun Tabellen (acht Arten plus Unterliste), Grundstock ins Änderungslog. Rücknahme: die Trigger
 fallen mit einer Folgemigration; das Log stört ohne Trigger nicht.
