@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import type { PersonDetail } from '../api/types';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import { EinsatzPfadeProvider, GERAET_BETREUUNG_PFADE } from '../routing/EinsatzPfade';
 import Personendaten from './Personendaten';
 
@@ -227,6 +227,18 @@ describe('Personendaten — Haushalt umbauen (LLH-1615)', () => {
     expect(bezug).toBeDisabled();
     expect(aendern).toHaveAccessibleDescription(grund);
     expect(screen.getAllByText(grund)).toHaveLength(1);
+  });
+
+  it('ohne Netz: beide Aktionen gesperrt, der Grund steht einmal am Kopf (CodeRabbit)', async () => {
+    renderMitProviders(<Personendaten einsatzId={1} person={TOM} darfSchreiben />, {
+      datenRouter: true,
+    });
+    const aendern = await screen.findByRole('button', { name: 'Haushalt ändern' });
+    setzeOnline(false);
+    await waitFor(() => expect(aendern).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Zur Bezugsperson machen' })).toBeDisabled();
+    expect(screen.getAllByText('Ohne Verbindung nicht änderbar')).toHaveLength(1);
+    expect(aendern).toHaveAccessibleDescription('Ohne Verbindung nicht änderbar');
   });
 
   it('ohne Modul Betreuung oder ohne Stelle im Verbleib keine Aktionen', async () => {

@@ -29,10 +29,12 @@ export interface HaushaltAktionenProps {
   /** Nach jedem Schreiben (Detail, Liste und ETB abgleichen). */
   onGeschrieben?: () => void;
   /**
-   * Kennung der Zeile mit dem Sperrgrund der Seite, solange ein Feld einen Entwurf hat (Spec
-   * `formularseiten`, „Eine offene Bearbeitung je Ansicht“): dann sind beide Aktionen gesperrt.
+   * Kennung der Zeile, in der die Seite ihren Sperrgrund schon nennt (offene Bearbeitung nach Spec
+   * `formularseiten`, „Eine offene Bearbeitung je Ansicht“, oder ohne Netz). Gesetzt sind beide
+   * Aktionen gesperrt und verweisen dorthin; der eigene Hinweis ohne Netz entfällt, damit der Grund
+   * einmal steht.
    */
-  bearbeitungGrundId?: string;
+  seitenGrundId?: string;
   /** Zusätzlicher Stil am Behälter (ohne Haushaltszeile steht die Aktion für sich). */
   style?: CSSProperties;
 }
@@ -42,7 +44,7 @@ export default function HaushaltAktionen({
   person,
   darfSchreiben,
   onGeschrieben,
-  bearbeitungGrundId,
+  seitenGrundId,
   style,
 }: HaushaltAktionenProps) {
   const { message } = App.useApp();
@@ -81,8 +83,8 @@ export default function HaushaltAktionen({
     return null;
   }
   const haushaltId = person.haushalt_id ?? null;
-  const gesperrt = ohneNetz || bearbeitungGrundId != null;
-  const sperrGrund = ohneNetz ? grundId : bearbeitungGrundId;
+  const gesperrt = ohneNetz || seitenGrundId != null;
+  const sperrGrund = seitenGrundId ?? grundId;
 
   return (
     <span
@@ -95,7 +97,7 @@ export default function HaushaltAktionen({
         ...style,
       }}
     >
-      {ohneNetz && (
+      {ohneNetz && seitenGrundId == null && (
         <Typography.Text id={grundId} type="secondary">
           {OHNE_VERBINDUNG_NICHT_AENDERBAR}
         </Typography.Text>

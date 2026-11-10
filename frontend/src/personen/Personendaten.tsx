@@ -753,7 +753,7 @@ function PersonendatenInhalt({
             person={person}
             darfSchreiben={darfSchreiben}
             onGeschrieben={onGeschrieben}
-            bearbeitungGrundId={grund && !ohneNetz ? grundId : undefined}
+            seitenGrundId={grund ? grundId : undefined}
           />
         </div>
       )}
@@ -764,7 +764,7 @@ function PersonendatenInhalt({
           person={person}
           darfSchreiben={darfSchreiben}
           onGeschrieben={onGeschrieben}
-          bearbeitungGrundId={grund && !ohneNetz ? grundId : undefined}
+          seitenGrundId={grund ? grundId : undefined}
           style={{ marginBottom: token.marginXS }}
         />
       )}
