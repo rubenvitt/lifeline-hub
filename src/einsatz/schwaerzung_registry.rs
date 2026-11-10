@@ -3174,6 +3174,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lokaler_schluessel", G_SPIEGEL),
         ],
     },
+    // Mitbenutzte Katalogzeilen eines Spiegels (LLH-1629).
+    TabellenRegel {
+        tabelle: "spiegel_katalog",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("fremder_schluessel", G_SPIEGEL),
+            retain("lokaler_schluessel", G_SPIEGEL),
+        ],
+    },
     TabellenRegel {
         tabelle: "spiegel_anhang",
         scoping: Scoping::EinsatzId,
