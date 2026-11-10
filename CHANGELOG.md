@@ -1,3 +1,41 @@
+## [1.0.0-alpha.182](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.181...v1.0.0-alpha.182) (2026-11-10)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Beim ersten Start nach dem Update wird die Datenbank automatisch erweitert, damit weitere Kataloge an gekoppelte ELW verteilt werden können.
+- **Gekoppelte ELW übernehmen mehr Kataloge vom Hub:** Nach dem Update erhalten gekoppelte ELW acht weitere Kataloge vom Hub (siehe „Verwaltung“). Einträge, die vom Hub kommen, lassen sich am ELW nicht mehr bearbeiten. Betreiber gekoppelter Fahrzeuge sollten diese Kataloge künftig am Hub pflegen.
+
+### Kräfte und Mittel
+
+- **Kontextmenü im Schichtplan:** Ein Block im Schichtplan-Raster hat jetzt ein eigenes Menü. Es öffnet sich per Rechtsklick, durch langes Drücken oder mit der Kontextmenü-Taste bzw. Umschalt+F10. Das Menü bietet:
+  - „Bearbeiten“
+  - „Als nächsten Block kopieren“: kopiert den Block direkt, ohne Dialog
+  - „Wechsel vollziehen …“: nur im laufenden Einsatz und nur, wenn ein Wechsel möglich ist
+  - „Block löschen …“: fragt vor dem Löschen nach
+- Das Menü gibt es im Einsatz und in der Vorplanung. Wer keine Schreibrechte hat, sieht weiterhin das normale Browsermenü.
+- Wer einen Eintrag im Menü mit der Enter-Taste wählt, schickt den Dialog, der sich danach öffnet, nicht mehr sofort ab. Bisher wurde zum Beispiel ein Block über „Bearbeiten“ sofort gespeichert und der Dialog wieder geschlossen.
+
+### Verwaltung
+
+- **Weitere Kataloge für gekoppelte ELW:** Der Hub verteilt jetzt auch diese Kataloge an gekoppelte ELW:
+  - Schichtmodelle
+  - Einsatz-Vorlagen samt ausgeblendeten Modulen
+  - Stichwort-Vorschläge
+  - Verpflegungs-Vorlagen
+  - Sprechgruppen der Organisation
+  - ETB-Bausteine
+  - Externe Stellen
+  - Unterkunft-Richtwerte
+- **Herkunft in den Stammdaten sichtbar:** In den betroffenen Reitern zeigt ein Abzeichen, ob ein Eintrag „vom Hub“ kommt oder „nur hier“ gepflegt wird. Bei Einträgen vom Hub steht statt der Aktionen der Hinweis „Wird am Hub gepflegt“. Eigene Einträge lassen sich weiterhin überall anlegen.
+- **Vorgaben folgen dem Hub:**
+  - Kommt das Standard-Schichtmodell vom Hub, kann am ELW kein eigenes Modell als Vorgabe gesetzt werden.
+  - Kommt die zuständige Leitstelle vom Hub, lässt sich am ELW keine andere Externe Stelle als zuständige Leitstelle markieren.
+- **Unterkunft-Richtwerte je Wert:** Jeder Richtwert ist einzeln gesperrt. Einen Richtwert, den der Hub nicht vorgibt, kann die Organisation am ELW weiterhin selbst setzen. Werte, die im Einsatz gesetzt sind, bleiben unberührt.
+- **Sprechgruppen:** Verteilt werden nur die Sprechgruppen aus dem Katalog der Organisation. Gibt es mehrere Sprechgruppen mit gleichem Namen, wird eine aktive gegenüber einer stillgelegten bevorzugt.
+- **Löschen am Hub:** Schichtmodelle, Einsatz-Vorlagen, Stichwort-Vorschläge und Unterkunft-Richtwerte werden am ELW nicht stillgelegt, wenn der Hub sie löscht. Verweist eine eigene Vorlage des ELW auf ein Schichtmodell, das am Hub gelöscht wurde, bleibt das Modell am ELW erhalten und gehört dann dem ELW.
+- **Abgleich robuster:** Scheitert eine Löschung, weil der Eintrag noch verwendet wird, holt der ELW sie nach, sobald der Rest der Lieferung übernommen ist. Legt der Hub dabei einen gleichnamigen Eintrag neu an, wird der vorhandene übernommen, statt dass der Abgleich abbricht. Das gilt auch für Material und Fahrzeuge, die ein Einsatz verwendet.
+- Das Kapitel „Instanzkopplung“ und die Beschreibung des Schichtplan-Kontextmenüs in der Anwenderdokumentation sind ergänzt.
+
 ## [1.0.0-alpha.181](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.180...v1.0.0-alpha.181) (2026-11-10)
 
 ### Wichtige Änderungen

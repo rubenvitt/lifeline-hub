@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { offenesMenue, warteAufMenueFokus } from '../test/menue';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -604,5 +605,31 @@ describe('ZeitfensterKarte — Empfänger (LLH-1055 Teil II)', () => {
       empfaenger: { einheiten: [], abschnitte: [], betreuungsstellen: [] },
     });
     expect(within(karte).queryByRole('button', { name: /^Einheiten/ })).toBeNull();
+  });
+});
+
+describe('ZeitfensterKarte — Kontextmenü (LLH-1598)', () => {
+  const rechtsklick = (el: Element) =>
+    fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });
+
+  it('laufend: die Aktionen der Karte, ohne den Sprung „Ausgabe öffnen“', async () => {
+    const { karte, props } = zeige(zeitfenster());
+    expect(rechtsklick(karte)).toBe(false);
+    await warteAufMenueFokus();
+    const menue = within(offenesMenue()).getByRole('menu');
+    expect(menue).toHaveAttribute('aria-label', `Aktionen zu Zeitfenster ${kennung}`);
+    const punkte = within(menue)
+      .getAllByRole('menuitem')
+      .map((e) => e.textContent);
+    expect(punkte[0]).toBe('Ausgabe nachtragen');
+    expect(punkte).toContain('Bedarf bearbeiten');
+    expect(punkte.some((p) => p?.startsWith('Ausgabe öffnen'))).toBe(false);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Ausgabe nachtragen' }));
+    expect(props.onAusgabeNachtragen).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Schreibrecht bleibt das Browsermenü', () => {
+    const { karte } = zeige(zeitfenster(), { darfSchreiben: false });
+    expect(rechtsklick(karte)).toBe(true);
   });
 });

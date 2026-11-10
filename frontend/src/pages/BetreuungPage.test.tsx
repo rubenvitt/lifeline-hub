@@ -127,17 +127,6 @@ async function einsatzAbrufeNach(aktion: () => Promise<void>): Promise<() => num
 
 const zeileVon = (titel: string) => screen.getByText(titel).closest('tr') as HTMLElement;
 
-/**
- * Der offene Dialog mit diesem Titel. Nicht über `findByRole('dialog', { name })`: ohne
- * `ConfigProvider` vergibt antd im Testmodus die id „test-id", der Name aus `aria-labelledby`
- * zeigte auf den ersten Knoten dieser id.
- */
-async function dialogMit(titel: string): Promise<HTMLElement> {
-  const dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByText(titel, { selector: '.ant-modal-title' })).toBeInTheDocument();
-  return dialog;
-}
-
 /** Das geöffnete Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. */
 async function offenesMenue() {
   return waitFor(() => {
@@ -173,7 +162,7 @@ describe('BetreuungPage (LFH-639)', () => {
     const knoepfe = screen.getAllByRole('button', { name: 'Betreuungsstelle anlegen' });
     expect(knoepfe).toHaveLength(2);
     await userEvent.click(knoepfe[1]);
-    await dialogMit('Betreuungsstelle anlegen');
+    await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
     // Die Bezirke sind das Modul Evakuierung (LLH-1034).
     expect(screen.queryByText(/Evakuierungsbezirk/)).toBeNull();
   });
@@ -402,7 +391,7 @@ describe('BetreuungPage (LFH-639)', () => {
     renderPage();
     await screen.findByText('Turnhalle Ost');
     await userEvent.click(screen.getByRole('button', { name: 'Betreuungsstelle anlegen' }));
-    const dialog = await dialogMit('Betreuungsstelle anlegen');
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Halle West');
     await userEvent.type(within(dialog).getByLabelText('Kapazität (Personen)'), '80');
     const neu = await einsatzAbrufeNach(async () => {
@@ -489,7 +478,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
-      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      const dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       const neu = await einsatzAbrufeNach(async () => {
         await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
@@ -510,7 +499,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
-      let dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      let dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       await screen.findByRole('button', { name: /Rückgängig/ });
@@ -519,7 +508,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(
         screen.getByRole('button', { name: 'Belegung melden für Weserstadion' }),
       );
-      dialog = await dialogMit('Belegung melden: Weserstadion');
+      dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Weserstadion' });
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '120');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       await waitFor(() =>
@@ -548,7 +537,7 @@ describe('BetreuungPage (LFH-639)', () => {
       // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
       setzeOnline(false);
       await userEvent.click(melden);
-      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      const dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
 
@@ -571,7 +560,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
-      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      const dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       expect(await screen.findByRole('button', { name: /Rückgängig/ })).toBeInTheDocument();
@@ -587,7 +576,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
-      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      const dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       await waitFor(() =>
@@ -689,7 +678,7 @@ describe('BetreuungPage (LFH-639)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
     );
-    await dialogMit('Belegung melden: Turnhalle Ost');
+    await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
     expect(screen.queryByTestId('stelle-ziel')).toBeNull();
     await userEvent.keyboard('{Escape}');
     // Ein Klick in eine Zelle ohne eigenes Bedienziel (Status) führt auf die Seite der Stelle.
@@ -704,7 +693,9 @@ describe('BetreuungPage (LFH-639)', () => {
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
       /Stornieren/,
     );
-    const dialog = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Betreuungsstelle Turnhalle Ost stornieren?',
+    });
     const ok = within(dialog).getByRole('button', { name: 'Stornieren' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     const abrufeVorher = api.ladeBetreuung.mock.calls.length;
@@ -725,7 +716,9 @@ describe('BetreuungPage (LFH-639)', () => {
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
       /Stornieren/,
     );
-    const dialog = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Betreuungsstelle Turnhalle Ost stornieren?',
+    });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(api.storniereStelle).not.toHaveBeenCalled();
@@ -737,7 +730,9 @@ describe('BetreuungPage (LFH-639)', () => {
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
       /Stornieren/,
     );
-    const stelleStorno = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
+    const stelleStorno = await screen.findByRole('dialog', {
+      name: 'Betreuungsstelle Turnhalle Ost stornieren?',
+    });
     await userEvent.click(
       within(stelleStorno).getByRole('button', { name: 'Stattdessen Status setzen' }),
     );

@@ -10,6 +10,7 @@ import BenutzerPage from './BenutzerPage';
 import { globalKeys } from '../api/queryKeys';
 import { adminFixture } from '../test/fixtures';
 import { warteAufMenueFokus } from '../test/menue';
+import { eintraegeVon, oeffneKontextmenue, trennerVon } from '../test/kontextmenue';
 import {
   EIGENES_KONTO,
   EIGENES_PASSWORT,
@@ -501,22 +502,6 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Beide Dialoge stehen unbedingt im Baum, und antd lässt den geschlossenen als `role="dialog"`
-   * stehen. Über den zugänglichen Namen sind sie nicht zu trennen: `useId` aus `@rc-component/util`
-   * liefert unter `NODE_ENV=test` die Konstante `'test-id'`, beide `aria-labelledby` zeigen auf
-   * dasselbe Element. Unterschieden wird an der sichtbaren Überschrift.
-   */
-  function dialogMitTitel(titel: string): HTMLElement {
-    const treffer = screen
-      .getAllByRole('dialog')
-      .filter((d) => d.querySelector('.ant-modal-title')?.textContent === titel);
-    if (treffer.length !== 1) {
-      throw new Error(`Erwartet genau EIN Modal „${titel}", gefunden ${treffer.length}`);
-    }
-    return treffer[0];
-  }
-
-  /**
    * Zwei Benutzer, damit „Bearbeiten"-Zeilen unterscheidbar sind; die Prüfungen brauchen Anlegen-
    * und Bearbeiten-Dialog.
    */
@@ -549,13 +534,13 @@ describe('BenutzerPage', () => {
     renderMitZwei();
     await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
     await screen.findByRole('dialog');
-    const anlegen = dialogMitTitel('Neuen Benutzer anlegen');
+    const anlegen = screen.getByRole('dialog', { name: 'Neuen Benutzer anlegen' });
     expect(anlegen.querySelector('.ant-modal-footer')).toBeNull();
     expect(within(anlegen).getByRole('button', { name: 'Anlegen' }).closest('form')).not.toBeNull();
     await userEvent.click(within(anlegen).getByRole('button', { name: 'Abbrechen' }));
 
     await waehle('Eva', 'Bearbeiten');
-    const bearbeiten = dialogMitTitel('Benutzer bearbeiten');
+    const bearbeiten = screen.getByRole('dialog', { name: 'Benutzer bearbeiten' });
     expect(bearbeiten.querySelector('.ant-modal-footer')).toBeNull();
     expect(
       within(bearbeiten).getByRole('button', { name: 'Speichern' }).closest('form'),
@@ -622,7 +607,7 @@ describe('BenutzerPage', () => {
 
     await waehle('Eva', 'Bearbeiten');
     await screen.findByRole('dialog');
-    const ersterDialog = dialogMitTitel('Benutzer bearbeiten');
+    const ersterDialog = screen.getByRole('dialog', { name: 'Benutzer bearbeiten' });
     expect(within(ersterDialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
     // Der gewählte Wert eines antd-`Select` steht im sichtbaren Auswahl-Element, nicht
     // im `<input>` — der zugängliche Name der Combobox ist die Feldbeschriftung.
@@ -631,7 +616,7 @@ describe('BenutzerPage', () => {
     await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Abbrechen' }));
 
     await waehle('Ben', 'Bearbeiten');
-    const zweiterDialog = dialogMitTitel('Benutzer bearbeiten');
+    const zweiterDialog = screen.getByRole('dialog', { name: 'Benutzer bearbeiten' });
     await waitFor(() =>
       expect(within(zweiterDialog).getByLabelText('Anzeigename')).toHaveValue('Ben'),
     );
@@ -667,7 +652,7 @@ describe('BenutzerPage', () => {
     await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
-    const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+    const dialog = screen.getByRole('dialog', { name: 'Neuen Benutzer anlegen' });
     // Der Grund steht IM Dialog (LFH-966), nicht im Toast.
     expect(await within(dialog).findByText('Benutzername bereits vergeben')).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
@@ -739,7 +724,7 @@ describe('BenutzerPage', () => {
     await userEvent.type(screen.getByLabelText('Anzeigename'), 'Eva');
     await userEvent.type(screen.getByLabelText('Benutzername'), 'eva');
     await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
-    const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+    const dialog = screen.getByRole('dialog', { name: 'Neuen Benutzer anlegen' });
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.click(await within(dialog).findByLabelText('Org-Rolle'));
     // Die Optionsliste hängt im Portal, nicht im Dialog; gegriffen wird der echte Options-Knoten
@@ -761,7 +746,7 @@ describe('BenutzerPage', () => {
     renderMitZwei();
     await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
     await screen.findByRole('dialog');
-    const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+    const dialog = screen.getByRole('dialog', { name: 'Neuen Benutzer anlegen' });
 
     expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
 
@@ -1065,14 +1050,16 @@ describe('BenutzerPage', () => {
       seite();
       await waehle('Admin', 'Bearbeiten');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      const dialog = dialogMitTitel('Benutzer bearbeiten');
+      const dialog = screen.getByRole('dialog', { name: 'Benutzer bearbeiten' });
       expect(await within(dialog).findByText(grund)).toBeInTheDocument();
       keinToast();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
       await waehle('Admin', 'Bearbeiten');
       await waitFor(() =>
         expect(
-          within(dialogMitTitel('Benutzer bearbeiten')).getByLabelText('Anzeigename'),
+          within(screen.getByRole('dialog', { name: 'Benutzer bearbeiten' })).getByLabelText(
+            'Anzeigename',
+          ),
         ).toHaveValue('Admin'),
       );
       expect(screen.queryByText(grund)).toBeNull();
@@ -1257,7 +1244,7 @@ describe('BenutzerPage', () => {
       });
     async function bearbeitenVon(anzeigename: string) {
       await waehle(anzeigename, 'Bearbeiten');
-      return dialogMitTitel('Benutzer bearbeiten');
+      return screen.getByRole('dialog', { name: 'Benutzer bearbeiten' });
     }
 
     it('fragt nach, vergibt und zeigt das Passwort einmal', async () => {
@@ -1448,5 +1435,50 @@ describe('BenutzerPage und Stammdaten-Verteilung (LLH-1493)', () => {
     const bearbeiten = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
     expect(within(bearbeiten).getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(within(bearbeiten).getByRole('button', { name: /Einmalpasswort/ })).toBeEnabled();
+  });
+
+  describe('Kontextmenü (LLH-1599)', () => {
+    it('Rechtsklick auf eine Zeile zeigt die Einträge des ⋮; die Wahl wirkt wie dort', async () => {
+      const eva = benutzer({
+        id: 2,
+        anzeigename: 'Eva',
+        benutzername: 'eva',
+        system_rolle: 'keiner',
+        totp_aktiviert: true,
+      });
+      let deaktiviert = false;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva])),
+        http.post('/api/benutzer/2/deaktivieren', () => {
+          deaktiviert = true;
+          return HttpResponse.json({ ...eva, aktiv: false });
+        }),
+      );
+      renderMitProviders(<BenutzerPage />);
+      const zeile = (await screen.findByText('@eva')).closest('tr')!;
+      const menue = await oeffneKontextmenue(within(zeile).getByText('@eva'));
+      expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Benutzer Eva (@eva)');
+      expect(eintraegeVon(menue)).toEqual([
+        'Bearbeiten',
+        'Anmeldungen',
+        'rot:Zweiten Faktor zurücksetzen …',
+        'rot:Deaktivieren',
+      ]);
+      expect(trennerVon(menue)).toBe(1);
+      await userEvent.click(within(menue).getByRole('menuitem', { name: 'Deaktivieren' }));
+      await waitFor(() => expect(deaktiviert).toBe(true));
+    });
+
+    it('eigenes Konto: „Deaktivieren“ steht gesperrt mit Grund, wie im ⋮', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      );
+      renderMitProviders(<BenutzerPage />);
+      const zeile = (await screen.findByText('@admin')).closest('tr')!;
+      const kontext = eintraegeVon(await oeffneKontextmenue(within(zeile).getByText('@admin')));
+      expect(kontext[kontext.length - 1]).toMatch(/^Deaktivieren gesperrt: .* \(gesperrt\)$/);
+    });
   });
 });

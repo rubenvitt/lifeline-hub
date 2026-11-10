@@ -93,9 +93,9 @@ test('Detailseite „Lagevortrag zur Entscheidung" bleibt bei 1366 px unter der 
   await vorbereiten(page);
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${berichtId}`);
-  await expect(page.getByLabel('Auftrag')).toBeVisible();
+  await expect(page.getByLabel('Auftrag', { exact: true })).toBeVisible();
   // Alle acht offen (LLH-1074) — die Höhe gilt für das ganze Dokument, nicht für einen Abschnitt.
-  await expect(page.getByLabel('Vorschlag der besten Möglichkeit')).toBeVisible();
+  await expect(page.getByLabel('Vorschlag der besten Möglichkeit', { exact: true })).toBeVisible();
 
   // Erst messen, wenn die Höhe STEHT: `autoSize` misst die Textfelder nach dem Einhängen nach.
   const hoehe = await stabileHoehe(page);
@@ -125,7 +125,7 @@ test('Detailseite im Entwurf: kein waagerechter Überlauf bei 390 px, Gliederung
   await vorbereiten(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${berichtId}`);
-  await expect(page.getByLabel('Auftrag')).toBeVisible();
+  await expect(page.getByLabel('Auftrag', { exact: true })).toBeVisible();
   const gliederung = page.getByRole('navigation', { name: 'Gliederung' });
   await expect(gliederung.getByRole('button')).toHaveCount(8);
   const mass = await page.evaluate(() => {
@@ -221,7 +221,7 @@ test('Lageberichte: Liste ohne Querlauf und Detail unter der Höhengrenze (Beoba
     'Vorbedingung: der Druckknopf bleibt — der Kopf ist gerendert',
   ).toBeVisible();
   await expect(
-    page.getByLabel('Auftrag'),
+    page.getByLabel('Auftrag', { exact: true }),
     'Vorbedingung: ohne Schreibrecht kein Editor',
   ).toHaveCount(0);
   for (const name of ['Entwurf speichern', 'Freigeben']) {

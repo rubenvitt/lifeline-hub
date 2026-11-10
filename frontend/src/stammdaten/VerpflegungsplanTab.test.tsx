@@ -8,6 +8,13 @@ import { VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { adminFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  knopfreiheVon,
+  oeffneKontextmenue,
+} from '../test/kontextmenue';
+import { setzeViewportBreite } from '../test/viewport';
 import { herkunftHandler } from '../test/stammdatenHerkunft';
 import { mahlzeit, verpflegungsplan } from '../test/verpflegungVorlageDaten';
 import VerpflegungsplanTab from './VerpflegungsplanTab';
@@ -213,6 +220,37 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
   });
 });
 
+describe('VerpflegungsplanTab · Kontextmenü (LLH-1599)', () => {
+  it('am breiten Schirm zeigt das Kontextmenü die Knöpfe der Zeile, die Wahl wirkt wie der Knopf', async () => {
+    setzeViewportBreite(1280);
+    const plan = [...verpflegungsplan(), mahlzeit({ id: 5, bezeichnung: 'Kaffee', aktiv: false })];
+    const { anfragen } = render(admin, plan);
+    for (const name of ['Mittag', 'Kaffee']) {
+      const z = await zeile(name);
+      const menue = await oeffneKontextmenue(z.querySelector('td')!);
+      expect(menue).toHaveAttribute('aria-label', `Aktionen zu Mahlzeit ${name}`);
+      expect(eintraegeVon(menue)).toEqual(knopfreiheVon(z));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]')).toBeNull(),
+      );
+    }
+    const menue = await oeffneKontextmenue((await zeile('Kaffee')).querySelector('td')!);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aktivieren' }));
+    await waitFor(() =>
+      expect(anfragen).toContainEqual(
+        expect.objectContaining({ methode: 'PATCH', pfad: '/api/verpflegung-vorlagen/5' }),
+      ),
+    );
+  });
+
+  it('ohne Verwaltungsrecht bleibt das Browsermenü', async () => {
+    setzeViewportBreite(1280);
+    render(nichtAdmin);
+    erwarteBrowsermenue((await zeile('Mittag')).querySelector('td')!);
+  });
+});
+
 describe('VerpflegungsplanTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
   it('sperrt die Mahlzeit vom Hub und lässt die eigene bearbeitbar', async () => {
     server.use(herkunftHandler({ verpflegung_vorlage: ['1'] }));
@@ -220,6 +258,8 @@ describe('VerpflegungsplanTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
     const hubZeile = await zeile('Frühstück');
     await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
     expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    // Gesperrt heißt auch: kein eigenes Kontextmenü (LLH-1599 × kjezbk06).
+    erwarteBrowsermenue(hubZeile.querySelector('td')!);
     expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
 

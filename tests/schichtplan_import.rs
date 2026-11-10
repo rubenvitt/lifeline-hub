@@ -121,7 +121,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
         json!({"einheiten_neu": 1, "uhs_neu": 0, "bloecke_neu": 10, "bloecke_ergaenzt": 0,
                "bloecke_unveraendert": 0, "helfer_neu": 7, "einteilungen_neu": 20,
                "grenzwerte_neu": 0, "programmpunkte_neu": 0,
-               "programmpunkte_vorhanden": 0, "aenderungen": 38})
+               "programmpunkte_vorhanden": 0, "abschnitte_neu": 0, "aenderungen": 38})
     );
     let (_, plan) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
     assert_eq!(plan["bloecke"], json!([]), "Vorschau schreibt nichts");

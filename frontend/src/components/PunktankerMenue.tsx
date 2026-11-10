@@ -109,7 +109,21 @@ export default function PunktankerMenue({
   const offen = anker != null;
   useEffect(() => {
     if (!offen) return;
+    // Ein Eintrag per Enter wählt und schließt noch im `keydown`, und `schliessen` gibt den Fokus
+    // dabei an `fokusZiel` zurück. Danach aktivierte der Browser das Element mit dem Fokus: ein
+    // Knopf oder Link löste mit aus (LLH-1601; Spec `datensatz-aktionsmenue`, ein Griff löst nur
+    // die gewählte Aktion aus). `preventDefault` in der Capture-Phase nimmt dem Tastendruck nur
+    // diese Folge; rc-menu wählt weiter (sein Hörer am Menü fragt `defaultPrevented` nicht, und
+    // `menu.onKeyDown` erreicht es bei Enter im senkrechten Menü gar nicht).
+    const preventActivation = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.target instanceof Element && e.target.closest('.ant-dropdown [role="menu"]')) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', preventActivation, true);
     return () => {
+      window.removeEventListener('keydown', preventActivation, true);
       const aktiv = document.activeElement;
       if (!aktiv || aktiv === document.body || aktiv.closest('.ant-dropdown'))
         fokusZielRef.current?.()?.focus({ preventScroll: true });

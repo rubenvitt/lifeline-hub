@@ -150,28 +150,6 @@ const zeileVon = (titel: string) => screen.getByText(titel).closest('tr') as HTM
 const band = () => screen.getByRole('group', { name: 'Räumung in Zahlen' });
 
 /**
- * Der offene Dialog mit diesem Titel. Nicht über `findByRole('dialog', { name })`: ohne
- * `ConfigProvider` vergibt antd im Testmodus die id „test-id", der Name aus `aria-labelledby`
- * zeigte auf den ersten Knoten dieser id.
- */
-async function dialogMit(titel: string): Promise<HTMLElement> {
-  const dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByText(titel, { selector: '.ant-modal-title' })).toBeInTheDocument();
-  return dialog;
-}
-
-/** Wie `dialogMit`, aber auch, solange ein zweiter (schließender) Dialog noch im Baum steht. */
-async function dialogUnter(titel: string): Promise<HTMLElement> {
-  return waitFor(() => {
-    const dialog = screen
-      .getAllByRole('dialog')
-      .find((d) => d.querySelector('.ant-modal-title')?.textContent === titel);
-    expect(dialog).toBeDefined();
-    return dialog!;
-  });
-}
-
-/**
  * Das geöffnete Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. Kommt erst
  * zurück, wenn der späte `autoFocus` verbraucht ist: sonst zieht er den Fokus nach der Wahl ins
  * geschlossene Menü (LLH-1390, siehe `test/menue.ts`).
@@ -192,7 +170,7 @@ async function meldeStand(evakuiert: string) {
   await userEvent.click(
     await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
   );
-  const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
+  const dialog = await screen.findByRole('dialog', { name: 'Stand melden: Uferstraße 12–40' });
   await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), evakuiert);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
 }
@@ -366,7 +344,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
       // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
       setzeOnline(false);
       await userEvent.click(melden);
-      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
+      const dialog = await screen.findByRole('dialog', { name: 'Stand melden: Uferstraße 12–40' });
       await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '200');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
 
@@ -501,7 +479,9 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await userEvent.click(
       within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
     );
-    const dialog = await dialogMit('Bezirk Uferstraße 12–40 stornieren?');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Bezirk Uferstraße 12–40 stornieren?',
+    });
     const ok = within(dialog).getByRole('button', { name: 'Stornieren' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     const neu = await einsatzAbrufeNach(async () => {
@@ -521,11 +501,13 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await userEvent.click(
       within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
     );
-    const storno = await dialogMit('Bezirk Uferstraße 12–40 stornieren?');
+    const storno = await screen.findByRole('dialog', {
+      name: 'Bezirk Uferstraße 12–40 stornieren?',
+    });
     await userEvent.click(
       within(storno).getByRole('button', { name: 'Stattdessen Räumung setzen' }),
     );
-    await dialogUnter('Räumung: Uferstraße 12–40');
+    await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
     expect(api.storniereBezirk).not.toHaveBeenCalled();
   });
 
@@ -534,7 +516,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     renderPage();
     await screen.findByText('Uferstraße 12–40');
     await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
-    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Keins' }));
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
@@ -561,7 +543,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     renderPage();
     await screen.findByText('Uferstraße 12–40');
     await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
-    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
     expect(within(dialog).getByRole('radio', { name: 'Fläche zeichnen' })).toBeChecked();
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
@@ -582,7 +564,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     renderPage();
     await screen.findByText('Uferstraße 12–40');
     await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
-    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Radius' }));
@@ -606,7 +588,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     renderPage();
     await screen.findByText('Uferstraße 12–40');
     await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
-    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Uferstraße 12–40');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -622,7 +604,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await screen.findByText('Uferstraße 12–40');
     await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
     await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
-    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
     expect(within(dialog).getByRole('radio', { name: 'Keins' })).toBeChecked();
     expect(
       within(dialog).getByRole('radio', { name: 'Fläche zeichnen (Keine Berechtigung)' }),
@@ -690,7 +672,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await userEvent.click(
       within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
     );
-    const dialog = await dialogMit('Räumung: Uferstraße 12–40');
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
     await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }).closest('label')!);
     const neu = await einsatzAbrufeNach(async () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
@@ -740,7 +722,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await userEvent.click(
       within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
     );
-    const dialog = await dialogMit('Räumung: Uferstraße 12–40');
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
     // Fremd auf „geräumt" gesetzt: der Dialog zeigt es, die Person wählt zurück auf „läuft".
     act(() => {
       client.setQueryData<EvakuierungUebersicht>(einsatzKeys.evakuierung(1), {

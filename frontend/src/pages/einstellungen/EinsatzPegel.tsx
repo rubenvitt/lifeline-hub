@@ -5,7 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Formularpaneel, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
-import { MenueAusloeser } from '../../components/MenueAusloeser';
+import type { MenueEintrag } from '../../components/MenueAusloeser';
+import type { WeitereAktionen } from '../../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
+import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
@@ -218,6 +221,71 @@ export default function EinsatzPegel() {
     [stationenQ.data],
   );
 
+  /**
+   * Aktionen eines Pegels, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, design.md D3). Einheitsform
+   * (LFH-683): Verschieben und Prognose neutral, dann EIN Trenner, dann das Entfernende rot. Der
+   * Name trägt die Zeilenkennung. Läuft eine Änderung der Liste, steht alles gesperrt (ein zweiter
+   * Vollersatz-PUT liefe gegen einen alten Stand).
+   */
+  const pegelListe = pegelQ.data ?? [];
+  const listeLaeuft =
+    aendern.isPending || prognoseLoeschen.isPending || prognoseWiederherstellen.isPending;
+  const pegelMenue: WeitereAktionen<PegelAnzeige> | undefined = darfImEinsatzSchreiben(
+    daten.einsatz,
+  )
+    ? {
+        eintraege: (p) => {
+          const index = pegelListe.findIndex((x) => x.station_uuid === p.station_uuid);
+          const eintraege: MenueEintrag[] = [
+            {
+              key: 'hoch',
+              icon: <IconPfeilHoch />,
+              label: 'Nach oben',
+              ...(index === 0 ? { gesperrt: true as const } : {}),
+            },
+            {
+              key: 'runter',
+              icon: <IconPfeilRunter />,
+              label: 'Nach unten',
+              ...(index === pegelListe.length - 1 ? { gesperrt: true as const } : {}),
+            },
+            {
+              key: 'prognose',
+              icon: <IconStift />,
+              label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
+            },
+            ...(p.prognose
+              ? [
+                  {
+                    key: 'prognose-loeschen',
+                    icon: <IconMuelleimer />,
+                    label: 'Prognose löschen',
+                    gefahr: true as const,
+                  },
+                ]
+              : []),
+            { key: 'entfernen', icon: <IconMuelleimer />, label: 'Entfernen', gefahr: true },
+          ];
+          return listeLaeuft
+            ? eintraege.map((e) => ({ ...e, gesperrt: true as const }))
+            : eintraege;
+        },
+        zugaenglicherName: (p) => `Aktionen zu Pegel ${p.name}`,
+        onWahl: (key, p) => {
+          const uuid = p.station_uuid;
+          if (key === 'hoch') aendern.mutate({ art: 'verschieben', uuid, richtung: -1 });
+          else if (key === 'runter') aendern.mutate({ art: 'verschieben', uuid, richtung: 1 });
+          else if (key === 'entfernen') aendern.mutate({ art: 'entfernen', uuid });
+          else if (key === 'prognose') setPrognoseFuer(p);
+          else if (key === 'prognose-loeschen') prognoseLoeschen.mutate(p);
+        },
+      }
+    : undefined;
+  const kontext = useZeilenMenueKontext(pegelMenue, {
+    finde: (k) => pegelListe.find((p) => p.station_uuid === k),
+    schluessel: (p) => p.station_uuid,
+  });
+
   if (daten.laedt || pegelQ.isLoading) return <SeitenSkeleton />;
   /*
    * Ohne Bestand kein Bearbeiten: ein gescheiterter Abruf fiele sonst in die leere Liste, und der
@@ -281,96 +349,54 @@ export default function EinsatzPegel() {
           rowKey={(p) => p.station_uuid}
           emptyText="Noch kein Pegel festgelegt"
           renderItem={(p, index) => (
-            <ListenEintrag
-              actions={
-                darf
-                  ? [
-                      // Einheitsform (LFH-683): Verschieben und Prognose neutral, dann EIN
-                      // Trenner, dann das Entfernende rot. Der Name trägt die Zeilenkennung.
-                      <MenueAusloeser
-                        key="aktionen"
-                        gesperrt={laeuft}
-                        eintraege={[
-                          {
-                            key: 'hoch',
-                            icon: <IconPfeilHoch />,
-                            label: 'Nach oben',
-                            ...(index === 0 ? { gesperrt: true as const } : {}),
-                          },
-                          {
-                            key: 'runter',
-                            icon: <IconPfeilRunter />,
-                            label: 'Nach unten',
-                            ...(index === liste.length - 1 ? { gesperrt: true as const } : {}),
-                          },
-                          {
-                            key: 'prognose',
-                            icon: <IconStift />,
-                            label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
-                          },
-                          ...(p.prognose
-                            ? [
-                                {
-                                  key: 'prognose-loeschen',
-                                  icon: <IconMuelleimer />,
-                                  label: 'Prognose löschen',
-                                  gefahr: true as const,
-                                },
-                              ]
-                            : []),
-                          {
-                            key: 'entfernen',
-                            icon: <IconMuelleimer />,
-                            label: 'Entfernen',
-                            gefahr: true,
-                          },
-                        ]}
-                        zugaenglicherName={`Aktionen zu Pegel ${p.name}`}
-                        onWahl={(key) => {
-                          const uuid = p.station_uuid;
-                          if (key === 'hoch')
-                            aendern.mutate({ art: 'verschieben', uuid, richtung: -1 });
-                          else if (key === 'runter')
-                            aendern.mutate({ art: 'verschieben', uuid, richtung: 1 });
-                          else if (key === 'entfernen') aendern.mutate({ art: 'entfernen', uuid });
-                          else if (key === 'prognose') setPrognoseFuer(p);
-                          else if (key === 'prognose-loeschen') prognoseLoeschen.mutate(p);
-                        }}
-                      />,
-                    ]
-                  : undefined
-              }
-            >
-              <ListenEintragMeta
-                title={
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: token.marginXS,
-                    }}
-                  >
-                    <span data-lfh="pegel-titel">{`${index + 1}. ${p.name}`}</span>
-                    {index === 0 && <Tag data-lfh="leitpegel">Leitpegel</Tag>}
-                  </span>
+            // Hülle für das Kontextmenü: `ListenEintrag` nimmt keine Ereignis-Props (LLH-1599 D3).
+            <div data-lfh="pegel-eintrag" {...(pegelMenue ? kontext.ausloeser(p) : {})}>
+              <ListenEintrag
+                actions={
+                  pegelMenue
+                    ? [
+                        <ZeilenMenueAusloeser
+                          key="aktionen"
+                          menue={pegelMenue}
+                          zeile={p}
+                          gesperrt={laeuft}
+                        />,
+                      ]
+                    : undefined
                 }
-                description={
-                  <span style={{ color: rollen.gedaempft }}>
-                    {[p.gewaesser, messText(p)].filter(Boolean).join(' · ')}
-                    {p.prognose && (
-                      <span data-lfh="pegel-prognose" style={{ display: 'block' }}>
-                        {prognoseOffen(p.prognose, Date.now())
-                          ? prognoseText(p.prognose, Date.now(), konv)
-                          : `${prognoseText(p.prognose, Date.now(), konv)} · abgelaufen`}
-                      </span>
-                    )}
-                  </span>
-                }
-              />
-            </ListenEintrag>
+              >
+                <ListenEintragMeta
+                  title={
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: token.marginXS,
+                      }}
+                    >
+                      <span data-lfh="pegel-titel">{`${index + 1}. ${p.name}`}</span>
+                      {index === 0 && <Tag data-lfh="leitpegel">Leitpegel</Tag>}
+                    </span>
+                  }
+                  description={
+                    <span style={{ color: rollen.gedaempft }}>
+                      {[p.gewaesser, messText(p)].filter(Boolean).join(' · ')}
+                      {p.prognose && (
+                        <span data-lfh="pegel-prognose" style={{ display: 'block' }}>
+                          {prognoseOffen(p.prognose, Date.now())
+                            ? prognoseText(p.prognose, Date.now(), konv)
+                            : `${prognoseText(p.prognose, Date.now(), konv)} · abgelaufen`}
+                        </span>
+                      )}
+                    </span>
+                  }
+                />
+              </ListenEintrag>
+            </div>
           )}
         />
+        {kontext.menue}
 
         {/* Sichtbares Label über dem Feld, kein bloßes aria-label. */}
         <label

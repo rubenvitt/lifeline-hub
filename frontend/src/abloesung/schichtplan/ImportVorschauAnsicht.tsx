@@ -19,7 +19,9 @@ import { useRollen } from '../../components/instrument';
  * Vorschau einer Übernahme in den Schichtplan (LLH-1556, design.md D10): Zählung, Fehler, Posten
  * und Personen mit ihrer Wahl, Hinweise. Ein Kern, zwei Quellen: „Schichtplan einlesen“ aus einer
  * Datei und „In Einsatz übernehmen“ aus einer Planung (LLH-1587) zeigen dieselbe Vorschau des
- * Servers. Jede Wahl geht über `onWahl` an den Aufrufer, der die Vorschau neu abfragt.
+ * Servers. Jede Wahl geht über `onWahl` an den Aufrufer, der die Vorschau neu abfragt. Aus einer
+ * Planung entstehen fehlende Abschnitte mit (LLH-1609): die Vorschau nennt sie und markiert die
+ * Posten, die hineinkommen.
  */
 
 export const LEERE_WAHL: SchichtplanEntscheidungenEingabe = { posten: {}, personen: {} };
@@ -46,6 +48,9 @@ export function zaehlungMarken(z: SchichtplanImportZaehlung): string[] {
   if (z.einteilungen_neu > 0)
     marken.push(`${mehrzahl(z.einteilungen_neu, 'Einteilung', 'Einteilungen')}`);
   if (z.helfer_neu > 0) marken.push(`${mehrzahl(z.helfer_neu, 'Helfer', 'Helfer')} neu`);
+  // Nur aus der Vorplanung (LLH-1609); eine Datei legt keine Abschnitte an.
+  if (z.abschnitte_neu > 0)
+    marken.push(`${mehrzahl(z.abschnitte_neu, 'Abschnitt', 'Abschnitte')} neu`);
   if (z.einheiten_neu > 0) marken.push(`${mehrzahl(z.einheiten_neu, 'Einheit', 'Einheiten')} neu`);
   if (z.uhs_neu > 0) marken.push(`${mehrzahl(z.uhs_neu, 'UHS', 'UHS')} neu`);
   // Nur aus der Vorplanung (LLH-1583); eine Datei bringt keine Programmpunkte.
@@ -158,6 +163,11 @@ function PostenZeile({
         {posten.abschnitt != null && (
           <Typography.Text type="secondary"> · {posten.abschnitt}</Typography.Text>
         )}
+        {posten.abschnitt_neu && (
+          <Tag data-lfh="einlesen-abschnitt-neu" style={{ marginInlineStart: token.marginXS }}>
+            neu
+          </Tag>
+        )}
       </span>
       <Treffer treffer={posten.treffer} />
       {posten.art !== 'pause' && (
@@ -269,6 +279,16 @@ export function ImportVorschauAnsicht({
         ))}
       </Flex>
       <Meldungen meldungen={vorschau.meldungen} stufe="fehler" />
+      {vorschau.abschnitte_neu.length > 0 && (
+        <section aria-label="Neue Abschnitte" data-lfh="einlesen-abschnitte-neu">
+          <Typography.Title level={5}>Neue Abschnitte</Typography.Title>
+          <Flex gap={token.marginXS} wrap>
+            {vorschau.abschnitte_neu.map((name) => (
+              <Tag key={name}>{name}</Tag>
+            ))}
+          </Flex>
+        </section>
+      )}
       {vorschau.posten.length > 0 && (
         <section aria-label="Posten">
           <Typography.Title level={5}>Posten</Typography.Title>

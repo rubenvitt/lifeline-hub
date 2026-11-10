@@ -156,6 +156,8 @@ function LageberichtDetail() {
       werte[VERTEILER_FIELD],
       berichtQuery.data!.verteiler,
     );
+    // Reihenfolge und Abbruch beim Verlassen hält der Hook (`useEntwurfVerlustschutz`,
+    // „SPEICHERFOLGE“, LLH-1619): er ruft `speichern` erst, wenn der vorige Auftrag zurück ist.
     return aktualisiereLagebericht(einsatzId, berichtId, {
       titel: werte.titel,
       ...(verteiler ? { verteiler } : {}),
@@ -182,6 +184,7 @@ function LageberichtDetail() {
    */
   const schutz = useEntwurfVerlustschutz<LageberichtAnzeige, FormWerte>({
     daten: berichtQuery.data,
+    geladenAm: berichtQuery.dataUpdatedAt,
     istEntwurf: berichtQuery.data?.status === 'entwurf',
     form,
     werteAus: (b) => {

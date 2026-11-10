@@ -11,12 +11,20 @@ export const AUTOSAVE_MS = 30_000;
 interface VerlustschutzArgs<D, W extends object> {
   /** Serverstand (Query-Data). `undefined`, solange nichts geladen ist. */
   daten: D | undefined;
+  /**
+   * Wann `daten` geladen wurde (`query.dataUpdatedAt`). Ändert sich mit jedem Laden, auch wenn
+   * React Query bei gleichem Inhalt dieselbe Referenz liefert (LLH-1628, s. „NACH DER QUITTUNG“).
+   */
+  geladenAm: number;
   /** Nur im Entwurf läuft die Autosave-Uhr. */
   istEntwurf: boolean;
   form: FormInstance<W>;
   /** Serverstand → Formularwerte. Wird über eine Ref gelesen, darf also inline stehen. */
   werteAus: (daten: D) => W;
-  /** Der PATCH. Wird über eine Ref gelesen, darf also inline stehen. */
+  /**
+   * Der PATCH. Wird über eine Ref gelesen, darf also inline stehen. Der Hook ruft ihn erst, wenn
+   * der vorige zurück ist (SPEICHERFOLGE); die Seite reiht nichts selbst.
+   */
   speichern: (werte: W) => Promise<unknown>;
   /** Nach JEDEM erfolgreichen Speichern (Invalidierung) — genau einmal je PATCH. */
   onGespeichert?: () => void;
@@ -77,6 +85,13 @@ interface Verlustschutz<W extends object> {
  * Der Riegel fällt nur, wenn ihn noch derselbe Auftrag hält (`auftragRef`). Die API ist bewusst
  * eng: kein öffentlicher Weg, einen zweiten Speicherpfad daneben zu bauen.
  *
+ * **DIE SPEICHERFOLGE** (LLH-1619). Ein Auftrag (c) startet seinen PATCH erst, wenn der vorige
+ * zurück ist, gleich ob mit Erfolg oder Fehler. Parallel könnte ein spätes älteres S1 beim Server
+ * nach S2 ankommen und S2 überschreiben, während das Formular S2 zeigt und quittiert. Die Folge
+ * liegt hier und nicht in den Seiten, damit keine Seite sie vergessen kann. Verlässt man den
+ * Editor („Verwerfen“, Unmount), starten vorgemerkte Aufträge nicht mehr (`AbortError`); ein
+ * laufender PATCH läuft zu Ende.
+ *
  * Befehls- und Lageberichtsentwurf nutzen zusätzlich
  * `EntwurfNavigationSchutz` (`useBlocker`), der denselben Merker liest; dieser Hook selbst bleibt
  * routerunabhängig.
@@ -92,6 +107,7 @@ interface Verlustschutz<W extends object> {
  */
 export function useEntwurfVerlustschutz<D, W extends object>({
   daten,
+  geladenAm,
   istEntwurf,
   form,
   werteAus,
@@ -118,15 +134,43 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const uhrzeitRef = useRef(() => uhrzeit(dayjs(), konventionen));
   uhrzeitRef.current = () => uhrzeit(dayjs(), konventionen);
 
+  /**
+   * **NACH DER QUITTUNG** wird nur ein Serverstand geschrieben, der NACH ihr geladen wurde
+   * (LLH-1607, LLH-1628). Fällt der Riegel mit einer Quittung, ist `daten` bis zum Refetch ein
+   * älterer Stand: der vom Start des PATCH (LLH-1607) oder, in DER SPEICHERFOLGE, der Refetch nach
+   * der Quittung des Vorgängers, der kam, während der Nachfolger lief (LLH-1628). Ihn zu schreiben
+   * setzte die eben gesicherte Fassung zurück, und schlösse eine Eingabe den Riegel vor dem
+   * nächsten Refetch, bliebe es dabei.
+   *
+   * Eine fremde Änderung geht dabei nicht verloren: die Quittung invalidiert (`onGespeichert`),
+   * und der Refetch danach trägt sie samt eigenem Stand. Kommt er bei gleichem Inhalt mit derselben
+   * Referenz zurück (structural sharing), ändert sich doch `geladenAm`; deshalb hängt die Regel am
+   * Ladezeitpunkt, nicht an der Referenz.
+   *
+   * Überholt ist, was bei der Quittung im Render stand (Referenz UND Ladezeitpunkt), und was
+   * vorher geladen, aber noch nicht gerendert war (`geladenAm` vor der Quittung). Ein laufender
+   * Abruf von davor kommt nicht mehr an: die Invalidierung bricht ihn ab (`cancelRefetch`). Die
+   * Referenz gehört dazu, weil eine stehende Uhr (Fake-Timer, Bilderlauf) jedem Laden denselben
+   * Zeitpunkt gibt; allein am Zeitpunkt bliebe dort jede spätere fremde Änderung draußen.
+   */
+  const datenRef = useRef(daten);
+  datenRef.current = daten;
+  const geladenAmRef = useRef(geladenAm);
+  geladenAmRef.current = geladenAm;
+  const quittungRef = useRef<{ zeit: number; daten: D | undefined; geladenAm: number } | null>(
+    null,
+  );
   useEffect(() => {
     if (!daten) return;
     if (!formular.da) return; // (4)
     if (ungespeichert) return; // DER RIEGEL (1)
+    const q = quittungRef.current;
+    if (q && ((daten === q.daten && geladenAm === q.geladenAm) || geladenAm < q.zeit)) return;
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
-  }, [daten, form, formular.da, ungespeichert]);
+  }, [daten, geladenAm, form, formular.da, ungespeichert]);
 
   /**
-   * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Befehlseditors) ist kein
+   * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Editors, s. SPEICHERFOLGE) ist kein
    * Speicherfehler.
    */
   const meldeSpeicherfehler = useCallback((e: unknown) => {
@@ -154,9 +198,16 @@ export function useEntwurfVerlustschutz<D, W extends object>({
    * persistierten Stand.
    */
   const gesichertRef = useRef(-1);
+  /** Der Änderungsstand gilt beim EINREIHEN: dann werden die Werte gelesen. */
   const quittungVorbereiten = useCallback(() => {
     const stand = aenderungRef.current;
     return () => {
+      // Alles bis hierher Geladene ist mit diesem PATCH überholt (NACH DER QUITTUNG, s. o.).
+      quittungRef.current = {
+        zeit: Date.now(),
+        daten: datenRef.current,
+        geladenAm: geladenAmRef.current,
+      };
       // VOR der Verzweigung: der Server hat in BEIDEN Zweigen gespeichert, sonst bliebe nach einem
       // überholten Speichern ein veralteter Grund stehen.
       setSpeicherFehler(null);
@@ -172,6 +223,16 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const laeuftRef = useRef(false);
   const auftragRef = useRef<Promise<unknown> | null>(null);
   const standRef = useRef(0);
+  // DIE SPEICHERFOLGE: der zuletzt eingereihte Auftrag. `aktivRef` fällt beim Unmount; ein
+  // späteres Öffnen desselben Datensatzes bekommt eigene Refs und eine eigene Folge.
+  const folgeRef = useRef<Promise<unknown>>(Promise.resolve());
+  const aktivRef = useRef(true);
+  useEffect(() => {
+    aktivRef.current = true;
+    return () => {
+      aktivRef.current = false;
+    };
+  }, []);
 
   /** Der EINE Speicherweg. Lehnt mit dem Grund des Servers ab; Zustand setzt der Aufrufer. */
   const speichereMit = useCallback(
@@ -180,7 +241,13 @@ export function useEntwurfVerlustschutz<D, W extends object>({
       standRef.current = aenderungRef.current;
       setSpeichertGerade(true);
       const quittieren = quittungVorbereiten();
-      const auftrag = speichernRef.current(werte);
+      const auftrag = folgeRef.current
+        .catch(() => {}) // Ein Fehlschlag des vorigen sperrt den nächsten Versuch nicht.
+        .then(() => {
+          if (!aktivRef.current) throw new DOMException('Editor verlassen', 'AbortError');
+          return speichernRef.current(werte);
+        });
+      folgeRef.current = auftrag;
       auftragRef.current = auftrag;
       return auftrag
         .then((r) => {
@@ -206,7 +273,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     if (!ungespeichert) return;
     /**
      * Der Riegel sperrt DIE DUBLETTE, nicht den Fortschritt: ein Blur mit NEUEREM Stand bekommt
-     * seinen eigenen PATCH, den die `speicherfolge` der Seite hinter den laufenden setzt.
+     * seinen eigenen PATCH, den DIE SPEICHERFOLGE hinter den laufenden setzt.
      */
     if (laeuftRef.current && aenderungRef.current === standRef.current) return;
     // Der Grund bleibt als Zustand stehen, bis ein Speichern gelingt.

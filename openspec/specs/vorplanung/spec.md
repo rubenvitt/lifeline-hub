@@ -129,19 +129,44 @@ kommen, auch vergangene; einen Punkt mit gleicher Bezeichnung (ohne Groß- und K
 gleichem Zeitpunkt, den der Einsatz schon hat, MUST die Übernahme auslassen. Hätte der Einsatz
 danach mehr als 50 Programmpunkte, MUST die Vorschau das als Fehler nennen, ohne zu kürzen. Fehler des Abgleichs MUST es mit 422 ablehnen, ohne etwas zu
 schreiben, ebenso eine Übernahme in einen laufenden Einsatz ohne jede Änderung. Jeder Posten MUST
-eine Einheit oder UHS werden oder einer vorhandenen zugeordnet sein, auch ohne Block. Ein laufender Einsatz MUST zur eigenen Organisation gehören (404 sonst) und verlangt
+eine Einheit oder UHS werden oder einer vorhandenen zugeordnet sein, auch ohne Block. Fehlt dem
+Einsatz der Abschnitt eines Postens, der eine neue Einheit oder UHS wird (kein Abschnitt trägt den
+Text als Name oder Kurzbezeichnung, ohne Groß- und Kleinschreibung), MUST die Übernahme ihn in
+derselben Transaktion anlegen und den Posten hineinstellen, im neuen wie im laufenden Einsatz;
+gleiche Texte MUST einen Abschnitt ergeben. Die Vorschau MUST die neuen Abschnitte nennen. Ohne
+Freigabe des Moduls Einsatzabschnitte oder bei mehreren passenden Abschnitten MUST kein Abschnitt
+entstehen; der Posten kommt ohne, mit einem Hinweis. Ein Posten, der eine vorhandene Einheit oder
+UHS trifft, MUST keinen Abschnitt anlegen. Ein laufender Einsatz MUST zur eigenen Organisation gehören (404 sonst) und verlangt
 Schreibrecht und die Module Ablösung und Personal (403), aktiv (409). Niemand wird alarmiert oder
 disponiert. Danach MUST die Planung schreibgeschützt sein: jeder Schreibweg und eine zweite
 Übernahme antworten mit 409, Lesen und Löschen bleiben. Kopf und Liste MUST Zeitpunkt, Einsatz und
 Einsatznummer der Übernahme nennen und die Kennzahlen vom Zeitpunkt der Übernahme zeigen.
+Die Vorschau MUST den Stand der Planung nennen, auf dem sie beruht, und jede Änderung der Planung
+(Kopf, Posten, Reihenfolge, Blöcke mit Personen, Helfer, Programmpunkte) MUST diesen Stand
+erhöhen. Das Übernehmen MUST den Stand der Vorschau mitschicken (400 ohne) und MUST mit 409
+ablehnen, ohne etwas zu schreiben, wenn sich die Planung seitdem geändert hat; die Planung bleibt
+dann beschreibbar, und der Dialog MUST die Vorschau mit demselben Ziel und derselben Wahl neu holen
+und sagen, dass sich die Planung geändert hat (LLH-1610).
 
 #### Scenario: Neuer Einsatz
 - **WHEN** eine Führungskraft die Demo-Planung „Stadtfest Musterstadt“ in einen neuen Einsatz übernimmt
 - **THEN** entsteht der Einsatz „Stadtfest Musterstadt“ mit ihr als Einsatzleitung, vier neuen Einheiten, einer UHS, zwei Helfern und jedem Block der Planung im Schichtplan
 
+#### Scenario: Abschnitte der Planung
+- **WHEN** die Demo-Planung „Stadtfest Musterstadt“ in einen neuen Einsatz übernommen wird
+- **THEN** nennt die Vorschau „3 Abschnitte neu“ (Marktplatz, Festmeile, Bühne), der Einsatz hat danach diese Abschnitte, jede Einheit und UHS steht im Abschnitt ihres Postens, und der KTW ohne Abschnitt bleibt ohne
+
+#### Scenario: Fehlender Abschnitt im laufenden Einsatz
+- **WHEN** eine Planung mit dem neuen Posten „Streife 1“ im Abschnitt „Festmeile“ in einen laufenden Einsatz ohne diesen Abschnitt übernommen wird
+- **THEN** entsteht dort der Abschnitt „Festmeile“ mit der Einheit „Streife 1“; ein vorhandener Abschnitt „Nord“ nimmt Posten mit „nord“ auf, ohne dass ein zweiter entsteht
+
 #### Scenario: Zweiter Aufruf
 - **WHEN** jemand dieselbe Planung danach noch einmal übernimmt oder einen Posten anlegt
 - **THEN** antwortet das System mit 409 und legt keinen Einsatz an
+
+#### Scenario: Planung seit der Vorschau geändert
+- **WHEN** jemand einen Block der Planung ändert, nachdem die Vorschau geholt ist, und dann „Übernehmen“ gewählt wird
+- **THEN** antwortet das System mit 409, legt keinen Einsatz an, die Planung bleibt beschreibbar, und der Dialog zeigt die neu geholte Vorschau mit „Planung geändert, Vorschau neu geladen“
 
 #### Scenario: Laufender Einsatz
 - **WHEN** eine Planung mit dem Posten „Streife 2“ in einen laufenden Einsatz mit der Einheit „Streife 2“ übernommen wird
