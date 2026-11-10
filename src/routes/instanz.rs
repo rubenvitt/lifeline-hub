@@ -597,17 +597,47 @@ pub async fn melden(
 /// D6): Lieferungen ihrer Einsätze und ihre Stände der unseren hinein, unsere hinaus.
 pub async fn spiegel_abgleich(
     State(state): State<AppState>,
+    axum::Extension(platz): axum::Extension<crate::instanz::spiegel::antrag::RouterPlatz>,
     anfrage: GekoppelteInstanz,
 ) -> Result<Response, AppError> {
     let body: crate::instanz::spiegel::paket::SpiegelPaket = anfrage.json()?;
     let antwort = crate::instanz::spiegel::abgleich::handle_abgleich(
         &state.pool,
+        platz.router().as_ref(),
         &anfrage.identitaet,
         &anfrage.kopplung,
         &body,
     )
     .await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
+}
+
+/// GET /api/einsaetze/{id}/antraege — die eigenen Anträge an einem Spiegel (LLH-1492, Spec
+/// `spiegel-antraege`); an einem eigenen Einsatz leer.
+pub async fn antraege_liste(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzKontext,
+) -> Result<Json<Vec<crate::instanz::spiegel::antrag::SpiegelAntragAnzeige>>, AppError> {
+    Ok(Json(
+        crate::instanz::spiegel::antrag::liste(&state.pool, ctx.einsatz.id, ctx.benutzer.id)
+            .await?,
+    ))
+}
+
+/// DELETE /api/einsaetze/{id}/antraege/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
+pub async fn antrag_verwerfen(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzKontext,
+    PfadParam((_eid, antrag_id)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    crate::instanz::spiegel::antrag::verwerfen(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        antrag_id,
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────

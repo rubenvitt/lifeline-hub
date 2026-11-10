@@ -102,7 +102,7 @@ async fn gekoppelt_gemeldet() -> (Instanz, Instanz) {
 }
 
 async fn abgleichen(elw: &Instanz) {
-    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, true)
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
         .await
         .unwrap();
 }
@@ -576,4 +576,315 @@ async fn der_uhs_plan_kommt_ebenso_auf_abruf() {
     }
     let am_hub: Vec<u8> = eine(&hub.pool, "SELECT daten FROM uhs_plan").await;
     assert_eq!(am_hub, bild);
+}
+
+// ── Anträge (D9, D11) ────────────────────────────────────────────────────────────────────────
+
+/// Legt am Hub ein Konto an, das der Hub an den ELW verteilt; liefert (id am Hub, Cookie am Hub,
+/// id am ELW).
+async fn gemeinsames_konto(hub: &Instanz, elw: &Instanz, name: &str) -> (i64, String, i64) {
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        "/api/benutzer",
+        &hub.admin,
+        Some(&json!({"anzeigename": name, "benutzername": name, "passwort": format!("{name}pw12345")})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id_hub = v["id"].as_i64().unwrap();
+    exec(
+        &hub.pool,
+        "UPDATE benutzer SET passwort_wechsel_pflicht = 0",
+    )
+    .await;
+    let cookie = common::login_cookie(&hub.app, name, &format!("{name}pw12345")).await;
+    melden(elw).await;
+    let id_elw = lokale_id(elw, "benutzer", "benutzername", name).await;
+    (id_hub, cookie, id_elw)
+}
+
+async fn antraege(i: &Instanz, einsatz: i64, cookie: &str) -> Vec<serde_json::Value> {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/antraege"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v.as_array().cloned().unwrap_or_default()
+}
+
+#[tokio::test]
+async fn ein_etb_eintrag_am_hub_wird_antrag_und_beim_elw_uebernommen() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let vorher = etb_inhalte(&hub, s).await.len();
+    let body = json!({ "typ": "meldung", "inhalt": "Vom Stab", "von": "Stab", "an": "EL",
+                       "client_id": "c-1" });
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    assert_eq!(v["antrag"]["zustand"], "ausstehend");
+    // Dieselbe client_id ergibt denselben Antrag.
+    let (_, v2) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(v2["antrag"]["id"], v["antrag"]["id"]);
+    assert_eq!(
+        etb_inhalte(&hub, s).await.len(),
+        vorher,
+        "nicht in die Daten des Spiegels"
+    );
+    let offen = antraege(&hub, s, &erika).await;
+    assert_eq!(offen.len(), 1);
+    assert_eq!(offen[0]["daten"]["inhalt"], "Vom Stab");
+
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let verfasser: String = eine(
+        &elw.pool,
+        &format!(
+            "SELECT b.benutzername FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
+             WHERE e.einsatz_id = {e} AND e.inhalt = 'Vom Stab'"
+        ),
+    )
+    .await;
+    assert_eq!(verfasser, "erika", "im Namen des Kontos");
+    let anzahl: i64 = eine(
+        &elw.pool,
+        &format!("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = {e} AND inhalt = 'Vom Stab'"),
+    )
+    .await;
+    assert_eq!(anzahl, 1, "genau einmal");
+    assert!(etb_inhalte(&hub, s).await.contains(&"Vom Stab".to_string()));
+    assert!(
+        antraege(&hub, s, &erika).await.is_empty(),
+        "verschwindet mit der Zeile"
+    );
+}
+
+#[tokio::test]
+async fn antraege_an_den_hub_und_ihre_ablehnungen() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (erika_hub, _, _) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    common::rolle_setzen(&hub.app, &hub.admin, e, erika_hub, "fuehrungspersonal").await;
+    let p = common::person_anlegen(&hub.app, &hub.admin, e, r#"{"name":"Max"}"#).await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&elw).await;
+    // Spontanhelfer gibt es nur am ELW; er bekommt am Spiegel keine Rolle über den Hub. Für den
+    // Fall „Konto am Führer unbekannt“ geben wir ihm die Rolle direkt am Spiegel.
+    let spontan = common::benutzer_anlegen(&elw.app, &elw.admin, "spontan", "keine").await;
+    // Ohne bestätigte Platte kommt Erikas Passwort nicht mit; am ELW setzen wir ein lokales.
+    exec(
+        &elw.pool,
+        "UPDATE benutzer SET passwort_hash = (SELECT passwort_hash FROM benutzer \
+         WHERE benutzername = 'spontan'), passwort_wechsel_pflicht = 0 WHERE benutzername = 'erika'",
+    )
+    .await;
+    let erika = common::login_cookie(&elw.app, "erika", "spontanpw1").await;
+    {
+        let mut tx = elw.pool.begin().await.unwrap();
+        for sql in [
+            "INSERT INTO spiegel_uebernahme (id) VALUES (1)".to_string(),
+            format!(
+                "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+                 VALUES ({s}, {spontan}, 'fuehrungspersonal')"
+            ),
+            "DELETE FROM spiegel_uebernahme".to_string(),
+        ] {
+            sqlx::query(sqlx::AssertSqlSafe(sql))
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        tx.commit().await.unwrap();
+    }
+    let spontan_cookie = common::login_cookie(&elw.app, "spontan", "spontanpw1").await;
+    let p_spiegel = lokale_id(&elw, "einsatz_person", "einsatz_id", &s.to_string()).await;
+    let _ = p;
+
+    // Erika: Notiz an der Person, wird am Hub übernommen.
+    let (st, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen/{p_spiegel}/notizen"),
+        &erika,
+        Some(&json!({ "text": "Ansprechbar", "client_id": "n-1" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    // Spontan: ETB-Eintrag, das Konto kennt der Hub nicht.
+    let (st, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &spontan_cookie,
+        Some(&json!({ "typ": "meldung", "inhalt": "Spontan", "von": "A", "an": "B", "client_id": "s-1" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    // Mit Anhang geht es am Spiegel nicht.
+    let (st, _) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(
+            &json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "a-1",
+                      "anhang_ids": [1] }),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let notiz: i64 = eine(
+        &hub.pool,
+        &format!("SELECT COUNT(*) FROM person_verlaufsnotiz WHERE einsatz_id = {e}"),
+    )
+    .await;
+    assert_eq!(notiz, 1, "Notiz beim Hub übernommen");
+    let abgelehnt = antraege(&elw, s, &spontan_cookie).await;
+    assert_eq!(abgelehnt.len(), 1, "{abgelehnt:?}");
+    assert_eq!(abgelehnt[0]["zustand"], "abgelehnt");
+    assert_eq!(abgelehnt[0]["grund"], "Konto am Führer unbekannt.");
+    // Verwerfen räumt ihn.
+    let id = abgelehnt[0]["id"].as_i64().unwrap();
+    let (st, _) = common::anfrage(
+        &elw.app,
+        "DELETE",
+        &format!("/api/einsaetze/{s}/antraege/{id}"),
+        &spontan_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::NO_CONTENT);
+
+    // Der Hub schließt den Einsatz ab; ein neuer Antrag wird mit Grund abgelehnt.
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    let (st, _) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen/{p_spiegel}/notizen"),
+        &erika,
+        Some(&json!({ "text": "Später", "client_id": "n-2" })),
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::ACCEPTED,
+        "Spiegel weiß noch nichts vom Abschluss"
+    );
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let liste = antraege(&elw, s, &erika).await;
+    let roh: Vec<(String, String, Option<String>)> =
+        sqlx::query_as("SELECT daten, zustand, grund FROM spiegel_antrag")
+            .fetch_all(&elw.pool)
+            .await
+            .unwrap();
+    let spaet = liste
+        .iter()
+        .find(|a| a["daten"]["text"] == "Später")
+        .unwrap_or_else(|| panic!("Antrag fehlt: {liste:?} {roh:?}"));
+    assert_eq!(spaet["zustand"], "abgelehnt");
+    assert!(
+        spaet["grund"].as_str().unwrap().contains("abgeschlossen"),
+        "{spaet}"
+    );
+}
+
+#[tokio::test]
+async fn ein_beobachter_stellt_keinen_antrag() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "beobachter").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let (st, _) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(
+            &json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "b-1" }),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_es_keinen_akteur() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    common::person_anlegen(&elw.app, &elw.admin, e, r#"{"name":"Max"}"#).await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let p = lokale_id(&hub, "einsatz_person", "einsatz_id", &s.to_string()).await;
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen/{p}/notizen"),
+        &erika,
+        Some(&json!({ "text": "Notiz", "client_id": "v-1" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    // Wie eine Person, die der Führer inzwischen nicht mehr kennt.
+    exec(
+        &hub.pool,
+        "UPDATE spiegel_antrag SET pfad_parameter = '{\"pid\":\"999999\"}'",
+    )
+    .await;
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let a = antraege(&hub, s, &erika).await;
+    assert_eq!(a[0]["zustand"], "abgelehnt");
+    assert_eq!(a[0]["grund"], "Bezug nicht mehr vorhanden.");
+    // Ohne Cookie führt kein Kopf zu einem Konto: nur die interne Extension tut das.
+    let (st, _) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/etb"),
+        "antrag_akteur=1",
+        Some(&json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
 }

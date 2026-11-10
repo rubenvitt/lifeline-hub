@@ -438,6 +438,13 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   Lesemarke; „Eingänge gelesen“ und das Quittieren schreiben lokal und sind keine Anträge.
   `BEANTRAGBAR` hat damit 16 Einträge. Hinweise zu Ereignissen eines ELW am Hub bringt LLH-1495.
 
+- **10.11.2026, Router für die Anträge (D11):** Der Router liegt nicht im `AppState`, sondern als
+  Extension `RouterPlatz` an jeder Anfrage; `build_router_mit` setzt ihn, sobald er steht. Die
+  Route des Abgleichs liest ihn daraus, der Takt bekommt ihn beim Start. Mehrere Instanzen in
+  einem Prozess (Tests) behalten so je ihren eigenen Router. Die Kennung eines Antrags kehrt nie
+  wieder (`AUTOINCREMENT`): Der Führer erkennt eine zweite Zustellung an ihr, und ein
+  aufgeräumter Antrag darf keinen neuen verdecken (gefunden im Integrationstest).
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.

@@ -191,6 +191,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("spiegel_ziel", "Verwaltung des Spiegels selbst"),
     ("spiegel_anhang", "Verwaltung des Spiegels selbst"),
     (
+        "spiegel_antrag",
+        "Anträge gehen als Antrag zum Führer, nicht als Zeile",
+    ),
+    (
         "spiegel_anhang_teil",
         "Inhalt auf dem Weg; gilt erst in seiner Zeile",
     ),

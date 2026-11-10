@@ -183,6 +183,7 @@ pub async fn melde_live(pool: &SqlitePool, u: &Uebernommen) {
 /// Beantwortet einen Abgleich (Handler `POST /api/instanz/spiegel`).
 pub async fn handle_abgleich(
     pool: &SqlitePool,
+    router: Option<&axum::Router>,
     eigen: &Identitaet,
     kopplung: &KopplungZeile,
     anfrage: &SpiegelPaket,
@@ -191,6 +192,16 @@ pub async fn handle_abgleich(
         return Err(AppError::Forbidden);
     }
     anfrage.check().map_err(AppError::Validation)?;
+    // Anträge an Einsätze, die hier geführt werden: außerhalb der Transaktion ausführen, denn
+    // jeder läuft durch seine Route mit eigener Schreibtransaktion (D11).
+    let mut quittungen = Vec::new();
+    if let Some(router) = router {
+        for a in &anfrage.antraege {
+            if let Some(q) = super::antrag::ausfuehren(pool, router, kopplung, false, a).await? {
+                quittungen.push(q);
+            }
+        }
+    }
     let mut uebernommen = Uebernommen::default();
     let antwort = crate::write_retry!(pool, |conn| {
         uebernommen = Uebernommen::default();
@@ -209,12 +220,17 @@ pub async fn handle_abgleich(
         let anhang_teile =
             super::anhang::liefere_teile(conn, &anfrage.abrufe, budget.bytes).await?;
         let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
+        super::antrag::quittungen_uebernehmen(conn, &anfrage.quittungen).await?;
+        let antraege = super::antrag::offene_antraege(conn, kopplung.id, false).await?;
+        let ids: Vec<i64> = antraege.iter().map(|a| a.id).collect();
+        super::antrag::markiere_zugestellt(conn, &ids).await?;
         Ok(SpiegelPaket {
             staende: staende_antwort,
             lieferungen,
             abrufe,
             anhang_teile,
-            ..Default::default()
+            antraege,
+            quittungen: quittungen.clone(),
         })
     })?;
     melde_live(pool, &uebernommen).await;
@@ -235,7 +251,11 @@ const RUNDEN_MAX: usize = 4;
 
 /// Gleicht einmal mit einer Kopplung ab, in der diese Instanz sich meldet. Ruft die erreichte
 /// Seite Inhalte ab, folgen ihre Stücke in weiteren Runden desselben Abgleichs.
-pub async fn abgleich_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Result<(), SendError> {
+pub async fn abgleich_einmal(
+    pool: &SqlitePool,
+    router: Option<&axum::Router>,
+    kopplung: &KopplungZeile,
+) -> Result<(), SendError> {
     let fehler = |e: AppError| SendError::Netz(e.to_string());
     let eigen = identitaet::load_or_create(pool)
         .await
@@ -260,12 +280,15 @@ pub async fn abgleich_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Res
             let anhang_teile =
                 super::anhang::liefere_teile(conn, &abgerufen, budget.bytes).await?;
             let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
+            let antraege = super::antrag::offene_antraege(conn, kopplung.id, true).await?;
+            let quittungen = super::antrag::offene_quittungen(conn, kopplung.id).await?;
             Ok(SpiegelPaket {
                 staende,
                 lieferungen,
                 abrufe,
                 anhang_teile,
-                ..Default::default()
+                antraege,
+                quittungen,
             })
         })
         .map_err(fehler)?;
@@ -306,12 +329,32 @@ pub async fn abgleich_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Res
             uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
             let fertig = super::anhang::uebernehme_teile(conn, &antwort.anhang_teile).await?;
             uebernommen.einsaetze.extend(fertig);
+            let gesendet: Vec<i64> = anfrage.antraege.iter().map(|a| a.id).collect();
+            super::antrag::markiere_zugestellt(conn, &gesendet).await?;
+            super::antrag::quittungen_uebernehmen(conn, &antwort.quittungen).await?;
+            let quittiert: Vec<i64> = anfrage.quittungen.iter().map(|q| q.id).collect();
+            let offen: Vec<i64> = antwort.antraege.iter().map(|a| a.id).collect();
+            super::antrag::markiere_gemeldet(conn, kopplung.id, &quittiert, &offen).await?;
             Ok(())
         })
         .map_err(fehler)?;
         melde_live(pool, &uebernommen).await;
+        // Anträge an Einsätze, die hier geführt werden; die Quittungen gehen mit der nächsten
+        // Anfrage hinaus.
+        let mut ausgefuehrt = false;
+        if let Some(router) = router {
+            for a in &antwort.antraege {
+                if super::antrag::ausfuehren(pool, router, kopplung, true, a)
+                    .await
+                    .map_err(fehler)?
+                    .is_some()
+                {
+                    ausgefuehrt = true;
+                }
+            }
+        }
         abgerufen = antwort.abrufe;
-        let weiter = !abgerufen.is_empty() || !antwort.anhang_teile.is_empty();
+        let weiter = !abgerufen.is_empty() || !antwort.anhang_teile.is_empty() || ausgefuehrt;
         if !weiter || runde + 1 == RUNDEN_MAX {
             break;
         }

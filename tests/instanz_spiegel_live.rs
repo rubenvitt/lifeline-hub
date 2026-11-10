@@ -23,7 +23,7 @@ async fn uebernahme_meldet_lagged_und_ein_neuer_spiegel_die_einsatzliste() {
     melden(&elw).await;
     let mut org = live.abonniere_org();
     let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
-    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, true)
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
         .await
         .unwrap();
     let mut liste = 0;
@@ -44,13 +44,13 @@ async fn uebernahme_meldet_lagged_und_ein_neuer_spiegel_die_einsatzliste() {
     )
     .await;
     assert_eq!(st, StatusCode::CREATED, "{v}");
-    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, true)
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
         .await
         .unwrap();
     let m = rx.try_recv().expect("ein Ereignis nach der Übernahme");
     assert_eq!(m.event, LiveEvent::Lagged);
     assert!(rx.try_recv().is_err(), "genau eines je Paket");
-    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, true)
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
         .await
         .unwrap();
     assert!(rx.try_recv().is_err(), "ohne Änderung kein Ereignis");

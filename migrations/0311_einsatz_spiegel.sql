@@ -119,6 +119,47 @@ CREATE TABLE spiegel_anhang_teil (
         ON DELETE CASCADE
 );
 
+-- Anträge am Spiegel (D9): eine beantragbare Erfassung, die zum Führer geht. `pfad_parameter`
+-- und `daten` tragen die Kennungen des Führers. `zustand`: ausstehend (noch nicht zugestellt),
+-- zugestellt, uebernommen, abgelehnt (mit `grund`). Abgelehnte räumt der Purge-Lauf nach 30 Tagen.
+-- Die Kennung kehrt nie wieder (AUTOINCREMENT): der Führer erkennt eine zweite Zustellung an
+-- ihr, und ein aufgeräumter Antrag darf keinen neuen verdecken.
+CREATE TABLE spiegel_antrag (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    einsatz_id          INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,
+    art                 TEXT NOT NULL,
+    methode             TEXT NOT NULL,
+    pfad_vorlage        TEXT NOT NULL,
+    pfad_parameter      TEXT NOT NULL DEFAULT '{}',
+    pfad_lokal          TEXT NOT NULL DEFAULT '{}',
+    daten               TEXT NOT NULL,
+    benutzer_id         INTEGER NOT NULL REFERENCES benutzer(id),
+    client_id           TEXT,
+    erfasst_at          TEXT NOT NULL,
+    zustand             TEXT NOT NULL DEFAULT 'ausstehend'
+        CHECK (zustand IN ('ausstehend', 'zugestellt', 'uebernommen', 'abgelehnt')),
+    grund               TEXT,
+    ergebnis_art        TEXT,
+    ergebnis_schluessel TEXT,
+    geaendert_at        TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_spiegel_antrag_client ON spiegel_antrag (einsatz_id, art, client_id)
+    WHERE client_id IS NOT NULL;
+CREATE INDEX idx_spiegel_antrag_offen ON spiegel_antrag (einsatz_id)
+    WHERE zustand IN ('ausstehend', 'zugestellt');
+
+-- Beim Führer (D11): jedes Ergebnis eines Antrags, damit eine zweite Zustellung dieselbe
+-- Quittung bekommt, ohne erneut auszuführen. `gemeldet_at`: die Gegenseite hat die Quittung
+-- (nur nötig, wenn der Führer sich meldet und die Quittung in der nächsten Anfrage mitgibt).
+CREATE TABLE spiegel_antrag_eingang (
+    kopplung_id      INTEGER NOT NULL REFERENCES instanz_kopplung(id) ON DELETE CASCADE,
+    fremde_antrag_id INTEGER NOT NULL,
+    quittung         TEXT NOT NULL,
+    erstellt_at      TEXT NOT NULL,
+    gemeldet_at      TEXT,
+    PRIMARY KEY (kopplung_id, fremde_antrag_id)
+);
+
 -- Log- und Schutz-Trigger je gespiegelter Tabelle (D1, D10), erzeugt von
 -- `instanz::spiegel::art::trigger_sql`. Schutz: an einem Spiegel schreibt nur die Übernahme.
 -- einsatz

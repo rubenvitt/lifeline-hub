@@ -54,7 +54,11 @@ pub async fn ist_aktiv(pool: &SqlitePool, kopplung_id: i64) -> Result<bool, AppE
             WHERE o.kopplung_id = ?1 AND s.beendet_at IS NULL AND e.status = 'aktiv') \
          OR EXISTS (SELECT 1 FROM spiegel_anhang a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-            WHERE o.kopplung_id = ?1 AND a.fertig_at IS NULL AND a.angefordert_at IS NOT NULL)",
+            WHERE o.kopplung_id = ?1 AND a.fertig_at IS NULL AND a.angefordert_at IS NOT NULL) \
+         OR EXISTS (SELECT 1 FROM spiegel_antrag a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
+            JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+            WHERE o.kopplung_id = ?1 AND a.zustand IN ('ausstehend', 'zugestellt')) \
+         OR EXISTS (SELECT 1 FROM spiegel_antrag_eingang WHERE kopplung_id = ?1 AND gemeldet_at IS NULL)",
     )
     .bind(kopplung_id)
     .fetch_one(pool)
@@ -69,8 +73,15 @@ pub fn plan_abstand(aktiv: bool, fehlversuche: u32, kurz: u64, melden: u64) -> u
 
 /// Ein Durchlauf: gleicht mit jeder fälligen Kopplung ab, deren Gegenüber den Abgleich kennt.
 /// `immer` übergeht den Plan (Tests).
-pub async fn durchlauf(pool: &SqlitePool, immer: bool) -> Result<(), AppError> {
+pub async fn durchlauf(
+    pool: &SqlitePool,
+    router: Option<&axum::Router>,
+    immer: bool,
+) -> Result<(), AppError> {
     let jetzt = Instant::now();
+    if let Err(e) = super::antrag::aufraeumen(pool).await {
+        tracing::warn!(error = %e, "Spiegel: Anträge nicht aufgeräumt");
+    }
     for k in repo::list_meldend_aktiv(pool).await? {
         if !abgleich::kann_spiegeln(&k) {
             continue;
@@ -82,7 +93,7 @@ pub async fn durchlauf(pool: &SqlitePool, immer: bool) -> Result<(), AppError> {
         if !immer && plan.is_some_and(|p| p.naechster > jetzt) {
             continue;
         }
-        let ergebnis = abgleich::abgleich_einmal(pool, &k).await;
+        let ergebnis = abgleich::abgleich_einmal(pool, router, &k).await;
         let aktiv = ist_aktiv(pool, k.id).await?;
         let fehlversuche = match &ergebnis {
             Ok(()) => 0,
@@ -107,7 +118,7 @@ pub async fn durchlauf(pool: &SqlitePool, immer: bool) -> Result<(), AppError> {
 
 /// Startet den Hintergrund-Task: jede Sekunde ein Durchlauf, sofort nach [`wecken`]. Ohne
 /// Kopplung baut er nie eine Verbindung auf.
-pub fn start(pool: SqlitePool) {
+pub fn start(pool: SqlitePool, router: axum::Router) {
     tokio::spawn(async move {
         let mut takt = tokio::time::interval(Duration::from_secs(1));
         takt.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -116,7 +127,7 @@ pub fn start(pool: SqlitePool) {
                 _ = takt.tick() => {}
                 _ = WECKER.notified() => {}
             }
-            if let Err(e) = durchlauf(&pool, false).await {
+            if let Err(e) = durchlauf(&pool, Some(&router), false).await {
                 tracing::warn!(error = %e, "Spiegel: Durchlauf gescheitert");
             }
         }
