@@ -87,14 +87,6 @@ function BefehlDetail() {
   const formTitel = Form.useWatch('titel', form);
   // Der Verteiler speist ebenso den Druckkopf (LLH-1172); ein Feld, kein `useWatch([])`.
   const formVerteiler = Form.useWatch(VERTEILER_FIELD, form) as VerteilerFormValues | undefined;
-  const speicherfolge = useRef<Promise<unknown>>(Promise.resolve());
-  const aktiv = useRef(true);
-  useEffect(() => {
-    aktiv.current = true;
-    return () => {
-      aktiv.current = false;
-    };
-  }, []);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -139,27 +131,23 @@ function BefehlDetail() {
       werte[VERTEILER_FIELD],
       befehlQuery.data!.verteiler,
     );
-    // Blur-Autosave und explizites Speichern können direkt aufeinander folgen. In Reihenfolge
-    // schreiben, damit eine späte S1-Antwort S2 nicht überschreibt.
-    const auftrag = speicherfolge.current
-      .catch(() => {}) // Ein Fehler darf den nächsten Speicherversuch nicht sperren.
-      .then(() => {
-        // „Verwerfen“/Unmount beendet noch nicht gestartete Aufträge dieses Editors.
-        // Ein späteres Öffnen derselben ID bekommt seine eigene Ref und Speicherfolge.
-        if (!aktiv.current) throw new DOMException('Editor verlassen', 'AbortError');
-        return aktualisiereBefehl(einsatzId, befehlId, {
-          titel: werte.titel,
-          abschnitte,
-          verteiler,
-        });
-      });
-    // Die Basis des Verteilers rückt nur bei Erfolg endgültig vor (`useVerteilerSync`).
-    auftrag.then(
-      () => settle(true),
-      () => settle(false),
+    // Reihenfolge und Abbruch beim Verlassen hält der Hook (`useEntwurfVerlustschutz`,
+    // „SPEICHERFOLGE“, LLH-1619): er ruft `speichern` erst, wenn der vorige Auftrag zurück ist.
+    return aktualisiereBefehl(einsatzId, befehlId, {
+      titel: werte.titel,
+      abschnitte,
+      verteiler,
+    }).then(
+      (antwort) => {
+        settle(true);
+        return antwort;
+      },
+      (fehler: unknown) => {
+        // Die Basis des Verteilers rückt nur bei Erfolg endgültig vor (`useVerteilerSync`).
+        settle(false);
+        throw fehler;
+      },
     );
-    speicherfolge.current = auftrag;
-    return auftrag;
   };
 
   /**
