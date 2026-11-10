@@ -62,6 +62,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Begriff | Bedeutung | Quelle |
 | --- | --- | --- |
 | ADR | Architekturentscheidung als Datei mit prüfbaren Regeln. | [`docs/architektur/AGENTS.md`](AGENTS.md), [Architekturentscheidungen](09-architekturentscheidungen.md) |
+| Antrag (am Spiegel) | Erfassung an einem Spiegel, die als Antrag zum Führer geht; Zustand `ausstehend`, `zugestellt`, `uebernommen` oder `abgelehnt`. Beantragbar ist nur, was ohne Netz vormerkbar ist (`BEANTRAGBAR`). | `src/instanz/spiegel/antrag.rs`, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md) |
 | Archiv (Aufbewahrung) | Nur lesender, dem System-Admin vorbehaltener Zugang zu gesperrten Einsätzen unter `/api/aufbewahrung`. | `src/aufbewahrung/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Aufbewahrung“ |
 | CAS | Vergleich mit dem Stand beim Öffnen vor dem Schreiben (`basis_geaendert_at`, `erwartet`); Verstoß ist 409. | [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Statuscode-Konvention“ |
 | Change | Laufende OpenSpec-Änderung unter `openspec/changes/<name>/`, nach Abschluss im Archiv. | [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Planung und Ausführung“ |
@@ -72,6 +73,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Dichtestufe | `kompakt`, `komfortabel` oder `handschuh`; bestimmt Steuerhöhe und Trefffläche. | `frontend/src/theme/dichte.ts`, Spec [`bedien-dichte`](../../openspec/specs/bedien-dichte/spec.md) |
 | Druckwurzel | Das eine Element einer Seite, das gedruckt wird (`data-lfh="druckwurzel"`). | [`frontend/src/druck/AGENTS.md`](../../frontend/src/druck/AGENTS.md) |
 | `EinsatzKontext` | Extractor, der Einsatz, Rolle und Org-Floor für jeden einsatzgebundenen Handler prüft. | `src/einsatz/kontext.rs` |
+| Führer (eines Einsatzes) | Die Instanz, die einen Einsatz führt und an gekoppelte Instanzen liefert: die, an der er angelegt wurde. | [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md), `src/instanz/spiegel/liefern.rs` |
 | Funktionsansicht | Was ein gekoppeltes Gerät lesen und schreiben darf (etwa UHS, Abschnitt, Lagemonitor). | Spec [`funktionsansichten`](../../openspec/specs/funktionsansichten/spec.md), [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |
 | Gerätekonto | Konto, unter dem ein gekoppeltes Gerät schreibt; keine Person. | `ist_geraetekonto` in `src/geraet/repo.rs`, Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md), „Gerätekonto ist keine Person“ |
 | Hülle (Desktop-Hülle) | Tauri-2-App `src-tauri`, deren Webview die https-Adresse des Servers lädt; ohne Anwendungslogik. | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md), `frontend/src/huelle/faehigkeiten.ts` |
@@ -92,8 +94,10 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Schuldmenge | Liste bekannter Altverstöße in einem Wächter, die nur schrumpfen darf. | etwa Spec [`zeitdarstellung`](../../openspec/specs/zeitdarstellung/spec.md), „Eine Formatstelle“ |
 | Schwärzung | Unumkehrbares Entfernen personenbezogener Werte, physisch überschrieben. | `src/einsatz/schwaerzung_*.rs`, `src/db/physisch.rs` |
 | Spec | Fähigkeits-Spec unter `openspec/specs/<name>/spec.md` mit SHALL/MUST und Szenarien. | [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Planung und Ausführung“ |
+| Spiegel | Lesekopie eines Einsatzes an einer gekoppelten Instanz, die ihn nicht führt, in denselben Tabellen; erkennbar an einer Zeile in `einsatz_spiegel`, nachgeholt über den Stand im Änderungslog `einsatz_aenderung`. | [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md), `src/instanz/spiegel/` |
 | Sprungpalette | Tastaturgesteuerte Suche über Module und Datensätze. | [`frontend/src/command-palette/AGENTS.md`](../../frontend/src/command-palette/AGENTS.md), Spec [`sprungpalette`](../../openspec/specs/sprungpalette/spec.md) |
 | Stellenbindung | Bindung einer Kopplung an eine Stelle (UHS, Betreuungsstelle, BR, Abschnitt, Verpflegungsstelle). | `src/geraet/stelle.rs`, [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |
+| Stellvertreter (Konto) | Konto am Spiegel für ein Konto, das es nur beim Gegenüber gibt: trägt dessen Anzeigenamen, kann sich nie anmelden und wird nie Mitglied. | `spiegel_konto` in `migrations/0311_einsatz_spiegel.sql`, `src/instanz/spiegel/abbildung.rs` |
 | Typ-Codegen | Erzeugung der Frontend-Typen aus dem OpenAPI-Schema des Backends. | [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“ |
 | Unterschriftsschlüssel | Passkey eines Org-Admins nur zum Unterschreiben (nie zur Anmeldung); gekoppelte Instanzen kennen seinen öffentlichen Schlüssel und prüfen damit Erklärungen des Admins. | `src/auth/unterschrift/`, Spec `org-admin-unterschrift` (`openspec/specs/org-admin-unterschrift/`) |
 | Wächter | Test oder Skript, das eine Regel im Code durchsetzt (`*.guard.test.ts`, `tests/*_guard.rs`, `scripts/check-*.sh`). | [Querschnitt 8.27](08-querschnittliche-konzepte.md) |

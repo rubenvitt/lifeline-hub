@@ -14,7 +14,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 - [x] 1.3 Verweise aus `PRAGMA foreign_key_list` einordnen (Einsatz, Stammdaten, Org) plus `VERWEISE_OHNE_FK` (polymorphe Bezüge, IDs in JSON). Wächter `jede_id_spalte_ist_eingeordnet` über alle `*_id`-Spalten der gespiegelten Tabellen
 - [x] 1.4 Generator für Log-Trigger (`_spiegel_log_i/_u/_d`, Elternzeile bei `UeberParent`) und Migration mit `einsatz_aenderung`, `einsatz.kennung`, `einsatz.freigabestufe` und Grundstock. Wächter `trigger_passen_zur_beschreibung` gegen `sqlite_master`. Tests: Anlegen, Ändern, Schwärzen, weiches und hartes Löschen erhöhen den Stand; je Zeile eine Logzeile; Kind per CASCADE ohne Fehler
 - [x] 1.5 Messung nachher wie 1.1; Abweichung über 20 % → mit Ruben klären, sonst Wert in die Nachträge
-- [ ] 1.6 `src/AGENTS.md`, Abschnitt Instanzkopplung: Regel „neue Einsatztabelle = Eintrag in `spiegel::art` + Trigger in ihrer Migration“, Verweis auf die Wächter; `scripts/adr-fuer.sh` für die berührten Pfade geprüft
+- [x] 1.6 `src/AGENTS.md`, Abschnitt Instanzkopplung: Regel „neue Einsatztabelle = Eintrag in `spiegel::art` + Trigger in ihrer Migration“, Verweis auf die Wächter; `scripts/adr-fuer.sh` für die berührten Pfade geprüft
 
 ## 2. Spiegel, Schutz und Fehlerbild (D4, D10)
 
@@ -49,7 +49,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 - [x] 6.2 Antrag am Spiegel: Anmeldung und Schreibrecht wie die Route, `client_id`-Pflicht, Verweise lokal → fremd, 202 `{ antrag }`, gleiche `client_id` → gleicher Antrag, Anhänge am ETB → 400; `GET /api/einsaetze/{id}/antraege`, `DELETE …/antraege/{antrag_id}` (nur abgelehnte, nur eigene). Tests je Fall, Beobachter → 403
 - [x] 6.3 `AntragAkteur`-Extension in `CurrentUser`, Router in `OnceLock` am `AppState`, `spiegel::antrag::ausfuehren` per `oneshot`; Ergebnis 2xx/4xx/5xx wie D11, `spiegel_antrag_eingang` für Wiederholungen, „Führung liegt nicht hier“. Tests: Kopf und Cookie täuschen keinen Akteur vor; doppelte Zustellung wirkt einmal; Konto ohne Schreibrolle → abgelehnt
 - [x] 6.4 Anträge und Quittungen im Paket (beide Richtungen), Kontoübersetzung an der meldenden Seite, Zustände `zugestellt`/`uebernommen`/`abgelehnt`, Verschwinden erst mit bekannter Ergebniszeile, Räumen abgelehnter nach 30 Tagen. Integrationstests: alle 16 Arten Hub → ELW und ELW → Hub; abgeschlossener Einsatz → abgelehnt mit Grund; Person gelöscht → „Bezug nicht mehr vorhanden“; Konto nur am ELW → „Konto am Führer unbekannt“
-- [ ] 6.5 `docs/architektur/entscheidungen/`: ADR „Ein Einsatz wird an einer anderen Instanz als Spiegel in denselben Tabellen gehalten“ (Regeln: Trigger-Pflicht, Schutz, Anträge nur `BEANTRAGBAR`, Ausführen über den Router), Prüfung in `scripts/check-architektur.sh` grün
+- [x] 6.5 `docs/architektur/entscheidungen/`: ADR „Ein Einsatz wird an einer anderen Instanz als Spiegel in denselben Tabellen gehalten“ (Regeln: Trigger-Pflicht, Schutz, Anträge nur `BEANTRAGBAR`, Ausführen über den Router), Prüfung in `scripts/check-architektur.sh` grün
 
 ## 7. Oberfläche (D13)
 
@@ -66,7 +66,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 ## 9. Doku
 
-- [ ] 9.1 Architekturdoku Kapitel 5 (Baustein `instanz::spiegel`), 6 (Laufzeitsicht Abgleich und Antrag), 8 (Schutz per Trigger, Ausführen im Namen des Kontos), 11 (Risiken aus diesem Entwurf, Art.-9-Daten am Hub); Konzeptnotiz: offene Frage „schmale Leitung“ beantwortet. `scripts/check-architektur.sh` grün
+- [x] 9.1 Architekturdoku Kapitel 5 (Baustein `instanz::spiegel`), 6 (Laufzeitsicht Abgleich und Antrag), 8 (Schutz per Trigger, Ausführen im Namen des Kontos), 11 (Risiken aus diesem Entwurf, Art.-9-Daten am Hub); Konzeptnotiz: offene Frage „schmale Leitung“ beantwortet. `scripts/check-architektur.sh` grün
 - [ ] 9.2 Anwenderdoku `instanzkopplung.md` (Spiegel, Band, Anträge, Anhänge „wird geholt“, Widerruf) nach `docs/anwender/AGENTS.md`; Wächter der Anwenderdoku grün
 
 ## 10. Abschluss

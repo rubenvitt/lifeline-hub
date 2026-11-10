@@ -169,8 +169,14 @@ sequenceDiagram
 
 ## Offene Fragen
 
-- **Schmale Leitung:** Reihenfolge beim Nachholen (Führung und Anträge vor ETB vor Lage vor
-  Anhängen?), Budget bei Satellit, Anhänge verzögert oder nur auf Abruf.
+- ~~**Schmale Leitung:**~~ beantwortet am 10.11.2026 (LLH-1492): Anträge und Quittungen stehen
+  in jedem Paket vorn, danach die Zeilen nach Stand, jedes Paket höchstens 2 MiB. Anhänge reisen
+  nur als Metadaten (Größe, Prüfsumme); den Inhalt holt der Spiegel auf Abruf in Stücken von
+  256 KiB, angeforderte vor dem Vorabladen im Leerlauf. Abgeglichen wird alle 5 s, solange ein
+  gespiegelter oder gelieferter Einsatz aktiv ist oder etwas aussteht
+  (`--instanz-spiegel-sekunden`), sonst im Takt der Meldung
+  ([ADR-0018](../architektur/entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md),
+  `openspec/changes/polrv1lt-spiegel-antraege/design.md`, D6, D8, D12).
 - ~~**Protokollversion:**~~ beantwortet am 08.11.2026 (LLH-1490): ganzzahlig, beide Seiten
   sprechen N und N−1, bei größerem Abstand nur Melden und der Hinweis „Update nötig“. Ebenso
   festgelegt: Schlüsselverfahren und Einmal-Code
@@ -190,8 +196,8 @@ sequenceDiagram
   Lesen eines Archivs.
 - **Mehrere Orgs in einem Einsatz** (Mitgliedschaft über Org-Grenzen): Wessen Hub, wessen
   Freigabestufe?
-- **Härtung des Hubs:** er hält Art.-9-Daten im Klartext im Internet. Neues Risiko für Kapitel 11,
-  Mindestanforderungen an Betrieb (Kapitel 7, `docs/betrieb/`).
+- **Härtung des Hubs:** er hält Art.-9-Daten im Klartext im Internet (seit LLH-1492 als Risiko
+  R27 in Kapitel 11). Offen: Mindestanforderungen an Betrieb (Kapitel 7, `docs/betrieb/`).
 - **Entdeckung im LAN** für ELW↔ELW (mDNS o. ä.).
 
 ## Vorschlag für Folgeaufgaben

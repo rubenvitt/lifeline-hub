@@ -85,6 +85,19 @@ Wer eine solche Tabelle neu baut, legt ihre Trigger wieder an; ein Test vergleic
 `src/instanz/stammdaten/art.rs` ([`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt
 „Instanzkopplung“).
 
+Ebenso sitzen Änderungslog und Schreibschutz gespiegelter Einsätze in Triggern (LLH-1492,
+`migrations/0311_einsatz_spiegel.sql`,
+[ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)):
+An jeder Einsatztabelle aus `instanz::spiegel::art::GESPIEGELT` schreiben
+`<tabelle>_spiegellog_i/_u/_d` den Stand der Zeile nach `einsatz_aenderung`, und
+`<tabelle>_spiegelschutz_i/_u/_d` brechen an einem Spiegel mit `einsatz_ist_spiegel` ab (409
+„Dieser Einsatz ist ein Spiegel; ändern geht nur als Antrag an die führende Instanz.“,
+`src/error.rs`), außer unter dem Merker `spiegel_uebernahme`. Routen und Repos prüfen deshalb
+nicht selbst, ob ein Einsatz ein Spiegel ist; Hintergrundläufe lassen Spiegel über
+`einsatz::spiegel_filter::nicht_gespiegelt` aus. Die Trigger erzeugt `spiegel::art::trigger_sql`,
+und Tests vergleichen sie mit dem Schema ([`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt
+„Instanzkopplung“, „Spiegel und Anträge“).
+
 ## 8.8 Nebenläufigkeit und Transaktionen
 
 Schreibende Transaktionen holen den Schreib-Lock am Beginn (`BEGIN IMMEDIATE`) und wiederholen
@@ -213,6 +226,17 @@ wenn sein Betreiber die Datenträgerverschlüsselung bestätigt hat. Ein Admin m
 sich an einer Instanz, die die Geheimnisse seiner Org verteilt, nicht mehr per Passwort an
 ([ADR-0016](entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md)).
 „ELW verloren“ macht die dorthin verteilten Passwörter und zweiten Faktoren ungültig.
+
+Einen Antrag von einem Spiegel führt die führende Instanz im Namen des Kontos aus, das ihn
+gestellt hat (LLH-1492, Spec `spiegel-antraege`): Sie baut eine Anfrage an ihren eigenen Router
+und hängt die Extension `AntragAkteur` an; `CurrentUser` nimmt das Konto dann aus ihr statt aus
+dem Cookie (`src/auth/session.rs`). So gelten Rechte, Modul, Freeze, `client_id`-Replay, Live und
+Audit wie bei einem eigenen Aufruf. Die Extension legt nur `instanz::spiegel::antrag::ausfuehren`
+an; HTTP kann sie nicht setzen (`tests/instanz_spiegel.rs`,
+`ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_es_keinen_akteur`). Das
+Konto bildet die meldende Seite über die Stammdaten-Herkunft ab; ein Konto ohne Gegenstück zeigt
+am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
+([ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)).
 
 ## 8.18 Konfiguration über die Umgebung
 

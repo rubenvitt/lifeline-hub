@@ -343,6 +343,42 @@ Herleitung in
   - **Systemrolle `admin` vom Hub nur an einer Instanz mit einer Org** (`uebernehmen`); sonst
     `keiner` mit Hinweis an der Kopplung.
   - Nachweis: `tests/instanz_stammdaten.rs`, `tests/instanz_stammdaten_live.rs`.
+- **Spiegel und Anträge (LLH-1492)**, Specs `einsatz-spiegel` und `spiegel-antraege`,
+  Entscheidung
+  [ADR-0018](../docs/architektur/entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md),
+  Herleitung `openspec/changes/polrv1lt-spiegel-antraege/design.md`:
+  - **Eine neue Einsatztabelle** (neu in `einsatz::schwaerzung_registry::TABELLEN`) **bekommt
+    einen Eintrag in `instanz::spiegel::art`**: `GESPIEGELT` mit Kategorie oder `AUSGENOMMEN` mit
+    Grund. Eine gespiegelte bekommt in ihrer eigenen Migration ihre Log- und Schutz-Trigger
+    (`<tabelle>_spiegellog_i/_u/_d`, `<tabelle>_spiegelschutz_i/_u/_d`), erzeugt mit
+    `spiegel::art::trigger_sql` (Ausgabe über den Test `art::tests::erzeuge_migration`,
+    `--ignored`). Wer eine dieser Tabellen neu baut, legt die Trigger wieder an. Wächter
+    `art::tests::jede_einsatztabelle_ist_eingeordnet`, `art::tests::trigger_passen_zur_beschreibung`,
+    `art::tests::eine_eltern_tabelle_wird_mitgespiegelt`. Kein Schreibweg in Rust schreibt in
+    `einsatz_aenderung`.
+  - **Ein Verweis ohne Fremdschlüssel** in einer gespiegelten Tabelle (polymorpher Bezug,
+    Kennung in Text oder JSON) steht in `spiegel::schema::VERWEISE_OHNE_FK` samt Auflösung; ein
+    Fremdschlüssel zeigt auf eine gespiegelte Tabelle, auf Stammdaten, `benutzer` oder
+    `organisation`.
+    Wächter `schema::tests::jeder_fremdschluessel_ist_eingeordnet` und
+    `schema::tests::jede_id_spalte_ist_eingeordnet` (sieht nur `*_id`-Spalten; Kennungen in Text
+    und JSON trägt ein, wer sie anlegt).
+  - **Eine neue ohne Netz vormerkbare Erfassung** (Art in `frontend/src/offline/queue.ts`) steht
+    in `spiegel::antrag::BEANTRAGBAR` (Methode, Routenvorlage, Verweise in Pfad und Body,
+    `client_id`, Ergebnis) oder in `NICHT_BEANTRAGBAR` mit Grund. Wächter
+    `antrag::tests::jede_vormerkbare_art_ist_eingeordnet` und
+    `antrag::tests::jede_vorlage_steht_im_router_und_jeder_parameter_ist_abgebildet`.
+  - **Am Spiegel sperrt der Schutz-Trigger** (`einsatz_ist_spiegel` → 409, `src/error.rs`); eine
+    Route braucht keine eigene Prüfung. Nur die Übernahme setzt den Merker `spiegel_uebernahme`
+    in ihrer Transaktion.
+  - **Ein Hintergrundlauf, der an Einsätzen schreibt, lässt Spiegel aus**
+    (`einsatz::spiegel_filter::nicht_gespiegelt`); sonst bricht eine Sammelanweisung am Trigger
+    ganz ab.
+  - **Eine Liste von Konten** (Verwaltung, Auswahl, Anmeldung) schließt Stellvertreter fremder
+    Konten aus (`instanz::spiegel::OHNE_STELLVERTRETER`).
+  - **`AntragAkteur` setzt nur `spiegel::antrag::ausfuehren`**; `CurrentUser` nimmt das Konto
+    dann aus der Extension statt aus dem Cookie.
+  - Nachweis: `tests/instanz_spiegel.rs`, `tests/instanz_spiegel_live.rs`.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
