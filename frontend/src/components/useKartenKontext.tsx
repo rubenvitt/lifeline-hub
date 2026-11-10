@@ -1,6 +1,6 @@
 /**
  * Kontextmenü eines einzelnen Datensatzes, der sich selbst zeichnet (Karte, Nachricht; LLH-1598,
- * `openspec/changes/g11xq51l-kontextmenue-karten/design.md` D2).
+ * `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/design.md` D2).
  *
  * Fasst `useKontextMenue` (Auslöser, geteilte Hörer) und `KontextMenue` (Schale) zusammen. Die
  * Einträge kommen aus den `KartenAktion[]` der Karte, aus denen sie auch Knöpfe und ⋮ zeichnet.

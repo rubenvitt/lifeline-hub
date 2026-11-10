@@ -39,7 +39,7 @@
 - [x] 7.1 `frontend/AGENTS.md`, Regel „Kontextmenü nur über den Baustein“: Karten über `useKartenKontext` mit `KartenAktion[]` als einer Quelle für Knöpfe, ⋮ und Kontextmenü; Sprünge und Auswahlfelder nicht; Zählschirm ohne; Prettier grün
 - [x] 7.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`, „Wo das Kontextmenü gilt“: Chat, Meldungen, Nachforderungen, Aufträge, Ablösung, Betreuung, Verpflegung ergänzt, Zählschirm ausgenommen; `quellen:` um die neuen Bausteine ergänzt; Doku-Wächter grün
 - [x] 7.3 e2e `frontend/e2e/kontextmenue-karten.spec.ts`: Rechtsklick auf eine Meldung zeigt Knöpfe und ⋮-Einträge; Umschalt+F10 mit Fokus auf einem Knopf der Karte öffnet es, Escape gibt den Fokus zurück; langer Druck per CDP-Touch bei 390 px auf eine Chat-Nachricht öffnet ihr Menü
-- [ ] 7.4 `./scripts/check-all.sh` grün (lokal mindestens `--nur schnell` und `--nur frontend`, dazu die neuen e2e-Specs; den Rest belegt die CI des PRs)
+- [x] 7.4 `./scripts/check-all.sh` grün (lokal mindestens `--nur schnell` und `--nur frontend`, dazu die neuen e2e-Specs; den Rest belegt die CI des PRs) — lokal `--nur schnell` grün, `--nur frontend` in zwei Anteilen: grün bis auf die zwei Tests in `RegistrierungPaneel.test.tsx`, die auf `alpha` genauso rot sind (Nachzug LLH-1621); e2e `kontextmenue-karten`, `kontextmenue-datensatz`, `fernmeldeskizze`, `lagekarte-touch` grün (61); Rust-Suite und volle e2e-Suite belegt die CI des PRs
 - [x] 7.5 Bilder der Änderung (Kontextmenü an Meldung, Nachforderung, Chat, Betreuungstabelle) per Wegwerf-Spec aufnehmen
 
 ## 8. Befunde aus dem Review (09.11.2026)

@@ -3,7 +3,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Kontextmenü an Karten und Chat (LLH-1598, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/g11xq51l-kontextmenue-karten/design.md`) im echten Browser: Rechtsklick auf
+ * `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/design.md`) im echten Browser: Rechtsklick auf
  * eine Meldung zeigt ihre Knöpfe vor den Einträgen des ⋮, Umschalt+F10 auf einem Knopf der Karte
  * öffnet dasselbe Menü, und ein langer Druck auf eine Chat-Nachricht öffnet ihr Menü, ohne dass
  * das Abheben es schließt. Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).

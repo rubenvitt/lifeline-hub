@@ -1,5 +1,5 @@
 /**
- * Kontextmenü der Betreuungstabellen (LLH-1598, `openspec/changes/g11xq51l-kontextmenue-karten/
+ * Kontextmenü der Betreuungstabellen (LLH-1598, `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/
  * design.md` D5): Primäraktion und ⋮ stehen im Kartenplan der `Datensicht`, die Spalte „Aktionen“
  * speist sich daraus.
  */

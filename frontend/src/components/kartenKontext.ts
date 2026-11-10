@@ -1,6 +1,6 @@
 /**
  * Aktionen einer Karte als Daten (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine Karte mit mehreren
- * Knöpfen zeigt alle ihre Handlungen“; `openspec/changes/g11xq51l-kontextmenue-karten/design.md` D3).
+ * Knöpfen zeigt alle ihre Handlungen“; `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/design.md` D3).
  *
  * Eine Karte, die ihre Knöpfe selbst zeichnet, beschreibt ihre Handlungen EINMAL als geordnete
  * Liste: erst die Knöpfe der Aktionszeile, dann die Einträge ihres ⋮. Knopfzeile, ⋮ und

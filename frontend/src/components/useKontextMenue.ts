@@ -137,7 +137,7 @@ interface LangerDruck {
 export const DRUCK_ATTRIBUT = 'data-kontext-druck';
 
 /**
- * Geteilter Zustand aller Flächen (LLH-1598, `openspec/changes/g11xq51l-kontextmenue-karten/design.md`
+ * Geteilter Zustand aller Flächen (LLH-1598, `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/design.md`
  * D1). Zeiger, Tastatur und das nachgeschobene `contextmenu` gibt es nur einmal; je Instanz einen
  * Satz Fensterhörer und einen Nachklick-Riegel anzulegen, kostete bei 200 Karten 200 Sätze. Die
  * Hörer hängen mit der ersten eingehängten Fläche an und mit der letzten ab.
