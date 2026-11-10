@@ -28,6 +28,11 @@ export interface HaushaltAktionenProps {
   darfSchreiben: boolean;
   /** Nach jedem Schreiben (Detail, Liste und ETB abgleichen). */
   onGeschrieben?: () => void;
+  /**
+   * Kennung der Zeile mit dem Sperrgrund der Seite, solange ein Feld einen Entwurf hat (Spec
+   * `formularseiten`, „Eine offene Bearbeitung je Ansicht“): dann sind beide Aktionen gesperrt.
+   */
+  bearbeitungGrundId?: string;
   /** Zusätzlicher Stil am Behälter (ohne Haushaltszeile steht die Aktion für sich). */
   style?: CSSProperties;
 }
@@ -37,6 +42,7 @@ export default function HaushaltAktionen({
   person,
   darfSchreiben,
   onGeschrieben,
+  bearbeitungGrundId,
   style,
 }: HaushaltAktionenProps) {
   const { message } = App.useApp();
@@ -75,7 +81,8 @@ export default function HaushaltAktionen({
     return null;
   }
   const haushaltId = person.haushalt_id ?? null;
-  const gesperrt = ohneNetz;
+  const gesperrt = ohneNetz || bearbeitungGrundId != null;
+  const sperrGrund = ohneNetz ? grundId : bearbeitungGrundId;
 
   return (
     <span
@@ -96,7 +103,7 @@ export default function HaushaltAktionen({
       {haushaltId != null && !person.haushalt_bezugsperson && (
         <Button
           disabled={gesperrt}
-          aria-describedby={gesperrt ? grundId : undefined}
+          aria-describedby={gesperrt ? sperrGrund : undefined}
           loading={bezugsperson.isPending}
           onClick={() => bezugsperson.mutate({ haushaltId, stelle: stelleId })}
         >
@@ -105,7 +112,7 @@ export default function HaushaltAktionen({
       )}
       <Button
         disabled={gesperrt}
-        aria-describedby={gesperrt ? grundId : undefined}
+        aria-describedby={gesperrt ? sperrGrund : undefined}
         onClick={() => setOffen(true)}
       >
         Haushalt ändern

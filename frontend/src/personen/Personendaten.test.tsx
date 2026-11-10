@@ -212,6 +212,23 @@ describe('Personendaten — Haushalt umbauen (LLH-1615)', () => {
     expect(within(zeile).queryByRole('button', { name: 'Zur Bezugsperson machen' })).toBeNull();
   });
 
+  it('offener Feldentwurf sperrt beide Aktionen mit dem Grund der Seite (CodeRabbit)', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<Personendaten einsatzId={1} person={TOM} darfSchreiben />, {
+      datenRouter: true,
+    });
+    const aendern = await screen.findByRole('button', { name: 'Haushalt ändern' });
+    const bezug = screen.getByRole('button', { name: 'Zur Bezugsperson machen' });
+    expect(aendern).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x');
+    const grund = 'Erst „Name“ speichern oder abbrechen';
+    await waitFor(() => expect(aendern).toBeDisabled());
+    expect(bezug).toBeDisabled();
+    expect(aendern).toHaveAccessibleDescription(grund);
+    expect(screen.getAllByText(grund)).toHaveLength(1);
+  });
+
   it('ohne Modul Betreuung oder ohne Stelle im Verbleib keine Aktionen', async () => {
     server.use(
       http.get('/api/einsaetze/1/modul-freigaben', () =>
