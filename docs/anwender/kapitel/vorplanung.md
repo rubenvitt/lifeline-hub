@@ -113,7 +113,9 @@ Planung“ führt zur Planung zurück.
    Auswahl einer Zeile lässt sich ein Posten einer anderen Einheit oder UHS zuordnen oder neu
    anlegen und eine Person einer anderen zuordnen; die Vorschau rechnet danach neu.
 4. „Übernehmen“ schreibt alles auf einmal. Bei Fehlern in der Vorschau, in einem laufenden Einsatz
-   auch ohne jede Änderung, bleibt der Knopf gesperrt und nennt den Grund.
+   auch ohne jede Änderung, bleibt der Knopf gesperrt und nennt den Grund. Hat jemand die Planung
+   geändert, seit die Vorschau steht, wird nichts übernommen: der Dialog meldet „Planung geändert,
+   Vorschau neu geladen“ und zeigt die Vorschau des neuen Stands, die man dann übernimmt.
 5. Nach der Übernahme führt „Zum Schichtplan des Einsatzes“ in die Ablösung des Einsatzes, Ansicht
    „Schichtplan“.
 
