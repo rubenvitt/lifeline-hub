@@ -200,20 +200,29 @@ einlösen.
 
 Bezieht die Organisation ihre Stammdaten aus einer Kopplung, trägt jede Zeile in den
 Stammdaten (Fahrzeuge, Material, Personal, Qualifikationen, Status-Kataloge, Einheitstypen,
-Einheiten-Vorlagen, Führungsfunktionen) und in der Benutzerverwaltung „vom Hub“ oder
-„nur hier“. Was vom Hub kommt, ist am ELW nur lesbar und zeigt „Wird am Hub gepflegt“. Ebenso
+Einheiten- und Einsatz-Vorlagen, Schichtmodelle, Stichworte, Verpflegungsplan, Sprechgruppen,
+ETB-Bausteine, Externe Stellen, Führungsfunktionen) und in der Benutzerverwaltung „vom Hub“ oder
+„nur hier“. Bei den Unterkunft-Richtwerten gilt das je Richtwert: einen, den der Hub nicht
+setzt, kann der ELW für sich setzen. Von den Sprechgruppen kommt nur der Katalog der
+Organisation; die Sprechgruppen eines Einsatzes bleiben in ihrem Einsatz. Was vom Hub kommt, ist am ELW nur lesbar und zeigt „Wird am Hub gepflegt“. Ebenso
 die Anzeige- und Einsatz-Vorgaben der Organisation. Was am ELW angelegt wird, etwa ein
 geliehenes Fahrzeug oder ein Spontanhelfer, gilt sofort, trägt „nur hier“ und erscheint nicht
 am Hub. Änderungen am Hub kommen mit der nächsten Meldung, also binnen einer Minute.
 
 Beim ersten Abgleich führt der ELW Gleiches zusammen: ein Fahrzeug mit demselben Funkrufnamen,
 Personal mit derselben Personalnummer, Material mit derselben Bestandsnummer, Kataloge und
-Vorlagen mit demselben Namen. Die Daten des Hubs gelten danach, Einsätze zeigen weiter auf
-dieselbe Zeile. Konten werden nie zusammengeführt: Ist ein Benutzername am ELW schon vergeben,
+Vorlagen mit demselben Namen, Sprechgruppen mit derselben Betriebsart und Bezeichnung. Die Daten
+des Hubs gelten danach, Einsätze zeigen weiter auf dieselbe Zeile. Gibt der Hub ein Schichtmodell
+als Vorgabe vor oder eine Leitstelle als zuständig, gilt das auch am ELW; eine eigene Vorgabe
+oder zuständige Leitstelle des ELW verliert diese Markierung und bleibt sonst erhalten. Konten werden nie zusammengeführt: Ist ein Benutzername am ELW schon vergeben,
 kommt das Konto vom Hub nicht an, und an der Kopplung steht „Konto „…“ ist hier schon
-vergeben.“ Löscht der Hub eine Zeile, die ein Einsatz am ELW verwendet, wird sie dort außer
-Dienst genommen oder deaktiviert statt gelöscht. Nach dem Widerruf gehören alle Zeilen dem ELW
-und sind wieder bearbeitbar.
+vergeben.“ Löscht der Hub eine Zeile, die am ELW noch verwendet wird, wird sie dort außer
+Dienst genommen oder deaktiviert statt gelöscht. Schichtmodelle, Einsatz-Vorlagen,
+Stichwort-Vorschläge und Unterkunft-Richtwerte kennen das nicht: Zeigt eine eigene Einsatz-Vorlage
+des ELW auf ein am Hub gelöschtes Schichtmodell, bleibt es stehen, gehört dem ELW und ist dort
+bearbeitbar. Was der Hub im selben Zug selbst nicht mehr verwendet, etwa ein Schichtmodell, das er
+erst aus seinen Vorlagen nimmt und dann löscht, löscht auch der ELW. Nach dem Widerruf gehören
+alle Zeilen dem ELW und sind wieder bearbeitbar.
 
 Eine Organisation bezieht Stammdaten aus genau einer Kopplung; eine weitere zeigt „Stammdaten
 dieser Org kommen schon aus einer anderen Kopplung.“

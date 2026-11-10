@@ -66,6 +66,18 @@ describe('geraetDarf', () => {
     });
   });
 
+  describe('registrierliste-druck (LLH-1616): nur die Betreuungsstelle druckt ihre Liste', () => {
+    it.each(ANSICHTEN)('Ansicht %s', (ansicht) => {
+      expect(geraetDarf(geraet(ansicht), 'registrierliste-druck')).toBe(
+        ansicht === 'betreuungsstelle',
+      );
+    });
+
+    it('eine Person druckt', () => {
+      expect(geraetDarf(null, 'registrierliste-druck')).toBe(true);
+    });
+  });
+
   describe('person-druck (LLH-1120): die Druckansicht einer Person gibt es am Gerät nicht', () => {
     it.each(ANSICHTEN)('Ansicht %s druckt nicht', (ansicht) => {
       expect(geraetDarf(geraet(ansicht), 'person-druck')).toBe(false);

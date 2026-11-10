@@ -130,3 +130,55 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
     await kontext.close();
   }
 });
+
+test('LLH-1616: Tablet der Betreuungsstelle druckt die Registrierliste der eigenen Stelle', async ({
+  page,
+  browser,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatz = await senden(page, 'post', '/api/einsaetze', {
+    bezeichnung: `E2E Registrierliste Gerät ${Date.now()}`,
+  });
+  const e = einsatz.id;
+  const nord = await stelleInBetrieb(page, e, 'NU Turnhalle Nord');
+  const sued = await stelleInBetrieb(page, e, 'NU Schule Süd');
+  const registrieren = (stelle: number, name: string) =>
+    senden(page, 'post', `/api/einsaetze/${e}/betreuung/stellen/${stelle}/registrierungen`, {
+      personen: [{ name, vorname: 'Ida', kostform: 'vegan' }],
+    });
+  await registrieren(nord, 'Nordhoff');
+  await registrieren(sued, 'Südmann');
+  const kopplung = await senden<{ code: { code: string } }>(
+    page,
+    'post',
+    `/api/einsaetze/${e}/geraete`,
+    { ansicht: 'betreuungsstelle', stelle_id: nord, bezeichnung: 'Tablet NU' },
+  );
+
+  const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/betroffene$`));
+
+    const nav = tablet.getByRole('navigation', { name: 'Gerätenavigation' });
+    await nav.getByRole('link', { name: 'Stelle' }).click();
+    await tablet.getByRole('tab', { name: 'Registrierung' }).click();
+    await tablet.getByRole('link', { name: 'Registrierliste drucken' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/betreuung/registrierliste/druck$`));
+
+    const tabelle = tablet
+      .locator('[data-lfh="druckwurzel"]')
+      .getByRole('table', { name: 'Registrierte Personen' });
+    await expect(tabelle).toContainText('Nordhoff, Ida');
+    await expect(tabelle).not.toContainText('Südmann');
+    await expect(tablet.getByRole('button', { name: /Drucken/ })).toBeEnabled();
+
+    // Zurück auf die Stelle.
+    await tablet.getByRole('link', { name: 'Zurück zur Stelle' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/betreuung$`));
+  } finally {
+    await kontext.close();
+  }
+});

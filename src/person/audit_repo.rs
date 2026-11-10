@@ -4,8 +4,8 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-/// `art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,
-/// zuvor 0132 und 0021).
+/// `art IN ('detail','export','druck','anhang','registrierliste')`
+/// (migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ZugriffArt {
@@ -17,6 +17,9 @@ pub enum ZugriffArt {
     /// LFH-757: Abruf der Datei eines Personen-Anhangs (`GET …/personen/{pid}/anhaenge/{aid}/datei`),
     /// mit Person, ohne Bezug auf die Datei. Auch 304 und Original schreiben eine Zeile.
     Anhang,
+    /// LLH-1616: Druck der Registrierliste einer Betreuungsstelle
+    /// (`GET …/stellen/{sid}/registrierungen/druck`), je gedruckter Person ein Eintrag.
+    Registrierliste,
 }
 
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
@@ -32,8 +35,8 @@ pub struct ZugriffAnzeige {
 }
 
 /// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export oder Druck der
-/// gesamten Liste. `art` ist 'detail', 'export', 'druck' oder 'anhang'.
-pub async fn anlegen(
+/// gesamten Liste. `art` ist 'detail', 'export', 'druck', 'anhang' oder 'registrierliste'.
+pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: Option<i64>,
@@ -49,6 +52,28 @@ pub async fn anlegen(
     .bind(benutzer_id)
     .bind(art)
     .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Wie [`create`], aber in einer offenen Transaktion: der Registrierlistendruck (LLH-1616)
+/// schreibt je Person einen Eintrag und liefert nur, wenn alle stehen.
+pub async fn create_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    person_id: Option<i64>,
+    benutzer_id: i64,
+    art: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+         VALUES (?, ?, ?, ?)",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .bind(benutzer_id)
+    .bind(art)
+    .execute(conn)
     .await?;
     Ok(())
 }
@@ -140,8 +165,8 @@ mod tests {
     async fn anlegen_und_liste_je_person() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        anlegen(&pool, e, Some(p), b, "detail").await.unwrap();
-        anlegen(&pool, e, Some(p), b, "detail").await.unwrap();
+        create(&pool, e, Some(p), b, "detail").await.unwrap();
+        create(&pool, e, Some(p), b, "detail").await.unwrap();
         let eintraege = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(eintraege.len(), 2);
         assert_eq!(eintraege[0].art, "detail");
@@ -152,7 +177,7 @@ mod tests {
     async fn export_eintrag_ohne_person() {
         let pool = test_pool().await;
         let (b, e, _p) = setup(&pool).await;
-        anlegen(&pool, e, None, b, "export").await.unwrap();
+        create(&pool, e, None, b, "export").await.unwrap();
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'export'",
         )
@@ -168,7 +193,7 @@ mod tests {
     async fn druck_eintrag_ohne_person() {
         let pool = test_pool().await;
         let (b, e, _p) = setup(&pool).await;
-        anlegen(&pool, e, None, b, "druck").await.unwrap();
+        create(&pool, e, None, b, "druck").await.unwrap();
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM person_zugriff_audit \
              WHERE einsatz_id = ? AND art = 'druck' AND person_id IS NULL",
@@ -335,7 +360,7 @@ mod tests {
     async fn anhang_eintrag_mit_person() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        anlegen(&pool, e, Some(p), b, "anhang").await.unwrap();
+        create(&pool, e, Some(p), b, "anhang").await.unwrap();
         let eintraege = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(eintraege.len(), 1);
         assert_eq!(eintraege[0].art, "anhang");

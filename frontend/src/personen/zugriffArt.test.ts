@@ -10,8 +10,13 @@ describe('zugriffArtText (LFH-757)', () => {
       export: 'Liste exportiert',
       druck: 'Liste gedruckt',
       anhang: 'Datei geladen',
+      registrierliste: 'Registrierliste gedruckt',
     });
     expect(zugriffArtText({ art: 'anhang', person_id: 9 })).toBe('Datei geladen');
+    // LLH-1616: der Druck der Registrierliste steht je Person, getrennt vom Personenblatt.
+    expect(zugriffArtText({ art: 'registrierliste', person_id: 9 })).toBe(
+      'Registrierliste gedruckt',
+    );
   });
 
   it('unterscheidet den Druck einer Person vom Druck der Liste (LLH-1120)', () => {

@@ -7,15 +7,18 @@ import {
   geraetBetroffenerPfad,
   geraetPatientenPfad,
   geraetPersonPfad,
+  geraetRegistrierlisteDruckPfad,
   geraetUhsPfad,
   geraetVerpflegungAusgabePfad,
   geraetVerpflegungPfad,
   personDetailPfad,
   personenAufnahmePfad,
   personenPfad,
+  registrierlisteDruckPfad,
   uhsDetailPfad,
   verpflegungAusgabePfad,
   verpflegungPfad,
+  type RegistrierlisteDruckWahl,
 } from './deeplinks';
 
 /**
@@ -41,6 +44,12 @@ export interface EinsatzPfade {
    * Stabsoberfläche: das Gerät hat keine Stellenseite, dort bleibt der Verbleib Text.
    */
   betreuungsstelle: ((einsatzId: number, stelleId: number) => string) | null;
+  /**
+   * Druckansicht der Registrierliste (LLH-1616): an der Stabsoberfläche unter der Stelle, am
+   * Gerät „Betreuungsstelle“ ohne Stelle (es gilt die gebundene). Andere Geräte haben keine.
+   */
+  registrierlisteDruck:
+    ((einsatzId: number, stelleId: number, wahl?: RegistrierlisteDruckWahl) => string) | null;
 }
 
 export const STAB_PFADE: EinsatzPfade = {
@@ -51,6 +60,7 @@ export const STAB_PFADE: EinsatzPfade = {
   verpflegung: verpflegungPfad,
   verpflegungAusgabe: verpflegungAusgabePfad,
   betreuungsstelle: betreuungsstellePfad,
+  registrierlisteDruck: registrierlisteDruckPfad,
 };
 
 export const GERAET_PFADE: EinsatzPfade = {
@@ -61,6 +71,7 @@ export const GERAET_PFADE: EinsatzPfade = {
   verpflegung: geraetVerpflegungPfad,
   verpflegungAusgabe: geraetVerpflegungAusgabePfad,
   betreuungsstelle: null,
+  registrierlisteDruck: null,
 };
 
 /**
@@ -76,6 +87,8 @@ export const GERAET_BETREUUNG_PFADE: EinsatzPfade = {
   verpflegung: geraetVerpflegungPfad,
   verpflegungAusgabe: geraetVerpflegungAusgabePfad,
   betreuungsstelle: null,
+  registrierlisteDruck: (einsatzId, _stelleId, wahl) =>
+    geraetRegistrierlisteDruckPfad(einsatzId, wahl),
 };
 
 const PfadeKontext = createContext<EinsatzPfade>(STAB_PFADE);

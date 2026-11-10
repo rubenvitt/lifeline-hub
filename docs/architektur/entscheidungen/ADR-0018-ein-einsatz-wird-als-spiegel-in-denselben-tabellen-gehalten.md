@@ -8,7 +8,7 @@ gilt_fuer:
   - src/einsatz/spiegel_filter.rs
   - src/einsatz/schwaerzung_registry.rs
   - src/auth/session.rs
-  - migrations/0311_einsatz_spiegel.sql
+  - migrations/0313_einsatz_spiegel.sql
   - frontend/src/offline/queue.ts
 herleitung:
   - openspec/changes/polrv1lt-spiegel-antraege/design.md
@@ -41,7 +41,7 @@ herleitung:
 ## Prüfung
 
 ```sh
-verlange "RAISE\(ABORT, 'einsatz_ist_spiegel'\)" migrations/0311_einsatz_spiegel.sql
+verlange "RAISE\(ABORT, 'einsatz_ist_spiegel'\)" migrations/0313_einsatz_spiegel.sql
 verlange 'fn trigger_passen_zur_beschreibung' src/instanz/spiegel/art.rs
 verlange 'fn jede_einsatztabelle_ist_eingeordnet' src/instanz/spiegel/art.rs
 verlange 'fn jede_vormerkbare_art_ist_eingeordnet' src/instanz/spiegel/antrag.rs

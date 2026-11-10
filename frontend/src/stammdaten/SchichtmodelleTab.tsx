@@ -29,6 +29,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 /**
@@ -49,6 +50,9 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  * - Live über das Org-Ereignis `stammdaten` (`globalKeys.schichtmodelle`).
  * - Wechselzeiten in der Zeitdarstellung (LLH-1437); außerhalb jedes Einsatzes kommt sie aus Gerät
  *   und Organisation (`OrgAnzeigeProvider`).
+ * - **Vom Hub** (kjezbk06, design.md D6): ein Modell vom Hub ist nur lesbar, auch seine Vorgabe.
+ *   Ist die Vorgabe vom Hub, bietet kein eigenes Modell „Als Vorgabe setzen“ an: der Wechsel höbe
+ *   erst die Vorgabe vom Hub auf, und das lehnt der Server ab (409). Die Vorgabe folgt dem Hub.
  */
 /** Folge des Löschens für Einsatz-Vorlagen, die das Modell vorgeben (LLH-1313). */
 function verlierenText(vorlagen: string[]): string {
@@ -72,6 +76,7 @@ function SchichtmodelleInhalt() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { istSchmal } = useViewport();
+  const herkunft = useStammdatenHerkunft();
   const [formular, setFormular] = useState<{ modell: Schichtmodell | null } | null>(null);
   const [zuLoeschen, setZuLoeschen] = useState<Schichtmodell | null>(null);
 
@@ -80,6 +85,8 @@ function SchichtmodelleInhalt() {
     queryFn: fetchSchichtmodelle,
   });
   const modelle = modelleQuery.data ?? [];
+  const istVomHub = (m: Schichtmodell) => herkunft.istVomHub('schichtmodell', m.id);
+  const vorgabeVomHub = modelle.some((m) => m.ist_vorgabe && istVomHub(m));
   const invalidiere = () => qc.invalidateQueries({ queryKey: globalKeys.schichtmodelle() });
   // Nur für die Rückfrage beim Löschen: welche Vorlagen das Modell vorgeben (LLH-1313).
   const { data: vorlagen = [] } = useQuery({
@@ -160,6 +167,10 @@ function SchichtmodelleInhalt() {
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_vorgabe && <StatusChip ton="normal" wort="Vorgabe der Organisation" />}
           {m.ist_demo && <DemoMarke />}
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('schichtmodell', m.id)}
+            quelle={herkunft.quelle}
+          />
         </Space>
       ),
     },
@@ -196,20 +207,25 @@ function SchichtmodelleInhalt() {
             key: 'aktionen',
             immerSichtbar: true,
             fixed: 'right' as const,
-            render: (_: unknown, m: Schichtmodell) => (
-              <MenueAusloeser
-                gesperrt={vorgabe.isPending}
-                eintraege={[
-                  { key: 'bearbeiten' as const, label: 'Bearbeiten' },
-                  m.ist_vorgabe
-                    ? { key: 'aufheben' as const, label: 'Vorgabe aufheben' }
-                    : { key: 'vorgabe' as const, label: 'Als Vorgabe setzen' },
-                  { key: 'loeschen' as const, label: 'Löschen', gefahr: true as const },
-                ]}
-                zugaenglicherName={`Aktionen zu ${m.bezeichnung}`}
-                onWahl={(aktion) => handle(aktion, m)}
-              />
-            ),
+            render: (_: unknown, m: Schichtmodell) =>
+              istVomHub(m) ? (
+                <VomHubGesperrt />
+              ) : (
+                <MenueAusloeser
+                  gesperrt={vorgabe.isPending}
+                  eintraege={[
+                    { key: 'bearbeiten' as const, label: 'Bearbeiten' },
+                    ...(m.ist_vorgabe
+                      ? [{ key: 'aufheben' as const, label: 'Vorgabe aufheben' }]
+                      : vorgabeVomHub
+                        ? []
+                        : [{ key: 'vorgabe' as const, label: 'Als Vorgabe setzen' }]),
+                    { key: 'loeschen' as const, label: 'Löschen', gefahr: true as const },
+                  ]}
+                  zugaenglicherName={`Aktionen zu ${m.bezeichnung}`}
+                  onWahl={(aktion) => handle(aktion, m)}
+                />
+              ),
           },
         ]
       : []),

@@ -86,7 +86,7 @@ Wer eine solche Tabelle neu baut, legt ihre Trigger wieder an; ein Test vergleic
 „Instanzkopplung“).
 
 Ebenso sitzen Änderungslog und Schreibschutz gespiegelter Einsätze in Triggern (LLH-1492,
-`migrations/0311_einsatz_spiegel.sql`,
+`migrations/0313_einsatz_spiegel.sql`,
 [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)):
 An jeder Einsatztabelle aus `instanz::spiegel::art::GESPIEGELT` schreiben
 `<tabelle>_spiegellog_i/_u/_d` den Stand der Zeile nach `einsatz_aenderung`, und

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import { adminFixture } from '../test/fixtures';
 import type { ExterneStelle } from '../api/types';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -169,5 +170,35 @@ describe('ExterneStellenTab · Sortieren (LLH-1096)', () => {
       'Polizei Musterstadt',
       'ILS Musterkreis zuständig',
     ]);
+  });
+});
+
+describe('ExterneStellenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt die Stelle vom Hub und lässt die eigene bearbeitbar', async () => {
+    server.use(herkunftHandler({ externe_stelle: ['1'] }));
+    render(admin);
+    const hubZeile = (await screen.findByText('ILS Musterkreis')).closest('tr')!;
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+
+    const lokal = screen.getByText('Polizei Musterstadt').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+    expect(within(lokal).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Externe Stelle anlegen' })).toBeEnabled();
+  });
+
+  it('bietet keine eigene zuständige Leitstelle an, solange sie vom Hub kommt', async () => {
+    server.use(herkunftHandler({ externe_stelle: ['1'] }));
+    const nutzer = userEvent.setup();
+    render(admin);
+    await waitFor(() => expect(screen.getByText('vom Hub')).toBeInTheDocument());
+    await nutzer.click(screen.getByRole('button', { name: 'Externe Stelle anlegen' }));
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.click(within(dialog).getByLabelText('Art'));
+    await nutzer.click(await screen.findByTitle('Leitstelle'));
+    expect(await within(dialog).findByLabelText('Zuständige Leitstelle')).toBeDisabled();
   });
 });

@@ -8,18 +8,21 @@ import {
   setzeOrgUnterkunftRichtwert,
 } from '../api/unterkunftRichtwerte';
 import RichtwerteListe from '../betreuung/unterkunft/RichtwerteListe';
+import { useStammdatenHerkunft } from '../instanz/herkunft';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 /**
  * Verwaltung → Stammdaten → Unterkunft (LLH-1520, design.md D2): die Richtwerte des
  * Unterkunftsrechners für die ganze Organisation. Leer gilt die Vorgabe aus dem Programm; ein
  * Einsatz kann jeden Wert noch einmal überschreiben. Nur der System-Admin ändert (der Server
- * antwortet sonst 403), jeder Angemeldete liest.
+ * antwortet sonst 403), jeder Angemeldete liest. Ein Schlüssel, den der Hub setzt, ist nur lesbar;
+ * die übrigen bleiben hier setzbar (kjezbk06, design.md D6).
  */
 export default function UnterkunftRichtwerteTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
+  const herkunft = useStammdatenHerkunft();
   const query = useQuery({
     queryKey: globalKeys.unterkunftRichtwerte(),
     queryFn: ladeOrgUnterkunftRichtwerte,
@@ -46,6 +49,10 @@ export default function UnterkunftRichtwerteTab() {
         ebenen={query.data}
         ebene="org"
         gesperrt={!istAdmin}
+        stammdatenHerkunft={{
+          quelle: herkunft.quelle,
+          herkunft: (schluessel) => herkunft.herkunft('unterkunft_richtwert', schluessel),
+        }}
         laeuft={setzen.isPending ? setzen.variables?.schluessel : null}
         onSetzen={(schluessel, wert) => setzen.mutate({ schluessel, wert })}
       />

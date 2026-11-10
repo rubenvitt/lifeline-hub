@@ -28,6 +28,11 @@ export type GeraetFaehigkeit =
   | 'person-behandlung'
   /** Druckansicht einer Person (LLH-1120): nur am Arbeitsplatz, die Route steht in keiner Liste. */
   | 'person-druck'
+  /**
+   * Registrierliste der eigenen Stelle drucken (LLH-1616): nur die Betreuungsstelle (Routenliste
+   * `BETREUUNGSSTELLE`, fremde Stelle 403). Bewusste Ausnahme zu `person-druck`.
+   */
+  | 'registrierliste-druck'
   /** Tiere und Schäden einer Person. */
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
@@ -77,6 +82,8 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'br-eintreffen':
     case 'br-material':
       return geraet.ansicht === 'bereitstellungsraum';
+    case 'registrierliste-druck':
+      return geraet.ansicht === 'betreuungsstelle';
     case 'uhs-verwalten':
     case 'br-verwalten':
     case 'br-abrufen':
