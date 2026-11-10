@@ -64,7 +64,8 @@ import {
  *   des Knopfs.
  * - Gesperrt mit Grund: ohne Schreibrecht (`rechteGrund`) oder an einer geschlossenen Stelle.
  * - **„Registrierliste drucken“** (LLH-1616) führt auf die Druckansicht der Stelle, auch ohne
- *   Schreibrecht und an einer geschlossenen Stelle; am Gerät nur an der Betreuungsstelle.
+ *   Schreibrecht und an einer geschlossenen Stelle; am Gerät nur an der Betreuungsstelle. Eigene
+ *   Zeile über dem Band, nicht im Kopf: bei 390 px liefe der Kopf sonst über (Gate 1).
  */
 
 interface Ziel {
@@ -332,19 +333,6 @@ export default function RegistrierungPaneel({
               {sperrGrund}
             </Typography.Text>
           )}
-          {druckPfad && (
-            <Button
-              href={druckPfad}
-              onClick={(e) => {
-                // Ein Link mit Knopfgestalt: Strg/⌘+Klick öffnet den neuen Tab wie jeder Link.
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                navigate(druckPfad);
-              }}
-            >
-              Registrierliste drucken
-            </Button>
-          )}
           <Button
             disabled={sperrGrund != null}
             aria-describedby={sperrGrund ? grundId : undefined}
@@ -358,6 +346,29 @@ export default function RegistrierungPaneel({
         </span>
       }
     >
+      {/* Eigene Zeile statt Kopf (LLH-1616): bei 390 px trägt der Kopf neben Grund und
+          „Registrieren“ keinen dritten Knopf (Gate 1), und eine Aktion wird nie gekürzt. */}
+      {druckPfad && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBlockEnd: token.marginXS,
+          }}
+        >
+          <Button
+            href={druckPfad}
+            onClick={(e) => {
+              // Ein Link mit Knopfgestalt: Strg/⌘+Klick öffnet den neuen Tab wie jeder Link.
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+              e.preventDefault();
+              navigate(druckPfad);
+            }}
+          >
+            Registrierliste drucken
+          </Button>
+        </div>
+      )}
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
           nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
       {vorgemerkteRegistrierungen.length > 0 && (

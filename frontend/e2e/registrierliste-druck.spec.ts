@@ -137,8 +137,15 @@ test('Registrierliste: Einstieg im Paneel, Gesundheitsangaben nur nach Wahl, Hau
   const ohneLeerraum = seiten.map((s) => s.text.replace(/\s/g, ''));
   const seiteVon = (text: string) => ohneLeerraum.findIndex((t) => t.includes(text));
   for (let h = 1; h <= HAUSHALTE; h++) {
-    const kopf = seiteVon(`Haus${h},P1`);
+    const name = `Haus${h},P1`;
+    const kopf = seiteVon(name);
     expect(kopf, `Kopf von H-${h} im PDF`).toBeGreaterThanOrEqual(0);
+    // Die Bezugsperson steht im Kopf UND in ihrer Zeile: fehlte der Kopf, fände `seiteVon` sonst
+    // die Personenzeile und bliebe grün.
+    expect(
+      ohneLeerraum[kopf].split(name).length - 1,
+      `Kopf und erste Person von H-${h} auf einer Seite`,
+    ).toBe(2);
     expect(seiteVon(`Haus${h},P${JE_HAUSHALT}`), `H-${h} ganz auf einer Seite`).toBe(kopf);
   }
   await page.emulateMedia({ media: null });
