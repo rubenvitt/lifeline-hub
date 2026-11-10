@@ -39,11 +39,7 @@ export default function FuehrungHinweisband({ einsatz }: { einsatz: EinsatzAnzei
           banner
           title="Übernahme der Führung wartet auf Entscheidung"
           description="Die Angaben zur Übernahme ließen sich nicht laden."
-          action={
-            <Button size="small" onClick={() => void fuehrungQ.refetch()}>
-              Erneut laden
-            </Button>
-          }
+          action={<Button onClick={() => void fuehrungQ.refetch()}>Erneut laden</Button>}
         />
       </div>
     );
