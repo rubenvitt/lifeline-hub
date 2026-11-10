@@ -404,12 +404,14 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
 
 /// Nach dem Widerruf einer Org-Zuordnung (hier oder vom Gegenüber): lokale Einsätze der Org, die
 /// dieses Gegenüber führt, holt diese Instanz mit der nächsten Epoche zurück. Sonst bliebe ein Einsatz
-/// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491).
+/// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491). Gibt die
+/// Einsätze zurück, deren Akte sich geändert hat; der Aufrufer meldet ihren Kopf nach dem Commit.
 pub async fn release_nach_widerruf(
     conn: &mut SqliteConnection,
     org_id: i64,
     gegenueber_kennung: &str,
-) -> Result<(), AppError> {
+) -> Result<Vec<i64>, AppError> {
+    let mut einsaetze = Vec::new();
     let ids: Vec<i64> = sqlx::query_scalar(
         "SELECT id FROM einsatz_fuehrung WHERE org_id = ? AND fuehrer_kennung = ? \
          AND einsatz_id IS NOT NULL",
@@ -432,9 +434,10 @@ pub async fn release_nach_widerruf(
         a.offen = None;
         a.offen_bruch_at = None;
         save(conn, &mut a, true).await?;
+        einsaetze.extend(a.einsatz_id);
     }
     if ids.is_empty() {
-        return Ok(());
+        return Ok(einsaetze);
     }
     let ich = ich(conn).await?;
     for id in ids {
@@ -464,6 +467,31 @@ pub async fn release_nach_widerruf(
             },
         )
         .await?;
+        einsaetze.extend(a.einsatz_id);
+    }
+    einsaetze.sort_unstable();
+    einsaetze.dedup();
+    Ok(einsaetze)
+}
+
+/// Neue Org-Zuordnung an einer Kopplung: die vorhandenen Akten der Org bekommen einen frischen
+/// Stand. Der Stand der Kopplung (`fuehrung_gesendet_bis`) kann schon über ihnen liegen, etwa nach
+/// Widerruf und erneuter Zuordnung oder wenn die Org schon an einer anderen Kopplung hängt; dann
+/// gingen sie nie hinaus (CodeRabbit-Review LLH-1491). Ein frischer Stand schickt sie auch an
+/// andere Kopplungen erneut, was dort nichts ändert.
+pub async fn renew_stand_der_org(conn: &mut SqliteConnection, org_id: i64) -> Result<(), AppError> {
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM einsatz_fuehrung WHERE org_id = ? ORDER BY stand, id")
+            .bind(org_id)
+            .fetch_all(&mut *conn)
+            .await?;
+    for id in ids {
+        let stand = next_stand(conn).await?;
+        sqlx::query("UPDATE einsatz_fuehrung SET stand = ? WHERE id = ?")
+            .bind(stand)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
     }
     Ok(())
 }
@@ -774,6 +802,85 @@ pub(crate) mod tests {
         );
         super::super::save_schalter(&pool, true).await.unwrap();
         assert_eq!(bei(&pool, id).await.as_deref(), Some("Hub Nord"));
+    }
+
+    #[tokio::test]
+    async fn neue_zuordnung_schickt_vorhandene_akten_der_org_erneut() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        einsatz(&pool, "Lage").await;
+        ensure(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        // Alles bis zum jetzigen Stand ist gesendet; dann Widerruf und neue Zuordnung der Org.
+        let bis: i64 = sqlx::query_scalar("SELECT fuehrung_stand FROM instanz_identitaet")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        save_kopplung_staende(&mut conn, 1, Some(bis), None)
+            .await
+            .unwrap();
+        let alt: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung_org")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        crate::instanz::repo::org_widerrufen(&mut conn, alt, None, "2026-11-10 10:00:00", true)
+            .await
+            .unwrap();
+        assert!(list_zu_senden(&mut conn, &[1], bis, 50)
+            .await
+            .unwrap()
+            .is_empty());
+        crate::instanz::repo::create_org_zuordnung(&mut conn, 1, 1, "hub/1", "Hub-Org", None, true)
+            .await
+            .unwrap();
+        assert_eq!(
+            list_zu_senden(&mut conn, &[1], bis, 50)
+                .await
+                .unwrap()
+                .len(),
+            1,
+            "die Akte der wieder zugeordneten Org geht hinaus"
+        );
+    }
+
+    #[tokio::test]
+    async fn widerruf_nennt_die_einsaetze_die_er_freigibt() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        let gefuehrt = einsatz(&pool, "Beim Hub").await;
+        einsatz(&pool, "Hier").await;
+        ensure(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut a = find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap();
+        a.fuehrer_kennung = "hub".into();
+        a.fuehrer_name = "Hub Nord".into();
+        save(&mut conn, &mut a, true).await.unwrap();
+        let zeile: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung_org")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        let w = crate::instanz::repo::org_widerrufen(
+            &mut conn,
+            zeile,
+            None,
+            "2026-11-10 10:00:00",
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(w, Some(vec![gefuehrt]), "nur der freigegebene Einsatz");
+        let noch_mal = crate::instanz::repo::org_widerrufen(
+            &mut conn,
+            zeile,
+            None,
+            "2026-11-10 10:00:00",
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(noch_mal, None, "schon widerrufen");
     }
 
     #[tokio::test]

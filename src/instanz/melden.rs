@@ -485,8 +485,15 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 continue;
             };
             if oa.widerrufen {
-                if repo::org_widerrufen(conn, o.id, None, &jetzt, true).await? {
+                if let Some(einsaetze) =
+                    repo::org_widerrufen(conn, o.id, None, &jetzt, true).await?
+                {
                     vom_gegenueber_widerrufen.push(o.clone());
+                    fuehrung_folgen.extend(
+                        einsaetze
+                            .into_iter()
+                            .map(|einsatz_id| fuehrung_austausch::Folge::Kopf { einsatz_id }),
+                    );
                 }
                 continue;
             }
@@ -695,8 +702,15 @@ pub async fn handle_meldung(
                 .iter()
                 .find(|o| o.widerrufen_at.is_none() && kennung(o) == w)
             {
-                if repo::org_widerrufen(conn, o.id, None, &jetzt, true).await? {
+                if let Some(einsaetze) =
+                    repo::org_widerrufen(conn, o.id, None, &jetzt, true).await?
+                {
                     vom_gegenueber.push(o.clone());
+                    fuehrung_folgen.extend(
+                        einsaetze
+                            .into_iter()
+                            .map(|einsatz_id| fuehrung_austausch::Folge::Kopf { einsatz_id }),
+                    );
                 }
             }
         }

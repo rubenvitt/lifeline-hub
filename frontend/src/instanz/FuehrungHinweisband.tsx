@@ -1,4 +1,4 @@
-import { Alert } from 'antd';
+import { Alert, Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
@@ -26,7 +26,28 @@ export default function FuehrungHinweisband({ einsatz }: { einsatz: EinsatzAnzei
     enabled: offen,
   });
   const f = fuehrungQ.data;
-  if (!offen || !f?.offen) return null;
+  if (!offen) return null;
+  if (!f?.offen) {
+    // Scheitert der Abruf, bleibt das Band stehen: die offene Übernahme kennt der Einsatzkopf
+    // schon, nur ihre Angaben fehlen (CodeRabbit-Review LLH-1491).
+    if (!fuehrungQ.isError) return null;
+    return (
+      <div data-lfh="fuehrung-hinweisband">
+        <Alert
+          type="warning"
+          showIcon
+          banner
+          title="Übernahme der Führung wartet auf Entscheidung"
+          description="Die Angaben zur Übernahme ließen sich nicht laden."
+          action={
+            <Button size="small" onClick={() => void fuehrungQ.refetch()}>
+              Erneut laden
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
   const teile = [
     f.offen.zeitpunkt ? zeitKurz(f.offen.zeitpunkt, konv) : null,
     f.offen.unterzeichner ? `unterzeichnet von ${f.offen.unterzeichner}` : null,

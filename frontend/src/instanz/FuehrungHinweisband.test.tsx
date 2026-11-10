@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import FuehrungHinweisband from './FuehrungHinweisband';
@@ -74,5 +75,16 @@ describe('FuehrungHinweisband (LLH-1491)', () => {
     renderMitProviders(<FuehrungHinweisband einsatz={einsatz('fuehrungspersonal', true)} />);
     expect(await screen.findByText('Führung übernommen von Hub Nord')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Übernahme bestätigen' })).toBeNull();
+  });
+  it('ein gescheiterter Abruf lässt das Band mit „Erneut laden“ stehen', async () => {
+    vi.mocked(loadFuehrung).mockRejectedValueOnce(new Error('Netz weg'));
+    renderMitProviders(<FuehrungHinweisband einsatz={einsatz('einsatzleitung', true)} />);
+    const knopf = await screen.findByRole('button', { name: 'Erneut laden' });
+    expect(
+      screen.getByText('Die Angaben zur Übernahme ließen sich nicht laden.'),
+    ).toBeInTheDocument();
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Führung übernommen von Hub Nord')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Erneut laden' })).toBeNull());
   });
 });
