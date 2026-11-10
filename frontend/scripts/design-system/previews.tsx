@@ -1265,6 +1265,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     group: 'Bedienung',
     height: 275,
     source: 'components/BreiteHalten.tsx',
+    docAnchor: 'export default function BreiteHalten',
     content: () => (
       <div className="ds-stapel">
         <div className="ds-reihe">
