@@ -86,11 +86,22 @@ pub struct BestandAbschnitt {
     pub kurzbezeichnung: Option<String>,
 }
 
-/// Der Abschnitt zu einem Namen oder einer Kurzbezeichnung; mehrdeutig oder unbekannt `None`.
-pub fn finde_abschnitt(abschnitte: &[BestandAbschnitt], text: &str) -> Option<i64> {
+/// Wie ein Abschnittstext auf die Abschnitte des Einsatzes trifft.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbschnittTreffer {
+    /// Genau ein Abschnitt trägt den Text als Name oder Kurzbezeichnung.
+    Eindeutig(i64),
+    /// Mehrere Abschnitte passen (etwa der Name des einen ist die Kurzbezeichnung des anderen).
+    Mehrdeutig,
+    /// Kein Abschnitt passt (oder der Text ist leer).
+    Keiner,
+}
+
+/// Sucht den Abschnitt zu einem Namen oder einer Kurzbezeichnung, ohne Groß-/Kleinschreibung.
+pub fn abschnitt_treffer(abschnitte: &[BestandAbschnitt], text: &str) -> AbschnittTreffer {
     let t = norm(text);
     if t.is_empty() {
-        return None;
+        return AbschnittTreffer::Keiner;
     }
     let treffer: Vec<i64> = abschnitte
         .iter()
@@ -100,8 +111,17 @@ pub fn finde_abschnitt(abschnitte: &[BestandAbschnitt], text: &str) -> Option<i6
         .map(|a| a.id)
         .collect();
     match treffer.as_slice() {
-        [id] => Some(*id),
-        _ => None,
+        [] => AbschnittTreffer::Keiner,
+        [id] => AbschnittTreffer::Eindeutig(*id),
+        _ => AbschnittTreffer::Mehrdeutig,
+    }
+}
+
+/// Der Abschnitt zu einem Namen oder einer Kurzbezeichnung; mehrdeutig oder unbekannt `None`.
+pub fn finde_abschnitt(abschnitte: &[BestandAbschnitt], text: &str) -> Option<i64> {
+    match abschnitt_treffer(abschnitte, text) {
+        AbschnittTreffer::Eindeutig(id) => Some(id),
+        AbschnittTreffer::Mehrdeutig | AbschnittTreffer::Keiner => None,
     }
 }
 
@@ -777,5 +797,30 @@ mod tests {
         assert_eq!(finde_abschnitt(&a, "bühne"), Some(1));
         assert_eq!(finde_abschnitt(&a, "ea 2"), Some(2));
         assert_eq!(finde_abschnitt(&a, "Festmeile"), None);
+    }
+
+    #[test]
+    fn abschnitt_mehrdeutig_ist_kein_treffer() {
+        // Der Name des einen ist die Kurzbezeichnung des anderen (LLH-1609).
+        let a = [
+            BestandAbschnitt {
+                id: 1,
+                name: "Nord".into(),
+                kurzbezeichnung: None,
+            },
+            BestandAbschnitt {
+                id: 2,
+                name: "Abschnitt Nord".into(),
+                kurzbezeichnung: Some("nord".into()),
+            },
+        ];
+        assert_eq!(abschnitt_treffer(&a, "Nord"), AbschnittTreffer::Mehrdeutig);
+        assert_eq!(finde_abschnitt(&a, "Nord"), None);
+        assert_eq!(abschnitt_treffer(&a, "Süd"), AbschnittTreffer::Keiner);
+        assert_eq!(abschnitt_treffer(&a, "  "), AbschnittTreffer::Keiner);
+        assert_eq!(
+            abschnitt_treffer(&a, "abschnitt nord"),
+            AbschnittTreffer::Eindeutig(2)
+        );
     }
 }

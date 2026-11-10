@@ -31,6 +31,7 @@ const NULL: SchichtplanImportZaehlung = {
   grenzwerte_neu: 0,
   programmpunkte_neu: 0,
   programmpunkte_vorhanden: 0,
+  abschnitte_neu: 0,
   aenderungen: 0,
 };
 
@@ -43,6 +44,7 @@ function vorschau(teil: Partial<SchichtplanImportVorschau> = {}): SchichtplanImp
         name: 'Streife 3',
         abschnitt: 'Eingang',
         abschnitt_id: 2,
+        abschnitt_neu: false,
         ziel: { art: 'neu' },
         treffer: 'neu',
         kandidaten: [],
@@ -79,6 +81,7 @@ function vorschau(teil: Partial<SchichtplanImportVorschau> = {}): SchichtplanImp
       vorlagen: [{ id: 5, bezeichnung: 'Fußstreife' }],
       abschnitte: [],
     },
+    abschnitte_neu: [],
     uebernehmbar: true,
     ...teil,
   };
@@ -253,5 +256,12 @@ describe('SchichtplanEinlesen', () => {
         aenderungen: 3,
       }),
     ).toEqual(['3 Programmpunkte neu', '1 Programmpunkt vorhanden']);
+    // LLH-1609: Abschnitte nur aus der Vorplanung, vor den Einheiten.
+    expect(
+      zaehlungMarken({ ...NULL, abschnitte_neu: 1, einheiten_neu: 2, aenderungen: 3 }),
+    ).toEqual(['1 Abschnitt neu', '2 Einheiten neu']);
+    expect(zaehlungMarken({ ...NULL, abschnitte_neu: 3, aenderungen: 3 })).toEqual([
+      '3 Abschnitte neu',
+    ]);
   });
 });
