@@ -11,6 +11,11 @@ export const AUTOSAVE_MS = 30_000;
 interface VerlustschutzArgs<D, W extends object> {
   /** Serverstand (Query-Data). `undefined`, solange nichts geladen ist. */
   daten: D | undefined;
+  /**
+   * Wann `daten` geladen wurde (`query.dataUpdatedAt`). Ändert sich mit jedem Laden, auch wenn
+   * React Query bei gleichem Inhalt dieselbe Referenz liefert (LLH-1628, s. „NACH DER QUITTUNG“).
+   */
+  geladenAm: number;
   /** Nur im Entwurf läuft die Autosave-Uhr. */
   istEntwurf: boolean;
   form: FormInstance<W>;
@@ -102,6 +107,7 @@ interface Verlustschutz<W extends object> {
  */
 export function useEntwurfVerlustschutz<D, W extends object>({
   daten,
+  geladenAm,
   istEntwurf,
   form,
   werteAus,
@@ -129,23 +135,34 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   uhrzeitRef.current = () => uhrzeit(dayjs(), konventionen);
 
   /**
-   * Nie geschrieben wird der Serverstand, den der eigene PATCH überholt hat (LLH-1607). Fällt der Riegel mit einer Quittung, ist `daten` bis zum Refetch
-   * meist noch der Stand, der beim START des PATCH galt. Ihn zu schreiben setzte die eben gesicherte
-   * Fassung zurück, und schlösse eine Füllung den Riegel vor dem Refetch, bliebe es dabei.
-   * Übersprungen wird NUR dieser Stand (`ueberholtRef`): ein Refetch, der während des PATCH kam,
-   * kann ihn schon enthalten, samt fremder Änderung, und nach der Invalidierung käme bei gleichem
-   * Inhalt dieselbe Referenz zurück (structural sharing).
+   * **NACH DER QUITTUNG** wird nur ein Serverstand geschrieben, der NACH ihr geladen wurde
+   * (LLH-1607, LLH-1628). Fällt der Riegel mit einer Quittung, ist `daten` bis zum Refetch ein
+   * älterer Stand: der vom Start des PATCH (LLH-1607) oder, in DER SPEICHERFOLGE, der Refetch nach
+   * der Quittung des Vorgängers, der kam, während der Nachfolger lief (LLH-1628). Ihn zu schreiben
+   * setzte die eben gesicherte Fassung zurück, und schlösse eine Eingabe den Riegel vor dem
+   * nächsten Refetch, bliebe es dabei.
+   *
+   * Eine fremde Änderung geht dabei nicht verloren: die Quittung invalidiert (`onGespeichert`),
+   * und der Refetch danach trägt sie samt eigenem Stand. Kommt er bei gleichem Inhalt mit derselben
+   * Referenz zurück (structural sharing), ändert sich doch `geladenAm`; deshalb hängt die Regel am
+   * Ladezeitpunkt, nicht an der Referenz.
+   *
+   * Zwei Merkmale, weil das Laden und sein Rendern auseinanderliegen können: gleich dem Stand im
+   * Render bei der Quittung (auch bei stehender Uhr), oder vor der Quittung geladen, aber noch
+   * nicht gerendert. Ein laufender Abruf von davor kommt nicht mehr an: die Invalidierung bricht
+   * ihn ab (`cancelRefetch`).
    */
-  const datenRef = useRef(daten);
-  datenRef.current = daten;
-  const ueberholtRef = useRef<D | undefined>(undefined);
+  const geladenAmRef = useRef(geladenAm);
+  geladenAmRef.current = geladenAm;
+  const quittungRef = useRef<{ zeit: number; geladenAm: number } | null>(null);
   useEffect(() => {
     if (!daten) return;
     if (!formular.da) return; // (4)
     if (ungespeichert) return; // DER RIEGEL (1)
-    if (daten === ueberholtRef.current) return;
+    const q = quittungRef.current;
+    if (q && (geladenAm === q.geladenAm || geladenAm < q.zeit)) return; // NACH DER QUITTUNG
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
-  }, [daten, form, formular.da, ungespeichert]);
+  }, [daten, geladenAm, form, formular.da, ungespeichert]);
 
   /**
    * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Editors, s. SPEICHERFOLGE) ist kein
@@ -176,16 +193,12 @@ export function useEntwurfVerlustschutz<D, W extends object>({
    * persistierten Stand.
    */
   const gesichertRef = useRef(-1);
-  /**
-   * Der Änderungsstand gilt beim EINREIHEN (dann werden die Werte gelesen), der überholte
-   * Serverstand beim echten START des PATCH: ein Auftrag kann in DER SPEICHERFOLGE warten, und
-   * was beim Einreihen galt, wäre dann zu alt (LLH-1619).
-   */
+  /** Der Änderungsstand gilt beim EINREIHEN: dann werden die Werte gelesen. */
   const quittungVorbereiten = useCallback(() => {
     const stand = aenderungRef.current;
-    return (basis: D | undefined) => {
-      // Der Serverstand beim Start ist mit diesem PATCH überholt (LLH-1607, s. o.).
-      ueberholtRef.current = basis;
+    return () => {
+      // Alles bis hierher Geladene ist mit diesem PATCH überholt (NACH DER QUITTUNG, s. o.).
+      quittungRef.current = { zeit: Date.now(), geladenAm: geladenAmRef.current };
       // VOR der Verzweigung: der Server hat in BEIDEN Zweigen gespeichert, sonst bliebe nach einem
       // überholten Speichern ein veralteter Grund stehen.
       setSpeicherFehler(null);
@@ -219,19 +232,17 @@ export function useEntwurfVerlustschutz<D, W extends object>({
       standRef.current = aenderungRef.current;
       setSpeichertGerade(true);
       const quittieren = quittungVorbereiten();
-      let basis: D | undefined;
       const auftrag = folgeRef.current
         .catch(() => {}) // Ein Fehlschlag des vorigen sperrt den nächsten Versuch nicht.
         .then(() => {
           if (!aktivRef.current) throw new DOMException('Editor verlassen', 'AbortError');
-          basis = datenRef.current;
           return speichernRef.current(werte);
         });
       folgeRef.current = auftrag;
       auftragRef.current = auftrag;
       return auftrag
         .then((r) => {
-          quittieren(basis);
+          quittieren();
           onGespeichertRef.current?.();
           return r;
         })
