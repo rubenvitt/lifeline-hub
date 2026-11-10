@@ -201,7 +201,7 @@ impl AppError {
         {
             return Some((StatusCode::CONFLICT, "Wird am Hub gepflegt."));
         }
-        // Schreibschutz eines Spiegels (LLH-1492, `migrations/0313`, design.md D10).
+        // Schreibschutz eines Spiegels (LLH-1492, `migrations/0314`, design.md D10).
         if db
             .message()
             .contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT)
