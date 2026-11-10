@@ -1137,13 +1137,43 @@ describe('AusgabeAnsicht — Live-Zufluss „Letzte Buchungen“ (LLH-1292)', ()
   });
 });
 
-describe('AusgabeAnsicht — kein Kontextmenü auf dem Zählschirm (LLH-1598)', () => {
+describe('AusgabeAnsicht — kein Kontextmenü auf dem Zählschirm (LLH-1598, LLH-1639)', () => {
+  const offenesMenue = () =>
+    document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+
   it('Rechtsklick auf eine Zähltaste öffnet kein eigenes Menü, das Browsermenü bleibt', async () => {
     zeige();
     await geladen();
     expect(fireEvent.contextMenu(taste('+5'), { clientX: 5, clientY: 5, button: 2 })).toBe(true);
-    expect(
-      document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
-    ).toBeNull();
+    expect(offenesMenue()).toBeNull();
+  });
+
+  it('langer Druck auf eine Zähltaste öffnet kein Menü; das Abheben zählt wie ein Tipp', async () => {
+    zeige();
+    await geladen();
+    const plus5 = taste('+5');
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerDown(plus5, {
+        isPrimary: true,
+        pointerId: 7,
+        pointerType: 'touch',
+        clientX: 40,
+        clientY: 50,
+      });
+      // Android-Chrome schiebt während des Drucks selbst ein `contextmenu` nach.
+      act(() => vi.advanceTimersByTime(500));
+      fireEvent.contextMenu(plus5, { clientX: 40, clientY: 50, button: 0 });
+      act(() => vi.advanceTimersByTime(100));
+      expect(offenesMenue()).toBeNull();
+      expect(plus5).not.toHaveAttribute('data-kontext-druck');
+      fireEvent.pointerUp(plus5, { pointerId: 7, pointerType: 'touch' });
+      fireEvent.click(plus5);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(offenesMenue()).toBeNull();
+    expect(sammlungMenge()).toBe('5');
+    expect(erfasseAusgabe).not.toHaveBeenCalled();
   });
 });
