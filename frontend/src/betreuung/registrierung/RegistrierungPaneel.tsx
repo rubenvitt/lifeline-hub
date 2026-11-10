@@ -1,7 +1,7 @@
 import { App, Button, Collapse, Form, Input, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { heuteInZone } from '../../anzeige/zeitEingabe';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import { useZeitEingabe } from '../../anzeige/ZeitpunktEingabe';
@@ -33,6 +33,7 @@ import {
 } from '../../offline/schreiben';
 import { serverJetzt } from '../../offline/serveruhr';
 import { useVorgemerkteSchreibaktionen } from '../../offline/useVorgemerkteSchreibaktionen';
+import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import RegistrierMaske from './RegistrierMaske';
 import {
@@ -62,6 +63,9 @@ import {
  *   Haushalte stehen oben als „vorgemerkt“, vorgemerkt abgemeldete Personen tragen das Wort statt
  *   des Knopfs.
  * - Gesperrt mit Grund: ohne Schreibrecht (`rechteGrund`) oder an einer geschlossenen Stelle.
+ * - **„Registrierliste drucken“** (LLH-1616) führt auf die Druckansicht der Stelle, auch ohne
+ *   Schreibrecht und an einer geschlossenen Stelle; am Gerät nur an der Betreuungsstelle. Eigene
+ *   Zeile über dem Band, nicht im Kopf: bei 390 px liefe der Kopf sonst über (Gate 1).
  */
 
 interface Ziel {
@@ -97,6 +101,8 @@ export default function RegistrierungPaneel({
   const qc = useQueryClient();
   const { token } = useRollen();
   const pfade = useEinsatzPfade();
+  const navigate = useNavigate();
+  const geraetDarfHier = useGeraetDarf();
   const { zone } = useZeitEingabe();
   const grundId = useId();
   const [maske, setMaske] = useState<MaskeOffen>(null);
@@ -155,6 +161,12 @@ export default function RegistrierungPaneel({
     },
   });
 
+  // Registrierliste drucken (LLH-1616): auch ohne Schreibrecht; am Gerät nur die Betreuungsstelle
+  // (`geraetDarf`), sonst fehlt der Pfad (`EinsatzPfade.registrierlisteDruck`).
+  const druckPfad =
+    pfade.registrierlisteDruck && geraetDarfHier('registrierliste-druck')
+      ? pfade.registrierlisteDruck(einsatzId, stelle.id)
+      : null;
   const geschlossen = stelle.status === 'geschlossen';
   const sperrGrund = !darfSchreiben
     ? (rechteGrund ?? 'Nur Ansicht')
@@ -334,6 +346,29 @@ export default function RegistrierungPaneel({
         </span>
       }
     >
+      {/* Eigene Zeile statt Kopf (LLH-1616): bei 390 px trägt der Kopf neben Grund und
+          „Registrieren“ keinen dritten Knopf (Gate 1), und eine Aktion wird nie gekürzt. */}
+      {druckPfad && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBlockEnd: token.marginXS,
+          }}
+        >
+          <Button
+            href={druckPfad}
+            onClick={(e) => {
+              // Ein Link mit Knopfgestalt: Strg/⌘+Klick öffnet den neuen Tab wie jeder Link.
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+              e.preventDefault();
+              navigate(druckPfad);
+            }}
+          >
+            Registrierliste drucken
+          </Button>
+        </div>
+      )}
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
           nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
       {vorgemerkteRegistrierungen.length > 0 && (

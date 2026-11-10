@@ -98,6 +98,9 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   erfassen“ gilt hier nicht. Kostformen ohne Personenbezug liest `GET …/betreuung/kostformen`
   (nur Modul Betreuung); daraus belegt die Verpflegung die Sonderkost beim Anlegen eines
   Zeitfensters vor (`useBedarfsvorschlag`, Stand jetzt, nie als 0 ohne Registrierte).
+  **Registrierliste drucken** (LLH-1616): nur über den je Person protokollierten Druckabruf,
+  Gesundheitsangaben nur auf Wunsch; Regel in `druck/AGENTS.md`, „Registrierliste einer
+  Betreuungsstelle“.
 - **Übersicht als Lagebild** (LLH-1050, Spec `betreuung-evakuierung`, „Übersicht der
   Betreuung“): das Band „Unterbringung in Zahlen“ (`betreuung/UnterbringungKennzahlen.tsx`) rechnet
   nur über `betreuung/unterbringungKennzahl.ts`, und die nur mit `inBetreuung`, `freiePlaetze` und

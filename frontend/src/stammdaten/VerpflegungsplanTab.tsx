@@ -20,6 +20,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { VERPFLEGUNGSART_LABEL } from '../verpflegung/verpflegungText';
 import MahlzeitDialog from './MahlzeitDialog';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -37,7 +38,8 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  *
  * Gelöscht wird nicht: Deaktivieren und Aktivieren sind umkehrbar und fragen deshalb nicht nach
  * (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“). Live über das Org-Ereignis
- * `stammdaten` (Prefix `verpflegung-vorlagen` in `ORG_STREAM_EVENTS`).
+ * `stammdaten` (Prefix `verpflegung-vorlagen` in `ORG_STREAM_EVENTS`). Eine Mahlzeit vom Hub ist
+ * nur lesbar (kjezbk06, design.md D6).
  */
 const ART_FOLGE = Object.keys(VERPFLEGUNGSART_LABEL) as Verpflegungsart[];
 
@@ -55,6 +57,7 @@ function VerpflegungsplanInhalt() {
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { istSchmal } = useViewport();
+  const herkunft = useStammdatenHerkunft();
   // Offen = der Dialog; `null` im Objekt heißt „neu anlegen“.
   const [dialog, setDialog] = useState<{ mahlzeit: VerpflegungVorlage | null } | null>(null);
 
@@ -78,12 +81,16 @@ function VerpflegungsplanInhalt() {
    * Aktionsspalte; der Test der Seite hält beide gleich (design.md D4).
    */
   const zeilenMenue: WeitereAktionen<VerpflegungVorlage> = {
-    eintraege: (m) => [
-      { key: 'bearbeiten', label: 'Bearbeiten' },
-      m.aktiv
-        ? { key: 'schalten', label: 'Deaktivieren', gefahr: true }
-        : { key: 'schalten', label: 'Aktivieren' },
-    ],
+    // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+    eintraege: (m) =>
+      herkunft.istVomHub('verpflegung_vorlage', m.id)
+        ? []
+        : [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            m.aktiv
+              ? { key: 'schalten', label: 'Deaktivieren', gefahr: true }
+              : { key: 'schalten', label: 'Aktivieren' },
+          ],
     zugaenglicherName: (m) => `Aktionen zu Mahlzeit ${m.bezeichnung}`,
     onWahl: (aktion, m) => (aktion === 'bearbeiten' ? bearbeiten(m) : schalte(m, !m.aktiv)),
   };
@@ -96,7 +103,15 @@ function VerpflegungsplanInhalt() {
       sorter: nachText((m: VerpflegungVorlage) => m.bezeichnung),
       // Unter `md` gedeckelt, damit Zeit und Aktionen daneben im Bild bleiben (wie Sprechgruppen).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
-      render: (b: string) => <span style={{ overflowWrap: 'anywhere' }}>{b}</span>,
+      render: (b: string, m) => (
+        <Space size={[8, 4]} wrap>
+          <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('verpflegung_vorlage', m.id)}
+            quelle={herkunft.quelle}
+          />
+        </Space>
+      ),
     },
     {
       title: 'Zeit',
@@ -152,7 +167,9 @@ function VerpflegungsplanInhalt() {
             immerSichtbar: true,
             fixed: 'right' as const,
             render: (_: unknown, m: VerpflegungVorlage) =>
-              istSchmal ? (
+              herkunft.istVomHub('verpflegung_vorlage', m.id) ? (
+                <VomHubGesperrt />
+              ) : istSchmal ? (
                 <ZeilenMenueAusloeser menue={zeilenMenue} zeile={m} />
               ) : (
                 <Space size="middle">

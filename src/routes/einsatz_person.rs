@@ -1128,7 +1128,7 @@ async fn detail_mit_audit(
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    audit_repo::anlegen(
+    audit_repo::create(
         &state.pool,
         einsatz_id,
         Some(person_id),
@@ -1996,7 +1996,7 @@ pub async fn export(
 ) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let personen = repo::liste(&state.pool, einsatz_id, None).await?;
-    audit_repo::anlegen(&state.pool, einsatz_id, None, ctx.benutzer.id, "export").await?;
+    audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "export").await?;
 
     let mut csv =
         String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
@@ -2035,7 +2035,7 @@ pub async fn druck(
     ctx: EinsatzLesezugriff<Personen>,
 ) -> Result<Json<Vec<PersonAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    audit_repo::anlegen(&state.pool, einsatz_id, None, ctx.benutzer.id, "druck").await?;
+    audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "druck").await?;
     Ok(Json(repo::liste(&state.pool, einsatz_id, None).await?))
 }
 

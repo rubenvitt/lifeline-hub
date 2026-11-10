@@ -520,6 +520,26 @@ export function betreuungsstellePfad(einsatzId: number, stelleId: number): strin
   return `${einsatzModulPfad(einsatzId, 'betreuung')}/${stelleId}`;
 }
 
+/** Wahl der Druckansicht „Registrierliste“: Unverträglichkeiten nur, wenn bewusst gewählt. */
+export interface RegistrierlisteDruckWahl {
+  unvertraeglichkeiten?: boolean;
+}
+
+/**
+ * Druckansicht der Registrierliste einer Betreuungsstelle (LLH-1616, Change
+ * `iw8hjb93-registrierliste-drucken` design.md D4): unter der Stelle, gegatet über das Segment
+ * `betreuung`. Die Wahl „Unverträglichkeiten“ reist in der Adresse, fehlend = ohne.
+ */
+export function registrierlisteDruckPfad(
+  einsatzId: number,
+  stelleId: number,
+  wahl: RegistrierlisteDruckWahl = {},
+): string {
+  return mitQuery(`${betreuungsstellePfad(einsatzId, stelleId)}/registrierliste/druck`, {
+    unvertraeglichkeiten: wahl.unvertraeglichkeiten ? 1 : undefined,
+  });
+}
+
 /** Rechner „Unterkunft planen“ einer Betreuungsstelle (LLH-1520), Unterroute der Detailseite. */
 export function unterkunftPlanenPfad(einsatzId: number, stelleId: number): string {
   return `${betreuungsstellePfad(einsatzId, stelleId)}/unterkunft`;
@@ -1556,6 +1576,19 @@ export function geraetBetroffenAufnahmePfad(einsatzId: number): string {
 /** Bereich „Stelle“ der Betreuungsstelle: Belegung, Meldeverlauf, Meldungen. */
 export function geraetBetreuungPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/betreuung`;
+}
+
+/**
+ * Registrierliste drucken am Gerät „Betreuungsstelle“ (LLH-1616): ohne Stelle in der Adresse,
+ * es gilt die gebundene. Wahl wie {@link registrierlisteDruckPfad}.
+ */
+export function geraetRegistrierlisteDruckPfad(
+  einsatzId: number,
+  wahl: RegistrierlisteDruckWahl = {},
+): string {
+  return mitQuery(`${geraetBetreuungPfad(einsatzId)}/registrierliste/druck`, {
+    unvertraeglichkeiten: wahl.unvertraeglichkeiten ? 1 : undefined,
+  });
 }
 
 /** Eigener Bereitstellungsraum eines BR-Geräts (LFH-1042), Startseite der Ansicht. */

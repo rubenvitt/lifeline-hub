@@ -1,3 +1,112 @@
+## [1.0.0-alpha.182](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.181...v1.0.0-alpha.182) (2026-11-10)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Beim ersten Start nach dem Update wird die Datenbank automatisch erweitert, damit weitere Kataloge an gekoppelte ELW verteilt werden können.
+- **Gekoppelte ELW übernehmen mehr Kataloge vom Hub:** Nach dem Update erhalten gekoppelte ELW acht weitere Kataloge vom Hub (siehe „Verwaltung“). Einträge, die vom Hub kommen, lassen sich am ELW nicht mehr bearbeiten. Betreiber gekoppelter Fahrzeuge sollten diese Kataloge künftig am Hub pflegen.
+
+### Kräfte und Mittel
+
+- **Kontextmenü im Schichtplan:** Ein Block im Schichtplan-Raster hat jetzt ein eigenes Menü. Es öffnet sich per Rechtsklick, durch langes Drücken oder mit der Kontextmenü-Taste bzw. Umschalt+F10. Das Menü bietet:
+  - „Bearbeiten“
+  - „Als nächsten Block kopieren“: kopiert den Block direkt, ohne Dialog
+  - „Wechsel vollziehen …“: nur im laufenden Einsatz und nur, wenn ein Wechsel möglich ist
+  - „Block löschen …“: fragt vor dem Löschen nach
+- Das Menü gibt es im Einsatz und in der Vorplanung. Wer keine Schreibrechte hat, sieht weiterhin das normale Browsermenü.
+- Wer einen Eintrag im Menü mit der Enter-Taste wählt, schickt den Dialog, der sich danach öffnet, nicht mehr sofort ab. Bisher wurde zum Beispiel ein Block über „Bearbeiten“ sofort gespeichert und der Dialog wieder geschlossen.
+
+### Verwaltung
+
+- **Weitere Kataloge für gekoppelte ELW:** Der Hub verteilt jetzt auch diese Kataloge an gekoppelte ELW:
+  - Schichtmodelle
+  - Einsatz-Vorlagen samt ausgeblendeten Modulen
+  - Stichwort-Vorschläge
+  - Verpflegungs-Vorlagen
+  - Sprechgruppen der Organisation
+  - ETB-Bausteine
+  - Externe Stellen
+  - Unterkunft-Richtwerte
+- **Herkunft in den Stammdaten sichtbar:** In den betroffenen Reitern zeigt ein Abzeichen, ob ein Eintrag „vom Hub“ kommt oder „nur hier“ gepflegt wird. Bei Einträgen vom Hub steht statt der Aktionen der Hinweis „Wird am Hub gepflegt“. Eigene Einträge lassen sich weiterhin überall anlegen.
+- **Vorgaben folgen dem Hub:**
+  - Kommt das Standard-Schichtmodell vom Hub, kann am ELW kein eigenes Modell als Vorgabe gesetzt werden.
+  - Kommt die zuständige Leitstelle vom Hub, lässt sich am ELW keine andere Externe Stelle als zuständige Leitstelle markieren.
+- **Unterkunft-Richtwerte je Wert:** Jeder Richtwert ist einzeln gesperrt. Einen Richtwert, den der Hub nicht vorgibt, kann die Organisation am ELW weiterhin selbst setzen. Werte, die im Einsatz gesetzt sind, bleiben unberührt.
+- **Sprechgruppen:** Verteilt werden nur die Sprechgruppen aus dem Katalog der Organisation. Gibt es mehrere Sprechgruppen mit gleichem Namen, wird eine aktive gegenüber einer stillgelegten bevorzugt.
+- **Löschen am Hub:** Schichtmodelle, Einsatz-Vorlagen, Stichwort-Vorschläge und Unterkunft-Richtwerte werden am ELW nicht stillgelegt, wenn der Hub sie löscht. Verweist eine eigene Vorlage des ELW auf ein Schichtmodell, das am Hub gelöscht wurde, bleibt das Modell am ELW erhalten und gehört dann dem ELW.
+- **Abgleich robuster:** Scheitert eine Löschung, weil der Eintrag noch verwendet wird, holt der ELW sie nach, sobald der Rest der Lieferung übernommen ist. Legt der Hub dabei einen gleichnamigen Eintrag neu an, wird der vorhandene übernommen, statt dass der Abgleich abbricht. Das gilt auch für Material und Fahrzeuge, die ein Einsatz verwendet.
+- Das Kapitel „Instanzkopplung“ und die Beschreibung des Schichtplan-Kontextmenüs in der Anwenderdokumentation sind ergänzt.
+
+## [1.0.0-alpha.181](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.180...v1.0.0-alpha.181) (2026-11-10)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Das Zugriffsprotokoll für Personendaten kennt eine neue Eintragsart „Registrierliste gedruckt“. Die Migration läuft beim ersten Start der neuen Version automatisch. Danach lässt sich die Datenbank nicht mehr ohne Weiteres mit einer älteren Version öffnen.
+
+### Betroffene – Betreuung und Verpflegung
+
+- **Neu: Registrierliste einer Betreuungsstelle drucken.** Im Paneel „Registrierung“ gibt es den Knopf „Registrierliste drucken“. Er steht rechtsbündig in der ersten Zeile des Paneels und ist auch ohne Schreibrecht nutzbar.
+- **So sieht das Blatt aus:**
+  - Summen je Kostform
+  - Personen nach Haushalt gruppiert, jeder Haushalt steht ganz auf einer Seite
+  - eine Abhakspalte für die Arbeit vor Ort
+  - ein Druckkopf mit Umfang, Stand und der Angabe, ob Gesundheitsangaben enthalten sind
+- **Gesundheitsangaben nur auf Wunsch:** Unverträglichkeiten erscheinen nur, wenn „Unverträglichkeiten mitdrucken“ eingeschaltet ist.
+- **Fester Stand mit „Neu laden“:** Die Druckansicht zeigt den Stand zum Zeitpunkt des Abrufs. Mit „Neu laden“ holt man den aktuellen Stand.
+- **Jeder Druck wird protokolliert:** Für jede Person auf der Liste entsteht ein Eintrag „Registrierliste gedruckt“ im Zugriffsprotokoll. Dieser Eintrag ist vom Druck des Blatts einer einzelnen Person getrennt. Daten werden erst ausgegeben, wenn das Protokoll geschrieben ist.
+- **Nur protokollierte Personen auf dem Blatt:** Ist eine Bezugsperson nicht mehr an der Stelle registriert, fehlt sie im Kopf des Haushalts.
+
+### Gekoppelte Geräte
+
+- Ein Gerät, das als „Betreuungsstelle“ gekoppelt ist, kann die Registrierliste der Stelle drucken, an die es gebunden ist.
+
+### Dokumentation
+
+- Die Kapitel „Betreuung“ und „Gerät Betreuungsstelle“ der Anwenderdokumentation beschreiben jetzt „Registrierliste drucken“. Das Bild zum Paneel „Registrierung“ ist in heller und dunkler Darstellung neu aufgenommen.
+
+## [1.0.0-alpha.180](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.179...v1.0.0-alpha.180) (2026-11-10)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Dieses Release bringt neue Migrationen für die Stammdaten-Verteilung, die Bestätigung von Unterschriftsschlüsseln und die Registrierstelle in der Betreuung. Eine Rückkehr auf eine ältere Version ist danach nicht ohne Weiteres möglich.
+- **Passwort-Anmeldung für Admins eingeschränkt:** Eine Instanz kann die Kontodaten ihrer Organisation an gekoppelte ELW verteilen. Admins mit Passkey können sich an einer solchen Instanz nicht mehr per Passwort anmelden. Das gilt auch dann weiter, wenn die Kopplung widerrufen wurde, sofern ihr Passwort einmal an einen ELW ging. Der abgewiesene Versuch zählt nicht als Fehlversuch. System-Admins ohne Anmelde-Passkey bekommen ihre Kontodaten gar nicht an den ELW verteilt.
+- **Neuer Startbefehl `admin-zugang-zuruecksetzen <benutzername>`:** Rettungsweg, wenn der letzte Admin seinen Passkey verloren hat. Der Befehl entfernt die Passkeys des Kontos, gibt ein Einmalpasswort am Terminal aus, beendet alle Sitzungen und trägt den Vorgang in die Admin-Spur ein.
+- **Nachgelieferte Unterschriftsschlüssel brauchen eine Bestätigung:** Ein neuer Schlüssel, den die Gegenstelle nachliefert, gilt erst, wenn ein Admin auf der übernehmenden Seite ihn bestätigt hat. Die Schlüssel beim ersten Koppeln und Widerrufe brauchen keine Bestätigung.
+- **Admin-Rolle am ELW:** Führt ein ELW mehrere Organisationen, kommt ein Admin vom Hub dort ohne Rolle an. Die Kopplung zeigt dazu einen Hinweis.
+
+### Betreuung und Verpflegung
+
+- **Neue Registrierstelle:** An einer Betreuungsstelle lassen sich Haushalte namentlich aufnehmen. Die Maske fragt Adresse und Kontakt einmal je Haushalt ab und zeigt jede Person in einer eigenen Zeile mit Personendaten, Kostform und Unverträglichkeiten. Nichts ist eingeklappt, die Tastaturbedienung bleibt durchgängig.
+- **Registrierliste:** Zeigt die aufgenommenen Personen mit einem Überblick über die Kostformen. Personen lassen sich dort auch abmelden. Registrierungen und Abmeldungen gehen auch ohne Netz und werden nachgesendet.
+- **Belegung gezählt oder namentlich:** Jede Stelle führt ihre Belegung entweder gezählt oder namentlich. Bei namentlicher Führung meldet das System die Belegung selbst, sobald sich die Zahl der Registrierten ändert. Das gilt auch, wenn eine Person die Stelle wechselt oder storniert wird. Im Meldeverlauf erscheinen diese Meldungen mit der Herkunft „Registrierung“. Eine geschlossene namentliche Stelle nimmt niemanden mehr auf.
+- **Sonderkost-Vorschlag:** Die Verpflegung schlägt die Sonderkost aus den erfassten Kostformen vor. Die Zählung ist ohne Personenbezug und aktualisiert sich sofort.
+- Kostform und Unverträglichkeiten lassen sich in den Personendaten bearbeiten. Unverträglichkeiten werden wie Behandlungsdaten geschützt und geschwärzt.
+- Das Gerät einer Betreuungsstelle bekommt einen eigenen Reiter für die Registrierung und sieht nur die Daten der eigenen Stelle.
+
+### Kräfte und Mittel
+
+- **Wechsel-Leiste im Schichtplan:** Über dem Raster steht für jeden Wechselzeitpunkt ein Knopf, zum Beispiel „14:00 · 3 Wechsel“. Vergangene Zeitpunkte mit offenen Wechseln sind als „überfällig“ markiert. Wählt man einen Zeitpunkt, zeigt die Leiste seine Wechsel mit Posten, Art und Stand. Von dort lässt sich die Ablösung direkt vollziehen oder der Wechsel einer Pause bzw. UHS bearbeiten.
+- **Ein Hinweis je Zeitpunkt:** Sind mehrere Schichten zum selben Zeitpunkt fällig, kommen Vorwarnung und Fälligkeit nur je einmal, etwa „15 Wechsel um 1400“. Ein Klick auf den Hinweis führt direkt zu diesem Zeitpunkt im Schichtplan. Kommt nach der Quittung noch eine Schicht dazu, meldet sich der Zeitpunkt erneut. Schichten, die nach Rangfolge abgelöst werden, melden sich weiter einzeln.
+- **Ruhiger Schichtplan beim Arbeiten:** Neue, entfallene und umsortierte Posten anderer Nutzer warten hinter einem Sammelbanner, solange man im Schichtplan arbeitet. Das gilt für Fokus, Mauszeiger, Ziehen und offene Dialoge, im Einsatz wie in der Vorplanung und auf dem Handy. Entfallene Posten bleiben bis dahin als leere Zeile „(entfallen)“ stehen, Änderungen an Blöcken erscheinen sofort.
+
+### Patientenablage
+
+- Scheitert die Zustellung einer RTW-Meldung, erscheint die neue Person trotzdem sofort live in den anderen Ansichten.
+
+### Instanzkopplung (Hub und ELW)
+
+- **Stammdaten vom Hub:** Der Hub verteilt seine Stammdaten an gekoppelte ELW und liefert sie bei jeder Meldung nach. Dazu gehören Fahrzeuge, Material, Personal, Qualifikationen, Status-Kataloge, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen, Org-Einstellungen und Benutzerkonten. Eine Organisation bezieht ihre Stammdaten nur aus einer Kopplung.
+- **Herkunft sichtbar:** Listen und Detailseiten zeigen „vom Hub“ oder „nur hier“. Zeilen vom Hub sind am ELW gesperrt („Wird am Hub gepflegt“). Nach dem Widerruf der Kopplung gehören sie der Instanz.
+- **Anmeldung am ELW ohne Netz:** Passwort, zweiter Faktor und Pflicht zum Passwortwechsel gehen Ende-zu-Ende verschlüsselt an den ELW. Voraussetzung ist, dass dort die Verschlüsselung des Datenträgers bestätigt ist. Ein Einmalpasswort, das vor Ort vergeben wurde, gilt so lange, bis am Hub ein neues Passwort gesetzt wird.
+- **„ELW verloren“:** Widerruft die Zuordnung zum verlorenen ELW. Passwort und zweiter Faktor aller Konten, die dorthin verteilt wurden, werden ungültig, und ihre Sitzungen werden beendet. Das geht auch nach einem normalen Widerruf noch.
+- **„Stammdaten erneut abgleichen“:** Steht auf der meldenden Seite zur Verfügung. Die Kopplungsseite zeigt den Stand der Stammdaten und Hinweise, zum Beispiel bei Namenskonflikten zwischen Konten.
+- **Schlüssel bestätigen:** Wartende Schlüssel werden in einem Dialog bestätigt. Er zeigt Fingerabdruck, Inhaber, Unterzeichner und Zeitpunkt, zur Bestätigung gibt man die letzten vier Zeichen des Fingerabdrucks ein. Ein Schlüssel lässt sich nach Rückfrage auch zurückweisen und kann danach nicht wieder aufleben. Die Kopplung zeigt wartende Schlüssel an und warnt, wenn die eigene Organisation keinen gültigen Schlüssel mehr hat.
+
+### Verwaltung
+
+- **Letzter Schlüsselhalter:** Beim Deaktivieren des letzten Admins mit Unterschriftsschlüssel fragt die Benutzerverwaltung nach und nennt die Kopplungen, die danach neu aufgebaut werden müssen. Beim Herabstufen warnt der Bearbeiten-Dialog. Das Deaktivieren selbst bleibt möglich.
+- Vergibt man einem Admin mit Passkey-Pflicht ein Einmalpasswort, werden seine Anmelde-Passkeys entfernt. Das Zugangsprotokoll nennt ihre Zahl.
+- Am verteilenden Hub zeigt die Benutzerverwaltung Admins ohne Passkey an. Konten vom Hub lassen sich am ELW nicht bearbeiten.
+
 ## [1.0.0-alpha.179](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.178...v1.0.0-alpha.179) (2026-11-09)
 
 ### Wichtige Änderungen

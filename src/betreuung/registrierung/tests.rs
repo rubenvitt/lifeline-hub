@@ -23,7 +23,10 @@ struct Welt {
 }
 
 async fn welt() -> Welt {
-    let pool = crate::db::test_pool().await;
+    welt_auf(crate::db::test_pool().await).await
+}
+
+async fn welt_auf(pool: SqlitePool) -> Welt {
     sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
         .execute(&pool)
         .await
@@ -769,5 +772,80 @@ async fn bezugsperson_einer_fremden_stelle_bleibt_dem_geraet_verborgen() {
     assert_eq!(
         eigene.haushalte[0].bezugsperson_name.as_deref(),
         Some("Weber")
+    );
+}
+
+/// Druck der Registrierliste (LLH-1616): liest und protokolliert in EINER Schreibtransaktion
+/// (`BEGIN IMMEDIATE`). Hält ein anderer gerade den Schreib-Lock (Registrieren am Tablet), wartet
+/// der Druck, statt beim ersten Protokolleintrag mit `SQLITE_BUSY` zu scheitern (`src/tx.rs`).
+#[tokio::test]
+async fn druck_wartet_auf_einen_fremden_schreiber() {
+    let (_dir, pool) = crate::db::test_pool_datei().await;
+    let w = welt_auf(pool).await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Namentlich).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+
+    let mut fremd = w.pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    sqlx::query("UPDATE organisation SET name = 'Schreiber' WHERE id = 1")
+        .execute(&mut *fremd)
+        .await
+        .unwrap();
+    let loslassen = tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        fremd.commit().await.unwrap();
+    });
+
+    let liste = liste_for_druck(&w.pool, w.e, sid, false, w.b, false)
+        .await
+        .expect("der Druck wartet auf den fremden Schreiber");
+    loslassen.await.unwrap();
+    assert_eq!(personen_count(&liste), r.person_ids.len());
+    let eintraege: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'registrierliste'",
+    )
+    .bind(w.e)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(eintraege, r.person_ids.len() as i64);
+}
+
+fn personen_count(l: &RegistrierListe) -> usize {
+    l.haushalte.iter().map(|h| h.personen.len()).sum::<usize>() + l.ohne_haushalt.len()
+}
+
+/// Review LLH-1616: eine Bezugsperson, die nicht (mehr) auf der Liste steht, kommt nicht aufs
+/// Blatt — nur wer gedruckt wird, steht im Protokoll.
+#[tokio::test]
+async fn druck_nennt_eine_abgemeldete_bezugsperson_nicht() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Namentlich).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    abmelden(&w, sid, None, vec![r.person_ids[0]])
+        .await
+        .unwrap();
+
+    let l = liste_for_druck(&w.pool, w.e, sid, false, w.b, false)
+        .await
+        .unwrap();
+    let h = &l.haushalte[0];
+    assert_eq!(h.personen.len(), 2);
+    assert_eq!(h.bezugsperson_name, None, "kein Name ohne Protokolleintrag");
+    assert_eq!(h.bezugsperson_id, None);
+    let protokolliert: Vec<i64> = sqlx::query_scalar(
+        "SELECT person_id FROM person_zugriff_audit \
+         WHERE einsatz_id = ? AND art = 'registrierliste' ORDER BY person_id",
+    )
+    .bind(w.e)
+    .fetch_all(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(protokolliert, r.person_ids[1..].to_vec());
+
+    // Die Bildschirmliste nennt sie weiter (unverändert, LLH-1612).
+    let bildschirm = liste(&w.pool, w.e, sid, false).await.unwrap();
+    assert_eq!(
+        bildschirm.haushalte[0].bezugsperson_id,
+        Some(r.person_ids[0])
     );
 }

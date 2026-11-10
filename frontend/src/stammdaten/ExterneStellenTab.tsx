@@ -11,6 +11,7 @@ import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -25,7 +26,8 @@ import { EXTERNE_STELLE_ARTEN, EXTERNE_STELLE_ART_LABEL } from './externeStellen
 /**
  * Katalog „Externe Stellen“ (LFH-1194, design.md D10): Leitstellen, Behörden, Polizei und
  * Hilfsorganisationen der Organisation. Kein Löschen; Deaktivieren lässt sich zurücknehmen.
- * Bauform wie `SprechgruppenTab` (Filterachsen Art und Aktiv, Rückfrage als ein Modal).
+ * Bauform wie `SprechgruppenTab` (Filterachsen Art und Aktiv, Rückfrage als ein Modal). Eine
+ * Stelle vom Hub ist nur lesbar (kjezbk06, design.md D6).
  */
 export default function ExterneStellenTab() {
   const { benutzer } = useAuth();
@@ -35,11 +37,16 @@ export default function ExterneStellenTab() {
   const [bearbeite, setBearbeite] = useState<ExterneStelle | null>(null);
   const [zuDeaktivieren, setZuDeaktivieren] = useState<ExterneStelle | null>(null);
   const { istSchmal } = useViewport();
+  const herkunft = useStammdatenHerkunft();
 
   const stellenQuery = useQuery({
     queryKey: globalKeys.externeStellenListe('alle'),
     queryFn: () => fetchExterneStellen('alle'),
   });
+  // Kommt die zuständige Leitstelle vom Hub, folgt die Markierung dem Hub (kjezbk06, D4).
+  const zustaendigVomHub = (stellenQuery.data ?? []).some(
+    (s) => s.zustaendig && herkunft.istVomHub('externe_stelle', s.id),
+  );
 
   // KEIN `onError`-Toast (LFH-473): der Fehler steht im `SeitenHinweise`-Slot.
   const aktivMutation = useMutation({
@@ -60,12 +67,16 @@ export default function ExterneStellenTab() {
    * Aktionsspalte; der Test der Seite hält beide gleich (design.md D4).
    */
   const zeilenMenue: WeitereAktionen<ExterneStelle> = {
-    eintraege: (s) => [
-      { key: 'bearbeiten', label: 'Bearbeiten' },
-      s.aktiv
-        ? { key: 'deaktivieren', label: 'Deaktivieren', gefahr: true }
-        : { key: 'aktivieren', label: 'Aktivieren' },
-    ],
+    // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+    eintraege: (s) =>
+      herkunft.istVomHub('externe_stelle', s.id)
+        ? []
+        : [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            s.aktiv
+              ? { key: 'deaktivieren', label: 'Deaktivieren', gefahr: true }
+              : { key: 'aktivieren', label: 'Aktivieren' },
+          ],
     zugaenglicherName: (s) => `Aktionen zu ${s.bezeichnung}`,
     onWahl: (aktion, s) => {
       if (aktion === 'bearbeiten') bearbeiten(s);
@@ -90,6 +101,15 @@ export default function ExterneStellenTab() {
             <>
               {' '}
               <StatusChip ton="normal" wort="zuständig" />
+            </>
+          )}
+          {herkunft.quelle && (
+            <>
+              {' '}
+              <HerkunftAbzeichen
+                herkunft={herkunft.herkunft('externe_stelle', s.id)}
+                quelle={herkunft.quelle}
+              />
             </>
           )}
         </span>
@@ -152,7 +172,9 @@ export default function ExterneStellenTab() {
             immerSichtbar: true,
             fixed: 'right' as const,
             render: (_: unknown, s: ExterneStelle) =>
-              istSchmal ? (
+              herkunft.istVomHub('externe_stelle', s.id) ? (
+                <VomHubGesperrt />
+              ) : istSchmal ? (
                 <ZeilenMenueAusloeser menue={zeilenMenue} zeile={s} />
               ) : (
                 <Space size="middle">
@@ -247,6 +269,7 @@ export default function ExterneStellenTab() {
       <ExterneStelleFormModal
         offen={modalOffen}
         stelle={bearbeite}
+        zustaendigVomHub={zustaendigVomHub}
         onClose={() => setModalOffen(false)}
       />
     </AdminPage>

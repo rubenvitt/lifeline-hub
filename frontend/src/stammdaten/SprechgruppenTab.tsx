@@ -11,6 +11,7 @@ import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { useViewport } from '../components/useViewport';
 import { nachText, werteAus } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -31,6 +32,9 @@ export default function SprechgruppenTab() {
   // kann keine Blase am Knopf hängen, und beide Formen fragen gleich.
   const [zuDeaktivieren, setZuDeaktivieren] = useState<Sprechgruppe | null>(null);
   const { istSchmal } = useViewport();
+  // Eine Sprechgruppe des Katalogs vom Hub ist nur lesbar (kjezbk06, design.md D6); die
+  // Sprechgruppen im Einsatz verteilt der Hub nicht.
+  const herkunft = useStammdatenHerkunft();
 
   const sprechgruppenQuery = useQuery({
     queryKey: globalKeys.sprechgruppenAlle(),
@@ -64,10 +68,16 @@ export default function SprechgruppenTab() {
    * Aktionsspalte; der Test der Seite hält beide gleich (design.md D4).
    */
   const zeilenMenue: WeitereAktionen<Sprechgruppe> = {
-    eintraege: (sg) => [
-      { key: 'bearbeiten', label: 'Bearbeiten' },
-      ...(sg.aktiv ? [{ key: 'deaktivieren', label: 'Deaktivieren', gefahr: true as const }] : []),
-    ],
+    // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+    eintraege: (sg) =>
+      herkunft.istVomHub('sprechgruppe', sg.id)
+        ? []
+        : [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            ...(sg.aktiv
+              ? [{ key: 'deaktivieren', label: 'Deaktivieren', gefahr: true as const }]
+              : []),
+          ],
     zugaenglicherName: (sg) => `Aktionen zu Sprechgruppe ${sg.bezeichnung}`,
     onWahl: (aktion, sg) => (aktion === 'bearbeiten' ? bearbeiten(sg) : setZuDeaktivieren(sg)),
   };
@@ -85,7 +95,15 @@ export default function SprechgruppenTab() {
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
       // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
-      render: (b: string) => <span style={{ overflowWrap: 'anywhere' }}>{b}</span>,
+      render: (b: string, sg) => (
+        <Space size={[8, 4]} wrap>
+          <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('sprechgruppe', sg.id)}
+            quelle={herkunft.quelle}
+          />
+        </Space>
+      ),
     },
     {
       title: 'Betriebsart',
@@ -174,7 +192,9 @@ export default function SprechgruppenTab() {
             immerSichtbar: true,
             fixed: 'right' as const,
             render: (_: unknown, sg: Sprechgruppe) =>
-              istSchmal ? (
+              herkunft.istVomHub('sprechgruppe', sg.id) ? (
+                <VomHubGesperrt />
+              ) : istSchmal ? (
                 // Unter `md` passen zwei Knöpfe neben Kennung und Status nicht in 390 px.
                 <ZeilenMenueAusloeser menue={zeilenMenue} zeile={sg} />
               ) : (

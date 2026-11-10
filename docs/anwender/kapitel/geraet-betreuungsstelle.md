@@ -2,7 +2,7 @@
 titel: Betreuungsstelle am Gerät
 gruppen: [geraete]
 reihenfolge: 730
-quellen: [frontend/src/betreuung/registrierung/, frontend/src/geraet/GeraetBetroffenePage.tsx, frontend/src/geraet/GeraetBetreuungsstellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/StellenBlock.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/betreuung/registrierung/, frontend/src/geraet/GeraetBetroffenePage.tsx, frontend/src/geraet/GeraetBetreuungsstellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/StellenBlock.tsx, src/geraet/mod.rs, frontend/src/geraet/GeraetRegistrierlisteDruckPage.tsx]
 ---
 
 ## Überblick
@@ -53,6 +53,18 @@ Betreuungsstelle untergebracht.
    ein „Ziel“ angeben und bestätigen.
 
 Die Maske und die Liste sind dieselben wie auf der Seite der Stelle ([Betreuung](betreuung.md)).
+
+### Registrierliste drucken
+
+1. Unten „Stelle“ öffnen, oben „Registrierung“ wählen und „Registrierliste drucken“ wählen.
+2. Die Druckansicht zeigt die Registrierten der eigenen Stelle, mit Summen je Kostform und einer
+   Spalte zum Abhaken. „Unverträglichkeiten mitdrucken“ nimmt die Gesundheitsangaben auf das
+   Blatt.
+3. „Drucken / als PDF“ wählen; „Zurück zur Stelle“ führt zurück.
+
+Das Gerät druckt nur die Liste seiner eigenen Stelle. Jedes Öffnen steht im Zugriffsprotokoll
+jeder Person auf dem Blatt, mit dem Gerät als Abrufer. Das Blatt ist dasselbe wie auf der Seite
+der Stelle ([Betreuung](betreuung.md)).
 
 ### Belegung melden
 

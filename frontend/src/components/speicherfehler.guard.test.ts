@@ -43,6 +43,8 @@ const ERLAUBT: Record<string, { anzahl: number; grund: string }> = {
     grund: 'Kartenbilder laden ohne Handlung im Hintergrund nach, kein Ort sichtbar',
   },
   'pages/lagekarte/kontextmenue.ts': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
+  // „Text kopieren“ eines Abschnitts (LLH-1601): das Menü ist beim Ablehnen schon zu.
+  'entwurf/DokumentEntwurf.tsx': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
   'karten/OfflineRegionPicker.tsx': {
     anzahl: 2,
     grund: 'Kartenbau oder Download scheitert bei geschlossenem Dialog, kein Ort sichtbar',

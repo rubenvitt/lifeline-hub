@@ -295,14 +295,15 @@ der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers 
 öffnen“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer Zeile mit Kontextmenü nicht
 durch langes Drücken markieren.
 
-Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, im
-Kommunikationsplan, in den Einstellungen des Einsatzes bei Pegeln, Geräten und Lagemonitoren, bei
-den Personen einer Einheit und an den Bild-Hintergründen der Lagekarte. In der Verwaltung gilt es
-für die Stammdaten (Fahrzeuge, Personal, Material, Schichtmodelle, Externe Stellen, Sprechgruppen,
-Verpflegungsplan) und für die Benutzer. Wo eine Zeile ihre Aktionen als Knöpfe zeigt (etwa
-„Bearbeiten“ und „Deaktivieren“), stehen im Kontextmenü dieselben. Bei einem Bild-Hintergrund
-öffnet es nur auf dem Namen, nicht auf Schalter, Deckkraft und Ansicht. Lagekarte und
-Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
+Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, an den
+Blöcken im Raster des Schichtplans (Kapitel [Ablösung](abloesung.md)), im Kommunikationsplan, in den
+Einstellungen des Einsatzes bei Pegeln, Geräten und Lagemonitoren, bei den Personen einer Einheit
+und an den Bild-Hintergründen der Lagekarte. In der Verwaltung gilt es für die Stammdaten
+(Fahrzeuge, Personal, Material, Schichtmodelle, Externe Stellen, Sprechgruppen, Verpflegungsplan)
+und für die Benutzer; Stammdaten, die am Hub gepflegt werden, haben keines. Wo eine Zeile ihre
+Aktionen als Knöpfe zeigt (etwa „Bearbeiten“ und „Deaktivieren“), stehen im Kontextmenü dieselben.
+Bei einem Bild-Hintergrund öffnet es nur auf dem Namen, nicht auf Schalter, Deckkraft und Ansicht.
+Lagekarte und Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 
 ### Was die Sprungpalette kennt
 

@@ -452,21 +452,26 @@ impl<'a> Qualis<'a> {
         meldungen: &mut Vec<ImportMeldung>,
     ) -> Option<i64> {
         let gefunden = match angabe {
-            QualiAngabe::Id(id) => self.katalog.iter().find(|(k, _)| k == id).map(|q| q.0),
+            QualiAngabe::Id { id, .. } => self.katalog.iter().find(|(k, _)| k == id).map(|q| q.0),
             QualiAngabe::Bezeichnung(b) => {
                 let n = norm(b);
                 self.katalog.iter().find(|(_, l)| norm(l) == n).map(|q| q.0)
             }
         };
         if gefunden.is_none() {
-            let text = match angabe {
-                QualiAngabe::Id(id) => format!("#{id}"),
-                QualiAngabe::Bezeichnung(b) => b.trim().to_string(),
+            // Eine Kennung mit Bezeichnung kennt der Katalog, nur nicht mehr unter den aktiven
+            // (LLH-1611); ohne Bezeichnung bleibt die Nummer.
+            let (text, grund) = match angabe {
+                QualiAngabe::Id {
+                    name: Some(name), ..
+                } if !name.trim().is_empty() => (name.trim().to_string(), "deaktiviert"),
+                QualiAngabe::Id { id, .. } => (format!("#{id}"), "unbekannt"),
+                QualiAngabe::Bezeichnung(b) => (b.trim().to_string(), "unbekannt"),
             };
             if self.gemeldet.insert(norm(&text)) {
                 meldungen.push(ImportMeldung::hinweis(
                     zeile,
-                    format!("Qualifikation «{text}» unbekannt, ausgelassen"),
+                    format!("Qualifikation «{text}» {grund}, ausgelassen"),
                 ));
             }
         }
@@ -2353,6 +2358,57 @@ mod tests {
         assert_eq!(p.vorschau.bloecke[0].zustand, BlockZustand::Unveraendert);
         assert_eq!(
             p.bloecke[1].quali_soll.as_deref(),
+            Some(r#"[{"n":1,"q":7}]"#)
+        );
+    }
+
+    /// LLH-1611: Eine Qualifikation der Planung, die nach dem Planen deaktiviert wurde, meldet
+    /// der Hinweis mit ihrem Namen; nur ohne Namen bleibt die Nummer.
+    #[test]
+    fn deaktivierte_katalog_qualifikation_mit_namen_im_hinweis() {
+        let mut b = block("p1", "2026-07-04T12:00:00Z", "2026-07-04T16:00:00Z", &[], 3);
+        b.quali_soll = Some(vec![
+            PaketQualiSoll {
+                qualifikation: QualiAngabe::Id {
+                    id: 7,
+                    name: Some("Sanitäter".into()),
+                },
+                anzahl: 1,
+            },
+            PaketQualiSoll {
+                qualifikation: QualiAngabe::Id {
+                    id: 17,
+                    name: Some("Notfallsanitäter".into()),
+                },
+                anzahl: 1,
+            },
+            PaketQualiSoll {
+                qualifikation: QualiAngabe::Id { id: 18, name: None },
+                anzahl: 1,
+            },
+        ]);
+        let paket = PlanPaket {
+            posten: vec![posten("p1", PaketPostenArt::Einheit, "Streife 1", 2)],
+            bloecke: vec![b],
+            ..Default::default()
+        };
+        let p = planen(&bestand(), &paket, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        assert!(p.vorschau.uebernehmbar);
+        let texte: Vec<&str> = p
+            .vorschau
+            .meldungen
+            .iter()
+            .map(|m| m.text.as_str())
+            .collect();
+        assert_eq!(
+            texte,
+            [
+                "Qualifikation «Notfallsanitäter» deaktiviert, ausgelassen",
+                "Qualifikation «#18» unbekannt, ausgelassen"
+            ]
+        );
+        assert_eq!(
+            p.bloecke[0].quali_soll.as_deref(),
             Some(r#"[{"n":1,"q":7}]"#)
         );
     }

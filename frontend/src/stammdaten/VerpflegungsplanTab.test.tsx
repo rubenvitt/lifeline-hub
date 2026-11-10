@@ -15,6 +15,7 @@ import {
   oeffneKontextmenue,
 } from '../test/kontextmenue';
 import { setzeViewportBreite } from '../test/viewport';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import { mahlzeit, verpflegungsplan } from '../test/verpflegungVorlageDaten';
 import VerpflegungsplanTab from './VerpflegungsplanTab';
 
@@ -247,5 +248,25 @@ describe('VerpflegungsplanTab · Kontextmenü (LLH-1599)', () => {
     setzeViewportBreite(1280);
     render(nichtAdmin);
     erwarteBrowsermenue((await zeile('Mittag')).querySelector('td')!);
+  });
+});
+
+describe('VerpflegungsplanTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt die Mahlzeit vom Hub und lässt die eigene bearbeitbar', async () => {
+    server.use(herkunftHandler({ verpflegung_vorlage: ['1'] }));
+    render(admin);
+    const hubZeile = await zeile('Frühstück');
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    // Gesperrt heißt auch: kein eigenes Kontextmenü (LLH-1599 × kjezbk06).
+    erwarteBrowsermenue(hubZeile.querySelector('td')!);
+    expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+
+    const lokal = await zeile('Mittag');
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+    expect(within(lokal).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Mahlzeit anlegen' })).toBeEnabled();
   });
 });

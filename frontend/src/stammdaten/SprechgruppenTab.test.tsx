@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
@@ -365,5 +366,28 @@ describe('SprechgruppenTab · Kontextmenü (LLH-1599)', () => {
     render(nichtAdmin, aktivPaar);
     const zeile = (await screen.findByText('412_F_DRK')).closest('tr')!;
     erwarteBrowsermenue(within(zeile).getAllByRole('cell')[1]);
+  });
+});
+
+describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt die Sprechgruppe vom Hub und lässt die eigene bearbeitbar', async () => {
+    server.use(herkunftHandler({ sprechgruppe: ['1'] }));
+    render(admin, [
+      { ...sprechgruppe, id: 1, bezeichnung: '412_F_DRK' },
+      { ...sprechgruppe, id: 2, bezeichnung: '413_F_DRK', hinweis: null },
+    ]);
+    const hubZeile = (await screen.findByText('412_F_DRK')).closest('tr')!;
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    // Gesperrt heißt auch: kein eigenes Kontextmenü (LLH-1599 × kjezbk06).
+    erwarteBrowsermenue(within(hubZeile).getAllByRole('cell')[1]);
+    expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+
+    const lokal = screen.getByText('413_F_DRK').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+    expect(within(lokal).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Sprechgruppe anlegen' })).toBeEnabled();
   });
 });

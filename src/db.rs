@@ -4535,6 +4535,32 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
+    const MIGRATION_0311: &str =
+        include_str!("../migrations/0311_person_zugriff_audit_registrierliste.sql");
+
+    // --- Migration 0311: Leaf-Rebuild von person_zugriff_audit mit Art 'registrierliste'
+    // (LLH-1616). Ausgangspunkt ist der 0141-Stand, befüllt mit allen vier Bestandsarten.
+    #[tokio::test]
+    async fn migration_0311_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = alt_db_person_zugriff_audit_0132().await;
+        sqlx::raw_sql(MIGRATION_0141).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art, zugriff_at) \
+             VALUES (1, 1, 1, 'detail', '2026-11-09 10:00:00'), \
+                    (1, NULL, 1, 'druck', '2026-11-09 10:01:00'), \
+                    (1, NULL, 1, 'anhang', '2026-11-09 10:02:00')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_zugriff_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        pruefe_audit_rebuild(&pool, MIGRATION_0311, "registrierliste").await;
+    }
+
     const MIGRATION_0143: &str = include_str!("../migrations/0143_auth_audit_passwortwechsel.sql");
 
     /// Alt-DB im 0091-Stand: Minimal-`benutzer` für den FK und die echte 0091.
