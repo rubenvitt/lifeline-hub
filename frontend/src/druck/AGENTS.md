@@ -138,7 +138,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `currentColor`: Sternchen und Liste unterscheiden sich durch Nummer und Form, nie durch Farbe
   (Nachweis `e2e/koerperschema-druck.spec.ts`, schwarz-weiß).
 - **Registrierliste einer Betreuungsstelle** (LLH-1616, Spec `betreuung-registrierung`,
-  Herleitung `openspec/changes/iw8hjb93-registrierliste-drucken/design.md`):
+  Herleitung
+  `openspec/changes/archive/2026-11-10-iw8hjb93-registrierliste-drucken/design.md`):
   `/einsaetze/:id/betreuung/:stelleId/registrierliste/druck` (`pages/RegistrierlisteDruckPage.tsx`)
   und am Gerät `/geraet/:id/betreuung/registrierliste/druck`, beide über
   `betreuung/registrierung/RegistrierlisteDruckSeite.tsx` und `EinsatzPfade.registrierlisteDruck`;

@@ -27,7 +27,7 @@ Jede Aufgabe entsteht per TDD (erst der rote Test). Zunder: LLH-1616,
 
 - [x] 4.1 Regeln nachziehen: `frontend/src/druck/AGENTS.md` (Eintrag Registrierliste, Ausnahme Gerät), `frontend/src/betreuung/AGENTS.md` (Registrierstelle: Druck), `frontend/src/geraet/AGENTS.md` (Betreuungsstelle druckt die eigene Liste); `prettier --check` grün
 - [x] 4.2 Anwenderkapitel `docs/anwender/kapitel/betreuung.md` und `geraet-betreuungsstelle.md` um „Registrierliste drucken“ ergänzen (Mitänderungsregel, `docs/anwender/AGENTS.md`); Doku-Wächter grün
-- [ ] 4.3 `./scripts/check-all.sh` grün (bzw. die CI des PRs)
+- [x] 4.3 `./scripts/check-all.sh` grün (bzw. die CI des PRs): hier `--nur schnell`, Rust- und Vitest-Teilsuiten der berührten Bereiche und die Chromium-e2e grün; der volle Lauf (drei Engines) läuft als CI des PRs
 
 ## 5. Review-Nachzüge (Entscheidungen 09.11.2026)
 
