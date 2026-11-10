@@ -147,20 +147,25 @@ export function useEntwurfVerlustschutz<D, W extends object>({
    * Referenz zurück (structural sharing), ändert sich doch `geladenAm`; deshalb hängt die Regel am
    * Ladezeitpunkt, nicht an der Referenz.
    *
-   * Zwei Merkmale, weil das Laden und sein Rendern auseinanderliegen können: gleich dem Stand im
-   * Render bei der Quittung (auch bei stehender Uhr), oder vor der Quittung geladen, aber noch
-   * nicht gerendert. Ein laufender Abruf von davor kommt nicht mehr an: die Invalidierung bricht
-   * ihn ab (`cancelRefetch`).
+   * Überholt ist, was bei der Quittung im Render stand (Referenz UND Ladezeitpunkt), und was
+   * vorher geladen, aber noch nicht gerendert war (`geladenAm` vor der Quittung). Ein laufender
+   * Abruf von davor kommt nicht mehr an: die Invalidierung bricht ihn ab (`cancelRefetch`). Die
+   * Referenz gehört dazu, weil eine stehende Uhr (Fake-Timer, Bilderlauf) jedem Laden denselben
+   * Zeitpunkt gibt; allein am Zeitpunkt bliebe dort jede spätere fremde Änderung draußen.
    */
+  const datenRef = useRef(daten);
+  datenRef.current = daten;
   const geladenAmRef = useRef(geladenAm);
   geladenAmRef.current = geladenAm;
-  const quittungRef = useRef<{ zeit: number; geladenAm: number } | null>(null);
+  const quittungRef = useRef<{ zeit: number; daten: D | undefined; geladenAm: number } | null>(
+    null,
+  );
   useEffect(() => {
     if (!daten) return;
     if (!formular.da) return; // (4)
     if (ungespeichert) return; // DER RIEGEL (1)
     const q = quittungRef.current;
-    if (q && (geladenAm === q.geladenAm || geladenAm < q.zeit)) return; // NACH DER QUITTUNG
+    if (q && ((daten === q.daten && geladenAm === q.geladenAm) || geladenAm < q.zeit)) return;
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
   }, [daten, geladenAm, form, formular.da, ungespeichert]);
 
@@ -198,7 +203,11 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     const stand = aenderungRef.current;
     return () => {
       // Alles bis hierher Geladene ist mit diesem PATCH überholt (NACH DER QUITTUNG, s. o.).
-      quittungRef.current = { zeit: Date.now(), geladenAm: geladenAmRef.current };
+      quittungRef.current = {
+        zeit: Date.now(),
+        daten: datenRef.current,
+        geladenAm: geladenAmRef.current,
+      };
       // VOR der Verzweigung: der Server hat in BEIDEN Zweigen gespeichert, sonst bliebe nach einem
       // überholten Speichern ein veralteter Grund stehen.
       setSpeicherFehler(null);

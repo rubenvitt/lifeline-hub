@@ -74,13 +74,17 @@ function Traeger({ daten, geladenAm, speichern, istEntwurf = true }: TraegerProp
 let zuletztGeladen = 0;
 const lade = () => (zuletztGeladen = Math.max(Date.now(), zuletztGeladen + 1));
 
-/** Der Serverstand samt Ladezeitpunkt, wie die Seiten ihn aus der Query reichen. */
-function useServerstand(start: Daten) {
-  const [stand, setStand] = useState(() => ({ daten: start, geladenAm: lade() }));
+/**
+ * Der Serverstand samt Ladezeitpunkt, wie die Seiten ihn aus der Query reichen. `uhrSteht`: jedes
+ * Laden bekommt denselben Zeitpunkt, wie unter Fake-Timern oder im Bilderlauf.
+ */
+function useServerstand(start: Daten, uhrSteht = false) {
+  const zeitpunkt = () => (uhrSteht ? 0 : lade());
+  const [stand, setStand] = useState(() => ({ daten: start, geladenAm: zeitpunkt() }));
   /** Ein Laden mit neuem Inhalt. */
-  const setze = (daten: Daten) => setStand({ daten, geladenAm: lade() });
+  const setze = (daten: Daten) => setStand({ daten, geladenAm: zeitpunkt() });
   /** Ein Laden mit gleichem Inhalt: React Query gäbe dieselbe Referenz zurück. */
-  const neuLaden = () => setStand((s) => ({ daten: s.daten, geladenAm: lade() }));
+  const neuLaden = () => setStand((s) => ({ daten: s.daten, geladenAm: zeitpunkt() }));
   return { ...stand, setze, neuLaden };
 }
 
@@ -117,11 +121,13 @@ function Huelle({
 function HuelleMitServer({
   speichern,
   steuerung,
+  uhrSteht,
 }: {
   speichern: (w: Daten) => Promise<unknown>;
   steuerung: { setze: (d: Daten) => void };
+  uhrSteht?: boolean;
 }) {
-  const server = useServerstand({ titel: 'Server 1' });
+  const server = useServerstand({ titel: 'Server 1' }, uhrSteht);
   steuerung.setze = server.setze;
   return <Traeger daten={server.daten} geladenAm={server.geladenAm} speichern={speichern} />;
 }
@@ -601,6 +607,26 @@ describe('useEntwurfVerlustschutz', () => {
     expect(feld).toHaveValue('Server 1ab');
     act(() => steuerung.setze({ titel: 'Server 1ab' })); // R2 nach der Quittung von S2
     expect(feld).toHaveValue('Server 1ab');
+  });
+
+  it('übernimmt nach der Quittung eine fremde Änderung auch bei stehender Uhr (LLH-1628)', async () => {
+    // Steht die Uhr, trägt jedes Laden denselben Zeitpunkt. Am Zeitpunkt allein bliebe dann jede
+    // spätere fremde Änderung draußen; ein neuer Serverstand ist aber eine neue Referenz.
+    const jetzt = vi.spyOn(Date, 'now').mockReturnValue(0);
+    try {
+      const speichern = vi.fn().mockResolvedValue(undefined);
+      const steuerung: { setze: (d: Daten) => void } = { setze: () => {} };
+      render(<HuelleMitServer speichern={speichern} steuerung={steuerung} uhrSteht />);
+      const feld = screen.getByLabelText('Titel');
+      await userEvent.type(feld, 'x');
+      await userEvent.tab();
+      expect(await screen.findByText('sauber')).toBeInTheDocument();
+      expect(feld).toHaveValue('Server 1x'); // der Stand vor dem PATCH bleibt draußen
+      act(() => steuerung.setze({ titel: 'Server 2' }));
+      expect(feld).toHaveValue('Server 2');
+    } finally {
+      jetzt.mockRestore();
+    }
   });
 
   it('startet nach dem Verlassen keinen vorgemerkten PATCH mehr (Speicherfolge)', async () => {
