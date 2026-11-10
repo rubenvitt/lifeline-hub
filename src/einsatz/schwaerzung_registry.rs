@@ -239,6 +239,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
             retain("kennung", G_SPIEGEL),
             retain("freigabestufe", G_ENUM),
+            retain("spiegel", G_SPIEGEL),
         ],
     },
     // ---------- Personen (Betroffene) + Historie/Triage ----------

@@ -11,7 +11,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 - [x] 1.1 Messung vorher: ETB-Einfügen (50 Einträge) und Personenerfassung auf einer Demo-DB, Werte in design.md „Nachträge“ notieren
 - [x] 1.2 `instanz::spiegel::art`: `TABELLEN` (gespiegelt mit Kategorie, Schlüssel, Scoping, `blob`; ausgenommen mit Grund), Wire-Enums `SpiegelKategorie` und `Freigabestufe` per `wire_enum!` mit Fällen in `tests/enum_wire_kontrakt.rs`. Wächter `jede_einsatztabelle_ist_eingeordnet` (gegen `schwaerzung_registry::TABELLEN`) rot, dann grün
-- [ ] 1.3 Verweise aus `PRAGMA foreign_key_list` einordnen (Einsatz, Stammdaten, Org) plus `VERWEISE_OHNE_FK` (polymorphe Bezüge, IDs in JSON). Wächter `jede_id_spalte_ist_eingeordnet` über alle `*_id`-Spalten der gespiegelten Tabellen
+- [x] 1.3 Verweise aus `PRAGMA foreign_key_list` einordnen (Einsatz, Stammdaten, Org) plus `VERWEISE_OHNE_FK` (polymorphe Bezüge, IDs in JSON). Wächter `jede_id_spalte_ist_eingeordnet` über alle `*_id`-Spalten der gespiegelten Tabellen
 - [x] 1.4 Generator für Log-Trigger (`_spiegel_log_i/_u/_d`, Elternzeile bei `UeberParent`) und Migration mit `einsatz_aenderung`, `einsatz.kennung`, `einsatz.freigabestufe` und Grundstock. Wächter `trigger_passen_zur_beschreibung` gegen `sqlite_master`. Tests: Anlegen, Ändern, Schwärzen, weiches und hartes Löschen erhöhen den Stand; je Zeile eine Logzeile; Kind per CASCADE ohne Fehler
 - [x] 1.5 Messung nachher wie 1.1; Abweichung über 20 % → mit Ruben klären, sonst Wert in die Nachträge
 - [ ] 1.6 `src/AGENTS.md`, Abschnitt Instanzkopplung: Regel „neue Einsatztabelle = Eintrag in `spiegel::art` + Trigger in ihrer Migration“, Verweis auf die Wächter; `scripts/adr-fuer.sh` für die berührten Pfade geprüft

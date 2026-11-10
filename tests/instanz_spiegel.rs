@@ -12,15 +12,21 @@ use serde_json::json;
 const SPIEGEL_409: &str =
     "Dieser Einsatz ist ein Spiegel; ändern geht nur als Antrag an die führende Instanz.";
 
-/// Markiert einen Einsatz von Hand als Spiegel, ohne zweite Instanz.
+/// Markiert einen Einsatz von Hand als Spiegel, ohne zweite Instanz: unter dem Merker der
+/// Übernahme, wie jede Übergabe.
 async fn als_spiegel(pool: &sqlx::SqlitePool, einsatz: i64) {
-    exec(
-        pool,
-        &format!(
-            "INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({einsatz}, 'x/{einsatz}')"
-        ),
-    )
-    .await;
+    let mut tx = pool.begin().await.unwrap();
+    for sql in [
+        "INSERT INTO spiegel_uebernahme (id) VALUES (1)".to_string(),
+        format!("INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({einsatz}, 'x/{einsatz}')"),
+        "DELETE FROM spiegel_uebernahme".to_string(),
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
 }
 
 // ── Schreibschutz (D10) ──────────────────────────────────────────────────────────────────────

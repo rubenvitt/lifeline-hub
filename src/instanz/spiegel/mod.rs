@@ -8,6 +8,7 @@
 //! Änderungslog und Schreibschutz sitzen in Triggern, damit kein Schreibweg sie umgeht.
 
 pub mod art;
+pub mod schema;
 
 use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};

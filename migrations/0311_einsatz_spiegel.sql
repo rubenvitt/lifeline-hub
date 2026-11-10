@@ -24,6 +24,17 @@ CREATE UNIQUE INDEX idx_einsatz_kennung ON einsatz (kennung) WHERE kennung IS NO
 ALTER TABLE einsatz ADD COLUMN freigabestufe TEXT NOT NULL DEFAULT 'alles'
     CHECK (freigabestufe IN ('alles'));
 
+-- Einsatznummern sind je Org eindeutig, aber ELW und Hub vergeben sie unabhängig. Ein Spiegel
+-- trägt die Nummer des Führers und ist von der Eindeutigkeit ausgenommen (Nachtrag D4,
+-- 10.11.2026). `spiegel` folgt der Zeile in `einsatz_spiegel` (Trigger unten) und wird nie
+-- geliefert.
+ALTER TABLE einsatz ADD COLUMN spiegel INTEGER NOT NULL DEFAULT 0 CHECK (spiegel IN (0, 1));
+DROP INDEX idx_einsatz_nummer;
+CREATE UNIQUE INDEX idx_einsatz_nummer ON einsatz(org_id, einsatznummer_intern) WHERE spiegel = 0;
+DROP INDEX idx_einsatz_nummer_lfd;
+CREATE UNIQUE INDEX idx_einsatz_nummer_lfd ON einsatz(org_id, nummer_jahr, nummer_lfd)
+    WHERE spiegel = 0;
+
 -- Ein Einsatz mit Zeile hier ist ein Spiegel; ohne Zeile führt ihn diese Instanz (D4). Eine
 -- Übergabe (LLH-1491) legt die Zeile an oder entfernt sie, ohne Daten zu kopieren.
 CREATE TABLE einsatz_spiegel (
@@ -36,6 +47,15 @@ CREATE TABLE einsatz_spiegel (
     hinweis             TEXT,
     beendet_at          TEXT
 );
+
+-- `einsatz.spiegel` folgt der Zeile. Das UPDATE am Einsatz geht durch dessen Schutz-Trigger und
+-- verlangt deshalb den Merker der Übernahme (wie jede Übergabe).
+CREATE TRIGGER einsatz_spiegel_merker_i AFTER INSERT ON einsatz_spiegel BEGIN
+    UPDATE einsatz SET spiegel = 1 WHERE id = NEW.einsatz_id;
+END;
+CREATE TRIGGER einsatz_spiegel_merker_d AFTER DELETE ON einsatz_spiegel BEGIN
+    UPDATE einsatz SET spiegel = 0 WHERE id = OLD.einsatz_id;
+END;
 
 -- Abbildung der Zeilen eines Spiegels (D4, D5): wie eine lokale Zeile beim Führer heißt.
 CREATE TABLE spiegel_herkunft (

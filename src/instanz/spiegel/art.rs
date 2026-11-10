@@ -435,6 +435,28 @@ mod tests {
         (einsatz, uhs, platz)
     }
 
+    /// Markiert einen Einsatz als Spiegel, wie es nur die Übernahme tut: unter dem Merker.
+    async fn als_spiegel(pool: &sqlx::SqlitePool, einsatz: i64) {
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let fehler = sqlx::query(
+            "INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES (?, 'x/' || ?)",
+        )
+        .bind(einsatz)
+        .bind(einsatz)
+        .execute(&mut *tx)
+        .await;
+        fehler.unwrap();
+        sqlx::query("DELETE FROM spiegel_uebernahme")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+
     async fn stand(pool: &sqlx::SqlitePool, art: &str, schluessel: i64) -> Option<(i64, i64)> {
         sqlx::query_as(
             "SELECT stand, einsatz_id FROM einsatz_aenderung WHERE art = ? AND schluessel = ?",
@@ -519,11 +541,16 @@ mod tests {
     async fn ein_spiegel_ist_nur_unter_dem_merker_schreibbar() {
         let pool = crate::db::test_pool().await;
         let (einsatz, uhs, platz) = einsatz_mit_uhs(&pool).await;
-        sqlx::query("INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES (?, 'x/1')")
+        als_spiegel(&pool, einsatz).await;
+        let spiegel: i64 = sqlx::query_scalar("SELECT spiegel FROM einsatz WHERE id = ?")
             .bind(einsatz)
-            .execute(&pool)
+            .fetch_one(&pool)
             .await
             .unwrap();
+        assert_eq!(
+            spiegel, 1,
+            "einsatz.spiegel folgt der Zeile in einsatz_spiegel"
+        );
         let fehler = |r: Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error>| {
             let e = r.expect_err("am Spiegel gesperrt");
             assert!(

@@ -412,6 +412,18 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   Zugriffsprotokolle). Der Text der 409 nennt deshalb nicht die Gegenstelle; die steht im
   Hinweisband.
 
+- **10.11.2026, Einsatznummern (D4):** Nummern sind je Org eindeutig (`idx_einsatz_nummer`,
+  `idx_einsatz_nummer_lfd`), ELW und Hub vergeben sie aber unabhängig. Ein Spiegel trägt die
+  Nummer des Führers und ist von der Eindeutigkeit ausgenommen: Spalte `einsatz.spiegel` (folgt per
+  Trigger der Zeile in `einsatz_spiegel`, wird nie geliefert), beide Indizes mit
+  `WHERE spiegel = 0`. Abgestimmte Nummernkreise über Instanzen sind eine eigene Frage.
+- **10.11.2026, Verweise ohne Fremdschlüssel (D3):** Aufnahme in `spiegel::schema::VERWEISE_OHNE_FK`:
+  polymorphe Bezüge (Erinnerung, Benachrichtigung, Chat, Kommunikationsstatus und -zustellung,
+  Bereitstellungsraum, Verbindungen der Fernmeldeskizze), Kennungen in Text
+  (`fernmeldeskizze_lage.element`, `ab-<id>` usw.), Qualifikationen in JSON (`quali_soll`,
+  `qualifikationen`) und im eingefrorenen Lagestand nur `bilder[].id`, weil der Client das Bild
+  live nachlädt. Alle übrigen IDs im Lagestand bleiben, wie sie sind: Er ist ein Dokument.
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.
