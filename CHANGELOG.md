@@ -1,3 +1,60 @@
+## [1.0.0-alpha.183](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.182...v1.0.0-alpha.183) (2026-11-10)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Planungen bekommen einen eigenen Bearbeitungsstand. Die Migration läuft beim Start automatisch.
+- **Übernahme einer Planung:** Die Vorschau „In Einsatz übernehmen“ nennt jetzt den Planungsstand, auf dem sie beruht. „Übernehmen“ schickt diesen Stand mit. Hat jemand die Planung seitdem geändert, lehnt der Server die Übernahme ab. Eigene Anbindungen an die Übernahme müssen den Stand aus der Vorschau mitschicken.
+
+### Bedienung: Kontextmenü an weiteren Stellen
+
+Rechtsklick, langer Druck und Umschalt+F10 öffnen an vielen weiteren Stellen ein Kontextmenü. Es zeigt dieselben Aktionen wie die Knöpfe und das ⋮-Menü.
+
+- **Chat:** Nachrichten haben ein Kontextmenü. Auf Anhängen, Vorschaubildern und gelöschten Nachrichten bleibt das Menü des Browsers, zum Beispiel für „Bild speichern unter“.
+- **Karten:** Meldungen, Nachforderungen, Aufträge, Ablösungen, Zeitfenster, Betreuungsstellen, Evakuierungsbezirke und Verpflegungsstellen haben ein Kontextmenü. Es zeigt alle Knöpfe der Karte vor den ⋮-Einträgen. Rückfragen erscheinen als Dialog, und eine gesperrte Aktion nennt ihren Grund. Wird eine Aktion hinfällig, während ihre Rückfrage offen ist, löst „OK“ sie nicht mehr aus, etwa wenn der Auftrag anderswo abgenommen wurde.
+- **Tabellen und Listen:** Kontextmenüs gibt es jetzt auch in diesen Bereichen:
+  - Schichtmodelle, Externe Stellen, Sprechgruppen, Verpflegungsplan und Benutzer
+  - die Dienststatus-Spalte bei Fahrzeugen, Personal und Material
+  - Pegel, Geräte und Lagemonitor-Zugänge
+  - die Besatzung in Fahrzeugen
+  - die Bild-Hintergründe, nur am Namen
+  - der Kommunikationsplan, samt „+ Verbindung“
+
+  Am Hub gepflegte Einträge haben keine Einträge im Kontextmenü.
+- Der Ausgabe-Zählschirm der Verpflegung hat bewusst kein Kontextmenü.
+- Enter im Kontextmenü löst nur den gewählten Eintrag aus und betätigt nicht zusätzlich das Element dahinter.
+
+### Lageberichte, Aufträge und Befehle
+
+- **Neu:** Jeder Abschnitt hat im Kopf ein ⋮-Menü mit diesen Einträgen:
+  - „Text kopieren“
+  - „In der Lesefassung zeigen“
+  - „Abschnitt leeren“, mit Rückfrage und an leeren Abschnitten gesperrt
+
+  Dieselben Einträge öffnen sich per Kontextmenü am Abschnittskopf. In der Gliederung kommt „Zum Abschnitt springen“ dazu.
+- **Behoben:** Von Hand eingegebener Text geht nicht mehr verloren, wenn direkt nach dem Speichern „Leere Abschnitte aus dem Lagebild füllen“ läuft.
+- **Behoben:** Wer mehrmals kurz hintereinander speichert, behält immer die zuletzt gespeicherte Fassung:
+  - Beim Lagebericht konnte eine ältere Speicherung eine neuere überschreiben. Speicherungen laufen jetzt nacheinander ab, wie schon beim Befehl.
+  - Das Formular zeigt nach zwei Speicherungen nicht mehr kurz den Stand der ersten. Wer in diesem Moment weitertippte, schrieb bisher auf dem älteren Text weiter.
+- **Behoben:** Änderungen anderer Nutzer, die während des eigenen Speicherns eingehen, erscheinen danach zuverlässig im Formular.
+
+### Vorplanung
+
+- **Neu:** Bei der Übernahme in einen neuen oder laufenden Einsatz werden fehlende Einsatzabschnitte neuer Posten mit angelegt. Die Vorschau nennt die neuen Abschnitte und markiert die Posten darin, und jeder Abschnitt bekommt einen ETB-Eintrag. Das erfordert das Recht für das Modul Einsatzabschnitte. Beim Einlesen einer Datei werden keine Abschnitte angelegt.
+- **Neu:** Wurde die Planung seit der Vorschau geändert, lädt der Dialog die Vorschau mit derselben Auswahl neu und meldet „Planung geändert, Vorschau neu geladen“. Andere Ablehnungen, etwa bei einer schon übernommenen Planung oder einem abgeschlossenen Einsatz, zeigt der Dialog weiter mit der Meldung des Servers.
+- **Behoben:** Ist eine Qualifikation seit dem Planen deaktiviert, nennt der Hinweis sie jetzt mit Namen („Qualifikation «Bootsführer» deaktiviert, ausgelassen“) statt nur mit einer Nummer.
+
+### Führung
+
+- **Behoben:** „meine Stelle“ im Paneel „Offene Vorgänge“ erkennt jetzt auch S7, Fachberater und Führungshilfspersonal, nicht mehr nur S1 bis S6. Fachberater und Führungshilfspersonal werden zusätzlich über ihre Bezeichnung zugeordnet.
+
+### Betroffene
+
+- **Behoben (Unfallhilfsstelle):** Der Knopf „Auflösen“ ist von Anfang an so breit wie seine längste Form („Auflösen (noch … Personen)“). Bisher konnte der Seitenkopf beim Ablegen des ersten Patienten umbrechen. Dann rutschte der Grundriss nach unten, und der nächste Klick ging daneben.
+
+### Informationstelefon
+
+- **Behoben:** Die Aufgliederung „Nach Anliegen“ trennt Anliegen und Zahl sichtbar, also nicht mehr „Vermisstensuche1“. Sie wird auch von Screenreadern als Liste vorgelesen.
+
 ## [1.0.0-alpha.182](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.181...v1.0.0-alpha.182) (2026-11-10)
 
 ### Wichtige Änderungen
