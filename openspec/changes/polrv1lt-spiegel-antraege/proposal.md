@@ -39,13 +39,15 @@ LLH-1494 (Archiv) und LLH-1496 (Lagebild für Externe) haben nichts, worauf sie 
   - Der Einsatz trägt eine Freigabestufe. Gebaut wird nur „alles“, sparsamere Stufen kommen
     später ohne Protokollbruch.
 - **Am Spiegel wird nicht geschrieben, sondern beantragt.** Die Datenbank sperrt jeden direkten
-  Schreibweg (409). Die 18 Erfassungen, die heute schon ohne Netz vormerkbar sind, werden am
-  Spiegel zum Antrag:
+  Schreibweg (409). Die 16 Erfassungen an Einsatzdaten, die heute schon ohne Netz vormerkbar
+  sind, werden am Spiegel zum Antrag:
   - ETB-Eintrag und Meldung,
   - die Einträge an einer Person, das Anlegen einer Person,
   - Stand- und Belegungsmeldung, Registrierung und Abmeldung,
-  - Eintreffen, Verpflegungsausgabe,
-  - Eingänge gelesen und quittiert.
+  - Eintreffen, Verpflegungsausgabe.
+
+  Benachrichtigungen werden nicht gespiegelt (Nachtrag 10.11.2026): jede Instanz führt ihre
+  eigenen, „Eingänge gelesen“ und Quittieren bleiben lokal.
 
   Ein Antrag steht „ausstehend“, bis der Führer ihn übernommen hat. Der Führer führt ihn im
   Namen des Kontos aus, als käme er von dort. Lehnt der Führer ab, steht der Antrag mit Grund
@@ -83,7 +85,7 @@ Spiegel, und dann wird schlicht nicht gespiegelt; das regelt `einsatz-spiegel`.
   - `src/instanz/extractor.rs`: Körpergrenze je Route;
   - `src/routes/instanz.rs` und `src/app.rs`: neue Routen;
   - Fehlerabbildung `src/error.rs`: 409 aus dem Schutz-Trigger;
-  - Antragsweg vor den 18 Schreibrouten;
+  - Antragsweg vor den 16 Schreibrouten;
   - Ausführen im Namen des Kontos über den bestehenden Router;
   - Live-Ereignis nach einer Übernahme (`src/live/`).
 - **Migrationen:**

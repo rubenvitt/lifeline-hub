@@ -279,7 +279,7 @@ Fremdschlüssel hat noch dort steht. Für IDs in JSON-Spalten gilt dieselbe List
   - Eine schreibende Methode auf eine Route außerhalb von `BEANTRAGBAR` endet mit 409 „Dieser
     Einsatz ist ein Spiegel von <Gegenstelle>“. Der Trigger (D10) ist nur das Netz darunter.
   - Eine Route in `BEANTRAGBAR` wird zum Antrag. `BEANTRAGBAR` ist eine Liste aus Art, Methode
-    und `MatchedPath` mit den 18 Erfassungen, je mit den Pfadparametern und Body-Feldern, die auf
+    und `MatchedPath` mit den 16 Erfassungen an Einsatzdaten, je mit den Pfadparametern und Body-Feldern, die auf
     Einsatzzeilen zeigen.
 - **Ein Antrag entsteht so:**
   1. Anmelden über `CurrentUser`, Schreibrecht über die gespiegelte Mitgliedschaft prüfen
@@ -348,7 +348,7 @@ serverseitig. Den Router legt `main` nach dem Bau in eine `OnceLock` im `AppStat
 - **Ist der Einsatz beim Empfänger selbst ein Spiegel**, etwa nach einer Übergabe in LLH-1491,
   lautet das Ergebnis „abgelehnt: Führung liegt nicht hier“.
 
-*Verworfen:* **Je Art ein direkter Aufruf der Fachfunktionen.** Das sind 18 Wege, die die Prüfungen
+*Verworfen:* **Je Art ein direkter Aufruf der Fachfunktionen.** Das sind 16 Wege, die die Prüfungen
 der Routen nachbauen und mit ihnen auseinanderlaufen.
 
 ### D12 Takt
@@ -370,7 +370,7 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   - `darfImEinsatzSchreiben` und `darfEinsatzLeiten` in `einsatz/schreibrecht.ts` liefern für
     einen Spiegel `false`. Damit wird jede Seite still lesend, ohne die rund 200 Aufrufstellen
     anzufassen.
-  - Die neue Regel `darfBeantragen` (aktiv und Schreibrolle) gilt nur an den 18 Erfassungsorten.
+  - Die neue Regel `darfBeantragen` (aktiv und Schreibrolle) gilt nur an den 16 Erfassungsorten.
 - **Antworten:** Die `erfasse…OfflineFaehig`-Funktionen kennen das Ergebnis `beantragt`.
   `useVorgemerkteSchreibaktionen` nimmt die ausstehenden Anträge derselben Art dazu. Damit zeigen
   die Orte, die heute „Vorgemerkt“ zeigen, auch „Beantragt“, mit demselben Platz und Abstand.
@@ -432,6 +432,11 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
 - **10.11.2026, Lücke am Spiegel (D6):** Nennt der Spiegel einen niedrigeren Stand als `seit`
   einer Lieferung (Wiederherstellung), übernimmt er nichts und nennt seinen Stand; die
   Gegenseite liefert ab dort neu.
+
+- **10.11.2026, Benachrichtigungen (D3, D9), Entscheidung Ruben:** `benachrichtigung` wird nicht
+  gespiegelt. Sie ist Zustellstand je Instanz (Empfänger, Lesestand, Live-Zustellung) wie die
+  Lesemarke; „Eingänge gelesen“ und das Quittieren schreiben lokal und sind keine Anträge.
+  `BEANTRAGBAR` hat damit 16 Einträge. Hinweise zu Ereignissen eines ELW am Hub bringt LLH-1495.
 
 ## Risks / Trade-offs
 

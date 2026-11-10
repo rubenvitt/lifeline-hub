@@ -42,7 +42,6 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     g("einsatzabschnitt_sprechgruppe", K::Fuehrung),
     g("erinnerung", K::Fuehrung),
     g("programmpunkt", K::Fuehrung),
-    g("benachrichtigung", K::Fuehrung),
     g("benachrichtigung_vorgabe", K::Fuehrung),
     // ETB
     g("etb_eintrag", K::Etb),
@@ -160,6 +159,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ),
     ("etb_lesemarke", "Lesestand einer Person an dieser Instanz"),
     ("lagemonitor_freigabe", "Geräte hängen an einer Instanz"),
+    (
+        "benachrichtigung",
+        "Zustellstand je Instanz: jede Instanz führt ihre eigenen Hinweise (Nachtrag 10.11.2026)",
+    ),
     ("geraet_kopplung", "Geräte hängen an einer Instanz"),
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),

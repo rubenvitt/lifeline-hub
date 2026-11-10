@@ -10,11 +10,14 @@ bis sie ihn übernommen oder abgelehnt hat.
 
 ### Requirement: Beantragbar ist genau, was ohne Netz vormerkbar ist
 
-An einem Spiegel SHALL genau die Erfassungen zum Antrag werden, die ohne Netz vormerkbar sind,
-heute 18. Jede andere Schreibaktion MUST am Spiegel gesperrt sein (Spec `einsatz-spiegel`).
+An einem Spiegel SHALL genau die Erfassungen zum Antrag werden, die ohne Netz vormerkbar sind
+und Daten des Einsatzes schreiben, heute 16. Jede andere Schreibaktion an Daten des Einsatzes
+MUST am Spiegel gesperrt sein (Spec `einsatz-spiegel`). „Eingänge gelesen“ und das Quittieren
+einer Benachrichtigung sind keine Anträge: Benachrichtigungen werden nicht gespiegelt, jede
+Instanz führt ihre eigenen.
 
-#### Scenario: Die 18 Erfassungen
-- **WHEN** jemand am Spiegel einen ETB-Eintrag, eine Meldung, eine Person, einen Personeneintrag (Sichtung, Verbleib, Notiz, Transport, Anlass, Maßnahme, Verletzung), eine Stand- oder Belegungsmeldung, eine Registrierung oder Abmeldung, ein Eintreffen, eine Verpflegungsausgabe, „Eingänge gelesen“ oder eine Quittung einer Benachrichtigung erfasst
+#### Scenario: Die 16 Erfassungen
+- **WHEN** jemand am Spiegel einen ETB-Eintrag, eine Meldung, eine Person, einen Personeneintrag (Sichtung, Verbleib, Notiz, Transport, Anlass, Maßnahme, Verletzung), eine Stand- oder Belegungsmeldung, eine Registrierung oder Abmeldung, ein Eintreffen oder eine Verpflegungsausgabe erfasst
 - **THEN** wird daraus ein Antrag
 
 #### Scenario: Maßnahme aufheben am Spiegel

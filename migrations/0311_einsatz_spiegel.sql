@@ -341,23 +341,6 @@ END;
 CREATE TRIGGER programmpunkt_spiegelschutz_i BEFORE INSERT ON programmpunkt WHEN NOT EXISTS (SELECT 1 FROM spiegel_uebernahme) AND EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = NEW.einsatz_id) BEGIN SELECT RAISE(ABORT, 'einsatz_ist_spiegel'); END;
 CREATE TRIGGER programmpunkt_spiegelschutz_u BEFORE UPDATE ON programmpunkt WHEN NOT EXISTS (SELECT 1 FROM spiegel_uebernahme) AND (EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = OLD.einsatz_id) OR EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = NEW.einsatz_id)) BEGIN SELECT RAISE(ABORT, 'einsatz_ist_spiegel'); END;
 CREATE TRIGGER programmpunkt_spiegelschutz_d BEFORE DELETE ON programmpunkt WHEN NOT EXISTS (SELECT 1 FROM spiegel_uebernahme) AND EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = OLD.einsatz_id) BEGIN SELECT RAISE(ABORT, 'einsatz_ist_spiegel'); END;
--- benachrichtigung
-CREATE TRIGGER benachrichtigung_spiegellog_i AFTER INSERT ON benachrichtigung WHEN EXISTS (SELECT 1 FROM einsatz WHERE id = NEW.einsatz_id) BEGIN
-    DELETE FROM einsatz_aenderung WHERE art = 'benachrichtigung' AND schluessel = CAST(NEW.id AS TEXT);
-    INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (NEW.einsatz_id, 'benachrichtigung', CAST(NEW.id AS TEXT));
-END;
-CREATE TRIGGER benachrichtigung_spiegellog_u AFTER UPDATE ON benachrichtigung BEGIN
-    DELETE FROM einsatz_aenderung WHERE art = 'benachrichtigung' AND schluessel IN (CAST(OLD.id AS TEXT), CAST(NEW.id AS TEXT));
-    INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT OLD.einsatz_id, 'benachrichtigung', CAST(OLD.id AS TEXT) WHERE CAST(OLD.id AS TEXT) IS NOT CAST(NEW.id AS TEXT) AND EXISTS (SELECT 1 FROM einsatz WHERE id = OLD.einsatz_id);
-    INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT NEW.einsatz_id, 'benachrichtigung', CAST(NEW.id AS TEXT) WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = NEW.einsatz_id);
-END;
-CREATE TRIGGER benachrichtigung_spiegellog_d AFTER DELETE ON benachrichtigung BEGIN
-    DELETE FROM einsatz_aenderung WHERE art = 'benachrichtigung' AND schluessel = CAST(OLD.id AS TEXT);
-    INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT OLD.einsatz_id, 'benachrichtigung', CAST(OLD.id AS TEXT) WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = OLD.einsatz_id);
-END;
-CREATE TRIGGER benachrichtigung_spiegelschutz_i BEFORE INSERT ON benachrichtigung WHEN NOT EXISTS (SELECT 1 FROM spiegel_uebernahme) AND EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = NEW.einsatz_id) BEGIN SELECT RAISE(ABORT, 'einsatz_ist_spiegel'); END;
-CREATE TRIGGER benachrichtigung_spiegelschutz_u BEFORE UPDATE ON benachrichtigung WHEN NOT EXISTS (SELECT 1 FROM spiegel_uebernahme) AND (EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = OLD.einsatz_id) OR EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = NEW.einsatz_id)) BEGIN SELECT RAISE(ABORT, 'einsatz_ist_spiegel'); END;
-CREATE TRIGGER benachrichtigung_spiegelschutz_d BEFORE DELETE ON benachrichtigung WHEN NOT EXISTS (SELECT 1 FROM spiegel_uebernahme) AND EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = OLD.einsatz_id) BEGIN SELECT RAISE(ABORT, 'einsatz_ist_spiegel'); END;
 -- benachrichtigung_vorgabe
 CREATE TRIGGER benachrichtigung_vorgabe_spiegellog_i AFTER INSERT ON benachrichtigung_vorgabe WHEN EXISTS (SELECT 1 FROM einsatz WHERE id = NEW.einsatz_id) BEGIN
     DELETE FROM einsatz_aenderung WHERE art = 'benachrichtigung_vorgabe' AND schluessel = json_array(NEW.einsatz_id, NEW.art, NEW.funktion);
@@ -1954,7 +1937,6 @@ INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT z.e
 INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT (SELECT einsatz_id FROM einsatzabschnitt WHERE id = z.abschnitt_id), 'einsatzabschnitt_sprechgruppe', json_array(z.abschnitt_id, z.sprechgruppe_id) FROM einsatzabschnitt_sprechgruppe AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = (SELECT einsatz_id FROM einsatzabschnitt WHERE id = z.abschnitt_id));
 INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT z.einsatz_id, 'erinnerung', CAST(z.id AS TEXT) FROM erinnerung AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = z.einsatz_id);
 INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT z.einsatz_id, 'programmpunkt', CAST(z.id AS TEXT) FROM programmpunkt AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = z.einsatz_id);
-INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT z.einsatz_id, 'benachrichtigung', CAST(z.id AS TEXT) FROM benachrichtigung AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = z.einsatz_id);
 INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT z.einsatz_id, 'benachrichtigung_vorgabe', json_array(z.einsatz_id, z.art, z.funktion) FROM benachrichtigung_vorgabe AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = z.einsatz_id);
 INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT z.einsatz_id, 'etb_eintrag', CAST(z.id AS TEXT) FROM etb_eintrag AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = z.einsatz_id);
 INSERT OR IGNORE INTO einsatz_aenderung (einsatz_id, art, schluessel) SELECT (SELECT einsatz_id FROM etb_eintrag WHERE id = z.eintrag_id), 'etb_eintrag_einheit', json_array(z.eintrag_id, z.einheit_id) FROM etb_eintrag_einheit AS z WHERE EXISTS (SELECT 1 FROM einsatz WHERE id = (SELECT einsatz_id FROM etb_eintrag WHERE id = z.eintrag_id));
