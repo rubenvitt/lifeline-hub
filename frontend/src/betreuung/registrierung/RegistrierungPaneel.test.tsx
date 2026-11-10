@@ -377,4 +377,21 @@ describe('Haushalte umbauen (LLH-1615)', () => {
     await waitFor(() => expect(ausloeser).toBeDisabled());
     expect(screen.getByText('Haushalte · Ohne Verbindung nicht änderbar')).toBeInTheDocument();
   });
+
+  it('Netz fällt bei offenem Dialog weg: Speichern gesperrt mit Grund, nichts geht hinaus (CodeRabbit)', async () => {
+    const user = userEvent.setup();
+    const draht = rendereUmbau();
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zu R-020 Muster, Max' }),
+      'Haushalt ändern …',
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('radio', { name: 'Neuer Haushalt' }));
+    setzeOnline(false);
+    const speichern = within(dialog).getByRole('button', { name: 'Haushalt ändern' });
+    await waitFor(() => expect(speichern).toBeDisabled());
+    expect(within(dialog).getByText('Ohne Verbindung nicht änderbar')).toBeInTheDocument();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    expect(draht.haushalt).toEqual([]);
+  });
 });

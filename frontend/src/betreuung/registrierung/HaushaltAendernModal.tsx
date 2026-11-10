@@ -5,13 +5,17 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { Haushalt, HaushaltZielEingabe } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { useRollen } from '../../components/instrument';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { haushaltKennung } from './registrierKern';
 
 /**
  * Dialog „Haushalt ändern“ (LLH-1615, Change `lm62ud0b-haushalt-umbauen`, design.md D4): eine an
  * der Stelle registrierte Person in einen anderen Haushalt DIESER Stelle umhängen oder in einen
  * neuen lösen. Die Auswahl kommt aus der Registrierliste der Stelle (derselbe Query-Key wie das
- * Paneel). Ohne Netz öffnet ihn niemand: die Aufrufer sperren mit Grund (D5).
+ * Paneel). Ohne Netz öffnet ihn niemand: die Aufrufer sperren mit Grund (D5). Fällt das Netz bei
+ * offenem Dialog weg, sperrt er das Speichern selbst mit Grund; die Mutation läuft mit
+ * `networkMode: 'always'`, damit TanStack sie nicht anhält und später still nachholt (kein
+ * `client_id`, also nicht wiederholbar).
  */
 
 export interface HaushaltAendernPerson {
@@ -45,11 +49,13 @@ export default function HaushaltAendernModal({
   const { message } = App.useApp();
   const { token } = useRollen();
   const [form] = Form.useForm<{ ziel: string }>();
+  const ohneNetz = useOhneVerbindung();
   const liste = useQuery({
     queryKey: einsatzKeys.registrierliste(einsatzId, stelleId),
     queryFn: () => loadRegistrierListe(einsatzId, stelleId),
   });
   const wechsel = useMutation({
+    networkMode: 'always',
     mutationFn: (ziel: HaushaltZielEingabe) =>
       sendHaushaltWechsel(einsatzId, stelleId, person.id, ziel),
     onSuccess: (ziel) => {
@@ -73,6 +79,7 @@ export default function HaushaltAendernModal({
       form={form}
       erfassenText="Haushalt ändern"
       laeuft={wechsel.isPending}
+      gesperrt={ohneNetz}
       speicherung={wechsel}
       speicherFehlerTitel="Haushalt nicht geändert"
       onErfassen={({ ziel }) =>
@@ -81,6 +88,11 @@ export default function HaushaltAendernModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
+      {ohneNetz && (
+        <Typography.Paragraph type="secondary">
+          {OHNE_VERBINDUNG_NICHT_AENDERBAR}
+        </Typography.Paragraph>
+      )}
       {folge && <Typography.Paragraph>{folge}</Typography.Paragraph>}
       <Form.Item name="ziel" label="Ziel" rules={[{ required: true, message: 'Haushalt wählen' }]}>
         <Radio.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>

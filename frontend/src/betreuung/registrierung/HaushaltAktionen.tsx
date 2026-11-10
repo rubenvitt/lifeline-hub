@@ -53,6 +53,8 @@ export default function HaushaltAktionen({
   });
   const titel = `${registrierNummer('R', person.registrier_nr)} ${personName(person)}`;
   const bezugsperson = useMutation({
+    // Ohne Netz gesperrt; nie angehalten und still nachgeholt (kein client_id).
+    networkMode: 'always',
     mutationFn: ({ haushaltId, stelle }: { haushaltId: number; stelle: number }) =>
       sendBezugsperson(einsatzId, stelle, haushaltId, person.id),
     onSuccess: (h) => {

@@ -175,6 +175,8 @@ export default function RegistrierungPaneel({
   // Grund einer Ablehnung an der Personenzeile (LFH-1077), nicht als Toast.
   const zeilenFehler = useZeilenFehler<number>();
   const bezugsperson = useMutation({
+    // Ohne Netz gesperrt; nie angehalten und still nachgeholt (kein client_id).
+    networkMode: 'always',
     mutationFn: ({
       haushaltId,
       personId,
