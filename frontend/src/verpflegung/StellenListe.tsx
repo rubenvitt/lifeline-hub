@@ -144,6 +144,8 @@ export default function StellenListe({
   };
   const kontextStelle = kontext == null ? undefined : stellen.find((s) => s.id === kontext.id);
   const kontextListe = kontextStelle ? kontextEintraege(kontextStelle) : [];
+  // Zustand aus den Daten abgeleitet (wie `Datensicht`): im selben Render zurückgesetzt, danach ist
+  // die Bedingung falsch, es folgt kein weiterer Durchlauf.
   if (kontext != null && kontextListe.length === 0) setKontext(null);
   const kontextAusloeser = useKontextMenue<number>({
     kannOeffnen: (id) => {

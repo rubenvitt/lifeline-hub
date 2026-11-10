@@ -596,11 +596,7 @@ describe('AbloesungKarte — laut Schichtplan (LLH-1555)', () => {
 describe('AbloesungKarte — Kontextmenü (LLH-1598)', () => {
   const kontextMenue = async () => {
     await warteAufMenueFokus();
-    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
-      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
-    );
-    expect(offen).toHaveLength(1);
-    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+    return within(offenesMenue()).getByRole('menu');
   };
   const rechtsklick = () =>
     fireEvent.contextMenu(screen.getByText('Zug 1'), { clientX: 20, clientY: 20, button: 2 });

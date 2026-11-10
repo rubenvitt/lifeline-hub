@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { warteAufMenueFokus } from '../test/menue';
+import { offenesMenue, warteAufMenueFokus } from '../test/menue';
 import type { Auftrag } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import AuftragKarte from './AuftragKarte';
@@ -107,11 +107,7 @@ describe('AuftragKarte — Schema in Formularfolge (LLH-1091)', () => {
 describe('AuftragKarte — Kontextmenü (LLH-1598)', () => {
   const offenesKontextmenue = async () => {
     await warteAufMenueFokus();
-    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
-      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
-    );
-    expect(offen).toHaveLength(1);
-    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+    return within(offenesMenue()).getByRole('menu');
   };
   const rechtsklick = (el: Element) =>
     fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });

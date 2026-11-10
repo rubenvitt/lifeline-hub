@@ -9,7 +9,7 @@ import { antdToken, farbenHell, type Dichte } from '../theme/tokens';
 import { server } from '../test/server';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
-import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
+import { offenesMenue, waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { ApiError } from '../api/client';
 import type { Nachforderung } from '../api/types';
@@ -972,11 +972,7 @@ describe('NachforderungKarte — Eintreffen zurücknehmen (LLH-1539)', () => {
 describe('NachforderungKarte — Kontextmenü (LLH-1598)', () => {
   const offenesKontextmenue = async () => {
     await warteAufMenueFokus();
-    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
-      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
-    );
-    expect(offen).toHaveLength(1);
-    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+    return within(offenesMenue()).getByRole('menu');
   };
   const rechtsklick = (el: Element) =>
     fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });

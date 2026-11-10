@@ -193,6 +193,8 @@ export default function NachrichtenStrom({
   const kontextNachricht =
     kontext == null ? undefined : nachrichten.find((n) => n.id === kontext.id);
   const kontextAktionen = kontextNachricht ? aktionenZu(kontextNachricht) : null;
+  // Zustand aus den Daten abgeleitet (wie `Datensicht`): im selben Render zurückgesetzt, danach ist
+  // die Bedingung falsch, es folgt kein weiterer Durchlauf.
   if (kontext != null && (kontextAktionen == null || kontextAktionen.eintraege.length === 0)) {
     setKontext(null);
   }
