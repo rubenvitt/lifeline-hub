@@ -240,8 +240,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('behandelt einen abgebrochenen Auftrag NICHT als Speicherfehler', async () => {
-    // `BefehlDetailPage` bricht die Speicherfolge beim Verlassen mit `AbortError` ab — kein Zustand,
-    // den jemand lesen soll.
+    // DIE SPEICHERFOLGE bricht vorgemerkte Aufträge beim Verlassen mit `AbortError` ab — kein
+    // Zustand, den jemand lesen soll.
     const speichern = vi.fn().mockRejectedValue(new DOMException('Editor verlassen', 'AbortError'));
     render(<Huelle speichern={speichern} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'x');
@@ -309,11 +309,13 @@ describe('useEntwurfVerlustschutz', () => {
   it('schickt einen EIGENEN PATCH, wenn seit dem laufenden Speichern getippt wurde (Gegenaussage)', async () => {
     // Ein Anhängen bei UNGLEICHEM Stand wäre eine Quittung über S1, während S2 im Formular steht;
     // ohne diese Hälfte wäre ein immer anhängender Riegel vom richtigen nicht zu unterscheiden.
-    let aufloesen: () => void = () => {};
+    // DIE SPEICHERFOLGE (LLH-1619): S2 startet erst, wenn S1 zurück ist — sonst könnte ein spätes
+    // S1 beim Server nach S2 ankommen und es überschreiben.
+    const aufloeser: Array<() => void> = [];
     const speichern = vi.fn(
       () =>
         new Promise<void>((r) => {
-          aufloesen = r;
+          aufloeser.push(r);
         }),
     );
     render(<Huelle speichern={speichern} />);
@@ -324,16 +326,87 @@ describe('useEntwurfVerlustschutz', () => {
 
     await userEvent.type(feld, 'b'); // S2 entsteht, während S1 unterwegs ist
     await userEvent.click(speichernKnopf());
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1); // S2 wartet hinter S1
+
+    await act(async () => {
+      aufloeser[0]();
+    });
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1ab' });
+    expect(screen.getByText('quittungen 0')).toBeInTheDocument(); // S2 noch nicht zurück
     await act(async () => {
-      aufloesen();
+      aufloeser[1]();
     });
+    expect(screen.getByText('quittungen 1')).toBeInTheDocument();
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+  });
+
+  it('lässt S2 nach einem GESCHEITERTEN S1 trotzdem los (Speicherfolge)', async () => {
+    // Ein Fehlschlag in der Folge darf den nächsten Versuch nicht sperren; der Grund fällt erst
+    // mit dem gelungenen S2.
+    let ablehnen: (e: Error) => void = () => {};
+    const speichern = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_r, nein) => {
+            ablehnen = nein;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+
+    await userEvent.type(feld, 'b');
+    await userEvent.tab(); // S2 reiht sich ein
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      ablehnen(new Error('503'));
+    });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1ab' });
+    expect(await screen.findByText('sauber')).toBeInTheDocument();
+    expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument();
+  });
+
+  it('startet nach dem Verlassen keinen vorgemerkten PATCH mehr (Speicherfolge)', async () => {
+    // „Verwerfen“ hängt den Editor aus: S2 war nur vorgemerkt und darf nicht mehr hinaus. Der
+    // laufende S1 läuft zu Ende, er ist schon beim Server.
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
+    const { unmount } = render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b');
+    await userEvent.tab();
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      aufloeser[0]();
+    });
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
   });
 
   it('gibt den Riegel nur an den Auftrag zurück, der ihn HÄLT', async () => {
-    // Bei ungleichem Stand laufen zwei Speicherungen gleichzeitig. Kommt die ERSTE zurück, darf sie
-    // den Riegel nicht öffnen, sonst schickte der nächste Blur einen dritten PATCH neben die zweite.
+    // Bei ungleichem Stand stehen zwei Aufträge an, der zweite wartet in DER SPEICHERFOLGE. Kommt
+    // der ERSTE zurück, darf er den Riegel nicht öffnen, sonst schickte der nächste Blur einen
+    // dritten PATCH neben den zweiten.
     const aufloeser: Array<() => void> = [];
     const speichern = vi.fn(
       () =>
@@ -348,14 +421,16 @@ describe('useEntwurfVerlustschutz', () => {
     await userEvent.tab(); // Auftrag 1 (Stand 1) hängt
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
 
-    await userEvent.type(feld, 'b'); // Stand 2 — der Klick bekommt einen eigenen PATCH
+    await userEvent.type(feld, 'b'); // Stand 2 — der Klick bekommt einen eigenen Auftrag
     await userEvent.click(speichernKnopf());
-    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1); // Auftrag 2 wartet hinter Auftrag 1
 
-    // Auftrag 1 kommt zurück, Auftrag 2 hält den Riegel noch.
+    // Auftrag 1 kommt zurück, Auftrag 2 startet und hält den Riegel.
     await act(async () => {
       aufloeser[0]();
     });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     expect(screen.getByText('speichert')).toBeInTheDocument();
 
     // Ein Blur mit UNVERÄNDERTEM Stand: Auftrag 2 trägt den Inhalt schon — es sei denn, Auftrag 1
@@ -386,7 +461,8 @@ describe('useEntwurfVerlustschutz', () => {
         vi.advanceTimersByTime(AUTOSAVE_MS - 1);
       });
       expect(speichern).not.toHaveBeenCalled();
-      act(() => {
+      // Asynchron: DIE SPEICHERFOLGE startet den PATCH eine Mikroaufgabe später.
+      await act(async () => {
         vi.advanceTimersByTime(1);
       });
       expect(speichern).toHaveBeenCalledTimes(1);

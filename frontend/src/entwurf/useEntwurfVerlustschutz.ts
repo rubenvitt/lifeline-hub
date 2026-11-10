@@ -16,7 +16,10 @@ interface VerlustschutzArgs<D, W extends object> {
   form: FormInstance<W>;
   /** Serverstand → Formularwerte. Wird über eine Ref gelesen, darf also inline stehen. */
   werteAus: (daten: D) => W;
-  /** Der PATCH. Wird über eine Ref gelesen, darf also inline stehen. */
+  /**
+   * Der PATCH. Wird über eine Ref gelesen, darf also inline stehen. Der Hook ruft ihn erst, wenn
+   * der vorige zurück ist (SPEICHERFOLGE); die Seite reiht nichts selbst.
+   */
   speichern: (werte: W) => Promise<unknown>;
   /** Nach JEDEM erfolgreichen Speichern (Invalidierung) — genau einmal je PATCH. */
   onGespeichert?: () => void;
@@ -77,6 +80,13 @@ interface Verlustschutz<W extends object> {
  * Der Riegel fällt nur, wenn ihn noch derselbe Auftrag hält (`auftragRef`). Die API ist bewusst
  * eng: kein öffentlicher Weg, einen zweiten Speicherpfad daneben zu bauen.
  *
+ * **DIE SPEICHERFOLGE** (LLH-1619). Ein Auftrag (c) startet seinen PATCH erst, wenn der vorige
+ * zurück ist, gleich ob mit Erfolg oder Fehler. Parallel könnte ein spätes älteres S1 beim Server
+ * nach S2 ankommen und S2 überschreiben, während das Formular S2 zeigt und quittiert. Die Folge
+ * liegt hier und nicht in den Seiten, damit keine Seite sie vergessen kann. Verlässt man den
+ * Editor („Verwerfen“, Unmount), starten vorgemerkte Aufträge nicht mehr (`AbortError`); ein
+ * laufender PATCH läuft zu Ende.
+ *
  * Befehls- und Lageberichtsentwurf nutzen zusätzlich
  * `EntwurfNavigationSchutz` (`useBlocker`), der denselben Merker liest; dieser Hook selbst bleibt
  * routerunabhängig.
@@ -126,7 +136,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   }, [daten, form, formular.da, ungespeichert]);
 
   /**
-   * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Befehlseditors) ist kein
+   * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Editors, s. SPEICHERFOLGE) ist kein
    * Speicherfehler.
    */
   const meldeSpeicherfehler = useCallback((e: unknown) => {
@@ -172,6 +182,16 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const laeuftRef = useRef(false);
   const auftragRef = useRef<Promise<unknown> | null>(null);
   const standRef = useRef(0);
+  // DIE SPEICHERFOLGE: der zuletzt eingereihte Auftrag. `aktivRef` fällt beim Unmount; ein
+  // späteres Öffnen desselben Datensatzes bekommt eigene Refs und eine eigene Folge.
+  const folgeRef = useRef<Promise<unknown>>(Promise.resolve());
+  const aktivRef = useRef(true);
+  useEffect(() => {
+    aktivRef.current = true;
+    return () => {
+      aktivRef.current = false;
+    };
+  }, []);
 
   /** Der EINE Speicherweg. Lehnt mit dem Grund des Servers ab; Zustand setzt der Aufrufer. */
   const speichereMit = useCallback(
@@ -180,7 +200,13 @@ export function useEntwurfVerlustschutz<D, W extends object>({
       standRef.current = aenderungRef.current;
       setSpeichertGerade(true);
       const quittieren = quittungVorbereiten();
-      const auftrag = speichernRef.current(werte);
+      const auftrag = folgeRef.current
+        .catch(() => {}) // Ein Fehlschlag des vorigen sperrt den nächsten Versuch nicht.
+        .then(() => {
+          if (!aktivRef.current) throw new DOMException('Editor verlassen', 'AbortError');
+          return speichernRef.current(werte);
+        });
+      folgeRef.current = auftrag;
       auftragRef.current = auftrag;
       return auftrag
         .then((r) => {
@@ -206,7 +232,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     if (!ungespeichert) return;
     /**
      * Der Riegel sperrt DIE DUBLETTE, nicht den Fortschritt: ein Blur mit NEUEREM Stand bekommt
-     * seinen eigenen PATCH, den die `speicherfolge` der Seite hinter den laufenden setzt.
+     * seinen eigenen PATCH, den DIE SPEICHERFOLGE hinter den laufenden setzt.
      */
     if (laeuftRef.current && aenderungRef.current === standRef.current) return;
     // Der Grund bleibt als Zustand stehen, bis ein Speichern gelingt.
