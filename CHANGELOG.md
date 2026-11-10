@@ -1,3 +1,30 @@
+## [1.0.0-alpha.181](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.180...v1.0.0-alpha.181) (2026-11-10)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Das Zugriffsprotokoll für Personendaten kennt eine neue Eintragsart „Registrierliste gedruckt“. Die Migration läuft beim ersten Start der neuen Version automatisch. Danach lässt sich die Datenbank nicht mehr ohne Weiteres mit einer älteren Version öffnen.
+
+### Betroffene – Betreuung und Verpflegung
+
+- **Neu: Registrierliste einer Betreuungsstelle drucken.** Im Paneel „Registrierung“ gibt es den Knopf „Registrierliste drucken“. Er steht rechtsbündig in der ersten Zeile des Paneels und ist auch ohne Schreibrecht nutzbar.
+- **So sieht das Blatt aus:**
+  - Summen je Kostform
+  - Personen nach Haushalt gruppiert, jeder Haushalt steht ganz auf einer Seite
+  - eine Abhakspalte für die Arbeit vor Ort
+  - ein Druckkopf mit Umfang, Stand und der Angabe, ob Gesundheitsangaben enthalten sind
+- **Gesundheitsangaben nur auf Wunsch:** Unverträglichkeiten erscheinen nur, wenn „Unverträglichkeiten mitdrucken“ eingeschaltet ist.
+- **Fester Stand mit „Neu laden“:** Die Druckansicht zeigt den Stand zum Zeitpunkt des Abrufs. Mit „Neu laden“ holt man den aktuellen Stand.
+- **Jeder Druck wird protokolliert:** Für jede Person auf der Liste entsteht ein Eintrag „Registrierliste gedruckt“ im Zugriffsprotokoll. Dieser Eintrag ist vom Druck des Blatts einer einzelnen Person getrennt. Daten werden erst ausgegeben, wenn das Protokoll geschrieben ist.
+- **Nur protokollierte Personen auf dem Blatt:** Ist eine Bezugsperson nicht mehr an der Stelle registriert, fehlt sie im Kopf des Haushalts.
+
+### Gekoppelte Geräte
+
+- Ein Gerät, das als „Betreuungsstelle“ gekoppelt ist, kann die Registrierliste der Stelle drucken, an die es gebunden ist.
+
+### Dokumentation
+
+- Die Kapitel „Betreuung“ und „Gerät Betreuungsstelle“ der Anwenderdokumentation beschreiben jetzt „Registrierliste drucken“. Das Bild zum Paneel „Registrierung“ ist in heller und dunkler Darstellung neu aufgenommen.
+
 ## [1.0.0-alpha.180](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.179...v1.0.0-alpha.180) (2026-11-10)
 
 ### Wichtige Änderungen

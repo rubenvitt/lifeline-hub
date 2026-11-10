@@ -7150,7 +7150,7 @@ export interface components {
          *     eine ältere Instanz eine neue Art überspringen kann (D2).
          * @enum {string}
          */
-        StammdatenArt: "konto" | "org_einstellungen" | "modul_einstellung" | "fuehrungsfunktion" | "fahrzeug_status" | "personal_status" | "qualifikation" | "einheit_typ" | "fahrzeug" | "material" | "personal" | "einheit_vorlage";
+        StammdatenArt: "konto" | "org_einstellungen" | "modul_einstellung" | "fuehrungsfunktion" | "fahrzeug_status" | "personal_status" | "qualifikation" | "einheit_typ" | "fahrzeug" | "material" | "personal" | "einheit_vorlage" | "schichtmodell" | "einsatz_vorlage" | "stichwort_vorschlag" | "verpflegung_vorlage" | "sprechgruppe" | "etb_baustein" | "externe_stelle" | "unterkunft_richtwert";
         /** @description Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9). */
         StammdatenHerkunftAnzeige: {
             /**

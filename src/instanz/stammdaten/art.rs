@@ -45,18 +45,29 @@ pub struct ArtBeschreibung {
     pub verweise: &'static [Verweis],
     /// Spalte im Format `[{"q": <qualifikation_id>, "n": <anzahl>}]` (`personal::quali_soll`).
     pub quali_soll: Option<&'static str>,
-    /// Natürlicher Schlüssel für den ersten Abgleich (D5); `None` = nie abgleichen (Konten) oder
-    /// der Schlüssel ist ohnehin gleich ([`Schluessel::Spalte`], [`Schluessel::Org`]).
-    pub natuerlich: Option<&'static str>,
+    /// Natürlicher Schlüssel für den ersten Abgleich (D5), eine oder mehrere Spalten, die alle
+    /// gleich sein müssen (Change `kjezbk06-stammdaten-kataloge`, D3); leer = nie abgleichen
+    /// (Konten) oder der Schlüssel ist ohnehin gleich ([`Schluessel::Spalte`], [`Schluessel::Org`]).
+    pub natuerlich: &'static [&'static str],
     /// Spalte und Wert, mit denen eine verwendete Zeile stillgelegt wird, wenn die Quelle sie
     /// löscht; `None` = die Zeile wird gelöscht.
     pub stilllegen: Option<(&'static str, &'static str)>,
+    /// Nur dieser Teil der Tabelle ist die Art, als SQL-Bedingung über ihre Spalten (D2 der Change
+    /// `kjezbk06-stammdaten-kataloge`): Sprechgruppen nur im Org-Katalog. Gilt beim Liefern, im
+    /// ersten Abgleich und in den Log-Triggern der Migration; eine Konstante dieser Datei.
+    pub bereich: Option<&'static str>,
+    /// Markierung, die es je Org nur einmal gibt (`ist_vorgabe`, `zustaendig`). Trägt die gelieferte
+    /// Zeile sie, verlieren die übrigen Zeilen der Org sie bei der Übernahme (D4 der Change
+    /// `kjezbk06-stammdaten-kataloge`).
+    pub exklusiv: Option<&'static str>,
     pub unterlisten: &'static [Unterliste],
 }
 
 const FAHRZEUG: StammdatenArt = StammdatenArt::Fahrzeug;
 const PERSONAL: StammdatenArt = StammdatenArt::Personal;
 const MATERIAL: StammdatenArt = StammdatenArt::Material;
+const SCHICHTMODELL: StammdatenArt = StammdatenArt::Schichtmodell;
+const EINSATZ_VORLAGE: StammdatenArt = StammdatenArt::EinsatzVorlage;
 
 /// Reihenfolge der Übernahme: wer verwiesen wird, kommt vorher. Verweise auf die eigene Art
 /// (Qualifikation, Vorlage) setzt erst der zweite Durchgang.
@@ -74,8 +85,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: None,
-        natuerlich: None,
+        natuerlich: &[],
         stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -101,8 +114,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: None,
-        natuerlich: None,
+        natuerlich: &[],
         stilllegen: None,
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -112,8 +127,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         spalten: &["benoetigte_rolle", "sichtbar"],
         verweise: &[],
         quali_soll: None,
-        natuerlich: None,
+        natuerlich: &[],
         stilllegen: None,
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -123,8 +140,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         spalten: &["label", "aktiv"],
         verweise: &[],
         quali_soll: None,
-        natuerlich: None,
+        natuerlich: &[],
         stilllegen: None,
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -142,8 +161,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: None,
-        natuerlich: Some("label"),
+        natuerlich: &["label"],
         stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -161,8 +182,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: None,
-        natuerlich: Some("label"),
+        natuerlich: &["label"],
         stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -175,8 +198,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
             ziel: StammdatenArt::Qualifikation,
         }],
         quali_soll: None,
-        natuerlich: Some("label"),
+        natuerlich: &["label"],
         stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -194,8 +219,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: Some("quali_soll"),
-        natuerlich: Some("label"),
+        natuerlich: &["label"],
         stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -220,8 +247,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: None,
-        natuerlich: Some("funkrufname"),
+        natuerlich: &["funkrufname"],
         stilllegen: Some(("dienststatus", "ausser_dienst")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -240,8 +269,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
         ],
         verweise: &[],
         quali_soll: None,
-        natuerlich: Some("bestandsnummer"),
+        natuerlich: &["bestandsnummer"],
         stilllegen: Some(("dienststatus", "ausser_dienst")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[],
     },
     ArtBeschreibung {
@@ -263,8 +294,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
             ziel: StammdatenArt::Konto,
         }],
         quali_soll: None,
-        natuerlich: Some("personalnummer"),
+        natuerlich: &["personalnummer"],
         stilllegen: Some(("dienststatus", "ausser_dienst")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[Unterliste {
             tabelle: "personal_qualifikation",
             eltern_spalte: "personal_id",
@@ -305,8 +338,10 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
             },
         ],
         quali_soll: Some("quali_soll"),
-        natuerlich: Some("name"),
+        natuerlich: &["name"],
         stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
         unterlisten: &[
             Unterliste {
                 tabelle: "einheit_vorlage_fahrzeug",
@@ -348,6 +383,155 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
                 ],
             },
         ],
+    },
+    // ── Übrige Kataloge (LLH-1613, Change `kjezbk06-stammdaten-kataloge`, D1) ──
+    ArtBeschreibung {
+        art: SCHICHTMODELL,
+        tabelle: "schichtmodell",
+        schluessel: Schluessel::Id,
+        spalten: &[
+            "bezeichnung",
+            "typ",
+            "rhythmus_minuten",
+            "wechselzeiten",
+            "mindestdauer_minuten",
+            "vorwarnung_minuten",
+            "planungsvorlauf_minuten",
+            "ist_vorgabe",
+        ],
+        verweise: &[],
+        quali_soll: None,
+        natuerlich: &["bezeichnung"],
+        stilllegen: None,
+        bereich: None,
+        exklusiv: Some("ist_vorgabe"),
+        unterlisten: &[],
+    },
+    ArtBeschreibung {
+        art: EINSATZ_VORLAGE,
+        tabelle: "einsatz_vorlage",
+        schluessel: Schluessel::Id,
+        spalten: &["bezeichnung", "einsatzart", "sortier", "schichtmodell_id"],
+        verweise: &[Verweis {
+            spalte: "schichtmodell_id",
+            ziel: SCHICHTMODELL,
+        }],
+        quali_soll: None,
+        natuerlich: &["bezeichnung"],
+        stilllegen: None,
+        bereich: None,
+        exklusiv: None,
+        unterlisten: &[Unterliste {
+            tabelle: "einsatz_vorlage_modul_aus",
+            eltern_spalte: "vorlage_id",
+            spalten: &["modul_key"],
+            verweise: &[],
+        }],
+    },
+    ArtBeschreibung {
+        art: StammdatenArt::StichwortVorschlag,
+        tabelle: "einsatz_stichwort_vorschlag",
+        schluessel: Schluessel::Id,
+        spalten: &["text", "sortier", "vorlage_id"],
+        verweise: &[Verweis {
+            spalte: "vorlage_id",
+            ziel: EINSATZ_VORLAGE,
+        }],
+        quali_soll: None,
+        natuerlich: &["text"],
+        stilllegen: None,
+        bereich: None,
+        exklusiv: None,
+        unterlisten: &[],
+    },
+    ArtBeschreibung {
+        art: StammdatenArt::VerpflegungVorlage,
+        tabelle: "verpflegung_vorlage",
+        schluessel: Schluessel::Id,
+        spalten: &["bezeichnung", "beginn", "ende", "verpflegungsart", "aktiv"],
+        verweise: &[],
+        quali_soll: None,
+        natuerlich: &["bezeichnung"],
+        stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
+        unterlisten: &[],
+    },
+    ArtBeschreibung {
+        art: StammdatenArt::Sprechgruppe,
+        tabelle: "sprechgruppe",
+        schluessel: Schluessel::Id,
+        spalten: &[
+            "bezeichnung",
+            "betriebsart",
+            "hinweis",
+            "aktiv",
+            "sortier",
+            "netz",
+            "sicherheit",
+        ],
+        verweise: &[],
+        quali_soll: None,
+        natuerlich: &["betriebsart", "bezeichnung"],
+        stilllegen: Some(("aktiv", "0")),
+        bereich: Some("einsatz_id IS NULL"),
+        exklusiv: None,
+        unterlisten: &[],
+    },
+    ArtBeschreibung {
+        art: StammdatenArt::EtbBaustein,
+        tabelle: "etb_baustein",
+        schluessel: Schluessel::Id,
+        spalten: &[
+            "label",
+            "typ",
+            "inhalt",
+            "meldeweg",
+            "veranlassung",
+            "sortier",
+            "aktiv",
+        ],
+        verweise: &[],
+        quali_soll: None,
+        natuerlich: &["label"],
+        stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: None,
+        unterlisten: &[],
+    },
+    ArtBeschreibung {
+        art: StammdatenArt::ExterneStelle,
+        tabelle: "org_externe_stelle",
+        schluessel: Schluessel::Id,
+        spalten: &[
+            "bezeichnung",
+            "art",
+            "rufnummer",
+            "funkrufname",
+            "aktiv",
+            "zustaendig",
+        ],
+        verweise: &[],
+        quali_soll: None,
+        natuerlich: &["bezeichnung"],
+        stilllegen: Some(("aktiv", "0")),
+        bereich: None,
+        exklusiv: Some("zustaendig"),
+        unterlisten: &[],
+    },
+    // `geaendert_at` ist NOT NULL ohne Vorgabe: der Zeitpunkt des Hubs geht mit (D1).
+    ArtBeschreibung {
+        art: StammdatenArt::UnterkunftRichtwert,
+        tabelle: "org_unterkunft_richtwert",
+        schluessel: Schluessel::Spalte("schluessel"),
+        spalten: &["wert", "geaendert_at"],
+        verweise: &[],
+        quali_soll: None,
+        natuerlich: &[],
+        stilllegen: None,
+        bereich: None,
+        exklusiv: None,
+        unterlisten: &[],
     },
 ];
 
@@ -421,8 +605,11 @@ mod tests {
             if let Some(q) = b.quali_soll {
                 assert!(spalten.contains(&q), "{:?}.{q}", b.art);
             }
-            if let Some(n) = b.natuerlich {
-                assert!(spalten.contains(&n), "{:?}.{n}", b.art);
+            for n in b.natuerlich {
+                assert!(spalten.contains(n), "{:?}.{n}", b.art);
+            }
+            if let Some(x) = b.exklusiv {
+                assert!(spalten.contains(&x), "{:?}.{x}", b.art);
             }
             for u in b.unterlisten {
                 let us: HashSet<_> = u.spalten.iter().collect();

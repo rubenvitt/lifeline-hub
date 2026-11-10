@@ -341,6 +341,12 @@ Herleitung in
     Muster `migrations/0306`). Wer eine dieser Tabellen in einer Migration neu baut, legt die
     Trigger wieder an; Guard `art::tests::trigger_und_spalten_passen_zur_beschreibung`. Kein
     Schreibweg in Rust schreibt ins Änderungslog.
+  - **Teil einer Tabelle, mehrspaltiger Abgleich, einmalige Markierung** (LLH-1613, Herleitung
+    `openspec/changes/archive/2026-11-09-kjezbk06-stammdaten-kataloge/design.md` D2–D4):
+    `bereich` grenzt die Art auf einen Teil der Tabelle ein (Sprechgruppen nur
+    `einsatz_id IS NULL`) und gehört dann auch in die Log-Trigger; `natuerlich` nennt alle Spalten
+    des natürlichen Schlüssels; `exklusiv` nennt eine je Org einmalige Markierung, die die
+    gelieferte Zeile den übrigen nimmt.
   - **Übernommene Zeilen ändert nur die Übernahme** (`stammdaten::uebernehmen`, Merker
     `stammdaten_uebernahme` in ihrer Transaktion); jeder andere Weg bekommt 409 „Wird am Hub
     gepflegt.“ aus dem Trigger. An `benutzer` schützt der Trigger nur Name, Anzeigename, Rollen,

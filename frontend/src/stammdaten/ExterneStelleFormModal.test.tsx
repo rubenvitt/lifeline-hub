@@ -19,12 +19,19 @@ const ils: ExterneStelle = {
   zustaendig: true,
 };
 
-function Harness({ bestand }: { bestand?: ExterneStelle | null }) {
+function Harness({
+  bestand,
+  zustaendigVomHub,
+}: {
+  bestand?: ExterneStelle | null;
+  zustaendigVomHub?: boolean;
+}) {
   const [offen, setOffen] = useState(true);
   return (
     <ExterneStelleFormModal
       offen={offen}
       stelle={bestand ?? null}
+      zustaendigVomHub={zustaendigVomHub}
       onClose={() => setOffen(false)}
     />
   );
@@ -83,6 +90,17 @@ describe('ExterneStelleFormModal', () => {
     await waitFor(() =>
       expect(body).toEqual({ bezeichnung: 'ILS Nord', art: 'leitstelle', zustaendig: true }),
     );
+  });
+
+  it('kommt die zuständige Leitstelle vom Hub, ist die Markierung gesperrt (kjezbk06 D4)', async () => {
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness zustaendigVomHub />);
+    await nutzer.type(await screen.findByLabelText('Bezeichnung'), 'ILS ELW');
+    await artWaehlen(nutzer, 'Leitstelle');
+    expect(await screen.findByLabelText('Zuständige Leitstelle')).toBeDisabled();
+    expect(
+      screen.getByText('Die zuständige Leitstelle kommt vom Hub und wird dort gepflegt.'),
+    ).toBeInTheDocument();
   });
 
   it('Bearbeiten sendet nur Geändertes; unverändert geht keine Anfrage hinaus', async () => {

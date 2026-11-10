@@ -669,7 +669,7 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
-    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0312).
+    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0313).
     enum_wire!(lifeline_hub::instanz::fuehrung::FuehrungWechselArt {
         Angelegt => "angelegt",
         Uebergabe => "uebergabe",
@@ -680,7 +680,8 @@ fn serde_wire_gleich_as_str() {
         Widerspruch => "widerspruch",
         Verworfen => "verworfen",
     } in lifeline_hub::instanz::fuehrung::FuehrungWechselArt::ALLE);
-    // Stammdaten-Verteilung (LLH-1493): Wire = `art` in stammdaten_aenderung/-herkunft (0306).
+    // Stammdaten-Verteilung (LLH-1493, LLH-1613): Wire = `art` in stammdaten_aenderung/-herkunft
+    // (0306, 0312).
     enum_wire_as_str!(lifeline_hub::instanz::stammdaten::StammdatenArt {
         Konto,
         OrgEinstellungen,
@@ -694,6 +695,14 @@ fn serde_wire_gleich_as_str() {
         Material,
         Personal,
         EinheitVorlage,
+        Schichtmodell,
+        EinsatzVorlage,
+        StichwortVorschlag,
+        VerpflegungVorlage,
+        Sprechgruppe,
+        EtbBaustein,
+        ExterneStelle,
+        UnterkunftRichtwert,
     });
     enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzProtokoll {
         Passt,

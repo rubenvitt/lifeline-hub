@@ -166,6 +166,10 @@ export default function PunktankerMenue({
         // Eintrag (Quelle `menu`), ein zweites Schließen hier liefe doppelt.
         onClick: ({ key, domEvent }) => {
           domEvent.stopPropagation();
+          // Per Taste gewählt: das `keydown` abbrechen, dann folgt kein `keypress`. Öffnet die Wahl
+          // einen Dialog, steht der Fokus schon in seinem ersten Feld, und das `keypress` desselben
+          // Enter schickte dort das Formular ab (LLH-1600; dieselbe Falle wie LFH-1212).
+          if (domEvent.type === 'keydown') domEvent.preventDefault();
           onWaehlen(key);
         },
       }}

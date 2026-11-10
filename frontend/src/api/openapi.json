@@ -17948,7 +17948,15 @@
           "fahrzeug",
           "material",
           "personal",
-          "einheit_vorlage"
+          "einheit_vorlage",
+          "schichtmodell",
+          "einsatz_vorlage",
+          "stichwort_vorschlag",
+          "verpflegung_vorlage",
+          "sprechgruppe",
+          "etb_baustein",
+          "externe_stelle",
+          "unterkunft_richtwert"
         ]
       },
       "StammdatenHerkunftAnzeige": {
