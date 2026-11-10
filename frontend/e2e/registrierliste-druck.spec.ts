@@ -130,11 +130,16 @@ test('Registrierliste: Einstieg im Paneel, Gesundheitsangaben nur nach Wahl, Hau
   const seiten = await pdfAuszug(await page.pdf({ format: 'A4', preferCSSPageSize: true }));
   test.info().annotations.push({ type: 'messwert', description: `${seiten.length} Seiten` });
   expect(seiten.length, 'die Liste läuft über mehr als eine Seite').toBeGreaterThanOrEqual(2);
-  const seiteVon = (text: string) => seiten.findIndex((s) => s.text.includes(text));
+  // Ohne Leerraum verglichen: `pdfAuszug` fügt die Textstücke ohne Trenner zusammen, und wie der
+  // Druck sie schneidet, hängt von Schrift und Umgebung ab (in der CI fand „H-1 ·“ nichts, lokal
+  // schon). Deshalb weder Leerraum noch der Trennpunkt: der Kopf eines Haushalts ist das erste
+  // Vorkommen seiner Bezugsperson „HausN, P1“.
+  const ohneLeerraum = seiten.map((s) => s.text.replace(/\s/g, ''));
+  const seiteVon = (text: string) => ohneLeerraum.findIndex((t) => t.includes(text));
   for (let h = 1; h <= HAUSHALTE; h++) {
-    const kopf = seiteVon(`H-${h} ·`);
+    const kopf = seiteVon(`Haus${h},P1`);
     expect(kopf, `Kopf von H-${h} im PDF`).toBeGreaterThanOrEqual(0);
-    expect(seiteVon(`Haus${h}, P${JE_HAUSHALT}`), `H-${h} ganz auf einer Seite`).toBe(kopf);
+    expect(seiteVon(`Haus${h},P${JE_HAUSHALT}`), `H-${h} ganz auf einer Seite`).toBe(kopf);
   }
   await page.emulateMedia({ media: null });
 });
