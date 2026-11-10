@@ -699,8 +699,8 @@ describe('FahrzeugeBesatzung · Kontextmenü (LLH-1599)', () => {
 
   it('Rechtsklick auf den Namens-Link lässt das Browsermenü', () => {
     zeige();
-    const link = within(personZeile('Dora Ohne')).queryByRole('link');
-    if (link) erwarteBrowsermenue(link);
+    const link = within(personZeile('Dora Ohne')).getByRole('link', { name: 'Dora Ohne' });
+    erwarteBrowsermenue(link);
   });
 
   it('ohne Schreibrecht hat die Person keine Aktion, das Browsermenü bleibt', () => {

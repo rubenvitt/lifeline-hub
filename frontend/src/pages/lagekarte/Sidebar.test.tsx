@@ -1,8 +1,13 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  oeffneKontextmenue,
+  offenesKontextmenue,
+} from '../../test/kontextmenue';
 import Sidebar, {
   bedienzielStil,
   ebenenZeileStil,
@@ -1761,6 +1766,19 @@ describe('Sidebar · Bild-Hintergründe · Kontextmenü (LLH-1599, D6)', () => {
     ]);
     fireEvent.click(within(menue).getByRole('menuitem', { name: /Auf Bild zentrieren/ }));
     expect(onBildZentrieren).toHaveBeenCalledWith(1);
+  });
+
+  it('Umschalt+F10 auf dem ⋮ öffnet das Kontextmenü des Bildes', async () => {
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben bilder={[bildLageplan]} />);
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu Lageplan' });
+    knopf.focus();
+    fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true });
+    const menue = await waitFor(() => {
+      const m = offenesKontextmenue();
+      if (!m) throw new Error('kein Kontextmenü');
+      return m;
+    });
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Lageplan');
   });
 
   it('Schalter und Deckkraft-Regler öffnen kein Kontextmenü', () => {
