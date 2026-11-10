@@ -1965,7 +1965,7 @@ mod tests {
             etb_ids.push(etb);
         }
         // Ein Download hinterlässt seine Protokollzeile (die Route schreibt sie, hier direkt).
-        crate::person::audit_repo::anlegen(&pool, einsatz.id, Some(person), leit, "anhang")
+        crate::person::audit_repo::create(&pool, einsatz.id, Some(person), leit, "anhang")
             .await
             .unwrap();
         etb_ids.push(

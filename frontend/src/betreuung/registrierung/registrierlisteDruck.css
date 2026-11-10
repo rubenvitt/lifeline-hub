@@ -1,0 +1,9 @@
+/* Eigenheit der Registrierliste (LLH-1616, `RegistrierlisteBlatt.tsx`); die Mechanik steht in
+   `druck/druck.css`. Ein Haushalt bricht nicht über eine Seite: Kopfzeile und Personen bleiben
+   für Übergabe und Essensausgabe beisammen. Ein Haushalt hat höchstens 30 Personen
+   (`REGISTRIERUNG_PERSONEN_MAX`), passt also auf ein Blatt. */
+@media print {
+  [data-lfh='druckwurzel'] [data-lfh='registrierliste-haushalt'] {
+    break-inside: avoid;
+  }
+}

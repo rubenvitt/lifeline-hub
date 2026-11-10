@@ -8823,11 +8823,11 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,
-         *     zuvor 0132 und 0021).
+         *     `art IN ('detail','export','druck','anhang','registrierliste')`
+         *     (migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).
          * @enum {string}
          */
-        ZugriffArt: "detail" | "export" | "druck" | "anhang";
+        ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste";
         /**
          * @description Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.
          * @enum {string}
