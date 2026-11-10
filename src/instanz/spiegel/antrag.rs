@@ -62,6 +62,35 @@ pub struct Beantragbar {
     pub ergebnis_feld: &'static str,
 }
 
+/// Das Feld, in dem die Route einer beantragbaren Erfassung ihre Erfassungszeit annimmt;
+/// `None`, wo sie keine kennt oder der Client sie immer mitschickt (Meldung: Ereigniszeit ist
+/// Pflicht). Der Wächter `jede_beantragbare_art_nennt_ihre_erfassungszeit` hält die Liste vollständig.
+pub const ERFASSUNGSZEIT: &[(&str, Option<&str>)] = &[
+    ("etb", Some("ereigniszeit")),
+    ("meldung", None),
+    ("person", Some("zeitpunkt_at")),
+    ("sichtung", Some("zeitpunkt_at")),
+    ("verbleib", Some("zeitpunkt_at")),
+    ("notiz", Some("zeitpunkt_at")),
+    ("transport", Some("zeitpunkt_at")),
+    ("anlass", Some("zeitpunkt_at")),
+    ("massnahme", Some("zeitpunkt_at")),
+    ("verletzung", Some("zeitpunkt_at")),
+    ("stand", Some("zeitpunkt_at")),
+    ("belegung", Some("zeitpunkt_at")),
+    ("registrierung", Some("zeitpunkt_at")),
+    ("abmeldung", Some("zeitpunkt_at")),
+    ("eintreffen", Some("zeitpunkt_at")),
+    ("ausgabe", Some("zeitpunkt_at")),
+];
+
+fn erfassungszeit_feld(art: &str) -> Option<&'static str> {
+    ERFASSUNGSZEIT
+        .iter()
+        .find(|(a, _)| *a == art)
+        .and_then(|(_, f)| *f)
+}
+
 /// Die beantragbaren Erfassungen. Ergänzt aus der Aufnahme der Routen; der Wächter
 /// `jede_vormerkbare_art_ist_eingeordnet` hält sie mit der Offline-Warteschlange gleich.
 pub const BEANTRAGBAR: &[Beantragbar] = &[
@@ -544,6 +573,13 @@ async fn beantragen(
         }
     }
     let jetzt = crate::zeit::jetzt();
+    // Die Erfassungszeit des Antrags gilt beim Führer (Spec `spiegel-antraege`, „Der Führer
+    // übernimmt im Namen des Kontos“): ohne eigene Angabe setzte er sonst die Zeit der Ausführung.
+    if let (Some(feld), Some(o)) = (erfassungszeit_feld(b.art), daten.as_object_mut()) {
+        if o.get(feld).is_none_or(Value::is_null) {
+            o.insert(feld.to_string(), Value::from(jetzt.clone()));
+        }
+    }
     if let Some(c) = &client_id {
         let vorhanden: Option<(i64, String)> = sqlx::query_as(
             "SELECT id, zustand FROM spiegel_antrag WHERE einsatz_id = ? AND art = ? AND client_id = ?",
@@ -1055,6 +1091,15 @@ pub async fn aufraeumen(pool: &SqlitePool) -> Result<u64, AppError> {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    /// Jede beantragbare Art sagt, wo ihre Route die Erfassungszeit annimmt (oder dass sie keine
+    /// braucht); eine neue Art ohne Eintrag landete beim Führer mit der Zeit der Ausführung.
+    #[test]
+    fn jede_beantragbare_art_nennt_ihre_erfassungszeit() {
+        let arten: BTreeSet<&str> = BEANTRAGBAR.iter().map(|b| b.art).collect();
+        let genannt: BTreeSet<&str> = ERFASSUNGSZEIT.iter().map(|(a, _)| *a).collect();
+        assert_eq!(arten, genannt);
+    }
 
     /// Jede Art der Offline-Warteschlange ist beantragbar oder mit Grund ausgenommen (Spec
     /// `spiegel-antraege`, „Neue vormerkbare Erfassungen werden eingeordnet“). Die ETB-Erfassung

@@ -672,6 +672,13 @@ async fn ein_etb_eintrag_am_hub_wird_antrag_und_beim_elw_uebernommen() {
     let offen = antraege(&hub, s, &erika).await;
     assert_eq!(offen.len(), 1);
     assert_eq!(offen[0]["daten"]["inhalt"], "Vom Stab");
+    // Die Erfassungszeit des Antrags gilt beim Führer, nicht die Zeit der Ausführung.
+    assert_eq!(offen[0]["daten"]["ereigniszeit"], offen[0]["erfasst_at"]);
+    exec(
+        &hub.pool,
+        "UPDATE spiegel_antrag SET daten = json_set(daten, '$.ereigniszeit', '2026-11-10 08:00:00')",
+    )
+    .await;
 
     for _ in 0..3 {
         abgleichen(&elw).await;
@@ -685,6 +692,14 @@ async fn ein_etb_eintrag_am_hub_wird_antrag_und_beim_elw_uebernommen() {
     )
     .await;
     assert_eq!(verfasser, "erika", "im Namen des Kontos");
+    let zeit: String = eine(
+        &elw.pool,
+        &format!(
+            "SELECT ereigniszeit FROM etb_eintrag WHERE einsatz_id = {e} AND inhalt = 'Vom Stab'"
+        ),
+    )
+    .await;
+    assert_eq!(zeit, "2026-11-10 08:00:00");
     let anzahl: i64 = eine(
         &elw.pool,
         &format!("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = {e} AND inhalt = 'Vom Stab'"),
