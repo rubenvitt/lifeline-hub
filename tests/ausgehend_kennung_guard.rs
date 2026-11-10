@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 /// Die eine Stelle, an der ein Client gebaut und die Kennung gesetzt wird.
 const ZENTRALE: &str = "src/ausgehend.rs";
 
+/// Sammelt rekursiv alle `.rs`-Dateien unter `dir`.
 fn rust_dateien(dir: &Path, aus: &mut Vec<PathBuf>) {
     for eintrag in fs::read_dir(dir).expect("Verzeichnis lesbar") {
         let pfad = eintrag.expect("Eintrag lesbar").path();
@@ -74,7 +75,7 @@ fn rumpf_ende(quelle: &str, auf: usize) -> usize {
                     i += 1;
                 }
             }
-            b'\'' if i + 2 < b.len() && b[i + 2] == b'\'' => i += 2,
+            b'\'' => i = zeichenliteral_ende(quelle, i),
             b'/' if b.get(i + 1) == Some(&b'/') => {
                 while i < b.len() && b[i] != b'\n' {
                     i += 1;
@@ -94,6 +95,24 @@ fn rumpf_ende(quelle: &str, auf: usize) -> usize {
     b.len()
 }
 
+/// Bei einem `'` an `pos`: Index des schließenden `'` eines Zeichenliterals (`'x'`, `'ä'`,
+/// `'\\''`, `'\\\\'`, `'\\u{7b}'`), sonst `pos` selbst (Lifetime wie `'a`).
+fn zeichenliteral_ende(quelle: &str, pos: usize) -> usize {
+    let rest = &quelle[pos + 1..];
+    if let Some(escape) = rest.strip_prefix('\\') {
+        // Das Zeichen nach dem Backslash gehört zum Literal, auch ein `'`.
+        let nach = escape.chars().next().map_or(0, char::len_utf8);
+        return escape[nach..]
+            .find('\'')
+            .map_or(pos, |i| pos + 2 + nach + i);
+    }
+    match rest.chars().next() {
+        Some(c) if rest[c.len_utf8()..].starts_with('\'') => pos + 1 + c.len_utf8(),
+        _ => pos,
+    }
+}
+
+/// Alle Rust-Dateien unter `src/` als (Pfad relativ zur Wurzel, Inhalt).
 fn src_dateien() -> Vec<(String, String)> {
     let wurzel = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut dateien = Vec::new();
@@ -113,6 +132,7 @@ fn src_dateien() -> Vec<(String, String)> {
         .collect()
 }
 
+/// Der Platzhalter aus R14 kehrt nicht zurück.
 #[test]
 fn kein_platzhalter_im_user_agent() {
     // Zusammengesetzt, sonst fände der Wächter sein eigenes Literal (liegt aber unter tests/).
@@ -129,6 +149,7 @@ fn kein_platzhalter_im_user_agent() {
     );
 }
 
+/// Produktiver Code baut keinen HTTP-Client und setzt keinen User-Agent an der Zentrale vorbei.
 #[test]
 fn http_clients_nur_ueber_die_zentrale_kennung() {
     let verboten = [
@@ -161,6 +182,7 @@ fn http_clients_nur_ueber_die_zentrale_kennung() {
     );
 }
 
+/// Die Zentrale setzt die Kennung samt Version wirklich.
 #[test]
 fn zentrale_setzt_die_kennung() {
     let quelle = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(ZENTRALE))
@@ -173,6 +195,7 @@ fn zentrale_setzt_die_kennung() {
     assert!(produktiv.contains("env!(\"CARGO_PKG_VERSION\")"));
 }
 
+/// Testmodule fallen auch mitten in der Datei heraus, `mod x;` bleibt stehen.
 #[test]
 fn testmodule_mitten_in_der_datei_fallen_heraus() {
     let quelle = "fn a() {}\n#[cfg(test)]\nmod extern_;\n#[cfg(test)]\nmod t {\n    \
@@ -183,4 +206,14 @@ fn testmodule_mitten_in_der_datei_fallen_heraus() {
         "fn a() {}\n#[cfg(test)]\nmod extern_;\n\nfn b() {}\n\n"
     );
     assert_eq!(ohne_testmodule("fn a() {}"), "fn a() {}");
+}
+
+/// Escapes in Zeichenliteralen verschieben die Klammertiefe nicht, Lifetimes sind keine
+/// Zeichenliterale (Review #1265).
+#[test]
+fn zeichenliterale_mit_escapes_und_lifetimes() {
+    let quelle =
+        "#[cfg(test)]\nmod t {\n    const Z: [char; 4] = ['\\\\','{','\\'','\\u{7b}'];\n    \
+                  fn f<'a>(x: &'a str) -> &'a str { x }\n    const U: char = 'ä';\n}\nfn b() {}\n";
+    assert_eq!(ohne_testmodule(quelle), "\nfn b() {}\n");
 }

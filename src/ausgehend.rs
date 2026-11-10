@@ -45,6 +45,7 @@ pub enum Zweck {
 }
 
 impl Zweck {
+    /// Der Name vor dem Schrägstrich der Kennung.
     fn name(self) -> &'static str {
         match self {
             Zweck::Geocoder => "Geocoder",
@@ -101,6 +102,7 @@ pub fn user_agent(zweck: Zweck) -> String {
     kennung(zweck, betreiber_kontakt())
 }
 
+/// Baut die Kennung aus Zweck, Softwarestand, Projektadresse und optionalem Kontakt.
 fn kennung(zweck: Zweck, kontakt: Option<&str>) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let name = zweck.name();
