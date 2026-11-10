@@ -445,6 +445,11 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   wieder (`AUTOINCREMENT`): Der Führer erkennt eine zweite Zustellung an ihr, und ein
   aufgeräumter Antrag darf keinen neuen verdecken (gefunden im Integrationstest).
 
+- **10.11.2026, Widerruf (D14):** Das Beenden läuft in `repo::org_widerrufen`, also in derselben
+  Transaktion wie jeder Widerruf an beiden Seiten. Eine eigene Aktion `instanz_spiegel_beendet` in
+  der Admin-Spur gibt es nicht: Der Widerruf selbst steht dort schon (`InstanzKopplungWiderrufen`
+  bzw. `…VomGegenueberWiderrufen`), ein zweiter Eintrag sagte nichts Neues.
+
 ## Risks / Trade-offs
 
 - **[Rund 700 Trigger, Schreiblast]** Jede Schreibanfrage schreibt eine Logzeile mehr.

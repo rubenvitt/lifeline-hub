@@ -418,6 +418,8 @@ pub async fn org_widerrufen(
             .await?;
         // Übernommene Stammdaten gehören danach der Instanz (LLH-1493, design.md D3).
         crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
+        // Der Abgleich ihrer Einsätze endet; Spiegel bleiben lesbar (LLH-1492, D14).
+        crate::instanz::spiegel::beende_fuer_zuordnung(conn, org_zeile_id, jetzt).await?;
     }
     Ok(n == 1)
 }

@@ -28,6 +28,37 @@ use utoipa::ToSchema;
 pub const OHNE_STELLVERTRETER: &str =
     "NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)";
 
+/// Beendet den Abgleich der Einsätze einer widerrufenen Org-Zuordnung (D14): Spiegel bleiben
+/// lesbar und geschützt, offene Anträge an sie sind abgelehnt, gemerkte Stände des Gegenübers
+/// fallen weg. Läuft in der Transaktion des Widerrufs, an beiden Seiten.
+pub async fn beende_fuer_zuordnung(
+    conn: &mut sqlx::SqliteConnection,
+    kopplung_org_id: i64,
+    jetzt: &str,
+) -> Result<(), crate::error::AppError> {
+    sqlx::query(
+        "UPDATE spiegel_antrag SET zustand = 'abgelehnt', grund = 'Kopplung widerrufen.', \
+         geaendert_at = ? WHERE zustand IN ('ausstehend', 'zugestellt') AND einsatz_id IN \
+         (SELECT einsatz_id FROM einsatz_spiegel WHERE kopplung_org_id = ?)",
+    )
+    .bind(jetzt)
+    .bind(kopplung_org_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_spiegel SET beendet_at = ? WHERE kopplung_org_id = ? AND beendet_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(kopplung_org_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query("DELETE FROM spiegel_ziel WHERE kopplung_org_id = ?")
+        .bind(kopplung_org_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 /// Nachricht, mit der die Schutz-Trigger abbrechen; `AppError` macht daraus 409 (D10).
 pub const SCHUTZ_NACHRICHT: &str = "einsatz_ist_spiegel";
 

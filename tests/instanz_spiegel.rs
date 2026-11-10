@@ -888,3 +888,65 @@ async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_
     .await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
+
+// ── Widerruf (D14) ───────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn widerruf_beendet_den_abgleich_der_spiegel_bleibt_lesbar() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    etb_eintrag(&elw, e, "Vor dem Widerruf").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let (st, _) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(&json!({ "typ": "meldung", "inhalt": "Offen", "von": "A", "an": "B", "client_id": "w-1" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED);
+    // Der Admin am Hub widerruft die Zuordnung seiner Org.
+    let kopplung: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung").await;
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{kopplung}/widerrufen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    let beendet: Option<String> = eine(
+        &hub.pool,
+        &format!("SELECT beendet_at FROM einsatz_spiegel WHERE einsatz_id = {s}"),
+    )
+    .await;
+    assert!(beendet.is_some());
+    let a = antraege(&hub, s, &erika).await;
+    assert_eq!(a[0]["zustand"], "abgelehnt");
+    assert_eq!(a[0]["grund"], "Kopplung widerrufen.");
+    // Lesbar, weiter geschützt.
+    assert!(etb_inhalte(&hub, s)
+        .await
+        .contains(&"Vor dem Widerruf".to_string()));
+    let (st, _) = common::anfrage_json(
+        &hub.app,
+        "PATCH",
+        &format!("/api/einsaetze/{s}"),
+        &hub.admin,
+        Some(&json!({ "bezeichnung": "X" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT);
+    // Der ELW erfährt den Widerruf und liefert nichts mehr.
+    melden(&elw).await;
+    etb_eintrag(&elw, e, "Nach dem Widerruf").await;
+    abgleichen(&elw).await;
+    assert!(!etb_inhalte(&hub, s)
+        .await
+        .contains(&"Nach dem Widerruf".to_string()));
+}

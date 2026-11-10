@@ -62,7 +62,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 ## 8. Widerruf (D14)
 
-- [ ] 8.1 Widerruf einer Org-Zuordnung (eigene Seite und Mitteilung des Gegenübers): `beendet_at`, Anträge `abgelehnt: Kopplung widerrufen`, `spiegel_ziel` gelöscht, `admin_audit`-Aktion `instanz_spiegel_beendet` (Migration für den CHECK, Fall in `tests/admin_audit.rs`). Integrationstest: Widerruf am Hub, Spiegel bleibt lesbar und gesperrt, ELW liefert nichts mehr
+- [x] 8.1 Widerruf einer Org-Zuordnung (eigene Seite und Mitteilung des Gegenübers): `beendet_at`, Anträge `abgelehnt: Kopplung widerrufen`, `spiegel_ziel` gelöscht, in der Transaktion des Widerrufs (`repo::org_widerrufen`); keine eigene `admin_audit`-Aktion, der Widerruf steht schon in der Admin-Spur (Nachtrag D14). Integrationstest: Widerruf am Hub, Spiegel bleibt lesbar und gesperrt, ELW liefert nichts mehr
 
 ## 9. Doku
 
