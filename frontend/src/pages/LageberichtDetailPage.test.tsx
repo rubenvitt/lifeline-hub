@@ -1000,4 +1000,29 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
       expect.arrayContaining([{ schluessel: 'eigene_lage', text: '' }]),
     );
   });
+
+  it('„Abschnitt leeren“ aus dem ⋮ verwirft den Stand wie Löschen von Hand (LLH-1601)', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await waitFor(() => expect(marke('Eigene Lage')).not.toBeNull());
+    await userEvent.click(
+      within(abschnitt('Eigene Lage')).getByRole('button', {
+        name: 'Aktionen zu Abschnitt Eigene Lage',
+      }),
+    );
+    const menue = await waitFor(() =>
+      document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!,
+    );
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abschnitt leeren' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abschnitt „Eigene Lage“ leeren?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschnitt leeren' }));
+    expect(screen.getByRole('textbox', { name: 'Eigene Lage' })).toHaveValue('');
+    expect(marke('Eigene Lage')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalled());
+    const aufrufe = vi.mocked(lageberichteApi.aktualisiereLagebericht).mock.calls;
+    const body = aufrufe[aufrufe.length - 1][2];
+    expect(body.abschnitte).toEqual(
+      expect.arrayContaining([{ schluessel: 'eigene_lage', text: '' }]),
+    );
+  });
 });

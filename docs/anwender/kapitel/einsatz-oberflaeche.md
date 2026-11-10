@@ -295,10 +295,11 @@ der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers 
 öffnen“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer Zeile mit Kontextmenü nicht
 durch langes Drücken markieren, außer im Einsatztagebuch (siehe unten).
 
-Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, dazu im
-Einsatztagebuch an den Einträgen und an den Chips der Erfassung. Im Einsatztagebuch öffnen es nur
-Rechtsklick und Tasten; ein langer Druck am Tablet markiert dort weiter Text. Lagekarte und
-Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
+Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, an den
+Blöcken im Raster des Schichtplans (Kapitel [Ablösung](abloesung.md)) und im Einsatztagebuch an den
+Einträgen und an den Chips der Erfassung. Im Einsatztagebuch öffnen es nur Rechtsklick und Tasten;
+ein langer Druck am Tablet markiert dort weiter Text. Lagekarte und Fernmeldeskizze haben ein
+eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 
 ### Was die Sprungpalette kennt
 

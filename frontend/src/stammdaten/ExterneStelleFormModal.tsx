@@ -59,10 +59,16 @@ function geaenderteFelder(bisher: ExterneStelle, neu: NeueExterneStelle): Extern
 export default function ExterneStelleFormModal({
   offen,
   stelle,
+  zustaendigVomHub = false,
   onClose,
 }: {
   offen: boolean;
   stelle: ExterneStelle | null; // null = neu
+  /**
+   * Die zuständige Leitstelle kommt vom Hub (kjezbk06, design.md D4): eine eigene Markierung höbe
+   * ihre auf, und das lehnt der Server ab (409). Die Markierung folgt dem Hub.
+   */
+  zustaendigVomHub?: boolean;
   onClose: () => void;
 }) {
   const [form] = Form.useForm<FormWerte>();
@@ -134,9 +140,13 @@ export default function ExterneStelleFormModal({
         <Form.Item
           name="zustaendig"
           valuePropName="checked"
-          extra="Vorgabe für den Adressaten einer Nachforderung. Ist schon eine andere Leitstelle zuständig, verliert sie die Markierung."
+          extra={
+            zustaendigVomHub
+              ? 'Die zuständige Leitstelle kommt vom Hub und wird dort gepflegt.'
+              : 'Vorgabe für den Adressaten einer Nachforderung. Ist schon eine andere Leitstelle zuständig, verliert sie die Markierung.'
+          }
         >
-          <Checkbox>Zuständige Leitstelle</Checkbox>
+          <Checkbox disabled={zustaendigVomHub}>Zuständige Leitstelle</Checkbox>
         </Form.Item>
       )}
       {/* Feldbudget (LFH-19): Bezeichnung und Art offen (bei Leitstelle dazu die Markierung),

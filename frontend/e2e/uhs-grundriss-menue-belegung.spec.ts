@@ -122,18 +122,49 @@ test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung'
   expect(tief).toBe(2);
 });
 
+/** Drop-Target zu einem Spalten-Titel: der Paneel-Körper (zweites Kind), nicht der Kopf —
+ *  dort sitzt das Droppable. */
+function dropZone(page: Page, titel: string): Locator {
+  return page.locator('[data-lfh="paneel"]', { hasText: titel }).locator(':scope > div').nth(1);
+}
+
 // Der erste Klick nach einem Drag öffnet das Platzmenü, und die Wahl wirkt (LFH-519). dnd-kit schluckte bis zu
 // seinem 50-ms-Timer JEDEN Klick; unter Last verhungert der Timer, und der nächste echte Klick
 // ging verloren. Hier fällt der Klick ohne Aktionsprüfung sofort nach dem Loslassen — in genau
 // dieses Fenster (mit dem nackten `PointerSensor` gemessen rot, 3 von 3). Die Koordinaten stehen
 // vor dem Zug fest, damit zwischen Loslassen und Klick kein Rundlauf liegt.
+//
+// Vorab gemessene Koordinaten verlangen, dass der Zug nichts über dem Grundriss verschiebt
+// (LLH-1624). Kam die Person aus „Noch nicht aufgenommen", wurde aus „Auflösen" im Seitenkopf
+// „Auflösen (noch 1 Person)"; war der Kopf knapp, brach er um, der Grundriss rutschte ~35 px, und
+// der Klick traf das „frei"-Tag statt „…". Darum steht die Person vor dem Messen schon im
+// Wartebereich derselben UHS: der Zug von dort auf den Platz lässt den Kopf, wie er ist.
 test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', async ({ page }) => {
   const personName = await grundrissMitZweiPlaetzen(page);
-  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
-  const k = (await karte.locator('button[aria-label^="Platzaktionen"]').boundingBox())!;
+  const wartebereich = dropZone(page, 'Wartebereich (Eingang)');
+  await ziehe(page, page.getByText(personName).first(), wartebereich);
+  await expect(wartebereich.getByText(personName)).toBeVisible();
+  // Serverstand, nicht der optimistische: erst mit der Personenliste steht der Kopf endgültig.
+  await expect(page.getByRole('button', { name: 'Auflösen (noch 1 Person)' })).toBeVisible();
+  const marke = page
+    .locator('[aria-roledescription="draggable"]')
+    .filter({ has: page.locator('[data-lfh="personenkarte"]', { hasText: personName }) });
+  await expect(marke).toHaveAttribute('aria-disabled', 'false');
 
-  await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
+  const ausloeser = karte.locator('button[aria-label^="Platzaktionen"]');
+  const k = (await ausloeser.boundingBox())!;
+
+  await ziehe(page, wartebereich.getByText(personName), page.getByText('Behandlungsplatz 1'));
   await page.mouse.click(k.x + k.width / 2, k.y + k.height / 2);
+
+  // Erst nach dem Klick, also ohne Rundlauf davor: Stand der Auslöser noch dort, wo geklickt
+  // wurde? Sonst nennt der Fehler den Versatz statt eines fehlenden Menüs.
+  const nachher = (await ausloeser.boundingBox())!;
+  expect(
+    { x: Math.round(nachher.x), y: Math.round(nachher.y) },
+    'Auslöser hat sich durch den Zug verschoben — der Klick ging daneben',
+  ).toEqual({ x: Math.round(k.x), y: Math.round(k.y) });
 
   await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
   await expect(karte.getByText('aufbereitung')).toBeVisible();

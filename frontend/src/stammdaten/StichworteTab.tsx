@@ -1,10 +1,11 @@
-import { Button, Popconfirm } from 'antd';
+import { Button, Popconfirm, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachText } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { HerkunftAbzeichen, VomHubGesperrt, useStammdatenHerkunft } from '../instanz/herkunft';
 import { Select } from '../components/Select';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -29,6 +30,9 @@ export default function StichworteTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
+  // Ein Stichwort vom Hub ist nur lesbar, auch seine Vorlage (kjezbk06, design.md D6).
+  const herkunft = useStammdatenHerkunft();
+  const istVomHub = (v: StichwortVorschlag) => herkunft.istVomHub('stichwort_vorschlag', v.id);
 
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
@@ -134,6 +138,15 @@ export default function StichworteTab() {
        * das Frontend sie nicht wiederherstellen; nur der dritte Kopfklick holt sie zurück.
        */
       sorter: (a, b) => a.text.localeCompare(b.text, 'de', { numeric: true }),
+      render: (text: string, v) => (
+        <Space size={[8, 4]} wrap>
+          <span>{text}</span>
+          <HerkunftAbzeichen
+            herkunft={herkunft.herkunft('stichwort_vorschlag', v.id)}
+            quelle={herkunft.quelle}
+          />
+        </Space>
+      ),
     },
     {
       title: 'Vorlage',
@@ -163,6 +176,7 @@ export default function StichworteTab() {
               value={auswahlWert(v.vorlage_id)}
               options={vorlagenAuswahl}
               loading={vorlagenQuery.isLoading}
+              disabled={istVomHub(v)}
               style={{ width: '100%', minWidth: 180 }}
               onChange={(wert) =>
                 vorlageMutation.mutate({ id: v.id, vorlageId: vorlageAusWert(wert) })
@@ -184,27 +198,30 @@ export default function StichworteTab() {
              * heißt „Außer Dienst"/„Deaktivieren" und trägt ihre Umkehrung daneben. Deshalb steht nur
              * hier eine Rückfrage. Einen Abstand braucht es nicht: die Zelle trägt nur diese eine Aktion.
              */
-            render: (_, v: StichwortVorschlag) => (
-              <Popconfirm
-                title="Stichwort löschen?"
-                okText="Stichwort löschen"
-                cancelText="Abbrechen"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => {
-                  anlegenMutation.reset();
-                  loeschenMutation.mutate(v.id);
-                }}
-              >
-                {/* Der Lauf gehört GENAU der gelöschten Zeile (LFH-346): an `isPending` drehte der Spinner in
-                   JEDER Zeile. `variables` ist hier die nackte id. */}
-                <Button
-                  danger
-                  loading={loeschenMutation.isPending && loeschenMutation.variables === v.id}
+            render: (_, v: StichwortVorschlag) =>
+              istVomHub(v) ? (
+                <VomHubGesperrt />
+              ) : (
+                <Popconfirm
+                  title="Stichwort löschen?"
+                  okText="Stichwort löschen"
+                  cancelText="Abbrechen"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => {
+                    anlegenMutation.reset();
+                    loeschenMutation.mutate(v.id);
+                  }}
                 >
-                  Löschen
-                </Button>
-              </Popconfirm>
-            ),
+                  {/* Der Lauf gehört GENAU der gelöschten Zeile (LFH-346): an `isPending` drehte der Spinner in
+                   JEDER Zeile. `variables` ist hier die nackte id. */}
+                  <Button
+                    danger
+                    loading={loeschenMutation.isPending && loeschenMutation.variables === v.id}
+                  >
+                    Löschen
+                  </Button>
+                </Popconfirm>
+              ),
           },
         ] as KatalogSpalte<StichwortVorschlag>[])
       : []),

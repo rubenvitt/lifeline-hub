@@ -171,13 +171,39 @@ describe('Registrieren gesperrt', () => {
   });
 });
 
+describe('Registrierliste drucken (LLH-1616)', () => {
+  it('führt auf die Druckansicht der Stelle, auch ohne Schreibrecht', async () => {
+    rendere({ darfSchreiben: false });
+    const link = await screen.findByRole('link', { name: 'Registrierliste drucken' });
+    expect(link).toHaveAttribute('href', '/einsaetze/7/betreuung/8/registrierliste/druck');
+  });
+
+  it('fehlt ohne Personenrecht', async () => {
+    server.use(meHandler(benutzerFixture({ id: 11 })));
+    renderMitProviders(
+      <RegistrierungPaneel einsatzId={7} stelle={TURNHALLE} personenFrei={false} darfSchreiben />,
+    );
+    await screen.findByText(/Registrierung ·/);
+    expect(screen.queryByRole('link', { name: 'Registrierliste drucken' })).toBeNull();
+  });
+});
+
+// Nicht über den Namen des Dialogs suchen: unter Test vergibt `@rc-component/util` jedem `useId`
+// dieselbe Kennung (`test-id`), seit antd 6.7 auch dem Collapse-Inhalt, auf den dann das
+// `aria-labelledby` des Dialogs zeigt.
+async function abmeldeDialog(titel: string): Promise<HTMLElement> {
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText(titel)).toBeInTheDocument();
+  return dialog;
+}
+
 describe('Abmelden', () => {
   it('Haushalt: Rückfrage nennt Haushalt und Zahl, Ziel optional, ein Request mit haushalt_id', async () => {
     const user = userEvent.setup();
     const draht = rendere();
     await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
     await user.click(await screen.findByRole('button', { name: 'H-1 abmelden' }));
-    const dialog = await screen.findByRole('dialog', { name: /H-1 abmelden/ });
+    const dialog = await abmeldeDialog('H-1 abmelden?');
     expect(dialog).toHaveTextContent('3 Personen');
     await user.type(within(dialog).getByRole('textbox', { name: 'Ziel' }), 'zu Verwandten');
     await user.click(within(dialog).getByRole('button', { name: 'Haushalt abmelden' }));
@@ -195,7 +221,7 @@ describe('Abmelden', () => {
     const draht = rendere();
     await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
     await user.click(await screen.findByRole('button', { name: 'R-013 Weber, Tom abmelden' }));
-    const dialog = await screen.findByRole('dialog', { name: /R-013 Weber, Tom abmelden/ });
+    const dialog = await abmeldeDialog('R-013 Weber, Tom abmelden?');
     await user.click(within(dialog).getByRole('button', { name: 'Person abmelden' }));
 
     await waitFor(() => expect(draht.abmeldungen).toHaveLength(1));
