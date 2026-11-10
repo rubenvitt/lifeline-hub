@@ -491,6 +491,38 @@ describe('useEntwurfVerlustschutz', () => {
     expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument();
   });
 
+  it('nimmt als überholten Serverstand den beim START des wartenden PATCH, nicht beim Einreihen', async () => {
+    // S2 wartet hinter S1; derweil kommt ein Serverstand herein, den S2 überschreibt. Gälte der
+    // Stand beim Einreihen als überholt, schriebe die Quittung von S2 diesen Stand ins Formular
+    // und nähme die eben gesicherte Fassung zurück (LLH-1607 × LLH-1619).
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b');
+    await userEvent.tab(); // S2 reiht sich ein
+    await userEvent.click(screen.getByRole('button', { name: 'fremd' })); // Riegel hält
+    expect(feld).toHaveValue('Server 1ab');
+
+    await act(async () => {
+      aufloeser[0]();
+    });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      aufloeser[1]();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(feld).toHaveValue('Server 1ab');
+  });
+
   it('startet nach dem Verlassen keinen vorgemerkten PATCH mehr (Speicherfolge)', async () => {
     // „Verwerfen“ hängt den Editor aus: S2 war nur vorgemerkt und darf nicht mehr hinaus. Der
     // laufende S1 läuft zu Ende, er ist schon beim Server.

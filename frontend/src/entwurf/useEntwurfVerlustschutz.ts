@@ -176,10 +176,14 @@ export function useEntwurfVerlustschutz<D, W extends object>({
    * persistierten Stand.
    */
   const gesichertRef = useRef(-1);
+  /**
+   * Der Änderungsstand gilt beim EINREIHEN (dann werden die Werte gelesen), der überholte
+   * Serverstand beim echten START des PATCH: ein Auftrag kann in DER SPEICHERFOLGE warten, und
+   * was beim Einreihen galt, wäre dann zu alt (LLH-1619).
+   */
   const quittungVorbereiten = useCallback(() => {
     const stand = aenderungRef.current;
-    const basis = datenRef.current;
-    return () => {
+    return (basis: D | undefined) => {
       // Der Serverstand beim Start ist mit diesem PATCH überholt (LLH-1607, s. o.).
       ueberholtRef.current = basis;
       // VOR der Verzweigung: der Server hat in BEIDEN Zweigen gespeichert, sonst bliebe nach einem
@@ -215,17 +219,19 @@ export function useEntwurfVerlustschutz<D, W extends object>({
       standRef.current = aenderungRef.current;
       setSpeichertGerade(true);
       const quittieren = quittungVorbereiten();
+      let basis: D | undefined;
       const auftrag = folgeRef.current
         .catch(() => {}) // Ein Fehlschlag des vorigen sperrt den nächsten Versuch nicht.
         .then(() => {
           if (!aktivRef.current) throw new DOMException('Editor verlassen', 'AbortError');
+          basis = datenRef.current;
           return speichernRef.current(werte);
         });
       folgeRef.current = auftrag;
       auftragRef.current = auftrag;
       return auftrag
         .then((r) => {
-          quittieren();
+          quittieren(basis);
           onGespeichertRef.current?.();
           return r;
         })
