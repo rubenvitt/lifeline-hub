@@ -171,6 +171,23 @@ describe('Registrieren gesperrt', () => {
   });
 });
 
+describe('Registrierliste drucken (LLH-1616)', () => {
+  it('führt auf die Druckansicht der Stelle, auch ohne Schreibrecht', async () => {
+    rendere({ darfSchreiben: false });
+    const link = await screen.findByRole('link', { name: 'Registrierliste drucken' });
+    expect(link).toHaveAttribute('href', '/einsaetze/7/betreuung/8/registrierliste/druck');
+  });
+
+  it('fehlt ohne Personenrecht', async () => {
+    server.use(meHandler(benutzerFixture({ id: 11 })));
+    renderMitProviders(
+      <RegistrierungPaneel einsatzId={7} stelle={TURNHALLE} personenFrei={false} darfSchreiben />,
+    );
+    await screen.findByText(/Registrierung ·/);
+    expect(screen.queryByRole('link', { name: 'Registrierliste drucken' })).toBeNull();
+  });
+});
+
 // Nicht über den Namen des Dialogs suchen: unter Test vergibt `@rc-component/util` jedem `useId`
 // dieselbe Kennung (`test-id`), seit antd 6.7 auch dem Collapse-Inhalt, auf den dann das
 // `aria-labelledby` des Dialogs zeigt.

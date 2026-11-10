@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 530
-quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs]
+quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx]
 ---
 
 ## Überblick
@@ -92,6 +92,25 @@ stehen auch unter [Betroffene und Sichtung](betroffene.md).
    Person nur sie. Die Rückfrage nimmt ein „Ziel“ auf (etwa „zu Verwandten“); bestätigen.
 
 Abgemeldete Personen tragen den Verbleib „entlassen“ und stehen nicht mehr in der Liste.
+
+### Registrierliste drucken
+
+Für Stromausfall, Schichtübergabe und Essensausgabe gibt es die Registrierliste auf Papier.
+
+1. Unter „Registrierung“ „Registrierliste drucken“ wählen. Das geht auch ohne Schreibrecht und an
+   einer geschlossenen Stelle.
+2. Die Druckansicht zeigt oben die Summen je Kostform mit „ohne Angabe“ und „gesamt“, darunter
+   je Haushalt („H-1 · Bezugsperson · Zahl der Personen“) die hier registrierten Personen mit
+   Registriernummer, Name, Geburtsdatum oder geschätztem Alter, Kostform und einer leeren Spalte
+   zum Abhaken. Personen ohne Haushalt stehen am Ende in einem eigenen Block.
+3. Unverträglichkeiten kommen nur auf das Blatt, wenn „Unverträglichkeiten mitdrucken“
+   eingeschaltet ist. Der Kopf des Blatts nennt dann „Gesundheitsangaben“.
+4. „Drucken / als PDF“ wählen. Ein Haushalt bricht nicht über zwei Seiten.
+
+Das Blatt ist ein Stand zum Zeitpunkt des Öffnens; was danach registriert oder abgemeldet wird,
+kommt erst mit „Neu laden“ dazu. Jedes Öffnen, jedes „Neu laden“ und jedes Umschalten steht im
+Zugriffsprotokoll jeder Person auf dem Blatt als „Registrierliste gedruckt“. Ist niemand registriert, gibt es nichts
+zu drucken.
 
 ### Bedarf einer Stelle anfordern
 

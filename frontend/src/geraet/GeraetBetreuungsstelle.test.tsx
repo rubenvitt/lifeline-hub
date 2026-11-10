@@ -319,6 +319,43 @@ describe('Betreuungsstelle — Registrierung (LLH-1612)', () => {
   });
 });
 
+describe('Betreuungsstelle — Registrierliste drucken (LLH-1616)', () => {
+  it('„Registrierliste drucken“ öffnet die Druckansicht der eigenen Stelle', async () => {
+    bereit();
+    const abrufe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/betreuung/stellen/3/registrierungen', () =>
+        HttpResponse.json({ stelle_id: 3, haushalte: [], ohne_haushalt: [] }),
+      ),
+      http.get('/api/einsaetze/7/betreuung/stellen/3/registrierungen/druck', ({ request }) => {
+        abrufe.push(new URL(request.url).pathname);
+        return HttpResponse.json({
+          stelle_id: 3,
+          haushalte: [],
+          ohne_haushalt: [
+            {
+              id: 10,
+              registrier_nr: 1,
+              name: 'Muster',
+              vorname: 'Max',
+              kostform: 'vegan',
+              erfasst_at: '2026-10-08 09:00:00',
+            },
+          ],
+        });
+      }),
+    );
+    const router = renderApp('/geraet/7/betreuung');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Registrierung' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Registrierliste drucken' }));
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/betreuung/registrierliste/druck'));
+    expect(await screen.findByRole('table', { name: 'Registrierte Personen' })).toHaveTextContent(
+      'Muster, Max',
+    );
+    expect(abrufe).toEqual(['/api/einsaetze/7/betreuung/stellen/3/registrierungen/druck']);
+  });
+});
+
 describe('Bausteine', () => {
   it('istHier: nur der jüngste Verbleib Notunterkunft an der eigenen Stelle', () => {
     expect(istHier(hier, 3)).toBe(true);
