@@ -446,7 +446,7 @@ describe('BetreuungPage (LFH-639)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
     );
-    const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+    const dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
     await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
     expect(

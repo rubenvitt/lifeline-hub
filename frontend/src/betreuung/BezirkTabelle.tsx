@@ -358,10 +358,7 @@ export default function BezirkTabelle({
     () => (abschnittNamen ? abschnittNamen.split('\n').map((n) => ({ text: n, value: n })) : []),
     [abschnittNamen],
   );
-  const aktion = useMemo(
-    () => standMelden(darfMelden, onStandMelden),
-    [darfMelden, onStandMelden],
-  );
+  const aktion = useMemo(() => standMelden(darfMelden, onStandMelden), [darfMelden, onStandMelden]);
   const weitere = useMemo(
     () => bezirkWeitere(darfSchreiben, karteGesperrt, onAktion),
     [darfSchreiben, karteGesperrt, onAktion],
