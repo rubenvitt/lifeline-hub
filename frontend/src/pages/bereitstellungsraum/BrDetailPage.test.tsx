@@ -1200,18 +1200,7 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     const qc = renderBrDetail();
     return { stand, qc };
   }
-  /**
-   * Der Dialog über seinen Titel, nicht über `getByRole('dialog', { name })`: antd vergibt im
-   * Testmodus jedem Knoten die id „test-id“, und `aria-labelledby` zeigte auf das erste Auswahlfeld
-   * der Seite (seit LLH-1225 „Material zuordnen“ in der Sektion „Material“).
-   */
-  const dialog = () =>
-    screen
-      .getAllByRole('dialog')
-      .find(
-        (d) =>
-          d.querySelector('.ant-modal-title')?.textContent === 'Bereitstellungsraum bearbeiten',
-      )!;
+  const dialog = () => screen.getByRole('dialog', { name: 'Bereitstellungsraum bearbeiten' });
   const feld = (name: string) => within(dialog()).getByLabelText(name);
   // jsdom kennt kein `transitionend`: antd beginnt das Ausblenden (`ant-zoom-leave`) und bleibt
   // dort stehen (Muster `stammdaten/verwaltungstabellen.test.tsx`).

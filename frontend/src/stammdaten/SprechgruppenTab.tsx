@@ -6,7 +6,8 @@ import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { WeitereAktionen } from '../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { useViewport } from '../components/useViewport';
 import { nachText, werteAus } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
@@ -60,6 +61,26 @@ export default function SprechgruppenTab() {
   // Netz und Sicherheit filtern mit den Werten der Zeilen (LLH-1096); ohne Wert kein Trichter.
   const netzWerte = werteAus(sprechgruppen, (sg) => sg.netz);
   const sicherheitWerte = werteAus(sprechgruppen, (sg) => sg.sicherheit);
+
+  /**
+   * Aktionen einer Zeile, EINE Quelle für das schmale ⋮ und das Kontextmenü auf jeder Breite
+   * (LLH-1599, `KatalogTabelle.zeilenMenue`). Breit stehen dieselben Handlungen als Knöpfe in der
+   * Aktionsspalte; der Test der Seite hält beide gleich (design.md D4).
+   */
+  const zeilenMenue: WeitereAktionen<Sprechgruppe> = {
+    // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+    eintraege: (sg) =>
+      herkunft.istVomHub('sprechgruppe', sg.id)
+        ? []
+        : [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            ...(sg.aktiv
+              ? [{ key: 'deaktivieren', label: 'Deaktivieren', gefahr: true as const }]
+              : []),
+          ],
+    zugaenglicherName: (sg) => `Aktionen zu Sprechgruppe ${sg.bezeichnung}`,
+    onWahl: (aktion, sg) => (aktion === 'bearbeiten' ? bearbeiten(sg) : setZuDeaktivieren(sg)),
+  };
 
   const spalten: KatalogSpalte<Sprechgruppe>[] = [
     {
@@ -175,24 +196,7 @@ export default function SprechgruppenTab() {
                 <VomHubGesperrt />
               ) : istSchmal ? (
                 // Unter `md` passen zwei Knöpfe neben Kennung und Status nicht in 390 px.
-                <MenueAusloeser
-                  eintraege={[
-                    { key: 'bearbeiten' as const, label: 'Bearbeiten' },
-                    ...(sg.aktiv
-                      ? [
-                          {
-                            key: 'deaktivieren' as const,
-                            label: 'Deaktivieren',
-                            gefahr: true as const,
-                          },
-                        ]
-                      : []),
-                  ]}
-                  zugaenglicherName={`Aktionen zu Sprechgruppe ${sg.bezeichnung}`}
-                  onWahl={(aktion) =>
-                    aktion === 'bearbeiten' ? bearbeiten(sg) : setZuDeaktivieren(sg)
-                  }
-                />
+                <ZeilenMenueAusloeser menue={zeilenMenue} zeile={sg} />
               ) : (
                 <Space size="middle">
                   <Button onClick={() => bearbeiten(sg)}>Bearbeiten</Button>
@@ -262,6 +266,7 @@ export default function SprechgruppenTab() {
           locale={{ emptyText: 'Noch keine Sprechgruppen' }}
           suche={{ platzhalter: 'Bezeichnung, Betriebsart, Netz oder Hinweis' }}
           spaltenSchalter={{ bezeichnung: 'Sprechgruppen' }}
+          zeilenMenue={istAdmin ? zeilenMenue : undefined}
         />
       )}
       <Modal

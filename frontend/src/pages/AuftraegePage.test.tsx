@@ -1107,6 +1107,12 @@ describe('AuftraegePage', () => {
       await userEvent.click(erteilen(dialog));
       await within(dialog).findByRole('alert');
 
+      // Escape schließt nur die oberste Ebene. Die Empfänger-Auswahl hat sich nach der Wahl
+      // geschlossen, ihr Ausblenden endet in jsdom aber nie; ohne Ende bliebe sie die oberste
+      // Ebene, und der Dialog nähme Escape nicht an (LLH-1625).
+      for (const liste of document.querySelectorAll('.ant-select-dropdown.ant-slide-up-leave')) {
+        fireEvent.transitionEnd(liste);
+      }
       fireEvent.keyDown(within(dialog).getByLabelText('Auftrag / Was'), { key: 'Escape' });
       await waitFor(() => expect(istZu(dialog)).toBe(true));
       const neu = await oeffneErteilen();

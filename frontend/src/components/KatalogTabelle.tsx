@@ -6,9 +6,12 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type Key,
   type RefObject,
 } from 'react';
+import type { WeitereAktionen } from './Datensicht';
+import { useZeilenMenueKontext } from './useDatensatzKontextMenue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import {
@@ -213,6 +216,15 @@ export type KatalogTabelleProps<T> = Omit<
   gedaechtnis?: ListenGedaechtnis;
   /** Mehrzahl im Dativ für den `Filterhinweis` („3 von 9 Quellen sichtbar“); Vorgabe „Einträgen“. */
   mehrzahl?: string;
+  /**
+   * Aktionen jeder Zeile (LLH-1599, Spec `datensatz-aktionsmenue`,
+   * `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md` D2): Rechtsklick, langer Druck und
+   * die Tasten öffnen damit das Kontextmenü der Zeile. DIESELBE Beschreibung speist das ⋮ der
+   * Aktionsspalte (`ZeilenMenueAusloeser`), eine Quelle für beide. Bei `laeuft` stehen alle
+   * Einträge gesperrt. Ohne Einträge bleibt das Browsermenü. `Datensicht` setzt es NIE, sie bindet
+   * ihr Kontextmenü selbst an.
+   */
+  zeilenMenue?: WeitereAktionen<T>;
 };
 
 /**
@@ -745,6 +757,34 @@ function vorbelegteSortierung<T>(spalten: readonly KatalogSpalte<T>[]): ListenSo
   return null;
 }
 
+/** Schlüssel einer Zeile wie antd ihn aus `rowKey` bildet (Vorgabe `key`). */
+function schluesselVon<T>(zeile: T, rowKey: TableProps<T>['rowKey']): Key {
+  if (typeof rowKey === 'function') return rowKey(zeile);
+  return (zeile as Record<string, unknown>)[(rowKey as string | undefined) ?? 'key'] as Key;
+}
+
+/**
+ * Führt die Zeilen-Props des Aufrufers mit den Handlern des Kontextmenüs zusammen: gleichnamige
+ * Handler laufen beide, der des Aufrufers zuerst (LLH-1599 D2).
+ */
+function verbindeHandler(
+  aufrufer: HTMLAttributes<HTMLElement> | undefined,
+  kontext: object,
+): HTMLAttributes<HTMLElement> {
+  const ergebnis: Record<string, unknown> = { ...aufrufer };
+  for (const [name, handler] of Object.entries(kontext)) {
+    const vorher = ergebnis[name];
+    ergebnis[name] =
+      typeof vorher === 'function'
+        ? (...args: unknown[]) => {
+            (vorher as (...a: unknown[]) => void)(...args);
+            (handler as (...a: unknown[]) => void)(...args);
+          }
+        : handler;
+  }
+  return ergebnis as HTMLAttributes<HTMLElement>;
+}
+
 export default function KatalogTabelle<T extends object>({
   columns,
   dataSource,
@@ -755,6 +795,7 @@ export default function KatalogTabelle<T extends object>({
   spaltenSchalter,
   gedaechtnis,
   mehrzahl,
+  zeilenMenue,
   ...rest
 }: KatalogTabelleProps<T>) {
   const [suchbegriff, setSuchbegriff] = useState(() => gedaechtnis?.start.suche ?? '');
@@ -779,6 +820,17 @@ export default function KatalogTabelle<T extends object>({
   useFokusUnterKopf(tabelleRef);
   useFilterTastatur(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
+
+  // ── Kontextmenü der Zeilen (LLH-1599, D2) ─────────────────────────────────────────
+  const zeilenSchluessel = (zeile: T): Key => schluesselVon(zeile, rest.rowKey);
+  const kontext = useZeilenMenueKontext<T>(zeilenMenue, {
+    finde: (k) => dataSource?.find((zeile) => zeilenSchluessel(zeile) === k),
+    schluessel: zeilenSchluessel,
+  });
+  const aufruferOnRow = rest.onRow;
+  const zeilenProps: TableProps<T>['onRow'] = zeilenMenue
+    ? (zeile, index) => verbindeHandler(aufruferOnRow?.(zeile, index), kontext.ausloeser(zeile))
+    : aufruferOnRow;
 
   // ── Spaltenschalter ───────────────────────────────────────────────────────────────
   // Zählung und Schalter kommen aus `SpaltenSchalter.tsx`; hier wohnt nur der Zustand.
@@ -834,6 +886,16 @@ export default function KatalogTabelle<T extends object>({
         'ohne Zähler wäre das eine stille Ausblendung, abBreite bleibt deshalb wirkungslos.',
     );
   }, [abBreiteOhneSchalter]);
+
+  // `zeilenMenue` sucht die Zeile über `rowKey` (LLH-1599 D2). Ohne ihn fiele jede Zeile ohne
+  // `key`-Feld auf `undefined`, und das Menü hinge an der ersten Zeile.
+  const menueOhneRowKey = zeilenMenue != null && rest.rowKey == null;
+  useEffect(() => {
+    if (!import.meta.env.DEV || !menueOhneRowKey) return;
+    console.error(
+      '[KatalogTabelle] zeilenMenue ohne rowKey — das Kontextmenü fände die Zeile nicht sicher.',
+    );
+  }, [menueOhneRowKey]);
 
   const filterZuruecksetzen = useCallback(() => {
     setSuchbegriff('');
@@ -1287,6 +1349,7 @@ export default function KatalogTabelle<T extends object>({
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
         <Table<T>
           {...rest}
+          onRow={zeilenProps}
           onChange={beiAenderung}
           ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
@@ -1317,6 +1380,7 @@ export default function KatalogTabelle<T extends object>({
           sticky={druckt ? false : { offsetHeader: rahmenOben }}
         />
       </ConfigProvider>
+      {kontext.menue}
     </>
   );
 }

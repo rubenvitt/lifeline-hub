@@ -81,7 +81,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
-  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
+  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
+  ihren Wortlaut mit den Daten („Auflösen (noch 2 Personen)“), hält `components/BreiteHalten.tsx`
+  die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.
 - **Orientierung** (LFH-954, Spec `seiten-orientierung`): den Tab-Titel setzen nur die Rahmen über
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
@@ -654,7 +656,12 @@ anwendbar), „nicht geprüft" ist keins.
   8 px) und Kontextmenü-Taste/Umschalt+F10 kommen aus **`components/useKontextMenue.ts`**, das Menü
   eines Datensatzes ist **`components/KontextMenue.tsx`** in der Schale `PunktankerMenue`. Die
   Einträge kommen aus derselben Quelle wie Primärknopf und ⋮-Menü (`Datensicht`:
-  `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Auf Link,
+  `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Außerhalb der
+  `Datensicht` (LLH-1599, `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md`) beschreibt
+  die Seite die Aktionen einer Zeile EINMAL als `WeitereAktionen` und reicht sie an
+  `KatalogTabelle.zeilenMenue` bzw. `useZeilenMenueKontext` (Listen, eigene Zeilen) UND an das ⋮
+  (`ZeilenMenueAusloeser`); eine Knopfreihe am breiten Schirm hält ein Seitentest gleich. Eine Zeile
+  mit Reglern oder Schaltern trägt die Handler nur am Namensteil. Auf Link,
   Eingabefeld und markiertem Text und ohne Einträge bleibt das Browsermenü; die Taste öffnet auch auf
   dem Titel-Link. Kein eigenes `onContextMenu` (`kontextMenue.guard.test.ts`); die Lagekarte bleibt
   beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`.

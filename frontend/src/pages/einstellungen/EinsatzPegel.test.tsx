@@ -8,6 +8,7 @@ import { adminFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
 import { mitProzessZone } from '../../test/prozessZone';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../../test/menue';
+import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { QueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -857,5 +858,35 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
         zeitpunkt: new Date('2099-09-23T06:00:00+02:00').toISOString(),
       });
     });
+  });
+});
+
+describe('EinsatzPegel · Kontextmenü (LLH-1599)', () => {
+  const eintragVon = (name: string) =>
+    [...document.querySelectorAll<HTMLElement>('[data-lfh="pegel-eintrag"]')].find((e) =>
+      e.textContent?.includes(name),
+    )!;
+
+  it('Rechtsklick auf den ersten Pegel zeigt die Einträge des ⋮, „Nach oben“ gesperrt', async () => {
+    const aufrufe = stelleBereit();
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    const menue = await oeffneKontextmenue(eintragVon('HANN. MÜNDEN'));
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Pegel HANN. MÜNDEN');
+    expect(eintraegeVon(menue)).toEqual([
+      'Nach oben (gesperrt)',
+      'Nach unten',
+      'Prognose erfassen …',
+      'rot:Entfernen',
+    ]);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Nach unten/ }));
+    await waitFor(() => expect(aufrufe.some((a) => a.methode === 'PUT')).toBe(true));
+  });
+
+  it('ohne Schreibrecht bleibt das Browsermenü', async () => {
+    stelleBereit({ rolle: 'beobachter' });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    erwarteBrowsermenue(eintragVon('HANN. MÜNDEN'));
   });
 });
