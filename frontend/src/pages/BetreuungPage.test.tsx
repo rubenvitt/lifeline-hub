@@ -454,11 +454,15 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(screen.getByRole('button', { name: 'Betreuungsstelle anlegen' })).toBeDisabled();
     expect(screen.getByText('Spiegel von ELW 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+    );
     const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
     await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-    expect(await screen.findByText('Beantragt: Belegungsmeldung Turnhalle Ost')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Beantragt: Belegungsmeldung Turnhalle Ost'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
     // Kennzahlen bleiben die des Servers: die Belegung der Turnhalle steht unverändert.
     expect(zeileVon('Turnhalle Ost')).toHaveTextContent('89');

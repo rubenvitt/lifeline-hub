@@ -12,10 +12,8 @@ import { useAuthOptional } from '../../auth/AuthContext';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
-import { aktivSchluessel, entwurfSpeichern } from '../../etb/entwuerfe/entwurfStore';
+import { entwurfAnlegenUndAktivieren } from '../../etb/entwuerfe/entwurfStore';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
-import { sicherSchreiben } from '../../lib/sichererSpeicher';
-import { neueClientId } from '../../offline/clientId';
 import { useSpiegelAntraege } from './useSpiegelAntraege';
 import {
   ANTRAG_ZUSTAND_WORT,
@@ -157,29 +155,17 @@ function BandInhalt({
 }
 
 /** Ein ETB-Antrag als Entwurf der Erfassung: Wortlaut, Typ, Von/An, Meldeweg (LLH-1492). */
-async function legeEtbEntwurfAn(
-  benutzerId: number,
-  einsatzId: number,
-  daten: unknown,
-): Promise<void> {
+function legeEtbEntwurfAn(benutzerId: number, einsatzId: number, daten: unknown): Promise<void> {
   const d = (daten ?? {}) as Record<string, unknown>;
   const text = (feld: string) => (typeof d[feld] === 'string' ? (d[feld] as string) : undefined);
-  const jetzt = new Date().toISOString();
-  const id = neueClientId();
-  await entwurfSpeichern({
-    id,
-    benutzer_id: benutzerId,
-    einsatz_id: einsatzId,
+  return entwurfAnlegenUndAktivieren(benutzerId, einsatzId, {
     inhalt: text('inhalt') ?? '',
     typ: (text('typ') ?? 'meldung') as EtbTyp,
     von: text('von'),
     an: text('an'),
     meldeweg: text('meldeweg') as MeldeWeg | undefined,
     veranlassung: text('veranlassung'),
-    erstellt_at: jetzt,
-    geaendert_at: jetzt,
   });
-  sicherSchreiben(aktivSchluessel(benutzerId, einsatzId), id);
 }
 
 function AntragZeile({

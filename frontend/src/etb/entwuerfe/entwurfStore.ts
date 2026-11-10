@@ -284,3 +284,26 @@ export async function entwuerfeLeerenFuerTests(): Promise<void> {
   const d = await db();
   await d.clear('entwuerfe');
 }
+
+/**
+ * Legt einen Entwurf mit vorgegebenem Inhalt an und macht ihn zum aktiven (LLH-1492): „Neu
+ * erfassen“ eines abgelehnten Antrags am Spiegel öffnet die Erfassung mit seinen Daten. Gilt beim
+ * nächsten Laden der Entwürfe (Öffnen des ETB); eine schon offene Erfassung lädt nicht nach.
+ */
+export async function entwurfAnlegenUndAktivieren(
+  benutzerId: number,
+  einsatzId: number,
+  inhalt: Pick<EtbEntwurf, 'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung'>,
+): Promise<void> {
+  const jetzt = new Date().toISOString();
+  const id = neueClientId();
+  await entwurfSpeichern({
+    id,
+    benutzer_id: benutzerId,
+    einsatz_id: einsatzId,
+    ...inhalt,
+    erstellt_at: jetzt,
+    geaendert_at: jetzt,
+  });
+  sicherSchreiben(aktivSchluessel(benutzerId, einsatzId), id);
+}

@@ -14,7 +14,7 @@ import {
   modulRegistry,
   modulName,
 } from '../../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
   Augenbraue,
@@ -414,6 +414,8 @@ export default function UeberblickPage() {
    * Hinweis — ein beim Laden aufblitzender Grund wäre falsch.
    */
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13).
+  const darfEtbErfassen = darfBeantragen(einsatz);
   // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
   const personen = personenFrei ? personenQ.data : undefined;
   const personal = personalFrei ? personalQ.data : undefined;
@@ -668,7 +670,7 @@ export default function UeberblickPage() {
             {/* Gesperrt statt versteckt: der Hinweis darüber nennt den Grund. */}
             <Button
               type="primary"
-              disabled={!darfSchreiben || etbSprungGesperrt}
+              disabled={!darfEtbErfassen || etbSprungGesperrt}
               title={etbSprungGesperrt ? KEINE_BERECHTIGUNG : undefined}
               icon={
                 <Icon>
@@ -952,7 +954,7 @@ export default function UeberblickPage() {
                     leerText="Noch keine Entscheidung im Einsatztagebuch."
                     gesperrtText={GESPERRT}
                     leerAktion={
-                      darfSchreiben
+                      darfEtbErfassen
                         ? {
                             label: 'Eintrag erfassen',
                             onKlick: () => waehle(etbPfad(einsatzId, { neu: true })),

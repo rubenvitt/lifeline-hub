@@ -1843,12 +1843,7 @@ describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
       },
     ]);
     renderMitProviders(
-      <Patientenkopf
-        einsatzId={1}
-        person={basis}
-        darfSchreiben={false}
-        darfErfassen
-      />,
+      <Patientenkopf einsatzId={1} person={basis} darfSchreiben={false} darfErfassen />,
       { client },
     );
     const block = await screen.findByRole('region', { name: 'Beantragt' });

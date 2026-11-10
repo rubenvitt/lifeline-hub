@@ -117,7 +117,14 @@ describe('Anträge am Spiegel stehen bei den vorgemerkten (LLH-1492, design.md D
     ziel: Record<string, unknown>,
     daten: Record<string, unknown>,
   ) =>
-    ({ id, art, zustand, ziel, daten, erfasst_at: '2026-11-10 08:00:00' }) as unknown as SpiegelAntragAnzeige;
+    ({
+      id,
+      art,
+      zustand,
+      ziel,
+      daten,
+      erfasst_at: '2026-11-10 08:00:00',
+    }) as unknown as SpiegelAntragAnzeige;
 
   it('nimmt offene Anträge derselben Art dazu, mit lokalem Ziel, ohne abgelehnte', async () => {
     await schreibaktionEinreihen(11, 7, {
