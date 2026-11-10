@@ -1718,11 +1718,11 @@ async fn geraet_liest_die_antraege_seines_einsatzes() {
         assert_eq!(s, StatusCode::NOT_FOUND, "{wer}: anderer Einsatz");
     }
 
-    let verwerfen = format!("/api/einsaetze/{einsatz}/antraege/unbekannt");
+    let verwerfen = format!("/api/einsaetze/{einsatz}/antraege/999999");
     let (s, _) = anfrage(&app, "DELETE", &verwerfen, &monitor, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Lagemonitor verwirft nicht");
     let (s, v) = anfrage(&app, "DELETE", &verwerfen, &tablet, None).await;
-    assert_ne!(s, StatusCode::FORBIDDEN, "Tablet erreicht die Route: {v}");
+    assert_eq!(s, StatusCode::NOT_FOUND, "Tablet erreicht den Handler: {v}");
 }
 
 /// LFH-1072: der Kachel-Proxy verlangt eine Sitzung; jedes gekoppelte Gerät besteht sie, gleich
