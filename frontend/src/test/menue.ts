@@ -54,11 +54,8 @@ export function offenesMenue(): HTMLElement {
  * `waehleMenueEintrag`). Direkt nach dem Klick auf den Auslöser aufrufen, für Tests, die das Menü
  * selbst öffnen, weil sie vor der Wahl seine Einträge prüfen.
  *
- * Gewartet wird auf den Fokus in IRGENDEINEM Menü, nicht im neuen: In Tests vergibt
- * `@rc-component/util` jedem Menü dieselbe Kennung (`useId` → `test-id`), und rc-menu sucht das
- * Fokusziel per `data-menu-id` im ganzen Dokument. Steht ein früheres Menü mit gleichen Schlüsseln
- * noch im DOM, landet der Fokus dort, und das neue Menü bekommt ihn nie. Verbraucht ist der Aufruf
- * so oder so; der Klick auf den Auslöser hat den Fokus vorher aus jedem Menü genommen.
+ * Gewartet wird auf den Fokus in irgendeinem Menü: Verbraucht ist der Aufruf so oder so, der Klick
+ * auf den Auslöser hat den Fokus vorher aus jedem Menü genommen.
  */
 export async function warteAufMenueFokus(): Promise<void> {
   await waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull());
