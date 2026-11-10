@@ -133,7 +133,7 @@ import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { modulName } from '../einsatz/modulRegistry';
 import { waermeVokabularAuf } from './lagekarte/zeichenWahl';
-import { WIRD_GEHOLT_WORT, istAnhangWirdGeholt } from '../api/anhangAbruf';
+import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../api/anhangAbruf';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
@@ -353,7 +353,7 @@ export default function LagekartePage() {
     (e: unknown) => {
       // Am Spiegel kommt der Inhalt auf Abruf (LLH-1492, D8): kein Fehler, ein Hinweis; der
       // nächste Abgleich lädt die Liste neu, und das Bild wird erneut versucht.
-      if (istAnhangWirdGeholt(e)) {
+      if (isAnhangWirdGeholt(e)) {
         message.info({ content: `Kartenbild ${WIRD_GEHOLT_WORT}`, key: 'kartenbild-wird-geholt' });
         return;
       }

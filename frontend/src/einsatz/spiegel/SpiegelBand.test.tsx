@@ -60,7 +60,7 @@ describe('SpiegelBand (LLH-1492, design.md D13)', () => {
   it('nennt Gegenstelle, Stand und Zähler der Anträge', async () => {
     mitServer();
     renderMitProviders(<SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel() })} />);
-    const band = screen.getByRole('status');
+    const band = document.querySelector('[data-lfh="spiegel-band"]') as HTMLElement;
     expect(band).toHaveTextContent('Spiegel von ELW 1 DRK Nord');
     expect(band).toHaveTextContent(/Abgleich \d/);
     expect(band).toHaveTextContent('1 Antrag ausstehend');
@@ -76,7 +76,9 @@ describe('SpiegelBand (LLH-1492, design.md D13)', () => {
         })}
       />,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Abgleich beendet');
+    expect(document.querySelector('[data-lfh="spiegel-band"]')).toHaveTextContent(
+      'Abgleich beendet',
+    );
   });
 
   it('klappt die Anträge auf: abgelehnte mit Grund, „Verwerfen“ löscht', async () => {
@@ -94,5 +96,53 @@ describe('SpiegelBand (LLH-1492, design.md D13)', () => {
     expect(within(zeilen[1]).getByRole('button', { name: 'Neu erfassen' })).toBeInTheDocument();
     await user.click(within(zeilen[1]).getByRole('button', { name: 'Verwerfen' }));
     await waitFor(() => expect(verworfen).toEqual([4]));
+  });
+});
+
+describe('SpiegelBand: Anträge folgen den Zählern im Kopf (LLH-1492)', () => {
+  it('lädt die Anträge neu, sobald sich ein Zähler im Kopf ändert, sonst nicht', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
+      http.get('/api/einsaetze/1/antraege', () => {
+        abrufe += 1;
+        return HttpResponse.json(antraege);
+      }),
+    );
+    const { rerender } = renderMitProviders(
+      <SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel() })} />,
+    );
+    await waitFor(() => expect(abrufe).toBe(1));
+    // Ein neuer Kopf mit denselben Zählern (Abruf im Takt): kein neuer Abruf der Anträge.
+    rerender(<SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel() })} />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(abrufe).toBe(1);
+    // Die Ablehnung kommt mit dem Abgleich: der Zähler steigt, die Liste lädt nach.
+    rerender(
+      <SpiegelBand
+        einsatz={einsatzFixture({ spiegel: spiegel({ antraege_ausstehend: 0, antraege_abgelehnt: 2 }) })}
+      />,
+    );
+    await waitFor(() => expect(abrufe).toBe(2));
+  });
+});
+
+describe('SpiegelBand: Vorlesen (LLH-1492)', () => {
+  it('sagt nur Zähler und Störung an, nicht das ganze Band und keine laufende Zeit', () => {
+    mitServer();
+    renderMitProviders(
+      <SpiegelBand
+        einsatz={einsatzFixture({
+          spiegel: spiegel({ letzter_abgleich_at: '2026-01-01 08:00:00' }),
+        })}
+      />,
+    );
+    const band = document.querySelector('[data-lfh="spiegel-band"]') as HTMLElement;
+    expect(band).not.toHaveAttribute('role', 'status');
+    const ansage = screen.getByRole('status');
+    expect(band.contains(ansage)).toBe(true);
+    expect(ansage).toHaveTextContent('1 Antrag ausstehend');
+    expect(ansage).toHaveTextContent('Keine Verbindung zur führenden Instanz');
+    expect(ansage).not.toHaveTextContent(/seit|\d+ min/);
   });
 });

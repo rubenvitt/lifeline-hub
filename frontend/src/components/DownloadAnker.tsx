@@ -1,4 +1,4 @@
-import { useId, type AnchorHTMLAttributes, type ReactNode } from 'react';
+import { useId, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
 import {
@@ -19,13 +19,19 @@ export function AnhangVerweis({
   href,
   download,
   children,
+  onClick,
   ...rest
 }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; download: string }) {
   const { rollen, token } = useRollen();
   const abruf = useAnhangDownload(href, download);
+  // Erst der Aufrufer, dann am Spiegel der Abruf: der eigene `onClick` geht nicht verloren.
+  const beimKlick = (e: MouseEvent<HTMLAnchorElement>) => {
+    onClick?.(e);
+    abruf.onClick?.(e);
+  };
   return (
     <>
-      <a href={href} download={download} onClick={abruf.onClick} {...rest}>
+      <a {...rest} href={href} download={download} onClick={beimKlick}>
         {children}
       </a>
       {abruf.hinweis && (

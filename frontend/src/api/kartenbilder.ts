@@ -1,7 +1,7 @@
 import { apiGet, apiSend, apiUploadMitFortschritt, type UploadFortschritt } from './client';
 import type { components } from './types.generated';
 import { UPLOAD_TIMEOUT_MS } from './upload';
-import { wirfFallsWirdGeholt } from './anhangAbruf';
+import { throwIfWirdGeholt } from './anhangAbruf';
 
 // `Hintergrundbild` ist ein Re-Export des generierten Schemas; `BildPatch` bleibt als Eingabe-DTO
 // handgepflegt. `Ecke`/`Ecken` sind FE-lokale Tupel für den `ecken`-Multipart-Teil.
@@ -103,7 +103,7 @@ export async function ladeBildBlobUrl(
       signal: beide.signal,
     });
     // Am Spiegel kommt der Inhalt auf Abruf (LLH-1492, D8): 409 „wird geholt“ statt eines Fehlers.
-    await wirfFallsWirdGeholt(res);
+    await throwIfWirdGeholt(res);
     if (!res.ok) throw new Error(`Bild ${id} konnte nicht geladen werden (${res.status})`);
     return URL.createObjectURL(await res.blob());
   } finally {

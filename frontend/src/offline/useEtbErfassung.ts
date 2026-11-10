@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, fehlerText } from '../api/client';
-import { istAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
+import { isAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
 import { erfasseEtb, type NeuerEintrag } from '../api/etb';
 import type { EtbEintragAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
@@ -228,7 +228,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         );
         // Am Spiegel (LLH-1492): ein Antrag, noch ohne Nummer. Die Zeitachse zeigt ihn aus der
         // Antragsliste wie einen ausstehenden; Liste und Kopf gleichen über `ANTRAG_EREIGNIS` ab.
-        if (istAntragAngenommen(angenommen)) return null;
+        if (isAntragAngenommen(angenommen)) return null;
         qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
         // Die Antwort geht an den Aufrufer: die Seite prüft, ob der Eintrag zum Filter passt
         // (LLH-1071, „Nr. … erfasst – außerhalb des Filters“).

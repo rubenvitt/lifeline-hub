@@ -5,7 +5,7 @@ import {
   markiereBenachrichtigungenGelesen,
   quittiereBenachrichtigung,
 } from '../api/benachrichtigungen';
-import { istAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
+import { isAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
 import { ApiError } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -54,7 +54,7 @@ export type OfflineSchreibErgebnis<T> =
 
 /** Gesendet oder, an einem Spiegel, beantragt: die Antwort entscheidet (202 mit `antrag`). */
 function gesendetOderBeantragt<T>(antwort: T | AntragAngenommen): OfflineSchreibErgebnis<T> {
-  if (istAntragAngenommen(antwort)) return { zustand: 'beantragt', antrag: antwort.antrag };
+  if (isAntragAngenommen(antwort)) return { zustand: 'beantragt', antrag: antwort.antrag };
   return { zustand: 'gesendet', daten: antwort as T };
 }
 

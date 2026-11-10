@@ -496,6 +496,18 @@ describe('AusgabeAnsicht — Zustände (D1, D7)', () => {
     expect(taste(`Ausgabe nachtragen (${grundText})`)).toBeDisabled();
   });
 
+  it('am Spiegel: Zählen geht (als Antrag), kein „Nur Ansicht“, kein „Zurücknehmen“ (LLH-1492)', async () => {
+    einsatz.wert = {
+      ...einsatz.wert,
+      spiegel: { gegenstelle: 'ELW 1', beendet: false, antraege_ausstehend: 0, antraege_abgelehnt: 0 },
+    } as typeof einsatz.wert;
+    zeige();
+    await geladen();
+    expect(taste('+1')).toBeEnabled();
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Zurücknehmen/ })).toBeNull();
+  });
+
   it('abgeschlossener Einsatz: dieselbe Sperre mit „Einsatz abgeschlossen“', async () => {
     einsatz.wert = { ...einsatz.wert, status: 'abgeschlossen' };
     zeige();

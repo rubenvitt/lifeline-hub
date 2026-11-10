@@ -82,7 +82,7 @@ export function baueZeilen(args: {
 }
 
 /** Der Antrag trägt einen bekannten Typ: die Daten gingen ungeprüft in den Antrag. */
-function hatEtbTyp(daten: unknown): boolean {
+function hasEtbTyp(daten: unknown): boolean {
   const typ = daten != null && typeof daten === 'object' ? (daten as { typ?: unknown }).typ : null;
   return typeof typ === 'string' && Object.prototype.hasOwnProperty.call(etbTyp, typ);
 }
@@ -99,7 +99,7 @@ export function etbAntraegeAlsAusstehend(
 ): AusstehendeEtbZeile[] {
   if (benutzerId == null) return [];
   return antraege
-    .filter((a) => a.art === 'etb' && a.zustand !== 'abgelehnt' && hatEtbTyp(a.daten))
+    .filter((a) => a.art === 'etb' && a.zustand !== 'abgelehnt' && hasEtbTyp(a.daten))
     .map((a) => ({
       benutzer_id: benutzerId,
       einsatz_id: einsatzId,

@@ -21,7 +21,7 @@ import {
   vorschauPfad,
 } from '../api/anhangFassung';
 import { einsatzKeys } from '../api/queryKeys';
-import { WIRD_GEHOLT_WORT, pruefeAnhangAbruf } from '../api/anhangAbruf';
+import { WIRD_GEHOLT_WORT, checkAnhangAbruf } from '../api/anhangAbruf';
 import { useSpiegelAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 
 /**
@@ -296,8 +296,8 @@ function KachelAnzeige({
   const id = useId();
   const knopf = useRef<HTMLButtonElement>(null);
   const [fehler, setFehler] = useState(false);
-  // Takt des Abgleichs, bei dem der Inhalt zuletzt „wird geholt“ hieß (LLH-1492); ein neuer Takt
-  // lädt das Bild neu (Schlüssel am `img`).
+  // Takt des Abgleichs, bei dem der Inhalt zuletzt „wird geholt“ hieß (LLH-1492). Ein neuer Takt
+  // beendet „wird geholt“; das `img` hängt dann frisch ein und lädt neu. Ein geladenes Bild bleibt.
   const { spiegel, abgleichTakt } = useSpiegelAusCache(einsatzIdAusPfad(href));
   const [geholtBeiTakt, setGeholtBeiTakt] = useState<number | null>(null);
   // Ein neuer Versuch ohne neuen Takt: die Nachfrage fand den Inhalt schon da.
@@ -310,13 +310,13 @@ function KachelAnzeige({
     return gruppe.registriere(id, gross, knopf.current);
   }, [gruppe, id, gross, fehler, wirdGeholt, grossansicht]);
 
-  const ladeFehler = () => {
+  const handleLoadError = () => {
     if (!spiegel) {
       setFehler(true);
       return;
     }
     const takt = abgleichTakt;
-    void pruefeAnhangAbruf(quellen.klein).then((ergebnis) => {
+    void checkAnhangAbruf(quellen.klein).then((ergebnis) => {
       if (ergebnis === 'wird_geholt') setGeholtBeiTakt(takt);
       else if (ergebnis === 'fehler') setFehler(true);
       // Einmal neu laden; scheitert das Bild trotz Inhalt (Decoder), bleibt der Platzhalter.
@@ -343,12 +343,12 @@ function KachelAnzeige({
   const name = `Vorschau: ${kennung ? `${dateiname}, ${kennung}` : dateiname}`;
   const bild = (
     <img
-      key={spiegel ? `${abgleichTakt}-${versuch}` : 'bild'}
+      key={versuch}
       src={quellen.klein}
       alt=""
       loading="lazy"
       decoding="async"
-      onError={ladeFehler}
+      onError={handleLoadError}
       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
     />
   );

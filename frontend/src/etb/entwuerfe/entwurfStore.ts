@@ -290,7 +290,7 @@ export async function entwuerfeLeerenFuerTests(): Promise<void> {
  * erfassen“ eines abgelehnten Antrags am Spiegel öffnet die Erfassung mit seinen Daten. Gilt beim
  * nächsten Laden der Entwürfe (Öffnen des ETB); eine schon offene Erfassung lädt nicht nach.
  */
-export async function entwurfAnlegenUndAktivieren(
+export async function createAndActivateEntwurf(
   benutzerId: number,
   einsatzId: number,
   inhalt: Pick<EtbEntwurf, 'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung'>,

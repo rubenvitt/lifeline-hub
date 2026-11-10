@@ -7,7 +7,7 @@ import {
   markiereBenachrichtigungenGelesen,
   quittiereBenachrichtigung,
 } from '../api/benachrichtigungen';
-import { istAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
+import { isAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
 import { ApiError, fehlerText } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
@@ -95,7 +95,7 @@ export function useOfflineSync(benutzerId?: number): void {
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             // Am Spiegel (LLH-1492) wird aus der Vormerkung ein Antrag: angenommen, noch ohne
             // Person; die Antragsliste zeigt ihn (`ANTRAG_EREIGNIS` aus `apiSend`).
-            if (istAntragAngenommen(person)) {
+            if (isAntragAngenommen(person)) {
               await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
               continue;
             }
@@ -149,7 +149,7 @@ export function useOfflineSync(benutzerId?: number): void {
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
             // Am Spiegel (LLH-1492): ein Antrag, noch keine Meldung, nichts zu melden.
-            if (istAntragAngenommen(meldung)) continue;
+            if (isAntragAngenommen(meldung)) continue;
             void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(element.wert.einsatz_id) });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
             const clientId = aktion.daten.client_id;
@@ -221,7 +221,7 @@ export function useOfflineSync(benutzerId?: number): void {
             );
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             // Am Spiegel (LLH-1492): ein Antrag, noch keine Ausgabe und kein Zeitfenster-Stand.
-            if (istAntragAngenommen(antwort)) {
+            if (isAntragAngenommen(antwort)) {
               await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
               continue;
             }

@@ -60,6 +60,16 @@ describe('Vorschau am Spiegel', () => {
     expect(await screen.findByRole('button', { name: 'Vorschau: dach.jpg' })).toBeInTheDocument();
   });
 
+  it('hängt ein geladenes Bild bei einem neuen Abgleich nicht neu ein', () => {
+    const qc = clientMit(true);
+    renderMitProviders(<AnhangVorschau href={HREF} mime="image/jpeg" dateiname="dach.jpg" />, {
+      client: qc,
+    });
+    const vorher = screen.getByRole('button').querySelector('img');
+    neuerAbgleich(qc);
+    expect(screen.getByRole('button').querySelector('img')).toBe(vorher);
+  });
+
   it('ohne Spiegel bleibt es beim stillen Platzhalter, ohne Nachfrage', async () => {
     const nachfrage = vi.fn();
     server.use(
@@ -106,6 +116,22 @@ describe('Download am Spiegel', () => {
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
     expect(speichern.mock.calls[0][1]).toBe('dach.jpg');
     expect(screen.queryByText('wird geholt')).toBeNull();
+  });
+
+  it('ruft den eigenen onClick des Aufrufers auch am Spiegel', async () => {
+    vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    server.use(http.get(HREF, () => new HttpResponse('inhalt', { status: 200 })));
+    const eigener = vi.fn();
+    const user = userEvent.setup();
+    renderMitProviders(
+      <AnhangVerweis href={HREF} download="dach.jpg" onClick={eigener}>
+        dach.jpg
+      </AnhangVerweis>,
+      { client: clientMit(true) },
+    );
+    await user.click(screen.getByRole('link', { name: 'dach.jpg' }));
+    expect(eigener).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(dateiSpeichern.speichereDatei).toHaveBeenCalledTimes(1));
   });
 
   it('ohne Spiegel bleibt der native Verweis', () => {

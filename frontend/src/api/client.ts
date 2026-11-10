@@ -1,7 +1,7 @@
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
 import { merkeServerzeit } from '../offline/serveruhr';
 import type { ZeilenArt, ZeilenGrund } from './types';
-import { meldeAntragFallsAngenommen } from './antragEreignis';
+import { dispatchAntragIfAngenommen } from './antragEreignis';
 
 export type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -397,7 +397,7 @@ export async function apiSend<T>(
     const daten: unknown = JSON.parse(text);
     // Am Spiegel wird eine Erfassung zum Antrag (LLH-1492, 202): Antragsliste und Hinweisband
     // gleichen ab, gleich ob die Erfassung direkt oder aus der Warteschlange kam.
-    if (res.status === 202) meldeAntragFallsAngenommen(pfad, daten);
+    if (res.status === 202) dispatchAntragIfAngenommen(pfad, daten);
     return daten as T;
   } catch (e) {
     netzFehlerWerfen(e);

@@ -15,7 +15,7 @@ export interface AntragAngenommen {
 
 /** Ob eine Antwort ein angenommener Antrag ist statt der Ressource. Keine Ressource der
  *  beantragbaren Routen trägt ein Objekt `antrag` mit Kennung und Zustand. */
-export function istAntragAngenommen(antwort: unknown): antwort is AntragAngenommen {
+export function isAntragAngenommen(antwort: unknown): antwort is AntragAngenommen {
   if (antwort == null || typeof antwort !== 'object' || !('antrag' in antwort)) return false;
   const antrag = (antwort as { antrag: unknown }).antrag;
   return (
@@ -34,15 +34,15 @@ export function istAntragAngenommen(antwort: unknown): antwort is AntragAngenomm
 export const ANTRAG_EREIGNIS = 'lfh:spiegel-antrag';
 
 /** Einsatz-Kennung aus einem Pfad `/api/einsaetze/{id}/…`. */
-function einsatzAusPfad(pfad: string): number | null {
+function parseEinsatzAusPfad(pfad: string): number | null {
   const treffer = /^\/api\/einsaetze\/(\d+)\//.exec(pfad);
   return treffer ? Number(treffer[1]) : null;
 }
 
 /** Meldet einen angenommenen Antrag, falls die 202-Antwort einer ist (`apiSend`). */
-export function meldeAntragFallsAngenommen(pfad: string, antwort: unknown): void {
-  if (!istAntragAngenommen(antwort)) return;
-  const einsatzId = einsatzAusPfad(pfad);
+export function dispatchAntragIfAngenommen(pfad: string, antwort: unknown): void {
+  if (!isAntragAngenommen(antwort)) return;
+  const einsatzId = parseEinsatzAusPfad(pfad);
   if (einsatzId == null || typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(ANTRAG_EREIGNIS, { detail: { einsatzId } }));
 }

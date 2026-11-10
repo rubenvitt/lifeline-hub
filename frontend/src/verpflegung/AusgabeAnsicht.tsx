@@ -479,7 +479,7 @@ export default function AusgabeAnsicht() {
       // Nur der Rechtehinweis: er steht ab dem ersten Bild. Der Grund einer abgelehnten Rücknahme
       // käme erst später und schöbe hier alle Tasten nach unten; er steht unter den
       // Sonderkost-Tasten (Spec: eine Ablehnung verschiebt keine Zähltaste).
-      hinweis={!darfSchreiben && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
+      hinweis={!darfZaehlen && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
     >
       <div
         ref={restHoehe}

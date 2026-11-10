@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type MouseEvent } from 'react';
 import { ApiError, apiDatei } from '../api/client';
-import { WIRD_GEHOLT_WORT, istAnhangWirdGeholt } from '../api/anhangAbruf';
+import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../api/anhangAbruf';
 import { einsatzIdAusPfad } from '../api/anhangFassung';
 import { useSpiegelAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 import { speichereDatei } from './dateiSpeichern';
@@ -32,7 +32,7 @@ export function useAnhangDownload(
   const { spiegel, abgleichTakt } = useSpiegelAusCache(einsatzIdAusPfad(href));
   const [stand, setStand] = useState<Stand | null>(null);
 
-  const laden = useCallback(
+  const load = useCallback(
     (takt: number) => {
       setStand({ zustand: 'laedt' });
       apiDatei(href, { timeoutMs: DOWNLOAD_TIMEOUT_MS }).then(
@@ -41,7 +41,7 @@ export function useAnhangDownload(
           speichereDatei(datei, dateiname);
         },
         (e: unknown) => {
-          if (istAnhangWirdGeholt(e)) setStand({ zustand: 'wird_geholt', takt });
+          if (isAnhangWirdGeholt(e)) setStand({ zustand: 'wird_geholt', takt });
           else
             setStand({
               zustand: 'fehler',
@@ -56,15 +56,15 @@ export function useAnhangDownload(
   // Nach dem nächsten Abgleich erneut: der Inhalt kann inzwischen da sein.
   const nochmal = stand?.zustand === 'wird_geholt' && stand.takt !== abgleichTakt;
   useEffect(() => {
-    if (nochmal) laden(abgleichTakt);
-  }, [nochmal, abgleichTakt, laden]);
+    if (nochmal) load(abgleichTakt);
+  }, [nochmal, abgleichTakt, load]);
 
   if (!spiegel) return { onClick: undefined, hinweis: null };
   return {
     onClick: (e) => {
       e.preventDefault();
       if (stand?.zustand === 'laedt') return;
-      laden(abgleichTakt);
+      load(abgleichTakt);
     },
     hinweis:
       stand == null

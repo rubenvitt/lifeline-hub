@@ -1,7 +1,8 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
-import { istAdmin, istEinsatzLeitung } from '../einsatz/schreibrecht';
+import { NUR_LEITUNG_ORG_ADMIN, spiegelGrund } from '../components/nurAnsicht';
+import { istAdmin, istEinsatzLeitung, istSpiegel } from '../einsatz/schreibrecht';
 
 dayjs.extend(utc);
 
@@ -26,7 +27,7 @@ export function istFristverkuerzung(
 
 /** Einsatz-Kontext des Frist-Rechts: Rolle und Org des Einsatzes. */
 export type FristEinsatzKontext =
-  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id'> | null | undefined;
+  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id' | 'spiegel'> | null | undefined;
 
 /** Benutzer-Kontext des Frist-Rechts: System-Rolle und eigene Org. */
 export type FristBenutzerKontext =
@@ -35,14 +36,21 @@ export type FristBenutzerKontext =
 /**
  * Einsatzleitung (Mitgliedschaft) oder System-Admin der Einsatz-Org — wie der Server
  * (`aufbewahrungsfrist_setzen`, LFH-753), unabhängig vom Status. Der Admin einer fremden Org
- * bekäme dort 403, die Aktion steht für ihn deshalb gesperrt.
+ * bekäme dort 403, die Aktion steht für ihn deshalb gesperrt. Am Spiegel (LLH-1492) nie: die Frist
+ * gehört dem Einsatz, den die führende Instanz hält, der Server antwortet 409.
  */
 export function darfFristSetzen(
   einsatz: FristEinsatzKontext,
   benutzer: FristBenutzerKontext,
 ): boolean {
+  if (istSpiegel(einsatz)) return false;
   if (istEinsatzLeitung(einsatz)) return true;
   return istAdmin(benutzer) && einsatz != null && benutzer?.org_id === einsatz.org_id;
+}
+
+/** Grund der Sperre an der Frist: am Spiegel die führende Instanz, sonst die Rollen. */
+export function fristSperrGrund(einsatz: FristEinsatzKontext): string {
+  return einsatz?.spiegel != null ? spiegelGrund(einsatz.spiegel.gegenstelle) : NUR_LEITUNG_ORG_ADMIN;
 }
 
 /**

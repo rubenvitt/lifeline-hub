@@ -14,6 +14,7 @@ import {
 import { listeMeldungen } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Meldung, Person, UhsZielAuswahl } from '../api/types';
+import { isAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -167,8 +168,13 @@ export default function GeraetKontaktePage() {
       if (daten.rtw) {
         const wiederholt = rtwClientId.current != null;
         rtwClientId.current ??= neueClientId();
-        const person = await legePersonAn(einsatzId, { ...daten, client_id: rtwClientId.current });
+        const person: Person | AntragAngenommen = await legePersonAn(einsatzId, {
+          ...daten,
+          client_id: rtwClientId.current,
+        });
         rtwClientId.current = null;
+        // Am Spiegel (LLH-1492) wird auch der RTW zum Antrag, noch ohne Person und ohne Meldung.
+        if (isAntragAngenommen(person)) return { zustand: 'beantragt', antrag: person.antrag };
         rtwAbweichung.current = wiederholt && weichtAb(person, daten);
         return { zustand: 'gesendet', daten: person };
       }
@@ -180,8 +186,10 @@ export default function GeraetKontaktePage() {
         return;
       }
       // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+      // Ein RTW wartet als Antrag auf die führende Instanz: er gehört sofort über Funk.
       if (ergebnis.zustand === 'beantragt') {
-        void message.info('Beantragt · R-…');
+        if (daten.rtw) void message.warning('Beantragt · RTW über Funk anfordern');
+        else void message.info('Beantragt · R-…');
         return;
       }
       const reg = registrierAnzeige(ergebnis.daten.registrier_nr);
@@ -205,8 +213,10 @@ export default function GeraetKontaktePage() {
   const kontakte = [...(personenQuery.data ?? [])].sort((a, b) =>
     b.erfasst_at.localeCompare(a.erfasst_at),
   );
+  // Anträge am Spiegel (LLH-1492) tragen die Einheit nur mit fremder Kennung; das Gerätekonto gehört
+  // zu dieser Einheit, also sind seine Anträge ihre Kontakte.
   const eigeneVorgemerkt = vorgemerkt.filter(
-    (v) => v.aktion.daten.versorgende_einheit_id === einheitId,
+    (v) => v.antrag != null || v.aktion.daten.versorgende_einheit_id === einheitId,
   );
   // Am Spiegel wird die Erfassung zum Antrag (LLH-1492, D13).
   const darfErfassen = darfBeantragen(einsatzQuery.data) && stelle != null;
@@ -241,15 +251,17 @@ export default function GeraetKontaktePage() {
           <Flex vertical gap={token.marginXS} data-lfh="kontakt-liste">
             {eigeneVorgemerkt.map((v) => (
               <KontaktZeile
-                key={v.id ?? v.erstellt_at}
+                key={v.antrag ? `antrag-${v.antrag.id}` : (v.id ?? v.erstellt_at)}
                 reg="R-…"
                 zeit={
                   v.aktion.daten.zeitpunkt_at
                     ? zeitKurz(v.aktion.daten.zeitpunkt_at, konventionen)
-                    : ''
+                    : v.antrag
+                      ? zeitKurz(v.erstellt_at, konventionen)
+                      : ''
                 }
                 anlass={v.aktion.daten.anlass ? ANLASS_WORT[v.aktion.daten.anlass] : undefined}
-                marke={{ ton: 'achtung', wort: 'vorgemerkt' }}
+                marke={{ ton: 'achtung', wort: v.antrag ? 'beantragt' : 'vorgemerkt' }}
               />
             ))}
             {kontakte.map((p) => {

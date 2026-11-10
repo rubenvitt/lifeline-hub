@@ -103,7 +103,7 @@ import {
   unterwegsAus,
 } from './uhsLage';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
-import { WIRD_GEHOLT_WORT, istAnhangWirdGeholt } from '../../api/anhangAbruf';
+import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../../api/anhangAbruf';
 import { useSpiegelAusCache } from '../../einsatz/spiegel/useSpiegelAntraege';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
@@ -1256,7 +1256,7 @@ function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
   });
   // Am Spiegel kommt der Plan auf Abruf (LLH-1492, D8): „wird geholt“, und nach dem nächsten
   // Abgleich (neuer Stand des Kopfs) ein neuer Versuch.
-  const wirdGeholt = bild.isError && istAnhangWirdGeholt(bild.error);
+  const wirdGeholt = bild.isError && isAnhangWirdGeholt(bild.error);
   const { abgleichTakt } = useSpiegelAusCache(einsatzId);
   const { refetch } = bild;
   useEffect(() => {

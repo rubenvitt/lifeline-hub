@@ -99,11 +99,11 @@ export function darfEinsatzVerwalten(
     Benutzer-Parameter: der Server (`EinsatzSchreibzugriff`) lehnt den Admin ohne Schreibrolle mit
     403 ab (LFH-1118). */
 export function darfImEinsatzSchreiben(einsatz?: EinsatzSchreibkontext): boolean {
-  return !istSpiegel(einsatz) && hatSchreibrolleImAktivenEinsatz(einsatz);
+  return !istSpiegel(einsatz) && hasSchreibrolleImAktivenEinsatz(einsatz);
 }
 
 /** Aktiver Einsatz UND Schreibrolle — der gemeinsame Kern von Schreiben und Beantragen. */
-function hatSchreibrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boolean {
+function hasSchreibrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boolean {
   return (
     einsatz?.status === 'aktiv' &&
     (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal')
@@ -121,7 +121,7 @@ function hatSchreibrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boole
  */
 export function darfBeantragen(einsatz?: EinsatzSchreibkontext): boolean {
   if (einsatz?.spiegel?.beendet) return false;
-  return hatSchreibrolleImAktivenEinsatz(einsatz);
+  return hasSchreibrolleImAktivenEinsatz(einsatz);
 }
 
 /** Original eines Bild-Anhangs mit Standort- und Gerätedaten laden (LFH-747, Spec

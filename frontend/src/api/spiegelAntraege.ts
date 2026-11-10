@@ -5,7 +5,7 @@ import type { SpiegelAntragAnzeige } from './types';
  * Anträge am Spiegel (LLH-1492, Spec `spiegel-antraege`, design.md D9): die eigenen offenen,
  * abgelehnten und übernommenen (deren Zeile der Spiegel noch nicht hat) Anträge der Person.
  */
-export function ladeAntraege(einsatzId: number): Promise<SpiegelAntragAnzeige[]> {
+export function loadAntraege(einsatzId: number): Promise<SpiegelAntragAnzeige[]> {
   return apiGet<SpiegelAntragAnzeige[]>(`/api/einsaetze/${einsatzId}/antraege`);
 }
 

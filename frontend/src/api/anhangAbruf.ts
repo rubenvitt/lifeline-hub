@@ -22,13 +22,13 @@ export class AnhangWirdGeholt extends Error {
 }
 
 /** Ob ein Fehler „wird geholt“ heißt (eigener Fehler oder die 409 des Servers). */
-export function istAnhangWirdGeholt(e: unknown): boolean {
+export function isAnhangWirdGeholt(e: unknown): boolean {
   if (e instanceof AnhangWirdGeholt) return true;
   return e instanceof ApiError && e.status === 409 && e.message === ANHANG_WIRD_GEHOLT_TEXT;
 }
 
 /** Liest eine 409-Antwort eines Inhaltsabrufs; heißt sie „wird geholt“, wirft es das. */
-export async function wirfFallsWirdGeholt(res: Response): Promise<void> {
+export async function throwIfWirdGeholt(res: Response): Promise<void> {
   if (res.status !== 409) return;
   let text: unknown = null;
   try {
@@ -44,7 +44,7 @@ export async function wirfFallsWirdGeholt(res: Response): Promise<void> {
  * Ein GET auf dieselbe Adresse: 409 mit dem Text heißt `wird_geholt`, eine 2xx `bereit`, alles
  * andere `fehler`. Nur am Spiegel aufrufen: sonst kostet ein kaputtes Bild einen zweiten Abruf.
  */
-export async function pruefeAnhangAbruf(
+export async function checkAnhangAbruf(
   href: string,
   signal?: AbortSignal,
 ): Promise<'bereit' | 'wird_geholt' | 'fehler'> {
@@ -55,9 +55,9 @@ export async function pruefeAnhangAbruf(
       void res.body?.cancel().catch(() => {});
       return 'bereit';
     }
-    await wirfFallsWirdGeholt(res);
+    await throwIfWirdGeholt(res);
     return 'fehler';
   } catch (e) {
-    return istAnhangWirdGeholt(e) ? 'wird_geholt' : 'fehler';
+    return isAnhangWirdGeholt(e) ? 'wird_geholt' : 'fehler';
   }
 }

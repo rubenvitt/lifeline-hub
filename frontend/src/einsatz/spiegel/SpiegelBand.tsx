@@ -1,6 +1,6 @@
 import { Button, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -12,7 +12,7 @@ import { useAuthOptional } from '../../auth/AuthContext';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
-import { entwurfAnlegenUndAktivieren } from '../../etb/entwuerfe/entwurfStore';
+import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
 import { useSpiegelAntraege } from './useSpiegelAntraege';
 import {
@@ -52,6 +52,17 @@ export default function SpiegelBand({ einsatz }: { einsatz: EinsatzAnzeige | und
     refetchInterval: SPIEGEL_KOPF_ABRUF_MS,
   });
   const antraege = useSpiegelAntraege(einsatzId, aktiv);
+  // Übernahme und Ablehnung kommen mit dem Abgleich und ändern die Zähler im Kopf: dann die Liste
+  // neu laden. Den Kopf holt das Band im Takt, auch wenn kein `lagged` kommt.
+  const qc = useQueryClient();
+  const zaehler = spiegel ? `${spiegel.antraege_ausstehend}/${spiegel.antraege_abgelehnt}` : null;
+  const vorigeZaehler = useRef(zaehler);
+  useEffect(() => {
+    const vorher = vorigeZaehler.current;
+    vorigeZaehler.current = zaehler;
+    if (vorher == null || zaehler == null || vorher === zaehler) return;
+    void qc.invalidateQueries({ queryKey: einsatzKeys.antraege(einsatzId) });
+  }, [zaehler, qc, einsatzId]);
   if (!einsatz || !spiegel) return null;
   return (
     <BandInhalt einsatz={einsatz} antraege={antraege.data} antraegeFehler={antraege.isError} />
@@ -155,10 +166,10 @@ function BandInhalt({
 }
 
 /** Ein ETB-Antrag als Entwurf der Erfassung: Wortlaut, Typ, Von/An, Meldeweg (LLH-1492). */
-function legeEtbEntwurfAn(benutzerId: number, einsatzId: number, daten: unknown): Promise<void> {
+function createEtbEntwurf(benutzerId: number, einsatzId: number, daten: unknown): Promise<void> {
   const d = (daten ?? {}) as Record<string, unknown>;
   const text = (feld: string) => (typeof d[feld] === 'string' ? (d[feld] as string) : undefined);
-  return entwurfAnlegenUndAktivieren(benutzerId, einsatzId, {
+  return createAndActivateEntwurf(benutzerId, einsatzId, {
     inhalt: text('inhalt') ?? '',
     typ: (text('typ') ?? 'meldung') as EtbTyp,
     von: text('von'),
@@ -192,7 +203,7 @@ function AntragZeile({
   const neuErfassen = async () => {
     // Nur das ETB nimmt die Daten als Entwurf auf; die übrigen Orte zeigen sie hier.
     if (a.art === 'etb' && benutzerId != null) {
-      await legeEtbEntwurfAn(benutzerId, einsatzId, a.daten).catch(() => {});
+      await createEtbEntwurf(benutzerId, einsatzId, a.daten).catch(() => {});
     }
     if (ort) navigate(ort);
   };
