@@ -57,7 +57,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 - [x] 7.2 Die 16 Erfassungsorte auf `darfBeantragen`; `erfasse…OfflineFaehig` mit Ergebnis `beantragt`; `useVorgemerkteSchreibaktionen` nimmt Anträge derselben Art dazu; ETB zeigt beantragte Einträge wie ausstehende; Anhang-Knopf am Spiegel aus. Vitest je Ort (Spiegel: Erfassen möglich, Bearbeiten gesperrt; Beantragt sichtbar, nicht in Kennzahlen)
 - [x] 7.3 `SpiegelBand` im Einsatzrahmen (Gegenstelle, Stand, Zähler, „keine Verbindung seit …“, „Abgleich beendet“) mit Antragsliste („Neu erfassen“, „Verwerfen“); Query-Key `antraege` nach `frontend/AGENTS.md`, in `lagebildOffline.guard.test.ts` ausdrücklich draußen mit Grund. Wortlaut per `design:ux-copy`. Vitest
 - [x] 7.4 Seite „Instanzkopplung“: Abschnitt „Einsätze“ je Kopplung, Hinweise (Protokoll 1, Freigabestufe unbekannt, ausgelassene Zeilen); Endpunkt dafür samt Typ-Codegen. Vitest
-- [ ] 7.5 e2e-Fall in `frontend/e2e/`: Einsatz per Testhelfer als Spiegel markiert; Band sichtbar, Bearbeiten gesperrt, ETB-Erfassung wird „Beantragt“. Lauf grün
+- [x] 7.5 e2e-Fall in `frontend/e2e/`: Einsatz per Testhelfer als Spiegel markiert; Band sichtbar, Bearbeiten gesperrt, ETB-Erfassung wird „Beantragt“. Lauf grün
 - [x] 7.6 `frontend/src/offline/AGENTS.md`: Abschnitt „Anträge am Spiegel“ (Verhältnis zur Warteschlange, Query-Key draußen, `beantragt`)
 
 ## 8. Widerruf (D14)
