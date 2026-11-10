@@ -91,7 +91,14 @@ pub struct PaketPosten {
 /// Bezeichnung aus der Datei.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum QualiAngabe {
-    Id(i64),
+    /// Eine Kennung des Katalogs mit ihrer Bezeichnung (LLH-1611). Die Bezeichnung kommt aus dem
+    /// Katalog der Organisation einschließlich deaktivierter Einträge; sie benennt den Hinweis,
+    /// wenn die Kennung unter den aktiven fehlt. `None` nur, wenn der Katalog die Kennung gar
+    /// nicht kennt.
+    Id {
+        id: i64,
+        name: Option<String>,
+    },
     Bezeichnung(String),
 }
 

@@ -633,7 +633,7 @@ fn quali_soll_schluessel(q: &[PaketQualiSoll]) -> Vec<(String, i64)> {
         .iter()
         .map(|e| match &e.qualifikation {
             QualiAngabe::Bezeichnung(b) => (norm(b), e.anzahl),
-            QualiAngabe::Id(id) => (id.to_string(), e.anzahl),
+            QualiAngabe::Id { id, .. } => (id.to_string(), e.anzahl),
         })
         .collect();
     v.sort();
