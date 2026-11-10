@@ -20,7 +20,7 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 - [x] 2.1 Migration `einsatz_spiegel`, `spiegel_herkunft`, `spiegel_uebernahme` (Merker), `spiegel_ziel` und Schutz-Trigger aus dem Generator (`_spiegel_schutz_i/_u/_d`). `AppError`: Nachricht `einsatz_ist_spiegel` → 409 „Dieser Einsatz ist ein Spiegel“, Fall in `tests/fehler_vertrag.rs`. Tests: Schreibroute auf Spiegel → 409, auf eigenen Einsatz → 2xx; unter Merker schreibbar
 - [x] 2.2 Schreibende Routen am Spiegel enden mit 409 aus dem Schutz-Trigger (Nachtrag D9/D10: keine Sperrschicht für alle Methoden). Test über eine Auswahl Routen je Modul (PATCH, DELETE, POST); die Lesemarke des ETB bleibt am Spiegel schreibbar
-- [ ] 2.3 Hintergrundläufe durchgehen (Erinnerungen, Ablösung-Vorwarnung, Pegel, Benachrichtigungen, Aufbewahrung, Schwärzungsjobs, weitere per `grep tokio::spawn`): Spiegel auslassen. Test je Lauf mit einem Spiegel-Einsatz ohne 409 im Log
+- [x] 2.3 Hintergrundläufe durchgehen (Erinnerungen, Ablösung-Vorwarnung, Pegel, Benachrichtigungen, Aufbewahrung, Schwärzungsjobs, weitere per `grep tokio::spawn`): Spiegel auslassen. Test je Lauf mit einem Spiegel-Einsatz ohne 409 im Log
 
 ## 3. Liefern und Übernehmen (D5, D6, D7)
 
