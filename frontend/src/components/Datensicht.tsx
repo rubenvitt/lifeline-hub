@@ -1826,8 +1826,6 @@ export default function Datensicht<T extends object, const K extends string>(
           mode="multiple"
           allowClear
           maxTagCount="responsive"
-          // Eigene Kennung: ohne sie vergibt antd im Test eine feste (`test-id`), die mit der
-          // Titelkennung eines Dialogs auf derselben Seite kollidiert.
           id={`${idPraefix}-filter-${idTeil(spalte.key)}`}
           aria-label={etikettVon(spalte) ?? spalte.key}
           /*
