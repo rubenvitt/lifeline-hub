@@ -261,6 +261,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Vorgabe je Funktion (LLH-1421): Einstellung des Einsatzes, modul-los wie die übrigen
     // Einstellungen.
     ("/api/einsaetze/{id}/benachrichtigung-vorgaben", None),
+    // Eigene Anträge an einem Spiegel (LLH-1492): modul-los. Ein Antrag gehört dem Konto, das ihn
+    // gestellt hat; das Modulrecht prüfte schon die Erfassung, aus der er entstand.
+    ("/api/einsaetze/{id}/antraege", None),
     // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].

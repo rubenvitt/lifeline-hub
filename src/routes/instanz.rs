@@ -616,7 +616,7 @@ pub async fn spiegel_abgleich(
 /// `spiegel-antraege`); an einem eigenen Einsatz leer.
 pub async fn antraege_liste(
     State(state): State<AppState>,
-    ctx: crate::einsatz::kontext::EinsatzKontext,
+    ctx: crate::einsatz::kontext::EinsatzLesezugriff,
 ) -> Result<Json<Vec<crate::instanz::spiegel::antrag::SpiegelAntragAnzeige>>, AppError> {
     Ok(Json(
         crate::instanz::spiegel::antrag::liste(&state.pool, ctx.einsatz.id, ctx.benutzer.id)
@@ -625,9 +625,11 @@ pub async fn antraege_liste(
 }
 
 /// DELETE /api/einsaetze/{id}/antraege/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
+/// Lese- statt Schreib-Gate: der Antrag ist Buchführung dieser Instanz, keine Einsatzdaten, und
+/// gehört dem Konto, das ihn gestellt hat.
 pub async fn antrag_verwerfen(
     State(state): State<AppState>,
-    ctx: crate::einsatz::kontext::EinsatzKontext,
+    ctx: crate::einsatz::kontext::EinsatzLesezugriff,
     PfadParam((_eid, antrag_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     crate::instanz::spiegel::antrag::verwerfen(
