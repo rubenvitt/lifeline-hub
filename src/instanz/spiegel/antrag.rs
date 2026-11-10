@@ -740,24 +740,26 @@ pub async fn markiere_zugestellt(conn: &mut SqliteConnection, ids: &[i64]) -> Re
     Ok(())
 }
 
-/// Übernimmt Quittungen des Führers.
+/// Übernimmt Quittungen des Führers; liefert die Spiegel, deren Anträge sich geändert haben
+/// (Live-Ereignis: die Antragsliste am Spiegel gleicht sich ab, auch ohne neue Zeile).
 pub async fn quittungen_uebernehmen(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     quittungen: &[AntragQuittung],
-) -> Result<(), AppError> {
+) -> Result<Vec<i64>, AppError> {
+    let mut einsaetze = Vec::new();
     for q in quittungen.iter().take(ANTRAEGE_MAX) {
         let zustand = match q.ergebnis.as_str() {
             "uebernommen" => "uebernommen",
             _ => "abgelehnt",
         };
-        sqlx::query(
+        let geaendert: Option<i64> = sqlx::query_scalar(
             "UPDATE spiegel_antrag SET zustand = ?, grund = ?, ergebnis_art = ?, \
              ergebnis_schluessel = ?, geaendert_at = ? \
              WHERE id = ? AND zustand IN ('ausstehend', 'zugestellt') \
              AND einsatz_id IN (SELECT s.einsatz_id FROM einsatz_spiegel s \
                  JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-                 WHERE o.kopplung_id = ?)",
+                 WHERE o.kopplung_id = ?) RETURNING einsatz_id",
         )
         .bind(zustand)
         .bind(
@@ -770,10 +772,15 @@ pub async fn quittungen_uebernehmen(
         .bind(crate::zeit::jetzt())
         .bind(q.id)
         .bind(kopplung_id)
-        .execute(&mut *conn)
+        .fetch_optional(&mut *conn)
         .await?;
+        if let Some(e) = geaendert {
+            if !einsaetze.contains(&e) {
+                einsaetze.push(e);
+            }
+        }
     }
-    Ok(())
+    Ok(einsaetze)
 }
 
 // ── Beim Führer ──────────────────────────────────────────────────────────────────────────────

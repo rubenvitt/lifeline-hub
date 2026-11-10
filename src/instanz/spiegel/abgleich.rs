@@ -196,7 +196,8 @@ pub async fn melde_live(pool: &SqlitePool, u: &Uebernommen) {
     let Some(live) = crate::instanz::stammdaten::live() else {
         return;
     };
-    for id in &u.einsaetze {
+    let mut gemeldet = std::collections::BTreeSet::new();
+    for id in u.einsaetze.iter().filter(|id| gemeldet.insert(**id)) {
         live.publiziere_event(
             *id,
             crate::live::LiveEvent::Lagged,
@@ -246,7 +247,9 @@ pub async fn handle_abgleich(
         let fertig =
             super::anhang::uebernehme_teile(conn, kopplung.id, &anfrage.anhang_teile).await?;
         uebernommen.einsaetze.extend(fertig);
-        super::antrag::quittungen_uebernehmen(conn, kopplung.id, &anfrage.quittungen).await?;
+        let quittiert =
+            super::antrag::quittungen_uebernehmen(conn, kopplung.id, &anfrage.quittungen).await?;
+        uebernommen.einsaetze.extend(quittiert);
         // Anträge stehen vorn (D8) und zählen ins Budget.
         let (antraege, antrag_bytes) =
             super::antrag::offene_antraege(conn, kopplung.id, false).await?;
@@ -367,7 +370,10 @@ pub async fn abgleich_einmal(
             uebernommen.einsaetze.extend(fertig);
             let gesendet: Vec<i64> = anfrage.antraege.iter().map(|a| a.id).collect();
             super::antrag::markiere_zugestellt(conn, &gesendet).await?;
-            super::antrag::quittungen_uebernehmen(conn, kopplung.id, &antwort.quittungen).await?;
+            let quittiert =
+                super::antrag::quittungen_uebernehmen(conn, kopplung.id, &antwort.quittungen)
+                    .await?;
+            uebernommen.einsaetze.extend(quittiert);
             let quittiert: Vec<i64> = anfrage.quittungen.iter().map(|q| q.id).collect();
             let offen: Vec<i64> = antwort.antraege.iter().map(|a| a.id).collect();
             super::antrag::markiere_gemeldet(conn, kopplung.id, &quittiert, &offen).await?;
