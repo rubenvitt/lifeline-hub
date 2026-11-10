@@ -669,7 +669,7 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
-    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0313).
+    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0314).
     enum_wire!(lifeline_hub::instanz::fuehrung::FuehrungWechselArt {
         Angelegt => "angelegt",
         Uebergabe => "uebergabe",
