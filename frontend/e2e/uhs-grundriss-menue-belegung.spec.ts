@@ -138,7 +138,9 @@ function dropZone(page: Page, titel: string): Locator {
 // (LLH-1624). Kam die Person aus „Noch nicht aufgenommen", wurde aus „Auflösen" im Seitenkopf
 // „Auflösen (noch 1 Person)"; war der Kopf knapp, brach er um, der Grundriss rutschte ~35 px, und
 // der Klick traf das „frei"-Tag statt „…". Darum steht die Person vor dem Messen schon im
-// Wartebereich derselben UHS: der Zug von dort auf den Platz lässt den Kopf, wie er ist.
+// Wartebereich derselben UHS: der Zug von dort auf den Platz lässt den Kopf, wie er ist. Den
+// Sprung selbst behebt LLH-1627 (Test unten); der Weg über den Wartebereich bleibt, weil dieser
+// Test den Klick nach dem Zug prüft, nicht den Kopf.
 test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', async ({ page }) => {
   const personName = await grundrissMitZweiPlaetzen(page);
   const wartebereich = dropZone(page, 'Wartebereich (Eingang)');
@@ -168,4 +170,52 @@ test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', as
 
   await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
   await expect(karte.getByText('aufbereitung')).toBeVisible();
+});
+
+// Ablegen des ersten Patienten lässt den Grundriss stehen, auch wenn der Seitenkopf auf der
+// Kippe steht (LLH-1627). Aus „Auflösen“ wird „Auflösen (noch 1 Person)“; der Knopf hält die
+// Breite dieser Form schon vorher (`components/BreiteHalten.tsx`). Ohne das wuchs er beim Ablegen,
+// die Aktionen brachen in eine zweite Zeile, und alles darunter rückte ~35 px.
+//
+// Die Kippe ist gebaut, nicht vom Zufall der Namenslängen abhängig: der Titelblock bekommt genau
+// den Platz neben den Aktionen, bis auf 1 px. Jeder Zuwachs der Aktionen bräche dann um.
+test('UHS Grundriss: Ablegen aus „Noch nicht aufgenommen“ verschiebt den Grundriss nicht', async ({
+  page,
+}) => {
+  const personName = await grundrissMitZweiPlaetzen(page);
+  // Serverstand: die Personenliste ist da, niemand belegt, der Kopf steht endgültig.
+  await expect(page.getByRole('button', { name: 'Auflösen', exact: true })).toBeEnabled();
+
+  const kopf = page.locator('[data-lfh="seitenkopf"]');
+  await kopf.evaluate((el) => {
+    const titel = el.querySelector<HTMLElement>('.lfh-seitenkopf__titelblock')!;
+    const aktionen = el.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    const stil = getComputedStyle(el);
+    const innen = el.clientWidth - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight);
+    const platz = innen - parseFloat(stil.columnGap) - aktionen.getBoundingClientRect().width - 1;
+    titel.style.flex = `0 0 ${Math.floor(platz)}px`;
+  });
+  const vorher = (await kopf.boundingBox())!;
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
+  const k = (await karte.boundingBox())!;
+  // Aktionen und Titelblock stehen in EINER Zeile: sonst prüfte der Test die Kippe nicht.
+  const aktionenBox = (await page.locator('[data-lfh="seitenkopf-aktionen"]').boundingBox())!;
+  const titelBox = (await kopf.locator('.lfh-seitenkopf__titelblock').boundingBox())!;
+  expect(aktionenBox.y, 'Aktionen stehen schon vor dem Zug in einer zweiten Zeile').toBeLessThan(
+    titelBox.y + titelBox.height,
+  );
+
+  await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
+  // Serverstand nach dem Ablegen: erst mit der neuen Personenliste wechselt der Wortlaut.
+  await expect(page.getByRole('button', { name: 'Auflösen (noch 1 Person)' })).toBeDisabled();
+
+  const nachher = (await kopf.boundingBox())!;
+  expect(Math.round(nachher.height), 'Seitenkopf ist beim Ablegen gewachsen').toBe(
+    Math.round(vorher.height),
+  );
+  const kn = (await karte.boundingBox())!;
+  expect(
+    { x: Math.round(kn.x), y: Math.round(kn.y) },
+    'Grundriss hat sich durch das Ablegen verschoben',
+  ).toEqual({ x: Math.round(k.x), y: Math.round(k.y) });
 });
