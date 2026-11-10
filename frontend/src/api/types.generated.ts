@@ -1186,7 +1186,7 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0312_einsatz_fuehrung.sql`)
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0313_einsatz_fuehrung.sql`)
          *     spiegelt `ALLE`.
          * @enum {string}
          */
