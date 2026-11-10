@@ -71,9 +71,9 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 ## 10. Abschluss
 
-- [ ] 10.1 Review-Fan-out (Sicherheit mit Schwerpunkt D11, Korrektheit, Konventionen, Tests) und `superpowers:requesting-code-review`; bestätigte Befunde behoben
-- [ ] 10.2 Bilder der Änderung (Band am Spiegel, gesperrte Bearbeitung, beantragter ETB-Eintrag, abgelehnter Antrag, Abschnitt „Einsätze“ der Seite „Instanzkopplung“) für PR und Meldung
-- [ ] 10.3 `./scripts/check-all.sh` grün (lokal das Bündel `schnell` und die betroffenen Suiten, voll über die CI des PRs)
+- [x] 10.1 Review-Fan-out (Sicherheit mit Schwerpunkt D11, Korrektheit, Konventionen, Tests) und `superpowers:requesting-code-review`; bestätigte Befunde behoben
+- [x] 10.2 Bilder der Änderung (Band am Spiegel, gesperrte Bearbeitung, beantragter ETB-Eintrag, abgelehnter Antrag, Abschnitt „Einsätze“ der Seite „Instanzkopplung“) für PR und Meldung
+- [x] 10.3 `./scripts/check-all.sh` grün (lokal das Bündel `schnell` und die betroffenen Suiten, voll über die CI des PRs)
 
 ## Workflow follow-up
 

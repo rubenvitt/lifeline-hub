@@ -11,7 +11,7 @@ gilt_fuer:
   - migrations/0313_einsatz_spiegel.sql
   - frontend/src/offline/queue.ts
 herleitung:
-  - openspec/changes/polrv1lt-spiegel-antraege/design.md
+  - openspec/changes/archive/2026-11-10-polrv1lt-spiegel-antraege/design.md
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md
 ---
 

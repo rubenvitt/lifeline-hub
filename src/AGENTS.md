@@ -352,7 +352,7 @@ Herleitung in
 - **Spiegel und Anträge (LLH-1492)**, Specs `einsatz-spiegel` und `spiegel-antraege`,
   Entscheidung
   [ADR-0018](../docs/architektur/entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md),
-  Herleitung `openspec/changes/polrv1lt-spiegel-antraege/design.md`:
+  Herleitung `openspec/changes/archive/2026-11-10-polrv1lt-spiegel-antraege/design.md`:
   - **Eine neue Einsatztabelle** (neu in `einsatz::schwaerzung_registry::TABELLEN`) **bekommt
     einen Eintrag in `instanz::spiegel::art`**: `GESPIEGELT` mit Kategorie oder `AUSGENOMMEN` mit
     Grund. Eine gespiegelte bekommt in ihrer eigenen Migration ihre Log- und Schutz-Trigger

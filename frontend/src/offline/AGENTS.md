@@ -267,7 +267,7 @@ draußen gelassen werden.
 Gilt für `einsatz/spiegel/`, `api/antragEreignis.ts`, `api/spiegelAntraege.ts`,
 `offline/antragAlsVormerkung.ts` und jede Stelle, die das Ergebnis einer
 `erfasse…OfflineFaehig`/`save…OfflineCapable`-Funktion auswertet. Herleitung:
-`openspec/changes/polrv1lt-spiegel-antraege/design.md`, D9 und D13.
+`openspec/changes/archive/2026-11-10-polrv1lt-spiegel-antraege/design.md`, D9 und D13.
 
 - **Am Spiegel wird beantragt, nicht geschrieben.** Führt eine andere Instanz den Einsatz
   (`EinsatzAnzeige.spiegel` gesetzt), antworten genau die vormerkbaren Erfassungen mit **202** und

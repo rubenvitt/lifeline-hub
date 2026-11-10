@@ -176,7 +176,7 @@ sequenceDiagram
   gespiegelter oder gelieferter Einsatz aktiv ist oder etwas aussteht
   (`--instanz-spiegel-sekunden`), sonst im Takt der Meldung
   ([ADR-0018](../architektur/entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md),
-  `openspec/changes/polrv1lt-spiegel-antraege/design.md`, D6, D8, D12).
+  `openspec/changes/archive/2026-11-10-polrv1lt-spiegel-antraege/design.md`, D6, D8, D12).
 - ~~**Protokollversion:**~~ beantwortet am 08.11.2026 (LLH-1490): ganzzahlig, beide Seiten
   sprechen N und N−1, bei größerem Abstand nur Melden und der Hinweis „Update nötig“. Ebenso
   festgelegt: Schlüsselverfahren und Einmal-Code
