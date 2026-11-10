@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { tippeZeit } from '../../test/zeitEingabe';
 import { waehleMenueEintrag } from '../../test/menue';
 import EinsatzGeraete from './EinsatzGeraete';
@@ -553,5 +554,28 @@ describe('Gerät koppeln aus dem Einheiten-Detail (LLH-1579)', () => {
     expect(within(neu).queryAllByTitle('Einheit')).toHaveLength(0);
     expect(within(neu).queryByText('Einheit wählen')).not.toBeInTheDocument();
     expect(within(neu).getByText('Ansicht wählen')).toBeInTheDocument();
+  });
+});
+
+describe('EinsatzGeraete · Kontextmenü (LLH-1599)', () => {
+  const eintragVon = (name: string) =>
+    [...document.querySelectorAll<HTMLElement>('[data-lfh="geraet-eintrag"]')].find((e) =>
+      e.textContent?.includes(name),
+    )!;
+
+  it('Rechtsklick auf eine aktive Kopplung zeigt die Einträge des ⋮; beendete ohne eigenes Menü', async () => {
+    stelleBereit({ kopplungen: [kopplung(1, 'aktiv'), kopplung(2, 'widerrufen')] });
+    rendern();
+    await screen.findByText('UHS Nord · Tablet 1');
+    const menue = await oeffneKontextmenue(eintragVon('UHS Nord · Tablet 1'));
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Gerät UHS Nord · Tablet 1');
+    expect(eintraegeVon(menue)).toEqual([
+      'Neuen Code ausstellen',
+      'Verlängern …',
+      'rot:Widerrufen …',
+    ]);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Widerrufen/ }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Tablet 1');
+    erwarteBrowsermenue(eintragVon('UHS Nord · Tablet 2'));
   });
 });

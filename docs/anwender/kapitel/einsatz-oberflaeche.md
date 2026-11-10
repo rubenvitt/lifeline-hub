@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -296,10 +296,16 @@ der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers 
 durch langes Drücken markieren, außer im Einsatztagebuch (siehe unten).
 
 Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, an den
-Blöcken im Raster des Schichtplans (Kapitel [Ablösung](abloesung.md)) und im Einsatztagebuch an den
-Einträgen und an den Chips der Erfassung. Im Einsatztagebuch öffnen es nur Rechtsklick und Tasten;
-ein langer Druck am Tablet markiert dort weiter Text. Lagekarte und Fernmeldeskizze haben ein
-eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
+Blöcken im Raster des Schichtplans (Kapitel [Ablösung](abloesung.md)), im Einsatztagebuch an den
+Einträgen und an den Chips der Erfassung, im Kommunikationsplan, in den Einstellungen des Einsatzes
+bei Pegeln, Geräten und Lagemonitoren, bei den Personen einer Einheit und an den Bild-Hintergründen
+der Lagekarte. Im Einsatztagebuch öffnen es nur Rechtsklick und Tasten; ein langer Druck am Tablet
+markiert dort weiter Text. In der Verwaltung gilt es für die Stammdaten (Fahrzeuge, Personal,
+Material, Schichtmodelle, Externe Stellen, Sprechgruppen, Verpflegungsplan) und für die Benutzer;
+Stammdaten, die am Hub gepflegt werden, haben keines. Wo eine Zeile ihre Aktionen als Knöpfe zeigt
+(etwa „Bearbeiten“ und „Deaktivieren“), stehen im Kontextmenü dieselben. Bei einem Bild-Hintergrund
+öffnet es nur auf dem Namen, nicht auf Schalter, Deckkraft und Ansicht. Lagekarte und
+Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 
 ### Was die Sprungpalette kennt
 

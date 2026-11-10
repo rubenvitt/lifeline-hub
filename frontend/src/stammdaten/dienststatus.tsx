@@ -3,7 +3,8 @@ import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-quer
 import StatusTag from '../components/StatusTag';
 import type { KatalogSpalte } from '../components/KatalogTabelle';
 import { nachZahl } from '../components/katalogVergleich';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { WeitereAktionen } from '../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import type { Dienststatus } from '../api/types';
 import { VomHubGesperrt } from '../instanz/herkunft';
 import { dienststatus } from '../theme/statusFarben';
@@ -56,6 +57,58 @@ const DIENSTSTATUS_FILTER = DIENSTSTATUS_REIHENFOLGE.map((s) => ({
   value: s,
 }));
 
+export interface DienststatusOptionen<T> {
+  mutation: DienststatusMutation;
+  istAdmin: boolean;
+  onBearbeiten: (eintrag: T) => void;
+  schmal: boolean;
+  /** Menschenlesbare Kennung der Zeile für den zugänglichen Namen des Aktionsmenüs. */
+  kennung: (eintrag: T) => string;
+  /** Zeile kommt vom Hub (LLH-1493): statt der Knöpfe steht der Grund, warum es hier nicht geht. */
+  vomHub?: (eintrag: T) => boolean;
+}
+
+/**
+ * Die Aktionen einer Zeile als Beschreibung (LLH-1599, `KatalogTabelle.zeilenMenue`, design.md D5):
+ * EINE Quelle für das schmale ⋮ und das Kontextmenü auf jeder Breite. Breit stehen dieselben zwei
+ * Handlungen als Knöpfe ({@link dienststatusSpalten}); `verwaltungstabellen.test.tsx` hält beide
+ * gleich. Ohne Verwaltungsrecht `undefined`; vom Hub verwaltete Zeilen tragen keine Einträge
+ * (Browsermenü, wie ihr gesperrter Platzhalter).
+ */
+export function dienststatusMenue<T extends { id: number; dienststatus: Dienststatus }>({
+  mutation,
+  istAdmin,
+  onBearbeiten,
+  kennung,
+  vomHub,
+}: DienststatusOptionen<T>): WeitereAktionen<T> | undefined {
+  if (!istAdmin) return undefined;
+  /**
+   * Eine laufende Mutation sperrt GENAU EINE Zeile, nicht die ganze Tabelle. Der Observer kennt nur
+   * den jüngsten Aufruf, die Marke wandert also beim Klick auf eine andere Zeile — unschädlich,
+   * weil der Endpunkt einen Status SETZT (idempotent), nicht umschaltet.
+   */
+  const laeuft = (t: T) => mutation.isPending && mutation.variables?.id === t.id;
+  return {
+    eintraege: (t) => {
+      if (vomHub?.(t)) return [];
+      // „Außer Dienst nehmen“ bleibt rot (dieselbe Handlung wie der rote Knopf).
+      return [
+        { key: 'bearbeiten', label: 'Bearbeiten' },
+        t.dienststatus === 'in_dienst'
+          ? { key: 'dienst', label: DIENSTSTATUS_HANDLUNG.ausser_dienst, gefahr: true }
+          : { key: 'dienst', label: DIENSTSTATUS_HANDLUNG.in_dienst },
+      ];
+    },
+    zugaenglicherName: (t) => `Aktionen zu ${kennung(t)}`,
+    laeuft,
+    onWahl: (aktion, t) => {
+      if (aktion === 'bearbeiten') onBearbeiten(t);
+      else if (!laeuft(t)) mutation.mutate({ id: t.id, inDienst: t.dienststatus !== 'in_dienst' });
+    },
+  };
+}
+
 /**
  * Status- und (nur für Admins) Aktionsspalte der Stammdaten-Tabellen Fahrzeuge, Personal
  * und Material. Die Farbrolle des Dienststatus steht im Vertrag (`theme/statusFarben.ts`,
@@ -66,23 +119,11 @@ const DIENSTSTATUS_FILTER = DIENSTSTATUS_REIHENFOLGE.map((s) => ({
  * (`schmal`) passen zwei Knöpfe neben der fixierten Kennung und dem Status nicht mehr in 390 px;
  * dort stehen sie im Aktionsmenü, benannt mit der Zeilenkennung (`kennung`).
  */
-export function dienststatusSpalten<T extends { id: number; dienststatus: Dienststatus }>({
-  mutation,
-  istAdmin,
-  onBearbeiten,
-  schmal,
-  kennung,
-  vomHub,
-}: {
-  mutation: DienststatusMutation;
-  istAdmin: boolean;
-  onBearbeiten: (eintrag: T) => void;
-  schmal: boolean;
-  /** Menschenlesbare Kennung der Zeile für den zugänglichen Namen des Aktionsmenüs. */
-  kennung: (eintrag: T) => string;
-  /** Zeile kommt vom Hub (LLH-1493): statt der Knöpfe steht der Grund, warum es hier nicht geht. */
-  vomHub?: (eintrag: T) => boolean;
-}): KatalogSpalte<T>[] {
+export function dienststatusSpalten<T extends { id: number; dienststatus: Dienststatus }>(
+  optionen: DienststatusOptionen<T>,
+): KatalogSpalte<T>[] {
+  const { mutation, istAdmin, onBearbeiten, schmal, vomHub } = optionen;
+  const menue = dienststatusMenue(optionen);
   const status: KatalogSpalte<T> = {
     title: 'Status',
     key: 'dienststatus',
@@ -107,34 +148,11 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
       fixed: 'right',
       render: (_, t) => {
         if (vomHub?.(t)) return <VomHubGesperrt />;
-        /**
-         * Eine laufende Mutation sperrt GENAU EINE Zeile, nicht die ganze Tabelle. Der
-         * Observer kennt nur den jüngsten Aufruf, die Marke wandert also beim Klick auf
-         * eine andere Zeile — unschädlich, weil der Endpunkt einen Status SETZT
-         * (idempotent), nicht umschaltet.
-         */
+        // Dieselben zwei Handlungen wie in der Knopfreihe darunter, aus der Beschreibung.
+        if (schmal && menue) return <ZeilenMenueAusloeser menue={menue} zeile={t} />;
+        // Eine laufende Mutation sperrt genau eine Zeile (siehe `dienststatusMenue`).
         const laeuft = mutation.isPending && mutation.variables?.id === t.id;
         const inDienst = t.dienststatus === 'in_dienst';
-        if (schmal) {
-          // Dieselben zwei Handlungen wie in der Knopfreihe darunter; „Außer Dienst nehmen" bleibt rot.
-          return (
-            <MenueAusloeser
-              eintraege={[
-                { key: 'bearbeiten', label: 'Bearbeiten' },
-                inDienst
-                  ? { key: 'dienst', label: DIENSTSTATUS_HANDLUNG.ausser_dienst, gefahr: true }
-                  : { key: 'dienst', label: DIENSTSTATUS_HANDLUNG.in_dienst },
-              ]}
-              zugaenglicherName={`Aktionen zu ${kennung(t)}`}
-              gesperrt={laeuft}
-              laeuft={laeuft}
-              onWahl={(aktion) => {
-                if (aktion === 'bearbeiten') onBearbeiten(t);
-                else if (!laeuft) mutation.mutate({ id: t.id, inDienst: !inDienst });
-              }}
-            />
-          );
-        }
         return (
           <Space size="middle">
             <Button disabled={laeuft} onClick={() => onBearbeiten(t)}>

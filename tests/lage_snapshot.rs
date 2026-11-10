@@ -964,3 +964,46 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
         "unverändert lesbar"
     );
 }
+
+/// Spec `einsatzkopf-live`, „Funktionsfelder folgen der Mitgliedschaft“ (pkjvl5iy): Der Stand hat
+/// keinen abfragenden Benutzer. Code und Bezeichnung der eigenen Funktion friert er nicht ein,
+/// auch wenn der Erzeuger eine Funktion trägt — die Bezeichnung stünde sonst ungeschwärzt im
+/// Dokument.
+#[tokio::test]
+async fn snapshot_friert_die_eigene_funktion_nicht_ein() {
+    let (app, e, cookie) = setup_http().await;
+    let (_, ich) = anfrage(&app, "GET", "/api/auth/me", &cookie, None).await;
+    let ich = ich["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/mitglieder/{ich}"),
+        &cookie,
+        Some(r#"{"einsatz_rolle":"einsatzleitung","fuehrungsfunktion":"fachberater","fuehrungsstelle":"THW"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let (_, kopf) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}"), &cookie, None).await;
+    assert_eq!(kopf["meine_funktion_code"], "fachberater");
+    assert_eq!(kopf["meine_funktion_bezeichnung"], "THW");
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &cookie,
+        Some(r#"{"bezeichnung":"Stand 1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let einsatz = v["daten"]["einsatz"]
+        .as_object()
+        .expect("Stand trägt den Einsatz");
+    for feld in [
+        "meine_funktion",
+        "meine_funktion_code",
+        "meine_funktion_bezeichnung",
+    ] {
+        assert!(!einsatz.contains_key(feld), "{feld} im Stand: {einsatz:?}");
+    }
+}

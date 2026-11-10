@@ -654,7 +654,12 @@ anwendbar), „nicht geprüft" ist keins.
   8 px) und Kontextmenü-Taste/Umschalt+F10 kommen aus **`components/useKontextMenue.ts`**, das Menü
   eines Datensatzes ist **`components/KontextMenue.tsx`** in der Schale `PunktankerMenue`. Die
   Einträge kommen aus derselben Quelle wie Primärknopf und ⋮-Menü (`Datensicht`:
-  `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Auf Link,
+  `datensichtKontext.ts` aus `aktion` + `weitere`), nie aus einer zweiten Liste. Außerhalb der
+  `Datensicht` (LLH-1599, `openspec/changes/archive/2026-11-09-lor2qhep-kontextmenue-tabellen/design.md`) beschreibt
+  die Seite die Aktionen einer Zeile EINMAL als `WeitereAktionen` und reicht sie an
+  `KatalogTabelle.zeilenMenue` bzw. `useZeilenMenueKontext` (Listen, eigene Zeilen) UND an das ⋮
+  (`ZeilenMenueAusloeser`); eine Knopfreihe am breiten Schirm hält ein Seitentest gleich. Eine Zeile
+  mit Reglern oder Schaltern trägt die Handler nur am Namensteil. Auf Link,
   Eingabefeld und markiertem Text und ohne Einträge bleibt das Browsermenü; die Taste öffnet auch auf
   dem Titel-Link. Kein eigenes `onContextMenu` (`kontextMenue.guard.test.ts`); die Lagekarte bleibt
   beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`. Eine Lesefläche

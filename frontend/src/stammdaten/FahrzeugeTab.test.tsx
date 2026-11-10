@@ -3,6 +3,12 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  knopfreiheVon,
+  oeffneKontextmenue,
+} from '../test/kontextmenue';
 import { renderMitProviders, sortTarget } from '../test/utils';
 import FahrzeugeTab from './FahrzeugeTab';
 import { adminFixture } from '../test/fixtures';
@@ -370,5 +376,11 @@ describe('FahrzeugeTab mit Stammdaten vom Hub (LLH-1493)', () => {
     const lokal = screen.getByText('Geliehen 1').closest('tr')!;
     expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
     expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+
+    // Kontextmenü (LLH-1599): die Hub-Zeile hat keine Aktion, also bleibt das Browsermenü; die
+    // Zeile vor Ort zeigt dieselben Handlungen wie ihre Knöpfe.
+    erwarteBrowsermenue(within(hubZeile).getByText('Wird am Hub gepflegt'));
+    const menue = await oeffneKontextmenue(within(lokal).getByText('nur hier'));
+    expect(eintraegeVon(menue)).toEqual(knopfreiheVon(lokal));
   });
 });
