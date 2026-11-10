@@ -117,7 +117,9 @@ export default function PlanungUebernahmeDialog({
       if (istKonflikt(e)) requestVorschau({ ziel: v.ziel, wahl: v.wahl });
     },
   });
-  const standGeaendert = istKonflikt(uebernehmenMut.error);
+  // Nur wenn die neu geholte Vorschau steht: ein anderer 409 (schon übernommen, Einsatz
+  // abgeschlossen) scheitert auch in der Vorschau und behält seinen eigenen Text.
+  const standGeaendert = istKonflikt(uebernehmenMut.error) && vorschauMut.isSuccess;
 
   // Beim Öffnen gilt „Neuer Einsatz“ ohne Vorlage: die Vorschau steht gleich da.
   useEffect(() => {
