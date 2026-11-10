@@ -741,6 +741,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::betreuung_registrierung::liste)
                 .post(routes::betreuung_registrierung::registrieren),
         )
+        // Registrierliste drucken (LLH-1616): je Person protokolliert.
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen/druck",
+            get(routes::betreuung_registrierung::druck),
+        )
         .route(
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
             post(routes::betreuung_registrierung::abmelden),

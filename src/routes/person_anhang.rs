@@ -101,7 +101,7 @@ pub async fn datei(
         let ablage = person_anhang::ablage_name(person.registrier_nr);
         original_freigeben(&state, &ctx, anhang_id, &ablage).await?;
     }
-    audit_repo::anlegen(
+    audit_repo::create(
         &state.pool,
         einsatz_id,
         Some(person_id),

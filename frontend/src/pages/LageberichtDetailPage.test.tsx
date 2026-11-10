@@ -735,8 +735,8 @@ describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
  *
  * Zwilling des Blocks „Router-Blocker (LFH-462)“ in `BefehlDetailPage.test.tsx`: derselbe Baustein
  * (`entwurf/EntwurfNavigationSchutz.tsx`), dieselben Antworten. Die Mechanik selbst (Riegel,
- * Reihenfolge der PATCHes) prüft der Befehl; hier steht, dass der Lagebericht sie eingehängt hat
- * und richtig speist.
+ * Reihenfolge der PATCHes) prüft `entwurf/useEntwurfVerlustschutz.test.tsx`; hier steht, dass der
+ * Lagebericht sie eingehängt hat und richtig speist.
  */
 describe('LageberichtDetailPage — Verlassen-Schutz (LLH-1351)', () => {
   beforeEach(() => {
@@ -836,6 +836,55 @@ describe('LageberichtDetailPage — Verlassen-Schutz (LLH-1351)', () => {
     await erneut.erfolg();
     expect(await screen.findByText('LB-LISTE')).toBeInTheDocument();
     expect(screen.queryByText('Speichern vorübergehend nicht möglich')).toBeNull();
+  });
+
+  /**
+   * LLH-1619: Blur-Autosave S1 läuft, weitergetippt, dann ein zweites Speichern mit S2. Laufen
+   * beide parallel, kann das ältere S1 zuletzt beim Server ankommen und S2 überschreiben, während
+   * das Formular S2 zeigt und quittiert. S2 startet erst, wenn S1 zurück ist.
+   */
+  it.each([
+    ['zweiter Blur', () => userEvent.tab()],
+    [
+      '„Entwurf speichern“',
+      () => userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' })),
+    ],
+  ])('schreibt zwei Speicherungen in Startreihenfolge (%s)', async (_weg, zweites) => {
+    const save = halteSpeichernAn();
+    renderBei('/einsaetze/1/lageberichte/9');
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' a');
+    await userEvent.tab();
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(1));
+    await userEvent.type(titel, ' b');
+    await zweites();
+    // S1 hängt noch: S2 darf noch nicht unterwegs sein.
+    expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(1);
+    await save.erfolg();
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(2));
+    expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenLastCalledWith(
+      1,
+      9,
+      expect.objectContaining({ titel: 'Lage 1 a b' }),
+    );
+    await save.erfolg();
+    expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(2);
+  });
+
+  it('startet nach Verwerfen keinen vorgemerkten PATCH des verlassenen Berichts', async () => {
+    const save = halteSpeichernAn();
+    renderBei('/einsaetze/1/lageberichte/9');
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' a');
+    await userEvent.tab();
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(1));
+    await userEvent.type(titel, ' b');
+    await userEvent.click(screen.getByRole('link', { name: 'Lageberichte' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Verwerfen' }));
+    await screen.findByText('LB-LISTE');
+    await save.erfolg();
+    expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(1);
   });
 
   it('schützt auch Browser-Zurück', async () => {
@@ -991,6 +1040,31 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
     renderBei('/einsaetze/1/lageberichte/9');
     await waitFor(() => expect(marke('Eigene Lage')).not.toBeNull());
     await userEvent.clear(screen.getByRole('textbox', { name: 'Eigene Lage' }));
+    expect(marke('Eigene Lage')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalled());
+    const aufrufe = vi.mocked(lageberichteApi.aktualisiereLagebericht).mock.calls;
+    const body = aufrufe[aufrufe.length - 1][2];
+    expect(body.abschnitte).toEqual(
+      expect.arrayContaining([{ schluessel: 'eigene_lage', text: '' }]),
+    );
+  });
+
+  it('„Abschnitt leeren“ aus dem ⋮ verwirft den Stand wie Löschen von Hand (LLH-1601)', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await waitFor(() => expect(marke('Eigene Lage')).not.toBeNull());
+    await userEvent.click(
+      within(abschnitt('Eigene Lage')).getByRole('button', {
+        name: 'Aktionen zu Abschnitt Eigene Lage',
+      }),
+    );
+    const menue = await waitFor(() =>
+      document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!,
+    );
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abschnitt leeren' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abschnitt „Eigene Lage“ leeren?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschnitt leeren' }));
+    expect(screen.getByRole('textbox', { name: 'Eigene Lage' })).toHaveValue('');
     expect(marke('Eigene Lage')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
     await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalled());

@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
+import { herkunftHandler } from '../test/stammdatenHerkunft';
 import EtbBausteineTab from './EtbBausteineTab';
 import { adminFixture } from '../test/fixtures';
 import { offeneRueckfrage } from '../test/rueckfrage';
@@ -232,5 +233,25 @@ describe('EtbBausteineTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
     );
     await keinStehenderFehler('Baustein wird gerade bearbeitet');
     expect(versuch).toBe(2);
+  });
+});
+
+describe('EtbBausteineTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
+  it('sperrt den Baustein vom Hub und lässt den eigenen bearbeitbar', async () => {
+    server.use(herkunftHandler({ etb_baustein: ['1'] }));
+    render(admin, zweiBausteine);
+    const hubZeile = (await screen.findByText('Lage unverändert')).closest('tr')!;
+    await waitFor(() => expect(within(hubZeile).getByText('vom Hub')).toBeInTheDocument());
+    expect(within(hubZeile).getByText('Wird am Hub gepflegt')).toBeInTheDocument();
+    expect(within(hubZeile).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(hubZeile).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+    // Die Marke trägt weiter nur das Label, nicht das Abzeichen.
+    expect(labels(document.body)).toEqual(['Lage unverändert', 'Abschnitt gebildet']);
+
+    const lokal = screen.getByText('Abschnitt gebildet').closest('tr')!;
+    expect(within(lokal).getByText('nur hier')).toBeInTheDocument();
+    expect(within(lokal).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+    expect(within(lokal).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Baustein anlegen' })).toBeEnabled();
   });
 });
