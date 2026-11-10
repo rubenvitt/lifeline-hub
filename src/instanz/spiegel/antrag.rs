@@ -864,15 +864,15 @@ async fn ausfuehren_innen(
         return Ok(Some(abgelehnt(a.id, "Unbekannte Art des Antrags.")));
     };
     // Nur Einsätze, die hier geführt werden und deren Org der Kopplung zugeordnet ist.
-    let einsatz: Option<(i64, i64)> = sqlx::query_as(
-        "SELECT e.id, o.id FROM einsatz e JOIN instanz_kopplung_org o ON o.org_id = e.org_id \
+    let einsatz: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT e.id, o.id, e.org_id FROM einsatz e JOIN instanz_kopplung_org o ON o.org_id = e.org_id \
          WHERE e.kennung = ? AND e.spiegel = 0 AND o.kopplung_id = ? AND o.widerrufen_at IS NULL",
     )
     .bind(&a.kennung)
     .bind(kopplung.id)
     .fetch_optional(pool)
     .await?;
-    let Some((einsatz_id, kopplung_org_id)) = einsatz else {
+    let Some((einsatz_id, kopplung_org_id, org_id)) = einsatz else {
         return Ok(Some(abgelehnt(a.id, "Führung liegt nicht hier.")));
     };
     let mut conn = pool.acquire().await?;
@@ -892,13 +892,11 @@ async fn ausfuehren_innen(
     let konto: Option<i64> = match konto {
         Some(k) => {
             sqlx::query_scalar(
-                "SELECT b.id FROM benutzer b WHERE b.id = ? AND b.aktiv = 1 \
-             AND b.org_id IN (SELECT ko.org_id FROM instanz_kopplung_org ko \
-                              WHERE ko.kopplung_id = ? AND ko.widerrufen_at IS NULL) \
+                "SELECT b.id FROM benutzer b WHERE b.id = ? AND b.aktiv = 1 AND b.org_id = ? \
              AND NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)",
             )
             .bind(k)
-            .bind(kopplung.id)
+            .bind(org_id)
             .fetch_optional(&mut *conn)
             .await?
         }
