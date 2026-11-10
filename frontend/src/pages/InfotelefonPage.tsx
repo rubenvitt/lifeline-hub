@@ -362,8 +362,13 @@ export default function InfotelefonPage() {
   const aufgliederung = zustand === 'daten' && jeAnliegen.length > 0 && (
     <Paneel titel="Nach Anliegen">
       {/* Liste mit Anliegen links, Zahl rechts wie „Verbleib“ in der Betroffenen-Seitenleiste:
-          je Zeile ein Listenpunkt, damit Vorlesen nicht „Vermisstensuche1“ sagt (LLH-1608). */}
-      <ul aria-label="Nach Anliegen" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          je Zeile ein Listenpunkt, damit Vorlesen nicht „Vermisstensuche1“ sagt (LLH-1608).
+          `role="list"`: Safari gibt die Rolle ohne Listenzeichen sonst nicht an VoiceOver. */}
+      <ul
+        role="list"
+        aria-label="Nach Anliegen"
+        style={{ listStyle: 'none', margin: 0, padding: 0 }}
+      >
         {jeAnliegen.map((x) => (
           <li key={x.anliegen} data-anliegen={x.anliegen}>
             <PaneelZeile
