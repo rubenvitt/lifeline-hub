@@ -244,6 +244,23 @@ pub async fn handle_abgleich(
             .iter()
             .map(|s| (s.kennung.clone(), s.stand))
             .collect();
+        // Pull: den Stand, den die spiegelnde Seite nennt, für die Seite „Instanzkopplung“ merken
+        // (wie im Push aus der Antwort). Nur eigene Einsätze der Org der Zuordnung.
+        for s in &anfrage.staende {
+            for o in &orgs {
+                sqlx::query(
+                    "INSERT INTO spiegel_ziel (kopplung_org_id, einsatz_id, stand) \
+                     SELECT ?, id, ? FROM einsatz WHERE kennung = ? AND org_id = ? AND spiegel = 0 \
+                     ON CONFLICT (kopplung_org_id, einsatz_id) DO UPDATE SET stand = excluded.stand",
+                )
+                .bind(o.id)
+                .bind(s.stand)
+                .bind(&s.kennung)
+                .bind(o.org_id)
+                .execute(&mut *conn)
+                .await?;
+            }
+        }
         let fertig =
             super::anhang::uebernehme_teile(conn, kopplung.id, &anfrage.anhang_teile).await?;
         uebernommen.einsaetze.extend(fertig);

@@ -20,8 +20,8 @@ wurde. Am Spiegel wird nicht geschrieben, sondern **beantragt**.
 
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
-der Organisation. Bedienen darf sie der System-Admin; wer die Verwaltung sieht, liest mit. Am
-Spiegel arbeitet jeder, der im Einsatz Mitglied ist.
+der Organisation. Bedienen darf sie der System-Admin; wer die Verwaltung sieht, liest mit. Einen
+Spiegel liest jedes Mitglied des Einsatzes; Anträge stellt, wer im Einsatz Schreibrecht hat.
 
 ## Abläufe
 

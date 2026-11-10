@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { einsatzKeys } from '../api/queryKeys';
 import type { SpiegelAntragAnzeige } from '../api/types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -102,7 +103,7 @@ describe('useVorgemerktePersonEintraege (LLH-1138, design.md D8)', () => {
 describe('Anträge am Spiegel stehen bei den vorgemerkten (LLH-1492, design.md D13)', () => {
   function mitAntraegen(antraege: SpiegelAntragAnzeige[]) {
     const qc = new QueryClient();
-    qc.setQueryData(['einsatz-antraege', 7], antraege);
+    qc.setQueryData(einsatzKeys.antraege(7), antraege);
     return {
       qc,
       wrapper: ({ children }: { children: ReactNode }) => (
@@ -173,7 +174,7 @@ describe('Anträge am Spiegel stehen bei den vorgemerkten (LLH-1492, design.md D
     ]);
     const { result } = renderHook(() => useVorgemerkteEintreffen(11, 7), { wrapper });
     await waitFor(() => expect(result.current).toHaveLength(1));
-    act(() => qc.setQueryData(['einsatz-antraege', 7], []));
+    act(() => qc.setQueryData(einsatzKeys.antraege(7), []));
     await waitFor(() => expect(result.current).toEqual([]));
   });
 });

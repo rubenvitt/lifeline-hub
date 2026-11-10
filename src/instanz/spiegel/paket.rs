@@ -195,6 +195,11 @@ impl SpiegelPaket {
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
         }
+        // `seit > bis` ließe `clamp` in der Übernahme in Panik geraten (und damit den Takt für alle
+        // Kopplungen enden).
+        if self.lieferungen.iter().any(|l| l.seit > l.bis) {
+            return Err("Lieferung mit Stand vor ihrem Beginn".into());
+        }
         let mut gesehen = std::collections::HashSet::new();
         if !self.lieferungen.iter().all(|l| gesehen.insert(&l.kennung)) {
             return Err("ein Einsatz doppelt im Paket".into());
@@ -238,6 +243,22 @@ mod tests {
             };
             EINSAETZE_MAX + 1
         ];
+        assert!(p.check().is_err());
+    }
+
+    #[test]
+    fn lieferung_mit_stand_vor_dem_beginn_ist_ungueltig() {
+        let mut p = SpiegelPaket {
+            lieferungen: vec![EinsatzLieferung {
+                kennung: "a/1".into(),
+                seit: 5,
+                bis: 5,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(p.check().is_ok());
+        p.lieferungen[0].seit = 6;
         assert!(p.check().is_err());
     }
 }

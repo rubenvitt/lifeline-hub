@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ANHANG_WIRD_GEHOLT_TEXT } from '../api/anhangAbruf';
+import { einsatzKeys } from '../api/queryKeys';
 import { einsatzFixture } from '../test/fixtures';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -27,14 +28,17 @@ const spiegel = {
 /** Ein Cache mit dem Kopf des Einsatzes 5: am Spiegel oder nicht. */
 function clientMit(amSpiegel: boolean): QueryClient {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  qc.setQueryData(['einsatz', 5], einsatzFixture({ id: 5, spiegel: amSpiegel ? spiegel : null }));
+  qc.setQueryData(
+    einsatzKeys.einsatz(5),
+    einsatzFixture({ id: 5, spiegel: amSpiegel ? spiegel : null }),
+  );
   return qc;
 }
 
 /** Ein neuer Stand des Kopfs, wie ihn der Vollabgleich nach `lagged` bringt. */
 function neuerAbgleich(qc: QueryClient) {
   act(() => {
-    qc.setQueryData(['einsatz', 5], einsatzFixture({ id: 5, spiegel }), {
+    qc.setQueryData(einsatzKeys.einsatz(5), einsatzFixture({ id: 5, spiegel }), {
       updatedAt: Date.now() + 1000,
     });
   });

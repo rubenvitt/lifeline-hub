@@ -394,6 +394,8 @@ pub async fn liefere_einsatz(
         return Ok(None);
     }
     let mut zeilen = Vec::new();
+    // Größe jeder Zeile aus dem Log, um sie zurückzugeben, wenn die Abhängigkeiten nicht passen.
+    let mut groessen = Vec::new();
     let mut bis = seit;
     let mut drin: HashSet<(String, String)> = HashSet::new();
     for (art, schluessel, stand) in log {
@@ -413,6 +415,7 @@ pub async fn liefere_einsatz(
         budget.zeilen -= 1;
         drin.insert((art, schluessel));
         zeilen.push(z);
+        groessen.push(groesse);
         bis = stand;
         if budget.zeilen == 0 || budget.bytes == 0 {
             break;
@@ -425,7 +428,44 @@ pub async fn liefere_einsatz(
         }
         return Ok(None);
     }
-    abhaengige(conn, schema, a, e.id, bis, &mut zeilen, &mut drin, budget).await?;
+    // Die Abhängigkeiten zählen ins Byte-Budget. Passen sie nicht, liefert der Einsatz weniger
+    // Zeilen aus dem Log (halbiert, bis es passt oder nur eine bleibt): `bis` rückt dann weniger
+    // weit vor, und die Abhängigkeiten werden für den kürzeren Ausschnitt neu bestimmt.
+    let mut anzahl = zeilen.len();
+    loop {
+        let mut versuch = zeilen[..anzahl].to_vec();
+        let mut versuch_drin: HashSet<(String, String)> = versuch
+            .iter()
+            .map(|z| (z.art.clone(), z.schluessel.clone()))
+            .collect();
+        let mut versuch_budget = budget.clone();
+        abhaengige(
+            conn,
+            schema,
+            a,
+            e.id,
+            bis,
+            &mut versuch,
+            &mut versuch_drin,
+            &mut versuch_budget,
+        )
+        .await?;
+        let mehr: usize = versuch[anzahl..]
+            .iter()
+            .map(|z| serde_json::to_vec(z).map(|v| v.len()).unwrap_or(0))
+            .sum();
+        if mehr <= budget.bytes || anzahl == 1 {
+            versuch_budget.bytes = budget.bytes.saturating_sub(mehr);
+            *budget = versuch_budget;
+            zeilen = versuch;
+            break;
+        }
+        let neu = anzahl / 2;
+        budget.bytes += groessen[neu..anzahl].iter().sum::<usize>();
+        budget.zeilen += anzahl - neu;
+        anzahl = neu;
+        bis = zeilen[anzahl - 1].stand;
+    }
     let konten = konten(conn, schema, a, &zeilen).await?;
     Ok(Some(EinsatzLieferung {
         kennung: kennung.to_string(),

@@ -121,6 +121,7 @@ export function useKartenbilder({
     const ctrl = new AbortController();
     abbruchRef.current = ctrl;
     imFlugRef.current = new Set();
+    setWirdGeholt(false);
     return () => ctrl.abort();
   }, [einsatzId]);
 
@@ -176,6 +177,11 @@ export function useKartenbilder({
     // (`nachholTakt`) fehlende Bilder erneut: es kommt nach dem nächsten Abgleich, dessen `lagged`
     // die Liste neu holt. Ein gewöhnlich defektes Bild lädt so nicht bei jedem Abruf neu.
   }, [bilderRoh, einsatzId, ladeFehler, nachholTakt]);
+
+  // Steht kein Bild mehr aus, endet das Nachholen: weitere Abrufe der Liste laden nichts neu.
+  useEffect(() => {
+    if (wirdGeholt && (bilderRoh ?? []).every((b) => blobUrls[b.id])) setWirdGeholt(false);
+  }, [wirdGeholt, bilderRoh, blobUrls]);
 
   // Unmount-only: beim Verlassen der Karte alle dann aktuellen Blob-URLs freigeben.
   useEffect(

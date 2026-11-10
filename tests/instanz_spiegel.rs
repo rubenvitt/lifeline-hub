@@ -224,6 +224,17 @@ async fn hub_fuehrt_und_der_elw_spiegelt() {
     .await;
     let fremd: String = eine(&elw.pool, "SELECT fremde_kennung FROM einsatz_spiegel").await;
     assert_eq!(kennung, fremd, "Kennung über Instanzen gleich");
+    // Der Hub merkt sich den Stand, den der ELW mit dem nächsten Abgleich nennt (Seite
+    // „Instanzkopplung“, „gelieferte Einsätze“).
+    abgleichen(&elw).await;
+    let am_spiegel: i64 = eine(&elw.pool, "SELECT stand FROM einsatz_spiegel").await;
+    let gemerkt: i64 = eine(
+        &hub.pool,
+        &format!("SELECT stand FROM spiegel_ziel WHERE einsatz_id = {e}"),
+    )
+    .await;
+    assert!(am_spiegel > 0);
+    assert_eq!(gemerkt, am_spiegel);
 }
 
 #[tokio::test]

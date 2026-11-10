@@ -440,3 +440,53 @@ async fn die_volltextsuche_findet_gespiegelte_eintraege() {
     .await;
     assert_eq!(treffer, 1);
 }
+
+/// CodeRabbit auf #1266: `gegen_id` trifft nur ein echtes Konto der Org des Einsatzes. Ein Konto
+/// einer anderen Org und ein Stellvertreter (auch einer anderen Kopplung) zählen nicht; dann
+/// greift der Stellvertreter dieser Kopplung.
+#[tokio::test]
+async fn gegen_id_auf_ein_fremdes_konto_wird_stellvertreter() {
+    use super::abbildung::konto_lokal;
+    use super::paket::KontoAngabe;
+    let (_, s) = zwei_seiten().await;
+    let eigen = konto(&s, "eigen").await;
+    exec(
+        &s,
+        "INSERT INTO organisation (id, name) VALUES (2, 'Fremd')",
+    )
+    .await;
+    let fremd: i64 = eine(
+        &s,
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+         aktiv, erstellt_at, org_rolle) VALUES (2, 'fremd', 'fremd', 'x', 'keiner', 1, \
+         '2026-11-10 00:00:00', 'keine') RETURNING id",
+    )
+    .await;
+    let mut conn = s.acquire().await.unwrap();
+    let angabe = |id: i64, gegen_id: i64| KontoAngabe {
+        id,
+        anzeigename: format!("Konto {id}"),
+        gegen_id: Some(gegen_id),
+    };
+
+    let lokal = konto_lokal(&mut conn, 1, 1, 1, false, &angabe(10, eigen))
+        .await
+        .unwrap();
+    assert_eq!(lokal, eigen, "ein Konto der eigenen Org gilt");
+
+    let lokal = konto_lokal(&mut conn, 1, 1, 1, false, &angabe(11, fremd))
+        .await
+        .unwrap();
+    assert_ne!(lokal, fremd, "ein Konto einer anderen Org nie");
+    let stellvertreter: i64 =
+        sqlx::query_scalar("SELECT benutzer_id FROM spiegel_konto WHERE fremde_id = 11")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(lokal, stellvertreter);
+
+    let lokal = konto_lokal(&mut conn, 1, 1, 1, false, &angabe(12, stellvertreter))
+        .await
+        .unwrap();
+    assert_ne!(lokal, stellvertreter, "ein Stellvertreter nie");
+}
