@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
+import { einsatzKeys } from '../api/queryKeys';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
@@ -74,7 +75,7 @@ function setup(antraege: unknown[]) {
   );
   // Die Anträge lädt im Rahmen das Hinweisband; die Seite liest sie aus dem Cache.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  client.setQueryData(['einsatz-antraege', 7], antraege);
+  client.setQueryData(einsatzKeys.antraege(7), antraege);
   return renderMitProviders(
     <CommandPaletteProvider>
       <Routes>

@@ -172,7 +172,7 @@ export function useKartenbilder({
         setBlobUrls(blobUrlsRef.current);
       }
     }
-    // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus. Jeder
+    // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
     // Nur solange ein Bild „wird geholt“ (am Spiegel, LLH-1492), versucht jeder Abruf der Liste
     // (`nachholTakt`) fehlende Bilder erneut: es kommt nach dem nächsten Abgleich, dessen `lagged`
     // die Liste neu holt. Ein gewöhnlich defektes Bild lädt so nicht bei jedem Abruf neu.
