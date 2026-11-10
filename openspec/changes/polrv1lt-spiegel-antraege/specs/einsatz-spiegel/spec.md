@@ -122,12 +122,29 @@ Erfassungen (Spec `spiegel-antraege`).
 Mitgliedschaften und Rollen eines Einsatzes SHALL mitgespiegelt werden. Ein Konto, das über die
 Stammdaten-Verteilung an beiden Seiten dasselbe ist, MUST am Spiegel dieselbe Einsatzrolle haben
 wie am Führer. Ein Konto, das es nur an einer Seite gibt, MUST am Spiegel ohne diese
-Mitgliedschaft bleiben. Ein Verweis auf Stammdaten, die es an der spiegelnden Seite nicht gibt,
-MUST leer bleiben. Der Schnappschuss des Namens MUST erhalten bleiben.
+Mitgliedschaft bleiben. Ein Verweis auf andere Stammdaten (Fahrzeug, Personal, Material,
+Status, Typ), die es an der spiegelnden Seite nicht gibt, MUST leer bleiben. Der Schnappschuss
+des Namens MUST erhalten bleiben.
 
 #### Scenario: Spontanhelfer nur am ELW
 - **WHEN** ein am ELW angelegter Spontanhelfer einer Einheit zugeordnet ist
-- **THEN** zeigt der Spiegel am Hub ihn mit seinem Namen aus dem Schnappschuss, ohne Verweis auf ein Hub-Konto
+- **THEN** zeigt der Spiegel am Hub ihn mit seinem Namen aus dem Schnappschuss, ohne Verweis auf das Personal des Hubs
+
+### Requirement: Stellvertreter für fremde Konten
+
+Verweist eine gespiegelte Zeile auf ein Konto, das es an der spiegelnden Seite nicht gibt, SHALL
+die spiegelnde Seite ein Stellvertreter-Konto dafür führen, eines je fremdem Konto und Kopplung.
+Ein Stellvertreter MUST den Anzeigenamen des Gegenübers tragen und ihm folgen. Er MUST sich nie
+anmelden können, MUST in der Benutzerverwaltung fehlen und MUST nie Mitglied eines Einsatzes
+werden. Wo Konten angezeigt werden, SHALL er „von <Gegenstelle>“ heißen.
+
+#### Scenario: Verfasser nur am ELW
+- **WHEN** ein Konto, das es nur am ELW gibt, einen ETB-Eintrag schreibt
+- **THEN** zeigt das ETB im Spiegel am Hub den Eintrag mit dem Anzeigenamen dieses Kontos, und am Hub kann sich niemand mit diesem Konto anmelden
+
+#### Scenario: Name geändert
+- **WHEN** das Konto am ELW umbenannt wird
+- **THEN** zeigt der Spiegel am Hub nach dem nächsten Abgleich den neuen Namen
 
 ### Requirement: Kategorie je Zeile
 

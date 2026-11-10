@@ -161,13 +161,30 @@ Fremdschlüssel hat noch dort steht. Für IDs in JSON-Spalten gilt dieselbe List
   `stammdaten_herkunft`.
   - Führt sie, übersetzt sie beim Senden lokal → fremd.
   - Spiegelt sie, übersetzt sie beim Übernehmen fremd → lokal.
-  - Ein Verweis ohne Gegenstück (Spontanhelfer, geliehenes Fahrzeug, Konto nur hier) wird
-    `NULL`, und der Schnappschuss bleibt.
-  - Ist die Spalte `NOT NULL`, wird die Zeile ausgelassen und an der Kopplung gezählt. Eine
-    Mitgliedschaft eines Kontos, das es nur an einer Seite gibt, zählt dabei nicht als
-    Hinweis.
+  - Ein Verweis ohne Gegenstück (Spontanhelfer, geliehenes Fahrzeug) wird `NULL`, und der
+    Schnappschuss bleibt. Konten bekommen stattdessen einen Stellvertreter (unten).
 - **Org:** Die Org des Einsatzes kommt als `fremde_org_kennung` der Zuordnung
   (`instanz_kopplung_org`).
+- **Konten** (Nachtrag 10.11.2026, Entscheidung Ruben): Rund 60 Spalten der gespiegelten
+  Tabellen verweisen `NOT NULL` auf `benutzer`, und das ETB zeigt den Verfasser per JOIN auf
+  `benutzer.anzeigename`. Ein Konto ohne Gegenstück wird deshalb nicht leer, sondern zeigt auf
+  einen **Stellvertreter**:
+  - Jede Lieferung trägt `konten: [{ id, anzeigename, gegen_id }]` für jedes Konto, auf das ihre
+    Zeilen verweisen. `id` ist die eigene Kennung des Senders. `gegen_id` kennt nur die meldende
+    Seite, wenn sie führt (Herkunft lokal → fremd).
+  - Der Empfänger löst so auf: `gegen_id`, sonst `stammdaten_herkunft` (Konto, fremd → lokal),
+    sonst der Stellvertreter aus `spiegel_konto(kopplung_id, fremde_id, benutzer_id)`.
+  - Ein Stellvertreter ist eine Zeile in `benutzer` mit `aktiv = 0`, Platzhalter-Hash
+    `PASSWORT_HASH_KEIN_LOKALES`, Systemrolle `keiner`, der Org der Zuordnung, Benutzername
+    `spiegel:<kopplung_id>:<fremde_id>` und Anzeigename vom Gegenüber. Bei jeder Lieferung wird
+    der Anzeigename nachgezogen.
+  - Die Benutzerverwaltung, Auswahllisten und die Anmeldung schließen Konten mit einer Zeile in
+    `spiegel_konto` aus.
+  - Mitgliedschaften (`einsatz_mitgliedschaft`) werden für Stellvertreter ausgelassen.
+  - Eine Spalte `NOT NULL` auf andere Stammdaten gibt es unter den gespiegelten Tabellen nicht
+    (Analyse vom 10.11.2026). Diese Verweise bleiben bei fehlendem Gegenstück `NULL`.
+  - *Verworfen:* ein Sammelkonto je Kopplung (das ETB zeigte den Namen der Gegenstelle statt
+    der Person); Zeilen auslassen (der Spiegel wäre auch im ETB unvollständig).
 
 ### D6 Eigene Route, ein Paket in beide Richtungen
 
