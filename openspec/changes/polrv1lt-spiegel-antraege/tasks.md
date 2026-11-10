@@ -35,13 +35,13 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 ## 4. Takt (D12)
 
 - [x] 4.1 `spiegel::start` mit Tick 1 s, `naechster_abgleich_at` je Kopplung, kurzer Takt bei aktiven Einsätzen, offenen Anträgen oder Anforderungen, sonst Takt der Meldung, Rückoff bis 600 s, Wecken per `Notify`; Schalter `--instanz-spiegel-sekunden` / `LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN` (2–600, Vorgabe 5) in `src/config.rs` und `docs/betrieb/`. Tests: ruhige Kopplung im Melde-Takt, aktiver Einsatz im kurzen Takt, Fehler verdoppeln, neuer Antrag weckt
-- [ ] 4.2 Gegenüber mit Protokoll 1: kein Abgleich, Hinweis „Gegenüber spiegelt noch nicht (Update nötig)“ an beiden Seiten. Integrationstest mit herabgesetzter Version
+- [x] 4.2 Gegenüber mit Protokoll 1: kein Abgleich, Hinweis „Gegenüber spiegelt noch nicht (Update nötig)“ an beiden Seiten. Integrationstest mit herabgesetzter Version
 
 ## 5. Anhänge auf Abruf (D8)
 
 - [x] 5.1 Migration `spiegel_anhang`, `spiegel_anhang_teil`; Liefern ohne BLOB (Größe, Prüfsumme), Spiegel legt leeren Inhalt an. Test: ETB-Abgleich mit 20-MiB-Anhang braucht ein Paket, nicht die Anhangsgröße
 - [x] 5.2 Abruf am Spiegel → 409 `ANHANG_WIRD_GEHOLT` (Fall in `tests/fehler_vertrag.rs`), `angefordert_at`, Wecken; Stücke à 256 KiB, Angeforderte vor Vorabladen, Prüfsumme vor Gültigkeit, falsche Prüfsumme → verwerfen und neu, geänderter Anhang → neu. Integrationstests für jeden Fall, auch `karte_hintergrundbild_daten` und `uhs_plan`
-- [ ] 5.3 Vorschau und Download im Frontend: „wird geholt“, erneuter Versuch nach Live-Ereignis. Vitest
+- [x] 5.3 Vorschau und Download im Frontend: „wird geholt“, erneuter Versuch nach Live-Ereignis. Vitest
 
 ## 6. Anträge (D9, D11)
 
@@ -53,12 +53,12 @@ Instanzen auf Loopback). Nach jeder Änderung an Response-DTOs oder Enums
 
 ## 7. Oberfläche (D13)
 
-- [ ] 7.1 `EinsatzAnzeige.spiegel` im Backend samt Typ-Codegen; `darfImEinsatzSchreiben`/`darfEinsatzLeiten` → `false` am Spiegel, neue Regel `darfBeantragen`; Vitest in `schreibrecht.test.ts`, Guard `schreibrecht.guard.test.ts` grün
-- [ ] 7.2 Die 16 Erfassungsorte auf `darfBeantragen`; `erfasse…OfflineFaehig` mit Ergebnis `beantragt`; `useVorgemerkteSchreibaktionen` nimmt Anträge derselben Art dazu; ETB zeigt beantragte Einträge wie ausstehende; Anhang-Knopf am Spiegel aus. Vitest je Ort (Spiegel: Erfassen möglich, Bearbeiten gesperrt; Beantragt sichtbar, nicht in Kennzahlen)
-- [ ] 7.3 `SpiegelBand` im Einsatzrahmen (Gegenstelle, Stand, Zähler, „keine Verbindung seit …“, „Abgleich beendet“) mit Antragsliste („Neu erfassen“, „Verwerfen“); Query-Key `antraege` nach `frontend/AGENTS.md`, in `lagebildOffline.guard.test.ts` ausdrücklich draußen mit Grund. Wortlaut per `design:ux-copy`. Vitest
-- [ ] 7.4 Seite „Instanzkopplung“: Abschnitt „Einsätze“ je Kopplung, Hinweise (Protokoll 1, Freigabestufe unbekannt, ausgelassene Zeilen); Endpunkt dafür samt Typ-Codegen. Vitest
+- [x] 7.1 `EinsatzAnzeige.spiegel` im Backend samt Typ-Codegen; `darfImEinsatzSchreiben`/`darfEinsatzLeiten` → `false` am Spiegel, neue Regel `darfBeantragen`; Vitest in `schreibrecht.test.ts`, Guard `schreibrecht.guard.test.ts` grün
+- [x] 7.2 Die 16 Erfassungsorte auf `darfBeantragen`; `erfasse…OfflineFaehig` mit Ergebnis `beantragt`; `useVorgemerkteSchreibaktionen` nimmt Anträge derselben Art dazu; ETB zeigt beantragte Einträge wie ausstehende; Anhang-Knopf am Spiegel aus. Vitest je Ort (Spiegel: Erfassen möglich, Bearbeiten gesperrt; Beantragt sichtbar, nicht in Kennzahlen)
+- [x] 7.3 `SpiegelBand` im Einsatzrahmen (Gegenstelle, Stand, Zähler, „keine Verbindung seit …“, „Abgleich beendet“) mit Antragsliste („Neu erfassen“, „Verwerfen“); Query-Key `antraege` nach `frontend/AGENTS.md`, in `lagebildOffline.guard.test.ts` ausdrücklich draußen mit Grund. Wortlaut per `design:ux-copy`. Vitest
+- [x] 7.4 Seite „Instanzkopplung“: Abschnitt „Einsätze“ je Kopplung, Hinweise (Protokoll 1, Freigabestufe unbekannt, ausgelassene Zeilen); Endpunkt dafür samt Typ-Codegen. Vitest
 - [ ] 7.5 e2e-Fall in `frontend/e2e/`: Einsatz per Testhelfer als Spiegel markiert; Band sichtbar, Bearbeiten gesperrt, ETB-Erfassung wird „Beantragt“. Lauf grün
-- [ ] 7.6 `frontend/src/offline/AGENTS.md`: Abschnitt „Anträge am Spiegel“ (Verhältnis zur Warteschlange, Query-Key draußen, `beantragt`)
+- [x] 7.6 `frontend/src/offline/AGENTS.md`: Abschnitt „Anträge am Spiegel“ (Verhältnis zur Warteschlange, Query-Key draußen, `beantragt`)
 
 ## 8. Widerruf (D14)
 

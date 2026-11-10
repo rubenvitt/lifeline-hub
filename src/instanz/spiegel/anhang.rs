@@ -330,3 +330,21 @@ pub async fn uebernehme_teile(
     }
     Ok(fertig)
 }
+
+#[cfg(test)]
+mod tests {
+    /// Das Frontend erkennt „wird geholt“ am Wortlaut der 409 (`{error}`-Kontrakt ohne Code,
+    /// `frontend/src/api/anhangAbruf.ts`); ändert er sich hier, bräche die Anzeige still.
+    #[test]
+    fn das_frontend_kennt_den_wortlaut_von_wird_geholt() {
+        let pfad = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/frontend/src/api/anhangAbruf.ts"
+        );
+        let ts = std::fs::read_to_string(pfad).expect("anhangAbruf.ts lesbar");
+        assert!(
+            ts.contains(&format!("'{}'", super::WIRD_GEHOLT)),
+            "ANHANG_WIRD_GEHOLT_TEXT weicht von anhang::WIRD_GEHOLT ab"
+        );
+    }
+}
