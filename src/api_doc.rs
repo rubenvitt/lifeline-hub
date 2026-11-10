@@ -512,6 +512,7 @@ use utoipa::OpenApi;
         crate::planung::PlanungBlockAnzeige,
         crate::planung::PlanungAnzeige,
         crate::planung::PlanungUebernahme,
+        crate::planung::PlanungUebernahmeVorschau,
         crate::planung::PlanungUebernahmeErgebnis,
         crate::schichtmodell::EinsatzSchichtmodell,
         crate::schichtmodell::Schichtmodell,

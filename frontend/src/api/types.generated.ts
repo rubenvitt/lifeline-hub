@@ -6468,6 +6468,18 @@ export interface components {
             planung: components["schemas"]["PlanungAnzeige"];
             zaehlung: components["schemas"]["ImportZaehlung"];
         };
+        /**
+         * @description Antwort der Vorschau einer Übernahme (LLH-1587): die Vorschau des Kerns und der Stand der
+         *     Planung, auf dem sie beruht (LLH-1610). „Übernehmen“ schickt den Stand zurück; hat sich die
+         *     Planung seitdem geändert, ist es 409.
+         */
+        PlanungUebernahmeVorschau: components["schemas"]["ImportVorschau"] & {
+            /**
+             * Format: int64
+             * @description Zählt jede Änderung der Planung; nur zum Zurückschicken, keine Anzeige.
+             */
+            stand: number;
+        };
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;

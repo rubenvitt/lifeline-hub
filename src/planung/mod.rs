@@ -251,6 +251,17 @@ pub struct PlanungAnzeige {
     pub kennzahlen: PlanungKennzahlen,
 }
 
+/// Antwort der Vorschau einer Übernahme (LLH-1587): die Vorschau des Kerns und der Stand der
+/// Planung, auf dem sie beruht (LLH-1610). „Übernehmen“ schickt den Stand zurück; hat sich die
+/// Planung seitdem geändert, ist es 409.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct PlanungUebernahmeVorschau {
+    #[serde(flatten)]
+    pub vorschau: crate::abloesung::schichtplan::uebernahme::ImportVorschau,
+    /// Zählt jede Änderung der Planung; nur zum Zurückschicken, keine Anzeige.
+    pub stand: i64,
+}
+
 /// Antwort der Übernahme einer Planung (LLH-1587): der Einsatz, die Zählung des Kerns und die
 /// nun schreibgeschützte Planung.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]

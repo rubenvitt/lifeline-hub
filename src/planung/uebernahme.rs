@@ -165,14 +165,18 @@ type BlockRoh = (
 );
 type HelferRoh = (i64, String, Option<String>, Option<String>, Option<String>);
 
-/// Liest eine Planung als [`PlanPaket`] auf der offenen Verbindung. Fremd oder unbekannt 404,
-/// schon übernommen 409.
+/// Liest eine Planung als [`PlanPaket`] auf der offenen Verbindung, mit ihrem Stand (LLH-1610).
+/// Fremd oder unbekannt 404, schon übernommen 409.
+///
+/// Der Stand kommt zuerst: liest die Vorschau ohne Transaktion und ändert jemand die Planung
+/// dazwischen, ist er höchstens älter als das Paket, und die Übernahme lehnt ab (409), statt
+/// etwas anderes zu übernehmen.
 async fn build_paket_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     planung_id: i64,
-) -> Result<(Source, PlanPaket), AppError> {
-    super::repo::check_schreibbar_tx(conn, org_id, planung_id).await?;
+) -> Result<(i64, Source, PlanPaket), AppError> {
+    let stand = super::repo::stand_tx(conn, org_id, planung_id).await?;
     let quelle: Source = sqlx::query_as(
         "SELECT bezeichnung, einsatzart, ort, ort_lat, ort_lon, max_dienst_min, min_ruhe_min \
          FROM planung WHERE id = ?",
@@ -328,6 +332,7 @@ async fn build_paket_tx(
     );
     let programmpunkte = super::programm::paket_tx(conn, planung_id).await?;
     Ok((
+        stand,
         quelle,
         PlanPaket {
             grenzwerte,
@@ -453,6 +458,8 @@ async fn load_rechte_neu_tx(
 
 /// Was Vorschau und Übernehmen in der Transaktion vorbereiten.
 struct Prepared {
+    /// Stand der Planung, aus dem das Paket stammt (LLH-1610).
+    stand: i64,
     einsatz_id: i64,
     quelle: Source,
     planung: kern::Planung,
@@ -468,7 +475,7 @@ async fn prepare_tx(
     entscheidungen: &Entscheidungen,
     jetzt: DateTime<Utc>,
 ) -> Result<Prepared, AppError> {
-    let (quelle, paket) = build_paket_tx(conn, benutzer.org_id, planung_id).await?;
+    let (stand, quelle, paket) = build_paket_tx(conn, benutzer.org_id, planung_id).await?;
     let (einsatz_id, rechte) = match ziel {
         CheckedZiel::Einsatz { einsatz_id, rechte } => (einsatz_id, rechte),
         CheckedZiel::Neu { vorlage_id } => {
@@ -495,10 +502,28 @@ async fn prepare_tx(
     let bestand = bestand_tx(conn, einsatz_id, benutzer.org_id).await?;
     let planung = planen(&bestand, &paket, Vec::new(), entscheidungen, rechte)?;
     Ok(Prepared {
+        stand,
         einsatz_id,
         quelle,
         planung,
     })
+}
+
+/// Die Vorschau samt dem Stand der Planung, auf dem sie beruht; die Übernahme schickt ihn
+/// zurück (LLH-1610).
+#[derive(Debug)]
+pub struct Vorschau {
+    pub stand: i64,
+    pub vorschau: ImportVorschau,
+}
+
+impl From<Prepared> for Vorschau {
+    fn from(v: Prepared) -> Self {
+        Self {
+            stand: v.stand,
+            vorschau: v.planung.vorschau,
+        }
+    }
 }
 
 /// Die Vorschau: gleicht ab und schreibt nichts. Ein neuer Einsatz wird in einer Transaktion
@@ -509,7 +534,7 @@ pub async fn vorschau(
     planung_id: i64,
     ziel: Ziel,
     entscheidungen: &Entscheidungen,
-) -> Result<ImportVorschau, AppError> {
+) -> Result<Vorschau, AppError> {
     let ziel = check_ziel(pool, benutzer, ziel).await?;
     let jetzt = Utc::now();
     if let CheckedZiel::Einsatz { .. } = ziel {
@@ -517,8 +542,7 @@ pub async fn vorschau(
         return Ok(
             prepare_tx(&mut conn, benutzer, planung_id, ziel, entscheidungen, jetzt)
                 .await?
-                .planung
-                .vorschau,
+                .into(),
         );
     }
     let mut versuch: u32 = 0;
@@ -540,24 +564,30 @@ pub async fn vorschau(
         let zurueck = tx.rollback().await;
         let v = ergebnis?;
         zurueck?;
-        return Ok(v.planung.vorschau);
+        return Ok(v.into());
     }
 }
 
 /// Übernimmt in EINER Transaktion: neuer Einsatz, Abgleich, Schreiben und der Vermerk an der
 /// Planung. Fehler des Abgleichs 422 (Zeilen), fehlende Freigabe eines Moduls 403, schon
-/// übernommen 409, in einen laufenden Einsatz ohne jede Änderung 422.
+/// übernommen 409, in einen laufenden Einsatz ohne jede Änderung 422. `stand` ist der Stand aus
+/// der Vorschau; hat sich die Planung seitdem geändert, 409 vor allem anderen (LLH-1610).
 pub async fn uebernehmen(
     pool: &SqlitePool,
     benutzer: &Benutzer,
     planung_id: i64,
     ziel: Ziel,
     entscheidungen: &Entscheidungen,
+    stand: i64,
 ) -> Result<Uebernommen, AppError> {
     let ziel = check_ziel(pool, benutzer, ziel).await?;
     let jetzt = Utc::now();
     let jetzt_text = zeit::formatiere_utc(jetzt);
     crate::write_retry!(pool, |conn| {
+        check_stand(
+            super::repo::stand_tx(conn, benutzer.org_id, planung_id).await?,
+            stand,
+        )?;
         let v = prepare_tx(conn, benutzer, planung_id, ziel, entscheidungen, jetzt).await?;
         let startwert =
             crate::einsatz::einstellungen::etb_startwert(&mut *conn, v.einsatz_id).await?;
@@ -588,6 +618,16 @@ pub async fn uebernehmen(
             geschrieben,
         })
     })
+}
+
+/// Die Planung steht noch auf dem Stand der Vorschau; sonst 409 (LLH-1610).
+fn check_stand(aktuell: i64, aus_vorschau: i64) -> Result<(), AppError> {
+    if aktuell != aus_vorschau {
+        return Err(AppError::Conflict(
+            "Die Planung wurde seit der Vorschau geändert".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Vermerkt die Übernahme an der Planung, mit den Kennzahlen dieses Zeitpunkts. Danach ist sie
@@ -663,6 +703,15 @@ mod tests {
                     anzahl: 1,
                 },
             ])
+        );
+    }
+
+    #[test]
+    fn anderer_stand_ist_409() {
+        assert!(check_stand(4, 4).is_ok());
+        assert_eq!(
+            check_stand(5, 4).unwrap_err().status(),
+            axum::http::StatusCode::CONFLICT
         );
     }
 
