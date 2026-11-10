@@ -1136,3 +1136,14 @@ describe('AusgabeAnsicht — Live-Zufluss „Letzte Buchungen“ (LLH-1292)', ()
     expect(screen.getByText('1 neue Buchung')).toBeInTheDocument();
   });
 });
+
+describe('AusgabeAnsicht — kein Kontextmenü auf dem Zählschirm (LLH-1598)', () => {
+  it('Rechtsklick auf eine Zähltaste öffnet kein eigenes Menü, das Browsermenü bleibt', async () => {
+    zeige();
+    await geladen();
+    expect(fireEvent.contextMenu(taste('+5'), { clientX: 5, clientY: 5, button: 2 })).toBe(true);
+    expect(
+      document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
+    ).toBeNull();
+  });
+});

@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -290,20 +290,29 @@ führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft
 ### Wo das Kontextmenü gilt
 
 Das Kontextmenü zeigt genau die Aktionen, die die Zeile auch als Knopf und im Menü „⋮“ anbietet;
-fehlt das Schreibrecht, fehlen sie hier ebenso. Eine Zeile ohne Aktion, ein Link (etwa der Titel
-der Zeile), ein Eingabefeld und markierter Text behalten das Menü des Browsers mit „In neuem Tab
-öffnen“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer Zeile mit Kontextmenü nicht
-durch langes Drücken markieren.
+fehlt das Schreibrecht, fehlen sie hier ebenso. Eine Zeile ohne Aktion, ein Link (etwa der Titel der
+Zeile), ein Bild, ein Eingabefeld und markierter Text behalten das Menü des Browsers mit „In neuem
+Tab öffnen“, „Bild speichern unter“, „Kopieren“ und „Einfügen“. Am Tablet lässt sich Text in einer
+Zeile mit Kontextmenü nicht durch langes Drücken markieren.
 
-Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, an den
-Blöcken im Raster des Schichtplans (Kapitel [Ablösung](abloesung.md)), im Kommunikationsplan, in den
-Einstellungen des Einsatzes bei Pegeln, Geräten und Lagemonitoren, bei den Personen einer Einheit
-und an den Bild-Hintergründen der Lagekarte. In der Verwaltung gilt es für die Stammdaten
-(Fahrzeuge, Personal, Material, Schichtmodelle, Externe Stellen, Sprechgruppen, Verpflegungsplan)
-und für die Benutzer; Stammdaten, die am Hub gepflegt werden, haben keines. Wo eine Zeile ihre
-Aktionen als Knöpfe zeigt (etwa „Bearbeiten“ und „Deaktivieren“), stehen im Kontextmenü dieselben.
-Bei einem Bild-Hintergrund öffnet es nur auf dem Namen, nicht auf Schalter, Deckkraft und Ansicht.
-Lagekarte und Fernmeldeskizze haben ein eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
+Das Kontextmenü steht in den Listen Material, Fahrzeuge, Personen, Dokumente und Presse, in den
+Tabellen der Betreuungsstellen und Evakuierungsbezirke, an den Blöcken im Raster des Schichtplans
+(Kapitel [Ablösung](abloesung.md)), an den Karten von Meldungen, Nachforderungen, Aufträgen,
+Ablösungen, Verpflegungsstellen und Zeitfenstern, an den Nachrichten im Chat, im
+Kommunikationsplan, in den Einstellungen des Einsatzes bei Pegeln, Geräten und Lagemonitoren, bei
+den Personen einer Einheit und an den Bild-Hintergründen der Lagekarte. In der Verwaltung gilt es
+für die Stammdaten (Fahrzeuge, Personal, Material, Schichtmodelle, Externe Stellen, Sprechgruppen,
+Verpflegungsplan) und für die Benutzer; Stammdaten, die am Hub gepflegt werden, haben keines.
+
+Wo eine Zeile ihre Aktionen als Knöpfe zeigt (etwa „Bearbeiten“ und „Deaktivieren“), stehen im
+Kontextmenü dieselben. Trägt eine Karte mehrere Knöpfe, stehen alle Knöpfe ihrer Aktionszeile im
+Menü, danach die Einträge des Menüs „⋮“; Sprünge wie „Ausgabe öffnen“, Auswahlfelder wie
+„Bearbeiter zuweisen“ und Knöpfe einzelner Zeilen in der Karte, etwa „Quittieren“ an einem
+Empfänger eines Auftrags, bleiben an der Karte. Ein Knopf, der vorher nachfragt, fragt aus dem
+Kontextmenü in einem Dialog nach. Bei einem Bild-Hintergrund öffnet es nur auf dem Namen, nicht auf
+Schalter, Deckkraft und Ansicht. Der Zählschirm der Verpflegungsausgabe hat kein Kontextmenü, damit
+ein langer Druck auf eine Zähltaste nichts anderes auslöst. Lagekarte und Fernmeldeskizze haben ein
+eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 
 ### Was die Sprungpalette kennt
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
@@ -423,5 +423,39 @@ describe('Liste — Innenabstände folgen der Dichte', () => {
       expect(handschuh.kopfBlock).not.toBe(kompakt.kopfBlock);
       expect(handschuh.eintragBlock).not.toBe(kompakt.eintragBlock);
     }
+  });
+
+  it('reicht die Handler des Kontextmenüs an das Element der Zeile (LLH-1598, D4)', () => {
+    let ziel: EventTarget | null = null;
+    const onContextMenu = vi.fn((e: { currentTarget: EventTarget }) => {
+      ziel = e.currentTarget;
+    });
+    const onKeyDown = vi.fn();
+    const leer = () => {};
+    renderMitProviders(
+      <Liste
+        dataSource={['A']}
+        renderItem={(t) => (
+          <ListenEintrag
+            kontext={{
+              onContextMenu,
+              onKeyDown,
+              onPointerDown: leer,
+              onPointerMove: leer,
+              onPointerUp: leer,
+              onPointerCancel: leer,
+            }}
+          >
+            <span>{t}</span>
+          </ListenEintrag>
+        )}
+      />,
+    );
+    const zeile = screen.getByText('A').closest('.listen-eintrag')!;
+    fireEvent.contextMenu(screen.getByText('A'));
+    fireEvent.keyDown(screen.getByText('A'), { key: 'ContextMenu' });
+    expect(onContextMenu).toHaveBeenCalledTimes(1);
+    expect(ziel).toBe(zeile);
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
   });
 });
