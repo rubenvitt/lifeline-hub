@@ -122,6 +122,25 @@ describe('useKartenKontext (LLH-1598, D2)', () => {
     expect(onWahl).not.toHaveBeenCalled();
   });
 
+  it('hängt die Karte aus, während die Rückfrage offen ist, löst die Bestätigung nichts aus', async () => {
+    const onWahl = vi.fn();
+    const ab: KartenAktion = {
+      key: 'ab',
+      label: 'Abnehmen',
+      onWahl,
+      rueckfrage: { titel: 'Auftrag abnehmen?', knopf: 'Auftrag abnehmen' },
+    };
+    const { rerender } = renderMitProviders(<Karte aktionen={[ab]} />);
+    rechtsklick(screen.getByTestId('text'));
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    await userEvent.click(within(offenesMenue()!).getByRole('menuitem', { name: 'Abnehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    // Live-Abgleich: die Karte wandert in eine andere Gruppe und wird dort neu eingehängt.
+    rerender(<div data-testid="leer" />);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag abnehmen' }));
+    expect(onWahl).not.toHaveBeenCalled();
+  });
+
   it('Abbrechen in der Rückfrage löst nichts aus', async () => {
     const onWahl = vi.fn();
     renderMitProviders(

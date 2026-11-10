@@ -30,6 +30,14 @@ export function useKartenKontext<K extends string, E extends Element = HTMLEleme
   useEffect(() => {
     aktuell.current = aktionen;
   });
+  // Hängt die Karte aus (Live-Abgleich trägt sie in eine andere Gruppe), gilt keine ihrer Aktionen
+  // mehr: eine noch offene Rückfrage bestätigt dann nichts.
+  useEffect(
+    () => () => {
+      aktuell.current = [];
+    },
+    [],
+  );
   const [offen, setOffen] = useState<KontextMenueOffen | null>(null);
   const hatAktionen = aktionen.length > 0;
   // Verliert die Karte alle Aktionen, schließt das Menü (abgeleiteter Zustand wie `Datensicht`).
