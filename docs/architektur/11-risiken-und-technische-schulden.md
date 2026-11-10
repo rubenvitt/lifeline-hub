@@ -31,7 +31,6 @@ Repository; was sich nicht belegen ließ, fehlt hier.
 | R11 | sqlx spielt eine nachträglich eingeschobene kleinere Migrationsnummer still nach. Zwei Branches mit derselben oder einer überholten Nummer laufen so auf bestehenden Datenbanken in falscher Reihenfolge. | Abgesichert durch `scripts/check-migrationen.sh`, den Status `Migrationsnummern` und `scripts/migrationen-autofix.sh`. Fehlt der Pflicht-Check im Ruleset, warnt nur der Push-Lauf. | `src/db.rs` (`sqlx_spielt_eingeschobene_kleinere_version_still_nach`), `.github/workflows/migrationen.yml`, Wurzel-`AGENTS.md` („Backend — Migrationsvergabe“) | – |
 | R12 | Ein Entzug eines Modulrechts wirkt auf einen offenen Live-Strom erst beim nächsten Verbindungsaufbau, spätestens nach `STROM_LEBENSDAUER + STROM_LEBENSDAUER_STREUUNG` (45 min). Das Ende der Sitzung wirkt sofort. | Im Restfenster sieht der Nutzer Ereignis-Metadaten (nur IDs); der Inhaltsabruf antwortet sofort 403. | `src/routes/live.rs` (Kopfkommentar, LFH-920, LFH-1092) | – |
 | R13 | Der Offline-Kartenkatalog ist ein Platzhalter: `OFFLINE_KATALOG_MANIFEST_URL` zeigt auf `https://TODO-karten-build-release/…`, die einkompilierten Einträge in `default_offline_katalog` tragen keine `sha256`, und `remote_eintrag_ist_gueltig` verwirft solche Einträge. | Ohne `--offline-katalog-manifest-url` (`LIFELINE_OFFLINE_KATALOG_MANIFEST_URL`) bietet der Server keine ladbaren Offline-Karten an. | `src/karte/katalog.rs`, `src/config.rs` (`default_offline_katalog`, `offline_katalog_manifest_url`), `crates/karten-katalog/src/lib.rs` | Release von `karten-build` (Operator-Pin laut `src/config.rs`) |
-| R14 | Die User-Agents der ausgehenden Abrufe enden auf den Platzhalter `(+https://github.com/)` ohne Projektadresse. Ohne eigene `geocoder_url` der Organisation fragt der Server den öffentlichen Nominatim. | Die Nutzungsregeln von Nominatim verlangen eine Kennung, über die der Betreiber erreichbar ist; ohne sie droht eine Sperre der Ortssuche. | `src/geocoding/mod.rs` (`user_agent`, `NOMINATIM_DEFAULT`), `src/karte/mod.rs`, `src/karte/download.rs`, `src/karte/proxy.rs`, `src/routes/ort_suche.rs` | – |
 | R15 | Der Kartenbau zieht `versatiles/versatiles-planetiler:latest` ohne Digest. | Zwei Builds desselben Stands können verschiedene Kacheln liefern; eine neue Image-Version wirkt unbemerkt. | `karten-build/Makefile` (`IMAGE`) | – |
 | R16 | Die KRITIS-Fachebene ist per Vorgabe an und lädt alle 168 Stunden den Deutschland-Extrakt von Geofabrik, rund 4–5 GB je neuem Extrakt. | Jede Instanz erzeugt diesen Verkehr, auch im Entwicklungsbetrieb, bis `--kritis-extrakt false` oder ein eigener Spiegel (`--kritis-extrakt-url`) gesetzt ist. | `src/config.rs` (`kritis_extrakt`, `kritis_extrakt_url`, `kritis_extrakt_intervall_stunden`) | – |
 | R17 | Das Ausrollen übernimmt ein Pull-Agent auf dem Zielserver, der nicht im Repository liegt. | Den letzten Schritt der Auslieferung kann hier niemand prüfen oder ändern. | `.github/workflows/deployment.yml` (Kopfkommentar) | – |
@@ -97,3 +96,11 @@ Die Zunder-Kennung ist jeweils die Aufgabe zum Befund; Unteraufgaben sind nicht 
 | G08 | Der Router hatte keine Zulassungssteuerung. | `src/zulassung.rs`, `tests/zulassung_guard.rs`; LLH-216 |
 | G09 | Der Pool wartete 30 s statt schnell 503 zu melden. | `acquire_timeout` 10 s (`src/db.rs`); LLH-218 |
 | G10 | Es gab keinen Schutz gegen Slow-Loris. | `header_read_timeout` (`src/verbindung.rs`); LLH-221 |
+
+## 11.4 Behobene Risiken
+
+Risiken aus Abschnitt 11.2, die geschlossen sind. Ihre Nummer wird nicht neu vergeben.
+
+| Nr | Risiko in einem Satz | Behoben durch |
+|---|---|---|
+| R14 | Die User-Agents der ausgehenden Abrufe endeten auf den Platzhalter `(+https://github.com/)`; der öffentliche Nominatim verlangt eine erreichbare Kennung. | Einziger Client-Bau über `src/ausgehend.rs` mit Zweck, Softwarestand, Projektadresse und optionalem `--betreiber-kontakt`; Wächter `tests/ausgehend_kennung_guard.rs`; LLH-1547 |

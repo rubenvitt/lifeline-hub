@@ -61,9 +61,8 @@ fn statics() -> &'static Statics {
 /// bleibt davon unberührt. Die Antwort liest jeder Abruf über [`crate::http_begrenzt`] mit
 /// [`DECKEL_GEOCODER`](crate::http_begrenzt::DECKEL_GEOCODER), auch die gzip-gepackte.
 fn geocoder_client() -> reqwest::Client {
-    reqwest::Client::builder()
+    crate::ausgehend::client_builder(crate::ausgehend::Zweck::Geocoder)
         .timeout(GEOCODER_TIMEOUT)
-        .user_agent("LifelineHub-Geocoder/1.0 (+https://github.com/)")
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .expect("reqwest-Client baubar")

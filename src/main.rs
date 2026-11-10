@@ -27,6 +27,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::parse();
+    // Kennung ausgehender Abrufe (LLH-1547): vor dem ersten HTTP-Client setzen.
+    lifeline_hub::ausgehend::set_betreiber_kontakt(config.betreiber_kontakt()?);
 
     match config.command.clone() {
         Some(Command::Backup {

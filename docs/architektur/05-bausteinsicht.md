@@ -249,6 +249,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | `src/zulassung.rs` | Zeitbudget und Höchstzahl gleichzeitiger Requests, Lastabwurf | Layer in `src/app.rs` |
 | `src/transfer.rs` | Upload- und Download-Grenzen für große Transfers; volle Upload-Grenze → 503 mit `Retry-After` | `UploadGrenze`, `DownloadGrenze` |
 | `src/http_begrenzt.rs` | Begrenztes Einlesen fremder HTTP-Antworten | Geocoder, Fachebenen, OIDC |
+| `src/ausgehend.rs` | Einziger Bau der HTTP-Clients: Kennung im `User-Agent` mit Zweck, Softwarestand, Projektadresse und `--betreiber-kontakt` | `client_builder`, `tests/ausgehend_kennung_guard.rs` |
 | `src/log_drossel.rs` | Sammelzeilen für fremdausgelöste Logereignisse | Lastabwurf, Pool, 503 |
 | `src/zeit.rs` | Ein Zeitformat für DB und Wire: UTC, sekundengenau | überall |
 | `src/zeitdarstellung.rs` | Zeitpunkte in fertigen Servertexten (ETB-Sätze, Hinweise) in der Darstellung von Einsatz bzw. Organisation, Vorgabe taktisch | Gegenstück `frontend/src/anzeige/zeitDarstellung.ts` |

@@ -502,10 +502,9 @@ impl Resolve for SichererResolver {
 pub fn proxy_client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
     CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
+        crate::ausgehend::client_builder(crate::ausgehend::Zweck::Kartenproxy)
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(30))
-            .user_agent("LifelineHub-Kartenproxy/1.0 (+https://github.com/)")
             .dns_resolver(Arc::new(SichererResolver))
             .redirect(crate::karte::download::ssrf_redirect_policy())
             // Content-Encoding wird verbatim durchgereicht (`AssetAntwort`, Kachel-Cache):
