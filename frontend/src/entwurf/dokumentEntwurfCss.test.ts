@@ -66,7 +66,11 @@ describe('dokumentEntwurf.css — Druck', () => {
     expect(sichtbar, 'Druckfassung oder Titel bleiben am Papier verborgen').toBeDefined();
     expect(sichtbar!.koerper).toMatch(/display:\s*block\s*!important/);
     // Ohne `druckfassung` druckte ein Abschnitt leer, ohne `druckTitel` ohne Namen.
-    expect(baustein).toMatch(/<MarkdownEditor\b[^>]*?\bdruckfassung\b/);
+    // Das Feld eines Abschnitts ist `AbschnittFeld` (LLH-1601), das alles an den Editor reicht.
+    expect(baustein).toMatch(/<AbschnittFeld\b[^>]*?\bdruckfassung\b/);
+    expect(baustein).toMatch(
+      /<MarkdownEditor ref=\{ref\} onChange=\{onChange\} \{\.\.\.rest\} \/>/,
+    );
     expect(baustein).toMatch(/druckTitel=\{a\.label\}/);
     // Und der Editor wird nie als GANZES versteckt (das träfe die Druckfassung mit).
     for (const r of druck.filter(versteckt)) {

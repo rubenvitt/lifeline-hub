@@ -128,10 +128,22 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const uhrzeitRef = useRef(() => uhrzeit(dayjs(), konventionen));
   uhrzeitRef.current = () => uhrzeit(dayjs(), konventionen);
 
+  /**
+   * Nie geschrieben wird der Serverstand, den der eigene PATCH überholt hat (LLH-1607). Fällt der Riegel mit einer Quittung, ist `daten` bis zum Refetch
+   * meist noch der Stand, der beim START des PATCH galt. Ihn zu schreiben setzte die eben gesicherte
+   * Fassung zurück, und schlösse eine Füllung den Riegel vor dem Refetch, bliebe es dabei.
+   * Übersprungen wird NUR dieser Stand (`ueberholtRef`): ein Refetch, der während des PATCH kam,
+   * kann ihn schon enthalten, samt fremder Änderung, und nach der Invalidierung käme bei gleichem
+   * Inhalt dieselbe Referenz zurück (structural sharing).
+   */
+  const datenRef = useRef(daten);
+  datenRef.current = daten;
+  const ueberholtRef = useRef<D | undefined>(undefined);
   useEffect(() => {
     if (!daten) return;
     if (!formular.da) return; // (4)
     if (ungespeichert) return; // DER RIEGEL (1)
+    if (daten === ueberholtRef.current) return;
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
   }, [daten, form, formular.da, ungespeichert]);
 
@@ -166,7 +178,10 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const gesichertRef = useRef(-1);
   const quittungVorbereiten = useCallback(() => {
     const stand = aenderungRef.current;
+    const basis = datenRef.current;
     return () => {
+      // Der Serverstand beim Start ist mit diesem PATCH überholt (LLH-1607, s. o.).
+      ueberholtRef.current = basis;
       // VOR der Verzweigung: der Server hat in BEIDEN Zweigen gespeichert, sonst bliebe nach einem
       // überholten Speichern ein veralteter Grund stehen.
       setSpeicherFehler(null);
