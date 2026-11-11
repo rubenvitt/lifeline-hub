@@ -6,14 +6,16 @@ import {
   IconGlocke,
   IconPerson,
   IconPosteingang,
+  IconSprechblase,
   type Icon,
 } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
+import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
 import {
   useDichte,
   useHelligkeit,
@@ -100,6 +102,7 @@ export default function BenutzerMenu({
 }: { funktion?: string | null; hasFixedWidth?: boolean } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: versionsstand } = useVersionsstand();
   const neuigkeitenUngelesen = istUngelesen(versionsstand);
   const { token } = theme.useToken();
@@ -281,6 +284,9 @@ export default function BenutzerMenu({
     // (LFH-1096) steht darüber, ebenso selten gebraucht.
     { type: 'divider' },
     { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
+    // Rückmeldeweg (LLH-1549): das Issue-Formular im öffentlichen Repo, vorbefüllt mit Version,
+    // Oberfläche und Routenmuster (nie Kennungen). Immer sichtbar, nicht nur in Vorabversionen.
+    { key: 'rueckmeldung', icon: <IconSprechblase />, label: 'Rückmeldung' },
     { key: 'lizenzen', icon: <IconDokument />, label: 'Lizenzen' },
   ];
 
@@ -291,6 +297,13 @@ export default function BenutzerMenu({
     else if (key === 'neuigkeiten') navigate(NEUIGKEITEN_PFAD);
     else if (key === 'benachrichtigungen') navigate(BENACHRICHTIGUNGEN_PFAD);
     else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
+    else if (key === 'rueckmeldung')
+      window.open(
+        rueckmeldungsAdresse({ version: __APP_VERSION__, pfad: location.pathname }),
+        '_blank',
+        // ohne Referer: die Adresse der Installation bleibt bei uns
+        'noopener,noreferrer',
+      );
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);
     else if (key.startsWith(DICHTE_PRAEFIX)) setDichte(key.slice(DICHTE_PRAEFIX.length) as Dichte);

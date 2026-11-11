@@ -319,6 +319,7 @@ flowchart TB
 | `frontend/src/druck` | Druckmechanik und Listendruck ([AGENTS.md](../../frontend/src/druck/AGENTS.md)) | Listenrouten der Fachmodule |
 | `frontend/src/hilfe` | Hilfe-Seite mit den Kapiteln aus `docs/anwender/kapitel/` | — |
 | `frontend/src/neuigkeiten` | Versionshinweise aus dem CHANGELOG | `src/versionsstand` |
+| `frontend/src/rueckmeldung` | Adresse des Rückmeldeformulars (GitHub-Issue) mit Version und Routenmuster | `.github/workflows/rueckmeldung.yml` |
 | `frontend/src/alarm` | Benachrichtigungen, Alarmton, Badge, Desktop-Alarm, Web-Push-Anmeldung | `src/benachrichtigung`, `src/web_push` |
 | `frontend/src/test` | Test-Setup, Attrappen und Hilfen der Vitest-Suite | — |
 | `frontend/src/pages` | Seiten der Module; Unterordner u. a. `lagekarte` ([AGENTS.md](../../frontend/src/pages/lagekarte/AGENTS.md)), `lage-dashboard`, `uhs`, `gefahren`, `einstellungen` | je Modul |

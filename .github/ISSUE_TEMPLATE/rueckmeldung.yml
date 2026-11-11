@@ -1,0 +1,62 @@
+# Rückmeldung von Testern (LLH-1549). Das einzige Formular: leere Issues sind in `config.yml`
+# abgeschaltet. Der Menüeintrag „Rückmeldung“ der App füllt `version`, `oberflaeche` und `seite`
+# über die Adresse vor (`frontend/src/rueckmeldung/adresse.ts`), deshalb dürfen sich diese drei
+# `id`s nicht ändern. Der Workflow `rueckmeldung.yml` liest die Überschriften der Felder
+# (`scripts/rueckmeldung/einwurf.mjs`, FELDER) und wirft die Meldung in Zunder ein.
+name: Rückmeldung
+description: Fehler, Wunsch oder Frage zu Lifeline Hub
+labels: ['rückmeldung']
+body:
+  - type: dropdown
+    id: art
+    attributes:
+      label: Art
+      options:
+        - Fehler
+        - Wunsch
+        - Frage
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 1.0.0-beta.1
+    validations:
+      required: true
+  - type: input
+    id: oberflaeche
+    attributes:
+      label: Oberfläche
+      placeholder: Browser, Desktop-App oder gekoppeltes Gerät
+  - type: input
+    id: seite
+    attributes:
+      label: Bereich der App
+      placeholder: /einsatz/:id/etb
+  - type: textarea
+    id: beschreibung
+    attributes:
+      label: Was ist passiert, was wünschst du dir?
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Erwartet
+  - type: checkboxes
+    id: datenschutz
+    attributes:
+      label: Öffentlich
+      description: Dieses Issue kann jeder lesen.
+      options:
+        - label: Text und Bilder enthalten keine Namen von Betroffenen oder Patienten und keine Einsatzinhalte.
+          required: true

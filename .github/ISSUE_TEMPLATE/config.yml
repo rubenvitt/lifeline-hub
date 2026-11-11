@@ -1,0 +1,13 @@
+# Nur das Formular `rueckmeldung.yml` (LLH-1549): ein freies Issue trüge weder Version noch
+# Label, und der Workflow `rueckmeldung.yml` würfe es nicht in Zunder ein.
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/rubenvitt/lifeline-hub/security/advisories/new
+    about: Nicht öffentlich, nur für die Entwicklung sichtbar.
+  - name: Ohne GitHub-Konto
+    url: mailto:rueckmeldung@lifeline-hub.de
+    about: rueckmeldung@lifeline-hub.de
+  - name: Anwenderdokumentation
+    url: https://lifeline-hub.pages.dev/doku/rueckmeldung/
+    about: Wie und wo Rückmeldungen ankommen.

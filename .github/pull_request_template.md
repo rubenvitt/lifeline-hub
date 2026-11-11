@@ -1,4 +1,11 @@
 Zunder: https://zunder.rubeen.dev/#/aufgabe/
+Fixes #
+
+<!--
+`Fixes #<nummer>` nur, wenn der PR eine Rückmeldung aus einem Issue erledigt (LLH-1549,
+`.github/ISSUE_TEMPLATE/rueckmeldung.yml`); GitHub schließt das Issue beim Merge nach `alpha`.
+Das Schlüsselwort muss englisch bleiben, „Schließt“ erkennt GitHub nicht. Sonst die Zeile löschen.
+-->
 
 <!--
 Vollständiger Link auf die Aufgabe, mit UUID. Eine Integration liest die Zeile nicht: sie ist

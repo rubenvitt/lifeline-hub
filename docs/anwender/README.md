@@ -25,6 +25,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstieg | [Profil und Sicherheit](kapitel/profil-sicherheit.md) | Alle |
 | Einstieg | [Neuigkeiten](kapitel/neuigkeiten.md) | Alle |
 | Einstieg | [Chat](kapitel/chat.md) | Alle |
+| Einstieg | [Rückmeldung geben](kapitel/rueckmeldung.md) | Alle |
 | Führungsmittel | [Einsatztagebuch](kapitel/einsatztagebuch.md) | Alle, Führung |
 | Führungsmittel | [Meldungen](kapitel/meldungen.md) | Alle, Führung |
 | Führungsmittel | [Aufträge und Befehle](kapitel/auftraege-befehle.md) | Führung |
