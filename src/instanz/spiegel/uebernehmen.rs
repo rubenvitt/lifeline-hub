@@ -343,13 +343,16 @@ async fn uebernehme_zeilen(
     }
     super::anhang::merke_inhalte(conn, einsatz_id, &ergebnis.inhalte).await?;
     // Ab 0 geliefert (neu, wieder angebunden oder der Führer nach einer Wiederherstellung):
-    // der Stand gilt, wie er kommt; sonst rückt er nur vor.
+    // der Stand gilt, wie er kommt. Ebenso, wenn eine Zeile nicht übernommen wurde, auch wenn er
+    // schon höher stand (Wiederholung nach verlorener Antwort): Er bleibt vor dieser Zeile, damit
+    // sie wiederkommt. Sonst rückt er nur vor.
     let bis = nachholen_ab.map_or(l.bis, |n| (n - 1).clamp(l.seit, l.bis));
     sqlx::query(
-        "UPDATE einsatz_spiegel SET stand = CASE WHEN ? = 0 THEN ? ELSE MAX(stand, ?) END, \
+        "UPDATE einsatz_spiegel SET stand = CASE WHEN ? = 0 OR ? THEN ? ELSE MAX(stand, ?) END, \
          letzter_abgleich_at = ?, freigabestufe = ? WHERE einsatz_id = ?",
     )
     .bind(l.seit)
+    .bind(nachholen_ab.is_some())
     .bind(bis)
     .bind(bis)
     .bind(crate::zeit::jetzt())
@@ -357,7 +360,7 @@ async fn uebernehme_zeilen(
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    katalog::nach_update_neu_holen(conn, einsatz_id, l, katalog_ab, nachholen_ab).await?;
+    katalog::nach_update_neu_holen(conn, einsatz_id, l, katalog_ab).await?;
     ergebnis.stand = sqlx::query_scalar("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = ?")
         .bind(einsatz_id)
         .fetch_one(&mut *conn)

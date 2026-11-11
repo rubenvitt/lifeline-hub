@@ -657,6 +657,7 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
         .expect("Lieferung");
     fc.commit().await.unwrap();
     assert!(l.katalog);
+    let voll = l.clone();
     let vorher = l.zeilen.len();
     l.zeilen
         .retain(|z| !(z.art == "sprechgruppe" && z.schluessel == sg.to_string()));
@@ -716,11 +717,35 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
     wieder.katalog = true;
     wieder.seit = 1;
     wieder.zeilen.retain(|z| z.stand > wieder.seit);
+    let hoeher = "UPDATE einsatz_spiegel SET stand = stand + 50";
     let mut sc = s.begin().await.unwrap();
+    sqlx::query(hoeher).execute(&mut *sc).await.unwrap();
     let erg = uebernehmen::uebernehmen(&mut sc, &empf, &wieder)
         .await
         .unwrap();
     assert_eq!(erg.stand, ab - 1);
+    sc.rollback().await.unwrap();
+    // Gelingt eine solche Wiederholung bis zum Merker, gilt höchstens ihr Ende: Was der ältere
+    // Absender danach noch übersprungen haben kann, kommt erneut.
+    let mut bis_merker = voll.clone();
+    bis_merker.katalog = true;
+    bis_merker.seit = 1;
+    bis_merker.bis = ab;
+    bis_merker.zeilen.retain(|z| {
+        (z.art == "sprechgruppe" && z.schluessel == sg.to_string())
+            || (z.stand > 1 && z.stand <= ab)
+    });
+    let mut sc = s.begin().await.unwrap();
+    sqlx::query(hoeher).execute(&mut *sc).await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &empf, &bis_merker)
+        .await
+        .unwrap();
+    assert_eq!(erg.stand, ab);
+    let merker: Option<i64> = sqlx::query_scalar("SELECT katalog_ab FROM einsatz_spiegel")
+        .fetch_one(&mut *sc)
+        .await
+        .unwrap();
+    assert_eq!(merker, None);
     sc.rollback().await.unwrap();
     exec(
         &f,

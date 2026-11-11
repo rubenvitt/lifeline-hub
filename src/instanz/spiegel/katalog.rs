@@ -42,18 +42,18 @@ pub async fn nach_update_neu_holen(
     einsatz_id: i64,
     l: &super::paket::EinsatzLieferung,
     katalog_ab: Option<i64>,
-    nachholen_ab: Option<i64>,
 ) -> Result<(), sqlx::Error> {
     if l.katalog {
-        // Lag die gemerkte Zeile in dieser Lieferung, ist sie neu übernommen worden. Scheitert sie
-        // wieder, bleibt der Stand vor der ersten nicht übernommenen Zeile, auch wenn er schon
-        // höher stand (Wiederholung nach verlorener Antwort). Sonst, auch bei einer kürzeren
-        // Wiederholung darunter, höchstens bis vor den Merker bestätigen und ihn behalten.
+        // Lag die gemerkte Zeile in dieser Lieferung, ist sie neu übernommen worden (scheitert sie
+        // wieder, hält `nachholen_ab` den Stand davor). Bestätigt wird dann höchstens das Ende
+        // dieser Lieferung, auch wenn der Stand schon höher stand (Wiederholung nach verlorener
+        // Antwort): Darüber kann der ältere Absender weitere Zeilen übersprungen haben. Sonst,
+        // auch bei einer kürzeren Wiederholung darunter, höchstens bis vor den Merker bestätigen
+        // und ihn behalten.
         sqlx::query(
             "UPDATE einsatz_spiegel SET \
-             stand = MIN(CASE WHEN ?1 < katalog_ab AND ?2 >= katalog_ab THEN stand \
-                              ELSE MIN(stand, katalog_ab - 1) END, \
-                         COALESCE(?4 - 1, stand)), \
+             stand = CASE WHEN ?1 < katalog_ab AND ?2 >= katalog_ab THEN MIN(stand, ?2) \
+                          ELSE MIN(stand, katalog_ab - 1) END, \
              katalog_ab = CASE WHEN ?1 < katalog_ab AND ?2 >= katalog_ab THEN NULL \
                                ELSE katalog_ab END \
              WHERE einsatz_id = ?3 AND katalog_ab IS NOT NULL",
@@ -61,7 +61,6 @@ pub async fn nach_update_neu_holen(
         .bind(l.seit)
         .bind(l.bis)
         .bind(einsatz_id)
-        .bind(nachholen_ab)
         .execute(&mut *conn)
         .await?;
     } else if let Some(ab) = katalog_ab {
