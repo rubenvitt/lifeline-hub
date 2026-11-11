@@ -1,3 +1,49 @@
+## [1.0.0-alpha.184](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.183...v1.0.0-alpha.184) (2026-11-11)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Dieses Update bringt eine Migration mit. Sie legt ein Änderungsprotokoll je Einsatz an, ergänzt die Einsätze um Kennung und Freigabestufe und fügt die Tabellen für gespiegelte Einsätze und Anträge hinzu. Die Migration läuft beim ersten Start automatisch.
+- **Instanzkopplung, Protokoll 2:** Gekoppelte Instanzen sprechen jetzt Protokollversion 2. Ein Gegenüber mit einer älteren Version spiegelt keine Einsätze. Beide Seiten zeigen dann „Update nötig“ an.
+- **Neuer Aufrufparameter `--instanz-spiegel-sekunden`:** legt fest, wie oft gespiegelte Einsätze abgeglichen werden, solange kein Einsatz aktiv ist. Bei einem aktiven Einsatz läuft der Abgleich alle 5 Sekunden.
+- **Neuer Aufrufparameter `--betreiber-kontakt`** (Umgebungsvariable `LIFELINE_BETREIBER_KONTAKT`): Damit trägt jeder ausgehende Abruf zusätzlich den Kontakt des Betreibers.
+- **Hintergrundbilder der Lagekarte:** Bilder, deren Metadaten sich nicht entfernen lassen, lehnt der Server schon beim Hochladen ab. Die Bilder werden außerdem nicht mehr dauerhaft im Browser zwischengespeichert.
+
+### Einsätze über gekoppelte Instanzen (Spiegel)
+
+- Ein Einsatz lässt sich jetzt an einer gekoppelten Instanz **spiegeln**, die ihn nicht führt. Der Spiegel zeigt den vollständigen Einsatz, ist aber schreibgeschützt. Die Daten gehen in beide Richtungen und werden nach einer Verbindungsunterbrechung nachgeholt.
+- **Anträge statt Schreiben:** Wer am Spiegel eine der Erfassungen vornimmt, die auch ohne Netz möglich sind, stellt einen Antrag an die führende Instanz.
+  - Die Eingabe erscheint als „beantragt“. Die führende Instanz führt den Antrag im Namen des Kontos aus und meldet das Ergebnis zurück.
+  - Es gilt die Zeit, zu der der Antrag erfasst wurde, nicht die Zeit der Ausführung.
+  - Eigene Anträge lassen sich einsehen und verwerfen. Erledigte Anträge werden nach 30 Tagen aufgeräumt.
+- **Hinweisband am Einsatzkopf:** Es nennt Gegenstelle und Datenstand sowie die Zahl der ausstehenden und abgelehnten Anträge. Steht die Verbindung bei laufendem Einsatz länger als eine Minute, zeigt es „keine Verbindung seit …“.
+- An der Instanzkopplung sind gespiegelte und gelieferte Einsätze mit ihrem Stand aufgeführt.
+- **Anhänge auf Abruf:** Anhänge, Kartenbilder und UHS-Pläne werden erst geholt, wenn jemand sie öffnet. Bis dahin steht dort „wird geholt“, danach laden Vorschau und Bild von selbst nach.
+- **Widerruf der Kopplung:** Er beendet den Abgleich, und offene Anträge werden mit „Kopplung widerrufen“ abgelehnt. Der Spiegel bleibt lesbar und geschützt.
+- **Was am Spiegel lokal bleibt bzw. gesperrt ist:**
+  - Benachrichtigungen, „gelesen“ und Quittieren werden nicht gespiegelt und bleiben lokal.
+  - Fristen lassen sich nicht ändern.
+  - Geräte können nicht gekoppelt werden. Die Freigabe externer Lagemonitore bleibt möglich.
+- **Fremde Konten:** Hat ein Konto der führenden Instanz kein Gegenstück, erscheint es am Spiegel als Platzhalter ohne Anmeldung. So bleiben etwa die Verfasser im Einsatztagebuch erhalten. Diese Platzhalter tauchen nicht in Benutzerverwaltung und Auswahllisten auf.
+- **Hintergrundläufe:** Erinnerungen, Fristen, Ankündigungen der Lagebesprechung und Aufbewahrungsläufe berücksichtigen nur Einsätze, die die eigene Instanz führt.
+
+### Einsatztagebuch
+
+- **Kontextmenü an der Zeitachse:** Rechtsklick, die Kontextmenü-Taste oder Umschalt+F10 öffnen an ETB-Einträgen, abgelehnten Zeilen und an den Chips der Erfassung dieselben Aktionen wie das ⋮-Menü.
+  - Ein langer Druck öffnet hier bewusst kein Menü, damit sich Text am Tablet weiter markieren lässt.
+  - Die Rechtsklick-Taste eines Stifts öffnet das Menü sofort.
+- Solange ein Menü offen ist, hält die Zeitachse an. Danach läuft sie zuverlässig weiter, auch wenn die Zeile inzwischen verschwunden ist. Neue Einträge bleiben nicht mehr hinter dem Sammelbanner hängen.
+- „Nur protokollieren“ wirkt jetzt auch, wenn diese Möglichkeit erst nachträglich angeboten wird.
+
+### Lagekarte
+
+- **Datenschutz:** Hintergrundbilder werden ohne Metadaten ausgeliefert, also ohne EXIF, GPS, XMP, IPTC und Kommentare. Erhalten bleibt nur die Ausrichtung. Ein Drohnenfoto verrät so weder Standort noch Gerät.
+  - Das gilt auch für Bilder, die schon vorher hochgeladen wurden. Gespeichert bleibt das Original.
+  - Lässt sich ein Bild nicht bereinigen, wird es abgelehnt und nie im Original ausgeliefert.
+
+### Betrieb und Installation
+
+- **Kennung bei ausgehenden Abrufen:** Alle ausgehenden Abrufe des Servers nennen jetzt Anwendung, Version und Projektadresse. Das betrifft Geocoder, Fachebenen, Kartendienst und Kartendownload, Anmeldung über OIDC, Web Push und Instanzkopplung. Bei Bedarf kommt der Kontakt des Betreibers hinzu (siehe oben). Bisher fehlte diese Kennung teilweise ganz oder war nur ein Platzhalter.
+
 ## [1.0.0-alpha.183](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.182...v1.0.0-alpha.183) (2026-11-10)
 
 ### Wichtige Änderungen
