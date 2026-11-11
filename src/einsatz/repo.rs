@@ -342,6 +342,10 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 o.name AS org_name, \
+                (SELECT v.gegenstelle FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung_gegenstelle, \
+                (SELECT v.grund FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung_grund, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
@@ -617,6 +621,7 @@ pub async fn liste_fuer(
                 anzahl_betroffene_initial: r.anzahl_betroffene_initial,
                 retention_bis: r.retention_bis,
                 nachbereitung_bis: r.nachbereitung_bis,
+                verwahrung: None,
                 meine_rolle: r.meine_rolle,
                 meine_fuehrungsstelle,
                 meine_sachgebiete,

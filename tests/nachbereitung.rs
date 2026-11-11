@@ -159,3 +159,28 @@ async fn einsatzleitung_aendert_beobachter_ist_403_aktiv_ist_409() {
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "vorgemerkt");
 }
+
+#[tokio::test]
+async fn der_kopf_nennt_die_wartende_verwahrung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_anlegen(&app, &admin).await;
+    let einsatz = abschliessen(&app, &admin, id).await;
+    assert!(einsatz.get("verwahrung").is_none(), "{einsatz}");
+
+    sqlx::query(
+        "INSERT INTO einsatz_verwahrung (einsatz_id, gegenstelle, grund, quittiert_at) \
+         VALUES (?, 'Hub Kreis', '1 Anhang fehlt', datetime('now'))",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (status, body) =
+        anfrage_json(&app, "GET", &format!("/api/einsaetze/{id}"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body["verwahrung"],
+        json!({ "gegenstelle": "Hub Kreis", "grund": "1 Anhang fehlt" })
+    );
+}

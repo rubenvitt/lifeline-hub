@@ -156,6 +156,7 @@ use utoipa::OpenApi;
         crate::einheit_vorlage::EinheitVorlagePersonal,
         crate::einsatz_vorlage::EinsatzVorlage,
         crate::einsatz::EinsatzAnzeige,
+        crate::einsatz::EinsatzVerwahrungAnzeige,
         crate::einsatz::EinsatzRolle,
         crate::einsatz::EinsatzStatus,
         crate::einsatz::Einsatzart,

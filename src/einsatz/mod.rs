@@ -143,6 +143,12 @@ pub struct Einsatz {
     /// Ende der Nachbereitung (LLH-1494): danach übergibt die meldende Instanz einen eigenen
     /// Einsatz der verwahrenden und räumt einen Spiegel ab. `None` = keine Nachbereitungsfrist.
     pub nachbereitung_bis: Option<String>,
+    /// Letzte Quittung „wartet“ der verwahrenden Gegenstelle (LLH-1494, D8), aus
+    /// `einsatz_verwahrung`; nur `laden` füllt sie.
+    #[sqlx(default)]
+    pub verwahrung_gegenstelle: Option<String>,
+    #[sqlx(default)]
+    pub verwahrung_grund: Option<String>,
     /// Soft-Delete-Tombstone (LFH-130). Hier nur abgebildet; das Kippen folgt im
     /// Archiv-Feature (LFH-135).
     pub geloescht_at: Option<String>,
@@ -220,6 +226,12 @@ impl Einsatz {
             anzahl_betroffene_initial: self.anzahl_betroffene_initial,
             retention_bis: self.retention_bis.clone(),
             nachbereitung_bis: self.nachbereitung_bis.clone(),
+            verwahrung: self.verwahrung_gegenstelle.clone().map(|gegenstelle| {
+                EinsatzVerwahrungAnzeige {
+                    gegenstelle,
+                    grund: self.verwahrung_grund.clone(),
+                }
+            }),
             meine_rolle,
             meine_fuehrungsstelle,
             meine_sachgebiete,
@@ -238,6 +250,16 @@ impl Einsatz {
             spiegel: self.spiegel.anzeige(),
         }
     }
+}
+
+/// Stand der Übergabe an die verwahrende Gegenstelle (LLH-1494, D8): ihre letzte Quittung
+/// „wartet“.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EinsatzVerwahrungAnzeige {
+    pub gegenstelle: String,
+    /// Worauf die Gegenstelle wartet, etwa „1 Anhang fehlt“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grund: Option<String>,
 }
 
 /// Öffentliche Einsatz-Darstellung für API-Antworten,
@@ -271,6 +293,9 @@ pub struct EinsatzAnzeige {
     /// Ende der Nachbereitung (LLH-1494, UTC); fehlt = keine Nachbereitungsfrist.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachbereitung_bis: Option<String>,
+    /// Die Übergabe an die verwahrende Gegenstelle wartet (LLH-1494); fehlt sonst.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verwahrung: Option<EinsatzVerwahrungAnzeige>,
     #[schema(value_type = Option<EinsatzRolle>)]
     pub meine_rolle: Option<String>,
     /// Eigene Führungsstelle in diesem Einsatz als Vorbelegungstext der ETB-Erfassung
@@ -486,6 +511,8 @@ mod tests {
             anzahl_betroffene_initial: None,
             retention_bis: None,
             nachbereitung_bis: None,
+            verwahrung_gegenstelle: None,
+            verwahrung_grund: None,
             geloescht_at: None,
             einsatzleiter: Default::default(),
             fuehrung: Default::default(),

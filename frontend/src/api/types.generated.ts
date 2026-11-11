@@ -2380,6 +2380,7 @@ export interface components {
              *     Nennt bewusst weder Person noch Zeitpunkt noch Modul.
              */
             teilschwaerzungen?: number | null;
+            verwahrung?: components["schemas"]["EinsatzVerwahrungAnzeige"] | null;
         };
         /**
          * @description Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel
@@ -2675,6 +2676,15 @@ export interface components {
             einsatz_fahrzeug_id: number;
             fahrzeugtyp?: string | null;
             funkrufname: string;
+        };
+        /**
+         * @description Stand der Übergabe an die verwahrende Gegenstelle (LLH-1494, D8): ihre letzte Quittung
+         *     „wartet“.
+         */
+        EinsatzVerwahrungAnzeige: {
+            gegenstelle: string;
+            /** @description Worauf die Gegenstelle wartet, etwa „1 Anhang fehlt“. */
+            grund?: string | null;
         };
         /**
          * @description Eine Einsatz-Vorlage der Organisation. `ausgeblendet` sind die Modulschlüssel, die ein mit ihr
