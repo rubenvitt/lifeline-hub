@@ -206,9 +206,12 @@ describe('BenutzerMenu — Aufbau (LFH-952, LLH-1642)', () => {
   });
 
   it.each([
-    [390, 'calc(100vw - 16px)'],
-    [1024, '320px'],
-  ])('Menübreite bei %i px: %s (LLH-1642)', async (breite, erwartet) => {
+    [390, 'kompakt', 'calc(100vw - 16px)'],
+    [1024, 'kompakt', '320px'],
+    [390, 'handschuh', 'calc(100vw - 16px)'],
+    [1024, 'handschuh', '480px'],
+  ])('Menübreite bei %i px in %s: %s (LLH-1642 D12)', async (breite, dichte, erwartet) => {
+    localStorage.setItem('lifeline-hub.dichte', dichte);
     setzeViewportBreite(breite);
     zeige();
     await oeffne();
@@ -262,6 +265,37 @@ describe('BenutzerMenu — Aufbau (LFH-952, LLH-1642)', () => {
       await screen.findByRole('heading', { name: 'Benachrichtigungen-Seite' }),
     ).toBeInTheDocument();
   });
+
+  /*
+   * D11 (LLH-1642): im Handschuh-Betrieb ist der App-Kopf am Handy zweizeilig; damit die drei
+   * Leisten ohne Rollen ins Fenster passen, stehen Profil und Abmelden nebeneinander und der Kopf
+   * rückt zusammen. Die Lage im Fenster misst `e2e/benutzermenue.spec.ts`; hier die Form, mit der
+   * Gegenprobe `komfortabel` (dieselbe Abfrage, untereinander).
+   */
+  it.each([
+    ['handschuh', true],
+    ['komfortabel', false],
+  ])(
+    'Dichte %s: Profil und Abmelden nebeneinander = %s, beide wählbar',
+    async (dichte, nebeneinander) => {
+      localStorage.setItem('lifeline-hub.dichte', dichte);
+      zeige();
+      await oeffne();
+      const profil = await screen.findByRole('menuitem', { name: 'Profil' });
+      const abmelden = screen.getByRole('menuitem', { name: 'Abmelden' });
+      for (const eintrag of [profil, abmelden]) {
+        expect(eintrag.style.display).toBe(nebeneinander ? 'inline-flex' : '');
+        expect(eintrag.style.width).toBe(nebeneinander ? 'calc(50% - 4px)' : '');
+      }
+      const kopf = screen.getByTestId('benutzermenue-kopf');
+      // Knapper Kopf: Benutzername und Version in einer Zeile.
+      expect(kopf.textContent).toContain(`@${benutzer.benutzername}`);
+      expect(
+        within(kopf).queryByText(`@${benutzer.benutzername} · Version ${__APP_VERSION__}`),
+      ).toEqual(nebeneinander ? expect.anything() : null);
+      expect(within(kopf).getAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(1);
+    },
+  );
 
   it('der Menükopf nennt die Funktion auch unter xl', async () => {
     setzeViewportBreite(1024);
@@ -385,11 +419,12 @@ describe.each([
   });
 
   /*
-   * TASTATUR MIT `keyCode` (LLH-1642 D2): `rc-menu` und `rc-dropdown` lesen `keyCode`, und
-   * user-event setzt ihn nicht — ihre Wege liefen hier sonst nie, und ein fehlendes Abfangen bliebe
-   * grün. Deshalb `fireEvent.keyDown` mit `keyCode`; die Fokuswanderung tragen die Handler selbst.
+   * TASTATUR MIT `keyCode` (LLH-1642 D2): `rc-dropdown` liest `keyCode`, und user-event setzt ihn
+   * nicht — sein Tab-Weg liefe hier sonst nie. Deshalb `fireEvent.keyDown` mit `keyCode`. Dass die
+   * Pfeiltasten nicht an `rc-menu` weitergehen, belegt jsdom nicht (`rc-menu` setzt den Fokus erst
+   * im nächsten Frame); das prüft `e2e/benutzermenue.spec.ts` mit Pfeil runter und Ende.
    */
-  it('Pfeiltaste bleibt in der Leiste: wählt den Nachbarn, der Menüfokus wandert nicht mit', async () => {
+  it('Pfeiltaste wählt den Nachbarn in der Leiste, Pos1 springt an ihren Anfang', async () => {
     zeige();
     await oeffne();
     const dunkel = (
@@ -402,9 +437,6 @@ describe.each([
     expect(system).toHaveFocus();
     fireEvent.keyDown(system, { key: 'Home', keyCode: 36 });
     expect(leiste('Darstellung').getByRole('radio', { name: 'Hell' })).toHaveFocus();
-    // Enter wählt per Knopf und schließt das Menü nicht.
-    fireEvent.keyDown(document.activeElement!, { key: 'Enter', keyCode: 13 });
-    expect(screen.getByRole('button', { name: 'Benutzermenü' })).toHaveClass('ant-dropdown-open');
   });
 
   it('Tab führt vom Menü in die Leisten und von Leiste zu Leiste, Umschalt+Tab zurück', async () => {
@@ -482,6 +514,9 @@ describe('BenutzerMenu — Helligkeit (LFH-397)', () => {
     expect(screen.getByText('Helligkeit in %')).toBeInTheDocument();
     expect(screen.queryByText(/Warnung aktiv/)).not.toBeInTheDocument();
     expect(screen.queryByText(/wirkt/)).not.toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Helligkeit in %' })).not.toHaveAttribute(
+      'aria-describedby',
+    );
   });
 
   it('mit Warnung: Boden und Grund im Etikett, Stufen darunter gesperrt mit Grund, Wahl zeigt die Wirkung', async () => {
@@ -502,6 +537,10 @@ describe('BenutzerMenu — Helligkeit (LFH-397)', () => {
     expect(vierzig).toHaveAttribute('aria-disabled', 'true');
     expect(vierzig).toHaveAccessibleDescription('Warnung aktiv: mindestens 80 %');
     expect(screen.getByText('Gewählt 40 %, wirkt 80 %')).toBeInTheDocument();
+    // Die Leiste verweist auf den Hinweis, wie früher der Name „40 % ✓ (wirkt 80 %)“ ihn trug.
+    expect(screen.getByRole('radiogroup', { name: 'Helligkeit in %' })).toHaveAccessibleDescription(
+      'Gewählt 40 %, wirkt 80 %',
+    );
     for (const s of ['60 %', '20 %']) {
       expect(helligkeit().getByRole('radio', { name: s })).toHaveAttribute('aria-disabled', 'true');
     }

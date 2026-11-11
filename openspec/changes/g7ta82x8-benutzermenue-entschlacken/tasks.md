@@ -17,6 +17,8 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 - [x] 2.4 Helligkeitssperre: Etikett nennt Boden und Grund, Stufen unter dem Boden gesperrt mit Grund, Zeile „Gewählt W %, wirkt N %“ bei Wahl unter dem Boden (Tests wie bisher in `BenutzerMenu.test.tsx`, umgestellt)
 - [x] 2.5 Einträge „Rückmeldung“ und „Lizenzen“ entfernen; „Hilfe“ öffnet die Hilfe mit `state: { von: <Pfad> }` (Test)
 - [x] 2.6 Menübreite 320 px ab `md`, am Handy Fensterbreite − 16 px; Maße der Staffel (30/48/72) aus den Tokens, kein fester Pixelwert für Höhen
+- [x] 2.8 Handschuh (D11): „Profil“ und „Abmelden“ nebeneinander in einer Zeile, Kopf knapper (Rollen neben dem Namen, Benutzername und Version in einer Zeile); Unit-Test für Lage und Wählbarkeit, e2e `benutzermenue` belegt die Lage im Fenster
+- [x] 2.9 Helligkeit im Handschuh (D12): Menü ab `md` im Handschuh 480 px; in voller Breite entfällt die Mindestbreite der Segmente (Zellen teilen gleich, Höhe und Zielabstand bleiben); Unit-Tests, e2e misst Abstand ≥ 16 px und kein Überstand bei 390 × 844 und 1024 × 768
 - [x] 2.7 `components/AppLayout.test.tsx`, `einsatz/EinsatzLayout.test.tsx`, `neuigkeiten/Benutzermenue.neuigkeiten.test.tsx`, `theme/rahmenKontrast.test.ts` auf Leisten und Rollen umstellen
 
 ## 3. Hilfe-Seite (D5, D6)
@@ -30,9 +32,9 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 
 ## 5. e2e und Bildlauf (D9)
 
-- [ ] 5.1 Helfer in `e2e/menue-kern.ts`: Anzeige im Benutzermenü wählen (Leiste und Wert über Rollen), ein gemeinsamer Weg für alle Specs
-- [ ] 5.2 Specs umstellen, die Darstellung, Dichte oder Helligkeit über das Menü setzen oder prüfen (`dichte-ableitung`, `kopfzeile-schmal`, `lagekarte-smoke`, `lagekarte-zeichnen-korrigierbar`, `rahmen-stehen-bleiben`, `gate3-trefflaeche`, `neuigkeiten`, `hilfe` u. a.; Abschlussprüfung per `grep` nach `menuitem` mit den alten Namen)
-- [ ] 5.3 e2e `benutzermenue` (neu oder in bestehender Spec): 390 × 844 `komfortabel` ganzes Menü im Fenster; `handschuh` Abmelden und alle drei Leisten ohne Rollen; Tastatur in einer Leiste; Eingänge-Link führt auf Benachrichtigungen
+- [x] 5.1 Helfer in `e2e/menue-kern.ts`: Anzeige im Benutzermenü wählen (Leiste und Wert über Rollen), ein gemeinsamer Weg für alle Specs
+- [x] 5.2 Specs umstellen, die Darstellung, Dichte oder Helligkeit über das Menü setzen oder prüfen (`dichte-ableitung`, `kopfzeile-schmal`, `lagekarte-smoke`, `lagekarte-zeichnen-korrigierbar`, `rahmen-stehen-bleiben`, `gate3-trefflaeche`, `neuigkeiten`, `hilfe` u. a.; Abschlussprüfung per `grep` nach `menuitem` mit den alten Namen)
+- [x] 5.3 e2e `benutzermenue` (neu oder in bestehender Spec): 390 × 844 `komfortabel` ganzes Menü im Fenster; `handschuh` Abmelden und alle drei Leisten ohne Rollen; Tastatur in einer Leiste; Eingänge-Link führt auf Benachrichtigungen
 - [ ] 5.4 Bildlauf: `doku-bilder/anmelden-abmelden.bilder.ts` (`benutzermenue*.png`), `doku-bilder/einsatz-oberflaeche.bilder.ts` (`darstellung*.png`), neues Bild der Hilfe-Übersicht mit Rückmeldung, falls das Kapitel `rueckmeldung` eines zeigt
 
 ## 6. Anwenderdoku (Mitänderungsregel)

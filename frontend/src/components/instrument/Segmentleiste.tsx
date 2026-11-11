@@ -146,9 +146,14 @@ interface SegmentleisteProps<W extends string | number> {
   rolle?: 'radiogroup' | 'tablist';
   /**
    * Volle Breite des Behälters (LLH-1642, Benutzermenü): die Leiste wird ein Block, jede Zelle
-   * wächst gleich, das Wort bleibt mittig. Ohne richtet sich die Leiste nach ihren Wörtern.
+   * wächst gleich, das Wort bleibt mittig. Die Zellen TEILEN die Breite: die Mindestbreite der
+   * Staffel entfällt hier, Höhe und Zielabstand bleiben (D12; fünf Helligkeitsstufen im
+   * Handschuh-Betrieb am Handy, sonst überlappten sie). Ohne richtet sich die Leiste nach ihren
+   * Wörtern.
    */
   hasFullWidth?: boolean;
+  /** Id eines Texts, der die ganze Leiste beschreibt (`aria-describedby`, LLH-1642). */
+  beschreibungId?: string;
   style?: CSSProperties;
 }
 
@@ -159,6 +164,7 @@ export default function Segmentleiste<W extends string | number>({
   beschriftung,
   rolle = 'radiogroup',
   hasFullWidth = false,
+  beschreibungId: leistenBeschreibungId,
   style,
 }: SegmentleisteProps<W>) {
   const { token } = useRollen();
@@ -182,6 +188,7 @@ export default function Segmentleiste<W extends string | number>({
     <div
       role={rolle}
       aria-label={beschriftung}
+      aria-describedby={leistenBeschreibungId}
       className="lfh-segmente"
       data-lfh="segmentleiste"
       style={hasFullWidth ? { display: 'flex', ...style } : style}
@@ -210,7 +217,11 @@ export default function Segmentleiste<W extends string | number>({
               if (!gesperrt) onWechsel(o.wert);
             }}
             onKeyDown={(e) => taste(e, i)}
-            style={hasFullWidth ? { ...segmentStil(token), flexGrow: 1 } : segmentStil(token)}
+            style={
+              hasFullWidth
+                ? { ...segmentStil(token), flexGrow: 1, minWidth: 0 }
+                : segmentStil(token)
+            }
           >
             {o.punkt != null && (
               <span

@@ -6,6 +6,8 @@ import { http, HttpResponse } from 'msw';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { merkeRouten } from '../rueckmeldung/adresse';
+import { merkeGeraet } from '../geraet/geraetMarke';
+import { waehle } from '../test/auswahlListe';
 import { renderMitProviders } from '../test/utils';
 import HilfePage from './HilfePage';
 import { KAPITEL, kapitelDerGruppe } from './kapitel';
@@ -158,6 +160,7 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
   afterEach(() => {
     oeffnen.mockRestore();
     merkeRouten([]);
+    merkeGeraet(false);
   });
 
   function geraeteSitzung() {
@@ -186,8 +189,9 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
   it('die Übersicht trägt „Rückmeldung geben“ und „Lizenzen“', async () => {
     zeige('/hilfe');
     const abschnitt = await screen.findByRole('region', { name: 'Rückmeldung und Lizenzen' });
+    // Erst nach dem Laden der Sitzung: bis dahin ist offen, ob das ein gekoppeltes Gerät ist.
     expect(
-      within(abschnitt).getByRole('button', { name: /Rückmeldung geben/ }),
+      await within(abschnitt).findByRole('button', { name: /Rückmeldung geben/ }),
     ).toBeInTheDocument();
     expect(within(abschnitt).getByRole('link', { name: /Lizenzen/ })).toHaveAttribute(
       'href',
@@ -229,6 +233,48 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
     // Das Muster, nie die Kennung.
     expect(seiteVonAdresse()).toBe('/einsatz/:id/etb');
     expect(String(ziel)).not.toContain('42');
+  });
+
+  it('die Herkunft bleibt über einen Wechsel der Lesergruppe erhalten', async () => {
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/start"
+          element={<Navigate to="/hilfe" state={{ von: '/einsatz/42/etb' }} />}
+        />
+        <Route path="/hilfe" element={<HilfePage />} />
+      </Routes>,
+      { route: '/start' },
+    );
+    await screen.findByRole('region', { name: 'Rückmeldung und Lizenzen' });
+    await waehle('Lesergruppe', 'Administration');
+    await waitFor(() =>
+      expect(titel()).toEqual(kapitelDerGruppe('administration').map((k) => k.titel)),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Rückmeldung geben/ }));
+    expect(seiteVonAdresse()).toBe('/einsatz/:id/etb');
+  });
+
+  it('nach einer widerrufenen Kopplung (Browser lief als Gerät) fehlt „Rückmeldung geben“', async () => {
+    merkeGeraet(true);
+    let beantwortet = false;
+    server.use(
+      http.get('/api/auth/me', () => {
+        beantwortet = true;
+        return HttpResponse.json({ error: 'abgemeldet' }, { status: 401 });
+      }),
+    );
+    zeige('/hilfe');
+    // Erst nach der Antwort zur Sitzung prüfen: davor fehlt der Knopf ohnehin (`laedt`).
+    await waitFor(() => expect(beantwortet).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Zur Anmeldung' })).toBeInTheDocument(),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    // Positive Gegenprobe: der Abschnitt steht, nur ohne Knopf.
+    const abschnitt = await screen.findByRole('region', { name: 'Rückmeldung und Lizenzen' });
+    expect(within(abschnitt).getByRole('link', { name: /Lizenzen/ })).toBeInTheDocument();
+    expect(within(abschnitt).queryByRole('button', { name: /Rückmeldung geben/ })).toBeNull();
   });
 
   it('ohne Herkunft trägt die Rückmeldung das Muster der Hilfe', async () => {

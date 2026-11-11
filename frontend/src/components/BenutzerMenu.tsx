@@ -13,6 +13,7 @@ import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand'
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
@@ -27,6 +28,11 @@ function initialen(name: string): string {
 
 /** Breite des geöffneten Menüs ab `md` (LLH-1642): die drei Leisten tragen ihre Wörter ganz. */
 const MENUE_BREITE = 320;
+/**
+ * Breite ab `md` im Handschuh-Betrieb (D12): fünf Helligkeitsstufen à 72 px plus Zielabstand
+ * (2 × 8 px) brauchen 440 px; mit Polsterung des Menüs 480.
+ */
+const MENUE_BREITE_HANDSCHUH = 480;
 
 /** Deckel des Etiketts am Trigger: längere Funktionen und Namen enden mit „…“. */
 const ETIKETT_DECKEL = 180;
@@ -48,7 +54,7 @@ const ETIKETT_PLATZ = 120;
  * des Menüs reicht, weil React im Portal-Behälter lauscht und `stopPropagation` damit vor dem
  * `window`-Lauscher von `rc-dropdown` greift.
  */
-function tabInsMenue(e: KeyboardEvent<HTMLElement>) {
+function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
   if (e.key !== 'Tab') return;
   const gruppe = e.currentTarget.querySelector<HTMLElement>(`[data-lfh="${ANZEIGE_GRUPPE}"]`);
   if (!gruppe) return;
@@ -100,10 +106,17 @@ export default function BenutzerMenu({
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
   // der Benutzer eintrifft.
   const { abBreite } = useViewport();
+  // Handschuh (design.md D11): Kopf knapper, Profil und Abmelden nebeneinander — sonst läge am
+  // Handy unter dem zweizeiligen App-Kopf die Leiste „Helligkeit“ unter dem Rand.
+  const isKnapp = useDichte().dichte === 'handschuh';
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
   // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
-  const menueBreite = abBreite('md') ? MENUE_BREITE : 'calc(100vw - 16px)';
+  const menueBreite = !abBreite('md')
+    ? 'calc(100vw - 16px)'
+    : isKnapp
+      ? MENUE_BREITE_HANDSCHUH
+      : MENUE_BREITE;
 
   if (!benutzer) return null;
 
@@ -129,6 +142,16 @@ export default function BenutzerMenu({
     );
   }
 
+  // Zwei `menuitem`s je halbe Breite: Rollen, Tastatur und `onClick` bleiben unverändert (D11).
+  const halbeZeile = isKnapp
+    ? {
+        display: 'inline-flex',
+        width: 'calc(50% - 4px)',
+        boxSizing: 'border-box' as const,
+        verticalAlign: 'top',
+      }
+    : undefined;
+
   const items: MenuProps['items'] = [
     {
       key: 'kopf',
@@ -150,11 +173,28 @@ export default function BenutzerMenu({
             {initialen(benutzer.anzeigename)}
           </Avatar>
           <div style={{ minWidth: 0 }}>
-            <Typography.Text strong style={{ display: 'block', fontSize: 14, lineHeight: 1.3 }}>
-              {benutzer.anzeigename}
-            </Typography.Text>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                columnGap: 6,
+                rowGap: 4,
+              }}
+            >
+              <Typography.Text strong style={{ fontSize: 14, lineHeight: 1.3 }}>
+                {benutzer.anzeigename}
+              </Typography.Text>
+              {isKnapp && rollenTags.length > 0 && (
+                <Space size={4} wrap>
+                  {rollenTags}
+                </Space>
+              )}
+            </div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              @{benutzer.benutzername}
+              {isKnapp
+                ? `@${benutzer.benutzername} · Version ${__APP_VERSION__}`
+                : `@${benutzer.benutzername}`}
             </Typography.Text>
             {/* Die Funktion auf JEDER Breite (LFH-952, U89): am Auslöser steht sie erst ab `xl`, auf
                 Tablet und Handy war sie sonst nirgends zu sehen. */}
@@ -166,19 +206,21 @@ export default function BenutzerMenu({
                 {funktion}
               </Typography.Text>
             )}
-            {rollenTags.length > 0 && (
+            {!isKnapp && rollenTags.length > 0 && (
               <div style={{ marginTop: 6 }}>
                 <Space size={4} wrap>
                   {rollenTags}
                 </Space>
               </div>
             )}
-            <Typography.Text
-              type="secondary"
-              style={{ display: 'block', fontSize: 11, marginTop: 6 }}
-            >
-              Version {__APP_VERSION__}
-            </Typography.Text>
+            {!isKnapp && (
+              <Typography.Text
+                type="secondary"
+                style={{ display: 'block', fontSize: 11, marginTop: 6 }}
+              >
+                Version {__APP_VERSION__}
+              </Typography.Text>
+            )}
           </div>
         </div>
       ),
@@ -187,8 +229,8 @@ export default function BenutzerMenu({
     // sichtbar 702 px — ganz unten lagen Profil und Abmelden unter dem Rand, beim Schichtwechsel
     // am geteilten Gerät. Rot steht durch den Trenner darunter abgesetzt.
     { type: 'divider' },
-    { key: 'profil', icon: <IconPerson />, label: 'Profil' },
-    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true },
+    { key: 'profil', icon: <IconPerson />, label: 'Profil', style: halbeZeile },
+    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true, style: halbeZeile },
     // AUF JEDER BREITE (LFH-392, LLH-1642): die Kopfzeile ist die Aktionsreihe, eine Einstellung
     // gehört dort nicht hinein. Wer das an eine Breite hängt, nimmt allen drei Achsen ihren
     // einzigen sichtbaren Bedienweg mit aktivem Wert — die Palette zeigt keinen
@@ -242,7 +284,7 @@ export default function BenutzerMenu({
 
   return (
     <Dropdown
-      menu={{ items, onClick, onKeyDown: tabInsMenue, style: { width: menueBreite } }}
+      menu={{ items, onClick, onKeyDown: handleMenuKeyDown, style: { width: menueBreite } }}
       trigger={['click']}
       placement="bottomRight"
     >

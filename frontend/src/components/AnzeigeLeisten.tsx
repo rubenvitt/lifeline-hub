@@ -23,7 +23,7 @@ export const ANZEIGE_GRUPPE = 'benutzermenue-anzeige';
  * Leertaste). Sie gehen NICHT an das Menü weiter: `rc-menu` zöge sonst den Menüfokus mit, und
  * Enter auf dem Menü schlösse es.
  */
-const EIGENE_TASTEN = new Set([
+const OWN_KEYS = new Set([
   'ArrowLeft',
   'ArrowRight',
   'ArrowUp',
@@ -60,11 +60,16 @@ const DICHTE: SegmentOption<Dichte>[] = DICHTE_OPTIONEN.map((o) => ({
 export default function AnzeigeLeisten() {
   const { token } = theme.useToken();
   const titelId = useId();
+  const hinweisId = useId();
   const { modus, setModus } = useThemeMode();
   const { dichte, setDichte } = useDichte();
   const { helligkeit, setHelligkeit, wirksam, warnungAktiv } = useHelligkeit();
 
   const grund = `Warnung aktiv: mindestens ${HELLIGKEIT_BODEN_WARNUNG} %`;
+  // Wirkt eine andere Stufe als die gewählte, nennt eine Zeile unter der Leiste beide; die Leiste
+  // verweist darauf (`aria-describedby`), wie früher der Name des Eintrags „(wirkt 80 %)“ trug.
+  const hinweis =
+    wirksam !== helligkeit ? `Gewählt ${helligkeit} %, wirkt ${wirksam} %` : undefined;
   // Sichtbar steht die Zahl, der zugängliche Name nennt die Einheit („40 %“).
   const helligkeitOptionen: SegmentOption<Helligkeit>[] = HELLIGKEIT_OPTIONEN.map((o) => ({
     wert: o.wert,
@@ -77,13 +82,13 @@ export default function AnzeigeLeisten() {
 
   // Das sichtbare Etikett steht über der Leiste; ihren zugänglichen Namen trägt die Leiste selbst
   // (`beschriftung`), damit er nicht mit dem Warnhinweis wechselt.
-  function leiste(sichtbar: string, kind: ReactNode, hinweis?: string) {
+  function renderLeiste(sichtbar: string, kind: ReactNode, hinweis?: string) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
         <span style={etikett}>{sichtbar}</span>
         {kind}
         {hinweis && (
-          <span data-lfh="helligkeit-wirkt" style={etikett}>
+          <span id={hinweisId} data-lfh="helligkeit-wirkt" style={etikett}>
             {hinweis}
           </span>
         )}
@@ -91,8 +96,8 @@ export default function AnzeigeLeisten() {
     );
   }
 
-  function tasten(e: KeyboardEvent<HTMLDivElement>) {
-    if (EIGENE_TASTEN.has(e.key)) e.stopPropagation();
+  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (OWN_KEYS.has(e.key)) e.stopPropagation();
   }
 
   return (
@@ -100,7 +105,7 @@ export default function AnzeigeLeisten() {
       role="group"
       aria-labelledby={titelId}
       data-lfh={ANZEIGE_GRUPPE}
-      onKeyDown={tasten}
+      onKeyDown={handleKeyDown}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -110,7 +115,7 @@ export default function AnzeigeLeisten() {
       }}
     >
       <Augenbraue id={titelId}>Anzeige</Augenbraue>
-      {leiste(
+      {renderLeiste(
         'Darstellung',
         <Segmentleiste
           optionen={DARSTELLUNG}
@@ -120,7 +125,7 @@ export default function AnzeigeLeisten() {
           hasFullWidth
         />,
       )}
-      {leiste(
+      {renderLeiste(
         'Bediendichte',
         <Segmentleiste
           optionen={DICHTE}
@@ -130,7 +135,7 @@ export default function AnzeigeLeisten() {
           hasFullWidth
         />,
       )}
-      {leiste(
+      {renderLeiste(
         warnungAktiv
           ? `Helligkeit in % · mind. ${HELLIGKEIT_BODEN_WARNUNG} % (Warnung aktiv)`
           : 'Helligkeit in %',
@@ -139,9 +144,10 @@ export default function AnzeigeLeisten() {
           wert={helligkeit}
           onWechsel={setHelligkeit}
           beschriftung="Helligkeit in %"
+          beschreibungId={hinweis ? hinweisId : undefined}
           hasFullWidth
         />,
-        wirksam !== helligkeit ? `Gewählt ${helligkeit} %, wirkt ${wirksam} %` : undefined,
+        hinweis,
       )}
     </div>
   );

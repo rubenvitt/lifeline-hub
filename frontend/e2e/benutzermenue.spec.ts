@@ -67,6 +67,50 @@ test('Handy, Handschuh: Abmelden und alle drei Leisten ohne Rollen im Fenster', 
   await expect(offenesMenue(page)).toHaveCount(1);
 });
 
+/**
+ * D12: fünf Helligkeitsstufen im Handschuh-Betrieb in einer Zeile, nicht überlappend, nicht über
+ * die Leiste hinaus, Zielabstand ≥ 16 px (LFH-865), Höhe 72 px. Am Handy schmaler als die Staffel,
+ * ab `md` (Menü 480 px) in voller Breite.
+ */
+for (const fenster of [HANDY, { width: 1024, height: 768 }]) {
+  test(`Handschuh ${fenster.width} px: Helligkeit in einer Zeile mit Zielabstand`, async ({
+    page,
+  }) => {
+    await dichte(page, 'handschuh');
+    await anmeldenAlsAdmin(page);
+    await page.setViewportSize(fenster);
+    await page.goto('/einsaetze');
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    const menue = await oeffneMenue(page, ausloeser(page));
+    const mass = await menue
+      .getByRole('radiogroup', { name: 'Helligkeit in %' })
+      .evaluate((leiste) => {
+        const l = leiste.getBoundingClientRect();
+        const k = [...leiste.querySelectorAll('button')].map((b) => b.getBoundingClientRect());
+        return {
+          links: l.left,
+          rechts: l.right,
+          knoepfe: k.map((r) => ({ links: r.left, rechts: r.right, oben: r.top, hoehe: r.height })),
+        };
+      });
+    expect(mass.knoepfe).toHaveLength(5);
+    const oben = mass.knoepfe[0]!.oben;
+    for (const [i, k] of mass.knoepfe.entries()) {
+      expect(k.oben, `Stufe ${i} in derselben Zeile`).toBeCloseTo(oben, 0);
+      expect(k.hoehe, `Stufe ${i} hoch genug`).toBeGreaterThanOrEqual(72);
+      expect(k.links, `Stufe ${i} nicht links heraus`).toBeGreaterThanOrEqual(mass.links);
+      expect(k.rechts, `Stufe ${i} nicht rechts heraus`).toBeLessThanOrEqual(mass.rechts);
+      if (fenster.width >= 768) {
+        expect(k.rechts - k.links, `Stufe ${i} hält 72 px ab md`).toBeGreaterThanOrEqual(72);
+      }
+      const naechster = mass.knoepfe[i + 1];
+      if (naechster) {
+        expect(naechster.links - k.rechts, `Abstand ${i}/${i + 1}`).toBeGreaterThanOrEqual(16);
+      }
+    }
+  });
+}
+
 test('Tastatur: Tab führt in die Leisten, Pfeile bleiben darin, Tab hinter der letzten schließt', async ({
   page,
 }) => {
@@ -88,6 +132,15 @@ test('Tastatur: Tab führt in die Leisten, Pfeile bleiben darin, Tab hinter der 
   const danach = leiste('Darstellung').locator('[aria-checked="true"]');
   await expect(danach).toBeFocused();
   expect(await danach.textContent()).not.toBe(vorher);
+  await expect(offenesMenue(page)).toHaveCount(1);
+  // Pfeil runter und Ende sind die Tasten, mit denen `rc-menu` zwischen Einträgen wandert: sie
+  // bleiben in der Leiste (Abfangen in `AnzeigeLeisten`), der Fokus springt nicht auf „Profil“.
+  await page.keyboard.press('End');
+  const ende = leiste('Darstellung').getByRole('radio').last();
+  await expect(ende).toBeFocused();
+  await expect(ende).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('ArrowDown');
+  await expect(leiste('Darstellung').getByRole('radio').first()).toBeFocused();
   await expect(offenesMenue(page)).toHaveCount(1);
 
   await page.keyboard.press('Tab');

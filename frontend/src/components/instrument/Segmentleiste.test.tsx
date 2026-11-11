@@ -139,7 +139,10 @@ describe('Segmentleiste', () => {
     expect(leiste).toHaveStyle({ display: 'flex' });
     for (const zelle of leiste.querySelectorAll<HTMLElement>('[data-lfh="segment-zelle"]')) {
       expect(zelle).toHaveStyle({ flexGrow: '1', flexBasis: '0px', minWidth: '0px' });
-      expect(zelle.querySelector('button')).toHaveStyle({ flexGrow: '1' });
+      // Volle Breite teilt gleich: die Mindestbreite der Staffel entfällt (LLH-1642 D12), die
+      // Höhe bleibt.
+      expect(zelle.querySelector('button')).toHaveStyle({ flexGrow: '1', minWidth: '0px' });
+      expect(zelle.querySelector('button')!.style.minHeight).not.toBe('');
     }
     rerender(
       <Segmentleiste optionen={OPTIONEN} wert="alle" onWechsel={() => {}} beschriftung="voll" />,

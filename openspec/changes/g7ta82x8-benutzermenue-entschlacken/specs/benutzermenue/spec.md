@@ -48,15 +48,23 @@ Menü offen lassen.
 
 Am Handy (390 × 844) SHALL das geöffnete Benutzermenü in `kompakt` und `komfortabel` ganz im
 Fenster liegen, ohne Rollen. In `handschuh` MUST mindestens alles bis einschließlich der Gruppe
-„Anzeige“ ohne Rollen sichtbar sein; der Rest ist im Menü erreichbar.
+„Anzeige“ ohne Rollen sichtbar sein, auch unter dem zweizeiligen Kopf außerhalb eines Einsatzes;
+dafür stehen dort „Profil“ und „Abmelden“ nebeneinander in einer Zeile. Der Rest ist im Menü
+erreichbar.
 
 #### Scenario: Komfortabel am Handy
 - **WHEN** das Benutzermenü bei 390 × 844 in `komfortabel` geöffnet wird
 - **THEN** liegen alle Einträge bis „Hilfe“ im Fenster
 
+#### Scenario: Helligkeit im Handschuh-Betrieb in einer Zeile
+- **WHEN** das Benutzermenü in `handschuh` bei 390 × 844 oder bei 1024 × 768 geöffnet wird
+- **THEN** stehen die fünf Stufen der Leiste „Helligkeit“ in einer Zeile, ohne sich zu überlappen und ohne über die Leiste hinauszuragen
+- **AND** benachbarte Stufen stehen mindestens 16 px auseinander, jede ist 72 px hoch
+
 #### Scenario: Handschuh am Handy
 - **WHEN** das Benutzermenü bei 390 × 844 in `handschuh` geöffnet wird
 - **THEN** liegen „Abmelden“ und alle drei Leisten der Gruppe „Anzeige“ ohne Rollen im Fenster
+- **AND** „Profil“ und „Abmelden“ stehen nebeneinander, jeder Eintrag bleibt einzeln wählbar
 
 ### Requirement: Rückmeldung und Lizenzen auf der Hilfe-Seite
 

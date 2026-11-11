@@ -10,6 +10,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useViewport } from '../components/useViewport';
 import { Bildmarke } from '../marke/Bildmarke';
+import { warGeraet } from '../geraet/geraetMarke';
 import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
 import {
   GERAET_START_PFAD,
@@ -27,7 +28,7 @@ import './Hilfe.css';
 const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
 /** Der Pfad, aus dem das Benutzermenü die Hilfe geöffnet hat (`state.von`, LLH-1642 D5). */
-function herkunft(state: unknown): string | undefined {
+function parseHerkunft(state: unknown): string | undefined {
   const von = (state as { von?: unknown } | null)?.von;
   return typeof von === 'string' && von.startsWith('/') ? von : undefined;
 }
@@ -69,7 +70,7 @@ export default function HilfePage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { benutzer, geraet } = useAuth();
+  const { benutzer, geraet, laedt } = useAuth();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const gruppe = parseHilfeGruppe(params);
@@ -102,16 +103,23 @@ export default function HilfePage() {
   // Rückmeldeweg (LLH-1549, seit LLH-1642 hier statt im Benutzermenü): das Issue-Formular,
   // vorbefüllt mit Version, Oberfläche und dem Bereich, aus dem die Hilfe geöffnet wurde — nur als
   // Routenmuster, nie mit Kennungen. Ohne Referer: die Adresse der Installation bleibt bei uns.
-  function rueckmelden() {
+  function openRueckmeldung() {
     window.open(
       rueckmeldungsAdresse({
         version: __APP_VERSION__,
-        pfad: herkunft(location.state) ?? location.pathname,
+        pfad: parseHerkunft(location.state) ?? location.pathname,
       }),
       '_blank',
       'noopener,noreferrer',
     );
   }
+
+  // Am gekoppelten Gerät kein Rückmeldeweg (LLH-1549): auch nicht, solange die Sitzung noch lädt,
+  // und nicht nach einer widerrufenen Kopplung (der Browser lief zuletzt als Gerät).
+  const isRueckmeldungSichtbar = !geraet && !laedt && !warGeraet();
+  // Wechsel innerhalb der Hilfe tragen die Herkunft weiter, sonst meldete die Rückmeldung nach
+  // einem Kapitelwechsel `/hilfe` statt des Bereichs, aus dem die Hilfe geöffnet wurde (D5).
+  const herkunftState = location.state;
 
   // „/“ springt in die Suche, wie in der Doku der Website.
   useEffect(() => {
@@ -181,12 +189,13 @@ export default function HilfePage() {
     const ziel = a?.getAttribute('href');
     if (!ziel?.startsWith('/hilfe')) return;
     e.preventDefault();
-    void navigate(ziel);
+    void navigate(ziel, { state: herkunftState });
   }
 
   const kapitelListe = (
     <>
       <Link
+        state={herkunftState}
         className="hilfe-navi__start"
         to={hilfePfad({ gruppe })}
         aria-current={slug === undefined ? 'page' : undefined}
@@ -207,6 +216,7 @@ export default function HilfePage() {
             {b.kapitel.map((k) => (
               <li key={k.slug}>
                 <Link
+                  state={herkunftState}
                   to={hilfePfad({ kapitel: k.slug, gruppe })}
                   aria-current={k.slug === slug ? 'page' : undefined}
                 >
@@ -269,7 +279,7 @@ export default function HilfePage() {
               showSearch={false}
               value={gruppe}
               options={GRUPPEN.map((g) => ({ value: g.key, label: g.name }))}
-              onChange={(g) => void navigate(hilfePfad({ gruppe: g }))}
+              onChange={(g) => void navigate(hilfePfad({ gruppe: g }), { state: herkunftState })}
             />
           </div>
           {breit ? (
@@ -297,7 +307,11 @@ export default function HilfePage() {
                   <ul className="hilfe-karten">
                     {b.kapitel.map((k) => (
                       <li key={k.slug}>
-                        <Link className="hilfe-karte" to={hilfePfad({ kapitel: k.slug, gruppe })}>
+                        <Link
+                          state={herkunftState}
+                          className="hilfe-karte"
+                          to={hilfePfad({ kapitel: k.slug, gruppe })}
+                        >
                           <span className="hilfe-karte__titel">{k.titel}</span>
                           <span className="hilfe-karte__kurz">{kurztext(k.text)}</span>
                         </Link>
@@ -314,14 +328,14 @@ export default function HilfePage() {
                 aria-label="Rückmeldung und Lizenzen"
                 data-lfh="hilfe-rueckmeldung"
               >
-                {!geraet && (
+                {isRueckmeldungSichtbar && (
                   <>
                     <p className="hilfe-rueckmeldung__frage">Fehler gefunden oder eine Idee?</p>
                     <p className="hilfe-rueckmeldung__text">
                       Das Formular öffnet sich in einem neuen Fenster, vorbefüllt mit Version,
                       Oberfläche und Bereich der App. Keine Namen, keine Einsatzdaten.
                     </p>
-                    <Button onClick={rueckmelden}>Rückmeldung geben ↗</Button>
+                    <Button onClick={openRueckmeldung}>Rückmeldung geben ↗</Button>
                   </>
                 )}
                 <p className="hilfe-rueckmeldung__fuss">
@@ -380,6 +394,7 @@ export default function HilfePage() {
             <nav className="hilfe-blaettern" aria-label="Kapitel blättern">
               {zurueck ? (
                 <Link
+                  state={herkunftState}
                   className="hilfe-blaettern__link hilfe-blaettern__link--zurueck"
                   to={hilfePfad({ kapitel: zurueck.slug, gruppe })}
                 >
@@ -391,6 +406,7 @@ export default function HilfePage() {
               )}
               {weiter && (
                 <Link
+                  state={herkunftState}
                   className="hilfe-blaettern__link hilfe-blaettern__link--weiter"
                   to={hilfePfad({ kapitel: weiter.slug, gruppe })}
                 >

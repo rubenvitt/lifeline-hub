@@ -133,6 +133,30 @@ Da `Segmentleiste` ein vorgestellter Baustein des Design Systems ist, läuft
 `pnpm -C frontend design-system`, und das Erzeugte kommt in den PR; nach dem Merge wird das
 Design System neu veröffentlicht.
 
+### D11 Handschuh am Handy: Profil und Abmelden in einer Zeile (Nachtrag 11.11.2026)
+
+Gemessen (e2e, 390 × 844, `handschuh`, außerhalb eines Einsatzes): der App-Kopf ist dort
+zweizeilig (148 px), die Menühöhe auf 627 px gedeckelt, jede Leiste mit Zielabstand 90 px hoch;
+die Leiste „Helligkeit“ lag unter dem Rand. Ruben hat entschieden: im Handschuh-Betrieb stehen
+„Profil“ und „Abmelden“ nebeneinander (zwei `menuitem`s, je halbe Breite, Tastatur und Rollen
+unverändert), und der Kopf wird knapper (Rollen neben dem Namen, Benutzername und Version in einer
+Zeile).
+
+- *Verworfen: Spec lockern* (Helligkeit nur durch Rollen erreichbar).
+- *Verworfen: Leisten ohne Zielabstand im Handschuh:* bricht LFH-865 (≥ 16 px zwischen Zielen).
+
+### D12 Helligkeit im Handschuh-Betrieb: breiteres Menü, schmalere Stufen (Nachtrag 11.11.2026)
+
+Fünf Stufen mit der Mindestbreite der Staffel (72 px) und dem Zielabstand (2 × 8 px) brauchen
+440 px; das Menü bot am Handy 350 px, am Tablet 290 px, und die Knöpfe überlappten (Review). Ruben
+hat entschieden: ab `md` ist das Menü im Handschuh-Betrieb 480 px breit, dann halten alle Stufen
+72 px. In voller Breite (`hasFullWidth`) teilen die Zellen der Segmentleiste die Breite gleich, die
+Mindestbreite der Staffel entfällt dort; Höhe (72 px) und Zielabstand (16 px) bleiben. Am Handy
+werden die Helligkeitsstufen so rund 54 × 72 px.
+
+- *Verworfen: nur schmalere Stufen:* am Tablet rund 43 px breit, zu schmal für Handschuhe.
+- *Verworfen: Umbruch 3 + 2:* die zweite Zeile läge am Handy unter dem Rand (D11).
+
 ## Risks / Trade-offs
 
 - [rc-menu fängt Tasten oder Klicks im Gruppeninhalt ab, das Menü schließt beim Wählen] →

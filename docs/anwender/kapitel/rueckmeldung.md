@@ -19,8 +19,7 @@ rueckmeldung@lifeline-hub.de.
 1. Aus der Seite, um die es geht, das Benutzermenü öffnen und „Hilfe“ wählen.
 2. In der Übersicht der Hilfe unter „Fehler gefunden oder eine Idee?“ „Rückmeldung geben“ wählen.
    Das Formular öffnet sich in einem neuen Fenster des Browsers, in der Desktop-App im
-   Standardbrowser des Rechners. Auch vor der Anmeldung führt „Hilfe“ auf der Anmeldeseite
-   dorthin.
+   Standardbrowser des Rechners.
 3. Bei GitHub anmelden, falls noch nicht geschehen. Ein Konto lässt sich dort kostenlos anlegen.
 4. „Art“ wählen: Fehler, Wunsch oder Frage.
 5. „Version“, „Oberfläche“ und „Bereich der App“ sind schon ausgefüllt. Sie stimmen, solange die
