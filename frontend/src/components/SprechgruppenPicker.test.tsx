@@ -115,19 +115,67 @@ describe('SprechgruppenPicker', () => {
   });
 
   /** Öffnet die Anlegen-Zeile, füllt sie und legt an. */
-  async function legeSonderAn() {
+  async function legeSonderAn(bezeichnung = 'Sonder 1', betriebsart = 'DMO') {
     await userEvent.click(
       await screen.findByRole('button', { name: /neue sprechgruppe anlegen/i }),
     );
-    await userEvent.type(screen.getByLabelText('Neue Bezeichnung'), 'Sonder 1');
+    await userEvent.type(screen.getByLabelText('Neue Bezeichnung'), bezeichnung);
     await userEvent.click(screen.getAllByRole('combobox')[1]);
     await userEvent.click(
       await screen.findByText(
-        (_, el) => el?.className === 'ant-select-item-option-content' && el?.textContent === 'DMO',
+        (_, el) =>
+          el?.className === 'ant-select-item-option-content' && el?.textContent === betriebsart,
       ),
     );
     await userEvent.click(screen.getByRole('button', { name: /^anlegen$/i }));
   }
+
+  describe('Name einer vorhandenen Sprechgruppe (LLH-1645)', () => {
+    it('wählt die Katalog-Sprechgruppe aus, statt eine Einsatz-Sprechgruppe anzulegen', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue([
+        ...MOCK_LISTE,
+        // Altbestand: gleichnamige Einsatz-Sprechgruppe; der Katalog geht vor.
+        { ...MOCK_LISTE[0], id: 7, einsatz_id: 5, einsatz_lokal: true },
+      ]);
+      const onChange = vi.fn();
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[2]} onChange={onChange} />);
+      await legeSonderAn(' 412 ', 'TMO');
+
+      await waitFor(() => expect(onChange).toHaveBeenCalledWith([2, 1]));
+      expect(legeEinsatzSprechgruppeAn).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText('Neue Bezeichnung')).toBeNull();
+      expect(await screen.findByText('Sprechgruppe „412" ausgewählt')).toBeInTheDocument();
+    });
+
+    it('legt bei anderer Betriebsart an', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      vi.mocked(legeEinsatzSprechgruppeAn).mockImplementation(() => new Promise(() => {}));
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn('412', 'DMO');
+
+      await waitFor(() =>
+        expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledWith(5, {
+          bezeichnung: '412',
+          betriebsart: 'DMO',
+        }),
+      );
+    });
+
+    it('nennt die Ablehnung des Servers, wenn der Katalog den Namen außerhalb der Auswahl trägt', async () => {
+      // Deaktivierte Katalog-Sprechgruppe, die der Einsatz noch nutzt: nicht in der Auswahl.
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      vi.mocked(legeEinsatzSprechgruppeAn).mockRejectedValue(
+        new ApiError(409, 'Sprechgruppe „Sonder 1“ (DMO) steht schon im Katalog'),
+      );
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn();
+
+      const grund = await screen.findByRole('alert');
+      expect(grund).toHaveTextContent('Sprechgruppe nicht angelegt');
+      expect(grund).toHaveTextContent('Sprechgruppe „Sonder 1“ (DMO) steht schon im Katalog');
+      expect(screen.getByLabelText('Neue Bezeichnung')).toHaveValue('Sonder 1');
+    });
+  });
 
   describe('Ablehnung am Ort (LFH-1077)', () => {
     it('zeigt den Grund unter der Zeile, die Eingabe bleibt, kein Toast', async () => {

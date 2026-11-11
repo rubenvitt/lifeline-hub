@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
+quellen: [frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs]
 ---
 
 ## Überblick
@@ -287,6 +287,18 @@ Die Art eines Materials entscheidet, wie es im Einsatz steht: ein Gerät je Stü
 allen fünf Status, ein Verbrauchsgut mit Menge, Ausgabe und den Status einsatzbereit, im Einsatz
 und defekt (Kapitel [Material](material.md)). Sie geht beim Disponieren auf den Posten über; eine
 spätere Änderung am Stamm gilt nur für neue Dispositionen.
+
+### Sprechgruppen im Katalog und im Einsatz
+
+Eine Sprechgruppe gibt es mit derselben Betriebsart und Bezeichnung nur einmal: entweder im
+Katalog unter „Stammdaten“ „Sprechgruppen“ oder als Sprechgruppe eines Einsatzes. Trägt ein
+laufender Einsatz eine Sprechgruppe mit diesem Namen, lehnt „Sprechgruppe anlegen“ ab und nennt
+den Einsatz; dasselbe gilt beim Umbenennen. Nach dem Abschluss des Einsatzes lässt sie sich in den
+Katalog übernehmen.
+
+Gibt es aus der Zeit vor dieser Regel noch ein solches Paar, trägt die Sprechgruppe im Katalog die
+Marke „auch lokal“; mit dem Mauszeiger darauf erscheinen die Einsätze. Umbenannt wird nichts
+selbsttätig.
 
 ### Externe Stellen
 

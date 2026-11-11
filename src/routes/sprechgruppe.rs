@@ -9,7 +9,9 @@ use crate::routes::support::{
     deserialize_optional_field, hoechstens, optional_max, parse_enum, pflicht, trimme_tri,
 };
 use crate::sprechgruppe::repo as sg_repo;
-use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige, BEDINGUNG_MAX};
+use crate::sprechgruppe::{
+    Sprechgruppe, SprechgruppeAnzeige, SprechgruppeAuchLokal, BEDINGUNG_MAX,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -240,7 +242,19 @@ pub async fn liste_katalog(
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
-/// POST /api/sprechgruppen — Admin. Dublette → Conflict.
+/// GET /api/sprechgruppen/auch-lokal — Admin. Katalog-Sprechgruppen, deren Name ein Einsatz
+/// zugleich als Einsatz-Sprechgruppe trägt (LLH-1645, Altbestand).
+pub async fn liste_auch_lokal(
+    State(state): State<AppState>,
+    AdminUser(benutzer): AdminUser,
+) -> Result<Json<Vec<SprechgruppeAuchLokal>>, AppError> {
+    Ok(Json(
+        sg_repo::liste_auch_lokal(&state.pool, benutzer.org_id).await?,
+    ))
+}
+
+/// POST /api/sprechgruppen — Admin. Dublette → Conflict; Name einer Einsatz-Sprechgruppe in einem
+/// Einsatz → Conflict (LLH-1645).
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -252,7 +266,7 @@ pub async fn anlegen(
 }
 
 /// PATCH /api/sprechgruppen/{id} — Admin, echter Teil-Patch (LFH-306):
-/// Feld absent = unverändert, `null`/`""` bei `hinweis` = leeren.
+/// Feld absent = unverändert, `null`/`""` bei `hinweis` = leeren. Konflikte wie beim Anlegen.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -291,7 +305,8 @@ pub async fn liste_fuer_einsatz(
 }
 
 /// POST /api/einsaetze/{einsatz_id}/sprechgruppen — einsatz-lokale Sprechgruppe anlegen.
-/// Schreibrecht + aktiver Einsatz; kein Modul-Key.
+/// Schreibrecht + aktiver Einsatz; kein Modul-Key. Name einer Katalog-Sprechgruppe → Conflict
+/// (LLH-1645).
 pub async fn anlegen_einsatz_lokal(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff,

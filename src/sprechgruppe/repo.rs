@@ -1,4 +1,4 @@
-use super::{Sprechgruppe, SprechgruppeAnzeige};
+use super::{Sprechgruppe, SprechgruppeAnzeige, SprechgruppeAuchLokal};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
@@ -29,6 +29,105 @@ fn sprechgruppe_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
         }
     }
     Err(e.into())
+}
+
+/// Einsätze, die die Katalog-Sprechgruppe mit der id `sg` (SQL-Ausdruck) nutzen. Dieselbe Liste wie
+/// im Trigger `sprechgruppe_spiegelkatalog_u` (Migration 0315): über diese Verweise liefert der
+/// Führer eine Katalogzeile an den Spiegel.
+fn nutzende_einsaetze(sg: &str) -> String {
+    format!(
+        "SELECT einsatz_id FROM einsatz_fuehrungsstelle_sprechgruppe WHERE sprechgruppe_id = {sg} \
+         UNION SELECT a.einsatz_id FROM einsatzabschnitt_sprechgruppe x \
+             JOIN einsatzabschnitt a ON a.id = x.abschnitt_id WHERE x.sprechgruppe_id = {sg} \
+         UNION SELECT h.einsatz_id FROM einsatz_einheit_sprechgruppe x \
+             JOIN einsatz_einheit h ON h.id = x.einheit_id WHERE x.sprechgruppe_id = {sg} \
+         UNION SELECT s.einsatz_id FROM einsatz_kommunikation_stelle_sprechgruppe x \
+             JOIN einsatz_kommunikation_stelle s ON s.id = x.stelle_id WHERE x.sprechgruppe_id = {sg} \
+         UNION SELECT k.einsatz_id FROM fernmeldeskizze_komponente_sprechgruppe x \
+             JOIN fernmeldeskizze_komponente k ON k.id = x.komponente_id WHERE x.sprechgruppe_id = {sg} \
+         UNION SELECT einsatz_id FROM fernmeldeskizze_lage WHERE element = 'sg-' || {sg}"
+    )
+}
+
+/// Katalog-Sprechgruppe `k` und gleichnamige Einsatz-Sprechgruppe `l` im Einsatz `e` kollidieren
+/// am Spiegel (LLH-1645): Der Spiegel nimmt für eine Katalogzeile ohne Gegenstück eine
+/// gleichnamige Einsatz-Sprechgruppe oder legt eine an, und `idx_sprechgruppe_einsatz_lokal`
+/// lässt keine zweite zu. Es zählt eine aktive Katalog-Sprechgruppe in einem laufenden Einsatz
+/// (sie kann jederzeit zugeordnet werden) und jede, die der Einsatz nutzt (sie wird geliefert,
+/// auch deaktiviert oder nach Abschluss). Gespiegelte Einsätze liefern nicht weiter.
+fn kollision_sql() -> String {
+    format!(
+        "k.einsatz_id IS NULL AND l.org_id = k.org_id AND l.einsatz_id = e.id \
+         AND l.betriebsart = k.betriebsart AND l.bezeichnung = k.bezeichnung \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_spiegel sp WHERE sp.einsatz_id = e.id) \
+         AND (k.aktiv = 1 AND e.abgeschlossen_at IS NULL OR e.id IN ({}))",
+        nutzende_einsaetze("k.id")
+    )
+}
+
+/// Höchstzahl Einsätze, die eine Ablehnung beim Namen nennt.
+const EINSAETZE_IN_MELDUNG: usize = 3;
+
+/// Lehnt eine Katalog-Sprechgruppe ab, deren Name (Betriebsart und Bezeichnung) in einem Einsatz
+/// schon eine Einsatz-Sprechgruppe trägt (LLH-1645, Richtung Katalog). Läuft in der Transaktion
+/// nach dem Schreiben, damit Anlegen und jeder Teil-Patch denselben Endstand prüfen.
+async fn pruefe_katalogname(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+    let treffer: Vec<(String, String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT k.bezeichnung, k.betriebsart, e.bezeichnung \
+         FROM sprechgruppe k, sprechgruppe l, einsatz e \
+         WHERE k.id = ? AND {} ORDER BY e.id",
+        kollision_sql()
+    )))
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let Some((bezeichnung, betriebsart, _)) = treffer.first() else {
+        return Ok(());
+    };
+    let mut einsaetze: Vec<String> = treffer
+        .iter()
+        .take(EINSAETZE_IN_MELDUNG)
+        .map(|(_, _, e)| format!("„{e}“"))
+        .collect();
+    if treffer.len() > EINSAETZE_IN_MELDUNG {
+        einsaetze.push(format!("{} weiteren", treffer.len() - EINSAETZE_IN_MELDUNG));
+    }
+    let wo = match einsaetze.len() {
+        1 => format!("im Einsatz {}", einsaetze[0]),
+        n => format!(
+            "in den Einsätzen {} und {}",
+            einsaetze[..n - 1].join(", "),
+            einsaetze[n - 1]
+        ),
+    };
+    Err(AppError::Conflict(format!(
+        "„{bezeichnung}“ ({betriebsart}) ist {wo} als Einsatz-Sprechgruppe angelegt"
+    )))
+}
+
+/// Katalog-Sprechgruppe mit gleichem Namen, die eine neue Einsatz-Sprechgruppe im Einsatz
+/// `einsatz_id` am Spiegel kollidieren ließe (LLH-1645, Richtung Einsatz): aktiv, oder im Einsatz
+/// noch genutzt.
+async fn katalog_gleichen_namens(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    bezeichnung: &str,
+    betriebsart: &str,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT k.id FROM sprechgruppe k \
+         WHERE k.org_id = ?1 AND k.einsatz_id IS NULL AND k.betriebsart = ?2 \
+           AND k.bezeichnung = ?3 AND (k.aktiv = 1 OR ?4 IN ({})) \
+         ORDER BY k.aktiv DESC, k.id LIMIT 1",
+        nutzende_einsaetze("k.id")
+    )))
+    .bind(org_id)
+    .bind(betriebsart)
+    .bind(bezeichnung)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?)
 }
 
 /// Lädt eine Sprechgruppe der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
@@ -77,6 +176,7 @@ pub async fn anlegen_katalog(
     org_id: i64,
     daten: KatalogDaten<'_>,
 ) -> Result<Sprechgruppe, AppError> {
+    let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO sprechgruppe \
              (org_id, bezeichnung, betriebsart, hinweis, netz, sicherheit, sortier) \
@@ -89,13 +189,15 @@ pub async fn anlegen_katalog(
     .bind(daten.netz)
     .bind(daten.sicherheit)
     .bind(daten.sortier)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await;
 
     let id = match ergebnis {
         Ok(id) => id,
         Err(e) => return sprechgruppe_conflict(e),
     };
+    pruefe_katalogname(&mut tx, id).await?;
+    tx.commit().await?;
     laden(pool, org_id, id).await
 }
 
@@ -124,6 +226,7 @@ pub async fn patche_katalog(
     id: i64,
     patch: KatalogPatch<'_>,
 ) -> Result<Sprechgruppe, AppError> {
+    let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
         "UPDATE sprechgruppe SET \
             bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
@@ -148,7 +251,7 @@ pub async fn patche_katalog(
     .bind(patch.sicherheit.and_then(|v| v))
     .bind(id)
     .bind(org_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await;
 
     let resultat = match ergebnis {
@@ -158,6 +261,8 @@ pub async fn patche_katalog(
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    pruefe_katalogname(&mut tx, id).await?;
+    tx.commit().await?;
     laden(pool, org_id, id).await
 }
 
@@ -170,7 +275,9 @@ pub struct Zusatz<'a> {
 }
 
 /// Legt eine einsatz-lokale Sprechgruppe an, idempotent: trifft die Zeile den Unique-Index
-/// `(einsatz_id, betriebsart, bezeichnung)`, kommt der vorhandene Eintrag zurück.
+/// `(einsatz_id, betriebsart, bezeichnung)`, kommt der vorhandene Eintrag zurück. Trägt eine
+/// Katalog-Sprechgruppe den Namen (aktiv oder im Einsatz genutzt), `Conflict` (LLH-1645): sonst
+/// fiele das Paar am Spiegel auf eine Zeile.
 pub async fn anlegen_einsatz_lokal(
     pool: &SqlitePool,
     org_id: i64,
@@ -179,6 +286,15 @@ pub async fn anlegen_einsatz_lokal(
     betriebsart: &str,
     zusatz: Zusatz<'_>,
 ) -> Result<Sprechgruppe, AppError> {
+    let mut tx = pool.begin().await?;
+    if katalog_gleichen_namens(&mut tx, org_id, einsatz_id, bezeichnung, betriebsart)
+        .await?
+        .is_some()
+    {
+        return Err(AppError::Conflict(format!(
+            "Sprechgruppe „{bezeichnung}“ ({betriebsart}) steht schon im Katalog"
+        )));
+    }
     sqlx::query(
         "INSERT INTO sprechgruppe \
              (org_id, einsatz_id, bezeichnung, betriebsart, hinweis, netz, sicherheit) \
@@ -191,7 +307,7 @@ pub async fn anlegen_einsatz_lokal(
     .bind(zusatz.hinweis)
     .bind(zusatz.netz)
     .bind(zusatz.sicherheit)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
 
     let sg = sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(format!(
@@ -202,11 +318,31 @@ pub async fn anlegen_einsatz_lokal(
     .bind(einsatz_id)
     .bind(betriebsart)
     .bind(bezeichnung)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
+    tx.commit().await?;
 
     Ok(sg)
+}
+
+/// Alle Paare aus Katalog-Sprechgruppe und gleichnamiger Einsatz-Sprechgruppe der Org, die am
+/// Spiegel kollidieren (LLH-1645, Altbestand vor der Sperre), je Katalog-Sprechgruppe nach Einsatz
+/// sortiert. Nur erkannt, nie umbenannt.
+pub async fn liste_auch_lokal(
+    pool: &SqlitePool,
+    org_id: i64,
+) -> Result<Vec<SprechgruppeAuchLokal>, AppError> {
+    sqlx::query_as::<_, SprechgruppeAuchLokal>(sqlx::AssertSqlSafe(format!(
+        "SELECT DISTINCT k.id AS sprechgruppe_id, e.id AS einsatz_id, e.bezeichnung AS einsatz \
+         FROM sprechgruppe k, sprechgruppe l, einsatz e \
+         WHERE k.org_id = ? AND {} ORDER BY k.id, e.id",
+        kollision_sql()
+    )))
+    .bind(org_id)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
 }
 
 /// Gibt den aktiven Katalog (`einsatz_id IS NULL AND aktiv = 1`) **plus** alle
@@ -1252,6 +1388,26 @@ mod tests {
             AppError::NotFound
         ));
     }
+    /// LLH-1645: Die Liste der nutzenden Einsätze ist dieselbe wie im Trigger
+    /// `sprechgruppe_spiegelkatalog_u`; dessen Vollständigkeit prüft
+    /// `instanz::spiegel::katalog::tests::der_log_trigger_kennt_jeden_verweis_auf_sprechgruppen`.
+    #[tokio::test]
+    async fn nutzende_einsaetze_wie_im_log_trigger() {
+        let pool = crate::db::test_pool().await;
+        let sql: String = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' \
+             AND name = 'sprechgruppe_spiegelkatalog_u'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let flach = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            flach(&sql).contains(&flach(&nutzende_einsaetze("NEW.id"))),
+            "nutzende_einsaetze weicht vom Trigger ab"
+        );
+    }
+
     #[tokio::test]
     async fn einsatz_lokal_anlegen_ist_idempotent() {
         let pool = crate::db::test_pool().await;

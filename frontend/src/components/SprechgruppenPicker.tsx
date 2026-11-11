@@ -30,6 +30,10 @@ interface SprechgruppenPickerProps {
  * `Select mode="multiple"`, gruppiert nach Betriebsart. Darunter ein kompaktes
  * Inline-Formular zum Anlegen einer einsatz-lokalen Sprechgruppe.
  *
+ * Trägt schon eine Sprechgruppe der Auswahl den Namen, wählt „Anlegen“ sie aus (LLH-1645): eine
+ * Einsatz-Sprechgruppe mit dem Namen einer Katalog-Sprechgruppe lehnt der Server ab, sonst fiele
+ * das Paar am Spiegel auf eine Zeile. Der Katalog geht vor einer gleichnamigen lokalen.
+ *
  * Bewusst KEIN verschachteltes `<Form>`/Submit-Button: der Picker wird selbst in einem
  * antd-`<Form>` (Abschnitt/Einheit) gerendert — ein innerer Submit würde das äußere
  * Formular nativ abschicken (Seiten-Reload). Anlegen läuft daher rein über `onClick`.
@@ -87,12 +91,22 @@ export default function SprechgruppenPicker({
   const fehler = diesesAnlegen ? mutation.error : null;
 
   const anlegen = () => {
-    if (kannAnlegen && !laeuft)
-      mutation.mutate({
-        einsatzId,
-        bezeichnung: neuBezeichnung.trim(),
-        betriebsart: neuBetriebsart as Betriebsart,
-      });
+    if (!kannAnlegen || laeuft) return;
+    const bezeichnung = neuBezeichnung.trim();
+    const betriebsart = neuBetriebsart as Betriebsart;
+    const vorhanden = sprechgruppen
+      .filter((s) => s.betriebsart === betriebsart && s.bezeichnung === bezeichnung)
+      .sort((a, b) => Number(a.einsatz_lokal) - Number(b.einsatz_lokal))[0];
+    if (vorhanden) {
+      if (!value.includes(vorhanden.id)) onChange?.([...value, vorhanden.id]);
+      if (mutation.error != null) mutation.reset();
+      setNeuBezeichnung('');
+      setNeuBetriebsart(undefined);
+      setAnlegenOffen(false);
+      message.success(`Sprechgruppe „${vorhanden.bezeichnung}" ausgewählt`);
+      return;
+    }
+    mutation.mutate({ einsatzId, bezeichnung, betriebsart });
   };
   // Öffnen und Abbrechen räumen den Grund; eine laufende Anfrage bleibt unberührt.
   const schalteAnlegen = (offen: boolean) => {

@@ -459,6 +459,7 @@ use utoipa::OpenApi;
         crate::schaden::SchadenStatus,
         crate::schaden::SchadenTyp,
         crate::sprechgruppe::SprechgruppeAnzeige,
+        crate::sprechgruppe::SprechgruppeAuchLokal,
         crate::abloesung::AbloesungAnzeige,
         crate::abloesung::AbloesungEinsatzVorgabeAnzeige,
         crate::abloesung::AbloesungErbe,

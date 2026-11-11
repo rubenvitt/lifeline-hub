@@ -88,7 +88,9 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.material()).toEqual(['material']);
     expect(globalKeys.materialListe('alle')).toEqual(['material', 'alle']);
     expect(globalKeys.materialListe('im-dienst')).toEqual(['material', 'im-dienst']);
+    expect(globalKeys.sprechgruppen()).toEqual(['sprechgruppen']);
     expect(globalKeys.sprechgruppenAlle()).toEqual(['sprechgruppen', 'alle']);
+    expect(globalKeys.sprechgruppenAuchLokal()).toEqual(['sprechgruppen', 'auch-lokal']);
     expect(globalKeys.externeStellen()).toEqual(['externe-stellen']);
     expect(globalKeys.externeStellenListe('aktiv')).toEqual(['externe-stellen', 'aktiv']);
     expect(globalKeys.externeStellenListe('alle')).toEqual(['externe-stellen', 'alle']);
