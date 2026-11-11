@@ -55,6 +55,36 @@ pub fn erkenne_bild_mime(daten: &[u8]) -> Result<&'static str, AppError> {
     }
 }
 
+/// Meldung des 422, wenn sich ein Hintergrundbild nicht von Metadaten bereinigen lässt (LLH-1635).
+/// Anders als bei Anhängen gibt es für Kartenbilder keinen Original-Abruf.
+pub const UNBEREINIGBAR_MELDUNG: &str = "Das Bild lässt sich nicht von Metadaten bereinigen.";
+
+/// Bereinigt die gespeicherten Bytes für die Auslieferung (LLH-1635): ohne EXIF/GPS, XMP, IPTC und
+/// Kommentare, nur die Ausrichtung bleibt (`anhang::metadaten`, LFH-747). Gespeichert bleibt das
+/// Original. Lässt sich ein Bild nicht bereinigen → 422, nie das Original.
+pub fn bereinigt(daten: Vec<u8>, mime: &str) -> Result<Vec<u8>, AppError> {
+    use std::borrow::Cow;
+    match crate::anhang::metadaten::bereinigen(&daten, mime) {
+        Ok(Cow::Owned(neu)) => Ok(neu),
+        Ok(Cow::Borrowed(_)) => Ok(daten),
+        Err(crate::anhang::metadaten::Unbereinigbar(grund)) => {
+            tracing::warn!(grund, "Hintergrundbild lässt sich nicht bereinigen");
+            Err(AppError::UnprocessableEntity(UNBEREINIGBAR_MELDUNG.into()))
+        }
+    }
+}
+
+/// Upload-Prüfung (LLH-1635): ein Bild, das sich nicht bereinigen lässt, käme nie auf die Karte.
+/// Deshalb schon beim Hochladen 422 statt eines Bildes, das beim Anzeigen fehlt.
+pub fn pruefe_bereinigbar(daten: &[u8], mime: &str) -> Result<(), AppError> {
+    crate::anhang::metadaten::bereinigen(daten, mime)
+        .map(|_| ())
+        .map_err(|crate::anhang::metadaten::Unbereinigbar(grund)| {
+            tracing::info!(grund, "Hintergrundbild beim Hochladen nicht bereinigbar");
+            AppError::UnprocessableEntity(UNBEREINIGBAR_MELDUNG.into())
+        })
+}
+
 /// Validiert `ecken_json`: exakt 4 [lng,lat]-Paare.
 pub fn pruefe_ecken(ecken_json: &str) -> Result<(), AppError> {
     let ecken: Vec<[f64; 2]> = serde_json::from_str(ecken_json)

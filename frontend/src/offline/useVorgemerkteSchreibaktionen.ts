@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAntraegeAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
+import { antraegeAlsSchreibaktionen, type AntragKennung } from './antragAlsVormerkung';
 import {
   beobachteQueueAenderungen,
   schreibaktionenLaden,
@@ -9,9 +11,14 @@ import { PERSON_EINTRAG_ARTEN, type PersonEintragArt } from './personEintrag';
 
 type Art = OfflineSchreibaktion['art'];
 
-/** Eine auf diesem Gerät vorgemerkte, vom Server noch nicht bestätigte Schreibaktion einer Art. */
+/**
+ * Eine auf diesem Gerät vorgemerkte, vom Server noch nicht bestätigte Schreibaktion einer Art.
+ * Mit `antrag` ist es ein Antrag am Spiegel (LLH-1492): die Seite zeigt „beantragt“ statt
+ * „vorgemerkt“, an derselben Stelle. Er hat keine Queue-Nummer (`id`).
+ */
 export type VorgemerkteSchreibaktion<A extends Art> = AusstehendeSchreibaktion & {
   aktion: Extract<OfflineSchreibaktion, { art: A }>;
+  antrag?: AntragKennung;
 };
 
 /** Ein vorgemerktes Eintreffen am Bereitstellungsraum (LLH-1075 Teil III). */
@@ -64,7 +71,19 @@ export function useVorgemerkteSchreibaktionen<A extends Art>(
       ladeGeneration.current += 1;
     };
   }, [laden]);
-  return stand.scope === scope ? stand.wert : LEER;
+  // Anträge am Spiegel derselben Art (LLH-1492, design.md D13): hinter den vorgemerkten, nur aus
+  // dem Cache (das Hinweisband lädt sie).
+  const antraege = useAntraegeAusCache(einsatzId);
+  const vorgemerkt = stand.scope === scope ? stand.wert : LEER;
+  return useMemo(() => {
+    if (benutzerId == null || antraege.length === 0) return vorgemerkt;
+    const gesucht = new Set(arten.split(','));
+    const beantragt = antraegeAlsSchreibaktionen(antraege, benutzerId, einsatzId).filter(
+      (z): z is VorgemerkteSchreibaktion<A> & { antrag: AntragKennung } =>
+        gesucht.has(z.aktion.art),
+    );
+    return beantragt.length === 0 ? vorgemerkt : [...vorgemerkt, ...beantragt];
+  }, [vorgemerkt, antraege, benutzerId, einsatzId, arten]);
 }
 
 /** Vorgemerkte Eintreffen eines Einsatzes, über alle Räume (LLH-1075 Teil III). */

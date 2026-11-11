@@ -13,9 +13,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
-use crate::abloesung::schichtplan::uebernahme::{
-    Entscheidungen, ImportVorschau, ENTSCHEIDUNGEN_MAX,
-};
+use crate::abloesung::schichtplan::uebernahme::{Entscheidungen, ENTSCHEIDUNGEN_MAX};
 use crate::abloesung::schichtplan::{
     zerlegung, PlanHelferAnzeige, PlanPerson, BLOCK_MIN_MINUTEN, HELFER_TELEFON_MAX,
     HELFER_TEXT_MAX, MAX_DIENST_BEREICH, MIN_RUHE_BEREICH, NOTIZ_MAX, PLAN_PERSONEN_MAX,
@@ -32,7 +30,7 @@ use crate::planung::zugriff::{Planer, PlanungsZugriff};
 use crate::planung::{programm, uebernahme};
 use crate::planung::{
     PlanungAnzeige, PlanungListeneintrag, PlanungPostenArt, PlanungUebernahmeErgebnis,
-    ABSCHNITT_MAX, BEZEICHNUNG_MAX, ORT_MAX, POSTEN_MAX,
+    PlanungUebernahmeVorschau, ABSCHNITT_MAX, BEZEICHNUNG_MAX, ORT_MAX, POSTEN_MAX,
 };
 use crate::programmpunkt::{Programmpunkt, PROGRAMMPUNKT_BEZEICHNUNG_MAX};
 use crate::routes::abloesung_schichtplan::{
@@ -824,6 +822,10 @@ pub struct UebernahmeAnfrage {
     /// Die Wahl in der Vorschau je Schlüssel; fehlt ein Schlüssel, gilt der Vorschlag.
     #[serde(default)]
     entscheidungen: Entscheidungen,
+    /// Der Stand aus der Vorschau (LLH-1610): Pflicht beim Übernehmen (400 sonst), in der
+    /// Vorschau ohne Bedeutung.
+    #[serde(default)]
+    stand: Option<i64>,
 }
 
 /// Entscheidungen je Art höchstens [`ENTSCHEIDUNGEN_MAX`] (400), wie beim Einlesen einer Datei.
@@ -839,28 +841,35 @@ fn check_entscheidungen(e: Entscheidungen) -> Result<Entscheidungen, AppError> {
 /// POST /api/planungen/{id}/uebernahme/vorschau — gleicht die Planung mit dem Ziel ab und
 /// schreibt nichts; Fehler stehen in der Antwort (200). Ein laufender Einsatz: fremd oder
 /// unbekannt 404, ohne Schreibrecht, Ablösung oder Personal 403, abgeschlossen 409. Eine schon
-/// übernommene Planung 409.
+/// übernommene Planung 409. Die Antwort trägt den Stand der Planung (LLH-1610).
 pub async fn uebernahme_vorschau(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<UebernahmeAnfrage>,
-) -> Result<Json<ImportVorschau>, AppError> {
+) -> Result<Json<PlanungUebernahmeVorschau>, AppError> {
     let e = check_entscheidungen(req.entscheidungen)?;
-    Ok(Json(
-        uebernahme::vorschau(&state.pool, &z.benutzer, z.planung_id, req.ziel, &e).await?,
-    ))
+    let v = uebernahme::vorschau(&state.pool, &z.benutzer, z.planung_id, req.ziel, &e).await?;
+    Ok(Json(PlanungUebernahmeVorschau {
+        vorschau: v.vorschau,
+        stand: v.stand,
+    }))
 }
 
 /// POST /api/planungen/{id}/uebernahme — wie die Vorschau, schreibt aber in EINER Transaktion:
 /// neuer Einsatz (wenn gewählt), Plan des Einsatzes und Vermerk an der Planung. Danach ist die
-/// Planung schreibgeschützt, ein zweiter Aufruf 409. Fehler des Abgleichs 422 (Zeilen).
+/// Planung schreibgeschützt, ein zweiter Aufruf 409. Fehler des Abgleichs 422 (Zeilen). Ohne
+/// `stand` 400; hat sich die Planung seit der Vorschau geändert, 409 (LLH-1610).
 pub async fn uebernehmen(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<UebernahmeAnfrage>,
 ) -> Result<Json<PlanungUebernahmeErgebnis>, AppError> {
+    let stand = req
+        .stand
+        .ok_or_else(|| AppError::Validation("stand fehlt".into()))?;
     let e = check_entscheidungen(req.entscheidungen)?;
-    let u = uebernahme::uebernehmen(&state.pool, &z.benutzer, z.planung_id, req.ziel, &e).await?;
+    let u = uebernahme::uebernehmen(&state.pool, &z.benutzer, z.planung_id, req.ziel, &e, stand)
+        .await?;
     if u.neu {
         super::einsatz::publish_neuer_einsatz(&state, u.einsatz_id, z.benutzer.id).await;
     }

@@ -3,7 +3,9 @@ import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
-import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import type { MenueEintrag } from '../components/MenueAusloeser';
+import type { WeitereAktionen } from '../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
@@ -244,6 +246,87 @@ export default function BenutzerPage() {
   }
 
   /**
+   * Aktionen einer Zeile, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, `KatalogTabelle.zeilenMenue`).
+   * Umkehrbares zuerst, Unumkehrbares und Entfernendes rot hinter dem Trenner (Spec
+   * `datensatz-aktionsmenue`). Deaktivieren bleibt ohne Rückfrage (LFH-966, umkehrbar über
+   * „Reaktivieren“), steht aber als entfernende Aktion rot.
+   */
+  const zeilenMenue: WeitereAktionen<BenutzerAnzeige> = {
+    eintraege: (b) => {
+      const grund = sperrGrund(b);
+      const eintraege: MenueEintrag<ZeilenAktion>[] = [
+        { key: 'bearbeiten', label: 'Bearbeiten' },
+        // Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen.
+        ...(b.aktiv ? [{ key: 'anmeldungen' as const, label: 'Anmeldungen' }] : []),
+        ...(b.aktiv
+          ? []
+          : kontoVomHub(b)
+            ? [
+                {
+                  key: 'aktiv' as const,
+                  label: `Reaktivieren gesperrt: ${VOM_HUB_TEXT}`,
+                  gesperrt: true as const,
+                },
+              ]
+            : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
+        // Nur bei aktivem zweiten Faktor: sonst gibt es nichts zurückzusetzen (LFH-1122).
+        ...(b.totp_aktiviert
+          ? [
+              {
+                key: 'zweitfaktor' as const,
+                label: 'Zweiten Faktor zurücksetzen …',
+                gefahr: true as const,
+              },
+            ]
+          : []),
+        ...(b.aktiv
+          ? [
+              kontoVomHub(b)
+                ? {
+                    key: 'aktiv' as const,
+                    label: `Deaktivieren gesperrt: ${VOM_HUB_TEXT}`,
+                    gesperrt: true as const,
+                  }
+                : grund
+                  ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
+                    {
+                      key: 'aktiv' as const,
+                      label: `Deaktivieren gesperrt: ${grund}`,
+                      gesperrt: true as const,
+                    }
+                  : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
+            ]
+          : []),
+      ];
+      return eintraege;
+    },
+    // Mit Benutzername: Anzeigenamen sind nicht eindeutig, zwei „Kim Beispiel“ trügen sonst
+    // zwei gleichnamige Auslöser (Spec `datensatz-aktionsmenue`).
+    zugaenglicherName: (b) => `Aktionen zu Benutzer ${b.anzeigename} (@${b.benutzername})`,
+    // Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
+    laeuft: (b) =>
+      (deaktivieren.isPending && deaktivieren.variables === b.id) ||
+      (reaktivieren.isPending && reaktivieren.variables === b.id),
+    onWahl: (key, b) => {
+      const aktion = key as ZeilenAktion;
+      if (aktion === 'bearbeiten') {
+        bearbeiten.reset();
+        einmalpasswort.reset();
+        setZuBearbeiten(b);
+      } else if (aktion === 'anmeldungen') setAnmeldungenVon(b);
+      else if (aktion === 'zweitfaktor') {
+        zweitfaktor.reset();
+        setZweitfaktorVon(b);
+      } else if (b.aktiv && brauchtWarnung(b)) {
+        deaktivieren.reset();
+        reaktivieren.reset();
+        setDeaktivierenVon(b);
+      } else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
+      else zeilenAktion('reaktivieren', b.id);
+    },
+  };
+
+  /**
    * Breiten nach der Regel „Fließende Spalte" (LFH-523, `frontend/AGENTS.md`): genau eine Spalte
    * fließt, alle übrigen tragen eine Zahl, sonst bleibt die Tabelle inhaltsgetrieben.
    *
@@ -335,85 +418,7 @@ export default function BenutzerPage() {
       width: AKTIONEN_BREITE,
       immerSichtbar: true,
       fixed: 'right',
-      render: (_, b) => {
-        const grund = sperrGrund(b);
-        // Umkehrbares zuerst, Unumkehrbares und Entfernendes rot hinter dem Trenner (Spec
-        // `datensatz-aktionsmenue`). Deaktivieren bleibt ohne Rückfrage (LFH-966, umkehrbar über
-        // „Reaktivieren“), steht aber als entfernende Aktion rot.
-        const eintraege: MenueEintrag<ZeilenAktion>[] = [
-          { key: 'bearbeiten', label: 'Bearbeiten' },
-          // Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen.
-          ...(b.aktiv ? [{ key: 'anmeldungen' as const, label: 'Anmeldungen' }] : []),
-          ...(b.aktiv
-            ? []
-            : kontoVomHub(b)
-              ? [
-                  {
-                    key: 'aktiv' as const,
-                    label: `Reaktivieren gesperrt: ${VOM_HUB_TEXT}`,
-                    gesperrt: true as const,
-                  },
-                ]
-              : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
-          // Nur bei aktivem zweiten Faktor: sonst gibt es nichts zurückzusetzen (LFH-1122).
-          ...(b.totp_aktiviert
-            ? [
-                {
-                  key: 'zweitfaktor' as const,
-                  label: 'Zweiten Faktor zurücksetzen …',
-                  gefahr: true as const,
-                },
-              ]
-            : []),
-          ...(b.aktiv
-            ? [
-                kontoVomHub(b)
-                  ? {
-                      key: 'aktiv' as const,
-                      label: `Deaktivieren gesperrt: ${VOM_HUB_TEXT}`,
-                      gesperrt: true as const,
-                    }
-                  : grund
-                    ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
-                      {
-                        key: 'aktiv' as const,
-                        label: `Deaktivieren gesperrt: ${grund}`,
-                        gesperrt: true as const,
-                      }
-                    : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
-              ]
-            : []),
-        ];
-        return (
-          <MenueAusloeser
-            eintraege={eintraege}
-            // Mit Benutzername: Anzeigenamen sind nicht eindeutig, zwei „Kim Beispiel“ trügen sonst
-            // zwei gleichnamige Auslöser (Spec `datensatz-aktionsmenue`).
-            zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename} (@${b.benutzername})`}
-            // Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
-            laeuft={
-              (deaktivieren.isPending && deaktivieren.variables === b.id) ||
-              (reaktivieren.isPending && reaktivieren.variables === b.id)
-            }
-            onWahl={(aktion) => {
-              if (aktion === 'bearbeiten') {
-                bearbeiten.reset();
-                einmalpasswort.reset();
-                setZuBearbeiten(b);
-              } else if (aktion === 'anmeldungen') setAnmeldungenVon(b);
-              else if (aktion === 'zweitfaktor') {
-                zweitfaktor.reset();
-                setZweitfaktorVon(b);
-              } else if (b.aktiv && brauchtWarnung(b)) {
-                deaktivieren.reset();
-                reaktivieren.reset();
-                setDeaktivierenVon(b);
-              } else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
-              else zeilenAktion('reaktivieren', b.id);
-            }}
-          />
-        );
-      },
+      render: (_, b) => <ZeilenMenueAusloeser menue={zeilenMenue} zeile={b} />,
     },
   ];
 
@@ -458,6 +463,7 @@ export default function BenutzerPage() {
           locale={{ emptyText: 'Noch keine Benutzer' }}
           suche={{ platzhalter: 'Name oder Benutzername' }}
           spaltenSchalter={{ bezeichnung: 'Benutzer' }}
+          zeilenMenue={zeilenMenue}
         />
       )}
 

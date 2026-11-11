@@ -75,7 +75,7 @@ pub async fn anlegen_tx(
     bezeichnung: &str,
     zeitpunkt_at: &str,
 ) -> Result<Programmpunkt, AppError> {
-    super::repo::check_schreibbar_tx(conn, org_id, planung_id).await?;
+    super::repo::schreibbar_tx(conn, org_id, planung_id).await?;
     let bisher: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM planung_programmpunkt WHERE planung_id = ?")
             .bind(planung_id)
@@ -109,7 +109,7 @@ pub async fn aendern(
     zeitpunkt_at: Option<&str>,
 ) -> Result<Programmpunkt, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::check_schreibbar_tx(conn, org_id, planung_id).await?;
+        super::repo::schreibbar_tx(conn, org_id, planung_id).await?;
         sqlx::query_as::<_, Programmpunkt>(
             "UPDATE planung_programmpunkt SET \
                bezeichnung = COALESCE(?, bezeichnung), \
@@ -136,7 +136,7 @@ pub async fn loeschen(
     id: i64,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        super::repo::check_schreibbar_tx(conn, org_id, planung_id).await?;
+        super::repo::schreibbar_tx(conn, org_id, planung_id).await?;
         let geloescht =
             sqlx::query("DELETE FROM planung_programmpunkt WHERE id = ? AND planung_id = ?")
                 .bind(id)

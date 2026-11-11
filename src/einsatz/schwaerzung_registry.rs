@@ -182,6 +182,10 @@ const G_ANTRAG: &str =
      (der Dialog verlangt ein Zeichen ohne Namen, LFH-751 design.md D10)";
 // REVIEW: operativer Freitext-Zettel, konservativ gescrubbt — Begründung im Scrub-Kommentar.
 
+const G_SPIEGEL: &str =
+    "Verwaltung des Spiegels einer gekoppelten Instanz (LLH-1492): Kennungen, Stände, \
+     Tabellennamen, kein Inhalt";
+
 /// Die vollständige Registry aller einsatz-scoped Tabellen (Menge S). Reihenfolge =
 /// Ausführungsreihenfolge des Scrubs (Korrektheit ist reihenfolgeunabhängig).
 pub const TABELLEN: &[TabellenRegel] = &[
@@ -232,6 +236,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("retention_gesetzt_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
+            // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
+            retain("kennung", G_SPIEGEL),
+            retain("freigabestufe", G_ENUM),
+            retain("spiegel", G_SPIEGEL),
         ],
     },
     // ---------- Personen (Betroffene) + Historie/Triage ----------
@@ -3121,6 +3129,116 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("inhalt", G_WEB_PUSH),
             retain("stumm", G_WEB_PUSH),
             retain("erstellt_at", G_ZEIT),
+        ],
+    },
+    // ---------- Spiegel einer gekoppelten Instanz (LLH-1492) ----------
+    // Nur Verwaltung: welche Zeile sich wann geändert hat und wie sie beim Führer heißt. Die
+    // gespiegelten Daten selbst stehen in den Tabellen oben und werden dort geschwärzt.
+    TabellenRegel {
+        tabelle: "einsatz_aenderung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("stand", G_SPIEGEL),
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("schluessel", G_SPIEGEL),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "einsatz_spiegel",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("kopplung_org_id", G_FK),
+            retain("fremde_kennung", G_SPIEGEL),
+            retain("stand", G_SPIEGEL),
+            retain("freigabestufe", G_ENUM),
+            retain("letzter_abgleich_at", G_ZEIT),
+            retain("hinweis", G_SPIEGEL),
+            retain("beendet_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "spiegel_herkunft",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("fremder_schluessel", G_SPIEGEL),
+            retain("lokaler_schluessel", G_SPIEGEL),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "spiegel_anhang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("lokaler_schluessel", G_SPIEGEL),
+            retain("fremder_schluessel", G_SPIEGEL),
+            retain("sha256", G_SPIEGEL),
+            retain("groesse", G_ZAEHLER),
+            retain("empfangen", G_ZAEHLER),
+            retain("angefordert_at", G_ZEIT),
+            retain("fertig_at", G_ZEIT),
+        ],
+    },
+    // Stücke eines Inhalts auf dem Weg: Bytes eines Anhangs, darum mit ihm weg.
+    TabellenRegel {
+        tabelle: "spiegel_anhang_teil",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("art", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("lokaler_schluessel", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("ab", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    // Anträge tragen Erfassungen (Freitext, Personendaten): mit dem Einsatz geschwärzt.
+    TabellenRegel {
+        tabelle: "spiegel_antrag",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("art", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("methode", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("pfad_vorlage", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("pfad_parameter", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("pfad_lokal", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("benutzer_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("client_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erfasst_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("zustand", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("grund", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("ergebnis_art", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("ergebnis_schluessel", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geaendert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "spiegel_ziel",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("kopplung_org_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("stand", G_SPIEGEL),
         ],
     },
 ];

@@ -215,9 +215,11 @@ fn zeitraum_text(stil: &Zeitstil, von: &str, bis: &str) -> String {
 // ---------------------------------------------------------------------------------------------
 
 #[derive(sqlx::FromRow)]
-struct KopfZeile {
+pub(crate) struct KopfZeile {
     id: i64,
     version: i64,
+    /// Zählt jede Änderung der Planung (LLH-1610), anders als `version` nicht nur den Kopf.
+    stand: i64,
     bezeichnung: String,
     einsatzart: String,
     ort: Option<String>,
@@ -234,7 +236,8 @@ struct KopfZeile {
     uebernahme_kennzahlen: Option<String>,
 }
 
-const SELECT_KOPF: &str = "SELECT id, version, bezeichnung, einsatzart, ort, ort_lat, ort_lon, \
+const SELECT_KOPF: &str =
+    "SELECT id, version, stand, bezeichnung, einsatzart, ort, ort_lat, ort_lon, \
      von, bis, max_dienst_min, min_ruhe_min, angelegt_at, uebernommen_at, uebernahme_einsatz, \
      uebernahme_einsatznummer, uebernahme_kennzahlen FROM planung WHERE id = ? AND org_id = ?";
 
@@ -301,9 +304,9 @@ async fn kopf_tx(conn: &mut SqliteConnection, org_id: i64, id: i64) -> Result<Ko
 }
 
 /// Der Kopf einer Planung, die noch geschrieben werden darf: eine übernommene ist
-/// schreibgeschützt (409, Spec `vorplanung`, „Übernahme in einen Einsatz“). Jeder Schreibweg
-/// außer dem Löschen prüft hier, in seiner Transaktion.
-async fn schreibbar_tx(
+/// schreibgeschützt (409, Spec `vorplanung`, „Übernahme in einen Einsatz“). Fremd oder
+/// unbekannt 404.
+async fn check_schreibbar_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
@@ -317,14 +320,31 @@ async fn schreibbar_tx(
     Ok(k)
 }
 
-/// [`schreibbar_tx`] für die Übernahme (`super::uebernahme`): fremd oder unbekannt 404,
-/// übernommen 409.
-pub(crate) async fn check_schreibbar_tx(
+/// [`check_schreibbar_tx`] für einen Schreibweg: erhöht den Stand der Planung (LLH-1610), an dem
+/// die Übernahme erkennt, dass sich seit ihrer Vorschau etwas geändert hat. Jeder Schreibweg
+/// außer dem Löschen geht hier durch, in seiner Transaktion; scheitert er danach, rollt die
+/// Transaktion den Stand mit zurück.
+pub(crate) async fn schreibbar_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
-) -> Result<(), AppError> {
-    schreibbar_tx(conn, org_id, id).await.map(|_| ())
+) -> Result<KopfZeile, AppError> {
+    let k = check_schreibbar_tx(conn, org_id, id).await?;
+    sqlx::query("UPDATE planung SET stand = stand + 1 WHERE id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(k)
+}
+
+/// Der Stand einer Planung, die noch übernommen werden darf (`super::uebernahme`): fremd oder
+/// unbekannt 404, übernommen 409. Erhöht nichts.
+pub(crate) async fn stand_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+) -> Result<i64, AppError> {
+    Ok(check_schreibbar_tx(conn, org_id, id).await?.stand)
 }
 
 #[derive(sqlx::FromRow)]

@@ -5741,8 +5741,9 @@ mod tests {
             "Liste und Metadaten lesen {nachher} Seiten, erlaubt < 1 % von {bildseiten}"
         );
 
-        // Die Bytes selbst kommen unverändert.
-        let pool = pool_bis(ort(), 154).await;
+        // Die Bytes selbst kommen unverändert, auch nach allen späteren Migrationen (der heutige
+        // Ladeweg fragt seit LLH-1492 `spiegel_anhang`, das es bei 154 noch nicht gibt).
+        let pool = pool_bis(ort(), i64::MAX).await;
         let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, ids[2])
             .await
             .unwrap();
@@ -14087,6 +14088,42 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rest, 0, "geht mit der Planung");
+    }
+
+    /// LLH-1610: Der Stand einer Planung beginnt für den Bestand bei 0 und ist nie negativ.
+    #[tokio::test]
+    async fn migration_0313_planung_stand() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 313;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (_, b) = bild_grundlage(&pool).await;
+        let planung: i64 = sqlx::query_scalar(
+            "INSERT INTO planung (org_id, bezeichnung, von, bis, angelegt_von) \
+             VALUES (1, 'Stadtfest', '2026-11-14 09:00:00', '2026-11-14 23:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let stand: i64 = sqlx::query_scalar("SELECT stand FROM planung WHERE id = ?")
+            .bind(planung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(stand, 0, "Bestand beginnt bei 0");
+        sqlx::query("UPDATE planung SET stand = -1 WHERE id = ?")
+            .bind(planung)
+            .execute(&pool)
+            .await
+            .expect_err("Stand nie negativ");
     }
 
     /// LLH-1612 (design.md D3–D5): der Bestand bleibt unverändert — Stellen `gezaehlt`,

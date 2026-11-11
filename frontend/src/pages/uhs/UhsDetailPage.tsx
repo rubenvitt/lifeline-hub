@@ -44,7 +44,12 @@ import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
+import BreiteHalten from '../../components/BreiteHalten';
 import UhsBearbeitenModal from './UhsBearbeitenModal';
+
+/** Breiteste Form von „Auflösen“ im gesperrten Zustand, Zahl als `0` (LLH-1627, `BreiteHalten`).
+ *  Zwei Ziffern decken jede UHS-Belegung, die im Betrieb vorkommt; darüber wächst der Knopf. */
+const AUFLOESEN_RESERVE = 'Auflösen (noch 00 Personen)';
 
 /**
  * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
@@ -361,11 +366,15 @@ export default function UhsDetailPage() {
               onConfirm={() => setzeStatus('aufgeloest')}
               okButtonProps={{ danger: true }}
             >
-              {/* Gesperrt mit Grund im Wort (LFH-1078), solange jemand in der UHS steht. */}
+              {/* Gesperrt mit Grund im Wort (LFH-1078), solange jemand in der UHS steht. Der Knopf
+                  hält die Breite der gesperrten Form (LLH-1627): sonst wuchs er beim Ablegen des
+                  ersten Patienten, ein knapper Kopf brach um, und der Grundriss sprang ~35 px. */}
               <Button danger disabled={nochBelegt > 0}>
-                {nochBelegt > 0
-                  ? `Auflösen (noch ${nochBelegt} ${nochBelegt === 1 ? 'Person' : 'Personen'})`
-                  : 'Auflösen'}
+                <BreiteHalten reserve={[AUFLOESEN_RESERVE]}>
+                  {nochBelegt > 0
+                    ? `Auflösen (noch ${nochBelegt} ${nochBelegt === 1 ? 'Person' : 'Personen'})`
+                    : 'Auflösen'}
+                </BreiteHalten>
               </Button>
             </Popconfirm>
           )}

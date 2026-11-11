@@ -148,7 +148,7 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
  * einem Block per API, dazu ein Programmpunkt über den Reiter „Ablauf“ (LLH-1583), dann über die
  * Oberfläche in einen neuen Einsatz. Danach ist die Planung schreibgeschützt, ein zweiter Aufruf
  * antwortet 409, der Block steht im Schichtplan und der Programmpunkt im Ablauf des neuen
- * Einsatzes. Die Demo-Planung „Stadtfest Musterstadt“ prüft `tests/planung_uebernahme.rs`; das
+ * Einsatzes. Der Abschnitt des Postens entsteht im neuen Einsatz mit (LLH-1609). Die Demo-Planung „Stadtfest Musterstadt“ prüft `tests/planung_uebernahme.rs`; das
  * e2e-Backend läuft ohne Demo-Daten.
  */
 test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibgeschützt', async ({
@@ -178,6 +178,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   const mitPosten = await api(`/api/planungen/${planungId}/posten`, {
     bezeichnung: 'Streife Markt',
     art: 'einheit',
+    abschnitt: 'Festmeile',
     soll_anzahl: 2,
   });
   await api(`/api/planungen/${planungId}/bloecke`, {
@@ -210,6 +211,8 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(zaehlung).toContainText('1 Schicht neu');
   await expect(zaehlung).toContainText('1 Helfer neu');
   await expect(zaehlung).toContainText('1 Programmpunkt neu');
+  await expect(zaehlung).toContainText('1 Abschnitt neu');
+  await expect(dialog.getByRole('region', { name: 'Neue Abschnitte' })).toContainText('Festmeile');
   await dialog.getByRole('button', { name: 'Übernehmen' }).click();
   await expect(dialog.locator('[data-lfh="uebernahme-ergebnis"]')).toContainText(
     'Einsatz angelegt, Plan übernommen',
@@ -225,7 +228,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(page.getByRole('button', { name: 'Block anlegen' })).toHaveCount(0);
   await expect(ablauf.getByRole('button', { name: 'Programmpunkt', exact: true })).toHaveCount(0);
   const nochmal = await page.request.post(`/api/planungen/${planungId}/uebernahme`, {
-    data: { ziel: { art: 'neu' } },
+    data: { ziel: { art: 'neu' }, stand: 0 },
   });
   expect(nochmal.status()).toBe(409);
 
@@ -238,6 +241,10 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   ).json();
   expect(schichtplan.bloecke).toHaveLength(1);
   expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');
+  const abschnitte = await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/abschnitte`)
+  ).json();
+  expect(abschnitte.map((a: { name: string }) => a.name)).toEqual(['Festmeile']);
   expect(schichtplan.helfer.map((h: { name: string }) => h.name)).toEqual(['Hanna Stadtfest']);
   // Derselbe Zeitpunkt wie in der Planung; welche UTC-Zeit 22:30 ist, hängt an der Zone.
   const paar = (punkte: { bezeichnung: string; zeitpunkt_at: string }[]) =>

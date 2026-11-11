@@ -23,7 +23,9 @@ import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { MenueEintrag } from '../components/MenueAusloeser';
+import type { WeitereAktionen } from '../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
@@ -155,6 +157,33 @@ function SchichtmodelleInhalt() {
     }
   };
 
+  /**
+   * Aktionen einer Zeile, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, `KatalogTabelle.zeilenMenue`).
+   * Solange eine Vorgabe gesetzt wird, steht in jeder Zeile alles gesperrt: `setOrgVorgabe` rechnet
+   * mit der bisherigen Vorgabe, ein zweiter Wechsel davor liefe gegen einen alten Stand.
+   */
+  const zeilenMenue: WeitereAktionen<Schichtmodell> = {
+    eintraege: (m) => {
+      // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+      if (istVomHub(m)) return [];
+      const eintraege: MenueEintrag<'bearbeiten' | 'vorgabe' | 'aufheben' | 'loeschen'>[] = [
+        { key: 'bearbeiten', label: 'Bearbeiten' },
+        ...(m.ist_vorgabe
+          ? [{ key: 'aufheben' as const, label: 'Vorgabe aufheben' }]
+          : vorgabeVomHub
+            ? []
+            : [{ key: 'vorgabe' as const, label: 'Als Vorgabe setzen' }]),
+        { key: 'loeschen', label: 'Löschen', gefahr: true },
+      ];
+      return vorgabe.isPending
+        ? eintraege.map((e) => ({ ...e, gesperrt: true as const }))
+        : eintraege;
+    },
+    zugaenglicherName: (m) => `Aktionen zu ${m.bezeichnung}`,
+    onWahl: (aktion, m) => handle(aktion as 'bearbeiten' | 'vorgabe' | 'aufheben' | 'loeschen', m),
+    laeuft: (m) => vorgabe.isPending && vorgabe.variables?.modell.id === m.id,
+  };
+
   const spalten: KatalogSpalte<Schichtmodell>[] = [
     {
       title: 'Bezeichnung',
@@ -211,20 +240,7 @@ function SchichtmodelleInhalt() {
               istVomHub(m) ? (
                 <VomHubGesperrt />
               ) : (
-                <MenueAusloeser
-                  gesperrt={vorgabe.isPending}
-                  eintraege={[
-                    { key: 'bearbeiten' as const, label: 'Bearbeiten' },
-                    ...(m.ist_vorgabe
-                      ? [{ key: 'aufheben' as const, label: 'Vorgabe aufheben' }]
-                      : vorgabeVomHub
-                        ? []
-                        : [{ key: 'vorgabe' as const, label: 'Als Vorgabe setzen' }]),
-                    { key: 'loeschen' as const, label: 'Löschen', gefahr: true as const },
-                  ]}
-                  zugaenglicherName={`Aktionen zu ${m.bezeichnung}`}
-                  onWahl={(aktion) => handle(aktion, m)}
-                />
+                <ZeilenMenueAusloeser menue={zeilenMenue} zeile={m} gesperrt={vorgabe.isPending} />
               ),
           },
         ]
@@ -276,6 +292,7 @@ function SchichtmodelleInhalt() {
           mehrzahl="Schichtmodellen"
           locale={{ emptyText: 'Noch keine Schichtmodelle' }}
           spaltenSchalter={{ bezeichnung: 'Schichtmodelle' }}
+          zeilenMenue={istAdmin ? zeilenMenue : undefined}
         />
       )}
       <Modal

@@ -875,3 +875,42 @@ describe('Registrieren und Abmelden ohne Netz (LLH-1612, design.md D8)', () => {
     expect(gesendet).toEqual({ person_ids: [21], client_id: expect.any(String) });
   });
 });
+
+describe('Antrag am Spiegel (LLH-1492, Spec `spiegel-antraege`)', () => {
+  const angenommen = { antrag: { id: 41, zustand: 'ausstehend' } };
+
+  it('liefert „beantragt“ statt „gesendet“, wenn der Server einen Antrag annimmt', async () => {
+    vi.mocked(legeMeldungAn).mockResolvedValueOnce(angenommen as never);
+    await expect(
+      erfasseMeldungOfflineFaehig(11, 7, { inhalt: 'Lage ruhig' } as never),
+    ).resolves.toEqual({ zustand: 'beantragt', antrag: { id: 41, zustand: 'ausstehend' } });
+    // Ein Antrag ist angenommen: nichts bleibt in der Warteschlange.
+    expect(await schreibaktionenLaden(11, 7)).toEqual([]);
+  });
+
+  it('gilt für die Erfassungen mit Erfassungszeit ebenso (Person, Stand, Eintrag an einer Person)', async () => {
+    vi.mocked(legePersonAn).mockResolvedValueOnce(angenommen as never);
+    vi.mocked(meldeStand).mockResolvedValueOnce(angenommen as never);
+    vi.mocked(erfasseSichtung).mockResolvedValueOnce(angenommen as never);
+    const erwartet = { zustand: 'beantragt', antrag: angenommen.antrag };
+    await expect(erfassePersonOfflineFaehig(11, 7, { name: 'A' } as never)).resolves.toEqual(
+      erwartet,
+    );
+    await expect(
+      erfasseStandOfflineFaehig(11, 7, { id: 3, bezeichnung: 'Nord' }, { evakuiert: 1 } as never),
+    ).resolves.toEqual(erwartet);
+    await expect(
+      savePersonEintragOfflineCapable(11, 7, { id: 10, bezeichnung: 'R-012' }, 'sichtung', {
+        kategorie: 'sk1',
+      } as never),
+    ).resolves.toEqual(erwartet);
+    expect(await schreibaktionenLaden(11, 7)).toEqual([]);
+  });
+
+  it('bleibt „gesendet“ bei einer gewöhnlichen Ressource', async () => {
+    vi.mocked(legeMeldungAn).mockResolvedValueOnce({ id: 5 } as never);
+    await expect(
+      erfasseMeldungOfflineFaehig(11, 7, { inhalt: 'x' } as never),
+    ).resolves.toMatchObject({ zustand: 'gesendet', daten: { id: 5 } });
+  });
+});

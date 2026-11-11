@@ -486,6 +486,24 @@ impl FromRequestParts<AppState> for CurrentUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // Ein Antrag eines Spiegels, den diese Instanz als Führer ausführt (LLH-1492, D11): das
+        // Konto steht in der Extension, die nur `instanz::spiegel::antrag::ausfuehren` setzt.
+        if let Some(akteur) = parts
+            .extensions
+            .get::<crate::instanz::spiegel::antrag::AntragAkteur>()
+            .copied()
+        {
+            let benutzer = sqlx::query_as::<_, Benutzer>(
+                "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
+                        b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at \
+                 FROM benutzer b WHERE b.id = ? AND b.aktiv = 1",
+            )
+            .bind(akteur.benutzer_id())
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or(AppError::Unauthorized)?;
+            return Ok(CurrentUser(benutzer));
+        }
         let jar = CookieJar::from_request_parts(parts, state)
             .await
             .expect("CookieJar-Extractor ist infallible");

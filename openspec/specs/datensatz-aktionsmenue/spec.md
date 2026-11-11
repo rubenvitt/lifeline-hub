@@ -4,7 +4,7 @@
 Legt fest, wie die gebündelten Aktionen eines Datensatzes (Zeile, Karte, Chip, Detailkopf)
 erreichbar sind: ein Auslöser je Datensatz, eindeutig benannt, mit vorhersehbarem Menü, das
 nur die gewählte Aktion auslöst, und ein Kontextmenü (Rechtsklick, langer Druck, Tastatur) mit
-denselben Aktionen (LLH-1596).
+denselben Aktionen (LLH-1596), auch an Karten mit eigenen Knöpfen und im Chat (LLH-1598).
 
 ## Requirements
 
@@ -140,6 +140,10 @@ demselben Titel und derselben Knopfbeschriftung tun.
 - **WHEN** für eine Zeile eine Aktion aus dem ⋮-Menü noch läuft und jemand ihr Kontextmenü öffnet
 - **THEN** stehen die Einträge des ⋮-Menüs gesperrt im Menü, und die Primäraktion bleibt wählbar wie ihr Knopf
 
+#### Scenario: Betreuungsstelle in der Tabelle
+- **WHEN** eine Person mit Schreibrecht in der Tabelle der Betreuungsstellen auf die Zeile einer geöffneten, unverorteten Stelle mit gezählter Belegung rechtsklickt
+- **THEN** stehen darin „Belegung melden“, „Auf Karte verorten“, ein Trenner und rot „Stornieren“
+
 ### Requirement: Auf Link, Eingabefeld und markiertem Text bleibt das Browsermenü
 
 Ein Rechtsklick oder langer Druck auf einen Link, in einem Eingabefeld oder auf markierten Text
@@ -156,10 +160,11 @@ innerhalb eines Datensatzes SHALL das Browsermenü zeigen und kein eigenes Menü
 
 ### Requirement: Langer Druck öffnet das Kontextmenü am Touchgerät
 
-Am Touchgerät SHALL ein Druck auf einen Datensatz mit Aktionen, der ohne nennenswerte Bewegung
-mindestens 550 ms liegt, dessen Kontextmenü an der Druckstelle öffnen. Bewegt sich der Finger
-vorher, MUST kein Menü öffnen, damit Wischen und Blättern ungestört bleiben. Das Abheben des
-Fingers danach MUST weder das Menü schließen noch als Tipp auf den Datensatz wirken.
+Am Touchgerät SHALL außerhalb des Einsatztagebuchs ein Druck auf einen Datensatz mit Aktionen, der
+ohne nennenswerte Bewegung mindestens 550 ms liegt, dessen Kontextmenü an der Druckstelle öffnen.
+Bewegt sich der Finger vorher, MUST kein Menü öffnen, damit Wischen und Blättern ungestört bleiben.
+Das Abheben des Fingers danach MUST weder das Menü schließen noch als Tipp auf den Datensatz
+wirken.
 
 #### Scenario: Langer Druck auf eine Karte
 - **WHEN** eine Person am Tablet unter 768 px Breite 600 ms auf die Karte eines Fahrzeugs drückt, ohne den Finger zu bewegen, und dann abhebt
@@ -197,3 +202,198 @@ verliert er alle Aktionen, MUST das Menü schließen.
 #### Scenario: Datensatz verliert seine Aktionen
 - **WHEN** das Kontextmenü einer Zeile offen ist und der Person das Schreibrecht entzogen wird
 - **THEN** schließt das Menü
+
+### Requirement: Im Einsatztagebuch öffnet ein langer Druck kein Kontextmenü
+
+Im Einsatztagebuch (Einträge der Zeitachse und Chips der Erfassung) SHALL ein langer Druck am
+Touchgerät kein Kontextmenü öffnen, damit Text markierbar bleibt; das ⋮-Menü führt dort zu den
+Aktionen. Rechtsklick und Tasten MUST das Kontextmenü weiter öffnen.
+
+#### Scenario: Langer Druck im Einsatztagebuch
+- **WHEN** eine Person mit Schreibrecht am Tablet 600 ms auf den Text eines ETB-Eintrags drückt, ohne den Finger zu bewegen
+- **THEN** öffnet kein Kontextmenü, und das Gerät darf den Text wie gewohnt markieren
+
+### Requirement: ETB-Einträge tragen das Kontextmenü
+
+Ein gesendeter Eintrag der ETB-Zeitachse mit mindestens einer Aktion SHALL auf Rechtsklick und
+Tasten ein Kontextmenü mit genau den Einträgen seines ⋮-Menüs öffnen, in derselben Reihenfolge und
+mit demselben Sperrzustand. Ein vorgemerkter Eintrag, eine Bündelzeile von Systemeinträgen und ein
+Eintrag ohne Aktion MUST das Browsermenü behalten.
+
+#### Scenario: Rechtsklick auf einen Eintrag
+- **WHEN** eine Person mit Schreibrecht und Freigabe für Aufträge auf den Text des Eintrags Nr. 12 rechtsklickt
+- **THEN** öffnet am Zeiger ein Menü mit „Berichtigen“, „Wiedervorlage“ und „Auftrag erteilen“, und das Browsermenü erscheint nicht
+
+#### Scenario: Berichtigen gesperrt
+- **WHEN** ein Entwurf gerade sendet und jemand das Kontextmenü eines Eintrags öffnet
+- **THEN** steht „Berichtigen“ gesperrt mit demselben Grund wie im ⋮-Menü
+
+#### Scenario: Vorgemerkter Eintrag
+- **WHEN** jemand ohne Netz einen Eintrag erfasst hat und auf die vorgemerkte Zeile rechtsklickt
+- **THEN** erscheint das Browsermenü und kein eigenes Menü
+
+#### Scenario: Taste im Eintrag
+- **WHEN** der Fokus auf dem ⋮-Knopf des Eintrags Nr. 12 steht und jemand Umschalt+F10 drückt
+- **THEN** öffnet das Kontextmenü dieses Eintrags am Eintrag, und der Fokus liegt im Menü
+
+### Requirement: Abgelehnte ETB-Einträge zeigen ihre Entscheidung im Kontextmenü
+
+Ein vom Server abgelehnter Eintrag SHALL auf Rechtsklick und Tasten ein Kontextmenü mit denselben
+Wegen öffnen wie seine Knöpfe: „Erneut senden“, „Nur protokollieren“ (nur wenn der Knopf steht)
+und „Verwerfen“ rot hinter einem Trenner. Die Wahl MUST dieselbe Wirkung haben wie der Knopf, auch
+ohne Rückfrage beim Verwerfen.
+
+#### Scenario: Abgelehnte Meldung
+- **WHEN** der Server eine gepufferte Meldung mit Kopplung an den Meldungseingang abgelehnt hat und jemand auf ihre Zeile rechtsklickt
+- **THEN** stehen im Menü „Erneut senden“, „Nur protokollieren“, ein Trenner und rot „Verwerfen“
+
+#### Scenario: Verwerfen aus dem Kontextmenü
+- **WHEN** jemand im Kontextmenü einer abgelehnten Zeile „Verwerfen“ wählt
+- **THEN** verschwindet die Zeile wie nach dem Knopf „Verwerfen“
+
+### Requirement: Ein offenes Kontextmenü hält die ETB-Zeitachse
+
+Solange das Kontextmenü eines ETB-Eintrags offen ist, SHALL die Zeitachse neue Einträge zurückhalten
+wie bei Fokus in der Achse, sodass die Zeile unter dem Menü stehen bleibt. Verschwindet der Eintrag
+trotzdem oder verliert er alle Aktionen, MUST das Menü schließen.
+
+#### Scenario: Neuer Eintrag während das Menü offen ist
+- **WHEN** das Kontextmenü eines Eintrags offen ist und ein anderer Platz einen Eintrag erfasst
+- **THEN** bleibt die Zeile an ihrer Stelle, und das Sammelbanner nennt den neuen Eintrag
+
+### Requirement: Chips der ETB-Erfassung tragen das Kontextmenü
+
+Ein Chip der ETB-Erfassung (Von, An, Zeit, Meldeweg) SHALL auf Rechtsklick und Tasten ein
+Kontextmenü mit den Einträgen seines ⋮-Menüs öffnen. Während der Eintrag sendet, MUST es die
+Einträge gesperrt zeigen. Ein Chip, der gerade bearbeitet wird, MUST das Browsermenü behalten.
+
+#### Scenario: Rechtsklick auf den Chip „An“
+- **WHEN** jemand auf den Chip „An: S2“ rechtsklickt
+- **THEN** öffnet ein Menü mit „Bearbeiten“, einem Trenner und rot „Entfernen“
+
+#### Scenario: Chip aus dem Standard-Rufnamen
+- **WHEN** der Chip „Von“ aus dem Standard-Rufnamen kommt und jemand auf ihn rechtsklickt
+- **THEN** stehen im Menü „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“, kein „Entfernen“
+
+#### Scenario: Während des Sendens
+- **WHEN** der Eintrag gerade sendet und jemand auf einen Chip rechtsklickt
+- **THEN** stehen die Einträge des Chips gesperrt im Menü
+
+### Requirement: Eine Karte mit mehreren Knöpfen zeigt alle ihre Handlungen
+
+Trägt die Aktionszeile einer Karte mehrere Knöpfe, SHALL ihr Kontextmenü alle Knöpfe dieser Zeile
+zeigen, die etwas tun, in ihrer Reihenfolge, danach die Einträge des ⋮-Menüs. Das MUST auch gelten,
+wenn die Karte unter drei Aktionen kein ⋮-Menü zeigt. Ein gesperrter Knopf MUST gesperrt mit Grund
+im Menü stehen. Sprünge, Auswahlfelder und Knöpfe einzelner Unterzeilen (Empfänger, Ausgabe) MUST
+NOT im Menü stehen.
+
+#### Scenario: Neue Sofortmeldung
+- **WHEN** eine Person mit Schreibrecht auf eine neue, unbestätigte Sofortmeldung rechtsklickt, deren Karte „Bestätigen“, „Sichten“ und das ⋮-Menü trägt
+- **THEN** stehen im Menü zuerst „Bestätigen“ und „Sichten“, danach die Einträge des ⋮-Menüs in dessen Reihenfolge
+
+#### Scenario: Karte unter drei Aktionen
+- **WHEN** eine Verpflegungsstelle im Status „aktiv“ die Knöpfe „Bearbeiten …“ und rot „Auflösen …“ ohne ⋮-Menü trägt und jemand auf sie rechtsklickt
+- **THEN** stehen im Menü „Bearbeiten …“, ein Trenner und rot „Auflösen …“
+
+#### Scenario: Knopf mit Rückfrage
+- **WHEN** jemand im Kontextmenü eines vollzogenen Auftrags „Abnehmen“ wählt
+- **THEN** schließt das Menü, ein Dialog fragt „Auftrag abnehmen?“ mit dem Knopf „Auftrag abnehmen“, und erst die Bestätigung nimmt den Auftrag ab
+
+#### Scenario: Gesperrte Übernahme
+- **WHEN** eine eingetroffene Nachforderung „Als Material übernehmen“ gesperrt trägt, weil das Materialmodul für die Person gesperrt ist, und jemand ihr Kontextmenü öffnet
+- **THEN** steht „Als Material übernehmen“ gesperrt im Menü und nennt den Grund
+
+#### Scenario: Sprung bleibt draußen
+- **WHEN** jemand auf ein laufendes Zeitfenster rechtsklickt, dessen Karte „Ausgabe öffnen“ und „Ausgabe nachtragen“ trägt
+- **THEN** steht „Ausgabe nachtragen“ im Menü und „Ausgabe öffnen“ nicht
+
+#### Scenario: Knopf einer Unterzeile bleibt an der Zeile
+- **WHEN** jemand auf ein Zeitfenster rechtsklickt, in dessen Ausgabenliste eine Ausgabe den Knopf „Zurücknehmen“ trägt
+- **THEN** enthält das Menü die Aktionen des Zeitfensters und kein „Zurücknehmen“
+
+#### Scenario: Zuweisung bleibt an der Karte
+- **WHEN** jemand das Kontextmenü einer Meldung öffnet, an der die Auswahl „Bearbeiter zuweisen“ steht
+- **THEN** enthält das Menü keinen Eintrag zur Zuweisung
+
+### Requirement: Eine Chat-Nachricht öffnet ihr Kontextmenü
+
+Eine Nachricht im Chat mit Aktionen SHALL per Rechtsklick, langem Druck und Tastatur dasselbe Menü
+öffnen wie ihr ⋮-Auslöser. Auf einem Anhang, dem Link wie dem Vorschaubild, MUST das Browsermenü
+bleiben. Auf einem Bild in einem Datensatz bleibt es überall, damit „Bild speichern unter“ erreichbar
+ist.
+
+#### Scenario: Rechtsklick auf eine eigene Nachricht
+- **WHEN** eine Person mit Schreibrecht neben den Text ihrer eigenen Nachricht rechtsklickt
+- **THEN** öffnet am Zeiger ein Menü mit „Zu ETB“, „Zu Auftrag“, „Bearbeiten“, einem Trenner und rot „Löschen“, soweit diese Einträge auch im ⋮-Menü stehen
+
+#### Scenario: Rechtsklick auf einen Anhang
+- **WHEN** jemand auf den Anhang einer Nachricht rechtsklickt
+- **THEN** erscheint das Browsermenü mit „Link speichern unter“
+
+#### Scenario: Rechtsklick auf das Vorschaubild eines Anhangs
+- **WHEN** jemand auf das Vorschaubild eines Bildanhangs einer Nachricht rechtsklickt
+- **THEN** erscheint das Browsermenü mit „Bild speichern unter“ und kein eigenes Menü
+
+#### Scenario: Gelöschte Nachricht
+- **WHEN** jemand auf eine gelöschte Nachricht rechtsklickt
+- **THEN** erscheint das Browsermenü
+
+### Requirement: Ein Zählschirm hat kein Kontextmenü
+
+Ein Schirm, auf dem in schneller Folge Tasten gezählt werden, SHALL kein eigenes Kontextmenü
+öffnen. Ein langer Druck auf eine Zähltaste MUST wie bisher wirken und kein Menü öffnen. Eine
+Auswahl hinter einem ⋮-Knopf auf diesem Schirm ist kein Menü eines Datensatzes.
+
+#### Scenario: Langer Druck im Ausgabe-Zählschirm
+- **WHEN** eine Person am Tablet im Zählschirm einer Verpflegungsausgabe 600 ms auf eine Zähltaste drückt
+- **THEN** öffnet kein Kontextmenü
+
+### Requirement: Kontextmenü zeigt die Aktionen der Knopfreihe
+
+Stehen die Aktionen eines Datensatzes auf breitem Schirm als Knöpfe in der Zeile und nur auf
+schmalem Schirm hinter einem ⋮, SHALL das Kontextmenü auf jeder Breite dieselben Aktionen in
+derselben Reihenfolge, mit demselben Sperrzustand und derselben Wirkung zeigen wie Knöpfe und ⋮.
+Was als Knopf rot steht, MUST im Kontextmenü rot hinter einem Trenner stehen.
+
+#### Scenario: Externe Stelle am breiten Schirm
+- **WHEN** eine Person mit Verwaltungsrecht in den Stammdaten bei 1280 px Breite mit der rechten Maustaste auf die Zeile der aktiven externen Stelle „Leitstelle Nord“ klickt, die die Knöpfe „Bearbeiten“ und rot „Deaktivieren“ trägt
+- **THEN** öffnet am Zeiger ein Menü mit „Bearbeiten“, einem Trenner und rot „Deaktivieren“, und das Browsermenü erscheint nicht
+
+#### Scenario: Statuswechsel läuft
+- **WHEN** ein Fahrzeug in den Stammdaten gerade außer Dienst genommen wird und jemand vor der Serverantwort das Kontextmenü dieser Zeile öffnet
+- **THEN** stehen „Bearbeiten“ und „Außer Dienst nehmen“ gesperrt im Menü, wie die Knöpfe der Zeile
+
+#### Scenario: Vom Hub verwaltet
+- **WHEN** eine Person mit der rechten Maustaste auf die Zeile eines Fahrzeugs klickt, das der Hub verwaltet und das deshalb keine Aktion trägt
+- **THEN** erscheint das Browsermenü und kein eigenes Menü
+
+### Requirement: Gesperrte Primäraktion steht gesperrt im Kontextmenü
+
+Ist die Primäraktion eines Datensatzes als Knopf gesperrt (etwa ohne Netz), SHALL sie im
+Kontextmenü an ihrer Stelle gesperrt stehen und nicht auslösen.
+
+#### Scenario: Kommunikationsplan ohne Netz
+- **WHEN** der Kommunikationsplan ohne Netz geöffnet ist und eine Person mit Schreibrecht das Kontextmenü einer gepflegten Stelle öffnet
+- **THEN** stehen „+ Verbindung“ und alle Einträge des ⋮ gesperrt im Menü
+
+#### Scenario: Kommunikationsplan mit Netz
+- **WHEN** eine Person mit Schreibrecht das Kontextmenü der gepflegten Stelle „Fernmeldezentrale“ mit einer Rufnummer öffnet
+- **THEN** stehen oben „+ Verbindung“, danach die Einträge des ⋮ in dessen Reihenfolge und rot hinter einem Trenner „Stelle entfernen“
+
+### Requirement: Zeilen mit Reglern tragen das Kontextmenü an ihrer Bezeichnung
+
+Trägt die Zeile eines Datensatzes Bedienelemente, die auf Drücken und Halten reagieren (Regler,
+Schalter, Auswahlfelder), SHALL nur der Teil mit Bezeichnung und ⋮ das Kontextmenü öffnen. Auf
+den Bedienelementen MUST weder Rechtsklick noch langer Druck das Kontextmenü öffnen.
+
+#### Scenario: Deckkraft eines Bild-Hintergrunds
+- **WHEN** eine Person am Tablet in den Bild-Hintergründen der Lagekarte 600 ms auf den Deckkraft-Regler eines Bildes drückt, ohne den Finger zu bewegen
+- **THEN** öffnet kein Kontextmenü, und der Regler bleibt bedienbar
+
+#### Scenario: Sichtbarkeitsschalter eines Bild-Hintergrunds
+- **WHEN** eine Person mit Schreibrecht mit der rechten Maustaste auf den Sichtbarkeitsschalter eines Bildes klickt
+- **THEN** öffnet kein eigenes Kontextmenü
+
+#### Scenario: Name eines Bild-Hintergrunds
+- **WHEN** eine Person mit Schreibrecht mit der rechten Maustaste auf den Namen des Bild-Hintergrunds „Gelände Nord“ klickt
+- **THEN** öffnet am Zeiger ein Menü mit „Auf Bild zentrieren“, „Auf der Karte platzieren“, einem Trenner und rot „Bild entfernen …“

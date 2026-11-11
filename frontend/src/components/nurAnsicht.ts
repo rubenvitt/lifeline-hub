@@ -1,4 +1,4 @@
-import type { EinsatzStatus } from '../api/types';
+import type { EinsatzAnzeige, EinsatzStatus } from '../api/types';
 
 /**
  * Gründe der Zeile „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078; `frontend/AGENTS.md`,
@@ -49,7 +49,24 @@ export function modulSperre(namen: readonly string[]): string | null {
   return `Module ${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]} gesperrt`;
 }
 
-/** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. */
-export function einsatzRechteGrund(einsatzStatus: EinsatzStatus): string {
-  return einsatzStatus !== 'aktiv' ? EINSATZ_ABGESCHLOSSEN : NUR_LEITUNG_FUEHRUNG;
+/**
+ * Ein Spiegel (LLH-1492, Spec `einsatz-spiegel`): die führende Instanz nennt der Grund, wie das
+ * Hinweisband. Ändern geht dort; hier nur die beantragbaren Erfassungen.
+ */
+export function spiegelGrund(gegenstelle: string): string {
+  return `Spiegel von ${gegenstelle}`;
+}
+
+/**
+ * Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. Mit dem Einsatz statt
+ * nur seinem Status nennt er am Spiegel die führende Instanz (LLH-1492).
+ */
+export function einsatzRechteGrund(
+  einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'spiegel'>,
+): string {
+  if (typeof einsatz !== 'string' && einsatz.spiegel != null) {
+    return spiegelGrund(einsatz.spiegel.gegenstelle);
+  }
+  const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
+  return status !== 'aktiv' ? EINSATZ_ABGESCHLOSSEN : NUR_LEITUNG_FUEHRUNG;
 }

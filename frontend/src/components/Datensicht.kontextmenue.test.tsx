@@ -197,6 +197,31 @@ describe('Datensicht · Kontextmenü im Kartenzweig (4.2)', () => {
   });
 });
 
+describe('Datensicht · gesperrte Primäraktion (LLH-1599 D7)', () => {
+  it('der Knopf im Kartenfuß ist gesperrt, im Kontextmenü steht der Eintrag gesperrt', async () => {
+    setzeViewportBreite(390);
+    const onKlick = vi.fn();
+    const karte = plan(onKlick);
+    if (karte.art === 'plan' && karte.aktion) karte.aktion.gesperrt = (f) => f.id === 2;
+    renderMitProviders(sicht(karte));
+
+    const knoepfe = screen.getAllByRole('button', { name: 'Melden' });
+    expect(knoepfe.map((k) => (k as HTMLButtonElement).disabled)).toEqual([false, true, false]);
+
+    const zweite = screen
+      .getByRole('link', { name: 'Rotkreuz 2' })
+      .closest<HTMLElement>('[data-lfh="datensicht-karte"]')!;
+    fireEvent.contextMenu(zweite, { button: 2 });
+    const menue = await waitFor(() => offenesMenue()!);
+    expect(within(menue).getByRole('menuitem', { name: 'Melden' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Melden' }));
+    expect(onKlick).not.toHaveBeenCalled();
+  });
+});
+
 describe('Datensicht · Befunde aus dem Review', () => {
   it('ein Rechtsklick im offenen ⋮-Menü einer Karte öffnet kein zweites Menü', async () => {
     setzeViewportBreite(390);

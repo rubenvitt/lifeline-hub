@@ -6,18 +6,27 @@ import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { tippeZeit } from '../../test/zeitEingabe';
 import { waehleMenueEintrag } from '../../test/menue';
 import EinsatzGeraete from './EinsatzGeraete';
 
 /** Sektion „Geräte“ (LFH-892, Spec `geraete-kopplung`). */
 
-const einsatz = (meine_rolle = 'einsatzleitung', status = 'aktiv') => ({
+const einsatz = (meine_rolle = 'einsatzleitung', status = 'aktiv', spiegel: unknown = null) => ({
   id: 1,
   bezeichnung: 'Hochwasser Weser',
   status,
   meine_rolle,
+  spiegel,
 });
+
+const SPIEGEL = {
+  gegenstelle: 'ELW Nord',
+  beendet: false,
+  antraege_ausstehend: 0,
+  antraege_abgelehnt: 0,
+};
 
 const kopplung = (id: number, status: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -41,6 +50,7 @@ const UHS = [
 
 interface Aufbau {
   rolle?: string;
+  spiegel?: unknown;
   kopplungen?: unknown[];
   sperren?: unknown[];
   ansichten?: unknown[];
@@ -58,7 +68,9 @@ function stelleBereit(a: Aufbau = {}) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
   const gelesen: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle))),
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json(einsatz(a.rolle, 'aktiv', a.spiegel ?? null)),
+    ),
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
@@ -449,6 +461,24 @@ describe('EinsatzGeraete (LFH-892)', () => {
     }
   });
 
+  it('koppelt am Spiegel nicht, die Lagemonitor-Freigabe bleibt (LLH-1492)', async () => {
+    stelleBereit({
+      spiegel: SPIEGEL,
+      lagemonitore: [
+        { zugang_id: 1, bezeichnung: 'FüKW 1', freigegeben: false, anderer_einsatz: false },
+      ],
+    });
+    rendern();
+    expect(await screen.findByText('UHS Nord · Tablet 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gerät koppeln/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 1' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('switch', { name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz' }),
+    ).toBeEnabled();
+  });
+
   describe('Externe Lagemonitore (LLH-1484)', () => {
     const zugang = (zugang_id: number, extra: Record<string, unknown> = {}) => ({
       zugang_id,
@@ -553,5 +583,28 @@ describe('Gerät koppeln aus dem Einheiten-Detail (LLH-1579)', () => {
     expect(within(neu).queryAllByTitle('Einheit')).toHaveLength(0);
     expect(within(neu).queryByText('Einheit wählen')).not.toBeInTheDocument();
     expect(within(neu).getByText('Ansicht wählen')).toBeInTheDocument();
+  });
+});
+
+describe('EinsatzGeraete · Kontextmenü (LLH-1599)', () => {
+  const eintragVon = (name: string) =>
+    [...document.querySelectorAll<HTMLElement>('[data-lfh="geraet-eintrag"]')].find((e) =>
+      e.textContent?.includes(name),
+    )!;
+
+  it('Rechtsklick auf eine aktive Kopplung zeigt die Einträge des ⋮; beendete ohne eigenes Menü', async () => {
+    stelleBereit({ kopplungen: [kopplung(1, 'aktiv'), kopplung(2, 'widerrufen')] });
+    rendern();
+    await screen.findByText('UHS Nord · Tablet 1');
+    const menue = await oeffneKontextmenue(eintragVon('UHS Nord · Tablet 1'));
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Gerät UHS Nord · Tablet 1');
+    expect(eintraegeVon(menue)).toEqual([
+      'Neuen Code ausstellen',
+      'Verlängern …',
+      'rot:Widerrufen …',
+    ]);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Widerrufen/ }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Tablet 1');
+    erwarteBrowsermenue(eintragVon('UHS Nord · Tablet 2'));
   });
 });

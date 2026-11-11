@@ -16,6 +16,7 @@ pub mod schwaerzung_nachlauf;
 pub mod schwaerzung_person;
 pub mod schwaerzung_registry;
 pub mod skelett_loeschung;
+pub mod spiegel_filter;
 pub mod verbindungen;
 pub mod zaehler;
 
@@ -161,6 +162,9 @@ pub struct Einsatz {
     /// `einsatzleiter_spalten!`/`einsatzleiter_joins!` in `repo`.
     #[sqlx(flatten)]
     pub einsatzleiter: fuehrungsstelle::EinsatzleiterSpalten,
+    /// Spiegel-Angaben (LLH-1492).
+    #[sqlx(flatten)]
+    pub spiegel: crate::instanz::spiegel::SpiegelSpalten,
 }
 
 impl Einsatz {
@@ -181,6 +185,8 @@ impl Einsatz {
             fuehrungsstelle: meine_fuehrungsstelle,
             sachgebiete: meine_sachgebiete,
             funktion: meine_funktion,
+            funktion_code: meine_funktion_code,
+            funktion_bezeichnung: meine_funktion_bezeichnung,
         } = MeineFelder::ableiten(meine_rolle.as_deref(), meine_stelle, karte);
         EinsatzAnzeige {
             id: self.id,
@@ -208,6 +214,8 @@ impl Einsatz {
             meine_fuehrungsstelle,
             meine_sachgebiete,
             meine_funktion,
+            meine_funktion_code,
+            meine_funktion_bezeichnung,
             lagekennzahlen: lagekennzahl::ableiten(
                 self.pegel_festgelegt,
                 self.evakuierung_angeordnet,
@@ -216,6 +224,7 @@ impl Einsatz {
             ),
             teilschwaerzungen: self.teilschwaerzungen,
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
+            spiegel: self.spiegel.anzeige(),
         }
     }
 }
@@ -270,6 +279,15 @@ pub struct EinsatzAnzeige {
     /// wenn keine Funktion folgt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_funktion: Option<String>,
+    /// Katalogcode derselben Funktion wie `meine_funktion` (pkjvl5iy, design.md D1): ganzer
+    /// Katalog, ohne Führungsfunktion mit Rolle Einsatzleitung `el`. Daran erkennt „meine
+    /// Stelle“ im Überblick die eigenen Vorgänge. Fehlt, wenn keine Funktion folgt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meine_funktion_code: Option<crate::fuehrung::Fuehrungsfunktion>,
+    /// Bezeichnung der eigenen Funktion, nur bei Führungshilfspersonal und Fachberater („THW“);
+    /// fehlt sonst und nach einer Schwärzung der Mitgliedschaft (pkjvl5iy, design.md D1/D2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meine_funktion_bezeichnung: Option<String>,
     /// Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
     /// Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,
     /// Evakuierung angeordnet, gewählt per `lagekennzahl::waehlen`), nie durch Messwerte.
@@ -291,6 +309,11 @@ pub struct EinsatzAnzeige {
     /// `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzleiter: Option<fuehrungsstelle::EinsatzleiterAnzeige>,
+    /// Spiegel einer gekoppelten Instanz (LLH-1492, Spec `einsatz-spiegel`): wer führt, Stand,
+    /// Anträge. Fehlt an einem Einsatz, den diese Instanz führt. Am Spiegel schreibt der Client
+    /// nur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spiegel: Option<crate::instanz::spiegel::EinsatzSpiegelAnzeige>,
 }
 
 /// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,
@@ -300,6 +323,8 @@ pub(crate) struct MeineFelder {
     pub fuehrungsstelle: Option<String>,
     pub sachgebiete: Vec<Sachgebiet>,
     pub funktion: Option<String>,
+    pub funktion_code: Option<crate::fuehrung::Fuehrungsfunktion>,
+    pub funktion_bezeichnung: Option<String>,
 }
 
 impl MeineFelder {
@@ -312,13 +337,22 @@ impl MeineFelder {
             funktion: None,
             text: None,
         });
-        let funktion = funktion::ableiten(
+        let derived = funktion::ableiten(
             stelle.funktion,
             stelle.text.as_deref(),
             rolle.and_then(EinsatzRolle::parse),
             karte,
-        )
-        .map(|f| f.bezeichnung);
+        );
+        let funktion_code = derived.as_ref().map(|f| f.code);
+        // Die Bezeichnung nur, wo der Katalog eine verlangt (Führungshilfspersonal, Fachberater);
+        // ein Text neben einem Sachgebiet wäre keine (`fuehrung::pruefe_funktion`).
+        let funktion_bezeichnung = funktion_code
+            .filter(|c| c.bezeichnung_pflicht())
+            .and(stelle.text.as_deref())
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+            .map(str::to_string);
+        let funktion = derived.map(|f| f.bezeichnung);
         Self {
             sachgebiete: stelle
                 .funktion
@@ -331,6 +365,8 @@ impl MeineFelder {
                 stelle.text,
             ),
             funktion,
+            funktion_code,
+            funktion_bezeichnung,
         }
     }
 }
@@ -432,6 +468,7 @@ mod tests {
             retention_bis: None,
             geloescht_at: None,
             einsatzleiter: Default::default(),
+            spiegel: Default::default(),
         };
         assert!(e.ist_aktiv());
         e.status = EinsatzStatus::Abgeschlossen;

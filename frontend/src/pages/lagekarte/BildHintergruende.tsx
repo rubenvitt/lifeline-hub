@@ -1,7 +1,9 @@
 import { Button, Slider, Space, Switch, Tooltip, Typography, Upload } from 'antd';
 import { IconFadenkreuz, IconHochladen, IconMuelleimer, IconVollbildEcken } from '../../icons';
 import { useRollen } from '../../components/instrument';
-import { MenueAusloeser } from '../../components/MenueAusloeser';
+import type { WeitereAktionen } from '../../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
+import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import UploadFortschrittAnzeige from '../../components/UploadFortschritt';
 import { ablageFehlerKopf } from '../../components/useUploadFortschritt';
@@ -44,6 +46,37 @@ export default function BildHintergruende(
 ) {
   const { token, rollen } = useRollen();
   const { darfSchreiben } = props;
+  /**
+   * Aktionen eines Bildes, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, design.md D6). Ohne
+   * Schreibrecht bleibt ein einzelner Zentrieren-Knopf, keine gebündelten Aktionen und kein Menü.
+   */
+  const bildMenue: WeitereAktionen<Hintergrundbild> | undefined = darfSchreiben
+    ? {
+        eintraege: (b) => [
+          { key: 'zentrieren', icon: <IconVollbildEcken />, label: 'Auf Bild zentrieren' },
+          {
+            key: 'platzieren',
+            icon: <IconFadenkreuz />,
+            label:
+              props.bildPlatzierenId === b.id ? 'Platzieren beenden' : 'Auf der Karte platzieren',
+          },
+          { key: 'loeschen', icon: <IconMuelleimer />, label: 'Bild entfernen …', gefahr: true },
+        ],
+        // Der Name trägt die Bild-Kennung.
+        zugaenglicherName: (b) => `Aktionen zu ${b.name}`,
+        onWahl: (key, b) => {
+          if (key === 'zentrieren') props.onBildZentrieren(b.id);
+          else if (key === 'platzieren') {
+            if (props.bildPlatzierenId === b.id) props.onBildPlatzierenFertig();
+            else props.onBildPlatzieren(b.id);
+          } else if (key === 'loeschen') props.onLoeschenFragen(b.id);
+        },
+      }
+    : undefined;
+  const kontext = useZeilenMenueKontext(bildMenue, {
+    finde: (id) => props.angezeigt.find((b) => b.id === id),
+    schluessel: (b) => b.id,
+  });
   return (
     <Space orientation="vertical" style={{ width: '100%' }}>
       {/* Der Slot ist ein Banner über der Liste, kein Ersatz: die Overlays liegen weiter auf der
@@ -67,7 +100,13 @@ export default function BildHintergruende(
                 onChange={(v) => props.onBildToggle(b.id, v)}
                 style={{ flexShrink: 0 }}
               />
-              <span style={{ ...namensteilStil(token), alignItems: 'center' }}>
+              {/* Nur der Namensteil trägt das Kontextmenü, nicht Schalter, Regler und Auswahl
+                  (Spec `datensatz-aktionsmenue`, LLH-1599 D6). */}
+              <span
+                data-lfh="bild-namensteil"
+                style={{ ...namensteilStil(token), alignItems: 'center' }}
+                {...(bildMenue ? kontext.ausloeser(b) : {})}
+              >
                 <Typography.Text
                   ellipsis={{ tooltip: b.name }}
                   editable={
@@ -88,36 +127,8 @@ export default function BildHintergruende(
                 {/* Drei Aktionen an einer Zeile werden gebündelt; ohne Schreibrecht bleibt eine,
                     dann steht der Zentrieren-Knopf direkt da. */}
                 <div style={{ flexShrink: 0 }}>
-                  {darfSchreiben ? (
-                    <MenueAusloeser
-                      eintraege={[
-                        {
-                          key: 'zentrieren',
-                          icon: <IconVollbildEcken />,
-                          label: 'Auf Bild zentrieren',
-                        },
-                        {
-                          key: 'platzieren',
-                          icon: <IconFadenkreuz />,
-                          label: imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren',
-                        },
-                        {
-                          key: 'loeschen',
-                          icon: <IconMuelleimer />,
-                          label: 'Bild entfernen …',
-                          gefahr: true,
-                        },
-                      ]}
-                      // Der Name trägt die Bild-Kennung.
-                      zugaenglicherName={`Aktionen zu ${b.name}`}
-                      onWahl={(key) => {
-                        if (key === 'zentrieren') props.onBildZentrieren(b.id);
-                        else if (key === 'platzieren') {
-                          if (imPlatzieren) props.onBildPlatzierenFertig();
-                          else props.onBildPlatzieren(b.id);
-                        } else if (key === 'loeschen') props.onLoeschenFragen(b.id);
-                      }}
-                    />
+                  {bildMenue ? (
+                    <ZeilenMenueAusloeser menue={bildMenue} zeile={b} />
                   ) : (
                     <Tooltip title="Auf Bild zentrieren">
                       <Button
@@ -174,6 +185,7 @@ export default function BildHintergruende(
           </Upload>
         </>
       )}
+      {kontext.menue}
     </Space>
   );
 }

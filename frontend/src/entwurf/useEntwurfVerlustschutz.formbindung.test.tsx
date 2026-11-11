@@ -22,6 +22,7 @@ function Traeger({ mitFormular }: { mitFormular: boolean }) {
   const [form] = Form.useForm<Daten>();
   const schutz = useEntwurfVerlustschutz<Daten, Daten>({
     daten: { titel: 'Server 1' },
+    geladenAm: 1,
     istEntwurf: true,
     form,
     werteAus: (d) => ({ titel: d.titel }),
@@ -30,6 +31,30 @@ function Traeger({ mitFormular }: { mitFormular: boolean }) {
   if (!mitFormular) return <p>nur lesen</p>;
   return (
     <Form form={form} onValuesChange={schutz.markiereGeaendert}>
+      <Form.Item label="Titel" name="titel">
+        <Input />
+      </Form.Item>
+      <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
+    </Form>
+  );
+}
+
+/** Ein Serverstand mit fester Identität wie Query-Data, die sich nicht geändert hat. */
+const STABIL: Daten = { titel: 'Server 1' };
+
+function StabilerTraeger({ mitFormular }: { mitFormular: boolean }) {
+  const [form] = Form.useForm<Daten>();
+  const schutz = useEntwurfVerlustschutz<Daten, Daten>({
+    daten: STABIL,
+    geladenAm: 1,
+    istEntwurf: true,
+    form,
+    werteAus: (d) => ({ titel: d.titel }),
+    speichern: () => Promise.resolve(),
+  });
+  if (!mitFormular) return <p>nur lesen</p>;
+  return (
+    <Form form={form} clearOnDestroy onValuesChange={schutz.markiereGeaendert}>
       <Form.Item label="Titel" name="titel">
         <Input />
       </Form.Item>
@@ -56,6 +81,17 @@ describe('useEntwurfVerlustschutz · Formularbindung (LFH-627)', () => {
 
     // Kommt das Formular später (Schreibrecht, Entwurf), holt der Effekt den Serverstand nach.
     rerender(<Traeger mitFormular />);
+    expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
+  });
+
+  it('schreibt einem neu eingehängten Formular auch einen schon bekannten Serverstand (LLH-1607)', async () => {
+    // Übersprungen wird nur ein vom eigenen PATCH überholter Stand; ein unveränderter Serverstand
+    // geht beim Einhängen trotzdem ins Formular. `clearOnDestroy` macht das Aushängen sichtbar:
+    // ohne leerte nichts den Speicher.
+    const { rerender } = render(<StabilerTraeger mitFormular />);
+    expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
+    rerender(<StabilerTraeger mitFormular={false} />);
+    rerender(<StabilerTraeger mitFormular />);
     expect(await screen.findByLabelText('Titel')).toHaveValue('Server 1');
   });
 });

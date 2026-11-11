@@ -1162,3 +1162,55 @@ describe('Vorgemerktes einer beendeten Kopplung (LLH-1331)', () => {
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1 });
   });
 });
+
+describe('am Spiegel wird aus der Vormerkung ein Antrag (LLH-1492, Spec `spiegel-antraege`)', () => {
+  const angenommen = { antrag: { id: 3, zustand: 'ausstehend' } };
+
+  it('nimmt Person, Meldung und Ausgabe als angenommen, ohne Ablehnung und ohne Cache-Eintrag', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    client.setQueryData<Person[]>(einsatzKeys.personen(7), []);
+    client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
+      zeitfenster: [{ id: 9, ausgegeben: { gesamt: 100 } } as unknown as VerpflegungZeitfenster],
+      stellen: [],
+      empfaenger: { einheiten: [], abschnitte: [], betreuungsstellen: [] },
+    });
+    vi.mocked(legePersonAn).mockResolvedValue(angenommen as never);
+    vi.mocked(legeMeldungAn).mockResolvedValue(angenommen as never);
+    vi.mocked(erfasseAusgabe).mockResolvedValue(angenommen as never);
+    await schreibaktionEinreihen(BENUTZER_A, 7, {
+      art: 'person',
+      daten: { status: 'erfasst', client_id: 'person-1' },
+    });
+    await schreibaktionEinreihen(BENUTZER_A, 7, {
+      art: 'meldung',
+      daten: {
+        absender: 'Hub',
+        meldeweg: 'funk',
+        inhalt: 'Lage',
+        ereigniszeit: '2026-11-10 08:00:00',
+        client_id: 'meldung-1',
+      },
+    });
+    await schreibaktionEinreihen(BENUTZER_A, 7, {
+      art: 'ausgabe',
+      zeitfenster_id: 9,
+      bezeichnung: 'Mittag',
+      daten: { menge: 10, client_id: 'ausgabe-1' },
+    });
+
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
+        ausstehend: 0,
+        abgelehnt: 0,
+        nicht_zugeordnet: 0,
+      }),
+    );
+    // Kein Antrag landet als Person in der Liste, das Zeitfenster bleibt der Stand des Servers.
+    expect(client.getQueryData(einsatzKeys.personen(7))).toEqual([]);
+    expect(
+      client.getQueryData<Verpflegung>(einsatzKeys.verpflegung(7))?.zeitfenster[0].ausgegeben
+        .gesamt,
+    ).toBe(100);
+  });
+});

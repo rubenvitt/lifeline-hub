@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  abschnittEintraege,
   befuellteAbschnitte,
   befuellungsKette,
   EDITOR_ZEILEN,
   fuellstandText,
+  gliederungEintraege,
   istLeer,
 } from './dokumentEntwurfKern';
 import { vorlage } from '../lageberichte/vorlagen';
@@ -58,5 +60,41 @@ describe('EDITOR_ZEILEN', () => {
   it('leer einzeilig, mit Obergrenze (danach rollt das Feld)', () => {
     expect(EDITOR_ZEILEN.minRows).toBe(1);
     expect(EDITOR_ZEILEN.maxRows).toBeGreaterThan(1);
+  });
+});
+
+describe('Einträge eines Abschnitts (LLH-1601, eine Quelle für ⋮ und Kontextmenü)', () => {
+  const voll = { leer: false, kopierbar: true, ansicht: 'bearbeiten' } as const;
+
+  it('nennt Kopieren, Lesefassung und rot das Leeren, in dieser Folge', () => {
+    expect(abschnittEintraege(voll)).toEqual([
+      { key: 'kopieren', label: 'Text kopieren' },
+      { key: 'lesefassung', label: 'In der Lesefassung zeigen' },
+      { key: 'leeren', label: 'Abschnitt leeren', gefahr: true },
+    ]);
+  });
+
+  it('sperrt „Text kopieren“ bei leerem Abschnitt und ohne Zwischenablage', () => {
+    const ohne = abschnittEintraege({ ...voll, kopierbar: false });
+    expect(ohne.filter((e) => e.gesperrt).map((e) => e.key)).toEqual(['kopieren']);
+  });
+
+  it('sperrt bei leerem Abschnitt Kopieren und Leeren, die Lesefassung bleibt', () => {
+    // Leeren eines leeren Abschnitts meldete eine Änderung, die keine ist (Autosave ohne Inhalt).
+    const leer = abschnittEintraege({ ...voll, leer: true });
+    expect(leer.filter((e) => e.gesperrt).map((e) => e.key)).toEqual(['kopieren', 'leeren']);
+  });
+
+  it('lässt „In der Lesefassung zeigen“ weg, wenn die Lesefassung gewählt ist', () => {
+    expect(abschnittEintraege({ ...voll, ansicht: 'lesen' }).map((e) => e.key)).toEqual([
+      'kopieren',
+      'leeren',
+    ]);
+  });
+
+  it('stellt in der Gliederung „Zum Abschnitt springen“ voran', () => {
+    const g = gliederungEintraege(voll);
+    expect(g[0]).toEqual({ key: 'springen', label: 'Zum Abschnitt springen' });
+    expect(g.slice(1)).toEqual(abschnittEintraege(voll));
   });
 });

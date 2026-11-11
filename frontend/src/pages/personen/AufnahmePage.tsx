@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfBeantragen } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { registrierAnzeige } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -102,6 +102,9 @@ export default function AufnahmePage() {
     onSuccess: (ergebnis, { einsatzId }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         setQuittung({ einsatzId, text: 'Offline vorgemerkt · R-…' });
+      } else if (ergebnis.zustand === 'beantragt') {
+        // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+        setQuittung({ einsatzId, text: 'Beantragt · R-…' });
       } else {
         const person = ergebnis.daten;
         const zusatz =
@@ -158,7 +161,8 @@ export default function AufnahmePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Die Aufnahme ist eine Erfassung: am Spiegel ein Antrag (LLH-1492, D13).
+  const darfSchreiben = darfBeantragen(einsatz);
 
   return (
     <EinsatzSeite
@@ -184,9 +188,7 @@ export default function AufnahmePage() {
           />
         )
       }
-      hinweis={
-        !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-      }
+      hinweis={!darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />}
     >
       {quittung?.einsatzId === einsatzId && (
         // Stehende Quittung statt Toast: an ihr wird die Registriernummer abgelesen.

@@ -9,6 +9,8 @@ import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
 import { useState } from 'react';
+import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
+import { useKontextMenue } from '../components/useKontextMenue';
 import type { MeldeWeg } from '../api/types';
 import { MELDEWEG_OPTIONEN, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
 import BuchstabierHilfe from './BuchstabierHilfe';
@@ -37,6 +39,20 @@ const CHIP_MENUE_STANDARD: readonly MenueEintrag<ChipAktion>[] = [
  * („Nur für diesen Eintrag ändern“, „Standard-Rufname ändern“).
  */
 const STANDARD_TITEL = 'Standard-Rufname: für jeden neuen Eintrag';
+
+/**
+ * Einträge des Chips, EINE Liste für ⋮ und Kontextmenü (LLH-1597, design.md D5). Der Schnellweg
+ * (Klick = Bearbeiten) steht schon darin, er kommt nicht doppelt.
+ */
+function chipMenue(
+  ausStandard: boolean,
+  standardAendernMoeglich: boolean,
+): readonly MenueEintrag<ChipAktion>[] {
+  if (!ausStandard) return CHIP_MENUE;
+  return standardAendernMoeglich
+    ? CHIP_MENUE_STANDARD
+    : CHIP_MENUE_STANDARD.filter((e) => e.key !== 'standard');
+}
 
 interface Props {
   feld: MetaFeld;
@@ -124,6 +140,26 @@ export default function MetaChip({
   const { rollen } = useRollen();
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
   const { konventionen } = useAnzeigeKonventionen();
+  const eintraege = chipMenue(ausStandard, onStandardAendern != null);
+  const waehle = (key: ChipAktion) => {
+    if (key === 'bearbeiten') onEdit(feld);
+    if (key === 'entfernen') onRemove(feld);
+    if (key === 'standard') onStandardAendern?.();
+  };
+  /*
+   * Kontextmenü am Chip (LLH-1597, Spec `datensatz-aktionsmenue`): Rechtsklick und Tasten, kein
+   * langer Druck (ETB, abgestimmt mit Ruben am 09.11.2026). Während des Sendens ist der ⋮-Auslöser
+   * gesperrt; das Kontextmenü zeigt dieselben Einträge gesperrt. Im Bearbeiten-Zustand steht kein
+   * `Tag` und damit kein Auslöser: im Eingabefeld bleibt das Browsermenü.
+   */
+  const [kontext, setKontext] = useState<KontextMenueOffen | null>(null);
+  const kontextAusloeser = useKontextMenue<MetaFeld>({
+    langerDruck: false,
+    onOeffnen: (_feld, { anker, vorherFokus }) => {
+      setKontext({ anker, vorherFokus });
+      return true;
+    },
+  });
 
   if (editing) {
     if (d.editor === 'text') {
@@ -219,13 +255,15 @@ export default function MetaChip({
   }
 
   return (
-    <Tag
-      title={ausStandard ? STANDARD_TITEL : undefined}
-      data-standard={ausStandard ? 'ja' : undefined}
-      // Die Kante als zweiter Kanal neben dem Wort (WCAG 1.4.1).
-      style={grund ? { borderColor: rollen.alarm } : undefined}
-    >
-      {/* Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip.
+    <>
+      <Tag
+        {...kontextAusloeser<HTMLSpanElement>(feld)}
+        title={ausStandard ? STANDARD_TITEL : undefined}
+        data-standard={ausStandard ? 'ja' : undefined}
+        // Die Kante als zweiter Kanal neben dem Wort (WCAG 1.4.1).
+        style={grund ? { borderColor: rollen.alarm } : undefined}
+      >
+        {/* Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip.
 
          Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und das Menü-Overlay IST
          ein Nachfahre: ein Synthetic Event steigt durch den Komponentenbaum auf, auch über die
@@ -236,36 +274,34 @@ export default function MetaChip({
          deshalb an einem Geschwisterknoten des Menüs, ohne `stopPropagation`. Der Portal-Riegel in
          `components/MenueAusloeser.tsx` (LFH-683) fängt denselben Fall noch einmal; er ist die
          zweite Sicherung, nicht der Grund, den Schnellweg zurück an den `<Tag>` zu hängen. */}
-      <span
-        onClick={gesperrt ? undefined : () => onEdit(feld)}
-        style={{ cursor: gesperrt ? 'default' : 'pointer' }}
-      >
-        {d.label}: {anzeige(feld, wert, konventionen)}
-      </span>
-      {grund && (
-        <span role="alert" data-lfh="chip-grund" style={{ color: rollen.alarmText }}>
-          {' '}
-          · {grund}
+        <span
+          onClick={gesperrt ? undefined : () => onEdit(feld)}
+          style={{ cursor: gesperrt ? 'default' : 'pointer' }}
+        >
+          {d.label}: {anzeige(feld, wert, konventionen)}
         </span>
-      )}
-      {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
+        {grund && (
+          <span role="alert" data-lfh="chip-grund" style={{ color: rollen.alarmText }}>
+            {' '}
+            · {grund}
+          </span>
+        )}
+        {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
          „Bearbeiten" daneben legt es wieder an (LFH-363). */}
-      <MenueAusloeser
-        eintraege={
-          !ausStandard
-            ? CHIP_MENUE
-            : onStandardAendern
-              ? CHIP_MENUE_STANDARD
-              : CHIP_MENUE_STANDARD.filter((e) => e.key !== 'standard')
-        }
+        <MenueAusloeser
+          eintraege={eintraege}
+          zugaenglicherName={`Aktionen zu ${d.label}`}
+          gesperrt={gesperrt}
+          onWahl={waehle}
+        />
+      </Tag>
+      <KontextMenue
+        offen={kontext}
+        eintraege={gesperrt ? eintraege.map((e) => ({ ...e, gesperrt: true })) : eintraege}
         zugaenglicherName={`Aktionen zu ${d.label}`}
-        gesperrt={gesperrt}
-        onWahl={(key) => {
-          if (key === 'bearbeiten') onEdit(feld);
-          if (key === 'entfernen') onRemove(feld);
-          if (key === 'standard') onStandardAendern?.();
-        }}
+        onWahl={waehle}
+        onSchliessen={() => setKontext(null)}
       />
-    </Tag>
+    </>
   );
 }

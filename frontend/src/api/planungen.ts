@@ -12,9 +12,10 @@ import type {
   PlanungPostenBody,
   PlanungUebernahmeBody,
   PlanungUebernahmeErgebnis,
+  PlanungUebernahmeVorschau,
+  PlanungUebernehmenBody,
   Programmpunkt,
   SchichtplanHelfer,
-  SchichtplanImportVorschau,
   SchichtplanHelferAendernBody,
   SchichtplanHelferBody,
 } from './types';
@@ -145,19 +146,23 @@ export function loeschePlanungProgrammpunkt(id: number, punktId: number): Promis
 /**
  * Vorschau der Übernahme in einen neuen oder laufenden Einsatz (LLH-1587): schreibt nichts,
  * Fehler stehen in der Antwort (`uebernehmbar: false`). Ein fremder Einsatz ist 404, ohne
- * Schreibrecht 403, ein abgeschlossener oder eine schon übernommene Planung 409.
+ * Schreibrecht 403, ein abgeschlossener oder eine schon übernommene Planung 409. `stand` ist der
+ * Stand der Planung, auf dem sie beruht (LLH-1610).
  */
 export function planungUebernahmeVorschau(
   id: number,
   body: PlanungUebernahmeBody,
-): Promise<SchichtplanImportVorschau> {
-  return apiSend<SchichtplanImportVorschau>(`${basis(id)}/uebernahme/vorschau`, 'POST', body);
+): Promise<PlanungUebernahmeVorschau> {
+  return apiSend<PlanungUebernahmeVorschau>(`${basis(id)}/uebernahme/vorschau`, 'POST', body);
 }
 
-/** Übernimmt in EINER Transaktion; danach ist die Planung schreibgeschützt (jeder Schreibweg 409). */
+/**
+ * Übernimmt in EINER Transaktion; danach ist die Planung schreibgeschützt (jeder Schreibweg 409).
+ * Hat sich die Planung seit der Vorschau (`stand`) geändert, 409 (LLH-1610).
+ */
 export function planungUebernehmen(
   id: number,
-  body: PlanungUebernahmeBody,
+  body: PlanungUebernehmenBody,
 ): Promise<PlanungUebernahmeErgebnis> {
   return apiSend<PlanungUebernahmeErgebnis>(`${basis(id)}/uebernahme`, 'POST', body);
 }

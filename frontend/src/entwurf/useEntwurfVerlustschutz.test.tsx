@@ -14,6 +14,7 @@ interface Daten {
 
 interface TraegerProps {
   daten: Daten;
+  geladenAm: number;
   speichern: (w: Daten) => Promise<unknown>;
   istEntwurf?: boolean;
 }
@@ -26,12 +27,13 @@ interface TraegerProps {
  * Klick nimmt dem FELD zuerst den Fokus (Blur-Autosave), dann kommt `form.submit()` — die
  * Zähler im Bild prüfen „genau eine Quittung" ohne Mock-Zugriff.
  */
-function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
+function Traeger({ daten, geladenAm, speichern, istEntwurf = true }: TraegerProps) {
   const [form] = Form.useForm<Daten>();
   const [quittungen, setQuittungen] = useState(0);
   const [ablehnungen, setAblehnungen] = useState(0);
   const schutz = useEntwurfVerlustschutz<Daten, Daten>({
     daten,
+    geladenAm,
     istEntwurf,
     form,
     werteAus: (d) => ({ titel: d.titel }),
@@ -68,6 +70,24 @@ function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
   );
 }
 
+/** Ladezeitpunkt wie `dataUpdatedAt`: die Uhr, aber je Laden streng steigend. */
+let zuletztGeladen = 0;
+const lade = () => (zuletztGeladen = Math.max(Date.now(), zuletztGeladen + 1));
+
+/**
+ * Der Serverstand samt Ladezeitpunkt, wie die Seiten ihn aus der Query reichen. `uhrSteht`: jedes
+ * Laden bekommt denselben Zeitpunkt, wie unter Fake-Timern oder im Bilderlauf.
+ */
+function useServerstand(start: Daten, uhrSteht = false) {
+  const zeitpunkt = () => (uhrSteht ? 0 : lade());
+  const [stand, setStand] = useState(() => ({ daten: start, geladenAm: zeitpunkt() }));
+  /** Ein Laden mit neuem Inhalt. */
+  const setze = (daten: Daten) => setStand({ daten, geladenAm: zeitpunkt() });
+  /** Ein Laden mit gleichem Inhalt: React Query gäbe dieselbe Referenz zurück. */
+  const neuLaden = () => setStand((s) => ({ daten: s.daten, geladenAm: zeitpunkt() }));
+  return { ...stand, setze, neuLaden };
+}
+
 function Huelle({
   speichern = () => Promise.resolve(),
   istEntwurf,
@@ -75,13 +95,93 @@ function Huelle({
   speichern?: (w: Daten) => Promise<unknown>;
   istEntwurf?: boolean;
 }) {
-  const [daten, setDaten] = useState<Daten>({ titel: 'Server 1' });
+  const server = useServerstand({ titel: 'Server 1' });
   return (
     <>
-      <Traeger daten={daten} speichern={speichern} istEntwurf={istEntwurf} />
-      <button type="button" onClick={() => setDaten({ titel: 'Server 2' })}>
+      <Traeger
+        daten={server.daten}
+        geladenAm={server.geladenAm}
+        speichern={speichern}
+        istEntwurf={istEntwurf}
+      />
+      <button type="button" onClick={() => server.setze({ titel: 'Server 2' })}>
         fremd
       </button>
+      <button type="button" onClick={server.neuLaden}>
+        neu laden
+      </button>
+    </>
+  );
+}
+
+/**
+ * Hülle, deren Serverstand der Test frei setzt (`steuerung.setze`), etwa den Refetch eines
+ * eigenen älteren PATCH (LLH-1628).
+ */
+function HuelleMitServer({
+  speichern,
+  steuerung,
+  uhrSteht,
+}: {
+  speichern: (w: Daten) => Promise<unknown>;
+  steuerung: { setze: (d: Daten) => void };
+  uhrSteht?: boolean;
+}) {
+  const server = useServerstand({ titel: 'Server 1' }, uhrSteht);
+  steuerung.setze = server.setze;
+  return <Traeger daten={server.daten} geladenAm={server.geladenAm} speichern={speichern} />;
+}
+
+interface DatenMitNotiz extends Daten {
+  notiz?: string;
+}
+
+/**
+ * Träger mit einem zweiten Feld und einer Füllung, die es wie „Leere Abschnitte aus dem Lagebild
+ * füllen“ setzt: `setFieldValue` (kein `onValuesChange`) und EINMAL `markiereGeaendert`. Der
+ * Serverstand bleibt beim Test der alte, wie zwischen Quittung und Refetch.
+ */
+function HuelleMitFuellung({ speichern }: { speichern: (w: DatenMitNotiz) => Promise<unknown> }) {
+  const [form] = Form.useForm<DatenMitNotiz>();
+  const [daten] = useState<DatenMitNotiz>({ titel: 'Server 1' });
+  const [geladenAm] = useState(lade);
+  const schutz = useEntwurfVerlustschutz<DatenMitNotiz, DatenMitNotiz>({
+    daten,
+    geladenAm,
+    istEntwurf: true,
+    form,
+    werteAus: (d) => ({ titel: d.titel, notiz: d.notiz }),
+    speichern,
+  });
+  return (
+    <>
+      <Form
+        form={form}
+        onValuesChange={schutz.markiereGeaendert}
+        onBlur={schutz.autosaveJetzt}
+        onFinish={(w) => void schutz.speichereJetzt(w).catch(() => {})}
+      >
+        <Form.Item label="Titel" name="titel">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Notiz" name="notiz">
+          <Input />
+        </Form.Item>
+        <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
+      </Form>
+      <button
+        type="button"
+        onClick={() => {
+          form.setFieldValue('notiz', 'gefüllt');
+          schutz.markiereGeaendert();
+        }}
+      >
+        füllen
+      </button>
+      <button type="button" onClick={() => form.submit()}>
+        Entwurf speichern
+      </button>
+      <output>{schutz.ungespeichert ? 'offen' : 'sauber'}</output>
     </>
   );
 }
@@ -124,6 +224,72 @@ describe('useEntwurfVerlustschutz', () => {
     expect(speichern).toHaveBeenCalledWith({ titel: 'Server 1x' });
     expect(await screen.findByText('sauber')).toBeInTheDocument();
     expect(screen.getByText(/zuletzt gespeichert \d{4}/)).toBeInTheDocument();
+  });
+
+  it('setzt das Formular mit der Quittung NICHT auf den Serverstand vor dem PATCH zurück (LLH-1607)', async () => {
+    // Bis der Refetch nach der Invalidierung kommt, ist `daten` der Stand VOR dem PATCH. Fällt der
+    // Riegel mit der Quittung, darf er diesen alten Stand nicht ins Formular schreiben.
+    const speichern = vi.fn().mockResolvedValue(undefined);
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('sauber')).toBeInTheDocument();
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x');
+  });
+
+  it('hält die eigene Fassung, wenn nach der Quittung eine Füllung den Riegel schließt (LLH-1607)', async () => {
+    // Der Ablauf des Lagevortrags: Blur-Autosave mit dem Klick auf „Leere Abschnitte … füllen“,
+    // die Füllung kommt nach der Quittung und vor dem Refetch. Danach muss „Entwurf speichern“
+    // die eigene Fassung schicken, nicht den alten Serverstand.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
+    render(<HuelleMitFuellung speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab(); // Blur-Autosave mit „Server 1x“ hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      aufloesen();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('füllen')); // ändert ein anderes Feld, Riegel zu
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x');
+
+    speichern.mockResolvedValue(undefined);
+    await userEvent.click(speichernKnopf());
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1x', notiz: 'gefüllt' });
+  });
+
+  it('schreibt die fremde Änderung aus dem PATCH-Fenster mit dem Refetch nach der Quittung (LLH-1607, Gegenaussage)', async () => {
+    // Ein Stand, der während des PATCH eintraf, gilt nach der Quittung als überholt (LLH-1628),
+    // seine fremde Änderung kommt mit dem Refetch danach. Der liefert bei gleichem Inhalt DIESELBE
+    // Referenz (structural sharing); hinge die Regel an der Referenz statt am Ladezeitpunkt,
+    // bliebe das Formular still veraltet.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab(); // Blur-Autosave hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText('fremd')); // Riegel hält
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x');
+    await act(async () => {
+      aufloesen();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 1x'); // vor der Quittung geladen
+    fireEvent.click(screen.getByText('neu laden')); // Refetch nach der Invalidierung
+    expect(screen.getByLabelText('Titel')).toHaveValue('Server 2');
   });
 
   it('lässt den Merker stehen, wenn während des laufenden Autosave weitergetippt wurde', async () => {
@@ -240,8 +406,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('behandelt einen abgebrochenen Auftrag NICHT als Speicherfehler', async () => {
-    // `BefehlDetailPage` bricht die Speicherfolge beim Verlassen mit `AbortError` ab — kein Zustand,
-    // den jemand lesen soll.
+    // DIE SPEICHERFOLGE bricht vorgemerkte Aufträge beim Verlassen mit `AbortError` ab — kein
+    // Zustand, den jemand lesen soll.
     const speichern = vi.fn().mockRejectedValue(new DOMException('Editor verlassen', 'AbortError'));
     render(<Huelle speichern={speichern} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'x');
@@ -309,11 +475,13 @@ describe('useEntwurfVerlustschutz', () => {
   it('schickt einen EIGENEN PATCH, wenn seit dem laufenden Speichern getippt wurde (Gegenaussage)', async () => {
     // Ein Anhängen bei UNGLEICHEM Stand wäre eine Quittung über S1, während S2 im Formular steht;
     // ohne diese Hälfte wäre ein immer anhängender Riegel vom richtigen nicht zu unterscheiden.
-    let aufloesen: () => void = () => {};
+    // DIE SPEICHERFOLGE (LLH-1619): S2 startet erst, wenn S1 zurück ist — sonst könnte ein spätes
+    // S1 beim Server nach S2 ankommen und es überschreiben.
+    const aufloeser: Array<() => void> = [];
     const speichern = vi.fn(
       () =>
         new Promise<void>((r) => {
-          aufloesen = r;
+          aufloeser.push(r);
         }),
     );
     render(<Huelle speichern={speichern} />);
@@ -324,16 +492,175 @@ describe('useEntwurfVerlustschutz', () => {
 
     await userEvent.type(feld, 'b'); // S2 entsteht, während S1 unterwegs ist
     await userEvent.click(speichernKnopf());
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1); // S2 wartet hinter S1
+
+    await act(async () => {
+      aufloeser[0]();
+    });
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1ab' });
+    expect(screen.getByText('quittungen 0')).toBeInTheDocument(); // S2 noch nicht zurück
     await act(async () => {
-      aufloesen();
+      aufloeser[1]();
     });
+    expect(screen.getByText('quittungen 1')).toBeInTheDocument();
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+  });
+
+  it('lässt S2 nach einem GESCHEITERTEN S1 trotzdem los (Speicherfolge)', async () => {
+    // Ein Fehlschlag in der Folge darf den nächsten Versuch nicht sperren; der Grund fällt erst
+    // mit dem gelungenen S2.
+    let ablehnen: (e: Error) => void = () => {};
+    const speichern = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_r, nein) => {
+            ablehnen = nein;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+
+    await userEvent.type(feld, 'b');
+    await userEvent.tab(); // S2 reiht sich ein
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      ablehnen(new Error('503'));
+    });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1ab' });
+    expect(await screen.findByText('sauber')).toBeInTheDocument();
+    expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument();
+  });
+
+  it('schreibt mit der Quittung von S2 keinen Stand, der hereinkam, während S2 wartete', async () => {
+    // S2 wartet hinter S1; derweil kommt ein Serverstand herein, den S2 überschreibt. Schriebe
+    // die Quittung von S2 diesen Stand ins Formular, nähme sie die eben gesicherte Fassung zurück
+    // (LLH-1607 × LLH-1619).
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b');
+    await userEvent.tab(); // S2 reiht sich ein
+    await userEvent.click(screen.getByRole('button', { name: 'fremd' })); // Riegel hält
+    expect(feld).toHaveValue('Server 1ab');
+
+    await act(async () => {
+      aufloeser[0]();
+    });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      aufloeser[1]();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(feld).toHaveValue('Server 1ab');
+  });
+
+  it('schreibt nach der Quittung von S2 nicht den Refetch von S1 ins Formular (LLH-1628)', async () => {
+    // Die Quittung von S1 invalidiert, der Refetch R1 (Inhalt S1) kommt, während S2 noch läuft.
+    // Fällt mit der Quittung von S2 der Riegel, darf R1 nicht ins Formular: es zeigte S1, bis
+    // R2 kommt, und wer in diesem Fenster tippt, schriebe auf S1 weiter.
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
+    const steuerung: { setze: (d: Daten) => void } = { setze: () => {} };
+    render(<HuelleMitServer speichern={speichern} steuerung={steuerung} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab(); // S1 „Server 1a“ hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b');
+    await userEvent.tab(); // S2 „Server 1ab“ reiht sich ein
+
+    await act(async () => {
+      aufloeser[0]();
+    });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    act(() => steuerung.setze({ titel: 'Server 1a' })); // R1, während S2 läuft
+    expect(feld).toHaveValue('Server 1ab');
+
+    await act(async () => {
+      aufloeser[1]();
+    });
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(feld).toHaveValue('Server 1ab');
+    act(() => steuerung.setze({ titel: 'Server 1ab' })); // R2 nach der Quittung von S2
+    expect(feld).toHaveValue('Server 1ab');
+  });
+
+  it('übernimmt nach der Quittung eine fremde Änderung auch bei stehender Uhr (LLH-1628)', async () => {
+    // Steht die Uhr, trägt jedes Laden denselben Zeitpunkt. Am Zeitpunkt allein bliebe dann jede
+    // spätere fremde Änderung draußen; ein neuer Serverstand ist aber eine neue Referenz.
+    const jetzt = vi.spyOn(Date, 'now').mockReturnValue(0);
+    try {
+      const speichern = vi.fn().mockResolvedValue(undefined);
+      const steuerung: { setze: (d: Daten) => void } = { setze: () => {} };
+      render(<HuelleMitServer speichern={speichern} steuerung={steuerung} uhrSteht />);
+      const feld = screen.getByLabelText('Titel');
+      await userEvent.type(feld, 'x');
+      await userEvent.tab();
+      expect(await screen.findByText('sauber')).toBeInTheDocument();
+      expect(feld).toHaveValue('Server 1x'); // der Stand vor dem PATCH bleibt draußen
+      act(() => steuerung.setze({ titel: 'Server 2' }));
+      expect(feld).toHaveValue('Server 2');
+    } finally {
+      jetzt.mockRestore();
+    }
+  });
+
+  it('startet nach dem Verlassen keinen vorgemerkten PATCH mehr (Speicherfolge)', async () => {
+    // „Verwerfen“ hängt den Editor aus: S2 war nur vorgemerkt und darf nicht mehr hinaus. Der
+    // laufende S1 läuft zu Ende, er ist schon beim Server.
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
+    const { unmount } = render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b');
+    await userEvent.tab();
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      aufloeser[0]();
+    });
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
   });
 
   it('gibt den Riegel nur an den Auftrag zurück, der ihn HÄLT', async () => {
-    // Bei ungleichem Stand laufen zwei Speicherungen gleichzeitig. Kommt die ERSTE zurück, darf sie
-    // den Riegel nicht öffnen, sonst schickte der nächste Blur einen dritten PATCH neben die zweite.
+    // Bei ungleichem Stand stehen zwei Aufträge an, der zweite wartet in DER SPEICHERFOLGE. Kommt
+    // der ERSTE zurück, darf er den Riegel nicht öffnen, sonst schickte der nächste Blur einen
+    // dritten PATCH neben den zweiten.
     const aufloeser: Array<() => void> = [];
     const speichern = vi.fn(
       () =>
@@ -348,14 +675,16 @@ describe('useEntwurfVerlustschutz', () => {
     await userEvent.tab(); // Auftrag 1 (Stand 1) hängt
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
 
-    await userEvent.type(feld, 'b'); // Stand 2 — der Klick bekommt einen eigenen PATCH
+    await userEvent.type(feld, 'b'); // Stand 2 — der Klick bekommt einen eigenen Auftrag
     await userEvent.click(speichernKnopf());
-    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1); // Auftrag 2 wartet hinter Auftrag 1
 
-    // Auftrag 1 kommt zurück, Auftrag 2 hält den Riegel noch.
+    // Auftrag 1 kommt zurück, Auftrag 2 startet und hält den Riegel.
     await act(async () => {
       aufloeser[0]();
     });
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     expect(screen.getByText('speichert')).toBeInTheDocument();
 
     // Ein Blur mit UNVERÄNDERTEM Stand: Auftrag 2 trägt den Inhalt schon — es sei denn, Auftrag 1
@@ -386,7 +715,8 @@ describe('useEntwurfVerlustschutz', () => {
         vi.advanceTimersByTime(AUTOSAVE_MS - 1);
       });
       expect(speichern).not.toHaveBeenCalled();
-      act(() => {
+      // Asynchron: DIE SPEICHERFOLGE startet den PATCH eine Mikroaufgabe später.
+      await act(async () => {
         vi.advanceTimersByTime(1);
       });
       expect(speichern).toHaveBeenCalledTimes(1);

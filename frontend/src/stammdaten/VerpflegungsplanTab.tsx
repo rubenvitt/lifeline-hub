@@ -13,7 +13,8 @@ import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { WeitereAktionen } from '../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
@@ -73,6 +74,26 @@ function VerpflegungsplanInhalt() {
   });
   const schalte = (m: VerpflegungVorlage, aktiv: boolean) => schalten.mutate({ m, aktiv });
   const bearbeiten = (m: VerpflegungVorlage) => setDialog({ mahlzeit: m });
+
+  /**
+   * Aktionen einer Zeile, EINE Quelle für das schmale ⋮ und das Kontextmenü auf jeder Breite
+   * (LLH-1599, `KatalogTabelle.zeilenMenue`). Breit stehen dieselben Handlungen als Knöpfe in der
+   * Aktionsspalte; der Test der Seite hält beide gleich (design.md D4).
+   */
+  const zeilenMenue: WeitereAktionen<VerpflegungVorlage> = {
+    // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+    eintraege: (m) =>
+      herkunft.istVomHub('verpflegung_vorlage', m.id)
+        ? []
+        : [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            m.aktiv
+              ? { key: 'schalten', label: 'Deaktivieren', gefahr: true }
+              : { key: 'schalten', label: 'Aktivieren' },
+          ],
+    zugaenglicherName: (m) => `Aktionen zu Mahlzeit ${m.bezeichnung}`,
+    onWahl: (aktion, m) => (aktion === 'bearbeiten' ? bearbeiten(m) : schalte(m, !m.aktiv)),
+  };
 
   const spalten: KatalogSpalte<VerpflegungVorlage>[] = [
     {
@@ -149,18 +170,7 @@ function VerpflegungsplanInhalt() {
               herkunft.istVomHub('verpflegung_vorlage', m.id) ? (
                 <VomHubGesperrt />
               ) : istSchmal ? (
-                <MenueAusloeser
-                  eintraege={[
-                    { key: 'bearbeiten' as const, label: 'Bearbeiten' },
-                    m.aktiv
-                      ? { key: 'schalten' as const, label: 'Deaktivieren', gefahr: true as const }
-                      : { key: 'schalten' as const, label: 'Aktivieren' },
-                  ]}
-                  zugaenglicherName={`Aktionen zu Mahlzeit ${m.bezeichnung}`}
-                  onWahl={(aktion) =>
-                    aktion === 'bearbeiten' ? bearbeiten(m) : schalte(m, !m.aktiv)
-                  }
-                />
+                <ZeilenMenueAusloeser menue={zeilenMenue} zeile={m} />
               ) : (
                 <Space size="middle">
                   <Button onClick={() => bearbeiten(m)}>Bearbeiten</Button>
@@ -219,6 +229,7 @@ function VerpflegungsplanInhalt() {
           mehrzahl="Mahlzeiten"
           locale={{ emptyText: 'Noch keine Mahlzeiten' }}
           suche={{ platzhalter: 'Bezeichnung' }}
+          zeilenMenue={istAdmin ? zeilenMenue : undefined}
         />
       )}
       {dialog && (

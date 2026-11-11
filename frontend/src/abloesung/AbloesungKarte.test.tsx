@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { Abloesung } from '../api/types';
@@ -590,5 +590,61 @@ describe('AbloesungKarte — laut Schichtplan (LLH-1555)', () => {
     zeigeMitMenue(schicht());
     expect(zeile().querySelector('[data-lfh="abloesung-rhythmus-wert"]')).not.toBeNull();
     expect(await menue()).toEqual(['Ablösung planen', 'Rhythmus ändern']);
+  });
+});
+
+describe('AbloesungKarte — Kontextmenü (LLH-1598)', () => {
+  const kontextMenue = async () => {
+    await warteAufMenueFokus();
+    return within(offenesMenue()).getByRole('menu');
+  };
+  const rechtsklick = () =>
+    fireEvent.contextMenu(screen.getByText('Zug 1'), { clientX: 20, clientY: 20, button: 2 });
+
+  it('laufende Schicht: „Ablösung vollziehen“ vor den Einträgen des ⋮', async () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={schicht()}
+        jetzt={jetzt}
+        darfSchreiben
+        onVollziehen={() => {}}
+        onAbloeserPlanen={() => {}}
+        onRhythmusAendern={() => {}}
+      />,
+    );
+    expect(rechtsklick()).toBe(false);
+    const menue = await kontextMenue();
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Zug 1');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Ablösung vollziehen', 'Ablösung planen', 'Rhythmus ändern']);
+  });
+
+  it('abgelöste Schicht mit Rücknahme: nur „Vollzug zurücknehmen“, die Wahl löst sie aus', async () => {
+    const onZuruecknehmen = vi.fn();
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={schicht({ status: 'abgeloest', ruecknehmbar: true })}
+        jetzt={jetzt}
+        darfSchreiben
+        onZuruecknehmen={onZuruecknehmen}
+      />,
+    );
+    rechtsklick();
+    const menue = await kontextMenue();
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Vollzug zurücknehmen']);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Vollzug zurücknehmen' }));
+    expect(onZuruecknehmen).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Schreibrecht bleibt das Browsermenü', () => {
+    zeige(schicht(), false);
+    expect(rechtsklick()).toBe(true);
   });
 });

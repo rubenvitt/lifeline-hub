@@ -86,7 +86,7 @@ const AUTH_CODE_BODY_MAX: usize = 4 * 1024;
 /// Body-Limit jeder Route ohne eigenes (LFH-1074, `src/AGENTS.md`, Eingabegrenzen). Kein
 /// legitimer JSON-Body erreicht es: ETB-Eingänge tragen höchstens 80 KB, die übrigen weniger.
 /// Darüber lehnt `JsonBody` mit 413 ab, bevor der Handler läuft.
-const JSON_BODY_MAX: usize = 256 * 1024;
+pub const JSON_BODY_MAX: usize = 256 * 1024;
 
 /// Schichtplan einlesen (LLH-1556): die Datei bis 2 MiB
 /// (`abloesung::schichtplan::uebernahme::DATEI_MAX_BYTES`) plus Entscheidungen und Rahmen. So
@@ -1895,6 +1895,22 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             crate::instanz::extractor::MELDEN_PFAD,
             post(routes::instanz::melden),
         )
+        // Anträge am Spiegel (LLH-1492): lesen und verwerfen.
+        .route(
+            "/api/einsaetze/{id}/antraege",
+            get(routes::instanz::antraege_liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/antraege/{antrag_id}",
+            delete(routes::instanz::antrag_verwerfen),
+        )
+        // Abgleich der Einsätze (LLH-1492): Pakete bis `SPIEGEL_MAX`, signiert wie Melden.
+        .route(
+            crate::instanz::extractor::SPIEGEL_PFAD,
+            post(routes::instanz::spiegel_abgleich).layer(DefaultBodyLimit::max(
+                crate::instanz::spiegel::paket::SPIEGEL_MAX,
+            )),
+        )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(
             "/api/organisation",
@@ -2452,7 +2468,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         );
 
     let heic_decoder = opt.heic_decoder_verzeichnis.clone().map(Arc::new);
-    router
+    let router_platz = crate::instanz::spiegel::antrag::RouterPlatz::default();
+    let router: Router = router
         .fallback(move |uri: axum::http::Uri, kopf: axum::http::HeaderMap| {
             crate::static_files::serve(uri, kopf, heic_decoder.clone())
         })
@@ -2487,6 +2504,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             routes::live::stammdaten_live,
+        ))
+        // Anträge am Spiegel (LLH-1492, D9): eine beantragbare Erfassung an einem gespiegelten
+        // Einsatz wird zum Antrag, bevor die Route schreibt. `MatchedPath` ist gesetzt.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::instanz::spiegel::antrag::schicht,
         ))
         // Zulassungssteuerung: Zeitbudget und Gleichzeitigkeits-Cap mit Lastabwurf. Muss AUSSERHALB
         // des `CatchPanicLayer` liegen, damit sie dessen 500-Antwort bekommt statt eines Unwinds.
@@ -2534,7 +2557,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 axum::http::HeaderValue::from_static("nosniff"),
             ),
         )
-        .with_state(state)
+        // Platz für den fertigen Router (LLH-1492, D11): der Führer führt Anträge darüber aus.
+        .layer(axum::Extension(router_platz.clone()))
+        .with_state(state);
+    let _ = router_platz.0.set(router.clone());
+    router
 }
 
 /// Ab dieser Größe (Bytes) wird eine JSON-Antwort komprimiert (LFH-940); darunter kostet das

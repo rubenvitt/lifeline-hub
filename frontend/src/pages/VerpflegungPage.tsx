@@ -55,7 +55,7 @@ import {
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useVorgemerkteAusgaben, type VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import {
   geraetMeldungenPfad,
@@ -487,7 +487,7 @@ export default function VerpflegungPage() {
                   }
                 : {
                     key: 'aus-vorlage',
-                    label: `Tag aus Vorlage anlegen (${verpflegungRechteText(einsatz.status)})`,
+                    label: `Tag aus Vorlage anlegen (${verpflegungRechteText(einsatz)})`,
                     onWahl: () => {},
                     gesperrt: true,
                   },
@@ -499,7 +499,7 @@ export default function VerpflegungPage() {
         (!darfSchreiben || ruecknahmeFehler != null) && (
           <SeitenHinweise
             rechteFehlt={!darfSchreiben}
-            rechteText={verpflegungRechteText(einsatz.status)}
+            rechteText={verpflegungRechteText(einsatz)}
             fehler={ruecknahmeFehler}
             fehlerTitel="Nicht zurückgenommen"
             fehlerFallback="Rücknahme fehlgeschlagen"
@@ -633,6 +633,8 @@ export default function VerpflegungPage() {
                 zeitfenster={zf}
                 jetzt={jetzt}
                 darfSchreiben={darfSchreiben}
+                // Ausgeben ist am Spiegel ein Antrag (LLH-1492, D13).
+                darfAusgeben={darfBeantragen(einsatzQuery.data)}
                 nachforderungenFrei={nachforderungenFrei}
                 nachforderungName={(nfId) => nachforderungNamen.get(nfId)}
                 onAusgabeNachtragen={(x) => {

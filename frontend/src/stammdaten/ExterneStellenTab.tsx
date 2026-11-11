@@ -6,7 +6,8 @@ import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
-import { MenueAusloeser } from '../components/MenueAusloeser';
+import type { WeitereAktionen } from '../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
@@ -58,6 +59,30 @@ export default function ExterneStellenTab() {
   const bearbeiten = (s: ExterneStelle) => {
     setBearbeite(s);
     setModalOffen(true);
+  };
+
+  /**
+   * Aktionen einer Zeile, EINE Quelle für das schmale ⋮ und das Kontextmenü auf jeder Breite
+   * (LLH-1599, `KatalogTabelle.zeilenMenue`). Breit stehen dieselben Handlungen als Knöpfe in der
+   * Aktionsspalte; der Test der Seite hält beide gleich (design.md D4).
+   */
+  const zeilenMenue: WeitereAktionen<ExterneStelle> = {
+    // Vom Hub gepflegt: keine Aktionen, auch nicht im Kontextmenü.
+    eintraege: (s) =>
+      herkunft.istVomHub('externe_stelle', s.id)
+        ? []
+        : [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            s.aktiv
+              ? { key: 'deaktivieren', label: 'Deaktivieren', gefahr: true }
+              : { key: 'aktivieren', label: 'Aktivieren' },
+          ],
+    zugaenglicherName: (s) => `Aktionen zu ${s.bezeichnung}`,
+    onWahl: (aktion, s) => {
+      if (aktion === 'bearbeiten') bearbeiten(s);
+      else if (aktion === 'deaktivieren') setZuDeaktivieren(s);
+      else aktivMutation.mutate({ id: s.id, aktiv: true });
+    },
   };
 
   const spalten: KatalogSpalte<ExterneStelle>[] = [
@@ -150,24 +175,7 @@ export default function ExterneStellenTab() {
               herkunft.istVomHub('externe_stelle', s.id) ? (
                 <VomHubGesperrt />
               ) : istSchmal ? (
-                <MenueAusloeser
-                  eintraege={[
-                    { key: 'bearbeiten' as const, label: 'Bearbeiten' },
-                    s.aktiv
-                      ? {
-                          key: 'deaktivieren' as const,
-                          label: 'Deaktivieren',
-                          gefahr: true as const,
-                        }
-                      : { key: 'aktivieren' as const, label: 'Aktivieren' },
-                  ]}
-                  zugaenglicherName={`Aktionen zu ${s.bezeichnung}`}
-                  onWahl={(aktion) => {
-                    if (aktion === 'bearbeiten') bearbeiten(s);
-                    else if (aktion === 'deaktivieren') setZuDeaktivieren(s);
-                    else aktivMutation.mutate({ id: s.id, aktiv: true });
-                  }}
-                />
+                <ZeilenMenueAusloeser menue={zeilenMenue} zeile={s} />
               ) : (
                 <Space size="middle">
                   <Button onClick={() => bearbeiten(s)}>Bearbeiten</Button>
@@ -237,6 +245,7 @@ export default function ExterneStellenTab() {
           locale={{ emptyText: 'Noch keine externen Stellen' }}
           suche={{ platzhalter: 'Bezeichnung, Rufnummer oder Funkrufname' }}
           spaltenSchalter={{ bezeichnung: 'Externe Stellen' }}
+          zeilenMenue={istAdmin ? zeilenMenue : undefined}
         />
       )}
       <Modal

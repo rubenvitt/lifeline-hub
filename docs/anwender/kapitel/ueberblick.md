@@ -2,7 +2,7 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
 ---
 
 ## Überblick
@@ -93,9 +93,13 @@ trägt dazu einen roten Rand links und das Wort „überfällig“. Ein Klick au
 ihn im Modul, hervorgehoben. Alle weiteren erreicht „alle ↗“. Steht „keine“, gibt es nichts Offenes. Steht „ohne Netz nicht geladen“, war
 die Liste ohne Verbindung noch nie geladen; das heißt nicht, dass nichts offen ist.
 
-„meine Stelle“ zeigt die Vorgänge, die an eine eigene Funktion gehen (die besetzten Sachgebiete,
-als Einsatzleitung ohne Sachgebiet „EL“) oder selbst angelegt wurden; bei Nachforderungen nur die
-selbst angelegten. Ablösungen gehören zu keiner Stelle und bleiben vollständig stehen („alle Stellen“).
+„meine Stelle“ zeigt die Vorgänge, die an die eigene Funktion gehen oder selbst angelegt wurden;
+bei Nachforderungen nur die selbst angelegten. Die eigene Funktion ist die Funktion der
+Mitgliedschaft im Einsatz (gepflegt im Reiter „Zugriff“, Spalte „Führungsstelle“: EL, S1 bis S7,
+Führungshilfspersonal oder Fachberater); ohne Funktion gilt „EL“, wenn die Person die Rolle Einsatzleitung trägt. Bei
+Fachberater und Führungshilfspersonal muss auch die Bezeichnung passen: Der Fachberater THW sieht
+den Auftrag an „Fachberater: THW“, nicht den an „Fachberater: Polizei“. Ablösungen gehören zu
+keiner Stelle und bleiben vollständig stehen („alle Stellen“).
 
 ### Nächste Marken
 

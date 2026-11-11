@@ -515,6 +515,13 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_WEB_PUSH_KONTAKT")]
     pub web_push_kontakt: Option<String>,
 
+    /// Kontakt des Betreibers dieser Installation (LLH-1547), z. B. `betrieb@example.org`. Steht
+    /// in der Kennung (`User-Agent`) jedes ausgehenden Abrufs, damit ein Dienst wie der
+    /// öffentliche Nominatim bei zu vielen Anfragen den Betreiber erreicht, statt die Kennung
+    /// aller Installationen zu sperren. Ohne Angabe nur Projektadresse und Softwarestand.
+    #[arg(long, env = "LIFELINE_BETREIBER_KONTAKT")]
+    pub betreiber_kontakt: Option<String>,
+
     /// Name dieser Instanz, wie gekoppelte Instanzen sie anzeigen (LLH-1490, Spec
     /// `instanz-kopplung`), z. B. „ELW 1 DRK Nord“ oder „Hub DRK Landesverband“. Ohne Angabe die
     /// WebAuthn-RP-ID, sonst „Lifeline Hub“.
@@ -530,6 +537,17 @@ pub struct Config {
         value_parser = clap::value_parser!(u64).range(10..=3600)
     )]
     pub instanz_melden_sekunden: u64,
+
+    /// Abstand in Sekunden des Abgleichs gespiegelter Einsätze, solange an einer Kopplung ein
+    /// Einsatz aktiv ist oder etwas aussteht (LLH-1492, design.md D12); sonst gilt der Abstand der
+    /// Meldung. Bei Fehlern verdoppelt er sich bis zehn Minuten.
+    #[arg(
+        long,
+        env = "LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN",
+        default_value_t = 5,
+        value_parser = clap::value_parser!(u64).range(2..=600)
+    )]
+    pub instanz_spiegel_sekunden: u64,
 
     /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
     /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
@@ -701,6 +719,17 @@ impl Config {
         }
         crate::web_push::kontakt_pruefen(kontakt).map_err(anyhow::Error::msg)?;
         Ok(Some(kontakt.to_owned()))
+    }
+
+    /// Der Betreiberkontakt für die Kennung ausgehender Abrufe (LLH-1547); `None` ohne Angabe
+    /// oder bei leerer Angabe. Ein unzulässiger Kontakt bricht den Start mit Text ab.
+    pub fn betreiber_kontakt(&self) -> anyhow::Result<Option<String>> {
+        match self.betreiber_kontakt.as_deref().map(str::trim) {
+            None | Some("") => Ok(None),
+            Some(kontakt) => crate::ausgehend::kontakt_pruefen(kontakt)
+                .map(Some)
+                .map_err(anyhow::Error::msg),
+        }
     }
 
     /// Ob Cookies prozessweit `Secure` tragen (LFH-603): bei eigenem TLS oder mit
@@ -881,6 +910,25 @@ mod tests {
         assert_eq!(c.instanz_melden_sekunden, 10);
     }
 
+    /// Der Abgleich der Einsätze läuft per Vorgabe alle 5 s (LLH-1492, D12), höchstens alle 2 s.
+    #[test]
+    fn instanz_spiegel_vorgabe_und_grenzen() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert_eq!(c.instanz_spiegel_sekunden, 5);
+        assert!(
+            try_parse_mit_env("LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN", "1", &["lifeline-hub"]).is_err()
+        );
+        assert!(try_parse_mit_env(
+            "LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN",
+            "601",
+            &["lifeline-hub"]
+        )
+        .is_err());
+        let c =
+            try_parse_mit_env("LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN", "2", &["lifeline-hub"]).unwrap();
+        assert_eq!(c.instanz_spiegel_sekunden, 2);
+    }
+
     /// Web Push ist per Vorgabe aus (LLH-1223); mit Schalter ist der Kontakt Pflicht und muss
     /// `mailto:` oder `https://` sein.
     #[test]
@@ -914,6 +962,36 @@ mod tests {
         }
         assert!(parse_mit_env("LIFELINE_WEB_PUSH", "true", &["lifeline-hub"]).web_push);
         assert!(try_parse_mit_env("LIFELINE_WEB_PUSH", "1", &["lifeline-hub"]).is_err());
+    }
+
+    /// Der Betreiberkontakt ist optional (LLH-1547); gesetzt wird er getrimmt übernommen, ein
+    /// unzulässiger Kontakt bricht den Start ab.
+    #[test]
+    fn betreiber_kontakt_optional_und_geprueft() {
+        assert_eq!(
+            parse_hermetisch(["lifeline-hub"])
+                .betreiber_kontakt()
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            parse_hermetisch(["lifeline-hub", "--betreiber-kontakt", "  "])
+                .betreiber_kontakt()
+                .unwrap(),
+            None
+        );
+        let c = parse_mit_env(
+            "LIFELINE_BETREIBER_KONTAKT",
+            " betrieb@example.org ",
+            &["lifeline-hub"],
+        );
+        assert_eq!(
+            c.betreiber_kontakt().unwrap().as_deref(),
+            Some("betrieb@example.org")
+        );
+        let falsch = parse_hermetisch(["lifeline-hub", "--betreiber-kontakt", "a (b)"]);
+        let fehler = falsch.betreiber_kontakt().unwrap_err().to_string();
+        assert!(fehler.contains("--betreiber-kontakt"), "{fehler}");
     }
 
     /// Der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar. Die Env nimmt nur

@@ -3,6 +3,12 @@ import { act, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders, setzeOnline } from '../test/utils';
+import {
+  eintraegeVon,
+  erwarteBrowsermenue,
+  oeffneKontextmenue,
+  trennerVon,
+} from '../test/kontextmenue';
 import KommunikationsplanPage from './KommunikationsplanPage';
 import {
   ladeEinsatz,
@@ -911,5 +917,61 @@ describe('KommunikationsplanPage — Katalog „Externe Stellen“ (LLH-1165)', 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     // Die Stelle steht schon: der Plan wird neu geholt, statt die Maske ein zweites Mal anlegen zu lassen.
     await waitFor(() => expect(ladeKommunikationsplan).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('KommunikationsplanPage — Kontextmenü (LLH-1599, D7)', () => {
+  it('Rechtsklick auf eine gepflegte Stelle: „+ Verbindung“ oben, dann das ⋮, „Stelle entfernen“ rot', async () => {
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    const polizei = zeile(container, 'st-2');
+    const menue = await oeffneKontextmenue(within(polizei).getByText('0421 111').closest('td')!);
+    expect(menue).toHaveAttribute('aria-label', 'Weitere Aktionen zu Polizei PI Nord');
+    const eintraege = eintraegeVon(menue);
+    expect(eintraege[0]).toBe('+ Verbindung');
+    expect(eintraege[eintraege.length - 1]).toBe('rot:Stelle entfernen');
+    expect(trennerVon(menue)).toBe(1);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: '+ Verbindung' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Polizei PI Nord');
+  });
+
+  it('dieselben Einträge wie das ⋮ der Zeile', async () => {
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    const polizei = zeile(container, 'st-2');
+    await userEvent.click(
+      within(polizei).getByRole('button', { name: 'Weitere Aktionen zu Polizei PI Nord' }),
+    );
+    const ausloeserMenue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      if (!m) throw new Error('kein Menü');
+      return m;
+    });
+    const vomAusloeser = eintraegeVon(ausloeserMenue);
+    await userEvent.keyboard('{Escape}');
+    const kontext = await oeffneKontextmenue(within(polizei).getByText('0421 111').closest('td')!);
+    expect(eintraegeVon(kontext)).toEqual(['+ Verbindung', ...vomAusloeser]);
+  });
+
+  it('ohne Netz steht alles gesperrt im Kontextmenü', async () => {
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    setzeOnline(false);
+    const polizei = zeile(container, 'st-2');
+    await waitFor(() =>
+      expect(
+        within(polizei).getByRole('button', { name: 'Verbindung zu Polizei PI Nord hinzufügen' }),
+      ).toBeDisabled(),
+    );
+    const menue = await oeffneKontextmenue(within(polizei).getByText('0421 111').closest('td')!);
+    expect(eintraegeVon(menue).every((e) => e.endsWith('(gesperrt)'))).toBe(true);
+  });
+
+  it('Gruppenzeilen behalten das Browsermenü', async () => {
+    setup();
+    await screen.findByText('Polizei PI Nord');
+    erwarteBrowsermenue(within(tabelle()).getByText('Externe Stellen'));
   });
 });

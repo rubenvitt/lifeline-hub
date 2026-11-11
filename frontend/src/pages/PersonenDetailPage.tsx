@@ -23,6 +23,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
+  darfBeantragen,
   darfImEinsatzSchreiben,
   darfEinsatzLeiten,
   istEinsatzLeitung,
@@ -789,6 +790,8 @@ export default function PersonenDetailPage() {
           einsatzId={einsatzId}
           person={p}
           darfSchreiben={darfSchreiben}
+          // Am Spiegel werden die Einträge zum Antrag (LLH-1492, D13).
+          darfErfassen={darfBeantragen(einsatz)}
           darfSichten={darf('person-sichtung')}
           darfBehandeln={darf('person-behandlung')}
           aufenthaltAktionen={aufenthaltAktionen}

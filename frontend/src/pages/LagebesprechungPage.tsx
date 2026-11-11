@@ -132,9 +132,7 @@ export default function LagebesprechungPage() {
       }
       // Derselbe Riegel wie am Knopf — die Palette ist ein zweiter Weg auf dieselbe Aktion.
       neueZeile={canAbschliessen ? openAbschluss : undefined}
-      hinweis={
-        !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-      }
+      hinweis={!darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />}
     >
       {standFehler.gescheitert ? (
         <SeitenFehler

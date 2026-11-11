@@ -252,7 +252,8 @@ export default defineConfig(({ mode }) => {
       // Anzeigezone“): im Hauptprozess gesetzt, bevor ein Worker startet.
       globalSetup: './src/test/suitenZone.ts',
       environment: 'jsdom',
-      setupFiles: './src/test/setup.ts',
+      // Erst eindeutige antd-Kennungen (LLH-1625), dann die übrige Einrichtung.
+      setupFiles: ['./src/test/eindeutigeIds.ts', './src/test/setup.ts'],
       css: false,
       testTimeout: 10000,
       include: ['src/**/*.{test,spec}.{ts,tsx}'],

@@ -11,6 +11,7 @@ import type {
   ZeitfensterPatch,
 } from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
+import { useKartenKontext } from '../components/useKartenKontext';
 import { useOffeneBearbeitungGrund } from '../components/offeneBearbeitung';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
@@ -49,6 +50,11 @@ export interface ZeitfensterKarteProps {
   zeitfenster: VerpflegungZeitfenster;
   jetzt: Dayjs;
   darfSchreiben: boolean;
+  /**
+   * „Ausgabe nachtragen“ und der Sprung in die Ausgabe: am Spiegel ein Antrag, auch ohne
+   * Schreibrecht (LLH-1492). Vorgabe `darfSchreiben`.
+   */
+  darfAusgeben?: boolean;
   /**
    * Modul Nachforderungen für die Person bedienbar (und Freigaben bekannt). Ohne: kein
    * „Nachfordern" und am Verweis nur „Nachforderung #n".
@@ -150,6 +156,7 @@ export default function ZeitfensterKarte({
   zeitfenster: zf,
   jetzt,
   darfSchreiben,
+  darfAusgeben = darfSchreiben,
   nachforderungenFrei,
   nachforderungName,
   onAusgabeNachtragen,
@@ -211,8 +218,10 @@ export default function ZeitfensterKarte({
           },
         onLoeschen && !hatGueltigeAusgabe && { key: 'loeschen', label: 'Löschen', danger: true },
       ].filter(Boolean) as Aktion[])
-    : [];
-  const sprung = darfSchreiben && !istVergangen(zf, jetzt);
+    : darfAusgeben && onAusgabeNachtragen
+      ? [{ key: 'nachtragen', label: 'Ausgabe nachtragen' }]
+      : [];
+  const sprung = darfAusgeben && !istVergangen(zf, jetzt);
   const jeStelle = zeilenJeStelle(zf, stellen);
   const sprungJeStelle = sprung && !istSchmal;
   /** Stelle statt Ort: eine Ausgabe an einer Stelle nennt die Stelle, ohne den Ort. */
@@ -243,9 +252,28 @@ export default function ZeitfensterKarte({
     if (key === 'nachfordern') onNachfordern?.(zf);
     if (key === 'loeschen') onLoeschen?.(zf);
   };
+  /*
+   * Kontextmenü (LLH-1598, Spec `datensatz-aktionsmenue`, „Eine Karte mit mehreren Knöpfen …“):
+   * dieselben `aktionen` wie Knöpfe und ⋮, ohne den Sprung „Ausgabe öffnen“. Während der eigenen
+   * Bearbeitung sind die Aktionen ausgeblendet, also auch das Menü.
+   */
+  const { ausloeser, menue: kontextMenue } = useKartenKontext<Aktionsschluessel>({
+    aktionen:
+      bearbeiten && onBedarfSpeichern
+        ? []
+        : aktionen.map((a) => ({
+            key: a.key,
+            label: a.label,
+            onWahl: () => fuehreAus(a.key),
+            ...(a.danger ? { gefahr: true as const } : {}),
+            ...(a.gesperrt != null ? { gesperrt: true as const, sperrgrund: a.gesperrt } : {}),
+          })),
+    zugaenglicherName: `Aktionen zu Zeitfenster ${kennung}`,
+  });
 
   return (
     <article
+      {...ausloeser}
       data-lfh="verpflegung-karte"
       data-einstufung={stufe}
       data-alarm={stufe === 'unterdeckung' ? 'true' : undefined}
@@ -489,12 +517,13 @@ export default function ZeitfensterKarte({
                 const sk = sonderkostText(sonderkostVoll(d.sonderkost));
                 return (
                   <Zeitachseneintrag
-                    key={`ausstehend-${v.id ?? d.client_id}`}
+                    key={v.antrag ? `antrag-${v.antrag.id}` : `ausstehend-${v.id ?? d.client_id}`}
                     als="li"
                     data-lfh="verpflegung-ausgabe-ausstehend"
                     zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
                     typwort="ausstehend"
-                    hinweis="Offline vorgemerkt"
+                    // Ein Antrag am Spiegel (LLH-1492) steht wie Vorgemerktes.
+                    hinweis={v.antrag ? 'Beantragt' : 'Offline vorgemerkt'}
                   >
                     <span style={{ color: rollen.text2 }}>
                       <span style={monoStil(13, 500)}>{d.menge} EP</span>
@@ -589,6 +618,7 @@ export default function ZeitfensterKarte({
           )}
         </>
       )}
+      {kontextMenue}
     </article>
   );
 }

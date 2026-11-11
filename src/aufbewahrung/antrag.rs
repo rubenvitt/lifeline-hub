@@ -532,11 +532,15 @@ pub async fn offener_einsatz_antrag(
 
 /// IDs der fälligen, offenen Anträge (Kandidaten des Purge-Laufs), älteste zuerst.
 pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64>, AppError> {
-    Ok(sqlx::query_scalar(
+    // Anträge an einem Spiegel bleiben offen (LLH-1492, design.md D10): die Schwärzung kommt
+    // vom Führer über das Log, ein Vollzug hier scheiterte am Schutz-Trigger.
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM schwaerzung_antrag \
          WHERE zurueckgenommen_at IS NULL AND vollzogen_at IS NULL AND faellig_at <= ? \
+           AND {} \
          ORDER BY faellig_at, id",
-    )
+        crate::einsatz::spiegel_filter::nicht_gespiegelt("schwaerzung_antrag.einsatz_id")
+    )))
     .bind(crate::zeit::formatiere_utc(jetzt))
     .fetch_all(pool)
     .await?)

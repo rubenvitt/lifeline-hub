@@ -15,11 +15,11 @@ import KategorieFristen from './KategorieFristen';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
   darfFristSetzen,
+  fristSperrGrund,
   fristAusEingabe,
   istFristverkuerzung,
   liegtInDerVergangenheit,
 } from './fristModell';
-import { NUR_LEITUNG_ORG_ADMIN } from '../components/nurAnsicht';
 
 /**
  * Aufbewahrungsfrist am Einsatz anzeigen und ändern.
@@ -52,9 +52,6 @@ interface Rueckfrage {
   bestaetigen: () => void;
   abbrechen: () => void;
 }
-
-/** Text des Rechte-Hinweises — eine Stelle für Paneel und Akte. */
-const FRIST_RECHTE_TEXT = NUR_LEITUNG_ORG_ADMIN;
 
 interface FristAenderung {
   /** Öffnet den Dialog „Frist ändern". */
@@ -253,7 +250,7 @@ export default function FristPaneel({ einsatzId, einsatz }: FristPaneelProps) {
   return (
     <Paneel titel="Aufbewahrungsfrist" koerperPolster style={{ marginBottom: token.marginLG }}>
       <Flex vertical gap={token.marginSM}>
-        <RechteHinweis sichtbar={!darf} text={FRIST_RECHTE_TEXT} />
+        <RechteHinweis sichtbar={!darf} text={fristSperrGrund(einsatz)} />
         <SpeicherFehler fehler={aenderung.fehlerAussen} />
         <Datenraster spalten={1} beschriftung="Aufbewahrungsfrist">
           <Datenfeld label="Frist" mono={einsatz.retention_bis != null}>

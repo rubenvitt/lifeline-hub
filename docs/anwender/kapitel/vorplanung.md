@@ -113,7 +113,9 @@ Planung“ führt zur Planung zurück.
    Auswahl einer Zeile lässt sich ein Posten einer anderen Einheit oder UHS zuordnen oder neu
    anlegen und eine Person einer anderen zuordnen; die Vorschau rechnet danach neu.
 4. „Übernehmen“ schreibt alles auf einmal. Bei Fehlern in der Vorschau, in einem laufenden Einsatz
-   auch ohne jede Änderung, bleibt der Knopf gesperrt und nennt den Grund.
+   auch ohne jede Änderung, bleibt der Knopf gesperrt und nennt den Grund. Hat jemand die Planung
+   geändert, seit die Vorschau steht, wird nichts übernommen: der Dialog meldet „Planung geändert,
+   Vorschau neu geladen“ und zeigt die Vorschau des neuen Stands, die man dann übernimmt.
 5. Nach der Übernahme führt „Zum Schichtplan des Einsatzes“ in die Ablösung des Einsatzes, Ansicht
    „Schichtplan“.
 
@@ -156,8 +158,13 @@ Jeder Posten wird eine Einheit oder eine UHS im Einsatz, auch einer ohne Block; 
 Vorschau eine vorhandene Einheit oder UHS gleichen Namens vor. Ein Posten aus einer
 Einheitenvorlage wird eine Einheit nach dieser Vorlage, ein Posten mit Stamm-Fahrzeug eine Einheit
 ohne das Fahrzeug: disponiert wird es nicht, die Vorschau nennt es als Hinweis „Stamm-Fahrzeug
-nicht disponiert“. Ein Abschnitt der
-Planung, den es im Einsatz nicht gibt, bleibt als Hinweis stehen, die Einheit kommt ohne Abschnitt.
+nicht disponiert“. Fehlt dem Einsatz der Abschnitt eines Postens, der neu angelegt wird, entsteht
+er mit, im neuen wie im laufenden Einsatz; die Vorschau nennt ihn unter „Neue Abschnitte“ und
+markiert die Posten darin mit „neu“. Ein vorhandener Abschnitt wird über Name oder Kurzbezeichnung
+gefunden, ohne Groß- und Kleinschreibung. Trifft der Posten eine vorhandene Einheit oder UHS,
+bleibt sie, wo sie ist, und es entsteht kein Abschnitt. Ist das Modul Einsatzabschnitte für die
+übernehmende Person nicht freigegeben oder passt der Text auf mehrere Abschnitte, bleibt ein Hinweis
+stehen, und die Einheit kommt ohne Abschnitt.
 Stamm-Personal kommt als feste Zuordnung in den Plan; wer inzwischen außer Dienst ist, macht die
 Übernahme mit einem Fehler unmöglich, bis er aus der Planung genommen ist. Helfer der Planung
 werden Helfer im Plan des Einsatzes mit der Herkunft „vorplanung“. Jeder Block nimmt sein Soll

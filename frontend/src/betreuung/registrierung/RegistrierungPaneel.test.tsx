@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { RegistrierListe } from '../../api/types';
 import { queueLeerenFuerTests, schreibaktionEinreihen } from '../../offline/queue';
 import { meHandler, server } from '../../test/server';
@@ -189,22 +191,13 @@ describe('Registrierliste drucken (LLH-1616)', () => {
   });
 });
 
-// Nicht über den Namen des Dialogs suchen: unter Test vergibt `@rc-component/util` jedem `useId`
-// dieselbe Kennung (`test-id`), seit antd 6.7 auch dem Collapse-Inhalt, auf den dann das
-// `aria-labelledby` des Dialogs zeigt.
-async function abmeldeDialog(titel: string): Promise<HTMLElement> {
-  const dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByText(titel)).toBeInTheDocument();
-  return dialog;
-}
-
 describe('Abmelden', () => {
   it('Haushalt: Rückfrage nennt Haushalt und Zahl, Ziel optional, ein Request mit haushalt_id', async () => {
     const user = userEvent.setup();
     const draht = rendere();
     await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
     await user.click(await screen.findByRole('button', { name: 'H-1 abmelden' }));
-    const dialog = await abmeldeDialog('H-1 abmelden?');
+    const dialog = await screen.findByRole('dialog', { name: 'H-1 abmelden?' });
     expect(dialog).toHaveTextContent('3 Personen');
     await user.type(within(dialog).getByRole('textbox', { name: 'Ziel' }), 'zu Verwandten');
     await user.click(within(dialog).getByRole('button', { name: 'Haushalt abmelden' }));
@@ -222,7 +215,7 @@ describe('Abmelden', () => {
     const draht = rendere();
     await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
     await user.click(await screen.findByRole('button', { name: 'R-013 Weber, Tom abmelden' }));
-    const dialog = await abmeldeDialog('R-013 Weber, Tom abmelden?');
+    const dialog = await screen.findByRole('dialog', { name: 'R-013 Weber, Tom abmelden?' });
     await user.click(within(dialog).getByRole('button', { name: 'Person abmelden' }));
 
     await waitFor(() => expect(draht.abmeldungen).toHaveLength(1));
@@ -393,5 +386,37 @@ describe('Haushalte umbauen (LLH-1615)', () => {
     expect(within(dialog).getByText('Ohne Verbindung nicht änderbar')).toBeInTheDocument();
     await user.keyboard('{Control>}{Enter}{/Control}');
     expect(draht.haushalt).toEqual([]);
+  });
+});
+
+describe('Abmeldung am Spiegel (LLH-1492)', () => {
+  it('eine beantragte Abmeldung steht da und sperrt weitere Abmeldungen an der Stelle', async () => {
+    const user = userEvent.setup();
+    server.use(
+      meHandler(benutzerFixture({ id: 11 })),
+      http.get(LISTE, () => HttpResponse.json(WEBER)),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Die Kennungen im Körper sind die der führenden Instanz; nur die Stelle (`sid`) ist lokal.
+    client.setQueryData(einsatzKeys.antraege(7), [
+      {
+        id: 4,
+        art: 'abmeldung',
+        zustand: 'ausstehend',
+        erfasst_at: '2026-11-10 08:00:00',
+        ziel: { sid: 8 },
+        daten: { haushalt_id: 903, client_id: 'a-4' },
+      },
+    ]);
+    renderMitProviders(
+      <RegistrierungPaneel einsatzId={7} stelle={TURNHALLE} personenFrei darfSchreiben />,
+      { client },
+    );
+    expect(await screen.findByText('Abmeldung beantragt')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /H-1 · Weber, Anna/ }));
+    const knopf = await screen.findByRole('button', { name: 'H-1 abmelden' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('Abmeldung beantragt');
+    expect(screen.getByRole('button', { name: 'R-013 Weber, Tom abmelden' })).toBeDisabled();
   });
 });

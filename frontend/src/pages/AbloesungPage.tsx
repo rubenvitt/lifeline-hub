@@ -825,7 +825,7 @@ export default function AbloesungPage() {
         (!darfSchreiben || rueckgaengigFehler != null) && (
           <SeitenHinweise
             rechteFehlt={!darfSchreiben}
-            rechteText={abloesungRechteText(einsatz.status)}
+            rechteText={abloesungRechteText(einsatz)}
             fehler={rueckgaengigFehler}
             fehlerTitel="Nicht zurückgenommen"
             fehlerFallback="Rücknahme fehlgeschlagen"

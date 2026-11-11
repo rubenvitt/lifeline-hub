@@ -28,14 +28,19 @@ import type {
   SkizzenVerbindung,
   VerbindungPatch,
 } from '../api/types';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datensicht, {
+  spaltenFuer,
+  type PrimaerAktion,
+  type WeitereAktionen,
+} from '../components/Datensicht';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import { NUR_VORLESER, Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
-import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import type { MenueEintrag } from '../components/MenueAusloeser';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -221,18 +226,60 @@ function menueFuer(z: KommunikationsZeile & { art: 'gepflegt' }): MenueEintrag<M
 /** Grund am gesperrten Knopf ohne Netz; dass die Seite offline ist, zeigt der Datenstand im Kopf. */
 const OFFLINE_GRUND = 'Offline';
 
+type Gepflegt = KommunikationsZeile & { art: 'gepflegt' };
+
+/** Die gepflegte Zeile hinter einer Planzeile; Gruppen und abgeleitete Zeilen tragen keine Aktion. */
+function gepflegtVon(p: PlanZeile): Gepflegt | null {
+  return p.zeile?.art === 'gepflegt' ? (p.zeile as Gepflegt) : null;
+}
+
+/**
+ * Aktionen einer gepflegten Stelle, EINE Quelle für Aktionsspalte und Kontextmenü (LLH-1599,
+ * Spec `datensatz-aktionsmenue`, design.md D7): „+ Verbindung“ als Primäraktion, dann das ⋮.
+ * Ohne Netz steht beides gesperrt, im Kontextmenü wie am Knopf. Ohne Schreibrecht oder im Druck
+ * gibt es keine Aktionen.
+ */
+function planAktionen(
+  mitAktionen: boolean,
+  gesperrt: boolean,
+  onVerbindung: (z: Gepflegt) => void,
+  onMenue: (aktion: MenueAktion, z: Gepflegt) => void,
+): { aktion?: PrimaerAktion<PlanZeile>; weitere?: WeitereAktionen<PlanZeile> } {
+  if (!mitAktionen) return {};
+  return {
+    aktion: {
+      etikett: '+ Verbindung',
+      zugaenglicherName: (p) => `Verbindung zu ${p.zeile?.kennung ?? ''} hinzufügen`,
+      sichtbar: (p) => gepflegtVon(p) != null,
+      gesperrt: () => gesperrt,
+      onKlick: (p) => {
+        const z = gepflegtVon(p);
+        if (z) onVerbindung(z);
+      },
+    },
+    weitere: {
+      eintraege: (p) => {
+        const z = gepflegtVon(p);
+        if (!z) return [];
+        const eintraege = menueFuer(z);
+        return gesperrt ? eintraege.map((e) => ({ ...e, gesperrt: true as const })) : eintraege;
+      },
+      zugaenglicherName: (p) => `Weitere Aktionen zu ${p.zeile?.kennung ?? ''}`,
+      onWahl: (key, p) => {
+        const z = gepflegtVon(p);
+        if (z) onMenue(key as MenueAktion, z);
+      },
+    },
+  };
+}
+
 /**
  * Spalten. Gewählt gegen die Fläche des Funkplans (LFH-548 D4: 1050 px Contentbreite am Fükw mit
  * offenem Panel): Σ Zahlbreiten 600 + `mindestBreite` 300 = 900 px. EINE fließende Spalte
  * (Verbindungen, LFH-523); Kennung und Werte brechen um. Ohne Schreibrecht und im Druck fehlt
  * die Aktionsspalte.
  */
-function planSpalten(
-  mitAktionen: boolean,
-  gesperrt: boolean,
-  onVerbindung: (z: KommunikationsZeile & { art: 'gepflegt' }) => void,
-  onMenue: (aktion: MenueAktion, z: KommunikationsZeile & { art: 'gepflegt' }) => void,
-) {
+function planSpalten(gesperrt: boolean, { aktion, weitere }: ReturnType<typeof planAktionen>) {
   const sperrGrund = gesperrt ? OFFLINE_GRUND : undefined;
   return spaltenFuer<PlanZeile>()([
     {
@@ -270,33 +317,27 @@ function planSpalten(
           <VerbindungenZelle verbindungen={p.zeile!.verbindungen} />
         ),
     },
-    ...(mitAktionen
+    ...(aktion && weitere
       ? [
           {
             title: 'Aktionen',
             key: 'aktionen' as SpalteKey,
             width: 160,
             render: (_t: unknown, p: PlanZeile) => {
-              const z = p.zeile;
               // Abgeleitete Zeilen werden an ihrem Datensatz gepflegt: keine Aktion.
-              if (!z || z.art !== 'gepflegt') return null;
+              if (!gepflegtVon(p)) return null;
               return (
                 // `middle`: ≥ 16 px zwischen zwei Zielen im Handschuh-Betrieb (LFH-653).
                 <Space wrap size="middle">
                   <Button
-                    aria-label={`Verbindung zu ${z.kennung} hinzufügen`}
+                    aria-label={aktion.zugaenglicherName?.(p)}
                     disabled={gesperrt}
                     title={sperrGrund}
-                    onClick={() => onVerbindung(z)}
+                    onClick={() => aktion.onKlick(p)}
                   >
-                    + Verbindung
+                    {aktion.etikett}
                   </Button>
-                  <MenueAusloeser<MenueAktion>
-                    eintraege={menueFuer(z)}
-                    zugaenglicherName={`Weitere Aktionen zu ${z.kennung}`}
-                    gesperrt={gesperrt}
-                    onWahl={(aktion) => onMenue(aktion, z)}
-                  />
+                  <ZeilenMenueAusloeser menue={weitere} zeile={p} gesperrt={gesperrt} />
                 </Space>
               );
             },
@@ -518,9 +559,9 @@ export default function KommunikationsplanPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const mitAktionen = darfSchreiben && !druckt;
-  const spalten = useMemo(
+  const aktionen = useMemo(
     () =>
-      planSpalten(
+      planAktionen(
         mitAktionen,
         ohneVerbindung,
         (z) => oeffne({ art: 'verbindung', stelle: z.stelle, kennung: z.kennung }),
@@ -555,6 +596,7 @@ export default function KommunikationsplanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mitAktionen, ohneVerbindung, skizzenVerbindungen],
   );
+  const spalten = useMemo(() => planSpalten(ohneVerbindung, aktionen), [ohneVerbindung, aktionen]);
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
@@ -729,6 +771,9 @@ export default function KommunikationsplanPage() {
               ziel: (p) => (p.zeile && p.zeile.art !== 'gepflegt' ? p.zeile.ziel : null),
             },
             sekundaer: ['besetzung', 'verbindungen'],
+            // Kontextmenü der gepflegten Stellen (LLH-1599 D7); der Kartenzweig rendert bei
+            // `form="tabelle"` nie, die Karten bekommen also keinen zweiten Knopf.
+            ...aktionen,
           }}
         />
       </EinsatzSeite>

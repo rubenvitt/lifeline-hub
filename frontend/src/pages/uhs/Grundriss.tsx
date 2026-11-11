@@ -103,6 +103,8 @@ import {
   unterwegsAus,
 } from './uhsLage';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../../api/anhangAbruf';
+import { useSpiegelAusCache } from '../../einsatz/spiegel/useSpiegelAntraege';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -1245,13 +1247,37 @@ export function planHoehe(plan: UhsPlan): number {
  * Abruf, bleibt die Fläche ohne Bild — die Plätze sind ohne Plan voll bedienbar.
  */
 function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
-  const { dunkel } = useRollen();
+  const { dunkel, rollen } = useRollen();
   const bild = useQuery({
     queryKey: einsatzKeys.uhsPlanBild(einsatzId, plan.uhs_id, plan.sha256),
     queryFn: ({ signal }) => ladePlanBild(einsatzId, plan.uhs_id, plan.sha256, signal),
     staleTime: Infinity,
     retry: false,
   });
+  // Am Spiegel kommt der Plan auf Abruf (LLH-1492, D8): „wird geholt“, und nach dem nächsten
+  // Abgleich (neuer Stand des Kopfs) ein neuer Versuch.
+  const wirdGeholt = bild.isError && isAnhangWirdGeholt(bild.error);
+  const { abgleichTakt } = useSpiegelAusCache(einsatzId);
+  const { refetch } = bild;
+  useEffect(() => {
+    if (wirdGeholt) void refetch();
+  }, [abgleichTakt, wirdGeholt, refetch]);
+  if (wirdGeholt) {
+    return (
+      <span
+        data-lfh="uhs-plan-wird-geholt"
+        style={{
+          position: 'absolute',
+          left: plan.x,
+          top: plan.y,
+          color: rollen.text2,
+          pointerEvents: 'none',
+        }}
+      >
+        Plan {WIRD_GEHOLT_WORT}
+      </span>
+    );
+  }
   if (!bild.data) return null;
   return (
     <img

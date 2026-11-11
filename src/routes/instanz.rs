@@ -507,7 +507,7 @@ async fn send_einloesen(
             "Die Instanz unter {adresse} ist nicht erreichbar: {e}"
         ))
     };
-    let resp = reqwest::Client::builder()
+    let resp = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(15))
@@ -589,6 +589,57 @@ pub async fn melden(
     let antwort =
         melden::handle_meldung(&state.pool, &anfrage.identitaet, &anfrage.kopplung, &body).await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
+}
+
+// ── Abgleich der Einsätze (LLH-1492) ─────────────────────────────────────────────────────────
+
+/// POST /api/instanz/spiegel — eine gekoppelte Instanz gleicht Einsätze ab (signiert, design.md
+/// D6): Lieferungen ihrer Einsätze und ihre Stände der unseren hinein, unsere hinaus.
+pub async fn spiegel_abgleich(
+    State(state): State<AppState>,
+    axum::Extension(platz): axum::Extension<crate::instanz::spiegel::antrag::RouterPlatz>,
+    anfrage: GekoppelteInstanz,
+) -> Result<Response, AppError> {
+    let body: crate::instanz::spiegel::paket::SpiegelPaket = anfrage.json()?;
+    let antwort = crate::instanz::spiegel::abgleich::handle_abgleich(
+        &state.pool,
+        platz.router().as_ref(),
+        &anfrage.identitaet,
+        &anfrage.kopplung,
+        &body,
+    )
+    .await?;
+    Ok(anfrage.antwort(StatusCode::OK, &antwort))
+}
+
+/// GET /api/einsaetze/{id}/antraege — die eigenen Anträge an einem Spiegel (LLH-1492, Spec
+/// `spiegel-antraege`); an einem eigenen Einsatz leer.
+pub async fn antraege_liste(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzLesezugriff,
+) -> Result<Json<Vec<crate::instanz::spiegel::antrag::SpiegelAntragAnzeige>>, AppError> {
+    Ok(Json(
+        crate::instanz::spiegel::antrag::liste(&state.pool, ctx.einsatz.id, ctx.benutzer.id)
+            .await?,
+    ))
+}
+
+/// DELETE /api/einsaetze/{id}/antraege/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
+/// Lese- statt Schreib-Gate: der Antrag ist Buchführung dieser Instanz, keine Einsatzdaten, und
+/// gehört dem Konto, das ihn gestellt hat.
+pub async fn antrag_verwerfen(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzLesezugriff,
+    PfadParam((_eid, antrag_id)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    crate::instanz::spiegel::antrag::verwerfen(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        antrag_id,
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────

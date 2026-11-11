@@ -394,14 +394,16 @@ pub async fn faellige_vormerkung(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<(i64, Datenkategorie)>, AppError> {
-    let zeilen: Vec<(i64, String)> = sqlx::query_as(
+    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    let zeilen: Vec<(i64, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT k.einsatz_id, k.kategorie FROM einsatz_aufbewahrung_kategorie k \
          JOIN einsatz e ON e.id = k.einsatz_id \
          WHERE e.status = ? AND e.geschwaerzt_at IS NULL \
            AND k.frist_bis IS NOT NULL AND ? >= k.frist_bis \
-           AND k.vorgemerkt_at IS NULL AND k.geschwaerzt_at IS NULL \
+           AND k.vorgemerkt_at IS NULL AND k.geschwaerzt_at IS NULL AND {} \
          ORDER BY k.einsatz_id, k.kategorie",
-    )
+        super::spiegel_filter::nicht_gespiegelt("k.einsatz_id")
+    )))
     .bind(STATUS_ABGESCHLOSSEN)
     .bind(jetzt)
     .fetch_all(pool)
@@ -491,13 +493,15 @@ pub async fn vormerken(
 pub async fn faellige_schwaerzung(
     pool: &SqlitePool,
 ) -> Result<Vec<(i64, Datenkategorie, String)>, AppError> {
-    let zeilen: Vec<(i64, String, String)> = sqlx::query_as(
+    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    let zeilen: Vec<(i64, String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT k.einsatz_id, k.kategorie, k.vorgemerkt_at FROM einsatz_aufbewahrung_kategorie k \
          JOIN einsatz e ON e.id = k.einsatz_id \
          WHERE e.status = ? AND e.geschwaerzt_at IS NULL \
-           AND k.vorgemerkt_at IS NOT NULL AND k.geschwaerzt_at IS NULL \
+           AND k.vorgemerkt_at IS NOT NULL AND k.geschwaerzt_at IS NULL AND {} \
          ORDER BY k.einsatz_id, k.kategorie",
-    )
+        super::spiegel_filter::nicht_gespiegelt("k.einsatz_id")
+    )))
     .bind(STATUS_ABGESCHLOSSEN)
     .fetch_all(pool)
     .await?;

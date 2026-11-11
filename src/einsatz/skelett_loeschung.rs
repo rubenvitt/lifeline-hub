@@ -61,7 +61,9 @@ pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64
         .iter()
         .map(|t| format!(" AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.einsatz_id = e.id)"))
         .collect();
-    let sql = format!("{KANDIDAT_SELECT}{ohne_reste} ORDER BY e.id");
+    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    let eigen = super::spiegel_filter::nicht_gespiegelt("e.id");
+    let sql = format!("{KANDIDAT_SELECT} AND {eigen}{ohne_reste} ORDER BY e.id");
     let kandidaten = sqlx::query_as::<_, Kandidat>(sqlx::AssertSqlSafe(sql))
         .bind(STATUS_ABGESCHLOSSEN)
         .fetch_all(pool)

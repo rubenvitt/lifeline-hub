@@ -19,19 +19,26 @@ type Oeffnen = (schluessel: string, oeffnung: KontextOeffnung) => boolean;
 function Probe({
   onOeffnen,
   kannOeffnen,
+  langerDruck,
 }: {
   onOeffnen: Oeffnen;
   kannOeffnen?: (schluessel: string) => boolean;
+  langerDruck?: boolean;
 }) {
   const ausloeser = useKontextMenue<string>({
     onOeffnen,
     ...(kannOeffnen ? { kannOeffnen } : {}),
+    ...(langerDruck != null ? { langerDruck } : {}),
   });
   return (
     <ul>
       <li data-testid="zeile" tabIndex={-1} {...ausloeser('z1')}>
         <a href="/ziel">Titel-Link</a>
         <span data-testid="text">Freitext der Zeile</span>
+        {/* Ein Vorschaubild in einem Knopf, wie der Bildanhang im Chat (LLH-1598). */}
+        <button type="button" data-testid="bildknopf">
+          <img data-testid="bild" alt="Vorschau" src="data:," />
+        </button>
         <input aria-label="Feld" />
         <textarea aria-label="Notiz" />
         <select aria-label="Wahl">
@@ -87,6 +94,7 @@ describe('useKontextMenue — Rechtsklick (LLH-1596, D1/D2)', () => {
     ['Textbereich', () => screen.getByRole('textbox', { name: 'Notiz' })],
     ['Auswahlfeld', () => screen.getByRole('combobox', { name: 'Wahl' })],
     ['editierbarer Bereich', () => screen.getByTestId('editierbar')],
+    ['Bild (LLH-1598)', () => screen.getByTestId('bild')],
   ])('lässt das Browsermenü auf %s', (_name, ziel) => {
     const { onOeffnen } = aufbau();
     expect(rechtsklick(ziel())).toBe(true);
@@ -119,6 +127,56 @@ describe('useKontextMenue — Rechtsklick (LLH-1596, D1/D2)', () => {
   it('lässt das Browsermenü, wenn der Datensatz keine Einträge meldet', () => {
     const { onOeffnen } = aufbau(false);
     expect(rechtsklick(screen.getByTestId('text'))).toBe(true);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useKontextMenue — ohne langen Druck (LLH-1597, D1)', () => {
+  function ohneDruck() {
+    const onOeffnen = vi.fn<Oeffnen>(() => true);
+    render(<Probe onOeffnen={onOeffnen} langerDruck={false} />);
+    return { onOeffnen, zeile: screen.getByTestId('zeile'), text: screen.getByTestId('text') };
+  }
+
+  it('ein Touchdruck startet keinen Zeitgeber und sperrt das Markieren nicht', () => {
+    vi.useFakeTimers();
+    const { onOeffnen, zeile, text } = ohneDruck();
+    fireEvent.pointerDown(text, { ...touch, clientX: 50, clientY: 60 });
+    expect(zeile.hasAttribute(DRUCK_ATTRIBUT)).toBe(false);
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS * 2));
+    expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it.each(['touch', 'pen'])(
+    'das native `contextmenu` nach einem Druck mit %s lässt das Systemmenü',
+    (pointerType) => {
+      const { onOeffnen, text } = ohneDruck();
+      fireEvent.pointerDown(text, { ...touch, pointerType });
+      expect(rechtsklick(text)).toBe(true);
+      expect(onOeffnen).not.toHaveBeenCalled();
+    },
+  );
+
+  it('Rechtsklick mit der Maus und die Taste öffnen weiter', () => {
+    const { onOeffnen, zeile, text } = ohneDruck();
+    fireEvent.pointerDown(text, { ...touch, pointerType: 'touch' });
+    fireEvent.pointerDown(text, { ...touch, pointerType: 'mouse', button: 2 });
+    expect(rechtsklick(text)).toBe(false);
+    zeile.focus();
+    expect(fireEvent.keyDown(zeile, { key: 'F10', shiftKey: true })).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(2);
+  });
+
+  it('die Rechtsklick-Taste am Stift öffnet wie die Maus', () => {
+    const { onOeffnen, text } = ohneDruck();
+    fireEvent.pointerDown(text, { ...touch, pointerType: 'pen', button: 2 });
+    expect(rechtsklick(text)).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne vorheriges `pointerdown` gilt der Rechtsklick als Maus', () => {
+    const { onOeffnen, text } = ohneDruck();
+    expect(rechtsklick(text)).toBe(false);
     expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 });
@@ -172,6 +230,21 @@ describe('useKontextMenue — langer Druck (D3)', () => {
     fireEvent.pointerDown(screen.getByTestId('text'), { ...touch, pointerType: 'mouse' });
     act(() => vi.advanceTimersByTime(LANGDRUCK_MS * 2));
     expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it('ein langer Druck auf ein Bild öffnet nicht (Bildblase des Systems, LLH-1598)', () => {
+    vi.useFakeTimers();
+    const { onOeffnen, zeile } = aufbau();
+    fireEvent.pointerDown(screen.getByTestId('bild'), { ...touch, clientX: 5, clientY: 5 });
+    expect(zeile).not.toHaveAttribute(DRUCK_ATTRIBUT);
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it('ein Knopf ohne Bild öffnet weiter das eigene Menü', () => {
+    const { onOeffnen } = aufbau();
+    expect(rechtsklick(screen.getByTestId('bildknopf'))).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 
   it('ein langer Druck auf einen Link öffnet nicht (Linkmenü des Systems)', () => {
@@ -397,5 +470,127 @@ describe('istKontextTaste', () => {
     expect(istKontextTaste({ key: 'F10', shiftKey: true })).toBe(true);
     expect(istKontextTaste({ key: 'F10', shiftKey: false })).toBe(false);
     expect(istKontextTaste({ key: 'Enter', shiftKey: true })).toBe(false);
+  });
+});
+
+/** Kleine Fläche ohne Portal: mehrere davon in einem Test (LLH-1598). */
+function Flaeche({ name, onOeffnen }: { name: string; onOeffnen: Oeffnen }) {
+  const ausloeser = useKontextMenue<string>({ onOeffnen });
+  return (
+    <div data-testid={name} {...ausloeser(name)}>
+      <span data-testid={`${name}-text`}>Text {name}</span>
+    </div>
+  );
+}
+
+/** Zählt, welche Hörer am `window` gerade hängen (je Typ und Phase). */
+function zaehleFensterhoerer() {
+  const haengt = new Map<string, number>();
+  const schluessel = (typ: string, opt?: boolean | AddEventListenerOptions) =>
+    `${typ}:${typeof opt === 'boolean' ? opt : (opt?.capture ?? false)}`;
+  const anOriginal = window.addEventListener.bind(window);
+  const abOriginal = window.removeEventListener.bind(window);
+  const an = vi.spyOn(window, 'addEventListener').mockImplementation(function (
+    typ: string,
+    hoerer: EventListenerOrEventListenerObject,
+    opt?: boolean | AddEventListenerOptions,
+  ) {
+    const k = schluessel(typ, opt);
+    haengt.set(k, (haengt.get(k) ?? 0) + 1);
+    anOriginal(typ, hoerer, opt);
+  });
+  const ab = vi.spyOn(window, 'removeEventListener').mockImplementation(function (
+    typ: string,
+    hoerer: EventListenerOrEventListenerObject,
+    opt?: boolean | EventListenerOptions,
+  ) {
+    const k = schluessel(typ, opt);
+    haengt.set(k, (haengt.get(k) ?? 0) - 1);
+    abOriginal(typ, hoerer, opt);
+  });
+  return {
+    haengt,
+    zurueck: () => {
+      an.mockRestore();
+      ab.mockRestore();
+    },
+  };
+}
+
+describe('useKontextMenue — geteilte Hörer (LLH-1598, D1)', () => {
+  it('zwei Flächen teilen einen Satz Fensterhörer; nach dem Aushängen hängt keiner mehr', () => {
+    const z = zaehleFensterhoerer();
+    try {
+      const eine = render(<Flaeche name="a" onOeffnen={() => true} />);
+      const nachEiner = new Map(z.haengt);
+      const zweite = render(<Flaeche name="b" onOeffnen={() => true} />);
+      expect(nachEiner.size).toBeGreaterThan(0);
+      for (const [k, n] of z.haengt) expect([k, n]).toEqual([k, nachEiner.get(k)]);
+      eine.unmount();
+      for (const [k, n] of z.haengt) expect([k, n]).toEqual([k, nachEiner.get(k)]);
+      zweite.unmount();
+      for (const [k, n] of z.haengt) expect([k, n]).toEqual([k, 0]);
+    } finally {
+      z.zurueck();
+    }
+  });
+
+  it('Tasten-Nachlauf mit zwei Flächen: genau ein Öffnen, das nachgeschobene Menü verworfen', () => {
+    vi.useFakeTimers();
+    const a = vi.fn<Oeffnen>(() => true);
+    const b = vi.fn<Oeffnen>(() => true);
+    render(
+      <>
+        <Flaeche name="a" onOeffnen={a} />
+        <Flaeche name="b" onOeffnen={b} />
+      </>,
+    );
+    fireEvent.keyDown(screen.getByTestId('a'), { key: 'ContextMenu' });
+    // Der Browser schickt das Folge-`contextmenu` an das fokussierte Element, gleich welche Fläche.
+    expect(fireEvent.contextMenu(screen.getByTestId('b-text'), { button: 0 })).toBe(false);
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(TASTEN_NACHLAUF_MS + 1));
+    expect(rechtsklick(screen.getByTestId('b-text'))).toBe(false);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+
+  it('Stift auf Fläche A: der Riegel schluckt das Abheben auch über B und löst danach', () => {
+    vi.useFakeTimers();
+    const beiKlickB = vi.fn();
+    render(
+      <>
+        <Flaeche name="a" onOeffnen={() => true} />
+        <Flaeche name="b" onOeffnen={() => true} />
+      </>,
+    );
+    screen.getByTestId('b').addEventListener('click', beiKlickB);
+    const stift = { ...touch, pointerType: 'pen' };
+    fireEvent.pointerDown(screen.getByTestId('a-text'), { ...stift, clientX: 5, clientY: 5 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    fireEvent.pointerUp(screen.getByTestId('b-text'), stift);
+    fireEvent.click(screen.getByTestId('b-text'));
+    expect(beiKlickB).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1000));
+    fireEvent.click(screen.getByTestId('b-text'));
+    expect(beiKlickB).toHaveBeenCalledTimes(1);
+  });
+
+  it('ein Druck auf A beendet keinen Druck auf B, und B öffnet danach weiter', () => {
+    vi.useFakeTimers();
+    const a = vi.fn<Oeffnen>(() => true);
+    const b = vi.fn<Oeffnen>(() => true);
+    render(
+      <>
+        <Flaeche name="a" onOeffnen={a} />
+        <Flaeche name="b" onOeffnen={b} />
+      </>,
+    );
+    fireEvent.pointerDown(screen.getByTestId('b-text'), { ...touch, pointerId: 1 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    expect(b).toHaveBeenCalledTimes(1);
+    expect(a).not.toHaveBeenCalled();
+    fireEvent.pointerUp(screen.getByTestId('b-text'), { ...touch, pointerId: 1 });
+    expect(screen.getByTestId('b')).not.toHaveAttribute(DRUCK_ATTRIBUT);
   });
 });

@@ -5801,6 +5801,24 @@
             ],
             "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „Fachberater: THW\", „Einsatzleitung\"; LFH-615). Abgeleitet aus der\nFührungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,\nwenn keine Funktion folgt."
           },
+          "meine_funktion_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung der eigenen Funktion, nur bei Führungshilfspersonal und Fachberater („THW“);\nfehlt sonst und nach einer Schwärzung der Mitgliedschaft (pkjvl5iy, design.md D1/D2)."
+          },
+          "meine_funktion_code": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Katalogcode derselben Funktion wie `meine_funktion` (pkjvl5iy, design.md D1): ganzer\nKatalog, ohne Führungsfunktion mit Rolle Einsatzleitung `el`. Daran erkennt „meine\nStelle“ im Überblick die eigenen Vorgänge. Fehlt, wenn keine Funktion folgt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "meine_rolle": {
             "oneOf": [
               {
@@ -5849,6 +5867,17 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "spiegel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzSpiegelAnzeige",
+                "description": "Spiegel einer gekoppelten Instanz (LLH-1492, Spec `einsatz-spiegel`): wer führt, Stand,\nAnträge. Fehlt an einem Einsatz, den diese Instanz führt. Am Spiegel schreibt der Client\nnur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`)."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -6490,6 +6519,41 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "EinsatzSpiegelAnzeige": {
+        "type": "object",
+        "description": "Ein Spiegel, wie der Client ihn zeigt (Hinweisband).",
+        "required": [
+          "gegenstelle",
+          "beendet",
+          "antraege_ausstehend",
+          "antraege_abgelehnt"
+        ],
+        "properties": {
+          "antraege_abgelehnt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "antraege_ausstehend": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "beendet": {
+            "type": "boolean",
+            "description": "Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar."
+          },
+          "gegenstelle": {
+            "type": "string",
+            "description": "Name der führenden Instanz."
+          },
+          "letzter_abgleich_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abgleich (UTC); fehlt vor dem ersten."
           }
         }
       },
@@ -9218,10 +9282,18 @@
           "bloecke",
           "meldungen",
           "zaehlung",
+          "abschnitte_neu",
           "auswahl",
           "uebernehmbar"
         ],
         "properties": {
+          "abschnitte_neu": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Namen der Einsatzabschnitte, die das Übernehmen anlegt, in der Reihenfolge der Posten\n(LLH-1609); aus einer Datei leer."
+          },
           "auswahl": {
             "$ref": "#/components/schemas/ImportAuswahl"
           },
@@ -9273,9 +9345,15 @@
           "grenzwerte_neu",
           "programmpunkte_neu",
           "programmpunkte_vorhanden",
+          "abschnitte_neu",
           "aenderungen"
         ],
         "properties": {
+          "abschnitte_neu": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Einsatzabschnitte, die die Vorplanung anlegt (LLH-1609); aus einer Datei 0."
+          },
           "aenderungen": {
             "type": "integer",
             "format": "int64",
@@ -9504,7 +9582,8 @@
           "protokoll",
           "org",
           "wartende_schluessel",
-          "ohne_gueltigen_schluessel"
+          "ohne_gueltigen_schluessel",
+          "spiegel"
         ],
         "properties": {
           "gegenueber_adresse": {
@@ -9564,6 +9643,10 @@
           },
           "richtung": {
             "$ref": "#/components/schemas/InstanzKopplungRichtung"
+          },
+          "spiegel": {
+            "$ref": "#/components/schemas/InstanzSpiegelStand",
+            "description": "Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`, „Die Seite Instanzkopplung zeigt\nden Abgleich“)."
           },
           "uhr_abweichung_s": {
             "type": [
@@ -9649,6 +9732,73 @@
           "update_hier",
           "update_gegenueber"
         ]
+      },
+      "InstanzSpiegelEinsatz": {
+        "type": "object",
+        "description": "Ein Einsatz im Abgleich einer Kopplung.",
+        "required": [
+          "einsatz_id",
+          "bezeichnung",
+          "gespiegelt",
+          "stand",
+          "beendet"
+        ],
+        "properties": {
+          "beendet": {
+            "type": "boolean"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gespiegelt": {
+            "type": "boolean",
+            "description": "`true`: diese Instanz spiegelt ihn; `false`: sie führt und liefert ihn."
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "letzter_abgleich_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stand": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gespiegelt: übernommener Stand; geliefert: zuletzt bestätigter Stand der Gegenseite."
+          }
+        }
+      },
+      "InstanzSpiegelStand": {
+        "type": "object",
+        "description": "Abgleich der Einsätze an einer Kopplung.",
+        "required": [
+          "einsaetze"
+        ],
+        "properties": {
+          "einsaetze": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanzSpiegelEinsatz"
+            },
+            "description": "Gelieferte und gespiegelte Einsätze der eigenen Org, jüngste zuerst (höchstens 50)."
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Etwa „Gegenüber spiegelt noch nicht (Update nötig).“"
+          }
+        }
       },
       "InstanzStammdatenStand": {
         "type": "object",
@@ -15868,6 +16018,27 @@
           }
         }
       },
+      "PlanungUebernahmeVorschau": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ImportVorschau"
+          },
+          {
+            "type": "object",
+            "required": [
+              "stand"
+            ],
+            "properties": {
+              "stand": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Zählt jede Änderung der Planung; nur zum Zurückschicken, keine Anzeige."
+              }
+            }
+          }
+        ],
+        "description": "Antwort der Vorschau einer Übernahme (LLH-1587): die Vorschau des Kerns und der Stand der\nPlanung, auf dem sie beruht (LLH-1610). „Übernehmen“ schickt den Stand zurück; hat sich die\nPlanung seitdem geändert, ist es 409."
+      },
       "PlatzAnzeige": {
         "type": "object",
         "description": "Serialisierbare Platz-Anzeige (1:1 zur Tabelle).",
@@ -17425,6 +17596,49 @@
           "wildtier",
           "sonstige"
         ]
+      },
+      "SpiegelAntragAnzeige": {
+        "type": "object",
+        "description": "Ein Antrag, wie die Person ihn am Spiegel sieht (Spec `spiegel-antraege`).",
+        "required": [
+          "id",
+          "art",
+          "zustand",
+          "erfasst_at",
+          "ziel",
+          "daten"
+        ],
+        "properties": {
+          "art": {
+            "type": "string",
+            "description": "Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …)."
+          },
+          "daten": {
+            "type": "object",
+            "description": "Die erfassten Daten (Kennungen der führenden Instanz)."
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ziel": {
+            "type": "object",
+            "description": "Pfadparameter mit den Kennungen dieser Instanz (etwa `pid` der Person)."
+          },
+          "zustand": {
+            "type": "string",
+            "description": "`ausstehend`, `zugestellt`, `uebernommen` (Zeile noch nicht im Spiegel) oder `abgelehnt`."
+          }
+        }
       },
       "SprechgruppeAnzeige": {
         "type": "object",
@@ -20460,6 +20674,7 @@
           "schluessel",
           "art",
           "name",
+          "abschnitt_neu",
           "ziel",
           "treffer",
           "kandidaten",
@@ -20480,6 +20695,10 @@
             ],
             "format": "int64",
             "description": "Der gefundene Abschnitt; bei einem neuen Posten liegt er dort."
+          },
+          "abschnitt_neu": {
+            "type": "boolean",
+            "description": "Der Abschnitt entsteht mit dem Übernehmen, und der neue Posten kommt hinein (LLH-1609)."
           },
           "art": {
             "$ref": "#/components/schemas/PaketPostenArt"

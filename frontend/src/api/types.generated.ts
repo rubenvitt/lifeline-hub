@@ -2334,6 +2334,12 @@ export interface components {
              *     wenn keine Funktion folgt.
              */
             meine_funktion?: string | null;
+            /**
+             * @description Bezeichnung der eigenen Funktion, nur bei Führungshilfspersonal und Fachberater („THW“);
+             *     fehlt sonst und nach einer Schwärzung der Mitgliedschaft (pkjvl5iy, design.md D1/D2).
+             */
+            meine_funktion_bezeichnung?: string | null;
+            meine_funktion_code?: components["schemas"]["Fuehrungsfunktion"] | null;
             meine_rolle?: components["schemas"]["EinsatzRolle"] | null;
             /**
              * @description Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;
@@ -2355,6 +2361,7 @@ export interface components {
             /** @description Aufbewahrungsfrist (LFH-130); `None` = keine Frist gesetzt. */
             retention_bis?: string | null;
             sachverhalt?: string | null;
+            spiegel?: components["schemas"]["EinsatzSpiegelAnzeige"] | null;
             status: components["schemas"]["EinsatzStatus"];
             stichwort?: string | null;
             /**
@@ -2621,6 +2628,19 @@ export interface components {
             /** Format: int64 */
             vorwarnung_minuten: number;
             wechselzeiten?: string[] | null;
+        };
+        /** @description Ein Spiegel, wie der Client ihn zeigt (Hinweisband). */
+        EinsatzSpiegelAnzeige: {
+            /** Format: int64 */
+            antraege_abgelehnt: number;
+            /** Format: int64 */
+            antraege_ausstehend: number;
+            /** @description Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar. */
+            beendet: boolean;
+            /** @description Name der führenden Instanz. */
+            gegenstelle: string;
+            /** @description Letzter erfolgreicher Abgleich (UTC); fehlt vor dem ersten. */
+            letzter_abgleich_at?: string | null;
         };
         /**
          * @description Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
@@ -3731,6 +3751,11 @@ export interface components {
         };
         /** @description Antwort der Vorschau: nichts ist geschrieben. */
         ImportVorschau: {
+            /**
+             * @description Namen der Einsatzabschnitte, die das Übernehmen anlegt, in der Reihenfolge der Posten
+             *     (LLH-1609); aus einer Datei leer.
+             */
+            abschnitte_neu: string[];
             auswahl: components["schemas"]["ImportAuswahl"];
             bloecke: components["schemas"]["VorschauBlock"][];
             /** @description Fehler zuerst, dann Hinweise, je nach Zeile. */
@@ -3743,6 +3768,11 @@ export interface components {
         };
         /** @description Zählung der Änderungen. Alles 0 außer `*_unveraendert` heißt: nichts zu tun. */
         ImportZaehlung: {
+            /**
+             * Format: int64
+             * @description Einsatzabschnitte, die die Vorplanung anlegt (LLH-1609); aus einer Datei 0.
+             */
+            abschnitte_neu: number;
             /**
              * Format: int64
              * @description Summe aller Änderungen; 0 = das Übernehmen schreibt nichts.
@@ -3868,6 +3898,11 @@ export interface components {
             org: components["schemas"]["InstanzOrgZuordnung"];
             protokoll: components["schemas"]["InstanzProtokoll"];
             richtung: components["schemas"]["InstanzKopplungRichtung"];
+            /**
+             * @description Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`, „Die Seite Instanzkopplung zeigt
+             *     den Abgleich“).
+             */
+            spiegel: components["schemas"]["InstanzSpiegelStand"];
             /** Format: int64 */
             uhr_abweichung_s?: number | null;
             /**
@@ -3909,6 +3944,29 @@ export interface components {
          * @enum {string}
          */
         InstanzProtokoll: "passt" | "update_hier" | "update_gegenueber";
+        /** @description Ein Einsatz im Abgleich einer Kopplung. */
+        InstanzSpiegelEinsatz: {
+            beendet: boolean;
+            bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description `true`: diese Instanz spiegelt ihn; `false`: sie führt und liefert ihn. */
+            gespiegelt: boolean;
+            hinweis?: string | null;
+            letzter_abgleich_at?: string | null;
+            /**
+             * Format: int64
+             * @description Gespiegelt: übernommener Stand; geliefert: zuletzt bestätigter Stand der Gegenseite.
+             */
+            stand: number;
+        };
+        /** @description Abgleich der Einsätze an einer Kopplung. */
+        InstanzSpiegelStand: {
+            /** @description Gelieferte und gespiegelte Einsätze der eigenen Org, jüngste zuerst (höchstens 50). */
+            einsaetze: components["schemas"]["InstanzSpiegelEinsatz"][];
+            /** @description Etwa „Gegenüber spiegelt noch nicht (Update nötig).“ */
+            hinweis?: string | null;
+        };
         /** @description Stand der Stammdaten-Verteilung an einer Org-Zuordnung (design.md D9). */
         InstanzStammdatenStand: {
             /** @description Nur erreichte Seite: Geheimnisse gehen hinaus (Empfänger bekannt, Platte bestätigt). */
@@ -6412,6 +6470,18 @@ export interface components {
             planung: components["schemas"]["PlanungAnzeige"];
             zaehlung: components["schemas"]["ImportZaehlung"];
         };
+        /**
+         * @description Antwort der Vorschau einer Übernahme (LLH-1587): die Vorschau des Kerns und der Stand der
+         *     Planung, auf dem sie beruht (LLH-1610). „Übernehmen“ schickt den Stand zurück; hat sich die
+         *     Planung seitdem geändert, ist es 409.
+         */
+        PlanungUebernahmeVorschau: components["schemas"]["ImportVorschau"] & {
+            /**
+             * Format: int64
+             * @description Zählt jede Änderung der Planung; nur zum Zurückschicken, keine Anzeige.
+             */
+            stand: number;
+        };
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;
@@ -6986,6 +7056,21 @@ export interface components {
          * @enum {string}
          */
         Spezies: "hund" | "katze" | "grosstier" | "nutzgefluegel" | "kleintier" | "wildtier" | "sonstige";
+        /** @description Ein Antrag, wie die Person ihn am Spiegel sieht (Spec `spiegel-antraege`). */
+        SpiegelAntragAnzeige: {
+            /** @description Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …). */
+            art: string;
+            /** @description Die erfassten Daten (Kennungen der führenden Instanz). */
+            daten: Record<string, never>;
+            erfasst_at: string;
+            grund?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Pfadparameter mit den Kennungen dieser Instanz (etwa `pid` der Person). */
+            ziel: Record<string, never>;
+            /** @description `ausstehend`, `zugestellt`, `uebernommen` (Zeile noch nicht im Spiegel) oder `abgelehnt`. */
+            zustand: string;
+        };
         /** @description Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag). */
         SprechgruppeAnzeige: {
             aktiv: boolean;
@@ -8151,6 +8236,8 @@ export interface components {
              * @description Der gefundene Abschnitt; bei einem neuen Posten liegt er dort.
              */
             abschnitt_id?: number | null;
+            /** @description Der Abschnitt entsteht mit dem Übernehmen, und der neue Posten kommt hinein (LLH-1609). */
+            abschnitt_neu: boolean;
             art: components["schemas"]["PaketPostenArt"];
             /** Format: int64 */
             bloecke: number;

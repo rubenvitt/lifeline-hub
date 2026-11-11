@@ -7,7 +7,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { IconKreuz, IconPlus, IconSchluessel, IconUhr } from '../../icons';
 import { Formularpaneel, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
-import { MenueAusloeser } from '../../components/MenueAusloeser';
+import type { WeitereAktionen } from '../../components/Datensicht';
+import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
+import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
 import { Select } from '../../components/Select';
 import KopierbarerText from '../../components/KopierbarerText';
 import { ErfassungsModal } from '../../components/Erfassung';
@@ -39,7 +41,7 @@ import type {
   KopplungAnzeige,
   KopplungMitCode,
 } from '../../api/types';
-import { istEinsatzLeitung } from '../../einsatz/schreibrecht';
+import { darfEinsatzLeiten, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { koppelnAdresse, parseRouteId } from '../../routing/deeplinks';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
@@ -110,6 +112,9 @@ export default function EinsatzGeraete() {
   const daten = useEinstellungenDaten(einsatzId);
   const leitung = istEinsatzLeitung(daten.einsatz);
   const darf = leitung && daten.istAktiv;
+  // Koppeln und Widerrufen schreiben einen ETB-Eintrag; am Spiegel sperrt das die Datenbank
+  // (LLH-1492). Die Freigabe externer Lagemonitore bleibt lokal und hängt weiter an `darf`.
+  const darfKoppeln = darf && darfEinsatzLeiten(daten.einsatz);
 
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [anlegenVorbelegung, setAnlegenVorbelegung] = useState<AnlegenWerte | undefined>();
@@ -133,35 +138,35 @@ export default function EinsatzGeraete() {
   const uhsQ = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: darf && stellenart === 'uhs',
+    enabled: darfKoppeln && stellenart === 'uhs',
   });
   const betreuungQ = useQuery({
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),
-    enabled: darf && stellenart === 'betreuungsstelle',
+    enabled: darfKoppeln && stellenart === 'betreuungsstelle',
   });
   const brQ = useQuery({
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
-    enabled: darf && stellenart === 'bereitstellungsraum',
+    enabled: darfKoppeln && stellenart === 'bereitstellungsraum',
   });
   const abschnitteQ = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: darf && stellenart === 'einsatzabschnitt',
+    enabled: darfKoppeln && stellenart === 'einsatzabschnitt',
   });
   // Verpflegungsstellen (LLH-1048): `stellen` aus der einen Lesequelle der Verpflegung, ohne
   // stornierte; geplant und aktiv nimmt der Server an.
   const verpflegungQ = useQuery({
     queryKey: einsatzKeys.verpflegung(einsatzId),
     queryFn: () => ladeVerpflegung(einsatzId),
-    enabled: darf && stellenart === 'verpflegungsstelle',
+    enabled: darfKoppeln && stellenart === 'verpflegungsstelle',
   });
   // Einheiten (LLH-1579): die aktiven; eine aufgelöste lehnt der Server ab.
   const einheitenQ = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: darf && stellenart === 'einheit',
+    enabled: darfKoppeln && stellenart === 'einheit',
   });
 
   // Auftrag aus dem Einheiten-Detail: einmal öffnen, dann aus der Adresse nehmen. Ohne Recht
@@ -169,7 +174,7 @@ export default function EinsatzGeraete() {
   const uebersichtDa = geraeteQ.data != null;
   useEffect(() => {
     if (einheitAuftrag == null || daten.laedt || (leitung && !uebersichtDa)) return;
-    if (darf) {
+    if (darfKoppeln) {
       setAnlegenVorbelegung({ ansicht: 'einheit', stelle_id: einheitAuftrag });
       setAnlegenOffen(true);
     }
@@ -181,7 +186,7 @@ export default function EinsatzGeraete() {
       },
       { replace: true },
     );
-  }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darf, setSuche]);
+  }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darfKoppeln, setSuche]);
 
   // Vorbelegen ist kein Reset (`frontend/AGENTS.md`, Erfassung): erst wenn das Formular hängt,
   // und nicht als `initialValues`, sonst setzten Abbrechen und Erfolg auf die Einheit zurück und
@@ -237,6 +242,40 @@ export default function EinsatzGeraete() {
     },
   });
 
+  /**
+   * Aktionen einer Kopplung, EINE Quelle für ⋮ und Kontextmenü (LLH-1599, design.md D3). Läuft
+   * eine Aktion, ist jeder Auslöser gesperrt und zeigt das (wie bisher).
+   */
+  const geraetLaeuft = neuerCode.isPending || verlaengern.isPending || widerrufen.isPending;
+  const kopplungMenue: WeitereAktionen<KopplungAnzeige> | undefined = darfKoppeln
+    ? {
+        eintraege: (k) =>
+          istBeendet(k)
+            ? []
+            : [
+                { key: 'code', icon: <IconSchluessel />, label: 'Neuen Code ausstellen' },
+                { key: 'verlaengern', icon: <IconUhr />, label: 'Verlängern …' },
+                { key: 'widerrufen', icon: <IconKreuz />, label: 'Widerrufen …', gefahr: true },
+              ],
+        zugaenglicherName: (k) => `Aktionen zu Gerät ${k.anzeigename}`,
+        laeuft: () => geraetLaeuft,
+        onWahl: (key, k) => {
+          if (key === 'code') neuerCode.mutate(k);
+          else if (key === 'verlaengern') {
+            verlaengern.reset();
+            setVerlaengernFuer(k);
+          } else if (key === 'widerrufen') {
+            widerrufen.reset();
+            setWiderrufFuer(k);
+          }
+        },
+      }
+    : undefined;
+  const kontext = useZeilenMenueKontext(kopplungMenue, {
+    finde: (id) => geraeteQ.data?.kopplungen.find((k) => k.id === id),
+    schluessel: (k) => k.id,
+  });
+
   if (daten.laedt || (leitung && geraeteQ.isLoading)) return <SeitenSkeleton />;
   if (!leitung) {
     return <SeitenLeer titel={RECHTE_TEXT} />;
@@ -252,7 +291,6 @@ export default function EinsatzGeraete() {
   }
 
   const { kopplungen, sperren, ansichten } = geraeteQ.data;
-  const laeuft = neuerCode.isPending || verlaengern.isPending || widerrufen.isPending;
   const stellenAuswahl = stellenart
     ? stellenOptionen(
         {
@@ -282,7 +320,7 @@ export default function EinsatzGeraete() {
         titel="Gekoppelte Geräte"
         dataUpdatedAt={geraeteQ.dataUpdatedAt}
         aktion={
-          darf && (
+          darfKoppeln && (
             <Button
               type="primary"
               icon={<IconPlus />}
@@ -303,67 +341,40 @@ export default function EinsatzGeraete() {
           rowKey={(k) => k.id}
           emptyText="Noch kein Gerät gekoppelt"
           renderItem={(k) => (
-            <ListenEintrag
-              actions={
-                darf && !istBeendet(k)
-                  ? [
-                      <MenueAusloeser
-                        key="aktionen"
-                        gesperrt={laeuft}
-                        laeuft={laeuft}
-                        zugaenglicherName={`Aktionen zu Gerät ${k.anzeigename}`}
-                        eintraege={[
-                          {
-                            key: 'code',
-                            icon: <IconSchluessel />,
-                            label: 'Neuen Code ausstellen',
-                          },
-                          { key: 'verlaengern', icon: <IconUhr />, label: 'Verlängern …' },
-                          {
-                            key: 'widerrufen',
-                            icon: <IconKreuz />,
-                            label: 'Widerrufen …',
-                            gefahr: true,
-                          },
-                        ]}
-                        onWahl={(key) => {
-                          if (key === 'code') neuerCode.mutate(k);
-                          else if (key === 'verlaengern') {
-                            verlaengern.reset();
-                            setVerlaengernFuer(k);
-                          } else if (key === 'widerrufen') {
-                            widerrufen.reset();
-                            setWiderrufFuer(k);
-                          }
-                        }}
-                      />,
-                    ]
-                  : undefined
-              }
-            >
-              <ListenEintragMeta
-                title={<span data-lfh="geraet-titel">{k.anzeigename}</span>}
-                description={
-                  <span style={{ color: rollen.gedaempft }} data-lfh="geraet-zustand">
-                    {[
-                      ANSICHT_LABEL[k.ansicht],
-                      STATUS_WORT[k.status],
-                      k.status === 'widerrufen'
-                        ? `von ${k.widerrufen_von_name ?? '—'} um ${zeitKurz(k.widerrufen_at, konv)}`
-                        : `bis ${zeitKurz(k.laeuft_ab_at, konv)}`,
-                      k.letzter_zugriff_at
-                        ? `zuletzt ${zeitKurz(k.letzter_zugriff_at, konv)}`
-                        : null,
-                      `angelegt von ${k.erstellt_von_name}`,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
+            // Hülle für das Kontextmenü: `ListenEintrag` nimmt keine Ereignis-Props (LLH-1599 D3).
+            <div data-lfh="geraet-eintrag" {...(kopplungMenue ? kontext.ausloeser(k) : {})}>
+              <ListenEintrag
+                actions={
+                  kopplungMenue && !istBeendet(k)
+                    ? [<ZeilenMenueAusloeser key="aktionen" menue={kopplungMenue} zeile={k} />]
+                    : undefined
                 }
-              />
-            </ListenEintrag>
+              >
+                <ListenEintragMeta
+                  title={<span data-lfh="geraet-titel">{k.anzeigename}</span>}
+                  description={
+                    <span style={{ color: rollen.gedaempft }} data-lfh="geraet-zustand">
+                      {[
+                        ANSICHT_LABEL[k.ansicht],
+                        STATUS_WORT[k.status],
+                        k.status === 'widerrufen'
+                          ? `von ${k.widerrufen_von_name ?? '—'} um ${zeitKurz(k.widerrufen_at, konv)}`
+                          : `bis ${zeitKurz(k.laeuft_ab_at, konv)}`,
+                        k.letzter_zugriff_at
+                          ? `zuletzt ${zeitKurz(k.letzter_zugriff_at, konv)}`
+                          : null,
+                        `angelegt von ${k.erstellt_von_name}`,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  }
+                />
+              </ListenEintrag>
+            </div>
           )}
         />
+        {kontext.menue}
       </Formularpaneel>
 
       <EinsatzLagemonitore einsatzId={einsatzId} darf={darf} />

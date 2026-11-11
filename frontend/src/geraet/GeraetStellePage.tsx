@@ -11,7 +11,7 @@ import type { UhsDetail } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Segmentleiste } from '../components/instrument';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import MaterialTab from '../pages/uhs/MaterialTab';
 import UhsAnhaenge from '../pages/uhs/UhsAnhaenge';
 import UhsKraefte from '../pages/uhs/UhsKraefte';
@@ -114,7 +114,8 @@ export default function GeraetStellePage() {
               <GeraetMeldungen
                 einsatzId={einsatzId}
                 absender={[uhs.bezeichnung, geraet?.bezeichnung].filter(Boolean).join(' · ')}
-                schreibgeschuetzt={schreibgeschuetzt}
+                // Eine Meldung ist am Spiegel ein Antrag (LLH-1492, D13).
+                schreibgeschuetzt={!darfBeantragen(einsatzQuery.data)}
               />
             ) : (
               <UhsAnhaenge

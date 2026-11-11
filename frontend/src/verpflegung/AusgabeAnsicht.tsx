@@ -44,7 +44,7 @@ import {
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { useOnline } from '../offline/useOnline';
 import {
@@ -316,6 +316,8 @@ export default function AusgabeAnsicht() {
     setEmpfaengerWahl({ zeitfenster: zfId, wahl });
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
+  // Zählen und Nachtragen sind am Spiegel ein Antrag (LLH-1492, D13); Zurücknehmen bleibt gesperrt.
+  const darfZaehlen = darfBeantragen(einsatzQuery.data);
   const vergangen = zf != null && istVergangen(zf, jetzt);
 
   const vorgemerkt = useVorgemerkteAusgaben(benutzer?.id, einsatzId);
@@ -348,6 +350,8 @@ export default function AusgabeAnsicht() {
       nachtrag.zeigeVorgemerkt(
         `Offline vorgemerkt: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}`,
       ),
+    onBeantragt: (b) =>
+      nachtrag.zeigeVorgemerkt(`Beantragt: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}`),
   });
 
   // Rücknahme aus der Liste: endgültig, mit Rückfrage; der Fehler steht im Dialog.
@@ -380,7 +384,7 @@ export default function AusgabeAnsicht() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const rechteText = einsatzRechteGrund(einsatz.status);
+  const rechteText = einsatzRechteGrund(einsatz);
   const verpflegungPfad = pfade.verpflegung(einsatzId);
 
   const ortspfad = (titel: string) =>
@@ -426,7 +430,7 @@ export default function AusgabeAnsicht() {
   );
 
   // Gründe der Sperren; einer gilt für alle Zähltasten, „keine Sammlung“ nur für „−1“ und „Buchen“.
-  const tastenGrund = !darfSchreiben ? rechteText : vergangen ? ZEITFENSTER_VORBEI : null;
+  const tastenGrund = !darfZaehlen ? rechteText : vergangen ? ZEITFENSTER_VORBEI : null;
   const tastenGesperrt = tastenGrund != null;
   const zuruckGesperrt = tastenGesperrt || !sammlung.offen;
   const grundText = tastenGrund ?? (sammlung.offen ? '' : KEINE_SAMMLUNG);
@@ -462,7 +466,7 @@ export default function AusgabeAnsicht() {
       weitere={{
         name: `Weitere Aktionen zur Ausgabe ${zitat(zf.bezeichnung)}`,
         eintraege: [
-          darfSchreiben
+          darfZaehlen
             ? { key: 'nachtragen', label: 'Ausgabe nachtragen', onWahl: oeffneNachtragen }
             : {
                 key: 'nachtragen',
@@ -475,7 +479,7 @@ export default function AusgabeAnsicht() {
       // Nur der Rechtehinweis: er steht ab dem ersten Bild. Der Grund einer abgelehnten Rücknahme
       // käme erst später und schöbe hier alle Tasten nach unten; er steht unter den
       // Sonderkost-Tasten (Spec: eine Ablehnung verschiebt keine Zähltaste).
-      hinweis={!darfSchreiben && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
+      hinweis={!darfZaehlen && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
     >
       <div
         ref={restHoehe}
@@ -893,6 +897,9 @@ export default function AusgabeAnsicht() {
                     : { display: 'contents' }
                 }
               >
+                {/* Eine Auswahl, kein Menü eines Datensatzes: der Zählschirm hat bewusst kein
+                    Kontextmenü (Spec `datensatz-aktionsmenue`, „Ein Zählschirm hat kein
+                    Kontextmenü“, LLH-1598). */}
                 <MenueAusloeser<Kostform>
                   eintraege={ohneBedarf.map((k) => ({ key: k, label: KOSTFORM_LABEL[k] }))}
                   zugaenglicherName="Weitere Kostform …"
@@ -969,11 +976,12 @@ export default function AusgabeAnsicht() {
                 const sk = sonderkostText(sonderkostVoll(d.sonderkost));
                 return (
                   <Zeitachseneintrag
-                    key={`ausstehend-${v.id ?? d.client_id}`}
+                    key={v.antrag ? `antrag-${v.antrag.id}` : `ausstehend-${v.id ?? d.client_id}`}
                     als="li"
                     data-lfh="ausgabe-zeile-ausstehend"
                     zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
-                    typwort="ausstehend"
+                    // Ein Antrag am Spiegel (LLH-1492) steht wie Vorgemerktes.
+                    typwort={v.antrag ? 'beantragt' : 'ausstehend'}
                   >
                     <span style={{ color: rollen.text2 }}>
                       <span style={monoStil(13, 500)}>{d.menge} EP</span>

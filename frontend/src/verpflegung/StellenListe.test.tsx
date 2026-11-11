@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { offenesMenue, warteAufMenueFokus } from '../test/menue';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -325,5 +326,61 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
     const s: Verpflegungsstelle = stelle({ id: 5, bezeichnung: 'Leer' });
     zeige({ stellen: [s], zeitfenster: [zeitfenster({ stelle_ids: [] })] });
     expect(within(zeile('Leer')).queryByText(/EP ausgegeben/)).toBeNull();
+  });
+});
+
+describe('StellenListe — Kontextmenü (LLH-1598)', () => {
+  const kontextMenue = async () => {
+    await warteAufMenueFokus();
+    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+    );
+    expect(offen).toHaveLength(1);
+    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+  };
+  const rechtsklick = (el: Element) =>
+    fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });
+
+  it('aktive Stelle ohne ⋮: „Bearbeiten …“, Trenner, rot „Auflösen …“', async () => {
+    zeige({ stellen: [stelle({ id: 1, bezeichnung: 'Feldküche', status: 'aktiv' })] });
+    expect(rechtsklick(zeile('Feldküche'))).toBe(false);
+    const menue = await kontextMenue();
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Stelle Feldküche');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Bearbeiten …', 'Auflösen …']);
+    expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
+  });
+
+  it('läuft die Inbetriebnahme, stehen die Einträge gesperrt', async () => {
+    let fertig: () => void = () => {};
+    zeige({
+      stellen: [stelle({ id: 1, bezeichnung: 'Feldküche', status: 'geplant' })],
+      onStatus: vi.fn(
+        () =>
+          new Promise<void>((r) => {
+            fertig = r;
+          }),
+      ),
+    });
+    rechtsklick(zeile('Feldküche'));
+    await userEvent.click(
+      within(await kontextMenue()).getByRole('menuitem', { name: 'In Betrieb nehmen' }),
+    );
+    expect(rechtsklick(zeile('Feldküche'))).toBe(false);
+    // Alle Einträge gesperrt: kein Fokusziel, also nicht auf den Fokus warten (`test/menue.ts`).
+    const menue = await waitFor(() => offenesMenue().querySelector<HTMLElement>('[role="menu"]')!);
+    for (const e of within(menue).getAllByRole('menuitem')) {
+      expect(e).toHaveAttribute('aria-disabled', 'true');
+    }
+    fertig();
+  });
+
+  it('ohne Planungsrecht bleibt das Browsermenü', () => {
+    zeige({ darfPlanen: false });
+    const erste = screen.getAllByRole('article')[0];
+    expect(rechtsklick(erste)).toBe(true);
   });
 });

@@ -20,7 +20,13 @@ import FahrzeugFormModal from './FahrzeugFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
-import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import {
+  DIENSTSTATUS_FEHLER,
+  dienststatusMenue,
+  dienststatusSpalten,
+  useDienststatusMutation,
+  type DienststatusOptionen,
+} from './dienststatus';
 import { staerkeSumme, staerkeText } from '../anzeige/staerke';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
@@ -49,6 +55,19 @@ export default function FahrzeugeTab() {
   // kein Trichter.
   const typWerte = werteAus(fahrzeuge, (f) => f.fahrzeugtyp);
   const traegerWerte = werteAus(fahrzeuge, (f) => f.traegerorganisation);
+
+  // Eine Beschreibung für Aktionsspalte und Kontextmenü (LLH-1599, `dienststatus.tsx`).
+  const dienstOptionen: DienststatusOptionen<Fahrzeug> = {
+    vomHub: (z) => herkunft.istVomHub('fahrzeug', z.id),
+    mutation: dienststatusMutation,
+    istAdmin,
+    schmal: istSchmal,
+    kennung: (f) => `Fahrzeug ${f.funkrufname}`,
+    onBearbeiten: (f) => {
+      setBearbeite(f);
+      setModalOffen(true);
+    },
+  };
 
   // Träger und Kennzeichen sind nachrangig und fallen unter `lg` weg; der Spaltenschalter zählt
   // sie und holt sie zurück (LFH-980).
@@ -125,17 +144,7 @@ export default function FahrzeugeTab() {
       sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),
       render: (_, f) => <span style={monoStil(12)}>{staerkeText(f.staerke)}</span>,
     },
-    ...dienststatusSpalten<Fahrzeug>({
-      vomHub: (z) => herkunft.istVomHub('fahrzeug', z.id),
-      mutation: dienststatusMutation,
-      istAdmin,
-      schmal: istSchmal,
-      kennung: (f) => `Fahrzeug ${f.funkrufname}`,
-      onBearbeiten: (f) => {
-        setBearbeite(f);
-        setModalOffen(true);
-      },
-    }),
+    ...dienststatusSpalten<Fahrzeug>(dienstOptionen),
   ];
 
   /**
@@ -186,6 +195,7 @@ export default function FahrzeugeTab() {
       ) : (
         <KatalogTabelle
           rowKey="id"
+          zeilenMenue={dienststatusMenue(dienstOptionen)}
           loading={fahrzeugeQuery.isLoading}
           dataSource={fahrzeuge}
           columns={spalten}
