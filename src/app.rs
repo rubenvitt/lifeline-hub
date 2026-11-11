@@ -1468,6 +1468,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::lagemonitor_zugang::freigeben)
                 .delete(routes::lagemonitor_zugang::freigabe_beenden),
         )
+        // LLH-1496: Lagebild für Externe, Links je Empfänger (Einsatzleitung, auch am Spiegel).
+        .route(
+            "/api/einsaetze/{id}/lagebild-freigaben",
+            get(routes::lagebild_extern::liste).post(routes::lagebild_extern::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lagebild-freigaben/{fid}/widerrufen",
+            post(routes::lagebild_extern::widerrufen),
+        )
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
         .route(
             "/api/einsaetze/{id}/uhs",
@@ -1871,6 +1880,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/lagemonitor/v1/lage",
             get(routes::lagemonitor_v1::lage),
+        )
+        // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
+        // dem Link (`lagebild_extern::LagebildZugriff`), IP-Sperre wie die Gerätekopplung.
+        .route(
+            "/api/extern/v1/lagebild",
+            get(routes::lagebild_extern::abruf),
         )
         // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
         // (IP-Sperre wie die Gerätekopplung), Melden signiert (`instanz::extractor`).

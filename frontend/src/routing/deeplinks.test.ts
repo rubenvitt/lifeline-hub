@@ -91,6 +91,7 @@ import {
   einsatzEinstellungenPfad,
   EINSTELLUNGEN_SEKTIONEN,
   koppelnAdresse,
+  lagebildExternAdresse,
   erinnerungenPfad,
   kraefteuebersichtPfad,
   materialPfad,
@@ -1086,6 +1087,13 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(adresse.pathname).toBe('/koppeln');
     expect(adresse.search).toBe('');
     expect(adresse.hash).toBe('#ABCD1234');
+  });
+
+  it('trägt den Schlüssel des Lagebild-Links im Fragment (LLH-1496)', () => {
+    const adresse = new URL(lagebildExternAdresse('https://hub.example', 'llh_lb_Ab-9_x'));
+    expect(adresse.pathname).toBe('/extern');
+    expect(adresse.search).toBe('');
+    expect(adresse.hash).toBe('#llh_lb_Ab-9_x');
   });
 
   /**

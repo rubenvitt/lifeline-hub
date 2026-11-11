@@ -11600,6 +11600,328 @@
           }
         }
       },
+      "LagebildDauer": {
+        "type": "string",
+        "description": "Wie lange ein Link gilt (design.md D2). Spätestens der Abschluss beendet ihn.",
+        "enum": [
+          "2h",
+          "12h",
+          "24h",
+          "einsatzende"
+        ]
+      },
+      "LagebildEinsatz": {
+        "type": "object",
+        "description": "Der Einsatz, ohne Sachverhalt, Adresse und meldende Stelle. Die Stufe `oeffentlich` trägt nur\ndie Kopfangaben und die beiden Gesamtzahlen.",
+        "required": [
+          "bezeichnung",
+          "einsatzart",
+          "begonnen_at"
+        ],
+        "properties": {
+          "begonnen_at": {
+            "type": "string"
+          },
+          "betroffene": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorBetroffene",
+                "description": "Nur Stufe `lagebild`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "betroffene_gesamt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/Einsatzart"
+          },
+          "einsatzkraefte_gesamt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Eingesetztes Personal."
+          },
+          "kraefte": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorKraefte",
+                "description": "Nur Stufe `lagebild`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lagemeldung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorLagemeldung",
+                "description": "Nur Stufe `lagebild`: Zusammenfassung des jüngsten freigegebenen Lageberichts."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sanitaetsdienst": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorSanitaetsdienst",
+                "description": "Nur Stufe `lagebild` und nur bei gewählter Kennzahl Sanitätsdienst."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorUhsZahl"
+            },
+            "description": "Nur Stufe `lagebild`."
+          }
+        }
+      },
+      "LagebildExtern": {
+        "type": "object",
+        "description": "Antwort der öffentlichen Route.",
+        "required": [
+          "api_version",
+          "stand_at",
+          "stufe",
+          "empfaenger",
+          "quelle",
+          "einsatz",
+          "nicht_uebertragen"
+        ],
+        "properties": {
+          "api_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "einsatz": {
+            "$ref": "#/components/schemas/LagebildEinsatz"
+          },
+          "empfaenger": {
+            "type": "string",
+            "description": "Für wen die Einsatzleitung den Link ausgegeben hat."
+          },
+          "gueltig_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Gültigkeit (UTC); fehlt bei „bis Einsatzende“."
+          },
+          "karte": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GeoJsonFeatureCollection",
+                "description": "Karte als GeoJSON-FeatureCollection; fehlt bei `?karte=aus`, wenn sie der Fassung aus\n`?karte=<etag>` gleicht oder nicht übertragen ist."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "karte_etag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nicht_uebertragen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Felder, die fehlen, weil die Freigabestufe des Spiegels ihre Kategorie nicht liefert."
+          },
+          "quelle": {
+            "$ref": "#/components/schemas/LagebildQuelle"
+          },
+          "stand_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Berechnung (UTC, SQLite-Format)."
+          },
+          "stufe": {
+            "$ref": "#/components/schemas/LagebildStufe"
+          }
+        }
+      },
+      "LagebildFreigabeAnzeige": {
+        "type": "object",
+        "description": "Eine Freigabe, wie die Einsatzleitung sie sieht. Der Schlüssel steht nie darin.",
+        "required": [
+          "id",
+          "empfaenger",
+          "stufe",
+          "gueltig",
+          "angelegt_at",
+          "oeffnungen",
+          "protokoll"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "angelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Person, die freigegeben hat; fehlt, wenn ihr Konto gelöscht ist."
+          },
+          "empfaenger": {
+            "type": "string"
+          },
+          "gueltig": {
+            "type": "boolean",
+            "description": "Der Link wirkt gerade: nicht widerrufen, nicht abgelaufen, Einsatz aktiv."
+          },
+          "gueltig_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Gültigkeit (UTC); fehlt bei „bis Einsatzende“."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "oeffnungen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Alle Öffnungen der Seite über diesen Link."
+          },
+          "protokoll": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagebildOeffnung"
+            },
+            "description": "Die jüngsten Öffnungen (höchstens [`PROTOKOLL_ANZEIGE_MAX`])."
+          },
+          "stufe": {
+            "$ref": "#/components/schemas/LagebildStufe"
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "widerrufen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zuletzt_abgerufen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter Abruf über diesen Link; fehlt, solange ihn niemand geöffnet hat."
+          }
+        }
+      },
+      "LagebildFreigabeMitSchluessel": {
+        "type": "object",
+        "description": "Eine frisch angelegte Freigabe. Der Schlüssel verlässt den Server nur hier, einmal.",
+        "required": [
+          "freigabe",
+          "schluessel"
+        ],
+        "properties": {
+          "freigabe": {
+            "$ref": "#/components/schemas/LagebildFreigabeAnzeige"
+          },
+          "schluessel": {
+            "type": "string"
+          }
+        }
+      },
+      "LagebildOeffnung": {
+        "type": "object",
+        "description": "Eine Öffnung der Seite im Protokoll (design.md D6).",
+        "required": [
+          "begonnen_at",
+          "zuletzt_at",
+          "abrufe"
+        ],
+        "properties": {
+          "abrufe": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "begonnen_at": {
+            "type": "string",
+            "description": "UTC im SQLite-Format."
+          },
+          "zuletzt_at": {
+            "type": "string",
+            "description": "Letzter Abruf dieser Öffnung (UTC im SQLite-Format)."
+          }
+        }
+      },
+      "LagebildQuelle": {
+        "type": "object",
+        "description": "Woher die Zahlen kommen: geführt hier oder Spiegel einer anderen Instanz.",
+        "required": [
+          "spiegel",
+          "abgleich_beendet"
+        ],
+        "properties": {
+          "abgleich_beendet": {
+            "type": "boolean",
+            "description": "Der Abgleich ist beendet; die Zahlen werden nicht mehr aktuell."
+          },
+          "letzter_abgleich_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abgleich mit der führenden Instanz (UTC); nur am Spiegel."
+          },
+          "spiegel": {
+            "type": "boolean",
+            "description": "Der Einsatz ist an dieser Instanz ein Spiegel."
+          }
+        }
+      },
+      "LagebildStufe": {
+        "type": "string",
+        "description": "Was ein Link zeigt (design.md D4). `oeffentlich` ist eine Teilmenge von `lagebild`.",
+        "enum": [
+          "lagebild",
+          "oeffentlich"
+        ]
+      },
       "Lagekennzahl": {
         "type": "string",
         "description": "Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.\n\nDie Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);\nhier steht nur, welche Auslöser gesetzt sind. Die Reihenfolge der Varianten ist die\nReihenfolge der Ausgabe von [`ableiten`].",

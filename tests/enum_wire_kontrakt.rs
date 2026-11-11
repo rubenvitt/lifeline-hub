@@ -1944,3 +1944,17 @@ fn richtwert_herkunft_wire() {
         Einsatz => "einsatz",
     });
 }
+
+#[test]
+fn lagebild_extern_wire() {
+    enum_wire!(lifeline_hub::lagebild_extern::LagebildStufe {
+        Lagebild => "lagebild",
+        Oeffentlich => "oeffentlich",
+    });
+    enum_wire!(lifeline_hub::lagebild_extern::LagebildDauer {
+        ZweiStunden => "2h",
+        ZwoelfStunden => "12h",
+        VierundzwanzigStunden => "24h",
+        Einsatzende => "einsatzende",
+    });
+}

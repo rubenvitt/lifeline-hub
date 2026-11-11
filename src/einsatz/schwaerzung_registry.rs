@@ -2999,6 +2999,49 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("freigegeben_at", G_ZEIT),
         ],
     },
+    // ---------- Lagebild für Externe (LLH-1496, migrations/0319) ----------
+    TabellenRegel {
+        tabelle: "lagebild_freigabe",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            // Der Empfänger ist Freitext („Pressestelle Muster“) und kann eine Person nennen.
+            scrub("empfaenger", Strategie::Platzhalter, Z_EINSATZ),
+            retain("stufe", G_ENUM),
+            retain(
+                "schluessel_hash",
+                "SHA-256 eines Zufallsschlüssels (Struktur, kein Personenbezug)",
+            ),
+            retain("gueltig_bis", G_ZEIT),
+            retain("angelegt_von", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("widerrufen_at", G_ZEIT),
+            retain("widerrufen_von", G_FK),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "lagebild_abruf",
+        scoping: Scoping::UeberParent {
+            fk: "freigabe_id",
+            parent: "lagebild_freigabe",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("freigabe_id", G_FK),
+            retain(
+                "oeffnung",
+                "Zufallskennung einer Öffnung der Seite (kein Personenbezug, keine IP)",
+            ),
+            retain("begonnen_at", G_ZEIT),
+            retain("zuletzt_at", G_ZEIT),
+            retain("abrufe", G_ZAEHLER),
+        ],
+    },
     // ---------- Gerätekopplung (LFH-892, migrations/0147; Stellen LFH-1040, 0158;
     // Verpflegungsstelle LLH-1048, 0213; Einheit LLH-1579, 0286) ----------
     TabellenRegel {

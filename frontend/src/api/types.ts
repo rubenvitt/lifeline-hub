@@ -31,6 +31,16 @@ export type GeraeteUebersicht = S['GeraeteUebersicht'];
 export type LesezugangAnzeige = S['LesezugangAnzeige'];
 export type LesezugangFreigabe = S['LesezugangFreigabe'];
 export type LesezugangMitSchluessel = S['LesezugangMitSchluessel'];
+// Lagebild für Externe (LLH-1496)
+export type LagebildStufe = S['LagebildStufe'];
+export type LagebildDauer = S['LagebildDauer'];
+export type LagebildFreigabeAnzeige = S['LagebildFreigabeAnzeige'];
+export type LagebildOeffnung = S['LagebildOeffnung'];
+export type LagebildFreigabeMitSchluessel = S['LagebildFreigabeMitSchluessel'];
+export type LagebildExtern = S['LagebildExtern'];
+export type LagebildEinsatz = S['LagebildEinsatz'];
+export type LagebildQuelle = S['LagebildQuelle'];
+export type GeoJsonFeatureCollection = S['GeoJsonFeatureCollection'];
 // Instanzkopplung (LLH-1490)
 export type InstanzUebersicht = S['InstanzUebersicht'];
 export type InstanzKopplungAnzeige = S['InstanzKopplungAnzeige'];
