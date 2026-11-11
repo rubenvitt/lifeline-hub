@@ -14094,9 +14094,9 @@ mod tests {
     /// LLH-1630: `einsatz_planschicht_person` bekommt `id`; die alten rowids werden zu `id`, damit
     /// Änderungslog und Spiegel-Herkunft weiter passen. Indizes und Spiegel-Trigger kommen wieder.
     #[tokio::test]
-    async fn migration_0318_planschicht_person_id() {
+    async fn migration_0320_planschicht_person_id() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 318;
+        const VERSION: i64 = 320;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
