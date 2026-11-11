@@ -1,3 +1,21 @@
+## [1.0.0-alpha.186](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.185...v1.0.0-alpha.186) (2026-11-11)
+
+### Wichtige Änderungen
+
+- **KRITIS-Extrakt ist jetzt standardmäßig ausgeschaltet.** Neue Installationen laden den Deutschland-Extrakt nicht mehr von selbst herunter. Er ist 4–5 GB groß, und jeder neue Stand wird erneut geladen. Wer die KRITIS-Daten braucht, schaltet sie mit `LIFELINE_KRITIS_EXTRAKT=true` ein.
+
+### Lagekarte
+
+- **Offline-Karten funktionieren ohne weitere Einstellung.** Eine neue Installation bietet die Kartenregionen des Projekt-Kartendienstes direkt zum Herunterladen an. Jede Region wird über eine Prüfsumme abgesichert.
+- **Der Abruf des Kartenkatalogs ist robuster.** Das Verzeichnis der verfügbaren Regionen wird beim Herunterladen auf 1 MiB begrenzt. Auch eine Antwort ohne Größenangabe kann den Server dadurch nicht mehr überlasten.
+- **Der Kartenbau ist nachvollziehbar.** Er nutzt eine fest benannte Version des Bauwerkzeugs statt der jeweils neuesten.
+
+### Betrieb und Installation
+
+- **Neuer Vorabkanal „Beta“.** Er läuft neben „Alpha“ und hat eigene Versionsnummern (`1.0.0-beta.N`). Bereits veröffentlichte Alpha-Stände können nach Beta übernommen werden. Für Beta gibt es kein eigenes Deployment.
+- **Desktop-App:** Mit dem eigenen Beta-Kanal erhalten Beta-Installationen nur Beta-Stände und stabile Versionen als Updates, keine Alpha-Stände.
+- **Container-Abbilder:** Neben `:latest` gibt es jetzt die gleitenden Tags `:alpha` und `:beta`. Sie zeigen immer auf das neueste Release ihres Kanals und springen nicht auf einen älteren Stand zurück. Das gilt auch, wenn mehrere Releases kurz nacheinander erscheinen.
+
 ## [1.0.0-alpha.185](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.184...v1.0.0-alpha.185) (2026-11-11)
 
 ### Betroffene und Betreuung

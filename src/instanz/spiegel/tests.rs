@@ -603,3 +603,160 @@ async fn gegen_id_auf_ein_fremdes_konto_wird_stellvertreter() {
         .unwrap();
     assert_ne!(lokal, stellvertreter, "ein Stellvertreter nie");
 }
+
+/// Ein Absender vor LLH-1629 liefert eine genutzte Katalog-Sprechgruppe nicht mit. Der Spiegel
+/// rückt dann trotzdem vor (mit Hinweis), statt bis zu dessen Update stehen zu bleiben; ein
+/// neuer Absender liefert sie nach, dort wartet der Spiegel.
+#[tokio::test]
+async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
+    let (f, s) = zwei_seiten().await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    let abschnitt: i64 = eine(
+        &f,
+        &format!(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES ({einsatz}, 'Nord') \
+             RETURNING id"
+        ),
+    )
+    .await;
+    let sg: i64 = eine(
+        &f,
+        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart) VALUES (1, 'Kanal 7', 'DMO') \
+         RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) \
+             VALUES ({abschnitt}, {sg})"
+        ),
+    )
+    .await;
+    let a = Absender {
+        kennung: "elw",
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        meldend: true,
+    };
+    let mut budget = Budget::neu(1024 * 1024);
+    let mut fc = f.begin().await.unwrap();
+    let staende = HashMap::new();
+    let e = liefern::list_gefuehrt(&mut fc, 1, &staende)
+        .await
+        .unwrap()
+        .remove(0);
+    let k = liefern::ensure_kennung(&mut fc, "elw", &e).await.unwrap();
+    let mut l = liefern::liefere_einsatz(&mut fc, &a, &e, &k, "hub/1", 0, &mut budget)
+        .await
+        .unwrap()
+        .expect("Lieferung");
+    fc.commit().await.unwrap();
+    assert!(l.katalog);
+    let voll = l.clone();
+    let vorher = l.zeilen.len();
+    l.zeilen
+        .retain(|z| !(z.art == "sprechgruppe" && z.schluessel == sg.to_string()));
+    assert_eq!(l.zeilen.len(), vorher - 1, "Katalogzeile war mitgeliefert");
+    let empf = Empfaenger {
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        org_id: 1,
+        meldend: false,
+    };
+    for (katalog, rueckt_vor) in [(true, false), (false, true)] {
+        l.katalog = katalog;
+        let mut sc = s.begin().await.unwrap();
+        let erg = uebernehmen::uebernehmen(&mut sc, &empf, &l).await.unwrap();
+        assert!(
+            erg.hinweise.iter().any(|h| h.contains("Bezug fehlt")),
+            "{:?}",
+            erg.hinweise
+        );
+        assert_eq!(erg.stand == l.bis, rueckt_vor, "katalog = {katalog}");
+        sc.rollback().await.unwrap();
+    }
+
+    // Der ältere Absender liefert wirklich, danach kommt er mit Update: Mit der nächsten Änderung
+    // des Einsatzes holt der Spiegel die übersprungene Zuordnung samt Sprechgruppe nach.
+    l.katalog = false;
+    let mut sc = s.begin().await.unwrap();
+    uebernehmen::uebernehmen(&mut sc, &empf, &l).await.unwrap();
+    sc.commit().await.unwrap();
+    let zuordnungen = "SELECT COUNT(*) FROM einsatzabschnitt_sprechgruppe z \
+         JOIN einsatzabschnitt a ON a.id = z.abschnitt_id JOIN einsatz e ON e.id = a.einsatz_id \
+         WHERE e.spiegel = 1";
+    assert_eq!(eine::<i64>(&s, zuordnungen).await, 0);
+    let ab: i64 = eine(&s, "SELECT katalog_ab FROM einsatz_spiegel").await;
+    assert!(ab >= 2, "{ab}");
+    // Eine kürzere Wiederholung unterhalb des Merkers (Budget): Stand höchstens davor, Merker bleibt.
+    let mut kurz = l.clone();
+    kurz.katalog = true;
+    kurz.seit = ab - 2;
+    kurz.bis = ab - 1;
+    kurz.zeilen
+        .retain(|z| z.stand > kurz.seit && z.stand <= kurz.bis);
+    let mut sc = s.begin().await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &empf, &kurz)
+        .await
+        .unwrap();
+    assert_eq!(erg.stand, ab - 1);
+    let merker: Option<i64> = sqlx::query_scalar("SELECT katalog_ab FROM einsatz_spiegel")
+        .fetch_one(&mut *sc)
+        .await
+        .unwrap();
+    assert_eq!(merker, Some(ab));
+    sc.rollback().await.unwrap();
+    // Eine Wiederholung über den Merker nach verlorener Antwort, in der die Zuordnung wieder
+    // scheitert: Der Stand fällt vor sie zurück, obwohl er schon höher stand.
+    let mut wieder = l.clone();
+    wieder.katalog = true;
+    wieder.seit = 1;
+    wieder.zeilen.retain(|z| z.stand > wieder.seit);
+    let hoeher = "UPDATE einsatz_spiegel SET stand = stand + 50";
+    let mut sc = s.begin().await.unwrap();
+    sqlx::query(hoeher).execute(&mut *sc).await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &empf, &wieder)
+        .await
+        .unwrap();
+    assert_eq!(erg.stand, ab - 1);
+    sc.rollback().await.unwrap();
+    // Gelingt eine solche Wiederholung bis zum Merker, gilt höchstens ihr Ende: Was der ältere
+    // Absender danach noch übersprungen haben kann, kommt erneut.
+    let mut bis_merker = voll.clone();
+    bis_merker.katalog = true;
+    bis_merker.seit = 1;
+    bis_merker.bis = ab;
+    bis_merker.zeilen.retain(|z| {
+        (z.art == "sprechgruppe" && z.schluessel == sg.to_string())
+            || (z.stand > 1 && z.stand <= ab)
+    });
+    let mut sc = s.begin().await.unwrap();
+    sqlx::query(hoeher).execute(&mut *sc).await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &empf, &bis_merker)
+        .await
+        .unwrap();
+    assert_eq!(erg.stand, ab);
+    let merker: Option<i64> = sqlx::query_scalar("SELECT katalog_ab FROM einsatz_spiegel")
+        .fetch_one(&mut *sc)
+        .await
+        .unwrap();
+    assert_eq!(merker, None);
+    sc.rollback().await.unwrap();
+    exec(
+        &f,
+        &format!("UPDATE einsatzabschnitt SET name = 'Nord 2' WHERE id = {abschnitt}"),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    assert_eq!(eine::<i64>(&s, zuordnungen).await, 1, "nachgeholt");
+    assert!(
+        eine::<Option<i64>>(&s, "SELECT katalog_ab FROM einsatz_spiegel")
+            .await
+            .is_none()
+    );
+}

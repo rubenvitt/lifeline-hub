@@ -4,8 +4,9 @@
 //! Inhalte auf Abruf gehen nur als Größe und Prüfsumme hinaus (D8).
 
 use super::abbildung;
+use super::katalog;
 use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile, ABHAENGIGE_MAX};
-use super::schema::{self, Schema, Tabelle, Ziel};
+use super::schema::{self, Schema, Tabelle, Ziel, SKIZZE_ELEMENTE};
 use crate::error::AppError;
 use crate::instanz::stammdaten::StammdatenArt;
 use serde_json::{Map, Value};
@@ -189,6 +190,22 @@ pub fn einsatz_verweis(
     }
 }
 
+/// Wie [`einsatz_verweis`], dazu Elemente der Fernmeldeskizze (`sg-12`), deren Kennung im Text
+/// steht.
+fn verweis_mit_skizze(
+    ziel: &Ziel,
+    daten: &Map<String, Value>,
+    wert: &Value,
+) -> Option<(&'static str, String)> {
+    if *ziel != Ziel::SkizzenElement {
+        return einsatz_verweis(ziel, daten, wert);
+    }
+    let text = wert.as_str()?;
+    let (praefix, t) = SKIZZE_ELEMENTE.iter().find(|(p, _)| text.starts_with(p))?;
+    let id: i64 = text[praefix.len()..].parse().ok()?;
+    Some((t, id.to_string()))
+}
+
 /// Übersetzt an der meldenden Seite Stammdaten lokal → fremd (D5); ohne Gegenstück `NULL` bzw.
 /// der Eintrag entfällt.
 async fn stammdaten_hinaus(
@@ -334,10 +351,15 @@ async fn baue_zeile(
     stand: i64,
 ) -> Result<Zeile, AppError> {
     let geladen = load_zeile(conn, t, schluessel).await?;
+    let mut gegen = None;
     let (daten, blob, geloescht) = match geladen {
         Some((mut daten, blob)) => {
             if a.meldend {
                 stammdaten_hinaus(conn, a, t, &mut daten).await?;
+                if katalog::ist_katalog_daten(t.name, &daten) {
+                    gegen =
+                        katalog::gegen_hinaus(conn, a.kopplung_org_id, t.name, schluessel).await?;
+                }
             }
             (Some(Value::Object(daten)), blob, false)
         }
@@ -351,6 +373,7 @@ async fn baue_zeile(
         geloescht,
         daten,
         blob,
+        gegen,
     })
 }
 
@@ -484,6 +507,7 @@ pub async fn liefere_einsatz(
         bis,
         zeilen,
         konten,
+        katalog: true,
     }))
 }
 
@@ -501,6 +525,7 @@ fn leere_lieferung(
         freigabestufe: e.freigabestufe.clone(),
         seit,
         bis,
+        katalog: true,
         ..Default::default()
     }
 }
@@ -530,7 +555,7 @@ async fn abhaengige(
                 let (Some(ziel), Some(w)) = (&s.verweis, d.get(&s.name)) else {
                     continue;
                 };
-                if let Some(v) = einsatz_verweis(ziel, d, w) {
+                if let Some(v) = verweis_mit_skizze(ziel, d, w) {
                     neu.push(v);
                 }
             }
@@ -547,8 +572,12 @@ async fn abhaengige(
             .bind(&schluessel)
             .fetch_optional(&mut *conn)
             .await?;
-            let Some(stand) = stand.filter(|s| *s > bis) else {
-                continue;
+            // Eine Katalogzeile steht in keinem Log des Einsatzes und geht immer mit (LLH-1629);
+            // der Spiegel nimmt sie als Gegenstück oder Kopie.
+            let stand = match stand.filter(|s| *s > bis) {
+                Some(s) => s,
+                None if katalog::ist_katalogzeile(conn, art, &schluessel).await? => bis,
+                None => continue,
             };
             let Some(t) = schema.tabelle(art) else {
                 continue;
