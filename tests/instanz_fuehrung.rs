@@ -1394,6 +1394,21 @@ async fn schwaerzung_beim_fuehrer_raeumt_die_bruchstelle_am_spiegel() {
     let am_hub = marke(&hub, h).await;
     assert!(am_hub.is_some());
     assert_eq!(marke(&elw, e).await, am_hub, "die Marke kam mit dem Kopf");
+    // Eine zweite Schwärzung erneuert die Marke, und der Spiegel übernimmt die neue.
+    let mut tx = hub.pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_person::scrubbe_person(
+        &mut tx,
+        h,
+        lifeline_hub::einsatz::schwaerzung_person::PersonenArt::Betroffene,
+        987_653,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    abgleichen(&elw).await;
+    let neu = marke(&hub, h).await;
+    assert_ne!(neu, am_hub, "die Marke ist neu");
+    assert_eq!(marke(&elw, e).await, neu, "der Spiegel hat die neue Marke");
     let (_, kopf) = common::anfrage(
         &elw.app,
         "GET",
@@ -1403,6 +1418,98 @@ async fn schwaerzung_beim_fuehrer_raeumt_die_bruchstelle_am_spiegel() {
     )
     .await;
     assert_eq!(kopf["spiegel"]["bruchstelle"].as_i64(), Some(0), "{kopf}");
+}
+
+/// Schwärzen beide Seiten während der Trennung, räumt der alte Führer seine Bruchstelle mit
+/// dem ersten Abgleich als Spiegel: Die Marken unterscheiden sich, auch wenn jede Seite genau
+/// einmal schwärzt (Review #1284).
+#[tokio::test]
+async fn schwaerzung_auf_beiden_seiten_der_trennung_raeumt_die_bruchstelle() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    for (i, einsatz, person) in [(&hub, h, 987_654), (&elw, e, 987_655)] {
+        let mut tx = i.pool.begin().await.unwrap();
+        lifeline_hub::einsatz::schwaerzung_person::scrubbe_person(
+            &mut tx,
+            einsatz,
+            lifeline_hub::einsatz::schwaerzung_person::PersonenArt::Betroffene,
+            person,
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    assert!(
+        bruchstellen_zeilen(&elw, e).await >= 1,
+        "der eigene Eintrag ist gesichert"
+    );
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert_eq!(bruchstellen_zeilen(&elw, e).await, 0, "Bruchstelle geräumt");
+    assert_eq!(
+        bruch_offen(&elw, e).await,
+        0,
+        "der Spiegel fragt nicht mehr"
+    );
+}
+
+/// Schwärzt nur der alte Führer während der Trennung, bleibt seine Bruchstelle: Sie ist schon
+/// geschwärzt gesichert, und ein Führer ohne Marke überschreibt die eigene nicht (Review #1284).
+#[tokio::test]
+async fn eigene_schwaerzung_in_der_trennung_laesst_die_bruchstelle_stehen() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let mut tx = elw.pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_person::scrubbe_person(
+        &mut tx,
+        e,
+        lifeline_hub::einsatz::schwaerzung_person::PersonenArt::Betroffene,
+        987_655,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert!(
+        bruchstellen_zeilen(&elw, e).await >= 1,
+        "der eigene Eintrag bleibt gesichert"
+    );
+    let mit_kopie: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND daten IS NOT NULL",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert!(mit_kopie >= 1, "mit Inhalt");
 }
 
 async fn bruch_offen(i: &Instanz, einsatz: i64) -> i64 {

@@ -3294,7 +3294,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // (`einsatz::repo::nach_schwaerzung_tx`). Am Spiegel laufen diese Wege nicht: Er räumt sie,
     // sobald der Kopf eine andere `einsatz.schwaerzung_marke` bringt
     // (`instanz::spiegel::fuehrung::raeume_bruchstelle`, LLH-1649): Kopien und Geklärtes gehen,
-    // offene Zeilen ohne Kopie werden weiter gefragt. Mit dem Einsatz geht alles beim Abräumen
+    // offene Zeilen ohne Kopie werden weiter gefragt und gehen, sobald sie geklärt sind
+    // (`geraeumt`). Mit dem Einsatz geht alles beim Abräumen
     // (Kaskade).
     TabellenRegel {
         tabelle: "einsatz_bruchstelle",
@@ -3310,6 +3311,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("entfernt", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("geklaert", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geraeumt", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gesichert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },

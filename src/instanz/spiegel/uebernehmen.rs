@@ -488,6 +488,10 @@ async fn kopf_uebernehmen(
     werte.push(("kennung".into(), Value::from(l.kennung.clone())));
     if let Some(id) = vorhanden {
         let marke_vorher = schwaerzung_marke(conn, id).await?;
+        // Ein Führer, der nie geschwärzt hat, überschreibt die eigene Marke nicht: Hat diese Seite
+        // während einer Trennung selbst geschwärzt, ist ihre Bruchstelle schon geschwärzt
+        // gesichert, und ein Wechsel auf NULL räumte sie grundlos (Review #1284).
+        werte.retain(|(s, v)| !(s == "schwaerzung_marke" && v.is_null()));
         update(conn, t.name, &werte, "id", &id.to_string()).await?;
         // Hat der Führer seither geschwärzt, räumt der Spiegel seine Bruchstelle (LLH-1649).
         // Ein Führer ohne Marke (älterer Stand) schickt keine; dann bleibt alles, wie es ist.

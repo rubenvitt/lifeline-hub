@@ -924,12 +924,7 @@ async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abglei
 /// Zeilen bleiben ohne Kopie und werden weiter gefragt (LLH-1649, Review #1284).
 #[tokio::test]
 async fn schwaerzung_nimmt_die_kopien_und_laesst_offene_zeilen_weiter_fragen() {
-    let pool = crate::db::test_pool().await;
-    exec(
-        &pool,
-        "INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Org')",
-    )
-    .await;
+    let (_, pool) = zwei_seiten().await;
     let e: i64 = eine(
         &pool,
         "INSERT INTO einsatz (org_id, bezeichnung, kennung) VALUES (1, 'Spiegel', 'k/1') \
@@ -939,7 +934,9 @@ async fn schwaerzung_nimmt_die_kopien_und_laesst_offene_zeilen_weiter_fragen() {
     crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e).await;
     exec(
         &pool,
-        &format!("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = {e}"),
+        &format!(
+            "UPDATE einsatz_spiegel SET bruch_offen = 1, kopplung_org_id = 1 WHERE einsatz_id = {e}"
+        ),
     )
     .await;
     // entfernt, geklärt, offen, zurückgestellt
@@ -977,26 +974,39 @@ async fn schwaerzung_nimmt_die_kopien_und_laesst_offene_zeilen_weiter_fragen() {
         "offene Zeilen werden weiter gefragt"
     );
 
-    // Ist nichts mehr offen, fragt der Spiegel nicht mehr.
-    exec(
-        &pool,
-        &format!(
-            "UPDATE einsatz_bruchstelle SET entfernt = 1, geklaert = 1 WHERE einsatz_id = {e}"
-        ),
-    )
-    .await;
+    // Die weiteren Antworten des Führers: Was geklärt ist, geht ganz, statt als leerer Eintrag
+    // stehen zu bleiben. Ist nichts mehr offen, fragt der Spiegel nicht mehr.
+    let anzahl = format!("SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = {e}");
+    let antwort = |unbekannt: Vec<[String; 2]>, bis: &str| super::paket::BruchAntwort {
+        kennung: format!("x/{e}"),
+        kennt: true,
+        unbekannt,
+        bis: Some(["einsatz_person".into(), bis.into()]),
+    };
     let mut conn = pool.acquire().await.unwrap();
-    super::fuehrung::raeume_bruchstelle(&mut conn, e)
+    super::fuehrung::uebernimm_bruch_antworten(
+        &mut conn,
+        1,
+        &[antwort(vec![["einsatz_person".into(), "3".into()]], "3")],
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    assert_eq!(
+        eine::<i64>(&pool, &anzahl).await,
+        1,
+        "die unbekannte Zeile ist fort"
+    );
+    assert_eq!(
+        eine::<i64>(&pool, &offen).await,
+        1,
+        "die zurückgestellte kommt noch"
+    );
+    let mut conn = pool.acquire().await.unwrap();
+    super::fuehrung::uebernimm_bruch_antworten(&mut conn, 1, &[antwort(Vec::new(), "4")])
         .await
         .unwrap();
     drop(conn);
-    assert_eq!(
-        eine::<i64>(
-            &pool,
-            &format!("SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = {e}")
-        )
-        .await,
-        0
-    );
+    assert_eq!(eine::<i64>(&pool, &anzahl).await, 0);
     assert_eq!(eine::<i64>(&pool, &offen).await, 0);
 }

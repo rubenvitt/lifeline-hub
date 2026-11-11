@@ -385,8 +385,9 @@ sequenceDiagram
   (Kategorie, Löschersuchen je Person, ganzer Einsatz) löscht dort die Bruchstelle und setzt
   `einsatz.schwaerzung_marke` neu (Zufallswert); bringt der Kopf am Spiegel eine andere Marke,
   räumt auch er seine Bruchstelle (`fuehrung::raeume_bruchstelle`, LLH-1649): Alle Kopien und
-  Geklärtes gehen; offene Zeilen fragt er ohne Kopie weiter und entfernt sie, wenn der Führer sie
-  nicht kennt.
+  Geklärtes gehen; offene Zeilen fragt er ohne Kopie weiter (`geraeumt`) und löscht sie ganz,
+  sobald sie geklärt sind. Schwärzen beide Seiten während einer Trennung, unterscheiden sich die
+  Marken ebenso.
 - Offene Anträge der neuen führenden Seite führt sie selbst aus (`antrag::fuehre_eigene_aus`),
   genau einmal; Anhänge, die ihr fehlen, holt sie beim alten Führer.
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht
