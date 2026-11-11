@@ -6,7 +6,7 @@
 //! Stand und bekommt die Lieferung in der Antwort (Pull). Den Stand nennt immer, wer spiegelt.
 
 use super::liefern::{self, Absender, Budget};
-use super::paket::{EinsatzStand, SpiegelPaket, RESERVE, SPIEGEL_MAX};
+use super::paket::{EinsatzStand, SpiegelPaket, EINSAETZE_MAX, RESERVE, SPIEGEL_MAX};
 use super::uebernehmen::{self, Empfaenger, Ergebnis};
 use crate::error::AppError;
 use crate::instanz::extractor::SPIEGEL_PFAD;
@@ -16,6 +16,7 @@ use crate::instanz::repo::{self, KopplungZeile, OrgZeile};
 use crate::instanz::{org_kennung, InstanzKopplungRichtung, PROTOKOLL_SPIEGEL};
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 /// Was ein Abgleich an der eigenen Seite übernommen hat; nach dem Commit gemeldet.
 #[derive(Debug, Default)]
@@ -36,29 +37,87 @@ fn org_wire(eigen: &Identitaet, kopplung: &KopplungZeile, o: &OrgZeile) -> Strin
     }
 }
 
+/// Zähler je Kopplung, getrennt für die Auswahl der eigenen Stände und für die Lieferung; er
+/// verschiebt den Anfang der Reihe um eins je Abgleich (LLH-1630). Ein gemeinsamer Zähler rückte
+/// je Pfad in Zweierschritten vor und träfe bei einer geraden Zahl übriger Plätze nie alle.
+static RUNDE_STAENDE: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
+static RUNDE_LIEFERN: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
+
+/// Die nächste Runde dieser Kopplung auf diesem Zähler: 0, 1, 2, …
+fn naechste_runde(zaehler: &Mutex<Option<HashMap<i64, usize>>>, kopplung_id: i64) -> usize {
+    let mut z = zaehler.lock().unwrap_or_else(|e| e.into_inner());
+    let n = z
+        .get_or_insert_with(HashMap::new)
+        .entry(kopplung_id)
+        .or_insert(0);
+    let runde = *n;
+    *n = n.wrapping_add(1);
+    runde
+}
+
+/// Die Liste ab einer Stelle, die mit jedem Abgleich weiterrückt: Was am Ende der Reihe steht,
+/// kommt so auch dran, wenn Budget oder [`EINSAETZE_MAX`] vorher ausgehen (LLH-1630).
+fn reihum<T>(mut liste: Vec<T>, runde: usize) -> Vec<T> {
+    if !liste.is_empty() {
+        let n = liste.len();
+        liste.rotate_left(runde % n);
+    }
+    liste
+}
+
 /// Stände der Spiegel dieser Instanz für eine Kopplung.
 async fn eigene_staende(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<EinsatzStand>, AppError> {
-    // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann die jüngsten. Ein
-    // abgeschlossener Spiegel, der hier fehlt, bekommt nichts mehr (der Führer liefert nur
-    // laufende Einsätze ungenannt).
-    let zeilen: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT s.fremde_kennung, s.stand FROM einsatz_spiegel s \
+    // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann reihum die übrigen. Ein
+    // abgeschlossener Spiegel, der hier fehlt, bekommt in diesem Abgleich nichts (der Führer
+    // liefert nur laufende Einsätze ungenannt). Spiegel enden erst mit dem Widerruf, über Jahre
+    // werden es also mehr als ein Paket trägt; eine feste Auswahl schnitte immer dieselben ab, und
+    // deren Nachträge kämen nie an (LLH-1630).
+    let zeilen: Vec<(String, i64, bool)> = sqlx::query_as(
+        "SELECT s.fremde_kennung, s.stand, e.status <> 'abgeschlossen' FROM einsatz_spiegel s \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
          JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
-         ORDER BY e.status = 'abgeschlossen', s.einsatz_id DESC LIMIT ?",
+         ORDER BY s.einsatz_id DESC",
     )
     .bind(kopplung_id)
-    .bind(super::paket::EINSAETZE_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
-    Ok(zeilen
+    Ok(auswahl_staende(
+        zeilen,
+        naechste_runde(&RUNDE_STAENDE, kopplung_id),
+    ))
+}
+
+/// Die laufenden zuerst, dann die übrigen, je Gruppe reihum, zusammen höchstens
+/// [`EINSAETZE_MAX`]; mindestens ein Platz bleibt den übrigen.
+fn auswahl_staende(zeilen: Vec<(String, i64, bool)>, runde: usize) -> Vec<EinsatzStand> {
+    let (laufend, uebrig): (Vec<_>, Vec<_>) = zeilen.into_iter().partition(|z| z.2);
+    // Ein Platz bleibt den übrigen, auch wenn die laufenden allein das Paket füllten: sonst kämen
+    // Nachträge abgeschlossener Spiegel nie an.
+    let fuer_laufende = if uebrig.is_empty() {
+        EINSAETZE_MAX
+    } else {
+        EINSAETZE_MAX - 1
+    };
+    let mut auswahl = if laufend.len() > fuer_laufende {
+        reihum(laufend, runde)
+    } else {
+        laufend
+    };
+    auswahl.truncate(fuer_laufende);
+    let frei = EINSAETZE_MAX - auswahl.len();
+    if uebrig.len() > frei {
+        auswahl.extend(reihum(uebrig, runde).into_iter().take(frei));
+    } else {
+        auswahl.extend(uebrig);
+    }
+    auswahl
         .into_iter()
-        .map(|(kennung, stand)| EinsatzStand { kennung, stand })
-        .collect())
+        .map(|(kennung, stand, _)| EinsatzStand { kennung, stand })
+        .collect()
 }
 
 /// Liefert die geführten Einsätze aller aktiven Orgs ab den genannten Ständen.
@@ -72,7 +131,18 @@ async fn liefere_alle(
 ) -> Result<Vec<super::paket::EinsatzLieferung>, AppError> {
     let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
     let mut lieferungen = Vec::new();
+    let mut alle = Vec::new();
     for o in orgs {
+        for e in liefern::list_gefuehrt(conn, o.org_id, staende).await? {
+            alle.push((o, e));
+        }
+    }
+    // Reihum (LLH-1630): nach der ID allein bekämen bei knappem Budget oder mehr als
+    // `EINSAETZE_MAX` wartenden Einsätzen immer dieselben den Vortritt.
+    for (o, e) in reihum(alle, naechste_runde(&RUNDE_LIEFERN, kopplung.id)) {
+        if lieferungen.len() >= EINSAETZE_MAX {
+            break;
+        }
         let a = Absender {
             kennung: &eigen.kennung,
             kopplung_id: kopplung.id,
@@ -80,17 +150,12 @@ async fn liefere_alle(
             meldend,
         };
         let wire = org_wire(eigen, kopplung, o);
-        for e in liefern::list_gefuehrt(conn, o.org_id, staende).await? {
-            if lieferungen.len() >= super::paket::EINSAETZE_MAX {
-                return Ok(lieferungen);
-            }
-            let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
-            let seit = staende.get(&kennung).copied().unwrap_or(0);
-            if let Some(l) =
-                liefern::liefere_einsatz(conn, &a, &e, &kennung, &wire, seit, budget).await?
-            {
-                lieferungen.push(l);
-            }
+        let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
+        let seit = staende.get(&kennung).copied().unwrap_or(0);
+        if let Some(l) =
+            liefern::liefere_einsatz(conn, &a, &e, &kennung, &wire, seit, budget).await?
+        {
+            lieferungen.push(l);
         }
     }
     Ok(lieferungen)
@@ -150,9 +215,9 @@ async fn uebernehme_alle(
         };
         if !erg.hinweise.is_empty() {
             tracing::warn!(kennung = %l.kennung, hinweise = ?erg.hinweise, "Spiegel: Hinweise beim Übernehmen");
-            if let Some(id) = erg.einsatz_id {
-                save_hinweis(conn, id, &erg.hinweise).await?;
-            }
+        }
+        if let Some(id) = erg.einsatz_id {
+            save_hinweis(conn, id, &erg.hinweise, &erg.erledigt).await?;
         }
         if let Some(id) = erg.einsatz_id {
             if !erg.kategorien.is_empty() {
@@ -174,19 +239,63 @@ async fn save_hinweis(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     hinweise: &[String],
+    erledigt: &[(String, String)],
 ) -> Result<(), AppError> {
-    let text: String = hinweise
+    let alt: Option<String> =
+        sqlx::query_scalar("SELECT hinweis FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .flatten();
+    let geliefert: Vec<String> = erledigt
         .iter()
-        .take(20)
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n");
-    sqlx::query("UPDATE einsatz_spiegel SET hinweis = ? WHERE einsatz_id = ?")
-        .bind(text)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
+        .map(|(art, schluessel)| uebernehmen::zu_gross_anfang(art, schluessel))
+        .collect();
+    let neu = hinweise_fortschreiben(alt.as_deref(), hinweise, &geliefert);
+    if neu != alt {
+        sqlx::query("UPDATE einsatz_spiegel SET hinweis = ? WHERE einsatz_id = ?")
+            .bind(neu)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+    }
     Ok(())
+}
+
+/// Der Hinweis am Spiegel nach einer Übernahme. „Zu groß“ steht je Zeile, bis dieselbe Zeile
+/// übernommen oder gelöscht ist (`Ergebnis::erledigt`): ihr Stand wird nicht neu geliefert, der
+/// Hinweis ginge sonst mit der nächsten Runde verloren, und er zählt nicht zur Grenze von 20
+/// (LLH-1630). Andere Hinweise gelten nur für die letzte Übernahme, höchstens 20.
+fn hinweise_fortschreiben(
+    alt: Option<&str>,
+    neu: &[String],
+    erledigt: &[String],
+) -> Option<String> {
+    let ist_erledigt = |zeile: &str| erledigt.iter().any(|g| zeile.starts_with(g.as_str()));
+    let ist_zu_gross = |zeile: &str| zeile.starts_with("Zeile ") && zeile.contains(" ist zu groß");
+    let alte: Vec<&str> = alt
+        .unwrap_or("")
+        .lines()
+        .filter(|z| !z.is_empty())
+        .collect();
+    let mut zeilen: Vec<String> = Vec::new();
+    for z in alte
+        .iter()
+        .copied()
+        .chain(neu.iter().map(String::as_str))
+        .filter(|z| ist_zu_gross(z) && !ist_erledigt(z))
+    {
+        if !zeilen.iter().any(|v| v == z) {
+            zeilen.push(z.to_owned());
+        }
+    }
+    let neue_andere: Vec<&str> = neu
+        .iter()
+        .map(String::as_str)
+        .filter(|z| !ist_zu_gross(z))
+        .collect();
+    zeilen.extend(neue_andere.into_iter().take(20).map(str::to_owned));
+    (!zeilen.is_empty()).then(|| zeilen.join("\n"))
 }
 
 /// Meldet nach dem Commit, was sich geändert hat: `lagged` an die Clients des Einsatzes (ein
@@ -419,4 +528,142 @@ pub async fn abgleich_einmal(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod reihum_tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    fn spiegel(laufend: usize, abgeschlossen: usize) -> Vec<(String, i64, bool)> {
+        (0..laufend)
+            .map(|i| (format!("l{i}"), 0, true))
+            .chain((0..abgeschlossen).map(|i| (format!("a{i}"), 0, false)))
+            .collect()
+    }
+
+    #[test]
+    fn mehr_spiegel_als_ein_paket_traegt_kommen_reihum_alle_dran() {
+        let mut alle = BTreeSet::new();
+        for runde in 0..400 {
+            let auswahl = auswahl_staende(spiegel(10, 400), runde);
+            assert_eq!(auswahl.len(), EINSAETZE_MAX);
+            let kennungen: BTreeSet<_> = auswahl.iter().map(|s| s.kennung.clone()).collect();
+            assert!(
+                (0..10).all(|i| kennungen.contains(&format!("l{i}"))),
+                "laufende sind immer dabei"
+            );
+            alle.extend(kennungen);
+        }
+        assert_eq!(alle.len(), 410, "jeder Spiegel kommt irgendwann dran");
+    }
+
+    /// Der Aufrufpfad: Stände und Lieferung zählen je Kopplung getrennt, jede Runde rückt um eins.
+    /// Mit 255 laufenden und zwei abgeschlossenen Spiegeln bleibt ein Platz; beide kommen dran.
+    #[test]
+    fn ein_freier_platz_wechselt_zwischen_zwei_abgeschlossenen() {
+        let kopplung = -1630;
+        let mut gesehen = BTreeSet::new();
+        for _ in 0..4 {
+            // Die Lieferung derselben Kopplung zählt dazwischen, darf die Auswahl aber nicht
+            // verschieben.
+            naechste_runde(&RUNDE_LIEFERN, kopplung);
+            let runde = naechste_runde(&RUNDE_STAENDE, kopplung);
+            let auswahl = auswahl_staende(spiegel(EINSAETZE_MAX - 1, 2), runde);
+            gesehen.extend(
+                auswahl
+                    .into_iter()
+                    .map(|s| s.kennung)
+                    .filter(|k| k.starts_with('a')),
+            );
+        }
+        assert_eq!(
+            gesehen,
+            BTreeSet::from(["a0".to_string(), "a1".to_string()])
+        );
+        assert_eq!(
+            naechste_runde(&RUNDE_STAENDE, kopplung - 1),
+            0,
+            "je Kopplung"
+        );
+    }
+
+    /// Füllen die laufenden allein das Paket, bleibt ein Platz für die übrigen, reihum.
+    #[test]
+    fn auch_bei_vollem_paket_kommen_abgeschlossene_dran() {
+        let mut gesehen = BTreeSet::new();
+        for runde in 0..4 {
+            let auswahl = auswahl_staende(spiegel(EINSAETZE_MAX + 44, 2), runde);
+            assert_eq!(auswahl.len(), EINSAETZE_MAX);
+            gesehen.extend(
+                auswahl
+                    .into_iter()
+                    .map(|s| s.kennung)
+                    .filter(|k| k.starts_with('a')),
+            );
+        }
+        assert_eq!(
+            gesehen,
+            BTreeSet::from(["a0".to_string(), "a1".to_string()])
+        );
+        // Ohne übrige bekommen die laufenden alle Plätze.
+        assert_eq!(
+            auswahl_staende(spiegel(EINSAETZE_MAX + 44, 0), 0).len(),
+            EINSAETZE_MAX
+        );
+    }
+
+    #[test]
+    fn ein_hinweis_zu_gross_bleibt_bis_die_zeile_kommt() {
+        let a = uebernehmen::zu_gross_hinweis("etb_eintrag", "1");
+        let b = uebernehmen::zu_gross_hinweis("etb_eintrag", "2");
+        // Runde 1: Zeile 1 zu groß.
+        let h = hinweise_fortschreiben(None, std::slice::from_ref(&a), &[]);
+        assert_eq!(h.as_deref(), Some(a.as_str()));
+        // Runde 2: Zeile 2 zu groß, Zeile 1 kommt nicht neu: beide stehen.
+        let h = hinweise_fortschreiben(h.as_deref(), std::slice::from_ref(&b), &[]);
+        assert_eq!(h, Some(format!("{a}\n{b}")));
+        // Runde 3: Zeile 1 kommt mit Daten, keine neuen Hinweise: nur Zeile 2 bleibt.
+        let geliefert = [uebernehmen::zu_gross_anfang("etb_eintrag", "1")];
+        let h = hinweise_fortschreiben(h.as_deref(), &[], &geliefert);
+        assert_eq!(h.as_deref(), Some(b.as_str()));
+        // Zeile 10 ist nicht Zeile 1.
+        let c = uebernehmen::zu_gross_hinweis("etb_eintrag", "10");
+        assert_eq!(
+            hinweise_fortschreiben(Some(&c), &[], &geliefert).as_deref(),
+            Some(c.as_str())
+        );
+        // Über 20 „zu groß“ geht keiner verloren; andere Hinweise bleiben bei 20.
+        let viele: Vec<String> = (0..25)
+            .map(|i| uebernehmen::zu_gross_hinweis("anhang", &i.to_string()))
+            .chain((0..25).map(|i| format!("Lieferung nicht übernommen: {i}")))
+            .collect();
+        let h = hinweise_fortschreiben(None, &viele, &[]).unwrap();
+        assert_eq!(h.lines().filter(|z| z.contains("zu groß")).count(), 25);
+        assert_eq!(
+            h.lines().filter(|z| z.contains("nicht übernommen")).count(),
+            20
+        );
+        // Eine Übernahme ohne Hinweise räumt alte andere Hinweise, „zu groß“ bleibt.
+        let h = hinweise_fortschreiben(
+            Some(&format!("{c}\nLieferung nicht übernommen: x")),
+            &[],
+            &[],
+        );
+        assert_eq!(h.as_deref(), Some(c.as_str()));
+        // Andere Hinweise ersetzt ein neuer.
+        let h = hinweise_fortschreiben(
+            Some("Lieferung nicht übernommen: x"),
+            &["Lieferung nicht übernommen: y".into()],
+            &[],
+        );
+        assert_eq!(h.as_deref(), Some("Lieferung nicht übernommen: y"));
+    }
+
+    #[test]
+    fn bis_zur_grenze_bleibt_alles_wie_es_ist() {
+        let auswahl = auswahl_staende(spiegel(3, 5), 7);
+        let kennungen: Vec<_> = auswahl.iter().map(|s| s.kennung.as_str()).collect();
+        assert_eq!(kennungen, ["l0", "l1", "l2", "a0", "a1", "a2", "a3", "a4"]);
+    }
 }

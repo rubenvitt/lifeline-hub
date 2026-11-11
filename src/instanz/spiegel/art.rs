@@ -734,6 +734,26 @@ mod tests {
         s.trim_end_matches(';').to_string()
     }
 
+    #[tokio::test]
+    async fn jede_gespiegelte_tabelle_hat_einen_primaerschluessel() {
+        // Die rowid einer Tabelle ohne Primärschlüssel darf `VACUUM` neu vergeben; dann zeigte die
+        // Herkunft am Spiegel auf eine andere Zeile (LLH-1630, Migration 0320). Eine neue
+        // gespiegelte Tabelle bekommt deshalb `id INTEGER PRIMARY KEY` oder einen mehrspaltigen
+        // Schlüssel.
+        let pool = crate::db::test_pool().await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut ohne = Vec::new();
+        for g in GESPIEGELT {
+            if schluessel(&mut conn, g.tabelle).await.unwrap() == Schluessel::Rowid {
+                ohne.push(g.tabelle);
+            }
+        }
+        assert!(
+            ohne.is_empty(),
+            "gespiegelt ohne Primärschlüssel (rowid ist über VACUUM nicht stabil): {ohne:?}"
+        );
+    }
+
     /// Jede gespiegelte Tabelle hat genau die Trigger, die der Generator erzeugt (ein Neubau einer
     /// Tabelle verliert sie still), und kein anderer Trigger schreibt ins Log.
     #[tokio::test]

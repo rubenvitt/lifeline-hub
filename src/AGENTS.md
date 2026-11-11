@@ -375,7 +375,18 @@ Herleitung in
     `--ignored`). Wer eine dieser Tabellen neu baut, legt die Trigger wieder an. Wächter
     `art::tests::jede_einsatztabelle_ist_eingeordnet`, `art::tests::trigger_passen_zur_beschreibung`,
     `art::tests::eine_eltern_tabelle_wird_mitgespiegelt`. Kein Schreibweg in Rust schreibt in
-    `einsatz_aenderung`.
+    `einsatz_aenderung`. **Eine gespiegelte Tabelle hat einen Primärschlüssel**: die rowid allein
+    darf `VACUUM` neu vergeben, dann zeigt `spiegel_herkunft` auf eine andere Zeile (LLH-1630,
+    Wächter `art::tests::jede_gespiegelte_tabelle_hat_einen_primaerschluessel`).
+  - **Eine neue Einsatz-ID vergibt `einsatz::repo::naechste_id`** (oberhalb von Demo- und
+    Löschsperre, LFH-690), auch die Übernahme eines Spiegels; die laufende Nummer zählt nur
+    eigene Einsätze (`spiegel = 0`).
+  - **Paket- und Inhaltsgrenzen** (`spiegel::paket`, `spiegel::anhang`): Eine Zeile über
+    `paket::ZEILE_MAX` (oder eine erste Zeile, deren Abhängigkeiten das Paket sprengen) geht als
+    `zu_gross` ohne Daten, der Stand rückt vor, der Spiegel behält die alte Fassung mit Hinweis.
+    Ein Inhalt über `anhang::INHALT_MAX` wird nicht geholt (`anhang::ZU_GROSS`). Trägt die Zeile
+    eine Spalte `sha256`, liefert der Führer die Prüfsumme daraus, ohne den Inhalt zu lesen, und
+    zieht sie beim ersten Stück nach, wenn sie nicht stimmt.
   - **Ein Verweis ohne Fremdschlüssel** in einer gespiegelten Tabelle (polymorpher Bezug,
     Kennung in Text oder JSON) steht in `spiegel::schema::VERWEISE_OHNE_FK` samt Auflösung; ein
     Fremdschlüssel zeigt auf eine gespiegelte Tabelle, auf Stammdaten, `benutzer` oder
@@ -402,7 +413,9 @@ Herleitung in
   - **Eine Liste von Konten** (Verwaltung, Auswahl, Anmeldung) schließt Stellvertreter fremder
     Konten aus (`instanz::spiegel::OHNE_STELLVERTRETER`).
   - **`AntragAkteur` setzt nur `spiegel::antrag::ausfuehren`**; `CurrentUser` nimmt das Konto
-    dann aus der Extension statt aus dem Cookie.
+    dann aus der Extension statt aus dem Cookie. Jede beantragbare Art trägt eine `client_id`,
+    damit ein wiederholter Antrag nach Abbruch vor der Quittung nicht doppelt wirkt (ADR-0008,
+    Wächter `antrag::tests::jede_beantragbare_art_traegt_eine_client_id`).
   - Nachweis: `tests/instanz_spiegel.rs`, `tests/instanz_spiegel_live.rs`.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
