@@ -86,6 +86,7 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
       HttpResponse.json(a.lagemonitore ?? []),
     ),
+    http.get('/api/einsaetze/1/lagebild-freigaben', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/betreuung', () =>
       HttpResponse.json({
         stellen: [
@@ -477,6 +478,8 @@ describe('EinsatzGeraete (LFH-892)', () => {
     expect(
       await screen.findByRole('switch', { name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz' }),
     ).toBeEnabled();
+    // Ein Link auf das Lagebild gilt an dieser Instanz; das ETB geht als Antrag (LLH-1496).
+    expect(await screen.findByRole('button', { name: /Link ausgeben/ })).toBeEnabled();
   });
 
   describe('Externe Lagemonitore (LLH-1484)', () => {

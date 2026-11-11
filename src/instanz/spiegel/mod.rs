@@ -136,5 +136,15 @@ wire_enum! {
     }
 }
 
+impl Freigabestufe {
+    /// Ob diese Stufe die Kategorie `k` spiegelt. Lesende Ansichten am Spiegel (Lagebild für
+    /// Externe, LLH-1496) zeigen ein Feld nur, wenn seine Kategorie übertragen wird.
+    pub fn liefert(&self, _k: SpiegelKategorie) -> bool {
+        match self {
+            Freigabestufe::Alles => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;
