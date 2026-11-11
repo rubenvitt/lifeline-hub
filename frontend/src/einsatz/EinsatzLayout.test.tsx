@@ -392,9 +392,9 @@ describe('EinsatzLayout', () => {
   });
 
   /**
-   * Beide Achsen sind ab lg im Benutzermenü erreichbar. Die Wirkung prüft
-   * `BenutzerMenu.test.tsx`; hier fehlt der `ThemeModeProvider`, die Hooks fallen auf
-   * `system`/`kompakt` zurück.
+   * Alle drei Achsen sind ab lg im Benutzermenü erreichbar. Die Wirkung prüft
+   * `BenutzerMenu.test.tsx`; hier fehlt der `ThemeModeProvider`, die Hooks fallen auf ihre
+   * Vorgaben zurück (Nachtbetrieb, `kompakt`, 100 %).
    */
   it('AK2 — alle drei Achsen sind ab lg im Benutzermenü erreichbar (LLH-1642: Leisten)', async () => {
     setup();

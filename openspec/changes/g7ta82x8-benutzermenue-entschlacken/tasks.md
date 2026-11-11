@@ -35,7 +35,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 - [x] 5.1 Helfer in `e2e/menue-kern.ts`: Anzeige im Benutzermenü wählen (Leiste und Wert über Rollen), ein gemeinsamer Weg für alle Specs
 - [x] 5.2 Specs umstellen, die Darstellung, Dichte oder Helligkeit über das Menü setzen oder prüfen (`dichte-ableitung`, `kopfzeile-schmal`, `lagekarte-smoke`, `lagekarte-zeichnen-korrigierbar`, `rahmen-stehen-bleiben`, `gate3-trefflaeche`, `neuigkeiten`, `hilfe` u. a.; Abschlussprüfung per `grep` nach `menuitem` mit den alten Namen)
 - [x] 5.3 e2e `benutzermenue` (neu oder in bestehender Spec): 390 × 844 `komfortabel` ganzes Menü im Fenster; `handschuh` Abmelden und alle drei Leisten ohne Rollen; Tastatur in einer Leiste; Eingänge-Link führt auf Benachrichtigungen
-- [ ] 5.4 Bildlauf: `doku-bilder/anmelden-abmelden.bilder.ts` (`benutzermenue*.png`), `doku-bilder/einsatz-oberflaeche.bilder.ts` (`darstellung*.png`), neues Bild der Hilfe-Übersicht mit Rückmeldung, falls das Kapitel `rueckmeldung` eines zeigt
+- [x] 5.4 Bildlauf: `doku-bilder/anmelden-abmelden.bilder.ts` (`benutzermenue*.png`), `doku-bilder/einsatz-oberflaeche.bilder.ts` (`darstellung*.png`), neues Bild der Hilfe-Übersicht mit Rückmeldung, falls das Kapitel `rueckmeldung` eines zeigt
 
 ## 6. Anwenderdoku (Mitänderungsregel)
 
