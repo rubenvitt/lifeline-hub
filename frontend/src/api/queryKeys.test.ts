@@ -236,6 +236,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       'einsatz-lagemonitor',
       // LLH-1492: die eigenen Anträge am Spiegel, ihre Zähler stehen im Kopf.
       'einsatz-antraege',
+      // LLH-1646: nicht übernommene Erfassungen, ihr Zähler steht im Kopf.
+      'einsatz-bruchstelle',
     ]);
   });
 

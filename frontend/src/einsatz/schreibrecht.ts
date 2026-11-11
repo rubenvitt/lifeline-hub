@@ -149,6 +149,13 @@ export function darfBeantragen(einsatz?: EinsatzSchreibkontext): boolean {
   return hasSchreibrolleImAktivenEinsatz(einsatz);
 }
 
+/** Nicht übernommene Erfassungen nach einer Notübernahme ablegen (LLH-1646, N6): Schreibrolle,
+    auch am abgeschlossenen Einsatz und nach beendetem Abgleich (der Server prüft wie
+    `EinsatzSchreibfreigabe`). */
+export function darfNachreichenVerwerfen(einsatz?: EinsatzSchreibkontext): boolean {
+  return einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal';
+}
+
 /** Original eines Bild-Anhangs mit Standort- und Gerätedaten laden (LFH-747, Spec
     `anhang-metadaten`): Einsatzleitung ODER System-Admin, unabhängig vom Einsatzstatus (auch im
     abgeschlossenen Einsatz). Reine UI-Schranke: das Backend verlangt beim Admin zusätzlich die

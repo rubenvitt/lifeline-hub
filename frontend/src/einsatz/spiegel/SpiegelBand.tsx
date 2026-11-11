@@ -14,6 +14,7 @@ import { NUR_VORLESER, monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
+import BruchstelleListe from './BruchstelleListe';
 import { useSpiegelAntraege } from './useSpiegelAntraege';
 import {
   ANTRAG_ZUSTAND_WORT,
@@ -33,7 +34,8 @@ import {
  * der Stand des Abgleichs („keine Verbindung seit …“, „Abgleich beendet“) und die Zahl der eigenen
  * Anträge aus dem Kopf; aufgeklappt die Anträge mit Zustand, abgelehnte mit Grund, „Neu erfassen“
  * und „Verwerfen“. Nach einem Führungswechsel die eigenen Änderungen, die der neue Führer nicht
- * kannte („3 Änderungen nicht übernommen“, LLH-1641).
+ * kannte („3 Änderungen nicht übernommen“, LLH-1641); aufgeklappt unter „Nicht übernommen“ zum
+ * Nachreichen als Antrag oder Verwerfen (LLH-1646).
  *
  * FARBE: Grund `bannerGrund`, Kante `bannerLinie` wie ein Hinweis; eine Störung des Abgleichs,
  * abgelehnte Anträge und nicht übernommene Änderungen in `achtungText` (zweiter Kanal: das Wort).
@@ -66,6 +68,16 @@ export default function SpiegelBand({ einsatz }: { einsatz: EinsatzAnzeige | und
     if (vorher == null || zaehler == null || vorher === zaehler) return;
     void qc.invalidateQueries({ queryKey: einsatzKeys.antraege(einsatzId) });
   }, [zaehler, qc, einsatzId]);
+  // Eine abgelehnte Nachreichung öffnet ihre Erfassung wieder (LLH-1646, N2): der Zähler der
+  // Bruchstelle steigt, die Liste lädt neu.
+  const bruchZahl = spiegel?.bruchstelle ?? null;
+  const vorigeBruchZahl = useRef(bruchZahl);
+  useEffect(() => {
+    const vorher = vorigeBruchZahl.current;
+    vorigeBruchZahl.current = bruchZahl;
+    if (vorher == null || bruchZahl == null || vorher === bruchZahl) return;
+    void qc.invalidateQueries({ queryKey: einsatzKeys.bruchstelle(einsatzId) });
+  }, [bruchZahl, qc, einsatzId]);
   if (!einsatz || !spiegel) return null;
   return (
     <BandInhalt einsatz={einsatz} antraege={antraege.data} antraegeFehler={antraege.isError} />
@@ -86,7 +98,9 @@ function BandInhalt({
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useMinutenTakt();
   const [offen, setOffen] = useState(false);
+  const [bruchOffen, setBruchOffen] = useState(false);
   const listeId = useId();
+  const bruchListeId = useId();
   const stand = spiegelStand(spiegel, einsatz.status === 'aktiv', jetzt, (w) =>
     zeitKurz(w, konventionen),
   );
@@ -147,20 +161,47 @@ function BandInhalt({
             <span style={NUR_VORLESER}>Keine Verbindung zur führenden Instanz</span>
           )}
         </span>
-        {hatAntraege && (
-          <Button
-            type="link"
-            aria-expanded={offen}
-            aria-controls={listeId}
-            icon={offen ? <IconChevronHoch /> : <IconChevronRunter />}
-            iconPlacement="end"
-            onClick={() => setOffen((o) => !o)}
-            style={{ marginInlineStart: 'auto', paddingInline: 0 }}
-          >
-            Anträge
-          </Button>
+        {(bruch || hatAntraege) && (
+          <span style={{ display: 'inline-flex', gap: token.marginSM, marginInlineStart: 'auto' }}>
+            {/* LLH-1646, N4: die nicht übernommenen Erfassungen klappen wie die Anträge auf. */}
+            {bruch && (
+              <Button
+                type="link"
+                aria-expanded={bruchOffen}
+                aria-controls={bruchListeId}
+                icon={bruchOffen ? <IconChevronHoch /> : <IconChevronRunter />}
+                iconPlacement="end"
+                onClick={() => setBruchOffen((o) => !o)}
+                style={{ paddingInline: 0 }}
+              >
+                Nicht übernommen
+              </Button>
+            )}
+            {hatAntraege && (
+              <Button
+                type="link"
+                aria-expanded={offen}
+                aria-controls={listeId}
+                icon={offen ? <IconChevronHoch /> : <IconChevronRunter />}
+                iconPlacement="end"
+                onClick={() => setOffen((o) => !o)}
+                style={{ paddingInline: 0 }}
+              >
+                Anträge
+              </Button>
+            )}
+          </span>
         )}
       </div>
+      {bruchOffen && (
+        <div
+          id={bruchListeId}
+          data-lfh="spiegel-band-bruchliste"
+          style={{ paddingBlockEnd: token.paddingXS }}
+        >
+          <BruchstelleListe einsatz={einsatz} />
+        </div>
+      )}
       {offen && (
         <div id={listeId} data-lfh="spiegel-antraege" style={{ paddingBlockEnd: token.paddingXS }}>
           {antraegeFehler && antraege == null ? (

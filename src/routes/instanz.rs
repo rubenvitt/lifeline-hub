@@ -759,6 +759,13 @@ pub async fn bruchstelle_verwerfen(
     ctx: crate::einsatz::kontext::EinsatzSchreibfreigabe,
     PfadParam((_eid, bruch_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
+    // Ablegen nur, was die Person auch sehen darf (Modul der Zeile).
+    let darf = modul_freigabe_fuer(&state, &ctx).await?;
+    let liste =
+        crate::instanz::spiegel::bruchstelle::liste(&state.pool, ctx.einsatz.id, &darf).await?;
+    if liste.iter().any(|e| e.id == bruch_id && e.verborgen) {
+        return Err(AppError::Forbidden);
+    }
     crate::instanz::spiegel::bruchstelle::verwerfen(
         &state.pool,
         ctx.einsatz.id,

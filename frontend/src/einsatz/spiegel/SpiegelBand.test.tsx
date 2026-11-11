@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as entwurfStore from '../../etb/entwuerfe/entwurfStore';
-import type { EinsatzSpiegelAnzeige, SpiegelAntragAnzeige } from '../../api/types';
+import type { BruchErfassung, EinsatzSpiegelAnzeige, SpiegelAntragAnzeige } from '../../api/types';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
@@ -195,5 +195,156 @@ describe('SpiegelBand: „Neu erfassen“ (LLH-1492)', () => {
     await new Promise((r) => setTimeout(r, 50));
     await user.click(within(zeile).getByRole('button', { name: 'Neu erfassen' }));
     expect(await within(zeile).findByText('Entwurf nicht angelegt')).toBeInTheDocument();
+  });
+});
+
+const erfassung = (teil: Partial<BruchErfassung>): BruchErfassung => ({
+  id: 1,
+  tabelle: 'etb_eintrag',
+  kategorie: 'etb',
+  antrag_art: 'etb',
+  typ: 'meldung',
+  zeit: '2026-11-10 09:30:00',
+  von: 'ELW',
+  kurz: 'Nach dem Bruch',
+  verborgen: false,
+  folgen: 0,
+  gesichert_at: '2026-11-10 10:00:00',
+  ...teil,
+});
+
+const bruchliste: BruchErfassung[] = [
+  erfassung({ id: 1 }),
+  erfassung({
+    id: 2,
+    tabelle: 'meldung',
+    antrag_art: 'meldung',
+    typ: null,
+    zeit: '2026-11-10 09:40:00',
+    von: 'Abschnitt Deich',
+    kurz: 'Deich hält',
+    folgen: 1,
+  }),
+  erfassung({
+    id: 3,
+    tabelle: 'lage_objekt',
+    kategorie: 'lage',
+    antrag_art: null,
+    typ: null,
+    zeit: null,
+    von: null,
+    kurz: null,
+  }),
+  erfassung({ id: 4, verborgen: true, von: null, kurz: null }),
+];
+
+function mitBruchServer(liste = bruchliste) {
+  const aufrufe: string[] = [];
+  server.use(
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json(einsatzFixture({ spiegel: spiegel({ bruchstelle: liste.length }) })),
+    ),
+    http.get('/api/einsaetze/1/antraege', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/bruchstelle', () => HttpResponse.json(liste)),
+    http.post('/api/einsaetze/1/bruchstelle/antraege', () => {
+      aufrufe.push('alle');
+      return HttpResponse.json({
+        gestellt: 1,
+        offen: [{ id: 2, grund: 'Bezug noch nicht beim Führer.' }],
+      });
+    }),
+    http.post('/api/einsaetze/1/bruchstelle/:bid/antrag', ({ params }) => {
+      aufrufe.push(`stellen ${String(params.bid)}`);
+      return HttpResponse.json({ antrag: { id: 9, zustand: 'ausstehend' } }, { status: 202 });
+    }),
+    http.post('/api/einsaetze/1/bruchstelle/:bid/verwerfen', ({ params }) => {
+      aufrufe.push(`verwerfen ${String(params.bid)}`);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return aufrufe;
+}
+
+async function bruchAufklappen(einsatz = einsatzFixture({ spiegel: spiegel({ bruchstelle: 4 }) })) {
+  const user = userEvent.setup();
+  renderMitProviders(<SpiegelBand einsatz={einsatz} />);
+  await user.click(screen.getByRole('button', { name: /Nicht übernommen/ }));
+  const liste = document.querySelector('[data-lfh="spiegel-band-bruchliste"]') as HTMLElement;
+  const zeilen = await within(liste).findAllByRole('listitem');
+  return { user, liste, zeilen };
+}
+
+describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', () => {
+  it('zeigt je Erfassung Zeit, Art, Absender und Inhalt; nur ETB und Meldung lassen sich stellen', async () => {
+    mitBruchServer();
+    const { zeilen } = await bruchAufklappen();
+    expect(zeilen).toHaveLength(4);
+    expect(zeilen[0]).toHaveTextContent('ETB-Eintrag');
+    expect(zeilen[0]).toHaveTextContent('Nach dem Bruch');
+    expect(zeilen[1]).toHaveTextContent('Meldung');
+    expect(zeilen[1]).toHaveTextContent('Abschnitt Deich');
+    expect(zeilen[1]).toHaveTextContent('+ 1 Zeile');
+    expect(within(zeilen[1]).getByRole('button', { name: 'Als Antrag stellen' })).toBeEnabled();
+    // Lagekarte: nur lesbar, ablegen geht.
+    expect(zeilen[2]).toHaveTextContent('Lagekarte');
+    expect(within(zeilen[2]).queryByRole('button', { name: 'Als Antrag stellen' })).toBeNull();
+    expect(within(zeilen[2]).getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
+    // Ohne Freigabe des Moduls: Art und Zeit, kein Inhalt, keine Knöpfe.
+    expect(zeilen[3]).toHaveTextContent('ETB-Eintrag');
+    expect(zeilen[3]).not.toHaveTextContent('Nach dem Bruch');
+    expect(within(zeilen[3]).queryByRole('button')).toBeNull();
+  });
+
+  it('stellt eine Erfassung als Antrag', async () => {
+    const aufrufe = mitBruchServer();
+    const { user, zeilen } = await bruchAufklappen();
+    await user.click(within(zeilen[0]).getByRole('button', { name: 'Als Antrag stellen' }));
+    await waitFor(() => expect(aufrufe).toEqual(['stellen 1']));
+  });
+
+  it('„Alle stellen“ ab zwei stellbaren Erfassungen, nennt, was offen blieb', async () => {
+    const aufrufe = mitBruchServer();
+    const { user, liste } = await bruchAufklappen();
+    await user.click(within(liste).getByRole('button', { name: 'Alle stellen' }));
+    await waitFor(() => expect(aufrufe).toEqual(['alle']));
+    expect(
+      await within(liste).findByText('1 nicht gestellt: Bezug noch nicht beim Führer.'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne zweite stellbare Erfassung kein „Alle stellen“', async () => {
+    mitBruchServer([bruchliste[0], bruchliste[2]]);
+    const { liste } = await bruchAufklappen(
+      einsatzFixture({ spiegel: spiegel({ bruchstelle: 2 }) }),
+    );
+    expect(within(liste).queryByRole('button', { name: 'Alle stellen' })).toBeNull();
+  });
+
+  it('verwirft erst nach der Rückfrage „Nicht nachreichen?“', async () => {
+    const aufrufe = mitBruchServer();
+    const { user, zeilen } = await bruchAufklappen();
+    await user.click(within(zeilen[2]).getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('Nicht nachreichen?')).toBeInTheDocument();
+    expect(aufrufe).toEqual([]);
+    const rueckfrage = document.querySelector('.ant-popconfirm') as HTMLElement;
+    await user.click(within(rueckfrage).getByRole('button', { name: 'Verwerfen' }));
+    await waitFor(() => expect(aufrufe).toEqual(['verwerfen 3']));
+  });
+
+  it('als Beobachter nur lesen', async () => {
+    mitBruchServer();
+    const { liste } = await bruchAufklappen(
+      einsatzFixture({ meine_rolle: 'beobachter', spiegel: spiegel({ bruchstelle: 4 }) }),
+    );
+    expect(within(liste).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('nach beendetem Abgleich nur noch verwerfen', async () => {
+    mitBruchServer();
+    const { liste } = await bruchAufklappen(
+      einsatzFixture({ spiegel: spiegel({ bruchstelle: 4, beendet: true }) }),
+    );
+    expect(within(liste).queryByRole('button', { name: 'Als Antrag stellen' })).toBeNull();
+    expect(within(liste).getAllByRole('button', { name: 'Verwerfen' })).toHaveLength(3);
   });
 });
