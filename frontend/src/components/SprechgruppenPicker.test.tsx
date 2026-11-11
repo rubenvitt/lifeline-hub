@@ -132,11 +132,7 @@ describe('SprechgruppenPicker', () => {
 
   describe('Name einer vorhandenen Sprechgruppe (LLH-1645)', () => {
     it('wählt die Katalog-Sprechgruppe aus, statt eine Einsatz-Sprechgruppe anzulegen', async () => {
-      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue([
-        ...MOCK_LISTE,
-        // Altbestand: gleichnamige Einsatz-Sprechgruppe; der Katalog geht vor.
-        { ...MOCK_LISTE[0], id: 7, einsatz_id: 5, einsatz_lokal: true },
-      ]);
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
       const onChange = vi.fn();
       renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[2]} onChange={onChange} />);
       await legeSonderAn(' 412 ', 'TMO');
@@ -145,6 +141,27 @@ describe('SprechgruppenPicker', () => {
       expect(legeEinsatzSprechgruppeAn).not.toHaveBeenCalled();
       expect(screen.queryByLabelText('Neue Bezeichnung')).toBeNull();
       expect(await screen.findByText('Sprechgruppe „412" ausgewählt')).toBeInTheDocument();
+    });
+
+    it('Altbestand: nimmt die lokale, ohne die Katalogzeile neu in den Einsatz zu holen', async () => {
+      const paar = [...MOCK_LISTE, { ...MOCK_LISTE[0], id: 7, einsatz_id: 5, einsatz_lokal: true }];
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(paar);
+      const onChange = vi.fn();
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={onChange} />);
+      await legeSonderAn('412', 'TMO');
+      await waitFor(() => expect(onChange).toHaveBeenCalledWith([7]));
+      expect(legeEinsatzSprechgruppeAn).not.toHaveBeenCalled();
+    });
+
+    it('Altbestand: eine schon gewählte Sprechgruppe des Paars bleibt allein', async () => {
+      const paar = [...MOCK_LISTE, { ...MOCK_LISTE[0], id: 7, einsatz_id: 5, einsatz_lokal: true }];
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(paar);
+      const onChange = vi.fn();
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[1]} onChange={onChange} />);
+      await legeSonderAn('412', 'TMO');
+      expect(await screen.findByText('Sprechgruppe „412" ausgewählt')).toBeInTheDocument();
+      expect(onChange).not.toHaveBeenCalled();
+      expect(legeEinsatzSprechgruppeAn).not.toHaveBeenCalled();
     });
 
     it('legt bei anderer Betriebsart an', async () => {

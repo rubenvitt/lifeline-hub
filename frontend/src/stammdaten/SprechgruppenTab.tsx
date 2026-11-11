@@ -121,9 +121,11 @@ export default function SprechgruppenTab() {
             herkunft={herkunft.herkunft('sprechgruppe', sg.id)}
             quelle={herkunft.quelle}
           />
+          {/* Die Einsätze stehen in der Marke selbst, nicht nur im Titel: ohne Mauszeiger
+             (Touch, Tastatur) wäre ein Titel nicht zu lesen. */}
           {auchLokal.has(sg.id) && (
-            <Tag title={`Einsatz-Sprechgruppe in ${auchLokal.get(sg.id)?.join(', ')}`}>
-              auch lokal
+            <Tag style={{ whiteSpace: 'normal' }}>
+              auch lokal in {auchLokal.get(sg.id)?.join(', ')}
             </Tag>
           )}
         </Space>

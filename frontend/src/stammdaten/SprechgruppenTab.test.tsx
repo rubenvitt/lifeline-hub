@@ -392,7 +392,7 @@ describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
   });
 
   describe('Altbestand: Name zugleich Einsatz-Sprechgruppe (LLH-1645)', () => {
-    it('markiert die Katalog-Sprechgruppe und nennt die Einsätze im Titel', async () => {
+    it('markiert die Katalog-Sprechgruppe und nennt die Einsätze in der Marke', async () => {
       server.use(
         http.get('/api/sprechgruppen/auch-lokal', () =>
           HttpResponse.json([
@@ -402,13 +402,9 @@ describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
         ),
       );
       render(admin, aktivPaar);
-      const marke = await screen.findByText('auch lokal');
-      expect(marke).toHaveAttribute(
-        'title',
-        'Einsatz-Sprechgruppe in „Hochwasser Elbe“, „Stadtfest“',
-      );
+      const marke = await screen.findByText('auch lokal in „Hochwasser Elbe“, „Stadtfest“');
       expect(marke.closest('tr')).toHaveTextContent('412_F_DRK');
-      expect(screen.getAllByText('auch lokal')).toHaveLength(1);
+      expect(screen.getAllByText(/^auch lokal/)).toHaveLength(1);
     });
 
     it('fragt ohne Verwaltungsrecht nicht nach', async () => {
@@ -422,7 +418,7 @@ describe('SprechgruppenTab mit Stammdaten vom Hub (kjezbk06 D6)', () => {
       render(nichtAdmin, aktivPaar);
       await screen.findByText('412_F_DRK');
       expect(gefragt).toBe(false);
-      expect(screen.queryByText('auch lokal')).toBeNull();
+      expect(screen.queryByText(/^auch lokal/)).toBeNull();
     });
   });
 });

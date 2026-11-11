@@ -274,7 +274,58 @@ async fn altbestand_wird_erkannt_und_nur_fuer_admins_gezeigt() {
     let (status, _) = anfrage(&app, "GET", "/api/sprechgruppen/auch-lokal", &erika, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
+    // Hinweis, Netz und Sicherheit bleiben pflegbar: der Name ändert sich nicht.
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/sprechgruppen/{sg}"),
+        &admin,
+        Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO","hinweis":"Führungskanal"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    // Zuordnen stiftete das Paar erst im Einsatz: abgelehnt.
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle/sprechgruppen/{sg}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+    assert_eq!(
+        json["error"],
+        "„412_F_DRK“ (TMO) ist in diesem Einsatz schon als Einsatz-Sprechgruppe angelegt"
+    );
+
     // Deaktiviert und im Einsatz nicht genutzt: kein Paar mehr.
     deaktivieren(&app, &admin, sg).await;
     assert!(auch_lokal(&app, &admin).await.is_empty());
+}
+
+#[tokio::test]
+async fn deaktivierte_katalog_sprechgruppe_neben_gleichnamiger_lokaler_ist_nicht_zuordenbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let sg = katalog(&app, &admin, "412_F_DRK", "TMO").await;
+    deaktivieren(&app, &admin, sg).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, _) = lokal(&app, &admin, einsatz, "412_F_DRK", "TMO").await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle/sprechgruppen/{sg}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+
+    // Ohne gleichnamige lokale bleibt sie zuordenbar wie bisher.
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    fuehrungsstelle_zuordnen(&app, &admin, anderer, sg).await;
 }

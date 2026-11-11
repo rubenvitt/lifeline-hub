@@ -32,7 +32,9 @@ interface SprechgruppenPickerProps {
  *
  * Trägt schon eine Sprechgruppe der Auswahl den Namen, wählt „Anlegen“ sie aus (LLH-1645): eine
  * Einsatz-Sprechgruppe mit dem Namen einer Katalog-Sprechgruppe lehnt der Server ab, sonst fiele
- * das Paar am Spiegel auf eine Zeile. Der Katalog geht vor einer gleichnamigen lokalen.
+ * das Paar am Spiegel auf eine Zeile. Bei einem Paar aus dem Altbestand bleibt eine schon gewählte
+ * Sprechgruppe stehen, sonst geht die lokale vor: sie liegt schon im Einsatz, die Katalogzeile
+ * käme erst mit dieser Wahl dazu.
  *
  * Bewusst KEIN verschachteltes `<Form>`/Submit-Button: der Picker wird selbst in einem
  * antd-`<Form>` (Abschnitt/Einheit) gerendert — ein innerer Submit würde das äußere
@@ -94,9 +96,13 @@ export default function SprechgruppenPicker({
     if (!kannAnlegen || laeuft) return;
     const bezeichnung = neuBezeichnung.trim();
     const betriebsart = neuBetriebsart as Betriebsart;
-    const vorhanden = sprechgruppen
-      .filter((s) => s.betriebsart === betriebsart && s.bezeichnung === bezeichnung)
-      .sort((a, b) => Number(a.einsatz_lokal) - Number(b.einsatz_lokal))[0];
+    const treffer = sprechgruppen.filter(
+      (s) => s.betriebsart === betriebsart && s.bezeichnung === bezeichnung,
+    );
+    const vorhanden =
+      treffer.find((s) => value.includes(s.id)) ??
+      treffer.find((s) => s.einsatz_lokal) ??
+      treffer[0];
     if (vorhanden) {
       if (!value.includes(vorhanden.id)) onChange?.([...value, vorhanden.id]);
       if (mutation.error != null) mutation.reset();

@@ -176,28 +176,29 @@ pub async fn anlegen_katalog(
     org_id: i64,
     daten: KatalogDaten<'_>,
 ) -> Result<Sprechgruppe, AppError> {
-    let mut tx = pool.begin().await?;
-    let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO sprechgruppe \
-             (org_id, bezeichnung, betriebsart, hinweis, netz, sicherheit, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
-    )
-    .bind(org_id)
-    .bind(daten.bezeichnung)
-    .bind(daten.betriebsart)
-    .bind(daten.hinweis)
-    .bind(daten.netz)
-    .bind(daten.sicherheit)
-    .bind(daten.sortier)
-    .fetch_one(&mut *tx)
-    .await;
-
-    let id = match ergebnis {
-        Ok(id) => id,
-        Err(e) => return sprechgruppe_conflict(e),
-    };
-    pruefe_katalogname(&mut tx, id).await?;
-    tx.commit().await?;
+    // Schreiben und Namensprüfung in EINER Schreibtransaktion (`src/tx.rs`).
+    let id = crate::write_retry!(pool, |conn| {
+        let ergebnis = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO sprechgruppe \
+                 (org_id, bezeichnung, betriebsart, hinweis, netz, sicherheit, sortier) \
+             VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        )
+        .bind(org_id)
+        .bind(daten.bezeichnung)
+        .bind(daten.betriebsart)
+        .bind(daten.hinweis)
+        .bind(daten.netz)
+        .bind(daten.sicherheit)
+        .bind(daten.sortier)
+        .fetch_one(&mut *conn)
+        .await;
+        let id = match ergebnis {
+            Ok(id) => id,
+            Err(e) => return sprechgruppe_conflict(e),
+        };
+        pruefe_katalogname(conn, id).await?;
+        Ok(id)
+    })?;
     laden(pool, org_id, id).await
 }
 
@@ -226,9 +227,20 @@ pub async fn patche_katalog(
     id: i64,
     patch: KatalogPatch<'_>,
 ) -> Result<Sprechgruppe, AppError> {
-    let mut tx = pool.begin().await?;
-    let ergebnis = sqlx::query(
-        "UPDATE sprechgruppe SET \
+    crate::write_retry!(pool, |conn| {
+        let vorher: Option<(String, String)> = sqlx::query_as(
+            "SELECT bezeichnung, betriebsart FROM sprechgruppe \
+             WHERE id = ? AND org_id = ? AND einsatz_id IS NULL",
+        )
+        .bind(id)
+        .bind(org_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some(vorher) = vorher else {
+            return Err(AppError::NotFound);
+        };
+        let ergebnis = sqlx::query(
+            "UPDATE sprechgruppe SET \
             bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
             betriebsart = CASE WHEN ?3 IS NULL THEN betriebsart ELSE ?4 END, \
             hinweis = CASE WHEN ?5 IS NULL THEN hinweis ELSE ?6 END, \
@@ -236,33 +248,37 @@ pub async fn patche_katalog(
             netz = CASE WHEN ?9 IS NULL THEN netz ELSE ?10 END, \
             sicherheit = CASE WHEN ?11 IS NULL THEN sicherheit ELSE ?12 END \
          WHERE id = ?13 AND org_id = ?14 AND einsatz_id IS NULL",
-    )
-    .bind(patch.bezeichnung.map(|_| 1_i64))
-    .bind(patch.bezeichnung)
-    .bind(patch.betriebsart.map(|_| 1_i64))
-    .bind(patch.betriebsart)
-    .bind(patch.hinweis.map(|_| 1_i64))
-    .bind(patch.hinweis.and_then(|v| v))
-    .bind(patch.sortier.map(|_| 1_i64))
-    .bind(patch.sortier)
-    .bind(patch.netz.map(|_| 1_i64))
-    .bind(patch.netz.and_then(|v| v))
-    .bind(patch.sicherheit.map(|_| 1_i64))
-    .bind(patch.sicherheit.and_then(|v| v))
-    .bind(id)
-    .bind(org_id)
-    .execute(&mut *tx)
-    .await;
-
-    let resultat = match ergebnis {
-        Ok(r) => r,
-        Err(e) => return sprechgruppe_conflict(e),
-    };
-    if resultat.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
-    pruefe_katalogname(&mut tx, id).await?;
-    tx.commit().await?;
+        )
+        .bind(patch.bezeichnung.map(|_| 1_i64))
+        .bind(patch.bezeichnung)
+        .bind(patch.betriebsart.map(|_| 1_i64))
+        .bind(patch.betriebsart)
+        .bind(patch.hinweis.map(|_| 1_i64))
+        .bind(patch.hinweis.and_then(|v| v))
+        .bind(patch.sortier.map(|_| 1_i64))
+        .bind(patch.sortier)
+        .bind(patch.netz.map(|_| 1_i64))
+        .bind(patch.netz.and_then(|v| v))
+        .bind(patch.sicherheit.map(|_| 1_i64))
+        .bind(patch.sicherheit.and_then(|v| v))
+        .bind(id)
+        .bind(org_id)
+        .execute(&mut *conn)
+        .await;
+        if let Err(e) = ergebnis {
+            return sprechgruppe_conflict(e);
+        }
+        // Nur ein neuer Name kann ein Paar stiften (LLH-1645): Hinweis, Netz, Sicherheit und
+        // Sortierung bleiben auch an einer Katalogzeile mit Altbestand pflegbar.
+        let nachher = (
+            patch.bezeichnung.unwrap_or(&vorher.0),
+            patch.betriebsart.unwrap_or(&vorher.1),
+        );
+        if nachher != (vorher.0.as_str(), vorher.1.as_str()) {
+            pruefe_katalogname(conn, id).await?;
+        }
+        Ok(())
+    })?;
     laden(pool, org_id, id).await
 }
 
@@ -286,44 +302,44 @@ pub async fn anlegen_einsatz_lokal(
     betriebsart: &str,
     zusatz: Zusatz<'_>,
 ) -> Result<Sprechgruppe, AppError> {
-    let mut tx = pool.begin().await?;
-    if katalog_gleichen_namens(&mut tx, org_id, einsatz_id, bezeichnung, betriebsart)
-        .await?
-        .is_some()
-    {
-        return Err(AppError::Conflict(format!(
-            "Sprechgruppe „{bezeichnung}“ ({betriebsart}) steht schon im Katalog"
-        )));
-    }
-    sqlx::query(
-        "INSERT INTO sprechgruppe \
+    // Prüfung und Einfügen in EINER Schreibtransaktion (`src/tx.rs`).
+    crate::write_retry!(pool, |conn| {
+        if katalog_gleichen_namens(conn, org_id, einsatz_id, bezeichnung, betriebsart)
+            .await?
+            .is_some()
+        {
+            return Err(AppError::Conflict(format!(
+                "Sprechgruppe „{bezeichnung}“ ({betriebsart}) steht schon im Katalog"
+            )));
+        }
+        sqlx::query(
+            "INSERT INTO sprechgruppe \
              (org_id, einsatz_id, bezeichnung, betriebsart, hinweis, netz, sicherheit) \
          VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
-    )
-    .bind(org_id)
-    .bind(einsatz_id)
-    .bind(bezeichnung)
-    .bind(betriebsart)
-    .bind(zusatz.hinweis)
-    .bind(zusatz.netz)
-    .bind(zusatz.sicherheit)
-    .execute(&mut *tx)
-    .await?;
+        )
+        .bind(org_id)
+        .bind(einsatz_id)
+        .bind(bezeichnung)
+        .bind(betriebsart)
+        .bind(zusatz.hinweis)
+        .bind(zusatz.netz)
+        .bind(zusatz.sicherheit)
+        .execute(&mut *conn)
+        .await?;
 
-    let sg = sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM sprechgruppe \
+        let sg = sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(format!(
+            "SELECT {SPALTEN} FROM sprechgruppe \
          WHERE org_id = ? AND einsatz_id = ? AND betriebsart = ? AND bezeichnung = ?",
-    )))
-    .bind(org_id)
-    .bind(einsatz_id)
-    .bind(betriebsart)
-    .bind(bezeichnung)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    tx.commit().await?;
-
-    Ok(sg)
+        )))
+        .bind(org_id)
+        .bind(einsatz_id)
+        .bind(betriebsart)
+        .bind(bezeichnung)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+        Ok(sg)
+    })
 }
 
 /// Alle Paare aus Katalog-Sprechgruppe und gleichnamiger Einsatz-Sprechgruppe der Org, die am
@@ -392,6 +408,27 @@ pub(crate) async fn pruefe_zuordenbar(
     if let Some(id) = ids.iter().find(|id| !zuordenbar.contains(id)) {
         return Err(AppError::UnprocessableEntity(format!(
             "Sprechgruppe {id} ist für diese Organisation/diesen Einsatz nicht zuordenbar"
+        )));
+    }
+    // LLH-1645: Eine Katalog-Sprechgruppe, die der Einsatz noch nicht nutzt, darf kein Paar mit
+    // einer gleichnamigen Einsatz-Sprechgruppe stiften (etwa eine deaktivierte, die der Picker
+    // nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar.
+    let paar: Option<(String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT k.bezeichnung, k.betriebsart FROM sprechgruppe k \
+         WHERE k.id IN (SELECT value FROM json_each(?1)) AND k.einsatz_id IS NULL \
+           AND EXISTS (SELECT 1 FROM sprechgruppe l WHERE l.einsatz_id = ?2 \
+                       AND l.betriebsart = k.betriebsart AND l.bezeichnung = k.bezeichnung) \
+           AND ?2 NOT IN ({}) \
+         ORDER BY k.id LIMIT 1",
+        nutzende_einsaetze("k.id")
+    )))
+    .bind(ids_json(ids)?)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    if let Some((bezeichnung, betriebsart)) = paar {
+        return Err(AppError::Conflict(format!(
+            "„{bezeichnung}“ ({betriebsart}) ist in diesem Einsatz schon als Einsatz-Sprechgruppe angelegt"
         )));
     }
     Ok(())

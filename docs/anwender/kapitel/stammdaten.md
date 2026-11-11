@@ -290,15 +290,19 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 
 ### Sprechgruppen im Katalog und im Einsatz
 
-Eine Sprechgruppe gibt es mit derselben Betriebsart und Bezeichnung nur einmal: entweder im
-Katalog unter „Stammdaten“ „Sprechgruppen“ oder als Sprechgruppe eines Einsatzes. Trägt ein
-laufender Einsatz eine Sprechgruppe mit diesem Namen, lehnt „Sprechgruppe anlegen“ ab und nennt
-den Einsatz; dasselbe gilt beim Umbenennen. Nach dem Abschluss des Einsatzes lässt sie sich in den
-Katalog übernehmen.
+Innerhalb eines Einsatzes gibt es eine Sprechgruppe mit derselben Betriebsart und Bezeichnung nur
+einmal: entweder aus dem Katalog unter „Stammdaten“ „Sprechgruppen“ oder als Sprechgruppe des
+Einsatzes. Verschiedene Einsätze dürfen jeder eine eigene gleichnamige Sprechgruppe haben.
+
+- Steht der Name im Katalog, legt ein Einsatz keine eigene Sprechgruppe mit ihm an.
+- Trägt ein laufender Einsatz eine eigene Sprechgruppe mit dem Namen, lehnt „Sprechgruppe
+  anlegen“ ab und nennt den Einsatz; dasselbe gilt beim Umbenennen, auch für einen abgeschlossenen
+  Einsatz, der die Katalog-Sprechgruppe nutzt.
+- Nach dem Abschluss des Einsatzes lässt sich der Name in den Katalog übernehmen.
 
 Gibt es aus der Zeit vor dieser Regel noch ein solches Paar, trägt die Sprechgruppe im Katalog die
-Marke „auch lokal“; mit dem Mauszeiger darauf erscheinen die Einsätze. Umbenannt wird nichts
-selbsttätig.
+Marke „auch lokal in …“ mit den Einsätzen. Umbenannt wird nichts selbsttätig; Hinweis, Netz und
+Sicherheit bleiben pflegbar.
 
 ### Externe Stellen
 
