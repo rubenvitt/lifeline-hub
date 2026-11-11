@@ -262,3 +262,5 @@ export const UHS_SOLL_ANZAHL_MAX = 200;
 export const ZEITACHSE_NOTIZ_MAX = 500;
 /** Bezeichnung eines Lesezugangs für einen externen Lagemonitor (LLH-1484). */
 export const LAGEMONITOR_BEZEICHNUNG_MAX = 60;
+/** Empfänger eines Links auf das Lagebild für Externe (LLH-1496). */
+export const LAGEBILD_EMPFAENGER_MAX = 80;

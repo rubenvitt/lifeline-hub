@@ -21,6 +21,7 @@ const karte = vi.hoisted(() => ({
   wurf: null as null | (() => Error),
   gebaut: 0,
   marker: 0,
+  optionen: null as null | Record<string, unknown>,
 }));
 
 vi.mock('maplibre-gl', () => {
@@ -33,9 +34,10 @@ vi.mock('maplibre-gl', () => {
     });
   }
   class Map {
-    constructor() {
+    constructor(optionen: Record<string, unknown>) {
       if (karte.wurf) throw karte.wurf();
       karte.gebaut += 1;
+      karte.optionen = optionen;
       return spion();
     }
   }
@@ -79,6 +81,7 @@ beforeEach(() => {
   karte.wurf = null;
   karte.gebaut = 0;
   karte.marker = 0;
+  karte.optionen = null;
   server.use(
     http.get('/api/karte/config', () =>
       HttpResponse.json({
@@ -138,5 +141,54 @@ describe('LagemonitorKarte ohne Kartengrafik (LLH-1377)', () => {
     } finally {
       konsole.mockRestore();
     }
+  });
+});
+
+/**
+ * Quellenangabe (LLH-1496): bedienbar (Lagebild für Externe, öffentlich geteilt) steht die
+ * hinterlegte Lizenz der Grundlage auf der Karte, wie auf der Lagekarte; der Monitor an der Wand
+ * bleibt ohne. Mutationsprobe: `customAttribution` weg → der erste Fall rot.
+ */
+describe('LagemonitorKarte Quellenangabe (LLH-1496)', () => {
+  const ODBL = '© OpenStreetMap contributors (ODbL)';
+  beforeEach(() => {
+    server.use(
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: true,
+          offline_tiles_url: '/api/karte/offline/1/tiles/{z}/{x}/{y}',
+          offline_attribution: ODBL,
+          offline_regionen: [
+            {
+              karte_id: 1,
+              name: 'R1',
+              tiles_url: '/api/karte/offline/1/tiles/{z}/{x}/{y}',
+              attribution: ODBL,
+              format: 'vektor',
+              maxzoom: 14,
+            },
+          ],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+    );
+  });
+
+  it('bedienbar: hinterlegte Lizenz der Grundlage', async () => {
+    renderMitProviders(
+      <LagemonitorKarte einsatzort={{ lat: 52.52, lon: 13.405 }} uhs={[]} bedienbar />,
+    );
+    await waitFor(() => expect(karte.gebaut).toBe(1));
+    expect(karte.optionen?.attributionControl).toEqual({
+      compact: true,
+      customAttribution: ODBL,
+    });
+  });
+
+  it('Monitor an der Wand: ohne Quellenangabe', async () => {
+    zeige();
+    await waitFor(() => expect(karte.gebaut).toBe(1));
+    expect(karte.optionen?.attributionControl).toBe(false);
   });
 });

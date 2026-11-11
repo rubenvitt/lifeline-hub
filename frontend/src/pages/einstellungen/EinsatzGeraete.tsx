@@ -41,7 +41,12 @@ import type {
   KopplungAnzeige,
   KopplungMitCode,
 } from '../../api/types';
-import { darfEinsatzLeiten, istEinsatzLeitung } from '../../einsatz/schreibrecht';
+import {
+  darfEinsatzLeiten,
+  fuehrtHier,
+  istEinsatzLeitung,
+  istSpiegel,
+} from '../../einsatz/schreibrecht';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { koppelnAdresse, parseRouteId } from '../../routing/deeplinks';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
@@ -64,6 +69,7 @@ import {
 } from './geraeteKern';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import EinsatzLagemonitore from './EinsatzLagemonitore';
+import EinsatzLagebildExtern from './EinsatzLagebildExtern';
 
 /**
  * Ohne Einsatzleitung lädt die Sektion nichts (der Server lässt nur sie zu, auch keinen Admin):
@@ -115,6 +121,10 @@ export default function EinsatzGeraete() {
   // Koppeln und Widerrufen schreiben einen ETB-Eintrag; am Spiegel sperrt das die Datenbank
   // (LLH-1492). Die Freigabe externer Lagemonitore bleibt lokal und hängt weiter an `darf`.
   const darfKoppeln = darf && darfEinsatzLeiten(daten.einsatz);
+  // Lagebild für Externe (LLH-1496): der Link gilt an dieser Instanz, auch am Spiegel (der
+  // ETB-Eintrag geht dort als Antrag); führt eine andere Instanz ohne Spiegel hier, lehnt der
+  // Server ab.
+  const darfLagebild = darf && (istSpiegel(daten.einsatz) || fuehrtHier(daten.einsatz));
 
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [anlegenVorbelegung, setAnlegenVorbelegung] = useState<AnlegenWerte | undefined>();
@@ -378,6 +388,8 @@ export default function EinsatzGeraete() {
       </Formularpaneel>
 
       <EinsatzLagemonitore einsatzId={einsatzId} darf={darf} />
+
+      <EinsatzLagebildExtern einsatzId={einsatzId} darf={darfLagebild} />
 
       <ErfassungsModal<AnlegenWerte>
         offen={anlegenOffen}

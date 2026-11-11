@@ -139,6 +139,8 @@ export const EINSATZ_KEYS = {
   geraete: 'einsatz-geraete',
   // Freigaben externer Lagemonitore an diesem Einsatz (LLH-1484), Seite der Geräte.
   lagemonitorZugaenge: 'einsatz-lagemonitor-zugaenge',
+  // Links auf das Lagebild für Externe (LLH-1496), Seite der Geräte.
+  lagebildFreigaben: 'einsatz-lagebild-freigaben',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
   // Verlauf der eigenen Benachrichtigungen samt ungelesenen Eingängen (LLH-1143): Knopf
@@ -514,6 +516,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
  * - `lagemonitorZugaenge` (LLH-1484): wie `geraete`; die Freigabe setzt die Antwort, ein Abruf
  *   des externen Monitors ist kein Ereignis.
+ * - `lagebildFreigaben` (LLH-1496): wie `lagemonitorZugaenge`; Anlegen und Widerruf setzen die
+ *   Antwort, eine Öffnung des Links ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
  *   Die eigene Änderung invalidiert die Mutation; die eines anderen wirkt beim nächsten Abruf,
  *   das 403 der Server-Gates bleibt das Netz.
@@ -567,6 +571,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulVorgaben,
   EINSATZ_KEYS.geraete,
   EINSATZ_KEYS.lagemonitorZugaenge,
+  EINSATZ_KEYS.lagebildFreigaben,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.benachrichtigungVerlauf,
   EINSATZ_KEYS.ortVorschau,
@@ -668,6 +673,8 @@ export const einsatzKeys = {
   /** Lagemonitor-Zugänge der Org aus Sicht dieses Einsatzes (LLH-1484), nicht live. */
   lagemonitorZugaenge: (einsatzId: number) =>
     [EINSATZ_KEYS.lagemonitorZugaenge, einsatzId] as const,
+  /** Links auf das Lagebild für Externe an diesem Einsatz (LLH-1496), nicht live. */
+  lagebildFreigaben: (einsatzId: number) => [EINSATZ_KEYS.lagebildFreigaben, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulFreigaben: (einsatzId: number | null) => [EINSATZ_KEYS.modulFreigaben, einsatzId] as const,
   // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe wirkt auf jeden Einsatz der Org.
@@ -1047,6 +1054,8 @@ export const GLOBAL_KEYS = {
   authProvider: 'auth-provider',
   // Lesezugänge externer Lagemonitore (LLH-1484), Verwaltung.
   lagemonitorZugaenge: 'lagemonitor-zugaenge',
+  // Lagebild für Externe (LLH-1496): Abruf der Seite `/extern` mit dem Schlüssel aus dem Link.
+  lagebildExtern: 'lagebild-extern',
   // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
   instanzkopplung: 'instanzkopplung',
   // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
@@ -1165,6 +1174,8 @@ export const globalKeys = {
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
+  /** Abruf der Seite `/extern` (LLH-1496). Ohne den Schlüssel: der bleibt aus dem Cache. */
+  lagebildExtern: () => [GLOBAL_KEYS.lagebildExtern] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
   /**
@@ -1234,9 +1245,11 @@ export const globalKeys = {
   fahrzeugeListe: (filter: Dienstfilter) => [GLOBAL_KEYS.fahrzeuge, filter] as const,
   material: () => [GLOBAL_KEYS.material] as const,
   materialListe: (filter: Dienstfilter) => [GLOBAL_KEYS.material, filter] as const,
-  // sprechgruppen kennt nur den Filterwert 'alle', deshalb nur dieser eine Accessor (siehe
-  // queryKeys.prefixmatch.test.ts). Den baren Prefix invalidiert `stammdaten` (LFH-734).
+  // Der bare Prefix invalidiert die Liste und die Paare mit Einsatz-Sprechgruppen (LLH-1645);
+  // `stammdaten` nimmt ihn mit (LFH-734).
+  sprechgruppen: () => [GLOBAL_KEYS.sprechgruppen] as const,
   sprechgruppenAlle: () => [GLOBAL_KEYS.sprechgruppen, 'alle'] as const,
+  sprechgruppenAuchLokal: () => [GLOBAL_KEYS.sprechgruppen, 'auch-lokal'] as const,
   /**
    * Externe Stellen (LFH-1194): `'aktiv'` für die Vorschläge, `'alle'` für die Verwaltung. Der
    * argumentlose Accessor ist der Invalidierungs-Prefix beider Fächer.
@@ -1352,6 +1365,7 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `benutzer`, `authProvider`: Benutzerverwaltung und Anmeldewege, nur für den Admin.
  * - `lagemonitorZugaenge` (LLH-1484): Verwaltung der Lesezugänge; die eigene Änderung setzt die
  *   Antwort, eine Freigabe am Einsatz wirkt beim nächsten Abruf.
+ * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
@@ -1372,6 +1386,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
   GLOBAL_KEYS.authProvider,
   GLOBAL_KEYS.lagemonitorZugaenge,
+  GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
