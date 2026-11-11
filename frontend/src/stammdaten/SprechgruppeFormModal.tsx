@@ -55,8 +55,9 @@ export default function SprechgruppeFormModal({
         : legeSprechgruppeAn(eingabe);
     },
     // Kein `onClose()` mehr: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    // Prefix: Liste und Paare mit Einsatz-Sprechgruppen (LLH-1645).
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() });
+      qc.invalidateQueries({ queryKey: globalKeys.sprechgruppen() });
     },
   });
 

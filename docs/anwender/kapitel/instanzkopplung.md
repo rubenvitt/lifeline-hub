@@ -391,6 +391,12 @@ Spiegel öffnet, bevor sein Inhalt da ist, sieht „wird geholt“; die Installa
 zuerst und in Stücken, damit Einträge und Anträge auch über eine schmale Leitung durchgehen. Im
 Leerlauf holt sie die übrigen Anhänge vorab. Ein Inhalt gilt erst, wenn seine Prüfsumme stimmt.
 
+Ein Anhang über 32 MiB wird nicht geholt; am Spiegel steht dann „zu groß für den Abgleich“, der
+Inhalt liegt nur an der Installation, die den Einsatz führt. Ebenso bleibt ein einzelner Eintrag,
+der allein (mit allem, was er braucht) größer ist als eine Lieferung, am Spiegel in seiner alten
+Fassung; die Einsätze-Übersicht der Kopplung nennt ihn unter den Hinweisen. Der Abgleich der
+übrigen Einträge geht weiter, und die nächste Änderung des Eintrags versucht es neu.
+
 ### Widerruf und Spiegel
 
 Mit dem Widerruf einer Kopplung endet der Abgleich ihrer Einsätze, an beiden Installationen.
