@@ -1610,13 +1610,14 @@ async fn offline_katalog_zeigt_nur_lieferbare() {
     let v = json(res).await;
     let liste = v.as_array().expect("Array");
     // LFH-201: der Download-Katalog zeigt NUR tatsächlich lieferbare Regionen (Pin + echte URL).
-    // Im Test fehlt das Manifest (Fetch der TODO-Platzhalter-URL scheitert) → alle compiled-in
-    // Platzhalter sind gefiltert → leer. Ungebaute Platzhalter dürfen nie als ladbar erscheinen.
+    // Ohne Netz bleibt nur die einkompilierte Baseline, die ohne `sha256` komplett gefiltert wird
+    // → leer; mit Netz kommen die gepinnten Einträge des Vorgabe-Manifests (LLH-1546). In beiden
+    // Fällen darf kein ungepinnter Platzhalter als ladbar erscheinen.
     assert!(
         liste
             .iter()
             .all(|e| !e["url"].as_str().unwrap().contains("TODO")),
-        "keine ungebauten TODO-Platzhalter im Download-Katalog"
+        "keine TODO-Platzhalter im Download-Katalog"
     );
     assert!(
         liste.iter().all(|e| e["sha256"].as_str().is_some()),
@@ -1708,8 +1709,8 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
 #[tokio::test]
 async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
     // LFH-206-Bugfix: eine real installierte Region, deren einziger Katalog-Treffer ein UNGEBAUTER
-    // TODO-Platzhalter ist (leerer Katalog-Cache → nur compiled-in), darf NICHT „Update verfügbar"
-    // melden — sonst lädt „Aktualisieren" eine nicht-ladbare URL (`https://TODO-karten-build-release/…`).
+    // Platzhalter ist (leerer Katalog-Cache → nur compiled-in), darf NICHT „Update verfügbar"
+    // melden — sonst lädt „Aktualisieren" eine nicht-ladbare URL (Baseline ohne `sha256`).
     // Genau das trat auf: Schweiz/NRW im compiled-in-Katalog boten sich nach Neustart als Platzhalter-
     // Update an. Die eigentliche Filterlogik (nur lieferbare Einträge) ist in `update_check_tests`
     // unit-getestet; dieser Handler-Test ist clean-env-deterministisch (in einer Dev-Env mit

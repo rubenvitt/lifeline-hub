@@ -9,10 +9,15 @@ use crate::config::{
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 
-/// Gepinnte Manifest-URL am Eigen-Mirror. Bis zum ersten Release ein Platzhalter; der Fetch
-/// schlägt dann sauber fehl → einkompilierter Fallback.
+/// Öffentliche Basis des Vorgabe-Katalogs: der Bucket, in den der `karten-service` des Projekts
+/// Karten und Manifest veröffentlicht (LLH-1546). Eine eigene Installation ohne
+/// `--offline-katalog-manifest-url` lädt ihre Offline-Karten von hier.
+pub const KARTEN_BASIS_URL: &str = "https://karten.rubeen.dev";
+
+/// Gepinnte Manifest-URL unter [`KARTEN_BASIS_URL`]. Scheitert der Abruf (offline, Mirror weg),
+/// bleibt es beim einkompilierten Katalog bzw. dem letzten Cache-Stand.
 pub const OFFLINE_KATALOG_MANIFEST_URL: &str =
-    "https://TODO-karten-build-release/offline-katalog-manifest.json";
+    "https://karten.rubeen.dev/offline-katalog-manifest.json";
 
 /// TTL des Manifest-Caches; auch ein fehlgeschlagener Fetch pausiert so lange (kein Hämmern auf
 /// einen toten Mirror).
@@ -70,7 +75,7 @@ async fn effektiver_katalog_intern(
     }
     // Nur LIEFERBARE Einträge (Pin + echte URL); einkompilierte Platzhalter erscheinen nicht als
     // ladbar. Der Update-Check filtert ebenso (`finde_update_eintrag`), damit „Aktualisieren“ nie
-    // auf eine TODO-URL läuft.
+    // auf einen ungebauten Platzhalter läuft.
     nur_lieferbare(katalog_aus_cache())
 }
 
@@ -168,6 +173,20 @@ mod tests {
             )),
             "https://cdn.example/maps/offline-katalog-manifest.json"
         );
+    }
+
+    #[test]
+    fn vorgabe_manifest_liegt_unter_der_karten_basis() {
+        // LLH-1546: kein Platzhalter mehr als Vorgabe; Manifest und Platzhalter-Einträge zeigen
+        // auf denselben Bucket, und beide sind https.
+        assert!(KARTEN_BASIS_URL.starts_with("https://"));
+        assert!(!KARTEN_BASIS_URL.ends_with('/'));
+        assert_eq!(
+            OFFLINE_KATALOG_MANIFEST_URL,
+            format!("{KARTEN_BASIS_URL}/offline-katalog-manifest.json")
+        );
+        assert!(!OFFLINE_KATALOG_MANIFEST_URL.contains("TODO"));
+        assert!(reqwest::Url::parse(OFFLINE_KATALOG_MANIFEST_URL).is_ok());
     }
 
     #[test]

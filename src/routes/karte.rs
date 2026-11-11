@@ -1013,11 +1013,12 @@ mod update_check_tests {
 
     #[test]
     fn kein_update_auf_ungebauten_platzhalter() {
-        // LFH-206: ein ungebauter TODO-Platzhalter (nicht lieferbar) darf NIE als Update erscheinen —
-        // sonst lädt „Aktualisieren" eine nicht-ladbare URL (der Bug, den Schweiz/NRW auslösten).
+        // LFH-206: ein ungebauter Platzhalter ohne Pin (nicht lieferbar) darf NIE als Update
+        // erscheinen — sonst lädt „Aktualisieren" eine nicht-ladbare URL (der Bug, den Schweiz/NRW
+        // auslösten).
         let katalog = vec![eintrag(
             "Schweiz",
-            "https://TODO-karten-build-release/switzerland.shortbread.mbtiles",
+            "https://karten.example/switzerland.shortbread.mbtiles",
             None,
         )];
         assert!(finde_update_eintrag(

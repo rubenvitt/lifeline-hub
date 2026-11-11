@@ -351,9 +351,12 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
   wird beim Start angelegt.
   - **Erzeugen des MBTiles** (bau-zeitig, nicht in der App): das Repo-Projekt `karten-build/`
     (Docker + **Planetiler-Shortbread**) baut ein Regions-Bundle, Default **Deutschland z0–14**
-    (`make -C karten-build tiles AREA=germany`, ~einige GB). Das fertige `germany.shortbread.mbtiles`
-    wird als GitHub-Release / an einer stabilen URL gehostet; URL + gemessene Größe + SHA256 gehen
-    in `default_offline_katalog()` (`src/config.rs`). **Kein Laufzeit-Docker / kein externer
+    (`make -C karten-build tiles AREA=germany`, ~einige GB). Der `karten-service` des Projekts
+    baut die Regionen quartalsweise und veröffentlicht sie mit Größe und SHA256 im Manifest
+    `https://karten.rubeen.dev/offline-katalog-manifest.json`; das ist der einkompilierte
+    Vorgabe-Katalog (`OFFLINE_KATALOG_MANIFEST_URL`, LLH-1546). Eine frische Installation zeigt
+    ohne weiteren Schalter die dort gebauten Regionen. Ein eigener karten-service wird mit
+    `--offline-katalog-manifest-url` eingetragen. **Kein Laufzeit-Docker / kein externer
     Tile-Service** — die App serviert die MBTiles selbst (LFH-178-Eckpunkt „alles in-App").
   - **Laden/Aktualisieren über die Admin-UI:** der Offline-Karten-Manager lädt das Bundle per
     verifiziertem Download (SHA256-Pin, SSRF-Guard) und aktiviert es; „Aktualisieren" = neue

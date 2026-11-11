@@ -142,14 +142,12 @@ pub use karten_katalog::{
 };
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`): Eigenbau
-/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), als GitHub-Release des Build-Projekts
-/// gehostet.
+/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), vom `karten-service` des Projekts unter
+/// [`crate::karte::katalog::KARTEN_BASIS_URL`] veröffentlicht.
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    // >>> OPERATOR-PIN <<< — je Eintrag beim karten-build-Release genau drei Felder ersetzen
-    // (README karten-build): `url`, `groesse` (gemessene Bytes), `sha256` (aus
-    // out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin erkennbare, aber gültige
-    // https-Platzhalter; `katalog_eintrag_sha256_pin_konsistent` trägt beide Zustände. Alternativ
-    // füllt das Remote-Manifest die echten Einträge ohne App-Release.
+    // Einkompiliert ist nur die Baseline (Name, Region, Gruppe, grobe Größe) ohne `sha256`: sie
+    // ist nie ladbar (`eintrag_ist_lieferbar`). Die gebauten Stände mit Prüfsumme liefert das
+    // Manifest unter `OFFLINE_KATALOG_MANIFEST_URL` und überschreibt per `name` (LLH-1546).
     //
     // `gruppe` steuert die geführte Auswahl. Neue Region = Zeile ergänzen (Slug =
     // karten-build-Dateiname).
@@ -162,7 +160,10 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     ) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
             name: name.into(),
-            url: format!("https://TODO-karten-build-release/{slug}.shortbread.mbtiles"),
+            url: format!(
+                "{}/{slug}.shortbread.mbtiles",
+                crate::karte::katalog::KARTEN_BASIS_URL
+            ),
             region: region.into(),
             groesse: ca_gb * 1024 * 1024 * 1024, // grobe Schätzung, nach Bau durch Messung ersetzen
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
@@ -1182,17 +1183,21 @@ mod tests {
 
     #[test]
     fn katalog_eintrag_sha256_pin_konsistent_und_serialisiert() {
-        // Pin-Konsistenz: jeder Eintrag ist ENTWEDER ungepinnter Platzhalter (sha256 None) ODER
-        // vollständig gepinnt (64-stelliger lowercase-hex-Hash + echte URL). Halb gepinnte Zustände
-        // fallen durch.
+        // Pin-Konsistenz (LLH-1546): die einkompilierte Baseline ist ungepinnt (sha256 None) und
+        // zeigt auf den Vorgabe-Bucket, nie auf einen TODO-Platzhalter. Ladbar wird ein Eintrag
+        // nur über das Manifest mit Prüfsumme.
         for e in default_offline_katalog() {
-            // Gepinnt GENAU DANN, wenn die URL kein TODO-Platzhalter ist. Fängt beide Richtungen:
-            // echte URL
-            // ohne Hash (download.rs lüde ungeprüft) und Hash bei Platzhalter-URL.
-            assert_eq!(
-                e.sha256.is_some(),
-                !e.url.contains("TODO"),
-                "URL/Pin-Zustand inkonsistent (echte URL braucht sha256 und umgekehrt): {}",
+            assert!(
+                e.url
+                    .starts_with(&format!("{}/", crate::karte::katalog::KARTEN_BASIS_URL)),
+                "Baseline-URL außerhalb des Vorgabe-Buckets: {} ({})",
+                e.name,
+                e.url
+            );
+            assert!(!e.url.contains("TODO"), "TODO-Platzhalter: {}", e.name);
+            assert!(
+                !crate::config::eintrag_ist_lieferbar(&e),
+                "Baseline ohne Manifest-Pin darf nicht ladbar sein: {}",
                 e.name
             );
             if let Some(h) = &e.sha256 {
