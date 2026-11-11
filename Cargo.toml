@@ -190,7 +190,7 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
-# Der KRITIS-Import liest einen 4–5 GB großen PBF-Extrakt, auch im Dev-Stack. Nur diese
+# Der KRITIS-Import liest einen 4–5 GB großen PBF-Extrakt, eingeschaltet auch im Dev-Stack. Nur diese
 # Abhängigkeiten werden im Dev-Build optimiert; der eigene Code bleibt debugbar.
 [profile.dev.package.osmpbf]
 opt-level = 3

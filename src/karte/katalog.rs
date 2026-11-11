@@ -9,10 +9,15 @@ use crate::config::{
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 
-/// Gepinnte Manifest-URL am Eigen-Mirror. Bis zum ersten Release ein Platzhalter; der Fetch
-/// schlägt dann sauber fehl → einkompilierter Fallback.
+/// Öffentliche Basis des Vorgabe-Katalogs: der Bucket, in den der `karten-service` des Projekts
+/// Karten und Manifest veröffentlicht (LLH-1546). Eine eigene Installation ohne
+/// `--offline-katalog-manifest-url` lädt ihre Offline-Karten von hier.
+pub const KARTEN_BASIS_URL: &str = "https://karten.rubeen.dev";
+
+/// Gepinnte Manifest-URL unter [`KARTEN_BASIS_URL`]. Scheitert der Abruf (offline, Mirror weg),
+/// bleibt es beim einkompilierten Katalog bzw. dem letzten Cache-Stand.
 pub const OFFLINE_KATALOG_MANIFEST_URL: &str =
-    "https://TODO-karten-build-release/offline-katalog-manifest.json";
+    "https://karten.rubeen.dev/offline-katalog-manifest.json";
 
 /// TTL des Manifest-Caches; auch ein fehlgeschlagener Fetch pausiert so lange (kein Hämmern auf
 /// einen toten Mirror).
@@ -70,7 +75,7 @@ async fn effektiver_katalog_intern(
     }
     // Nur LIEFERBARE Einträge (Pin + echte URL); einkompilierte Platzhalter erscheinen nicht als
     // ladbar. Der Update-Check filtert ebenso (`finde_update_eintrag`), damit „Aktualisieren“ nie
-    // auf eine TODO-URL läuft.
+    // auf einen ungebauten Platzhalter läuft.
     nur_lieferbare(katalog_aus_cache())
 }
 
@@ -108,18 +113,35 @@ fn resolve_manifest_url(override_env: Option<String>) -> String {
 }
 
 async fn hole_manifest(client: &reqwest::Client) -> Option<Vec<OfflineKatalogEintrag>> {
-    let resp = client.get(manifest_url()).send().await.ok()?;
+    hole_manifest_von(client, &manifest_url()).await
+}
+
+/// Holt und parst ein Manifest. Der Größen-Guard greift zweimal: vorab über `Content-Length`
+/// und beim Lesen, damit auch eine Antwort ohne Längenangabe (chunked) nie mehr als
+/// `MAX_MANIFEST_BYTES` in den Speicher bringt (LLH-1546: seit der echten Vorgabe-URL ruft
+/// jede Installation ohne Override das Manifest ab).
+async fn hole_manifest_von(
+    client: &reqwest::Client,
+    url: &str,
+) -> Option<Vec<OfflineKatalogEintrag>> {
+    let mut resp = client.get(url).send().await.ok()?;
     if !resp.status().is_success() {
         return None;
     }
-    // Größen-Guard: ein riesiger Body wäre ein Fehler oder Angriff.
     if resp
         .content_length()
         .is_some_and(|n| n > MAX_MANIFEST_BYTES)
     {
         return None;
     }
-    resp.json::<Vec<OfflineKatalogEintrag>>().await.ok()
+    let mut body = Vec::new();
+    while let Some(stueck) = resp.chunk().await.ok()? {
+        if (body.len() + stueck.len()) as u64 > MAX_MANIFEST_BYTES {
+            return None;
+        }
+        body.extend_from_slice(&stueck);
+    }
+    serde_json::from_slice(&body).ok()
 }
 
 #[cfg(test)]
@@ -168,6 +190,64 @@ mod tests {
             )),
             "https://cdn.example/maps/offline-katalog-manifest.json"
         );
+    }
+
+    /// Lokaler Server, der `teile` nacheinander ohne `Content-Length` (chunked) liefert.
+    async fn streamender_server(teile: Vec<Vec<u8>>) -> String {
+        use axum::{body::Body, routing::get, Router};
+        let app = Router::new().route(
+            "/m.json",
+            get(move || {
+                let teile = teile.clone();
+                async move {
+                    Body::from_stream(futures::stream::iter(
+                        teile.into_iter().map(Ok::<_, std::io::Error>),
+                    ))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        format!("http://127.0.0.1:{}/m.json", addr.port())
+    }
+
+    #[tokio::test]
+    async fn manifest_ohne_laengenangabe_ueber_der_grenze_wird_verworfen() {
+        // `[]` und dann 2 MiB Leerraum, chunked: ohne Grenze wäre das ein gültiges, leeres
+        // Manifest. Vorab greift kein Content-Length, also muss der Lese-Guard verwerfen.
+        let mut teile = vec![b"[]".to_vec()];
+        teile.extend((0..32).map(|_| vec![b' '; 64 * 1024]));
+        let url = streamender_server(teile).await;
+        let client = reqwest::Client::new();
+        assert!(hole_manifest_von(&client, &url).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn manifest_ohne_laengenangabe_unter_der_grenze_wird_gelesen() {
+        // `[]` mit Leerraum, chunked, deutlich unter 1 MiB → leere Liste.
+        let url = streamender_server(vec![b"[".to_vec(), vec![b' '; 4096], b"]".to_vec()]).await;
+        let client = reqwest::Client::new();
+        assert_eq!(
+            hole_manifest_von(&client, &url).await.map(|v| v.len()),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn vorgabe_manifest_liegt_unter_der_karten_basis() {
+        // LLH-1546: kein Platzhalter mehr als Vorgabe; Manifest und Platzhalter-Einträge zeigen
+        // auf denselben Bucket, und beide sind https.
+        assert!(KARTEN_BASIS_URL.starts_with("https://"));
+        assert!(!KARTEN_BASIS_URL.ends_with('/'));
+        assert_eq!(
+            OFFLINE_KATALOG_MANIFEST_URL,
+            format!("{KARTEN_BASIS_URL}/offline-katalog-manifest.json")
+        );
+        assert!(!OFFLINE_KATALOG_MANIFEST_URL.contains("TODO"));
+        assert!(reqwest::Url::parse(OFFLINE_KATALOG_MANIFEST_URL).is_ok());
     }
 
     #[test]
