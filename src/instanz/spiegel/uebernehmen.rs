@@ -49,6 +49,10 @@ pub struct Ergebnis {
     pub kategorien: BTreeSet<SpiegelKategorie>,
     pub hinweise: Vec<String>,
     pub inhalte: Vec<OffenerInhalt>,
+    /// Zeilen (Art, fremder Schlüssel), die geschrieben, bewusst ausgelassen oder gelöscht
+    /// wurden; ihr Hinweis „zu groß“ ist damit erledigt (LLH-1630). Eine zurückgerollte
+    /// Übernahme liefert ein neues, leeres Ergebnis.
+    pub erledigt: Vec<(String, String)>,
 }
 
 /// Ein nullbarer Verweis, der erst nach allen Zeilen gesetzt wird.
@@ -204,16 +208,30 @@ async fn uebernehme_zeilen(
     }
     let mut einsatz_id = vorhanden;
     // Der Kopf zuerst: an ihm hängen alle anderen Zeilen.
-    if let Some(kopf) = l.zeilen.iter().find(|z| z.art == "einsatz" && !z.geloescht) {
+    if let Some(kopf) = l
+        .zeilen
+        .iter()
+        .find(|z| z.art == "einsatz" && !z.geloescht && !z.zu_gross)
+    {
         let t = schema.tabelle("einsatz").expect("einsatz ist gespiegelt");
         let id = kopf_uebernehmen(conn, t, e, l, kopf, einsatz_id, &konten).await?;
         einsatz_id = Some(id);
         ergebnis.kategorien.insert(t.kategorie);
+        ergebnis
+            .erledigt
+            .push((kopf.art.clone(), kopf.schluessel.clone()));
     }
     let Some(einsatz_id) = einsatz_id else {
         return Ok(());
     };
     ergebnis.einsatz_id = Some(einsatz_id);
+    // Zu groß für den Abgleich (LLH-1630): die Zeile kommt ohne Daten, die bisherige Fassung
+    // bleibt stehen. Kein Nachholen, sonst käme dieselbe Zeile in jedem Takt wieder.
+    for z in l.zeilen.iter().filter(|z| z.zu_gross) {
+        ergebnis
+            .hinweise
+            .push(zu_gross_hinweis(&z.art, &z.schluessel));
+    }
     // Löschungen zuerst: eine neue Zeile kann den Platz einer gelöschten einnehmen (Reihenfolge,
     // eindeutige Paare). Hängt an der Zeile noch ein Verweis, den erst eine geänderte Zeile dieser
     // Lieferung löst (Abschnitt auflösen: Einheiten verlieren ihn vorher), folgt sie danach.
@@ -251,7 +269,12 @@ async fn uebernehme_zeilen(
             let kopie;
             let daten = if katalog::ist_katalog_daten(t.name, daten) {
                 match katalog::uebernehmen(conn, e, einsatz_id, z, daten).await? {
-                    katalog::Katalog::Gegenstueck => continue,
+                    katalog::Katalog::Gegenstueck => {
+                        ergebnis
+                            .erledigt
+                            .push((z.art.clone(), z.schluessel.clone()));
+                        continue;
+                    }
                     katalog::Katalog::Kopie(d) => {
                         kopie = d;
                         &kopie
@@ -267,11 +290,17 @@ async fn uebernehme_zeilen(
                 {
                     // Ein Stellvertreter wird nie Mitglied (D5): die Zeile entfällt still.
                     let _ = werte;
+                    ergebnis
+                        .erledigt
+                        .push((z.art.clone(), z.schluessel.clone()));
                 }
                 Abgebildet::Fertig(werte, spaeter) => {
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
                             ergebnis.kategorien.insert(t.kategorie);
+                            ergebnis
+                                .erledigt
+                                .push((z.art.clone(), z.schluessel.clone()));
                             for (spalte, ziel, fremd) in spaeter {
                                 offen.push(Offen {
                                     tabelle: t.name,
@@ -405,6 +434,9 @@ async fn loeschen(
         .bind(&z.schluessel)
         .execute(&mut *conn)
         .await?;
+        ergebnis
+            .erledigt
+            .push((z.art.clone(), z.schluessel.clone()));
         return Ok(());
     };
     sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -427,6 +459,9 @@ async fn loeschen(
     .execute(&mut *conn)
     .await?;
     ergebnis.kategorien.insert(t.kategorie);
+    ergebnis
+        .erledigt
+        .push((z.art.clone(), z.schluessel.clone()));
     Ok(())
 }
 
@@ -456,6 +491,11 @@ async fn kopf_uebernehmen(
         return Ok(id);
     }
     werte.push(("spiegel".into(), Value::from(1)));
+    // Die ID nach derselben Regel wie jede Anlage (LFH-690, LLH-1630): nie die eines entfernten
+    // Demo- oder endgültig gelöschten Einsatzes, sonst schrieben offene Tabs und
+    // Offline-Warteschlangen still in den Spiegel.
+    let neue_id = crate::einsatz::repo::naechste_id(conn).await?;
+    werte.push(("id".into(), Value::from(neue_id)));
     let id = insert(conn, t.name, &werte).await?;
     sqlx::query(
         "INSERT INTO einsatz_spiegel (einsatz_id, kopplung_org_id, fremde_kennung, freigabestufe) \
@@ -940,4 +980,18 @@ async fn upsert(
         };
     }
     Ok(q.fetch_one(&mut *conn).await?)
+}
+
+/// Anfang des Hinweises zu einer Zeile über der Paketgrenze; er bleibt am Spiegel stehen, bis
+/// dieselbe Zeile mit Daten ankommt (LLH-1630, `abgleich::hinweise_fortschreiben`).
+pub(super) fn zu_gross_anfang(art: &str, schluessel: &str) -> String {
+    format!("Zeile {art} {schluessel} ist zu groß")
+}
+
+/// Hinweis zu einer Zeile, die ohne Daten kam (`Zeile::zu_gross`).
+pub(super) fn zu_gross_hinweis(art: &str, schluessel: &str) -> String {
+    format!(
+        "{} für den Abgleich und liegt nur an der führenden Instanz.",
+        zu_gross_anfang(art, schluessel)
+    )
 }

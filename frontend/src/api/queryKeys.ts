@@ -1251,9 +1251,11 @@ export const globalKeys = {
   fahrzeugeListe: (filter: Dienstfilter) => [GLOBAL_KEYS.fahrzeuge, filter] as const,
   material: () => [GLOBAL_KEYS.material] as const,
   materialListe: (filter: Dienstfilter) => [GLOBAL_KEYS.material, filter] as const,
-  // sprechgruppen kennt nur den Filterwert 'alle', deshalb nur dieser eine Accessor (siehe
-  // queryKeys.prefixmatch.test.ts). Den baren Prefix invalidiert `stammdaten` (LFH-734).
+  // Der bare Prefix invalidiert die Liste und die Paare mit Einsatz-Sprechgruppen (LLH-1645);
+  // `stammdaten` nimmt ihn mit (LFH-734).
+  sprechgruppen: () => [GLOBAL_KEYS.sprechgruppen] as const,
   sprechgruppenAlle: () => [GLOBAL_KEYS.sprechgruppen, 'alle'] as const,
+  sprechgruppenAuchLokal: () => [GLOBAL_KEYS.sprechgruppen, 'auch-lokal'] as const,
   /**
    * Externe Stellen (LFH-1194): `'aktiv'` für die Vorschläge, `'alle'` für die Verwaltung. Der
    * argumentlose Accessor ist der Invalidierungs-Prefix beider Fächer.

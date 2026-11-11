@@ -545,7 +545,7 @@ async fn uebernimm_bruch_antwort(
     Ok(Some(einsatz_id))
 }
 
-/// Löst Verweise zwischen Zeilen, die gemeinsam entfernt werden (LLH-1646): Eine Meldung und ihr
+/// Löst Verweise zwischen Zeilen, die gemeinsam entfernt werden (gefunden in LLH-1646): Eine Meldung und ihr
 /// ETB-Eintrag zeigen aufeinander (`meldung.etb_meldung_id`, `etb_eintrag.meldung_id`), ohne
 /// `ON DELETE`. Keine der beiden ließe sich zuerst löschen, und die Bruchstelle käme nie zu Ende.
 /// Der Inhalt ist schon gesichert; geleert wird nur, was keine Pflichtspalte ist. Läuft unter dem

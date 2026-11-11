@@ -18494,6 +18494,29 @@
           }
         }
       },
+      "SprechgruppeAuchLokal": {
+        "type": "object",
+        "description": "Katalog-Sprechgruppe, deren Name ein Einsatz zugleich als Einsatz-Sprechgruppe trägt\n(LLH-1645, Altbestand vor der Sperre): eine Zeile je Paar aus Sprechgruppe und Einsatz.",
+        "required": [
+          "sprechgruppe_id",
+          "einsatz_id",
+          "einsatz"
+        ],
+        "properties": {
+          "einsatz": {
+            "type": "string",
+            "description": "Bezeichnung des Einsatzes."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sprechgruppe_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Staerke": {
         "type": "object",
         "description": "Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.\n`gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab\nüber 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).\n`FromRow` über die Spalten `fuehrer`, `unterfuehrer`, `mannschaft`, damit eine Abfrage\ndie gezählte Stärke flach mitliefern kann (UHS, LFH-1045).",

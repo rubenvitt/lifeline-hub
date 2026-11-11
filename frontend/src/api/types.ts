@@ -398,6 +398,8 @@ export interface EinheitVorlagePersonalEingabe {
 // ============================== LFH-109 Sprechgruppen-Katalog ==============================
 export type Betriebsart = S['Betriebsart'];
 export type Sprechgruppe = S['SprechgruppeAnzeige'];
+/** Katalog-Sprechgruppe, deren Name ein Einsatz zugleich lokal trägt (LLH-1645). */
+export type SprechgruppeAuchLokal = S['SprechgruppeAuchLokal'];
 
 /** Eingabe-Body für Anlegen und PATCH einer Sprechgruppe. Kein Backend-Schema, FE-lokal. */
 export interface SprechgruppeEingabe {

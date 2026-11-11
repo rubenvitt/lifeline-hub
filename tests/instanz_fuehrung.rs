@@ -1260,6 +1260,51 @@ async fn notuebernahme_am_hub_macht_den_spiegel_beschreibbar() {
     assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
 }
 
+/// Eine Meldung nach dem Bruch und ihr ETB-Eintrag zeigen aufeinander. Beide verlassen den
+/// Spiegel trotzdem, und die Bruchstelle kommt zu Ende (Befund aus LLH-1646).
+#[tokio::test]
+async fn meldung_nach_dem_bruch_verlaesst_den_spiegel() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+
+    let (s, m) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/meldungen"),
+        json!({"absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "Deich instabil",
+               "ereigniszeit": "2026-06-12 09:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+    let offen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(offen, 0, "Meldung und ETB-Eintrag sind entfernt");
+    let meldungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ?")
+        .bind(e)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(meldungen, 0, "die Meldung liegt nicht mehr am Spiegel");
+}
+
 async fn bruch_offen(i: &Instanz, einsatz: i64) -> i64 {
     sqlx::query_scalar("SELECT bruch_offen FROM einsatz_spiegel WHERE einsatz_id = ?")
         .bind(einsatz)
@@ -1554,7 +1599,7 @@ async fn ein_offener_antrag_am_spiegel_wird_beim_wechsel_genau_einmal_ausgefuehr
 }
 
 /// Anträge ohne eigene Erfassung gehen beim Wechsel nicht verloren (Review LLH-1641): der
-/// ETB-Antrag einer Freigabe (`etb_beantragen_tx`) und ein Antrag aus der Zeit vor Migration 0320
+/// ETB-Antrag einer Freigabe (`etb_beantragen_tx`) und ein Antrag aus der Zeit vor LLH-1641
 /// (`daten_lokal` leer, keine Kennungen darin).
 #[tokio::test]
 async fn antraege_ohne_eigene_erfassung_werden_beim_wechsel_ausgefuehrt() {

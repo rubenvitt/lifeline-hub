@@ -2316,6 +2316,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route("/api/sprechgruppen", post(routes::sprechgruppe::anlegen))
         .route(
+            "/api/sprechgruppen/auch-lokal",
+            get(routes::sprechgruppe::liste_auch_lokal),
+        )
+        .route(
             "/api/sprechgruppen/{id}",
             patch(routes::sprechgruppe::aktualisieren),
         )

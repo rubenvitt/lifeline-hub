@@ -436,10 +436,11 @@ async fn anhang_am_elw(elw: &Instanz, einsatz: i64, n: usize) -> (i64, Vec<u8>) 
     let bytes: Vec<u8> = (0..n).map(|i| (i * 7 % 251) as u8).collect();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
-         VALUES (?, 'foto.bin', 'application/octet-stream', ?, 'x', ?, 1) RETURNING id",
+         VALUES (?, 'foto.bin', 'application/octet-stream', ?, ?, ?, 1) RETURNING id",
     )
     .bind(einsatz)
     .bind(n as i64)
+    .bind(lifeline_hub::anhang::repo::sha256_hex(&bytes))
     .bind(&bytes)
     .fetch_one(&elw.pool)
     .await
@@ -548,8 +549,9 @@ async fn ein_verfaelschtes_stueck_beginnt_neu_und_ein_geaenderter_anhang_auch() 
     );
     // Der Führer ändert den Inhalt: neue Prüfsumme, neuer Abruf.
     let neu: Vec<u8> = vec![9u8; 500];
-    sqlx::query("UPDATE anhang SET daten = ?, groesse = 500 WHERE id = ?")
+    sqlx::query("UPDATE anhang SET daten = ?, groesse = 500, sha256 = ? WHERE id = ?")
         .bind(&neu)
+        .bind(lifeline_hub::anhang::repo::sha256_hex(&neu))
         .bind(elw_id)
         .execute(&elw.pool)
         .await
@@ -584,12 +586,13 @@ async fn der_uhs_plan_kommt_ebenso_auf_abruf() {
     let bild: Vec<u8> = (0..300_000u32).map(|i| (i % 256) as u8).collect();
     sqlx::query(
         "INSERT INTO uhs_plan (uhs_id, einsatz_id, daten, mime, groesse, sha256, bild_breite, \
-         bild_hoehe, breite, hinterlegt_von) VALUES (?, ?, ?, 'image/png', ?, 'x', 10, 10, 100, 1)",
+         bild_hoehe, breite, hinterlegt_von) VALUES (?, ?, ?, 'image/png', ?, ?, 10, 10, 100, 1)",
     )
     .bind(uhs)
     .bind(e)
     .bind(&bild)
     .bind(bild.len() as i64)
+    .bind(lifeline_hub::anhang::repo::sha256_hex(&bild))
     .execute(&elw.pool)
     .await
     .unwrap();
@@ -604,6 +607,78 @@ async fn der_uhs_plan_kommt_ebenso_auf_abruf() {
     }
     let am_hub: Vec<u8> = eine(&hub.pool, "SELECT daten FROM uhs_plan").await;
     assert_eq!(am_hub, bild);
+}
+
+/// LLH-1630: Die Prüfsumme kommt aus der Spalte `sha256`, ohne den Inhalt zu lesen. Stimmt die
+/// Spalte nicht (Altbestand), korrigiert der Führer sie beim ersten Stück, meldet die Zeile neu,
+/// und der Spiegel holt den Inhalt mit der richtigen Prüfsumme, statt ihn bei jedem Abruf zu
+/// verwerfen. Kleine Inhalte lädt der Spiegel vorab, das geht also ohne Anforderung.
+#[tokio::test]
+async fn eine_falsche_pruefsumme_in_der_spalte_zieht_der_fuehrer_nach() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (elw_id, bytes) = anhang_am_elw(&elw, e, 2000).await;
+    exec(
+        &elw.pool,
+        &format!("UPDATE anhang SET sha256 = 'falsch' WHERE id = {elw_id}"),
+    )
+    .await;
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let richtig = lifeline_hub::anhang::repo::sha256_hex(&bytes);
+    let am_elw: String = eine(
+        &elw.pool,
+        &format!("SELECT sha256 FROM anhang WHERE id = {elw_id}"),
+    )
+    .await;
+    assert_eq!(am_elw, richtig, "Führer hat die Spalte nachgezogen");
+    let gemeldet: String = eine(&hub.pool, "SELECT sha256 FROM spiegel_anhang").await;
+    assert_eq!(gemeldet, richtig);
+    let am_hub: Vec<u8> = eine(&hub.pool, "SELECT daten FROM anhang").await;
+    assert_eq!(am_hub, bytes, "mit der richtigen Prüfsumme geholt");
+}
+
+/// LLH-1630: Ein Inhalt über `INHALT_MAX` wird nicht geholt; der Spiegel antwortet „zu groß“.
+#[tokio::test]
+async fn ein_zu_grosser_inhalt_wird_nicht_geholt() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    anhang_am_elw(&elw, e, 1000).await;
+    abgleichen(&elw).await;
+    // Die Gegenseite meldet eine Größe über der Grenze (hier am Merker gesetzt).
+    exec(
+        &hub.pool,
+        &format!(
+            "UPDATE spiegel_anhang SET groesse = {}, empfangen = 0, fertig_at = NULL",
+            lifeline_hub::instanz::spiegel::anhang::INHALT_MAX + 1
+        ),
+    )
+    .await;
+    let hub_id: i64 = eine(
+        &hub.pool,
+        "SELECT CAST(lokaler_schluessel AS INTEGER) FROM spiegel_anhang",
+    )
+    .await;
+    let f = lifeline_hub::instanz::spiegel::anhang::pruefe_vorhanden(
+        &hub.pool,
+        "anhang",
+        &hub_id.to_string(),
+    )
+    .await;
+    assert!(
+        matches!(f, Err(lifeline_hub::error::AppError::Conflict(ref t)) if t == lifeline_hub::instanz::spiegel::anhang::ZU_GROSS),
+        "{f:?}"
+    );
+    let angefordert: Option<String> =
+        eine(&hub.pool, "SELECT angefordert_at FROM spiegel_anhang").await;
+    assert!(angefordert.is_none(), "nicht angefordert");
+    let kopplung: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung").await;
+    let mut conn = hub.pool.acquire().await.unwrap();
+    let abrufe = lifeline_hub::instanz::spiegel::anhang::offene_abrufe(&mut conn, kopplung)
+        .await
+        .unwrap();
+    assert!(abrufe.is_empty(), "kein Abruf: {abrufe:?}");
 }
 
 // ── Anträge (D9, D11) ────────────────────────────────────────────────────────────────────────
@@ -1407,5 +1482,64 @@ async fn katalog_sprechgruppen_des_hubs_erscheinen_am_elw_auch_in_der_fernmeldes
         )
         .await,
         0
+    );
+}
+
+/// LLH-1630: Stürzt der Führer nach der Ausführung und vor dem Speichern der Quittung ab, stellt
+/// der Spiegel den Antrag erneut. Die Route erkennt ihn an der `client_id` (ADR-0008), es entsteht
+/// kein zweiter Eintrag.
+#[tokio::test]
+async fn ein_antrag_ohne_gespeicherte_quittung_wird_nicht_doppelt_ausgefuehrt() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let body = json!({ "typ": "meldung", "inhalt": "Einmal", "von": "Stab", "an": "EL",
+                       "client_id": "c-absturz" });
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    let anzahl = |pool: sqlx::SqlitePool| async move {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'Einmal'",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+        if anzahl(elw.pool.clone()).await > 0 {
+            break;
+        }
+    }
+    assert_eq!(anzahl(elw.pool.clone()).await, 1, "ausgeführt");
+    // Absturz vor der Quittung: der Führer weiß nichts mehr von der Ausführung, und der Spiegel
+    // stellt den Antrag erneut.
+    exec(&elw.pool, "DELETE FROM spiegel_antrag_eingang").await;
+    let wieder = sqlx::query(
+        "UPDATE spiegel_antrag SET zustand = 'ausstehend' WHERE client_id = 'c-absturz'",
+    )
+    .execute(&hub.pool)
+    .await
+    .unwrap()
+    .rows_affected();
+    assert_eq!(wieder, 1, "der Antrag steht am Spiegel noch an");
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    assert_eq!(anzahl(elw.pool.clone()).await, 1, "nicht doppelt");
+    assert!(
+        antraege(&hub, s, &erika).await.is_empty(),
+        "der Antrag ist erledigt"
     );
 }
