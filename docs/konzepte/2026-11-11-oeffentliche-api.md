@@ -328,7 +328,10 @@ Claims des JWS (`aud` ist die Instanz-UUID aus dem Einlösen):
 **Fehlerstrategie für den Absender:**
 
 - Bei `5xx`, `429` und Zeitüberschreitung wiederholt er mit Backoff und neuem `jti`. Die
-  Idempotenz hängt am Schlüssel, nicht am `jti`.
+  Idempotenz hängt an `external_id` und `message_id`, nicht am `jti`. Deshalb gilt sie auch für
+  Retries nach Stunden.
+- Ein Absender ohne `external_id` hat keine dauerhafte Idempotenz. Er wiederholt höchstens
+  2 Minuten lang (siehe Einwurf).
 - Bei `4xx` außer `429` wiederholt er nicht.
 - Die Uhr prüft er mit `GET /api/v1/me`.
 
@@ -373,7 +376,9 @@ Authorization: Machine …
 - **Begrenzung der wartenden Abrufe:** Jeder wartende Abruf belegt einen Platz der Zulassung
   (`MAX_GLEICHZEITIGE_REQUESTS`, `src/zulassung.rs`).
   - Höchstens 32 Abrufe warten gleichzeitig, je Zugang höchstens einer.
-  - Darüber antwortet der Abruf sofort, ohne zu warten. Schreibanfragen behalten so ihre Plätze.
+  - Darüber antwortet der Abruf sofort, ohne zu warten, und setzt `Retry-After: 10`. Der Client
+    wartet so lange vor dem nächsten Abruf und läuft nicht in seine Drosselung. Schreibanfragen
+    behalten so ihre Plätze.
 - Ist der Cursor älter als sieben Tage, kommt `410 cursor_expired`. Der Client liest dann den
   Stand über `GET /api/v1/einsaetze` neu und fängt mit dem gelieferten Cursor wieder an.
 - Ohne Netz holt der Abrufer später nach (G8). Innerhalb der sieben Tage geht nichts verloren.
@@ -429,8 +434,10 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
   - Zwei echte Alarme mit gleichem Inhalt lassen sich ohne Kennung nicht unterscheiden. Der
     Mensch sieht deshalb am Vorschlag, wie oft und wann er kam, und kann daraus einen zweiten
     Einsatz anlegen.
-  - Ein nur ähnlicher Inhalt ergibt den Hinweis „möglicherweise derselbe Alarm“
-    (Schnittstellen-Ausbau).
+  - Kommt derselbe Inhalt erst nach mehr als 2 Minuten, etwa als später Retry, entsteht ein neuer
+    Vorschlag mit dem Hinweis „möglicherweise derselbe Alarm“ und einem Verweis auf den früheren.
+    Ein Mensch führt beide mit einem Klick zusammen. Ein nur ähnlicher Inhalt ergibt denselben
+    Hinweis (Schnittstellen-Ausbau).
 - **Nur über TLS:**
   - Der Einwurf nimmt Aufrufe nur an, wenn sie verschlüsselt ankommen: direkt mit `--tls` oder
     vom vertrauten Proxy mit `X-Forwarded-Proto: https` (`weitergeleitet_als_https`,
