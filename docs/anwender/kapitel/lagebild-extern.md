@@ -64,8 +64,9 @@ Betroffenen nach Sichtung, die Kräfte, die Unfallhilfsstellen mit Belegung und 
 dasselbe wie ein [externer Lagemonitor](externe-lagemonitore.md). Unter „Lagemeldung“ steht die
 „Zusammenfassung“ des zuletzt freigegebenen Lageberichts (siehe [Lageberichte](lageberichte.md));
 ein Entwurf geht nicht hinaus. Die Zusammenfassung geht so hinaus, wie sie freigegeben ist: Namen
-gehören vor der Freigabe nicht hinein. Die Stufe „Öffentlich“ zeigt nur die Zahl der Betroffenen
-und der Einsatzkräfte und auf der Karte den Einsatzort, die Absperrungen und die Sperrgebiete.
+gehören vor der Freigabe nicht hinein. Die Stufe „Öffentlich“ zeigt nur Bezeichnung, Stichwort,
+Einsatzart und Beginn des Einsatzes, die Zahl der Betroffenen und der Einsatzkräfte und auf der
+Karte den Einsatzort, die Absperrungen und die Sperrgebiete.
 Namen der Betroffenen und Kräfte, Meldungstexte und das Einsatztagebuch zeigt keine Stufe.
 
 Ist der Einsatz ein Spiegel, zeigt die Seite den Stand des letzten Abgleichs. Was die führende

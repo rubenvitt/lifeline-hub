@@ -10,6 +10,7 @@ import type { LagemonitorAbschnitt, LagemonitorUhs, LagemonitorZone } from '../a
 import { useRollen } from '../components/instrument';
 import {
   absolutiereProxyAnfrage,
+  aktuelleAttribution,
   baueBasemapStyle,
   defaultModus,
 } from '../pages/lagekarte/basemapStil';
@@ -123,8 +124,9 @@ export default function LagemonitorKarte({
   // Karte je Style einmal bauen; der Style hängt an Config und Tag/Nacht.
   useEffect(() => {
     if (!container.current || !config || !hatAusschnitt) return;
+    const modus = defaultModus(config);
     const style = baueBasemapStyle(
-      defaultModus(config),
+      modus,
       dunkel ? 'dark' : 'light',
       config,
       config.online_styles[0],
@@ -136,9 +138,16 @@ export default function LagemonitorKarte({
       center: [10.45, 51.16],
       zoom: 5,
       interactive: bedienbar,
-      // Bedienbar (Lagebild für Externe, öffentlich geteilt) mit Quellenangabe der Grundlage;
-      // der Monitor an der Wand bleibt ohne.
-      attributionControl: bedienbar ? { compact: true } : false,
+      // Bedienbar (Lagebild für Externe, öffentlich geteilt) mit der hinterlegten Lizenz der
+      // Grundlage wie auf der Lagekarte (Raster-Quellen tragen selbst keine); der Monitor an der
+      // Wand bleibt ohne.
+      attributionControl: bedienbar
+        ? {
+            compact: true,
+            customAttribution:
+              aktuelleAttribution(modus, config.online_styles[0], config) ?? undefined,
+          }
+        : false,
       transformRequest: anfrage,
     };
     const map = wennDarstellbar(() => new maplibregl.Map(optionen));
