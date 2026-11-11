@@ -1318,6 +1318,95 @@ async fn eine_grosse_bruchstelle_klaert_sich_ueber_mehrere_runden() {
     assert_eq!(bruch_offen(&elw, e).await, 0);
 }
 
+/// Eine ganze Seite, an der noch Verweise späterer Zeilen hängen, blockiert die Bruchstelle
+/// nicht: Sie wird zurückgestellt, die späteren Seiten laufen durch, dann geht sie (Review
+/// LLH-1641).
+#[tokio::test]
+async fn verweise_von_spaeteren_seiten_blockieren_die_bruchstelle_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    // Eine volle Seite Einheiten, jede mit einer Einsatzkraft darin; die Kräfte sortieren
+    // dahinter und kommen erst auf der zweiten Seite.
+    let zahl = lifeline_hub::instanz::spiegel::paket::BRUCH_MAX;
+    let mut tx = elw.pool.begin().await.unwrap();
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    for n in 0..zahl {
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(format!("Zug {n}"))
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let kraft: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id) VALUES (?, ?, ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(format!("Kraft {n}"))
+        .bind(einheit)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        for (art, id) in [("einsatz_einheit", einheit), ("einsatz_personal", kraft)] {
+            sqlx::query(
+                "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, \
+                 gesichert_at) VALUES (?, ?, ?, 1, '2026-11-11 12:00:00')",
+            )
+            .bind(e)
+            .bind(art)
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+    }
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let einheiten: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert_eq!(einheiten, 0, "die Einheiten gehen nach ihren Kräften");
+    let ungeklaert: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(ungeklaert, 0);
+    assert_eq!(bruch_offen(&elw, e).await, 0);
+}
+
 #[tokio::test]
 async fn rueckuebergabe_bringt_keine_doppelten() {
     let (hub, elw) = gekoppelt().await;

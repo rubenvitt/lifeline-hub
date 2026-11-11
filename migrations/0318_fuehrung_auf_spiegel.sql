@@ -19,7 +19,8 @@
 --    gesichert und räumt neue Zeilen ab, sobald der Führer ihm sagt, welche er kennt (E6).
 -- 6. `einsatz_bruchstelle`: je gesicherter Zeile ihr Inhalt beim Wechsel zum Spiegel (JSON, NULL
 --    für eine gelöschte Zeile), ob sie lokal entfernt wurde und ob der Führer sie schon beurteilt
---    hat (`geklaert`; mehr als `BRUCH_MAX` Zeilen klären sich über mehrere Runden). Einsatz-scoped
+--    hat (`geklaert`: 0 offen, 1 geklärt, 2 zurückgestellt, weil noch ein Verweis daran hängt; mehr
+--    als `BRUCH_MAX` Zeilen klären sich über mehrere Runden). Einsatz-scoped
 --    (`einsatz::schwaerzung_registry`), nicht gespiegelt (`instanz::spiegel::art::AUSGENOMMEN`).
 ALTER TABLE einsatz DROP COLUMN fuehrung_bei;
 
@@ -44,7 +45,7 @@ CREATE TABLE einsatz_bruchstelle (
     stand        INTEGER NOT NULL,
     daten        TEXT,
     entfernt     INTEGER NOT NULL DEFAULT 0 CHECK (entfernt IN (0, 1)),
-    geklaert     INTEGER NOT NULL DEFAULT 0 CHECK (geklaert IN (0, 1)),
+    geklaert     INTEGER NOT NULL DEFAULT 0 CHECK (geklaert IN (0, 1, 2)),
     gesichert_at TEXT    NOT NULL
 );
 CREATE INDEX idx_einsatz_bruchstelle_einsatz ON einsatz_bruchstelle (einsatz_id);
