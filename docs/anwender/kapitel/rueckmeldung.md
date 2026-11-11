@@ -60,14 +60,18 @@ Ein Bildschirmfoto mit Demo-Daten ([Demo-Daten](demo-daten.md)) zeigt dasselbe o
 Der Eintrag „Rückmeldung“ füllt nur drei Felder vor: die Version, die Oberfläche (Browser oder
 Desktop-App) und den Bereich der App als Muster, etwa `/einsatz/:id/etb`. Kennungen von Einsatz,
 Personen oder Einheiten stehen nicht darin, ebenso wenig Name, Benutzername oder die Adresse des
-Servers. Alles Weitere steht nur im Formular, wenn es dort eingetragen wird.
+Servers; auch als Herkunft (Referer) gibt der Aufruf die Adresse nicht weiter. Alles Weitere steht
+nur im Formular, wenn es dort eingetragen wird.
 
 ### Was danach passiert
 
 Jede Rückmeldung aus dem Formular geht automatisch in die Aufgabenliste der Entwicklung und trägt
-danach das Label „aufgenommen“. Rückfragen und Antworten stehen als Kommentar im Issue; GitHub
-benachrichtigt die meldende Person darüber. Das Issue bleibt der Ort für Ergänzungen: später
-hinzugefügter Text erreicht die Entwicklung über das Issue, nicht über eine neue Rückmeldung.
+danach das Label „aufgenommen“. Das Label „nicht-aufgenommen“ heißt, dass die Übernahme gescheitert
+ist; die Entwicklung sieht das und holt sie nach. Steht es nach einem Tag noch da, hilft eine E-Mail
+mit der Nummer des Issues an rueckmeldung@lifeline-hub.de. Rückfragen und Antworten stehen als
+Kommentar im Issue; GitHub benachrichtigt die meldende Person darüber. Das Issue bleibt der Ort für
+Ergänzungen: später hinzugefügter Text erreicht die Entwicklung über das Issue, nicht über eine neue
+Rückmeldung.
 
 ### Gekoppelte Geräte
 

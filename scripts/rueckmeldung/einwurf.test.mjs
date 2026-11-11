@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url';
 import {
   BESCHREIBUNG_MAX,
   FELDER,
+  VERSUCHE,
   baueEinwurf,
   einwerfen,
+  kennzeichnen,
   zerlegeFormular,
 } from './einwurf.mjs';
 
@@ -43,7 +45,7 @@ test('Formular-Labels stimmen mit rueckmeldung.yml überein', () => {
   const pfad = fileURLToPath(new URL('../../.github/ISSUE_TEMPLATE/rueckmeldung.yml', import.meta.url));
   const vorlage = readFileSync(pfad, 'utf8');
   for (const [id, label] of Object.entries(FELDER)) {
-    assert.match(vorlage, new RegExp(`id: ${id}\\n    attributes:\\n      label: ${label.replace(/[?]/g, '\\?')}\\n`), id);
+    assert.ok(vorlage.includes(`id: ${id}\n    attributes:\n      label: ${label}\n`), id);
   }
 });
 
@@ -53,6 +55,14 @@ test('zerlegt ein Formular, leere Felder werden leer', () => {
   assert.equal(werte.version, '1.0.0-beta.1');
   assert.equal(werte.schritte, '1. ETB öffnen\n2. Filter setzen');
   assert.equal(werte.erwartet, '');
+});
+
+test('eigene ###-Überschriften in einer Antwort bleiben in der Antwort', () => {
+  const beschreibung = 'Kurz.\n\n### Details\n\n```\n### kein Feld\n```';
+  const werte = zerlegeFormular(formularText({ beschreibung, erwartet: 'Ruhe.' }));
+  assert.equal(werte.beschreibung, beschreibung);
+  assert.equal(werte.erwartet, 'Ruhe.');
+  assert.match(baueEinwurf(issue({ beschreibung })).description, /### Details/);
 });
 
 test('ein freies Issue ist keine Rückmeldung', () => {
@@ -100,8 +110,19 @@ test('Grenzen des Eingangs: Titel 200, Beschreibung 20 000', () => {
   assert.equal(baueEinwurf(issue({}, { title: '   ' })).title, 'Rückmeldung #12');
 });
 
-function antwort(status, daten) {
-  return { status, ok: status < 300, json: async () => daten };
+function antwort(status, daten, kopf = {}) {
+  return {
+    status,
+    ok: status < 300,
+    headers: { get: (name) => kopf[name.toLowerCase()] ?? null },
+    json: async () => daten,
+  };
+}
+
+/** Wartezeiten mitschreiben statt schlafen. */
+function uhr() {
+  const pausen = [];
+  return { pausen, warte: async (ms) => void pausen.push(ms) };
 }
 
 test('einwerfen: schickt an den Eingang mit Bearer, liefert die Kennung', async () => {
@@ -132,7 +153,8 @@ test('einwerfen: Ablehnung, Netzfehler und fehlendes Secret werfen nicht und nen
   const abgelehnt = await einwerfen(einwurf, {
     zunderUrl: 'https://z',
     token: 'zi_geheim',
-    abruf: async () => antwort(429, { error: 'too_many_requests' }),
+    abruf: async () => antwort(429, { error: 'too_many_requests' }, { 'retry-after': '3600' }),
+    warte: uhr().warte,
   });
   assert.equal(abgelehnt.ok, false);
   assert.match(abgelehnt.fehler, /429 too_many_requests/);
@@ -142,9 +164,96 @@ test('einwerfen: Ablehnung, Netzfehler und fehlendes Secret werfen nicht und nen
     abruf: async () => {
       throw new Error('getaddrinfo ENOTFOUND');
     },
+    warte: uhr().warte,
   });
   assert.match(netz.fehler, /nicht erreichbar/);
   const ohne = await einwerfen(einwurf, { zunderUrl: '', token: '' });
   assert.match(ohne.fehler, /fehlt/);
   for (const e of [abgelehnt, netz, ohne]) assert.doesNotMatch(e.fehler, /zi_geheim/);
+});
+
+test('einwerfen: vorübergehende Fehler werden begrenzt wiederholt, 4xx nicht', async () => {
+  const einwurf = baueEinwurf(issue());
+  let n = 0;
+  const { pausen, warte } = uhr();
+  const erholt = await einwerfen(einwurf, {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    abruf: async () => (++n < 3 ? antwort(503, {}) : antwort(201, { ref: 'LLHE-2' })),
+    warte,
+  });
+  assert.deepEqual(erholt, { ok: true, status: 201, ref: 'LLHE-2' });
+  assert.deepEqual(pausen, [2_000, 4_000]);
+
+  n = 0;
+  const kurz = uhr();
+  await einwerfen(einwurf, {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    abruf: async () => (++n < 2 ? antwort(429, {}, { 'retry-after': '5' }) : antwort(200, { ref: 'LLHE-2' })),
+    warte: kurz.warte,
+  });
+  assert.deepEqual(kurz.pausen, [5_000]);
+
+  n = 0;
+  const immer = await einwerfen(einwurf, {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    abruf: async () => (n++, antwort(502, {})),
+    warte: uhr().warte,
+  });
+  assert.equal(immer.ok, false);
+  assert.equal(n, VERSUCHE);
+
+  n = 0;
+  await einwerfen(einwurf, {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    abruf: async () => (n++, antwort(400, { error: 'bad_request' })),
+    warte: uhr().warte,
+  });
+  assert.equal(n, 1);
+});
+
+test('einwerfen: hängende Antwort läuft in die Frist', async () => {
+  const ergebnis = await einwerfen(baueEinwurf(issue()), {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    frist: 50,
+    versuche: 1,
+    abruf: async (_adresse, { signal }) =>
+      new Promise((_fertig, abbruch) => signal.addEventListener('abort', () => abbruch(signal.reason))),
+  });
+  assert.equal(ergebnis.ok, false);
+  assert.match(ergebnis.fehler, /keine Antwort in 0\.05 s/);
+});
+
+test('kennzeichnen: setzt den Status und nimmt das Gegenlabel ab, 404 zählt nicht', async () => {
+  const aufrufe = [];
+  await kennzeichnen({
+    repo: 'o/r',
+    nummer: 12,
+    labels: ['rückmeldung', 'aufgenommen'],
+    entfernen: ['nicht-aufgenommen'],
+    ghToken: 'gh',
+    abruf: async (adresse, optionen) => {
+      aufrufe.push(`${optionen.method} ${adresse}`);
+      return antwort(optionen.method === 'DELETE' ? 404 : 200, []);
+    },
+  });
+  assert.deepEqual(aufrufe, [
+    'POST https://api.github.com/repos/o/r/issues/12/labels',
+    'DELETE https://api.github.com/repos/o/r/issues/12/labels/nicht-aufgenommen',
+  ]);
+  await assert.rejects(
+    kennzeichnen({
+      repo: 'o/r',
+      nummer: 12,
+      labels: ['aufgenommen'],
+      entfernen: ['nicht-aufgenommen'],
+      ghToken: 'gh',
+      abruf: async (_a, o) => antwort(o.method === 'DELETE' ? 500 : 200, []),
+    }),
+    /500 beim Entfernen/,
+  );
 });

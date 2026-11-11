@@ -301,7 +301,8 @@ export default function BenutzerMenu({
       window.open(
         rueckmeldungsAdresse({ version: __APP_VERSION__, pfad: location.pathname }),
         '_blank',
-        'noopener',
+        // ohne Referer: die Adresse der Installation bleibt bei uns
+        'noopener,noreferrer',
       );
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);

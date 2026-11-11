@@ -50,25 +50,34 @@ export const BESCHREIBUNG_MAX = 20_000;
 /** Was GitHub in ein leer gelassenes Feld schreibt. */
 const LEER = '_No response_';
 
+/** Überschrift hinter den Feldern: das Pflicht-Häkchen „Öffentlich“. */
+const SCHLUSS = 'Öffentlich';
+
 /**
  * Zerlegt den Text eines Formular-Issues in `id → Wert`. Felder, die fehlen oder leer blieben,
  * sind `''`. Gibt `null` zurück, wenn der Text nicht aus dem Formular stammt (Art, Version und
  * Beschreibung fehlen).
+ *
+ * Getrennt wird nur an den Überschriften des Formulars, und nur an einer, die nach dem
+ * laufenden Feld kommt (GitHub schreibt die Felder in ihrer Reihenfolge). Eigene `###`-Zeilen
+ * in einer Antwort bleiben so Teil dieser Antwort.
  */
 export function zerlegeFormular(text) {
+  const reihenfolge = [...Object.values(FELDER), SCHLUSS];
   const abschnitte = new Map();
-  let ueberschrift = null;
+  let stelle = -1;
   let zeilen = [];
   const abschliessen = () => {
-    if (ueberschrift !== null) abschnitte.set(ueberschrift, zeilen.join('\n').trim());
+    if (stelle >= 0) abschnitte.set(reihenfolge[stelle], zeilen.join('\n').trim());
   };
   for (const zeile of String(text ?? '').replace(/\r\n/g, '\n').split('\n')) {
     const treffer = /^### (.+?)\s*$/.exec(zeile);
-    if (treffer) {
+    const naechste = treffer ? reihenfolge.indexOf(treffer[1]) : -1;
+    if (naechste > stelle) {
       abschliessen();
-      ueberschrift = treffer[1];
+      stelle = naechste;
       zeilen = [];
-    } else if (ueberschrift !== null) {
+    } else if (stelle >= 0) {
       zeilen.push(zeile);
     }
   }
@@ -137,51 +146,100 @@ export function baueEinwurf(issue) {
   };
 }
 
+/** Frist je Anfrage (inklusive Antwortkörper) und Versuche beim Zunder-Eingang. */
+export const FRIST_MS = 20_000;
+export const VERSUCHE = 3;
+/** Längste Wartezeit aus `Retry-After`, die noch abgewartet wird; sonst gleich aufgeben. */
+const WARTE_MAX_MS = 30_000;
+
+const schlafen = (ms) => new Promise((fertig) => setTimeout(fertig, ms));
+
+/** Ein Versuch: `{ status, daten }`, Status 0 bei Netzfehler oder abgelaufener Frist. */
+async function versuch(adresse, optionen, abruf, frist) {
+  try {
+    const antwort = await abruf(adresse, { ...optionen, signal: AbortSignal.timeout(frist) });
+    let daten = null;
+    try {
+      daten = await antwort.json();
+    } catch (fehler) {
+      // kein JSON reicht, eine abgelaufene Frist beim Lesen nicht
+      if (fehler?.name === 'TimeoutError' || fehler?.name === 'AbortError') throw fehler;
+    }
+    const nachSek = Number(antwort.headers?.get?.('retry-after'));
+    return { status: antwort.status, daten, warteMs: Number.isFinite(nachSek) ? nachSek * 1000 : null };
+  } catch (fehler) {
+    const grund = fehler?.name === 'TimeoutError' ? `keine Antwort in ${frist / 1000} s` : (fehler?.message ?? fehler);
+    return { status: 0, daten: null, grund: `Zunder nicht erreichbar: ${grund}` };
+  }
+}
+
 /**
  * Schickt den Einwurf an Zunder. Ergebnis `{ ok, status, ref?, fehler? }`; wirft nie, damit der
  * Aufrufer das Issue in jedem Fall kennzeichnen kann.
+ *
+ * Jeder Versuch hat eine Frist (`FRIST_MS`, inklusive Antwortkörper). Wiederholt wird nur, was
+ * vorübergehend ist: Netzfehler, Frist, 5xx und 429 mit kurzem `Retry-After`. Höchstens
+ * `VERSUCHE` Versuche, zusammen gut eine Minute, damit im 5-Minuten-Job Zeit für die
+ * Kennzeichnung bleibt. Wiederholen ist sicher, weil `external_id` den Einwurf idempotent macht.
  */
-export async function einwerfen(einwurf, { zunderUrl, token, abruf = fetch }) {
+export async function einwerfen(
+  einwurf,
+  { zunderUrl, token, abruf = fetch, frist = FRIST_MS, versuche = VERSUCHE, warte = schlafen },
+) {
   if (!zunderUrl || !token) {
     return { ok: false, status: 0, fehler: 'ZUNDER_URL oder ZUNDER_EINGANG_TOKEN fehlt.' };
   }
   const adresse = `${zunderUrl.replace(/\/+$/, '')}/intake/v1/tasks`;
-  let antwort;
-  try {
-    antwort = await abruf(adresse, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(einwurf),
-    });
-  } catch (fehler) {
-    return { ok: false, status: 0, fehler: `Zunder nicht erreichbar: ${fehler?.message ?? fehler}` };
+  const optionen = {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(einwurf),
+  };
+  let ergebnis;
+  for (let nr = 1; nr <= versuche; nr += 1) {
+    const { status, daten, grund, warteMs } = await versuch(adresse, optionen, abruf, frist);
+    if (status === 200 || status === 201) return { ok: true, status, ref: daten?.ref ?? null };
+    const text = grund ?? `Zunder antwortet ${status} ${daten?.message ?? daten?.error ?? ''}`.trim();
+    ergebnis = { ok: false, status, fehler: text };
+    const voruebergehend = status === 0 || status >= 500 || (status === 429 && (warteMs ?? 0) <= WARTE_MAX_MS);
+    if (!voruebergehend || nr === versuche) break;
+    await warte(status === 429 && warteMs ? warteMs : 2_000 * nr);
   }
-  let daten = null;
-  try {
-    daten = await antwort.json();
-  } catch {
-    // kein JSON: Status reicht für die Meldung
-  }
-  if (antwort.status === 200 || antwort.status === 201) {
-    return { ok: true, status: antwort.status, ref: daten?.ref ?? null };
-  }
-  const grund = daten?.message ?? daten?.error ?? '';
-  return { ok: false, status: antwort.status, fehler: `Zunder antwortet ${antwort.status} ${grund}`.trim() };
+  return ergebnis;
 }
 
-/** Setzt Labels am Issue; fehlende Labels legt GitHub dabei an. */
-export async function kennzeichnen({ repo, nummer, labels, ghToken, abruf = fetch }) {
-  const antwort = await abruf(`https://api.github.com/repos/${repo}/issues/${nummer}/labels`, {
+/** Statuslabels; beim Kennzeichnen fällt das jeweils andere weg. */
+export const STATUS_LABELS = ['aufgenommen', 'nicht-aufgenommen'];
+
+/**
+ * Setzt Labels am Issue (fehlende legt GitHub dabei an) und nimmt `entfernen` ab, falls
+ * vorhanden. So steht nach einem Re-run nur der letzte Status am Issue; übrige Labels bleiben.
+ */
+export async function kennzeichnen({ repo, nummer, labels, entfernen = [], ghToken, abruf = fetch, frist = FRIST_MS }) {
+  const basis = `https://api.github.com/repos/${repo}/issues/${nummer}/labels`;
+  const kopf = {
+    Authorization: `Bearer ${ghToken}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const antwort = await abruf(basis, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${ghToken}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-    },
+    headers: { ...kopf, 'Content-Type': 'application/json' },
     body: JSON.stringify({ labels }),
+    signal: AbortSignal.timeout(frist),
   });
   if (!antwort.ok) throw new Error(`GitHub antwortet ${antwort.status} beim Setzen der Labels.`);
+  for (const name of entfernen) {
+    const weg = await abruf(`${basis}/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      headers: kopf,
+      signal: AbortSignal.timeout(frist),
+    });
+    // 404: das Label hing nicht am Issue
+    if (!weg.ok && weg.status !== 404) {
+      throw new Error(`GitHub antwortet ${weg.status} beim Entfernen von „${name}“.`);
+    }
+  }
 }
 
 async function main() {
@@ -197,11 +255,12 @@ async function main() {
     zunderUrl: umgebung.ZUNDER_URL,
     token: umgebung.ZUNDER_EINGANG_TOKEN,
   });
-  const labels = ['rückmeldung', ergebnis.ok ? 'aufgenommen' : 'nicht-aufgenommen'];
+  const [ja, nein] = STATUS_LABELS;
   await kennzeichnen({
     repo: umgebung.GITHUB_REPOSITORY,
     nummer: issue.number,
-    labels,
+    labels: ['rückmeldung', ergebnis.ok ? ja : nein],
+    entfernen: [ergebnis.ok ? nein : ja],
     ghToken: umgebung.GH_TOKEN,
   });
   if (!ergebnis.ok) {

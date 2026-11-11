@@ -232,7 +232,7 @@ describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
     expect(oeffnen).toHaveBeenCalledTimes(1);
     const [ziel, fenster, merkmale] = oeffnen.mock.calls[0]!;
     expect(fenster).toBe('_blank');
-    expect(merkmale).toBe('noopener');
+    expect(merkmale).toBe('noopener,noreferrer');
     const adresse = new URL(String(ziel));
     expect(adresse.origin + adresse.pathname).toBe(
       'https://github.com/rubenvitt/lifeline-hub/issues/new',
