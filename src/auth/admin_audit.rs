@@ -85,6 +85,13 @@ wire_enum! {
         UnterschriftBestaetigt => "unterschrift_bestaetigt",
         /// Ein Admin hat einen vom Gegenüber gelieferten Unterschriftsschlüssel zurückgewiesen.
         UnterschriftZurueckgewiesen => "unterschrift_zurueckgewiesen",
+        /// Notübernahme der Führung eines Einsatzes (LLH-1491): an der erklärenden Seite und an
+        /// der meldenden Seite beim Bestätigen.
+        FuehrungNotuebernahme => "fuehrung_notuebernahme",
+        /// Eine ungültige Übernahme der Führung wurde verworfen (LLH-1491).
+        FuehrungVerworfen => "fuehrung_verworfen",
+        /// Die meldende Seite hat einer Notübernahme widersprochen (LLH-1491).
+        FuehrungWiderspruch => "fuehrung_widerspruch",
         /// LLH-1493: „ELW verloren“ — Kopplung widerrufen, Geheimnisse der dorthin verteilten
         /// Konten ungültig (Migration 0307).
         InstanzElwVerloren => "instanz_elw_verloren",

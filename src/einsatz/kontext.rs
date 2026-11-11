@@ -306,3 +306,34 @@ impl Deref for EinsatzVerwaltungszugriff {
         &self.0
     }
 }
+
+/// Gate der Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`, design.md D5): Schalter (sonst
+/// 404) → Org-Floor → Einsatzleitung oder System-Admin der Einsatz-Org → Lese-Policy. Bewusst
+/// **ohne** `fordere_aktiv`: die Führung wird auch bedient, wenn eine andere Instanz führt oder
+/// der Einsatz abgeschlossen ist (Übergabe zur Verwahrung). Ein gekoppeltes Gerät bedient sie nie.
+pub struct EinsatzFuehrungszugriff(pub EinsatzKontext);
+
+impl FromRequestParts<AppState> for EinsatzFuehrungszugriff {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        crate::instanz::fuehrung::fordere_enabled(&state.pool).await?;
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        if ctx.geraet.is_some() {
+            return Err(AppError::Forbidden);
+        }
+        let admin = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+        if !admin {
+            ctx.fordere_einsatzleitung()?;
+        }
+        ctx.fordere_lesezugriff()?;
+        Ok(Self(ctx))
+    }
+}
+
+impl Deref for EinsatzFuehrungszugriff {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}

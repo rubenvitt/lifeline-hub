@@ -199,6 +199,14 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "spiegel_anhang_teil",
         "Inhalt auf dem Weg; gilt erst in seiner Zeile",
     ),
+    (
+        "einsatz_fuehrung",
+        "Führungsakten tauscht die Meldung selbst aus (LLH-1491); jede Instanz führt ihre Sicht",
+    ),
+    (
+        "einsatz_fuehrung_verlauf",
+        "Verlauf der Führungsakte; reist mit ihr über die Meldung (LLH-1491)",
+    ),
 ];
 
 /// Die Kategorie einer gespiegelten Tabelle.

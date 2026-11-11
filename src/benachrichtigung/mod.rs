@@ -57,7 +57,7 @@ wire_enum! {
 wire_enum! {
     /// Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
     /// fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0255_benachrichtigung_quellen.sql`)
+    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0316_einsatz_fuehrung.sql`)
     /// spiegelt `ALLE`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
     pub enum BenachrichtigungArt {
@@ -98,6 +98,11 @@ wire_enum! {
         /// Nur für die Einstellungen: Unwetter erkennt der Browser selbst (design.md D4). Seit
         /// LLH-1425 ein Alarm (Warnstufe rot), also ohne Schalter.
         Unwetter => "unwetter",
+        /// Eine gekoppelte Instanz hat eine Übernahme der Führung gemeldet, die hier nicht trägt
+        /// (LLH-1491, Spec `instanz-fuehrung`): ein Alarm an die Einsatzleitung.
+        FuehrungUngueltig => "fuehrung_ungueltig",
+        /// Eine gültige Notübernahme wartet auf die Entscheidung der Einsatzleitung (LLH-1491).
+        FuehrungUebernommen => "fuehrung_uebernommen",
     }
     try_from = |s| format!("Ungültige Benachrichtigungsart: {s}");
 }
@@ -105,7 +110,8 @@ wire_enum! {
 impl BenachrichtigungArt {
     /// Die feste Stufe der Art (design.md D4, Matrix der Spec; Katalog LLH-1142 E1). Alarm sind
     /// genau Sofortmeldung, ihre Eskalation, überfälliger Auftrag, fällige Ablösung,
-    /// Vermisstenmeldung und Unwetter (Warnstufe rot, erkannt im Browser, LLH-1425).
+    /// Vermisstenmeldung, Unwetter (Warnstufe rot, erkannt im Browser, LLH-1425) und eine
+    /// ungültige Übernahme der Führung (LLH-1491).
     pub const fn stufe(self) -> BenachrichtigungStufe {
         match self {
             BenachrichtigungArt::Sofortmeldung
@@ -113,7 +119,8 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::AuftragUeberfaellig
             | BenachrichtigungArt::AbloesungFaellig
             | BenachrichtigungArt::Vermisstenmeldung
-            | BenachrichtigungArt::Unwetter => BenachrichtigungStufe::Alarm,
+            | BenachrichtigungArt::Unwetter
+            | BenachrichtigungArt::FuehrungUngueltig => BenachrichtigungStufe::Alarm,
             BenachrichtigungArt::ErinnerungFaellig
             | BenachrichtigungArt::AbloesungVorwarnung
             | BenachrichtigungArt::AbloesungPlanung
@@ -133,7 +140,8 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::WiederVerfuegbar
             | BenachrichtigungArt::ChatErwaehnung
             | BenachrichtigungArt::EinsatzAufnahme
-            | BenachrichtigungArt::EinsatzNeu => BenachrichtigungStufe::Hinweis,
+            | BenachrichtigungArt::EinsatzNeu
+            | BenachrichtigungArt::FuehrungUebernommen => BenachrichtigungStufe::Hinweis,
         }
     }
 
@@ -314,6 +322,8 @@ pub enum Adressat {
     /// Die Führungskräfte und Admins der Einsatz-Organisation, die den Einsatz ohne
     /// Mitgliedschaft lesen dürfen (für `einsatz_neu`).
     Fuehrungskraefte,
+    /// Die Mitglieder mit der Rolle Einsatzleitung (LLH-1491: Führung je Einsatz).
+    Einsatzleitung,
 }
 
 /// Was geschah: die eine Eingabe von [`melden`].

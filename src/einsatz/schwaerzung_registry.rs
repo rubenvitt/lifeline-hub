@@ -177,6 +177,9 @@ const G_ABGLEICH: &str =
      werden selbst gescrubbt)";
 const G_AUDIT: &str =
     "Zugriffs-Audit (Nachweis-Struktur; benutzer=System-Nutzer, kein Betroffenen-Freitext)";
+const G_FUEHRUNG: &str =
+    "Führung je Einsatz (LLH-1491): Instanzkennung, Instanzname, Epoche oder Beweis einer \
+     Übernahme (Struktur der Kopplung, kein Personenbezug)";
 const G_ANTRAG: &str =
     "Aktenzeichen des Löschersuchens (Art. 17): Nachweis der Erfüllung, kein Personenwert \
      (der Dialog verlangt ein Zeichen ohne Namen, LFH-751 design.md D10)";
@@ -236,6 +239,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("retention_gesetzt_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
+            // Führung je Einsatz (LLH-1491): Name der führenden Instanz, Schreibsperre.
+            retain("fuehrung_bei", G_FUEHRUNG),
             // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
             retain("kennung", G_SPIEGEL),
             retain("freigabestufe", G_ENUM),
@@ -3131,6 +3136,75 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("inhalt", G_WEB_PUSH),
             retain("stumm", G_WEB_PUSH),
             retain("erstellt_at", G_ZEIT),
+        ],
+    },
+    // Führung je Einsatz (LLH-1491): Akte und Verlauf. Instanzen, Epochen und handelnde
+    // Einsatzkräfte bleiben als Nachweis, wer den Einsatz wann geschrieben hat; der Grund einer
+    // Notübernahme und die Erklärung, die ihn trägt, sind Freitext und werden gescrubbt.
+    TabellenRegel {
+        tabelle: "einsatz_fuehrung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("kennung", G_FUEHRUNG),
+            retain("einsatz_id", G_SCOPE),
+            retain("org_id", G_FK),
+            retain("nummer", G_ZAEHLER),
+            retain(
+                "bezeichnung",
+                "Einsatz-Bezeichnung (operatives Label, Spiegel von einsatz.bezeichnung)",
+            ),
+            retain(
+                "stichwort",
+                "Einsatz-Stichwort (operatives Schlagwort, Spiegel von einsatz.stichwort)",
+            ),
+            retain("status", G_ENUM),
+            retain("epoche_zaehler", G_ZAEHLER),
+            retain("epoche_instanz", G_FUEHRUNG),
+            retain("fuehrer_kennung", G_FUEHRUNG),
+            retain("fuehrer_name", G_FUEHRUNG),
+            retain("art", G_ENUM),
+            scrub("erklaerung", Strategie::NullSetzen, Z_EINSATZ),
+            retain("beweis", G_FUEHRUNG),
+            scrub("offen", Strategie::NullSetzen, Z_EINSATZ),
+            // CHECK (offen IS NULL) = (offen_bruch_at IS NULL): beide fallen gemeinsam.
+            scrub("offen_bruch_at", Strategie::NullSetzen, Z_EINSATZ),
+            retain("abgabe_schluessel", G_FUEHRUNG),
+            retain("anfrage_at", G_ZEIT),
+            retain("bruch_at", G_ZEIT),
+            retain("stand", G_ZAEHLER),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "einsatz_fuehrung_verlauf",
+        scoping: Scoping::UeberParent {
+            fk: "fuehrung_id",
+            parent: "einsatz_fuehrung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("fuehrung_id", G_FK),
+            retain("epoche_zaehler", G_ZAEHLER),
+            retain("epoche_instanz", G_FUEHRUNG),
+            retain("art", G_ENUM),
+            retain("von_name", G_FUEHRUNG),
+            retain("nach_name", G_FUEHRUNG),
+            retain(
+                "wer",
+                "Name der handelnden Einsatzkraft (System-Nutzer, kein Betroffener)",
+            ),
+            scrub("grund", Strategie::NullSetzen, Z_EINSATZ),
+            retain(
+                "unterzeichner",
+                "Name des unterzeichnenden Org-Admins (System-Nutzer, kein Betroffener)",
+            ),
+            retain("bruch_at", G_ZEIT),
+            retain("at", G_ZEIT),
         ],
     },
     // ---------- Spiegel einer gekoppelten Instanz (LLH-1492) ----------

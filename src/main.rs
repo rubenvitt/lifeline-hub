@@ -221,6 +221,13 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     )
     .await?;
     lifeline_hub::instanz::stammdaten::set_live(live.clone());
+    // Führung je Einsatz (LLH-1491): Schalter in die DB, Schreibsperre danach ausrichten.
+    if config.fuehrung {
+        tracing::warn!(
+            "Führung je Einsatz ist an (--fuehrung): gekoppelte Instanzen können Einsätze übernehmen"
+        );
+    }
+    lifeline_hub::instanz::fuehrung::save_schalter(&pool, config.fuehrung).await?;
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
     // Spiegel (LLH-1492): Abgleich der Einsätze mit gekoppelten Instanzen, eigener Takt.

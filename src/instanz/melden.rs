@@ -7,6 +7,8 @@
 //! Versionen weiter auseinanderliegen (D5).
 
 use super::extractor::MELDEN_PFAD;
+use super::fuehrung::austausch::{self as fuehrung_austausch, AkteMeldung};
+use super::fuehrung::repo as fuehrung_repo;
 use super::identitaet::{self, parse_oeffentlich, Identitaet};
 use super::repo::{self, KopplungZeile};
 use super::signatur::{self, AnfrageDraft, ANTWORT_KOPF, SCHEMA};
@@ -88,6 +90,13 @@ pub struct MeldenAnfrage {
     /// Der Betreiber der meldenden Seite hat die Datenträgerverschlüsselung bestätigt (D6).
     #[serde(default)]
     pub datentraeger_verschluesselt: bool,
+    /// Führungsakten der meldenden Seite seit der letzten Quittung (LLH-1491, D3); leer ohne
+    /// Schalter oder vor LLH-1491.
+    #[serde(default)]
+    pub fuehrung: Vec<AkteMeldung>,
+    /// Bis zu diesem Stand der erreichten Seite hat die meldende Seite Akten übernommen.
+    #[serde(default)]
+    pub fuehrung_bis: i64,
 }
 
 /// Eine Org in der Antwort.
@@ -112,6 +121,15 @@ pub struct MeldenAntwort {
     pub softwarestand: String,
     pub protokoll: u32,
     pub orgs: Vec<MeldenOrgAntwort>,
+    /// Führungsakten der erreichten Seite über `fuehrung_bis` der Meldung (LLH-1491, D3).
+    #[serde(default)]
+    pub fuehrung: Vec<AkteMeldung>,
+    /// Bis zu diesem Stand der meldenden Seite hat die erreichte Seite Akten übernommen.
+    #[serde(default)]
+    pub fuehrung_bis: i64,
+    /// Es bleiben weitere Akten: die meldende Seite meldet sich gleich wieder.
+    #[serde(default)]
+    pub fuehrung_mehr: bool,
 }
 
 fn client() -> &'static reqwest::Client {
@@ -393,6 +411,25 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             repo::list_orgs_widerruf_offen(&mut conn, kopplung.id).await?,
         )
     };
+    // Führung je Einsatz (LLH-1491, D3): Akten seit der letzten Quittung des Gegenübers.
+    let fuehrung_an = super::fuehrung::is_enabled(pool).await?;
+    let (fuehrung_ausgang, fuehrung_gesendet, fuehrung_empfangen) = if fuehrung_an {
+        crate::write_retry!(pool, |conn| {
+            fuehrung_repo::ensure_akten(conn).await?;
+            let (gesendet, empfangen) =
+                fuehrung_repo::load_kopplung_staende(conn, kopplung.id).await?;
+            let ausgang = fuehrung_austausch::build_ausgang(
+                conn,
+                kopplung,
+                gesendet,
+                fuehrung_austausch::MELDUNG_BYTES,
+            )
+            .await?;
+            Ok((ausgang, gesendet, empfangen))
+        })?
+    } else {
+        (fuehrung_austausch::Ausgang::default(), 0, 0)
+    };
     let anfrage = MeldenAnfrage {
         name: super::name().to_string(),
         softwarestand: super::softwarestand().to_string(),
@@ -413,6 +450,8 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         stammdaten_arten: stammdaten::eigene_arten(),
         age_empfaenger: Some(age.to_public().to_string()),
         datentraeger_verschluesselt: datentraeger,
+        fuehrung: fuehrung_ausgang.akten,
+        fuehrung_bis: fuehrung_empfangen,
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
@@ -435,11 +474,13 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     let mut vom_gegenueber_widerrufen = Vec::new();
     let mut stammdaten_geaendert: Vec<i64> = Vec::new();
     let mut sitzungen_beendet: Vec<String> = Vec::new();
+    let mut fuehrung_folgen = Vec::new();
     crate::write_retry!(pool, |conn| {
         abgelehnt_alle.clear();
         vom_gegenueber_widerrufen.clear();
         stammdaten_geaendert.clear();
         sitzungen_beendet.clear();
+        fuehrung_folgen.clear();
         repo::mark_gesehen(
             conn,
             kopplung.id,
@@ -456,8 +497,15 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 continue;
             };
             if oa.widerrufen {
-                if repo::org_widerrufen(conn, o.id, None, &jetzt, true).await? {
+                if let Some(einsaetze) =
+                    repo::org_widerrufen(conn, o.id, None, &jetzt, true).await?
+                {
                     vom_gegenueber_widerrufen.push(o.clone());
+                    fuehrung_folgen.extend(
+                        einsaetze
+                            .into_iter()
+                            .map(|einsatz_id| fuehrung_austausch::Folge::Kopf { einsatz_id }),
+                    );
                 }
                 continue;
             }
@@ -498,6 +546,27 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             )
             .await?;
         }
+        if fuehrung_an {
+            // Bruchstelle (D11): die letzte erfolgreiche Meldung VOR dieser.
+            let eingang = fuehrung_austausch::apply_eingang(
+                conn,
+                kopplung,
+                &a.fuehrung,
+                kopplung.zuletzt_gesehen_at.as_deref(),
+            )
+            .await?;
+            fuehrung_repo::save_kopplung_staende(
+                conn,
+                kopplung.id,
+                Some(a.fuehrung_bis),
+                eingang.bis,
+            )
+            .await?;
+            if let Some(h) = &eingang.hinweis {
+                repo::set_hinweis(conn, kopplung.id, h).await?;
+            }
+            fuehrung_folgen = eingang.folgen;
+        }
         repo::update_zustand_nach_orgs(
             conn,
             kopplung.id,
@@ -506,8 +575,17 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         .await?;
         Ok(())
     })?;
-    let naechste = add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone());
+    // Bleibt mehr Führung, als in diese Meldung passte, meldet sie sich gleich wieder (D3).
+    // Eigener Rest nur, wenn das Gegenüber quittiert hat (sonst hörte ein Gegenüber ohne Schalter
+    // die Meldung jede fünf Sekunden).
+    let fortschritt = a.fuehrung_bis > fuehrung_gesendet;
+    let naechste = if fuehrung_an && ((fuehrung_ausgang.mehr && fortschritt) || a.fuehrung_mehr) {
+        jetzt.clone()
+    } else {
+        add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone())
+    };
     repo::save_meldeversuch(pool, kopplung.id, None, &naechste).await?;
+    fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     if let Some(live) = stammdaten::live() {
         for org_id in &stammdaten_geaendert {
             live.publiziere_stammdaten(*org_id);
@@ -605,10 +683,21 @@ pub async fn handle_meldung(
         return Err(AppError::Forbidden);
     }
     let (anfrage_orgs, anfrage_widerrufen) = dedupe_anfrage(anfrage)?;
+    if anfrage.fuehrung.len() > fuehrung_austausch::AKTEN_MAX {
+        return Err(AppError::Validation(format!(
+            "Eine Meldung darf höchstens {} Führungsakten tragen.",
+            fuehrung_austausch::AKTEN_MAX
+        )));
+    }
     let jetzt = crate::zeit::jetzt();
+    let fuehrung_an = super::fuehrung::is_enabled(pool).await?;
     let mut vom_gegenueber = Vec::new();
+    let mut fuehrung_folgen = Vec::new();
+    let mut fuehrung_ausgang = fuehrung_austausch::Ausgang::default();
+    let mut fuehrung_bis = 0;
     let orgs = crate::write_retry!(pool, |conn| {
         vom_gegenueber.clear();
+        fuehrung_folgen.clear();
         repo::mark_gesehen(
             conn,
             kopplung.id,
@@ -625,8 +714,15 @@ pub async fn handle_meldung(
                 .iter()
                 .find(|o| o.widerrufen_at.is_none() && kennung(o) == w)
             {
-                if repo::org_widerrufen(conn, o.id, None, &jetzt, true).await? {
+                if let Some(einsaetze) =
+                    repo::org_widerrufen(conn, o.id, None, &jetzt, true).await?
+                {
                     vom_gegenueber.push(o.clone());
+                    fuehrung_folgen.extend(
+                        einsaetze
+                            .into_iter()
+                            .map(|einsatz_id| fuehrung_austausch::Folge::Kopf { einsatz_id }),
+                    );
                 }
             }
         }
@@ -716,8 +812,42 @@ pub async fn handle_meldung(
             InstanzKopplungZustand::VomGegenueberWiderrufen,
         )
         .await?;
+        if fuehrung_an {
+            // Führung je Einsatz (LLH-1491, D3, D7): erst übernehmen (eine Anfrage wird dabei
+            // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite.
+            fuehrung_repo::ensure_akten(conn).await?;
+            let eingang = fuehrung_austausch::apply_eingang(
+                conn,
+                kopplung,
+                &anfrage.fuehrung,
+                kopplung.zuletzt_gesehen_at.as_deref(),
+            )
+            .await?;
+            fuehrung_repo::save_kopplung_staende(
+                conn,
+                kopplung.id,
+                Some(anfrage.fuehrung_bis),
+                eingang.bis,
+            )
+            .await?;
+            if let Some(h) = &eingang.hinweis {
+                repo::set_hinweis(conn, kopplung.id, h).await?;
+            }
+            fuehrung_folgen = eingang.folgen;
+            fuehrung_bis = fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
+                .await?
+                .1;
+            fuehrung_ausgang = fuehrung_austausch::build_ausgang(
+                conn,
+                kopplung,
+                anfrage.fuehrung_bis,
+                fuehrung_austausch::ANTWORT_BYTES,
+            )
+            .await?;
+        }
         Ok(orgs)
     })?;
+    fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     for o in &vom_gegenueber {
         admin_audit::schreibe_ohne_akteur(
             pool,
@@ -735,6 +865,9 @@ pub async fn handle_meldung(
         softwarestand: super::softwarestand().to_string(),
         protokoll: PROTOKOLL,
         orgs,
+        fuehrung: fuehrung_ausgang.akten,
+        fuehrung_bis,
+        fuehrung_mehr: fuehrung_ausgang.mehr,
     })
 }
 
@@ -760,6 +893,8 @@ mod tests {
             stammdaten_arten: Vec::new(),
             age_empfaenger: None,
             datentraeger_verschluesselt: false,
+            fuehrung: Vec::new(),
+            fuehrung_bis: 0,
         }
     }
 
@@ -811,6 +946,9 @@ mod tests {
                     stammdaten_bis: 0,
                 })
                 .collect(),
+            fuehrung: Vec::new(),
+            fuehrung_bis: 0,
+            fuehrung_mehr: false,
         }
     }
 

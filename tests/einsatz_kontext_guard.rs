@@ -38,6 +38,8 @@ const SANKTIONIERTE_GATES: &[&str] = &[
     "EinsatzSchreibfreigabe",
     "EinsatzLeitungszugriff",
     "EinsatzVerwaltungszugriff",
+    // LLH-1491: Führung je Einsatz, Einsatzleitung oder Admin ohne `fordere_aktiv`.
+    "EinsatzFuehrungszugriff",
 ];
 
 /// Handler, die BEWUSST nur den Org-Floor (`EinsatzKontext`) ziehen, ohne Read-/Write-

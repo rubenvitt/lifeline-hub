@@ -13,7 +13,7 @@ import {
 } from './benachrichtigungKatalog';
 
 describe('Katalog der Benachrichtigungsarten', () => {
-  it('Alarm-Arten sind genau die des Katalogs (design.md D4, LLH-1142 E1, LLH-1425)', () => {
+  it('Alarm-Arten sind genau die des Katalogs (design.md D4, LLH-1142 E1, LLH-1425, LLH-1491)', () => {
     expect(ALLE_ARTEN.filter((a) => BENACHRICHTIGUNG_ARTEN[a].stufe === 'alarm')).toEqual([
       'sofortmeldung',
       'sofortmeldung_eskaliert',
@@ -21,7 +21,10 @@ describe('Katalog der Benachrichtigungsarten', () => {
       'abloesung_faellig',
       'vermisstenmeldung',
       'unwetter',
+      // LLH-1491: eine ungültige Übernahme der Führung.
+      'fuehrung_ungueltig',
     ]);
+    expect(BENACHRICHTIGUNG_ARTEN.fuehrung_uebernommen.stufe).toBe('hinweis');
   });
 
   it('Rückmeldung überfällig ist ein abschaltbarer Eingang mit Sprung zur Einheit (LLH-1425)', () => {

@@ -1397,6 +1397,46 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
             get(routes::schaden_anhang::datei).route_layer(download_grenze()),
         )
+        // LLH-1491: Führung je Einsatz zwischen gekoppelten Instanzen (Schalter
+        // `LIFELINE_FUEHRUNG`, sonst 404). Bedienung ohne `fordere_aktiv`: sie geht auch, wenn eine
+        // andere Instanz führt oder der Einsatz abgeschlossen ist.
+        .route("/api/einsaetze/{id}/fuehrung", get(routes::fuehrung::lesen))
+        .route(
+            "/api/einsaetze/{id}/fuehrung/uebergeben",
+            post(routes::fuehrung::uebergeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/code",
+            post(routes::fuehrung::code_abgeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/anfragen",
+            post(routes::fuehrung::anfragen),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/notuebernahme",
+            post(routes::fuehrung::notuebernahme),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/notuebernahme/start",
+            post(routes::fuehrung::notuebernahme_start),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/notuebernahme/abschluss",
+            post(routes::fuehrung::notuebernahme_abschluss),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/notuebernahme/code",
+            post(routes::fuehrung::notuebernahme_code),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/bestaetigen",
+            post(routes::fuehrung::bestaetigen),
+        )
+        .route(
+            "/api/einsaetze/{id}/fuehrung/widersprechen",
+            post(routes::fuehrung::widersprechen),
+        )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
         .route(
             "/api/einsaetze/{id}/geraete",
@@ -1831,6 +1871,47 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
         // (IP-Sperre wie die Gerätekopplung), Melden signiert (`instanz::extractor`).
         .route("/api/admin/instanz", get(routes::instanz::uebersicht))
+        // LLH-1491: Führung der Einsätze beim Gegenüber (Akten ohne lokalen Einsatz).
+        .route(
+            "/api/admin/instanz/fuehrung",
+            get(routes::fuehrung::admin_liste),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/uebergeben",
+            post(routes::fuehrung::admin_uebergeben),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/code",
+            post(routes::fuehrung::admin_code_abgeben),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/anfragen",
+            post(routes::fuehrung::admin_anfragen),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/notuebernahme",
+            post(routes::fuehrung::admin_notuebernahme),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/notuebernahme/start",
+            post(routes::fuehrung::admin_notuebernahme_start),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/notuebernahme/abschluss",
+            post(routes::fuehrung::admin_notuebernahme_abschluss),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/notuebernahme/code",
+            post(routes::fuehrung::admin_notuebernahme_code),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/bestaetigen",
+            post(routes::fuehrung::admin_bestaetigen),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/widersprechen",
+            post(routes::fuehrung::admin_widersprechen),
+        )
         .route(
             "/api/admin/instanz/codes",
             post(routes::instanz::code_ausstellen),

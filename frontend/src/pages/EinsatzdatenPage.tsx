@@ -61,7 +61,13 @@ import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
 import { InlineAngabe, type InlineEingabe } from '../components/InlineAngabe';
 import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
-import { darfEinsatzLeiten, darfEinsatzVerwalten } from '../einsatz/schreibrecht';
+import {
+  darfEinsatzLeiten,
+  darfEinsatzVerwalten,
+  darfFuehrungBedienen,
+} from '../einsatz/schreibrecht';
+import FuehrungPaneel from '../instanz/FuehrungPaneel';
+import { loadFuehrung } from '../api/fuehrung';
 import type {
   EinsatzAnzeige,
   Einsatzart,
@@ -1451,11 +1457,57 @@ export default function EinsatzdatenPage() {
         <FuehrungsstellePaneel einsatz={einsatz} darfSchreiben={darfBearbeiten} />
       </div>
 
+      {/* Führung je Einsatz (LLH-1491): vor dem Abschluss, weil eine Übergabe wie der Abschluss den
+          ganzen Einsatz betrifft. Nur mit Akte (gekoppelte Org, Schalter an). */}
+      {einsatz.fuehrung && (
+        <FuehrungAbschnitt
+          einsatzId={einsatzId}
+          darfBedienen={darfFuehrungBedienen(einsatz, benutzer)}
+        />
+      )}
+
       {/* Zuletzt und nicht im Kopf (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht im
           Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“). */}
       {/* `key`: ein Einsatzwechsel räumt den Grund, eine spätere Antwort meldet nicht hier. */}
       {darfLeiten && <EinsatzAbschluss key={einsatzId} einsatzId={einsatzId} />}
     </EinsatzSeite>
+  );
+}
+
+/** Paneel „Führung“ mit eigener Abfrage (Akte und Verlauf, live über `einsatz`). */
+function FuehrungAbschnitt({
+  einsatzId,
+  darfBedienen,
+}: {
+  einsatzId: number;
+  darfBedienen: boolean;
+}) {
+  const { token } = useRollen();
+  const q = useQuery({
+    queryKey: einsatzKeys.fuehrung(einsatzId),
+    queryFn: () => loadFuehrung(einsatzId),
+  });
+  if (!q.data) {
+    // Ein gescheiterter Abruf steht am Platz des Paneels, mit „Erneut laden“ (PaneelZustand).
+    return (
+      <Paneel titel="Führung" style={{ marginTop: token.marginLG }}>
+        <PaneelZustand
+          zustand={q.isError ? 'fehler' : 'laden'}
+          titel="Führung"
+          leerText=""
+          onNeuladen={() => void q.refetch()}
+        >
+          {null}
+        </PaneelZustand>
+      </Paneel>
+    );
+  }
+  return (
+    <FuehrungPaneel
+      fuehrung={q.data}
+      darfBedienen={darfBedienen}
+      style={{ marginTop: token.marginLG }}
+    />
   );
 }
 

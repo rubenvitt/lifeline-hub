@@ -304,6 +304,24 @@ macro_rules! einsatzleiter_joins {
     };
 }
 
+/// Die Führung je Einsatz (LLH-1491), wortgleich in `laden` und `liste_fuer`: die Spalten hinter
+/// das SELECT, der Join hinter `FROM einsatz e`. Ohne Schalter findet der Join keine Akte, und
+/// `fuehrung_bei` ist NULL (der Start richtet es aus). Gelesen über
+/// `instanz::fuehrung::FuehrungSpalten`.
+macro_rules! fuehrung_spalten {
+    () => {
+        "e.fuehrung_bei, ef.epoche_zaehler AS fuehrung_epoche, ef.fuehrer_name AS fuehrung_fuehrer, \
+         ef.offen IS NOT NULL AS fuehrung_offen"
+    };
+}
+
+macro_rules! fuehrung_joins {
+    () => {
+        " LEFT JOIN einsatz_fuehrung ef ON ef.einsatz_id = e.id \
+            AND (SELECT fuehrung_an FROM instanz_identitaet) = 1 "
+    };
+}
+
 /// Spiegel-Angaben (LLH-1492): ob der Einsatz ein Spiegel ist, von wem, wann zuletzt abgeglichen,
 /// und die Zahl offener und abgelehnter Anträge.
 macro_rules! spiegel_spalten {
@@ -349,10 +367,13 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
         ", ",
         einsatzleiter_spalten!(),
         ", ",
+        fuehrung_spalten!(),
+        ", ",
         spiegel_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
+        fuehrung_joins!(),
         spiegel_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
@@ -470,6 +491,8 @@ pub async fn liste_fuer(
         #[sqlx(flatten)]
         einsatzleiter: super::fuehrungsstelle::EinsatzleiterSpalten,
         #[sqlx(flatten)]
+        fuehrung: crate::instanz::fuehrung::FuehrungSpalten,
+        #[sqlx(flatten)]
         spiegel: crate::instanz::spiegel::SpiegelSpalten,
     }
 
@@ -507,10 +530,13 @@ pub async fn liste_fuer(
         ", ",
         einsatzleiter_spalten!(),
         ", ",
+        fuehrung_spalten!(),
+        ", ",
         spiegel_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
+        fuehrung_joins!(),
         spiegel_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
@@ -616,6 +642,7 @@ pub async fn liste_fuer(
                 ),
                 teilschwaerzungen: r.teilschwaerzungen,
                 einsatzleiter: r.einsatzleiter.anzeige(),
+                fuehrung: r.fuehrung.anzeige(),
                 spiegel: r.spiegel.anzeige(),
             }
         })
@@ -1611,17 +1638,22 @@ pub(crate) async fn fordere_aktiv_in_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<(), AppError> {
-    let aktiv: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
+    let zeile: Option<(String, Option<String>)> =
+        sqlx::query_as("SELECT status, fuehrung_bei FROM einsatz WHERE id = ?")
             .bind(einsatz_id)
             .fetch_optional(&mut *conn)
             .await?;
-    if aktiv.is_none() {
-        return Err(AppError::Conflict(
+    match zeile {
+        Some((status, _)) if status != "aktiv" => Err(AppError::Conflict(
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        ));
+        )),
+        // Führung je Einsatz (LLH-1491): eine andere Instanz führt.
+        Some((_, Some(bei))) => Err(super::berechtigung::fuehrung_error(&bei)),
+        Some(_) => Ok(()),
+        None => Err(AppError::Conflict(
+            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
+        )),
     }
-    Ok(())
 }
 
 #[cfg(test)]

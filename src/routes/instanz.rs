@@ -662,14 +662,18 @@ pub async fn widerrufen(
             .into_iter()
             .find(|o| o.org_id == admin.org_id)
         else {
-            return Ok(false);
+            return Ok(None);
         };
         let w = repo::org_widerrufen(conn, o.id, Some(admin.id), &jetzt, false).await?;
         repo::update_zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen)
             .await?;
         Ok(w)
     })?;
-    if widerrufen {
+    if let Some(einsaetze) = widerrufen {
+        // Freigegebene Einsätze: geöffnete Oberflächen laden den Kopf neu (LLH-1491).
+        for einsatz_id in einsaetze {
+            crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+        }
         let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
         admin_audit::schreibe(
             &state.pool,
@@ -759,8 +763,10 @@ pub async fn elw_verloren(
     }
     let jetzt = crate::zeit::jetzt();
     let zuordnung_id = vorher.org.id;
-    let (konten, beendet) = crate::write_retry!(&state.pool, |conn| {
-        repo::org_widerrufen(conn, zuordnung_id, Some(admin.id), &jetzt, false).await?;
+    let (konten, beendet, freigegeben) = crate::write_retry!(&state.pool, |conn| {
+        let freigegeben = repo::org_widerrufen(conn, zuordnung_id, Some(admin.id), &jetzt, false)
+            .await?
+            .unwrap_or_default();
         repo::update_zustand_nach_orgs(conn, kopplung_id, InstanzKopplungZustand::Widerrufen)
             .await?;
         // Jede Zuordnung der eigenen Org an dieser Kopplung, auch frühere: was je dorthin ging,
@@ -800,9 +806,12 @@ pub async fn elw_verloren(
         .bind(admin.org_id)
         .execute(&mut *conn)
         .await?;
-        Ok((konten.len() as i64, beendet))
+        Ok((konten.len() as i64, beendet, freigegeben))
     })?;
     state.live.melde_sitzung_ende(beendet);
+    for einsatz_id in freigegeben {
+        crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+    }
     let mut angaben = melden::build_angaben_gegenstelle(&kopplung, &vorher.org.fremde_org_name);
     angaben.anzahl = Some(konten);
     admin_audit::schreibe(

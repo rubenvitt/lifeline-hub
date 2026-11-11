@@ -20,6 +20,9 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
+import { StatusChip } from '../components/instrument';
+import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
+import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -443,6 +446,14 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 {EINSATZNUMMER_PLATZHALTER}
               </span>
             )}
+            {/* Führung je Einsatz (LLH-1491): nur, wenn eine andere Instanz führt. Dann ist hier
+                alles nur zu lesen: `achtung` mit Wort. Führt diese Instanz, zeigt den Stand das
+                Paneel „Führung“ auf Einsatzdaten; der Kopf bleibt dem Einsatznamen. */}
+            {mittel && einsatz?.fuehrung && !einsatz.fuehrung.fuehrend && (
+              <span data-lfh="kopf-fuehrung">
+                <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
+              </span>
+            )}
             <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
               {einsatzQuery.isLoading ? (
                 <span
@@ -516,6 +527,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
          Gefahr vorbehalten ist. Nur der Zustand und der Knopf, keine Folgenerklärung (LFH-1078). */}
+      {/* LLH-1491: eine gültige Notübernahme wartet auf die Einsatzleitung. */}
+      {einsatz?.fuehrung?.offen && (
+        <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+          <FuehrungHinweisband einsatz={einsatz} />
+        </EinsatzAnzeigeProvider>
+      )}
       {modulFreigabenQuery.isError && (
         <Alert
           type="warning"

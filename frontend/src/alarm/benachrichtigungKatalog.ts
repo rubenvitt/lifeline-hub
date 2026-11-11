@@ -141,6 +141,20 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
   einsatz_neu: { name: 'Neuer Einsatz', stufe: 'hinweis', org: true, einstellbar: true },
   // Warnstufe rot und darüber (LLH-1425, Katalog LLH-1142 E1).
   unwetter: { name: 'Unwetterwarnung', stufe: 'alarm', org: false, einstellbar: true },
+  // Führung je Einsatz (LLH-1491): an die Einsatzleitung. Ungültig ist ein Alarm, eine gültige
+  // Übernahme wartet auf die Entscheidung im Hinweisband.
+  fuehrung_ungueltig: {
+    name: 'Ungültige Übernahme der Führung',
+    stufe: 'alarm',
+    org: false,
+    einstellbar: true,
+  },
+  fuehrung_uebernommen: {
+    name: 'Führung übernommen',
+    stufe: 'hinweis',
+    org: false,
+    einstellbar: true,
+  },
 };
 
 /** Alle Arten in Katalogreihenfolge. */

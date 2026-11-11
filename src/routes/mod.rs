@@ -41,6 +41,7 @@ pub mod fahrzeug;
 pub mod fahrzeug_status;
 pub mod fernmeldewesen;
 pub mod freies_zeichen;
+pub mod fuehrung;
 pub mod fuehrungsfunktion;
 pub mod gefahr;
 pub mod geraet;

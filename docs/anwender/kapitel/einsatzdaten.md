@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
 ---
 
 ## Überblick
@@ -135,6 +135,10 @@ Für die Einsatzleitung:
   Einsatzleitung, in den Einstellungen des Einsatzes. Nur sie sieht den Sprung „Zugriff
   verwalten“.
 - Was die Rollen im Einzelnen bedeuten, steht in [Rechte im Einsatz](rechte-im-einsatz.md).
+- **Führung:** Gehört der Einsatz einer gekoppelten Organisation und ist die Führung je Einsatz
+  eingeschaltet, steht vor „Einsatzabschluss“ das Paneel „Führung“. Führt eine andere
+  Installation, ist der ganze Einsatz hier „Nur Ansicht · Führung liegt bei …“. Bedienung und
+  Folgen stehen in [Instanzkopplung](instanzkopplung.md).
 
 ### Was eine Änderung bewirkt
 
