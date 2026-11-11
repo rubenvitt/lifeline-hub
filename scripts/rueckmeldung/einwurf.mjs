@@ -54,6 +54,29 @@ const LEER = '_No response_';
 const SCHLUSS = 'Öffentlich';
 
 /**
+ * Markiert ab `von` die Zeilen, die in einem Markdown-Codeblock (``` oder ~~~) liegen, die
+ * Zäune eingeschlossen. Eine Feldüberschrift von GitHub steht nie in einem Codeblock.
+ */
+function codeZeilen(zeilen, von) {
+  const markiert = new Array(zeilen.length).fill(false);
+  let zaun = null;
+  for (let nr = von; nr < zeilen.length; nr += 1) {
+    const treffer = /^ {0,3}(`{3,}|~{3,})/.exec(zeilen[nr]);
+    if (zaun === null) {
+      if (treffer) {
+        zaun = treffer[1];
+        markiert[nr] = true;
+      }
+      continue;
+    }
+    markiert[nr] = true;
+    const schluss = /^ {0,3}(`{3,}|~{3,})\s*$/.exec(zeilen[nr]);
+    if (schluss && schluss[1][0] === zaun[0] && schluss[1].length >= zaun.length) zaun = null;
+  }
+  return markiert;
+}
+
+/**
  * Zerlegt den Text eines Formular-Issues in `id → Wert`. Felder, die fehlen oder leer blieben,
  * sind `''`. Gibt `null` zurück, wenn der Text nicht aus dem Formular stammt (Art, Version und
  * Beschreibung fehlen).
@@ -62,9 +85,10 @@ const SCHLUSS = 'Öffentlich';
  * Beschreibung stehen nur einzeilige Felder (Auswahl, Eingabe); ihre Überschriften und die der
  * Beschreibung werden von vorn gesucht. Hinter der Beschreibung liegen die übrigen Textfelder und
  * das Häkchen „Öffentlich“; sie werden von hinten gesucht, höchstens bis zur Beschreibung. Eine
- * `###`-Zeile in einer Antwort, auch mit dem Namen eines Feldes oder in einem Codeblock, bleibt
- * so Text: Sie landet in ihrer Antwort oder, wo die Grenze mehrdeutig ist (eine Feldüberschrift
- * der hinteren Textfelder in deren eigenen Antworten), im Textfeld davor, geht aber nie verloren.
+ * `###`-Zeile in einer Antwort, auch mit dem Namen eines Feldes, bleibt so Text. Hinten zählen
+ * Überschriften in Codeblöcken nur, wenn außerhalb keine passende steht (offener Zaun). Mehrdeutig
+ * bleibt nur eine Feldüberschrift der hinteren Textfelder außerhalb eines Codeblocks in deren
+ * eigenen Antworten: Dann landet Text im Textfeld davor, geht aber nie verloren.
  */
 export function zerlegeFormular(text) {
   const zeilen = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
@@ -82,10 +106,16 @@ export function zerlegeFormular(text) {
     stelle = fund + 1;
   }
   const untergrenze = stelle;
+  const imCode = codeZeilen(zeilen, untergrenze);
+  const sucheZurueck = (label, von, auchImCode) => {
+    let fund = von;
+    while (fund >= untergrenze && !(ist(fund, label) && (auchImCode || !imCode[fund]))) fund -= 1;
+    return fund;
+  };
   stelle = zeilen.length - 1;
   for (const label of [...hinten].reverse()) {
-    let fund = stelle;
-    while (fund >= untergrenze && !ist(fund, label)) fund -= 1;
+    let fund = sucheZurueck(label, stelle, false);
+    if (fund < untergrenze) fund = sucheZurueck(label, stelle, true);
     if (fund < untergrenze) continue;
     koepfe.push({ label, stelle: fund });
     stelle = fund - 1;

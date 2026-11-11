@@ -89,6 +89,22 @@ test('die eigene Feldüberschrift in der Beschreibung schneidet nichts ab', () =
   assert.match(description, /Nachher/);
 });
 
+test('Feldüberschrift im Codeblock der hinteren Textfelder bleibt im Codeblock', () => {
+  const erwartet = 'So:\n\n```md\n### Erwartet\n### Schritte zum Nachstellen\n```\n\nEnde';
+  const schritte = '1. Öffnen\n\n~~~\n### Erwartet\n~~~';
+  const werte = zerlegeFormular(formularText({ schritte, erwartet }));
+  assert.equal(werte.schritte, schritte);
+  assert.equal(werte.erwartet, erwartet);
+});
+
+test('offener Codeblock: Feldgrenzen gelten trotzdem', () => {
+  const beschreibung = 'Fehler:\n\n```\nPanik';
+  const werte = zerlegeFormular(formularText({ beschreibung, schritte: '1. Öffnen', erwartet: 'Ruhe' }));
+  assert.equal(werte.beschreibung, beschreibung);
+  assert.equal(werte.schritte, '1. Öffnen');
+  assert.equal(werte.erwartet, 'Ruhe');
+});
+
 test('mehrdeutige Grenze hinten: der Text bleibt erhalten', () => {
   const erwartet = 'Ruhe\n\n### Erwartet\n\nnoch mehr';
   const werte = zerlegeFormular(formularText({ schritte: '1. Öffnen', erwartet }));
