@@ -1904,17 +1904,19 @@ async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
     .await
     .unwrap();
     assert_eq!(meldungen, 1);
-    let zeit: String = sqlx::query_scalar(
-        "SELECT ereigniszeit FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'Nach dem Bruch'",
-    )
-    .bind(h)
-    .fetch_one(&hub.pool)
-    .await
-    .unwrap();
-    assert!(
-        zeit.starts_with("2026-11-11"),
-        "Ereigniszeit von damals: {zeit}"
-    );
+    async fn ereigniszeit(pool: &sqlx::SqlitePool, einsatz: i64) -> String {
+        sqlx::query_scalar(
+            "SELECT ereigniszeit FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'Nach dem Bruch'",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+    let damals = ereigniszeit(&elw.pool, e).await;
+    let zeit = ereigniszeit(&hub.pool, h).await;
+    assert!(damals.starts_with("2026-11-11"), "am ELW erfasst: {damals}");
+    assert_eq!(zeit, damals, "Ereigniszeit von damals, auf die Sekunde");
     assert_eq!(
         etb_inhalte(&elw, e).await,
         am_hub,
@@ -1922,11 +1924,17 @@ async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
     );
 
     // Ein weiterer Abgleich und ein erneutes Stellen ändern nichts.
-    let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    let (s, v3) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
     assert!(
         s == StatusCode::ACCEPTED || s == StatusCode::CONFLICT,
         "kein zweiter Antrag: {s}"
     );
+    if s == StatusCode::ACCEPTED {
+        assert_eq!(
+            v3["antrag"]["id"], v1["antrag"]["id"],
+            "kein zweiter Antrag: {v3}"
+        );
+    }
     abgleichen(&elw).await;
     assert_eq!(etb_inhalte(&hub, h).await, am_hub);
 }

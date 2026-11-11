@@ -161,10 +161,12 @@ function BandInhalt({
             <span style={NUR_VORLESER}>Keine Verbindung zur führenden Instanz</span>
           )}
         </span>
-        {(bruch || hatAntraege) && (
+        {(bruch || bruchOffen || hatAntraege) && (
           <span style={{ display: 'inline-flex', gap: token.marginSM, marginInlineStart: 'auto' }}>
-            {/* LLH-1646, N4: die nicht übernommenen Erfassungen klappen wie die Anträge auf. */}
-            {bruch && (
+            {/* LLH-1646, N4: die nicht übernommenen Erfassungen klappen wie die Anträge auf.
+                Offen bleibt der Knopf auch, wenn die letzte Erfassung erledigt ist, damit die Liste
+                zuklappt. */}
+            {(bruch || bruchOffen) && (
               <Button
                 type="link"
                 aria-expanded={bruchOffen}

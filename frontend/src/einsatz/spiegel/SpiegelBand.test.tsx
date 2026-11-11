@@ -349,6 +349,21 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
     await waitFor(() => expect(aufrufe).toEqual(['verwerfen 3']));
   });
 
+  it('klappt auch zu, wenn die letzte Erfassung erledigt ist', async () => {
+    mitBruchServer();
+    const user = userEvent.setup();
+    const { rerender } = renderMitProviders(
+      <SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel({ bruchstelle: 1 }) })} />,
+    );
+    await user.click(screen.getByRole('button', { name: /Nicht übernommen/ }));
+    rerender(<SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel({ bruchstelle: 0 }) })} />);
+    const knopf = screen.getByRole('button', { name: /Nicht übernommen/ });
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    await user.click(knopf);
+    expect(document.querySelector('[data-lfh="spiegel-band-bruchliste"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Nicht übernommen/ })).toBeNull();
+  });
+
   it('als Beobachter nur lesen', async () => {
     mitBruchServer();
     const { liste } = await bruchAufklappen(
