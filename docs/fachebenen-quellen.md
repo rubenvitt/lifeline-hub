@@ -501,7 +501,8 @@ Release-Build, Apple Silicon, 16 Kerne):
 Der Import läuft deshalb in einem eigenen Pool mit **4 Threads**: dreimal so lang, aber
 ein Sechstel des Speichers, und die übrigen Kerne bleiben dem Einsatzbetrieb. Im Dev-Build
 sind `osmpbf`, `protobuf`, `flate2` und `miniz_oxide` optimiert übersetzt
-(`[profile.dev.package.*]` in `Cargo.toml`), weil der Import auch dort Default-an ist.
+(`[profile.dev.package.*]` in `Cargo.toml`), damit ein eingeschalteter Import
+(`--kritis-extrakt true`) auch im Dev-Stack in vertretbarer Zeit läuft.
 
 **Abhängigkeit `osmpbf`:** zieht `memmap2` 0.5.10 mit, für das `cargo audit` seit
 Einführung RUSTSEC-2026-0186 („unsound": ungeprüfter Zeiger-Offset) als **erlaubte Warnung**

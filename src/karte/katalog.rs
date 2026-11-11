@@ -113,18 +113,35 @@ fn resolve_manifest_url(override_env: Option<String>) -> String {
 }
 
 async fn hole_manifest(client: &reqwest::Client) -> Option<Vec<OfflineKatalogEintrag>> {
-    let resp = client.get(manifest_url()).send().await.ok()?;
+    hole_manifest_von(client, &manifest_url()).await
+}
+
+/// Holt und parst ein Manifest. Der Größen-Guard greift zweimal: vorab über `Content-Length`
+/// und beim Lesen, damit auch eine Antwort ohne Längenangabe (chunked) nie mehr als
+/// `MAX_MANIFEST_BYTES` in den Speicher bringt (LLH-1546: seit der echten Vorgabe-URL ruft
+/// jede Installation ohne Override das Manifest ab).
+async fn hole_manifest_von(
+    client: &reqwest::Client,
+    url: &str,
+) -> Option<Vec<OfflineKatalogEintrag>> {
+    let mut resp = client.get(url).send().await.ok()?;
     if !resp.status().is_success() {
         return None;
     }
-    // Größen-Guard: ein riesiger Body wäre ein Fehler oder Angriff.
     if resp
         .content_length()
         .is_some_and(|n| n > MAX_MANIFEST_BYTES)
     {
         return None;
     }
-    resp.json::<Vec<OfflineKatalogEintrag>>().await.ok()
+    let mut body = Vec::new();
+    while let Some(stueck) = resp.chunk().await.ok()? {
+        if (body.len() + stueck.len()) as u64 > MAX_MANIFEST_BYTES {
+            return None;
+        }
+        body.extend_from_slice(&stueck);
+    }
+    serde_json::from_slice(&body).ok()
 }
 
 #[cfg(test)]
@@ -172,6 +189,62 @@ mod tests {
                 "https://cdn.example/maps/offline-katalog-manifest.json".into()
             )),
             "https://cdn.example/maps/offline-katalog-manifest.json"
+        );
+    }
+
+    /// Lokaler Server, der `stuecke` × `laenge` Bytes ohne `Content-Length` (chunked) liefert.
+    async fn streamender_server(stuecke: usize, laenge: usize, inhalt: u8) -> String {
+        use axum::{body::Body, routing::get, Router};
+        let app = Router::new().route(
+            "/m.json",
+            get(move || async move {
+                let s = futures::stream::iter(
+                    (0..stuecke).map(move |_| Ok::<_, std::io::Error>(vec![inhalt; laenge])),
+                );
+                Body::from_stream(s)
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        format!("http://127.0.0.1:{}/m.json", addr.port())
+    }
+
+    #[tokio::test]
+    async fn manifest_ohne_laengenangabe_ueber_der_grenze_wird_verworfen() {
+        // 2 MiB Leerzeichen, chunked: vorab greift kein Content-Length, der Lese-Guard muss.
+        let url = streamender_server(32, 64 * 1024, b' ').await;
+        let client = reqwest::Client::new();
+        assert!(hole_manifest_von(&client, &url).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn manifest_ohne_laengenangabe_unter_der_grenze_wird_gelesen() {
+        // `[]` gefolgt von Leerraum, chunked, deutlich unter 1 MiB → leere Liste.
+        let url = {
+            use axum::{body::Body, routing::get, Router};
+            let app = Router::new().route(
+                "/m.json",
+                get(|| async {
+                    let teile = vec![b"[".to_vec(), vec![b' '; 4096], b"]".to_vec()];
+                    Body::from_stream(futures::stream::iter(
+                        teile.into_iter().map(Ok::<_, std::io::Error>),
+                    ))
+                }),
+            );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move {
+                axum::serve(listener, app).await.unwrap();
+            });
+            format!("http://127.0.0.1:{}/m.json", addr.port())
+        };
+        let client = reqwest::Client::new();
+        assert_eq!(
+            hole_manifest_von(&client, &url).await.map(|v| v.len()),
+            Some(0)
         );
     }
 
