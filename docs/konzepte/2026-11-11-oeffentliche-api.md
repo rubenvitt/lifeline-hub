@@ -260,6 +260,7 @@ Schnittstellen-Ausbaus (Abschnitt „Alarmübernahme“). Technische Namen sind 
 | Normalform 10.11. | API v1 |
 | --- | --- |
 | `externe_id` | `external_id` |
+| – (neu) | `message_id` je Meldung, `sequence` optional |
 | `art` mit `neu`, `nachtrag`, `abbruch`, `abschluss` | `kind` mit denselben Werten |
 | `test` | `is_test` |
 | `einsatznummer`, `stichwort`, `meldung`, `meldebild` | unverändert |
@@ -306,10 +307,16 @@ Claims des JWS (`aud` ist die Instanz-UUID aus dem Einlösen):
 
 **Idempotenz und Reihenfolge:**
 
-- Der Vorschlag hängt am Schlüssel (Zugang, `external_id`). Jede einzelne Meldung dazu wird am
-  Hash ihres Bodys erkannt. Eine wiederholte Meldung ändert nichts und antwortet `200`. Damit
-  überschreibt auch ein verspäteter Retry der Erstmeldung keinen inzwischen verarbeiteten
-  Nachtrag.
+- Der Vorschlag hängt am Schlüssel (Zugang, `external_id`).
+- Jede einzelne Meldung dazu erkennt der Server an ihrer `message_id`, die der Absender bei
+  Retries gleich lässt. Eine wiederholte Meldung ändert nichts und antwortet `200`. Damit
+  überschreibt ein verspäteter Retry der Erstmeldung keinen inzwischen verarbeiteten Nachtrag.
+  Eine neue Meldung mit gleichem Inhalt, aber neuer `message_id` wird übernommen.
+- Ohne `message_id` dient der Hash des Bodys als Ersatz. Dann ist ein Fall mehrdeutig: Kommt nach
+  den Meldungen A und B wieder A, kann der Server einen späten Retry nicht von einer bewussten
+  Rückkehr zu A unterscheiden. Er übernimmt A dann nicht, vermerkt sie aber im Verlauf und zeigt am
+  Vorschlag den Hinweis „Meldung entspricht einer früheren“. So entscheidet ein Mensch, nichts
+  geht still verloren. Die Doku empfiehlt Absendern deshalb `message_id` oder `sequence`.
 - Liefert der Absender eine fortlaufende `sequence` je `external_id`, wird eine Meldung mit
   kleinerer `sequence` als die zuletzt übernommene nur in den Verlauf gelegt und nicht übernommen.
   Ohne `sequence` gilt die Reihenfolge des Eingangs.
