@@ -1191,3 +1191,221 @@ async fn ein_aufgeloester_abschnitt_haelt_den_abgleich_nicht_an() {
     assert_eq!(ohne, 1);
     assert!(etb_inhalte(&hub, s).await.contains(&"Danach".to_string()));
 }
+
+// ── Sprechgruppen aus dem Katalog der Org (LLH-1629) ─────────────────────────────────────────
+
+/// Legt eine Katalog-Sprechgruppe an und liefert ihre ID.
+async fn katalog_sprechgruppe(i: &Instanz, bezeichnung: &str) -> i64 {
+    exec(
+        &i.pool,
+        &format!(
+            "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart) VALUES (1, '{bezeichnung}', 'TMO')"
+        ),
+    )
+    .await;
+    eine(
+        &i.pool,
+        &format!(
+            "SELECT id FROM sprechgruppe WHERE bezeichnung = '{bezeichnung}' AND einsatz_id IS NULL"
+        ),
+    )
+    .await
+}
+
+async fn sprechgruppe_zuordnen(i: &Instanz, einsatz: i64, einheit: i64, sg: i64) {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/sprechgruppen/{sg}"),
+        &i.admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s}: {v}");
+}
+
+/// Die Sprechgruppen der Einheiten eines Einsatzes: (Bezeichnung, ID, gehört zum Einsatz).
+async fn sprechgruppen_der_einheiten(i: &Instanz, einsatz: i64) -> Vec<(String, i64, bool)> {
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT sg.bezeichnung, sg.id, sg.einsatz_id IS NOT NULL FROM einsatz_einheit_sprechgruppe x \
+         JOIN einsatz_einheit h ON h.id = x.einheit_id JOIN sprechgruppe sg ON sg.id = x.sprechgruppe_id \
+         WHERE h.einsatz_id = {einsatz} ORDER BY sg.bezeichnung"
+    )))
+    .fetch_all(&i.pool)
+    .await
+    .unwrap()
+}
+
+async fn ohne_hinweis(i: &Instanz, spiegel: i64) {
+    let hinweis: Option<String> = eine(
+        &i.pool,
+        &format!("SELECT hinweis FROM einsatz_spiegel WHERE einsatz_id = {spiegel}"),
+    )
+    .await;
+    assert_eq!(hinweis, None, "jede Zeile übernommen");
+}
+
+#[tokio::test]
+async fn katalog_sprechgruppen_des_elw_erscheinen_am_hub_als_gegenstueck_oder_kopie() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    // Vom Hub verteilt: am ELW mit Herkunft der Stammdaten.
+    let hub_sg = katalog_sprechgruppe(&hub, "Rotkreuz 1").await;
+    melden(&elw).await;
+    let elw_vom_hub: i64 = eine(
+        &elw.pool,
+        "SELECT id FROM sprechgruppe WHERE bezeichnung = 'Rotkreuz 1' AND einsatz_id IS NULL",
+    )
+    .await;
+    // Nur am ELW.
+    let elw_eigen = katalog_sprechgruppe(&elw, "Kanal ELW").await;
+
+    let e = common::einsatz_anlegen_mit(&elw.app, &elw.admin, "Hochwasser").await;
+    let einheit = common::einheit_bilden(&elw.app, &elw.admin, e, "SEG 1").await;
+    sprechgruppe_zuordnen(&elw, e, einheit, elw_vom_hub).await;
+    sprechgruppe_zuordnen(&elw, e, einheit, elw_eigen).await;
+    abgleichen(&elw).await;
+
+    let s = spiegel_von(&hub).await;
+    ohne_hinweis(&hub, s).await;
+    let zuordnungen = sprechgruppen_der_einheiten(&hub, s).await;
+    assert_eq!(zuordnungen.len(), 2, "{zuordnungen:?}");
+    // Die Sprechgruppe vom Hub ist die eigene Katalogzeile, die nur am ELW eine Kopie am Spiegel.
+    assert_eq!(zuordnungen[1], ("Rotkreuz 1".into(), hub_sg, false));
+    assert_eq!(zuordnungen[0].0, "Kanal ELW");
+    assert!(zuordnungen[0].2, "Kopie gehört zum Spiegel");
+    let kopie = zuordnungen[0].1;
+    assert_eq!(
+        eine::<i64>(
+            &hub.pool,
+            &format!("SELECT einsatz_id FROM sprechgruppe WHERE id = {kopie}")
+        )
+        .await,
+        s
+    );
+    // Die Katalogzeile des Hubs gehört keinem Spiegel und ist weiter änderbar.
+    exec(
+        &hub.pool,
+        &format!("UPDATE sprechgruppe SET hinweis = 'am Hub' WHERE id = {hub_sg}"),
+    )
+    .await;
+
+    // Umbenannt am ELW: die Kopie zieht nach; nichts wartet.
+    exec(
+        &elw.pool,
+        &format!("UPDATE sprechgruppe SET bezeichnung = 'Kanal ELW Nord' WHERE id = {elw_eigen}"),
+    )
+    .await;
+    abgleichen(&elw).await;
+    ohne_hinweis(&hub, s).await;
+    assert_eq!(
+        eine::<String>(
+            &hub.pool,
+            &format!("SELECT bezeichnung FROM sprechgruppe WHERE id = {kopie}")
+        )
+        .await,
+        "Kanal ELW Nord"
+    );
+    let stand_elw: i64 = eine(
+        &elw.pool,
+        &format!("SELECT MAX(stand) FROM einsatz_aenderung WHERE einsatz_id = {e}"),
+    )
+    .await;
+    let stand_hub: i64 = eine(
+        &hub.pool,
+        &format!("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = {s}"),
+    )
+    .await;
+    assert_eq!(stand_hub, stand_elw, "Stand ganz vorgerückt");
+    // Ein Spiegel ändert seine Kopie nur über die Übernahme.
+    let schutz = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "UPDATE sprechgruppe SET bezeichnung = 'X' WHERE id = {kopie}"
+    )))
+    .execute(&hub.pool)
+    .await;
+    assert!(schutz.is_err(), "Kopie ist geschützt");
+}
+
+#[tokio::test]
+async fn katalog_sprechgruppen_des_hubs_erscheinen_am_elw_auch_in_der_fernmeldeskizze() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let hub_sg = katalog_sprechgruppe(&hub, "Rotkreuz 1").await;
+    melden(&elw).await;
+    let elw_vom_hub: i64 = eine(
+        &elw.pool,
+        "SELECT id FROM sprechgruppe WHERE bezeichnung = 'Rotkreuz 1' AND einsatz_id IS NULL",
+    )
+    .await;
+    // Noch nicht verteilt: am ELW ohne Gegenstück.
+    let hub_neu = katalog_sprechgruppe(&hub, "Kanal Neu").await;
+    // Nur in der Skizze, keiner Einheit zugeordnet: kommt allein über das Element `sg-<id>`.
+    let hub_skizze = katalog_sprechgruppe(&hub, "Kanal Skizze").await;
+
+    let e = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Alarm Hub").await;
+    let einheit = common::einheit_bilden(&hub.app, &hub.admin, e, "SEG 1").await;
+    sprechgruppe_zuordnen(&hub, e, einheit, hub_sg).await;
+    sprechgruppe_zuordnen(&hub, e, einheit, hub_neu).await;
+    let admin: i64 = eine(&hub.pool, "SELECT MIN(id) FROM benutzer").await;
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO fernmeldeskizze_lage (einsatz_id, element, x, y, geaendert_von_id) \
+             VALUES ({e}, 'sg-{hub_sg}', 10, 20, {admin})"
+        ),
+    )
+    .await;
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO fernmeldeskizze_lage (einsatz_id, element, x, y, geaendert_von_id) \
+             VALUES ({e}, 'sg-{hub_skizze}', 30, 20, {admin})"
+        ),
+    )
+    .await;
+    abgleichen(&elw).await;
+
+    let s = spiegel_von(&elw).await;
+    ohne_hinweis(&elw, s).await;
+    let zuordnungen = sprechgruppen_der_einheiten(&elw, s).await;
+    assert_eq!(zuordnungen.len(), 2, "{zuordnungen:?}");
+    assert_eq!(zuordnungen[0].0, "Kanal Neu");
+    assert!(
+        zuordnungen[0].2,
+        "Kopie, solange der Katalog nicht verteilt ist"
+    );
+    assert_eq!(zuordnungen[1], ("Rotkreuz 1".into(), elw_vom_hub, false));
+    let elemente: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT element FROM fernmeldeskizze_lage WHERE einsatz_id = {s} ORDER BY x"
+    )))
+    .fetch_all(&elw.pool)
+    .await
+    .unwrap();
+    let skizze_kopie: i64 = eine(
+        &elw.pool,
+        &format!(
+            "SELECT id FROM sprechgruppe WHERE bezeichnung = 'Kanal Skizze' AND einsatz_id = {s}"
+        ),
+    )
+    .await;
+    assert_eq!(
+        elemente,
+        vec![format!("sg-{elw_vom_hub}"), format!("sg-{skizze_kopie}")]
+    );
+
+    // Deaktiviert am Hub: die Änderung kommt über das Log des Einsatzes, die Kopie zieht nach.
+    exec(
+        &hub.pool,
+        &format!("UPDATE sprechgruppe SET aktiv = 0 WHERE id = {hub_neu}"),
+    )
+    .await;
+    abgleichen(&elw).await;
+    ohne_hinweis(&elw, s).await;
+    let kopie = zuordnungen[0].1;
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            &format!("SELECT aktiv FROM sprechgruppe WHERE id = {kopie}")
+        )
+        .await,
+        0
+    );
+}

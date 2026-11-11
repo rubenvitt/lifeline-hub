@@ -188,6 +188,7 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("einsatz_aenderung", "Verwaltung des Spiegels selbst"),
     ("einsatz_spiegel", "Verwaltung des Spiegels selbst"),
     ("spiegel_herkunft", "Verwaltung des Spiegels selbst"),
+    ("spiegel_katalog", "Verwaltung des Spiegels selbst"),
     ("spiegel_ziel", "Verwaltung des Spiegels selbst"),
     ("spiegel_anhang", "Verwaltung des Spiegels selbst"),
     (

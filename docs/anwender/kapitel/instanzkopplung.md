@@ -318,6 +318,12 @@ als Verfasser im Einsatztagebuch. Anmelden kann sich mit ihm niemand, und es ste
 Benutzerverwaltung. Fahrzeuge oder Personal, die es nur an der anderen Installation gibt, stehen
 am Spiegel mit ihrem Namen, aber ohne Verweis auf die eigenen Stammdaten.
 
+Sprechgruppen aus dem Katalog der Organisation stehen am Spiegel mit allen Zuordnungen, im
+Funkplan wie in der Fernmeldeskizze. Kennt der eigene Katalog die Sprechgruppe, zeigt der Spiegel
+auf sie, ebenso auf eine gleichnamige Sprechgruppe des Spiegels; diese bleibt dabei unverändert.
+Sonst legt der Spiegel eine Kopie als Sprechgruppe des Einsatzes an. Nur diese Kopie folgt den
+Änderungen dort, wo der Einsatz geführt wird.
+
 Einsatznummern vergibt jede Installation selbst. Ein Spiegel trägt die Nummer der Installation,
 die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen wie ein Spiegel.
 
