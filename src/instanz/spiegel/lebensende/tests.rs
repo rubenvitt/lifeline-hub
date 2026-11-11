@@ -114,6 +114,7 @@ fn frist(kategorie: &str) -> KategorieFrist {
         rechtsgrundlage: "RDG".into(),
         vorgemerkt_at: None,
         geschwaerzt_at: None,
+        frist_gesetzt_at: Some("2026-11-01 00:00:00".into()),
     }
 }
 
@@ -242,6 +243,12 @@ async fn verwahrung_macht_den_spiegel_zum_eigenen_einsatz() {
         ),
         (
             "SELECT COUNT(*) FROM einsatz_aufbewahrung_kategorie WHERE einsatz_id = ?",
+            2,
+        ),
+        // Der Setzzeitpunkt kommt mit: die Karenz beginnt am Hub nicht neu.
+        (
+            "SELECT COUNT(*) FROM einsatz_aufbewahrung_kategorie WHERE einsatz_id = ? \
+             AND frist_gesetzt_at = '2026-11-01 00:00:00'",
             2,
         ),
     ] {
@@ -383,7 +390,8 @@ async fn faellig_ist_nur_ein_abgelaufener_eigener_einsatz_ohne_hindernis() {
     setze_bis(&pool, faellig, "2026-11-01 00:00:00").await;
     sqlx::query(
         "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
-         rechtsgrundlage) VALUES (?, 'anhaenge', '2027-01-01 00:00:00', 'RDG')",
+         rechtsgrundlage, frist_gesetzt_at) \
+         VALUES (?, 'anhaenge', '2027-01-01 00:00:00', 'RDG', '2026-11-01 00:00:00')",
     )
     .bind(faellig)
     .execute(&pool)

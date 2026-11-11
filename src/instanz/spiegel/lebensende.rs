@@ -159,7 +159,8 @@ pub async fn faellige_verwahrungen(
                     .fetch_one(&mut *conn)
                     .await?;
             let kategorien: Vec<KategorieFrist> = sqlx::query_as(
-                "SELECT kategorie, frist_bis, rechtsgrundlage, vorgemerkt_at, geschwaerzt_at \
+                "SELECT kategorie, frist_bis, rechtsgrundlage, vorgemerkt_at, geschwaerzt_at, \
+                    frist_gesetzt_at \
                  FROM einsatz_aufbewahrung_kategorie WHERE einsatz_id = ? \
                  ORDER BY kategorie LIMIT ?",
             )
@@ -313,10 +314,12 @@ async fn umwandeln(
         }
         sqlx::query(
             "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
-                rechtsgrundlage, vorgemerkt_at, geschwaerzt_at) VALUES (?, ?, ?, ?, ?, ?) \
+                rechtsgrundlage, vorgemerkt_at, geschwaerzt_at, frist_gesetzt_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?) \
              ON CONFLICT (einsatz_id, kategorie) DO UPDATE SET frist_bis = excluded.frist_bis, \
                 rechtsgrundlage = excluded.rechtsgrundlage, \
-                vorgemerkt_at = excluded.vorgemerkt_at, geschwaerzt_at = excluded.geschwaerzt_at",
+                vorgemerkt_at = excluded.vorgemerkt_at, geschwaerzt_at = excluded.geschwaerzt_at, \
+                frist_gesetzt_at = excluded.frist_gesetzt_at",
         )
         .bind(id)
         .bind(&k.kategorie)
@@ -324,6 +327,7 @@ async fn umwandeln(
         .bind(&k.rechtsgrundlage)
         .bind(&k.vorgemerkt_at)
         .bind(&k.geschwaerzt_at)
+        .bind(&k.frist_gesetzt_at)
         .execute(&mut *conn)
         .await?;
     }

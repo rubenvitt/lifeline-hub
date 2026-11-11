@@ -86,6 +86,10 @@ pub struct KategorieFrist {
     pub vorgemerkt_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub geschwaerzt_at: Option<String>,
+    /// Wann die Frist am Führer gesetzt wurde: der Karenz-Beginn der Phase K1 rechnet damit
+    /// (LFH-1049). Fehlt bei einem älteren Führer; dann gilt wie bisher der Lauf selbst.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frist_gesetzt_at: Option<String>,
 }
 
 /// Antwort der erreichten Seite auf `verwahrt` (D4).
@@ -340,6 +344,7 @@ mod tests {
                     rechtsgrundlage: "RG".into(),
                     vorgemerkt_at: None,
                     geschwaerzt_at: None,
+                    frist_gesetzt_at: None,
                 };
                 KATEGORIEN_MAX + 1
             ],
