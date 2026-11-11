@@ -16,6 +16,7 @@ import { Bildmarke } from '../marke/Bildmarke';
 import { absolutiereProxyAnfrage } from '../pages/lagekarte/basemapStil';
 import { neueClientId } from '../offline/clientId';
 import { lagebildKartenDaten } from './lagebildKarte';
+import { seiteNeuLaden } from './seiteNeuLaden';
 
 /** Takt der Seite (design.md D9). */
 export const ABRUF_MS = 30_000;
@@ -106,9 +107,8 @@ export default function LagebildExternPage() {
   // Ein anderer Link im selben Tab ändert nur das Fragment: neu laden, damit nichts vom alten
   // Schlüssel (Daten, Abruf, Zustand) unter dem neuen steht.
   useEffect(() => {
-    const neuLaden = () => window.location.reload();
-    window.addEventListener('hashchange', neuLaden);
-    return () => window.removeEventListener('hashchange', neuLaden);
+    window.addEventListener('hashchange', seiteNeuLaden);
+    return () => window.removeEventListener('hashchange', seiteNeuLaden);
   }, []);
 
   // Uhr für „keine Verbindung seit …“ am Spiegel.

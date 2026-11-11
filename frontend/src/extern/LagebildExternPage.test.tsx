@@ -6,8 +6,10 @@ import { renderMitProviders } from '../test/utils';
 import type { LagebildExtern } from '../api/types';
 import LagebildExternPage, { linkUngueltig, mitKarte } from './LagebildExternPage';
 import { ApiError } from '../api/client';
+import { seiteNeuLaden } from './seiteNeuLaden';
 
 // jsdom hat kein WebGL: die Karte selbst zeigt das Bild im PR.
+vi.mock('./seiteNeuLaden', () => ({ seiteNeuLaden: vi.fn() }));
 vi.mock('../geraet/LagemonitorKarte', async (original) => ({
   ...(await original<typeof import('../geraet/LagemonitorKarte')>()),
   default: () => <div data-lfh="lagemonitor-karte" />,
@@ -95,6 +97,7 @@ function oeffne(hash: string) {
 
 afterEach(() => {
   window.history.replaceState(null, '', '/');
+  vi.mocked(seiteNeuLaden).mockClear();
 });
 
 describe('LagebildExternPage', () => {
@@ -167,6 +170,18 @@ describe('LagebildExternPage', () => {
     oeffne('#llh_lb_ALT');
     expect(await screen.findByText('Dieser Link gilt nicht mehr.')).toBeInTheDocument();
     expect(anfragen).toHaveLength(1);
+  });
+
+  it('lädt bei einem anderen Fragment neu, damit nichts vom alten Schlüssel bleibt', async () => {
+    bereit(antwort());
+    const { unmount } = oeffne('#llh_lb_GEHEIM');
+    expect(await screen.findByText('Hochwasser Ilmenau')).toBeInTheDocument();
+    expect(seiteNeuLaden).not.toHaveBeenCalled();
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(seiteNeuLaden).toHaveBeenCalledTimes(1);
+    unmount();
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(seiteNeuLaden).toHaveBeenCalledTimes(1);
   });
 
   it('ohne Schlüssel fragt sie nicht', async () => {
