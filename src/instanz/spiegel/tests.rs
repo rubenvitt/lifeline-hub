@@ -919,3 +919,84 @@ async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abglei
             .unwrap();
     assert_eq!(lfd, [1, 3], "die übrigen Zeilen kommen an");
 }
+
+/// Eine Schwärzung beim Führer nimmt am Spiegel jede gesicherte Kopie und alles Geklärte; offene
+/// Zeilen bleiben ohne Kopie und werden weiter gefragt (LLH-1649, Review #1284).
+#[tokio::test]
+async fn schwaerzung_nimmt_die_kopien_und_laesst_offene_zeilen_weiter_fragen() {
+    let pool = crate::db::test_pool().await;
+    exec(
+        &pool,
+        "INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Org')",
+    )
+    .await;
+    let e: i64 = eine(
+        &pool,
+        "INSERT INTO einsatz (org_id, bezeichnung, kennung) VALUES (1, 'Spiegel', 'k/1') \
+         RETURNING id",
+    )
+    .await;
+    crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e).await;
+    exec(
+        &pool,
+        &format!("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = {e}"),
+    )
+    .await;
+    // entfernt, geklärt, offen, zurückgestellt
+    for (schluessel, entfernt, geklaert) in [("1", 1, 1), ("2", 0, 1), ("3", 0, 0), ("4", 0, 2)] {
+        sqlx::query(
+            "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, daten, \
+             entfernt, geklaert, gesichert_at) \
+             VALUES (?, 'einsatz_person', ?, 1, '{\"name\":\"Muster\"}', ?, ?, '2026-11-11 12:00:00')",
+        )
+        .bind(e)
+        .bind(schluessel)
+        .bind(entfernt)
+        .bind(geklaert)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let mut conn = pool.acquire().await.unwrap();
+    super::fuehrung::raeume_bruchstelle(&mut conn, e)
+        .await
+        .unwrap();
+    drop(conn);
+    let uebrig: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT schluessel, daten FROM einsatz_bruchstelle WHERE einsatz_id = ? ORDER BY schluessel",
+    )
+    .bind(e)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(uebrig, vec![("3".into(), None), ("4".into(), None)]);
+    let offen = format!("SELECT bruch_offen FROM einsatz_spiegel WHERE einsatz_id = {e}");
+    assert_eq!(
+        eine::<i64>(&pool, &offen).await,
+        1,
+        "offene Zeilen werden weiter gefragt"
+    );
+
+    // Ist nichts mehr offen, fragt der Spiegel nicht mehr.
+    exec(
+        &pool,
+        &format!(
+            "UPDATE einsatz_bruchstelle SET entfernt = 1, geklaert = 1 WHERE einsatz_id = {e}"
+        ),
+    )
+    .await;
+    let mut conn = pool.acquire().await.unwrap();
+    super::fuehrung::raeume_bruchstelle(&mut conn, e)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(
+        eine::<i64>(
+            &pool,
+            &format!("SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = {e}")
+        )
+        .await,
+        0
+    );
+    assert_eq!(eine::<i64>(&pool, &offen).await, 0);
+}

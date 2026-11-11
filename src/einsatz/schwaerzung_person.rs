@@ -593,8 +593,8 @@ pub async fn scrubbe_person(
             .await?;
     }
     // Die Bruchstelle (LLH-1641, E6) hält ganze Zeilen als JSON; ob die Person darin steht, sagt
-    // keine Spalte. Darum geht sie bei jedem Löschersuchen im Einsatz ganz, am Spiegel über den
-    // Zähler am Kopf (LLH-1649).
+    // keine Spalte. Darum geht sie bei jedem Löschersuchen im Einsatz ganz, am Spiegel über die
+    // Marke am Kopf (LLH-1649).
     super::repo::nach_schwaerzung_tx(&mut *conn, einsatz_id).await
 }
 

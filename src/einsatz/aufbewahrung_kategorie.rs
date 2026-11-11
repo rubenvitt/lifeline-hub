@@ -546,7 +546,7 @@ pub async fn schwaerzen(
     scrubbe_aus_registry(&mut tx, einsatz_id, Umfang::Kategorie(kategorie)).await?;
     // Die Bruchstelle (LLH-1641, E6) sichert ganze Zeilen als JSON, gleich welcher Kategorie;
     // ihre Spalten folgen in der Registry dem Einsatz. Damit keine Kopie eine kürzere Frist
-    // überlebt, geht sie mit der ersten geschwärzten Kategorie ganz, am Spiegel über den Zähler
+    // überlebt, geht sie mit der ersten geschwärzten Kategorie ganz, am Spiegel über die Marke
     // am Kopf (LLH-1649).
     super::repo::nach_schwaerzung_tx(&mut tx, einsatz_id).await?;
 
@@ -2449,13 +2449,14 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(uebrig, 0);
-        // Der Zähler am Kopf trägt die Schwärzung zum Spiegel (LLH-1649).
-        let stand: i64 = sqlx::query_scalar("SELECT schwaerzung_stand FROM einsatz WHERE id = ?")
-            .bind(einsatz)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-        assert_eq!(stand, 1);
+        // Die Marke am Kopf trägt die Schwärzung zum Spiegel (LLH-1649).
+        let marke: Option<String> =
+            sqlx::query_scalar("SELECT schwaerzung_marke FROM einsatz WHERE id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(marke.map(|m| m.len()), Some(16));
     }
 
     #[tokio::test]

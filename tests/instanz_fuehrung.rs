@@ -1334,12 +1334,21 @@ async fn schwaerzung_beim_fuehrer_raeumt_die_bruchstelle_am_spiegel() {
         0,
         "der Spiegel fragt nicht mehr"
     );
-    let stand: i64 = sqlx::query_scalar("SELECT schwaerzung_stand FROM einsatz WHERE id = ?")
-        .bind(e)
-        .fetch_one(&elw.pool)
-        .await
-        .unwrap();
-    assert_eq!(stand, 1, "der Zähler kam mit dem Kopf");
+    let marke = |i: &Instanz, einsatz: i64| {
+        let pool = i.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, Option<String>>(
+                "SELECT schwaerzung_marke FROM einsatz WHERE id = ?",
+            )
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let am_hub = marke(&hub, h).await;
+    assert!(am_hub.is_some());
+    assert_eq!(marke(&elw, e).await, am_hub, "die Marke kam mit dem Kopf");
     let (_, kopf) = common::anfrage(
         &elw.app,
         "GET",

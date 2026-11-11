@@ -1245,8 +1245,8 @@ pub(crate) async fn schwaerze_einsatz_auf_antrag_tx(
 /// Nach jeder Schwärzung am Einsatz (Kategorie, Löschersuchen je Person, ganzer Einsatz), in der
 /// Transaktion der Schwärzung: Die Bruchstelle (LLH-1641, E6) hält ganze Zeilen als JSON, und
 /// welche Kategorie oder Person darin steht, sagt keine Spalte. Darum geht sie ganz. Der Zähler
-/// `schwaerzung_stand` am Kopf reist mit der Lieferung zum Spiegel, der daran seine eigene
-/// Bruchstelle räumt (LLH-1649, `instanz::spiegel::fuehrung::raeume_bruchstelle`).
+/// Die neue Zufallsmarke `schwaerzung_marke` am Kopf reist mit der Lieferung zum Spiegel, der
+/// daran seine eigene Bruchstelle räumt (LLH-1649, `instanz::spiegel::fuehrung::raeume_bruchstelle`).
 pub(crate) async fn nach_schwaerzung_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -1255,7 +1255,7 @@ pub(crate) async fn nach_schwaerzung_tx(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    sqlx::query("UPDATE einsatz SET schwaerzung_stand = schwaerzung_stand + 1 WHERE id = ?")
+    sqlx::query("UPDATE einsatz SET schwaerzung_marke = lower(hex(randomblob(8))) WHERE id = ?")
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
@@ -1848,9 +1848,10 @@ mod tests {
             }
         };
         assert_eq!(
-            zaehle("SELECT schwaerzung_stand FROM einsatz WHERE id = ?").await,
+            zaehle("SELECT COUNT(*) FROM einsatz WHERE id = ? AND schwaerzung_marke IS NOT NULL")
+                .await,
             1,
-            "der Zähler trägt die Schwärzung zum Spiegel (LLH-1649)"
+            "die Marke trägt die Schwärzung zum Spiegel (LLH-1649)"
         );
         assert_eq!(
             zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,

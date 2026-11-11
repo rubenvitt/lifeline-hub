@@ -487,11 +487,11 @@ async fn kopf_uebernehmen(
     werte.retain(|(s, _)| s != "id" && s != "kennung");
     werte.push(("kennung".into(), Value::from(l.kennung.clone())));
     if let Some(id) = vorhanden {
-        let stand_vorher = schwaerzung_stand(conn, id).await?;
+        let marke_vorher = schwaerzung_marke(conn, id).await?;
         update(conn, t.name, &werte, "id", &id.to_string()).await?;
         // Hat der Führer seither geschwärzt, räumt der Spiegel seine Bruchstelle (LLH-1649).
-        // Ein Führer ohne Zähler (älterer Stand) schickt keinen; dann bleibt alles, wie es ist.
-        if schwaerzung_stand(conn, id).await? > stand_vorher {
+        // Ein Führer ohne Marke (älterer Stand) schickt keine; dann bleibt alles, wie es ist.
+        if schwaerzung_marke(conn, id).await? != marke_vorher {
             super::fuehrung::raeume_bruchstelle(conn, id).await?;
         }
         return Ok(id);
@@ -527,10 +527,13 @@ async fn kopf_uebernehmen(
     Ok(id)
 }
 
-/// Wie oft am Einsatz geschwärzt wurde (LLH-1649).
-async fn schwaerzung_stand(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<i64, AppError> {
+/// Die Marke der letzten Schwärzung am Einsatz (LLH-1649).
+async fn schwaerzung_marke(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Option<String>, AppError> {
     Ok(
-        sqlx::query_scalar("SELECT schwaerzung_stand FROM einsatz WHERE id = ?")
+        sqlx::query_scalar("SELECT schwaerzung_marke FROM einsatz WHERE id = ?")
             .bind(einsatz_id)
             .fetch_one(&mut *conn)
             .await?,

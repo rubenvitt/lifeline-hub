@@ -239,9 +239,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("retention_gesetzt_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
-            // Zählt jede Schwärzung am Einsatz; der Spiegel räumt daran seine Bruchstelle
-            // (LLH-1649).
-            retain("schwaerzung_stand", G_ZAEHLER),
+            // Neue Zufallsmarke je Schwärzung am Einsatz, kein Inhalt; der Spiegel räumt daran
+            // seine Bruchstelle (LLH-1649).
+            retain("schwaerzung_marke", G_SPIEGEL),
             // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
             retain("kennung", G_SPIEGEL),
             retain("freigabestufe", G_ENUM),
@@ -3292,9 +3292,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // Zeilen (Freitext, Personendaten), darum mit dem Einsatz weg. Das JSON sagt nicht, welche
     // Kategorie oder Person darin steht; deshalb geht sie bei jeder Schwärzung ganz
     // (`einsatz::repo::nach_schwaerzung_tx`). Am Spiegel laufen diese Wege nicht: Er räumt sie,
-    // sobald der Kopf einen höheren `einsatz.schwaerzung_stand` bringt
-    // (`instanz::spiegel::fuehrung::raeume_bruchstelle`, LLH-1649), und mit dem Einsatz beim
-    // Abräumen (Kaskade).
+    // sobald der Kopf eine andere `einsatz.schwaerzung_marke` bringt
+    // (`instanz::spiegel::fuehrung::raeume_bruchstelle`, LLH-1649): Kopien und Geklärtes gehen,
+    // offene Zeilen ohne Kopie werden weiter gefragt. Mit dem Einsatz geht alles beim Abräumen
+    // (Kaskade).
     TabellenRegel {
         tabelle: "einsatz_bruchstelle",
         scoping: Scoping::EinsatzId,

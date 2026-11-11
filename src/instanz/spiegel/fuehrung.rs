@@ -541,29 +541,37 @@ async fn uebernimm_bruch_antwort(
     Ok(Some(einsatz_id))
 }
 
-/// Räumt am Spiegel die ganze Bruchstelle eines Einsatzes (LLH-1649): Der Führer hat geschwärzt,
-/// sein Kopf bringt einen höheren `einsatz.schwaerzung_stand`. Wie beim Führer
-/// (`einsatz::repo::nach_schwaerzung_tx`) geht sie ganz, weil das JSON nicht sagt, welche
-/// Kategorie oder Person darin steht. Auch eine noch offene Bruchstelle endet damit: Der Spiegel
-/// fragt nicht mehr; was davon hier noch als Zeile steht, bleibt bis zum Abräumen des Spiegels
-/// (mit Ruben am 11.11.2026 abgestimmt). Liefert, ob etwas geräumt wurde.
+/// Räumt am Spiegel die Bruchstelle eines Einsatzes (LLH-1649): Der Führer hat geschwärzt, sein
+/// Kopf bringt eine andere `einsatz.schwaerzung_marke`. Wie beim Führer
+/// (`einsatz::repo::nach_schwaerzung_tx`) geht jede gesicherte Kopie (`daten`), weil das JSON
+/// nicht sagt, welche Kategorie oder Person darin steht; geklärte und entfernte Zeilen gehen ganz.
+/// Eine noch offene Zeile steht hier noch als lokale Zeile und kann Daten tragen, die der Führer
+/// nie schwärzen kann: Sie bleibt ohne Kopie in der Bruchstelle und wird weiter gefragt; kennt der
+/// Führer sie nicht, entfernt [`uebernimm_bruch_antwort`] sie wie bisher (mit Ruben am 11.11.2026
+/// abgestimmt, Review #1284). Ist nichts mehr offen, fragt der Spiegel nicht mehr.
 pub async fn raeume_bruchstelle(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
-) -> Result<bool, AppError> {
-    let zeilen = sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?
-        .rows_affected();
-    let offen = sqlx::query(
-        "UPDATE einsatz_spiegel SET bruch_offen = 0 WHERE einsatz_id = ? AND bruch_offen = 1",
+) -> Result<(), AppError> {
+    sqlx::query(
+        "DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ? AND (entfernt = 1 OR geklaert = 1)",
     )
     .bind(einsatz_id)
     .execute(&mut *conn)
-    .await?
-    .rows_affected();
-    Ok(zeilen > 0 || offen > 0)
+    .await?;
+    sqlx::query("UPDATE einsatz_bruchstelle SET daten = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "UPDATE einsatz_spiegel SET bruch_offen = 0 WHERE einsatz_id = ? AND bruch_offen = 1 \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_bruchstelle WHERE einsatz_id = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 // ── Übergabe und Anfrage ─────────────────────────────────────────────────────────────────────
