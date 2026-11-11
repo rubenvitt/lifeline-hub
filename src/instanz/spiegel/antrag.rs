@@ -683,14 +683,17 @@ pub async fn etb_beantragen_tx(
         "ereigniszeit": jetzt,
         "client_id": client_id,
     });
+    // Ohne Verweise sind die Daten beim Führer und hier dieselben (LLH-1641, E5).
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, benutzer_id, \
-         client_id, erfasst_at, geaendert_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, daten_lokal, \
+         benutzer_id, client_id, erfasst_at, geaendert_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+         RETURNING id",
     )
     .bind(einsatz_id)
     .bind(b.art)
     .bind(b.methode)
     .bind(b.pfad)
+    .bind(daten.to_string())
     .bind(daten.to_string())
     .bind(benutzer_id)
     .bind(&client_id)
@@ -1084,25 +1087,30 @@ async fn ausfuehren_innen(
 /// Führer den Antrag schon ausgeführt hatte. Liefert die Einsätze, deren Anträge sich änderten.
 pub async fn fuehre_eigene_aus(pool: &SqlitePool, router: &Router) -> Result<Vec<i64>, AppError> {
     #[allow(clippy::type_complexity)]
-    let offen: Vec<(i64, i64, String, String, String, String, Option<String>, i64)> =
+    let offen: Vec<(i64, i64, String, String, String, String, Option<String>, String, i64)> =
         sqlx::query_as(
             "SELECT a.id, a.einsatz_id, a.art, a.methode, a.pfad_vorlage, a.pfad_lokal, \
-             a.daten_lokal, a.benutzer_id FROM spiegel_antrag a JOIN einsatz e ON e.id = a.einsatz_id \
+             a.daten_lokal, a.daten, a.benutzer_id FROM spiegel_antrag a \
+             JOIN einsatz e ON e.id = a.einsatz_id \
              WHERE e.spiegel = 0 AND a.zustand IN ('ausstehend', 'zugestellt') ORDER BY a.id LIMIT ?",
         )
         .bind(ANTRAEGE_MAX as i64)
         .fetch_all(pool)
         .await?;
     let mut einsaetze = Vec::new();
-    for (id, einsatz_id, art, methode, pfad, pfad_lokal, daten_lokal, benutzer) in offen {
-        let ergebnis = match (
-            BEANTRAGBAR
-                .iter()
-                .find(|b| b.art == art && b.pfad == pfad && b.methode == methode),
-            daten_lokal,
-        ) {
+    for (id, einsatz_id, art, methode, pfad, pfad_lokal, daten_lokal, daten, benutzer) in offen {
+        let b = BEANTRAGBAR
+            .iter()
+            .find(|b| b.art == art && b.pfad == pfad && b.methode == methode);
+        // Ein Antrag ohne eigene Erfassung (vor Migration 0320 gestellt) geht mit den Daten für
+        // den Führer, wenn darin keine Kennung steht: Dann sind sie hier dieselben.
+        let daten_lokal = daten_lokal.or_else(|| {
+            b.filter(|b| ohne_kennungen(b, &pfad_lokal, &daten))
+                .map(|_| daten)
+        });
+        let ergebnis = match (b, daten_lokal) {
             (Some(b), Some(daten)) => {
-                eigen_ausfuehren(router, b, einsatz_id, &pfad_lokal, daten, benutzer).await?
+                eigen_ausfuehren(router, b, id, einsatz_id, &pfad_lokal, daten, benutzer).await?
             }
             _ => Some(Err("Führung gewechselt; bitte neu erfassen.".to_string())),
         };
@@ -1137,10 +1145,29 @@ pub async fn fuehre_eigene_aus(pool: &SqlitePool, router: &Router) -> Result<Vec
     Ok(einsaetze)
 }
 
-/// Ein eigener Antrag über den Router. `None`: vorübergehend gescheitert (5xx).
+/// Trägt ein Antrag keine Kennung in Pfad und Body? Dann gelten seine Daten beim Führer und
+/// hier gleich.
+fn ohne_kennungen(b: &Beantragbar, pfad_lokal: &str, daten: &str) -> bool {
+    let pfad_leer = serde_json::from_str::<serde_json::Map<String, Value>>(pfad_lokal)
+        .is_ok_and(|m| m.is_empty());
+    let Ok(wert) = serde_json::from_str::<Value>(daten) else {
+        return false;
+    };
+    pfad_leer
+        && b.body_verweise.iter().all(|v| {
+            let mut kopie = wert.clone();
+            let mut werte = Vec::new();
+            jeder_wert(&mut kopie, v.pfad, &mut werte);
+            werte.iter().all(|w| w.is_null())
+        })
+}
+
+/// Ein eigener Antrag über den Router. `None`: vorübergehend gescheitert (5xx) oder wieder als
+/// Antrag angenommen (202).
 async fn eigen_ausfuehren(
     router: &Router,
     b: &Beantragbar,
+    antrag_id: i64,
     einsatz_id: i64,
     pfad_lokal: &str,
     daten: String,
@@ -1184,13 +1211,24 @@ async fn eigen_ausfuehren(
         tracing::warn!(%status, "Eigener Antrag nach Führungswechsel vorübergehend gescheitert");
         return Ok(None);
     }
-    if status.is_success() {
-        return Ok(Some(Ok(())));
-    }
     let rumpf = axum::body::to_bytes(antwort.into_body(), 1024 * 1024)
         .await
         .unwrap_or_default();
     let wert: Value = serde_json::from_slice(&rumpf).unwrap_or(Value::Null);
+    if status == StatusCode::ACCEPTED {
+        // Die Führung ist inzwischen wieder gewechselt, und die Route hat einen Antrag
+        // angenommen. Ist es dieser (gleiche `client_id`), bleibt er und geht an den Führer.
+        // Ist es ein neuer, ersetzt der den alten.
+        let neu = wert.pointer("/antrag/id").and_then(Value::as_i64);
+        return Ok(if neu == Some(antrag_id) {
+            None
+        } else {
+            Some(Ok(()))
+        });
+    }
+    if status.is_success() {
+        return Ok(Some(Ok(())));
+    }
     Ok(Some(Err(if status == StatusCode::NOT_FOUND {
         "Bezug nicht mehr vorhanden.".to_string()
     } else {

@@ -294,7 +294,7 @@ pub async fn beantworte_bruch(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let bis = fragen.iter().take(BRUCH_MAX).last().cloned();
+    let bis = fragen[..fragen.len().min(BRUCH_MAX)].last().cloned();
     if herkunft.flatten() != Some(kopplung_id) {
         return Ok(BruchAntwort {
             kennung: kennung.to_string(),

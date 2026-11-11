@@ -1553,6 +1553,85 @@ async fn ein_offener_antrag_am_spiegel_wird_beim_wechsel_genau_einmal_ausgefuehr
     assert_eq!(offen, 0, "ausgeführt und erledigt");
 }
 
+/// Anträge ohne eigene Erfassung gehen beim Wechsel nicht verloren (Review LLH-1641): der
+/// ETB-Antrag einer Freigabe (`etb_beantragen_tx`) und ein Antrag aus der Zeit vor Migration 0320
+/// (`daten_lokal` leer, keine Kennungen darin).
+#[tokio::test]
+async fn antraege_ohne_eigene_erfassung_werden_beim_wechsel_ausgefuehrt() {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, _) = gemeinsames_konto(&hub, &elw, "erika").await;
+    sqlx::query("UPDATE benutzer SET passwort_wechsel_pflicht = 0")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let erika = common::login_cookie(&hub.app, "erika", "erikapw12345").await;
+    let erika_hub: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'erika'")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    let h = einsatz_der_akte(&hub, akte).await;
+
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{h}/etb"),
+        &erika,
+        Some(
+            &json!({"von": "Stab", "an": "EL", "typ": "meldung", "inhalt": "Alter Antrag",
+                     "anhang_ids": [], "client_id": "c-alt"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    sqlx::query("UPDATE spiegel_antrag SET daten_lokal = NULL")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let mut conn = hub.pool.acquire().await.unwrap();
+    lifeline_hub::instanz::spiegel::antrag::etb_beantragen_tx(
+        &mut conn,
+        h,
+        erika_hub,
+        lifeline_hub::etb::EtbTyp::Meldung,
+        "Lagebild freigegeben",
+        "Stab",
+        "EL",
+    )
+    .await
+    .unwrap();
+    drop(conn);
+
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    for _ in 0..2 {
+        lifeline_hub::instanz::spiegel::takt::durchlauf(&hub.pool, Some(&hub.app), true)
+            .await
+            .unwrap();
+        abgleichen(&elw).await;
+    }
+    assert_eq!(
+        etb_nummern(&hub, h).await.len(),
+        2,
+        "beide Anträge stehen am Hub"
+    );
+    let offen: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT zustand, grund FROM spiegel_antrag")
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert!(offen.is_empty(), "ausgeführt und erledigt: {offen:?}");
+}
+
 #[tokio::test]
 async fn ein_anhang_den_der_neue_fuehrer_nicht_hat_kommt_vom_alten() {
     let (hub, elw) = gekoppelt().await;
