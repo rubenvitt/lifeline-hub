@@ -192,16 +192,18 @@ mod tests {
         );
     }
 
-    /// Lokaler Server, der `stuecke` × `laenge` Bytes ohne `Content-Length` (chunked) liefert.
-    async fn streamender_server(stuecke: usize, laenge: usize, inhalt: u8) -> String {
+    /// Lokaler Server, der `teile` nacheinander ohne `Content-Length` (chunked) liefert.
+    async fn streamender_server(teile: Vec<Vec<u8>>) -> String {
         use axum::{body::Body, routing::get, Router};
         let app = Router::new().route(
             "/m.json",
-            get(move || async move {
-                let s = futures::stream::iter(
-                    (0..stuecke).map(move |_| Ok::<_, std::io::Error>(vec![inhalt; laenge])),
-                );
-                Body::from_stream(s)
+            get(move || {
+                let teile = teile.clone();
+                async move {
+                    Body::from_stream(futures::stream::iter(
+                        teile.into_iter().map(Ok::<_, std::io::Error>),
+                    ))
+                }
             }),
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -214,33 +216,19 @@ mod tests {
 
     #[tokio::test]
     async fn manifest_ohne_laengenangabe_ueber_der_grenze_wird_verworfen() {
-        // 2 MiB Leerzeichen, chunked: vorab greift kein Content-Length, der Lese-Guard muss.
-        let url = streamender_server(32, 64 * 1024, b' ').await;
+        // `[]` und dann 2 MiB Leerraum, chunked: ohne Grenze wäre das ein gültiges, leeres
+        // Manifest. Vorab greift kein Content-Length, also muss der Lese-Guard verwerfen.
+        let mut teile = vec![b"[]".to_vec()];
+        teile.extend((0..32).map(|_| vec![b' '; 64 * 1024]));
+        let url = streamender_server(teile).await;
         let client = reqwest::Client::new();
         assert!(hole_manifest_von(&client, &url).await.is_none());
     }
 
     #[tokio::test]
     async fn manifest_ohne_laengenangabe_unter_der_grenze_wird_gelesen() {
-        // `[]` gefolgt von Leerraum, chunked, deutlich unter 1 MiB → leere Liste.
-        let url = {
-            use axum::{body::Body, routing::get, Router};
-            let app = Router::new().route(
-                "/m.json",
-                get(|| async {
-                    let teile = vec![b"[".to_vec(), vec![b' '; 4096], b"]".to_vec()];
-                    Body::from_stream(futures::stream::iter(
-                        teile.into_iter().map(Ok::<_, std::io::Error>),
-                    ))
-                }),
-            );
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tokio::spawn(async move {
-                axum::serve(listener, app).await.unwrap();
-            });
-            format!("http://127.0.0.1:{}/m.json", addr.port())
-        };
+        // `[]` mit Leerraum, chunked, deutlich unter 1 MiB → leere Liste.
+        let url = streamender_server(vec![b"[".to_vec(), vec![b' '; 4096], b"]".to_vec()]).await;
         let client = reqwest::Client::new();
         assert_eq!(
             hole_manifest_von(&client, &url).await.map(|v| v.len()),
