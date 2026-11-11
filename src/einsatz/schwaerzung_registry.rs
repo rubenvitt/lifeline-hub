@@ -1431,7 +1431,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Eingeteilte Personen eines Planblocks (LLH-1552, Mig 0277): nur Verweise; die Namen stecken
-    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN. `id` seit Mig 0316
+    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN. `id` seit Mig 0318
     // (LLH-1630).
     TabellenRegel {
         tabelle: "einsatz_planschicht_person",
