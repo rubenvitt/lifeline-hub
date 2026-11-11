@@ -138,13 +138,14 @@ const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
 /** „Stand melden“ als Primäraktion der Zeile: EINE Quelle für Spalte und Kontextmenü (LLH-1598). */
 function standMelden(
-  darfSchreiben: boolean,
+  /** Am Spiegel ein Antrag, auch ohne Schreibrecht (LLH-1492). */
+  darfMelden: boolean,
   onStandMelden: (b: Evakuierungsbezirk) => void,
 ): PrimaerAktion<Evakuierungsbezirk> {
   return {
     etikett: 'Stand melden',
     zugaenglicherName: (b) => `Stand melden für Bezirk ${b.bezeichnung}`,
-    sichtbar: () => darfSchreiben,
+    sichtbar: () => darfMelden,
     onKlick: onStandMelden,
   };
 }
@@ -325,6 +326,7 @@ export default function BezirkTabelle({
   bezirke,
   ladend,
   darfSchreiben,
+  darfMelden = darfSchreiben,
   onStandMelden,
   onAktion,
 }: {
@@ -332,6 +334,8 @@ export default function BezirkTabelle({
   bezirke: readonly Evakuierungsbezirk[];
   ladend: boolean;
   darfSchreiben: boolean;
+  /** „Stand melden“ (LLH-1492: am Spiegel ein Antrag); Vorgabe `darfSchreiben`. */
+  darfMelden?: boolean;
   onStandMelden: (b: Evakuierungsbezirk) => void;
   onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void;
 }) {
@@ -354,10 +358,7 @@ export default function BezirkTabelle({
     () => (abschnittNamen ? abschnittNamen.split('\n').map((n) => ({ text: n, value: n })) : []),
     [abschnittNamen],
   );
-  const aktion = useMemo(
-    () => standMelden(darfSchreiben, onStandMelden),
-    [darfSchreiben, onStandMelden],
-  );
+  const aktion = useMemo(() => standMelden(darfMelden, onStandMelden), [darfMelden, onStandMelden]);
   const weitere = useMemo(
     () => bezirkWeitere(darfSchreiben, karteGesperrt, onAktion),
     [darfSchreiben, karteGesperrt, onAktion],

@@ -75,21 +75,22 @@ impl Ankuendigung {
     /// Zeitpunkt (Termin + Versatz) liegt in `(jetzt − NACHHOLEN, jetzt]`, also der Termin in
     /// `(?1, ?2]`. Die Zeiten sind kanonisch (`crate::zeit::FORMAT`), der Textvergleich ordnet
     /// richtig.
-    fn sql_faellige(self) -> &'static str {
-        match self {
-            Ankuendigung::Vorher => {
-                "SELECT id, naechste_lagebesprechung_at FROM einsatz \
-                 WHERE status = 'aktiv' AND lagebesprechung_angekuendigt_vorher_at IS NULL \
-                   AND naechste_lagebesprechung_at > ?1 AND naechste_lagebesprechung_at <= ?2 \
-                 ORDER BY id"
-            }
-            Ankuendigung::Faellig => {
-                "SELECT id, naechste_lagebesprechung_at FROM einsatz \
-                 WHERE status = 'aktiv' AND lagebesprechung_angekuendigt_faellig_at IS NULL \
-                   AND naechste_lagebesprechung_at > ?1 AND naechste_lagebesprechung_at <= ?2 \
-                 ORDER BY id"
-            }
-        }
+    ///
+    /// Spiegel bleiben aus (LLH-1492, design.md D10): ihren Termin kündigt der Führer an, und der
+    /// Merker an einem Spiegel scheiterte am Schutz-Trigger samt allen Einsätzen dahinter.
+    fn sql_faellige(self) -> String {
+        let merker = match self {
+            Ankuendigung::Vorher => "lagebesprechung_angekuendigt_vorher_at",
+            Ankuendigung::Faellig => "lagebesprechung_angekuendigt_faellig_at",
+        };
+        format!(
+            "SELECT id, naechste_lagebesprechung_at FROM einsatz \
+             WHERE status = 'aktiv' AND {merker} IS NULL \
+               AND naechste_lagebesprechung_at > ?1 AND naechste_lagebesprechung_at <= ?2 \
+               AND {} \
+             ORDER BY id",
+            crate::einsatz::spiegel_filter::nicht_gespiegelt("einsatz.id")
+        )
     }
 
     /// Setzt den Merker, solange der Termin noch der gelesene ist und der Merker leer.
@@ -136,11 +137,12 @@ async fn ankuendigen_fuer(
     // Termin = Zeitpunkt − Versatz; der Zeitpunkt liegt in (jetzt − NACHHOLEN, jetzt].
     let bis = jetzt - Duration::minutes(ankuendigung.versatz_minuten());
     let ab = bis - Duration::minutes(NACHHOLEN_MINUTEN);
-    let faellige: Vec<(i64, String)> = sqlx::query_as(ankuendigung.sql_faellige())
-        .bind(crate::zeit::formatiere_utc(ab))
-        .bind(crate::zeit::formatiere_utc(bis))
-        .fetch_all(pool)
-        .await?;
+    let faellige: Vec<(i64, String)> =
+        sqlx::query_as(sqlx::AssertSqlSafe(ankuendigung.sql_faellige()))
+            .bind(crate::zeit::formatiere_utc(ab))
+            .bind(crate::zeit::formatiere_utc(bis))
+            .fetch_all(pool)
+            .await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let mut anzahl = 0;
     for (einsatz_id, termin) in faellige {
@@ -167,4 +169,63 @@ async fn ankuendigen_fuer(
         anzahl += 1;
     }
     Ok(anzahl)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn t(s: &str) -> DateTime<Utc> {
+        crate::zeit::parse_utc(s).unwrap()
+    }
+
+    /// LLH-1492 (design.md D10): ein Spiegel wird nicht angekündigt, und sein Merker bleibt leer.
+    /// Der Spiegel steht vor dem eigenen Einsatz; versuchte der Lauf ihn zu merken, bräche das am
+    /// Schutz-Trigger ab und nähme den eigenen Einsatz mit.
+    #[tokio::test]
+    async fn spiegel_wird_ausgelassen_und_haelt_den_eigenen_nicht_auf() {
+        let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut ids = Vec::new();
+        for bezeichnung in ["Spiegel", "Eigen"] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung, naechste_lagebesprechung_at) \
+                 VALUES (1, ?, '2026-06-11 10:10:00') RETURNING id",
+            )
+            .bind(bezeichnung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            ids.push(id);
+        }
+        let (spiegel, eigen) = (ids[0], ids[1]);
+        crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, spiegel).await;
+
+        let live = LiveHub::new();
+        assert_eq!(ankuendigen(&pool, &live, t("2026-06-11 10:00:00")).await, 1);
+
+        let merker = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Option<String>>(
+                    "SELECT lagebesprechung_angekuendigt_vorher_at FROM einsatz WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(merker(eigen).await.as_deref(), Some("2026-06-11 10:00:00"));
+        assert_eq!(merker(spiegel).await, None);
+        let log = puffer.text();
+        assert!(
+            !log.contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
+            "{log}"
+        );
+    }
 }

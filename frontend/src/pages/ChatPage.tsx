@@ -610,7 +610,7 @@ export default function ChatPage() {
           {/* Statt der Eingabe: „Nur Ansicht · Grund“, kein Satz (LFH-1078). */}
           {!darfSchreiben && (
             <div style={{ marginTop: token.marginSM }}>
-              <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+              <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
             </div>
           )}
         </Col>

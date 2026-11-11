@@ -2,7 +2,7 @@
 
 Stand: 23.10.2026 (alpha dcc500f5).
 
-Dieses Kapitel zeigt acht Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
+Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
 stehen in den genannten Dateien und Bereichs-`AGENTS.md` und werden hier nicht wiederholt.
 
@@ -14,6 +14,8 @@ stehen in den genannten Dateien und Bereichs-`AGENTS.md` und werden hier nicht w
 | 6.4 | Schreiben ohne Netz und Nachsenden | `frontend/src/offline`, `src/routes` |
 | 6.5 | Lagebild ohne Netz lesen | `frontend/src/offline`, `frontend/src/auth`, Service Worker |
 | 6.6 | Gerät koppeln und Funktionsansicht | `src/geraet`, `frontend/src/geraet` |
+| 6.6a | Instanzen koppeln und melden | `src/instanz`, `src/routes` |
+| 6.6b | Einsatz spiegeln und am Spiegel beantragen | `src/instanz` (`spiegel`), `src/auth`, `src/live` |
 | 6.7 | Kartenkacheln über Proxy, Cache und Offline-Karte | `src/karte`, `karten-service` |
 | 6.8 | Benachrichtigung und Web Push | `src/benachrichtigung`, `src/web_push`, `frontend/src/alarm` |
 
@@ -279,6 +281,62 @@ sequenceDiagram
   meldenden Seite trägt eine letzte Meldung, den der erreichten Seite die Antwort auf die nächste.
 - Neue Unterschriftsschlüssel nimmt E nur mit Gegenzeichnung eines bekannten an
   (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
+
+## 6.6b Einsatz spiegeln und am Spiegel beantragen
+
+Eine gekoppelte Instanz hält die Einsätze der zugeordneten Orgs, die sie nicht führt, als
+Spiegel (LLH-1492,
+[ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)).
+Das Diagramm zeigt den Fall „ELW führt, meldet sich beim Hub; am Hub entsteht ein Antrag“. Führt
+die erreichte Seite, kehrt sich nur um, wer liefert: Die meldende Seite nennt ihre `staende`, die
+Lieferung kommt in der Antwort, und die erreichte Seite führt Anträge vor ihrer Antwort aus.
+
+```mermaid
+sequenceDiagram
+  participant SB as frontend am Hub (Spiegel)
+  participant H as Hub, erreicht (src/instanz/spiegel/abgleich.rs)
+  participant E as ELW, meldet sich und führt (src/instanz/spiegel/takt.rs)
+  participant ER as ELW, eigener Router (src/app.rs)
+  SB->>H: POST /api/einsaetze/{id}/etb
+  H->>H: antrag::schicht: Spiegel, BEANTRAGBAR, Verweise lokal → fremd
+  H-->>SB: 202 {antrag: ausstehend}
+  loop Tick 1 s; je Kopplung 5 s bei Aktivität, sonst Takt der Meldung
+    E->>H: POST /api/instanz/spiegel {quittungen, antraege, staende, lieferungen ab spiegel_ziel, abrufe, anhang_teile}
+    H->>H: Lieferung übernehmen (Merker, spiegel_herkunft, Stand nur vorwärts)
+    H-->>E: {antraege (jetzt zugestellt), staende, abrufe, …} signiert
+    E->>E: spiegel_ziel = staende der Antwort
+    E->>ER: oneshot(POST …/etb) mit AntragAkteur
+    ER-->>E: 201 {id}, Quittung in spiegel_antrag_eingang
+  end
+  Note over H,E: nächste Runde: Quittung „übernommen“ und der neue Eintrag gehen zum Hub
+  H-->>SB: Live `lagged` je Einsatz, die Abfragen laden neu
+```
+
+- **Stand:** Trigger an jeder gespiegelten Tabelle schreiben `einsatz_aenderung` (Tabelle,
+  Schlüssel, global steigender `stand`, je Zeile höchstens einmal); geliefert werden die Zeilen
+  über dem Stand der spiegelnden Seite mit ihrem aktuellen Inhalt (`src/instanz/spiegel/liefern.rs`).
+  Einen niedrigeren Stand, etwa nach einer Wiederherstellung, beliefert der Führer neu ab dort.
+- **Paket:** Anfrage und Antwort sind dasselbe `SpiegelPaket`, je höchstens `SPIEGEL_MAX` = 2 MiB;
+  Lieferungen füllen das Budget bis auf `RESERVE`, Anträge und Quittungen stehen vorn
+  (`src/instanz/spiegel/paket.rs`). Übernommen wird je Einsatz in einer Transaktion unter dem
+  Merker `spiegel_uebernahme` (`src/instanz/spiegel/uebernehmen.rs`).
+- **Takt:** `--instanz-spiegel-sekunden` (Vorgabe 5, 2 bis 600, `src/config.rs`) gilt, solange
+  ein Einsatz der Kopplung aktiv ist, Anträge offen oder Anhänge angefordert sind; sonst der Takt
+  der Meldung. Fehler verdoppeln den Abstand bis 600 s; ein neuer Antrag oder eine Anforderung
+  weckt den Lauf (`takt::wecken`). Nur die meldende Seite läuft; ein Gegenüber unter
+  `PROTOKOLL_SPIEGEL` wird nicht abgeglichen (`abgleich::kann_spiegeln`).
+- **Anhänge:** Inhalte reisen zuerst nur mit Größe und Prüfsumme. Ein Abruf am Spiegel antwortet
+  409 „Der Anhang wird von der führenden Instanz geholt.“, fordert an und weckt. Die Stücke à
+  256 KiB kommen mit der nächsten Nachricht des Führers (liefert die meldende Seite, in weiteren
+  Runden desselben Abgleichs, `abgleich::RUNDEN_MAX`), angeforderte vor vorab geladenen, und
+  gelten erst nach passender Prüfsumme (`src/instanz/spiegel/anhang.rs`).
+- **Antrag:** 2xx beim Führer ist „übernommen“, 4xx „abgelehnt“ mit dem Text der Antwort, 5xx
+  kein Ergebnis (erneute Zustellung). Eine zweite Zustellung derselben Antrags-ID bekommt die
+  gespeicherte Quittung (`src/instanz/spiegel/antrag.rs`, `ausfuehren`). Am Spiegel verschwindet
+  ein übernommener Antrag erst, wenn `spiegel_herkunft` die entstandene Zeile kennt.
+- **Widerruf** einer Org-Zuordnung setzt `einsatz_spiegel.beendet_at`, lehnt offene Anträge ab
+  und löscht `spiegel_ziel`, in der Transaktion des Widerrufs (`instanz::spiegel::beende_fuer_zuordnung`).
+  Nachweis: `tests/instanz_spiegel.rs`.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

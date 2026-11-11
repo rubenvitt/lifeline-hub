@@ -1,0 +1,422 @@
+//! Abgleich der Einsätze über `POST /api/instanz/spiegel` (design.md D6, D7, D12).
+//!
+//! Die meldende Seite ruft, die erreichte antwortet; beide schicken dasselbe [`SpiegelPaket`].
+//! Führt die meldende Seite einen Einsatz, liefert sie ihn in der Anfrage und merkt sich den Stand
+//! aus der Antwort (`spiegel_ziel`, Push). Führt die erreichte Seite, nennt die meldende ihren
+//! Stand und bekommt die Lieferung in der Antwort (Pull). Den Stand nennt immer, wer spiegelt.
+
+use super::liefern::{self, Absender, Budget};
+use super::paket::{EinsatzStand, SpiegelPaket, RESERVE, SPIEGEL_MAX};
+use super::uebernehmen::{self, Empfaenger, Ergebnis};
+use crate::error::AppError;
+use crate::instanz::extractor::SPIEGEL_PFAD;
+use crate::instanz::identitaet::{self, Identitaet};
+use crate::instanz::melden::{self, SendError};
+use crate::instanz::repo::{self, KopplungZeile, OrgZeile};
+use crate::instanz::{org_kennung, InstanzKopplungRichtung, PROTOKOLL_SPIEGEL};
+use sqlx::{SqliteConnection, SqlitePool};
+use std::collections::HashMap;
+
+/// Was ein Abgleich an der eigenen Seite übernommen hat; nach dem Commit gemeldet.
+#[derive(Debug, Default)]
+pub struct Uebernommen {
+    /// Lokale Einsätze, deren Spiegel sich geändert hat.
+    pub einsaetze: Vec<i64>,
+    /// Davon neu angelegte Spiegel (Einsatzliste der Org).
+    pub neu: Vec<i64>,
+}
+
+/// Die Org-Kennung, unter der eine Lieferung reist: immer die Kennung der erreichten Seite, wie in
+/// Melden (`MeldenOrg::org`).
+fn org_wire(eigen: &Identitaet, kopplung: &KopplungZeile, o: &OrgZeile) -> String {
+    if kopplung.richtung() == Some(InstanzKopplungRichtung::WirdGemeldet) {
+        org_kennung(&eigen.kennung, o.org_id)
+    } else {
+        o.fremde_org_kennung.clone()
+    }
+}
+
+/// Stände der Spiegel dieser Instanz für eine Kopplung.
+async fn eigene_staende(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<Vec<EinsatzStand>, AppError> {
+    // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann die jüngsten. Ein
+    // abgeschlossener Spiegel, der hier fehlt, bekommt nichts mehr (der Führer liefert nur
+    // laufende Einsätze ungenannt).
+    let zeilen: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT s.fremde_kennung, s.stand FROM einsatz_spiegel s \
+         JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+         JOIN einsatz e ON e.id = s.einsatz_id \
+         WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
+         ORDER BY e.status = 'abgeschlossen', s.einsatz_id DESC LIMIT ?",
+    )
+    .bind(kopplung_id)
+    .bind(super::paket::EINSAETZE_MAX as i64)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(|(kennung, stand)| EinsatzStand { kennung, stand })
+        .collect())
+}
+
+/// Liefert die geführten Einsätze aller aktiven Orgs ab den genannten Ständen.
+async fn liefere_alle(
+    conn: &mut SqliteConnection,
+    eigen: &Identitaet,
+    kopplung: &KopplungZeile,
+    orgs: &[OrgZeile],
+    staende: &HashMap<String, i64>,
+    budget: &mut Budget,
+) -> Result<Vec<super::paket::EinsatzLieferung>, AppError> {
+    let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
+    let mut lieferungen = Vec::new();
+    for o in orgs {
+        let a = Absender {
+            kennung: &eigen.kennung,
+            kopplung_id: kopplung.id,
+            kopplung_org_id: o.id,
+            meldend,
+        };
+        let wire = org_wire(eigen, kopplung, o);
+        for e in liefern::list_gefuehrt(conn, o.org_id, staende).await? {
+            if lieferungen.len() >= super::paket::EINSAETZE_MAX {
+                return Ok(lieferungen);
+            }
+            let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
+            let seit = staende.get(&kennung).copied().unwrap_or(0);
+            if let Some(l) =
+                liefern::liefere_einsatz(conn, &a, &e, &kennung, &wire, seit, budget).await?
+            {
+                lieferungen.push(l);
+            }
+        }
+    }
+    Ok(lieferungen)
+}
+
+/// Übernimmt die Lieferungen eines Pakets; liefert die neuen Stände und was sich geändert hat.
+async fn uebernehme_alle(
+    conn: &mut SqliteConnection,
+    eigen: &Identitaet,
+    kopplung: &KopplungZeile,
+    orgs: &[OrgZeile],
+    paket: &SpiegelPaket,
+    uebernommen: &mut Uebernommen,
+) -> Result<Vec<EinsatzStand>, AppError> {
+    let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
+    let mut staende = Vec::new();
+    // Ein Gegenüber liefert nur Einsätze, die es selbst führt: ihre Kennung beginnt mit seiner.
+    let praefix = format!("{}/", kopplung.gegenueber_kennung);
+    for l in &paket.lieferungen {
+        let Some(o) = orgs.iter().find(|o| org_wire(eigen, kopplung, o) == l.org) else {
+            continue;
+        };
+        if !l.kennung.starts_with(&praefix) {
+            tracing::warn!(kennung = %l.kennung, "Spiegel: Lieferung eines fremden Einsatzes verworfen");
+            continue;
+        }
+        let e = Empfaenger {
+            kopplung_id: kopplung.id,
+            kopplung_org_id: o.id,
+            org_id: o.org_id,
+            meldend,
+        };
+        let vorher: Option<i64> =
+            sqlx::query_scalar("SELECT einsatz_id FROM einsatz_spiegel WHERE fremde_kennung = ?")
+                .bind(&l.kennung)
+                .fetch_optional(&mut *conn)
+                .await?;
+        // Ein Einsatz, der nicht übernommen werden kann, hält die anderen nicht an: sein
+        // Savepoint ist zurückgerollt, sein Stand bleibt, der Grund steht am Spiegel.
+        let erg: Ergebnis = match uebernehmen::uebernehmen(conn, &e, l).await {
+            Ok(erg) => erg,
+            Err(f) => {
+                tracing::warn!(kennung = %l.kennung, fehler = %f, "Spiegel: Lieferung nicht übernommen");
+                let stand: Option<i64> = sqlx::query_scalar(
+                    "SELECT stand FROM einsatz_spiegel WHERE fremde_kennung = ?",
+                )
+                .bind(&l.kennung)
+                .fetch_optional(&mut *conn)
+                .await?;
+                Ergebnis {
+                    einsatz_id: vorher,
+                    stand: stand.unwrap_or(0),
+                    hinweise: vec![format!("Lieferung nicht übernommen: {f}")],
+                    ..Default::default()
+                }
+            }
+        };
+        if !erg.hinweise.is_empty() {
+            tracing::warn!(kennung = %l.kennung, hinweise = ?erg.hinweise, "Spiegel: Hinweise beim Übernehmen");
+            if let Some(id) = erg.einsatz_id {
+                save_hinweis(conn, id, &erg.hinweise).await?;
+            }
+        }
+        if let Some(id) = erg.einsatz_id {
+            if !erg.kategorien.is_empty() {
+                uebernommen.einsaetze.push(id);
+                if vorher.is_none() {
+                    uebernommen.neu.push(id);
+                }
+            }
+        }
+        staende.push(EinsatzStand {
+            kennung: l.kennung.clone(),
+            stand: erg.stand,
+        });
+    }
+    Ok(staende)
+}
+
+async fn save_hinweis(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    hinweise: &[String],
+) -> Result<(), AppError> {
+    let text: String = hinweise
+        .iter()
+        .take(20)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n");
+    sqlx::query("UPDATE einsatz_spiegel SET hinweis = ? WHERE einsatz_id = ?")
+        .bind(text)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Meldet nach dem Commit, was sich geändert hat: `lagged` an die Clients des Einsatzes (ein
+/// Vollabgleich, ohne Module zu verraten, design.md D7, Nachtrag) und die Einsatzliste der Org für
+/// neue Spiegel.
+pub async fn melde_live(pool: &SqlitePool, u: &Uebernommen) {
+    let Some(live) = crate::instanz::stammdaten::live() else {
+        return;
+    };
+    let mut gemeldet = std::collections::BTreeSet::new();
+    for id in u.einsaetze.iter().filter(|id| gemeldet.insert(**id)) {
+        live.publiziere_event(
+            *id,
+            crate::live::LiveEvent::Lagged,
+            format!(r#"{{"einsatz_id":{id}}}"#),
+        );
+    }
+    for id in &u.neu {
+        crate::live::org::einsatzliste_melden(pool, live, *id, &[]).await;
+    }
+}
+
+// ── Erreichte Seite ──────────────────────────────────────────────────────────────────────────
+
+/// Beantwortet einen Abgleich (Handler `POST /api/instanz/spiegel`).
+pub async fn handle_abgleich(
+    pool: &SqlitePool,
+    router: Option<&axum::Router>,
+    eigen: &Identitaet,
+    kopplung: &KopplungZeile,
+    anfrage: &SpiegelPaket,
+) -> Result<SpiegelPaket, AppError> {
+    if kopplung.richtung() != Some(InstanzKopplungRichtung::WirdGemeldet) {
+        return Err(AppError::Forbidden);
+    }
+    anfrage.check().map_err(AppError::Validation)?;
+    // Anträge an Einsätze, die hier geführt werden: außerhalb der Transaktion ausführen, denn
+    // jeder läuft durch seine Route mit eigener Schreibtransaktion (D11).
+    let mut quittungen = Vec::new();
+    if let Some(router) = router {
+        for a in &anfrage.antraege {
+            if let Some(q) = super::antrag::ausfuehren(pool, router, kopplung, false, a).await? {
+                quittungen.push(q);
+            }
+        }
+    }
+    let mut uebernommen = Uebernommen::default();
+    let antwort = crate::write_retry!(pool, |conn| {
+        uebernommen = Uebernommen::default();
+        let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+        let staende_antwort =
+            uebernehme_alle(conn, eigen, kopplung, &orgs, anfrage, &mut uebernommen).await?;
+        let staende: HashMap<String, i64> = anfrage
+            .staende
+            .iter()
+            .map(|s| (s.kennung.clone(), s.stand))
+            .collect();
+        // Pull: den Stand, den die spiegelnde Seite nennt, für die Seite „Instanzkopplung“ merken
+        // (wie im Push aus der Antwort). Nur eigene Einsätze der Org der Zuordnung.
+        for s in &anfrage.staende {
+            for o in &orgs {
+                sqlx::query(
+                    "INSERT INTO spiegel_ziel (kopplung_org_id, einsatz_id, stand) \
+                     SELECT ?, id, ? FROM einsatz WHERE kennung = ? AND org_id = ? AND spiegel = 0 \
+                     ON CONFLICT (kopplung_org_id, einsatz_id) DO UPDATE SET stand = excluded.stand",
+                )
+                .bind(o.id)
+                .bind(s.stand)
+                .bind(&s.kennung)
+                .bind(o.org_id)
+                .execute(&mut *conn)
+                .await?;
+            }
+        }
+        let fertig =
+            super::anhang::uebernehme_teile(conn, kopplung.id, &anfrage.anhang_teile).await?;
+        uebernommen.einsaetze.extend(fertig);
+        let quittiert =
+            super::antrag::quittungen_uebernehmen(conn, kopplung.id, &anfrage.quittungen).await?;
+        uebernommen.einsaetze.extend(quittiert);
+        // Anträge stehen vorn (D8) und zählen ins Budget.
+        let (antraege, antrag_bytes) =
+            super::antrag::offene_antraege(conn, kopplung.id, false).await?;
+        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
+        let lieferungen = liefere_alle(conn, eigen, kopplung, &orgs, &staende, &mut budget).await?;
+        let anhang_teile =
+            super::anhang::liefere_teile(conn, kopplung.id, &anfrage.abrufe, budget.bytes).await?;
+        let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
+        let ids: Vec<i64> = antraege.iter().map(|a| a.id).collect();
+        super::antrag::markiere_zugestellt(conn, &ids).await?;
+        Ok(SpiegelPaket {
+            staende: staende_antwort,
+            lieferungen,
+            abrufe,
+            anhang_teile,
+            antraege,
+            quittungen: quittungen.clone(),
+        })
+    })?;
+    melde_live(pool, &uebernommen).await;
+    Ok(antwort)
+}
+
+// ── Meldende Seite ───────────────────────────────────────────────────────────────────────────
+
+/// Ob das Gegenüber den Abgleich kennt (Spec `einsatz-spiegel`, Protokoll).
+pub fn kann_spiegeln(kopplung: &KopplungZeile) -> bool {
+    kopplung
+        .gegenueber_protokoll
+        .is_some_and(|p| p >= i64::from(PROTOKOLL_SPIEGEL))
+}
+
+/// Höchstzahl Runden eines Abgleichs, wenn das Gegenüber Inhalte abruft (D8, Push).
+const RUNDEN_MAX: usize = 4;
+
+/// Gleicht einmal mit einer Kopplung ab, in der diese Instanz sich meldet. Ruft die erreichte
+/// Seite Inhalte ab, folgen ihre Stücke in weiteren Runden desselben Abgleichs.
+pub async fn abgleich_einmal(
+    pool: &SqlitePool,
+    router: Option<&axum::Router>,
+    kopplung: &KopplungZeile,
+) -> Result<(), SendError> {
+    let fehler = |e: AppError| SendError::Netz(e.to_string());
+    let eigen = identitaet::load_or_create(pool)
+        .await
+        .map_err(|e| SendError::Netz(e.to_string()))?;
+    let mut abgerufen: Vec<super::paket::AnhangAbruf> = Vec::new();
+    for runde in 0..RUNDEN_MAX {
+        let anfrage = crate::write_retry!(pool, |conn| {
+            let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+            let staende = eigene_staende(conn, kopplung.id).await?;
+            let ziele: Vec<(String, i64)> = sqlx::query_as(
+                "SELECT e.kennung, z.stand FROM spiegel_ziel z JOIN einsatz e ON e.id = z.einsatz_id \
+                 JOIN instanz_kopplung_org o ON o.id = z.kopplung_org_id \
+                 WHERE o.kopplung_id = ? AND e.kennung IS NOT NULL",
+            )
+            .bind(kopplung.id)
+            .fetch_all(&mut *conn)
+            .await?;
+            let ziele: HashMap<String, i64> = ziele.into_iter().collect();
+            // Anträge stehen vorn (D8) und zählen ins Budget.
+            let (antraege, antrag_bytes) =
+                super::antrag::offene_antraege(conn, kopplung.id, true).await?;
+            let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
+            let lieferungen =
+                liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
+            let anhang_teile =
+                super::anhang::liefere_teile(conn, kopplung.id, &abgerufen, budget.bytes).await?;
+            let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
+            let quittungen = super::antrag::offene_quittungen(conn, kopplung.id).await?;
+            Ok(SpiegelPaket {
+                staende,
+                lieferungen,
+                abrufe,
+                anhang_teile,
+                antraege,
+                quittungen,
+            })
+        })
+        .map_err(fehler)?;
+        let antwort = melden::send_signed_bis::<_, SpiegelPaket>(
+            &eigen,
+            kopplung,
+            SPIEGEL_PFAD,
+            &anfrage,
+            SPIEGEL_MAX,
+        )
+        .await?
+        .wert;
+        antwort.check().map_err(SendError::AntwortUngueltig)?;
+        let mut uebernommen = Uebernommen::default();
+        crate::write_retry!(pool, |conn| {
+            uebernommen = Uebernommen::default();
+            let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+            // Push: was die erreichte Seite übernommen hat. Ein niedrigerer Stand
+            // (Wiederherstellung, verlorener Spiegel) setzt zurück.
+            for s in &antwort.staende {
+                let Some(l) = anfrage.lieferungen.iter().find(|l| l.kennung == s.kennung) else {
+                    continue;
+                };
+                let Some(o) = orgs.iter().find(|o| o.fremde_org_kennung == l.org) else {
+                    continue;
+                };
+                sqlx::query(
+                    "INSERT INTO spiegel_ziel (kopplung_org_id, einsatz_id, stand) \
+                     SELECT ?, id, ? FROM einsatz WHERE kennung = ? \
+                     ON CONFLICT (kopplung_org_id, einsatz_id) DO UPDATE SET stand = excluded.stand",
+                )
+                .bind(o.id)
+                .bind(s.stand)
+                .bind(&s.kennung)
+                .execute(&mut *conn)
+                .await?;
+            }
+            uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
+            let fertig =
+                super::anhang::uebernehme_teile(conn, kopplung.id, &antwort.anhang_teile).await?;
+            uebernommen.einsaetze.extend(fertig);
+            let gesendet: Vec<i64> = anfrage.antraege.iter().map(|a| a.id).collect();
+            super::antrag::markiere_zugestellt(conn, &gesendet).await?;
+            let quittiert =
+                super::antrag::quittungen_uebernehmen(conn, kopplung.id, &antwort.quittungen)
+                    .await?;
+            uebernommen.einsaetze.extend(quittiert);
+            let quittiert: Vec<i64> = anfrage.quittungen.iter().map(|q| q.id).collect();
+            let offen: Vec<i64> = antwort.antraege.iter().map(|a| a.id).collect();
+            super::antrag::markiere_gemeldet(conn, kopplung.id, &quittiert, &offen).await?;
+            Ok(())
+        })
+        .map_err(fehler)?;
+        melde_live(pool, &uebernommen).await;
+        // Anträge an Einsätze, die hier geführt werden; die Quittungen gehen mit der nächsten
+        // Anfrage hinaus.
+        let mut ausgefuehrt = false;
+        if let Some(router) = router {
+            for a in &antwort.antraege {
+                if super::antrag::ausfuehren(pool, router, kopplung, true, a)
+                    .await
+                    .map_err(fehler)?
+                    .is_some()
+                {
+                    ausgefuehrt = true;
+                }
+            }
+        }
+        abgerufen = antwort.abrufe;
+        let weiter = !abgerufen.is_empty() || !antwort.anhang_teile.is_empty() || ausgefuehrt;
+        if !weiter || runde + 1 == RUNDEN_MAX {
+            break;
+        }
+    }
+    Ok(())
+}

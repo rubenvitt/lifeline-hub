@@ -10,7 +10,9 @@ import {
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
 import { istKeyFreigegeben, istSprungGesperrt, modulName } from '../einsatz/modulRegistry';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAntraegeAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
+import { etbAntraegeAlsAusstehend } from '../etb/etbZeile';
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
 import {
@@ -594,9 +596,21 @@ export default function EtbPage() {
    * Gesendete und gepufferte Einträge als eine Chronologie. Die Banner unten fassen zusammen, die
    * Zeilen zeigen — sonst fehlte in der Chronologie die eigene, gerade erfasste Meldung.
    */
+  // Anträge am Spiegel (LLH-1492, Spec `spiegel-antraege`, „ETB-Eintrag am Hub“): wie ausstehende,
+  // ohne Nummer und nicht im Zähler. Abgelehnte stehen mit Grund im Hinweisband.
+  const antraege = useAntraegeAusCache(einsatzId);
+  const beantragt = useMemo(
+    () => etbAntraegeAlsAusstehend(antraege, benutzer?.id, einsatzId),
+    [antraege, benutzer?.id, einsatzId],
+  );
   const chronologie = useMemo(
-    () => baueZeilen({ eintraege, ausstehend, abgelehnt }),
-    [eintraege, ausstehend, abgelehnt],
+    () =>
+      baueZeilen({
+        eintraege,
+        ausstehend: beantragt.length > 0 ? [...ausstehend, ...beantragt] : ausstehend,
+        abgelehnt,
+      }),
+    [eintraege, ausstehend, beantragt, abgelehnt],
   );
 
   /*
@@ -716,6 +730,9 @@ export default function EtbPage() {
   const einsatz = einsatzQuery.data;
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Erfassen und Berichtigen sind am Spiegel ein Antrag (LLH-1492, D13); Wiedervorlage und Auftrag
+  // bleiben gesperrt.
+  const darfErfassen = darfBeantragen(einsatz);
 
   /**
    * Der Zustandsraum des Tagebuchs, dritter und vierter Teil: leer mit und ohne Filter. Laden und
@@ -730,7 +747,7 @@ export default function EtbPage() {
       titel="Kein Eintrag passt zum Filter"
       aktion={{ label: 'Filter zurücksetzen', onClick: filterZuruecksetzen }}
     />
-  ) : darfSchreiben ? (
+  ) : darfErfassen ? (
     <SeitenLeer
       titel="Noch keine Einträge."
       // Ziel aus der Deeplink-Registry: `?neu=1` rollt die Erfassungszeile ins Bild und fokussiert
@@ -845,7 +862,7 @@ export default function EtbPage() {
   // Außenrand vor der Bilanzspalte. Das Filterband steht im selben Fuß, darüber; ohne
   // Schreibrecht steht es dort allein.
   const erfassung =
-    darfSchreiben || band ? (
+    darfErfassen || band ? (
       <div
         ref={erfassungRef}
         className={
@@ -857,7 +874,7 @@ export default function EtbPage() {
         {/* Fokus in der Leiste klappt sie auf (D4, `components/fokusInLeiste.ts`); das Band
             gehört nicht dazu, ein Zurücksetzen klappt die Erfassung nicht auf. */}
         <div {...leistenFokus}>
-          {darfSchreiben &&
+          {darfErfassen &&
             (berichtigungZu ? (
               <Schnellerfassung
                 key="berichtigung"
@@ -1001,9 +1018,7 @@ export default function EtbPage() {
       aktionen={kopfAktionen}
       // Nur mit Inhalt gesetzt: ein leerer Slot hielte Abstand (LFH-1078, Erfahrung aus P1).
       hinweis={
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-        )
+        darfErfassen ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
       fuss={erfassung}
     >
@@ -1119,7 +1134,7 @@ export default function EtbPage() {
               fehler={etbQuery.isError}
               leerText={leerInhalt}
               dokumente={dokumenteZuEintrag}
-              onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+              onBerichtigen={darfErfassen ? (e) => setBerichtigungZu(e) : undefined}
               berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
               onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}

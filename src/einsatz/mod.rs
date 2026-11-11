@@ -16,6 +16,7 @@ pub mod schwaerzung_nachlauf;
 pub mod schwaerzung_person;
 pub mod schwaerzung_registry;
 pub mod skelett_loeschung;
+pub mod spiegel_filter;
 pub mod verbindungen;
 pub mod zaehler;
 
@@ -161,6 +162,9 @@ pub struct Einsatz {
     /// `einsatzleiter_spalten!`/`einsatzleiter_joins!` in `repo`.
     #[sqlx(flatten)]
     pub einsatzleiter: fuehrungsstelle::EinsatzleiterSpalten,
+    /// Spiegel-Angaben (LLH-1492).
+    #[sqlx(flatten)]
+    pub spiegel: crate::instanz::spiegel::SpiegelSpalten,
 }
 
 impl Einsatz {
@@ -220,6 +224,7 @@ impl Einsatz {
             ),
             teilschwaerzungen: self.teilschwaerzungen,
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
+            spiegel: self.spiegel.anzeige(),
         }
     }
 }
@@ -304,6 +309,11 @@ pub struct EinsatzAnzeige {
     /// `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzleiter: Option<fuehrungsstelle::EinsatzleiterAnzeige>,
+    /// Spiegel einer gekoppelten Instanz (LLH-1492, Spec `einsatz-spiegel`): wer führt, Stand,
+    /// Anträge. Fehlt an einem Einsatz, den diese Instanz führt. Am Spiegel schreibt der Client
+    /// nur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spiegel: Option<crate::instanz::spiegel::EinsatzSpiegelAnzeige>,
 }
 
 /// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,
@@ -458,6 +468,7 @@ mod tests {
             retention_bis: None,
             geloescht_at: None,
             einsatzleiter: Default::default(),
+            spiegel: Default::default(),
         };
         assert!(e.ist_aktiv());
         e.status = EinsatzStatus::Abgeschlossen;

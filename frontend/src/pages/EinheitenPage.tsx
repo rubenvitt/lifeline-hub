@@ -309,9 +309,7 @@ export default function EinheitenPage() {
       }
       hinweis={
         // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei.
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-        )
+        darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
     >
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />

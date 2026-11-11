@@ -129,7 +129,7 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const rechteGrund = einsatzRechteGrund(einsatz.status);
+  const rechteGrund = einsatzRechteGrund(einsatz);
   const kapGrund = kapazitaetGesperrt({
     weg: eingabe.weg,
     plaetze: ergebnis.personen,

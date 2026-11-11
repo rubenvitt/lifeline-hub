@@ -1,8 +1,8 @@
 ---
 titel: Instanzkopplung
-gruppen: [administration]
+gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/auth/unterschrift/repo.rs, src/routes/auth.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs]
 ---
 
 ## Überblick
@@ -12,11 +12,16 @@ Einsatzleitwagen und ein öffentlich erreichbarer Server der Organisation. Die K
 fest, dass beide einander vertrauen. Über sie kommen die **Stammdaten** der Organisation vom
 Hub zum ELW: Konten, Fahrzeuge, Personal, Material, Qualifikationen, Fahrzeug- und
 Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen und Org-Einstellungen.
-Einsatzdaten fließen nicht darüber.
+
+Auch die **Einsätze** der Organisation gehen über die Kopplung: Ein Einsatz, der an einer
+Installation angelegt wurde, erscheint an der anderen als **Spiegel**. Der Spiegel ist lesbar wie
+ein eigener Einsatz, mit Seiten, Druck und Suche. Geändert wird er nur dort, wo er angelegt
+wurde. Am Spiegel wird nicht geschrieben, sondern **beantragt**.
 
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
-der Organisation. Bedienen darf sie der System-Admin; wer die Verwaltung sieht, liest mit.
+der Organisation. Bedienen darf sie der System-Admin; wer die Verwaltung sieht, liest mit. Einen
+Spiegel liest jedes Mitglied des Einsatzes; Anträge stellt, wer im Einsatz Schreibrecht hat.
 
 ## Abläufe
 
@@ -97,6 +102,39 @@ Konto umbenannt wurde, dessen Name der Hub auch vergibt):
 1. Unter „Gekoppelte Instanzen“ im Menü der Zeile des Hubs „Stammdaten erneut abgleichen“
    wählen.
 2. Die Instanz holt alle Stammdaten neu und gleicht sie ab; die Hinweise beginnen von vorn.
+
+### Am Spiegel erfassen
+
+Am Spiegel lassen sich nur die Erfassungen machen, die auch ohne Netz vormerkbar sind (Liste
+unter „Was am Spiegel geht“).
+
+1. Den Spiegel öffnen. Oben steht das Hinweisband „Spiegel von …“ mit dem Namen der anderen
+   Installation.
+2. Die Erfassung ausfüllen und speichern wie an einem eigenen Einsatz, etwa einen Eintrag im
+   Einsatztagebuch.
+3. Der Eintrag erscheint an derselben Stelle wie vorgemerkte Einträge, als „beantragt“: ohne
+   laufende Nummer und nicht in den Zählern. Das Hinweisband zählt ihn als ausstehenden Antrag.
+4. Hat die andere Installation den Antrag übernommen, kommt der Eintrag mit dem nächsten
+   Abgleich als gewöhnlicher Eintrag zurück, und der Antrag verschwindet.
+
+### Abgelehnten Antrag neu erfassen oder verwerfen
+
+1. Im Hinweisband „Spiegel von …“ die Anträge aufklappen. Abgelehnte Anträge stehen mit dem
+   Grund da.
+2. „Neu erfassen“ wählen. Bei einem Eintrag im Einsatztagebuch liegen die erfassten Daten dann
+   als Entwurf in der Erfassung; bei den übrigen Erfassungen öffnet sich die Seite, auf der sie
+   erfasst werden, und das Hinweisband zeigt die Daten. Berichtigen und erneut speichern: daraus
+   wird ein neuer Antrag.
+3. Oder „Verwerfen“ wählen. Der abgelehnte Antrag ist dann weg.
+
+### Abgleich der Einsätze prüfen
+
+Für den System-Admin:
+
+1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
+2. Unter „Gekoppelte Instanzen“ zeigt der Abschnitt „Einsätze“ je Kopplung die Einsätze, die
+   diese Installation liefert, und die, die sie spiegelt, je mit Stand, letztem Abgleich und
+   Hinweisen.
 
 ## Hintergrund
 
@@ -223,8 +261,92 @@ Ein Admin vom Hub ist am ELW Admin, solange der ELW nur seine Organisation träg
 mehrere Organisationen, kommt das Konto dort ohne Admin-Rolle an, und die Kopplung zeigt
 „Konto „…“ ist am Hub Admin, hier nicht: diese Instanz trägt mehrere Organisationen.“
 
+### Spiegel
+
+Wer einen Einsatz anlegt, führt ihn: Die Installation, an der er angelegt wurde, liefert ihn an
+die gekoppelten Installationen ihrer Organisation. Das gilt in beide Richtungen, für Einsätze des
+ELW am Hub wie für Einsätze des Hubs am ELW. Demo-Einsätze werden nicht gespiegelt. Ein
+abgeschlossener Einsatz wird noch so lange geliefert, bis die andere Seite den Abschluss hat.
+
+Am Spiegel gelten dieselben Mitgliedschaften und Rollen wie dort, wo er geführt wird. Ein Konto,
+das es über die Stammdaten an beiden Installationen gibt, hat am Spiegel dieselbe Rolle. Ein
+Konto, das es nur an der anderen Installation gibt, erscheint am Spiegel mit seinem Namen, etwa
+als Verfasser im Einsatztagebuch. Anmelden kann sich mit ihm niemand, und es steht in keiner
+Benutzerverwaltung. Fahrzeuge oder Personal, die es nur an der anderen Installation gibt, stehen
+am Spiegel mit ihrem Namen, aber ohne Verweis auf die eigenen Stammdaten.
+
+Einsatznummern vergibt jede Installation selbst. Ein Spiegel trägt die Nummer der Installation,
+die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen wie ein Spiegel.
+
+Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
+das Quittieren gelten nur dort.
+
+### Hinweisband und Abgleich
+
+Jede Seite eines Spiegels zeigt das Hinweisband „Spiegel von …“ mit der Zeit des letzten
+Abgleichs und der Zahl der ausstehenden und abgelehnten Anträge. Liegt bei einem laufenden
+Einsatz der letzte Abgleich länger als eine Minute zurück, steht dort „keine Verbindung seit …“.
+
+Abgeglichen wird alle fünf Sekunden, solange an der Kopplung ein Einsatz aktiv ist, ein Antrag
+offen ist oder ein Anhang geholt wird; sonst im Takt der Meldung. Den kurzen
+Takt stellt der Betrieb der Installation ein, die sich meldet (`--instanz-spiegel-sekunden`, 2 bis
+600 s). Scheitert ein Abgleich, wachsen die Abstände bis zehn Minuten. Nach einer Pause kommt nur
+der letzte Stand jeder Zeile, nicht jede Zwischenfassung. Bringt ein Abgleich etwas Neues, laden
+offene Seiten des Spiegels neu.
+
+### Was am Spiegel geht
+
+Jede Bedienung, die etwas ändert, ist am Spiegel gesperrt wie für Beobachter. Ein direkter
+Aufruf endet mit „Dieser Einsatz ist ein Spiegel; ändern geht nur als Antrag an die führende
+Instanz.“
+
+Ausgenommen sind die 16 Erfassungen, die auch ohne Netz vormerkbar sind. Sie werden zum Antrag:
+
+- Eintrag im Einsatztagebuch und Meldung;
+- Person anlegen, Sichtung, Verbleib, Notiz, Transport, Anlass, Maßnahme und Verletzung an einer
+  Person;
+- Standmeldung eines Bezirks, Belegungsmeldung, Registrierung und Abmeldung an einer
+  Betreuungsstelle;
+- Eintreffen an einem Bereitstellungsraum und Ausgabe in der Verpflegung.
+
+Anträge darf stellen, wer im Einsatz eine Rolle mit Schreibrecht hat, solange der Einsatz läuft.
+Anhänge lassen sich an einem Antrag nicht mitschicken. Eine Maßnahme aufheben geht am Spiegel
+nicht, weil das auch ohne Netz nicht vormerkbar ist.
+
+### Anträge
+
+Ein Antrag steht „ausstehend“, bis die Installation, die den Einsatz führt, ihn übernommen oder
+abgelehnt hat. Ohne Verbindung wartet er, ohne Frist, und geht mit dem ersten Abgleich danach
+hinüber. Dort wird er so ausgeführt, als hätte die Person die Erfassung selbst dort gemacht: mit
+ihren Rechten dort und unter ihrem Namen. Kommt ein Antrag doppelt an, wirkt er nur einmal.
+
+Ein abgelehnter Antrag nennt den Grund, etwa:
+
+- „Einsatz ist abgeschlossen und schreibgeschützt“: der Einsatz wurde dort inzwischen
+  abgeschlossen;
+- „Bezug nicht mehr vorhanden.“: die Person, Stelle oder Meldung, auf die sich der Antrag
+  bezieht, gibt es dort nicht mehr;
+- „Konto am Führer unbekannt.“: das eigene Konto gibt es dort nicht;
+- „Kopplung widerrufen.“: die Kopplung wurde widerrufen, bevor der Antrag übernommen war.
+
+Abgelehnte Anträge verschwinden nach 30 Tagen.
+
+### Anhänge
+
+Anhänge, Fotos und Pläne kommen zuerst nur mit Name, Größe und Prüfsumme. Wer einen Anhang am
+Spiegel öffnet, bevor sein Inhalt da ist, sieht „wird geholt“; die Installation holt ihn dann
+zuerst und in Stücken, damit Einträge und Anträge auch über eine schmale Leitung durchgehen. Im
+Leerlauf holt sie die übrigen Anhänge vorab. Ein Inhalt gilt erst, wenn seine Prüfsumme stimmt.
+
+### Widerruf und Spiegel
+
+Mit dem Widerruf einer Kopplung endet der Abgleich ihrer Einsätze, an beiden Installationen.
+Vorhandene Spiegel bleiben lesbar und gesperrt; das Hinweisband zeigt „Abgleich beendet“. Offene
+Anträge an diese Spiegel sind abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Spiegel
+dabei nicht.
+
 ### Hinweise an einer Kopplung
 
 „Update nötig“ heißt, die Programmstände liegen zu weit auseinander; Melden geht weiter, sonst
-nichts. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
+nichts. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
 Installationen einander ab.

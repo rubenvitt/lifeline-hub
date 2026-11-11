@@ -311,9 +311,7 @@ function TagAusVorlageInhalt({
       breite="schmal"
       dataUpdatedAt={planQuery.dataUpdatedAt}
       hinweis={
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-        )
+        darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
     >
       {/* Ein Griff für Bildlauf und e2e: Tag und Vorschau zusammen. */}

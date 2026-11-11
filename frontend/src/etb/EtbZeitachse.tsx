@@ -888,7 +888,8 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
               }}
             >
               {z.art === 'ausstehend' ? (
-                <StatusChip ton="achtung" wort="vorgemerkt" />
+                // Ein Antrag am Spiegel (LLH-1492) steht wie ein vorgemerkter Eintrag.
+                <StatusChip ton="achtung" wort={z.puffer.antrag ? 'beantragt' : 'vorgemerkt'} />
               ) : (
                 <StatusChip ton="alarm" wort="abgelehnt" />
               )}

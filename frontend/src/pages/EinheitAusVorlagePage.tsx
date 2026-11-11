@@ -256,9 +256,7 @@ function EinheitAusVorlage({
       meta={wurzelName}
       breite="schmal"
       hinweis={
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-        )
+        darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
     >
       <ErfassungsFormular<KopfWerte>

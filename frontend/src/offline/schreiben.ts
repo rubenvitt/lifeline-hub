@@ -5,6 +5,7 @@ import {
   markiereBenachrichtigungenGelesen,
   quittiereBenachrichtigung,
 } from '../api/benachrichtigungen';
+import { isAntragAngenommen, type AntragAngenommen } from '../api/antragEreignis';
 import { ApiError } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -41,8 +42,21 @@ import {
   type PersonEintragDaten,
 } from './personEintrag';
 
+/**
+ * Ergebnis einer vormerkbaren Erfassung. `beantragt` (LLH-1492, Spec `spiegel-antraege`): der
+ * Einsatz ist ein Spiegel, der Server hat mit 202 einen Antrag an die führende Instanz angelegt
+ * statt der Ressource. Es gibt dann noch keine Zeile, keine Nummer und kein „Rückgängig“.
+ */
 export type OfflineSchreibErgebnis<T> =
-  { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
+  | { zustand: 'gesendet'; daten: T }
+  | { zustand: 'vorgemerkt'; client_id: string }
+  | { zustand: 'beantragt'; antrag: AntragAngenommen['antrag'] };
+
+/** Gesendet oder, an einem Spiegel, beantragt: die Antwort entscheidet (202 mit `antrag`). */
+function gesendetOderBeantragt<T>(antwort: T | AntragAngenommen): OfflineSchreibErgebnis<T> {
+  if (isAntragAngenommen(antwort)) return { zustand: 'beantragt', antrag: antwort.antrag };
+  return { zustand: 'gesendet', daten: antwort as T };
+}
 
 function clientId(vorgegeben?: string | null): string {
   return vorgegeben ?? neueClientId();
@@ -91,12 +105,11 @@ export async function erfasseMeldungOfflineFaehig(
     return vormerken(benutzerId, einsatzId, { art: 'meldung', daten }, daten.client_id!);
   }
   try {
-    return {
-      zustand: 'gesendet',
-      daten: await legeMeldungAn(einsatzId, daten, {
+    return gesendetOderBeantragt(
+      await legeMeldungAn(einsatzId, daten, {
         offlineQueueBenutzerId: benutzerId,
       }),
-    };
+    );
   } catch (e) {
     if (!istOfflineTransient(e)) throw e;
     if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
@@ -159,7 +172,7 @@ async function mitErfassungszeitOfflineFaehig<
   const { daten, vormerkenMitZeit } = vormerkbar(benutzerId, einsatzId, eingabe, aktion);
   if (!navigator.onLine) return vormerkenMitZeit();
   try {
-    return { zustand: 'gesendet', daten: await senden(daten) };
+    return gesendetOderBeantragt(await senden(daten));
   } catch (e) {
     if (!istOfflineTransient(e)) throw e;
     if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();

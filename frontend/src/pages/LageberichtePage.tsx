@@ -248,7 +248,7 @@ export default function LageberichtePage() {
           fehlerTitel={anlegenFehler ? 'Nicht angelegt' : 'Nicht fortgeschrieben'}
           fehlerFallback={anlegenFehler ? 'Anlegen fehlgeschlagen' : 'Fortschreiben fehlgeschlagen'}
           rechteFehlt={!darfSchreiben}
-          rechteText={einsatzRechteGrund(einsatz.status)}
+          rechteText={einsatzRechteGrund(einsatz)}
         />
       }
     >

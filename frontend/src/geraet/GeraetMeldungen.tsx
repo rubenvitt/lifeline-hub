@@ -144,6 +144,11 @@ export default function GeraetMeldungen({
         message.warning('Offline vorgemerkt');
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+      if (ergebnis.zustand === 'beantragt') {
+        message.info('Beantragt');
+        return;
+      }
       qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
       message.success(`Meldung #${ergebnis.daten.lfd_nr} gesendet`);
     },

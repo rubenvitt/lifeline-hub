@@ -640,7 +640,7 @@ export default function EinsatzabschnittePage() {
         darfSchreiben && rueckFehler == null ? undefined : (
           <SeitenHinweise
             rechteFehlt={!darfSchreiben}
-            rechteText={einsatzRechteGrund(einsatz.status)}
+            rechteText={einsatzRechteGrund(einsatz)}
             fehler={rueckFehler}
             fehlerTitel="Nicht zurückgenommen"
             fehlerFallback="Rückgängig fehlgeschlagen"

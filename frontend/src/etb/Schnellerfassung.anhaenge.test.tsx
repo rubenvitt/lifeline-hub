@@ -759,3 +759,23 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 });
+
+describe('Anhang am Spiegel (LLH-1492, design.md D9)', () => {
+  it('fehlt: der Server nimmt am Spiegel keine Anhänge an', () => {
+    const spiegel = einsatzFixture({
+      id: 7,
+      spiegel: {
+        gegenstelle: 'ELW 1',
+        beendet: false,
+        antraege_ausstehend: 0,
+        antraege_abgelehnt: 0,
+      },
+    });
+    const { container } = renderMitProviders(<Schnellerfassung {...props({ einsatz: spiegel })} />);
+    expect(screen.queryByRole('button', { name: 'Anhang' })).toBeNull();
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+    // Gegenprobe ohne Spiegel: der Knopf steht da.
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getByRole('button', { name: 'Anhang' })).toBeInTheDocument();
+  });
+});

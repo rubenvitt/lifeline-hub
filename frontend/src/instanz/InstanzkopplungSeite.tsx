@@ -29,6 +29,7 @@ import {
 import { globalKeys } from '../api/queryKeys';
 import type {
   InstanzKopplungAnzeige,
+  InstanzSpiegelEinsatz,
   KopplungscodeAntwort,
   UnterschriftSchluesselAnzeige,
 } from '../api/types';
@@ -38,6 +39,7 @@ import {
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
+  spiegelEinsatzZeile,
   stammdatenZeile,
 } from './instanzText';
 
@@ -336,6 +338,11 @@ export default function InstanzkopplungSeite() {
                               {h}
                             </div>
                           ))}
+                          <SpiegelEinsaetze
+                            gegenstelle={k.gegenueber_name}
+                            einsaetze={k.spiegel.einsaetze}
+                            zeit={zeit}
+                          />
                         </div>
                       }
                     />
@@ -732,5 +739,47 @@ export default function InstanzkopplungSeite() {
         <SpeicherFehler fehler={schluesselWiderrufen.error} titel="Nicht widerrufen" />
       </Modal>
     </AdminPage>
+  );
+}
+
+/**
+ * Abschnitt „Einsätze“ einer Kopplung (LLH-1492, Spec `einsatz-spiegel`, „Die Seite
+ * Instanzkopplung zeigt den Abgleich“): die hier gespiegelten und die von hier gelieferten Einsätze
+ * der eigenen Org, jüngste zuerst, je mit Stand, letztem Abgleich und Hinweis. Leer steht „keine“.
+ */
+function SpiegelEinsaetze({
+  gegenstelle,
+  einsaetze,
+  zeit,
+}: {
+  gegenstelle: string;
+  einsaetze: readonly InstanzSpiegelEinsatz[];
+  zeit: (wert: string) => string;
+}) {
+  const { token, rollen } = useRollen();
+  return (
+    <section
+      aria-label={`Einsätze mit ${gegenstelle}`}
+      data-lfh="instanz-kopplung-einsaetze"
+      style={{ marginBlockStart: token.marginXS }}
+    >
+      <Typography.Text strong>Einsätze</Typography.Text>
+      {einsaetze.length === 0 ? (
+        <span style={{ color: rollen.gedaempft }}> · keine</span>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {einsaetze.map((e) => (
+            <li
+              key={`${e.gespiegelt ? 's' : 'l'}-${e.einsatz_id}`}
+              data-lfh="instanz-spiegel-einsatz"
+            >
+              <span>{e.bezeichnung}</span>
+              <span style={{ color: rollen.gedaempft }}> · {spiegelEinsatzZeile(e, zeit)}</span>
+              {e.hinweis && <div style={{ color: rollen.achtungText }}>{e.hinweis}</div>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

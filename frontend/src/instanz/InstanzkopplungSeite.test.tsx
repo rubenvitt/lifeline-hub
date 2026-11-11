@@ -70,6 +70,7 @@ const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht =>
           konten_mit_geheimnis: 0,
         },
       },
+      spiegel: { einsaetze: [] },
     },
   ],
   schluessel: [
@@ -101,6 +102,56 @@ describe('InstanzkopplungSeite', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Update nötig: diese Instanz ist zu alt')).toBeInTheDocument();
     expect(screen.getByText('Bea Admin · Stick B')).toBeInTheDocument();
+  });
+
+  it('zeigt je Kopplung die gespiegelten und gelieferten Einsätze samt Hinweis (LLH-1492)', async () => {
+    const basis = uebersicht();
+    vi.mocked(loadInstanzUebersicht).mockResolvedValue({
+      ...basis,
+      kopplungen: [
+        {
+          ...basis.kopplungen[0],
+          protokoll: 'passt',
+          spiegel: {
+            hinweis: 'Gegenüber spiegelt noch nicht (Update nötig).',
+            einsaetze: [
+              {
+                einsatz_id: 4,
+                bezeichnung: 'Hochwasser Nord',
+                gespiegelt: true,
+                stand: 812,
+                letzter_abgleich_at: '2026-11-10 08:00:00',
+                beendet: true,
+                hinweis: 'Freigabestufe unbekannt',
+              },
+              {
+                einsatz_id: 5,
+                bezeichnung: 'Stadtfest',
+                gespiegelt: false,
+                stand: 40,
+                beendet: false,
+              },
+            ],
+          },
+        },
+      ],
+    });
+    renderMitProviders(<InstanzkopplungSeite />);
+    const abschnitt = await screen.findByRole('region', { name: 'Einsätze mit Hub Landesverband' });
+    expect(abschnitt).toHaveTextContent('Hochwasser Nord');
+    expect(abschnitt).toHaveTextContent(
+      /hier gespiegelt · Stand 812 · letzter Abgleich .* · Abgleich beendet/,
+    );
+    expect(abschnitt).toHaveTextContent('Freigabestufe unbekannt');
+    expect(abschnitt).toHaveTextContent('Stadtfest');
+    expect(abschnitt).toHaveTextContent('von hier geliefert · Stand 40 · noch kein Abgleich');
+    expect(screen.getByText('Gegenüber spiegelt noch nicht (Update nötig).')).toBeInTheDocument();
+  });
+
+  it('ohne Einsatz im Abgleich steht „keine“', async () => {
+    renderMitProviders(<InstanzkopplungSeite />);
+    const abschnitt = await screen.findByRole('region', { name: 'Einsätze mit Hub Landesverband' });
+    expect(abschnitt).toHaveTextContent('keine');
   });
 
   it('Code ausstellen zeigt den Code einmal', async () => {

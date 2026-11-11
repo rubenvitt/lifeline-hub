@@ -3,7 +3,7 @@ import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, NavLink, Outlet, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Funktionsansicht, GeraetAnzeige, ModulFreigaben } from '../api/types';
 import {
@@ -22,6 +22,7 @@ import {
 } from '../icons';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
+import SpiegelBand from '../einsatz/spiegel/SpiegelBand';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import {
   EinsatzPfadeProvider,
@@ -494,6 +495,11 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   // Einzige Ausnahme von „Geräte bleiben still“: das Einheitengerät vibriert kurz bei einem neuen
   // Auftrag an die eigene Einheit (LLH-1579, Spec `benachrichtigungen`).
   useAuftragsVibration(geraet);
+  // Am Spiegel (LLH-1492) auch am Gerät das Hinweisband: Herkunft, Stand, eigene Anträge.
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(geraet.einsatz_id),
+    queryFn: () => ladeEinsatz(geraet.einsatz_id),
+  });
   const pfade = geraet.ansicht === 'betreuungsstelle' ? GERAET_BETREUUNG_PFADE : GERAET_PFADE;
   return (
     <EinsatzPfadeProvider pfade={pfade}>
@@ -503,6 +509,7 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
       >
         <GeraeteKopf geraet={geraet} />
         <LiveStatusBanner benutzerId={benutzer?.id} geraet />
+        <SpiegelBand einsatz={einsatzQuery.data} />
         <main
           style={{
             flex: '1 1 0',

@@ -6,6 +6,7 @@ import {
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
+  spiegelEinsatzZeile,
   stammdatenZeile,
 } from './instanzText';
 
@@ -29,6 +30,7 @@ const kopplung = (teil: Partial<InstanzKopplungAnzeige> = {}): InstanzKopplungAn
     angelegt_at: '2026-11-08 11:00:00',
     stammdaten: { stand: 0, hinweise: [], geheimnisse_verteilt: true, konten_mit_geheimnis: 0 },
   },
+  spiegel: { einsaetze: [] },
   ...teil,
 });
 
@@ -182,5 +184,40 @@ describe('instanzText', () => {
     expect(codeAusstellenSperre(u({ passkeys_eingerichtet: false }))).toBe(
       'Passkeys sind an dieser Instanz nicht eingerichtet',
     );
+  });
+});
+
+describe('Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`)', () => {
+  it('nennt gespiegelt oder geliefert, Stand, letzten Abgleich und ein Ende', () => {
+    expect(
+      spiegelEinsatzZeile(
+        {
+          einsatz_id: 4,
+          bezeichnung: 'Hochwasser',
+          gespiegelt: true,
+          stand: 812,
+          letzter_abgleich_at: '2026-11-10 08:00:00',
+          beendet: false,
+        },
+        zeit,
+      ),
+    ).toBe('hier gespiegelt · Stand 812 · letzter Abgleich [2026-11-10 08:00:00]');
+    expect(
+      spiegelEinsatzZeile(
+        { einsatz_id: 5, bezeichnung: 'Fest', gespiegelt: false, stand: 0, beendet: true },
+        zeit,
+      ),
+    ).toBe('von hier geliefert · Stand 0 · noch kein Abgleich · Abgleich beendet');
+  });
+
+  it('übernimmt den Hinweis des Abgleichs an die Kopplung', () => {
+    expect(
+      kopplungHinweise(
+        kopplung({
+          spiegel: { einsaetze: [], hinweis: 'Gegenüber spiegelt noch nicht (Update nötig).' },
+        }),
+      ),
+    ).toContain('Gegenüber spiegelt noch nicht (Update nötig).');
+    expect(kopplungHinweise(kopplung())).toEqual([]);
   });
 });

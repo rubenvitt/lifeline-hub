@@ -4469,4 +4469,204 @@ mod tests {
             .unwrap();
         assert_eq!(rest, 0);
     }
+
+    // ---------- LLH-1492: Spiegel lässt der Purge-Lauf aus ----------
+
+    /// Abgeschlossener Einsatz (2026-01-01) mit Frist, Vormerkung und Schwärzung wie angegeben.
+    async fn einsatz_im_zustand(
+        pool: &SqlitePool,
+        b: i64,
+        retention_bis: &str,
+        geloescht_at: Option<&str>,
+        geschwaerzt_at: Option<&str>,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, \
+                abgeschlossen_von, retention_bis, geloescht_at, geschwaerzt_at) \
+             VALUES (1, 'Lage', 'abgeschlossen', '2026-01-01 00:00:00', ?, ?, ?, ?) RETURNING id",
+        )
+        .bind(b)
+        .bind(retention_bis)
+        .bind(geloescht_at)
+        .bind(geschwaerzt_at)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Ein Anhang ohne Verknüpfung, hochgeladen lange vor dem Lauf.
+    async fn alter_anhang(pool: &SqlitePool, e: i64, b: i64) {
+        sqlx::query(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, \
+                hochgeladen_von, erstellt_at) \
+             VALUES (?, 'foto.jpg', 'image/jpeg', 1, 'x', x'00', ?, '2026-01-01 00:00:00')",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Was der Lauf an einem Einsatz ändern könnte, als ein Wert.
+    async fn purge_stand(pool: &SqlitePool, e: i64) -> String {
+        let einsatz: Option<(Option<String>, Option<String>)> =
+            sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_optional(pool)
+                .await
+                .unwrap();
+        let kategorien: Vec<(String, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT kategorie, vorgemerkt_at, geschwaerzt_at FROM einsatz_aufbewahrung_kategorie \
+             WHERE einsatz_id = ? ORDER BY kategorie",
+        )
+        .bind(e)
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        let antraege: Vec<Option<String>> = sqlx::query_scalar(
+            "SELECT vollzogen_at FROM schwaerzung_antrag WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        format!(
+            "{einsatz:?} {kategorien:?} {antraege:?} anhaenge={}",
+            anhaenge_von(pool, e).await
+        )
+    }
+
+    /// LLH-1492 (design.md D10): Ein Spiegel liegt in jeder Phase brach, die einen Einsatz
+    /// betrifft: Soft-Delete (A), Antrag (A2), Kategorien (K1, K2), Schwärzung (B), Nachlauf,
+    /// endgültige Löschung (D) und verwaiste Anhänge (E). Sein Lebensende regelt LLH-1494. Je
+    /// Zustand steht ein eigener Einsatz daneben, den derselbe Lauf bearbeitet; kein Schreibversuch
+    /// scheitert am Schutz-Trigger, und ein zweiter Lauf lässt den Spiegel ebenso stehen.
+    #[tokio::test]
+    async fn purge_laesst_spiegel_in_jeder_phase_aus() {
+        let (puffer, _log) = LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        skelett_frist(&pool, Some(30)).await;
+        // Je Zustand ein Paar (eigen, Spiegel), gleich angelegt.
+        let mut paare = Vec::new();
+        for _ in 0..2 {
+            // A: Frist abgelaufen, noch nicht vorgemerkt.
+            let a = einsatz_im_zustand(&pool, b, "2026-06-01 00:00:00", None, None).await;
+            // B: vorgemerkt, Karenz abgelaufen.
+            let bb = einsatz_im_zustand(
+                &pool,
+                b,
+                "2026-01-01 00:00:00",
+                Some("2026-01-02 00:00:00"),
+                None,
+            )
+            .await;
+            // D: geschwärzt, Skelett-Frist abgelaufen. Nachlauf: ebenso, ein Anhang steht noch.
+            let mut geschwaerzt = Vec::new();
+            for _ in 0..2 {
+                geschwaerzt.push(
+                    einsatz_im_zustand(
+                        &pool,
+                        b,
+                        "2026-01-01 00:00:00",
+                        Some("2026-01-02 00:00:00"),
+                        Some("2026-02-01 00:00:00"),
+                    )
+                    .await,
+                );
+            }
+            let (d, n) = (geschwaerzt[0], geschwaerzt[1]);
+            alter_anhang(&pool, n, b).await;
+            // K1, K2 und E: eine Kategorie fällig, eine vorgemerkt mit abgelaufener Karenz, ein
+            // verwaister Anhang.
+            let k = einsatz_im_zustand(&pool, b, "2099-01-01 00:00:00", None, None).await;
+            kategorie_mit_frist(&pool, k, "personenauskunft", "2026-06-01 00:00:00").await;
+            sqlx::query(
+                "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
+                    rechtsgrundlage, vorgemerkt_at) \
+                 VALUES (?, 'behandlung', '2026-01-01 00:00:00', 'RG', '2026-01-02 00:00:00')",
+            )
+            .bind(k)
+            .execute(&pool)
+            .await
+            .unwrap();
+            alter_anhang(&pool, k, b).await;
+            // A2: ein fälliger Antrag auf Schwärzung des Einsatzes.
+            let a2 = einsatz_im_zustand(&pool, b, "2099-01-01 00:00:00", None, None).await;
+            sqlx::query(
+                "INSERT INTO schwaerzung_antrag (einsatz_id, ziel_art, aktenzeichen, \
+                    beantragt_von, beantragt_at, faellig_at) \
+                 VALUES (?, 'einsatz', 'DS-1', ?, '2026-05-01 00:00:00', '2026-05-02 00:00:00')",
+            )
+            .bind(a2)
+            .bind(b)
+            .execute(&pool)
+            .await
+            .unwrap();
+            paare.push([a, bb, d, n, k, a2]);
+        }
+        let (eigen, spiegel) = (paare[0], paare[1]);
+        for e in spiegel {
+            crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e).await;
+        }
+        let mut vorher = Vec::new();
+        for e in spiegel {
+            vorher.push(purge_stand(&pool, e).await);
+        }
+        let mut eigen_vorher = Vec::new();
+        for e in eigen {
+            eigen_vorher.push(purge_stand(&pool, e).await);
+        }
+
+        let jetzt = t("2026-06-02 12:00:00");
+        assert!(tick_einmal(&pool, &LiveHub::new(), jetzt).await > 0);
+
+        for (i, e) in eigen.into_iter().enumerate() {
+            assert_ne!(
+                purge_stand(&pool, e).await,
+                eigen_vorher[i],
+                "der eigene Einsatz {i} wird bearbeitet"
+            );
+        }
+        assert!(
+            !existiert(&pool, eigen[2]).await,
+            "D: eigenes Skelett gelöscht"
+        );
+        assert_eq!(
+            anhaenge_von(&pool, eigen[3]).await,
+            0,
+            "Nachlauf am eigenen"
+        );
+        assert_eq!(
+            anhaenge_von(&pool, eigen[4]).await,
+            0,
+            "E: eigener verwaister Anhang"
+        );
+        for _ in 0..2 {
+            for (i, e) in spiegel.into_iter().enumerate() {
+                assert_eq!(
+                    purge_stand(&pool, e).await,
+                    vorher[i],
+                    "der Spiegel {i} bleibt unberührt"
+                );
+            }
+            tick_einmal(&pool, &LiveHub::new(), jetzt).await;
+        }
+        let log = puffer.text();
+        assert!(
+            !log.contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
+            "{log}"
+        );
+    }
 }

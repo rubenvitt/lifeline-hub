@@ -531,6 +531,17 @@ pub struct Config {
     )]
     pub instanz_melden_sekunden: u64,
 
+    /// Abstand in Sekunden des Abgleichs gespiegelter Einsätze, solange an einer Kopplung ein
+    /// Einsatz aktiv ist oder etwas aussteht (LLH-1492, design.md D12); sonst gilt der Abstand der
+    /// Meldung. Bei Fehlern verdoppelt er sich bis zehn Minuten.
+    #[arg(
+        long,
+        env = "LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN",
+        default_value_t = 5,
+        value_parser = clap::value_parser!(u64).range(2..=600)
+    )]
+    pub instanz_spiegel_sekunden: u64,
+
     /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
     /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
     #[arg(long, env = "LIFELINE_TLS_CERT")]
@@ -879,6 +890,25 @@ mod tests {
         let c =
             try_parse_mit_env("LIFELINE_INSTANZ_MELDEN_SEKUNDEN", "10", &["lifeline-hub"]).unwrap();
         assert_eq!(c.instanz_melden_sekunden, 10);
+    }
+
+    /// Der Abgleich der Einsätze läuft per Vorgabe alle 5 s (LLH-1492, D12), höchstens alle 2 s.
+    #[test]
+    fn instanz_spiegel_vorgabe_und_grenzen() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert_eq!(c.instanz_spiegel_sekunden, 5);
+        assert!(
+            try_parse_mit_env("LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN", "1", &["lifeline-hub"]).is_err()
+        );
+        assert!(try_parse_mit_env(
+            "LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN",
+            "601",
+            &["lifeline-hub"]
+        )
+        .is_err());
+        let c =
+            try_parse_mit_env("LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN", "2", &["lifeline-hub"]).unwrap();
+        assert_eq!(c.instanz_spiegel_sekunden, 2);
     }
 
     /// Web Push ist per Vorgabe aus (LLH-1223); mit Schalter ist der Kontakt Pflicht und muss

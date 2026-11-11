@@ -10,16 +10,21 @@ import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
  * Aufrufort und werden dort mit `lokal && darfImEinsatzSchreiben(...)` verknüpft. Die ORG-Achse
  * (`darfVerwaltung`) steht am Dateiende mit eigenem Kontext-Typ.
  *
+ * Spiegel (LLH-1492, design.md D13): führt eine andere Instanz den Einsatz (`spiegel` gesetzt),
+ * sperren alle Schreib- und Leitungsregeln wie beim Beobachter, damit jede Seite ohne eigene
+ * Prüfung lesend wird. Offen bleiben nur die 16 beantragbaren Erfassungen über
+ * {@link darfBeantragen}; der Server macht daraus einen Antrag an die führende Instanz.
+ *
  * Norm: `aktiv && (EL || FüPers)`. Die System-Rolle Admin schreibt in Modulen nur mit
  * Einsatzrolle, wie der Server (`EinsatzSchreibzugriff`, LFH-1118); ohne Rolle bleiben ihm nur die
  * Verwaltungswege der eigenen Org (`darfEinsatzVerwalten`, `darfModuleVerwalten`). Reine
  * UI-Schranke; die verbindliche Autorisierung erzwingt das Backend.
  */
 
-/** Nur die zwei Einsatz-Felder, die die Regel braucht — `Pick` + nullable, damit
- *  Partial-Fixtures und `einsatzQuery.data?.`-Aufrufstellen ohne Cast durchlaufen. */
+/** Nur die Einsatz-Felder, die die Regel braucht — `Pick` + nullable, damit Partial-Fixtures und
+ *  `einsatzQuery.data?.`-Aufrufstellen ohne Cast durchlaufen. `spiegel` ist optional wie am Wire. */
 export type EinsatzSchreibkontext =
-  Pick<EinsatzAnzeige, 'status' | 'meine_rolle'> | null | undefined;
+  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'spiegel'> | null | undefined;
 
 /** Nur die System-Rolle des Benutzers (für den Admin-Zweig). */
 export type BenutzerSchreibkontext = Pick<BenutzerAnzeige, 'system_rolle'> | null | undefined;
@@ -27,6 +32,11 @@ export type BenutzerSchreibkontext = Pick<BenutzerAnzeige, 'system_rolle'> | nul
 /** System-Admin (globale Rolle). Einziger erlaubter `system_rolle`-Vergleich im Einsatz-Kontext. */
 export function istAdmin(benutzer?: BenutzerSchreibkontext): boolean {
   return benutzer?.system_rolle === 'admin';
+}
+
+/** Der Einsatz ist ein Spiegel: eine andere Instanz führt ihn (LLH-1492, Spec `einsatz-spiegel`). */
+export function istSpiegel(einsatz?: EinsatzSchreibkontext): boolean {
+  return einsatz?.spiegel != null;
 }
 
 /** Beobachter-Rolle im Einsatz (rein lesend). */
@@ -45,13 +55,13 @@ export function istEinsatzLeitung(einsatz?: EinsatzSchreibkontext): boolean {
     Admin-Zweig und darum kein Benutzer-Parameter: der Server (`EinsatzLeitungszugriff`) fragt
     allein die Einsatzrolle (LFH-1118). */
 export function darfEinsatzLeiten(einsatz?: EinsatzSchreibkontext): boolean {
-  return einsatz?.status === 'aktiv' && istEinsatzLeitung(einsatz);
+  return einsatz?.status === 'aktiv' && !istSpiegel(einsatz) && istEinsatzLeitung(einsatz);
 }
 
 /** Einsatz-Kontext mit Org — nur für Rechte, deren Admin-Zweig an der Einsatz-Org hängt. Eigener
     Typ, damit die geteilten `…Schreibkontext`-Typen und ihre Fixtures unberührt bleiben. */
 export type EinsatzOrgKontext =
-  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id'> | null | undefined;
+  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id' | 'spiegel'> | null | undefined;
 
 /** System-Rolle und eigene Org des Benutzers — Gegenstück zu {@link EinsatzOrgKontext}. */
 export type BenutzerOrgKontext =
@@ -64,7 +74,7 @@ export function darfModuleVerwalten(
   einsatz: EinsatzOrgKontext,
   benutzer: BenutzerOrgKontext,
 ): boolean {
-  if (einsatz?.status !== 'aktiv') return false;
+  if (einsatz?.status !== 'aktiv' || istSpiegel(einsatz)) return false;
   if (istEinsatzLeitung(einsatz)) return true;
   return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
 }
@@ -77,7 +87,7 @@ export function darfEinsatzVerwalten(
   einsatz: EinsatzOrgKontext,
   benutzer: BenutzerOrgKontext,
 ): boolean {
-  if (einsatz?.status !== 'aktiv') return false;
+  if (einsatz?.status !== 'aktiv' || istSpiegel(einsatz)) return false;
   if (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal') {
     return true;
   }
@@ -89,10 +99,29 @@ export function darfEinsatzVerwalten(
     Benutzer-Parameter: der Server (`EinsatzSchreibzugriff`) lehnt den Admin ohne Schreibrolle mit
     403 ab (LFH-1118). */
 export function darfImEinsatzSchreiben(einsatz?: EinsatzSchreibkontext): boolean {
+  return !istSpiegel(einsatz) && hasSchreibrolleImAktivenEinsatz(einsatz);
+}
+
+/** Aktiver Einsatz UND Schreibrolle — der gemeinsame Kern von Schreiben und Beantragen. */
+function hasSchreibrolleImAktivenEinsatz(einsatz?: EinsatzSchreibkontext): boolean {
   return (
     einsatz?.status === 'aktiv' &&
     (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal')
   );
+}
+
+/**
+ * Eine beantragbare Erfassung starten (LLH-1492, design.md D13, Spec `spiegel-antraege`): ETB-Eintrag,
+ * Meldung, Person, Einträge an einer Person, Stand- und Belegungsmeldung, Registrierung und
+ * Abmeldung, Eintreffen, Verpflegungsausgabe — genau die Erfassungen, die ohne Netz vormerkbar
+ * sind. Ohne Spiegel gilt {@link darfImEinsatzSchreiben}. Am Spiegel dieselbe Schranke ohne den
+ * Spiegel-Ausschluss (der Server prüft die gespiegelte Mitgliedschaft wie die Route); nach dem
+ * Widerruf (`spiegel.beendet`) nimmt der Server keinen Antrag mehr an. Nur an den Erfassungsorten,
+ * nie für Bearbeiten oder Löschen.
+ */
+export function darfBeantragen(einsatz?: EinsatzSchreibkontext): boolean {
+  if (einsatz?.spiegel?.beendet) return false;
+  return hasSchreibrolleImAktivenEinsatz(einsatz);
 }
 
 /** Original eines Bild-Anhangs mit Standort- und Gerätedaten laden (LFH-747, Spec

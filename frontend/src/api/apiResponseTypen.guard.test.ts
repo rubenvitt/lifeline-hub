@@ -41,6 +41,9 @@ const AUSNAHMEN: Record<string, string> = {
   'client.ts#UploadMitFortschrittOptionen':
     'FE-lokale Transportoptionen des Uploads mit Fortschritt (Timeout, Rückruf, LFH-654) — ' +
     'weder Request- noch Response-Wire-DTO.',
+  'antragEreignis.ts#AntragAngenommen':
+    'Körper der 202-Antwort einer beantragbaren Erfassung am Spiegel (LLH-1492); der Server baut ' +
+    'ihn per `json!` in `antrag_antwort`, ohne `ToSchema`-Gegenstück.',
   'abrufZustand.ts#Quelle':
     'FE-lokale Hülle „geladene Liste + Abrufzustand“ neben `AbrufZustand` (LLH-1602, aus ' +
     '`stab/luecken.ts` umgezogen) — kein Wire-Typ, die Liste selbst ist ein generierter Typ.',

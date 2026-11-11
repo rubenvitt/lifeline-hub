@@ -5741,8 +5741,9 @@ mod tests {
             "Liste und Metadaten lesen {nachher} Seiten, erlaubt < 1 % von {bildseiten}"
         );
 
-        // Die Bytes selbst kommen unverändert.
-        let pool = pool_bis(ort(), 154).await;
+        // Die Bytes selbst kommen unverändert, auch nach allen späteren Migrationen (der heutige
+        // Ladeweg fragt seit LLH-1492 `spiegel_anhang`, das es bei 154 noch nicht gibt).
+        let pool = pool_bis(ort(), i64::MAX).await;
         let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, ids[2])
             .await
             .unwrap();
