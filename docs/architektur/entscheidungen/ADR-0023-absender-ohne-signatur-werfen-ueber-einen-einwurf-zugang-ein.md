@@ -22,9 +22,10 @@ herleitung:
 - MUST: Ein Einwurf schreibt nur in die Ablage seines Scopes (`alarmmeldungen:write` oder
   `positionen:write`) und nur für seine Org; er legt keinen Einsatz an und ändert keinen.
 - MUST NOT: Ein Einwurf liest etwas; die Antwort trägt außer Status und Fehler keine Daten.
-- MUST: Gleicher Inhalt desselben Zugangs innerhalb von 2 Minuten legt keinen zweiten Vorschlag an,
-  sondern wird am bestehenden als erneut empfangen vermerkt; später ergibt er einen neuen Vorschlag
-  mit Hinweis auf den früheren. Still verworfen wird keiner.
+- MUST: Ein Einwurf mit `external_id` (und `message_id`) ist dauerhaft idempotent wie unter
+  ADR-0022. Erst ohne Kennung zählt der Inhalt: Gleicher Inhalt desselben Zugangs innerhalb von
+  2 Minuten wird am bestehenden Vorschlag als erneut empfangen vermerkt; später ergibt er einen
+  neuen Vorschlag mit Hinweis auf den früheren. Still verworfen wird keiner.
 - MUST: Ein Einwurf wird nur über TLS angenommen (`--tls` oder `X-Forwarded-Proto: https` vom
   vertrauten Proxy), sonst 403; Ausnahme nur per ausdrücklichem Schalter des Betreibers.
 - MUST: Antworten auf Einwürfe tragen `Cache-Control: no-store`.
