@@ -10,6 +10,7 @@ import {
   baueEinwurf,
   einwerfen,
   kennzeichnen,
+  warteAus,
   zerlegeFormular,
 } from './einwurf.mjs';
 
@@ -256,4 +257,34 @@ test('kennzeichnen: setzt den Status und nimmt das Gegenlabel ab, 404 zählt nic
     }),
     /500 beim Entfernen/,
   );
+});
+
+test('Retry-After: Sekunden, HTTP-Datum, fehlend', async () => {
+  const jetzt = Date.parse('2026-11-11T08:00:00Z');
+  assert.equal(warteAus('5', jetzt), 5_000);
+  assert.equal(warteAus('0', jetzt), 0);
+  assert.equal(warteAus('Wed, 11 Nov 2026 08:00:10 GMT', jetzt), 10_000);
+  assert.equal(warteAus('Wed, 11 Nov 2026 07:59:00 GMT', jetzt), 0);
+  assert.equal(warteAus(null, jetzt), null);
+  assert.equal(warteAus('bald', jetzt), null);
+
+  let n = 0;
+  const ohne = await einwerfen(baueEinwurf(issue()), {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    abruf: async () => (n++, antwort(429, {})),
+    warte: uhr().warte,
+  });
+  assert.equal(ohne.ok, false);
+  assert.equal(n, 1, '429 ohne Retry-After wird nicht wiederholt');
+
+  n = 0;
+  const null_s = uhr();
+  await einwerfen(baueEinwurf(issue()), {
+    zunderUrl: 'https://z',
+    token: 'zi_x',
+    abruf: async () => (++n < 2 ? antwort(429, {}, { 'retry-after': '0' }) : antwort(201, {})),
+    warte: null_s.warte,
+  });
+  assert.deepEqual(null_s.pausen, [0]);
 });

@@ -152,7 +152,20 @@ export const VERSUCHE = 3;
 /** Längste Wartezeit aus `Retry-After`, die noch abgewartet wird; sonst gleich aufgeben. */
 const WARTE_MAX_MS = 30_000;
 
+/** Wartet `ms` Millisekunden. */
 const schlafen = (ms) => new Promise((fertig) => setTimeout(fertig, ms));
+
+/**
+ * `Retry-After` in Millisekunden: Sekunden oder HTTP-Datum (RFC 9110). `null`, wenn der Kopf
+ * fehlt oder ungültig ist; ein Datum in der Vergangenheit ergibt 0.
+ */
+export function warteAus(kopf, jetzt = Date.now()) {
+  const wert = String(kopf ?? '').trim();
+  if (!wert) return null;
+  if (/^\d+$/.test(wert)) return Number(wert) * 1000;
+  const datum = Date.parse(wert);
+  return Number.isFinite(datum) ? Math.max(0, datum - jetzt) : null;
+}
 
 /** Ein Versuch: `{ status, daten }`, Status 0 bei Netzfehler oder abgelaufener Frist. */
 async function versuch(adresse, optionen, abruf, frist) {
@@ -165,8 +178,7 @@ async function versuch(adresse, optionen, abruf, frist) {
       // kein JSON reicht, eine abgelaufene Frist beim Lesen nicht
       if (fehler?.name === 'TimeoutError' || fehler?.name === 'AbortError') throw fehler;
     }
-    const nachSek = Number(antwort.headers?.get?.('retry-after'));
-    return { status: antwort.status, daten, warteMs: Number.isFinite(nachSek) ? nachSek * 1000 : null };
+    return { status: antwort.status, daten, warteMs: warteAus(antwort.headers?.get?.('retry-after')) };
   } catch (fehler) {
     const grund = fehler?.name === 'TimeoutError' ? `keine Antwort in ${frist / 1000} s` : (fehler?.message ?? fehler);
     return { status: 0, daten: null, grund: `Zunder nicht erreichbar: ${grund}` };
@@ -178,7 +190,7 @@ async function versuch(adresse, optionen, abruf, frist) {
  * Aufrufer das Issue in jedem Fall kennzeichnen kann.
  *
  * Jeder Versuch hat eine Frist (`FRIST_MS`, inklusive Antwortkörper). Wiederholt wird nur, was
- * vorübergehend ist: Netzfehler, Frist, 5xx und 429 mit kurzem `Retry-After`. Höchstens
+ * vorübergehend ist: Netzfehler, Frist, 5xx und 429 mit gültigem, kurzem `Retry-After`. Höchstens
  * `VERSUCHE` Versuche, zusammen gut eine Minute, damit im 5-Minuten-Job Zeit für die
  * Kennzeichnung bleibt. Wiederholen ist sicher, weil `external_id` den Einwurf idempotent macht.
  */
@@ -201,9 +213,11 @@ export async function einwerfen(
     if (status === 200 || status === 201) return { ok: true, status, ref: daten?.ref ?? null };
     const text = grund ?? `Zunder antwortet ${status} ${daten?.message ?? daten?.error ?? ''}`.trim();
     ergebnis = { ok: false, status, fehler: text };
-    const voruebergehend = status === 0 || status >= 500 || (status === 429 && (warteMs ?? 0) <= WARTE_MAX_MS);
+    // 429 nur mit gültigem, kurzem Retry-After: ohne Angabe wäre jeder Versuch geraten.
+    const kurzGedrosselt = status === 429 && warteMs !== null && warteMs <= WARTE_MAX_MS;
+    const voruebergehend = status === 0 || status >= 500 || kurzGedrosselt;
     if (!voruebergehend || nr === versuche) break;
-    await warte(status === 429 && warteMs ? warteMs : 2_000 * nr);
+    await warte(status === 429 ? warteMs : 2_000 * nr);
   }
   return ergebnis;
 }
@@ -242,6 +256,7 @@ export async function kennzeichnen({ repo, nummer, labels, entfernen = [], ghTok
   }
 }
 
+/** Workflow-Einstieg: Event lesen, einwerfen, Issue kennzeichnen, bei Fehler rot beenden. */
 async function main() {
   const umgebung = process.env;
   const event = JSON.parse(readFileSync(umgebung.GITHUB_EVENT_PATH, 'utf8'));
