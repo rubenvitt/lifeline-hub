@@ -368,11 +368,15 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     const belegung = tablet.getByTestId('br-belegung');
     const vorgemerkt = tablet.getByTestId('br-vorgemerkt');
 
-    // Ohne Netz: vorgemerkt, beim Wiederverbinden gebucht.
+    // Ohne Netz: vorgemerkt, beim Wiederverbinden gebucht. Die Einheitenliste lädt erst nach den
+    // Freigaben; der Knopf ist schon vorher bedienbar. Also erst mit Netz auf die Kraft im Dialog
+    // warten, sonst fehlt sie unter Last ganz.
     await expect(tablet.getByRole('button', { name: 'Eintreffen buchen' })).toBeEnabled();
-    await kontext.setOffline(true);
     await tablet.getByRole('button', { name: 'Eintreffen buchen' }).click();
-    await dialog.getByRole('button', { name: 'Eintreffen LF Nachbarort' }).click();
+    const lfNachbarort = dialog.getByRole('button', { name: 'Eintreffen LF Nachbarort' });
+    await expect(lfNachbarort).toBeVisible({ timeout: 30_000 });
+    await kontext.setOffline(true);
+    await lfNachbarort.click();
     await expect(tablet.getByText('Offline vorgemerkt: Eintreffen LF Nachbarort')).toBeVisible();
     await expect(vorgemerkt.getByText('LF Nachbarort')).toBeVisible();
     await kontext.setOffline(false);
