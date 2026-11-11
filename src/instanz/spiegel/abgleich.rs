@@ -5,8 +5,12 @@
 //! aus der Antwort (`spiegel_ziel`, Push). Führt die erreichte Seite, nennt die meldende ihren
 //! Stand und bekommt die Lieferung in der Antwort (Pull). Den Stand nennt immer, wer spiegelt.
 
+use super::lebensende;
 use super::liefern::{self, Absender, Budget};
-use super::paket::{EinsatzStand, SpiegelPaket, RESERVE, SPIEGEL_MAX};
+use super::paket::{
+    EinsatzStand, Lebensende, SpiegelPaket, EINSAETZE_MAX, LEBENSENDE_GELOESCHT, RESERVE,
+    SPIEGEL_MAX,
+};
 use super::uebernehmen::{self, Empfaenger, Ergebnis};
 use crate::error::AppError;
 use crate::instanz::extractor::SPIEGEL_PFAD;
@@ -36,7 +40,7 @@ fn org_wire(eigen: &Identitaet, kopplung: &KopplungZeile, o: &OrgZeile) -> Strin
     }
 }
 
-/// Stände der Spiegel dieser Instanz für eine Kopplung.
+/// Stände der Spiegel dieser Instanz für eine Kopplung; ohne Spiegel, die gerade abgeräumt werden.
 async fn eigene_staende(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -49,10 +53,11 @@ async fn eigene_staende(
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
          JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = s.einsatz_id) \
          ORDER BY e.status = 'abgeschlossen', s.einsatz_id DESC LIMIT ?",
     )
     .bind(kopplung_id)
-    .bind(super::paket::EINSAETZE_MAX as i64)
+    .bind(EINSAETZE_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
     Ok(zeilen
@@ -81,7 +86,7 @@ async fn liefere_alle(
         };
         let wire = org_wire(eigen, kopplung, o);
         for e in liefern::list_gefuehrt(conn, o.org_id, staende).await? {
-            if lieferungen.len() >= super::paket::EINSAETZE_MAX {
+            if lieferungen.len() >= EINSAETZE_MAX {
                 return Ok(lieferungen);
             }
             let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
@@ -234,10 +239,12 @@ pub async fn handle_abgleich(
         }
     }
     let mut uebernommen = Uebernommen::default();
+    let mut abzuraeumen = Vec::new();
+    let jetzt = crate::zeit::jetzt();
     let antwort = crate::write_retry!(pool, |conn| {
         uebernommen = Uebernommen::default();
         let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
-        let staende_antwort =
+        let mut staende_antwort =
             uebernehme_alle(conn, eigen, kopplung, &orgs, anfrage, &mut uebernommen).await?;
         let staende: HashMap<String, i64> = anfrage
             .staende
@@ -267,6 +274,32 @@ pub async fn handle_abgleich(
         let quittiert =
             super::antrag::quittungen_uebernehmen(conn, kopplung.id, &anfrage.quittungen).await?;
         uebernommen.einsaetze.extend(quittiert);
+        // Lebensende (LLH-1494, D3, D4): Spiegel, deren Führer sie gelöscht hat, abräumen;
+        // übergebene Einsätze annehmen oder sagen, worauf sie warten (fehlende Anhänge werden
+        // angefordert und gehen unten mit den Abrufen hinaus).
+        abzuraeumen =
+            lebensende::geloescht_uebernehmen(conn, kopplung, &anfrage.lebensende).await?;
+        let mut lebensende_quittungen = Vec::new();
+        for l in &anfrage.lebensende {
+            if let Some((q, umgewandelt)) =
+                lebensende::verwahrung_annehmen(conn, kopplung, l, &jetzt).await?
+            {
+                lebensende_quittungen.push(q);
+                uebernommen.einsaetze.extend(umgewandelt);
+            }
+        }
+        // Pull: genannte Einsätze, die hier gelöscht sind.
+        let geloescht = lebensende::geloeschte(conn, &eigen.kennung, &anfrage.staende).await?;
+        // Push: die Stände aller Spiegel dieser Kopplung, damit die meldende Seite gelöschte
+        // Einsätze erkennt (ein älterer Stand überliest Kennungen ohne Lieferung).
+        for s in eigene_staende(conn, kopplung.id).await? {
+            if staende_antwort.len() >= EINSAETZE_MAX {
+                break;
+            }
+            if !staende_antwort.iter().any(|a| a.kennung == s.kennung) {
+                staende_antwort.push(s);
+            }
+        }
         // Anträge stehen vorn (D8) und zählen ins Budget.
         let (antraege, antrag_bytes) =
             super::antrag::offene_antraege(conn, kopplung.id, false).await?;
@@ -284,9 +317,12 @@ pub async fn handle_abgleich(
             anhang_teile,
             antraege,
             quittungen: quittungen.clone(),
+            lebensende: geloescht,
+            lebensende_quittungen,
         })
     })?;
     melde_live(pool, &uebernommen).await;
+    lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
     Ok(antwort)
 }
 
@@ -314,7 +350,10 @@ pub async fn abgleich_einmal(
         .await
         .map_err(|e| SendError::Netz(e.to_string()))?;
     let mut abgerufen: Vec<super::paket::AnhangAbruf> = Vec::new();
+    // Gelöschte Einsätze, die das Gegenüber noch spiegelt (aus seiner letzten Antwort).
+    let mut geloescht_offen: Vec<Lebensende> = Vec::new();
     for runde in 0..RUNDEN_MAX {
+        let jetzt = crate::zeit::jetzt();
         let anfrage = crate::write_retry!(pool, |conn| {
             let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
             let staende = eigene_staende(conn, kopplung.id).await?;
@@ -326,7 +365,16 @@ pub async fn abgleich_einmal(
             .bind(kopplung.id)
             .fetch_all(&mut *conn)
             .await?;
-            let ziele: HashMap<String, i64> = ziele.into_iter().collect();
+            let mut ziele: HashMap<String, i64> = ziele.into_iter().collect();
+            // Zur Verwahrung fällige Einsätze (LLH-1494, D4) gehen auch hinaus, wenn das Gegenüber
+            // sie noch nicht kennt (etwa ohne Netz angelegt und abgeschlossen).
+            let mut lebensende =
+                lebensende::faellige_verwahrungen(conn, &eigen.kennung, &orgs, &jetzt).await?;
+            for l in &lebensende {
+                ziele.entry(l.kennung.clone()).or_insert(0);
+            }
+            let platz = EINSAETZE_MAX.saturating_sub(lebensende.len());
+            lebensende.extend(geloescht_offen.iter().take(platz).cloned());
             // Anträge stehen vorn (D8) und zählen ins Budget.
             let (antraege, antrag_bytes) =
                 super::antrag::offene_antraege(conn, kopplung.id, true).await?;
@@ -344,6 +392,8 @@ pub async fn abgleich_einmal(
                 anhang_teile,
                 antraege,
                 quittungen,
+                lebensende,
+                lebensende_quittungen: Vec::new(),
             })
         })
         .map_err(fehler)?;
@@ -358,6 +408,7 @@ pub async fn abgleich_einmal(
         .wert;
         antwort.check().map_err(SendError::AntwortUngueltig)?;
         let mut uebernommen = Uebernommen::default();
+        let mut abzuraeumen = Vec::new();
         crate::write_retry!(pool, |conn| {
             uebernommen = Uebernommen::default();
             let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
@@ -394,10 +445,38 @@ pub async fn abgleich_einmal(
             let quittiert: Vec<i64> = anfrage.quittungen.iter().map(|q| q.id).collect();
             let offen: Vec<i64> = antwort.antraege.iter().map(|a| a.id).collect();
             super::antrag::markiere_gemeldet(conn, kopplung.id, &quittiert, &offen).await?;
+            // Lebensende (LLH-1494): Spiegel, deren Führer sie gelöscht hat, und angenommene
+            // Verwahrungen abräumen; gelöschte eigene Einsätze, die das Gegenüber noch spiegelt,
+            // in der nächsten Anfrage melden.
+            abzuraeumen =
+                lebensende::geloescht_uebernehmen(conn, kopplung, &antwort.lebensende).await?;
+            abzuraeumen.extend(
+                lebensende::quittungen_uebernehmen(
+                    conn,
+                    kopplung,
+                    &eigen.kennung,
+                    &anfrage.lebensende,
+                    &antwort.lebensende_quittungen,
+                    &jetzt,
+                )
+                .await?,
+            );
+            let gesendet: Vec<&str> = anfrage
+                .lebensende
+                .iter()
+                .filter(|l| l.art == LEBENSENDE_GELOESCHT)
+                .map(|l| l.kennung.as_str())
+                .collect();
+            geloescht_offen = lebensende::geloeschte(conn, &eigen.kennung, &antwort.staende)
+                .await?
+                .into_iter()
+                .filter(|l| !gesendet.contains(&l.kennung.as_str()))
+                .collect();
             Ok(())
         })
         .map_err(fehler)?;
         melde_live(pool, &uebernommen).await;
+        lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
         // Anträge an Einsätze, die hier geführt werden; die Quittungen gehen mit der nächsten
         // Anfrage hinaus.
         let mut ausgefuehrt = false;
@@ -413,7 +492,10 @@ pub async fn abgleich_einmal(
             }
         }
         abgerufen = antwort.abrufe;
-        let weiter = !abgerufen.is_empty() || !antwort.anhang_teile.is_empty() || ausgefuehrt;
+        let weiter = !abgerufen.is_empty()
+            || !antwort.anhang_teile.is_empty()
+            || ausgefuehrt
+            || !geloescht_offen.is_empty();
         if !weiter || runde + 1 == RUNDEN_MAX {
             break;
         }

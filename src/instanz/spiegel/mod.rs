@@ -13,6 +13,7 @@ pub mod anhang;
 pub mod antrag;
 pub mod art;
 pub mod katalog;
+pub mod lebensende;
 pub mod liefern;
 pub mod paket;
 pub mod schema;
