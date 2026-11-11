@@ -92,15 +92,22 @@ async fn eigene_staende(
 }
 
 /// Die laufenden zuerst, dann die übrigen, je Gruppe reihum, zusammen höchstens
-/// [`EINSAETZE_MAX`].
+/// [`EINSAETZE_MAX`]; mindestens ein Platz bleibt den übrigen.
 fn auswahl_staende(zeilen: Vec<(String, i64, bool)>, runde: usize) -> Vec<EinsatzStand> {
     let (laufend, uebrig): (Vec<_>, Vec<_>) = zeilen.into_iter().partition(|z| z.2);
-    let mut auswahl = if laufend.len() > EINSAETZE_MAX {
+    // Ein Platz bleibt den übrigen, auch wenn die laufenden allein das Paket füllten: sonst kämen
+    // Nachträge abgeschlossener Spiegel nie an.
+    let fuer_laufende = if uebrig.is_empty() {
+        EINSAETZE_MAX
+    } else {
+        EINSAETZE_MAX - 1
+    };
+    let mut auswahl = if laufend.len() > fuer_laufende {
         reihum(laufend, runde)
     } else {
         laufend
     };
-    auswahl.truncate(EINSAETZE_MAX);
+    auswahl.truncate(fuer_laufende);
     let frei = EINSAETZE_MAX - auswahl.len();
     if uebrig.len() > frei {
         auswahl.extend(reihum(uebrig, runde).into_iter().take(frei));
@@ -258,7 +265,7 @@ async fn save_hinweis(
 /// Der Hinweis am Spiegel nach einer Übernahme. „Zu groß“ steht je Zeile, bis dieselbe Zeile
 /// übernommen oder gelöscht ist (`Ergebnis::erledigt`): ihr Stand wird nicht neu geliefert, der
 /// Hinweis ginge sonst mit der nächsten Runde verloren, und er zählt nicht zur Grenze von 20
-/// (LLH-1630). Andere Hinweise ersetzt ein neuer wie bisher, höchstens 20.
+/// (LLH-1630). Andere Hinweise gelten nur für die letzte Übernahme, höchstens 20.
 fn hinweise_fortschreiben(
     alt: Option<&str>,
     neu: &[String],
@@ -287,12 +294,7 @@ fn hinweise_fortschreiben(
         .map(String::as_str)
         .filter(|z| !ist_zu_gross(z))
         .collect();
-    let andere = if neue_andere.is_empty() {
-        alte.into_iter().filter(|z| !ist_zu_gross(z)).collect()
-    } else {
-        neue_andere
-    };
-    zeilen.extend(andere.into_iter().take(20).map(str::to_owned));
+    zeilen.extend(neue_andere.into_iter().take(20).map(str::to_owned));
     (!zeilen.is_empty()).then(|| zeilen.join("\n"))
 }
 
@@ -586,6 +588,31 @@ mod reihum_tests {
         );
     }
 
+    /// Füllen die laufenden allein das Paket, bleibt ein Platz für die übrigen, reihum.
+    #[test]
+    fn auch_bei_vollem_paket_kommen_abgeschlossene_dran() {
+        let mut gesehen = BTreeSet::new();
+        for runde in 0..4 {
+            let auswahl = auswahl_staende(spiegel(EINSAETZE_MAX + 44, 2), runde);
+            assert_eq!(auswahl.len(), EINSAETZE_MAX);
+            gesehen.extend(
+                auswahl
+                    .into_iter()
+                    .map(|s| s.kennung)
+                    .filter(|k| k.starts_with('a')),
+            );
+        }
+        assert_eq!(
+            gesehen,
+            BTreeSet::from(["a0".to_string(), "a1".to_string()])
+        );
+        // Ohne übrige bekommen die laufenden alle Plätze.
+        assert_eq!(
+            auswahl_staende(spiegel(EINSAETZE_MAX + 44, 0), 0).len(),
+            EINSAETZE_MAX
+        );
+    }
+
     #[test]
     fn ein_hinweis_zu_gross_bleibt_bis_die_zeile_kommt() {
         let a = uebernehmen::zu_gross_hinweis("etb_eintrag", "1");
@@ -617,7 +644,14 @@ mod reihum_tests {
             h.lines().filter(|z| z.contains("nicht übernommen")).count(),
             20
         );
-        // Andere Hinweise ersetzt ein neuer wie bisher.
+        // Eine Übernahme ohne Hinweise räumt alte andere Hinweise, „zu groß“ bleibt.
+        let h = hinweise_fortschreiben(
+            Some(&format!("{c}\nLieferung nicht übernommen: x")),
+            &[],
+            &[],
+        );
+        assert_eq!(h.as_deref(), Some(c.as_str()));
+        // Andere Hinweise ersetzt ein neuer.
         let h = hinweise_fortschreiben(
             Some("Lieferung nicht übernommen: x"),
             &["Lieferung nicht übernommen: y".into()],
