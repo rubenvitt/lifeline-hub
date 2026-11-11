@@ -188,7 +188,11 @@ async fn uebernehme_zeilen(
     let konten: HashMap<i64, &KontoAngabe> = l.konten.iter().map(|k| (k.id, k)).collect();
     let mut einsatz_id = vorhanden;
     // Der Kopf zuerst: an ihm hängen alle anderen Zeilen.
-    if let Some(kopf) = l.zeilen.iter().find(|z| z.art == "einsatz" && !z.geloescht) {
+    if let Some(kopf) = l
+        .zeilen
+        .iter()
+        .find(|z| z.art == "einsatz" && !z.geloescht && !z.zu_gross)
+    {
         let t = schema.tabelle("einsatz").expect("einsatz ist gespiegelt");
         let id = kopf_uebernehmen(conn, t, e, l, kopf, einsatz_id, &konten).await?;
         einsatz_id = Some(id);
@@ -198,6 +202,14 @@ async fn uebernehme_zeilen(
         return Ok(());
     };
     ergebnis.einsatz_id = Some(einsatz_id);
+    // Zu groß für den Abgleich (LLH-1630): die Zeile kommt ohne Daten, die bisherige Fassung
+    // bleibt stehen. Kein Nachholen, sonst käme dieselbe Zeile in jedem Takt wieder.
+    for z in l.zeilen.iter().filter(|z| z.zu_gross) {
+        ergebnis.hinweise.push(format!(
+            "Zeile {} {} ist zu groß für den Abgleich und liegt nur an der führenden Instanz.",
+            z.art, z.schluessel
+        ));
+    }
     // Löschungen zuerst: eine neue Zeile kann den Platz einer gelöschten einnehmen (Reihenfolge,
     // eindeutige Paare). Hängt an der Zeile noch ein Verweis, den erst eine geänderte Zeile dieser
     // Lieferung löst (Abschnitt auflösen: Einheiten verlieren ihn vorher), folgt sie danach.
@@ -419,6 +431,11 @@ async fn kopf_uebernehmen(
         return Ok(id);
     }
     werte.push(("spiegel".into(), Value::from(1)));
+    // Die ID nach derselben Regel wie jede Anlage (LFH-690, LLH-1630): nie die eines entfernten
+    // Demo- oder endgültig gelöschten Einsatzes, sonst schrieben offene Tabs und
+    // Offline-Warteschlangen still in den Spiegel.
+    let neue_id = crate::einsatz::repo::naechste_id(conn).await?;
+    werte.push(("id".into(), Value::from(neue_id)));
     let id = insert(conn, t.name, &werte).await?;
     sqlx::query(
         "INSERT INTO einsatz_spiegel (einsatz_id, kopplung_org_id, fremde_kennung, freigabestufe) \

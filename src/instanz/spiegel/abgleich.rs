@@ -6,7 +6,7 @@
 //! Stand und bekommt die Lieferung in der Antwort (Pull). Den Stand nennt immer, wer spiegelt.
 
 use super::liefern::{self, Absender, Budget};
-use super::paket::{EinsatzStand, SpiegelPaket, RESERVE, SPIEGEL_MAX};
+use super::paket::{EinsatzStand, SpiegelPaket, EINSAETZE_MAX, RESERVE, SPIEGEL_MAX};
 use super::uebernehmen::{self, Empfaenger, Ergebnis};
 use crate::error::AppError;
 use crate::instanz::extractor::SPIEGEL_PFAD;
@@ -16,6 +16,7 @@ use crate::instanz::repo::{self, KopplungZeile, OrgZeile};
 use crate::instanz::{org_kennung, InstanzKopplungRichtung, PROTOKOLL_SPIEGEL};
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Was ein Abgleich an der eigenen Seite übernommen hat; nach dem Commit gemeldet.
 #[derive(Debug, Default)]
@@ -36,29 +37,65 @@ fn org_wire(eigen: &Identitaet, kopplung: &KopplungZeile, o: &OrgZeile) -> Strin
     }
 }
 
+/// Zähler der Abgleiche dieses Prozesses; er verschiebt den Anfang der Reihe (LLH-1630).
+static RUNDE: AtomicUsize = AtomicUsize::new(0);
+
+/// Die Liste ab einer Stelle, die mit jedem Abgleich weiterrückt: Was am Ende der Reihe steht,
+/// kommt so auch dran, wenn Budget oder [`EINSAETZE_MAX`] vorher ausgehen (LLH-1630).
+fn reihum<T>(mut liste: Vec<T>, runde: usize) -> Vec<T> {
+    if !liste.is_empty() {
+        let n = liste.len();
+        liste.rotate_left(runde % n);
+    }
+    liste
+}
+
 /// Stände der Spiegel dieser Instanz für eine Kopplung.
 async fn eigene_staende(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<EinsatzStand>, AppError> {
-    // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann die jüngsten. Ein
-    // abgeschlossener Spiegel, der hier fehlt, bekommt nichts mehr (der Führer liefert nur
-    // laufende Einsätze ungenannt).
-    let zeilen: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT s.fremde_kennung, s.stand FROM einsatz_spiegel s \
+    // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann reihum die übrigen. Ein
+    // abgeschlossener Spiegel, der hier fehlt, bekommt in diesem Abgleich nichts (der Führer
+    // liefert nur laufende Einsätze ungenannt). Spiegel enden erst mit dem Widerruf, über Jahre
+    // werden es also mehr als ein Paket trägt; eine feste Auswahl schnitte immer dieselben ab, und
+    // deren Nachträge kämen nie an (LLH-1630).
+    let zeilen: Vec<(String, i64, bool)> = sqlx::query_as(
+        "SELECT s.fremde_kennung, s.stand, e.status <> 'abgeschlossen' FROM einsatz_spiegel s \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
          JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
-         ORDER BY e.status = 'abgeschlossen', s.einsatz_id DESC LIMIT ?",
+         ORDER BY s.einsatz_id DESC",
     )
     .bind(kopplung_id)
-    .bind(super::paket::EINSAETZE_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
-    Ok(zeilen
+    Ok(auswahl_staende(
+        zeilen,
+        RUNDE.fetch_add(1, Ordering::Relaxed),
+    ))
+}
+
+/// Die laufenden zuerst, dann die übrigen, je Gruppe reihum, zusammen höchstens
+/// [`EINSAETZE_MAX`].
+fn auswahl_staende(zeilen: Vec<(String, i64, bool)>, runde: usize) -> Vec<EinsatzStand> {
+    let (laufend, uebrig): (Vec<_>, Vec<_>) = zeilen.into_iter().partition(|z| z.2);
+    let mut auswahl = if laufend.len() > EINSAETZE_MAX {
+        reihum(laufend, runde)
+    } else {
+        laufend
+    };
+    auswahl.truncate(EINSAETZE_MAX);
+    let frei = EINSAETZE_MAX - auswahl.len();
+    if uebrig.len() > frei {
+        auswahl.extend(reihum(uebrig, runde).into_iter().take(frei));
+    } else {
+        auswahl.extend(uebrig);
+    }
+    auswahl
         .into_iter()
-        .map(|(kennung, stand)| EinsatzStand { kennung, stand })
-        .collect())
+        .map(|(kennung, stand, _)| EinsatzStand { kennung, stand })
+        .collect()
 }
 
 /// Liefert die geführten Einsätze aller aktiven Orgs ab den genannten Ständen.
@@ -72,7 +109,18 @@ async fn liefere_alle(
 ) -> Result<Vec<super::paket::EinsatzLieferung>, AppError> {
     let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
     let mut lieferungen = Vec::new();
+    let mut alle = Vec::new();
     for o in orgs {
+        for e in liefern::list_gefuehrt(conn, o.org_id, staende).await? {
+            alle.push((o, e));
+        }
+    }
+    // Reihum (LLH-1630): nach der ID allein bekämen bei knappem Budget oder mehr als
+    // `EINSAETZE_MAX` wartenden Einsätzen immer dieselben den Vortritt.
+    for (o, e) in reihum(alle, RUNDE.fetch_add(1, Ordering::Relaxed)) {
+        if lieferungen.len() >= EINSAETZE_MAX {
+            break;
+        }
         let a = Absender {
             kennung: &eigen.kennung,
             kopplung_id: kopplung.id,
@@ -80,17 +128,12 @@ async fn liefere_alle(
             meldend,
         };
         let wire = org_wire(eigen, kopplung, o);
-        for e in liefern::list_gefuehrt(conn, o.org_id, staende).await? {
-            if lieferungen.len() >= super::paket::EINSAETZE_MAX {
-                return Ok(lieferungen);
-            }
-            let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
-            let seit = staende.get(&kennung).copied().unwrap_or(0);
-            if let Some(l) =
-                liefern::liefere_einsatz(conn, &a, &e, &kennung, &wire, seit, budget).await?
-            {
-                lieferungen.push(l);
-            }
+        let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
+        let seit = staende.get(&kennung).copied().unwrap_or(0);
+        if let Some(l) =
+            liefern::liefere_einsatz(conn, &a, &e, &kennung, &wire, seit, budget).await?
+        {
+            lieferungen.push(l);
         }
     }
     Ok(lieferungen)
@@ -419,4 +462,40 @@ pub async fn abgleich_einmal(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod reihum_tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    fn spiegel(laufend: usize, abgeschlossen: usize) -> Vec<(String, i64, bool)> {
+        (0..laufend)
+            .map(|i| (format!("l{i}"), 0, true))
+            .chain((0..abgeschlossen).map(|i| (format!("a{i}"), 0, false)))
+            .collect()
+    }
+
+    #[test]
+    fn mehr_spiegel_als_ein_paket_traegt_kommen_reihum_alle_dran() {
+        let mut alle = BTreeSet::new();
+        for runde in 0..400 {
+            let auswahl = auswahl_staende(spiegel(10, 400), runde);
+            assert_eq!(auswahl.len(), EINSAETZE_MAX);
+            let kennungen: BTreeSet<_> = auswahl.iter().map(|s| s.kennung.clone()).collect();
+            assert!(
+                (0..10).all(|i| kennungen.contains(&format!("l{i}"))),
+                "laufende sind immer dabei"
+            );
+            alle.extend(kennungen);
+        }
+        assert_eq!(alle.len(), 410, "jeder Spiegel kommt irgendwann dran");
+    }
+
+    #[test]
+    fn bis_zur_grenze_bleibt_alles_wie_es_ist() {
+        let auswahl = auswahl_staende(spiegel(3, 5), 7);
+        let kennungen: Vec<_> = auswahl.iter().map(|s| s.kennung.as_str()).collect();
+        assert_eq!(kennungen, ["l0", "l1", "l2", "a0", "a1", "a2", "a3", "a4"]);
+    }
 }

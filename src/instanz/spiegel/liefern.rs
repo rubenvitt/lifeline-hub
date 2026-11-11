@@ -4,7 +4,7 @@
 //! Inhalte auf Abruf gehen nur als Größe und Prüfsumme hinaus (D8).
 
 use super::abbildung;
-use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile, ABHAENGIGE_MAX};
+use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile, ABHAENGIGE_MAX, ZEILE_MAX};
 use super::schema::{self, Schema, Tabelle, Ziel};
 use crate::error::AppError;
 use crate::instanz::stammdaten::StammdatenArt;
@@ -150,20 +150,39 @@ async fn load_zeile(
         )));
     };
     let blob = match &t.blob {
-        Some(spalte) => {
-            let bytes: Option<Vec<u8>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT \"{spalte}\" FROM {} WHERE {}",
-                t.name,
-                t.schluessel.gleich(t.name)
-            )))
-            .bind(schluessel)
-            .fetch_one(&mut *conn)
-            .await?;
-            bytes.map(|b| BlobAngabe {
-                groesse: b.len() as i64,
-                sha256: hex(&Sha256::digest(&b)),
-            })
-        }
+        // Trägt die Zeile ihre Prüfsumme selbst (`anhang`, `uhs_plan`), liest die Lieferung den
+        // Inhalt nicht (LLH-1630): Größe per `length()`, Prüfsumme aus der Spalte. Stimmt die
+        // Spalte nicht, merkt es der Führer beim ersten Stück (`anhang::liefere_teile`).
+        Some(spalte) => match daten.get("sha256").and_then(Value::as_str) {
+            Some(sha256) if !sha256.is_empty() => {
+                let groesse: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                    "SELECT length(\"{spalte}\") FROM {} WHERE {}",
+                    t.name,
+                    t.schluessel.gleich(t.name)
+                )))
+                .bind(schluessel)
+                .fetch_one(&mut *conn)
+                .await?;
+                groesse.map(|groesse| BlobAngabe {
+                    groesse,
+                    sha256: sha256.to_ascii_lowercase(),
+                })
+            }
+            _ => {
+                let bytes: Option<Vec<u8>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                    "SELECT \"{spalte}\" FROM {} WHERE {}",
+                    t.name,
+                    t.schluessel.gleich(t.name)
+                )))
+                .bind(schluessel)
+                .fetch_one(&mut *conn)
+                .await?;
+                bytes.map(|b| BlobAngabe {
+                    groesse: b.len() as i64,
+                    sha256: hex(&Sha256::digest(&b)),
+                })
+            }
+        },
         None => None,
     };
     Ok(Some((daten, blob)))
@@ -351,7 +370,26 @@ async fn baue_zeile(
         geloescht,
         daten,
         blob,
+        zu_gross: false,
     })
+}
+
+/// Bytes einer Zeile im Paket.
+fn groesse(z: &Zeile) -> usize {
+    serde_json::to_vec(z).map(|v| v.len()).unwrap_or(0)
+}
+
+/// Eine Zeile über [`ZEILE_MAX`] geht ohne Daten und mit [`Zeile::zu_gross`] (LLH-1630): sonst
+/// wüchse das Paket über `SPIEGEL_MAX`, die Gegenseite lehnte es ab, und der Abgleich der ganzen
+/// Kopplung stünde. Der Stand rückt trotzdem vor; die nächste Änderung der Zeile versucht es neu.
+fn begrenzt(mut z: Zeile) -> Zeile {
+    if !z.geloescht && groesse(&z) > ZEILE_MAX {
+        tracing::warn!(art = %z.art, schluessel = %z.schluessel, "Spiegel: Zeile zu groß für den Abgleich");
+        z.daten = None;
+        z.blob = None;
+        z.zu_gross = true;
+    }
+    z
 }
 
 /// Liefert einen Einsatz seit `seit` (D6). `None`, wenn es nichts Neues gibt oder das Budget
@@ -403,19 +441,19 @@ pub async fn liefere_einsatz(
             bis = stand;
             continue;
         };
-        let z = baue_zeile(conn, a, t, &schluessel, stand).await?;
-        let groesse = serde_json::to_vec(&z).map(|v| v.len()).unwrap_or(0);
-        // Eine einzelne übergroße Zeile geht, wenn sie die erste des Pakets ist.
-        if groesse > budget.bytes
-            && !(zeilen.is_empty() && budget.zeilen == super::paket::ZEILEN_MAX)
+        let z = begrenzt(baue_zeile(conn, a, t, &schluessel, stand).await?);
+        let bytes = groesse(&z);
+        // Eine einzelne Zeile über dem Rest des Budgets geht, wenn sie die erste des Pakets ist;
+        // dort ist das Budget nie kleiner als `ZEILE_MAX`.
+        if bytes > budget.bytes && !(zeilen.is_empty() && budget.zeilen == super::paket::ZEILEN_MAX)
         {
             break;
         }
-        budget.bytes = budget.bytes.saturating_sub(groesse);
+        budget.bytes = budget.bytes.saturating_sub(bytes);
         budget.zeilen -= 1;
         drin.insert((art, schluessel));
         zeilen.push(z);
-        groessen.push(groesse);
+        groessen.push(bytes);
         bis = stand;
         if budget.zeilen == 0 || budget.bytes == 0 {
             break;
@@ -450,17 +488,25 @@ pub async fn liefere_einsatz(
             &mut versuch_budget,
         )
         .await?;
-        let mehr: usize = versuch[anzahl..]
-            .iter()
-            .map(|z| serde_json::to_vec(z).map(|v| v.len()).unwrap_or(0))
-            .sum();
-        // Eine einzelne Zeile mit übergroßen Abhängigkeiten geht nur als erste des Pakets; nach
-        // einer früheren Lieferung wartet der Einsatz auf den nächsten Abgleich.
-        let erste_des_pakets = budget.zeilen + anzahl == super::paket::ZEILEN_MAX;
-        if mehr <= budget.bytes || (anzahl == 1 && erste_des_pakets) {
+        let mehr: usize = versuch[anzahl..].iter().map(groesse).sum();
+        if mehr <= budget.bytes {
             versuch_budget.bytes = budget.bytes.saturating_sub(mehr);
             *budget = versuch_budget;
             zeilen = versuch;
+            break;
+        }
+        // Eine einzelne Zeile, deren Abhängigkeiten nicht einmal in ein leeres Paket passen, geht
+        // als zu groß (LLH-1630), statt das Paket über `SPIEGEL_MAX` zu treiben. Nach einer
+        // früheren Lieferung wartet der Einsatz auf den nächsten Abgleich.
+        let erste_des_pakets = budget.zeilen + anzahl == super::paket::ZEILEN_MAX;
+        if anzahl == 1 && erste_des_pakets {
+            let mut z = zeilen[0].clone();
+            z.daten = None;
+            z.blob = None;
+            z.zu_gross = true;
+            tracing::warn!(art = %z.art, schluessel = %z.schluessel, "Spiegel: Zeile mit Bezügen zu groß für den Abgleich");
+            budget.bytes = (budget.bytes + groessen[0]).saturating_sub(groesse(&z));
+            zeilen = vec![z];
             break;
         }
         if anzahl == 1 {
@@ -553,7 +599,7 @@ async fn abhaengige(
             let Some(t) = schema.tabelle(art) else {
                 continue;
             };
-            let z = baue_zeile(conn, a, t, &schluessel, stand).await?;
+            let z = begrenzt(baue_zeile(conn, a, t, &schluessel, stand).await?);
             if z.geloescht {
                 continue;
             }

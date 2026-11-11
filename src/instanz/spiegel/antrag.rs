@@ -1187,6 +1187,20 @@ mod tests {
         );
     }
 
+    /// Jede beantragbare Art trägt eine `client_id` (LLH-1630). Stürzt der Führer nach der
+    /// Ausführung und vor dem Speichern der Quittung ab, kommt der Antrag wieder; die Route
+    /// erkennt ihn dann an der `client_id` wie ein Replay der Warteschlange (ADR-0008) und legt
+    /// nichts zweimal an. Eine Art ohne `client_id` bräuchte eine andere Sicherung.
+    #[test]
+    fn jede_beantragbare_art_traegt_eine_client_id() {
+        let ohne: Vec<&str> = BEANTRAGBAR
+            .iter()
+            .filter(|b| b.client_id.is_none())
+            .map(|b| b.art)
+            .collect();
+        assert!(ohne.is_empty(), "beantragbar ohne client_id: {ohne:?}");
+    }
+
     /// Jede Routenvorlage gibt es im Router, und ihre Pfadparameter sind abgebildet.
     #[test]
     fn jede_vorlage_steht_im_router_und_jeder_parameter_ist_abgebildet() {

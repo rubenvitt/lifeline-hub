@@ -14091,6 +14091,135 @@ mod tests {
     }
 
     /// LLH-1610: Der Stand einer Planung beginnt für den Bestand bei 0 und ist nie negativ.
+    /// LLH-1630: `einsatz_planschicht_person` bekommt `id`; die alten rowids werden zu `id`, damit
+    /// Änderungslog und Spiegel-Herkunft weiter passen. Indizes und Spiegel-Trigger kommen wieder.
+    #[tokio::test]
+    async fn migration_0315_planschicht_person_id() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 315;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let block: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_planschicht (einsatz_id, posten_art, von, bis) \
+             VALUES (?, 'pause', '2026-11-11 08:00:00', '2026-11-11 16:00:00') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut helfer = Vec::new();
+        for name in ["Anna", "Ben", "Cem"] {
+            let h: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_plan_helfer (einsatz_id, name, angelegt_von) \
+                 VALUES (?, ?, ?) RETURNING id",
+            )
+            .bind(e)
+            .bind(name)
+            .bind(b)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            helfer.push(h);
+        }
+        for h in &helfer {
+            sqlx::query(
+                "INSERT INTO einsatz_planschicht_person (planschicht_id, helfer_id) VALUES (?, ?)",
+            )
+            .bind(block)
+            .bind(h)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        // Eine Lücke in den rowids: die mittlere Zeile fällt weg.
+        sqlx::query("DELETE FROM einsatz_planschicht_person WHERE helfer_id = ?")
+            .bind(helfer[1])
+            .execute(&pool)
+            .await
+            .unwrap();
+        let vorher: Vec<(i64, i64)> = sqlx::query_as(
+            "SELECT rowid, helfer_id FROM einsatz_planschicht_person ORDER BY rowid",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(vorher.len(), 2);
+
+        migriere_bis(&pool, VERSION).await;
+
+        let nachher: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT id, helfer_id FROM einsatz_planschicht_person ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(nachher, vorher, "id = alte rowid, Lücke bleibt");
+        let pk: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_table_info('einsatz_planschicht_person') WHERE pk > 0",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(pk, ["id"]);
+        let mut objekte: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE tbl_name = 'einsatz_planschicht_person' \
+             AND type IN ('index', 'trigger') AND name NOT LIKE 'sqlite_%'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        objekte.sort();
+        assert_eq!(
+            objekte,
+            [
+                "einsatz_planschicht_person_spiegellog_d",
+                "einsatz_planschicht_person_spiegellog_i",
+                "einsatz_planschicht_person_spiegellog_u",
+                "einsatz_planschicht_person_spiegelschutz_d",
+                "einsatz_planschicht_person_spiegelschutz_i",
+                "einsatz_planschicht_person_spiegelschutz_u",
+                "idx_planschicht_person_block",
+                "idx_planschicht_person_einsatz",
+                "idx_planschicht_person_helfer",
+                "idx_planschicht_person_stamm",
+                "uq_planschicht_person_einsatz",
+                "uq_planschicht_person_helfer",
+                "uq_planschicht_person_stamm",
+            ]
+        );
+        // Doppelte Person im Block bleibt verboten, und das Log nennt die Zeile über ihre id.
+        sqlx::query(
+            "INSERT INTO einsatz_planschicht_person (planschicht_id, helfer_id) VALUES (?, ?)",
+        )
+        .bind(block)
+        .bind(helfer[0])
+        .execute(&pool)
+        .await
+        .expect_err("Person je Block einmal");
+        let neu: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_planschicht_person (planschicht_id, helfer_id) \
+             VALUES (?, ?) RETURNING id",
+        )
+        .bind(block)
+        .bind(helfer[1])
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let im_log: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM einsatz_aenderung WHERE einsatz_id = ? \
+             AND art = 'einsatz_planschicht_person' AND schluessel = ?)",
+        )
+        .bind(e)
+        .bind(neu.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(im_log, "Log-Trigger schreibt die id");
+    }
+
     #[tokio::test]
     async fn migration_0313_planung_stand() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
