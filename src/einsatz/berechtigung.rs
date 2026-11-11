@@ -191,24 +191,16 @@ pub fn fordere_schreibrecht_oder_admin(
     fordere_schreibrecht(rolle)
 }
 
-/// Stellt sicher, dass der Einsatz noch aktiv (beschreibbar) ist und diese Instanz ihn führt.
-/// `Conflict` (409) bei abgeschlossenem (read-only) Einsatz und, wenn eine andere gekoppelte
-/// Instanz ihn führt, mit „Führung liegt bei …“ (LLH-1491, Spec `instanz-fuehrung`; ADR-0020).
+/// Stellt sicher, dass der Einsatz noch aktiv (beschreibbar) ist: `Conflict` (409) bei
+/// abgeschlossenem (read-only) Einsatz. Führt eine andere gekoppelte Instanz, ist der Einsatz hier
+/// ein Spiegel, und dessen Schutz-Trigger antworten mit 409 (LLH-1641; ADR-0018, ADR-0021).
 pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
     if !einsatz.ist_aktiv() {
         return Err(AppError::Conflict(
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
         ));
     }
-    match &einsatz.fuehrung.fuehrung_bei {
-        Some(bei) => Err(fuehrung_error(bei)),
-        None => Ok(()),
-    }
-}
-
-/// 409 „Führung liegt bei …“: eine andere Instanz schreibt den Einsatz (LLH-1491).
-pub fn fuehrung_error(bei: &str) -> AppError {
-    AppError::Conflict(format!("Führung liegt bei „{bei}“."))
+    Ok(())
 }
 
 /// Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
@@ -946,16 +938,13 @@ mod tests {
         ));
     }
 
-    /// LLH-1491: führt eine andere Instanz, ist jeder Schreibweg 409 mit ihrem Namen; ein
-    /// abgeschlossener Einsatz nennt weiter den Abschluss.
+    /// LLH-1641: die Akte allein sperrt nicht; führt eine andere Instanz, schützt der Spiegel
+    /// (Trigger). Ein abgeschlossener Einsatz nennt weiter den Abschluss.
     #[test]
-    fn fordere_aktiv_blockt_fremde_fuehrung() {
+    fn fordere_aktiv_prueft_nur_den_abschluss() {
         let mut e = einsatz_mit_status(EinsatzStatus::Aktiv);
-        e.fuehrung.fuehrung_bei = Some("Hub Nord".into());
-        match fordere_aktiv(&e).unwrap_err() {
-            AppError::Conflict(t) => assert_eq!(t, "Führung liegt bei „Hub Nord“."),
-            f => panic!("{f:?}"),
-        }
+        e.fuehrung.fuehrung_fremd = true;
+        assert!(fordere_aktiv(&e).is_ok());
         e.status = EinsatzStatus::Abgeschlossen;
         match fordere_aktiv(&e).unwrap_err() {
             AppError::Conflict(t) => assert!(t.contains("abgeschlossen"), "{t}"),

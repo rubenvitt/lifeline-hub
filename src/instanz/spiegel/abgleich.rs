@@ -79,8 +79,9 @@ async fn eigene_staende(
     // liefert nur laufende Einsätze ungenannt). Spiegel enden erst mit dem Widerruf, über Jahre
     // werden es also mehr als ein Paket trägt; eine feste Auswahl schnitte immer dieselben ab, und
     // deren Nachträge kämen nie an (LLH-1630).
-    let zeilen: Vec<(String, i64, bool)> = sqlx::query_as(
-        "SELECT s.fremde_kennung, s.stand, e.status <> 'abgeschlossen' FROM einsatz_spiegel s \
+    let zeilen: Vec<(String, i64, bool, i64)> = sqlx::query_as(
+        "SELECT s.fremde_kennung, s.stand, e.status <> 'abgeschlossen', s.einsatz_id \
+         FROM einsatz_spiegel s \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
          JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
@@ -90,10 +91,24 @@ async fn eigene_staende(
     .bind(kopplung_id)
     .fetch_all(&mut *conn)
     .await?;
-    Ok(auswahl_staende(
-        zeilen,
+    let einsaetze: HashMap<String, i64> = zeilen
+        .iter()
+        .map(|(kennung, _, _, id)| (kennung.clone(), *id))
+        .collect();
+    let mut staende = auswahl_staende(
+        zeilen
+            .into_iter()
+            .map(|(kennung, stand, laufend, _)| (kennung, stand, laufend))
+            .collect(),
         naechste_runde(&RUNDE_STAENDE, kopplung_id),
-    ))
+    );
+    // Dazu die offenen Fragen der Bruchstelle (LLH-1641, E6).
+    for s in &mut staende {
+        if let Some(&einsatz_id) = einsaetze.get(&s.kennung) {
+            s.bruch = super::fuehrung::offene_bruch_fragen(conn, einsatz_id).await?;
+        }
+    }
+    Ok(staende)
 }
 
 /// Die laufenden zuerst, dann die übrigen, je Gruppe reihum, zusammen höchstens
@@ -121,7 +136,11 @@ fn auswahl_staende(zeilen: Vec<(String, i64, bool)>, runde: usize) -> Vec<Einsat
     }
     auswahl
         .into_iter()
-        .map(|(kennung, stand, _)| EinsatzStand { kennung, stand })
+        .map(|(kennung, stand, _)| EinsatzStand {
+            kennung,
+            stand,
+            bruch: Vec::new(),
+        })
         .collect()
 }
 
@@ -183,7 +202,12 @@ async fn uebernehme_alle(
         let Some(o) = orgs.iter().find(|o| org_wire(eigen, kopplung, o) == l.org) else {
             continue;
         };
-        if !l.kennung.starts_with(&praefix) {
+        // Nach einem Führungswechsel liefert der neue Führer auch Einsätze mit fremder Kennung;
+        // dann nennt ihn die Akte hier (LLH-1641, E3).
+        if !l.kennung.starts_with(&praefix)
+            && !super::fuehrung::fuehrt_laut_akte(conn, &l.kennung, &kopplung.gegenueber_kennung)
+                .await?
+        {
             tracing::warn!(kennung = %l.kennung, "Spiegel: Lieferung eines fremden Einsatzes verworfen");
             continue;
         }
@@ -232,9 +256,14 @@ async fn uebernehme_alle(
                 }
             }
         }
+        let bruch = match erg.einsatz_id {
+            Some(id) => super::fuehrung::offene_bruch_fragen(conn, id).await?,
+            None => Vec::new(),
+        };
         staende.push(EinsatzStand {
             kennung: l.kennung.clone(),
             stand: erg.stand,
+            bruch,
         });
     }
     Ok(staende)
@@ -353,8 +382,15 @@ pub async fn handle_abgleich(
     let antwort = crate::write_retry!(pool, |conn| {
         uebernommen = Uebernommen::default();
         let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+        // Bruchstellen vor den Lieferungen klären (LLH-1641, E6).
+        let geklaert =
+            super::fuehrung::uebernimm_bruch_antworten(conn, kopplung.id, &anfrage.bruch_antworten)
+                .await?;
+        uebernommen.einsaetze.extend(geklaert);
         let mut staende_antwort =
             uebernehme_alle(conn, eigen, kopplung, &orgs, anfrage, &mut uebernommen).await?;
+        let bruch_antworten =
+            super::fuehrung::beantworte_staende(conn, kopplung.id, &anfrage.staende).await?;
         let staende: HashMap<String, i64> = anfrage
             .staende
             .iter()
@@ -428,6 +464,7 @@ pub async fn handle_abgleich(
             quittungen: quittungen.clone(),
             lebensende: geloescht,
             lebensende_quittungen,
+            bruch_antworten,
         })
     })?;
     melde_live(pool, &uebernommen).await;
@@ -461,6 +498,9 @@ pub async fn abgleich_einmal(
     let mut abgerufen: Vec<super::paket::AnhangAbruf> = Vec::new();
     // Gelöschte Einsätze, die das Gegenüber noch spiegelt (aus seiner letzten Antwort).
     let mut geloescht_offen: Vec<Lebensende> = Vec::new();
+    // Antworten auf Bruchstellen, nach denen die erreichte Seite in ihrer Antwort fragte; sie gehen
+    // mit der nächsten Runde hinaus (LLH-1641, E6).
+    let mut bruch_antworten: Vec<super::paket::BruchAntwort> = Vec::new();
     for runde in 0..RUNDEN_MAX {
         let jetzt = crate::zeit::jetzt();
         let anfrage = crate::write_retry!(pool, |conn| {
@@ -503,6 +543,7 @@ pub async fn abgleich_einmal(
                 quittungen,
                 lebensende,
                 lebensende_quittungen: Vec::new(),
+                bruch_antworten: bruch_antworten.clone(),
             })
         })
         .map_err(fehler)?;
@@ -541,7 +582,17 @@ pub async fn abgleich_einmal(
                 .execute(&mut *conn)
                 .await?;
             }
+            // Bruchstellen vor den Lieferungen klären (LLH-1641, E6).
+            let geklaert = super::fuehrung::uebernimm_bruch_antworten(
+                conn,
+                kopplung.id,
+                &antwort.bruch_antworten,
+            )
+            .await?;
+            uebernommen.einsaetze.extend(geklaert);
             uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
+            bruch_antworten =
+                super::fuehrung::beantworte_staende(conn, kopplung.id, &antwort.staende).await?;
             let fertig =
                 super::anhang::uebernehme_teile(conn, kopplung.id, &antwort.anhang_teile).await?;
             uebernommen.einsaetze.extend(fertig);
@@ -604,7 +655,8 @@ pub async fn abgleich_einmal(
         let weiter = !abgerufen.is_empty()
             || !antwort.anhang_teile.is_empty()
             || ausgefuehrt
-            || !geloescht_offen.is_empty();
+            || !geloescht_offen.is_empty()
+            || !bruch_antworten.is_empty();
         if !weiter || runde + 1 == RUNDEN_MAX {
             break;
         }

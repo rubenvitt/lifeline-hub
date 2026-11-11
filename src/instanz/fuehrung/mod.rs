@@ -3,14 +3,14 @@
 //! wandert per Übergabe, Anfrage oder Notübernahme; jede Änderung vergibt eine neue Epoche.
 //!
 //! - [`Epoche`]: Paar aus Zähler und Kennung der vergebenden Instanz, das größere gilt (D2).
-//! - [`repo`]: Akte je Einsatz, Verlauf, Schreibsperre `einsatz.fuehrung_bei` (D1, D4).
+//! - [`repo`]: Akte je Einsatz und Verlauf (D1, D4); die Akte richtet den Spiegel aus (LLH-1641).
 //! - [`erklaerung`]: Erklärung der Notübernahme, Unterschrift und Abgabecode (D6, D8).
 //! - [`austausch`]: Akten in der Meldung, Annahmeregel nach Richtung (D3, D7, D10).
 //! - [`dienst`]: die Bedienung (Übergabe, Code, Notübernahme, Bestätigen, Widersprechen, D9).
 //!
 //! Der Schalter `LIFELINE_FUEHRUNG` steht in `instanz_identitaet.fuehrung_an` (beim Start
-//! geschrieben). Ohne ihn tauscht die Instanz keine Akten aus, sperrt nichts und antwortet auf die
-//! Routen der Führung mit 404.
+//! geschrieben). Ohne ihn tauscht die Instanz keine Akten aus, ändert an Führer und Spiegel nichts
+//! (der Stand bleibt eingefroren) und antwortet auf die Routen der Führung mit 404.
 
 pub mod austausch;
 pub mod dienst;
@@ -101,10 +101,12 @@ pub struct EinsatzFuehrung {
 }
 
 /// Spalten der Führung am geladenen Einsatz (`einsatz::repo`, Makros `fuehrung_spalten!` und
-/// `fuehrung_joins!`). `fuehrung_bei` trägt die Schreibsperre ([`repo::sync_sperre`]).
+/// `fuehrung_joins!`). Nur Anzeige: Geschützt ist ein Einsatz, den eine andere Instanz führt, als
+/// Spiegel (LLH-1641, ADR-0018/0020).
 #[derive(Debug, Clone, Default, PartialEq, Eq, sqlx::FromRow)]
 pub struct FuehrungSpalten {
-    pub fuehrung_bei: Option<String>,
+    /// Die Akte nennt eine andere Instanz als Führer.
+    pub fuehrung_fremd: bool,
     pub fuehrung_epoche: Option<i64>,
     pub fuehrung_fuehrer: Option<String>,
     pub fuehrung_offen: bool,
@@ -113,7 +115,7 @@ pub struct FuehrungSpalten {
 impl FuehrungSpalten {
     pub fn anzeige(&self) -> Option<EinsatzFuehrung> {
         Some(EinsatzFuehrung {
-            fuehrend: self.fuehrung_bei.is_none(),
+            fuehrend: !self.fuehrung_fremd,
             bei: self.fuehrung_fuehrer.clone()?,
             epoche: self.fuehrung_epoche?,
             offen: self.fuehrung_offen,
@@ -141,8 +143,9 @@ pub async fn fordere_enabled(pool: &SqlitePool) -> Result<(), AppError> {
     }
 }
 
-/// Schreibt beim Start den Schalter und richtet die Schreibsperre danach aus: aus → kein Einsatz
-/// gesperrt, an → die Akten entscheiden (design.md D4, Rückweg).
+/// Schreibt beim Start den Schalter. An: die Akten entscheiden, Spiegel folgen ihnen. Aus: es
+/// bleibt, wie es ist (LLH-1641, E8; ein Spiegel wird nicht wieder beschreibbar, weil der Schalter
+/// fällt, sonst schrieben zwei Instanzen).
 pub async fn save_schalter(pool: &SqlitePool, an: bool) -> Result<(), AppError> {
     crate::instanz::identitaet::load_or_create(pool)
         .await
@@ -151,9 +154,11 @@ pub async fn save_schalter(pool: &SqlitePool, an: bool) -> Result<(), AppError> 
         .bind(an)
         .execute(pool)
         .await?;
-    crate::write_retry!(pool, |conn| { repo::sync_sperre_alle(conn).await })?;
     if an {
-        crate::write_retry!(pool, |conn| { repo::ensure_akten(conn).await })?;
+        crate::write_retry!(pool, |conn| {
+            repo::ensure_akten(conn).await?;
+            crate::instanz::spiegel::fuehrung::richte_alle_aus(conn).await
+        })?;
     }
     Ok(())
 }

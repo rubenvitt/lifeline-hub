@@ -79,6 +79,13 @@ export function antragZaehler(
   return teile;
 }
 
+/** Eigene Änderungen aus der Zeit vor dem Führungswechsel, die der neue Führer nicht kannte
+ *  (Bruchstelle, LLH-1641); ohne solche nichts. */
+export function bruchText(s: Pick<EinsatzSpiegelAnzeige, 'bruchstelle'>): string | null {
+  if (!s.bruchstelle) return null;
+  return `${s.bruchstelle} ${s.bruchstelle === 1 ? 'Änderung' : 'Änderungen'} nicht übernommen`;
+}
+
 /** Was beantragt wurde, als Wort; Arten wie in der Warteschlange. */
 const ART_WORT: Readonly<Record<string, string>> = {
   etb: 'ETB-Eintrag',

@@ -352,8 +352,10 @@ sequenceDiagram
 
 Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
 Führungsakten aus (LLH-1491,
-[ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md)). Genau eine
-Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung).
+[ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md)). Genau eine
+Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung). Seit LLH-1641
+entscheidet die Akte, wer führt, und der Spiegel folgt ihr: wer die Führung abgibt, wird Spiegel
+mit Anträgen; wer sie bekommt, schreibt den bisherigen Spiegel weiter.
 
 ```mermaid
 sequenceDiagram
@@ -370,7 +372,7 @@ sequenceDiagram
   H-->>E: Akte (n+1, Hub) mit Erklärung und Unterschrift
   alt Unterschrift von einem am ELW gültigen Schlüssel
     E->>E: offen halten, ELW schreibt weiter, Benachrichtigung „Führung übernommen“
-    EL->>E: Übernahme bestätigen (Sperre, Bruchstelle) oder Widersprechen (n+2, ELW)
+    EL->>E: Übernahme bestätigen (ELW wird Spiegel, Bruchstelle) oder Widersprechen (n+2, ELW)
   else ungültig
     E->>E: verwerfen, ELW führt mit (n+2, ELW), Alarm, Admin-Spur
   end
@@ -380,8 +382,18 @@ sequenceDiagram
 - Die erreichte Seite (Hub) nimmt eine höhere Epoche der meldenden ohne Beweis an; die meldende
   (ELW) nur mit Unterschrift oder Abgabecode und nach der Entscheidung eines Menschen
   (`austausch::entscheide`).
-- Die Sperre sitzt in `fordere_aktiv` und `fordere_aktiv_in_tx` (`einsatz.fuehrung_bei`); die
-  Bedienung zieht `EinsatzFuehrungszugriff` ohne diese Prüfung.
+- Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
+  `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
+  (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.
+- Übergabe geht nur abgeglichen (`fordere_abgeglichen`, sonst 409 „Abgleich läuft noch“); eine
+  Anfrage wartet am Führer (`anfrage_von`), bis der Anfragende alles hat. Eine Notübernahme geht
+  nur an einem Einsatz, der hier als Spiegel vorliegt.
+- Nach dem Wechsel liefert der neue Führer; der Kopf jeder Zeile trägt im Feld `gegen` den
+  Schlüssel des Empfängers, damit Zeilen beider Seiten zusammenfinden. Was die abgelöste Seite
+  nach der Bruchstelle schrieb, fragt sie beim Führer nach (`EinsatzStand.bruch`); was er nicht
+  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`.
+- Offene Anträge der neuen führenden Seite führt sie selbst aus (`antrag::fuehre_eigene_aus`),
+  genau einmal; Anhänge, die ihr fehlen, holt sie beim alten Führer.
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht
   (`tests/instanz_fuehrung.rs`).
 

@@ -428,6 +428,30 @@ async fn scrub_je_art_trifft_nur_die_zielperson() {
     fk_check_leer(&pool).await;
 }
 
+/// Die Bruchstelle eines Führungswechsels (LLH-1641) kann die Person als JSON enthalten; sie geht
+/// mit, die eines anderen Einsatzes bleibt.
+#[tokio::test]
+async fn scrub_nimmt_die_bruchstelle_des_einsatzes_mit() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    for e in [b.e1, b.e2] {
+        sqlx::query(
+            "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, daten, \
+             gesichert_at) VALUES (?, 'einsatz_person', '1', 1, '{}', '2026-11-11 12:00:00')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    scrub(&pool, b.e1, PersonenArt::Betroffene, b.p1).await;
+    let rest: Vec<i64> = sqlx::query_scalar("SELECT einsatz_id FROM einsatz_bruchstelle")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rest, vec![b.e2]);
+}
+
 /// Die Einsatzgrenze hält: ein Scrub mit der ID einer Person, aber dem falschen Einsatz,
 /// ändert nichts — auch nicht an Zeilen, die per FK auf sie zeigen.
 #[tokio::test]

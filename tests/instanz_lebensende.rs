@@ -151,10 +151,17 @@ async fn ein_ohne_netz_angelegter_einsatz_wird_ebenso_verwahrt() {
     // fällige Verwahrung trotzdem hinaus.
     abgleichen(&elw).await;
 
-    let k = format!(
-        "{}/{e}",
+    // Die Kennung trägt einen Zufallsteil (`<instanz>/<id>-<zufall>`, LLH-1641); den Einsatz gibt
+    // es am ELW nicht mehr, also am Hub über das Präfix suchen.
+    let praefix = format!(
+        "{}/{e}-",
         eine::<String>(&elw.pool, "SELECT kennung FROM instanz_identitaet").await
     );
+    let k: String = eine(
+        &hub.pool,
+        &format!("SELECT kennung FROM einsatz WHERE kennung LIKE '{praefix}%'"),
+    )
+    .await;
     let (h, spiegel) = am_hub(&hub, &k).await;
     assert!(!spiegel);
     assert!(etb_texte(&hub.pool, h)

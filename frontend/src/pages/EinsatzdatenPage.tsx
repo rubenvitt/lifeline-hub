@@ -57,7 +57,7 @@ import { teilwortSuche } from '../components/teilwortSuche';
 import { MELDENDE_STELLE_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
-import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
+import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN, spiegelGrund } from '../components/nurAnsicht';
 import { InlineAngabe, type InlineEingabe } from '../components/InlineAngabe';
 import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
@@ -1214,11 +1214,20 @@ export default function EinsatzdatenPage() {
       }
       dataUpdatedAt={einsatzQuery.dataUpdatedAt}
       weitere={{ name: 'Weitere Aktionen zu den Einsatzdaten', eintraege: nebenwege }}
-      // Am aktiven Einsatz ohne Verwaltungsrecht der Grund; bedingt übergeben, sonst bliebe ein
-      // leerer Slot mit Außenabstand (wie `StabPage`).
+      // Am aktiven Einsatz ohne Verwaltungsrecht der Grund (am Spiegel die führende Instanz,
+      // LLH-1641); bedingt übergeben, sonst bliebe ein leerer Slot mit Außenabstand (wie `StabPage`).
       hinweis={
         einsatz.status === 'aktiv' &&
-        !darfBearbeiten && <RechteHinweis sichtbar text={NUR_LEITUNG_FUEHRUNG_ORG_ADMIN} />
+        !darfBearbeiten && (
+          <RechteHinweis
+            sichtbar
+            text={
+              einsatz.spiegel
+                ? spiegelGrund(einsatz.spiegel.gegenstelle)
+                : NUR_LEITUNG_FUEHRUNG_ORG_ADMIN
+            }
+          />
+        )
       }
     >
       {/* Kopfleiste — die vier Angaben, die im Fükw zuerst gebraucht werden. Sie stehen

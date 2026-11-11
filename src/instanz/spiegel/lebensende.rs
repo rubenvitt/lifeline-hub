@@ -32,6 +32,8 @@ async fn ist_geloescht(
     let Some(id) = kennung
         .strip_prefix(eigene_kennung)
         .and_then(|r| r.strip_prefix('/'))
+        // `<id>` oder `<id>-<zufall>` (LLH-1641, E2).
+        .and_then(|r| r.split('-').next())
         .and_then(|r| r.parse::<i64>().ok())
     else {
         return Ok(false);
@@ -369,7 +371,6 @@ async fn umwandeln(
     sqlx::query("DELETE FROM spiegel_uebernahme")
         .execute(&mut *conn)
         .await?;
-    crate::instanz::fuehrung::repo::sync_sperre(conn, id).await?;
     let mut inhalt = format!("Zur Verwahrung übernommen von {}", kopplung.gegenueber_name);
     if let Some((alt, neu)) = umnummeriert {
         inhalt.push_str(&format!(" (Einsatznummer {neu}, dort {alt})"));

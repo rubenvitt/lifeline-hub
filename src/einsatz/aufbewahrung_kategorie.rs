@@ -546,6 +546,13 @@ pub async fn schwaerzen(
     }
 
     scrubbe_aus_registry(&mut tx, einsatz_id, Umfang::Kategorie(kategorie)).await?;
+    // Die Bruchstelle (LLH-1641, E6) sichert ganze Zeilen als JSON, gleich welcher Kategorie;
+    // ihre Spalten folgen in der Registry dem Einsatz. Damit keine Kopie eine kürzere Frist
+    // überlebt, geht sie mit der ersten geschwärzten Kategorie ganz.
+    sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
 
     // Personenstamm (design.md D3): erst wenn alle Zwecke der Person geschwärzt sind. Nur die
     // Kategorie dieses Laufs kann daran etwas ändern; der ETB-Eintrag nennt den Stamm deshalb
@@ -2410,6 +2417,42 @@ mod tests {
             None,
             "beide Zwecke abgelaufen"
         );
+    }
+
+    #[tokio::test]
+    async fn jede_kategorie_nimmt_die_bruchstelle_mit() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        sqlx::query(
+            "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, daten, \
+                gesichert_at) VALUES (?, 'einsatz_person', '1', 1, '{\"name\":\"Muster\"}', \
+                '2026-01-01 09:00:00')",
+        )
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+        schliessen(&pool, einsatz, leit).await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-05-01 00:00:00",
+            Some("2026-05-30 12:00:00"),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Anhaenge, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let uebrig: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(uebrig, 0);
     }
 
     #[tokio::test]

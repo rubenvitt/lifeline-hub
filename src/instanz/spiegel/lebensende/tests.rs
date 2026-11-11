@@ -304,6 +304,7 @@ async fn gemeldet_wird_nur_was_hier_geloescht_ist() {
     let stand = |k: String| EinsatzStand {
         kennung: k,
         stand: 1,
+        bruch: Vec::new(),
     };
     let staende = vec![
         stand(format!("ich/{weg}")),
@@ -433,7 +434,11 @@ async fn faellig_ist_nur_ein_abgelaufener_eigener_einsatz_ohne_hindernis() {
         .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(ende.len(), 1, "{ende:?}");
-    assert_eq!(ende[0].kennung, format!("ich/{faellig}"), "Kennung gesetzt");
+    assert!(
+        ende[0].kennung.starts_with(&format!("ich/{faellig}-")),
+        "Kennung gesetzt: {}",
+        ende[0].kennung
+    );
     assert_eq!(ende[0].art, LEBENSENDE_VERWAHRT);
     assert!(ende[0].stand > 0);
     assert_eq!(ende[0].kategorien, vec![frist("anhaenge")]);
@@ -442,7 +447,7 @@ async fn faellig_ist_nur_ein_abgelaufener_eigener_einsatz_ohne_hindernis() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(kennung, Some(format!("ich/{faellig}")));
+    assert_eq!(kennung.as_deref(), Some(ende[0].kennung.as_str()));
 
     let mut tx = pool.begin().await.unwrap();
     abraeumen::vormerken(&mut tx, faellig, AbraeumArt::Verwahrt, Some("Hub"))

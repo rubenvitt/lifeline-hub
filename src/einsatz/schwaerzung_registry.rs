@@ -241,8 +241,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("nachbereitung_bis", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
-            // Führung je Einsatz (LLH-1491): Name der führenden Instanz, Schreibsperre.
-            retain("fuehrung_bei", G_FUEHRUNG),
             // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
             retain("kennung", G_SPIEGEL),
             retain("freigabestufe", G_ENUM),
@@ -3264,6 +3262,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("bruch_at", G_ZEIT),
             retain("stand", G_ZAEHLER),
             retain("geaendert_at", G_ZEIT),
+            // LLH-1641: Herkunft nach einem Wechsel und wartende Anfrage, nur Verwaltung.
+            retain("herkunft_kopplung_id", G_FK),
+            retain("uebernommen_stand", G_SPIEGEL),
+            retain("anfrage_von", G_FUEHRUNG),
         ],
     },
     TabellenRegel {
@@ -3325,6 +3327,26 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("hinweis", G_SPIEGEL),
             retain("beendet_at", G_ZEIT),
             retain("katalog_ab", G_SPIEGEL),
+            retain("bruch_offen", G_SPIEGEL),
+        ],
+    },
+    // Bruchstelle beim Führungswechsel (LLH-1641, E6): Inhalte eigener, nicht abgeglichener
+    // Zeilen (Freitext, Personendaten), darum mit dem Einsatz weg.
+    TabellenRegel {
+        tabelle: "einsatz_bruchstelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("art", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("schluessel", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("stand", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("entfernt", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geklaert", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("gesichert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {
@@ -3398,6 +3420,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("pfad_parameter", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("pfad_lokal", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten_lokal", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("benutzer_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("client_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("erfasst_at", Strategie::ZeileLoeschen, Z_EINSATZ),

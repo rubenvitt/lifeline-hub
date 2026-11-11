@@ -15,9 +15,10 @@ Personal-Status, Einheitstypen, Einheiten-Vorlagen, Führungsfunktionen und Org-
 
 Auch die **Einsätze** der Organisation gehen über die Kopplung: Ein Einsatz, der an einer
 Installation angelegt wurde, erscheint an der anderen als **Spiegel**. Der Spiegel ist lesbar wie
-ein eigener Einsatz, mit Seiten, Druck und Suche. Geändert wird er nur dort, wo er angelegt
-wurde. Am Spiegel wird nicht geschrieben, sondern **beantragt**. Ist die **Führung je Einsatz**
-eingeschaltet, einigen sich beide je Einsatz darauf, welche Installation ihn schreibt.
+ein eigener Einsatz, mit Seiten, Druck und Suche. Geändert wird er nur dort, wo er geführt wird,
+ohne Führung je Einsatz also dort, wo er angelegt wurde. Am Spiegel wird nicht geschrieben,
+sondern **beantragt**. Ist die **Führung je Einsatz** eingeschaltet, kann die Führung wechseln:
+wer sie abgibt, hat den Einsatz danach als Spiegel; wer sie bekommt, schreibt ihn weiter.
 
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
@@ -157,6 +158,8 @@ Organisation, an der Installation, die den Einsatz führt.
 
 1. Am Einsatz „Einsatzdaten“ öffnen; das Paneel „Führung“ steht vor „Einsatzabschluss“.
 2. „Führung an … übergeben“ wählen und die Rückfrage mit „Führung übergeben“ bestätigen.
+   Steht „Abgleich läuft noch“, hat die andere Installation noch nicht alles; nach dem nächsten
+   Abgleich erneut versuchen.
 
 Ohne Verbindung zum Hub gibt die Installation, die sich meldet, die Führung per Code ab:
 „Führung per Code abgeben“, Rückfrage mit „Code erzeugen“ bestätigen und den Code, der nur
@@ -168,13 +171,14 @@ Für einen Admin der Organisation, an der Installation, die sich meldet, etwa am
 
 1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
 2. Im Paneel „Einsätze beim Gegenüber“ am Einsatz „Führung …“ wählen.
-3. „Führung anfragen“ wählen. Mit der nächsten Meldung führt diese Installation.
+3. „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
+   Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
 
 ### Notübernahme
 
-Für einen Admin der Organisation, wenn die führende Installation nicht erreichbar ist. Liegt
-der Einsatz hier, steht der Knopf im Paneel „Führung“ auf „Einsatzdaten“, sonst unter
-„Einsätze beim Gegenüber“.
+Für einen Admin der Organisation, wenn die führende Installation nicht erreichbar ist. Übernehmen
+lässt sich nur ein Einsatz, der hier schon als Spiegel vorliegt; der Knopf steht im Paneel
+„Führung“ auf „Einsatzdaten“ des Spiegels und unter „Einsätze beim Gegenüber“.
 
 1. „Notübernahme …“ wählen.
 2. Einen „Grund“ eintragen, etwa „ELW ohne Verbindung seit 40 min“.
@@ -189,7 +193,7 @@ Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, 
 
 1. Unter der Kopfleiste des Einsatzes steht „Führung übernommen von …“ mit Zeit, Unterzeichner
    und Grund.
-2. „Übernahme bestätigen“ wählen, dann ist der Einsatz hier nur noch zu lesen; oder
+2. „Übernahme bestätigen“ wählen, dann ist der Einsatz hier ein Spiegel; oder
    „Widersprechen“ wählen, dann führt diese Installation weiter.
 
 ## Hintergrund
@@ -429,12 +433,17 @@ Spiegel von Einsätzen des Hubs löscht der ELW nach der Nachbereitung. Das Kapi
 
 Die Führung je Einsatz schaltet der Betrieb mit `LIFELINE_FUEHRUNG` an beiden Installationen
 ein; ohne sie bleibt jeder Einsatz an der Installation, an der er angelegt wurde, und das Paneel
-„Führung“ fehlt. Solange Einsatzinhalte nicht zwischen den Installationen fließen, bleibt sie
-aus: eine Übergabe übergäbe sonst einen leeren Einsatz.
+„Führung“ fehlt. Wird sie wieder ausgeschaltet, bleibt jeder Einsatz bei der Installation, die
+ihn gerade führt.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
-schreibt den Einsatz; an der anderen ist er „Nur Ansicht · Führung liegt bei …“, und der
-Einsatzkopf zeigt „Führung: … · Epoche n“. Jeder Wechsel zählt die **Epoche** hoch. Erklären
+schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
+dem beantragt wird, und der Einsatzkopf zeigt „Führung: … · Epoche n“. Jeder Wechsel zählt die
+**Epoche** hoch. Übergeben lässt sich die Führung erst, wenn beide Seiten abgeglichen sind
+(sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
+führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich nachgezogen hat:
+Bis dahin zeigt das Paneel „Führung“ sie als offen, danach steht im Einsatzkopf „Führung: hier“.
+Erklären
 zwei Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
 der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
 
@@ -453,8 +462,12 @@ Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
 
 Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und
 Unterzeichner. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
-der abgelösten Installation geschrieben wurde, kennt die neue noch nicht. Die Übergabe geht
-auch nach dem Einsatzabschluss, etwa zur Verwahrung am Hub.
+der abgelösten Installation geschrieben wurde, kennt die neue nicht. Mit dem Bestätigen wird die
+abgelöste Installation zum Spiegel. Was sie seit der Bruchstelle geschrieben hat und die neue
+nicht kennt, nimmt sie aus dem Einsatz und hebt es auf; das Hinweisband zeigt dann „n Änderungen
+nicht übernommen“. Anträge, die beim Wechsel noch offen waren, führt die neue führende
+Installation genau einmal aus. Anhänge, die ihr noch fehlen, holt sie bei der bisherigen. Die
+Übergabe geht auch nach dem Einsatzabschluss, etwa zur Verwahrung am Hub.
 
 ### Hinweise an einer Kopplung
 

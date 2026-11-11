@@ -504,6 +504,9 @@ async fn beantragen(
             "Anhänge gehen an einem Spiegel nicht; ohne Anhang erneut erfassen.".into(),
         ));
     }
+    // Die Erfassung mit den eigenen Kennungen: Wird dieser Spiegel selbst Führer, führt er den
+    // Antrag damit aus (LLH-1641, E5).
+    let mut daten_lokal = daten.clone();
     let client_id = match b.client_id {
         Some(feld) => Some(
             daten
@@ -591,9 +594,13 @@ async fn beantragen(
     let jetzt = crate::zeit::jetzt();
     // Die Erfassungszeit des Antrags gilt beim Führer (Spec `spiegel-antraege`, „Der Führer
     // übernimmt im Namen des Kontos“): ohne eigene Angabe setzte er sonst die Zeit der Ausführung.
-    if let (Some(feld), Some(o)) = (erfassungszeit_feld(b.art), daten.as_object_mut()) {
-        if o.get(feld).is_none_or(Value::is_null) {
-            o.insert(feld.to_string(), Value::from(jetzt.clone()));
+    if let Some(feld) = erfassungszeit_feld(b.art) {
+        for d in [&mut daten, &mut daten_lokal] {
+            if let Some(o) = d.as_object_mut() {
+                if o.get(feld).is_none_or(Value::is_null) {
+                    o.insert(feld.to_string(), Value::from(jetzt.clone()));
+                }
+            }
         }
     }
     if let Some(c) = &client_id {
@@ -613,8 +620,8 @@ async fn beantragen(
     let id: i64 = crate::write_retry!(&state.pool, |conn| {
         Ok(sqlx::query_scalar(
             "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, pfad_parameter, \
-             pfad_lokal, daten, benutzer_id, client_id, erfasst_at, geaendert_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             pfad_lokal, daten, daten_lokal, benutzer_id, client_id, erfasst_at, geaendert_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(einsatz_id)
         .bind(b.art)
@@ -623,6 +630,7 @@ async fn beantragen(
         .bind(Value::Object(pfad_parameter.clone()).to_string())
         .bind(Value::Object(pfad_lokal.clone()).to_string())
         .bind(daten.to_string())
+        .bind(daten_lokal.to_string())
         .bind(benutzer.id)
         .bind(&client_id)
         .bind(&jetzt)
@@ -675,14 +683,17 @@ pub async fn etb_beantragen_tx(
         "ereigniszeit": jetzt,
         "client_id": client_id,
     });
+    // Ohne Verweise sind die Daten beim Führer und hier dieselben (LLH-1641, E5).
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, benutzer_id, \
-         client_id, erfasst_at, geaendert_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, daten_lokal, \
+         benutzer_id, client_id, erfasst_at, geaendert_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+         RETURNING id",
     )
     .bind(einsatz_id)
     .bind(b.art)
     .bind(b.methode)
     .bind(b.pfad)
+    .bind(daten.to_string())
     .bind(daten.to_string())
     .bind(benutzer_id)
     .bind(&client_id)
@@ -938,6 +949,18 @@ async fn ausfuehren_innen(
     .fetch_optional(pool)
     .await?;
     let Some((einsatz_id, kopplung_org_id, org_id)) = einsatz else {
+        // Hier ein Spiegel desselben Einsatzes: Die Führung wechselt gerade (LLH-1641, E5). Keine
+        // Quittung, damit der Antragsteller erneut zustellt oder ihn selbst ausführt, sobald er
+        // führt.
+        let spiegel: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM einsatz WHERE kennung = ? AND spiegel = 1)",
+        )
+        .bind(&a.kennung)
+        .fetch_one(pool)
+        .await?;
+        if spiegel {
+            return Ok(None);
+        }
         return Ok(Some(abgelehnt(a.id, "Führung liegt nicht hier.")));
     };
     let mut conn = pool.acquire().await?;
@@ -1056,6 +1079,164 @@ async fn ausfuehren_innen(
             .to_string()
     };
     Ok(Some(abgelehnt(a.id, &grund)))
+}
+
+/// Führt offene Anträge an Einsätze aus, die diese Instanz jetzt selbst führt (LLH-1641, E5): Sie
+/// gingen als Spiegel an den alten Führer und kamen nicht mehr zurück. Mit der Erfassung in den
+/// eigenen Kennungen (`daten_lokal`); `client_id` schützt vor einer zweiten Zeile, falls der alte
+/// Führer den Antrag schon ausgeführt hatte. Liefert die Einsätze, deren Anträge sich änderten.
+pub async fn fuehre_eigene_aus(pool: &SqlitePool, router: &Router) -> Result<Vec<i64>, AppError> {
+    #[allow(clippy::type_complexity)]
+    let offen: Vec<(i64, i64, String, String, String, String, Option<String>, String, i64)> =
+        sqlx::query_as(
+            "SELECT a.id, a.einsatz_id, a.art, a.methode, a.pfad_vorlage, a.pfad_lokal, \
+             a.daten_lokal, a.daten, a.benutzer_id FROM spiegel_antrag a \
+             JOIN einsatz e ON e.id = a.einsatz_id \
+             WHERE e.spiegel = 0 AND a.zustand IN ('ausstehend', 'zugestellt') ORDER BY a.id LIMIT ?",
+        )
+        .bind(ANTRAEGE_MAX as i64)
+        .fetch_all(pool)
+        .await?;
+    let mut einsaetze = Vec::new();
+    for (id, einsatz_id, art, methode, pfad, pfad_lokal, daten_lokal, daten, benutzer) in offen {
+        let b = BEANTRAGBAR
+            .iter()
+            .find(|b| b.art == art && b.pfad == pfad && b.methode == methode);
+        // Ein Antrag ohne eigene Erfassung (vor LLH-1641 gestellt) geht mit den Daten für
+        // den Führer, wenn darin keine Kennung steht: Dann sind sie hier dieselben.
+        let daten_lokal = daten_lokal.or_else(|| {
+            b.filter(|b| ohne_kennungen(b, &pfad_lokal, &daten))
+                .map(|_| daten)
+        });
+        let ergebnis = match (b, daten_lokal) {
+            (Some(b), Some(daten)) => {
+                eigen_ausfuehren(router, b, id, einsatz_id, &pfad_lokal, daten, benutzer).await?
+            }
+            _ => Some(Err("Führung gewechselt; bitte neu erfassen.".to_string())),
+        };
+        let Some(ergebnis) = ergebnis else { continue };
+        crate::write_retry!(pool, |conn| {
+            match &ergebnis {
+                // Die Zeile steht jetzt hier; der Antrag hat nichts mehr zu sagen.
+                Ok(()) => {
+                    sqlx::query("DELETE FROM spiegel_antrag WHERE id = ?")
+                        .bind(id)
+                        .execute(&mut *conn)
+                        .await?;
+                }
+                Err(grund) => {
+                    sqlx::query(
+                        "UPDATE spiegel_antrag SET zustand = 'abgelehnt', grund = ?, \
+                         geaendert_at = ? WHERE id = ?",
+                    )
+                    .bind(grund.chars().take(500).collect::<String>())
+                    .bind(crate::zeit::jetzt())
+                    .bind(id)
+                    .execute(&mut *conn)
+                    .await?;
+                }
+            }
+            Ok(())
+        })?;
+        if !einsaetze.contains(&einsatz_id) {
+            einsaetze.push(einsatz_id);
+        }
+    }
+    Ok(einsaetze)
+}
+
+/// Trägt ein Antrag keine Kennung in Pfad und Body? Dann gelten seine Daten beim Führer und
+/// hier gleich.
+fn ohne_kennungen(b: &Beantragbar, pfad_lokal: &str, daten: &str) -> bool {
+    let pfad_leer = serde_json::from_str::<serde_json::Map<String, Value>>(pfad_lokal)
+        .is_ok_and(|m| m.is_empty());
+    let Ok(wert) = serde_json::from_str::<Value>(daten) else {
+        return false;
+    };
+    pfad_leer
+        && b.body_verweise.iter().all(|v| {
+            let mut kopie = wert.clone();
+            let mut werte = Vec::new();
+            jeder_wert(&mut kopie, v.pfad, &mut werte);
+            werte.iter().all(|w| w.is_null())
+        })
+}
+
+/// Ein eigener Antrag über den Router. `None`: vorübergehend gescheitert (5xx) oder wieder als
+/// Antrag angenommen (202).
+async fn eigen_ausfuehren(
+    router: &Router,
+    b: &Beantragbar,
+    antrag_id: i64,
+    einsatz_id: i64,
+    pfad_lokal: &str,
+    daten: String,
+    benutzer: i64,
+) -> Result<Option<Result<(), String>>, AppError> {
+    let parameter: serde_json::Map<String, Value> =
+        serde_json::from_str(pfad_lokal).unwrap_or_default();
+    let mut uri = b.pfad.replace("{id}", &einsatz_id.to_string());
+    for (name, wert) in &parameter {
+        let text = match wert {
+            Value::String(s) => s.clone(),
+            w => w.to_string(),
+        };
+        if text
+            .chars()
+            .any(|c| !c.is_ascii_alphanumeric() && c != '-' && c != '_')
+        {
+            return Ok(Some(Err("Bezug nicht mehr vorhanden.".into())));
+        }
+        uri = uri.replace(&format!("{{{name}}}"), &text);
+    }
+    if uri.contains('{') {
+        return Ok(Some(Err("Bezug nicht mehr vorhanden.".into())));
+    }
+    let mut anfrage = axum::http::Request::builder()
+        .method(b.methode)
+        .uri(uri)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(daten))
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    anfrage.extensions_mut().insert(AntragAkteur {
+        benutzer_id: benutzer,
+    });
+    let antwort = router
+        .clone()
+        .oneshot(anfrage)
+        .await
+        .map_err(|e| AppError::Internal(format!("{e:?}")))?;
+    let status = antwort.status();
+    if status.is_server_error() {
+        tracing::warn!(%status, "Eigener Antrag nach Führungswechsel vorübergehend gescheitert");
+        return Ok(None);
+    }
+    let rumpf = axum::body::to_bytes(antwort.into_body(), 1024 * 1024)
+        .await
+        .unwrap_or_default();
+    let wert: Value = serde_json::from_slice(&rumpf).unwrap_or(Value::Null);
+    if status == StatusCode::ACCEPTED {
+        // Die Führung ist inzwischen wieder gewechselt, und die Route hat einen Antrag
+        // angenommen. Ist es dieser (gleiche `client_id`), bleibt er und geht an den Führer.
+        // Ist es ein neuer, ersetzt der den alten.
+        let neu = wert.pointer("/antrag/id").and_then(Value::as_i64);
+        return Ok(if neu == Some(antrag_id) {
+            None
+        } else {
+            Some(Ok(()))
+        });
+    }
+    if status.is_success() {
+        return Ok(Some(Ok(())));
+    }
+    Ok(Some(Err(if status == StatusCode::NOT_FOUND {
+        "Bezug nicht mehr vorhanden.".to_string()
+    } else {
+        wert.get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("Abgelehnt.")
+            .to_string()
+    })))
 }
 
 /// Quittungen, die der Führer als meldende Seite noch mitgeben muss.
