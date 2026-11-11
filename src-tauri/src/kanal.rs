@@ -1,9 +1,12 @@
-//! Update-Kanal der Hülle (LLH-1280): `<app_config_dir>/kanal.json` mit `{ "kanal": "alpha" }`.
+//! Update-Kanal der Hülle (LLH-1280, LLH-1545): `<app_config_dir>/kanal.json` mit
+//! `{ "kanal": "alpha" }` oder `{ "kanal": "beta" }`.
 //!
-//! Eine Hülle, die einmal als Vorabversion lief, bleibt im Alpha-Kanal, auch nachdem sie ein
-//! stabiles Release aus dem Kanal installiert hat (der Kanal führt stabile Releases mit, SemVer
-//! ordnet `1.0.0` nach `1.0.0-alpha.N` und `1.1.0` nach `1.0.1-alpha.N`). Ohne gemerkten Kanal
-//! verlöre sie mit dem ersten stabilen Update die Alphas. Eine stabil installierte Hülle, die nie
+//! Eine Vorabversion bestimmt den Kanal selbst: `…-beta.N` liest den Beta-Kanal, jede andere
+//! Vorabversion den Alpha-Kanal. Wer eine Vorabversion des anderen Kanals installiert, wechselt
+//! damit. Eine Hülle, die einmal als Vorabversion lief, bleibt in ihrem Kanal, auch nachdem sie
+//! ein stabiles Release aus dem Kanal installiert hat (beide Kanäle führen stabile Releases mit,
+//! SemVer ordnet `1.0.0` nach `1.0.0-alpha.N` und `1.0.0-beta.N`). Ohne gemerkten Kanal verlöre
+//! sie mit dem ersten stabilen Update die Vorabversionen. Eine stabil installierte Hülle, die nie
 //! eine Vorabversion war, bleibt im stabilen Kanal. Zurück zu „stabil“: Datei löschen und eine
 //! stabile Version installieren.
 //!
@@ -23,6 +26,7 @@ pub const DATEINAME: &str = "kanal.json";
 pub enum Kanal {
     Stabil,
     Alpha,
+    Beta,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,18 +34,19 @@ struct Datei {
     kanal: Kanal,
 }
 
-/// Vorabversion nach SemVer: ein `-` vor einem `+`.
-fn ist_vorab(version: &str) -> bool {
-    version.split('+').next().unwrap_or(version).contains('-')
+/// Vorabkennung nach SemVer (der Teil nach dem ersten `-` vor einem `+`), sonst `None`.
+fn vorabkennung(version: &str) -> Option<&str> {
+    let ohne_build = version.split('+').next().unwrap_or(version);
+    ohne_build.split_once('-').map(|(_, vorab)| vorab)
 }
 
-/// Der Kanal für die installierte `version`: gemerktes Alpha bleibt, sonst entscheidet die
-/// Version.
+/// Der Kanal für die installierte `version`: eine Vorabversion bestimmt ihn selbst (`beta…` →
+/// Beta, sonst Alpha), eine stabile behält den gemerkten.
 pub fn bestimmen(version: &str, gemerkt: Option<Kanal>) -> Kanal {
-    if gemerkt == Some(Kanal::Alpha) || ist_vorab(version) {
-        Kanal::Alpha
-    } else {
-        Kanal::Stabil
+    match vorabkennung(version) {
+        Some(vorab) if vorab.split('.').next() == Some("beta") => Kanal::Beta,
+        Some(_) => Kanal::Alpha,
+        None => gemerkt.unwrap_or(Kanal::Stabil),
     }
 }
 
@@ -70,9 +75,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn vorabversion_ist_alpha() {
+    fn vorabversion_bestimmt_den_kanal() {
         assert_eq!(bestimmen("1.0.0-alpha.130", None), Kanal::Alpha);
-        assert_eq!(bestimmen("1.1.0-beta.2+abc", None), Kanal::Alpha);
+        assert_eq!(bestimmen("1.1.0-beta.2+abc", None), Kanal::Beta);
+        assert_eq!(bestimmen("1.0.0-beta.1", None), Kanal::Beta);
+        // Eine andere Vorabkennung bleibt beim Alpha-Kanal wie vor LLH-1545.
+        assert_eq!(bestimmen("1.0.0-rc.1", None), Kanal::Alpha);
+        // „betaX“ ist nicht „beta“.
+        assert_eq!(bestimmen("1.0.0-betax.1", None), Kanal::Alpha);
+    }
+
+    #[test]
+    fn installierte_vorabversion_wechselt_den_gemerkten_kanal() {
+        assert_eq!(bestimmen("1.0.0-beta.1", Some(Kanal::Alpha)), Kanal::Beta);
+        assert_eq!(
+            bestimmen("1.0.0-alpha.181", Some(Kanal::Beta)),
+            Kanal::Alpha
+        );
+        assert_eq!(bestimmen("1.0.0-beta.1", Some(Kanal::Stabil)), Kanal::Beta);
     }
 
     #[test]
@@ -84,8 +104,9 @@ mod tests {
     }
 
     #[test]
-    fn gemerktes_alpha_bleibt_nach_stabilem_update() {
+    fn gemerkter_vorabkanal_bleibt_nach_stabilem_update() {
         assert_eq!(bestimmen("1.0.0", Some(Kanal::Alpha)), Kanal::Alpha);
+        assert_eq!(bestimmen("1.0.0", Some(Kanal::Beta)), Kanal::Beta);
     }
 
     #[test]
@@ -97,6 +118,11 @@ mod tests {
         assert!(fs::read_to_string(pfad(&unter))
             .unwrap()
             .contains(r#""kanal": "alpha""#));
+        schreiben(&unter, Kanal::Beta).unwrap();
+        assert_eq!(lesen(&unter), Some(Kanal::Beta));
+        assert!(fs::read_to_string(pfad(&unter))
+            .unwrap()
+            .contains(r#""kanal": "beta""#));
     }
 
     #[test]
@@ -105,7 +131,7 @@ mod tests {
         assert_eq!(lesen(dir.path()), None);
         fs::write(pfad(dir.path()), "{ kein json").unwrap();
         assert_eq!(lesen(dir.path()), None);
-        fs::write(pfad(dir.path()), r#"{ "kanal": "beta" }"#).unwrap();
+        fs::write(pfad(dir.path()), r#"{ "kanal": "gamma" }"#).unwrap();
         assert_eq!(lesen(dir.path()), None);
     }
 }

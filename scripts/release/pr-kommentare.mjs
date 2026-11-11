@@ -20,6 +20,11 @@
  * Merge-Commit in diesem Bereich liegt — wie beim Plugin also auch zweimal je PR im Normalfall
  * (Vorabversion auf `alpha`, dann stabil nach `alpha → main`).
  *
+ * DAS ERSTE RELEASE EINES VORABKANALS KOMMENTIERT NICHTS (LLH-1545): ohne Vorgänger im Kanal
+ * reichte der Bereich bis zum Anfang, und `1.0.0-beta.1` hätte jeden je gemergten PR noch einmal
+ * kommentiert, jeder schon mit seiner Alpha. Das erste STABILE Release kommentiert weiter die
+ * ganze Historie (es ist der Weg zur Version, die bleibt).
+ *
  * KEIN PR ZWEIMAL ZUM SELBEN TAG: der Text trägt eine unsichtbare Marke mit dem Tag; liegt sie
  * schon am PR, entfällt der Kommentar. Ein wiederholter Freigabe-Job ist damit harmlos.
  *
@@ -117,10 +122,14 @@ export async function kommentiereRelease({
   melden,
 }) {
   const von = vorgaenger({ tag, releases: await releases() });
+  const ergebnis = { kommentiert: 0, vorhanden: 0, fehler: 0 };
+  if (von === null && kanalVon(tag) !== null) {
+    melden(`Erstes Release im Kanal ${kanalVon(tag)}: keine Kommentare (Bereich wäre die ganze Historie).`);
+    return ergebnis;
+  }
   melden(`Bereich: ${von ?? '(Anfang)'} .. ${tag}`);
   const shas = await commitsImBereich(von, tag);
   const imBereich = new Set(shas);
-  const ergebnis = { kommentiert: 0, vorhanden: 0, fehler: 0 };
   if (!shas.length) return ergebnis;
 
   const gesehen = new Set();

@@ -1,0 +1,103 @@
+# Beta nachziehen (LLH-1545) — bringt einen veröffentlichten Alpha-Stand nach `beta`.
+#
+# NUR VON HAND (workflow_dispatch): wer einen Alpha-Stand für erprobt hält, startet den Lauf mit
+# dessen Tag, z. B. `v1.0.0-alpha.180`. Gibt es `beta` noch nicht, entsteht es genau auf diesem
+# Tag; sonst mergt `scripts/release/kanal-nachziehen.sh` den Tag mit einem Angleich-Commit für
+# die Versionsdateien nach `beta` (Begründung im Kopf des Skripts). Der Push startet `ci.yml`
+# auf `beta`: Gate, dann `release.yml` mit `1.0.0-beta.N`, dann `artefakte.yml` mit dem
+# Beta-Kanal der Desktop-App (`desktop-beta`) und dem Abbild-Tag `:beta`.
+#
+# Auf `beta` wird nicht entwickelt. Ein Fehler in der Beta wird auf `alpha` behoben und mit dem
+# nächsten Alpha-Tag nachgezogen; damit muss nie etwas von `beta` zurück nach `alpha`.
+#
+# Gepusht wird mit dem Token der Release-App: ein Push mit GITHUB_TOKEN startete keinen Workflow
+# (das Gate bliebe aus), und das Ruleset für `beta` lässt nur die App schreiben.
+name: Beta nachziehen
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Veröffentlichter Alpha-Tag, der nach beta kommt, z. B. v1.0.0-alpha.180'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Ein Nachzug zur Zeit. Ein zweiter wartet und findet danach den neuen Stand von `beta` vor.
+concurrency:
+  group: kanal-nachziehen-beta
+  cancel-in-progress: false
+
+jobs:
+  nachziehen:
+    name: ${{ inputs.tag }} nach beta
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ist die Release-App eingerichtet?
+        env:
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+        run: |
+          if [ -z "${APP_ID:-}" ]; then
+            echo "::error::Das Secret RELEASE_APP_ID fehlt; ohne Release-App kann nichts nach beta geschrieben werden."
+            exit 1
+          fi
+
+      # Nur ein VERÖFFENTLICHTES Alpha-Release: ein Entwurf ist ein Stand, dessen Bau rot war
+      # oder noch läuft. Der Tag ist freie Eingabe und wird vor jeder Verwendung geprüft (das
+      # Skript prüft ihn ein zweites Mal).
+      - name: Tag prüfen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ROH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$'; then
+            echo "::error::'$ROH_TAG' ist kein Alpha-Tag (erwartet: vX.Y.Z-alpha.N)."
+            exit 1
+          fi
+          if [ "$(gh release view "$ROH_TAG" --json isDraft --jq .isDraft)" != "false" ]; then
+            echo "::error::$ROH_TAG ist nicht veröffentlicht (Entwurf oder kein Release)."
+            exit 1
+          fi
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      # Volle Historie und alle Tags: das Skript prüft, ob der Tag schon in `beta` steckt, und
+      # mergt gegen `origin/beta`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Nachziehen
+        id: nachziehen
+        env:
+          TAG: ${{ inputs.tag }}
+          GIT_AUTHOR_NAME: lifeline-hub-release
+          GIT_AUTHOR_EMAIL: noreply@github.com
+          GIT_COMMITTER_NAME: lifeline-hub-release
+          GIT_COMMITTER_EMAIL: noreply@github.com
+        run: ./scripts/release/kanal-nachziehen.sh --tag "$TAG" --ziel beta
+
+      - name: Zusammenfassung
+        env:
+          TAG: ${{ inputs.tag }}
+          ERGEBNIS: ${{ steps.nachziehen.outputs.ergebnis }}
+        run: |
+          case "$ERGEBNIS" in
+            angelegt) text="beta ist neu auf $TAG angelegt. Gate und Release laufen jetzt auf beta (1.0.0-beta.1)." ;;
+            nachgezogen) text="$TAG ist nach beta gemergt. Gate und Release laufen jetzt auf beta." ;;
+            aktuell) text="$TAG steckt schon in beta, es gab nichts zu tun." ;;
+            *) text="Unbekanntes Ergebnis '$ERGEBNIS'." ;;
+          esac
+          echo "::notice::$text"
+          echo "$text" >> "$GITHUB_STEP_SUMMARY"

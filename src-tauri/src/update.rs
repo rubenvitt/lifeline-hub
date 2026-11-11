@@ -1,7 +1,8 @@
 //! Update der Hülle (desktop-auslieferung). Quelle ist `latest.json`: für eine stabile Hülle am
-//! neuesten STABILEN Release (Endpunkt in `tauri.conf.json`), für eine Hülle im Alpha-Kanal
-//! (`ALPHA_KANAL`, `kanal.rs`, LLH-1280). Die Signatur prüft der Updater in beiden Fällen gegen
-//! den öffentlichen Schlüssel aus `tauri.conf.json`.
+//! neuesten STABILEN Release (Endpunkt in `tauri.conf.json`), für eine Hülle im Alpha- oder
+//! Beta-Kanal das Manifest des Kanals (`ALPHA_KANAL`, `BETA_KANAL`, `kanal.rs`, LLH-1280,
+//! LLH-1545). Die Signatur prüft der Updater in jedem Fall gegen den öffentlichen Schlüssel aus
+//! `tauri.conf.json`.
 //!
 //! Nie ohne Zustimmung, und zweimal gefragt: erst ob geladen wird, dann — wenn das Update da
 //! ist — ob JETZT neu gestartet wird. Der Download dauert im ELW-Uplink Sekunden bis Minuten, und
@@ -23,26 +24,37 @@ use crate::kanal::{self, Kanal};
 /// TCP-Timeout des Systems.
 const FRIST: Duration = Duration::from_secs(10);
 
-/// Manifest des Alpha-Kanals, fortgeschrieben vom Job `desktop-kanal` in `artefakte.yml`. Es
-/// zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, auch auf ein stabiles.
+/// Manifeste der Vorabkanäle, fortgeschrieben vom Job `desktop-kanal` in `artefakte.yml`. Jedes
+/// zeigt auf das neueste veröffentlichte Release seines Kanals mit Desktop-Paketen, auch auf ein
+/// stabiles (`scripts/release/desktop-kanal.mjs`).
 const ALPHA_KANAL: &str =
     "https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-alpha/latest.json";
+const BETA_KANAL: &str =
+    "https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-beta/latest.json";
 
-/// Der Updater für den Kanal der Hülle (`kanal.rs`): Alpha liest `ALPHA_KANAL`, stabil den
-/// Endpunkt aus `tauri.conf.json`. Ein Alpha-Kanal wird gemerkt, damit die Hülle nach einem
-/// stabilen Update dort bleibt; scheitert das Merken, prüft sie trotzdem.
+/// Das Manifest eines Vorabkanals; `None` für stabil (Endpunkt aus `tauri.conf.json`).
+fn kanal_manifest(kanal: Kanal) -> Option<&'static str> {
+    match kanal {
+        Kanal::Stabil => None,
+        Kanal::Alpha => Some(ALPHA_KANAL),
+        Kanal::Beta => Some(BETA_KANAL),
+    }
+}
+
+/// Der Updater für den Kanal der Hülle (`kanal.rs`). Ein Vorabkanal wird gemerkt, damit die
+/// Hülle nach einem stabilen Update dort bleibt; scheitert das Merken, prüft sie trotzdem.
 fn updater(app: &AppHandle) -> tauri_plugin_updater::Result<Updater> {
     let mut builder = app.updater_builder().timeout(FRIST);
     let konfig_dir = app.path().app_config_dir().ok();
     let gemerkt = konfig_dir.as_deref().and_then(kanal::lesen);
     let kanal = kanal::bestimmen(&app.package_info().version.to_string(), gemerkt);
-    if kanal == Kanal::Alpha {
-        if let (Some(dir), None) = (&konfig_dir, gemerkt) {
-            if let Err(fehler) = kanal::schreiben(dir, Kanal::Alpha) {
+    if let Some(manifest) = kanal_manifest(kanal) {
+        if let Some(dir) = konfig_dir.as_deref().filter(|_| gemerkt != Some(kanal)) {
+            if let Err(fehler) = kanal::schreiben(dir, kanal) {
                 log::warn!("Update-Kanal nicht gemerkt: {fehler}");
             }
         }
-        builder = builder.endpoints(vec![tauri::Url::parse(ALPHA_KANAL)?])?;
+        builder = builder.endpoints(vec![tauri::Url::parse(manifest)?])?;
     }
     builder.build()
 }
@@ -195,11 +207,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn alpha_kanal_ist_https_und_parsebar() {
-        let url = tauri::Url::parse(ALPHA_KANAL).expect("feste URL");
-        assert_eq!(url.scheme(), "https");
-        assert!(url
-            .path()
-            .ends_with("/releases/download/desktop-alpha/latest.json"));
+    fn vorabkanaele_sind_https_und_parsebar() {
+        for (kanal, release) in [
+            (Kanal::Alpha, "desktop-alpha"),
+            (Kanal::Beta, "desktop-beta"),
+        ] {
+            let url =
+                tauri::Url::parse(kanal_manifest(kanal).expect("Vorabkanal")).expect("feste URL");
+            assert_eq!(url.scheme(), "https");
+            assert!(url
+                .path()
+                .ends_with(&format!("/releases/download/{release}/latest.json")));
+        }
+    }
+
+    #[test]
+    fn stabil_liest_den_endpunkt_aus_der_konfiguration() {
+        assert_eq!(kanal_manifest(Kanal::Stabil), None);
     }
 }

@@ -6,6 +6,10 @@
 //! - `GET  …/betreuung/stellen/{sid}/registrierungen/druck` — dieselbe Liste für den Druck, je
 //!   Person protokolliert (LLH-1616, Change `iw8hjb93-registrierliste-drucken`).
 //! - `POST …/betreuung/stellen/{sid}/abmeldungen` — Personen oder Haushalt abmelden (D6).
+//! - `PUT  …/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson` — Bezugsperson wechseln
+//!   (LLH-1615, Change `lm62ud0b-haushalt-umbauen`, design.md D1).
+//! - `PUT  …/betreuung/stellen/{sid}/personen/{pid}/haushalt` — Person in einen anderen oder
+//!   neuen Haushalt umhängen (LLH-1615, D1). Beide ohne `client_id`: ohne Netz gesperrt (D5).
 //! - `GET  …/betreuung/kostformen` — Kostformen der Registrierten ohne Personenbezug (D7).
 //!
 //! **Rechte:** Registrieren, Abmelden und die Liste verlangen die Module Betreuung UND Personen
@@ -26,9 +30,9 @@ use serde::Deserialize;
 
 use crate::app::AppState;
 use crate::betreuung::registrierung::{
-    self, AbmeldeEingabe, AbmeldungAnzeige, HaushaltAnzeige, KostformZaehlung, RegistrierEingabe,
-    RegistrierListe, RegistrierPerson, Registriert, ABMELDUNG_PERSONEN_MAX, ABMELDUNG_ZIEL_MAX,
-    REGISTRIERUNG_PERSONEN_MAX,
+    self, AbmeldeEingabe, AbmeldungAnzeige, HaushaltAnzeige, HaushaltZiel, KostformZaehlung,
+    RegistrierEingabe, RegistrierListe, RegistrierPerson, Registriert, ABMELDUNG_PERSONEN_MAX,
+    ABMELDUNG_ZIEL_MAX, REGISTRIERUNG_PERSONEN_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe};
@@ -382,6 +386,99 @@ pub async fn abmelden(
         stelle_id: sid,
         person_ids: r.person_ids,
     }))
+}
+
+// ── Haushalte umbauen (LLH-1615) ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct BezugspersonBody {
+    person_id: i64,
+}
+
+/// PUT /api/einsaetze/{id}/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson
+pub async fn bezugsperson_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibfreigabe<Betreuung>,
+    PfadParam((_eid, sid, hid)): PfadParam<(i64, i64, i64)>,
+    JsonBody(body): JsonBody<BezugspersonBody>,
+) -> Result<Json<HaushaltAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    fordere_eigene_stelle(ctx.geraet.as_ref(), sid)?;
+    ctx.fordere_modul_zugriff(&state.pool, "personen").await?;
+    ctx.fordere_aktiv()?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let benutzer_id = ctx.benutzer.id;
+    let jetzt = crate::zeit::jetzt();
+    let r = crate::write_retry!(&state.pool, |conn| {
+        registrierung::bezugsperson_setzen_tx(
+            conn,
+            einsatz_id,
+            sid,
+            benutzer_id,
+            startwert,
+            hid,
+            body.person_id,
+            &jetzt,
+        )
+        .await
+    })?;
+    publiziere(&state, einsatz_id, sid, &r);
+    Ok(Json(
+        haushalt_antwort(&state, einsatz_id, sid, r.haushalt_id, ctx.geraet.is_some()).await?,
+    ))
+}
+
+/// Body von „Haushalt ändern“: genau eins von `haushalt_id` und `neuer_haushalt: true` (422).
+#[derive(Debug, Deserialize)]
+pub struct HaushaltBody {
+    #[serde(default)]
+    haushalt_id: Option<i64>,
+    #[serde(default)]
+    neuer_haushalt: bool,
+}
+
+/// PUT /api/einsaetze/{id}/betreuung/stellen/{sid}/personen/{pid}/haushalt
+pub async fn haushalt_aendern(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibfreigabe<Betreuung>,
+    PfadParam((_eid, sid, pid)): PfadParam<(i64, i64, i64)>,
+    JsonBody(body): JsonBody<HaushaltBody>,
+) -> Result<Json<HaushaltAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    fordere_eigene_stelle(ctx.geraet.as_ref(), sid)?;
+    ctx.fordere_modul_zugriff(&state.pool, "personen").await?;
+    ctx.fordere_aktiv()?;
+    // 404/409 der Stelle vor dem 422 des Bodys (Statuscode-Konvention).
+    registrierung::stelle_pruefen(&state.pool, einsatz_id, sid).await?;
+    let ziel = match (body.haushalt_id, body.neuer_haushalt) {
+        (Some(h), false) => HaushaltZiel::Bestehend(h),
+        (None, true) => HaushaltZiel::Neu,
+        _ => {
+            return Err(AppError::UnprocessableEntity(
+                "Ziel ist entweder ein bestehender oder ein neuer Haushalt".into(),
+            ))
+        }
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let benutzer_id = ctx.benutzer.id;
+    let jetzt = crate::zeit::jetzt();
+    let r = crate::write_retry!(&state.pool, |conn| {
+        registrierung::haushalt_aendern_tx(
+            conn,
+            einsatz_id,
+            sid,
+            benutzer_id,
+            startwert,
+            pid,
+            ziel,
+            &jetzt,
+        )
+        .await
+    })?;
+    publiziere(&state, einsatz_id, sid, &r);
+    Ok(Json(
+        haushalt_antwort(&state, einsatz_id, sid, r.haushalt_id, ctx.geraet.is_some()).await?,
+    ))
 }
 
 // ── Kostformen ──────────────────────────────────────────────────────────────────────────────

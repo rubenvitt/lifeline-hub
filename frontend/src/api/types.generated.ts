@@ -5901,6 +5901,8 @@ export interface components {
             geaendert_von: number;
             geburtsdatum?: string | null;
             geschlecht?: components["schemas"]["Geschlecht"] | null;
+            /** @description Die Person ist Bezugsperson ihres Haushalts (LLH-1615, design.md D4); fehlt bei `false`. */
+            haushalt_bezugsperson?: boolean;
             /**
              * Format: int64
              * @description Haushalt der Registrierstelle (LLH-1612, design.md D3); fehlt ohne Haushalt.

@@ -710,6 +710,10 @@ pub struct PersonAnzeige {
     /// Nummer dieses Haushalts im Einsatz, angezeigt als „H-n“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub haushalt_nummer: Option<i64>,
+    /// Die Person ist Bezugsperson ihres Haushalts (LLH-1615, design.md D4); fehlt bei `false`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[schema(required = false)]
+    pub haushalt_bezugsperson: bool,
     /// Kostform (LLH-1612, design.md D4); fehlt ohne Angabe.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kostform: Option<Kostform>,
@@ -774,6 +778,7 @@ impl PersonAnzeige {
         self.kostform = None;
         self.haushalt_id = None;
         self.haushalt_nummer = None;
+        self.haushalt_bezugsperson = false;
     }
 
     /// Setzt den abgeleiteten Versorgungszustand aus den Verbleib-Caches.

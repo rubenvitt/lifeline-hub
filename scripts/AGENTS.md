@@ -6,7 +6,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
+`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
@@ -95,8 +95,11 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   SDK über die `^0.1`-Sperre des Plugins.
 - **Release erst nach grünem Bau aller Plattformen** (LFH-1054): semantic-release legt einen
   Entwurf an (`draftRelease`), `release.yml` startet `artefakte.yml` per Dispatch, dessen Job
-  `freigeben` veröffentlicht, `latest` an die Abbilder hängt, die PRs kommentiert
+  `freigeben` veröffentlicht, den gleitenden Tag (`latest`, `alpha`, `beta`,
+  `scripts/release/abbild-kanal.mjs`) an die Abbilder hängt, die PRs kommentiert
   (`scripts/release/pr-kommentare.mjs`, Selbsttest in Schritt 8) und das Deployment anstößt.
+  **Beta** bekommt nur veröffentlichte Alpha-Tags über `scripts/release/kanal-nachziehen.sh`
+  (Workflow „Beta nachziehen“, ADR-0019); Alpha zählt daneben weiter.
   Nichts darf mehr an `release: published` hängen: das Veröffentlichen mit `GITHUB_TOKEN`
   startet keinen Workflow. Ein neuer Artefakt-Job, der zum Release gehört, gehört in die
   `needs` und die Bedingung von `freigeben`. Betrieb bei rotem Bau: `docs/betrieb/desktop-app.md`,

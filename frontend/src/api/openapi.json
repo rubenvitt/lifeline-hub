@@ -14455,6 +14455,10 @@
               }
             ]
           },
+          "haushalt_bezugsperson": {
+            "type": "boolean",
+            "description": "Die Person ist Bezugsperson ihres Haushalts (LLH-1615, design.md D4); fehlt bei `false`."
+          },
           "haushalt_id": {
             "type": [
               "integer",

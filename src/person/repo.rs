@@ -35,6 +35,8 @@ const SELECT_ALLE: &str = "\
            haushalt_id, \
            (SELECT h.nummer FROM haushalt h WHERE h.id = einsatz_person.haushalt_id) \
              AS haushalt_nummer, \
+           EXISTS (SELECT 1 FROM haushalt h WHERE h.id = einsatz_person.haushalt_id \
+                     AND h.bezugsperson_id = einsatz_person.id) AS haushalt_bezugsperson, \
            kostform, unvertraeglichkeiten \
     FROM einsatz_person";
 

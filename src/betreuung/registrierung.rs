@@ -7,6 +7,10 @@
 //! „entlassen“ (D6). Beides schreibt EINEN ETB-Eintrag je Vorgang, ohne Namen, und führt danach
 //! die Belegung einer namentlich geführten Stelle einmal nach (D5).
 //!
+//! Haushalte umbauen (LLH-1615, Change `lm62ud0b-haushalt-umbauen`): Bezugsperson wechseln und
+//! Personen zwischen Haushalten einer Stelle umhängen, je Vorgang ein ETB-Eintrag ohne Namen; die
+//! Bezugsperson rückt nach, wenn sie den Haushalt verlässt oder storniert wird.
+//!
 //! Die Felder prüft die Route (`routes/betreuung_registrierung.rs`); hier liegen nur die
 //! Zusammenhänge (Stelle, Haushalt) und das Schreiben in einer offenen Transaktion.
 
@@ -289,21 +293,11 @@ pub async fn registrieren_tx(
     }
     let (haushalt_id, nummer) = match bestehend {
         Some(h) => h,
-        None => {
-            let (id, nummer): (i64, i64) = sqlx::query_as(
-                "INSERT INTO haushalt (einsatz_id, nummer, angelegt_von_id, angelegt_at) \
-                 SELECT ?1, COALESCE(MAX(nummer), 0) + 1, ?2, ?3 \
-                 FROM haushalt WHERE einsatz_id = ?1 \
-                 RETURNING id, nummer",
-            )
-            .bind(einsatz_id)
-            .bind(benutzer_id)
-            .bind(&eingabe.zeitpunkt_at)
-            .fetch_one(&mut *conn)
-            .await?;
-            (id, nummer)
-        }
+        None => haushalt_anlegen_tx(conn, einsatz_id, benutzer_id, &eingabe.zeitpunkt_at).await?,
     };
+    // Ohne gültige Bezugsperson (keine, storniert, weggezogen) wird die erste neue Person sie
+    // (LLH-1615, design.md D2); das heilt auch Haushalte von vor dem Nachrücken.
+    let bezugsperson_setzen = !bezugsperson_gueltig_tx(conn, haushalt_id).await?;
 
     let mut person_ids = Vec::new();
     let mut registriernummern = Vec::new();
@@ -363,7 +357,7 @@ pub async fn registrieren_tx(
         person_ids.push(id);
         registriernummern.push(registrier_anzeige(reg));
     }
-    if bestehend.is_none() {
+    if bezugsperson_setzen {
         sqlx::query("UPDATE haushalt SET bezugsperson_id = ? WHERE id = ?")
             .bind(person_ids.first())
             .bind(haushalt_id)
@@ -508,6 +502,302 @@ pub async fn abmelden_tx(
         person_ids: kandidaten.into_iter().map(|(id, _)| id).collect(),
         etb_ids,
         belegung_nachgefuehrt,
+    })
+}
+
+/// Legt einen Haushalt mit der nächsten Nummer des Einsatzes an (`id`, `nummer`).
+async fn haushalt_anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    zeitpunkt_at: &str,
+) -> Result<(i64, i64), AppError> {
+    Ok(sqlx::query_as(
+        "INSERT INTO haushalt (einsatz_id, nummer, angelegt_von_id, angelegt_at) \
+         SELECT ?1, COALESCE(MAX(nummer), 0) + 1, ?2, ?3 \
+         FROM haushalt WHERE einsatz_id = ?1 \
+         RETURNING id, nummer",
+    )
+    .bind(einsatz_id)
+    .bind(benutzer_id)
+    .bind(zeitpunkt_at)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Ob der Haushalt eine gültige Bezugsperson hat: gesetzt, nicht storniert und noch Mitglied.
+async fn bezugsperson_gueltig_tx(
+    conn: &mut SqliteConnection,
+    haushalt_id: i64,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM haushalt h JOIN einsatz_person p ON p.id = h.bezugsperson_id \
+                        WHERE h.id = ?1 AND p.haushalt_id = ?1 AND p.storniert_at IS NULL)",
+    )
+    .bind(haushalt_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Bezugsperson rückt nach (LLH-1615, design.md D2): die nächste nicht stornierte Person des
+/// Haushalts, zuerst in einer Notunterkunft, dann nach Registriernummer; ohne solche bleibt der
+/// Haushalt ohne. Liefert die neue Bezugsperson als `(person_id, registrier_nr)`.
+pub async fn bezugsperson_nachruecken_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    haushalt_id: i64,
+) -> Result<Option<(i64, i64)>, AppError> {
+    let neu: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT id, registrier_nr FROM einsatz_person \
+         WHERE einsatz_id = ? AND haushalt_id = ? AND storniert_at IS NULL \
+         ORDER BY COALESCE(aktuelle_verbleib_art = 'notunterkunft', 0) DESC, registrier_nr \
+         LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(haushalt_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    sqlx::query("UPDATE haushalt SET bezugsperson_id = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(neu.map(|(id, _)| id))
+        .bind(haushalt_id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(neu)
+}
+
+/// Rückt in jedem Haushalt nach, dessen Bezugsperson diese Person ist (Storno, design.md D2).
+/// Liefert `(haushalt_nummer, neue Bezugsperson)` für den ETB-Satz und die Live-Verteilung.
+pub async fn nach_storno_nachruecken_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<Option<(i64, Option<(i64, i64)>)>, AppError> {
+    let haushalt: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT id, nummer FROM haushalt WHERE einsatz_id = ? AND bezugsperson_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some((hid, nummer)) = haushalt else {
+        return Ok(None);
+    };
+    Ok(Some((
+        nummer,
+        bezugsperson_nachruecken_tx(conn, einsatz_id, hid).await?,
+    )))
+}
+
+/// Eine Person, die jetzt an der Stelle registriert ist (LLH-1615, design.md D1): fremd oder
+/// unbekannt → 404, storniert → 409, nicht hier → 422. Liefert `(registrier_nr, haushalt_id)`.
+async fn person_hier_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    person_id: i64,
+) -> Result<(i64, Option<i64>), AppError> {
+    let (reg, haushalt, art, stelle, storniert_at): (
+        i64,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+    ) = sqlx::query_as(
+        "SELECT registrier_nr, haushalt_id, aktuelle_verbleib_art, \
+                aktuelle_verbleib_betreuungsstelle_id, storniert_at \
+         FROM einsatz_person WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(person_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if storniert_at.is_some() {
+        return Err(AppError::Conflict(format!(
+            "Person {} ist storniert",
+            registrier_anzeige(reg)
+        )));
+    }
+    if art.as_deref() != Some(VerbleibArt::Notunterkunft.as_str()) || stelle != Some(stelle_id) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Person {} ist nicht an dieser Betreuungsstelle registriert",
+            registrier_anzeige(reg)
+        )));
+    }
+    Ok((reg, haushalt))
+}
+
+/// Setzt die Bezugsperson eines Haushalts an einer Stelle (LLH-1615, design.md D1). Prüfkette:
+/// 404 (Stelle, Haushalt, Person) → 409 (Stelle, Person storniert) → 422 (Person nicht hier,
+/// nicht im Haushalt). Ist sie es schon, schreibt der Vorgang nichts.
+#[allow(clippy::too_many_arguments)]
+pub async fn bezugsperson_setzen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    haushalt_id: i64,
+    person_id: i64,
+    zeitpunkt_at: &str,
+) -> Result<Registriert, AppError> {
+    let (bezeichnung, _) = stelle_tx(conn, einsatz_id, stelle_id).await?;
+    let nummer = haushalt_nummer_tx(conn, einsatz_id, haushalt_id).await?;
+    let (reg, haushalt) = person_hier_tx(conn, einsatz_id, stelle_id, person_id).await?;
+    if haushalt != Some(haushalt_id) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Person {} gehört nicht zu Haushalt H-{nummer}",
+            registrier_anzeige(reg)
+        )));
+    }
+    let bisher: Option<i64> =
+        sqlx::query_scalar("SELECT bezugsperson_id FROM haushalt WHERE id = ?")
+            .bind(haushalt_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let mut ergebnis = Registriert {
+        haushalt_id: Some(haushalt_id),
+        person_ids: Vec::new(),
+        etb_ids: Vec::new(),
+        belegung_nachgefuehrt: false,
+    };
+    if bisher == Some(person_id) {
+        return Ok(ergebnis);
+    }
+    sqlx::query("UPDATE haushalt SET bezugsperson_id = ? WHERE id = ?")
+        .bind(person_id)
+        .bind(haushalt_id)
+        .execute(&mut *conn)
+        .await?;
+    ergebnis.etb_ids.push(
+        crate::etb::system_audit_zu_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            startwert,
+            &etb_text::bezugsperson_gewechselt(&bezeichnung, nummer, &registrier_anzeige(reg)),
+            zeitpunkt_at,
+        )
+        .await?,
+    );
+    ergebnis.person_ids = bisher.into_iter().chain([person_id]).collect();
+    Ok(ergebnis)
+}
+
+/// Ziel von „Haushalt ändern“ (LLH-1615, design.md D1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HaushaltZiel {
+    Bestehend(i64),
+    Neu,
+}
+
+/// Hängt eine an der Stelle registrierte Person in einen anderen Haushalt um oder in einen neuen
+/// (LLH-1615, design.md D1/D2). Ein bestehendes Ziel braucht eine hier registrierte Person (422).
+/// Verlässt die Bezugsperson ihren Haushalt, rückt dort jemand nach; ohne gültige Bezugsperson im
+/// Ziel wird die Person sie. Ist sie schon im Ziel, schreibt der Vorgang nichts. Prüfkette wie
+/// [`bezugsperson_setzen_tx`]; die geschlossene Stelle sperrt nicht.
+#[allow(clippy::too_many_arguments)]
+pub async fn haushalt_aendern_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    person_id: i64,
+    ziel: HaushaltZiel,
+    zeitpunkt_at: &str,
+) -> Result<Registriert, AppError> {
+    let (bezeichnung, _) = stelle_tx(conn, einsatz_id, stelle_id).await?;
+    let ziel_nummer = match ziel {
+        HaushaltZiel::Bestehend(h) => Some(haushalt_nummer_tx(conn, einsatz_id, h).await?),
+        HaushaltZiel::Neu => None,
+    };
+    let (reg, bisher) = person_hier_tx(conn, einsatz_id, stelle_id, person_id).await?;
+    if let HaushaltZiel::Bestehend(h) = ziel {
+        if bisher == Some(h) {
+            return Ok(Registriert {
+                haushalt_id: Some(h),
+                person_ids: Vec::new(),
+                etb_ids: Vec::new(),
+                belegung_nachgefuehrt: false,
+            });
+        }
+        let hier: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM einsatz_person WHERE einsatz_id = ? AND haushalt_id = ? \
+                AND storniert_at IS NULL AND aktuelle_verbleib_art = 'notunterkunft' \
+                AND aktuelle_verbleib_betreuungsstelle_id = ?)",
+        )
+        .bind(einsatz_id)
+        .bind(h)
+        .bind(stelle_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if !hier {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Haushalt H-{} hat an dieser Betreuungsstelle niemanden registriert",
+                ziel_nummer.unwrap_or_default()
+            )));
+        }
+    }
+    let (ziel_id, ziel_nummer) = match (ziel, ziel_nummer) {
+        (HaushaltZiel::Bestehend(h), Some(n)) => (h, n),
+        _ => haushalt_anlegen_tx(conn, einsatz_id, benutzer_id, zeitpunkt_at).await?,
+    };
+    sqlx::query("UPDATE einsatz_person SET haushalt_id = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(ziel_id)
+        .bind(person_id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+
+    let mut person_ids = vec![person_id];
+    let mut von_nummer = None;
+    let mut nachgerueckt = None;
+    if let Some(alt) = bisher {
+        let (nummer, bezugsperson): (i64, Option<i64>) =
+            sqlx::query_as("SELECT nummer, bezugsperson_id FROM haushalt WHERE id = ?")
+                .bind(alt)
+                .fetch_one(&mut *conn)
+                .await?;
+        von_nummer = Some(nummer);
+        if bezugsperson == Some(person_id) {
+            if let Some((pid, r)) = bezugsperson_nachruecken_tx(conn, einsatz_id, alt).await? {
+                person_ids.push(pid);
+                nachgerueckt = Some(registrier_anzeige(r));
+            }
+        }
+    }
+    let wird_bezugsperson = !bezugsperson_gueltig_tx(conn, ziel_id).await?;
+    if wird_bezugsperson {
+        sqlx::query("UPDATE haushalt SET bezugsperson_id = ? WHERE id = ?")
+            .bind(person_id)
+            .bind(ziel_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    let etb_id = crate::etb::system_audit_zu_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        startwert,
+        &etb_text::haushalt_gewechselt(
+            &bezeichnung,
+            &registrier_anzeige(reg),
+            von_nummer,
+            ziel_nummer,
+            ziel == HaushaltZiel::Neu,
+            wird_bezugsperson,
+            nachgerueckt.as_deref(),
+        ),
+        zeitpunkt_at,
+    )
+    .await?;
+    Ok(Registriert {
+        haushalt_id: Some(ziel_id),
+        person_ids,
+        etb_ids: vec![etb_id],
+        belegung_nachgefuehrt: false,
     })
 }
 

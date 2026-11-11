@@ -16,6 +16,19 @@ async fn pool() -> sqlx::SqlitePool {
     lifeline_hub::db::test_pool().await
 }
 
+/// Hält den Katalog dieses Testprozesses frei vom echten Vorgabe-Manifest (LLH-1546): Ein Test,
+/// der `/katalog` abruft, füllte sonst den prozessweiten Cache mit gebauten Einträgen, und ein
+/// parallel laufender Update-Test sähe ein echtes Update. `.invalid` löst nie auf, der Abruf
+/// scheitert sofort. Erster Aufruf gewinnt (`OnceLock`), jeder App-Bau ruft es vorab.
+fn katalog_ohne_netz() {
+    lifeline_hub::karte::init_karte_config(lifeline_hub::karte::KarteConfig {
+        offline_katalog_manifest_url: Some(
+            "https://manifest.invalid/offline-katalog-manifest.json".into(),
+        ),
+        ..Default::default()
+    });
+}
+
 /// Baut den Router um einen vorhandenen Pool. `karten_dir` ist für die hier getesteten Pfade
 /// belanglos (Tiles nutzen absolute Pfade bzw. den Traversal-Guard) → Wegwerf-Tempverzeichnis.
 fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
@@ -24,6 +37,7 @@ fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
 
 /// Wie [`app_mit_pool`], mit eigenem `karten_dir`.
 fn app_mit(pool: sqlx::SqlitePool, karten_dir: std::path::PathBuf) -> axum::Router {
+    katalog_ohne_netz();
     build_router(AppState {
         karten_dir,
         ..common::test_state(&pool, &LiveHub::new())
@@ -32,6 +46,7 @@ fn app_mit(pool: sqlx::SqlitePool, karten_dir: std::path::PathBuf) -> axum::Rout
 
 /// Bootstrappt eine Org + Admin und liefert (Router, Admin-Session-Cookie).
 async fn admin_app() -> (axum::Router, String) {
+    katalog_ohne_netz();
     let (app, _pool) =
         common::setup_mit_state(|s| s.karten_dir = lifeline_hub::db::test_karten_dir()).await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
@@ -1610,13 +1625,17 @@ async fn offline_katalog_zeigt_nur_lieferbare() {
     let v = json(res).await;
     let liste = v.as_array().expect("Array");
     // LFH-201: der Download-Katalog zeigt NUR tatsächlich lieferbare Regionen (Pin + echte URL).
-    // Im Test fehlt das Manifest (Fetch der TODO-Platzhalter-URL scheitert) → alle compiled-in
-    // Platzhalter sind gefiltert → leer. Ungebaute Platzhalter dürfen nie als ladbar erscheinen.
+    // Das Manifest ist im Testprozess unerreichbar (`katalog_ohne_netz`), es bleibt nur die
+    // einkompilierte Baseline, die ohne `sha256` komplett gefiltert wird → leer.
+    assert!(
+        liste.is_empty(),
+        "ohne Manifest ist nichts ladbar: {liste:?}"
+    );
     assert!(
         liste
             .iter()
             .all(|e| !e["url"].as_str().unwrap().contains("TODO")),
-        "keine ungebauten TODO-Platzhalter im Download-Katalog"
+        "keine TODO-Platzhalter im Download-Katalog"
     );
     assert!(
         liste.iter().all(|e| e["sha256"].as_str().is_some()),
@@ -1708,12 +1727,12 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
 #[tokio::test]
 async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
     // LFH-206-Bugfix: eine real installierte Region, deren einziger Katalog-Treffer ein UNGEBAUTER
-    // TODO-Platzhalter ist (leerer Katalog-Cache → nur compiled-in), darf NICHT „Update verfügbar"
-    // melden — sonst lädt „Aktualisieren" eine nicht-ladbare URL (`https://TODO-karten-build-release/…`).
+    // Platzhalter ist (leerer Katalog-Cache → nur compiled-in), darf NICHT „Update verfügbar"
+    // melden — sonst lädt „Aktualisieren" eine nicht-ladbare URL (Baseline ohne `sha256`).
     // Genau das trat auf: Schweiz/NRW im compiled-in-Katalog boten sich nach Neustart als Platzhalter-
     // Update an. Die eigentliche Filterlogik (nur lieferbare Einträge) ist in `update_check_tests`
-    // unit-getestet; dieser Handler-Test ist clean-env-deterministisch (in einer Dev-Env mit
-    // erreichbarem Manifest kann ein echter Eintrag ein legitimes Update liefern — env-abhängig).
+    // unit-getestet; dieser Handler-Test ist deterministisch, weil `katalog_ohne_netz` das echte
+    // Vorgabe-Manifest aus dem Testprozess fernhält.
     let (app, cookie) = admin_app().await;
     let res = anfrage(
         &app,
