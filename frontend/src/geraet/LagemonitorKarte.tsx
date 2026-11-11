@@ -70,17 +70,29 @@ export function monitorAusschnitt(
  * Ohne Kartengrafik (LLH-1377, wie die Lagekarte seit LLH-1353, `pages/lagekarte/kartenGrafik.ts`)
  * steht an Stelle der Karte {@link KarteNichtDarstellbar} in Großbild-Schrift; die übrigen Kacheln
  * des Monitors bleiben.
+ *
+ * Die Seite des Lagebilds für Externe (LLH-1496) nimmt dieselbe Karte mit kleinerer Schrift,
+ * bedienbar und mit eigener `anfrage`, die dem Karten-Proxy den Schlüssel des Links mitgibt.
  */
 export default function LagemonitorKarte({
   einsatzort,
   uhs,
   zonen = [],
   abschnitte = [],
+  schrift = GROSS_TEXT,
+  bedienbar = false,
+  anfrage = absolutiereProxyAnfrage,
 }: {
   einsatzort: MonitorPunkt | null;
   uhs: readonly LagemonitorUhs[];
   zonen?: readonly LagemonitorZone[];
   abschnitte?: readonly LagemonitorAbschnitt[];
+  /** Textgröße der Marken und Zustände in px. */
+  schrift?: number;
+  /** Verschieben und Zoomen zulassen. */
+  bedienbar?: boolean;
+  /** `transformRequest` der Karte; die Vorgabe absolutiert die Proxy-Adressen. */
+  anfrage?: (url: string) => maplibregl.RequestParameters;
 }) {
   const { rollen, dunkel } = useRollen();
   const container = useRef<HTMLDivElement>(null);
@@ -123,9 +135,9 @@ export default function LagemonitorKarte({
       style,
       center: [10.45, 51.16],
       zoom: 5,
-      interactive: false,
+      interactive: bedienbar,
       attributionControl: false,
-      transformRequest: absolutiereProxyAnfrage,
+      transformRequest: anfrage,
     };
     const map = wennDarstellbar(() => new maplibregl.Map(optionen));
     if (!map) {
@@ -142,6 +154,8 @@ export default function LagemonitorKarte({
       if (import.meta.env.DEV) delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
       map.remove();
     };
+    // `anfrage` und `bedienbar` gelten ab dem Bau; sie wechseln auf keiner Seite.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Bau gelesen
   }, [config, dunkel, hatAusschnitt]);
 
   // Ausschnitt nachführen, wenn eine UHS oder der Einsatzort dazukommt.
@@ -202,7 +216,7 @@ export default function LagemonitorKarte({
       el.textContent = a.text;
       el.setAttribute('data-lfh', 'monitor-abschnitt');
       Object.assign(el.style, {
-        fontSize: '28px',
+        fontSize: `${schrift}px`,
         fontWeight: '600',
         padding: '2px 10px',
         borderRadius: '6px',
@@ -217,7 +231,7 @@ export default function LagemonitorKarte({
       const el = document.createElement('div');
       el.textContent = `${u.bezeichnung} · ${u.belegt}`;
       Object.assign(el.style, {
-        fontSize: '28px',
+        fontSize: `${schrift}px`,
         fontWeight: '600',
         padding: '4px 12px',
         borderRadius: '6px',
@@ -231,7 +245,16 @@ export default function LagemonitorKarte({
     for (const m of neu) m.addTo(map);
     marker.current = neu;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
-  }, [verortetSchluessel, flaechen, einsatzort?.lat, einsatzort?.lon, config, dunkel, rollen]);
+  }, [
+    verortetSchluessel,
+    flaechen,
+    einsatzort?.lat,
+    einsatzort?.lon,
+    config,
+    dunkel,
+    rollen,
+    schrift,
+  ]);
 
   if (!ausschnitt) {
     return (
@@ -240,7 +263,7 @@ export default function LagemonitorKarte({
           height: '100%',
           display: 'grid',
           placeItems: 'center',
-          fontSize: GROSS_TEXT,
+          fontSize: schrift,
           color: rollen.gedaempft,
         }}
       >
@@ -248,14 +271,14 @@ export default function LagemonitorKarte({
       </div>
     );
   }
-  if (!darstellbar) return <KarteNichtDarstellbar hoehe="100%" schrift={GROSS_TEXT} />;
+  if (!darstellbar) return <KarteNichtDarstellbar hoehe="100%" schrift={schrift} />;
   return (
     <div
       ref={container}
       data-lfh="lagemonitor-karte"
       aria-label="Lagekarte des Einsatzgebiets"
       role="img"
-      style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
+      style={{ width: '100%', height: '100%', pointerEvents: bedienbar ? undefined : 'none' }}
     />
   );
 }
