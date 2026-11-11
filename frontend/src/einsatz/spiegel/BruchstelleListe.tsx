@@ -144,7 +144,12 @@ function BruchZeile({
     >
       <span style={monoStil(12)}>{zeitKurz(zeit, konventionen)}</span>
       <strong>{bruchArtWort(e)}</strong>
-      {!e.verborgen && e.von && <span style={{ color: rollen.text2 }}>{e.von}</span>}
+      {!e.verborgen && e.von && (
+        <span style={{ color: rollen.text2 }}>
+          {e.von}
+          {e.kurz && <span aria-hidden="true"> ·</span>}
+        </span>
+      )}
       {!e.verborgen && e.kurz && <span>{e.kurz}</span>}
       {folgen && <span style={{ color: rollen.text2 }}>{folgen}</span>}
       {!e.verborgen && (darfStellen || darfVerwerfen) && (

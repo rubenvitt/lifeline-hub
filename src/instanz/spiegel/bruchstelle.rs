@@ -501,16 +501,17 @@ pub async fn stellen_tx(
     bruch_id: i64,
     benutzer_id: i64,
 ) -> Result<Gestellt, AppError> {
-    let zeile: Option<(String, String, Option<String>, Option<i64>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT art, daten, erledigt, antrag_id, client_id FROM einsatz_bruchstelle \
+    // Tabelle, Daten, erledigt, Antrag, eigene client_id.
+    type Zeile = (String, String, Option<String>, Option<i64>, Option<String>);
+    let zeile: Option<Zeile> = sqlx::query_as(
+        "SELECT art, daten, erledigt, antrag_id, client_id FROM einsatz_bruchstelle \
              WHERE id = ? AND einsatz_id = ? AND entfernt = 1 AND daten IS NOT NULL \
              AND folge_von IS NULL",
-        )
-        .bind(bruch_id)
-        .bind(einsatz_id)
-        .fetch_optional(&mut *conn)
-        .await?;
+    )
+    .bind(bruch_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
     let Some((tabelle, daten, erledigt, antrag_id, eigene_client_id)) = zeile else {
         return Err(AppError::NotFound);
     };
