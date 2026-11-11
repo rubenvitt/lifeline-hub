@@ -6,7 +6,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` → `check-deps.test.sh` →
+`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
@@ -106,6 +106,13 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   Stände gepinnt mit Commit in `drittanbieter-quellen.txt`, Selbsttest in Schritt 8). Ein neuer
   Stand einer Bibliothek im Binary heißt: Liste nachziehen (Herleitung
   `frontend/src/heic/LIESMICH.md`).
+- **Rückmeldungen** (LLH-1549): Tester melden über das Issue-Formular
+  `.github/ISSUE_TEMPLATE/rueckmeldung.yml` (freie Issues sind abgeschaltet). Der Workflow
+  `rueckmeldung.yml` (`issues: opened`) wirft jedes Formular-Issue über den Zunder-Eingang in das
+  Projekt „Lifeline Hub Eingang“ ein (`scripts/rueckmeldung/einwurf.mjs`, Selbsttest in Schritt 8)
+  und setzt `aufgenommen` bzw. `nicht-aufgenommen`. Wer ein Feld des Formulars umbenennt, zieht
+  `FELDER` im Skript und, bei `version`/`oberflaeche`/`seite`, `frontend/src/rueckmeldung/adresse.ts`
+  nach; der Selbsttest vergleicht die Labels. Secret `ZUNDER_EINGANG_TOKEN`, Variable `ZUNDER_URL`.
 - **Eigene Lizenz** (LLH-1446): `LICENSE` ist die einzige Quelle. Das Binary bettet sie ein
   (`src/lizenz.rs`, Unterbefehl `lizenz`), das Abbild legt sie unter `/LICENSE` ab, `artefakte.yml`
   hängt sie als `lifeline-hub-<version>-LIZENZ.txt` ans Release und vergleicht im Starttest die
