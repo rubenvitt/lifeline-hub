@@ -189,6 +189,10 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `BEREINIGUNG_VERSION` (steht im ETag `"<sha256>.b<n>"`).
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
+- **Kartenhintergrundbilder (LLH-1635)** sind keine Anhänge, laufen beim Download aber durch
+  dieselbe Bereinigung (`karte_hintergrundbild::bereinigt`; ETag `"<sha256>.b<n>"`,
+  `BEREINIGT_CACHE_CONTROL`). Gespeichert bleibt das Original, einen Original-Abruf gibt es
+  nicht. Was sich nicht bereinigen lässt, weist schon der Upload mit 422 ab.
 
 **Vorschau (LFH-759)** (Spec `anhang-vorschau`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`):

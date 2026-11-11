@@ -329,7 +329,9 @@ pub const ANHANG_CSP: &str = "default-src 'none'; sandbox";
 /// `tests/anhang_metadaten.rs`).
 /// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
 /// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt
-/// außen vor: er liest aus einer eigenen Tabelle. Regeln: `src/AGENTS.md`, „Anhänge“.
+/// außen vor: er liest aus einer eigenen Tabelle, bereinigt aber mit derselben
+/// `anhang::metadaten` (`karte_hintergrundbild::bereinigt`, LLH-1635). Regeln: `src/AGENTS.md`,
+/// „Anhänge“.
 pub async fn anhang_antwort(
     pool: &SqlitePool,
     anhang_id: i64,

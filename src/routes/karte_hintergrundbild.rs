@@ -9,7 +9,8 @@ use crate::karte_hintergrundbild::{
 };
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, etag_von, if_none_match_matcht, AnsichtFilter, ASSET_CACHE_CONTROL,
+    deserialize_optional_field, etag_von, if_none_match_matcht, AnsichtFilter,
+    BEREINIGT_CACHE_CONTROL,
 };
 use axum::extract::{Multipart, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -96,6 +97,7 @@ pub async fn hochladen(
     let ecken = ecken.ok_or_else(|| AppError::Validation("Ecken fehlen".into()))?;
     bild::pruefe_groesse(bytes.len())?;
     let mime = bild::erkenne_bild_mime(&bytes)?;
+    bild::pruefe_bereinigbar(&bytes, mime)?;
     bild::pruefe_ecken(&ecken)?;
     // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404 — vor dem teuren Scan.
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, ansicht_id).await?;
@@ -121,6 +123,10 @@ pub async fn hochladen(
 }
 
 /// GET Download der Bytes. Nur Lesezugriff; Ownership über `laden_bytes(einsatz_id, id)`.
+///
+/// Ausgeliefert wird die bereinigte Fassung (LLH-1635): ohne EXIF/GPS, XMP, IPTC und Kommentare,
+/// über dieselbe Bereinigung wie Anhänge (`anhang::metadaten`, LFH-747). Gespeichert bleibt das
+/// Original; einen Original-Abruf gibt es für Kartenbilder nicht.
 pub async fn herunterladen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
@@ -133,7 +139,12 @@ pub async fn herunterladen(
     // liegen seit LFH-936 in `karte_hintergrundbild_daten`).
     let (name, mime, sha256) =
         bild_repo::meta_fuer_download(&state.pool, einsatz_id, bild_id).await?;
-    let etag = etag_von(&sha256);
+    // ETag trägt die Version der Bereinigung wie bei Anhängen: ändert sich die Bereinigung, holt
+    // jeder Browser die neue Fassung.
+    let etag = etag_von(&format!(
+        "{sha256}.b{}",
+        crate::anhang::metadaten::BEREINIGUNG_VERSION
+    ));
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -141,9 +152,11 @@ pub async fn herunterladen(
         HeaderValue::from_str(&etag)
             .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
     );
+    // Nicht `ASSET_CACHE_CONTROL` (immutable): die Fassung hängt an der Version der Bereinigung.
+    // Revalidieren kostet nur ein 304 ohne BLOB.
     headers.insert(
         header::CACHE_CONTROL,
-        HeaderValue::from_static(ASSET_CACHE_CONTROL),
+        HeaderValue::from_static(BEREINIGT_CACHE_CONTROL),
     );
 
     if if_none_match_matcht(&req_headers, &etag) {
@@ -162,7 +175,8 @@ pub async fn herunterladen(
         HeaderValue::from_str(&crate::anhang::content_disposition(&name))
             .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
-    let (_, _, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
+    let (_, mime, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
+    let daten = bild::bereinigt(daten, &mime)?;
     Ok((headers, daten).into_response())
 }
 
