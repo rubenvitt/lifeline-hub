@@ -1,0 +1,46 @@
+# Rückmeldungen von Testern nach Zunder (LLH-1549).
+#
+# Ein neues Issue aus dem Formular `.github/ISSUE_TEMPLATE/rueckmeldung.yml` geht über den
+# Zunder-Eingang (`POST /intake/v1/tasks`) in das Projekt „Lifeline Hub Eingang“ und bekommt das
+# Label `aufgenommen`; geht das schief, `nicht-aufgenommen` und ein roter Lauf („Re-run“ wirft
+# idempotent erneut ein). Die Logik steht in `scripts/rueckmeldung/einwurf.mjs`.
+#
+# Einrichtung: Actions-Secret `ZUNDER_EINGANG_TOKEN` (`zi_…` des Eingangs „github“) und
+# Variable `ZUNDER_URL` (https://zunder.rubeen.dev).
+#
+# SICHERHEIT: `issues` läuft für Issues von jedermann mit Zugriff auf die Secrets. Issue-Texte
+# stehen deshalb nirgends als `${{ }}` in einem `run:`, das Skript liest sie aus
+# `GITHUB_EVENT_PATH` und gibt sie nur als JSON weiter. Der Checkout holt den Stand des
+# Standard-Branches, nicht den eines Forks.
+name: Rückmeldung
+
+on:
+  issues:
+    types: [opened]
+
+permissions: {}
+
+concurrency:
+  group: rueckmeldung-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  einwerfen:
+    if: github.repository == 'rubenvitt/lifeline-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/rueckmeldung
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - name: In Zunder einwerfen
+        env:
+          ZUNDER_URL: ${{ vars.ZUNDER_URL }}
+          ZUNDER_EINGANG_TOKEN: ${{ secrets.ZUNDER_EINGANG_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: mise exec -- node scripts/rueckmeldung/einwurf.mjs

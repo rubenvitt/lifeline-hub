@@ -140,6 +140,7 @@ import {
   BENACHRICHTIGUNGEN_PFAD,
   HILFE_PFAD,
   KOPPELN_PFAD,
+  EXTERN_PFAD,
   KOPPLUNG_BEENDET_PFAD,
 } from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
@@ -154,6 +155,7 @@ const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage')
 const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'));
 // Hilfe (LFH-1096): eigener Chunk mit den Kapiteltexten; der Service Worker hält ihn vor.
 const HilfePage = lazy(() => import('./hilfe/HilfePage'));
+const LagebildExternPage = lazy(() => import('./extern/LagebildExternPage'));
 const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
 // Vorplanung ohne Einsatz (LLH-1586): eigener Chunk, nur Planer kommen hierher.
 const PlanungenPage = lazy(() => import('./planung/PlanungenPage'));
@@ -300,6 +302,15 @@ export const appRouten = createRoutesFromElements(
     {/* Gerätekopplung (LFH-892): Einlösen und Ende ohne Sitzung, ohne Anmeldung für Personen. */}
     <Route path={KOPPELN_PFAD} element={<KoppelnPage />} />
     <Route path={KOPPLUNG_BEENDET_PFAD} element={<KopplungBeendetPage />} />
+    {/* Lagebild für Externe (LLH-1496): ohne Sitzung, der Schlüssel steht im Fragment. */}
+    <Route
+      path={EXTERN_PFAD}
+      element={
+        <Suspense fallback={null}>
+          <LagebildExternPage />
+        </Suspense>
+      }
+    />
     <Route element={<RequireAuth />}>
       {/* Hülle eines gekoppelten Geräts; die Ansichten hängen darunter (LFH-892, design.md D9). */}
       <Route path={GERAET_START_PFAD} element={<GeraeteLayout />}>

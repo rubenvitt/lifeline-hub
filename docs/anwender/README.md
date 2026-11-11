@@ -25,6 +25,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstieg | [Profil und Sicherheit](kapitel/profil-sicherheit.md) | Alle |
 | Einstieg | [Neuigkeiten](kapitel/neuigkeiten.md) | Alle |
 | Einstieg | [Chat](kapitel/chat.md) | Alle |
+| Einstieg | [Rückmeldung geben](kapitel/rueckmeldung.md) | Alle |
 | Führungsmittel | [Einsatztagebuch](kapitel/einsatztagebuch.md) | Alle, Führung |
 | Führungsmittel | [Meldungen](kapitel/meldungen.md) | Alle, Führung |
 | Führungsmittel | [Aufträge und Befehle](kapitel/auftraege-befehle.md) | Führung |
@@ -79,6 +80,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Gekoppelte Geräte | [Verpflegung am Gerät](kapitel/geraet-verpflegung.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Lagemonitor](kapitel/lagemonitor.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Externe Lagemonitore](kapitel/externe-lagemonitore.md) | Führung, Administration |
+| Gekoppelte Geräte | [Lagebild für Externe](kapitel/lagebild-extern.md) | Führung |
 
 Jeder Bereich ordnet seine Kapitel in einem eigenen Hunderterblock der `reihenfolge`
 (Einstieg 0–99, Führungsmittel 100–199, Lage 200–299, Kräfte 300–399, Führungsorganisation

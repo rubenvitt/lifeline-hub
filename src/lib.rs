@@ -53,6 +53,7 @@ pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;
 pub mod lagebesprechung;
+pub mod lagebild_extern;
 pub mod lagemonitor_zugang;
 pub mod live;
 pub mod lizenz;

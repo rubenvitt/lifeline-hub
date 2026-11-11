@@ -13,7 +13,8 @@ ein Gerät, sondern liest mit einem **Schlüssel** das Lagebild genau eines Eins
 
 Den Schlüssel legt der System-Admin in der Verwaltung unter „Lagemonitore“ an. Welchen Einsatz
 der Monitor zeigt, entscheidet die Einsatzleitung auf der Seite „Geräte“ ihres Einsatzes. Für
-den gekoppelten Großbildschirm in der App siehe [Lagemonitor](lagemonitor.md).
+den gekoppelten Großbildschirm in der App siehe [Lagemonitor](lagemonitor.md), für Stellen
+ohne eigenen Monitor das [Lagebild für Externe](lagebild-extern.md).
 
 ## Abläufe
 

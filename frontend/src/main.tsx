@@ -13,6 +13,7 @@ import { registerSW } from 'virtual:pwa-register';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { appRouten } from './App';
+import { merkeRouten } from './rueckmeldung/adresse';
 import { registerSchriften } from './theme/schriften';
 import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { erzeugeQueryClient } from './api/queryClient';
@@ -29,6 +30,8 @@ const updateSW = registerSW({
 setzeAppAktualisierer(updateSW);
 
 const queryClient = erzeugeQueryClient();
+// Für den Bereich im Rückmeldeformular (LLH-1549): nur das Routenmuster, nie Kennungen.
+merkeRouten(appRouten);
 const router = createBrowserRouter(appRouten);
 
 void schriften.then(() => {

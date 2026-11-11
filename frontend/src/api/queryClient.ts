@@ -44,7 +44,8 @@ const queryClientDefaults = {
  *  Programmierfehler) werden protokolliert. */
 function behandleFehler(fehler: unknown): void {
   if (fehler instanceof ApiError) {
-    if (fehler.status === 401) meldeSitzungAbgelaufen();
+    // Ein 401 auf einen eigenen Schlüssel (Lagebild für Externe) ist keine abgelaufene Sitzung.
+    if (fehler.status === 401 && !fehler.ohneSitzung) meldeSitzungAbgelaufen();
     return;
   }
   if (fehler instanceof NetzFehler) return;

@@ -64,19 +64,26 @@ export class ApiError extends Error {
    * `zeilen`). Leer, wenn die Antwort keine trägt. Der Dialog zeigt sie an der jeweiligen Kraft.
    */
   zeilen: ZeilenGrund[];
+  /**
+   * Die Anfrage lief ohne Sitzung mit eigenem Schlüssel (Lagebild für Externe, LLH-1496): ein
+   * 401 heißt dann „Schlüssel ungültig“, nicht „Sitzung abgelaufen“, und meldet nicht ab.
+   */
+  ohneSitzung: boolean;
   constructor(
     status: number,
     message: string,
     {
       vomAnwendungsserver = false,
       zeilen = [] as ZeilenGrund[],
-    }: { vomAnwendungsserver?: boolean; zeilen?: ZeilenGrund[] } = {},
+      ohneSitzung = false,
+    }: { vomAnwendungsserver?: boolean; zeilen?: ZeilenGrund[]; ohneSitzung?: boolean } = {},
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.vomAnwendungsserver = vomAnwendungsserver;
     this.zeilen = zeilen;
+    this.ohneSitzung = ohneSitzung;
   }
 }
 

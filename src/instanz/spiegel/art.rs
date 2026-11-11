@@ -160,6 +160,14 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("etb_lesemarke", "Lesestand einer Person an dieser Instanz"),
     ("lagemonitor_freigabe", "Geräte hängen an einer Instanz"),
     (
+        "lagebild_freigabe",
+        "Externe Links gelten an der Instanz, die sie ausgibt (LLH-1496)",
+    ),
+    (
+        "lagebild_abruf",
+        "Externe Links gelten an der Instanz, die sie ausgibt (LLH-1496)",
+    ),
+    (
         "benachrichtigung",
         "Zustellstand je Instanz: jede Instanz führt ihre eigenen Hinweise (Nachtrag 10.11.2026)",
     ),

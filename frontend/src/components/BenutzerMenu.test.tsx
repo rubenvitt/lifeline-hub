@@ -200,7 +200,7 @@ describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
     oeffnen.mockRestore();
   });
 
-  it('die Hilfe steht über dem Lizenzhinweis und öffnet die Hilfe-Seite (LFH-1096)', async () => {
+  it('die Hilfe steht über Rückmeldung und Lizenzhinweis und öffnet die Hilfe-Seite (LFH-1096)', async () => {
     server.use(meHandler(benutzer));
     renderMitProviders(
       <ThemeModeProvider>
@@ -212,10 +212,35 @@ describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
     );
     await oeffne();
     const eintraege = await screen.findAllByRole('menuitem');
-    const hilfe = eintraege[eintraege.length - 2]!;
+    const hilfe = eintraege[eintraege.length - 3]!;
     expect(hilfe.textContent).toBe('Hilfe');
     await userEvent.click(hilfe);
     expect(await screen.findByRole('heading', { name: 'Hilfe-Seite' })).toBeInTheDocument();
+  });
+
+  // Der Rückmeldeweg (LLH-1549): das Issue-Formular, vorbefüllt mit Version und Oberfläche.
+  // Ohne gemerkte Routen (wie hier, `main.tsx` setzt sie) fehlt nur der Bereich; das
+  // Routenmuster prüft `rueckmeldung/adresse.test.ts`.
+  it('„Rückmeldung“ steht über dem Lizenzhinweis und öffnet das Issue-Formular (LLH-1549)', async () => {
+    const oeffnen = vi.spyOn(window, 'open').mockReturnValue(null);
+    zeige();
+    await oeffne();
+    const eintraege = await screen.findAllByRole('menuitem');
+    const rueckmeldung = eintraege[eintraege.length - 2]!;
+    expect(rueckmeldung.textContent).toBe('Rückmeldung');
+    await userEvent.click(rueckmeldung);
+    expect(oeffnen).toHaveBeenCalledTimes(1);
+    const [ziel, fenster, merkmale] = oeffnen.mock.calls[0]!;
+    expect(fenster).toBe('_blank');
+    expect(merkmale).toBe('noopener,noreferrer');
+    const adresse = new URL(String(ziel));
+    expect(adresse.origin + adresse.pathname).toBe(
+      'https://github.com/rubenvitt/lifeline-hub/issues/new',
+    );
+    expect(adresse.searchParams.get('template')).toBe('rueckmeldung.yml');
+    expect(adresse.searchParams.get('version')).toBe(__APP_VERSION__);
+    expect(adresse.searchParams.get('oberflaeche')).toBe('Browser');
+    oeffnen.mockRestore();
   });
 
   it('„Benachrichtigungen“ öffnet die eigenen Einstellungen (kcjecn9e D6)', async () => {

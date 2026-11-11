@@ -44,6 +44,14 @@ describe('erzeugeQueryClient — globale 401-Erkennung', () => {
     expect(horcher).toHaveBeenCalledTimes(1);
   });
 
+  it('meldet keinen Sitzungsablauf für einen ungültigen Schlüssel ohne Sitzung (LLH-1496)', async () => {
+    const horcher = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, horcher);
+    await queryScheitert(new ApiError(401, 'Nicht angemeldet', { ohneSitzung: true }));
+    window.removeEventListener(SITZUNG_ABGELAUFEN, horcher);
+    expect(horcher).not.toHaveBeenCalled();
+  });
+
   it('schweigt bei jedem anderen ApiError — die lokalen onError-Handler melden ihn', async () => {
     const horcher = vi.fn();
     const konsole = vi.spyOn(console, 'error').mockImplementation(() => {});
