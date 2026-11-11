@@ -18,6 +18,7 @@ const spiegel = (teil: Partial<EinsatzSpiegelAnzeige> = {}): EinsatzSpiegelAnzei
   beendet: false,
   antraege_ausstehend: 1,
   antraege_abgelehnt: 1,
+  bruchstelle: 0,
   ...teil,
 });
 
@@ -68,6 +69,22 @@ describe('SpiegelBand (LLH-1492, design.md D13)', () => {
     expect(band).toHaveTextContent(/Abgleich \d/);
     expect(band).toHaveTextContent('1 Antrag ausstehend');
     expect(band).toHaveTextContent('1 abgelehnt');
+  });
+
+  it('zählt die Änderungen der Bruchstelle, die der neue Führer nicht kannte (LLH-1641)', () => {
+    mitServer([]);
+    renderMitProviders(
+      <SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel({ bruchstelle: 2 }) })} />,
+    );
+    expect(document.querySelector('[data-lfh="spiegel-band-bruch"]')).toHaveTextContent(
+      '2 Änderungen nicht übernommen',
+    );
+  });
+
+  it('zeigt ohne Bruchstelle nichts dazu', () => {
+    mitServer([]);
+    renderMitProviders(<SpiegelBand einsatz={einsatzFixture({ spiegel: spiegel() })} />);
+    expect(document.querySelector('[data-lfh="spiegel-band-bruch"]')).toBeNull();
   });
 
   it('sagt „Abgleich beendet“ nach dem Widerruf', () => {

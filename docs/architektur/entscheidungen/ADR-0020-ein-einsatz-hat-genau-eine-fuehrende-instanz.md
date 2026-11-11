@@ -1,7 +1,8 @@
 ---
 id: ADR-0020
 titel: Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0021
 datum: 2026-11-09
 gilt_fuer:
   - src/instanz/fuehrung/**

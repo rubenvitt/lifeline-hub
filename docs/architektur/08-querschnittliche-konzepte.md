@@ -240,9 +240,10 @@ am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
 
 Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
 `LIFELINE_FUEHRUNG`,
-[ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md)). Jede andere
-liest nur: Der Merker `einsatz.fuehrung_bei` sperrt alle Schreibwege über `fordere_aktiv`, die
-Oberfläche über `schreibrecht.ts`. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
+[ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md)). Jede andere
+hält den Einsatz als Spiegel (LLH-1641): die Akte entscheidet, `einsatz.spiegel` folgt ihr, und
+nur der Schutz-Trigger des Spiegels sperrt, am Server wie in `schreibrecht.ts`. Am Spiegel wird
+beantragt. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
 Unterschrift eines Org-Admins oder einen Code, den sie selbst erzeugt hat, und gilt dort erst
 nach der Bestätigung eines Menschen (Ablauf 6.6c).
 

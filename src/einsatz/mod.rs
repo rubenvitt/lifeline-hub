@@ -162,8 +162,8 @@ pub struct Einsatz {
     /// `einsatzleiter_spalten!`/`einsatzleiter_joins!` in `repo`.
     #[sqlx(flatten)]
     pub einsatzleiter: fuehrungsstelle::EinsatzleiterSpalten,
-    /// Führung je Einsatz (LLH-1491): `fuehrung_bei` gesetzt heißt, eine andere Instanz führt,
-    /// und jeder Schreibweg antwortet mit 409 (`berechtigung::fordere_aktiv`).
+    /// Führung je Einsatz (LLH-1491), nur Anzeige: Führt eine andere Instanz, ist der Einsatz hier
+    /// ein Spiegel, und dessen Schutz antwortet auf jeden Schreibweg mit 409 (LLH-1641).
     #[sqlx(flatten)]
     pub fuehrung: crate::instanz::fuehrung::FuehrungSpalten,
     /// Spiegel-Angaben (LLH-1492).

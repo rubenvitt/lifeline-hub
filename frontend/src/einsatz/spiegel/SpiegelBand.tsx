@@ -22,6 +22,7 @@ import {
   antragDatenText,
   antragErfassungsort,
   antragZaehler,
+  bruchText,
   spiegelStand,
   spiegelTitel,
 } from './spiegelText';
@@ -31,10 +32,12 @@ import {
  * seine Herkunft und seinen Stand“): über jeder Einsatzseite, im Rahmen. „Spiegel von <Gegenstelle>“,
  * der Stand des Abgleichs („keine Verbindung seit …“, „Abgleich beendet“) und die Zahl der eigenen
  * Anträge aus dem Kopf; aufgeklappt die Anträge mit Zustand, abgelehnte mit Grund, „Neu erfassen“
- * und „Verwerfen“.
+ * und „Verwerfen“. Nach einem Führungswechsel die eigenen Änderungen, die der neue Führer nicht
+ * kannte („3 Änderungen nicht übernommen“, LLH-1641).
  *
- * FARBE: Grund `bannerGrund`, Kante `bannerLinie` wie ein Hinweis; eine Störung des Abgleichs und
- * abgelehnte Anträge in `achtungText` (zweiter Kanal: das Wort). Ohne Spiegel steht nichts da.
+ * FARBE: Grund `bannerGrund`, Kante `bannerLinie` wie ein Hinweis; eine Störung des Abgleichs,
+ * abgelehnte Anträge und nicht übernommene Änderungen in `achtungText` (zweiter Kanal: das Wort).
+ * Ohne Spiegel steht nichts da.
  *
  * Das Band lädt die Anträge (`useSpiegelAntraege`): die Fachseiten lesen sie aus dem Cache, wo sie
  * Vorgemerktes zeigen. Es holt den Kopf alle {@link SPIEGEL_KOPF_ABRUF_MS} neu, weil ein Abgleich
@@ -88,6 +91,7 @@ function BandInhalt({
     zeitKurz(w, konventionen),
   );
   const zaehler = antragZaehler(spiegel);
+  const bruch = bruchText(spiegel);
   const hatAntraege = (antraege?.length ?? 0) > 0 || zaehler.length > 0;
   return (
     <div
@@ -132,6 +136,13 @@ function BandInhalt({
               {z.slice(z.indexOf(' '))}
             </span>
           ))}
+          {bruch && (
+            <span data-lfh="spiegel-band-bruch" style={{ color: rollen.achtungText }}>
+              <span aria-hidden="true">· </span>
+              <span style={monoStil(12)}>{bruch.split(' ')[0]}</span>
+              {bruch.slice(bruch.indexOf(' '))}
+            </span>
+          )}
           {stand.gestoert && (
             <span style={NUR_VORLESER}>Keine Verbindung zur führenden Instanz</span>
           )}
