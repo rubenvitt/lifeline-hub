@@ -193,6 +193,10 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   dieselbe Bereinigung (`karte_hintergrundbild::bereinigt`; ETag `"<sha256>.b<n>"`,
   `BEREINIGT_CACHE_CONTROL`). Gespeichert bleibt das Original, einen Original-Abruf gibt es
   nicht. Was sich nicht bereinigen lässt, weist schon der Upload mit 422 ab.
+- **Organisationslogo (LLH-1640)** ist kein Beweismittel: `logo_hochladen` speichert nur die
+  bereinigten Bytes (`org::logo::bereinigt`, 422 bei Unbereinigbarem), `logo_lesen` bereinigt
+  trotzdem noch einmal (Bestand von vor LLH-1640, neuere `BEREINIGUNG_VERSION`). ETag
+  `"<sha256>.b<n>"` über `org::logo::etag_wert`; `sha256` an der Anzeige bleibt der Cache-Brecher.
 
 **Vorschau (LFH-759)** (Spec `anhang-vorschau`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`):
