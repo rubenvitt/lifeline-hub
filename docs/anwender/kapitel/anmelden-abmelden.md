@@ -61,7 +61,7 @@ folgt auf „Anmelden“ (und gegebenenfalls den Code) noch ein Schritt:
 
 1. Oben rechts das „Benutzermenü“ (Kachel mit den Initialen) öffnen.
 
-   ![Geöffnetes Benutzermenü mit „Profil“ und „Abmelden“ unter dem Namen der Person](../bilder/anmelden-abmelden/benutzermenue.png)
+   ![Geöffnetes Benutzermenü mit „Profil“ und „Abmelden“ unter dem Namen der Person, darunter die Gruppe „Anzeige“](../bilder/anmelden-abmelden/benutzermenue.png)
 
 2. „Abmelden“ wählen. Die App kehrt zur Anmeldeseite zurück.
 

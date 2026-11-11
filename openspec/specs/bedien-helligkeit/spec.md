@@ -15,8 +15,8 @@ MUST es nicht geben.
 
 #### Scenario: Stufen im Benutzermenü
 - **WHEN** das Benutzermenü geöffnet wird
-- **THEN** enthält die Gruppe „Helligkeit“ genau die Stufen 100, 80, 60, 40 und 20 %
-- **AND** die gewählte Stufe trägt „✓“ im Text
+- **THEN** enthält die Leiste „Helligkeit“ der Gruppe „Anzeige“ genau die Stufen 100, 80, 60, 40 und 20 %
+- **AND** die gewählte Stufe ist ausgewählt, sichtbar und für Hilfstechnik
 
 #### Scenario: Stufen in der Sprungpalette
 - **WHEN** in der Sprungpalette „Helligkeit“ gesucht wird
@@ -126,9 +126,9 @@ Wahl sein. Die Sperre MUST NOT die gespeicherte Wahl ändern.
 
 #### Scenario: Erklärung im Menü
 - **WHEN** eine Warnung aktiv ist und das Benutzermenü geöffnet wird
-- **THEN** nennt die Gruppe „Helligkeit“ den Boden und den Grund
-- **AND** die Stufen unter dem Boden sind gesperrt
-- **AND** eine Wahl unter dem Boden trägt den Hinweis auf die wirksame Stufe
+- **THEN** nennt die Leiste „Helligkeit“ den Boden und den Grund
+- **AND** die Stufen unter dem Boden sind gesperrt und nennen den Grund der Sperre
+- **AND** liegt die Wahl unter dem Boden, nennt die Leiste die wirksame Stufe
 
 ### Requirement: Darstellung der Abdunklung
 

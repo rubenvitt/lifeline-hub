@@ -144,6 +144,16 @@ interface SegmentleisteProps<W extends string | number> {
   /** Zugänglicher Name der Gruppe — Pflicht („Einträge nach Typ filtern"). */
   beschriftung: string;
   rolle?: 'radiogroup' | 'tablist';
+  /**
+   * Volle Breite des Behälters (LLH-1642, Benutzermenü): die Leiste wird ein Block, jede Zelle
+   * wächst gleich, das Wort bleibt mittig. Die Zellen TEILEN die Breite: die Mindestbreite der
+   * Staffel entfällt hier, Höhe und Zielabstand bleiben (D12; fünf Helligkeitsstufen im
+   * Handschuh-Betrieb am Handy, sonst überlappten sie). Ohne richtet sich die Leiste nach ihren
+   * Wörtern.
+   */
+  hasFullWidth?: boolean;
+  /** Id eines Texts, der die ganze Leiste beschreibt (`aria-describedby`, LLH-1642). */
+  beschreibungId?: string;
   style?: CSSProperties;
 }
 
@@ -153,6 +163,8 @@ export default function Segmentleiste<W extends string | number>({
   onWechsel,
   beschriftung,
   rolle = 'radiogroup',
+  hasFullWidth = false,
+  beschreibungId: leistenBeschreibungId,
   style,
 }: SegmentleisteProps<W>) {
   const { token } = useRollen();
@@ -176,9 +188,10 @@ export default function Segmentleiste<W extends string | number>({
     <div
       role={rolle}
       aria-label={beschriftung}
+      aria-describedby={leistenBeschreibungId}
       className="lfh-segmente"
       data-lfh="segmentleiste"
-      style={style}
+      style={hasFullWidth ? { display: 'flex', ...style } : style}
     >
       {optionen.map((o, i) => {
         const aktiv = i === gewaehltIndex;
@@ -204,7 +217,11 @@ export default function Segmentleiste<W extends string | number>({
               if (!gesperrt) onWechsel(o.wert);
             }}
             onKeyDown={(e) => taste(e, i)}
-            style={segmentStil(token)}
+            style={
+              hasFullWidth
+                ? { ...segmentStil(token), flexGrow: 1, minWidth: 0 }
+                : segmentStil(token)
+            }
           >
             {o.punkt != null && (
               <span
@@ -228,7 +245,17 @@ export default function Segmentleiste<W extends string | number>({
             role="none"
             className="lfh-segment-zelle"
             data-lfh="segment-zelle"
-            style={segmentZelleStil(token)}
+            style={
+              hasFullWidth
+                ? {
+                    ...segmentZelleStil(token),
+                    flexGrow: 1,
+                    flexShrink: 1,
+                    flexBasis: 0,
+                    minWidth: 0,
+                  }
+                : segmentZelleStil(token)
+            }
           >
             {gesperrt ? <Tooltip title={o.gesperrt}>{knopf}</Tooltip> : knopf}
           </span>

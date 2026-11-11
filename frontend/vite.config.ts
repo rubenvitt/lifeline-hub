@@ -195,7 +195,7 @@ export default defineConfig(({ mode }) => {
           // Seitenwechsel auf /api/ MÜSSEN zum Server: der OIDC-Login ist ein Full-Page-Redirect
           // über `/api/auth/oidc/…`. Sonst antwortet der Service Worker mit dem gecachten
           // `index.html`, und der Login endet stumm wieder auf der Login-Seite.
-          // Ebenso die Lizenzhinweise (LFH-1000, Benutzermenü „Lizenzen“): sie öffnen als eigene
+          // Ebenso die Lizenzhinweise (LFH-1000, „Lizenzen“ in der Übersicht der Hilfe): sie öffnen als eigene
           // Seite und kämen sonst als App-Hülle zurück.
           navigateFallbackDenylist: [/^\/api\//, /^\/lizenzen\//],
           // Klick auf eine Alarm-Meldung, die über den Service Worker kam (LFH-1062, Android):
