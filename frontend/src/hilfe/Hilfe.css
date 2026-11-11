@@ -295,6 +295,53 @@
   color: var(--lfh-bedien-text);
 }
 
+/* Rückmeldung und Lizenzen (LLH-1642): ein Block unter den Bereichskarten, Grund wie eine
+   Auswahlfläche, kein Kartenraster. */
+.hilfe-rueckmeldung {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 24px 0 0;
+  padding: 16px 18px;
+  border: 1px solid var(--lfh-linie-stark);
+  background: var(--lfh-bedien-flaeche);
+}
+
+.hilfe-rueckmeldung p {
+  margin: 0;
+}
+
+.hilfe-rueckmeldung__frage {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hilfe-rueckmeldung__text {
+  color: var(--lfh-gedaempft);
+  max-width: 60ch;
+}
+
+.hilfe-rueckmeldung__fuss {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  color: var(--lfh-schwach);
+  font-size: 12px;
+}
+
+.hilfe-rueckmeldung__fuss span {
+  font-family: var(--lfh-schrift-zahl);
+}
+
+/* Trefffläche ≥ 44 px Höhe für den Link (Bedien-Leitlinie), ohne die Zeile aufzublähen. */
+.hilfe-rueckmeldung__fuss a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 .hilfe-mappe__titel {
   margin: 8px 0 0;
   padding-top: 32px;

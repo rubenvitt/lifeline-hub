@@ -2,7 +2,7 @@
 titel: Rückmeldung geben
 gruppen: [alle]
 reihenfolge: 90
-quellen: [frontend/src/rueckmeldung/, frontend/src/components/BenutzerMenu.tsx, .github/ISSUE_TEMPLATE/, scripts/rueckmeldung/, SECURITY.md]
+quellen: [frontend/src/rueckmeldung/, frontend/src/components/BenutzerMenu.tsx, frontend/src/hilfe/HilfePage.tsx, .github/ISSUE_TEMPLATE/, scripts/rueckmeldung/, SECURITY.md]
 ---
 
 ## Überblick
@@ -16,13 +16,14 @@ rueckmeldung@lifeline-hub.de.
 
 ### Rückmeldung über das Formular
 
-1. Das Benutzermenü öffnen.
-2. „Rückmeldung“ wählen. Das Formular öffnet sich in einem neuen Fenster des Browsers, in der
-   Desktop-App im Standardbrowser des Rechners.
+1. Aus der Seite, um die es geht, das Benutzermenü öffnen und „Hilfe“ wählen.
+2. In der Übersicht der Hilfe unter „Fehler gefunden oder eine Idee?“ „Rückmeldung geben“ wählen.
+   Das Formular öffnet sich in einem neuen Fenster des Browsers, in der Desktop-App im
+   Standardbrowser des Rechners.
 3. Bei GitHub anmelden, falls noch nicht geschehen. Ein Konto lässt sich dort kostenlos anlegen.
 4. „Art“ wählen: Fehler, Wunsch oder Frage.
 5. „Version“, „Oberfläche“ und „Bereich der App“ sind schon ausgefüllt. Sie stimmen, solange die
-   Rückmeldung den Bereich betrifft, aus dem das Menü geöffnet wurde.
+   Rückmeldung den Bereich betrifft, aus dem die Hilfe geöffnet wurde.
 6. Einen Titel eintragen und unter „Was ist passiert, was wünschst du dir?“ beschreiben, worum es
    geht. Bei einem Fehler helfen „Schritte zum Nachstellen“ und „Erwartet“.
 7. Bestätigen, dass Text und Bilder keine Namen von Betroffenen oder Patienten und keine
@@ -35,8 +36,8 @@ später gemeldet.
 ### Rückmeldung per E-Mail
 
 1. Eine E-Mail an rueckmeldung@lifeline-hub.de schreiben.
-2. Die Version aus dem Benutzermenü (Zeile „Version …“ unter dem Namen), den Bereich der App und
-   die Beobachtung nennen.
+2. Die Version (im Benutzermenü die Zeile „Version …“ unter dem Namen, ebenso unten in der
+   Übersicht der Hilfe), den Bereich der App und die Beobachtung nennen.
 
 ### Sicherheitslücke melden
 
@@ -57,8 +58,9 @@ Ein Bildschirmfoto mit Demo-Daten ([Demo-Daten](demo-daten.md)) zeigt dasselbe o
 
 ### Was die Anwendung mitgibt
 
-Der Eintrag „Rückmeldung“ füllt nur drei Felder vor: die Version, die Oberfläche (Browser oder
-Desktop-App) und den Bereich der App als Muster, etwa `/einsatz/:id/etb`. Kennungen von Einsatz,
+„Rückmeldung geben“ füllt nur drei Felder vor: die Version, die Oberfläche (Browser oder
+Desktop-App) und den Bereich der App als Muster, etwa `/einsatz/:id/etb`: den Bereich, aus dem
+die Hilfe über das Benutzermenü geöffnet wurde, sonst die Hilfe selbst. Kennungen von Einsatz,
 Personen oder Einheiten stehen nicht darin, ebenso wenig Name, Benutzername oder die Adresse des
 Servers; auch als Herkunft (Referer) gibt der Aufruf die Adresse nicht weiter. Alles Weitere steht
 nur im Formular, wenn es dort eingetragen wird.
@@ -76,6 +78,11 @@ neue Rückmeldung.
 
 ### Gekoppelte Geräte
 
-Auf gekoppelten Geräten fehlt der Eintrag. Eine Beobachtung dort meldet eine angemeldete Person
-über das Benutzermenü auf einem anderen Gerät oder per E-Mail, mit der Oberfläche „gekoppeltes
-Gerät“.
+Auf gekoppelten Geräten fehlt „Rückmeldung geben“, auch in der Hilfe. Eine Beobachtung dort meldet
+eine angemeldete Person über die Hilfe auf einem anderen Gerät oder per E-Mail, mit der Oberfläche
+„gekoppeltes Gerät“.
+
+### Lizenzen
+
+Die Hinweise zu den Lizenzen eingebetteter Bibliotheken stehen unten in der Übersicht der Hilfe
+unter „Lizenzen“, neben der Version.

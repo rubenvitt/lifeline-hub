@@ -226,8 +226,8 @@ const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: Icon 
   { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: IconMond },
 ];
 
-/** Bediendichte über die Palette, die schnelle Abkürzung neben der Umschaltgruppe im
- *  Benutzermenü. Kein Ersatz: ein `Befehl` trägt kein Zustandsfeld, die Palette zeigt die
+/** Bediendichte über die Palette, die schnelle Abkürzung neben der Leiste „Bediendichte“ im
+ *  Benutzermenü (Gruppe „Anzeige“, LLH-1642). Kein Ersatz: ein `Befehl` trägt kein Zustandsfeld, die Palette zeigt die
  *  aktive Stufe nicht an. */
 const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: Icon }[] = [
   { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: IconPfeileEinwaerts },

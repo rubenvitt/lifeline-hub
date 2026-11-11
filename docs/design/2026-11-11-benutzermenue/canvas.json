@@ -1,0 +1,50 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-11T15:12:00Z" },
+  "title": "Benutzermenü entschlackt",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Heute · Handy 390 × 844 · komfortabel" },
+    "A-Handy-komfortabel.dc.html": { "x": 0, "y": 1224, "w": 390, "h": 844, "title": "A · Handy · komfortabel" },
+    "A-Handy-handschuh.dc.html": { "x": 470, "y": 1224, "w": 390, "h": 844, "title": "A · Handy · Handschuh" },
+    "A-Desktop-kompakt.dc.html": { "x": 940, "y": 1224, "w": 1180, "h": 700, "title": "A · Tablet/Desktop 1180 · kompakt" },
+    "B-Handy-Hauptmenue.dc.html": { "x": 0, "y": 2448, "w": 390, "h": 844, "title": "B · Handy · Hauptmenü" },
+    "B-Handy-Anzeige.dc.html": { "x": 470, "y": 2448, "w": 390, "h": 844, "title": "B · Handy · nach Tipp auf „Anzeige ›“" },
+    "C-Handy-Seite.dc.html": { "x": 0, "y": 3672, "w": 390, "h": 844, "title": "C · Handy · Seite „Anzeige“ im Profil" },
+    "Hilfe-Handy.dc.html": { "x": 0, "y": 4896, "w": 390, "h": 844, "title": "Entschieden · Hilfe-Seite mit Rückmeldung und Lizenzen" },
+    "Eingaenge-Klappflaeche.dc.html": { "x": 470, "y": 4896, "w": 420, "h": 560, "title": "Entschieden · Eingänge mit Link „Benachrichtigungen“" }
+  },
+  "order": [
+    "Main.dc.html",
+    "A-Handy-komfortabel.dc.html",
+    "A-Handy-handschuh.dc.html",
+    "A-Desktop-kompakt.dc.html",
+    "B-Handy-Hauptmenue.dc.html",
+    "B-Handy-Anzeige.dc.html",
+    "C-Handy-Seite.dc.html",
+    "Hilfe-Handy.dc.html",
+    "Eingaenge-Klappflaeche.dc.html"
+  ],
+  "notes": {
+    "t0": { "x": 0, "y": -260, "text": "Heute: 18 Einträge, ~1070 px hoch", "kind": "title1", "maxW": 1400 },
+    "n0": { "x": 470, "y": 0, "w": 360, "text": "Heute am Handy in „komfortabel“: Darstellung, Bediendichte und Helligkeit sind 11 Zeilen plus 3 Überschriften. Benachrichtigungen, Neuigkeiten, Hilfe, Rückmeldung und Lizenzen liegen unter dem Rand.", "color": "gray" },
+    "t1": { "x": 0, "y": 964, "text": "A · Kompakte Schalter im Menü (Empfehlung)", "kind": "title1", "maxW": 2120 },
+    "n1": { "x": 2200, "y": 1224, "w": 360, "text": "Je Achse eine Segmentleiste statt einer Liste: aus 14 Zeilen werden 4. Weiter ein Tipp, der gewählte Wert steht sichtbar. Handschuh: Leisten 72 px hoch, das Menü reicht knapp bis zum Rand.", "color": "blue" },
+    "t2": { "x": 0, "y": 2188, "text": "B · Untermenü „Anzeige ›“", "kind": "title1", "maxW": 1400 },
+    "n2": { "x": 940, "y": 2448, "w": 360, "text": "Hauptmenü am kürzesten, der Eintrag nennt die aktuellen Werte. Am Handy klappt das Untermenü nicht seitlich auf, sondern ersetzt die Liste (mit „‹ Zurück“). Zwei Tipps für die Helligkeit.", "color": "gray" },
+    "t3": { "x": 0, "y": 3412, "text": "C · Eigene Seite (im Profil)", "kind": "title1", "maxW": 1400 },
+    "n3": { "x": 470, "y": 3672, "w": 360, "text": "Menü wie B, aber „Anzeige“ führt ins Profil, Abschnitt „Anzeige auf diesem Gerät“ (dort steht schon die Zeitdarstellung). Kürzestes Menü, aber nachts für die Helligkeit raus aus ETB oder Lagekarte.", "color": "gray" },
+    "t4": { "x": 0, "y": 4636, "text": "Schon entschieden", "kind": "title1", "maxW": 1400 },
+    "n4": { "x": 970, "y": 4896, "w": 360, "text": "Rückmeldung und Lizenzen ziehen auf die Hilfe-Seite (dort auch ohne Anmeldung und ohne Netz). Benachrichtigungen bleibt im Menü und bekommt einen zweiten Weg aus der Eingänge-Klappfläche im Einsatz.", "color": "green" }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": null,
+      "copiedAt": "2026-11-11T15:12:00Z"
+    }
+  ]
+}
