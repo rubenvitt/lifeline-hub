@@ -155,6 +155,34 @@ test('kommentiereRelease: ohne Vorgänger gilt der ganze Verlauf bis zum Tag', a
   assert.deepEqual(aufrufe.gefragt, []);
 });
 
+test('kommentiereRelease: das erste Release eines Vorabkanals kommentiert nichts', async () => {
+  // Alpha-Releases zählen für die erste Beta nicht als Vorgänger: der Bereich wäre die ganze
+  // Historie, und jeder PR bekäme einen zweiten Kommentar.
+  const { aufrufe, abhaengigkeiten, log } = attrappe({
+    releases: [{ tag_name: 'v1.0.0-alpha.180', draft: false }],
+    commits: ['a1'],
+    prs: [{ number: 600, merged: true, mergeCommit: 'a1', kommentare: [] }],
+  });
+  const ergebnis = await kommentiereRelease({ tag: 'v1.0.0-beta.1', repo: REPO, ...abhaengigkeiten });
+  assert.deepEqual(aufrufe.bereich, []);
+  assert.deepEqual(aufrufe.kommentiert, []);
+  assert.deepEqual(ergebnis, { kommentiert: 0, vorhanden: 0, fehler: 0 });
+  assert.ok(log.some((zeile) => /Erstes Release im Kanal beta/.test(zeile)));
+});
+
+test('kommentiereRelease: die zweite Beta rechnet ab der ersten', async () => {
+  const { aufrufe, abhaengigkeiten } = attrappe({
+    releases: [
+      { tag_name: 'v1.0.0-beta.1', draft: false },
+      { tag_name: 'v1.0.0-alpha.185', draft: false },
+    ],
+    commits: [],
+    prs: [],
+  });
+  await kommentiereRelease({ tag: 'v1.0.0-beta.2', repo: REPO, ...abhaengigkeiten });
+  assert.deepEqual(aufrufe.bereich, [['v1.0.0-beta.1', 'v1.0.0-beta.2']]);
+});
+
 test('kommentiereRelease: ein gescheiterter Kommentar ist eine Warnung, die übrigen gehen raus', async () => {
   const { aufrufe, abhaengigkeiten, log } = attrappe({
     releases: [],

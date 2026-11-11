@@ -146,18 +146,19 @@ flowchart LR
   ART --> B["bauen: 4 Binaries,<br/>karten-service, SBOM"]
   ART --> D["docker, docker-karten<br/>(GHCR)"]
   ART --> DS["desktop (nur stabil)"]
+  NZ["kanal-nachziehen.yml<br/>Alpha-Tag nach beta"] -->|Push auf beta| CI
   B --> F["freigeben"]
   D --> F
   DS --> F
-  F --> PUB["Release veröffentlicht,<br/>latest am Abbild (stabil)"]
+  F --> PUB["Release veröffentlicht,<br/>latest, alpha oder beta am Abbild"]
   F -->|alpha| DEP["deployment.yml<br/>→ Pull-Agent am Server"]
-  F -->|alpha| DA["desktop-alpha<br/>→ desktop-kanal"]
+  F -->|alpha, beta| DA["desktop-alpha<br/>→ desktop-kanal"]
 ```
 
 | Kanal | Branch | Version | Desktop-Update liest |
 | --- | --- | --- | --- |
 | Vorabversion | `alpha` (Default-Branch, jeder Merge) | `X.Y.Z-alpha.N` | Release `desktop-alpha`, `latest.json` |
-| Beta | `beta`, vorbereitet, existiert nicht | — | — |
+| Beta | `beta`, nur durch den Workflow „Beta nachziehen“ mit einem Alpha-Tag | `X.Y.Z-beta.N` | Release `desktop-beta`, `latest.json` |
 | Stabil | `main`, nur durch Merge `alpha → main` | `X.Y.Z` | `releases/latest/download/latest.json` |
 
 - Kanäle und Versionsquelle: `release.config.mjs`. `prepareCmd` setzt die Version in
@@ -166,6 +167,13 @@ flowchart LR
 - Ein Release erscheint erst, wenn alle Bau-, Abbild- und bei stabilen Tags auch Desktop-Jobs
   grün sind (Job `freigeben`, Kopf von `artefakte.yml`). Die Desktop-Pakete einer Alpha
   entstehen danach und halten nichts auf (Job `desktop-alpha` in `artefakte.yml`, `desktop.yml`).
+- Beta (LLH-1545, [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md)):
+  `kanal-nachziehen.yml` bringt einen veröffentlichten Alpha-Tag nach `beta`
+  (`scripts/release/kanal-nachziehen.sh`, Angleich-Commit gegen die Konflikte des
+  Versions-Commits). Alpha zählt daneben weiter. Jeder Desktop-Kanal und jeder gleitende
+  Abbild-Tag (`:latest`, `:alpha`, `:beta`) führt nur Releases seines Kanals, nur vorwärts
+  (`scripts/release/desktop-kanal.mjs`, `scripts/release/abbild-kanal.mjs`). Beta legt kein
+  Deployment an.
 - `deployment.yml` rollt nichts aus: es legt ein GitHub-Deployment an, das ein Pull-Agent auf dem
   Zielserver abholt. Der Agent liegt nicht in diesem Repo (Kopf von `deployment.yml`).
 - Regeln für Release-Skripte: [`scripts/AGENTS.md`](../../scripts/AGENTS.md); Ablauf und

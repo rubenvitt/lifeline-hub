@@ -1,17 +1,19 @@
 # Release-Artefakte — vier Binaries, zwei Container-Abbilder (lifeline-hub und
-# karten-service), bei Alpha-Releases danach ein GitHub-Deployment. Dazu die Desktop-Hülle
-# (LFH-721, desktop.yml): Pakete für macOS arm64 und Windows x64 plus das Update-Manifest
-# latest.json. Stabile Hüllen lesen es über …/releases/latest/download/, Alpha-Hüllen über den
-# Alpha-Kanal …/releases/download/desktop-alpha/ (LLH-1280, Job `desktop-kanal`). Bei stabilen
-# Tags entsteht die Hülle vor der Freigabe und hält sie bei rotem Bau auf, bei Alpha-Tags erst
-# danach, ohne Release oder Deployment aufzuhalten.
+# karten-service), bei Alpha-Releases danach ein GitHub-Deployment (Beta bekommt keins, LLH-1545).
+# Dazu die Desktop-Hülle (LFH-721, desktop.yml): Pakete für macOS arm64 und Windows x64 plus das
+# Update-Manifest latest.json. Stabile Hüllen lesen es über …/releases/latest/download/,
+# Vorab-Hüllen über ihren Kanal …/releases/download/desktop-alpha/ bzw. desktop-beta/
+# (LLH-1280, LLH-1545, Job `desktop-kanal`). Bei stabilen Tags entsteht die Hülle vor der
+# Freigabe und hält sie bei rotem Bau auf, bei Vorab-Tags (Alpha, Beta) erst danach, ohne
+# Release oder Deployment aufzuhalten.
 #
 # EIN RELEASE WIRD ERST HIER VERÖFFENTLICHT (LFH-1054). semantic-release legt es als Entwurf an
 # und startet diesen Workflow mit `freigeben: true` (letzter Schritt in release.yml). Der Job
 # `freigeben` veröffentlicht nur, wenn ALLE Bau-, Smoke-, Abbild- und Upload-Jobs grün sind;
-# danach `latest` an den Abbildern, PR-Kommentare und das Deployment. Bleibt ein Job rot, bleibt
-# das Release Entwurf, Tag und Versions-Commit bleiben, die Nummer ist verbraucht. Nach einer
-# vorübergehenden Störung (Runner, Apple) führt „Re-run failed jobs“ bis zur Veröffentlichung.
+# danach den gleitenden Tag an den Abbildern (`latest`, `alpha`, `beta`), PR-Kommentare und das
+# Deployment. Bleibt ein Job rot, bleibt das Release Entwurf, Tag und Versions-Commit bleiben,
+# die Nummer ist verbraucht. Nach einer vorübergehenden Störung (Runner, Apple) führt „Re-run
+# failed jobs“ bis zur Veröffentlichung.
 #
 # Eigener Lauf statt Teil des Release-Laufs: so lassen sich die Artefakte eines bestehenden
 # Releases per workflow_dispatch nachbauen, ohne die Version neu zu ermitteln, und der bis zu
@@ -83,7 +85,7 @@ jobs:
             echo "vorab=true" >> "$GITHUB_OUTPUT"
           fi
           # `desktop`: Hülle VOR der Freigabe bauen — bei einem Tag ohne Vorabkennung oder per
-          # Dispatch ausdrücklich. Alpha-Tags bauen sie sonst danach (Job `desktop-alpha`,
+          # Dispatch ausdrücklich. Vorab-Tags bauen sie sonst danach (Job `desktop-alpha`,
           # LLH-1280).
           if [ "${ROH_TAG#*-}" = "$ROH_TAG" ] || [ "$DESKTOP_ERZWUNGEN" = "true" ]; then
             echo "desktop=true" >> "$GITHUB_OUTPUT"
@@ -328,13 +330,14 @@ jobs:
       version: ${{ needs.vorbereiten.outputs.version }}
     secrets: inherit
 
-  # Alpha-Kanal (LLH-1280): Alpha-Tags bauen die Hülle erst NACH der Freigabe ans schon
-  # veröffentlichte Release. Bau und Notarisierung dauern länger als die Server-Artefakte und
+  # Vorabkanäle (LLH-1280, LLH-1545): Alpha- und Beta-Tags bauen die Hülle erst NACH der Freigabe
+  # ans schon veröffentlichte Release. Die Job-ID bleibt `desktop-alpha` (Verweise in Doku und
+  # `desktop-kanal`), sie gilt für jede Vorabversion. Bau und Notarisierung dauern länger als die Server-Artefakte und
   # hängen an Apple; so verzögern sie weder Veröffentlichung noch Deployment, und ein roter Bau
   # kostet nur die Desktop-App dieses Releases. Nur aus release.yml (`freigeben`), ein Nachbau
   # baut die Hülle über `desktop: true` vor der (dann ausbleibenden) Freigabe.
   desktop-alpha:
-    name: Desktop-Hülle (Alpha-Kanal)
+    name: Desktop-Hülle (Vorabkanal)
     needs: [vorbereiten, freigeben]
     if: >-
       ${{ !cancelled() && inputs.freigeben
@@ -538,28 +541,6 @@ jobs:
           fi
           echo "::notice::$TAG veröffentlicht."
 
-      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        if: needs.vorbereiten.outputs.vorab != 'true'
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        if: needs.vorbereiten.outputs.vorab != 'true'
-
-      # Ein Prerelease darf `latest` nie übernehmen. Umgehängt wird das Manifest der Version,
-      # nichts wird neu gebaut — beide Architekturen, Provenance und SBOM bleiben dieselben.
-      - name: Abbilder als latest markieren
-        if: needs.vorbereiten.outputs.vorab != 'true'
-        env:
-          VERSION: ${{ needs.vorbereiten.outputs.version }}
-        run: |
-          set -euo pipefail
-          for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"; do
-            docker buildx imagetools create --tag "$bild:latest" "$bild:$VERSION"
-          done
-
       # Volle Historie: das Skript rechnet den Commit-Bereich seit dem letzten veröffentlichten
       # Release desselben Kanals mit `git rev-list`.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -572,6 +553,58 @@ jobs:
         with:
           version: 2026.9.1
           cache: true
+
+      # GLEITENDER TAG (LLH-1545): `latest` für stabil, `alpha`/`beta` für die Vorabkanäle, und
+      # nur, wenn dieses Release das neueste veröffentlichte seines Kanals ist
+      # (`scripts/release/abbild-kanal.mjs`): ein nachgeholter älterer Lauf dreht nichts zurück.
+      # Ein Prerelease übernimmt `latest` nie. Ältere Tags ohne das Skript: nur stabil wie bisher.
+      # Bei Vorabversionen ist ein Fehler hier nur eine Warnung: `freigeben` muss grün bleiben,
+      # sonst fielen Deployment und Desktop-Hülle aus, nur weil `:alpha` nicht umgehängt wurde.
+      - name: Gleitenden Abbild-Tag bestimmen
+        id: abbild
+        continue-on-error: ${{ needs.vorbereiten.outputs.vorab == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+          VORAB: ${{ needs.vorbereiten.outputs.vorab }}
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/release/abbild-kanal.mjs ]; then
+            if [ "$VORAB" != "true" ]; then echo "name=latest" >> "$GITHUB_OUTPUT"; fi
+            exit 0
+          fi
+          gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
+            --jq '.[] | select(.draft == false) | .tag_name' > "$RUNNER_TEMP/veroeffentlicht.txt"
+          name="$(mise exec -- node scripts/release/abbild-kanal.mjs --tag "$TAG" \
+            --veroeffentlicht "$RUNNER_TEMP/veroeffentlicht.txt")"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        if: steps.abbild.outputs.name != ''
+        continue-on-error: ${{ needs.vorbereiten.outputs.vorab == 'true' }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.abbild.outputs.name != ''
+        continue-on-error: ${{ needs.vorbereiten.outputs.vorab == 'true' }}
+
+      # Umgehängt wird das Manifest der Version, nichts wird neu gebaut — beide Architekturen,
+      # Provenance und SBOM bleiben dieselben.
+      - name: Gleitenden Tag an die Abbilder hängen
+        if: steps.abbild.outputs.name != ''
+        continue-on-error: ${{ needs.vorbereiten.outputs.vorab == 'true' }}
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+          NAME: ${{ steps.abbild.outputs.name }}
+        run: |
+          set -euo pipefail
+          for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"; do
+            docker buildx imagetools create --tag "$bild:$NAME" "$bild:$VERSION"
+          done
 
       # Fehler hier machen den Job nicht rot (das Release steht schon), sie stehen als Warnung im
       # Protokoll. Begründung und Rechnung im Kopf von scripts/release/pr-kommentare.mjs.
@@ -610,16 +643,18 @@ jobs:
     with:
       tag: ${{ needs.vorbereiten.outputs.tag }}
 
-  # ── Alpha-Kanal der Desktop-Hülle (LLH-1280) ─────────────────────────────────────────
-  # Hüllen mit einer Vorabversion lesen `releases/download/desktop-alpha/latest.json`
-  # (src-tauri/src/update.rs), stabile weiter `releases/latest/download/latest.json`. Dieser Job
-  # schreibt den Kanal fort, sobald ein Release mit Desktop-Paketen veröffentlicht ist, auch ein
-  # stabiles. Nur vorwärts und nur vollständig (scripts/release/desktop-kanal.mjs). Das Release
-  # `desktop-alpha` legt er beim ersten Mal selbst an: Vorabversion, nie „latest“, Tag ohne `v`,
-  # damit semantic-release und pr-kommentare.mjs es übergehen. Eine Gruppe für alle Läufe, damit
-  # zwei Releases den Kanal nicht gleichzeitig schreiben.
+  # ── Vorabkanäle der Desktop-Hülle (LLH-1280, LLH-1545) ──────────────────────────────
+  # Alpha-Hüllen lesen `releases/download/desktop-alpha/latest.json`, Beta-Hüllen
+  # `releases/download/desktop-beta/latest.json` (src-tauri/src/kanal.rs, update.rs), stabile
+  # weiter `releases/latest/download/latest.json`. Dieser Job schreibt die Kanäle des Releases
+  # fort, sobald es mit Desktop-Paketen veröffentlicht ist: eine Alpha den Alpha-, eine Beta den
+  # Beta-Kanal, ein stabiles Release beide. Nur vorwärts, nur vollständig, jeder Kanal nur seine
+  # eigenen (scripts/release/desktop-kanal.mjs). Ein Kanal-Release legt er beim ersten Mal selbst
+  # an: Vorabversion, nie „latest“, Tag ohne `v`, damit semantic-release und pr-kommentare.mjs es
+  # übergehen. Eine Gruppe für alle Läufe, damit zwei Releases einen Kanal nicht gleichzeitig
+  # schreiben.
   desktop-kanal:
-    name: Alpha-Kanal der Desktop-Hülle fortschreiben
+    name: Vorabkanäle der Desktop-Hülle fortschreiben
     needs: [vorbereiten, freigeben, desktop, desktop-alpha]
     if: >-
       ${{ !cancelled()
@@ -647,30 +682,40 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.vorbereiten.outputs.tag }}
-          KANAL: desktop-alpha
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
         run: |
           set -euo pipefail
           # Ein Entwurf (Nachbau ohne Freigabe, rote Freigabe) hat Download-URLs, die nur
           # Berechtigte erreichen; der Kanal zeigte für alle anderen ins Leere.
           if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "false" ]; then
-            echo "::notice::$TAG ist nicht veröffentlicht, der Alpha-Kanal bleibt."
+            echo "::notice::$TAG ist nicht veröffentlicht, die Desktop-Kanäle bleiben."
             exit 0
           fi
-          mkdir -p neu kanal
+          mkdir -p neu
           gh release download "$TAG" --pattern latest.json --dir neu
-          if gh release view "$KANAL" > /dev/null 2>&1; then
-            # Kein `|| true` ums Laden: ein Netzfehler hieße sonst „Kanal leer“ und könnte ihn
-            # zurückdrehen.
-            if gh release view "$KANAL" --json assets --jq '.assets[].name' | grep -qx latest.json; then
-              gh release download "$KANAL" --pattern latest.json --dir kanal
+          # Welche Kanäle: Alpha → desktop-alpha, Beta → desktop-beta, stabil → beide.
+          mapfile -t kanaele < <(mise exec -- node scripts/release/desktop-kanal.mjs --kanaele-fuer "$VERSION")
+          if [ "${#kanaele[@]}" -eq 0 ]; then
+            echo "::notice::$TAG gehört in keinen Desktop-Kanal."
+            exit 0
+          fi
+          for kanal in "${kanaele[@]}"; do
+            rm -rf alt && mkdir -p alt
+            if gh release view "$kanal" > /dev/null 2>&1; then
+              # Kein `|| true` ums Laden: ein Netzfehler hieße sonst „Kanal leer“ und könnte ihn
+              # zurückdrehen.
+              if gh release view "$kanal" --json assets --jq '.assets[].name' | grep -qx latest.json; then
+                gh release download "$kanal" --pattern latest.json --dir alt
+              fi
+            else
+              titel="Alpha"; [ "$kanal" = desktop-beta ] && titel="Beta"
+              gh release create "$kanal" --prerelease --latest=false --target "$GITHUB_SHA" \
+                --title "Desktop-App: $titel-Kanal" \
+                --notes "Update-Manifest für Desktop-Apps im $titel-Kanal (LLH-1280, LLH-1545). Die Pakete liegen am jeweiligen Release; dieses Release trägt nur latest.json und wird bei jeder Freigabe fortgeschrieben."
             fi
-          else
-            gh release create "$KANAL" --prerelease --latest=false --target "$GITHUB_SHA" \
-              --title "Desktop-App: Alpha-Kanal" \
-              --notes "Update-Manifest für Desktop-Apps mit Vorabversion (LLH-1280). Die Pakete liegen am jeweiligen Release; dieses Release trägt nur latest.json und wird bei jeder Freigabe fortgeschrieben."
-          fi
-          entscheidung="$(mise exec -- node scripts/release/desktop-kanal.mjs --neu neu/latest.json --alt kanal/latest.json)"
-          if [ "$entscheidung" = "hochladen" ]; then
-            gh release upload "$KANAL" neu/latest.json --clobber
-            echo "::notice::Alpha-Kanal zeigt auf $TAG."
-          fi
+            entscheidung="$(mise exec -- node scripts/release/desktop-kanal.mjs --kanal "$kanal" --neu neu/latest.json --alt alt/latest.json)"
+            if [ "$entscheidung" = "hochladen" ]; then
+              gh release upload "$kanal" neu/latest.json --clobber
+              echo "::notice::$kanal zeigt auf $TAG."
+            fi
+          done
