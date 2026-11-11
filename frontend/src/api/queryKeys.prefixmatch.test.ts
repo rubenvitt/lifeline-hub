@@ -46,11 +46,12 @@ describe('Query-Key-Prefix-Match: Dienstfilter-Trio (LFH-307-Charakterisierung)'
     ).toBe(false);
   });
 
-  it('sprechgruppen: heute existiert nur der Filterwert "alle"', () => {
-    // Kein bare-Invalidate im Bestand, deshalb hat sprechgruppen nur `sprechgruppenAlle()`.
+  it('sprechgruppen: der bare Prefix trifft Liste und Paare mit Einsatz-Sprechgruppen (LLH-1645)', () => {
     const qc = new QueryClient();
     qc.setQueryData(['sprechgruppen', 'alle'], { wert: 1 });
-    qc.invalidateQueries({ queryKey: ['sprechgruppen', 'alle'] });
+    qc.setQueryData(['sprechgruppen', 'auch-lokal'], { wert: 1 });
+    qc.invalidateQueries({ queryKey: ['sprechgruppen'] });
     expect(qc.getQueryState(['sprechgruppen', 'alle'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['sprechgruppen', 'auch-lokal'])?.isInvalidated).toBe(true);
   });
 });

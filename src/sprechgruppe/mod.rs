@@ -131,3 +131,13 @@ mod tests {
         assert_eq!(sg(None).anzeige().bezeichnung, "412_F_DRK");
     }
 }
+
+/// Katalog-Sprechgruppe, deren Name ein Einsatz zugleich als Einsatz-Sprechgruppe trägt
+/// (LLH-1645, Altbestand vor der Sperre): eine Zeile je Paar aus Sprechgruppe und Einsatz.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, ToSchema, sqlx::FromRow)]
+pub struct SprechgruppeAuchLokal {
+    pub sprechgruppe_id: i64,
+    pub einsatz_id: i64,
+    /// Bezeichnung des Einsatzes.
+    pub einsatz: String,
+}

@@ -30,7 +30,7 @@ use super::lagemonitor::{verdichte, LagemonitorBetroffene, LagemonitorKraefte};
 pub const API_VERSION: u32 = 1;
 
 /// `?karte=`, mit dem die Anzeige die Karte abbestellt.
-const KARTE_AUS: &str = "aus";
+pub(crate) const KARTE_AUS: &str = "aus";
 
 /// Antwort der Schnittstelle.
 #[derive(Debug, Serialize, ToSchema)]
@@ -175,7 +175,7 @@ pub async fn lage(
 }
 
 /// Fassung der Karte: die ersten 16 Hex-Zeichen des SHA-256 ihrer Serialisierung.
-fn karte_etag(karte: &Value) -> String {
+pub(crate) fn karte_etag(karte: &Value) -> String {
     let text = serde_json::to_string(karte).expect("Karte ist serialisierbar");
     crate::anhang::repo::sha256_hex(text.as_bytes())[..16].to_string()
 }
@@ -202,7 +202,7 @@ fn feature(geometrie: Value, properties: Value) -> Value {
 /// Die Lagekarte (D5): Einsatzort, Gefahrenzonen, Abschnittsflächen, UHS und die einsatzweiten
 /// freien Zeichen. Freie Zeichen nur mit ihrer Zeichenbeschreibung, ohne Beschriftung (Freitext);
 /// Zeichen einer Kartenansicht gehören zu dieser Ansicht und bleiben weg.
-async fn baue_karte(
+pub(crate) async fn baue_karte(
     pool: &SqlitePool,
     kopf: &crate::einsatz::Einsatz,
     verdichtet: &super::lagemonitor::LagemonitorAnzeige,
@@ -265,7 +265,7 @@ async fn baue_karte(
 
 /// Abschnitt `zusammenfassung` des jüngsten freigegebenen Lageberichts der Vorlage
 /// `lagebericht` (D6). Leer oder geschwärzt: `None`.
-async fn lagemeldung(
+pub(crate) async fn lagemeldung(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Option<LagemonitorLagemeldung>, AppError> {

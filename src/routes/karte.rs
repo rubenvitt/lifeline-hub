@@ -13,6 +13,7 @@ use crate::karte::registry::repo::{
 };
 use crate::karte::tile_cache;
 use crate::karte::typen::{BuildJob, RegionDto};
+use crate::lagebild_extern::KartenZugriff;
 use crate::routes::support::{deserialize_optional_field, etag_von, if_none_match_matcht, pflicht};
 use axum::body::Body;
 use axum::extract::{Query, State};
@@ -2207,9 +2208,10 @@ pub async fn offline_aktualisierung_einstellen(
 // ===== Style-/Tile-Proxy (LFH-182) =====
 //
 // Alle Endpunkte verlangen eine Sitzung (LFH-1072): sie rufen mit dem Key des Betreibers beim
-// Anbieter ab, anonyme Abrufe verbrauchten sein Kontingent. `CurrentUser` steht als erstes
+// Anbieter ab, anonyme Abrufe verbrauchten sein Kontingent. `KartenZugriff` steht als erstes
 // Argument, damit 401 vor jeder Prüfung von Quelle, Slot oder Koordinate fällt; gekoppelte Geräte
-// bestehen die Schranke über `geraet::ALLE_GERAETE`. Antworten sind nur privat
+// bestehen die Schranke über `geraet::ALLE_GERAETE`, die Seite des Lagebilds für Externe über
+// einen gültigen Link (LLH-1496). Antworten sind nur privat
 // zwischenspeicherbar ([`privates_cache_control`]).
 //
 // Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft
@@ -2342,7 +2344,7 @@ async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppE
 
 /// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
 pub async fn proxy_style(
-    _sitzung: CurrentUser,
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Response, AppError> {
@@ -2363,7 +2365,7 @@ pub async fn proxy_style(
 
 /// GET /api/karte/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
 pub async fn proxy_raster(
-    _sitzung: CurrentUser,
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam((id, z, x, y)): PfadParam<(i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
@@ -2377,7 +2379,7 @@ pub async fn proxy_raster(
 
 /// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
 pub async fn proxy_tile(
-    _sitzung: CurrentUser,
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam((id, slot, z, x, y)): PfadParam<(i64, i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
@@ -2392,7 +2394,7 @@ pub async fn proxy_tile(
 
 /// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
 pub async fn proxy_tilejson(
-    _sitzung: CurrentUser,
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam((id, slot)): PfadParam<(i64, i64)>,
 ) -> Result<Response, AppError> {
@@ -2415,7 +2417,7 @@ pub async fn proxy_tilejson(
 
 /// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
 pub async fn proxy_sprite(
-    _sitzung: CurrentUser,
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam((id, rest)): PfadParam<(i64, String)>,
 ) -> Result<Response, AppError> {
@@ -2428,7 +2430,7 @@ pub async fn proxy_sprite(
 
 /// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
 pub async fn proxy_glyphs(
-    _sitzung: CurrentUser,
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam((id, slot, fontstack, range)): PfadParam<(i64, i64, String, String)>,
 ) -> Result<Response, AppError> {

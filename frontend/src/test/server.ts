@@ -58,6 +58,11 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:id/programmpunkte', () => HttpResponse.json([])),
   /**
+   * Katalog-Sprechgruppen mit gleichnamiger Einsatz-Sprechgruppe (LLH-1645) — keine als Default.
+   * Der Sprechgruppen-Tab fragt sie für Admins mit ab; Tests mit Paaren überschreiben.
+   */
+  http.get('/api/sprechgruppen/auch-lokal', () => HttpResponse.json([])),
+  /**
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
    * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
    */

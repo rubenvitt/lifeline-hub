@@ -67,6 +67,21 @@ pub(crate) async fn anlegen_zum(
     laden(pool, einsatz_id).await
 }
 
+/// ID für einen neuen Einsatz (LFH-690, design.md D6): über allen bestehenden Einsätzen UND über
+/// jeder ID, die ein Demo-Import je getragen hat oder die das Löschprotokoll der endgültigen
+/// Löschung führt (LFH-750, design.md D5). Ohne Demo-Historie ist das `MAX(id)+1`, dieselbe
+/// Vergabe wie SQLites eigene für `INTEGER PRIMARY KEY` ohne AUTOINCREMENT. Gilt für jede
+/// Anlage, auch für einen Spiegel (LLH-1630). Der Aufrufer hält `BEGIN IMMEDIATE`.
+pub(crate) async fn naechste_id(conn: &mut SqliteConnection) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT MAX(COALESCE((SELECT MAX(id) FROM einsatz), 0), \
+                    COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0), \
+                    COALESCE((SELECT MAX(einsatz_id) FROM aufbewahrung_loeschprotokoll), 0)) + 1",
+    )
+    .fetch_one(conn)
+    .await
+}
+
 /// Legt einen Einsatz auf der Verbindung des Aufrufers an: Einsatznummer aus dem Kreis der
 /// Organisation und Mitgliedschaft des Erstellers als Einsatzleitung. Liefert die neue ID.
 ///
@@ -117,10 +132,12 @@ pub(crate) async fn anlegen_tx(
     };
     let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
     // Das Löschprotokoll zählt mit (LFH-750, design.md D5): die Nummer eines endgültig
-    // gelöschten Einsatzes kommt nicht wieder.
+    // gelöschten Einsatzes kommt nicht wieder. Spiegel zählen nicht (LLH-1630): ihre Nummer
+    // vergibt die führende Instanz unabhängig (`idx_einsatz_nummer… WHERE spiegel = 0`).
     let max_lfd: Option<i64> = sqlx::query_scalar(
         "SELECT MAX(lfd) FROM ( \
-             SELECT nummer_lfd AS lfd FROM einsatz WHERE org_id = ?1 AND nummer_jahr = ?2 \
+             SELECT nummer_lfd AS lfd FROM einsatz \
+             WHERE org_id = ?1 AND nummer_jahr = ?2 AND spiegel = 0 \
              UNION ALL \
              SELECT nummer_lfd FROM aufbewahrung_loeschprotokoll \
              WHERE org_id = ?1 AND nummer_jahr = ?2)",
@@ -139,7 +156,7 @@ pub(crate) async fn anlegen_tx(
         let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
         let belegt: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM einsatz \
-                           WHERE org_id = ?1 AND einsatznummer_intern = ?2) \
+                           WHERE org_id = ?1 AND einsatznummer_intern = ?2 AND spiegel = 0) \
                  OR EXISTS(SELECT 1 FROM aufbewahrung_loeschprotokoll \
                            WHERE org_id = ?1 AND einsatznummer_intern = ?2)",
         )
@@ -163,19 +180,15 @@ pub(crate) async fn anlegen_tx(
     // behält die ID nach dem Entfernen als Sperre; ohne sie bekäme der nächste echte
     // Einsatz die ID des gelöschten Demo-Einsatzes, und Offline-Queues oder offene Tabs
     // schrieben still in ihn. Das gilt für JEDE Anlage, instanzweit (IDs sind nicht je Org).
-    // Ohne Demo-Historie ist das Ergebnis `MAX(id)+1` — dieselbe Vergabe wie SQLites eigene
-    // für `INTEGER PRIMARY KEY` ohne AUTOINCREMENT. Rennfrei unter BEGIN IMMEDIATE.
+    // Regel in [`naechste_id`]; rennfrei unter BEGIN IMMEDIATE.
     let einsatz_id: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz (id, org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
                               einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at, \
                               einsatzort, einsatzort_lat, einsatzort_lon) \
-         VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM einsatz), 0), \
-                             COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0), \
-                             COALESCE((SELECT MAX(einsatz_id) FROM aufbewahrung_loeschprotokoll), 0)) \
-                         + 1), \
-                 ?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
+         VALUES (?, ?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
                  ?, ?, datetime('now'), ?, ?, ?) RETURNING id",
     )
+    .bind(naechste_id(&mut *conn).await?)
     .bind(org_id)
     .bind(daten.bezeichnung)
     .bind(daten.stichwort)

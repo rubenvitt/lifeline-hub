@@ -4627,6 +4627,105 @@ export interface components {
             naechste_lagebesprechung_at?: string | null;
         };
         /**
+         * @description Wie lange ein Link gilt (design.md D2). Spätestens der Abschluss beendet ihn.
+         * @enum {string}
+         */
+        LagebildDauer: "2h" | "12h" | "24h" | "einsatzende";
+        /**
+         * @description Der Einsatz, ohne Sachverhalt, Adresse und meldende Stelle. Die Stufe `oeffentlich` trägt nur
+         *     die Kopfangaben und die beiden Gesamtzahlen.
+         */
+        LagebildEinsatz: {
+            begonnen_at: string;
+            betroffene?: components["schemas"]["LagemonitorBetroffene"] | null;
+            /** Format: int64 */
+            betroffene_gesamt?: number | null;
+            bezeichnung: string;
+            einsatzart: components["schemas"]["Einsatzart"];
+            /**
+             * Format: int64
+             * @description Eingesetztes Personal.
+             */
+            einsatzkraefte_gesamt?: number | null;
+            kraefte?: components["schemas"]["LagemonitorKraefte"] | null;
+            lagemeldung?: components["schemas"]["LagemonitorLagemeldung"] | null;
+            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
+            stichwort?: string | null;
+            /** @description Nur Stufe `lagebild`. */
+            uhs?: components["schemas"]["LagemonitorUhsZahl"][] | null;
+        };
+        /** @description Antwort der öffentlichen Route. */
+        LagebildExtern: {
+            /** Format: int32 */
+            api_version: number;
+            einsatz: components["schemas"]["LagebildEinsatz"];
+            /** @description Für wen die Einsatzleitung den Link ausgegeben hat. */
+            empfaenger: string;
+            /** @description Ende der Gültigkeit (UTC); fehlt bei „bis Einsatzende“. */
+            gueltig_bis?: string | null;
+            karte?: components["schemas"]["GeoJsonFeatureCollection"] | null;
+            karte_etag?: string | null;
+            /** @description Felder, die fehlen, weil die Freigabestufe des Spiegels ihre Kategorie nicht liefert. */
+            nicht_uebertragen: string[];
+            quelle: components["schemas"]["LagebildQuelle"];
+            /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
+            stand_at: string;
+            stufe: components["schemas"]["LagebildStufe"];
+        };
+        /** @description Eine Freigabe, wie die Einsatzleitung sie sieht. Der Schlüssel steht nie darin. */
+        LagebildFreigabeAnzeige: {
+            angelegt_at: string;
+            /** @description Anzeigename der Person, die freigegeben hat; fehlt, wenn ihr Konto gelöscht ist. */
+            angelegt_von_name?: string | null;
+            empfaenger: string;
+            /** @description Der Link wirkt gerade: nicht widerrufen, nicht abgelaufen, Einsatz aktiv. */
+            gueltig: boolean;
+            /** @description Ende der Gültigkeit (UTC); fehlt bei „bis Einsatzende“. */
+            gueltig_bis?: string | null;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Alle Öffnungen der Seite über diesen Link.
+             */
+            oeffnungen: number;
+            /** @description Die jüngsten Öffnungen (höchstens [`PROTOKOLL_ANZEIGE_MAX`]). */
+            protokoll: components["schemas"]["LagebildOeffnung"][];
+            stufe: components["schemas"]["LagebildStufe"];
+            widerrufen_at?: string | null;
+            widerrufen_von_name?: string | null;
+            /** @description Letzter Abruf über diesen Link; fehlt, solange ihn niemand geöffnet hat. */
+            zuletzt_abgerufen_at?: string | null;
+        };
+        /** @description Eine frisch angelegte Freigabe. Der Schlüssel verlässt den Server nur hier, einmal. */
+        LagebildFreigabeMitSchluessel: {
+            freigabe: components["schemas"]["LagebildFreigabeAnzeige"];
+            schluessel: string;
+        };
+        /** @description Eine Öffnung der Seite im Protokoll (design.md D6). */
+        LagebildOeffnung: {
+            /** Format: int64 */
+            abrufe: number;
+            /** @description UTC im SQLite-Format. */
+            begonnen_at: string;
+            /** @description Letzter Abruf dieser Öffnung (UTC im SQLite-Format). */
+            zuletzt_at: string;
+        };
+        /** @description Woher die Zahlen kommen: geführt hier oder Spiegel einer anderen Instanz. */
+        LagebildQuelle: {
+            /** @description Der Abgleich ist beendet; die Zahlen werden nicht mehr aktuell. */
+            abgleich_beendet: boolean;
+            /** @description Letzter erfolgreicher Abgleich mit der führenden Instanz (UTC); nur am Spiegel. */
+            letzter_abgleich_at?: string | null;
+            /** @description Der Einsatz ist an dieser Instanz ein Spiegel. */
+            spiegel: boolean;
+        };
+        /**
+         * @description Was ein Link zeigt (design.md D4). `oeffentlich` ist eine Teilmenge von `lagebild`.
+         * @enum {string}
+         */
+        LagebildStufe: "lagebild" | "oeffentlich";
+        /**
          * @description Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.
          *
          *     Die Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);
@@ -7184,6 +7283,18 @@ export interface components {
             sicherheit?: string | null;
             /** Format: int64 */
             sortier: number;
+        };
+        /**
+         * @description Katalog-Sprechgruppe, deren Name ein Einsatz zugleich als Einsatz-Sprechgruppe trägt
+         *     (LLH-1645, Altbestand vor der Sperre): eine Zeile je Paar aus Sprechgruppe und Einsatz.
+         */
+        SprechgruppeAuchLokal: {
+            /** @description Bezeichnung des Einsatzes. */
+            einsatz: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            sprechgruppe_id: number;
         };
         /**
          * @description Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.

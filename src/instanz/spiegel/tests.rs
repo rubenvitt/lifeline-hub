@@ -760,3 +760,161 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
             .is_none()
     );
 }
+
+#[tokio::test]
+async fn ein_spiegel_bekommt_nie_die_id_eines_entfernten_demo_einsatzes() {
+    let (f, s) = zwei_seiten().await;
+    exec(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung, nummer_jahr, nummer_lfd) \
+         VALUES (1, 'Hochwasser', 2026, 1)",
+    )
+    .await;
+    // Am Hub war ein Demo-Einsatz 40, er ist entfernt; seine ID bleibt gesperrt (LFH-690).
+    exec(
+        &s,
+        "INSERT INTO demo_import (org_id, einsatz_id, entfernt_at, bericht) \
+         VALUES (1, 40, '2026-11-10 00:00:00', '{}')",
+    )
+    .await;
+    while abgleichen(&f, &s, 120).await > 0 {}
+    let spiegel: i64 = eine(&s, "SELECT einsatz_id FROM einsatz_spiegel").await;
+    assert_eq!(
+        spiegel, 41,
+        "über der gesperrten Demo-ID, nicht MAX(id)+1 = 1"
+    );
+    let herkunft: String = eine(
+        &s,
+        "SELECT lokaler_schluessel FROM spiegel_herkunft WHERE art = 'einsatz'",
+    )
+    .await;
+    assert_eq!(herkunft, "41");
+}
+
+#[tokio::test]
+async fn die_eigene_einsatznummer_zaehlt_spiegel_nicht_mit() {
+    let (_f, s) = zwei_seiten().await;
+    let erika = konto(&s, "Erika").await;
+    exec(
+        &s,
+        "INSERT INTO einsatz (org_id, bezeichnung, nummer_jahr, nummer_lfd, \
+         einsatznummer_intern, spiegel) VALUES (1, 'Spiegel', 2026, 7, 'E-2026-0001', 1)",
+    )
+    .await;
+    let jetzt = chrono::DateTime::parse_from_rfc3339("2026-06-01T12:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let eigen = crate::einsatz::repo::anlegen_zum(
+        &s,
+        crate::einsatz::repo::NeuerEinsatzDaten {
+            bezeichnung: "Eigen",
+            stichwort: None,
+            einsatzart: None,
+            begonnen_at: None,
+            ort: Default::default(),
+            vorlage_id: None,
+        },
+        erika,
+        jetzt,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        eigen.einsatznummer_intern.as_deref(),
+        Some("E-2026-0001"),
+        "Nummer des Spiegels belegt die eigene nicht, und die Zählung springt nicht über ihn"
+    );
+}
+
+#[tokio::test]
+async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abgleich_nicht_an() {
+    use super::paket::{RESERVE, SPIEGEL_MAX, ZEILE_MAX};
+    let (f, s) = zwei_seiten().await;
+    let erika = konto(&f, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung, nummer_jahr, nummer_lfd) \
+         VALUES (1, 'Hochwasser', 2026, 1) RETURNING id",
+    )
+    .await;
+    etb(&f, einsatz, 1, erika).await;
+    let gross: i64 = etb(&f, einsatz, 2, erika).await;
+    sqlx::query("UPDATE etb_eintrag SET inhalt = ? WHERE id = ?")
+        .bind("x".repeat(ZEILE_MAX + 1))
+        .bind(gross)
+        .execute(&f)
+        .await
+        .unwrap();
+    etb(&f, einsatz, 3, erika).await;
+
+    let a = Absender {
+        kennung: "elw",
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        meldend: true,
+    };
+    // Erster Einsatz eines leeren Pakets: dort ging eine übergroße Zeile bisher allein mit und
+    // trieb das Paket über die Grenze.
+    let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE);
+    let mut fc = f.begin().await.unwrap();
+    let e = liefern::list_gefuehrt(&mut fc, 1, &HashMap::new())
+        .await
+        .unwrap()
+        .remove(0);
+    let k = liefern::ensure_kennung(&mut fc, "elw", &e).await.unwrap();
+    let l = liefern::liefere_einsatz(&mut fc, &a, &e, &k, "hub/1", 0, &mut budget)
+        .await
+        .unwrap()
+        .expect("Lieferung");
+    fc.commit().await.unwrap();
+    assert!(
+        serde_json::to_vec(&l).unwrap().len() < SPIEGEL_MAX - RESERVE,
+        "Paket bleibt unter der Grenze"
+    );
+    let z = l
+        .zeilen
+        .iter()
+        .find(|z| z.art == "etb_eintrag" && z.schluessel == gross.to_string())
+        .expect("die große Zeile ist dabei");
+    assert!(z.zu_gross && z.daten.is_none());
+
+    let mut sc = s.begin().await.unwrap();
+    let erg = uebernehmen::uebernehmen(
+        &mut sc,
+        &Empfaenger {
+            kopplung_id: 1,
+            kopplung_org_id: 1,
+            org_id: 1,
+            meldend: false,
+        },
+        &l,
+    )
+    .await
+    .unwrap();
+    sc.commit().await.unwrap();
+    assert_eq!(erg.stand, l.bis, "der Stand rückt vor");
+    assert!(
+        erg.hinweise
+            .iter()
+            .any(|h| h.contains("zu groß für den Abgleich")),
+        "{:?}",
+        erg.hinweise
+    );
+    // Nur übernommene Zeilen erledigen einen Hinweis „zu groß“, die große selbst nicht.
+    let erledigt: Vec<&str> = erg
+        .erledigt
+        .iter()
+        .filter(|(art, _)| art == "etb_eintrag")
+        .map(|(_, s)| s.as_str())
+        .collect();
+    assert_eq!(erledigt.len(), 2, "{erledigt:?}");
+    assert!(!erledigt.contains(&gross.to_string().as_str()));
+    let spiegel: i64 = eine(&s, "SELECT einsatz_id FROM einsatz_spiegel").await;
+    let lfd: Vec<i64> =
+        sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr")
+            .bind(spiegel)
+            .fetch_all(&s)
+            .await
+            .unwrap();
+    assert_eq!(lfd, [1, 3], "die übrigen Zeilen kommen an");
+}
