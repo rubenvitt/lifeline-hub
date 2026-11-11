@@ -396,17 +396,24 @@ describe('EinsatzLayout', () => {
    * `BenutzerMenu.test.tsx`; hier fehlt der `ThemeModeProvider`, die Hooks fallen auf
    * `system`/`kompakt` zurück.
    */
-  it('AK2 — beide Achsen sind ab lg im Benutzermenü erreichbar', async () => {
+  it('AK2 — alle drei Achsen sind ab lg im Benutzermenü erreichbar (LLH-1642: Leisten)', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
 
     const menu = await screen.findByRole('menu');
-    // Vorgabe: Nachtbetrieb trägt das Häkchen.
-    expect(within(menu).getByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
+    // Vorgabe: Nachtbetrieb, `kompakt`, 100 % sind gewählt.
+    const darstellung = within(within(menu).getByRole('radiogroup', { name: 'Darstellung' }));
+    expect(darstellung.getByRole('radio', { name: 'Dunkel' })).toBeChecked();
+    expect(darstellung.getByRole('radio', { name: 'System' })).not.toBeChecked();
+    const dichte = within(within(menu).getByRole('radiogroup', { name: 'Bediendichte' }));
+    expect(dichte.getByRole('radio', { name: 'Kompakt' })).toBeChecked();
+    expect(dichte.getByRole('radio', { name: 'Handschuh' })).not.toBeChecked();
+    expect(
+      within(within(menu).getByRole('radiogroup', { name: 'Helligkeit in %' })).getByRole('radio', {
+        name: '100 %',
+      }),
+    ).toBeChecked();
   });
 
   /**

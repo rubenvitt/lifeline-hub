@@ -12,6 +12,7 @@ import { IconPosteingang } from '../icons';
 import { saveEingaengeGelesenOfflineCapable } from '../offline/schreiben';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 import { useOhneVerbindung } from '../offline/verbindung';
+import { BENACHRICHTIGUNGEN_PFAD } from '../routing/deeplinks';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
@@ -263,6 +264,25 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
           <Gruppe name="Früher" eintraege={frueher} quittiere={quittiere} beiSprung={schliessen} />
         </>
       )}
+      {/* Zweiter Weg zu den eigenen Einstellungen (LLH-1642, Spec `benutzermenue`): der erste
+          bleibt im Benutzermenü, das es auch außerhalb des Einsatzes gibt. */}
+      <div
+        data-lfh="eingaenge-einstellungen"
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginBlockStart: token.marginXS,
+          borderTop: `1px solid ${token.colorBorderSecondary}`,
+        }}
+      >
+        <Link
+          to={BENACHRICHTIGUNGEN_PFAD}
+          onClick={schliessen}
+          style={{ display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight }}
+        >
+          Benachrichtigungen einstellen →
+        </Link>
+      </div>
     </section>
   );
 }

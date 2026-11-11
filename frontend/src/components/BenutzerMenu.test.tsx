@@ -5,11 +5,11 @@
  *
  * 1. BREITENABHÄNGIG ist nur der TRIGGER — schmal schrumpft er auf die Initialen (kein Name,
  *    kein Chevron). Das tragen die Blöcke je Breite.
- * 2. BREITENUNABHÄNGIG sind die zwei Umschaltgruppen im Dropdown: der EINZIGE sichtbare
- *    Bedienweg für Farbschema und Bediendichte. Sie stehen im über beide Breiten
- *    parametrisierten Block ganz unten.
+ * 2. BREITENUNABHÄNGIG sind die drei Leisten der Gruppe „Anzeige“ im Dropdown (LLH-1642): der
+ *    EINZIGE sichtbare Bedienweg für Farbschema, Bediendichte und Helligkeit mit aktivem Wert.
+ *    Sie stehen im über beide Breiten parametrisierten Block unten.
  *
- * Die Gruppen sind nicht verzichtbar: A1 weist Tablet und Handschirm `komfortabel` und
+ * Die Leisten sind nicht verzichtbar: A1 weist Tablet und Handschirm `komfortabel` und
  * `handschuh` zu, und die Kommandopalette zeigt keinen AKTIVEN Wert an.
  *
  * JEDE NULLAUSSAGE BRAUCHT IHRE POSITIVE GEGENPROBE mit derselben Abfrage: eine reine
@@ -19,10 +19,10 @@
  * `matches`.
  */
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
-import { Route, Routes } from 'react-router';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { Route, Routes, useLocation } from 'react-router';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -167,7 +167,7 @@ describe('BenutzerMenu — unter lg', () => {
   });
 
   it('Profil und Abmelden bleiben erreichbar', async () => {
-    // Die Gruppen kommen HINZU, sie ersetzen nichts.
+    // Die Leisten kommen HINZU, sie ersetzen nichts.
     zeige();
     await oeffne();
     // Regex, nicht exakt: aus der Zeit, als antds Symbol-Span ein eigenes `aria-label` (`user`,
@@ -179,68 +179,71 @@ describe('BenutzerMenu — unter lg', () => {
 });
 
 /**
- * LFH-952 (U89): Profil und Abmelden stehen DIREKT unter dem Kopf, vor den Umschaltgruppen. Das
- * Menü ist in `handschuh` höher als der Handschirm; unten lagen sie unter dem Rand. Die Lage im
- * Fenster misst `e2e/rahmen-stehen-bleiben.spec.ts`, hier die Reihenfolge.
+ * LFH-952 (U89), LLH-1642: Profil und Abmelden stehen DIREKT unter dem Kopf, vor der Gruppe
+ * „Anzeige“; danach Benachrichtigungen, Neuigkeiten, Hilfe. Rückmeldung und Lizenzen stehen auf
+ * der Hilfe-Seite (Spec `benutzermenue`). Die Lage im Fenster misst
+ * `e2e/rahmen-stehen-bleiben.spec.ts`, hier die Reihenfolge.
  */
-describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
+describe('BenutzerMenu — Aufbau (LFH-952, LLH-1642)', () => {
   beforeEach(() => setzeViewportBreite(390));
 
-  // Der ganze Eintrag öffnet, nicht nur ein Link im Text: Enter läuft bei antd über dasselbe
-  // `onClick` des Menüs.
-  it('der Lizenzhinweis steht ganz unten, der ganze Eintrag öffnet ihn (LFH-1000)', async () => {
-    const oeffnen = vi.spyOn(window, 'open').mockReturnValue(null);
+  it('Einträge in Reihenfolge, die Gruppe „Anzeige“ zwischen Abmelden und Benachrichtigungen', async () => {
     zeige();
     await oeffne();
     const eintraege = await screen.findAllByRole('menuitem');
-    const lizenzen = eintraege[eintraege.length - 1]!;
-    expect(lizenzen.textContent).toBe('Lizenzen');
-    await userEvent.click(lizenzen);
-    expect(oeffnen).toHaveBeenCalledWith('/lizenzen/HEIC-DECODER.txt', '_blank', 'noopener');
-    oeffnen.mockRestore();
+    expect(eintraege.map((e) => e.textContent)).toEqual([
+      'Profil',
+      'Abmelden',
+      'Benachrichtigungen',
+      'Neuigkeiten',
+      'Hilfe',
+    ]);
+    const anzeige = screen.getByRole('group', { name: 'Anzeige' });
+    const vor = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(vor(eintraege[1]!, anzeige)).toBe(true);
+    expect(vor(anzeige, eintraege[2]!)).toBe(true);
   });
 
-  it('die Hilfe steht über Rückmeldung und Lizenzhinweis und öffnet die Hilfe-Seite (LFH-1096)', async () => {
+  it.each([
+    [390, 'calc(100vw - 16px)'],
+    [1024, '320px'],
+  ])('Menübreite bei %i px: %s (LLH-1642)', async (breite, erwartet) => {
+    setzeViewportBreite(breite);
+    zeige();
+    await oeffne();
+    expect((await screen.findByRole('menu')).style.width).toBe(erwartet);
+  });
+
+  it('kein Eintrag „Rückmeldung“ und keiner „Lizenzen“ — die stehen auf der Hilfe-Seite', async () => {
+    zeige();
+    await oeffne();
+    // Positive Gegenprobe mit derselben Abfrage: die Einträge sind geladen.
+    expect(await screen.findByRole('menuitem', { name: 'Hilfe' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Rückmeldung/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Lizenzen/ })).not.toBeInTheDocument();
+  });
+
+  it('„Hilfe“ öffnet die Hilfe-Seite und gibt die Herkunft mit (LFH-1096, LLH-1642 D5)', async () => {
     server.use(meHandler(benutzer));
+    function HilfeSeite() {
+      const { state } = useLocation() as { state: { von?: string } | null };
+      return <h1>Hilfe von {state?.von ?? '—'}</h1>;
+    }
     renderMitProviders(
       <ThemeModeProvider>
         <Routes>
-          <Route path="/" element={<BenutzerMenu />} />
-          <Route path="/hilfe" element={<h1>Hilfe-Seite</h1>} />
+          <Route path="/einsatz/:id/etb" element={<BenutzerMenu />} />
+          <Route path="/hilfe" element={<HilfeSeite />} />
         </Routes>
       </ThemeModeProvider>,
+      { route: '/einsatz/42/etb' },
     );
     await oeffne();
-    const eintraege = await screen.findAllByRole('menuitem');
-    const hilfe = eintraege[eintraege.length - 3]!;
-    expect(hilfe.textContent).toBe('Hilfe');
-    await userEvent.click(hilfe);
-    expect(await screen.findByRole('heading', { name: 'Hilfe-Seite' })).toBeInTheDocument();
-  });
-
-  // Der Rückmeldeweg (LLH-1549): das Issue-Formular, vorbefüllt mit Version und Oberfläche.
-  // Ohne gemerkte Routen (wie hier, `main.tsx` setzt sie) fehlt nur der Bereich; das
-  // Routenmuster prüft `rueckmeldung/adresse.test.ts`.
-  it('„Rückmeldung“ steht über dem Lizenzhinweis und öffnet das Issue-Formular (LLH-1549)', async () => {
-    const oeffnen = vi.spyOn(window, 'open').mockReturnValue(null);
-    zeige();
-    await oeffne();
-    const eintraege = await screen.findAllByRole('menuitem');
-    const rueckmeldung = eintraege[eintraege.length - 2]!;
-    expect(rueckmeldung.textContent).toBe('Rückmeldung');
-    await userEvent.click(rueckmeldung);
-    expect(oeffnen).toHaveBeenCalledTimes(1);
-    const [ziel, fenster, merkmale] = oeffnen.mock.calls[0]!;
-    expect(fenster).toBe('_blank');
-    expect(merkmale).toBe('noopener,noreferrer');
-    const adresse = new URL(String(ziel));
-    expect(adresse.origin + adresse.pathname).toBe(
-      'https://github.com/rubenvitt/lifeline-hub/issues/new',
-    );
-    expect(adresse.searchParams.get('template')).toBe('rueckmeldung.yml');
-    expect(adresse.searchParams.get('version')).toBe(__APP_VERSION__);
-    expect(adresse.searchParams.get('oberflaeche')).toBe('Browser');
-    oeffnen.mockRestore();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hilfe' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Hilfe von /einsatz/42/etb' }),
+    ).toBeInTheDocument();
   });
 
   it('„Benachrichtigungen“ öffnet die eigenen Einstellungen (kcjecn9e D6)', async () => {
@@ -258,18 +261,6 @@ describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
     expect(
       await screen.findByRole('heading', { name: 'Benachrichtigungen-Seite' }),
     ).toBeInTheDocument();
-  });
-
-  it('Profil und Abmelden stehen vor Darstellung, Bediendichte und Helligkeit', async () => {
-    zeige();
-    await oeffne();
-    const eintraege = (await screen.findAllByRole('menuitem')).map((e) => e.textContent ?? '');
-    // Gegenprobe: die Gruppen sind da, sonst wäre „vorne" trivial.
-    const ersteStufe = eintraege.findIndex((t) => t.includes('Dunkel'));
-    expect(ersteStufe).toBeGreaterThan(-1);
-    expect(eintraege[0]).toContain('Profil');
-    expect(eintraege[1]).toContain('Abmelden');
-    expect(ersteStufe).toBeGreaterThan(1);
   });
 
   it('der Menükopf nennt die Funktion auch unter xl', async () => {
@@ -336,8 +327,8 @@ describe('Abmelden', () => {
 });
 
 /**
- * Die zwei Umschaltgruppen hängen an KEINER Breite (LFH-392). Die Parametrisierung schreibt die
- * Abwesenheit einer Breitenregel hin.
+ * Die drei Leisten der Gruppe „Anzeige“ hängen an KEINER Breite (LFH-392, LLH-1642). Die
+ * Parametrisierung schreibt die Abwesenheit einer Breitenregel hin.
  *
  * Die Breite steht als LITERAL da (1024 = Vitest-Vorgabe, 390 = Handschirm); aus `useViewport`
  * zurückgelesen prüfte sie sich selbst.
@@ -345,52 +336,113 @@ describe('Abmelden', () => {
 describe.each([
   ['ab lg', 1024],
   ['unter lg', 390],
-])('BenutzerMenu — Umschaltgruppen, %s', (_lage, breite) => {
+])('BenutzerMenu — Anzeige, %s', (_lage, breite) => {
   beforeEach(() => setzeViewportBreite(breite));
 
-  it('Darstellung liegt im Dropdown, der aktive Modus trägt ihn im Namen', async () => {
+  function leiste(name: string) {
+    return within(screen.getByRole('radiogroup', { name }));
+  }
+
+  it('drei benannte Leisten, der gewählte Wert ist ausgewählt', async () => {
     zeige();
     await oeffne();
-    // Das Häkchen ist der ZWEITE KANAL neben der Auswahlfarbe (WCAG 1.4.1) und prüfbar. Ohne
-    // gespeicherte Wahl ist der Nachtbetrieb aktiv; „System" bleibt wählbar.
-    expect(await screen.findByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^Hell$/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
+    // Ohne gespeicherte Wahl: Nachtbetrieb, `kompakt` (jsdom hat keinen groben Zeiger), 100 %.
+    await screen.findByRole('radiogroup', { name: 'Darstellung' });
+    expect(
+      leiste('Darstellung')
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Hell', 'Dunkel', 'System']);
+    expect(leiste('Darstellung').getByRole('radio', { name: 'Dunkel' })).toBeChecked();
+    expect(
+      leiste('Bediendichte')
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Kompakt', 'Komfortabel', 'Handschuh']);
+    expect(leiste('Bediendichte').getByRole('radio', { name: 'Kompakt' })).toBeChecked();
+    expect(leiste('Helligkeit in %').getByRole('radio', { name: '100 %' })).toBeChecked();
+    // Genau ein gewählter Wert je Leiste.
+    expect(screen.getAllByRole('radio', { checked: true })).toHaveLength(3);
   });
 
-  it('die Bediendichte liegt daneben — alle drei Stufen', async () => {
-    // Der Grund für die Gruppe: die Kommandopalette zeigt keinen aktiven Wert an.
+  it('eine Wahl führt bis ans <html> durch, beide Achsen unabhängig, das Menü bleibt offen', async () => {
+    // Gemessen am Wurzelelement: eine Wahl, die das Segment markiert, aber das Merkmal nicht setzt,
+    // ließe das CSS auf der Ausgangsstufe stehen.
     zeige();
     await oeffne();
-    expect(await screen.findByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^Komfortabel$/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
-  });
-
-  it('ein Klick führt bis ans <html> durch — beide Achsen', async () => {
-    // Gemessen am Wurzelelement: eine Wahl, die den Eintrag markiert, aber das Merkmal nicht setzt,
-    // ließe das CSS auf der Ausgangsstufe stehen. DIESE HÄLFTE TRÄGT DIE AUSSAGE — ein fehlender
-    // `onClick`-Zweig ließe die Präsenztests oben grün.
-    zeige();
-    await oeffne();
-    // Gewählt wird der NICHT aktive Modus: ein Klick auf „Dunkel" (Vorgabe) bewiese nichts.
-    await userEvent.click(screen.getByRole('menuitem', { name: /^Hell$/ }));
+    // Gewählt wird der NICHT aktive Modus: ein Klick auf „Dunkel“ (Vorgabe) bewiese nichts.
+    await screen.findByRole('radiogroup', { name: 'Darstellung' });
+    await userEvent.click(leiste('Darstellung').getByRole('radio', { name: 'Hell' }));
     expect(document.documentElement.dataset.theme).toBe('light');
+    // Das Menü schließt nicht: dieselbe Leiste zeigt die neue Wahl.
+    expect(leiste('Darstellung').getByRole('radio', { name: 'Hell' })).toBeChecked();
 
-    await oeffne();
-    await userEvent.click(screen.getByRole('menuitem', { name: /^Handschuh$/ }));
+    await userEvent.click(leiste('Bediendichte').getByRole('radio', { name: 'Handschuh' }));
     expect(document.documentElement.dataset.dichte).toBe('handschuh');
-
-    // DIE ACHSEN SIND UNABHÄNGIG — der Dichte-Klick setzt das Farbschema nicht mit (ein Context im
-    // `ThemeModeProvider`, zwei Setter).
+    expect(leiste('Bediendichte').getByRole('radio', { name: 'Handschuh' })).toBeChecked();
+    // DIE ACHSEN SIND UNABHÄNGIG — der Dichte-Klick setzt das Farbschema nicht mit.
     expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  /*
+   * TASTATUR MIT `keyCode` (LLH-1642 D2): `rc-menu` und `rc-dropdown` lesen `keyCode`, und
+   * user-event setzt ihn nicht — ihre Wege liefen hier sonst nie, und ein fehlendes Abfangen bliebe
+   * grün. Deshalb `fireEvent.keyDown` mit `keyCode`; die Fokuswanderung tragen die Handler selbst.
+   */
+  it('Pfeiltaste bleibt in der Leiste: wählt den Nachbarn, der Menüfokus wandert nicht mit', async () => {
+    zeige();
+    await oeffne();
+    const dunkel = (
+      await screen.findByRole('radiogroup', { name: 'Darstellung' })
+    ).querySelector<HTMLButtonElement>('[aria-checked="true"]')!;
+    dunkel.focus();
+    fireEvent.keyDown(dunkel, { key: 'ArrowRight', keyCode: 39 });
+    const system = leiste('Darstellung').getByRole('radio', { name: 'System' });
+    expect(system).toBeChecked();
+    expect(system).toHaveFocus();
+    fireEvent.keyDown(system, { key: 'Home', keyCode: 36 });
+    expect(leiste('Darstellung').getByRole('radio', { name: 'Hell' })).toHaveFocus();
+    // Enter wählt per Knopf und schließt das Menü nicht.
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter', keyCode: 13 });
+    expect(screen.getByRole('button', { name: 'Benutzermenü' })).toHaveClass('ant-dropdown-open');
+  });
+
+  it('Tab führt vom Menü in die Leisten und von Leiste zu Leiste, Umschalt+Tab zurück', async () => {
+    zeige();
+    await oeffne();
+    await screen.findByRole('radiogroup', { name: 'Darstellung' });
+    const tab = (shiftKey = false) =>
+      fireEvent.keyDown(document.activeElement!, { key: 'Tab', keyCode: 9, shiftKey });
+    // Der Fokus steht am Auslöser; der erste Tab gehört `rc-dropdown`: Fokus ins Menü. Wohin
+    // `rc-menu` ihn setzt, rechnet jsdom nicht nach; im Browser landet er auf dem ersten Eintrag.
+    expect(screen.getByRole('button', { name: 'Benutzermenü' })).toHaveFocus();
+    tab();
+    screen.getByRole('menuitem', { name: 'Profil' }).focus();
+    tab();
+    expect(leiste('Darstellung').getByRole('radio', { name: 'Dunkel' })).toHaveFocus();
+    tab();
+    expect(leiste('Bediendichte').getByRole('radio', { name: 'Kompakt' })).toHaveFocus();
+    tab();
+    expect(leiste('Helligkeit in %').getByRole('radio', { name: '100 %' })).toHaveFocus();
+    tab(true);
+    expect(leiste('Bediendichte').getByRole('radio', { name: 'Kompakt' })).toHaveFocus();
+    // Bis hierher hält das Menü: `rc-dropdown` hat keinen Tab gesehen.
+    expect(screen.getByRole('button', { name: 'Benutzermenü' })).toHaveClass('ant-dropdown-open');
+    tab();
+    // Hinter der letzten Leiste fällt Tab an `rc-dropdown` und schließt das Menü wie bisher.
+    tab();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Benutzermenü' })).not.toHaveClass(
+        'ant-dropdown-open',
+      ),
+    );
   });
 });
 
 /**
- * Die Helligkeitsgruppe (LFH-397, design.md D6). Mit Warnung wird die Sperre ERKLÄRT, nicht
- * stumm weggeschaltet (M16): die Überschrift nennt Boden und Grund, die Stufen darunter
- * sind gesperrt, und eine Wahl unter dem Boden sagt, was wirkt.
+ * Die Leiste „Helligkeit“ (LFH-397, LLH-1642). Mit Warnung wird die Sperre ERKLÄRT, nicht stumm
+ * weggeschaltet (M16): das Etikett nennt Boden und Grund, die Stufen darunter sind gesperrt und
+ * nennen den Grund, und eine Wahl unter dem Boden sagt, was wirkt.
  */
 describe('BenutzerMenu — Helligkeit (LFH-397)', () => {
   afterEach(() => {
@@ -402,28 +454,37 @@ describe('BenutzerMenu — Helligkeit (LFH-397)', () => {
     return null;
   }
 
-  it('fünf Stufen, die gewählte trägt ✓, ein Klick führt bis ans <html> durch', async () => {
+  function helligkeit() {
+    return within(screen.getByRole('radiogroup', { name: 'Helligkeit in %' }));
+  }
+
+  it('fünf Stufen, die gewählte ist ausgewählt, ein Klick führt bis ans <html> durch', async () => {
     zeige();
     await oeffne();
-    expect(await screen.findByRole('menuitem', { name: /^100 % ✓$/ })).toBeInTheDocument();
-    for (const s of ['80 %', '60 %', '40 %', '20 %']) {
-      expect(screen.getByRole('menuitem', { name: new RegExp(`^${s}$`) })).toBeInTheDocument();
-    }
-    await userEvent.click(screen.getByRole('menuitem', { name: /^40 %$/ }));
+    await screen.findByRole('radiogroup', { name: 'Helligkeit in %' });
+    expect(
+      helligkeit()
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['100', '80', '60', '40', '20']);
+    expect(helligkeit().getByRole('radio', { name: '100 %' })).toBeChecked();
+    await userEvent.click(helligkeit().getByRole('radio', { name: '40 %' }));
     expect(document.documentElement.dataset.helligkeit).toBe('40');
     expect(localStorage.getItem('lifeline-hub.helligkeit')).toBe('40');
+    expect(helligkeit().getByRole('radio', { name: '40 %' })).toBeChecked();
   });
 
-  it('ohne Warnung ist keine Stufe gesperrt und die Überschrift nennt keinen Boden', async () => {
+  it('ohne Warnung ist keine Stufe gesperrt und das Etikett nennt keinen Boden', async () => {
     zeige();
     await oeffne();
-    const zwanzig = await screen.findByRole('menuitem', { name: /^20 %$/ });
-    expect(zwanzig).not.toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByText('Helligkeit')).toBeInTheDocument();
+    await screen.findByRole('radiogroup', { name: 'Helligkeit in %' });
+    expect(helligkeit().getByRole('radio', { name: '20 %' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByText('Helligkeit in %')).toBeInTheDocument();
     expect(screen.queryByText(/Warnung aktiv/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/wirkt/)).not.toBeInTheDocument();
   });
 
-  it('mit Warnung: Boden und Grund in der Überschrift, Stufen darunter gesperrt, Wahl zeigt die Wirkung', async () => {
+  it('mit Warnung: Boden und Grund im Etikett, Stufen darunter gesperrt mit Grund, Wahl zeigt die Wirkung', async () => {
     localStorage.setItem('lifeline-hub.helligkeit', '40');
     server.use(meHandler(benutzer));
     renderMitProviders(
@@ -433,22 +494,19 @@ describe('BenutzerMenu — Helligkeit (LFH-397)', () => {
       </ThemeModeProvider>,
     );
     await oeffne();
-    expect(await screen.findByText('Helligkeit · mind. 80 % (Warnung aktiv)')).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^40 % ✓ \(wirkt 80 %\)$/ })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    expect(
+      await screen.findByText('Helligkeit in % · mind. 80 % (Warnung aktiv)'),
+    ).toBeInTheDocument();
+    const vierzig = helligkeit().getByRole('radio', { name: '40 %' });
+    expect(vierzig).toBeChecked();
+    expect(vierzig).toHaveAttribute('aria-disabled', 'true');
+    expect(vierzig).toHaveAccessibleDescription('Warnung aktiv: mindestens 80 %');
+    expect(screen.getByText('Gewählt 40 %, wirkt 80 %')).toBeInTheDocument();
     for (const s of ['60 %', '20 %']) {
-      expect(screen.getByRole('menuitem', { name: new RegExp(`^${s}$`) })).toHaveAttribute(
-        'aria-disabled',
-        'true',
-      );
+      expect(helligkeit().getByRole('radio', { name: s })).toHaveAttribute('aria-disabled', 'true');
     }
     for (const s of ['100 %', '80 %']) {
-      expect(screen.getByRole('menuitem', { name: new RegExp(`^${s}$`) })).not.toHaveAttribute(
-        'aria-disabled',
-        'true',
-      );
+      expect(helligkeit().getByRole('radio', { name: s })).not.toHaveAttribute('aria-disabled');
     }
   });
 });

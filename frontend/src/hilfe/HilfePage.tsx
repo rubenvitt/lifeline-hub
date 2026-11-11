@@ -2,7 +2,7 @@ import { Button, Input } from 'antd';
 import type { InputRef } from 'antd';
 import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import Markdown from '../components/Markdown';
 import { Select } from '../components/Select';
@@ -10,6 +10,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useViewport } from '../components/useViewport';
 import { Bildmarke } from '../marke/Bildmarke';
+import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
 import {
   GERAET_START_PFAD,
   einsaetzePfad,
@@ -21,6 +22,15 @@ import { GRUPPEN, gruppenName, type Gruppe } from './gruppen';
 import HilfeBild from './HilfeBild';
 import { KAPITEL, findeKapitel, kapitelDerGruppe, verlinke, type Kapitel } from './kapitel';
 import './Hilfe.css';
+
+/** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`, HEIC-Decoder LFH-1000). */
+const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
+
+/** Der Pfad, aus dem das Benutzermenü die Hilfe geöffnet hat (`state.von`, LLH-1642 D5). */
+function herkunft(state: unknown): string | undefined {
+  const von = (state as { von?: unknown } | null)?.von;
+  return typeof von === 'string' && von.startsWith('/') ? von : undefined;
+}
 
 /** Klein, ohne Umlaute und ß: „gerat“ findet „Gerät“. */
 function falte(text: string): string {
@@ -58,6 +68,7 @@ export default function HilfePage() {
   const { kapitel: slug } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { benutzer, geraet } = useAuth();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
@@ -87,6 +98,20 @@ export default function HilfePage() {
     : benutzer
       ? { pfad: einsaetzePfad(), label: 'Zur App' }
       : { pfad: '/login', label: 'Zur Anmeldung' };
+
+  // Rückmeldeweg (LLH-1549, seit LLH-1642 hier statt im Benutzermenü): das Issue-Formular,
+  // vorbefüllt mit Version, Oberfläche und dem Bereich, aus dem die Hilfe geöffnet wurde — nur als
+  // Routenmuster, nie mit Kennungen. Ohne Referer: die Adresse der Installation bleibt bei uns.
+  function rueckmelden() {
+    window.open(
+      rueckmeldungsAdresse({
+        version: __APP_VERSION__,
+        pfad: herkunft(location.state) ?? location.pathname,
+      }),
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }
 
   // „/“ springt in die Suche, wie in der Doku der Website.
   useEffect(() => {
@@ -281,6 +306,31 @@ export default function HilfePage() {
                   </ul>
                 </div>
               ))}
+              {/* Rückmeldung und Lizenzen (LLH-1642, Spec `benutzermenue`): aus dem Benutzermenü
+                  hierher, außerhalb der Druckwurzel. Am gekoppelten Gerät ohne Rückmeldeweg
+                  (Entscheidung LLH-1549); ohne Anmeldung mit, das Formular ist öffentlich. */}
+              <section
+                className="hilfe-rueckmeldung"
+                aria-label="Rückmeldung und Lizenzen"
+                data-lfh="hilfe-rueckmeldung"
+              >
+                {!geraet && (
+                  <>
+                    <p className="hilfe-rueckmeldung__frage">Fehler gefunden oder eine Idee?</p>
+                    <p className="hilfe-rueckmeldung__text">
+                      Das Formular öffnet sich in einem neuen Fenster, vorbefüllt mit Version,
+                      Oberfläche und Bereich der App. Keine Namen, keine Einsatzdaten.
+                    </p>
+                    <Button onClick={rueckmelden}>Rückmeldung geben ↗</Button>
+                  </>
+                )}
+                <p className="hilfe-rueckmeldung__fuss">
+                  <span>Version {__APP_VERSION__}</span>
+                  <a href={LIZENZ_HINWEIS} target="_blank" rel="noopener">
+                    Lizenzen ↗
+                  </a>
+                </p>
+              </section>
               <h2 className="hilfe-mappe__titel">
                 Alle Kapitel am Stück
                 <span className="hilfe-mappe__zahl">{liste.length}</span>

@@ -197,6 +197,19 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     await waitFor(() => expect(zaehler.quittiert).toEqual([5]));
   });
 
+  it('„Benachrichtigungen einstellen“ führt auf die Einstellungen und schließt (LLH-1642)', async () => {
+    serverMit({ eintraege: [eintrag(5)], ungelesen: 1 });
+    rendern();
+    const knopf = await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' });
+    await userEvent.click(knopf);
+    const paneel = await screen.findByRole('region', { name: 'Eingänge' });
+    await userEvent.click(
+      within(paneel).getByRole('link', { name: /Benachrichtigungen einstellen/ }),
+    );
+    expect(screen.getByTestId('route')).toHaveTextContent(/^\/benachrichtigungen$/);
+    await waitFor(() => expect(knopf).toHaveAttribute('aria-expanded', 'false'));
+  });
+
   it('„Alle gelesen“ schickt die jüngste Kennung; ohne Ungelesene gesperrt', async () => {
     const zaehler = serverMit({ eintraege: [eintrag(9), eintrag(4)], ungelesen: 2 });
     rendern();
@@ -318,6 +331,11 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     });
     const blatt = await screen.findByRole('dialog');
     expect(within(blatt).getByRole('region', { name: 'Eingänge' })).toBeInTheDocument();
+    // Auch im Blatt der zweite Weg zu den Benachrichtigungen (LLH-1642).
+    await userEvent.click(
+      within(blatt).getByRole('link', { name: /Benachrichtigungen einstellen/ }),
+    );
+    expect(screen.getByTestId('route')).toHaveTextContent(/^\/benachrichtigungen$/);
   });
 });
 

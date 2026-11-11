@@ -6,27 +6,27 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 
 ## 1. Segmentleiste für das Menü (D3, D4)
 
-- [ ] 1.1 `components/instrument/Segmentleiste.tsx`: optionale Eigenschaft für volle Breite (Leiste `flex`, Zellen wachsen gleich, Wort mittig); Test in `Segmentleiste.test.tsx`, ohne die Eigenschaft unverändert
-- [ ] 1.2 Test: gewählter Wert, der zugleich `gesperrt` ist (Helligkeit 40 % bei Boden 80 %), bleibt ausgewählt und in der Tab-Reihenfolge; Pfeile springen über gesperrte Segmente. Falls rot, in `Segmentleiste` ergänzen
+- [x] 1.1 `components/instrument/Segmentleiste.tsx`: optionale Eigenschaft für volle Breite (Leiste `flex`, Zellen wachsen gleich, Wort mittig); Test in `Segmentleiste.test.tsx`, ohne die Eigenschaft unverändert
+- [x] 1.2 Test: gewählter Wert, der zugleich `gesperrt` ist (Helligkeit 40 % bei Boden 80 %), bleibt ausgewählt und in der Tab-Reihenfolge; Pfeile springen über gesperrte Segmente. Falls rot, in `Segmentleiste` ergänzen
 
 ## 2. Benutzermenü (D1, D2, D4)
 
-- [ ] 2.1 `components/BenutzerMenu.test.tsx` auf die neue Form: Reihenfolge Kopf, Profil, Abmelden, Gruppe „Anzeige“, Benachrichtigungen, Neuigkeiten, Hilfe; kein „Rückmeldung“, kein „Lizenzen“
-- [ ] 2.2 Gruppe „Anzeige“ mit drei benannten Leisten (Darstellung, Bediendichte, Helligkeit in %) als Gruppen-Inhalt; `aria-checked` am gewählten Wert; Wahl wirkt sofort, Menü bleibt offen (Test)
-- [ ] 2.3 Tastatur: Pfeile/Pos1/Ende/Leertaste/Enter in einer Leiste gehen nicht an das Menü (Fokus bleibt in der Leiste, Menü bleibt offen; Test)
-- [ ] 2.4 Helligkeitssperre: Etikett nennt Boden und Grund, Stufen unter dem Boden gesperrt mit Grund, Zeile „Gewählt W %, wirkt N %“ bei Wahl unter dem Boden (Tests wie bisher in `BenutzerMenu.test.tsx`, umgestellt)
-- [ ] 2.5 Einträge „Rückmeldung“ und „Lizenzen“ entfernen; „Hilfe“ öffnet die Hilfe mit `state: { von: <Pfad> }` (Test)
-- [ ] 2.6 Menübreite 320 px ab `md`, am Handy Fensterbreite − 16 px; Maße der Staffel (30/48/72) aus den Tokens, kein fester Pixelwert für Höhen
-- [ ] 2.7 `components/AppLayout.test.tsx`, `einsatz/EinsatzLayout.test.tsx`, `neuigkeiten/Benutzermenue.neuigkeiten.test.tsx`, `theme/rahmenKontrast.test.ts` auf Leisten und Rollen umstellen
+- [x] 2.1 `components/BenutzerMenu.test.tsx` auf die neue Form: Reihenfolge Kopf, Profil, Abmelden, Gruppe „Anzeige“, Benachrichtigungen, Neuigkeiten, Hilfe; kein „Rückmeldung“, kein „Lizenzen“
+- [x] 2.2 Gruppe „Anzeige“ mit drei benannten Leisten (Darstellung, Bediendichte, Helligkeit in %) als Gruppen-Inhalt; `aria-checked` am gewählten Wert; Wahl wirkt sofort, Menü bleibt offen (Test)
+- [x] 2.3 Tastatur: Pfeile/Pos1/Ende/Leertaste/Enter in einer Leiste gehen nicht an das Menü (Fokus bleibt in der Leiste, Menü bleibt offen; Test)
+- [x] 2.4 Helligkeitssperre: Etikett nennt Boden und Grund, Stufen unter dem Boden gesperrt mit Grund, Zeile „Gewählt W %, wirkt N %“ bei Wahl unter dem Boden (Tests wie bisher in `BenutzerMenu.test.tsx`, umgestellt)
+- [x] 2.5 Einträge „Rückmeldung“ und „Lizenzen“ entfernen; „Hilfe“ öffnet die Hilfe mit `state: { von: <Pfad> }` (Test)
+- [x] 2.6 Menübreite 320 px ab `md`, am Handy Fensterbreite − 16 px; Maße der Staffel (30/48/72) aus den Tokens, kein fester Pixelwert für Höhen
+- [x] 2.7 `components/AppLayout.test.tsx`, `einsatz/EinsatzLayout.test.tsx`, `neuigkeiten/Benutzermenue.neuigkeiten.test.tsx`, `theme/rahmenKontrast.test.ts` auf Leisten und Rollen umstellen
 
 ## 3. Hilfe-Seite (D5, D6)
 
-- [ ] 3.1 `hilfe/HilfePage.test.tsx`: Übersicht trägt „Rückmeldung geben ↗“ und „Lizenzen ↗“; in einer Gerätesitzung fehlt „Rückmeldung geben“, „Lizenzen“ bleibt; mit Kapitel in der Adresse fehlt der Abschnitt
-- [ ] 3.2 Abschnitt in der Übersicht umsetzen (`hilfe/HilfePage.tsx`, `hilfe/Hilfe.css`), nicht in der Druckwurzel; Rückmeldung öffnet `rueckmeldungsAdresse` mit `von` aus dem Router-State, sonst dem eigenen Pfad, mit `noopener,noreferrer` (Test: Bereich `/einsatz/:id/etb` bei `von` aus dem ETB)
+- [x] 3.1 `hilfe/HilfePage.test.tsx`: Übersicht trägt „Rückmeldung geben ↗“ und „Lizenzen ↗“; in einer Gerätesitzung fehlt „Rückmeldung geben“, „Lizenzen“ bleibt; mit Kapitel in der Adresse fehlt der Abschnitt
+- [x] 3.2 Abschnitt in der Übersicht umsetzen (`hilfe/HilfePage.tsx`, `hilfe/Hilfe.css`), nicht in der Druckwurzel; Rückmeldung öffnet `rueckmeldungsAdresse` mit `von` aus dem Router-State, sonst dem eigenen Pfad, mit `noopener,noreferrer` (Test: Bereich `/einsatz/:id/etb` bei `von` aus dem ETB)
 
 ## 4. Eingänge (D7)
 
-- [ ] 4.1 `alarm/EingaengeKnopf.tsx`: Link „Benachrichtigungen einstellen →“ am Fuß von Klappfläche und Blatt; schließt die Fläche und führt auf `BENACHRICHTIGUNGEN_PFAD` (Test)
+- [x] 4.1 `alarm/EingaengeKnopf.tsx`: Link „Benachrichtigungen einstellen →“ am Fuß von Klappfläche und Blatt; schließt die Fläche und führt auf `BENACHRICHTIGUNGEN_PFAD` (Test)
 
 ## 5. e2e und Bildlauf (D9)
 
@@ -37,15 +37,15 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 
 ## 6. Anwenderdoku (Mitänderungsregel)
 
-- [ ] 6.1 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Abschnitt Darstellung (Leisten statt Liste mit Häkchen), Benachrichtigungen (zweiter Weg aus den Eingängen), Aufzählung des Benutzermenüs
-- [ ] 6.2 `docs/anwender/kapitel/rueckmeldung.md`: Weg über die Hilfe statt über das Menü, Bereich der App aus der vorherigen Seite, gekoppelte Geräte; `quellen:` um `frontend/src/hilfe/HilfePage.tsx` ergänzen
-- [ ] 6.3 `docs/anwender/kapitel/anmelden-abmelden.md` prüfen (Bildunterschrift), `profil-sicherheit.md` prüfen; Lizenzen erwähnen, wo bisher das Menü genannt war
+- [x] 6.1 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Abschnitt Darstellung (Leisten statt Liste mit Häkchen), Benachrichtigungen (zweiter Weg aus den Eingängen), Aufzählung des Benutzermenüs
+- [x] 6.2 `docs/anwender/kapitel/rueckmeldung.md`: Weg über die Hilfe statt über das Menü, Bereich der App aus der vorherigen Seite, gekoppelte Geräte; `quellen:` um `frontend/src/hilfe/HilfePage.tsx` ergänzen
+- [x] 6.3 `docs/anwender/kapitel/anmelden-abmelden.md` prüfen (Bildunterschrift), `profil-sicherheit.md` prüfen; Lizenzen erwähnen, wo bisher das Menü genannt war
 
 ## 7. Entwurf, Design System, Abschluss (D10)
 
-- [ ] 7.1 Zeichenflächen und `canvas.json` aus dem Artifact nach `docs/design/2026-11-11-benutzermenue/`
-- [ ] 7.2 `mise exec -- pnpm -C frontend design-system`, Erzeugtes unter `docs/design/design-system/project/` mitcommitten (Segmentleiste geändert)
-- [ ] 7.3 Kommentare im Code nachziehen, die „Umschaltgruppen“, „✓ im Text“ oder die alten Einträge nennen (`BenutzerMenu.tsx`, `command-palette/befehle.ts`, `theme/darstellungOptionen.ts`, `rueckmeldung/adresse.ts`)
+- [x] 7.1 Zeichenflächen und `canvas.json` aus dem Artifact nach `docs/design/2026-11-11-benutzermenue/`
+- [x] 7.2 `mise exec -- pnpm -C frontend design-system`, Erzeugtes unter `docs/design/design-system/project/` mitcommitten (Segmentleiste geändert)
+- [x] 7.3 Kommentare im Code nachziehen, die „Umschaltgruppen“, „✓ im Text“ oder die alten Einträge nennen (`BenutzerMenu.tsx`, `command-palette/befehle.ts`, `theme/darstellungOptionen.ts`, `rueckmeldung/adresse.ts`)
 - [ ] 7.4 `./scripts/check-all.sh` grün (Gate-Lauf dieses Branches)
 - [ ] 7.5 `superpowers:requesting-code-review`, bestätigte Befunde abarbeiten
 

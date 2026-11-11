@@ -125,6 +125,54 @@ describe('Segmentleiste', () => {
     expect(online).not.toHaveAttribute('aria-describedby');
   });
 
+  it('volle Breite (LLH-1642): Leiste als Block, jede Zelle wächst gleich; ohne bleibt sie inline', () => {
+    const { rerender } = renderMitProviders(
+      <Segmentleiste
+        optionen={OPTIONEN}
+        wert="alle"
+        onWechsel={() => {}}
+        beschriftung="voll"
+        hasFullWidth
+      />,
+    );
+    const leiste = screen.getByRole('radiogroup', { name: 'voll' });
+    expect(leiste).toHaveStyle({ display: 'flex' });
+    for (const zelle of leiste.querySelectorAll<HTMLElement>('[data-lfh="segment-zelle"]')) {
+      expect(zelle).toHaveStyle({ flexGrow: '1', flexBasis: '0px', minWidth: '0px' });
+      expect(zelle.querySelector('button')).toHaveStyle({ flexGrow: '1' });
+    }
+    rerender(
+      <Segmentleiste optionen={OPTIONEN} wert="alle" onWechsel={() => {}} beschriftung="voll" />,
+    );
+    const ohne = screen.getByRole('radiogroup', { name: 'voll' });
+    expect(ohne.style.display).toBe('');
+    expect(ohne.querySelector<HTMLElement>('[data-lfh="segment-zelle"]')!.style.flexGrow).toBe('');
+  });
+
+  it('ein gewählter, zugleich gesperrter Wert bleibt gewählt und im Tab-Weg (Helligkeit unter dem Boden, LLH-1642)', async () => {
+    const onWechsel = vi.fn();
+    const optionen: SegmentOption<number>[] = [
+      { wert: 100, label: '100' },
+      { wert: 80, label: '80' },
+      { wert: 40, label: '40', gesperrt: 'Warnung aktiv: mindestens 80 %' },
+    ];
+    renderMitProviders(
+      <Segmentleiste
+        optionen={optionen}
+        wert={40}
+        onWechsel={onWechsel}
+        beschriftung="Helligkeit"
+      />,
+    );
+    const vierzig = screen.getByRole('radio', { name: '40' });
+    expect(vierzig).toBeChecked();
+    expect(vierzig).toHaveAttribute('tabindex', '0');
+    expect(vierzig).toHaveAccessibleDescription('Warnung aktiv: mindestens 80 %');
+    vierzig.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(onWechsel).toHaveBeenCalledWith(100);
+  });
+
   /** Gate 3: ZWEI Angaben an einem handgebauten Bedienziel, Böden als Literale. */
   it('Bedienziel: Boden 30 / 48 / 72 aus controlHeight, plus Polsterung, die mitwächst', () => {
     const t = (s: keyof typeof dichten) => ({

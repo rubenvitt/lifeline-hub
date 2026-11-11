@@ -2,7 +2,8 @@ import { matchRoutes, type RouteObject } from 'react-router';
 import { inHuelle } from '../huelle/faehigkeiten';
 
 /**
- * Der Rückmeldeweg (LLH-1549): Der Menüeintrag „Rückmeldung“ öffnet das Issue-Formular im
+ * Der Rückmeldeweg (LLH-1549): „Rückmeldung geben“ in der Übersicht der Hilfe (seit LLH-1642,
+ * vorher ein Eintrag im Benutzermenü) öffnet das Issue-Formular im
  * öffentlichen Repo, vorbefüllt mit Version, Oberfläche und dem Bereich der App. Ein Workflow
  * wirft jedes Issue in Zunder ein (`.github/workflows/rueckmeldung.yml`).
  *
@@ -17,8 +18,8 @@ export const RUECKMELDUNG_FORMULAR =
 let gemerkteRouten: RouteObject[] | null = null;
 
 /**
- * Die Routen der App, einmal beim Start gesetzt (`main.tsx`). Ein Import von `appRouten` ins
- * Benutzermenü wäre ein Kreis (App → Layout → Menü → App); ohne gemerkte Routen fehlt der
+ * Die Routen der App, einmal beim Start gesetzt (`main.tsx`). Ein Import von `appRouten` in die
+ * Hilfe wäre ein Kreis (App → Hilfe → App); ohne gemerkte Routen fehlt der
  * Bereich, die Meldung geht trotzdem.
  */
 export function merkeRouten(routen: RouteObject[]): void {
