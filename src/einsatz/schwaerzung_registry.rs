@@ -1426,7 +1426,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Eingeteilte Personen eines Planblocks (LLH-1552, Mig 0277): nur Verweise; die Namen stecken
-    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN.
+    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN. `id` seit Mig 0315
+    // (LLH-1630).
     TabellenRegel {
         tabelle: "einsatz_planschicht_person",
         scoping: Scoping::UeberParent {
@@ -1436,6 +1437,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         zeilenfilter: None,
         person_bezug: None,
         spalten: &[
+            retain("id", G_PK),
             retain("planschicht_id", G_FK),
             retain("personal_id", G_FK),
             retain("einsatz_personal_id", G_FK),

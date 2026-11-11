@@ -16,7 +16,7 @@ use crate::instanz::repo::{self, KopplungZeile, OrgZeile};
 use crate::instanz::{org_kennung, InstanzKopplungRichtung, PROTOKOLL_SPIEGEL};
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 /// Was ein Abgleich an der eigenen Seite übernommen hat; nach dem Commit gemeldet.
 #[derive(Debug, Default)]
@@ -37,8 +37,23 @@ fn org_wire(eigen: &Identitaet, kopplung: &KopplungZeile, o: &OrgZeile) -> Strin
     }
 }
 
-/// Zähler der Abgleiche dieses Prozesses; er verschiebt den Anfang der Reihe (LLH-1630).
-static RUNDE: AtomicUsize = AtomicUsize::new(0);
+/// Zähler je Kopplung, getrennt für die Auswahl der eigenen Stände und für die Lieferung; er
+/// verschiebt den Anfang der Reihe um eins je Abgleich (LLH-1630). Ein gemeinsamer Zähler rückte
+/// je Pfad in Zweierschritten vor und träfe bei einer geraden Zahl übriger Plätze nie alle.
+static RUNDE_STAENDE: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
+static RUNDE_LIEFERN: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
+
+/// Die nächste Runde dieser Kopplung auf diesem Zähler: 0, 1, 2, …
+fn naechste_runde(zaehler: &Mutex<Option<HashMap<i64, usize>>>, kopplung_id: i64) -> usize {
+    let mut z = zaehler.lock().unwrap_or_else(|e| e.into_inner());
+    let n = z
+        .get_or_insert_with(HashMap::new)
+        .entry(kopplung_id)
+        .or_insert(0);
+    let runde = *n;
+    *n = n.wrapping_add(1);
+    runde
+}
 
 /// Die Liste ab einer Stelle, die mit jedem Abgleich weiterrückt: Was am Ende der Reihe steht,
 /// kommt so auch dran, wenn Budget oder [`EINSAETZE_MAX`] vorher ausgehen (LLH-1630).
@@ -72,7 +87,7 @@ async fn eigene_staende(
     .await?;
     Ok(auswahl_staende(
         zeilen,
-        RUNDE.fetch_add(1, Ordering::Relaxed),
+        naechste_runde(&RUNDE_STAENDE, kopplung_id),
     ))
 }
 
@@ -117,7 +132,7 @@ async fn liefere_alle(
     }
     // Reihum (LLH-1630): nach der ID allein bekämen bei knappem Budget oder mehr als
     // `EINSAETZE_MAX` wartenden Einsätzen immer dieselben den Vortritt.
-    for (o, e) in reihum(alle, RUNDE.fetch_add(1, Ordering::Relaxed)) {
+    for (o, e) in reihum(alle, naechste_runde(&RUNDE_LIEFERN, kopplung.id)) {
         if lieferungen.len() >= EINSAETZE_MAX {
             break;
         }
@@ -193,9 +208,9 @@ async fn uebernehme_alle(
         };
         if !erg.hinweise.is_empty() {
             tracing::warn!(kennung = %l.kennung, hinweise = ?erg.hinweise, "Spiegel: Hinweise beim Übernehmen");
-            if let Some(id) = erg.einsatz_id {
-                save_hinweis(conn, id, &erg.hinweise).await?;
-            }
+        }
+        if let Some(id) = erg.einsatz_id {
+            save_hinweis(conn, id, &erg.hinweise, l).await?;
         }
         if let Some(id) = erg.einsatz_id {
             if !erg.kategorien.is_empty() {
@@ -217,19 +232,55 @@ async fn save_hinweis(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     hinweise: &[String],
+    l: &super::paket::EinsatzLieferung,
 ) -> Result<(), AppError> {
-    let text: String = hinweise
+    let alt: Option<String> =
+        sqlx::query_scalar("SELECT hinweis FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .flatten();
+    let geliefert: Vec<String> = l
+        .zeilen
         .iter()
-        .take(20)
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n");
-    sqlx::query("UPDATE einsatz_spiegel SET hinweis = ? WHERE einsatz_id = ?")
-        .bind(text)
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
+        .filter(|z| !z.zu_gross)
+        .map(|z| uebernehmen::zu_gross_anfang(&z.art, &z.schluessel))
+        .collect();
+    let neu = hinweise_fortschreiben(alt.as_deref(), hinweise, &geliefert);
+    if neu != alt {
+        sqlx::query("UPDATE einsatz_spiegel SET hinweis = ? WHERE einsatz_id = ?")
+            .bind(neu)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+    }
     Ok(())
+}
+
+/// Der Hinweis am Spiegel nach einer Lieferung. Neue Hinweise ersetzen die alten, nur „zu groß“
+/// bleibt je Zeile stehen, bis dieselbe Zeile mit Daten kommt: ihr Stand wird nicht neu geliefert,
+/// der Hinweis ginge sonst mit der nächsten Runde verloren (LLH-1630). Ohne neue Hinweise bleiben
+/// die alten bis auf die erledigten „zu groß“.
+fn hinweise_fortschreiben(
+    alt: Option<&str>,
+    neu: &[String],
+    geliefert: &[String],
+) -> Option<String> {
+    let erledigt = |zeile: &str| geliefert.iter().any(|g| zeile.starts_with(g.as_str()));
+    let ist_zu_gross = |zeile: &str| zeile.starts_with("Zeile ") && zeile.contains(" ist zu groß");
+    let alte = alt.unwrap_or("").lines().filter(|z| !z.is_empty());
+    let mut zeilen: Vec<String> = if neu.is_empty() {
+        alte.filter(|z| !(ist_zu_gross(z) && erledigt(z)))
+            .map(str::to_owned)
+            .collect()
+    } else {
+        alte.filter(|z| ist_zu_gross(z) && !erledigt(z) && !neu.iter().any(|n| n == z))
+            .map(str::to_owned)
+            .chain(neu.iter().cloned())
+            .collect()
+    };
+    zeilen.truncate(20);
+    (!zeilen.is_empty()).then(|| zeilen.join("\n"))
 }
 
 /// Meldet nach dem Commit, was sich geändert hat: `lagged` an die Clients des Einsatzes (ein
@@ -490,6 +541,65 @@ mod reihum_tests {
             alle.extend(kennungen);
         }
         assert_eq!(alle.len(), 410, "jeder Spiegel kommt irgendwann dran");
+    }
+
+    /// Der Aufrufpfad: Stände und Lieferung zählen je Kopplung getrennt, jede Runde rückt um eins.
+    /// Mit 255 laufenden und zwei abgeschlossenen Spiegeln bleibt ein Platz; beide kommen dran.
+    #[test]
+    fn ein_freier_platz_wechselt_zwischen_zwei_abgeschlossenen() {
+        let kopplung = -1630;
+        let mut gesehen = BTreeSet::new();
+        for _ in 0..4 {
+            // Die Lieferung derselben Kopplung zählt dazwischen, darf die Auswahl aber nicht
+            // verschieben.
+            naechste_runde(&RUNDE_LIEFERN, kopplung);
+            let runde = naechste_runde(&RUNDE_STAENDE, kopplung);
+            let auswahl = auswahl_staende(spiegel(EINSAETZE_MAX - 1, 2), runde);
+            gesehen.extend(
+                auswahl
+                    .into_iter()
+                    .map(|s| s.kennung)
+                    .filter(|k| k.starts_with('a')),
+            );
+        }
+        assert_eq!(
+            gesehen,
+            BTreeSet::from(["a0".to_string(), "a1".to_string()])
+        );
+        assert_eq!(
+            naechste_runde(&RUNDE_STAENDE, kopplung - 1),
+            0,
+            "je Kopplung"
+        );
+    }
+
+    #[test]
+    fn ein_hinweis_zu_gross_bleibt_bis_die_zeile_kommt() {
+        let a = uebernehmen::zu_gross_hinweis("etb_eintrag", "1");
+        let b = uebernehmen::zu_gross_hinweis("etb_eintrag", "2");
+        // Runde 1: Zeile 1 zu groß.
+        let h = hinweise_fortschreiben(None, std::slice::from_ref(&a), &[]);
+        assert_eq!(h.as_deref(), Some(a.as_str()));
+        // Runde 2: Zeile 2 zu groß, Zeile 1 kommt nicht neu: beide stehen.
+        let h = hinweise_fortschreiben(h.as_deref(), std::slice::from_ref(&b), &[]);
+        assert_eq!(h, Some(format!("{a}\n{b}")));
+        // Runde 3: Zeile 1 kommt mit Daten, keine neuen Hinweise: nur Zeile 2 bleibt.
+        let geliefert = [uebernehmen::zu_gross_anfang("etb_eintrag", "1")];
+        let h = hinweise_fortschreiben(h.as_deref(), &[], &geliefert);
+        assert_eq!(h.as_deref(), Some(b.as_str()));
+        // Zeile 10 ist nicht Zeile 1.
+        let c = uebernehmen::zu_gross_hinweis("etb_eintrag", "10");
+        assert_eq!(
+            hinweise_fortschreiben(Some(&c), &[], &geliefert).as_deref(),
+            Some(c.as_str())
+        );
+        // Andere Hinweise ersetzt ein neuer wie bisher.
+        let h = hinweise_fortschreiben(
+            Some("Lieferung nicht übernommen: x"),
+            &["Lieferung nicht übernommen: y".into()],
+            &[],
+        );
+        assert_eq!(h.as_deref(), Some("Lieferung nicht übernommen: y"));
     }
 
     #[test]

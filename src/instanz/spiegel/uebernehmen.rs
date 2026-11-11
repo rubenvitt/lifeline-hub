@@ -205,10 +205,9 @@ async fn uebernehme_zeilen(
     // Zu groß für den Abgleich (LLH-1630): die Zeile kommt ohne Daten, die bisherige Fassung
     // bleibt stehen. Kein Nachholen, sonst käme dieselbe Zeile in jedem Takt wieder.
     for z in l.zeilen.iter().filter(|z| z.zu_gross) {
-        ergebnis.hinweise.push(format!(
-            "Zeile {} {} ist zu groß für den Abgleich und liegt nur an der führenden Instanz.",
-            z.art, z.schluessel
-        ));
+        ergebnis
+            .hinweise
+            .push(zu_gross_hinweis(&z.art, &z.schluessel));
     }
     // Löschungen zuerst: eine neue Zeile kann den Platz einer gelöschten einnehmen (Reihenfolge,
     // eindeutige Paare). Hängt an der Zeile noch ein Verweis, den erst eine geänderte Zeile dieser
@@ -915,4 +914,18 @@ async fn upsert(
         };
     }
     Ok(q.fetch_one(&mut *conn).await?)
+}
+
+/// Anfang des Hinweises zu einer Zeile über der Paketgrenze; er bleibt am Spiegel stehen, bis
+/// dieselbe Zeile mit Daten ankommt (LLH-1630, `abgleich::hinweise_fortschreiben`).
+pub(super) fn zu_gross_anfang(art: &str, schluessel: &str) -> String {
+    format!("Zeile {art} {schluessel} ist zu groß")
+}
+
+/// Hinweis zu einer Zeile, die ohne Daten kam (`Zeile::zu_gross`).
+pub(super) fn zu_gross_hinweis(art: &str, schluessel: &str) -> String {
+    format!(
+        "{} für den Abgleich und liegt nur an der führenden Instanz.",
+        zu_gross_anfang(art, schluessel)
+    )
 }
