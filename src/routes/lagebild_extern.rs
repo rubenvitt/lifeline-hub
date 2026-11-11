@@ -110,6 +110,29 @@ fn fordere_freigabe_moeglich(ctx: &EinsatzLesezugriff) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Prüfung in der Transaktion: beim Führer Status und Führung (`fordere_aktiv_in_tx`, die
+/// Sperre „Führung liegt bei …“), am Spiegel nur der Status, denn dort führt immer die andere
+/// Instanz und der Eintrag geht als Antrag.
+async fn im_tx_aktiv(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    spiegel: bool,
+) -> Result<(), AppError> {
+    if !spiegel {
+        return crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await;
+    }
+    let status: Option<String> = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    if status.as_deref() != Some("aktiv") {
+        return Err(AppError::Conflict(
+            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Schreibt den ETB-Eintrag einer Freigabe (design.md D7): beim Führer als Systemeintrag, am
 /// Spiegel als Antrag an den Führer. Liefert die id eines direkt geschriebenen Eintrags.
 async fn etb_vermerken(
@@ -208,17 +231,9 @@ pub async fn anlegen(
     let schluessel = lagebild::neuer_schluessel();
     let schluessel_hash = lagebild::hash(&schluessel);
     let (id, etb_id) = crate::write_retry!(&state.pool, |conn| {
-        // Der Extractor sah den Stand vor der Transaktion; ein Abschluss dazwischen darf keinen
-        // Link an einem geschlossenen Einsatz hinterlassen.
-        let status: Option<String> = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-        if status.as_deref() != Some("aktiv") {
-            return Err(AppError::Conflict(
-                "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-            ));
-        }
+        // Der Extractor sah den Stand vor der Transaktion; ein Abschluss oder eine
+        // Führungsübergabe dazwischen darf keinen Link hinterlassen.
+        im_tx_aktiv(conn, einsatz_id, spiegel).await?;
         let (id, _) = lagebild::anlegen_tx(
             conn,
             einsatz_id,
@@ -262,8 +277,18 @@ pub async fn widerrufen(
     let von = ctx.benutzer.id;
     let name = ctx.benutzer.anzeigename.clone();
     let etb_id = crate::write_retry!(&state.pool, |conn| {
+        im_tx_aktiv(conn, einsatz_id, spiegel).await?;
         match lagebild::widerrufen_tx(conn, einsatz_id, freigabe_id, von).await? {
             None => Ok(None),
+            // Abgleich beendet: der Widerruf muss trotzdem gelten, nur der Antrag entfällt.
+            // Sonst bliebe ein Link „bis Einsatzende“ am Spiegel offen, solange er aktiv ist.
+            Some(_)
+                if spiegel
+                    && !crate::instanz::spiegel::antrag::abgleich_laeuft_tx(conn, einsatz_id)
+                        .await? =>
+            {
+                Ok(None)
+            }
             Some(empfaenger) => {
                 let text = format!("Lagebild für Externe an „{empfaenger}“ widerrufen von {name}.");
                 let am_spiegel = spiegel.then_some(SpiegelEintrag {

@@ -582,6 +582,7 @@ async fn am_spiegel_gilt_der_link_hier_und_das_etb_geht_als_antrag_an_den_fuehre
 
     let (v, schluessel) = freigabe(&hub.app, &erika, s, "Krisenstab", "lagebild", "24h").await;
     assert_eq!(v["freigabe"]["empfaenger"], "Krisenstab");
+    let fid = v["freigabe"]["id"].as_i64().unwrap();
     let antrag: (String, String) = sqlx::query_as(
         "SELECT art, json_extract(daten, '$.inhalt') FROM spiegel_antrag WHERE einsatz_id = ?",
     )
@@ -623,5 +624,23 @@ async fn am_spiegel_gilt_der_link_hier_und_das_etb_geht_als_antrag_an_den_fuehre
     assert_eq!(
         abruf(&elw.app, EXTERN, Some(&schluessel)).await.0,
         StatusCode::UNAUTHORIZED
+    );
+
+    // Endet der Abgleich, gilt der Widerruf trotzdem; nur der Antrag entfällt.
+    exec(
+        &hub.pool,
+        &format!("UPDATE einsatz_spiegel SET beendet_at = datetime('now') WHERE einsatz_id = {s}"),
+    )
+    .await;
+    let antraege_vorher: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM spiegel_antrag").await;
+    assert_eq!(widerrufen(&hub.app, &erika, s, fid).await, StatusCode::OK);
+    assert_eq!(
+        abruf(&hub.app, EXTERN, Some(&schluessel)).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let antraege_nachher: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM spiegel_antrag").await;
+    assert_eq!(
+        antraege_nachher, antraege_vorher,
+        "kein Antrag nach dem Abgleich"
     );
 }

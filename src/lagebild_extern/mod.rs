@@ -330,10 +330,22 @@ async fn gueltige_freigabe(
         .transpose()
 }
 
+/// Gibt es eine Freigabe mit diesem Schlüssel, gleich ob noch wirksam?
+async fn schluessel_bekannt(pool: &SqlitePool, schluessel: &str) -> Result<bool, AppError> {
+    Ok(
+        sqlx::query_scalar::<_, i64>("SELECT 1 FROM lagebild_freigabe WHERE schluessel_hash = ?")
+            .bind(hash(schluessel))
+            .fetch_optional(pool)
+            .await?
+            .is_some(),
+    )
+}
+
 /// Extractor der öffentlichen Lagebild-Route: eine wirksame Freigabe als
 /// `Authorization: Bearer llh_lb_…`. Alles andere ist 401, ohne zu sagen, warum (fehlt,
-/// unbekannt, abgelaufen, widerrufen, Einsatz abgeschlossen). Ein falscher Schlüssel zählt als
-/// Fehlversuch der Adresse wie bei der Gerätekopplung; eine gesperrte Adresse bekommt 429.
+/// unbekannt, abgelaufen, widerrufen, Einsatz abgeschlossen). Ein fehlender oder unbekannter
+/// Schlüssel zählt als Fehlversuch der Adresse wie bei der Gerätekopplung, ein bekannter, nicht
+/// mehr wirksamer nicht; eine gesperrte Adresse bekommt 429.
 #[derive(Debug, Clone, Copy)]
 pub struct LagebildZugriff {
     pub freigabe_id: i64,
@@ -360,19 +372,23 @@ impl FromRequestParts<AppState> for LagebildZugriff {
                 ));
             }
         }
-        let gefunden = match schluessel_aus(parts) {
-            Some(s) => gueltige_freigabe(&state.pool, s).await?,
-            None => None,
-        };
-        match gefunden {
-            Some(z) => Ok(z),
-            None => {
-                if let Some(ip) = peer_ip {
-                    crate::auth::rate_limit::fehlversuch(ip, None);
-                }
-                Err(AppError::Unauthorized)
+        let schluessel = schluessel_aus(parts);
+        if let Some(s) = schluessel {
+            if let Some(z) = gueltige_freigabe(&state.pool, s).await? {
+                return Ok(z);
             }
         }
+        // Ein bekannter, aber nicht mehr wirksamer Schlüssel (abgelaufen, widerrufen, Einsatz
+        // abgeschlossen) ist kein Rateversuch: offene Seiten hinter einer gemeinsamen Adresse
+        // sperrten sonst beim Einsatzende die Adresse für alle gültigen Links und Anmeldungen.
+        let bekannt = match schluessel {
+            Some(s) => schluessel_bekannt(&state.pool, s).await?,
+            None => false,
+        };
+        if let (Some(ip), false) = (peer_ip, bekannt) {
+            crate::auth::rate_limit::fehlversuch(ip, None);
+        }
+        Err(AppError::Unauthorized)
     }
 }
 

@@ -136,7 +136,9 @@ export default function LagemonitorKarte({
       center: [10.45, 51.16],
       zoom: 5,
       interactive: bedienbar,
-      attributionControl: false,
+      // Bedienbar (Lagebild für Externe, öffentlich geteilt) mit Quellenangabe der Grundlage;
+      // der Monitor an der Wand bleibt ohne.
+      attributionControl: bedienbar ? { compact: true } : false,
       transformRequest: anfrage,
     };
     const map = wennDarstellbar(() => new maplibregl.Map(optionen));

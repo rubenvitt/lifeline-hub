@@ -103,6 +103,14 @@ export default function LagebildExternPage() {
     if (linkUngueltig(abfrage.error)) setBeendet(true);
   }, [abfrage.error]);
 
+  // Ein anderer Link im selben Tab ändert nur das Fragment: neu laden, damit nichts vom alten
+  // Schlüssel (Daten, Abruf, Zustand) unter dem neuen steht.
+  useEffect(() => {
+    const neuLaden = () => window.location.reload();
+    window.addEventListener('hashchange', neuLaden);
+    return () => window.removeEventListener('hashchange', neuLaden);
+  }, []);
+
   // Uhr für „keine Verbindung seit …“ am Spiegel.
   useEffect(() => {
     const t = window.setInterval(() => setJetzt(Date.now()), 15_000);

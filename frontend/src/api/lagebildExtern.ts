@@ -84,7 +84,7 @@ export async function ladeLagebildExtern(
     } catch {
       // keine JSON-Antwort
     }
-    throw new ApiError(res.status, message, { vomAnwendungsserver });
+    throw new ApiError(res.status, message, { vomAnwendungsserver, ohneSitzung: true });
   }
   return (await res.json()) as LagebildExtern;
 }

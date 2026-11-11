@@ -634,6 +634,15 @@ async fn beantragen(
     Ok(antrag_antwort(id, "ausstehend"))
 }
 
+/// Läuft der Abgleich dieses Spiegels noch, nimmt er also Anträge an (LLH-1496: ein Widerruf
+/// gilt auch ohne Antrag, wenn der Abgleich beendet ist)?
+pub async fn abgleich_laeuft_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    Ok(kopplung_des_spiegels(conn, einsatz_id).await?.is_some())
+}
+
 /// Legt am Spiegel einen ETB-Eintrag als Antrag ab, für einen Schreibweg des Servers, der beim
 /// Führer einen Systemeintrag schriebe (LLH-1496, design.md D7: Freigabe eines Lagebilds für
 /// Externe). Beim Führer kommt er als Eintrag des Kontos an, wie eine Erfassung am Spiegel; `von`

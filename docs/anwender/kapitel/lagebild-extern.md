@@ -2,7 +2,7 @@
 titel: Lagebild für Externe
 gruppen: [fuehrung]
 reihenfolge: 790
-quellen: [frontend/src/pages/einstellungen/EinsatzLagebildExtern.tsx, frontend/src/extern/LagebildExternPage.tsx, src/routes/lagebild_extern.rs, src/lagebild_extern/mod.rs]
+quellen: [frontend/src/pages/einstellungen/EinsatzLagebildExtern.tsx, frontend/src/extern/LagebildExternPage.tsx, src/routes/lagebild_extern.rs, src/lagebild_extern/mod.rs, src/routes/lagemonitor_v1.rs]
 ---
 
 ## Überblick
@@ -60,11 +60,13 @@ kein Konto und sieht nur dieses eine Lagebild; der Link öffnet nichts anderes i
 ### Inhalt je Stufe
 
 Die Stufe „Lagebild“ zeigt Bezeichnung, Stichwort, Einsatzart und Beginn des Einsatzes, die
-Betroffenen nach Sichtung, die Kräfte, die Unfallhilfsstellen mit Belegung, die Karte und die
-zuletzt freigegebene Lagemeldung, also dasselbe wie ein
-[externer Lagemonitor](externe-lagemonitore.md). Die Stufe „Öffentlich“ zeigt nur die Zahl der
-Betroffenen und der Einsatzkräfte und auf der Karte den Einsatzort, die Absperrungen und die
-Sperrgebiete. Namen, Meldungstexte und das Einsatztagebuch zeigt keine Stufe.
+Betroffenen nach Sichtung, die Kräfte, die Unfallhilfsstellen mit Belegung und die Karte, also
+dasselbe wie ein [externer Lagemonitor](externe-lagemonitore.md). Unter „Lagemeldung“ steht die
+„Zusammenfassung“ des zuletzt freigegebenen Lageberichts (siehe [Lageberichte](lageberichte.md));
+ein Entwurf geht nicht hinaus. Die Zusammenfassung geht so hinaus, wie sie freigegeben ist: Namen
+gehören vor der Freigabe nicht hinein. Die Stufe „Öffentlich“ zeigt nur die Zahl der Betroffenen
+und der Einsatzkräfte und auf der Karte den Einsatzort, die Absperrungen und die Sperrgebiete.
+Namen der Betroffenen und Kräfte, Meldungstexte und das Einsatztagebuch zeigt keine Stufe.
 
 Ist der Einsatz ein Spiegel, zeigt die Seite den Stand des letzten Abgleichs. Was die führende
 Stelle nicht überträgt, steht dort als „nicht übertragen“, etwa „Karte: nicht übertragen“.
@@ -86,4 +88,5 @@ festgehalten.
 ### Was das Einsatztagebuch festhält
 
 Ausgabe und Widerruf stehen als Eintrag im Einsatztagebuch mit dem Empfänger und dem Namen der
-Person. An einem Spiegel geht der Eintrag als Antrag an die führende Stelle.
+Person. An einem Spiegel geht der Eintrag als Antrag an die führende Stelle. Ist der Abgleich
+des Spiegels beendet, gilt ein Widerruf trotzdem, nur ohne Eintrag.

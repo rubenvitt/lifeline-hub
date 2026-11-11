@@ -191,13 +191,12 @@ export default function EinsatzLagebildExtern({
         form={form}
         erfassenText="Ausgeben"
         laeuft={anlegen.isPending}
+        speicherung={anlegen}
+        speicherFehlerTitel="Kein Link ausgegeben"
         initialValues={{ stufe: 'lagebild', dauer: '24h' }}
         onErfassen={(w) => anlegen.mutateAsync(w)}
         onFertig={() => setAnlegenOffen(false)}
-        onAbbrechen={() => {
-          anlegen.reset();
-          setAnlegenOffen(false);
-        }}
+        onAbbrechen={() => setAnlegenOffen(false)}
       >
         <Form.Item
           label="Empfänger"
@@ -232,7 +231,6 @@ export default function EinsatzLagebildExtern({
             }))}
           />
         </Form.Item>
-        <SpeicherFehler fehler={anlegen.error} titel="Kein Link ausgegeben" />
       </ErfassungsModal>
 
       <Modal
