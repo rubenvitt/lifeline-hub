@@ -1,3 +1,29 @@
+## [1.0.0-alpha.185](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.184...v1.0.0-alpha.185) (2026-11-11)
+
+### Betroffene und Betreuung
+
+- **Bezugsperson wechseln:** An der Registrierstelle kann die Bezugsperson eines Haushalts jetzt gewechselt werden.
+- **Personen zwischen Haushalten umhängen:** Eine Person lässt sich in einen anderen Haushalt derselben Stelle oder in einen neuen Haushalt verschieben.
+- **Bedienung:** In der Registrierliste stehen die Aktionen im Menü ⋮ neben „Abmelden“. Auf der Detailseite einer Person liegen sie als Knöpfe „Zur Bezugsperson machen“ und „Haushalt ändern“ am Haushalt.
+- **Bezugsperson rückt nach:** Verlässt die Bezugsperson den Haushalt oder wird sie storniert, übernimmt eine andere Person des Haushalts. Beim Abmelden geschieht das nicht.
+- **Einsatztagebuch:** Für jeden Wechsel oder jedes Umhängen entsteht ein Eintrag im Einsatztagebuch. Namen stehen darin nicht.
+- **Berechtigungen:** Es gelten dieselben Rechte wie bei der Registrierung.
+- **Person ohne Haushalt:** Ist eine Person an einer Stelle registriert, gehört aber noch zu keinem Haushalt, lässt sie sich auf ihrer Detailseite über „Haushalt ändern“ einem Haushalt zuordnen.
+- **Offene Bearbeitung:** Solange in den Personendaten ein Feld bearbeitet und noch nicht gespeichert ist, sind die Haushalt-Aktionen gesperrt. Ein Hinweis nennt den Grund.
+- **Ohne Netz:**
+  - Ohne Verbindung sind die Haushalt-Aktionen gesperrt.
+  - Fällt die Verbindung weg, während der Dialog offen ist, lässt sich nicht speichern und der Dialog nennt den Grund.
+  - Änderungen werden nicht unbemerkt später nachgeholt.
+  - Auf der Detailseite erscheint der Hinweis „Ohne Verbindung nicht änderbar“ nur noch einmal oben auf der Seite.
+
+### Gekoppelte Geräte
+
+- Die neuen Haushalt-Aktionen gibt es auch auf Geräten, die als Betreuungsstelle gekoppelt sind.
+
+### Dokumentation
+
+- Die Anwenderdokumentation hat ein neues Bild der Registrierliste. Es zeigt die Bezugsperson und das Menü ⋮.
+
 ## [1.0.0-alpha.184](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.183...v1.0.0-alpha.184) (2026-11-11)
 
 ### Wichtige Änderungen
