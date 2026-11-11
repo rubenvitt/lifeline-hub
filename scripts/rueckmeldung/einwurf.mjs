@@ -58,30 +58,24 @@ const SCHLUSS = 'Öffentlich';
  * sind `''`. Gibt `null` zurück, wenn der Text nicht aus dem Formular stammt (Art, Version und
  * Beschreibung fehlen).
  *
- * Getrennt wird nur an den Überschriften des Formulars, und nur an einer, die nach dem
- * laufenden Feld kommt (GitHub schreibt die Felder in ihrer Reihenfolge). Eigene `###`-Zeilen
- * in einer Antwort bleiben so Teil dieser Antwort.
+ * GitHub schreibt alle Felder in ihrer Reihenfolge, jedes mit seiner Überschrift. Gesucht wird
+ * deshalb von hinten: erst die letzte „### Öffentlich“, davor die letzte Überschrift des
+ * vorigen Feldes und so weiter. Eine `###`-Zeile, die jemand in eine Antwort schreibt, auch mit
+ * dem Namen eines Feldes oder in einem Codeblock, bleibt so Teil dieser Antwort.
  */
 export function zerlegeFormular(text) {
+  const zeilen = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
   const reihenfolge = [...Object.values(FELDER), SCHLUSS];
   const abschnitte = new Map();
-  let stelle = -1;
-  let zeilen = [];
-  const abschliessen = () => {
-    if (stelle >= 0) abschnitte.set(reihenfolge[stelle], zeilen.join('\n').trim());
-  };
-  for (const zeile of String(text ?? '').replace(/\r\n/g, '\n').split('\n')) {
-    const treffer = /^### (.+?)\s*$/.exec(zeile);
-    const naechste = treffer ? reihenfolge.indexOf(treffer[1]) : -1;
-    if (naechste > stelle) {
-      abschliessen();
-      stelle = naechste;
-      zeilen = [];
-    } else if (stelle >= 0) {
-      zeilen.push(zeile);
-    }
+  let grenze = zeilen.length;
+  for (let feld = reihenfolge.length - 1; feld >= 0; feld -= 1) {
+    const kopf = `### ${reihenfolge[feld]}`;
+    let stelle = grenze - 1;
+    while (stelle >= 0 && zeilen[stelle].trimEnd() !== kopf) stelle -= 1;
+    if (stelle < 0) continue;
+    abschnitte.set(reihenfolge[feld], zeilen.slice(stelle + 1, grenze).join('\n').trim());
+    grenze = stelle;
   }
-  abschliessen();
 
   const werte = {};
   for (const [id, label] of Object.entries(FELDER)) {

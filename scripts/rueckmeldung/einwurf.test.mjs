@@ -66,6 +66,19 @@ test('eigene ###-Überschriften in einer Antwort bleiben in der Antwort', () => 
   assert.match(baueEinwurf(issue({ beschreibung })).description, /### Details/);
 });
 
+test('Feldüberschriften in einer Antwort bleiben in der Antwort', () => {
+  const beschreibung = 'Kurz.\n\n```\n### Öffentlich\n### Erwartet\n```\n\n### Version\n\nNachsatz';
+  const erwartet = 'Ruhe.\n\n### Schritte zum Nachstellen\n\nsiehe oben';
+  const werte = zerlegeFormular(formularText({ beschreibung, erwartet, schritte: '1. Öffnen' }));
+  assert.equal(werte.beschreibung, beschreibung);
+  assert.equal(werte.schritte, '1. Öffnen');
+  assert.equal(werte.erwartet, erwartet);
+  assert.equal(werte.version, '1.0.0-beta.1');
+  const { description } = baueEinwurf(issue({ beschreibung, erwartet }));
+  assert.match(description, /Nachsatz/);
+  assert.match(description, /siehe oben/);
+});
+
 test('ein freies Issue ist keine Rückmeldung', () => {
   assert.equal(zerlegeFormular('Bitte Dark Mode'), null);
   assert.equal(baueEinwurf({ ...issue(), body: '### Irgendwas\n\nText' }), null);
