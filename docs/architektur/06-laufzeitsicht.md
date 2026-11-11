@@ -381,7 +381,10 @@ sequenceDiagram
 - Nach dem Wechsel liefert der neue Führer; der Kopf jeder Zeile trägt im Feld `gegen` den
   Schlüssel des Empfängers, damit Zeilen beider Seiten zusammenfinden. Was die abgelöste Seite
   nach der Bruchstelle schrieb, fragt sie beim Führer nach (`EinsatzStand.bruch`); was er nicht
-  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`.
+  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Jede Schwärzung beim Führer
+  (Kategorie, Löschersuchen je Person, ganzer Einsatz) löscht dort die Bruchstelle und zählt
+  `einsatz.schwaerzung_stand` hoch; bringt der Kopf am Spiegel einen höheren Zähler, räumt auch
+  er seine ganze Bruchstelle, offen oder geklärt (`fuehrung::raeume_bruchstelle`, LLH-1649).
 - Offene Anträge der neuen führenden Seite führt sie selbst aus (`antrag::fuehre_eigene_aus`),
   genau einmal; Anhänge, die ihr fehlen, holt sie beim alten Führer.
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht

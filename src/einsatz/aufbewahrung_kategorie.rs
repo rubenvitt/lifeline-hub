@@ -546,11 +546,9 @@ pub async fn schwaerzen(
     scrubbe_aus_registry(&mut tx, einsatz_id, Umfang::Kategorie(kategorie)).await?;
     // Die Bruchstelle (LLH-1641, E6) sichert ganze Zeilen als JSON, gleich welcher Kategorie;
     // ihre Spalten folgen in der Registry dem Einsatz. Damit keine Kopie eine kürzere Frist
-    // überlebt, geht sie mit der ersten geschwärzten Kategorie ganz.
-    sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
+    // überlebt, geht sie mit der ersten geschwärzten Kategorie ganz, am Spiegel über den Zähler
+    // am Kopf (LLH-1649).
+    super::repo::nach_schwaerzung_tx(&mut tx, einsatz_id).await?;
 
     // Personenstamm (design.md D3): erst wenn alle Zwecke der Person geschwärzt sind. Nur die
     // Kategorie dieses Laufs kann daran etwas ändern; der ETB-Eintrag nennt den Stamm deshalb
@@ -2451,6 +2449,13 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(uebrig, 0);
+        // Der Zähler am Kopf trägt die Schwärzung zum Spiegel (LLH-1649).
+        let stand: i64 = sqlx::query_scalar("SELECT schwaerzung_stand FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(stand, 1);
     }
 
     #[tokio::test]

@@ -450,6 +450,15 @@ async fn scrub_nimmt_die_bruchstelle_des_einsatzes_mit() {
         .await
         .unwrap();
     assert_eq!(rest, vec![b.e2]);
+    // Der Zähler am Kopf trägt die Schwärzung zum Spiegel (LLH-1649), nur im eigenen Einsatz.
+    let staende: Vec<(i64, i64)> =
+        sqlx::query_as("SELECT id, schwaerzung_stand FROM einsatz WHERE id IN (?, ?) ORDER BY id")
+            .bind(b.e1)
+            .bind(b.e2)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(staende, vec![(b.e1, 1), (b.e2, 0)]);
 }
 
 /// Die Einsatzgrenze hält: ein Scrub mit der ID einer Person, aber dem falschen Einsatz,
@@ -458,11 +467,30 @@ async fn scrub_nimmt_die_bruchstelle_des_einsatzes_mit() {
 async fn scrub_im_falschen_einsatz_aendert_nichts() {
     let pool = crate::db::test_pool().await;
     let b = testdaten::anlegen(&pool).await;
-    let vorher = testdaten::alle_texte(&pool).await;
+    // Jedes Löschersuchen zählt am Kopf seines Einsatzes (LLH-1649), auch wenn es nichts trifft.
+    // Zähler und Spiegel-Log sind kein Inhalt; sie bleiben aus dem Vergleich.
+    let ohne_zaehler = || async {
+        sqlx::query("UPDATE einsatz SET schwaerzung_stand = 0")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz_aenderung")
+            .execute(&pool)
+            .await
+            .unwrap();
+        testdaten::alle_texte(&pool).await
+    };
+    let vorher = ohne_zaehler().await;
     scrub(&pool, b.e2, PersonenArt::Betroffene, b.p1).await;
     scrub(&pool, b.e2, PersonenArt::ExterneKraft, b.k1).await;
     scrub(&pool, b.e2, PersonenArt::InfotelefonAnruf, b.anruf1).await;
-    assert_eq!(testdaten::alle_texte(&pool).await, vorher);
+    let stand: i64 = sqlx::query_scalar("SELECT schwaerzung_stand FROM einsatz WHERE id = ?")
+        .bind(b.e2)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(stand, 3);
+    assert_eq!(ohne_zaehler().await, vorher);
     let _ = (b.p_e2, b.p2, b.k2, b.anruf2);
 }
 

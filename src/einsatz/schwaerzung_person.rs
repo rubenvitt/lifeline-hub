@@ -593,12 +593,9 @@ pub async fn scrubbe_person(
             .await?;
     }
     // Die Bruchstelle (LLH-1641, E6) hält ganze Zeilen als JSON; ob die Person darin steht, sagt
-    // keine Spalte. Darum geht sie bei jedem Löschersuchen im Einsatz ganz.
-    sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *conn)
-        .await?;
-    Ok(())
+    // keine Spalte. Darum geht sie bei jedem Löschersuchen im Einsatz ganz, am Spiegel über den
+    // Zähler am Kopf (LLH-1649).
+    super::repo::nach_schwaerzung_tx(&mut *conn, einsatz_id).await
 }
 
 #[cfg(test)]

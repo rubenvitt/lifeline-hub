@@ -434,7 +434,9 @@ Unterzeichner. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; 
 der abgelösten Installation geschrieben wurde, kennt die neue nicht. Mit dem Bestätigen wird die
 abgelöste Installation zum Spiegel. Was sie seit der Bruchstelle geschrieben hat und die neue
 nicht kennt, nimmt sie aus dem Einsatz und hebt es auf; das Hinweisband zeigt dann „n Änderungen
-nicht übernommen“. Anträge, die beim Wechsel noch offen waren, führt die neue führende
+nicht übernommen“. Aufgehoben bleibt es, bis die führende Installation Daten des Einsatzes
+schwärzt, etwa nach Ablauf einer Frist oder auf ein Löschersuchen. Mit dem nächsten Abgleich
+verwirft die abgelöste Installation dann alles Aufgehobene, und das Hinweisband verschwindet. Anträge, die beim Wechsel noch offen waren, führt die neue führende
 Installation genau einmal aus. Anhänge, die ihr noch fehlen, holt sie bei der bisherigen. Die
 Übergabe geht auch nach dem Einsatzabschluss, etwa zur Verwahrung am Hub.
 

@@ -541,6 +541,31 @@ async fn uebernimm_bruch_antwort(
     Ok(Some(einsatz_id))
 }
 
+/// Räumt am Spiegel die ganze Bruchstelle eines Einsatzes (LLH-1649): Der Führer hat geschwärzt,
+/// sein Kopf bringt einen höheren `einsatz.schwaerzung_stand`. Wie beim Führer
+/// (`einsatz::repo::nach_schwaerzung_tx`) geht sie ganz, weil das JSON nicht sagt, welche
+/// Kategorie oder Person darin steht. Auch eine noch offene Bruchstelle endet damit: Der Spiegel
+/// fragt nicht mehr; was davon hier noch als Zeile steht, bleibt bis zum Abräumen des Spiegels
+/// (mit Ruben am 11.11.2026 abgestimmt). Liefert, ob etwas geräumt wurde.
+pub async fn raeume_bruchstelle(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    let zeilen = sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    let offen = sqlx::query(
+        "UPDATE einsatz_spiegel SET bruch_offen = 0 WHERE einsatz_id = ? AND bruch_offen = 1",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    Ok(zeilen > 0 || offen > 0)
+}
+
 // ── Übergabe und Anfrage ─────────────────────────────────────────────────────────────────────
 
 /// Ob das Gegenüber der Kopplung alles hat, was diese Instanz von einem Einsatz kennt (E4): sein

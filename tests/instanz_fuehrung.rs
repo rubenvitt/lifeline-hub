@@ -1260,6 +1260,97 @@ async fn notuebernahme_am_hub_macht_den_spiegel_beschreibbar() {
     assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
 }
 
+async fn bruchstellen_zeilen(i: &Instanz, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Schwärzt der Führer, räumt der Spiegel beim nächsten Abgleich seine ganze Bruchstelle, auch
+/// eine noch offene (LLH-1649). Ohne Schwärzung bleibt sie.
+#[tokio::test]
+async fn schwaerzung_beim_fuehrer_raeumt_die_bruchstelle_am_spiegel() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    // Was der ELW danach schreibt, kennt der Hub nicht: Es wird Bruchstelle.
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    let gesichert = bruchstellen_zeilen(&elw, e).await;
+    assert!(gesichert >= 1, "der eigene Eintrag ist gesichert");
+    // Ein Abgleich ohne Schwärzung lässt sie stehen.
+    abgleichen(&elw).await;
+    assert_eq!(bruchstellen_zeilen(&elw, e).await, gesichert);
+
+    // Noch eine ungeklärte Zeile, die der Führer nie beurteilt hat: offene Bruchstelle.
+    sqlx::query(
+        "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, daten, \
+         gesichert_at) VALUES (?, 'einsatz_person', '987654', 1, '{\"name\":\"Muster\"}', \
+         '2026-11-11 12:00:00')",
+    )
+    .bind(e)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+
+    // Löschersuchen je Person beim Führer.
+    let mut tx = hub.pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_person::scrubbe_person(
+        &mut tx,
+        h,
+        lifeline_hub::einsatz::schwaerzung_person::PersonenArt::Betroffene,
+        987_654,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    abgleichen(&elw).await;
+    assert_eq!(bruchstellen_zeilen(&elw, e).await, 0, "Bruchstelle geräumt");
+    assert_eq!(
+        bruch_offen(&elw, e).await,
+        0,
+        "der Spiegel fragt nicht mehr"
+    );
+    let stand: i64 = sqlx::query_scalar("SELECT schwaerzung_stand FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(stand, 1, "der Zähler kam mit dem Kopf");
+    let (_, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(kopf["spiegel"]["bruchstelle"].as_i64(), Some(0), "{kopf}");
+}
+
 async fn bruch_offen(i: &Instanz, einsatz: i64) -> i64 {
     sqlx::query_scalar("SELECT bruch_offen FROM einsatz_spiegel WHERE einsatz_id = ?")
         .bind(einsatz)
