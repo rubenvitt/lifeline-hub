@@ -64,8 +64,6 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 - **Grenzwerte bleiben:** Wire-Felder und -Werte, Tabellen und Spalten, Migrationen, generierte
   Typen, gespeicherte Schlüssel, Routen und Ereignisnamen nicht wegen dieser Regel umbenennen,
   auch nicht per `#[serde(rename)]`; dafür braucht es eine eigene Change mit Übergangsweg.
-- **Öffentliche API ganz englisch:** Unter `/api/v1/` ist jeder Name auf dem Wire englisch, auch
-  ein Fachbegriff (`incident`, nicht `einsatz`); Regel und Glossar: ADR-0021. Code wie oben.
 - **Bestand beim Anfassen umstellen, nie in einem Zug:** Neue Bezeichner folgen der Regel sofort.
   Ein bestehender wird umgestellt, wenn der Task Code ändert, der ihn deklariert, und seine
   Verwendungen im Diff liegen oder sich mechanisch mitziehen lassen; eine Namensfamilie in

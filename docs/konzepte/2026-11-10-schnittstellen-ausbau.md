@@ -90,10 +90,9 @@ und BOSWatch 3):
 | `zusatz[]` | Bezeichnung + Wert | am Vorschlag |
 | `rohdaten` | Original | bei Annahme gelöscht |
 
-Auf dem Wire unter `/api/v1` tragen diese Felder englische Namen (`external_id`, `kind`,
-`dispatch_number`, `keyword` …). Die Zuordnung steht in
-[`2026-11-11-oeffentliche-api.md`](2026-11-11-oeffentliche-api.md), Abschnitt „Richtung herein“
-(Entscheidung D9 vom 11.11.2026).
+Auf dem Wire unter `/api/v1` heißen die technischen Felder englisch (`external_id`, `kind`,
+`is_test`, `alarmiert_at`), die Fachbegriffe bleiben. Die Zuordnung steht in
+[`2026-11-11-oeffentliche-api.md`](2026-11-11-oeffentliche-api.md), Abschnitt „Richtung herein“.
 
 **Lebenslauf eines Vorschlags.** Zustände: offen → (Nachtrag) → angenommen | verknüpft |
 verworfen | abgelaufen | von der Quelle beendet.
