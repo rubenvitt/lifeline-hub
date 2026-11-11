@@ -333,13 +333,20 @@ async fn umwandeln(
         .execute(&mut *conn)
         .await?;
     }
-    for tabelle in ["spiegel_herkunft", "spiegel_anhang", "spiegel_katalog"] {
-        sqlx::query(sqlx::AssertSqlSafe(format!(
-            "DELETE FROM {tabelle} WHERE einsatz_id = ?"
-        )))
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
+    // Führungsakte (LLH-1647, E1): Mit eingeschalteter Führung führt diese Instanz ab jetzt, mit
+    // der nächsten Epoche und der Art `verwahrung`. Das richtet den Spiegel aus wie jeder Wechsel
+    // (`fuehrung::werde_fuehrer`): Die Herkunft der Zeilen bleibt, damit ein Rückfall zum Spiegel
+    // keine Zeile doppelt anlegt, wenn die Gegenstelle die Verwahrung ablehnt (E3).
+    let gewechselt = crate::instanz::fuehrung::repo::verwahren(conn, id).await?;
+    if !gewechselt {
+        for tabelle in ["spiegel_herkunft", "spiegel_anhang", "spiegel_katalog"] {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "DELETE FROM {tabelle} WHERE einsatz_id = ?"
+            )))
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+        }
     }
     // Abgelehnte Anträge bleiben mit ihren Daten für die erfassende Person, bis der Purge-Lauf
     // sie nach `antrag::ABGELEHNT_TAGE` räumt; offene gibt es hier nicht mehr (oben).
@@ -360,9 +367,11 @@ async fn umwandeln(
         .bind(id)
         .execute(&mut *conn)
         .await?;
+    // Nach einem Rückfall zum Spiegel (LLH-1647, E3) steht die Zeile schon: die neue Annahme gilt.
     sqlx::query(
         "INSERT INTO verwahrung_angenommen (einsatz_id, stand, angenommen_at) \
-         VALUES (?, ?, datetime('now'))",
+         VALUES (?, ?, datetime('now')) ON CONFLICT (einsatz_id) DO UPDATE SET \
+         stand = excluded.stand, angenommen_at = excluded.angenommen_at",
     )
     .bind(id)
     .bind(l.stand)
@@ -528,7 +537,7 @@ pub async fn quittungen_uebernehmen(
                 conn,
                 id,
                 &kopplung.gegenueber_name,
-                Some("Nach der Übergabe geändert"),
+                Some(GRUND_GEAENDERT),
                 jetzt,
             )
             .await?;
@@ -614,6 +623,52 @@ async fn verwahrung_merken(
     .await?;
     Ok(())
 }
+
+/// Ob diese Instanz den Einsatz verwahrt: zur Verwahrung angenommen und kein Spiegel mehr
+/// (LLH-1647, E4). Nach einem Rückfall zum Spiegel (E3) nicht.
+pub async fn ist_verwahrt(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM verwahrung_angenommen v JOIN einsatz e ON e.id = v.einsatz_id \
+         WHERE v.einsatz_id = ? AND e.spiegel = 0)",
+    )
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Meldende Seite (LLH-1647, E2): Die Gegenstelle hat die Übergabe des eigenen Einsatzes
+/// `einsatz_id` mit `angenommen` quittiert; er wird gleich abgeräumt.
+pub async fn ist_verwahrung_quittiert(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_abraeumen WHERE einsatz_id = ? AND art = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(AbraeumArt::Verwahrt.as_str())
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Meldende Seite (LLH-1647, E3): Warum die Verwahrung des Einsatzes nicht gilt, für den Verlauf.
+pub async fn grund_gegen_verwahrung(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<&'static str, AppError> {
+    let grund: Option<Option<String>> =
+        sqlx::query_scalar("SELECT grund FROM einsatz_verwahrung WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    Ok(match grund.flatten().as_deref() {
+        Some(GRUND_GEAENDERT) => "nach der Übergabe geändert",
+        _ => "Übergabe hier nicht bestätigt",
+    })
+}
+
+/// Grund der Quittung, wenn sich der Einsatz nach der Übergabe geändert hat.
+const GRUND_GEAENDERT: &str = "Nach der Übergabe geändert";
 
 /// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
 pub async fn abraeumen_nach_commit(pool: &sqlx::SqlitePool, ids: &[i64]) {

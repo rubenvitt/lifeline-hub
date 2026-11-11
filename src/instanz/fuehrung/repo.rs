@@ -346,7 +346,9 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
          stichwort, status, epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, \
          stand, geaendert_at) \
          SELECT e.kennung, e.id, e.org_id, e.einsatznummer_intern, e.bezeichnung, \
-                e.stichwort, e.status, 1, ?, ?, ?, 'angelegt', 0, ? \
+                e.stichwort, e.status, 1, ?, ?, ?, \
+                CASE WHEN EXISTS (SELECT 1 FROM verwahrung_angenommen v WHERE v.einsatz_id = e.id) \
+                     THEN 'verwahrung' ELSE 'angelegt' END, 0, ? \
          FROM einsatz e \
          WHERE {OHNE_AKTE} AND e.kennung IS NOT NULL \
            AND NOT EXISTS (SELECT 1 FROM einsatz_fuehrung f WHERE f.kennung = e.kennung) \
@@ -358,6 +360,8 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
     .bind(&jetzt)
     .fetch_all(&mut *conn)
     .await?;
+    // Ein schon verwahrter Einsatz (Schalter erst danach eingeschaltet) bekommt die Art
+    // `verwahrung` statt `angelegt` (LLH-1647, E1); den Verlauf davor kennt diese Instanz nicht.
     for id in neu {
         let mut a = load(conn, id).await?;
         save(conn, &mut a, true).await?;
@@ -365,7 +369,6 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
             conn,
             &a,
             VerlaufNeu {
-                art: Some(FuehrungWechselArt::Angelegt),
                 nach_name: &ich.name,
                 ..VerlaufNeu::default()
             },
@@ -393,6 +396,57 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
         save(conn, &mut a, eigen).await?;
     }
     Ok(())
+}
+
+/// Verwahrung (LLH-1647, E1): Diese Instanz hat den Spiegel `einsatz_id` zur Verwahrung
+/// angenommen und führt ihn ab jetzt, mit der nächsten Epoche und der Art `verwahrung`. Läuft in
+/// der Transaktion von `spiegel::lebensende::umwandeln`, solange der Spiegel noch steht: `save`
+/// richtet ihn aus (`werde_fuehrer`, die Herkunft der Zeilen bleibt für einen Rückfall, E3).
+/// Ohne Schalter, ohne Akte oder wenn diese Instanz schon führt: nichts (eine fehlende Akte legt
+/// [`ensure_akten`] später mit der Art `verwahrung` an). Liefert, ob die Akte gewechselt hat.
+pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<bool, AppError> {
+    if !is_enabled_tx(conn).await? {
+        return Ok(false);
+    }
+    let Some(mut a) = find_by_einsatz(conn, einsatz_id).await? else {
+        return Ok(false);
+    };
+    let ich = ich(conn).await?;
+    if a.fuehrer_kennung == ich.kennung {
+        return Ok(false);
+    }
+    let mut bekannte = vec![a.epoche()];
+    if let Some(offen) = a
+        .offen
+        .as_deref()
+        .and_then(|o| serde_json::from_str::<super::austausch::AkteMeldung>(o).ok())
+    {
+        bekannte.push(offen.epoche);
+    }
+    let von = a.fuehrer_name.clone();
+    a.set_epoche(&Epoche::naechste(&bekannte, &ich.kennung));
+    a.fuehrer_kennung = ich.kennung.clone();
+    a.fuehrer_name = ich.name.clone();
+    a.set_art(FuehrungWechselArt::Verwahrung);
+    a.erklaerung = None;
+    a.beweis = None;
+    a.offen = None;
+    a.offen_bruch_at = None;
+    a.abgabe_schluessel = None;
+    a.anfrage_at = None;
+    a.bruch_at = None;
+    save(conn, &mut a, true).await?;
+    add_verlauf(
+        conn,
+        &a,
+        VerlaufNeu {
+            von_name: Some(&von),
+            nach_name: &ich.name,
+            ..VerlaufNeu::default()
+        },
+    )
+    .await?;
+    Ok(true)
 }
 
 /// Nach dem Widerruf einer Org-Zuordnung (hier oder vom Gegenüber): lokale Einsätze der Org, die

@@ -47,6 +47,9 @@ wire_enum! {
         Widerspruch => "widerspruch",
         /// Die meldende Seite hat eine ungültige Übernahme verworfen und führt weiter (D10).
         Verworfen => "verworfen",
+        /// Die verwahrende Instanz hat den Einsatz nach der Nachbereitung zur Verwahrung
+        /// übernommen und führt ab da (LLH-1647, E1).
+        Verwahrung => "verwahrung",
     }
     try_from = |s| format!("Ungültige FuehrungWechselArt: {s}");
 }

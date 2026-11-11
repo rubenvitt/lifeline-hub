@@ -324,3 +324,282 @@ async fn ein_spiegel_am_elw_geht_nach_der_nachbereitung_der_einsatz_am_hub_bleib
     );
     assert!(gibt_es(&hub.pool, &format!("SELECT 1 FROM einsatz WHERE id = {e}")).await);
 }
+
+// ── Führungsakte bei Verwahrung (LLH-1647) ───────────────────────────────────────────────────
+
+/// Beide Instanzen mit `LIFELINE_FUEHRUNG`, gekoppelt und gemeldet.
+async fn mit_fuehrung() -> (Instanz, Instanz) {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    for i in [&hub, &elw] {
+        lifeline_hub::instanz::fuehrung::save_schalter(&i.pool, true)
+            .await
+            .unwrap();
+    }
+    melden(&elw).await;
+    (hub, elw)
+}
+
+/// Abgeschlossener ELW-Einsatz mit ETB-Eintrag, am Hub gespiegelt samt Akte: (ELW-ID, Kennung).
+async fn abgeschlossen_gespiegelt(hub: &Instanz, elw: &Instanz) -> (i64, String) {
+    let e = common::einsatz_anlegen_mit(&elw.app, &elw.admin, "Hochwasser").await;
+    etb_eintrag(elw, e, "Lage erkundet").await;
+    melden(elw).await;
+    abgleichen(elw).await;
+    abschliessen(elw, e).await;
+    melden(elw).await;
+    abgleichen(elw).await;
+    let k = kennung(&elw.pool, e).await;
+    let (h, spiegel) = am_hub(hub, &k).await;
+    assert!(spiegel, "erst Spiegel");
+    assert_eq!(
+        eine::<String>(
+            &hub.pool,
+            &format!("SELECT fuehrer_kennung FROM einsatz_fuehrung WHERE einsatz_id = {h}")
+        )
+        .await,
+        eine::<String>(&elw.pool, "SELECT kennung FROM instanz_identitaet").await,
+        "die Akte des ELW hängt am Spiegel"
+    );
+    (e, k)
+}
+
+async fn fuehrung_am(i: &Instanz, einsatz: i64) -> serde_json::Value {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fuehrung"),
+        &i.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+async fn texte(pool: &sqlx::SqlitePool, sql: &str) -> Vec<String> {
+    sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_string()))
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+/// Kein Alarm „ungültige Übernahme“ und keine Admin-Spur der Führung an dieser Instanz.
+async fn ohne_alarm(i: &Instanz) {
+    assert!(
+        texte(
+            &i.pool,
+            "SELECT art FROM benachrichtigung WHERE art LIKE 'fuehrung%'"
+        )
+        .await
+        .is_empty(),
+        "kein Alarm an die Einsatzleitung"
+    );
+    assert!(
+        texte(
+            &i.pool,
+            "SELECT aktion FROM admin_audit WHERE aktion LIKE 'fuehrung%'"
+        )
+        .await
+        .is_empty(),
+        "keine Admin-Spur der Führung"
+    );
+}
+
+#[tokio::test]
+async fn mit_fuehrung_fuehrt_der_hub_den_verwahrten_einsatz_mit_nachvollziehbarem_verlauf() {
+    let (hub, elw) = mit_fuehrung().await;
+    let (e, k) = abgeschlossen_gespiegelt(&hub, &elw).await;
+    // Im Testprozess tragen beide Instanzen denselben Namen; die Kennung unterscheidet sie.
+    let name = lifeline_hub::instanz::name().to_string();
+    let elw_kennung: String = eine(&elw.pool, "SELECT kennung FROM instanz_identitaet").await;
+    let hub_kennung: String = eine(&hub.pool, "SELECT kennung FROM instanz_identitaet").await;
+
+    nachbereitung_vorbei(&elw, e).await;
+    abgleichen(&elw).await;
+
+    let (h, spiegel) = am_hub(&hub, &k).await;
+    assert!(!spiegel, "am Hub ein eigener Einsatz");
+    assert!(
+        !gibt_es(&elw.pool, &format!("SELECT 1 FROM einsatz WHERE id = {e}")).await,
+        "am ELW abgeräumt"
+    );
+    let a = fuehrung_am(&hub, h).await;
+    assert_eq!(a["fuehrend"], true, "{a}");
+    assert_eq!(a["fuehrer_kennung"], hub_kennung.as_str(), "{a}");
+    assert_eq!(a["art"], "verwahrung", "{a}");
+    assert_eq!(a["verwahrt"], true, "{a}");
+    assert_eq!(a["epoche"], 2, "{a}");
+    let verlauf = a["verlauf"].as_array().unwrap();
+    let arten: Vec<&str> = verlauf.iter().map(|v| v["art"].as_str().unwrap()).collect();
+    assert_eq!(arten, ["angelegt", "verwahrung"], "{a}");
+    let letzter = verlauf.last().unwrap();
+    assert_eq!(letzter["epoche_zaehler"], 2, "{a}");
+    assert_eq!(letzter["von_name"], name.as_str(), "{a}");
+    assert_eq!(letzter["nach_name"], name.as_str(), "{a}");
+    assert!(letzter.get("wer").is_none(), "der Abgleich löst aus: {a}");
+    let epoche_von: String = eine(
+        &hub.pool,
+        &format!("SELECT epoche_instanz FROM einsatz_fuehrung WHERE einsatz_id = {h}"),
+    )
+    .await;
+    assert_eq!(epoche_von, hub_kennung, "der Hub vergibt die Epoche");
+
+    // Die Akte des Hubs geht beim ELW ins Leere: kein Alarm, nichts zurück.
+    melden(&elw).await;
+    melden(&elw).await;
+    ohne_alarm(&elw).await;
+    ohne_alarm(&hub).await;
+    assert!(!gibt_es(&elw.pool, "SELECT 1 FROM einsatz_fuehrung").await);
+
+    // Ausrichten nach der Akte (jede Meldung, Neustart) lässt ihn eigen, der Abgleich räumt nichts.
+    lifeline_hub::instanz::fuehrung::save_schalter(&hub.pool, true)
+        .await
+        .unwrap();
+    abgleichen(&elw).await;
+    assert_eq!(am_hub(&hub, &k).await, (h, false), "bleibt eigen am Hub");
+    assert_eq!(fuehrung_am(&hub, h).await["epoche"], 2);
+
+    // E4: Übergeben lässt sich ein verwahrter Einsatz nicht mehr.
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        &hub.admin,
+        Some(&json!({ "an": elw_kennung })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["error"], "Einsatz ist verwahrt.", "{v}");
+}
+
+#[tokio::test]
+async fn ohne_quittung_lehnt_der_elw_die_verwahrung_still_ab_und_sie_gelingt_spaeter() {
+    use lifeline_hub::instanz::repo as kopplungen;
+    use lifeline_hub::instanz::spiegel::lebensende;
+
+    let (hub, elw) = mit_fuehrung().await;
+    let (e, k) = abgeschlossen_gespiegelt(&hub, &elw).await;
+    // Nachbereitung bis weit in die Zukunft, am Hub angekommen: Das Angebot unten rechnet mit
+    // einem späteren `jetzt`, damit der Hub denselben Stand hat wie der ELW.
+    exec(
+        &elw.pool,
+        &format!("UPDATE einsatz SET nachbereitung_bis = '2999-01-01 00:00:00' WHERE id = {e}"),
+    )
+    .await;
+    abgleichen(&elw).await;
+
+    // Der Hub nimmt an, die Quittung erreicht den ELW nie (Antwort verloren).
+    let angebot = {
+        let ich: String = eine(&elw.pool, "SELECT kennung FROM instanz_identitaet").await;
+        let kid: i64 = eine(&elw.pool, "SELECT id FROM instanz_kopplung").await;
+        let mut conn = elw.pool.acquire().await.unwrap();
+        let orgs = kopplungen::list_orgs_aktiv(&mut conn, kid).await.unwrap();
+        lebensende::faellige_verwahrungen(&mut conn, &ich, &orgs, "3000-01-01 00:00:00")
+            .await
+            .unwrap()
+    };
+    assert_eq!(angebot.len(), 1);
+    {
+        let kid: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung").await;
+        let kopplung = kopplungen::load_kopplung(&hub.pool, kid).await.unwrap();
+        let mut tx = hub.pool.begin().await.unwrap();
+        let (q, _) = lebensende::verwahrung_annehmen(
+            &mut tx,
+            &kopplung,
+            &angebot[0],
+            &lifeline_hub::zeit::jetzt(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(q.ergebnis, "angenommen");
+        tx.commit().await.unwrap();
+    }
+    let (h, spiegel) = am_hub(&hub, &k).await;
+    assert!(!spiegel);
+    assert_eq!(fuehrung_am(&hub, h).await["art"], "verwahrung");
+
+    // Die Meldung bringt die Akte des Hubs vor der Quittung: Der ELW führt still weiter …
+    melden(&elw).await;
+    let am_elw: (String, String) =
+        sqlx::query_as("SELECT art, grund FROM einsatz_fuehrung_verlauf ORDER BY id DESC LIMIT 1")
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert_eq!(am_elw.0, "verworfen");
+    assert!(
+        am_elw.1.starts_with("Verwahrung durch ")
+            && am_elw
+                .1
+                .ends_with(" abgelehnt: Übergabe hier nicht bestätigt"),
+        "{am_elw:?}"
+    );
+    // … und der Hub wird mit der nächsten Meldung wieder Spiegel.
+    melden(&elw).await;
+    let (h2, spiegel) = am_hub(&hub, &k).await;
+    assert_eq!(h2, h);
+    assert!(spiegel, "Rückfall zum Spiegel");
+    let a = fuehrung_am(&hub, h).await;
+    assert_eq!(a["fuehrend"], false, "{a}");
+    assert_eq!(a["verwahrt"], false, "{a}");
+    let grund = a["verlauf"].as_array().unwrap().last().unwrap()["grund"].clone();
+    assert!(
+        grund
+            .as_str()
+            .is_some_and(|g| g.starts_with("Verwahrung von ")
+                && g.ends_with(" abgelehnt, der Einsatz liegt dort weiter")),
+        "{a}"
+    );
+    ohne_alarm(&elw).await;
+    ohne_alarm(&hub).await;
+
+    // Das nächste Angebot läuft normal durch, ohne doppelte Zeilen.
+    nachbereitung_vorbei(&elw, e).await;
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+        if !gibt_es(&elw.pool, &format!("SELECT 1 FROM einsatz WHERE id = {e}")).await {
+            break;
+        }
+    }
+    assert!(
+        !gibt_es(&elw.pool, &format!("SELECT 1 FROM einsatz WHERE id = {e}")).await,
+        "am ELW abgeräumt"
+    );
+    let (h3, spiegel) = am_hub(&hub, &k).await;
+    assert_eq!(h3, h);
+    assert!(!spiegel, "verwahrt");
+    let texte = etb_texte(&hub.pool, h).await;
+    assert_eq!(
+        texte.iter().filter(|t| *t == "Lage erkundet").count(),
+        1,
+        "{texte:?}"
+    );
+    let a = fuehrung_am(&hub, h).await;
+    assert_eq!(a["art"], "verwahrung", "{a}");
+    assert_eq!(a["fuehrend"], true, "{a}");
+    melden(&elw).await;
+    ohne_alarm(&elw).await;
+}
+
+#[tokio::test]
+async fn ohne_schalter_bleibt_die_verwahrung_ohne_akte() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen_mit(&elw.app, &elw.admin, "Hochwasser").await;
+    abgleichen(&elw).await;
+    abschliessen(&elw, e).await;
+    abgleichen(&elw).await;
+    let k = kennung(&elw.pool, e).await;
+    nachbereitung_vorbei(&elw, e).await;
+    abgleichen(&elw).await;
+    let (h, spiegel) = am_hub(&hub, &k).await;
+    assert!(!spiegel);
+    assert!(!gibt_es(&hub.pool, "SELECT 1 FROM einsatz_fuehrung").await);
+    // Wird die Führung danach eingeschaltet, trägt die neue Akte die Art `verwahrung`.
+    lifeline_hub::instanz::fuehrung::save_schalter(&hub.pool, true)
+        .await
+        .unwrap();
+    let a = fuehrung_am(&hub, h).await;
+    assert_eq!(a["art"], "verwahrung", "{a}");
+    assert_eq!(a["fuehrend"], true, "{a}");
+    assert_eq!(a["verlauf"][0]["art"], "verwahrung", "{a}");
+}

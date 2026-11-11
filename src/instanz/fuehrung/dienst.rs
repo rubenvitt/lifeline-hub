@@ -89,6 +89,26 @@ fn fordere_nicht_fuehrend(a: &AkteZeile, ich: &Ich) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Ob diese Instanz den Einsatz der Akte verwahrt (LLH-1647, E4).
+async fn ist_verwahrt(conn: &mut SqliteConnection, a: &AkteZeile) -> Result<bool, AppError> {
+    match a.einsatz_id {
+        Some(id) => crate::instanz::spiegel::lebensende::ist_verwahrt(conn, id).await,
+        None => Ok(false),
+    }
+}
+
+/// Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647, E4): Sonst ginge die Führung
+/// an eine Instanz, die den Einsatz nach der Nachbereitung gelöscht hat.
+async fn fordere_nicht_verwahrt(
+    conn: &mut SqliteConnection,
+    a: &AkteZeile,
+) -> Result<(), AppError> {
+    if ist_verwahrt(conn, a).await? {
+        return Err(AppError::Conflict("Einsatz ist verwahrt.".into()));
+    }
+    Ok(())
+}
+
 /// Eine Notübernahme braucht den Einsatz hier als Spiegel (LLH-1641, E4): Ohne ihn hätte diese
 /// Instanz nichts, womit sie weiterführen könnte.
 fn fordere_spiegel_hier(a: &AkteZeile) -> Result<(), AppError> {
@@ -112,6 +132,7 @@ pub async fn uebergeben(
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
+        fordere_nicht_verwahrt(conn, &a).await?;
         let g = gegenueber(conn, &a, an).await?;
         // Übergeben wird nur, was das Gegenüber vollständig hat (LLH-1641, E4); sonst entstünde
         // ohne Not eine Bruchstelle.
@@ -159,6 +180,7 @@ pub async fn code_abgeben(
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
+        fordere_nicht_verwahrt(conn, &a).await?;
         let g = gegenueber(conn, &a, an).await?;
         if g.richtung != InstanzKopplungRichtung::MeldetSich {
             return Err(AppError::UnprocessableEntity(
@@ -528,6 +550,8 @@ pub struct FuehrungAnzeige {
     pub offen: Option<FuehrungOffen>,
     /// Diese Instanz hat die Führung beim Gegenüber erbeten.
     pub anfrage_offen: bool,
+    /// Diese Instanz verwahrt den Einsatz (LLH-1647, E4): keine Übergabe mehr.
+    pub verwahrt: bool,
     /// Die Gegenüber der Org, an die die Führung gehen kann.
     pub gegenueber: Vec<FuehrungGegenueber>,
     /// Richtung der Kopplung zur führenden Instanz, wenn ein Gegenüber führt: sie entscheidet,
@@ -577,6 +601,7 @@ pub async fn anzeige(
         bruch_at: a.bruch_at.clone(),
         offen,
         anfrage_offen: a.anfrage_at.is_some(),
+        verwahrt: ist_verwahrt(conn, a).await?,
         fuehrer_richtung: gegenueber
             .iter()
             .find(|g| g.kennung == a.fuehrer_kennung)

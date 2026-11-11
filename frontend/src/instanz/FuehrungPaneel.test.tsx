@@ -38,6 +38,7 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
   fuehrend: true,
   art: 'angelegt',
   anfrage_offen: false,
+  verwahrt: false,
   gegenueber: [{ kopplung_id: 1, kennung: 'k-hub', name: 'Hub Nord', richtung: 'meldet_sich' }],
   verlauf: [
     {

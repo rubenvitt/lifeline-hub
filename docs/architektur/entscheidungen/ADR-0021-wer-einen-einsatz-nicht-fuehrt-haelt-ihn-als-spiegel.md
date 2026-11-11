@@ -15,6 +15,7 @@ herleitung:
   - openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md
   - LLH-1641 (Entwurf E1–E8, mit Ruben am 11.11.2026 abgestimmt)
+  - LLH-1647 (Führungsakte bei Verwahrung, Entwurf E1–E4, mit Ruben am 11.11.2026 abgestimmt)
 ---
 
 # ADR-0021: Ein Einsatz hat genau eine führende Instanz; wer ihn nicht führt, hält ihn als Spiegel
@@ -39,6 +40,9 @@ herleitung:
   nach der Entscheidung eines Menschen; sonst verwirft sie sie und vergibt die nächste Epoche
   selbst.
 - MUST: Epochen werden als Paar (Zähler, Instanzkennung) verglichen; das größere gilt.
+- MUST: Die Verwahrung (LLH-1494) wechselt die Führung: `umwandeln` vergibt die nächste Epoche
+  mit Art `verwahrung` (`fuehrung::repo::verwahren`). Die meldende Seite lehnt sie ohne Alarm ab,
+  solange sie die Übergabe nicht quittiert bekam; einen verwahrten Einsatz gibt niemand mehr ab.
 
 ## Prüfung
 
@@ -49,6 +53,7 @@ verbiete '(INSERT INTO|DELETE FROM) einsatz_spiegel' 'src/**/*.rs' ':(exclude,gl
 verlange 'fn fordere_abgeglichen' src/instanz/spiegel/fuehrung.rs
 verlange 'pub struct EinsatzFuehrungszugriff' src/einsatz/kontext.rs
 verlange 'pub fn entscheide\(' src/instanz/fuehrung/austausch.rs
+verlange 'fuehrung::repo::verwahren\(' src/instanz/spiegel/lebensende.rs
 verlange 'then_with\(\|\| self\.instanz\.cmp\(&other\.instanz\)\)' src/instanz/fuehrung/mod.rs
 ```
 
