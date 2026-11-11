@@ -507,7 +507,7 @@ async fn send_einloesen(
             "Die Instanz unter {adresse} ist nicht erreichbar: {e}"
         ))
     };
-    let resp = reqwest::Client::builder()
+    let resp = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(15))

@@ -1736,7 +1736,7 @@ pub struct OfflineBauBody {
 /// Prozessweit mit kurzem Timeout (der Aufruf startet nur einen Build, wartet nicht auf ihn).
 static KARTEN_SERVICE_CLIENT: std::sync::LazyLock<reqwest::Client> =
     std::sync::LazyLock::new(|| {
-        reqwest::Client::builder()
+        crate::ausgehend::client_builder(crate::ausgehend::Zweck::KartenService)
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .expect("karten-service-Client baubar")

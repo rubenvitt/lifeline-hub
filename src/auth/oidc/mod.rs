@@ -433,7 +433,7 @@ const OIDC_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 /// `https_pflicht` lehnt jeden `http://`-Abruf ab, auch einen `jwks_uri` oder Token-Endpoint aus
 /// dem Discovery-Dokument.
 fn baue_http_client(https_pflicht: bool) -> reqwest::Client {
-    let builder = reqwest::Client::builder()
+    let builder = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Oidc)
         .redirect(reqwest::redirect::Policy::none())
         .timeout(OIDC_HTTP_TIMEOUT)
         .connect_timeout(OIDC_HTTP_CONNECT_TIMEOUT)

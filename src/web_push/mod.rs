@@ -307,13 +307,15 @@ pub fn nutzlast_fuer(ereignis: &str, inhalt: bool) -> std::borrow::Cow<'_, str> 
 /// HTTP-Client der Push-Versände: Zeitlimit, keine Weiterleitung (eine Weiterleitung führte am
 /// geprüften Host vorbei), auf Wunsch nur https.
 fn client(nur_https: bool) -> anyhow::Result<reqwest::Client> {
-    Ok(reqwest::Client::builder()
-        .timeout(ZEITLIMIT)
-        .connect_timeout(Duration::from_secs(5))
-        .redirect(reqwest::redirect::Policy::none())
-        .https_only(nur_https)
-        .no_gzip()
-        .build()?)
+    Ok(
+        crate::ausgehend::client_builder(crate::ausgehend::Zweck::WebPush)
+            .timeout(ZEITLIMIT)
+            .connect_timeout(Duration::from_secs(5))
+            .redirect(reqwest::redirect::Policy::none())
+            .https_only(nur_https)
+            .no_gzip()
+            .build()?,
+    )
 }
 
 /// Prüft den Kontakt für das VAPID-Token (design.md D1): `mailto:` mit Adresse oder `https://`
