@@ -277,6 +277,21 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
     expect(within(abschnitt).queryByRole('button', { name: /Rückmeldung geben/ })).toBeNull();
   });
 
+  it('ohne Suchtreffer bleiben „Rückmeldung geben“ und „Lizenzen“ erreichbar', async () => {
+    zeige('/hilfe');
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Kapitel durchsuchen' }),
+      'xyzkeinkapitelpasst',
+    );
+    // Vorbedingung: die Suche hat wirklich keinen Treffer.
+    expect(await screen.findByText('Kein Kapitel passt zur Suche.')).toBeInTheDocument();
+    const abschnitt = screen.getByRole('region', { name: 'Rückmeldung und Lizenzen' });
+    expect(
+      await within(abschnitt).findByRole('button', { name: /Rückmeldung geben/ }),
+    ).toBeInTheDocument();
+    expect(within(abschnitt).getByRole('link', { name: /Lizenzen/ })).toBeInTheDocument();
+  });
+
   it('ohne Herkunft trägt die Rückmeldung das Muster der Hilfe', async () => {
     zeige('/hilfe');
     await userEvent.click(await screen.findByRole('button', { name: /Rückmeldung geben/ }));

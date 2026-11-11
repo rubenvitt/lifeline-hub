@@ -265,14 +265,18 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
         </>
       )}
       {/* Zweiter Weg zu den eigenen Einstellungen (LLH-1642, Spec `benutzermenue`): der erste
-          bleibt im Benutzermenü, das es auch außerhalb des Einsatzes gibt. */}
+          bleibt im Benutzermenü, das es auch außerhalb des Einsatzes gibt. Der Fuß klebt unten in
+          der rollenden Fläche, sonst läge er bei langem Verlauf (bis 200 Einträge) außer Sicht. */}
       <div
         data-lfh="eingaenge-einstellungen"
         style={{
+          position: 'sticky',
+          bottom: 0,
           display: 'flex',
           justifyContent: 'flex-end',
           marginBlockStart: token.marginXS,
           borderTop: `1px solid ${token.colorBorderSecondary}`,
+          background: token.colorBgElevated,
         }}
       >
         <Link

@@ -117,6 +117,36 @@ export default function HilfePage() {
   // Am gekoppelten Gerät kein Rückmeldeweg (LLH-1549): auch nicht, solange die Sitzung noch lädt,
   // und nicht nach einer widerrufenen Kopplung (der Browser lief zuletzt als Gerät).
   const isRueckmeldungSichtbar = !geraet && !laedt && !warGeraet();
+
+  // Rückmeldung und Lizenzen (LLH-1642, Spec `benutzermenue`): aus dem Benutzermenü hierher,
+  // außerhalb der Druckwurzel. Am gekoppelten Gerät ohne Rückmeldeweg (Entscheidung LLH-1549);
+  // ohne Anmeldung mit, das Formular ist öffentlich. Steht auch ohne Suchtreffer: die Wege gehören
+  // zur Hilfe, nicht zu den Kapiteln.
+  const rueckmeldungAbschnitt = (
+    <section
+      className="hilfe-rueckmeldung"
+      aria-label="Rückmeldung und Lizenzen"
+      data-lfh="hilfe-rueckmeldung"
+    >
+      {isRueckmeldungSichtbar && (
+        <>
+          <p className="hilfe-rueckmeldung__frage">Fehler gefunden oder eine Idee?</p>
+          <p className="hilfe-rueckmeldung__text">
+            Das Formular öffnet sich in einem neuen Fenster, vorbefüllt mit Version, Oberfläche und
+            Bereich der App. Keine Namen, keine Einsatzdaten.
+          </p>
+          <Button onClick={openRueckmeldung}>Rückmeldung geben ↗</Button>
+        </>
+      )}
+      <p className="hilfe-rueckmeldung__fuss">
+        <span>Version {__APP_VERSION__}</span>
+        <a href={LIZENZ_HINWEIS} target="_blank" rel="noopener">
+          Lizenzen ↗
+        </a>
+      </p>
+    </section>
+  );
+
   // Wechsel innerhalb der Hilfe tragen die Herkunft weiter, sonst meldete die Rückmeldung nach
   // einem Kapitelwechsel `/hilfe` statt des Bereichs, aus dem die Hilfe geöffnet wurde (D5).
   const herkunftState = location.state;
@@ -320,31 +350,7 @@ export default function HilfePage() {
                   </ul>
                 </div>
               ))}
-              {/* Rückmeldung und Lizenzen (LLH-1642, Spec `benutzermenue`): aus dem Benutzermenü
-                  hierher, außerhalb der Druckwurzel. Am gekoppelten Gerät ohne Rückmeldeweg
-                  (Entscheidung LLH-1549); ohne Anmeldung mit, das Formular ist öffentlich. */}
-              <section
-                className="hilfe-rueckmeldung"
-                aria-label="Rückmeldung und Lizenzen"
-                data-lfh="hilfe-rueckmeldung"
-              >
-                {isRueckmeldungSichtbar && (
-                  <>
-                    <p className="hilfe-rueckmeldung__frage">Fehler gefunden oder eine Idee?</p>
-                    <p className="hilfe-rueckmeldung__text">
-                      Das Formular öffnet sich in einem neuen Fenster, vorbefüllt mit Version,
-                      Oberfläche und Bereich der App. Keine Namen, keine Einsatzdaten.
-                    </p>
-                    <Button onClick={openRueckmeldung}>Rückmeldung geben ↗</Button>
-                  </>
-                )}
-                <p className="hilfe-rueckmeldung__fuss">
-                  <span>Version {__APP_VERSION__}</span>
-                  <a href={LIZENZ_HINWEIS} target="_blank" rel="noopener">
-                    Lizenzen ↗
-                  </a>
-                </p>
-              </section>
+              {rueckmeldungAbschnitt}
               <h2 className="hilfe-mappe__titel">
                 Alle Kapitel am Stück
                 <span className="hilfe-mappe__zahl">{liste.length}</span>
@@ -352,10 +358,13 @@ export default function HilfePage() {
             </section>
           )}
           {slug === undefined && liste.length === 0 && (
-            <div className="hilfe-leer">
-              <p>Kein Kapitel passt zur Suche.</p>
-              <Button onClick={() => setSuche('')}>Suche lösen</Button>
-            </div>
+            <>
+              <div className="hilfe-leer">
+                <p>Kein Kapitel passt zur Suche.</p>
+                <Button onClick={() => setSuche('')}>Suche lösen</Button>
+              </div>
+              {rueckmeldungAbschnitt}
+            </>
           )}
           {slug !== undefined && gezeigt.length === 0 && (
             <SeitenLeer

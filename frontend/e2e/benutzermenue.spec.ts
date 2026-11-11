@@ -1,7 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzAnlegen } from './einsatz-kern';
 import { offenesMenue, oeffneMenue } from './menue-kern';
-import { anmeldenAlsAdmin } from './rollen-kern';
+import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Das entschlackte Benutzermenü (LLH-1642, Spec `benutzermenue`): Platz am Handy, Tastatur in der
@@ -20,52 +20,78 @@ function ausloeser(page: Page) {
   return page.getByRole('button', { name: 'Benutzermenü' });
 }
 
-test('Handy, komfortabel: das ganze Menü liegt ohne Rollen im Fenster', async ({ page }) => {
-  await dichte(page, 'komfortabel');
+/**
+ * Der Kopf hängt an der Rolle (Tag „Admin“, „Führungskraft“ oder keiner). Gemessen wird als Admin
+ * (mit Tag) und als Beobachter ohne Rollen-Tag (LFH-435, `e2e/AGENTS.md`); den Wechsel sät der
+ * Admin, der Beobachter braucht dafür einen Einsatz.
+ */
+const NUTZER = ['admin', 'beobachter'] as const;
+type Nutzer = (typeof NUTZER)[number];
+
+async function anmelden(page: Page, nutzer: Nutzer): Promise<string> {
   await anmeldenAlsAdmin(page);
-  await page.setViewportSize(HANDY);
-  await page.goto('/einsaetze');
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
+  if (nutzer === 'admin') return 'admin';
+  const einsatzId = await einsatzAnlegen(page, `Benutzermenü Beobachter ${Date.now()}`);
+  const konto = await wechsleZuRolle(page, 'beobachter', einsatzId);
+  return konto.benutzername;
+}
 
-  const menue = await oeffneMenue(page, ausloeser(page));
-  const gerollt = await menue.evaluate((m) => m.scrollTop);
-  expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-  for (const name of ['Profil', 'Abmelden', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe']) {
-    await expect(menue.getByRole('menuitem', { name: new RegExp(`^${name}`) })).toBeInViewport({
-      ratio: 1,
-    });
-  }
-  for (const leiste of ['Darstellung', 'Bediendichte', 'Helligkeit in %']) {
-    await expect(menue.getByRole('radiogroup', { name: leiste })).toBeInViewport({ ratio: 1 });
-  }
-  // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): „Hilfe“ führt auf die Hilfe.
-  await menue.getByRole('menuitem', { name: 'Hilfe' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
-});
+/** Vorbedingung vor der Messung: der Kopf zeigt die Person und genau ihren Rollenzweig. */
+async function pruefeKopf(menue: Locator, nutzer: Nutzer, benutzername: string) {
+  await expect(menue.getByText(new RegExp(`@${benutzername}\\b`))).toBeVisible();
+  await expect(menue.getByText('Admin', { exact: true })).toHaveCount(nutzer === 'admin' ? 1 : 0);
+}
 
-test('Handy, Handschuh: Abmelden und alle drei Leisten ohne Rollen im Fenster', async ({
-  page,
-}) => {
-  await dichte(page, 'handschuh');
-  await anmeldenAlsAdmin(page);
-  await page.setViewportSize(HANDY);
-  await page.goto('/einsaetze');
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+for (const nutzer of NUTZER) {
+  test(`Handy, komfortabel, ${nutzer}: das ganze Menü liegt im Fenster`, async ({ page }) => {
+    await dichte(page, 'komfortabel');
+    const benutzername = await anmelden(page, nutzer);
+    await page.setViewportSize(HANDY);
+    await page.goto('/einsaetze');
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
 
-  const menue = await oeffneMenue(page, ausloeser(page));
-  expect(await menue.evaluate((m) => m.scrollTop), 'Vorbedingung: ungerollt').toBe(0);
-  await expect(menue.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport({ ratio: 1 });
-  const helligkeit = menue.getByRole('radiogroup', { name: 'Helligkeit in %' });
-  await expect(helligkeit).toBeInViewport({ ratio: 1 });
-  // Bedienbar: eine Stufe wählen, das Menü bleibt offen und zeigt sie.
-  await helligkeit.getByRole('radio', { name: '60 %' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-helligkeit', '60');
-  await expect(helligkeit.getByRole('radio', { name: '60 %' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
-  await expect(offenesMenue(page)).toHaveCount(1);
-});
+    const menue = await oeffneMenue(page, ausloeser(page));
+    await pruefeKopf(menue, nutzer, benutzername);
+    const gerollt = await menue.evaluate((m) => m.scrollTop);
+    expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
+    for (const name of ['Profil', 'Abmelden', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe']) {
+      await expect(menue.getByRole('menuitem', { name: new RegExp(`^${name}`) })).toBeInViewport({
+        ratio: 1,
+      });
+    }
+    for (const leiste of ['Darstellung', 'Bediendichte', 'Helligkeit in %']) {
+      await expect(menue.getByRole('radiogroup', { name: leiste })).toBeInViewport({ ratio: 1 });
+    }
+    // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): „Hilfe“ führt auf die Hilfe.
+    await menue.getByRole('menuitem', { name: 'Hilfe' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
+  });
+
+  test(`Handy, Handschuh, ${nutzer}: Abmelden und alle drei Leisten im Fenster`, async ({
+    page,
+  }) => {
+    await dichte(page, 'handschuh');
+    const benutzername = await anmelden(page, nutzer);
+    await page.setViewportSize(HANDY);
+    await page.goto('/einsaetze');
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+
+    const menue = await oeffneMenue(page, ausloeser(page));
+    await pruefeKopf(menue, nutzer, benutzername);
+    expect(await menue.evaluate((m) => m.scrollTop), 'Vorbedingung: ungerollt').toBe(0);
+    await expect(menue.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport({ ratio: 1 });
+    const helligkeit = menue.getByRole('radiogroup', { name: 'Helligkeit in %' });
+    await expect(helligkeit).toBeInViewport({ ratio: 1 });
+    // Bedienbar: eine Stufe wählen, das Menü bleibt offen und zeigt sie.
+    await helligkeit.getByRole('radio', { name: '60 %' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-helligkeit', '60');
+    await expect(helligkeit.getByRole('radio', { name: '60 %' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(offenesMenue(page)).toHaveCount(1);
+  });
+}
 
 /**
  * D12: fünf Helligkeitsstufen im Handschuh-Betrieb in einer Zeile, nicht überlappend, nicht über
