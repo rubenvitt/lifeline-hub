@@ -221,8 +221,8 @@ describe('darfOriginalLaden (LFH-747)', () => {
   });
 });
 
-// Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`): führt eine gekoppelte Instanz, lehnt der
-// Server jeden Schreibweg mit 409 ab; die Schreib-UI sperrt mit. Bedienen darf die Führung die
+// Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`): führt eine gekoppelte Instanz, ist der
+// Einsatz hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641). Bedienen darf die Führung die
 // Einsatzleitung oder der Admin der Einsatz-Org, auch am abgeschlossenen Einsatz.
 describe('Führung je Einsatz (LLH-1491)', () => {
   const hier = { fuehrend: true, bei: 'ELW 1', epoche: 1, offen: false };
@@ -238,24 +238,27 @@ describe('Führung je Einsatz (LLH-1491)', () => {
     expect(darfImEinsatzSchreiben({ ...el, fuehrung: hier })).toBe(true);
   });
 
-  it('führt eine andere Instanz, sind Schreiben, Leiten und Verwalten gesperrt', () => {
-    expect(fuehrtHier({ fuehrung: hub })).toBe(false);
-    expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub })).toBe(false);
-    expect(darfEinsatzLeiten({ ...el, fuehrung: hub })).toBe(false);
-    expect(darfEinsatzVerwalten({ ...el, org_id: 1, fuehrung: hub }, orgAdmin)).toBe(false);
-    expect(darfModuleVerwalten({ ...el, org_id: 1, fuehrung: hub }, orgAdmin)).toBe(false);
-    expect(darfBeantragen({ ...el, fuehrung: hub })).toBe(false);
-  });
-
-  it('am Spiegel bleibt Beantragen trotz fremder Führung offen (LLH-1492)', () => {
+  it('führt eine andere Instanz, sperrt der Spiegel Schreiben, Leiten und Verwalten (LLH-1641)', () => {
     const spiegel = {
       gegenstelle: 'Hub Nord',
       beendet: false,
       antraege_ausstehend: 0,
       antraege_abgelehnt: 0,
+      bruchstelle: 0,
     };
-    expect(darfBeantragen({ ...el, fuehrung: hub, spiegel })).toBe(true);
+    expect(fuehrtHier({ fuehrung: hub })).toBe(false);
     expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub, spiegel })).toBe(false);
+    expect(darfEinsatzLeiten({ ...el, fuehrung: hub, spiegel })).toBe(false);
+    expect(darfEinsatzVerwalten({ ...el, org_id: 1, fuehrung: hub, spiegel }, orgAdmin)).toBe(
+      false,
+    );
+    expect(darfModuleVerwalten({ ...el, org_id: 1, fuehrung: hub, spiegel }, orgAdmin)).toBe(false);
+    expect(darfBeantragen({ ...el, fuehrung: hub, spiegel })).toBe(true);
+  });
+
+  it('die Akte allein sperrt nicht: eine Schranke, der Spiegel (LLH-1641)', () => {
+    expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub })).toBe(true);
+    expect(darfBeantragen({ ...el, fuehrung: hub })).toBe(true);
   });
 
   it('die Führung bedienen Einsatzleitung und Admin der Einsatz-Org, unabhängig von Status und Führung', () => {
@@ -288,6 +291,7 @@ describe('Spiegel (LLH-1492, D13)', () => {
     beendet: false,
     antraege_ausstehend: 0,
     antraege_abgelehnt: 0,
+    bruchstelle: 0,
   };
   const el = { ...aktiv, meine_rolle: 'einsatzleitung' as const, spiegel };
   const fuePers = { ...aktiv, meine_rolle: 'fuehrungspersonal' as const, spiegel };

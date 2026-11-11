@@ -2649,6 +2649,12 @@ export interface components {
             antraege_ausstehend: number;
             /** @description Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar. */
             beendet: boolean;
+            /**
+             * Format: int64
+             * @description Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
+             *     kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert.
+             */
+            bruchstelle: number;
             /** @description Name der führenden Instanz. */
             gegenstelle: string;
             /** @description Letzter erfolgreicher Abgleich (UTC); fehlt vor dem ersten. */

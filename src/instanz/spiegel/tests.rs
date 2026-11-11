@@ -123,6 +123,7 @@ async fn abgleichen(f: &SqlitePool, s: &SqlitePool, zeilen: usize) -> usize {
         let _ = EinsatzStand {
             kennung: l.kennung.clone(),
             stand: erg.stand,
+            bruch: Vec::new(),
         };
     }
     sc.commit().await.unwrap();

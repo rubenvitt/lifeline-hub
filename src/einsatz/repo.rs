@@ -292,12 +292,14 @@ macro_rules! einsatzleiter_joins {
 }
 
 /// Die Führung je Einsatz (LLH-1491), wortgleich in `laden` und `liste_fuer`: die Spalten hinter
-/// das SELECT, der Join hinter `FROM einsatz e`. Ohne Schalter findet der Join keine Akte, und
-/// `fuehrung_bei` ist NULL (der Start richtet es aus). Gelesen über
+/// das SELECT, der Join hinter `FROM einsatz e`. Ohne Schalter findet der Join keine Akte. Nur
+/// Anzeige; geschützt ist ein fremd geführter Einsatz als Spiegel (LLH-1641). Gelesen über
 /// `instanz::fuehrung::FuehrungSpalten`.
 macro_rules! fuehrung_spalten {
     () => {
-        "e.fuehrung_bei, ef.epoche_zaehler AS fuehrung_epoche, ef.fuehrer_name AS fuehrung_fuehrer, \
+        "COALESCE(ef.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet), 0) \
+           AS fuehrung_fremd, \
+         ef.epoche_zaehler AS fuehrung_epoche, ef.fuehrer_name AS fuehrung_fuehrer, \
          ef.offen IS NOT NULL AS fuehrung_offen"
     };
 }
@@ -318,7 +320,9 @@ macro_rules! spiegel_spalten {
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
              AND sa.zustand IN ('ausstehend', 'zugestellt')) AS spiegel_ausstehend, \
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
-             AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt"
+             AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt, \
+         (SELECT COUNT(*) FROM einsatz_bruchstelle eb WHERE eb.einsatz_id = e.id \
+             AND eb.entfernt = 1) AS spiegel_bruchstelle"
     };
 }
 
@@ -1625,19 +1629,15 @@ pub(crate) async fn fordere_aktiv_in_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<(), AppError> {
-    let zeile: Option<(String, Option<String>)> =
-        sqlx::query_as("SELECT status, fuehrung_bei FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-    match zeile {
-        Some((status, _)) if status != "aktiv" => Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        )),
-        // Führung je Einsatz (LLH-1491): eine andere Instanz führt.
-        Some((_, Some(bei))) => Err(super::berechtigung::fuehrung_error(&bei)),
-        Some(_) => Ok(()),
-        None => Err(AppError::Conflict(
+    // Führt eine andere Instanz, ist der Einsatz hier ein Spiegel; den Schutz tragen dessen
+    // Trigger (LLH-1641, ADR-0018).
+    let status: Option<String> = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    match status {
+        Some(status) if status == "aktiv" => Ok(()),
+        _ => Err(AppError::Conflict(
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
         )),
     }

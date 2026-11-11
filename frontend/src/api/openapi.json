@@ -6573,7 +6573,8 @@
           "gegenstelle",
           "beendet",
           "antraege_ausstehend",
-          "antraege_abgelehnt"
+          "antraege_abgelehnt",
+          "bruchstelle"
         ],
         "properties": {
           "antraege_abgelehnt": {
@@ -6587,6 +6588,11 @@
           "beendet": {
             "type": "boolean",
             "description": "Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar."
+          },
+          "bruchstelle": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht\nkannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert."
           },
           "gegenstelle": {
             "type": "string",

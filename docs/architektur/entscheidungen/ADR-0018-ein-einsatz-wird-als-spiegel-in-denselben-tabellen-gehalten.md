@@ -63,7 +63,9 @@ eigene Tabellen je Spiegel hätten jede dieser Stellen verdoppelt. Ruben hat den
 ## Konsequenzen
 
 Lesewege unterscheiden einen Spiegel nicht von einem eigenen Einsatz; eine Übergabe (LLH-1491)
-muss nur umschalten, wer führt, und nichts kopieren. Jede neue Einsatztabelle braucht Trigger
+muss nur umschalten, wer führt, und nichts kopieren: Die Akte entscheidet, und
+`spiegel::fuehrung` legt die Zeile in `einsatz_spiegel` an oder entfernt sie (LLH-1641,
+ADR-0020). Der Spiegel ist damit die einzige Schreibsperre für fremde Führung. Jede neue Einsatztabelle braucht Trigger
 und einen Eintrag in der Beschreibung, sonst wird der Wächter rot; ein Neubau einer Tabelle
 verliert die Trigger still, bis der Test sie vermisst. Hintergrundläufe müssen Spiegel auslassen. Am Spiegel
 geht nur, was auch ohne Netz vormerkbar ist; alles andere wartet auf den Führer.

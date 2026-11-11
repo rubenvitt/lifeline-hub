@@ -207,6 +207,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "einsatz_fuehrung_verlauf",
         "Verlauf der Führungsakte; reist mit ihr über die Meldung (LLH-1491)",
     ),
+    (
+        "einsatz_bruchstelle",
+        "Sicherung der eigenen Seite beim Führungswechsel (LLH-1641); bleibt an dieser Instanz",
+    ),
 ];
 
 /// Die Kategorie einer gespiegelten Tabelle.

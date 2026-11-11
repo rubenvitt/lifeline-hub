@@ -44,8 +44,8 @@ async fn eigene_staende(
     // Höchstens so viele, wie ein Paket trägt: die laufenden zuerst, dann die jüngsten. Ein
     // abgeschlossener Spiegel, der hier fehlt, bekommt nichts mehr (der Führer liefert nur
     // laufende Einsätze ungenannt).
-    let zeilen: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT s.fremde_kennung, s.stand FROM einsatz_spiegel s \
+    let zeilen: Vec<(String, i64, i64)> = sqlx::query_as(
+        "SELECT s.fremde_kennung, s.stand, s.einsatz_id FROM einsatz_spiegel s \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
          JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
@@ -55,10 +55,15 @@ async fn eigene_staende(
     .bind(super::paket::EINSAETZE_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
-    Ok(zeilen
-        .into_iter()
-        .map(|(kennung, stand)| EinsatzStand { kennung, stand })
-        .collect())
+    let mut staende = Vec::with_capacity(zeilen.len());
+    for (kennung, stand, einsatz_id) in zeilen {
+        staende.push(EinsatzStand {
+            kennung,
+            stand,
+            bruch: super::fuehrung::offene_bruch_fragen(conn, einsatz_id).await?,
+        });
+    }
+    Ok(staende)
 }
 
 /// Liefert die geführten Einsätze aller aktiven Orgs ab den genannten Ständen.
@@ -113,7 +118,12 @@ async fn uebernehme_alle(
         let Some(o) = orgs.iter().find(|o| org_wire(eigen, kopplung, o) == l.org) else {
             continue;
         };
-        if !l.kennung.starts_with(&praefix) {
+        // Nach einem Führungswechsel liefert der neue Führer auch Einsätze mit fremder Kennung;
+        // dann nennt ihn die Akte hier (LLH-1641, E3).
+        if !l.kennung.starts_with(&praefix)
+            && !super::fuehrung::fuehrt_laut_akte(conn, &l.kennung, &kopplung.gegenueber_kennung)
+                .await?
+        {
             tracing::warn!(kennung = %l.kennung, "Spiegel: Lieferung eines fremden Einsatzes verworfen");
             continue;
         }
@@ -162,9 +172,14 @@ async fn uebernehme_alle(
                 }
             }
         }
+        let bruch = match erg.einsatz_id {
+            Some(id) => super::fuehrung::offene_bruch_fragen(conn, id).await?,
+            None => Vec::new(),
+        };
         staende.push(EinsatzStand {
             kennung: l.kennung.clone(),
             stand: erg.stand,
+            bruch,
         });
     }
     Ok(staende)
@@ -237,8 +252,15 @@ pub async fn handle_abgleich(
     let antwort = crate::write_retry!(pool, |conn| {
         uebernommen = Uebernommen::default();
         let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+        // Bruchstellen vor den Lieferungen klären (LLH-1641, E6).
+        let geklaert =
+            super::fuehrung::uebernimm_bruch_antworten(conn, kopplung.id, &anfrage.bruch_antworten)
+                .await?;
+        uebernommen.einsaetze.extend(geklaert);
         let staende_antwort =
             uebernehme_alle(conn, eigen, kopplung, &orgs, anfrage, &mut uebernommen).await?;
+        let bruch_antworten =
+            super::fuehrung::beantworte_staende(conn, kopplung.id, &anfrage.staende).await?;
         let staende: HashMap<String, i64> = anfrage
             .staende
             .iter()
@@ -284,6 +306,7 @@ pub async fn handle_abgleich(
             anhang_teile,
             antraege,
             quittungen: quittungen.clone(),
+            bruch_antworten,
         })
     })?;
     melde_live(pool, &uebernommen).await;
@@ -314,6 +337,9 @@ pub async fn abgleich_einmal(
         .await
         .map_err(|e| SendError::Netz(e.to_string()))?;
     let mut abgerufen: Vec<super::paket::AnhangAbruf> = Vec::new();
+    // Antworten auf Bruchstellen, nach denen die erreichte Seite in ihrer Antwort fragte; sie gehen
+    // mit der nächsten Runde hinaus (LLH-1641, E6).
+    let mut bruch_antworten: Vec<super::paket::BruchAntwort> = Vec::new();
     for runde in 0..RUNDEN_MAX {
         let anfrage = crate::write_retry!(pool, |conn| {
             let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
@@ -344,6 +370,7 @@ pub async fn abgleich_einmal(
                 anhang_teile,
                 antraege,
                 quittungen,
+                bruch_antworten: bruch_antworten.clone(),
             })
         })
         .map_err(fehler)?;
@@ -381,7 +408,17 @@ pub async fn abgleich_einmal(
                 .execute(&mut *conn)
                 .await?;
             }
+            // Bruchstellen vor den Lieferungen klären (LLH-1641, E6).
+            let geklaert = super::fuehrung::uebernimm_bruch_antworten(
+                conn,
+                kopplung.id,
+                &antwort.bruch_antworten,
+            )
+            .await?;
+            uebernommen.einsaetze.extend(geklaert);
             uebernehme_alle(conn, &eigen, kopplung, &orgs, &antwort, &mut uebernommen).await?;
+            bruch_antworten =
+                super::fuehrung::beantworte_staende(conn, kopplung.id, &antwort.staende).await?;
             let fertig =
                 super::anhang::uebernehme_teile(conn, kopplung.id, &antwort.anhang_teile).await?;
             uebernommen.einsaetze.extend(fertig);
@@ -413,7 +450,10 @@ pub async fn abgleich_einmal(
             }
         }
         abgerufen = antwort.abrufe;
-        let weiter = !abgerufen.is_empty() || !antwort.anhang_teile.is_empty() || ausgefuehrt;
+        let weiter = !abgerufen.is_empty()
+            || !antwort.anhang_teile.is_empty()
+            || ausgefuehrt
+            || !bruch_antworten.is_empty();
         if !weiter || runde + 1 == RUNDEN_MAX {
             break;
         }

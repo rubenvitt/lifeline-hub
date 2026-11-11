@@ -59,7 +59,11 @@ pub async fn ist_aktiv(pool: &SqlitePool, kopplung_id: i64) -> Result<bool, AppE
          OR EXISTS (SELECT 1 FROM spiegel_antrag a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
             WHERE o.kopplung_id = ?1 AND a.zustand IN ('ausstehend', 'zugestellt')) \
-         OR EXISTS (SELECT 1 FROM spiegel_antrag_eingang WHERE kopplung_id = ?1 AND gemeldet_at IS NULL)",
+         OR EXISTS (SELECT 1 FROM spiegel_antrag_eingang WHERE kopplung_id = ?1 AND gemeldet_at IS NULL) \
+         OR EXISTS (SELECT 1 FROM spiegel_anhang a JOIN einsatz_fuehrung f ON f.einsatz_id = a.einsatz_id \
+            WHERE f.herkunft_kopplung_id = ?1 AND a.fertig_at IS NULL AND a.angefordert_at IS NOT NULL) \
+         OR EXISTS (SELECT 1 FROM einsatz_spiegel s JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+            WHERE o.kopplung_id = ?1 AND s.bruch_offen = 1)",
     )
     .bind(kopplung_id)
     .fetch_one(pool)
@@ -82,6 +86,23 @@ pub async fn durchlauf(
     let jetzt = Instant::now();
     if let Err(e) = super::antrag::aufraeumen(pool).await {
         tracing::warn!(error = %e, "Spiegel: Anträge nicht aufgeräumt");
+    }
+    // Anträge eines früheren Spiegels, der jetzt führt (LLH-1641, E5).
+    if let Some(router) = router {
+        match super::antrag::fuehre_eigene_aus(pool, router).await {
+            Ok(einsaetze) if !einsaetze.is_empty() => {
+                abgleich::melde_live(
+                    pool,
+                    &abgleich::Uebernommen {
+                        einsaetze,
+                        neu: Vec::new(),
+                    },
+                )
+                .await;
+            }
+            Ok(_) => {}
+            Err(e) => tracing::warn!(error = %e, "Spiegel: eigene Anträge nicht ausgeführt"),
+        }
     }
     for k in repo::list_meldend_aktiv(pool).await? {
         if !abgleich::kann_spiegeln(&k) {

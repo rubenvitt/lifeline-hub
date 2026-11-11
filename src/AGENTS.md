@@ -328,9 +328,12 @@ Herleitung in
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
   [ADR-0020](../docs/architektur/entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md):
-  - **Ein neuer Schreibweg am Einsatz prüft `fordere_aktiv` bzw. `fordere_aktiv_in_tx`**; nur
-    dort greift die Sperre „Führung liegt bei …“ (`einsatz.fuehrung_bei`). Den Merker schreibt
-    allein `instanz::fuehrung::repo` (`save`, `sync_sperre*`), der Start richtet ihn aus.
+  - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
+    (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
+    `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
+    (`richte_aus` aus `fuehrung::repo::save`); ein neuer Schreibweg braucht dafür nichts.
+  - Übergabe und Anfrage gehen nur abgeglichen (`fordere_abgeglichen`), eine Notübernahme nur
+    an einem Einsatz, der hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
     `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 nach.

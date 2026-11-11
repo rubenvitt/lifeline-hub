@@ -115,6 +115,7 @@ describe('Frist am Spiegel (LLH-1492)', () => {
     beendet: false,
     antraege_ausstehend: 0,
     antraege_abgelehnt: 0,
+    bruchstelle: 0,
   };
   const admin = { system_rolle: 'admin' as const, org_id: 1 };
 

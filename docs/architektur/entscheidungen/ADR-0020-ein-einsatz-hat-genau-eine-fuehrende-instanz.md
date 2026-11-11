@@ -5,23 +5,32 @@ status: akzeptiert
 datum: 2026-11-09
 gilt_fuer:
   - src/instanz/fuehrung/**
+  - src/instanz/spiegel/fuehrung.rs
   - src/einsatz/berechtigung.rs
   - src/einsatz/repo.rs
   - src/einsatz/kontext.rs
+  - frontend/src/einsatz/schreibrecht.ts
 herleitung:
   - openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md
+  - LLH-1641 (Entwurf E1–E8, mit Ruben am 11.11.2026 abgestimmt)
 ---
 
 # ADR-0020: Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn
 
 ## Regeln
 
-- MUST: Jeder Schreibweg an einem Einsatz geht über `berechtigung::fordere_aktiv` oder, in einer
-  Transaktion, über `einsatz::repo::fordere_aktiv_in_tx`; beide lehnen mit 409 „Führung liegt bei
-  …“ ab, wenn `einsatz.fuehrung_bei` gesetzt ist.
-- MUST NOT: `einsatz.fuehrung_bei` schreibt nur `src/instanz/fuehrung/` (abgeleitet aus der Akte,
-  beim Start neu ausgerichtet).
+- MUST: Die Akte (`einsatz_fuehrung`) entscheidet, wer führt; der Einsatz folgt ihr in derselben
+  Transaktion (`repo::save` → `spiegel::fuehrung::richte_aus`). Nennt die Akte eine andere
+  Instanz, ist der Einsatz hier ein Spiegel (ADR-0018), sonst nicht. Seit LLH-1641 sperrt allein
+  der Spiegel; eine eigene Sperre der Führung gibt es nicht.
+- MUST NOT: `einsatz_spiegel` legt außerhalb der Übernahme nur `spiegel::fuehrung` an oder
+  entfernt sie (Führer werden, Spiegel werden).
+- MUST: Eine Akte und der Spiegel desselben Einsatzes tragen dieselbe Kennung (`einsatz.kennung`,
+  `<instanz>/<id>-<zufall>`); ein Spiegel bekommt keine eigene Akte.
+- MUST: Übergabe und erfüllte Anfrage nur, wenn das Gegenüber alles hat
+  (`spiegel::fuehrung::fordere_abgeglichen`, 409 „Abgleich läuft noch“); eine Notübernahme nur,
+  wenn der Einsatz hier als Spiegel liegt.
 - MUST: Die Bedienung der Führung zieht `EinsatzFuehrungszugriff` (ohne `fordere_aktiv`), nie ein
   Schreib-Gate.
 - MUST: Die meldende Seite nimmt eine Epoche des Gegenübers, die ihr die Führung nimmt, nur mit
@@ -33,9 +42,10 @@ herleitung:
 ## Prüfung
 
 ```sh
-verlange 'fuehrung_bei' src/einsatz/berechtigung.rs
-verlange 'SELECT status, fuehrung_bei FROM einsatz' src/einsatz/repo.rs
-verbiete 'SET fuehrung_bei' 'src/**' ':(exclude,glob)src/instanz/fuehrung/**'
+verlange 'spiegel::fuehrung::richte_aus' src/instanz/fuehrung/repo.rs
+verbiete 'fuehrung_bei' 'src/**/*.rs' 'frontend/src/**/*.ts' 'frontend/src/**/*.tsx'
+verbiete '(INSERT INTO|DELETE FROM) einsatz_spiegel' 'src/**/*.rs' ':(exclude,glob)src/instanz/spiegel/**' ':(exclude)src/einsatz/spiegel_filter.rs'
+verlange 'fn fordere_abgeglichen' src/instanz/spiegel/fuehrung.rs
 verlange 'pub struct EinsatzFuehrungszugriff' src/einsatz/kontext.rs
 verlange 'pub fn entscheide\(' src/instanz/fuehrung/austausch.rs
 verlange 'then_with\(\|\| self\.instanz\.cmp\(&other\.instanz\)\)' src/instanz/fuehrung/mod.rs
@@ -49,7 +59,12 @@ einer Epoche. Ein kompromittierter Hub darf sie einem ELW nicht nehmen können (
 
 ## Konsequenzen
 
-Eine Sperre an einer Stelle deckt alle Gates, Replay-Handler und Transaktionen. Wer einen neuen
-Schreibweg baut, der nicht über diese Prüfungen geht, öffnet die Sperre still; der Wächter
-erkennt das nicht. Inhalte der Einsätze fließen erst mit LLH-1492; bis dahin bleibt der Schalter
-`LIFELINE_FUEHRUNG` aus.
+Die Sperre ist der Schutz-Trigger des Spiegels (ADR-0018): Er deckt jeden Schreibweg, auch einen,
+der `fordere_aktiv` vergisst, und die Oberfläche fragt nur `istSpiegel`. Ein Wechsel kippt die
+Lieferrichtung: Der neue Führer liefert ab Stand 0 und nennt zu jeder Zeile, die er vom alten
+Führer bekam, dessen Schlüssel (`Zeile.gegen`), damit dort keine zweite Zeile entsteht. Offene
+Anträge eines Spiegels, der Führer wird, führt er selbst aus. Was der alte Führer nach dem
+letzten bestätigten Stand noch änderte (Notübernahme, Abgabe per Code), sichert er beim Wechsel
+als Bruchstelle (`einsatz_bruchstelle`) und entfernt, was der neue Führer nicht kennt. Fällt der
+Schalter `LIFELINE_FUEHRUNG` nach einem Wechsel, bleibt der Stand eingefroren: Ein Spiegel wird
+nicht wieder beschreibbar, sonst schrieben zwei Instanzen.

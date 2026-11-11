@@ -28,6 +28,8 @@ pub const ANTRAEGE_BYTES_MAX: usize = 512 * 1024;
 pub const ANHAENGE_MAX: usize = 64;
 /// Größe eines Anhang-Stücks (D8).
 pub const TEIL_GROESSE: usize = 256 * 1024;
+/// Höchstzahl Zeilen einer Bruchstelle je Frage und je Antwort (LLH-1641, E6).
+pub const BRUCH_MAX: usize = 1000;
 
 /// Anfrage und Antwort des Abgleichs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -50,6 +52,10 @@ pub struct SpiegelPaket {
     /// Stücke von Anhängen, die das Gegenüber angefordert hat.
     #[serde(default)]
     pub anhang_teile: Vec<AnhangTeil>,
+    /// Antworten auf die Bruchstellen in den Ständen des Gegenübers (LLH-1641, E6): welche der
+    /// gefragten Zeilen ich als Führer nicht kenne.
+    #[serde(default)]
+    pub bruch_antworten: Vec<BruchAntwort>,
 }
 
 /// Stand eines gespiegelten Einsatzes.
@@ -57,6 +63,22 @@ pub struct SpiegelPaket {
 pub struct EinsatzStand {
     pub kennung: String,
     pub stand: i64,
+    /// Zeilen (Art, Schlüssel beim Spiegel), die der Spiegel vor dem Führungswechsel selbst
+    /// geändert hat (Bruchstelle, LLH-1641 E6): Der Führer sagt, welche er nicht kennt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bruch: Vec<[String; 2]>,
+}
+
+/// Antwort des Führers auf eine Bruchstelle (LLH-1641, E6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BruchAntwort {
+    pub kennung: String,
+    /// Der Führer kann die Frage beantworten (er bekam den Einsatz als Spiegel dieser Kopplung);
+    /// sonst bleibt die Bruchstelle stehen und nichts wird entfernt.
+    pub kennt: bool,
+    /// Die gefragten Zeilen, die der Führer nicht kennt.
+    #[serde(default)]
+    pub unbekannt: Vec<[String; 2]>,
 }
 
 /// Zeilen eines Einsatzes seit einem Stand (D6).
@@ -200,6 +222,15 @@ impl SpiegelPaket {
         if self.antraege.len() > ANTRAEGE_MAX || self.quittungen.len() > ANTRAEGE_MAX {
             return Err(format!("mehr als {ANTRAEGE_MAX} Anträge oder Quittungen"));
         }
+        if self.bruch_antworten.len() > EINSAETZE_MAX
+            || self.staende.iter().any(|s| s.bruch.len() > BRUCH_MAX)
+            || self
+                .bruch_antworten
+                .iter()
+                .any(|a| a.unbekannt.len() > BRUCH_MAX)
+        {
+            return Err(format!("mehr als {BRUCH_MAX} Zeilen einer Bruchstelle"));
+        }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
         }
@@ -247,7 +278,8 @@ mod tests {
         p.staende = vec![
             EinsatzStand {
                 kennung: "x".into(),
-                stand: 0
+                stand: 0,
+                bruch: Vec::new(),
             };
             EINSAETZE_MAX + 1
         ];

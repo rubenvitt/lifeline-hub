@@ -12,6 +12,7 @@ pub mod abgleich;
 pub mod anhang;
 pub mod antrag;
 pub mod art;
+pub mod fuehrung;
 pub mod katalog;
 pub mod liefern;
 pub mod paket;
@@ -39,6 +40,7 @@ pub struct SpiegelSpalten {
     pub spiegel_beendet_at: Option<String>,
     pub spiegel_ausstehend: i64,
     pub spiegel_abgelehnt: i64,
+    pub spiegel_bruchstelle: i64,
 }
 
 /// Ein Spiegel, wie der Client ihn zeigt (Hinweisband).
@@ -53,6 +55,9 @@ pub struct EinsatzSpiegelAnzeige {
     pub beendet: bool,
     pub antraege_ausstehend: i64,
     pub antraege_abgelehnt: i64,
+    /// Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
+    /// kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert.
+    pub bruchstelle: i64,
 }
 
 impl SpiegelSpalten {
@@ -66,6 +71,7 @@ impl SpiegelSpalten {
             beendet: self.spiegel_beendet_at.is_some(),
             antraege_ausstehend: self.spiegel_ausstehend,
             antraege_abgelehnt: self.spiegel_abgelehnt,
+            bruchstelle: self.spiegel_bruchstelle,
         })
     }
 }
