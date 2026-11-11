@@ -743,6 +743,15 @@ async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abglei
         "{:?}",
         erg.hinweise
     );
+    // Nur übernommene Zeilen erledigen einen Hinweis „zu groß“, die große selbst nicht.
+    let erledigt: Vec<&str> = erg
+        .erledigt
+        .iter()
+        .filter(|(art, _)| art == "etb_eintrag")
+        .map(|(_, s)| s.as_str())
+        .collect();
+    assert_eq!(erledigt.len(), 2, "{erledigt:?}");
+    assert!(!erledigt.contains(&gross.to_string().as_str()));
     let spiegel: i64 = eine(&s, "SELECT einsatz_id FROM einsatz_spiegel").await;
     let lfd: Vec<i64> =
         sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr")

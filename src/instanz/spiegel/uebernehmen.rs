@@ -48,6 +48,10 @@ pub struct Ergebnis {
     pub kategorien: BTreeSet<SpiegelKategorie>,
     pub hinweise: Vec<String>,
     pub inhalte: Vec<OffenerInhalt>,
+    /// Zeilen (Art, fremder Schlüssel), die geschrieben, bewusst ausgelassen oder gelöscht
+    /// wurden; ihr Hinweis „zu groß“ ist damit erledigt (LLH-1630). Eine zurückgerollte
+    /// Übernahme liefert ein neues, leeres Ergebnis.
+    pub erledigt: Vec<(String, String)>,
 }
 
 /// Ein nullbarer Verweis, der erst nach allen Zeilen gesetzt wird.
@@ -197,6 +201,9 @@ async fn uebernehme_zeilen(
         let id = kopf_uebernehmen(conn, t, e, l, kopf, einsatz_id, &konten).await?;
         einsatz_id = Some(id);
         ergebnis.kategorien.insert(t.kategorie);
+        ergebnis
+            .erledigt
+            .push((kopf.art.clone(), kopf.schluessel.clone()));
     }
     let Some(einsatz_id) = einsatz_id else {
         return Ok(());
@@ -249,11 +256,17 @@ async fn uebernehme_zeilen(
                 {
                     // Ein Stellvertreter wird nie Mitglied (D5): die Zeile entfällt still.
                     let _ = werte;
+                    ergebnis
+                        .erledigt
+                        .push((z.art.clone(), z.schluessel.clone()));
                 }
                 Abgebildet::Fertig(werte, spaeter) => {
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
                             ergebnis.kategorien.insert(t.kategorie);
+                            ergebnis
+                                .erledigt
+                                .push((z.art.clone(), z.schluessel.clone()));
                             for (spalte, ziel, fremd) in spaeter {
                                 offen.push(Offen {
                                     tabelle: t.name,
@@ -379,6 +392,9 @@ async fn loeschen(
     };
     let Some(lokal) = abbildung::einsatz_lokal(conn, einsatz_id, &z.art, &z.schluessel).await?
     else {
+        ergebnis
+            .erledigt
+            .push((z.art.clone(), z.schluessel.clone()));
         return Ok(());
     };
     sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -401,6 +417,9 @@ async fn loeschen(
     .execute(&mut *conn)
     .await?;
     ergebnis.kategorien.insert(t.kategorie);
+    ergebnis
+        .erledigt
+        .push((z.art.clone(), z.schluessel.clone()));
     Ok(())
 }
 

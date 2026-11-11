@@ -210,7 +210,7 @@ async fn uebernehme_alle(
             tracing::warn!(kennung = %l.kennung, hinweise = ?erg.hinweise, "Spiegel: Hinweise beim Übernehmen");
         }
         if let Some(id) = erg.einsatz_id {
-            save_hinweis(conn, id, &erg.hinweise, l).await?;
+            save_hinweis(conn, id, &erg.hinweise, &erg.erledigt).await?;
         }
         if let Some(id) = erg.einsatz_id {
             if !erg.kategorien.is_empty() {
@@ -232,7 +232,7 @@ async fn save_hinweis(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     hinweise: &[String],
-    l: &super::paket::EinsatzLieferung,
+    erledigt: &[(String, String)],
 ) -> Result<(), AppError> {
     let alt: Option<String> =
         sqlx::query_scalar("SELECT hinweis FROM einsatz_spiegel WHERE einsatz_id = ?")
@@ -240,11 +240,9 @@ async fn save_hinweis(
             .fetch_optional(&mut *conn)
             .await?
             .flatten();
-    let geliefert: Vec<String> = l
-        .zeilen
+    let geliefert: Vec<String> = erledigt
         .iter()
-        .filter(|z| !z.zu_gross)
-        .map(|z| uebernehmen::zu_gross_anfang(&z.art, &z.schluessel))
+        .map(|(art, schluessel)| uebernehmen::zu_gross_anfang(art, schluessel))
         .collect();
     let neu = hinweise_fortschreiben(alt.as_deref(), hinweise, &geliefert);
     if neu != alt {
@@ -257,29 +255,44 @@ async fn save_hinweis(
     Ok(())
 }
 
-/// Der Hinweis am Spiegel nach einer Lieferung. Neue Hinweise ersetzen die alten, nur „zu groß“
-/// bleibt je Zeile stehen, bis dieselbe Zeile mit Daten kommt: ihr Stand wird nicht neu geliefert,
-/// der Hinweis ginge sonst mit der nächsten Runde verloren (LLH-1630). Ohne neue Hinweise bleiben
-/// die alten bis auf die erledigten „zu groß“.
+/// Der Hinweis am Spiegel nach einer Übernahme. „Zu groß“ steht je Zeile, bis dieselbe Zeile
+/// übernommen oder gelöscht ist (`Ergebnis::erledigt`): ihr Stand wird nicht neu geliefert, der
+/// Hinweis ginge sonst mit der nächsten Runde verloren, und er zählt nicht zur Grenze von 20
+/// (LLH-1630). Andere Hinweise ersetzt ein neuer wie bisher, höchstens 20.
 fn hinweise_fortschreiben(
     alt: Option<&str>,
     neu: &[String],
-    geliefert: &[String],
+    erledigt: &[String],
 ) -> Option<String> {
-    let erledigt = |zeile: &str| geliefert.iter().any(|g| zeile.starts_with(g.as_str()));
+    let ist_erledigt = |zeile: &str| erledigt.iter().any(|g| zeile.starts_with(g.as_str()));
     let ist_zu_gross = |zeile: &str| zeile.starts_with("Zeile ") && zeile.contains(" ist zu groß");
-    let alte = alt.unwrap_or("").lines().filter(|z| !z.is_empty());
-    let mut zeilen: Vec<String> = if neu.is_empty() {
-        alte.filter(|z| !(ist_zu_gross(z) && erledigt(z)))
-            .map(str::to_owned)
-            .collect()
+    let alte: Vec<&str> = alt
+        .unwrap_or("")
+        .lines()
+        .filter(|z| !z.is_empty())
+        .collect();
+    let mut zeilen: Vec<String> = Vec::new();
+    for z in alte
+        .iter()
+        .copied()
+        .chain(neu.iter().map(String::as_str))
+        .filter(|z| ist_zu_gross(z) && !ist_erledigt(z))
+    {
+        if !zeilen.iter().any(|v| v == z) {
+            zeilen.push(z.to_owned());
+        }
+    }
+    let neue_andere: Vec<&str> = neu
+        .iter()
+        .map(String::as_str)
+        .filter(|z| !ist_zu_gross(z))
+        .collect();
+    let andere = if neue_andere.is_empty() {
+        alte.into_iter().filter(|z| !ist_zu_gross(z)).collect()
     } else {
-        alte.filter(|z| ist_zu_gross(z) && !erledigt(z) && !neu.iter().any(|n| n == z))
-            .map(str::to_owned)
-            .chain(neu.iter().cloned())
-            .collect()
+        neue_andere
     };
-    zeilen.truncate(20);
+    zeilen.extend(andere.into_iter().take(20).map(str::to_owned));
     (!zeilen.is_empty()).then(|| zeilen.join("\n"))
 }
 
@@ -592,6 +605,17 @@ mod reihum_tests {
         assert_eq!(
             hinweise_fortschreiben(Some(&c), &[], &geliefert).as_deref(),
             Some(c.as_str())
+        );
+        // Über 20 „zu groß“ geht keiner verloren; andere Hinweise bleiben bei 20.
+        let viele: Vec<String> = (0..25)
+            .map(|i| uebernehmen::zu_gross_hinweis("anhang", &i.to_string()))
+            .chain((0..25).map(|i| format!("Lieferung nicht übernommen: {i}")))
+            .collect();
+        let h = hinweise_fortschreiben(None, &viele, &[]).unwrap();
+        assert_eq!(h.lines().filter(|z| z.contains("zu groß")).count(), 25);
+        assert_eq!(
+            h.lines().filter(|z| z.contains("nicht übernommen")).count(),
+            20
         );
         // Andere Hinweise ersetzt ein neuer wie bisher.
         let h = hinweise_fortschreiben(
