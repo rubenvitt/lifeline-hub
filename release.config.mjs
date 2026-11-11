@@ -100,9 +100,12 @@ export default {
    * (`X.Y.Z-alpha.N`). Ein stabiles Release entsteht ausschließlich durch den bewussten Merge
    * `alpha → main`.
    *
-   * `beta` ist vorbereitet, existiert aber nicht: semantic-release ignoriert konfigurierte
-   * Branches, die es auf dem REMOTE nicht gibt (ein nur lokaler Branch zählt nicht). Scharf
-   * wird der Kanal durch `git push origin alpha:beta`.
+   * `beta` (LLH-1545, ADR-0019) bekommt nur veröffentlichte Alpha-Tags, über den Workflow
+   * „Beta nachziehen“ (`.github/workflows/kanal-nachziehen.yml`). Der erste Lauf legt `beta`
+   * auf dem Tag an; bis dahin ignoriert semantic-release den Branch (konfigurierte Branches,
+   * die es auf dem REMOTE nicht gibt, zählen nicht). Danach kein `git push alpha:beta` mehr:
+   * der Versions-Commit auf `beta` machte jeden direkten Merge zum Konflikt. Beta zählt
+   * `X.Y.Z-beta.N`, Alpha daneben unverändert `X.Y.Z-alpha.N`.
    *
    * KEIN BOOTSTRAP-TAG: ohne Tag setzt semantic-release die erste Version selbst
    * (`1.0.0-alpha.1`); ein Start-Tag von Hand wäre ein manueller Schritt in einem Flow, der

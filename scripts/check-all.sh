@@ -267,7 +267,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest, PR-Kommentare, Drittanbieter-Quellen (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -277,9 +277,16 @@ schritt_8() {
   # Das Update-Manifest der Desktop-Hülle (LFH-721): ein falscher Eintrag lässt jede installierte
   # Hülle ins Leere laden oder bietet ein Update an, das keins ist — beides still.
   mise exec -- node --test "$ROOT/scripts/release/desktop-manifest.test.mjs"
-  # Der Alpha-Kanal der Hülle (LLH-1280): nur vorwärts und nur vollständig — ein Rückschritt
-  # oder eine fehlende Plattform bliebe an jeder Alpha-Hülle still hängen.
+  # Die Vorabkanäle der Hülle (LLH-1280, LLH-1545): nur vorwärts, nur vollständig, jeder Kanal
+  # nur seine eigenen — ein Rückschritt, eine fehlende Plattform oder eine Beta im Alpha-Kanal
+  # bliebe an jeder Vorab-Hülle still hängen.
   mise exec -- node --test "$ROOT/scripts/release/desktop-kanal.test.mjs"
+  # Das Nachziehen eines Alpha-Tags nach `beta` (LLH-1545): ein still aufgelöster Konflikt oder
+  # eine Alpha-Version auf `beta` fiele erst beim nächsten Beta-Release auf. Ohne Netz.
+  "$ROOT/scripts/release/kanal-nachziehen.test.sh"
+  # Die gleitenden Abbild-Tags `:latest`, `:alpha`, `:beta` (LLH-1545): nur vorwärts — ein
+  # nachgeholter älterer Lauf drehte sonst still zurück, was `docker pull …:beta` liefert.
+  mise exec -- node --test "$ROOT/scripts/release/abbild-kanal.test.mjs"
   # Die PR-Kommentare nach der Freigabe (LFH-1054): ab welchem Release gerechnet wird und dass
   # kein PR zweimal kommentiert wird — beides fiele erst an echten PRs auf.
   mise exec -- node --test "$ROOT/scripts/release/pr-kommentare.test.mjs"
