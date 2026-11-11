@@ -357,7 +357,7 @@ async fn uebernehme_zeilen(
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    katalog::nach_update_neu_holen(conn, einsatz_id, l, katalog_ab).await?;
+    katalog::nach_update_neu_holen(conn, einsatz_id, l, katalog_ab, nachholen_ab).await?;
     ergebnis.stand = sqlx::query_scalar("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = ?")
         .bind(einsatz_id)
         .fetch_one(&mut *conn)

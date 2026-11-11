@@ -710,6 +710,18 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
         .unwrap();
     assert_eq!(merker, Some(ab));
     sc.rollback().await.unwrap();
+    // Eine Wiederholung über den Merker nach verlorener Antwort, in der die Zuordnung wieder
+    // scheitert: Der Stand fällt vor sie zurück, obwohl er schon höher stand.
+    let mut wieder = l.clone();
+    wieder.katalog = true;
+    wieder.seit = 1;
+    wieder.zeilen.retain(|z| z.stand > wieder.seit);
+    let mut sc = s.begin().await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &empf, &wieder)
+        .await
+        .unwrap();
+    assert_eq!(erg.stand, ab - 1);
+    sc.rollback().await.unwrap();
     exec(
         &f,
         &format!("UPDATE einsatzabschnitt SET name = 'Nord 2' WHERE id = {abschnitt}"),
