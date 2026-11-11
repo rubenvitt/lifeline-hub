@@ -65,13 +65,14 @@ nur im Formular, wenn es dort eingetragen wird.
 
 ### Was danach passiert
 
-Jede Rückmeldung aus dem Formular geht automatisch in die Aufgabenliste der Entwicklung und trägt
-danach das Label „aufgenommen“. Das Label „nicht-aufgenommen“ heißt, dass die Übernahme gescheitert
-ist; die Entwicklung sieht das und holt sie nach. Steht es nach einem Tag noch da, hilft eine E-Mail
-mit der Nummer des Issues an rueckmeldung@lifeline-hub.de. Rückfragen und Antworten stehen als
-Kommentar im Issue; GitHub benachrichtigt die meldende Person darüber. Das Issue bleibt der Ort für
-Ergänzungen: später hinzugefügter Text erreicht die Entwicklung über das Issue, nicht über eine neue
-Rückmeldung.
+Eine Rückmeldung aus dem Formular geht automatisch in die Aufgabenliste der Entwicklung und trägt
+danach das Label „aufgenommen“. Das Label „nicht-aufgenommen“ heißt, dass die Übernahme nicht
+bestätigt ist. Die Entwicklung bekommt das angezeigt und holt die Übernahme von Hand nach; danach
+wechselt das Label auf „aufgenommen“. Steht „nicht-aufgenommen“ nach einem Tag noch da, hilft eine
+E-Mail mit der Nummer des Issues an rueckmeldung@lifeline-hub.de. Rückfragen und Antworten stehen
+als Kommentar im Issue; GitHub benachrichtigt die meldende Person darüber. Das Issue bleibt der Ort
+für Ergänzungen: später hinzugefügter Text erreicht die Entwicklung über das Issue, nicht über eine
+neue Rückmeldung.
 
 ### Gekoppelte Geräte
 
