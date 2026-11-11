@@ -21,25 +21,39 @@ function ausloeser(page: Page) {
 }
 
 /**
- * Der Kopf hängt an der Rolle (Tag „Admin“, „Führungskraft“ oder keiner). Gemessen wird als Admin
- * (mit Tag) und als Beobachter ohne Rollen-Tag (LFH-435, `e2e/AGENTS.md`); den Wechsel sät der
- * Admin, der Beobachter braucht dafür einen Einsatz.
+ * Der Kopf hängt an der Rolle (Tag „Admin“, „Führungskraft“ oder keiner). Gemessen wird jeder
+ * Zweig (LFH-435, `e2e/AGENTS.md`): Admin, Org-Führungskraft mit dem längsten Tag (im
+ * Handschuh-Betrieb neben dem Namen) und Beobachter ohne Tag. Den Wechsel sät der Admin; der
+ * Beobachter braucht dafür einen Einsatz.
  */
-const NUTZER = ['admin', 'beobachter'] as const;
+const NUTZER = ['admin', 'fuehrungskraft', 'beobachter'] as const;
 type Nutzer = (typeof NUTZER)[number];
+
+const ROLLEN_TAGS: Record<Nutzer, string[]> = {
+  admin: ['Admin'],
+  fuehrungskraft: ['Führungskraft'],
+  beobachter: [],
+};
 
 async function anmelden(page: Page, nutzer: Nutzer): Promise<string> {
   await anmeldenAlsAdmin(page);
   if (nutzer === 'admin') return 'admin';
-  const einsatzId = await einsatzAnlegen(page, `Benutzermenü Beobachter ${Date.now()}`);
-  const konto = await wechsleZuRolle(page, 'beobachter', einsatzId);
+  const einsatzId =
+    nutzer === 'beobachter'
+      ? await einsatzAnlegen(page, `Benutzermenü Beobachter ${Date.now()}`)
+      : undefined;
+  const konto = await wechsleZuRolle(page, nutzer, einsatzId);
   return konto.benutzername;
 }
 
 /** Vorbedingung vor der Messung: der Kopf zeigt die Person und genau ihren Rollenzweig. */
 async function pruefeKopf(menue: Locator, nutzer: Nutzer, benutzername: string) {
   await expect(menue.getByText(new RegExp(`@${benutzername}\\b`))).toBeVisible();
-  await expect(menue.getByText('Admin', { exact: true })).toHaveCount(nutzer === 'admin' ? 1 : 0);
+  for (const tag of ['Admin', 'Führungskraft']) {
+    await expect(menue.getByText(tag, { exact: true })).toHaveCount(
+      ROLLEN_TAGS[nutzer].includes(tag) ? 1 : 0,
+    );
+  }
 }
 
 for (const nutzer of NUTZER) {
