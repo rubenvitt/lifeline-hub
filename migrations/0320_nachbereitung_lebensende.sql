@@ -60,3 +60,12 @@ CREATE TABLE einsatz_verwahrung (
     grund        TEXT,
     quittiert_at TEXT NOT NULL
 );
+
+-- D4: Erreichte Seite: der Stand, zu dem ein Spiegel zur Verwahrung umgewandelt wurde. Meldet die
+-- Gegenstelle den Einsatz danach mit einem anderen Stand, hat er sich nach der Übergabe geändert:
+-- dann quittiert sie nicht erneut „angenommen“, damit die meldende Seite die Änderung behält.
+CREATE TABLE verwahrung_angenommen (
+    einsatz_id    INTEGER PRIMARY KEY REFERENCES einsatz(id) ON DELETE CASCADE,
+    stand         INTEGER NOT NULL,
+    angenommen_at TEXT NOT NULL
+);

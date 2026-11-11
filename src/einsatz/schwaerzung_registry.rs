@@ -2940,6 +2940,18 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("quittiert_at", G_ZEIT),
         ],
     },
+    // Stand der Annahme einer Verwahrung an der erreichten Seite (LLH-1494, D4): eine Zahl.
+    TabellenRegel {
+        tabelle: "verwahrung_angenommen",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("stand", G_ZAEHLER),
+            retain("angenommen_at", G_ZEIT),
+        ],
+    },
     // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf
     // Stammdaten der Org, nie auf Einsatzzeilen.
     TabellenRegel {

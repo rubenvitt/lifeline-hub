@@ -144,6 +144,9 @@ Mit dem Ende der Nachbereitung gilt an einem ELW, der mit einem Hub gekoppelt is
   Hub zuerst. Solange der Hub nicht bestätigt hat, bleibt der Einsatz am ELW. Läuft in dieser
   Zeit seine Aufbewahrungsfrist ab, geht die Frist vor: der ELW merkt ihn zur Löschung vor und
   schwärzt ihn wie jeden anderen Einsatz.
+- **Ändert sich der Einsatz am ELW während der Übergabe**, etwa seine Frist, bleibt er am ELW.
+  Das Paneel nennt „Nach der Übergabe geändert“. Der Hub behält seinen Stand vom Zeitpunkt der
+  Übernahme.
 - **Nicht übergeben** wird ein Einsatz, der zur Löschung vorgemerkt oder geschwärzt ist oder ein
   offenes Löschersuchen hat.
 - **Spiegel von Einsätzen des Hubs** löscht der ELW nach dem Ende der Nachbereitung, sobald kein

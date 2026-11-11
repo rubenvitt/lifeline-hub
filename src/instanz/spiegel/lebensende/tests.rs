@@ -454,16 +454,32 @@ async fn quittungen_merken_angenommen_vor_und_halten_den_grund_fest() {
     let (a, _) = einsatz(&pool, leit).await;
     let (b, _) = einsatz(&pool, leit).await;
     let (c, _) = einsatz(&pool, leit).await;
-    for id in [a, b, c] {
+    let (geaendert, _) = einsatz(&pool, leit).await;
+    let (verlaengert, _) = einsatz(&pool, leit).await;
+    for id in [a, b, c, geaendert, verlaengert] {
         sqlx::query("UPDATE einsatz SET kennung = 'ich/' || id WHERE id = ?")
             .bind(id)
             .execute(&pool)
             .await
             .unwrap();
+        setze_bis(&pool, id, "2026-11-01 00:00:00").await;
     }
+    // Nach dem Senden verlängert: nicht mehr fällig.
+    setze_bis(&pool, verlaengert, "2026-12-01 00:00:00").await;
     let gesendet = vec![
-        verwahrt(&format!("ich/{a}"), 1, vec![]),
-        verwahrt(&format!("ich/{b}"), 1, vec![]),
+        verwahrt(&format!("ich/{a}"), stand_von(&pool, a).await, vec![]),
+        verwahrt(&format!("ich/{b}"), stand_von(&pool, b).await, vec![]),
+        // Nach dem Senden geändert: der gesendete Stand ist älter.
+        verwahrt(
+            &format!("ich/{geaendert}"),
+            stand_von(&pool, geaendert).await - 1,
+            vec![],
+        ),
+        verwahrt(
+            &format!("ich/{verlaengert}"),
+            stand_von(&pool, verlaengert).await,
+            vec![],
+        ),
     ];
     let quittung = |id: i64, ergebnis: &str, grund: Option<&str>| LebensendeQuittung {
         kennung: format!("ich/{id}"),
@@ -481,6 +497,8 @@ async fn quittungen_merken_angenommen_vor_und_halten_den_grund_fest() {
             quittung(a, VERWAHRUNG_ANGENOMMEN, None),
             quittung(b, VERWAHRUNG_WARTET, Some("1 Anhang fehlt")),
             quittung(c, VERWAHRUNG_ANGENOMMEN, None),
+            quittung(geaendert, VERWAHRUNG_ANGENOMMEN, None),
+            quittung(verlaengert, VERWAHRUNG_ANGENOMMEN, None),
         ],
         JETZT,
     )
@@ -498,11 +516,61 @@ async fn quittungen_merken_angenommen_vor_und_halten_den_grund_fest() {
         (gegenstelle.as_str(), grund.as_deref()),
         ("Gegenstelle", Some("1 Anhang fehlt"))
     );
+    for id in [geaendert, verlaengert] {
+        let grund: Option<String> =
+            sqlx::query_scalar("SELECT grund FROM einsatz_verwahrung WHERE einsatz_id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(grund.as_deref(), Some("Nach der Übergabe geändert"));
+    }
     let merker: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abraeumen")
         .fetch_one(&pool)
         .await
         .unwrap();
     assert_eq!(merker, 1);
+}
+
+async fn stand_von(pool: &SqlitePool, id: i64) -> i64 {
+    let stand: Option<i64> =
+        sqlx::query_scalar("SELECT MAX(stand) FROM einsatz_aenderung WHERE einsatz_id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    stand.unwrap_or(0)
+}
+
+#[tokio::test]
+async fn zweite_meldung_mit_anderem_stand_wird_nicht_wieder_angenommen() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let k = kopplung(&pool, "wird_gemeldet").await;
+    spiegel(&pool, leit, "gegen/7", 3).await;
+    let (q, umgewandelt) = annehmen(&pool, &k, &verwahrt("gegen/7", 3, vec![]))
+        .await
+        .unwrap();
+    assert_eq!(q.ergebnis, VERWAHRUNG_ANGENOMMEN);
+    assert!(umgewandelt.is_some());
+
+    // Die Quittung ging verloren: derselbe Stand wird wieder angenommen.
+    let (q, umgewandelt) = annehmen(&pool, &k, &verwahrt("gegen/7", 3, vec![]))
+        .await
+        .unwrap();
+    assert_eq!(q.ergebnis, VERWAHRUNG_ANGENOMMEN);
+    assert_eq!(umgewandelt, None);
+
+    // Drüben nach der Übergabe geändert: kein zweites „angenommen“.
+    let (q, umgewandelt) = annehmen(&pool, &k, &verwahrt("gegen/7", 4, vec![]))
+        .await
+        .unwrap();
+    assert_eq!(q.ergebnis, VERWAHRUNG_WARTET);
+    assert_eq!(
+        q.grund.as_deref(),
+        Some("Nach der Übergabe geändert (Stand 3 von 4)")
+    );
+    assert_eq!(umgewandelt, None);
 }
 
 #[tokio::test]

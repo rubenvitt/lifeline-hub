@@ -194,6 +194,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Stand der Übergabe an dieser Instanz; die Quittung kommt im Paket",
     ),
     (
+        "verwahrung_angenommen",
+        "Stand der Annahme an der verwahrenden Instanz; nur sie vergleicht ihn",
+    ),
+    (
         "schwaerzung_antrag",
         "Löschersuchen wirkt beim Führer; die Schwärzung kommt über das Log",
     ),

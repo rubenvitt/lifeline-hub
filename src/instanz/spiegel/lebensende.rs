@@ -211,14 +211,28 @@ pub async fn verwahrung_annehmen(
     {
         return Ok(None);
     }
-    // Schon angenommen (die Quittung ging verloren): wieder `angenommen`.
-    let eigen: Option<i64> =
-        sqlx::query_scalar("SELECT id FROM einsatz WHERE kennung = ? AND spiegel = 0")
-            .bind(&l.kennung)
-            .fetch_optional(&mut *conn)
-            .await?;
-    if eigen.is_some() {
-        return Ok(Some((angenommen(&l.kennung), None)));
+    // Schon angenommen (die Quittung ging verloren): wieder `angenommen`, aber nur zum selben
+    // Stand. Hat sich der Einsatz drüben nach der Übergabe geändert, behält die meldende Seite
+    // ihn; ein zweites `angenommen` ließe sie die Änderung abräumen.
+    let eigen: Option<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT e.id, v.stand FROM einsatz e \
+         LEFT JOIN verwahrung_angenommen v ON v.einsatz_id = e.id \
+         WHERE e.kennung = ? AND e.spiegel = 0",
+    )
+    .bind(&l.kennung)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some((_, stand)) = eigen {
+        return Ok(Some(match stand {
+            Some(s) if s != l.stand => (
+                wartet(
+                    &l.kennung,
+                    format!("Nach der Übergabe geändert (Stand {s} von {})", l.stand),
+                ),
+                None,
+            ),
+            _ => (angenommen(&l.kennung), None),
+        }));
     }
     let Some((id, stand)) = spiegel_der_kopplung(conn, kopplung.id, &l.kennung).await? else {
         return Ok(Some((
@@ -340,6 +354,14 @@ async fn umwandeln(
         .bind(id)
         .execute(&mut *conn)
         .await?;
+    sqlx::query(
+        "INSERT INTO verwahrung_angenommen (einsatz_id, stand, angenommen_at) \
+         VALUES (?, ?, datetime('now'))",
+    )
+    .bind(id)
+    .bind(l.stand)
+    .execute(&mut *conn)
+    .await?;
     sqlx::query("DELETE FROM spiegel_uebernahme")
         .execute(&mut *conn)
         .await?;
@@ -488,7 +510,24 @@ pub async fn quittungen_uebernehmen(
         else {
             continue;
         };
-        if q.ergebnis == VERWAHRUNG_ANGENOMMEN {
+        // Die Quittung gilt dem gesendeten Stand. Hat sich der Einsatz seitdem geändert oder ist
+        // er nicht mehr fällig (Nachbereitung verlängert, Löschung vorgemerkt), bleibt er hier.
+        let gesendeter_stand = gesendet
+            .iter()
+            .find(|l| l.art == LEBENSENDE_VERWAHRT && l.kennung == q.kennung)
+            .map(|l| l.stand);
+        let noch_so = q.ergebnis != VERWAHRUNG_ANGENOMMEN
+            || noch_wie_gesendet(conn, id, gesendeter_stand, jetzt).await?;
+        if !noch_so {
+            verwahrung_merken(
+                conn,
+                id,
+                &kopplung.gegenueber_name,
+                Some("Nach der Übergabe geändert"),
+                jetzt,
+            )
+            .await?;
+        } else if q.ergebnis == VERWAHRUNG_ANGENOMMEN {
             abraeumen::vormerken(
                 conn,
                 id,
@@ -498,22 +537,77 @@ pub async fn quittungen_uebernehmen(
             .await?;
             ids.push(id);
         } else if q.ergebnis == VERWAHRUNG_WARTET {
-            let grund: Option<String> = q.grund.as_deref().map(|g| g.chars().take(200).collect());
-            sqlx::query(
-                "INSERT INTO einsatz_verwahrung (einsatz_id, gegenstelle, grund, quittiert_at) \
-                 VALUES (?, ?, ?, ?) ON CONFLICT (einsatz_id) DO UPDATE SET \
-                 gegenstelle = excluded.gegenstelle, grund = excluded.grund, \
-                 quittiert_at = excluded.quittiert_at",
+            verwahrung_merken(
+                conn,
+                id,
+                &kopplung.gegenueber_name,
+                q.grund.as_deref(),
+                jetzt,
             )
-            .bind(id)
-            .bind(&kopplung.gegenueber_name)
-            .bind(grund)
-            .bind(jetzt)
-            .execute(&mut *conn)
             .await?;
         }
     }
     Ok(ids)
+}
+
+/// Ob der Einsatz noch so ist, wie er zur Verwahrung gesendet wurde: gleicher Stand und weiter
+/// fällig (dieselbe Bedingung wie [`faellige_verwahrungen`], ohne die Grenze je Anfrage).
+async fn noch_wie_gesendet(
+    conn: &mut SqliteConnection,
+    id: i64,
+    gesendeter_stand: Option<i64>,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let Some(gesendet) = gesendeter_stand else {
+        return Ok(false);
+    };
+    let stand: Option<i64> =
+        sqlx::query_scalar("SELECT MAX(stand) FROM einsatz_aenderung WHERE einsatz_id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if stand.unwrap_or(0) != gesendet {
+        return Ok(false);
+    }
+    let faellig: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz e WHERE e.id = ?1 AND e.spiegel = 0 \
+           AND e.status = ?2 AND e.geloescht_at IS NULL AND e.geschwaerzt_at IS NULL \
+           AND e.nachbereitung_bis GLOB \
+               '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' \
+           AND ?3 >= e.nachbereitung_bis \
+           AND NOT EXISTS (SELECT 1 FROM schwaerzung_antrag a WHERE a.einsatz_id = e.id \
+                           AND a.zurueckgenommen_at IS NULL AND a.vollzogen_at IS NULL))",
+    )
+    .bind(id)
+    .bind(crate::einsatz::STATUS_ABGESCHLOSSEN)
+    .bind(jetzt)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(faellig)
+}
+
+/// Hält die letzte Quittung „wartet“ samt Grund für die Anzeige fest.
+async fn verwahrung_merken(
+    conn: &mut SqliteConnection,
+    id: i64,
+    gegenstelle: &str,
+    grund: Option<&str>,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let grund: Option<String> = grund.map(|g| g.chars().take(200).collect());
+    sqlx::query(
+        "INSERT INTO einsatz_verwahrung (einsatz_id, gegenstelle, grund, quittiert_at) \
+         VALUES (?, ?, ?, ?) ON CONFLICT (einsatz_id) DO UPDATE SET \
+         gegenstelle = excluded.gegenstelle, grund = excluded.grund, \
+         quittiert_at = excluded.quittiert_at",
+    )
+    .bind(id)
+    .bind(gegenstelle)
+    .bind(grund)
+    .bind(jetzt)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
