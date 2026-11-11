@@ -264,6 +264,39 @@ async fn uebersicht_zeigt_protokollzeilen_nur_der_eigenen_org() {
     );
 }
 
+/// LLH-1494 (design.md D7): Ein verwahrter Einsatz erscheint mit Zustand `verwahrt` und
+/// Gegenstelle, ein abgeräumter Spiegel gar nicht.
+#[tokio::test]
+async fn uebersicht_zeigt_verwahrt_mit_gegenstelle_und_laesst_spiegel_aus() {
+    let pool = crate::db::test_pool().await;
+    let _admin = grundlage(&pool).await;
+    for (id, art, nummer) in [
+        (900, "verwahrt", Some("E-2026-0007")),
+        (901, "spiegel", None),
+    ] {
+        sqlx::query(
+            "INSERT INTO aufbewahrung_loeschprotokoll (org_id, einsatz_id, art, gegenstelle, \
+                einsatznummer_intern, abgeschlossen_at, geloescht_at) \
+             VALUES (1, ?, ?, 'Hub Kreis', ?, '2026-05-01 00:00:00', '2026-06-01 00:00:00')",
+        )
+        .bind(id)
+        .bind(art)
+        .bind(nummer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let liste = repo::uebersicht(&pool, 1, t(JETZT)).await.unwrap();
+    let ids: Vec<i64> = liste.iter().map(|e| e.einsatz_id).collect();
+    assert_eq!(ids, vec![900], "abgeräumter Spiegel fehlt");
+    let v = &liste[0];
+    assert_eq!(v.zustand, AufbewahrungZustand::Verwahrt);
+    assert_eq!(v.gegenstelle.as_deref(), Some("Hub Kreis"));
+    assert_eq!(v.einsatznummer_intern.as_deref(), Some("E-2026-0007"));
+    assert_eq!(v.geschwaerzt_at, None);
+}
+
 #[tokio::test]
 async fn akte_waehrend_karenz_traegt_keine_personendaten() {
     let pool = crate::db::test_pool().await;

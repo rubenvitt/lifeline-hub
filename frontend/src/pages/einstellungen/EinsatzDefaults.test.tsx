@@ -34,6 +34,7 @@ const VOLL = {
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
   skelett_dauer_tage: null as number | null,
+  nachbereitung_tage: 30 as number | null,
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
@@ -76,6 +77,7 @@ describe('EinsatzDefaults', () => {
         geocoder_url: 'https://geo.example',
         retention_dauer_tage: 90,
         skelett_dauer_tage: null,
+        nachbereitung_tage: 30,
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
@@ -86,6 +88,19 @@ describe('EinsatzDefaults', () => {
         auto_etb_eintraege: false,
         aufbewahrung_kategorien: [],
       }),
+    );
+  });
+
+  it('LLH-1494: leere Nachbereitung geht als null hinaus', async () => {
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+    const feld = await screen.findByLabelText('Nachbereitung (Tage ab Abschluss)');
+    expect(feld).toHaveValue('30');
+    await userEvent.clear(feld);
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ nachbereitung_tage: null }),
+      ),
     );
   });
 

@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs]
 ---
 
 ## Überblick
@@ -66,8 +66,11 @@ durchsehen: was danach fehlt, lässt sich nicht mehr nachtragen.
   Einsatztagebuch hält das fest. Eine schon gesetzte Frist bleibt unverändert.
 - Hat die Organisation Vorgaben je Datenkategorie, entstehen daraus die Fristen für
   Behandlung, Personenauskunft und Anhänge dieses Einsatzes.
+- Hat die Organisation eine Nachbereitung in Tagen, setzt der Abschluss ihr Ende auf Abschluss
+  plus Dauer. Das Einsatztagebuch hält das fest. Danach übergibt ein ELW, der mit einem Hub
+  gekoppelt ist, den Einsatz dem Hub; ohne Kopplung bleibt er, wo er ist.
 
-Nur die Aufbewahrungsfrist lässt sich danach noch ändern; das Kapitel
+Nur Aufbewahrungsfrist und Nachbereitung lassen sich danach noch ändern; das Kapitel
 [Aufbewahrung](aufbewahrung.md) beschreibt den Weg und die Folgen.
 
 ### Wer einen abgeschlossenen Einsatz noch liest

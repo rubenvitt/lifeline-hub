@@ -183,7 +183,19 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("demo_herkunft", "Demo-Daten werden nicht gespiegelt (D6)"),
     (
         "aufbewahrung_loeschprotokoll",
-        "Löschprotokoll dieser Instanz; das Lebensende regelt LLH-1494",
+        "Löschprotokoll dieser Instanz; das Lebensende kommt als eigene Nachricht (LLH-1494)",
+    ),
+    (
+        "einsatz_abraeumen",
+        "Merker dieser Instanz für das Abräumen",
+    ),
+    (
+        "einsatz_verwahrung",
+        "Stand der Übergabe an dieser Instanz; die Quittung kommt im Paket",
+    ),
+    (
+        "verwahrung_angenommen",
+        "Stand der Annahme an der verwahrenden Instanz; nur sie vergleicht ihn",
     ),
     (
         "schwaerzung_antrag",
@@ -191,7 +203,7 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ),
     (
         "einsatz_aufbewahrung_kategorie",
-        "Fristen gelten am Führer; das Lebensende des Spiegels regelt LLH-1494",
+        "Fristen gelten am Führer; zur Verwahrung kommen sie mit dem Lebensende (LLH-1494)",
     ),
     ("einsatz_aenderung", "Verwaltung des Spiegels selbst"),
     ("einsatz_spiegel", "Verwaltung des Spiegels selbst"),

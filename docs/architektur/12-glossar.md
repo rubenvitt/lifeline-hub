@@ -43,6 +43,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Lagefeststellung | Mehrzahl des ETB-Typs „Lage“; keine Lagemeldung. | [`frontend/AGENTS.md`](../../frontend/AGENTS.md), Abschnitt „Begriffe“ |
 | Lagekarte | Karte mit Einsatzort, Objekten, taktischen Zeichen und Gefahrengebieten. | [`frontend/src/pages/lagekarte/AGENTS.md`](../../frontend/src/pages/lagekarte/AGENTS.md) |
 | Meldebild | Status, Stärke und Gliederung der Kräfte (Modul-Key `kraefteuebersicht`). | `frontend/src/einsatz/modulRegistry.ts`, `src/einsatz/modul.rs` |
+| Nachbereitung | Zeit nach dem Abschluss, in der ein Einsatz an seiner Instanz bleibt; danach übergibt ein ELW eigene Einsätze dem Hub zur Verwahrung und räumt Spiegel ab. | `src/einsatz/nachbereitung.rs`, `org_einstellungen.nachbereitung_tage` |
 | Nachforderung | Anforderung weiterer Kräfte oder Mittel mit Zusage, Anmarsch und Eintreffen, jeder Schritt im ETB. | `src/nachforderung/`, Specs [`nachforderung-erfassung`](../../openspec/specs/nachforderung-erfassung/spec.md), [`etb-vorgaenge`](../../openspec/specs/etb-vorgaenge/spec.md) |
 | Organisation | Der Mandant: Träger der Stammdaten, Einstellungen und Einsätze. | `src/org/`, [Querschnitt 8.1](08-querschnittliche-konzepte.md) |
 | PAT-Nummer | Kennung eines Patienten im Patientenkopf. | [`frontend/src/personen/AGENTS.md`](../../frontend/src/personen/AGENTS.md) |
@@ -61,6 +62,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 
 | Begriff | Bedeutung | Quelle |
 | --- | --- | --- |
+| Abräumen | Löschen eines Einsatzes, den diese Instanz nicht mehr halten soll (verwahrt oder Spiegel), mit Zeile im Löschprotokoll; Merker `einsatz_abraeumen`, nachgeholt in Phase R des Purge-Laufs. | `src/einsatz/abraeumen.rs` |
 | ADR | Architekturentscheidung als Datei mit prüfbaren Regeln. | [`docs/architektur/AGENTS.md`](AGENTS.md), [Architekturentscheidungen](09-architekturentscheidungen.md) |
 | Antrag (am Spiegel) | Erfassung an einem Spiegel, die als Antrag zum Führer geht; Zustand `ausstehend`, `zugestellt`, `uebernommen` oder `abgelehnt`. Beantragbar ist nur, was ohne Netz vormerkbar ist (`BEANTRAGBAR`). | `src/instanz/spiegel/antrag.rs`, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md) |
 | Archiv (Aufbewahrung) | Nur lesender, dem System-Admin vorbehaltener Zugang zu gesperrten Einsätzen unter `/api/aufbewahrung`. | `src/aufbewahrung/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Aufbewahrung“ |
@@ -82,6 +84,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Kopplung | Bindung eines ausgegebenen Geräts an genau einen Einsatz, befristet und widerrufbar. | `src/geraet/`, Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md) |
 | Lagebild-Speicher | IndexedDB `lifeline-lagebild` mit dem ohne Netz lesbaren Stand. | `frontend/src/offline/lagebildSpeicher.ts`, [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md) |
 | Lagemonitor | Gekoppeltes Gerät, das das Lagebild ohne Bedienung und ohne Personendaten zeigt. | Spec [`lagemonitor`](../../openspec/specs/lagemonitor/spec.md) |
+| Lebensende (Spiegel) | Nachricht im Abgleich, dass der Führer einen Einsatz gelöscht (`geloescht`) oder zur Verwahrung übergeben hat (`verwahrt`), mit Quittung `angenommen` oder `wartet`. | `src/instanz/spiegel/lebensende.rs`, `Lebensende` in `src/instanz/spiegel/paket.rs` |
 | Live-Kanal (Einsatz-Strom, Org-Strom) | SSE-Strom je Einsatz bzw. je Organisation mit festen Ereignisnamen. | `src/live/mod.rs`, `src/live/org.rs`, [Querschnitt 8.6](08-querschnittliche-konzepte.md) |
 | Modul, Modul-Registry | Fachbereich der Einsatzoberfläche mit festem Key; Registry im Frontend, Key-Spiegel im Backend. | `frontend/src/einsatz/modulRegistry.ts`, `MODUL_KEYS` in `src/einsatz/modul.rs` |
 | Modulfreigabe, Modul-Override | Vom Server berechnete Sichtbarkeit und Rolle je Modul; ein Override setzt sie für einen Einsatz. | Spec [`modul-freigabe`](../../openspec/specs/modul-freigabe/spec.md), `src/einsatz/modul_override.rs` |
@@ -100,6 +103,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Stellvertreter (Konto) | Konto am Spiegel für ein Konto, das es nur beim Gegenüber gibt: trägt dessen Anzeigenamen, kann sich nie anmelden und wird nie Mitglied. | `spiegel_konto` in `migrations/0314_einsatz_spiegel.sql`, `src/instanz/spiegel/abbildung.rs` |
 | Typ-Codegen | Erzeugung der Frontend-Typen aus dem OpenAPI-Schema des Backends. | [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“ |
 | Unterschriftsschlüssel | Passkey eines Org-Admins nur zum Unterschreiben (nie zur Anmeldung); gekoppelte Instanzen kennen seinen öffentlichen Schlüssel und prüfen damit Erklärungen des Admins. | `src/auth/unterschrift/`, Spec `org-admin-unterschrift` (`openspec/specs/org-admin-unterschrift/`) |
+| Verwahrung | Übergabe eines eigenen, abgeschlossenen Einsatzes nach der Nachbereitung von der meldenden an die erreichte Instanz; dort wird aus dem Spiegel ein eigener Einsatz. | `verwahrung_annehmen` in `src/instanz/spiegel/lebensende.rs`, `einsatz_verwahrung` in `migrations/0322_nachbereitung_lebensende.sql` |
 | Wächter | Test oder Skript, das eine Regel im Code durchsetzt (`*.guard.test.ts`, `tests/*_guard.rs`, `scripts/check-*.sh`). | [Querschnitt 8.27](08-querschnittliche-konzepte.md) |
 | Wire-Enum | Enum, dessen Wire-Werte aus einer Liste `Variante => "wire"` entstehen. | `wire_enum!` in `src/wire_enum.rs`, `tests/enum_wire_kontrakt.rs` |
 | Zunder | Aufgabenverwaltung des Projekts; alte Kennungen `LFH-<n>` bleiben gültig. | [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Zunder“ |

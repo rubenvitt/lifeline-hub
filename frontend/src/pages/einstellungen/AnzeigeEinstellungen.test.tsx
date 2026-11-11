@@ -26,6 +26,7 @@ const VOLL = {
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
   skelett_dauer_tage: 3650,
+  nachbereitung_tage: 30,
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
@@ -66,6 +67,8 @@ describe('AnzeigeEinstellungen', () => {
         retention_dauer_tage: 90,
         // LFH-750: ein Anzeige-Save darf die Skelett-Frist weder nullen noch verkürzen.
         skelett_dauer_tage: 3650,
+        // LLH-1494: ebenso wenig die Nachbereitung.
+        nachbereitung_tage: 30,
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',

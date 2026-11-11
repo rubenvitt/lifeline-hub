@@ -49,6 +49,8 @@ const ORG_FLOOR_AUSNAHME: &[(&str, &str)] = &[
     // Admin ODER Einsatzleitung, auch an einem Einsatz mit abgelaufener Frist, den das
     // Lese-Gate hart sperrt. Die Prüfung steht im Rumpf.
     ("einsatz", "aufbewahrungsfrist_setzen"),
+    // Wie die Frist: die Nachbereitung eines abgeschlossenen Einsatzes (LLH-1494).
+    ("einsatz", "nachbereitung_setzen"),
     // LFH-749: dasselbe je Datenkategorie — Admin ODER Einsatzleitung, auch an einem Einsatz
     // mit abgelaufener Frist; die Zustandsprüfungen stehen im Repo.
     ("einsatz", "kategorie_frist_setzen"),
