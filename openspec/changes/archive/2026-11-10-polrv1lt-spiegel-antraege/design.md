@@ -496,7 +496,11 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   `sprechgruppe_spiegelkatalog_u` schreibt eine geänderte Katalogzeile ins Log jedes nutzenden
   Einsatzes (Wächter `katalog::tests`). `OHNE_NACHHOLEN` entfällt. Liefern folgt jetzt auch
   Elementen der Fernmeldeskizze (`sg-12`). Grenze: Eine über den Namen gefundene Sprechgruppe des
-  Spiegels zieht eine spätere Umbenennung beim Führer nicht nach.
+  Spiegels zieht eine spätere Umbenennung beim Führer nicht nach. Ein Absender vor LLH-1629
+  meldet dasselbe Protokoll, liefert die Katalogzeile aber nicht: Die Lieferung trägt deshalb
+  `katalog: true`; fehlt das Feld, wartet der Spiegel nicht auf einen fehlenden Bezug der
+  Sprechgruppen-Zuordnungen (`katalog::OHNE_KATALOG`), sonst bliebe sein Stand bis zum Update
+  stehen.
 - **10.11.2026, Review, offen (Folgeaufgaben):** Das Konto eines Antrags gegen die Orgs der Kopplung
   prüfen (die Route verlangt weiter eine Mitgliedschaft mit Schreibrecht), die Vergabe neuer
   Spiegel-IDs nach LFH-690, die Prüfsumme je Lieferung aus `anhang.sha256` statt aus dem Inhalt

@@ -22,6 +22,17 @@ use crate::instanz::stammdaten::StammdatenArt;
 use serde_json::{Map, Value};
 use sqlx::SqliteConnection;
 
+/// Zuordnungen auf Sprechgruppen, deren Katalogzeile ein Absender vor LLH-1629 nicht mitliefert
+/// ([`super::paket::EinsatzLieferung::katalog`]). Fehlt ihr Bezug, wartet der Spiegel bei ihm
+/// nicht darauf, sonst bliebe sein Stand bis zum Update des Absenders stehen.
+pub const OHNE_KATALOG: &[&str] = &[
+    "einsatz_fuehrungsstelle_sprechgruppe",
+    "einsatzabschnitt_sprechgruppe",
+    "einsatz_einheit_sprechgruppe",
+    "einsatz_kommunikation_stelle_sprechgruppe",
+    "fernmeldeskizze_komponente_sprechgruppe",
+];
+
 /// Gespiegelte Tabellen mit Katalogzeilen (`einsatz_id IS NULL`) und ihre Stammdatenart.
 const KATALOGE: &[(&str, StammdatenArt)] = &[("sprechgruppe", StammdatenArt::Sprechgruppe)];
 

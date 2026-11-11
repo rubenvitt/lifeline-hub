@@ -303,7 +303,10 @@ async fn uebernehme_zeilen(
             "Zeile {} {} nicht übernommen: {grund}",
             z.art, z.schluessel
         ));
-        nachholen_ab = Some(nachholen_ab.map_or(z.stand, |n| n.min(z.stand)));
+        // Ein Absender vor LLH-1629 liefert die Katalogzeile nie nach: dort nicht darauf warten.
+        if l.katalog || !katalog::OHNE_KATALOG.contains(&z.art.as_str()) {
+            nachholen_ab = Some(nachholen_ab.map_or(z.stand, |n| n.min(z.stand)));
+        }
     }
     for z in spaeter_loeschen {
         if let Err(f) = loeschen(conn, schema, einsatz_id, z, ergebnis).await {

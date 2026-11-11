@@ -507,6 +507,7 @@ pub async fn liefere_einsatz(
         bis,
         zeilen,
         konten,
+        katalog: true,
     }))
 }
 
@@ -524,6 +525,7 @@ fn leere_lieferung(
         freigabestufe: e.freigabestufe.clone(),
         seit,
         bis,
+        katalog: true,
         ..Default::default()
     }
 }

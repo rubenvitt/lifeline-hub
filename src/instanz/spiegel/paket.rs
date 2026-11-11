@@ -79,6 +79,10 @@ pub struct EinsatzLieferung {
     /// Die Konten, auf die die Zeilen verweisen (D5).
     #[serde(default)]
     pub konten: Vec<KontoAngabe>,
+    /// Der Absender liefert genutzte Katalog-Sprechgruppen mit (LLH-1629); ein älterer nicht
+    /// (siehe [`super::katalog::OHNE_KATALOG`]).
+    #[serde(default)]
+    pub katalog: bool,
 }
 
 /// Eine gelieferte Zeile.

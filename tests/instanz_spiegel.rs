@@ -1337,6 +1337,8 @@ async fn katalog_sprechgruppen_des_hubs_erscheinen_am_elw_auch_in_der_fernmeldes
     .await;
     // Noch nicht verteilt: am ELW ohne Gegenstück.
     let hub_neu = katalog_sprechgruppe(&hub, "Kanal Neu").await;
+    // Nur in der Skizze, keiner Einheit zugeordnet: kommt allein über das Element `sg-<id>`.
+    let hub_skizze = katalog_sprechgruppe(&hub, "Kanal Skizze").await;
 
     let e = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Alarm Hub").await;
     let einheit = common::einheit_bilden(&hub.app, &hub.admin, e, "SEG 1").await;
@@ -1348,6 +1350,14 @@ async fn katalog_sprechgruppen_des_hubs_erscheinen_am_elw_auch_in_der_fernmeldes
         &format!(
             "INSERT INTO fernmeldeskizze_lage (einsatz_id, element, x, y, geaendert_von_id) \
              VALUES ({e}, 'sg-{hub_sg}', 10, 20, {admin})"
+        ),
+    )
+    .await;
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO fernmeldeskizze_lage (einsatz_id, element, x, y, geaendert_von_id) \
+             VALUES ({e}, 'sg-{hub_skizze}', 30, 20, {admin})"
         ),
     )
     .await;
@@ -1363,12 +1373,23 @@ async fn katalog_sprechgruppen_des_hubs_erscheinen_am_elw_auch_in_der_fernmeldes
         "Kopie, solange der Katalog nicht verteilt ist"
     );
     assert_eq!(zuordnungen[1], ("Rotkreuz 1".into(), elw_vom_hub, false));
-    let element: String = eine(
+    let elemente: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT element FROM fernmeldeskizze_lage WHERE einsatz_id = {s} ORDER BY x"
+    )))
+    .fetch_all(&elw.pool)
+    .await
+    .unwrap();
+    let skizze_kopie: i64 = eine(
         &elw.pool,
-        &format!("SELECT element FROM fernmeldeskizze_lage WHERE einsatz_id = {s}"),
+        &format!(
+            "SELECT id FROM sprechgruppe WHERE bezeichnung = 'Kanal Skizze' AND einsatz_id = {s}"
+        ),
     )
     .await;
-    assert_eq!(element, format!("sg-{elw_vom_hub}"));
+    assert_eq!(
+        elemente,
+        vec![format!("sg-{elw_vom_hub}"), format!("sg-{skizze_kopie}")]
+    );
 
     // Deaktiviert am Hub: die Änderung kommt über das Log des Einsatzes, die Kopie zieht nach.
     exec(

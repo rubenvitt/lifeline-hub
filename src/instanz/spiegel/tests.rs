@@ -603,3 +603,80 @@ async fn gegen_id_auf_ein_fremdes_konto_wird_stellvertreter() {
         .unwrap();
     assert_ne!(lokal, stellvertreter, "ein Stellvertreter nie");
 }
+
+/// Ein Absender vor LLH-1629 liefert eine genutzte Katalog-Sprechgruppe nicht mit. Der Spiegel
+/// rückt dann trotzdem vor (mit Hinweis), statt bis zu dessen Update stehen zu bleiben; ein
+/// neuer Absender liefert sie nach, dort wartet der Spiegel.
+#[tokio::test]
+async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
+    let (f, s) = zwei_seiten().await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    let abschnitt: i64 = eine(
+        &f,
+        &format!(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES ({einsatz}, 'Nord') \
+             RETURNING id"
+        ),
+    )
+    .await;
+    let sg: i64 = eine(
+        &f,
+        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart) VALUES (1, 'Kanal 7', 'DMO') \
+         RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) \
+             VALUES ({abschnitt}, {sg})"
+        ),
+    )
+    .await;
+    let a = Absender {
+        kennung: "elw",
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        meldend: true,
+    };
+    let mut budget = Budget::neu(1024 * 1024);
+    let mut fc = f.begin().await.unwrap();
+    let staende = HashMap::new();
+    let e = liefern::list_gefuehrt(&mut fc, 1, &staende)
+        .await
+        .unwrap()
+        .remove(0);
+    let k = liefern::ensure_kennung(&mut fc, "elw", &e).await.unwrap();
+    let mut l = liefern::liefere_einsatz(&mut fc, &a, &e, &k, "hub/1", 0, &mut budget)
+        .await
+        .unwrap()
+        .expect("Lieferung");
+    fc.commit().await.unwrap();
+    assert!(l.katalog);
+    let vorher = l.zeilen.len();
+    l.zeilen
+        .retain(|z| !(z.art == "sprechgruppe" && z.schluessel == sg.to_string()));
+    assert_eq!(l.zeilen.len(), vorher - 1, "Katalogzeile war mitgeliefert");
+    let empf = Empfaenger {
+        kopplung_id: 1,
+        kopplung_org_id: 1,
+        org_id: 1,
+        meldend: false,
+    };
+    for (katalog, rueckt_vor) in [(true, false), (false, true)] {
+        l.katalog = katalog;
+        let mut sc = s.begin().await.unwrap();
+        let erg = uebernehmen::uebernehmen(&mut sc, &empf, &l).await.unwrap();
+        assert!(
+            erg.hinweise.iter().any(|h| h.contains("Bezug fehlt")),
+            "{:?}",
+            erg.hinweise
+        );
+        assert_eq!(erg.stand == l.bis, rueckt_vor, "katalog = {katalog}");
+        sc.rollback().await.unwrap();
+    }
+}
