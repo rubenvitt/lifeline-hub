@@ -849,3 +849,339 @@ async fn druck_nennt_eine_abgemeldete_bezugsperson_nicht() {
         Some(r.person_ids[0])
     );
 }
+
+// ── Haushalte umbauen (LLH-1615, Change `lm62ud0b-haushalt-umbauen`) ─────────────────────────
+
+async fn bezugsperson(w: &Welt, sid: i64, hid: i64, pid: i64) -> Result<Registriert, AppError> {
+    let (pool, b, e) = (&w.pool, w.b, w.e);
+    write_retry!(pool, |conn| {
+        bezugsperson_setzen_tx(conn, e, sid, b, STARTWERT, hid, pid, ZEIT).await
+    })
+}
+
+async fn umhaengen(
+    w: &Welt,
+    sid: i64,
+    pid: i64,
+    ziel: HaushaltZiel,
+) -> Result<Registriert, AppError> {
+    let (pool, b, e) = (&w.pool, w.b, w.e);
+    write_retry!(pool, |conn| {
+        haushalt_aendern_tx(conn, e, sid, b, STARTWERT, pid, ziel, ZEIT).await
+    })
+}
+
+async fn bezugsperson_von(w: &Welt, hid: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT bezugsperson_id FROM haushalt WHERE id = ?")
+        .bind(hid)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+async fn haushalt_von(w: &Welt, pid: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT haushalt_id FROM einsatz_person WHERE id = ?")
+        .bind(pid)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Szenario „Bezugsperson wechseln“: ein ETB-Eintrag ohne Namen; schon Bezugsperson → nichts.
+#[tokio::test]
+async fn bezugsperson_wechseln() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let (hid, anna, tom) = (r.haushalt_id.unwrap(), r.person_ids[0], r.person_ids[1]);
+    let vorher = etb_inhalte(&w).await.len();
+
+    let g = bezugsperson(&w, sid, hid, tom).await.unwrap();
+    assert_eq!(bezugsperson_von(&w, hid).await, Some(tom));
+    assert_eq!(g.person_ids, vec![anna, tom], "beide Personen live");
+    let etb = etb_inhalte(&w).await;
+    assert_eq!(etb.len(), vorher + 1);
+    assert_eq!(
+        etb.last().unwrap(),
+        "Betreuungsstelle ‚Turnhalle Ost‘: Haushalt H-1, Bezugsperson jetzt R-002."
+    );
+    let p = crate::person::repo::laden(&w.pool, w.e, tom).await.unwrap();
+    assert!(p.haushalt_bezugsperson);
+    let p = crate::person::repo::laden(&w.pool, w.e, anna)
+        .await
+        .unwrap();
+    assert!(!p.haushalt_bezugsperson);
+
+    let nochmal = bezugsperson(&w, sid, hid, tom).await.unwrap();
+    assert!(nochmal.etb_ids.is_empty() && nochmal.person_ids.is_empty());
+    assert_eq!(etb_inhalte(&w).await.len(), vorher + 1);
+}
+
+/// Prüfkette „Bezugsperson“: 404 fremd, 409 storniert, 422 nicht im Haushalt / nicht hier.
+#[tokio::test]
+async fn pruefkette_der_bezugsperson() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let andere = stelle(&w, w.e, "Weserstadion", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let hid = r.haushalt_id.unwrap();
+    let y = registrieren(&w, sid, None, vec![person("Yilmaz", Kostform::Normal)])
+        .await
+        .unwrap();
+    let dort = registrieren(
+        &w,
+        andere,
+        Some(hid),
+        vec![person("Weber", Kostform::Normal)],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        status(bezugsperson(&w, sid, hid, 9999).await.unwrap_err()),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        status(
+            bezugsperson(&w, sid, 9999, r.person_ids[1])
+                .await
+                .unwrap_err()
+        ),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        status(
+            bezugsperson(&w, sid, hid, y.person_ids[0])
+                .await
+                .unwrap_err()
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "nicht im Haushalt"
+    );
+    assert_eq!(
+        status(
+            bezugsperson(&w, sid, hid, dort.person_ids[0])
+                .await
+                .unwrap_err()
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Mitglied, aber an einer anderen Stelle"
+    );
+    crate::person::repo::storniere(&w.pool, w.e, r.person_ids[2], w.b)
+        .await
+        .unwrap();
+    assert_eq!(
+        status(
+            bezugsperson(&w, sid, hid, r.person_ids[2])
+                .await
+                .unwrap_err()
+        ),
+        StatusCode::CONFLICT
+    );
+    assert_eq!(bezugsperson_von(&w, hid).await, Some(r.person_ids[0]));
+}
+
+/// Szenario „Kind eigenständig unterbringen“: neuer Haushalt, Person wird Bezugsperson.
+#[tokio::test]
+async fn in_neuen_haushalt_loesen() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let (h1, lea) = (r.haushalt_id.unwrap(), r.person_ids[2]);
+
+    let g = umhaengen(&w, sid, lea, HaushaltZiel::Neu).await.unwrap();
+    let h2 = g.haushalt_id.unwrap();
+    assert_ne!(h1, h2);
+    assert_eq!(haushalt_von(&w, lea).await, Some(h2));
+    assert_eq!(bezugsperson_von(&w, h2).await, Some(lea));
+    assert_eq!(bezugsperson_von(&w, h1).await, Some(r.person_ids[0]));
+    assert_eq!(
+        etb_inhalte(&w).await.last().unwrap(),
+        "Betreuungsstelle ‚Turnhalle Ost‘: R-003 von Haushalt H-1 in Haushalt H-2 umgehängt \
+         (neu, Bezugsperson)."
+    );
+    let liste = liste(&w.pool, w.e, sid, false).await.unwrap();
+    assert_eq!(liste.haushalte.len(), 2);
+    assert_eq!(liste.haushalte[0].personen.len(), 2);
+    assert_eq!(liste.haushalte[1].nummer, 2);
+}
+
+/// Die Bezugsperson zieht um: im alten Haushalt rückt die nächste nach, im selben Eintrag.
+#[tokio::test]
+async fn bezugsperson_zieht_um_und_jemand_rueckt_nach() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let h1 = r.haushalt_id.unwrap();
+    let y = registrieren(&w, sid, None, vec![person("Yilmaz", Kostform::Normal)])
+        .await
+        .unwrap();
+    let h2 = y.haushalt_id.unwrap();
+    // Tom ist abgemeldet: Lea (in der Notunterkunft) geht ihm vor, trotz höherer Nummer.
+    abmelden(&w, sid, None, vec![r.person_ids[1]])
+        .await
+        .unwrap();
+
+    let g = umhaengen(&w, sid, r.person_ids[0], HaushaltZiel::Bestehend(h2))
+        .await
+        .unwrap();
+    assert_eq!(g.person_ids, vec![r.person_ids[0], r.person_ids[2]]);
+    assert_eq!(bezugsperson_von(&w, h1).await, Some(r.person_ids[2]));
+    assert_eq!(bezugsperson_von(&w, h2).await, Some(y.person_ids[0]));
+    assert_eq!(
+        etb_inhalte(&w).await.last().unwrap(),
+        "Betreuungsstelle ‚Turnhalle Ost‘: R-001 von Haushalt H-1 in Haushalt H-2 umgehängt. \
+         Haushalt H-1: Bezugsperson jetzt R-003."
+    );
+}
+
+/// Eine Person ohne Haushalt wird aufgenommen; ein leerer Haushalt bleibt ohne Bezugsperson.
+#[tokio::test]
+async fn ohne_haushalt_aufnehmen_und_letzte_person_geht() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, vec![person("Weber", Kostform::Normal)])
+        .await
+        .unwrap();
+    let y = registrieren(&w, sid, None, vec![person("Yilmaz", Kostform::Normal)])
+        .await
+        .unwrap();
+    let (h1, h2) = (r.haushalt_id.unwrap(), y.haushalt_id.unwrap());
+    sqlx::query("UPDATE einsatz_person SET haushalt_id = NULL WHERE id = ?")
+        .bind(y.person_ids[0])
+        .execute(&w.pool)
+        .await
+        .unwrap();
+
+    umhaengen(&w, sid, y.person_ids[0], HaushaltZiel::Bestehend(h1))
+        .await
+        .unwrap();
+    assert_eq!(haushalt_von(&w, y.person_ids[0]).await, Some(h1));
+    assert_eq!(
+        etb_inhalte(&w).await.last().unwrap(),
+        "Betreuungsstelle ‚Turnhalle Ost‘: R-002 in Haushalt H-1 aufgenommen."
+    );
+    // Weber geht in den leeren H-2 (ohne gültige Bezugsperson) und wird dort Bezugsperson; H-1
+    // behält Yilmaz, der nachrückt.
+    sqlx::query("UPDATE einsatz_person SET haushalt_id = ? WHERE id = ?")
+        .bind(h2)
+        .bind(y.person_ids[0])
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let fehler = umhaengen(&w, sid, r.person_ids[0], HaushaltZiel::Bestehend(h2)).await;
+    assert!(fehler.is_ok(), "H-2 hat Yilmaz an der Stelle");
+    assert_eq!(bezugsperson_von(&w, h1).await, None, "H-1 ist leer");
+    assert_eq!(bezugsperson_von(&w, h2).await, Some(y.person_ids[0]));
+}
+
+/// Prüfkette „Haushalt ändern“: Ziel ohne Person an der Stelle 422, schon im Ziel → nichts,
+/// fremder Haushalt 404, Person nicht hier 422; eine geschlossene Stelle sperrt nicht.
+#[tokio::test]
+async fn pruefkette_haushalt_aendern() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let andere = stelle(&w, w.e, "Weserstadion", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let h1 = r.haushalt_id.unwrap();
+    let dort = registrieren(&w, andere, None, vec![person("Yilmaz", Kostform::Normal)])
+        .await
+        .unwrap();
+
+    assert_eq!(
+        status(
+            umhaengen(
+                &w,
+                sid,
+                r.person_ids[1],
+                HaushaltZiel::Bestehend(dort.haushalt_id.unwrap())
+            )
+            .await
+            .unwrap_err()
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Haushalt einer anderen Stelle"
+    );
+    assert_eq!(
+        status(
+            umhaengen(&w, sid, dort.person_ids[0], HaushaltZiel::Neu)
+                .await
+                .unwrap_err()
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Person nicht an dieser Stelle"
+    );
+    assert_eq!(
+        status(
+            umhaengen(&w, sid, r.person_ids[1], HaushaltZiel::Bestehend(9999))
+                .await
+                .unwrap_err()
+        ),
+        StatusCode::NOT_FOUND
+    );
+    let vorher = etb_inhalte(&w).await.len();
+    let gleich = umhaengen(&w, sid, r.person_ids[1], HaushaltZiel::Bestehend(h1))
+        .await
+        .unwrap();
+    assert!(gleich.etb_ids.is_empty());
+    assert_eq!(etb_inhalte(&w).await.len(), vorher);
+
+    aendern(
+        &w,
+        sid,
+        StelleAenderung {
+            status: Some(Status::Geschlossen),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    umhaengen(&w, sid, r.person_ids[1], HaushaltZiel::Neu)
+        .await
+        .unwrap();
+}
+
+/// Szenario „Bezugsperson abgemeldet“: Abmelden ändert die Bezugsperson nicht; eine
+/// Registrierung in einen Haushalt mit stornierter Bezugsperson setzt die erste neue Person.
+#[tokio::test]
+async fn abmelden_laesst_bezugsperson_registrierung_heilt() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let hid = r.haushalt_id.unwrap();
+    abmelden(&w, sid, None, vec![r.person_ids[0]])
+        .await
+        .unwrap();
+    assert_eq!(bezugsperson_von(&w, hid).await, Some(r.person_ids[0]));
+
+    // Bestand von vor dem Nachrücken: alle storniert, die Bezugsperson bleibt stehen.
+    sqlx::query(
+        "UPDATE einsatz_person SET storniert_at = '2026-11-09 11:00:00' WHERE haushalt_id = ?",
+    )
+    .bind(hid)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let neu = registrieren(&w, sid, Some(hid), vec![person("Weber", Kostform::Vegan)])
+        .await
+        .unwrap();
+    assert_eq!(bezugsperson_von(&w, hid).await, Some(neu.person_ids[0]));
+}
+
+/// Storno der Bezugsperson: die nächste rückt nach.
+#[tokio::test]
+async fn storno_der_bezugsperson_rueckt_nach() {
+    let w = welt().await;
+    let sid = stelle(&w, w.e, "Turnhalle Ost", Belegungsart::Gezaehlt).await;
+    let r = registrieren(&w, sid, None, familie()).await.unwrap();
+    let hid = r.haushalt_id.unwrap();
+    let (pool, e, anna) = (&w.pool, w.e, r.person_ids[0]);
+    let b = w.b;
+    let nachgerueckt = write_retry!(pool, |conn| {
+        crate::person::repo::storniere_tx(conn, e, anna, b).await?;
+        nach_storno_nachruecken_tx(conn, e, anna).await
+    })
+    .unwrap();
+    assert_eq!(nachgerueckt, Some((1, Some((r.person_ids[1], 2)))));
+    assert_eq!(bezugsperson_von(&w, hid).await, Some(r.person_ids[1]));
+}

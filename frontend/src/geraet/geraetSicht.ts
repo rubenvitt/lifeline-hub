@@ -33,6 +33,11 @@ export type GeraetFaehigkeit =
    * `BETREUUNGSSTELLE`, fremde Stelle 403). Bewusste Ausnahme zu `person-druck`.
    */
   | 'registrierliste-druck'
+  /**
+   * Haushalte an der Registrierstelle umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen.
+   * Nur die Betreuungsstelle (Routenliste `BETREUUNGSSTELLE`, fremde Stelle 403).
+   */
+  | 'haushalt-umbauen'
   /** Tiere und Schäden einer Person. */
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
@@ -83,6 +88,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'br-material':
       return geraet.ansicht === 'bereitstellungsraum';
     case 'registrierliste-druck':
+    case 'haushalt-umbauen':
       return geraet.ansicht === 'betreuungsstelle';
     case 'uhs-verwalten':
     case 'br-verwalten':

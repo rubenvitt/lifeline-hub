@@ -98,6 +98,14 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   erfassen“ gilt hier nicht. Kostformen ohne Personenbezug liest `GET …/betreuung/kostformen`
   (nur Modul Betreuung); daraus belegt die Verpflegung die Sonderkost beim Anlegen eines
   Zeitfensters vor (`useBedarfsvorschlag`, Stand jetzt, nie als 0 ohne Registrierte).
+  **Haushalte umbauen** (LLH-1615, Change `lm62ud0b-haushalt-umbauen`): `PUT
+…/stellen/{sid}/haushalte/{hid}/bezugsperson` und `PUT …/stellen/{sid}/personen/{pid}/haushalt`
+  (`haushalt_id` oder `neuer_haushalt`), nur Personen, die jetzt an `{sid}` registriert sind, Ziel
+  nur ein Haushalt mit jemandem an `{sid}`. Je Vorgang EIN ETB-Eintrag ohne Namen, ohne
+  `client_id`, ohne Netz gesperrt (nie vorgemerkt). Die Bezugsperson rückt nach
+  (`registrierung::bezugsperson_nachruecken_tx`: Notunterkunft vor Registriernummer), wenn sie
+  den Haushalt verlässt oder storniert wird, nie beim Abmelden; wer in einen Haushalt ohne gültige
+  Bezugsperson kommt, wird sie. In der Liste bleibt „Abmelden“ der Knopf, der Rest steht im ⋮.
   **Registrierliste drucken** (LLH-1616): nur über den je Person protokollierten Druckabruf,
   Gesundheitsangaben nur auf Wunsch; Regel in `druck/AGENTS.md`, „Registrierliste einer
   Betreuungsstelle“.

@@ -750,6 +750,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
             post(routes::betreuung_registrierung::abmelden),
         )
+        // Haushalte umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen.
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson",
+            put(routes::betreuung_registrierung::bezugsperson_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/personen/{pid}/haushalt",
+            put(routes::betreuung_registrierung::haushalt_aendern),
+        )
         .route(
             "/api/einsaetze/{id}/betreuung/kostformen",
             get(routes::betreuung_registrierung::kostformen),

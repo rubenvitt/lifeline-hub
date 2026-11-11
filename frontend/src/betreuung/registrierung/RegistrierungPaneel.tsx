@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router';
 import { heuteInZone } from '../../anzeige/zeitEingabe';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import { useZeitEingabe } from '../../anzeige/ZeitpunktEingabe';
-import { loadRegistrierListe } from '../../api/betreuungRegistrierung';
+import { loadRegistrierListe, sendBezugsperson } from '../../api/betreuungRegistrierung';
 import { BETREUUNG_ABMELDUNG_ZIEL_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
@@ -17,6 +17,9 @@ import type {
 } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloeser';
+import { ZeilenFehler } from '../../components/SpeicherHinweis';
+import { useZeilenFehler } from '../../components/useZeilenFehler';
 import {
   Kennzahl,
   Kennzahlenband,
@@ -33,8 +36,10 @@ import {
 } from '../../offline/schreiben';
 import { serverJetzt } from '../../offline/serveruhr';
 import { useVorgemerkteSchreibaktionen } from '../../offline/useVorgemerkteSchreibaktionen';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
+import HaushaltAendernModal, { type HaushaltAendernPerson } from './HaushaltAendernModal';
 import RegistrierMaske from './RegistrierMaske';
 import {
   KOSTFORM_REIHE,
@@ -59,6 +64,10 @@ import {
  *   (Maske mit dem Haushalt) und „Abmelden“; je Person „Abmelden“. Abmelden fragt nach, das Ziel
  *   ist optional und geht nie ins ETB. Personen ohne Haushalt (über einen Verbleib aufgenommen)
  *   stehen als eigener Block.
+ * - **Haushalte umbauen** (LLH-1615, Change `lm62ud0b-haushalt-umbauen`, design.md D4): neben
+ *   „Abmelden“ je Person ein ⋮-Menü mit „Zur Bezugsperson machen“ (nur im Haushalt, nicht für die
+ *   Bezugsperson) und „Haushalt ändern …“; die Bezugsperson trägt das Wort. Ohne Netz gesperrt mit
+ *   Grund, nie vorgemerkt (D5).
  * - **Ohne Netz** merken Registrieren und Abmelden vor (`offline/schreiben.ts`); vorgemerkte
  *   Haushalte stehen oben als „vorgemerkt“, vorgemerkt abgemeldete Personen tragen das Wort statt
  *   des Knopfs.
@@ -108,6 +117,8 @@ export default function RegistrierungPaneel({
   const abmeldungGrundId = useId();
   const [maske, setMaske] = useState<MaskeOffen>(null);
   const [abmelden, setAbmelden] = useState<Ziel | null>(null);
+  const [umhaengen, setUmhaengen] = useState<HaushaltAendernPerson | null>(null);
+  const ohneNetz = useOhneVerbindung();
   const [zielForm] = Form.useForm<{ ziel?: string }>();
 
   const liste = useQuery({
@@ -169,6 +180,27 @@ export default function RegistrierungPaneel({
       invalidiere();
       message.success(`Abgemeldet: ${personenWort(ergebnis.daten.person_ids.length)}`);
     },
+  });
+
+  // Grund einer Ablehnung an der Personenzeile (LFH-1077), nicht als Toast.
+  const zeilenFehler = useZeilenFehler<number>();
+  const bezugsperson = useMutation({
+    // Ohne Netz gesperrt; nie angehalten und still nachgeholt (kein client_id).
+    networkMode: 'always',
+    mutationFn: ({
+      haushaltId,
+      personId,
+    }: {
+      haushaltId: number;
+      personId: number;
+      titel: string;
+    }) => sendBezugsperson(einsatzId, stelle.id, haushaltId, personId),
+    onMutate: ({ personId }) => zeilenFehler.beginne(personId),
+    onSuccess: (h, { titel }) => {
+      invalidiere();
+      message.success(`${titel} ist Bezugsperson von ${haushaltKennung(h.nummer)}`);
+    },
+    onError: (e, { personId }) => zeilenFehler.melde(personId, e, 'Bezugsperson nicht geändert'),
   });
 
   // Registrierliste drucken (LLH-1616): auch ohne Schreibrecht; am Gerät nur die Betreuungsstelle
@@ -240,10 +272,22 @@ export default function RegistrierungPaneel({
     setAbmelden(z);
   }
 
-  const personZeile = (p: RegistriertePerson, haushaltAbgemeldet: boolean) => {
+  const personZeile = (
+    p: RegistriertePerson,
+    haushalt: Haushalt | null,
+    haushaltAbgemeldet: boolean,
+  ) => {
     const kennung = registrierNummer('R', p.registrier_nr);
     const name = personName(p);
     const vorgemerktAb = haushaltAbgemeldet || abgemeldetVorgemerkt.has(p.id);
+    const istBezugsperson = haushalt != null && haushalt.bezugsperson_id === p.id;
+    const titel = `${kennung} ${name}`;
+    const umbau: MenueEintrag<'bezugsperson' | 'haushalt'>[] = [
+      ...(haushalt && !istBezugsperson
+        ? [{ key: 'bezugsperson' as const, label: 'Zur Bezugsperson machen' }]
+        : []),
+      { key: 'haushalt', label: 'Haushalt ändern …' },
+    ];
     return (
       <li
         key={p.id}
@@ -262,33 +306,71 @@ export default function RegistrierungPaneel({
           {kennung}
         </Link>
         <span style={{ fontWeight: 600 }}>{name}</span>
+        {istBezugsperson && <Typography.Text type="secondary">Bezugsperson</Typography.Text>}
         {alterText(p, heute) && <span style={monoStil(14)}>{alterText(p, heute)}</span>}
         <Typography.Text type="secondary">
           {p.kostform ? KOSTFORM_WORT[p.kostform] : 'Kostform ohne Angabe'}
         </Typography.Text>
-        <span style={{ marginLeft: 'auto' }}>
+        <span
+          style={{
+            marginLeft: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: token.marginXXS,
+          }}
+        >
           {vorgemerktAb ? (
             <Typography.Text type="secondary">Abmeldung vorgemerkt</Typography.Text>
           ) : (
             darfSchreiben && (
-              <Button
-                aria-label={`${kennung} ${name} abmelden`}
-                disabled={abmeldungBeantragt}
-                aria-describedby={abmeldungBeantragt ? abmeldungGrundId : undefined}
-                onClick={() =>
-                  oeffneAbmelden({
-                    art: 'person',
-                    titel: `${kennung} ${name}`,
-                    anzahl: 1,
-                    body: { person_ids: [p.id] },
-                  })
-                }
-              >
-                Abmelden
-              </Button>
+              <>
+                <Button
+                  aria-label={`${titel} abmelden`}
+                  disabled={abmeldungBeantragt}
+                  aria-describedby={abmeldungBeantragt ? abmeldungGrundId : undefined}
+                  onClick={() =>
+                    oeffneAbmelden({
+                      art: 'person',
+                      titel,
+                      anzahl: 1,
+                      body: { person_ids: [p.id] },
+                    })
+                  }
+                >
+                  Abmelden
+                </Button>
+                {/* Ohne Netz gesperrt (design.md D5): nie vorgemerkt, der Grund steht am Kopf. */}
+                <MenueAusloeser
+                  eintraege={umbau}
+                  zugaenglicherName={`Weitere Aktionen zu ${titel}`}
+                  gesperrt={ohneNetz || bezugsperson.isPending}
+                  laeuft={bezugsperson.isPending && bezugsperson.variables?.personId === p.id}
+                  onWahl={(key) => {
+                    zeilenFehler.verwirf(p.id);
+                    if (key === 'bezugsperson' && haushalt) {
+                      bezugsperson.mutate({ haushaltId: haushalt.id, personId: p.id, titel });
+                    } else {
+                      setUmhaengen({
+                        id: p.id,
+                        titel,
+                        haushaltId: haushalt?.id ?? null,
+                        istBezugsperson,
+                      });
+                    }
+                  }}
+                />
+              </>
             )
           )}
         </span>
+        {zeilenFehler.grund(p.id) && (
+          <span style={{ flexBasis: '100%' }}>
+            <ZeilenFehler
+              fehler={zeilenFehler.grund(p.id)?.fehler}
+              fallback={zeilenFehler.grund(p.id)?.fallback}
+            />
+          </span>
+        )}
       </li>
     );
   };
@@ -343,7 +425,7 @@ export default function RegistrierungPaneel({
           aria-label={`Personen in ${kennung}`}
           style={{ listStyle: 'none', margin: 0, padding: 0 }}
         >
-          {h.personen.map((p) => personZeile(p, abgemeldet))}
+          {h.personen.map((p) => personZeile(p, h, abgemeldet))}
         </ul>
       </>
     );
@@ -460,6 +542,13 @@ export default function RegistrierungPaneel({
                 <Kennzahl groesse="klein" titel="ohne Angabe" wert={band.ohne_angabe} />
               </Kennzahlenband>
             )}
+            {/* Haushalte umbauen geht nur mit Verbindung (design.md D5): der Grund einmal statt
+                je Zeile; die ⋮-Menüs der Zeilen sind gesperrt. */}
+            {ohneNetz && darfSchreiben && (
+              <Typography.Text type="secondary" data-lfh="haushalte-ohne-netz">
+                Haushalte · {OHNE_VERBINDUNG_NICHT_AENDERBAR}
+              </Typography.Text>
+            )}
             {daten && daten.haushalte.length > 0 && (
               <Collapse
                 items={daten.haushalte.map((h) => ({
@@ -482,7 +571,7 @@ export default function RegistrierungPaneel({
                   aria-label="Personen ohne Haushalt"
                   style={{ listStyle: 'none', margin: 0, padding: 0 }}
                 >
-                  {daten.ohne_haushalt.map((p) => personZeile(p, false))}
+                  {daten.ohne_haushalt.map((p) => personZeile(p, null, false))}
                 </ul>
               </div>
             )}
@@ -498,6 +587,15 @@ export default function RegistrierungPaneel({
           speicherung={registrieren}
           onErfassen={(body) => registrieren.mutateAsync(body)}
           onSchliessen={() => setMaske(null)}
+        />
+      )}
+      {umhaengen && (
+        <HaushaltAendernModal
+          einsatzId={einsatzId}
+          stelleId={stelle.id}
+          person={umhaengen}
+          onGeschrieben={invalidiere}
+          onSchliessen={() => setUmhaengen(null)}
         />
       )}
       {abmelden && (
