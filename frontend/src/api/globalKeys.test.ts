@@ -36,6 +36,8 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.planungDruck(7)).toEqual(['planung-druck', 7]);
     // Lesezugänge externer Lagemonitore (LLH-1484), Verwaltung → Einstellungen.
     expect(globalKeys.lagemonitorZugaenge()).toEqual(['lagemonitor-zugaenge']);
+    // Seite des Lagebilds für Externe (LLH-1496), ohne den Schlüssel im Key.
+    expect(globalKeys.lagebildExtern()).toEqual(['lagebild-extern']);
     expect(globalKeys.instanzkopplung()).toEqual(['instanzkopplung']);
     expect(globalKeys.instanzkopplungLetzteSchluessel()).toEqual([
       'instanzkopplung',
@@ -149,10 +151,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 43 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 44 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(43);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(43);
+    expect(werte).toHaveLength(44);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(44);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

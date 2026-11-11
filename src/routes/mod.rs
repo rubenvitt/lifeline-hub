@@ -56,6 +56,7 @@ pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;
 pub mod lagebesprechung;
+pub mod lagebild_extern;
 pub mod lagekennzahl_wahl;
 pub mod lagemonitor;
 pub mod lagemonitor_v1;

@@ -1522,6 +1522,17 @@ export function koppelnAdresse(origin: string, code: string): string {
   return `${origin}${KOPPELN_PFAD}#${encodeURIComponent(code)}`;
 }
 
+/** Seite des Lagebilds für Externe (LLH-1496), ohne Sitzung. */
+export const EXTERN_PFAD = '/extern';
+
+/**
+ * Link auf das Lagebild für Externe (LLH-1496, design.md D1): der Schlüssel steht im Fragment,
+ * das der Browser nie an den Server schickt (wie {@link koppelnAdresse}).
+ */
+export function lagebildExternAdresse(origin: string, schluessel: string): string {
+  return `${origin}${EXTERN_PFAD}#${encodeURIComponent(schluessel)}`;
+}
+
 /** Startseite eines gekoppelten Geräts; die Hülle wählt darunter die Ansicht. */
 export const GERAET_START_PFAD = '/geraet';
 
