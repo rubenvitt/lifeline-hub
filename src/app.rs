@@ -2004,6 +2004,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/antraege/{antrag_id}",
             delete(routes::instanz::antrag_verwerfen),
         )
+        // Abgelehnte Anträge nach der Verwahrung (LLH-1648): einsatzübergreifend, nur die eigenen.
+        .route(
+            "/api/antraege/abgelehnt",
+            get(routes::instanz::antraege_abgelehnt),
+        )
+        .route(
+            "/api/antraege/abgelehnt/{antrag_id}",
+            delete(routes::instanz::antrag_abgelehnt_verwerfen),
+        )
         // Abgleich der Einsätze (LLH-1492): Pakete bis `SPIEGEL_MAX`, signiert wie Melden.
         .route(
             crate::instanz::extractor::SPIEGEL_PFAD,

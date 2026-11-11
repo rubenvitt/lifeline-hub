@@ -10,10 +10,22 @@ import {
   Space,
   Typography,
 } from 'antd';
-import { useQuery } from '@tanstack/react-query';
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { QueryClientContext, useQuery } from '@tanstack/react-query';
+import {
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { anzahl } from '../anzeige/anzahl';
-import { einsatzKeys } from '../api/queryKeys';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { datum, zeitpunkt } from '../anzeige/zeitDarstellung';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
+import { verwerfeAbgelehntenAntrag } from '../api/spiegelAntraege';
+import type { AbgelehnterAntragAnzeige } from '../api/types';
 import { ladeVerpflegung } from '../api/verpflegung';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
@@ -34,6 +46,13 @@ import {
 } from './queue';
 import { discardFruehereKopplung, useFruehereKopplungCount } from './fruehereKopplung';
 import { PERSON_EINTRAG_ABGELEHNT } from './personEintrag';
+import { useAbgelehnteAntraegeAusCache } from '../einsatz/spiegel/abgelehnteAntraege';
+import {
+  antragArtWort,
+  antragDatenText,
+  antragEinsatzText,
+  antragKopierText,
+} from '../einsatz/spiegel/spiegelText';
 
 interface OfflineRecoveryDrawerProps {
   open: boolean;
@@ -195,6 +214,54 @@ function RecoveryCard({
   );
 }
 
+/**
+ * Ein abgelehnter Antrag nach der Verwahrung (LLH-1648): der Einsatz ist kein Spiegel mehr und
+ * abgeschlossen, „Neu erfassen“ entfällt. Einsatz mit Nummer und Stichwort, die Daten ungekürzt,
+ * der Grund und bis wann der Antrag bleibt.
+ */
+function AntragKarte({
+  antrag: a,
+  aktionen,
+  fehler,
+}: {
+  antrag: AbgelehnterAntragAnzeige;
+  aktionen: ReactNode;
+  fehler: ZeilenGrund | null;
+}) {
+  const { konventionen } = useAnzeigeKonventionen();
+  const daten = antragDatenText(a, { voll: true });
+  return (
+    <Card
+      size="small"
+      title={`Abgelehnter Antrag: ${antragArtWort(a.art)}`}
+      extra={aktionen}
+      data-lfh="abgelehnter-antrag"
+    >
+      {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
+      <Descriptions
+        size="small"
+        column={1}
+        items={[
+          { key: 'einsatz', label: 'Einsatz', children: antragEinsatzText(a) },
+          { key: 'erfasst', label: 'Erfasst', children: zeitpunkt(a.erfasst_at, konventionen) },
+          ...(daten ? [{ key: 'daten', label: 'Daten', children: daten }] : []),
+          ...(a.grund
+            ? [
+                {
+                  key: 'grund',
+                  label: 'Grund',
+                  children: <Typography.Text type="danger">{a.grund}</Typography.Text>,
+                },
+              ]
+            : []),
+          { key: 'frist', label: 'Bleibt', children: `bis ${datum(a.frist_bis, konventionen)}` },
+          { key: 'inhalt', label: 'Vollständiger Inhalt', children: vollstaendigerInhalt(a.daten) },
+        ]}
+      />
+    </Card>
+  );
+}
+
 /** Die Aktion fand ihren Eintrag nicht mehr (anderer Tab, schon gesendet). */
 class NichtMehrVorhanden extends Error {}
 
@@ -229,6 +296,14 @@ export default function OfflineRecoveryDrawer({
   const titelJeZeile = useRef(new Map<string, string>());
   const aktuellerScope = useRef(scopeKey);
   aktuellerScope.current = scopeKey;
+  // Abgelehnte Anträge nach der Verwahrung (LLH-1648): aus dem Cache, geladen von der
+  // Betriebszeile. Eine Gerätesitzung hat keine.
+  const queryClient = useContext(QueryClientContext);
+  const { konventionen } = useAnzeigeKonventionen();
+  const alleAntraege = useAbgelehnteAntraegeAusCache(geraet ? undefined : benutzerId);
+  const sichtbareAntraege =
+    einsatzId == null ? alleAntraege : alleAntraege.filter((a) => a.einsatz_id === einsatzId);
+  const kopierenMoeglich = typeof navigator.clipboard?.writeText === 'function';
 
   // Öffnen und ein Wechsel von Benutzer oder Einsatz räumen alte Gründe.
   useEffect(() => {
@@ -358,6 +433,27 @@ export default function OfflineRecoveryDrawer({
       </Space>
     );
   };
+  /** Verwirft einen abgelehnten Antrag am Server und lädt die Liste neu, auch nach einem 404. */
+  const antragVerwerfen = async (antragId: number): Promise<boolean> => {
+    try {
+      await verwerfeAbgelehntenAntrag(antragId);
+      return true;
+    } finally {
+      if (benutzerId != null)
+        await queryClient?.invalidateQueries({
+          queryKey: globalKeys.abgelehnteAntraegeVon(benutzerId),
+        });
+    }
+  };
+  const antragKopieren = (a: AbgelehnterAntragAnzeige, zeile: { schluessel: string }) => {
+    // Beide Ausgänge melden sich: `writeText` kann vorhanden sein und trotzdem ablehnen. Der Grund
+    // steht an der Karte (LFH-1077), nicht als Toast.
+    zeilen.beginne(zeile.schluessel);
+    navigator.clipboard.writeText(antragKopierText(a, (w) => zeitpunkt(w, konventionen))).then(
+      () => void message.success('Antrag kopiert'),
+      (e: unknown) => zeilen.melde(zeile.schluessel, e, 'Nicht kopiert'),
+    );
+  };
   const alsAktuellerBenutzer = (
     aktion: (aktuellerBenutzerId: number) => Promise<boolean>,
   ): Promise<boolean> => (benutzerId == null ? Promise.resolve(false) : aktion(benutzerId));
@@ -373,6 +469,7 @@ export default function OfflineRecoveryDrawer({
   const sichtbareZeilen = new Set([
     ...(sichtbareNichtZugeordnet > 0 ? [legacyZeile.schluessel] : []),
     ...(fruehereKopplung > 0 ? [fruehereZeile.schluessel] : []),
+    ...sichtbareAntraege.map((a) => `antrag:${a.id}`),
     ...sichtbareEtb.map((e) => `etb:${e.id}`),
     ...sichtbareSchreibaktionen.map((e) => `schreiben:${e.id}`),
   ]);
@@ -384,7 +481,8 @@ export default function OfflineRecoveryDrawer({
     sichtbareEtb.length === 0 &&
     sichtbareSchreibaktionen.length === 0 &&
     sichtbareNichtZugeordnet === 0 &&
-    fruehereKopplung === 0;
+    fruehereKopplung === 0 &&
+    sichtbareAntraege.length === 0;
 
   return (
     <Drawer
@@ -487,6 +585,43 @@ export default function OfflineRecoveryDrawer({
             }
           />
         )}
+
+        {sichtbareAntraege.map((a) => {
+          const zeile = {
+            schluessel: `antrag:${a.id}`,
+            titel: `Abgelehnter Antrag: ${antragArtWort(a.art)}`,
+          };
+          return (
+            <AntragKarte
+              key={zeile.schluessel}
+              antrag={a}
+              fehler={zeilen.grund(zeile.schluessel)}
+              aktionen={
+                <Space size="middle">
+                  {kopierenMoeglich && <Button onClick={() => antragKopieren(a, zeile)}>Kopieren</Button>}
+                  <Popconfirm
+                    title="Antrag endgültig verwerfen?"
+                    okText="Endgültig verwerfen"
+                    cancelText="Abbrechen"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() =>
+                      ausfuehren(
+                        zeile,
+                        `${zeile.schluessel}:discard`,
+                        () => antragVerwerfen(a.id),
+                        'Antrag verworfen',
+                      )
+                    }
+                  >
+                    <Button danger loading={aktionLaeuft === `${zeile.schluessel}:discard`}>
+                      Verwerfen
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              }
+            />
+          );
+        })}
 
         {sichtbareEtb.map((eintrag) => {
           if (eintrag.id == null) return null;

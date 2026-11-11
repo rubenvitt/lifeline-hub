@@ -7,6 +7,29 @@ export type paths = Record<string, never>;
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Ein abgelehnter Antrag an einem Einsatz, der kein Spiegel mehr ist: der Hub hat ihn in
+         *     Verwahrung genommen (`lebensende::umwandeln`). Das Hinweisband am Spiegel gibt es dann nicht
+         *     mehr, und nach der Schonfrist liest ein Mitglied den Einsatz nicht mehr. Die Person sieht ihre
+         *     abgelehnten Anträge deshalb einsatzübergreifend, bis [`ABGELEHNT_TAGE`] vorbei sind.
+         */
+        AbgelehnterAntragAnzeige: {
+            /** @description Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …). */
+            art: string;
+            /** @description Die erfassten Daten (Kennungen der führenden Instanz). */
+            daten: Record<string, never>;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Nummer und Stichwort des Einsatzes; Lagedaten trägt der Antrag nicht. */
+            einsatznummer?: string | null;
+            erfasst_at: string;
+            /** @description Bis dahin bleibt der Antrag (30 Tage nach der Ablehnung); danach räumt ihn der Purge. */
+            frist_bis: string;
+            grund?: string | null;
+            /** Format: int64 */
+            id: number;
+            stichwort?: string | null;
+        };
         /** @description Ein Vermisstenabgleich (1:1 zu `person_abgleich`). */
         AbgleichAnzeige: {
             /** Format: int64 */

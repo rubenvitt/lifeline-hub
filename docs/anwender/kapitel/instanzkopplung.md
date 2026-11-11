@@ -128,6 +128,19 @@ unter „Was am Spiegel geht“).
    wird ein neuer Antrag.
 3. Oder „Verwerfen“ wählen. Der abgelehnte Antrag ist dann weg.
 
+### Abgelehnten Antrag nach der Verwahrung ansehen
+
+Hat der Hub den Einsatz in Verwahrung genommen, ist er kein Spiegel mehr, und das Hinweisband
+fehlt. Abgelehnte Anträge bleiben trotzdem 30 Tage nach der Ablehnung erreichbar, auch wenn der
+Einsatz selbst nicht mehr lesbar ist:
+
+1. In der Zeile oben „Anträge abgelehnt“ wählen.
+2. Jeder Antrag steht mit Einsatznummer und Stichwort, den erfassten Daten, dem Grund und dem
+   Tag, bis zu dem er bleibt.
+3. „Kopieren“ legt Art, Einsatz, Zeit, Daten und Grund in die Zwischenablage.
+4. „Verwerfen“ entfernt den Antrag. „Neu erfassen“ gibt es hier nicht: der Einsatz ist
+   abgeschlossen.
+
 ### Abgleich der Einsätze prüfen
 
 Für den System-Admin:

@@ -11,6 +11,62 @@
   "paths": {},
   "components": {
     "schemas": {
+      "AbgelehnterAntragAnzeige": {
+        "type": "object",
+        "description": "Ein abgelehnter Antrag an einem Einsatz, der kein Spiegel mehr ist: der Hub hat ihn in\nVerwahrung genommen (`lebensende::umwandeln`). Das Hinweisband am Spiegel gibt es dann nicht\nmehr, und nach der Schonfrist liest ein Mitglied den Einsatz nicht mehr. Die Person sieht ihre\nabgelehnten Anträge deshalb einsatzübergreifend, bis [`ABGELEHNT_TAGE`] vorbei sind.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "art",
+          "erfasst_at",
+          "frist_bis",
+          "daten"
+        ],
+        "properties": {
+          "art": {
+            "type": "string",
+            "description": "Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …)."
+          },
+          "daten": {
+            "type": "object",
+            "description": "Die erfassten Daten (Kennungen der führenden Instanz)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nummer und Stichwort des Einsatzes; Lagedaten trägt der Antrag nicht."
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "frist_bis": {
+            "type": "string",
+            "description": "Bis dahin bleibt der Antrag (30 Tage nach der Ablehnung); danach räumt ihn der Purge."
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "AbgleichAnzeige": {
         "type": "object",
         "description": "Ein Vermisstenabgleich (1:1 zu `person_abgleich`).",
