@@ -634,6 +634,66 @@ async fn beantragen(
     Ok(antrag_antwort(id, "ausstehend"))
 }
 
+/// Läuft der Abgleich dieses Spiegels noch, nimmt er also Anträge an (LLH-1496: ein Widerruf
+/// gilt auch ohne Antrag, wenn der Abgleich beendet ist)?
+pub async fn abgleich_laeuft_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    Ok(kopplung_des_spiegels(conn, einsatz_id).await?.is_some())
+}
+
+/// Legt am Spiegel einen ETB-Eintrag als Antrag ab, für einen Schreibweg des Servers, der beim
+/// Führer einen Systemeintrag schriebe (LLH-1496, design.md D7: Freigabe eines Lagebilds für
+/// Externe). Beim Führer kommt er als Eintrag des Kontos an, wie eine Erfassung am Spiegel; `von`
+/// und `an` sind dort Pflicht. 409, wenn der Abgleich des Spiegels beendet ist.
+pub async fn etb_beantragen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    typ: crate::etb::EtbTyp,
+    inhalt: &str,
+    von: &str,
+    an: &str,
+) -> Result<i64, AppError> {
+    if kopplung_des_spiegels(conn, einsatz_id).await?.is_none() {
+        return Err(AppError::Conflict(
+            "Der Abgleich dieses Spiegels ist beendet; ein Antrag geht nicht mehr.".into(),
+        ));
+    }
+    let b = BEANTRAGBAR
+        .iter()
+        .find(|b| b.art == "etb")
+        .expect("ETB-Eintrag ist beantragbar");
+    let jetzt = crate::zeit::jetzt();
+    let client_id = uuid::Uuid::new_v4().to_string();
+    let daten = json!({
+        "typ": typ.as_str(),
+        "inhalt": inhalt,
+        "von": von,
+        "an": an,
+        "ereigniszeit": jetzt,
+        "client_id": client_id,
+    });
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, daten, benutzer_id, \
+         client_id, erfasst_at, geaendert_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(b.art)
+    .bind(b.methode)
+    .bind(b.pfad)
+    .bind(daten.to_string())
+    .bind(benutzer_id)
+    .bind(&client_id)
+    .bind(&jetzt)
+    .bind(&jetzt)
+    .fetch_one(&mut *conn)
+    .await?;
+    super::takt::wecken();
+    Ok(id)
+}
+
 fn antrag_antwort(id: i64, zustand: &str) -> Response {
     (
         StatusCode::ACCEPTED,
@@ -1190,6 +1250,20 @@ mod tests {
             arten, bekannt,
             "BEANTRAGBAR/NICHT_BEANTRAGBAR passen nicht zur Warteschlange"
         );
+    }
+
+    /// Jede beantragbare Art trägt eine `client_id` (LLH-1630). Stürzt der Führer nach der
+    /// Ausführung und vor dem Speichern der Quittung ab, kommt der Antrag wieder; die Route
+    /// erkennt ihn dann an der `client_id` wie ein Replay der Warteschlange (ADR-0008) und legt
+    /// nichts zweimal an. Eine Art ohne `client_id` bräuchte eine andere Sicherung.
+    #[test]
+    fn jede_beantragbare_art_traegt_eine_client_id() {
+        let ohne: Vec<&str> = BEANTRAGBAR
+            .iter()
+            .filter(|b| b.client_id.is_none())
+            .map(|b| b.art)
+            .collect();
+        assert!(ohne.is_empty(), "beantragbar ohne client_id: {ohne:?}");
     }
 
     /// Jede Routenvorlage gibt es im Router, und ihre Pfadparameter sind abgebildet.

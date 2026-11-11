@@ -80,6 +80,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Gekoppelte Geräte | [Verpflegung am Gerät](kapitel/geraet-verpflegung.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Lagemonitor](kapitel/lagemonitor.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Externe Lagemonitore](kapitel/externe-lagemonitore.md) | Führung, Administration |
+| Gekoppelte Geräte | [Lagebild für Externe](kapitel/lagebild-extern.md) | Führung |
 
 Jeder Bereich ordnet seine Kapitel in einem eigenen Hunderterblock der `reihenfolge`
 (Einstieg 0–99, Führungsmittel 100–199, Lage 200–299, Kräfte 300–399, Führungsorganisation

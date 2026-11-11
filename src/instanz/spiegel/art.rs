@@ -160,6 +160,14 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("etb_lesemarke", "Lesestand einer Person an dieser Instanz"),
     ("lagemonitor_freigabe", "Geräte hängen an einer Instanz"),
     (
+        "lagebild_freigabe",
+        "Externe Links gelten an der Instanz, die sie ausgibt (LLH-1496)",
+    ),
+    (
+        "lagebild_abruf",
+        "Externe Links gelten an der Instanz, die sie ausgibt (LLH-1496)",
+    ),
+    (
         "benachrichtigung",
         "Zustellstand je Instanz: jede Instanz führt ihre eigenen Hinweise (Nachtrag 10.11.2026)",
     ),
@@ -724,6 +732,26 @@ mod tests {
     fn normal(sql: &str) -> String {
         let s = sql.split_whitespace().collect::<Vec<_>>().join(" ");
         s.trim_end_matches(';').to_string()
+    }
+
+    #[tokio::test]
+    async fn jede_gespiegelte_tabelle_hat_einen_primaerschluessel() {
+        // Die rowid einer Tabelle ohne Primärschlüssel darf `VACUUM` neu vergeben; dann zeigte die
+        // Herkunft am Spiegel auf eine andere Zeile (LLH-1630, Migration 0320). Eine neue
+        // gespiegelte Tabelle bekommt deshalb `id INTEGER PRIMARY KEY` oder einen mehrspaltigen
+        // Schlüssel.
+        let pool = crate::db::test_pool().await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut ohne = Vec::new();
+        for g in GESPIEGELT {
+            if schluessel(&mut conn, g.tabelle).await.unwrap() == Schluessel::Rowid {
+                ohne.push(g.tabelle);
+            }
+        }
+        assert!(
+            ohne.is_empty(),
+            "gespiegelt ohne Primärschlüssel (rowid ist über VACUUM nicht stabil): {ohne:?}"
+        );
     }
 
     /// Jede gespiegelte Tabelle hat genau die Trigger, die der Generator erzeugt (ein Neubau einer
