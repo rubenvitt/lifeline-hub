@@ -1426,7 +1426,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Eingeteilte Personen eines Planblocks (LLH-1552, Mig 0277): nur Verweise; die Namen stecken
-    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN. `id` seit Mig 0315
+    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN. `id` seit Mig 0316
     // (LLH-1630).
     TabellenRegel {
         tabelle: "einsatz_planschicht_person",
@@ -3162,10 +3162,24 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("letzter_abgleich_at", G_ZEIT),
             retain("hinweis", G_SPIEGEL),
             retain("beendet_at", G_ZEIT),
+            retain("katalog_ab", G_SPIEGEL),
         ],
     },
     TabellenRegel {
         tabelle: "spiegel_herkunft",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_SPIEGEL),
+            retain("fremder_schluessel", G_SPIEGEL),
+            retain("lokaler_schluessel", G_SPIEGEL),
+        ],
+    },
+    // Mitbenutzte Katalogzeilen eines Spiegels (LLH-1629).
+    TabellenRegel {
+        tabelle: "spiegel_katalog",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
         person_bezug: None,

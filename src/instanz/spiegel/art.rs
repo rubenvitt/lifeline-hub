@@ -188,6 +188,7 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("einsatz_aenderung", "Verwaltung des Spiegels selbst"),
     ("einsatz_spiegel", "Verwaltung des Spiegels selbst"),
     ("spiegel_herkunft", "Verwaltung des Spiegels selbst"),
+    ("spiegel_katalog", "Verwaltung des Spiegels selbst"),
     ("spiegel_ziel", "Verwaltung des Spiegels selbst"),
     ("spiegel_anhang", "Verwaltung des Spiegels selbst"),
     (
@@ -720,7 +721,7 @@ mod tests {
     #[tokio::test]
     async fn jede_gespiegelte_tabelle_hat_einen_primaerschluessel() {
         // Die rowid einer Tabelle ohne Primärschlüssel darf `VACUUM` neu vergeben; dann zeigte die
-        // Herkunft am Spiegel auf eine andere Zeile (LLH-1630, Migration 0315). Eine neue
+        // Herkunft am Spiegel auf eine andere Zeile (LLH-1630, Migration 0316). Eine neue
         // gespiegelte Tabelle bekommt deshalb `id INTEGER PRIMARY KEY` oder einen mehrspaltigen
         // Schlüssel.
         let pool = crate::db::test_pool().await;

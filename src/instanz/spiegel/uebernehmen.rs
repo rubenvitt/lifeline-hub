@@ -7,6 +7,7 @@
 
 use super::abbildung;
 use super::art::Schluessel;
+use super::katalog;
 use super::liefern::{quali_ersetzen, quali_ids};
 use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile};
 use super::schema::{self, Tabelle, Ziel, SKIZZE_ELEMENTE};
@@ -249,6 +250,19 @@ async fn uebernehme_zeilen(
             let Some(Value::Object(daten)) = &z.daten else {
                 continue;
             };
+            // Eine Katalogzeile des Führers: Gegenstück oder Kopie (LLH-1629).
+            let kopie;
+            let daten = if katalog::ist_katalog_daten(t.name, daten) {
+                match katalog::uebernehmen(conn, e, einsatz_id, z, daten).await? {
+                    katalog::Katalog::Gegenstueck => continue,
+                    katalog::Katalog::Kopie(d) => {
+                        kopie = d;
+                        &kopie
+                    }
+                }
+            } else {
+                daten
+            };
             match abbilden(conn, t, e, l, einsatz_id, daten, &konten).await? {
                 Abgebildet::Wartet => naechste.push(z),
                 Abgebildet::Fertig(werte, _)
@@ -304,6 +318,7 @@ async fn uebernehme_zeilen(
     // Ein Stand vor der ersten Zeile, die nicht übernommen wurde: der Führer liefert sie mit
     // dem nächsten Abgleich wieder, statt dass sie still fehlt (D7).
     let mut nachholen_ab: Option<i64> = None;
+    let mut katalog_ab: Option<i64> = None;
     for z in &wartend {
         let grund = fehler
             .get(&(z.art.as_str(), z.schluessel.as_str()))
@@ -313,8 +328,12 @@ async fn uebernehme_zeilen(
             "Zeile {} {} nicht übernommen: {grund}",
             z.art, z.schluessel
         ));
-        if !OHNE_NACHHOLEN.contains(&z.art.as_str()) {
+        // Ein Absender vor LLH-1629 liefert die Katalogzeile nie nach: dort nicht darauf warten,
+        // sondern den Stand merken und nach seinem Update ab dort neu holen.
+        if l.katalog || !katalog::OHNE_KATALOG.contains(&z.art.as_str()) {
             nachholen_ab = Some(nachholen_ab.map_or(z.stand, |n| n.min(z.stand)));
+        } else {
+            katalog_ab = Some(katalog_ab.map_or(z.stand, |n| n.min(z.stand)));
         }
     }
     for z in spaeter_loeschen {
@@ -348,13 +367,16 @@ async fn uebernehme_zeilen(
     }
     super::anhang::merke_inhalte(conn, einsatz_id, &ergebnis.inhalte).await?;
     // Ab 0 geliefert (neu, wieder angebunden oder der Führer nach einer Wiederherstellung):
-    // der Stand gilt, wie er kommt; sonst rückt er nur vor.
+    // der Stand gilt, wie er kommt. Ebenso, wenn eine Zeile nicht übernommen wurde, auch wenn er
+    // schon höher stand (Wiederholung nach verlorener Antwort): Er bleibt vor dieser Zeile, damit
+    // sie wiederkommt. Sonst rückt er nur vor.
     let bis = nachholen_ab.map_or(l.bis, |n| (n - 1).clamp(l.seit, l.bis));
     sqlx::query(
-        "UPDATE einsatz_spiegel SET stand = CASE WHEN ? = 0 THEN ? ELSE MAX(stand, ?) END, \
+        "UPDATE einsatz_spiegel SET stand = CASE WHEN ? = 0 OR ? THEN ? ELSE MAX(stand, ?) END, \
          letzter_abgleich_at = ?, freigabestufe = ? WHERE einsatz_id = ?",
     )
     .bind(l.seit)
+    .bind(nachholen_ab.is_some())
     .bind(bis)
     .bind(bis)
     .bind(crate::zeit::jetzt())
@@ -362,22 +384,13 @@ async fn uebernehme_zeilen(
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
+    katalog::nach_update_neu_holen(conn, einsatz_id, l, katalog_ab).await?;
     ergebnis.stand = sqlx::query_scalar("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = ?")
         .bind(einsatz_id)
         .fetch_one(&mut *conn)
         .await?;
     Ok(())
 }
-
-/// Tabellen, deren nicht übernommene Zeilen nicht nachgeholt werden: sie verweisen auch auf
-/// Sprechgruppen aus dem Katalog der Org, die kein Einsatz-Log kennt; ein Nachholen käme nie an.
-const OHNE_NACHHOLEN: &[&str] = &[
-    "einsatz_fuehrungsstelle_sprechgruppe",
-    "einsatzabschnitt_sprechgruppe",
-    "einsatz_einheit_sprechgruppe",
-    "einsatz_kommunikation_stelle_sprechgruppe",
-    "fernmeldeskizze_komponente_sprechgruppe",
-];
 
 /// Löscht die lokale Zeile einer gelieferten Löschung samt Herkunft.
 async fn loeschen(
@@ -392,6 +405,15 @@ async fn loeschen(
     };
     let Some(lokal) = abbildung::einsatz_lokal(conn, einsatz_id, &z.art, &z.schluessel).await?
     else {
+        // Ein Gegenstück aus dem eigenen Katalog bleibt; nur die Abbildung fällt weg (LLH-1629).
+        sqlx::query(
+            "DELETE FROM spiegel_katalog WHERE einsatz_id = ? AND art = ? AND fremder_schluessel = ?",
+        )
+        .bind(einsatz_id)
+        .bind(&z.art)
+        .bind(&z.schluessel)
+        .execute(&mut *conn)
+        .await?;
         ergebnis
             .erledigt
             .push((z.art.clone(), z.schluessel.clone()));
@@ -510,9 +532,12 @@ async fn ziel_lokal(
     if ziel == "einsatz" {
         return Ok(Some(einsatz_id));
     }
-    Ok(abbildung::einsatz_lokal(conn, einsatz_id, ziel, fremd)
-        .await?
-        .and_then(|l| l.parse().ok()))
+    let lokal = match abbildung::einsatz_lokal(conn, einsatz_id, ziel, fremd).await? {
+        Some(l) => Some(l),
+        // Eine mitbenutzte Katalogzeile (LLH-1629).
+        None => katalog::lokal(conn, einsatz_id, ziel, fremd).await?,
+    };
+    Ok(lokal.and_then(|l| l.parse().ok()))
 }
 
 /// Bildet die Werte einer Zeile ab (D5).
