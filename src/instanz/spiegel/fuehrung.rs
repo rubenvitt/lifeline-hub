@@ -432,21 +432,34 @@ async fn uebernimm_bruch_antwort(
             sqlx::query("SAVEPOINT bruch_zeile")
                 .execute(&mut *conn)
                 .await?;
+            // Nur die Zeile dieses Einsatzes: SQLite vergibt die Kennung einer gelöschten Zeile
+            // neu, und ein Schlüssel aus der Bruchstelle kann inzwischen in einem anderen
+            // Einsatz stehen.
             let lauf = sqlx::query(sqlx::AssertSqlSafe(format!(
-                "DELETE FROM {} WHERE {}",
+                "DELETE FROM {} WHERE {} AND {} = ?",
                 t.name,
-                t.schluessel.gleich(t.name)
+                t.schluessel.gleich(t.name),
+                super::art::einsatz_ausdruck(t.scoping, t.name)
             )))
             .bind(schluessel)
+            .bind(einsatz_id)
             .execute(&mut *conn)
             .await;
             match lauf {
-                Ok(_) => {
+                Ok(geloescht) => {
                     sqlx::query("RELEASE bruch_zeile")
                         .execute(&mut *conn)
                         .await?;
-                    if t.blob.is_some() {
-                        super::anhang::vergiss(conn, t.name, schluessel).await?;
+                    if t.blob.is_some() && geloescht.rows_affected() > 0 {
+                        sqlx::query(
+                            "DELETE FROM spiegel_anhang WHERE einsatz_id = ? AND art = ? \
+                             AND lokaler_schluessel = ?",
+                        )
+                        .bind(einsatz_id)
+                        .bind(t.name)
+                        .bind(schluessel)
+                        .execute(&mut *conn)
+                        .await?;
                     }
                     sqlx::query(
                         "UPDATE einsatz_bruchstelle SET entfernt = 1 WHERE einsatz_id = ? \

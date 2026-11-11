@@ -1407,6 +1407,61 @@ async fn verweise_von_spaeteren_seiten_blockieren_die_bruchstelle_nicht() {
     assert_eq!(bruch_offen(&elw, e).await, 0);
 }
 
+/// Ein Schlüssel aus der Bruchstelle, den SQLite inzwischen in einem anderen Einsatz neu
+/// vergeben hat, löscht dort nichts: Geräumt wird nur im Einsatz der Bruchstelle (Review
+/// LLH-1641).
+#[tokio::test]
+async fn bruchstelle_raeumt_nur_im_eigenen_einsatz() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    // Ein zweiter Einsatz, den der ELW selbst führt, mit einer Einheit.
+    let anderer = common::einsatz_anlegen_mit(&elw.app, &elw.admin, "Zweiter Einsatz").await;
+    assert!(!ist_spiegel(&elw, anderer).await);
+    let einheit: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Fremder Zug') RETURNING id",
+    )
+    .bind(anderer)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    // Die Bruchstelle des Spiegels nennt dieselbe Kennung, als hätte SQLite sie neu vergeben.
+    sqlx::query(
+        "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, gesichert_at) \
+         VALUES (?, 'einsatz_einheit', ?, 1, '2026-11-11 12:00:00')",
+    )
+    .bind(e)
+    .bind(einheit.to_string())
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    let bleibt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE id = ?")
+        .bind(einheit)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(bleibt, 1, "die Einheit des anderen Einsatzes bleibt");
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+}
+
 #[tokio::test]
 async fn rueckuebergabe_bringt_keine_doppelten() {
     let (hub, elw) = gekoppelt().await;
