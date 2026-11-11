@@ -44,13 +44,19 @@ pub async fn nach_update_neu_holen(
     katalog_ab: Option<i64>,
 ) -> Result<(), sqlx::Error> {
     if l.katalog {
-        // Lag die gemerkte Zeile schon in dieser Lieferung, ist sie neu übernommen worden.
+        // Lag die gemerkte Zeile in dieser Lieferung, ist sie neu übernommen worden (scheitert sie
+        // wieder, hält `nachholen_ab` den Stand davor). Sonst, auch bei einer kürzeren
+        // Wiederholung darunter, höchstens bis davor bestätigen und den Merker behalten.
         sqlx::query(
-            "UPDATE einsatz_spiegel SET katalog_ab = NULL, \
-             stand = CASE WHEN ?1 >= katalog_ab THEN MIN(stand, katalog_ab - 1) ELSE stand END \
-             WHERE einsatz_id = ?2 AND katalog_ab IS NOT NULL",
+            "UPDATE einsatz_spiegel SET \
+             stand = CASE WHEN ?1 < katalog_ab AND ?2 >= katalog_ab THEN stand \
+                          ELSE MIN(stand, katalog_ab - 1) END, \
+             katalog_ab = CASE WHEN ?1 < katalog_ab AND ?2 >= katalog_ab THEN NULL \
+                               ELSE katalog_ab END \
+             WHERE einsatz_id = ?3 AND katalog_ab IS NOT NULL",
         )
         .bind(l.seit)
+        .bind(l.bis)
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;

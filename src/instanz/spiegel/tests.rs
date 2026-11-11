@@ -690,11 +690,26 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
          JOIN einsatzabschnitt a ON a.id = z.abschnitt_id JOIN einsatz e ON e.id = a.einsatz_id \
          WHERE e.spiegel = 1";
     assert_eq!(eine::<i64>(&s, zuordnungen).await, 0);
-    assert!(
-        eine::<Option<i64>>(&s, "SELECT katalog_ab FROM einsatz_spiegel")
-            .await
-            .is_some()
-    );
+    let ab: i64 = eine(&s, "SELECT katalog_ab FROM einsatz_spiegel").await;
+    assert!(ab >= 2, "{ab}");
+    // Eine kürzere Wiederholung unterhalb des Merkers (Budget): Stand höchstens davor, Merker bleibt.
+    let mut kurz = l.clone();
+    kurz.katalog = true;
+    kurz.seit = ab - 2;
+    kurz.bis = ab - 1;
+    kurz.zeilen
+        .retain(|z| z.stand > kurz.seit && z.stand <= kurz.bis);
+    let mut sc = s.begin().await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &empf, &kurz)
+        .await
+        .unwrap();
+    assert_eq!(erg.stand, ab - 1);
+    let merker: Option<i64> = sqlx::query_scalar("SELECT katalog_ab FROM einsatz_spiegel")
+        .fetch_one(&mut *sc)
+        .await
+        .unwrap();
+    assert_eq!(merker, Some(ab));
+    sc.rollback().await.unwrap();
     exec(
         &f,
         &format!("UPDATE einsatzabschnitt SET name = 'Nord 2' WHERE id = {abschnitt}"),
