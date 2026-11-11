@@ -11,7 +11,7 @@ import {
 } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {
   ladePersonenExport,
@@ -147,7 +147,7 @@ type ZeilenQuittung =
   | { art: 'gesendet'; person: Person }
   | { art: 'vorgemerkt'; name: string | null; sichtung?: Sichtungskategorie };
 type ErfassungsQuittung = {
-  typ: 'success' | 'warning';
+  typ: 'success' | 'warning' | 'info';
   text: string;
   benutzerId: number;
   /** Erst beim expliziten Schließen in einem sichtbaren Dokument quittieren;
@@ -423,6 +423,17 @@ export default function PersonenPage() {
         });
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer. Die Quittung
+      // steht über der Liste, auch für die Zeile: sie kennt nur „gesendet“ und „vorgemerkt“.
+      if (ergebnis.zustand === 'beantragt') {
+        setHighlightFuer(zielEinsatzId, null);
+        setQuittungFuer(zielEinsatzId, {
+          typ: 'info',
+          text: 'Beantragt · R-…',
+          benutzerId: variablen.benutzerId,
+        });
+        return;
+      }
       const person = ergebnis.daten;
       merkeFrisch(zielEinsatzId, [person]);
       zeigeNeuePerson(zielEinsatzId, person);
@@ -659,8 +670,8 @@ export default function PersonenPage() {
     if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     const e = einsatzQuery.data;
-    const darfSchr = darfImEinsatzSchreiben(e);
-    if (darfSchr) setModusFuer(einsatzId, 'erfassen');
+    // Erfassen ist am Spiegel ein Antrag (LLH-1492, D13).
+    if (darfBeantragen(e)) setModusFuer(einsatzId, 'erfassen');
     neuAuftrag.raeume('neu');
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, einsatzQuery.data, benutzer, einsatzId]);
 
@@ -865,6 +876,9 @@ export default function PersonenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Betroffene erfassen, Vermisst melden und der leichte Fall: am Spiegel ein Antrag (LLH-1492,
+  // D13). Die Zeilen bleiben ohne Schreibrecht Anzeige.
+  const darfErfassen = darfBeantragen(einsatz);
   /*
    * Ohne Schreibrecht steht „Nur Ansicht · Grund“ über der Liste (M16; LLH-1130, Spec
    * `betroffene-lagedaten`): beim Beobachter die Rollen, die schreiben, beim abgeschlossenen Einsatz
@@ -1000,7 +1014,7 @@ export default function PersonenPage() {
           {/* EINE Maske (LFH-963, Entscheidung 9): sie legt mit Status „erfasst" an und sagt das
               im Dialog. Primär, weil sie der eine Erfassungsweg des Kopfes ist; die Zeile darunter
               ist der schnelle Weg ohne Dialog. „Vermisst melden" bleibt ein eigener Weg. */}
-          {darfSchreiben && (
+          {darfErfassen && (
             <>
               <Button type="primary" onClick={() => setModusFuer(einsatzId, 'erfassen')}>
                 Betroffene erfassen
@@ -1021,7 +1035,7 @@ export default function PersonenPage() {
           // der erst beim „Entlassen“ anlegt. Ab `md` ein Knopf neben „Vermisst melden“; unter
           // `md` hinter „Weitere“, sonst bräche der Kopf bei 390 px in eine dritte Zeile und
           // schöbe die erste Person aus dem ersten Bild. Am Handy bleibt `>entl` der kurze Weg.
-          ...(darfSchreiben
+          ...(darfErfassen
             ? [
                 {
                   key: 'leichter-fall',
@@ -1057,7 +1071,7 @@ export default function PersonenPage() {
       // Rechte-Riegel. Im nächsten Bild: die Palette gibt beim Schließen den Fokus zurück, ein
       // direkter Aufruf verlöre gegen sie.
       neueZeile={
-        darfSchreiben ? () => requestAnimationFrame(() => feldRef.current?.focus()) : undefined
+        darfErfassen ? () => requestAnimationFrame(() => feldRef.current?.focus()) : undefined
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
@@ -1109,7 +1123,7 @@ export default function PersonenPage() {
         />
       )}
 
-      {darfSchreiben && (
+      {darfErfassen && (
         <div
           data-lfh="erfassungsband"
           style={{

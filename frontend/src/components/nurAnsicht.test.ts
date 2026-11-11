@@ -28,6 +28,20 @@ describe('nurAnsicht (LFH-1078)', () => {
     );
   });
 
+  it('nennt am Spiegel die führende Instanz, auch im abgeschlossenen Einsatz (LLH-1492)', () => {
+    const spiegel = {
+      gegenstelle: 'ELW 1',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+    };
+    expect(einsatzRechteGrund({ status: 'aktiv', spiegel })).toBe('Spiegel von ELW 1');
+    expect(einsatzRechteGrund({ status: 'abgeschlossen', spiegel })).toBe('Spiegel von ELW 1');
+    expect(einsatzRechteGrund({ status: 'aktiv', spiegel: null })).toBe(
+      'nur Einsatzleitung und Führungspersonal',
+    );
+  });
+
   it('bleibt bei wenigen Wörtern', () => {
     for (const grund of [
       einsatzRechteGrund('abgeschlossen'),

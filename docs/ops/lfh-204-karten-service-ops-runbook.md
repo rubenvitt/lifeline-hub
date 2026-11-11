@@ -121,9 +121,10 @@ Erzeuge für AWS einen IAM-User/eine Rolle mit minimalen Rechten (`s3:PutObject`
   `karten-service/src/config.rs`), der Service-Prozess muss also mit `cwd` = Repo-Wurzel
   gestartet werden, **oder** `KS_KARTEN_BUILD_DIR` auf einen absoluten Pfad setzen.
 
-Image vorab ziehen (einmalig, spart Zeit beim ersten Build):
+Image vorab ziehen (einmalig, spart Zeit beim ersten Build). Der Tag mit Digest steht in
+`karten-build/Makefile` (`IMAGE`, gepinnt seit LLH-1546):
 ```bash
-docker pull versatiles/versatiles-planetiler:latest
+docker pull "$(sed -n 's/^IMAGE *:= *//p' karten-build/Makefile)"
 ```
 
 ### 2.2 Plattenplatz
@@ -338,19 +339,21 @@ reines Ops (Werte setzen + Service erreichbar machen), kein Code.
 `src/karte/katalog.rs`:
 
 ```rust
+pub const KARTEN_BASIS_URL: &str = "https://karten.rubeen.dev";
 pub const OFFLINE_KATALOG_MANIFEST_URL: &str =
-    "https://TODO-karten-build-release/offline-katalog-manifest.json";
+    "https://karten.rubeen.dev/offline-katalog-manifest.json";
 ```
 
-Das ist bewusst ein **Rust-`const`**, kein Laufzeit-Flag (Trust-Modell aus LFH-199: die
-Manifest-URL ist admin-nicht-editierbar, kompiliert-gepinnt). Sobald der Bucket steht:
+Das ist bewusst ein **Rust-`const`** (Trust-Modell aus LFH-199: die Manifest-URL ist
+admin-nicht-editierbar, kompiliert-gepinnt). Seit LLH-1546 zeigt sie auf den karten-service des
+Projekts; jede Installation ohne Schalter lädt ihre Offline-Karten von dort.
 
-1. Konstante ersetzen mit `{KS_BASE_URL}/offline-katalog-manifest.json` (exakt die URL, die
-   in Abschnitt 7.2 verifiziert wird).
-2. lifeline-hub-Backend **neu bauen** (`cargo build --release`) **und neu starten** — eine
-   reine Config-/Env-Änderung reicht hier NICHT, weil der Wert zur Compile-Zeit eingebrannt
-   wird. Nach dem Rebuild greift der bestehende Fetch/Merge/TTL-Cache-Mechanismus
-   unverändert (`effektiver_katalog`, TTL 300 s, Größenlimit 1 MiB — `katalog.rs`).
+Wer einen **eigenen** karten-service betreibt, setzt
+`LIFELINE_OFFLINE_KATALOG_MANIFEST_URL={KS_BASE_URL}/offline-katalog-manifest.json` (exakt
+die URL aus Abschnitt 7.2). Ein Umzug des Projekt-Buckets heißt dagegen: beide Konstanten
+ändern, neu bauen und ausliefern, denn ältere Installationen fragen weiter die alte Adresse.
+Der Fetch/Merge/TTL-Cache-Mechanismus bleibt unverändert (`effektiver_katalog`, TTL 300 s,
+Größenlimit 1 MiB — `katalog.rs`).
 
 ---
 
@@ -509,9 +512,6 @@ Posten mitführen:
 - **Kein Dockerfile/Compose/systemd-Unit für `karten-service` im Repo** — nur das
   `versatiles/versatiles-planetiler`-Image für den eigentlichen Kartenbau. Paketierung des
   Service-Binaries ist Operator-Sache (Beispiel-Unit in Abschnitt 3.2 ist ein Vorschlag).
-- **`OFFLINE_KATALOG_MANIFEST_URL` ist noch der TODO-Platzhalter** im Repo-Stand
-  (`https://TODO-karten-build-release/offline-katalog-manifest.json`, `src/karte/katalog.rs`)
-  — muss im Rahmen dieses Runbooks per Code-Änderung + Rebuild gepinnt werden (Abschnitt 5.2).
 - **Retention/GC alter `.mbtiles`-Versionen ist nicht automatisiert** — alte, datierte
   Objekte bleiben im Storage liegen (bewusst YAGNI laut Design-Doc, „Ops-Politik"). Ohne
   manuelle/Lifecycle-Policy-Bereinigung wächst der Bucket unbegrenzt.

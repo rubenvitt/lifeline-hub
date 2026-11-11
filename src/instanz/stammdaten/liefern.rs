@@ -38,6 +38,19 @@ async fn load_daten(
     schluessel: &str,
 ) -> Result<Option<Value>, AppError> {
     let objekt = art::json_object_sql(b.spalten, "");
+    // Stellvertreter fremder Konten (LLH-1492) gehören keiner Org dieser Instanz und gehen nie
+    // hinaus; geliefert werden sie als gelöscht.
+    if b.art == super::StammdatenArt::Konto {
+        let stellvertreter: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM spiegel_konto WHERE CAST(benutzer_id AS TEXT) = ?)",
+        )
+        .bind(schluessel)
+        .fetch_one(&mut *conn)
+        .await?;
+        if stellvertreter {
+            return Ok(None);
+        }
+    }
     // Eine Zeile außerhalb des Bereichs gilt als nicht vorhanden, also als Löschung (D2 der Change
     // `kjezbk06-stammdaten-kataloge`).
     let bereich = b

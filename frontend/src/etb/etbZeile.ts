@@ -1,5 +1,15 @@
-import type { EtbEintragAnzeige } from '../api/types';
+import type { NeuerEintrag } from '../api/etb';
+import type { EtbEintragAnzeige, SpiegelAntragAnzeige } from '../api/types';
+import { antragDatenOhneVerweise, type AntragKennung } from '../offline/antragAlsVormerkung';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
+import { etbTyp } from '../theme/statusFarben';
+
+/**
+ * Ein ausstehender Eintrag: aus der Warteschlange oder, mit `antrag`, ein Antrag am Spiegel
+ * (LLH-1492, Spec `spiegel-antraege`, „ETB-Eintrag am Hub“). Beide haben noch keine Nummer und
+ * stehen gleich da; der Chip sagt „beantragt“ statt „vorgemerkt“.
+ */
+export type AusstehendeEtbZeile = AusstehenderEintrag & { antrag?: AntragKennung };
 
 /**
  * Zeilentyp der ETB-Chronologie: gesendete und gepufferte Einträge in EINER Folge. Fehlte
@@ -13,7 +23,7 @@ import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
  */
 export type EtbZeile =
   | { art: 'eintrag'; schluessel: string; eintrag: EtbEintragAnzeige }
-  | { art: 'ausstehend'; schluessel: string; puffer: AusstehenderEintrag }
+  | { art: 'ausstehend'; schluessel: string; puffer: AusstehendeEtbZeile }
   | { art: 'abgelehnt'; schluessel: string; puffer: AbgelehnterEintrag };
 
 /**
@@ -24,7 +34,8 @@ export type EtbZeile =
  * Zeile. Der Rückfall auf den Zeitstempel deckt den Moment ab, in dem die Queue die Nummer
  * noch nicht vergeben hat.
  */
-function ausstehendSchluessel(p: AusstehenderEintrag): string {
+function ausstehendSchluessel(p: AusstehendeEtbZeile): string {
+  if (p.antrag) return `beantragt-${p.antrag.id}`;
   return `ausstehend-${p.id ?? p.erstellt_at}`;
 }
 
@@ -46,7 +57,7 @@ export function abgelehntSchluessel(p: AbgelehnterEintrag): string {
  */
 export function baueZeilen(args: {
   eintraege: readonly EtbEintragAnzeige[];
-  ausstehend: readonly AusstehenderEintrag[];
+  ausstehend: readonly AusstehendeEtbZeile[];
   abgelehnt: readonly AbgelehnterEintrag[];
 }): EtbZeile[] {
   // Die Puffer kommen aufsteigend aus der Warteschlange (`queueLaden`); hier gilt Serverordnung,
@@ -68,4 +79,32 @@ export function baueZeilen(args: {
       eintrag,
     })),
   ];
+}
+
+/** Der Antrag trägt einen bekannten Typ: die Daten gingen ungeprüft in den Antrag. */
+function hasEtbTyp(daten: unknown): boolean {
+  const typ = daten != null && typeof daten === 'object' ? (daten as { typ?: unknown }).typ : null;
+  return typeof typ === 'string' && Object.prototype.hasOwnProperty.call(etbTyp, typ);
+}
+
+/**
+ * Offene ETB-Anträge der Person am Spiegel als ausstehende Zeilen (LLH-1492): Wortlaut aus den
+ * erfassten Daten, Zeit der Erfassung; der Verweis auf einen berichtigten Eintrag trägt die
+ * Kennung der führenden Instanz und fällt weg. Abgelehnte nicht: die stehen im Hinweisband.
+ */
+export function etbAntraegeAlsAusstehend(
+  antraege: readonly SpiegelAntragAnzeige[],
+  benutzerId: number | undefined,
+  einsatzId: number,
+): AusstehendeEtbZeile[] {
+  if (benutzerId == null) return [];
+  return antraege
+    .filter((a) => a.art === 'etb' && a.zustand !== 'abgelehnt' && hasEtbTyp(a.daten))
+    .map((a) => ({
+      benutzer_id: benutzerId,
+      einsatz_id: einsatzId,
+      eintrag: antragDatenOhneVerweise('etb', a.daten) as unknown as NeuerEintrag,
+      erstellt_at: a.erfasst_at,
+      antrag: { id: a.id, zustand: a.zustand },
+    }));
 }

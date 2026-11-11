@@ -104,6 +104,11 @@ export default function GeraetPatientenPage() {
         void message.warning('Offline vorgemerkt · R-…');
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+      if (ergebnis.zustand === 'beantragt') {
+        void message.info('Beantragt · R-…');
+        return;
+      }
       void message.success(`Entlassen als ${registrierAnzeige(ergebnis.daten.registrier_nr)}`);
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
       if (uhsId != null) {

@@ -49,17 +49,30 @@ export function modulSperre(namen: readonly string[]): string | null {
   return `Module ${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]} gesperrt`;
 }
 
+/**
+ * Ein Spiegel (LLH-1492, Spec `einsatz-spiegel`): die führende Instanz nennt der Grund, wie das
+ * Hinweisband. Ändern geht dort; hier nur die beantragbaren Erfassungen.
+ */
+export function spiegelGrund(gegenstelle: string): string {
+  return `Spiegel von ${gegenstelle}`;
+}
+
 /** Führt eine gekoppelte Instanz den Einsatz (LLH-1491), schreibt hier niemand. */
 export function fuehrungBei(name: string): string {
   return `Führung liegt bei ${name}`;
 }
 
-/** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben: abgeschlossen, dann
-    die Führung einer anderen Instanz (LLH-1491), sonst die Rollen. Nimmt den Einsatz oder nur
-    seinen Status. */
+/**
+ * Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. Mit dem Einsatz statt
+ * nur seinem Status nennt er am Spiegel die führende Instanz (LLH-1492); sonst abgeschlossen, dann
+ * die Führung einer anderen Instanz (LLH-1491), sonst die Rollen.
+ */
 export function einsatzRechteGrund(
-  einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'fuehrung'>,
+  einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'spiegel' | 'fuehrung'>,
 ): string {
+  if (typeof einsatz !== 'string' && einsatz.spiegel != null) {
+    return spiegelGrund(einsatz.spiegel.gegenstelle);
+  }
   const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
   if (status !== 'aktiv') return EINSATZ_ABGESCHLOSSEN;
   if (typeof einsatz !== 'string' && einsatz.fuehrung && !einsatz.fuehrung.fuehrend) {

@@ -991,4 +991,86 @@ mod tests {
         );
         assert!(rx.try_recv().is_err(), "kein Live-Ereignis");
     }
+
+    /// LLH-1492 (design.md D10): ein Spiegel lässt der Takt aus. Seine fällige Erinnerung und
+    /// seine alte Benachrichtigung bleiben stehen, und kein Schreibversuch scheitert am
+    /// Schutz-Trigger (kein `einsatz_ist_spiegel` im Log). Der eigene Einsatz löst im selben Takt
+    /// aus, und seine alte Benachrichtigung wird abgeräumt: das Abräumen ist EINE Anweisung, die
+    /// an einer Zeile des Spiegels ganz scheiterte.
+    #[tokio::test]
+    async fn spiegel_bleibt_unberuehrt_und_haelt_den_takt_nicht_auf() {
+        let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        let (b, eigen) = setup(&pool).await;
+        let spiegel: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Spiegel') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let r_spiegel = wiederkehrende_um_zehn(&pool, spiegel, b).await;
+        let r_eigen = wiederkehrende_um_zehn(&pool, eigen, b).await;
+        let mut alte = Vec::new();
+        for e in [spiegel, eigen] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
+                     bezug_id, erstellt_at) \
+                 VALUES (?, ?, 'meldung', 'hinweis', 'meldung', 1, '2026-06-10 00:00:00') \
+                 RETURNING id",
+            )
+            .bind(e)
+            .bind(b)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            alte.push(id);
+        }
+        crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, spiegel).await;
+        let live = LiveHub::new();
+        let mut rx_spiegel = live.abonniere(spiegel);
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
+
+        let stand = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (String, Option<String>)>(
+                    "SELECT faellig_at, zuletzt_ausgeloest_at FROM erinnerung WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(
+            stand(r_eigen).await,
+            (
+                "2026-06-11 10:30:00".to_string(),
+                Some("2026-06-11 10:01:00".to_string())
+            ),
+            "der eigene Einsatz löst aus"
+        );
+        assert_eq!(
+            stand(r_spiegel).await,
+            ("2026-06-11 10:00:00".to_string(), None),
+            "der Spiegel bleibt stehen"
+        );
+        assert!(
+            rx_spiegel.try_recv().is_err(),
+            "kein Live-Ereignis am Spiegel"
+        );
+        let uebrig: Vec<i64> = sqlx::query_scalar(
+            "SELECT id FROM benachrichtigung WHERE erstellt_at = '2026-06-10 00:00:00' ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(uebrig, vec![alte[0]], "nur die alte des Spiegels bleibt");
+        let log = puffer.text();
+        assert!(
+            !log.contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
+            "{log}"
+        );
+    }
 }

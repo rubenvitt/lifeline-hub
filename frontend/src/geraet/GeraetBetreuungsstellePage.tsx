@@ -16,7 +16,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Paneel, Segmentleiste } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import GeraetMeldungen from './GeraetMeldungen';
 
@@ -89,6 +89,8 @@ export default function GeraetBetreuungsstellePage() {
     ? (betreuungQuery.data.namentlich.find((n) => n.stelle_id === stelleId)?.anzahl ?? 0)
     : undefined;
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
+  // Belegung, Registrierung, Abmeldung und Meldung: am Spiegel ein Antrag (LLH-1492, D13).
+  const darfErfassen = darfBeantragen(einsatzQuery.data);
   const personenFrei = betreuungQuery.data?.namentlich != null;
   const namentlichGefuehrt = stelle?.belegungsart === 'namentlich';
 
@@ -105,6 +107,10 @@ export default function GeraetBetreuungsstellePage() {
         message.warning(`Offline vorgemerkt: Belegungsmeldung ${ziel.bezeichnung}`);
         return;
       }
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Belegungsmeldung ${ziel.bezeichnung}`);
+        return;
+      }
       void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
       message.success(`Belegung gemeldet: ${personenZahl(body.belegt)} untergebracht`);
     },
@@ -119,7 +125,7 @@ export default function GeraetBetreuungsstellePage() {
         betreuungQuery.dataUpdatedAt,
       )}
       aktionen={
-        darfSchreiben &&
+        darfErfassen &&
         stelle &&
         stelle.status !== 'geschlossen' && (
           <Space size="middle" wrap>
@@ -170,14 +176,14 @@ export default function GeraetBetreuungsstellePage() {
                 einsatzId={einsatzId}
                 stelle={stelle}
                 personenFrei={personenFrei}
-                darfSchreiben={darfSchreiben}
+                darfSchreiben={darfErfassen}
                 rechteGrund={einsatzQuery.data ? einsatzRechteGrund(einsatzQuery.data) : undefined}
               />
             ) : (
               <GeraetMeldungen
                 einsatzId={einsatzId}
                 absender={[stelle.bezeichnung, geraet?.bezeichnung].filter(Boolean).join(' · ')}
-                schreibgeschuetzt={!darfSchreiben}
+                schreibgeschuetzt={!darfErfassen}
               />
             )}
           </div>

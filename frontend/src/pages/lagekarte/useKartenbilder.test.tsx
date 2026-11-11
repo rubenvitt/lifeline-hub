@@ -15,6 +15,7 @@ import { ApiError, AusgangUnbekannt, type UploadFortschritt } from '../../api/cl
 import type { KartenHandle } from './Kartenflaeche';
 import { useKartenbilder } from './useKartenbilder';
 import { useKartenFehler } from './useKartenFehler';
+import { AnhangWirdGeholt } from '../../api/anhangAbruf';
 
 /**
  * Bild-URLs der Hintergrundbilder (LFH-943, D4): jede URL wird freigegeben, ob übernommen,
@@ -400,5 +401,60 @@ describe('useKartenbilder: Bildaktionen melden am Kartenhinweis (LFH-1077)', () 
     });
     expect(hook.result.current.hinweis.gruende).toEqual([]);
     expect(invalidiert).toHaveBeenCalledWith({ queryKey: einsatzKeys.kartenbilder(1) });
+  });
+});
+
+describe('useKartenbilder: Bild „wird geholt“ am Spiegel (LLH-1492)', () => {
+  it('ein gewöhnlich gescheitertes Bild lädt ein Abruf der Liste nicht neu', async () => {
+    api.liste.set(1, [bild(3)]);
+    const { fehler, setzeListe } = aufbau();
+    await waitFor(() => expect(api.downloads).toHaveLength(1));
+    await act(async () => api.downloads[0].ablehnen(new Error('kaputt')));
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    // Derselbe Stand, neu abgerufen (Live-Kanal): kein zweiter Download, kein zweiter Fehler.
+    setzeListe(1, [bild(3)]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(api.downloads).toHaveLength(1);
+    expect(fehler).toHaveBeenCalledTimes(1);
+  });
+
+  it('ein Bild, das geholt wird, versucht der nächste Abruf der Liste erneut', async () => {
+    api.liste.set(1, [bild(3)]);
+    const { hook, setzeListe } = aufbau();
+    await waitFor(() => expect(api.downloads).toHaveLength(1));
+    await act(async () => api.downloads[0].ablehnen(new AnhangWirdGeholt()));
+    setzeListe(1, [bild(3)]);
+    await waitFor(() => expect(api.downloads).toHaveLength(2));
+    await act(async () => api.downloads[1].aufloesen('blob:da'));
+    await waitFor(() => expect(hook.result.current.bildOverlays).toHaveLength(1));
+    // Danach kein weiterer Versuch.
+    setzeListe(1, [bild(3)]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(api.downloads).toHaveLength(2);
+  });
+
+  it('nachgeholt wird nur das Bild, das geholt wird, nicht ein gewöhnlich gescheitertes', async () => {
+    api.liste.set(1, [bild(3), bild(4)]);
+    const { hook, fehler, setzeListe } = aufbau();
+    await waitFor(() => expect(api.downloads).toHaveLength(2));
+    const download = (id: number) => api.downloads.filter((d) => d.id === id);
+    await act(async () => {
+      download(3)[0].ablehnen(new Error('kaputt'));
+      download(4)[0].ablehnen(new AnhangWirdGeholt());
+    });
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(2));
+
+    setzeListe(1, [bild(3), bild(4)]);
+    await waitFor(() => expect(download(4)).toHaveLength(2));
+    expect(download(3)).toHaveLength(1);
+    await act(async () => download(4)[1].aufloesen('blob:vier'));
+    await waitFor(() => expect(hook.result.current.bildOverlays).toHaveLength(1));
+
+    // Nichts steht mehr aus: auch das gescheiterte Bild lädt kein Abruf neu.
+    setzeListe(1, [bild(3), bild(4)]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(download(3)).toHaveLength(1);
+    expect(download(4)).toHaveLength(2);
+    expect(fehler).toHaveBeenCalledTimes(2);
   });
 });

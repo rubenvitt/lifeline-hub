@@ -1790,3 +1790,65 @@ describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
     expect(within(kopf).queryByRole('button', { name: 'Anlass festlegen' })).toBeNull();
   });
 });
+
+describe('Patientenkopf am Spiegel (LLH-1492, design.md D13)', () => {
+  it('erfasst Einträge (als Antrag), ändert aber nichts: Zustand, PAT und Versorgt von gesperrt', async () => {
+    server.use(
+      meHandler(benutzerFixture({ id: 11 })),
+      http.post('/api/einsaetze/1/personen/10/notizen', async ({ request }) => {
+        gesendet.push({ pfad: 'notizen', body: await request.json() });
+        return HttpResponse.json({ antrag: { id: 8, zustand: 'ausstehend' } }, { status: 202 });
+      }),
+    );
+    const { kopf, onGeschrieben } = zeige({}, { darfSchreiben: false, darfErfassen: true });
+    // Erfassen: Sichtung, Verbleib, Notiz, Transport, Maßnahme, Verletzung.
+    expect(within(kopf).getByRole('button', { name: /^Nachsichten/ })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Verbleib erfassen' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' })).toBeInTheDocument();
+    // Ändern bleibt gesperrt: Zustand / Verdacht nur als Text.
+    expect(within(kopf).getByText('Verdacht auf Hüftfraktur')).toBeInTheDocument();
+    expect(within(kopf).queryByRole('textbox', { name: /Zustand/ })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: /Zustand/ })).toBeNull();
+    expect(kopf.querySelector('[data-lfh="zustand"]')).not.toBeNull();
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    // Beantragt ist kein neuer Serverstand: die Seite lädt nicht neu.
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Verlaufsnotiz' })).toHaveValue(''),
+    );
+    expect(onGeschrieben).not.toHaveBeenCalled();
+  });
+
+  it('zeigt beantragte Einträge an der Person, getrennt von „Offline vorgemerkt“', async () => {
+    server.use(meHandler(benutzerFixture({ id: 11 })));
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    client.setQueryData(einsatzKeys.antraege(1), [
+      {
+        id: 5,
+        art: 'sichtung',
+        zustand: 'ausstehend',
+        erfasst_at: '2026-10-18 10:00:00',
+        ziel: { pid: 10 },
+        daten: { kategorie: 'sk1', client_id: 'a-5' },
+      },
+      {
+        id: 6,
+        art: 'sichtung',
+        zustand: 'ausstehend',
+        erfasst_at: '2026-10-18 10:00:00',
+        ziel: { pid: 99 },
+        daten: { kategorie: 'sk3', client_id: 'a-6' },
+      },
+    ]);
+    renderMitProviders(
+      <Patientenkopf einsatzId={1} person={basis} darfSchreiben={false} darfErfassen />,
+      { client },
+    );
+    const block = await screen.findByRole('region', { name: 'Beantragt' });
+    expect(block).toHaveTextContent('Sichtung SK I');
+    expect(block).not.toHaveTextContent('SK III');
+    expect(screen.queryByRole('region', { name: 'Offline vorgemerkt' })).toBeNull();
+  });
+});

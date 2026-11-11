@@ -1675,6 +1675,56 @@ async fn geraet_erreicht_nur_gelistete_routen_seines_einsatzes() {
     assert_eq!(s, StatusCode::NOT_FOUND, "anderer Einsatz");
 }
 
+/// LLH-1492: Die eigenen Anträge am Spiegel liest jede Ansicht (Band in der Gerätehülle), nur im
+/// eigenen Einsatz. Verwerfen darf jede Ansicht außer dem Lagemonitor, der nie schreibt.
+#[tokio::test]
+async fn geraet_liest_die_antraege_seines_einsatzes() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Anderer").await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (_, tablet) = tablet(&app, &admin, einsatz, uhs).await;
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"}),
+    )
+    .await;
+    let monitor = koppeln(&app, &code, None)
+        .await
+        .cookie
+        .expect("Sitzungscookie");
+
+    for (wer, cookie) in [("Tablet", &tablet), ("Lagemonitor", &monitor)] {
+        let (s, v) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/antraege"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{wer}: {v}");
+        let (s, _) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{anderer}/antraege"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{wer}: anderer Einsatz");
+    }
+
+    let verwerfen = format!("/api/einsaetze/{einsatz}/antraege/999999");
+    let (s, _) = anfrage(&app, "DELETE", &verwerfen, &monitor, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Lagemonitor verwirft nicht");
+    let (s, v) = anfrage(&app, "DELETE", &verwerfen, &tablet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Tablet erreicht den Handler: {v}");
+}
+
 /// LFH-1072: der Kachel-Proxy verlangt eine Sitzung; jedes gekoppelte Gerät besteht sie, gleich
 /// welche Ansicht. Die Kachel außerhalb des Rasters ist 204 ohne Abruf, die unbekannte Quelle 404.
 #[tokio::test]

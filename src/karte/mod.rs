@@ -85,9 +85,8 @@ pub const BRIGHTSKY_BASIS_URL: &str = "https://api.brightsky.dev";
 
 impl FachebenenState {
     pub fn neu() -> Self {
-        let client = reqwest::Client::builder()
+        let client = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Lagekarte)
             .timeout(Duration::from_secs(8))
-            .user_agent("LifelineHub-Lagekarte/1.0 (+https://github.com/)")
             // Die 8 s gelten der ganzen Anfrage: ungepackt bräuchte ODL bei ~1 Mbit/s rund 7 s
             // (LFH-599). Ausdrücklich, obwohl Vorgabe — Proxy und Download schalten es ab.
             .gzip(true)

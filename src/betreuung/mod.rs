@@ -817,6 +817,60 @@ pub mod etb_text {
         )
     }
 
+    /// Bezugsperson eines Haushalts gewechselt (LLH-1615, design.md D3), ohne Namen.
+    pub fn bezugsperson_gewechselt(
+        bezeichnung: &str,
+        haushalt_nr: i64,
+        registriernummer: &str,
+    ) -> String {
+        format!(
+            "Betreuungsstelle {}: Haushalt H-{haushalt_nr}, Bezugsperson jetzt {registriernummer}.",
+            q(bezeichnung)
+        )
+    }
+
+    /// Eine Person wechselt den Haushalt (LLH-1615, design.md D3), ohne Namen. `von` fehlt ohne
+    /// bisherigen Haushalt; `nachgerueckt` nennt die neue Bezugsperson des alten Haushalts.
+    pub fn haushalt_gewechselt(
+        bezeichnung: &str,
+        registriernummer: &str,
+        von: Option<i64>,
+        nach: i64,
+        neu: bool,
+        wird_bezugsperson: bool,
+        nachgerueckt: Option<&str>,
+    ) -> String {
+        let vorgang = match von {
+            Some(v) => {
+                format!("{registriernummer} von Haushalt H-{v} in Haushalt H-{nach} umgehängt")
+            }
+            None => format!("{registriernummer} in Haushalt H-{nach} aufgenommen"),
+        };
+        let zusatz: Vec<&str> = [(neu, "neu"), (wird_bezugsperson, "Bezugsperson")]
+            .into_iter()
+            .filter_map(|(an, wort)| an.then_some(wort))
+            .collect();
+        let zusatz = if zusatz.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", zusatz.join(", "))
+        };
+        let nachgerueckt = match (von, nachgerueckt) {
+            (Some(v), Some(r)) => format!(" {}", bezugsperson_nachgerueckt(v, r)),
+            _ => String::new(),
+        };
+        format!(
+            "Betreuungsstelle {}: {vorgang}{zusatz}.{nachgerueckt}",
+            q(bezeichnung)
+        )
+    }
+
+    /// Satz zum Nachrücken der Bezugsperson (LLH-1615, design.md D2/D3), an einen Eintrag
+    /// angehängt, nie ein eigener.
+    pub fn bezugsperson_nachgerueckt(haushalt_nr: i64, registriernummer: &str) -> String {
+        format!("Haushalt H-{haushalt_nr}: Bezugsperson jetzt {registriernummer}.")
+    }
+
     fn personen(n: usize) -> String {
         if n == 1 {
             "1 Person".to_string()

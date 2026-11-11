@@ -1013,11 +1013,12 @@ mod update_check_tests {
 
     #[test]
     fn kein_update_auf_ungebauten_platzhalter() {
-        // LFH-206: ein ungebauter TODO-Platzhalter (nicht lieferbar) darf NIE als Update erscheinen —
-        // sonst lädt „Aktualisieren" eine nicht-ladbare URL (der Bug, den Schweiz/NRW auslösten).
+        // LFH-206: ein ungebauter Platzhalter ohne Pin (nicht lieferbar) darf NIE als Update
+        // erscheinen — sonst lädt „Aktualisieren" eine nicht-ladbare URL (der Bug, den Schweiz/NRW
+        // auslösten).
         let katalog = vec![eintrag(
             "Schweiz",
-            "https://TODO-karten-build-release/switzerland.shortbread.mbtiles",
+            "https://karten.example/switzerland.shortbread.mbtiles",
             None,
         )];
         assert!(finde_update_eintrag(
@@ -1736,7 +1737,7 @@ pub struct OfflineBauBody {
 /// Prozessweit mit kurzem Timeout (der Aufruf startet nur einen Build, wartet nicht auf ihn).
 static KARTEN_SERVICE_CLIENT: std::sync::LazyLock<reqwest::Client> =
     std::sync::LazyLock::new(|| {
-        reqwest::Client::builder()
+        crate::ausgehend::client_builder(crate::ausgehend::Zweck::KartenService)
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .expect("karten-service-Client baubar")

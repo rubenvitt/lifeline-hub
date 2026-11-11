@@ -16,6 +16,7 @@ pub mod schwaerzung_nachlauf;
 pub mod schwaerzung_person;
 pub mod schwaerzung_registry;
 pub mod skelett_loeschung;
+pub mod spiegel_filter;
 pub mod verbindungen;
 pub mod zaehler;
 
@@ -165,6 +166,9 @@ pub struct Einsatz {
     /// und jeder Schreibweg antwortet mit 409 (`berechtigung::fordere_aktiv`).
     #[sqlx(flatten)]
     pub fuehrung: crate::instanz::fuehrung::FuehrungSpalten,
+    /// Spiegel-Angaben (LLH-1492).
+    #[sqlx(flatten)]
+    pub spiegel: crate::instanz::spiegel::SpiegelSpalten,
 }
 
 impl Einsatz {
@@ -225,6 +229,7 @@ impl Einsatz {
             teilschwaerzungen: self.teilschwaerzungen,
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
             fuehrung: self.fuehrung.anzeige(),
+            spiegel: self.spiegel.anzeige(),
         }
     }
 }
@@ -314,6 +319,11 @@ pub struct EinsatzAnzeige {
     /// ist; in Liste und Detail dieselbe Aussage.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fuehrung: Option<crate::instanz::fuehrung::EinsatzFuehrung>,
+    /// Spiegel einer gekoppelten Instanz (LLH-1492, Spec `einsatz-spiegel`): wer führt, Stand,
+    /// Anträge. Fehlt an einem Einsatz, den diese Instanz führt. Am Spiegel schreibt der Client
+    /// nur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spiegel: Option<crate::instanz::spiegel::EinsatzSpiegelAnzeige>,
 }
 
 /// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,
@@ -469,6 +479,7 @@ mod tests {
             geloescht_at: None,
             einsatzleiter: Default::default(),
             fuehrung: Default::default(),
+            spiegel: Default::default(),
         };
         assert!(e.ist_aktiv());
         e.status = EinsatzStatus::Abgeschlossen;

@@ -7,7 +7,7 @@
 //! registrierte Route mit passender Methode in `src/app.rs`, mit demselben Quelltext-Parsing
 //! wie `tests/zulassung_guard.rs`.
 
-use lifeline_hub::geraet::{Funktionsansicht, ALLE_ANSICHTEN, ALLE_GERAETE};
+use lifeline_hub::geraet::{Funktionsansicht, ALLE_ANSICHTEN, ALLE_GERAETE, SCHREIBENDE_ANSICHTEN};
 use std::fs;
 
 /// Jeder `.route(…)`-Block für `pfad`, per Klammer-Tiefe abgegrenzt (wie im Zulassungs-Guard:
@@ -57,6 +57,9 @@ fn alle_eintraege() -> Vec<(String, &'static str, &'static str)> {
     for (m, p) in ALLE_ANSICHTEN {
         aus.push(("ALLE_ANSICHTEN".to_string(), *m, *p));
     }
+    for (m, p) in SCHREIBENDE_ANSICHTEN {
+        aus.push(("SCHREIBENDE_ANSICHTEN".to_string(), *m, *p));
+    }
     for a in Funktionsansicht::ALLE {
         for (m, p) in a.routen() {
             aus.push((format!("{a:?}"), *m, *p));
@@ -93,8 +96,12 @@ fn jeder_eintrag_zeigt_auf_eine_real_registrierte_route() {
 
 #[test]
 fn routenliste_ist_duplikatfrei() {
-    let mut gesehen: Vec<(&str, &str)> =
-        ALLE_GERAETE.iter().chain(ALLE_ANSICHTEN).copied().collect();
+    let mut gesehen: Vec<(&str, &str)> = ALLE_GERAETE
+        .iter()
+        .chain(ALLE_ANSICHTEN)
+        .chain(SCHREIBENDE_ANSICHTEN)
+        .copied()
+        .collect();
     let gemeinsam = gesehen.len();
     gesehen.sort();
     gesehen.dedup();

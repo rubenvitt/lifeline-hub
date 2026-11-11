@@ -320,7 +320,8 @@ pub async fn faellige_zum_ausloesen(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<FaelligeErinnerung>, AppError> {
-    sqlx::query_as::<_, FaelligeErinnerung>(
+    // Spiegel lösen nicht aus (LLH-1492, design.md D10): ihre Erinnerungen löst der Führer aus.
+    sqlx::query_as::<_, FaelligeErinnerung>(sqlx::AssertSqlSafe(format!(
         "SELECT e.id, e.einsatz_id, e.faellig_at, e.intervall_minuten, e.bezug_typ, \
                 e.bezug_id, e.titel, e.quelle, e.empfaenger_funktion_code, e.erstellt_von_id \
          FROM erinnerung e \
@@ -328,8 +329,10 @@ pub async fn faellige_zum_ausloesen(
          WHERE e.status = 'offen' AND e.faellig_at <= ? \
            AND (e.zuletzt_ausgeloest_at IS NULL OR e.zuletzt_ausgeloest_at < e.faellig_at) \
            AND ei.status = 'aktiv' AND ei.geloescht_at IS NULL AND ei.geschwaerzt_at IS NULL \
+           AND {} \
          ORDER BY e.faellig_at, e.id",
-    )
+        crate::einsatz::spiegel_filter::nicht_gespiegelt("e.einsatz_id")
+    )))
     .bind(jetzt)
     .fetch_all(pool)
     .await

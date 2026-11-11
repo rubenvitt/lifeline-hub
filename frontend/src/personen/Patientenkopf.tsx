@@ -65,6 +65,12 @@ export interface PatientenkopfProps {
   modus?: 'bedienen' | 'lesen';
   /** Schreibrecht im Einsatz; an einer stornierten Person ohnehin aus. */
   darfSchreiben?: boolean;
+  /**
+   * Die Einträge an der Person erfassen (Sichtung, Anlass, Verbleib, Transport, Maßnahme,
+   * Verletzung, Notiz), auch ohne Schreibrecht: am Spiegel werden sie zum Antrag (LLH-1492,
+   * `darfBeantragen`). Ändern und Aufheben bleiben bei `darfSchreiben`. Vorgabe `darfSchreiben`.
+   */
+  darfErfassen?: boolean;
   /** Darf hier gesichtet werden? An der Betreuungsstelle nicht (LFH-1041). */
   darfSichten?: boolean;
   /**
@@ -97,6 +103,7 @@ export default function Patientenkopf({
   person,
   modus = 'bedienen',
   darfSchreiben = false,
+  darfErfassen = darfSchreiben,
   darfSichten = true,
   darfBehandeln = true,
   aufenthaltAktionen,
@@ -105,6 +112,8 @@ export default function Patientenkopf({
   const { token } = useRollen();
   const jetzt = useMinutenTakt();
   const bedienbar = modus === 'bedienen' && darfSchreiben && !person.storniert_at;
+  // Erfassen ohne Ändern: am Spiegel (LLH-1492) die beantragbaren Einträge, sonst wie `bedienbar`.
+  const erfassbar = modus === 'bedienen' && (darfSchreiben || darfErfassen) && !person.storniert_at;
   const angetroffen = istAngetroffen(person);
   const [offen, setOffen] = useState<Paneel | null>(null);
   const toggle = (paneel: Paneel) => setOffen((o) => (o === paneel ? null : paneel));
@@ -116,7 +125,7 @@ export default function Patientenkopf({
   // Serverstand; die Quittung steht unten im Kopf.
   const saveSichtung = useSaveSichtung();
   const save = useSavePersonEintrag();
-  const nachSpeichern = (ergebnis: { zustand: 'gesendet' | 'vorgemerkt' }) => {
+  const nachSpeichern = (ergebnis: { zustand: 'gesendet' | 'vorgemerkt' | 'beantragt' }) => {
     if (ergebnis.zustand === 'gesendet') onGeschrieben?.();
   };
   const sichtungMutation = useMutation({
@@ -168,7 +177,7 @@ export default function Patientenkopf({
     massnahmeAufhebenMutation.isPending ||
     verletzungMutation.isPending ||
     verletzungAufhebenMutation.isPending;
-  const behandelbar = bedienbar && darfBehandeln && angetroffen;
+  const behandelbar = erfassbar && darfBehandeln && angetroffen;
 
   const letzteSichtung = person.sichtungen?.[0];
   const letzteNotiz = person.notizen?.[0];
@@ -192,7 +201,13 @@ export default function Patientenkopf({
   // Ohne Verbindung heißt: Browser offline ODER der Server antwortet nicht (WLAN ohne Server,
   // `frontend/src/offline/AGENTS.md`); `navigator.onLine` allein böte das Aufheben dort an.
   const ohneVerbindung = useOhneVerbindung();
-  const aufhebenGesperrt = ohneVerbindung ? AUFHEBEN_OHNE_NETZ : undefined;
+  // Am Spiegel (erfassen ja, ändern nein) ist Aufheben kein Antrag (Spec `spiegel-antraege`,
+  // „Maßnahme aufheben am Spiegel“).
+  const aufhebenGesperrt = ohneVerbindung
+    ? AUFHEBEN_OHNE_NETZ
+    : !bedienbar
+      ? AUFHEBEN_AM_SPIEGEL
+      : undefined;
   // Vorgemerkt an dieser Person, getrennt vom Serverstand (`frontend/src/offline/AGENTS.md`, „Was
   // vorgemerkt ist, kennt der Server noch nicht“); die Notizen quittiert die Notizzeile.
   const auth = useAuthOptional();
@@ -232,7 +247,7 @@ export default function Patientenkopf({
             <Flex vertical gap={token.marginXXS}>
               <SichtungsAnzeige
                 person={person}
-                bedienbar={bedienbar && darfSichten && angetroffen}
+                bedienbar={erfassbar && darfSichten && angetroffen}
                 offen={offen === 'sichtung'}
                 gesperrt={isSpeichernd}
                 onUmschalten={() => toggle('sichtung')}
@@ -258,7 +273,7 @@ export default function Patientenkopf({
                 <Typography.Text type="secondary">kein Anlass</Typography.Text>
               )}
             </span>
-            {bedienbar && darfSichten && angetroffen && (
+            {erfassbar && darfSichten && angetroffen && (
               <PaneelKnopf
                 offen={offen === 'anlass'}
                 gesperrt={isSpeichernd}
@@ -329,7 +344,7 @@ export default function Patientenkopf({
                       Übergabe quittieren
                     </Button>
                   )}
-                  {bedienbar && angetroffen && (
+                  {erfassbar && angetroffen && (
                     <Button
                       aria-expanded={offen === 'verbleib'}
                       disabled={isSpeichernd}
@@ -535,7 +550,7 @@ export default function Patientenkopf({
           onSchliessen={close('massnahme')}
         />
       )}
-      {bedienbar && (
+      {erfassbar && (
         <NotizZeile
           einsatzId={einsatzId}
           person={person}
@@ -614,6 +629,9 @@ function SichtungsAnzeige({
 /** Grund, warum ohne Netz nicht aufgehoben wird (LFH-966: wenige Wörter). */
 export const AUFHEBEN_OHNE_NETZ = 'Aufheben ohne Netz nicht möglich';
 
+/** Grund, warum am Spiegel nicht aufgehoben wird (LLH-1492): Aufheben ist kein Antrag. */
+export const AUFHEBEN_AM_SPIEGEL = 'Aufheben nur bei der führenden Instanz';
+
 /**
  * Der jüngste ohne Netz vorgemerkte Anlass-Stand dieser Person, `undefined` ohne Vormerkung. Die
  * Warteschlange spielt in ihrer Folge ab, also gilt der letzte Eintrag, auch eine Aufhebung (`null`).
@@ -635,19 +653,29 @@ function vorgemerkterAnlass(
 function VorgemerktBlock({ eintraege }: { eintraege: readonly VorgemerkterPersonEintrag[] }) {
   const { token, rollen } = useRollen();
   if (eintraege.length === 0) return null;
+  const stil = {
+    borderInlineStart: `3px solid ${token.colorWarning}`,
+    paddingInlineStart: token.paddingSM,
+    color: rollen.text2,
+  };
+  // Anträge am Spiegel (LLH-1492) an derselben Stelle, eigens überschrieben.
+  const offline = eintraege.filter((v) => v.antrag == null);
+  const beantragt = eintraege.filter((v) => v.antrag != null);
   return (
-    <section
-      aria-label="Offline vorgemerkt"
-      data-lfh="vorgemerkt"
-      style={{
-        borderInlineStart: `3px solid ${token.colorWarning}`,
-        paddingInlineStart: token.paddingSM,
-        color: rollen.text2,
-      }}
-    >
-      <Typography.Text strong>Offline vorgemerkt</Typography.Text>
-      <VorgemerktListe eintraege={eintraege} />
-    </section>
+    <>
+      {offline.length > 0 && (
+        <section aria-label="Offline vorgemerkt" data-lfh="vorgemerkt" style={stil}>
+          <Typography.Text strong>Offline vorgemerkt</Typography.Text>
+          <VorgemerktListe eintraege={offline} />
+        </section>
+      )}
+      {beantragt.length > 0 && (
+        <section aria-label="Beantragt" data-lfh="beantragt" style={stil}>
+          <Typography.Text strong>Beantragt</Typography.Text>
+          <VorgemerktListe eintraege={beantragt} />
+        </section>
+      )}
+    </>
   );
 }
 
@@ -655,12 +683,16 @@ function VorgemerktListe({ eintraege }: { eintraege: readonly VorgemerkterPerson
   return (
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {eintraege.map((v) => (
-        <li key={v.id ?? v.aktion.daten.client_id}>
+        <li key={v.antrag ? `antrag-${v.antrag.id}` : (v.id ?? v.aktion.daten.client_id)}>
           {vormerkungText(v.aktion)}
-          {v.aktion.daten.zeitpunkt_at && (
+          {/* Ein Antrag trägt seine Erfassungszeit am Antrag, nicht im Körper (LLH-1492). */}
+          {(v.aktion.daten.zeitpunkt_at ?? (v.antrag ? v.erstellt_at : null)) && (
             <>
               {' · '}
-              <ZeitAnzeige wert={v.aktion.daten.zeitpunkt_at} rolle="kurz" />
+              <ZeitAnzeige
+                wert={(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at) as string}
+                rolle="kurz"
+              />
             </>
           )}
         </li>
@@ -859,10 +891,16 @@ function NotizZeile({
           </Button>
         </Flex>
       </Schnellerfassungszeile>
-      {vorgemerkt.length > 0 && (
+      {vorgemerkt.some((v) => v.antrag == null) && (
         <div data-lfh="notiz-vorgemerkt" style={{ marginTop: token.marginXS, color: rollen.text2 }}>
           <Typography.Text strong>Offline vorgemerkt</Typography.Text>
-          <VorgemerktListe eintraege={vorgemerkt} />
+          <VorgemerktListe eintraege={vorgemerkt.filter((v) => v.antrag == null)} />
+        </div>
+      )}
+      {vorgemerkt.some((v) => v.antrag != null) && (
+        <div data-lfh="notiz-beantragt" style={{ marginTop: token.marginXS, color: rollen.text2 }}>
+          <Typography.Text strong>Beantragt</Typography.Text>
+          <VorgemerktListe eintraege={vorgemerkt.filter((v) => v.antrag != null)} />
         </div>
       )}
       {mutation.error != null && (

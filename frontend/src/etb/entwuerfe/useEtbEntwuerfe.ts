@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EntwurfWerte, EtbEntwurf } from './entwurfModell';
 import { istLeer, werteZuPatch } from './entwurfModell';
 import {
+  ENTWURF_ANGELEGT_EREIGNIS,
   aktivSchluessel,
   entwuerfeLaden,
   entwurfEntfernen,
@@ -83,6 +84,20 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
     return () => {
       abgebrochen = true;
     };
+  }, [benutzerId, einsatzId]);
+
+  // Ein Entwurf von außen (LLH-1492, „Neu erfassen“ eines abgelehnten Antrags): die offene
+  // Erfassung nimmt ihn auf und zeigt ihn, statt erst beim nächsten Laden.
+  useEffect(() => {
+    if (benutzerId === null) return;
+    const listener = (e: Event) => {
+      const neu = (e as CustomEvent<EtbEntwurf>).detail;
+      if (neu?.benutzer_id !== benutzerId || neu.einsatz_id !== einsatzId) return;
+      setEntwuerfe((prev) => (prev.some((x) => x.id === neu.id) ? prev : [...prev, neu]));
+      setAktiverId(neu.id);
+    };
+    window.addEventListener(ENTWURF_ANGELEGT_EREIGNIS, listener);
+    return () => window.removeEventListener(ENTWURF_ANGELEGT_EREIGNIS, listener);
   }, [benutzerId, einsatzId]);
 
   const aktivenSetzen = useCallback(

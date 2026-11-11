@@ -234,6 +234,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       // LLH-1570: Programmpunkte der Veranstaltung und der Lagemonitor, der die nächsten zeigt.
       'einsatz-programmpunkte',
       'einsatz-lagemonitor',
+      // LLH-1492: die eigenen Anträge am Spiegel, ihre Zähler stehen im Kopf.
+      'einsatz-antraege',
     ]);
   });
 

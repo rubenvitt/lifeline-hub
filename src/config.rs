@@ -142,14 +142,12 @@ pub use karten_katalog::{
 };
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`): Eigenbau
-/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), als GitHub-Release des Build-Projekts
-/// gehostet.
+/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), vom `karten-service` des Projekts unter
+/// [`crate::karte::katalog::KARTEN_BASIS_URL`] veröffentlicht.
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    // >>> OPERATOR-PIN <<< — je Eintrag beim karten-build-Release genau drei Felder ersetzen
-    // (README karten-build): `url`, `groesse` (gemessene Bytes), `sha256` (aus
-    // out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin erkennbare, aber gültige
-    // https-Platzhalter; `katalog_eintrag_sha256_pin_konsistent` trägt beide Zustände. Alternativ
-    // füllt das Remote-Manifest die echten Einträge ohne App-Release.
+    // Einkompiliert ist nur die Baseline (Name, Region, Gruppe, grobe Größe) ohne `sha256`: sie
+    // ist nie ladbar (`eintrag_ist_lieferbar`). Die gebauten Stände mit Prüfsumme liefert das
+    // Manifest unter `OFFLINE_KATALOG_MANIFEST_URL` und überschreibt per `name` (LLH-1546).
     //
     // `gruppe` steuert die geführte Auswahl. Neue Region = Zeile ergänzen (Slug =
     // karten-build-Dateiname).
@@ -162,7 +160,10 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     ) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
             name: name.into(),
-            url: format!("https://TODO-karten-build-release/{slug}.shortbread.mbtiles"),
+            url: format!(
+                "{}/{slug}.shortbread.mbtiles",
+                crate::karte::katalog::KARTEN_BASIS_URL
+            ),
             region: region.into(),
             groesse: ca_gb * 1024 * 1024 * 1024, // grobe Schätzung, nach Bau durch Messung ersetzen
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
@@ -404,15 +405,15 @@ pub struct Config {
     pub datentraeger_verschluesselung_extern: bool,
 
     /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
-    /// **Default AN** — auch im Dev-Betrieb, damit die Ebene überall bundesweit zeigt, was
-    /// sie zeigen soll. Jeder Lauf lädt rund 4–5 GB (nur, wenn der Extrakt neu ist);
-    /// abschalten mit `--kritis-extrakt false` bzw. `LIFELINE_KRITIS_EXTRAKT=false` — so
-    /// startet die e2e-Suite. Abgeschaltet und ohne früheren Bestand meldet die Ebene
-    /// `offline`.
+    /// **Vorgabe aus** (LLH-1546): Jeder Lauf lädt rund 4–5 GB, sobald der Extrakt neu ist,
+    /// und das soll keine Installation ungefragt tun. Einschalten mit `--kritis-extrakt true`
+    /// bzw. `LIFELINE_KRITIS_EXTRAKT=true`, bei vielen Instanzen besser mit eigenem Spiegel
+    /// (`--kritis-extrakt-url`). Abgeschaltet und ohne früheren Bestand meldet die Ebene
+    /// `offline`; ein vorhandener Bestand bleibt gültig.
     #[arg(
         long,
         env = "LIFELINE_KRITIS_EXTRAKT",
-        default_value_t = true,
+        default_value_t = false,
         action = clap::ArgAction::Set
     )]
     pub kritis_extrakt: bool,
@@ -515,6 +516,13 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_WEB_PUSH_KONTAKT")]
     pub web_push_kontakt: Option<String>,
 
+    /// Kontakt des Betreibers dieser Installation (LLH-1547), z. B. `betrieb@example.org`. Steht
+    /// in der Kennung (`User-Agent`) jedes ausgehenden Abrufs, damit ein Dienst wie der
+    /// öffentliche Nominatim bei zu vielen Anfragen den Betreiber erreicht, statt die Kennung
+    /// aller Installationen zu sperren. Ohne Angabe nur Projektadresse und Softwarestand.
+    #[arg(long, env = "LIFELINE_BETREIBER_KONTAKT")]
+    pub betreiber_kontakt: Option<String>,
+
     /// Name dieser Instanz, wie gekoppelte Instanzen sie anzeigen (LLH-1490, Spec
     /// `instanz-kopplung`), z. B. „ELW 1 DRK Nord“ oder „Hub DRK Landesverband“. Ohne Angabe die
     /// WebAuthn-RP-ID, sonst „Lifeline Hub“.
@@ -538,6 +546,17 @@ pub struct Config {
     /// Umgebungsvariable nimmt nur `true`/`false`.
     #[arg(long, env = "LIFELINE_FUEHRUNG", default_value_t = false)]
     pub fuehrung: bool,
+
+    /// Abstand in Sekunden des Abgleichs gespiegelter Einsätze, solange an einer Kopplung ein
+    /// Einsatz aktiv ist oder etwas aussteht (LLH-1492, design.md D12); sonst gilt der Abstand der
+    /// Meldung. Bei Fehlern verdoppelt er sich bis zehn Minuten.
+    #[arg(
+        long,
+        env = "LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN",
+        default_value_t = 5,
+        value_parser = clap::value_parser!(u64).range(2..=600)
+    )]
+    pub instanz_spiegel_sekunden: u64,
 
     /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
     /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
@@ -709,6 +728,17 @@ impl Config {
         }
         crate::web_push::kontakt_pruefen(kontakt).map_err(anyhow::Error::msg)?;
         Ok(Some(kontakt.to_owned()))
+    }
+
+    /// Der Betreiberkontakt für die Kennung ausgehender Abrufe (LLH-1547); `None` ohne Angabe
+    /// oder bei leerer Angabe. Ein unzulässiger Kontakt bricht den Start mit Text ab.
+    pub fn betreiber_kontakt(&self) -> anyhow::Result<Option<String>> {
+        match self.betreiber_kontakt.as_deref().map(str::trim) {
+            None | Some("") => Ok(None),
+            Some(kontakt) => crate::ausgehend::kontakt_pruefen(kontakt)
+                .map(Some)
+                .map_err(anyhow::Error::msg),
+        }
     }
 
     /// Ob Cookies prozessweit `Secure` tragen (LFH-603): bei eigenem TLS oder mit
@@ -902,6 +932,25 @@ mod tests {
         assert!(try_parse_mit_env("LIFELINE_FUEHRUNG", "ja", &["lifeline-hub"]).is_err());
     }
 
+    /// Der Abgleich der Einsätze läuft per Vorgabe alle 5 s (LLH-1492, D12), höchstens alle 2 s.
+    #[test]
+    fn instanz_spiegel_vorgabe_und_grenzen() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert_eq!(c.instanz_spiegel_sekunden, 5);
+        assert!(
+            try_parse_mit_env("LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN", "1", &["lifeline-hub"]).is_err()
+        );
+        assert!(try_parse_mit_env(
+            "LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN",
+            "601",
+            &["lifeline-hub"]
+        )
+        .is_err());
+        let c =
+            try_parse_mit_env("LIFELINE_INSTANZ_SPIEGEL_SEKUNDEN", "2", &["lifeline-hub"]).unwrap();
+        assert_eq!(c.instanz_spiegel_sekunden, 2);
+    }
+
     /// Web Push ist per Vorgabe aus (LLH-1223); mit Schalter ist der Kontakt Pflicht und muss
     /// `mailto:` oder `https://` sein.
     #[test]
@@ -935,6 +984,36 @@ mod tests {
         }
         assert!(parse_mit_env("LIFELINE_WEB_PUSH", "true", &["lifeline-hub"]).web_push);
         assert!(try_parse_mit_env("LIFELINE_WEB_PUSH", "1", &["lifeline-hub"]).is_err());
+    }
+
+    /// Der Betreiberkontakt ist optional (LLH-1547); gesetzt wird er getrimmt übernommen, ein
+    /// unzulässiger Kontakt bricht den Start ab.
+    #[test]
+    fn betreiber_kontakt_optional_und_geprueft() {
+        assert_eq!(
+            parse_hermetisch(["lifeline-hub"])
+                .betreiber_kontakt()
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            parse_hermetisch(["lifeline-hub", "--betreiber-kontakt", "  "])
+                .betreiber_kontakt()
+                .unwrap(),
+            None
+        );
+        let c = parse_mit_env(
+            "LIFELINE_BETREIBER_KONTAKT",
+            " betrieb@example.org ",
+            &["lifeline-hub"],
+        );
+        assert_eq!(
+            c.betreiber_kontakt().unwrap().as_deref(),
+            Some("betrieb@example.org")
+        );
+        let falsch = parse_hermetisch(["lifeline-hub", "--betreiber-kontakt", "a (b)"]);
+        let fehler = falsch.betreiber_kontakt().unwrap_err().to_string();
+        assert!(fehler.contains("--betreiber-kontakt"), "{fehler}");
     }
 
     /// Der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar. Die Env nimmt nur
@@ -1014,18 +1093,17 @@ mod tests {
 
     /// Der KRITIS-Import ist per Vorgabe an und auf beiden Wegen abschaltbar.
     #[test]
-    fn kritis_extrakt_default_an_und_abschaltbar() {
+    fn kritis_extrakt_default_aus_und_einschaltbar() {
         let c = parse_hermetisch(["lifeline-hub"]);
-        assert!(c.kritis_extrakt);
+        assert!(!c.kritis_extrakt);
         assert_eq!(
             c.kritis_extrakt_url,
             "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
         );
         assert_eq!(c.kritis_extrakt_intervall_stunden, 168);
+        assert!(parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "true"]).kritis_extrakt);
+        assert!(parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "true", &["lifeline-hub"]).kritis_extrakt);
         assert!(!parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "false"]).kritis_extrakt);
-        assert!(
-            !parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "false", &["lifeline-hub"]).kritis_extrakt
-        );
         let c = parse_mit_env(
             "LIFELINE_KRITIS_EXTRAKT_INTERVALL_STUNDEN",
             "24",
@@ -1204,17 +1282,21 @@ mod tests {
 
     #[test]
     fn katalog_eintrag_sha256_pin_konsistent_und_serialisiert() {
-        // Pin-Konsistenz: jeder Eintrag ist ENTWEDER ungepinnter Platzhalter (sha256 None) ODER
-        // vollständig gepinnt (64-stelliger lowercase-hex-Hash + echte URL). Halb gepinnte Zustände
-        // fallen durch.
+        // Pin-Konsistenz (LLH-1546): die einkompilierte Baseline ist ungepinnt (sha256 None) und
+        // zeigt auf den Vorgabe-Bucket, nie auf einen TODO-Platzhalter. Ladbar wird ein Eintrag
+        // nur über das Manifest mit Prüfsumme.
         for e in default_offline_katalog() {
-            // Gepinnt GENAU DANN, wenn die URL kein TODO-Platzhalter ist. Fängt beide Richtungen:
-            // echte URL
-            // ohne Hash (download.rs lüde ungeprüft) und Hash bei Platzhalter-URL.
-            assert_eq!(
-                e.sha256.is_some(),
-                !e.url.contains("TODO"),
-                "URL/Pin-Zustand inkonsistent (echte URL braucht sha256 und umgekehrt): {}",
+            assert!(
+                e.url
+                    .starts_with(&format!("{}/", crate::karte::katalog::KARTEN_BASIS_URL)),
+                "Baseline-URL außerhalb des Vorgabe-Buckets: {} ({})",
+                e.name,
+                e.url
+            );
+            assert!(!e.url.contains("TODO"), "TODO-Platzhalter: {}", e.name);
+            assert!(
+                !crate::config::eintrag_ist_lieferbar(&e),
+                "Baseline ohne Manifest-Pin darf nicht ladbar sein: {}",
                 e.name
             );
             if let Some(h) = &e.sha256 {

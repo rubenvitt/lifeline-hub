@@ -1,7 +1,8 @@
 //! Periodische Erneuerung des KRITIS-Bestands aus dem OSM-Extrakt (LFH-83).
 //!
 //! Ein dünner Tokio-Task ruft [`tick_einmal`]; die Logik ist ohne laufenden Scheduler testbar.
-//! Der Import ist per Vorgabe an (`--kritis-extrakt`), sonst bliebe die Ebene leer.
+//! Der Import ist per Vorgabe aus (`--kritis-extrakt`, LLH-1546); ohne ihn und ohne früheren
+//! Bestand bleibt die Ebene leer.
 //!
 //! Ablauf je Tick: fällig? → `HEAD` auf den Extrakt → unverändert (`ETag` bzw.
 //! `Last-Modified`)? dann nur den Zeitpunkt fortschreiben → sonst herunterladen, einlesen

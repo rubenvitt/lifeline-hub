@@ -1,6 +1,6 @@
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
@@ -10,6 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
 import { baueZeilen, type EtbZeile } from './etbZeile';
 import EtbZeitachse, { gezeigteRaender } from './EtbZeitachse';
+import { LANGDRUCK_MS } from '../components/useKontextMenue';
 
 type ZeitachsenProps = ComponentProps<typeof EtbZeitachse>;
 
@@ -476,6 +477,240 @@ describe('EtbZeitachse – gepufferte Einträge', () => {
     const z = zeileVon(container, 'abgelehnt-1');
     await userEvent.click(within(z).getByRole('button', { name: 'Nur protokollieren' }));
     expect(onNurProtokollieren).toHaveBeenCalledWith(zeile);
+  });
+});
+
+/**
+ * Kontextmenü an der Zeitachse (LLH-1597, Spec `datensatz-aktionsmenue`,
+ * `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D2–D4).
+ */
+describe('EtbZeitachse – Kontextmenü (LLH-1597)', () => {
+  /** Das offene Kontextmenü; wirft, solange es fehlt, damit `waitFor` wirklich darauf wartet. */
+  const offenesKontextmenue = (): HTMLElement => {
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label^="Aktionen zu"]',
+    );
+    if (menue == null) throw new Error('Kontextmenü nicht offen');
+    return menue;
+  };
+  const kontextAnker = () => document.querySelector('[data-lfh="datensatz-kontextmenue-anker"]');
+  const punkte = (menue: HTMLElement) =>
+    within(menue)
+      .getAllByRole('menuitem')
+      .map((m) => m.textContent);
+  const alle = () => ({
+    onBerichtigen: vi.fn(),
+    onWiedervorlage: vi.fn(),
+    onAuftragErteilen: vi.fn(),
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('Rechtsklick auf den Text zeigt die Einträge des ⋮; die Wahl ruft den Weg genau einmal', async () => {
+    const wege = alle();
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ id: 4, lfd_nr: 12, inhalt: 'Wasserentnahme bereit' })],
+      ...wege,
+    });
+    const text = within(zeileVon(container, 'eintrag-4')).getByText('Wasserentnahme bereit');
+    expect(fireEvent.contextMenu(text, { clientX: 40, clientY: 50, button: 2 })).toBe(false);
+    const menue = await waitFor(offenesKontextmenue);
+    expect(menue).toHaveAttribute('aria-label', 'Aktionen zu Eintrag 12');
+    expect(punkte(menue)).toEqual(['Berichtigen', 'Wiedervorlage', 'Auftrag erteilen']);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' }));
+    expect(wege.onWiedervorlage).toHaveBeenCalledTimes(1);
+    expect(wege.onWiedervorlage).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
+    expect(wege.onBerichtigen).not.toHaveBeenCalled();
+  });
+
+  it('gesperrte Einträge stehen wie im ⋮ gesperrt mit Grund da', async () => {
+    const wege = alle();
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ id: 4, lfd_nr: 12 })],
+      ...wege,
+      berichtigenGesperrt: 'erst nach dem Senden',
+    });
+    fireEvent.contextMenu(zeileVon(container, 'eintrag-4'), { button: 2 });
+    const menue = await waitFor(offenesKontextmenue);
+    const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
+    expect(punkt).toHaveTextContent('Berichtigen (erst nach dem Senden)');
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('ohne Aktion, an vorgemerkter Zeile und auf einem Link bleibt das Browsermenü', () => {
+    const { container } = renderZeitachse({ eintraege: [eintrag({ id: 1 })] });
+    expect(fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 })).toBe(true);
+    expect(kontextAnker()).toBeNull();
+  });
+
+  it('eine vorgemerkte Zeile lässt das Browsermenü, auch wenn Wege angeboten sind', () => {
+    const { container } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [], ausstehend: [ausstehend()], abgelehnt: [] }),
+      ...alle(),
+    });
+    expect(fireEvent.contextMenu(zeileVon(container, 'ausstehend-1'), { button: 2 })).toBe(true);
+    expect(kontextAnker()).toBeNull();
+  });
+
+  it('ein Verweis in der Zeile lässt das Browsermenü', () => {
+    const grund = eintrag({ id: 1, lfd_nr: 1 });
+    const ber = eintrag({ id: 2, lfd_nr: 2, typ: 'berichtigung', berichtigt_eintrag_id: 1 });
+    renderZeitachse({ eintraege: [ber, grund], ...alle() });
+    const link = screen.getByRole('link', { name: /Grundeintrag anzeigen/ });
+    expect(fireEvent.contextMenu(link, { button: 2 })).toBe(true);
+    expect(kontextAnker()).toBeNull();
+  });
+
+  it('abgelehnte Zeile: Erneut senden, Nur protokollieren, rot Verwerfen hinter einem Trenner', async () => {
+    const onVerwerfen = vi.fn();
+    const onErneutSenden = vi.fn();
+    const puffer = abgelehnt();
+    puffer.eintrag = { ...puffer.eintrag, in_meldungseingang: true };
+    const { container } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [puffer] }),
+      onErneutSenden,
+      onVerwerfen,
+      onNurProtokollieren: vi.fn(),
+    });
+    expect(fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 })).toBe(false);
+    const menue = await waitFor(offenesKontextmenue);
+    expect(punkte(menue)).toEqual(['Erneut senden', 'Nur protokollieren', 'Verwerfen']);
+    expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
+    expect(within(menue).getByRole('menuitem', { name: 'Verwerfen' })).toHaveClass(
+      'ant-dropdown-menu-item-danger',
+    );
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Verwerfen' }));
+    expect(onVerwerfen).toHaveBeenCalledWith(puffer);
+    expect(onErneutSenden).not.toHaveBeenCalled();
+  });
+
+  it('Umschalt+F10 auf dem ⋮ öffnet das Menü dieser Zeile, Escape gibt den Fokus zurück', async () => {
+    renderZeitachse({ eintraege: [eintrag({ id: 4, lfd_nr: 12 })], ...alle() });
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu Eintrag 12' });
+    act(() => knopf.focus());
+    expect(fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true })).toBe(false);
+    const menue = await waitFor(offenesKontextmenue);
+    expect(kontextAnker()).not.toBeNull();
+    await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(document.activeElement).toBe(knopf));
+  });
+
+  it('ein langer Touchdruck öffnet kein Menü und sperrt das Markieren nicht', () => {
+    vi.useFakeTimers();
+    const { container } = renderZeitachse({ eintraege: [eintrag({ id: 4 })], ...alle() });
+    const z = zeileVon(container, 'eintrag-4');
+    fireEvent.pointerDown(z, { isPrimary: true, pointerId: 3, pointerType: 'touch' });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS * 2));
+    expect(z.hasAttribute('data-kontext-druck')).toBe(false);
+    expect(kontextAnker()).toBeNull();
+    // Das native `contextmenu` beim Halten (Android) bleibt beim System.
+    expect(fireEvent.contextMenu(z, { button: 0 })).toBe(true);
+    expect(kontextAnker()).toBeNull();
+  });
+
+  it('ein offenes Menü hält neue Einträge zurück', async () => {
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const zeilenAus = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const { container, neu: setze } = renderZeitachse({ zeilen: zeilenAus([alt]), ...alle() });
+    fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
+    await waitFor(offenesKontextmenue);
+    setze(zeilenAus([neu, alt]));
+    expect(screen.queryByText('Neu')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
+  });
+
+  it('nach Rechtsklick ohne Fokus in der Achse taut das Schließen wieder auf (Escape und Wahl)', async () => {
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const zeilenAus = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const wege = alle();
+    const { container, neu: setze } = renderZeitachse({ zeilen: zeilenAus([alt]), ...wege });
+    // Escape: der Fokus kam von außerhalb (body) und fällt aus dem Menü heraus, ohne `blur`.
+    fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
+    let menue = await waitFor(offenesKontextmenue);
+    await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    setze(zeilenAus([neu, alt]));
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+    // Wahl eines Eintrags ebenso.
+    const neuer = eintrag({ id: 3, lfd_nr: 3, inhalt: 'Neuer' });
+    fireEvent.contextMenu(zeileVon(container, 'eintrag-1'), { button: 2 });
+    menue = await waitFor(offenesKontextmenue);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' }));
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    setze(zeilenAus([neuer, neu, alt]));
+    expect(screen.getByText('Neuer')).toBeInTheDocument();
+  });
+
+  it('verschwindet die Zeile bei offenem Menü, taut die Achse wieder auf', async () => {
+    const puffer = abgelehnt();
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const { container, neu: setze } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [alt], ausstehend: [], abgelehnt: [puffer] }),
+      onErneutSenden: vi.fn(),
+      onVerwerfen: vi.fn(),
+    });
+    fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
+    await waitFor(offenesKontextmenue);
+    setze(baueZeilen({ eintraege: [alt], ausstehend: [], abgelehnt: [] }));
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    setze(baueZeilen({ eintraege: [neu, alt], ausstehend: [], abgelehnt: [] }));
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+  });
+
+  it('„Nur protokollieren“ wirkt auch, wenn die Seite den Weg erst nach dem Einhängen anbietet', async () => {
+    const puffer = abgelehnt();
+    puffer.eintrag = { ...puffer.eintrag, in_meldungseingang: true };
+    const zeilen = baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [puffer] });
+    const onNurProtokollieren = vi.fn();
+    const props = { einsatzId: 1, zeilen, onErneutSenden: vi.fn(), onVerwerfen: vi.fn() };
+    const { container, rerender } = renderMitProviders(<EtbZeitachse {...props} />);
+    rerender(<EtbZeitachse {...props} onNurProtokollieren={onNurProtokollieren} />);
+    fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
+    const menue = await waitFor(offenesKontextmenue);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Nur protokollieren' }));
+    expect(onNurProtokollieren).toHaveBeenCalledWith(puffer);
+  });
+
+  it('per Tastatur geöffnet: verliert die Zeile ihre Aktionen, taut die Achse am Ende wieder auf', async () => {
+    const alt = eintrag({ id: 1, lfd_nr: 1, inhalt: 'Alt' });
+    const neu = eintrag({ id: 2, lfd_nr: 2, inhalt: 'Neu' });
+    const zeilenAus = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const { rerender } = renderMitProviders(
+      <EtbZeitachse einsatzId={1} zeilen={zeilenAus([alt])} onWiedervorlage={vi.fn()} />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: 'F10', shiftKey: true });
+    const menue = await waitFor(offenesKontextmenue);
+    await waitFor(() => expect(menue.contains(document.activeElement)).toBe(true));
+    // Die Rechte fallen weg: Menü und ⋮-Knopf verschwinden, der Fokus hat kein Ziel mehr.
+    rerender(<EtbZeitachse einsatzId={1} zeilen={zeilenAus([alt])} />);
+    await waitFor(() => expect(kontextAnker()).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Eintrag 1' })).toBeNull();
+    rerender(<EtbZeitachse einsatzId={1} zeilen={zeilenAus([neu, alt])} />);
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+  });
+
+  it('verschwindet die Zeile, schließt das Menü', async () => {
+    const puffer = abgelehnt();
+    const { container, neu: setze } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [puffer] }),
+      onErneutSenden: vi.fn(),
+      onVerwerfen: vi.fn(),
+    });
+    fireEvent.contextMenu(zeileVon(container, 'abgelehnt-1'), { button: 2 });
+    await waitFor(offenesKontextmenue);
+    setze(baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [] }));
+    await waitFor(() => expect(kontextAnker()).toBeNull());
   });
 });
 

@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
   darfFristSetzen,
+  fristSperrGrund,
   fristAusEingabe,
   istFristverkuerzung,
   liegtInDerVergangenheit,
@@ -105,5 +106,36 @@ describe('liegtInDerVergangenheit', () => {
     expect(liegtInDerVergangenheit('2026-09-25 12:00:00', jetzt)).toBe(true);
     expect(liegtInDerVergangenheit('2026-09-25 11:59:59', jetzt)).toBe(true);
     expect(liegtInDerVergangenheit('2026-09-25 12:00:01', jetzt)).toBe(false);
+  });
+});
+
+describe('Frist am Spiegel (LLH-1492)', () => {
+  const spiegel = {
+    gegenstelle: 'ELW 1',
+    beendet: false,
+    antraege_ausstehend: 0,
+    antraege_abgelehnt: 0,
+  };
+  const admin = { system_rolle: 'admin' as const, org_id: 1 };
+
+  it('ist gesperrt, auch für Einsatzleitung und Org-Admin: der Server antwortet 409', () => {
+    expect(
+      darfFristSetzen(
+        { status: 'aktiv', meine_rolle: 'einsatzleitung', org_id: 1, spiegel },
+        admin,
+      ),
+    ).toBe(false);
+    expect(darfFristSetzen({ status: 'aktiv', meine_rolle: null, org_id: 1, spiegel }, admin)).toBe(
+      false,
+    );
+  });
+
+  it('nennt am Spiegel die führende Instanz, sonst die Rollen', () => {
+    expect(fristSperrGrund({ status: 'aktiv', meine_rolle: null, org_id: 1, spiegel })).toBe(
+      'Spiegel von ELW 1',
+    );
+    expect(fristSperrGrund({ status: 'aktiv', meine_rolle: null, org_id: 1 })).toBe(
+      'nur Einsatzleitung oder Org-Admin',
+    );
   });
 });

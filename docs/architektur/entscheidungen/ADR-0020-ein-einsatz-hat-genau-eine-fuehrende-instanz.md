@@ -1,5 +1,5 @@
 ---
-id: ADR-0018
+id: ADR-0020
 titel: Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn
 status: akzeptiert
 datum: 2026-11-09
@@ -13,7 +13,7 @@ herleitung:
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md
 ---
 
-# ADR-0018: Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn
+# ADR-0020: Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn
 
 ## Regeln
 

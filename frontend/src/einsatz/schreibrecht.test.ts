@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  darfBeantragen,
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
   darfEinsatzVerwalten,
@@ -11,6 +12,7 @@ import {
   istBeobachter,
   istEinsatzLeitung,
   fuehrtHier,
+  istSpiegel,
 } from './schreibrecht';
 
 // Wahrheitstabelle für die zentrale Schreibrecht-Regel (LFH-234). Pinnt die beiden bewussten
@@ -242,6 +244,13 @@ describe('Führung je Einsatz (LLH-1491)', () => {
     expect(darfEinsatzLeiten({ ...el, fuehrung: hub })).toBe(false);
     expect(darfEinsatzVerwalten({ ...el, org_id: 1, fuehrung: hub }, orgAdmin)).toBe(false);
     expect(darfModuleVerwalten({ ...el, org_id: 1, fuehrung: hub }, orgAdmin)).toBe(false);
+    expect(darfBeantragen({ ...el, fuehrung: hub })).toBe(false);
+  });
+
+  it('am Spiegel bleibt Beantragen trotz fremder Führung offen (LLH-1492)', () => {
+    const spiegel = { gegenstelle: 'Hub Nord', beendet: false, antraege_ausstehend: 0, antraege_abgelehnt: 0 };
+    expect(darfBeantragen({ ...el, fuehrung: hub, spiegel })).toBe(true);
+    expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub, spiegel })).toBe(false);
   });
 
   it('die Führung bedienen Einsatzleitung und Admin der Einsatz-Org, unabhängig von Status und Führung', () => {
@@ -262,5 +271,66 @@ describe('Führung je Einsatz (LLH-1491)', () => {
       ),
     ).toBe(false);
     expect(darfFuehrungBedienen(undefined, orgAdmin)).toBe(false);
+  });
+});
+
+// Spiegel (LLH-1492, design.md D13): eine andere Instanz führt den Einsatz. Die Bedienung ist wie
+// beim Beobachter, nur die beantragbaren Erfassungen bleiben offen (`darfBeantragen`).
+describe('Spiegel (LLH-1492, D13)', () => {
+  const spiegel = {
+    gegenstelle: 'ELW 1',
+    letzter_abgleich_at: '2026-11-10 08:00:00',
+    beendet: false,
+    antraege_ausstehend: 0,
+    antraege_abgelehnt: 0,
+  };
+  const el = { ...aktiv, meine_rolle: 'einsatzleitung' as const, spiegel };
+  const fuePers = { ...aktiv, meine_rolle: 'fuehrungspersonal' as const, spiegel };
+
+  it('erkennt den Spiegel am Feld spiegel', () => {
+    expect(istSpiegel(el)).toBe(true);
+    expect(istSpiegel({ ...aktiv, meine_rolle: 'einsatzleitung', spiegel: null })).toBe(false);
+    expect(istSpiegel({ ...aktiv, meine_rolle: 'einsatzleitung' })).toBe(false);
+    expect(istSpiegel(undefined)).toBe(false);
+  });
+
+  it('sperrt Schreiben und Leiten wie beim Beobachter', () => {
+    expect(darfImEinsatzSchreiben(el)).toBe(false);
+    expect(darfImEinsatzSchreiben(fuePers)).toBe(false);
+    expect(darfEinsatzLeiten(el)).toBe(false);
+  });
+
+  it('sperrt Verwaltung und Module, auch für den Admin der Org', () => {
+    const adminOrg1 = { system_rolle: 'admin' as const, org_id: 1 };
+    expect(darfEinsatzVerwalten({ ...el, org_id: 1 }, adminOrg1)).toBe(false);
+    expect(darfModuleVerwalten({ ...el, org_id: 1 }, adminOrg1)).toBe(false);
+    expect(darfEinsatzVerwalten({ ...el, meine_rolle: null, org_id: 1 }, adminOrg1)).toBe(false);
+  });
+
+  it('darfBeantragen: Schreibrollen im aktiven Spiegel', () => {
+    expect(darfBeantragen(el)).toBe(true);
+    expect(darfBeantragen(fuePers)).toBe(true);
+  });
+
+  it('darfBeantragen: nicht für Beobachter, ohne Rolle, abgeschlossen oder nach beendetem Abgleich', () => {
+    expect(darfBeantragen({ ...el, meine_rolle: 'beobachter' })).toBe(false);
+    expect(darfBeantragen({ ...el, meine_rolle: null })).toBe(false);
+    expect(darfBeantragen({ ...el, status: 'abgeschlossen' })).toBe(false);
+    expect(darfBeantragen({ ...el, spiegel: { ...spiegel, beendet: true } })).toBe(false);
+    expect(darfBeantragen(undefined)).toBe(false);
+  });
+
+  it('darfBeantragen gleicht ohne Spiegel dem Schreibrecht', () => {
+    for (const meine_rolle of [
+      'einsatzleitung',
+      'fuehrungspersonal',
+      'beobachter',
+      null,
+    ] as const) {
+      for (const status of ['aktiv', 'abgeschlossen'] as const) {
+        const e = { status, meine_rolle };
+        expect(darfBeantragen(e)).toBe(darfImEinsatzSchreiben(e));
+      }
+    }
   });
 });

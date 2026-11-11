@@ -240,8 +240,10 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     renderApp('/geraet/7/betroffene/10');
     const kopf = await screen.findByRole('region', { name: 'Patientenkopf' });
     // Die Personenseite lädt die Freigaben mit (Sprünge), die Kopfzeile hält die Stellen: beide
-    // liegen im Speicher des Tabs, solange die Person geladen ist.
-    await waitFor(() => expect(freigabeAbrufe).toBe(1));
+    // liegen im Speicher des Tabs, solange die Person geladen ist. Die Haushalt-Aktion der
+    // Personendaten liest dieselben Freigaben (LLH-1615); ohne staleTime im Test ruft ihr
+    // Einhängen sie ein zweites Mal ab, darum zählt hier nur, dass sie geladen sind.
+    await waitFor(() => expect(freigabeAbrufe).toBeGreaterThanOrEqual(1));
     act(() => setzeOnline(false));
     const user = userEvent.setup();
     await user.click(within(kopf).getByRole('button', { name: 'Verbleib erfassen' }));

@@ -41,6 +41,11 @@ export type ElwVerlorenAntwort = S['ElwVerlorenAntwort'];
 export type InstanzKopplungRichtung = S['InstanzKopplungRichtung'];
 export type InstanzKopplungZustand = S['InstanzKopplungZustand'];
 export type InstanzProtokoll = S['InstanzProtokoll'];
+// Spiegel und Anträge (LLH-1492)
+export type InstanzSpiegelStand = S['InstanzSpiegelStand'];
+export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
+export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
+export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
 export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
 export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
 export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];
@@ -1321,6 +1326,12 @@ export interface AbmeldungEingabe {
   zeitpunkt_at?: string;
   client_id?: string;
 }
+
+/**
+ * Kein Backend-Schema: Body von `PUT …/betreuung/stellen/{sid}/personen/{pid}/haushalt`
+ * (LLH-1615). Genau eins von `haushalt_id` und `neuer_haushalt: true` (sonst 422).
+ */
+export type HaushaltZielEingabe = { haushalt_id: number } | { neuer_haushalt: true };
 
 /** Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke` (`BezirkAnlegen`), FE-lokal. */
 export interface EvakuierungsbezirkEingabe {

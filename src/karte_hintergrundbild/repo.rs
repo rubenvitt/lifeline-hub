@@ -95,6 +95,13 @@ pub async fn laden_bytes(
     einsatz_id: i64,
     id: i64,
 ) -> Result<(String, String, Vec<u8>), AppError> {
+    // Am Spiegel kommt der Inhalt auf Abruf (LLH-1492, D8).
+    crate::instanz::spiegel::anhang::pruefe_vorhanden(
+        pool,
+        "karte_hintergrundbild_daten",
+        &id.to_string(),
+    )
+    .await?;
     sqlx::query_as::<_, (String, String, Vec<u8>)>(sqlx::AssertSqlSafe(format!(
         "SELECT b.name, b.mime, d.daten FROM karte_hintergrundbild b \
          JOIN karte_hintergrundbild_daten d ON d.bild_id = b.id \

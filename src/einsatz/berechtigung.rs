@@ -193,7 +193,7 @@ pub fn fordere_schreibrecht_oder_admin(
 
 /// Stellt sicher, dass der Einsatz noch aktiv (beschreibbar) ist und diese Instanz ihn führt.
 /// `Conflict` (409) bei abgeschlossenem (read-only) Einsatz und, wenn eine andere gekoppelte
-/// Instanz ihn führt, mit „Führung liegt bei …“ (LLH-1491, Spec `instanz-fuehrung`; ADR-0018).
+/// Instanz ihn führt, mit „Führung liegt bei …“ (LLH-1491, Spec `instanz-fuehrung`; ADR-0020).
 pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
     if !einsatz.ist_aktiv() {
         return Err(AppError::Conflict(
@@ -515,6 +515,7 @@ mod tests {
             geloescht_at: None,
             einsatzleiter: Default::default(),
             fuehrung: Default::default(),
+            spiegel: Default::default(),
         }
     }
 

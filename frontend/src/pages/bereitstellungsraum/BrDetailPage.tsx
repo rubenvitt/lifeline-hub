@@ -15,7 +15,7 @@ import { Link, Navigate, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import {
   parseRouteId,
@@ -453,7 +453,8 @@ export default function BrDetailPage() {
   const bearbeitbar =
     verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest' && !br.storniert_at;
   const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
-  const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
+  // Eintreffen buchen ist am Spiegel ein Antrag (LLH-1492, D13).
+  const eintreffen = darf('br-eintreffen') && darfBeantragen(einsatz);
   const inBetrieb = br.status === 'aktiv';
   const verlegenRaeume = raeumeQuery.data ? zielRaeume(raeumeQuery.data, br.id) : null;
   // Steht die Kraft des offenen Verlegen-Dialogs noch bereitgestellt hier? Aus dem Serverstand,
@@ -986,17 +987,24 @@ export default function BrDetailPage() {
                 Servers. Beim Nachsenden lädt der Abgleich erst den Raum, dann geht die Zeile. */}
             {vorgemerktHier.length > 0 && (
               <div data-testid="br-vorgemerkt" style={{ marginTop: abstand.lg }}>
-                <SektionHeader titel="Vorgemerkt" extra={vorgemerktHier.length} />
+                {/* Anträge am Spiegel (LLH-1492) stehen hier wie Vorgemerktes. */}
+                <SektionHeader
+                  titel={vorgemerktHier.every((v) => v.antrag) ? 'Beantragt' : 'Vorgemerkt'}
+                  extra={vorgemerktHier.length}
+                />
                 <Liste
                   dataSource={vorgemerktHier}
-                  rowKey={(v) => v.aktion.daten.client_id ?? String(v.id)}
+                  rowKey={(v) =>
+                    v.antrag ? `antrag-${v.antrag.id}` : (v.aktion.daten.client_id ?? String(v.id))
+                  }
                   renderItem={(v) => (
                     <ListenEintrag>
                       <Space wrap>
                         <span>{v.aktion.name}</span>
                         {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
                         <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
-                          vorgemerkt {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
+                          {v.antrag ? 'beantragt' : 'vorgemerkt'}{' '}
+                          {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
                         </span>
                       </Space>
                     </ListenEintrag>

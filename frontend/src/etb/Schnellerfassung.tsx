@@ -64,6 +64,7 @@ import { neueClientId } from '../offline/clientId';
 import { serverJetzt } from '../offline/serveruhr';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { lageberichtePfad } from '../routing/deeplinks';
+import { istSpiegel } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { MODUL_MELDUNGEN_GESPERRT } from '../components/nurAnsicht';
 
@@ -1016,7 +1017,8 @@ export default function Schnellerfassung({
     : dateien.length > 0
       ? `${dateien.length}/${ETB_ANHAENGE_MAX}`
       : null;
-  const anhangTeil = (
+  // Am Spiegel gehen keine Anhänge (LLH-1492, design.md D9: der Server lehnt sie mit 400 ab).
+  const anhangTeil = istSpiegel(einsatz) ? null : (
     <>
       {/* „Anhang": ein antd-Knopf plus unsichtbare Dateieingabe statt antds `Upload` — der wickelte
          den Knopf in ein zweites `role="button"` mit eigenem Tabstopp. So bleibt EIN Bedienziel,

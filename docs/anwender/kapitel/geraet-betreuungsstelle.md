@@ -51,6 +51,8 @@ Betreuungsstelle untergebracht.
    ihn mit.
 4. Zum Abmelden den Haushalt aufklappen und „Abmelden“ am Haushalt oder an einer Person wählen,
    ein „Ziel“ angeben und bestätigen.
+5. Bezugsperson und Haushalt einer Person ändern sich über das Menü „⋮“ an der Person: „Zur
+   Bezugsperson machen“ oder „Haushalt ändern …“. Das geht nur mit Verbindung.
 
 Die Maske und die Liste sind dieselben wie auf der Seite der Stelle ([Betreuung](betreuung.md)).
 

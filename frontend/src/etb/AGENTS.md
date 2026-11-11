@@ -130,6 +130,14 @@ Ableitungen in `etb/zeitachseModell.ts`)
 - Jede Zeile trägt `data-lfh="datensicht-karte"` und die Zeilenklasse (`scrolleZurZeile`,
   `?eintrag=`). Ein neuer `KARTEN_EIGENBAU` wird gegen den Plan-Modus begründet (Titel, Status,
   ≤ 3 Sekundärfelder, eine Primäraktion, optional Menü `weitere`) und setzt Marke/Klasse selbst.
+- **Kontextmenü an Zeile und Chip** (LLH-1597, Spec `datensatz-aktionsmenue`, Herleitung
+  `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md`): ⋮, Knöpfe der abgelehnten Zeile und
+  Kontextmenü lesen EINE Liste (`etb/zeilenAktionen.ts`, `zeilenAktionen` + `fuehreZeilenWahlAus`);
+  ein Hook und ein `KontextMenue` je Zeitachse, die gemerkte Zeile bekommt nur die stabile Fabrik.
+  Vorgemerkte Zeilen, Bündelzeilen und Zeilen ohne Einträge tragen keine Handler (Browsermenü).
+  Das Menü steht in der Wurzel der Zeitachse und friert sie beim Öffnen ein. Im ETB kein langer
+  Druck (`langerDruck: false`, Entscheidung Ruben 09.11.2026: Text am Tablet markierbar), auch am
+  `MetaChip`, dessen Menü dieselbe Liste wie sein ⋮ zeigt (gesperrt beim Senden).
 - ≥ 50 % Meldungstext im Fükw: `e2e/etb-chronologie.spec.ts`, gegen die **Contentbreite**.
 - **Kompakte Zeile** (LFH-958, `zeitachsenAufbau` in `components/instrument/Zeitachseneintrag.tsx`):
   unter 48 px Bedienhöhe stehen Verfasser (einzeilig, Titel mit Volltext) und Weg in der

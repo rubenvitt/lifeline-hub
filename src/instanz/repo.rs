@@ -425,6 +425,8 @@ pub async fn org_widerrufen(
             .await?;
         // Übernommene Stammdaten gehören danach der Instanz (LLH-1493, design.md D3).
         crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
+        // Der Abgleich ihrer Einsätze endet; Spiegel bleiben lesbar (LLH-1492, D14).
+        crate::instanz::spiegel::beende_fuer_zuordnung(conn, org_zeile_id, jetzt).await?;
         // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491).
         let (org_id, gegenueber): (i64, String) = sqlx::query_as(
             "SELECT o.org_id, k.gegenueber_kennung FROM instanz_kopplung_org o \
@@ -519,6 +521,16 @@ pub async fn list_faellige_meldungen(
          AND (naechste_meldung_at IS NULL OR naechste_meldung_at <= ?) ORDER BY id"
     )))
     .bind(jetzt)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Aktive Kopplungen, in denen diese Instanz sich meldet (Abgleich der Einsätze, LLH-1492).
+pub async fn list_meldend_aktiv(pool: &SqlitePool) -> Result<Vec<KopplungZeile>, AppError> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung \
+         WHERE richtung = 'meldet_sich' AND zustand = 'aktiv' ORDER BY id"
+    )))
     .fetch_all(pool)
     .await?)
 }
@@ -787,6 +799,65 @@ pub struct InstanzKopplungAnzeige {
     /// Die eigene Org verteilt ihre Schlüssel an diese Kopplung, hat aber keinen gültigen mehr
     /// (etwa nach dem Deaktivieren des letzten Halters): die Kopplung muss neu aufgebaut werden.
     pub ohne_gueltigen_schluessel: bool,
+    /// Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`, „Die Seite Instanzkopplung zeigt
+    /// den Abgleich“).
+    pub spiegel: InstanzSpiegelStand,
+}
+
+/// Abgleich der Einsätze an einer Kopplung.
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
+pub struct InstanzSpiegelStand {
+    /// Etwa „Gegenüber spiegelt noch nicht (Update nötig).“
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hinweis: Option<String>,
+    /// Gelieferte und gespiegelte Einsätze der eigenen Org, jüngste zuerst (höchstens 50).
+    #[schema(required)]
+    pub einsaetze: Vec<InstanzSpiegelEinsatz>,
+}
+
+/// Ein Einsatz im Abgleich einer Kopplung.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct InstanzSpiegelEinsatz {
+    pub einsatz_id: i64,
+    pub bezeichnung: String,
+    /// `true`: diese Instanz spiegelt ihn; `false`: sie führt und liefert ihn.
+    pub gespiegelt: bool,
+    /// Gespiegelt: übernommener Stand; geliefert: zuletzt bestätigter Stand der Gegenseite.
+    pub stand: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzter_abgleich_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hinweis: Option<String>,
+    pub beendet: bool,
+}
+
+/// Lädt den Abgleich der Einsätze einer Org-Zuordnung.
+async fn load_spiegel_stand(
+    pool: &SqlitePool,
+    k: &KopplungZeile,
+    o: &OrgZeile,
+) -> Result<InstanzSpiegelStand, AppError> {
+    let hinweis = k
+        .gegenueber_protokoll
+        .filter(|p| *p < i64::from(super::PROTOKOLL_SPIEGEL))
+        .map(|_| "Gegenüber spiegelt noch nicht (Update nötig).".to_string());
+    let einsaetze: Vec<InstanzSpiegelEinsatz> = sqlx::query_as(
+        "SELECT * FROM ( \
+           SELECT e.id AS einsatz_id, e.bezeichnung, 1 AS gespiegelt, s.stand, \
+                  s.letzter_abgleich_at, s.hinweis, s.beendet_at IS NOT NULL AS beendet \
+           FROM einsatz_spiegel s JOIN einsatz e ON e.id = s.einsatz_id \
+           WHERE s.kopplung_org_id = ?1 \
+           UNION ALL \
+           SELECT e.id, e.bezeichnung, 0, COALESCE(z.stand, 0), NULL, NULL, 0 \
+           FROM einsatz e LEFT JOIN spiegel_ziel z ON z.einsatz_id = e.id AND z.kopplung_org_id = ?1 \
+           WHERE e.org_id = ?2 AND e.spiegel = 0 AND e.kennung IS NOT NULL) \
+         ORDER BY einsatz_id DESC LIMIT 50",
+    )
+    .bind(o.id)
+    .bind(o.org_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(InstanzSpiegelStand { hinweis, einsaetze })
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -863,7 +934,9 @@ pub async fn list_fuer_org(
             .await?;
             n == 0
         };
+        let spiegel = load_spiegel_stand(pool, &k, &o).await?;
         let mut anzeige = to_anzeige(k, o, konten);
+        anzeige.spiegel = spiegel;
         anzeige.wartende_schluessel = wartende;
         anzeige.ohne_gueltigen_schluessel = ohne_gueltigen;
         aus.push(anzeige);
@@ -941,6 +1014,7 @@ fn to_anzeige(k: KopplungZeile, o: OrgZeile, konten_mit_geheimnis: i64) -> Insta
         },
         wartende_schluessel: 0,
         ohne_gueltigen_schluessel: false,
+        spiegel: InstanzSpiegelStand::default(),
     }
 }
 

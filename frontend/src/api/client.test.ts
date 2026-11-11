@@ -4,6 +4,7 @@ import { server } from '../test/server';
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
 import { serverJetzt, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
+import { ANTRAG_EREIGNIS } from './antragEreignis';
 import {
   ApiError,
   AusgangUnbekannt,
@@ -190,6 +191,45 @@ describe('apiSend', () => {
     );
     const fehler = await apiSend('/api/ding', 'POST', {}).catch((e) => e);
     expect(istKonflikt(fehler)).toBe(true);
+  });
+});
+
+describe('apiSend — Antrag am Spiegel (LLH-1492)', () => {
+  it('meldet eine 202 mit Antrag als Fensterereignis mit der Einsatz-Kennung', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/etb', () =>
+        HttpResponse.json({ antrag: { id: 3, zustand: 'ausstehend' } }, { status: 202 }),
+      ),
+    );
+    const gemeldet: unknown[] = [];
+    const hoerer = (e: Event) => gemeldet.push((e as CustomEvent).detail);
+    window.addEventListener(ANTRAG_EREIGNIS, hoerer);
+    try {
+      await expect(apiSend('/api/einsaetze/7/etb', 'POST', {})).resolves.toEqual({
+        antrag: { id: 3, zustand: 'ausstehend' },
+      });
+    } finally {
+      window.removeEventListener(ANTRAG_EREIGNIS, hoerer);
+    }
+    expect(gemeldet).toEqual([{ einsatzId: 7 }]);
+  });
+
+  it('meldet keine andere 202 und keine 201', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/karte', () => HttpResponse.json({ id: 1 }, { status: 202 })),
+      http.post('/api/einsaetze/7/etb', () =>
+        HttpResponse.json({ antrag: { id: 3, zustand: 'x' } }, { status: 201 }),
+      ),
+    );
+    const hoerer = vi.fn();
+    window.addEventListener(ANTRAG_EREIGNIS, hoerer);
+    try {
+      await apiSend('/api/einsaetze/7/karte', 'POST', {});
+      await apiSend('/api/einsaetze/7/etb', 'POST', {});
+    } finally {
+      window.removeEventListener(ANTRAG_EREIGNIS, hoerer);
+    }
+    expect(hoerer).not.toHaveBeenCalled();
   });
 });
 

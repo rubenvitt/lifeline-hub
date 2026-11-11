@@ -70,6 +70,7 @@ import EingaengeKnopf from '../alarm/EingaengeKnopf';
 import { useUngeleseneEingaenge } from '../alarm/useBenachrichtigungVerlauf';
 import { einsatzKennung } from './einsatzKennung';
 import UnwetterHinweis from '../wetter/UnwetterHinweis';
+import SpiegelBand from './spiegel/SpiegelBand';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useDichte, useWarnsperre } from '../theme/ThemeModeProvider';
 
@@ -543,6 +544,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           }
         />
       )}
+      {/* Am Spiegel (LLH-1492, D13): Herkunft, Stand des Abgleichs und die eigenen Anträge, über
+         jeder Einsatzseite. Ohne Spiegel rendert es nichts. */}
+      <SpiegelBand einsatz={einsatz} />
       {/* `hasSider` ist tragend: weder Rail noch Panel ist eine antd-Seitenspalte, ohne das Attribut
          stapelten die Spalten untereinander. */}
       <Layout hasSider>

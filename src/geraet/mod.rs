@@ -109,7 +109,14 @@ pub const ALLE_ANSICHTEN: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/modul-freigaben"),
     ("GET", "/api/einsaetze/{id}/modul-zaehler"),
     ("GET", "/api/einsaetze/{id}/live"),
+    // Die eigenen Anträge am Spiegel (LLH-1492): das Band liest sie über jeder Ansicht.
+    ("GET", "/api/einsaetze/{id}/antraege"),
 ];
+
+/// Einsatzrouten jeder schreibenden Ansicht (alle außer dem Lagemonitor): einen eigenen,
+/// abgelehnten Antrag am Spiegel verwerfen (LLH-1492).
+pub const SCHREIBENDE_ANSICHTEN: &[(&str, &str)] =
+    &[("DELETE", "/api/einsaetze/{id}/antraege/{antrag_id}")];
 
 impl Funktionsansicht {
     /// Anzeigename der Ansicht (ETB-Text, Oberfläche).
@@ -487,6 +494,16 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
     ),
+    // Haushalte umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen; nur Personen der
+    // eigenen Stelle (der Handler prüft die Stelle, fremd 403).
+    (
+        "PUT",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson",
+    ),
+    (
+        "PUT",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/personen/{pid}/haushalt",
+    ),
     // Registrierliste drucken (LLH-1616): nur die eigene Stelle (der Handler prüft, fremd 403),
     // je Person protokolliert. Bewusste Ausnahme zu „Personendruck nie am Gerät“
     // (`frontend/src/druck/AGENTS.md`); die Personendruckansicht bleibt draußen.
@@ -553,7 +570,10 @@ const EINHEIT: &[(&str, &str)] = &[
 /// ist die `MatchedPath` (Muster mit Platzhaltern). Ohne Treffer: verboten.
 pub fn darf_route(ansicht: Funktionsansicht, methode: &str, pfad: &str) -> bool {
     let passt = |liste: &[(&str, &str)]| liste.iter().any(|(m, p)| *m == methode && *p == pfad);
-    passt(ALLE_GERAETE) || passt(ALLE_ANSICHTEN) || passt(ansicht.routen())
+    passt(ALLE_GERAETE)
+        || passt(ALLE_ANSICHTEN)
+        || (ansicht != Funktionsansicht::Lagemonitor && passt(SCHREIBENDE_ANSICHTEN))
+        || passt(ansicht.routen())
 }
 
 /// Der Kontext einer Gerätesitzung. [`crate::auth::session::CurrentUser`] legt ihn in die
@@ -641,6 +661,19 @@ mod tests {
             assert!(!darf_route(a, "PATCH", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/auth/me"));
+        }
+    }
+
+    #[test]
+    fn antraege_liest_jede_ansicht_verwerfen_nur_eine_schreibende() {
+        let verwerfen = "/api/einsaetze/{id}/antraege/{antrag_id}";
+        for a in Funktionsansicht::ALLE {
+            assert!(darf_route(a, "GET", "/api/einsaetze/{id}/antraege"));
+            assert_eq!(
+                darf_route(a, "DELETE", verwerfen),
+                a != Funktionsansicht::Lagemonitor,
+                "{a:?}"
+            );
         }
     }
 

@@ -6,7 +6,9 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import BeantragtListe from '../einsatz/spiegel/BeantragtListe';
+import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 import { useAuth } from '../auth/AuthContext';
 import {
   type AbschlussCursor,
@@ -106,6 +108,12 @@ export default function MeldungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
+  // Beantragte Meldungen am Spiegel (LLH-1492, D13); vorgemerkte zeigt der Wiederherstellungsbereich.
+  const beantragteMeldungen = useVorgemerkteSchreibaktionen(
+    benutzer?.id,
+    einsatzId,
+    'meldung',
+  ).filter((v) => v.antrag != null);
   // Unter `md` Zeile statt Band und Filterknopf statt Segmentleiste (LFH-974): der Wortlaut der
   // ersten Karte gehört in den ersten Schirm.
   const { istSchmal } = useViewport();
@@ -336,6 +344,11 @@ export default function MeldungenPage() {
         message.warning(`Offline vorgemerkt: Meldung von ${d.absender}`);
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Meldung von ${d.absender}`);
+        return;
+      }
       const meldung = ergebnis.daten;
       // Nur in die Arrays der offenen Listen, deren Richtung passt (D6): die Seitenstruktur der
       // abgeschlossenen, die Kennzahlen und der Einzelabruf haben eine andere Form.
@@ -466,6 +479,10 @@ export default function MeldungenPage() {
       invalidiere(eid);
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning('Offline vorgemerkt · R-…');
+        return;
+      }
+      if (ergebnis.zustand === 'beantragt') {
+        message.info('Beantragt · R-…');
         return;
       }
       message.success(`${registrierAnzeige(ergebnis.daten.registrier_nr)} erfasst`);
@@ -657,6 +674,8 @@ export default function MeldungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // „Meldung erfassen“ am Spiegel als Antrag (LLH-1492, D13); die Karten bleiben gesperrt.
+  const darfMelden = darfBeantragen(einsatz);
 
   const lageSpeicherung = imEinsatz(lageMutation);
   const auftragSpeicherung = imEinsatz(auftragMutation);
@@ -752,7 +771,7 @@ export default function MeldungenPage() {
         />
       }
       aktionen={
-        darfSchreiben && (
+        darfMelden && (
           // Solange eine Meldung unterwegs ist, bleibt das Paneel offen: die Antwort braucht ihren
           // Ort (design.md D3).
           <Button
@@ -806,7 +825,16 @@ export default function MeldungenPage() {
         </Kennzahlenband>
       )}
 
-      {darfSchreiben && formOffen && (
+      {/* Beantragte Meldungen am Spiegel (LLH-1492): über der Liste, nicht in den Kennzahlen. */}
+      <BeantragtListe
+        titel="Beantragte Meldungen"
+        eintraege={beantragteMeldungen.map((v) => ({
+          schluessel: `antrag-${v.antrag!.id}`,
+          text: `${v.aktion.daten.absender} · ${v.aktion.daten.inhalt}`,
+          zeit: v.erstellt_at,
+        }))}
+      />
+      {darfMelden && formOffen && (
         <Paneel
           titel="Neue Meldung erfassen"
           koerperPolster

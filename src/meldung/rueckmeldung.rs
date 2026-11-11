@@ -105,10 +105,12 @@ pub async fn ueberfaellige_melden(
     live: &LiveHub,
     jetzt: DateTime<Utc>,
 ) -> usize {
-    let einsaetze: Vec<(i64, i64)> = match sqlx::query_as(
+    // Spiegel bleiben aus (LLH-1492, design.md D10): ihre Hinweise kommen vom Führer.
+    let einsaetze: Vec<(i64, i64)> = match sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT id, org_id FROM einsatz WHERE status = 'aktiv' AND geloescht_at IS NULL \
-           AND geschwaerzt_at IS NULL ORDER BY id",
-    )
+           AND geschwaerzt_at IS NULL AND {} ORDER BY id",
+        crate::einsatz::spiegel_filter::nicht_gespiegelt("einsatz.id")
+    )))
     .fetch_all(pool)
     .await
     {
@@ -210,5 +212,83 @@ mod tests {
         assert!(!ist_ueberfaellig(faellig, t("2026-10-26 08:59:59")));
         assert!(ist_ueberfaellig(faellig, t("2026-10-26 09:00:00")));
         assert!(ist_ueberfaellig("kaputt", t("2026-10-26 08:00:00")));
+    }
+
+    /// LLH-1492 (design.md D10): der Takt lässt Spiegel aus. Die überfällige Rückmeldung am
+    /// Spiegel meldet nichts, ihr Merker bleibt leer, und kein Schreibversuch scheitert am
+    /// Schutz-Trigger; die am eigenen Einsatz meldet im selben Takt.
+    #[tokio::test]
+    async fn spiegel_wird_ausgelassen() {
+        let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut einheiten = Vec::new();
+        for bezeichnung in ["Spiegel", "Eigen"] {
+            let e: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, ?) RETURNING id",
+            )
+            .bind(bezeichnung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let einheit: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, \
+                                      ereigniszeit, eingang_at, erfasst_von_id, einheit_id) \
+                 VALUES (?, 1, 'Florian Nord 1', 'funk', 'Lage unverändert', \
+                         '2026-10-26 08:00:00', '2026-10-26 08:00:00', ?, ?)",
+            )
+            .bind(e)
+            .bind(b)
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+            einheiten.push((e, einheit));
+        }
+        let ((spiegel, einheit_spiegel), (_, einheit_eigen)) = (einheiten[0], einheiten[1]);
+        crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, spiegel).await;
+
+        let live = LiveHub::new();
+        assert_eq!(
+            ueberfaellige_melden(&pool, &live, t("2026-10-26 10:00:00")).await,
+            1
+        );
+
+        let merker = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Option<i64>>(
+                    "SELECT rueckmeldung_ueberfaellig_meldung_id FROM einsatz_einheit WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert!(merker(einheit_eigen).await.is_some(), "der eigene meldet");
+        assert_eq!(merker(einheit_spiegel).await, None, "der Spiegel nicht");
+        let log = puffer.text();
+        assert!(
+            !log.contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
+            "{log}"
+        );
     }
 }

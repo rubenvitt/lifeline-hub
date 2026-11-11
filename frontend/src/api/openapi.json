@@ -5885,6 +5885,17 @@
               "null"
             ]
           },
+          "spiegel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzSpiegelAnzeige",
+                "description": "Spiegel einer gekoppelten Instanz (LLH-1492, Spec `einsatz-spiegel`): wer führt, Stand,\nAnträge. Fehlt an einem Einsatz, den diese Instanz führt. Am Spiegel schreibt der Client\nnur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/EinsatzStatus"
           },
@@ -6552,6 +6563,41 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "EinsatzSpiegelAnzeige": {
+        "type": "object",
+        "description": "Ein Spiegel, wie der Client ihn zeigt (Hinweisband).",
+        "required": [
+          "gegenstelle",
+          "beendet",
+          "antraege_ausstehend",
+          "antraege_abgelehnt"
+        ],
+        "properties": {
+          "antraege_abgelehnt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "antraege_ausstehend": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "beendet": {
+            "type": "boolean",
+            "description": "Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar."
+          },
+          "gegenstelle": {
+            "type": "string",
+            "description": "Name der führenden Instanz."
+          },
+          "letzter_abgleich_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abgleich (UTC); fehlt vor dem ersten."
           }
         }
       },
@@ -9877,7 +9923,8 @@
           "protokoll",
           "org",
           "wartende_schluessel",
-          "ohne_gueltigen_schluessel"
+          "ohne_gueltigen_schluessel",
+          "spiegel"
         ],
         "properties": {
           "gegenueber_adresse": {
@@ -9937,6 +9984,10 @@
           },
           "richtung": {
             "$ref": "#/components/schemas/InstanzKopplungRichtung"
+          },
+          "spiegel": {
+            "$ref": "#/components/schemas/InstanzSpiegelStand",
+            "description": "Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`, „Die Seite Instanzkopplung zeigt\nden Abgleich“)."
           },
           "uhr_abweichung_s": {
             "type": [
@@ -10022,6 +10073,73 @@
           "update_hier",
           "update_gegenueber"
         ]
+      },
+      "InstanzSpiegelEinsatz": {
+        "type": "object",
+        "description": "Ein Einsatz im Abgleich einer Kopplung.",
+        "required": [
+          "einsatz_id",
+          "bezeichnung",
+          "gespiegelt",
+          "stand",
+          "beendet"
+        ],
+        "properties": {
+          "beendet": {
+            "type": "boolean"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gespiegelt": {
+            "type": "boolean",
+            "description": "`true`: diese Instanz spiegelt ihn; `false`: sie führt und liefert ihn."
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "letzter_abgleich_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stand": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gespiegelt: übernommener Stand; geliefert: zuletzt bestätigter Stand der Gegenseite."
+          }
+        }
+      },
+      "InstanzSpiegelStand": {
+        "type": "object",
+        "description": "Abgleich der Einsätze an einer Kopplung.",
+        "required": [
+          "einsaetze"
+        ],
+        "properties": {
+          "einsaetze": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanzSpiegelEinsatz"
+            },
+            "description": "Gelieferte und gespiegelte Einsätze der eigenen Org, jüngste zuerst (höchstens 50)."
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Etwa „Gegenüber spiegelt noch nicht (Update nötig).“"
+          }
+        }
       },
       "InstanzStammdatenStand": {
         "type": "object",
@@ -14678,6 +14796,10 @@
               }
             ]
           },
+          "haushalt_bezugsperson": {
+            "type": "boolean",
+            "description": "Die Person ist Bezugsperson ihres Haushalts (LLH-1615, design.md D4); fehlt bei `false`."
+          },
           "haushalt_id": {
             "type": [
               "integer",
@@ -17815,6 +17937,49 @@
           "wildtier",
           "sonstige"
         ]
+      },
+      "SpiegelAntragAnzeige": {
+        "type": "object",
+        "description": "Ein Antrag, wie die Person ihn am Spiegel sieht (Spec `spiegel-antraege`).",
+        "required": [
+          "id",
+          "art",
+          "zustand",
+          "erfasst_at",
+          "ziel",
+          "daten"
+        ],
+        "properties": {
+          "art": {
+            "type": "string",
+            "description": "Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …)."
+          },
+          "daten": {
+            "type": "object",
+            "description": "Die erfassten Daten (Kennungen der führenden Instanz)."
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ziel": {
+            "type": "object",
+            "description": "Pfadparameter mit den Kennungen dieser Instanz (etwa `pid` der Person)."
+          },
+          "zustand": {
+            "type": "string",
+            "description": "`ausstehend`, `zugestellt`, `uebernommen` (Zeile noch nicht im Spiegel) oder `abgelehnt`."
+          }
+        }
       },
       "SprechgruppeAnzeige": {
         "type": "object",

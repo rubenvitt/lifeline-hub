@@ -6,7 +6,7 @@ import {
   originalPfad,
   originalZugaenglicherName,
 } from '../api/anhangFassung';
-import { ORIGINAL_TEXT } from '../components/DownloadAnker';
+import { AnhangVerweis, ORIGINAL_TEXT } from '../components/DownloadAnker';
 import AnhangVorschau, { AnhangVorschauGruppe } from '../components/AnhangVorschau';
 import { useRollen } from '../components/instrument';
 import { formatGroesse } from '../karten/formatGroesse';
@@ -70,14 +70,15 @@ export default function EtbAnhaenge({
                 kennung={`Anhang zu Nr. ${eintrag.lfd_nr}`}
                 grossansicht={grossansicht}
               />
-              <a
+              {/* Am Spiegel „wird geholt“ statt einer Fehlerdatei (LLH-1492). */}
+              <AnhangVerweis
                 href={href}
                 download={a.dateiname}
                 aria-label={`${a.dateiname}, ${groesse}, Anhang zu Nr. ${eintrag.lfd_nr} herunterladen`}
                 style={stil}
               >
                 {a.dateiname} · {groesse}
-              </a>
+              </AnhangVerweis>
               {darfOriginal && istBildMime(a.mime) && (
                 <a
                   href={originalPfad(href)}

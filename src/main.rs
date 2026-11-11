@@ -27,6 +27,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::parse();
+    // Kennung ausgehender Abrufe (LLH-1547): vor dem ersten HTTP-Client setzen.
+    lifeline_hub::ausgehend::set_betreiber_kontakt(config.betreiber_kontakt()?);
 
     match config.command.clone() {
         Some(Command::Backup {
@@ -228,6 +230,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     lifeline_hub::instanz::fuehrung::save_schalter(&pool, config.fuehrung).await?;
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
+    // Spiegel (LLH-1492): Abgleich der Einsätze mit gekoppelten Instanzen, eigener Takt.
+    lifeline_hub::instanz::spiegel::takt::set_abstand(config.instanz_spiegel_sekunden);
+    // Der Takt startet, sobald der Router steht (er führt Anträge darüber aus, D11).
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone(), live.clone());
     // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`. Das Stoppsignal setzt der
@@ -451,6 +456,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());
+    let spiegel_pool = state.pool.clone();
     let app = build_router_mit(
         state,
         RouterOptionen {
@@ -459,6 +465,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             heic_decoder_verzeichnis: config.heic_decoder_verzeichnis.clone(),
         },
     );
+    lifeline_hub::instanz::spiegel::takt::start(spiegel_pool, app.clone());
 
     let ergebnis = if config.tls {
         // rustls 0.23 wählt bei genau einem kompilierten Provider-Feature dessen Default

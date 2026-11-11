@@ -309,6 +309,27 @@ macro_rules! fuehrung_joins {
     };
 }
 
+/// Spiegel-Angaben (LLH-1492): ob der Einsatz ein Spiegel ist, von wem, wann zuletzt abgeglichen,
+/// und die Zahl offener und abgelehnter Anträge.
+macro_rules! spiegel_spalten {
+    () => {
+        "sp.einsatz_id IS NOT NULL AS spiegel_ist, spk.gegenueber_name AS spiegel_gegenstelle, \
+         sp.letzter_abgleich_at AS spiegel_abgleich_at, sp.beendet_at AS spiegel_beendet_at, \
+         (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
+             AND sa.zustand IN ('ausstehend', 'zugestellt')) AS spiegel_ausstehend, \
+         (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
+             AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt"
+    };
+}
+
+macro_rules! spiegel_joins {
+    () => {
+        " LEFT JOIN einsatz_spiegel sp ON sp.einsatz_id = e.id \
+          LEFT JOIN instanz_kopplung_org spo ON spo.id = sp.kopplung_org_id \
+          LEFT JOIN instanz_kopplung spk ON spk.id = spo.kopplung_id "
+    };
+}
+
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     // Die vier EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607/LLH-1371/LLH-1574); sie
@@ -334,10 +355,13 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
         einsatzleiter_spalten!(),
         ", ",
         fuehrung_spalten!(),
+        ", ",
+        spiegel_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
         fuehrung_joins!(),
+        spiegel_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
     ))
@@ -455,6 +479,8 @@ pub async fn liste_fuer(
         einsatzleiter: super::fuehrungsstelle::EinsatzleiterSpalten,
         #[sqlx(flatten)]
         fuehrung: crate::instanz::fuehrung::FuehrungSpalten,
+        #[sqlx(flatten)]
+        spiegel: crate::instanz::spiegel::SpiegelSpalten,
     }
 
     // Ein Zeitpunkt für SQL und `darf_lesen`, damit beide dieselbe Fristgrenze ziehen. Die
@@ -492,10 +518,13 @@ pub async fn liste_fuer(
         einsatzleiter_spalten!(),
         ", ",
         fuehrung_spalten!(),
+        ", ",
+        spiegel_spalten!(),
         " FROM einsatz e",
         teilschwaerzungen_joins!(),
         einsatzleiter_joins!(),
         fuehrung_joins!(),
+        spiegel_joins!(),
         "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
@@ -601,6 +630,7 @@ pub async fn liste_fuer(
                 teilschwaerzungen: r.teilschwaerzungen,
                 einsatzleiter: r.einsatzleiter.anzeige(),
                 fuehrung: r.fuehrung.anzeige(),
+                spiegel: r.spiegel.anzeige(),
             }
         })
         .collect())
@@ -934,12 +964,14 @@ pub(crate) async fn system_audit_tx(
 /// ist hart im WHERE — aktive Einsätze sind NIE fällig. Lexikografischer
 /// Zeitvergleich (kanonisches Format). Org-isoliert über die `einsatz`-Tabelle.
 pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<i64>, AppError> {
-    let ids = sqlx::query_scalar::<_, i64>(
+    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    let ids = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM einsatz \
          WHERE status = ? AND retention_bis IS NOT NULL \
-           AND ? >= retention_bis AND geloescht_at IS NULL \
+           AND ? >= retention_bis AND geloescht_at IS NULL AND {} \
          ORDER BY id",
-    )
+        super::spiegel_filter::nicht_gespiegelt("einsatz.id")
+    )))
     .bind(STATUS_ABGESCHLOSSEN)
     .bind(jetzt)
     .fetch_all(pool)
@@ -1133,11 +1165,13 @@ pub async fn faellige_purge(
     pool: &SqlitePool,
     _karenz_tage: i64,
 ) -> Result<Vec<(i64, String)>, AppError> {
-    let rows = sqlx::query_as::<_, (i64, String)>(
+    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    let rows = sqlx::query_as::<_, (i64, String)>(sqlx::AssertSqlSafe(format!(
         "SELECT id, geloescht_at FROM einsatz \
-         WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL \
+         WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL AND {} \
          ORDER BY id",
-    )
+        super::spiegel_filter::nicht_gespiegelt("einsatz.id")
+    )))
     .bind(STATUS_ABGESCHLOSSEN)
     .fetch_all(pool)
     .await?;
@@ -1420,11 +1454,12 @@ pub async fn mitglied_auswahl(
     let sql = format!(
         "SELECT b.id AS benutzer_id, b.anzeigename \
          FROM benutzer b JOIN einsatz e ON e.id = ? \
-         WHERE b.org_id = e.org_id AND b.aktiv = 1 AND {} \
+         WHERE b.org_id = e.org_id AND b.aktiv = 1 AND {} AND {} \
            AND NOT EXISTS (SELECT 1 FROM einsatz_mitgliedschaft m \
                            WHERE m.einsatz_id = e.id AND m.benutzer_id = b.id) \
          ORDER BY b.anzeigename COLLATE NOCASE, b.id",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
     Ok(
         sqlx::query_as::<_, MitgliedAuswahl>(sqlx::AssertSqlSafe(sql))
@@ -1502,8 +1537,9 @@ pub async fn setze_mitgliedschaft(
     // gleichzeitigen Aufnahmen derselben Person gewinnt genau ein INSERT.
     let guard = format!(
         "EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
-                 WHERE b.id = ?2 AND b.org_id = e.org_id AND {})",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+                 WHERE b.id = ?2 AND b.org_id = e.org_id AND {} AND {})",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
     let eingefuegt = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO einsatz_mitgliedschaft \

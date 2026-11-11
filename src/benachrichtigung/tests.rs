@@ -421,6 +421,49 @@ async fn aufraeumen_loescht_quittierte_und_offene_nach_24_stunden() {
     assert_eq!(ids(&pool).await, vec![offen_frisch, quittiert_frisch]);
 }
 
+/// LLH-1492 (design.md D10): das Abräumen lässt Spiegel aus. Es ist EINE Anweisung; träfe sie
+/// eine Zeile eines Spiegels, bräche sie am Schutz-Trigger ganz ab, und auch die alte Zeile des
+/// eigenen Einsatzes bliebe stehen.
+#[tokio::test]
+async fn aufraeumen_laesst_spiegel_aus() {
+    let pool = crate::db::test_pool().await;
+    let (b, eigen) = setup(&pool).await;
+    let spiegel: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Spiegel') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let alt_spiegel = zeile(&pool, spiegel, b, "2026-06-10 00:00:00", None).await;
+    let quittiert_spiegel = zeile(
+        &pool,
+        spiegel,
+        b,
+        "2026-06-09 00:00:00",
+        Some("2026-06-10 00:00:00"),
+    )
+    .await;
+    zeile(&pool, eigen, b, "2026-06-10 00:00:00", None).await;
+    zeile(
+        &pool,
+        eigen,
+        b,
+        "2026-06-09 00:00:00",
+        Some("2026-06-10 00:00:00"),
+    )
+    .await;
+    crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, spiegel).await;
+
+    let geloescht = repo::aufraeumen(&pool, t("2026-06-11 12:00:00"))
+        .await
+        .unwrap();
+    assert_eq!(
+        geloescht, 2,
+        "die beiden alten Zeilen des eigenen Einsatzes"
+    );
+    assert_eq!(ids(&pool).await, vec![alt_spiegel, quittiert_spiegel]);
+}
+
 /// Der Erinnerungs-Scheduler räumt bei jedem Takt mit ab.
 #[tokio::test]
 async fn scheduler_takt_raeumt_ab() {

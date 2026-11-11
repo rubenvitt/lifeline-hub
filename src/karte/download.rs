@@ -284,10 +284,9 @@ pub fn ssrf_redirect_policy() -> reqwest::redirect::Policy {
 /// pinnenden DNS-Resolver (`proxy::SichererResolver`): der Host wird selbst aufgelöst und über
 /// `nur_public` gefiltert, es gibt kein Rebind-Fenster. `url_ist_sicher` bleibt Vorabprüfung.
 pub fn download_client() -> reqwest::Client {
-    reqwest::Client::builder()
+    crate::ausgehend::client_builder(crate::ausgehend::Zweck::Kartendownload)
         .connect_timeout(Duration::from_secs(20))
         .read_timeout(Duration::from_secs(READ_TIMEOUT_SEKUNDEN))
-        .user_agent("LifelineHub-Kartendownload/1.0 (+https://github.com/)")
         .redirect(ssrf_redirect_policy())
         .dns_resolver(std::sync::Arc::new(crate::karte::proxy::SichererResolver))
         // Byte-gleich auf die Platte: Größe, Fortschritt und sha256-Pin gelten den gelieferten

@@ -65,6 +65,9 @@ pub async fn bild_voll(
     einsatz_id: i64,
     uhs_id: i64,
 ) -> Result<(String, String, Vec<u8>), AppError> {
+    // Am Spiegel kommt der Inhalt auf Abruf (LLH-1492, D8).
+    crate::instanz::spiegel::anhang::pruefe_vorhanden(pool, "uhs_plan", &uhs_id.to_string())
+        .await?;
     sqlx::query_as::<_, (String, String, Vec<u8>)>(
         "SELECT mime, sha256, daten FROM uhs_plan WHERE uhs_id = ? AND einsatz_id = ?",
     )
