@@ -443,8 +443,10 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
   gespeicherte wird nicht übernommen.
 - **Nur über TLS:**
   - Der Einwurf nimmt Aufrufe nur an, wenn sie verschlüsselt ankommen: direkt mit `--tls` oder
-    vom vertrauten Proxy mit `X-Forwarded-Proto: https` (`weitergeleitet_als_https`,
-    `src/auth/session.rs`). Sonst antwortet er `403` mit dem Code `tls_required`.
+    über `X-Forwarded-Proto: https`. Den Kopf zählt der Server nur, wenn die Gegenstelle in
+    `--trusted-proxies` steht, wie bei `PeerIp` (`src/extract.rs`, LFH-604). `weitergeleitet_als_https`
+    (`src/auth/session.rs`) prüft allein den Kopf und reicht dafür nicht. Sonst antwortet der
+    Einwurf `403` mit dem Code `tls_required`.
   - Reines HTTP gibt es nur mit einem ausdrücklichen Schalter des Betreibers für ein Tailnet, das
     selbst verschlüsselt. Dann warnt der Admin-Bereich.
 - **Kein Cache:** Antworten tragen `Cache-Control: no-store`. Sonst könnte ein Cache die

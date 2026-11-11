@@ -29,8 +29,9 @@ herleitung:
   Hinweis auf den früheren. Still verworfen wird keine.
 - MUST: Eine eingeworfene Position ersetzt nur die letzte Position ihres Ziels, ohne Verlauf; eine
   mit älterem Zeitstempel als die gespeicherte wird nicht übernommen.
-- MUST: Ein Einwurf wird nur über TLS angenommen (`--tls` oder `X-Forwarded-Proto: https` vom
-  vertrauten Proxy), sonst 403; Ausnahme nur per ausdrücklichem Schalter des Betreibers.
+- MUST: Ein Einwurf wird nur über TLS angenommen (`--tls` oder `X-Forwarded-Proto: https`, und
+  der Kopf zählt nur von einer Gegenstelle aus `--trusted-proxies`), sonst 403; Ausnahme nur per
+  ausdrücklichem Schalter des Betreibers.
 - MUST: Antworten auf Einwürfe tragen `Cache-Control: no-store`.
 - MUST: Der Pfadabschnitt nach `/einwurf/` erscheint in keinem Protokoll; `pfad_fuer_protokoll`
   maskiert ihn.
