@@ -1708,6 +1708,44 @@ export interface components {
              */
             ziel?: string | null;
         };
+        /** @description Ergebnis von „Alle stellen“ (N5). */
+        BruchAlleErgebnis: {
+            /** Format: int64 */
+            gestellt: number;
+            /** @description Erfassungen, die offen bleiben, mit Grund (etwa „Bezug noch nicht beim Führer.“). */
+            offen: components["schemas"]["BruchOffen"][];
+        };
+        /** @description Eine nicht übernommene Erfassung, wie die Liste am Band sie zeigt (N2). */
+        BruchErfassung: {
+            /** @description Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`). */
+            antrag_art?: string | null;
+            /**
+             * Format: int64
+             * @description Zahl der Folgezeilen, die mit ihr gingen.
+             */
+            folgen: number;
+            gesichert_at: string;
+            /** Format: int64 */
+            id: number;
+            kategorie: components["schemas"]["SpiegelKategorie"];
+            /** @description Inhalt in Kurzform (höchstens [`KURZ_MAX`] Zeichen). */
+            kurz?: string | null;
+            /** @description Tabelle der Zeile (`etb_eintrag`, `meldung`, `einsatz_person` …). */
+            tabelle: string;
+            /** @description Typ eines ETB-Eintrags (`meldung`, `lage`, …). */
+            typ?: string | null;
+            /** @description Die Person darf das Modul der Zeile nicht nutzen: kein Inhalt, kein Antrag. */
+            verborgen: boolean;
+            /** @description Absender oder „von“. */
+            von?: string | null;
+            /** @description Ereignis- oder Erfassungszeit der Zeile (UTC); fehlt, wenn sie keine trägt. */
+            zeit?: string | null;
+        };
+        BruchOffen: {
+            grund: string;
+            /** Format: int64 */
+            id: number;
+        };
         /**
          * @description Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit
          *     läuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher
@@ -2651,8 +2689,9 @@ export interface components {
             beendet: boolean;
             /**
              * Format: int64
-             * @description Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
-             *     kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert.
+             * @description Eigene Erfassungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
+             *     kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert. Nur
+             *     offene, also weder nachgereicht noch verworfen (LLH-1646).
              */
             bruchstelle: number;
             /** @description Name der führenden Instanz. */
@@ -7271,6 +7310,13 @@ export interface components {
             /** @description `ausstehend`, `zugestellt`, `uebernommen` (Zeile noch nicht im Spiegel) oder `abgelehnt`. */
             zustand: string;
         };
+        /**
+         * @description Kategorie einer gespiegelten Zeile (Spec `einsatz-spiegel`, „Kategorie je Zeile“). Auf der
+         *     Leitung steht sie an jeder Zeile, damit sparsamere Freigabestufen später ohne Protokollbruch
+         *     kommen können (Entscheidung 14).
+         * @enum {string}
+         */
+        SpiegelKategorie: "fuehrung" | "etb" | "lage" | "kraefte" | "personen" | "betreuung" | "kommunikation" | "anhaenge";
         /** @description Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag). */
         SprechgruppeAnzeige: {
             aktiv: boolean;

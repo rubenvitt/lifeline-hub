@@ -4146,6 +4146,115 @@
           }
         }
       },
+      "BruchAlleErgebnis": {
+        "type": "object",
+        "description": "Ergebnis von „Alle stellen“ (N5).",
+        "required": [
+          "gestellt",
+          "offen"
+        ],
+        "properties": {
+          "gestellt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BruchOffen"
+            },
+            "description": "Erfassungen, die offen bleiben, mit Grund (etwa „Bezug noch nicht beim Führer.“)."
+          }
+        }
+      },
+      "BruchErfassung": {
+        "type": "object",
+        "description": "Eine nicht übernommene Erfassung, wie die Liste am Band sie zeigt (N2).",
+        "required": [
+          "id",
+          "tabelle",
+          "kategorie",
+          "verborgen",
+          "folgen",
+          "gesichert_at"
+        ],
+        "properties": {
+          "antrag_art": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`)."
+          },
+          "folgen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Folgezeilen, die mit ihr gingen."
+          },
+          "gesichert_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/SpiegelKategorie"
+          },
+          "kurz": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Inhalt in Kurzform (höchstens [`KURZ_MAX`] Zeichen)."
+          },
+          "tabelle": {
+            "type": "string",
+            "description": "Tabelle der Zeile (`etb_eintrag`, `meldung`, `einsatz_person` …)."
+          },
+          "typ": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Typ eines ETB-Eintrags (`meldung`, `lage`, …)."
+          },
+          "verborgen": {
+            "type": "boolean",
+            "description": "Die Person darf das Modul der Zeile nicht nutzen: kein Inhalt, kein Antrag."
+          },
+          "von": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absender oder „von“."
+          },
+          "zeit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ereignis- oder Erfassungszeit der Zeile (UTC); fehlt, wenn sie keine trägt."
+          }
+        }
+      },
+      "BruchOffen": {
+        "type": "object",
+        "required": [
+          "id",
+          "grund"
+        ],
+        "properties": {
+          "grund": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "BuildJob": {
         "type": "object",
         "description": "Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit\nläuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher\n`serde_json::Value` daran vorbei.",
@@ -6592,7 +6701,7 @@
           "bruchstelle": {
             "type": "integer",
             "format": "int64",
-            "description": "Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht\nkannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert."
+            "description": "Eigene Erfassungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht\nkannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert. Nur\noffene, also weder nachgereicht noch verworfen (LLH-1646)."
           },
           "gegenstelle": {
             "type": "string",
@@ -18308,6 +18417,20 @@
             "description": "`ausstehend`, `zugestellt`, `uebernommen` (Zeile noch nicht im Spiegel) oder `abgelehnt`."
           }
         }
+      },
+      "SpiegelKategorie": {
+        "type": "string",
+        "description": "Kategorie einer gespiegelten Zeile (Spec `einsatz-spiegel`, „Kategorie je Zeile“). Auf der\nLeitung steht sie an jeder Zeile, damit sparsamere Freigabestufen später ohne Protokollbruch\nkommen können (Entscheidung 14).",
+        "enum": [
+          "fuehrung",
+          "etb",
+          "lage",
+          "kraefte",
+          "personen",
+          "betreuung",
+          "kommunikation",
+          "anhaenge"
+        ]
       },
       "SprechgruppeAnzeige": {
         "type": "object",

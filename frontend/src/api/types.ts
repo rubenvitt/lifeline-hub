@@ -56,6 +56,9 @@ export type InstanzSpiegelStand = S['InstanzSpiegelStand'];
 export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
 export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
 export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
+// Nicht übernommene Erfassungen am Spiegel (LLH-1646).
+export type BruchErfassung = S['BruchErfassung'];
+export type BruchAlleErgebnis = S['BruchAlleErgebnis'];
 export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
 export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
 export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];
