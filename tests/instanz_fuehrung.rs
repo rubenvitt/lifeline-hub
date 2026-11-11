@@ -1695,3 +1695,304 @@ async fn ein_anhang_den_der_neue_fuehrer_nicht_hat_kommt_vom_alten() {
         .unwrap();
     assert_eq!(am_hub, bytes, "vom ELW geholt");
 }
+
+// ── Bruchstelle nachreichen (LLH-1646) ───────────────────────────────────────────────────────
+
+/// Notübernahme am Hub, danach schreibt Erika (ein Konto, das beide kennen) am ELW einen
+/// ETB-Eintrag und eine Meldung, der ELW bestätigt und wird Spiegel. (Hub, ELW, Einsatz am ELW,
+/// Einsatz am Hub, Erikas Cookie am ELW.)
+async fn bruch_nach_notuebernahme() -> (Instanz, Instanz, i64, i64, String) {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, erika) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    mitglied_werden(&hub, h).await;
+    let (s, v) = etb(&hub, h).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/etb"),
+        &erika,
+        Some(&json!({"von": "ELW 1", "an": "EL", "typ": "lage", "inhalt": "Nach dem Bruch",
+                     "ereigniszeit": "2026-11-11 09:30:00", "anhang_ids": [],
+                     "client_id": "bruch-etb-1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &erika,
+        Some(&json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+                     "inhalt": "Deich hält", "ereigniszeit": "2026-11-11 09:40:00",
+                     "client_id": "bruch-meldung-1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+    // Meldung und ETB-Eintrag zeigen aufeinander; die Bruchstelle kommt trotzdem zu Ende.
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+    (hub, elw, e, h, erika)
+}
+
+async fn bruchstelle(i: &Instanz, cookie: &str, einsatz: i64) -> Vec<Value> {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/bruchstelle"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v.as_array().unwrap().clone()
+}
+
+async fn band_zaehlt(i: &Instanz, einsatz: i64) -> i64 {
+    let (_, kopf) = common::anfrage(
+        &i.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &i.admin,
+        None,
+    )
+    .await;
+    kopf["spiegel"]["bruchstelle"].as_i64().unwrap()
+}
+
+async fn etb_inhalte(i: &Instanz, einsatz: i64) -> Vec<String> {
+    sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr")
+        .bind(einsatz)
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
+    let (hub, elw, e, h, erika) = bruch_nach_notuebernahme().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    assert_eq!(liste.len(), 2, "ETB-Eintrag und Meldung, je eine Erfassung: {liste:?}");
+    assert_eq!(band_zaehlt(&elw, e).await, 2);
+    let etb_bruch = liste.iter().find(|l| l["tabelle"] == "etb_eintrag").unwrap();
+    let meldung = liste.iter().find(|l| l["tabelle"] == "meldung").unwrap();
+    assert_eq!(etb_bruch["antrag_art"], "etb");
+    assert_eq!(etb_bruch["kurz"], "Nach dem Bruch");
+    assert_eq!(meldung["antrag_art"], "meldung");
+    assert_eq!(meldung["folgen"], 1, "ihr ETB-Eintrag zählt nicht extra");
+
+    // Stellen, zweimal: derselbe Antrag.
+    let pfad = format!(
+        "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+        etb_bruch["id"].as_i64().unwrap()
+    );
+    let (s, v1) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v1}");
+    let (s, v2) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v2}");
+    assert_eq!(v1["antrag"]["id"], v2["antrag"]["id"]);
+    assert_eq!(band_zaehlt(&elw, e).await, 1);
+
+    // „Alle stellen“ nimmt die Meldung.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["gestellt"], 1, "{v}");
+    assert_eq!(band_zaehlt(&elw, e).await, 0);
+    assert!(bruchstelle(&elw, &erika, e).await.is_empty());
+
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    let am_hub = etb_inhalte(&hub, h).await;
+    assert_eq!(
+        am_hub.iter().filter(|i| *i == "Nach dem Bruch").count(),
+        1,
+        "genau einmal: {am_hub:?}"
+    );
+    assert_eq!(
+        am_hub.iter().filter(|i| *i == "Deich hält").count(),
+        1,
+        "der ETB-Eintrag der Meldung einmal: {am_hub:?}"
+    );
+    let meldungen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM meldung WHERE einsatz_id = ? AND inhalt = 'Deich hält'",
+    )
+    .bind(h)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(meldungen, 1);
+    let zeit: String = sqlx::query_scalar(
+        "SELECT ereigniszeit FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'Nach dem Bruch'",
+    )
+    .bind(h)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert!(zeit.starts_with("2026-11-11"), "Ereigniszeit von damals: {zeit}");
+    assert_eq!(
+        etb_inhalte(&elw, e).await,
+        am_hub,
+        "der Spiegel holt die nachgereichten Einträge"
+    );
+
+    // Ein weiterer Abgleich und ein erneutes Stellen ändern nichts.
+    let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert!(
+        s == StatusCode::ACCEPTED || s == StatusCode::CONFLICT,
+        "kein zweiter Antrag: {s}"
+    );
+    abgleichen(&elw).await;
+    assert_eq!(etb_inhalte(&hub, h).await, am_hub);
+}
+
+#[tokio::test]
+async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
+    let (hub, elw, e, h, erika) = bruch_nach_notuebernahme().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let id = |tabelle: &str| {
+        liste
+            .iter()
+            .find(|l| l["tabelle"] == tabelle)
+            .unwrap()["id"]
+            .as_i64()
+            .unwrap()
+    };
+    let (etb_id, meldung_id) = (id("etb_eintrag"), id("meldung"));
+
+    // Verwerfen.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/{meldung_id}/verwerfen"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    assert_eq!(band_zaehlt(&elw, e).await, 1);
+
+    // Ein Antrag, den der Hub ablehnt (ohne „von“), macht den Eintrag wieder offen.
+    sqlx::query(
+        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.von', '') WHERE id = ?",
+    )
+    .bind(etb_id)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/{etb_id}/antrag"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    assert_eq!(band_zaehlt(&elw, e).await, 0);
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    let zustand: String = sqlx::query_scalar("SELECT zustand FROM spiegel_antrag WHERE id = ?")
+        .bind(v["antrag"]["id"].as_i64().unwrap())
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(zustand, "abgelehnt");
+    assert_eq!(band_zaehlt(&elw, e).await, 1, "wieder offen");
+
+    // Richtig gestellt geht er durch, mit derselben client_id, und ersetzt den abgelehnten.
+    sqlx::query(
+        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.von', 'ELW 1') WHERE id = ?",
+    )
+    .bind(etb_id)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/{etb_id}/antrag"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert_eq!(
+        etb_inhalte(&hub, h)
+            .await
+            .iter()
+            .filter(|i| *i == "Nach dem Bruch")
+            .count(),
+        1
+    );
+    let antraege: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM spiegel_antrag WHERE client_id = 'bruch-etb-1'",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert!(antraege <= 1, "der abgelehnte ist ersetzt");
+    assert_eq!(band_zaehlt(&elw, e).await, 0);
+}
+
+#[tokio::test]
+async fn ohne_schreibrecht_kein_nachreichen() {
+    let (_hub, elw, e, _h, erika) = bruch_nach_notuebernahme().await;
+    let id = bruchstelle(&elw, &erika, e).await[0]["id"].as_i64().unwrap();
+    // Die Mitgliedschaft ist gespiegelt: ändern nur unter dem Merker der Übernahme.
+    let mut conn = elw.pool.acquire().await.unwrap();
+    sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'beobachter' WHERE einsatz_id = ? \
+         AND benutzer_id = (SELECT id FROM benutzer WHERE benutzername = 'erika')",
+    )
+    .bind(e)
+    .execute(&mut *conn)
+    .await
+    .unwrap();
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    drop(conn);
+    for pfad in [
+        format!("/api/einsaetze/{e}/bruchstelle/{id}/antrag"),
+        format!("/api/einsaetze/{e}/bruchstelle/{id}/verwerfen"),
+        format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+    ] {
+        let (s, v) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}: {v}");
+    }
+    assert_eq!(band_zaehlt(&elw, e).await, 2);
+}

@@ -12,6 +12,7 @@ pub mod abgleich;
 pub mod anhang;
 pub mod antrag;
 pub mod art;
+pub mod bruchstelle;
 pub mod fuehrung;
 pub mod katalog;
 pub mod liefern;
@@ -55,8 +56,9 @@ pub struct EinsatzSpiegelAnzeige {
     pub beendet: bool,
     pub antraege_ausstehend: i64,
     pub antraege_abgelehnt: i64,
-    /// Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
-    /// kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert.
+    /// Eigene Erfassungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
+    /// kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert. Nur
+    /// offene, also weder nachgereicht noch verworfen (LLH-1646).
     pub bruchstelle: i64,
 }
 

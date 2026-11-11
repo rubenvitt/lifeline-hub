@@ -642,6 +642,134 @@ pub async fn antrag_verwerfen(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ── Bruchstelle nachreichen (LLH-1646) ─────────────────────────────────────────────────────
+
+/// Welche Module die Person in diesem Einsatz nutzen darf: Die Liste der Bruchstelle zeigt
+/// Inhalte nur dort (LLH-1646, Entwurf „Rechte“).
+async fn modul_freigabe_fuer(
+    state: &AppState,
+    ctx: &crate::einsatz::kontext::EinsatzKontext,
+) -> Result<impl Fn(&str) -> bool, AppError> {
+    let (overrides, org_defaults) = crate::einsatz::berechtigung::lade_modul_regeln(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+    )
+    .await?;
+    let benutzer = ctx.benutzer.clone();
+    let org_id = ctx.einsatz.org_id;
+    let rolle = ctx.modul_rolle();
+    Ok(move |modul: &str| {
+        crate::einsatz::berechtigung::modul_freigabe(
+            &overrides,
+            &org_defaults,
+            modul,
+            &benutzer,
+            org_id,
+            rolle,
+        )
+        .zugriff
+    })
+}
+
+/// GET /api/einsaetze/{id}/bruchstelle — die nicht übernommenen Erfassungen eines Spiegels nach
+/// einer Notübernahme (LLH-1646, N2): offen, nach Zeit; Inhalte nur mit Freigabe des Moduls.
+pub async fn bruchstelle_liste(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzLesezugriff,
+) -> Result<Json<Vec<crate::instanz::spiegel::bruchstelle::BruchErfassung>>, AppError> {
+    let darf = modul_freigabe_fuer(&state, &ctx).await?;
+    Ok(Json(
+        crate::instanz::spiegel::bruchstelle::liste(&state.pool, ctx.einsatz.id, darf).await?,
+    ))
+}
+
+/// Antwort auf „Als Antrag stellen“ und „Alle stellen“: die Zähler im Kopf ändern sich.
+async fn bruchstelle_geaendert(state: &AppState, einsatz_id: i64) {
+    crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+}
+
+/// POST /api/einsaetze/{id}/bruchstelle/{bruch_id}/antrag — stellt eine nicht übernommene
+/// Erfassung als Antrag an den Führer (LLH-1646, N1, N3). 202 mit dem Antrag wie eine Erfassung
+/// am Spiegel; ein zweites Stellen liefert denselben Antrag.
+pub async fn bruchstelle_stellen(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzSchreibzugriff,
+    PfadParam((_eid, bruch_id)): PfadParam<(i64, i64)>,
+) -> Result<Response, AppError> {
+    let darf = modul_freigabe_fuer(&state, &ctx).await?;
+    let liste =
+        crate::instanz::spiegel::bruchstelle::liste(&state.pool, ctx.einsatz.id, &darf).await?;
+    // Nur, was die Person in der Liste stellen könnte (Modul der Zeile und der Antragsart).
+    if let Some(e) = liste.iter().find(|e| e.id == bruch_id) {
+        if e.verborgen {
+            return Err(AppError::Forbidden);
+        }
+        if let Some(art) = &e.antrag_art {
+            ctx.fordere_modul_zugriff(
+                &state.pool,
+                crate::instanz::spiegel::bruchstelle::modul_des_antrags(art),
+            )
+            .await?;
+        }
+    }
+    let einsatz_id = ctx.einsatz.id;
+    let benutzer_id = ctx.benutzer.id;
+    let gestellt = crate::write_retry!(&state.pool, |conn| {
+        crate::instanz::spiegel::bruchstelle::stellen_tx(conn, einsatz_id, bruch_id, benutzer_id)
+            .await
+    })?;
+    if gestellt.neu {
+        crate::instanz::spiegel::takt::wecken();
+        bruchstelle_geaendert(&state, einsatz_id).await;
+    }
+    Ok(axum::response::IntoResponse::into_response((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({
+            "antrag": { "id": gestellt.antrag_id, "zustand": gestellt.zustand }
+        })),
+    )))
+}
+
+/// POST /api/einsaetze/{id}/bruchstelle/antraege — stellt alle nachreichbaren Erfassungen in der
+/// Reihenfolge ihrer Zeit (LLH-1646, N5). Was noch nicht geht, bleibt offen und steht mit Grund in
+/// der Antwort.
+pub async fn bruchstelle_alle_stellen(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzSchreibzugriff,
+) -> Result<Json<crate::instanz::spiegel::bruchstelle::BruchAlleErgebnis>, AppError> {
+    let darf = modul_freigabe_fuer(&state, &ctx).await?;
+    let ergebnis = crate::instanz::spiegel::bruchstelle::alle_stellen(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        darf,
+    )
+    .await?;
+    if ergebnis.gestellt > 0 {
+        bruchstelle_geaendert(&state, ctx.einsatz.id).await;
+    }
+    Ok(Json(ergebnis))
+}
+
+/// POST /api/einsaetze/{id}/bruchstelle/{bruch_id}/verwerfen — legt eine nicht übernommene
+/// Erfassung ab (LLH-1646, N6). Auch am abgeschlossenen Einsatz und nach beendetem Abgleich.
+pub async fn bruchstelle_verwerfen(
+    State(state): State<AppState>,
+    ctx: crate::einsatz::kontext::EinsatzSchreibfreigabe,
+    PfadParam((_eid, bruch_id)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    crate::instanz::spiegel::bruchstelle::verwerfen(
+        &state.pool,
+        ctx.einsatz.id,
+        bruch_id,
+        ctx.benutzer.id,
+    )
+    .await?;
+    bruchstelle_geaendert(&state, ctx.einsatz.id).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────
 
 /// POST /api/admin/instanz/kopplungen/{id}/widerrufen — nimmt die Org des Admins aus der Kopplung.

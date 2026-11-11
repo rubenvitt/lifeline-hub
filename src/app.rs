@@ -2000,6 +2000,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/antraege/{antrag_id}",
             delete(routes::instanz::antrag_verwerfen),
         )
+        // Bruchstelle am Spiegel (LLH-1646): ansehen, nachreichen, verwerfen.
+        .route(
+            "/api/einsaetze/{id}/bruchstelle",
+            get(routes::instanz::bruchstelle_liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/bruchstelle/antraege",
+            post(routes::instanz::bruchstelle_alle_stellen),
+        )
+        .route(
+            "/api/einsaetze/{id}/bruchstelle/{bruch_id}/antrag",
+            post(routes::instanz::bruchstelle_stellen),
+        )
+        .route(
+            "/api/einsaetze/{id}/bruchstelle/{bruch_id}/verwerfen",
+            post(routes::instanz::bruchstelle_verwerfen),
+        )
         // Abgleich der Einsätze (LLH-1492): Pakete bis `SPIEGEL_MAX`, signiert wie Melden.
         .route(
             crate::instanz::extractor::SPIEGEL_PFAD,

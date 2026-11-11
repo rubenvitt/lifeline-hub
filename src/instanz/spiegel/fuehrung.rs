@@ -424,6 +424,7 @@ async fn uebernimm_bruch_antwort(
             }
         }
         ziele.reverse();
+        loese_verweise_untereinander(conn, &schema, einsatz_id, &ziele).await?;
         let mut fehler = None;
         for (art, schluessel) in &ziele {
             let Some(t) = schema.tabelle(art) else {
@@ -538,7 +539,62 @@ async fn uebernimm_bruch_antwort(
                 .await?;
         }
     }
+    // Die entfernten Zeilen je Erfassung ordnen, damit Band und Liste Erfassungen zählen
+    // (LLH-1646).
+    super::bruchstelle::ordne_folgen(conn, einsatz_id).await?;
     Ok(Some(einsatz_id))
+}
+
+/// Löst Verweise zwischen Zeilen, die gemeinsam entfernt werden (LLH-1646): Eine Meldung und ihr
+/// ETB-Eintrag zeigen aufeinander (`meldung.etb_meldung_id`, `etb_eintrag.meldung_id`), ohne
+/// `ON DELETE`. Keine der beiden ließe sich zuerst löschen, und die Bruchstelle käme nie zu Ende.
+/// Der Inhalt ist schon gesichert; geleert wird nur, was keine Pflichtspalte ist. Läuft unter dem
+/// Merker der Übernahme.
+async fn loese_verweise_untereinander(
+    conn: &mut SqliteConnection,
+    schema: &schema::Schema,
+    einsatz_id: i64,
+    ziele: &[(String, String)],
+) -> Result<(), AppError> {
+    if ziele.len() < 2 {
+        return Ok(());
+    }
+    let arten: std::collections::HashSet<&str> = ziele.iter().map(|(a, _)| a.as_str()).collect();
+    for (art, schluessel) in ziele {
+        let Some(t) = schema.tabelle(art) else {
+            continue;
+        };
+        for sp in &t.spalten {
+            let Some(schema::Ziel::Einsatz(ziel)) = &sp.verweis else {
+                continue;
+            };
+            if sp.pflicht || !arten.contains(ziel) {
+                continue;
+            }
+            let mit: Vec<&str> = ziele
+                .iter()
+                .filter(|(a, s)| a == ziel && !(a == art && s == schluessel))
+                .map(|(_, s)| s.as_str())
+                .collect();
+            if mit.is_empty() {
+                continue;
+            }
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE {tab} SET {sp} = NULL WHERE {gleich} AND {einsatz} = ? \
+                 AND CAST({sp} AS TEXT) IN (SELECT value FROM json_each(?))",
+                tab = t.name,
+                sp = sp.name,
+                gleich = t.schluessel.gleich(t.name),
+                einsatz = super::art::einsatz_ausdruck(t.scoping, t.name),
+            )))
+            .bind(schluessel)
+            .bind(einsatz_id)
+            .bind(serde_json::to_string(&mit).unwrap_or_else(|_| "[]".into()))
+            .execute(&mut *conn)
+            .await?;
+        }
+    }
+    Ok(())
 }
 
 // ── Übergabe und Anfrage ─────────────────────────────────────────────────────────────────────

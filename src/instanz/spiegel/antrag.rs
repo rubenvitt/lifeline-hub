@@ -493,7 +493,7 @@ async fn beantragen(
             "Für einen Antrag an die führende Instanz ist die Erfassung zu groß.".into(),
         ));
     }
-    let mut daten: Value = serde_json::from_slice(&bytes)
+    let daten: Value = serde_json::from_slice(&bytes)
         .map_err(|e| AppError::Validation(format!("Body unlesbar: {e}")))?;
     if daten
         .get("anhang_ids")
@@ -503,6 +503,39 @@ async fn beantragen(
         return Err(AppError::Validation(
             "Anhänge gehen an einem Spiegel nicht; ohne Anhang erneut erfassen.".into(),
         ));
+    }
+    let pfad: Vec<(String, String)> = params
+        .iter()
+        .filter(|(name, _)| *name != "id")
+        .map(|(name, wert)| (name.to_string(), wert.to_string()))
+        .collect();
+    let (id, zustand, neu) = crate::write_retry!(&state.pool, |conn| {
+        lege_an_tx(conn, b, einsatz_id, benutzer.id, &pfad, daten.clone(), None).await
+    })?;
+    if neu {
+        super::takt::wecken();
+    }
+    Ok(antrag_antwort(id, &zustand))
+}
+
+/// Legt eine Erfassung am Spiegel als Antrag ab, auf einer offenen Transaktion: Kern von
+/// [`beantragen`] und vom Nachreichen der Bruchstelle (LLH-1646). Bildet die Verweise in Pfad
+/// (`pfad`, ohne `id`) und Body auf die Kennungen des Führers ab, setzt die Erfassungszeit und
+/// legt den Antrag an. Gibt es zur `client_id` schon einen, kommt dieser zurück (`neu` = false).
+/// `client_id_vorgabe` setzt die `client_id` im Body, wo sie fehlt. Liefert `(id, zustand, neu)`.
+pub(super) async fn lege_an_tx(
+    conn: &mut SqliteConnection,
+    b: &Beantragbar,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    pfad: &[(String, String)],
+    mut daten: Value,
+    client_id_vorgabe: Option<&str>,
+) -> Result<(i64, String, bool), AppError> {
+    if let (Some(feld), Some(vorgabe), Some(o)) = (b.client_id, client_id_vorgabe, daten.as_object_mut()) {
+        if o.get(feld).and_then(Value::as_str).is_none_or(|s| s.trim().is_empty()) {
+            o.insert(feld.to_string(), Value::from(vorgabe));
+        }
     }
     // Die Erfassung mit den eigenen Kennungen: Wird dieser Spiegel selbst Führer, führt er den
     // Antrag damit aus (LLH-1641, E5).
@@ -518,39 +551,48 @@ async fn beantragen(
         ),
         None => None,
     };
-    let mut conn = state.pool.acquire().await?;
     let Some((_kopplung_id, kopplung_org_id, meldend)) =
-        kopplung_des_spiegels(&mut conn, einsatz_id).await?
+        kopplung_des_spiegels(&mut *conn, einsatz_id).await?
     else {
         return Err(AppError::Conflict(
             "Der Abgleich dieses Spiegels ist beendet; ein Antrag geht nicht mehr.".into(),
         ));
     };
+    if let Some(c) = &client_id {
+        let vorhanden: Option<(i64, String)> = sqlx::query_as(
+            "SELECT id, zustand FROM spiegel_antrag WHERE einsatz_id = ? AND art = ? AND client_id = ?",
+        )
+        .bind(einsatz_id)
+        .bind(b.art)
+        .bind(c)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if let Some((id, zustand)) = vorhanden {
+            return Ok((id, zustand, false));
+        }
+    }
     let fehlt = || AppError::Validation("Bezug noch nicht beim Führer.".into());
     let mut pfad_parameter = serde_json::Map::new();
     let mut pfad_lokal = serde_json::Map::new();
-    for (name, wert) in params.iter() {
-        if name == "id" {
-            continue;
-        }
+    for (name, wert) in pfad {
         pfad_lokal.insert(
-            name.to_string(),
+            name.clone(),
             wert.parse::<i64>()
                 .map(Value::from)
-                .unwrap_or(Value::from(wert)),
+                .unwrap_or(Value::from(wert.as_str())),
         );
         let ziel = b
             .pfad_verweise
             .iter()
-            .find(|(n, _)| *n == name)
+            .find(|(n, _)| n == name)
             .map(|(_, t)| *t);
         let fremd = match ziel {
-            Some(t) => einsatz_fremd(&mut conn, einsatz_id, t, wert)
+            Some(t) => einsatz_fremd(&mut *conn, einsatz_id, t, wert)
                 .await?
                 .ok_or_else(fehlt)?,
-            None => wert.to_string(),
+            None => wert.clone(),
         };
-        pfad_parameter.insert(name.to_string(), Value::from(fremd));
+        pfad_parameter.insert(name.clone(), Value::from(fremd));
     }
     for v in b.body_verweise {
         let ziel = match v.ziel {
@@ -577,13 +619,13 @@ async fn beantragen(
             *w = match ziel {
                 AntragZiel::Polymorph { .. } => continue,
                 AntragZiel::Einsatz(t) => {
-                    let f = einsatz_fremd(&mut conn, einsatz_id, t, &id.to_string())
+                    let f = einsatz_fremd(&mut *conn, einsatz_id, t, &id.to_string())
                         .await?
                         .ok_or_else(fehlt)?;
                     f.parse::<i64>().map(Value::from).unwrap_or(Value::from(f))
                 }
                 AntragZiel::Stammdaten(art) if meldend => {
-                    abbildung::stammdaten_fremd(&mut conn, kopplung_org_id, art, id)
+                    abbildung::stammdaten_fremd(&mut *conn, kopplung_org_id, art, id)
                         .await?
                         .map_or(Value::Null, Value::from)
                 }
@@ -603,43 +645,26 @@ async fn beantragen(
             }
         }
     }
-    if let Some(c) = &client_id {
-        let vorhanden: Option<(i64, String)> = sqlx::query_as(
-            "SELECT id, zustand FROM spiegel_antrag WHERE einsatz_id = ? AND art = ? AND client_id = ?",
-        )
-        .bind(einsatz_id)
-        .bind(b.art)
-        .bind(c)
-        .fetch_optional(&mut *conn)
-        .await?;
-        if let Some((id, zustand)) = vorhanden {
-            return Ok(antrag_antwort(id, &zustand));
-        }
-    }
-    drop(conn);
-    let id: i64 = crate::write_retry!(&state.pool, |conn| {
-        Ok(sqlx::query_scalar(
-            "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, pfad_parameter, \
-             pfad_lokal, daten, daten_lokal, benutzer_id, client_id, erfasst_at, geaendert_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(einsatz_id)
-        .bind(b.art)
-        .bind(b.methode)
-        .bind(b.pfad)
-        .bind(Value::Object(pfad_parameter.clone()).to_string())
-        .bind(Value::Object(pfad_lokal.clone()).to_string())
-        .bind(daten.to_string())
-        .bind(daten_lokal.to_string())
-        .bind(benutzer.id)
-        .bind(&client_id)
-        .bind(&jetzt)
-        .bind(&jetzt)
-        .fetch_one(&mut *conn)
-        .await?)
-    })?;
-    super::takt::wecken();
-    Ok(antrag_antwort(id, "ausstehend"))
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, pfad_parameter, \
+         pfad_lokal, daten, daten_lokal, benutzer_id, client_id, erfasst_at, geaendert_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(b.art)
+    .bind(b.methode)
+    .bind(b.pfad)
+    .bind(Value::Object(pfad_parameter).to_string())
+    .bind(Value::Object(pfad_lokal).to_string())
+    .bind(daten.to_string())
+    .bind(daten_lokal.to_string())
+    .bind(benutzer_id)
+    .bind(&client_id)
+    .bind(&jetzt)
+    .bind(&jetzt)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok((id, "ausstehend".to_string(), true))
 }
 
 /// Läuft der Abgleich dieses Spiegels noch, nimmt er also Anträge an (LLH-1496: ein Widerruf
@@ -850,6 +875,16 @@ pub async fn quittungen_uebernehmen(
         .bind(kopplung_id)
         .fetch_optional(&mut *conn)
         .await?;
+        if geaendert.is_some() {
+            // Eine nachgereichte Erfassung der Bruchstelle folgt ihrem Antrag (LLH-1646).
+            super::bruchstelle::quittung_uebernehmen(
+                conn,
+                q.id,
+                zustand == "abgelehnt",
+                q.ergebnis_schluessel.as_deref(),
+            )
+            .await?;
+        }
         if let Some(e) = geaendert {
             if !einsaetze.contains(&e) {
                 einsaetze.push(e);

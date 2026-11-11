@@ -312,7 +312,8 @@ macro_rules! fuehrung_joins {
 }
 
 /// Spiegel-Angaben (LLH-1492): ob der Einsatz ein Spiegel ist, von wem, wann zuletzt abgeglichen,
-/// und die Zahl offener und abgelehnter Anträge.
+/// die Zahl offener und abgelehnter Anträge und der offenen Erfassungen der Bruchstelle
+/// (LLH-1646: weder nachgereicht noch verworfen, Folgezeilen zählen nicht extra).
 macro_rules! spiegel_spalten {
     () => {
         "sp.einsatz_id IS NOT NULL AS spiegel_ist, spk.gegenueber_name AS spiegel_gegenstelle, \
@@ -322,7 +323,8 @@ macro_rules! spiegel_spalten {
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
              AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt, \
          (SELECT COUNT(*) FROM einsatz_bruchstelle eb WHERE eb.einsatz_id = e.id \
-             AND eb.entfernt = 1) AS spiegel_bruchstelle"
+             AND eb.entfernt = 1 AND eb.daten IS NOT NULL AND eb.folge_von IS NULL \
+             AND eb.erledigt IS NULL) AS spiegel_bruchstelle"
     };
 }
 
