@@ -599,7 +599,9 @@ jobs:
       # gleichzeitig, kann dieser Lauf seinen Tag nach dem neueren geschrieben haben. Dann ist
       # das neuere inzwischen veröffentlicht, und der Tag wird auf dessen Abbild umgehängt. Wer
       # zuletzt schreibt, liest danach zuletzt; so landet der Tag am Ende auf dem neuesten Stand
-      # (Begründung im Kopf von scripts/release/abbild-kanal.mjs).
+      # (Begründung im Kopf von scripts/release/abbild-kanal.mjs). Ohne feste Rundenzahl: eine
+      # weitere Runde gibt es nur, wenn inzwischen wieder ein neueres Release veröffentlicht ist,
+      # und eine feste Grenze ließe genau den letzten Rücksprung stehen.
       - name: Gleitenden Tag an die Abbilder hängen
         if: steps.abbild.outputs.name != ''
         continue-on-error: ${{ needs.vorbereiten.outputs.vorab == 'true' }}
@@ -611,7 +613,7 @@ jobs:
         run: |
           set -euo pipefail
           ziel="$TAG"
-          for runde in 1 2 3; do
+          while :; do
             for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"; do
               docker buildx imagetools create --tag "$bild:$NAME" "$bild:${ziel#v}"
             done
@@ -626,7 +628,6 @@ jobs:
             echo "::notice::Inzwischen ist $neuestes veröffentlicht, :$NAME wird darauf umgehängt."
             ziel="$neuestes"
           done
-          echo "::warning::Abbild-Tag :$NAME nach drei Runden nicht stabil; die nächste Freigabe im Kanal hängt ihn neu."
 
       # Fehler hier machen den Job nicht rot (das Release steht schon), sie stehen als Warnung im
       # Protokoll. Begründung und Rechnung im Kopf von scripts/release/pr-kommentare.mjs.
