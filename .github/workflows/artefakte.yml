@@ -574,8 +574,10 @@ jobs:
             if [ "$VORAB" != "true" ]; then echo "name=latest" >> "$GITHUB_OUTPUT"; fi
             exit 0
           fi
-          gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
-            --jq '.[] | select(.draft == false) | .tag_name' > "$RUNNER_TEMP/veroeffentlicht.txt"
+          # Frist je Versuch und Wiederholung (scripts/AGENTS.md, LFH-1101); die Datei schreibt
+          # jeder Versuch neu, ein abgebrochener hinterlässt keine halbe Liste.
+          ./scripts/wiederholen.sh 3 120 -- sh -c 'gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
+            --jq ".[] | select(.draft == false) | .tag_name" > "$RUNNER_TEMP/veroeffentlicht.txt"'
           name="$(mise exec -- node scripts/release/abbild-kanal.mjs --tag "$TAG" \
             --veroeffentlicht "$RUNNER_TEMP/veroeffentlicht.txt")"
           echo "name=$name" >> "$GITHUB_OUTPUT"
@@ -615,13 +617,14 @@ jobs:
           ziel="$TAG"
           while :; do
             for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"; do
-              docker buildx imagetools create --tag "$bild:$NAME" "$bild:${ziel#v}"
+              ./scripts/wiederholen.sh 3 120 -- \
+                docker buildx imagetools create --tag "$bild:$NAME" "$bild:${ziel#v}"
             done
             echo "::notice::Abbild-Tag :$NAME zeigt auf $ziel."
             # Tags ohne das Skript (nur stabil, siehe oben): keine Gegenprobe, wie bisher.
             [ -f scripts/release/abbild-kanal.mjs ] || exit 0
-            gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
-              --jq '.[] | select(.draft == false) | .tag_name' > "$RUNNER_TEMP/veroeffentlicht.txt"
+            ./scripts/wiederholen.sh 3 120 -- sh -c 'gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
+              --jq ".[] | select(.draft == false) | .tag_name" > "$RUNNER_TEMP/veroeffentlicht.txt"'
             neuestes="$(mise exec -- node scripts/release/abbild-kanal.mjs --tag "$TAG" \
               --veroeffentlicht "$RUNNER_TEMP/veroeffentlicht.txt" --neuestes)"
             [ "$neuestes" = "$ziel" ] && exit 0
