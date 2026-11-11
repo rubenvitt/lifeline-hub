@@ -3255,6 +3255,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("stand", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("entfernt", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geklaert", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gesichert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },

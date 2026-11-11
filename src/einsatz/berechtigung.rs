@@ -193,7 +193,7 @@ pub fn fordere_schreibrecht_oder_admin(
 
 /// Stellt sicher, dass der Einsatz noch aktiv (beschreibbar) ist: `Conflict` (409) bei
 /// abgeschlossenem (read-only) Einsatz. Führt eine andere gekoppelte Instanz, ist der Einsatz hier
-/// ein Spiegel, und dessen Schutz-Trigger antworten mit 409 (LLH-1641; ADR-0018, ADR-0020).
+/// ein Spiegel, und dessen Schutz-Trigger antworten mit 409 (LLH-1641; ADR-0018, ADR-0021).
 pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
     if !einsatz.ist_aktiv() {
         return Err(AppError::Conflict(

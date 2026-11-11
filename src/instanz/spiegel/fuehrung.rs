@@ -1,5 +1,5 @@
 //! Führung je Einsatz auf dem Spiegel (LLH-1641, Entwurf E1–E7, mit Ruben am 11.11.2026
-//! abgestimmt; ADR-0018, ADR-0020).
+//! abgestimmt; ADR-0018, ADR-0021).
 //!
 //! Die Akte (`einsatz_fuehrung`) entscheidet, wer einen Einsatz führt; die Zeile in
 //! `einsatz_spiegel` folgt ihr ([`richte_aus`]), und allein sie sperrt (Trigger und Antragsschicht
@@ -268,7 +268,8 @@ pub async fn offene_bruch_fragen(
     let zeilen: Vec<(String, String)> = sqlx::query_as(
         "SELECT DISTINCT b.art, b.schluessel FROM einsatz_bruchstelle b \
          JOIN einsatz_spiegel s ON s.einsatz_id = b.einsatz_id AND s.bruch_offen = 1 \
-         WHERE b.einsatz_id = ? AND b.entfernt = 0 ORDER BY b.art, b.schluessel LIMIT ?",
+         WHERE b.einsatz_id = ? AND b.entfernt = 0 AND b.geklaert = 0 \
+         ORDER BY b.art, b.schluessel LIMIT ?",
     )
     .bind(einsatz_id)
     .bind(BRUCH_MAX as i64)
@@ -293,11 +294,13 @@ pub async fn beantworte_bruch(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
+    let bis = fragen.iter().take(BRUCH_MAX).last().cloned();
     if herkunft.flatten() != Some(kopplung_id) {
         return Ok(BruchAntwort {
             kennung: kennung.to_string(),
             kennt: false,
             unbekannt: Vec::new(),
+            bis,
         });
     }
     let mut unbekannt = Vec::new();
@@ -319,6 +322,7 @@ pub async fn beantworte_bruch(
         kennung: kennung.to_string(),
         kennt: true,
         unbekannt,
+        bis,
     })
 }
 
@@ -366,7 +370,10 @@ pub async fn uebernimm_bruch_antworten(
 /// werden lokal entfernt (ihr Inhalt bleibt in `einsatz_bruchstelle`); bekannte überschreibt seine
 /// Lieferung. Läuft vor den Lieferungen desselben Pakets, damit eine neue Zeile des Führers nicht
 /// an einer entfernten scheitert (etwa der laufenden Nummer im ETB). Eine Zeile, an der noch ein
-/// Verweis hängt, bleibt stehen und wird in einer späteren Runde erneut versucht.
+/// Verweis hängt, bleibt stehen und wird in einer späteren Runde erneut versucht. Die Antwort
+/// klärt die Zeilen bis `bis`; geschlossen wird die Bruchstelle erst, wenn keine ungeklärte mehr
+/// übrig ist. Kennt der Führer den Einsatz nicht als Spiegel dieser Kopplung (`kennt: false`),
+/// bleibt sie offen, bis ein Führer antwortet, der es kann.
 async fn uebernimm_bruch_antwort(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -384,9 +391,12 @@ async fn uebernimm_bruch_antwort(
     let Some(einsatz_id) = spiegel else {
         return Ok(None);
     };
+    if !a.kennt {
+        return Ok(None);
+    }
     let schema = schema::schema(conn).await?;
-    let mut bleibt = false;
-    if a.kennt {
+    let mut uebrig: Vec<(String, String)> = Vec::new();
+    {
         sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
             .execute(&mut *conn)
             .await?;
@@ -448,7 +458,7 @@ async fn uebernimm_bruch_antwort(
                     sqlx::query("RELEASE bruch_zeile")
                         .execute(&mut *conn)
                         .await?;
-                    bleibt = true;
+                    uebrig.push((art.clone(), schluessel.clone()));
                     fehler.get_or_insert(f);
                 }
             }
@@ -460,12 +470,46 @@ async fn uebernimm_bruch_antwort(
             tracing::warn!(kennung = %a.kennung, fehler = %f, "Bruchstelle: Zeile bleibt vorerst");
         }
     }
-    if !bleibt {
-        sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 0 WHERE einsatz_id = ?")
+    // Geklärt ist alles bis zur letzten gefragten Zeile, außer was eben nicht entfernt werden
+    // konnte (es wird erneut gefragt). Ohne `bis` (ältere Gegenseite) gilt alles als gefragt.
+    match &a.bis {
+        Some([art, schluessel]) => {
+            sqlx::query(
+                "UPDATE einsatz_bruchstelle SET geklaert = 1 WHERE einsatz_id = ? AND geklaert = 0 \
+                 AND (art, schluessel) <= (?, ?)",
+            )
             .bind(einsatz_id)
+            .bind(art)
+            .bind(schluessel)
             .execute(&mut *conn)
             .await?;
+        }
+        None => {
+            sqlx::query("UPDATE einsatz_bruchstelle SET geklaert = 1 WHERE einsatz_id = ?")
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
+        }
     }
+    for (art, schluessel) in &uebrig {
+        sqlx::query(
+            "UPDATE einsatz_bruchstelle SET geklaert = 0 WHERE einsatz_id = ? AND art = ? \
+             AND schluessel = ? AND entfernt = 0",
+        )
+        .bind(einsatz_id)
+        .bind(art)
+        .bind(schluessel)
+        .execute(&mut *conn)
+        .await?;
+    }
+    sqlx::query(
+        "UPDATE einsatz_spiegel SET bruch_offen = 0 WHERE einsatz_id = ? AND NOT EXISTS \
+         (SELECT 1 FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0 AND geklaert = 0)",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
     Ok(Some(einsatz_id))
 }
 

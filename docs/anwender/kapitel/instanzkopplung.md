@@ -158,7 +158,8 @@ Für einen Admin der Organisation, an der Installation, die sich meldet, etwa am
 
 1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
 2. Im Paneel „Einsätze beim Gegenüber“ am Einsatz „Führung …“ wählen.
-3. „Führung anfragen“ wählen. Mit der nächsten Meldung führt diese Installation.
+3. „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
+   Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
 
 ### Notübernahme
 
@@ -407,8 +408,11 @@ ihn gerade führt.
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
 dem beantragt wird, und der Einsatzkopf zeigt „Führung: … · Epoche n“. Jeder Wechsel zählt die
-**Epoche** hoch. Übergeben und anfragen lässt sich die Führung erst, wenn beide Seiten
-abgeglichen sind; so geht beim Wechsel nichts verloren. Erklären
+**Epoche** hoch. Übergeben lässt sich die Führung erst, wenn beide Seiten abgeglichen sind
+(sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
+führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich nachgezogen hat:
+Bis dahin zeigt das Paneel „Führung“ sie als offen, danach steht im Einsatzkopf „Führung: hier“.
+Erklären
 zwei Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
 der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
 

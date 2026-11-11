@@ -79,6 +79,10 @@ pub struct BruchAntwort {
     /// Die gefragten Zeilen, die der Führer nicht kennt.
     #[serde(default)]
     pub unbekannt: Vec<[String; 2]>,
+    /// Die letzte gefragte Zeile (die Fragen sind nach Art und Schlüssel geordnet): Bis hierher
+    /// ist die Bruchstelle geklärt, dahinter fragt der Spiegel in der nächsten Runde weiter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bis: Option<[String; 2]>,
 }
 
 /// Zeilen eines Einsatzes seit einem Stand (D6).

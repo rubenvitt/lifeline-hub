@@ -1257,6 +1257,65 @@ async fn notuebernahme_am_hub_macht_den_spiegel_beschreibbar() {
         kopf["spiegel"]["bruchstelle"].as_i64().unwrap() >= 1,
         "{kopf}"
     );
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+}
+
+async fn bruch_offen(i: &Instanz, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT bruch_offen FROM einsatz_spiegel WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Mehr als `BRUCH_MAX` gesicherte Zeilen klären sich über mehrere Runden; geschlossen wird
+/// erst, wenn keine ungefragte mehr übrig ist (Review LLH-1641).
+#[tokio::test]
+async fn eine_grosse_bruchstelle_klaert_sich_ueber_mehrere_runden() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    // Zeilen, die der Hub nicht kennt (und die es hier nicht mehr gibt): jede muss gefragt werden.
+    let zahl = lifeline_hub::instanz::spiegel::paket::BRUCH_MAX + 50;
+    for n in 0..zahl {
+        sqlx::query(
+            "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, gesichert_at) \
+             VALUES (?, 'etb_eintrag', ?, 1, '2026-11-11 12:00:00')",
+        )
+        .bind(e)
+        .bind(format!("{}", 900_000 + n))
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let ungeklaert: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0 \
+         AND schluessel >= '900000'",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(ungeklaert, 0, "jede Zeile ist gefragt und entfernt");
+    assert_eq!(bruch_offen(&elw, e).await, 0);
 }
 
 #[tokio::test]

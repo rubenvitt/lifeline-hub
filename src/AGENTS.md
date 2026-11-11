@@ -327,13 +327,14 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0020](../docs/architektur/entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md):
+  [ADR-0021](../docs/architektur/entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
     (`richte_aus` aus `fuehrung::repo::save`); ein neuer Schreibweg braucht dafür nichts.
-  - Übergabe und Anfrage gehen nur abgeglichen (`fordere_abgeglichen`), eine Notübernahme nur
-    an einem Einsatz, der hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
+  - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer
+    (`anfrage_von`), bis der Anfragende alles hat; eine Notübernahme nur an einem Einsatz, der
+    hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
     `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 nach.

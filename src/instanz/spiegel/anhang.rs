@@ -216,11 +216,16 @@ pub async fn liefere_teile(
             continue;
         };
         let Some(spalte) = &t.blob else { continue };
-        // Nur Einsätze, die diese Kopplung bekommt: ihre Org ist ihr aktiv zugeordnet.
+        // Nur Einsätze, die diese Kopplung bekommt: ein hier geführter, dessen Org ihr aktiv
+        // zugeordnet ist, oder ein Spiegel genau dieser Kopplung (alter Führer, E7). Ein Spiegel
+        // einer anderen Kopplung derselben Org bleibt außen vor.
         let gefuehrt: Option<i64> = sqlx::query_scalar(
-            "SELECT e.id FROM einsatz e WHERE e.kennung = ? AND EXISTS ( \
-             SELECT 1 FROM instanz_kopplung_org o WHERE o.kopplung_id = ? \
-             AND o.org_id = e.org_id AND o.widerrufen_at IS NULL)",
+            "SELECT e.id FROM einsatz e WHERE e.kennung = ?1 AND ( \
+             (e.spiegel = 0 AND EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+               WHERE o.kopplung_id = ?2 AND o.org_id = e.org_id AND o.widerrufen_at IS NULL)) \
+             OR EXISTS (SELECT 1 FROM einsatz_spiegel s JOIN instanz_kopplung_org o \
+               ON o.id = s.kopplung_org_id WHERE s.einsatz_id = e.id AND o.kopplung_id = ?2 \
+               AND o.widerrufen_at IS NULL))",
         )
         .bind(&a.kennung)
         .bind(kopplung_id)

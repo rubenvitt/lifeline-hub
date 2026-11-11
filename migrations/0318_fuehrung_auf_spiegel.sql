@@ -1,6 +1,6 @@
 -- LLH-1641: Führung je Einsatz auf den Spiegel aufgesetzt (Entwurf E1–E7, mit Ruben am
 -- 11.11.2026 abgestimmt). Die Akte entscheidet, wer führt; die Zeile in `einsatz_spiegel` folgt ihr
--- (`instanz::spiegel::fuehrung::richte_aus`), und nur der Spiegel sperrt (ADR-0018, ADR-0020).
+-- (`instanz::spiegel::fuehrung::richte_aus`), und nur der Spiegel sperrt (ADR-0018, ADR-0021).
 --
 -- 1. `einsatz.fuehrung_bei` entfällt: der Schreibschutz ist allein der Spiegel.
 -- 2. Akten und Stände des Austauschs werden verworfen. Der Schalter `LIFELINE_FUEHRUNG` war bis
@@ -18,7 +18,8 @@
 -- 5. `einsatz_spiegel.bruch_offen`: der Spiegel hat eigene, nicht abgeglichene Änderungen
 --    gesichert und räumt neue Zeilen ab, sobald der Führer ihm sagt, welche er kennt (E6).
 -- 6. `einsatz_bruchstelle`: je gesicherter Zeile ihr Inhalt beim Wechsel zum Spiegel (JSON, NULL
---    für eine gelöschte Zeile) und ob sie lokal entfernt wurde. Einsatz-scoped
+--    für eine gelöschte Zeile), ob sie lokal entfernt wurde und ob der Führer sie schon beurteilt
+--    hat (`geklaert`; mehr als `BRUCH_MAX` Zeilen klären sich über mehrere Runden). Einsatz-scoped
 --    (`einsatz::schwaerzung_registry`), nicht gespiegelt (`instanz::spiegel::art::AUSGENOMMEN`).
 ALTER TABLE einsatz DROP COLUMN fuehrung_bei;
 
@@ -43,6 +44,7 @@ CREATE TABLE einsatz_bruchstelle (
     stand        INTEGER NOT NULL,
     daten        TEXT,
     entfernt     INTEGER NOT NULL DEFAULT 0 CHECK (entfernt IN (0, 1)),
+    geklaert     INTEGER NOT NULL DEFAULT 0 CHECK (geklaert IN (0, 1)),
     gesichert_at TEXT    NOT NULL
 );
 CREATE INDEX idx_einsatz_bruchstelle_einsatz ON einsatz_bruchstelle (einsatz_id);
