@@ -43,7 +43,7 @@ Erst die Verträge herausarbeiten, dann Adapter schreiben.
 
 | Nr. | Frage | Entscheidung |
 | --- | --- | --- |
-| E1 | Absender ohne Signatur (BOSWatch, FE2 „URL öffnen“, Divera-Webhook, OsmAnd) | **Einwurf-Zugang:** geheimer Schlüssel im Pfad, darf nur in eine Ablage schreiben (Alarmmeldung, Position), liest nichts. Festgehalten als ADR-0022, Ausnahme zu ADR-0014 (hier zuerst als ADR-0015 geführt; die Nummer war vergeben, berichtigt 11.11.2026). |
+| E1 | Absender ohne Signatur (BOSWatch, FE2 „URL öffnen“, Divera-Webhook, OsmAnd) | **Einwurf-Zugang:** geheimer Schlüssel im Pfad, darf nur in eine Ablage schreiben (Alarmmeldung, Position), liest nichts. Festgehalten als ADR-0023, Ausnahme zu ADR-0014 (hier zuerst als ADR-0015 geführt; die Nummer war vergeben, berichtigt 11.11.2026). |
 | E2 | Bearer-Lesezugang für Lagemonitore (LLH-1484) | **Vor LGM-14 auf ADR-0014 umstellen.** Der Monitor hält seinen Schlüssel selbst. |
 | E3 | Stufe der Benachrichtigung | **Eingang**, nicht Alarm. Ablauf: Ein Alarm kommt herein und erscheint als Alarmmeldung; daraus legt ein Mensch einen neuen Einsatz an (Daten übernommen) oder verknüpft ihn mit einem laufenden. |
 | E4 | Nachträge nach der Annahme | **Hinweis am Einsatz** mit „übernehmen“ je Feld, Spur im ETB. |
@@ -54,7 +54,7 @@ Erst die Verträge herausarbeiten, dann Adapter schreiben.
 | E9 | Drohnenvideo | **Kein eigener Medienserver.** Lifeline Hub zeigt WHEP/HLS-Quellen an (Suchlage, MediaMTX des Kunden). |
 | E10 | Stammdaten-Eingang | **Eigene Unteraufgabe, Stufe 1.** |
 | E11 | Meshtastic | **Weiter verfolgen**, aber zuerst allgemein klären, wie eine Funk-/Mesh-Anbindung als Adapter aussieht. |
-| E12 | Verhältnis zu LLH-1148 | **LLH-1148 zuerst** als kurzes Konzept abschließen (ADR-0014 für Fremdsysteme, ADR-0022, `/api/v1`, OpenAPI-Pfade nur für öffentliche Routen). |
+| E12 | Verhältnis zu LLH-1148 | **LLH-1148 zuerst** als kurzes Konzept abschließen (ADR-0014 für Fremdsysteme, ADR-0023, `/api/v1`, OpenAPI-Pfade nur für öffentliche Routen). |
 
 Weitere Vorgaben vom 10.11.2026:
 
@@ -127,7 +127,7 @@ Divera (abrufen, Webhook nur als Auslöser), HiOrg-EFS (Veranstaltungen), späte
   Probelauf und die Freigabe durch den Aufgabenträger.
 - **Kennung + Herkunft** an Personal, Qualifikation und Fahrzeug, nach dem Muster aus LLH-1556.
 - **Koordinatenumrechnung auf dem Server** (UTM/GK → WGS84). Heute gibt es sie nur im Browser.
-- **Architektur:** Kapitel 3, 5, 6, 7, 8, 11 und 12 sowie ADR-0022 kommen mit.
+- **Architektur:** Kapitel 3, 5, 6, 7, 8, 11 und 12 sowie ADR-0023 kommen mit.
 
 ## Weitere Wege (Kurzfassung)
 

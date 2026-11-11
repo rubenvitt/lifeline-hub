@@ -1,5 +1,5 @@
 ---
-id: ADR-0022
+id: ADR-0023
 titel: Absender ohne Signatur werfen über einen Einwurf-Zugang ein, der nur schreibt
 status: vorgeschlagen
 datum: 2026-11-11
@@ -11,7 +11,7 @@ herleitung:
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
 ---
 
-# ADR-0022: Absender ohne Signatur werfen über einen Einwurf-Zugang ein, der nur schreibt
+# ADR-0023: Absender ohne Signatur werfen über einen Einwurf-Zugang ein, der nur schreibt
 
 ## Regeln
 
@@ -32,7 +32,7 @@ herleitung:
 - MUST: Jeder Einwurf-Zugang ist gedrosselt; ein unbekannter Schlüssel zählt im Zähler für
   Maschinen je IP, nicht in der Anmeldesperre.
 - MUST: Anlegen und Widerruf stehen in `admin_audit`; ein Widerruf wirkt sofort.
-- SHOULD: Ein Absender, der signieren kann, bekommt einen Zugang nach ADR-0021, und einer, der POST
+- SHOULD: Ein Absender, der signieren kann, bekommt einen Zugang nach ADR-0022, und einer, der POST
   kann, nimmt POST statt GET.
 
 ## Prüfung

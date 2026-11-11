@@ -9,9 +9,9 @@ Am 11.11.2026 hat Ruben D2 bis D4 und D9 entschieden; für D1 hat er die Richtun
 „möglichst zugänglich und vor allem sicher“. Die Regeln stehen in zwei ADRs mit Status
 `vorgeschlagen`. Akzeptiert werden sie mit der ersten Umsetzung.
 
-- [ADR-0021](../architektur/entscheidungen/ADR-0021-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md):
+- [ADR-0022](../architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md):
   Fremdsysteme und öffentliche API
-- [ADR-0022](../architektur/entscheidungen/ADR-0022-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md):
+- [ADR-0023](../architektur/entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md):
   Einwurf-Zugang
 
 ## Ausgangslage im Code
@@ -59,7 +59,7 @@ Weitere Befunde:
 | D2 | Rechte | **Feste Scopes je Zugang.** Ein Zugang gehört genau einer Org. Ein Lese-Scope mit Einsatzbezug braucht zusätzlich die Freigabe der Einsatzleitung, wie heute beim Lagemonitor. |
 | D3 | Vertrag | **Alles Öffentliche liegt unter `/api/v1/`.** Es hat ein eigenes OpenAPI-Dokument mit Pfaden und eigenem Drift-Test. Nur dort gilt eine Stabilitätszusage; die interne API bleibt ohne Zusage. |
 | D4 | Hinaus | **Eine Outbox von Anfang an.** Ausgangsereignisse werden in derselben Transaktion wie die Änderung geschrieben. Erster Leser ist der Abruf `GET /api/v1/events`. Zweiter Leser sind Webhooks; sie kommen direkt danach und werden mit dem Instanzschlüssel signiert, nicht per HMAC. |
-| D5 | Absender ohne Signatur | **Einwurf-Zugang** (E1 vom 10.11.): ein geheimer Schlüssel im Pfad, der nur in eine Ablage schreibt. Festgehalten als **ADR-0022**, weil die Nummer 0015 schon vergeben war. |
+| D5 | Absender ohne Signatur | **Einwurf-Zugang** (E1 vom 10.11.): ein geheimer Schlüssel im Pfad, der nur in eine Ablage schreibt. Festgehalten als **ADR-0023**, weil die Nummer 0015 schon vergeben war. |
 | D6 | Lagemonitor | Er wird auf D1 umgestellt (E2, LLH-1638) und zieht nach `GET /api/v1/lage` um. Der alte Pfad bleibt eine Übergangszeit lang. |
 | D7 | Lagebild-Link | Der Lagebild-Link (`llh_lb_`) ist **kein Maschinenzugang**, sondern ein Link für Menschen ohne Konto. Er bleibt, wie er ist, und gehört nicht zu `/api/v1`. |
 | D8 | Mehrere Instanzen | Eingehendes kommt am Hub an. Eine ungekoppelte Instanz verhält sich wie ein Hub (G5, Entscheidung 12 der Instanzkopplung). An einem Spiegel antwortet ein Schreibweg wie bisher mit 409. |
@@ -201,7 +201,7 @@ eine eigene ADR und kommt erst, wenn ein konkretes Fremdsystem nur OAuth kann.
   - `POST /api/v1/zugang/redeem`, mit dem Maschinenzähler je IP;
   - `GET /api/v1/instanz/jwks.json`;
   - `GET /api/v1/openapi.json`;
-  - der Einwurf (ADR-0022).
+  - der Einwurf (ADR-0023).
 
 **OpenAPI:**
 
@@ -409,7 +409,7 @@ Authorization: Machine …
   - Ein Ziel im LAN gibt es nur als bewusste Ausnahme am Abo, wie im Adapter-Rahmen (LLH-1632).
 - **Abgrenzung:** Der Ausgang an Menschen (E-Mail, Fax, Matrix; LLH-1197) ist ein anderer Weg.
 
-## Einwurf (D5, ADR-0022)
+## Einwurf (D5, ADR-0023)
 
 Gedacht für Absender, die nicht signieren können: BOSWatch 3 (nur GET mit Platzhaltern), FE2 mit
 „URL öffnen“, den Divera-Webhook und OsmAnd. Ein Beispiel für BOSWatch:
@@ -458,7 +458,7 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
   - Wo der Absender POST kann, nimmt er POST.
 - **Audit:** dieselben Aktionen wie beim Maschinenzugang.
 - **Verhältnis zu ADR-0014:** Der Einwurf ist eine Ausnahme zu dessen Regel, dass jede Maschine ein
-  Schlüsselpaar hat. ADR-0014 ist akzeptiert und damit unveränderlich. Wenn ADR-0022 akzeptiert
+  Schlüsselpaar hat. ADR-0014 ist akzeptiert und damit unveränderlich. Wenn ADR-0023 akzeptiert
   wird (LLH-1654), braucht ADR-0014 deshalb eine Nachfolgerin mit `ersetzt: ADR-0014`, die den
   Einwurf als Ausnahme nennt.
 
@@ -494,7 +494,7 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
 
 Am 11.11.2026 als Unteraufgaben von LLH-1148 angelegt, in dieser Reihenfolge:
 
-1. **LLH-1652 Maschinenzugang** (Route `entwurf`). ADR-0021 wird damit akzeptiert. Umfang:
+1. **LLH-1652 Maschinenzugang** (Route `entwurf`). ADR-0022 wird damit akzeptiert. Umfang:
    - Tabelle und Einlösen per Code
    - Extractor mit Scopes
    - Drosselung mit eigenem Zähler
@@ -505,7 +505,7 @@ Am 11.11.2026 als Unteraufgaben von LLH-1148 angelegt, in dieser Reihenfolge:
 2. **LLH-1653 Öffentliches OpenAPI-Dokument und Fehlercode** für `/api/v1`, mit Drift-Test.
 3. **LLH-1638 Lagemonitor:** Umstellung auf den Maschinenzugang, Umzug nach `/api/v1/lage`,
    Übergang für `llh_lm_`.
-4. **LLH-1654 Einwurf-Zugang** (ADR-0022) mit Maskierung, Doppelerkennung und Nachfolgerin für
+4. **LLH-1654 Einwurf-Zugang** (ADR-0023) mit Maskierung, Doppelerkennung und Nachfolgerin für
    ADR-0014. Ihn brauchen BOSWatch, FE2, Divera und OsmAnd.
 5. **LLH-1655 Outbox und Ereignis-Abruf** `GET /api/v1/events`, samt Leserouten für Einsätze.
 6. **LLH-1656 Webhooks aus der Outbox.**

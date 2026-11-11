@@ -1,5 +1,5 @@
 ---
-id: ADR-0021
+id: ADR-0022
 titel: Fremdsysteme sprechen signiert und mit festen Scopes mit der öffentlichen API unter /api/v1
 status: vorgeschlagen
 datum: 2026-11-11
@@ -14,7 +14,7 @@ herleitung:
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
 ---
 
-# ADR-0021: Fremdsysteme sprechen signiert und mit festen Scopes mit der öffentlichen API unter /api/v1
+# ADR-0022: Fremdsysteme sprechen signiert und mit festen Scopes mit der öffentlichen API unter /api/v1
 
 ## Regeln
 
@@ -27,7 +27,7 @@ herleitung:
   `Authorization: Machine`, Claims `iss`, `aud` (Instanz-UUID), `iat`, `exp`, `jti`, `htm`, `htu`,
   `bh`; geprüft in einem Extractor vor dem Handler.
 - MUST NOT: Eine Route unter `/api/v1/` nimmt ein Bearer-Token, ein Sitzungs-Cookie oder ein
-  geteiltes Geheimnis an; Ausnahme ist allein der Einwurf nach ADR-0022.
+  geteiltes Geheimnis an; Ausnahme ist allein der Einwurf nach ADR-0023.
 - MUST: Ein Zugang gehört genau einer Org und trägt feste Scopes; der Extractor prüft Signatur,
   Widerruf, Ablauf, Scope und Org. Einsatzbezogenes Lesen braucht die Freigabe der Einsatzleitung.
 - MUST: Eine gescheiterte Anmeldung antwortet 401 ohne Grund; der Grund steht am Zugang im
