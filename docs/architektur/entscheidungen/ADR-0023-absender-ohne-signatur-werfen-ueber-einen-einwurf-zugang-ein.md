@@ -22,8 +22,9 @@ herleitung:
 - MUST: Ein Einwurf schreibt nur in die Ablage seines Scopes (`alarmmeldungen:write` oder
   `positionen:write`) und nur für seine Org; er legt keinen Einsatz an und ändert keinen.
 - MUST NOT: Ein Einwurf liest etwas; die Antwort trägt außer Status und Fehler keine Daten.
-- MUST: Ein wiederholter Einwurf legt keinen zweiten Vorschlag an, sondern wird am bestehenden als
-  erneut empfangen vermerkt; still verworfen wird keiner.
+- MUST: Gleicher Inhalt desselben Zugangs innerhalb von 2 Minuten legt keinen zweiten Vorschlag an,
+  sondern wird am bestehenden als erneut empfangen vermerkt; später ergibt er einen neuen Vorschlag
+  mit Hinweis auf den früheren. Still verworfen wird keiner.
 - MUST: Ein Einwurf wird nur über TLS angenommen (`--tls` oder `X-Forwarded-Proto: https` vom
   vertrauten Proxy), sonst 403; Ausnahme nur per ausdrücklichem Schalter des Betreibers.
 - MUST: Antworten auf Einwürfe tragen `Cache-Control: no-store`.
