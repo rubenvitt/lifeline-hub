@@ -679,4 +679,32 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
         assert_eq!(erg.stand == l.bis, rueckt_vor, "katalog = {katalog}");
         sc.rollback().await.unwrap();
     }
+
+    // Der ältere Absender liefert wirklich, danach kommt er mit Update: Mit der nächsten Änderung
+    // des Einsatzes holt der Spiegel die übersprungene Zuordnung samt Sprechgruppe nach.
+    l.katalog = false;
+    let mut sc = s.begin().await.unwrap();
+    uebernehmen::uebernehmen(&mut sc, &empf, &l).await.unwrap();
+    sc.commit().await.unwrap();
+    let zuordnungen = "SELECT COUNT(*) FROM einsatzabschnitt_sprechgruppe z \
+         JOIN einsatzabschnitt a ON a.id = z.abschnitt_id JOIN einsatz e ON e.id = a.einsatz_id \
+         WHERE e.spiegel = 1";
+    assert_eq!(eine::<i64>(&s, zuordnungen).await, 0);
+    assert!(
+        eine::<Option<i64>>(&s, "SELECT katalog_ab FROM einsatz_spiegel")
+            .await
+            .is_some()
+    );
+    exec(
+        &f,
+        &format!("UPDATE einsatzabschnitt SET name = 'Nord 2' WHERE id = {abschnitt}"),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    assert_eq!(eine::<i64>(&s, zuordnungen).await, 1, "nachgeholt");
+    assert!(
+        eine::<Option<i64>>(&s, "SELECT katalog_ab FROM einsatz_spiegel")
+            .await
+            .is_none()
+    );
 }

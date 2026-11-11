@@ -294,6 +294,7 @@ async fn uebernehme_zeilen(
     // Ein Stand vor der ersten Zeile, die nicht übernommen wurde: der Führer liefert sie mit
     // dem nächsten Abgleich wieder, statt dass sie still fehlt (D7).
     let mut nachholen_ab: Option<i64> = None;
+    let mut katalog_ab: Option<i64> = None;
     for z in &wartend {
         let grund = fehler
             .get(&(z.art.as_str(), z.schluessel.as_str()))
@@ -303,9 +304,12 @@ async fn uebernehme_zeilen(
             "Zeile {} {} nicht übernommen: {grund}",
             z.art, z.schluessel
         ));
-        // Ein Absender vor LLH-1629 liefert die Katalogzeile nie nach: dort nicht darauf warten.
+        // Ein Absender vor LLH-1629 liefert die Katalogzeile nie nach: dort nicht darauf warten,
+        // sondern den Stand merken und nach seinem Update ab dort neu holen.
         if l.katalog || !katalog::OHNE_KATALOG.contains(&z.art.as_str()) {
             nachholen_ab = Some(nachholen_ab.map_or(z.stand, |n| n.min(z.stand)));
+        } else {
+            katalog_ab = Some(katalog_ab.map_or(z.stand, |n| n.min(z.stand)));
         }
     }
     for z in spaeter_loeschen {
@@ -353,6 +357,7 @@ async fn uebernehme_zeilen(
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
+    katalog::nach_update_neu_holen(conn, einsatz_id, l, katalog_ab).await?;
     ergebnis.stand = sqlx::query_scalar("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = ?")
         .bind(einsatz_id)
         .fetch_one(&mut *conn)

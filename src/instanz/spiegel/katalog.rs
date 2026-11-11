@@ -33,6 +33,40 @@ pub const OHNE_KATALOG: &[&str] = &[
     "fernmeldeskizze_komponente_sprechgruppe",
 ];
 
+/// Merkt den Stand der ersten Zuordnung, die ein älterer Absender ohne Katalogzeile geliefert hat
+/// (`katalog_ab`), und setzt den Stand des Spiegels darauf zurück, sobald derselbe Führer
+/// Katalogzeilen liefert: Die übersprungenen Zuordnungen kommen dann mit dem nächsten Abgleich
+/// erneut, samt ihrer Sprechgruppe.
+pub async fn nach_update_neu_holen(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    l: &super::paket::EinsatzLieferung,
+    katalog_ab: Option<i64>,
+) -> Result<(), sqlx::Error> {
+    if l.katalog {
+        // Lag die gemerkte Zeile schon in dieser Lieferung, ist sie neu übernommen worden.
+        sqlx::query(
+            "UPDATE einsatz_spiegel SET katalog_ab = NULL, \
+             stand = CASE WHEN ?1 >= katalog_ab THEN MIN(stand, katalog_ab - 1) ELSE stand END \
+             WHERE einsatz_id = ?2 AND katalog_ab IS NOT NULL",
+        )
+        .bind(l.seit)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    } else if let Some(ab) = katalog_ab {
+        sqlx::query(
+            "UPDATE einsatz_spiegel SET katalog_ab = MIN(COALESCE(katalog_ab, ?1), ?1) \
+             WHERE einsatz_id = ?2",
+        )
+        .bind(ab)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
 /// Gespiegelte Tabellen mit Katalogzeilen (`einsatz_id IS NULL`) und ihre Stammdatenart.
 const KATALOGE: &[(&str, StammdatenArt)] = &[("sprechgruppe", StammdatenArt::Sprechgruppe)];
 

@@ -18,6 +18,11 @@ CREATE TABLE spiegel_katalog (
     PRIMARY KEY (einsatz_id, art, fremder_schluessel)
 );
 
+-- Ein Absender vor LLH-1629 liefert die Katalogzeile nicht mit; der Spiegel rückt dann über die
+-- Zuordnungen ohne Bezug hinweg und merkt sich hier den Stand der ersten. Liefert der Absender nach
+-- seinem Update, setzt der Spiegel seinen Stand darauf zurück und bekommt sie erneut.
+ALTER TABLE einsatz_spiegel ADD COLUMN katalog_ab INTEGER;
+
 -- Ändert sich eine Katalog-Sprechgruppe, kommt sie ins Änderungslog jedes Einsatzes, der sie
 -- nutzt, damit eine Kopie am Spiegel nachzieht. Die Liste der Verweise prüft der Wächter
 -- `instanz::spiegel::katalog::tests::der_log_trigger_kennt_jeden_verweis_auf_sprechgruppen`.

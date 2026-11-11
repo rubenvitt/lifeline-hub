@@ -500,7 +500,10 @@ der Routen nachbauen und mit ihnen auseinanderlaufen.
   meldet dasselbe Protokoll, liefert die Katalogzeile aber nicht: Die Lieferung trägt deshalb
   `katalog: true`; fehlt das Feld, wartet der Spiegel nicht auf einen fehlenden Bezug der
   Sprechgruppen-Zuordnungen (`katalog::OHNE_KATALOG`), sonst bliebe sein Stand bis zum Update
-  stehen.
+  stehen. Den Stand der ersten übersprungenen Zuordnung merkt er in `einsatz_spiegel.katalog_ab`;
+  kommt vom selben Führer die erste Lieferung mit `katalog: true` (nach dessen Update, mit der
+  nächsten Änderung des Einsatzes), setzt er seinen Stand darauf zurück und holt die Zuordnungen
+  samt Sprechgruppe nach.
 - **10.11.2026, Review, offen (Folgeaufgaben):** Das Konto eines Antrags gegen die Orgs der Kopplung
   prüfen (die Route verlangt weiter eine Mitgliedschaft mit Schreibrecht), die Vergabe neuer
   Spiegel-IDs nach LFH-690, die Prüfsumme je Lieferung aus `anhang.sha256` statt aus dem Inhalt

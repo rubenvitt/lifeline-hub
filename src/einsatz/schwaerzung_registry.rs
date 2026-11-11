@@ -3160,6 +3160,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("letzter_abgleich_at", G_ZEIT),
             retain("hinweis", G_SPIEGEL),
             retain("beendet_at", G_ZEIT),
+            retain("katalog_ab", G_SPIEGEL),
         ],
     },
     TabellenRegel {
