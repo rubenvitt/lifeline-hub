@@ -1,3 +1,21 @@
+## [1.0.0-alpha.187](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.186...v1.0.0-alpha.187) (2026-11-11)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Dieses Release bringt eine Migration für die Sprechgruppen-Zuordnung bei gekoppelten Instanzen mit. Sie läuft beim ersten Start der neuen Version automatisch.
+- **Gekoppelte Instanzen mit unterschiedlichen Versionen:** Läuft die führende Instanz noch auf einer älteren Version, kann sie Sprechgruppen aus dem Katalog nicht mitliefern. Die gespiegelte Instanz übernimmt die übrigen Daten trotzdem. Die fehlenden Sprechgruppen-Zuordnungen holt sie automatisch nach, sobald die führende Instanz aktualisiert ist.
+
+### Kommunikation
+
+- **Sprechgruppen aus dem Katalog kommen auf gespiegelten Instanzen an:** Nutzt ein Einsatz Sprechgruppen aus dem Sprechgruppen-Katalog der Organisation, liefert die führende Instanz sie jetzt mit. Hat die gespiegelte Instanz dieselbe Sprechgruppe in ihrem eigenen Katalog, wird diese verwendet. Sonst legt sie eine Kopie als eigene Sprechgruppe an.
+- **Änderungen am Katalog werden weitergegeben:** Wird eine Sprechgruppe im Katalog geändert, erhalten alle Einsätze die Änderung, die diese Sprechgruppe nutzen. Auf der gespiegelten Instanz folgt nur eine dort neu angelegte Kopie den Änderungen. Eine dort schon vorhandene Sprechgruppe mit demselben Namen bleibt unverändert.
+- **Fernmeldeskizze:** Sprechgruppen, die nur in der Fernmeldeskizze vorkommen, werden jetzt ebenfalls an gespiegelte Instanzen übertragen.
+
+### Betrieb und Installation
+
+- **Abgleich gekoppelter Instanzen ist robuster:** Geht eine Antwort verloren oder kann eine Zeile nicht übernommen werden, bestätigt die gespiegelte Instanz den Empfang nur bis vor diese Zeile. So kommen beim nächsten Abgleich auch alle folgenden Daten erneut an, und es fehlt nichts still.
+- **Datenschutz:** Die neuen Katalogdaten auf gespiegelten Instanzen werden beim Schwärzen personenbezogener Daten berücksichtigt.
+
 ## [1.0.0-alpha.186](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.185...v1.0.0-alpha.186) (2026-11-11)
 
 ### Wichtige Änderungen
