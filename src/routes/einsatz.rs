@@ -383,8 +383,9 @@ where
 
 /// PUT /api/einsaetze/{id}/nachbereitung — Nachbereitungsfrist setzen, ändern oder aufheben
 /// (LLH-1494, design.md D1). Rechte wie der Frist-PUT: Einsatzleitung oder System-Admin der
-/// Einsatz-Org. Nur an einem abgeschlossenen Einsatz, der weder vorgemerkt noch geschwärzt noch
-/// übergeben ist (409); am Spiegel 409 aus dem Schutz. ETB-Eintrag mit altem und neuem Wert.
+/// Einsatz-Org. Nur an einem abgeschlossenen Einsatz (laufend 422), der weder vorgemerkt noch
+/// geschwärzt noch übergeben ist (409); am Spiegel 409 aus dem Schutz. Fehlt das Feld, 400.
+/// ETB-Eintrag mit altem und neuem Wert.
 pub async fn nachbereitung_setzen(
     State(state): State<AppState>,
     ctx: EinsatzKontext,

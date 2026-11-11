@@ -136,7 +136,7 @@ type KopfZeile = (String, Option<String>, Option<String>, Option<String>, bool);
 
 /// Setzt, ändert oder hebt die Nachbereitungsfrist auf, mit System-Eintrag im ETB, in einer
 /// Transaktion. `neu` ist bereits normalisiert. Unverändert → kein UPDATE und kein Eintrag.
-/// 409, wenn der Einsatz nicht abgeschlossen, vorgemerkt, geschwärzt oder schon übergeben ist.
+/// 422, solange der Einsatz läuft; 409, wenn er vorgemerkt, geschwärzt oder schon übergeben ist.
 pub async fn setzen(
     pool: &SqlitePool,
     einsatz_id: i64,
