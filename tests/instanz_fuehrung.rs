@@ -1767,9 +1767,11 @@ async fn bruch_nach_notuebernahme() -> (Instanz, Instanz, i64, i64, String) {
         "POST",
         &format!("/api/einsaetze/{e}/etb"),
         &erika,
-        Some(&json!({"von": "ELW 1", "an": "EL", "typ": "lage", "inhalt": "Nach dem Bruch",
+        Some(
+            &json!({"von": "ELW 1", "an": "EL", "typ": "lage", "inhalt": "Nach dem Bruch",
                      "ereigniszeit": "2026-11-11 09:30:00", "anhang_ids": [],
-                     "client_id": "bruch-etb-1"})),
+                     "client_id": "bruch-etb-1"}),
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -1778,9 +1780,11 @@ async fn bruch_nach_notuebernahme() -> (Instanz, Instanz, i64, i64, String) {
         "POST",
         &format!("/api/einsaetze/{e}/meldungen"),
         &erika,
-        Some(&json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+        Some(
+            &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                      "inhalt": "Deich hält", "ereigniszeit": "2026-11-11 09:40:00",
-                     "client_id": "bruch-meldung-1"})),
+                     "client_id": "bruch-meldung-1"}),
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -1837,9 +1841,16 @@ async fn etb_inhalte(i: &Instanz, einsatz: i64) -> Vec<String> {
 async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
     let (hub, elw, e, h, erika) = bruch_nach_notuebernahme().await;
     let liste = bruchstelle(&elw, &erika, e).await;
-    assert_eq!(liste.len(), 2, "ETB-Eintrag und Meldung, je eine Erfassung: {liste:?}");
+    assert_eq!(
+        liste.len(),
+        2,
+        "ETB-Eintrag und Meldung, je eine Erfassung: {liste:?}"
+    );
     assert_eq!(band_zaehlt(&elw, e).await, 2);
-    let etb_bruch = liste.iter().find(|l| l["tabelle"] == "etb_eintrag").unwrap();
+    let etb_bruch = liste
+        .iter()
+        .find(|l| l["tabelle"] == "etb_eintrag")
+        .unwrap();
     let meldung = liste.iter().find(|l| l["tabelle"] == "meldung").unwrap();
     assert_eq!(etb_bruch["antrag_art"], "etb");
     assert_eq!(etb_bruch["kurz"], "Nach dem Bruch");
@@ -1900,7 +1911,10 @@ async fn nach_der_notuebernahme_reicht_der_elw_genau_einmal_nach() {
     .fetch_one(&hub.pool)
     .await
     .unwrap();
-    assert!(zeit.starts_with("2026-11-11"), "Ereigniszeit von damals: {zeit}");
+    assert!(
+        zeit.starts_with("2026-11-11"),
+        "Ereigniszeit von damals: {zeit}"
+    );
     assert_eq!(
         etb_inhalte(&elw, e).await,
         am_hub,
@@ -1922,10 +1936,7 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
     let (hub, elw, e, h, erika) = bruch_nach_notuebernahme().await;
     let liste = bruchstelle(&elw, &erika, e).await;
     let id = |tabelle: &str| {
-        liste
-            .iter()
-            .find(|l| l["tabelle"] == tabelle)
-            .unwrap()["id"]
+        liste.iter().find(|l| l["tabelle"] == tabelle).unwrap()["id"]
             .as_i64()
             .unwrap()
     };
@@ -1944,13 +1955,11 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
     assert_eq!(band_zaehlt(&elw, e).await, 1);
 
     // Ein Antrag, den der Hub ablehnt (ohne „von“), macht den Eintrag wieder offen.
-    sqlx::query(
-        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.von', '') WHERE id = ?",
-    )
-    .bind(etb_id)
-    .execute(&elw.pool)
-    .await
-    .unwrap();
+    sqlx::query("UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.von', '') WHERE id = ?")
+        .bind(etb_id)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
@@ -1998,12 +2007,11 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
             .count(),
         1
     );
-    let antraege: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM spiegel_antrag WHERE client_id = 'bruch-etb-1'",
-    )
-    .fetch_one(&elw.pool)
-    .await
-    .unwrap();
+    let antraege: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM spiegel_antrag WHERE client_id = 'bruch-etb-1'")
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
     assert!(antraege <= 1, "der abgelehnte ist ersetzt");
     assert_eq!(band_zaehlt(&elw, e).await, 0);
 }
@@ -2011,7 +2019,9 @@ async fn verworfen_und_abgelehnt_bestimmen_den_zaehler() {
 #[tokio::test]
 async fn ohne_schreibrecht_kein_nachreichen() {
     let (_hub, elw, e, _h, erika) = bruch_nach_notuebernahme().await;
-    let id = bruchstelle(&elw, &erika, e).await[0]["id"].as_i64().unwrap();
+    let id = bruchstelle(&elw, &erika, e).await[0]["id"]
+        .as_i64()
+        .unwrap();
     // Die Mitgliedschaft ist gespiegelt: ändern nur unter dem Merker der Übernahme.
     let mut conn = elw.pool.acquire().await.unwrap();
     sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")

@@ -444,6 +444,29 @@ nicht übernommen“. Anträge, die beim Wechsel noch offen waren, führt die ne
 Installation genau einmal aus. Anhänge, die ihr noch fehlen, holt sie bei der bisherigen. Die
 Übergabe geht auch nach dem Einsatzabschluss, etwa zur Verwahrung am Hub.
 
+### Nicht übernommene Änderungen nachreichen
+
+„Nicht übernommen“ im Hinweisband klappt die Liste auf: eine Zeile je Erfassung, nach Zeit, mit
+Art, Absender und Inhalt. Was zu einer Erfassung gehört (der ETB-Eintrag einer Meldung), steht
+nicht eigens da, sondern als „+ n Zeilen“ an ihr. Den Inhalt sieht nur, wer das Modul der Zeile
+nutzen darf.
+
+- **Als Antrag stellen** gibt es für ETB-Einträge und Meldungen. Der Antrag geht im Namen
+  dessen, der klickt, an die führende Installation; Wortlaut und Zeit bleiben, die laufende
+  Nummer im ETB vergibt die führende. Er kommt dort genau einmal an, auch wenn er zweimal
+  gestellt wird. Lehnt die führende ihn ab, steht die Erfassung wieder in der Liste.
+- **Alle stellen** erscheint ab zwei solchen Erfassungen und stellt sie in der Reihenfolge ihrer
+  Zeit. Was noch nicht geht, etwa eine Meldung, deren Bezug die führende noch nicht kennt, bleibt
+  in der Liste; der Grund steht neben dem Knopf.
+- **Verwerfen** legt eine Erfassung nach der Rückfrage „Nicht nachreichen?“ ab. Alles andere
+  als ETB-Einträge und Meldungen (Personen, Lagekarte, Kräfte …) lässt sich nur so erledigen;
+  es ist hier gesichert, die führende Installation erfasst es bei Bedarf neu.
+
+Die Zahl im Band zählt nur, was weder gestellt noch verworfen ist. Stellen und Verwerfen
+braucht Schreibrecht im Einsatz. Ist der Abgleich beendet oder der Einsatz abgeschlossen, bleibt
+die Liste lesbar und Verwerfen möglich; stellen lässt sich dann nichts mehr. Nach dem Löschen
+oder Schwärzen des Einsatzes ist die Liste leer.
+
 ### Hinweise an einer Kopplung
 
 „Update nötig“ heißt, die Programmstände liegen zu weit auseinander; Melden geht weiter, sonst

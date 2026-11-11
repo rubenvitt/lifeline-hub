@@ -381,7 +381,11 @@ sequenceDiagram
 - Nach dem Wechsel liefert der neue Führer; der Kopf jeder Zeile trägt im Feld `gegen` den
   Schlüssel des Empfängers, damit Zeilen beider Seiten zusammenfinden. Was die abgelöste Seite
   nach der Bruchstelle schrieb, fragt sie beim Führer nach (`EinsatzStand.bruch`); was er nicht
-  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`.
+  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Zeilen, die aufeinander zeigen,
+  ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
+  Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
+  kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine
+  Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`).
 - Offene Anträge der neuen führenden Seite führt sie selbst aus (`antrag::fuehre_eigene_aus`),
   genau einmal; Anhänge, die ihr fehlen, holt sie beim alten Führer.
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht

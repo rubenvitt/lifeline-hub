@@ -188,10 +188,9 @@ pub async fn ordne_folgen(conn: &mut SqliteConnection, einsatz_id: i64) -> Resul
     }
     let mut eltern: HashMap<i64, i64> = HashMap::new();
     for (id, art, _, daten, gesichert, _) in &zeilen {
-        let (Some(t), Ok(Value::Object(d))) = (
-            schema.tabelle(art),
-            serde_json::from_str::<Value>(daten),
-        ) else {
+        let (Some(t), Ok(Value::Object(d))) =
+            (schema.tabelle(art), serde_json::from_str::<Value>(daten))
+        else {
             continue;
         };
         for sp in &t.spalten {
@@ -467,7 +466,10 @@ async fn body_der_zeile(
         match neuer_lokaler_schluessel(conn, einsatz_id, ziel, &wert).await? {
             Ok(None) => {}
             Ok(Some(neu)) => {
-                let neu = neu.parse::<i64>().map(Value::from).unwrap_or(Value::from(neu));
+                let neu = neu
+                    .parse::<i64>()
+                    .map(Value::from)
+                    .unwrap_or(Value::from(neu));
                 body.insert(v.pfad.to_string(), neu);
             }
             Err(()) if VERZICHTBAR.contains(&(tabelle, v.pfad)) => {
@@ -561,8 +563,16 @@ pub async fn stellen_tx(
     .bind(&client_id)
     .execute(&mut *conn)
     .await?;
-    let (id, zustand, neu) =
-        antrag::lege_an_tx(conn, b, einsatz_id, benutzer_id, &[], body, Some(&client_id)).await?;
+    let (id, zustand, neu) = antrag::lege_an_tx(
+        conn,
+        b,
+        einsatz_id,
+        benutzer_id,
+        &[],
+        body,
+        Some(&client_id),
+    )
+    .await?;
     sqlx::query(
         "UPDATE einsatz_bruchstelle SET erledigt = 'nachgereicht', erledigt_at = ?, \
          erledigt_von_id = ?, antrag_id = ?, client_id = ? WHERE id = ?",
@@ -716,7 +726,13 @@ mod tests {
     }
 
     /// Legt eine entfernte Zeile der Bruchstelle an; liefert ihre Kennung.
-    async fn gesichert(pool: &SqlitePool, e: i64, art: &str, schluessel: &str, daten: Value) -> i64 {
+    async fn gesichert(
+        pool: &SqlitePool,
+        e: i64,
+        art: &str,
+        schluessel: &str,
+        daten: Value,
+    ) -> i64 {
         sqlx::query_scalar(
             "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, daten, entfernt, \
              geklaert, gesichert_at) VALUES (?, ?, ?, 1, ?, 1, 1, '2026-11-11 10:00:00') \
@@ -790,9 +806,21 @@ mod tests {
         )
         .await;
         ordnen(&pool, e).await;
-        assert_eq!(folge_von(&pool, etb).await, Some(m), "ETB-Eintrag der Meldung");
-        assert_eq!(folge_von(&pool, m).await, None, "die Meldung ist der Ursprung");
-        assert_eq!(folge_von(&pool, berichtigung).await, None, "eigene Erfassung");
+        assert_eq!(
+            folge_von(&pool, etb).await,
+            Some(m),
+            "ETB-Eintrag der Meldung"
+        );
+        assert_eq!(
+            folge_von(&pool, m).await,
+            None,
+            "die Meldung ist der Ursprung"
+        );
+        assert_eq!(
+            folge_von(&pool, berichtigung).await,
+            None,
+            "eigene Erfassung"
+        );
 
         let liste = liste(&pool, e, alles).await.unwrap();
         let ids: Vec<i64> = liste.iter().map(|l| l.id).collect();
@@ -837,7 +865,10 @@ mod tests {
         let liste = liste(&pool, e, alles).await.unwrap();
         assert_eq!(liste.len(), 3);
         assert!(liste.iter().all(|l| l.antrag_art.is_none()), "{liste:?}");
-        let person = liste.iter().find(|l| l.tabelle == "einsatz_person").unwrap();
+        let person = liste
+            .iter()
+            .find(|l| l.tabelle == "einsatz_person")
+            .unwrap();
         assert_eq!(person.kurz.as_deref(), Some("Muster, Max"));
 
         // Ohne Freigabe des Moduls Personen kein Inhalt.

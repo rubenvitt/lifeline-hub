@@ -532,8 +532,13 @@ pub(super) async fn lege_an_tx(
     mut daten: Value,
     client_id_vorgabe: Option<&str>,
 ) -> Result<(i64, String, bool), AppError> {
-    if let (Some(feld), Some(vorgabe), Some(o)) = (b.client_id, client_id_vorgabe, daten.as_object_mut()) {
-        if o.get(feld).and_then(Value::as_str).is_none_or(|s| s.trim().is_empty()) {
+    if let (Some(feld), Some(vorgabe), Some(o)) =
+        (b.client_id, client_id_vorgabe, daten.as_object_mut())
+    {
+        if o.get(feld)
+            .and_then(Value::as_str)
+            .is_none_or(|s| s.trim().is_empty())
+        {
             o.insert(feld.to_string(), Value::from(vorgabe));
         }
     }
