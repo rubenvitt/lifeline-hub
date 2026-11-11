@@ -28,7 +28,7 @@ use crate::error::AppError;
 use serde::Serialize;
 use serde_json::{Map, Value};
 use sqlx::{SqliteConnection, SqlitePool};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use utoipa::ToSchema;
 
 /// Tabellen, deren neue Zeilen sich als Antrag nachreichen lassen (N1), mit der Art des Antrags.
@@ -220,20 +220,10 @@ pub async fn ordne_folgen(conn: &mut SqliteConnection, einsatz_id: i64) -> Resul
         }
     }
     // Ein Kreis (zwei Zeilen, die aufeinander zeigen und nicht ausgenommen sind) hätte keinen
-    // Ursprung: die kleinste Kennung im Kreis wird Ursprung.
+    // Ursprung: die kleinste Kennung im Kreis wird Ursprung. Nur die Zeilen ab dem Wiedereintritt
+    // gehören zum Kreis; eine Zeile auf dem Weg dorthin bleibt an ihm hängen.
     let ids: Vec<i64> = zeilen.iter().map(|z| z.0).collect();
-    for id in &ids {
-        let mut gesehen = HashSet::new();
-        let mut k = *id;
-        while let Some(e) = eltern.get(&k).copied() {
-            if !gesehen.insert(k) {
-                let kleinste = *gesehen.iter().min().unwrap_or(&k);
-                eltern.remove(&kleinste);
-                break;
-            }
-            k = e;
-        }
-    }
+    loese_kreise(&mut eltern, &ids);
     for (id, _, _, _, _, vorher) in &zeilen {
         let neu = eltern.get(id).copied();
         if neu != *vorher {
@@ -692,9 +682,35 @@ pub async fn quittung_uebernehmen(
     Ok(())
 }
 
+/// Bricht Kreise in `eltern` (Zeile → Ursprung): je Kreis verliert die kleinste Kennung ihren
+/// Ursprung. Zeilen auf dem Weg in einen Kreis bleiben angebunden.
+fn loese_kreise(eltern: &mut HashMap<i64, i64>, ids: &[i64]) {
+    for id in ids {
+        let mut weg: Vec<i64> = Vec::new();
+        let mut k = *id;
+        while let Some(e) = eltern.get(&k).copied() {
+            if let Some(pos) = weg.iter().position(|x| *x == k) {
+                let kleinste = *weg[pos..].iter().min().unwrap_or(&k);
+                eltern.remove(&kleinste);
+                break;
+            }
+            weg.push(k);
+            k = e;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ein_kreis_trennt_nur_seine_eigenen_zeilen() {
+        // 1 → 2, 2 → 3, 3 → 2: der Kreis ist 2 ↔ 3, Zeile 1 hängt an 2.
+        let mut eltern = HashMap::from([(1, 2), (2, 3), (3, 2)]);
+        loese_kreise(&mut eltern, &[1, 2, 3]);
+        assert_eq!(eltern, HashMap::from([(1, 2), (3, 2)]));
+    }
     use crate::einsatz::repo::{anlegen, NeuerEinsatzDaten};
 
     async fn einsatz(pool: &SqlitePool) -> i64 {

@@ -69,8 +69,7 @@ Lieferrichtung: Der neue Führer liefert ab Stand 0 und nennt zu jeder Zeile, di
 Führer bekam, dessen Schlüssel (`Zeile.gegen`), damit dort keine zweite Zeile entsteht. Offene
 Anträge eines Spiegels, der Führer wird, führt er selbst aus. Was der alte Führer nach dem
 letzten bestätigten Stand noch änderte (Notübernahme, Abgabe per Code), sichert er beim Wechsel
-als Bruchstelle (`einsatz_bruchstelle`) und entfernt, was der neue Führer nicht kennt. Von dort
-reicht er ETB-Einträge und Meldungen als Antrag nach, mit der ursprünglichen `client_id`; alles
-andere lässt sich nur verwerfen (LLH-1646). Fällt der
+als Bruchstelle (`einsatz_bruchstelle`), entfernt, was der neue Führer nicht kennt, und reicht
+davon ETB-Einträge und Meldungen als Antrag nach (LLH-1646, Laufzeitsicht 6.6c). Fällt der
 Schalter `LIFELINE_FUEHRUNG` nach einem Wechsel, bleibt der Stand eingefroren: Ein Spiegel wird
 nicht wieder beschreibbar, sonst schrieben zwei Instanzen.

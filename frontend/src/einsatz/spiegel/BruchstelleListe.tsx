@@ -63,7 +63,9 @@ export default function BruchstelleListe({ einsatz }: { einsatz: EinsatzAnzeige 
   const zeilenHoehe = token.controlHeight + 2 * token.paddingXXS + 1;
   return (
     <div data-lfh="spiegel-bruchstelle">
-      {stellen && stellbar >= 2 && (
+      {/* Das Ergebnis von „Alle stellen“ bleibt stehen, auch wenn danach nur noch eine
+          Erfassung stellbar ist und der Knopf verschwindet. */}
+      {((stellen && stellbar >= 2) || offenText) && (
         <div
           style={{
             display: 'flex',
@@ -73,9 +75,11 @@ export default function BruchstelleListe({ einsatz }: { einsatz: EinsatzAnzeige 
             paddingBlockEnd: token.paddingXXS,
           }}
         >
-          <Button loading={alle.isPending} onClick={() => alle.mutate()}>
-            Alle stellen
-          </Button>
+          {stellen && stellbar >= 2 && (
+            <Button loading={alle.isPending} onClick={() => alle.mutate()}>
+              Alle stellen
+            </Button>
+          )}
           {offenText && <Typography.Text type="warning">{offenText}</Typography.Text>}
         </div>
       )}

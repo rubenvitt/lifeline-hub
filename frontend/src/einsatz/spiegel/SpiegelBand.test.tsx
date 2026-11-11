@@ -312,6 +312,24 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
     ).toBeInTheDocument();
   });
 
+  it('der Grund bleibt stehen, wenn danach nur noch eine Erfassung stellbar ist', async () => {
+    mitBruchServer();
+    const { user, liste } = await bruchAufklappen();
+    // Nach „Alle stellen“ ist nur noch die Meldung offen.
+    server.use(
+      http.get('/api/einsaetze/1/bruchstelle', () =>
+        HttpResponse.json([bruchliste[1], bruchliste[2]]),
+      ),
+    );
+    await user.click(within(liste).getByRole('button', { name: 'Alle stellen' }));
+    await waitFor(() =>
+      expect(within(liste).queryByRole('button', { name: 'Alle stellen' })).toBeNull(),
+    );
+    expect(
+      within(liste).getByText('1 nicht gestellt: Bezug noch nicht beim Führer.'),
+    ).toBeInTheDocument();
+  });
+
   it('ohne zweite stellbare Erfassung kein „Alle stellen“', async () => {
     mitBruchServer([bruchliste[0], bruchliste[2]]);
     const { liste } = await bruchAufklappen(
