@@ -232,6 +232,7 @@ eine eigene ADR und kommt erst, wenn ein konkretes Fremdsystem nur OAuth kann.
 | --- | --- |
 | `unauthorized` | 401 |
 | `missing_scope` | 403 |
+| `tls_required` | 403 (Einwurf ohne TLS) |
 | `not_found` | 404 |
 | `invalid_field` | 400 |
 | `unprocessable` | 422 |
@@ -246,6 +247,7 @@ eine eigene ADR und kommt erst, wenn ein konkretes Fremdsystem nur OAuth kann.
 - Zeitpunkte in UTC im Format `zeit::FORMAT` (`2026-11-11 19:02:11`) mit Suffix `_at` (ADR-0012).
   Das Dokument nennt die Zone ausdrücklich. Ein Absender mit Zonenangabe rechnet im Adapter um.
 - Bodies höchstens 64 KiB.
+- Antworten tragen `Cache-Control: no-store`.
 - Kein CORS, also keine Browser-Clients von fremden Seiten.
 - Die v1-Routen unterliegen der Zulassung wie jede Route. Der Long-Poll liegt mit 25 s unter
   `REQUEST_BUDGET` (`src/zulassung.rs`) und braucht keine Ausnahme.
@@ -295,12 +297,26 @@ Claims des JWS (`aud` ist die Instanz-UUID aus dem Einlösen):
 | Status | Bedeutung |
 | --- | --- |
 | `201` | neu: `{"id": "…", "state": "offen"}` |
-| `200` | derselbe Schlüssel (Zugang, `external_id`) noch einmal, also Nachtrag oder Wiederholung; der Vorschlag wird aktualisiert |
+| `200` | bekannter Vorschlag (Zugang, `external_id`): Nachtrag übernommen oder Wiederholung erkannt, siehe unten |
 | `401 unauthorized` | Anmeldung gescheitert |
 | `403 missing_scope` | Scope fehlt |
 | `413 payload_too_large` | Body zu groß |
 | `422 unprocessable` | weder `stichwort` noch `meldung` |
 | `429 rate_limited` | gedrosselt |
+
+**Idempotenz und Reihenfolge:**
+
+- Der Vorschlag hängt am Schlüssel (Zugang, `external_id`). Jede einzelne Meldung dazu wird am
+  Hash ihres Bodys erkannt. Eine wiederholte Meldung ändert nichts und antwortet `200`. Damit
+  überschreibt auch ein verspäteter Retry der Erstmeldung keinen inzwischen verarbeiteten
+  Nachtrag.
+- Liefert der Absender eine fortlaufende `sequence` je `external_id`, wird eine Meldung mit
+  kleinerer `sequence` als die zuletzt übernommene nur in den Verlauf gelegt und nicht übernommen.
+  Ohne `sequence` gilt die Reihenfolge des Eingangs.
+- Jede Meldung bleibt im Verlauf des Vorschlags, bis die Fristen aus E5 sie löschen.
+- Hash, Verlauf und Änderung des Vorschlags werden in einer Transaktion geschrieben.
+- Ohne `external_id` gilt die Regel des Einwurfs (siehe unten): Wiederholungen werden am Vorschlag
+  vermerkt, nie still verworfen.
 
 **Fehlerstrategie für den Absender:**
 
@@ -347,6 +363,10 @@ Authorization: Machine …
 
 - `wait` hält den Abruf höchstens 25 s offen, bis etwas Neues da ist. Das ist ein Long-Poll, kein
   dritter Strom.
+- **Begrenzung der wartenden Abrufe:** Jeder wartende Abruf belegt einen Platz der Zulassung
+  (`MAX_GLEICHZEITIGE_REQUESTS`, `src/zulassung.rs`).
+  - Höchstens 32 Abrufe warten gleichzeitig, je Zugang höchstens einer.
+  - Darüber antwortet der Abruf sofort, ohne zu warten. Schreibanfragen behalten so ihre Plätze.
 - Ist der Cursor älter als sieben Tage, kommt `410 cursor_expired`. Der Client liest dann den
   Stand über `GET /api/v1/einsaetze` neu und fängt mit dem gelieferten Cursor wieder an.
 - Ohne Netz holt der Abrufer später nach (G8). Innerhalb der sieben Tage geht nichts verloren.
@@ -394,11 +414,25 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
   - Er schreibt nur in die Ablage seines Scopes (`alarmmeldungen:write` oder `positionen:write`)
     und nur für seine Org.
   - Er liest nichts. Die Antwort ist `204` oder ein Fehler, ohne Daten.
-- **Doppelte Einwürfe:** Wiederholt der Absender einen Aufruf, legt er keinen zweiten Vorschlag an.
+- **Doppelte Einwürfe:** Ein wiederholter Aufruf legt keinen zweiten Vorschlag an, verschwindet
+  aber auch nicht still.
   - Fehlt eine `external_id`, gelten gleicher Zugang, gleicher Inhalt und höchstens 2 Minuten
-    Abstand als Wiederholung.
-  - Erst ein ähnlicher Inhalt ergibt den Hinweis „möglicherweise derselbe Alarm“
+    Abstand als Wiederholung. Sie wird am bestehenden Vorschlag als „erneut empfangen“ mit Zeit
+    vermerkt (Zähler). POCSAG wiederholt Alarme absichtlich.
+  - Zwei echte Alarme mit gleichem Inhalt lassen sich ohne Kennung nicht unterscheiden. Der
+    Mensch sieht deshalb am Vorschlag, wie oft und wann er kam, und kann daraus einen zweiten
+    Einsatz anlegen.
+  - Ein nur ähnlicher Inhalt ergibt den Hinweis „möglicherweise derselbe Alarm“
     (Schnittstellen-Ausbau).
+- **Nur über TLS:**
+  - Der Einwurf nimmt Aufrufe nur an, wenn sie verschlüsselt ankommen: direkt mit `--tls` oder
+    vom vertrauten Proxy mit `X-Forwarded-Proto: https` (`weitergeleitet_als_https`,
+    `src/auth/session.rs`). Sonst antwortet er `403` mit dem Code `tls_required`.
+  - Reines HTTP gibt es nur mit einem ausdrücklichen Schalter des Betreibers für ein Tailnet, das
+    selbst verschlüsselt. Dann warnt der Admin-Bereich.
+- **Kein Cache:** Antworten tragen `Cache-Control: no-store`. Sonst könnte ein Cache die
+  `204`-Antwort eines GET wiederverwenden, und ein späterer Einwurf mit derselben URL ginge
+  verloren.
 - **Drosselung:** 30 Aufrufe je Minute und Zugang. Ein unbekannter Schlüssel zählt im
   Maschinenzähler je IP, nicht in der Anmeldesperre.
 - **Protokolle:**
@@ -434,7 +468,9 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
 
 - **Erreichbarkeit:**
   - Am Hub öffentlich, über TLS hinter dem Reverse-Proxy.
-  - Am ELW nur im LAN oder Tailnet.
+  - Am ELW nur im LAN oder Tailnet. Der Einwurf verlangt auch dort TLS (siehe Einwurf).
+    Signierte Anfragen verraten ohne TLS kein wiederverwendbares Geheimnis. Ihre Inhalte liest man
+    dann aber mit, deshalb gilt auch für sie: TLS, wo es geht.
   - Ein gekoppelter ELW nimmt keine Fremdsysteme an; das übernimmt der Hub (D8).
 - **Uhr:** ± 5 min wie bei Instanzen. `GET /api/v1/me` zeigt die Abweichung.
 - **Mehrere Prozesse:** Drosselung, Long-Poll und Webhook-Lauf leben in einem Prozess (R10). Mehrere
