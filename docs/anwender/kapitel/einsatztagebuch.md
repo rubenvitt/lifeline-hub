@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md]
 ---
 
 ## Überblick
@@ -58,7 +58,7 @@ Für Einsatzleitung und Führungspersonal:
    trägt seine Farbe als Rahmen, links als Kante wie die Zeitachse (eine Anordnung etwa orange). Ein Klick darauf wechselt den Typ. Schneller
    geht es mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
 3. „Von“ und „An“ prüfen. Beide sind mit dem persönlichen Standard-Rufnamen vorbelegt. Das Menü
-   eines Chips bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“; ein „@“ im
+   eines Chips (auch per Rechtsklick auf den Chip) bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“; ein „@“ im
    Text setzt ebenfalls einen Rufnamen ein.
 4. „Erfassen“ wählen oder Enter drücken. Auf einem Touch-Gerät erfasst erst Strg+Enter (⌘+Enter
    am Mac); Enter allein beginnt dort eine neue Zeile.
@@ -277,6 +277,16 @@ oder „Lage“ legt seine Meldung erst beim Senden an; wird er abgelehnt, etwa 
 Meldungen inzwischen gesperrt ist, bietet seine Zeile zusätzlich „Nur protokollieren“, und er geht
 ohne Meldung hinaus. Anhänge gehen nur mit Verbindung. Mehr dazu im
 Kapitel [Arbeiten ohne Netz](ohne-netz.md).
+
+### Rechtsklick auf Eintrag und Chip
+
+Ein Rechtsklick auf einen Eintrag öffnet dasselbe Menü wie „Aktionen zu Eintrag …“, ebenso die
+Kontextmenü-Taste oder **Umschalt+F10**, wenn der Fokus im Eintrag steht. An einer abgelehnten
+Zeile stehen darin „Erneut senden“, „Nur protokollieren“ (wenn die Zeile es anbietet) und rot
+„Verwerfen“, das wie der Knopf ohne Rückfrage verwirft. Auf die Chips der Erfassung wirkt der
+Rechtsklick wie ihr Menü. Ein vorgemerkter Eintrag, ein Eintrag ohne Aktion, ein Verweis und
+markierter Text behalten das Menü des Browsers. Am Tablet öffnet ein langer Druck im ETB kein
+Menü: Text bleibt markierbar, die Aktionen stehen im Menü „⋮“.
 
 ### Abgeschlossener Einsatz
 

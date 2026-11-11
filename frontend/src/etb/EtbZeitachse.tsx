@@ -15,7 +15,9 @@ import { Link } from 'react-router';
 import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import { funkprotokollFolge } from '../components/useFunkprotokollLauf';
-import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
+import { useKontextMenue, type KontextHandler } from '../components/useKontextMenue';
 import { useAlsUntereLeiste } from '../components/untereLeiste';
 import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
@@ -50,6 +52,13 @@ import { SYSTEM_RUFNAME } from './systemKennung';
 import { istNachgetragen } from './typFarben';
 import { verfasserText } from './verfasser';
 import {
+  fuehreZeilenWahlAus,
+  zeilenAktionen,
+  zeilenMenueName,
+  type ZeilenAufrufe,
+  type ZeilenRechte,
+} from './zeilenAktionen';
+import {
   type Berichtigungsindex,
   berichtigungsindex,
   buendleSystemfolgen,
@@ -64,7 +73,6 @@ import {
   zuflussText,
 } from './zeitachseModell';
 import { useDarfOriginalLaden } from '../einsatz/useDarfOriginalLaden';
-import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 
 interface Props {
   /** Gesendete und gepufferte Einträge als EINE Chronologie (`etb/etbZeile.ts`). */
@@ -449,12 +457,102 @@ export default function EtbZeitachse({
       auftragErteilen: (e) => handler.current.onAuftragErteilen?.(e),
       erneutSenden: (p) => handler.current.onErneutSenden?.(p),
       verwerfen: (p) => handler.current.onVerwerfen?.(p),
-      nurProtokollieren: handler.current.onNurProtokollieren
-        ? (p) => handler.current.onNurProtokollieren?.(p)
-        : undefined,
+      // Immer gesetzt: ob der Weg angeboten wird, sagt `rechte` (aktuelle Prop). Ein beim
+      // Einhängen eingefrorenes `undefined` stünde sonst als Eintrag ohne Wirkung da.
+      nurProtokollieren: (p) => handler.current.onNurProtokollieren?.(p),
     }),
     [],
   );
+  const kannBerichtigen = onBerichtigen != null;
+  const kannWiedervorlage = onWiedervorlage != null;
+  const kannAuftrag = onAuftragErteilen != null;
+  const nurProtokollierenAngeboten = onNurProtokollieren != null;
+  const rechte = useMemo<ZeilenRechte>(
+    () => ({
+      kannBerichtigen,
+      ...(berichtigenGesperrt ? { berichtigenGesperrt } : {}),
+      kannWiedervorlage,
+      kannAuftrag,
+      auftragGesperrt,
+      nurProtokollierenAngeboten,
+    }),
+    [
+      kannBerichtigen,
+      berichtigenGesperrt,
+      kannWiedervorlage,
+      kannAuftrag,
+      auftragGesperrt,
+      nurProtokollierenAngeboten,
+    ],
+  );
+
+  /*
+   * Kontextmenü (LLH-1597, Spec `datensatz-aktionsmenue`,
+   * `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md` D3/D4): ein Hook und ein Menü je
+   * Zeitachse, die Einträge aus derselben Liste wie ⋮ und Knöpfe. Kein langer Druck: am Tablet
+   * bleibt Text markierbar (abgestimmt mit Ruben am 09.11.2026).
+   */
+  const sichtbarNachSchluessel = useMemo(
+    () => new Map(sichtbar.map((z) => [z.schluessel, z])),
+    [sichtbar],
+  );
+  const [kontext, setKontext] = useState<{
+    schluessel: string;
+    offen: KontextMenueOffen;
+    /** Geht der Fokus beim Schließen in die Achse zurück? Beim Öffnen bestimmt (Ref im Handler). */
+    zurueckInAchse: boolean;
+  } | null>(null);
+  const kontextAusloeser = useKontextMenue<string>({
+    langerDruck: false,
+    onOeffnen: (schluessel, { anker, vorherFokus }) => {
+      const z = sichtbarNachSchluessel.get(schluessel);
+      if (z == null || zeilenAktionen(z, rechte).length === 0) return false;
+      // Sofort einfrieren: der Fokus kommt erst einen Commit später ins Menü (`betreten`), und ein
+      // Eintrag dazwischen verschöbe die Zeile unter dem Menü (D4).
+      setGefroren((vorher) => vorher ?? einfrieren(zeilen));
+      const zurueckInAchse =
+        vorherFokus instanceof HTMLElement &&
+        vorherFokus !== document.body &&
+        (wurzel.current?.contains(vorherFokus) ?? false);
+      setKontext({ schluessel, offen: { anker, vorherFokus }, zurueckInAchse });
+      return true;
+    },
+  });
+  const kontextZeile = kontext == null ? undefined : sichtbarNachSchluessel.get(kontext.schluessel);
+  const kontextListe = kontextZeile == null ? [] : zeilenAktionen(kontextZeile, rechte);
+  /*
+   * Schließen taut auf, wenn der Fokus nicht in die Achse zurückkehrt. Auf `verlassen` ist dabei
+   * kein Verlass: kam der Rechtsklick ohne Fokus in der Achse (Fokus auf `body`), fällt der Fokus
+   * mit dem ausgehängten Menü heraus, und dabei feuert kein `blur` (Firefox, Safari). `fokusDrin`
+   * bliebe wahr und die Achse eingefroren, auch nach dem Zurückrollen ans Ende.
+   */
+  const kontextZu = (k: { zurueckInAchse: boolean }) => {
+    setKontext(null);
+    if (k.zurueckInAchse) return;
+    setFokusDrin(false);
+    if (amEnde) setGefroren(null);
+  };
+  // Verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü (abgeleiteter
+  // Zustand wie in `Datensicht`).
+  if (kontext != null && kontextListe.length === 0) kontextZu(kontext);
+  const kontextSchliessen = () => {
+    if (kontext != null) kontextZu(kontext);
+  };
+  /*
+   * Kehrt der Fokus in die Achse zurück, prüft das erst der Commit: verlor die Zeile ihre
+   * Aktionen, ist ihr ⋮ (das Fokusziel) mit dem Menü ausgehängt, und der Fokus fällt heraus,
+   * ebenfalls ohne `blur`.
+   */
+  const letzterKontext = useRef(kontext);
+  useLayoutEffect(() => {
+    const vorher = letzterKontext.current;
+    letzterKontext.current = kontext;
+    if (kontext != null || vorher == null || !vorher.zurueckInAchse) return;
+    if (vorher.offen.vorherFokus?.isConnected) return;
+    setFokusDrin(false);
+    if (amEnde) setGefroren(null);
+  }, [kontext, amEnde]);
+
   const zeile = (z: EtbZeile) => (
     <EtbZeitachsenZeile
       key={z.schluessel}
@@ -465,12 +563,9 @@ export default function EtbZeitachse({
       index={index}
       dokumente={z.art === 'eintrag' ? dokumente?.get(z.eintrag.id) : undefined}
       darfOriginal={darfOriginal}
-      kannBerichtigen={onBerichtigen != null}
-      berichtigenGesperrt={berichtigenGesperrt}
-      kannWiedervorlage={onWiedervorlage != null}
-      kannAuftrag={onAuftragErteilen != null}
-      auftragGesperrt={auftragGesperrt}
+      rechte={rechte}
       aufrufe={aufrufe}
+      kontext={kontextAusloeser}
       fehler={z.art === 'abgelehnt' ? (zeilenFehler?.(z.schluessel) ?? null) : null}
     />
   );
@@ -565,6 +660,17 @@ export default function EtbZeitachse({
       style={{ position: 'relative' }}
     >
       {inhalt}
+      {/* In der Wurzel: der Fokus im Menü (Portal) steigt im React-Baum zu `betreten` auf und
+          hält die Achse wie jeder Fokus in ihr (D4). */}
+      {kontextZeile != null && (
+        <KontextMenue
+          offen={kontext?.offen ?? null}
+          eintraege={kontextListe}
+          zugaenglicherName={zeilenMenueName(kontextZeile)}
+          onWahl={(key) => fuehreZeilenWahlAus(kontextZeile, key, aufrufe)}
+          onSchliessen={kontextSchliessen}
+        />
+      )}
       {/* Überlagerung mit Nullhöhe am UNTEREN Rand (LLH-1149): neue Einträge kommen unten an,
           das Banner klebt dort über der angepinnten Erfassung (`--lfh-etb-fokusabstand`, ihre
           gemessene Höhe) und nimmt keinen Platz im Fluss. „Nach oben“ steht rechts darüber,
@@ -640,16 +746,8 @@ export default function EtbZeitachse({
   );
 }
 
-/** Die stabilen Aufrufer einer Zeile — sie lesen den aktuellen Handler der Zeitachse. */
-interface ZeilenAufrufe {
-  berichtigen: (e: EtbEintragAnzeige) => void;
-  wiedervorlage: (e: EtbEintragAnzeige) => void;
-  auftragErteilen: (e: EtbEintragAnzeige) => void;
-  erneutSenden: (p: AbgelehnterEintrag) => void;
-  verwerfen: (p: AbgelehnterEintrag) => void;
-  /** Fehlt, wenn die Seite den Weg nicht anbietet. */
-  nurProtokollieren?: (p: AbgelehnterEintrag) => void;
-}
+/** Handler-Fabrik des Kontextmenüs, je Zeitachse eine (stabil, `useKontextMenue`). */
+type KontextFabrik = <E extends Element = Element>(schluessel: string) => KontextHandler<E>;
 
 interface ZeilenProps {
   z: EtbZeile;
@@ -660,12 +758,11 @@ interface ZeilenProps {
   index: Berichtigungsindex;
   dokumente?: readonly EtbDokument[];
   darfOriginal: boolean;
-  kannBerichtigen: boolean;
-  berichtigenGesperrt?: string;
-  kannWiedervorlage: boolean;
-  kannAuftrag: boolean;
-  auftragGesperrt: boolean;
+  /** Welche Wege die Seite anbietet (gemerkt, je Zeitachse gleich). */
+  rechte: ZeilenRechte;
   aufrufe: ZeilenAufrufe;
+  /** Rechtsklick und Tasten öffnen das Kontextmenü der Zeitachse (LLH-1597). */
+  kontext: KontextFabrik;
   /** Grund eines gescheiterten „Erneut senden“; derselbe Wert, solange er steht (`memo`). */
   fehler: ZeilenGrund | null;
 }
@@ -683,16 +780,15 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   index,
   dokumente,
   darfOriginal,
-  kannBerichtigen,
-  berichtigenGesperrt,
-  kannWiedervorlage,
-  kannAuftrag,
-  auftragGesperrt,
+  rechte,
   aufrufe,
+  kontext,
   fehler,
 }: ZeilenProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
+  // EINE Liste für ⋮, Knöpfe und Kontextmenü (LLH-1597, `etb/zeilenAktionen.ts`).
+  const liste = zeilenAktionen(z, rechte);
 
   function aktionen(): ReactNode {
     if (z.art === 'abgelehnt') {
@@ -700,58 +796,28 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
       // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
       return (
         <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
-          <Button onClick={() => aufrufe.erneutSenden(z.puffer)}>Erneut senden</Button>
-          {z.puffer.eintrag.in_meldungseingang === true && aufrufe.nurProtokollieren && (
-            <Button onClick={() => aufrufe.nurProtokollieren?.(z.puffer)}>
-              Nur protokollieren
+          {liste.map((a) => (
+            <Button
+              key={a.key}
+              danger={a.gefahr}
+              onClick={() => fuehreZeilenWahlAus(z, a.key, aufrufe)}
+            >
+              {a.label}
             </Button>
-          )}
-          <Button danger onClick={() => aufrufe.verwerfen(z.puffer)}>
-            Verwerfen
-          </Button>
+          ))}
         </Space>
       );
     }
-    // Ausstehend: noch nicht im Tagebuch — nichts zu berichtigen, nichts zu beauftragen.
-    if (z.art === 'ausstehend') return null;
-    const e = z.eintrag;
-    const eintraege: MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[] = [
-      ...(kannBerichtigen
-        ? [
-            {
-              key: 'berichtigen' as const,
-              label: berichtigenGesperrt ? `Berichtigen (${berichtigenGesperrt})` : 'Berichtigen',
-              ...(berichtigenGesperrt ? { gesperrt: true as const } : {}),
-            },
-          ]
-        : []),
-      ...(kannWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
-      ...(kannAuftrag
-        ? [
-            auftragGesperrt
-              ? {
-                  key: 'auftrag' as const,
-                  label: `Auftrag erteilen (${KEINE_BERECHTIGUNG})`,
-                  gesperrt: true as const,
-                }
-              : { key: 'auftrag' as const, label: 'Auftrag erteilen' },
-          ]
-        : []),
-    ];
-    // Auch hier, nicht nur im Baustein: `Zeitachseneintrag` zeigt seine Fußzeile, sobald
-    // `aktionen` nicht `null` ist.
-    if (eintraege.length === 0) return null;
+    // Ausstehend hat keine Einträge (`zeilenAktionen`). Auch hier, nicht nur im Baustein:
+    // `Zeitachseneintrag` zeigt seine Fußzeile, sobald `aktionen` nicht `null` ist.
+    if (z.art !== 'eintrag' || liste.length === 0) return null;
     // Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
     // auseinanderzuhalten.
     return (
       <MenueAusloeser
-        eintraege={eintraege}
-        zugaenglicherName={`Aktionen zu Eintrag ${e.lfd_nr}`}
-        onWahl={(key) => {
-          if (key === 'berichtigen') aufrufe.berichtigen(e);
-          if (key === 'wiedervorlage') aufrufe.wiedervorlage(e);
-          if (key === 'auftrag') aufrufe.auftragErteilen(e);
-        }}
+        eintraege={liste}
+        zugaenglicherName={zeilenMenueName(z)}
+        onWahl={(key) => fuehreZeilenWahlAus(z, key, aufrufe)}
       />
     );
   }
@@ -859,6 +925,8 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
       'data-testid': 'etb-ereigniszeile',
       'data-zeile': z.schluessel,
       className: klassen || undefined,
+      // Ohne Einträge keine Handler: das Browsermenü bleibt (vorgemerkt, Lesende).
+      ...(liste.length > 0 ? kontext<HTMLElement>(z.schluessel) : {}),
       // Das Menü steht in `kompakt` in der Kopfzeile; die Entscheidung einer abgelehnten Zeile
       // bleibt rechts (LFH-958, `Zeitachseneintrag`).
       ...(z.art === 'abgelehnt' ? { aktionen: aktionen() } : { menue: aktionen() }),
