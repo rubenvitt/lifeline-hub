@@ -712,6 +712,7 @@ mod tests {
         )
         .await
         .unwrap()
+        .id
     }
 
     /// Legt eine entfernte Zeile der Bruchstelle an; liefert ihre Kennung.
@@ -869,6 +870,7 @@ mod tests {
             stellen_tx(&mut conn, e, b, 1).await,
             Err(AppError::Conflict(_))
         ));
+        drop(conn);
         assert!(matches!(
             verwerfen(&pool, e + 1, b, 1).await,
             Err(AppError::NotFound)
