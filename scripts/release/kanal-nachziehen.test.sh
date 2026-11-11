@@ -22,6 +22,17 @@ export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.invalid
 export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.invalid
 unset GITHUB_OUTPUT
 
+# Ersetzen an Ort und Stelle ohne `sed -i`: dessen Schreibweise unterscheidet sich zwischen GNU
+# und BSD/macOS, das Gate läuft auf beiden.
+ersetze() { # <sed-Ausdruck> <datei>…
+  local ausdruck="$1" datei
+  shift
+  for datei in "$@"; do
+    sed "$ausdruck" "$datei" > "$datei.neu"
+    mv "$datei.neu" "$datei"
+  done
+}
+
 pruefe() { # <name> <erwartet> <gemessen>
   if [ "$2" = "$3" ]; then
     echo "  ok   $1"
@@ -76,15 +87,19 @@ git -C "$KLON" commit -q -m "chore: anfang"
 
 # Stellt den Versions-Commit von semantic-release nach: Version in den drei Dateien, Eintrag
 # oben im CHANGELOG, Tag, Push. Arbeitet auf dem ausgecheckten Branch.
-release() { # <version>
-  local v="$1" alt
+release() { # <version> [annotiert]
+  local v="$1" art="${2:-}" alt
   alt="$(awk '/^\[workspace.package\]/{im=1} im && /^version/{gsub(/.*= "|"/,""); print; exit}' "$KLON/Cargo.toml")"
-  sed -i "s/^version = \"$alt\"$/version = \"$v\"/" "$KLON/Cargo.toml" "$KLON/Cargo.lock"
-  sed -i "s/^  \"version\": \"$alt\",$/  \"version\": \"$v\",/" "$KLON/frontend/package.json"
+  ersetze "s/^version = \"$alt\"$/version = \"$v\"/" "$KLON/Cargo.toml" "$KLON/Cargo.lock"
+  ersetze "s/^  \"version\": \"$alt\",$/  \"version\": \"$v\",/" "$KLON/frontend/package.json"
   { printf '# Changelog\n\n## %s\n' "$v"; tail -n +2 "$KLON/CHANGELOG.md"; } > "$KLON/CHANGELOG.neu"
   mv "$KLON/CHANGELOG.neu" "$KLON/CHANGELOG.md"
   git -C "$KLON" commit -q -am "chore(release): $v [skip ci]"
-  git -C "$KLON" tag "v$v"
+  if [ "$art" = annotiert ]; then
+    git -C "$KLON" tag -a -m "v$v" "v$v"
+  else
+    git -C "$KLON" tag "v$v"
+  fi
   git -C "$KLON" push -q origin HEAD "v$v"
 }
 
@@ -102,18 +117,22 @@ echo "==> Kanal-nachziehen-Selbsttest"
 release 1.0.0-alpha.1
 printf 'zeile eins\nzeile zwei geändert\n' > "$KLON/src/code.txt"
 git -C "$KLON" commit -q -am "fix: zwei"
-release 1.0.0-alpha.2
+# alpha.2 mit annotiertem Tag: das Skript muss ihn auf den Commit auflösen.
+release 1.0.0-alpha.2 annotiert
 
 # 1 — Unzulässige Angaben brechen ab, bevor irgendetwas geschrieben wird.
 lauf v1.0.0-beta.1 > /dev/null; pruefe "Beta-Tag als Quelle abgelehnt" 1 "$LAUF_RC"
 lauf 'v1.0.0-alpha.2; rm -rf /' > /dev/null; pruefe "freie Eingabe abgelehnt" 1 "$LAUF_RC"
 lauf v1.0.0-alpha.99 > /dev/null; pruefe "unbekannter Tag abgelehnt" 1 "$LAUF_RC"
 lauf v1.0.0-alpha.2 --ziel main > /dev/null; pruefe "Ziel main abgelehnt" 1 "$LAUF_RC"
+git -C "$KLON" tag v1.0.0-alpha.77 'HEAD^{tree}'
+git -C "$KLON" push -q origin v1.0.0-alpha.77
+lauf v1.0.0-alpha.77 > /dev/null; pruefe "Tag ohne Commit abgelehnt" 1 "$LAUF_RC"
 pruefe "nichts geschrieben" keiner "$(remote_beta)"
 
 # 2 — Erstes Mal: beta entsteht genau auf dem Tag.
 pruefe "beta angelegt" "ergebnis=angelegt" "$(lauf v1.0.0-alpha.2)"
-pruefe "beta steht auf alpha.2" "$(git -C "$KLON" rev-parse 'v1.0.0-alpha.2^{commit}')" "$(remote_beta)"
+pruefe "beta steht auf dem Commit von alpha.2 (annotierter Tag)" "$(git -C "$KLON" rev-parse 'v1.0.0-alpha.2^{commit}')" "$(remote_beta)"
 
 # 3 — Derselbe Tag noch einmal: nichts zu tun.
 pruefe "derselbe Tag ist aktuell" "ergebnis=aktuell" "$(lauf v1.0.0-alpha.2)"
@@ -125,7 +144,7 @@ git -C "$KLON" checkout -q -b beta origin/beta
 release 1.0.0-beta.1
 git -C "$KLON" checkout -q alpha
 printf 'zeile eins neu\nzeile zwei geändert\n' > "$KLON/src/code.txt"
-sed -i 's/^foo = "1"$/foo = "2"/' "$KLON/Cargo.toml"
+ersetze 's/^foo = "1"$/foo = "2"/' "$KLON/Cargo.toml"
 git -C "$KLON" commit -q -am "feat: eins, foo 2"
 release 1.0.0-alpha.3
 
@@ -149,7 +168,7 @@ pruefe "Fremde Crate im Lockfile unberührt" 1 "$(remote_datei Cargo.lock | grep
 pruefe "Frontend-Version bleibt beta.1" 1 "$(remote_datei frontend/package.json | grep -c '"version": "1.0.0-beta.1"')"
 pruefe "keine Alpha-Version auf beta" 0 "$(remote_datei Cargo.toml | grep -c alpha || true)"
 pruefe "CHANGELOG von beta" "## 1.0.0-beta.1" "$(remote_datei CHANGELOG.md | sed -n 3p)"
-pruefe "Merge-Commit mit zwei Eltern" 2 "$(git --git-dir="$REMOTE" log -1 --format=%p beta | wc -w)"
+pruefe "Merge-Commit mit zwei Eltern" 2 "$(( $(git --git-dir="$REMOTE" log -1 --format=%p beta | wc -w) ))"
 pruefe "alpha.3 ist jetzt in beta enthalten" ja \
   "$(git --git-dir="$REMOTE" merge-base --is-ancestor v1.0.0-alpha.3 beta && echo ja || echo nein)"
 
@@ -171,18 +190,18 @@ pruefe "Version bleibt beta.2" 1 "$(remote_datei Cargo.toml | grep -c '^version 
 # Abbruch, beta bleibt unverändert.
 git -C "$KLON" checkout -q beta
 git -C "$KLON" pull -q --ff-only origin beta
-sed -i 's/^zeile drei$/zeile drei auf beta/' "$KLON/src/code.txt"
+ersetze 's/^zeile drei$/zeile drei auf beta/' "$KLON/src/code.txt"
 git -C "$KLON" commit -q -am "fix: direkt auf beta"
 git -C "$KLON" push -q origin beta
 git -C "$KLON" checkout -q alpha
-sed -i 's/^zeile drei$/zeile drei auf alpha/' "$KLON/src/code.txt"
+ersetze 's/^zeile drei$/zeile drei auf alpha/' "$KLON/src/code.txt"
 git -C "$KLON" commit -q -am "fix: drei"
 release 1.0.0-alpha.5
 vorher="$(remote_beta)"
 lauf v1.0.0-alpha.5 > /dev/null
 pruefe "echter Konflikt bricht ab" 1 "$LAUF_RC"
 pruefe "beta bleibt nach dem Konflikt stehen" "$vorher" "$(remote_beta)"
-pruefe "kein Arbeitsverzeichnis bleibt hängen" 1 "$(git -C "$KLON" worktree list | wc -l)"
+pruefe "kein Arbeitsverzeichnis bleibt hängen" 1 "$(( $(git -C "$KLON" worktree list | wc -l) ))"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> $fehler Fall/Fälle rot." >&2

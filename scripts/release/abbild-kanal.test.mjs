@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { abbildTag } from './abbild-kanal.mjs';
+import { abbildTag, neuestesImKanal } from './abbild-kanal.mjs';
 
 test('stabil → latest, Alpha → alpha, Beta → beta', () => {
   assert.equal(abbildTag({ tag: 'v1.0.0', veroeffentlicht: ['v1.0.0'] }), 'latest');
@@ -33,4 +33,14 @@ test('Kanäle zählen parallel: eine Beta hält Alpha nicht auf und umgekehrt', 
 test('Leerzeilen und Fremdes in der Liste stören nicht, kaputter Tag bricht ab', () => {
   assert.equal(abbildTag({ tag: 'v1.0.0-beta.2', veroeffentlicht: ['', 'desktop-beta', 'v1.0.0-beta.1'] }), 'beta');
   assert.throws(() => abbildTag({ tag: '1.0.0', veroeffentlicht: [] }), /Kein zulässiger Release-Tag/);
+});
+
+test('neuestes Release im Kanal: für die Gegenprobe nach dem Umhängen', () => {
+  const liste = ['v1.0.0-alpha.9', 'v1.0.0-alpha.10', 'v1.0.0-beta.2', 'v1.0.0', 'v1.0.0-rc.1', '', 'desktop-alpha'];
+  assert.equal(neuestesImKanal({ tag: 'v1.0.0-alpha.9', veroeffentlicht: liste }), 'v1.0.0-alpha.10');
+  assert.equal(neuestesImKanal({ tag: 'v1.0.0-beta.1', veroeffentlicht: liste }), 'v1.0.0-beta.2');
+  assert.equal(neuestesImKanal({ tag: 'v0.9.0', veroeffentlicht: liste }), 'v1.0.0');
+  // Nichts Neueres (oder die eigene Freigabe ist die neueste): der Tag selbst.
+  assert.equal(neuestesImKanal({ tag: 'v1.0.0-alpha.11', veroeffentlicht: liste }), 'v1.0.0-alpha.11');
+  assert.equal(neuestesImKanal({ tag: 'v1.0.0-beta.2', veroeffentlicht: liste }), 'v1.0.0-beta.2');
 });

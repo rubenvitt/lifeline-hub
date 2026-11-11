@@ -152,7 +152,7 @@ git worktree add -q --detach "$ARBEIT" "$QUELLE"
   fi
   # Gegenprobe: die Versionsdateien sind die des Ziels, nicht die der Alpha.
   if ! git diff --quiet "$ZIEL_REF" HEAD -- CHANGELOG.md \
-      || [ "$(git grep -c -F "$ALPHA_VERSION" HEAD -- Cargo.toml Cargo.lock frontend/package.json | wc -l)" != 0 ]; then
+      || git grep -q -F "$ALPHA_VERSION" HEAD -- Cargo.toml Cargo.lock frontend/package.json; then
     melde "FEHLER: Nach dem Merge tragen die Versionsdateien nicht den Stand von $ZIEL."
     exit 1
   fi
