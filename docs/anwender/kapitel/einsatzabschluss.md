@@ -67,7 +67,8 @@ durchsehen: was danach fehlt, lässt sich nicht mehr nachtragen.
 - Hat die Organisation Vorgaben je Datenkategorie, entstehen daraus die Fristen für
   Behandlung, Personenauskunft und Anhänge dieses Einsatzes.
 - Hat die Organisation eine Nachbereitung in Tagen, setzt der Abschluss ihr Ende auf Abschluss
-  plus Dauer. Das Einsatztagebuch hält das fest. Danach übergibt ein ELW den Einsatz dem Hub.
+  plus Dauer. Das Einsatztagebuch hält das fest. Danach übergibt ein ELW, der mit einem Hub
+  gekoppelt ist, den Einsatz dem Hub; ohne Kopplung bleibt er, wo er ist.
 
 Nur Aufbewahrungsfrist und Nachbereitung lassen sich danach noch ändern; das Kapitel
 [Aufbewahrung](aufbewahrung.md) beschreibt den Weg und die Folgen.

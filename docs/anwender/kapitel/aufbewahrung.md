@@ -141,7 +141,9 @@ Mit dem Ende der Nachbereitung gilt an einem ELW, der mit einem Hub gekoppelt is
   bestätigt, löscht der ELW den Einsatz; im Löschprotokoll bleibt eine Zeile mit der Nummer.
 - **Fehlt dem Hub noch etwas**, etwa ein neuerer Stand oder ein Anhang, wartet die Übergabe.
   Das Paneel „Nachbereitung“ nennt dann „Wartet auf …“ und den Grund; fehlende Anhänge holt der
-  Hub zuerst. Nichts geht verloren, solange der Hub nicht bestätigt hat.
+  Hub zuerst. Solange der Hub nicht bestätigt hat, bleibt der Einsatz am ELW. Läuft in dieser
+  Zeit seine Aufbewahrungsfrist ab, geht die Frist vor: der ELW merkt ihn zur Löschung vor und
+  schwärzt ihn wie jeden anderen Einsatz.
 - **Nicht übergeben** wird ein Einsatz, der zur Löschung vorgemerkt oder geschwärzt ist oder ein
   offenes Löschersuchen hat.
 - **Spiegel von Einsätzen des Hubs** löscht der ELW nach dem Ende der Nachbereitung, sobald kein

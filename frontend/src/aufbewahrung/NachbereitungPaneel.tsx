@@ -111,6 +111,7 @@ export default function NachbereitungPaneel({ einsatzId, einsatz }: Props) {
         initialValues={{ bis: alsZeitpunkt(bis) ?? null, ohne: false }}
         erfassenText={ohne ? 'Frist aufheben' : 'Frist setzen'}
         laeuft={mutation.isPending}
+        speicherung={mutation}
         onErfassen={async (werte) => {
           if (werte.ohne) {
             await mutation.mutateAsync({ nachbereitung_bis: null });
@@ -133,7 +134,6 @@ export default function NachbereitungPaneel({ einsatzId, einsatz }: Props) {
         <Form.Item label="Ohne Nachbereitung" name="ohne" valuePropName="checked">
           <Switch />
         </Form.Item>
-        <SpeicherFehler fehler={offen ? mutation.error : null} />
       </ErfassungsModal>
     </Paneel>
   );

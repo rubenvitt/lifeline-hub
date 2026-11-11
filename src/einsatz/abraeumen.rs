@@ -61,7 +61,8 @@ pub async fn vorgemerkte(pool: &SqlitePool) -> Result<Vec<i64>, AppError> {
 
 /// Spiegel an der meldenden Seite, deren Nachbereitung zu `jetzt` abgelaufen ist (D5), mit dem
 /// Namen der Gegenstelle. Ausgenommen sind Spiegel mit einem Antrag, der noch aussteht oder
-/// zugestellt ist: die Antwort des Führers soll ankommen. Ein Spiegel am Hub (erreichte Seite)
+/// zugestellt ist: die Antwort des Führers soll ankommen, und ein beendeter Spiegel (Widerruf):
+/// er bleibt ohne Kopplung lesbar, kein Führer meldet mehr sein Ende. Ein Spiegel am Hub (erreichte Seite)
 /// ist nie dabei; er endet über Verwahrung oder Lebensende.
 pub async fn faellige_spiegel(
     pool: &SqlitePool,
@@ -73,6 +74,7 @@ pub async fn faellige_spiegel(
            JOIN instanz_kopplung_org ko ON ko.id = sp.kopplung_org_id \
            JOIN instanz_kopplung k ON k.id = ko.kopplung_id \
          WHERE k.richtung = 'meldet_sich' AND e.status = ?1 \
+           AND sp.beendet_at IS NULL AND ko.widerrufen_at IS NULL \
            AND e.nachbereitung_bis GLOB \
                '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' \
            AND ?2 >= e.nachbereitung_bis \

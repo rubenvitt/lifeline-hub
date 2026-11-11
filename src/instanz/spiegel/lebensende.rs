@@ -255,6 +255,23 @@ pub async fn verwahrung_annehmen(
         };
         return Ok(Some((wartet(&l.kennung, grund), None)));
     }
+    // Ein offener Antrag soll seine Antwort noch bekommen; der Führer quittiert ihn im nächsten
+    // Abgleich (am abgeschlossenen Einsatz meist als Ablehnung).
+    let offen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM spiegel_antrag WHERE einsatz_id = ? \
+         AND zustand IN ('ausstehend', 'zugestellt')",
+    )
+    .bind(id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if offen > 0 {
+        let grund = if offen == 1 {
+            "1 Antrag offen".to_string()
+        } else {
+            format!("{offen} Anträge offen")
+        };
+        return Ok(Some((wartet(&l.kennung, grund), None)));
+    }
     let Some(akteur) = crate::einsatz::repo::ermittle_system_akteur(conn, id).await? else {
         return Ok(Some((
             wartet(&l.kennung, "Niemand für den ETB-Eintrag".into()),
@@ -296,12 +313,7 @@ async fn umwandeln(
         .execute(&mut *conn)
         .await?;
     }
-    for tabelle in [
-        "spiegel_herkunft",
-        "spiegel_anhang",
-        "spiegel_katalog",
-        "spiegel_antrag",
-    ] {
+    for tabelle in ["spiegel_herkunft", "spiegel_anhang", "spiegel_katalog"] {
         sqlx::query(sqlx::AssertSqlSafe(format!(
             "DELETE FROM {tabelle} WHERE einsatz_id = ?"
         )))
@@ -309,6 +321,12 @@ async fn umwandeln(
         .execute(&mut *conn)
         .await?;
     }
+    // Abgelehnte Anträge bleiben mit ihren Daten für die erfassende Person, bis der Purge-Lauf
+    // sie nach `antrag::ABGELEHNT_TAGE` räumt; offene gibt es hier nicht mehr (oben).
+    sqlx::query("DELETE FROM spiegel_antrag WHERE einsatz_id = ? AND zustand <> 'abgelehnt'")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
     // Die Nummer vergeben ELW und Hub unabhängig; ein Spiegel ist von ihrer Eindeutigkeit
     // ausgenommen. Ist sie hier belegt, bekommt der Einsatz eine Nummer dieser Instanz.
     let umnummeriert = nummer_freimachen(conn, id).await?;

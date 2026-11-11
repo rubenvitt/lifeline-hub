@@ -256,6 +256,14 @@ async fn phase_r_raeumt_spiegel_der_meldenden_seite_nach_der_nachbereitung_ab() 
         &[mit_antrag, leit],
     )
     .await;
+    // Nach einem Widerruf bleibt der Spiegel ohne Kopplung lesbar.
+    let beendet = spiegel(&pool, leit, Some("2026-11-01 00:00:00")).await;
+    crate::einsatz::spiegel_filter::unter_merker(
+        &pool,
+        "UPDATE einsatz_spiegel SET beendet_at = '2026-11-02 00:00:00' WHERE einsatz_id = ?",
+        &[beendet],
+    )
+    .await;
     // Ein eigener Einsatz nach der Nachbereitung bleibt: er geht über die Verwahrung.
     let (eigen, _) = einsatz(&pool, leit).await;
     sqlx::query("UPDATE einsatz SET nachbereitung_bis = '2026-11-01 00:00:00' WHERE id = ?")
@@ -270,6 +278,7 @@ async fn phase_r_raeumt_spiegel_der_meldenden_seite_nach_der_nachbereitung_ab() 
         (laeuft, "Nachbereitung läuft"),
         (ohne, "ohne Nachbereitung"),
         (mit_antrag, "Antrag steht aus"),
+        (beendet, "Spiegel beendet"),
         (eigen, "eigener Einsatz"),
     ] {
         assert!(gibt_es(&pool, id).await, "{was}");

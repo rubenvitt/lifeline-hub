@@ -504,3 +504,56 @@ async fn quittungen_merken_angenommen_vor_und_halten_den_grund_fest() {
         .unwrap();
     assert_eq!(merker, 1);
 }
+
+#[tokio::test]
+async fn verwahrung_wartet_auf_offene_antraege_und_behaelt_abgelehnte() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let k = kopplung(&pool, "wird_gemeldet").await;
+    let id = spiegel(&pool, leit, "gegen/5", 3).await;
+    for client in ["c1", "c2"] {
+        unter_merker(
+            &pool,
+            "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, pfad_lokal, \
+             daten, benutzer_id, client_id, erfasst_at, geaendert_at) \
+             VALUES (?, 'etb', 'POST', '/x', '{}', '{\"text\":\"Lage\"}', ?, ?, \
+             datetime('now'), datetime('now'))",
+            &[&id.to_string(), &leit.to_string(), client],
+        )
+        .await;
+    }
+
+    let (q, umgewandelt) = annehmen(&pool, &k, &verwahrt("gegen/5", 3, vec![]))
+        .await
+        .unwrap();
+    assert_eq!(
+        (q.ergebnis.as_str(), q.grund.as_deref(), umgewandelt),
+        (VERWAHRUNG_WARTET, Some("2 Anträge offen"), None)
+    );
+
+    // Der Führer lehnt einen ab und übernimmt den anderen.
+    unter_merker(
+        &pool,
+        "UPDATE spiegel_antrag SET zustand = CASE client_id WHEN 'c1' THEN 'abgelehnt' \
+         ELSE 'uebernommen' END, grund = 'Einsatz abgeschlossen.' WHERE einsatz_id = ?",
+        &[&id.to_string()],
+    )
+    .await;
+    let (q, umgewandelt) = annehmen(&pool, &k, &verwahrt("gegen/5", 3, vec![]))
+        .await
+        .unwrap();
+    assert_eq!(q.ergebnis, VERWAHRUNG_ANGENOMMEN);
+    assert_eq!(umgewandelt, Some(id));
+    let bleiben: Vec<(String, String)> = sqlx::query_as(
+        "SELECT client_id, daten FROM spiegel_antrag WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        bleiben,
+        vec![("c1".to_string(), "{\"text\":\"Lage\"}".to_string())],
+        "der abgelehnte bleibt mit seinen Daten"
+    );
+}

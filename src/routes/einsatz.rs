@@ -367,8 +367,18 @@ pub async fn aufbewahrungsfrist_setzen(
 #[derive(Debug, Deserialize)]
 pub struct NachbereitungSetzen {
     /// Neues Ende der Nachbereitung (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer hebt
-    /// die Nachbereitungsfrist auf.
-    pub nachbereitung_bis: Option<String>,
+    /// die Nachbereitungsfrist auf. Pflichtfeld: fehlt es, ist das 400 (äußeres `None`), damit
+    /// ein unvollständiger Body keine Frist aufhebt.
+    #[serde(default, deserialize_with = "vorhanden")]
+    pub nachbereitung_bis: Option<Option<String>>,
+}
+
+/// Unterscheidet ein gesendetes `null` (`Some(None)`) von einem fehlenden Feld (`None`).
+fn vorhanden<'de, D>(d: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(d).map(Some)
 }
 
 /// PUT /api/einsaetze/{id}/nachbereitung — Nachbereitungsfrist setzen, ändern oder aufheben
@@ -385,12 +395,12 @@ pub async fn nachbereitung_setzen(
     if !admin_der_org {
         ctx.fordere_einsatzleitung()?;
     }
-    let neu = match req
-        .nachbereitung_bis
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
+    let Some(bis) = req.nachbereitung_bis else {
+        return Err(AppError::Validation(
+            "nachbereitung_bis fehlt (null hebt die Frist auf)".into(),
+        ));
+    };
+    let neu = match bis.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         Some(s) => Some(crate::etb::normalisiere_zeit(s)?),
         None => None,
     };

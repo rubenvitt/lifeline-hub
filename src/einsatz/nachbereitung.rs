@@ -109,7 +109,7 @@ fn sperre(
     abraeumen: bool,
 ) -> Option<AppError> {
     if status != super::STATUS_ABGESCHLOSSEN {
-        return Some(AppError::Conflict(
+        return Some(AppError::UnprocessableEntity(
             "Die Nachbereitung beginnt mit dem Abschluss".into(),
         ));
     }
@@ -337,7 +337,13 @@ mod tests {
         let ist_409 =
             |r: Result<MitEtbEintraegen, AppError>| matches!(r, Err(AppError::Conflict(_)));
 
-        assert!(ist_409(setzen(&pool, e.id, leit, None).await), "aktiv");
+        assert!(
+            matches!(
+                setzen(&pool, e.id, leit, None).await,
+                Err(AppError::UnprocessableEntity(_))
+            ),
+            "aktiv: 422"
+        );
         abschliessen(&pool, e.id, leit).await.unwrap();
 
         for (sql, was) in [
