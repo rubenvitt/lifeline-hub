@@ -426,8 +426,8 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
   - Er schreibt nur in die Ablage seines Scopes (`alarmmeldungen:write` oder `positionen:write`)
     und nur für seine Org.
   - Er liest nichts. Die Antwort ist `204` oder ein Fehler, ohne Daten.
-- **Doppelte Einwürfe:** Ein wiederholter Aufruf legt keinen zweiten Vorschlag an, verschwindet
-  aber auch nicht still.
+- **Doppelte Einwürfe (Alarmmeldung):** Ein wiederholter Aufruf legt keinen zweiten Vorschlag an,
+  verschwindet aber auch nicht still.
   - Fehlt eine `external_id`, gelten gleicher Zugang, gleicher Inhalt und höchstens 2 Minuten
     Abstand als Wiederholung. Sie wird am bestehenden Vorschlag als „erneut empfangen“ mit Zeit
     vermerkt (Zähler). POCSAG wiederholt Alarme absichtlich.
@@ -438,6 +438,9 @@ GET https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric={RIC}&subr
     Vorschlag mit dem Hinweis „möglicherweise derselbe Alarm“ und einem Verweis auf den früheren.
     Ein Mensch führt beide mit einem Klick zusammen. Ein nur ähnlicher Inhalt ergibt denselben
     Hinweis (Schnittstellen-Ausbau).
+- **Doppelte Einwürfe (Position):** Eine Position ersetzt nur die letzte ihres Ziels, ohne
+  Verlauf. Eine Wiederholung schadet deshalb nicht. Eine Position mit älterem Zeitstempel als die
+  gespeicherte wird nicht übernommen.
 - **Nur über TLS:**
   - Der Einwurf nimmt Aufrufe nur an, wenn sie verschlüsselt ankommen: direkt mit `--tls` oder
     vom vertrauten Proxy mit `X-Forwarded-Proto: https` (`weitergeleitet_als_https`,
