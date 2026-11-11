@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Eingänge mit Link zu Benachrichtigungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+a{color:#8ec2f0}a:hover{color:#7db3e8}
+.flaeche{width:420px;height:560px;box-sizing:border-box;background:#14171b;border:1px solid #2e343a;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column}
+.kopf{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #22262b}
+.titel{font-size:14px;font-weight:600}
+.zahl{font:500 12px "LFH Mono",monospace;color:#9aa2ab}
+.gruppe{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#838b94;padding:10px 12px 4px}
+.ein{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;padding:8px 12px;border-bottom:1px solid #22262b}
+.zeit{font:500 12px "LFH Mono",monospace;color:#c6ccd2}
+.et{font-size:13px}
+.ex{font-size:12px;color:#9aa2ab}
+.ungelesen{box-shadow:inset 3px 0 0 #4d94d6}
+.platz{flex:1}
+.fuss{border-top:1px solid #22262b;padding:0 12px;display:flex;align-items:center;justify-content:space-between;min-height:44px;outline:2px dashed #4d94d6;outline-offset:-4px}
+.fuss a{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:13px;text-decoration:none}
+.marker{font-size:11px;color:#4d94d6;letter-spacing:.06em;text-transform:uppercase}
+</style>
+</helmet>
+<section class="flaeche" aria-label="Eingänge">
+  <div class="kopf"><span class="titel">Eingänge</span><span class="zahl">3 ungelesen</span></div>
+  <div class="gruppe">Neu</div>
+  <div class="ein ungelesen"><span class="zeit">14:52</span><div><div class="et">Auftrag an dich: Lagekarte aktualisieren</div><div class="ex">von Einsatzleitung</div></div></div>
+  <div class="ein ungelesen"><span class="zeit">14:40</span><div><div class="et">Erinnerung fällig: Pegel prüfen</div><div class="ex">UA Nord</div></div></div>
+  <div class="ein ungelesen"><span class="zeit">14:31</span><div><div class="et">Lagebesprechung 15:00</div><div class="ex">Einladung</div></div></div>
+  <div class="gruppe">Früher</div>
+  <div class="ein"><span class="zeit">13:58</span><div><div class="et">Unwetterwarnung Stufe 2</div><div class="ex">DWD, Einsatzort</div></div></div>
+  <div class="ein"><span class="zeit">13:12</span><div><div class="et">Auftrag erledigt: Sandsäcke</div><div class="ex">Florian Elbe 1/44-1</div></div></div>
+  <div class="platz"></div>
+  <div class="fuss"><span class="marker">neu hier</span><a href="#">Benachrichtigungen einstellen →</a></div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":420,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

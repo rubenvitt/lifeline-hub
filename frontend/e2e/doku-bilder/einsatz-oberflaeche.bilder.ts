@@ -127,17 +127,18 @@ test.describe(KAPITEL, () => {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
     const menue = page.getByRole('menu');
+    const leiste = (name: string) => menue.getByRole('radiogroup', { name, exact: true });
     // Der Lauf stellt „System“ und kompakt ein (`playwright.doku.config.ts`), damit jedes Bild
-    // hell und dunkel entsteht; die Wahl trägt ✓.
-    await expect(menue.getByRole('menuitem', { name: 'System ✓' })).toBeVisible();
-    await expect(menue.getByRole('menuitem', { name: 'Kompakt ✓' })).toBeVisible();
-    await expect(menue.getByRole('menuitem', { name: '100 % ✓' })).toBeVisible();
+    // hell und dunkel entsteht; die Wahl ist in der Leiste ausgewählt (LLH-1642).
+    await expect(leiste('Darstellung').getByRole('radio', { name: 'System' })).toBeChecked();
+    await expect(leiste('Bediendichte').getByRole('radio', { name: 'Kompakt' })).toBeChecked();
+    await expect(leiste('Helligkeit in %').getByRole('radio', { name: '100 %' })).toBeChecked();
     await fotografiere(menue, KAPITEL, 'darstellung');
 
-    // Nachgeklickt: eine Stufe wirkt sofort und bleibt gewählt.
-    await menue.getByRole('menuitem', { name: '60 %', exact: true }).click();
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    await expect(page.getByRole('menu').getByRole('menuitem', { name: '60 % ✓' })).toBeVisible();
+    // Nachgeklickt: eine Stufe wirkt sofort, bleibt gewählt, und das Menü bleibt offen.
+    await leiste('Helligkeit in %').getByRole('radio', { name: '60 %', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-helligkeit', '60');
+    await expect(leiste('Helligkeit in %').getByRole('radio', { name: '60 %' })).toBeChecked();
     await page.keyboard.press('Escape');
 
     // Im Einsatz mit Warnung: Boden 80 %, die Wahl bleibt stehen und nennt, was wirkt.
@@ -145,9 +146,12 @@ test.describe(KAPITEL, () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Überblick' })).toBeVisible();
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
     const imEinsatz = page.getByRole('menu');
-    await expect(imEinsatz.getByText('Helligkeit · mind. 80 % (Warnung aktiv)')).toBeVisible();
-    await expect(imEinsatz.getByRole('menuitem', { name: '60 % ✓ (wirkt 80 %)' })).toBeVisible();
+    const helligkeit = imEinsatz.getByRole('radiogroup', { name: 'Helligkeit in %' });
+    await expect(imEinsatz.getByText('Helligkeit in % · mind. 80 % (Warnung aktiv)')).toBeVisible();
+    await expect(helligkeit.getByRole('radio', { name: '60 %' })).toBeChecked();
+    await expect(imEinsatz.getByText('Gewählt 60 %, wirkt 80 %')).toBeVisible();
     // Zurück auf 100 %, damit spätere Bilder hell bleiben (die Wahl liegt im Speicher des Geräts).
-    await imEinsatz.getByRole('menuitem', { name: '100 %', exact: true }).click();
+    await helligkeit.getByRole('radio', { name: '100 %', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-helligkeit', '100');
   });
 });

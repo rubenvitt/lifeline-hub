@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waehleImMenue } from './menue-kern';
+import { waehleAnzeige } from './menue-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 // Eine feste Reserve verschenkt Platz oder schiebt die Unterkante aus dem Fenster. Echte
@@ -176,11 +176,16 @@ for (const breite of [1366, 1024, 390]) {
       expect(verkleinert.fenster - verkleinert.polster - verkleinert.oben).toBeLessThan(380);
       expect(verkleinert.hoehe).toBeCloseTo(380, 0);
     }
-    // Live-Wechsel ohne Reload/resize: der äußere App-Kopf ändert seine Höhe. Im Handschuh rollt
-    // das Benutzermenü in sich, „Kompakt“ liegt unter dem Rand; `waehleImMenue` rollt nur die
-    // Liste, sonst richtet antd das Menü mitten im Klick neu aus (`menue-kern.ts`, LLH-1337).
+    // Live-Wechsel ohne Reload/resize: der äußere App-Kopf ändert seine Höhe. `waehleAnzeige`
+    // rollt nur die Liste, sonst richtet antd das Menü mitten im Klick neu aus (`menue-kern.ts`,
+    // LLH-1337).
     await page.evaluate(() => window.scrollTo(0, 0));
-    await waehleImMenue(page, page.getByRole('button', { name: /Benutzermenü/ }), 'Kompakt');
+    await waehleAnzeige(
+      page,
+      page.getByRole('button', { name: /Benutzermenü/ }),
+      'Bediendichte',
+      'Kompakt',
+    );
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
     await fuelltArbeitsflaeche(page);
     expect(browserFehler).toEqual([]);

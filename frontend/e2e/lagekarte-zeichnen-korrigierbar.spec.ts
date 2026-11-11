@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { waehleWerkzeug } from './leisten-kern';
+import { waehleAnzeige } from './menue-kern';
 
 /**
  * Korrigierbares Zeichnen und Eigenposition an der echten Karte. Vitest belegt Adapter und
@@ -192,8 +193,12 @@ test.describe('Eigenposition', () => {
     // Eigenposition muss danach wieder stehen. Grenze: „Hell" ändert auch die Bedienfarbe, dann
     // legt schon der Farb-Effekt die Ebene neu an; welcher Weg sie zurückholt, trennt der
     // Schritt nicht.
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    await page.getByRole('menuitem', { name: /Hell/ }).click();
+    await waehleAnzeige(
+      page,
+      page.getByRole('button', { name: 'Benutzermenü' }),
+      'Darstellung',
+      'Hell',
+    );
     await expect.poll(quelleDa, { timeout: 10_000 }).toBe(true);
 
     // Nichts davon ging an den Server.

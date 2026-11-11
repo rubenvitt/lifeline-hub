@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { stehendeAuswahl, waehleIn } from './auswahl-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { oeffneZeichenWahl, waehleWerkzeug, zeigeLeistenAnsicht } from './leisten-kern';
+import { waehleAnzeige } from './menue-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -406,8 +407,12 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
   // Kartenwechsel mitten in einer Messung: „Hell" ergibt `setStyle` mit `diff: false`, das die
   // Sources des Adapters wegwirft. Erwartet: die Messung beginnt in derselben Form neu.
   await page.mouse.click(punkt(-120, 40).x, punkt(-120, 40).y);
-  await page.getByRole('button', { name: 'Benutzermenü' }).click();
-  await page.getByRole('menuitem', { name: /Hell/ }).click();
+  await waehleAnzeige(
+    page,
+    page.getByRole('button', { name: 'Benutzermenü' }),
+    'Darstellung',
+    'Hell',
+  );
   await expect(wert).toHaveText('—');
   await page.mouse.click(punkt(-120, -40).x, punkt(-120, -40).y);
   await page.mouse.move(punkt(60, -40).x, punkt(60, -40).y, { steps: 4 });

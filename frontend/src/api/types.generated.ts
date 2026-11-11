@@ -5883,7 +5883,7 @@ export interface components {
             /** Format: int64 */
             groesse: number;
             mime: string;
-            /** @description Hex-sha256 der Bytes; zugleich der ETag des Abrufs und der Cache-Brecher `?v=`. */
+            /** @description Hex-sha256 der gespeicherten (bereinigten) Bytes; Cache-Brecher `?v=` und Kern des ETags. */
             sha256: string;
         };
         /**
