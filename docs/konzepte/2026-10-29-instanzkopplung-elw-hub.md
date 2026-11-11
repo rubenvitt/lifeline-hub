@@ -188,8 +188,12 @@ sequenceDiagram
   nur noch per Passkey an; „ELW verloren“ macht die Geheimnisse wertlos
   ([ADR-0016](../architektur/entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md),
   `openspec/changes/archive/2026-11-09-ca8v0psv-stammdaten-verteilung/design.md`).
-- **Gleichzeitige Notübernahmen** mit derselben Epoche (zwei Seiten ohne Verbindung): Gleichstand
-  über die Instanzkennung oder Pflicht zur menschlichen Klärung?
+- ~~**Gleichzeitige Notübernahmen**~~ beantwortet am 09.11.2026 (LLH-1491): Die Epoche ist ein
+  Paar (Zähler, Instanzkennung), das größere gilt; die unterlegene Seite durchläuft den Ablauf
+  einer Übernahme gegen sich. Widersprechen heißt Rückübernahme, den Code-Fallback erzeugt der
+  ELW bei Bedarf
+  ([ADR-0020](../architektur/entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md),
+  `openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md`).
 - **Nachbereitungsfrist:** Vorgabe, wer sie einstellt (Org am Hub?), Verhältnis zur bestehenden
   Aufbewahrung.
 - **Archivschlüssel:** Verwahrung bei der Org, Verlust heißt Daten weg; Wiederherstellung und

@@ -15,6 +15,19 @@ describe('nurAnsicht (LFH-1078)', () => {
     expect(einsatzRechteGrund('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
   });
 
+  it('nennt die führende Instanz, wenn eine andere führt (LLH-1491)', () => {
+    const hub = { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false };
+    expect(einsatzRechteGrund({ status: 'aktiv', fuehrung: hub })).toBe(
+      'Führung liegt bei Hub Nord',
+    );
+    expect(einsatzRechteGrund({ status: 'abgeschlossen', fuehrung: hub })).toBe(
+      'Einsatz abgeschlossen',
+    );
+    expect(einsatzRechteGrund({ status: 'aktiv', fuehrung: { ...hub, fuehrend: true } })).toBe(
+      'nur Einsatzleitung und Führungspersonal',
+    );
+  });
+
   it('nennt am Spiegel die führende Instanz, auch im abgeschlossenen Einsatz (LLH-1492)', () => {
     const spiegel = {
       gegenstelle: 'ELW 1',

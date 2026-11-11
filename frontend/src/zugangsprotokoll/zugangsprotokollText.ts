@@ -45,18 +45,23 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   unterschrift_bestaetigt: 'Unterschriftsschlüssel bestätigt',
   unterschrift_zurueckgewiesen: 'Unterschriftsschlüssel zurückgewiesen',
   instanz_elw_verloren: 'ELW als verloren gemeldet',
+  fuehrung_notuebernahme: 'Notübernahme der Führung',
+  fuehrung_verworfen: 'Ungültige Übernahme verworfen',
+  fuehrung_widerspruch: 'Notübernahme widersprochen',
 };
 
 /**
  * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
- * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber).
+ * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber),
+ * Führung je Einsatz (LLH-1491, die Gegenstelle).
  */
 export function hasNamensziel(aktion: AdminAktion): boolean {
   return (
     aktion === 'lesezugang_angelegt' ||
     aktion === 'lesezugang_widerrufen' ||
     aktion.startsWith('instanz_') ||
-    aktion.startsWith('unterschrift_')
+    aktion.startsWith('unterschrift_') ||
+    aktion.startsWith('fuehrung_')
   );
 }
 

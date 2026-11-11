@@ -238,6 +238,14 @@ Konto bildet die meldende Seite über die Stammdaten-Herkunft ab; ein Konto ohne
 am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
 ([ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)).
 
+Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
+`LIFELINE_FUEHRUNG`,
+[ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md)). Jede andere
+liest nur: Der Merker `einsatz.fuehrung_bei` sperrt alle Schreibwege über `fordere_aktiv`, die
+Oberfläche über `schreibrecht.ts`. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
+Unterschrift eines Org-Admins oder einen Code, den sie selbst erzeugt hat, und gilt dort erst
+nach der Bestätigung eines Menschen (Ablauf 6.6c).
+
 ## 8.18 Konfiguration über die Umgebung
 
 Jeder Schalter des Servers ist ein Argument der clap-`Config` in `src/config.rs` mit

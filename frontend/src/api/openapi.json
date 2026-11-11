@@ -836,6 +836,9 @@
           "unterschrift_abgelehnt",
           "unterschrift_bestaetigt",
           "unterschrift_zurueckgewiesen",
+          "fuehrung_notuebernahme",
+          "fuehrung_verworfen",
+          "fuehrung_widerspruch",
           "instanz_elw_verloren"
         ]
       },
@@ -2992,7 +2995,7 @@
       },
       "BenachrichtigungArt": {
         "type": "string",
-        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0255_benachrichtigung_quellen.sql`)\nspiegelt `ALLE`.",
+        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0316_einsatz_fuehrung.sql`)\nspiegelt `ALLE`.",
         "enum": [
           "sofortmeldung",
           "sofortmeldung_eskaliert",
@@ -3019,7 +3022,9 @@
           "chat_erwaehnung",
           "einsatz_aufnahme",
           "einsatz_neu",
-          "unwetter"
+          "unwetter",
+          "fuehrung_ungueltig",
+          "fuehrung_uebernommen"
         ]
       },
       "BenachrichtigungBezugTyp": {
@@ -5770,6 +5775,17 @@
             ],
             "format": "double"
           },
+          "fuehrung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzFuehrung",
+                "description": "Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`): welche gekoppelte Instanz den\nEinsatz schreibt. Fehlt, solange der Einsatz keine Führungsakte hat oder die Führung aus\nist; in Liste und Detail dieselbe Aussage."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -6089,6 +6105,34 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "EinsatzFuehrung": {
+        "type": "object",
+        "description": "Die Führung im Einsatzkopf (`EinsatzAnzeige.fuehrung`): fehlt ohne Akte oder ohne Schalter.",
+        "required": [
+          "fuehrend",
+          "bei",
+          "epoche",
+          "offen"
+        ],
+        "properties": {
+          "bei": {
+            "type": "string",
+            "description": "Name der führenden Instanz."
+          },
+          "epoche": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fuehrend": {
+            "type": "boolean",
+            "description": "Diese Instanz führt den Einsatz."
+          },
+          "offen": {
+            "type": "boolean",
+            "description": "Eine Notübernahme gegen diese Instanz wartet auf die Einsatzleitung."
           }
         }
       },
@@ -8530,6 +8574,303 @@
             "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0192, LLH-1160), bis es das nächste Mal geändert wird."
           }
         }
+      },
+      "FuehrungAnzeige": {
+        "type": "object",
+        "description": "Die Führung einer Akte samt Verlauf (Paneel „Führung“, Seite „Instanzkopplung“).",
+        "required": [
+          "id",
+          "kennung",
+          "bezeichnung",
+          "status",
+          "epoche",
+          "fuehrer_name",
+          "fuehrer_kennung",
+          "fuehrend",
+          "art",
+          "anfrage_offen",
+          "gegenueber",
+          "verlauf"
+        ],
+        "properties": {
+          "anfrage_offen": {
+            "type": "boolean",
+            "description": "Diese Instanz hat die Führung beim Gegenüber erbeten."
+          },
+          "art": {
+            "$ref": "#/components/schemas/FuehrungWechselArt"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "bruch_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "epoche": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fuehrend": {
+            "type": "boolean",
+            "description": "Diese Instanz führt."
+          },
+          "fuehrer_kennung": {
+            "type": "string"
+          },
+          "fuehrer_name": {
+            "type": "string"
+          },
+          "fuehrer_richtung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InstanzKopplungRichtung",
+                "description": "Richtung der Kopplung zur führenden Instanz, wenn ein Gegenüber führt: sie entscheidet,\nwie eine Notübernahme geht (`wird_gemeldet` = mit Unterschrift oder Code)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gegenueber": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FuehrungGegenueber"
+            },
+            "description": "Die Gegenüber der Org, an die die Führung gehen kann."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kennung": {
+            "type": "string"
+          },
+          "nummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "offen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FuehrungOffen"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verlauf": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FuehrungVerlaufEintrag"
+            }
+          }
+        }
+      },
+      "FuehrungCodeAntwort": {
+        "type": "object",
+        "description": "Der Abgabecode, genau einmal angezeigt.",
+        "required": [
+          "code",
+          "fuehrung"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "In Vierergruppen."
+          },
+          "fuehrung": {
+            "$ref": "#/components/schemas/FuehrungAnzeige"
+          }
+        }
+      },
+      "FuehrungGegenueber": {
+        "type": "object",
+        "description": "Ein Gegenüber, an das die Führung einer Akte gehen kann: eine aktive Kopplung, in der die Org\nder Akte zugeordnet ist.",
+        "required": [
+          "kopplung_id",
+          "kennung",
+          "name",
+          "richtung"
+        ],
+        "properties": {
+          "kennung": {
+            "type": "string"
+          },
+          "kopplung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "richtung": {
+            "$ref": "#/components/schemas/InstanzKopplungRichtung"
+          }
+        }
+      },
+      "FuehrungOffen": {
+        "type": "object",
+        "description": "Eine offene Übernahme gegen diese Instanz, wie die Oberfläche sie zeigt.",
+        "required": [
+          "von",
+          "epoche",
+          "bruch_at"
+        ],
+        "properties": {
+          "bruch_at": {
+            "type": "string"
+          },
+          "epoche": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unterzeichner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "von": {
+            "type": "string"
+          },
+          "zeitpunkt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "FuehrungUnterschriftStart": {
+        "type": "object",
+        "description": "Start der Unterschrift einer Notübernahme (wie die Gegenzeichnung, LLH-1490).",
+        "required": [
+          "zeremonie",
+          "challenge",
+          "rp_id",
+          "credential_ids",
+          "erklaerung"
+        ],
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "Challenge für `navigator.credentials.get` (Base64url): SHA-256 der Erklärung."
+          },
+          "credential_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Die eigenen gültigen Unterschriftsschlüssel (Base64url), für `allowCredentials`."
+          },
+          "erklaerung": {
+            "type": "string",
+            "description": "Die Erklärung im Wortlaut."
+          },
+          "rp_id": {
+            "type": "string"
+          },
+          "zeremonie": {
+            "type": "string"
+          }
+        }
+      },
+      "FuehrungVerlaufEintrag": {
+        "type": "object",
+        "description": "Ein Eintrag des Verlaufs, wie die Oberfläche ihn zeigt.",
+        "required": [
+          "epoche_zaehler",
+          "art",
+          "nach_name",
+          "at"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/FuehrungWechselArt"
+          },
+          "at": {
+            "type": "string"
+          },
+          "bruch_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "epoche_zaehler": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nach_name": {
+            "type": "string"
+          },
+          "unterzeichner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "wer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "FuehrungWechselArt": {
+        "type": "string",
+        "description": "Wie die geltende Führung zustande kam (Verlauf und Akte).",
+        "enum": [
+          "angelegt",
+          "uebergabe",
+          "anfrage",
+          "notuebernahme",
+          "code_abgabe",
+          "bestaetigt",
+          "widerspruch",
+          "verworfen"
+        ]
       },
       "Fuehrungsfunktion": {
         "type": "string",

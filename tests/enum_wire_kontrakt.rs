@@ -654,6 +654,9 @@ fn serde_wire_gleich_as_str() {
         UnterschriftBestaetigt,
         UnterschriftZurueckgewiesen,
         InstanzElwVerloren,
+        FuehrungNotuebernahme,
+        FuehrungVerworfen,
+        FuehrungWiderspruch,
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
@@ -666,6 +669,17 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
+    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0316).
+    enum_wire!(lifeline_hub::instanz::fuehrung::FuehrungWechselArt {
+        Angelegt => "angelegt",
+        Uebergabe => "uebergabe",
+        Anfrage => "anfrage",
+        Notuebernahme => "notuebernahme",
+        CodeAbgabe => "code_abgabe",
+        Bestaetigt => "bestaetigt",
+        Widerspruch => "widerspruch",
+        Verworfen => "verworfen",
+    } in lifeline_hub::instanz::fuehrung::FuehrungWechselArt::ALLE);
     // Stammdaten-Verteilung (LLH-1493, LLH-1613): Wire = `art` in stammdaten_aenderung/-herkunft
     // (0306, 0312).
     enum_wire_as_str!(lifeline_hub::instanz::stammdaten::StammdatenArt {
@@ -1545,6 +1559,8 @@ fn benachrichtigung_wire() {
         EinsatzAufnahme => "einsatz_aufnahme",
         EinsatzNeu => "einsatz_neu",
         Unwetter => "unwetter",
+        FuehrungUngueltig => "fuehrung_ungueltig",
+        FuehrungUebernommen => "fuehrung_uebernommen",
     } in lifeline_hub::benachrichtigung::BenachrichtigungArt::ALLE);
     enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp {
         Einsatz => "einsatz",

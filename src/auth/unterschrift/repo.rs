@@ -200,6 +200,24 @@ pub async fn list_gueltige_eigene(
     .await?)
 }
 
+/// Ein gültiger Schlüssel der Org mit dieser Credential-ID, lokal oder vom Gegenüber geliefert
+/// und bestätigt: Prüfer einer Notübernahme (LLH-1491). Ein wartender, abgelehnter oder
+/// widerrufener zählt nie (`src/AGENTS.md`, „Instanzkopplung“).
+pub async fn find_gueltig_der_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    credential_id: &str,
+) -> Result<Option<SchluesselZeile>, AppError> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND credential_id = ? \
+         AND zustand = 'gueltig' ORDER BY id LIMIT 1"
+    )))
+    .bind(org_id)
+    .bind(credential_id)
+    .fetch_optional(&mut *conn)
+    .await?)
+}
+
 /// Setzt einen wartenden Schlüssel nach geprüfter Gegenzeichnung auf gültig.
 pub async fn save_gegenzeichnung(
     conn: &mut SqliteConnection,

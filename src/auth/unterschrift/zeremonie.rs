@@ -1,6 +1,6 @@
 //! Zeremonie-Zustand der Unterschriftsschlüssel (design.md D7): zwischen Start und Abschluss einer
-//! Registrierung oder Gegenzeichnung, kurzlebig im Prozessspeicher wie `auth::webauthn::state`
-//! (R10: ein Neustart bricht nur laufende Zeremonien ab). Der Schlüssel zum Eintrag geht als
+//! Registrierung, Gegenzeichnung oder Notübernahme (LLH-1491), kurzlebig im Prozessspeicher wie
+//! `auth::webauthn::state` (R10: ein Neustart bricht nur laufende Zeremonien ab). Der Schlüssel zum Eintrag geht als
 //! Wert `zeremonie` an den Browser und zurück; der Eintrag ist an das Konto gebunden, das ihn
 //! begonnen hat.
 
@@ -26,13 +26,22 @@ pub enum Zeremonie {
         /// Die wörtliche Erklärung; ihr SHA-256 ist die Challenge.
         erklaerung: String,
     },
+    /// Notübernahme der Führung eines Einsatzes (LLH-1491, design.md D6).
+    Fuehrungserklaerung {
+        benutzer_id: i64,
+        /// Die Führungsakte (`einsatz_fuehrung.id`).
+        akte_id: i64,
+        /// Die wörtliche Erklärung; ihr SHA-256 ist die Challenge.
+        erklaerung: String,
+    },
 }
 
 impl Zeremonie {
     fn benutzer_id(&self) -> i64 {
         match self {
             Zeremonie::Registrierung { benutzer_id, .. }
-            | Zeremonie::Gegenzeichnung { benutzer_id, .. } => *benutzer_id,
+            | Zeremonie::Gegenzeichnung { benutzer_id, .. }
+            | Zeremonie::Fuehrungserklaerung { benutzer_id, .. } => *benutzer_id,
         }
     }
 }

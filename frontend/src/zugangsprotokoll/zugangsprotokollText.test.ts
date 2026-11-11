@@ -88,3 +88,13 @@ describe('Bestätigung nachgelieferter Schlüssel (LLH-1605)', () => {
     expect(hasNamensziel('unterschrift_zurueckgewiesen')).toBe(true);
   });
 });
+
+describe('Führung je Einsatz (LLH-1491)', () => {
+  it('nennt die drei Aktionen und zeigt die Gegenstelle als Ziel', () => {
+    expect(AKTION_TEXT.fuehrung_notuebernahme).toBe('Notübernahme der Führung');
+    expect(AKTION_TEXT.fuehrung_verworfen).toBe('Ungültige Übernahme verworfen');
+    expect(AKTION_TEXT.fuehrung_widerspruch).toBe('Notübernahme widersprochen');
+    expect(hasNamensziel('fuehrung_notuebernahme')).toBe(true);
+    expect(hasNamensziel('fuehrung_widerspruch')).toBe(true);
+  });
+});

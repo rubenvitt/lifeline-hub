@@ -338,6 +338,43 @@ sequenceDiagram
   und löscht `spiegel_ziel`, in der Transaktion des Widerrufs (`instanz::spiegel::beende_fuer_zuordnung`).
   Nachweis: `tests/instanz_spiegel.rs`.
 
+## 6.6c Führung je Einsatz: Notübernahme gegen den ELW
+
+Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
+Führungsakten aus (LLH-1491,
+[ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md)). Genau eine
+Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung).
+
+```mermaid
+sequenceDiagram
+  participant AH as frontend Admin am Hub
+  participant H as Hub (src/routes/fuehrung.rs)
+  participant E as ELW (src/instanz/fuehrung/austausch.rs)
+  participant EL as frontend Einsatzleitung am ELW
+  Note over E: ELW führt (Epoche n, ELW), keine Verbindung
+  AH->>H: …/notuebernahme/start {grund}
+  H-->>AH: Erklärung, Challenge = SHA-256 der Erklärung
+  AH->>H: …/notuebernahme/abschluss {Assertion}
+  H->>H: Unterschrift gegen eigenen gültigen Schlüssel, Hub führt (n+1, Hub)
+  E->>H: POST /api/instanz/melden {fuehrung: Akten seit Quittung}
+  H-->>E: Akte (n+1, Hub) mit Erklärung und Unterschrift
+  alt Unterschrift von einem am ELW gültigen Schlüssel
+    E->>E: offen halten, ELW schreibt weiter, Benachrichtigung „Führung übernommen“
+    EL->>E: Übernahme bestätigen (Sperre, Bruchstelle) oder Widersprechen (n+2, ELW)
+  else ungültig
+    E->>E: verwerfen, ELW führt mit (n+2, ELW), Alarm, Admin-Spur
+  end
+  E->>H: nächste Meldung: Akte mit dem Ergebnis, der Hub nimmt die höhere Epoche an
+```
+
+- Die erreichte Seite (Hub) nimmt eine höhere Epoche der meldenden ohne Beweis an; die meldende
+  (ELW) nur mit Unterschrift oder Abgabecode und nach der Entscheidung eines Menschen
+  (`austausch::entscheide`).
+- Die Sperre sitzt in `fordere_aktiv` und `fordere_aktiv_in_tx` (`einsatz.fuehrung_bei`); die
+  Bedienung zieht `EinsatzFuehrungszugriff` ohne diese Prüfung.
+- Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht
+  (`tests/instanz_fuehrung.rs`).
+
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 
 ```mermaid

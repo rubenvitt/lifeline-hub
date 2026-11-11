@@ -4,12 +4,14 @@ import {
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
   darfEinsatzVerwalten,
+  darfFuehrungBedienen,
   darfModuleVerwalten,
   darfOriginalLaden,
   darfVerwaltung,
   istAdmin,
   istBeobachter,
   istEinsatzLeitung,
+  fuehrtHier,
   istSpiegel,
 } from './schreibrecht';
 
@@ -216,6 +218,64 @@ describe('darfOriginalLaden (LFH-747)', () => {
     expect(darfOriginalLaden({ ...aktiv, meine_rolle: 'fuehrungspersonal' }, keiner)).toBe(false);
     expect(darfOriginalLaden({ ...aktiv, meine_rolle: 'beobachter' }, keiner)).toBe(false);
     expect(darfOriginalLaden(undefined, undefined)).toBe(false);
+  });
+});
+
+// Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`): führt eine gekoppelte Instanz, lehnt der
+// Server jeden Schreibweg mit 409 ab; die Schreib-UI sperrt mit. Bedienen darf die Führung die
+// Einsatzleitung oder der Admin der Einsatz-Org, auch am abgeschlossenen Einsatz.
+describe('Führung je Einsatz (LLH-1491)', () => {
+  const hier = { fuehrend: true, bei: 'ELW 1', epoche: 1, offen: false };
+  const hub = { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false };
+  const el = { ...aktiv, meine_rolle: 'einsatzleitung' as const };
+  const orgAdmin = { ...admin, org_id: 1 };
+  const orgKeiner = { ...keiner, org_id: 1 };
+
+  it('ohne Akte und mit eigener Führung schreibt die Instanz', () => {
+    expect(fuehrtHier(undefined)).toBe(true);
+    expect(fuehrtHier({})).toBe(true);
+    expect(fuehrtHier({ fuehrung: hier })).toBe(true);
+    expect(darfImEinsatzSchreiben({ ...el, fuehrung: hier })).toBe(true);
+  });
+
+  it('führt eine andere Instanz, sind Schreiben, Leiten und Verwalten gesperrt', () => {
+    expect(fuehrtHier({ fuehrung: hub })).toBe(false);
+    expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub })).toBe(false);
+    expect(darfEinsatzLeiten({ ...el, fuehrung: hub })).toBe(false);
+    expect(darfEinsatzVerwalten({ ...el, org_id: 1, fuehrung: hub }, orgAdmin)).toBe(false);
+    expect(darfModuleVerwalten({ ...el, org_id: 1, fuehrung: hub }, orgAdmin)).toBe(false);
+    expect(darfBeantragen({ ...el, fuehrung: hub })).toBe(false);
+  });
+
+  it('am Spiegel bleibt Beantragen trotz fremder Führung offen (LLH-1492)', () => {
+    const spiegel = {
+      gegenstelle: 'Hub Nord',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+    };
+    expect(darfBeantragen({ ...el, fuehrung: hub, spiegel })).toBe(true);
+    expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub, spiegel })).toBe(false);
+  });
+
+  it('die Führung bedienen Einsatzleitung und Admin der Einsatz-Org, unabhängig von Status und Führung', () => {
+    expect(darfFuehrungBedienen({ ...el, org_id: 1, fuehrung: hub }, orgKeiner)).toBe(true);
+    expect(
+      darfFuehrungBedienen({ ...zu, meine_rolle: 'einsatzleitung', org_id: 1 }, orgKeiner),
+    ).toBe(true);
+    expect(
+      darfFuehrungBedienen({ ...aktiv, meine_rolle: null, org_id: 1 }, { ...admin, org_id: 1 }),
+    ).toBe(true);
+    expect(
+      darfFuehrungBedienen({ ...aktiv, meine_rolle: null, org_id: 1 }, { ...admin, org_id: 2 }),
+    ).toBe(false);
+    expect(
+      darfFuehrungBedienen(
+        { ...aktiv, meine_rolle: 'fuehrungspersonal', org_id: 1 },
+        { ...keiner, org_id: 1 },
+      ),
+    ).toBe(false);
+    expect(darfFuehrungBedienen(undefined, orgAdmin)).toBe(false);
   });
 });
 

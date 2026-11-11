@@ -539,6 +539,14 @@ pub struct Config {
     )]
     pub instanz_melden_sekunden: u64,
 
+    /// Führung je Einsatz zwischen gekoppelten Instanzen (LLH-1491, Spec `instanz-fuehrung`).
+    /// **Vorgabe AUS**, bis Einsatzinhalte zwischen den Instanzen fließen (LLH-1492): ohne
+    /// Inhaltsspiegel führte eine Übergabe zu einer leeren Hülle. Mit dem Schalter tauscht die
+    /// Instanz Führungsakten aus und sperrt Einsätze, die eine andere führt. Die
+    /// Umgebungsvariable nimmt nur `true`/`false`.
+    #[arg(long, env = "LIFELINE_FUEHRUNG", default_value_t = false)]
+    pub fuehrung: bool,
+
     /// Abstand in Sekunden des Abgleichs gespiegelter Einsätze, solange an einer Kopplung ein
     /// Einsatz aktiv ist oder etwas aussteht (LLH-1492, design.md D12); sonst gilt der Abstand der
     /// Meldung. Bei Fehlern verdoppelt er sich bis zehn Minuten.
@@ -909,6 +917,19 @@ mod tests {
         let c =
             try_parse_mit_env("LIFELINE_INSTANZ_MELDEN_SEKUNDEN", "10", &["lifeline-hub"]).unwrap();
         assert_eq!(c.instanz_melden_sekunden, 10);
+    }
+
+    /// Führung je Einsatz ist per Vorgabe aus (LLH-1491); Schalter und Umgebungsvariable.
+    #[test]
+    fn fuehrung_ist_vorgabe_aus() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).fuehrung);
+        assert!(parse_hermetisch(["lifeline-hub", "--fuehrung"]).fuehrung);
+        assert!(
+            try_parse_mit_env("LIFELINE_FUEHRUNG", "true", &["lifeline-hub"])
+                .unwrap()
+                .fuehrung
+        );
+        assert!(try_parse_mit_env("LIFELINE_FUEHRUNG", "ja", &["lifeline-hub"]).is_err());
     }
 
     /// Der Abgleich der Einsätze läuft per Vorgabe alle 5 s (LLH-1492, D12), höchstens alle 2 s.

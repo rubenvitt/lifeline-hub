@@ -314,7 +314,7 @@ pub async fn create_org_zuordnung(
     .bind(fremde_org_kennung)
     .execute(&mut *conn)
     .await?;
-    Ok(sqlx::query_scalar(
+    let id = sqlx::query_scalar(
         "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
          fremde_org_name, angelegt_von, bestaetigt_at) \
          VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') END) RETURNING id",
@@ -326,7 +326,10 @@ pub async fn create_org_zuordnung(
     .bind(von)
     .bind(bestaetigt)
     .fetch_one(&mut *conn)
-    .await?)
+    .await?;
+    // Vorhandene Akten der Org gehen an diese Kopplung (LLH-1491).
+    crate::instanz::fuehrung::repo::renew_stand_der_org(conn, org_id).await?;
+    Ok(id)
 }
 
 /// Erreichte Seite: das Gegenüber hat die Zuordnung gemeldet.
@@ -391,15 +394,16 @@ pub async fn update_zustand_nach_orgs(
     Ok(())
 }
 
-/// Widerruft eine Org-Zuordnung (`von = None`: durch das Gegenüber). `false`, wenn sie schon
-/// widerrufen war.
+/// Widerruft eine Org-Zuordnung (`von = None`: durch das Gegenüber). `None`, wenn sie schon
+/// widerrufen war; sonst die Einsätze, deren Führung der Widerruf geändert hat (LLH-1491). Ihren
+/// Kopf meldet der Aufrufer nach dem Commit.
 pub async fn org_widerrufen(
     conn: &mut SqliteConnection,
     org_zeile_id: i64,
     von: Option<i64>,
     jetzt: &str,
     gemeldet: bool,
-) -> Result<bool, AppError> {
+) -> Result<Option<Vec<i64>>, AppError> {
     let n = sqlx::query(
         "UPDATE instanz_kopplung_org SET widerrufen_at = ?, widerrufen_von = ?, \
          widerruf_gemeldet_at = CASE WHEN ? THEN ? ELSE NULL END \
@@ -413,15 +417,29 @@ pub async fn org_widerrufen(
     .execute(&mut *conn)
     .await?
     .rows_affected();
-    if n == 1 {
+    if n != 1 {
+        return Ok(None);
+    }
+    {
         crate::auth::unterschrift::repo::fremde_der_zuordnung_widerrufen(conn, org_zeile_id, jetzt)
             .await?;
         // Übernommene Stammdaten gehören danach der Instanz (LLH-1493, design.md D3).
         crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
         // Der Abgleich ihrer Einsätze endet; Spiegel bleiben lesbar (LLH-1492, D14).
         crate::instanz::spiegel::beende_fuer_zuordnung(conn, org_zeile_id, jetzt).await?;
+        // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491).
+        let (org_id, gegenueber): (i64, String) = sqlx::query_as(
+            "SELECT o.org_id, k.gegenueber_kennung FROM instanz_kopplung_org o \
+             JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
+        )
+        .bind(org_zeile_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        Ok(Some(
+            crate::instanz::fuehrung::repo::release_nach_widerruf(conn, org_id, &gegenueber)
+                .await?,
+        ))
     }
-    Ok(n == 1)
 }
 
 pub async fn mark_widerruf_gemeldet(
