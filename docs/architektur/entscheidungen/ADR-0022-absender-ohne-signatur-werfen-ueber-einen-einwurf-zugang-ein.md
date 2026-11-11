@@ -16,13 +16,13 @@ herleitung:
 ## Regeln
 
 - MUST: Ein Einwurf-Zugang ist die einzige Ausnahme zu ADR-0014 und ADR-0021; er gilt nur unter
-  `/api/v1/einwurf/<schluessel>/…`.
-- MUST: Der Schlüssel hat das Präfix `llh_ew_` und 32 Zufallsbytes; gespeichert wird nur sein
+  `/api/v1/ingest/<key>/…`.
+- MUST: Der Schlüssel hat das Präfix `llh_in_` und 32 Zufallsbytes; gespeichert wird nur sein
   SHA-256.
-- MUST: Ein Einwurf schreibt nur in die Ablage seines Zwecks (Alarmmeldung oder Position) und nur
+- MUST: Ein Einwurf schreibt nur in die Ablage seines Zwecks (Scope `alarms:write` oder `positions:write`) und nur
   für seine Org; er legt keinen Einsatz an und ändert keinen.
 - MUST NOT: Ein Einwurf liest etwas; die Antwort trägt außer Status und Fehler keine Daten.
-- MUST: Der Pfadabschnitt nach `/einwurf/` erscheint in keinem Protokoll; `pfad_fuer_protokoll`
+- MUST: Der Pfadabschnitt nach `/ingest/` erscheint in keinem Protokoll; `pfad_fuer_protokoll`
   maskiert ihn.
 - MUST: Jeder Einwurf-Zugang ist gedrosselt; ein unbekannter Schlüssel zählt in die IP-Sperre.
 - MUST: Anlegen und Widerruf stehen in `admin_audit`; ein Widerruf wirkt sofort.
@@ -32,8 +32,8 @@ herleitung:
 ## Prüfung
 
 ```sh
-verlange '/api/v1/einwurf/' src/app.rs
-verlange 'llh_ew_' 'src/einwurf/**'
+verlange '/api/v1/ingest/' src/app.rs
+verlange 'llh_in_' 'src/public_api/**'
 ```
 
 ## Kontext
