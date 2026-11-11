@@ -7307,6 +7307,18 @@ export interface components {
             sortier: number;
         };
         /**
+         * @description Katalog-Sprechgruppe, deren Name ein Einsatz zugleich als Einsatz-Sprechgruppe trägt
+         *     (LLH-1645, Altbestand vor der Sperre): eine Zeile je Paar aus Sprechgruppe und Einsatz.
+         */
+        SprechgruppeAuchLokal: {
+            /** @description Bezeichnung des Einsatzes. */
+            einsatz: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            sprechgruppe_id: number;
+        };
+        /**
          * @description Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.
          *     `gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab
          *     über 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).

@@ -1,4 +1,4 @@
-import { Button, Modal, Space } from 'antd';
+import { Button, Modal, Space, Tag } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -16,7 +16,11 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { deaktiviereSprechgruppe, listeSprechgruppen } from '../api/sprechgruppen';
+import {
+  deaktiviereSprechgruppe,
+  listeSprechgruppen,
+  listeSprechgruppenAuchLokal,
+} from '../api/sprechgruppen';
 import type { Sprechgruppe } from '../api/types';
 import SprechgruppeFormModal from './SprechgruppeFormModal';
 import { globalKeys } from '../api/queryKeys';
@@ -40,12 +44,27 @@ export default function SprechgruppenTab() {
     queryKey: globalKeys.sprechgruppenAlle(),
     queryFn: () => listeSprechgruppen(false),
   });
+  // Altbestand (LLH-1645): Katalog-Sprechgruppen, deren Name ein Einsatz zugleich als
+  // Einsatz-Sprechgruppe trägt. Nur erkannt; die Route nennt Einsätze und ist deshalb Admins
+  // vorbehalten. Scheitert der Abruf, fehlt nur die Marke.
+  const auchLokalQuery = useQuery({
+    queryKey: globalKeys.sprechgruppenAuchLokal(),
+    queryFn: listeSprechgruppenAuchLokal,
+    enabled: istAdmin,
+  });
+  const auchLokal = new Map<number, string[]>();
+  for (const paar of auchLokalQuery.data ?? []) {
+    auchLokal.set(paar.sprechgruppe_id, [
+      ...(auchLokal.get(paar.sprechgruppe_id) ?? []),
+      `„${paar.einsatz}“`,
+    ]);
+  }
 
   // KEIN `onError` (LFH-473): ein Toast wäre nach drei Sekunden weg, danach sagte nichts mehr, dass
   // und warum das Deaktivieren scheiterte. Der Fehler steht im `SeitenHinweise`-Slot unten.
   const deaktivierenMutation = useMutation({
     mutationFn: (id: number) => deaktiviereSprechgruppe(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.sprechgruppen() }),
     // Auch bei Ablehnung schließt die Rückfrage: der Fehler steht im Seitenhinweis.
     onSettled: () => setZuDeaktivieren(null),
   });
@@ -102,6 +121,13 @@ export default function SprechgruppenTab() {
             herkunft={herkunft.herkunft('sprechgruppe', sg.id)}
             quelle={herkunft.quelle}
           />
+          {/* Die Einsätze stehen in der Marke selbst, nicht nur im Titel: ohne Mauszeiger
+             (Touch, Tastatur) wäre ein Titel nicht zu lesen. */}
+          {auchLokal.has(sg.id) && (
+            <Tag style={{ whiteSpace: 'normal' }}>
+              auch lokal in {auchLokal.get(sg.id)?.join(', ')}
+            </Tag>
+          )}
         </Space>
       ),
     },
