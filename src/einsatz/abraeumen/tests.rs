@@ -307,3 +307,32 @@ async fn phase_r_laesst_spiegel_am_hub_stehen() {
     assert_eq!(phase_r(&pool, JETZT).await, 0);
     assert!(gibt_es(&pool, id).await);
 }
+
+#[tokio::test]
+async fn widerruf_zwischen_auswahl_und_vormerken_laesst_den_spiegel_stehen() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    kopplung(&pool, "meldet_sich").await;
+    let id = spiegel(&pool, leit, Some("2026-11-01 00:00:00")).await;
+    let faellig = faellige_spiegel(&pool, JETZT).await.unwrap();
+    assert_eq!(faellig, vec![(id, "Gegenstelle".to_string())]);
+
+    sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = datetime('now') WHERE id = 1")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+    assert!(!spiegel_vormerken(&mut conn, id, JETZT).await.unwrap());
+    drop(conn);
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM einsatz_abraeumen WHERE einsatz_id = ?",
+            id
+        )
+        .await,
+        0
+    );
+    assert_eq!(alle_vorgemerkten(&pool).await, 0);
+    assert!(gibt_es(&pool, id).await);
+}

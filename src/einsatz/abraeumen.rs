@@ -59,34 +59,59 @@ pub async fn vorgemerkte(pool: &SqlitePool) -> Result<Vec<i64>, AppError> {
     )
 }
 
+/// Von welchen Spiegeln ein Einsatz `e` fällig ist, mit `sp`/`k` für die Gegenstelle; `?1` ist
+/// der Status „abgeschlossen“, `?2` der Zeitpunkt. Auswahl und Vormerken prüfen dieselbe
+/// Bedingung, das Vormerken erneut in seiner Schreibtransaktion.
+const FAELLIGER_SPIEGEL: &str = "FROM einsatz e \
+       JOIN einsatz_spiegel sp ON sp.einsatz_id = e.id \
+       JOIN instanz_kopplung_org ko ON ko.id = sp.kopplung_org_id \
+       JOIN instanz_kopplung k ON k.id = ko.kopplung_id \
+     WHERE k.richtung = 'meldet_sich' AND e.status = ?1 \
+       AND sp.beendet_at IS NULL AND ko.widerrufen_at IS NULL \
+       AND e.nachbereitung_bis GLOB \
+           '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' \
+       AND ?2 >= e.nachbereitung_bis \
+       AND NOT EXISTS (SELECT 1 FROM spiegel_antrag a WHERE a.einsatz_id = e.id \
+                       AND a.zustand IN ('ausstehend', 'zugestellt')) \
+       AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id)";
+
 /// Spiegel an der meldenden Seite, deren Nachbereitung zu `jetzt` abgelaufen ist (D5), mit dem
 /// Namen der Gegenstelle. Ausgenommen sind Spiegel mit einem Antrag, der noch aussteht oder
 /// zugestellt ist: die Antwort des Führers soll ankommen, und ein beendeter Spiegel (Widerruf):
-/// er bleibt ohne Kopplung lesbar, kein Führer meldet mehr sein Ende. Ein Spiegel am Hub (erreichte Seite)
-/// ist nie dabei; er endet über Verwahrung oder Lebensende.
+/// er bleibt ohne Kopplung lesbar, kein Führer meldet mehr sein Ende. Ein Spiegel am Hub
+/// (erreichte Seite) ist nie dabei; er endet über Verwahrung oder Lebensende.
 pub async fn faellige_spiegel(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<(i64, String)>, AppError> {
-    Ok(sqlx::query_as(
-        "SELECT e.id, k.gegenueber_name FROM einsatz e \
-           JOIN einsatz_spiegel sp ON sp.einsatz_id = e.id \
-           JOIN instanz_kopplung_org ko ON ko.id = sp.kopplung_org_id \
-           JOIN instanz_kopplung k ON k.id = ko.kopplung_id \
-         WHERE k.richtung = 'meldet_sich' AND e.status = ?1 \
-           AND sp.beendet_at IS NULL AND ko.widerrufen_at IS NULL \
-           AND e.nachbereitung_bis GLOB \
-               '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' \
-           AND ?2 >= e.nachbereitung_bis \
-           AND NOT EXISTS (SELECT 1 FROM spiegel_antrag a WHERE a.einsatz_id = e.id \
-                           AND a.zustand IN ('ausstehend', 'zugestellt')) \
-           AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id) \
-         ORDER BY e.id",
-    )
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT e.id, k.gegenueber_name {FAELLIGER_SPIEGEL} ORDER BY e.id"
+    )))
     .bind(super::STATUS_ABGESCHLOSSEN)
     .bind(jetzt)
     .fetch_all(pool)
     .await?)
+}
+
+/// Merkt einen fälligen Spiegel vor, nur wenn er in dieser Transaktion noch fällig ist: ein
+/// Widerruf, ein Ende oder ein neuer Antrag zwischen Auswahl und Vormerken lässt ihn stehen.
+/// Liefert, ob vorgemerkt wurde.
+async fn spiegel_vormerken(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let r = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "INSERT INTO einsatz_abraeumen (einsatz_id, art, gegenstelle) \
+         SELECT e.id, ?3, k.gegenueber_name {FAELLIGER_SPIEGEL} AND e.id = ?4"
+    )))
+    .bind(super::STATUS_ABGESCHLOSSEN)
+    .bind(jetzt)
+    .bind(AbraeumArt::Spiegel.as_str())
+    .bind(einsatz_id)
+    .execute(conn)
+    .await?;
+    Ok(r.rows_affected() > 0)
 }
 
 /// Phase R des Purge-Laufs: merkt fällige Spiegel der meldenden Seite vor (D5) und räumt jeden
@@ -95,16 +120,21 @@ pub async fn faellige_spiegel(
 pub async fn phase_r(pool: &SqlitePool, jetzt: &str) -> usize {
     match faellige_spiegel(pool, jetzt).await {
         Ok(faellig) => {
-            for (id, gegenstelle) in faellig {
-                tracing::warn!(
-                    einsatz_id = id,
-                    "Purge Phase R: Spiegel nach der Nachbereitung zum Abräumen vorgemerkt"
-                );
-                let ergebnis = crate::write_retry!(pool, |conn| {
-                    vormerken(conn, id, AbraeumArt::Spiegel, Some(&gegenstelle)).await
-                });
-                if let Err(e) = ergebnis {
-                    tracing::error!(einsatz_id = id, "Purge Phase R: Vormerken gescheitert: {e}");
+            for (id, _) in faellig {
+                let ergebnis =
+                    crate::write_retry!(pool, |conn| { spiegel_vormerken(conn, id, jetzt).await });
+                match ergebnis {
+                    Ok(true) => tracing::warn!(
+                        einsatz_id = id,
+                        "Purge Phase R: Spiegel nach der Nachbereitung zum Abräumen vorgemerkt"
+                    ),
+                    Ok(false) => {}
+                    Err(e) => {
+                        tracing::error!(
+                            einsatz_id = id,
+                            "Purge Phase R: Vormerken gescheitert: {e}"
+                        )
+                    }
                 }
             }
         }
