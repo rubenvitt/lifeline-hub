@@ -58,24 +58,45 @@ const SCHLUSS = 'Öffentlich';
  * sind `''`. Gibt `null` zurück, wenn der Text nicht aus dem Formular stammt (Art, Version und
  * Beschreibung fehlen).
  *
- * GitHub schreibt alle Felder in ihrer Reihenfolge, jedes mit seiner Überschrift. Gesucht wird
- * deshalb von hinten: erst die letzte „### Öffentlich“, davor die letzte Überschrift des
- * vorigen Feldes und so weiter. Eine `###`-Zeile, die jemand in eine Antwort schreibt, auch mit
- * dem Namen eines Feldes oder in einem Codeblock, bleibt so Teil dieser Antwort.
+ * GitHub schreibt alle Felder in ihrer Reihenfolge, jedes mit seiner Überschrift. Vor der
+ * Beschreibung stehen nur einzeilige Felder (Auswahl, Eingabe); ihre Überschriften und die der
+ * Beschreibung werden von vorn gesucht. Hinter der Beschreibung liegen die übrigen Textfelder und
+ * das Häkchen „Öffentlich“; sie werden von hinten gesucht, höchstens bis zur Beschreibung. Eine
+ * `###`-Zeile in einer Antwort, auch mit dem Namen eines Feldes oder in einem Codeblock, bleibt
+ * so Text: Sie landet in ihrer Antwort oder, wo die Grenze mehrdeutig ist (eine Feldüberschrift
+ * der hinteren Textfelder in deren eigenen Antworten), im Textfeld davor, geht aber nie verloren.
  */
 export function zerlegeFormular(text) {
   const zeilen = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
-  const reihenfolge = [...Object.values(FELDER), SCHLUSS];
-  const abschnitte = new Map();
-  let grenze = zeilen.length;
-  for (let feld = reihenfolge.length - 1; feld >= 0; feld -= 1) {
-    const kopf = `### ${reihenfolge[feld]}`;
-    let stelle = grenze - 1;
-    while (stelle >= 0 && zeilen[stelle].trimEnd() !== kopf) stelle -= 1;
-    if (stelle < 0) continue;
-    abschnitte.set(reihenfolge[feld], zeilen.slice(stelle + 1, grenze).join('\n').trim());
-    grenze = stelle;
+  const ist = (stelle, label) => zeilen[stelle].trimEnd() === `### ${label}`;
+  const vorn = [FELDER.art, FELDER.version, FELDER.oberflaeche, FELDER.seite, FELDER.beschreibung];
+  const hinten = [FELDER.schritte, FELDER.erwartet, SCHLUSS];
+  const koepfe = [];
+
+  let stelle = 0;
+  for (const label of vorn) {
+    let fund = stelle;
+    while (fund < zeilen.length && !ist(fund, label)) fund += 1;
+    if (fund === zeilen.length) continue;
+    koepfe.push({ label, stelle: fund });
+    stelle = fund + 1;
   }
+  const untergrenze = stelle;
+  stelle = zeilen.length - 1;
+  for (const label of [...hinten].reverse()) {
+    let fund = stelle;
+    while (fund >= untergrenze && !ist(fund, label)) fund -= 1;
+    if (fund < untergrenze) continue;
+    koepfe.push({ label, stelle: fund });
+    stelle = fund - 1;
+  }
+
+  koepfe.sort((a, b) => a.stelle - b.stelle);
+  const abschnitte = new Map();
+  koepfe.forEach(({ label, stelle: von }, nr) => {
+    const bis = koepfe[nr + 1]?.stelle ?? zeilen.length;
+    abschnitte.set(label, zeilen.slice(von + 1, bis).join('\n').trim());
+  });
 
   const werte = {};
   for (const [id, label] of Object.entries(FELDER)) {

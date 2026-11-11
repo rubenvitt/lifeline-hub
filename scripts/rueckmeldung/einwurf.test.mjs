@@ -79,6 +79,23 @@ test('Feldüberschriften in einer Antwort bleiben in der Antwort', () => {
   assert.match(description, /siehe oben/);
 });
 
+test('die eigene Feldüberschrift in der Beschreibung schneidet nichts ab', () => {
+  const beschreibung = 'Vorher\n\n### Was ist passiert, was wünschst du dir?\n\nNachher';
+  const werte = zerlegeFormular(formularText({ beschreibung }));
+  assert.equal(werte.beschreibung, beschreibung);
+  assert.equal(werte.seite, '/einsatz/:id/etb');
+  const { description } = baueEinwurf(issue({ beschreibung }));
+  assert.match(description, /^Vorher/);
+  assert.match(description, /Nachher/);
+});
+
+test('mehrdeutige Grenze hinten: der Text bleibt erhalten', () => {
+  const erwartet = 'Ruhe\n\n### Erwartet\n\nnoch mehr';
+  const werte = zerlegeFormular(formularText({ schritte: '1. Öffnen', erwartet }));
+  const alles = [werte.beschreibung, werte.schritte, werte.erwartet].join('\n');
+  for (const teil of ['1. Öffnen', 'Ruhe', 'noch mehr']) assert.ok(alles.includes(teil), teil);
+});
+
 test('ein freies Issue ist keine Rückmeldung', () => {
   assert.equal(zerlegeFormular('Bitte Dark Mode'), null);
   assert.equal(baueEinwurf({ ...issue(), body: '### Irgendwas\n\nText' }), null);
