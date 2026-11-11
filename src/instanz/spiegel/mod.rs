@@ -102,6 +102,33 @@ pub async fn beende_fuer_zuordnung(
     Ok(())
 }
 
+/// Löscht unter dem Merker der Übernahme (LLH-1494): das Abräumen eines Einsatzes
+/// (`einsatz::abraeumen`) geht durch die Schutz-Trigger eines Spiegels. Nur `DELETE`, in der
+/// Transaktion des Aufrufers; liefert die Zahl gelöschter Zeilen.
+pub async fn loeschen_unter_merker(
+    conn: &mut sqlx::SqliteConnection,
+    sql: &str,
+    id: i64,
+) -> Result<u64, crate::error::AppError> {
+    if !sql.starts_with("DELETE FROM ") {
+        return Err(crate::error::AppError::Internal(
+            "loeschen_unter_merker: nur DELETE".into(),
+        ));
+    }
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *conn)
+        .await?;
+    let n = sqlx::query(sqlx::AssertSqlSafe(sql.to_string()))
+        .bind(id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *conn)
+        .await?;
+    Ok(n)
+}
+
 /// Nachricht, mit der die Schutz-Trigger abbrechen; `AppError` macht daraus 409 (D10).
 pub const SCHUTZ_NACHRICHT: &str = "einsatz_ist_spiegel";
 

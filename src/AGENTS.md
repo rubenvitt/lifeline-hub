@@ -404,6 +404,19 @@ Herleitung in
   - **`AntragAkteur` setzt nur `spiegel::antrag::ausfuehren`**; `CurrentUser` nimmt das Konto
     dann aus der Extension statt aus dem Cookie.
   - Nachweis: `tests/instanz_spiegel.rs`, `tests/instanz_spiegel_live.rs`.
+  - **Lebensende (LLH-1494)**, Spec `aufbewahrung`, Herleitung
+    `/mnt/project-files/llh-1494/tkky2noy-archiv-nachbereitung/design.md` (D2–D7): Der Führer
+    liefert einen abgeschlossenen Einsatz weiter, solange die Gegenseite einen niedrigeren Stand
+    nennt, auch soft-gelöscht oder geschwärzt (`liefern::list_gefuehrt`). `geloescht` meldet
+    eine Seite nur für genannte Kennungen mit eigenem Präfix, deren ID im eigenen
+    Löschprotokoll steht (eine aus der Sicherung zurückgekehrte Instanz meldet nichts).
+    `verwahrt` geht nur von der meldenden Seite aus; die erreichte wandelt ihren Spiegel erst
+    bei gleichem Stand und ohne fehlenden Anhang (`spiegel::lebensende::verwahrung_annehmen`),
+    und erst ihre Quittung `angenommen` merkt den Einsatz der meldenden Seite zum Abräumen vor.
+    **Ein Einsatz verlässt eine Instanz nur über `einsatz::abraeumen`** (Merker
+    `einsatz_abraeumen` in der beschließenden Transaktion, Löschen nach dem Commit, Phase R holt
+    nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
+    `tests/instanz_lebensende.rs`.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
@@ -705,6 +718,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `skelett_dauer_bestaetigt` → 409. Das Protokoll sperrt ID und Einsatznummer
   (`einsatz::repo::anlegen_tx`). Herleitung:
   `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`.
+- **Nachbereitung und Abräumen** (LLH-1494): der Abschluss setzt `einsatz.nachbereitung_bis`
+  aus `org_einstellungen.nachbereitung_tage` (`einsatz/nachbereitung.rs`, ETB-Eintrag).
+  Danach räumt Phase R (`einsatz/abraeumen.rs`) Spiegel der meldenden Seite ab und holt jeden
+  stehen gebliebenen Merker `einsatz_abraeumen` nach. Das Löschprotokoll trägt `art`:
+  `skelett` (Pflichtfelder per CHECK), `verwahrt` (mit Nummer, an die Gegenstelle übergeben) und
+  `spiegel` (ohne Nummer, die gehört dem Führer; Übersicht lässt sie aus). Alle Arten sperren
+  die ID, nur Zeilen mit Nummer die Nummer.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

@@ -394,6 +394,18 @@ Vorhandene Spiegel bleiben lesbar und gesperrt; das Hinweisband zeigt „Abgleic
 Anträge an diese Spiegel sind abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Spiegel
 dabei nicht.
 
+### Ende eines Spiegels
+
+Ein zur Löschung vorgemerkter Einsatz ist auch am Spiegel gesperrt, eine Wiederherstellung
+hebt die Sperre auch dort auf, und eine Schwärzung kommt ebenso an. Löscht die Installation, die
+einen Einsatz führt, ihn endgültig, löscht die andere ihren Spiegel beim nächsten Abgleich; das
+Löschprotokoll dort nennt die Gegenstelle, aber keine Nummer.
+
+Nach dem Ende der Nachbereitung übergibt ein ELW seine eigenen Einsätze dem Hub zur Verwahrung:
+Der Spiegel am Hub wird dabei zu einem eigenen Einsatz des Hubs, und der ELW löscht seinen.
+Spiegel von Einsätzen des Hubs löscht der ELW nach der Nachbereitung. Das Kapitel
+[Aufbewahrung](aufbewahrung.md) beschreibt die Einzelheiten.
+
 ### Führung je Einsatz
 
 Die Führung je Einsatz schaltet der Betrieb mit `LIFELINE_FUEHRUNG` an beiden Installationen

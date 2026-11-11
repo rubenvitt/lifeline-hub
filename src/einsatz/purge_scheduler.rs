@@ -4548,7 +4548,8 @@ mod tests {
 
     /// LLH-1492 (design.md D10): Ein Spiegel liegt in jeder Phase brach, die einen Einsatz
     /// betrifft: Soft-Delete (A), Antrag (A2), Kategorien (K1, K2), Schwärzung (B), Nachlauf,
-    /// endgültige Löschung (D) und verwaiste Anhänge (E). Sein Lebensende regelt LLH-1494. Je
+    /// endgültige Löschung (D) und verwaiste Anhänge (E). Abgeräumt wird er nur in Phase R
+    /// (LLH-1494), die hier nichts findet: ohne Merker und ohne meldende Kopplung. Je
     /// Zustand steht ein eigener Einsatz daneben, den derselbe Lauf bearbeitet; kein Schreibversuch
     /// scheitert am Schutz-Trigger, und ein zweiter Lauf lässt den Spiegel ebenso stehen.
     #[tokio::test]

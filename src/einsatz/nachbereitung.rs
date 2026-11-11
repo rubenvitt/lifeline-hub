@@ -131,6 +131,9 @@ fn sperre(
     None
 }
 
+/// Status, gelöscht, geschwärzt, Nachbereitung bis, Abräumen vorgemerkt.
+type KopfZeile = (String, Option<String>, Option<String>, Option<String>, bool);
+
 /// Setzt, ändert oder hebt die Nachbereitungsfrist auf, mit System-Eintrag im ETB, in einer
 /// Transaktion. `neu` ist bereits normalisiert. Unverändert → kein UPDATE und kein Eintrag.
 /// 409, wenn der Einsatz nicht abgeschlossen, vorgemerkt, geschwärzt oder schon übergeben ist.
@@ -143,15 +146,14 @@ pub async fn setzen(
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
-    let zeile: Option<(String, Option<String>, Option<String>, Option<String>, bool)> =
-        sqlx::query_as(
-            "SELECT status, geloescht_at, geschwaerzt_at, nachbereitung_bis, \
+    let zeile: Option<KopfZeile> = sqlx::query_as(
+        "SELECT status, geloescht_at, geschwaerzt_at, nachbereitung_bis, \
                     EXISTS (SELECT 1 FROM einsatz_abraeumen a WHERE a.einsatz_id = einsatz.id) \
              FROM einsatz WHERE id = ?",
-        )
-        .bind(einsatz_id)
-        .fetch_optional(&mut *tx)
-        .await?;
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     let Some((status, geloescht_at, geschwaerzt_at, alt, abraeumen)) = zeile else {
         return Err(AppError::NotFound);
     };

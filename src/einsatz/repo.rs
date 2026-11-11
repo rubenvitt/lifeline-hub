@@ -986,7 +986,8 @@ pub(crate) async fn system_audit_tx(
 /// ist hart im WHERE — aktive Einsätze sind NIE fällig. Lexikografischer
 /// Zeitvergleich (kanonisches Format). Org-isoliert über die `einsatz`-Tabelle.
 pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<i64>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let ids = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM einsatz \
          WHERE status = ? AND retention_bis IS NOT NULL \
@@ -1187,7 +1188,8 @@ pub async fn faellige_purge(
     pool: &SqlitePool,
     _karenz_tage: i64,
 ) -> Result<Vec<(i64, String)>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let rows = sqlx::query_as::<_, (i64, String)>(sqlx::AssertSqlSafe(format!(
         "SELECT id, geloescht_at FROM einsatz \
          WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL AND {} \

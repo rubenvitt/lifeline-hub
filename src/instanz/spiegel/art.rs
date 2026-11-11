@@ -191,7 +191,7 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ),
     (
         "einsatz_aufbewahrung_kategorie",
-        "Fristen gelten am Führer; das Lebensende des Spiegels regelt LLH-1494",
+        "Fristen gelten am Führer; zur Verwahrung kommen sie mit dem Lebensende (LLH-1494)",
     ),
     ("einsatz_aenderung", "Verwaltung des Spiegels selbst"),
     ("einsatz_spiegel", "Verwaltung des Spiegels selbst"),

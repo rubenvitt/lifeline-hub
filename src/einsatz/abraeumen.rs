@@ -12,8 +12,9 @@
 //!
 //! Gelöscht wird wie bei der endgültigen Löschung (`skelett_loeschung`): Datei-Inhalte einzeln
 //! (LFH-905), dann eine Transaktion mit Protokollzeile und `DELETE FROM einsatz`, dessen Kaskade
-//! den Rest nimmt, zuletzt der Rückschrieb des WAL. Unter dem Merker `spiegel_uebernahme`, damit
-//! die Schutz-Trigger eines Spiegels das Löschen nicht abbrechen.
+//! den Rest nimmt, zuletzt der Rückschrieb des WAL. Gelöscht wird über
+//! `instanz::spiegel::loeschen_unter_merker`, damit die Schutz-Trigger eines Spiegels das Löschen
+//! nicht abbrechen (der Merker gehört nach ADR-0018 dem Spiegel-Modul).
 
 use crate::error::AppError;
 use crate::wire_enum::wire_enum;
@@ -110,21 +111,6 @@ pub async fn phase_r(pool: &SqlitePool, jetzt: &str) -> usize {
     alle_vorgemerkten(pool).await
 }
 
-/// Schaltet die Schutz-Trigger eines Spiegels für die laufende Transaktion ab.
-async fn merker_an(conn: &mut SqliteConnection) -> Result<(), AppError> {
-    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
-        .execute(conn)
-        .await?;
-    Ok(())
-}
-
-async fn merker_aus(conn: &mut SqliteConnection) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM spiegel_uebernahme")
-        .execute(conn)
-        .await?;
-    Ok(())
-}
-
 /// Löscht die Datei-Inhalte eines vorgemerkten Einsatzes einzeln, je Zeile eine Transaktion
 /// (wie `schwaerzung_nachlauf::entferne_vorgesehene`): die Schreibsperre hält höchstens für
 /// einen Inhalt.
@@ -142,12 +128,7 @@ async fn dateien_einzeln(pool: &SqlitePool, einsatz_id: i64) -> Result<(), AppEr
         );
         for id in ids {
             crate::write_retry!(pool, |conn| {
-                merker_an(conn).await?;
-                sqlx::query(sqlx::AssertSqlSafe(sql.clone()))
-                    .bind(id)
-                    .execute(&mut *conn)
-                    .await?;
-                merker_aus(conn).await?;
+                crate::instanz::spiegel::loeschen_unter_merker(conn, &sql, id).await?;
                 Ok(())
             })?;
         }
@@ -205,13 +186,12 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
         .execute(&mut *conn)
         .await?;
         crate::db::fk_pruefung_sicherstellen(&mut *conn, "Abräumen").await?;
-        merker_an(conn).await?;
-        let n = sqlx::query("DELETE FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?
-            .rows_affected();
-        merker_aus(conn).await?;
+        let n = crate::instanz::spiegel::loeschen_unter_merker(
+            conn,
+            "DELETE FROM einsatz WHERE id = ?",
+            einsatz_id,
+        )
+        .await?;
         if n != 1 {
             return Err(AppError::Internal(format!(
                 "Abräumen von Einsatz {einsatz_id}: {n} Zeilen statt 1"

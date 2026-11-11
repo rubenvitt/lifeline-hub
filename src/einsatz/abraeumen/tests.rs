@@ -224,21 +224,12 @@ async fn spiegel(pool: &SqlitePool, leit: i64, bis: Option<&str>) -> i64 {
         .await
         .unwrap();
     crate::einsatz::spiegel_filter::als_spiegel_markieren(pool, id).await;
-    let mut tx = pool.begin().await.unwrap();
-    sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    sqlx::query("UPDATE einsatz_spiegel SET kopplung_org_id = 1 WHERE einsatz_id = ?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    sqlx::query("DELETE FROM spiegel_uebernahme")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
+    crate::einsatz::spiegel_filter::unter_merker(
+        pool,
+        "UPDATE einsatz_spiegel SET kopplung_org_id = 1 WHERE einsatz_id = ?",
+        &[id],
+    )
+    .await;
     id
 }
 
@@ -257,26 +248,14 @@ async fn phase_r_raeumt_spiegel_der_meldenden_seite_nach_der_nachbereitung_ab() 
     let laeuft = spiegel(&pool, leit, Some("2026-12-01 00:00:00")).await;
     let ohne = spiegel(&pool, leit, None).await;
     let mit_antrag = spiegel(&pool, leit, Some("2026-11-01 00:00:00")).await;
-    let mut tx = pool.begin().await.unwrap();
-    sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    sqlx::query(
+    crate::einsatz::spiegel_filter::unter_merker(
+        &pool,
         "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, pfad_lokal, daten, \
          benutzer_id, client_id, erfasst_at, geaendert_at) \
          VALUES (?, 'etb', 'POST', '/x', '{}', '{}', ?, 'c1', datetime('now'), datetime('now'))",
+        &[mit_antrag, leit],
     )
-    .bind(mit_antrag)
-    .bind(leit)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    sqlx::query("DELETE FROM spiegel_uebernahme")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
+    .await;
     // Ein eigener Einsatz nach der Nachbereitung bleibt: er geht über die Verwahrung.
     let (eigen, _) = einsatz(&pool, leit).await;
     sqlx::query("UPDATE einsatz SET nachbereitung_bis = '2026-11-01 00:00:00' WHERE id = ?")
