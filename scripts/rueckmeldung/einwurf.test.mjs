@@ -300,8 +300,62 @@ test('kennzeichnen: setzt den Status und nimmt das Gegenlabel ab, 404 zählt nic
       entfernen: ['nicht-aufgenommen'],
       ghToken: 'gh',
       abruf: async (_a, o) => antwort(o.method === 'DELETE' ? 500 : 200, []),
+      warte: uhr().warte,
     }),
     /500 beim Entfernen/,
+  );
+});
+
+test('kennzeichnen: wiederholt vorübergehende Fehler, 4xx nicht', async () => {
+  const { pausen, warte } = uhr();
+  const antworten = [502, 0, 200, 429, 204];
+  const aufrufe = [];
+  await kennzeichnen({
+    repo: 'o/r',
+    nummer: 12,
+    labels: ['aufgenommen'],
+    entfernen: ['nicht-aufgenommen'],
+    ghToken: 'gh',
+    warte,
+    abruf: async (_a, o) => {
+      aufrufe.push(o.method);
+      assert.ok(o.signal, 'jeder Versuch hat eine Frist');
+      const status = antworten.shift();
+      if (status === 0) throw new TypeError('fetch failed');
+      return antwort(status, [], status === 429 ? { 'retry-after': '1' } : {});
+    },
+  });
+  assert.deepEqual(aufrufe, ['POST', 'POST', 'POST', 'DELETE', 'DELETE']);
+  assert.deepEqual(pausen, [2_000, 4_000, 1_000]);
+
+  let n = 0;
+  await assert.rejects(
+    kennzeichnen({
+      repo: 'o/r',
+      nummer: 12,
+      labels: ['aufgenommen'],
+      ghToken: 'gh',
+      warte,
+      abruf: async () => {
+        n += 1;
+        return antwort(403, { message: 'Forbidden' });
+      },
+    }),
+    /403 beim Setzen/,
+  );
+  assert.equal(n, 1);
+  await assert.rejects(
+    kennzeichnen({
+      repo: 'o/r',
+      nummer: 12,
+      labels: ['aufgenommen'],
+      ghToken: 'gh',
+      warte,
+      abruf: async () => {
+        throw new TypeError('fetch failed');
+      },
+    }),
+    /GitHub nicht erreichbar/,
   );
 });
 

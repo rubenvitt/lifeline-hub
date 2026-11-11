@@ -212,8 +212,11 @@ export function warteAus(kopf, jetzt = Date.now()) {
   return Number.isFinite(datum) ? Math.max(0, datum - jetzt) : null;
 }
 
-/** Ein Versuch: `{ status, daten }`, Status 0 bei Netzfehler oder abgelaufener Frist. */
-async function versuch(adresse, optionen, abruf, frist) {
+/**
+ * Ein Versuch: `{ status, daten, warteMs }`, Status 0 bei Netzfehler oder abgelaufener Frist
+ * (dann mit `grund`). `gegenueber` nennt die Gegenstelle in der Meldung.
+ */
+async function versuch(adresse, optionen, abruf, frist, gegenueber) {
   try {
     const antwort = await abruf(adresse, { ...optionen, signal: AbortSignal.timeout(frist) });
     let daten = null;
@@ -226,18 +229,37 @@ async function versuch(adresse, optionen, abruf, frist) {
     return { status: antwort.status, daten, warteMs: warteAus(antwort.headers?.get?.('retry-after')) };
   } catch (fehler) {
     const grund = fehler?.name === 'TimeoutError' ? `keine Antwort in ${frist / 1000} s` : (fehler?.message ?? fehler);
-    return { status: 0, daten: null, grund: `Zunder nicht erreichbar: ${grund}` };
+    return { status: 0, daten: null, warteMs: null, grund: `${gegenueber} nicht erreichbar: ${grund}` };
   }
+}
+
+/**
+ * Wiederholt `versuch`, solange der Fehler vorübergehend ist: Netzfehler, Frist, 5xx und 429 mit
+ * gültigem, kurzem `Retry-After` (ohne Angabe wäre jeder Versuch geraten). Höchstens `versuche`
+ * Versuche; `fertig(status)` sagt, welcher Status kein Fehler ist. Liefert den letzten Versuch.
+ */
+async function wiederholt(adresse, optionen, { abruf, frist, versuche, warte, gegenueber, fertig }) {
+  let letzter;
+  for (let nr = 1; nr <= versuche; nr += 1) {
+    letzter = await versuch(adresse, optionen, abruf, frist, gegenueber);
+    const { status, warteMs } = letzter;
+    if (fertig(status)) return letzter;
+    const kurzGedrosselt = status === 429 && warteMs !== null && warteMs <= WARTE_MAX_MS;
+    const voruebergehend = status === 0 || status >= 500 || kurzGedrosselt;
+    if (!voruebergehend || nr === versuche) break;
+    await warte(status === 429 ? warteMs : 2_000 * nr);
+  }
+  return letzter;
 }
 
 /**
  * Schickt den Einwurf an Zunder. Ergebnis `{ ok, status, ref?, fehler? }`; wirft nie, damit der
  * Aufrufer das Issue in jedem Fall kennzeichnen kann.
  *
- * Jeder Versuch hat eine Frist (`FRIST_MS`, inklusive Antwortkörper). Wiederholt wird nur, was
- * vorübergehend ist: Netzfehler, Frist, 5xx und 429 mit gültigem, kurzem `Retry-After`. Höchstens
- * `VERSUCHE` Versuche, zusammen gut eine Minute, damit im 5-Minuten-Job Zeit für die
- * Kennzeichnung bleibt. Wiederholen ist sicher, weil `external_id` den Einwurf idempotent macht.
+ * Jeder Versuch hat eine Frist (`FRIST_MS`, inklusive Antwortkörper), wiederholt wird nur
+ * Vorübergehendes (`wiederholt`). Höchstens `VERSUCHE` Versuche, zusammen gut eine Minute, damit
+ * im 5-Minuten-Job Zeit für die Kennzeichnung bleibt. Wiederholen ist sicher, weil
+ * `external_id` den Einwurf idempotent macht.
  */
 export async function einwerfen(
   einwurf,
@@ -252,51 +274,63 @@ export async function einwerfen(
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(einwurf),
   };
-  let ergebnis;
-  for (let nr = 1; nr <= versuche; nr += 1) {
-    const { status, daten, grund, warteMs } = await versuch(adresse, optionen, abruf, frist);
-    if (status === 200 || status === 201) return { ok: true, status, ref: daten?.ref ?? null };
-    const text = grund ?? `Zunder antwortet ${status} ${daten?.message ?? daten?.error ?? ''}`.trim();
-    ergebnis = { ok: false, status, fehler: text };
-    // 429 nur mit gültigem, kurzem Retry-After: ohne Angabe wäre jeder Versuch geraten.
-    const kurzGedrosselt = status === 429 && warteMs !== null && warteMs <= WARTE_MAX_MS;
-    const voruebergehend = status === 0 || status >= 500 || kurzGedrosselt;
-    if (!voruebergehend || nr === versuche) break;
-    await warte(status === 429 ? warteMs : 2_000 * nr);
-  }
-  return ergebnis;
+  const fertig = (status) => status === 200 || status === 201;
+  const { status, daten, grund } = await wiederholt(adresse, optionen, {
+    abruf,
+    frist,
+    versuche,
+    warte,
+    gegenueber: 'Zunder',
+    fertig,
+  });
+  if (fertig(status)) return { ok: true, status, ref: daten?.ref ?? null };
+  const fehler = grund ?? `Zunder antwortet ${status} ${daten?.message ?? daten?.error ?? ''}`.trim();
+  return { ok: false, status, fehler };
 }
 
-/** Statuslabels; beim Kennzeichnen fällt das jeweils andere weg. */
 export const STATUS_LABELS = ['aufgenommen', 'nicht-aufgenommen'];
 
 /**
  * Setzt Labels am Issue (fehlende legt GitHub dabei an) und nimmt `entfernen` ab, falls
  * vorhanden. So steht nach einem Re-run nur der letzte Status am Issue; übrige Labels bleiben.
+ * Frist und Wiederholung wie beim Einwurf; beide Anfragen sind idempotent. Wirft, wenn eine
+ * Anfrage endgültig scheitert.
  */
-export async function kennzeichnen({ repo, nummer, labels, entfernen = [], ghToken, abruf = fetch, frist = FRIST_MS }) {
+export async function kennzeichnen({
+  repo,
+  nummer,
+  labels,
+  entfernen = [],
+  ghToken,
+  abruf = fetch,
+  frist = FRIST_MS,
+  versuche = VERSUCHE,
+  warte = schlafen,
+}) {
   const basis = `https://api.github.com/repos/${repo}/issues/${nummer}/labels`;
   const kopf = {
     Authorization: `Bearer ${ghToken}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
   };
-  const antwort = await abruf(basis, {
-    method: 'POST',
-    headers: { ...kopf, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ labels }),
-    signal: AbortSignal.timeout(frist),
-  });
-  if (!antwort.ok) throw new Error(`GitHub antwortet ${antwort.status} beim Setzen der Labels.`);
+  const art = { abruf, frist, versuche, warte, gegenueber: 'GitHub' };
+  const gesetzt = await wiederholt(
+    basis,
+    { method: 'POST', headers: { ...kopf, 'Content-Type': 'application/json' }, body: JSON.stringify({ labels }) },
+    { ...art, fertig: (status) => status >= 200 && status < 300 },
+  );
+  if (!(gesetzt.status >= 200 && gesetzt.status < 300)) {
+    throw new Error(gesetzt.grund ?? `GitHub antwortet ${gesetzt.status} beim Setzen der Labels.`);
+  }
   for (const name of entfernen) {
-    const weg = await abruf(`${basis}/${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-      headers: kopf,
-      signal: AbortSignal.timeout(frist),
-    });
     // 404: das Label hing nicht am Issue
-    if (!weg.ok && weg.status !== 404) {
-      throw new Error(`GitHub antwortet ${weg.status} beim Entfernen von „${name}“.`);
+    const fertig = (status) => (status >= 200 && status < 300) || status === 404;
+    const weg = await wiederholt(`${basis}/${encodeURIComponent(name)}`, { method: 'DELETE', headers: kopf }, {
+      ...art,
+      fertig,
+    });
+    if (!fertig(weg.status)) {
+      throw new Error(weg.grund ?? `GitHub antwortet ${weg.status} beim Entfernen von „${name}“.`);
     }
   }
 }
