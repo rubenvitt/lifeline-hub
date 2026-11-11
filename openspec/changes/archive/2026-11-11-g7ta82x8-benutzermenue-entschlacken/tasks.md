@@ -48,7 +48,12 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 - [x] 7.1 Zeichenflächen und `canvas.json` aus dem Artifact nach `docs/design/2026-11-11-benutzermenue/`
 - [x] 7.2 `mise exec -- pnpm -C frontend design-system`, Erzeugtes unter `docs/design/design-system/project/` mitcommitten (Segmentleiste geändert)
 - [x] 7.3 Kommentare im Code nachziehen, die „Umschaltgruppen“, „✓ im Text“ oder die alten Einträge nennen (`BenutzerMenu.tsx`, `command-palette/befehle.ts`, `theme/darstellungOptionen.ts`, `rueckmeldung/adresse.ts`)
-- [ ] 7.4 `./scripts/check-all.sh` grün (Gate-Lauf dieses Branches)
+- [x] 7.4 `./scripts/check-all.sh` grün (Gate-Lauf dieses Branches). Cloud-Sitzung ohne mise mit
+  Node 22 statt 26.7: Schnellbündel grün bis auf Schritt 8 (`scripts/rueckmeldung/einwurf.test.mjs`,
+  „Promise resolution is still pending“), Vitest 1223/1227 Dateien grün, rot nur `Grundriss`,
+  `kartenbilder`, `uhsPlan`, `skizzeAlsBild` (`object.stream is not a function`) — alle ohne Diff
+  in diesem Branch, Node-22-Grenze; e2e der geänderten Specs 52/52 (chromium). Der volle Lauf gilt
+  in der CI des PRs.
 - [x] 7.5 `superpowers:requesting-code-review`, bestätigte Befunde abarbeiten
 
 ## Workflow follow-up
