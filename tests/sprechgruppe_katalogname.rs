@@ -329,3 +329,46 @@ async fn deaktivierte_katalog_sprechgruppe_neben_gleichnamiger_lokaler_ist_nicht
     let anderer = einsatz_anlegen(&app, &admin).await;
     fuehrungsstelle_zuordnen(&app, &admin, anderer, sg).await;
 }
+
+#[tokio::test]
+async fn erste_skizzenlage_einer_katalog_sprechgruppe_neben_gleichnamiger_lokaler_ist_409() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let sg = katalog(&app, &admin, "412_F_DRK", "TMO").await;
+    deaktivieren(&app, &admin, sg).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, _) = lokal(&app, &admin, einsatz, "412_F_DRK", "TMO").await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let lage = r#"{"x": 0, "y": 320, "breite": 640, "version": null}"#;
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/stab/fernmeldeskizze/lage/sg-{sg}"),
+        &admin,
+        Some(lage),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+
+    // Altbestand: genutzt und mit gleichnamiger lokaler. Die Skizze bleibt bearbeitbar.
+    let alt = einsatz_anlegen(&app, &admin).await;
+    fuehrungsstelle_zuordnen(&app, &admin, alt, sg).await;
+    sqlx::query(
+        "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
+         SELECT org_id, id, '412_F_DRK', 'TMO' FROM einsatz WHERE id = ?",
+    )
+    .bind(alt)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{alt}/stab/fernmeldeskizze/lage/sg-{sg}"),
+        &admin,
+        Some(lage),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+}

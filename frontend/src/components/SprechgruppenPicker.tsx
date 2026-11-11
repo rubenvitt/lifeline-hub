@@ -53,7 +53,7 @@ export default function SprechgruppenPicker({
   const [neuBezeichnung, setNeuBezeichnung] = useState('');
   const [neuBetriebsart, setNeuBetriebsart] = useState<Betriebsart | undefined>(undefined);
 
-  const { data: sprechgruppen = [] } = useQuery({
+  const { data: sprechgruppen = [], isPending: listeLaedt } = useQuery({
     queryKey: einsatzKeys.sprechgruppen(einsatzId),
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
@@ -69,7 +69,8 @@ export default function SprechgruppenPicker({
     { label: 'DMO', title: 'DMO', options: optionenFuer('DMO') },
   ].filter((g) => g.options.length > 0);
 
-  const kannAnlegen = neuBezeichnung.trim().length > 0 && !!neuBetriebsart;
+  // Erst mit geladener Liste entscheiden, ob „Anlegen“ eine vorhandene Sprechgruppe auswählt.
+  const kannAnlegen = neuBezeichnung.trim().length > 0 && !!neuBetriebsart && !listeLaedt;
 
   // Kein `onError`: der Grund steht unter der Zeile, bis zum nächsten Anlegen (LFH-1077).
   const mutation = useMutation({

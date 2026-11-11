@@ -164,6 +164,14 @@ describe('SprechgruppenPicker', () => {
       expect(legeEinsatzSprechgruppeAn).not.toHaveBeenCalled();
     });
 
+    it('sperrt „Anlegen“, solange die Liste lädt', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockImplementation(() => new Promise(() => {}));
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn('412', 'TMO');
+      expect(screen.getByRole('button', { name: /^anlegen$/i })).toBeDisabled();
+      expect(legeEinsatzSprechgruppeAn).not.toHaveBeenCalled();
+    });
+
     it('legt bei anderer Betriebsart an', async () => {
       vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
       vi.mocked(legeEinsatzSprechgruppeAn).mockImplementation(() => new Promise(() => {}));

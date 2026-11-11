@@ -294,7 +294,9 @@ Innerhalb eines Einsatzes gibt es eine Sprechgruppe mit derselben Betriebsart un
 einmal: entweder aus dem Katalog unter „Stammdaten“ „Sprechgruppen“ oder als Sprechgruppe des
 Einsatzes. Verschiedene Einsätze dürfen jeder eine eigene gleichnamige Sprechgruppe haben.
 
-- Steht der Name im Katalog, legt ein Einsatz keine eigene Sprechgruppe mit ihm an.
+- Steht der Name im Katalog, legt ein Einsatz keine eigene Sprechgruppe mit ihm an. Ist die
+  Katalog-Sprechgruppe deaktiviert und im Einsatz nicht zugeordnet, geht es doch; die
+  deaktivierte lässt sich dann in diesem Einsatz nicht mehr zuordnen.
 - Trägt ein laufender Einsatz eine eigene Sprechgruppe mit dem Namen, lehnt „Sprechgruppe
   anlegen“ ab und nennt den Einsatz; dasselbe gilt beim Umbenennen, auch für einen abgeschlossenen
   Einsatz, der die Katalog-Sprechgruppe nutzt.

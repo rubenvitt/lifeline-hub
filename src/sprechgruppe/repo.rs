@@ -410,9 +410,21 @@ pub(crate) async fn pruefe_zuordenbar(
             "Sprechgruppe {id} ist für diese Organisation/diesen Einsatz nicht zuordenbar"
         )));
     }
-    // LLH-1645: Eine Katalog-Sprechgruppe, die der Einsatz noch nicht nutzt, darf kein Paar mit
-    // einer gleichnamigen Einsatz-Sprechgruppe stiften (etwa eine deaktivierte, die der Picker
-    // nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar.
+    pruefe_kein_lokales_paar(&mut *pool.acquire().await?, einsatz_id, ids).await
+}
+
+/// LLH-1645: Eine Katalog-Sprechgruppe, die der Einsatz noch nicht nutzt, darf kein Paar mit
+/// einer gleichnamigen Einsatz-Sprechgruppe stiften (etwa eine deaktivierte, die der Picker
+/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Auf der
+/// Verbindung, damit Schreibpfade wie die Lage der Fernmeldeskizze in ihrer Transaktion prüfen.
+pub(crate) async fn pruefe_kein_lokales_paar(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    if ids.is_empty() {
+        return Ok(());
+    }
     let paar: Option<(String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT k.bezeichnung, k.betriebsart FROM sprechgruppe k \
          WHERE k.id IN (SELECT value FROM json_each(?1)) AND k.einsatz_id IS NULL \
@@ -424,7 +436,7 @@ pub(crate) async fn pruefe_zuordenbar(
     )))
     .bind(ids_json(ids)?)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     if let Some((bezeichnung, betriebsart)) = paar {
         return Err(AppError::Conflict(format!(
