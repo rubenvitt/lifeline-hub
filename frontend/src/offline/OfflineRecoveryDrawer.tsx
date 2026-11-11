@@ -598,7 +598,9 @@ export default function OfflineRecoveryDrawer({
               fehler={zeilen.grund(zeile.schluessel)}
               aktionen={
                 <Space size="middle">
-                  {kopierenMoeglich && <Button onClick={() => antragKopieren(a, zeile)}>Kopieren</Button>}
+                  {kopierenMoeglich && (
+                    <Button onClick={() => antragKopieren(a, zeile)}>Kopieren</Button>
+                  )}
                   <Popconfirm
                     title="Antrag endgültig verwerfen?"
                     okText="Endgültig verwerfen"
