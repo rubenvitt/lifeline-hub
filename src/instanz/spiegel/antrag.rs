@@ -1102,7 +1102,7 @@ pub async fn fuehre_eigene_aus(pool: &SqlitePool, router: &Router) -> Result<Vec
         let b = BEANTRAGBAR
             .iter()
             .find(|b| b.art == art && b.pfad == pfad && b.methode == methode);
-        // Ein Antrag ohne eigene Erfassung (vor Migration 0320 gestellt) geht mit den Daten für
+        // Ein Antrag ohne eigene Erfassung (vor LLH-1641 gestellt) geht mit den Daten für
         // den Führer, wenn darin keine Kennung steht: Dann sind sie hier dieselben.
         let daten_lokal = daten_lokal.or_else(|| {
             b.filter(|b| ohne_kennungen(b, &pfad_lokal, &daten))
@@ -1431,6 +1431,20 @@ mod tests {
             arten, bekannt,
             "BEANTRAGBAR/NICHT_BEANTRAGBAR passen nicht zur Warteschlange"
         );
+    }
+
+    /// Jede beantragbare Art trägt eine `client_id` (LLH-1630). Stürzt der Führer nach der
+    /// Ausführung und vor dem Speichern der Quittung ab, kommt der Antrag wieder; die Route
+    /// erkennt ihn dann an der `client_id` wie ein Replay der Warteschlange (ADR-0008) und legt
+    /// nichts zweimal an. Eine Art ohne `client_id` bräuchte eine andere Sicherung.
+    #[test]
+    fn jede_beantragbare_art_traegt_eine_client_id() {
+        let ohne: Vec<&str> = BEANTRAGBAR
+            .iter()
+            .filter(|b| b.client_id.is_none())
+            .map(|b| b.art)
+            .collect();
+        assert!(ohne.is_empty(), "beantragbar ohne client_id: {ohne:?}");
     }
 
     /// Jede Routenvorlage gibt es im Router, und ihre Pfadparameter sind abgebildet.

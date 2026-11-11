@@ -1554,7 +1554,7 @@ async fn ein_offener_antrag_am_spiegel_wird_beim_wechsel_genau_einmal_ausgefuehr
 }
 
 /// Anträge ohne eigene Erfassung gehen beim Wechsel nicht verloren (Review LLH-1641): der
-/// ETB-Antrag einer Freigabe (`etb_beantragen_tx`) und ein Antrag aus der Zeit vor Migration 0320
+/// ETB-Antrag einer Freigabe (`etb_beantragen_tx`) und ein Antrag aus der Zeit vor LLH-1641
 /// (`daten_lokal` leer, keine Kennungen darin).
 #[tokio::test]
 async fn antraege_ohne_eigene_erfassung_werden_beim_wechsel_ausgefuehrt() {

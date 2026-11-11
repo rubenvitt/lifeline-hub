@@ -7,6 +7,7 @@ use super::schema;
 use super::uebernehmen::OffenerInhalt;
 use crate::error::AppError;
 use base64::Engine;
+use futures::TryStreamExt;
 use sha2::{Digest, Sha256};
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -14,8 +15,18 @@ use sqlx::{SqliteConnection, SqlitePool};
 /// „wird geholt“.
 pub const WIRD_GEHOLT: &str = "Der Anhang wird von der führenden Instanz geholt.";
 
+/// Antwort (409) für einen Inhalt über [`INHALT_MAX`]: der Spiegel holt ihn nicht.
+pub const ZU_GROSS: &str =
+    "Der Anhang ist zu groß für den Abgleich; er liegt nur an der führenden Instanz.";
+
 /// Höchstzahl Abrufe je Paket, die nur vorab laden (ohne Anforderung).
 const VORAB_MAX: i64 = 4;
+
+/// Größter Inhalt, den ein Spiegel holt (LLH-1630): die Upload-Grenze der Anhänge
+/// (`anhang::MAX_GROESSE`, 25 MiB) mit Luft. Am Spiegel liegen alle Stücke bis zum Schluss in
+/// `spiegel_anhang_teil` und der fertige Inhalt einmal im Speicher; ohne Grenze bestimmte die
+/// Gegenseite, wie viel das ist.
+pub const INHALT_MAX: i64 = 32 * 1024 * 1024;
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
@@ -126,17 +137,20 @@ pub async fn pruefe_vorhanden(
     art: &str,
     lokaler_schluessel: &str,
 ) -> Result<(), AppError> {
-    let offen: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT angefordert_at FROM spiegel_anhang \
+    let offen: Option<(Option<String>, i64)> = sqlx::query_as(
+        "SELECT angefordert_at, groesse FROM spiegel_anhang \
          WHERE art = ? AND lokaler_schluessel = ? AND fertig_at IS NULL",
     )
     .bind(art)
     .bind(lokaler_schluessel)
     .fetch_optional(pool)
     .await?;
-    let Some(angefordert) = offen else {
+    let Some((angefordert, groesse)) = offen else {
         return Ok(());
     };
+    if groesse > INHALT_MAX {
+        return Err(AppError::Conflict(ZU_GROSS.into()));
+    }
     if angefordert.is_none() {
         sqlx::query(
             "UPDATE spiegel_anhang SET angefordert_at = ? \
@@ -161,7 +175,7 @@ pub async fn offene_abrufe(
     let zeilen: Vec<(String, String, String, String, i64, Option<String>)> = sqlx::query_as(
         "SELECT e.kennung, a.art, a.fremder_schluessel, a.sha256, a.empfangen, \
          a.angefordert_at FROM spiegel_anhang a JOIN einsatz e ON e.id = a.einsatz_id \
-         WHERE a.fertig_at IS NULL AND e.kennung IS NOT NULL AND ( \
+         WHERE a.fertig_at IS NULL AND a.groesse <= ? AND e.kennung IS NOT NULL AND ( \
            EXISTS (SELECT 1 FROM einsatz_spiegel s \
                    JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
                    WHERE s.einsatz_id = a.einsatz_id AND o.kopplung_id = ? \
@@ -170,6 +184,7 @@ pub async fn offene_abrufe(
                    WHERE f.einsatz_id = a.einsatz_id AND f.herkunft_kopplung_id = ?))) \
          ORDER BY a.angefordert_at IS NULL, a.angefordert_at, a.rowid LIMIT ?",
     )
+    .bind(INHALT_MAX)
     .bind(kopplung_id)
     .bind(kopplung_id)
     .bind(ANHAENGE_MAX as i64)
@@ -244,6 +259,12 @@ pub async fn liefere_teile(
         if !besitzt || a.ab < 0 || offene_angabe(conn, &a.art, &a.schluessel).await?.is_some() {
             continue;
         }
+        if a.ab == 0
+            && t.spalten.iter().any(|s| s.name == "sha256")
+            && !pruefsumme_stimmt(conn, t, spalte, &a.schluessel, &a.sha256).await?
+        {
+            continue;
+        }
         let stueck: Option<Vec<u8>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT substr(\"{spalte}\", ?, ?) FROM {} WHERE {}",
             t.name,
@@ -268,6 +289,57 @@ pub async fn liefere_teile(
         });
     }
     Ok(teile)
+}
+
+/// Vor dem ersten Stück eines Inhalts, dessen Prüfsumme aus der Spalte `sha256` geliefert wurde
+/// (LLH-1630): stimmt sie nicht zum Inhalt (Altbestand), schreibt der Führer die richtige nach.
+/// Das Änderungslog liefert sie mit dem nächsten Abgleich, und der Spiegel holt neu, statt den
+/// Inhalt bei jedem Abruf zu verwerfen. Liefert `false`, wenn jetzt nichts gesendet wird.
+async fn pruefsumme_stimmt(
+    conn: &mut SqliteConnection,
+    t: &schema::Tabelle,
+    spalte: &str,
+    schluessel: &str,
+    gemeldet: &str,
+) -> Result<bool, AppError> {
+    let zeile: Option<(Option<Vec<u8>>, Option<String>)> =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT \"{spalte}\", sha256 FROM {} WHERE {}",
+            t.name,
+            t.schluessel.gleich(t.name)
+        )))
+        .bind(schluessel)
+        .fetch_optional(&mut *conn)
+        .await?;
+    let Some((Some(inhalt), gespeichert)) = zeile else {
+        return Ok(true);
+    };
+    let echt = hex(&Sha256::digest(&inhalt));
+    if echt == gemeldet {
+        return Ok(true);
+    }
+    // Nur eine falsche Spalte korrigieren; hat sich die Zeile seit der Meldung geändert, kommt
+    // die neue Angabe ohnehin mit dem Log.
+    if gespeichert
+        .as_deref()
+        .is_some_and(|g| g.eq_ignore_ascii_case(gemeldet))
+    {
+        tracing::warn!(
+            tabelle = t.name,
+            schluessel,
+            "Prüfsumme in der Spalte stimmt nicht zum Inhalt; nachgezogen"
+        );
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {} SET sha256 = ? WHERE {}",
+            t.name,
+            t.schluessel.gleich(t.name)
+        )))
+        .bind(&echt)
+        .bind(schluessel)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(false)
 }
 
 /// Übernimmt Stücke am Spiegel. Ist ein Inhalt vollständig und passt die Prüfsumme, wird er unter
@@ -306,7 +378,11 @@ pub async fn uebernehme_teile(
         let Some((einsatz_id, lokal, groesse, empfangen)) = offen else {
             continue;
         };
-        if t.ab != empfangen || bytes.is_empty() || empfangen + bytes.len() as i64 > groesse {
+        if groesse > INHALT_MAX
+            || t.ab != empfangen
+            || bytes.is_empty()
+            || empfangen + bytes.len() as i64 > groesse
+        {
             continue;
         }
         sqlx::query(
@@ -332,21 +408,29 @@ pub async fn uebernehme_teile(
         if jetzt_empfangen < groesse {
             continue;
         }
-        let stuecke: Vec<Vec<u8>> = sqlx::query_scalar(
-            "SELECT daten FROM spiegel_anhang_teil WHERE art = ? AND lokaler_schluessel = ? \
-             ORDER BY ab",
-        )
-        .bind(&t.art)
-        .bind(&lokal)
-        .fetch_all(&mut *conn)
-        .await?;
-        let inhalt: Vec<u8> = stuecke.concat();
+        // Stück für Stück in einen Puffer fester Größe, mit der Prüfsumme nebenher: so liegt der
+        // Inhalt nur einmal im Speicher, nicht noch einmal als Liste der Stücke (LLH-1630).
+        let mut inhalt: Vec<u8> = Vec::with_capacity(groesse as usize);
+        let mut pruefer = Sha256::new();
+        {
+            let mut stuecke = sqlx::query_scalar::<_, Vec<u8>>(
+                "SELECT daten FROM spiegel_anhang_teil WHERE art = ? AND lokaler_schluessel = ? \
+                 ORDER BY ab",
+            )
+            .bind(&t.art)
+            .bind(&lokal)
+            .fetch(&mut *conn);
+            while let Some(stueck) = stuecke.try_next().await? {
+                pruefer.update(&stueck);
+                inhalt.extend_from_slice(&stueck);
+            }
+        }
         sqlx::query("DELETE FROM spiegel_anhang_teil WHERE art = ? AND lokaler_schluessel = ?")
             .bind(&t.art)
             .bind(&lokal)
             .execute(&mut *conn)
             .await?;
-        if hex(&Sha256::digest(&inhalt)) != t.sha256 {
+        if hex(&pruefer.finalize()) != t.sha256 {
             // Unterwegs geändert oder verfälscht: neu holen.
             sqlx::query(
                 "UPDATE spiegel_anhang SET empfangen = 0 WHERE art = ? AND lokaler_schluessel = ?",

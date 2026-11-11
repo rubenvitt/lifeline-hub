@@ -643,6 +643,11 @@ pub async fn lage_setzen(
         let aktuell = lage_zeile(conn, einsatz_id, &schluessel).await?;
         match (&aktuell, eingabe.version) {
             (None, None) => {
+                // Die erste Lage macht eine Katalog-Sprechgruppe zur genutzten (Spiegel, LLH-1645).
+                if let Element::Sprechgruppe(id) = element {
+                    crate::sprechgruppe::repo::pruefe_kein_lokales_paar(conn, einsatz_id, &[id])
+                        .await?;
+                }
                 sqlx::query(
                     "INSERT INTO fernmeldeskizze_lage \
                         (einsatz_id, element, x, y, breite, version, geaendert_von_id) \

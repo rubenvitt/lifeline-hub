@@ -30,6 +30,12 @@ interface SprechgruppenPickerProps {
  * `Select mode="multiple"`, gruppiert nach Betriebsart. Darunter ein kompaktes
  * Inline-Formular zum Anlegen einer einsatz-lokalen Sprechgruppe.
  *
+ * Trägt schon eine Sprechgruppe der Auswahl den Namen, wählt „Anlegen“ sie aus (LLH-1645): eine
+ * Einsatz-Sprechgruppe mit dem Namen einer Katalog-Sprechgruppe lehnt der Server ab, sonst fiele
+ * das Paar am Spiegel auf eine Zeile. Bei einem Paar aus dem Altbestand bleibt eine schon gewählte
+ * Sprechgruppe stehen, sonst geht die lokale vor: sie liegt schon im Einsatz, die Katalogzeile
+ * käme erst mit dieser Wahl dazu.
+ *
  * Bewusst KEIN verschachteltes `<Form>`/Submit-Button: der Picker wird selbst in einem
  * antd-`<Form>` (Abschnitt/Einheit) gerendert — ein innerer Submit würde das äußere
  * Formular nativ abschicken (Seiten-Reload). Anlegen läuft daher rein über `onClick`.
@@ -47,7 +53,7 @@ export default function SprechgruppenPicker({
   const [neuBezeichnung, setNeuBezeichnung] = useState('');
   const [neuBetriebsart, setNeuBetriebsart] = useState<Betriebsart | undefined>(undefined);
 
-  const { data: sprechgruppen = [] } = useQuery({
+  const { data: sprechgruppen = [], isPending: listeLaedt } = useQuery({
     queryKey: einsatzKeys.sprechgruppen(einsatzId),
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
@@ -63,7 +69,8 @@ export default function SprechgruppenPicker({
     { label: 'DMO', title: 'DMO', options: optionenFuer('DMO') },
   ].filter((g) => g.options.length > 0);
 
-  const kannAnlegen = neuBezeichnung.trim().length > 0 && !!neuBetriebsart;
+  // Erst mit geladener Liste entscheiden, ob „Anlegen“ eine vorhandene Sprechgruppe auswählt.
+  const kannAnlegen = neuBezeichnung.trim().length > 0 && !!neuBetriebsart && !listeLaedt;
 
   // Kein `onError`: der Grund steht unter der Zeile, bis zum nächsten Anlegen (LFH-1077).
   const mutation = useMutation({
@@ -87,12 +94,26 @@ export default function SprechgruppenPicker({
   const fehler = diesesAnlegen ? mutation.error : null;
 
   const anlegen = () => {
-    if (kannAnlegen && !laeuft)
-      mutation.mutate({
-        einsatzId,
-        bezeichnung: neuBezeichnung.trim(),
-        betriebsart: neuBetriebsart as Betriebsart,
-      });
+    if (!kannAnlegen || laeuft) return;
+    const bezeichnung = neuBezeichnung.trim();
+    const betriebsart = neuBetriebsart as Betriebsart;
+    const treffer = sprechgruppen.filter(
+      (s) => s.betriebsart === betriebsart && s.bezeichnung === bezeichnung,
+    );
+    const vorhanden =
+      treffer.find((s) => value.includes(s.id)) ??
+      treffer.find((s) => s.einsatz_lokal) ??
+      treffer[0];
+    if (vorhanden) {
+      if (!value.includes(vorhanden.id)) onChange?.([...value, vorhanden.id]);
+      if (mutation.error != null) mutation.reset();
+      setNeuBezeichnung('');
+      setNeuBetriebsart(undefined);
+      setAnlegenOffen(false);
+      message.success(`Sprechgruppe „${vorhanden.bezeichnung}" ausgewählt`);
+      return;
+    }
+    mutation.mutate({ einsatzId, bezeichnung, betriebsart });
   };
   // Öffnen und Abbrechen räumen den Grund; eine laufende Anfrage bleibt unberührt.
   const schalteAnlegen = (offen: boolean) => {

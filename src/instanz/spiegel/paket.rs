@@ -24,6 +24,11 @@ pub const ANTRAEGE_MAX: usize = 200;
 pub const ANTRAG_DATEN_MAX: usize = 64 * 1024;
 /// Höchstens so viele Bytes Anträge je Paket; sie gehen vor den Lieferungen vom Budget ab.
 pub const ANTRAEGE_BYTES_MAX: usize = 512 * 1024;
+/// Größte einzelne Zeile samt Bezügen, die ein Paket trägt (LLH-1630): so viel bleibt dem ersten
+/// Einsatz eines Pakets immer, auch neben Anträgen bis [`ANTRAEGE_BYTES_MAX`]. Größere gehen als
+/// [`Zeile::zu_gross`], damit kein Paket über [`SPIEGEL_MAX`] wächst und den Abgleich der ganzen
+/// Kopplung anhält.
+pub const ZEILE_MAX: usize = SPIEGEL_MAX - RESERVE - ANTRAEGE_BYTES_MAX;
 /// Höchstzahl Anhang-Abrufe und -Stücke je Paket.
 pub const ANHAENGE_MAX: usize = 64;
 /// Größe eines Anhang-Stücks (D8).
@@ -132,6 +137,11 @@ pub struct Zeile {
     /// Stammdaten (LLH-1629, [`super::katalog`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gegen: Option<String>,
+    /// Die Zeile (mit ihren Bezügen) ist größer als [`ZEILE_MAX`] und kommt ohne `daten` (LLH-1630).
+    /// Der Spiegel behält seine bisherige Fassung und zeigt einen Hinweis; eine ältere Gegenseite
+    /// überliest das Feld und lässt die Zeile ohne Daten ebenfalls aus.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub zu_gross: bool,
 }
 
 /// Größe und SHA-256 (hex) eines Inhalts auf Abruf.
