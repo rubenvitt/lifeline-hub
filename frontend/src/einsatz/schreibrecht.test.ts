@@ -248,7 +248,12 @@ describe('Führung je Einsatz (LLH-1491)', () => {
   });
 
   it('am Spiegel bleibt Beantragen trotz fremder Führung offen (LLH-1492)', () => {
-    const spiegel = { gegenstelle: 'Hub Nord', beendet: false, antraege_ausstehend: 0, antraege_abgelehnt: 0 };
+    const spiegel = {
+      gegenstelle: 'Hub Nord',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+    };
     expect(darfBeantragen({ ...el, fuehrung: hub, spiegel })).toBe(true);
     expect(darfImEinsatzSchreiben({ ...el, fuehrung: hub, spiegel })).toBe(false);
   });

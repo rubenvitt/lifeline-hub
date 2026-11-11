@@ -19,7 +19,7 @@
 --    nachvollziehbar“).
 -- 6. `benachrichtigung` mit zwei neuen Arten (Rebuild nach Muster 0255, mit den Spalten aus
 --    0275 und 0282); die drei neuen
---    Aktionen der Admin-Spur stehen in 0315 (ohne Transaktion, Muster 0309).
+--    Aktionen der Admin-Spur stehen in 0317 (ohne Transaktion, Muster 0309).
 --
 -- Aufbewahrung: beide neuen Tabellen sind einsatz-scoped (`einsatz::schwaerzung_registry`).
 ALTER TABLE instanz_identitaet ADD COLUMN fuehrung_an INTEGER NOT NULL DEFAULT 0
