@@ -602,6 +602,7 @@ pub async fn patch_tx(
     if let Some(ids) = patch.sprechgruppe_ids {
         crate::sprechgruppe::repo::ersetzen_tx(
             conn,
+            einsatz_id,
             crate::sprechgruppe::repo::Zuordnungsziel::Fuehrungsstelle(einsatz_id),
             ids,
         )

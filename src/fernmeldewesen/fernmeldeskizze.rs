@@ -896,7 +896,8 @@ pub async fn komponente_entfernen(
 }
 
 /// Bindet eine Sprechgruppe an die Komponente, idempotent. Erst die Komponente (404), dann die
-/// Sprechgruppe wie an Abschnitt und Einheit (`sprechgruppe::repo::pruefe_zuordenbar`, 422).
+/// Sprechgruppe wie an Abschnitt und Einheit (`sprechgruppe::repo::pruefe_zuordenbar`, 422; das
+/// Paar mit einer gleichnamigen Einsatz-Sprechgruppe, 409, in der Schreibtransaktion, LLH-1650).
 /// `true`, wenn die Bindung neu ist.
 pub async fn komponente_kanal_setzen(
     pool: &SqlitePool,
@@ -911,6 +912,8 @@ pub async fn komponente_kanal_setzen(
     write_retry!(pool, |conn| {
         fordere_aktiv_in_tx(conn, einsatz_id).await?;
         komponente_im_einsatz(conn, einsatz_id, komponente_id).await?;
+        crate::sprechgruppe::repo::pruefe_kein_lokales_paar(conn, einsatz_id, &[sprechgruppe_id])
+            .await?;
         let r = sqlx::query(
             "INSERT OR IGNORE INTO fernmeldeskizze_komponente_sprechgruppe \
                 (komponente_id, sprechgruppe_id) VALUES (?, ?)",
