@@ -175,7 +175,15 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("demo_herkunft", "Demo-Daten werden nicht gespiegelt (D6)"),
     (
         "aufbewahrung_loeschprotokoll",
-        "Löschprotokoll dieser Instanz; das Lebensende regelt LLH-1494",
+        "Löschprotokoll dieser Instanz; das Lebensende kommt als eigene Nachricht (LLH-1494)",
+    ),
+    (
+        "einsatz_abraeumen",
+        "Merker dieser Instanz für das Abräumen",
+    ),
+    (
+        "einsatz_verwahrung",
+        "Stand der Übergabe an dieser Instanz; die Quittung kommt im Paket",
     ),
     (
         "schwaerzung_antrag",

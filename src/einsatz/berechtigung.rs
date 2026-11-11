@@ -512,6 +512,7 @@ mod tests {
             sachverhalt: None,
             anzahl_betroffene_initial: None,
             retention_bis: None,
+            nachbereitung_bis: None,
             geloescht_at: None,
             einsatzleiter: Default::default(),
             fuehrung: Default::default(),

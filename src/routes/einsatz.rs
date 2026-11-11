@@ -364,6 +364,57 @@ pub async fn aufbewahrungsfrist_setzen(
     )))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct NachbereitungSetzen {
+    /// Neues Ende der Nachbereitung (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer hebt
+    /// die Nachbereitungsfrist auf.
+    pub nachbereitung_bis: Option<String>,
+}
+
+/// PUT /api/einsaetze/{id}/nachbereitung — Nachbereitungsfrist setzen, ändern oder aufheben
+/// (LLH-1494, design.md D1). Rechte wie der Frist-PUT: Einsatzleitung oder System-Admin der
+/// Einsatz-Org. Nur an einem abgeschlossenen Einsatz, der weder vorgemerkt noch geschwärzt noch
+/// übergeben ist (409); am Spiegel 409 aus dem Schutz. ETB-Eintrag mit altem und neuem Wert.
+pub async fn nachbereitung_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzKontext,
+    JsonBody(req): JsonBody<NachbereitungSetzen>,
+) -> Result<Json<EinsatzAnzeige>, AppError> {
+    let id = ctx.einsatz.id;
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
+        ctx.fordere_einsatzleitung()?;
+    }
+    let neu = match req
+        .nachbereitung_bis
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(s) => Some(crate::etb::normalisiere_zeit(s)?),
+        None => None,
+    };
+    let ergebnis =
+        crate::einsatz::nachbereitung::setzen(&state.pool, id, ctx.benutzer.id, neu.as_deref())
+            .await?;
+    if !ergebnis.etb_eintrag_ids.is_empty() {
+        kopf_geaendert(&state, id).await;
+        etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    }
+    let aktualisiert = ergebnis.einsatz;
+    let anzeige = aktualisiert.anzeige(
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
+    );
+    Ok(Json(ohne_kopf_pii_wenn_gesperrt(
+        anzeige,
+        &aktualisiert,
+        &ctx.benutzer,
+        ctx.rolle,
+    )))
+}
+
 /// GET /api/einsaetze/{id}/aufbewahrung-kategorien — Aufbewahrung je Datenkategorie (LFH-749,
 /// Spec `aufbewahrung-kategorien`, „Zustand je Kategorie“): alle drei Kategorien mit Frist,
 /// Zustand und Rechtsgrundlage, bei einem aktiven Einsatz mit der Dauer der Org-Vorgabe. Kein

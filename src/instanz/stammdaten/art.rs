@@ -111,6 +111,7 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
             "rueckmeldung_frist_min",
             "einsatz_nummer_praefix",
             "skelett_dauer_tage",
+            "nachbereitung_tage",
         ],
         verweise: &[],
         quali_soll: None,
