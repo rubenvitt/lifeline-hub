@@ -25,6 +25,7 @@ import {
   KOSTFORM_WORT,
   haushaltKennung,
 } from '../betreuung/registrierung/registrierKern';
+import HaushaltAktionen from '../betreuung/registrierung/HaushaltAktionen';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { formatKalenderdatum, parseKalenderdatum } from '../anzeige/kalenderdatum';
 import { Ortsfeld } from '../anzeige/Ortsfeld';
@@ -720,20 +721,52 @@ function PersonendatenInhalt({
   return (
     <div ref={behaelterRef} data-lfh="personendaten">
       {person.haushalt_nummer != null && (
-        // Lesezeile (LLH-1612): der Haushalt entsteht an der Registrierstelle und wechselt nicht hier.
-        <div data-lfh="haushalt-zeile" style={{ marginBottom: token.marginXS }}>
-          <span style={{ fontFamily: token.fontFamilyCode }}>
-            Haushalt {haushaltKennung(person.haushalt_nummer)}
+        // Haushalt der Registrierstelle (LLH-1612); Bezugsperson wechseln und umhängen an der
+        // Stelle des Verbleibs (LLH-1615, `betreuung/registrierung/HaushaltAktionen.tsx`).
+        <div
+          data-lfh="haushalt-zeile"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: token.marginSM,
+            rowGap: token.marginXXS,
+            marginBottom: token.marginXS,
+          }}
+        >
+          <span>
+            <span style={{ fontFamily: token.fontFamilyCode }}>
+              Haushalt {haushaltKennung(person.haushalt_nummer)}
+            </span>
+            {person.haushalt_bezugsperson && ' · Bezugsperson'}
+            {stellePfad && (
+              <>
+                {' · '}
+                <Link to={stellePfad}>
+                  Zur Betreuungsstelle <span aria-hidden="true">↗</span>
+                </Link>
+              </>
+            )}
           </span>
-          {stellePfad && (
-            <>
-              {' · '}
-              <Link to={stellePfad}>
-                Zur Betreuungsstelle <span aria-hidden="true">↗</span>
-              </Link>
-            </>
-          )}
+          <HaushaltAktionen
+            einsatzId={einsatzId}
+            person={person}
+            darfSchreiben={darfSchreiben}
+            onGeschrieben={onGeschrieben}
+            seitenGrundId={grund ? grundId : undefined}
+          />
         </div>
+      )}
+      {person.haushalt_nummer == null && (
+        // Ohne Haushalt, aber an einer Stelle registriert: einem Haushalt zuordnen (LLH-1615).
+        <HaushaltAktionen
+          einsatzId={einsatzId}
+          person={person}
+          darfSchreiben={darfSchreiben}
+          onGeschrieben={onGeschrieben}
+          seitenGrundId={grund ? grundId : undefined}
+          style={{ marginBottom: token.marginXS }}
+        />
       )}
       {grund && (
         <div id={grundId} data-lfh="personendaten-grund" style={{ color: rollen.text2 }}>

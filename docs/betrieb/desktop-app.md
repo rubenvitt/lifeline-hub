@@ -173,7 +173,7 @@ Herleitung: `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonze
 ## Update
 
 Nach jedem Start prüft die App im Hintergrund, ob es ein neueres Release gibt. Welches, hängt an
-der installierten Version (LLH-1280):
+der installierten Version (LLH-1280, LLH-1545):
 
 - **Stabile App** (`1.2.0`): liest
   `https://github.com/rubenvitt/lifeline-hub/releases/latest/download/latest.json`. GitHub lässt
@@ -182,9 +182,16 @@ der installierten Version (LLH-1280):
   `https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-alpha/latest.json`. Er
   zeigt auf das neueste veröffentlichte Release mit Desktop-Paketen, Alpha oder stabil; eine
   höhere Version ist immer neuer als die Alphas davor (`1.0.0` nach `1.0.0-alpha.N`, `1.1.0`
-  nach `1.0.1-alpha.N`). Die App merkt sich den Kanal in `kanal.json` neben
-  `verbindung.json` und bleibt auch nach einem stabilen Update im Alpha-Kanal. Zurück zum
-  stabilen Kanal: `kanal.json` löschen und eine stabile `.dmg` installieren.
+  nach `1.0.1-alpha.N`).
+- **Beta-App** (einmal als `…-beta.N` installiert): liest den **Beta-Kanal**
+  `https://github.com/rubenvitt/lifeline-hub/releases/download/desktop-beta/latest.json`, mit
+  Betas und stabilen Releases. Eine Beta kommt nie in den Alpha-Kanal und umgekehrt: Alpha und
+  Beta zählen nebeneinander (`1.0.0-alpha.180` neben `1.0.0-beta.3`), und nach SemVer wäre jede
+  Beta „neuer“ als jede Alpha.
+- Die App merkt sich ihren Vorabkanal in `kanal.json` neben `verbindung.json` und bleibt auch
+  nach einem stabilen Update darin. **Kanal wechseln:** eine Version des anderen Kanals
+  installieren (`.dmg` oder `.exe` vom Release), die App merkt sich dann diesen. Zurück zum
+  stabilen Kanal: `kanal.json` löschen und eine stabile Version installieren.
 
 - **Ohne Internet** (Einsatz-LAN) scheitert die Prüfung nach höchstens 10 s still. Die App
   läuft normal weiter, eine Fehlermeldung erscheint nicht.
@@ -301,16 +308,26 @@ unberührt.
   keine eigene, der Test `version_kommt_aus_dem_workspace` in `src-tauri` pinnt das.
 - Den Bau trägt `.github/workflows/desktop.yml`, aufgerufen aus `artefakte.yml`. Bei
   **stabilen** Tags läuft er vor der Freigabe (Job `desktop`), ein roter Bau hält das Release
-  auf. Bei **Alpha**-Tags läuft er erst nach der Freigabe ans schon veröffentlichte Release (Job
-  `desktop-alpha`, LLH-1280): Bau und zwei Notarisierungen dauern länger als die
+  auf. Bei **Alpha**- und **Beta**-Tags läuft er erst nach der Freigabe ans schon veröffentlichte
+  Release (Job `desktop-alpha`, „Desktop-Hülle (Vorabkanal)“, LLH-1280): Bau und zwei Notarisierungen dauern länger als die
   Server-Artefakte und hängen an Apple, Release und Deployment warten deshalb nicht darauf.
-- **Alpha-Kanal:** Danach schreibt der Job `desktop-kanal` das `latest.json` des Releases in das
-  Release `desktop-alpha` (Vorabversion, nie „latest“, legt der Job beim ersten Mal selbst an).
-  Nur vorwärts und nur vollständig: ein älteres Release (überholter Lauf, Nachbau) oder eines,
-  dem eine Plattform fehlt, lässt den Kanal stehen (`scripts/release/desktop-kanal.mjs`). Ein
-  Entwurf schreibt nie in den Kanal. Das Release `desktop-alpha` nicht löschen, sonst finden
-  Alpha-Apps kein Update mehr, bis das nächste Alpha-Release es neu anlegt.
-- **Nachbau eines Alpha-Releases** mit Desktop: „Run workflow“ mit dem Tag und `desktop: true`,
+- **Vorabkanäle:** Danach schreibt der Job `desktop-kanal` das `latest.json` des Releases in
+  das Release seines Kanals: eine Alpha nach `desktop-alpha`, eine Beta nach `desktop-beta`, ein
+  stabiles Release in beide (Vorabversion, nie „latest“, legt der Job beim ersten Mal selbst an).
+  Nur vorwärts, nur vollständig, nur der eigene Kanal: ein älteres Release (überholter Lauf,
+  Nachbau), eines, dem eine Plattform fehlt, oder eines aus dem anderen Vorabkanal lässt den
+  Kanal stehen (`scripts/release/desktop-kanal.mjs`). Ein Entwurf schreibt nie in einen Kanal.
+  Die Releases `desktop-alpha` und `desktop-beta` nicht löschen, sonst finden die Apps dieses
+  Kanals kein Update mehr, bis das nächste Release des Kanals es neu anlegt.
+- **Beta:** entsteht nur über den Workflow „Beta nachziehen“ (`kanal-nachziehen.yml`, „Run
+  workflow“ mit einem veröffentlichten Alpha-Tag wie `v1.0.0-alpha.180`). Der erste Lauf legt
+  den Branch `beta` auf dem Tag an, jeder weitere mergt den Tag nach `beta`; der Push startet
+  Gate und Release (`1.0.0-beta.N`). Auf `beta` wird nicht entwickelt, Fehler werden auf `alpha`
+  behoben und mit dem nächsten Tag nachgezogen ([ADR-0019](../architektur/entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md)).
+  Die Abbilder bekommen nach der Freigabe den gleitenden Tag `:beta` (Alpha `:alpha`, stabil
+  `:latest`, jeweils nur vorwärts, `scripts/release/abbild-kanal.mjs`). Ein Deployment gibt es
+  für Beta nicht.
+- **Nachbau eines Vorab-Releases** mit Desktop: „Run workflow“ mit dem Tag und `desktop: true`,
   ohne `freigeben`. Ist das Release veröffentlicht und neuer als der Kanal, schreibt der Lauf
   ihn auch fort.
 - `latest.json` erzeugt `scripts/release/desktop-manifest.mjs` aus den tatsächlich gebauten
@@ -318,8 +335,8 @@ unberührt.
 - **Ein Release erscheint erst, wenn alles gebaut ist** (LFH-1054). `semantic-release` legt es
   als Entwurf an und startet `artefakte.yml` mit `freigeben`. Erst wenn alle Server-Binaries,
   beide Abbilder und bei stabilen Tags beide Desktop-Pakete samt `latest.json` hängen,
-  veröffentlicht der Job „Release freigeben“ den Entwurf, setzt bei stabilen Tags `latest` an
-  den Abbildern, kommentiert die enthaltenen PRs und legt bei Alpha das Deployment an. Die Apps
+  veröffentlicht der Job „Release freigeben“ den Entwurf, setzt den gleitenden Tag an den
+  Abbildern (`latest`, `alpha` oder `beta`), kommentiert die enthaltenen PRs und legt bei Alpha das Deployment an. Die Apps
   sehen ein neues stabiles Release also erst, wenn sein Manifest vollständig ist.
 - **Ein Job bleibt rot:** Release bleibt Entwurf (unter „Releases“ nur für Berechtigte
   sichtbar), Tag und Versions-Commit bleiben, die Nummer ist verbraucht. War die Ursache eine

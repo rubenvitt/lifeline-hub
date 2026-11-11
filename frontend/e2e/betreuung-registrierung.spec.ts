@@ -188,3 +188,74 @@ test('Zeitfenster anlegen schlägt die Sonderkost aus der Registrierung vor', as
   await expect(dialog.getByLabel('vegan', { exact: true })).toHaveValue('');
   await expect(dialog.getByText('Vorschlag: aus 3 Registrierten, Stand jetzt')).toBeVisible();
 });
+
+/** Familie Weber und Haushalt Yilmaz an der Stelle, per API. */
+async function saeHaushalte(page: Page, einsatzId: number, stelleId: number): Promise<void> {
+  const pfad = `/api/einsaetze/${einsatzId}/betreuung/stellen/${stelleId}/registrierungen`;
+  await senden(page, 'post', pfad, {
+    personen: [
+      { name: 'Weber', vorname: 'Anna', kostform: 'vegetarisch' },
+      { name: 'Weber', vorname: 'Tom', kostform: 'normal' },
+      { name: 'Weber', vorname: 'Lea', kostform: 'saeugling_kleinkind' },
+    ],
+  });
+  await senden(page, 'post', pfad, {
+    personen: [{ name: 'Yilmaz', vorname: 'Deniz', kostform: 'ohne_schwein' }],
+  });
+}
+
+test('Haushalt umbauen (LLH-1615): Bezugsperson wechseln, Person in einen neuen Haushalt lösen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { einsatzId, stelleId } = await saeStelle(page);
+  await saeHaushalte(page, einsatzId, stelleId);
+  await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);
+
+  const registrierung = page.getByRole('region', { name: 'Registrierung', exact: true });
+  await registrierung.getByRole('button', { name: /^H-1 · Weber, Anna · 3 Personen/ }).click();
+  const h1 = registrierung.getByRole('list', { name: 'Personen in H-1' });
+  await expect(h1.getByRole('listitem').first()).toContainText('Bezugsperson');
+
+  await h1.getByRole('button', { name: /^Weitere Aktionen zu R-\d+ Weber, Tom$/ }).click();
+  await page.getByRole('menuitem', { name: 'Zur Bezugsperson machen' }).click();
+  await expect(
+    registrierung.getByRole('button', { name: /^H-1 · Weber, Tom · 3 Personen/ }),
+  ).toBeVisible();
+
+  await h1.getByRole('button', { name: /^Weitere Aktionen zu R-\d+ Weber, Lea$/ }).click();
+  await page.getByRole('menuitem', { name: 'Haushalt ändern …' }).click();
+  const dialog = page.getByRole('dialog').filter({ hasText: 'Weber, Lea ändern' });
+  await expect(dialog.getByRole('radio', { name: 'H-2 · Yilmaz, Deniz · 1 Person' })).toBeVisible();
+  await dialog.getByText('Neuer Haushalt', { exact: true }).click();
+  await dialog.getByRole('button', { name: 'Haushalt ändern', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    registrierung.getByRole('button', { name: /^H-3 · Weber, Lea · 1 Person/ }),
+  ).toBeVisible();
+  await expect(
+    registrierung.getByRole('button', { name: /^H-1 · Weber, Tom · 2 Personen/ }),
+  ).toBeVisible();
+});
+
+test('Haushalt umbauen bei 390 px: Zeile mit Abmelden und ⋮ ohne waagerechten Bildlauf', async ({
+  page,
+}) => {
+  await page.setViewportSize(HANDSCHIRM);
+  const { einsatzId, stelleId } = await saeStelle(page);
+  await saeHaushalte(page, einsatzId, stelleId);
+  await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);
+  const registrierung = page.getByRole('region', { name: 'Registrierung', exact: true });
+  await registrierung.getByRole('button', { name: /^H-1 · Weber, Anna/ }).click();
+  const anna = registrierung
+    .getByRole('list', { name: 'Personen in H-1' })
+    .getByRole('listitem')
+    .first();
+  await expect(anna.getByRole('button', { name: /^Weitere Aktionen zu/ })).toBeVisible();
+  await eingeschwungen(anna);
+  const breite = await page.evaluate(() => ({
+    seite: document.documentElement.scrollWidth,
+    fenster: window.innerWidth,
+  }));
+  expect(breite.seite).toBeLessThanOrEqual(breite.fenster);
+});

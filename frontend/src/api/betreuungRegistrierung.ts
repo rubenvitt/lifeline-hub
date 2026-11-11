@@ -3,6 +3,7 @@ import type {
   Abmeldung,
   AbmeldungEingabe,
   Haushalt,
+  HaushaltZielEingabe,
   KostformZaehlung,
   RegistrierListe,
   RegistrierungEingabe,
@@ -67,6 +68,40 @@ export function sendAbmeldung(
     'POST',
     body,
     optionen,
+  );
+}
+
+/**
+ * Bezugsperson eines Haushalts wechseln (LLH-1615); antwortet mit dem Haushalt. Ohne `client_id`:
+ * ohne Netz gesperrt, nie vorgemerkt.
+ */
+export function sendBezugsperson(
+  einsatzId: number,
+  stelleId: number,
+  haushaltId: number,
+  personId: number,
+): Promise<Haushalt> {
+  return apiSend<Haushalt>(
+    `${basis(einsatzId)}/stellen/${stelleId}/haushalte/${haushaltId}/bezugsperson`,
+    'PUT',
+    { person_id: personId },
+  );
+}
+
+/**
+ * Person in einen anderen oder neuen Haushalt der Stelle umhängen (LLH-1615); antwortet mit dem
+ * Ziel-Haushalt. Ohne Netz gesperrt wie `sendBezugsperson`.
+ */
+export function sendHaushaltWechsel(
+  einsatzId: number,
+  stelleId: number,
+  personId: number,
+  ziel: HaushaltZielEingabe,
+): Promise<Haushalt> {
+  return apiSend<Haushalt>(
+    `${basis(einsatzId)}/stellen/${stelleId}/personen/${personId}/haushalt`,
+    'PUT',
+    ziel,
   );
 }
 

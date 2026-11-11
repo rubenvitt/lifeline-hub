@@ -1,3 +1,93 @@
+## [1.0.0-alpha.186](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.185...v1.0.0-alpha.186) (2026-11-11)
+
+### Wichtige Änderungen
+
+- **KRITIS-Extrakt ist jetzt standardmäßig ausgeschaltet.** Neue Installationen laden den Deutschland-Extrakt nicht mehr von selbst herunter. Er ist 4–5 GB groß, und jeder neue Stand wird erneut geladen. Wer die KRITIS-Daten braucht, schaltet sie mit `LIFELINE_KRITIS_EXTRAKT=true` ein.
+
+### Lagekarte
+
+- **Offline-Karten funktionieren ohne weitere Einstellung.** Eine neue Installation bietet die Kartenregionen des Projekt-Kartendienstes direkt zum Herunterladen an. Jede Region wird über eine Prüfsumme abgesichert.
+- **Der Abruf des Kartenkatalogs ist robuster.** Das Verzeichnis der verfügbaren Regionen wird beim Herunterladen auf 1 MiB begrenzt. Auch eine Antwort ohne Größenangabe kann den Server dadurch nicht mehr überlasten.
+- **Der Kartenbau ist nachvollziehbar.** Er nutzt eine fest benannte Version des Bauwerkzeugs statt der jeweils neuesten.
+
+### Betrieb und Installation
+
+- **Neuer Vorabkanal „Beta“.** Er läuft neben „Alpha“ und hat eigene Versionsnummern (`1.0.0-beta.N`). Bereits veröffentlichte Alpha-Stände können nach Beta übernommen werden. Für Beta gibt es kein eigenes Deployment.
+- **Desktop-App:** Mit dem eigenen Beta-Kanal erhalten Beta-Installationen nur Beta-Stände und stabile Versionen als Updates, keine Alpha-Stände.
+- **Container-Abbilder:** Neben `:latest` gibt es jetzt die gleitenden Tags `:alpha` und `:beta`. Sie zeigen immer auf das neueste Release ihres Kanals und springen nicht auf einen älteren Stand zurück. Das gilt auch, wenn mehrere Releases kurz nacheinander erscheinen.
+
+## [1.0.0-alpha.185](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.184...v1.0.0-alpha.185) (2026-11-11)
+
+### Betroffene und Betreuung
+
+- **Bezugsperson wechseln:** An der Registrierstelle kann die Bezugsperson eines Haushalts jetzt gewechselt werden.
+- **Personen zwischen Haushalten umhängen:** Eine Person lässt sich in einen anderen Haushalt derselben Stelle oder in einen neuen Haushalt verschieben.
+- **Bedienung:** In der Registrierliste stehen die Aktionen im Menü ⋮ neben „Abmelden“. Auf der Detailseite einer Person liegen sie als Knöpfe „Zur Bezugsperson machen“ und „Haushalt ändern“ am Haushalt.
+- **Bezugsperson rückt nach:** Verlässt die Bezugsperson den Haushalt oder wird sie storniert, übernimmt eine andere Person des Haushalts. Beim Abmelden geschieht das nicht.
+- **Einsatztagebuch:** Für jeden Wechsel oder jedes Umhängen entsteht ein Eintrag im Einsatztagebuch. Namen stehen darin nicht.
+- **Berechtigungen:** Es gelten dieselben Rechte wie bei der Registrierung.
+- **Person ohne Haushalt:** Ist eine Person an einer Stelle registriert, gehört aber noch zu keinem Haushalt, lässt sie sich auf ihrer Detailseite über „Haushalt ändern“ einem Haushalt zuordnen.
+- **Offene Bearbeitung:** Solange in den Personendaten ein Feld bearbeitet und noch nicht gespeichert ist, sind die Haushalt-Aktionen gesperrt. Ein Hinweis nennt den Grund.
+- **Ohne Netz:**
+  - Ohne Verbindung sind die Haushalt-Aktionen gesperrt.
+  - Fällt die Verbindung weg, während der Dialog offen ist, lässt sich nicht speichern und der Dialog nennt den Grund.
+  - Änderungen werden nicht unbemerkt später nachgeholt.
+  - Auf der Detailseite erscheint der Hinweis „Ohne Verbindung nicht änderbar“ nur noch einmal oben auf der Seite.
+
+### Gekoppelte Geräte
+
+- Die neuen Haushalt-Aktionen gibt es auch auf Geräten, die als Betreuungsstelle gekoppelt sind.
+
+### Dokumentation
+
+- Die Anwenderdokumentation hat ein neues Bild der Registrierliste. Es zeigt die Bezugsperson und das Menü ⋮.
+
+## [1.0.0-alpha.184](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.183...v1.0.0-alpha.184) (2026-11-11)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Dieses Update bringt eine Migration mit. Sie legt ein Änderungsprotokoll je Einsatz an, ergänzt die Einsätze um Kennung und Freigabestufe und fügt die Tabellen für gespiegelte Einsätze und Anträge hinzu. Die Migration läuft beim ersten Start automatisch.
+- **Instanzkopplung, Protokoll 2:** Gekoppelte Instanzen sprechen jetzt Protokollversion 2. Ein Gegenüber mit einer älteren Version spiegelt keine Einsätze. Beide Seiten zeigen dann „Update nötig“ an.
+- **Neuer Aufrufparameter `--instanz-spiegel-sekunden`:** legt fest, wie oft gespiegelte Einsätze abgeglichen werden, solange kein Einsatz aktiv ist. Bei einem aktiven Einsatz läuft der Abgleich alle 5 Sekunden.
+- **Neuer Aufrufparameter `--betreiber-kontakt`** (Umgebungsvariable `LIFELINE_BETREIBER_KONTAKT`): Damit trägt jeder ausgehende Abruf zusätzlich den Kontakt des Betreibers.
+- **Hintergrundbilder der Lagekarte:** Bilder, deren Metadaten sich nicht entfernen lassen, lehnt der Server schon beim Hochladen ab. Die Bilder werden außerdem nicht mehr dauerhaft im Browser zwischengespeichert.
+
+### Einsätze über gekoppelte Instanzen (Spiegel)
+
+- Ein Einsatz lässt sich jetzt an einer gekoppelten Instanz **spiegeln**, die ihn nicht führt. Der Spiegel zeigt den vollständigen Einsatz, ist aber schreibgeschützt. Die Daten gehen in beide Richtungen und werden nach einer Verbindungsunterbrechung nachgeholt.
+- **Anträge statt Schreiben:** Wer am Spiegel eine der Erfassungen vornimmt, die auch ohne Netz möglich sind, stellt einen Antrag an die führende Instanz.
+  - Die Eingabe erscheint als „beantragt“. Die führende Instanz führt den Antrag im Namen des Kontos aus und meldet das Ergebnis zurück.
+  - Es gilt die Zeit, zu der der Antrag erfasst wurde, nicht die Zeit der Ausführung.
+  - Eigene Anträge lassen sich einsehen und verwerfen. Erledigte Anträge werden nach 30 Tagen aufgeräumt.
+- **Hinweisband am Einsatzkopf:** Es nennt Gegenstelle und Datenstand sowie die Zahl der ausstehenden und abgelehnten Anträge. Steht die Verbindung bei laufendem Einsatz länger als eine Minute, zeigt es „keine Verbindung seit …“.
+- An der Instanzkopplung sind gespiegelte und gelieferte Einsätze mit ihrem Stand aufgeführt.
+- **Anhänge auf Abruf:** Anhänge, Kartenbilder und UHS-Pläne werden erst geholt, wenn jemand sie öffnet. Bis dahin steht dort „wird geholt“, danach laden Vorschau und Bild von selbst nach.
+- **Widerruf der Kopplung:** Er beendet den Abgleich, und offene Anträge werden mit „Kopplung widerrufen“ abgelehnt. Der Spiegel bleibt lesbar und geschützt.
+- **Was am Spiegel lokal bleibt bzw. gesperrt ist:**
+  - Benachrichtigungen, „gelesen“ und Quittieren werden nicht gespiegelt und bleiben lokal.
+  - Fristen lassen sich nicht ändern.
+  - Geräte können nicht gekoppelt werden. Die Freigabe externer Lagemonitore bleibt möglich.
+- **Fremde Konten:** Hat ein Konto der führenden Instanz kein Gegenstück, erscheint es am Spiegel als Platzhalter ohne Anmeldung. So bleiben etwa die Verfasser im Einsatztagebuch erhalten. Diese Platzhalter tauchen nicht in Benutzerverwaltung und Auswahllisten auf.
+- **Hintergrundläufe:** Erinnerungen, Fristen, Ankündigungen der Lagebesprechung und Aufbewahrungsläufe berücksichtigen nur Einsätze, die die eigene Instanz führt.
+
+### Einsatztagebuch
+
+- **Kontextmenü an der Zeitachse:** Rechtsklick, die Kontextmenü-Taste oder Umschalt+F10 öffnen an ETB-Einträgen, abgelehnten Zeilen und an den Chips der Erfassung dieselben Aktionen wie das ⋮-Menü.
+  - Ein langer Druck öffnet hier bewusst kein Menü, damit sich Text am Tablet weiter markieren lässt.
+  - Die Rechtsklick-Taste eines Stifts öffnet das Menü sofort.
+- Solange ein Menü offen ist, hält die Zeitachse an. Danach läuft sie zuverlässig weiter, auch wenn die Zeile inzwischen verschwunden ist. Neue Einträge bleiben nicht mehr hinter dem Sammelbanner hängen.
+- „Nur protokollieren“ wirkt jetzt auch, wenn diese Möglichkeit erst nachträglich angeboten wird.
+
+### Lagekarte
+
+- **Datenschutz:** Hintergrundbilder werden ohne Metadaten ausgeliefert, also ohne EXIF, GPS, XMP, IPTC und Kommentare. Erhalten bleibt nur die Ausrichtung. Ein Drohnenfoto verrät so weder Standort noch Gerät.
+  - Das gilt auch für Bilder, die schon vorher hochgeladen wurden. Gespeichert bleibt das Original.
+  - Lässt sich ein Bild nicht bereinigen, wird es abgelehnt und nie im Original ausgeliefert.
+
+### Betrieb und Installation
+
+- **Kennung bei ausgehenden Abrufen:** Alle ausgehenden Abrufe des Servers nennen jetzt Anwendung, Version und Projektadresse. Das betrifft Geocoder, Fachebenen, Kartendienst und Kartendownload, Anmeldung über OIDC, Web Push und Instanzkopplung. Bei Bedarf kommt der Kontakt des Betreibers hinzu (siehe oben). Bisher fehlte diese Kennung teilweise ganz oder war nur ein Platzhalter.
+
 ## [1.0.0-alpha.183](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.182...v1.0.0-alpha.183) (2026-11-10)
 
 ### Wichtige Änderungen

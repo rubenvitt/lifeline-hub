@@ -93,6 +93,17 @@ stehen auch unter [Betroffene und Sichtung](betroffene.md).
 
 Abgemeldete Personen tragen den Verbleib „entlassen“ und stehen nicht mehr in der Liste.
 
+### Haushalt einer Person ändern
+
+1. Den Haushalt aufklappen. Die Bezugsperson trägt das Wort „Bezugsperson“.
+2. An der Person das Menü „⋮“ öffnen.
+3. „Zur Bezugsperson machen“ wählen, um sie zur Bezugsperson ihres Haushalts zu machen.
+4. Oder „Haushalt ändern …“ wählen, einen anderen Haushalt der Stelle oder „Neuer Haushalt“
+   wählen und „Haushalt ändern“ bestätigen. In einem neuen Haushalt ist die Person Bezugsperson.
+
+Personen „Ohne Haushalt“ lassen sich so einem Haushalt zuordnen. Dieselben Aktionen stehen auf der
+Seite der Person neben „Haushalt H-n“, ohne Haushalt dort nur „Haushalt ändern“.
+
 ### Registrierliste drucken
 
 Für Stromausfall, Schichtübergabe und Essensausgabe gibt es die Registrierliste auf Papier.
@@ -221,8 +232,13 @@ Meldung davor. Das lässt sich nicht umkehren.
 - Unverträglichkeiten gelten als Gesundheitsangabe: Sie stehen nie im Einsatztagebuch und werden
   beim Schwärzen geleert. Das Lagebild hält sie ohne Netz nicht auf dem Gerät; eine ohne Netz
   vorgemerkte Registrierung trägt sie aber bis zum Senden mit.
-- Ins Einsatztagebuch kommt je Registrierung und je Abmeldung ein Eintrag mit Stelle,
-  Haushaltsnummer und Registriernummern, ohne Namen.
+- Ins Einsatztagebuch kommt je Registrierung, Abmeldung, neuer Bezugsperson und Haushaltswechsel
+  ein Eintrag mit Stelle, Haushaltsnummer und Registriernummern, ohne Namen.
+- Verlässt die Bezugsperson ihren Haushalt oder wird sie storniert, wird die nächste Person des
+  Haushalts Bezugsperson, zuerst wer noch in einer Notunterkunft ist, dann nach Registriernummer.
+  Beim Abmelden bleibt sie Bezugsperson.
+- Ein anderer Haushalt steht nur zur Wahl, wenn jemand aus ihm an derselben Stelle registriert
+  ist. Ohne Verbindung lassen sich Haushalte nicht ändern.
 - Die Registrierung braucht Zugriff auf „Betroffene“; ohne ihn fehlt „Registrieren“, und statt
   der Liste steht der Grund.
 

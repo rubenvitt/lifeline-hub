@@ -142,14 +142,12 @@ pub use karten_katalog::{
 };
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`): Eigenbau
-/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), als GitHub-Release des Build-Projekts
-/// gehostet.
+/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), vom `karten-service` des Projekts unter
+/// [`crate::karte::katalog::KARTEN_BASIS_URL`] veröffentlicht.
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    // >>> OPERATOR-PIN <<< — je Eintrag beim karten-build-Release genau drei Felder ersetzen
-    // (README karten-build): `url`, `groesse` (gemessene Bytes), `sha256` (aus
-    // out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin erkennbare, aber gültige
-    // https-Platzhalter; `katalog_eintrag_sha256_pin_konsistent` trägt beide Zustände. Alternativ
-    // füllt das Remote-Manifest die echten Einträge ohne App-Release.
+    // Einkompiliert ist nur die Baseline (Name, Region, Gruppe, grobe Größe) ohne `sha256`: sie
+    // ist nie ladbar (`eintrag_ist_lieferbar`). Die gebauten Stände mit Prüfsumme liefert das
+    // Manifest unter `OFFLINE_KATALOG_MANIFEST_URL` und überschreibt per `name` (LLH-1546).
     //
     // `gruppe` steuert die geführte Auswahl. Neue Region = Zeile ergänzen (Slug =
     // karten-build-Dateiname).
@@ -162,7 +160,10 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     ) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
             name: name.into(),
-            url: format!("https://TODO-karten-build-release/{slug}.shortbread.mbtiles"),
+            url: format!(
+                "{}/{slug}.shortbread.mbtiles",
+                crate::karte::katalog::KARTEN_BASIS_URL
+            ),
             region: region.into(),
             groesse: ca_gb * 1024 * 1024 * 1024, // grobe Schätzung, nach Bau durch Messung ersetzen
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
@@ -404,15 +405,15 @@ pub struct Config {
     pub datentraeger_verschluesselung_extern: bool,
 
     /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
-    /// **Default AN** — auch im Dev-Betrieb, damit die Ebene überall bundesweit zeigt, was
-    /// sie zeigen soll. Jeder Lauf lädt rund 4–5 GB (nur, wenn der Extrakt neu ist);
-    /// abschalten mit `--kritis-extrakt false` bzw. `LIFELINE_KRITIS_EXTRAKT=false` — so
-    /// startet die e2e-Suite. Abgeschaltet und ohne früheren Bestand meldet die Ebene
-    /// `offline`.
+    /// **Vorgabe aus** (LLH-1546): Jeder Lauf lädt rund 4–5 GB, sobald der Extrakt neu ist,
+    /// und das soll keine Installation ungefragt tun. Einschalten mit `--kritis-extrakt true`
+    /// bzw. `LIFELINE_KRITIS_EXTRAKT=true`, bei vielen Instanzen besser mit eigenem Spiegel
+    /// (`--kritis-extrakt-url`). Abgeschaltet und ohne früheren Bestand meldet die Ebene
+    /// `offline`; ein vorhandener Bestand bleibt gültig.
     #[arg(
         long,
         env = "LIFELINE_KRITIS_EXTRAKT",
-        default_value_t = true,
+        default_value_t = false,
         action = clap::ArgAction::Set
     )]
     pub kritis_extrakt: bool,
@@ -1071,18 +1072,17 @@ mod tests {
 
     /// Der KRITIS-Import ist per Vorgabe an und auf beiden Wegen abschaltbar.
     #[test]
-    fn kritis_extrakt_default_an_und_abschaltbar() {
+    fn kritis_extrakt_default_aus_und_einschaltbar() {
         let c = parse_hermetisch(["lifeline-hub"]);
-        assert!(c.kritis_extrakt);
+        assert!(!c.kritis_extrakt);
         assert_eq!(
             c.kritis_extrakt_url,
             "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
         );
         assert_eq!(c.kritis_extrakt_intervall_stunden, 168);
+        assert!(parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "true"]).kritis_extrakt);
+        assert!(parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "true", &["lifeline-hub"]).kritis_extrakt);
         assert!(!parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "false"]).kritis_extrakt);
-        assert!(
-            !parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "false", &["lifeline-hub"]).kritis_extrakt
-        );
         let c = parse_mit_env(
             "LIFELINE_KRITIS_EXTRAKT_INTERVALL_STUNDEN",
             "24",
@@ -1261,17 +1261,21 @@ mod tests {
 
     #[test]
     fn katalog_eintrag_sha256_pin_konsistent_und_serialisiert() {
-        // Pin-Konsistenz: jeder Eintrag ist ENTWEDER ungepinnter Platzhalter (sha256 None) ODER
-        // vollständig gepinnt (64-stelliger lowercase-hex-Hash + echte URL). Halb gepinnte Zustände
-        // fallen durch.
+        // Pin-Konsistenz (LLH-1546): die einkompilierte Baseline ist ungepinnt (sha256 None) und
+        // zeigt auf den Vorgabe-Bucket, nie auf einen TODO-Platzhalter. Ladbar wird ein Eintrag
+        // nur über das Manifest mit Prüfsumme.
         for e in default_offline_katalog() {
-            // Gepinnt GENAU DANN, wenn die URL kein TODO-Platzhalter ist. Fängt beide Richtungen:
-            // echte URL
-            // ohne Hash (download.rs lüde ungeprüft) und Hash bei Platzhalter-URL.
-            assert_eq!(
-                e.sha256.is_some(),
-                !e.url.contains("TODO"),
-                "URL/Pin-Zustand inkonsistent (echte URL braucht sha256 und umgekehrt): {}",
+            assert!(
+                e.url
+                    .starts_with(&format!("{}/", crate::karte::katalog::KARTEN_BASIS_URL)),
+                "Baseline-URL außerhalb des Vorgabe-Buckets: {} ({})",
+                e.name,
+                e.url
+            );
+            assert!(!e.url.contains("TODO"), "TODO-Platzhalter: {}", e.name);
+            assert!(
+                !crate::config::eintrag_ist_lieferbar(&e),
+                "Baseline ohne Manifest-Pin darf nicht ladbar sein: {}",
                 e.name
             );
             if let Some(h) = &e.sha256 {

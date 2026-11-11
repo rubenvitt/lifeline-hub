@@ -6,7 +6,12 @@
 AREA   ?= germany
 FORMAT ?= mbtiles
 OUT    ?= out
-IMAGE  := versatiles/versatiles-planetiler:latest
+# LLH-1546 (R15): Image per Datums-Tag UND Digest gepinnt, damit zwei Bauten desselben Stands
+# dieselben Kacheln liefern und eine neue Upstream-Version nicht unbemerkt wirkt. Heben: neuen
+# Datums-Tag auf hub.docker.com/r/versatiles/versatiles-planetiler/tags wählen, Digest mit
+# `docker buildx imagetools inspect versatiles/versatiles-planetiler:<tag>` lesen, beide hier
+# ersetzen und eine Region probebauen (`make tiles AREA=bremen && make validate`).
+IMAGE  := versatiles/versatiles-planetiler:2026-11-09@sha256:403be2da98557a2bd9339b25b45f48cd5f0c46965f2797cd601d85776bd82ad6
 # HOST_OUT = derselbe Ordner wie $(OUT), aber so, wie ihn der DOCKER-DAEMON sieht (LFH-602).
 # Läuft `make` selbst in einem Container und spricht über den gemounteten Socket mit dem
 # Daemon des Hosts, löst der Daemon den `-v`-Pfad auf dem HOST auf — $(CURDIR) ist dort ein

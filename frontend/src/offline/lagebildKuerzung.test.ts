@@ -54,6 +54,7 @@ const ERWARTET_BEHALTEN = [
   // LLH-1612: Haushalt (Verweis) und Kostform (Katalogwert) halten die Registrierliste ohne Netz.
   'haushalt_id',
   'haushalt_nummer',
+  'haushalt_bezugsperson',
   'kostform',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
@@ -132,6 +133,7 @@ const VOLL: Person = {
   },
   haushalt_id: 3,
   haushalt_nummer: 1,
+  haushalt_bezugsperson: true,
   kostform: 'vegetarisch',
   unvertraeglichkeiten: 'Erdnüsse',
 };
