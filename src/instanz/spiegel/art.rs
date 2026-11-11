@@ -729,7 +729,7 @@ mod tests {
     #[tokio::test]
     async fn jede_gespiegelte_tabelle_hat_einen_primaerschluessel() {
         // Die rowid einer Tabelle ohne Primärschlüssel darf `VACUUM` neu vergeben; dann zeigte die
-        // Herkunft am Spiegel auf eine andere Zeile (LLH-1630, Migration 0318). Eine neue
+        // Herkunft am Spiegel auf eine andere Zeile (LLH-1630, Migration 0320). Eine neue
         // gespiegelte Tabelle bekommt deshalb `id INTEGER PRIMARY KEY` oder einen mehrspaltigen
         // Schlüssel.
         let pool = crate::db::test_pool().await;

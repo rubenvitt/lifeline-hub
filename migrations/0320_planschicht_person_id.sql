@@ -10,7 +10,7 @@
 -- `PRAGMA foreign_keys`. Spalten, CHECK und Indizes wie 0277 und 0294; die Log- und
 -- Schutz-Trigger aus 0314 kommen wieder dazu, jetzt mit `id` statt `rowid`
 -- (`instanz::spiegel::art::trigger_sql`, Wächter `art::tests::trigger_passen_zur_beschreibung`).
--- Abgesichert von db::tests::migration_0318_planschicht_person_id.
+-- Abgesichert von db::tests::migration_0320_planschicht_person_id.
 
 CREATE TABLE einsatz_planschicht_person_neu (
     id                  INTEGER PRIMARY KEY,
