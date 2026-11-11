@@ -1,6 +1,6 @@
 # 11. Risiken und technische Schulden
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 11.11.2026.
 
 Grundlage ist das [Architektur-Review vom 11.07.2026](../architektur-review-2026-07-11.html)
 mit 46 Befunden (F01 bis F36, G01 bis G10). Jeder Befund ist am Code und in Zunder (Projekt
@@ -46,6 +46,7 @@ Repository; was sich nicht belegen ließ, fehlt hier.
 | R30 | Einsatznummern vergeben ELW und Hub unabhängig; ein Spiegel ist von der Eindeutigkeit je Org ausgenommen (`einsatz.spiegel`) und zählt bei der eigenen Nummernvergabe nicht mit (LLH-1630). | Am Hub können ein eigener Einsatz und ein Spiegel dieselbe Nummer tragen. Abgestimmte Nummernkreise über Instanzen sind offen. | `migrations/0314_einsatz_spiegel.sql` (`idx_einsatz_nummer … WHERE spiegel = 0`), `src/einsatz/repo.rs` (`anlegen_tx`) | – |
 | R31 | Der Vorgabe-Katalog der Offline-Karten liegt im Bucket des karten-service auf dem Alpha-Server (`https://karten.rubeen.dev`); die Adresse ist einkompiliert. | Jede Installation ohne `--offline-katalog-manifest-url` lädt ihre Offline-Karten von dort. Fällt der Server aus oder zieht der Bucket um, sehen ältere Installationen keine neuen Stände mehr; bereits geladene Karten bleiben nutzbar. | `src/karte/katalog.rs` (`KARTEN_BASIS_URL`, `OFFLINE_KATALOG_MANIFEST_URL`), `src/config.rs` (`default_offline_katalog`), `crates/karten-katalog/src/lib.rs` | – |
 | R32 | Ein kompromittierter Hub kann sich die Unterschrift eines Admins für eine Notübernahme erschleichen, wie bei R24: er liefert die Seite aus, auf der der Admin unterschreibt. | Am ELW greift die Übernahme erst, wenn die Einsatzleitung dort sie bestätigt; sie sieht Grund, Unterzeichner und Zeit. Bleibt die Gewöhnung an das Bestätigen. Bis LLH-1492 Inhalte spiegelt, ist die Führung ohnehin abgeschaltet (`LIFELINE_FUEHRUNG`). | `src/instanz/fuehrung/`, `openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md` (Risiken) | LLH-1491 |
+| R33 | Maschinenwege von außen sind nicht gedrosselt: Die signierten Instanzrouten und der Bearer-Lesezugang des Lagemonitors zählen Fehlversuche nicht in die IP-Sperre, ein unbekannter `kid` oder Schlüssel kostet je Anfrage einen DB-Zugriff. Lagemonitor-Schlüssel (`llh_lm_`) laufen nie ab. | Durchprobieren ist bei 256-Bit-Schlüsseln und Signaturen aussichtslos, aber Last auf SQLite (R09) lässt sich so ungebremst erzeugen; ein geleakter Lagemonitor-Schlüssel gilt bis zum Widerruf. | `src/instanz/extractor.rs`, `src/lagemonitor_zugang/mod.rs` (`LagemonitorZugriff`), `src/auth/rate_limit.rs`, `docs/konzepte/2026-11-11-oeffentliche-api.md` | Zunder LLH-1652, LLH-1638 |
 
 ## 11.3 Behobene Befunde aus dem Review
 
