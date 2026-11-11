@@ -1179,27 +1179,26 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
   });
 
   // Spec `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“ (LLH-730).
+  // Zeitpunkte VOR `render()` rechnen, nie im Handler: Die Uhr der Seite (`useUhr`) liest die Zeit
+  // beim Einhängen. Käme `vor(60)` erst mit der Anfrage, läge es unter Last mehr als eine Sekunde
+  // hinter der Uhr, und aus „1 h 00“ würden „59 min“ (LLH-1643).
   const vor = (minuten: number) =>
     new Date(Date.now() - minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
 
   it('„Ruhe zu kurz": Wiedereinsatz nach 2 h Ruhe, die Einsatzdauer trägt das Wort', async () => {
     setzeViewportBreite(1440);
+    const perioden = [
+      {
+        beginn_at: vor(9 * 60),
+        anker: 'alarmierung',
+        ende_at: vor(3 * 60),
+        ende_art: 'entlassung',
+      },
+      { beginn_at: vor(60), anker: 'alarmierung' },
+    ];
     server.use(
       http.get('/api/einsaetze/7/personal/zeitachse', () =>
-        HttpResponse.json([
-          {
-            personal_id: 10,
-            perioden: [
-              {
-                beginn_at: vor(9 * 60),
-                anker: 'alarmierung',
-                ende_at: vor(3 * 60),
-                ende_art: 'entlassung',
-              },
-              { beginn_at: vor(60), anker: 'alarmierung' },
-            ],
-          },
-        ]),
+        HttpResponse.json([{ personal_id: 10, perioden }]),
       ),
     );
     render(einsatz());
@@ -1217,21 +1216,17 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
 
   it('nach dem Ende einer langen Periode: keine Einstufung, Ruhe neutral', async () => {
     setzeViewportBreite(1440);
+    const perioden = [
+      {
+        beginn_at: vor(14 * 60),
+        anker: 'alarmierung',
+        ende_at: vor(60),
+        ende_art: 'entlassung',
+      },
+    ];
     server.use(
       http.get('/api/einsaetze/7/personal/zeitachse', () =>
-        HttpResponse.json([
-          {
-            personal_id: 10,
-            perioden: [
-              {
-                beginn_at: vor(14 * 60),
-                anker: 'alarmierung',
-                ende_at: vor(60),
-                ende_art: 'entlassung',
-              },
-            ],
-          },
-        ]),
+        HttpResponse.json([{ personal_id: 10, perioden }]),
       ),
     );
     render(einsatz());

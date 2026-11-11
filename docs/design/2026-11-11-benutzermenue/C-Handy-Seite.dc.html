@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Variante C, Anzeige im Profil</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.tel{width:390px;height:844px;position:relative;overflow:hidden;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee}
+.kopf{height:56px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:8px;padding:0 4px 0 12px;box-sizing:border-box}
+.marke{width:14px;height:14px;background:#a8071a;flex-shrink:0}
+.ktitel{font-size:14px;font-weight:600;flex:1}
+.kn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;color:#a0a8b1;padding:0}
+.ini{width:24px;height:24px;background:#16191d;color:#c6ccd2;font:500 10px "LFH Mono",monospace;display:inline-flex;align-items:center;justify-content:center}
+.seite{padding:12px}
+.pfad{font-size:12px;color:#9aa2ab;margin-bottom:4px}
+.h1{font-size:20px;font-weight:600;margin:0 0 12px}
+.paneel{background:#0f1215;border:1px solid #2e343a;margin-bottom:12px}
+.pkopf{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#838b94;padding:10px 12px;border-bottom:1px solid #22262b}
+.pkoerper{padding:12px;display:flex;flex-direction:column;gap:14px}
+.feld{display:flex;flex-direction:column;gap:6px}
+.etikett{font-size:13px;color:#c6ccd2}
+.seg{display:flex;gap:1px;background:#2e343a;border:1px solid #2e343a}
+.seg button{flex:1;min-width:0;height:48px;border:0;background:#0f1215;color:#9aa2ab;font-family:inherit;font-size:13px;padding:0 4px}
+.seg button.an{background:#16191d;color:#e8ebee;font-weight:600;box-shadow:inset 0 -2px 0 #4d94d6}
+.hinweis{font-size:12px;color:#838b94}
+.zu{height:44px;display:flex;align-items:center;padding:0 12px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#838b94}
+</style>
+</helmet>
+<div class="tel">
+  <div class="kopf">
+    <span class="marke"></span>
+    <span class="ktitel">Profil</span>
+    <button class="kn" aria-label="Benutzermenü"><span class="ini">RV</span></button>
+  </div>
+  <div class="seite">
+    <div class="pfad">Benutzermenü › Anzeige</div>
+    <h1 class="h1">Profil</h1>
+    <div class="paneel"><div class="zu">Konto ▸</div></div>
+    <section class="paneel" aria-label="Anzeige auf diesem Gerät">
+      <h2 class="pkopf" style="margin:0;font-weight:400">Anzeige auf diesem Gerät</h2>
+      <div class="pkoerper">
+        <div class="feld" role="radiogroup" aria-label="Darstellung">
+          <span class="etikett">Darstellung</span>
+          <div class="seg"><button role="radio" aria-checked="false">Hell</button><button role="radio" aria-checked="true" class="an">Dunkel</button><button role="radio" aria-checked="false">System</button></div>
+        </div>
+        <div class="feld" role="radiogroup" aria-label="Bediendichte">
+          <span class="etikett">Bediendichte</span>
+          <div class="seg"><button role="radio" aria-checked="false">Kompakt</button><button role="radio" aria-checked="true" class="an">Komfortabel</button><button role="radio" aria-checked="false">Handschuh</button></div>
+        </div>
+        <div class="feld" role="radiogroup" aria-label="Helligkeit in Prozent">
+          <span class="etikett">Helligkeit in %</span>
+          <div class="seg"><button role="radio" aria-checked="true" class="an" style="font-family:'LFH Mono',monospace">100</button><button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">80</button><button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">60</button><button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">40</button><button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">20</button></div>
+        </div>
+        <div class="feld">
+          <span class="etikett">Zeitdarstellung</span>
+          <div class="seg"><button class="an">Taktisch</button><button>Datum und Uhrzeit</button></div>
+          <span class="hinweis">Steht heute schon hier (LLH-1053).</span>
+        </div>
+      </div>
+    </section>
+    <div class="paneel"><div class="zu">Sicherheit ▸</div></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

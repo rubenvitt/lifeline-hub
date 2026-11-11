@@ -19,12 +19,39 @@ pub const MAX_GROESSE: usize = 1024 * 1024;
 /// Rückfrage mit dem ETag — ein neues Logo ist sofort da, ein unverändertes kostet ein 304.
 pub const CACHE_CONTROL: &str = "private, no-cache";
 
+/// Meldung des 422, wenn sich ein Logo nicht von Metadaten bereinigen lässt (LLH-1640).
+pub const UNBEREINIGBAR_MELDUNG: &str = "Das Logo lässt sich nicht von Metadaten bereinigen.";
+
+/// Bereinigt Logo-Bytes über `anhang::metadaten` (LFH-747): ohne EXIF/GPS, XMP, IPTC und
+/// Kommentare, nur die Ausrichtung bleibt. Gilt beim Hochladen (gespeichert werden nur die
+/// bereinigten Bytes) UND beim Ausliefern (Bestand von vor LLH-1640, neuere
+/// `BEREINIGUNG_VERSION`). Ein Logo ist kein Beweismittel, ein Original braucht es nicht.
+/// Lässt sich ein Bild nicht bereinigen → 422, nie das Original.
+pub fn bereinigt(daten: &[u8], mime: &str) -> Result<Vec<u8>, AppError> {
+    crate::anhang::metadaten::bereinigen(daten, mime)
+        .map(std::borrow::Cow::into_owned)
+        .map_err(|crate::anhang::metadaten::Unbereinigbar(grund)| {
+            tracing::warn!(grund, "Logo lässt sich nicht bereinigen");
+            AppError::UnprocessableEntity(UNBEREINIGBAR_MELDUNG.into())
+        })
+}
+
+/// ETag-Wert des Logo-Abrufs: Prüfsumme der gespeicherten Bytes plus Version der Bereinigung,
+/// wie bei Anhängen und Kartenbildern (`"<sha256>.b<n>"`). Ändert sich die Bereinigung, holt
+/// jeder Browser die neue Fassung.
+pub fn etag_wert(sha256: &str) -> String {
+    format!(
+        "{sha256}.b{}",
+        crate::anhang::metadaten::BEREINIGUNG_VERSION
+    )
+}
+
 /// Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`.
 #[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow, ToSchema)]
 pub struct OrgLogoAnzeige {
     pub mime: String,
     pub groesse: i64,
-    /// Hex-sha256 der Bytes; zugleich der ETag des Abrufs und der Cache-Brecher `?v=`.
+    /// Hex-sha256 der gespeicherten (bereinigten) Bytes; Cache-Brecher `?v=` und Kern des ETags.
     pub sha256: String,
     pub geaendert_at: String,
 }

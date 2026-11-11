@@ -2,7 +2,7 @@ import { Button, Input } from 'antd';
 import type { InputRef } from 'antd';
 import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import Markdown from '../components/Markdown';
 import { Select } from '../components/Select';
@@ -10,6 +10,8 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useViewport } from '../components/useViewport';
 import { Bildmarke } from '../marke/Bildmarke';
+import { warGeraet } from '../geraet/geraetMarke';
+import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
 import {
   GERAET_START_PFAD,
   einsaetzePfad,
@@ -21,6 +23,15 @@ import { GRUPPEN, gruppenName, type Gruppe } from './gruppen';
 import HilfeBild from './HilfeBild';
 import { KAPITEL, findeKapitel, kapitelDerGruppe, verlinke, type Kapitel } from './kapitel';
 import './Hilfe.css';
+
+/** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`, HEIC-Decoder LFH-1000). */
+const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
+
+/** Der Pfad, aus dem das Benutzermenü die Hilfe geöffnet hat (`state.von`, LLH-1642 D5). */
+function parseHerkunft(state: unknown): string | undefined {
+  const von = (state as { von?: unknown } | null)?.von;
+  return typeof von === 'string' && von.startsWith('/') ? von : undefined;
+}
 
 /** Klein, ohne Umlaute und ß: „gerat“ findet „Gerät“. */
 function falte(text: string): string {
@@ -58,7 +69,8 @@ export default function HilfePage() {
   const { kapitel: slug } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { benutzer, geraet } = useAuth();
+  const location = useLocation();
+  const { benutzer, geraet, laedt } = useAuth();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const gruppe = parseHilfeGruppe(params);
@@ -87,6 +99,57 @@ export default function HilfePage() {
     : benutzer
       ? { pfad: einsaetzePfad(), label: 'Zur App' }
       : { pfad: '/login', label: 'Zur Anmeldung' };
+
+  // Rückmeldeweg (LLH-1549, seit LLH-1642 hier statt im Benutzermenü): das Issue-Formular,
+  // vorbefüllt mit Version, Oberfläche und dem Bereich, aus dem die Hilfe geöffnet wurde — nur als
+  // Routenmuster, nie mit Kennungen. Ohne Referer: die Adresse der Installation bleibt bei uns.
+  function openRueckmeldung() {
+    window.open(
+      rueckmeldungsAdresse({
+        version: __APP_VERSION__,
+        pfad: parseHerkunft(location.state) ?? location.pathname,
+      }),
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }
+
+  // Am gekoppelten Gerät kein Rückmeldeweg (LLH-1549): auch nicht, solange die Sitzung noch lädt,
+  // und nicht nach einer widerrufenen Kopplung (der Browser lief zuletzt als Gerät).
+  const isRueckmeldungSichtbar = !geraet && !laedt && !warGeraet();
+
+  // Rückmeldung und Lizenzen (LLH-1642, Spec `benutzermenue`): aus dem Benutzermenü hierher,
+  // außerhalb der Druckwurzel. Am gekoppelten Gerät ohne Rückmeldeweg (Entscheidung LLH-1549);
+  // ohne Anmeldung mit, das Formular ist öffentlich. Steht auch ohne Suchtreffer: die Wege gehören
+  // zur Hilfe, nicht zu den Kapiteln.
+  const rueckmeldungAbschnitt = (
+    <section
+      className="hilfe-rueckmeldung"
+      aria-label="Rückmeldung und Lizenzen"
+      data-lfh="hilfe-rueckmeldung"
+    >
+      {isRueckmeldungSichtbar && (
+        <>
+          <p className="hilfe-rueckmeldung__frage">Fehler gefunden oder eine Idee?</p>
+          <p className="hilfe-rueckmeldung__text">
+            Das Formular öffnet sich in einem neuen Fenster, vorbefüllt mit Version, Oberfläche und
+            Bereich der App. Keine Namen, keine Einsatzdaten.
+          </p>
+          <Button onClick={openRueckmeldung}>Rückmeldung geben ↗</Button>
+        </>
+      )}
+      <p className="hilfe-rueckmeldung__fuss">
+        <span>Version {__APP_VERSION__}</span>
+        <a href={LIZENZ_HINWEIS} target="_blank" rel="noopener">
+          Lizenzen ↗
+        </a>
+      </p>
+    </section>
+  );
+
+  // Wechsel innerhalb der Hilfe tragen die Herkunft weiter, sonst meldete die Rückmeldung nach
+  // einem Kapitelwechsel `/hilfe` statt des Bereichs, aus dem die Hilfe geöffnet wurde (D5).
+  const herkunftState = location.state;
 
   // „/“ springt in die Suche, wie in der Doku der Website.
   useEffect(() => {
@@ -156,12 +219,13 @@ export default function HilfePage() {
     const ziel = a?.getAttribute('href');
     if (!ziel?.startsWith('/hilfe')) return;
     e.preventDefault();
-    void navigate(ziel);
+    void navigate(ziel, { state: herkunftState });
   }
 
   const kapitelListe = (
     <>
       <Link
+        state={herkunftState}
         className="hilfe-navi__start"
         to={hilfePfad({ gruppe })}
         aria-current={slug === undefined ? 'page' : undefined}
@@ -182,6 +246,7 @@ export default function HilfePage() {
             {b.kapitel.map((k) => (
               <li key={k.slug}>
                 <Link
+                  state={herkunftState}
                   to={hilfePfad({ kapitel: k.slug, gruppe })}
                   aria-current={k.slug === slug ? 'page' : undefined}
                 >
@@ -244,7 +309,7 @@ export default function HilfePage() {
               showSearch={false}
               value={gruppe}
               options={GRUPPEN.map((g) => ({ value: g.key, label: g.name }))}
-              onChange={(g) => void navigate(hilfePfad({ gruppe: g }))}
+              onChange={(g) => void navigate(hilfePfad({ gruppe: g }), { state: herkunftState })}
             />
           </div>
           {breit ? (
@@ -272,7 +337,11 @@ export default function HilfePage() {
                   <ul className="hilfe-karten">
                     {b.kapitel.map((k) => (
                       <li key={k.slug}>
-                        <Link className="hilfe-karte" to={hilfePfad({ kapitel: k.slug, gruppe })}>
+                        <Link
+                          state={herkunftState}
+                          className="hilfe-karte"
+                          to={hilfePfad({ kapitel: k.slug, gruppe })}
+                        >
                           <span className="hilfe-karte__titel">{k.titel}</span>
                           <span className="hilfe-karte__kurz">{kurztext(k.text)}</span>
                         </Link>
@@ -281,6 +350,7 @@ export default function HilfePage() {
                   </ul>
                 </div>
               ))}
+              {rueckmeldungAbschnitt}
               <h2 className="hilfe-mappe__titel">
                 Alle Kapitel am Stück
                 <span className="hilfe-mappe__zahl">{liste.length}</span>
@@ -288,10 +358,13 @@ export default function HilfePage() {
             </section>
           )}
           {slug === undefined && liste.length === 0 && (
-            <div className="hilfe-leer">
-              <p>Kein Kapitel passt zur Suche.</p>
-              <Button onClick={() => setSuche('')}>Suche lösen</Button>
-            </div>
+            <>
+              <div className="hilfe-leer">
+                <p>Kein Kapitel passt zur Suche.</p>
+                <Button onClick={() => setSuche('')}>Suche lösen</Button>
+              </div>
+              {rueckmeldungAbschnitt}
+            </>
           )}
           {slug !== undefined && gezeigt.length === 0 && (
             <SeitenLeer
@@ -330,6 +403,7 @@ export default function HilfePage() {
             <nav className="hilfe-blaettern" aria-label="Kapitel blättern">
               {zurueck ? (
                 <Link
+                  state={herkunftState}
                   className="hilfe-blaettern__link hilfe-blaettern__link--zurueck"
                   to={hilfePfad({ kapitel: zurueck.slug, gruppe })}
                 >
@@ -341,6 +415,7 @@ export default function HilfePage() {
               )}
               {weiter && (
                 <Link
+                  state={herkunftState}
                   className="hilfe-blaettern__link hilfe-blaettern__link--weiter"
                   to={hilfePfad({ kapitel: weiter.slug, gruppe })}
                 >
