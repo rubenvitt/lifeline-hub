@@ -49,7 +49,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`. Vor jedem „fertig“
 - [x] 7.2 `mise exec -- pnpm -C frontend design-system`, Erzeugtes unter `docs/design/design-system/project/` mitcommitten (Segmentleiste geändert)
 - [x] 7.3 Kommentare im Code nachziehen, die „Umschaltgruppen“, „✓ im Text“ oder die alten Einträge nennen (`BenutzerMenu.tsx`, `command-palette/befehle.ts`, `theme/darstellungOptionen.ts`, `rueckmeldung/adresse.ts`)
 - [ ] 7.4 `./scripts/check-all.sh` grün (Gate-Lauf dieses Branches)
-- [ ] 7.5 `superpowers:requesting-code-review`, bestätigte Befunde abarbeiten
+- [x] 7.5 `superpowers:requesting-code-review`, bestätigte Befunde abarbeiten
 
 ## Workflow follow-up
 
