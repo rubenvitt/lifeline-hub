@@ -207,6 +207,59 @@ describe('Einheitengerät — Kontakte', () => {
     expect(await screen.findByText('R-012 · RTW angefordert')).toBeInTheDocument();
   });
 
+  describe('am Spiegel (LLH-1492)', () => {
+    const SPIEGEL = {
+      gegenstelle: 'ELW 1',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+    };
+    function amSpiegel(antraege: unknown[] = []) {
+      const { gesendet } = stelleBereit();
+      server.use(
+        http.get('/api/einsaetze/7', () =>
+          HttpResponse.json(
+            einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', spiegel: SPIEGEL }),
+          ),
+        ),
+        http.get('/api/einsaetze/7/antraege', () => HttpResponse.json(antraege)),
+        http.post('/api/einsaetze/7/personen', async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          gesendet.push({ body, ausQueue: false });
+          return HttpResponse.json({ antrag: { id: 4, zustand: 'ausstehend' } }, { status: 202 });
+        }),
+      );
+      return { gesendet };
+    }
+
+    it('ein RTW wird zum Antrag: „Beantragt“, keine R-Nummer, kein „RTW angefordert“', async () => {
+      const { gesendet } = amSpiegel();
+      renderApp('/geraet/7/kontakte');
+      const { user, dialog } = await oeffneKontakt();
+      await user.click(within(dialog).getByRole('button', { name: 'RTW nötig' }));
+      await waitFor(() => expect(gesendet).toHaveLength(1));
+      expect(await screen.findByText('Beantragt · RTW über Funk anfordern')).toBeInTheDocument();
+      expect(screen.queryByText(/RTW angefordert/)).toBeNull();
+      expect(screen.queryByText(/Änderung über Funk/)).toBeNull();
+    });
+
+    it('zeigt beantragte Kontakte mit „beantragt“', async () => {
+      amSpiegel([
+        {
+          id: 9,
+          art: 'person',
+          zustand: 'ausstehend',
+          erfasst_at: '2026-11-10 08:00:00',
+          ziel: {},
+          // Die Einheit trägt im Antrag die Kennung der führenden Instanz.
+          daten: { status: 'betroffen', anlass: 'hitze_kaelte', versorgende_einheit_id: 77 },
+        },
+      ]);
+      renderApp('/geraet/7/kontakte');
+      expect(await screen.findByText('beantragt')).toBeInTheDocument();
+    });
+  });
+
   it('ein erneuter RTW nach verlorener Antwort trägt dieselbe client_id', async () => {
     const { gesendet } = stelleBereit();
     let ersterVersuch = true;

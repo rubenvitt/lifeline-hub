@@ -427,6 +427,36 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(screen.getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' })).toBeEnabled();
   });
 
+  it('am Spiegel: „Belegung melden“ als Antrag, ohne Zeilenmenü; quittiert „Beantragt“ ohne Rückgängig (LLH-1492)', async () => {
+    einsatz.wert = {
+      ...einsatz.wert,
+      spiegel: {
+        gegenstelle: 'ELW 1',
+        beendet: false,
+        antraege_ausstehend: 0,
+        antraege_abgelehnt: 0,
+      },
+    } as typeof einsatz.wert;
+    api.meldeBelegung.mockResolvedValue({ antrag: { id: 4, zustand: 'ausstehend' } });
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    expect(screen.getByRole('button', { name: 'Betreuungsstelle anlegen' })).toBeDisabled();
+    expect(screen.getByText('Spiegel von ELW 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Belegung melden: Turnhalle Ost' });
+    await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+    expect(
+      await screen.findByText('Beantragt: Belegungsmeldung Turnhalle Ost'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
+    // Kennzahlen bleiben die des Servers: die Belegung der Turnhalle steht unverändert.
+    expect(zeileVon('Turnhalle Ost')).toHaveTextContent('89');
+  });
+
   describe('Deeplink', () => {
     const vorher = Element.prototype.scrollIntoView;
     let gescrollt: Element[];

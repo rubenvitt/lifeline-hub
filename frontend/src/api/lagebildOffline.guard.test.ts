@@ -133,6 +133,14 @@ describe('istLagebildOfflineKey', () => {
     expect(istLagebildOfflineKey(einsatzKeys.brStammTreffer(7, 3, 'hlf'))).toBe(false);
   });
 
+  // Ausdrücklich draußen (LLH-1492, design.md D13): die Anträge sind ein Stand des Servers dieser
+  // Instanz. Ohne Verbindung zu ihr trägt die Warteschlange das Erfasste; ein alter Antragsstand
+  // von der Platte zeigte „ausstehend“, was längst übernommen oder abgelehnt ist.
+  it('nimmt die Anträge am Spiegel nicht offline (LLH-1492)', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.antraege(7))).toBe(false);
+    expect(ERWARTET_EINSATZ.has('einsatz-antraege')).toBe(false);
+  });
+
   it('nimmt die Lagebesprechung nicht offline (LLH-1111)', () => {
     expect(istLagebildOfflineKey(einsatzKeys.lagebesprechung(7))).toBe(false);
     expect(istLagebildOfflineKey(einsatzKeys.lagebesprechungen(7))).toBe(false);

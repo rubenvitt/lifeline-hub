@@ -59,6 +59,13 @@ export interface KontextMenueOptionen<S> {
    * Zeile, ohne sie zu verdecken).
    */
   tastaturAnker?: (element: HTMLElement | SVGElement) => KontextAnker;
+  /**
+   * Öffnet ein langer Druck (Touch, Stift) das Menü? Vorgabe `true`. `false` lässt am Touchgerät
+   * das Markieren und das Systemmenü, auch das native `contextmenu`, das Android beim Halten
+   * schickt; Rechtsklick mit der Maus und die Tasten öffnen weiter. Das Einsatztagebuch setzt
+   * `false`, dort wird Text am Tablet markiert (LLH-1597, Spec `datensatz-aktionsmenue`).
+   */
+  langerDruck?: boolean;
 }
 
 export interface KontextHandler<E extends Element = Element> {
@@ -236,6 +243,8 @@ export function useKontextMenue<S>(
   });
 
   const druck = useRef<LangerDruck | null>(null);
+  /** Zeigerart des letzten `pointerdown` am Datensatz (nur ohne langen Druck gebraucht). */
+  const letzterZeiger = useRef<string | null>(null);
   /** Läuft gerade ein Touchdruck oder hat er eben das Menü geöffnet? Dann kein natives Menü. */
   const touchAktiv = useRef(false);
 
@@ -285,6 +294,14 @@ export function useKontextMenue<S>(
       return {
         onContextMenu: (e) => {
           if (!ausEigenemBaum(e)) return;
+          // Ohne langen Druck ist ein `contextmenu` nach Finger oder Stift das Halten des Systems,
+          // kein Rechtsklick: es bleibt beim Systemmenü (Markieren, Kopieren).
+          if (
+            optionenRef.current.langerDruck === false &&
+            (letzterZeiger.current === 'touch' || letzterZeiger.current === 'pen')
+          ) {
+            return;
+          }
           if (touchAktiv.current) {
             // Android-Chrome meldet den langen Druck selbst; der eigene Zeitgeber öffnet (D3).
             e.preventDefault();
@@ -299,6 +316,10 @@ export function useKontextMenue<S>(
         },
 
         onPointerDown: (e) => {
+          // Die Rechtsklick-Taste am Stift (`button` 2) ist ein Rechtsklick, kein Halten.
+          letzterZeiger.current =
+            e.pointerType === 'pen' && e.button === 2 ? 'mouse' : e.pointerType;
+          if (optionenRef.current.langerDruck === false) return;
           if (e.pointerType === 'mouse' || !ausEigenemBaum(e)) return;
           loesen();
           if (browsermenueBleibt(e.target)) return;

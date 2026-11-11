@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Planung, PlanungPosten, SchichtplanImportVorschau } from '../api/types';
+import type { Planung, PlanungPosten, PlanungUebernahmeVorschau } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { adminFixture } from '../test/fixtures';
@@ -390,8 +390,8 @@ describe('PlanungPage (LLH-1586)', () => {
 
   describe('In Einsatz übernehmen (LLH-1587)', () => {
     const vorschau = (
-      ueber: Partial<SchichtplanImportVorschau> = {},
-    ): SchichtplanImportVorschau => ({
+      ueber: Partial<PlanungUebernahmeVorschau> = {},
+    ): PlanungUebernahmeVorschau => ({
       posten: [
         {
           schluessel: 'posten-1',
@@ -425,6 +425,7 @@ describe('PlanungPage (LLH-1586)', () => {
       abschnitte_neu: [],
       auswahl: { einheiten: [], uhs: [], vorlagen: [], abschnitte: [] },
       uebernehmbar: true,
+      stand: 3,
       ...ueber,
     });
     const uebernommen = planung({
@@ -478,10 +479,100 @@ describe('PlanungPage (LLH-1586)', () => {
       expect(uebernahmeBody).toEqual({
         ziel: { art: 'neu' },
         entscheidungen: { posten: {}, personen: {} },
+        stand: 3,
       });
       expect(
         within(dialog).getByRole('button', { name: 'Zum Schichtplan des Einsatzes' }),
       ).toBeInTheDocument();
+    });
+
+    it('hat sich die Planung seit der Vorschau geändert (409), holt der Dialog sie neu und übernimmt mit dem neuen Stand (LLH-1610)', async () => {
+      const anfragen: unknown[] = [];
+      const uebernahmen: unknown[] = [];
+      setup();
+      server.use(
+        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
+          anfragen.push(await request.json());
+          // Die zweite Vorschau sieht den geänderten Stand: ein Block mehr.
+          return HttpResponse.json(
+            anfragen.length === 1
+              ? vorschau()
+              : vorschau({
+                  stand: 4,
+                  zaehlung: { ...vorschau().zaehlung, bloecke_neu: 2, aenderungen: 3 },
+                }),
+          );
+        }),
+        http.post('/api/planungen/5/uebernahme', async ({ request }) => {
+          uebernahmen.push(await request.json());
+          if (uebernahmen.length === 1) {
+            return HttpResponse.json(
+              { error: 'Die Planung wurde seit der Vorschau geändert' },
+              { status: 409 },
+            );
+          }
+          return HttpResponse.json({
+            einsatz_id: 42,
+            einsatz_neu: true,
+            zaehlung: vorschau().zaehlung,
+            planung: uebernommen,
+          });
+        }),
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'In Einsatz übernehmen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'In Einsatz übernehmen' });
+      expect(await within(dialog).findByText('1 Schicht neu')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+
+      expect(
+        await within(dialog).findByText('Planung geändert, Vorschau neu geladen'),
+      ).toBeInTheDocument();
+      expect(await within(dialog).findByText('2 Schichten neu')).toBeInTheDocument();
+      expect(anfragen).toHaveLength(2);
+      expect(anfragen[1]).toEqual(anfragen[0]);
+      expect(within(dialog).queryByText('Nicht übernommen')).not.toBeInTheDocument();
+      expect(uebernahmen[0]).toMatchObject({ stand: 3 });
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+      expect(
+        await within(dialog).findByText('Einsatz angelegt, Plan übernommen · E-2027-0042'),
+      ).toBeInTheDocument();
+      expect(uebernahmen[1]).toEqual({
+        ziel: { art: 'neu' },
+        entscheidungen: { posten: {}, personen: {} },
+        stand: 4,
+      });
+    });
+
+    it('ein anderer 409 (Planung schon übernommen) behält seinen Text statt „Planung geändert“ (LLH-1610)', async () => {
+      let vorschauen = 0;
+      setup();
+      server.use(
+        http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.post('/api/planungen/5/uebernahme/vorschau', () => {
+          vorschauen += 1;
+          return vorschauen === 1
+            ? HttpResponse.json(vorschau())
+            : HttpResponse.json({ error: 'Die Planung ist schon übernommen' }, { status: 409 });
+        }),
+        http.post('/api/planungen/5/uebernahme', () =>
+          HttpResponse.json({ error: 'Die Planung ist schon übernommen' }, { status: 409 }),
+        ),
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'In Einsatz übernehmen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'In Einsatz übernehmen' });
+      await within(dialog).findByText('1 Schicht neu');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+      expect(await within(dialog).findByText('Nicht übernommen')).toBeInTheDocument();
+      await waitFor(() => expect(vorschauen).toBe(2));
+      expect(await within(dialog).findByText('Keine Vorschau')).toBeInTheDocument();
+      expect(within(dialog).getByText('Nicht übernommen')).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText('Planung geändert, Vorschau neu geladen'),
+      ).not.toBeInTheDocument();
     });
 
     it('ein laufender Einsatz muss erst gewählt werden; ohne Schreibrecht oder fremd steht er nicht zur Wahl', async () => {

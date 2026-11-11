@@ -108,6 +108,8 @@ Verbindung selbst auf; eingehend nimmt er nur Anfragen der Geräte an.
 | Sicherung | Server → lokales Verzeichnis | Datei, optional mit `age` verschlüsselt | `src/backup/`; [`docs/betrieb/backup-restore.md`](../betrieb/backup-restore.md) |
 
 Jede ausgehende Antwort, die der Server ganz einliest, läuft über eine Größenobergrenze
-(`src/http_begrenzt.rs`). Wie Ports, Prozesse und Speicherorte verteilt sind, steht in
+(`src/http_begrenzt.rs`). Jeder ausgehende Abruf nennt sich im `User-Agent` mit Zweck,
+Softwarestand und Projektadresse, mit `--betreiber-kontakt` auch mit dem Kontakt des Betreibers
+(`src/ausgehend.rs`); die Nutzungsregeln des öffentlichen Nominatim verlangen das. Wie Ports, Prozesse und Speicherorte verteilt sind, steht in
 [Kapitel 7](07-verteilungssicht.md), die Abläufe über diese Schnittstellen in
 [Kapitel 6](06-laufzeitsicht.md).

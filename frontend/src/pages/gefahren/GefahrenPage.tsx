@@ -411,7 +411,7 @@ export default function GefahrenPage() {
         )}
         {!darfSchreiben && (
           <div className="gefahren-no-print" style={{ marginBottom: 12 }}>
-            <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+            <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
           </div>
         )}
         {setzen.isError && (

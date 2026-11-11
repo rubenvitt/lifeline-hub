@@ -307,3 +307,30 @@ describe('useEtbEntwuerfe', () => {
     expect(result.current.entwuerfe.map((e) => e.id)).toEqual(['A']);
   });
 });
+
+describe('Entwurf von außen (LLH-1492, „Neu erfassen“ am Spiegel)', () => {
+  it('eine schon offene Erfassung übernimmt den angelegten Entwurf und macht ihn aktiv', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    await act(async () => {
+      await entwurfStore.createAndActivateEntwurf(ICH, 7, {
+        inhalt: 'Neu aus Antrag',
+        typ: 'lage',
+      });
+    });
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(2));
+    const neu = result.current.entwuerfe.find((e) => e.inhalt === 'Neu aus Antrag')!;
+    expect(neu.typ).toBe('lage');
+    expect(result.current.aktiverId).toBe(neu.id);
+  });
+
+  it('nimmt keinen Entwurf eines anderen Einsatzes oder einer anderen Person', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    await act(async () => {
+      await entwurfStore.createAndActivateEntwurf(ICH, 8, { inhalt: 'anderer', typ: 'meldung' });
+      await entwurfStore.createAndActivateEntwurf(99, 7, { inhalt: 'fremd', typ: 'meldung' });
+    });
+    expect(result.current.entwuerfe).toHaveLength(1);
+  });
+});

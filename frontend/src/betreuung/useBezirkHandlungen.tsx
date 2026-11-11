@@ -207,6 +207,11 @@ export function useBezirkHandlungen({
         message.warning(`Offline vorgemerkt: Standmeldung ${bezirk.bezeichnung}`);
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Meldung.
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Standmeldung ${bezirk.bezeichnung}`);
+        return;
+      }
       const r = ergebnis.daten;
       invalidiere();
       zeigeRueckgaengig(

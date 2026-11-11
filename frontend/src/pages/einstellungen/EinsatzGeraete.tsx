@@ -41,7 +41,7 @@ import type {
   KopplungAnzeige,
   KopplungMitCode,
 } from '../../api/types';
-import { istEinsatzLeitung } from '../../einsatz/schreibrecht';
+import { darfEinsatzLeiten, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { koppelnAdresse, parseRouteId } from '../../routing/deeplinks';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
@@ -112,6 +112,9 @@ export default function EinsatzGeraete() {
   const daten = useEinstellungenDaten(einsatzId);
   const leitung = istEinsatzLeitung(daten.einsatz);
   const darf = leitung && daten.istAktiv;
+  // Koppeln und Widerrufen schreiben einen ETB-Eintrag; am Spiegel sperrt das die Datenbank
+  // (LLH-1492). Die Freigabe externer Lagemonitore bleibt lokal und hängt weiter an `darf`.
+  const darfKoppeln = darf && darfEinsatzLeiten(daten.einsatz);
 
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [anlegenVorbelegung, setAnlegenVorbelegung] = useState<AnlegenWerte | undefined>();
@@ -135,35 +138,35 @@ export default function EinsatzGeraete() {
   const uhsQ = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: darf && stellenart === 'uhs',
+    enabled: darfKoppeln && stellenart === 'uhs',
   });
   const betreuungQ = useQuery({
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),
-    enabled: darf && stellenart === 'betreuungsstelle',
+    enabled: darfKoppeln && stellenart === 'betreuungsstelle',
   });
   const brQ = useQuery({
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
-    enabled: darf && stellenart === 'bereitstellungsraum',
+    enabled: darfKoppeln && stellenart === 'bereitstellungsraum',
   });
   const abschnitteQ = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: darf && stellenart === 'einsatzabschnitt',
+    enabled: darfKoppeln && stellenart === 'einsatzabschnitt',
   });
   // Verpflegungsstellen (LLH-1048): `stellen` aus der einen Lesequelle der Verpflegung, ohne
   // stornierte; geplant und aktiv nimmt der Server an.
   const verpflegungQ = useQuery({
     queryKey: einsatzKeys.verpflegung(einsatzId),
     queryFn: () => ladeVerpflegung(einsatzId),
-    enabled: darf && stellenart === 'verpflegungsstelle',
+    enabled: darfKoppeln && stellenart === 'verpflegungsstelle',
   });
   // Einheiten (LLH-1579): die aktiven; eine aufgelöste lehnt der Server ab.
   const einheitenQ = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: darf && stellenart === 'einheit',
+    enabled: darfKoppeln && stellenart === 'einheit',
   });
 
   // Auftrag aus dem Einheiten-Detail: einmal öffnen, dann aus der Adresse nehmen. Ohne Recht
@@ -171,7 +174,7 @@ export default function EinsatzGeraete() {
   const uebersichtDa = geraeteQ.data != null;
   useEffect(() => {
     if (einheitAuftrag == null || daten.laedt || (leitung && !uebersichtDa)) return;
-    if (darf) {
+    if (darfKoppeln) {
       setAnlegenVorbelegung({ ansicht: 'einheit', stelle_id: einheitAuftrag });
       setAnlegenOffen(true);
     }
@@ -183,7 +186,7 @@ export default function EinsatzGeraete() {
       },
       { replace: true },
     );
-  }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darf, setSuche]);
+  }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darfKoppeln, setSuche]);
 
   // Vorbelegen ist kein Reset (`frontend/AGENTS.md`, Erfassung): erst wenn das Formular hängt,
   // und nicht als `initialValues`, sonst setzten Abbrechen und Erfolg auf die Einheit zurück und
@@ -244,7 +247,7 @@ export default function EinsatzGeraete() {
    * eine Aktion, ist jeder Auslöser gesperrt und zeigt das (wie bisher).
    */
   const geraetLaeuft = neuerCode.isPending || verlaengern.isPending || widerrufen.isPending;
-  const kopplungMenue: WeitereAktionen<KopplungAnzeige> | undefined = darf
+  const kopplungMenue: WeitereAktionen<KopplungAnzeige> | undefined = darfKoppeln
     ? {
         eintraege: (k) =>
           istBeendet(k)
@@ -317,7 +320,7 @@ export default function EinsatzGeraete() {
         titel="Gekoppelte Geräte"
         dataUpdatedAt={geraeteQ.dataUpdatedAt}
         aktion={
-          darf && (
+          darfKoppeln && (
             <Button
               type="primary"
               icon={<IconPlus />}

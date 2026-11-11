@@ -34,7 +34,7 @@ import {
   Zeitachseneintrag,
   type SegmentOption,
 } from '../components/instrument';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { MELDUNG_STATUS } from '../kommunikation';
@@ -212,6 +212,11 @@ export default function LagemeldungenPage() {
         message.warning(`Offline vorgemerkt: Lagemeldung von ${daten.absender}`);
         return;
       }
+      // Am Spiegel (LLH-1492): ein Antrag an die führende Instanz, noch ohne Nummer.
+      if (ergebnis.zustand === 'beantragt') {
+        message.info(`Beantragt: Lagemeldung von ${daten.absender}`);
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(eid) });
       void queryClient.invalidateQueries({ queryKey: einsatzKeys.meldungen(eid) });
       void queryClient.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(eid) });
@@ -271,10 +276,12 @@ export default function LagemeldungenPage() {
   const einsatz = einsatzQuery.data;
   const gefiltert = angezeigt.length;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  // Erfassen schreibt eine Meldung: Schreibrecht im Einsatz UND Modul Meldungen.
-  const darfErfassen = darfSchreiben && !meldungenGesperrt;
+  // Erfassen schreibt eine Meldung: Schreibrecht im Einsatz UND Modul Meldungen. Am Spiegel wird
+  // das Erfassen zum Antrag (LLH-1492, D13); das Bearbeiten der Lageangaben bleibt gesperrt.
+  const darfErfassen = darfBeantragen(einsatz) && !meldungenGesperrt;
+  const darfBearbeiten = darfSchreiben && !meldungenGesperrt;
   const rechteGrund = !darfSchreiben
-    ? einsatzRechteGrund(einsatz.status)
+    ? einsatzRechteGrund(einsatz)
     : meldungenGesperrt
       ? MODUL_MELDUNGEN_GESPERRT
       : undefined;
@@ -283,7 +290,7 @@ export default function LagemeldungenPage() {
   const zahlWort = (n: number) => (n === 1 ? 'Lagemeldung' : 'Lagemeldungen');
 
   const zeilenHinweis = (l: LageMeldung) => {
-    if (darfErfassen && bearbeitetId === l.meldung_id) {
+    if (darfBearbeiten && bearbeitetId === l.meldung_id) {
       return (
         <LageAngabenBearbeiten
           einsatzId={einsatzId}
@@ -357,7 +364,7 @@ export default function LagemeldungenPage() {
         </>
       }
       aktionen={
-        (l.is_neu && darfSchreiben) || (darfErfassen && bearbeitetId !== l.meldung_id) ? (
+        (l.is_neu && darfSchreiben) || (darfBearbeiten && bearbeitetId !== l.meldung_id) ? (
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
           <Space wrap size={token.marginSM}>
@@ -370,7 +377,7 @@ export default function LagemeldungenPage() {
                 Als gesehen markieren
               </Button>
             )}
-            {darfErfassen && bearbeitetId !== l.meldung_id && (
+            {darfBearbeiten && bearbeitetId !== l.meldung_id && (
               <Button
                 disabled={ohneVerbindung}
                 aria-label={`Lage-Angaben zu Meldung #${l.meldung_lfd_nr} bearbeiten`}

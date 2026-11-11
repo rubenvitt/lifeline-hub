@@ -442,9 +442,7 @@ export default function InfotelefonPage() {
         />
       }
       hinweis={
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
-        )
+        darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
       fuss={
         darfSchreiben ? (

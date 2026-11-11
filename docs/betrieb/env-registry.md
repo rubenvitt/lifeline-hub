@@ -48,6 +48,12 @@ Umgekehrt **härten** diese die Grenze:
 | `LIFELINE_COOKIE_SECURE` | `--cookie-secure` | Markiert Sitzungs-, MFA-, OIDC- und WebAuthn-Cookies für jede Antwort `Secure`, obwohl die App selbst kein TLS bedient (LFH-603). Hinter einem Proxy, der `X-Forwarded-Proto: https` setzt (Traefik), nicht nötig: dort wird `Secure` je Anfrage erkannt. Der Schalter ist der Zwang für Proxys ohne diesen Kopf. Default aus, damit direkter HTTP-Betrieb (LAN, Dev) funktioniert; mit `--tls` ohnehin an. Mehr in `docs/betrieb-tls.md`. |
 | `LIFELINE_BACKUP_EMPFAENGER` | `--backup-empfaenger` | Öffentliche `age`-Schlüssel (`age1…`, Komma-Liste), an die jede Sicherung verschlüsselt wird: automatische Sicherung, `backup` und der Admin-Download (LFH-1002). Gilt auch für das Subkommando `backup`. **Ohne Angabe** bleiben Sicherungen Klartext, und der Start warnt einmal. Ein ungültiger oder leerer Eintrag bricht den Start ab. Der private Schlüssel gehört nicht auf den Server; ohne ihn ist eine Sicherung verloren. Mehr in `docs/betrieb/backup-restore.md`. |
 
+Was der Server nach draußen über sich sagt:
+
+| Variable | Flag | Wirkung |
+|---|---|---|
+| `LIFELINE_BETREIBER_KONTAKT` | `--betreiber-kontakt` | Kontakt des Betreibers (z. B. `betrieb@example.org`), angehängt an die Kennung jedes ausgehenden Abrufs: `LifelineHub-Geocoder/<Version> (+https://github.com/rubenvitt/lifeline-hub; betrieb@example.org)` (LLH-1547, `src/ausgehend.rs`). **Empfohlen, sobald die Ortssuche den öffentlichen Nominatim nutzt** (keine eigene Geocoder-URL der Organisation): dessen Nutzungsregeln verlangen eine erreichbare Kennung, und ohne Kontakt teilen sich alle Installationen eine, sodass eine Sperre alle trifft. Der Kontakt geht an jeden angefragten Dienst (Kartenquellen, Fachebenen, OIDC, Push-Dienste, gekoppelte Instanzen); darum eine Funktionsadresse, keine persönliche. Ohne Angabe nur Projektadresse und Softwarestand; ASCII ohne Klammern und Semikolon, höchstens 200 Zeichen, sonst bricht der Start ab. |
+
 Geheimnisse, die nie ins Log dürfen (im `Debug` maskiert):
 `LIFELINE_ADMIN_PASSWORD`, `LIFELINE_KARTEN_SERVICE_TOKEN`,
 `LIFELINE_OIDC_CLIENT_SECRET`.

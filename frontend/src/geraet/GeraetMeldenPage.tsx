@@ -5,7 +5,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys } from '../api/queryKeys';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfBeantragen } from '../einsatz/schreibrecht';
 import GeraetMeldungen from './GeraetMeldungen';
 
 /**
@@ -52,7 +52,7 @@ export default function GeraetMeldenPage() {
       <GeraetMeldungen
         einsatzId={einsatzId}
         absender={absender}
-        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data) || !stelleDa}
+        schreibgeschuetzt={!darfBeantragen(einsatzQuery.data) || !stelleDa}
         standort={istEinheit}
       />
     </EinsatzSeite>

@@ -120,8 +120,9 @@ pub async fn liste(
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
     // Gerätekonten (LFH-892) sind keine Personen: sie erscheinen nicht in der Verwaltung.
     let sql = format!(
-        "{ANZEIGE_SPALTEN} WHERE org_id = ? AND {} ORDER BY id",
-        crate::geraet::repo::OHNE_GERAETEKONTEN
+        "{ANZEIGE_SPALTEN} WHERE org_id = ? AND {} AND {} ORDER BY id",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
     );
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
         .bind(PASSWORT_HASH_SSO_ONLY)

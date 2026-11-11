@@ -1,5 +1,6 @@
 import type {
   InstanzKopplungAnzeige,
+  InstanzSpiegelEinsatz,
   InstanzKopplungZustand,
   InstanzUebersicht,
   UnterschriftSchluesselAnzeige,
@@ -93,6 +94,8 @@ export function kopplungHinweise(
   }
   if (k.letzter_fehler) aus.push(`Letzte Meldung: ${k.letzter_fehler}`);
   if (k.hinweis) aus.push(k.hinweis);
+  // Abgleich der Einsätze (LLH-1492), etwa „Gegenüber spiegelt noch nicht (Update nötig).“
+  if (k.spiegel.hinweis) aus.push(k.spiegel.hinweis);
   // LLH-1605: nachgelieferte Schlüssel warten auf einen Menschen hier; ohne gültigen eigenen
   // Schlüssel (etwa nach dem Deaktivieren des letzten Halters) hilft nur neues Koppeln.
   if (k.wartende_schluessel === 1) {
@@ -104,6 +107,26 @@ export function kopplungHinweise(
     aus.push('Kein gültiger Unterschriftsschlüssel mehr: Kopplung widerrufen und neu koppeln');
   }
   return aus;
+}
+
+/**
+ * Zeile eines Einsatzes im Abgleich einer Kopplung (LLH-1492, Spec `einsatz-spiegel`, „Die Seite
+ * Instanzkopplung zeigt den Abgleich“): ob hier gespiegelt oder von hier geliefert, Stand, letzter
+ * Abgleich, beendet. Die Bezeichnung steht davor, der Hinweis darunter.
+ */
+export function spiegelEinsatzZeile(
+  e: InstanzSpiegelEinsatz,
+  zeit: (wert: string) => string,
+): string {
+  const teile: (string | null)[] = [
+    e.gespiegelt ? 'hier gespiegelt' : 'von hier geliefert',
+    `Stand ${e.stand}`,
+    e.letzter_abgleich_at
+      ? `letzter Abgleich ${zeit(e.letzter_abgleich_at)}`
+      : 'noch kein Abgleich',
+    e.beendet ? 'Abgleich beendet' : null,
+  ];
+  return teile.filter(Boolean).join(' · ');
 }
 
 /** Warum „Code ausstellen“ gesperrt ist; `undefined`, wenn es geht. */

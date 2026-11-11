@@ -423,14 +423,18 @@ async fn sweep_verwaiste_mit_pause(
     pause: std::time::Duration,
 ) -> Result<u64, AppError> {
     let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));
+    // Anhänge eines Spiegels bleiben (LLH-1492, design.md D10): ihre Verknüpfung kann noch
+    // ausstehen, und ein Löschen scheiterte am Schutz-Trigger.
     let verwaist = format!(
         "anhang.erstellt_at < ? \
          AND NOT EXISTS \
              (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
          AND NOT {} \
-         AND NOT {}",
+         AND NOT {} \
+         AND {}",
         modul_gebunden_sql("anhang"),
-        zur_entfernung_vorgesehen_sql("anhang")
+        zur_entfernung_vorgesehen_sql("anhang"),
+        crate::einsatz::spiegel_filter::nicht_gespiegelt("anhang.einsatz_id")
     );
     let ids: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM anhang WHERE {verwaist} ORDER BY id"

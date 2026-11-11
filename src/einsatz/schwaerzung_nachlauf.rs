@@ -62,8 +62,12 @@ pub async fn entferne_vorgesehene(
     let mut geloescht = 0;
     for tabelle in EINZELN_GELOESCHT {
         let vorgesehen = zur_entfernung_vorgesehen_sql(tabelle);
+        // Spiegel bleiben aus (LLH-1492, design.md D10): ihre Zeilen entfernt die Übernahme,
+        // ein Löschen hier scheiterte am Schutz-Trigger und hielte den Nachlauf auf.
+        let eigen = super::spiegel_filter::nicht_gespiegelt(&format!("{tabelle}.einsatz_id"));
         let ids: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-            "SELECT id FROM {tabelle} WHERE {vorgesehen} AND (?1 IS NULL OR einsatz_id = ?1) \
+            "SELECT id FROM {tabelle} WHERE {vorgesehen} AND {eigen} \
+               AND (?1 IS NULL OR einsatz_id = ?1) \
              ORDER BY id"
         )))
         .bind(einsatz)

@@ -13,12 +13,20 @@ import EinsatzGeraete from './EinsatzGeraete';
 
 /** Sektion „Geräte“ (LFH-892, Spec `geraete-kopplung`). */
 
-const einsatz = (meine_rolle = 'einsatzleitung', status = 'aktiv') => ({
+const einsatz = (meine_rolle = 'einsatzleitung', status = 'aktiv', spiegel: unknown = null) => ({
   id: 1,
   bezeichnung: 'Hochwasser Weser',
   status,
   meine_rolle,
+  spiegel,
 });
+
+const SPIEGEL = {
+  gegenstelle: 'ELW Nord',
+  beendet: false,
+  antraege_ausstehend: 0,
+  antraege_abgelehnt: 0,
+};
 
 const kopplung = (id: number, status: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -42,6 +50,7 @@ const UHS = [
 
 interface Aufbau {
   rolle?: string;
+  spiegel?: unknown;
   kopplungen?: unknown[];
   sperren?: unknown[];
   ansichten?: unknown[];
@@ -59,7 +68,9 @@ function stelleBereit(a: Aufbau = {}) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
   const gelesen: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle))),
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json(einsatz(a.rolle, 'aktiv', a.spiegel ?? null)),
+    ),
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
@@ -448,6 +459,24 @@ describe('EinsatzGeraete (LFH-892)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('koppelt am Spiegel nicht, die Lagemonitor-Freigabe bleibt (LLH-1492)', async () => {
+    stelleBereit({
+      spiegel: SPIEGEL,
+      lagemonitore: [
+        { zugang_id: 1, bezeichnung: 'FüKW 1', freigegeben: false, anderer_einsatz: false },
+      ],
+    });
+    rendern();
+    expect(await screen.findByText('UHS Nord · Tablet 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gerät koppeln/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 1' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('switch', { name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz' }),
+    ).toBeEnabled();
   });
 
   describe('Externe Lagemonitore (LLH-1484)', () => {

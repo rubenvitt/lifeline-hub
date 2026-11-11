@@ -666,7 +666,9 @@ anwendbar), „nicht geprüft" ist keins.
   dem Titel-Link. Kein eigenes `onContextMenu` (`kontextMenue.guard.test.ts`); die Lagekarte bleibt
   beim maplibre-Ereignis und teilt nur den Riegel `components/nachklickRiegel.ts`. Hörer, Riegel und
   Tasten-Nachlauf teilen sich alle Flächen, ein Hook je Karte ist also billig (LLH-1598,
-  `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/design.md`).
+  `openspec/changes/archive/2026-11-10-g11xq51l-kontextmenue-karten/design.md`). Eine Lesefläche
+  ohne langen Druck setzt `langerDruck: false` (ETB, LLH-1597): Finger und Stift behalten Markieren
+  und Systemmenü, Rechtsklick und Tasten öffnen weiter.
 - **Karten mit eigenen Knöpfen beschreiben ihre Handlungen einmal als `KartenAktion[]`**
   (`components/kartenKontext.ts`, LLH-1598): erst die Knöpfe der Aktionszeile in ihrer Reihenfolge,
   dann die ⋮-Einträge. Knöpfe und ⋮ lesen Etikett, Sperre (`sperrgrund`), Rückfrage (`rueckfrage`,
