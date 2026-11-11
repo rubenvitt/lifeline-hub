@@ -655,8 +655,13 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             einsatznummer_intern?: string | null;
-            /** @description Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`. */
+            /**
+             * @description Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`, im Zustand
+             *     `verwahrt` der Zeitpunkt, zu dem der Einsatz hier abgeräumt wurde.
+             */
             endgueltig_geloescht_at?: string | null;
+            /** @description Name der Installation, die den Einsatz verwahrt (LLH-1494); nur im Zustand `verwahrt`. */
+            gegenstelle?: string | null;
             /** @description Zeitpunkt der Löschvormerkung (Beginn der Karenz). */
             geloescht_at?: string | null;
             geschwaerzt_at?: string | null;
@@ -678,7 +683,7 @@ export interface components {
          *     `tests/enum_wire_kontrakt.rs`.
          * @enum {string}
          */
-        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "schwaerzung_beantragt" | "loeschung_ausstehend" | "endgueltig_geloescht";
+        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "schwaerzung_beantragt" | "loeschung_ausstehend" | "endgueltig_geloescht" | "verwahrt";
         /**
          * @description Wo eine Person gerade in einer UHS steht (LLH-1129): für den Patientenkopf im Personen-Detail,
          *     damit er UHS- und Platznamen ohne zweiten Abruf nennt. UHS- und Platzbezeichnung sind
@@ -2354,6 +2359,8 @@ export interface components {
              */
             meine_sachgebiete: components["schemas"]["Sachgebiet"][];
             meldende_stelle?: string | null;
+            /** @description Ende der Nachbereitung (LLH-1494, UTC); fehlt = keine Nachbereitungsfrist. */
+            nachbereitung_bis?: string | null;
             /** @description Nächste Lagebesprechung als expliziter UTC-Termin; fehlt ohne gesetzten Termin. */
             naechste_lagebesprechung_at?: string | null;
             /** Format: int64 */
@@ -5676,6 +5683,11 @@ export interface components {
             /** Format: int64 */
             meldung_bestaetigung_frist_min?: number | null;
             meldung_nummer_praefix?: string | null;
+            /**
+             * Format: int64
+             * @description Nachbereitung in Tagen ab Abschluss (LLH-1494); fehlt = keine Nachbereitungsfrist.
+             */
+            nachbereitung_tage?: number | null;
             /** Format: int64 */
             org_id: number;
             /** Format: int64 */

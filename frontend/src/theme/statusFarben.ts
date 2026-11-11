@@ -487,6 +487,8 @@ export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung>
   schwaerzung_beantragt: { rolle: 'achtung', label: 'Schwärzung beantragt' },
   loeschung_ausstehend: { rolle: 'alarm', label: 'Löschung steht aus' },
   endgueltig_geloescht: { rolle: 'neutral', label: 'endgültig gelöscht' },
+  // LLH-1494: an die verwahrende Installation übergeben; ein Endzustand wie der vorige.
+  verwahrt: { rolle: 'neutral', label: 'verwahrt' },
 };
 
 /**

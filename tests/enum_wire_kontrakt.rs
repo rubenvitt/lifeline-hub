@@ -518,6 +518,7 @@ fn serde_wire_gleich_as_str() {
         LoeschungAusstehend,
         EndgueltigGeloescht,
         SchwaerzungBeantragt,
+        Verwahrt,
     });
     enum_wire_as_str!(lifeline_hub::einsatz::schwaerzung_person::PersonenArt {
         Betroffene,

@@ -1674,7 +1674,14 @@
               "string",
               "null"
             ],
-            "description": "Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`."
+            "description": "Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`, im Zustand\n`verwahrt` der Zeitpunkt, zu dem der Einsatz hier abgeräumt wurde."
+          },
+          "gegenstelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Installation, die den Einsatz verwahrt (LLH-1494); nur im Zustand `verwahrt`."
           },
           "geloescht_at": {
             "type": [
@@ -1727,7 +1734,8 @@
           "geschwaerzt",
           "schwaerzung_beantragt",
           "loeschung_ausstehend",
-          "endgueltig_geloescht"
+          "endgueltig_geloescht",
+          "verwahrt"
         ]
       },
       "AufenthaltAnzeige": {
@@ -5857,6 +5865,13 @@
               "string",
               "null"
             ]
+          },
+          "nachbereitung_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Nachbereitung (LLH-1494, UTC); fehlt = keine Nachbereitungsfrist."
           },
           "naechste_lagebesprechung_at": {
             "type": [
@@ -13990,6 +14005,14 @@
               "string",
               "null"
             ]
+          },
+          "nachbereitung_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nachbereitung in Tagen ab Abschluss (LLH-1494); fehlt = keine Nachbereitungsfrist."
           },
           "org_id": {
             "type": "integer",
