@@ -7,7 +7,7 @@
 //! - **Liefern:** Jede genutzte Katalogzeile geht als mitgelieferte Abhängigkeit hinaus, auch
 //!   ohne Logzeile ([`ist_katalogzeile`]). Die meldende Seite nennt dazu den Schlüssel beim
 //!   Gegenüber, wenn die Herkunft der Stammdaten ihn kennt ([`gegen_hinaus`]). Ändert sich die
-//!   Katalogzeile, schreibt der Trigger `sprechgruppe_spiegelkatalog_u` (Migration 0314) sie ins
+//!   Katalogzeile, schreibt der Trigger `sprechgruppe_spiegelkatalog_u` (Migration 0315) sie ins
 //!   Log jedes nutzenden Einsatzes.
 //! - **Übernehmen** ([`uebernehmen`]): Gegenstück aus dem eigenen Katalog (Herkunft der
 //!   Stammdaten), sonst eine gleichnamige Sprechgruppe des Spiegels, sonst eine Kopie als

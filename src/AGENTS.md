@@ -374,7 +374,7 @@ Herleitung in
     `schema::tests::jede_id_spalte_ist_eingeordnet` (sieht nur `*_id`-Spalten; Kennungen in Text
     und JSON trägt ein, wer sie anlegt).
   - **Ein neuer Verweis auf `sprechgruppe`** (Fremdschlüssel oder Skizzen-Element) steht auch im
-    Trigger `sprechgruppe_spiegelkatalog_u` (Migration 0314), damit eine Kopie einer
+    Trigger `sprechgruppe_spiegelkatalog_u` (Migration 0315), damit eine Kopie einer
     Katalog-Sprechgruppe am Spiegel nachzieht (LLH-1629, `spiegel::katalog`). Wächter
     `katalog::tests::der_log_trigger_kennt_jeden_verweis_auf_sprechgruppen`. Einzige Ausnahme
     von „nur die Tabellen-Trigger schreiben ins Log“.
