@@ -50,9 +50,9 @@ async function anmelden(page: Page, nutzer: Nutzer): Promise<string> {
 async function pruefeKopf(menue: Locator, nutzer: Nutzer, benutzername: string) {
   await expect(menue.getByText(new RegExp(`@${benutzername}\\b`))).toBeVisible();
   for (const tag of ['Admin', 'Führungskraft']) {
-    await expect(menue.getByText(tag, { exact: true })).toHaveCount(
-      ROLLEN_TAGS[nutzer].includes(tag) ? 1 : 0,
-    );
+    const element = menue.getByText(tag, { exact: true });
+    if (ROLLEN_TAGS[nutzer].includes(tag)) await expect(element).toBeVisible();
+    else await expect(element).toHaveCount(0);
   }
 }
 
