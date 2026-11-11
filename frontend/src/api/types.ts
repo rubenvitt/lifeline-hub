@@ -57,6 +57,7 @@ export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
 export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
 export type EinsatzVerwahrungAnzeige = S['EinsatzVerwahrungAnzeige'];
 export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
+export type AbgelehnterAntragAnzeige = S['AbgelehnterAntragAnzeige'];
 export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
 export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
 export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];

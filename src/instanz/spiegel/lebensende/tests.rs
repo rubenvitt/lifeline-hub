@@ -633,3 +633,101 @@ async fn verwahrung_wartet_auf_offene_antraege_und_behaelt_abgelehnte() {
         "der abgelehnte bleibt mit seinen Daten"
     );
 }
+
+/// LLH-1648: Nach der Verwahrung erreicht die erfassende Person ihre abgelehnten Anträge
+/// einsatzübergreifend, bis die Frist vorbei ist; am Spiegel bleibt das Band zuständig.
+#[tokio::test]
+async fn abgelehnte_antraege_bleiben_nach_der_verwahrung_fuer_die_person_erreichbar() {
+    use crate::instanz::spiegel::antrag::{
+        abgelehnte_ohne_spiegel, verwerfen_ohne_spiegel, ABGELEHNT_TAGE,
+    };
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let andere = leitung(&pool).await;
+    let k = kopplung(&pool, "wird_gemeldet").await;
+    let id = spiegel(&pool, leit, "gegen/6", 3).await;
+    unter_merker(
+        &pool,
+        "UPDATE einsatz SET stichwort = 'RD 1' WHERE id = ?",
+        &[&id.to_string()],
+    )
+    .await;
+    for (client, alter) in [("c1", "-1 days"), ("c2", "-31 days")] {
+        unter_merker(
+            &pool,
+            "INSERT INTO spiegel_antrag (einsatz_id, art, methode, pfad_vorlage, pfad_lokal, \
+             daten, benutzer_id, client_id, erfasst_at, geaendert_at, zustand, grund) \
+             VALUES (?, 'etb', 'POST', '/x', '{}', '{\"inhalt\":\"Lage\"}', ?, ?, \
+             datetime('now', ?), datetime('now', ?), 'abgelehnt', 'Einsatz abgeschlossen.')",
+            &[&id.to_string(), &leit.to_string(), client, alter, alter],
+        )
+        .await;
+    }
+
+    // Am Spiegel liest das Band die Anträge; die Liste ohne Spiegel bleibt leer.
+    assert!(abgelehnte_ohne_spiegel(&pool, leit)
+        .await
+        .unwrap()
+        .is_empty());
+    let am_spiegel: i64 =
+        sqlx::query_scalar("SELECT id FROM spiegel_antrag WHERE client_id = 'c1'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(matches!(
+        verwerfen_ohne_spiegel(&pool, leit, am_spiegel).await,
+        Err(AppError::NotFound)
+    ));
+
+    let (_, umgewandelt) = annehmen(&pool, &k, &verwahrt("gegen/6", 3, vec![]))
+        .await
+        .unwrap();
+    assert_eq!(umgewandelt, Some(id));
+
+    // Nach der Verwahrung: nur der eigene, nur der in der Frist, mit Nummer und Stichwort.
+    let liste = abgelehnte_ohne_spiegel(&pool, leit).await.unwrap();
+    assert_eq!(liste.len(), 1, "der abgelaufene fehlt");
+    let a = &liste[0];
+    let nummer: String =
+        sqlx::query_scalar("SELECT einsatznummer_intern FROM einsatz WHERE id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (
+            a.id,
+            a.einsatz_id,
+            a.einsatznummer.as_deref(),
+            a.stichwort.as_deref()
+        ),
+        (am_spiegel, id, Some(nummer.as_str()), Some("RD 1"))
+    );
+    assert_eq!(a.grund.as_deref(), Some("Einsatz abgeschlossen."));
+    assert_eq!(a.daten["inhalt"], "Lage");
+    let abgelehnt: String =
+        sqlx::query_scalar("SELECT geaendert_at FROM spiegel_antrag WHERE id = ?")
+            .bind(am_spiegel)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let erwartet = crate::zeit::formatiere_utc(
+        crate::zeit::parse_utc(&abgelehnt).unwrap() + chrono::Duration::days(ABGELEHNT_TAGE),
+    );
+    assert_eq!(a.frist_bis, erwartet);
+    assert!(abgelehnte_ohne_spiegel(&pool, andere)
+        .await
+        .unwrap()
+        .is_empty());
+
+    // Verwerfen: fremd 404, eigen weg.
+    assert!(matches!(
+        verwerfen_ohne_spiegel(&pool, andere, a.id).await,
+        Err(AppError::NotFound)
+    ));
+    verwerfen_ohne_spiegel(&pool, leit, a.id).await.unwrap();
+    assert!(abgelehnte_ohne_spiegel(&pool, leit)
+        .await
+        .unwrap()
+        .is_empty());
+}

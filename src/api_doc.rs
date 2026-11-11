@@ -239,6 +239,7 @@ use utoipa::OpenApi;
         crate::instanz::repo::InstanzSpiegelEinsatz,
         crate::instanz::spiegel::EinsatzSpiegelAnzeige,
         crate::instanz::spiegel::antrag::SpiegelAntragAnzeige,
+        crate::instanz::spiegel::antrag::AbgelehnterAntragAnzeige,
         crate::instanz::repo::InstanzProtokoll,
         crate::instanz::InstanzKopplungRichtung,
         crate::instanz::InstanzKopplungZustand,

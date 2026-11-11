@@ -642,6 +642,30 @@ pub async fn antrag_verwerfen(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// GET /api/antraege/abgelehnt — die eigenen abgelehnten Anträge an Einsätzen, die kein Spiegel
+/// mehr sind (LLH-1648, nach der Verwahrung am Hub). Einsatzübergreifend und ohne Einsatz-Lese-Gate:
+/// nach der Schonfrist liest die Person den Einsatz nicht mehr, ihren Antrag aber schon.
+pub async fn antraege_abgelehnt(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<Vec<crate::instanz::spiegel::antrag::AbgelehnterAntragAnzeige>>, AppError> {
+    Ok(Json(
+        crate::instanz::spiegel::antrag::abgelehnte_ohne_spiegel(&state.pool, benutzer.id).await?,
+    ))
+}
+
+/// DELETE /api/antraege/abgelehnt/{antrag_id} — verwirft einen davon (204; fremd oder am Spiegel
+/// 404).
+pub async fn antrag_abgelehnt_verwerfen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(antrag_id): PfadParam<i64>,
+) -> Result<StatusCode, AppError> {
+    crate::instanz::spiegel::antrag::verwerfen_ohne_spiegel(&state.pool, benutzer.id, antrag_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────
 
 /// POST /api/admin/instanz/kopplungen/{id}/widerrufen — nimmt die Org des Admins aus der Kopplung.
