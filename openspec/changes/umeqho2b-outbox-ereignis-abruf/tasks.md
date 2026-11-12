@@ -9,7 +9,7 @@ Die Gruppen 1 und 2 brauchen LLH-1638 nicht und entstehen sofort (Entscheidung R
 
 ## 1. Outbox: Tabellen
 
-- [ ] 1.1 Erste Migration mit Nummer über allen auf `origin/alpha`: `maschine_ereignis`,
+- [x] 1.1 Erste Migration mit Nummer über allen auf `origin/alpha`: `maschine_ereignis`,
   `maschine_ereignis_stand` und die zwei Indizes (D4), ohne Trigger. Einordnung nach D13:
   `TabellenRegel` in `schwaerzung_registry`, Eintrag in `spiegel::art::AUSGENOMMEN`. Verifizieren:
   `scripts/check-migrationen.sh`, `cargo test db::tests`, `cargo test schwaerzung_registry` und
@@ -22,10 +22,10 @@ unter `tests/` (die ADR aus 5.1 verbietet es unter `src/`). Die Tests rufen die 
 `public_api::events` auf; die Tests über HTTP mit Signatur folgen in Gruppe 4, sobald die Helfer
 in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
 
-- [ ] 2.1 `wire_enum!` `EventType` in `src/public_api/events.rs` mit den vier Werten.
+- [x] 2.1 `wire_enum!` `EventType` in `src/public_api/events.rs` mit den vier Werten.
   Verifizieren: Eintrag in `tests/enum_wire_kontrakt.rs`; ein Test vergleicht die Werte mit dem
   CHECK von `maschine_ereignis`.
-- [ ] 2.2 Lesen ohne Warten (D8) als Funktion in `public_api::events`: Höchststand, Löschgrenze,
+- [x] 2.2 Lesen ohne Warten (D8) als Funktion in `public_api::events`: Höchststand, Löschgrenze,
   Arten aus den Scopes, Seite von 500, Cursor. Verifizieren mit `tests/public_api_events.rs`:
   - ohne `after` kommt der Höchststand ohne Ereignisse;
   - Zeilen eines Zugangs kommen aufsteigend ab dem Cursor; Zeilen eines anderen Zugangs nie;
@@ -34,21 +34,21 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   - ein Zugang ohne eigene Zeilen bekommt den Höchststand als Cursor, auch wenn nur andere
     Zugänge Zeilen haben;
   - ein Cursor unter `purged_until` und ein Cursor über dem Höchststand ergeben `cursor_expired`.
-- [ ] 2.3 Long-Poll (D9): Nachfragen im Sekundentakt, keine gehaltene Verbindung. Verifizieren:
+- [x] 2.3 Long-Poll (D9): Nachfragen im Sekundentakt, keine gehaltene Verbindung. Verifizieren:
   - ein wartender Abruf kehrt binnen zwei Sekunden zurück, nachdem eine Zeile entstanden ist;
   - ohne Zeile kehrt er nach der Wartezeit leer mit dem Cursor zurück (verkürztes Intervall im
     Test);
   - mit einem Pool der Größe 1 kann während des Wartens geschrieben werden.
-- [ ] 2.4 Wartegrenzen (D10): 32 gesamt, einer je Zugang. Verifizieren:
+- [x] 2.4 Wartegrenzen (D10): 32 gesamt, einer je Zugang. Verifizieren:
   - der zweite wartende Abruf desselben Zugangs kehrt sofort zurück und meldet „nicht gewartet“,
     der erste wartet weiter;
   - bei belegten Plätzen kehrt ein weiterer Zugang sofort zurück (Grenze im Test verkleinert);
   - ein abgebrochener wartender Abruf gibt seinen Platz frei.
-- [ ] 2.5 Purge (D12): `public_api::events::purge` in Phase C von `purge_scheduler`, Modulkopf
+- [x] 2.5 Purge (D12): `public_api::events::purge` in Phase C von `purge_scheduler`, Modulkopf
   dort nachgetragen. Verifizieren: Ein Test mit acht und sechs Tage alten Zeilen löscht nach
   einem Lauf nur die alten und setzt `purged_until`; danach ergibt der alte Cursor
   `cursor_expired`.
-- [ ] 2.6 Route: Handler mit `#[utoipa::path]`, Schemas `EventsResponse` und `Event`, Prüfung
+- [x] 2.6 Route: Handler mit `#[utoipa::path]`, Schemas `EventsResponse` und `Event`, Prüfung
   von `after` und `wait` (0 bis 25, sonst `invalid_field`), `Retry-After: 10` an der leeren
   Antwort ohne Warteplatz, Eintrag in `public_api::router()` mit
   `ScopeAnforderung::Scope(Scope::EventsRead)`, Antwort über `client.antwort(..)`. Verifizieren:

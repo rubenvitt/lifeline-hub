@@ -143,6 +143,8 @@ pub struct TabellenRegel {
 const G_PK: &str = "Primärschlüssel (Struktur, kein Personenbezug)";
 const G_FK: &str =
     "Struktur-/Benutzer-FK (INTEGER-Referenz; System-Nutzer, kein Betroffenen-Freitext)";
+const G_FK_MASCHINE: &str =
+    "Kennung eines Maschinenzugangs (UUID eines Fremdsystems, kein Personenbezug)";
 const G_SCOPE: &str = "Einsatz-Scope-FK (Struktur)";
 const G_ZEIT: &str = "Zeitstempel (Struktur/Audit, kein Personenbezug)";
 const G_WEB_PUSH: &str =
@@ -3501,6 +3503,22 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, migrations/0337) ----------
+    // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
+    // der Purge-Lauf löscht nach sieben Tagen, der Trigger am Einsatz mit dem Einsatz.
+    TabellenRegel {
+        tabelle: "maschine_ereignis",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("zugang_id", G_FK_MASCHINE),
+            retain("type", G_ENUM),
+            retain("einsatz_id", G_SCOPE),
+            retain("occurred_at", G_ZEIT),
         ],
     },
     TabellenRegel {

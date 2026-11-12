@@ -24,7 +24,8 @@
 //!   Kategorien löscht jede Schwärzung nach ihrem Commit einzeln, je Zeile eine Transaktion
 //!   (`schwaerzung_nachlauf::entferne_vorgesehene`); der Tick holt Reste nach.
 //! - **Phase C**: abgelaufene Einträge des Auth-Audits und der Admin-Spur (LFH-1005), je mit
-//!   eigener Frist, an keinem Einsatz.
+//!   eigener Frist, an keinem Einsatz. Ebenso die Ausgangsereignisse für Fremdsysteme nach sieben
+//!   Tagen (`public_api::events::purge`, LLH-1655).
 //! - **Phase C2** (LFH-928): abgelaufene Sitzungen (`auth::session::purge_abgelaufene`), aus
 //!   demselben Grund wie Phase C.
 //! - **Phase C3** (LLH-1585): Planungen 90 Tage nach dem Ende ihres Zeitraums
@@ -297,6 +298,16 @@ pub async fn tick_mit_rueckschrieb(
     // Maschinenzugang (LLH-1652): abgelaufene `jti`, verfallene Codes, Abrufe nach 365 Tagen.
     if let Err(e) = crate::public_api::zugang::purge(pool, &crate::zeit::jetzt()).await {
         tracing::error!("Purge Maschinenzugang fehlgeschlagen: {e}");
+    }
+
+    // Ausgangsereignisse für Fremdsysteme (LLH-1655): sieben Tage, mit Löschgrenze für den
+    // Cursor des Abrufs.
+    match crate::public_api::events::purge(pool, &jetzt_s).await {
+        Ok(0) => {}
+        Ok(n) => {
+            tracing::info!("Purge Phase C: {n} Ausgangsereignis(se) für Fremdsysteme entfernt")
+        }
+        Err(e) => tracing::error!("Purge Ausgangsereignisse fehlgeschlagen: {e}"),
     }
 
     // Admin-Spur (LFH-1005): dieselbe Lage wie das Auth-Audit, eigene, längere Frist.

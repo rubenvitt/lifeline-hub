@@ -55,6 +55,31 @@ deutsch, für Menschen gedacht und kann sich ändern.
 `fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile
 trägt `unprocessable` (4xx) oder `internal_error` (5xx).
 
+## Ereignisse
+
+`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen
+Zugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`
+und `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.
+
+| `type` | Bedeutung | Sichtbar mit |
+| --- | --- | --- |
+| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |
+| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |
+| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |
+| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |
+
+- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt
+  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.
+- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es
+  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und
+  setzt `Retry-After`.
+- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem
+  neuen Cursor weiter abrufen.
+- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das
+  alte und trägt eine höhere `id`.
+- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;
+  der Client liest dann die Einsätze neu und fährt mit dem dort gelieferten Cursor fort.
+
 ## Grenzen
 
 - Ein Body ist höchstens 64 KiB groß.

@@ -19,6 +19,7 @@
 
 pub mod drossel;
 pub mod error;
+pub mod events;
 pub mod kommando;
 pub mod machine;
 pub mod routen;
@@ -99,6 +100,11 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
         .routes(routes!(routen::redeem).layer(DefaultBodyLimit::max(REDEEM_BODY_MAX)))
         .routes(routes!(routen::jwks))
         .routes(routes!(routen::me).layer(Extension(ScopeAnforderung::Keine)))
+        // Ausgangsereignisse (LLH-1655).
+        .routes(
+            routes!(events::events)
+                .layer(Extension(ScopeAnforderung::Scope(scope::Scope::EventsRead))),
+        )
 }
 
 /// Das fertige Dokument, einmal aus [`router`] gebaut.
