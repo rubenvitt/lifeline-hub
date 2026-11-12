@@ -862,9 +862,13 @@ pub async fn handle_meldung(
             // meldende Seite als quittiert führt, wurde diese Seite zurückgespielt. Dann gilt die
             // alte Quittung, auch wenn diese Meldung schon eine neue Akte bringt; die meldende
             // Seite setzt ihren Sendestand darauf zurück und schickt die verlorenen Akten erneut.
+            // Bis dahin bleibt der Empfangsstand stehen, damit auch eine Wiederholung nach einer
+            // verlorenen Antwort den Rückschritt noch zeigt. Nur bei 0 nicht: Eine Quittung 0
+            // setzt die meldende Seite nicht zurück, sie schickte sonst ewig dieselbe Seite.
             let empfangen_vorher = fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
                 .await?
                 .1;
+            let rueckschritt = empfangen_vorher < anfrage.fuehrung_gesendet_bis;
             let eingang = fuehrung_austausch::apply_eingang(
                 conn,
                 kopplung,
@@ -878,14 +882,18 @@ pub async fn handle_meldung(
                 conn,
                 kopplung.id,
                 Some(anfrage.fuehrung_bis),
-                eingang.bis,
+                if rueckschritt && empfangen_vorher > 0 {
+                    None
+                } else {
+                    eingang.bis
+                },
             )
             .await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
             fuehrung_folgen = eingang.folgen;
-            fuehrung_bis = if empfangen_vorher < anfrage.fuehrung_gesendet_bis {
+            fuehrung_bis = if rueckschritt {
                 empfangen_vorher
             } else {
                 fuehrung_repo::load_kopplung_staende(conn, kopplung.id)

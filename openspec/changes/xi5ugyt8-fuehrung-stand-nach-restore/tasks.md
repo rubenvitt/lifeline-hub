@@ -95,6 +95,19 @@ verworfen (der jüngste Hinweis gilt, so ist das Modell).
   nennen: nachgehende Uhr mit mehr Vergaben als verloren, Sicherung von vor der ersten Übernahme,
   Gegenstelle älteren Stands. Prüfen: Abschnitt gegen design.md D3–D5 und Risiken gelesen.
 
+## 6. Befunde des Reviews der Behebungen (12.11.2026)
+
+Gegenprüfung: B-1, B-2 und B-3 bestätigt, B-4 verworfen (die Formulierung in `src/AGENTS.md` ist
+richtig). B-3 nimmt der Mensch als Risiko hin.
+
+- [x] 6.1 B-1: Bei erkanntem Rückschritt mit Empfangsstand > 0 hebt `handle_meldung` den
+  Empfangsstand nicht an (D5). Integrationstest „verlorene Antwort“: Nach der ersten Meldung wird der
+  Sendestand des ELW wieder auf den alten Wert gesetzt. Ohne 6.1 ist der Test rot. Prüfen:
+  `cargo test --test instanz_fuehrung`.
+- [x] 6.2 B-2 und B-3 in Spec und Design: Die Ausnahme nennt die verschieden weit quittierenden
+  Gegenstellen, das Szenario mit zwei Kopplungen setzt gleich weite Quittungen voraus, B-3 steht
+  unter den Risiken. Prüfen: `openspec validate xi5ugyt8-fuehrung-stand-nach-restore --strict`.
+
 ## Workflow follow-up
 
 - Review vor dem PR (`dev-zunder-orchestrieren`, Phase 4) über den ganzen Branch.

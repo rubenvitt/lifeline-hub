@@ -174,8 +174,16 @@ Wissen quittiert hat.
 Wert unter `anfrage.fuehrung_gesendet_bis`, hat die erreichte Seite Akten verloren, die sie schon
 quittiert hatte. Sie antwortet dann mit diesem alten Wert statt mit dem neuen Maximum. Die
 meldende Seite setzt ihren Sendestand nach D2 darauf zurück und schickt alles darüber erneut, auch
-die Akte, die diese Meldung schon brachte (doppelt, schadet nicht). Gespeichert wird an der
-erreichten Seite wie bisher das Maximum, sodass die nächste Meldung normal quittiert wird.
+die Akte, die diese Meldung schon brachte (doppelt, schadet nicht).
+
+Solange der Rückschritt besteht, hebt die erreichte Seite ihren Empfangsstand nicht an, sie
+übernimmt die Akten aber. Erreicht die Antwort die meldende Seite nicht (Zeitüberschreitung,
+abgelehnte Antwort, gescheiterter Schreibvorgang) oder laufen zwei Meldungen gleichzeitig, zeigt
+die Wiederholung den Rückschritt so noch einmal (zweiter Review, Befund B-1). Hätte die erste
+Meldung das neue Maximum gespeichert, wäre die Erkennung verbraucht und die verlorenen Akten kämen
+nie. Erst wenn die meldende Seite ab dem alten Stand sendet, quittiert die erreichte Seite wieder
+normal. Bei einem Empfangsstand von 0 speichert sie wie bisher: Eine Quittung 0 setzt die meldende
+Seite nicht zurück, sie schickte sonst ewig dieselbe erste Seite.
 
 - Eine Quittung 0 setzt D2 nicht zurück (s. D2). Der Fall „Sicherung von vor der ersten Übernahme“
   bleibt deshalb offen (Risiken).
@@ -200,6 +208,13 @@ erreichten Seite wie bisher das Maximum, sodass die nächste Meldung normal quit
   quittiert haben, und die Reihenfolge muss ungünstig sein. Der Merker je Kopplung (D3, verworfen)
   schlösse das.
 - **[Gegenstelle älteren Stands]** → D5 wirkt nur, wenn beide Seiten das Feld kennen (D4).
+- **[Eine gekoppelte Gegenstelle überschreibt Hinweise an anderen Kopplungen]** (zweiter Review,
+  Befund B-3, am 12.11.2026 so hingenommen) → Eine fehlerhafte oder böswillige Gegenstelle kann mit
+  wiederholten Quittungen knapp über dem Zähler bei jeder Meldung D3 auslösen. Dabei ersetzt der
+  Hinweis aufs erneute Senden den Hinweis an jeder erreichten Kopplung, etwa „… schickt eine
+  ungültige Führungsakte …, abgelehnt“. Am Hinweis gilt ohnehin der jüngste. Schwere Ereignisse wie
+  eine verworfene Übernahme stehen zusätzlich als Alarm und in der Spur. Den Zähler kann sie dabei
+  nur bis `STAND_RAISE_MAX` treiben.
 - **[Hinweis nach dem Zurückspielen der erreichten Seite auch bei richtiger Uhr]** → Bis zu ihrer
   ersten Vergabe steht der Zähler auf dem Wert der Sicherung, und D3 erkennt den Rückschritt schon,
   bevor D1 greifen kann. Das ist richtig, der Hinweis beschreibt den Vorgang. Die Betriebsdoku sagt

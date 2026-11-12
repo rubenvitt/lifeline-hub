@@ -4415,3 +4415,42 @@ async fn antwort_hebt_den_zaehler_des_elw_genau_bis_zur_grenze() {
         .unwrap_or_default()
         .contains("zurückgespielt"));
 }
+
+#[tokio::test]
+async fn zurueckgespielt_hub_erkennt_den_rueckschritt_auch_nach_verlorener_antwort() {
+    // Zweiter Review, Befund B-1: Erreicht die Antwort mit der alten Quittung den ELW nicht, muss
+    // die nächste Meldung den Rückschritt wieder zeigen; sonst kämen die verlorenen Akten nie.
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
+        "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
+         FROM instanz_identitaet i, instanz_kopplung k",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    zurueckspielen(&hub, stand, gesendet, empfangen).await;
+    sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{nach}-%", elw.kennung))
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (elw_gesendet, _, _) = staende(&elw).await;
+    nur_melden(&elw).await;
+    // Die Antwort ging verloren: Der ELW behält seinen Sendestand.
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ?")
+        .bind(elw_gesendet)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    nur_melden(&elw).await;
+    nur_melden(&elw).await;
+    assert!(
+        has_akte(&hub, &elw, nach).await,
+        "die verlorene Akte kommt trotzdem erneut"
+    );
+}
