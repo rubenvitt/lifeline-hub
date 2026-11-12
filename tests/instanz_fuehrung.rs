@@ -2405,15 +2405,6 @@ async fn quittung_ueber_dem_eigenen_stand_wird_gekappt() {
     common::einsatz_anlegen(&elw.app, &elw.admin).await;
     elw_meldet(&elw).await;
     assert_eq!(fremde(&hub).await.len(), 2, "die neue Akte des ELW ist da");
-    // Umgekehrt kappt der Hub die Quittung eines fehlerhaften ELW.
-    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
-        .bind(i64::MAX)
-        .execute(&elw.pool)
-        .await
-        .unwrap();
-    elw_meldet(&elw).await;
-    let (gesendet, _, stand) = staende(&hub).await;
-    assert!(gesendet <= stand, "Hub kappt: {gesendet} über {stand}");
 }
 
 #[tokio::test]
@@ -2492,4 +2483,97 @@ async fn ueberhoehte_quittung_laesst_ungesendete_akten_nicht_fallen() {
         121,
         "quittiert ist nur, was hinausging"
     );
+}
+
+#[tokio::test]
+async fn hub_lehnt_ungueltige_akten_mit_hinweis_ab_und_quittiert_nur_plausible_staende() {
+    // Ein fehlerhaftes Gegenüber, an der Prüfung des Senders vorbei: die Meldung direkt an den
+    // Hub, wie sie über die Leitung käme.
+    let (hub, elw) = gekoppelt().await;
+    elw_einsatz(&hub, &elw).await;
+    let identitaet = lifeline_hub::instanz::identitaet::load_or_create(&hub.pool)
+        .await
+        .unwrap();
+    let kopplung_id: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let kopplung = lifeline_hub::instanz::repo::load_kopplung(&hub.pool, kopplung_id)
+        .await
+        .unwrap();
+    let (_, vorher, _) = staende(&hub).await;
+    let akte = |nr: i64, bezeichnung: String, stand: i64| {
+        json!({
+            "kennung": format!("{}/x{nr}", elw.kennung),
+            "org": format!("{}/1", hub.kennung), "bezeichnung": bezeichnung,
+            "status": "aktiv", "epoche": {"zaehler": 1, "instanz": elw.kennung},
+            "fuehrer": elw.kennung, "fuehrer_name": "ELW", "art": "angelegt", "stand": stand
+        })
+    };
+    let anfrage: lifeline_hub::instanz::melden::MeldenAnfrage = serde_json::from_value(json!({
+        "name": "ELW", "softwarestand": "1", "protokoll": lifeline_hub::instanz::PROTOKOLL,
+        "orgs": [{"org": format!("{}/1", hub.kennung), "unterschrift_stand": 0}],
+        "fuehrung": [
+            akte(1, "x".repeat(501), vorher + 10),
+            akte(2, "Lage".into(), i64::MAX),
+        ],
+        "fuehrung_bis": 0
+    }))
+    .unwrap();
+    lifeline_hub::instanz::melden::handle_meldung(&hub.pool, &identitaet, &kopplung, &anfrage)
+        .await
+        .unwrap();
+    assert_eq!(fremde(&hub).await.len(), 1, "keine der beiden angelegt");
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(h.contains("ungültige Führungsakte"), "nicht still: {h:?}");
+    let (_, empfangen, _) = staende(&hub).await;
+    assert_eq!(
+        empfangen,
+        vorher + 10,
+        "quittiert bis zum plausiblen Stand, nicht bis i64::MAX"
+    );
+}
+
+#[tokio::test]
+async fn lauter_uebersprungene_akten_loesen_keine_sofortige_meldung_aus() {
+    let (hub, elw) = gekoppelt().await;
+    elw_meldet(&elw).await;
+    // Mehr als eine Nachricht voll Akten am Hub, die alle nicht hinausgehen (Erklärung über der
+    // Grenze): Ohne gesendete Akte ist „es bleibt mehr“ kein Grund, sofort wieder zu melden.
+    for i in 0..=50 {
+        let stand: i64 = sqlx::query_scalar(
+            "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+             RETURNING fuehrung_stand",
+        )
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrung (kennung, org_id, bezeichnung, status, epoche_zaehler, \
+             epoche_instanz, fuehrer_kennung, fuehrer_name, art, erklaerung, stand, geaendert_at) \
+             VALUES (?, 1, 'Lage', 'aktiv', 1, ?, ?, 'Hub', 'angelegt', ?, ?, \
+             '2026-11-12 10:00:00')",
+        )
+        .bind(format!("{}/y{i}", hub.kennung))
+        .bind(&hub.kennung)
+        .bind(&hub.kennung)
+        .bind("x".repeat(5000))
+        .bind(stand)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    }
+    elw_meldet(&elw).await;
+    let naechste: Option<String> =
+        sqlx::query_scalar("SELECT naechste_meldung_at FROM instanz_kopplung")
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    let jetzt = lifeline_hub::zeit::jetzt();
+    assert!(
+        naechste.as_deref().is_some_and(|n| n > jetzt.as_str()),
+        "nicht sofort wieder: {naechste:?}"
+    );
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(h.contains("geht nicht an"), "{h:?}");
 }

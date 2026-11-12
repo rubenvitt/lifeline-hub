@@ -146,11 +146,11 @@ impl AkteMeldung {
     /// durchgeht, wird gespeichert und geht neu gebaut weiter, deshalb gilt am Eingang
     /// [`AKTE_BYTES`] abzüglich [`AKTE_SPIELRAUM`].
     fn is_in_grenzen(&self) -> bool {
-        self.check_grenzen(AKTE_BYTES - AKTE_SPIELRAUM)
+        self.is_in_grenzen_bis(AKTE_BYTES - AKTE_SPIELRAUM)
     }
 
     /// Die Grenzen der Felder und höchstens `bytes_max` Byte JSON.
-    fn check_grenzen(&self, bytes_max: usize) -> bool {
+    fn is_in_grenzen_bis(&self, bytes_max: usize) -> bool {
         let kurz = |s: &str| s.chars().count() <= TEXT_MAX;
         kurz(&self.kennung)
             && kurz(&self.org)
@@ -185,8 +185,9 @@ pub struct Ausgang {
 }
 
 /// Baut die Akten für eine Kopplung: Stand über `ab`, höchstens [`AKTEN_MAX`] und `bytes`
-/// (mindestens [`AKTE_BYTES`]). Eine Akte, die das Gegenüber nicht annähme (über den Grenzen oder
-/// über [`AKTE_BYTES`]), wird übersprungen, mit Hinweis an der Kopplung; ihr Stand zählt als
+/// (mindestens [`AKTE_BYTES`]). Eine Akte über den Grenzen des Ausgangs (Felder wie beim
+/// Empfänger, höchstens [`AKTE_BYTES`]; der Empfänger hält [`AKTE_SPIELRAUM`] für das Neubauen
+/// zurück, den eine ehrlich entstandene Akte nie braucht) wird übersprungen, mit Hinweis an der Kopplung; ihr Stand zählt als
 /// abgedeckt, das Gegenüber behält die bisherige Fassung, und mit der nächsten Änderung geht sie
 /// wieder hinaus (LLH-1672, wie `zu_gross` beim Spiegel). Anhalten ließe eine einzige Akte, auch
 /// eine fremde, den Austausch der ganzen Kopplung stehen.
@@ -210,7 +211,7 @@ pub async fn build_ausgang(
         };
         let m = AkteMeldung::aus(a, org);
         let groesse = m.bytes();
-        if !m.check_grenzen(AKTE_BYTES) {
+        if !m.is_in_grenzen_bis(AKTE_BYTES) {
             let grund = if groesse > AKTE_BYTES {
                 format!("zu groß ({groesse} Byte, höchstens {AKTE_BYTES})")
             } else {
@@ -238,8 +239,9 @@ pub async fn build_ausgang(
         aus.bis = aus.bis.max(a.stand);
         aus.akten.push(m);
     }
-    // Übersprungene zählen nicht gegen AKTEN_MAX: Lagen mehr Zeilen bereit, folgen sie.
-    aus.mehr = zeilen.len() > AKTEN_MAX;
+    // Übersprungene zählen nicht gegen AKTEN_MAX: Lagen mehr Zeilen bereit, folgen sie. Ohne
+    // gesendete Akte quittiert das Gegenüber nichts, ein „sofort wieder“ drehte sich im Kreis.
+    aus.mehr = zeilen.len() > AKTEN_MAX && !aus.akten.is_empty();
     Ok(aus)
 }
 
@@ -1089,11 +1091,11 @@ pub(crate) mod tests {
     /// Beweis an allen Grenzen der Assertion, die Erklärung aufgefüllt mit Steuerzeichen (sechs
     /// Byte in JSON) und einfachen Zeichen.
     pub(crate) fn akte_mit_bytes(ziel: usize) -> AkteMeldung {
-        auf_bytes(gefuellt(), ziel)
+        pad_to_bytes(build_filled(), ziel)
     }
 
-    /// Grundakte für [`auf_bytes`]: Textfelder voll mit Vier-Byte-Zeichen, Beweis an den Grenzen.
-    fn gefuellt() -> AkteMeldung {
+    /// Grundakte für [`pad_to_bytes`]: Textfelder voll mit Vier-Byte-Zeichen, Beweis an den Grenzen.
+    fn build_filled() -> AkteMeldung {
         let text = "𝄞".repeat(TEXT_MAX);
         let mut m = akte();
         m.nummer = Some(text.clone());
@@ -1110,7 +1112,7 @@ pub(crate) mod tests {
     }
 
     /// Füllt die Erklärung von `m` auf, bis die Akte genau `ziel` Byte JSON hat.
-    fn auf_bytes(mut m: AkteMeldung, ziel: usize) -> AkteMeldung {
+    fn pad_to_bytes(mut m: AkteMeldung, ziel: usize) -> AkteMeldung {
         m.erklaerung = Some(String::new());
         let fehlt = ziel - m.bytes();
         let erklaerung = "\u{1}".repeat(fehlt / 6) + &"e".repeat(fehlt % 6);
@@ -1197,8 +1199,8 @@ pub(crate) mod tests {
         assert!(akte_mit_bytes(eingang).is_in_grenzen());
         assert!(!akte_mit_bytes(eingang + 1).is_in_grenzen());
         // Hinaus geht bis AKTE_BYTES.
-        assert!(akte_mit_bytes(AKTE_BYTES).check_grenzen(AKTE_BYTES));
-        assert!(!akte_mit_bytes(AKTE_BYTES + 1).check_grenzen(AKTE_BYTES));
+        assert!(akte_mit_bytes(AKTE_BYTES).is_in_grenzen_bis(AKTE_BYTES));
+        assert!(!akte_mit_bytes(AKTE_BYTES + 1).is_in_grenzen_bis(AKTE_BYTES));
         assert!(AKTE_BYTES <= MELDUNG_BYTES && AKTE_BYTES <= ANTWORT_BYTES);
     }
 
@@ -1206,12 +1208,12 @@ pub(crate) mod tests {
     fn angenommene_akte_geht_neu_gebaut_wieder_hinaus() {
         // Am Eingang so klein wie möglich, was neu gebaut wächst: Stand 1, `anfrage` und `offen`
         // gesetzt, kurzer Org-Schlüssel.
-        let mut basis = gefuellt();
+        let mut basis = build_filled();
         basis.stand = 1;
         basis.anfrage = true;
         basis.offen = true;
         basis.org = "h".into();
-        let m = auf_bytes(basis, AKTE_BYTES - AKTE_SPIELRAUM);
+        let m = pad_to_bytes(basis, AKTE_BYTES - AKTE_SPIELRAUM);
         assert!(m.is_in_grenzen(), "{} Byte", m.bytes());
         // Neu gebaut: höchster Stand, ohne Merker, längster Org-Schlüssel voller Steuerzeichen.
         let zeile = AkteZeile {
@@ -1240,7 +1242,7 @@ pub(crate) mod tests {
         };
         let raus = AkteMeldung::aus(&zeile, &"\u{1}".repeat(88));
         assert!(
-            raus.check_grenzen(AKTE_BYTES),
+            raus.is_in_grenzen_bis(AKTE_BYTES),
             "{} Byte neu gebaut, {} am Eingang",
             raus.bytes(),
             m.bytes()

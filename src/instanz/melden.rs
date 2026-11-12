@@ -830,11 +830,15 @@ pub async fn handle_meldung(
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
-            let quittung = anfrage
-                .fuehrung_bis
-                .min(fuehrung_repo::load_stand(conn).await?);
-            fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
-                .await?;
+            // Die Quittung der meldenden Seite gilt hier nur für diesen Aufruf (`ab` unten); jeder
+            // Stand einer Akte kommt aus dem eigenen Zähler, eine Kappung darauf änderte nichts.
+            fuehrung_repo::save_kopplung_staende(
+                conn,
+                kopplung.id,
+                Some(anfrage.fuehrung_bis),
+                eingang.bis,
+            )
+            .await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -845,7 +849,7 @@ pub async fn handle_meldung(
             fuehrung_ausgang = fuehrung_austausch::build_ausgang(
                 conn,
                 kopplung,
-                quittung,
+                anfrage.fuehrung_bis,
                 fuehrung_austausch::ANTWORT_BYTES,
             )
             .await?;
@@ -1021,12 +1025,16 @@ mod tests {
         a.orgs[0].unterschrift = vec![lieferung.clone(); unterschrift::LIEFERUNGEN_MAX];
         let unterschrift_bytes =
             serde_json::to_vec(&lieferung).expect("JSON").len() * unterschrift::LIEFERUNGEN_MAX;
-        // Führungsakten (LLH-1672): `build_ausgang` packt höchstens `ANTWORT_BYTES`.
-        let akte = fuehrung_austausch::tests::groesste_akte();
+        // Führungsakten (LLH-1672): `build_ausgang` packt höchstens `ANTWORT_BYTES`, je Akte
+        // höchstens `AKTE_BYTES`.
+        let akte = fuehrung_austausch::tests::akte_mit_bytes(fuehrung_austausch::AKTE_BYTES);
         let akte_bytes = serde_json::to_vec(&akte).expect("JSON").len();
         let akten =
             (fuehrung_austausch::ANTWORT_BYTES / akte_bytes).min(fuehrung_austausch::AKTEN_MAX);
-        assert!(akten > 0, "die größte Akte passt in eine Antwort");
+        assert!(
+            akten > 0,
+            "die größte Akte des Ausgangs passt in eine Antwort"
+        );
         a.fuehrung = vec![akte; akten];
         // Die Teile der Antwort: Schlüssel und Stammdaten zusammen höchstens `STAMMDATEN_BUDGET`
         // (die Stammdaten füllen nur auf, was die Schlüssel übrig lassen), die Führung höchstens

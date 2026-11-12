@@ -27,8 +27,8 @@ pub const SCHUTZ_NACHRICHT: &str = "stammdaten_vom_hub";
 pub const STAMMDATEN_MAX: usize = 200;
 /// Platz, den eine Antwort auf eine Meldung neben den Stammdaten braucht: Hülle, Org-Einträge
 /// und eine einzelne übergroße Zeile (siehe [`liefern::Budget`]). Die Stammdaten bekommen, was
-/// `melden::ANTWORT_MAX` abzüglich dieser Reserve, der Unterschriftsschlüssel und, mit Schalter,
-/// des Budgets der Führungsakten übrig lässt (D2, LLH-1672; `melden::stammdaten_budget`, Test
+/// `melden::ANTWORT_MAX` abzüglich dieser Reserve, des Budgets der Führungsakten und der
+/// Unterschriftsschlüssel übrig lässt (D2, LLH-1672; `melden::STAMMDATEN_BUDGET`, Test
 /// `melden::tests::groesste_antwort_passt_in_die_lesegrenze`).
 pub const ANTWORT_RESERVE: usize = 128 * 1024;
 /// Höchstzahl mitgelieferter Abhängigkeiten je Antwort (D2).
