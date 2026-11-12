@@ -466,8 +466,21 @@ Herleitung in
     und erst ihre Quittung `angenommen` merkt den Einsatz der meldenden Seite zum Abräumen vor.
     **Ein Einsatz verlässt eine Instanz nur über `einsatz::abraeumen`** (Merker
     `einsatz_abraeumen` in der beschließenden Transaktion, Löschen nach dem Commit, Phase R holt
-    nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
-    `tests/instanz_lebensende.rs`.
+    nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll und den Löschvermerk der
+    Kennung (unten). Nachweis: `tests/instanz_lebensende.rs`.
+  - **Akten ohne Spiegel (LLH-1699)**, Spec `instanz-fuehrung`, Herleitung
+    `openspec/changes/archive/2026-11-12-h7shm5au-loeschsignal-spiegellose-akten/design.md`
+    (D1–D5): Wer eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung in
+    `SpiegelPaket.akten` (`fuehrung::repo::list_ohne_spiegel`; die erreichte Seite nur Akten, die
+    das Gegenüber führt). `geloescht` dafür belegt allein `lebensende::geloeschte_akten`:
+    Löschvermerk (`fuehrung_loeschvermerk`) oder eigenes Präfix im Löschprotokoll, und hier weder
+    Einsatz noch Akte mit der Kennung; nie „kenne ich nicht“. **Ein neuer Weg, auf dem ein
+    Einsatz mit Kennung endet, ruft `fuehrung::loeschvermerk::vermerken_einsatz` in seiner
+    Transaktion; eine Akte ohne Einsatz löscht nur `fuehrung::repo::delete_ohne_spiegel`** (schreibt
+    den Vermerk: Signal, Widerruf). Die erreichte Seite nimmt das Signal nur vom Führer der Akte
+    an (`lebensende::geloeschte_akten_uebernehmen`). Der Weg über die Stände bleibt, wie er ist
+    (Spiegel mit fremdem Präfix: LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt
+    „Akten ohne Spiegel“.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)

@@ -97,9 +97,9 @@ Stellen, an denen er heute `eigene_staende` baut.
 
 ### D3 Wer was annimmt
 
-`lebensende::geloescht_uebernehmen` behält den Spiegel-Zweig unverändert (Präfix des Gegenübers,
-Spiegel dieser Kopplung → `abraeumen::vormerken`). Daneben, nur bei eingeschaltetem Schalter, ein
-Zweig für Akten:
+`lebensende::geloescht_uebernehmen` bleibt unverändert (Präfix des Gegenübers, Spiegel dieser
+Kopplung → `abraeumen::vormerken`). Daneben, nur bei eingeschaltetem Schalter, eine eigene
+Funktion für Akten (`lebensende::geloeschte_akten_uebernehmen`):
 
 Die Akte mit der Kennung wird gelöscht, wenn sie keinen lokalen Einsatz hat, ihre Org dieser
 Kopplung aktiv zugeordnet ist und, an der erreichten Seite, ihr `fuehrer_kennung` das Gegenüber
@@ -132,18 +132,22 @@ festschreibt (`INSERT … ON CONFLICT (kennung) DO UPDATE`):
 | --- | --- |
 | Einsatz endgültig gelöscht (Skelett) | `einsatz::skelett_loeschung::loeschen`, neben der Protokollzeile |
 | Einsatz abgeräumt (verwahrt oder Spiegel) | `einsatz::abraeumen::ausfuehren`, neben der Protokollzeile |
-| Akte auf ein Signal hin gelöscht | `lebensende::geloescht_uebernehmen` (D3) |
+| Akte auf ein Signal hin gelöscht | `lebensende::geloeschte_akten_uebernehmen` (D3) |
 | Akte beim Widerruf gelöscht | `fuehrung::repo::release_nach_widerruf` (D5) |
+
+Die beiden letzten löschen über `fuehrung::repo::delete_ohne_spiegel`, das den Vermerk schreibt:
+Eine Akte ohne Einsatz verschwindet auf keinem anderen Weg.
 
 Die beiden ersten lesen Kennung und Org vom Einsatz (`einsatz.kennung`, beim Spiegel die Kennung
 des Führers); ohne Kennung entsteht kein Vermerk (nie geliefert, keine Akte, Demo-Einsatz).
 
-**Beleg** (`loeschvermerk::belegte`, eine Abfrage über die genannte Liste per `json_each`): Eine
-genannte Kennung gilt als gelöscht, wenn hier weder ein Einsatz noch eine Akte mit ihr steht und
+**Beleg** (`lebensende::geloeschte_akten`): Eine genannte Kennung gilt als gelöscht, wenn hier
+weder ein Einsatz noch eine Akte mit ihr steht und
 
-- ein Vermerk mit ihr steht, dessen Org dieser Kopplung aktiv zugeordnet ist, oder
+- ein Vermerk mit ihr steht, dessen Org dieser Kopplung aktiv zugeordnet ist
+  (`loeschvermerk::belegte`, eine Abfrage über die genannte Liste per `json_each`), oder
 - `lebensende::ist_geloescht` sie belegt (eigenes Präfix, ID im Löschprotokoll): der Bestand von
-  vor dieser Change.
+  vor dieser Change, je Kennung mit eigenem Präfix geprüft.
 
 „Keine Akte hier“ macht einen alten Vermerk wirkungslos, sobald die Akte wieder kommt (neue
 Zuordnung, neuer Stand beim Führer). Vermerke werden deshalb nie gelöscht; sie sind so klein und
@@ -177,6 +181,12 @@ neue Zuordnung bringt sie zurück (`renew_stand_der_org` beim Gegenüber, dann `
 Weitergabe).
 
 Der Filter in `list_fremde_der_org` bleibt, sein Kommentar verliert den Verweis auf LLH-1699.
+
+### D6 Die Entscheidung steht als ADR-0029
+
+Nach `docs/architektur/AGENTS.md` (Mitänderungsregel) bekommt eine Entscheidung der Route
+`entwurf` eine ADR: `ADR-0029` hält die Regeln aus D2–D4 mit Prüfung fest; Laufzeitsicht (6) und
+Glossar (12) nennen Ablauf und Begriff.
 
 ## Risks / Trade-offs
 

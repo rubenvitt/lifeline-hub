@@ -347,6 +347,15 @@ sequenceDiagram
   Antwort, im Push in der nächsten Anfrage, nachdem die erreichte Seite die Stände ihrer Spiegel
   genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Nachweis:
   `tests/instanz_lebensende.rs`.
+- **Ende einer Akte ohne Spiegel** (LLH-1699,
+  [ADR-0029](entscheidungen/ADR-0029-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
+  Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung
+  im Abgleich (`SpiegelPaket.akten`). Das Gegenüber meldet `geloescht` auf demselben Weg wie für
+  Spiegel, aber nur mit Beleg: Löschvermerk (`src/instanz/fuehrung/loeschvermerk.rs`) oder eigenes
+  Präfix im Löschprotokoll. Der Empfänger löscht die Akte und vermerkt ihr Ende selbst; so
+  erfährt es eine weitere ELW vom Hub mit ihrem nächsten Abgleich. Der Widerruf einer
+  Org-Zuordnung löscht und vermerkt die Akten ohne Spiegel, die das widerrufene Gegenüber führt
+  (`fuehrung::repo::release_nach_widerruf`). Nachweis: `tests/instanz_fuehrung.rs`.
 
 ## 6.6c Führung je Einsatz: Notübernahme gegen den ELW
 
