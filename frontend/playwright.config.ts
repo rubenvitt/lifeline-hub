@@ -55,7 +55,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * Eine weitere Druck-Spec kommt hier hinein, nicht als eigenes Projekt. Die Druckfälle von
  * Meldebild, Funkplan und Führungsorganisation stehen deshalb in eigenen `*-druck.spec.ts`
  * (Hilfen in `*-kern.ts`): sonst liefe jeweils die ganze Spec dreifach (LFH-915). Die CI fährt
- * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/ci.yml`); in welchem
+ * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/e2e.yml`); in welchem
  * Anteil die Firefox- und WebKit-Fälle landen, entscheidet die Verteilung unten. Lokal wählt
  * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
  */

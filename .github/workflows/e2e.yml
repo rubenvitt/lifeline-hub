@@ -314,9 +314,12 @@ jobs:
   # ── Ein Bericht aus den Teilläufen ──────────────────────────────────────────────────
   # KEIN Required Check — das sind die Anteile selbst: `playwright merge-reports` scheitert nur
   # bei NULL Blobs, ein gestorbener Anteil ergäbe sonst einen grünen Teilbericht. Mit
-  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht.
+  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht. `continue-on-error` am Job: bei
+  # Push wartet der Release auf den Aufruf dieses Workflows, und der ist nur grün, wenn jeder Job
+  # grün ist; ein Aussetzer im Bericht hielte sonst einen Release über grünen Suiten auf.
   berichte:
     name: e2e-Bericht
+    continue-on-error: true
     needs: [aenderungen, e2e]
     if: >-
       ${{ !cancelled() && needs.aenderungen.result != 'skipped'

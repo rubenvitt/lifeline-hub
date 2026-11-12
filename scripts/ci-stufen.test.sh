@@ -128,6 +128,12 @@ pruefe "e2e-Anteile laufen nur nach grünem Binary" enthaelt "$e_if" "needs.bina
 pruefe "e2e-Anteile: „betroffen“ steht nicht am Job" fehlt "$e_if" "outputs.e2e"
 pruefe "e2e-Anteile: „betroffen“ steht an den Schritten" enthaelt "$e" "if: env.E2E != 'false'"
 
+r="$(job "$E2E" berichte)"
+# Bei Push wartet der Release auf den Aufruf von e2e.yml, und ein Aufruf ist nur grün, wenn jeder
+# seiner Jobs grün ist: ein Aussetzer im Bericht (pnpm install, Checkout) hielte sonst einen
+# Release über grünen Suiten auf.
+pruefe "e2e-Bericht hält den Release nicht auf (continue-on-error am Job)" grep -qx "    continue-on-error: true" <<< "$r"
+
 echo "==> ci-stufen: ci.yml"
 pruefe "ci.yml hat keinen Job e2e-Binary" fehlt "$(cat "$CI")" "e2e-Binary"
 pruefe "ci.yml hat keine e2e-Anteile" fehlt "$(cat "$CI")" "name: e2e \${{ matrix.shard }}/4"
