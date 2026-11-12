@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs]
 ---
 
 ## Überblick
@@ -28,40 +28,49 @@ Für den System-Admin:
 3. „Anlegen und Code zeigen“ wählen. Der Dialog zeigt einen Code wie `ABCD-EFGH-JKMN-PQRS`, wie
    lange er gilt (15 Minuten) und das Kommando zum Einlösen.
 4. Den Code an den Betreiber des Fremdsystems geben und „Fertig“ wählen. Der Code ist danach
-   nicht mehr abrufbar.
+   nicht mehr abrufbar; der Dialog schließt nur über „Fertig“, damit er nicht versehentlich
+   verschwindet. Danach steht die Ansicht der neuen Anbindung.
 
-Die Zeile zeigt „wartet auf Schlüssel“, bis das Fremdsystem den Code eingelöst hat. Danach steht
-dort „aktiv“ und der Fingerabdruck seines Schlüssels. Das Kommando zum Einlösen nennt denselben
+Der Kopf zeigt „wartet auf Schlüssel“, bis das Fremdsystem den Code eingelöst hat. Danach steht
+dort „aktiv“ und im Paneel „Schlüssel“ der Fingerabdruck seines Schlüssels. Das Kommando zum Einlösen nennt denselben
 Fingerabdruck; stimmen beide überein, hat das richtige Gerät eingelöst.
 
 ### Rechte oder Name ändern
 
-1. Im Menü der Zeile „Bearbeiten …“ wählen.
-2. Name, Rechte oder „Gültig bis“ ändern und „Speichern“ wählen.
+1. In der Liste den Namen der Anbindung wählen. Die Ansicht der Anbindung öffnet sich.
+2. Im Paneel „Zugang“ „Bearbeiten“ wählen.
+3. Name, „Gültig bis“ oder Rechte ändern und „Speichern“ wählen. Ein leeres „Gültig bis“ heißt:
+   gilt bis zum Widerruf.
+
+Hat ein anderer Admin die Anbindung inzwischen geändert, fragt die Seite „Zwischenzeitlich
+geändert“: „Verwerfen und neu laden“ zeigt seinen Stand, „Meine Änderung übernehmen“ speichert
+deine.
 
 ### Schlüssel wechseln
 
 Wenn das Fremdsystem neu aufgesetzt wird oder sein Schlüssel verloren ist:
 
-1. Im Menü der Zeile „Neuer Code (Schlüssel wechseln)“ wählen.
+1. Im Menü der Zeile „Neuer Code (Schlüssel wechseln)“ wählen, oder in der Ansicht der
+   Anbindung „Neuer Code“.
 2. Den neuen Code wie beim Anlegen weitergeben.
 
-Bis das Fremdsystem mit dem neuen Schlüssel zum ersten Mal anfragt, zeigt die Zeile beide
+Bis das Fremdsystem mit dem neuen Schlüssel zum ersten Mal anfragt, zeigt die Anbindung beide
 Fingerabdrücke, und der alte Schlüssel gilt weiter. Danach gilt nur noch der neue.
 
 ### Anbindung widerrufen
 
-1. Im Menü der Zeile „Widerrufen …“ wählen.
+1. Im Menü der Zeile oder im Kopf der Ansicht „Widerrufen …“ wählen.
 2. Die Rückfrage mit „Widerrufen“ bestätigen.
 
-Ab sofort kommt das Fremdsystem nicht mehr herein. Die Zeile bleibt mit „widerrufen“ stehen.
+Ab sofort kommt das Fremdsystem nicht mehr herein. Die Anbindung bleibt mit „widerrufen“ stehen,
+samt Zeitpunkt und wer widerrufen hat.
 
 ## Hintergrund
 
 ### Wer was darf
 
 Anlegen, ändern, neuen Code ausstellen und widerrufen darf nur der System-Admin, und nur für die
-eigene Organisation. Eine Führungskraft sieht die Liste ohne Aktionen.
+eigene Organisation. Eine Führungskraft sieht Liste und Ansicht ohne Aktionen.
 
 ### Rechte
 
@@ -91,7 +100,8 @@ Fremdsystem selbst erfährt nur „Anmeldung fehlgeschlagen“. Die häufigsten 
 - **„Body passt nicht zur Signatur“, „Pfad passt nicht …“, „Anfrage für eine andere Instanz“**:
   Das Fremdsystem signiert falsch oder spricht die falsche Instanz an. Das ist eine Frage an den
   Betreiber des Fremdsystems.
-- **„Zugang abgelaufen“**: „Gültig bis“ ist verstrichen. „Bearbeiten …“ wählen und verlängern.
+- **„Zugang abgelaufen“**: „Gültig bis“ ist verstrichen. In der Ansicht „Bearbeiten“ wählen und
+  verlängern.
 
 ### Am ELW
 

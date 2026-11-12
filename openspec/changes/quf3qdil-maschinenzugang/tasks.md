@@ -156,7 +156,9 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 - [x] 7.3 Seite `frontend/src/pages/einstellungen/Anbindungen.tsx` und Sektion `anbindungen` in
   `adminNav.tsx`:
   - Liste, Anlegen im `ErfassungsModal`, Code-Dialog;
-  - Ändern in der Ansicht, Widerruf, neuer Code;
+  - Ändern in der Ansicht `AnbindungAnsicht.tsx` (Item-Route `…/anbindungen/:zugangId`,
+    `BearbeitbaresPaneel`, nur Geändertes mit `basis_geaendert_at`), Sprung dorthin nach dem
+    Anlegen; Widerruf und neuer Code in Liste und Ansicht;
   - Ablehnungsgrund in Klartext mit Uhrabweichung in Minuten und Richtung;
   - `RechteHinweis` bei fehlender Berechtigung und am gekoppelten ELW.
 

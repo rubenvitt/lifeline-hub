@@ -21,6 +21,10 @@ werden.
 - **WHEN** ein System-Admin einen Zugang „Alarm-Adapter Wache 1“ mit `alarmmeldungen:write` anlegt
 - **THEN** erscheint der Zugang mit Name, Scope und Zustand „wartet auf Schlüssel“ in der Liste seiner Org, und die Antwort enthält einen Einmal-Code
 
+#### Scenario: Ändern in der Ansicht
+- **WHEN** ein System-Admin in der Ansicht eines Zugangs nur die Scopes ändert, während ein anderer Admin denselben Zugang seit dem Öffnen umbenannt hat
+- **THEN** sendet die Seite nur die Scopes mit dem Stand beim Öffnen, der Server antwortet 409 „Zwischenzeitlich geändert“ und ändert nichts, und erst „Meine Änderung übernehmen“ setzt die Scopes, ohne den neuen Namen zu überschreiben
+
 #### Scenario: Unbekannter Scope
 - **WHEN** die Anlage den Scope `alles:write` nennt
 - **THEN** antwortet der Server mit 400 und legt nichts an

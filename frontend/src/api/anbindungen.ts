@@ -27,8 +27,23 @@ export function legeAnbindungAn(eingabe: AnbindungEingabe): Promise<AnbindungCod
   return apiSend<AnbindungCode>('/api/admin/anbindungen', 'POST', eingabe);
 }
 
-export function aendereAnbindung(id: string, eingabe: AnbindungEingabe): Promise<AnbindungAnzeige> {
-  return apiSend<AnbindungAnzeige>(`/api/admin/anbindungen/${id}`, 'PATCH', eingabe);
+/**
+ * Teiländerung aus der Ansicht (LLH-1139): nur die geänderten Felder; ein fehlender Schlüssel
+ * bleibt, wie er ist, `gueltig_bis: null` hebt die Frist auf. `basis_geaendert_at` ist der Stand
+ * beim Öffnen; hat ein anderer den Zugang inzwischen geändert, antwortet der Server 409.
+ */
+export interface AnbindungAenderung {
+  name?: string;
+  scopes?: Scope[];
+  gueltig_bis?: string | null;
+  basis_geaendert_at?: string;
+}
+
+export function aendereAnbindung(
+  id: string,
+  aenderung: AnbindungAenderung,
+): Promise<AnbindungAnzeige> {
+  return apiSend<AnbindungAnzeige>(`/api/admin/anbindungen/${id}`, 'PATCH', aenderung);
 }
 
 /** Neuer Einmal-Code (Schlüsselwechsel); ein früherer offener Code verfällt. */

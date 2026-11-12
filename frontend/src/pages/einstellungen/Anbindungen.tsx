@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Alert, App, Button, Checkbox, Form, Input, Modal, Spin } from 'antd';
+import { App, Button, Checkbox, Form, Input, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
+import { Link, useNavigate } from 'react-router';
 import { IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
 import { Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
@@ -9,46 +10,40 @@ import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste'
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
-import KopierbarerText from '../../components/KopierbarerText';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { RechteHinweis, SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
+import { SeitenFehler } from '../../components/SeitenZustand';
+import { RechteHinweis, SeitenHinweise } from '../../components/SpeicherHinweis';
 import { NUR_ADMIN } from '../../components/nurAnsicht';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
-import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
+import { alsBackendZeit } from '../../anzeige/zeitEingabe';
 import {
   SCOPES,
   SCOPE_TEXT,
   ablehnungText,
-  aendereAnbindung,
   ladeAnbindungen,
   legeAnbindungAn,
-  scopeText,
   stelleAnbindungsCodeAus,
   widerrufeAnbindung,
   type AnbindungEingabe,
 } from '../../api/anbindungen';
 import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
-import type { AnbindungAnzeige, AnbindungCode, AnbindungenListe, Scope } from '../../api/types';
+import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
+import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
+import {
+  ANBINDUNGEN_ABRUF_MS,
+  anbindungPath,
+  uebernimmAnbindung,
+  zustandAnzeige,
+} from './anbindungAnzeige';
 
 interface FormWerte {
   name?: string;
   scopes?: Scope[];
   gueltig_bis?: Dayjs | null;
-}
-
-/** Wort und Ton des Zustands, rein und exportiert für den Test. */
-export function zustandAnzeige(z: Pick<AnbindungAnzeige, 'zustand' | 'is_abgelaufen'>): {
-  wort: string;
-  ton: 'normal' | 'bedien' | 'neutral' | 'achtung';
-} {
-  if (z.zustand === 'widerrufen') return { wort: 'widerrufen', ton: 'neutral' };
-  if (z.is_abgelaufen) return { wort: 'abgelaufen', ton: 'achtung' };
-  if (z.zustand === 'wartet') return { wort: 'wartet auf Schlüssel', ton: 'bedien' };
-  return { wort: 'aktiv', ton: 'normal' };
 }
 
 function eingabe(w: FormWerte): AnbindungEingabe {
@@ -61,63 +56,53 @@ function eingabe(w: FormWerte): AnbindungEingabe {
 
 /**
  * Admin-Sektion `/admin/einstellungen/anbindungen`: Maschinenzugänge für Fremdsysteme (LLH-1652,
- * Spec `maschinenzugang`, Entwurf `docs/design/2026-11-12-anbindungen/`). Anlegen, Ändern, neuer
- * Code und Widerruf nur der System-Admin. Der Einmal-Code steht genau einmal im Dialog; danach
- * zeigt die Seite nur Fingerabdrücke. Den Grund einer abgelehnten Anfrage sieht nur der Admin.
+ * Spec `maschinenzugang`, Entwurf `docs/design/2026-11-12-anbindungen/`). Anlegen, neuer Code und
+ * Widerruf nur der System-Admin; Name, Rechte und Frist ändert er in der Ansicht des Zugangs
+ * (`AnbindungAnsicht`, Item-Route), wohin die Seite nach dem Anlegen springt. Der Einmal-Code
+ * steht genau einmal im Dialog; danach zeigt die Seite nur Fingerabdrücke. Den Grund einer
+ * abgelehnten Anfrage sieht nur der Admin.
  */
 export default function Anbindungen() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
-  const [bearbeiten, setBearbeiten] = useState<AnbindungAnzeige | null>(null);
   const [code, setCode] = useState<AnbindungCode | null>(null);
+  /** Nach dem Anlegen: „Fertig“ am Code führt in die neue Ansicht. */
+  const [nachCodeZu, setNachCodeZu] = useState<string | null>(null);
   const [widerrufFuer, setWiderrufFuer] = useState<AnbindungAnzeige | null>(null);
   const [form] = Form.useForm<FormWerte>();
 
-  const listeQ = useQuery({ queryKey: globalKeys.anbindungen(), queryFn: ladeAnbindungen });
-
-  const uebernimm = (z: AnbindungAnzeige) =>
-    qc.setQueryData<AnbindungenListe>(globalKeys.anbindungen(), (alt) =>
-      alt
-        ? {
-            ...alt,
-            zugaenge: alt.zugaenge.some((x) => x.id === z.id)
-              ? alt.zugaenge.map((x) => (x.id === z.id ? z : x))
-              : [z, ...alt.zugaenge],
-          }
-        : alt,
-    );
+  const listeQ = useQuery({
+    queryKey: globalKeys.anbindungen(),
+    queryFn: ladeAnbindungen,
+    refetchInterval: ANBINDUNGEN_ABRUF_MS,
+  });
 
   const anlegen = useMutation({
     mutationFn: legeAnbindungAn,
     onSuccess: (antwort) => {
-      uebernimm(antwort.zugang);
+      uebernimmAnbindung(qc, antwort.zugang);
+      setNachCodeZu(antwort.zugang.id);
       setCode(antwort);
-    },
-  });
-  const aendern = useMutation({
-    mutationFn: ({ id, werte }: { id: string; werte: AnbindungEingabe }) =>
-      aendereAnbindung(id, werte),
-    onSuccess: (z) => {
-      uebernimm(z);
-      message.success(`${z.name} gespeichert`);
     },
   });
   const neuerCode = useMutation({
     mutationFn: (z: AnbindungAnzeige) => stelleAnbindungsCodeAus(z.id),
     onSuccess: (antwort) => {
-      uebernimm(antwort.zugang);
+      uebernimmAnbindung(qc, antwort.zugang);
+      setNachCodeZu(null);
       setCode(antwort);
     },
   });
   const widerrufen = useMutation({
     mutationFn: (z: AnbindungAnzeige) => widerrufeAnbindung(z.id),
     onSuccess: (z) => {
-      uebernimm(z);
+      uebernimmAnbindung(qc, z);
       setWiderrufFuer(null);
       message.success(`${z.name} widerrufen`);
     },
@@ -135,17 +120,13 @@ export default function Anbindungen() {
           z.zustand === 'widerrufen'
             ? []
             : [
-                { key: 'bearbeiten', label: 'Bearbeiten …' },
                 ...(gesperrt ? [] : [{ key: 'code', label: 'Neuer Code (Schlüssel wechseln)' }]),
                 { key: 'widerrufen', icon: <IconKreuz />, label: 'Widerrufen …', gefahr: true },
               ],
         zugaenglicherName: (z) => `Aktionen zu Anbindung ${z.name}`,
         laeuft: () => neuerCode.isPending || widerrufen.isPending,
         onWahl: (key, z) => {
-          if (key === 'bearbeiten') {
-            aendern.reset();
-            setBearbeiten(z);
-          } else if (key === 'code') {
+          if (key === 'code') {
             neuerCode.mutate(z);
           } else {
             widerrufen.reset();
@@ -159,12 +140,6 @@ export default function Anbindungen() {
     schluessel: (z) => z.id,
   });
 
-  const formularOffen = anlegenOffen || bearbeiten != null;
-  const schliessen = () => {
-    setAnlegenOffen(false);
-    setBearbeiten(null);
-  };
-
   return (
     <AdminPage
       titel="Anbindungen"
@@ -173,7 +148,7 @@ export default function Anbindungen() {
           <Button
             type="primary"
             icon={<IconPlus />}
-            disabled={gesperrt != null}
+            disabled={liste == null || gesperrt != null}
             onClick={() => {
               anlegen.reset();
               setAnlegenOffen(true);
@@ -198,134 +173,130 @@ export default function Anbindungen() {
         </div>
       )}
       <Paneel titel="Zugänge" meta={listeQ.isSuccess ? zugaenge.length : undefined} koerperPolster>
-        {listeQ.isLoading ? (
-          <Spin />
-        ) : listeQ.isError ? (
-          <Alert type="error" title="Anbindungen nicht ladbar" showIcon />
+        {liste == null ? (
+          listeQ.isError ? (
+            <SeitenFehler
+              text="Anbindungen nicht ladbar"
+              ursache={listeQ.error}
+              onWiederholen={() => void listeQ.refetch()}
+              laedt={listeQ.isFetching}
+            />
+          ) : (
+            <Spin />
+          )
         ) : (
-          <Liste<AnbindungAnzeige>
-            bordered
-            dataSource={zugaenge}
-            rowKey={(z) => z.id}
-            emptyText="Noch keine Anbindung"
-            renderItem={(z) => {
-              const zustand = zustandAnzeige(z);
-              const widerrufenAm = z.zustand === 'widerrufen';
-              return (
-                <div data-lfh="anbindung-eintrag" {...(menue ? kontext.ausloeser(z) : {})}>
-                  <ListenEintrag
-                    actions={
-                      menue && !widerrufenAm
-                        ? [<ZeilenMenueAusloeser key="aktionen" menue={menue} zeile={z} />]
-                        : undefined
-                    }
-                  >
-                    <ListenEintragMeta
-                      title={
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            gap: token.marginXS,
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <span data-lfh="anbindung-name">{z.name}</span>
-                          <StatusChip ton={zustand.ton} wort={zustand.wort} />
-                        </span>
+          <>
+            {listeQ.isError && (
+              <div style={{ marginBlockEnd: token.marginSM }}>
+                <SeitenFehler
+                  text="Stand nicht aktuell: neu laden gescheitert"
+                  ursache={listeQ.error}
+                  onWiederholen={() => void listeQ.refetch()}
+                  laedt={listeQ.isFetching}
+                />
+              </div>
+            )}
+            <Liste<AnbindungAnzeige>
+              bordered
+              dataSource={zugaenge}
+              rowKey={(z) => z.id}
+              emptyText="Noch keine Anbindung"
+              renderItem={(z) => {
+                const zustand = zustandAnzeige(z);
+                const widerrufenAm = z.zustand === 'widerrufen';
+                return (
+                  <div data-lfh="anbindung-eintrag" {...(menue ? kontext.ausloeser(z) : {})}>
+                    <ListenEintrag
+                      actions={
+                        menue && !widerrufenAm
+                          ? [<ZeilenMenueAusloeser key="aktionen" menue={menue} zeile={z} />]
+                          : undefined
                       }
-                      description={
-                        <span
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 2,
-                            color: rollen.gedaempft,
-                          }}
-                        >
-                          <span data-lfh="anbindung-rechte">
-                            {z.scopes.map((s, i) => (
-                              <span key={s}>
-                                {i > 0 && ' · '}
-                                {scopeText(s)}{' '}
-                                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>
-                                  {s}
-                                </span>
-                              </span>
-                            ))}
+                    >
+                      <ListenEintragMeta
+                        title={
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              gap: token.marginXS,
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <Link data-lfh="anbindung-name" to={anbindungPath(z.id)}>
+                              {z.name}
+                            </Link>
+                            <StatusChip ton={zustand.ton} wort={zustand.wort} />
                           </span>
-                          <span>
-                            {z.fingerabdruck ? (
-                              <>
-                                Schlüssel <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
-                              </>
-                            ) : widerrufenAm ? (
-                              'ohne Schlüssel'
-                            ) : (
-                              'Code noch nicht eingelöst'
-                            )}
-                            {z.fingerabdruck_neu && (
-                              <>
-                                {' · neuer Schlüssel '}
-                                <span style={monoStil(12, 500)}>{z.fingerabdruck_neu}</span>
-                                {', gilt ab der ersten Anfrage damit'}
-                              </>
-                            )}
-                          </span>
-                          <span>
-                            {z.zuletzt_genutzt_at
-                              ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
-                              : 'noch nie genutzt'}
-                            {z.gueltig_bis && ` · gültig bis ${zeit(z.gueltig_bis)}`}
-                            {z.widerrufen_at && ` · widerrufen ${zeit(z.widerrufen_at)}`}
-                          </span>
-                          {z.letzte_ablehnung && !widerrufenAm && (
-                            <span
-                              data-lfh="anbindung-ablehnung"
-                              style={{ color: rollen.achtungText }}
-                            >
-                              {`Letzte Ablehnung: ${ablehnungText(z.letzte_ablehnung)} · ${zeit(z.letzte_ablehnung.at)}`}
+                        }
+                        description={
+                          <span
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 2,
+                              color: rollen.gedaempft,
+                            }}
+                          >
+                            <RechteText scopes={z.scopes} />
+                            <span>
+                              {z.fingerabdruck ? (
+                                <>
+                                  Schlüssel <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
+                                </>
+                              ) : widerrufenAm ? (
+                                'ohne Schlüssel'
+                              ) : (
+                                'Code noch nicht eingelöst'
+                              )}
+                              {z.fingerabdruck_neu && (
+                                <>
+                                  {' · neuer Schlüssel '}
+                                  <span style={monoStil(12, 500)}>{z.fingerabdruck_neu}</span>
+                                  {', gilt ab der ersten Anfrage damit'}
+                                </>
+                              )}
                             </span>
-                          )}
-                        </span>
-                      }
-                    />
-                  </ListenEintrag>
-                </div>
-              );
-            }}
-          />
+                            <span>
+                              {z.zuletzt_genutzt_at
+                                ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
+                                : 'noch nie genutzt'}
+                              {z.gueltig_bis && ` · gültig bis ${zeit(z.gueltig_bis)}`}
+                              {z.widerrufen_at &&
+                                ` · widerrufen ${zeit(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
+                            </span>
+                            {z.letzte_ablehnung && !widerrufenAm && (
+                              <span
+                                data-lfh="anbindung-ablehnung"
+                                style={{ color: rollen.achtungText }}
+                              >
+                                {`Letzte Ablehnung: ${ablehnungText(z.letzte_ablehnung)} · ${zeit(z.letzte_ablehnung.at)}`}
+                              </span>
+                            )}
+                          </span>
+                        }
+                      />
+                    </ListenEintrag>
+                  </div>
+                );
+              }}
+            />
+          </>
         )}
         {kontext.menue}
       </Paneel>
 
       <ErfassungsModal<FormWerte>
-        key={bearbeiten?.id ?? 'neu'}
-        offen={formularOffen}
-        initialValues={
-          bearbeiten
-            ? {
-                name: bearbeiten.name,
-                scopes: bearbeiten.scopes,
-                gueltig_bis: alsZeitpunkt(bearbeiten.gueltig_bis) ?? null,
-              }
-            : undefined
-        }
-        titel={bearbeiten ? `${bearbeiten.name} bearbeiten` : 'Anbindung anlegen'}
+        offen={anlegenOffen}
+        titel="Anbindung anlegen"
         form={form}
-        erfassenText={bearbeiten ? 'Speichern' : 'Anlegen und Code zeigen'}
-        laeuft={anlegen.isPending || aendern.isPending}
-        onErfassen={(w) =>
-          bearbeiten
-            ? aendern.mutateAsync({ id: bearbeiten.id, werte: eingabe(w) })
-            : anlegen.mutateAsync(eingabe(w))
-        }
-        onFertig={schliessen}
-        onAbbrechen={() => {
-          anlegen.reset();
-          aendern.reset();
-          schliessen();
-        }}
+        erfassenText="Anlegen und Code zeigen"
+        laeuft={anlegen.isPending}
+        speicherung={anlegen}
+        speicherFehlerTitel="Nicht angelegt"
+        onErfassen={(w) => anlegen.mutateAsync(eingabe(w))}
+        onFertig={() => setAnlegenOffen(false)}
+        onAbbrechen={() => setAnlegenOffen(false)}
       >
         <Form.Item
           label="Name"
@@ -355,71 +326,25 @@ export default function Anbindungen() {
             ))}
           </Checkbox.Group>
         </Form.Item>
-        <Form.Item label="Gültig bis" name="gueltig_bis" extra="Leer: gilt, bis du sie widerrufst.">
-          <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
+        <Form.Item label="Gültig bis" name="gueltig_bis">
+          <ZeitpunktEingabe art="frist" placeholder="bis zum Widerruf" style={{ width: '100%' }} />
         </Form.Item>
-        <SpeicherFehler
-          fehler={bearbeiten ? aendern.error : anlegen.error}
-          titel={bearbeiten ? 'Nicht gespeichert' : 'Nicht angelegt'}
-        />
       </ErfassungsModal>
 
-      <Modal
-        open={widerrufFuer != null}
-        title={widerrufFuer ? `${widerrufFuer.name} widerrufen?` : 'Widerrufen?'}
-        okText="Widerrufen"
-        cancelText="Abbrechen"
-        okButtonProps={{ danger: true, loading: widerrufen.isPending }}
-        onOk={() => widerrufFuer && widerrufen.mutate(widerrufFuer)}
-        onCancel={() => setWiderrufFuer(null)}
-        destroyOnHidden
-      >
-        <p>
-          Das Fremdsystem kommt ab sofort nicht mehr herein. Andere Anbindungen und gekoppelte
-          Instanzen bleiben unberührt.
-        </p>
-        <SpeicherFehler fehler={widerrufen.error} titel="Nicht widerrufen" />
-      </Modal>
-
-      <Modal
-        open={code != null}
-        title={code ? `Code für ${code.zugang.name}` : 'Code'}
-        footer={
-          <Button type="primary" onClick={() => setCode(null)}>
-            Fertig
-          </Button>
-        }
-        onCancel={() => setCode(null)}
-        destroyOnHidden
-      >
-        {code && (
-          <div
-            data-lfh="anbindung-code"
-            style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
-          >
-            <KopierbarerText text={code.code} bezeichnung="Code">
-              <span data-lfh="anbindung-code-text" style={monoStil(22, 500)}>
-                {code.code}
-              </span>
-            </KopierbarerText>
-            <span style={{ color: rollen.gedaempft }}>
-              gilt bis {zeit(code.laeuft_ab_at)}, einmal einlösbar · nur jetzt sichtbar
-            </span>
-            <KopierbarerText
-              text={`lifeline-hub zugang redeem ${window.location.origin} ${code.code}`}
-              bezeichnung="Kommando"
-            >
-              <span style={{ ...monoStil(12, 500), wordBreak: 'break-all' }}>
-                lifeline-hub zugang redeem {window.location.origin} {code.code}
-              </span>
-            </KopierbarerText>
-            <span style={{ color: rollen.gedaempft }}>
-              Nach dem Einlösen steht der Fingerabdruck des Fremdsystems am Zugang. Das Kommando
-              zeigt denselben.
-            </span>
-          </div>
-        )}
-      </Modal>
+      <WiderrufDialog
+        zugang={widerrufFuer}
+        laeuft={widerrufen.isPending}
+        fehler={widerrufen.error}
+        onWiderrufen={(z) => widerrufen.mutate(z)}
+        onAbbrechen={() => setWiderrufFuer(null)}
+      />
+      <CodeDialog
+        code={code}
+        onFertig={() => {
+          setCode(null);
+          if (nachCodeZu) navigate(anbindungPath(nachCodeZu));
+        }}
+      />
     </AdminPage>
   );
 }

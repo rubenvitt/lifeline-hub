@@ -29,8 +29,11 @@ test('Anbindung anlegen, Code einlösen, signiert abrufen', async ({ page, reque
   const code = (await codeText.textContent())!;
   await page.getByRole('button', { name: 'Fertig' }).click();
 
-  const zeile = page.locator('[data-lfh="anbindung-eintrag"]', { hasText: name });
-  await expect(zeile).toContainText('wartet auf Schlüssel');
+  // Nach dem Anlegen steht die Ansicht der neuen Anbindung (Item-Route).
+  await expect(page).toHaveURL(/\/admin\/einstellungen\/anbindungen\/[0-9a-f-]{36}$/);
+  const titel = page.locator('[data-lfh="anbindung-titel"]');
+  await expect(titel).toContainText(name);
+  await expect(titel).toContainText('wartet auf Schlüssel');
 
   // Das Fremdsystem löst ein, mit dem Referenz-Client.
   const schluessel = await generateKey();
@@ -54,11 +57,21 @@ test('Anbindung anlegen, Code einlösen, signiert abrufen', async ({ page, reque
   expect(me.headers()['lifeline-signature']).toBeTruthy();
 
   await page.reload();
-  await expect(zeile).toContainText('aktiv');
-  await expect(zeile).toContainText('zuletzt genutzt');
-  await expect(zeile.locator('[data-lfh="anbindung-rechte"]')).toHaveText(
-    'Lage lesen lage:read',
+  await expect(titel).toContainText('aktiv');
+  await expect(page.locator('[data-lfh="anbindung-fingerabdruck"]')).toHaveText(
+    /^([0-9A-Z]{4}-){7}[0-9A-Z]{4}$/,
   );
+  await expect(page.locator('[data-lfh="anbindung-rechte"]')).toHaveText('Lage lesen lage:read');
+
+  // Name in der Ansicht ändern; die Liste zeigt ihn mit „zuletzt genutzt“.
+  await page.getByRole('button', { name: 'Zugang bearbeiten' }).click();
+  const feld = page.getByRole('textbox', { name: 'Name' });
+  await feld.fill(`${name} neu`);
+  await page.getByRole('button', { name: 'Speichern' }).click();
+  await expect(titel).toContainText(`${name} neu`);
+  await page.getByRole('link', { name: 'Anbindungen' }).click();
+  const zeile = page.locator('[data-lfh="anbindung-eintrag"]', { hasText: `${name} neu` });
+  await expect(zeile).toContainText('zuletzt genutzt');
 });
 
 test('Anbindungen: eine Führungskraft liest nur, der Grund steht da', async ({ page }) => {
