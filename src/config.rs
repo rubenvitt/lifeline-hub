@@ -831,6 +831,15 @@ pub enum ZugangCommand {
         /// Pfad der Schlüsseldatei aus `redeem`.
         datei: String,
     },
+    /// Lage `GET /api/v1/lage` signiert aufrufen (Recht „Lage lesen“): zeigt den Einsatz, den
+    /// die Einsatzleitung für den Zugang freigegeben hat, oder `einsatz: null`.
+    Lage {
+        /// Pfad der Schlüsseldatei aus `redeem`.
+        datei: String,
+        /// Auch die Lagekarte ausgeben (GeoJSON); ohne den Schalter bleibt sie weg.
+        #[arg(long)]
+        karte: bool,
+    },
 }
 
 #[cfg(test)]

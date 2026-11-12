@@ -223,6 +223,17 @@ Fassung:
 
 Die Abfrage gehört zum signierten Pfad (`htu` ist `/api/v1/lage?karte=…`).
 
+**Prüfen am Terminal.** Ob Anbindung und Freigabe stehen, zeigt
+
+```sh
+lifeline-hub zugang lage lifeline-zugang.json
+```
+
+Die Ausgabe ist die Antwort ohne Karte; `--karte` gibt sie mit aus. Steht dort `"einsatz": null`,
+ist für den Zugang kein Einsatz freigegeben. Aus Rust:
+`lifeline_machine_client::lage(&client, &cred, karte, now)` mit `karte` `None`, `Some("none")`
+oder `Some(<karte_etag>)`.
+
 ## Fehler
 
 Fehler sind `{"error": "<Text>", "code": "<code>"}`. Vertrag ist `code`
@@ -242,7 +253,7 @@ bei anderen `4xx` nicht.
 ## Referenz-Clients
 
 - **Rust:** Crate [`crates/lifeline-machine-client`](../../crates/lifeline-machine-client),
-  Feature `http` für Einlösen und `me`. Das Kommando `lifeline-hub zugang` nutzt sie.
+  Feature `http` für Einlösen, `me` und `lage`. Das Kommando `lifeline-hub zugang` nutzt sie.
 - **TypeScript:** [`clients/typescript/machineClient.ts`](clients/typescript/machineClient.ts),
   nur WebCrypto, für Node ab 22 (die API erlaubt kein CORS, also keine Browser-Clients fremder
   Seiten).
