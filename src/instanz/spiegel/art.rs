@@ -194,6 +194,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Stand der Übergabe an dieser Instanz; die Quittung kommt im Paket",
     ),
     (
+        "einsatz_archiv",
+        "Archiv der verwahrenden Instanz; verschlüsselt an die Schlüssel ihrer Org (LLH-1494)",
+    ),
+    (
         "verwahrung_angenommen",
         "Stand der Annahme an der verwahrenden Instanz; nur sie vergleicht ihn",
     ),

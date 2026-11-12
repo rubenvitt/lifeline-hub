@@ -1398,6 +1398,43 @@ pub(crate) async fn schwaerze_einsatz_atomar(
     Ok(true)
 }
 
+/// Schwärzt einen Einsatz, dessen Archiv in derselben Transaktion entsteht (LLH-1494, D9), ohne
+/// Karenz: die Karenz dient dem Wiederherstellen, und das geht jetzt über das Archiv. Setzt
+/// Vormerkung und Tombstone zugleich, damit der Einsatz wie nach Phase B gesperrt ist und Phase A
+/// ihn nicht noch einmal vormerkt. Bewacht wie Phase B: nur abgeschlossene, nicht vorgemerkte,
+/// nicht geschwärzte Einsätze mit abgelaufener Nachbereitung; `false` = nichts zu tun. Den
+/// Nachlauf der Anhänge startet der Aufrufer nach dem Commit.
+pub(crate) async fn schwaerze_nach_archiv_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    etb_startwert: i64,
+    jetzt: &str,
+    grund: &str,
+) -> Result<bool, AppError> {
+    let res = sqlx::query(
+        "UPDATE einsatz SET geloescht_at = ?1, geschwaerzt_at = ?1 \
+         WHERE id = ?2 AND status = ?3 AND geloescht_at IS NULL AND geschwaerzt_at IS NULL \
+           AND nachbereitung_bis IS NOT NULL AND nachbereitung_bis <= ?1",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *conn)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Ok(false);
+    }
+    scrubbe_einsatz_ganz_tx(&mut *conn, einsatz_id, jetzt).await?;
+    system_audit_tx(
+        &mut *conn,
+        einsatz_id,
+        etb_startwert,
+        &schwaerzungs_audit(grund),
+    )
+    .await?;
+    Ok(true)
+}
+
 /// Teil-Patch der editierbaren Kopf-Spalten (LFH-306, Tri-State): äußere `Option` = „im
 /// Patch enthalten?", innere = Wert (`Some(None)` setzt die Spalte auf NULL). Die drei
 /// NOT-NULL-Spalten (`bezeichnung`, `einsatzart`, `begonnen_at`) tragen nur die äußere
