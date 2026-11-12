@@ -8,6 +8,8 @@ const BRUCH_TABELLE_WORT: Readonly<Record<string, string>> = {
   etb_eintrag: 'ETB-Eintrag',
   meldung: 'Meldung',
   einsatz_person: 'Person',
+  person_uhs_belegung: 'UHS-Aufnahme',
+  haushalt: 'Haushalt',
 };
 
 const BRUCH_KATEGORIE_WORT: Readonly<Record<BruchErfassung['kategorie'], string>> = {

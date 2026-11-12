@@ -496,9 +496,11 @@ nutzen darf.
   folgen“. Danach bekommt die Person eine Notiz, unter welcher Nummer sie vorher erfasst war und
   was dabei aufgehoben oder bestätigt wurde. Lehnt die führende einen Eintrag ab, steht nur dieser
   wieder in der Liste, mit Grund. Einträge an einer Person, die die führende schon kennt, stehen
-  einzeln da. Eine Person steht immer für sich, auch an einer neuen Meldung; kennt die führende
-  die Meldung nicht, kommt die Person ohne sie an. Haushalt und Aufnahme in eine UHS gehen nicht
-  mit; die Aufnahme steht als eigene Zeile da, den Haushalt nennt die Notiz.
+  einzeln da. Eine Person steht immer für sich, auch an einer neuen Meldung: Ist die Meldung noch
+  offen, zuerst sie stellen oder verwerfen; verworfen kommt die Person ohne sie an. Haushalt und
+  Aufnahme in eine UHS gehen nicht mit; beide stehen als eigene Zeilen da, die Notiz nennt die
+  fehlende Haushaltszuordnung. Beide Installationen brauchen dafür denselben Stand: Eine ältere
+  führende übernimmt PAT-Nummer, Kontamination, Kostform und Unverträglichkeiten nicht.
 - **Alle stellen** erscheint ab zwei solchen Erfassungen und stellt sie in der Reihenfolge ihrer
   Zeit. Was noch nicht geht, etwa eine Meldung, deren Bezug die führende noch nicht kennt, bleibt
   in der Liste; der Grund steht neben dem Knopf.

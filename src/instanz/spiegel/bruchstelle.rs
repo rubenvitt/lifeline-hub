@@ -123,6 +123,9 @@ pub const BEZUG_WARTET: &str = "Bezug noch nicht beim Führer.";
 /// Grund, wenn ein Bezug selbst nicht nachgereicht wird (verworfen, nicht nachreichbar, offen).
 pub const BEZUG_FEHLT: &str = "Bezug ist nicht nachgereicht.";
 
+/// Grund an einem Eintrag einer Kette, wenn der Einsatz hier wieder selbst geführt wird.
+pub const FUEHRUNG_GEWECHSELT: &str = "Führung gewechselt; bitte neu erfassen.";
+
 /// Höchstlänge des Kurzinhalts in der Liste (Zeichen).
 pub const KURZ_MAX: usize = 200;
 
@@ -300,6 +303,12 @@ pub async fn ordne_folgen(conn: &mut SqliteConnection, einsatz_id: i64) -> Resul
                 }
                 _ => continue,
             };
+            // An einer Person hängt nur, was `URSPRUNG` über `person_id` an sie bindet (und ihre
+            // Systemeinträge): Ein Schaden, ein Anhang, ein Abgleich mit ihr bleibt eigene Zeile,
+            // sonst verschwände er ungesehen, sobald die Person gestellt ist.
+            if ziel == "einsatz_person" && ursprung.is_none() {
+                continue;
+            }
             let Some(wert) = d.get(&sp.name).and_then(als_schluessel) else {
                 continue;
             };
@@ -474,6 +483,35 @@ fn kurzinhalt(tabelle: &str, d: &Map<String, Value>) -> Option<String> {
     KURZ_FELDER.iter().find_map(|f| text(d, f)).map(kuerze)
 }
 
+/// Name einer Person („Muster, Max“): aus der Bruchstelle, sonst aus dem Einsatz.
+async fn person_name(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    zeilen: &[BruchZeile],
+    person: &str,
+) -> Result<Option<String>, AppError> {
+    if let Some(z) = zeilen
+        .iter()
+        .find(|z| z.art == "einsatz_person" && z.schluessel == person)
+    {
+        return Ok(kurzinhalt("einsatz_person", &z.daten()));
+    }
+    let name: Option<(Option<String>, Option<String>)> =
+        sqlx::query_as("SELECT name, vorname FROM einsatz_person WHERE einsatz_id = ? AND id = ?")
+            .bind(einsatz_id)
+            .bind(person)
+            .fetch_optional(&mut *conn)
+            .await?;
+    Ok(name.and_then(|(n, v)| {
+        let teile: Vec<String> = [n, v]
+            .into_iter()
+            .flatten()
+            .filter(|t| !t.trim().is_empty())
+            .collect();
+        (!teile.is_empty()).then(|| kuerze(teile.join(", ")))
+    }))
+}
+
 /// Eine entfernte Zeile der Bruchstelle mit allem, was Liste und Kette brauchen.
 #[derive(Debug, Clone, sqlx::FromRow)]
 struct BruchZeile {
@@ -601,13 +639,19 @@ pub async fn liste(
                 .then(|| text(&d, "typ"))
                 .flatten();
             let von = text(&d, "von").or_else(|| text(&d, "absender"));
-            (
-                art.map(str::to_string),
-                typ,
-                von,
-                kurzinhalt(&tabelle, &d),
-                z.grund.clone(),
-            )
+            let kurz = match tabelle.as_str() {
+                // Die Aufnahme in eine UHS nennt ihre Person, der Haushalt seine Nummer.
+                "person_uhs_belegung" => match d.get("person_id").and_then(als_schluessel) {
+                    Some(p) => person_name(&mut conn, einsatz_id, &zeilen, &p).await?,
+                    None => None,
+                },
+                "haushalt" => d
+                    .get("nummer")
+                    .and_then(Value::as_i64)
+                    .map(|n| format!("Nr. {n}")),
+                _ => kurzinhalt(&tabelle, &d),
+            };
+            (art.map(str::to_string), typ, von, kurz, z.grund.clone())
         };
         liste.push(BruchErfassung {
             id: z.id,
@@ -780,7 +824,10 @@ enum Bezug {
     Neu(String),
     /// Die Zeile ist nachgereicht oder steht in einer laufenden Kette, ist aber noch nicht hier.
     Wartet,
-    /// Die Zeile wird nicht nachgereicht (verworfen, nicht nachreichbar, offen, mit Grund zurück).
+    /// Die Zeile ist noch offen und ließe sich stellen (auch mit Grund zurück, oder in der Kette
+    /// eines offenen Ursprungs): erst sie stellen oder verwerfen.
+    Offen,
+    /// Die Zeile wird nicht nachgereicht (verworfen, nicht nachreichbar).
     Fehlt,
 }
 
@@ -825,34 +872,30 @@ async fn bezug(
         .await?;
         return Ok(lokal.map_or(Bezug::Wartet, Bezug::Neu));
     }
-    Ok(match erledigt.as_deref() {
-        Some("nachgereicht") => Bezug::Wartet,
-        Some(_) => Bezug::Fehlt,
-        // Ein Eintrag einer Kette, der noch gestellt wird; eine Folgezeile, die nie gestellt
-        // wird (eines nicht gestellten Ursprungs oder nicht nachreichbar), fehlt.
-        None if folge_von.is_some()
-            && antrag_id.is_none()
-            && grund.is_none()
-            && wartet_in_kette(conn, einsatz_id, id).await? =>
-        {
-            Bezug::Wartet
-        }
-        None => Bezug::Fehlt,
-    })
-}
-
-/// Ob die Kette eine Folgezeile noch stellt ([`Ketten::wartet`] für eine einzelne Zeile).
-async fn wartet_in_kette(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    id: i64,
-) -> Result<bool, AppError> {
+    match erledigt.as_deref() {
+        Some("nachgereicht") => return Ok(Bezug::Wartet),
+        Some(_) => return Ok(Bezug::Fehlt),
+        None => {}
+    }
+    // Offen: Ein Eintrag einer Kette, der noch gestellt wird, wartet; eine Zeile, die sich noch
+    // stellen ließe, ist offen; eine Folgezeile, die nie gestellt wird, fehlt.
     let zeilen = bruch_zeilen(conn, einsatz_id).await?;
     let ketten = Ketten::neu(&zeilen);
-    Ok(zeilen
-        .iter()
-        .find(|z| z.id == id)
-        .is_some_and(|z| ketten.wartet(z)))
+    let Some(z) = zeilen.iter().find(|z| z.id == id) else {
+        return Ok(Bezug::Fehlt);
+    };
+    if folge_von.is_some() && antrag_id.is_none() && grund.is_none() && ketten.wartet(z) {
+        return Ok(Bezug::Wartet);
+    }
+    let ursprung = ketten.ursprung(z);
+    let stellbar = |z: &BruchZeile| nachreichbar_als(&z.art, &z.daten()).is_some();
+    Ok(
+        if ursprung.erledigt.is_none() && stellbar(z) && stellbar(ursprung) {
+            Bezug::Offen
+        } else {
+            Bezug::Fehlt
+        },
+    )
 }
 
 fn bezug_fehler(b: &Bezug) -> AppError {
@@ -1123,8 +1166,9 @@ pub async fn alle_stellen(
 /// sich mit Grund von der Kette. Danach bekommt jede angekommene Person ihre Nachreich-Notiz
 /// (K3–K5). Läuft im Takt nach dem Abgleich; liefert die Einsätze, an denen sich etwas geändert hat.
 pub async fn ketten_fortsetzen(pool: &SqlitePool) -> Result<Vec<i64>, AppError> {
-    // Nur Einsätze, die hier noch Spiegel sind, und nur Ketten, deren Ursprung gestellt ist: Was
-    // nie gestellt wird, liest der Takt nicht jede Sekunde neu.
+    // Nur Ketten, deren Ursprung gestellt ist: Was nie gestellt wird, liest der Takt nicht jede
+    // Sekunde neu. Führt der Einsatz hier wieder selbst, lösen sich die Einträge mit Grund (409);
+    // die Notiz geht nur an einen Spiegel.
     let tabellen: Vec<&str> = NACHREICHBAR
         .iter()
         .filter(|(_, art)| AN_DER_PERSON.contains(art))
@@ -1139,8 +1183,7 @@ pub async fn ketten_fortsetzen(pool: &SqlitePool) -> Result<Vec<i64>, AppError> 
            UNION SELECT w.id, b.folge_von FROM weg w JOIN einsatz_bruchstelle b ON b.id = w.oben \
              WHERE b.folge_von IS NOT NULL) \
          SELECT DISTINCT b.einsatz_id FROM weg w JOIN einsatz_bruchstelle b ON b.id = w.oben \
-           JOIN einsatz e ON e.id = b.einsatz_id \
-           WHERE b.folge_von IS NULL AND b.erledigt = 'nachgereicht' AND e.spiegel = 1 \
+           WHERE b.folge_von IS NULL AND b.erledigt = 'nachgereicht' \
          UNION SELECT b.einsatz_id FROM einsatz_bruchstelle b JOIN einsatz e ON e.id = b.einsatz_id \
            WHERE b.art = 'einsatz_person' AND b.entfernt = 1 AND b.daten IS NOT NULL \
            AND b.erledigt = 'nachgereicht' AND b.notiz_at IS NULL \
@@ -1203,6 +1246,38 @@ async fn kette_des_einsatzes(pool: &SqlitePool, einsatz_id: i64) -> Result<bool,
     let mut conn = pool.acquire().await?;
     let zeilen = bruch_zeilen(&mut conn, einsatz_id).await?;
     let ketten = Ketten::neu(&zeilen);
+    // Führt der Einsatz hier wieder selbst, stellt die Kette nichts mehr: Ihre Einträge lösen sich
+    // mit Grund, statt auf eine Quittung zu warten, die nicht mehr kommt.
+    let spiegel: bool = sqlx::query_scalar("SELECT spiegel = 1 FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .unwrap_or(false);
+    if !spiegel {
+        let wartend: Vec<i64> = zeilen
+            .iter()
+            .filter(|z| ketten.wartet(z))
+            .map(|z| z.id)
+            .collect();
+        drop(conn);
+        if wartend.is_empty() {
+            return Ok(false);
+        }
+        crate::write_retry!(pool, |conn| {
+            for id in &wartend {
+                sqlx::query(
+                    "UPDATE einsatz_bruchstelle SET grund = ?, folge_von = NULL WHERE id = ? \
+                     AND erledigt IS NULL AND antrag_id IS NULL",
+                )
+                .bind(FUEHRUNG_GEWECHSELT)
+                .bind(id)
+                .execute(&mut *conn)
+                .await?;
+            }
+            Ok::<_, AppError>(())
+        })?;
+        return Ok(true);
+    }
     let mut eintraege: Vec<(i64, Option<i64>, String)> = Vec::new();
     for z in &zeilen {
         if !ketten.wartet(z) || !ohne_wartenden_bezug(&mut conn, einsatz_id, z).await? {
@@ -1276,6 +1351,35 @@ async fn kette_des_einsatzes(pool: &SqlitePool, einsatz_id: i64) -> Result<bool,
 }
 
 /// Das Wort einer Maßnahme, wie das Paneel es zeigt (`frontend/src/personen/personMeta.ts`).
+/// Die Region einer Verletzung als Wort, wie im Körperschema (`koerperschemaKern.ts`).
+fn region_wort(region: &str) -> String {
+    match region {
+        "kopf" => "Kopf",
+        "gesicht" => "Gesicht",
+        "hals" => "Hals",
+        "thorax" => "Thorax",
+        "abdomen" => "Abdomen",
+        "becken" => "Becken",
+        "ruecken" => "Rücken",
+        "wirbelsaeule" => "Wirbelsäule",
+        "gesaess" => "Gesäß",
+        "oberarm_l" => "Oberarm links",
+        "oberarm_r" => "Oberarm rechts",
+        "unterarm_l" => "Unterarm links",
+        "unterarm_r" => "Unterarm rechts",
+        "hand_l" => "Hand links",
+        "hand_r" => "Hand rechts",
+        "oberschenkel_l" => "Oberschenkel links",
+        "oberschenkel_r" => "Oberschenkel rechts",
+        "unterschenkel_l" => "Unterschenkel links",
+        "unterschenkel_r" => "Unterschenkel rechts",
+        "fuss_l" => "Fuß links",
+        "fuss_r" => "Fuß rechts",
+        andere => return andere.replace('_', " "),
+    }
+    .to_string()
+}
+
 fn massnahme_wort(art: &str) -> String {
     match art {
         "blutstillung" => "Blutstillung",
@@ -1317,7 +1421,7 @@ fn eintrag_wert(tabelle: &str, d: &Map<String, Value>) -> Option<String> {
         "person_sichtung" => crate::person::Sichtungskategorie::parse(&wert("kategorie"))
             .map_or_else(|| wert("kategorie"), |k| k.etb_label().to_string()),
         "person_massnahme" => massnahme_wort(&wert("art")),
-        "person_verletzung" => wert("region").replace('_', " "),
+        "person_verletzung" => region_wort(&wert("region")),
         _ => return None,
     })
 }
@@ -1344,7 +1448,7 @@ fn nachreich_notiz_text(
         }
     }
     if person.get("haushalt_id").is_some_and(|h| !h.is_null()) {
-        teile.push("Haushalt nicht nachgereicht.".to_string());
+        teile.push("Haushaltszuordnung nicht nachgereicht.".to_string());
     }
     for (tabelle, d) in eintraege {
         let Some(wort) = eintrag_wort(tabelle, d) else {
@@ -1760,27 +1864,82 @@ mod tests {
         let liste = liste(&pool, e, alles).await.unwrap();
         let person = liste.iter().find(|l| l.id == p).unwrap();
         assert_eq!(person.antrag_art.as_deref(), Some("person"));
+        let belegung_id = b;
         let belegung = liste.iter().find(|l| l.id == b).unwrap();
         assert!(
             belegung.antrag_art.is_none(),
             "nur lesbar und verwerfbar (K6)"
         );
 
-        // Die offene Meldung kennt der Führer nicht: Die Person geht ohne sie und ohne UHS.
-        let mut conn = pool.acquire().await.unwrap();
-        let zeile = bruch_zeilen(&mut conn, e)
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|z| z.id == p)
-            .unwrap();
+        // Eine offene Meldung ist erst zu stellen oder zu verwerfen.
         let b = BEANTRAGBAR.iter().find(|b| b.art == "person").unwrap();
-        let body = body_der_zeile(&mut conn, e, "einsatz_person", b, &zeile.daten())
+        let body_jetzt = |pool: SqlitePool| async move {
+            let mut conn = pool.acquire().await.unwrap();
+            let zeile = bruch_zeilen(&mut conn, e)
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|z| z.id == p)
+                .unwrap();
+            body_der_zeile(&mut conn, e, "einsatz_person", b, &zeile.daten()).await
+        };
+        assert!(
+            matches!(body_jetzt(pool.clone()).await, Err(AppError::Validation(g)) if g == BEZUG_FEHLT)
+        );
+        // Gestellt, aber noch nicht zurück: Die Person wartet auf sie.
+        sqlx::query(
+            "UPDATE einsatz_bruchstelle SET erledigt = 'nachgereicht' WHERE art = 'meldung'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            matches!(body_jetzt(pool.clone()).await, Err(AppError::Validation(g)) if g == BEZUG_WARTET)
+        );
+        // Verworfen: Die Person geht ohne Meldung und ohne UHS.
+        sqlx::query("UPDATE einsatz_bruchstelle SET erledigt = 'verworfen' WHERE art = 'meldung'")
+            .execute(&pool)
             .await
             .unwrap();
+        let body = body_jetzt(pool.clone()).await.unwrap();
         assert!(body.get("meldung_id").is_none(), "{body}");
         assert!(body.get("uhs_id").is_none(), "{body}");
         assert!(body.get("haushalt_id").is_none(), "{body}");
+        let liste = super::liste(&pool, e, alles).await.unwrap();
+        let belegung = liste.iter().find(|l| l.id == belegung_id).unwrap();
+        assert_eq!(
+            belegung.kurz.as_deref(),
+            Some("Muster"),
+            "die Aufnahme nennt ihre Person"
+        );
+    }
+
+    #[tokio::test]
+    async fn was_nur_auf_eine_person_zeigt_bleibt_eigene_zeile() {
+        let pool = crate::db::test_pool().await;
+        let e = einsatz(&pool).await;
+        gesichert(
+            &pool,
+            e,
+            "einsatz_person",
+            "5",
+            serde_json::json!({"id": 5, "name": "Muster"}),
+        )
+        .await;
+        let schaden = gesichert(
+            &pool,
+            e,
+            "einsatz_schaden",
+            "9",
+            serde_json::json!({"id": 9, "geschaedigt_person_id": 5, "beschreibung": "Pkw"}),
+        )
+        .await;
+        ordnen(&pool, e).await;
+        assert_eq!(
+            folge_von(&pool, schaden).await,
+            None,
+            "sonst verschwände der Schaden mit der gestellten Person"
+        );
     }
 
     #[tokio::test]
@@ -1887,7 +2046,8 @@ mod tests {
     #[test]
     fn nachreich_notiz_nennt_nummer_status_bestaetigung_und_aufhebung() {
         let stil = crate::zeitdarstellung::Zeitstil::VORGABE;
-        let person = serde_json::json!({"registrier_nr": 2, "status": "verstorben"});
+        let person =
+            serde_json::json!({"registrier_nr": 2, "status": "verstorben", "haushalt_id": 4});
         let Value::Object(person) = person else {
             unreachable!()
         };
@@ -1912,7 +2072,8 @@ mod tests {
                 ),
                 (
                     "person_verletzung".into(),
-                    eintrag(serde_json::json!({"zeitpunkt_at": "2026-11-12T09:41:00Z"})),
+                    eintrag(serde_json::json!({"zeitpunkt_at": "2026-11-12T09:41:00Z",
+                        "region": "oberarm_l", "aufgehoben_at": "2026-11-12T09:45:00Z"})),
                 ),
             ],
         );
@@ -1925,6 +2086,14 @@ mod tests {
         assert!(text.contains(" bestätigt von Anna."), "{text}");
         assert!(
             text.contains("Aufgehoben: Maßnahme Blutstillung "),
+            "{text}"
+        );
+        assert!(
+            text.contains("Aufgehoben: Verletzung Oberarm links "),
+            "{text}"
+        );
+        assert!(
+            text.contains("Haushaltszuordnung nicht nachgereicht."),
             "{text}"
         );
 

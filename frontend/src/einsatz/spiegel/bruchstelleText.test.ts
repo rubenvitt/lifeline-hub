@@ -18,6 +18,12 @@ describe('Nicht übernommene Erfassungen (LLH-1646)', () => {
     expect(bruchArtWort({ antrag_art: null, tabelle: 'lage_objekt', kategorie: 'lage' })).toBe(
       'Lagekarte',
     );
+    expect(
+      bruchArtWort({ antrag_art: null, tabelle: 'person_uhs_belegung', kategorie: 'personen' }),
+    ).toBe('UHS-Aufnahme');
+    expect(bruchArtWort({ antrag_art: null, tabelle: 'haushalt', kategorie: 'betreuung' })).toBe(
+      'Haushalt',
+    );
   });
 
   it('zählt Folgezeilen nur, wenn es welche gibt', () => {
