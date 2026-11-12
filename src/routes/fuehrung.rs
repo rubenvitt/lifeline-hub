@@ -371,7 +371,9 @@ async fn akte_des_einsatzes(state: &AppState, einsatz_id: i64) -> Result<AkteZei
     dienst::load_fuer_einsatz(&state.pool, einsatz_id).await
 }
 
-/// GET /api/einsaetze/{id}/fuehrung — Führung des Einsatzes samt Verlauf; wer den Einsatz liest.
+/// GET /api/einsaetze/{id}/fuehrung — Führung des Einsatzes samt Verlauf; jede Person, die den
+/// Einsatz liest. Gerätekonten erreichen die Route nicht (`geraet::darf_route`, Spec
+/// `instanz-fuehrung`, „Den Verlauf der Führung lesen nur Personen“, LLH-1676).
 pub async fn lesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,

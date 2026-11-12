@@ -157,10 +157,12 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
           />
         )}
         {offen && (
+          // Bedienen darf diese Seite nur ein Admin; er darf auch unterschreiben (LLH-1676).
           <FuehrungPaneel
             key={offen.id}
             fuehrung={offen}
             darfBedienen={darfBedienen}
+            darfUnterschreiben={darfBedienen}
             onGeaendert={nachAktion}
             onLaeuft={setLaeuft}
           />
