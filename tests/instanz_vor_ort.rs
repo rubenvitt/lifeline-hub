@@ -655,6 +655,61 @@ async fn gibt_der_fuehrer_an_den_hub_ab_folgt_die_akte_vor_ort() {
     );
 }
 
+#[tokio::test]
+async fn gibt_der_fuehrer_an_den_hub_ab_spiegelt_ein_dort_gekoppeltes_elw_danach_vom_hub() {
+    // Spec `instanz-fuehrung`, „ELW übergibt an den Hub“: ELW 2 ist auch beim Hub gekoppelt.
+    let (hub, elw1, elw2) = hub_und_zwei_elw().await;
+    fuehrung_an(&[&hub, &elw1, &elw2]).await;
+    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    for _ in 0..2 {
+        melden(&elw1).await;
+        abgleichen(&elw1).await;
+        melden(&elw2).await;
+        abgleichen(&elw2).await;
+    }
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let ich_elw1 = kennung_von(&elw1).await;
+    let ich_hub = kennung_von(&hub).await;
+    assert_eq!(fuehrer(&elw2, &k).await, ich_elw1);
+    let (s, v) = common::anfrage_json(
+        &elw1.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &elw1.admin,
+        Some(&json!({"an": ich_hub})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..2 {
+        melden(&elw1).await;
+        abgleichen(&hub).await;
+        melden(&elw2).await;
+        abgleichen(&elw2).await;
+    }
+    assert_eq!(fuehrer(&hub, &k).await, ich_hub);
+    assert_eq!(fuehrer(&elw2, &k).await, ich_hub);
+    let (hinweis, quelle): (Option<String>, Option<String>) =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT s.hinweis, k.gegenueber_kennung FROM einsatz_spiegel s \
+             JOIN einsatz e ON e.id = s.einsatz_id \
+             LEFT JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+             LEFT JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE e.kennung = '{k}'"
+        )))
+        .fetch_one(&elw2.pool)
+        .await
+        .unwrap();
+    assert_eq!(hinweis, None, "kein Hinweis „nicht gekoppelt“");
+    assert_eq!(
+        quelle.as_deref(),
+        Some(ich_hub.as_str()),
+        "der Spiegel kommt vom Hub"
+    );
+}
+
 // ── Ursprungskennung (D5) ────────────────────────────────────────────────────────────────────
 
 /// Hub mit dem Konto „anna“ und dem Fahrzeug „Rotkreuz Nord 1/83-1“, beide ELW beim Hub

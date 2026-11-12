@@ -122,13 +122,18 @@ export default function InstanzkopplungSeite() {
   });
   const reload = () => qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() });
 
+  // `networkMode: 'always'` (Review LLH-1497): im Einsatz-LAN ohne Internet meldet der Browser
+  // womöglich „offline“; Ausstellen, Suchen und Einlösen gehen trotzdem hinaus, statt still zu
+  // pausieren — scheitern sie, sagt es der Fehler.
   const codeAusstellen = useMutation({
+    networkMode: 'always',
     mutationFn: (vorOrt: boolean) => issueKopplungscode(vorOrt),
     onSuccess: (c) => setNeuerCode(c),
   });
   // LAN-Entdeckung (LLH-1497): auf Knopfdruck, die Suche dauert einige Sekunden.
-  const imNetz = useMutation({ mutationFn: searchInstanzenImNetz });
+  const imNetz = useMutation({ networkMode: 'always', mutationFn: searchInstanzenImNetz });
   const einloesen = useMutation({
+    networkMode: 'always',
     mutationFn: (w: { adresse: string; code: string }) => redeemKopplungscode(w.adresse, w.code),
     onSuccess: (k) => {
       void reload();
@@ -213,7 +218,11 @@ export default function InstanzkopplungSeite() {
               <Button
                 type="primary"
                 icon={<IconPlus />}
-                disabled={!u || sperre != null}
+                disabled={
+                  !u ||
+                  sperre != null ||
+                  (codeAusstellen.isPending && codeAusstellen.variables === true)
+                }
                 loading={codeAusstellen.isPending && codeAusstellen.variables === false}
                 onClick={() => codeAusstellen.mutate(false)}
                 data-lfh="instanz-code-ausstellen"
@@ -223,7 +232,11 @@ export default function InstanzkopplungSeite() {
             </Tooltip>
             <Tooltip title={sperreVorOrt ?? VOR_ORT_ERKLAERUNG}>
               <Button
-                disabled={!u || sperreVorOrt != null}
+                disabled={
+                  !u ||
+                  sperreVorOrt != null ||
+                  (codeAusstellen.isPending && codeAusstellen.variables === false)
+                }
                 loading={codeAusstellen.isPending && codeAusstellen.variables === true}
                 onClick={() => codeAusstellen.mutate(true)}
                 data-lfh="instanz-code-vor-ort"
@@ -537,7 +550,10 @@ export default function InstanzkopplungSeite() {
             code: (w.code ?? '').trim(),
           })
         }
-        onFertig={() => setEinloesenOffen(false)}
+        onFertig={() => {
+          imNetz.reset();
+          setEinloesenOffen(false);
+        }}
         onAbbrechen={() => {
           einloesen.reset();
           imNetz.reset();
@@ -904,7 +920,9 @@ function ImNetzGefunden({
           bordered
           style={{ marginBlockStart: 8 }}
           dataSource={antwort.gefunden}
-          rowKey={(g) => g.kennung}
+          // Kennung UND Fingerabdruck: eine fremde Ankündigung unter derselben Kennung ist ein
+          // eigener Eintrag (Review LLH-1497).
+          rowKey={(g) => `${g.kennung}-${g.fingerabdruck}`}
           emptyText="Nichts gefunden"
           renderItem={(g) => {
             const adresse = g.adressen[0];

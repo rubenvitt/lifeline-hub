@@ -203,7 +203,6 @@ Stellvertreter oder Ablehnung):
 | `abbildung::konto_lokal` | Ursprung, sonst Stellvertreter |
 | `antrag` (Konto) | Ursprung, sonst Ablehnung |
 | `antrag` (`AntragZiel::Stammdaten`, heute nur die Einheitsvorlage beim Eintreffen) | Ursprung, sonst leer |
-| `katalog` | Ursprung, sonst bisheriger Ausgang |
 
 **Auf dem Draht**
 - `Zeile.ursprung`: Liste von `{spalte, wert, ursprung}`, `wert` = die ID beim Absender

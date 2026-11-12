@@ -237,12 +237,17 @@ mod art_tests {
             ("src/routes/instanz.rs", "Fluss::Geheimnisse", 1),
             // Verwahrung: anbieten (meldende Seite) und annehmen (erreichte Seite).
             ("src/instanz/spiegel/abgleich.rs", "Fluss::Verwahrung", 2),
+            // Verwahrung auch beim Archiv am Ende der Nachbereitung: es wartet nur auf eine
+            // Standardkopplung, die verwahren kann.
+            ("src/einsatz/archiv.rs", "k.art = 'standard'", 1),
             // Führungswechsel: Bedienung (Übergabe, Code, Anfrage, Notübernahme) und Austausch.
             (
                 "src/instanz/fuehrung/dienst.rs",
                 "Fluss::Fuehrungswechsel",
                 1,
             ),
+            // Beide Wege zum Gegenüber (zum Führer, zu einer genannten Instanz) fragen die Art ab.
+            ("src/instanz/fuehrung/dienst.rs", "fordere_wechsel(&g)?", 2),
             (
                 "src/instanz/fuehrung/austausch.rs",
                 "InstanzKopplungArt::VorOrt",
