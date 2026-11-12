@@ -474,11 +474,16 @@ async fn melden_mit_fehler(
     }
     // Über den Hub (LLH-1495, design.md D2, D4): der Anlass reist zum Hub, unabhängig davon, ob
     // hier jemand gemeint ist; bietet der Hub Push an, pusht diese Instanz nicht selbst.
+    // Ist der Anlass nicht vorgemerkt, erfährt der Hub nichts: dann pusht diese Instanz selbst.
     let ziele = hub_ziele(pool, anlass.einsatz_id).await;
-    if let Err(e) = vormerken_fuer_hub(pool, &ziele, anlass).await {
-        tracing::warn!(einsatz_id = anlass.einsatz_id, fehler = %e, "Hinweis für den Hub nicht vorgemerkt");
-    }
-    let push = !crate::instanz::spiegel::hinweis::pusht_ueber_hub(&ziele);
+    let vorgemerkt = match vormerken_fuer_hub(pool, &ziele, anlass).await {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::warn!(einsatz_id = anlass.einsatz_id, fehler = %e, "Hinweis für den Hub nicht vorgemerkt");
+            false
+        }
+    };
+    let push = !(vorgemerkt && crate::instanz::spiegel::hinweis::pusht_ueber_hub(&ziele));
     let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
     let mit_stufe = mit_stufe(anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids);
     ausliefern(pool, live, anlass, aufgeloest.org_id, &mit_stufe, push).await?;
@@ -512,8 +517,11 @@ async fn vormerken_fuer_hub(
     if ziele.is_empty() {
         return Ok(());
     }
-    let mut conn = pool.acquire().await?;
-    crate::instanz::spiegel::hinweis::vormerken(&mut conn, ziele, anlass).await
+    let mut tx = pool.begin().await?;
+    crate::instanz::spiegel::hinweis::vormerken(&mut tx, ziele, anlass).await?;
+    tx.commit().await?;
+    crate::instanz::spiegel::takt::wecken();
+    Ok(())
 }
 
 /// Je Empfänger seine Stufe: die der Art, für die Stillen `still` (LLH-1143, design.md D2).
@@ -608,14 +616,18 @@ pub async fn erledigen(
     let ziele = hub_ziele(pool, einsatz_id).await;
     if !ziele.is_empty() {
         let vorgemerkt = async {
-            let mut conn = pool.acquire().await?;
+            let mut tx = pool.begin().await?;
             crate::instanz::spiegel::hinweis::vormerken_erledigt(
-                &mut conn, &ziele, einsatz_id, art, typ, ids,
+                &mut tx, &ziele, einsatz_id, art, typ, ids,
             )
-            .await
+            .await?;
+            tx.commit().await
         };
-        if let Err(e) = vorgemerkt.await {
-            tracing::warn!(einsatz_id, fehler = %e, "Erledigt für den Hub nicht vorgemerkt");
+        match vorgemerkt.await {
+            Ok(()) => crate::instanz::spiegel::takt::wecken(),
+            Err(e) => {
+                tracing::warn!(einsatz_id, fehler = %e, "Erledigt für den Hub nicht vorgemerkt")
+            }
         }
     }
     let zeilen = match repo::quittieren_fuer_bezug(pool, einsatz_id, art, typ, ids).await {

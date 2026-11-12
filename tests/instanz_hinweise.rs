@@ -523,3 +523,124 @@ async fn ohne_push_am_hub_bleibt_der_schalter_am_elw() {
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
 }
+
+// ── Nachzüge aus dem Review ─────────────────────────────────────────────────────────────────
+
+/// „Für alle erledigt“ zu einer Zeile, die am Hub noch fehlt, wartet wie der Melde-Anlass; danach
+/// ist der Hinweis am Hub quittiert, nicht 24 Stunden offen.
+#[tokio::test]
+async fn erledigt_wartet_auf_die_zeile_wie_der_hinweis() {
+    let w = welt(false, false).await;
+    let p1 = common::person_anlegen(
+        &w.elw.i.app,
+        &w.elw.i.admin,
+        w.einsatz,
+        r#"{"name":"Eins"}"#,
+    )
+    .await;
+    abgleichen(&w.elw.i).await;
+    let naechste = p1 + 1;
+    benachrichtigung::melden(
+        &w.elw.i.pool,
+        &w.elw.live,
+        Anlass::neu(w.einsatz, Art::Meldung, Bezug::neu(Typ::Person, naechste))
+            .an(Adressat::Nutzer(w.erika_elw)),
+    )
+    .await;
+    benachrichtigung::erledigen(
+        &w.elw.i.pool,
+        &w.elw.live,
+        w.einsatz,
+        Art::Meldung,
+        Typ::Person,
+        &[naechste],
+    )
+    .await;
+    abgleichen(&w.elw.i).await;
+    assert_eq!(ausgang(&w.elw.i).await, 2, "beide zurückgestellt");
+    let p2 = common::person_anlegen(
+        &w.elw.i.app,
+        &w.elw.i.admin,
+        w.einsatz,
+        r#"{"name":"Zwei"}"#,
+    )
+    .await;
+    assert_eq!(p2, naechste);
+    abgleichen(&w.elw.i).await;
+    assert_eq!(ausgang(&w.elw.i).await, 0);
+    let p2_hub = lokale_id_herkunft(&w.hub.i, "einsatz_person", p2).await;
+    let am_hub: Vec<_> = hinweise(&w.hub.i)
+        .await
+        .into_iter()
+        .filter(|h| h.0 == w.erika_hub && h.2 == "meldung" && h.3 == p2_hub)
+        .collect();
+    assert_eq!(am_hub.len(), 1, "{am_hub:?}");
+    assert!(am_hub[0].4, "quittiert");
+}
+
+/// Die Kenntnisnahme reist auch, wenn am ELW keine offene Zeile mehr steht.
+#[tokio::test]
+async fn die_kenntnisnahme_reist_ohne_eigene_offene_zeile() {
+    let w = welt(false, false).await;
+    lifeline_hub::meldung::benachrichtigung::lage_gesehen(
+        &w.elw.i.pool,
+        &w.elw.live,
+        w.einsatz,
+        &[4711],
+    )
+    .await;
+    let daten: String = eine(
+        &w.elw.i.pool,
+        "SELECT daten FROM hinweis_ausgang ORDER BY id DESC LIMIT 1",
+    )
+    .await;
+    let v: Value = serde_json::from_str(&daten).unwrap();
+    assert_eq!(v["erledigen"], true);
+    assert_eq!(v["bezug_typ"], "lage_uebernahme");
+    assert_eq!(v["bezug_ids"], json!([4711]));
+}
+
+/// Scheitert das Vormerken, pusht der ELW selbst: nichts geht still verloren.
+#[tokio::test]
+async fn scheitert_das_vormerken_pusht_der_elw() {
+    let mut w = welt(true, true).await;
+    let am_elw = w.elw.abo(w.erika_elw).await;
+    exec(&w.elw.i.pool, "DROP TABLE hinweis_ausgang").await;
+    aufnahme_an_erika(&w).await;
+    let n = w.elw.push(&am_elw).await;
+    assert_eq!(n["einsatz_id"], w.einsatz);
+}
+
+/// Adressat Einsatzleitung: am Hub die Einsatzleitung des Spiegels.
+#[tokio::test]
+async fn die_einsatzleitung_am_hub_wird_erreicht() {
+    let w = welt(false, false).await;
+    common::rolle_setzen(
+        &w.elw.i.app,
+        &w.elw.i.admin,
+        w.einsatz,
+        w.erika_elw,
+        "einsatzleitung",
+    )
+    .await;
+    abgleichen(&w.elw.i).await;
+    let vorher = hinweise(&w.hub.i).await.len();
+    benachrichtigung::melden(
+        &w.elw.i.pool,
+        &w.elw.live,
+        Anlass::neu(
+            w.einsatz,
+            Art::Lagebericht,
+            Bezug::neu(Typ::Einsatz, w.einsatz),
+        )
+        .an(Adressat::Einsatzleitung),
+    )
+    .await;
+    abgleichen(&w.elw.i).await;
+    let neu: Vec<_> = hinweise(&w.hub.i).await.into_iter().skip(vorher).collect();
+    assert!(
+        neu.iter()
+            .any(|h| h.0 == w.erika_hub && h.2 == "lagebericht"),
+        "{neu:?}"
+    );
+}

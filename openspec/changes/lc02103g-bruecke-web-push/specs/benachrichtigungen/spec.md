@@ -8,8 +8,8 @@ Führt ein gekoppelter ELW einen Einsatz, den ein Hub spiegelt und der Hinweise 
 jeder Anlass einer Benachrichtigung dort auch am Hub ankommen. Der Hub MUST die Empfänger nach
 denselben Regeln wie für eigene Einsätze aus seinem Spiegel bestimmen und eigene
 Benachrichtigungen anlegen, mit Live-Ereignis und Web Push. Der Auslöser MUST NOT einen Hinweis
-erhalten, ein Konto, das nur am ELW besteht, MUST NOT einen am Hub erhalten. Am ELW MUST sich
-nichts ändern.
+erhalten, ein Konto, das nur am ELW besteht, MUST NOT einen am Hub erhalten. Hinweise und
+Live-Ereignisse am ELW MUST bleiben, wie sie sind.
 
 #### Scenario: Sofortmeldung am ELW
 - **WHEN** am ELW eine Sofortmeldung an die Einsatzleitung eingeht und Person A am Hub als Einsatzleitung Mitglied des gespiegelten Einsatzes ist
@@ -35,7 +35,7 @@ nichts ändern.
 
 Ein Anlass MUST am Hub höchstens einmal zu Benachrichtigungen führen, auch wenn der Abgleich ihn
 mehrfach überträgt. Kommt ein Anlass erst an, wenn sein Objekt am Hub noch fehlt, MUST der Hub
-ihn zurückstellen, bis das Objekt da ist. Ist ein Anlass älter als 12 Stunden, wenn der Hub ihn
+ihn zurückstellen, bis das Objekt da ist; das gilt auch für „für alle erledigt“. Ist ein Anlass älter als 12 Stunden, wenn der Hub ihn
 annehmen könnte, MUST der Hub ihn verwerfen.
 
 #### Scenario: Abgleich wiederholt

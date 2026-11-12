@@ -136,9 +136,10 @@ pub struct Ziel {
     pub web_push: bool,
 }
 
-/// Wohin die Hinweise dieses Einsatzes reisen (D4): nur ein Einsatz, den diese Instanz führt, und
-/// nur zu einer aktiven Kopplung, die sich meldet und Hinweise annimmt, mit nicht widerrufener
-/// Zuordnung seiner Org.
+/// Wohin die Hinweise dieses Einsatzes reisen (D4): nur ein Einsatz, den diese Instanz führt und
+/// liefert (ohne Demo-Einsatz und ohne einen zum Abräumen vorgemerkten, wie
+/// [`super::liefern`]), und nur zu einer aktiven Kopplung, die sich meldet und Hinweise annimmt,
+/// mit nicht widerrufener Zuordnung seiner Org. Was nicht geliefert wird, käme am Hub nie an.
 pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Ziel>, sqlx::Error> {
     sqlx::query_as(
         "SELECT o.id AS kopplung_org_id, k.gegenueber_web_push AS web_push \
@@ -147,6 +148,8 @@ pub async fn ziele(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Vec<Z
          JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE e.id = ? AND e.spiegel = 0 AND k.richtung = 'meldet_sich' \
            AND k.zustand = 'aktiv' AND k.gegenueber_hinweise = 1 \
+           AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id) \
          ORDER BY o.id",
     )
     .bind(einsatz_id)
@@ -202,7 +205,8 @@ async fn schreiben(
     Ok(())
 }
 
-/// Merkt einen gemeldeten Anlass für die erreichte Seite vor (D2) und weckt den Abgleich.
+/// Merkt einen gemeldeten Anlass für die erreichte Seite vor (D2). In einer Transaktion des
+/// Aufrufers, damit er alle Ziele trifft oder keines; danach [`super::takt::wecken`].
 pub async fn vormerken(
     conn: &mut SqliteConnection,
     ziele: &[Ziel],
@@ -226,12 +230,11 @@ pub async fn vormerken(
         einheit_id: anlass.einheit_id,
         durch_einheit_id: anlass.durch_einheit_id,
     };
-    schreiben(conn, ziele, anlass.einsatz_id, &daten).await?;
-    super::takt::wecken();
-    Ok(())
+    schreiben(conn, ziele, anlass.einsatz_id, &daten).await
 }
 
-/// Merkt „für alle erledigt“ für die erreichte Seite vor (D5).
+/// Merkt „für alle erledigt“ für die erreichte Seite vor (D5); Transaktion und Wecken wie bei
+/// [`vormerken`].
 pub async fn vormerken_erledigt(
     conn: &mut SqliteConnection,
     ziele: &[Ziel],
@@ -256,7 +259,6 @@ pub async fn vormerken_erledigt(
         };
         schreiben(conn, ziele, einsatz_id, &daten).await?;
     }
-    super::takt::wecken();
     Ok(())
 }
 
@@ -455,6 +457,31 @@ pub const fn bezug_tabelle(typ: BenachrichtigungBezugTyp) -> Option<&'static str
     }
 }
 
+/// Lokale Kennungen gespiegelter Zeilen, fremd → lokal, in einer Abfrage (`src/AGENTS.md`,
+/// Eingabegrenzen: ID-Listen mit einer von N unabhängigen Zahl von Anweisungen).
+async fn zeilen_lokal(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    tabelle: &str,
+    fremd: &[i64],
+) -> Result<std::collections::HashMap<i64, i64>, sqlx::Error> {
+    let schluessel: Vec<String> = fremd.iter().map(i64::to_string).collect();
+    let zeilen: Vec<(String, String)> = sqlx::query_as(
+        "SELECT fremder_schluessel, lokaler_schluessel FROM spiegel_herkunft \
+         WHERE einsatz_id = ? AND art = ? \
+           AND fremder_schluessel IN (SELECT value FROM json_each(?))",
+    )
+    .bind(einsatz_id)
+    .bind(tabelle)
+    .bind(serde_json::to_string(&schluessel).expect("Schlüssel serialisierbar"))
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .filter_map(|(f, l)| Some((f.parse().ok()?, l.parse().ok()?)))
+        .collect())
+}
+
 /// Lokale Kennung einer gespiegelten Zeile.
 async fn zeile_lokal(
     conn: &mut SqliteConnection,
@@ -562,6 +589,10 @@ async fn abbilden(
     ) else {
         return Ok(Abgebildet::Unbrauchbar);
     };
+    // Einen Alarm quittiert jeder selbst, auch am Hub (Spec „Für alle erledigt gilt auch am Hub“).
+    if h.erledigen && art.stufe() == crate::benachrichtigung::BenachrichtigungStufe::Alarm {
+        return Ok(Abgebildet::Unbrauchbar);
+    }
     if h.bezug_ids.is_empty()
         || h.bezug_ids.len() > BEZUEGE_MAX
         || (!h.erledigen && h.bezug_ids.len() != 1)
@@ -574,7 +605,8 @@ async fn abbilden(
     let einsatz: Option<(i64, i64)> = sqlx::query_as(
         "SELECT e.id, e.org_id FROM einsatz_spiegel s JOIN einsatz e ON e.id = s.einsatz_id \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-         WHERE s.fremde_kennung = ? AND o.kopplung_id = ? AND e.spiegel = 1",
+         WHERE s.fremde_kennung = ? AND o.kopplung_id = ? AND o.widerrufen_at IS NULL \
+           AND e.spiegel = 1",
     )
     .bind(&h.kennung)
     .bind(kopplung.id)
@@ -591,11 +623,12 @@ async fn abbilden(
         // Einsatz und Lagebesprechung tragen die Einsatzkennung.
         None => ids.extend(std::iter::repeat_n(einsatz_id, h.bezug_ids.len())),
         Some(tabelle) => {
-            for &fremd in &h.bezug_ids {
-                match zeile_lokal(conn, einsatz_id, tabelle, fremd).await? {
-                    Some(id) => ids.push(id),
-                    // Erledigen: was hier nie ankam, hat auch keinen Hinweis.
-                    None if h.erledigen => {}
+            let lokal = zeilen_lokal(conn, einsatz_id, tabelle, &h.bezug_ids).await?;
+            for fremd in &h.bezug_ids {
+                match lokal.get(fremd) {
+                    Some(&id) => ids.push(id),
+                    // Auch beim Erledigen zurückstellen: ein älterer Melde-Anlass zu dieser Zeile
+                    // kann noch warten und legte sonst danach einen offenen Hinweis an.
                     None => return Ok(Abgebildet::Fehlt),
                 }
             }
@@ -956,6 +989,57 @@ mod tests {
         // 1 und 3 sind unbrauchbar (quittiert, nichts gemeldet); 2 wartet auf den Spiegel.
         assert_eq!(quittungen, vec![1, 3]);
         assert!(folgen.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ein_demo_einsatz_hat_kein_ziel() {
+        let pool = crate::db::test_pool().await;
+        kopplung(&pool, "meldet_sich").await;
+        let e = einsatz(&pool).await;
+        sqlx::query("INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (1, ?, '{}')")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(ziele_von(&pool, e).await.is_empty(), "wird nicht geliefert");
+    }
+
+    #[tokio::test]
+    async fn alt_alarm_erledigt_und_widerrufen() {
+        let pool = crate::db::test_pool().await;
+        let k = kopplung(&pool, "wird_gemeldet").await;
+        let e = einsatz(&pool).await;
+        crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e).await;
+        sqlx::query("UPDATE einsatz_spiegel SET fremde_kennung = 'elw/1', kopplung_org_id = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let mut alt = hinweis(1, "einsatz_neu");
+        alt.erstellt_at =
+            crate::zeit::formatiere_utc(Utc::now() - Duration::hours(NACHREICHEN_STUNDEN + 1));
+        let mut alarm = hinweis(2, "sofortmeldung");
+        alarm.erledigen = true;
+        let (q, f) = annehmen(&mut conn, &k, &[alt, alarm], Utc::now())
+            .await
+            .unwrap();
+        assert_eq!(q, vec![1, 2], "zu alt und Alarm-Erledigt: quittiert");
+        assert!(f.is_empty(), "nichts gemeldet, kein Alarm quittiert");
+        let (q, f) = annehmen(&mut conn, &k, &[hinweis(3, "einsatz_neu")], Utc::now())
+            .await
+            .unwrap();
+        assert_eq!((q, f.len()), (vec![3], 1), "der Spiegel ist bekannt");
+        sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-12T00:00:00Z'")
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        let (q, f) = annehmen(&mut conn, &k, &[hinweis(4, "einsatz_neu")], Utc::now())
+            .await
+            .unwrap();
+        assert!(
+            q.is_empty() && f.is_empty(),
+            "widerrufene Org: nicht angenommen"
+        );
     }
 
     #[test]

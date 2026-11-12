@@ -206,8 +206,10 @@ const GESEHENE_UEBERNAHMEN_SQL: &str = "SELECT b.bezug_id FROM benachrichtigung 
        AND b.quittiert_at IS NULL AND m.lage_gesehen_at IS NOT NULL";
 
 /// Nach einer Kenntnisnahme in der Lage-Sicht (einzeln oder alle): die Übernahme-Hinweise der
-/// gesehenen Lagemeldungen sind für alle erledigt (design.md E6).
-pub async fn lage_gesehen(pool: &SqlitePool, live: &LiveHub, einsatz_id: i64) {
+/// gesehenen Lagemeldungen sind für alle erledigt (design.md E6). `gesehen` sind die Meldungen
+/// dieser Kenntnisnahme: sie reisen auch dann zum Hub, wenn hier keine offene Zeile mehr steht
+/// (LLH-1495, design.md D5).
+pub async fn lage_gesehen(pool: &SqlitePool, live: &LiveHub, einsatz_id: i64, gesehen: &[i64]) {
     let ids: Vec<i64> = match sqlx::query_scalar(GESEHENE_UEBERNAHMEN_SQL)
         .bind(einsatz_id)
         .fetch_all(pool)
@@ -219,6 +221,10 @@ pub async fn lage_gesehen(pool: &SqlitePool, live: &LiveHub, einsatz_id: i64) {
             return;
         }
     };
+    let mut ids = ids;
+    ids.extend_from_slice(gesehen);
+    ids.sort_unstable();
+    ids.dedup();
     erledigen(
         pool,
         live,

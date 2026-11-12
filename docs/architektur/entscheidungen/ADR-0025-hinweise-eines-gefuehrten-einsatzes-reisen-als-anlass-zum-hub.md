@@ -21,12 +21,13 @@ herleitung:
   dessen Org aktiv mit einer Instanz gekoppelt ist, die Hinweise annimmt, den Anlass vor
   (`instanz::spiegel::hinweis`). Der Anlass reist, nie die aufgelösten Empfänger: die erreichte
   Seite bestimmt sie nach ihren eigenen Regeln.
-- MUST: Die erreichte Seite nimmt einen Anlass erst an, wenn sein Einsatz und seine Zeilen im
-  Spiegel stehen, höchstens einmal je Kennung, und verwirft ihn nach 12 Stunden oder mit
-  unbekannten Werten.
-- MUST: Eine Instanz pusht für einen Einsatz nicht selbst, wenn sie ihn führt und eine solche
-  Kopplung zusätzlich Web Push anbietet (`hinweis::pusht_ueber_hub`). In jedem anderen Fall pusht
-  sie wie ohne Kopplung.
+- MUST: Die erreichte Seite nimmt einen Anlass (auch „für alle erledigt“) erst an, wenn sein
+  Einsatz und seine Zeilen im Spiegel stehen, höchstens einmal je Kennung und Inhalt (eine aus
+  der Sicherung zurückgekehrte Gegenseite vergibt Kennungen neu), und verwirft ihn nach 12
+  Stunden, mit unbekannten Werten oder als Erledigen eines Alarms.
+- MUST: Eine Instanz pusht für einen Einsatz nicht selbst, wenn sie ihn führt, der Anlass
+  vorgemerkt ist und eine solche Kopplung zusätzlich Web Push anbietet
+  (`hinweis::pusht_ueber_hub`). In jedem anderen Fall pusht sie wie ohne Kopplung.
 - MUST NOT: Benachrichtigungen oder Abos werden gespiegelt; jede Instanz führt ihre eigenen.
 - MUST NOT: Ein neues Abo wird an einer Instanz angenommen, deren Nutzer über den Hub gepusht
   werden; bestehende bleiben gespeichert.

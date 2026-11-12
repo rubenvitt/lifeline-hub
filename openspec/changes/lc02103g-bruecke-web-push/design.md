@@ -59,8 +59,9 @@ Einsatz.
 ### D2 Ausgang am ELW, Eingang am Hub
 
 - **ELW:** `melden` schreibt nach dem Commit zusätzlich eine Zeile in `hinweis_ausgang`, wenn der
-  Einsatz hier geführt wird (`spiegel = 0`) und seine Org aktiv mit einer Instanz gekoppelt ist,
-  die Hinweise annimmt (D4). Die Zeile trägt `kopplung_org_id`, Einsatz, die Anlass-Felder als
+  Einsatz hier geführt und geliefert wird (`spiegel = 0`, kein Demo-Einsatz, nicht zum Abräumen
+  vorgemerkt, wie `liefern`) und seine Org aktiv mit einer Instanz gekoppelt ist, die Hinweise
+  annimmt (D4). Alle Ziele in einer Transaktion; scheitert sie, pusht der ELW selbst. Die Zeile trägt `kopplung_org_id`, Einsatz, die Anlass-Felder als
   JSON und `erstellt_at`. Danach `spiegel::takt::wecken()`, damit der Hinweis nicht auf den Takt
   wartet. Der Ausgang entsteht unabhängig davon, ob der ELW selbst Empfänger findet: Am Hub kann
   jemand gemeint sein, den es am ELW nicht gibt.
@@ -128,8 +129,11 @@ Einsatz.
 ### D5 Für alle erledigt reist mit
 
 `benachrichtigung::erledigen` schreibt unter derselben Bedingung einen Ausgang mit
-`erledigen = true` (Art, Bezugstyp, eine Zeile je Kennung). Der Hub ruft `erledigen` mit den
-abgebildeten Kennungen. So verschwindet ein „Neue Meldung“ am Hub, wenn die Meldung am ELW
+`erledigen = true` (Art, Bezugstyp, die Kennungen). Der Hub ruft `erledigen` mit den
+abgebildeten Kennungen. Fehlt eine Zeile noch, stellt er auch das Erledigen zurück: ein älterer
+Melde-Anlass zu ihr kann noch warten und legte danach sonst einen offenen Hinweis an. Ein
+Erledigen eines Alarms verwirft er. Die Kenntnisnahme in der Lage reicht die gesehenen Meldungen
+mit, auch wenn am ELW keine offene Zeile mehr zu ihnen steht. So verschwindet ein „Neue Meldung“ am Hub, wenn die Meldung am ELW
 gesichtet wird, statt 24 Stunden stehen zu bleiben.
 
 ### D6 umadressieren reist nicht

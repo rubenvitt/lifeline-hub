@@ -1070,7 +1070,10 @@ mod tests {
         .fetch_all(&pool)
         .await
         .unwrap();
-        assert!(uebrig.is_empty(), "beide alten abgeräumt: {uebrig:?} von {alte:?}");
+        assert!(
+            uebrig.is_empty(),
+            "beide alten abgeräumt: {uebrig:?} von {alte:?}"
+        );
         let log = puffer.text();
         assert!(
             !log.contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
