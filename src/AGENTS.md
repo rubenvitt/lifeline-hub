@@ -468,21 +468,27 @@ Herleitung in
     und erst ihre Quittung `angenommen` merkt den Einsatz der meldenden Seite zum Abräumen vor.
     **Ein Einsatz verlässt eine Instanz nur über `einsatz::abraeumen`** (Merker
     `einsatz_abraeumen` in der beschließenden Transaktion, Löschen nach dem Commit, Phase R holt
-    nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll und den Löschvermerk der
-    Kennung (unten). Nachweis: `tests/instanz_lebensende.rs`.
-  - **Akten ohne Spiegel (LLH-1699)**, Spec `instanz-fuehrung`, Herleitung
+    nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
+    `tests/instanz_lebensende.rs`.
+  - **Akten ohne Spiegel (LLH-1699)**, Spec `instanz-fuehrung`,
+    [ADR-0031](../docs/architektur/entscheidungen/ADR-0031-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md),
+    Herleitung
     `openspec/changes/archive/2026-11-12-h7shm5au-loeschsignal-spiegellose-akten/design.md`
     (D1–D5): Wer eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung in
-    `SpiegelPaket.akten` (`fuehrung::repo::list_ohne_spiegel`; die erreichte Seite nur Akten, die
-    das Gegenüber führt). `geloescht` dafür belegt allein `lebensende::geloeschte_akten`:
-    Löschvermerk (`fuehrung_loeschvermerk`) oder eigenes Präfix im Löschprotokoll, und hier weder
-    Einsatz noch Akte mit der Kennung; nie „kenne ich nicht“. **Ein neuer Weg, auf dem ein
-    Einsatz mit Kennung endet, ruft `fuehrung::loeschvermerk::vermerken_einsatz` in seiner
-    Transaktion; eine Akte ohne Einsatz löscht nur `fuehrung::repo::delete_ohne_spiegel`** (schreibt
-    den Vermerk: Signal, Widerruf). Die erreichte Seite nimmt das Signal nur vom Führer der Akte
-    an (`lebensende::geloeschte_akten_uebernehmen`). Der Weg über die Stände bleibt, wie er ist
-    (Spiegel mit fremdem Präfix: LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt
-    „Akten ohne Spiegel“.
+    `SpiegelPaket.akten` (`fuehrung::repo::list_ohne_spiegel`). `geloescht` dafür belegt allein
+    `lebensende::geloeschte_akten`: Löschvermerk (`fuehrung_loeschvermerk`) oder, für ältere
+    Löschungen, eigenes Präfix im Löschprotokoll, und hier weder Einsatz noch Akte mit der
+    Kennung; nie „kenne ich nicht“. **Wo ein Einsatz mit Kennung endet, entsteht in derselben
+    Transaktion der Vermerk** (`fuehrung::loeschvermerk::vermerken_einsatz`): Skelett-Löschung,
+    Abräumen eines verwahrten Einsatzes, `geloescht` des Führers an einem Spiegel
+    (`lebensende::geloescht_uebernehmen`); nicht, wenn die meldende Seite einen Spiegel nach der
+    Nachbereitung abräumt. **Eine Akte ohne Einsatz löscht nur
+    `fuehrung::repo::delete_ohne_spiegel`** (schreibt den Vermerk: Signal, Widerruf). Wem eine
+    Seite die Akte nennt und von wem sie das Signal annimmt, sagt eine Regel für beides:
+    `fuehrung::repo::ist_frage_an_gegenueber` (der Führer der Akte; die meldende Seite auch ihr
+    einziger Hub). Genannte Kennungen sind auf `paket::KENNUNG_BYTES_MAX` Byte begrenzt und gehen
+    vom Paket-Budget ab. Der Weg über die Stände bleibt, wie er ist (Spiegel mit fremdem Präfix:
+    LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt „Akten ohne Spiegel“.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
@@ -790,7 +796,8 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Org-Einstellung `skelett_dauer_tage` (ab Abschluss, frühestens die Schwärzung) abgelaufen ist;
   ohne Einstellung bleibt das Skelett. Einzige Spur ist `aufbewahrung_loeschprotokoll` (keine
   Bezeichnung, kein Ort, kein ETB-Text), geschrieben in derselben Transaktion, Akteur
-  fail-closed wie beim Purge-Audit. Erstmaliges Setzen und Verkürzen der Frist ohne
+  fail-closed wie beim Purge-Audit; trug der Einsatz eine Kennung, dazu ihr Löschvermerk
+  (`fuehrung_loeschvermerk`, LLH-1699: nur die Kennung, s. „Instanzkopplung“, Akten ohne Spiegel). Erstmaliges Setzen und Verkürzen der Frist ohne
   `skelett_dauer_bestaetigt` → 409. Das Protokoll sperrt ID und Einsatznummer
   (`einsatz::repo::anlegen_tx`). Herleitung:
   `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`.

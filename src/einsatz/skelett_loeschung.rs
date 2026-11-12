@@ -6,6 +6,9 @@
 //! abhängigen Zeilen gelöscht — die Kaskade auf `einsatz(id)` nimmt ETB, Register und Anhänge
 //! mit. Seine einzige Spur ist danach eine Zeile in `aufbewahrung_loeschprotokoll`: Nummer,
 //! Zeitpunkte, angewandte Frist und Akteur, keine Bezeichnung, kein Ortsbezug, kein ETB-Text.
+//! Trug er eine Kennung für gekoppelte Instanzen, bleibt dazu ihr Löschvermerk
+//! (`instanz::fuehrung::loeschvermerk`, LLH-1699): nur die Kennung, damit ein Gegenüber seine
+//! Führungsakte ohne Spiegel verliert.
 //!
 //! **Fail-closed wie der übrige Purge-Audit:** ohne Akteur (abschließende Person →
 //! Einsatzleitung → System-Admin der Org) keine Löschung; der nächste Lauf versucht es erneut.

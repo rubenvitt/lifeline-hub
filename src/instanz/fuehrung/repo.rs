@@ -162,10 +162,10 @@ pub async fn list_fremde_der_org(
 
 /// Kennungen der Akten ohne lokalen Einsatz, nach deren Ende diese Instanz das Gegenüber einer
 /// Kopplung fragt (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`, D2): nur bei
-/// eingeschalteter Führung und nur Akten einer Org, die der Kopplung aktiv zugeordnet ist. Die
-/// meldende Seite nennt alle, denn die erreichte reicht auch Akten Dritter weiter und kann ihr
-/// Ende belegen; die erreichte Seite nennt nur Akten, die das Gegenüber führt, denn nur dessen
-/// Meldung nimmt sie an ([`delete_ohne_spiegel`] über `spiegel::lebensende`).
+/// eingeschalteter Führung und nur Akten einer Org, die der Kopplung aktiv zugeordnet ist. Welche
+/// davon, sagt [`ist_frage_an_gegenueber`]: dieselbe Regel, nach der `spiegel::lebensende` die
+/// Antwort annimmt. Kennungen über `KENNUNG_BYTES_MAX` Byte bleiben ungenannt: Sie kämen nur von
+/// einer fehlerhaften Instanz und sprengten das Paket.
 pub async fn list_ohne_spiegel(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -175,19 +175,50 @@ pub async fn list_ohne_spiegel(
     if !is_enabled_tx(conn).await? {
         return Ok(Vec::new());
     }
-    Ok(sqlx::query_scalar(
-        "SELECT f.kennung FROM einsatz_fuehrung f \
+    let akten: Vec<(String, i64, String)> = sqlx::query_as(
+        "SELECT f.kennung, f.org_id, f.fuehrer_kennung FROM einsatz_fuehrung f \
          WHERE f.einsatz_id IS NULL \
            AND f.org_id IN (SELECT o.org_id FROM instanz_kopplung_org o \
                             WHERE o.kopplung_id = ?1 AND o.widerrufen_at IS NULL) \
-           AND (?2 OR f.fuehrer_kennung = ?3) \
+           AND length(CAST(f.kennung AS BLOB)) <= ?2 \
          ORDER BY f.id",
     )
     .bind(kopplung_id)
-    .bind(richtung == InstanzKopplungRichtung::MeldetSich)
-    .bind(gegenueber_kennung)
+    .bind(crate::instanz::spiegel::paket::KENNUNG_BYTES_MAX as i64)
     .fetch_all(&mut *conn)
-    .await?)
+    .await?;
+    let mut hubs_je_org: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+    let mut kennungen = Vec::new();
+    for (kennung, org_id, fuehrer) in akten {
+        let hubs = match hubs_je_org.get(&org_id) {
+            Some(n) => *n,
+            None => {
+                let n = list_hubs(conn, org_id).await?.len();
+                hubs_je_org.insert(org_id, n);
+                n
+            }
+        };
+        if ist_frage_an_gegenueber(richtung, &fuehrer, gegenueber_kennung, hubs) {
+            kennungen.push(kennung);
+        }
+    }
+    Ok(kennungen)
+}
+
+/// Ob das Gegenüber einer Kopplung über das Ende einer Akte ohne Spiegel entscheidet, die
+/// `fuehrer` führt (LLH-1699, D2, D3). Gefragt und geglaubt wird immer der Führer der Akte selbst.
+/// Darüber hinaus glaubt nur die meldende Seite ihrer erreichten auch für Akten Dritter, die
+/// diese weiterreicht, und nur, solange die Org an keinem zweiten Hub hängt (`hubs` aus
+/// [`list_hubs`]): Sonst nähme ein Hub ihr eine Akte, die sie über den anderen weiter erreicht,
+/// etwa nach dessen Widerruf gegen den Führer. Die erreichte Seite glaubt einer meldenden nie für
+/// die Akte einer anderen.
+pub fn ist_frage_an_gegenueber(
+    richtung: InstanzKopplungRichtung,
+    fuehrer: &str,
+    gegenueber_kennung: &str,
+    hubs: usize,
+) -> bool {
+    fuehrer == gegenueber_kennung || (richtung == InstanzKopplungRichtung::MeldetSich && hubs <= 1)
 }
 
 /// Löscht eine Akte ohne lokalen Einsatz samt Verlauf (Kaskade) und vermerkt ihr Ende
@@ -1237,6 +1268,40 @@ pub(crate) mod tests {
             vec!["hub/5-aa"],
             "die erreichte Seite nennt nur Akten, die das Gegenüber führt"
         );
+        // Eine überlange Kennung (nur von einer fehlerhaften Instanz) bleibt ungenannt: Sie
+        // sprengte das Paket.
+        let lang = format!("hub/{}", "ä".repeat(120));
+        fremde_akte(&pool, &lang).await;
+        assert_eq!(
+            genannt(&pool, InstanzKopplungRichtung::MeldetSich).await,
+            vec!["hub/5-aa", "elw2/9-bb"]
+        );
+        // Hängt die Org an einem zweiten Hub, nennt die meldende Seite einem Hub nur noch die
+        // Akten, die er selbst führt.
+        sqlx::query(
+            "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand) \
+             VALUES (2, 'hub2', 's2', 'Hub 2', 'meldet_sich', 'http://127.0.0.1:2', 'aktiv')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (2, 1, 'hub2/1', 'Hub-2-Org')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            genannt(&pool, InstanzKopplungRichtung::MeldetSich).await,
+            vec!["hub/5-aa"],
+            "an zwei Hubs nur die Akten des gefragten Hubs"
+        );
+        sqlx::query("DELETE FROM instanz_kopplung WHERE id = 2")
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-10 10:00:00'")
             .execute(&pool)
             .await
@@ -1247,6 +1312,19 @@ pub(crate) mod tests {
                 .is_empty(),
             "widerrufene Zuordnung"
         );
+    }
+
+    #[test]
+    fn ueber_das_ende_einer_akte_entscheidet_ihr_fuehrer_oder_der_einzige_hub() {
+        use InstanzKopplungRichtung::{MeldetSich, WirdGemeldet};
+        // Der Führer selbst, in jeder Richtung und bei jeder Zahl von Hubs.
+        assert!(ist_frage_an_gegenueber(WirdGemeldet, "elw1", "elw1", 0));
+        assert!(ist_frage_an_gegenueber(MeldetSich, "hub", "hub", 2));
+        // Akte eines Dritten: nur die meldende Seite, nur mit einem Hub.
+        assert!(ist_frage_an_gegenueber(MeldetSich, "elw2", "hub", 1));
+        assert!(!ist_frage_an_gegenueber(MeldetSich, "elw2", "hub", 2));
+        assert!(!ist_frage_an_gegenueber(WirdGemeldet, "elw2", "elw1", 0));
+        assert!(!ist_frage_an_gegenueber(WirdGemeldet, "elw2", "elw1", 1));
     }
 
     #[tokio::test]

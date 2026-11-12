@@ -174,6 +174,13 @@ async fn eigene_akten(
     ))
 }
 
+/// Platz, den die genannten Akten im Paket belegen (JSON: Kennung, Anführungszeichen, Komma). Er
+/// geht wie die Anträge vom Budget der Zeilen ab; mit [`EINSAETZE_MAX`] Kennungen zu höchstens
+/// `KENNUNG_BYTES_MAX` Byte bleibt er unter 64 KiB.
+fn akten_bytes(akten: &[String]) -> usize {
+    akten.iter().map(|k| k.len() + 3).sum()
+}
+
 /// Höchstens [`EINSAETZE_MAX`] Akten je Paket. Sind es mehr, rückt die Auswahl je Abgleich um ein
 /// ganzes Paket weiter: Über alle Runden kommt jede Akte dran, auch wenn keine je endet.
 fn auswahl_akten(mut alle: Vec<String>, runde: usize) -> Vec<String> {
@@ -508,7 +515,7 @@ pub async fn handle_abgleich(
         // Anträge stehen vorn (D8) und zählen ins Budget.
         let (antraege, antrag_bytes) =
             super::antrag::offene_antraege(conn, kopplung.id, false).await?;
-        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
+        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes - akten_bytes(&akten));
         let lieferungen = liefere_alle(conn, eigen, kopplung, &orgs, &staende, &mut budget).await?;
         let anhang_teile =
             super::anhang::liefere_teile(conn, kopplung.id, &anfrage.abrufe, budget.bytes).await?;
@@ -593,7 +600,8 @@ pub async fn abgleich_einmal(
             // Anträge stehen vorn (D8) und zählen ins Budget.
             let (antraege, antrag_bytes) =
                 super::antrag::offene_antraege(conn, kopplung.id, true).await?;
-            let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
+            let mut budget =
+                Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes - akten_bytes(&akten));
             let lieferungen =
                 liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
             let anhang_teile =

@@ -155,6 +155,35 @@ async fn abraeumen_vermerkt_das_ende_der_kennung() {
     assert_eq!(vermerke, vec![("ich/5-ab12cd34".to_string(), 1)]);
 }
 
+/// Ein Spiegel, den diese Instanz nach der Nachbereitung abräumt, lebt beim Führer weiter: Das
+/// Abräumen vermerkt kein Ende (meldet der Führer ihn gelöscht, vermerkt das
+/// `spiegel::lebensende::geloescht_uebernehmen`).
+#[tokio::test]
+async fn ein_abgeraeumter_spiegel_bekommt_vom_abraeumen_keinen_vermerk() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let (id, _) = einsatz(&pool, leit).await;
+    sqlx::query("UPDATE einsatz SET kennung = 'hub/9-ab12cd34' WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, id).await;
+
+    vormerken_pool(&pool, id, AbraeumArt::Spiegel, Some("Hub Kreis")).await;
+    assert!(ausfuehren(&pool, id).await.unwrap());
+
+    assert_eq!(
+        zaehle(&pool, "SELECT COUNT(*) FROM einsatz WHERE id = ?", id).await,
+        0
+    );
+    let vermerke: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fuehrung_loeschvermerk")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(vermerke, 0);
+}
+
 #[tokio::test]
 async fn spiegel_geht_durch_den_schutz_und_traegt_keine_nummer() {
     let pool = crate::db::test_pool().await;

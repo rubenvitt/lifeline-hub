@@ -4346,6 +4346,36 @@ async fn zwei_elw_loescht_die_eine_verliert_auch_die_andere_die_akte_ueber_den_h
     assert!(beim_gegenueber(&elw2).await.is_empty(), "dann ELW 2");
 }
 
+/// Der Hub spiegelt den Einsatz der „ELW 1“, „ELW 2“ kennt ihn nur als Akte. Löscht „ELW 1“ ihn,
+/// räumt der Hub seinen Spiegel ab und hält das Ende fest; „ELW 2“ verliert die Akte.
+#[tokio::test]
+async fn zwei_elw_loescht_die_eine_einen_am_hub_gespiegelten_einsatz_verliert_die_andere_die_akte()
+{
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let e = common::einsatz_anlegen(&elw1.app, &elw1.admin).await;
+    elw_meldet(&elw1).await;
+    abschliessen(&elw1, e).await;
+    elw_meldet(&elw1).await;
+    let k: String = sqlx::query_scalar("SELECT kennung FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&elw1.pool)
+        .await
+        .unwrap();
+    assert!(hat_spiegel(&hub, &k).await, "am Hub gespiegelt");
+    elw_meldet(&elw2).await;
+    assert_eq!(beim_gegenueber(&elw2).await, vec![k.clone()]);
+    assert!(!hat_spiegel(&elw2, &k).await);
+
+    endgueltig_loeschen(&elw1, e).await;
+    abgleichen(&elw1).await;
+    assert!(!hat_spiegel(&hub, &k).await, "Spiegel am Hub abgeräumt");
+    assert!(vermerkt(&hub, &k).await);
+    abgleichen(&elw2).await;
+
+    assert!(beim_gegenueber(&elw2).await.is_empty());
+}
+
 /// Der Hub übernimmt einen Einsatz der „ELW 1“ zur Verwahrung und löscht ihn später endgültig.
 /// Die Kennung beginnt mit der der ELW 1; den Beleg für „ELW 2“ trägt der Löschvermerk.
 #[tokio::test]

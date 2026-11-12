@@ -8,7 +8,8 @@ use serde_json::Value;
 /// Größte Anfrage und größte Antwort des Abgleichs.
 pub const SPIEGEL_MAX: usize = 2 * 1024 * 1024;
 /// Platz für Hülle, Stände, Anträge, Quittungen und Hinweise (höchstens
-/// [`super::hinweis::HINWEISE_BYTES_MAX`]) neben den Zeilen; die Zeilen bekommen den Rest.
+/// [`super::hinweis::HINWEISE_BYTES_MAX`]) neben den Zeilen; die Zeilen bekommen den Rest. Die
+/// genannten Akten ohne Spiegel (`akten`) gehen wie die Anträge eigens vom Budget ab.
 pub const RESERVE: usize = 256 * 1024;
 /// Höchstzahl Einsätze je Paket (Lieferungen und Stände je für sich).
 pub const EINSAETZE_MAX: usize = 256;
@@ -36,9 +37,11 @@ pub const ANHAENGE_MAX: usize = 64;
 pub const TEIL_GROESSE: usize = 256 * 1024;
 /// Höchstzahl Zeilen einer Bruchstelle je Frage und je Antwort (LLH-1641, E6).
 pub const BRUCH_MAX: usize = 1000;
-/// Höchstlänge einer genannten Aktenkennung (Zeichen), wie die Kennung einer Akte in der Meldung
-/// (`fuehrung::austausch`).
-pub const KENNUNG_MAX: usize = 500;
+/// Höchstlänge einer genannten Aktenkennung in Byte. Eine echte Kennung
+/// (`<Instanzkennung>/<ID>-<Zufall>`) braucht etwa 55; in der Meldung dürfte eine Akte bis 500
+/// Zeichen tragen (`fuehrung::austausch`), und 256 solcher Kennungen einer fehlerhaften Instanz
+/// sprengten das Paket jeder anderen. Längere nennt `fuehrung::repo::list_ohne_spiegel` nicht.
+pub const KENNUNG_BYTES_MAX: usize = 200;
 
 /// Anfrage und Antwort des Abgleichs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -342,8 +345,8 @@ impl SpiegelPaket {
         if self.akten.len() > EINSAETZE_MAX {
             return Err(format!("mehr als {EINSAETZE_MAX} Akten im Paket"));
         }
-        if self.akten.iter().any(|k| k.chars().count() > KENNUNG_MAX) {
-            return Err(format!("Kennung einer Akte über {KENNUNG_MAX} Zeichen"));
+        if self.akten.iter().any(|k| k.len() > KENNUNG_BYTES_MAX) {
+            return Err(format!("Kennung einer Akte über {KENNUNG_BYTES_MAX} Byte"));
         }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
@@ -458,10 +461,13 @@ mod tests {
         assert!(p.check().is_ok());
         p.akten.push("a/2-y".into());
         assert!(p.check().is_err(), "zu viele Akten");
-        p.akten = vec!["k".repeat(KENNUNG_MAX)];
+        p.akten = vec!["k".repeat(KENNUNG_BYTES_MAX)];
         assert!(p.check().is_ok());
-        p.akten = vec!["k".repeat(KENNUNG_MAX + 1)];
+        p.akten = vec!["k".repeat(KENNUNG_BYTES_MAX + 1)];
         assert!(p.check().is_err(), "Kennung zu lang");
+        // Gezählt werden Byte, nicht Zeichen: „ä“ belegt zwei.
+        p.akten = vec!["ä".repeat(KENNUNG_BYTES_MAX / 2 + 1)];
+        assert!(p.check().is_err(), "Kennung in Byte zu lang");
     }
 
     #[test]
