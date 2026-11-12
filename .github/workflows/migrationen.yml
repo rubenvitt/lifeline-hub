@@ -27,7 +27,7 @@
 # als Bot-Commit auf den PR-Branch — nie auf einen Ziel-Branch, nur als Fast-Forward. Gepusht
 # wird mit einem Token der Release-App, weil ein Push mit `GITHUB_TOKEN` keine CI auslöst und
 # der PR dann ohne Checks hinge. Der alte Kopf bleibt rot, der neue bekommt seinen Status aus
-# dem eigenen `pull_request`-Lauf. Ohne `RELEASE_APP_ID` wird nur geprüft.
+# dem eigenen `pull_request`-Lauf. Ohne `RELEASE_APP_CLIENT_ID` wird nur geprüft.
 # Herleitung: openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md.
 name: Migrationsnummern
 
@@ -63,9 +63,6 @@ jobs:
       # Nur für den Autofix-Kommentar: die Release-App darf Pull Requests nur lesen, und ein
       # Kommentar an einem PR braucht `pull-requests: write` (Issues-Recht reicht nicht, 403).
       pull-requests: write
-    env:
-      # Für die `if:` der Autofix-Schritte; ohne Release-App wird nur geprüft.
-      APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -156,10 +153,10 @@ jobs:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         if: >-
-          steps.pruefen.outputs.code == '1' && env.APP_ID != '' &&
+          steps.pruefen.outputs.code == '1' && vars.RELEASE_APP_CLIENT_ID != '' &&
           github.event.pull_request.head.repo.full_name == github.repository
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
       - name: Umnummerieren und auf den PR-Branch pushen
@@ -224,8 +221,6 @@ jobs:
       contents: read
       statuses: write
       pull-requests: write # Autofix-Kommentar, siehe Job oben
-    env:
-      APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -306,9 +301,9 @@ jobs:
           done
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
-        if: steps.pruefen.outputs.reparieren != '0' && env.APP_ID != ''
+        if: steps.pruefen.outputs.reparieren != '0' && vars.RELEASE_APP_CLIENT_ID != ''
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
       - name: Rote PRs umnummerieren

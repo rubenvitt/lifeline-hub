@@ -621,5 +621,4 @@ jobs:
       actions: write
       id-token: write
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
