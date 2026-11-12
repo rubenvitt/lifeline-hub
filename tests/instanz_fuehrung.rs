@@ -2344,11 +2344,11 @@ async fn lange_bezeichnung_haelt_das_melden_nicht_auf() {
 }
 
 #[tokio::test]
-async fn akte_ueber_dem_budget_geht_nicht_hinaus_und_nennt_den_grund() {
+async fn zu_grosse_akte_wird_uebersprungen_und_haelt_den_rest_nicht_auf() {
     let (hub, elw) = gekoppelt().await;
     let (e, _) = elw_einsatz(&hub, &elw).await;
     // Eine Akte, die das Gegenüber nicht annähme (Erklärung weit über der Grenze), soll weder
-    // die Meldung sprengen noch still verschwinden.
+    // die Meldung sprengen noch die Akten danach aufhalten, und nicht still verschwinden.
     let stand: i64 = sqlx::query_scalar(
         "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
          RETURNING fuehrung_stand",
@@ -2363,6 +2363,7 @@ async fn akte_ueber_dem_budget_geht_nicht_hinaus_und_nennt_den_grund() {
         .execute(&elw.pool)
         .await
         .unwrap();
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
     elw_meldet(&elw).await;
     assert_eq!(
         letzter_fehler(&elw).await,
@@ -2371,8 +2372,16 @@ async fn akte_ueber_dem_budget_geht_nicht_hinaus_und_nennt_den_grund() {
     );
     let h = hinweis(&elw).await.unwrap_or_default();
     assert!(h.contains("zu groß"), "Hinweis mit Grund: {h:?}");
+    assert_eq!(
+        fremde(&hub).await.len(),
+        2,
+        "die Akte danach ist angekommen"
+    );
     let (gesendet, _, _) = staende(&elw).await;
-    assert!(gesendet < stand, "die Akte ist nicht quittiert");
+    assert!(
+        gesendet > stand,
+        "der Stand rückt über die übersprungene Akte"
+    );
 }
 
 #[tokio::test]
@@ -2420,8 +2429,9 @@ async fn unplausibler_stand_zaehlt_nicht_fuer_die_quittung() {
     elw_meldet(&elw).await;
     let (_, empfangen, _) = staende(&elw).await;
     assert!(empfangen < i64::MAX, "nicht aufs Maximum gesetzt");
-    let h = hinweis(&elw).await.unwrap_or_default();
-    assert!(h.contains("ungültige Führungsakte"), "nicht still: {h:?}");
+    // Schon der Hub schickt sie nicht (dieselben Grenzen wie beim Empfänger), aber nicht still.
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(h.contains("geht nicht an"), "nicht still: {h:?}");
 }
 
 #[tokio::test]

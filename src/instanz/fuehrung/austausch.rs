@@ -42,8 +42,13 @@ const ZAEHLER_MAX: i64 = 1 << 40;
 const STAND_MAX: i64 = 1 << 40;
 /// Länge eines Prüfwerts aus dem Abgabecode (HMAC-SHA256, Base64url: 43 Zeichen) mit Luft.
 const PRUEFWERT_MAX: usize = 64;
-/// Größte Akte in Byte (JSON): passt in jede Meldung ([`MELDUNG_BYTES`]) und jede Antwort.
+/// Größte Akte in Byte (JSON), die hinausgeht: passt in jede Meldung ([`MELDUNG_BYTES`]) und
+/// jede Antwort.
 pub const AKTE_BYTES: usize = 32 * 1024;
+/// Spielraum zwischen Annahme und Ausgang: Eine angenommene Akte geht neu gebaut weiter (eigener
+/// Stand bis 20 Ziffern, `anfrage`/`offen` als `false`, eigener Org-Schlüssel bis 88 Zeichen, in
+/// JSON höchstens sechs Byte je Zeichen). Ohne ihn läge sie dann über [`AKTE_BYTES`] (LLH-1672).
+const AKTE_SPIELRAUM: usize = 1024;
 
 /// Eine Akte auf der Leitung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,9 +142,15 @@ impl AkteMeldung {
         serde_json::to_vec(self).map_or(usize::MAX, |v| v.len())
     }
 
-    /// Grenzen der Felder; eine Akte darüber wird nicht übernommen. Was hier durchgeht, wird
-    /// gespeichert und geht weiter, also passt es auch in jede Nachricht ([`AKTE_BYTES`]).
+    /// Grenzen einer gelieferten Akte; eine Akte darüber wird nicht übernommen. Was hier
+    /// durchgeht, wird gespeichert und geht neu gebaut weiter, deshalb gilt am Eingang
+    /// [`AKTE_BYTES`] abzüglich [`AKTE_SPIELRAUM`].
     fn is_in_grenzen(&self) -> bool {
+        self.check_grenzen(AKTE_BYTES - AKTE_SPIELRAUM)
+    }
+
+    /// Die Grenzen der Felder und höchstens `bytes_max` Byte JSON.
+    fn check_grenzen(&self, bytes_max: usize) -> bool {
         let kurz = |s: &str| s.chars().count() <= TEXT_MAX;
         kurz(&self.kennung)
             && kurz(&self.org)
@@ -158,7 +169,7 @@ impl AkteMeldung {
                 .is_none_or(|e| e.len() <= ERKLAERUNG_MAX)
             && self.is_beweis_in_grenzen()
             && self.is_stand_plausibel()
-            && self.bytes() <= AKTE_BYTES
+            && self.bytes() <= bytes_max
     }
 }
 
@@ -168,11 +179,17 @@ pub struct Ausgang {
     pub akten: Vec<AkteMeldung>,
     /// Es bleibt mehr, als in diese Nachricht passte.
     pub mehr: bool,
+    /// Höchster Stand, den diese Nachricht abdeckt (gesendet oder übersprungen); 0 ohne Akte.
+    /// Mehr darf das Gegenüber nicht quittieren.
+    pub bis: i64,
 }
 
-/// Baut die Akten für eine Kopplung: Stand über `ab`, höchstens [`AKTEN_MAX`] und `bytes`.
-/// Eine Akte über [`AKTE_BYTES`] nähme das Gegenüber nicht an: Sie und alles danach bleibt hier,
-/// mit Hinweis an der Kopplung, bis sie kleiner ist (LLH-1672); der Rest der Nachricht geht.
+/// Baut die Akten für eine Kopplung: Stand über `ab`, höchstens [`AKTEN_MAX`] und `bytes`
+/// (mindestens [`AKTE_BYTES`]). Eine Akte, die das Gegenüber nicht annähme (über den Grenzen oder
+/// über [`AKTE_BYTES`]), wird übersprungen, mit Hinweis an der Kopplung; ihr Stand zählt als
+/// abgedeckt, das Gegenüber behält die bisherige Fassung, und mit der nächsten Änderung geht sie
+/// wieder hinaus (LLH-1672, wie `zu_gross` beim Spiegel). Anhalten ließe eine einzige Akte, auch
+/// eine fremde, den Austausch der ganzen Kopplung stehen.
 pub async fn build_ausgang(
     conn: &mut SqliteConnection,
     kopplung: &KopplungZeile,
@@ -193,29 +210,47 @@ pub async fn build_ausgang(
         };
         let m = AkteMeldung::aus(a, org);
         let groesse = m.bytes();
-        if groesse > AKTE_BYTES.min(bytes) {
+        if !m.check_grenzen(AKTE_BYTES) {
+            let grund = if groesse > AKTE_BYTES {
+                format!("zu groß ({groesse} Byte, höchstens {AKTE_BYTES})")
+            } else {
+                "über den Grenzen, die das Gegenüber annimmt".to_string()
+            };
             crate::instanz::repo::set_hinweis(
                 conn,
                 kopplung.id,
                 &format!(
-                    "Führungsakte „{}“ ist zu groß für den Austausch ({groesse} Byte, höchstens \
-                     {} Byte): Sie und die Akten danach gehen nicht an {}, bis sie kleiner ist.",
+                    "Führungsakte „{}“ geht nicht an {}: {grund}. Dort bleibt die bisherige \
+                     Fassung, bis sich die Akte wieder ändert.",
                     truncate_chars(&a.bezeichnung, 80),
-                    AKTE_BYTES.min(bytes),
                     kopplung.gegenueber_name
                 ),
             )
             .await?;
-            break;
+            aus.bis = aus.bis.max(a.stand);
+            continue;
         }
         if aus.akten.len() == AKTEN_MAX || summe + groesse > bytes {
             aus.mehr = true;
-            break;
+            return Ok(aus);
         }
         summe += groesse;
+        aus.bis = aus.bis.max(a.stand);
         aus.akten.push(m);
     }
+    // Übersprungene zählen nicht gegen AKTEN_MAX: Lagen mehr Zeilen bereit, folgen sie.
+    aus.mehr = zeilen.len() > AKTEN_MAX;
     Ok(aus)
+}
+
+/// Quittung nach einer gelieferten Akte: Nur ein plausibler Stand zählt, ein Wert wie `i64::MAX`
+/// setzte sie dauerhaft aufs Maximum (LLH-1672). Eine abgelehnte Akte mit plausiblem Stand wird
+/// quittiert, aber nicht still (Hinweis in [`apply_eingang`]).
+fn quittung_nach(bis: Option<i64>, m: &AkteMeldung) -> Option<i64> {
+    if !m.is_stand_plausibel() {
+        return bis;
+    }
+    Some(bis.map_or(m.stand, |b| b.max(m.stand)))
 }
 
 /// Was nach dem Commit eines Austauschs zu tun ist.
@@ -588,11 +623,7 @@ pub async fn apply_eingang(
         )
     };
     for m in akten.iter().take(AKTEN_MAX) {
-        // Nur ein plausibler Stand zählt für die Quittung: ein Wert wie `i64::MAX` setzte sie
-        // dauerhaft aufs Maximum (LLH-1672). Eine abgelehnte Akte wird quittiert, aber nicht still.
-        if m.is_stand_plausibel() {
-            aus.bis = Some(aus.bis.map_or(m.stand, |b| b.max(m.stand)));
-        }
+        aus.bis = quittung_nach(aus.bis, m);
         if !m.is_in_grenzen() {
             aus.hinweis = Some(ablehnen(m, "über den Grenzen"));
             continue;
@@ -1054,36 +1085,44 @@ pub(crate) mod tests {
         .unwrap()
     }
 
-    /// Die größte Akte, die [`AkteMeldung::is_in_grenzen`] annimmt: jedes Textfeld voll mit
-    /// Umlauten (zwei Byte je Zeichen), die Erklärung voll mit Anführungszeichen (in JSON zwei Byte
-    /// je Zeichen), der Beweis an allen Grenzen der Assertion.
+    /// Eine gültige Akte von genau `ziel` Byte JSON: Textfelder voll mit Vier-Byte-Zeichen, der
+    /// Beweis an allen Grenzen der Assertion, die Erklärung aufgefüllt mit Steuerzeichen (sechs
+    /// Byte in JSON) und einfachen Zeichen.
+    pub(crate) fn akte_mit_bytes(ziel: usize) -> AkteMeldung {
+        auf_bytes(gefuellt(), ziel)
+    }
+
+    /// Grundakte für [`auf_bytes`]: Textfelder voll mit Vier-Byte-Zeichen, Beweis an den Grenzen.
+    fn gefuellt() -> AkteMeldung {
+        let text = "𝄞".repeat(TEXT_MAX);
+        let mut m = akte();
+        m.nummer = Some(text.clone());
+        m.bezeichnung = text.clone();
+        m.stichwort = Some(text.clone());
+        m.fuehrer_name = text;
+        m.beweis = Some(assertion(
+            CREDENTIAL_ID_MAX,
+            AUTHENTICATOR_DATA_MAX,
+            CLIENT_DATA_JSON_MAX,
+            SIGNATUR_MAX,
+        ));
+        m
+    }
+
+    /// Füllt die Erklärung von `m` auf, bis die Akte genau `ziel` Byte JSON hat.
+    fn auf_bytes(mut m: AkteMeldung, ziel: usize) -> AkteMeldung {
+        m.erklaerung = Some(String::new());
+        let fehlt = ziel - m.bytes();
+        let erklaerung = "\u{1}".repeat(fehlt / 6) + &"e".repeat(fehlt % 6);
+        assert!(erklaerung.len() <= ERKLAERUNG_MAX, "Ziel {ziel} zu groß");
+        m.erklaerung = Some(erklaerung);
+        assert_eq!(m.bytes(), ziel);
+        m
+    }
+
+    /// Die größte Akte, die [`AkteMeldung::is_in_grenzen`] annimmt.
     pub(crate) fn groesste_akte() -> AkteMeldung {
-        let text = "ü".repeat(TEXT_MAX);
-        AkteMeldung {
-            kennung: text.clone(),
-            org: text.clone(),
-            nummer: Some(text.clone()),
-            bezeichnung: text.clone(),
-            stichwort: Some(text.clone()),
-            status: "abgeschlossen".into(),
-            epoche: Epoche {
-                zaehler: ZAEHLER_MAX,
-                instanz: text.clone(),
-            },
-            fuehrer: text.clone(),
-            fuehrer_name: text,
-            art: "notuebernahme".into(),
-            erklaerung: Some("\"".repeat(ERKLAERUNG_MAX)),
-            beweis: Some(assertion(
-                CREDENTIAL_ID_MAX,
-                AUTHENTICATOR_DATA_MAX,
-                CLIENT_DATA_JSON_MAX,
-                SIGNATUR_MAX,
-            )),
-            anfrage: true,
-            offen: true,
-            stand: STAND_MAX,
-        }
+        akte_mit_bytes(AKTE_BYTES - AKTE_SPIELRAUM)
     }
 
     #[test]
@@ -1106,6 +1145,25 @@ pub(crate) mod tests {
         assert!(!ok(&|m| m.stand = STAND_MAX + 1));
         assert!(!ok(&|m| m.stand = 0));
         assert!(!ok(&|m| m.stand = i64::MAX));
+    }
+
+    #[test]
+    fn nur_ein_plausibler_stand_zaehlt_fuer_die_quittung() {
+        let mit = |stand: i64| {
+            let mut m = akte();
+            m.stand = stand;
+            m
+        };
+        assert_eq!(quittung_nach(None, &mit(5)), Some(5));
+        assert_eq!(quittung_nach(Some(7), &mit(5)), Some(7));
+        assert_eq!(quittung_nach(Some(7), &mit(STAND_MAX)), Some(STAND_MAX));
+        assert_eq!(quittung_nach(Some(7), &mit(STAND_MAX + 1)), Some(7));
+        assert_eq!(quittung_nach(Some(7), &mit(i64::MAX)), Some(7));
+        assert_eq!(quittung_nach(None, &mit(0)), None);
+        // Über den übrigen Grenzen, aber mit plausiblem Stand: quittiert (mit Hinweis).
+        let mut m = mit(9);
+        m.art = "erfunden".into();
+        assert_eq!(quittung_nach(Some(7), &m), Some(9));
     }
 
     #[test]
@@ -1134,13 +1192,63 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn groesste_akte_passt_in_eine_meldung() {
-        let m = groesste_akte();
-        assert!(m.is_in_grenzen(), "die größte Akte liegt in den Grenzen");
-        let groesse = serde_json::to_vec(&m).unwrap().len();
-        assert!(groesse <= AKTE_BYTES, "{groesse} Byte über {AKTE_BYTES}");
+    fn akte_bytes_knapp_darunter_und_knapp_darueber() {
+        let eingang = AKTE_BYTES - AKTE_SPIELRAUM;
+        assert!(akte_mit_bytes(eingang).is_in_grenzen());
+        assert!(!akte_mit_bytes(eingang + 1).is_in_grenzen());
+        // Hinaus geht bis AKTE_BYTES.
+        assert!(akte_mit_bytes(AKTE_BYTES).check_grenzen(AKTE_BYTES));
+        assert!(!akte_mit_bytes(AKTE_BYTES + 1).check_grenzen(AKTE_BYTES));
         assert!(AKTE_BYTES <= MELDUNG_BYTES && AKTE_BYTES <= ANTWORT_BYTES);
-        // Über die Bytes hinaus (etwa Steuerzeichen, in JSON sechs Byte je Zeichen) gilt sie nicht.
+    }
+
+    #[test]
+    fn angenommene_akte_geht_neu_gebaut_wieder_hinaus() {
+        // Am Eingang so klein wie möglich, was neu gebaut wächst: Stand 1, `anfrage` und `offen`
+        // gesetzt, kurzer Org-Schlüssel.
+        let mut basis = gefuellt();
+        basis.stand = 1;
+        basis.anfrage = true;
+        basis.offen = true;
+        basis.org = "h".into();
+        let m = auf_bytes(basis, AKTE_BYTES - AKTE_SPIELRAUM);
+        assert!(m.is_in_grenzen(), "{} Byte", m.bytes());
+        // Neu gebaut: höchster Stand, ohne Merker, längster Org-Schlüssel voller Steuerzeichen.
+        let zeile = AkteZeile {
+            id: 1,
+            kennung: m.kennung.clone(),
+            einsatz_id: None,
+            org_id: 1,
+            nummer: m.nummer.clone(),
+            bezeichnung: m.bezeichnung.clone(),
+            stichwort: m.stichwort.clone(),
+            status: m.status.clone(),
+            epoche_zaehler: m.epoche.zaehler,
+            epoche_instanz: m.epoche.instanz.clone(),
+            fuehrer_kennung: m.fuehrer.clone(),
+            fuehrer_name: m.fuehrer_name.clone(),
+            art: m.art.clone(),
+            erklaerung: m.erklaerung.clone(),
+            beweis: m.beweis.as_ref().map(|b| serde_json::to_string(b).unwrap()),
+            offen: None,
+            offen_bruch_at: None,
+            abgabe_schluessel: None,
+            anfrage_at: None,
+            bruch_at: None,
+            stand: STAND_MAX,
+            geaendert_at: String::new(),
+        };
+        let raus = AkteMeldung::aus(&zeile, &"\u{1}".repeat(88));
+        assert!(
+            raus.check_grenzen(AKTE_BYTES),
+            "{} Byte neu gebaut, {} am Eingang",
+            raus.bytes(),
+            m.bytes()
+        );
+    }
+
+    #[test]
+    fn steuerzeichen_ueber_den_bytes_gelten_nicht() {
         let mut m = akte();
         m.bezeichnung = "\u{1}".repeat(TEXT_MAX);
         m.stichwort = Some(m.bezeichnung.clone());
@@ -1148,7 +1256,7 @@ pub(crate) mod tests {
         m.fuehrer_name = m.bezeichnung.clone();
         m.erklaerung = Some("\u{1}".repeat(ERKLAERUNG_MAX));
         m.beweis = groesste_akte().beweis;
-        assert!(serde_json::to_vec(&m).unwrap().len() > AKTE_BYTES);
+        assert!(m.bytes() > AKTE_BYTES);
         assert!(!m.is_in_grenzen());
     }
 
