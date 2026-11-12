@@ -291,7 +291,8 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 **Festlegung des Users vom 12.11.2026: Der Review wird „im Prozess verankert“ und vom Agenten
 selbst gestartet.** Er ersetzt CodeRabbit und den früheren Review-Skill von Superpowers und
 braucht nur das Agent- und das Workflow-Tool, läuft also lokal und in der Cloud gleich. Spec
-`review-vor-dem-pr`, Herleitung: `openspec/changes/review-vor-dem-pr/design.md`.
+`review-vor-dem-pr`, Herleitung:
+`openspec/changes/archive/2026-11-12-review-vor-dem-pr/design.md`.
 
 - **Wann:** nach der Verifikation, vor dem Archivieren und vor dem PR, auf jeder Route außer
   `trivial`, auch bei reinen Doku-Änderungen. Er darf parallel zu `check-all.sh` starten. Je PR
