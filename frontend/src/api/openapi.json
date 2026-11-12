@@ -11,6 +11,62 @@
   "paths": {},
   "components": {
     "schemas": {
+      "AbgelehnterAntragAnzeige": {
+        "type": "object",
+        "description": "Ein abgelehnter Antrag an einem Einsatz, der kein Spiegel mehr ist: der Hub hat ihn in\nVerwahrung genommen (`lebensende::umwandeln`). Das Hinweisband am Spiegel gibt es dann nicht\nmehr, und nach der Schonfrist liest ein Mitglied den Einsatz nicht mehr. Die Person sieht ihre\nabgelehnten Anträge deshalb einsatzübergreifend, bis [`ABGELEHNT_TAGE`] vorbei sind.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "art",
+          "erfasst_at",
+          "frist_bis",
+          "daten"
+        ],
+        "properties": {
+          "art": {
+            "type": "string",
+            "description": "Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …)."
+          },
+          "daten": {
+            "type": "object",
+            "description": "Die erfassten Daten (Kennungen der führenden Instanz)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nummer und Stichwort des Einsatzes; Lagedaten trägt der Antrag nicht."
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "frist_bis": {
+            "type": "string",
+            "description": "Bis dahin bleibt der Antrag (30 Tage nach der Ablehnung); danach räumt ihn der Purge."
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "AbgleichAnzeige": {
         "type": "object",
         "description": "Ein Vermisstenabgleich (1:1 zu `person_abgleich`).",
@@ -1674,7 +1730,14 @@
               "string",
               "null"
             ],
-            "description": "Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`."
+            "description": "Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`, im Zustand\n`verwahrt` der Zeitpunkt, zu dem der Einsatz hier abgeräumt wurde."
+          },
+          "gegenstelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Installation, die den Einsatz verwahrt (LLH-1494); nur im Zustand `verwahrt`."
           },
           "geloescht_at": {
             "type": [
@@ -1727,7 +1790,8 @@
           "geschwaerzt",
           "schwaerzung_beantragt",
           "loeschung_ausstehend",
-          "endgueltig_geloescht"
+          "endgueltig_geloescht",
+          "verwahrt"
         ]
       },
       "AufenthaltAnzeige": {
@@ -5858,6 +5922,13 @@
               "null"
             ]
           },
+          "nachbereitung_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Nachbereitung (LLH-1494, UTC); fehlt = keine Nachbereitungsfrist."
+          },
           "naechste_lagebesprechung_at": {
             "type": [
               "string",
@@ -5912,6 +5983,17 @@
             ],
             "format": "int64",
             "description": "Schwärzungsstand (LFH-996): vollzogene Personen-Anträge plus geschwärzte\nDatenkategorien dieses Einsatzes. Wächst nur; fehlt bei 0. Ein Gerät, das einen höheren\nStand sieht, verwirft jeden älteren Stand des Einsatzes (`frontend/src/offline/AGENTS.md`).\nNennt bewusst weder Person noch Zeitpunkt noch Modul."
+          },
+          "verwahrung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzVerwahrungAnzeige",
+                "description": "Die Übergabe an die verwahrende Gegenstelle wartet (LLH-1494); fehlt sonst."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -6635,6 +6717,25 @@
           },
           "funkrufname": {
             "type": "string"
+          }
+        }
+      },
+      "EinsatzVerwahrungAnzeige": {
+        "type": "object",
+        "description": "Stand der Übergabe an die verwahrende Gegenstelle (LLH-1494, D8): ihre letzte Quittung\n„wartet“.",
+        "required": [
+          "gegenstelle"
+        ],
+        "properties": {
+          "gegenstelle": {
+            "type": "string"
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Worauf die Gegenstelle wartet, etwa „1 Anhang fehlt“."
           }
         }
       },
@@ -14318,6 +14419,14 @@
               "string",
               "null"
             ]
+          },
+          "nachbereitung_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nachbereitung in Tagen ab Abschluss (LLH-1494); fehlt = keine Nachbereitungsfrist."
           },
           "org_id": {
             "type": "integer",

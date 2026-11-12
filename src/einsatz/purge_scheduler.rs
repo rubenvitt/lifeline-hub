@@ -28,6 +28,9 @@
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
 //!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
+//! - **Phase R** (UNUMKEHRBAR, LLH-1494): Abräumen nach Verwahrung und Lebensende
+//!   (`abraeumen::phase_r`): vorgemerkte Einsätze und Spiegel der meldenden Seite nach der
+//!   Nachbereitung; Spur im Löschprotokoll (Art `verwahrt` bzw. `spiegel`).
 //! - **Phase E** (LFH-250, LFH-928): verwaiste Anhänge jenseits ihrer Karenz, einzeln je
 //!   Transaktion (`anhang::repo::sweep_verwaiste`). Hängt an keiner Aufbewahrungsfrist.
 //!
@@ -297,6 +300,12 @@ pub async fn tick_mit_rueckschrieb(
         }
         Err(e) => tracing::warn!("Purge Phase C3: Planungs-Purge fehlgeschlagen: {e}"),
     }
+
+    // --- Phase R: Abräumen nach Verwahrung und Lebensende (UNUMKEHRBAR, LLH-1494) ---
+    // Holt Merker nach, deren Abräumen nach dem Abgleich scheiterte, und räumt Spiegel der
+    // meldenden Seite nach der Nachbereitung ab (design.md D5, D6). Schreibt den WAL selbst
+    // zurück.
+    anzahl += super::abraeumen::phase_r(pool, &jetzt_s).await;
 
     // --- Phase D: endgültige Löschung geschwärzter Skelette (UNUMKEHRBAR, LFH-750) ---
     // Läuft nach Phase B: fallen Karenz-Ende und Skelett-Frist in denselben Lauf, löscht er
@@ -4539,7 +4548,8 @@ mod tests {
 
     /// LLH-1492 (design.md D10): Ein Spiegel liegt in jeder Phase brach, die einen Einsatz
     /// betrifft: Soft-Delete (A), Antrag (A2), Kategorien (K1, K2), Schwärzung (B), Nachlauf,
-    /// endgültige Löschung (D) und verwaiste Anhänge (E). Sein Lebensende regelt LLH-1494. Je
+    /// endgültige Löschung (D) und verwaiste Anhänge (E). Abgeräumt wird er nur in Phase R
+    /// (LLH-1494), die hier nichts findet: ohne Merker und ohne meldende Kopplung. Je
     /// Zustand steht ein eigener Einsatz daneben, den derselbe Lauf bearbeitet; kein Schreibversuch
     /// scheitert am Schutz-Trigger, und ein zweiter Lauf lässt den Spiegel ebenso stehen.
     #[tokio::test]

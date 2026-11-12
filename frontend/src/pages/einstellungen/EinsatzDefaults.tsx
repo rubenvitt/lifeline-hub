@@ -213,6 +213,14 @@ export default function EinsatzDefaults() {
               placeholder={mitVorgabe('unbegrenzt')}
             />
           </Form.Item>
+          <Form.Item label="Nachbereitung (Tage ab Abschluss)" name="nachbereitung_tage">
+            <InputNumber
+              min={1}
+              max={3650}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder={mitVorgabe('keine')}
+            />
+          </Form.Item>
         </Formularpaneel>
 
         <KategorieVorgabenPaneel />

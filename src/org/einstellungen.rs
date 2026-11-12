@@ -25,6 +25,8 @@ pub struct OrgEinstellungen {
     pub retention_dauer_tage: Option<i64>,
     /// Skelett-Frist in Tagen ab Abschluss (LFH-750); `None` = das Skelett bleibt unbegrenzt.
     pub skelett_dauer_tage: Option<i64>,
+    /// Nachbereitung in Tagen ab Abschluss (LLH-1494); `None` = keine Nachbereitungsfrist.
+    pub nachbereitung_tage: Option<i64>,
     // Nummernkreis-Präfixe (display-only; Startwerte bleiben Einsatz-only).
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
@@ -54,6 +56,7 @@ impl OrgEinstellungen {
             koordinatenformat: None,
             retention_dauer_tage: None,
             skelett_dauer_tage: None,
+            nachbereitung_tage: None,
             etb_nummer_praefix: None,
             meldung_nummer_praefix: None,
             auftrag_nummer_praefix: None,
@@ -83,6 +86,7 @@ impl OrgEinstellungen {
             koordinatenformat: self.koordinatenformat.clone(),
             retention_dauer_tage: self.retention_dauer_tage,
             skelett_dauer_tage: self.skelett_dauer_tage,
+            nachbereitung_tage: self.nachbereitung_tage,
             etb_nummer_praefix: self.etb_nummer_praefix.clone(),
             meldung_nummer_praefix: self.meldung_nummer_praefix.clone(),
             auftrag_nummer_praefix: self.auftrag_nummer_praefix.clone(),
@@ -133,6 +137,9 @@ pub struct OrgEinstellungenAnzeige {
     /// Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skelett_dauer_tage: Option<i64>,
+    /// Nachbereitung in Tagen ab Abschluss (LLH-1494); fehlt = keine Nachbereitungsfrist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nachbereitung_tage: Option<i64>,
     /// Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leer = keine Kategorie hat eine
     /// eigene Frist.
     pub aufbewahrung_kategorien: Vec<KategorieVorgabe>,
@@ -184,6 +191,7 @@ pub struct OrgEinstellungenDaten<'a> {
     pub koordinatenformat: Option<&'a str>,
     pub retention_dauer_tage: Option<i64>,
     pub skelett_dauer_tage: Option<i64>,
+    pub nachbereitung_tage: Option<i64>,
     pub etb_nummer_praefix: Option<&'a str>,
     pub meldung_nummer_praefix: Option<&'a str>,
     pub auftrag_nummer_praefix: Option<&'a str>,
@@ -207,8 +215,8 @@ pub async fn laden_oder_default(
 ) -> Result<OrgEinstellungen, AppError> {
     let row = sqlx::query_as::<_, OrgEinstellungen>(
         "SELECT org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
-                retention_dauer_tage, skelett_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
-                auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
+                retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
+                meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
                 auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
                 geaendert_at, geaendert_von \
          FROM org_einstellungen WHERE org_id = ?",
@@ -232,11 +240,11 @@ pub async fn speichern(
     sqlx::query(
         "INSERT INTO org_einstellungen \
             (org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
-             retention_dauer_tage, skelett_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
-             auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
-             auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
-             geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+             retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
+             meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, \
+             meldung_bestaetigung_frist_min, auftrag_quittierung_frist_min, rueckmeldung_frist_min, \
+             auto_etb_eintraege, geocoder_url, geaendert_at, geaendert_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
              zeitdarstellung = excluded.zeitdarstellung, \
@@ -244,6 +252,7 @@ pub async fn speichern(
              koordinatenformat = excluded.koordinatenformat, \
              retention_dauer_tage = excluded.retention_dauer_tage, \
              skelett_dauer_tage = excluded.skelett_dauer_tage, \
+             nachbereitung_tage = excluded.nachbereitung_tage, \
              etb_nummer_praefix = excluded.etb_nummer_praefix, \
              meldung_nummer_praefix = excluded.meldung_nummer_praefix, \
              auftrag_nummer_praefix = excluded.auftrag_nummer_praefix, \
@@ -263,6 +272,7 @@ pub async fn speichern(
     .bind(daten.koordinatenformat)
     .bind(daten.retention_dauer_tage)
     .bind(daten.skelett_dauer_tage)
+    .bind(daten.nachbereitung_tage)
     .bind(daten.etb_nummer_praefix)
     .bind(daten.meldung_nummer_praefix)
     .bind(daten.auftrag_nummer_praefix)
@@ -317,6 +327,7 @@ mod tests {
         assert_eq!(e.koordinatenformat, None);
         assert_eq!(e.retention_dauer_tage, None);
         assert_eq!(e.skelett_dauer_tage, None);
+        assert_eq!(e.nachbereitung_tage, None);
         assert_eq!(e.etb_nummer_praefix, None);
         assert_eq!(e.meldung_nummer_praefix, None);
         assert_eq!(e.auftrag_nummer_praefix, None);
@@ -349,6 +360,7 @@ mod tests {
                 koordinatenformat: Some("mgrs"),
                 retention_dauer_tage: Some(365),
                 skelett_dauer_tage: Some(3650),
+                nachbereitung_tage: Some(30),
                 etb_nummer_praefix: Some("EB-"),
                 meldung_nummer_praefix: Some("M-"),
                 auftrag_nummer_praefix: Some("A-"),
@@ -367,6 +379,7 @@ mod tests {
         assert_eq!(g.org_id, 1);
         assert_eq!(g.zeitzone.as_deref(), Some("Europe/Berlin"));
         assert_eq!(g.skelett_dauer_tage, Some(3650));
+        assert_eq!(g.nachbereitung_tage, Some(30));
         assert_eq!(g.einsatz_nummer_praefix.as_deref(), Some("WF-"));
         assert_eq!(
             g.auftrag_nummer_praefix.as_deref(),
@@ -416,6 +429,10 @@ mod tests {
         assert_eq!(zweite.zeitzone.as_deref(), Some("UTC"));
         assert_eq!(zweite.zeitdarstellung, None);
         assert_eq!(zweite.retention_dauer_tage, None);
+        assert_eq!(
+            zweite.nachbereitung_tage, None,
+            "Vollersatz leert die Nachbereitung"
+        );
         assert_eq!(zweite.auto_etb_eintraege, None);
 
         // COUNT == 1 nach zwei Speichervorgängen (UPSERT, kein zweiter Insert).

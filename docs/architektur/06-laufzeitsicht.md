@@ -337,6 +337,16 @@ sequenceDiagram
 - **Widerruf** einer Org-Zuordnung setzt `einsatz_spiegel.beendet_at`, lehnt offene Anträge ab
   und löscht `spiegel_ziel`, in der Transaktion des Widerrufs (`instanz::spiegel::beende_fuer_zuordnung`).
   Nachweis: `tests/instanz_spiegel.rs`.
+- **Lebensende** (LLH-1494): Nach der Nachbereitung schickt die meldende Seite einen eigenen
+  Einsatz als `verwahrt` mit Stand und Kategorie-Fristen. Die erreichte Seite übernimmt zuerst die
+  Lieferung derselben Anfrage und die Anhang-Stücke, dann wandelt sie ihren Spiegel bei gleichem
+  Stand und ohne fehlenden Anhang in einen eigenen Einsatz und quittiert `angenommen`; sonst
+  `wartet` mit Grund, fehlende Anhänge sind dann angefordert. Erst `angenommen` merkt den
+  Einsatz der meldenden Seite zum Abräumen vor (`src/einsatz/abraeumen.rs`, nach dem Commit).
+  `geloescht` meldet der Führer für genannte Kennungen aus seinem Löschprotokoll: im Pull in der
+  Antwort, im Push in der nächsten Anfrage, nachdem die erreichte Seite die Stände ihrer Spiegel
+  genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Nachweis:
+  `tests/instanz_lebensende.rs`.
 
 ## 6.6c Führung je Einsatz: Notübernahme gegen den ELW
 

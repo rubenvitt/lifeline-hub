@@ -394,7 +394,8 @@ pub async fn faellige_vormerkung(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<(i64, Datenkategorie)>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let zeilen: Vec<(i64, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT k.einsatz_id, k.kategorie FROM einsatz_aufbewahrung_kategorie k \
          JOIN einsatz e ON e.id = k.einsatz_id \
@@ -493,7 +494,8 @@ pub async fn vormerken(
 pub async fn faellige_schwaerzung(
     pool: &SqlitePool,
 ) -> Result<Vec<(i64, Datenkategorie, String)>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let zeilen: Vec<(i64, String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT k.einsatz_id, k.kategorie, k.vorgemerkt_at FROM einsatz_aufbewahrung_kategorie k \
          JOIN einsatz e ON e.id = k.einsatz_id \

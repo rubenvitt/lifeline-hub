@@ -15,6 +15,7 @@ const VOLL = {
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
   skelett_dauer_tage: 3650,
+  nachbereitung_tage: 30,
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
@@ -29,7 +30,7 @@ const VOLL = {
 } as unknown as OrgEinstellungen;
 
 describe('zuUpdate', () => {
-  it('mappt alle 14 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
+  it('mappt alle 15 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
     expect(zuUpdate(VOLL)).toEqual({
       zeitzone: 'Europe/Berlin',
       zeitdarstellung: 'datum_uhrzeit',
@@ -38,6 +39,8 @@ describe('zuUpdate', () => {
       retention_dauer_tage: 90,
       // Fehlte es hier, leerte jedes Speichern einer anderen Sektion die Skelett-Frist (LFH-750).
       skelett_dauer_tage: 3650,
+      // Fehlte es hier, leerte jedes Speichern einer anderen Sektion die Nachbereitung (LLH-1494).
+      nachbereitung_tage: 30,
       etb_nummer_praefix: 'EB-',
       meldung_nummer_praefix: 'M-',
       auftrag_nummer_praefix: 'A-',
@@ -87,6 +90,7 @@ describe('normalisiereEinsatz', () => {
     ).toEqual({
       retention_dauer_tage: null,
       skelett_dauer_tage: null,
+      nachbereitung_tage: null,
       etb_nummer_praefix: null,
       meldung_nummer_praefix: null,
       auftrag_nummer_praefix: null,

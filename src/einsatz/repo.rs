@@ -357,8 +357,12 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
+                e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 o.name AS org_name, \
+                (SELECT v.gegenstelle FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung_gegenstelle, \
+                (SELECT v.grund FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung_grund, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
@@ -483,6 +487,7 @@ pub async fn liste_fuer(
         sachverhalt: Option<String>,
         anzahl_betroffene_initial: Option<i64>,
         retention_bis: Option<String>,
+        nachbereitung_bis: Option<String>,
         geloescht_at: Option<String>,
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
@@ -519,7 +524,7 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
+                e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle, \
                 m.fuehrungsfunktion AS meine_fuehrungsfunktion, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
@@ -632,6 +637,8 @@ pub async fn liste_fuer(
                 sachverhalt: r.sachverhalt,
                 anzahl_betroffene_initial: r.anzahl_betroffene_initial,
                 retention_bis: r.retention_bis,
+                nachbereitung_bis: r.nachbereitung_bis,
+                verwahrung: None,
                 meine_rolle: r.meine_rolle,
                 meine_fuehrungsstelle,
                 meine_sachgebiete,
@@ -758,6 +765,21 @@ pub async fn abschliessen(
                     .await?;
                     etb_eintrag_ids.push(etb_id);
                 }
+            }
+        }
+        // LLH-1494 (design.md D1): Nachbereitungsfrist aus der Org-Vorgabe.
+        if let Some(tage) = org_einstellungen.nachbereitung_tage {
+            if let Some(etb_id) = super::nachbereitung::beim_abschluss(
+                &mut tx,
+                einsatz_id,
+                von_benutzer_id,
+                einstellungen.etb_startwert(),
+                &stil,
+                tage,
+            )
+            .await?
+            {
+                etb_eintrag_ids.push(etb_id);
             }
         }
         if !kategorie_vorgaben.is_empty() {
@@ -981,7 +1003,8 @@ pub(crate) async fn system_audit_tx(
 /// ist hart im WHERE — aktive Einsätze sind NIE fällig. Lexikografischer
 /// Zeitvergleich (kanonisches Format). Org-isoliert über die `einsatz`-Tabelle.
 pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<i64>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let ids = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM einsatz \
          WHERE status = ? AND retention_bis IS NOT NULL \
@@ -1182,7 +1205,8 @@ pub async fn faellige_purge(
     pool: &SqlitePool,
     _karenz_tage: i64,
 ) -> Result<Vec<(i64, String)>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let rows = sqlx::query_as::<_, (i64, String)>(sqlx::AssertSqlSafe(format!(
         "SELECT id, geloescht_at FROM einsatz \
          WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL AND {} \

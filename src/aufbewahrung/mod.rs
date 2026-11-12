@@ -62,9 +62,13 @@ pub struct AufbewahrungEintragAnzeige {
     /// und Schwärzung); fehlt ohne Skelett-Frist der Org und bei gelöschten Einsätzen.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub loeschung_am: Option<String>,
-    /// Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`.
+    /// Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`, im Zustand
+    /// `verwahrt` der Zeitpunkt, zu dem der Einsatz hier abgeräumt wurde.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub endgueltig_geloescht_at: Option<String>,
+    /// Name der Installation, die den Einsatz verwahrt (LLH-1494); nur im Zustand `verwahrt`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gegenstelle: Option<String>,
     pub zustand: AufbewahrungZustand,
 }
 
