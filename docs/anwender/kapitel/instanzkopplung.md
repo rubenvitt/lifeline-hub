@@ -352,6 +352,8 @@ das Quittieren gelten nur dort.
 Jede Seite eines Spiegels zeigt das Hinweisband „Spiegel von …“ mit der Zeit des letzten
 Abgleichs und der Zahl der ausstehenden und abgelehnten Anträge. Liegt bei einem laufenden
 Einsatz der letzte Abgleich länger als eine Minute zurück, steht dort „keine Verbindung seit …“.
+Wo am Spiegel etwas gesperrt ist, nennt auch der Grund unter „Nur Ansicht“ die führende
+Installation („Spiegel von …“), nicht die Rollen: Am Spiegel schreibt auch die Einsatzleitung nicht.
 
 Abgeglichen wird alle fünf Sekunden, solange an der Kopplung ein Einsatz aktiv ist, ein Antrag
 offen ist oder ein Anhang geholt wird; sonst im Takt der Meldung. Den kurzen
@@ -442,6 +444,11 @@ Die Führung je Einsatz schaltet der Betrieb mit `LIFELINE_FUEHRUNG` an beiden I
 ein; ohne sie bleibt jeder Einsatz an der Installation, an der er angelegt wurde, und das Paneel
 „Führung“ fehlt. Wird sie wieder ausgeschaltet, bleibt jeder Einsatz bei der Installation, die
 ihn gerade führt.
+
+Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet die Einsätze, die eine
+andere Installation angelegt hat, solange die Organisation bei ihr zugeordnet ist: Mit dem Widerruf
+der Zuordnung oder der Kopplung fallen ihre Einsätze heraus. Ist die Führung je Einsatz aus, fehlt
+das Paneel; lässt es sich sonst nicht laden, steht dort der Fehler mit „Erneut laden“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an

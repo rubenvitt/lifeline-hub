@@ -135,15 +135,27 @@ pub async fn find_by_kennung(
 }
 
 /// Akten einer Org, deren Einsatz beim Gegenüber liegt: ohne lokalen Einsatz oder hier nur als
-/// Spiegel (LLH-1641, E2).
+/// Spiegel (LLH-1641, E2), und nur, solange die Org dort zugeordnet ist (LLH-1675): Ist die
+/// Ursprungs-Instanz der Akte (Präfix der Kennung) hier gekoppelt, zählt ihre Kopplung; sonst kam
+/// die Akte über eine dritte Instanz (mehrere ELW an einem Hub), und es zählt irgendeine aktive
+/// Zuordnung der Org. Eine beim Führer gelöschte Akte ohne Spiegel bleibt bis LLH-1699 stehen.
 pub async fn list_fremde_der_org(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<Vec<AkteZeile>, AppError> {
+    const ZUGEORDNET: &str = "o.org_id = f.org_id AND o.widerrufen_at IS NULL \
+         AND k.zustand IN ('angebahnt', 'aktiv')";
+    const VOM: &str = "substr(f.kennung, 1, length(k.gegenueber_kennung) + 1) \
+         = k.gegenueber_kennung || '/'";
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM einsatz_fuehrung WHERE org_id = ? AND (einsatz_id IS NULL \
-           OR einsatz_id IN (SELECT id FROM einsatz WHERE spiegel = 1)) \
-         ORDER BY status, geaendert_at DESC, id DESC"
+        "SELECT {SPALTEN} FROM einsatz_fuehrung f WHERE f.org_id = ? AND (f.einsatz_id IS NULL \
+           OR f.einsatz_id IN (SELECT id FROM einsatz WHERE spiegel = 1)) \
+         AND (EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+                      JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE {ZUGEORDNET} AND {VOM}) \
+           OR (NOT EXISTS (SELECT 1 FROM instanz_kopplung k WHERE {VOM}) \
+               AND EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+                           JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE {ZUGEORDNET}))) \
+         ORDER BY f.status, f.geaendert_at DESC, f.id DESC"
     )))
     .bind(org_id)
     .fetch_all(&mut *conn)
@@ -962,5 +974,114 @@ pub(crate) mod tests {
         einsatz(&pool, "Neu").await;
         ensure(&pool).await;
         assert!(akten(&pool).await[0].stand > alt);
+    }
+
+    /// Legt eine Akte an, die ein Gegenüber geliefert hat, ohne lokalen Spiegel.
+    async fn fremde_akte(pool: &sqlx::SqlitePool, kennung: &str) -> i64 {
+        org(pool).await;
+        let ursprung = kennung.split('/').next().unwrap().to_string();
+        let mut a = AkteZeile {
+            id: 0,
+            kennung: kennung.into(),
+            einsatz_id: None,
+            org_id: 1,
+            nummer: None,
+            bezeichnung: format!("Einsatz {kennung}"),
+            stichwort: None,
+            status: "abgeschlossen".into(),
+            epoche_zaehler: 1,
+            epoche_instanz: ursprung.clone(),
+            fuehrer_kennung: ursprung.clone(),
+            fuehrer_name: ursprung,
+            art: "angelegt".into(),
+            erklaerung: None,
+            beweis: None,
+            offen: None,
+            offen_bruch_at: None,
+            abgabe_schluessel: None,
+            anfrage_at: None,
+            bruch_at: None,
+            stand: 0,
+            geaendert_at: String::new(),
+        };
+        let mut conn = pool.acquire().await.unwrap();
+        insert_fremd(&mut conn, &mut a).await.unwrap();
+        a.id
+    }
+
+    async fn gelistet(pool: &sqlx::SqlitePool) -> Vec<String> {
+        let mut conn = pool.acquire().await.unwrap();
+        list_fremde_der_org(&mut conn, 1)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|a| a.kennung)
+            .collect()
+    }
+
+    // LLH-1675: Eine Akte steht unter „Einsätze beim Gegenüber“ nur, solange ihre Org bei der
+    // Instanz, von der der Einsatz stammt, aktiv zugeordnet ist.
+    #[tokio::test]
+    async fn widerrufene_zuordnung_nimmt_die_akten_des_gegenuebers_aus_der_liste() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        fremde_akte(&pool, "hub/5-aa").await;
+        assert_eq!(gelistet(&pool).await, vec!["hub/5-aa"]);
+        sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-10 10:00:00'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(gelistet(&pool).await.is_empty(), "Zuordnung widerrufen");
+    }
+
+    #[tokio::test]
+    async fn widerrufene_kopplung_nimmt_die_akten_des_gegenuebers_aus_der_liste() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        fremde_akte(&pool, "hub/5-aa").await;
+        for zustand in ["widerrufen", "vom_gegenueber_widerrufen"] {
+            sqlx::query("UPDATE instanz_kopplung SET zustand = ?")
+                .bind(zustand)
+                .execute(&pool)
+                .await
+                .unwrap();
+            assert!(gelistet(&pool).await.is_empty(), "{zustand}");
+        }
+    }
+
+    #[tokio::test]
+    async fn akte_einer_dritten_instanz_bleibt_solange_die_org_gekoppelt_ist() {
+        // Mehrere ELW an einem Hub: Die Akte von ELW 2 kommt über den Hub, ELW 2 ist hier nicht
+        // gekoppelt. Sie zählt, solange die Org überhaupt aktiv zugeordnet ist.
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        fremde_akte(&pool, "elw2/9-bb").await;
+        assert_eq!(gelistet(&pool).await, vec!["elw2/9-bb"]);
+        sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-10 10:00:00'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(gelistet(&pool).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn akte_einer_frueher_gekoppelten_instanz_faellt_trotz_anderer_kopplung_heraus() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        sqlx::query(
+            "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand) \
+             VALUES (2, 'elw2', 's2', 'ELW 2', 'meldet_sich', 'http://127.0.0.1:2', 'widerrufen')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        fremde_akte(&pool, "hub/5-aa").await;
+        fremde_akte(&pool, "elw2/9-bb").await;
+        assert_eq!(
+            gelistet(&pool).await,
+            vec!["hub/5-aa"],
+            "nur die des aktiven Hubs"
+        );
     }
 }
