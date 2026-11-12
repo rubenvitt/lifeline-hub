@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { contrastSurface } from '@einsatzzeichen/core';
+import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { describe, expect, it } from 'vitest';
 import EinsatzZeichen, { FunktionsZeichen } from './EinsatzZeichen';
 import { ZEICHEN_THEME_DUNKEL } from './zeichenTheme';
