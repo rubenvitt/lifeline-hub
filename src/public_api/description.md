@@ -20,7 +20,7 @@ Fachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschri
 | --- | --- | --- |
 | Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |
 | Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |
-| Abfrage | – | `after`, `wait` |
+| Abfrage | `karte` | `after`, `wait` |
 | Fehler | Text (`error`) | `code` |
 
 Felder sind `snake_case`.

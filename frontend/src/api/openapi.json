@@ -1071,7 +1071,8 @@
           "zustand",
           "is_abgelaufen",
           "angelegt_at",
-          "geaendert_at"
+          "geaendert_at",
+          "einsatz_freigebbar"
         ],
         "properties": {
           "angelegt_at": {
@@ -1082,6 +1083,10 @@
               "string",
               "null"
             ]
+          },
+          "einsatz_freigebbar": {
+            "type": "boolean",
+            "description": "Für diesen Zugang lässt sich hier ein Einsatz freigeben (LLH-1638): Lese-Recht mit\nEinsatzbezug, nicht widerrufen, nicht abgelaufen, und die Instanz nimmt für die Org\nFremdsysteme an. Die Seite zeigt dann, welchen Einsatz er liest."
           },
           "einsatz_id": {
             "type": [

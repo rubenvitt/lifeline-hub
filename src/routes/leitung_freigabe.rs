@@ -80,3 +80,47 @@ pub(crate) async fn etb_vermerken(
         crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, text).await?,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn einsatz(pool: &sqlx::SqlitePool, status: &str) -> i64 {
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1, 'Lage', ?) RETURNING id",
+        )
+        .bind(status)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Die Prüfung in der Transaktion: Der Extractor sah den Einsatz noch aktiv, der Abschluss
+    /// kam dazwischen. Dann darf keine Freigabe entstehen, geführt wie am Spiegel.
+    #[tokio::test]
+    async fn abgeschlossener_einsatz_ist_in_der_transaktion_409() {
+        let pool = crate::db::test_pool().await;
+        let aktiv = einsatz(&pool, "aktiv").await;
+        let zu = einsatz(&pool, "abgeschlossen").await;
+        let mut c = pool.acquire().await.unwrap();
+        for spiegel in [false, true] {
+            assert!(im_tx_aktiv(&mut c, aktiv, spiegel).await.is_ok());
+            assert!(
+                matches!(
+                    im_tx_aktiv(&mut c, zu, spiegel).await,
+                    Err(AppError::Conflict(_))
+                ),
+                "spiegel = {spiegel}"
+            );
+        }
+        // Ein Einsatz, den es nicht (mehr) gibt, ist am Spiegel ebenfalls kein aktiver.
+        assert!(matches!(
+            im_tx_aktiv(&mut c, 9999, true).await,
+            Err(AppError::Conflict(_))
+        ));
+    }
+}

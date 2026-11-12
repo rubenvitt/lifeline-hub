@@ -1,4 +1,4 @@
-//! Freigabe eines Einsatzes für einen Maschinenzugang (LLH-1638, ADR-0029, Spec
+//! Freigabe eines Einsatzes für einen Maschinenzugang (LLH-1638, ADR-0031, Spec
 //! `maschinenzugang`, „Einsatzbezogenes Lesen braucht die Freigabe der Einsatzleitung“).
 //!
 //! Ein Lese-Scope mit Einsatzbezug ([`Scope::has_einsatzbezug`]) sieht nur den Einsatz, den die
@@ -48,13 +48,25 @@ pub fn is_freigebbar(zugang: &Zugang, jetzt: &str) -> bool {
         && zugang.has_einsatzbezug()
 }
 
-/// Die freigebbaren Zugänge der Org aus Sicht eines Einsatzes, nach Namen.
+/// Nimmt diese Instanz für die Org Fremdsysteme an? Meldet sie sich für die Org bei einem Hub,
+/// lehnt der Extractor jeden Zugang der Org ab (Spec `maschinenzugang`, „Ein gekoppelter ELW
+/// nimmt keine Fremdsysteme an“): eine Freigabe hätte dort keine Wirkung, das Paneel zeigte
+/// Schalter ohne Folge.
+pub async fn is_org_angebunden(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
+    Ok(zugang::hub_fuer_org(conn, org_id).await?.is_none())
+}
+
+/// Die freigebbaren Zugänge der Org aus Sicht eines Einsatzes, nach Namen. Leer an einer
+/// Instanz, die sich für die Org bei einem Hub meldet.
 pub async fn list_fuer_einsatz(
     conn: &mut SqliteConnection,
     org_id: i64,
     einsatz_id: i64,
     jetzt: &str,
 ) -> Result<Vec<AnbindungFreigabe>, AppError> {
+    if !is_org_angebunden(conn, org_id).await? {
+        return Ok(Vec::new());
+    }
     let wirksam: Vec<(String, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(FREIGABE_WIRKSAM))
         .fetch_all(&mut *conn)
         .await?;
@@ -88,13 +100,16 @@ pub async fn list_fuer_einsatz(
 }
 
 /// Ein freigebbarer Zugang der Org; 404 sonst (fremd, widerrufen, abgelaufen, ohne Lese-Scope mit
-/// Einsatzbezug).
+/// Einsatzbezug, oder die Instanz meldet sich für die Org bei einem Hub).
 pub async fn load_freigebbar(
     conn: &mut SqliteConnection,
     org_id: i64,
     zugang_id: &str,
     jetzt: &str,
 ) -> Result<Zugang, AppError> {
+    if !is_org_angebunden(conn, org_id).await? {
+        return Err(AppError::NotFound);
+    }
     zugang::laden_in_org(conn, org_id, zugang_id)
         .await?
         .filter(|z| is_freigebbar(z, jetzt))
@@ -357,6 +372,47 @@ mod tests {
         freigeben_tx(&mut c, &z, e, von).await.unwrap();
         assert_eq!(delete_fuer_zugang_tx(&mut c, &z).await.unwrap(), Some(e));
         assert_eq!(delete_fuer_zugang_tx(&mut c, &z).await.unwrap(), None);
+    }
+
+    /// Meldet sich die Instanz für die Org bei einem Hub, lehnt der Extractor ihre Zugänge ab:
+    /// dann gibt es auch nichts freizugeben.
+    #[tokio::test]
+    async fn am_gekoppelten_elw_ist_kein_zugang_freigebbar() {
+        let pool = db::test_pool().await;
+        let z = neuer_zugang(&pool, "Monitor", &[Scope::LageRead]).await;
+        let e = neuer_einsatz(&pool, "A").await;
+        let mut c = pool.acquire().await.unwrap();
+        assert_eq!(
+            list_fuer_einsatz(&mut c, 1, e, JETZT).await.unwrap().len(),
+            1
+        );
+
+        let kopplung: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand) \
+             VALUES ('hub-1', 'X', 'Hub Kreis', 'meldet_sich', 'https://hub.example', 'aktiv') \
+             RETURNING id",
+        )
+        .fetch_one(&mut *c)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (?, 1, 'hub-1/1', 'Kreis')",
+        )
+        .bind(kopplung)
+        .execute(&mut *c)
+        .await
+        .unwrap();
+
+        assert!(list_fuer_einsatz(&mut c, 1, e, JETZT)
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(matches!(
+            load_freigebbar(&mut c, 1, &z, JETZT).await,
+            Err(AppError::NotFound)
+        ));
     }
 
     #[tokio::test]

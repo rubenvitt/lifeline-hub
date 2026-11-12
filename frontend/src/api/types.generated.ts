@@ -469,6 +469,12 @@ export interface components {
             angelegt_at: string;
             einsatz_bezeichnung?: string | null;
             /**
+             * @description Für diesen Zugang lässt sich hier ein Einsatz freigeben (LLH-1638): Lese-Recht mit
+             *     Einsatzbezug, nicht widerrufen, nicht abgelaufen, und die Instanz nimmt für die Org
+             *     Fremdsysteme an. Die Seite zeigt dann, welchen Einsatz er liest.
+             */
+            einsatz_freigebbar: boolean;
+            /**
              * Format: int64
              * @description Der aktive Einsatz, den der Zugang gerade liest (Freigabe der Einsatzleitung, LLH-1638).
              */
