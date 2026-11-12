@@ -189,3 +189,28 @@ src/api_doc.rs` greift erst, wenn die ADR akzeptiert ist.
   vergleicht sie mit `ErrorCode`.
 - **Die neue Abhängigkeit:** `cargo deny` oder Advisories schlagen an. → Prüfen im Gate-Lauf.
   utoipa-axum hat keine bekannten Advisories, und seine Lizenz (MIT/Apache-2.0) passt.
+
+## Nachträge (Umsetzung und Review vor dem PR, 12.11.2026)
+
+- **Namen nach der Bezeichner-Sprache:** Im Code heißen die Teile `is_v1`, `mount`,
+  `contract_layer`, `error_code_layer`, `openapi()`, `ErrorCode::for_status` und
+  `src/public_api/description.md`. Oben stehen noch die Arbeitsnamen (`ist_v1`, `montieren`,
+  `schicht`, `fuer_status`, `beschreibung.md`).
+- **D2, zwei Schichten statt einer:** Die Kompression packt JSON ab 1 KiB und liegt innerhalb der
+  äußeren Schicht. Eine Ablehnung, die die Eingabe zurückgibt (`JsonDataError`), kann lang genug
+  sein, und dann kam sie gepackt und ohne `code` an. `mount` hängt deshalb `error_code_layer` an
+  die v1-Routen, also innerhalb der Kompression. `contract_layer` bleibt außen für 404, 405,
+  Panik und Lastabwurf und setzt dort auch `no-store`. Die innere Schicht setzt `no-store` nicht,
+  weil die Kompression eine Antwort mit `Cache-Control` ungepackt lässt.
+- **D2, Text aus `AppError`:** `From<AppError>` liest den öffentlichen Text über
+  `AppError::public_message` (ausgelagert aus `into_response`, loggt wie bisher) statt aus dem
+  Body der Antwort. Konstruktoren gibt es zwei: `ApiError::new(code, text)` und
+  `ApiError::from_code(code)`, keinen je Code.
+- **D3, Grenze vor jedem Handler:** `DefaultBodyLimit` wirkt nur über Extraktoren. Ein Handler, der
+  den Body nicht oder roh liest (Signaturprüfung über `bh`, LLH-1652), sah keine Grenze. `mount`
+  legt deshalb zusätzlich `tower_http::limit::RequestBodyLimitLayer` (Feature `limit`) an. Sie
+  lehnt nach `Content-Length` vor dem Handler ab, ihr 413 bekommt seinen Code von der Schicht.
+- **D4, Fehler im Dokument:** Jede Route nennt `status = "default"` mit `ApiErrorBody`, so steht
+  die Fehlerform an jeder Operation.
+- **Gate:** `scripts/bereiche.sh` kennt `docs/api/*` und `src/public_api/*.md` als Querbezug der
+  Rust-Suite. Ohne den Eintrag ließe eine Änderung nur an der Beschreibung die Rust-Suite aus.

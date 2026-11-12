@@ -40,7 +40,8 @@ Vertrags: `tests/fehler_vertrag.rs`.
 Unter `/api/v1/` (öffentliche API, [ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md))
 trägt jeder Fehler zusätzlich einen stabilen englischen `code`. Vertrag ist dort der Code, nicht
 der Text. v1-Handler setzen ihn über `ApiError`; alles andere unter `/api/v1/` bekommt ihn von
-der Schicht `public_api::schicht`, auch Extractor-Ablehnungen, 404, 405, 413, Panik und
+den Schichten `public_api::error_code_layer` (an den Routen, innerhalb der Kompression) und
+`public_api::contract_layer` (außen, mit `no-store`), auch Extractor-Ablehnungen, 404, 405, 413, Panik und
 Lastabwurf (Spec [`oeffentliche-api-vertrag`](../../openspec/specs/oeffentliche-api-vertrag/spec.md)).
 
 ## 8.4 Eingabegrenzen

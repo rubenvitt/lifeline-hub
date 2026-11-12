@@ -121,13 +121,17 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   der Wurzel-`AGENTS.md`, „Bezeichner-Sprache“.
 - **Fehler:** v1-Handler geben `Result<_, ApiError>` zurück; `AppError` und `sqlx::Error` gehen per
   `?` über. Ein besonderer Fall nimmt seinen Code ausdrücklich (`ApiError::new(ErrorCode::…, …)`).
-  Was neben dem Handler scheitert, ergänzt `public_api::schicht`. Ein neuer Code kommt nur hinzu
-  (Enum, `beschreibung.md`, `tests/enum_wire_kontrakt.rs`); keiner wird umbenannt oder entfernt.
-- **Drift:** nach jeder Änderung an einer v1-Route, einem v1-Schema oder `beschreibung.md`
+  Was neben dem Handler scheitert, ergänzen `public_api::error_code_layer` (an den Routen, vor der
+  Kompression) und `public_api::contract_layer` (außen). Jede Route nennt im Dokument ihre
+  besonderen Fehler und `status = "default"` mit `ApiErrorBody`. Ein neuer Code kommt nur hinzu
+  (Enum, `description.md`, `tests/enum_wire_kontrakt.rs`); keiner wird umbenannt oder entfernt.
+- **Drift:** nach jeder Änderung an einer v1-Route, einem v1-Schema oder `description.md`
   `cargo test --test public_api_spec_aktuell` und `docs/api/public-v1.json` mitcommitten
   (`scripts/check-typ-codegen.sh`, Schritt 2).
-- **Grenzen:** Body höchstens `PUBLIC_API_BODY_MAX` (64 KiB, `app.rs`), jede Antwort
-  `Cache-Control: no-store`; beides montiert `public_api` selbst.
+- **Grenzen:** Body höchstens `PUBLIC_API_BODY_MAX` (64 KiB, `app.rs`), vor jedem Handler, auch
+  einem, der den Body roh liest (`public_api::mount`); jede Antwort `Cache-Control: no-store`
+  (`public_api::contract_layer`, montiert in `app.rs`). Die innere Schicht setzt den Kopf nicht,
+  sonst packte die Kompression keine v1-Antwort mehr.
 
 ## Anhänge
 

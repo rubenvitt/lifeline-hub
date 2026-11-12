@@ -4,7 +4,7 @@
 //! Vertrag ist `code`; der Text bleibt deutsche Prosa wie in der internen API (Konzept D9). v1-
 //! Handler geben [`ApiError`] zurück. Was vor oder neben einem Handler scheitert (abgelehnte
 //! Eingaben, unbekannter Pfad, 405, 413, Panik, Lastabwurf), bekommt seinen Code von der Schicht
-//! [`super::schicht`].
+//! [`super::error_code_layer`] und [`super::contract_layer`].
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -156,7 +156,7 @@ impl std::error::Error for ApiError {}
 impl From<AppError> for ApiError {
     fn from(err: AppError) -> Self {
         let status = err.status();
-        let code = if ist_spiegel_schutz(&err) {
+        let code = if is_spiegel_schutz(&err) {
             ErrorCode::FuehrungElsewhere
         } else {
             ErrorCode::for_status(status)
@@ -175,7 +175,7 @@ impl From<sqlx::Error> for ApiError {
     }
 }
 
-fn ist_spiegel_schutz(err: &AppError) -> bool {
+fn is_spiegel_schutz(err: &AppError) -> bool {
     matches!(
         err,
         AppError::Database(sqlx::Error::Database(db))
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn jeder_status_hat_seinen_vorgabe_code() {
-        let faelle = [
+        let cases = [
             (400, "invalid_field"),
             (401, "unauthorized"),
             (403, "missing_scope"),
@@ -222,7 +222,7 @@ mod tests {
             (500, "internal_error"),
             (503, "unavailable"),
         ];
-        for (status, code) in faelle {
+        for (status, code) in cases {
             let status = StatusCode::from_u16(status).unwrap();
             assert_eq!(ErrorCode::for_status(status).as_str(), code, "{status}");
         }
@@ -245,14 +245,14 @@ mod tests {
     #[test]
     fn code_und_status_passen_zusammen() {
         for code in ErrorCode::ALLE {
-            let vorgabe = ErrorCode::for_status(code.status());
+            let default = ErrorCode::for_status(code.status());
             assert!(
-                vorgabe == code
+                default == code
                     || matches!(code, ErrorCode::TlsRequired | ErrorCode::FuehrungElsewhere),
                 "{} antwortet mit {}, dessen Vorgabe {} ist",
                 code.as_str(),
                 code.status(),
-                vorgabe.as_str()
+                default.as_str()
             );
         }
     }
@@ -292,17 +292,17 @@ mod tests {
     /// Ein Datenbankfehler mit gegebenem Text, wie ihn der Trigger des Spiegel-Schutzes wirft
     /// (`migrations/0314`).
     #[derive(Debug)]
-    struct TriggerFehler(&'static str);
+    struct TriggerError(&'static str);
 
-    impl std::fmt::Display for TriggerFehler {
+    impl std::fmt::Display for TriggerError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.write_str(self.0)
         }
     }
 
-    impl std::error::Error for TriggerFehler {}
+    impl std::error::Error for TriggerError {}
 
-    impl sqlx::error::DatabaseError for TriggerFehler {
+    impl sqlx::error::DatabaseError for TriggerError {
         fn message(&self) -> &str {
             self.0
         }
@@ -322,7 +322,7 @@ mod tests {
 
     #[tokio::test]
     async fn spiegel_schutz_ist_fuehrung_elsewhere() {
-        let err = AppError::Database(sqlx::Error::Database(Box::new(TriggerFehler(
+        let err = AppError::Database(sqlx::Error::Database(Box::new(TriggerError(
             crate::instanz::spiegel::SCHUTZ_NACHRICHT,
         ))));
         let resp = ApiError::from(err).into_response();
