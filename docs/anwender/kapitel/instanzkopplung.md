@@ -570,3 +570,11 @@ oder Schwärzen des Einsatzes ist die Liste leer.
 „Update nötig“ heißt, die Programmstände liegen zu weit auseinander; Melden geht weiter, sonst
 nichts. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
 Installationen einander ab.
+
+Nach dem Zurückspielen einer Sicherung zeigt die Kopplung meist „… hat schon spätere Führungsakten
+quittiert, als diese Instanz vergeben hat (aus einer Sicherung zurückgespielt?)“, an weiteren
+Kopplungen „Der Zähler der Führungsakten lag unter einer Quittung …“. Das ist kein Fehler: Die
+Installation hat den Rückstand erkannt und schickt die Akten erneut, eingreifen muss niemand. Akten,
+die die andere Installation mit der Sicherung verloren hat, kommen mit den nächsten Meldungen
+wieder. Die Uhr des Servers muss dafür stimmen; die Grenzen nennt die Betriebsdoku
+(`docs/betrieb/backup-restore.md`, „Gekoppelte Instanz zurückspielen“).
