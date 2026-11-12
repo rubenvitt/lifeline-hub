@@ -6926,6 +6926,13 @@ export interface components {
             /** @description Zeitpunkt (UTC, `YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
         };
+        /** @description Der Hub, über den Push läuft. */
+        PushUeberHub: {
+            /** @description Adresse, unter der diese Instanz den Hub erreicht. */
+            adresse: string;
+            /** @description Name der Instanz, wie sie sich meldet. */
+            name: string;
+        };
         /** @description Ein Eintrag in der Antwort, mit dem Label der Qualifikation. */
         QualiSollEintrag: {
             /** Format: int64 */
@@ -8746,6 +8753,7 @@ export interface components {
              *     Abo leer.
              */
             stumm: components["schemas"]["BenachrichtigungArt"][];
+            ueber_hub?: components["schemas"]["PushUeberHub"] | null;
         };
         /**
          * @description Art eines Wechsels aus dem Plan (`einsatz_plan_wechsel.art`). Wire == `as_str()`.

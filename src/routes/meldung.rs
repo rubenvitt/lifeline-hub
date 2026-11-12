@@ -707,7 +707,13 @@ pub async fn lage_gesehen(
     .await?
     .ok_or(AppError::NotFound)?;
     crate::meldung::sse(&state, einsatz_id);
-    crate::meldung::benachrichtigung::lage_gesehen(&state.pool, &state.live, einsatz_id).await;
+    crate::meldung::benachrichtigung::lage_gesehen(
+        &state.pool,
+        &state.live,
+        einsatz_id,
+        &[meldung_id],
+    )
+    .await;
     Ok(Json(l))
 }
 
@@ -751,7 +757,13 @@ pub async fn lage_angezeigte_gesehen(
     .await?;
     if gesehen > 0 {
         crate::meldung::sse(&state, einsatz_id);
-        crate::meldung::benachrichtigung::lage_gesehen(&state.pool, &state.live, einsatz_id).await;
+        crate::meldung::benachrichtigung::lage_gesehen(
+            &state.pool,
+            &state.live,
+            einsatz_id,
+            &req.meldung_ids,
+        )
+        .await;
     }
     Ok(Json(LageGesehenAnzeige { gesehen }))
 }

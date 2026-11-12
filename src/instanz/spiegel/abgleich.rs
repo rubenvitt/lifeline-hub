@@ -366,6 +366,7 @@ pub async fn melde_live(pool: &SqlitePool, u: &Uebernommen) {
 /// Beantwortet einen Abgleich (Handler `POST /api/instanz/spiegel`).
 pub async fn handle_abgleich(
     pool: &SqlitePool,
+    live: &crate::live::LiveHub,
     router: Option<&axum::Router>,
     eigen: &Identitaet,
     kopplung: &KopplungZeile,
@@ -387,6 +388,7 @@ pub async fn handle_abgleich(
     }
     let mut uebernommen = Uebernommen::default();
     let mut abzuraeumen = Vec::new();
+    let mut hinweis_folgen = Vec::new();
     let jetzt = crate::zeit::jetzt();
     let antwort = crate::write_retry!(pool, |conn| {
         uebernommen = Uebernommen::default();
@@ -398,6 +400,10 @@ pub async fn handle_abgleich(
         uebernommen.einsaetze.extend(geklaert);
         let mut staende_antwort =
             uebernehme_alle(conn, eigen, kopplung, &orgs, anfrage, &mut uebernommen).await?;
+        // Hinweise nach den Zeilen, damit ihre Bezüge schon im Spiegel stehen (LLH-1495, D2).
+        let (hinweis_quittungen, folgen) =
+            super::hinweis::annehmen(conn, kopplung, &anfrage.hinweise, chrono::Utc::now()).await?;
+        hinweis_folgen = folgen;
         let bruch_antworten =
             super::fuehrung::beantworte_staende(conn, kopplung.id, &anfrage.staende).await?;
         let staende: HashMap<String, i64> = anfrage
@@ -477,10 +483,13 @@ pub async fn handle_abgleich(
             lebensende: geloescht,
             lebensende_quittungen,
             bruch_antworten,
+            hinweise: Vec::new(),
+            hinweis_quittungen,
         })
     })?;
     melde_live(pool, &uebernommen).await;
     lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
+    super::hinweis::ausfuehren(pool, live, hinweis_folgen).await;
     Ok(antwort)
 }
 
@@ -513,6 +522,7 @@ pub async fn abgleich_einmal(
     // Antworten auf Bruchstellen, nach denen die erreichte Seite in ihrer Antwort fragte; sie gehen
     // mit der nächsten Runde hinaus (LLH-1641, E6).
     let mut bruch_antworten: Vec<super::paket::BruchAntwort> = Vec::new();
+    let mut hinweise_mehr = false;
     for runde in 0..RUNDEN_MAX {
         let jetzt = crate::zeit::jetzt();
         let anfrage = crate::write_retry!(pool, |conn| {
@@ -549,6 +559,11 @@ pub async fn abgleich_einmal(
                 super::anhang::liefere_teile(conn, kopplung.id, &abgerufen, budget.bytes).await?;
             let abrufe = super::anhang::offene_abrufe(conn, kopplung.id).await?;
             let quittungen = super::antrag::offene_quittungen(conn, kopplung.id).await?;
+            // Hinweise nach den Lieferungen: erst das Liefern gibt einem neuen Einsatz seine
+            // Kennung (LLH-1495, D2); ihr Platz kommt aus der Reserve.
+            let (hinweise, mehr) =
+                super::hinweis::offene(conn, kopplung.id, chrono::Utc::now()).await?;
+            hinweise_mehr = mehr;
             Ok(SpiegelPaket {
                 staende,
                 lieferungen,
@@ -559,6 +574,8 @@ pub async fn abgleich_einmal(
                 lebensende,
                 lebensende_quittungen: Vec::new(),
                 bruch_antworten: bruch_antworten.clone(),
+                hinweise,
+                hinweis_quittungen: Vec::new(),
             })
         })
         .map_err(fehler)?;
@@ -618,6 +635,7 @@ pub async fn abgleich_einmal(
                 super::antrag::quittungen_uebernehmen(conn, kopplung.id, &antwort.quittungen)
                     .await?;
             uebernommen.einsaetze.extend(quittiert);
+            super::hinweis::quittiert(conn, kopplung.id, &antwort.hinweis_quittungen).await?;
             let quittiert: Vec<i64> = anfrage.quittungen.iter().map(|q| q.id).collect();
             let offen: Vec<i64> = antwort.antraege.iter().map(|a| a.id).collect();
             super::antrag::markiere_gemeldet(conn, kopplung.id, &quittiert, &offen).await?;
@@ -672,7 +690,8 @@ pub async fn abgleich_einmal(
             || !antwort.anhang_teile.is_empty()
             || ausgefuehrt
             || !geloescht_offen.is_empty()
-            || !bruch_antworten.is_empty();
+            || !bruch_antworten.is_empty()
+            || hinweise_mehr;
         if !weiter || runde + 1 == RUNDEN_MAX {
             break;
         }

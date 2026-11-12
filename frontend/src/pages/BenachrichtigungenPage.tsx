@@ -15,6 +15,7 @@ import {
   pushAusschalten,
   pushEinschalten,
   pushInhaltSetzen,
+  type PushHub,
   type PushZustand,
 } from '../alarm/webPush';
 import { useAuthOptional } from '../auth/AuthContext';
@@ -35,6 +36,17 @@ export const PUSH_SCHALTER = 'Auch bei geschlossener App';
  * Meldung nur auf Wunsch“). Nur bei eingeschaltetem Push, Vorgabe aus.
  */
 export const PUSH_INHALT_SCHALTER = 'Mit Absender und Wortlaut';
+
+/**
+ * Am gekoppelten ELW statt des Push-Schalters (LLH-1495, Spec `web-push`, „Push-Einstellung am
+ * gekoppelten ELW verweist auf den Hub“): Push schickt der Hub.
+ */
+export function pushUeberHub(name: string): string {
+  return `Push läuft über ${name}.`;
+}
+
+/** Linktext zur Seite „Benachrichtigungen“ am Hub. */
+export const ZUM_HUB = 'Am Hub einschalten';
 
 /** Eine Zeile mit Beschriftung, „nicht gespeichert“ bei Fehler, und dem Schalter rechts. */
 function SchalterZeile({
@@ -96,6 +108,7 @@ function SchalterZeile({
 function PushSchalter({ zeile }: { zeile: CSSProperties }) {
   const benutzerId = useAuthOptional()?.benutzer?.id ?? null;
   const [zustand, setZustand] = useState<PushZustand | null>(null);
+  const [hub, setHub] = useState<PushHub | null>(null);
   const [inhalt, setInhalt] = useState(false);
   const [laeuft, setLaeuft] = useState<'push' | 'inhalt' | null>(null);
   const [fehler, setFehler] = useState<'push' | 'inhalt' | null>(null);
@@ -106,6 +119,7 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
       (s) => {
         if (!aktiv) return;
         setZustand(s.zustand);
+        setHub(s.hub ?? null);
         setInhalt(s.inhalt);
       },
       () => aktiv && setZustand('fehlt'),
@@ -116,6 +130,16 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
   }, []);
 
   if (zustand == null || zustand === 'fehlt' || benutzerId == null) return null;
+  if (zustand === 'ueber_hub' && hub != null) {
+    return (
+      <Paneel titel="Dieses Gerät">
+        <PaneelZeile style={zeile}>
+          <Typography.Text>{pushUeberHub(hub.name)}</Typography.Text>
+          <Typography.Link href={`${hub.adresse}/benachrichtigungen`}>{ZUM_HUB}</Typography.Link>
+        </PaneelZeile>
+      </Paneel>
+    );
+  }
   const blockiert = zustand === 'blockiert';
   const setzePush = (an: boolean) => {
     setLaeuft('push');

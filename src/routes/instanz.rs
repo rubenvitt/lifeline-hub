@@ -822,8 +822,14 @@ pub async fn melden(
     anfrage: GekoppelteInstanz,
 ) -> Result<Response, AppError> {
     let body: MeldenAnfrage = anfrage.json()?;
-    let antwort =
-        melden::handle_meldung(&state.pool, &anfrage.identitaet, &anfrage.kopplung, &body).await?;
+    let antwort = melden::handle_meldung(
+        &state.pool,
+        &anfrage.identitaet,
+        &anfrage.kopplung,
+        &body,
+        state.live.web_push().is_some(),
+    )
+    .await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
@@ -890,6 +896,7 @@ pub async fn spiegel_abgleich(
     let body: crate::instanz::spiegel::paket::SpiegelPaket = anfrage.json()?;
     let antwort = crate::instanz::spiegel::abgleich::handle_abgleich(
         &state.pool,
+        &state.live,
         platz.router().as_ref(),
         &anfrage.identitaet,
         &anfrage.kopplung,

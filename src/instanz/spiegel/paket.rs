@@ -7,7 +7,8 @@ use serde_json::Value;
 
 /// Größte Anfrage und größte Antwort des Abgleichs.
 pub const SPIEGEL_MAX: usize = 2 * 1024 * 1024;
-/// Platz für Hülle, Stände, Anträge und Quittungen neben den Zeilen; die Zeilen bekommen den Rest.
+/// Platz für Hülle, Stände, Anträge, Quittungen und Hinweise (höchstens
+/// [`super::hinweis::HINWEISE_BYTES_MAX`]) neben den Zeilen; die Zeilen bekommen den Rest.
 pub const RESERVE: usize = 256 * 1024;
 /// Höchstzahl Einsätze je Paket (Lieferungen und Stände je für sich).
 pub const EINSAETZE_MAX: usize = 256;
@@ -68,6 +69,12 @@ pub struct SpiegelPaket {
     /// gefragten Zeilen ich als Führer nicht kenne.
     #[serde(default)]
     pub bruch_antworten: Vec<BruchAntwort>,
+    /// Anlässe von Hinweisen zu Einsätzen, die ich führe (LLH-1495, design.md D2).
+    #[serde(default)]
+    pub hinweise: Vec<super::hinweis::HinweisAnlass>,
+    /// Kennungen der Hinweise des Gegenübers, die ich angenommen oder verworfen habe.
+    #[serde(default)]
+    pub hinweis_quittungen: Vec<i64>,
 }
 
 /// Wie ein Einsatz beim Führer endet (D3).
@@ -327,6 +334,14 @@ impl SpiegelPaket {
                 .any(|a| a.unbekannt.len() > BRUCH_MAX)
         {
             return Err(format!("mehr als {BRUCH_MAX} Zeilen einer Bruchstelle"));
+        }
+        if self.hinweise.len() > super::hinweis::HINWEISE_MAX
+            || self.hinweis_quittungen.len() > super::hinweis::HINWEISE_MAX
+        {
+            return Err(format!(
+                "mehr als {} Hinweise im Paket",
+                super::hinweis::HINWEISE_MAX
+            ));
         }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
