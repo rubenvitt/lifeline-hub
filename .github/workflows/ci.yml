@@ -25,6 +25,14 @@
 # Im Zweifel wird geprüft: Nur ein ausdrückliches `false` spart, ein roter `aenderungen`-Job
 # lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
 #
+# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Shards laufen auf dem eigenen
+# Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
+# Fork stammt; die Wahl trifft `scripts/runner/select-runner.sh` im Job `aenderungen`. Leer heißt
+# GitHub, der Rückweg braucht also keine Codeänderung. Dort läuft jeder Job in einem frischen
+# Container ohne `sudo` (`scripts/runner/README.md`); Schritte, die `sudo` oder die Caches der
+# gehosteten Runner brauchen, tragen deshalb `runner.environment == 'github-hosted'`. Job- und
+# Check-Namen sind auf beiden Runner-Arten gleich.
+#
 # NUR UMNUMMERIERT (LLH-1660): Benennt der Migrations-Autofix auf einem grünen PR nur Migrationen
 # um, übernimmt der neue Kopf Frontend- und e2e-Suite vom Commit davor
 # (`scripts/nur-umnummeriert.sh`, Schritt im Job `aenderungen`). Schnellprüfungen,
@@ -88,13 +96,39 @@ jobs:
       rust: ${{ steps.bereiche.outputs.rust }}
       frontend: ${{ steps.bereiche.outputs.frontend }}
       e2e: ${{ steps.bereiche.outputs.e2e }}
+      runner: ${{ steps.runner.outputs.runner }}
     steps:
       # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches: zwei
-      # Commits Tiefe reichen für den Vergleich.
+      # Commits Tiefe reichen für den Vergleich. Auch bei `push` ausgecheckt: die Runner-Wahl
+      # liegt im Repo.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'pull_request'
         with:
           fetch-depth: 2
+      # Wo `e2e-Binary` und die e2e-Shards laufen (LLH-1666, Kopf). Vor der Bereichs-Erkennung:
+      # scheitert die, steht die Wahl schon fest. Scheitert diese, bleibt die Ausgabe leer, die
+      # Jobs fallen auf `ubuntu-latest` zurück, und die Bereichs-Erkennung läuft trotzdem.
+      - name: Runner für die e2e-Jobs
+        id: runner
+        continue-on-error: true
+        env:
+          EREIGNIS: ${{ github.event_name }}
+          KOPF_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          LABEL: ${{ vars.E2E_RUNNER }}
+        # Bei einem PR die Weiche aus dem ZIEL-Branch (HEAD^1 des Merge-Commits), nie aus dem PR:
+        # sonst stellte ein Fork sie mit einer Zeile in `select-runner.sh` auf den eigenen Server,
+        # ohne `.github/` anzufassen (ADR-0025). Fehlt sie dort noch, bleibt alles auf GitHub.
+        run: |
+          set -euo pipefail
+          weiche=./scripts/runner/select-runner.sh
+          if [ "$EREIGNIS" = pull_request ]; then
+            weiche="$RUNNER_TEMP/select-runner.sh"
+            git show HEAD^1:scripts/runner/select-runner.sh > "$weiche"
+            chmod +x "$weiche"
+          fi
+          runner="$("$weiche" "$EREIGNIS" "$KOPF_REPO" "$REPO" "$LABEL")"
+          echo "runner=$runner" >> "$GITHUB_OUTPUT"
+          echo "e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
       # NUR UMNUMMERIERT (LLH-1660): Der Migrations-Autofix pusht einen Commit, der Migrationen
       # nur umbenennt. Unterscheidet sich der Kopf des PRs vom letzten Commit mit grünen schweren
       # Suiten nur dadurch, laufen Frontend und e2e nicht noch einmal: `scripts/nur-umnummeriert.sh`
@@ -266,12 +300,15 @@ jobs:
     name: e2e-Binary
     needs: aenderungen
     if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
-    runs-on: ubuntu-latest
+    # Eigener Runner oder GitHub (LLH-1666, Kopf). Auf dem eigenen Runner bringt das Image nasm
+    # und den Compiler-Cache mit; die Schritte mit `sudo` und `rust-cache` laufen nur gehostet.
+    runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
       - name: Plattenplatz schaffen (nur bei Bedarf)
+        if: runner.environment == 'github-hosted'
         run: |
           df -h /
           frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
@@ -284,10 +321,14 @@ jobs:
       # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
       # zum Job-Timeout fest (LFH-1101).
       - name: System-Werkzeuge für die nativen Crates
+        if: runner.environment == 'github-hosted'
         run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      # Auf dem eigenen Runner hält `sccache` den Build warm (Volume, `scripts/runner/`); das
+      # `target/` aus dem GitHub-Cache zu laden kostete dort mehr, als es spart.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: runner.environment == 'github-hosted'
         with:
           shared-key: rust-openssl-vendored
           save-if: false
@@ -368,7 +409,9 @@ jobs:
     if: ${{ !cancelled() && (needs.binaer.result == 'success' || needs.binaer.result == 'skipped') }}
     env:
       E2E: ${{ needs.aenderungen.outputs.e2e }}
-    runs-on: ubuntu-latest
+    # Eigener Runner oder GitHub (LLH-1666, Kopf). Die Schritte für Systempakete und Browser-Cache
+    # laufen nur gehostet; das Image des eigenen Runners bringt beides mit, ohne `sudo`.
+    runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}
     # 75 min (LLH-1488): gemessen am 27.10.2026 (Lauf 40581848993) brauchten die Tests je Shard
     # 33, 58, 47 und 49 min; Shard 2 lief zweimal in die alte Frist von 60 min, ohne roten Test.
     # Die Suite hat sich seit der Laufzeittabelle von LFH-1117 verdoppelt (180 → 267 Dateien,
@@ -406,7 +449,7 @@ jobs:
       # Die Browserliste steht im Schlüssel: ein Eintrag aus der Zeit, als nur Chromium installiert
       # wurde, darf nicht als Treffer für alle drei gelten.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false'
+        if: env.E2E != 'false' && runner.environment == 'github-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
@@ -422,14 +465,14 @@ jobs:
       # erst am Ende eines GRÜNEN Jobs — ein roter oder abgebrochener Shard hinterließe nichts, und
       # der nächste Lauf stünde wieder am langsamen Mirror.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false'
+        if: env.E2E != 'false' && runner.environment == 'github-hosted'
         id: apt-cache
         with:
           path: ~/.cache/apt-playwright
           key: apt-playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: apt-playwright-${{ runner.os }}-${{ runner.arch }}-
       - name: Systempakete aus dem Cache bereitlegen
-        if: env.E2E != 'false'
+        if: env.E2E != 'false' && runner.environment == 'github-hosted'
         run: |
           mkdir -p ~/.cache/apt-playwright
           if compgen -G "$HOME/.cache/apt-playwright/*.deb" > /dev/null; then
@@ -449,7 +492,7 @@ jobs:
       # meist kommen sie aus dem Cache, daher 5 min je Versuch. So endet der Schritt auch im
       # schlimmsten Fall (3 × 15 + 3 × 5 min) mit eigenem Grund vor dem Job-Timeout von 75 min.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
-        if: env.E2E != 'false'
+        if: env.E2E != 'false' && runner.environment == 'github-hosted'
         run: |
           printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' \
             'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' |
@@ -466,8 +509,20 @@ jobs:
           fi
       # Gleich nach der Installation, nicht erst am Jobende (s. o.). Nur ohne exakten Treffer: ein
       # bestehender Schlüssel lässt sich nicht überschreiben.
+      # Auf dem eigenen Runner (LLH-1666): Browser und Systempakete stecken im Image. Passt dessen
+      # Playwright-Version nicht zum Lockfile, lädt `install` die neuen Browser (ohne `sudo`, die
+      # Systempakete ändern sich selten), und die Warnung erinnert an den Neubau des Images.
+      - name: Playwright-Browser (eigener Runner)
+        if: env.E2E != 'false' && runner.environment != 'github-hosted'
+        run: |
+          soll="$(mise exec -- node -p "require('./frontend/node_modules/@playwright/test/package.json').version")"
+          if [ "${LIFELINE_RUNNER_PLAYWRIGHT:-}" != "$soll" ]; then
+            echo "::warning::Runner-Image trägt Playwright ${LIFELINE_RUNNER_PLAYWRIGHT:-unbekannt}, das Lockfile $soll: die Browser werden in jedem Job geladen. Image auf dem Server neu bauen (scripts/runner/README.md)."
+          fi
+          ./scripts/wiederholen.sh 3 300 -- \
+            mise exec -- pnpm -C frontend exec playwright install chromium firefox webkit
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false' && steps.apt-cache.outputs.cache-hit != 'true'
+        if: env.E2E != 'false' && runner.environment == 'github-hosted' && steps.apt-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/apt-playwright
           key: ${{ steps.apt-cache.outputs.cache-primary-key }}
@@ -621,5 +676,4 @@ jobs:
       actions: write
       id-token: write
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

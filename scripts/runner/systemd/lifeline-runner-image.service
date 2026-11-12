@@ -1,0 +1,22 @@
+# Baut das Runner-Image neu (LLH-1666, ADR-0025): holt `alpha` in den Server-Klon, liest die
+# Playwright-Version aus dem Lockfile, zieht das Basisimage frisch und löscht alte Images dieses
+# Typs. Ausgelöst von lifeline-runner-image.timer oder von Hand nach einem Playwright-Bump.
+[Unit]
+Description=Lifeline-Hub e2e-Runner: Image neu bauen
+Documentation=https://github.com/rubenvitt/lifeline-hub/blob/alpha/scripts/runner/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=lifeline-runner
+Group=lifeline-runner
+ExecStart=/opt/lifeline-runner/repo/scripts/runner/build-image.sh --update
+TimeoutStartSec=1h
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Klon (git reset) und `.docker/` (buildx) im Home des Dienstnutzers.
+ReadWritePaths=/opt/lifeline-runner
