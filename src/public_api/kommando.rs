@@ -16,9 +16,9 @@ fn client() -> anyhow::Result<reqwest::Client> {
     )
 }
 
-/// Schreibt die Schlüsseldatei neu und nur für den Besitzer lesbar. Eine vorhandene Datei bleibt
+/// Legt die Schlüsseldatei neu und nur für den Besitzer lesbar an. Eine vorhandene Datei bleibt
 /// unangetastet: Sie trägt womöglich den einzigen Schlüssel eines laufenden Fremdsystems.
-pub fn write_schluesseldatei(pfad: &Path, cred: &Credentials) -> anyhow::Result<()> {
+pub fn oeffne_schluesseldatei(pfad: &Path) -> anyhow::Result<std::fs::File> {
     let mut optionen = std::fs::OpenOptions::new();
     optionen.write(true).create_new(true);
     #[cfg(unix)]
@@ -26,27 +26,51 @@ pub fn write_schluesseldatei(pfad: &Path, cred: &Credentials) -> anyhow::Result<
         use std::os::unix::fs::OpenOptionsExt;
         optionen.mode(0o600);
     }
-    let mut datei = match optionen.open(pfad) {
-        Ok(d) => d,
+    match optionen.open(pfad) {
+        Ok(d) => Ok(d),
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             bail!("{} gibt es schon; nicht überschrieben", pfad.display())
         }
-        Err(e) => return Err(e).with_context(|| format!("{} anlegen", pfad.display())),
-    };
+        Err(e) => Err(e).with_context(|| format!("{} anlegen", pfad.display())),
+    }
+}
+
+fn schreibe_in(datei: &mut std::fs::File, cred: &Credentials) -> anyhow::Result<()> {
     datei.write_all(serde_json::to_string_pretty(cred)?.as_bytes())?;
     datei.write_all(b"\n")?;
+    datei.sync_all()?;
     Ok(())
+}
+
+/// Schreibt die Schlüsseldatei neu und nur für den Besitzer lesbar; nie über eine vorhandene.
+pub fn write_schluesseldatei(pfad: &Path, cred: &Credentials) -> anyhow::Result<()> {
+    let mut datei = oeffne_schluesseldatei(pfad)?;
+    schreibe_in(&mut datei, cred)
 }
 
 pub async fn ausfuehren(befehl: ZugangCommand) -> anyhow::Result<()> {
     match befehl {
         ZugangCommand::Redeem { url, code, out } => {
             let pfad = Path::new(&out);
-            if pfad.exists() {
-                bail!("{out} gibt es schon; nicht überschrieben");
+            // Die Datei entsteht VOR dem Einlösen: Danach ist der Code verbraucht, und ein privater
+            // Schlüssel, der nirgends landet, wäre verloren.
+            let mut datei = oeffne_schluesseldatei(pfad)?;
+            let cred = match lifeline_machine_client::redeem(&client()?, &url, &code).await {
+                Ok(c) => c,
+                Err(e) => {
+                    drop(datei);
+                    let _ = std::fs::remove_file(pfad);
+                    return Err(e.into());
+                }
+            };
+            if let Err(e) = schreibe_in(&mut datei, &cred) {
+                // Letzter Ausweg: der Schlüssel steht nur noch hier. Der Betreiber sichert ihn.
+                eprintln!(
+                    "Schlüsseldatei nicht geschrieben ({e}). Inhalt zum Sichern, geheim halten:\n{}",
+                    serde_json::to_string_pretty(&cred)?
+                );
+                return Err(e);
             }
-            let cred = lifeline_machine_client::redeem(&client()?, &url, &code).await?;
-            write_schluesseldatei(pfad, &cred)?;
             println!("Eingelöst: Zugang {} an {}", cred.zugang_id, cred.base_url);
             println!("Schlüsseldatei: {out}");
             println!(
@@ -129,5 +153,35 @@ mod tests {
             }
             andere => panic!("{andere:?}"),
         }
+    }
+
+    /// Scheitert das Einlösen, bleibt keine leere Schlüsseldatei liegen; ist das Ziel nicht
+    /// beschreibbar, wird gar nicht erst eingelöst (sonst wäre der Code verbraucht und der Schlüssel
+    /// verloren).
+    #[tokio::test]
+    async fn redeem_legt_die_datei_vorher_an_und_raeumt_bei_fehler() {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("zugang.json");
+        let fehler = ausfuehren(ZugangCommand::Redeem {
+            url: "http://127.0.0.1:9".into(),
+            code: "ABCD-EFGH-JKMN-PQRS".into(),
+            out: pfad.to_string_lossy().into_owned(),
+        })
+        .await;
+        assert!(fehler.is_err());
+        assert!(
+            !pfad.exists(),
+            "keine leere Datei nach gescheitertem Einlösen"
+        );
+
+        let fehlt = dir.path().join("gibt/es/nicht/zugang.json");
+        let fehler = ausfuehren(ZugangCommand::Redeem {
+            url: "http://127.0.0.1:9".into(),
+            code: "ABCD-EFGH-JKMN-PQRS".into(),
+            out: fehlt.to_string_lossy().into_owned(),
+        })
+        .await
+        .unwrap_err();
+        assert!(fehler.to_string().contains("anlegen"), "{fehler}");
     }
 }

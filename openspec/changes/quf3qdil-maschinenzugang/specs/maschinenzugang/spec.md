@@ -103,7 +103,7 @@ werden. Bei einer Uhrabweichung MUST auch die Abweichung gespeichert werden.
 
 #### Scenario: Uhr weicht ab
 - **WHEN** ein Fremdsystem mit einer Uhr, die 7 min nachgeht, eine Anfrage signiert
-- **THEN** bekommt es 401 ohne Grund, und die Seite „Anbindungen“ zeigt am Zugang „Uhr weicht 7 min ab“ mit Zeitpunkt
+- **THEN** bekommt es 401 ohne Grund, und die Seite „Anbindungen“ zeigt am Zugang „Uhr geht 7 min nach“ mit Zeitpunkt
 
 #### Scenario: Unbekannter Zugang
 - **WHEN** ein JWS eine unbekannte Zugangs-ID im `kid` trägt
@@ -191,12 +191,13 @@ werden. Ein offener Code ersetzt einen früheren offenen Code desselben Zugangs.
 
 ### Requirement: Jeder Zugang ist gedrosselt
 
-Der Server SHALL je Zugang höchstens 60 Anfragen je Minute annehmen. Darüber MUST er mit 429,
-dem Code `rate_limited` und `Retry-After` in ganzen Sekunden antworten. Eine gedrosselte Anfrage
-MUST NOT ihre `jti` verbrauchen.
+Der Server SHALL je Zugang einen Vorrat von 60 Anfragen halten, der sich um eine je Sekunde
+auffüllt; im Mittel sind das 60 je Minute. Ist er leer, MUST der Server mit 429, dem Code
+`rate_limited` und `Retry-After` in ganzen Sekunden antworten. Eine gedrosselte Anfrage MUST NOT
+ihre `jti` verbrauchen.
 
 #### Scenario: Zu viele Anfragen
-- **WHEN** ein Zugang innerhalb einer Minute 61 gültig signierte Anfragen schickt
+- **WHEN** ein Zugang 61 gültig signierte Anfragen im selben Augenblick schickt
 - **THEN** bekommt die 61. eine 429 mit `Retry-After` von mindestens 1
 
 ### Requirement: Fehlversuche von Maschinen sperren nie die Anmeldung von Menschen

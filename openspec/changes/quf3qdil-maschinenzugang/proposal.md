@@ -36,7 +36,7 @@ unter `/api/v1/` anbieten.
   - `GET /api/v1/me`: Zugang, Org, Scopes, Serverzeit und Uhrabweichung.
   - `GET /api/v1/instanz/jwks.json`: öffentlicher Instanzschlüssel.
 - **Drosselung:**
-  - Je Zugang ein Token-Bucket mit 60 Anfragen je Minute. Darüber kommt 429 mit `Retry-After`.
+  - Je Zugang ein Token-Bucket: Vorrat 60, eine je Sekunde nach. Leer: 429 mit `Retry-After`.
   - Je IP ein eigener Zähler für Maschinen. Er zählt nur unbekannte Zugänge und gescheiterte
     Einlösungen und ist nie die Anmeldesperre.
 - **Nachweis:**

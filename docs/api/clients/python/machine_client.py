@@ -131,10 +131,18 @@ if __name__ == "__main__":
                                                             "machine-auth-testvektoren.json"))
     elif args[:1] == ["redeem"] and len(args) == 3:
         ziel = "lifeline-zugang.json"
-        if os.path.exists(ziel):
+        # Die Datei entsteht VOR dem Einlösen: danach ist der Code verbraucht, und ein privater
+        # Schlüssel, der nirgends landet, wäre verloren.
+        try:
+            fd = os.open(ziel, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
             sys.exit(ziel + " gibt es schon; nicht überschrieben")
-        cred = redeem(args[1], args[2])
-        fd = os.open(ziel, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            cred = redeem(args[1], args[2])
+        except Exception:
+            os.close(fd)
+            os.remove(ziel)
+            raise
         with os.fdopen(fd, "w") as f:
             json.dump(cred, f, indent=2)
         print("Eingelöst: Zugang", cred["zugang_id"], "→", ziel)

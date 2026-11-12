@@ -65,7 +65,7 @@ eigene Organisation. Eine Führungskraft sieht die Liste ohne Aktionen.
 
 ### Rechte
 
-| Recht                     | Das Fremdsystem darf                               |
+| Recht                     | Das Fremdsystem soll                               |
 | ------------------------- | -------------------------------------------------- |
 | Lage lesen                | die Lage eines freigegebenen Einsatzes lesen       |
 | Einsätze lesen            | die Köpfe freigegebener Einsätze lesen             |
@@ -74,9 +74,10 @@ eigene Organisation. Eine Führungskraft sieht die Liste ohne Aktionen.
 | Positionen einliefern     | Positionen melden                                  |
 | Rechner nutzen            | die Rechner verwenden                              |
 
-Neben jedem Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich mit
-der Doku des Fremdsystems vergleichen. Lesen mit Einsatzbezug braucht zusätzlich die Freigabe der
-Einsatzleitung. Ein Fremdsystem legt nie selbst einen Einsatz an.
+Die Rechte stehen fest, die Wege dahinter kommen nach und nach: Heute nutzt ein Fremdsystem nur die
+Prüfung seiner Anmeldung. Welche Daten ein Recht später öffnet, nennt dieses Kapitel, sobald es sie
+gibt. Neben jedem Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich
+mit der Doku des Fremdsystems vergleichen. Ein Fremdsystem legt nie selbst einen Einsatz an.
 
 ### Warum ein Fremdsystem nicht hereinkommt
 
