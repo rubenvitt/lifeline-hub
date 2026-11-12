@@ -668,6 +668,35 @@ fn serde_wire_gleich_as_str() {
         MaschinenzugangGeaendert,
         MaschinenzugangWiderrufen,
     });
+    // Maschinenzugang (LLH-1652): Scopes (Wire der öffentlichen API und JSON in
+    // `maschinenzugang.scopes`), Zustand (DB-CHECK in 0331) und Ablehnungsgrund.
+    enum_wire!(lifeline_hub::public_api::scope::Scope {
+        LageRead => "lage:read",
+        EinsaetzeRead => "einsaetze:read",
+        EventsRead => "events:read",
+        AlarmmeldungenWrite => "alarmmeldungen:write",
+        PositionenWrite => "positionen:write",
+        RechnerUse => "rechner:use",
+    });
+    enum_wire!(lifeline_hub::public_api::scope::ZugangZustand {
+        Wartet => "wartet",
+        Aktiv => "aktiv",
+        Widerrufen => "widerrufen",
+    });
+    enum_wire!(lifeline_hub::public_api::scope::AblehnungGrund {
+        Uhr => "uhr",
+        Signatur => "signatur",
+        Body => "body",
+        Pfad => "pfad",
+        Methode => "methode",
+        Ziel => "ziel",
+        Form => "form",
+        Wiederholung => "wiederholung",
+        Abgelaufen => "abgelaufen",
+        Widerrufen => "widerrufen",
+        KeinSchluessel => "kein_schluessel",
+        InstanzGekoppelt => "instanz_gekoppelt",
+    });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
         MeldetSich,

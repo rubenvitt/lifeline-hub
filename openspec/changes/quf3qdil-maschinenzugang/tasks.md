@@ -68,7 +68,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 4. Extractor und v1-Routen
 
-- [ ] 4.1 `src/public_api/machine.rs`: `impl FromRequest<AppState> for MachineClient` mit der
+- [x] 4.1 `src/public_api/machine.rs`: `impl FromRequest<AppState> for MachineClient` mit der
   Prüfreihenfolge aus D3. Dazu `ScopeAnforderung` über `route_layer` (fail closed, D8) und
   `antwort()` mit dem Kopf `Lifeline-Signature`. Verifizieren: Integrationstests in
   `tests/maschinenzugang.rs` für:
@@ -81,7 +81,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   - fehlender Scope 403 `missing_scope`;
   - 61. Anfrage 429 mit `Retry-After`, ohne verbrauchte `jti`;
   - Route ohne Scope-Angabe 500.
-- [ ] 4.2 `POST /api/v1/zugang/redeem` mit Body-Grenze 4 KiB, Maschinenzähler bei Fehlschlag,
+- [x] 4.2 `POST /api/v1/zugang/redeem` mit Body-Grenze 4 KiB, Maschinenzähler bei Fehlschlag,
   Admin-Spur `schluessel_gebunden` ohne Akteur und `#[utoipa::path]`. Verifizieren:
   Integrationstests für:
   - Einlösen;
@@ -89,20 +89,20 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   - abgelaufen 401;
   - falscher Prüfwert 401, und der Code bleibt einlösbar;
   - zehn Fehlversuche ergeben 429, und die Passwort-Anmeldung derselben IP bleibt möglich.
-- [ ] 4.3 `GET /api/v1/me` (Scope `Keine`) und `GET /api/v1/instanz/jwks.json` (ohne Anmeldung),
+- [x] 4.3 `GET /api/v1/me` (Scope `Keine`) und `GET /api/v1/instanz/jwks.json` (ohne Anmeldung),
   beide mit `#[utoipa::path]`. Im Dokument kommen das Sicherheitsschema `machine` und `servers`
   hinzu (D12). Verifizieren:
   - Integrationstest „Code einlösen, dann signiert `me`“ mit Zugang, Org, Scopes, Serverzeit
     und `clock_offset_s`;
   - die Antwortsignatur prüft mit dem Schlüssel aus dem Einlösen;
   - `docs/api/public-v1.json` ist neu geschrieben, und der Drift-Test ist grün.
-- [ ] 4.4 Kein Bearer und keine Sitzung unter `/api/v1/`, und `CurrentUser` nimmt
+- [x] 4.4 Kein Bearer und keine Sitzung unter `/api/v1/`, und `CurrentUser` nimmt
   `Authorization: Machine` nicht an. Verifizieren:
   - Integrationstests mit Lagemonitor-Bearer und mit Admin-Cookie gegen `me` ergeben 401;
   - `Authorization: Machine …` gegen eine Route der Oberfläche ergibt 401.
-- [ ] 4.5 Schlüsselwechsel über die Routen (D7). Verifizieren: Integrationstest „neuer Code
+- [x] 4.5 Schlüsselwechsel über die Routen (D7). Verifizieren: Integrationstest „neuer Code
   eingelöst, alter Schlüssel gilt, neuer Schlüssel signiert, alter Schlüssel 401“.
-- [ ] 4.6 Gekoppelter ELW (D10). Verifizieren: Integrationstest mit aktiver meldender Kopplung
+- [x] 4.6 Gekoppelter ELW (D10). Verifizieren: Integrationstest mit aktiver meldender Kopplung
   der Org: Anlegen 409, Anfrage eines vorher angelegten Zugangs 401 mit Grund
   `instanz_gekoppelt`.
 
@@ -125,7 +125,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 - [x] 6.2 Testvektoren `docs/api/machine-auth-testvektoren.json`. Die Crate schreibt sie im Test
   neu und scheitert bei Abweichung; ein Server-Test prüft das Vektor-JWS mit `verify` bei fester
   Zeit. Verifizieren: Beide Tests sind grün, eine geänderte Claim-Reihenfolge macht sie rot.
-- [ ] 6.3 Kommandos `lifeline-hub zugang redeem <url> <code> [--out]` und
+- [x] 6.3 Kommandos `lifeline-hub zugang redeem <url> <code> [--out]` und
   `lifeline-hub zugang me <datei>`: Datei mit `0600`, nie überschreiben, Fingerabdruck ausgeben.
   Verifizieren:
   - Test des Arguments-Parsers;

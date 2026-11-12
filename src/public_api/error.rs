@@ -123,6 +123,8 @@ pub struct ApiError {
     pub status: StatusCode,
     pub code: ErrorCode,
     pub message: String,
+    /// Wartezeit in Sekunden für den Kopf `Retry-After` (429, LLH-1652).
+    pub retry_after_s: Option<u64>,
 }
 
 impl ApiError {
@@ -132,6 +134,15 @@ impl ApiError {
             status: code.status(),
             code,
             message: message.into(),
+            retry_after_s: None,
+        }
+    }
+
+    /// 429 `rate_limited` mit `Retry-After` in ganzen Sekunden (mindestens 1).
+    pub fn rate_limited(retry_after_s: u64) -> Self {
+        ApiError {
+            retry_after_s: Some(retry_after_s.max(1)),
+            ..Self::from_code(ErrorCode::RateLimited)
         }
     }
 
@@ -165,6 +176,7 @@ impl From<AppError> for ApiError {
             status,
             code,
             message: err.public_message(),
+            retry_after_s: None,
         }
     }
 }
@@ -185,14 +197,21 @@ fn ist_spiegel_schutz(err: &AppError) -> bool {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (
+        let mut resp = (
             self.status,
             Json(ApiErrorBody {
                 error: self.message,
                 code: self.code,
             }),
         )
-            .into_response()
+            .into_response();
+        if let Some(s) = self.retry_after_s {
+            resp.headers_mut().insert(
+                axum::http::header::RETRY_AFTER,
+                axum::http::HeaderValue::from(s),
+            );
+        }
+        resp
     }
 }
 

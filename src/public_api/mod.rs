@@ -19,6 +19,8 @@
 pub mod drossel;
 pub mod error;
 pub mod kommando;
+pub mod machine;
+pub mod routen;
 pub mod scope;
 pub mod zugang;
 
@@ -32,6 +34,7 @@ use axum::response::{IntoResponse, Response};
 use axum::{Json, Router};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::router::UtoipaMethodRouterExt;
 use utoipa_axum::routes;
 
 pub use error::{ApiError, ApiErrorBody, ErrorCode};
@@ -49,15 +52,52 @@ pub const PREFIX: &str = "/api/v1";
         version = "1",
         description = include_str!("beschreibung.md"),
     ),
-    components(schemas(ApiErrorBody, ErrorCode))
+    components(schemas(ApiErrorBody, ErrorCode)),
+    servers((url = "/", description = "Diese Instanz")),
+    modifiers(&MaschinenAnmeldung)
 )]
 pub struct PublicApiDoc;
+
+/// Sicherheitsschema `machine` (LLH-1652, design.md D12): ein JWS je Anfrage im Kopf
+/// `Authorization: Machine <jws>`. OpenAPI kennt dafür kein eigenes `http`-Schema; `apiKey` im
+/// Kopf `Authorization` beschreibt den Ort, die Beschreibung das Verfahren.
+struct MaschinenAnmeldung;
+
+impl utoipa::Modify for MaschinenAnmeldung {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
+        let components = openapi.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "machine",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                "Authorization",
+                "`Machine <jws>`: je Anfrage ein kompaktes JWS (EdDSA, `typ` \
+                 `lifeline-machine+jwt`, `kid` = Zugangs-ID) mit den Claims `iss`, `aud` \
+                 (Instanz-UUID), `iat`, `exp` (höchstens 60 s nach `iat`), `jti`, `htm`, `htu` \
+                 (Pfad mit Abfrage) und `bh` (SHA-256 des Bodys, Base64url). Uhren dürfen 5 min \
+                 abweichen. Verfahren, Code-Ableitung und Testvektoren: \
+                 `docs/api/maschinenzugang.md`.",
+            ))),
+        );
+    }
+}
+
+/// Body-Grenze des Einlösens: ein Schlüssel und zwei Werte, öffentlich erreichbar.
+const REDEEM_BODY_MAX: usize = 4 * 1024;
 
 /// Alle Routen der öffentlichen API samt Dokument. Neue Routen nur per `.routes(routes!(…))`.
 /// Die einfache Routenmethode des `OpenApiRouter` legte eine Route ohne Dokumenteintrag an
 /// (`tests/public_api.rs` verbietet sie hier).
 pub fn router() -> OpenApiRouter<crate::app::AppState> {
-    OpenApiRouter::with_openapi(PublicApiDoc::openapi()).routes(routes!(openapi_json))
+    use axum::Extension;
+    use machine::ScopeAnforderung;
+    OpenApiRouter::with_openapi(PublicApiDoc::openapi())
+        .routes(routes!(openapi_json))
+        // Maschinenzugang (LLH-1652). Jede Route mit `MachineClient` trägt ihre
+        // `ScopeAnforderung`; ohne sie lehnt der Extractor ab (fail closed).
+        .routes(routes!(routen::redeem).layer(DefaultBodyLimit::max(REDEEM_BODY_MAX)))
+        .routes(routes!(routen::jwks))
+        .routes(routes!(routen::me).layer(Extension(ScopeAnforderung::Keine)))
 }
 
 /// Das fertige Dokument, einmal aus [`router`] gebaut.
