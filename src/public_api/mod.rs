@@ -19,6 +19,7 @@
 //! Regeln: `src/AGENTS.md`, „Öffentliche API v1“.
 
 pub mod drossel;
+pub mod einsaetze;
 pub mod error;
 pub mod events;
 pub mod freigabe;

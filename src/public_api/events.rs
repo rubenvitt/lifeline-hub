@@ -62,6 +62,39 @@ impl EventType {
     }
 }
 
+/// Die Tabellen, deren Änderung `lage.changed` auslöst: die Quellen der Lage
+/// (`public_api::lage::QUELLEN`) ohne den Einsatzkopf, den der Trigger `einsatz_ereignis_lage`
+/// spaltenweise abdeckt. Dieselbe Liste steht im Trigger `einsatz_aenderung_ereignis_i`
+/// (Abgleich in `tests::lage_arten_sind_die_quellen_der_lage_und_stehen_im_trigger`). Liest die
+/// Lage aus einer weiteren Tabelle, kommt sie hier dazu, und eine neue Migration baut den Trigger
+/// neu (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme).
+pub const LAGE_ARTEN: &[&str] = &[
+    "einsatz_person",
+    "einsatz_lagekennzahl_wahl",
+    "einsatz_personal",
+    "einsatz_einheit",
+    "uhs",
+    "uhs_platz",
+    "lagebericht",
+    "lage_zone",
+    "einsatzabschnitt",
+    "freies_zeichen",
+    "meldung",
+    "kommunikation_status",
+];
+
+/// Die Spalten des Einsatzkopfs, die in die Lage einfließen (`public_api::lage`: Bezeichnung,
+/// Stichwort, Einsatzart, Beginn und der Ort auf der Karte). Der Trigger `einsatz_ereignis_lage`
+/// hört auf genau diese.
+pub const LAGE_KOPF_SPALTEN: &[&str] = &[
+    "bezeichnung",
+    "stichwort",
+    "einsatzart",
+    "begonnen_at",
+    "einsatzort_lat",
+    "einsatzort_lon",
+];
+
 /// Höchstzahl der Ereignisse je Antwort. Eine volle Seite heißt: gleich weiter abrufen.
 pub const SEITE: i64 = 500;
 
@@ -530,6 +563,76 @@ mod tests {
         for falsch in ["26", "60", "x", "-1", "2.5", ""] {
             let fehler = parse_wait(Some(falsch)).unwrap_err();
             assert_eq!(fehler.code, ErrorCode::InvalidField, "wait={falsch:?}");
+        }
+    }
+
+    /// Text eines Triggers aus dem Schema.
+    async fn trigger_sql(name: &str) -> String {
+        let pool = crate::db::test_pool().await;
+        sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?")
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .expect("Trigger steht im Schema")
+    }
+
+    fn sortiert(liste: &[&'static str]) -> Vec<&'static str> {
+        let mut liste = liste.to_vec();
+        liste.sort();
+        liste
+    }
+
+    #[tokio::test]
+    async fn lage_arten_sind_die_quellen_der_lage_und_stehen_im_trigger() {
+        // Die Lage nennt ihre Quellen selbst; der Kopf hat seinen eigenen Trigger.
+        let quellen: Vec<&str> = crate::public_api::lage::QUELLEN
+            .iter()
+            .copied()
+            .filter(|t| *t != "einsatz")
+            .collect();
+        assert_eq!(
+            sortiert(LAGE_ARTEN),
+            sortiert(&quellen),
+            "liest die Lage aus einer weiteren Tabelle, gehört sie in LAGE_ARTEN und in den Trigger"
+        );
+        // Nur gespiegelte Tabellen schreiben ins Änderungslog, an dem der Trigger hängt.
+        for art in LAGE_ARTEN {
+            assert!(
+                crate::instanz::spiegel::art::GESPIEGELT
+                    .iter()
+                    .any(|g| g.tabelle == *art),
+                "{art} schreibt nicht ins Änderungslog: lage.changed bliebe aus"
+            );
+        }
+        let sql = trigger_sql("einsatz_aenderung_ereignis_i").await;
+        let liste =
+            &sql[sql.find("NEW.art IN (").expect("Liste der Arten") + "NEW.art IN (".len()..];
+        let liste = &liste[..liste.find(')').unwrap()];
+        let mut im_trigger: Vec<&str> = liste
+            .split(',')
+            .map(|a| a.trim().trim_matches('\''))
+            .collect();
+        im_trigger.sort();
+        assert_eq!(im_trigger, sortiert(LAGE_ARTEN));
+    }
+
+    #[tokio::test]
+    async fn der_lage_trigger_am_kopf_kennt_genau_die_lagespalten() {
+        let sql = trigger_sql("einsatz_ereignis_lage").await;
+        let liste = &sql[sql.find("UPDATE OF").unwrap() + "UPDATE OF".len()
+            ..sql.find("ON einsatz").expect("Trigger an einsatz")];
+        let mut im_trigger: Vec<&str> = liste.split(',').map(str::trim).collect();
+        im_trigger.sort();
+        assert_eq!(im_trigger, sortiert(LAGE_KOPF_SPALTEN));
+        for spalte in LAGE_KOPF_SPALTEN {
+            assert!(
+                sql.contains(&format!("OLD.{spalte} IS NOT NEW.{spalte}")),
+                "der Trigger vergleicht {spalte}"
+            );
+            assert!(
+                crate::public_api::einsaetze::KOPF_SPALTEN.contains(spalte),
+                "{spalte} gehört auch zum Kopf der Leseroute"
+            );
         }
     }
 }
