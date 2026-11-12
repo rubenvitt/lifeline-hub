@@ -28,6 +28,11 @@ bereiche_von() {
     frontend/src/api/* | frontend/src/heic/__fixtures__/* | frontend/src/einsatz/modulRegistry.ts \
       | frontend/public/beispiele/*)
       echo "rust frontend e2e" ;;
+    # Rust liest: das öffentliche Dokument (Drift-Test tests/public_api_spec_aktuell.rs) und
+    # dessen Beschreibung (`include_str!` in src/public_api, LLH-1653). Steht vor der
+    # Doku-Regel, die `docs/` und Markdown sonst ausnimmt.
+    docs/api/* | src/public_api/*.md)
+      echo "rust" ;;
     # Vitest liest: die Fachebenen-Quellen (fachebenen.test.ts), das gemeinsame Fixture der
     # Zählregeln (verdichtungFixture.test.ts) und die Werteliste der Zeichenbeschreibung
     # (zeichenWerte.guard.test.ts, LFH-836), dazu Fallsammlung und Basis-Richtwerte des

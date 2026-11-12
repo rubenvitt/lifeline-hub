@@ -96,6 +96,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Fehler; `code` nach der Tabelle in `info.description`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
           }
         }
       }

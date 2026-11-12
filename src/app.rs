@@ -90,7 +90,7 @@ pub const JSON_BODY_MAX: usize = 256 * 1024;
 
 /// Body-Grenze der öffentlichen API unter `/api/v1/` (LLH-1653, Spec `oeffentliche-api-vertrag`):
 /// Fremdsysteme schicken kurze JSON-Bodies (Alarmmeldung, Position, Rechner-Anfrage). Angewendet
-/// in `public_api::montieren`, also innen, vor `JSON_BODY_MAX`.
+/// in `public_api::mount`, also innen, vor `JSON_BODY_MAX`.
 pub const PUBLIC_API_BODY_MAX: usize = 64 * 1024;
 
 /// Schichtplan einlesen (LLH-1556): die Datei bis 2 MiB
@@ -2641,8 +2641,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router_platz = crate::instanz::spiegel::antrag::RouterPlatz::default();
     let router: Router = router
         // Öffentliche API v1 (LLH-1653): Routen nur über `public_api::router()`, jede mit ihrem
-        // Eintrag im Dokument; die Body-Grenze bringt `montieren` mit.
-        .merge(crate::public_api::montieren(crate::public_api::router()))
+        // Eintrag im Dokument; Body-Grenze und Fehlercode an den Routen bringt `mount` mit.
+        .merge(crate::public_api::mount(crate::public_api::router()))
         .fallback(move |uri: axum::http::Uri, kopf: axum::http::HeaderMap| {
             crate::static_files::serve(uri, kopf, heic_decoder.clone())
         })
@@ -2697,10 +2697,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 }),
             crate::zulassung::zulassung,
         ))
-        // Öffentliche API v1 (LLH-1653, `public_api::schicht`): `code` an jeder Fehlerantwort
+        // Öffentliche API v1 (LLH-1653, `public_api::contract_layer`): `code` an jeder Fehlerantwort
         // unter `/api/v1/` und `Cache-Control: no-store`. Außerhalb der Zulassung und von
         // CatchPanic, damit auch Lastabwurf-503 und Panik-500 einen Code bekommen.
-        .layer(axum::middleware::from_fn(crate::public_api::schicht))
+        .layer(axum::middleware::from_fn(crate::public_api::contract_layer))
         // Request-Instrumentierung. `.layer()` hängt nach außen, der Trace-Layer liegt also
         // außerhalb
         // von CatchPanic UND Zulassung und sieht Panik-500er wie Lastabwürfe. Jeder Handler läuft
@@ -3021,7 +3021,7 @@ mod tests {
     }
 
     /// Unter `/api/v1/` bekommen auch Panik-500 und Lastabwurf-503 ihren `code` (LLH-1653,
-    /// design.md D2): die Schicht `public_api::schicht` liegt außerhalb von CatchPanic und
+    /// design.md D2): die Schicht `public_api::contract_layer` liegt außerhalb von CatchPanic und
     /// Zulassung, in derselben Reihenfolge wie in `build_router_mit`.
     #[tokio::test]
     async fn panik_und_lastabwurf_unter_v1_tragen_code() {
@@ -3055,9 +3055,9 @@ mod tests {
                 zulassung,
                 crate::zulassung::zulassung,
             ))
-            .layer(axum::middleware::from_fn(crate::public_api::schicht));
+            .layer(axum::middleware::from_fn(crate::public_api::contract_layer));
 
-        for (pfad, status, code) in [
+        for (path, status, code) in [
             (
                 "/api/v1/boom",
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -3071,16 +3071,16 @@ mod tests {
         ] {
             let resp = app
                 .clone()
-                .oneshot(Request::builder().uri(pfad).body(Body::empty()).unwrap())
+                .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
-            assert_eq!(resp.status(), status, "{pfad}");
+            assert_eq!(resp.status(), status, "{path}");
             let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
             let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-            assert_eq!(json["code"], code, "{pfad}: {json}");
+            assert_eq!(json["code"], code, "{path}: {json}");
             assert!(
                 json["error"].as_str().is_some_and(|t| !t.is_empty()),
-                "{pfad}"
+                "{path}"
             );
         }
     }

@@ -57,9 +57,29 @@ async fn dokument_ist_ohne_anmeldung_abrufbar() {
 /// Jeder Pfad im Dokument liegt unter `/api/v1/`.
 #[test]
 fn dokument_kennt_nur_v1_pfade() {
-    for pfad in public_api::dokument().paths.paths.keys() {
-        assert!(public_api::ist_v1(pfad), "Pfad außerhalb von v1: {pfad}");
+    for path in public_api::openapi().paths.paths.keys() {
+        assert!(public_api::is_v1(path), "Pfad außerhalb von v1: {path}");
     }
+}
+
+/// Alle `.rs`-Dateien unter `dir`, auch in Unterordnern.
+fn rust_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files.extend(rust_files(&path));
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            files.push(path);
+        }
+    }
+    files
+}
+
+/// Der Produktionsteil von `src/app.rs`; die Tests darin bauen eigene Router.
+fn app_production_code() -> String {
+    let app = std::fs::read_to_string("src/app.rs").unwrap();
+    app.split("#[cfg(test)]").next().unwrap().to_string()
 }
 
 /// Eine Route unter `/api/v1/` entsteht nur über `public_api::router()` mit `routes!`; so steht
@@ -67,54 +87,116 @@ fn dokument_kennt_nur_v1_pfade() {
 /// legten eine Route ohne Eintrag an.
 #[test]
 fn v1_routen_entstehen_nur_mit_dokumenteintrag() {
-    let mut verstoesse = Vec::new();
-    for eintrag in std::fs::read_dir("src/public_api").unwrap() {
-        let pfad = eintrag.unwrap().path();
-        if pfad.extension().is_some_and(|e| e == "rs") {
-            let text = std::fs::read_to_string(&pfad).unwrap();
-            for nadel in [".route(", ".route_service(", ".nest_service("] {
-                if text.contains(nadel) {
-                    verstoesse.push(format!("{}: {nadel}", pfad.display()));
-                }
+    let files = rust_files(std::path::Path::new("src/public_api"));
+    assert!(files.len() >= 2, "src/public_api nicht gefunden");
+    let mut violations = Vec::new();
+    for path in files {
+        let text = std::fs::read_to_string(&path).unwrap();
+        for needle in [".route(", ".route_service(", ".nest_service("] {
+            if text.contains(needle) {
+                violations.push(format!("{}: {needle}", path.display()));
             }
         }
     }
-    let app = std::fs::read_to_string("src/app.rs").unwrap();
-    // Nur der Produktionsteil; die Tests in `app.rs` bauen eigene Router.
-    let produktion = app.split("#[cfg(test)]").next().unwrap();
-    if produktion.contains("\"/api/v1") {
-        verstoesse.push("src/app.rs registriert einen /api/v1-Pfad selbst".into());
+    if app_production_code().contains("\"/api/v1") {
+        violations.push("src/app.rs registriert einen /api/v1-Pfad selbst".into());
     }
     assert!(
-        verstoesse.is_empty(),
+        violations.is_empty(),
         "v1-Route ohne Dokumenteintrag möglich:\n{}",
-        verstoesse.join("\n")
+        violations.join("\n")
     );
 }
 
-/// Probe-Router wie in `app.rs`: v1-Route über `montieren`, Schicht außen. Bis LLH-1652 hat die
-/// öffentliche API keine Route mit Body, deshalb eine Proberoute.
-fn probe() -> axum::Router {
-    let v1 = OpenApiRouter::<()>::new().route(
-        "/api/v1/probe",
-        post(|JsonBody(_): JsonBody<Value>| async { StatusCode::NO_CONTENT }),
+/// Die äußere Schicht liegt in `build_router_mit` außerhalb von Kompression, CatchPanic und
+/// Zulassung (`.layer()` hängt nach außen, also später im Text): nur so bekommen Panik-500 und
+/// Lastabwurf-503 einen Code (design.md D2). Den Router mit Panik und Lastabwurf baut der Test
+/// `app::tests::panik_und_lastabwurf_unter_v1_tragen_code` in derselben Reihenfolge nach.
+#[test]
+fn die_vertragsschicht_liegt_ausserhalb_von_zulassung_und_catch_panic() {
+    let app = app_production_code();
+    let position = |needle: &str| {
+        app.find(needle)
+            .unwrap_or_else(|| panic!("src/app.rs montiert {needle} nicht"))
+    };
+    let contract = position("crate::public_api::contract_layer");
+    for inner in [
+        "CompressionLayer::new()",
+        "CatchPanicLayer::custom(on_panic)",
+        "crate::zulassung::zulassung",
+    ] {
+        assert!(
+            position(inner) < contract,
+            "contract_layer liegt innerhalb von {inner}"
+        );
+    }
+    assert!(
+        position("crate::public_api::mount(") < contract,
+        "die v1-Routen sind nicht eingehängt"
     );
-    public_api::montieren(v1).layer(axum::middleware::from_fn(public_api::schicht))
 }
 
-/// Ein JSON-Body von genau `laenge` Bytes.
-fn body_der_laenge(laenge: usize) -> String {
-    let rahmen = r#"{"x":""}"#.len();
-    format!(r#"{{"x":"{}"}}"#, "a".repeat(laenge - rahmen))
+/// Ein Body über 64 KiB scheitert an jeder v1-Route vor dem Handler, auch an einer, die den Body
+/// gar nicht liest, und am echten Router.
+#[tokio::test]
+async fn body_ueber_64_kib_scheitert_auch_an_einer_route_ohne_body() {
+    let app = common::setup().await;
+    let body = "a".repeat(64 * 1024 + 1);
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/openapi.json")
+                .header(header::CONTENT_LENGTH, body.len())
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(
+        resp.headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|v| v.to_str().ok()),
+        Some("no-store")
+    );
+    assert_eq!(json(resp).await["code"], "payload_too_large");
 }
 
-async fn sende(body: String) -> axum::response::Response {
-    probe()
+#[derive(serde::Deserialize)]
+#[allow(dead_code)]
+struct Number {
+    x: u32,
+}
+
+/// v1-Routen über `public_api::mount` wie in `app.rs`, mit der Antwortkompression darum. Bis
+/// LLH-1652 hat die öffentliche API keine Route mit Body, deshalb Proberouten.
+fn probe_router() -> axum::Router {
+    let v1 = OpenApiRouter::<()>::new()
+        .route(
+            "/api/v1/probe",
+            post(|JsonBody(_): JsonBody<Value>| async { StatusCode::NO_CONTENT }),
+        )
+        .route(
+            "/api/v1/number",
+            post(|JsonBody(_): JsonBody<Number>| async { StatusCode::NO_CONTENT }),
+        );
+    public_api::mount(v1).layer(tower_http::compression::CompressionLayer::new())
+}
+
+/// Ein JSON-Body von genau `length` Bytes.
+fn body_of_length(length: usize) -> String {
+    let frame = r#"{"x":""}"#.len();
+    format!(r#"{{"x":"{}"}}"#, "a".repeat(length - frame))
+}
+
+async fn send(uri: &str, body: String) -> axum::response::Response {
+    probe_router()
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/probe")
+                .uri(uri)
                 .header(header::CONTENT_TYPE, "application/json")
+                .header(header::ACCEPT_ENCODING, "gzip")
                 .body(Body::from(body))
                 .unwrap(),
         )
@@ -122,25 +204,69 @@ async fn sende(body: String) -> axum::response::Response {
         .unwrap()
 }
 
+/// Liest den Body, entpackt ihn, falls er gzip-gepackt ist.
+async fn json_unpacked(resp: axum::response::Response) -> Value {
+    let gzip = resp
+        .headers()
+        .get(header::CONTENT_ENCODING)
+        .is_some_and(|v| v == "gzip");
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = if gzip {
+        use std::io::Read;
+        let mut out = Vec::new();
+        flate2::read::GzDecoder::new(&bytes[..])
+            .read_to_end(&mut out)
+            .unwrap();
+        out
+    } else {
+        bytes.to_vec()
+    };
+    serde_json::from_slice(&bytes).unwrap()
+}
+
 #[tokio::test]
 async fn body_bis_64_kib_wird_angenommen() {
-    let body = body_der_laenge(lifeline_hub::app::PUBLIC_API_BODY_MAX);
+    let body = body_of_length(lifeline_hub::app::PUBLIC_API_BODY_MAX);
     assert_eq!(body.len(), 64 * 1024);
-    assert_eq!(sende(body).await.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        send("/api/v1/probe", body).await.status(),
+        StatusCode::NO_CONTENT
+    );
 }
 
 #[tokio::test]
 async fn body_ueber_64_kib_ist_413_payload_too_large() {
-    let resp = sende(body_der_laenge(64 * 1024 + 1)).await;
+    let resp = send("/api/v1/probe", body_of_length(64 * 1024 + 1)).await;
     assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
-    assert_eq!(json(resp).await["code"], "payload_too_large");
+    assert_eq!(json_unpacked(resp).await["code"], "payload_too_large");
 }
 
 #[tokio::test]
 async fn kaputtes_json_ist_400_invalid_field() {
-    let resp = sende(r#"{kaputt"#.into()).await;
+    let resp = send("/api/v1/probe", r#"{kaputt"#.into()).await;
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    let body = json(resp).await;
+    let body = json_unpacked(resp).await;
     assert_eq!(body["code"], "invalid_field");
     assert!(body["error"].as_str().is_some_and(|t| !t.is_empty()));
+}
+
+/// Eine Ablehnung, die die Eingabe zurückgibt, ist lang genug zum Packen. Der Code kommt vorher
+/// dazu und steht auch im gepackten Body.
+#[tokio::test]
+async fn langer_fehler_body_wird_gepackt_und_traegt_code() {
+    let resp = send(
+        "/api/v1/number",
+        format!(r#"{{"x":"{}"}}"#, "a".repeat(2000)),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        resp.headers()
+            .get(header::CONTENT_ENCODING)
+            .and_then(|v| v.to_str().ok()),
+        Some("gzip"),
+        "die Probe soll den gepackten Fall treffen"
+    );
+    let body = json_unpacked(resp).await;
+    assert_eq!(body["code"], "invalid_field", "{body}");
 }
