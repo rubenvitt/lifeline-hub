@@ -10007,6 +10007,137 @@ mod tests {
 
     // ── LLH-1579: Einheitengerät an einer Einheit (0286) ─────────────────────────────────
 
+    /// LLH-1647 (0325): Der Neubau von `einsatz_fuehrung` und `einsatz_fuehrung_verlauf` für die
+    /// Art `verwahrung` erhält Akten und Verlauf 1:1 (die Kaskade des Verlaufs greift nicht), die
+    /// Spalten aus 0321 und die Indizes; danach nehmen beide Tabellen `verwahrung` an und weisen
+    /// eine unbekannte Art weiter ab.
+    #[tokio::test]
+    async fn migration_0325_fuehrung_verwahrung() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 324).await;
+        let (e, _) = bild_grundlage(&pool).await;
+        let akte: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, bezeichnung, status, \
+                epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, stand, \
+                geaendert_at, uebernommen_stand, anfrage_von) \
+             VALUES ('elw/1-ab', ?, 1, 'Lage', 'abgeschlossen', 2, 'elw', 'elw', 'ELW Nord', \
+                'uebergabe', 7, '2026-11-11 10:00:00', 12, 'elw') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        for (art, nach) in [("angelegt", "Hub"), ("uebergabe", "ELW Nord")] {
+            sqlx::query(
+                "INSERT INTO einsatz_fuehrung_verlauf (fuehrung_id, epoche_zaehler, \
+                    epoche_instanz, art, nach_name, at) \
+                 VALUES (?, 1, 'hub', ?, ?, '2026-11-11 09:00:00')",
+            )
+            .bind(akte)
+            .bind(art)
+            .bind(nach)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        type Akte = (
+            i64,
+            String,
+            Option<i64>,
+            i64,
+            String,
+            Option<i64>,
+            Option<String>,
+        );
+        let akten = || {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, Akte>(
+                    "SELECT id, kennung, einsatz_id, epoche_zaehler, art, uebernommen_stand, \
+                        anfrage_von FROM einsatz_fuehrung ORDER BY id",
+                )
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let verlauf = || {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (i64, i64, String, String)>(
+                    "SELECT id, fuehrung_id, art, nach_name FROM einsatz_fuehrung_verlauf \
+                     ORDER BY id",
+                )
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let (akten_vorher, verlauf_vorher) = (akten().await, verlauf().await);
+
+        migriere_bis(&pool, 325).await;
+
+        assert_eq!(akten().await, akten_vorher, "Akten 1:1, ids unverändert");
+        assert_eq!(
+            verlauf().await,
+            verlauf_vorher,
+            "Verlauf überlebt den Neubau"
+        );
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+        for index in [
+            "idx_einsatz_fuehrung_org",
+            "idx_einsatz_fuehrung_stand",
+            "idx_einsatz_fuehrung_verlauf",
+        ] {
+            let da: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?",
+            )
+            .bind(index)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(da, 1, "{index} steht wieder");
+        }
+        sqlx::query("UPDATE einsatz_fuehrung SET art = 'verwahrung' WHERE id = ?")
+            .bind(akte)
+            .execute(&pool)
+            .await
+            .expect("Akte nimmt verwahrung an");
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrung_verlauf (fuehrung_id, epoche_zaehler, epoche_instanz, \
+                art, nach_name, at) VALUES (?, 3, 'hub', 'verwahrung', 'Hub', '2026-11-11 11:00:00')",
+        )
+        .bind(akte)
+        .execute(&pool)
+        .await
+        .expect("Verlauf nimmt verwahrung an");
+        assert!(
+            sqlx::query("UPDATE einsatz_fuehrung SET art = 'archiv' WHERE id = ?")
+                .bind(akte)
+                .execute(&pool)
+                .await
+                .is_err(),
+            "unbekannte Art bleibt verboten"
+        );
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM einsatz_fuehrung) + \
+                    (SELECT COUNT(*) FROM einsatz_fuehrung_verlauf)",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rest, 0, "Kaskade Einsatz → Akte → Verlauf greift wieder");
+    }
+
     /// Der Rebuild von `geraet_kopplung` (Muster 0213) hält Codes, Ereignisse und
     /// Gerätesitzungen 1:1, nimmt die Ansicht `einheit` an, bindet höchstens eine Stelle über alle
     /// sechs Spalten, und eine gelöschte Einheit leert nur die Bindung der (widerrufenen) Zeile.

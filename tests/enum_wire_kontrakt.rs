@@ -674,7 +674,7 @@ fn serde_wire_gleich_as_str() {
         Widerrufen,
         VomGegenueberWiderrufen,
     });
-    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0316).
+    // Führung je Einsatz (LLH-1491): Wire = `art` in einsatz_fuehrung/-verlauf (0316, 0325).
     enum_wire!(lifeline_hub::instanz::fuehrung::FuehrungWechselArt {
         Angelegt => "angelegt",
         Uebergabe => "uebergabe",
@@ -684,6 +684,7 @@ fn serde_wire_gleich_as_str() {
         Bestaetigt => "bestaetigt",
         Widerspruch => "widerspruch",
         Verworfen => "verworfen",
+        Verwahrung => "verwahrung",
     } in lifeline_hub::instanz::fuehrung::FuehrungWechselArt::ALLE);
     // Stammdaten-Verteilung (LLH-1493, LLH-1613): Wire = `art` in stammdaten_aenderung/-herkunft
     // (0306, 0312).

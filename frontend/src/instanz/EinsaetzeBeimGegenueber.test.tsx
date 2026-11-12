@@ -25,6 +25,7 @@ const akte: FuehrungAnzeige = {
   fuehrend: false,
   art: 'angelegt',
   anfrage_offen: false,
+  verwahrt: false,
   gegenueber: [{ kopplung_id: 1, kennung: 'k-hub', name: 'Hub Nord', richtung: 'meldet_sich' }],
   fuehrer_richtung: 'meldet_sich',
   verlauf: [],

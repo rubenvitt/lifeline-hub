@@ -27,6 +27,7 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
   fuehrend: true,
   art: 'angelegt',
   anfrage_offen: false,
+  verwahrt: false,
   gegenueber: [hub],
   verlauf: [],
   ...teil,
@@ -47,7 +48,8 @@ describe('fuehrungKurz (LLH-1491)', () => {
   });
 
   it('kennt jede Art', () => {
-    expect(Object.keys(FUEHRUNG_ART_TEXT)).toHaveLength(8);
+    expect(Object.keys(FUEHRUNG_ART_TEXT)).toHaveLength(9);
+    expect(FUEHRUNG_ART_TEXT.verwahrung).toBe('Verwahrung');
   });
 });
 
@@ -56,6 +58,13 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
     const m = fuehrungMoeglich(akte({ gegenueber: [hub, elw] }));
     expect(m.uebergeben.map((g) => g.name)).toEqual(['Hub Nord', 'ELW 1']);
     expect(m.perCode.map((g) => g.name)).toEqual(['Hub Nord']);
+    expect(m.anfragen || m.notuebernahme || m.notuebernahmeMitBeweis || m.entscheiden).toBe(false);
+  });
+
+  it('verwahrt: weder übergeben noch per Code abgeben (LLH-1647)', () => {
+    const m = fuehrungMoeglich(akte({ gegenueber: [hub, elw], verwahrt: true, art: 'verwahrung' }));
+    expect(m.uebergeben).toEqual([]);
+    expect(m.perCode).toEqual([]);
     expect(m.anfragen || m.notuebernahme || m.notuebernahmeMitBeweis || m.entscheiden).toBe(false);
   });
 
