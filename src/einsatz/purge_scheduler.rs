@@ -426,19 +426,43 @@ pub async fn tick_mit_rueckschrieb(
 /// Startet den Hintergrund-Purge-Scheduler (nur im Produktivlauf aus `main.rs`).
 /// Dünner Wrapper um `tick_einmal`; die Logik selbst ist oben testbar.
 pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
-        // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
-        // etwa nach einem Absturz zwischen Schwärzung und Rückschrieb.
-        let mut rueckschrieb_ausstehend = true;
-        // Klartext-Zwischendateien eines abgebrochenen Archivbaus (LLH-1494): außer diesem Task
-        // baut niemand Archive, also gehört jede vorhandene zu einem toten Lauf.
-        super::archiv::zwischendateien_aufraeumen(&pool).await;
-        loop {
-            ticker.tick().await;
-            tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
-        }
-    });
+    // Ein eigener Thread mit eigener Runtime: so muss der Future nicht `Send` sein.
+    // `tokio::spawn` lehnt ihn mit rustc 1.97 bis 1.99 ab („implementation of `Send` is not
+    // general enough“ für die geliehenen sqlx-Futures in `archiv::archivieren`), obwohl jeder Teil
+    // für sich `Send` ist. Der Pool und der LiveHub laufen mit jeder Tokio-Runtime. Der Thread
+    // wird nicht gejoint und endet mit dem Prozess; ein `spawn_blocking` hielte dagegen das
+    // Herunterfahren der Haupt-Runtime auf.
+    let gestartet = std::thread::Builder::new()
+        .name("purge".into())
+        .spawn(move || {
+            let runtime = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::error!("Purge: Runtime nicht gestartet, kein Hintergrund-Purge: {e}");
+                    return;
+                }
+            };
+            runtime.block_on(async move {
+                let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
+                // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
+                // etwa nach einem Absturz zwischen Schwärzung und Rückschrieb.
+                let mut rueckschrieb_ausstehend = true;
+                // Klartext-Zwischendateien eines abgebrochenen Archivbaus (LLH-1494): außer diesem Task
+                // baut niemand Archive, also gehört jede vorhandene zu einem toten Lauf.
+                super::archiv::zwischendateien_aufraeumen(&pool).await;
+                loop {
+                    ticker.tick().await;
+                    tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend)
+                        .await;
+                }
+            })
+        });
+    if let Err(e) = gestartet {
+        tracing::error!("Purge: Thread nicht gestartet, kein Hintergrund-Purge: {e}");
+    }
 }
 
 #[cfg(test)]
