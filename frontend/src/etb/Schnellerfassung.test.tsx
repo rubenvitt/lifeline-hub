@@ -1672,6 +1672,29 @@ describe('Ereigniszeit bleibt nach dem Verlassen des Felds (LLH-1842)', () => {
     expect(inhalt).toHaveFocus();
   });
 
+  it('die erneute Wahl des offenen Felds lässt den Editor an seinem Platz', async () => {
+    const p = props({
+      initialWerte: {
+        inhalt: '',
+        typ: 'meldung',
+        metadaten: { von: 'ELW 1', an: 'Leitstelle' },
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    const zeit = await tippeZeitUndVerlasse(nutzer);
+    const stehtNachAn = () =>
+      (screen.getByText(/^An:/).compareDocumentPosition(zeit) &
+        Node.DOCUMENT_POSITION_FOLLOWING) !==
+      0;
+    expect(stehtNachAn()).toBe(true);
+
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Ereigniszeit ✓'));
+    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
+    expect(stehtNachAn()).toBe(true);
+  });
+
   it('ein geöffneter, unberührter Zeit-Editor setzt keine Ereigniszeit', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);

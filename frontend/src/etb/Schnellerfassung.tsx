@@ -619,6 +619,9 @@ export default function Schnellerfassung({
 
   /** Öffnet den Editor eines Felds und merkt, ob es dabei schon einen Wert hatte (`chipFelder`). */
   function openEditor(feld: MetaFeld) {
+    // Schon offen (erneut über „+ Feld“ gewählt): nichts tun. Sein Wert kann inzwischen gelten,
+    // und `editNeu` neu zu bestimmen ließe den offenen Editor an einen anderen Platz springen.
+    if (editFeld === feld) return;
     setEditNeu(wirksam[feld] == null);
     setEditFeld(feld);
   }
