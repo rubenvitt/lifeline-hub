@@ -2,7 +2,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { EinsaetzeBeimGegenueber } from './EinsaetzeBeimGegenueber';
+import { EinsaetzeBeimGegenueber, fremdeNachladenAlle } from './EinsaetzeBeimGegenueber';
+import { ApiError } from '../api/client';
 import type { FuehrungAnzeige } from '../api/types';
 
 vi.mock('../api/fuehrung', () => ({
@@ -45,9 +46,32 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
   });
 
   it('ohne Schalter (404) fehlt der Abschnitt', async () => {
-    vi.mocked(loadFuehrungFremd).mockRejectedValue(new Error('404'));
+    vi.mocked(loadFuehrungFremd).mockRejectedValue(new ApiError(404, 'Nicht gefunden'));
     renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />);
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText('Einsätze beim Gegenüber')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  // LLH-1675: Ein Server- oder Leitungsfehler ist nicht der gewollte 404 bei Schalter aus; der
+  // Abschnitt fehlte sonst wortlos.
+  it('ein anderer Ladefehler steht mit „Erneut laden“ im Abschnitt', async () => {
+    vi.mocked(loadFuehrungFremd)
+      .mockRejectedValueOnce(new ApiError(500, 'Interner Fehler', { vomAnwendungsserver: true }))
+      .mockResolvedValueOnce([akte]);
+    renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />);
+    expect(await screen.findByText('Einsätze beim Gegenüber')).toBeInTheDocument();
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('Akten des Gegenübers nicht abrufbar')).toBeInTheDocument();
+    await userEvent.click(within(alert).getByRole('button', { name: 'Erneut laden' }));
+    expect(await screen.findByText('E2026-0003 Stadtfest')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('fragt bei 404 nicht mehr nach, bei anderen Fehlern weiter alle 30 s', () => {
+    expect(fremdeNachladenAlle(new ApiError(404, 'Nicht gefunden'))).toBe(false);
+    expect(fremdeNachladenAlle(new ApiError(500, 'Interner Fehler'))).toBe(30_000);
+    expect(fremdeNachladenAlle(new TypeError('Failed to fetch'))).toBe(30_000);
+    expect(fremdeNachladenAlle(null)).toBe(30_000);
   });
 });
