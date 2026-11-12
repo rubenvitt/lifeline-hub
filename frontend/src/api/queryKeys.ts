@@ -1062,6 +1062,8 @@ export const GLOBAL_KEYS = {
   lagemonitorZugaenge: 'lagemonitor-zugaenge',
   // Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652), Verwaltung.
   anbindungen: 'anbindungen',
+  // Einwurf-Zugänge für Absender ohne Signatur (LLH-1654), Verwaltung auf derselben Seite.
+  einwurfZugaenge: 'einwurf-zugaenge',
   // Lagebild für Externe (LLH-1496): Abruf der Seite `/extern` mit dem Schlüssel aus dem Link.
   lagebildExtern: 'lagebild-extern',
   // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
@@ -1188,6 +1190,7 @@ export const globalKeys = {
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
   anbindungen: () => [GLOBAL_KEYS.anbindungen] as const,
+  einwurfZugaenge: () => [GLOBAL_KEYS.einwurfZugaenge] as const,
   /** Abruf der Seite `/extern` (LLH-1496). Ohne den Schlüssel: der bleibt aus dem Cache. */
   lagebildExtern: () => [GLOBAL_KEYS.lagebildExtern] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
@@ -1386,6 +1389,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `anbindungen` (LLH-1652): Verwaltung der Maschinenzugänge; die eigene Änderung setzt die
  *   Antwort. Ablehnungen und „zuletzt genutzt“ zeigt der nächste Abruf, kein Ereignis je Anfrage
  *   eines Fremdsystems.
+ * - `einwurfZugaenge` (LLH-1654): Verwaltung der Einwurf-Zugänge; die eigene Änderung setzt die
+ *   Antwort. „Zuletzt genutzt“ zeigt der nächste Abruf, kein Ereignis je Einwurf.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
@@ -1413,6 +1418,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.authProvider,
   GLOBAL_KEYS.lagemonitorZugaenge,
   GLOBAL_KEYS.anbindungen,
+  GLOBAL_KEYS.einwurfZugaenge,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,
