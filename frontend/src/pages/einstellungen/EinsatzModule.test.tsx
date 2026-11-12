@@ -282,6 +282,29 @@ describe('EinsatzModule', () => {
     expect(within(zeile).getByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
   });
 
+  // LLH-1675: Am Spiegel trägt auch jede gesperrte Zeile die führende Instanz.
+  it('nennt am Spiegel an der Zeile die führende Instanz, nicht die Rolle', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      spiegel: {
+        gegenstelle: 'ELW 1',
+        beendet: false,
+        antraege_ausstehend: 0,
+        antraege_abgelehnt: 0,
+        bruchstelle: 0,
+      },
+    } as never);
+
+    rendern();
+
+    const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
+    expect(within(zeile).getByText('Spiegel von ELW 1')).toBeInTheDocument();
+    expect(within(zeile).queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
+  });
+
   // `darfEinsatzLeiten` verlangt einen aktiven Einsatz; ein abgeschlossener sperrt auch die
   // Einsatzleitung. Ein Rollenwort widerspräche dort dem Seitenkopf.
   it('nennt im abgeschlossenen Einsatz den Abschluss, nicht die Rolle', async () => {

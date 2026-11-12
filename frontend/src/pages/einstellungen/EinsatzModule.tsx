@@ -14,7 +14,7 @@ import {
 } from '../../api/einsaetze';
 import { orgVorgabe } from '../../components/vorgabeText';
 import { rollenName } from './optionen';
-import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_ORG_ADMIN } from '../../components/nurAnsicht';
+import { NUR_LEITUNG_ORG_ADMIN } from '../../components/nurAnsicht';
 import { einsatzKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { darfModuleVerwalten } from '../../einsatz/schreibrecht';
@@ -215,9 +215,9 @@ export default function EinsatzModule() {
               }),
           }}
           darfVerwalten={darfVerwalten}
-          // Zwei Ursachen, zwei Wörter: ein abgeschlossener Einsatz sperrt auch die Einsatzleitung,
-          // ein Rollenwort widerspräche dann dem Seitenkopf.
-          rechteGrund={daten.istAktiv ? NUR_LEITUNG_ORG_ADMIN : EINSATZ_ABGESCHLOSSEN}
+          // Drei Ursachen, drei Wörter: ein abgeschlossener Einsatz und ein Spiegel sperren auch
+          // die Einsatzleitung, ein Rollenwort widerspräche dann Seitenkopf und Band (LLH-1675).
+          rechteGrund={daten.rechteGrund(RECHTE_TEXT)}
           // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert.
           laeuftKey={laeuftKey}
           fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
