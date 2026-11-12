@@ -117,20 +117,25 @@ pub(super) async fn einspielen(quelle: Migrator, pool: &SqlitePool) -> Result<()
         "PRAGMA foreign_keys = ON"
     };
 
+    // `run_direct` statt `run`/`run_to`: dieselbe Arbeit, aber ohne den generischen
+    // `Acquire`-Weg, dessen Lebensdauern der `Send`-Beweis im Purge-Task (Archivbau ruft
+    // `db::migrate`) nicht allgemein genug führen kann.
     let ergebnis = async {
         for (version, r) in &einteilung {
             if *r != (Rahmen::Atomar { fk_aus: true }) {
                 continue;
             }
-            migrator.run_to(version - 1, &mut *conn).await?;
+            migrator
+                .run_direct(Some(version - 1), &mut *conn, false)
+                .await?;
             sqlx::query("PRAGMA foreign_keys = OFF")
                 .execute(&mut *conn)
                 .await?;
-            let umbau = migrator.run_to(*version, &mut *conn).await;
+            let umbau = migrator.run_direct(Some(*version), &mut *conn, false).await;
             sqlx::query(zuruecksetzen).execute(&mut *conn).await?;
             umbau?;
         }
-        migrator.run(&mut *conn).await
+        migrator.run_direct(None, &mut *conn, false).await
     }
     .await;
 
