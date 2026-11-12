@@ -512,7 +512,8 @@ Spiegel. Ist dieser ELW mit dem führenden ELW nicht selbst gekoppelt, bekommt d
 keine Änderungen mehr und zeigt das im Hinweisband; was er seit seiner Notübernahme erfasst hat,
 bleibt dort als Bruchstelle aufgehoben. Wird die Kopplung zum Hub widerrufen, verschwindet das
 Hinweisband, und der ELW führt weiter. Hat der Hub die Führung inzwischen von einem anderen ELW
-zurückbekommen, zeigt der ELW „Führung übernommen von …“ mit „Übernahme bestätigen“ und
+zurückbekommen oder sie sich von ihm zurückgeholt, per Notübernahme oder durch den Widerruf der
+Kopplung zu ihm, zeigt der ELW „Führung übernommen von …“ mit „Übernahme bestätigen“ und
 „Widersprechen“, ohne Alarm; widerspricht die Einsatzleitung, führt er mit der nächsten Epoche
 weiter, und der Hub nimmt das an. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der
 Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“, ohne auf den Hub zu

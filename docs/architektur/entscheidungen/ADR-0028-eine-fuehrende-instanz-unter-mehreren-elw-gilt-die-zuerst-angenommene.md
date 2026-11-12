@@ -1,7 +1,8 @@
 ---
 id: ADR-0028
 titel: Ein Einsatz hat genau eine führende Instanz; unter mehreren ELW gilt die zuerst angenommene
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0029
 datum: 2026-11-12
 ersetzt: ADR-0021
 gilt_fuer:
