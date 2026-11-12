@@ -32,7 +32,7 @@ ist, dann der Code. Tests im Backend mit `cargo test --test instanz_fuehrung <na
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` ist grün. Belegt durch den Lauf vor dem PR oder die CI des PRs; das Kästchen wird mit Verweis auf diesen Lauf abgehakt.
+- [x] 5.1 `./scripts/check-all.sh` ist grün. Belegt durch die CI des PRs (dasselbe Skript); lokal liefen `--nur schnell`, `--nur frontend` sowie `cargo test --test instanz_fuehrung` und `cargo test --lib instanz::fuehrung`, die volle Rust-Suite passte nicht in den Platz der Sitzung.
 
 ## Workflow follow-up
 

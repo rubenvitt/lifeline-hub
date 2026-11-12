@@ -343,7 +343,8 @@ Herleitung in
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
     `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 der Change
     `v6hj7xl2-fuehrung-epoche` und ihre Ergänzung in design.md D3 der Change
-    `faq7l7m4-zwei-elw-unterlegene-seite` nach. Ist ein Dritter beteiligt (mehrere ELW an einem
+    `faq7l7m4-zwei-elw-unterlegene-seite`
+    (`openspec/changes/archive/2026-11-12-faq7l7m4-zwei-elw-unterlegene-seite/design.md`) nach. Ist ein Dritter beteiligt (mehrere ELW an einem
     Hub), hält die meldende Seite offen; ob das ein Konflikt ist, sagt `austausch::ist_konflikt`.
   - Der Schalter steht in `instanz_identitaet.fuehrung_an` (je Instanz, auch im Testprozess);
     `instanz::fuehrung::is_enabled`, nie ein prozessweiter Merker.
