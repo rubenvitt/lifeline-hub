@@ -24,8 +24,8 @@ Wortlauts steht in der Aufgabe.
 
 ## 4. Glossar und ADR-Geltung (D3)
 
-- [ ] 4.1 `docs/architektur/12-glossar.md`: Einträge „Bruchstelle“, „Epoche (der Führung)“, „Führungsakte“, „Notübernahme“ mit Verweis auf Spec `instanz-fuehrung` und Codeort, alphabetisch in der passenden Tabelle; „Führer (eines Einsatzes)“ berichtigen (ohne Führung je Einsatz die anlegende Instanz, sonst die, die die Akte nennt; Verweis auf ADR-0021). Prüfen: Links treffen (`scripts/check-all.sh`-Schritt der Doku-Links bzw. Lesen der Ziele)
-- [ ] 4.2 `gilt_fuer` von ADR-0021 um `src/routes/fuehrung.rs`, `frontend/src/instanz/Fuehrung*`, `frontend/src/instanz/fuehrung*`, `frontend/src/instanz/EinsaetzeBeimGegenueber.tsx`; von ADR-0018 um `src/routes/einsatz.rs`; Regeln und Kontext unverändert. Prüfen: `scripts/adr-fuer.sh src/routes/fuehrung.rs src/routes/einsatz.rs frontend/src/instanz/FuehrungPaneel.tsx` nennt ADR-0021 bzw. ADR-0018, ADR-Wächter grün
+- [x] 4.1 `docs/architektur/12-glossar.md`: Einträge „Bruchstelle“, „Epoche (der Führung)“, „Führungsakte“, „Notübernahme“ mit Verweis auf Spec `instanz-fuehrung` und Codeort, alphabetisch in der passenden Tabelle; „Führer (eines Einsatzes)“ berichtigen (ohne Führung je Einsatz die anlegende Instanz, sonst die, die die Akte nennt; Verweis auf ADR-0021). Prüfen: Links treffen (`scripts/check-all.sh`-Schritt der Doku-Links bzw. Lesen der Ziele)
+- [x] 4.2 `gilt_fuer` von ADR-0021 um `src/routes/fuehrung.rs`, `frontend/src/instanz/Fuehrung*`, `frontend/src/instanz/fuehrung*`, `frontend/src/instanz/EinsaetzeBeimGegenueber.tsx`; von ADR-0018 um `src/routes/einsatz.rs`; Regeln und Kontext unverändert. Prüfen: `scripts/adr-fuer.sh src/routes/fuehrung.rs src/routes/einsatz.rs frontend/src/instanz/FuehrungPaneel.tsx` nennt ADR-0021 bzw. ADR-0018, ADR-Wächter grün
 
 ## 5. Abschluss
 
