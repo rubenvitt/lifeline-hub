@@ -1,0 +1,404 @@
+//! Anbindungen: Maschinenzugänge für Fremdsysteme verwalten (LLH-1652, Spec `maschinenzugang`,
+//! design.md D11). Lesen darf, wer die Verwaltung sieht; anlegen, ändern, Code ausstellen und
+//! widerrufen nur der System-Admin, immer für die eigene Org. Die Anmeldung der Fremdsysteme
+//! selbst trägt `public_api`.
+
+use crate::app::AppState;
+use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
+use crate::auth::session::{AdminUser, CurrentUser};
+use crate::error::AppError;
+use crate::extract::{JsonBody, PeerIp, PfadParam};
+use crate::instanz::basis32::{fingerabdruck, parse_b64};
+use crate::instanz::{code as kcode, identitaet};
+use crate::public_api::scope::{parse_scopes, AblehnungGrund, Scope, ZugangZustand};
+use crate::public_api::zugang::{self, Zugang};
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Json;
+use serde::{Deserialize, Serialize};
+use sqlx::SqliteConnection;
+use utoipa::ToSchema;
+
+/// Höchstlänge des Namens eines Zugangs (gespiegelt in `frontend/src/api/eingabegrenzen.ts`).
+pub const NAME_MAX: usize = 80;
+
+/// Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AnbindungAblehnung {
+    pub at: String,
+    pub grund: AblehnungGrund,
+    /// Bei `uhr`: Abweichung der Uhr des Fremdsystems in Sekunden (negativ: geht nach).
+    pub abweichung_s: Option<i64>,
+}
+
+/// Ein Zugang, wie die Seite „Anbindungen“ ihn zeigt. Schlüssel nur als Fingerabdruck.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AnbindungAnzeige {
+    pub id: String,
+    pub name: String,
+    pub scopes: Vec<Scope>,
+    pub gueltig_bis: Option<String>,
+    pub zustand: ZugangZustand,
+    /// „gültig bis“ ist verstrichen; der Zugang verhält sich wie widerrufen.
+    pub is_abgelaufen: bool,
+    pub fingerabdruck: Option<String>,
+    /// Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert.
+    pub fingerabdruck_neu: Option<String>,
+    pub angelegt_at: String,
+    pub widerrufen_at: Option<String>,
+    pub zuletzt_genutzt_at: Option<String>,
+    pub letzte_ablehnung: Option<AnbindungAblehnung>,
+}
+
+fn fingerabdruck_von(schluessel: Option<&str>) -> Option<String> {
+    schluessel
+        .and_then(parse_b64)
+        .map(|bytes| fingerabdruck(&bytes))
+}
+
+impl AnbindungAnzeige {
+    fn aus(z: &Zugang, jetzt: &str) -> Self {
+        AnbindungAnzeige {
+            id: z.id.clone(),
+            name: z.name.clone(),
+            scopes: z.scopes.clone(),
+            gueltig_bis: z.gueltig_bis.clone(),
+            zustand: z.zustand,
+            is_abgelaufen: z.is_abgelaufen(jetzt),
+            fingerabdruck: fingerabdruck_von(z.schluessel.as_deref()),
+            fingerabdruck_neu: fingerabdruck_von(z.schluessel_neu.as_deref()),
+            angelegt_at: z.angelegt_at.clone(),
+            widerrufen_at: z.widerrufen_at.clone(),
+            zuletzt_genutzt_at: z.zuletzt_genutzt_at.clone(),
+            letzte_ablehnung: match (&z.letzte_ablehnung_at, z.letzte_ablehnung_grund) {
+                (Some(at), Some(grund)) => Some(AnbindungAblehnung {
+                    at: at.clone(),
+                    grund,
+                    abweichung_s: z.letzte_ablehnung_abweichung_s,
+                }),
+                _ => None,
+            },
+        }
+    }
+}
+
+/// Die Zugänge der Org und, falls Anbindungen hier nicht angenommen werden, der Grund.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AnbindungenListe {
+    pub zugaenge: Vec<AnbindungAnzeige>,
+    /// Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):
+    /// Anlegen und neue Codes sind dann gesperrt.
+    pub gesperrt_grund: Option<String>,
+    /// Fingerabdruck dieser Instanz, zum Abgleich am Fremdsystem.
+    pub instanz_fingerabdruck: String,
+}
+
+/// Ein frisch ausgestellter Einmal-Code. Er verlässt den Server nur hier, einmal.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AnbindungCode {
+    pub zugang: AnbindungAnzeige,
+    /// In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`.
+    pub code: String,
+    pub laeuft_ab_at: String,
+}
+
+/// Body von Anlegen und Ändern: der ganze Stand.
+#[derive(Debug, Deserialize)]
+pub struct AnbindungEingabe {
+    pub name: String,
+    pub scopes: Vec<String>,
+    #[serde(default)]
+    pub gueltig_bis: Option<String>,
+}
+
+/// Prüft die Eingabe: Name 1..=80 Zeichen, mindestens ein bekannter Scope, „gültig bis“ in der
+/// Zukunft (UTC, `zeit::FORMAT` oder ohne Sekunden).
+fn check_eingabe(
+    e: &AnbindungEingabe,
+    jetzt: &str,
+) -> Result<(String, Vec<Scope>, Option<String>), AppError> {
+    let name = crate::routes::support::pflicht_max(&e.name, "name", NAME_MAX)?;
+    if e.scopes.len() > 32 {
+        return Err(AppError::Validation("scopes: zu viele Einträge".into()));
+    }
+    let scopes = parse_scopes(e.scopes.iter().map(String::as_str))
+        .map_err(|s| AppError::Validation(format!("scopes: unbekannter Wert „{s}“")))?;
+    if scopes.is_empty() {
+        return Err(AppError::Validation(
+            "scopes: mindestens ein Recht ist nötig".into(),
+        ));
+    }
+    let gueltig_bis = match e.gueltig_bis.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(roh) => {
+            let normal = crate::zeit::normalisiere_eingabe(roh).ok_or_else(|| {
+                AppError::Validation("gueltig_bis: Zeitpunkt nicht lesbar".into())
+            })?;
+            let normal = crate::zeit::im_jahresbereich(normal, "gueltig_bis")?;
+            if normal.as_str() <= jetzt {
+                return Err(AppError::Validation(
+                    "gueltig_bis: Zeitpunkt liegt in der Vergangenheit".into(),
+                ));
+            }
+            Some(normal)
+        }
+    };
+    Ok((name, scopes, gueltig_bis))
+}
+
+/// Text für den gekoppelten ELW (design.md D10), `None` wenn Anbindungen hier angenommen werden.
+async fn gesperrt_grund(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(zugang::hub_fuer_org(conn, org_id)
+        .await?
+        .map(|(name, adresse)| {
+            let wo = match adresse {
+                Some(a) => format!("{name} ({a})"),
+                None => name,
+            };
+            format!(
+                "Diese Instanz meldet sich für die Organisation bei {wo}. Anbindungen von \
+             Fremdsystemen gehören dorthin."
+            )
+        }))
+}
+
+fn scopes_wire(scopes: &[Scope]) -> Vec<String> {
+    scopes.iter().map(|s| s.as_str().to_string()).collect()
+}
+
+/// Stellt einen Code für den Zugang aus und liefert ihn in Anzeigeform samt Ablauf.
+async fn neuer_code(
+    conn: &mut SqliteConnection,
+    zugang_id: &str,
+    von: i64,
+    jetzt: &str,
+) -> Result<(String, String), AppError> {
+    let code = kcode::generate();
+    let ableitung = kcode::derive_mit_salz(&code, kcode::SALZ_MACHINE);
+    let laeuft_ab_at = crate::zeit::plus_minuten(jetzt, kcode::GUELTIG_MINUTEN)
+        .ok_or_else(|| AppError::Internal("Zeit".into()))?;
+    zugang::code_ausstellen(conn, zugang_id, &ableitung, Some(von), &laeuft_ab_at).await?;
+    Ok((kcode::format_anzeige(&code), laeuft_ab_at))
+}
+
+/// GET /api/admin/anbindungen — alle Zugänge der eigenen Org, widerrufene eingeschlossen.
+pub async fn liste(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<AnbindungenListe>, AppError> {
+    if !benutzer.darf_admin_bereich() {
+        return Err(AppError::Forbidden);
+    }
+    let jetzt = crate::zeit::jetzt();
+    let i = identitaet::load_or_create(&state.pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("Instanzidentität: {e}")))?;
+    let mut conn = state.pool.acquire().await?;
+    let zugaenge = zugang::liste(&mut conn, benutzer.org_id)
+        .await?
+        .iter()
+        .map(|z| AnbindungAnzeige::aus(z, &jetzt))
+        .collect();
+    Ok(Json(AnbindungenListe {
+        zugaenge,
+        gesperrt_grund: gesperrt_grund(&mut conn, benutzer.org_id).await?,
+        instanz_fingerabdruck: i.fingerabdruck(),
+    }))
+}
+
+/// POST /api/admin/anbindungen — legt einen Zugang an und stellt seinen ersten Code aus.
+/// Admin-Spur `maschinenzugang_angelegt`.
+pub async fn anlegen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    JsonBody(body): JsonBody<AnbindungEingabe>,
+) -> Result<(StatusCode, Json<AnbindungCode>), AppError> {
+    let jetzt = crate::zeit::jetzt();
+    let (name, scopes, gueltig_bis) = check_eingabe(&body, &jetzt)?;
+    let (org_id, von) = (admin.org_id, admin.id);
+    let (id, code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
+        if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
+            return Err(AppError::Conflict(grund));
+        }
+        let id = zugang::anlegen(
+            &mut *conn,
+            org_id,
+            &name,
+            &scopes,
+            gueltig_bis.as_deref(),
+            Some(von),
+            &jetzt,
+        )
+        .await?;
+        let (code, laeuft_ab_at) = neuer_code(&mut *conn, &id, von, &jetzt).await?;
+        Ok((id, code, laeuft_ab_at))
+    })?;
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::MaschinenzugangAngelegt,
+            akteur: &admin,
+            ziel: Ziel::Maschinenzugang(&name),
+            angaben: Some(ZugangsAngaben {
+                zugang_id: Some(id.clone()),
+                scopes: Some(scopes_wire(&scopes)),
+                ..Default::default()
+            }),
+            peer_ip,
+        },
+    )
+    .await;
+    let mut conn = state.pool.acquire().await?;
+    let z = zugang::laden(&mut conn, &id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Maschinenzugang verschwunden".into()))?;
+    Ok((
+        StatusCode::CREATED,
+        Json(AnbindungCode {
+            zugang: AnbindungAnzeige::aus(&z, &jetzt),
+            code,
+            laeuft_ab_at,
+        }),
+    ))
+}
+
+/// PATCH /api/admin/anbindungen/{id} — Name, Scopes und „gültig bis“ ersetzen. Ein widerrufener
+/// Zugang: 409. Admin-Spur `maschinenzugang_geaendert` nur bei einer Änderung.
+pub async fn aendern(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<String>,
+    JsonBody(body): JsonBody<AnbindungEingabe>,
+) -> Result<Json<AnbindungAnzeige>, AppError> {
+    let jetzt = crate::zeit::jetzt();
+    let (name, scopes, gueltig_bis) = check_eingabe(&body, &jetzt)?;
+    let org_id = admin.org_id;
+    let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
+        zugang::aendern(
+            &mut *conn,
+            org_id,
+            &id,
+            &name,
+            &scopes,
+            gueltig_bis.as_deref(),
+        )
+        .await?
+        .ok_or(AppError::NotFound)
+    })?;
+    if vorher != nachher {
+        admin_audit::schreibe(
+            &state.pool,
+            AdminEintrag {
+                aktion: AdminAktion::MaschinenzugangGeaendert,
+                akteur: &admin,
+                ziel: Ziel::Maschinenzugang(&nachher.name),
+                angaben: Some(ZugangsAngaben {
+                    zugang_id: Some(nachher.id.clone()),
+                    scopes: Some(scopes_wire(&nachher.scopes)),
+                    scopes_vorher: (vorher.scopes != nachher.scopes)
+                        .then(|| scopes_wire(&vorher.scopes)),
+                    ..Default::default()
+                }),
+                peer_ip,
+            },
+        )
+        .await;
+    }
+    Ok(Json(AnbindungAnzeige::aus(&nachher, &jetzt)))
+}
+
+/// POST /api/admin/anbindungen/{id}/code — neuer Einmal-Code für einen bestehenden Zugang
+/// (Schlüsselwechsel, oder der erste Code lief ab). Ein früherer offener Code verfällt.
+pub async fn code(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<String>,
+) -> Result<(StatusCode, Json<AnbindungCode>), AppError> {
+    let jetzt = crate::zeit::jetzt();
+    let (org_id, von) = (admin.org_id, admin.id);
+    let (z, code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
+        let z = zugang::laden_in_org(&mut *conn, org_id, &id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        if z.zustand == ZugangZustand::Widerrufen {
+            return Err(AppError::Conflict(
+                "Ein widerrufener Zugang bekommt keinen neuen Code.".into(),
+            ));
+        }
+        if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
+            return Err(AppError::Conflict(grund));
+        }
+        let (code, laeuft_ab_at) = neuer_code(&mut *conn, &id, von, &jetzt).await?;
+        Ok((z, code, laeuft_ab_at))
+    })?;
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::MaschinenzugangCodeAusgestellt,
+            akteur: &admin,
+            ziel: Ziel::Maschinenzugang(&z.name),
+            angaben: Some(ZugangsAngaben {
+                zugang_id: Some(z.id.clone()),
+                scopes: Some(scopes_wire(&z.scopes)),
+                fingerabdruck: fingerabdruck_von(z.schluessel.as_deref()),
+                ..Default::default()
+            }),
+            peer_ip,
+        },
+    )
+    .await;
+    Ok((
+        StatusCode::CREATED,
+        Json(AnbindungCode {
+            zugang: AnbindungAnzeige::aus(&z, &jetzt),
+            code,
+            laeuft_ab_at,
+        }),
+    ))
+}
+
+/// POST /api/admin/anbindungen/{id}/widerrufen — wirkt sofort und berührt nichts anderes.
+/// Idempotent; die Admin-Spur schreibt nur die Wirkung.
+pub async fn widerrufen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<String>,
+) -> Result<Json<AnbindungAnzeige>, AppError> {
+    let jetzt = crate::zeit::jetzt();
+    let (org_id, von) = (admin.org_id, admin.id);
+    let wirkung = crate::write_retry!(&state.pool, |conn| {
+        zugang::widerrufen(&mut *conn, org_id, &id, Some(von), &jetzt)
+            .await?
+            .ok_or(AppError::NotFound)
+    })?;
+    let mut conn = state.pool.acquire().await?;
+    let z = zugang::laden(&mut conn, &id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    if wirkung {
+        admin_audit::schreibe(
+            &state.pool,
+            AdminEintrag {
+                aktion: AdminAktion::MaschinenzugangWiderrufen,
+                akteur: &admin,
+                ziel: Ziel::Maschinenzugang(&z.name),
+                angaben: Some(ZugangsAngaben {
+                    zugang_id: Some(z.id.clone()),
+                    scopes: Some(scopes_wire(&z.scopes)),
+                    fingerabdruck: fingerabdruck_von(z.schluessel.as_deref()),
+                    ..Default::default()
+                }),
+                peer_ip,
+            },
+        )
+        .await;
+    }
+    Ok(Json(AnbindungAnzeige::aus(&z, &jetzt)))
+}

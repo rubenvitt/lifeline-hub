@@ -1871,6 +1871,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/aufbewahrung/einsaetze/{id}/archiv",
             get(routes::aufbewahrung::archiv_herunterladen).route_layer(download_grenze()),
         )
+        // LLH-1652: Anbindungen (Maschinenzugänge für Fremdsysteme) verwalten. Die Anmeldung der
+        // Fremdsysteme selbst liegt unter `/api/v1/` (`public_api`).
+        .route(
+            "/api/admin/anbindungen",
+            get(routes::anbindungen::liste).post(routes::anbindungen::anlegen),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}",
+            patch(routes::anbindungen::aendern),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/code",
+            post(routes::anbindungen::code),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/widerrufen",
+            post(routes::anbindungen::widerrufen),
+        )
         // LLH-1484: Lesezugänge externer Anzeigen (Verwaltung) und ihr Abruf. Der Abruf zieht
         // keinen `CurrentUser`, nur den Schlüssel (`lagemonitor_zugang::LagemonitorZugriff`).
         .route(
