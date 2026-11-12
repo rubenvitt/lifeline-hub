@@ -346,7 +346,7 @@ async fn umwandeln(
     // Die Nummer vergeben ELW und Hub unabhängig; ein Spiegel ist von ihrer Eindeutigkeit
     // ausgenommen. Ist sie hier belegt, bekommt der Einsatz eine Nummer dieser Instanz. Vor dem
     // Wechsel der Akte: Der beendet den Spiegel, und ab da gilt die Eindeutigkeit (LLH-1647).
-    let umnummeriert = nummer_freimachen(conn, id).await?;
+    let umnummeriert = super::nummer::ensure_freie_nummer(conn, id).await?;
     // Führungsakte (LLH-1647, E1): Mit eingeschalteter Führung führt diese Instanz ab jetzt, mit
     // der nächsten Epoche und der Art `verwahrung`. Das richtet den Spiegel aus wie jeder Wechsel
     // (`fuehrung::werde_fuehrer`): Die Herkunft der Zeilen bleibt, damit ein Rückfall zum Spiegel
@@ -415,95 +415,6 @@ async fn umwandeln(
     )
     .await?;
     Ok(())
-}
-
-/// Vergibt eine eigene Nummer, wenn die des Spiegels in seiner Org schon ein eigener Einsatz oder
-/// das Löschprotokoll trägt. Liefert (alt, neu) bei einer Umnummerierung. Läuft unter dem Merker.
-async fn nummer_freimachen(
-    conn: &mut SqliteConnection,
-    id: i64,
-) -> Result<Option<(String, String)>, AppError> {
-    let (org_id, nummer, jahr, lfd): (i64, String, Option<i64>, Option<i64>) = sqlx::query_as(
-        "SELECT org_id, einsatznummer_intern, nummer_jahr, nummer_lfd FROM einsatz WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(&mut *conn)
-    .await?;
-    let belegt: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM einsatz WHERE org_id = ?1 AND spiegel = 0 AND id <> ?2 \
-                        AND (einsatznummer_intern = ?3 \
-                             OR (nummer_jahr = ?4 AND nummer_lfd = ?5))) \
-             OR EXISTS (SELECT 1 FROM aufbewahrung_loeschprotokoll WHERE org_id = ?1 \
-                        AND (einsatznummer_intern = ?3 \
-                             OR (nummer_jahr = ?4 AND nummer_lfd = ?5)))",
-    )
-    .bind(org_id)
-    .bind(id)
-    .bind(&nummer)
-    .bind(jahr)
-    .bind(lfd)
-    .fetch_one(&mut *conn)
-    .await?;
-    if !belegt {
-        return Ok(None);
-    }
-    let (praefix, zeitzone): (Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT einsatz_nummer_praefix, zeitzone FROM org_einstellungen WHERE org_id = ?",
-    )
-    .bind(org_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .unwrap_or((None, None));
-    let jahr = match jahr {
-        Some(j) => j,
-        None => i64::from(crate::einsatz::nummer::jahr_in_zone(
-            chrono::Utc::now(),
-            zeitzone.as_deref(),
-        )),
-    };
-    // Wie bei der Anlage: über allen Einsätzen (auch Spiegeln) und dem Löschprotokoll.
-    let max_lfd: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(lfd) FROM ( \
-             SELECT nummer_lfd AS lfd FROM einsatz WHERE org_id = ?1 AND nummer_jahr = ?2 \
-             UNION ALL \
-             SELECT nummer_lfd FROM aufbewahrung_loeschprotokoll \
-             WHERE org_id = ?1 AND nummer_jahr = ?2)",
-    )
-    .bind(org_id)
-    .bind(jahr)
-    .fetch_one(&mut *conn)
-    .await?;
-    let mut neu_lfd = max_lfd.unwrap_or(0) + 1;
-    let neu = loop {
-        let kandidat = crate::einsatz::nummer::formatiere(
-            praefix.as_deref(),
-            i32::try_from(jahr).unwrap_or(0),
-            neu_lfd,
-        );
-        let vergeben: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM einsatz WHERE org_id = ?1 AND einsatznummer_intern = ?2) \
-                 OR EXISTS (SELECT 1 FROM aufbewahrung_loeschprotokoll \
-                            WHERE org_id = ?1 AND einsatznummer_intern = ?2)",
-        )
-        .bind(org_id)
-        .bind(&kandidat)
-        .fetch_one(&mut *conn)
-        .await?;
-        if !vergeben {
-            break kandidat;
-        }
-        neu_lfd += 1;
-    };
-    sqlx::query(
-        "UPDATE einsatz SET einsatznummer_intern = ?, nummer_jahr = ?, nummer_lfd = ? WHERE id = ?",
-    )
-    .bind(&neu)
-    .bind(jahr)
-    .bind(neu_lfd)
-    .bind(id)
-    .execute(&mut *conn)
-    .await?;
-    Ok(Some((nummer, neu)))
 }
 
 /// Meldende Seite: übernimmt die Quittungen der erreichten Seite (D4). `angenommen` merkt den

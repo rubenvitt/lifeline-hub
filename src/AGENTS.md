@@ -369,6 +369,14 @@ Herleitung in
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
     (`richte_aus` aus `fuehrung::repo::save`); ein neuer Schreibweg braucht dafür nichts.
+  - **Wer die Zeile in `einsatz_spiegel` entfernt, macht vorher die Einsatznummer frei**
+    (`spiegel::nummer::ensure_freie_nummer`, LLH-1703, Spec `einsatznummer`): Mit der Zeile endet
+    die Ausnahme von der Eindeutigkeit, und eine hier schon vergebene Nummer ließe den Wechsel
+    sonst mit 409 scheitern, im Abgleich in jedem Takt. Heute `fuehrung::werde_fuehrer` und
+    `lebensende::umwandeln`. Nach einem Führungswechsel an einem lokalen Einsatz meldet der
+    Aufrufer Kopf und Vollabgleich über `instanz::fuehrung::notify_wechsel`, nie `kopf_melden`
+    allein: Der Wechsel kann ins ETB geschrieben haben. Herleitung:
+    `openspec/changes/archive/2026-11-12-a36p545r-nummer-beim-fuehrungswechsel/design.md`.
   - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer
     (`anfrage_von`), bis der Anfragende alles hat; eine Notübernahme nur an einem Einsatz, der
     hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
