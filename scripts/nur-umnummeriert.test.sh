@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Selbsttest für scripts/nur-umnummeriert.sh (LLH-1660). Das Skript entscheidet, ob ein PR ohne
-# Rust-, Frontend- und e2e-Suite mergen darf. Irrt es zur einen Seite, mergt Ungeprüftes; zur
-# anderen kostet jede Umnummerierung wieder eine Stunde. Beide Richtungen stehen hier.
+# erneute Frontend- oder e2e-Suite mergen darf (jede für sich, LLH-1662). Irrt es zur einen
+# Seite, mergt Ungeprüftes; zur anderen kostet jede Umnummerierung wieder eine Stunde. Beide
+# Richtungen stehen hier.
 set -euo pipefail
 
 SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
@@ -201,40 +202,57 @@ laeufe() { # Zeilen "<name>|<status>|<conclusion>" → JSON wie von der API
   done
   printf ']}\n'
 }
-alle_gruen() {
-  "$SKRIPT_UNTER_TEST" checks | sed 's/$/|completed|success/'
-  echo "Schnellprüfungen|completed|failure" # zählt nicht zu den schweren
+alle_gruen() { # <suite>
+  "$SKRIPT_UNTER_TEST" checks "$1" | sed 's/$/|completed|success/'
+  echo "Schnellprüfungen|completed|failure" # zählt zu keiner Suite
 }
-gruen_code() { local code=0; "$SKRIPT_UNTER_TEST" gruen > /dev/null 2>&1 || code=$?; printf '%s\n' "$code"; }
+gruen_code() { # <suite> < check-runs.json
+  local code=0
+  "$SKRIPT_UNTER_TEST" gruen "$1" > /dev/null 2>&1 || code=$?
+  printf '%s\n' "$code"
+}
 
-pruefe "11 alle grün" 0 "$(alle_gruen | laeufe | gruen_code)"
-pruefe "12 einer rot" 1 "$(alle_gruen | sed 's#^e2e 3/4|completed|success#e2e 3/4|completed|failure#' | laeufe | gruen_code)"
-pruefe "13 einer fehlt" 1 "$(alle_gruen | grep -v '^Frontend-Suite 2/4' | laeufe | gruen_code)"
-pruefe "14 einer übersprungen gilt" 0 "$(alle_gruen | sed 's#^Rust-Suite|completed|success#Rust-Suite|completed|skipped#' | laeufe | gruen_code)"
-pruefe "15 einer läuft noch" 1 "$(alle_gruen | sed 's#^e2e 1/4|completed|success#e2e 1/4|in_progress|null#' | laeufe | gruen_code)"
-pruefe "16 einer abgebrochen" 1 "$(alle_gruen | sed 's#^Rust-Suite|completed|success#Rust-Suite|completed|cancelled#' | laeufe | gruen_code)"
+# Je Suite (LLH-1662): die e2e-Suite läuft nur an fertig markierten PRs, ihr Fehlen darf die
+# Übernahme der Frontend-Suite nicht verhindern.
+pruefe "11 Frontend alle grün" 0 "$(alle_gruen frontend | laeufe | gruen_code frontend)"
+pruefe "11b e2e alle grün" 0 "$(alle_gruen e2e | laeufe | gruen_code e2e)"
+pruefe "12 einer rot" 1 "$(alle_gruen e2e | sed 's#^e2e 3/4|completed|success#e2e 3/4|completed|failure#' | laeufe | gruen_code e2e)"
+pruefe "12b Binary rot" 1 "$(alle_gruen e2e | sed 's#^e2e-Binary|completed|success#e2e-Binary|completed|failure#' | laeufe | gruen_code e2e)"
+pruefe "13 einer fehlt" 1 "$(alle_gruen frontend | grep -v '^Frontend-Suite 2/4' | laeufe | gruen_code frontend)"
+pruefe "13b e2e fehlt ganz, Frontend grün: Frontend gilt" 0 "$(alle_gruen frontend | laeufe | gruen_code frontend)"
+pruefe "13c e2e fehlt ganz: e2e gilt nicht" 1 "$(alle_gruen frontend | laeufe | gruen_code e2e)"
+pruefe "13d Frontend rot, e2e grün: e2e gilt" 0 "$( { alle_gruen e2e; alle_gruen frontend | sed 's#^Frontend-Suite 1/4|completed|success#Frontend-Suite 1/4|completed|failure#'; } | laeufe | gruen_code e2e)"
+pruefe "14 einer übersprungen gilt" 0 "$(alle_gruen frontend | sed 's#^Frontend-Suite 1/4|completed|success#Frontend-Suite 1/4|completed|skipped#' | laeufe | gruen_code frontend)"
+# Ein per Job-`if` übersprungener Matrix-Job meldet sich unter seinem unexpandierten Namen: der
+# Lauf hat nie stattgefunden.
+pruefe "14b nur unexpandiert übersprungen gilt nicht" 1 "$(printf '%s\n' 'e2e ${{ matrix.shard }}/4|completed|skipped' '${{ matrix.check }}|completed|skipped' | laeufe | gruen_code e2e)"
+pruefe "15 einer läuft noch" 1 "$(alle_gruen e2e | sed 's#^e2e 1/4|completed|success#e2e 1/4|in_progress|null#' | laeufe | gruen_code e2e)"
+pruefe "16 einer abgebrochen" 1 "$(alle_gruen frontend | sed 's#^Frontend-Suite 4/4|completed|success#Frontend-Suite 4/4|completed|cancelled#' | laeufe | gruen_code frontend)"
 # Der jüngste Lauf je Name zählt: erst rot, dann neu gestartet und grün.
-pruefe "17 neu gestartet und grün gilt" 0 "$( { echo 'e2e 2/4|completed|failure'; alle_gruen; } | laeufe | gruen_code)"
-pruefe "18 erst grün, dann rot gilt nicht" 1 "$( { alle_gruen; echo 'e2e 2/4|completed|failure'; } | laeufe | gruen_code)"
+pruefe "17 neu gestartet und grün gilt" 0 "$( { echo 'e2e 2/4|completed|failure'; alle_gruen e2e; } | laeufe | gruen_code e2e)"
+pruefe "18 erst grün, dann rot gilt nicht" 1 "$( { alle_gruen e2e; echo 'e2e 2/4|completed|failure'; } | laeufe | gruen_code e2e)"
 # Zwei Seiten der API hintereinander (`--paginate`).
-pruefe "19 zwei Seiten" 0 "$( { alle_gruen | head -4 | laeufe; alle_gruen | tail -n +5 | laeufe; } | gruen_code)"
-pruefe "20 leere Antwort" 1 "$(echo '{"check_runs":[]}' | gruen_code)"
+pruefe "19 zwei Seiten" 0 "$( { alle_gruen e2e | head -3 | laeufe; alle_gruen e2e | tail -n +4 | laeufe; } | gruen_code e2e)"
+pruefe "20 leere Antwort" 1 "$(echo '{"check_runs":[]}' | gruen_code frontend)"
+pruefe "20b ohne Suite: Aufruffehler" 2 "$(alle_gruen frontend | laeufe | { code=0; "$SKRIPT_UNTER_TEST" gruen > /dev/null 2>&1 || code=$?; echo "$code"; })"
+pruefe "20c Rust ist keine übernehmbare Suite" 2 "$(alle_gruen frontend | laeufe | gruen_code rust)"
 
-echo "==> nur-umnummeriert: Namen passen zu ci.yml"
-# Jeder schwere Check muss als Jobname in ci.yml stehen (Matrix-Namen mit ihrem Platzhalter).
-ci="$SKRIPTE/../.github/workflows/ci.yml"
+echo "==> nur-umnummeriert: Namen passen zu den Workflows"
+# Jeder Check muss als Jobname in ci.yml oder e2e.yml stehen (Matrix-Namen mit ihrem
+# Platzhalter; das e2e-Binary heißt über seine Ein-Element-Matrix, LLH-1662).
+workflows="$(cat "$SKRIPTE/../.github/workflows/ci.yml" "$SKRIPTE/../.github/workflows/e2e.yml" 2> /dev/null || true)"
 while IFS= read -r name; do
   muster="$(printf '%s' "$name" | sed -E 's#[0-9]+/4$#${{ matrix.shard }}/4#')"
-  if grep -qF -- "name: $muster" "$ci"; then
-    echo "  ok   ci.yml kennt '$name'"
+  if grep -qF -e "name: $muster" -e "check: [$muster]" <<< "$workflows"; then
+    echo "  ok   Workflow kennt '$name'"
   else
-    echo "  FEHL ci.yml kennt keinen Job 'name: $muster'" >&2
+    echo "  FEHL kein Job 'name: $muster' in ci.yml oder e2e.yml" >&2
     fehler=$((fehler + 1))
   fi
-done < <("$SKRIPT_UNTER_TEST" checks)
-# Und umgekehrt: die Anteile in ci.yml sind vier, wie die Liste annimmt.
-anteile="$(grep -c 'shard: \[1, 2, 3, 4\]' "$ci" || true)"
-pruefe "ci.yml teilt Frontend und e2e in je vier Anteile" 2 "$anteile"
+done < <("$SKRIPT_UNTER_TEST" checks frontend; "$SKRIPT_UNTER_TEST" checks e2e)
+# Und umgekehrt: die Anteile sind vier, wie die Liste annimmt.
+anteile="$(grep -c 'shard: \[1, 2, 3, 4\]' <<< "$workflows" || true)"
+pruefe "Frontend und e2e laufen in je vier Anteilen" 2 "$anteile"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest nur-umnummeriert." >&2

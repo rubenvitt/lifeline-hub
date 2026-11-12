@@ -1,3 +1,4 @@
+pub mod archiv_empfaenger;
 pub mod aufbewahrung_kategorie;
 pub mod einstellungen;
 pub mod logo;

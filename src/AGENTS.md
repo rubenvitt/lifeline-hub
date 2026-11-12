@@ -331,7 +331,7 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0025](../docs/architektur/entscheidungen/ADR-0025-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md):
+  [ADR-0027](../docs/architektur/entscheidungen/ADR-0027-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
@@ -750,6 +750,16 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `skelett` (Pflichtfelder per CHECK), `verwahrt` (mit Nummer, an die Gegenstelle übergeben) und
   `spiegel` (ohne Nummer, die gehört dem Führer; Übersicht lässt sie aus). Alle Arten sperren
   die ID, nur Zeilen mit Nummer die Nummer.
+- **Archiv am Hub** (LLH-1494): Phase N des Purge-Laufs (`einsatz/archiv.rs`, vor Phase A)
+  archiviert einen Einsatz am Ende der Nachbereitung, wenn seine Org geprüfte
+  `org_archiv_empfaenger` hat und nicht meldende Seite einer Kopplung ist: Kopie in eine eigene
+  SQLite-Datei mit demselben Schema (`archiv/bauen.rs`; Tabellen aus `spiegel::art::GESPIEGELT`,
+  Stammzeilen aus `STAMM` bereinigt), je Kategorie-Frist ein Block (`plane_bloecke`), jeder
+  age-verschlüsselt an alle geprüften Schlüssel; dann `schwaerze_nach_archiv_tx` ohne Karenz.
+  Eine neue Stammtabelle mit FK aus einer Einsatztabelle braucht einen Eintrag in `STAMM` (Guard
+  `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
+  Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
+  und löscht alle Blöcke.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

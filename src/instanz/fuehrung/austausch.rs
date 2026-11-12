@@ -90,6 +90,16 @@ impl AkteMeldung {
         }
     }
 
+    /// Derselbe Führungswechsel: Epoche, Führer und Erklärung. Die übrigen Felder zählen nicht:
+    /// `stand` vergibt das Gegenüber bei jedem erneuten Senden neu, der Kopf ändert sich mit dem
+    /// Einsatz und nicht mit der Führung, und ein Beweis kommt nur bis hierher, wenn er diese
+    /// Erklärung trägt (`check_unterschrift`) (LLH-1671).
+    fn is_gleicher_wechsel(&self, other: &Self) -> bool {
+        self.epoche == other.epoche
+            && self.fuehrer == other.fuehrer
+            && self.erklaerung == other.erklaerung
+    }
+
     /// Grenzen der Felder; eine Akte darüber wird nicht übernommen.
     fn is_in_grenzen(&self) -> bool {
         let kurz = |s: &str| s.chars().count() <= TEXT_MAX;
@@ -208,8 +218,9 @@ pub fn entscheide(
 }
 
 /// Prüft den Beweis einer Notübernahme gegen mich (D6): Erklärung passt zur Akte, Unterschrift
-/// von einem gültigen Schlüssel meiner Org über genau diese Erklärung.
-async fn check_unterschrift(
+/// von einem gültigen Schlüssel meiner Org über genau diese Erklärung. Gilt bei Ankunft, bei jedem
+/// weiteren Eingang einer offenen Übernahme und beim Bestätigen (LLH-1671).
+pub(super) async fn check_unterschrift(
     conn: &mut SqliteConnection,
     ich: &Ich,
     org_id: i64,
@@ -266,9 +277,13 @@ fn check_code(a: &AkteZeile, m: &AkteMeldung) -> Result<NotuebernahmeErklaerung,
     Ok(e)
 }
 
-/// Übernimmt die Felder der Führung aus einer gelieferten Akte.
+/// Übernimmt die Felder der Führung aus einer gelieferten Akte mit größerer Epoche.
+///
+/// Jeder Wechsel löscht den Anfrage-Merker: Eine Anfrage gilt nur dem Stand, den sie sah, sonst
+/// gäbe die erreichte Seite die Führung später ohne Menschen ab (LLH-1673).
 fn uebernimm(a: &mut AkteZeile, m: &AkteMeldung) {
     a.set_epoche(&m.epoche);
+    a.anfrage_at = None;
     a.fuehrer_kennung = m.fuehrer.clone();
     a.fuehrer_name = m.fuehrer_name.clone();
     a.art = m.art.clone();
@@ -429,17 +444,6 @@ pub fn ist_konflikt(offen: &AkteMeldung, hubs: &[&str]) -> bool {
     !hubs.contains(&offen.fuehrer.as_str())
 }
 
-/// Der Inhalt einer gehaltenen Akte ohne das, was sich bei jedem Takt ändert (Stand, Merker der
-/// sendenden Seite): gleicher Inhalt heißt dieselbe Übernahme.
-fn inhalt(m: &AkteMeldung) -> AkteMeldung {
-    AkteMeldung {
-        stand: 0,
-        anfrage: false,
-        offen: false,
-        ..m.clone()
-    }
-}
-
 /// Hält eine Übernahme gegen mich offen, bis die Einsatzleitung entscheidet; bei gleichem Inhalt
 /// ändert sich nichts.
 async fn halte_offen(
@@ -453,17 +457,18 @@ async fn halte_offen(
         .offen
         .as_deref()
         .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok());
-    // Nur der Stand des Hubs hat sich geändert (etwa weil er meine Akte neu quittiert): dieselbe
-    // Übernahme, nichts schreiben, nichts melden. Sonst schaukelten sich beide Stände je Takt hoch
-    // und die Einsatzleitung bekäme jedes Mal einen neuen Hinweis.
-    if vorher.as_ref().is_some_and(|v| inhalt(v) == inhalt(m)) {
+    // Dieselbe Übernahme kommt mit jeder Meldung des Gegenübers wieder, mit neuem `stand`: kein
+    // neuer Stand, keine neue Bruchstelle, keine neue Benachrichtigung (LLH-1671). Sonst schaukelten
+    // sich beide Stände je Takt hoch (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D3).
+    if vorher.as_ref().is_some_and(|o| o.is_gleicher_wechsel(m)) {
         return Ok(());
     }
-    a.offen = Some(serde_json::to_string(m).expect("serialisierbar"));
-    // Die Bruchstelle ist die letzte Meldung vor der ersten Übernahme, die offen ist.
-    if vorher.is_none() || a.offen_bruch_at.is_none() {
+    // Die Bruchstelle gilt der Übernahme, nicht der Meldung: Bei derselben Epoche bleibt sie die
+    // erste, erst eine größere bekommt ihre eigene.
+    if !vorher.is_some_and(|o| o.epoche == m.epoche) || a.offen_bruch_at.is_none() {
         a.offen_bruch_at = Some(bruch.to_string());
     }
+    a.offen = Some(serde_json::to_string(m).expect("serialisierbar"));
     repo::save(conn, a, true).await?;
     if let Some(einsatz_id) = a.einsatz_id {
         aus.folgen.push(Folge::Offen { einsatz_id });
@@ -554,6 +559,55 @@ async fn erfuelle_wartende(
     Ok(())
 }
 
+/// Prüft die offenen Übernahmen dieser Kopplung erneut gegen die gültigen Schlüssel (LLH-1671).
+/// Ein Widerruf, der mit dieser Nachricht kam, ist schon übernommen (`melden.rs`); trägt die
+/// Unterschrift nicht mehr, wird verworfen wie bei Ankunft. Früher prüfte das nur nebenbei die je
+/// Meldetakt zurückkommende Akte, die nun nicht mehr kommt.
+async fn check_offene(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    orgs: &[(i64, String)],
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM einsatz_fuehrung WHERE offen IS NOT NULL ORDER BY id")
+            .fetch_all(&mut *conn)
+            .await?;
+    for id in ids {
+        let mut a = repo::load(conn, id).await?;
+        if !orgs.iter().any(|(org_id, _)| *org_id == a.org_id) {
+            continue;
+        }
+        let Some(m) = a
+            .offen
+            .as_deref()
+            .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok())
+        else {
+            continue;
+        };
+        if m.epoche.instanz != kopplung.gegenueber_kennung {
+            continue;
+        }
+        // Nur eine Übernahme gegen diese Instanz trägt eine Unterschrift, die gelten muss. Nennt
+        // der Hub einen Dritten (Konflikt) oder trägt die Akte keine Erklärung gegen diese Instanz,
+        // gibt es nichts nachzuprüfen (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D3, D7).
+        let gegen_mich = m
+            .erklaerung
+            .as_deref()
+            .and_then(NotuebernahmeErklaerung::parse)
+            .is_some_and(|e| e.fuehrer_alt == ich.kennung);
+        if ist_konflikt(&m, &[kopplung.gegenueber_kennung.as_str()]) || !gegen_mich {
+            continue;
+        }
+        let alt = a.epoche();
+        if let Err(grund) = check_unterschrift(conn, ich, a.org_id, &m, &alt).await {
+            verwerfen(conn, ich, kopplung, &mut a, &m, &grund, aus).await?;
+        }
+    }
+    Ok(())
+}
+
 /// Übernimmt die Akten einer Nachricht des Gegenübers. `zuletzt_gesehen` ist der Zeitpunkt der
 /// letzten erfolgreichen Meldung vor dieser Nachricht (Bruchstelle, D11).
 pub async fn apply_eingang(
@@ -572,6 +626,9 @@ pub async fn apply_eingang(
     let bruch = zuletzt_gesehen
         .map(str::to_string)
         .unwrap_or_else(crate::zeit::jetzt);
+    if richtung == InstanzKopplungRichtung::MeldetSich {
+        check_offene(conn, &ich, kopplung, &orgs, &mut aus).await?;
+    }
     for m in akten.iter().take(AKTEN_MAX) {
         aus.bis = Some(aus.bis.map_or(m.stand, |b| b.max(m.stand)));
         if !m.is_in_grenzen() {
@@ -756,7 +813,6 @@ pub async fn apply_eingang(
                     let von = a.fuehrer_name.clone();
                     uebernimm(&mut a, m);
                     if gewinne {
-                        a.anfrage_at = None;
                         a.bruch_at = None;
                     }
                     if a.offen.as_deref().is_some_and(|o| {
@@ -902,6 +958,20 @@ pub async fn apply_eingang(
                                 },
                             )
                             .await?;
+                            // Die Notübernahme mit Code gilt erst jetzt: Kopf und Admin-Spur wie
+                            // bei jeder Notübernahme (LLH-1674).
+                            if let Some(einsatz_id) = a.einsatz_id {
+                                aus.folgen.push(Folge::Kopf { einsatz_id });
+                            }
+                            let text = format!(
+                                "Notübernahme durch {} mit Code: {}",
+                                kopplung.gegenueber_name, e.grund
+                            );
+                            aus.folgen.push(Folge::Spur {
+                                aktion: AdminAktion::FuehrungNotuebernahme,
+                                org_id: a.org_id,
+                                grund: spur_text(&a, &text),
+                            });
                         }
                         Err(grund) => {
                             verwerfen(conn, &ich, kopplung, &mut a, m, &grund, &mut aus).await?;
@@ -925,6 +995,9 @@ pub async fn apply_eingang(
                         },
                     )
                     .await?;
+                    if let Some(einsatz_id) = a.einsatz_id {
+                        aus.folgen.push(Folge::Kopf { einsatz_id });
+                    }
                     continue;
                 }
                 // Eine Anfrage gilt nur dem Stand, den sie sah (Review LLH-1491: ein alter
@@ -943,8 +1016,12 @@ pub async fn apply_eingang(
             std::cmp::Ordering::Less => {
                 // Das Gegenüber ist hinter dieser Seite zurück: die eigene Akte geht mit einem
                 // neuen Stand noch einmal hinaus, damit beide wieder gleich stehen. Eine Anfrage
-                // auf einen alten Stand wird nicht erfüllt.
-                repo::save(conn, &mut a, true).await?;
+                // auf einen alten Stand wird nicht erfüllt. Hält das Gegenüber eine Übernahme
+                // gegen sich offen, hat es diese Akte schon; ein neuer Stand schickte sie nur je
+                // Meldetakt erneut (LLH-1671).
+                if !m.offen {
+                    repo::save(conn, &mut a, true).await?;
+                }
             }
         }
     }
@@ -1064,14 +1141,6 @@ mod tests {
             ist_konflikt(&akte("hub", 3), &[]),
             "ohne Kopplung führt ein Dritter"
         );
-    }
-
-    #[test]
-    fn derselbe_inhalt_mit_neuem_stand_ist_dieselbe_uebernahme() {
-        let mut neu = akte("elw1", 9);
-        neu.offen = true;
-        assert_eq!(inhalt(&akte("elw1", 3)), inhalt(&neu));
-        assert_ne!(inhalt(&akte("elw1", 3)), inhalt(&akte("elw2", 3)));
     }
 
     #[test]

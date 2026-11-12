@@ -112,8 +112,11 @@ Beweisprüfung und ohne Alarm. Die Tabelle D7 der Vorgänger-Change bekommt dami
 sich nur der Stand des Hubs, schreibt die ELW nichts und meldet nichts. Sonst schaukelten sich beide
 Stände je Meldetakt hoch, wenn die Epoche des Hubs größer ist (Zweig `Less` am Hub): Der Hub
 schickte seine Akte mit neuem Stand zurück, die ELW hielte sie erneut offen, und die
-Einsatzleitung bekäme jedes Mal einen Hinweis (Befund aus dem Review). `offen_bruch_at` bleibt die
-Bruchstelle der ersten offenen Übernahme.
+Einsatzleitung bekäme jedes Mal einen Hinweis (Befund aus dem Review). Gleich heißt dieselbe
+Epoche, derselbe Führer und dieselbe Erklärung (`AkteMeldung::is_gleicher_wechsel`). Die
+Bruchstelle gilt der Übernahme: Bei derselben Epoche bleibt sie, erst eine größere bekommt ihre
+eigene. Beides kam beim Merge von `alpha` aus LLH-1671 dazu, das denselben Fehler am Zweig
+`OffenHalten` behob; `halte_offen` ist seither der eine Weg für beide.
 
 **Angaben im Band:** Grund, Unterzeichner und Zeitpunkt zeigt `anzeige` nur aus einer Erklärung
 gegen diese Instanz (`fuehrer_alt == ich`). Im Konflikt trägt die Akte meist die Erklärung der
@@ -160,13 +163,13 @@ Oberfläche zeigt die Schaltfläche gar nicht erst.
 Einen eigenen Zweig dafür gibt es nicht. Nennt der Hub keinen Dritten mehr, gibt es nur drei
 Wege, und jeder räumt den Konflikt schon ab:
 
-- Der Hub führt mit der Epoche des Dritten (der gab an ihn zurück): D7 ersetzt die gehaltene Akte,
-  und die Bruchstelle bleibt.
+- Der Hub führt mit der Epoche des Dritten (der gab an ihn zurück): D7 ersetzt die gehaltene Akte
+  mit ihrer eigenen Bruchstelle, denn die Epoche ist größer.
 - Der Hub führt mit einer eigenen Epoche (Widerruf oder Notübernahme gegen den Dritten): Der Zweig
   `Greater` verwirft oder hält offen, und beides ersetzt `offen` (zum Fehlalarm dabei: LLH-1707).
 - Der Hub nennt die ELW selbst: Der Zweig `!nimmt_mir` räumt `offen` ab.
 
-Ein eigener Zweig davor setzte nur die Bruchstelle neu (Befund aus dem Nach-Review). Eine kleinere
+Ein eigener Zweig davor leerte `offen` erst und hielt es dann neu (Befund aus dem Nach-Review). Eine kleinere
 Epoche mit dem Hub als Führer kann nach einem Konflikt nicht mehr kommen, denn der Hub zählt nur
 weiter.
 

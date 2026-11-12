@@ -4,6 +4,10 @@
 //! testbar. Idempotent über WHERE-Guards in den Repo-Queries.
 //!
 //! Phasen in dieser Reihenfolge:
+//! - **Phase N** (IRREVERSIBEL für den Klartext, LLH-1494): am Ende der Nachbereitung legt die
+//!   verwahrende Instanz einen Einsatz als age-verschlüsselte Blöcke ab und schwärzt ihn ohne
+//!   Karenz (`archiv::archivieren`), wenn die Org geprüfte Archiv-Schlüssel hat. Blöcke, deren
+//!   Frist abgelaufen ist, löscht dieselbe Phase (`archiv::abgelaufene_bloecke_loeschen`).
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
 //!   soft-gelöscht (`geloescht_at` = Karenz-Start: Fristablauf bzw. Setzen einer Frist in die
 //!   Vergangenheit, höchstens jetzt; LFH-906). Ab da am Datenzugriff
@@ -85,6 +89,40 @@ pub async fn tick_mit_rueckschrieb(
     let mut anzahl = 0;
     let mut geschwaerzt = 0;
     let mut geloescht = 0;
+
+    // --- Phase N: Archiv am Ende der Nachbereitung (LLH-1494, IRREVERSIBEL für den Klartext) ---
+    // Vor Phase A: ein archivierter Einsatz ist danach vorgemerkt und geschwärzt, Phase A und B
+    // übergehen ihn. Zählt für den WAL-Rückschrieb wie Phase B.
+    match super::archiv::faellige(pool, &jetzt_s).await {
+        Ok(ids) => {
+            for id in ids {
+                match super::archiv::archivieren(pool, id, jetzt).await {
+                    Ok(true) => {
+                        anzahl += 1;
+                        geschwaerzt += 1;
+                        // Gesperrt und geschwärzt: offene Tabs und Geräte erfahren es über den
+                        // Kopf wie nach Phase A (src/AGENTS.md).
+                        crate::live::org::kopf_melden(pool, live, id, &[]).await;
+                    }
+                    Ok(false) => {}
+                    Err(e) => tracing::error!(einsatz_id = id, "Purge Phase N fehlgeschlagen: {e}"),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("Purge Phase N: Abfrage fehlgeschlagen: {e}"),
+    }
+    match super::archiv::abgelaufene_bloecke_loeschen(pool, &jetzt_s).await {
+        Ok(0) => {}
+        Ok(n) => {
+            anzahl += n;
+            geloescht += n;
+        }
+        Err(e) => {
+            tracing::warn!("Purge Phase N: Löschen abgelaufener Blöcke fehlgeschlagen: {e}");
+            // Jeder Block löscht in eigener Transaktion: frühere können schon weg sein.
+            *rueckschrieb_ausstehend = true;
+        }
+    }
 
     // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start ab Fristablauf) ---
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
@@ -393,6 +431,9 @@ pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
         // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
         // etwa nach einem Absturz zwischen Schwärzung und Rückschrieb.
         let mut rueckschrieb_ausstehend = true;
+        // Klartext-Zwischendateien eines abgebrochenen Archivbaus (LLH-1494): außer diesem Task
+        // baut niemand Archive, also gehört jede vorhandene zu einem toten Lauf.
+        super::archiv::zwischendateien_aufraeumen(&pool).await;
         loop {
             ticker.tick().await;
             tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;

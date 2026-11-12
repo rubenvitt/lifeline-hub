@@ -1,5 +1,5 @@
 ---
-id: ADR-0025
+id: ADR-0027
 titel: Ein Einsatz hat genau eine führende Instanz; unter mehreren ELW gilt die zuerst angenommene
 status: akzeptiert
 datum: 2026-11-12
@@ -17,7 +17,7 @@ herleitung:
   - LLH-1669 (mit Ruben am 12.11.2026 abgestimmt), LLH-1641
 ---
 
-# ADR-0025: Ein Einsatz hat genau eine führende Instanz; unter mehreren ELW gilt die zuerst angenommene
+# ADR-0027: Ein Einsatz hat genau eine führende Instanz; unter mehreren ELW gilt die zuerst angenommene
 
 ## Regeln
 

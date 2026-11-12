@@ -78,6 +78,9 @@ async fn anzeige(state: &AppState, akte_id: i64) -> Result<FuehrungAnzeige, AppE
 }
 
 /// Nach einer Änderung: Live-Ereignis am Einsatzkopf (lokaler Einsatz) und die neue Anzeige.
+/// `a` ist die Akte, wie der Dienst sie in seiner Transaktion gespeichert hat: Ereignis und
+/// Admin-Spur hängen an keinem Lesen nach dem Commit (LLH-1674); scheitert erst die Anzeige, gilt
+/// der Wechsel mit beidem.
 async fn danach(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige, AppError> {
     if let Some(einsatz_id) = a.einsatz_id {
         crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
@@ -113,19 +116,14 @@ async fn spur(
     .await;
 }
 
-async fn akte_neu(state: &AppState, id: i64) -> Result<AkteZeile, AppError> {
-    let mut conn = state.pool.acquire().await?;
-    repo::load(&mut conn, id).await
-}
-
 async fn run_uebergeben(
     state: &AppState,
     a: &AkteZeile,
     b: &Benutzer,
     an: &str,
 ) -> Result<FuehrungAnzeige, AppError> {
-    dienst::uebergeben(&state.pool, a.id, an, &b.anzeigename).await?;
-    danach(state, &akte_neu(state, a.id).await?).await
+    let saved = dienst::uebergeben(&state.pool, a.id, an, &b.anzeigename).await?;
+    danach(state, &saved).await
 }
 
 async fn run_code(
@@ -133,9 +131,24 @@ async fn run_code(
     a: &AkteZeile,
     b: &Benutzer,
     an: &str,
+    peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungCodeAntwort, AppError> {
-    let c = dienst::code_abgeben(&state.pool, a.id, an, &b.anzeigename).await?;
-    let fuehrung = danach(state, &akte_neu(state, a.id).await?).await?;
+    let (c, saved) = dienst::code_abgeben(&state.pool, a.id, an, &b.anzeigename).await?;
+    // Der Code ist die Zustimmung dieser Seite zur Notübernahme durch das Gegenüber (LLH-1674).
+    let text = format!(
+        "Abgabecode für die Notübernahme durch {} erzeugt",
+        saved.fuehrer_name
+    );
+    spur(
+        state,
+        AdminAktion::FuehrungNotuebernahme,
+        b,
+        &saved,
+        &text,
+        peer_ip,
+    )
+    .await;
+    let fuehrung = danach(state, &saved).await?;
     Ok(FuehrungCodeAntwort {
         code: code::format_anzeige(&c),
         fuehrung,
@@ -143,8 +156,8 @@ async fn run_code(
 }
 
 async fn run_anfragen(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige, AppError> {
-    dienst::anfragen(&state.pool, a.id).await?;
-    danach(state, &akte_neu(state, a.id).await?).await
+    let saved = dienst::anfragen(&state.pool, a.id).await?;
+    danach(state, &saved).await
 }
 
 async fn run_notuebernahme(
@@ -155,19 +168,19 @@ async fn run_notuebernahme(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
-    dienst::notuebernahme_gegen_erreichte(&state.pool, a.id, grund, &b.anzeigename).await?;
-    let neu = akte_neu(state, a.id).await?;
+    let saved =
+        dienst::notuebernahme_gegen_erreichte(&state.pool, a.id, grund, &b.anzeigename).await?;
     let text = format!("Notübernahme gegen {vorher}: {}", grund.trim());
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_start(
@@ -254,7 +267,7 @@ async fn run_abschluss(
     let e = NotuebernahmeErklaerung::parse(&erklaerung)
         .ok_or_else(|| AppError::Internal("Erklärung unlesbar".into()))?;
     let vorher = a.fuehrer_name.clone();
-    dienst::notuebernahme_gegen_meldende(
+    let saved = dienst::notuebernahme_gegen_meldende(
         &state.pool,
         a.id,
         &e,
@@ -264,18 +277,17 @@ async fn run_abschluss(
         &b.anzeigename,
     )
     .await?;
-    let neu = akte_neu(state, a.id).await?;
     let text = format!("Notübernahme gegen {vorher} mit Unterschrift: {}", e.grund);
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_mit_code(
@@ -286,9 +298,9 @@ async fn run_mit_code(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
-    dienst::notuebernahme_mit_code(&state.pool, a.id, &body.grund, &body.code, &b.anzeigename)
-        .await?;
-    let neu = akte_neu(state, a.id).await?;
+    let saved =
+        dienst::notuebernahme_mit_code(&state.pool, a.id, &body.grund, &body.code, &b.anzeigename)
+            .await?;
     let text = format!(
         "Notübernahme gegen {vorher} mit Code: {}",
         body.grund.trim()
@@ -297,12 +309,12 @@ async fn run_mit_code(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_bestaetigen(
@@ -312,14 +324,13 @@ async fn run_bestaetigen(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let eigene_notuebernahme = a.art() == fuehrung::FuehrungWechselArt::Notuebernahme;
-    let konflikt = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
-    let neu = akte_neu(state, a.id).await?;
+    let (saved, konflikt) = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
     let text = if konflikt {
         // Die erreichte Seite nannte einen Dritten (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
         // D4): keine Notübernahme gegen diese Instanz, und die Erklärung gehört einer anderen ELW.
         format!(
             "Bestätigt: {}",
-            dienst::konflikt_text(eigene_notuebernahme, &neu.fuehrer_name)
+            dienst::konflikt_text(eigene_notuebernahme, &saved.fuehrer_name)
         )
     } else {
         // Grund und „Notübernahme“ nur aus einer Erklärung gegen diese Instanz (D7: der Hub kann mit
@@ -328,7 +339,7 @@ async fn run_bestaetigen(
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?
             .kennung;
-        match neu
+        match saved
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
@@ -336,21 +347,21 @@ async fn run_bestaetigen(
         {
             Some(e) => format!(
                 "Notübernahme durch {} bestätigt: {}",
-                neu.fuehrer_name, e.grund
+                saved.fuehrer_name, e.grund
             ),
-            None => format!("Übernahme durch {} bestätigt", neu.fuehrer_name),
+            None => format!("Übernahme durch {} bestätigt", saved.fuehrer_name),
         }
     };
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_widersprechen(
@@ -359,18 +370,17 @@ async fn run_widersprechen(
     b: &Benutzer,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
-    dienst::widersprechen(&state.pool, a.id, &b.anzeigename).await?;
-    let neu = akte_neu(state, a.id).await?;
+    let saved = dienst::widersprechen(&state.pool, a.id, &b.anzeigename).await?;
     spur(
         state,
         AdminAktion::FuehrungWiderspruch,
         b,
-        &neu,
+        &saved,
         "Notübernahme widersprochen",
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 // ── Lokaler Einsatz ──────────────────────────────────────────────────────────────────────────
@@ -404,11 +414,14 @@ pub async fn uebergeben(
 /// POST /api/einsaetze/{id}/fuehrung/code — Abgabe per Code (meldende Seite).
 pub async fn code_abgeben(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     ctx: EinsatzFuehrungszugriff,
     JsonBody(body): JsonBody<AnBody>,
 ) -> Result<Json<FuehrungCodeAntwort>, AppError> {
     let a = akte_des_einsatzes(&state, ctx.einsatz.id).await?;
-    Ok(Json(run_code(&state, &a, &ctx.benutzer, &body.an).await?))
+    Ok(Json(
+        run_code(&state, &a, &ctx.benutzer, &body.an, peer_ip).await?,
+    ))
 }
 
 /// POST /api/einsaetze/{id}/fuehrung/anfragen — die Führung beim Gegenüber erbitten.
@@ -534,10 +547,11 @@ pub async fn admin_code_abgeben(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
+    PeerIp(peer_ip): PeerIp,
     JsonBody(body): JsonBody<AnBody>,
 ) -> Result<Json<FuehrungCodeAntwort>, AppError> {
     let a = akte_fremd(&state, &admin, id).await?;
-    Ok(Json(run_code(&state, &a, &admin, &body.an).await?))
+    Ok(Json(run_code(&state, &a, &admin, &body.an, peer_ip).await?))
 }
 
 pub async fn admin_anfragen(

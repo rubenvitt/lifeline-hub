@@ -2,7 +2,7 @@
 //!
 //! Jede gespeicherte Akte richtet ihren Einsatz aus ([`save`] →
 //! `instanz::spiegel::fuehrung::richte_aus`, in der Transaktion des Wechsels): Führt eine andere
-//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0025).
+//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0027).
 
 use super::{Epoche, FuehrungWechselArt};
 use crate::error::AppError;
@@ -486,12 +486,16 @@ pub async fn release_nach_widerruf(
     .bind(org_id)
     .fetch_all(&mut *conn)
     .await?;
-    let offene = kandidaten.into_iter().filter_map(|(id, fuehrer)| {
+    // Eine offene Übernahme kommt immer von einem Hub: nur sein Widerruf räumt sie ab. Die Liste
+    // steht fest, bevor geschrieben wird (kein Iterator mit Leihgaben über ein `await`).
+    let mut offene: Vec<i64> = Vec::new();
+    for (id, fuehrer) in kandidaten {
         let fuehrer = fuehrer.unwrap_or_default();
-        // Eine offene Übernahme kommt immer von einem Hub: nur sein Widerruf räumt sie ab.
-        (war_hub && (fuehrer == gegenueber_kennung || !hubs.contains(&fuehrer))).then_some(id)
-    });
-    for id in offene.collect::<Vec<_>>() {
+        if war_hub && (fuehrer == gegenueber_kennung || !hubs.contains(&fuehrer)) {
+            offene.push(id);
+        }
+    }
+    for id in offene {
         let mut a = load(conn, id).await?;
         a.offen = None;
         a.offen_bruch_at = None;

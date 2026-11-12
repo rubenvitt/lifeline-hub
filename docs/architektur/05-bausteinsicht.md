@@ -100,7 +100,7 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
-| `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler und Schwärzung | Routen `/api/einsaetze`, `…/{id}/modul-zaehler`, `…/{id}/lagekennzahl-wahl`; Live `einsatz` |
+| `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler, Schwärzung und Archiv nach der Nachbereitung (`archiv.rs`) | Routen `/api/einsaetze`, `…/{id}/modul-zaehler`, `…/{id}/lagekennzahl-wahl`; Live `einsatz` |
 | `src/einsatz_vorlage` | Org-Katalog „Einsatz-Vorlagen“: Modulsatz, der beim Anlegen Module ausblendet | `/api/einsatz-vorlagen`; nutzt `einsatz::repo::anlegen_tx` |
 | `src/einsatzabschnitt` | Abschnittsbaum mit Leiter, Fläche und Sprechgruppen; schreibt System-ETB beim Anlegen | `…/{id}/abschnitte`; Live `abschnitt` |
 | `src/etb` | Einsatztagebuch: Eintragstypen, Einfügen als einzige Stelle, Lesemarke, Zähler | `…/{id}/etb`; Live `etb` |
@@ -204,7 +204,7 @@ Regeln: [frontend/src/geraet/AGENTS.md](../../frontend/src/geraet/AGENTS.md).
 | `src/geraet` | Gerätekopplung per Code, Gerätekonto, Funktionsansicht, Stellenbindung, Routen-Whitelist | `…/{id}/geraete`, `POST /api/geraete/koppeln`, `…/{id}/lagemonitor` |
 | `src/lagemonitor_zugang` | Lesezugang externer Lagemonitore: Schlüssel (nur Hash), Freigabe je Einsatz durch die Einsatzleitung, Extractor `LagemonitorZugriff` nur für den Abruf | `/api/lagemonitor-zugaenge`, `…/{id}/lagemonitor-zugaenge`, `GET /api/lagemonitor/v1/lage` (Bearer) |
 | `src/lagebild_extern` | Lagebild für Externe (LLH-1496): Link je Empfänger ohne Konto (Schlüssel nur als Hash), Stufen „Lagebild“ und „Öffentlich“, Ablauf und Widerruf, Protokoll je Öffnung ohne IP; Extractor `LagebildZugriff` für den Abruf, `KartenZugriff` öffnet den Karten-Proxy für Sitzung oder gültigen Link; gilt nur an der ausgebenden Instanz (aus dem Spiegel ausgenommen) | `…/{id}/lagebild-freigaben`, `GET /api/extern/v1/lagebild` (Bearer) |
-| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)); `src/instanz/stammdaten` verteilt die Stammdaten einer Org von der erreichten zur meldenden Instanz (LLH-1493: Änderungslog und Schreibschutz per Trigger, Nachlieferung mit jeder Meldung, Kontogeheimnisse mit age); `src/instanz/fuehrung` hält je Einsatz die führende Instanz mit Epoche, tauscht die Akten in der Meldung und richtet den Spiegel danach aus: wer nicht führt, hält den Einsatz als Spiegel (LLH-1491, LLH-1641, [ADR-0025](entscheidungen/ADR-0025-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)); `src/instanz/spiegel` hält Einsätze einer gekoppelten Instanz als Spiegel in denselben Tabellen (LLH-1492, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)): Beschreibung der Tabellen und Trigger-Generator (`art`, `schema`), Liefern und Übernehmen über den Stand im Änderungslog `einsatz_aenderung`, Anhänge auf Abruf (`anhang`), Anträge am Spiegel und Ausführen beim Führer (`antrag`), eigener Takt (`takt`) | `/api/admin/instanz/…`, `/api/einsaetze/{id}/fuehrung/…`, `GET /api/instanz/stammdaten/herkunft`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden`, `POST /api/instanz/spiegel` (signiert); `GET /api/einsaetze/{id}/antraege`, `DELETE …/antraege/{antrag_id}`, `GET /api/antraege/abgelehnt`, `DELETE /api/antraege/abgelehnt/{antrag_id}` (LLH-1648, nach der Verwahrung); Unterschriftsschlüssel in `src/auth/unterschrift` |
+| `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)); `src/instanz/stammdaten` verteilt die Stammdaten einer Org von der erreichten zur meldenden Instanz (LLH-1493: Änderungslog und Schreibschutz per Trigger, Nachlieferung mit jeder Meldung, Kontogeheimnisse mit age); `src/instanz/fuehrung` hält je Einsatz die führende Instanz mit Epoche, tauscht die Akten in der Meldung und richtet den Spiegel danach aus: wer nicht führt, hält den Einsatz als Spiegel (LLH-1491, LLH-1641, [ADR-0027](entscheidungen/ADR-0027-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)); `src/instanz/spiegel` hält Einsätze einer gekoppelten Instanz als Spiegel in denselben Tabellen (LLH-1492, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)): Beschreibung der Tabellen und Trigger-Generator (`art`, `schema`), Liefern und Übernehmen über den Stand im Änderungslog `einsatz_aenderung`, Anhänge auf Abruf (`anhang`), Anträge am Spiegel und Ausführen beim Führer (`antrag`), eigener Takt (`takt`) | `/api/admin/instanz/…`, `/api/einsaetze/{id}/fuehrung/…`, `GET /api/instanz/stammdaten/herkunft`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden`, `POST /api/instanz/spiegel` (signiert); `GET /api/einsaetze/{id}/antraege`, `DELETE …/antraege/{antrag_id}`, `GET /api/antraege/abgelehnt`, `DELETE /api/antraege/abgelehnt/{antrag_id}` (LLH-1648, nach der Verwahrung); Unterschriftsschlüssel in `src/auth/unterschrift` |
 
 ### Auth & Organisation
 
@@ -213,7 +213,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
 | `src/auth` | Passwort, TOTP, WebAuthn, OIDC, Hüllen-Anmeldung (PKCE), Sitzungen, Drosseln, Anmelde- und Admin-Spur, Benutzerverwaltung, Unterschriftsschlüssel der Org-Admins (`unterschrift`, LLH-1490) | `/api/auth/…`, `/api/benutzer`, `/api/zugangsprotokoll/…` |
-| `src/org` | Org-Einstellungen, Modul-Vorgaben, Logo, Aufbewahrungsfristen je Kategorie | `/api/organisation`, `/api/org-einstellungen`, `/api/org-modul-einstellungen` |
+| `src/org` | Org-Einstellungen, Modul-Vorgaben, Logo, Aufbewahrungsfristen je Kategorie, Archiv-Schlüssel mit Schlüsselprobe | `/api/organisation`, `/api/org-einstellungen`, `/api/org-modul-einstellungen`, `/api/org-archiv-schluessel` |
 | `src/benutzer_einstellungen` | Schlüssel/Wert-Fach je Benutzer mit Whitelist (erster Nutzer: Sprungpalette) | `/api/benutzer-einstellungen` |
 
 ### Aufbewahrung & Dokumente
@@ -222,7 +222,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | --- | --- | --- |
 | `src/anhang` | Generische Anhänge als BLOB in SQLite: Allowlist, 25 MiB, Scan, Vorschaubilder, Audit | `…/{id}/anhaenge`; von ETB, Person, Tier, Schaden, UHS, Dokument genutzt |
 | `src/dokument` | Dokumentenablage eines Einsatzes mit Kategorie und Bezug, Bytes in `anhang` | `…/{id}/dokumente`; Live `dokument` |
-| `src/aufbewahrung` | Lesender Archivpfad des Org-Admins: Übersicht, pseudonyme Archivakte, Wiederherstellen, Schwärzungsantrag | `/api/aufbewahrung` |
+| `src/aufbewahrung` | Lesender Archivpfad des Org-Admins: Übersicht, pseudonyme Archivakte, Wiederherstellen, Schwärzungsantrag, Download des verschlüsselten Archivs | `/api/aufbewahrung` |
 | `src/backup` | Konsistente Sicherung (auch verschlüsselt mit `age`), Download, Restore, Scheduler | `GET /api/backup`, CLI `backup`/`restore` |
 | `src/storno.rs` | Soft-Delete einer Zeile genau einmal, mit 404/409-Semantik | von den Fachmodulen genutzt |
 
@@ -391,7 +391,7 @@ flowchart TB
 | `frontend/src/admin` | Verwaltungslayout, Datenträgerwarnung, Demo-Daten | `src/datentraeger`, `src/demo` |
 | `frontend/src/instanz` | Verwaltungsseite „Instanzkopplung“: Identität, Kopplungen, Unterschriftsschlüssel (WebAuthn), Stammdaten-Stand, „ELW verloren“; Herkunfts-Abzeichen und Sperre „Wird am Hub gepflegt“ für die Stammdaten-Seiten (`herkunft.tsx`); Führung je Einsatz: Paneel, Hinweisband, „Einsätze beim Gegenüber“ (LLH-1491) | `src/instanz`, `src/auth/unterschrift` |
 | `frontend/src/zugangsprotokoll` | Anmelde- und Admin-Spur | `src/auth` (`/api/zugangsprotokoll`) |
-| `frontend/src/aufbewahrung` | Aufbewahrungsübersicht, Archivakte, Fristen, Schwärzungsantrag | `src/aufbewahrung`, `src/org` |
+| `frontend/src/aufbewahrung` | Aufbewahrungsübersicht, Archivakte, Fristen, Schwärzungsantrag, Archiv-Download | `src/aufbewahrung`, `src/org` |
 
 ## 5.4 Ebene 2: weitere Teilprojekte
 

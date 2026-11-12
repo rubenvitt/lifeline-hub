@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import FuehrungHinweisband from './FuehrungHinweisband';
 import type { EinsatzAnzeige, FuehrungAnzeige } from '../api/types';
 
@@ -16,7 +16,7 @@ vi.mock('../api/fuehrung', () => ({
 }));
 
 import { useAuth } from '../auth/AuthContext';
-import { loadFuehrung } from '../api/fuehrung';
+import { bestaetigeUebernahme, loadFuehrung } from '../api/fuehrung';
 import { authWertFixture, benutzerFixture } from '../test/fixtures';
 
 const einsatz = (rolle: EinsatzAnzeige['meine_rolle'], offen: boolean): EinsatzAnzeige =>
@@ -71,6 +71,20 @@ describe('FuehrungHinweisband (LLH-1491)', () => {
     expect(screen.getByText(/unterzeichnet von Admin A · ELW ohne Verbindung/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Übernahme bestätigen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Widersprechen' })).toBeInTheDocument();
+  });
+
+  it('ohne Netz sind Bestätigen und Widersprechen gesperrt, mit Grund (LLH-1670)', async () => {
+    renderMitProviders(<FuehrungHinweisband einsatz={einsatz('einsatzleitung', true)} />);
+    expect(await screen.findByText('Führung übernommen von Hub Nord')).toBeInTheDocument();
+    setzeOnline(false);
+    const grund = await screen.findByText('Ohne Verbindung nicht änderbar');
+    for (const name of ['Übernahme bestätigen', 'Widersprechen']) {
+      const knopf = screen.getByRole('button', { name });
+      expect(knopf).toBeDisabled();
+      expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
+    expect(bestaetigeUebernahme).not.toHaveBeenCalled();
   });
 
   it('Führungspersonal sieht den Hinweis ohne Entscheidung', async () => {

@@ -291,6 +291,14 @@ fn backend() -> BTreeMap<&'static str, usize> {
             lagemonitor_zugang::BEZEICHNUNG_MAX,
         ),
         ("LAGEBILD_EMPFAENGER_MAX", lagebild_extern::EMPFAENGER_MAX),
+        (
+            "ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX",
+            lifeline_hub::org::archiv_empfaenger::BEZEICHNUNG_MAX,
+        ),
+        (
+            "ARCHIV_SCHLUESSEL_MAX",
+            usize::try_from(lifeline_hub::org::archiv_empfaenger::EMPFAENGER_MAX).unwrap(),
+        ),
         ("QUALI_SOLL_MAX", personal::quali_soll::QUALI_SOLL_MAX),
         (
             "QUALI_SOLL_ANZAHL_MAX",
