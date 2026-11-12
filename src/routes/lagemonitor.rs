@@ -31,7 +31,8 @@ use crate::staerke::{Staerke, StaerkePosition};
 use crate::uhs::{UhsStatus, UhsTyp};
 use axum::extract::State;
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
@@ -194,9 +195,9 @@ pub async fn lagebild(
     Ok(Json(verdichte(&state.pool, ctx.einsatz.id).await?))
 }
 
-/// Die Verdichtung des Lagebilds. Sie trägt den gekoppelten Lagemonitor und die Schnittstelle für
-/// externe Anzeigen (`routes::lagemonitor_v1`, LLH-1484), damit beide dieselben Zahlen zeigen.
-/// Prüft keine Rechte: das tun die Aufrufer.
+/// Die Verdichtung des Lagebilds. Sie trägt den gekoppelten Lagemonitor, das Lagebild für Externe
+/// (`routes::lagebild_extern`) und die Lage der öffentlichen API (`public_api::lage`), damit alle
+/// dieselben Zahlen zeigen. Prüft keine Rechte: das tun die Aufrufer.
 pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<LagemonitorAnzeige, AppError> {
     let mut betroffene = LagemonitorBetroffene::default();
     // Sichtung und Versorgungszustand je Person; die Zählung ist die gemeinsame Regel
@@ -389,6 +390,259 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
     })
 }
 
+// ---------------------------------------------------------------------------------------------
+// Lagekarte und Lagemeldung für Abrufe von außen (Lagebild für Externe, `GET /api/v1/lage`)
+// ---------------------------------------------------------------------------------------------
+
+/// `?karte=`, mit dem das Lagebild für Externe die Karte abbestellt.
+pub(crate) const KARTE_AUS: &str = "aus";
+
+/// Abfrage des Lagebilds für Externe.
+#[derive(Debug, Deserialize)]
+pub struct LageQuery {
+    /// `aus` oder die Fassung der Karte, die die Anzeige schon hat.
+    pub karte: Option<String>,
+}
+
+/// Eine UHS in Zahlen.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorUhsZahl {
+    pub id: i64,
+    pub bezeichnung: String,
+    pub typ: UhsTyp,
+    pub status: UhsStatus,
+    pub belegt: i64,
+    /// Plätze ohne Wartebereich.
+    pub plaetze: i64,
+    /// Stärke der zugeordneten Kräfte.
+    pub kraefte: i64,
+}
+
+/// Die Lagemeldung für die Anzeige.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorLagemeldung {
+    pub text: String,
+    /// Freigabe des Lageberichts (UTC, SQLite-Format).
+    pub freigegeben_at: String,
+}
+
+/// Fassung einer Karte: die ersten 16 Hex-Zeichen des SHA-256 ihrer Serialisierung.
+pub(crate) fn karte_etag<T: Serialize>(karte: &T) -> String {
+    let text = serde_json::to_string(karte).expect("Karte ist serialisierbar");
+    crate::anhang::repo::sha256_hex(text.as_bytes())[..16].to_string()
+}
+
+/// Eine gespeicherte GeoJSON-Geometrie; ein Feature wird auf seine Geometrie zurückgeführt.
+/// Kaputtes bleibt weg, statt die ganze Antwort scheitern zu lassen.
+fn geometrie(roh: &str) -> Option<Value> {
+    let wert: Value = serde_json::from_str(roh).ok()?;
+    match wert.get("type").and_then(Value::as_str) {
+        Some("Feature") => wert.get("geometry").cloned(),
+        Some(_) => Some(wert),
+        None => None,
+    }
+}
+
+fn punkt(lat: f64, lon: f64) -> Value {
+    json!({ "type": "Point", "coordinates": [lon, lat] })
+}
+
+/// Ein Feature der Lagekarte in getypter Form (LLH-1638, design.md D7). Jeder Abruf von außen
+/// serialisiert daraus seine eigene Fassung: das Lagebild für Externe über [`karte_json`], die
+/// öffentliche API über `public_api::lage`. Ein Feld, das hier dazukommt, erscheint dort erst,
+/// wenn jemand es ausdrücklich aufnimmt.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct KartenFeature {
+    /// GeoJSON-Geometrie.
+    pub geometrie: Value,
+    pub art: KartenFeatureArt,
+}
+
+/// Was ein [`KartenFeature`] zeigt. Ohne Freitext: keine Notiz, keine Beschriftung.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum KartenFeatureArt {
+    /// Die Koordinate des Einsatzorts, nicht seine Adresse.
+    Einsatzort,
+    /// Gefahrenzone (Gefahrengebiet, Absperrung, Sperrgebiet).
+    Zone { id: i64, typ: LageZoneTyp },
+    /// Fläche eines Einsatzabschnitts.
+    Abschnitt {
+        id: i64,
+        bezeichnung: String,
+        kurzbezeichnung: Option<String>,
+    },
+    /// Verortete Unfallhilfsstelle mit Belegung.
+    Uhs {
+        id: i64,
+        bezeichnung: String,
+        typ: UhsTyp,
+        belegt: i64,
+        plaetze: i64,
+    },
+    /// Einsatzweites freies Zeichen, nur mit seiner Zeichenbeschreibung.
+    Zeichen { id: i64, zeichen_spec: String },
+}
+
+/// Die Features der Lagekarte: Einsatzort, Gefahrenzonen, Abschnittsflächen, UHS und die
+/// einsatzweiten freien Zeichen. Freie Zeichen nur mit ihrer Zeichenbeschreibung, ohne
+/// Beschriftung (Freitext); Zeichen einer Kartenansicht gehören zu dieser Ansicht und bleiben weg.
+pub(crate) async fn load_karten_features(
+    pool: &SqlitePool,
+    kopf: &crate::einsatz::Einsatz,
+    verdichtet: &LagemonitorAnzeige,
+) -> Result<Vec<KartenFeature>, AppError> {
+    let mut features = Vec::new();
+    if let (Some(lat), Some(lon)) = (kopf.einsatzort_lat, kopf.einsatzort_lon) {
+        features.push(KartenFeature {
+            geometrie: punkt(lat, lon),
+            art: KartenFeatureArt::Einsatzort,
+        });
+    }
+    for zone in &verdichtet.zonen {
+        if let Some(g) = geometrie(&zone.geometrie) {
+            features.push(KartenFeature {
+                geometrie: g,
+                art: KartenFeatureArt::Zone {
+                    id: zone.id,
+                    typ: zone.typ,
+                },
+            });
+        }
+    }
+    for abschnitt in &verdichtet.abschnitte {
+        if let Some(g) = geometrie(&abschnitt.flaeche_geojson) {
+            features.push(KartenFeature {
+                geometrie: g,
+                art: KartenFeatureArt::Abschnitt {
+                    id: abschnitt.id,
+                    bezeichnung: abschnitt.bezeichnung.clone(),
+                    kurzbezeichnung: abschnitt.kurzbezeichnung.clone(),
+                },
+            });
+        }
+    }
+    for uhs in &verdichtet.uhs {
+        if let (Some(lat), Some(lon)) = (uhs.lat, uhs.lon) {
+            features.push(KartenFeature {
+                geometrie: punkt(lat, lon),
+                art: KartenFeatureArt::Uhs {
+                    id: uhs.id,
+                    bezeichnung: uhs.bezeichnung.clone(),
+                    typ: uhs.typ,
+                    belegt: uhs.belegt,
+                    plaetze: uhs.plaetze,
+                },
+            });
+        }
+    }
+    let zeichen: Vec<(i64, f64, f64, String)> = sqlx::query_as(
+        "SELECT id, lat, lon, zeichen_spec FROM freies_zeichen \
+         WHERE einsatz_id = ? AND ansicht_id IS NULL ORDER BY id",
+    )
+    .bind(kopf.id)
+    .fetch_all(pool)
+    .await?;
+    for (id, lat, lon, zeichen_spec) in zeichen {
+        features.push(KartenFeature {
+            geometrie: punkt(lat, lon),
+            art: KartenFeatureArt::Zeichen { id, zeichen_spec },
+        });
+    }
+    Ok(features)
+}
+
+/// Die Karte als GeoJSON-FeatureCollection in der Form des Lagebilds für Externe (D5 von
+/// LLH-1484): `properties.kind` nennt die Art, `typ` die Zonen- oder UHS-Art. Die Form ist
+/// festgehalten (`karte_des_lagebilds_bleibt_byte_fuer_byte`), weil `karte_etag` an ihr hängt.
+pub(crate) fn karte_json(features: &[KartenFeature]) -> Value {
+    let features: Vec<Value> = features
+        .iter()
+        .map(|f| {
+            let properties = match &f.art {
+                KartenFeatureArt::Einsatzort => json!({ "kind": "einsatzort" }),
+                KartenFeatureArt::Zone { id, typ } => {
+                    json!({ "kind": "zone", "id": id, "typ": typ })
+                }
+                KartenFeatureArt::Abschnitt {
+                    id,
+                    bezeichnung,
+                    kurzbezeichnung,
+                } => json!({
+                    "kind": "abschnitt",
+                    "id": id,
+                    "bezeichnung": bezeichnung,
+                    "kurzbezeichnung": kurzbezeichnung,
+                }),
+                KartenFeatureArt::Uhs {
+                    id,
+                    bezeichnung,
+                    typ,
+                    belegt,
+                    plaetze,
+                } => json!({
+                    "kind": "uhs",
+                    "id": id,
+                    "bezeichnung": bezeichnung,
+                    "typ": typ,
+                    "belegt": belegt,
+                    "plaetze": plaetze,
+                }),
+                KartenFeatureArt::Zeichen { id, zeichen_spec } => {
+                    json!({ "kind": "zeichen", "id": id, "zeichen_spec": zeichen_spec })
+                }
+            };
+            json!({ "type": "Feature", "geometry": f.geometrie, "properties": properties })
+        })
+        .collect();
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
+/// Die Lagekarte des Lagebilds für Externe: [`load_karten_features`] in der Form von
+/// [`karte_json`].
+pub(crate) async fn build_karte(
+    pool: &SqlitePool,
+    kopf: &crate::einsatz::Einsatz,
+    verdichtet: &LagemonitorAnzeige,
+) -> Result<Value, AppError> {
+    Ok(karte_json(
+        &load_karten_features(pool, kopf, verdichtet).await?,
+    ))
+}
+
+/// Abschnitt `zusammenfassung` des jüngsten freigegebenen Lageberichts der Vorlage
+/// `lagebericht` (D6 von LLH-1484). Leer oder geschwärzt: `None`.
+pub(crate) async fn lagemeldung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Option<LagemonitorLagemeldung>, AppError> {
+    let zeile: Option<(String, Option<String>)> = sqlx::query_as(
+        "SELECT abschnitte, freigegeben_at FROM lagebericht \
+         WHERE einsatz_id = ? AND status = 'freigegeben' AND vorlage = 'lagebericht' \
+         ORDER BY freigegeben_at DESC, id DESC LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    let Some((abschnitte, Some(freigegeben_at))) = zeile else {
+        return Ok(None);
+    };
+    #[derive(Deserialize)]
+    struct Abschnitt {
+        schluessel: String,
+        text: String,
+    }
+    let abschnitte: Vec<Abschnitt> = serde_json::from_str(&abschnitte).unwrap_or_default();
+    Ok(abschnitte
+        .into_iter()
+        .find(|a| a.schluessel == "zusammenfassung")
+        .map(|a| a.text.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .map(|text| LagemonitorLagemeldung {
+            text,
+            freigegeben_at,
+        }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449,5 +703,144 @@ mod tests {
             zeile(Betroffen, None, None, false).versorgung,
             Versorgung::Offen
         );
+    }
+
+    /// Ein Einsatz mit Einsatzort und einem freien Zeichen, dazu eine Verdichtung mit Zone,
+    /// Abschnitt und verorteter UHS: jede Art von Karten-Feature einmal.
+    async fn karten_fall() -> (SqlitePool, crate::einsatz::Einsatz, LagemonitorAnzeige) {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatzort_lat, einsatzort_lon) \
+             VALUES (1, 'Lage', 52.1, 9.3) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO freies_zeichen (id, einsatz_id, lat, lon, zeichen_spec) \
+             VALUES (7, ?, 50.2, 8.7, '{\"v\":1}')",
+        )
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let kopf = crate::einsatz::repo::laden(&pool, einsatz_id)
+            .await
+            .unwrap();
+        let polygon = r#"{"type":"Polygon","coordinates":[[[9,52],[9.1,52],[9,52.1],[9,52]]]}"#;
+        let verdichtet = LagemonitorAnzeige {
+            stand_at: "2026-11-12 19:00:00".into(),
+            betroffene: LagemonitorBetroffene::default(),
+            kraefte: LagemonitorKraefte {
+                einheiten: 0,
+                personal: 0,
+                staerke: Staerke::neu(0, 0, 0),
+            },
+            uhs: vec![
+                LagemonitorUhs {
+                    id: 5,
+                    bezeichnung: "BHP Nord".into(),
+                    typ: UhsTyp::Behandlungsplatz,
+                    status: UhsStatus::Aktiv,
+                    lat: Some(52.11),
+                    lon: Some(9.31),
+                    belegt: 3,
+                    plaetze: 10,
+                    kraefte: 4,
+                },
+                // Ohne Koordinate: steht in der Liste, nicht in der Karte.
+                LagemonitorUhs {
+                    id: 6,
+                    bezeichnung: "PA Süd".into(),
+                    typ: UhsTyp::Patientenablage,
+                    status: UhsStatus::Geplant,
+                    lat: None,
+                    lon: None,
+                    belegt: 0,
+                    plaetze: 0,
+                    kraefte: 0,
+                },
+            ],
+            zonen: vec![LagemonitorZone {
+                id: 3,
+                typ: LageZoneTyp::Absperrbereich,
+                geometrie: format!(
+                    r#"{{"type":"Feature","properties":{{}},"geometry":{polygon}}}"#
+                ),
+            }],
+            abschnitte: vec![
+                LagemonitorAbschnitt {
+                    id: 4,
+                    bezeichnung: "Abschnitt Nord".into(),
+                    kurzbezeichnung: None,
+                    flaeche_geojson: polygon.into(),
+                },
+                // Kaputte Fläche bleibt weg, statt die Karte scheitern zu lassen.
+                LagemonitorAbschnitt {
+                    id: 8,
+                    bezeichnung: "Abschnitt Süd".into(),
+                    kurzbezeichnung: Some("EA-S".into()),
+                    flaeche_geojson: "kein json".into(),
+                },
+            ],
+            sofortmeldungen_offen: 0,
+            programm: Vec::new(),
+            sanitaetsdienst: None,
+        };
+        (pool, kopf, verdichtet)
+    }
+
+    /// Die Karte des Lagebilds für Externe, Byte für Byte (LLH-1638, design.md D7): der Umzug des
+    /// Kartenbaus auf getypte Features darf weder Inhalt noch `karte_etag` ändern.
+    const KARTE_LAGEBILD: &str = r##"{"features":[{"geometry":{"coordinates":[9.3,52.1],"type":"Point"},"properties":{"kind":"einsatzort"},"type":"Feature"},{"geometry":{"coordinates":[[[9,52],[9.1,52],[9,52.1],[9,52]]],"type":"Polygon"},"properties":{"id":3,"kind":"zone","typ":"absperrbereich"},"type":"Feature"},{"geometry":{"coordinates":[[[9,52],[9.1,52],[9,52.1],[9,52]]],"type":"Polygon"},"properties":{"bezeichnung":"Abschnitt Nord","id":4,"kind":"abschnitt","kurzbezeichnung":null},"type":"Feature"},{"geometry":{"coordinates":[9.31,52.11],"type":"Point"},"properties":{"belegt":3,"bezeichnung":"BHP Nord","id":5,"kind":"uhs","plaetze":10,"typ":"behandlungsplatz"},"type":"Feature"},{"geometry":{"coordinates":[8.7,50.2],"type":"Point"},"properties":{"id":7,"kind":"zeichen","zeichen_spec":"{\"v\":1}"},"type":"Feature"}],"type":"FeatureCollection"}"##;
+
+    #[tokio::test]
+    async fn karte_des_lagebilds_bleibt_byte_fuer_byte() {
+        let (pool, kopf, verdichtet) = karten_fall().await;
+        let karte = build_karte(&pool, &kopf, &verdichtet).await.unwrap();
+        assert_eq!(serde_json::to_string(&karte).unwrap(), KARTE_LAGEBILD);
+    }
+
+    #[tokio::test]
+    async fn karten_features_tragen_jede_art_einmal() {
+        let (pool, kopf, verdichtet) = karten_fall().await;
+        let features = load_karten_features(&pool, &kopf, &verdichtet)
+            .await
+            .unwrap();
+        let arten: Vec<&str> = features
+            .iter()
+            .map(|f| match f.art {
+                KartenFeatureArt::Einsatzort => "einsatzort",
+                KartenFeatureArt::Zone { .. } => "zone",
+                KartenFeatureArt::Abschnitt { .. } => "abschnitt",
+                KartenFeatureArt::Uhs { .. } => "uhs",
+                KartenFeatureArt::Zeichen { .. } => "zeichen",
+            })
+            .collect();
+        // Die UHS ohne Koordinate und der Abschnitt mit kaputter Fläche fehlen.
+        assert_eq!(arten, ["einsatzort", "zone", "abschnitt", "uhs", "zeichen"]);
+    }
+
+    #[test]
+    fn geometrie_nimmt_feature_und_geometrie_und_verwirft_kaputtes() {
+        let g = r#"{"type":"Polygon","coordinates":[[[10,52],[10.1,52],[10,52.1],[10,52]]]}"#;
+        assert_eq!(geometrie(g).unwrap()["type"], "Polygon");
+        let f = format!(r#"{{"type":"Feature","properties":{{}},"geometry":{g}}}"#);
+        assert_eq!(geometrie(&f).unwrap()["type"], "Polygon");
+        assert!(geometrie("kein json").is_none());
+        assert!(geometrie("{}").is_none());
+    }
+
+    #[test]
+    fn karte_etag_haengt_am_inhalt() {
+        let a = json!({"type": "FeatureCollection", "features": []});
+        let b = json!({"type": "FeatureCollection", "features": [{"x": 1}]});
+        assert_eq!(karte_etag(&a), karte_etag(&a));
+        assert_ne!(karte_etag(&a), karte_etag(&b));
+        assert_eq!(karte_etag(&a).len(), 16);
     }
 }

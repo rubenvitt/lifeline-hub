@@ -54,10 +54,12 @@ wire_enum! {
         /// Einmalpasswort vergeben (LFH-1121): neues Passwort mit Änderungszwang, alle Sitzungen
         /// beendet. Ohne Detail; das Passwort steht nie in der Spur.
         EinmalpasswortVergeben => "einmalpasswort_vergeben",
-        /// Lesezugang für eine externe Anzeige angelegt (LLH-1484). Der Schlüssel steht nie in
-        /// der Spur.
+        /// Lesezugang für eine externe Anzeige angelegt (LLH-1484). Seit LLH-1638 schreibt das
+        /// kein Weg mehr (der Schlüsselweg `llh_lm_` ist entfernt); der Wert bleibt, damit alte
+        /// Einträge lesbar sind.
         LesezugangAngelegt => "lesezugang_angelegt",
-        /// Lesezugang für eine externe Anzeige widerrufen (LLH-1484).
+        /// Lesezugang für eine externe Anzeige widerrufen (LLH-1484); nur noch in alten
+        /// Einträgen.
         LesezugangWiderrufen => "lesezugang_widerrufen",
         /// Kopplungscode für eine andere Instanz ausgestellt (LLH-1490). Der Code steht nie in
         /// der Spur.
@@ -123,8 +125,6 @@ pub enum Ziel<'a> {
     Benutzer { id: i64, benutzername: &'a str },
     /// Ein Anmeldeweg, mit seiner id (`passwort`, `oidc`, …).
     Anmeldeweg(&'a str),
-    /// Ein Lesezugang für externe Anzeigen, mit seiner Bezeichnung (LLH-1484).
-    Lesezugang(&'a str),
     /// Eine gekoppelte Instanz, mit ihrem Namen (LLH-1490).
     Instanz(&'a str),
     /// Ein Unterschriftsschlüssel, mit Inhaber und Bezeichnung (LLH-1490).
@@ -244,7 +244,6 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
             crate::auth::benutzername::fuer_protokoll(benutzername),
         ),
         Ziel::Anmeldeweg(id)
-        | Ziel::Lesezugang(id)
         | Ziel::Instanz(id)
         | Ziel::Unterschrift(id)
         | Ziel::Archiv(id)
@@ -339,7 +338,6 @@ fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
     match ziel {
         Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
         Ziel::Anmeldeweg(t)
-        | Ziel::Lesezugang(t)
         | Ziel::Instanz(t)
         | Ziel::Unterschrift(t)
         | Ziel::Archiv(t)

@@ -367,120 +367,9 @@ async fn purge_lauf_raeumt_alte_zeilen_des_maschinenzugangs() {
 
 // ── Anmeldung unter /api/v1/ ────────────────────────────────────────────────────────────────
 
-use axum::body::{to_bytes, Body};
-use axum::extract::ConnectInfo;
-use axum::http::Request;
-use ed25519_dalek::SigningKey;
-use lifeline_machine_client::{finish_redeem, prepare_redeem, Credentials, RedeemResponse};
+use common::maschine::{angebunden, einloesen, jetzt, schluessel, senden, signiert};
+use lifeline_machine_client::{prepare_redeem, Credentials};
 use std::net::SocketAddr;
-use tower::ServiceExt;
-
-fn schluessel(n: u8) -> SigningKey {
-    SigningKey::from_bytes(&[n; 32])
-}
-
-async fn senden(
-    app: &axum::Router,
-    methode: &str,
-    pfad: &str,
-    kopf: Option<(&str, String)>,
-    body: Vec<u8>,
-    ip: &str,
-) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
-    let mut req = Request::builder().method(methode).uri(pfad);
-    if let Some((name, wert)) = kopf {
-        req = req.header(name, wert);
-    }
-    if !body.is_empty() {
-        req = req.header("content-type", "application/json");
-    }
-    let mut req = req.body(Body::from(body)).unwrap();
-    req.extensions_mut().insert(ConnectInfo::<SocketAddr>(
-        format!("{ip}:4000").parse().unwrap(),
-    ));
-    let resp = app.clone().oneshot(req).await.unwrap();
-    let status = resp.status();
-    let headers = resp.headers().clone();
-    let bytes = to_bytes(resp.into_body(), usize::MAX)
-        .await
-        .unwrap()
-        .to_vec();
-    (status, headers, bytes)
-}
-
-/// Löst `code` mit `key` ein; liefert Status und, bei Erfolg, die Zugangsdaten.
-async fn einloesen(
-    app: &axum::Router,
-    code: &str,
-    key: &SigningKey,
-    ip: &str,
-) -> (StatusCode, Option<Credentials>) {
-    let (d, anfrage) = prepare_redeem(code, key).unwrap();
-    let (s, _, bytes) = senden(
-        app,
-        "POST",
-        "/api/v1/zugang/redeem",
-        None,
-        serde_json::to_vec(&anfrage).unwrap(),
-        ip,
-    )
-    .await;
-    if s != StatusCode::OK {
-        return (s, None);
-    }
-    let antwort: RedeemResponse = serde_json::from_slice(&bytes).unwrap();
-    (
-        s,
-        Some(finish_redeem(&d, key, "http://test", &antwort).unwrap()),
-    )
-}
-
-fn jetzt() -> i64 {
-    chrono::Utc::now().timestamp()
-}
-
-/// Signiert und sendet; liefert Status, Köpfe und Body als JSON.
-async fn signiert(
-    app: &axum::Router,
-    cred: &Credentials,
-    methode: &str,
-    pfad: &str,
-    iat: i64,
-    jti: &str,
-    ip: &str,
-) -> (StatusCode, axum::http::HeaderMap, Value) {
-    let auth = cred.sign_request(methode, pfad, b"", iat, jti).unwrap();
-    let (s, h, b) = senden(
-        app,
-        methode,
-        pfad,
-        Some(("authorization", auth)),
-        vec![],
-        ip,
-    )
-    .await;
-    (s, h, serde_json::from_slice(&b).unwrap_or(Value::Null))
-}
-
-/// Legt eine Anbindung an und löst ihren Code ein.
-async fn angebunden(
-    app: &axum::Router,
-    admin: &str,
-    scopes: Value,
-    key: &SigningKey,
-    ip: &str,
-) -> Credentials {
-    let (s, v) = anlegen(
-        app,
-        admin,
-        json!({ "name": "Fremdsystem", "scopes": scopes }),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{v}");
-    let (s, cred) = einloesen(app, v["code"].as_str().unwrap(), key, ip).await;
-    assert_eq!(s, StatusCode::OK);
-    cred.unwrap()
-}
 
 async fn zugang_zeile(app: &axum::Router, admin: &str, id: &str) -> Value {
     let (_, liste) = anfrage_json(app, "GET", LISTE, admin, None).await;
@@ -932,15 +821,8 @@ async fn scope_pruefung_und_route_ohne_angabe() {
 async fn kein_bearer_und_keine_sitzung_unter_v1() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, v) = anfrage_json(
-        &app,
-        "POST",
-        "/api/lagemonitor-zugaenge",
-        &admin,
-        Some(&json!({ "bezeichnung": "Monitor" })),
-    )
-    .await;
-    let lm = v["schluessel"].as_str().unwrap().to_string();
+    // Die Form eines früheren Lagemonitor-Schlüssels (LLH-1484, entfernt mit LLH-1638).
+    let lm = "llh_lm_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string();
     let ip = "198.51.100.80";
     let (s, _, _) = senden(
         &app,
@@ -1106,7 +988,7 @@ async fn gekoppelter_elw_lehnt_vorhandene_zugaenge_ab() {
 /// Kommando und Referenz-Client gegen einen echten Server (6.3): einlösen, Schlüsseldatei
 /// schreiben, `me` mit geprüfter Antwortsignatur.
 #[tokio::test]
-async fn kommando_loest_ein_und_ruft_me_gegen_einen_echten_server() {
+async fn kommando_loest_ein_und_ruft_me_und_lage_gegen_einen_echten_server() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, v) = anlegen(
@@ -1145,6 +1027,46 @@ async fn kommando_loest_ein_und_ruft_me_gegen_einen_echten_server() {
         .unwrap();
     assert_eq!(me["zugang_id"], json!(cred.zugang_id));
     assert_eq!(me["name"], "CLI");
+
+    // Lage (LLH-1638): ohne Freigabe `einsatz: null`; nach der Freigabe der Einsatz, die Karte
+    // nur ohne `none`. Die Abfrage steht im signierten Pfad.
+    let lage = lifeline_machine_client::lage(&client, &gelesen, Some("none"), jetzt())
+        .await
+        .unwrap();
+    assert!(lage["einsatz"].is_null(), "{lage}");
+    let einsatz = common::einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let (s, v) = common::anfrage(
+        &app,
+        "PUT",
+        &format!(
+            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            cred.zugang_id
+        ),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let lage = lifeline_machine_client::lage(&client, &gelesen, Some("none"), jetzt())
+        .await
+        .unwrap();
+    assert_eq!(lage["einsatz"]["bezeichnung"], "Stadtfest");
+    assert!(lage.get("karte").is_none());
+    let lage = lifeline_machine_client::lage(&client, &gelesen, None, jetzt())
+        .await
+        .unwrap();
+    assert_eq!(lage["karte"]["type"], "FeatureCollection");
+    let etag = lage["karte_etag"].as_str().unwrap().to_string();
+    let lage = lifeline_machine_client::lage(&client, &gelesen, Some(&etag), jetzt())
+        .await
+        .unwrap();
+    assert!(lage.get("karte").is_none(), "unveränderte Karte bleibt weg");
+    assert!(
+        lifeline_machine_client::lage(&client, &gelesen, Some("a b"), jetzt())
+            .await
+            .is_err(),
+        "ein Wert, der nicht in die Abfrage passt, wird nicht gesendet"
+    );
 }
 
 // ── Befunde des Reviews vor dem PR ──────────────────────────────────────────────────────────

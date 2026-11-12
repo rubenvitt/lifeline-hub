@@ -77,9 +77,10 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Anmeldeweg aktiviert“** und **„Anmeldeweg deaktiviert“**: jedes Schalten unter
   „Einstellungen“, „Anmeldeverfahren“, auch wenn der Weg schon so stand. „Ziel“ ist dann der
   Anmeldeweg, etwa „Passwort“ oder „SSO“.
-- **„Lagemonitor-Zugang angelegt“** und **„Lagemonitor-Zugang widerrufen“**: unter
-  „Einstellungen“, „Lagemonitore“. „Ziel“ ist die Bezeichnung des Zugangs; ein zweiter Widerruf
-  schreibt nichts.
+- **„Lagemonitor-Zugang angelegt“** und **„Lagemonitor-Zugang widerrufen“**: nur in älteren
+  Einträgen. Sie stammen von den früheren Schlüsseln für Lagemonitore; heute ist ein Lagemonitor
+  eine Anbindung (siehe [Externe Lagemonitore](externe-lagemonitore.md)). „Ziel“ ist die
+  Bezeichnung des Zugangs.
 - **„Archiv-Schlüssel eingetragen“**, **„Archiv-Schlüssel geprüft“** und **„Archiv-Schlüssel
   entfernt“**: unter „Einstellungen“, „Archiv-Schlüssel“. „Ziel“ ist die Bezeichnung des
   Schlüssels, „Detail“ sein Fingerabdruck; ein zweites Prüfen schreibt nichts.

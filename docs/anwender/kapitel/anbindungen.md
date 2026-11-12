@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs]
 ---
 
 ## Überblick
@@ -13,8 +13,8 @@ einem eigenen Schlüssel an und darf nur, was der Zugang an **Rechten** trägt.
 
 Anbindungen legt der System-Admin in der Verwaltung unter „Einstellungen“, „Anbindungen“ an. Wie
 ein Fremdsystem den Zugang technisch nutzt, steht in der Anleitung für Entwickler
-(`docs/api/maschinenzugang.md`). Für eine Anzeige mit einem einzelnen Lese-Schlüssel siehe
-[Externe Lagemonitore](externe-lagemonitore.md).
+(`docs/api/maschinenzugang.md`). Wie ein Lagemonitor angebunden wird und seinen Einsatz bekommt,
+steht unter [Externe Lagemonitore](externe-lagemonitore.md).
 
 ## Abläufe
 
@@ -83,10 +83,20 @@ eigene Organisation. Eine Führungskraft sieht Liste und Ansicht ohne Aktionen.
 | Positionen einliefern     | Positionen melden                                  |
 | Rechner nutzen            | die Rechner verwenden                              |
 
-Die Rechte stehen fest, die Wege dahinter kommen nach und nach: Heute nutzt ein Fremdsystem nur die
-Prüfung seiner Anmeldung. Welche Daten ein Recht später öffnet, nennt dieses Kapitel, sobald es sie
-gibt. Neben jedem Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich
-mit der Doku des Fremdsystems vergleichen. Ein Fremdsystem legt nie selbst einen Einsatz an.
+Die Rechte stehen fest, die Wege dahinter kommen nach und nach: Heute öffnet „Lage lesen“ das
+Lagebild eines Einsatzes; die übrigen Rechte nutzt ein Fremdsystem noch nur zur Prüfung seiner
+Anmeldung. Welche Daten ein Recht öffnet, nennt dieses Kapitel, sobald es sie gibt. Neben jedem
+Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich mit der Doku des
+Fremdsystems vergleichen. Ein Fremdsystem legt nie selbst einen Einsatz an.
+
+### Lage lesen braucht die Freigabe der Einsatzleitung
+
+Eine Anbindung mit „Lage lesen“ sieht nur den Einsatz, den die Einsatzleitung auf der Seite
+„Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben hat, und höchstens einen.
+Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“. Die
+Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
+wenn ihr „Lage lesen“ genommen wird; bekommt sie das Recht wieder, braucht es eine neue Freigabe.
+Abläufe und Inhalt des Lagebilds: [Externe Lagemonitore](externe-lagemonitore.md).
 
 ### Warum ein Fremdsystem nicht hereinkommt
 

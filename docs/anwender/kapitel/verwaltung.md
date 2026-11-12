@@ -12,8 +12,8 @@ gilt, solange ein Einsatz nichts Eigenes einstellt: die Darstellung, Nummern und
 Module erscheinen und welche eine Rolle verlangen und auf welchen Wegen sich Personen anmelden. Die Einstellungen
 eines einzelnen Einsatzes beschreibt das Kapitel
 [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md).
-Die Zugänge externer Lagemonitore unter „Lagemonitore“ beschreibt
-[Externe Lagemonitore](externe-lagemonitore.md).
+Die Zugänge von Fremdsystemen unter „Anbindungen“, auch die externer Lagemonitore, beschreiben
+[Anbindungen](anbindungen.md) und [Externe Lagemonitore](externe-lagemonitore.md).
 
 Ändern dürfen nur System-Admins. Führungskräfte der Organisation sehen die Verwaltung zum
 Nachschlagen.

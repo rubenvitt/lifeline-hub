@@ -8,7 +8,7 @@ import { waehleMenueEintrag } from '../../test/menue';
 import { Route, Routes } from 'react-router';
 import Anbindungen from './Anbindungen';
 import AnbindungAnsicht, { zugangPatch } from './AnbindungAnsicht';
-import { zustandAnzeige } from './anbindungAnzeige';
+import { einsatzAnzeige, zustandAnzeige } from './anbindungAnzeige';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import { ablehnungText, scopeText } from '../../api/anbindungen';
 
@@ -289,6 +289,54 @@ describe('Anbindungen (LLH-1652)', () => {
       await screen.findByText(/meldet sich für die Organisation bei Hub Kreis/),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Anbindung anlegen/ })).toBeDisabled();
+  });
+});
+
+describe('Anbindungen · gelesener Einsatz (LLH-1638)', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
+  });
+
+  it('nennt an Anbindungen mit „Lage lesen“ den gelesenen Einsatz, sonst nichts', async () => {
+    stelleBereit([
+      zugang('a', {
+        name: 'FüKW Monitor',
+        scopes: ['lage:read'],
+        einsatz_id: 7,
+        einsatz_bezeichnung: 'Stadtfest',
+      }),
+      zugang('b', { name: 'Wache', scopes: ['lage:read'] }),
+      zugang('c', { name: 'Alarm-Adapter' }),
+    ]);
+    renderSeiten();
+    await screen.findByText('FüKW Monitor');
+    const zeilen = Array.from(document.querySelectorAll('[data-lfh="anbindung-einsatz"]')).map(
+      (e) => e.textContent,
+    );
+    expect(zeilen).toEqual(['liest Stadtfest', 'kein Einsatz freigegeben']);
+  });
+
+  it('zeigt ihn auch in der Ansicht', async () => {
+    stelleBereit([
+      zugang('a', { scopes: ['lage:read'], einsatz_id: 7, einsatz_bezeichnung: 'Stadtfest' }),
+    ]);
+    renderSeiten('/admin/einstellungen/anbindungen/a');
+    expect(await screen.findByText('liest Stadtfest')).toBeInTheDocument();
+  });
+
+  it('Wortlaut: nur mit Leserecht mit Einsatzbezug, nicht widerrufen, nicht abgelaufen', () => {
+    const basis = { scopes: ['lage:read'], zustand: 'aktiv', is_abgelaufen: false } as const;
+    expect(einsatzAnzeige({ ...basis, scopes: [...basis.scopes] })).toBe(
+      'kein Einsatz freigegeben',
+    );
+    expect(
+      einsatzAnzeige({ ...basis, scopes: [...basis.scopes], einsatz_bezeichnung: 'Stadtfest' }),
+    ).toBe('liest Stadtfest');
+    expect(einsatzAnzeige({ ...basis, scopes: ['rechner:use'] })).toBeNull();
+    expect(
+      einsatzAnzeige({ ...basis, scopes: [...basis.scopes], zustand: 'widerrufen' }),
+    ).toBeNull();
+    expect(einsatzAnzeige({ ...basis, scopes: [...basis.scopes], is_abgelaufen: true })).toBeNull();
   });
 });
 

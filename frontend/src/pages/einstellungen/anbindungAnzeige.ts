@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { adminSektionPfad } from '../../admin/adminNav';
+import { hasEinsatzbezug } from '../../api/anbindungen';
 import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungenListe } from '../../api/types';
 
@@ -24,6 +25,18 @@ export function zustandAnzeige(z: Pick<AnbindungAnzeige, 'zustand' | 'is_abgelau
   if (z.is_abgelaufen) return { wort: 'abgelaufen', ton: 'achtung' };
   if (z.zustand === 'wartet') return { wort: 'wartet auf Schlüssel', ton: 'bedien' };
   return { wort: 'aktiv', ton: 'normal' };
+}
+
+/**
+ * Welchen Einsatz eine Anbindung mit Lese-Recht mit Einsatzbezug gerade liest (LLH-1638); die
+ * Einsatzleitung gibt ihn auf der Seite „Geräte“ frei. `null`, wenn die Zeile fehlt: ohne solches
+ * Recht, widerrufen oder abgelaufen. Rein und exportiert für den Test.
+ */
+export function einsatzAnzeige(
+  z: Pick<AnbindungAnzeige, 'scopes' | 'zustand' | 'is_abgelaufen' | 'einsatz_bezeichnung'>,
+): string | null {
+  if (z.zustand === 'widerrufen' || z.is_abgelaufen || !hasEinsatzbezug(z.scopes)) return null;
+  return z.einsatz_bezeichnung ? `liest ${z.einsatz_bezeichnung}` : 'kein Einsatz freigegeben';
 }
 
 /**

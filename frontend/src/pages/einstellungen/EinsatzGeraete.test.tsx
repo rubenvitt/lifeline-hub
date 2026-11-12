@@ -54,7 +54,7 @@ interface Aufbau {
   kopplungen?: unknown[];
   sperren?: unknown[];
   ansichten?: unknown[];
-  lagemonitore?: unknown[];
+  anbindungen?: unknown[];
 }
 
 /** Die heute koppelbaren Ansichten, wie der Server sie anbietet (LFH-1040). */
@@ -83,9 +83,7 @@ function stelleBereit(a: Aufbau = {}) {
       });
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
-    http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
-      HttpResponse.json(a.lagemonitore ?? []),
-    ),
+    http.get('/api/einsaetze/1/anbindungen', () => HttpResponse.json(a.anbindungen ?? [])),
     http.get('/api/einsaetze/1/lagebild-freigaben', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/betreuung', () =>
       HttpResponse.json({
@@ -462,11 +460,18 @@ describe('EinsatzGeraete (LFH-892)', () => {
     }
   });
 
-  it('koppelt am Spiegel nicht, die Lagemonitor-Freigabe bleibt (LLH-1492)', async () => {
+  it('koppelt am Spiegel nicht, die Freigabe für Anbindungen bleibt (LLH-1492, LLH-1638)', async () => {
     stelleBereit({
       spiegel: SPIEGEL,
-      lagemonitore: [
-        { zugang_id: 1, bezeichnung: 'FüKW 1', freigegeben: false, anderer_einsatz: false },
+      anbindungen: [
+        {
+          zugang_id: 'z-1',
+          name: 'FüKW 1',
+          scopes: ['lage:read'],
+          zustand: 'aktiv',
+          freigegeben: false,
+          anderer_einsatz: false,
+        },
       ],
     });
     rendern();
@@ -476,64 +481,109 @@ describe('EinsatzGeraete (LFH-892)', () => {
       screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 1' }),
     ).not.toBeInTheDocument();
     expect(
-      await screen.findByRole('switch', { name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz' }),
+      await screen.findByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
     ).toBeEnabled();
     // Ein Link auf das Lagebild gilt an dieser Instanz; das ETB geht als Antrag (LLH-1496).
     expect(await screen.findByRole('button', { name: /Link ausgeben/ })).toBeEnabled();
   });
 
-  describe('Externe Lagemonitore (LLH-1484)', () => {
-    const zugang = (zugang_id: number, extra: Record<string, unknown> = {}) => ({
-      zugang_id,
-      bezeichnung: `FüKW ${zugang_id}`,
+  describe('Anbindungen (LLH-1638)', () => {
+    const anbindung = (nr: number, extra: Record<string, unknown> = {}) => ({
+      zugang_id: `z-${nr}`,
+      name: `FüKW ${nr}`,
+      scopes: ['lage:read'],
+      zustand: 'aktiv',
       freigegeben: false,
       anderer_einsatz: false,
       ...extra,
     });
 
-    it('bleibt ohne angelegten Zugang weg', async () => {
+    it('bleibt ohne freigebbare Anbindung weg', async () => {
       stelleBereit();
       rendern();
       await screen.findByText('UHS Nord · Tablet 1');
-      expect(screen.queryByText('Externe Lagemonitore')).not.toBeInTheDocument();
+      expect(screen.queryByText('Anbindungen')).not.toBeInTheDocument();
     });
 
     it('nennt einen Ladefehler statt die Sektion still wegzulassen', async () => {
       stelleBereit();
       server.use(
-        http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
+        http.get('/api/einsaetze/1/anbindungen', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
       );
       rendern();
-      expect(await screen.findByText('Externe Lagemonitore nicht ladbar')).toBeInTheDocument();
+      expect(await screen.findByText('Anbindungen nicht ladbar')).toBeInTheDocument();
     });
 
-    it('gibt den Einsatz per Schalter frei und nennt einen anderen', async () => {
+    it('zeigt Rechte und Zustand je Anbindung', async () => {
       stelleBereit({
-        lagemonitore: [zugang(1), zugang(2, { anderer_einsatz: true })],
+        anbindungen: [
+          anbindung(1, { zustand: 'wartet' }),
+          anbindung(2, { anderer_einsatz: true, zuletzt_genutzt_at: '2026-10-04 12:05:00' }),
+        ],
       });
-      let methode: string | null = null;
+      rendern();
+      await screen.findByText('Anbindungen');
+      const zustaende = Array.from(
+        document.querySelectorAll('[data-lfh="einsatz-anbindung-zustand"]'),
+      ).map((e) => e.textContent);
+      expect(zustaende[0]).toBe('nicht freigegeben · wartet auf Schlüssel');
+      expect(zustaende[1]).toMatch(/^liest einen anderen Einsatz · zuletzt /);
+      expect(screen.getAllByText(/Lage lesen/)).toHaveLength(2);
+    });
+
+    it('gibt den Einsatz per Schalter frei und beendet die Freigabe wieder', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      const methoden: string[] = [];
       server.use(
-        http.put('/api/einsaetze/1/lagemonitor-zugaenge/1/freigabe', ({ request }) => {
-          methode = request.method;
-          return HttpResponse.json([
-            zugang(1, { freigegeben: true }),
-            zugang(2, { anderer_einsatz: true }),
-          ]);
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', ({ request }) => {
+          methoden.push(request.method);
+          return HttpResponse.json([anbindung(1, { freigegeben: true })]);
+        }),
+        http.delete('/api/einsaetze/1/anbindungen/z-1/freigabe', ({ request }) => {
+          methoden.push(request.method);
+          return HttpResponse.json([anbindung(1)]);
         }),
       );
       rendern();
-      await screen.findByText('Externe Lagemonitore');
-      expect(screen.getByText('zeigt einen anderen Einsatz')).toBeInTheDocument();
+      await screen.findByText('Anbindungen');
       const schalter = screen.getByRole('switch', {
-        name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz',
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
       });
       expect(schalter).not.toBeChecked();
-      await userEvent.setup().click(schalter);
-      await waitFor(() => expect(methode).toBe('PUT'));
+      const user = userEvent.setup();
+      await user.click(schalter);
       await waitFor(() => expect(schalter).toBeChecked());
-      expect(screen.getByText('zeigt diesen Einsatz')).toBeInTheDocument();
+      expect(screen.getByText('liest diesen Einsatz')).toBeInTheDocument();
+      await user.click(schalter);
+      await waitFor(() => expect(schalter).not.toBeChecked());
+      expect(methoden).toEqual(['PUT', 'DELETE']);
+    });
+
+    it('sperrt die Schalter ohne Einsatzleitung nicht nur: die Sektion lädt dann gar nicht', async () => {
+      stelleBereit({ rolle: 'fuehrungspersonal', anbindungen: [anbindung(1)] });
+      rendern();
+      expect(await screen.findByText('Nur die Einsatzleitung koppelt Geräte')).toBeInTheDocument();
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    });
+
+    it('nennt einen Fehler beim Umschalten', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      server.use(
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () =>
+          HttpResponse.json(
+            { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
+            { status: 409 },
+          ),
+        ),
+      );
+      rendern();
+      await screen.findByText('Anbindungen');
+      await userEvent
+        .setup()
+        .click(screen.getByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }));
+      expect(await screen.findByText('Nicht umgeschaltet')).toBeInTheDocument();
     });
   });
 });
