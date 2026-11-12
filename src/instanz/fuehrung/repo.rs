@@ -462,8 +462,9 @@ pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<b
 /// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491). Gibt die
 /// Einsätze zurück, deren Akte sich geändert hat; der Aufrufer meldet ihren Kopf nach dem Commit.
 /// Ohne Schalter: nichts, auch offene Übernahmen bleiben stehen (LLH-1704). Der Stand ist dann
-/// eingefroren (ADR-0021): `save` richtete den Spiegel nicht aus, die Akte widerspräche dem
-/// Einsatz, und das nächste Einschalten machte ihn beim Start schreibbar.
+/// eingefroren (`src/AGENTS.md`, „Backend — Instanzkopplung (LLH-1490)“; LLH-1641, E8): `save`
+/// richtete den Spiegel nicht aus, die Akte widerspräche dem Einsatz, und das nächste Einschalten
+/// machte ihn beim Start schreibbar.
 pub async fn release_nach_widerruf(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -991,7 +992,7 @@ pub(crate) mod tests {
         assert_eq!(noch_mal, None, "schon widerrufen");
     }
 
-    /// LLH-1704 (ADR-0021): Ohne Schalter bleibt der Stand eingefroren, auch wenn die Kopplung
+    /// LLH-1704 (LLH-1641, E8): Ohne Schalter bleibt der Stand eingefroren, auch wenn die Kopplung
     /// widerrufen wird. Sonst nennte die Akte diese Instanz, während der Einsatz Spiegel bleibt,
     /// und das nächste Einschalten machte ihn beim Start schreibbar.
     #[tokio::test]
