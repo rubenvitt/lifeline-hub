@@ -4024,6 +4024,52 @@ async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
     assert!(an_meldung[0].is_some(), "an ihrer Meldung");
 }
 
+/// Läuft die Kette, solange die gestellte Person noch nicht zurück ist (der Takt läuft jede
+/// Sekunde), wartet sie: Kein Eintrag löst sich mit Grund, und kommt die Person, geht der Rest.
+#[tokio::test]
+async fn die_kette_wartet_bis_die_person_zurueck_ist() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let person = liste
+        .iter()
+        .find(|l| l["tabelle"] == "einsatz_person")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    let vorher = bruchstelle(&elw, &erika, e).await;
+
+    // Der Antrag ist noch nicht beim Führer, die Person also nicht zurück.
+    let geaendert = lifeline_hub::instanz::spiegel::bruchstelle::ketten_fortsetzen(&elw.pool)
+        .await
+        .unwrap();
+    assert!(geaendert.is_empty(), "nichts gestellt, nichts gelöst");
+    let wartend = bruchstelle(&elw, &erika, e).await;
+    assert_eq!(wartend, vorher, "die Kette hängt unverändert an der Person");
+    let zeile = wartend.iter().find(|l| l["id"] == person).unwrap();
+    assert!(zeile["folgen_offen"].as_i64().unwrap() >= 3, "{zeile}");
+    let mit_grund: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND grund IS NOT NULL",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(mit_grund, 0, "kein Eintrag hat sich mit Grund gelöst");
+
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let am_hub = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(am_hub.len(), 1);
+    assert_eq!(
+        sichtungen(&hub, am_hub[0]).await,
+        ["sk2", "sk1"],
+        "die Kette hat nach der Rückkehr gestellt"
+    );
+}
+
 #[tokio::test]
 async fn was_sich_nicht_nachreichen_laesst_antwortet_422() {
     let (_hub, elw, e, _h, erika) = bruch_nach_notuebernahme().await;
