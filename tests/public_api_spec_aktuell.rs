@@ -4,7 +4,7 @@
 
 #[test]
 fn public_v1_json_ist_aktuell() {
-    let aktuell = lifeline_hub::public_api::dokument()
+    let aktuell = lifeline_hub::public_api::openapi()
         .to_pretty_json()
         .unwrap();
     let pfad = concat!(env!("CARGO_MANIFEST_DIR"), "/docs/api/public-v1.json");

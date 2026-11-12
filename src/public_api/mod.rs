@@ -7,7 +7,8 @@
 //!   `#[utoipa::path]`. So steht jede Route im Dokument (`GET /api/v1/openapi.json`, versioniert
 //!   als `docs/api/public-v1.json`, Drift-Test `tests/public_api_spec_aktuell.rs`).
 //! - v1-Handler antworten im Fehlerfall mit [`ApiError`]. Alles andere unter `/api/v1/` bekommt
-//!   seinen `code` und `Cache-Control: no-store` von der Schicht [`schicht`].
+//!   seinen `code` von [`error_code_layer`] (an den v1-Routen, [`mount`]) und
+//!   [`contract_layer`] (außen in `crate::app`, mit `Cache-Control: no-store`).
 //! - v1-Typen sind eigene Schemas in [`PublicApiDoc`], nie solche aus `crate::api_doc` (die
 //!   interne API hat keine Zusage).
 //!
@@ -40,7 +41,7 @@ pub const PREFIX: &str = "/api/v1";
     info(
         title = "Lifeline Hub, öffentliche API",
         version = "1",
-        description = include_str!("beschreibung.md"),
+        description = include_str!("description.md"),
     ),
     components(schemas(ApiErrorBody, ErrorCode))
 )]
@@ -48,31 +49,43 @@ pub struct PublicApiDoc;
 
 /// Alle Routen der öffentlichen API samt Dokument. Neue Routen nur per `.routes(routes!(…))`.
 /// Die einfache Routenmethode des `OpenApiRouter` legte eine Route ohne Dokumenteintrag an
-/// (`tests/public_api.rs` verbietet sie hier).
+/// (`tests/public_api.rs` verbietet sie unter `src/public_api/`).
 pub fn router() -> OpenApiRouter<crate::app::AppState> {
     OpenApiRouter::with_openapi(PublicApiDoc::openapi()).routes(routes!(openapi_json))
 }
 
 /// Das fertige Dokument, einmal aus [`router`] gebaut.
-pub fn dokument() -> &'static utoipa::openapi::OpenApi {
-    static DOKUMENT: OnceLock<utoipa::openapi::OpenApi> = OnceLock::new();
-    DOKUMENT.get_or_init(|| {
-        let mut dokument = router().split_for_parts().1;
+pub fn openapi() -> &'static utoipa::openapi::OpenApi {
+    static DOCUMENT: OnceLock<utoipa::openapi::OpenApi> = OnceLock::new();
+    DOCUMENT.get_or_init(|| {
+        let mut document = router().split_for_parts().1;
         // utoipa setzt aus `license-file` eine Lizenz ohne Namen; die sagt Fremdsystemen nichts.
-        dokument.info.license = None;
-        dokument
+        document.info.license = None;
+        document
     })
 }
 
-/// Macht aus dem v1-Router den Router, den `crate::app` einhängt: mit der Body-Grenze der
-/// öffentlichen API (`crate::app::PUBLIC_API_BODY_MAX`). Sie liegt innen und gilt deshalb vor
-/// `JSON_BODY_MAX`. Generisch, damit Tests eine Proberoute ohne `AppState` montieren können.
-pub fn montieren<S>(router: OpenApiRouter<S>) -> Router<S>
+/// Macht aus dem v1-Router den Router, den `crate::app` einhängt (design.md D2, D3):
+///
+/// - Body-Grenze `crate::app::PUBLIC_API_BODY_MAX` auf zwei Ebenen: `RequestBodyLimitLayer` lehnt
+///   vor jedem Handler ab, auch wenn er den Body roh liest; `DefaultBodyLimit` stellt die
+///   Extraktoren (`JsonBody`) auf dieselbe Grenze, damit ihre Ablehnung 413 bleibt.
+/// - [`error_code_layer`] an den Routen, also innerhalb der Antwortkompression: ein langer
+///   Fehler-Body (etwa eine Ablehnung, die die Eingabe zurückgibt) bekommt seinen `code`, bevor
+///   er gepackt wird.
+///
+/// Generisch, damit Tests eine Proberoute ohne `AppState` montieren können.
+pub fn mount<S>(router: OpenApiRouter<S>) -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
     let (router, _) = router.split_for_parts();
-    router.layer(DefaultBodyLimit::max(crate::app::PUBLIC_API_BODY_MAX))
+    router
+        .layer(DefaultBodyLimit::max(crate::app::PUBLIC_API_BODY_MAX))
+        .layer(tower_http::limit::RequestBodyLimitLayer::new(
+            crate::app::PUBLIC_API_BODY_MAX,
+        ))
+        .layer(axum::middleware::from_fn(error_code_layer))
 }
 
 /// Das OpenAPI-Dokument dieser API.
@@ -84,40 +97,51 @@ where
     responses(
         (status = 200, description = "OpenAPI-Dokument (3.1) der öffentlichen API v1",
             content_type = "application/json", body = Object),
+        (status = "default", description = "Fehler; `code` nach der Tabelle in `info.description`",
+            body = ApiErrorBody),
     ),
 )]
 async fn openapi_json() -> Response {
-    Json(dokument()).into_response()
+    Json(openapi()).into_response()
 }
 
 /// `true` für Pfade der öffentlichen API.
-pub fn ist_v1(pfad: &str) -> bool {
-    pfad == PREFIX
-        || pfad
+pub fn is_v1(path: &str) -> bool {
+    path == PREFIX
+        || path
             .strip_prefix(PREFIX)
             .is_some_and(|rest| rest.starts_with('/'))
 }
 
-/// Höchstgröße eines Fehler-Bodys, den die Schicht liest. v1-Fehler sind kurz; ein größerer
-/// Body wird durch den Vorgabetext ersetzt.
-const FEHLER_BODY_MAX: usize = 64 * 1024;
+/// Höchstgröße eines Fehler-Bodys, den die Schichten lesen. Darüber wird der Body durch den
+/// Vorgabetext seines Codes ersetzt.
+const ERROR_BODY_MAX: usize = 64 * 1024;
 
-/// Schicht für alles unter `/api/v1/` (design.md D2), montiert in `crate::app` außerhalb der
-/// Zulassung, damit auch Panik-500 und Lastabwurf-503 sie durchlaufen:
-///
-/// - jede Antwort trägt `Cache-Control: no-store`;
-/// - jede Fehlerantwort ohne `code` bekommt den Vorgabe-Code ihres Status
-///   ([`ErrorCode::for_status`]); ein Body, der kein `{error}` ist, wird ersetzt.
-///
-/// Eine Antwort mit `code` (aus [`ApiError`]) bleibt, wie sie ist. Ein gepackter Body
-/// (`Content-Encoding`) wird nicht angefasst; Fehler-Bodys liegen unter der Packgrenze.
-pub async fn schicht(req: Request, next: Next) -> Response {
-    if !ist_v1(req.uri().path()) {
+/// Äußere Schicht für alles unter `/api/v1/`, montiert in `crate::app` außerhalb von Zulassung
+/// und CatchPanic (design.md D2): setzt `Cache-Control: no-store` und ergänzt `code` an
+/// Fehlerantworten, die nicht von einer v1-Route kommen (404 eines unbekannten Pfads, 405,
+/// Panik-500, Lastabwurf-503). Deren Bodys sind kurz und liegen unter der Packgrenze.
+pub async fn contract_layer(req: Request, next: Next) -> Response {
+    if !is_v1(req.uri().path()) {
         return next.run(req).await;
     }
-    let mut resp = next.run(req).await;
+    let mut resp = add_error_code(next.run(req).await).await;
     resp.headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    resp
+}
+
+/// Innere Schicht an den v1-Routen ([`mount`]): ergänzt `code` an Fehlerantworten der Routen,
+/// bevor die Antwortkompression packt. Setzt kein `Cache-Control`: die Kompression ließe eine
+/// Antwort mit diesem Kopf ungepackt.
+pub async fn error_code_layer(req: Request, next: Next) -> Response {
+    add_error_code(next.run(req).await).await
+}
+
+/// Gibt einer Fehlerantwort ohne `code` den Vorgabe-Code ihres Status
+/// ([`ErrorCode::for_status`]). Ein Body, der kein `{error}` ist, wird ersetzt; eine Antwort mit
+/// `code` (aus [`ApiError`]) und eine gepackte Antwort bleiben, wie sie sind.
+async fn add_error_code(resp: Response) -> Response {
     let status = resp.status();
     if !(status.is_client_error() || status.is_server_error())
         || resp.headers().contains_key(header::CONTENT_ENCODING)
@@ -126,9 +150,9 @@ pub async fn schicht(req: Request, next: Next) -> Response {
     }
 
     let (mut parts, body) = resp.into_parts();
-    let bytes = to_bytes(body, FEHLER_BODY_MAX).await.unwrap_or_default();
+    let bytes = to_bytes(body, ERROR_BODY_MAX).await.unwrap_or_default();
     let code = ErrorCode::for_status(status);
-    let neu = match serde_json::from_slice::<serde_json::Value>(&bytes) {
+    let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
         Ok(serde_json::Value::Object(o)) if o.contains_key("code") => {
             return Response::from_parts(parts, Body::from(bytes));
         }
@@ -141,13 +165,13 @@ pub async fn schicht(req: Request, next: Next) -> Response {
             code,
         }),
     };
-    let neu = serde_json::to_vec(&neu).unwrap_or_default();
+    let body = serde_json::to_vec(&body).unwrap_or_default();
     parts.headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
     parts.headers.remove(header::CONTENT_LENGTH);
-    Response::from_parts(parts, Body::from(neu))
+    Response::from_parts(parts, Body::from(body))
 }
 
 #[cfg(test)]
@@ -156,33 +180,33 @@ mod tests {
 
     #[test]
     fn nur_pfade_unter_v1_sind_v1() {
-        assert!(ist_v1("/api/v1"));
-        assert!(ist_v1("/api/v1/openapi.json"));
-        assert!(!ist_v1("/api/v10/x"));
-        assert!(!ist_v1("/api/v1x"));
-        assert!(!ist_v1("/api/einsaetze"));
+        assert!(is_v1("/api/v1"));
+        assert!(is_v1("/api/v1/openapi.json"));
+        assert!(!is_v1("/api/v10/x"));
+        assert!(!is_v1("/api/v1x"));
+        assert!(!is_v1("/api/einsaetze"));
     }
 
     /// Die Code-Tabelle der Beschreibung nennt genau die Werte von [`ErrorCode`], jeden mit dem
     /// Status, mit dem er antwortet. Sonst driftet die Prosa still vom Enum weg.
     #[test]
     fn beschreibung_nennt_genau_die_fehlercodes() {
-        let text = include_str!("beschreibung.md");
-        let mut in_tabelle: Vec<(u16, String)> = text
+        let text = include_str!("description.md");
+        let mut from_table: Vec<(u16, String)> = text
             .lines()
-            .filter_map(|zeile| {
-                let spalten: Vec<&str> = zeile.split('|').map(str::trim).collect();
-                let status = spalten.get(1)?.parse::<u16>().ok()?;
-                let code = spalten.get(2)?.trim_matches('`').to_string();
+            .filter_map(|line| {
+                let columns: Vec<&str> = line.split('|').map(str::trim).collect();
+                let status = columns.get(1)?.parse::<u16>().ok()?;
+                let code = columns.get(2)?.trim_matches('`').to_string();
                 Some((status, code))
             })
             .collect();
-        in_tabelle.sort();
-        let mut aus_enum: Vec<(u16, String)> = ErrorCode::ALLE
+        from_table.sort();
+        let mut from_enum: Vec<(u16, String)> = ErrorCode::ALLE
             .iter()
             .map(|c| (c.status().as_u16(), c.as_str().to_string()))
             .collect();
-        aus_enum.sort();
-        assert_eq!(in_tabelle, aus_enum);
+        from_enum.sort();
+        assert_eq!(from_table, from_enum);
     }
 }
