@@ -27,8 +27,8 @@ ist, dann der Code. Tests im Backend mit `cargo test --test instanz_fuehrung <na
 
 ## 4. Doku
 
-- [ ] 4.1 `docs/anwender/kapitel/instanzkopplung.md`: Den Satz zum Gleichstand ersetzen. Neu beschrieben wird der Fall zweier ELW am selben Hub mit Band, „Übernahme bestätigen“ und dem fehlenden Widerspruch. Zeigt ein Bild des Kapitels das Hinweisband, die Bilder neu erzeugen (`docs/anwender/AGENTS.md`, Mitänderungsregel). Verifikation: `anwenderdoku.guard.test.ts` grün.
-- [ ] 4.2 Neue ADR `ADR-<nächste freie>-unter-mehreren-elw-gilt-die-zuerst-angenommene-fuehrung.md` (Nummer nach `git fetch origin alpha` und einem Blick auf offene PRs), `status: akzeptiert`, `gilt_fuer` `src/instanz/fuehrung/**`, Regeln aus D1 bis D5 und D7, Herleitung auf das Archiv-`design.md` dieser Change. Kapitel 6.6c (`docs/architektur/06-laufzeitsicht.md`) bekommt einen Satz zur unterlegenen ELW. Verifikation: `scripts/check-architektur.sh` grün.
+- [x] 4.1 `docs/anwender/kapitel/instanzkopplung.md`: Den Satz zum Gleichstand ersetzen. Neu beschrieben wird der Fall zweier ELW am selben Hub mit Band, „Übernahme bestätigen“ und dem fehlenden Widerspruch. Zeigt ein Bild des Kapitels das Hinweisband, die Bilder neu erzeugen (`docs/anwender/AGENTS.md`, Mitänderungsregel). Verifikation: `anwenderdoku.guard.test.ts` grün.
+- [x] 4.2 Neue ADR `ADR-<nächste freie>-unter-mehreren-elw-gilt-die-zuerst-angenommene-fuehrung.md` (Nummer nach `git fetch origin alpha` und einem Blick auf offene PRs), `status: akzeptiert`, `gilt_fuer` `src/instanz/fuehrung/**`, Regeln aus D1 bis D5 und D7, Herleitung auf das Archiv-`design.md` dieser Change. Kapitel 6.6c (`docs/architektur/06-laufzeitsicht.md`) bekommt einen Satz zur unterlegenen ELW. Verifikation: `scripts/check-architektur.sh` grün.
 
 ## 5. Abschluss
 

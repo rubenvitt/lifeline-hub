@@ -450,9 +450,6 @@ dem beantragt wird, und der Einsatzkopf zeigt „Führung: … · Epoche n“. J
 (sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
 führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich nachgezogen hat:
 Bis dahin zeigt das Paneel „Führung“ sie als offen, danach steht im Einsatzkopf „Führung: hier“.
-Erklären
-zwei Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
-der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
 
 Gegen die Installation, die sich meldet (den ELW), braucht eine Notübernahme die Unterschrift
 eines Admins oder dessen Code. Der ELW prüft die Unterschrift gegen die Unterschriftsschlüssel,
@@ -464,7 +461,15 @@ mit falschem Code verwirft der ELW: er führt weiter, die Einsatzleitung bekommt
 „Ungültige Übernahme der Führung“, und die Admin-Spur zeigt „Ungültige Übernahme verworfen“.
 
 Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
-Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr; ein
+Meldung an und zeigt sie im Verlauf. Erklären zwei ELW ohne Verbindung beide eine Notübernahme
+gegen denselben Hub, behält der Hub die zuerst gemeldete. Der andere ELW zeigt nach seiner
+nächsten Meldung das Hinweisband „Deine Notübernahme hat am Hub nicht gegriffen, die Führung
+liegt bei …“, und seine Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Bis
+jemand „Übernahme bestätigen“ wählt, schreibt er weiter; widersprechen lässt sich hier nicht,
+denn der Hub nähme den Widerspruch nicht an. Mit dem Bestätigen wird der Einsatz dort zum
+Spiegel. Hat der Hub die Führung inzwischen von einem anderen ELW zurückbekommen, erneuert der ELW
+seine Notübernahme still mit der nächsten Epoche; der Verlauf zeigt „Notübernahme gegen … mit
+neuem Stand erneuert“. Wer per Code abgibt, schreibt ab dem Code nicht mehr; ein
 Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
 
 Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und

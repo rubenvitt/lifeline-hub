@@ -382,6 +382,11 @@ sequenceDiagram
 - Die erreichte Seite (Hub) nimmt eine höhere Epoche der meldenden ohne Beweis an; die meldende
   (ELW) nur mit Unterschrift oder Abgabecode und nach der Entscheidung eines Menschen
   (`austausch::entscheide`).
+- Mehrere ELW an einem Hub: Der Hub behält die zuerst angenommene Führung. Nennt er einer ELW, die
+  selbst führt, einen Dritten als Führer, hält sie dessen Führung offen und gibt erst nach
+  Bestätigung ab (`austausch::ist_konflikt`, ohne Widerspruch); führt der Hub selbst mit der
+  Epoche eines Dritten, zieht sie ihre Führung still nach (`austausch::ziehe_nach`,
+  [ADR-0025](entscheidungen/ADR-0025-unter-mehreren-elw-gilt-die-zuerst-angenommene-fuehrung.md)).
 - Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
   `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
   (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.
