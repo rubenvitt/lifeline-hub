@@ -229,3 +229,6 @@ Die Artefakte der e2e-Jobs (`lifeline-hub-debug`, `playwright-blob-k`, `e2e-lauf
   Push wie PR behandelt (erst nach einem zusätzlichen Fall „Push mit reinem Doku-Diff“ getötet).
   Stau-Wächter: Wartezeit umgedreht, Auto-Merge-Bedingung entfernt, Uhr ab Kopf entfernt,
   übersprungen zählt als gelaufen.
+- **Folgeaufgabe Messung:** LLH-1695
+  (https://zunder.rubeen.dev/#/aufgabe/l9tq50mmn1hmbha9u6o0fv9s), hängt an LLH-1662 und misst
+  vorher und nachher mit `scripts/ci-messung.sh`.
