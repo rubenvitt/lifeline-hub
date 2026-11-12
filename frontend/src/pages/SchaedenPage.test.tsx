@@ -240,7 +240,34 @@ describe('SchaedenPage', () => {
 
   it('weist Beobachter im Kopf auf die fehlende Schreibberechtigung hin', async () => {
     render({ ...einsatzBeobachter, status: 'abgeschlossen' }, [basisSchaden()]);
-    expect(await screen.findByText(/nur Ansicht/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+        'Nur Ansicht Einsatz abgeschlossen',
+      ),
+    );
+  });
+
+  // LLH-1675: Am Spiegel fehlten die Knöpfe ohne Grund auf der Seite.
+  it('am Spiegel nennt die Seite die führende Instanz', async () => {
+    render(
+      {
+        ...einsatzAktiv,
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      },
+      [basisSchaden()],
+    );
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+        'Nur Ansicht Spiegel von ELW 1',
+      ),
+    );
+    expect(screen.queryByRole('button', { name: 'Schaden erfassen' })).not.toBeInTheDocument();
   });
 
   /**

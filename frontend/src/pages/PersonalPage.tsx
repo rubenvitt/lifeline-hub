@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Button, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Space, Tag, theme } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz } from '../api/einsaetze';
 import { PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { RechteHinweis } from '../components/SpeicherHinweis';
 import { listePersonalStatus } from '../api/personalStatus';
 import { listeQualifikationen } from '../api/qualifikationen';
 import {
@@ -248,6 +250,8 @@ export default function PersonalPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Abgeschlossen oder Spiegel: der Grund steht auf der Seite (LLH-1675).
+  const nurAnsicht = isEinsatzGesperrt(einsatz);
 
   const eps = epQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
@@ -626,11 +630,7 @@ export default function PersonalPage() {
           </Space>
         )
       }
-      hinweis={
-        !darfSchreiben && einsatz.status !== 'aktiv' ? (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-        ) : null
-      }
+      hinweis={nurAnsicht ? <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} /> : null}
     >
       {/* Der Statuskatalog trägt die Auswahlliste jeder Statuszelle. Fällt er aus, wäre der
           Statuswechsel lautlos unmöglich; die Meldung steht deshalb über der Tabelle.

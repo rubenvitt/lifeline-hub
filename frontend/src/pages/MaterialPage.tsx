@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
+import { App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
@@ -23,7 +23,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeNachforderungen } from '../api/nachforderungen';
 import { KennungsLink } from '../components/kennungsLink';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { listeMaterial } from '../api/material';
 import {
   updateDisposition,
@@ -582,6 +583,8 @@ function MaterialInhalt() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Abgeschlossen oder Spiegel: der Grund steht auf der Seite (LLH-1675).
+  const nurAnsicht = isEinsatzGesperrt(einsatz);
 
   const ems = emQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
@@ -1011,17 +1014,14 @@ function MaterialInhalt() {
       metaPlatzhalter="0 Posten"
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={
-        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            {!darfSchreiben && einsatz.status !== 'aktiv' && (
-              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-            )}
-            <SeitenHinweise
-              fehler={rueckgaengigFehler?.fehler ?? null}
-              fehlerTitel={rueckgaengigFehler?.titel ?? 'Nicht erneut disponiert'}
-              fehlerFallback="Rückgängig fehlgeschlagen"
-            />
-          </Space>
+        nurAnsicht || rueckgaengigFehler != null ? (
+          <SeitenHinweise
+            rechteText={einsatzRechteGrund(einsatz)}
+            rechteFehlt={nurAnsicht}
+            fehler={rueckgaengigFehler?.fehler ?? null}
+            fehlerTitel={rueckgaengigFehler?.titel ?? 'Nicht erneut disponiert'}
+            fehlerFallback="Rückgängig fehlgeschlagen"
+          />
         ) : null
       }
       /**
