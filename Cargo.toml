@@ -174,7 +174,7 @@ clamav = ["dep:clamav-client"]
 version = "1.0.0-alpha.188"
 
 [workspace]
-members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]
+members = [".", "crates/karten-katalog", "crates/lifeline-machine-client", "karten-service", "src-tauri"]
 
 # Debuginfo im Dev- und Testprofil (LFH-845): eigener Code nur Zeilentabellen, Abhängigkeiten
 # keine. Unter Linux linkt jedes der ~130 Binaries in target/debug/deps die Debuginfo neu mit;
