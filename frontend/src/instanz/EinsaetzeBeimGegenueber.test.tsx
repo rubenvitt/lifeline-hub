@@ -81,4 +81,20 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
     expect(await within(dialog).findByText('beim Gegenüber gestellt')).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Führung anfragen' })).toBeNull();
   });
+
+  it('nimmt die eigene Aktion die Akte aus der Liste, zeigt der Dialog die Antwort des Servers (LLH-1670)', async () => {
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([akte]);
+    vi.mocked(frageFuehrungAn).mockResolvedValue({ ...akte, anfrage_offen: true });
+    const client = neuerQueryClient();
+    renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />, { client });
+    await userEvent.click(await screen.findByRole('button', { name: 'Führung …' }));
+    const dialog = await screen.findByRole('dialog');
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Führung anfragen' }));
+    expect(await screen.findByText('Kein Einsatz beim Gegenüber')).toBeInTheDocument();
+    const nochDa = screen.getByRole('dialog');
+    expect(within(nochDa).getByText(/Nicht mehr unter/)).toBeInTheDocument();
+    expect(within(nochDa).getByText('beim Gegenüber gestellt')).toBeInTheDocument();
+    expect(within(nochDa).queryByRole('button', { name: 'Führung anfragen' })).toBeNull();
+  });
 });

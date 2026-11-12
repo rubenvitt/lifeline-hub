@@ -82,11 +82,14 @@ export function UebernahmeEntscheidung({
   fuehrung,
   einsatzId,
   ohneNetzGrundId,
+  onGeaendert,
 }: {
   fuehrung: FuehrungAnzeige;
   einsatzId?: number;
   /** Steht der Grund „ohne Verbindung“ schon im umgebenden Paneel, verweisen die Knöpfe dorthin. */
   ohneNetzGrundId?: string;
+  /** Der Stand nach einer erfolgreichen Entscheidung, so wie ihn der Server meldet. */
+  onGeaendert?: (f: FuehrungAnzeige) => void;
 }) {
   const { message } = App.useApp();
   const nach = useNachFuehrung(einsatzId ?? fuehrung.einsatz_id ?? undefined);
@@ -99,14 +102,16 @@ export function UebernahmeEntscheidung({
     mutationFn: () => bestaetigeUebernahme(ort),
     onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success(`Führung liegt jetzt bei ${f.fuehrer_name}`);
     },
   });
   const widersprechen = useMutation({
     ...SOFORT_ODER_NIE,
     mutationFn: () => widersprecheUebernahme(ort),
-    onSuccess: () => {
+    onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success('Widersprochen, die Führung bleibt hier');
     },
   });
@@ -179,11 +184,18 @@ export default function FuehrungPaneel({
   darfBedienen,
   titel = 'Führung',
   style,
+  onGeaendert,
 }: {
   fuehrung: FuehrungAnzeige;
   darfBedienen: boolean;
   titel?: string;
   style?: React.CSSProperties;
+  /**
+   * Der Stand nach einer erfolgreichen Aktion, so wie ihn der Server meldet (LLH-1670). Für einen
+   * Ort, der die Akte nicht selbst nachlädt: „Einsätze beim Gegenüber“ hält sie fest, auch wenn
+   * sie danach aus der Liste fällt.
+   */
+  onGeaendert?: (f: FuehrungAnzeige) => void;
 }) {
   const { token, rollen } = useRollen();
   const { message } = App.useApp();
@@ -204,6 +216,7 @@ export default function FuehrungPaneel({
     mutationFn: (an: string) => uebergebeFuehrung(ort, an),
     onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success(`Führung an ${f.fuehrer_name} übergeben`);
     },
   });
@@ -212,14 +225,16 @@ export default function FuehrungPaneel({
     mutationFn: (an: string) => gibFuehrungPerCodeAb(ort, an),
     onSuccess: (c) => {
       nach();
+      onGeaendert?.(c.fuehrung);
       setNeuerCode(c);
     },
   });
   const anfragen = useMutation({
     ...SOFORT_ODER_NIE,
     mutationFn: () => frageFuehrungAn(ort),
-    onSuccess: () => {
+    onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success('Führung angefragt');
     },
   });
@@ -232,8 +247,9 @@ export default function FuehrungPaneel({
         ? uebernimmFuehrungMitCode(ort, grund, w.code ?? '')
         : uebernimmFuehrungMitUnterschrift(ort, grund);
     },
-    onSuccess: () => {
+    onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success('Führung übernommen');
     },
   });
@@ -300,7 +316,11 @@ export default function FuehrungPaneel({
           </Datenraster>
           {darfBedienen && (
             <div style={{ marginBlockStart: token.marginSM }}>
-              <UebernahmeEntscheidung fuehrung={fuehrung} ohneNetzGrundId={grundId} />
+              <UebernahmeEntscheidung
+                fuehrung={fuehrung}
+                ohneNetzGrundId={grundId}
+                onGeaendert={onGeaendert}
+              />
             </div>
           )}
         </div>

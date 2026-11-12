@@ -19,7 +19,9 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
   const { token } = useRollen();
   // Die beim Öffnen gewählte Akte (LLH-1670): Der Dialog hängt nicht am 30-s-Abruf. Steht sie
   // noch in der Liste, gilt deren neuerer Stand; fällt sie heraus, bleibt der letzte mit Hinweis
-  // stehen, samt getipptem Grund, eingegebenem Code und einer Erfolgsmeldung.
+  // stehen, samt getipptem Grund, eingegebenem Code und einer Erfolgsmeldung. Eine eigene Aktion
+  // setzt ihn auf die Antwort des Servers, denn danach fällt die Akte oft aus der Liste (eine
+  // Notübernahme löscht den Spiegel).
   const [gewaehlt, setGewaehlt] = useState<FuehrungAnzeige | null>(null);
   const q = useQuery({
     queryKey: globalKeys.instanzkopplungFuehrung(),
@@ -91,10 +93,12 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
             data-lfh="fremd-fuehrung-nicht-gelistet"
             style={{ marginBlockEnd: token.marginSM }}
             title="Nicht mehr unter „Einsätze beim Gegenüber“"
-            description="Stand vom letzten Abruf. Die Führung kann sich inzwischen geändert haben."
+            description="Zuletzt bekannter Stand. Die Führung kann sich inzwischen geändert haben."
           />
         )}
-        {offen && <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} />}
+        {offen && (
+          <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} onGeaendert={setGewaehlt} />
+        )}
       </Modal>
     </Paneel>
   );
