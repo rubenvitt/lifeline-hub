@@ -26,6 +26,14 @@ Zustand zeigen. Freigabe und Ende MUST im Einsatztagebuch stehen.
 - **WHEN** ein Mitglied ohne die Rolle Einsatzleitung oder ein System-Admin ohne Rolle im Einsatz freigeben will
 - **THEN** antwortet der Server mit 403
 
+#### Scenario: Instanz meldet sich bei einem Hub
+- **WHEN** die Instanz sich für die Org bei einem Hub meldet
+- **THEN** zeigt das Paneel „Anbindungen“ keinen Zugang, und eine Freigabe antwortet 404
+
+#### Scenario: Ohne Verbindung
+- **WHEN** die Einsatzleitung ohne Verbindung zum Server ist
+- **THEN** sind die Schalter gesperrt, daneben steht „Ohne Verbindung nicht änderbar“, und keine Freigabe wird vorgemerkt
+
 #### Scenario: Zugang einer fremden Org
 - **WHEN** die Einsatzleitung einen Zugang einer anderen Org freigeben will
 - **THEN** antwortet der Server mit 404
@@ -84,6 +92,10 @@ nennen.
 #### Scenario: Widerruf des Zugangs
 - **WHEN** ein Admin den Zugang widerruft, während er einen Einsatz liest
 - **THEN** antwortet der Server dem Zugang mit 401, und das Einsatztagebuch des Einsatzes nennt den Widerruf
+
+#### Scenario: Abgelaufen und verlängert
+- **WHEN** das „gültig bis“ eines Zugangs verstreicht, während er einen Einsatz liest, und ein Admin es danach verlängert
+- **THEN** ist kein Einsatz freigegeben, bis die Einsatzleitung erneut freigibt
 
 #### Scenario: Recht entzogen und wieder erteilt
 - **WHEN** ein Admin dem Zugang `lage:read` entzieht und es ihm später wieder gibt

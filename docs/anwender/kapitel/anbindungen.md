@@ -95,7 +95,8 @@ Eine Anbindung mit „Lage lesen“ sieht nur den Einsatz, den die Einsatzleitun
 „Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben hat, und höchstens einen.
 Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“. Die
 Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
-wenn ihr „Lage lesen“ genommen wird; bekommt sie das Recht wieder, braucht es eine neue Freigabe.
+wenn ihr „Lage lesen“ genommen wird; bekommt sie das Recht wieder oder wird ein verstrichenes
+„Gültig bis“ verlängert, braucht es eine neue Freigabe.
 Abläufe und Inhalt des Lagebilds: [Externe Lagemonitore](externe-lagemonitore.md).
 
 ### Warum ein Fremdsystem nicht hereinkommt

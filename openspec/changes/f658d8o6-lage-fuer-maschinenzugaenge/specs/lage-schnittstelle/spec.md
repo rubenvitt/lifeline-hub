@@ -108,6 +108,10 @@ fehlen.
 - **WHEN** die Einsatzleitung eine Gefahrenzone einzeichnet und der Zugang mit der alten Fassung fragt
 - **THEN** enthält die Antwort die neue `karte` mit einem Feature `zone` und eine andere `karte_etag`
 
+#### Scenario: Geometrie ohne Zusätze
+- **WHEN** eine gespeicherte Zonengeometrie neben `type` und `coordinates` einen weiteren Schlüssel mit Text trägt
+- **THEN** enthält `geometry` des Features nur `type` und `coordinates`
+
 #### Scenario: Karte abbestellt
 - **WHEN** der Zugang `GET /api/v1/lage?karte=none` aufruft
 - **THEN** fehlen `karte` und `karte_etag`, und die Zahlen des Einsatzes sind vollständig
