@@ -65,12 +65,20 @@ function browser(opts: { erlaubnis?: NotificationPermission; vorhanden?: Abo | n
   return { pushManager, notification, gezeigt, registration, aktuell: () => aktuell };
 }
 
-function serverMitPush(angemeldet = false, inhalt = false) {
+const HUB = { name: 'Hub Kreisverband', adresse: 'https://hub.example.org' };
+
+function serverMitPush(angemeldet = false, inhalt = false, ueberHub = false) {
   const anmeldungen: unknown[] = [];
   let abmeldungen = 0;
   server.use(
     http.get('/api/web-push', () =>
-      HttpResponse.json({ schluessel: SCHLUESSEL, angemeldet, inhalt }),
+      HttpResponse.json({
+        schluessel: SCHLUESSEL,
+        angemeldet,
+        inhalt,
+        stumm: [],
+        ...(ueberHub ? { ueber_hub: HUB } : {}),
+      }),
     ),
     http.put('/api/web-push/abo', async ({ request }) => {
       anmeldungen.push(await request.json());
@@ -109,6 +117,14 @@ describe('webPush: ob der Schalter erscheint (D8)', () => {
     expect(await ladePushZustand()).toBe('fehlt');
     server.use(http.get('/api/web-push', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
     expect(await ladePushZustand()).toBe('fehlt');
+  });
+
+  it('am gekoppelten ELW läuft Push über den Hub, auch bei blockierter Erlaubnis (LLH-1495)', async () => {
+    const b = browser();
+    serverMitPush(true, false, true);
+    expect(await ladePushStand()).toEqual({ zustand: 'ueber_hub', inhalt: false, hub: HUB });
+    b.notification.permission = 'denied';
+    expect(await ladePushZustand()).toBe('ueber_hub');
   });
 
   it('liest an, aus und blockiert', async () => {
@@ -346,6 +362,15 @@ describe('webPush: Wiederanmeldung nach einer neuen Sitzung', () => {
     b.notification.permission = 'granted';
     server.use(http.get('/api/web-push', () => HttpResponse.json({ error: 'x' }, { status: 404 })));
     await expect(pushAbgleichen(7)).resolves.toBeUndefined();
+    expect(s.anmeldungen).toEqual([]);
+  });
+
+  it('meldet am gekoppelten ELW nichts wieder an (LLH-1495)', async () => {
+    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+    b.notification.permission = 'granted';
+    const s = serverMitPush(true, false, true);
+    localStorage.setItem(pushMerker(7), '1');
+    await pushAbgleichen(7);
     expect(s.anmeldungen).toEqual([]);
   });
 

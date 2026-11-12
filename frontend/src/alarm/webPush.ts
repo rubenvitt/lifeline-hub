@@ -22,10 +22,17 @@ import { stummeArten } from './eingaengeStumm';
  * mit jeder Anmeldung des Abos an den Server, der dann für eine stumme Art keinen Push schickt.
  * Der Service Worker kann es nicht selbst lassen: zu jedem Push muss er eine Meldung zeigen.
  * Nach dem Umschalten meldet {@link pushAbgleichen} das Abo mit der neuen Liste an.
+ *
+ * Am gekoppelten ELW läuft Push über den Hub (LLH-1495, Spec `web-push`, „Push-Einstellung am
+ * gekoppelten ELW verweist auf den Hub“): der Server nennt ihn in `ueber_hub`, die Seite zeigt
+ * statt des Schalters einen Link dorthin, und nichts wird hier angemeldet.
  */
 
-/** `fehlt`: kein Schalter (Browser ohne Push, Hülle, Server ohne `--web-push`, Gerätekonto). */
-export type PushZustand = 'fehlt' | 'aus' | 'an' | 'blockiert';
+/**
+ * `fehlt`: kein Schalter (Browser ohne Push, Hülle, Server ohne `--web-push`, Gerätekonto).
+ * `ueber_hub`: Push läuft über den gekoppelten Hub, kein Schalter (LLH-1495).
+ */
+export type PushZustand = 'fehlt' | 'aus' | 'an' | 'blockiert' | 'ueber_hub';
 
 /** Schlüssel des Merkers im Browserspeicher; je Person, damit ein Wechsel ihn nicht erbt. */
 export function pushMerker(benutzerId: number): string {
@@ -37,8 +44,11 @@ const MERKER_OHNE_INHALT = '1';
 /** Wert des Merkers: Push gewählt, mit Absender und Wortlaut (LLH-1369). */
 export const MERKER_MIT_INHALT = 'inhalt';
 
-/** Stand für die Schalter: Push auf diesem Gerät und ob er den Inhalt zeigt. */
-export type PushStand = { zustand: PushZustand; inhalt: boolean };
+/** Der Hub, über den Push läuft (LLH-1495): Name und Adresse, wie dieser Server ihn erreicht. */
+export type PushHub = { name: string; adresse: string };
+
+/** Stand für die Schalter: Push auf diesem Gerät, ob er den Inhalt zeigt, und ggf. der Hub. */
+export type PushStand = { zustand: PushZustand; inhalt: boolean; hub?: PushHub };
 
 /** Wie lange auf den Service Worker gewartet wird; ohne Registrierung löst `ready` nie auf. */
 const WORKER_FRIST_MS = 10_000;
@@ -130,13 +140,14 @@ function ohnePush(e: unknown): boolean {
 /** Der Stand für die Schalter. Wirft bei einem Fehler des Servers (die Seite zeigt ihn). */
 export async function ladePushStand(): Promise<PushStand> {
   if (!moeglich()) return { zustand: 'fehlt', inhalt: false };
-  let stand: { angemeldet: boolean; inhalt?: boolean };
+  let stand: { angemeldet: boolean; inhalt?: boolean; ueber_hub?: PushHub };
   try {
     stand = await ladeWebPushStand();
   } catch (e) {
     if (ohnePush(e)) return { zustand: 'fehlt', inhalt: false };
     throw e;
   }
+  if (stand.ueber_hub) return { zustand: 'ueber_hub', inhalt: false, hub: stand.ueber_hub };
   if (Notification.permission === 'denied') return { zustand: 'blockiert', inhalt: false };
   return stand.angemeldet
     ? { zustand: 'an', inhalt: stand.inhalt === true }
@@ -197,6 +208,8 @@ export async function pushAbgleichen(benutzerId: number): Promise<void> {
     if (merker == null) return;
     if (Notification.permission !== 'granted') return;
     const stand = await ladeWebPushStand();
+    // Am gekoppelten ELW lehnt der Server jedes Abo ab; das alte ruht bis zum Entkoppeln.
+    if (stand.ueber_hub) return;
     await anmelden(await abonnieren(stand.schluessel), merker === MERKER_MIT_INHALT);
   } catch {
     // Ohne Schalter am Server, offline oder ohne Worker: die App meldet weiter im Tab.
