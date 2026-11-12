@@ -208,7 +208,7 @@ async fn run_start(
     }
     let e =
         dienst::build_erklaerung_gegen_meldende(&state.pool, a.id, grund, &b.anzeigename).await?;
-    let erklaerung = e.to_text();
+    let erklaerung = dienst::erklaerung_text(&e)?;
     let zeremonie = zeremonie::store(Zeremonie::Fuehrungserklaerung {
         benutzer_id: b.id,
         akte_id: a.id,

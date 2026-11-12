@@ -388,8 +388,8 @@ pub async fn bearbeiten(
     // Zielwerte auflösen: mitgeschickt → validieren; sonst Bestandswert (partielle PATCH-Semantik).
     let anzeigename = match &req.anzeigename {
         // Auch unverändert mitgeschickt geprüft (LLH-1702, design.md D2 der Change
-        // `a13nxa2k-notuebernahme-erklaerung-begrenzen`): ein Bestandsname über der Grenze wird
-        // beim nächsten Bearbeiten gekürzt.
+        // `a13nxa2k-notuebernahme-erklaerung-begrenzen`): ein Bestandsname über der Grenze ist
+        // 400, bis ihn jemand beim Bearbeiten kürzt. Der Server kürzt hier nichts.
         Some(n) => pflicht_max(n, "Anzeigename", ANZEIGENAME_MAX)?,
         None => ziel.anzeigename.clone(),
     };

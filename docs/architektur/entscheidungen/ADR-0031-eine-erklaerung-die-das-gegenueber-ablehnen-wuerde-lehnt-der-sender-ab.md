@@ -1,22 +1,25 @@
 ---
-id: ADR-0029
+id: ADR-0031
 titel: Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der Sender ab, bevor sie lokal gilt
 status: akzeptiert
 datum: 2026-11-12
 gilt_fuer:
   - src/instanz/fuehrung/**
+  - src/routes/fuehrung.rs
 herleitung:
   - openspec/changes/archive/2026-11-12-a13nxa2k-notuebernahme-erklaerung-begrenzen/design.md
   - LLH-1702 (mit Ruben am 12.11.2026 abgestimmt), LLH-1672
 ---
 
-# ADR-0029: Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der Sender ab, bevor sie lokal gilt
+# ADR-0031: Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der Sender ab, bevor sie lokal gilt
 
 ## Regeln
 
-- MUST: Jeder Text einer Erklärung, der in die Akte oder unter eine Unterschrift geht, kommt aus
-  `dienst::erklaerung_text`. Sie prüft gegen `austausch::ERKLAERUNG_MAX`, dieselbe Konstante und
-  dasselbe Maß (Byte des Texts), mit dem die empfangende Seite eine Akte annimmt.
+- MUST: Jeder Text einer Erklärung, der in die Akte, unter eine Unterschrift oder in den Prüfwert
+  eines Codes geht, kommt aus `dienst::erklaerung_text`; außerhalb dieser Funktion ruft kein
+  Produktivcode `to_text()` einer Erklärung. Sie prüft gegen `austausch::ERKLAERUNG_MAX`,
+  dieselbe Konstante und dasselbe Maß (Byte des Texts), mit dem die empfangende Seite eine Akte
+  annimmt.
 - MUST: Ist die Erklärung zu groß, antwortet der Server mit 422, bevor Epoche, führende Instanz
   oder Verlauf geschrieben sind.
 - MUST: Als Unterzeichner trägt eine Erklärung `auth::truncate_anzeigename(…)`, also höchstens
@@ -32,7 +35,7 @@ herleitung:
 verlange 'pub fn erklaerung_text' src/instanz/fuehrung/dienst.rs
 verlange 'pub\(super\) const ERKLAERUNG_MAX' src/instanz/fuehrung/austausch.rs
 verlange 'unterzeichner: crate::auth::truncate_anzeigename' src/instanz/fuehrung/dienst.rs
-verbiete 'erklaerung = Some\(e\.to_text\(\)\)' src/instanz/fuehrung/dienst.rs
+verbiete '(^|[^a-z_])e\.to_text\(\)' src/instanz/fuehrung/dienst.rs src/routes/fuehrung.rs
 ```
 
 ## Kontext

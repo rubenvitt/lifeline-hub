@@ -89,11 +89,14 @@ Kopplung (der Mensch hat „still“ gewählt, wie beim Stellvertreter).
   `e.to_text()` oder 422, wenn der Text mehr als `austausch::ERKLAERUNG_MAX` Byte hat. Dasselbe
   Maß und dieselbe Konstante wie beim Empfänger; `ERKLAERUNG_MAX` wird dafür im Modul
   `fuehrung` sichtbar (`pub(super)`).
-- **Drei Aufrufe:** in `notuebernahme_gegen_erreichte` und `notuebernahme_gegen_meldende` vor
-  dem Speichern (in der Transaktion: ein Fehler bricht sie ab, nichts wird wirksam), und am Ende
-  von `build_erklaerung_gegen_meldende`, damit die Unterschrift gar nicht erst beginnt. Der
-  Aufruf in `notuebernahme_gegen_meldende` ist nötig, weil der Weg mit Code `epoche_neu` nach
-  dem Bauen ändert. Kein Weg schreibt `e.to_text()` mehr ungeprüft in die Akte.
+- **Jeder Text kommt aus dieser Funktion:** in `notuebernahme_gegen_erreichte` und
+  `notuebernahme_gegen_meldende` vor dem Speichern (in der Transaktion: ein Fehler bricht sie ab,
+  nichts wird wirksam), am Ende von `build_erklaerung_gegen_meldende`, damit die Unterschrift gar
+  nicht erst beginnt, in `routes::fuehrung::run_start` für den Text unter der Unterschrift und in
+  `notuebernahme_mit_code` für den Text unter dem Prüfwert (nach dem Tausch von `epoche_neu`).
+  Außerhalb von `erklaerung_text` ruft kein Produktivcode mehr `to_text()` einer Erklärung
+  (nach dem Review vor dem PR so gefasst: vorher nahmen Unterschrift und Prüfwert den Text
+  direkt, geprüft war er nur davor und danach).
 - **Text des 422:** „Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den
   Grund kürzen.“ Nach dem Kürzen des Unterzeichners ist der Grund das Einzige, was die Person
   ändern kann. Der Dialog im Paneel „Führung“ zeigt Serverfehler schon an; die Umsetzung prüft
@@ -114,9 +117,10 @@ Verworfen:
 `docs/architektur/AGENTS.md`, „Mitänderungsregel“: eine Entscheidung der Route `entwurf` (E1)
 bekommt eine ADR. Titel sinngemäß „Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der
 Sender ab, bevor sie lokal gilt“, `gilt_fuer: src/instanz/fuehrung/**`, Nummer die nächste freie
-auf `alpha` zum Zeitpunkt der Umsetzung. Regeln: Jede Erklärung geht vor dem Speichern durch
+auf `alpha` zum Zeitpunkt der Umsetzung (ADR-0031: 0029 trägt der offene PR #1318, 0030 liegt
+auf `alpha`), dazu `src/routes/fuehrung.rs`. Regeln: Jeder Text einer Erklärung kommt aus
 `erklaerung_text`; gekürzt wird nur der Unterzeichner, auf `ANZEIGENAME_MAX`. Prüfung per
-`verlange`/`verbiete` auf `dienst.rs` (kein `Some(e.to_text())` mehr).
+`verlange`/`verbiete` auf `dienst.rs` und `routes/fuehrung.rs` (kein `e.to_text()` mehr).
 
 ### D6 Maske: Zähler und Regel, kein natives `maxLength`
 

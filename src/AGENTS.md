@@ -54,6 +54,11 @@ Spec `eingabegrenzen`, Herleitung
   das Feld besitzt, Prüfung über `routes::support::pflicht_max`/`pflicht_max_tri`/`optional_max`
   (`hoechstens` für schon getrimmten Text): Zeichen nach dem Trimmen, 400
   „{Feld} darf höchstens {max} Zeichen lang sein“, vor jedem 422 des Zusammenhangs.
+- **Der Anzeigename eines Kontos** (`auth::ANZEIGENAME_MAX`, LLH-1702) wird an der Maske wie
+  jeder Freitext mit 400 abgelehnt. Ein Name, den kein Mensch hier eingibt (Stammdaten einer
+  gekoppelten Instanz, SSO-Erstanmeldung, Stellvertreter eines fremden Kontos, jeder neue
+  Eingang), geht durch `auth::truncate_anzeigename` und wird gekürzt übernommen, ohne Hinweis:
+  das Konto soll deshalb nicht fehlen.
 - **Text, der unverändert ins ETB gelangt, trägt die ETB-Grenzen** (`etb::INHALT_MAX`,
   `etb::PARTEI_MAX`) an seinem Eingang, nicht in `etb::repo`: Systemtexte dürfen dort nicht
   scheitern. Ein neuer Weg ins ETB prüft selbst.

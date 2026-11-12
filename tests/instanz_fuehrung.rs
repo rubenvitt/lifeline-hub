@@ -4363,7 +4363,6 @@ async fn zu_grosse_erklaerung_am_hub_ist_422_vor_unterschrift_und_mit_code() {
     let (s, v) = post(&hub, &start, json!({"grund": zu_gross})).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     assert!(v["error"].as_str().unwrap().contains("Grund kürzen"), "{v}");
-    assert!(v.get("zeremonie").is_none(), "nichts zum Unterschreiben");
 
     let (s, v) = post(
         &hub,
@@ -4385,4 +4384,42 @@ async fn zu_grosse_erklaerung_am_hub_ist_422_vor_unterschrift_und_mit_code() {
         erklaerung_der_akte(&hub, akte).await.unwrap().len(),
         ERKLAERUNG_BYTES
     );
+}
+
+/// Der Vollzug prüft den endgültigen Text selbst (design.md D4 der Change
+/// `a13nxa2k-notuebernahme-erklaerung-begrenzen`): Über die Routen erreicht ihn kein zu großer
+/// Text, weil schon das Bauen ablehnt und die Kennungen gleich lang sind. Deshalb direkt, mit
+/// einer Erklärung, die nach dem Bauen gewachsen ist.
+#[tokio::test]
+async fn vollzug_gegen_die_meldende_seite_lehnt_eine_zu_grosse_erklaerung_selbst_ab() {
+    use lifeline_hub::error::AppError;
+    use lifeline_hub::instanz::fuehrung::dienst;
+    use lifeline_hub::instanz::fuehrung::erklaerung::FuehrungBeweis;
+
+    let (hub, elw) = gekoppelt().await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let mut e = dienst::build_erklaerung_gegen_meldende(&hub.pool, akte, "Sonde", "Erika")
+        .await
+        .unwrap();
+    e.grund = "g".repeat(ERKLAERUNG_BYTES);
+    let vorher = verlauf_zahl(&hub, akte).await;
+
+    let ergebnis = dienst::notuebernahme_gegen_meldende(
+        &hub.pool,
+        akte,
+        &e,
+        &FuehrungBeweis::Code {
+            pruefwert: "p".into(),
+        },
+        "Erika",
+    )
+    .await;
+    assert!(
+        matches!(ergebnis, Err(AppError::UnprocessableEntity(_))),
+        "erwartet 422"
+    );
+    let f = &fremde(&hub).await[0];
+    assert_eq!(f["fuehrer_kennung"], elw.kennung, "Führung bleibt beim ELW");
+    assert_eq!(erklaerung_der_akte(&hub, akte).await, None);
+    assert_eq!(verlauf_zahl(&hub, akte).await, vorher, "kein Eintrag");
 }

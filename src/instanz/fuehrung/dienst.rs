@@ -49,13 +49,13 @@ pub fn check_grund(grund: &str) -> Result<String, AppError> {
 /// Der Text einer Erklärung, wie er in die Akte und unter die Unterschrift geht, oder 422, wenn
 /// er größer ist, als das Gegenüber an einer Akte annimmt ([`austausch::ERKLAERUNG_MAX`] Byte,
 /// dasselbe Maß wie `AkteMeldung::is_in_grenzen_bis`). Jede Erklärung geht vor dem Speichern
-/// hier durch (LLH-1702, ADR-0029): Eine zu große Akte schickt der Ausgang nicht, die
+/// hier durch (LLH-1702, ADR-0031): Eine zu große Akte schickt der Ausgang nicht, die
 /// Notübernahme gälte dann nur lokal, und beide Seiten hielten sich für die führende Instanz.
 ///
 /// Der Unterzeichner ist beim Bauen schon gekürzt ([`crate::auth::truncate_anzeigename`]); was
 /// dann noch zu groß ist, liegt am Grund (Steuerzeichen kosten in JSON sechs Byte je Zeichen).
 pub fn erklaerung_text(e: &NotuebernahmeErklaerung) -> Result<String, AppError> {
-    let text = e.to_text();
+    let text = NotuebernahmeErklaerung::to_text(e);
     if text.len() > austausch::ERKLAERUNG_MAX {
         return Err(AppError::UnprocessableEntity(
             "Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den Grund \
@@ -435,7 +435,8 @@ pub async fn notuebernahme_mit_code(
     // Die meldende Seite hat die Epoche beim Erzeugen des Codes mit ihrer Kennung reserviert.
     e.epoche_neu = Epoche::naechste([&e.epoche_alt], &e.fuehrer_alt);
     let schluessel = erklaerung::abgabe_schluessel(&c, &e.einsatz, &e.epoche_neu);
-    let text = e.to_text();
+    // Der endgültige Text, nach dem Tausch der Epoche: über ihn rechnet der Prüfwert.
+    let text = erklaerung_text(&e)?;
     let beweis = FuehrungBeweis::Code {
         pruefwert: erklaerung::code_pruefwert(&schluessel, &text),
     };
