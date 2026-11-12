@@ -133,6 +133,9 @@ schritt_3() {
   # ein fremdes Testbinary prüfte die openapi.json des anderen Worktrees.
   bauziel_pruefen "$ROOT"
   "$ROOT/scripts/check-typ-codegen.sh"
+  # Python-Beispiel des Maschinenzugangs gegen die Testvektoren (LLH-1652); ohne `cryptography`
+  # laut übersprungen.
+  "$ROOT/scripts/check-api-clients.sh"
 }
 
 schritt_4() {

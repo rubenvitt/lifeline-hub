@@ -3851,6 +3851,7 @@ dependencies = [
  "ipnet",
  "karten-katalog",
  "libsqlite3-sys",
+ "lifeline-machine-client",
  "mime_guess",
  "openidconnect",
  "openssl",

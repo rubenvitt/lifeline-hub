@@ -56,6 +56,12 @@ bereiche_von() {
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/` und `website/` läuft in den Schnellprüfungen.
+    # Testvektoren des Maschinenzugangs (LLH-1652): Server- und Client-Tests (Rust) und der
+    # Vitest des TypeScript-Clients lesen sie.
+    docs/api/machine-auth-testvektoren.json)
+      echo "rust frontend" ;;
+    docs/api/clients/typescript/*)
+      echo "frontend" ;;
     website/* | docs/* | openspec/* | .claude/* | *.md)
       echo "" ;;
     # ── Bereiche ─────────────────────────────────────────────────────────────────────

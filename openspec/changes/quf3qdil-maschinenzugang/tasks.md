@@ -134,7 +134,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 - [x] 6.4 `docs/api/clients/typescript/machineClient.ts` (nur WebCrypto) mit Vitest gegen die
   Testvektoren im Frontend-Lauf. Verifizieren: `mise exec -- pnpm -C frontend vitest run
   <testdatei>` ist grün.
-- [ ] 6.5 `docs/api/clients/python/machine_client.py` mit `--selftest` gegen die Testvektoren,
+- [x] 6.5 `docs/api/clients/python/machine_client.py` mit `--selftest` gegen die Testvektoren,
   dazu ein Schritt im Bündel `schnell` von `check-all.sh`, laut übersprungen ohne
   `cryptography`. Verifizieren:
   - `python3 -I docs/api/clients/python/machine_client.py --selftest` ist grün;

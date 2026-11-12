@@ -42,6 +42,8 @@ pub enum Zweck {
     WebPush,
     /// Koppeln und Melden zwischen Lifeline-Hub-Instanzen.
     Instanzkopplung,
+    /// Kommando `lifeline-hub zugang …`: ein Fremdsystem bindet sich an einen Hub an (LLH-1652).
+    Anbindung,
 }
 
 impl Zweck {
@@ -56,6 +58,7 @@ impl Zweck {
             Zweck::Oidc => "OIDC",
             Zweck::WebPush => "WebPush",
             Zweck::Instanzkopplung => "Instanzkopplung",
+            Zweck::Anbindung => "Anbindung",
         }
     }
 }
