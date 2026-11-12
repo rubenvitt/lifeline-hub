@@ -301,9 +301,10 @@ export default function FuehrungPaneel({
           )}
         </Space>
       )}
-      {moeglich.vorOrt.map((name) => (
+      {/* Zwei Gegenstellen können gleich heißen: der Name taugt nicht als Key (Review LLH-1497). */}
+      {moeglich.vorOrt.map((name, i) => (
         <Typography.Paragraph
-          key={`vo-${name}`}
+          key={`vo-${i}`}
           style={{ color: rollen.gedaempft, marginBlock: token.marginXS }}
           data-lfh="fuehrung-vor-ort"
         >
