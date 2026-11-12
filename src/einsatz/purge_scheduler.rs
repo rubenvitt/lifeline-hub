@@ -34,7 +34,8 @@
 //!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
 //! - **Phase R** (UNUMKEHRBAR, LLH-1494): Abräumen nach Verwahrung und Lebensende
 //!   (`abraeumen::phase_r`): vorgemerkte Einsätze und Spiegel der meldenden Seite nach der
-//!   Nachbereitung; Spur im Löschprotokoll (Art `verwahrt` bzw. `spiegel`).
+//!   Nachbereitung, und eingespielte Archive nach 7 Tagen (`archiv::einspielen`, samt ihren
+//!   Platzhalter-Konten); Spur im Löschprotokoll (Art `verwahrt` bzw. `spiegel`).
 //! - **Phase E** (LFH-250, LFH-928): verwaiste Anhänge jenseits ihrer Karenz, einzeln je
 //!   Transaktion (`anhang::repo::sweep_verwaiste`). Hängt an keiner Aufbewahrungsfrist.
 //!
@@ -343,7 +344,10 @@ pub async fn tick_mit_rueckschrieb(
     // Holt Merker nach, deren Abräumen nach dem Abgleich scheiterte, und räumt Spiegel der
     // meldenden Seite nach der Nachbereitung ab (design.md D5, D6). Schreibt den WAL selbst
     // zurück.
+    // Eingespielte Archive gehen nach 7 Tagen denselben Weg (D10), ihre Platzhalter-Konten danach.
+    super::archiv::einspielen::faellige_vormerken(pool, &jetzt_s).await;
     anzahl += super::abraeumen::phase_r(pool, &jetzt_s).await;
+    super::archiv::einspielen::konten_aufraeumen(pool).await;
 
     // --- Phase D: endgültige Löschung geschwärzter Skelette (UNUMKEHRBAR, LFH-750) ---
     // Läuft nach Phase B: fallen Karenz-Ende und Skelett-Frist in denselben Lauf, löscht er

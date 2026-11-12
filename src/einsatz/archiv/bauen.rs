@@ -230,7 +230,7 @@ impl Drop for Zwischendatei {
 }
 
 /// Das Verzeichnis der Datenbank, sonst (In-Memory, Tests) das Temp-Verzeichnis.
-async fn verzeichnis(pool: &SqlitePool) -> Result<PathBuf, AppError> {
+pub(super) async fn verzeichnis(pool: &SqlitePool) -> Result<PathBuf, AppError> {
     let zeilen: Vec<(i64, String, String)> = sqlx::query_as("PRAGMA database_list")
         .fetch_all(pool)
         .await?;
@@ -247,7 +247,7 @@ async fn verzeichnis(pool: &SqlitePool) -> Result<PathBuf, AppError> {
     )
 }
 
-fn zwischendatei(
+pub(super) fn zwischendatei(
     verzeichnis: &Path,
     einsatz_id: i64,
     teil: &str,
@@ -311,7 +311,7 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
 
 /// Ein Pool mit genau einer Verbindung auf einer Zwischendatei, die `Zwischendatei::anlegen` angelegt
 /// hat.
-async fn oeffnen(pfad: &Path, fremdschluessel: bool) -> Result<SqlitePool, AppError> {
+pub(super) async fn oeffnen(pfad: &Path, fremdschluessel: bool) -> Result<SqlitePool, AppError> {
     let optionen = SqliteConnectOptions::new()
         .filename(pfad)
         .create_if_missing(false)
@@ -588,6 +588,33 @@ impl<W: std::io::Write> std::io::Write for Mitzaehlen<W> {
     }
 }
 
+/// Schwärzt Kategorien in einer Archivdatei ohne Karenz: die Datei steht für die Zeit nach ihrem
+/// Fristende (beim Bau eines Blocks und beim Einspielen eines veralteten Blocks).
+pub(super) async fn schwaerze_ohne_karenz(
+    archiv: &SqlitePool,
+    einsatz_id: i64,
+    kategorien: &[Datenkategorie],
+    jetzt: chrono::DateTime<chrono::Utc>,
+    wo: &str,
+) -> Result<(), AppError> {
+    for k in kategorien {
+        sqlx::query(
+            "UPDATE einsatz_aufbewahrung_kategorie SET vorgemerkt_at = '2000-01-01 00:00:00' \
+             WHERE einsatz_id = ? AND kategorie = ? AND geschwaerzt_at IS NULL",
+        )
+        .bind(einsatz_id)
+        .bind(k.as_str())
+        .execute(archiv)
+        .await?;
+        kategorie::schwaerzen(archiv, einsatz_id, *k, jetzt)
+            .await
+            .map_err(|e| {
+                AppError::Internal(format!("Archiv: Schwärzung „{}“ in {wo}: {e}", k.as_str()))
+            })?;
+    }
+    Ok(())
+}
+
 /// Baut einen Block aus der Vollkopie: Kopie, Schwärzung der Kategorien des Plans, `VACUUM`,
 /// Verschlüsselung.
 pub async fn baue_block(
@@ -614,26 +641,14 @@ pub async fn baue_block(
         drop(ziel);
     }
     let archiv = oeffnen(datei.pfad(), true).await?;
-    for k in &plan.geschwaerzt {
-        // Die Karenz gilt im Archiv nicht: der Block ist für die Zeit nach dem Fristende.
-        sqlx::query(
-            "UPDATE einsatz_aufbewahrung_kategorie SET vorgemerkt_at = '2000-01-01 00:00:00' \
-             WHERE einsatz_id = ? AND kategorie = ? AND geschwaerzt_at IS NULL",
-        )
-        .bind(einsatz_id)
-        .bind(k.as_str())
-        .execute(&archiv)
-        .await?;
-        kategorie::schwaerzen(&archiv, einsatz_id, *k, jetzt)
-            .await
-            .map_err(|e| {
-                AppError::Internal(format!(
-                    "Archiv: Schwärzung „{}“ in Block {}: {e}",
-                    k.as_str(),
-                    plan.block
-                ))
-            })?;
-    }
+    schwaerze_ohne_karenz(
+        &archiv,
+        einsatz_id,
+        &plan.geschwaerzt,
+        jetzt,
+        &format!("Block {}", plan.block),
+    )
+    .await?;
     sqlx::query("DELETE FROM einsatz_aenderung")
         .execute(&archiv)
         .await?;

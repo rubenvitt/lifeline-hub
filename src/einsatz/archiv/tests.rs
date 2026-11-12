@@ -72,7 +72,7 @@ fn abgelaufene_und_spaete_fristen() {
     );
 }
 
-async fn leitung(pool: &SqlitePool) -> i64 {
+pub(super) async fn leitung(pool: &SqlitePool) -> i64 {
     sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
         .execute(pool)
         .await
@@ -88,7 +88,7 @@ async fn leitung(pool: &SqlitePool) -> i64 {
 }
 
 /// Trägt einen geprüften Archiv-Schlüssel ein und liefert den privaten.
-async fn schluessel(pool: &SqlitePool) -> age::x25519::Identity {
+pub(super) async fn schluessel(pool: &SqlitePool) -> age::x25519::Identity {
     let id = age::x25519::Identity::generate();
     let r = id.to_public();
     sqlx::query(

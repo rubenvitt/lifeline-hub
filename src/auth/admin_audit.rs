@@ -99,6 +99,8 @@ wire_enum! {
         ArchivSchluesselGeprueft => "archiv_schluessel_geprueft",
         ArchivSchluesselEntfernt => "archiv_schluessel_entfernt",
         ArchivHeruntergeladen => "archiv_heruntergeladen",
+        /// Ein Archivblock wurde per Befehl eingespielt (LLH-1494, D10); ohne handelnde Person.
+        ArchivEingespielt => "archiv_eingespielt",
     }
 }
 
@@ -131,6 +133,7 @@ pub enum Ziel<'a> {
 ///   `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
 /// - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
 ///   des Blocks, durch Komma getrennt) und `block`.
+/// - `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

@@ -805,6 +805,34 @@ pub enum Command {
         /// Benutzername des Admins.
         benutzername: String,
     },
+    /// Archiv eines Einsatzes (LLH-1494).
+    Archiv {
+        #[command(subcommand)]
+        befehl: ArchivBefehl,
+    },
+}
+
+/// Befehle zum Archiv.
+#[derive(Subcommand, Debug, Clone)]
+pub enum ArchivBefehl {
+    /// Einen Archivblock einspielen: der Einsatz erscheint 7 Tage lang schreibgeschützt.
+    ///
+    /// Der Block (`.age`, aus der Archivakte) wird mit einem privaten Archiv-Schlüssel der
+    /// Organisation geöffnet, auf den Stand dieser Version gebracht und als Einsatz „aus dem
+    /// Archiv“ übernommen. Die Admin-Spur hält es fest. Geht auch bei laufendem Server.
+    Einspielen {
+        /// Der Archivblock.
+        #[arg(long)]
+        datei: String,
+        /// `age`-Identitätsdatei mit einem privaten Archiv-Schlüssel (`AGE-SECRET-KEY-1…`); `-`
+        /// liest sie von stdin. Eine mit Passphrase geschützte Datei (`age -p`) fragt die
+        /// Passphrase auf stdin ab.
+        #[arg(long)]
+        identitaet: String,
+        /// Ziel-Organisation (ID); ohne Angabe die Organisation des Einsatzes.
+        #[arg(long)]
+        org: Option<i64>,
+    },
 }
 
 #[cfg(test)]

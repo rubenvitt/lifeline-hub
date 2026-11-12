@@ -14,6 +14,7 @@
 //! ([`abgelaufene_bloecke_loeschen`]); das Skelett wartet in Phase D auf den letzten.
 
 pub mod bauen;
+pub mod einspielen;
 pub use bauen::zwischendateien_aufraeumen;
 
 use crate::einsatz::aufbewahrung_kategorie as kategorie;

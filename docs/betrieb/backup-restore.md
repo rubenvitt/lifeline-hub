@@ -213,6 +213,37 @@ arbeitet. Vorher sicherstellen, dass der Dienst beendet ist (`systemctl status �
 Das Entfernen der `-wal`/`-shm`-Dateien ist wichtig: Eine alte WAL-Datei würde
 sonst mit der zurückgespielten DB vermischt.
 
+## Archiv eines Einsatzes einspielen (LLH-1494)
+
+Ein Archivblock aus der Archivakte (`einsatz-…-block-<n>.sqlite.age`, siehe Anwenderdoku
+„Aufbewahrung“) lässt sich an einer Installation wieder ansehen. Der Befehl ersetzt nichts und
+darf bei laufendem Server laufen:
+
+```bash
+lifeline-hub --db-path /var/lib/lifeline/lifeline.db archiv einspielen \
+             --datei einsatz-E-2026-0751-block-1.sqlite.age --identitaet archiv-schluessel.txt
+# Schlüssel aus dem Passwortmanager
+pass show lifeline/archiv | lifeline-hub --db-path … archiv einspielen --datei … --identitaet -
+# In eine andere Organisation als die des Einsatzes
+lifeline-hub --db-path … archiv einspielen --datei … --identitaet … --org 2
+```
+
+- Der Block wird mit einem privaten Archiv-Schlüssel der Organisation geöffnet, neben der
+  Datenbank als Zwischendatei (nur für den Dienst lesbar, danach gelöscht) entschlüsselt und auf
+  den Stand dieser Version gebracht. Ein Block einer neueren Version lässt sich nur dort einspielen.
+- Der Einsatz erscheint als eigener Einsatz mit dem Band „Aus dem Archiv · bis …“, nur lesbar,
+  für Admins und Führungskräfte der Organisation. Ein Skelett desselben Einsatzes bleibt daneben
+  unberührt.
+- **Nach 7 Tagen** löscht der Purge-Lauf ihn wieder; das Löschprotokoll nennt ihn als Spiegel
+  mit Gegenstelle „Archiv“.
+- Personen aus dem Archiv stehen als gesperrte Konten mit ihrem damaligen Namen darin. Sie
+  erscheinen in keiner Verwaltung und gehen mit dem Einsatz. Fahrzeuge, Personal, Material und
+  Status gelten nur als dieselben, wenn es sie hier mit derselben Kennung und demselben Namen gibt.
+- **Abgelehnt** wird ein Block, dessen Aufbewahrung abgelaufen ist. Ist seit dem Download die
+  Frist einer Datenkategorie abgelaufen, schwärzt der Befehl sie vor dem Einspielen; die Ausgabe
+  nennt sie.
+- Das Zugangsprotokoll hält jedes Einspielen unter „Archiv eingespielt“ fest.
+
 ## Sicherungen und Schwärzung (LFH-725)
 
 Nach Ablauf von Aufbewahrungsfrist und Karenz schwärzt der Server die Personendaten eines

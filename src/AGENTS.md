@@ -766,6 +766,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
   Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
   und löscht alle Blöcke.
+- **Archiv einspielen** (LLH-1494, `archiv/einspielen.rs`, Befehl `archiv einspielen`): migriert
+  die entschlüsselte Datei, schwärzt abgelaufene Kategorien nach und übernimmt den Einsatz über
+  die Spiegel-Maschinerie (`liefern`/`uebernehmen`) mit einer Kopplung, die nur in der
+  Transaktion lebt. Ergebnis: beendeter Spiegel ohne Kopplung (`einsatz_archiv_eingespielt`),
+  Konten als gesperrte Platzhalter (`archiv_konto`, raus aus `OHNE_STELLVERTRETER`). Phase R
+  räumt ihn nach 7 Tagen ab. Eine neue Stammtabelle in `STAMM` braucht einen Namen in
+  `STAMM_NAME` (Guard `stamm_name_deckt_die_stammdaten_des_archivs`).
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
