@@ -232,22 +232,12 @@ impl AppError {
     }
 }
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        let status = self.status();
-        if let AppError::Zeilen { meldung, zeilen } = self {
-            return (
-                status,
-                Json(ZeilenFehler {
-                    error: meldung,
-                    zeilen,
-                }),
-            )
-                .into_response();
-        }
-        // Server-Fehler werden geloggt, dem Client aber generisch beantwortet,
-        // damit keine internen Details (SQL, Pfade) nach außen gelangen.
-        let message = match &self {
+impl AppError {
+    /// Der Text, den der Client sieht. Server-Fehler werden hier geloggt und generisch
+    /// beantwortet, damit keine internen Details (SQL, Pfade) nach außen gelangen. Auch die
+    /// öffentliche API (`crate::public_api::ApiError`) nimmt ihren Text von hier.
+    pub(crate) fn public_message(&self) -> String {
+        match self {
             AppError::Database(e) => {
                 if Self::ist_ueberlast(e) {
                     // Transiente Überlast: 503, dieselbe Klassifikation wie in `status()`. Nur die
@@ -291,7 +281,24 @@ impl IntoResponse for AppError {
                 "Interner Serverfehler".to_string()
             }
             other => other.to_string(),
-        };
+        }
+    }
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let status = self.status();
+        if let AppError::Zeilen { meldung, zeilen } = self {
+            return (
+                status,
+                Json(ZeilenFehler {
+                    error: meldung,
+                    zeilen,
+                }),
+            )
+                .into_response();
+        }
+        let message = self.public_message();
         (status, Json(json!({ "error": message }))).into_response()
     }
 }

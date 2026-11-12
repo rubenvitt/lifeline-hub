@@ -24,7 +24,7 @@ CREATE TABLE archiv_konto (
 
 CREATE INDEX idx_archiv_konto_einsatz ON archiv_konto (einsatz_id);
 
--- Admin-Spur: neu im aktion-CHECK 'archiv_eingespielt'. Rebuild nach Muster 0330, in einer
+-- Admin-Spur: neu im aktion-CHECK 'archiv_eingespielt' (Liste bis 0334). Rebuild nach Muster 0330, in einer
 -- Transaktion (admin_audit ist Leaf).
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +46,9 @@ CREATE TABLE admin_audit_neu (
                          'fuehrung_verworfen', 'fuehrung_widerspruch',
                          'archiv_schluessel_eingetragen', 'archiv_schluessel_geprueft',
                          'archiv_schluessel_entfernt', 'archiv_heruntergeladen',
-                         'archiv_eingespielt')),
+                         'maschinenzugang_angelegt', 'maschinenzugang_code_ausgestellt',
+                         'maschinenzugang_schluessel_gebunden', 'maschinenzugang_geaendert',
+                         'maschinenzugang_widerrufen', 'archiv_eingespielt')),
     akteur_id        INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     akteur_name      TEXT,
     ziel_benutzer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,

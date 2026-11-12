@@ -130,6 +130,24 @@
           "verworfen"
         ]
       },
+      "AblehnungGrund": {
+        "type": "string",
+        "description": "Warum die letzte Anfrage eines bekannten Zugangs scheiterte. Steht nur am Zugang (Seite\n„Anbindungen“); das Fremdsystem bekommt nur 401.",
+        "enum": [
+          "uhr",
+          "signatur",
+          "body",
+          "pfad",
+          "methode",
+          "ziel",
+          "form",
+          "wiederholung",
+          "abgelaufen",
+          "widerrufen",
+          "kein_schluessel",
+          "instanz_gekoppelt"
+        ]
+      },
       "AbloesungAbloeser": {
         "type": "object",
         "description": "Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`).",
@@ -900,7 +918,12 @@
           "archiv_schluessel_geprueft",
           "archiv_schluessel_entfernt",
           "archiv_heruntergeladen",
-          "archiv_eingespielt"
+          "archiv_eingespielt",
+          "maschinenzugang_angelegt",
+          "maschinenzugang_code_ausgestellt",
+          "maschinenzugang_schluessel_gebunden",
+          "maschinenzugang_geaendert",
+          "maschinenzugang_widerrufen"
         ]
       },
       "AdressatKategorie": {
@@ -1009,6 +1032,167 @@
           },
           "zustand": {
             "$ref": "#/components/schemas/BesetzungsZustand"
+          }
+        }
+      },
+      "AnbindungAblehnung": {
+        "type": "object",
+        "description": "Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6).",
+        "required": [
+          "at",
+          "grund"
+        ],
+        "properties": {
+          "abweichung_s": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bei `uhr`: Abweichung der Uhr des Fremdsystems in Sekunden (negativ: geht nach)."
+          },
+          "at": {
+            "type": "string"
+          },
+          "grund": {
+            "$ref": "#/components/schemas/AblehnungGrund"
+          }
+        }
+      },
+      "AnbindungAnzeige": {
+        "type": "object",
+        "description": "Ein Zugang, wie die Seite „Anbindungen“ ihn zeigt. Schlüssel nur als Fingerabdruck.",
+        "required": [
+          "id",
+          "name",
+          "scopes",
+          "zustand",
+          "is_abgelaufen",
+          "angelegt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "fingerabdruck": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fingerabdruck_neu": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert."
+          },
+          "geaendert_at": {
+            "type": "string",
+            "description": "Stand für das optimistische Lock beim Bearbeiten (`basis_geaendert_at`)."
+          },
+          "gueltig_bis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_abgelaufen": {
+            "type": "boolean",
+            "description": "„gültig bis“ ist verstrichen; der Zugang verhält sich wie widerrufen."
+          },
+          "letzte_ablehnung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnbindungAblehnung"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "widerrufen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename des Admins, der widerrufen hat."
+          },
+          "zuletzt_genutzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/ZugangZustand"
+          }
+        }
+      },
+      "AnbindungCode": {
+        "type": "object",
+        "description": "Ein frisch ausgestellter Einmal-Code. Er verlässt den Server nur hier, einmal.",
+        "required": [
+          "zugang",
+          "code",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`."
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          },
+          "zugang": {
+            "$ref": "#/components/schemas/AnbindungAnzeige"
+          }
+        }
+      },
+      "AnbindungenListe": {
+        "type": "object",
+        "description": "Die Zugänge der Org und, falls Anbindungen hier nicht angenommen werden, der Grund.",
+        "required": [
+          "zugaenge",
+          "instanz_fingerabdruck"
+        ],
+        "properties": {
+          "gesperrt_grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):\nAnlegen und neue Codes sind dann gesperrt."
+          },
+          "instanz_fingerabdruck": {
+            "type": "string",
+            "description": "Fingerabdruck dieser Instanz, zum Abgleich am Fremdsystem."
+          },
+          "zugaenge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnbindungAnzeige"
+            }
           }
         }
       },
@@ -18263,6 +18447,18 @@
           }
         }
       },
+      "Scope": {
+        "type": "string",
+        "description": "Was ein Maschinenzugang darf (Konzept D2). Wire-Werte nach LFH-1312: Fachbegriff deutsch,\nZugriffsart englisch. Neue Werte kommen nur hinzu (Stabilitätszusage v1).",
+        "enum": [
+          "lage:read",
+          "einsaetze:read",
+          "events:read",
+          "alarmmeldungen:write",
+          "positionen:write",
+          "rechner:use"
+        ]
+      },
       "SichtungAnzeige": {
         "type": "object",
         "description": "Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`).",
@@ -23060,9 +23256,18 @@
           }
         }
       },
+      "ZugangZustand": {
+        "type": "string",
+        "description": "Zustand eines Maschinenzugangs. „Abgelaufen“ ist kein Zustand, sondern ergibt sich aus\n`gueltig_bis` (design.md D2).",
+        "enum": [
+          "wartet",
+          "aktiv",
+          "widerrufen"
+        ]
+      },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.",
         "properties": {
           "adresse": {
             "type": [
@@ -23100,6 +23305,13 @@
               "null"
             ],
             "description": "Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels."
+          },
+          "fingerabdruck_vorher": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Maschinenzugang: Fingerabdruck des abgelösten Schlüssels beim Wechsel."
           },
           "fremde_org": {
             "type": [
@@ -23157,6 +23369,26 @@
             "format": "int64",
             "description": "Einmalpasswort für einen Admin unter Passkey-Pflicht (LLH-1493): Zahl der entfernten\nAnmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`."
           },
+          "scopes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Maschinenzugang: Scopes (Wire-Werte) nach der Aktion."
+          },
+          "scopes_vorher": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Maschinenzugang: Scopes vor einer Änderung."
+          },
           "system_rolle": {
             "oneOf": [
               {
@@ -23176,6 +23408,13 @@
                 "type": "null"
               }
             ]
+          },
+          "zugang_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Maschinenzugang (LLH-1652): seine Kennung."
           }
         }
       },

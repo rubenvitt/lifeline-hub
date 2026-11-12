@@ -810,16 +810,21 @@ pub enum Command {
         #[command(subcommand)]
         befehl: ArchivBefehl,
     },
+    /// Ein Fremdsystem an einen Lifeline Hub anbinden (Maschinenzugang, LLH-1652). Für
+    /// Betreiber eines Fremdsystems; der Hub selbst braucht dieses Kommando nicht.
+    #[command(subcommand)]
+    Zugang(ZugangCommand),
 }
 
 /// Befehle zum Archiv.
 #[derive(Subcommand, Debug, Clone)]
 pub enum ArchivBefehl {
-    /// Einen Archivblock einspielen: der Einsatz erscheint 7 Tage lang schreibgeschützt.
+    /// Einen Archivblock einspielen: der Einsatz erscheint bis zu 7 Tage lang schreibgeschützt.
     ///
     /// Der Block (`.age`, aus der Archivakte) wird mit einem privaten Archiv-Schlüssel der
     /// Organisation geöffnet, auf den Stand dieser Version gebracht und als Einsatz „aus dem
-    /// Archiv“ übernommen. Die Admin-Spur hält es fest. Geht auch bei laufendem Server.
+    /// Archiv“ übernommen. Die Admin-Spur hält es fest. Geht auch bei laufendem Server, mit
+    /// dessen Version.
     Einspielen {
         /// Der Archivblock.
         #[arg(long)]
@@ -832,6 +837,28 @@ pub enum ArchivBefehl {
         /// Ziel-Organisation (ID); ohne Angabe die Organisation des Einsatzes.
         #[arg(long)]
         org: Option<i64>,
+    },
+}
+
+/// Unterkommandos von `lifeline-hub zugang`.
+#[derive(Subcommand, Debug, Clone)]
+pub enum ZugangCommand {
+    /// Einmal-Code einlösen: erzeugt ein Schlüsselpaar, bindet es an den Zugang und legt die
+    /// Schlüsseldatei ab (nur für den Besitzer lesbar, wird nie überschrieben).
+    Redeem {
+        /// Basisadresse des Hubs, z. B. `https://hub.example`.
+        url: String,
+        /// Einmal-Code von der Seite „Anbindungen“, z. B. `ABCD-EFGH-JKMN-PQRS`.
+        code: String,
+        /// Pfad der Schlüsseldatei.
+        #[arg(long, default_value = "lifeline-zugang.json")]
+        out: String,
+    },
+    /// Prüfroute `GET /api/v1/me` signiert aufrufen: zeigt Zugang, Org, Scopes und
+    /// Uhrabweichung.
+    Me {
+        /// Pfad der Schlüsseldatei aus `redeem`.
+        datei: String,
     },
 }
 

@@ -112,3 +112,18 @@ describe('Archiv am Hub (LLH-1494)', () => {
     );
   });
 });
+
+describe('Angaben einer Anbindung (LLH-1652)', () => {
+  it('nennt Rechte vorher → nachher und den abgelösten Schlüssel', () => {
+    expect(
+      instanzText({
+        scopes: ['lage:read', 'events:read'],
+        scopes_vorher: ['lage:read'],
+        fingerabdruck: 'NEU1',
+        fingerabdruck_vorher: 'ALT1',
+      }),
+    ).toBe(
+      'Fingerabdruck NEU1 · vorher ALT1 · Rechte: Lage lesen → Lage lesen, Ereignisse abrufen',
+    );
+  });
+});

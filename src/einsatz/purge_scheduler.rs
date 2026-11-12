@@ -295,6 +295,11 @@ pub async fn tick_mit_rueckschrieb(
         tracing::error!("Purge Instanzkopplung fehlgeschlagen: {e}");
     }
 
+    // Maschinenzugang (LLH-1652): abgelaufene `jti`, verfallene Codes, Abrufe nach 365 Tagen.
+    if let Err(e) = crate::public_api::zugang::purge(pool, &crate::zeit::jetzt()).await {
+        tracing::error!("Purge Maschinenzugang fehlgeschlagen: {e}");
+    }
+
     // Admin-Spur (LFH-1005): dieselbe Lage wie das Auth-Audit, eigene, längere Frist.
     match crate::auth::admin_audit::purge_abgelaufene(pool).await {
         Ok(0) => {}
