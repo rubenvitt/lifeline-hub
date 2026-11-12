@@ -918,17 +918,25 @@ async fn unterschriebene_erklaerung_mit_abweichendem_feld_wird_verworfen() {
     }
     elw_meldet(&elw).await;
     let akten = fremde(&hub).await;
-    let akte_von = |e: i64| {
-        let kennung = format!("{}/{e}", elw.kennung);
+    let mut kennungen = Vec::new();
+    for e in &einsaetze {
+        kennungen.push(
+            fuehrung(&elw, *e).await["kennung"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        );
+    }
+    let akte_von = |kennung: &str| {
         akten
             .iter()
-            .find(|a| a["kennung"] == kennung.as_str())
+            .find(|a| a["kennung"] == kennung)
             .unwrap_or_else(|| panic!("Akte {kennung} fehlt am Hub"))["id"]
             .as_i64()
             .unwrap()
     };
     for (i, (feld, aendern)) in abweichungen.iter().enumerate() {
-        let akte = akte_von(einsaetze[i]);
+        let akte = akte_von(&kennungen[i]);
         hub_uebernimmt_mit_unterschrift(&hub, akte, feld).await;
         let text: String =
             sqlx::query_scalar("SELECT erklaerung FROM einsatz_fuehrung WHERE id = ?")
@@ -937,8 +945,8 @@ async fn unterschriebene_erklaerung_mit_abweichendem_feld_wird_verworfen() {
                 .await
                 .unwrap();
         let mut v: Value = serde_json::from_str(&text).unwrap();
-        let anderer = format!("{}/{}", elw.kennung, einsaetze[(i + 1) % einsaetze.len()]);
-        aendern(&mut v, &hub.kennung, &anderer);
+        let anderer = &kennungen[(i + 1) % kennungen.len()];
+        aendern(&mut v, &hub.kennung, anderer);
         let neu = v.to_string();
         assert_ne!(neu, text, "{feld}: die Abweichung ändert die Erklärung");
         let assertion = passkey().sign(&neu, ORIGIN, RP, 0x05);
