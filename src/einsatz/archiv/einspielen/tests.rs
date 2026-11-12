@@ -307,6 +307,7 @@ async fn eingespielt_schreibgeschuetzt_mit_platzhaltern_und_nach_7_tagen_weg() {
             id: 5,
             anzeigename: "Fremd".into(),
             gegen_id: Some(erfasser),
+            ursprung: None,
         };
         let lokal =
             crate::instanz::spiegel::abbildung::konto_lokal(&mut c, kopplung, 0, 1, false, &angabe)

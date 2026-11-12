@@ -153,7 +153,7 @@ async fn liefere_alle(
     staende: &HashMap<String, i64>,
     budget: &mut Budget,
 ) -> Result<Vec<super::paket::EinsatzLieferung>, AppError> {
-    let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
+    let meldend = uebersetzt(kopplung);
     let mut lieferungen = Vec::new();
     let mut alle = Vec::new();
     for o in orgs {
@@ -185,6 +185,14 @@ async fn liefere_alle(
     Ok(lieferungen)
 }
 
+/// Ob diese Seite Stammdaten über die Herkunft der Kopplung übersetzt (D5): nur die meldende
+/// Seite einer Standardkopplung hält sie; über eine Direktkopplung fließen keine Stammdaten, dort
+/// zählt die Ursprungskennung (LLH-1497).
+pub fn uebersetzt(kopplung: &KopplungZeile) -> bool {
+    kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich)
+        && kopplung.art() == crate::instanz::InstanzKopplungArt::Standard
+}
+
 /// Übernimmt die Lieferungen eines Pakets; liefert die neuen Stände und was sich geändert hat.
 async fn uebernehme_alle(
     conn: &mut SqliteConnection,
@@ -194,7 +202,7 @@ async fn uebernehme_alle(
     paket: &SpiegelPaket,
     uebernommen: &mut Uebernommen,
 ) -> Result<Vec<EinsatzStand>, AppError> {
-    let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
+    let meldend = uebersetzt(kopplung);
     let mut staende = Vec::new();
     // Ein Gegenüber liefert nur Einsätze, die es selbst führt: ihre Kennung beginnt mit seiner.
     let praefix = format!("{}/", kopplung.gegenueber_kennung);
@@ -216,6 +224,7 @@ async fn uebernehme_alle(
             kopplung_org_id: o.id,
             org_id: o.org_id,
             meldend,
+            vor_ort: kopplung.art() == crate::instanz::InstanzKopplungArt::VorOrt,
         };
         let vorher: Option<i64> =
             sqlx::query_scalar("SELECT einsatz_id FROM einsatz_spiegel WHERE fremde_kennung = ?")
@@ -431,7 +440,10 @@ pub async fn handle_abgleich(
         abzuraeumen =
             lebensende::geloescht_uebernehmen(conn, kopplung, &anfrage.lebensende).await?;
         let mut lebensende_quittungen = Vec::new();
-        for l in &anfrage.lebensende {
+        // Verwahrung nur über eine Kopplung, die sie trägt (LLH-1497): vor Ort wird kein
+        // übergebener Einsatz angenommen.
+        let verwahrung = kopplung.art().traegt(crate::instanz::Fluss::Verwahrung);
+        for l in anfrage.lebensende.iter().filter(|_| verwahrung) {
             if let Some((q, umgewandelt)) =
                 lebensende::verwahrung_annehmen(conn, kopplung, l, &jetzt).await?
             {
@@ -527,8 +539,11 @@ pub async fn abgleich_einmal(
             let mut ziele: HashMap<String, i64> = ziele.into_iter().collect();
             // Zur Verwahrung fällige Einsätze (LLH-1494, D4) gehen auch hinaus, wenn das Gegenüber
             // sie noch nicht kennt (etwa ohne Netz angelegt und abgeschlossen).
-            let mut lebensende =
-                lebensende::faellige_verwahrungen(conn, &eigen.kennung, &orgs, &jetzt).await?;
+            let mut lebensende = if kopplung.art().traegt(crate::instanz::Fluss::Verwahrung) {
+                lebensende::faellige_verwahrungen(conn, &eigen.kennung, &orgs, &jetzt).await?
+            } else {
+                Vec::new()
+            };
             for l in &lebensende {
                 ziele.entry(l.kennung.clone()).or_insert(0);
             }
@@ -536,7 +551,7 @@ pub async fn abgleich_einmal(
             lebensende.extend(geloescht_offen.iter().take(platz).cloned());
             // Anträge stehen vorn (D8) und zählen ins Budget.
             let (antraege, antrag_bytes) =
-                super::antrag::offene_antraege(conn, kopplung.id, true).await?;
+                super::antrag::offene_antraege(conn, kopplung.id, uebersetzt(kopplung)).await?;
             let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
             let lieferungen =
                 liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
@@ -565,6 +580,7 @@ pub async fn abgleich_einmal(
         })
         .map_err(fehler)?;
         let antwort = melden::send_signed_bis::<_, SpiegelPaket>(
+            pool,
             &eigen,
             kopplung,
             SPIEGEL_PFAD,
@@ -660,7 +676,7 @@ pub async fn abgleich_einmal(
         let mut ausgefuehrt = false;
         if let Some(router) = router {
             for a in &antwort.antraege {
-                if super::antrag::ausfuehren(pool, router, kopplung, true, a)
+                if super::antrag::ausfuehren(pool, router, kopplung, uebersetzt(kopplung), a)
                     .await
                     .map_err(fehler)?
                     .is_some()

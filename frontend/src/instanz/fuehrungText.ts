@@ -67,6 +67,14 @@ export interface FuehrungMoeglich {
   unterschrift: boolean;
   /** Eine Übernahme gegen diese Instanz wartet auf Bestätigen oder Widersprechen. */
   entscheiden: boolean;
+  /** Gegenüber vor Ort, mit denen die Führung hier wechseln würde, es aber nicht darf
+   *  (LLH-1497): der Grund steht im Paneel. */
+  vorOrt: string[];
+}
+
+/** Grund, warum zu einer Gegenstelle vor Ort keine Führung wechselt (wörtlich wie die 409). */
+export function vorOrtHinweis(name: string): string {
+  return `${name} ist vor Ort gekoppelt: Führungswechsel dorthin kommt später.`;
 }
 
 export function fuehrungMoeglich(
@@ -76,14 +84,26 @@ export function fuehrungMoeglich(
   // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647).
   const frei = f.fuehrend && !f.offen && !f.verwahrt;
   const liegtHier = f.einsatz_id != null;
-  const mitBeweis = liegtHier && !f.fuehrend && f.fuehrer_richtung === 'wird_gemeldet';
+  // Über eine Direktkopplung vor Ort wechselt die Führung nicht (LLH-1497).
+  const standard = f.gegenueber.filter((g) => g.art === 'standard');
+  const fuehrerVorOrt = f.gegenueber.find(
+    (g) => g.kennung === f.fuehrer_kennung && g.art === 'vor_ort',
+  );
+  const wechselZumFuehrer = !f.fuehrend && fuehrerVorOrt == null;
+  const vorOrt = frei
+    ? f.gegenueber.filter((g) => g.art === 'vor_ort').map((g) => g.name)
+    : fuehrerVorOrt && !f.fuehrend
+      ? [fuehrerVorOrt.name]
+      : [];
+  const mitBeweis = liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'wird_gemeldet';
   return {
-    uebergeben: frei ? f.gegenueber : [],
-    perCode: frei ? f.gegenueber.filter((g) => g.richtung === 'meldet_sich') : [],
-    anfragen: !f.fuehrend && f.fuehrer_richtung === 'meldet_sich' && !f.anfrage_offen,
-    notuebernahme: liegtHier && !f.fuehrend && f.fuehrer_richtung === 'meldet_sich',
+    uebergeben: frei ? standard : [],
+    perCode: frei ? standard.filter((g) => g.richtung === 'meldet_sich') : [],
+    anfragen: wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich' && !f.anfrage_offen,
+    notuebernahme: liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich',
     notuebernahmeMitBeweis: mitBeweis,
     unterschrift: mitBeweis && darfUnterschreiben,
     entscheiden: f.offen != null,
+    vorOrt,
   };
 }

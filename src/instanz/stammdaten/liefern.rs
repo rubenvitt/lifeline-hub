@@ -222,6 +222,7 @@ async fn build_lieferung(
         },
         _ => None,
     };
+    let ursprung = Some(super::herkunft::ursprung(conn, org_id, art, schluessel).await?);
     Ok(StammdatenLieferung {
         art: art.as_str().to_string(),
         schluessel: schluessel.to_string(),
@@ -229,6 +230,7 @@ async fn build_lieferung(
         geloescht: daten.is_none(),
         daten,
         geheimnis,
+        ursprung,
     })
 }
 
