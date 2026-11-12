@@ -1,6 +1,6 @@
 # 9. Architekturentscheidungen
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 11.11.2026.
 
 Die tragenden Entscheidungen stehen als ADRs unter [`entscheidungen/`](entscheidungen/), eine
 Datei je Entscheidung, geschrieben für Agenten, die sie vor einer Änderung lesen. Form und
@@ -45,6 +45,8 @@ ursprünglichen Entscheidung laut Herleitung, nicht der Tag der Niederschrift.
 | [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md) | Beta zählt neben Alpha und bekommt nur veröffentlichte Alpha-Tags über einen Nachzug | akzeptiert | 2026-11-11 | `release.config.mjs`, `scripts/release/kanal-nachziehen.sh`, `scripts/release/desktop-kanal.mjs`, `scripts/release/abbild-kanal.mjs`, `src-tauri/src/kanal.rs`, `.github/workflows/kanal-nachziehen.yml`, `.github/workflows/artefakte.yml` |
 | [ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md) | Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn | ersetzt | 2026-11-09 | `src/instanz/fuehrung/**`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs` |
 | [ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md) | Ein Einsatz hat genau eine führende Instanz; wer ihn nicht führt, hält ihn als Spiegel | akzeptiert | 2026-11-11 | `src/instanz/fuehrung/**`, `src/instanz/spiegel/fuehrung.rs`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs`, `frontend/src/einsatz/schreibrecht.ts` |
+| [ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md) | Fremdsysteme sprechen signiert und mit festen Scopes mit der öffentlichen API unter /api/v1 | vorgeschlagen | 2026-11-11 | `src/app.rs`, `src/api_doc.rs`, `src/instanz/signatur.rs`, `src/lagemonitor_zugang/**`, `src/routes/lagemonitor_v1.rs` |
+| [ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md) | Absender ohne Signatur werfen über einen Einwurf-Zugang ein, der nur schreibt | vorgeschlagen | 2026-11-11 | `src/app.rs`, `src/auth/rate_limit.rs` |
 | [ADR-0024](entscheidungen/ADR-0024-ein-verwahrter-einsatz-wird-vom-hub-gefuehrt.md) | Die Verwahrung wechselt die Führung; einen verwahrten Einsatz gibt der Hub nicht mehr ab | akzeptiert | 2026-11-12 | `src/instanz/fuehrung/**`, `src/instanz/spiegel/lebensende.rs` |
 
 ## 9.2 Weitere Entscheidungen ohne eigene ADR
