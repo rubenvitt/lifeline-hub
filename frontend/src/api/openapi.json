@@ -895,7 +895,11 @@
           "fuehrung_notuebernahme",
           "fuehrung_verworfen",
           "fuehrung_widerspruch",
-          "instanz_elw_verloren"
+          "instanz_elw_verloren",
+          "archiv_schluessel_eingetragen",
+          "archiv_schluessel_geprueft",
+          "archiv_schluessel_entfernt",
+          "archiv_heruntergeladen"
         ]
       },
       "AdressatKategorie": {
@@ -1302,6 +1306,17 @@
             ],
             "description": "Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751)."
           },
+          "archiv": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ArchivAngabe",
+                "description": "Das Archiv am Ende der Nachbereitung (LLH-1494): der Block, den ein Download liefert."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "karenz_ende": {
             "type": [
               "string",
@@ -1338,6 +1353,90 @@
           },
           "zustand": {
             "$ref": "#/components/schemas/AufbewahrungZustand"
+          }
+        }
+      },
+      "ArchivAngabe": {
+        "type": "object",
+        "description": "Das Archiv eines Einsatzes in der Archivakte.",
+        "required": [
+          "archiviert_at",
+          "block",
+          "bloecke",
+          "groesse",
+          "fingerabdruecke"
+        ],
+        "properties": {
+          "archiviert_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Archivierung (UTC)."
+          },
+          "block": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Der Block, den ein Download jetzt liefert."
+          },
+          "bloecke": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der noch vorhandenen Blöcke."
+          },
+          "fingerabdruecke": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fingerabdrücke der Schlüssel, die den Block öffnen."
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Größe des Blocks in Bytes."
+          },
+          "gueltig_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bis wann dieser Block gilt; `None` = so lange wie der Einsatz."
+          }
+        }
+      },
+      "ArchivEmpfaengerAnzeige": {
+        "type": "object",
+        "description": "Ein Archiv-Empfänger, wie die Verwaltung ihn sieht. Der Schlüssel selbst steht nicht darin,\nnur sein Fingerabdruck.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "fingerabdruck",
+          "angelegt_at",
+          "gesperrt"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "fingerabdruck": {
+            "type": "string",
+            "description": "Kurzform des Schlüssels zum Vergleichen (`ab12:cd34:…`)."
+          },
+          "geprueft_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der bestandenen Schlüsselprobe; ohne gilt der Empfänger noch nicht."
+          },
+          "gesperrt": {
+            "type": "boolean",
+            "description": "Die Probe ist nach zu vielen Fehlversuchen gesperrt."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -4210,6 +4309,115 @@
           }
         }
       },
+      "BruchAlleErgebnis": {
+        "type": "object",
+        "description": "Ergebnis von „Alle stellen“ (N5).",
+        "required": [
+          "gestellt",
+          "offen"
+        ],
+        "properties": {
+          "gestellt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BruchOffen"
+            },
+            "description": "Erfassungen, die offen bleiben, mit Grund (etwa „Bezug noch nicht beim Führer.“)."
+          }
+        }
+      },
+      "BruchErfassung": {
+        "type": "object",
+        "description": "Eine nicht übernommene Erfassung, wie die Liste am Band sie zeigt (N2).",
+        "required": [
+          "id",
+          "tabelle",
+          "kategorie",
+          "verborgen",
+          "folgen",
+          "gesichert_at"
+        ],
+        "properties": {
+          "antrag_art": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`)."
+          },
+          "folgen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Folgezeilen, die mit ihr gingen."
+          },
+          "gesichert_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/SpiegelKategorie"
+          },
+          "kurz": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Inhalt in Kurzform (höchstens [`KURZ_MAX`] Zeichen)."
+          },
+          "tabelle": {
+            "type": "string",
+            "description": "Tabelle der Zeile (`etb_eintrag`, `meldung`, `einsatz_person` …)."
+          },
+          "typ": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Typ eines ETB-Eintrags (`meldung`, `lage`, …)."
+          },
+          "verborgen": {
+            "type": "boolean",
+            "description": "Die Person darf das Modul der Zeile nicht nutzen: kein Inhalt, kein Antrag."
+          },
+          "von": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absender oder „von“."
+          },
+          "zeit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ereignis- oder Erfassungszeit der Zeile (UTC); fehlt, wenn sie keine trägt."
+          }
+        }
+      },
+      "BruchOffen": {
+        "type": "object",
+        "required": [
+          "id",
+          "grund"
+        ],
+        "properties": {
+          "grund": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "BuildJob": {
         "type": "object",
         "description": "Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit\nläuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher\n`serde_json::Value` daran vorbei.",
@@ -6674,7 +6882,7 @@
           "bruchstelle": {
             "type": "integer",
             "format": "int64",
-            "description": "Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht\nkannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert."
+            "description": "Eigene Erfassungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht\nkannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert. Nur\noffene, also weder nachgereicht noch verworfen (LLH-1646)."
           },
           "gegenstelle": {
             "type": "string",
@@ -13920,6 +14128,23 @@
           }
         }
       },
+      "NeuerArchivEmpfaenger": {
+        "type": "object",
+        "description": "Ein neu eingetragener Empfänger mit seiner Probe.",
+        "required": [
+          "empfaenger",
+          "probe"
+        ],
+        "properties": {
+          "empfaenger": {
+            "$ref": "#/components/schemas/ArchivEmpfaengerAnzeige"
+          },
+          "probe": {
+            "type": "string",
+            "description": "Der Code, verschlüsselt an den Schlüssel (age, ASCII-Armor). Entschlüsseln mit\n`age -d -i <schluesseldatei>`."
+          }
+        }
+      },
       "NotizAnzeige": {
         "type": "object",
         "description": "Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`).",
@@ -18424,6 +18649,20 @@
           }
         }
       },
+      "SpiegelKategorie": {
+        "type": "string",
+        "description": "Kategorie einer gespiegelten Zeile (Spec `einsatz-spiegel`, „Kategorie je Zeile“). Auf der\nLeitung steht sie an jeder Zeile, damit sparsamere Freigabestufen später ohne Protokollbruch\nkommen können (Entscheidung 14).",
+        "enum": [
+          "fuehrung",
+          "etb",
+          "lage",
+          "kraefte",
+          "personen",
+          "betreuung",
+          "kommunikation",
+          "anhaenge"
+        ]
+      },
       "SprechgruppeAnzeige": {
         "type": "object",
         "description": "Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag).",
@@ -22763,7 +23002,7 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.",
         "properties": {
           "adresse": {
             "type": [
@@ -22786,6 +23025,14 @@
             ],
             "format": "int64",
             "description": "„ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden."
+          },
+          "block": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Archiv (LLH-1494): Nummer des heruntergeladenen Blocks."
           },
           "fingerabdruck": {
             "type": [

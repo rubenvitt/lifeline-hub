@@ -185,6 +185,9 @@ const G_ANTRAG: &str =
      (der Dialog verlangt ein Zeichen ohne Namen, LFH-751 design.md D10)";
 // REVIEW: operativer Freitext-Zettel, konservativ gescrubbt — Begründung im Scrub-Kommentar.
 
+const G_ARCHIV: &str =
+    "Archiv (LLH-1494): age-verschlüsselt an die Org-Schlüssel, für den Server nicht \
+     lesbar; Fingerabdrücke und Prüfsumme ohne Personenbezug";
 const G_SPIEGEL: &str =
     "Verwaltung des Spiegels einer gekoppelten Instanz (LLH-1492): Kennungen, Stände, \
      Tabellennamen, kein Inhalt";
@@ -2955,6 +2958,26 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angenommen_at", G_ZEIT),
         ],
     },
+    // Archiv eines Einsatzes (LLH-1494, D9): age-verschlüsselte Blöcke. Der Klartext darin ist
+    // für den Server nicht lesbar; die Schwärzung lässt die Blöcke stehen, ihre Frist
+    // (`gueltig_bis`) und das Löschersuchen für den ganzen Einsatz löschen sie.
+    TabellenRegel {
+        tabelle: "einsatz_archiv",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("block", G_ZAEHLER),
+            retain("gueltig_bis", G_ZEIT),
+            retain("empfaenger_fingerabdruecke", G_ARCHIV),
+            retain("groesse", G_ZAEHLER),
+            retain("sha256", G_ARCHIV),
+            retain("inhalt", G_ARCHIV),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
     // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf
     // Stammdaten der Org, nie auf Einsatzzeilen.
     TabellenRegel {
@@ -3370,6 +3393,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("geklaert", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("geraeumt", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gesichert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            // Nachreichen (LLH-1646).
+            scrub("folge_von", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erledigt", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erledigt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erledigt_von_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("antrag_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("client_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("nachgereicht_als", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {

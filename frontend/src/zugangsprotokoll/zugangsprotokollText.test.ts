@@ -98,3 +98,15 @@ describe('Führung je Einsatz (LLH-1491)', () => {
     expect(hasNamensziel('fuehrung_widerspruch')).toBe(true);
   });
 });
+
+describe('Archiv am Hub (LLH-1494)', () => {
+  it('nennt Schlüssel und Abruf, zeigt die Bezeichnung als Ziel und den Block', () => {
+    expect(AKTION_TEXT.archiv_schluessel_eingetragen).toBe('Archiv-Schlüssel eingetragen');
+    expect(AKTION_TEXT.archiv_heruntergeladen).toBe('Archiv heruntergeladen');
+    expect(hasNamensziel('archiv_schluessel_geprueft')).toBe(true);
+    expect(hasNamensziel('archiv_heruntergeladen')).toBe(true);
+    expect(instanzText({ fingerabdruck: 'ab12:cd34', block: 2 })).toBe(
+      'Fingerabdruck ab12:cd34 · Block 2',
+    );
+  });
+});

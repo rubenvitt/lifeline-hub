@@ -325,7 +325,8 @@ macro_rules! fuehrung_joins {
 }
 
 /// Spiegel-Angaben (LLH-1492): ob der Einsatz ein Spiegel ist, von wem, wann zuletzt abgeglichen,
-/// und die Zahl offener und abgelehnter Anträge.
+/// die Zahl offener und abgelehnter Anträge und der offenen Erfassungen der Bruchstelle
+/// (LLH-1646: weder nachgereicht noch verworfen, Folgezeilen zählen nicht extra).
 macro_rules! spiegel_spalten {
     () => {
         "sp.einsatz_id IS NOT NULL AS spiegel_ist, spk.gegenueber_name AS spiegel_gegenstelle, \
@@ -335,7 +336,8 @@ macro_rules! spiegel_spalten {
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
              AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt, \
          (SELECT COUNT(*) FROM einsatz_bruchstelle eb WHERE eb.einsatz_id = e.id \
-             AND eb.entfernt = 1) AS spiegel_bruchstelle"
+             AND eb.entfernt = 1 AND eb.daten IS NOT NULL AND eb.folge_von IS NULL \
+             AND eb.erledigt IS NULL) AS spiegel_bruchstelle"
     };
 }
 
@@ -1425,6 +1427,43 @@ pub(crate) async fn schwaerze_einsatz_atomar(
         einsatz_id,
         "Purge Phase B abgeschlossen: PII geschwärzt (geschwaerzt_at gesetzt)"
     );
+    Ok(true)
+}
+
+/// Schwärzt einen Einsatz, dessen Archiv in derselben Transaktion entsteht (LLH-1494, D9), ohne
+/// Karenz: die Karenz dient dem Wiederherstellen, und das geht jetzt über das Archiv. Setzt
+/// Vormerkung und Tombstone zugleich, damit der Einsatz wie nach Phase B gesperrt ist und Phase A
+/// ihn nicht noch einmal vormerkt. Bewacht wie Phase B: nur abgeschlossene, nicht vorgemerkte,
+/// nicht geschwärzte Einsätze mit abgelaufener Nachbereitung; `false` = nichts zu tun. Den
+/// Nachlauf der Anhänge startet der Aufrufer nach dem Commit.
+pub(crate) async fn schwaerze_nach_archiv_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    etb_startwert: i64,
+    jetzt: &str,
+    grund: &str,
+) -> Result<bool, AppError> {
+    let res = sqlx::query(
+        "UPDATE einsatz SET geloescht_at = ?1, geschwaerzt_at = ?1 \
+         WHERE id = ?2 AND status = ?3 AND geloescht_at IS NULL AND geschwaerzt_at IS NULL \
+           AND nachbereitung_bis IS NOT NULL AND nachbereitung_bis <= ?1",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *conn)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Ok(false);
+    }
+    scrubbe_einsatz_ganz_tx(&mut *conn, einsatz_id, jetzt).await?;
+    system_audit_tx(
+        &mut *conn,
+        einsatz_id,
+        etb_startwert,
+        &schwaerzungs_audit(grund),
+    )
+    .await?;
     Ok(true)
 }
 

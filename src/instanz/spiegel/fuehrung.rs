@@ -548,6 +548,9 @@ async fn uebernimm_bruch_antwort(
                 .await?;
         }
     }
+    // Die entfernten Zeilen je Erfassung ordnen, damit Band und Liste Erfassungen zählen
+    // (LLH-1646).
+    super::bruchstelle::ordne_folgen(conn, einsatz_id).await?;
     Ok(Some(einsatz_id))
 }
 

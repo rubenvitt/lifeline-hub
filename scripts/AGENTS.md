@@ -7,9 +7,9 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
-`check-architektur.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
+`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
 - **Im PR laufen nur die betroffenen Suiten** (LFH-1111/1115): `scripts/bereiche.sh` ordnet
   jede geänderte Datei den Suiten Rust, Frontend und e2e zu, der CI-Job `aenderungen` und
   `check-all.sh --geaendert` fragen beide nur dieses Skript; die Schnellprüfungen und
@@ -21,6 +21,34 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   und grün durch statt per Job-`if`, sonst hingen ihre Required Checks auf „Expected"
   (Kopf von `ci.yml`). `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im
   PR, `--auswahl` zeigt sie nur an; ohne Argument läuft alles.
+- **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite** (LLH-1660): Folgen auf einen
+  Commit mit grünen schweren Suiten nur Autofix-Commits, die Migrationen unverändert auf eine
+  höhere Nummer legen (gleicher Name, gleiche Reihenfolge; daneben höchstens Dateien, die laut
+  `bereiche.sh` keine Suite liest), laufen Frontend und e2e auf dem neuen Kopf leer durch. **Die
+  Rust-Suite läuft immer neu:** der PR-Lauf prüft den Merge mit dem Ziel-Branch, und dort kam
+  die Migration dazu, wegen der umnummeriert wurde. `scripts/nur-umnummeriert.sh` nennt den
+  Vorgänger und wertet dessen Check-Runs aus, der Schritt „Nur umnummeriert?“ im Job
+  `aenderungen` fragt es. Entschieden wird am Inhalt des Commits, nicht am Autor; jeder Zweifel
+  lässt alles laufen. Die Liste der schweren Checks steht im Skript, der Selbsttest vergleicht
+  sie mit `ci.yml`: wer einen Anteil hinzufügt oder umbenennt, zieht sie nach.
+- **Stau-Wächter** (LLH-1660, `scripts/stau-waechter.sh`, `.github/workflows/stau-waechter.yml`:
+  Push auf einen Ziel-Branch, stündlich, von Hand): bewertet jeden offenen PR, der kein Entwurf
+  ist. Was er tut und warum, steht im Skriptkopf; die Grenzen belegt `stau-waechter.test.sh`.
+  - **Konflikt:** ein Hinweis am PR mit den betroffenen Dateien. Gelöst wird er von der Sitzung,
+    die den PR betreut (der Kommentar weckt sie), oder vom Menschen: Ziel-Branch in den PR-Branch
+    mergen, kein Rebase, kein Force-Push. Der Wächter löst nie selbst.
+  - **Kein CI-Lauf** (`Schnellprüfungen` fehlt 20 Minuten nach dem ersten Check des
+    Kopf-Commits, ohne jeden Check nach der letzten Änderung am PR): die Release-App mergt den Ziel-Branch in den PR-Branch. Grenzen wie beim
+    Migrations-Autofix: nur PRs aus diesem Repository, nie `alpha`/`beta`/`main`, nur
+    Fast-Forward auf genau den bewerteten Kopf (Push mit Lease), kein zweiter Versuch auf einem Wächter-Merge (Trailer
+    `Stau-Waechter`). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
+  - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
+  - **Ein Hinweis je PR** (Marke `<!-- stau-waechter:<art>:<kennung> -->`): gleicher Befund
+    schreibt nichts, neuer löscht und legt neu an, behobener ändert auf „behoben“. Wer eine Art
+    hinzufügt, ergänzt Skriptkopf, Selbsttest und die Spec `merge-stau`.
+  - Kein Schritt führt PR-Code aus. `--nur-zeigen` nennt Befund und Aktion, ohne zu schreiben,
+    auch lokal: `GITHUB_REPOSITORY=<owner>/<repo> scripts/stau-waechter.sh --nur-zeigen alle`.
+  - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,

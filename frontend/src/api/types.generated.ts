@@ -405,7 +405,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -564,6 +564,7 @@ export interface components {
         ArchivAkteAnzeige: {
             /** @description Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751). */
             antrag_faellig_at?: string | null;
+            archiv?: components["schemas"]["ArchivAngabe"] | null;
             karenz_ende?: string | null;
             /**
              * @description Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,
@@ -575,6 +576,46 @@ export interface components {
             schaeden: components["schemas"]["ArchivSchadenAnzeige"][];
             tiere: components["schemas"]["ArchivTierAnzeige"][];
             zustand: components["schemas"]["AufbewahrungZustand"];
+        };
+        /** @description Das Archiv eines Einsatzes in der Archivakte. */
+        ArchivAngabe: {
+            /** @description Zeitpunkt der Archivierung (UTC). */
+            archiviert_at: string;
+            /**
+             * Format: int64
+             * @description Der Block, den ein Download jetzt liefert.
+             */
+            block: number;
+            /**
+             * Format: int64
+             * @description Zahl der noch vorhandenen Blöcke.
+             */
+            bloecke: number;
+            /** @description Fingerabdrücke der Schlüssel, die den Block öffnen. */
+            fingerabdruecke: string[];
+            /**
+             * Format: int64
+             * @description Größe des Blocks in Bytes.
+             */
+            groesse: number;
+            /** @description Bis wann dieser Block gilt; `None` = so lange wie der Einsatz. */
+            gueltig_bis?: string | null;
+        };
+        /**
+         * @description Ein Archiv-Empfänger, wie die Verwaltung ihn sieht. Der Schlüssel selbst steht nicht darin,
+         *     nur sein Fingerabdruck.
+         */
+        ArchivEmpfaengerAnzeige: {
+            angelegt_at: string;
+            bezeichnung: string;
+            /** @description Kurzform des Schlüssels zum Vergleichen (`ab12:cd34:…`). */
+            fingerabdruck: string;
+            /** @description Zeitpunkt der bestandenen Schlüsselprobe; ohne gilt der Empfänger noch nicht. */
+            geprueft_at?: string | null;
+            /** @description Die Probe ist nach zu vielen Fehlversuchen gesperrt. */
+            gesperrt: boolean;
+            /** Format: int64 */
+            id: number;
         };
         /**
          * @description Ein ETB-Eintrag der Archivakte im Wortlaut — ohne Anhänge und ohne Rückverweise auf
@@ -1736,6 +1777,44 @@ export interface components {
              */
             ziel?: string | null;
         };
+        /** @description Ergebnis von „Alle stellen“ (N5). */
+        BruchAlleErgebnis: {
+            /** Format: int64 */
+            gestellt: number;
+            /** @description Erfassungen, die offen bleiben, mit Grund (etwa „Bezug noch nicht beim Führer.“). */
+            offen: components["schemas"]["BruchOffen"][];
+        };
+        /** @description Eine nicht übernommene Erfassung, wie die Liste am Band sie zeigt (N2). */
+        BruchErfassung: {
+            /** @description Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`). */
+            antrag_art?: string | null;
+            /**
+             * Format: int64
+             * @description Zahl der Folgezeilen, die mit ihr gingen.
+             */
+            folgen: number;
+            gesichert_at: string;
+            /** Format: int64 */
+            id: number;
+            kategorie: components["schemas"]["SpiegelKategorie"];
+            /** @description Inhalt in Kurzform (höchstens [`KURZ_MAX`] Zeichen). */
+            kurz?: string | null;
+            /** @description Tabelle der Zeile (`etb_eintrag`, `meldung`, `einsatz_person` …). */
+            tabelle: string;
+            /** @description Typ eines ETB-Eintrags (`meldung`, `lage`, …). */
+            typ?: string | null;
+            /** @description Die Person darf das Modul der Zeile nicht nutzen: kein Inhalt, kein Antrag. */
+            verborgen: boolean;
+            /** @description Absender oder „von“. */
+            von?: string | null;
+            /** @description Ereignis- oder Erfassungszeit der Zeile (UTC); fehlt, wenn sie keine trägt. */
+            zeit?: string | null;
+        };
+        BruchOffen: {
+            grund: string;
+            /** Format: int64 */
+            id: number;
+        };
         /**
          * @description Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit
          *     läuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher
@@ -2682,8 +2761,9 @@ export interface components {
             beendet: boolean;
             /**
              * Format: int64
-             * @description Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
-             *     kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert.
+             * @description Eigene Erfassungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
+             *     kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert. Nur
+             *     offene, also weder nachgereicht noch verworfen (LLH-1646).
              */
             bruchstelle: number;
             /** @description Name der führenden Instanz. */
@@ -5588,6 +5668,15 @@ export interface components {
              */
             zugesagt: number;
         };
+        /** @description Ein neu eingetragener Empfänger mit seiner Probe. */
+        NeuerArchivEmpfaenger: {
+            empfaenger: components["schemas"]["ArchivEmpfaengerAnzeige"];
+            /**
+             * @description Der Code, verschlüsselt an den Schlüssel (age, ASCII-Armor). Entschlüsseln mit
+             *     `age -d -i <schluesseldatei>`.
+             */
+            probe: string;
+        };
         /** @description Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`). */
         NotizAnzeige: {
             /**
@@ -7318,6 +7407,13 @@ export interface components {
             /** @description `ausstehend`, `zugestellt`, `uebernommen` (Zeile noch nicht im Spiegel) oder `abgelehnt`. */
             zustand: string;
         };
+        /**
+         * @description Kategorie einer gespiegelten Zeile (Spec `einsatz-spiegel`, „Kategorie je Zeile“). Auf der
+         *     Leitung steht sie an jeder Zeile, damit sparsamere Freigabestufen später ohne Protokollbruch
+         *     kommen können (Entscheidung 14).
+         * @enum {string}
+         */
+        SpiegelKategorie: "fuehrung" | "etb" | "lage" | "kraefte" | "personen" | "betreuung" | "kommunikation" | "anhaenge";
         /** @description Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag). */
         SprechgruppeAnzeige: {
             aktiv: boolean;
@@ -9005,6 +9101,8 @@ export interface components {
          *     - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
          *     - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;
          *       `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
+         *     - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
+         *       des Blocks, durch Komma getrennt) und `block`.
          *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
          *       Gegenstelle.
          */
@@ -9018,6 +9116,11 @@ export interface components {
              * @description „ELW verloren“ (LLH-1493): Zahl der Konten, deren Geheimnisse ungültig wurden.
              */
             anzahl?: number | null;
+            /**
+             * Format: int64
+             * @description Archiv (LLH-1494): Nummer des heruntergeladenen Blocks.
+             */
+            block?: number | null;
             /** @description Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels. */
             fingerabdruck?: string | null;
             /** @description Org der Gegenstelle. */

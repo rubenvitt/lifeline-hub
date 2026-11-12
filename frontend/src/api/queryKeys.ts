@@ -117,6 +117,8 @@ export const EINSATZ_KEYS = {
   // Zähler stehen im Kopf) und damit im Vollabgleich nach `lagged`, den der Spiegel je
   // übernommenem Paket meldet. Nicht im Lagebild offline: ohne Verbindung trägt die Warteschlange.
   antraege: 'einsatz-antraege',
+  // Nicht übernommene Erfassungen am Spiegel (LLH-1646), live über `einsatz` (Zähler im Kopf).
+  bruchstelle: 'einsatz-bruchstelle',
   // Eigene Führungsstelle (LFH-849): eigener Endpunkt, live über dasselbe `einsatz`-Ereignis.
   fuehrungsstelle: 'einsatz-fuehrungsstelle',
   // Führung je Einsatz (LLH-1491): Akte und Verlauf, live über das `einsatz`-Ereignis (jeder
@@ -422,6 +424,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.lagemonitor,
     // Anträge am Spiegel (LLH-1492): ihre Zähler stehen im Kopf, ein Abgleich meldet `lagged`.
     EINSATZ_KEYS.antraege,
+    // Die Bruchstelle (LLH-1646): Stellen und Verwerfen melden den Kopf.
+    EINSATZ_KEYS.bruchstelle,
   ],
   // Anrufe des Moduls Informationstelefon; der Server gatet das Ereignis nach `infotelefon`.
   infotelefon: [EINSATZ_KEYS.infotelefon],
@@ -1026,6 +1030,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.anhangHeicVorschau, einsatzId, href] as const,
   /** Eigene Anträge am Spiegel (LLH-1492), live über `einsatz`. */
   antraege: (einsatzId: number) => [EINSATZ_KEYS.antraege, einsatzId] as const,
+  /** Nicht übernommene Erfassungen am Spiegel (LLH-1646), live über `einsatz`. */
+  bruchstelle: (einsatzId: number) => [EINSATZ_KEYS.bruchstelle, einsatzId] as const,
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -1058,6 +1064,8 @@ export const GLOBAL_KEYS = {
   lagebildExtern: 'lagebild-extern',
   // Instanzkopplung (LLH-1490): Identität, Kopplungen und Unterschriftsschlüssel der Org.
   instanzkopplung: 'instanzkopplung',
+  // Archiv-Schlüssel der Org (LLH-1494): Empfänger der Archive am Ende der Nachbereitung.
+  orgArchivSchluessel: 'org-archiv-schluessel',
   // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
   stammdatenHerkunft: 'stammdaten-herkunft',
   // Präferenzen des ANGEMELDETEN Benutzers.
@@ -1181,6 +1189,7 @@ export const globalKeys = {
   lagebildExtern: () => [GLOBAL_KEYS.lagebildExtern] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
+  orgArchivSchluessel: () => [GLOBAL_KEYS.orgArchivSchluessel] as const,
   /**
    * Halter des letzten Unterschriftsschlüssels (LLH-1605), für die Warnung der Benutzerverwaltung.
    * Liegt unter dem Prefix `instanzkopplung`: wer die Kopplungen abgleicht, gleicht sie mit ab.
@@ -1374,6 +1383,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
+ * - `orgArchivSchluessel` (LLH-1494): Verwaltung der Archiv-Schlüssel, nur der System-Admin;
+ *   die eigene Änderung setzt die Antwort.
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
@@ -1397,6 +1408,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.lagemonitorZugaenge,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
+  GLOBAL_KEYS.orgArchivSchluessel,
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,

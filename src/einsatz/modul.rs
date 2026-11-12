@@ -264,6 +264,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Eigene Anträge an einem Spiegel (LLH-1492): modul-los. Ein Antrag gehört dem Konto, das ihn
     // gestellt hat; das Modulrecht prüfte schon die Erfassung, aus der er entstand.
     ("/api/einsaetze/{id}/antraege", None),
+    // Nicht übernommene Erfassungen nach einer Notübernahme (LLH-1646): modul-los. Jede Zeile
+    // gehört einem anderen Modul; der Handler prüft das Modul je Zeile (Inhalt, Stellen,
+    // Verwerfen) und das Modul der Antragsart.
+    ("/api/einsaetze/{id}/bruchstelle", None),
     // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].

@@ -58,6 +58,9 @@ export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
 export type EinsatzVerwahrungAnzeige = S['EinsatzVerwahrungAnzeige'];
 export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
 export type AbgelehnterAntragAnzeige = S['AbgelehnterAntragAnzeige'];
+// Nicht übernommene Erfassungen am Spiegel (LLH-1646).
+export type BruchErfassung = S['BruchErfassung'];
+export type BruchAlleErgebnis = S['BruchAlleErgebnis'];
 export type KopplungscodeAntwort = S['KopplungscodeAntwort'];
 export type UnterschriftSchluesselAnzeige = S['UnterschriftSchluesselAnzeige'];
 export type UnterschriftSchluesselZustand = S['UnterschriftSchluesselZustand'];
@@ -1893,6 +1896,10 @@ export type AufbewahrungZustand = S['AufbewahrungZustand'];
 export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
 /** Pseudonyme Archivakte: Kopf, Zustand, Register — nur Retain-Spalten. */
 export type ArchivAkte = S['ArchivAkteAnzeige'];
+// Archiv am Hub (LLH-1494): Block der Archivakte und Archiv-Schlüssel der Org.
+export type ArchivAngabe = S['ArchivAngabe'];
+export type ArchivEmpfaengerAnzeige = S['ArchivEmpfaengerAnzeige'];
+export type NeuerArchivEmpfaenger = S['NeuerArchivEmpfaenger'];
 export type ArchivPerson = S['ArchivPersonAnzeige'];
 export type ArchivTier = S['ArchivTierAnzeige'];
 export type ArchivSchaden = S['ArchivSchadenAnzeige'];

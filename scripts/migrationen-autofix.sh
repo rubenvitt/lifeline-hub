@@ -7,7 +7,8 @@
 #     <kopf-sha>     der geprüfte Kopf-Commit; gepusht wird nur, solange der Branch dort steht
 #   Exit 0 = Autofix gepusht · 1 = nicht behebbar (Bestandsmigration verletzt)
 #        2 = Aufruf- oder Umgebungsfehler · 3 = verweigert (Ziel-Branch, Schleifenbremse)
-#        4 = Push abgewiesen, weil der Branch sich bewegt hat · 5 = nichts umzunummerieren
+#        4 = Push abgewiesen, weil der Branch sich bewegt hat oder gelöscht ist
+#        5 = nichts umzunummerieren
 #   Umgebung: AUTOFIX_REMOTE  (Vorgabe origin)
 #             AUTOFIX_BERICHT Datei für den PR-Kommentar (Markdown), nur nach Exit 0 geschrieben
 #             AUTOFIX_PRUEFER Prüfskript (Vorgabe: check-migrationen.sh neben diesem Skript)
@@ -15,9 +16,10 @@
 # DIE GRENZEN (Begründung: openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md):
 #   1. Nie auf `alpha`, `beta`, `main` oder die Basis selbst. Das Token des Workflows hat auf
 #      `alpha` Bypass-Rechte; diese Sperre ist die erste von zwei.
-#   2. Nur Fast-Forward, nie Force: der Commit sitzt direkt auf <kopf-sha>. Hat jemand
-#      inzwischen gepusht, weist das Remote den Push ab, und sein Commit bekommt einen eigenen
-#      Lauf. Das ist auch die zweite Sperre gegen einen Ziel-Branch.
+#   2. Nur Fast-Forward auf GENAU den geprüften Kopf (`--force-with-lease` als Bedingung, der
+#      Commit sitzt direkt auf <kopf-sha>). Hat jemand inzwischen gepusht, wurde der Branch
+#      zurückgesetzt oder gelöscht, weist das Remote den Push ab; ein neuer Stand bekommt einen
+#      eigenen Lauf. Das ist auch die zweite Sperre gegen einen Ziel-Branch.
 #   3. Schleifenbremse: tragen die letzten drei Commits den Autofix-Trailer, setzt er aus.
 #
 # Gearbeitet wird in einem eigenen, losgelösten Arbeitsbaum; der des Aufrufers bleibt, wie er
@@ -28,7 +30,7 @@ TRAILER_SCHLUESSEL="Migrationsnummern-Autofix"
 TRAILER_WERT="LFH-1014"
 SCHLEIFE_MAX=3
 
-[ $# -eq 3 ] || { sed -n '2,13p' "$0" >&2; exit 2; }
+[ $# -eq 3 ] || { sed -n '2,14p' "$0" >&2; exit 2; }
 BASIS="$1"
 KOPF_BRANCH="$2"
 KOPF_SHA="$3"
@@ -104,18 +106,33 @@ git -C "$WT" add -A
 git -C "$WT" commit -q -F "$TMP/nachricht"
 neu="$(git -C "$WT" rev-parse HEAD)"
 
-# Ohne Force: nur ein Fast-Forward von <kopf-sha> wird angenommen (Grenze 2).
-if ! git -C "$WT" push -q "$REMOTE" "$neu:refs/heads/$KOPF_BRANCH"; then
-  # Bewegt oder verweigert? Nur ein bewegter Branch ist der erwartete Fall; ein Push, der bei
-  # stehendem Branch scheitert (Rechte, falscher Token), ist ein Fehler und muss so heißen.
-  jetzt="$(git -C "$WT" ls-remote "$REMOTE" "refs/heads/$KOPF_BRANCH" | cut -f1)" || jetzt=""
-  if [ -n "$jetzt" ] && [ "$jetzt" != "$K" ]; then
-    echo "==> Push abgewiesen: '$KOPF_BRANCH' steht nicht mehr auf ${K:0:12}. Der neue Stand wird" >&2
-    echo "    von seinem eigenen Lauf bewertet." >&2
-    exit 4
+# Nur ein Fast-Forward von GENAU <kopf-sha> wird angenommen (Grenze 2, LLH-1667). Der Lease
+# bindet den Push an den geprüften Kopf; der Commit sitzt direkt darauf, es bleibt ein
+# Fast-Forward. Ein einfacher Push prüfte nur gegen das, was gerade im Remote steht: ein
+# inzwischen gelöschter Branch (PR gemergt) entstünde neu, ein per Force auf einen Vorfahren
+# zurückgesetzter bekäme die entfernten Commits zurück.
+if ! git -C "$WT" push -q --force-with-lease="refs/heads/$KOPF_BRANCH:$K" "$REMOTE" \
+  "$neu:refs/heads/$KOPF_BRANCH"; then
+  # Bewegt oder verweigert? Nur ein bewegter oder gelöschter Branch ist der erwartete Fall; ein
+  # Push, der bei stehendem Branch scheitert (Rechte, falscher Token), ist ein Fehler und muss
+  # so heißen. Ist auch der Blick ins Remote nicht möglich, lässt sich das nicht entscheiden.
+  if jetzt="$(git -C "$WT" ls-remote "$REMOTE" "refs/heads/$KOPF_BRANCH" | cut -f1)"; then
+    if [ -z "$jetzt" ]; then
+      echo "==> Push abgewiesen: '$KOPF_BRANCH' gibt es nicht mehr (PR gemergt oder Branch" >&2
+      echo "    gelöscht). Der Autofix legt ihn nicht neu an." >&2
+      exit 4
+    fi
+    if [ "$jetzt" != "$K" ]; then
+      echo "==> Push abgewiesen: '$KOPF_BRANCH' steht nicht mehr auf ${K:0:12}. Der neue Stand wird" >&2
+      echo "    von seinem eigenen Lauf bewertet." >&2
+      exit 4
+    fi
+    echo "FEHLER: Push fehlgeschlagen, obwohl '$KOPF_BRANCH' noch auf ${K:0:12} steht" >&2
+    echo "    (Rechte des Tokens? Ausgabe von git push oben)." >&2
+    exit 2
   fi
-  echo "FEHLER: Push fehlgeschlagen, obwohl '$KOPF_BRANCH' noch auf ${K:0:12} steht" >&2
-  echo "    (Rechte des Tokens? Ausgabe von git push oben)." >&2
+  echo "FEHLER: Push fehlgeschlagen, und der Stand von '$KOPF_BRANCH' im Remote ist nicht" >&2
+  echo "    lesbar (Netz, Rechte des Tokens? Ausgaben oben)." >&2
   exit 2
 fi
 echo "==> Autofix gepusht: $KOPF_BRANCH ${K:0:12} -> ${neu:0:12}"

@@ -56,6 +56,7 @@ import {
   sichtung,
 } from '../theme/statusFarben';
 import { standVerworfen } from './archivAbruf';
+import ArchivPaneel from './ArchivPaneel';
 import { ETB_TYPEN, VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
 import { FristWert, useFristAenderung } from './FristPaneel';
 import { KategorieWert } from './KategorieFristen';
@@ -68,7 +69,7 @@ import WiederherstellenDialog from './WiederherstellenDialog';
  * nur für den System-Admin der eigenen Organisation.
  *
  * Vier Paneele: **Aufbewahrung** (Zustand, Fristen, Schwärzung, Kopf ohne Ort und
- * Sachverhalt), **Löschersuchen** (Art. 17, LFH-751: Anträge, Rücknahme, Personensuche),
+ * Sachverhalt), nach der Nachbereitung **Archiv** (LLH-1494), **Löschersuchen** (Art. 17, LFH-751: Anträge, Rücknahme, Personensuche),
  * **Register** (Personen, Tiere, Schäden ohne Namen, Kontakte oder Orte) und
  * **Einsatztagebuch** (lesende Zeitachse). Jede Angabe stammt aus einer Retain-Spalte, die
  * Akte sieht deshalb vor und nach der Schwärzung gleich aus.
@@ -534,6 +535,15 @@ function AkteInhalt({
             <SpeicherFehler fehler={frist.fehlerAussen} />
           </div>
         </Paneel>
+
+        {/* LLH-1494: das verschlüsselte Archiv nach der Nachbereitung. */}
+        {akte.archiv && (
+          <ArchivPaneel
+            einsatzId={einsatzId}
+            kennung={kopf.einsatznummer_intern ?? `#${einsatzId}`}
+            archiv={akte.archiv}
+          />
+        )}
 
         {/* LFH-749: Aufbewahrung je Datenkategorie, nur lesend — ändern geht am Einsatz. */}
         <Paneel titel="Datenkategorien" koerperPolster>
