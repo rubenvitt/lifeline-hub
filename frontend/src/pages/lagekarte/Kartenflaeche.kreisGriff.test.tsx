@@ -141,7 +141,7 @@ describe('Kartenflaeche: Radius-Griff nach dem Loslassen (LLH-1700)', () => {
       const ll = rand.getLngLat()!;
       return { lat: ll.lat, lon: ll.lng };
     };
-    const lege = (p: GeoPunkt) => rand.setLngLat([p.lon, p.lat]);
+    const place = (p: GeoPunkt) => rand.setLngLat([p.lon, p.lat]);
     expect(lage()).toEqual(griffLage(MITTE, 300));
 
     const zwischen = noerdlich(MITTE, 250);
@@ -154,14 +154,14 @@ describe('Kartenflaeche: Radius-Griff nach dem Loslassen (LLH-1700)', () => {
     imCommit.current = (radiusM) => {
       if (radiusM !== radiusZwischen || schonLosgelassen) return;
       schonLosgelassen = true;
-      lege(ziel);
+      place(ziel);
       rand.fire('drag');
       rand.fire('dragend');
     };
 
     act(() => {
       rand.fire('dragstart');
-      lege(zwischen);
+      place(zwischen);
       rand.fire('drag');
     });
 

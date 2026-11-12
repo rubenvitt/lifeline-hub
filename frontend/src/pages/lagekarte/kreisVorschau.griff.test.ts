@@ -5,8 +5,8 @@ import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
 
 /**
  * Der Radius-Griff gegen einen nachgebauten `maplibregl.Marker` (jsdom hat kein WebGL). Geprüft
- * wird, wo der Griff nach `set` steht: der Effekt der `Kartenflaeche` ruft es nach jedem Render,
- * also auch erst nach dem Loslassen (LLH-1700).
+ * wird, wo der Griff nach `set` steht: die `Kartenflaeche` ruft es im Commit, und der erste
+ * Commit nach dem Loslassen bringt den zuletzt gezogenen Radius (LLH-1700).
  */
 const marker = new Map<string, FakeMarker>();
 
@@ -81,7 +81,7 @@ describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
     expect(lage()).toEqual(griffLage(MITTE, 300));
   });
 
-  it('bleibt unter dem Zeiger, wenn der Effekt den gezogenen Radius erst nach dem Loslassen bringt', () => {
+  it('bleibt unter dem Zeiger, wenn der gezogene Radius erst nach dem Loslassen ankommt', () => {
     const { griff, onRadius, lage, ziehe } = setup();
     griff.set(MITTE, 300);
     // Nach Nordwesten gezogen: weit weg von der Ost-Lage des neuen Kreises.
@@ -95,7 +95,7 @@ describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
     expect(lage()).toEqual(ziel);
   });
 
-  it('bleibt auch stehen, wenn danach nur die Farbe wechselt (gleiche Mitte, gleicher Radius)', () => {
+  it('bleibt auch stehen, wenn derselbe Stand noch einmal kommt (gleiche Mitte, gleicher Radius)', () => {
     const { griff, lage, ziehe } = setup();
     griff.set(MITTE, 300);
     const ziel = noerdlich(MITTE, 220);

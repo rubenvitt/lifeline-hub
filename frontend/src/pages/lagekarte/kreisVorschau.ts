@@ -289,8 +289,8 @@ export function erzeugeKreisGriff(
         return;
       }
       // Ergibt die Lage des Griffs schon den Radius, hat ihn ein Zug dorthin gelegt: er bleibt
-      // unter dem Zeiger. Der Effekt der Kartenfläche ruft `set` nach dem Render, also auch
-      // erst nach `dragend` (Render unter Last) oder nur wegen einer neuen Farbe (LLH-1700).
+      // unter dem Zeiger. Die Kartenfläche ruft `set` im Commit, und der erste Commit nach
+      // `dragend` bringt den zuletzt gezogenen Radius (LLH-1700).
       const stehtAufRadius = gleicheMitte && radiusJetzt() === radiusM;
       // Mitten im Zug setzt der Zeiger die Lage, nicht der gemeldete Radius.
       if (!ziehend && !stehtAufRadius) {
