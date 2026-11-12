@@ -12,6 +12,10 @@ gilt_fuer:
   - src/einsatz/repo.rs
   - src/einsatz/kontext.rs
   - frontend/src/einsatz/schreibrecht.ts
+  - src/routes/fuehrung.rs
+  - frontend/src/instanz/Fuehrung*
+  - frontend/src/instanz/fuehrung*
+  - frontend/src/instanz/EinsaetzeBeimGegenueber.tsx
 herleitung:
   - openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md

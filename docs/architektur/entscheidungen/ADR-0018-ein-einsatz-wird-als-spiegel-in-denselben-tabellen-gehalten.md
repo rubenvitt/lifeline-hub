@@ -10,6 +10,7 @@ gilt_fuer:
   - src/auth/session.rs
   - migrations/0314_einsatz_spiegel.sql
   - frontend/src/offline/queue.ts
+  - src/routes/einsatz.rs
 herleitung:
   - openspec/changes/archive/2026-11-10-polrv1lt-spiegel-antraege/design.md
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md

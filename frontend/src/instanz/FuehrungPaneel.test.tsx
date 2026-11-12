@@ -25,6 +25,7 @@ import {
   uebergebeFuehrung,
   uebernimmFuehrung,
   uebernimmFuehrungMitCode,
+  uebernimmFuehrungMitUnterschrift,
   widersprecheUebernahme,
 } from '../api/fuehrung';
 
@@ -217,6 +218,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
           fuehrer_richtung: 'wird_gemeldet',
         })}
         darfBedienen
+        darfUnterschreiben
       />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
@@ -233,6 +235,54 @@ describe('FuehrungPaneel (LLH-1491)', () => {
         'ABCD-EFGH-JKMN-PQRS',
       ),
     );
+  });
+
+  it('die Einsatzleitung ohne Admin-Rolle übernimmt nur mit dem Code (LLH-1676)', async () => {
+    vi.mocked(uebernimmFuehrungMitCode).mockResolvedValue(akte());
+    renderMitProviders(
+      <FuehrungPaneel
+        fuehrung={akte({
+          fuehrend: false,
+          fuehrer_name: 'ELW 1',
+          fuehrer_richtung: 'wird_gemeldet',
+        })}
+        darfBedienen
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText('Eigene Unterschrift')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Beweis')).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Grund'), 'per Funk');
+    await userEvent.type(within(dialog).getByLabelText('Code'), 'ABCD-EFGH-JKMN-PQRS');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
+    await waitFor(() =>
+      expect(uebernimmFuehrungMitCode).toHaveBeenCalledWith(
+        { einsatzId: 7 },
+        'per Funk',
+        'ABCD-EFGH-JKMN-PQRS',
+      ),
+    );
+    expect(uebernimmFuehrungMitUnterschrift).not.toHaveBeenCalled();
+  });
+
+  it('ein Admin wählt zwischen eigener Unterschrift und Code (LLH-1676)', async () => {
+    renderMitProviders(
+      <FuehrungPaneel
+        fuehrung={akte({
+          fuehrend: false,
+          fuehrer_name: 'ELW 1',
+          fuehrer_richtung: 'wird_gemeldet',
+        })}
+        darfBedienen
+        darfUnterschreiben
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Beweis')).toBeInTheDocument();
+    expect(within(dialog).getByText('Eigene Unterschrift')).toBeInTheDocument();
+    expect(within(dialog).getByText('Code des Gegenübers')).toBeInTheDocument();
   });
 
   describe('ohne Netz (LLH-1670)', () => {

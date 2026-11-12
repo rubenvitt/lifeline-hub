@@ -106,6 +106,15 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
     expect(m.anfragen).toBe(false);
   });
 
+  it('eigene Unterschrift nur für einen Admin, und nur gegen die meldende Seite (LLH-1676)', () => {
+    const gegenMeldende = akte({ fuehrend: false, fuehrer_richtung: 'wird_gemeldet' });
+    expect(fuehrungMoeglich(gegenMeldende, { darfUnterschreiben: true }).unterschrift).toBe(true);
+    expect(fuehrungMoeglich(gegenMeldende, { darfUnterschreiben: false }).unterschrift).toBe(false);
+    expect(fuehrungMoeglich(gegenMeldende).unterschrift).toBe(false);
+    const gegenErreichte = akte({ fuehrend: false, fuehrer_richtung: 'meldet_sich' });
+    expect(fuehrungMoeglich(gegenErreichte, { darfUnterschreiben: true }).unterschrift).toBe(false);
+  });
+
   it('eine offene Übernahme sperrt die Übergabe und verlangt die Entscheidung', () => {
     const m = fuehrungMoeglich(
       akte({
