@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { formatVor } from '../../anzeige/abstand';
+import { spiegelGrund } from '../../components/nurAnsicht';
 import type {
   AbgelehnterAntragAnzeige,
   EinsatzSpiegelAnzeige,
@@ -38,22 +39,26 @@ export const KEINE_VERBINDUNG_AB_MS = 60_000;
  *  melden kein Live-Ereignis, der letzte Abgleich bliebe sonst stehen. */
 export const SPIEGEL_KOPF_ABRUF_MS = 30_000;
 
-/** Kopf des Bands: „Spiegel von ELW 1“. */
-export function spiegelTitel(s: Pick<EinsatzSpiegelAnzeige, 'gegenstelle'>): string {
-  return `Spiegel von ${s.gegenstelle}`;
+/** Kopf des Bands: „Spiegel von ELW 1“, bei einem eingespielten Archiv „Aus dem Archiv“
+ *  (LLH-1494). */
+export function spiegelTitel(s: Pick<EinsatzSpiegelAnzeige, 'gegenstelle' | 'archiv_bis'>): string {
+  return spiegelGrund(s);
 }
 
 /**
- * Stand des Abgleichs: beendet (Widerruf), noch keiner, zu alt oder der letzte. `zeit` formatiert
+ * Stand des Abgleichs: bis wann ein eingespieltes Archiv bleibt, beendet (Widerruf), noch keiner,
+ * zu alt oder der letzte. `zeit` formatiert
  * den Zeitpunkt in der Anzeigekonvention; `aktiv` heißt, der Einsatz ist aktiv (nur dann gilt der
  * kurze Takt, und ein Ausbleiben ist eine Störung).
  */
 export function spiegelStand(
-  s: Pick<EinsatzSpiegelAnzeige, 'beendet' | 'letzter_abgleich_at'>,
+  s: Pick<EinsatzSpiegelAnzeige, 'beendet' | 'letzter_abgleich_at' | 'archiv_bis'>,
   aktiv: boolean,
   jetzt: number,
   zeit: (wert: string) => string,
 ): { text: string; gestoert: boolean } {
+  // Ein eingespieltes Archiv bleibt bis zu seinem Abräumen (LLH-1494).
+  if (s.archiv_bis) return { text: `bis ${zeit(s.archiv_bis)}`, gestoert: false };
   if (s.beendet) return { text: 'Abgleich beendet', gestoert: false };
   const letzter = s.letzter_abgleich_at;
   if (!letzter) return { text: 'noch kein Abgleich', gestoert: aktiv };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
-import { serializeAnySpec } from '@einsatzzeichen/core';
+import { serializeAnySpec } from '@einsatzzeichen/core/exact';
 import { PALETTE } from '@einsatzzeichen/schema';
 import {
   buildFuehrungsstelleMarker,

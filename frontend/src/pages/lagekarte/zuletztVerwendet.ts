@@ -1,4 +1,4 @@
-import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import { isFreestandingSpec } from '@einsatzzeichen/schema';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';

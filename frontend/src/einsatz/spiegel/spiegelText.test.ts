@@ -19,6 +19,14 @@ describe('Hinweisband am Spiegel (LLH-1492, Spec `einsatz-spiegel`)', () => {
     expect(spiegelTitel({ gegenstelle: 'ELW 1' })).toBe('Spiegel von ELW 1');
   });
 
+  it('nennt ein eingespieltes Archiv und bis wann es bleibt (LLH-1494)', () => {
+    const archiv = { gegenstelle: 'Archiv', archiv_bis: '2026-11-19 16:00:00' };
+    expect(spiegelTitel(archiv)).toBe('Aus dem Archiv');
+    expect(
+      spiegelStand({ ...archiv, beendet: true, letzter_abgleich_at: letzter }, false, 0, zeit),
+    ).toEqual({ text: 'bis [2026-11-19 16:00:00]', gestoert: false });
+  });
+
   it('zeigt den letzten Abgleich, solange er frisch ist', () => {
     expect(
       spiegelStand(
