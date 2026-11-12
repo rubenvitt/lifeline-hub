@@ -244,7 +244,7 @@ async function seedePlanung(page: Page): Promise<number> {
 
 test('Planung: Aushang von der Planungsseite, der Kopf nennt die Planung', async ({ page }) => {
   test.setTimeout(180_000);
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
   const planungId = await seedePlanung(page);
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
 

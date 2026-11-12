@@ -3,6 +3,8 @@ import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-
 import { zeigeLeistenAnsicht } from './leisten-kern';
 import { ADMIN, ADMIN_PW, wechsleZuRolle } from './rollen-kern';
 import { SUBPIXEL, ZIELABSTAND } from './trefflaeche-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Prüflisten-Zeile 12 der Bedien-Leitlinie — „kein Sprung, kein Flächenfraß" — für die
@@ -31,12 +33,8 @@ const DECKEL = 0.5;
 /** CLS-Grenze „gut", https://web.dev/articles/cls — Literal wie in `einsatzauswahl-cls`. */
 const CLS_GUT = 0.1;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<number> {
@@ -84,8 +82,7 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
     await page.setViewportSize({ width: flaeche.width, height: flaeche.height });
     for (const dichte of DICHTEN) {
       const lauf = `${flaeche.name} ${flaeche.width}×${flaeche.height}/${dichte}`;
-      await page.goto(`/einsaetze/${einsatzId}/etb`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, dichte);
       // Ruhezustand: ein Entwurf, keine gesetzten Felder, kein Menü offen.
       const leiste = page.locator('.etb-erfassung-sticky');
       await expect(leiste.getByPlaceholder(/^Inhalt …/)).toBeVisible();
@@ -163,8 +160,7 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     });
     expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
   }
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, 'handschuh');
   const zeilen = page
     .getByRole('region', { name: 'Einsatztagebuch' })
     .getByTestId('etb-ereigniszeile');
@@ -405,8 +401,7 @@ test('Informationstelefon (LFH-1067): auf 390 × 844 stehen beim Öffnen zwei An
 
   const gemessen: string[] = [];
   for (const dichte of DICHTEN) {
-    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/infotelefon`, dichte);
     const zeilen = page.locator('[data-anruf]');
     await expect(zeilen).toHaveCount(10);
     await expect(page.getByRole('combobox', { name: 'Anliegen' })).toBeVisible();
@@ -952,8 +947,7 @@ test('Gefahrenmatrix (LFH-373): Hinweis über der Matrix — Laden ohne Sprung, 
     // ── Laden ohne Sprung (Handschirm), wie „Laden ohne Sprung" oben.
     await page.setViewportSize({ width: 390, height: 844 });
     for (const dichte of ['kompakt', 'handschuh'] as const) {
-      await page.goto(`/einsaetze/${id}/gefahren`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${id}/gefahren`, dichte);
       await nurLesenSteht(`Laden/${dichte}`);
       await schriftenGeladen(page);
       const messung = await ruheShifts(page);

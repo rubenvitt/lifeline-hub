@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Locator, type Response } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Das Befehls-Gedächtnis der Kommandopalette gegen den echten Server: die Vitest-Naht fährt
@@ -24,12 +25,8 @@ function standGeladen(page: Page): Promise<Response> {
   return page.waitForResponse((r) => r.url().includes(FACH) && r.request().method() === 'GET');
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function oeffnePalette(page: Page) {

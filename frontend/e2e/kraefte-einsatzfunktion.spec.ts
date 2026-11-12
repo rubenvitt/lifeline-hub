@@ -19,7 +19,7 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 test('Einsatzfunktion setzen: Meldebild nennt sie vor der Qualifikation, das ETB hält sie fest', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E ${NAME}` });
   const basis = `/api/einsaetze/${einsatzId}`;
   const einheitId = await post(page, `${basis}/einheiten`, { name: 'Sanitätsgruppe' });

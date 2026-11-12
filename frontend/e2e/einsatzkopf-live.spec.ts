@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzModulPfad, lagebesprechungPfad, ueberblickPfad } from '../src/routing/deeplinks';
 import { anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
@@ -30,11 +31,7 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW);
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Einsatzkopf live ${Date.now()}` },
   });

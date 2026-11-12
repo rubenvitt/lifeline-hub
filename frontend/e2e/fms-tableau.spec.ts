@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * FMS-Tableau im echten Browser:
@@ -20,12 +21,8 @@ const FAHRZEUG_FREI = 'Florian Tableau 2';
 const EINHEIT = 'Tableauzug';
 const ABSCHNITT = 'EA Tableau';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Seeding per `page.request`: die Session ist Cookie-basiert, der Jar wird geteilt. */

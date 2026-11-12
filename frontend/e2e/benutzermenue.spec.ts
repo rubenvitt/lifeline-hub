@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { offenesMenue, oeffneMenue } from './menue-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
@@ -117,7 +117,7 @@ for (const fenster of [HANDY, { width: 1024, height: 768 }]) {
     page,
   }) => {
     await dichte(page, 'handschuh');
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     await page.setViewportSize(fenster);
     await page.goto('/einsaetze');
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
@@ -154,7 +154,7 @@ for (const fenster of [HANDY, { width: 1024, height: 768 }]) {
 test('Tastatur: Tab führt in die Leisten, Pfeile bleiben darin, Tab hinter der letzten schließt', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   await page.setViewportSize({ width: 1180, height: 820 });
   await page.goto('/einsaetze');
 
@@ -196,9 +196,9 @@ test('Tastatur: Tab führt in die Leisten, Pfeile bleiben darin, Tab hinter der 
 });
 
 test('Eingänge: „Benachrichtigungen einstellen“ führt auf die Einstellungen', async ({ page }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   await page.setViewportSize({ width: 1366, height: 900 });
-  const einsatzId = await einsatzAnlegen(page, `Benutzermenü Eingänge ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `Benutzermenü Eingänge ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
 
   await page.getByRole('button', { name: /^Eingänge, / }).click();

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /** Echte StatusTags auf Karten-/Tabellengrund, einschließlich DB-Freitext. Keine
  * Tokenimporte: getComputedStyle liefert Vordergrund und die komponierten Flächen.
@@ -70,12 +71,8 @@ async function kontrastVon(ziel: Locator) {
   });
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {

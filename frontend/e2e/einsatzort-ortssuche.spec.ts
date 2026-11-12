@@ -89,7 +89,7 @@ test('Einsatzdaten: Einsatzort suchen, Treffer wählen, speichern — Ausschnitt
   page,
 }) => {
   const anfragen = await geocoder(page);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const id = await einsatzAnlegenApi(page);
   await page.goto(einsatzdatenPfad(id));
 
@@ -245,7 +245,7 @@ test('Einsatzdaten: Nadel ziehen berichtigt die Koordinate, der Ortsname kommt a
   page,
 }) => {
   await geocoder(page);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const id = await einsatzAnlegenApi(page, {
     einsatzort: 'Hinter der Halle',
     einsatzort_lat: TREFFER.lat,
@@ -296,7 +296,7 @@ test('Einsatzdaten: ohne Netz „Auf Karte wählen“ mit Offline-Karte, gespeic
     ],
   });
   await kachelnBeantworten(page, '/api/karten/1/tiles/', 'strassen');
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const id = await einsatzAnlegenApi(page);
   await page.goto(einsatzdatenPfad(id));
   await paneel(page).getByRole('button', { name: 'Adresse eintragen' }).click();
@@ -352,7 +352,7 @@ test.describe('Handy 390 px', () => {
       page,
     }) => {
       await geocoder(page);
-      await anmeldenAlsAdmin(page);
+      await anmeldenAlsAdmin(page, { startseite: false });
       const id = await einsatzAnlegenApi(page);
       if (rolle === 'fuehrungspersonal') await wechsleZuRolle(page, rolle, String(id));
       await page.goto(einsatzdatenPfad(id));

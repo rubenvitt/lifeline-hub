@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Aktionen eines Abschnitts gegliederter Dokumente im Browser (LLH-1601, Spec `dokument-entwurf`,
@@ -10,12 +11,8 @@ import { einsatzAnlegen } from './einsatz-kern';
 
 test.setTimeout(90_000);
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function lageberichtMitText(page: Page) {
@@ -121,8 +118,8 @@ test('Im Textfeld bleibt das Browsermenü; das ⋮ im Kopf führt in die Lesefas
 test('Befehl: ⋮ und Rechtsklick auf den Abschnittskopf zeigen dieselben Einträge', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Befehl-Menü ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Befehl-Menü ${Date.now()}`);
   const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
     data: { vorlage: 'befehl_ladef', titel: 'Befehl Menü' },
   });

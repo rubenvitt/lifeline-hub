@@ -1,6 +1,7 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { pdfAuszug, pngMitMassen, type PdfSeite } from './pdf-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Druck im normalen Fluss: ein Druckstück (Lagebericht lesend und im Entwurf, Befehl) steht
@@ -43,12 +44,8 @@ const SUBPIXEL = 1;
 
 const ENDMARKE = 'ENDMARKE-LETZTER-ABSCHNITT';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -412,8 +409,8 @@ test('PDF-Auszug-Selbsttest: Text und Bilder je Seite', async ({ page, browserNa
 });
 
 test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss LB ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss LB ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, true);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
@@ -430,8 +427,8 @@ test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', 
 test('Lagebericht (Entwurf, Bearbeiten) druckt jeden Abschnitt vollständig als Markdown', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss LB-Entwurf ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss LB-Entwurf ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
@@ -448,8 +445,8 @@ test('Lagebericht (Entwurf, Bearbeiten) druckt jeden Abschnitt vollständig als 
 });
 
 test('Lagebericht (Entwurf, Lesefassung) druckt im normalen Fluss', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss LB-Lesefassung ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss LB-Lesefassung ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
@@ -466,8 +463,8 @@ test('Lagebericht (Entwurf, Lesefassung) druckt im normalen Fluss', async ({ pag
 test('Befehl (Entwurf) druckt im normalen Fluss, Abschnittstitel bleibt beim Text', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Befehl-Entwurf ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss Befehl-Entwurf ${Date.now()}`);
   const id = await befehlSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
@@ -483,8 +480,8 @@ test('Befehl (Entwurf) druckt im normalen Fluss, Abschnittstitel bleibt beim Tex
 test('Befehl (Entwurf) mit Verteiler: Druckkopf nennt ihn, das Feld fällt im Druck weg', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Verteiler ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss Verteiler ${Date.now()}`);
   const id = await befehlSaeen(page, einsatzId, false);
   const patch = await mitWiederholung(() =>
     page.request.patch(`/api/einsaetze/${einsatzId}/befehle/${id}`, {
@@ -514,8 +511,8 @@ test('Befehl (Entwurf) mit Verteiler: Druckkopf nennt ihn, das Feld fällt im Dr
 });
 
 test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Befehl ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss Befehl ${Date.now()}`);
   const id = await befehlSaeen(page, einsatzId);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
@@ -524,8 +521,8 @@ test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async
 });
 
 test('Auftrag druckt im normalen Fluss über mehrere Seiten (LLH-1171)', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Auftrag ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss Auftrag ${Date.now()}`);
   const id = await auftragSaeen(page, einsatzId);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/auftraege/${id}/druck`);
@@ -549,7 +546,7 @@ const LOGO = { breite: 97, hoehe: 41 };
 test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite 1', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const hoch = await mitWiederholung(() =>
     page.request.post('/api/organisation/logo', {
       multipart: {
@@ -562,7 +559,7 @@ test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite
     }),
   );
   expect(hoch.ok(), await hoch.text()).toBe(true);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Logo ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Druckfluss Logo ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, true);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
@@ -744,8 +741,8 @@ async function pruefeBildschirm(page: Page, fall: string) {
 
 test.describe('Lagebericht-Entwurf druckt die Lesefassung (LFH-498)', () => {
   test('Bearbeiten: acht Abschnitte je einmal, gerendert, vollständig', async ({ page }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Bearbeiten ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `E2E LFH-498 Bearbeiten ${Date.now()}`);
     const id = await lagebeurteilungSaeen(page, einsatzId);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
@@ -756,8 +753,8 @@ test.describe('Lagebericht-Entwurf druckt die Lesefassung (LFH-498)', () => {
   });
 
   test('Lesefassung: acht Abschnitte je einmal, gerendert, vollständig', async ({ page }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Lesefassung ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `E2E LFH-498 Lesefassung ${Date.now()}`);
     const id = await lagebeurteilungSaeen(page, einsatzId);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);

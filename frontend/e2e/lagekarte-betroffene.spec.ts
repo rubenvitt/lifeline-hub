@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kontoAnlegen } from './konto-anlegen';
 import { oeffneEbenenGruppe, zeigeLeistenAnsicht } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Ebene „Betroffene" auf der Lagekarte. Ob Personen in IHRER Quelle `marker-personen` landen,
 // dort untereinander clustern statt Kräfte-Marker zu schlucken, und ob ein Personen-Donut
@@ -23,11 +24,7 @@ interface MapHaken {
 }
 
 async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, benutzer, passwort);
 }
 
 async function abmelden(page: Page) {

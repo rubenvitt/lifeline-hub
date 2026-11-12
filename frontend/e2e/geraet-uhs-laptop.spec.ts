@@ -104,7 +104,7 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
   page,
   browser,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatz = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Stärke ${Date.now()}`,
   });

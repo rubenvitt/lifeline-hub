@@ -11,7 +11,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 test('Instanzkopplung: Identität sichtbar, Code ausstellen gesperrt mit Grund', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   await page.goto('/admin/einstellungen/instanzkopplung');
 
   const fingerabdruck = page.locator('[data-lfh="instanz-fingerabdruck"]');

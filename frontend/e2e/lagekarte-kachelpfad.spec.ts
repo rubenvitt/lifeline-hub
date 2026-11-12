@@ -5,6 +5,7 @@ import {
   vektorKachel,
   vektorStilBeantworten,
 } from './kartenFixture';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Der echte Kachel-Pfad der Lagekarte — die Hälfte, die `lagekarte-smoke.spec.ts` (ohne
 // Basemap, `blindStyle`) nicht abdeckt: „Style-JSON → substituierte Kachel-URL →
@@ -63,12 +64,8 @@ interface MapHaken {
   querySourceFeatures(id: string, optionen: { sourceLayer: string }): unknown[];
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Einsatz über die API. Kein Modulname im Namen: die Kommandopalette durchsucht Module und

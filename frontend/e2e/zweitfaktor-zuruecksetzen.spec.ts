@@ -12,7 +12,7 @@ import { zweitenFaktorEinrichten } from './totp-kern';
  */
 
 test('ein Admin setzt den zweiten Faktor einer Person zurück', async ({ page }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const person = await benutzerAnlegen(page, 'beobachter', 'E2E Telefon weg');
   const ohne = await benutzerAnlegen(page, 'beobachter', 'E2E Ohne Faktor');
   const baseURL = test.info().project.use.baseURL;

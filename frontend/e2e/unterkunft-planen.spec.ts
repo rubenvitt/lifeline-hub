@@ -43,7 +43,7 @@ async function halleEintragen(page: Page) {
 test('Stelle → Unterkunft planen → Kapazität übernehmen und Nachforderungen anlegen', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { einsatzId, stelleId } = await saeStelle(page);
 
   await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);
@@ -77,7 +77,7 @@ test('Stelle → Unterkunft planen → Kapazität übernehmen und Nachforderunge
 test('Einsatz-Einstellungen → Unterkunft: ein Richtwert des Einsatzes ändert das Ergebnis', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { einsatzId, stelleId } = await saeStelle(page);
 
   await page.goto(`/einsaetze/${einsatzId}/einstellungen/unterkunft`);

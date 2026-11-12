@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 import { pdfAuszug } from './pdf-kern';
 import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
 
@@ -85,8 +85,8 @@ test('das Blatt trägt Matrix, schwarze Marke und die Erläuterungen in der Folg
   page,
   browserName,
 }) => {
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gefahren-Druck ${Date.now()}`);
+  await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Gefahren-Druck ${Date.now()}`);
   const gebiet = await gebietAnlegen(page, einsatzId, 'Überflutung Unterstadt');
   // Absichtlich nicht in Matrixfolge angelegt: die Liste ordnet selbst.
   await bewerten(page, einsatzId, gebiet, {
@@ -202,8 +202,8 @@ test('das Blatt trägt Matrix, schwarze Marke und die Erläuterungen in der Folg
 });
 
 test('ohne Erläuterung fehlt der Teil auch auf dem Blatt', async ({ page }) => {
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gefahren-Druck leer ${Date.now()}`);
+  await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Gefahren-Druck leer ${Date.now()}`);
   const gebiet = await gebietAnlegen(page, einsatzId, 'Hangrutsch Kirchberg');
   await bewerten(page, einsatzId, gebiet, {
     gefahrentyp: 'einsturz',

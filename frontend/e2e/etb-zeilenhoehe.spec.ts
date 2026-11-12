@@ -95,7 +95,7 @@ test('kompakte Zeile: höchstens 56 px, mindestens 9 Einträge im Bild (Admin)',
 test('kompakte Zeile: höchstens 56 px, mindestens 9 Einträge im Bild (Beobachter)', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await saeen(page);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
   await page.goto(`/einsaetze/${einsatzId}/etb`);

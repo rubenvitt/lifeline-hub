@@ -162,7 +162,7 @@ for (const { dichte, hoehe, abstand } of [
   test(`Personal der Einheit übernehmen · ${dichte}: Kästchen ${hoehe} px, Abstand ≥ ${abstand} px`, async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const { einsatzId, post, put } = await seedEinsatz(page);
     const funkrufname = 'RTW 83-9';
     const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname } });

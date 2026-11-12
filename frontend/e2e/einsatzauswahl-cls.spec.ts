@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { EinsatzAnzeige } from '../src/api/types';
 import { beobachteShifts, bericht, leseShifts, ruheShifts, setzeShiftsZurueck } from './cls-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kriterium 12 der Prüfliste Einsatztauglichkeit („Kein Sprung unter dem Cursor") an der
@@ -91,12 +92,8 @@ function ladeTor(): { tor: Promise<void>; oeffne: () => void } {
   return { tor, oeffne };
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -216,7 +213,7 @@ test('Einsatzauswahl: der Ladewechsel Skelett → Karten hält den Kachelboden u
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await beobachteShifts(page);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const stempel = Date.now();
   const vorlage = await vorlageHolen(page, `E2E CLS ${stempel} Vorlage A`);
@@ -264,7 +261,7 @@ test('Einsatzauswahl: der Ladewechsel mit Suchfeld und drei Rasterreihen bleibt 
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await beobachteShifts(page);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const stempel = Date.now();
   const vorlage = await vorlageHolen(page, `E2E CLS ${stempel} Vorlage B`);
@@ -300,7 +297,7 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await beobachteShifts(page);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const stempel = Date.now();
   const vorlage = await vorlageHolen(page, `E2E CLS ${stempel} Vorlage C`);

@@ -36,7 +36,7 @@ export async function mitHandy<T>(
   });
   try {
     const page = await kontext.newPage();
-    await anmeldenAls(page, konto.benutzername, konto.passwort);
+    await anmeldenAls(page, konto.benutzername, konto.passwort, { startseite: false });
     // Vorbedingung: die Sitzung ist wirklich das gemeinte Konto (sonst mäße der Fall still als
     // Admin weiter).
     const ich = (await (await page.request.get('/api/auth/me')).json()) as { benutzername: string };

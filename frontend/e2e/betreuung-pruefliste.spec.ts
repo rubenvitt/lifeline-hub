@@ -1,6 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, randKontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Browser-Nachweise für die Prüfliste der Betreuungsseite `/einsaetze/:id/betreuung` und, seit
@@ -48,8 +50,6 @@ const GESPERRT_BODEN = 4.5;
 
 const FUEKW = { width: 1366, height: 600 };
 const HANDSCHIRM = { width: 390, height: 844 };
-const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
-
 const BEZIRKE = [
   {
     name: 'Deichweg 1–9',
@@ -107,12 +107,8 @@ const AUSLASTUNG = [
   { stelle: 'Schule am Markt', wort: 'überbelegt', rolle: 'alarm' },
 ] as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function senden<T = { id: number }>(
@@ -161,16 +157,6 @@ async function saeLage(page: Page, name: string) {
       await senden(page, 'post', `${basis}/stellen/${id}/belegungen`, { belegt: s.belegt });
   }
   return { einsatzId, bezirke, stellen };
-}
-
-/** Der Provider liest die gespeicherte Wahl beim Montieren, deshalb das Neuladen. */
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-    DICHTE_SCHLUESSEL,
-    dichte,
-  ] as const);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
 const bezirkZeile = (page: Page, id: number) => page.locator(`tr[data-row-key="bezirk-${id}"]`);
@@ -527,7 +513,7 @@ for (const [viewport, dichte] of [
   }, testInfo) => {
     test.setTimeout(150_000);
     await page.setViewportSize(viewport);
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
       bezeichnung: `E2E 677 Fokus ${Date.now()}`,
     });
@@ -540,8 +526,7 @@ for (const [viewport, dichte] of [
       });
       await senden(page, 'post', `${basis}/stellen/${id}/belegungen`, { belegt: 40 + i });
     }
-    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/betreuung`, dichte);
     await expect(page.getByRole('button', { name: /^Belegung melden für / })).toHaveCount(20);
 
     const berichte: string[] = [];
@@ -677,10 +662,9 @@ for (const fall of DIALOGE) {
   }, testInfo) => {
     test.setTimeout(90_000);
     await page.setViewportSize(HANDSCHIRM);
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const { einsatzId } = await saeLage(page, 'E2E 677 Dialogfokus');
-    await page.goto(`/einsaetze/${einsatzId}/${fall.seite}`);
-    await stelleDichte(page, 'handschuh');
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/${fall.seite}`, 'handschuh');
     if (fall.seite === 'betreuung')
       await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
         STELLEN.length,

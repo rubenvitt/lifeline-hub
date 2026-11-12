@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Große Listen (LFH-949): 1 000 Personen in der Datensicht. Im DOM steht nur der Ausschnitt um den
@@ -10,12 +11,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const FUEKW = { width: 1366, height: 768 };
 const MENGE = 1000;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {

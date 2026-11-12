@@ -14,7 +14,7 @@ async function senden<T = { id: number }>(page: Page, pfad: string, data?: unkno
 }
 
 test('Schnellwahl, Anzahl, Enter: „2× RTW → BR Nord“ an Karte und ETB', async ({ page }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `Nachforderung schnell ${Date.now()}`,
   });

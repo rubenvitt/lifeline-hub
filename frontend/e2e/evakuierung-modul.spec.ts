@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LLH-1034: „Evakuierung" ist ein eigenes Modul neben „Betreuung". Ein alter Link auf einen
@@ -9,12 +10,8 @@ import { expect, test, type Page } from '@playwright/test';
  * Bezirksdaten.
  */
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function senden<T = { id: number }>(page: Page, pfad: string, data: unknown): Promise<T> {
@@ -26,7 +23,7 @@ async function senden<T = { id: number }>(page: Page, pfad: string, data: unknow
 test('alter Bezirkslink unter Betreuung führt auf die Detailseite des Bezirks', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Evakuierungsmodul ${Date.now()}`,
   });

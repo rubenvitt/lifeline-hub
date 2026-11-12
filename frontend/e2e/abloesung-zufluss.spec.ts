@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Ablösung: eine FREMD angelegte Schicht verschiebt keine Karte, bis das Sammelbanner bedient
@@ -24,12 +26,8 @@ const KONTEXTE = [
   { name: 'mobil', viewport: { width: 390, height: 844 }, dichte: 'komfortabel' },
 ] as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -226,7 +224,7 @@ test.describe('fremde Rhythmusänderung', () => {
         const fest = berlinNaechste(uhr.stunde, uhr.minute);
         await page.clock.setFixedTime(fest);
         await page.setViewportSize(kontext.viewport);
-        await anmelden(page);
+        await anmelden(page, { startseite: false });
 
         const neu = await page.request.post('/api/einsaetze', {
           data: { bezeichnung: `E2E Umordnung ${kontext.name} ${Date.now()}` },
@@ -260,8 +258,7 @@ test.describe('fremde Rhythmusänderung', () => {
           );
         }
 
-        await page.goto(`/einsaetze/${einsatzId}/abloesung`);
-        await stelleDichte(page, kontext.dichte);
+        await ladeInDichte(page, `/einsaetze/${einsatzId}/abloesung`, kontext.dichte);
 
         const karten = page.locator('[data-lfh="abloesung-karte"]');
         const banner = page.locator('[data-lfh="sammelbanner"]');
@@ -361,7 +358,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
   test(`Ablösung (mobil, ${dichte}): der längste Rhythmus bleibt einzeilig`, async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
 
     const neu = await page.request.post('/api/einsaetze', {
       data: { bezeichnung: `E2E Rhythmuszeile ${dichte} ${Date.now()}` },
@@ -398,8 +395,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     );
     await post('abloesungen', { einheit_id: einheit.id }, 'Schicht');
 
-    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/abloesung`, dichte);
     const zeile = page.locator('[data-lfh="abloesung-rhythmus"]');
     await expect(zeile).toHaveText('Rhythmus 167:59 h (Vorgabe Einsatz)');
     await schriftenGeladen(page);

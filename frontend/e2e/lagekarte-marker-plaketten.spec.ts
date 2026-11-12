@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Namensplaketten an den Markern und Mono-Glyphen vom eigenen Glyphen-Server. Ob MapLibre die
 // Plaketten tatsächlich setzt (Kollision, Mindestzoom, `icon-text-fit`), sieht nur ein echter
@@ -22,12 +23,8 @@ interface MapHaken {
   queryRenderedFeatures(o: { layers: string[] }): unknown[];
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -93,7 +90,7 @@ async function plakettenBeiZoom(page: Page, zoom: number): Promise<number> {
 
 test('Marker tragen ihre Namensplakette erst ab Zoom 12, offline in Mono', async ({ page }) => {
   test.setTimeout(120_000);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { einsatzId, ersteId } = await einsatzMitEinheiten(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await page.waitForFunction(() =>

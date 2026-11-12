@@ -35,7 +35,7 @@ async function seedePerson(page: Page): Promise<string> {
 test('Entlassen aus der Ansicht legt die Kraft in den Block „Entlassen“, Rückgängig holt sie mit Zeitachse zurück', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await seedePerson(page);
   await page.goto(`/einsaetze/${einsatzId}/personal`);
   const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });

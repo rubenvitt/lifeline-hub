@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleIn, waehleStehend } from './auswahl-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi as einsatzOhneDialog } from './einsatz-kern';
 import { wechsleZuRolle } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Die Personen-Detailseite als Vollseiten-Route (LLH-1094/LLH-1129, Spec `personen-detail`):
 // eine Spalte mit dem Patientenkopf zuerst, Nachsichten ohne Dialog, Bezüge als eine Liste.
@@ -14,12 +15,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const TABLET_QUER = { width: 1280, height: 800 };
 const DESKTOP = { width: 1440, height: 900 };
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Seeding per `page.request` (Cookie-Jar geteilt). */
@@ -41,8 +38,8 @@ function patientenkopf(page: Page) {
 test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf beginnt', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Personen ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzOhneDialog(page, `E2E Personen ${Date.now()}`);
 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   // Der Seitentitel heißt „Betroffene"; die Route bleibt `personen`.
@@ -100,7 +97,7 @@ test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlas
   page,
 }) => {
   test.slow();
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Personendaten ${Date.now()}`);
   const person = await senden(page, `/api/einsaetze/${e}/personen`, { name: 'Claasen' });
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
@@ -154,7 +151,7 @@ test('Patientenkopf bei 1280 × 800 und 1440 × 900 ohne Bildlauf ganz im Bild, 
   page,
 }) => {
   test.slow();
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Patientenkopf ${Date.now()}`);
   const uhs = await senden(page, `/api/einsaetze/${e}/uhs`, {
     typ: 'behandlungsplatz',
@@ -344,7 +341,7 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
 test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E PAT-Paneele ${Date.now()}`);
   const person = await senden<{ id: number; registrier_nr: number }>(
     page,
@@ -444,7 +441,7 @@ test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben
 });
 
 test('Nachsichten im Patientenkopf ohne Dialog', async ({ page }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Nachsichten ${Date.now()}`);
   const person = await senden(page, `/api/einsaetze/${e}/personen`, {
     antreff_ort: 'Brücke',
@@ -480,7 +477,7 @@ test('Nachsichten im Patientenkopf ohne Dialog', async ({ page }) => {
 test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (LLH-1566)', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Anlass ${Date.now()}`);
   await page.goto(`/einsaetze/${e}/personen`);
 
@@ -516,7 +513,7 @@ test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (
 test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „Halter von …"', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Bezüge ${Date.now()}`);
   const person = await senden(page, `/api/einsaetze/${e}/personen`, {
     name: 'Halterin',
@@ -651,7 +648,7 @@ for (const { viewport, dichten } of KOERPERSCHEMA_WAHL_FAELLE) {
 test('Patientenkopf bei 390 × 844 mit Schreibrecht und PAT-Zeile: Sichtung, Zustand, Aufenthalt im ersten Bild', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Kopf Handy ${Date.now()}`);
   const uhs = await senden(page, `/api/einsaetze/${e}/uhs`, {
     typ: 'behandlungsplatz',

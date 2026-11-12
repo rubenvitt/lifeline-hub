@@ -12,7 +12,8 @@
 //! - Fristen einer Ablösungsschicht: `abloesung_vorwarnung` bzw. `abloesung_faellig` an alle mit
 //!   dem Modul Ablösung. Keine zweite Benachrichtigung als Erinnerung. Ist die Schicht laut Plan
 //!   fällig (LLH-1555 Welle 3), meldet sich ihr Zeitpunkt (`schichtplan_wechsel`) statt ihrer,
-//!   einmal für alle Schichten, die zu ihm wechseln. Der Planungshinweis
+//!   einmal für alle Schichten, die zu ihm wechseln, und nur mit der Vorwarnung: Die Fälligkeit
+//!   schweigt, wenn die Vorwarnung der Schicht schon ausgelöst hat. Der Planungshinweis
 //!   (LLH-1131) meldet `abloesung_planung` ebenso, aber nur, solange die Schicht läuft und keine
 //!   ablösende Einheit geplant ist.
 //! - Jede andere Erinnerung, auch eine von Hand mit Bezug auf Meldung oder Auftrag:
@@ -92,10 +93,16 @@ async fn anlass(pool: &SqlitePool, f: &FaelligeErinnerung) -> Result<Option<Anla
                 BenachrichtigungArt::AbloesungVorwarnung
             };
             match wechsel_laut_plan(pool, f.einsatz_id, id).await? {
+                // Laut Plan kein zweiter Hinweis zum Zeitpunkt selbst (LLH-1555, Ruben 12.11.):
+                // Wer die Vorwarnung bekam, sieht die Fälligkeit in der Leiste. Nur eine Schicht,
+                // deren Vorwarnung nie ausgelöst hat (zu spät hinzugekommen), meldet ihn.
+                Some(_) if typ == OBJEKT_ABLOESUNG && vorwarnung_ausgeloest(pool, id).await? => {
+                    None
+                }
                 // Laut Plan: einmal je Zeitpunkt (LLH-1555 Welle 3, EEMUA 191). Die erste Frist
                 // des Zeitpunkts meldet, jede weitere findet ihn offen gemeldet und schweigt: der
                 // Text zählt sie beim Lesen mit. Ist der Hinweis schon quittiert, meldet eine
-                // später hinzugekommene Schicht ihn neu, statt ohne Alarm fällig zu werden.
+                // später hinzugekommene Schicht ihn neu, statt ohne Hinweis fällig zu werden.
                 Some(minute) => {
                     let offen = benachrichtigung::repo::offen_zum_bezug(
                         pool,
@@ -172,6 +179,22 @@ async fn wechsel_laut_plan(
         .as_deref()
         .and_then(crate::zeit::parse_utc)
         .map(|t| t.timestamp().div_euclid(60)))
+}
+
+/// Ob die offene Vorwarn-Frist einer Schicht schon ausgelöst hat. Eine verschobene Schicht stellt
+/// die Frist neu (`zuletzt_ausgeloest_at` leer) oder schließt sie, wenn die Vorwarnzeit schon
+/// vorbei ist: beides zählt als nicht gewarnt.
+async fn vorwarnung_ausgeloest(pool: &SqlitePool, id: i64) -> Result<bool, AppError> {
+    let r: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ? \
+           AND zuletzt_ausgeloest_at IS NOT NULL",
+    )
+    .bind(OBJEKT_ABLOESUNG_VORWARNUNG)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(r.is_some())
 }
 
 /// Ob der Planungshinweis einer Schicht noch gilt (LLH-1131): sie läuft, und weder die

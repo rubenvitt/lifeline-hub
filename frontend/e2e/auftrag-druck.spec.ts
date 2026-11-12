@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
 import { ADMIN, ADMIN_PW, anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 
 /**
  * Druckansicht eines Auftrags gegen einen echten Server (LLH-1171, Change
@@ -40,14 +40,14 @@ test('Beobachter öffnet die Druckansicht aus dem Detail; am Handy bleibt das Bl
   browser,
   browserName,
 }) => {
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Auftragsdruck ${Date.now()}`);
+  await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Auftragsdruck ${Date.now()}`);
   const auftragId = await auftragSaeen(page, einsatzId);
   const beobachter = await benutzerAnlegen(page, 'beobachter');
   await mitgliedEintragen(page, einsatzId, beobachter.id, 'beobachter');
 
   // ── Ohne Schreibrecht: aus dem Detail in die Druckansicht und zurück.
-  await anmeldenAls(page, beobachter.benutzername, beobachter.passwort);
+  await anmeldenAls(page, beobachter.benutzername, beobachter.passwort, { startseite: false });
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto(`/einsaetze/${einsatzId}/auftraege?auftrag=${auftragId}`);
   const detail = page.locator('[data-lfh="liste-detail-detail"]');

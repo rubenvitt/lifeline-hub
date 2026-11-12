@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Chat-Layout und Auftragsseite auf dem Handschirm: bleibt das Eingabefeld sichtbar, wenn der
@@ -15,12 +16,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 const SCHMAL = { width: 390, height: 844 };
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Waagerechter Überstand des Dokuments. `<= 0` heißt: kein Querscrollen. */
@@ -31,8 +28,8 @@ async function ueberstand(page: Page): Promise<number> {
 test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absenden', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Chat ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Chat ${Date.now()}`);
 
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/chat`);
@@ -123,8 +120,8 @@ test('Chat: der Hinweis ersetzt die Eingabe und bleibt bei langem Strom sichtbar
 test('Chat: unter md trägt eine Segmentleiste die Kanäle, nicht die Seitenspalte', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Chat Kanäle ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Chat Kanäle ${Date.now()}`);
 
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/chat`);
@@ -167,8 +164,8 @@ test('Chat: unter md legt das Führungspersonal einen Kanal über die Leiste an'
   page,
 }) => {
   test.slow();
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Chat Kanal anlegen ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Chat Kanal anlegen ${Date.now()}`);
   await vieleKanaeleSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
 
@@ -204,8 +201,8 @@ test('Chat: unter md fehlt dem Beobachter die Kanalanlage, die Leiste läuft nic
   page,
 }) => {
   test.slow();
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Chat Kanal lesend ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Chat Kanal lesend ${Date.now()}`);
   await vieleKanaeleSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
@@ -227,8 +224,8 @@ test('Chat: unter md fehlt dem Beobachter die Kanalanlage, die Leiste läuft nic
 });
 
 test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Auftraege ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Auftraege ${Date.now()}`);
 
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);

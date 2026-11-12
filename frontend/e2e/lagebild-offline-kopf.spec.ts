@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Offline-Kennzeichnung im Seitenkopf bei 390 px (LFH-723, design.md D7, Aufgabe 6.3).
@@ -19,18 +21,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er ist', async ({
@@ -39,7 +31,7 @@ test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er 
 }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `Offline Kopf 723 ${Date.now()}` },
   });
@@ -57,8 +49,7 @@ test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er 
     { name: 'Lagekarte', pfad: `/einsaetze/${id}/lagekarte` },
   ]) {
     for (const dichte of ['kompakt', 'handschuh'] as const) {
-      await page.goto(route.pfad);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, route.pfad, dichte);
       const kopf = page.locator('[data-lfh="seitenkopf"]').first();
       const stand = kopf.getByText(/^Stand \d{4}$/);
       await expect(stand).toBeVisible({ timeout: 30_000 });
