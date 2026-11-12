@@ -209,6 +209,8 @@ const erfassung = (teil: Partial<BruchErfassung>): BruchErfassung => ({
   kurz: 'Nach dem Bruch',
   verborgen: false,
   folgen: 0,
+  folgen_offen: 0,
+  nachgereicht: false,
   gesichert_at: '2026-11-10 10:00:00',
   ...teil,
 });
@@ -328,6 +330,44 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
     expect(
       within(liste).getByText('1 nicht gestellt: Bezug noch nicht beim Führer.'),
     ).toBeInTheDocument();
+  });
+
+  it('eine gestellte Person mit folgenden Einträgen steht ohne Knöpfe da; ein zurückgekommener Eintrag nennt seinen Grund (LLH-1657)', async () => {
+    mitBruchServer([
+      erfassung({
+        id: 5,
+        tabelle: 'einsatz_person',
+        kategorie: 'personen',
+        antrag_art: null,
+        typ: null,
+        von: null,
+        kurz: 'Muster, Max',
+        folgen: 4,
+        folgen_offen: 3,
+        nachgereicht: true,
+      }),
+      erfassung({
+        id: 6,
+        tabelle: 'person_massnahme',
+        kategorie: 'personen',
+        antrag_art: 'massnahme',
+        typ: null,
+        von: null,
+        kurz: 'Blutstillung',
+        grund: 'Abgelehnt.',
+      }),
+    ]);
+    const { zeilen } = await bruchAufklappen(
+      einsatzFixture({ spiegel: spiegel({ bruchstelle: 1 }) }),
+    );
+    expect(zeilen[0]).toHaveTextContent('Person');
+    expect(zeilen[0]).toHaveTextContent('Muster, Max');
+    expect(zeilen[0]).toHaveTextContent('3 Einträge folgen');
+    expect(within(zeilen[0]).queryByRole('button')).toBeNull();
+    expect(zeilen[1]).toHaveTextContent('Maßnahme');
+    expect(zeilen[1]).toHaveTextContent('Abgelehnt.');
+    expect(within(zeilen[1]).getByRole('button', { name: 'Als Antrag stellen' })).toBeEnabled();
+    expect(within(zeilen[1]).getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
   });
 
   it('ohne zweite stellbare Erfassung kein „Alle stellen“', async () => {

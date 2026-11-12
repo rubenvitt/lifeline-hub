@@ -3401,6 +3401,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("antrag_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("client_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("nachgereicht_als", Strategie::ZeileLoeschen, Z_EINSATZ),
+            // Personen samt Verlauf (LLH-1657).
+            scrub("grund", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("notiz_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {

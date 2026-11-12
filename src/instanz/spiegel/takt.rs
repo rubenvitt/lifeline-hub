@@ -141,6 +141,22 @@ pub async fn durchlauf(
             );
         }
     }
+    // Ketten der Bruchstelle (LLH-1657, K1): Einträge einer nachgereichten Person, die jetzt
+    // zurück ist, gehen als Antrag; nach dem Abgleich, damit eine eben angekommene Person zählt.
+    match super::bruchstelle::ketten_fortsetzen(pool).await {
+        Ok(einsaetze) if !einsaetze.is_empty() => {
+            abgleich::melde_live(
+                pool,
+                &abgleich::Uebernommen {
+                    einsaetze,
+                    neu: Vec::new(),
+                },
+            )
+            .await;
+        }
+        Ok(_) => {}
+        Err(e) => tracing::warn!(error = %e, "Spiegel: Ketten der Bruchstelle nicht fortgesetzt"),
+    }
     Ok(())
 }
 

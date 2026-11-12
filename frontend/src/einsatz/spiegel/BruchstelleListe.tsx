@@ -13,16 +13,24 @@ import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { monoStil, useRollen } from '../../components/instrument';
 import { darfBeantragen, darfNachreichenVerwerfen } from '../schreibrecht';
-import { bruchArtWort, bruchFolgenText, bruchOffenText, bruchStellbar } from './bruchstelleText';
+import {
+  bruchArtWort,
+  bruchFolgenText,
+  bruchKetteText,
+  bruchOffenText,
+  bruchStellbar,
+} from './bruchstelleText';
 
 /** Ab so vielen Einträgen rollt die Liste in sich (N4). */
 const SICHTBARE_ZEILEN = 8;
 
 /**
  * Nicht übernommene Erfassungen am Spiegel nach einer Notübernahme (LLH-1646, Entwurf N1–N6):
- * eine Zeile je Erfassung, nach Zeit. ETB-Einträge und Meldungen lassen sich als Antrag an den
+ * eine Zeile je Erfassung, nach Zeit. ETB-Einträge, Meldungen und Personen lassen sich als Antrag an den
  * Führer stellen (einzeln oder „Alle stellen“ ab zwei), jede Erfassung lässt sich nach Rückfrage
- * verwerfen. Ohne Freigabe des Moduls steht die Zeile ohne Inhalt und ohne Knöpfe da.
+ * verwerfen. Ohne Freigabe des Moduls steht die Zeile ohne Inhalt und ohne Knöpfe da. Eine
+ * gestellte Person, deren Einträge noch folgen, steht ohne Knöpfe da (LLH-1657); ein Eintrag,
+ * der aus ihrer Kette zurück ist, zeigt seinen Grund.
  *
  * Nach Stellen und Verwerfen lädt sie sich und den Kopf (Zähler im Band) neu; die Anträge kommen
  * über das Ereignis der Antragsroute in die Warteschlange.
@@ -133,6 +141,7 @@ function BruchZeile({
     onSuccess: neuLaden,
   });
   const folgen = bruchFolgenText(e.folgen);
+  const kette = bruchKetteText(e);
   const zeit = e.zeit ?? e.gesichert_at;
   return (
     <li
@@ -156,7 +165,13 @@ function BruchZeile({
       )}
       {!e.verborgen && e.kurz && <span>{e.kurz}</span>}
       {folgen && <span style={{ color: rollen.text2 }}>{folgen}</span>}
-      {!e.verborgen && (darfStellen || darfVerwerfen) && (
+      {e.grund && <Typography.Text type="warning">{e.grund}</Typography.Text>}
+      {kette && (
+        <span style={{ color: rollen.text2, marginInlineStart: 'auto' }} data-lfh="spiegel-kette">
+          {kette}
+        </span>
+      )}
+      {!e.verborgen && !e.nachgereicht && (darfStellen || darfVerwerfen) && (
         <span style={{ display: 'inline-flex', gap: token.marginXS, marginInlineStart: 'auto' }}>
           {darfStellen && bruchStellbar(e) && (
             <Button loading={stellen.isPending} onClick={() => stellen.mutate()}>

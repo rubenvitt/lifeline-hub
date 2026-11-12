@@ -117,9 +117,9 @@ pub(super) async fn einspielen(quelle: Migrator, pool: &SqlitePool) -> Result<()
         "PRAGMA foreign_keys = ON"
     };
 
-    // `run_direct` statt `run`/`run_to`: deren `Acquire`-Grenze über `&mut conn` ist für den
-    // Compiler nicht allgemein `Send`, und `db::migrate` läuft auch im gespawnten Purge-Lauf
-    // (Archivbau, `einsatz::archiv::bauen`).
+    // `run_direct` statt `run`/`run_to`: deren `Acquire<'a>` macht den Lauf in einem
+    // `tokio::spawn` (Archivbau im Purge-Takt) zu „`Send` is not general enough“; sqlx bietet
+    // `run_direct` genau dafür an. Gleiches Verhalten: `run_to` ruft es mit derselben Verbindung.
     let ergebnis = async {
         for (version, r) in &einteilung {
             if *r != (Rahmen::Atomar { fk_aus: true }) {
@@ -340,17 +340,6 @@ PRAGMA foreign_keys = ON;
 
     /// Der Fehler, um den es geht: sqlx allein lässt nach einem SQL-Fehler `eltern_neu` stehen,
     /// und auch mit berichtigten Daten scheitert jeder weitere Lauf.
-    /// `db::migrate` läuft auch im gespawnten Purge-Lauf (Archivbau): der Future muss für jede
-    /// Lebensdauer `Send` sein, sonst baut die Bibliothek nicht (Merge von LLH-1659 und LLH-1494).
-    #[tokio::test]
-    async fn migrate_laeuft_in_einem_gespawnten_task() {
-        let pool = crate::db::test_pool().await;
-        tokio::spawn(async move { crate::db::migrate(&pool).await })
-            .await
-            .unwrap()
-            .unwrap();
-    }
-
     #[tokio::test]
     async fn sqlx_allein_hinterlaesst_halben_umbau() {
         let (_dir, pool) = datei_pool().await;

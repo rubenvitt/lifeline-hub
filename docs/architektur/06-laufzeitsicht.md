@@ -395,7 +395,13 @@ sequenceDiagram
   ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
   Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
   kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine
-  Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`). Jede Schwärzung beim
+  Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`). Personen gehen samt Verlauf
+  (LLH-1657): Folge einer Person ist nur, was über `person_id` an ihr hängt (`URSPRUNG`), dazu
+  ihre Systemeinträge im ETB; die Person selbst, ihr Haushalt und ihre UHS-Aufnahme sind immer
+  eigene Erfassungen. Gestellt wird die Person; ist sie beim Spiegel zurück
+  (`spiegel_herkunft`), stellt `bruchstelle::ketten_fortsetzen` im Takt ihre Einträge in
+  Zeitfolge mit dem Pfad auf die Person hier, danach einmal die Nachreich-Notiz (`notiz_at`). Ein
+  abgelehnter oder nicht stellbarer Eintrag löst sich mit `grund` aus der Kette. Jede Schwärzung beim
   Führer (Kategorie, Löschersuchen je Person, ganzer Einsatz) löscht dort die Bruchstelle und setzt
   `einsatz.schwaerzung_marke` neu (Zufallswert); bringt der Kopf am Spiegel eine andere Marke,
   räumt auch er seine Bruchstelle (`fuehrung::raeume_bruchstelle`, LLH-1649): Alle Kopien und
