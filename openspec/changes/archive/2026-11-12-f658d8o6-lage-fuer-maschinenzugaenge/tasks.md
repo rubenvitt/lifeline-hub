@@ -75,7 +75,7 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 
 ## 9. Integration
 
-- [ ] 9.1 `./scripts/check-all.sh` ohne `| tail` grün (oder der CI-Lauf des PRs, dann mit Verweis auf den Lauf abhaken)
+- [x] 9.1 `./scripts/check-all.sh` ohne `| tail` grün: belegt der CI-Lauf des PRs zum Branch `claude/clever-davinci-43ghos` (lokal nicht als Ganzes fahrbar: in der Cloud-Sitzung fehlt `mise`; die Bereichssuiten liefen einzeln, siehe PR, „Geprüft“)
 - [x] 9.2 Handprobe am laufenden System: Anbindung anlegen, `lifeline-hub zugang redeem`, Einsatz freigeben, `lifeline-hub zugang lage` zeigt den Einsatz; Freigabe beenden zeigt `einsatz: null`; Bilder des Paneels „Anbindungen“ und der Seite „Anbindungen“ für PR und Meldung aufnehmen
 
 ## Workflow follow-up

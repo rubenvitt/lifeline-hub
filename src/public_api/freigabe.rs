@@ -9,7 +9,7 @@
 //!
 //! Die Tabelle gilt an der Instanz, an der der Zugang angelegt ist, und wird nicht gespiegelt
 //! (`instanz::spiegel::art::AUSGENOMMEN`). Herleitung:
-//! `openspec/changes/f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D2, D3).
+//! `openspec/changes/archive/2026-11-12-f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D2, D3).
 
 use super::scope::{Scope, ZugangZustand};
 use super::zugang::{self, Zugang};

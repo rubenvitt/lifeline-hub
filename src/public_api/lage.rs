@@ -9,7 +9,8 @@
 //!
 //! Alle Typen hier sind eigene v1-Schemas. Enums werden mit erschöpfendem `From` aus den internen
 //! abgebildet: ein neuer interner Wert bricht den Build, statt still im Vertrag zu erscheinen.
-//! Herleitung: `openspec/changes/f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D1, D6–D8).
+//! Herleitung:
+//! `openspec/changes/archive/2026-11-12-f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D1, D6–D8).
 
 use super::error::ApiError;
 use super::freigabe;

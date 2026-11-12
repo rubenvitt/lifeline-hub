@@ -8,7 +8,7 @@ gilt_fuer:
   - src/routes/einsatz_anbindungen.rs
   - src/routes/leitung_freigabe.rs
 herleitung:
-  - openspec/changes/f658d8o6-lage-fuer-maschinenzugaenge/design.md
+  - openspec/changes/archive/2026-11-12-f658d8o6-lage-fuer-maschinenzugaenge/design.md
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 
