@@ -243,3 +243,22 @@ Beispiele:
 - `72bb0dcc`: ADR-0023 verwies für die Idempotenz auf ADR-0022, das dazu keine Regel hat.
 - `ae50df0b`: Das Kapitel nannte „alle Knöpfe“, gemeint waren nur die der Aktionszeile; die
   `quellen` nannten die neuen Stellen nicht.
+
+## 11. Shell unter `set -euo pipefail`
+
+**Trifft zu, wenn** der Diff Bash-Skripte, Selbsttests oder `run:`-Blöcke in Workflows ändert.
+
+- Endet in einer Pipe der Leser vor dem Schreiber (`grep -q`, `head`, `awk … { exit }`)? Dann
+  bekommt der Schreiber SIGPIPE, und unter `pipefail` endet die Pipe mit 141: als Zuweisung
+  bricht das Skript ab, in einer Bedingung kippt sie still. Lokal trifft das Rennen oft nicht,
+  auf dem Runner schon. Here-String (`<<<`) oder Leser, der bis zum Ende liest.
+- Steht ein Befehl, dessen Fehlschlag zählt, in einer Bedingung (`if`, `||`, `&&`), wo `set -e`
+  nicht greift?
+- Scheitert eine Option ohne Wert (`shift 2` am Ende der Argumente) stumm mit Exit 1 statt mit dem
+  versprochenen Aufruffehler?
+
+Beispiele:
+
+- `7a796607`: `job_if` las den e2e-Job über eine Pipe, das hintere awk brach mit `exit` ab;
+  Schritt 11 war auf dem Runner rot mit Exit 141, lokal grün.
+- `94255ef2`: `--bis` ohne Wert endete per `shift 2` stumm mit Exit 1 statt Exit 2.

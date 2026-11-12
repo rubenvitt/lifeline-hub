@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runner-Wahl für `e2e-Binary` und die e2e-Shards (LLH-1666, Spec `ci-eigener-runner`, ADR zum
-# eigenen Runner). Aufruf aus dem Job `aenderungen` in `.github/workflows/ci.yml`:
+# eigenen Runner). Aufruf aus dem Job `aenderungen` in `.github/workflows/e2e.yml`:
 #
 #   select-runner.sh <ereignis> <kopf-repo> <repo> <label>
 #
@@ -8,7 +8,7 @@
 # Das Label nur, wenn es gesetzt ist und der Lauf kein Pull Request aus einem anderen Repository
 # ist; jedes andere oder unbekannte Ereignis als `push` und `pull_request` bleibt auf GitHub.
 #
-# KEINE SICHERHEITSGRENZE: Ein Fork-PR kann `ci.yml` ändern und das Label selbst eintragen. Die
+# KEINE SICHERHEITSGRENZE: Ein Fork-PR kann `e2e.yml` ändern und das Label selbst eintragen. Die
 # Grenze ist die Fork-Freigabe im Repo („Require approval for all external contributors“). Die
 # Weiche sorgt nur dafür, dass das Repo selbst nie fremden Code auf den Server schickt.
 set -euo pipefail
