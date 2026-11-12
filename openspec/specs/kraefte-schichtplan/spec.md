@@ -213,8 +213,10 @@ Zeitpunkt wählen.
 
 ### Requirement: Ein Hinweis je Zeitpunkt
 Schichten, die laut Plan zum selben Zeitpunkt fällig sind, SHALL das System gebündelt melden: die
-Vorwarnung und die Fälligkeit MUST es je Zeitpunkt einmal melden (Bezug `schichtplan_wechsel`, der
-Zeitpunkt in Minuten seit 1970), nicht je Schicht (EEMUA 191). Die Detailzeile MUST die Zahl der
+Vorwarnung MUST es je Zeitpunkt einmal melden (Bezug `schichtplan_wechsel`, der Zeitpunkt in
+Minuten seit 1970), nicht je Schicht (EEMUA 191). Zum Zeitpunkt selbst MUST NOT ein zweiter Hinweis
+kommen für Schichten, deren Vorwarnung ausgelöst hat; nur eine Schicht ohne ausgelöste Vorwarnung
+(ihre Vorwarnzeit war beim Anlegen schon vorbei) MUST ihn mit der Fälligkeit melden. Die Detailzeile MUST die Zahl der
 Wechsel und die Uhrzeit nennen („15 Wechsel um 1400“), bei einem einzigen Wechsel die Einheit wie
 bei einer Schicht. Der Sprung MUST in den Schichtplan auf den Zeitpunkt führen
 (`?ansicht=plan&wechsel=`). Kommt eine Schicht zu einem Zeitpunkt hinzu, dessen Hinweis noch
@@ -226,7 +228,11 @@ UHS und Pause haben keine Frist und melden sich nicht.
 
 #### Scenario: 15 Posten um 14:00
 - **WHEN** 15 Einheiten laut Plan um 14:00 wechseln
-- **THEN** bekommt jeder Leser der Ablösung um 13:30 eine Vorwarnung und um 14:00 einen Alarm „Ablösung fällig“ mit „15 Wechsel um 1400“, nicht je 15
+- **THEN** bekommt jeder Leser der Ablösung um 13:30 eine Vorwarnung mit „15 Wechsel um 1400“, nicht 15, und um 14:00 keinen zweiten Hinweis
+
+#### Scenario: Schicht ohne Vorwarnung
+- **WHEN** um 13:50 eine Einheit mit Block bis 14:00 hinzukommt und die Vorwarnzeit 30 min beträgt
+- **THEN** meldet um 14:00 „Ablösung fällig“ den Zeitpunkt, mit allen offenen Wechseln gezählt
 
 ### Requirement: Austauschformat
 Das System SHALL einen Schichtplan aus einer Datei lesen können, als Excel (`.xlsx`) oder CSV,
