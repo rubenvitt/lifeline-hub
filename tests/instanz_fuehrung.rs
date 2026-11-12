@@ -566,11 +566,35 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     let v = hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ohne Verbindung seit 40 min").await;
     assert_eq!(v["fuehrend"], true);
     assert_eq!(v["epoche"], 2);
-    elw_meldet(&elw).await;
+    // Drei Meldetakte, bevor jemand entscheidet (LLH-1671): Die offene Übernahme pendelt nicht,
+    // die Bruchstelle bleibt die letzte Meldung vor der ersten, es gibt genau eine
+    // Benachrichtigung. Die Meldezeit wird je Takt gesetzt, sonst lägen alle in derselben Sekunde.
+    const BRUCH: &str = "2026-01-01 10:00:00";
+    for zuletzt in [BRUCH, "2026-01-01 10:01:00", "2026-01-01 10:02:00"] {
+        sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
+            .bind(zuletzt)
+            .execute(&elw.pool)
+            .await
+            .unwrap();
+        elw_meldet(&elw).await;
+    }
     let f = fuehrung(&elw, e).await;
     assert_eq!(f["fuehrend"], true, "der ELW gibt nie still ab");
     assert_eq!(f["offen"]["grund"], "ELW ohne Verbindung seit 40 min");
     assert_eq!(f["offen"]["epoche"], 2);
+    assert_eq!(
+        f["offen"]["bruch_at"], BRUCH,
+        "die Bruchstelle wandert nicht mit jeder Meldung"
+    );
+    assert_eq!(
+        benachrichtigungen(&elw.pool)
+            .await
+            .iter()
+            .filter(|a| *a == "fuehrung_uebernommen")
+            .count(),
+        1,
+        "eine offene Übernahme meldet sich einmal, nicht je Meldetakt"
+    );
     assert!(f["offen"]["unterzeichner"].as_str().is_some());
     let (s, _) = etb(&elw, e).await;
     assert_eq!(
@@ -599,11 +623,11 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["fuehrend"], false);
-    assert!(v["bruch_at"].as_str().is_some());
+    assert_eq!(v["bruch_at"], BRUCH);
     let verlauf = v["verlauf"].as_array().unwrap();
     let letzter = verlauf.last().unwrap();
     assert_eq!(letzter["art"], "bestaetigt");
-    assert!(letzter["bruch_at"].as_str().is_some());
+    assert_eq!(letzter["bruch_at"], BRUCH);
     ist_spiegel_mit_antraegen(&elw, e).await;
     assert!(aktionen(&elw.pool)
         .await
