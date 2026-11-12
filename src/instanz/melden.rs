@@ -596,7 +596,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             // Rückschritt des eigenen Zählers (D3): Wer selbst zurückgespielt wurde, hebt ihn über
             // die Quittung. Neu zu stempeln braucht diese Seite nichts, sie sendet ab ihrem
             // eigenen `gesendet_bis`, und das Gegenüber nimmt jeden plausiblen Stand an.
-            if a.fuehrung_bis <= fuehrung_austausch::STAND_HEBEN_MAX {
+            if a.fuehrung_bis <= fuehrung_austausch::STAND_RAISE_MAX {
                 fuehrung_repo::raise_stand(conn, a.fuehrung_bis).await?;
             }
             if let Some(h) = &eingang.hinweis {

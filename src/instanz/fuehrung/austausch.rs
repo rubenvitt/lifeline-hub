@@ -37,13 +37,14 @@ const ERKLAERUNG_MAX: usize = 4096;
 /// Größter Zähler einer gelieferten Epoche: weit über jedem echten Verlauf, weit unter dem
 /// Überlauf (`Epoche::naechste` rechnet plus eins).
 const ZAEHLER_MAX: i64 = 1 << 40;
-/// Größter Stand einer gelieferten Akte (LLH-1672): Stände zählen je Änderung eins hoch, wie
-/// Epochen weit darüber; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
+/// Größter Stand einer gelieferten Akte (LLH-1672): Stände folgen den Unix-Sekunden und zählen
+/// je Änderung mindestens eins hoch (LLH-1708, `repo::next_stand`), um 2026 also bei 1,8 · 10⁹,
+/// weit darunter; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
 const STAND_MAX: i64 = 1 << 40;
 /// Bis hierher darf eine Quittung des Gegenübers den eigenen Zähler heben (LLH-1708, design.md
 /// D3): Eine gekoppelte Seite soll ihn nicht bis an [`STAND_MAX`] treiben können, ab dem jede
 /// weitere Akte abgelehnt würde.
-pub const STAND_HEBEN_MAX: i64 = STAND_MAX / 2;
+pub const STAND_RAISE_MAX: i64 = STAND_MAX / 2;
 /// Länge eines Prüfwerts aus dem Abgabecode (HMAC-SHA256, Base64url: 43 Zeichen) mit Luft.
 const PRUEFWERT_MAX: usize = 64;
 /// Größte Akte in Byte (JSON), die hinausgeht: passt in jede Meldung ([`MELDUNG_BYTES`]) und
@@ -730,7 +731,7 @@ pub async fn repair_stand(
     kopplung: &KopplungZeile,
     quittung: i64,
 ) -> Result<Option<String>, AppError> {
-    if !(1..=STAND_HEBEN_MAX).contains(&quittung) || quittung <= repo::load_stand(conn).await? {
+    if !(1..=STAND_RAISE_MAX).contains(&quittung) || quittung <= repo::load_stand(conn).await? {
         return Ok(None);
     }
     let (gesendet, _) = repo::load_kopplung_staende(conn, kopplung.id).await?;

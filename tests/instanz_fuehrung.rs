@@ -4205,7 +4205,7 @@ async fn zurueckspielen(i: &Instanz, stand: i64, gesendet: i64, empfangen: i64) 
 
 /// Kennt `i` die Akte des Einsatzes `einsatz` der Instanz `ursprung`? (Kennung
 /// `<Instanz>/<Einsatz-ID>-<Zufall>`.)
-async fn kennt(i: &Instanz, ursprung: &Instanz, einsatz: i64) -> bool {
+async fn has_akte(i: &Instanz, ursprung: &Instanz, einsatz: i64) -> bool {
     sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz_fuehrung WHERE kennung LIKE ?")
         .bind(format!("{}/{einsatz}-%", ursprung.kennung))
         .fetch_one(&i.pool)
@@ -4246,10 +4246,10 @@ async fn zurueckgespielt_hub_neue_einsaetze_erreichen_den_elw() {
     akten_anlegen(&hub).await;
     nur_melden(&elw).await;
     assert!(
-        kennt(&elw, &hub, a).await,
+        has_akte(&elw, &hub, a).await,
         "der erste Einsatz nach dem Zurückspielen"
     );
-    assert!(kennt(&elw, &hub, b).await);
+    assert!(has_akte(&elw, &hub, b).await);
 }
 
 #[tokio::test]
@@ -4257,7 +4257,7 @@ async fn zurueckgespielt_hub_bekommt_die_verlorene_akte_des_elw_erneut() {
     let (hub, elw) = gekoppelt().await;
     let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
     nur_melden(&elw).await;
-    assert!(kennt(&hub, &elw, vor).await);
+    assert!(has_akte(&hub, &elw, vor).await);
     // Sicherung des Hubs: Er hatte den ELW bis hier übernommen.
     let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
         "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
@@ -4269,7 +4269,7 @@ async fn zurueckgespielt_hub_bekommt_die_verlorene_akte_des_elw_erneut() {
     assert!(empfangen > 0);
     let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
     nur_melden(&elw).await;
-    assert!(kennt(&hub, &elw, nach).await);
+    assert!(has_akte(&hub, &elw, nach).await);
     // Der Hub spielt die Sicherung zurück: die Akte von danach ist weg.
     zurueckspielen(&hub, stand, gesendet, empfangen).await;
     sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
@@ -4281,7 +4281,7 @@ async fn zurueckgespielt_hub_bekommt_die_verlorene_akte_des_elw_erneut() {
     nur_melden(&elw).await;
     nur_melden(&elw).await;
     assert!(
-        kennt(&hub, &elw, nach).await,
+        has_akte(&hub, &elw, nach).await,
         "die verlorene Akte kommt erneut"
     );
 }
@@ -4311,7 +4311,7 @@ async fn zurueckgespielt_hub_mit_nachgehender_uhr_holt_das_netz() {
     let a = common::einsatz_anlegen(&hub.app, &hub.admin).await;
     akten_anlegen(&hub).await;
     nur_melden(&elw).await;
-    assert!(kennt(&elw, &hub, a).await, "das Netz (D3) stempelt neu");
+    assert!(has_akte(&elw, &hub, a).await, "das Netz (D3) stempelt neu");
     let (_, _, stand) = staende(&hub).await;
     assert!(stand > e, "der Zähler liegt über der Quittung: {stand}");
     let h = hinweis(&hub).await.unwrap_or_default();
@@ -4333,7 +4333,7 @@ async fn zurueckgespielt_elw_akten_fliessen_in_beide_richtungen() {
     let (hub, elw) = gekoppelt().await;
     let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
     nur_melden(&elw).await;
-    assert!(kennt(&hub, &elw, vor).await);
+    assert!(has_akte(&hub, &elw, vor).await);
     // Der ELW spielt zurück; vor dem Ausfall lief seine Uhr vor, der Hub hat Stände bis E.
     let e = jetzt_s() + 10_000;
     sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
@@ -4344,10 +4344,10 @@ async fn zurueckgespielt_elw_akten_fliessen_in_beide_richtungen() {
     zurueckspielen(&elw, 3, 0, 0).await;
     let neu = common::einsatz_anlegen(&elw.app, &elw.admin).await;
     nur_melden(&elw).await;
-    assert!(kennt(&hub, &elw, neu).await, "ELW → Hub");
+    assert!(has_akte(&hub, &elw, neu).await, "ELW → Hub");
     let (_, _, stand) = staende(&elw).await;
     assert!(stand >= e, "der ELW hebt seinen Zähler (D3): {stand}");
     let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
     nur_melden(&elw).await;
-    assert!(kennt(&elw, &hub, h).await, "Hub → ELW");
+    assert!(has_akte(&elw, &hub, h).await, "Hub → ELW");
 }
