@@ -186,8 +186,11 @@ belegt). Die Art heißt `ohne-e2e`; das Muster der Marke erlaubt dafür Ziffern.
 
 `scripts/ci-messung.sh --von <zeit> --bis <zeit>` fragt über `gh api` die Läufe von `ci.yml` und
 `e2e.yml` mit Ereignis `pull_request` im Zeitraum ab und gibt je PR (Kopf-Branch) eine Zeile aus:
-Läufe, davon abgebrochen/rot/grün, gestartete Jobs (ohne `skipped`), Job-Minuten. Dazu eine
-Summenzeile. Die Messung vorher (proposal.md) entstand von Hand über dieselbe API; das Skript
+Läufe, davon abgebrochen/rot/grün/laufend, gestartete Jobs (ohne `skipped`), Job-Minuten und,
+getrennt, Läufe ohne gestarteten Job (die übersprungene zweite Stufe an einem PR in Arbeit belegt
+keinen Runner und zählt nicht als Lauf). Dazu eine Summenzeile. Nur ein 404 lässt einen Workflow
+aus (vor der Zweiteilung gibt es `e2e.yml` nicht); jeder andere Abruffehler und eine von GitHub
+abgeschnittene Liste (höchstens 1000 Läufe mit diesen Filtern) brechen mit Exit 2 ab. Die Messung vorher (proposal.md) entstand von Hand über dieselbe API; das Skript
 rechnet sie für den Vergleich nach. Selbsttest mit eingespielten API-Antworten.
 
 ## Risks / Trade-offs

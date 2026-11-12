@@ -29,7 +29,8 @@ echo "$pfad" >> "$MESSUNG_FAKE/log"
 case "$pfad" in
   repos/test/repo/actions/workflows/*/runs*)
     wf="${pfad#repos/test/repo/actions/workflows/}"; wf="${wf%%/*}"
-    [ -f "$MESSUNG_FAKE/laeufe-$wf.json" ] || { echo "HTTP 404: Not Found" >&2; exit 1; }
+    [ ! -f "$MESSUNG_FAKE/fehler-$wf" ] || { cat "$MESSUNG_FAKE/fehler-$wf" >&2; exit 1; }
+    [ -f "$MESSUNG_FAKE/laeufe-$wf.json" ] || { echo "HTTP 404: Not Found (gh: Not Found)" >&2; exit 1; }
     cat "$MESSUNG_FAKE/laeufe-$wf.json" ;;
   repos/test/repo/actions/runs/*/jobs*)
     id="${pfad#repos/test/repo/actions/runs/}"; id="${id%%/*}"
@@ -60,9 +61,10 @@ job_json() { # <name> <conclusion|null> <start|null> <ende|null>
   printf '{"total_count":3,"workflow_runs":[%s,%s]}\n' "$(lauf_json 1 a completed cancelled)" "$(lauf_json 2 a completed success)"
   printf '{"total_count":3,"workflow_runs":[%s]}\n' "$(lauf_json 3 b completed failure)"
 } > "$ARBEIT/fake/laeufe-ci.yml.json"
-# e2e.yml: Branch a einmal grün, Branch b noch laufend.
-printf '{"total_count":2,"workflow_runs":[%s,%s]}\n' "$(lauf_json 4 a completed success)" "$(lauf_json 5 b in_progress null)" \
-  > "$ARBEIT/fake/laeufe-e2e.yml.json"
+# e2e.yml: Branch a einmal grün, Branch b noch laufend und einmal ohne gestarteten Job (PR nicht
+# fertig: alle Jobs übersprungen; belegt keinen Runner und zählt nicht als Lauf).
+printf '{"total_count":3,"workflow_runs":[%s,%s,%s]}\n' "$(lauf_json 4 a completed success)" \
+  "$(lauf_json 5 b in_progress null)" "$(lauf_json 6 b completed skipped)" > "$ARBEIT/fake/laeufe-e2e.yml.json"
 
 # Lauf 1: zwei Jobs gestartet (10 + 20 min), einer übersprungen (zählt nicht).
 printf '{"jobs":[%s,%s,%s]}\n' \
@@ -84,6 +86,10 @@ printf '{"jobs":[%s,%s,%s,%s,%s]}\n' \
 printf '{"jobs":[%s,%s]}\n' \
   "$(job_json e2e-Binary null 2026-11-12T15:00:00Z null)" \
   "$(job_json 'e2e 1/4' null null null)" > "$ARBEIT/fake/jobs-5.json"
+# Lauf 6: alles übersprungen.
+printf '{"jobs":[%s,%s]}\n' \
+  "$(job_json e2e-Auswahl skipped 2026-11-12T16:00:00Z 2026-11-12T16:00:00Z)" \
+  "$(job_json '${{ matrix.check }}' skipped 2026-11-12T16:00:00Z 2026-11-12T16:00:00Z)" > "$ARBEIT/fake/jobs-6.json"
 
 messen() {
   MESSUNG_GH="$ARBEIT/gh" MESSUNG_FAKE="$ARBEIT/fake" GITHUB_REPOSITORY=test/repo \
@@ -93,25 +99,41 @@ messen() {
 echo "==> ci-messung"
 aus="$(messen)"
 zeile() { printf '%s\n' "$aus" | grep -F "| $1 |" | head -1 | tr -s ' '; }
-pruefe "1 Branch a: Läufe, abgebrochen, rot, grün, laufend, Jobs, Job-Minuten" \
-  "| a | 3 | 1 | 0 | 2 | 0 | 8 | 360 |" "$(zeile a)"
-pruefe "2 Branch b: laufender Lauf und laufender Job" \
-  "| b | 2 | 0 | 1 | 0 | 1 | 2 | 5 |" "$(zeile b)"
-pruefe "3 Summe" "| Summe (2 PRs) | 5 | 1 | 1 | 2 | 1 | 10 | 365 |" "$(zeile 'Summe (2 PRs)')"
+pruefe "1 Branch a: Läufe, abgebrochen, rot, grün, laufend, Jobs, Job-Minuten, ohne Job" \
+  "| a | 3 | 1 | 0 | 2 | 0 | 8 | 360 | 0 |" "$(zeile a)"
+pruefe "2 Branch b: laufender Lauf, laufender Job, ein Lauf ohne Job" \
+  "| b | 2 | 0 | 1 | 0 | 1 | 2 | 5 | 1 |" "$(zeile b)"
+pruefe "3 Summe" "| Summe (2 PRs) | 5 | 1 | 1 | 2 | 1 | 10 | 365 | 1 |" "$(zeile 'Summe (2 PRs)')"
 pruefe "4 Zeitraum steht in der Abfrage" 2 "$(grep -c 'created=2026-11-12T00:00:00Z\.\.2026-11-13T00:00:00Z' "$ARBEIT/fake/log")"
 pruefe "5 nur PR-Läufe" 2 "$(grep -c 'event=pull_request' "$ARBEIT/fake/log")"
 
 # Vor der Zweiteilung gibt es e2e.yml nicht: die Messung läuft mit ci.yml allein weiter.
 mv "$ARBEIT/fake/laeufe-e2e.yml.json" "$ARBEIT/fake/weg.json"
 aus="$(messen 2> "$ARBEIT/fehler")"
-pruefe "6 ohne e2e.yml: nur ci.yml" "| Summe (2 PRs) | 3 | 1 | 1 | 1 | 0 | 4 | 65 |" "$(zeile 'Summe (2 PRs)')"
+pruefe "6 ohne e2e.yml: nur ci.yml" "| Summe (2 PRs) | 3 | 1 | 1 | 1 | 0 | 4 | 65 | 0 |" "$(zeile 'Summe (2 PRs)')"
 pruefe "6b und sagt es" 1 "$(grep -c 'e2e.yml' "$ARBEIT/fehler")"
 mv "$ARBEIT/fake/weg.json" "$ARBEIT/fake/laeufe-e2e.yml.json"
 
-code=0
-MESSUNG_GH="$ARBEIT/gh" MESSUNG_FAKE="$ARBEIT/fake" GITHUB_REPOSITORY=test/repo \
-  "$SKRIPT_UNTER_TEST" --von 2026-11-12T00:00:00Z > /dev/null 2>&1 || code=$?
-pruefe "7 ohne --bis: Aufruffehler" 2 "$code"
+exit_von() { local code=0; "$@" > /dev/null 2>&1 || code=$?; printf '%s\n' "$code"; }
+umgebung=(env MESSUNG_GH="$ARBEIT/gh" MESSUNG_FAKE="$ARBEIT/fake" GITHUB_REPOSITORY=test/repo "$SKRIPT_UNTER_TEST")
+pruefe "7 ohne --bis: Aufruffehler" 2 "$(exit_von "${umgebung[@]}" --von 2026-11-12T00:00:00Z)"
+pruefe "7b --bis ohne Wert: Aufruffehler" 2 "$(exit_von "${umgebung[@]}" --von 2026-11-12T00:00:00Z --bis)"
+pruefe "7c --workflow ohne Wert: Aufruffehler" 2 \
+  "$(exit_von "${umgebung[@]}" --von 2026-11-12T00:00:00Z --bis 2026-11-13T00:00:00Z --workflow)"
+
+# Jeder andere Fehler als 404 ist kein „Workflow gab es noch nicht“: sonst fehlten seine Läufe
+# still, und der Vergleich zeigte einen Rückgang, den es nicht gab.
+echo "HTTP 502: Bad Gateway" > "$ARBEIT/fake/fehler-ci.yml"
+pruefe "8 Abruffehler außer 404: Umgebungsfehler" 2 "$(exit_von messen)"
+rm "$ARBEIT/fake/fehler-ci.yml"
+
+# Mehr Läufe als geliefert (die API liefert mit diesen Filtern höchstens 1000): abbrechen statt
+# eine scheinbar vollständige Tabelle auszugeben.
+cp "$ARBEIT/fake/laeufe-ci.yml.json" "$ARBEIT/fake/voll.json"
+sed -i.alt 's/"total_count":3/"total_count":1500/' "$ARBEIT/fake/laeufe-ci.yml.json"
+pruefe "9 abgeschnittene Liste: Umgebungsfehler" 2 "$(exit_von messen)"
+mv "$ARBEIT/fake/voll.json" "$ARBEIT/fake/laeufe-ci.yml.json"
+pruefe "9b vollständige Liste wieder: gelaufen" 0 "$(exit_von messen)"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest ci-messung." >&2
