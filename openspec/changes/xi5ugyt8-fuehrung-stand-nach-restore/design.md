@@ -33,7 +33,8 @@ Was beim Zurückspielen schiefgeht, steht in proposal.md unter „Why“.
 - Akten, die die zurückgespielte erreichte Seite verloren hat, schickt die meldende Seite erneut.
 - Das gilt gleich, wie die Sicherung eingespielt wurde (`restore`, Datei von Hand zurückkopiert,
   Snapshot der VM).
-- Keine Protokolländerung und keine Migration.
+- Keine Migration. Das Protokoll wächst höchstens um ein additives Feld (D5, nach dem Review vom
+  12.11.2026; ursprünglich ganz ohne Protokolländerung geplant).
 
 **Non-Goals:**
 
@@ -96,6 +97,10 @@ deshalb ein sicheres Zeichen.
   Ihr eigenes `gesendet_bis` braucht sie nur für D3.
 - Nach dem Zurücksetzen meldet sich die meldende Seite im üblichen Abstand wieder, nicht sofort.
   Der erneute Versand ist einmalig und eilt nicht.
+- **Allein reicht das nicht (Review B1):** Hat die meldende Seite während des Ausfalls etwas
+  geändert, trägt schon ihre erste Meldung danach eine Akte über dem Sendestand. Die erreichte Seite
+  übernimmt sie und quittiert das neue Maximum, und D2 sieht keinen Rückschritt. Diesen Fall fängt
+  D5.
 
 Ein neuer Schreibweg `fuehrung::repo::reset_gesendet_bis(conn, kopplung_id, bis)` setzt den Wert.
 `save_kopplung_staende` bleibt bei `MAX`.
@@ -103,45 +108,80 @@ Ein neuer Schreibweg `fuehrung::repo::reset_gesendet_bis(conn, kopplung_id, bis)
 ### D3 Netz: Eine Quittung über dem eigenen Zähler hebt ihn
 
 Geht die Uhr der zurückgespielten Seite nach, greift D1 nicht. Dann quittiert das Gegenüber einen
-Stand, den diese Seite nach ihrem Zähler nie vergeben hat. Daran erkennt sie den Rückschritt:
+Stand, den diese Seite nach ihrem Zähler nie vergeben hat. Daran erkennt sie den Rückschritt, an
+beiden Seiten mit demselben Schritt `austausch::repair_stand(conn, quittung)`:
 
-- **Erreichte Seite (`handle_meldung`)**, in der Transaktion **vor** `apply_eingang`. Ist
-  `anfrage.fuehrung_bis` größer als `fuehrung_stand` und höchstens `STAND_HEBEN_MAX`, dann:
-  1. `fuehrung_stand` auf diese Quittung setzen;
-  2. die Akten der Orgs dieser Kopplung neu stempeln, deren Stand über dem gespeicherten
-     `fuehrung_gesendet_bis` liegt, in Reihenfolge ihres Stands;
-  3. einen Hinweis an die Kopplung schreiben, dass die Akten erneut gehen.
+1. Ist die Quittung größer als `fuehrung_stand` und höchstens `STAND_RAISE_MAX`, wird
+   `fuehrung_stand` auf sie gesetzt.
+2. Für **jede** aktive Kopplung, in der diese Instanz erreichte Seite ist, stempelt sie die Akten
+   ihrer Orgs neu, deren Stand über dem dort gespeicherten `fuehrung_gesendet_bis` liegt, in der
+   Reihenfolge ihres Stands, und schreibt einen Hinweis an diese Kopplung, dass die Akten erneut
+   gehen.
+3. Die Kopplung, deren Quittung den Rückschritt zeigte, bekommt den Hinweis auch dann, wenn die
+   Instanz dort meldende Seite ist.
 
-  `build_ausgang(ab = Quittung)` nimmt die neu gestempelten Akten dann gleich mit. Das gespeicherte
-  `gesendet_bis` ist mit der Sicherung zurückgekehrt. Es nennt den letzten Stand, den das Gegenüber
-  sicher hat. Alles darüber ist entweder schon beim Gegenüber (doppelt, schadet nicht) oder seit dem
-  Zurückspielen neu vergeben (genau die Lücke). Vor `apply_eingang`, damit auch die Akten, die diese
-  Meldung bringt, ihren Stand schon über der Quittung bekommen.
-- **Meldende Seite (`melden_einmal`)**, in der Transaktion nach der Antwort. Ist `a.fuehrung_bis`
-  größer als `fuehrung_stand` und höchstens `STAND_HEBEN_MAX`, hebt sie nur den Zähler. Sie sendet
-  ab ihrem eigenen `gesendet_bis`, und das Gegenüber nimmt jeden plausiblen Stand an. Neu zu stempeln
-  braucht sie also nichts. Der Hub hält danach kein überhöhtes `empfangen_bis` mehr gegenüber dem
-  Zähler des ELW.
+Wo es läuft:
 
-`STAND_HEBEN_MAX = STAND_MAX / 2` (2³⁹). Eine gekoppelte Seite kann den Zähler damit nicht bis an
+- **Erreichte Seite (`handle_meldung`):** in der Transaktion **vor** `ensure_akten` und
+  `apply_eingang`, mit `anfrage.fuehrung_bis`. `build_ausgang(ab = Quittung)` nimmt die neu
+  gestempelten Akten gleich mit. Vor `apply_eingang`, damit auch die Akten, die diese Meldung bringt,
+  ihren Stand schon über der Quittung bekommen.
+- **Meldende Seite (`melden_einmal`):** in der Transaktion nach der Antwort, mit `a.fuehrung_bis`.
+  Für die eigene Kopplung braucht es kein neues Stempeln, denn sie sendet ab ihrem eigenen
+  `gesendet_bis`, und das Gegenüber nimmt jeden plausiblen Stand an. Das Heben könnte aber die
+  Erkennung in einer Kopplung verdecken, in der dieselbe Instanz erreichte Seite ist. Deshalb gilt
+  Schritt 2 auch hier.
+
+Warum über dem gespeicherten `gesendet_bis` der jeweiligen Kopplung: Es ist mit der Sicherung
+zurückgekehrt und nennt den letzten Stand, den dieses Gegenüber sicher hat. Alles darüber ist
+entweder schon dort (doppelt, schadet nicht) oder seit dem Zurückspielen neu vergeben (genau die
+Lücke).
+
+`STAND_RAISE_MAX = STAND_MAX / 2` (2³⁹). Eine gekoppelte Seite kann den Zähler damit nicht bis an
 die Grenze treiben, ab der jede weitere Akte abgelehnt würde. Bis dahin ist bei Sekunden Raum für
 Jahrtausende. Eine größere Quittung hebt nichts, und das Verhalten bleibt das von heute.
 
-Ein Schreibweg `fuehrung::repo::raise_stand(conn, auf)` hebt den Zähler (`MAX`).
+Schreibwege: `fuehrung::repo::raise_stand(conn, auf)` hebt den Zähler, senkt nie.
 `renew_stand_ueber(conn, org_ids, ab)` stempelt neu. `renew_stand_der_org` bleibt.
 
-**Verworfen:** im Netz alle Akten neu zu stempeln. Das schickte jede Akte an jede Kopplung, auch an
-die, deren Quittung stimmt. Eine weitere Kopplung mit eigener überhöhter Quittung erkennt den
-Rückschritt bei ihrer eigenen Meldung selbst.
+**Verworfen:**
+
+- *Nur die Kopplung neu stempeln, deren Quittung den Rückschritt zeigt* (erste Fassung, Review B2):
+  Der Zähler gilt je Instanz, die Erkennung je Kopplung. Hebt eine Kopplung den Zähler, liegt die
+  Quittung einer zweiten danach nicht mehr über ihm, und deren Akten blieben liegen.
+- *Ein Merker „Rückschritt“ je Kopplung, den ihre nächste Meldung abarbeitet:* robuster gegen die
+  Restlücke (Risiken), braucht aber eine Spalte und damit eine Migration.
+- *Alle Akten aller Orgs neu stempeln:* schickt auch Akten an Kopplungen, die sie sicher haben.
 
 ### D4 Übergang
 
-Es gibt kein neues Feld und keine Migration. Gemischte Stände sind verträglich:
+Ein additives Feld (D5), keine Migration. Gemischte Stände sind verträglich:
 
 - Eine neue Seite vergibt große Stände. Eine alte Gegenstelle übernimmt und quittiert sie.
-- Eine alte erreichte Seite liefert nur nach einem Zurückspielen eine kleinere Quittung. D2 an einer
-  neuen meldenden Seite schickt dann erneut.
-- Eine alte meldende Seite profitiert von D1 und D3 an einer neuen erreichten Seite, nicht von D2.
+- Eine alte erreichte Seite ignoriert `fuehrung_gesendet_bis`. Sie liefert nur dann eine kleinere
+  Quittung, wenn die erste Meldung nach dem Zurückspielen keine Akte trägt, und D2 an einer neuen
+  meldenden Seite schickt erneut.
+- Eine alte meldende Seite schickt das Feld nicht (`#[serde(default)]` = 0). Sie profitiert von D1
+  und D3 an einer neuen erreichten Seite, nicht von D2 und D5.
+
+### D5 Sendestand in der Meldung (Review B1)
+
+`MeldenAnfrage` bekommt `#[serde(default)] fuehrung_gesendet_bis: i64`: das gespeicherte
+`fuehrung_gesendet_bis` der meldenden Seite, also bis wohin die erreichte Seite ihr nach ihrem
+Wissen quittiert hat.
+
+`handle_meldung` liest `fuehrung_empfangen_bis` dieser Kopplung **vor** `apply_eingang`. Liegt der
+Wert unter `anfrage.fuehrung_gesendet_bis`, hat die erreichte Seite Akten verloren, die sie schon
+quittiert hatte. Sie antwortet dann mit diesem alten Wert statt mit dem neuen Maximum. Die
+meldende Seite setzt ihren Sendestand nach D2 darauf zurück und schickt alles darüber erneut, auch
+die Akte, die diese Meldung schon brachte (doppelt, schadet nicht). Gespeichert wird an der
+erreichten Seite wie bisher das Maximum, sodass die nächste Meldung normal quittiert wird.
+
+- Eine Quittung 0 setzt D2 nicht zurück (s. D2). Der Fall „Sicherung von vor der ersten Übernahme“
+  bleibt deshalb offen (Risiken).
+- **Verworfen:** *ohne Feld eine Meldung später quittieren.* Die meldende Seite schickte dann jeden
+  Stapel zweimal, auch ohne Ausfall. *Ein Merker „zurückgespielt“ in der Antwort:* braucht ebenfalls
+  ein Feld und sagt der meldenden Seite nicht, ab wo sie neu senden soll.
 
 ## Risks / Trade-offs
 
@@ -152,7 +192,18 @@ Es gibt kein neues Feld und keine Migration. Gemischte Stände sind verträglich
 - **[Uhr springt weit nach vorn]** → Der Zähler bleibt dauerhaft hoch, aber unter `STAND_MAX`. Das
   stört nichts.
 - **[Erreichte Seite aus einer Sicherung vor ihrer ersten Übernahme]** → Die Quittung ist 0, und D2
-  greift nicht (s. D2). Die verlorenen Akten kommen mit ihrer nächsten Änderung.
+  greift nicht, auch nicht über D5. Die verlorenen Akten kommen mit ihrer nächsten Änderung.
+- **[Mehrere Kopplungen, Uhr geht nach: Restlücke]** → D3 stempelt beim Heben neu, die neuen Stände
+  beginnen aber bei der erkennenden Quittung. Liegt die Quittung einer später meldenden Kopplung
+  darüber, kann eine neu gestempelte Akte wieder darunter fallen und erkennt diese Kopplung keinen
+  Rückschritt mehr. Selten: Die Uhr muss nachgehen, mehrere Gegenstellen müssen verschieden weit
+  quittiert haben, und die Reihenfolge muss ungünstig sein. Der Merker je Kopplung (D3, verworfen)
+  schlösse das.
+- **[Gegenstelle älteren Stands]** → D5 wirkt nur, wenn beide Seiten das Feld kennen (D4).
+- **[Hinweis nach dem Zurückspielen der erreichten Seite auch bei richtiger Uhr]** → Bis zu ihrer
+  ersten Vergabe steht der Zähler auf dem Wert der Sicherung, und D3 erkennt den Rückschritt schon,
+  bevor D1 greifen kann. Das ist richtig, der Hinweis beschreibt den Vorgang. Die Betriebsdoku sagt
+  es so.
 - **[Einmaliger erneuter Versand nach D2 oder D3]** → Er läuft in Seiten zu höchstens 50 Akten je
   Nachricht (`AKTEN_MAX`). Eine Akte, die das Gegenüber schon hat, ändert dort nichts (Muster
   `renew_stand_der_org`).

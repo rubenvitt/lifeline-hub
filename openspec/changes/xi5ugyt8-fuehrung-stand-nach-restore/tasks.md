@@ -36,17 +36,17 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   `raise_stand` senkt nie. `renew_stand_ueber` stempelt nur Akten der genannten Orgs über `ab` neu,
   in der Reihenfolge ihres Stands. Prüfen: `cargo test instanz::fuehrung::repo`.
 - [x] 3.2 `handle_meldung`: vor `apply_eingang` den Rückschritt erkennen
-  (`fuehrung_stand < anfrage.fuehrung_bis <= STAND_HEBEN_MAX`), den Zähler heben, über dem
+  (`fuehrung_stand < anfrage.fuehrung_bis <= STAND_RAISE_MAX`), den Zähler heben, über dem
   gespeicherten `fuehrung_gesendet_bis` neu stempeln und einen Hinweis an die Kopplung setzen.
   Integrationstest „nachgehende Uhr“: Die Quittung des ELW wird über die Uhrzeit gesetzt (Sekunden
   jetzt + 10 000), der Zähler des Hubs klein. Danach legt der Hub einen Einsatz an, und er erreicht
   den ELW. Ohne 3.2 ist der Test rot. Prüfen: `cargo test --test instanz_fuehrung zurueckgespielt`.
 - [x] 3.3 `melden_einmal`: Liegt `a.fuehrung_bis` über `fuehrung_stand` und höchstens bei
-  `STAND_HEBEN_MAX`, wird nur der Zähler gehoben. Integrationstest „ELW zurückgespielt“: Der ELW
+  `STAND_RAISE_MAX`, wird nur der Zähler gehoben. Integrationstest „ELW zurückgespielt“: Der ELW
   spielt zurück, legt einen Einsatz an, der Hub kennt ihn, und ein danach am Hub angelegter Einsatz
   erreicht den ELW. Danach liegt `fuehrung_stand` des ELW mindestens bei `empfangen_bis` des Hubs.
   Prüfen: wie 3.2.
-- [x] 3.4 Eine Quittung über `STAND_HEBEN_MAX` hebt keinen Zähler (Unit- oder Integrationstest mit
+- [x] 3.4 Eine Quittung über `STAND_RAISE_MAX` hebt keinen Zähler (Unit- oder Integrationstest mit
   `STAND_MAX`). Prüfen: wie 3.2.
 
 ## 4. Doku und Gates
@@ -59,6 +59,41 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   Uhr folgt und `fuehrung_gesendet_bis` an der meldenden Seite nach unten gesetzt werden darf
   (Verweis auf diese Change). Prüfen: `scripts/check-fmt.sh` bleibt grün.
 - [ ] 4.3 `./scripts/check-all.sh --geaendert` grün, ohne `| tail`.
+
+## 5. Befunde des Reviews vor dem PR (12.11.2026)
+
+Entscheidungen des Menschen: B1 additives Feld (D5), B2 alle Kopplungen neu stempeln (D3). B3
+verworfen (der jüngste Hinweis gilt, so ist das Modell).
+
+- [ ] 5.1 Bezeichner und Kommentare (B7, B8) als eigener `refactor`-Commit: `STAND_HEBEN_MAX` →
+  `STAND_RAISE_MAX`, Testhelfer `kennt` → `has_akte`. Den Kommentar an `STAND_MAX` an D1 anpassen.
+  Den Punkt in `src/AGENTS.md` berichtigen: Instanzzähler und Kopplungsstände getrennt, beide
+  Schreibwege nennen. Prüfen: `grep -rn STAND_HEBEN_MAX src tests` leer,
+  `cargo test --test instanz_fuehrung zurueckgespielt` grün.
+- [ ] 5.2 Feld `fuehrung_gesendet_bis` in `MeldenAnfrage` (`#[serde(default)]`). `melden_einmal`
+  füllt es aus dem gespeicherten Sendestand. `handle_meldung` liest `fuehrung_empfangen_bis` vor
+  `apply_eingang` und antwortet mit diesem alten Wert, wenn er unter dem Feld liegt (D5).
+  Integrationstest „ELW hat während des Ausfalls geändert“: Wie 2.2, aber der ELW legt nach dem
+  Zurückspielen und vor der ersten Meldung einen weiteren Einsatz an. Nach den nächsten Meldungen
+  kennt der Hub beide Akten. Ohne 5.2 ist der Test rot. Unit-Test: Eine Anfrage ohne das Feld liest
+  sich mit 0. Prüfen: `cargo test --test instanz_fuehrung zurueckgespielt` und
+  `cargo test --lib instanz::melden`.
+- [ ] 5.3 `repair_stand` als gemeinsamer Schritt beider Seiten (D3). Nach dem Heben werden die Akten
+  jeder aktiven Kopplung, in der die Instanz erreichte Seite ist, über deren eigenem
+  `fuehrung_gesendet_bis` neu gestempelt, mit Hinweis an jeder; die erkennende Kopplung bekommt den
+  Hinweis immer. `melden_einmal` ruft ihn statt `raise_stand` direkt. Unit-Test mit zwei erreichten
+  Kopplungen und getrennten Orgs: Eine Quittung an Kopplung 1 stempelt auch die Akte der Org, die
+  nur an Kopplung 2 hängt, über die Quittung und setzt an beiden einen Hinweis. Ein zweiter Fall
+  ruft ihn mit einer Kopplung, in der die Instanz meldende Seite ist. Ohne 5.3 ist der Test rot.
+  Prüfen: `cargo test --lib instanz::fuehrung`.
+- [ ] 5.4 Grenztests (B6): Eine Quittung von genau `STAND_RAISE_MAX` hebt, `STAND_RAISE_MAX + 1`
+  nicht, einmal an der erreichten Seite (Unit-Test an `repair_stand`) und einmal an der meldenden
+  Seite (Integrationstest, Antwort mit überhöhtem `fuehrung_empfangen_bis` am Hub). Prüfen: wie 5.2
+  und 5.3, Mutation der Grenze (`+1`) wird rot.
+- [ ] 5.5 `docs/betrieb/backup-restore.md` (B4): Der Hinweis erscheint nach dem Zurückspielen der
+  erreichten Seite meist auch bei richtiger Uhr. Auch die meldende Seite zeigt ihn. Ausnahmen
+  nennen: nachgehende Uhr mit mehr Vergaben als verloren, Sicherung von vor der ersten Übernahme,
+  Gegenstelle älteren Stands. Prüfen: Abschnitt gegen design.md D3–D5 und Risiken gelesen.
 
 ## Workflow follow-up
 
