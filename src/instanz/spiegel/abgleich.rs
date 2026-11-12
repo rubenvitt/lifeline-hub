@@ -153,7 +153,7 @@ async fn liefere_alle(
     staende: &HashMap<String, i64>,
     budget: &mut Budget,
 ) -> Result<Vec<super::paket::EinsatzLieferung>, AppError> {
-    let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
+    let meldend = uebersetzt(kopplung);
     let mut lieferungen = Vec::new();
     let mut alle = Vec::new();
     for o in orgs {
@@ -185,6 +185,14 @@ async fn liefere_alle(
     Ok(lieferungen)
 }
 
+/// Ob diese Seite Stammdaten über die Herkunft der Kopplung übersetzt (D5): nur die meldende
+/// Seite einer Standardkopplung hält sie; über eine Direktkopplung fließen keine Stammdaten, dort
+/// zählt die Ursprungskennung (LLH-1497).
+pub fn uebersetzt(kopplung: &KopplungZeile) -> bool {
+    kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich)
+        && kopplung.art() == crate::instanz::InstanzKopplungArt::Standard
+}
+
 /// Übernimmt die Lieferungen eines Pakets; liefert die neuen Stände und was sich geändert hat.
 async fn uebernehme_alle(
     conn: &mut SqliteConnection,
@@ -194,7 +202,7 @@ async fn uebernehme_alle(
     paket: &SpiegelPaket,
     uebernommen: &mut Uebernommen,
 ) -> Result<Vec<EinsatzStand>, AppError> {
-    let meldend = kopplung.richtung() == Some(InstanzKopplungRichtung::MeldetSich);
+    let meldend = uebersetzt(kopplung);
     let mut staende = Vec::new();
     // Ein Gegenüber liefert nur Einsätze, die es selbst führt: ihre Kennung beginnt mit seiner.
     let praefix = format!("{}/", kopplung.gegenueber_kennung);
@@ -216,6 +224,7 @@ async fn uebernehme_alle(
             kopplung_org_id: o.id,
             org_id: o.org_id,
             meldend,
+            vor_ort: kopplung.art() == crate::instanz::InstanzKopplungArt::VorOrt,
         };
         let vorher: Option<i64> =
             sqlx::query_scalar("SELECT einsatz_id FROM einsatz_spiegel WHERE fremde_kennung = ?")
@@ -532,7 +541,7 @@ pub async fn abgleich_einmal(
             lebensende.extend(geloescht_offen.iter().take(platz).cloned());
             // Anträge stehen vorn (D8) und zählen ins Budget.
             let (antraege, antrag_bytes) =
-                super::antrag::offene_antraege(conn, kopplung.id, true).await?;
+                super::antrag::offene_antraege(conn, kopplung.id, uebersetzt(kopplung)).await?;
             let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes);
             let lieferungen =
                 liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
@@ -649,7 +658,7 @@ pub async fn abgleich_einmal(
         let mut ausgefuehrt = false;
         if let Some(router) = router {
             for a in &antwort.antraege {
-                if super::antrag::ausfuehren(pool, router, kopplung, true, a)
+                if super::antrag::ausfuehren(pool, router, kopplung, uebersetzt(kopplung), a)
                     .await
                     .map_err(fehler)?
                     .is_some()

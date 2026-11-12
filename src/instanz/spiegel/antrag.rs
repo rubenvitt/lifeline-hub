@@ -446,7 +446,7 @@ async fn kopplung_des_spiegels(
     einsatz_id: i64,
 ) -> Result<Option<(i64, i64, bool)>, AppError> {
     let z: Option<(i64, i64, String)> = sqlx::query_as(
-        "SELECT o.kopplung_id, o.id, k.richtung FROM einsatz_spiegel s \
+        "SELECT o.kopplung_id, o.id, k.richtung || '/' || k.art FROM einsatz_spiegel s \
          JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
          JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE s.einsatz_id = ? AND s.beendet_at IS NULL AND o.widerrufen_at IS NULL",
@@ -454,7 +454,8 @@ async fn kopplung_des_spiegels(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(z.map(|(k, o, r)| (k, o, r == "meldet_sich")))
+    // Übersetzt über die Herkunft nur die meldende Seite einer Standardkopplung (LLH-1497).
+    Ok(z.map(|(k, o, r)| (k, o, r == "meldet_sich/standard")))
 }
 
 /// Legt eine Erfassung am Spiegel als Antrag ab.
@@ -765,9 +766,11 @@ pub async fn offene_antraege(
         String,
         i64,
         String,
+        Option<String>,
     )> = sqlx::query_as(
         "SELECT a.id, s.fremde_kennung, a.art, a.methode, a.pfad_vorlage, a.pfad_parameter, \
-             a.daten, a.benutzer_id, a.client_id, a.erfasst_at, o.id, b.anzeigename \
+             a.daten, a.benutzer_id, a.client_id, a.erfasst_at, o.id, b.anzeigename, \
+             a.daten_lokal \
              FROM spiegel_antrag a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
              JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
              JOIN benutzer b ON b.id = a.benutzer_id \
@@ -793,8 +796,10 @@ pub async fn offene_antraege(
         erfasst,
         ko,
         name,
+        daten_lokal,
     ) in zeilen
     {
+        let ursprung = antrag_ursprung(conn, &art, &pfad, &methode, daten_lokal.as_deref()).await?;
         let gegen_id = if meldend {
             abbildung::stammdaten_fremd(conn, ko, StammdatenArt::Konto, benutzer).await?
         } else {
@@ -816,9 +821,11 @@ pub async fn offene_antraege(
                 id: benutzer,
                 anzeigename: name,
                 gegen_id,
+                ursprung: abbildung::konto_ursprung(conn, benutzer).await?,
             },
             client_id,
             erfasst_at: erfasst,
+            ursprung,
         });
         let groesse = antraege
             .last()
@@ -966,6 +973,41 @@ pub async fn ausfuehren(
     Ok(Some(quittung))
 }
 
+/// Ursprungskennungen der Verweise auf Stammdaten im Body eines Antrags, aus der Erfassung mit
+/// den eigenen Kennungen (LLH-1497, design.md D5).
+async fn antrag_ursprung(
+    conn: &mut SqliteConnection,
+    art: &str,
+    pfad: &str,
+    methode: &str,
+    daten_lokal: Option<&str>,
+) -> Result<std::collections::BTreeMap<String, String>, AppError> {
+    let mut aus = std::collections::BTreeMap::new();
+    let Some(b) = BEANTRAGBAR
+        .iter()
+        .find(|b| b.art == art && b.pfad == pfad && b.methode == methode)
+    else {
+        return Ok(aus);
+    };
+    let Some(mut daten) = daten_lokal.and_then(|d| serde_json::from_str::<Value>(d).ok()) else {
+        return Ok(aus);
+    };
+    for v in b.body_verweise {
+        let AntragZiel::Stammdaten(ziel) = v.ziel else {
+            continue;
+        };
+        let mut werte = Vec::new();
+        jeder_wert(&mut daten, v.pfad, &mut werte);
+        if let Some(id) = werte.first().and_then(|w| w.as_i64()) {
+            aus.insert(
+                v.pfad.to_string(),
+                abbildung::ursprung(conn, ziel, id).await?,
+            );
+        }
+    }
+    Ok(aus)
+}
+
 async fn ausfuehren_innen(
     pool: &SqlitePool,
     router: &Router,
@@ -1017,6 +1059,14 @@ async fn ausfuehren_innen(
         }
         None => None,
     };
+    // Über die Ursprungskennung (LLH-1497): dasselbe Konto aus derselben Quelle.
+    let konto = match (konto, &a.konto.ursprung) {
+        (Some(k), _) => Some(k),
+        (None, Some(u)) => {
+            abbildung::nach_ursprung(&mut conn, org_id, StammdatenArt::Konto, u).await?
+        }
+        (None, None) => None,
+    };
     let konto: Option<i64> = match konto {
         Some(k) => {
             sqlx::query_scalar(
@@ -1034,18 +1084,32 @@ async fn ausfuehren_innen(
         return Ok(Some(abgelehnt(a.id, "Konto am Führer unbekannt.")));
     };
     let mut daten = a.daten.clone();
-    if meldend {
+    // Direktkopplung (LLH-1497): Stammdaten kommen mit den Kennungen des Antragstellers, allein
+    // die Ursprungskennung zählt.
+    let vor_ort = kopplung.art() == crate::instanz::InstanzKopplungArt::VorOrt;
+    if meldend || vor_ort {
         for v in b.body_verweise {
             let AntragZiel::Stammdaten(art) = v.ziel else {
                 continue;
             };
+            let ursprung = a.ursprung.get(v.pfad);
             let mut werte = Vec::new();
             jeder_wert(&mut daten, v.pfad, &mut werte);
             for w in werte {
                 if let Some(id) = w.as_i64() {
-                    *w = abbildung::stammdaten_lokal(&mut conn, kopplung_org_id, art, id)
-                        .await?
-                        .map_or(Value::Null, Value::from);
+                    let lokal = if vor_ort {
+                        None
+                    } else {
+                        abbildung::stammdaten_lokal(&mut conn, kopplung_org_id, art, id).await?
+                    };
+                    let lokal = match (lokal, ursprung) {
+                        (Some(l), _) => Some(l),
+                        (None, Some(u)) => {
+                            abbildung::nach_ursprung(&mut conn, org_id, art, u).await?
+                        }
+                        (None, None) => None,
+                    };
+                    *w = lokal.map_or(Value::Null, Value::from);
                 }
             }
         }
@@ -1549,6 +1613,41 @@ pub async fn aufraeumen(pool: &SqlitePool) -> Result<u64, AppError> {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    /// Ein Eintreffen mit Einheitsvorlage nennt deren Ursprungskennung aus der Erfassung mit den
+    /// eigenen Kennungen (LLH-1497, design.md D5).
+    #[tokio::test]
+    async fn ein_eintreffen_nennt_den_ursprung_seiner_einheitsvorlage() {
+        let pool = crate::db::test_pool().await;
+        crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        crate::instanz::identitaet::load_or_create(&pool)
+            .await
+            .unwrap();
+        let ich: String = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let b = BEANTRAGBAR.iter().find(|b| b.art == "eintreffen").unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let u = antrag_ursprung(
+            &mut conn,
+            b.art,
+            b.pfad,
+            b.methode,
+            Some(r#"{"kraft": {"objekt_typ": "einheit", "objekt_id": 3}, "vorlage": {"vorlage_id": 12}}"#),
+        )
+        .await
+        .unwrap();
+        assert_eq!(u.get("vorlage.vorlage_id"), Some(&format!("{ich}/12")));
+        assert_eq!(u.len(), 1, "nur Stammdaten, keine Einsatzzeilen: {u:?}");
+        // Ohne Erfassung mit eigenen Kennungen (älterer Antrag) keine Angabe.
+        let leer = antrag_ursprung(&mut conn, b.art, b.pfad, b.methode, None)
+            .await
+            .unwrap();
+        assert!(leer.is_empty());
+    }
 
     /// Jede beantragbare Art sagt, wo ihre Route die Erfassungszeit annimmt (oder dass sie keine
     /// braucht); eine neue Art ohne Eintrag landete beim Führer mit der Zeit der Ausführung.

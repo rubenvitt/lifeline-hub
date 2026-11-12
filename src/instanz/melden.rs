@@ -694,6 +694,20 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             )
             .await?;
         }
+        // Spricht die Quelle zum ersten Mal Protokoll 3, liefert sie die Ursprungskennung mit
+        // (LLH-1497, design.md D5): einmal von vorn, damit jede übernommene Zeile sie trägt.
+        if kopplung
+            .gegenueber_protokoll
+            .is_some_and(|p| p < i64::from(super::PROTOKOLL_VOR_ORT))
+            && a.protokoll >= super::PROTOKOLL_VOR_ORT
+        {
+            for id in &quellen {
+                sqlx::query("UPDATE instanz_kopplung_org SET stammdaten_stand = 0 WHERE id = ?")
+                    .bind(id)
+                    .execute(&mut *conn)
+                    .await?;
+            }
+        }
         if fuehrung_an {
             // Bruchstelle (D11): die letzte erfolgreiche Meldung VOR dieser.
             let eingang = fuehrung_austausch::apply_eingang(

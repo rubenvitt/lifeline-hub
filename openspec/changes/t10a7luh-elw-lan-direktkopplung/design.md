@@ -202,7 +202,7 @@ Stellvertreter oder Ablehnung):
 | `uebernehmen` (`Ziel::Stammdaten`, Qualifikationslisten) | Ursprung, sonst leer |
 | `abbildung::konto_lokal` | Ursprung, sonst Stellvertreter |
 | `antrag` (Konto) | Ursprung, sonst Ablehnung |
-| `antrag` (`AntragZiel::Stammdaten`, heute nur die Einheitsvorlage der Belegung) | Ursprung, sonst leer |
+| `antrag` (`AntragZiel::Stammdaten`, heute nur die Einheitsvorlage beim Eintreffen) | Ursprung, sonst leer |
 | `katalog` | Ursprung, sonst bisheriger Ausgang |
 
 **Auf dem Draht**
@@ -365,3 +365,21 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
 - **12.11.2026, D2: Prüfstellen in SQL.** `find_quelle` und `is_org_verteilend` filtern in SQL auf
   `k.art = 'standard'`; der Wächter `instanz::art_tests::jeder_fluss_hat_seine_pruefstellen`
   zählt sie mit.
+- **12.11.2026, D5: Übersetzen nur an der Standardkopplung.** `meldend` heißt in Absender,
+  Empfänger und Anträgen jetzt „übersetzt über die Herkunft dieser Kopplung“
+  (`abgleich::uebersetzt`: meldende Seite einer Standardkopplung). Über eine Direktkopplung
+  gehen die Kennungen des Absenders unverändert hinaus, und der Empfänger (`Empfaenger::vor_ort`)
+  bildet allein über die Ursprungskennung ab. Auf Standardkopplungen ist sie der letzte Versuch
+  vor dem bisherigen Ausgang.
+- **12.11.2026, D5: Kataloge unverändert.** Katalogzeilen (`spiegel::katalog`, etwa
+  Sprechgruppen des Org-Katalogs) kommen über eine Direktkopplung wie an jeder nicht übersetzenden
+  Seite als Kopie; ein Gegenstück über die Ursprungskennung gibt es dort nicht. Grund: Kataloge
+  sind Einsatzdaten mit eigenem Abgleich (LLH-1629), keine verteilten Stammdaten.
+- **12.11.2026, D5: Eintreffen statt Belegung.** Die einzige Stammdaten-Referenz in Anträgen ist
+  die Einheitsvorlage beim Eintreffen im Bereitstellungsraum; das Spec-Szenario ist entsprechend
+  berichtigt. Sie ist per Unit-Test (`antrag::tests::ein_eintreffen_nennt_den_ursprung_seiner_einheitsvorlage`)
+  und über `nach_ursprung` belegt, nicht mit einem Lauf über drei Instanzen.
+- **12.11.2026, D7: Verträglichkeit mit Protokoll 2.** Kein Struct auf der Leitung verbietet
+  unbekannte Felder; die neuen sind optional und fehlen leer. Belegt per Unit-Test
+  (`spiegel::tests::die_neuen_felder_sind_optional_und_fehlen_leer_auf_der_leitung`); eine
+  Gegenseite mit Protokoll 2 lässt sich im selben Binary nicht starten.

@@ -43,6 +43,9 @@ pub async fn has_herkunft(
     .await?)
 }
 
+/// Hält die Herkunft einer übernommenen Zeile fest, samt Ursprungskennung (LLH-1497, design.md
+/// D5): die gelieferte, sonst `<Kennung der Quelle>/<fremder Schlüssel>` (eine Quelle mit
+/// Protokoll 2 liefert keine und hat die Zeile selbst angelegt).
 pub async fn save(
     conn: &mut SqliteConnection,
     kopplung_org_id: i64,
@@ -50,22 +53,82 @@ pub async fn save(
     art: StammdatenArt,
     fremd: &str,
     lokal: &str,
+    ursprung: Option<&str>,
 ) -> Result<(), AppError> {
     sqlx::query(
         "INSERT INTO stammdaten_herkunft \
-         (kopplung_org_id, org_id, art, fremder_schluessel, lokaler_schluessel) \
-         VALUES (?, ?, ?, ?, ?) \
+         (kopplung_org_id, org_id, art, fremder_schluessel, lokaler_schluessel, ursprung) \
+         VALUES (?1, ?2, ?3, ?4, ?5, COALESCE(?6, \
+             (SELECT k.gegenueber_kennung FROM instanz_kopplung_org o \
+               JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?1) || '/' || ?4)) \
          ON CONFLICT (kopplung_org_id, art, fremder_schluessel) \
-         DO UPDATE SET lokaler_schluessel = excluded.lokaler_schluessel",
+         DO UPDATE SET lokaler_schluessel = excluded.lokaler_schluessel, \
+                       ursprung = excluded.ursprung",
     )
     .bind(kopplung_org_id)
     .bind(org_id)
     .bind(art.as_str())
     .bind(fremd)
     .bind(lokal)
+    .bind(ursprung)
     .execute(&mut *conn)
     .await?;
     Ok(())
+}
+
+/// Ursprungskennung einer Zeile dieser Instanz (LLH-1497, design.md D5): die gespeicherte, wenn
+/// sie übernommen ist, sonst die eigene Instanz mit dem lokalen Schlüssel.
+pub async fn ursprung(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    art: StammdatenArt,
+    lokal: &str,
+) -> Result<String, AppError> {
+    let gespeichert: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT ursprung FROM stammdaten_herkunft \
+         WHERE org_id = ? AND art = ? AND lokaler_schluessel = ? ORDER BY id LIMIT 1",
+    )
+    .bind(org_id)
+    .bind(art.as_str())
+    .bind(lokal)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(Some(u)) = gespeichert {
+        return Ok(u);
+    }
+    let ich: String = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
+        .fetch_one(&mut *conn)
+        .await?;
+    Ok(format!("{ich}/{lokal}"))
+}
+
+/// Lokaler Schlüssel der Zeile einer Org mit dieser Ursprungskennung (LLH-1497, design.md D5):
+/// eigenes Präfix → die lokale Zeile selbst (wenn es sie in der Org gibt, prüft der Aufrufer),
+/// sonst die übernommene Zeile mit diesem Ursprung.
+pub async fn find_nach_ursprung(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    art: StammdatenArt,
+    ursprung: &str,
+) -> Result<Option<String>, AppError> {
+    let ich: String = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
+        .fetch_one(&mut *conn)
+        .await?;
+    if let Some(lokal) = ursprung
+        .strip_prefix(ich.as_str())
+        .and_then(|r| r.strip_prefix('/'))
+    {
+        return Ok(Some(lokal.to_string()));
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT lokaler_schluessel FROM stammdaten_herkunft \
+         WHERE org_id = ? AND art = ? AND ursprung = ? ORDER BY id LIMIT 1",
+    )
+    .bind(org_id)
+    .bind(art.as_str())
+    .bind(ursprung)
+    .fetch_optional(&mut *conn)
+    .await?)
 }
 
 pub async fn delete(

@@ -25,6 +25,6 @@ Führer MUST den Verweis auf seine Zeile derselben Ursprungskennung abbilden, we
 der Kopplung es nicht tun. Gibt es keine, MUST der Verweis leer bleiben, wie bei der Übernahme
 eines Spiegels.
 
-#### Scenario: Belegungsmeldung mit Einheitsvorlage vom Hub
-- **WHEN** an ELW 2 im Spiegel eines Einsatzes von ELW 1 eine Belegung eines Bereitstellungsraums mit der Einheitsvorlage „Sanitätstrupp“ vom Hub beantragt wird
-- **THEN** führt ELW 1 die Belegung mit seiner Einheitsvorlage derselben Ursprungskennung aus
+#### Scenario: Eintreffen mit Einheitsvorlage vom Hub
+- **WHEN** an ELW 2 im Spiegel eines Einsatzes von ELW 1 das Eintreffen einer Kraft in einem Bereitstellungsraum mit der Einheitsvorlage „Sanitätstrupp“ vom Hub beantragt wird
+- **THEN** führt ELW 1 das Eintreffen mit seiner Einheitsvorlage derselben Ursprungskennung aus

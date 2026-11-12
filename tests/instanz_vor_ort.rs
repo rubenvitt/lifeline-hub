@@ -654,3 +654,265 @@ async fn gibt_der_fuehrer_an_den_hub_ab_folgt_die_akte_vor_ort() {
         Some("Die führende Instanz ist hier nicht gekoppelt.")
     );
 }
+
+// ── Ursprungskennung (D5) ────────────────────────────────────────────────────────────────────
+
+/// Hub mit dem Konto „anna“ und dem Fahrzeug „Rotkreuz Nord 1/83-1“, beide ELW beim Hub
+/// gekoppelt und beliefert, dazu vor Ort miteinander (ELW 2 meldet sich bei ELW 1).
+async fn hub_und_zwei_elw() -> (Instanz, Instanz, Instanz) {
+    let hub = instanz().await;
+    schluessel(&hub).await;
+    konto(&hub, "anna").await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Rotkreuz Nord 1/83-1')",
+    )
+    .await;
+    let elw1 = instanz_tls().await;
+    let elw2 = instanz().await;
+    koppeln(&hub, &elw1).await;
+    koppeln(&hub, &elw2).await;
+    melden(&elw1).await;
+    melden(&elw2).await;
+    schluessel(&elw1).await;
+    let code = code_vor_ort(&elw1).await;
+    let (s, v) = einloesen(&elw2, &elw1, &code).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    (hub, elw1, elw2)
+}
+
+async fn ursprung_von(i: &Instanz, art: &str, lokal: i64) -> Option<String> {
+    eine(
+        &i.pool,
+        &format!(
+            "SELECT ursprung FROM stammdaten_herkunft WHERE art = '{art}' \
+             AND lokaler_schluessel = '{lokal}'"
+        ),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn ein_konto_vom_hub_traegt_an_beiden_elw_denselben_ursprung() {
+    let (hub, elw1, elw2) = hub_und_zwei_elw().await;
+    let anna_hub = lokale_id(&hub, "benutzer", "benutzername", "anna").await;
+    let anna1 = lokale_id(&elw1, "benutzer", "benutzername", "anna").await;
+    let anna2 = lokale_id(&elw2, "benutzer", "benutzername", "anna").await;
+    let erwartet = format!("{}/{anna_hub}", kennung_von(&hub).await);
+    assert_eq!(
+        ursprung_von(&elw1, "konto", anna1).await,
+        Some(erwartet.clone())
+    );
+    assert_eq!(ursprung_von(&elw2, "konto", anna2).await, Some(erwartet));
+}
+
+#[tokio::test]
+async fn eine_lieferung_mit_protokoll_3_berichtigt_den_ursprung_aelterer_zeilen() {
+    let (hub, _elw1, elw2) = hub_und_zwei_elw().await;
+    let anna_hub = lokale_id(&hub, "benutzer", "benutzername", "anna").await;
+    let anna2 = lokale_id(&elw2, "benutzer", "benutzername", "anna").await;
+    exec(
+        &elw2.pool,
+        "UPDATE stammdaten_herkunft SET ursprung = 'veraltet'",
+    )
+    .await;
+    exec(
+        &elw2.pool,
+        "UPDATE instanz_kopplung SET gegenueber_protokoll = 2 WHERE art = 'standard'",
+    )
+    .await;
+    for _ in 0..3 {
+        melden(&elw2).await;
+    }
+    assert_eq!(
+        ursprung_von(&elw2, "konto", anna2).await,
+        Some(format!("{}/{anna_hub}", kennung_von(&hub).await))
+    );
+}
+
+#[tokio::test]
+async fn im_spiegel_vor_ort_gelten_konto_rolle_und_fahrzeug_vom_hub_als_dieselben() {
+    let (_hub, elw1, elw2) = hub_und_zwei_elw().await;
+    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Hochwasser").await;
+    let anna1 = lokale_id(&elw1, "benutzer", "benutzername", "anna").await;
+    let anna2 = lokale_id(&elw2, "benutzer", "benutzername", "anna").await;
+    common::rolle_setzen(&elw1.app, &elw1.admin, e, anna1, "einsatzleitung").await;
+    let fz1 = lokale_id(&elw1, "fahrzeug", "funkrufname", "Rotkreuz Nord 1/83-1").await;
+    let fz2 = lokale_id(&elw2, "fahrzeug", "funkrufname", "Rotkreuz Nord 1/83-1").await;
+    let (s, v) = common::anfrage(
+        &elw1.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/fahrzeuge"),
+        &elw1.admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz1}}}"#)),
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    // Ein geliehenes Fahrzeug nur an ELW 1.
+    let (s, v) = common::anfrage_json(
+        &elw1.app,
+        "POST",
+        "/api/fahrzeuge",
+        &elw1.admin,
+        Some(&json!({"funkrufname": "Geliehen 1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let geliehen = v["id"].as_i64().unwrap();
+    let (s, v) = common::anfrage(
+        &elw1.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/fahrzeuge"),
+        &elw1.admin,
+        Some(&format!(r#"{{"fahrzeug_id":{geliehen}}}"#)),
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    for _ in 0..2 {
+        abgleichen(&elw2).await;
+    }
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let s2: i64 = eine(
+        &elw2.pool,
+        &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
+    )
+    .await;
+    let fahrzeuge: Vec<Option<i64>> = sqlx::query_scalar(
+        "SELECT fahrzeug_id FROM einsatz_fahrzeug WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(s2)
+    .fetch_all(&elw2.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        fahrzeuge,
+        vec![Some(fz2), None],
+        "vom Hub dasselbe, geliehen ohne Verweis"
+    );
+    let rolle: String = eine(
+        &elw2.pool,
+        &format!(
+            "SELECT einsatz_rolle FROM einsatz_mitgliedschaft WHERE einsatz_id = {s2} \
+             AND benutzer_id = {anna2}"
+        ),
+    )
+    .await;
+    assert_eq!(rolle, "einsatzleitung");
+    // Stellvertreter gibt es nur für Konten allein an ELW 1 (etwa dessen lokalen Admin).
+    let stellvertreter: i64 = eine(
+        &elw2.pool,
+        "SELECT COUNT(*) FROM spiegel_konto sk JOIN benutzer b ON b.id = sk.benutzer_id \
+         WHERE b.anzeigename = 'anna'",
+    )
+    .await;
+    assert_eq!(stellvertreter, 0, "kein Stellvertreter für Anna");
+}
+
+#[tokio::test]
+async fn ein_antrag_vom_elw_vor_ort_laeuft_im_namen_desselben_kontos() {
+    let (_hub, elw1, elw2) = hub_und_zwei_elw().await;
+    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Hochwasser").await;
+    let anna1 = lokale_id(&elw1, "benutzer", "benutzername", "anna").await;
+    common::rolle_setzen(&elw1.app, &elw1.admin, e, anna1, "fuehrungspersonal").await;
+    for _ in 0..2 {
+        abgleichen(&elw2).await;
+    }
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let s2: i64 = eine(
+        &elw2.pool,
+        &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
+    )
+    .await;
+    // Ohne bestätigte Platte kommt Annas Passwort nicht mit; an ELW 2 ein lokales.
+    let hilfe = konto(&elw2, "hilfe").await;
+    exec(
+        &elw2.pool,
+        "UPDATE benutzer SET passwort_hash = (SELECT passwort_hash FROM benutzer \
+         WHERE benutzername = 'hilfe'), passwort_wechsel_pflicht = 0 WHERE benutzername = 'anna'",
+    )
+    .await;
+    let anna = common::login_cookie(&elw2.app, "anna", "hilfe-pw-123").await;
+
+    let (st, v) = common::anfrage_json(
+        &elw2.app,
+        "POST",
+        &format!("/api/einsaetze/{s2}/etb"),
+        &anna,
+        Some(
+            &json!({ "typ": "meldung", "inhalt": "Vom ELW 2", "von": "ELW 2", "an": "EL",
+                      "client_id": "vo-1" }),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    // „hilfe“ ist ein Konto nur an ELW 2; die Rolle bekommt es direkt am Spiegel.
+    {
+        let mut tx = elw2.pool.begin().await.unwrap();
+        for sql in [
+            "INSERT INTO spiegel_uebernahme (id) VALUES (1)".to_string(),
+            format!(
+                "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+                 VALUES ({s2}, {hilfe}, 'fuehrungspersonal')"
+            ),
+            "DELETE FROM spiegel_uebernahme".to_string(),
+        ] {
+            sqlx::query(sqlx::AssertSqlSafe(sql))
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        tx.commit().await.unwrap();
+    }
+    exec(
+        &elw2.pool,
+        "UPDATE benutzer SET passwort_wechsel_pflicht = 0 WHERE benutzername = 'hilfe'",
+    )
+    .await;
+    let hilfe_cookie = common::login_cookie(&elw2.app, "hilfe", "hilfe-pw-123").await;
+    let (st, v) = common::anfrage_json(
+        &elw2.app,
+        "POST",
+        &format!("/api/einsaetze/{s2}/etb"),
+        &hilfe_cookie,
+        Some(
+            &json!({ "typ": "meldung", "inhalt": "Von Hilfe", "von": "ELW 2", "an": "EL",
+                      "client_id": "vo-2" }),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    for _ in 0..3 {
+        abgleichen(&elw2).await;
+    }
+    let verfasser: String = eine(
+        &elw1.pool,
+        &format!(
+            "SELECT b.benutzername FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
+             WHERE e.einsatz_id = {e} AND e.inhalt = 'Vom ELW 2'"
+        ),
+    )
+    .await;
+    assert_eq!(verfasser, "anna");
+    let grund: String = eine(
+        &elw2.pool,
+        "SELECT grund FROM spiegel_antrag WHERE client_id = 'vo-2'",
+    )
+    .await;
+    assert_eq!(grund, "Konto am Führer unbekannt.");
+    let im_spiegel: i64 = eine(
+        &elw2.pool,
+        &format!(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = {s2} AND inhalt = 'Vom ELW 2'"
+        ),
+    )
+    .await;
+    assert_eq!(im_spiegel, 1, "übernommen und zurückgespiegelt");
+}
