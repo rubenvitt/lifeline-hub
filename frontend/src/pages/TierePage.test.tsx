@@ -413,6 +413,27 @@ describe('TierePage', () => {
     });
   });
 
+  // LLH-1675: Am Spiegel fehlten die Knöpfe ohne Grund auf der Seite.
+  it('am Spiegel nennt die Seite die führende Instanz', async () => {
+    render(
+      einsatzFixture({
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      }),
+      [tierBasis],
+    );
+    await screen.findByText('T-001');
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Spiegel von ELW 1',
+    );
+    expect(screen.queryByRole('button', { name: 'Tier erfassen' })).not.toBeInTheDocument();
+  });
+
   it('Beobachter sieht keine Schreibaktionen', async () => {
     render(einsatzBeobachter, [tierBasis]);
     await screen.findByText('T-001');

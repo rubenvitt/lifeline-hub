@@ -7,7 +7,7 @@ import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import { modulRegistry, modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
-import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import { Formularpaneel } from '../../components/instrument';
 import {
   EINHEITEN_OPTIONEN,
@@ -93,7 +93,7 @@ export default function EinsatzAllgemein() {
         fehler={speichern.error}
         // Nur bei fehlender Rolle. Einen abgeschlossenen Einsatz nennt schon der Seitenkopf.
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
-        rechteText={RECHTE_TEXT}
+        rechteText={daten.rechteGrund()}
       />
       <Form<FormWerteAllgemein>
         form={form}

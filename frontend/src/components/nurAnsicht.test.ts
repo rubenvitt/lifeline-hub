@@ -30,6 +30,25 @@ describe('nurAnsicht (LFH-1078)', () => {
     );
   });
 
+  it('nimmt den Rollentext der Fläche, am Spiegel bleibt die führende Instanz (LLH-1675)', () => {
+    const spiegel = {
+      gegenstelle: 'ELW 1',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+      bruchstelle: 0,
+    };
+    expect(einsatzRechteGrund({ status: 'aktiv', spiegel: null }, NUR_LEITUNG_ORG_ADMIN)).toBe(
+      'nur Einsatzleitung oder Org-Admin',
+    );
+    expect(einsatzRechteGrund({ status: 'aktiv', spiegel }, NUR_LEITUNG_ORG_ADMIN)).toBe(
+      'Spiegel von ELW 1',
+    );
+    expect(einsatzRechteGrund('abgeschlossen', NUR_LEITUNG_ORG_ADMIN)).toBe(
+      'Einsatz abgeschlossen',
+    );
+  });
+
   it('bleibt bei wenigen Wörtern', () => {
     for (const grund of [
       einsatzRechteGrund('abgeschlossen'),

@@ -12,7 +12,15 @@ import EinsatzUnterkunft from './EinsatzUnterkunft';
 
 /** Sektion „Unterkunft“ der Einsatz-Einstellungen (LLH-1520, design.md D2). */
 
-function stelleBereit(rolle = 'einsatzleitung') {
+const SPIEGEL = {
+  gegenstelle: 'ELW 1',
+  beendet: false,
+  antraege_ausstehend: 0,
+  antraege_abgelehnt: 0,
+  bruchstelle: 0,
+};
+
+function stelleBereit(rolle = 'einsatzleitung', spiegel: unknown = null) {
   const puts: { schluessel: string; body: unknown }[] = [];
   let einsatz: Record<string, number> = {};
   server.use(
@@ -24,6 +32,7 @@ function stelleBereit(rolle = 'einsatzleitung') {
         status: 'aktiv',
         meine_rolle: rolle,
         org_id: 1,
+        spiegel,
       }),
     ),
     http.get('/api/einsaetze/1/einstellungen', () =>
@@ -77,5 +86,16 @@ describe('EinsatzUnterkunft (LLH-1520)', () => {
     const feld = await screen.findByRole('spinbutton', { name: 'Wasser je Person und Tag (l)' });
     expect(feld).toBeDisabled();
     expect(screen.getByText(RECHTE_TEXT)).toBeInTheDocument();
+  });
+
+  // LLH-1675: Am Spiegel sperrt die führende Instanz, nicht die Rolle; das Band darüber nennt sie.
+  it('am Spiegel nennt der Grund die führende Instanz statt der Rollen', async () => {
+    stelleBereit('einsatzleitung', SPIEGEL);
+    rendern();
+    const feld = await screen.findByRole('spinbutton', { name: 'Wasser je Person und Tag (l)' });
+    expect(feld).toBeDisabled();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Spiegel von ELW 1',
+    );
   });
 });

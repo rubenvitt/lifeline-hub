@@ -9,16 +9,17 @@ import EinsatzZugriff from './EinsatzZugriff';
 
 /** Sektion „Zugriff“ (LFH-1170, Spec `einsatz-zugriff`): das Paneel der Einsatzdaten, umgezogen. */
 
-const einsatz = (meine_rolle: string | null, status = 'aktiv') => ({
+const einsatz = (meine_rolle: string | null, status = 'aktiv', spiegel: unknown = null) => ({
   id: 1,
   bezeichnung: 'Hochwasser Weser',
   status,
   meine_rolle,
+  spiegel,
 });
 
-function setupServer(rolle: string | null, status = 'aktiv') {
+function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = null) {
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(rolle, status))),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(rolle, status, spiegel))),
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
@@ -87,6 +88,22 @@ describe('EinsatzZugriff', () => {
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).toBeNull();
     expect(screen.getByRole('combobox', { name: 'Rolle von Eva Einsatz' })).toBeDisabled();
+  });
+
+  // LLH-1675: Am Spiegel sperrt die führende Instanz, nicht die Rolle; auch die Einsatzleitung.
+  it('am Spiegel nennt der Grund die führende Instanz statt der Rolle', async () => {
+    setupServer('einsatzleitung', 'aktiv', {
+      gegenstelle: 'ELW 1',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+      bruchstelle: 0,
+    });
+    renderZugriff();
+    expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
+    expect(screen.getByText('Spiegel von ELW 1')).toBeInTheDocument();
+    expect(screen.queryByText('nur Einsatzleitung')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hinzufügen' })).toBeNull();
   });
 
   // LFH-461, umgezogen von den Einsatzdaten: `mitglied_setzen` fordert die Einsatzrolle, ohne

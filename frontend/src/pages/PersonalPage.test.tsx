@@ -492,6 +492,28 @@ describe('PersonalPage', () => {
     await waitFor(() => expect(reaktiviert).toBe(20));
   });
 
+  // LLH-1675: Am Spiegel fehlten die Knöpfe ohne Grund auf der Seite.
+  it('am Spiegel nennt die Seite die führende Instanz', async () => {
+    const { container } = render(
+      einsatz({
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      }),
+    );
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="10"]')).toHaveTextContent('Zugtrupp'),
+    );
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Spiegel von ELW 1',
+    );
+    expect(screen.queryByRole('button', { name: 'Personal disponieren' })).not.toBeInTheDocument();
+  });
+
   it('Beobachter / abgeschlossen: reine Ansicht, Einteilung als Text', async () => {
     const { container } = render(
       einsatz({
@@ -507,7 +529,9 @@ describe('PersonalPage', () => {
     });
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Person' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Personal disponieren' })).not.toBeInTheDocument();
-    expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Einsatz abgeschlossen',
+    );
     expect(zelleNachKopf(container, zeile, 'Einheit')).toHaveTextContent('Zugtrupp');
     expect(zelleNachKopf(container, zeile, 'Fahrzeug')).toHaveTextContent('Florian 1');
     expect(zelleNachKopf(container, zeile, 'Position')).toHaveTextContent('F');

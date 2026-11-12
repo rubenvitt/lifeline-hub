@@ -7,7 +7,7 @@ import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useViewport } from '../../components/useViewport';
 import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
-import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import {
   feldrasterStil,
   initialVerhalten,
@@ -84,7 +84,7 @@ export default function EinsatzVerhalten() {
       <SeitenHinweise
         fehler={speichern.error}
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
-        rechteText={RECHTE_TEXT}
+        rechteText={daten.rechteGrund()}
       />
       <Form<FormWerteVerhalten>
         form={form}

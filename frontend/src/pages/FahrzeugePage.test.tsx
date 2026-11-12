@@ -420,8 +420,30 @@ describe('FahrzeugePage', () => {
   it('abgeschlossener Einsatz ist read-only und zeigt Hinweis', async () => {
     render(einsatz({ status: 'abgeschlossen', abgeschlossen_at: '2026-05-26 12:00:00' }));
     await screen.findByText('Florian 1');
-    expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Einsatz abgeschlossen',
+    );
     expect(screen.queryByRole('button', { name: 'Florian 1 entlassen' })).not.toBeInTheDocument();
+  });
+
+  // LLH-1675: Am Spiegel fehlten die Knöpfe ohne Grund auf der Seite.
+  it('am Spiegel nennt die Seite die führende Instanz', async () => {
+    render(
+      einsatz({
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      }),
+    );
+    await screen.findByText('Florian 1');
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Spiegel von ELW 1',
+    );
+    expect(screen.queryByRole('button', { name: 'Fahrzeuge disponieren' })).not.toBeInTheDocument();
   });
 
   /** Das Besatzungs-Urteil der Tabellenzeile (die Spalte „Besatzung"), nicht das im Aufklappteil. */
