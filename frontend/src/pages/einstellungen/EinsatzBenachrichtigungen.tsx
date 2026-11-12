@@ -20,7 +20,7 @@ import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useViewport } from '../../components/useViewport';
-import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 
 /** Eine Änderung: die Art und ihre Funktionen „still“ danach und davor (für den Rücksprung). */
 type Aenderung = { art: BenachrichtigungArt; still: VorgabeFunktion[]; vorher: VorgabeFunktion[] };
@@ -117,7 +117,7 @@ export default function EinsatzBenachrichtigungen() {
       <SeitenHinweise
         fehler={setzen.error}
         rechteFehlt={daten.istAktiv && !darf}
-        rechteText={RECHTE_TEXT}
+        rechteText={daten.rechteGrund()}
       />
       <Formularpaneel titel="Still je Funktion">
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>

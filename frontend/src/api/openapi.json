@@ -4523,7 +4523,9 @@
           "kategorie",
           "verborgen",
           "folgen",
-          "gesichert_at"
+          "gesichert_at",
+          "nachgereicht",
+          "folgen_offen"
         ],
         "properties": {
           "antrag_art": {
@@ -4531,15 +4533,27 @@
               "string",
               "null"
             ],
-            "description": "Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`)."
+            "description": "Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`, `person`, `sichtung` …,\nsiehe [`NACHREICHBAR`])."
           },
           "folgen": {
             "type": "integer",
             "format": "int64",
             "description": "Zahl der Folgezeilen, die mit ihr gingen."
           },
+          "folgen_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Einträge der Kette, die der Spiegel noch selbst stellt, sobald ihr Bezug beim Führer ist."
+          },
           "gesichert_at": {
             "type": "string"
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Warum ein Eintrag der Kette als eigene Zeile zurück ist (abgelehnt, ein Bezug fehlt)."
           },
           "id": {
             "type": "integer",
@@ -4554,6 +4568,10 @@
               "null"
             ],
             "description": "Inhalt in Kurzform (höchstens [`KURZ_MAX`] Zeichen)."
+          },
+          "nachgereicht": {
+            "type": "boolean",
+            "description": "Schon gestellt; die Zeile steht nur noch da, weil Einträge ihrer Kette folgen (LLH-1657).\nKein Stellen, kein Verwerfen, zählt nicht im Band."
           },
           "tabelle": {
             "type": "string",

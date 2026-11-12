@@ -669,7 +669,7 @@ fn serde_wire_gleich_as_str() {
         MaschinenzugangWiderrufen,
     });
     // Maschinenzugang (LLH-1652): Scopes (Wire der öffentlichen API und JSON in
-    // `maschinenzugang.scopes`), Zustand (DB-CHECK in 0331) und Ablehnungsgrund.
+    // `maschinenzugang.scopes`), Zustand (DB-CHECK in 0332) und Ablehnungsgrund.
     enum_wire!(lifeline_hub::public_api::scope::Scope {
         LageRead => "lage:read",
         EinsaetzeRead => "einsaetze:read",

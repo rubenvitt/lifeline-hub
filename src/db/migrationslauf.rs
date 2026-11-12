@@ -117,9 +117,9 @@ pub(super) async fn einspielen(quelle: Migrator, pool: &SqlitePool) -> Result<()
         "PRAGMA foreign_keys = ON"
     };
 
-    // `run_direct` statt `run`/`run_to`: dieselbe Arbeit, aber ohne den generischen
-    // `Acquire`-Weg, dessen Lebensdauern der `Send`-Beweis im Purge-Task (Archivbau ruft
-    // `db::migrate`) nicht allgemein genug führen kann.
+    // `run_direct` statt `run`/`run_to`: deren `Acquire<'a>` macht den Lauf in einem
+    // `tokio::spawn` (Archivbau im Purge-Takt) zu „`Send` is not general enough“; sqlx bietet
+    // `run_direct` genau dafür an. Gleiches Verhalten: `run_to` ruft es mit derselben Verbindung.
     let ergebnis = async {
         for (version, r) in &einteilung {
             if *r != (Rahmen::Atomar { fk_aus: true }) {

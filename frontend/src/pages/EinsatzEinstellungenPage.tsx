@@ -23,7 +23,11 @@ import {
   type EinstellungenSektion,
 } from '../routing/deeplinks';
 import type { EinsatzEinstellungen } from '../api/types';
-import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
+import {
+  EINSATZ_ABGESCHLOSSEN,
+  NUR_LEITUNG_FUEHRUNG_ORG_ADMIN,
+  einsatzRechteGrund,
+} from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -45,6 +49,12 @@ interface EinstellungenDaten {
   /** Verwaltungsrecht am Einsatz (`darfEinsatzVerwalten`, schließt „aktiv" ein): der Admin nur
       der Einsatz-Org. */
   darfBearbeiten: boolean;
+  /**
+   * Grund des `RechteHinweis` einer Sektion: am Spiegel die führende Instanz, sonst `rollen`
+   * (Vorgabe {@link RECHTE_TEXT}). Die Rollen sperren an einem Spiegel nicht, das Band darüber
+   * nennt die führende Instanz; ein Rollen-Grund darunter widerspräche ihm (LLH-1675).
+   */
+  rechteGrund: (rollen?: string) => string;
   neuLaden: () => void;
 }
 
@@ -64,6 +74,8 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
     einstellungen: einstellungenQuery.data,
     istAktiv: einsatzQuery.data?.status === 'aktiv',
     darfBearbeiten: darfEinsatzVerwalten(einsatzQuery.data, benutzer),
+    rechteGrund: (rollen = RECHTE_TEXT) =>
+      einsatzQuery.data ? einsatzRechteGrund(einsatzQuery.data, rollen) : rollen,
     neuLaden: () => {
       void einsatzQuery.refetch();
       void einstellungenQuery.refetch();
@@ -177,7 +189,7 @@ export default function EinsatzEinstellungenPage() {
       // ein gesetzter `hinweis` reserviert in `EinsatzSeite` auch leer seinen Abstand.
       hinweis={
         !daten.istAktiv && aktiv !== 'aufbewahrung' ? (
-          <RechteHinweis sichtbar text={EINSATZ_ABGESCHLOSSEN} />
+          <RechteHinweis sichtbar text={daten.rechteGrund(EINSATZ_ABGESCHLOSSEN)} />
         ) : undefined
       }
     >

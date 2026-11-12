@@ -99,7 +99,7 @@ wire_enum! {
         ArchivSchluesselGeprueft => "archiv_schluessel_geprueft",
         ArchivSchluesselEntfernt => "archiv_schluessel_entfernt",
         ArchivHeruntergeladen => "archiv_heruntergeladen",
-        /// Maschinenzugang für ein Fremdsystem angelegt (LLH-1652, Migration 0332). Der Code
+        /// Maschinenzugang für ein Fremdsystem angelegt (LLH-1652, Migration 0333). Der Code
         /// steht nie in der Spur.
         MaschinenzugangAngelegt => "maschinenzugang_angelegt",
         /// Neuer Einmal-Code für einen bestehenden Zugang (Schlüsselwechsel).

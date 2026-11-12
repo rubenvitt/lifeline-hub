@@ -320,10 +320,35 @@ describe('MaterialPage', () => {
     expect(screen.getByRole('button', { name: 'Ad-hoc-Material' })).toBeInTheDocument();
   });
 
+  // LLH-1675: Am Spiegel fehlten die Knöpfe ohne Grund auf der Seite.
+  it('am Spiegel nennt die Seite die führende Instanz', async () => {
+    render(
+      {
+        ...einsatzAktiv,
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      },
+      [em],
+    );
+    await screen.findByText('Wolldecke');
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Spiegel von ELW 1',
+    );
+    expect(screen.queryByRole('button', { name: 'Material disponieren' })).not.toBeInTheDocument();
+  });
+
   it('abgeschlossener Einsatz ist reine Anzeige', async () => {
     const abgeschlossen = { ...einsatzAktiv, status: 'abgeschlossen' as const };
     render(abgeschlossen, [em]);
     await screen.findByText('Wolldecke');
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Einsatz abgeschlossen',
+    );
     expect(screen.queryByRole('button', { name: 'Material disponieren' })).not.toBeInTheDocument();
     /**
      * Diese Abfrage hält nur, weil das Gruppenetikett ein Textknoten ist (`1 einsatzbereit`) und

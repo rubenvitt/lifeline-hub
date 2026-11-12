@@ -367,6 +367,17 @@ pub struct AnlegenBody {
     /// mit Netz: aus der Offline-Warteschlange 422.
     #[serde(default)]
     pub rtw: Option<bool>,
+    /// LLH-1657 (Entwurf K2): Angaben, die sonst nur die Bearbeitung setzt. Beim Nachreichen
+    /// einer Person aus der Bruchstelle gehen sie mit der Anlage; nur bei einer wirklich neuen
+    /// Person, Prüfung wie im PATCH. Am Gerät einer Einheit 403 wie die Personalien.
+    #[serde(default)]
+    pub pat_nummer: Option<String>,
+    #[serde(default)]
+    pub kontamination: Option<bool>,
+    #[serde(default)]
+    pub kostform: Option<String>,
+    #[serde(default)]
+    pub unvertraeglichkeiten: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen — Person anlegen (initial erfasst/vermisst/betroffen).
@@ -437,9 +448,13 @@ pub async fn anlegen(
             &body.zustand,
             &body.sichtung,
             &body.vermisst_seit,
+            &body.pat_nummer,
+            &body.kostform,
+            &body.unvertraeglichkeiten,
         ];
         if personalien.into_iter().any(gesetzt)
             || body.alter_geschaetzt.is_some()
+            || body.kontamination.is_some()
             || body.bestaetigt_personal_id.is_some()
         {
             return Err(AppError::Forbidden);
@@ -537,6 +552,22 @@ pub async fn anlegen(
     let melder = optional_max(body.melder_kontakt, "Melder / Kontakt", PERSON_ANGABE_MAX)?;
     let zustand = optional_max(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
     let notiz = optional_max(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
+    // LLH-1657 (K2): wie im PATCH, das Feld für sich (400).
+    let pat_nummer = optional_max(body.pat_nummer, "PAT-Nummer", PAT_NUMMER_MAX)?;
+    let kostform = match trimme(body.kostform) {
+        Some(roh) => Some(crate::person::Kostform::try_from(roh).map_err(AppError::Validation)?),
+        None => None,
+    };
+    let unvertraeglichkeiten = optional_max(
+        body.unvertraeglichkeiten,
+        "Unverträglichkeiten",
+        crate::person::PERSON_UNVERTRAEGLICHKEITEN_MAX,
+    )?;
+    let kontamination = body.kontamination;
+    let zusatz_gesetzt = pat_nummer.is_some()
+        || kostform.is_some()
+        || unvertraeglichkeiten.is_some()
+        || kontamination.is_some();
     // LLH-1103 (design.md D6): dieselbe Prüfung wie im PATCH, das Feld für sich (400).
     let geburtsdatum = match trimme(body.geburtsdatum) {
         Some(roh) => Some(pruefe_geburtsdatum(&roh, chrono::Utc::now().date_naive())?),
@@ -777,6 +808,20 @@ pub async fn anlegen(
             let mut uhs_etb_id = None;
             let mut verbleib_etb_id = None;
             let mut belegung_etb_ids = Vec::new();
+            if war_neu && zusatz_gesetzt {
+                // LLH-1657 (K2): in derselben Transaktion wie die Anlage.
+                sqlx::query(
+                    "UPDATE einsatz_person SET pat_nummer = ?, kontamination = ?, kostform = ?, \
+                     unvertraeglichkeiten = ? WHERE id = ?",
+                )
+                .bind(pat_nummer.as_deref())
+                .bind(kontamination.map(i64::from))
+                .bind(kostform.as_ref().map(|k| k.as_str()))
+                .bind(unvertraeglichkeiten.as_deref())
+                .bind(id)
+                .execute(&mut *conn)
+                .await?;
+            }
             if war_neu {
                 // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
                 // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre

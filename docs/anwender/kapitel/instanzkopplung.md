@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
 ---
 
 ## Überblick
@@ -353,6 +353,8 @@ das Quittieren gelten nur dort.
 Jede Seite eines Spiegels zeigt das Hinweisband „Spiegel von …“ mit der Zeit des letzten
 Abgleichs und der Zahl der ausstehenden und abgelehnten Anträge. Liegt bei einem laufenden
 Einsatz der letzte Abgleich länger als eine Minute zurück, steht dort „keine Verbindung seit …“.
+Wo am Spiegel etwas gesperrt ist, nennt auch der Grund unter „Nur Ansicht“ die führende
+Installation („Spiegel von …“), nicht die Rollen: Am Spiegel schreibt auch die Einsatzleitung nicht.
 
 Abgeglichen wird alle fünf Sekunden, solange an der Kopplung ein Einsatz aktiv ist, ein Antrag
 offen ist oder ein Anhang geholt wird; sonst im Takt der Meldung. Den kurzen
@@ -444,6 +446,14 @@ ein; ohne sie bleibt jeder Einsatz an der Installation, an der er angelegt wurde
 „Führung“ fehlt. Wird sie wieder ausgeschaltet, bleibt jeder Einsatz bei der Installation, die
 ihn gerade führt.
 
+Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet die Einsätze, die hier nicht
+geführt werden: die einer anderen Installation und eigene, deren Führung abgegeben ist. Es zeigt
+sie, solange die Organisation in einer aktiven Kopplung zugeordnet ist; mit dem Widerruf der
+letzten Zuordnung oder Kopplung fallen sie heraus. Ein Einsatz, den die andere Installation
+gelöscht hat und der hier nie gespiegelt wurde, bleibt stehen. Ist die Führung je Einsatz
+aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
+steht dort der Fehler mit „Erneut laden“.
+
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
 dem beantragt wird, und der Einsatzkopf zeigt „Führung: … · Epoche n“. Jeder Wechsel zählt die
@@ -491,16 +501,28 @@ Art, Absender und Inhalt. Was zu einer Erfassung gehört (der ETB-Eintrag einer 
 nicht eigens da, sondern als „+ n Zeilen“ an ihr. Den Inhalt sieht nur, wer das Modul der Zeile
 nutzen darf.
 
-- **Als Antrag stellen** gibt es für ETB-Einträge und Meldungen. Der Antrag geht im Namen
-  dessen, der klickt, an die führende Installation; Wortlaut und Zeit bleiben, die laufende
-  Nummer im ETB vergibt die führende. Er kommt dort genau einmal an, auch wenn er zweimal
-  gestellt wird. Lehnt die führende ihn ab, steht die Erfassung wieder in der Liste.
+- **Als Antrag stellen** gibt es für ETB-Einträge, Meldungen und Personen sowie für Einträge an
+  einer Person (Sichtung, Verbleib, Notiz, Transport, Anlass, Maßnahme, Verletzung). Der Antrag
+  geht im Namen dessen, der klickt, an die führende Installation; Wortlaut und Zeit bleiben, die
+  laufende Nummer im ETB vergibt die führende. Er kommt dort genau einmal an, auch wenn er
+  zweimal gestellt wird. Lehnt die führende ihn ab, steht die Erfassung wieder in der Liste.
+- **Personen** kommen samt Verlauf: Gestellt wird die Person, ihre Einträge folgen von selbst in
+  der Reihenfolge ihrer Zeit, sobald die Person bei der führenden Installation angekommen ist.
+  Das Band zählt die gestellte Person nicht mehr; in der offenen Liste steht bis dahin „n Einträge
+  folgen“. Danach bekommt die Person eine Notiz, unter welcher Nummer sie vorher erfasst war und
+  was dabei aufgehoben oder bestätigt wurde. Lehnt die führende einen Eintrag ab, steht nur dieser
+  wieder in der Liste, mit Grund. Einträge an einer Person, die die führende schon kennt, stehen
+  einzeln da. Eine Person steht immer für sich, auch an einer neuen Meldung: Ist die Meldung noch
+  offen, zuerst sie stellen oder verwerfen; verworfen kommt die Person ohne sie an. Haushalt und
+  Aufnahme in eine UHS gehen nicht mit; beide stehen als eigene Zeilen da, die Notiz nennt die
+  fehlende Haushaltszuordnung. Beide Installationen brauchen dafür denselben Stand: Eine ältere
+  führende übernimmt PAT-Nummer, Kontamination, Kostform und Unverträglichkeiten nicht.
 - **Alle stellen** erscheint ab zwei solchen Erfassungen und stellt sie in der Reihenfolge ihrer
   Zeit. Was noch nicht geht, etwa eine Meldung, deren Bezug die führende noch nicht kennt, bleibt
   in der Liste; der Grund steht neben dem Knopf.
-- **Verwerfen** legt eine Erfassung nach der Rückfrage „Nicht nachreichen?“ ab. Alles andere
-  als ETB-Einträge und Meldungen (Personen, Lagekarte, Kräfte …) lässt sich nur so erledigen;
-  es ist hier gesichert, die führende Installation erfasst es bei Bedarf neu.
+- **Verwerfen** legt eine Erfassung nach der Rückfrage „Nicht nachreichen?“ ab. Was sich nicht
+  stellen lässt (Lagekarte, Kräfte, eine stornierte Person …), lässt sich nur so erledigen; es
+  ist hier gesichert, die führende Installation erfasst es bei Bedarf neu.
 
 Die Zahl im Band zählt nur, was weder gestellt noch verworfen ist. Stellen und Verwerfen
 braucht Schreibrecht im Einsatz. Ist der Abgleich beendet oder der Einsatz abgeschlossen, bleibt

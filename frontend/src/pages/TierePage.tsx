@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
 import {
   ladeTiereExport,
   legeTierAn,
@@ -45,7 +45,7 @@ import type { Spezies, Tier, TierStatus } from '../api/types';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
@@ -370,7 +370,8 @@ export default function TierePage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
+  // Abgeschlossen oder Spiegel: der Grund steht auf der Seite (LLH-1675).
+  const nurAnsicht = isEinsatzGesperrt(einsatz);
 
   const alle = frischAngelegt.alle;
   const tiere = filterTiere(alle, { sicht });
@@ -449,7 +450,7 @@ export default function TierePage() {
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
           <SeitenHinweise
-            rechteText={EINSATZ_ABGESCHLOSSEN}
+            rechteText={einsatzRechteGrund(einsatz)}
             rechteFehlt={nurAnsicht}
             fehler={csvExport.fehler}
             fehlerTitel="Export fehlgeschlagen"
