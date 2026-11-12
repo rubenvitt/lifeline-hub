@@ -1907,6 +1907,26 @@ fn verpflegungsstelle_wire() {
 }
 
 #[test]
+fn public_api_error_code_wire() {
+    enum_wire!(lifeline_hub::public_api::ErrorCode {
+        InvalidField => "invalid_field",
+        Unauthorized => "unauthorized",
+        MissingScope => "missing_scope",
+        TlsRequired => "tls_required",
+        NotFound => "not_found",
+        MethodNotAllowed => "method_not_allowed",
+        Conflict => "conflict",
+        FuehrungElsewhere => "fuehrung_elsewhere",
+        CursorExpired => "cursor_expired",
+        PayloadTooLarge => "payload_too_large",
+        Unprocessable => "unprocessable",
+        RateLimited => "rate_limited",
+        InternalError => "internal_error",
+        Unavailable => "unavailable",
+    } in lifeline_hub::public_api::ErrorCode::ALLE);
+}
+
+#[test]
 fn zeilen_art_wire() {
     enum_wire!(lifeline_hub::error::ZeilenArt {
         Personal => "personal",

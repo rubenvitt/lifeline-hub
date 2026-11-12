@@ -88,6 +88,11 @@ const AUTH_CODE_BODY_MAX: usize = 4 * 1024;
 /// Darüber lehnt `JsonBody` mit 413 ab, bevor der Handler läuft.
 pub const JSON_BODY_MAX: usize = 256 * 1024;
 
+/// Body-Grenze der öffentlichen API unter `/api/v1/` (LLH-1653, Spec `oeffentliche-api-vertrag`):
+/// Fremdsysteme schicken kurze JSON-Bodies (Alarmmeldung, Position, Rechner-Anfrage). Angewendet
+/// in `public_api::montieren`, also innen, vor `JSON_BODY_MAX`.
+pub const PUBLIC_API_BODY_MAX: usize = 64 * 1024;
+
 /// Schichtplan einlesen (LLH-1556): die Datei bis 2 MiB
 /// (`abloesung::schichtplan::uebernahme::DATEI_MAX_BYTES`) plus Entscheidungen und Rahmen. So
 /// bleibt die Prüfung der Datei (400 mit Meldung) die wirksame Grenze.
@@ -2600,6 +2605,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let heic_decoder = opt.heic_decoder_verzeichnis.clone().map(Arc::new);
     let router_platz = crate::instanz::spiegel::antrag::RouterPlatz::default();
     let router: Router = router
+        // Öffentliche API v1 (LLH-1653): Routen nur über `public_api::router()`, jede mit ihrem
+        // Eintrag im Dokument; die Body-Grenze bringt `montieren` mit.
+        .merge(crate::public_api::montieren(crate::public_api::router()))
         .fallback(move |uri: axum::http::Uri, kopf: axum::http::HeaderMap| {
             crate::static_files::serve(uri, kopf, heic_decoder.clone())
         })
@@ -2654,6 +2662,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 }),
             crate::zulassung::zulassung,
         ))
+        // Öffentliche API v1 (LLH-1653, `public_api::schicht`): `code` an jeder Fehlerantwort
+        // unter `/api/v1/` und `Cache-Control: no-store`. Außerhalb der Zulassung und von
+        // CatchPanic, damit auch Lastabwurf-503 und Panik-500 einen Code bekommen.
+        .layer(axum::middleware::from_fn(crate::public_api::schicht))
         // Request-Instrumentierung. `.layer()` hängt nach außen, der Trace-Layer liegt also
         // außerhalb
         // von CatchPanic UND Zulassung und sieht Panik-500er wie Lastabwürfe. Jeder Handler läuft
@@ -2971,5 +2983,70 @@ mod tests {
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["error"], "Interner Serverfehler");
+    }
+
+    /// Unter `/api/v1/` bekommen auch Panik-500 und Lastabwurf-503 ihren `code` (LLH-1653,
+    /// design.md D2): die Schicht `public_api::schicht` liegt außerhalb von CatchPanic und
+    /// Zulassung, in derselben Reihenfolge wie in `build_router_mit`.
+    #[tokio::test]
+    async fn panik_und_lastabwurf_unter_v1_tragen_code() {
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use axum::routing::get;
+        use tower::ServiceExt; // oneshot
+
+        let zulassung = crate::zulassung::Zulassung::neu(
+            std::time::Duration::from_millis(50),
+            crate::zulassung::MAX_GLEICHZEITIGE_REQUESTS,
+        );
+        let app = Router::new()
+            .route(
+                "/api/v1/boom",
+                get(|| async {
+                    panic!("absichtliche Test-Panik");
+                    #[allow(unreachable_code)]
+                    StatusCode::OK
+                }),
+            )
+            .route(
+                "/api/v1/langsam",
+                get(|| async {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    StatusCode::OK
+                }),
+            )
+            .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
+            .layer(axum::middleware::from_fn_with_state(
+                zulassung,
+                crate::zulassung::zulassung,
+            ))
+            .layer(axum::middleware::from_fn(crate::public_api::schicht));
+
+        for (pfad, status, code) in [
+            (
+                "/api/v1/boom",
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+            ),
+            (
+                "/api/v1/langsam",
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+            ),
+        ] {
+            let resp = app
+                .clone()
+                .oneshot(Request::builder().uri(pfad).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), status, "{pfad}");
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["code"], code, "{pfad}: {json}");
+            assert!(
+                json["error"].as_str().is_some_and(|t| !t.is_empty()),
+                "{pfad}"
+            );
+        }
     }
 }

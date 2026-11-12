@@ -1,5 +1,17 @@
 use utoipa::OpenApi;
 
+/// Das Dokument des Frontends bleibt ohne Pfade (ADR-0004, ADR-0022): Pfade mit Vertrag hat nur
+/// die öffentliche API (`docs/api/public-v1.json`).
+#[test]
+fn frontend_dokument_hat_keine_pfade() {
+    let dok = lifeline_hub::api_doc::ApiDoc::openapi();
+    assert!(
+        dok.paths.paths.is_empty(),
+        "src/api_doc.rs hat Pfade: {:?}",
+        dok.paths.paths.keys().collect::<Vec<_>>()
+    );
+}
+
 #[test]
 fn openapi_json_ist_aktuell() {
     let aktuell = lifeline_hub::api_doc::ApiDoc::openapi()
