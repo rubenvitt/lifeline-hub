@@ -6,6 +6,7 @@ datum: 2026-11-12
 gilt_fuer:
   - scripts/runner/**
   - .github/workflows/ci.yml
+  - .github/workflows/e2e.yml
 herleitung:
   - openspec/changes/archive/2026-11-12-igjd7nm7-e2e-eigener-runner/design.md
   - LLH-1666 (mit Ruben am 12.11.2026 abgestimmt)
@@ -32,14 +33,14 @@ herleitung:
 ## Prüfung
 
 ```sh
-verlange "runs-on: .*needs\\.aenderungen\\.outputs\\.runner [|][|] 'ubuntu-latest'" .github/workflows/ci.yml
-verlange 'git show HEAD\^1:scripts/runner/select-runner\.sh' .github/workflows/ci.yml
+verlange "runs-on: .*needs\\.aenderungen\\.outputs\\.runner [|][|] 'ubuntu-latest'" .github/workflows/e2e.yml
+verlange 'git show HEAD\^1:scripts/runner/select-runner\.sh' .github/workflows/e2e.yml
 verbiete 'runs-on:.*(self-hosted|lifeline-e2e)' '.github/workflows/*.yml'
 verlange 'docker run --rm' scripts/runner/runner-loop.sh
 verbiete 'lifeline-cargo-registry|\.cargo/registry' scripts/runner/runner-loop.sh
 verbiete 'docker\.sock|--privileged|--network host|--network=host|TOKEN_FILE.*docker run' scripts/runner/runner-loop.sh
 verlange 'purge -y sudo' scripts/runner/Dockerfile
-verlange "runner[.]environment == 'github-hosted'" .github/workflows/ci.yml
+verlange "runner[.]environment == 'github-hosted'" .github/workflows/e2e.yml
 # Schritte mit `sudo` im Detail: scripts/runner/ci-schritte.test.sh (Schritt 11).
 # Die Fork-Freigabe ist eine Repo-Einstellung und nicht maschinell prüfbar (scripts/runner/README.md).
 ```

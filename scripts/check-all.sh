@@ -343,7 +343,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1666)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Auswahl der Suiten, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -359,6 +359,15 @@ schritt_11() {
   # Die Bereichs-Erkennung (LFH-1115) entscheidet im PR, welche Suiten laufen: ein vergessener
   # Querbezug ließe eine Suite still aus, deren Rot erst auf `alpha` auffiele.
   "$ROOT/scripts/bereiche.test.sh"
+  # Die Auswahl der Suiten in beiden Stufen der PR-CI (LLH-1662) baut darauf auf und übernimmt
+  # nach einer Umnummerierung Suiten vom Vorgänger: irrt sie, mergt Ungeprüftes.
+  "$ROOT/scripts/ci-auswahl.test.sh"
+  # Ob ein PR ohne e2e-Lauf mergen kann, entscheidet die Form von ci.yml und e2e.yml: ein Job-`if`
+  # an der falschen Stelle meldet einen Pflicht-Check leer grün, statt ihn fehlen zu lassen.
+  "$ROOT/scripts/ci-stufen.test.sh"
+  # Die Messung der PR-CI vor und nach der Zweiteilung: zählt sie falsch, belegt der Vergleich
+  # das Gegenteil dessen, was passiert ist.
+  "$ROOT/scripts/ci-messung.test.sh"
   # Die Verteilung der e2e-Anteile nach Laufzeit (LFH-1117): eine Datei, die in keinem Anteil
   # landet, fährt nie, und keiner der vier Pflicht-Checks wird rot.
   mise exec -- node --test "$ROOT/scripts/e2e-anteile.test.mjs"
