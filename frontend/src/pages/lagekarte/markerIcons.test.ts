@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeAnySpec } from '@einsatzzeichen/core';
+import { serializeAnySpec } from '@einsatzzeichen/core/exact';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import {
   baueZeichenRegistry,

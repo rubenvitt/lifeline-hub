@@ -105,6 +105,8 @@ wire_enum! {
         ArchivSchluesselGeprueft => "archiv_schluessel_geprueft",
         ArchivSchluesselEntfernt => "archiv_schluessel_entfernt",
         ArchivHeruntergeladen => "archiv_heruntergeladen",
+        /// Ein Archivblock wurde per Befehl eingespielt (LLH-1494, D10); ohne handelnde Person.
+        ArchivEingespielt => "archiv_eingespielt",
         /// Maschinenzugang für ein Fremdsystem angelegt (LLH-1652, Migration
         /// `*_admin_audit_maschinenzugang.sql`). Der Code steht nie in der Spur.
         MaschinenzugangAngelegt => "maschinenzugang_angelegt",
@@ -151,6 +153,7 @@ pub enum Ziel<'a> {
 ///   `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
 /// - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
 ///   des Blocks, durch Komma getrennt) und `block`.
+/// - `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
 /// - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich
@@ -306,7 +309,40 @@ pub async fn schreibe_ohne_akteur(
     angaben: Option<ZugangsAngaben>,
     peer_ip: Option<IpAddr>,
 ) {
-    let (ziel_benutzer_id, ziel) = match ziel {
+    tracing::info!(
+        aktion = aktion.as_str(),
+        gegenstelle = %crate::auth::benutzername::fuer_protokoll(gegenstelle),
+        ziel = %crate::auth::benutzername::fuer_protokoll(ziel_teile(ziel).1),
+        detail = ?angaben.as_ref().and_then(|a| serde_json::to_string(a).ok()),
+        "Zugang durch gekoppelte Instanz geändert"
+    );
+    if let Err(e) =
+        einfuegen_ohne_akteur(pool, aktion, org_id, gegenstelle, ziel, angaben, peer_ip).await
+    {
+        tracing::error!(
+            aktion = aktion.as_str(),
+            "Admin-Audit konnte nicht geschrieben werden: {e}"
+        );
+    }
+}
+
+/// Wie [`schreibe_ohne_akteur`], aber in der Transaktion `conn` und mit Fehler: für einen
+/// Schreibweg, der ohne seinen Eintrag nicht gelten soll (Archiv einspielen, LLH-1494). Ohne
+/// eigene Log-Zeile: die Transaktion kann wiederholt werden, der Aufrufer protokolliert nach dem
+/// Commit.
+pub async fn schreibe_ohne_akteur_tx(
+    conn: &mut sqlx::SqliteConnection,
+    aktion: AdminAktion,
+    org_id: i64,
+    gegenstelle: &str,
+    ziel: Ziel<'_>,
+) -> Result<(), sqlx::Error> {
+    einfuegen_ohne_akteur(conn, aktion, org_id, gegenstelle, ziel, None, None).await
+}
+
+/// Konto (falls eines) und Text eines Ziels.
+fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
+    match ziel {
         Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
         Ziel::Anmeldeweg(t)
         | Ziel::Lesezugang(t)
@@ -314,20 +350,25 @@ pub async fn schreibe_ohne_akteur(
         | Ziel::Unterschrift(t)
         | Ziel::Archiv(t)
         | Ziel::Maschinenzugang(t) => (None, t),
-    };
+    }
+}
+
+async fn einfuegen_ohne_akteur<'e>(
+    e: impl sqlx::SqliteExecutor<'e>,
+    aktion: AdminAktion,
+    org_id: i64,
+    gegenstelle: &str,
+    ziel: Ziel<'_>,
+    angaben: Option<ZugangsAngaben>,
+    peer_ip: Option<IpAddr>,
+) -> Result<(), sqlx::Error> {
+    let (ziel_benutzer_id, ziel) = ziel_teile(ziel);
     let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
     let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);
     let detail = angaben
         .as_ref()
         .map(|a| serde_json::to_string(a).expect("ZugangsAngaben sind serialisierbar"));
-    tracing::info!(
-        aktion = aktion.as_str(),
-        gegenstelle = %akteur_name,
-        ziel = %ziel,
-        detail = ?detail,
-        "Zugang durch gekoppelte Instanz geändert"
-    );
-    let ergebnis = sqlx::query(
+    sqlx::query(
         "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
          VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
     )
@@ -338,14 +379,9 @@ pub async fn schreibe_ohne_akteur(
     .bind(detail.as_deref())
     .bind(peer_ip.map(|ip| ip.to_string()))
     .bind(org_id)
-    .execute(pool)
-    .await;
-    if let Err(e) = ergebnis {
-        tracing::error!(
-            aktion = aktion.as_str(),
-            "Admin-Audit konnte nicht geschrieben werden: {e}"
-        );
-    }
+    .execute(e)
+    .await?;
+    Ok(())
 }
 
 /// Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097).

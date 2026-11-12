@@ -98,12 +98,15 @@ pub async fn konto_lokal(
     angabe: &KontoAngabe,
 ) -> Result<i64, sqlx::Error> {
     // Die Kennung des Absenders zählt nur für ein echtes Konto der Org des Einsatzes: nie für ein
-    // Konto einer anderen Org und nie für einen Stellvertreter (auch nicht einer anderen Kopplung).
+    // Konto einer anderen Org und nie für einen Stellvertreter (auch nicht einer anderen Kopplung)
+    // oder ein Platzhalter eines eingespielten Archivs (das Einspielen trägt seine eigenen erst nach
+    // der Übernahme in `archiv_konto` ein).
     if let Some(id) = angabe.gegen_id {
-        let gibt: Option<i64> = sqlx::query_scalar(
+        let gibt: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT b.id FROM benutzer b WHERE b.id = ? AND b.org_id = ? \
-             AND NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)",
-        )
+             AND {}",
+            super::OHNE_STELLVERTRETER
+        )))
         .bind(id)
         .bind(org_id)
         .fetch_optional(&mut *conn)
