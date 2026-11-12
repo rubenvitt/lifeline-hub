@@ -12,8 +12,17 @@ import EinsatzKennzahlen from './EinsatzKennzahlen';
  * Kennzahlenbands. Speichert sofort wie die Pegel-Sektion.
  */
 
+const SPIEGEL = {
+  gegenstelle: 'ELW 1',
+  beendet: false,
+  antraege_ausstehend: 0,
+  antraege_abgelehnt: 0,
+  bruchstelle: 0,
+};
+
 interface Aufbau {
   rolle?: string;
+  spiegel?: unknown;
   status?: string;
   lagekennzahlen?: string[];
   putStatus?: number;
@@ -32,6 +41,7 @@ function stelleBereit(a: Aufbau = {}) {
         status: a.status ?? 'aktiv',
         meine_rolle: a.rolle ?? 'einsatzleitung',
         lagekennzahlen,
+        spiegel: a.spiegel ?? null,
       });
     }),
     http.get('/api/einsaetze/1/einstellungen', () =>
@@ -157,5 +167,15 @@ describe('EinsatzKennzahlen (LLH-1371)', () => {
       await userEvent.click(s);
       await waitFor(() => expect(aufrufe).toEqual([{ gewaehlt: [] }]));
     });
+  });
+
+  // LLH-1675: Am Spiegel sperrt die führende Instanz, nicht die Rolle.
+  it('am Spiegel nennt der Grund die führende Instanz', async () => {
+    stelleBereit({ spiegel: SPIEGEL });
+    rendern();
+    expect(await schalter()).toBeDisabled();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht Spiegel von ELW 1',
+    );
   });
 });

@@ -204,6 +204,32 @@ describe('EinsatzModule', () => {
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 
+  // LLH-1675: Am Spiegel sperrt die führende Instanz, nicht die Rolle.
+  it('nennt am Spiegel die führende Instanz statt der Rollen', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      spiegel: {
+        gegenstelle: 'ELW 1',
+        beendet: false,
+        antraege_ausstehend: 0,
+        antraege_abgelehnt: 0,
+        bruchstelle: 0,
+      },
+    } as never);
+
+    rendern();
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+        'Nur Ansicht Spiegel von ELW 1',
+      ),
+    );
+    expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
+  });
+
   // LFH-995: wie der Server — der Admin trägt nur in der Org des Einsatzes.
   it('laesst den Admin der Einsatz-Org ohne Mitgliedschaft verwalten', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({

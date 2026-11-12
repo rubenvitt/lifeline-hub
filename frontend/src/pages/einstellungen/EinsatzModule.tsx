@@ -183,7 +183,7 @@ export default function EinsatzModule() {
       <SeitenHinweise
         fehler={overrideMutation.error}
         rechteFehlt={daten.istAktiv && !darfVerwalten}
-        rechteText={RECHTE_TEXT}
+        rechteText={daten.rechteGrund(RECHTE_TEXT)}
       />
       <Formularpaneel titel="Modul-Sichtbarkeit & Berechtigungen">
         <ModulEinstellungsListe
