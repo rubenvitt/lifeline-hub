@@ -158,6 +158,13 @@ async fn werde_fuehrer(
         .execute(&mut *conn)
         .await?;
     if let Some((alt, neu)) = umnummeriert {
+        // Die Akte nennt die Nummer im Kopf: Sie folgt sofort, nicht erst mit `ensure_akten`,
+        // damit Antwort, Admin-Spur und die nächste Meldung die neue tragen.
+        sqlx::query("UPDATE einsatz_fuehrung SET nummer = ? WHERE id = ?")
+            .bind(&neu)
+            .bind(akte.id)
+            .execute(&mut *conn)
+            .await?;
         add_nummer_eintrag(conn, einsatz_id, &alt, &neu).await?;
     }
     super::takt::wecken();

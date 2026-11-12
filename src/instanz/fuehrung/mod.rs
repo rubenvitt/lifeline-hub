@@ -146,6 +146,16 @@ pub async fn fordere_enabled(pool: &SqlitePool) -> Result<(), AppError> {
     }
 }
 
+/// Meldet nach dem Commit einen Führungswechsel an einem lokalen Einsatz: den Kopf (`einsatz`,
+/// `einsatzliste`) und einen Vollabgleich (`lagged`). Der Wechsel kann am Einsatz geschrieben haben,
+/// ohne dass der Aufrufer es erfährt: Wird ein Spiegel eigen und ist seine Nummer hier belegt,
+/// steht danach ein Systemeintrag im ETB (LLH-1703). `lagged` lässt offene Schirme alles neu
+/// laden, wie nach jeder Lieferung im Abgleich (`spiegel::abgleich::melde_live`).
+pub async fn melde_wechsel(pool: &SqlitePool, live: &crate::live::LiveHub, einsatz_id: i64) {
+    crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;
+    live.publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Lagged);
+}
+
 /// Schreibt beim Start den Schalter. An: die Akten entscheiden, Spiegel folgen ihnen. Aus: es
 /// bleibt, wie es ist (LLH-1641, E8; ein Spiegel wird nicht wieder beschreibbar, weil der Schalter
 /// fällt, sonst schrieben zwei Instanzen).

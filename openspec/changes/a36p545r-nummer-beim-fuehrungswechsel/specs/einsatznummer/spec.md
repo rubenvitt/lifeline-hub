@@ -56,17 +56,17 @@ laufende Nummer über allen Einsätzen des Jahres, die die Instanz kennt, auch i
 
 ### Requirement: Eine Umnummerierung ist nachlesbar
 Bekommt ein Einsatz beim Übergang vom Spiegel zum eigenen Einsatz eine neue Nummer, MUST sein
-Einsatztagebuch einen Systemeintrag tragen, der die neue und die bisherige Nummer nennt. Die bisher
-führende Instanz MUST die neue Nummer nach dem nächsten Abgleich an ihrem Spiegel zeigen. Wechselt
-die Führung später zurück, kehrt die frühere Nummer nicht von selbst wieder.
+Einsatztagebuch einen Systemeintrag tragen, der die neue und die bisherige Nummer nennt. Findet
+die Instanz bei einem Führungswechsel kein Konto, unter dem der Eintrag stehen kann, entfällt er,
+und der Wechsel MUST trotzdem gelingen.
 
 #### Scenario: Eintrag nach Notübernahme
 - **WHEN** der Hub einen Einsatz bei der Notübernahme von `E-2026-0001` auf `E-2026-0003` umnummeriert hat
 - **THEN** nennt ein Systemeintrag im Einsatztagebuch dieses Einsatzes `E-2026-0003` und `E-2026-0001`
 
-#### Scenario: Die abgebende Seite zeigt die neue Nummer
-- **WHEN** der Hub den Einsatz bei der Notübernahme auf `E-2026-0003` umnummeriert hat und der ELW sich nach der bestätigten Übernahme meldet
-- **THEN** zeigt der ELW den Einsatz als Spiegel mit `E-2026-0003`
+#### Scenario: Kein Konto für den Eintrag
+- **WHEN** ein Spiegel mit belegter Nummer durch einen Führungswechsel zum eigenen Einsatz wird und an dieser Instanz weder eine abschließende Person noch eine Einsatzleitung des Einsatzes noch ein System-Admin seiner Organisation besteht
+- **THEN** gelingt der Wechsel, der Einsatz trägt die neue Nummer, und sein Einsatztagebuch bekommt keinen Eintrag zur Nummer
 
 #### Scenario: Kein Eintrag ohne Umnummerierung
 - **WHEN** ein Spiegel mit freier Nummer zum eigenen Einsatz wird
@@ -75,3 +75,16 @@ die Führung später zurück, kehrt die frühere Nummer nicht von selbst wieder.
 #### Scenario: Verwahrung bei gleicher Nummer
 - **WHEN** der Hub einen abgeschlossenen Einsatz des ELW zur Verwahrung annimmt und schon ein eigener Einsatz dieselbe Nummer trägt
 - **THEN** bekommt der verwahrte Einsatz eine freie Nummer, und der Systemeintrag „Zur Verwahrung übernommen von …“ nennt die neue und die bisherige Nummer
+
+### Requirement: Die neue Nummer gilt an beiden Seiten
+Die bisher führende Instanz MUST die neue Nummer an ihrem Spiegel zeigen, sobald sie den Einsatz
+als Spiegel abgleicht. Übergibt die neue führende Instanz die Führung später zurück, kehrt die
+frühere Nummer nicht von selbst wieder; der Einsatz behält seine Nummer, solange sie dort frei ist.
+
+#### Scenario: Die abgebende Seite zeigt die neue Nummer
+- **WHEN** der Hub den Einsatz bei der Notübernahme auf `E-2026-0003` umnummeriert hat und der ELW sich nach der bestätigten Übernahme meldet
+- **THEN** zeigt der ELW den Einsatz als Spiegel mit `E-2026-0003`
+
+#### Scenario: Rückgabe behält die Nummer
+- **WHEN** der Hub den auf `E-2026-0003` umnummerierten Einsatz an den ELW zurückgibt und der ELW keinen eigenen Einsatz `E-2026-0003` hat
+- **THEN** führt der ELW den Einsatz mit `E-2026-0003`

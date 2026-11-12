@@ -78,7 +78,10 @@ Verworfen:
 Ablauf englisch, „freie Nummer“ bleibt deutsch). Verhalten unverändert: belegt ist die Nummer, wenn
 ein eigener Einsatz der Organisation oder das Löschprotokoll denselben Text oder dieselbe laufende
 Nummer des Jahres trägt; die neue laufende Nummer liegt über allen Einsätzen (auch Spiegeln) und
-dem Löschprotokoll des Jahres, belegte Texte werden übersprungen. Ergebnis `Some((alt, neu))` bei
+dem Löschprotokoll des Jahres, belegte Texte werden übersprungen. Das weicht bewusst von der
+Anlage ab, die seit LLH-1630 nur eigene Einsätze zählt: Die neue Nummer soll keinem Spiegel
+gleichen, der später selbst eigen werden kann und dann wieder umnummeriert würde. Der Preis sind
+Lücken im eigenen Nummernkreis (im Review am 12.11.2026 als Frage aufgekommen, so belassen). Ergebnis `Some((alt, neu))` bei
 einer Umnummerierung. Das Verschieben ist ein eigener `refactor`-Commit ohne Verhaltensänderung.
 
 `lebensende::umwandeln` ruft die Funktion weiter selbst vor `verwahren`: Ohne Schalter
@@ -113,8 +116,16 @@ Findet sich kein Akteur, entfällt der Eintrag, und der Wechsel gelingt trotzdem
 Das weicht bewusst von der Verwahrung ab, die in diesem Fall wartet: Eine Verwahrung kann warten,
 eine Notübernahme nicht, und ein Abbruch im Abgleich wäre wieder der Fehler dieser Aufgabe.
 
-Ein eigenes Live-Ereignis gibt es nicht. Jeder Führungswechsel meldet schon den Einsatzkopf
-(LLH-1674), und der trägt die neue Nummer.
+Die Akte (`einsatz_fuehrung.nummer`) zieht `werde_fuehrer` bei einer Umnummerierung gleich mit,
+und `fuehrung::repo::save` liest sie danach neu: Antwort und Admin-Spur der Notübernahme nennen den
+Einsatz so mit seiner neuen Nummer, nicht mit einer, die hier ein anderer Einsatz trägt.
+
+Live (Nachtrag aus dem Review, 12.11.2026): Der Kopf allein reicht nicht, denn das Ereignis
+`einsatz` lädt im Client weder das ETB noch den Modulzähler neu, und die ID des Eintrags erreicht
+keinen Aufrufer von `save`. Jeder Führungswechsel an einem lokalen Einsatz meldet deshalb neben
+dem Kopf einen Vollabgleich (`lagged`, `fuehrung::melde_wechsel`), wie jede Lieferung im Abgleich
+(`spiegel::abgleich::melde_live`). Verworfen: die ID durch `werde_fuehrer`, `richte_aus`, `save`
+und die Dienste reichen (etwa zehn Signaturen für ein Ereignis je Führungswechsel).
 
 Verworfen (am 12.11.2026 mit Ruben): die Spur nur im Führungsverlauf (nur an der Instanz sichtbar,
 die umnummeriert hat, und nicht dort, wo Einsatzkräfte lesen) und gar keine Spur.

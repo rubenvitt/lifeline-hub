@@ -161,6 +161,19 @@ mod tests {
         .unwrap();
     }
 
+    /// Ein weiterer Spiegel derselben Org mit der Nummer `lfd`, der Spiegel bleibt.
+    async fn fremder_spiegel(pool: &SqlitePool, lfd: i64) {
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern, nummer_jahr, \
+             nummer_lfd, spiegel) \
+             VALUES (1, 'Fremd', 'E-2026-' || printf('%04d', ?1), 2026, ?1, 1)",
+        )
+        .bind(lfd)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
     async fn richte_aus(pool: &SqlitePool, id: i64) {
         let mut tx = pool.begin().await.unwrap();
         super::super::fuehrung::richte_aus(&mut tx, id)
@@ -199,6 +212,36 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(merker, 0, "der Merker der Übernahme bleibt nicht stehen");
+        let akte: Option<String> =
+            sqlx::query_scalar("SELECT nummer FROM einsatz_fuehrung WHERE einsatz_id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            akte.as_deref(),
+            Some("E-2026-0002"),
+            "die Akte folgt sofort"
+        );
+    }
+
+    /// Die neue Nummer liegt über allen Einsätzen des Jahres, auch über fremden Spiegeln (Spec
+    /// `einsatznummer`, „Neue Nummer über den Spiegeln“): anders als die Anlage, die nur eigene
+    /// zählt.
+    #[tokio::test]
+    async fn die_neue_nummer_liegt_ueber_den_spiegeln() {
+        let pool = pool().await;
+        eigener_einsatz(&pool, 1).await;
+        eigener_einsatz(&pool, 2).await;
+        for lfd in 2..=5 {
+            fremder_spiegel(&pool, lfd).await;
+        }
+        let id = spiegel_mit_eigener_akte(&pool, Some(1)).await;
+        richte_aus(&pool, id).await;
+        assert_eq!(
+            stand(&pool, id).await,
+            (Some("E-2026-0006".into()), false, 0)
+        );
     }
 
     #[tokio::test]

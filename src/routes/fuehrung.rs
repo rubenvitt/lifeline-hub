@@ -77,13 +77,14 @@ async fn anzeige(state: &AppState, akte_id: i64) -> Result<FuehrungAnzeige, AppE
     dienst::anzeige(&mut conn, &a).await
 }
 
-/// Nach einer Änderung: Live-Ereignis am Einsatzkopf (lokaler Einsatz) und die neue Anzeige.
+/// Nach einer Änderung: Live-Ereignisse am lokalen Einsatz (Kopf und Vollabgleich,
+/// `instanz::fuehrung::melde_wechsel`) und die neue Anzeige.
 /// `a` ist die Akte, wie der Dienst sie in seiner Transaktion gespeichert hat: Ereignis und
 /// Admin-Spur hängen an keinem Lesen nach dem Commit (LLH-1674); scheitert erst die Anzeige, gilt
 /// der Wechsel mit beidem.
 async fn danach(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige, AppError> {
     if let Some(einsatz_id) = a.einsatz_id {
-        crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+        crate::instanz::fuehrung::melde_wechsel(&state.pool, &state.live, einsatz_id).await;
     }
     anzeige(state, a.id).await
 }
