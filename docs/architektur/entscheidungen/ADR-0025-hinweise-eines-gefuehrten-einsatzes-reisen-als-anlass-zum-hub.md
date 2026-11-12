@@ -54,4 +54,6 @@ trägt nur Kennungen der sendenden Instanz, deren Text der Service Worker dort h
 Der Hub legt vollwertige Hinweise an (Eingang, Live, Push) und prüft dabei seine Rechte, auch
 für Nutzer, die nur am Hub arbeiten. Ein Hinweis kommt am Hub erst nach dem nächsten Abgleich an
 (der Ausgang weckt ihn). Wer an beiden Instanzen arbeitet, sieht den Hinweis zweimal, gepusht
-wird einmal. `umadressieren` reist nicht mit; neu Gemeinte pusht die führende Instanz selbst.
+wird einmal. `umadressieren` reist nicht mit; neu Gemeinte pusht die führende Instanz selbst. Ein
+Konto vom Hub hat am ELW kein neues Abo und bekommt dort, wo der Hub nicht pusht, keinen Push
+(hingenommen, design.md, „Risks“).

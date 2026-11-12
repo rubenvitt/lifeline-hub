@@ -184,6 +184,12 @@ der Wächter `art::tests::trigger_passen_zur_beschreibung` hält die Annahme.
   → Die Meldung läuft im Takt (Sekunden bis Minuten); der Hinweis am Hub bleibt. Hinnehmbar.
 - [Hinweis am Hub kommt spät] Er wartet auf den Abgleich. → `takt::wecken()` nach jedem
   Ausgang; ohne Verbindung kommt er nach, höchstens 12 Stunden.
+- [Konto vom Hub ohne Abo am ELW] Ein Konto, das vom Hub stammt, legt am gekoppelten ELW kein
+  neues Abo an (422). Wo der Hub nicht pusht (Einsatz einer ungekoppelten Org am selben ELW,
+  `umadressieren`, gescheitertes Vormerken, Demo- oder abzuräumender Einsatz), pusht der ELW an
+  Abos, die dieses Konto meist nicht mehr hat; es sieht den Hinweis dann nur im offenen Tab.
+  Hingenommen (mit Ruben am 12.11.2026): die Fälle sind selten, und ein ELW im Einsatz erreicht
+  Push-Dienste oft ohnehin nicht. Ein Nachzug wäre, das Abo am ELW für diese Fälle zuzulassen.
 - [Gegenstand vor dem Hub gelöscht] Wird die Zeile eines Hinweises am ELW gelöscht, bevor sie
   am Hub ankommt, wartet der Hinweis bis zu 12 Stunden und verfällt ohne Push. Hingenommen (mit
   Ruben am 12.11.2026): der Gegenstand ist weg, ein Push dazu zeigte ins Leere.

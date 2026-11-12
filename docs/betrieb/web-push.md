@@ -74,6 +74,9 @@ Internet und zu den Push-Diensten, nicht der ELW.
   Bestehende Abos bleiben gespeichert und gelten wieder, sobald die Kopplung der Org widerrufen
   ist. Konten, die nur am ELW bestehen (etwa Spontanhelfer), kennt der Hub nicht: Ihnen pusht der
   ELW weiter selbst, und sie behalten den Schalter.
+- Bekannte Grenze: Ein Konto vom Hub hat am ELW kein neues Abo. Für Einsätze, die der Hub nicht
+  kennt (eine ungekoppelte Org am selben ELW, Demo-Einsätze) und für eine korrigierte
+  Empfängerfunktion einer Meldung bekommt es deshalb keinen Push, nur den Hinweis in der App.
 - Bietet der Hub keinen Push an (oder kennt er die Hinweise noch nicht, älterer Softwarestand),
   pusht der ELW wie ohne Kopplung, sofern er selbst `LIFELINE_WEB_PUSH` hat.
 - Der Link zeigt die Adresse, unter der der ELW den Hub erreicht. Läuft die Kopplung über ein
