@@ -1048,8 +1048,9 @@ async fn nach_ursprung_findet_eigene_und_uebernommene_zeilen_nie_fremde_org_oder
             fz
         )
         .await
-        .unwrap(),
-        format!("{ich}/{fz}")
+        .unwrap()
+        .as_deref(),
+        Some(format!("{ich}/{fz}").as_str())
     );
     assert_eq!(
         nach_ursprung(
@@ -1105,8 +1106,9 @@ async fn nach_ursprung_findet_eigene_und_uebernommene_zeilen_nie_fremde_org_oder
             vom_hub
         )
         .await
-        .unwrap(),
-        "hub/7"
+        .unwrap()
+        .as_deref(),
+        Some("hub/7")
     );
     assert_eq!(
         nach_ursprung(
@@ -1184,4 +1186,18 @@ fn die_neuen_felder_sind_optional_und_fehlen_leer_auf_der_leitung() {
         serde_json::from_value(serde_json::json!({"art": "konto", "schluessel": "1", "stand": 1}))
             .unwrap();
     assert_eq!(l.ursprung, None);
+}
+
+#[tokio::test]
+async fn ohne_eigene_instanzkennung_gibt_es_keine_erfundene_ursprungskennung() {
+    // Liefern aus einer Archivdatei (LLH-1494): dort fehlt `instanz_identitaet`.
+    let pool = crate::db::test_pool().await;
+    let u = super::abbildung::ursprung(
+        &mut *pool.acquire().await.unwrap(),
+        crate::instanz::stammdaten::StammdatenArt::Fahrzeug,
+        42,
+    )
+    .await
+    .unwrap();
+    assert_eq!(u, None);
 }

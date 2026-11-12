@@ -442,15 +442,19 @@ async fn ursprung_hinaus(
         match ziel {
             Ziel::Stammdaten(art) => {
                 if let Some(id) = wert.as_i64() {
-                    let u = abbildung::ursprung(conn, *art, id).await?;
-                    aus.insert(s.name.clone(), Value::from(u));
+                    if let Some(u) = abbildung::ursprung(conn, *art, id).await? {
+                        aus.insert(s.name.clone(), Value::from(u));
+                    }
                 }
             }
             Ziel::QualiSoll | Ziel::QualiListe => {
                 let mut je = Map::new();
                 for q in quali_ids(wert) {
-                    let u = abbildung::ursprung(conn, StammdatenArt::Qualifikation, q).await?;
-                    je.insert(q.to_string(), Value::from(u));
+                    if let Some(u) =
+                        abbildung::ursprung(conn, StammdatenArt::Qualifikation, q).await?
+                    {
+                        je.insert(q.to_string(), Value::from(u));
+                    }
                 }
                 if !je.is_empty() {
                     aus.insert(s.name.clone(), Value::Object(je));

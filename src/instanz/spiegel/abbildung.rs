@@ -182,11 +182,13 @@ pub async fn stellvertreter(
 
 /// Ursprungskennung einer eigenen Stammdatenzeile (LLH-1497, design.md D5): die übernommene,
 /// sonst die eigene Instanz mit der lokalen ID. Eine ID ist je Tabelle eindeutig, darum ohne Org.
+/// `None` ohne eigene Instanzkennung, etwa beim Liefern aus einer Archivdatei (LLH-1494): dann
+/// wird keine erfunden, und die Gegenseite bildet wie bisher ab.
 pub async fn ursprung(
     conn: &mut SqliteConnection,
     art: StammdatenArt,
     id: i64,
-) -> Result<String, sqlx::Error> {
+) -> Result<Option<String>, sqlx::Error> {
     let gespeichert: Option<Option<String>> = sqlx::query_scalar(
         "SELECT ursprung FROM stammdaten_herkunft WHERE art = ? AND lokaler_schluessel = ? \
          ORDER BY id LIMIT 1",
@@ -196,12 +198,12 @@ pub async fn ursprung(
     .fetch_optional(&mut *conn)
     .await?;
     if let Some(Some(u)) = gespeichert {
-        return Ok(u);
+        return Ok(Some(u));
     }
-    let ich: String = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
-        .fetch_one(&mut *conn)
+    let ich: Option<String> = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
+        .fetch_optional(&mut *conn)
         .await?;
-    Ok(format!("{ich}/{id}"))
+    Ok(ich.map(|ich| format!("{ich}/{id}")))
 }
 
 /// Ursprungskennung eines Kontos; `None` für einen Stellvertreter (er ist nie ein echtes Konto).
@@ -217,7 +219,7 @@ pub async fn konto_ursprung(
     if stellvertreter {
         return Ok(None);
     }
-    Ok(Some(ursprung(conn, StammdatenArt::Konto, id).await?))
+    ursprung(conn, StammdatenArt::Konto, id).await
 }
 
 /// Die eigene Zeile der Org `org_id` mit dieser Ursprungskennung (LLH-1497, design.md D5): eigenes

@@ -1000,10 +1000,9 @@ async fn antrag_ursprung(
         let mut werte = Vec::new();
         jeder_wert(&mut daten, v.pfad, &mut werte);
         if let Some(id) = werte.first().and_then(|w| w.as_i64()) {
-            aus.insert(
-                v.pfad.to_string(),
-                abbildung::ursprung(conn, ziel, id).await?,
-            );
+            if let Some(u) = abbildung::ursprung(conn, ziel, id).await? {
+                aus.insert(v.pfad.to_string(), u);
+            }
         }
     }
     Ok(aus)
