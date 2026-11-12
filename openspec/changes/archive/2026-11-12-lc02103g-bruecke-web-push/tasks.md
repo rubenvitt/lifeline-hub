@@ -40,7 +40,7 @@ eigenen Testbinary, weil Live prozessweit ist (`tests/instanz_spiegel_live.rs`).
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` grün (Verweis auf den Lauf vor dem PR).
+- [x] 7.1 `./scripts/check-all.sh` grün: belegt durch die CI des PRs (in der Cloud-Sitzung fehlt `mise`; lokal gelaufen: rustfmt, Prettier, Schreibweisen, Architektur, OpenSpec-Archiv, ADR- und Migrationsnummern, Lib-Suite und die berührten Integrationssuiten).
 
 ## Workflow follow-up
 
