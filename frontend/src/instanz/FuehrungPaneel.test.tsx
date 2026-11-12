@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderMitProviders } from '../test/utils';
+import { onlineManager } from '@tanstack/react-query';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import FuehrungPaneel from './FuehrungPaneel';
 import type { FuehrungAnzeige } from '../api/types';
 import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
@@ -19,6 +20,7 @@ vi.mock('../api/fuehrung', () => ({
 
 import {
   bestaetigeUebernahme,
+  frageFuehrungAn,
   gibFuehrungPerCodeAb,
   uebergebeFuehrung,
   uebernimmFuehrung,
@@ -206,5 +208,125 @@ describe('FuehrungPaneel (LLH-1491)', () => {
         'ABCD-EFGH-JKMN-PQRS',
       ),
     );
+  });
+
+  describe('ohne Netz (LLH-1670)', () => {
+    const gegenueberFuehrt = () =>
+      akte({
+        fuehrend: false,
+        fuehrer_name: 'Hub Nord',
+        fuehrer_kennung: 'k-hub',
+        fuehrer_richtung: 'meldet_sich',
+      });
+
+    it('sperrt jede Aktion der Führung und nennt den Grund', async () => {
+      renderMitProviders(<FuehrungPaneel fuehrung={akte()} darfBedienen />);
+      setzeOnline(false);
+      const grund = await screen.findByText('Ohne Verbindung nicht änderbar');
+      for (const name of ['Führung an Hub Nord übergeben', 'Führung per Code abgeben']) {
+        const knopf = screen.getByRole('button', { name });
+        expect(knopf).toBeDisabled();
+        expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+      }
+    });
+
+    it('sperrt Anfrage und Notübernahme', async () => {
+      renderMitProviders(<FuehrungPaneel fuehrung={gegenueberFuehrt()} darfBedienen />);
+      setzeOnline(false);
+      expect(await screen.findByText('Ohne Verbindung nicht änderbar')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Führung anfragen' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Notübernahme …' })).toBeDisabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Führung anfragen' }));
+      expect(frageFuehrungAn).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['Führung an Hub Nord übergeben', 'Führung übergeben', uebergebeFuehrung],
+      ['Führung per Code abgeben', 'Code erzeugen', gibFuehrungPerCodeAb],
+    ] as const)(
+      'Netz fällt bei offener Rückfrage „%s“ weg: es geht nichts hinaus, auch nicht danach',
+      async (ausloeser, ok, api) => {
+        renderMitProviders(<FuehrungPaneel fuehrung={akte()} darfBedienen />);
+        await userEvent.click(screen.getByRole('button', { name: ausloeser }));
+        const knoepfe = await screen.findAllByRole('button', { name: ok });
+        setzeOnline(false);
+        await userEvent.click(knoepfe[knoepfe.length - 1]);
+        setzeOnline(true);
+        await new Promise((r) => setTimeout(r, 50));
+        expect(api).not.toHaveBeenCalled();
+      },
+    );
+
+    it('eine Aktion wird nie angehalten: sie geht sofort hinaus oder scheitert sofort', async () => {
+      vi.mocked(uebergebeFuehrung).mockResolvedValue(akte({ fuehrend: false }));
+      renderMitProviders(<FuehrungPaneel fuehrung={akte()} darfBedienen />);
+      // Nur TanStack hält sich für offline; die App selbst sieht Netz (`useOhneVerbindung`).
+      onlineManager.setOnline(false);
+      await userEvent.click(screen.getByRole('button', { name: 'Führung an Hub Nord übergeben' }));
+      await bestaetigeRueckfrage('Führung übergeben');
+      await waitFor(() => expect(uebergebeFuehrung).toHaveBeenCalledTimes(1));
+    });
+
+    it('Netz fällt bei offenem Notübernahme-Dialog weg: der getippte Grund bleibt, nichts geht hinaus', async () => {
+      renderMitProviders(<FuehrungPaneel fuehrung={gegenueberFuehrt()} darfBedienen />);
+      await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(within(dialog).getByLabelText('Grund'), 'Hub weg');
+      setzeOnline(false);
+      expect(await within(dialog).findByText('Ohne Verbindung nicht änderbar')).toBeInTheDocument();
+      const absenden = within(dialog).getByRole('button', { name: 'Führung übernehmen' });
+      expect(absenden).toBeDisabled();
+      await userEvent.click(absenden);
+      setzeOnline(true);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(uebernimmFuehrung).not.toHaveBeenCalled();
+      expect(within(dialog).getByLabelText('Grund')).toHaveValue('Hub weg');
+    });
+
+    it('sperrt Bestätigen und Widersprechen einer offenen Übernahme', async () => {
+      const offen = akte({
+        offen: { von: 'Hub Nord', epoche: 2, grund: 'ELW ohne Verbindung' },
+      });
+      renderMitProviders(<FuehrungPaneel fuehrung={offen} darfBedienen />);
+      setzeOnline(false);
+      const gruende = await screen.findAllByText('Ohne Verbindung nicht änderbar');
+      expect(gruende).toHaveLength(1);
+      for (const name of ['Übernahme bestätigen', 'Widersprechen']) {
+        const knopf = screen.getByRole('button', { name });
+        expect(knopf).toBeDisabled();
+        expect(knopf).toHaveAttribute('aria-describedby', gruende[0].id);
+      }
+    });
+  });
+
+  describe('eine Aktion zur Zeit (LLH-1670)', () => {
+    it('während die Übergabe läuft, ist die Abgabe per Code gesperrt', async () => {
+      vi.mocked(uebergebeFuehrung).mockReturnValue(new Promise(() => {}));
+      renderMitProviders(<FuehrungPaneel fuehrung={akte()} darfBedienen />);
+      await userEvent.click(screen.getByRole('button', { name: 'Führung an Hub Nord übergeben' }));
+      await bestaetigeRueckfrage('Führung übergeben');
+      await waitFor(() => expect(uebergebeFuehrung).toHaveBeenCalled());
+      expect(screen.getByRole('button', { name: 'Führung per Code abgeben' })).toBeDisabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Führung per Code abgeben' }));
+      expect(gibFuehrungPerCodeAb).not.toHaveBeenCalled();
+    });
+
+    it('während die Anfrage läuft, ist die Notübernahme gesperrt', async () => {
+      vi.mocked(frageFuehrungAn).mockReturnValue(new Promise(() => {}));
+      renderMitProviders(
+        <FuehrungPaneel
+          fuehrung={akte({
+            fuehrend: false,
+            fuehrer_name: 'Hub Nord',
+            fuehrer_kennung: 'k-hub',
+            fuehrer_richtung: 'meldet_sich',
+          })}
+          darfBedienen
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Führung anfragen' }));
+      await waitFor(() => expect(frageFuehrungAn).toHaveBeenCalled());
+      expect(screen.getByRole('button', { name: 'Notübernahme …' })).toBeDisabled();
+    });
   });
 });

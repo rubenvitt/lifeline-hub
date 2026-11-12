@@ -1,7 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { globalKeys } from '../api/queryKeys';
 import { EinsaetzeBeimGegenueber } from './EinsaetzeBeimGegenueber';
 import type { FuehrungAnzeige } from '../api/types';
 
@@ -49,5 +50,35 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
     renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />);
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText('Einsätze beim Gegenüber')).toBeNull();
+  });
+
+  it('fällt die Akte beim Abruf aus der Liste, bleibt der Dialog mit Hinweis stehen (LLH-1670)', async () => {
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([akte]);
+    const client = neuerQueryClient();
+    renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />, { client });
+    await userEvent.click(await screen.findByRole('button', { name: 'Führung …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/Nicht mehr unter/)).toBeNull();
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([]);
+    await client.invalidateQueries({ queryKey: globalKeys.instanzkopplungFuehrung() });
+    expect(await screen.findByText('Kein Einsatz beim Gegenüber')).toBeInTheDocument();
+    const nochDa = screen.getByRole('dialog');
+    expect(
+      within(nochDa).getByText(/Nicht mehr unter „Einsätze beim Gegenüber“/),
+    ).toBeInTheDocument();
+    expect(within(nochDa).getByRole('button', { name: 'Führung anfragen' })).toBeEnabled();
+  });
+
+  it('ein neuer Stand aus der Liste erreicht den offenen Dialog (LLH-1670)', async () => {
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([akte]);
+    const client = neuerQueryClient();
+    renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />, { client });
+    await userEvent.click(await screen.findByRole('button', { name: 'Führung …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Führung anfragen' })).toBeInTheDocument();
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([{ ...akte, anfrage_offen: true }]);
+    await client.invalidateQueries({ queryKey: globalKeys.instanzkopplungFuehrung() });
+    expect(await within(dialog).findByText('beim Gegenüber gestellt')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Führung anfragen' })).toBeNull();
   });
 });

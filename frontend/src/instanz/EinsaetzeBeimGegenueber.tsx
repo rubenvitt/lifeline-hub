@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Modal } from 'antd';
+import { Alert, Button, Modal } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { Paneel, StatusChip, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
@@ -17,7 +17,10 @@ import { FUEHRUNG_ART_TEXT, fuehrungKurz } from './fuehrungText';
  */
 export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolean }) {
   const { token } = useRollen();
-  const [offenId, setOffenId] = useState<number | null>(null);
+  // Die beim Öffnen gewählte Akte (LLH-1670): Der Dialog hängt nicht am 30-s-Abruf. Steht sie
+  // noch in der Liste, gilt deren neuerer Stand; fällt sie heraus, bleibt der letzte mit Hinweis
+  // stehen, samt getipptem Grund, eingegebenem Code und einer Erfolgsmeldung.
+  const [gewaehlt, setGewaehlt] = useState<FuehrungAnzeige | null>(null);
   const q = useQuery({
     queryKey: globalKeys.instanzkopplungFuehrung(),
     queryFn: loadFuehrungFremd,
@@ -25,7 +28,9 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
     retry: false,
   });
   if (!q.data) return null;
-  const offen = q.data.find((a) => a.id === offenId) ?? null;
+  const ausDerListe = gewaehlt ? (q.data.find((a) => a.id === gewaehlt.id) ?? null) : null;
+  const offen = ausDerListe ?? gewaehlt;
+  const nichtMehrGelistet = gewaehlt != null && ausDerListe == null;
   return (
     <Paneel
       titel="Einsätze beim Gegenüber"
@@ -41,7 +46,7 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         renderItem={(a) => (
           <ListenEintrag
             actions={[
-              <Button key="fuehrung" onClick={() => setOffenId(a.id)} data-lfh="fremd-fuehrung">
+              <Button key="fuehrung" onClick={() => setGewaehlt(a)} data-lfh="fremd-fuehrung">
                 Führung …
               </Button>,
             ]}
@@ -75,10 +80,20 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         open={offen != null}
         title={offen ? offen.bezeichnung : ''}
         footer={null}
-        onCancel={() => setOffenId(null)}
+        onCancel={() => setGewaehlt(null)}
         width={640}
         destroyOnHidden
       >
+        {nichtMehrGelistet && (
+          <Alert
+            type="info"
+            showIcon
+            data-lfh="fremd-fuehrung-nicht-gelistet"
+            style={{ marginBlockEnd: token.marginSM }}
+            title="Nicht mehr unter „Einsätze beim Gegenüber“"
+            description="Stand vom letzten Abruf. Die Führung kann sich inzwischen geändert haben."
+          />
+        )}
         {offen && <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} />}
       </Modal>
     </Paneel>
