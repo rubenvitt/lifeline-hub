@@ -285,7 +285,12 @@ describe('FuehrungPaneel (LLH-1491)', () => {
 
     it('sperrt Bestätigen und Widersprechen einer offenen Übernahme', async () => {
       const offen = akte({
-        offen: { von: 'Hub Nord', epoche: 2, grund: 'ELW ohne Verbindung' },
+        offen: {
+          von: 'Hub Nord',
+          epoche: 2,
+          grund: 'ELW ohne Verbindung',
+          bruch_at: '2026-11-09 14:00:00',
+        },
       });
       renderMitProviders(<FuehrungPaneel fuehrung={offen} darfBedienen />);
       setzeOnline(false);
