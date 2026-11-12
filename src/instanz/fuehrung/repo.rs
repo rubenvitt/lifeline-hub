@@ -135,26 +135,22 @@ pub async fn find_by_kennung(
 }
 
 /// Akten einer Org, deren Einsatz beim Gegenüber liegt: ohne lokalen Einsatz oder hier nur als
-/// Spiegel (LLH-1641, E2), und nur, solange die Org dort zugeordnet ist (LLH-1675): Ist die
-/// Ursprungs-Instanz der Akte (Präfix der Kennung) hier gekoppelt, zählt ihre Kopplung; sonst kam
-/// die Akte über eine dritte Instanz (mehrere ELW an einem Hub), und es zählt irgendeine aktive
-/// Zuordnung der Org. Eine beim Führer gelöschte Akte ohne Spiegel bleibt bis LLH-1699 stehen.
+/// Spiegel (LLH-1641, E2), und nur, solange die Org in einer aktiven Kopplung zugeordnet ist —
+/// dieselbe Bedingung, unter der [`ensure_akten`] eigene Akten anlegt (LLH-1675). Über welche
+/// Kopplung eine Akte kam, ist nicht gespeichert; das Präfix der Kennung nennt nur den Ursprung,
+/// nicht den Führer oder den Lieferweg. Eine beim Führer gelöschte Akte ohne Spiegel und die Akten
+/// eines widerrufenen ELW, solange die Org an einem anderen hängt, bleiben bis LLH-1699 stehen.
 pub async fn list_fremde_der_org(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<Vec<AkteZeile>, AppError> {
-    const ZUGEORDNET: &str = "o.org_id = f.org_id AND o.widerrufen_at IS NULL \
-         AND k.zustand IN ('angebahnt', 'aktiv')";
-    const VOM: &str = "substr(f.kennung, 1, length(k.gegenueber_kennung) + 1) \
-         = k.gegenueber_kennung || '/'";
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM einsatz_fuehrung f WHERE f.org_id = ? AND (f.einsatz_id IS NULL \
            OR f.einsatz_id IN (SELECT id FROM einsatz WHERE spiegel = 1)) \
-         AND (EXISTS (SELECT 1 FROM instanz_kopplung_org o \
-                      JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE {ZUGEORDNET} AND {VOM}) \
-           OR (NOT EXISTS (SELECT 1 FROM instanz_kopplung k WHERE {VOM}) \
-               AND EXISTS (SELECT 1 FROM instanz_kopplung_org o \
-                           JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE {ZUGEORDNET}))) \
+         AND EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+                     JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+                     WHERE o.org_id = f.org_id AND o.widerrufen_at IS NULL \
+                       AND k.zustand IN ('angebahnt', 'aktiv')) \
          ORDER BY f.status, f.geaendert_at DESC, f.id DESC"
     )))
     .bind(org_id)
@@ -1065,7 +1061,10 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn akte_einer_frueher_gekoppelten_instanz_faellt_trotz_anderer_kopplung_heraus() {
+    async fn andere_kopplung_zum_ursprung_versteckt_keine_akte_der_gekoppelten_org() {
+        // Review LLH-1675: Eine alte oder nur andere Orgs tragende Kopplung zur Ursprungs-Instanz
+        // sagt nichts darüber, über welche Kopplung die Akte kam (die Herkunft ist nicht
+        // gespeichert). Es zählt die Zuordnung der Org, wie beim Anlegen eigener Akten.
         let pool = crate::db::test_pool().await;
         gekoppelt(&pool).await;
         sqlx::query(
@@ -1078,10 +1077,8 @@ pub(crate) mod tests {
         .unwrap();
         fremde_akte(&pool, "hub/5-aa").await;
         fremde_akte(&pool, "elw2/9-bb").await;
-        assert_eq!(
-            gelistet(&pool).await,
-            vec!["hub/5-aa"],
-            "nur die des aktiven Hubs"
-        );
+        let mut liste = gelistet(&pool).await;
+        liste.sort();
+        assert_eq!(liste, vec!["elw2/9-bb", "hub/5-aa"]);
     }
 }

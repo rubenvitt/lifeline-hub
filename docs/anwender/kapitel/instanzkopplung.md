@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
 ---
 
 ## Überblick
@@ -445,10 +445,13 @@ ein; ohne sie bleibt jeder Einsatz an der Installation, an der er angelegt wurde
 „Führung“ fehlt. Wird sie wieder ausgeschaltet, bleibt jeder Einsatz bei der Installation, die
 ihn gerade führt.
 
-Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet die Einsätze, die eine
-andere Installation angelegt hat, solange die Organisation bei ihr zugeordnet ist: Mit dem Widerruf
-der Zuordnung oder der Kopplung fallen ihre Einsätze heraus. Ist die Führung je Einsatz aus, fehlt
-das Paneel; lässt es sich sonst nicht laden, steht dort der Fehler mit „Erneut laden“.
+Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet die Einsätze, die hier nicht
+geführt werden: die einer anderen Installation und eigene, deren Führung abgegeben ist. Es zeigt
+sie, solange die Organisation in einer aktiven Kopplung zugeordnet ist; mit dem Widerruf der
+letzten Zuordnung oder Kopplung fallen sie heraus. Ein Einsatz, den die andere Installation
+gelöscht hat und der hier nie gespiegelt wurde, bleibt vorerst stehen. Ist die Führung je Einsatz
+aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
+steht dort der Fehler mit „Erneut laden“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
