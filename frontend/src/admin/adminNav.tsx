@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { lazy, Suspense, type ReactElement } from 'react';
 import StichworteTab from '../stammdaten/StichworteTab';
 import EinsatzVorlagenTab from '../stammdaten/EinsatzVorlagenTab';
 import ExterneStellenTab from '../stammdaten/ExterneStellenTab';
@@ -21,10 +21,14 @@ import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
 import LagemonitorZugaenge from '../pages/einstellungen/LagemonitorZugaenge';
-import ArchivSchluessel from '../pages/einstellungen/ArchivSchluessel';
 import InstanzkopplungSeite from '../instanz/InstanzkopplungSeite';
 import KartenOnlineSektion from '../karten/KartenOnlineSektion';
 import KartenOfflineSektion from '../karten/KartenOfflineSektion';
+import { SeitenSkeleton } from '../components/SeitenZustand';
+
+// Eigener Chunk wie `PlanungenPage` (App.tsx): nur der System-Admin kommt hierher, und der
+// Haupt-Chunk liegt an der Precache-Grenze (`maximumFileSizeToCacheInBytes` in vite.config.ts).
+const ArchivSchluessel = lazy(() => import('../pages/einstellungen/ArchivSchluessel'));
 
 /**
  * Admin-Nav-Registry: einzige Quelle für die Sidebar-Einträge UND die Routen unter `/admin`.
@@ -94,7 +98,15 @@ export const adminGruppen: AdminGruppe[] = [
       // LLH-1490: diese Instanz mit einer anderen koppeln (ELW und Hub), Unterschriftsschlüssel.
       { key: 'instanzkopplung', label: 'Instanzkopplung', element: <InstanzkopplungSeite /> },
       // LLH-1494: Schlüssel, an die der Hub einen Einsatz nach der Nachbereitung verschlüsselt.
-      { key: 'archiv-schluessel', label: 'Archiv-Schlüssel', element: <ArchivSchluessel /> },
+      {
+        key: 'archiv-schluessel',
+        label: 'Archiv-Schlüssel',
+        element: (
+          <Suspense fallback={<SeitenSkeleton />}>
+            <ArchivSchluessel />
+          </Suspense>
+        ),
+      },
     ],
   },
   {
