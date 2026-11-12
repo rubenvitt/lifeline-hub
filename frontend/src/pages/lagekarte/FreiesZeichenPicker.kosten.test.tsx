@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, screen } from '@testing-library/react';
-import { serializeAnySpec } from '@einsatzzeichen/core';
+import { serializeAnySpec } from '@einsatzzeichen/core/exact';
 import type { SymbolSpec } from '@einsatzzeichen/schema';
 import { renderMitProviders } from '../../test/utils';
 import FreiesZeichenPicker from './FreiesZeichenPicker';

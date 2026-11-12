@@ -247,6 +247,55 @@ ersetzt.
 Herleitung:
 `openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
 
+## Archiv eines Einsatzes einspielen (LLH-1494)
+
+Ein Archivblock aus der Archivakte (`einsatz-…-block-<n>.sqlite.age`, siehe Anwenderdoku
+„Aufbewahrung“) lässt sich an einer Installation wieder ansehen. Der Befehl ersetzt nichts und
+darf bei laufendem Server laufen. Er migriert die Datenbank nicht und bricht ab, wenn sie nicht
+auf dem Stand seiner Version ist: also mit derselben Version aufrufen, mit der der Server läuft.
+
+```bash
+lifeline-hub --db-path /var/lib/lifeline/lifeline.db archiv einspielen \
+             --datei einsatz-E-2026-0751-block-1.sqlite.age --identitaet archiv-schluessel.txt
+# Schlüssel aus dem Passwortmanager
+pass show lifeline/archiv | lifeline-hub --db-path … archiv einspielen --datei … --identitaet -
+# In eine andere Organisation als die des Einsatzes
+lifeline-hub --db-path … archiv einspielen --datei … --identitaet … --org 2
+```
+
+- Der Block wird mit einem privaten Archiv-Schlüssel der Organisation geöffnet, neben der
+  Datenbank als Zwischendatei (nur für den Dienst lesbar, danach gelöscht, auch bei Strg+C oder
+  SIGTERM) entschlüsselt und auf den Stand dieser Version gebracht. Ein Block einer neueren
+  Version lässt sich nur dort einspielen. Nach einem harten Abbruch (`kill -9`, Absturz) löscht
+  der laufende Server eine liegen gebliebene Zwischendatei, sobald sie 6 Stunden alt ist (Purge-Lauf
+  alle 10 Minuten). Bis dahin liegt sie im Klartext neben der Datenbank; wer nicht warten will,
+  löscht `lifeline-zwischen-…-einspielen-…` von Hand.
+- Der Einsatz erscheint als eigener Einsatz mit dem Band „Aus dem Archiv · bis …“, nur lesbar,
+  für Admins und Führungskräfte der Organisation. Ein Skelett desselben Einsatzes bleibt daneben
+  unberührt. Offene Einsatzlisten zeigen ihn erst nach dem Neuladen.
+- **Nach 7 Tagen** löscht der Purge-Lauf ihn wieder, früher, wenn eine Frist des Blocks
+  (Datenkategorie oder Aufbewahrung) eher endet; die Ausgabe nennt das. Das Löschprotokoll nennt
+  ihn als Spiegel mit Gegenstelle „Archiv“. Bricht der Befehl nach der Übernahme ab, ist die
+  unvollständige Kopie eine Stunde nach Beginn der Übernahme fällig.
+- Personen aus dem Archiv stehen als gesperrte Konten mit ihrem damaligen Namen darin. Sie
+  erscheinen in keiner Verwaltung, werden nicht Mitglied und gehen mit dem Einsatz. Fahrzeuge,
+  Personal, Material und Status gelten nur als dieselben, wenn es sie hier mit derselben Kennung
+  und demselben Namen gibt.
+- **Organisation:** Ohne `--org` geht der Einsatz in die Organisation mit seiner Kennung, aber
+  nur, wenn sie hier denselben Namen trägt wie im Archiv. Sonst bricht der Befehl ab, und
+  `--org` nennt die Ziel-Organisation.
+- **Abgelehnt** wird ein Block, dessen Aufbewahrung abgelaufen ist. Stammt er von dieser
+  Installation (gleiche Kennung, Nummer und Abschlusszeit), muss er hier noch im Archiv stehen:
+  Einen Block, den seine Frist oder ein Löschersuchen gelöscht hat, oder einen endgültig
+  gelöschten Einsatz spielt der Befehl nicht ein. Vollzieht ein Löschersuchen, während eine Kopie
+  hier eingespielt ist, geht sie mit dem nächsten Purge-Lauf. An einer anderen Installation weiß
+  er davon nichts; heruntergeladene Blöcke sind beim Löschersuchen mit zu löschen. Ist seit dem Download die Frist einer Datenkategorie
+  abgelaufen, schwärzt der Befehl sie vor dem Einspielen; die Ausgabe nennt sie.
+- Die Übernahme läuft in einer Transaktion. Ein großer Block hält währenddessen die Schreiber des
+  laufenden Servers auf; während eines laufenden Einsatzes besser nicht einspielen.
+- Das Zugangsprotokoll hält jedes Einspielen unter „Archiv eingespielt“ fest, in derselben
+  Transaktion wie die Übernahme.
+
 ## Sicherungen und Schwärzung (LFH-725)
 
 Nach Ablauf von Aufbewahrungsfrist und Karenz schwärzt der Server die Personendaten eines

@@ -1,4 +1,4 @@
-import type { EinsatzAnzeige, EinsatzStatus } from '../api/types';
+import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../api/types';
 
 /**
  * Gründe der Zeile „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078; `frontend/AGENTS.md`,
@@ -51,10 +51,13 @@ export function modulSperre(namen: readonly string[]): string | null {
 
 /**
  * Ein Spiegel (LLH-1492, Spec `einsatz-spiegel`): die führende Instanz nennt der Grund, wie das
- * Hinweisband. Ändern geht dort; hier nur die beantragbaren Erfassungen.
+ * Hinweisband. Ändern geht dort; hier nur die beantragbaren Erfassungen. Ein eingespieltes Archiv
+ * (LLH-1494) heißt wie im Band.
  */
-export function spiegelGrund(gegenstelle: string): string {
-  return `Spiegel von ${gegenstelle}`;
+export function spiegelGrund(
+  spiegel: Pick<EinsatzSpiegelAnzeige, 'gegenstelle' | 'archiv_bis'>,
+): string {
+  return spiegel.archiv_bis ? 'Aus dem Archiv' : `Spiegel von ${spiegel.gegenstelle}`;
 }
 
 /**
@@ -68,7 +71,7 @@ export function einsatzRechteGrund(
   rollen: string = NUR_LEITUNG_FUEHRUNG,
 ): string {
   if (typeof einsatz !== 'string' && einsatz.spiegel != null) {
-    return spiegelGrund(einsatz.spiegel.gegenstelle);
+    return spiegelGrund(einsatz.spiegel);
   }
   const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
   if (status !== 'aktiv') return EINSATZ_ABGESCHLOSSEN;
