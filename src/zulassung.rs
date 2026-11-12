@@ -150,6 +150,8 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/personen/export"),
     ("GET", "/api/einsaetze/{id}/tiere/export"),
     ("GET", "/api/einsaetze/{id}/schaeden/export"),
+    // Archiv eines Einsatzes (LLH-1494): ein ganzer Block, Platz bis zum Ende der Übertragung.
+    ("GET", "/api/aufbewahrung/einsaetze/{id}/archiv"),
 ];
 
 /// Konfiguration der Zulassungssteuerung, als State an der Middleware, damit Tests enge Grenzen
