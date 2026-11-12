@@ -29,7 +29,14 @@ import {
 
 // Die Liste kommt erst beim Aufklappen (LLH-1646). Im Haupt-Chunk schob sie diesen über die
 // Precache-Grenze (`maximumFileSizeToCacheInBytes`, vite.config.ts); der Vorrat hält sie trotzdem.
-const BruchstelleListe = lazy(() => import('./BruchstelleListe'));
+// Scheitert das Nachladen (erste Sitzung ohne Netz), steht nur im Band ein Hinweis.
+const BruchstelleListe = lazy(() =>
+  import('./BruchstelleListe').catch(() => ({ default: ListeNichtGeladen })),
+);
+
+function ListeNichtGeladen() {
+  return <Typography.Text type="secondary">Liste nicht geladen</Typography.Text>;
+}
 
 /**
  * Hinweisband am Spiegel (LLH-1492, design.md D13, Spec `einsatz-spiegel`, „Der Spiegel zeigt
