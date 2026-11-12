@@ -132,10 +132,10 @@ describe('FuehrungPaneel (LLH-1491)', () => {
   it('im Konflikt gibt es nur das Bestätigen, kein Widersprechen (LLH-1669)', async () => {
     vi.mocked(bestaetigeUebernahme).mockResolvedValue(akte({ fuehrend: false }));
     const konflikt = akte({
+      art: 'notuebernahme',
       offen: {
         von: 'ELW 1',
         epoche: 2,
-        grund: 'Hub nicht erreichbar',
         bruch_at: '2026-11-09 14:00:00',
         konflikt: true,
       },
@@ -147,6 +147,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Widersprechen' })).toBeNull();
+    expect(screen.queryByText('Unterzeichnet von')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
     await bestaetigeRueckfrage('Übernahme bestätigen');
     await waitFor(() => expect(bestaetigeUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));

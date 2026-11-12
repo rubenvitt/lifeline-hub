@@ -57,7 +57,7 @@ export default function FuehrungHinweisband({ einsatz }: { einsatz: EinsatzAnzei
         type="warning"
         showIcon
         banner
-        title={offeneUebernahmeTitel(f.offen)}
+        title={offeneUebernahmeTitel(f.offen, f.art)}
         description={teile.join(' · ')}
         action={
           darfFuehrungBedienen(einsatz, benutzer) ? (

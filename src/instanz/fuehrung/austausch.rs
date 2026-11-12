@@ -188,12 +188,20 @@ pub enum Entscheid {
     Verwerfen(String),
 }
 
-/// Die Annahmeregel als reine Funktion (Tabelle in design.md D7): `richtung` der Kopplung aus
-/// meiner Sicht, `bewiesen` = ob der Beweis gegen meine Schlüssel trägt (nur für die meldende
-/// Seite von Belang).
-pub fn entscheide(richtung: InstanzKopplungRichtung, bewiesen: Result<(), String>) -> Entscheid {
+/// Die Annahmeregel als reine Funktion (Tabelle in design.md D7 der Change `v6hj7xl2`, ergänzt in
+/// design.md D3 und D7 der Change `faq7l7m4-zwei-elw-unterlegene-seite`): `richtung` der Kopplung
+/// aus meiner Sicht, `bewiesen` = ob der Beweis gegen meine Schlüssel trägt (nur für die meldende
+/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, oder
+/// sie hat die Epoche vergeben, mit der die erreichte Seite selbst führt). Dann gibt es keinen
+/// Beweis gegen mich, und niemand hat Unrechtes getan: offen halten, ohne Alarm.
+pub fn entscheide(
+    richtung: InstanzKopplungRichtung,
+    bewiesen: Result<(), String>,
+    dritter: bool,
+) -> Entscheid {
     match (richtung, bewiesen) {
         (InstanzKopplungRichtung::WirdGemeldet, _) => Entscheid::Annehmen,
+        (InstanzKopplungRichtung::MeldetSich, _) if dritter => Entscheid::OffenHalten,
         (InstanzKopplungRichtung::MeldetSich, Ok(())) => Entscheid::OffenHalten,
         (InstanzKopplungRichtung::MeldetSich, Err(grund)) => Entscheid::Verwerfen(grund),
     }
@@ -413,15 +421,22 @@ async fn fuehre_weiter(
 }
 
 /// Ob eine offene Übernahme ein Konflikt ist (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
-/// design.md D3): Die erreichte Seite nennt einen Dritten als Führer, die Akte trägt also keine
-/// Erklärung gegen diese Instanz. Eine gültige Übernahme gegen sie trägt sie immer
-/// ([`check_unterschrift`] setzt sie voraus); eine Abgabe per Code läuft nicht über `offen`.
-pub fn ist_konflikt(offen: &AkteMeldung, ich: &str) -> bool {
-    !offen
-        .erklaerung
-        .as_deref()
-        .and_then(NotuebernahmeErklaerung::parse)
-        .is_some_and(|e| e.fuehrer_alt == ich)
+/// design.md D3): Die erreichte Seite nennt als Führer eine Instanz, mit der diese nicht gekoppelt
+/// ist (`gekoppelt`: Kennungen der Gegenüber der Org). Eine Übernahme durch das Gegenüber selbst
+/// ist keiner, auch nicht mit der Epoche eines Dritten (D7).
+pub fn ist_konflikt(offen: &AkteMeldung, gekoppelt: &[&str]) -> bool {
+    !gekoppelt.contains(&offen.fuehrer.as_str())
+}
+
+/// Der Inhalt einer gehaltenen Akte ohne das, was sich bei jedem Takt ändert (Stand, Merker der
+/// sendenden Seite): gleicher Inhalt heißt dieselbe Übernahme.
+fn inhalt(m: &AkteMeldung) -> AkteMeldung {
+    AkteMeldung {
+        stand: 0,
+        anfrage: false,
+        offen: false,
+        ..m.clone()
+    }
 }
 
 /// Hält eine Übernahme gegen mich offen, bis die Einsatzleitung entscheidet; bei gleichem Inhalt
@@ -433,63 +448,27 @@ async fn halte_offen(
     bruch: &str,
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
-    let offen = serde_json::to_string(m).expect("serialisierbar");
-    if a.offen.as_deref() == Some(offen.as_str()) {
+    let vorher = a
+        .offen
+        .as_deref()
+        .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok());
+    // Nur der Stand des Hubs hat sich geändert (etwa weil er meine Akte neu quittiert): dieselbe
+    // Übernahme, nichts schreiben, nichts melden. Sonst schaukelten sich beide Stände je Takt hoch
+    // und die Einsatzleitung bekäme jedes Mal einen neuen Hinweis.
+    if vorher.as_ref().is_some_and(|v| inhalt(v) == inhalt(m)) {
         return Ok(());
     }
-    a.offen = Some(offen);
-    a.offen_bruch_at = Some(bruch.to_string());
+    a.offen = Some(serde_json::to_string(m).expect("serialisierbar"));
+    // Die Bruchstelle ist die letzte Meldung vor der ersten Übernahme, die offen ist.
+    if vorher.is_none() || a.offen_bruch_at.is_none() {
+        a.offen_bruch_at = Some(bruch.to_string());
+    }
     repo::save(conn, a, true).await?;
     if let Some(einsatz_id) = a.einsatz_id {
         aus.folgen.push(Folge::Offen { einsatz_id });
         aus.folgen.push(Folge::Kopf { einsatz_id });
     }
     Ok(())
-}
-
-/// Zieht meine Führung über die Epoche `m` des Hubs nach (D7): nächste Epoche, eine Erklärung an
-/// der Akte auf den neuen Stand, Verlauf ohne Alarm. Die Akte geht mit neuem Stand hinaus, und der
-/// Hub nimmt sie an, weil er selbst führt.
-async fn ziehe_nach(
-    conn: &mut SqliteConnection,
-    ich: &Ich,
-    kopplung: &KopplungZeile,
-    a: &mut AkteZeile,
-    m: &AkteMeldung,
-) -> Result<(), AppError> {
-    let neu = Epoche::naechste([&a.epoche(), &m.epoche], &ich.kennung);
-    if let Some(mut e) = a
-        .erklaerung
-        .as_deref()
-        .and_then(NotuebernahmeErklaerung::parse)
-    {
-        e.epoche_alt = m.epoche.clone();
-        e.epoche_neu = neu.clone();
-        e.fuehrer_alt = m.fuehrer.clone();
-        a.erklaerung = Some(e.to_text());
-    }
-    a.set_epoche(&neu);
-    repo::save(conn, a, true).await?;
-    let was = if a.art() == FuehrungWechselArt::Notuebernahme {
-        "Notübernahme"
-    } else {
-        "Führung"
-    };
-    let grund = format!(
-        "{was} gegen {} mit neuem Stand erneuert",
-        kopplung.gegenueber_name
-    );
-    repo::add_verlauf(
-        conn,
-        a,
-        VerlaufNeu {
-            von_name: Some(&m.fuehrer_name),
-            nach_name: &ich.name,
-            grund: Some(&grund),
-            ..VerlaufNeu::default()
-        },
-    )
-    .await
 }
 
 /// Erfüllt eine Anfrage: die erreichte Seite gibt an die meldende ab (D9). Hat die meldende Seite
@@ -657,20 +636,23 @@ pub async fn apply_eingang(
         let ich_fuehre = a.fuehrer_kennung == ich.kennung;
         if richtung == InstanzKopplungRichtung::MeldetSich {
             // Eine größere Epoche mit meiner Kennung, die ich nie vergeben habe, prüft der Zweig
-            // `Greater` unten (Verwerfen); sie ist weder Konflikt noch Nachziehen.
+            // `Greater` unten (Verwerfen); sie ist weder Konflikt noch Nachzug eines Dritten.
             let fremd_vergeben = !(m.epoche > alt && m.epoche.instanz == ich.kennung);
-            let dritter = m.fuehrer != ich.kennung && m.fuehrer != sender;
-            if ich_fuehre && dritter && fremd_vergeben {
-                // Der Hub nennt einen Dritten: er nimmt nichts mehr an, was ich schicke (sein
-                // Schutz vor dem Diebstahl unter ELW). Ich halte die Führung des Dritten offen
-                // (Change `faq7l7m4-zwei-elw-unterlegene-seite`, design.md D2, D3).
-                halte_offen(conn, &mut a, m, &bruch, &mut aus).await?;
-                continue;
-            }
+            // Der Hub nennt einen Dritten: er nimmt nichts mehr an, was ich schicke (sein Schutz
+            // vor dem Diebstahl unter ELW). Change `faq7l7m4-zwei-elw-unterlegene-seite`, D2, D3.
+            let dritter_fuehrt = m.fuehrer != ich.kennung && m.fuehrer != sender;
+            // Der Hub führt selbst, mit einer Epoche, die ein Dritter vergab (D7): Ob er meine
+            // Führung kannte und zurückholte, ist an der Akte nicht zu sehen; ein Mensch
+            // entscheidet (Bestätigen oder Widersprechen, das der Hub annimmt).
+            let dritte_epoche = m.fuehrer == sender
+                && m.epoche > alt
+                && m.epoche.instanz != sender
+                && m.epoche.instanz != ich.kennung;
             if a.offen
                 .as_deref()
                 .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok())
-                .is_some_and(|o| ist_konflikt(&o, &ich.kennung))
+                .is_some_and(|o| ist_konflikt(&o, &[sender]))
+                && !(ich_fuehre && dritter_fuehrt)
             {
                 // Der Hub nennt keinen Dritten mehr: der Konflikt erlischt (D6).
                 a.offen = None;
@@ -680,16 +662,15 @@ pub async fn apply_eingang(
                     aus.folgen.push(Folge::Kopf { einsatz_id });
                 }
             }
-            if ich_fuehre
-                && m.fuehrer == sender
-                && m.epoche > alt
-                && m.epoche.instanz != sender
-                && m.epoche.instanz != ich.kennung
-            {
-                // Der Hub führt laut seiner Akte selbst, mit einer Epoche, die ein Dritter vergab:
-                // Meine Führung kennt er nicht, also habe ich sie selbst erklärt, und er nähme sie
-                // an, wäre mein Zähler aktuell. Ich ziehe still nach (D7).
-                ziehe_nach(conn, &ich, kopplung, &mut a, m).await?;
+            if ich_fuehre && fremd_vergeben && (dritter_fuehrt || dritte_epoche) {
+                let entscheid = entscheide(
+                    richtung,
+                    Err("keine Übernahme gegen diese Instanz".into()),
+                    true,
+                );
+                if entscheid == Entscheid::OffenHalten {
+                    halte_offen(conn, &mut a, m, &bruch, &mut aus).await?;
+                }
                 continue;
             }
         }
@@ -821,7 +802,7 @@ pub async fn apply_eingang(
                             .map(|_| ())
                     }
                 };
-                match entscheide(richtung, bewiesen) {
+                match entscheide(richtung, bewiesen, false) {
                     Entscheid::Annehmen => {
                         let art = FuehrungWechselArt::parse(&m.art);
                         let verwahrung_abgelehnt = a.art() == FuehrungWechselArt::Verwahrung;
@@ -1051,56 +1032,57 @@ mod tests {
 
     #[test]
     fn annahmeregel_ueber_alle_zellen() {
-        assert_eq!(entscheide(WirdGemeldet, Ok(())), Entscheid::Annehmen);
+        for dritter in [false, true] {
+            assert_eq!(
+                entscheide(WirdGemeldet, Ok(()), dritter),
+                Entscheid::Annehmen
+            );
+            assert_eq!(
+                entscheide(WirdGemeldet, Err("x".into()), dritter),
+                Entscheid::Annehmen,
+                "die erreichte Seite nimmt ohne Beweis an"
+            );
+            assert_eq!(
+                entscheide(MeldetSich, Ok(()), dritter),
+                Entscheid::OffenHalten
+            );
+        }
         assert_eq!(
-            entscheide(WirdGemeldet, Err("x".into())),
-            Entscheid::Annehmen,
-            "die erreichte Seite nimmt ohne Beweis an"
-        );
-        assert_eq!(entscheide(MeldetSich, Ok(())), Entscheid::OffenHalten);
-        assert_eq!(
-            entscheide(MeldetSich, Err("x".into())),
+            entscheide(MeldetSich, Err("x".into()), false),
             Entscheid::Verwerfen("x".into())
         );
+        assert_eq!(
+            entscheide(MeldetSich, Err("x".into()), true),
+            Entscheid::OffenHalten,
+            "mit einem Dritten gibt es keinen Beweis gegen mich und keinen Alarm"
+        );
     }
 
-    fn akte_mit_erklaerung(fuehrer_alt: Option<&str>) -> AkteMeldung {
-        let mut m: AkteMeldung = serde_json::from_value(serde_json::json!({
+    fn akte(fuehrer: &str, stand: i64) -> AkteMeldung {
+        serde_json::from_value(serde_json::json!({
             "kennung": "hub/1", "org": "hub/1", "bezeichnung": "Lage", "status": "aktiv",
-            "epoche": {"zaehler": 2, "instanz": "elw1"}, "fuehrer": "elw1",
-            "fuehrer_name": "ELW 1", "art": "notuebernahme", "stand": 3
+            "epoche": {"zaehler": 2, "instanz": "elw1"}, "fuehrer": fuehrer,
+            "fuehrer_name": "ELW 1", "art": "notuebernahme", "stand": stand
         }))
-        .unwrap();
-        m.erklaerung = fuehrer_alt.map(|alt| {
-            NotuebernahmeErklaerung {
-                typ: erklaerung::TYP_NOTUEBERNAHME.into(),
-                einsatz: "hub/1".into(),
-                org: "hub/1".into(),
-                epoche_alt: Epoche::neu(1, "hub"),
-                epoche_neu: Epoche::neu(2, "elw1"),
-                fuehrer_alt: alt.into(),
-                fuehrer_neu: "elw1".into(),
-                grund: "Hub weg".into(),
-                zeitpunkt: "2026-11-12 09:00:00".into(),
-                unterzeichner: "Admin".into(),
-            }
-            .to_text()
-        });
-        m
+        .unwrap()
     }
 
     #[test]
-    fn eine_erklaerung_gegen_mich_ist_kein_konflikt() {
-        assert!(!ist_konflikt(&akte_mit_erklaerung(Some("elw2")), "elw2"));
+    fn konflikt_heisst_der_fuehrer_ist_kein_gegenueber() {
+        assert!(ist_konflikt(&akte("elw1", 3), &["hub"]));
+        assert!(!ist_konflikt(&akte("hub", 3), &["hub"]));
+        assert!(
+            ist_konflikt(&akte("hub", 3), &[]),
+            "ohne Kopplung führt ein Dritter"
+        );
     }
 
     #[test]
-    fn ohne_erklaerung_oder_gegen_einen_anderen_ist_es_ein_konflikt() {
-        assert!(ist_konflikt(&akte_mit_erklaerung(None), "elw2"));
-        assert!(ist_konflikt(&akte_mit_erklaerung(Some("hub")), "elw2"));
-        let mut kaputt = akte_mit_erklaerung(None);
-        kaputt.erklaerung = Some("kein json".into());
-        assert!(ist_konflikt(&kaputt, "elw2"));
+    fn derselbe_inhalt_mit_neuem_stand_ist_dieselbe_uebernahme() {
+        let mut neu = akte("elw1", 9);
+        neu.offen = true;
+        assert_eq!(inhalt(&akte("elw1", 3)), inhalt(&neu));
+        assert_ne!(inhalt(&akte("elw1", 3)), inhalt(&akte("elw2", 3)));
     }
 
     #[test]

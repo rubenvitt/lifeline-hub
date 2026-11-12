@@ -25,12 +25,17 @@ export const FUEHRUNG_ART_TEXT: Record<FuehrungWechselArt, string> = {
 
 /**
  * Titel einer offenen Übernahme in Hinweisband und Paneel. Im Konflikt (LLH-1669) nennt der Hub
- * eine andere ELW als Führer: Die eigene Notübernahme hat nicht gegriffen.
+ * eine andere ELW als Führer: Die eigene Führung hat dort nicht gegriffen. „Notübernahme“ sagt der
+ * Titel nur, wenn die eigene Führung eine war (`art` der eigenen Akte).
  */
-export function offeneUebernahmeTitel(o: Pick<FuehrungOffen, 'von' | 'konflikt'>): string {
-  return o.konflikt
+export function offeneUebernahmeTitel(
+  o: Pick<FuehrungOffen, 'von' | 'konflikt'>,
+  art: FuehrungWechselArt,
+): string {
+  if (!o.konflikt) return `Führung übernommen von ${o.von}`;
+  return art === 'notuebernahme'
     ? `Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ${o.von}`
-    : `Führung übernommen von ${o.von}`;
+    : `Die Führung liegt am Hub bei ${o.von}, nicht hier`;
 }
 
 /** Kurzform in Listen: „Führung: hier · Epoche 1“ oder „Führung: Hub Nord · Epoche 3“. */

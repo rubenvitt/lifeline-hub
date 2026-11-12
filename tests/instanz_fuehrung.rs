@@ -962,12 +962,23 @@ async fn zwei_notuebernahmen() -> ZweiElw {
     }
 }
 
-/// Die ELW führt noch, hält aber die Führung der anderen offen und schreibt weiter.
+fn anzahl(arten: &[String], art: &str) -> usize {
+    arten.iter().filter(|a| *a == art).count()
+}
+
+/// Die ELW führt noch, hält aber die Führung der anderen offen und schreibt weiter. Weitere
+/// Meldetakte ändern daran nichts: genau ein Hinweis, keine fremden Angaben im Band.
 async fn haelt_konflikt_offen(elw: &Instanz, einsatz: i64, epoche_hub: i64) {
+    elw_meldet(elw).await;
+    elw_meldet(elw).await;
     let f = fuehrung(elw, einsatz).await;
     assert_eq!(f["fuehrend"], true, "sie gibt nie still ab: {f}");
     assert_eq!(f["offen"]["konflikt"], true, "{f}");
     assert_eq!(f["offen"]["epoche"], epoche_hub, "{f}");
+    assert!(
+        f["offen"]["grund"].is_null() && f["offen"]["unterzeichner"].is_null(),
+        "Grund und Unterzeichner gehören der anderen ELW: {f}"
+    );
     let (_, kopf) = common::anfrage(
         &elw.app,
         "GET",
@@ -983,12 +994,13 @@ async fn haelt_konflikt_offen(elw: &Instanz, einsatz: i64, epoche_hub: i64) {
         StatusCode::CREATED,
         "bis zur Bestätigung schreibt sie: {v}"
     );
-    assert!(benachrichtigungen(&elw.pool)
-        .await
-        .contains(&"fuehrung_uebernommen".to_string()));
-    assert!(!benachrichtigungen(&elw.pool)
-        .await
-        .contains(&"fuehrung_ungueltig".to_string()));
+    let arten = benachrichtigungen(&elw.pool).await;
+    assert_eq!(
+        anzahl(&arten, "fuehrung_uebernommen"),
+        1,
+        "ein Hinweis, auch über mehrere Meldetakte: {arten:?}"
+    );
+    assert_eq!(anzahl(&arten, "fuehrung_ungueltig"), 0, "{arten:?}");
     assert!(!aktionen(&elw.pool)
         .await
         .contains(&"fuehrung_verworfen".to_string()));
@@ -1067,17 +1079,39 @@ async fn der_konflikt_erlischt_wenn_der_hub_keinen_dritten_mehr_nennt() {
     assert_eq!(fuehrung(&elw2, e2).await["offen"]["konflikt"], true);
     an_hub_zurueck(&elw1, &hub, e1).await;
     elw_meldet(&elw2).await;
+    // Der Konflikt ist weg; der Hub führt jetzt selbst mit der Epoche von ELW 1, und darüber
+    // entscheidet die Einsatzleitung (D7): Bestätigen oder Widersprechen.
     let f = fuehrung(&elw2, e2).await;
-    assert!(f["offen"].is_null(), "{f}");
     assert_eq!(f["fuehrend"], true);
-    elw_meldet(&elw2).await;
-    let am_hub = fuehrung(&hub, h).await;
-    assert_eq!(am_hub["fuehrer_kennung"], elw2.kennung, "{am_hub}");
-    assert_eq!(am_hub["epoche"], f["epoche"]);
+    assert_eq!(f["offen"]["konflikt"], false, "{f}");
+    assert_eq!(f["offen"]["epoche"], 5, "{f}");
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
 }
 
 #[tokio::test]
-async fn eine_ueberholte_notuebernahme_gegen_den_hub_zieht_die_elw_still_nach() {
+async fn der_widerruf_der_kopplung_raeumt_den_konflikt_ab() {
+    let (_hub, _elw1, elw2, _h, _e1, e2) = uebergabe_an_elw1_und_notuebernahme_von_elw2().await;
+    assert_eq!(fuehrung(&elw2, e2).await["offen"]["konflikt"], true);
+    let (_, u) = common::anfrage(&elw2.app, "GET", "/api/admin/instanz", &elw2.admin, None).await;
+    let id = u["kopplungen"][0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let f = fuehrung(&elw2, e2).await;
+    assert!(
+        f["offen"].is_null(),
+        "ohne Kopplung kein Konflikt mehr: {f}"
+    );
+    assert_eq!(f["fuehrend"], true);
+}
+
+/// Der Hub führt selbst, mit der Epoche (3, A), weil A ihm die Führung zurückgab; B kennt nur
+/// (1, Hub) und erklärt ohne Verbindung (2, B). Ergebnis: (Hub, B, Einsatz am Hub, an B).
+async fn hub_fuehrt_mit_der_epoche_einer_anderen_elw() -> (Instanz, Instanz, i64, i64) {
     let (hub, a) = gekoppelt().await;
     let b = weiterer_elw(&hub).await;
     let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
@@ -1093,27 +1127,68 @@ async fn eine_ueberholte_notuebernahme_gegen_den_hub_zieht_die_elw_still_nach() 
     assert_eq!(am_hub["epoche"], 3);
     notuebernahme_gegen_hub(&b, akte_b).await;
     wieder_verbunden(&b, &hub).await;
-    elw_meldet(&b).await;
+    for _ in 0..3 {
+        elw_meldet(&b).await;
+    }
+    (hub, b, h, e_b)
+}
+
+#[tokio::test]
+async fn fuehrt_der_hub_mit_der_epoche_einer_anderen_elw_haelt_die_elw_offen_ohne_alarm() {
+    let (hub, b, h, e_b) = hub_fuehrt_mit_der_epoche_einer_anderen_elw().await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(
+        am_hub["fuehrer_kennung"], hub.kennung,
+        "nichts still: {am_hub}"
+    );
+    assert_eq!(am_hub["epoche"], 3);
+    let f = fuehrung(&b, e_b).await;
+    assert_eq!(f["fuehrend"], true, "{f}");
+    assert_eq!(
+        f["offen"]["konflikt"], false,
+        "der Hub ist kein Dritter: {f}"
+    );
+    assert_eq!(f["offen"]["epoche"], 3);
+    let arten = benachrichtigungen(&b.pool).await;
+    assert_eq!(anzahl(&arten, "fuehrung_uebernommen"), 1, "{arten:?}");
+    assert_eq!(anzahl(&arten, "fuehrung_ungueltig"), 0, "{arten:?}");
+    assert!(!aktionen(&b.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+}
+
+#[tokio::test]
+async fn widerspricht_die_elw_der_fuehrung_des_hubs_nimmt_er_ihre_naechste_epoche_an() {
+    let (hub, b, h, e_b) = hub_fuehrt_mit_der_epoche_einer_anderen_elw().await;
+    let (s, v) = post(
+        &b,
+        &format!("/api/einsaetze/{e_b}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["epoche"], 4);
     elw_meldet(&b).await;
     let am_hub = fuehrung(&hub, h).await;
     assert_eq!(am_hub["fuehrer_kennung"], b.kennung, "{am_hub}");
     assert_eq!(am_hub["epoche"], 4);
-    let f = fuehrung(&b, e_b).await;
-    assert_eq!(f["fuehrend"], true);
-    assert_eq!(f["epoche"], 4);
-    assert!(f["offen"].is_null(), "{f}");
-    assert!(
-        f["verlauf"].as_array().unwrap().iter().any(|v| v["grund"]
-            .as_str()
-            .is_some_and(|g| g.contains("mit neuem Stand erneuert"))),
-        "{f}"
-    );
-    assert!(!benachrichtigungen(&b.pool)
-        .await
-        .contains(&"fuehrung_ungueltig".to_string()));
-    assert!(!aktionen(&b.pool)
-        .await
-        .contains(&"fuehrung_verworfen".to_string()));
+}
+
+#[tokio::test]
+async fn bestaetigt_die_elw_die_fuehrung_des_hubs_wird_sie_spiegel() {
+    let (hub, b, h, e_b) = hub_fuehrt_mit_der_epoche_einer_anderen_elw().await;
+    let (s, v) = post(
+        &b,
+        &format!("/api/einsaetze/{e_b}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], false);
+    assert_eq!(v["fuehrer_kennung"], hub.kennung);
+    assert!(ist_spiegel(&b, e_b).await);
+    elw_meldet(&b).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
 }
 
 #[tokio::test]
@@ -1146,6 +1221,16 @@ async fn bestaetigen_des_konflikts_macht_die_unterlegene_elw_zum_spiegel() {
         "{letzter}"
     );
     assert!(ist_spiegel(&z.gross, z.e_gross).await);
+    let spur: String =
+        sqlx::query_scalar("SELECT detail FROM admin_audit ORDER BY id DESC LIMIT 1")
+            .fetch_one(&z.gross.pool)
+            .await
+            .unwrap();
+    assert!(
+        spur.contains("Notübernahme hat am Hub nicht gegriffen")
+            && !spur.contains("Hub nicht erreichbar"),
+        "kein Grund der anderen ELW in der eigenen Spur: {spur}"
+    );
     // Ruhiger Takt: niemand ändert danach noch etwas an der Akte.
     elw_meldet(&z.gross).await;
     elw_meldet(&z.klein).await;

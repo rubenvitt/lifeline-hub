@@ -120,14 +120,20 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
 
 describe('offeneUebernahmeTitel (LLH-1669)', () => {
   it('nennt ohne Konflikt, wer übernommen hat', () => {
-    expect(offeneUebernahmeTitel({ von: 'Hub Nord', konflikt: false })).toBe(
+    expect(offeneUebernahmeTitel({ von: 'Hub Nord', konflikt: false }, 'angelegt')).toBe(
       'Führung übernommen von Hub Nord',
     );
   });
 
   it('sagt im Konflikt, dass die eigene Notübernahme nicht gegriffen hat', () => {
-    expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true })).toBe(
+    expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true }, 'notuebernahme')).toBe(
       'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+    );
+  });
+
+  it('nennt ohne eigene Notübernahme keine', () => {
+    expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true }, 'uebergabe')).toBe(
+      'Die Führung liegt am Hub bei ELW 1, nicht hier',
     );
   });
 });

@@ -467,16 +467,27 @@ pub async fn release_nach_widerruf(
     .bind(gegenueber_kennung)
     .fetch_all(&mut *conn)
     .await?;
-    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung.
-    let offene: Vec<i64> = sqlx::query_scalar(
-        "SELECT id FROM einsatz_fuehrung WHERE org_id = ? AND offen IS NOT NULL \
-         AND json_extract(offen, '$.fuehrer') = ?",
+    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung, ebenso ein Konflikt, den
+    // nur ein Gegenüber melden konnte: Er nennt einen Dritten, mit dem diese Instanz nicht
+    // gekoppelt ist, und ohne Kopplung kommt keine Akte mehr, die ihn erlöschen ließe (Change
+    // `faq7l7m4-zwei-elw-unterlegene-seite`, D6).
+    let gekoppelt: Vec<String> = list_gegenueber(conn, org_id)
+        .await?
+        .into_iter()
+        .map(|g| g.kennung)
+        .collect();
+    let kandidaten: Vec<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, json_extract(offen, '$.fuehrer') FROM einsatz_fuehrung \
+         WHERE org_id = ? AND offen IS NOT NULL",
     )
     .bind(org_id)
-    .bind(gegenueber_kennung)
     .fetch_all(&mut *conn)
     .await?;
-    for id in offene {
+    let offene = kandidaten.into_iter().filter_map(|(id, fuehrer)| {
+        let fuehrer = fuehrer.unwrap_or_default();
+        (fuehrer == gegenueber_kennung || !gekoppelt.contains(&fuehrer)).then_some(id)
+    });
+    for id in offene.collect::<Vec<_>>() {
         let mut a = load(conn, id).await?;
         a.offen = None;
         a.offen_bruch_at = None;

@@ -231,17 +231,20 @@ export default function FuehrungPaneel({
           }}
         >
           <Typography.Text strong style={{ color: rollen.achtungText }}>
-            {offeneUebernahmeTitel(fuehrung.offen)}
+            {offeneUebernahmeTitel(fuehrung.offen, fuehrung.art)}
           </Typography.Text>
-          <Datenraster spalten={2}>
-            <Datenfeld label="Grund" breit>
-              {fuehrung.offen.grund ?? '—'}
-            </Datenfeld>
-            <Datenfeld label="Unterzeichnet von">{fuehrung.offen.unterzeichner ?? '—'}</Datenfeld>
-            <Datenfeld label="Erklärt">
-              {fuehrung.offen.zeitpunkt ? zeit(fuehrung.offen.zeitpunkt) : '—'}
-            </Datenfeld>
-          </Datenraster>
+          {/* Im Konflikt gehören Grund und Unterzeichner einer anderen ELW: weglassen. */}
+          {!fuehrung.offen.konflikt && (
+            <Datenraster spalten={2}>
+              <Datenfeld label="Grund" breit>
+                {fuehrung.offen.grund ?? '—'}
+              </Datenfeld>
+              <Datenfeld label="Unterzeichnet von">{fuehrung.offen.unterzeichner ?? '—'}</Datenfeld>
+              <Datenfeld label="Erklärt">
+                {fuehrung.offen.zeitpunkt ? zeit(fuehrung.offen.zeitpunkt) : '—'}
+              </Datenfeld>
+            </Datenraster>
+          )}
           {darfBedienen && (
             <div style={{ marginBlockStart: token.marginSM }}>
               <UebernahmeEntscheidung fuehrung={fuehrung} />

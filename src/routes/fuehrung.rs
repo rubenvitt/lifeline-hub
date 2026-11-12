@@ -311,15 +311,25 @@ async fn run_bestaetigen(
     b: &Benutzer,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
-    dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
+    let eigene_notuebernahme = a.art() == fuehrung::FuehrungWechselArt::Notuebernahme;
+    let konflikt = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
     let neu = akte_neu(state, a.id).await?;
-    let grund = neu
-        .erklaerung
-        .as_deref()
-        .and_then(NotuebernahmeErklaerung::parse)
-        .map(|e| e.grund)
-        .unwrap_or_default();
-    let text = format!("Notübernahme durch {} bestätigt: {grund}", neu.fuehrer_name);
+    let text = if konflikt {
+        // Die erreichte Seite nannte einen Dritten (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
+        // D4): keine Notübernahme gegen diese Instanz, und die Erklärung gehört einer anderen ELW.
+        format!(
+            "Bestätigt: {}",
+            dienst::konflikt_text(eigene_notuebernahme, &neu.fuehrer_name)
+        )
+    } else {
+        let grund = neu
+            .erklaerung
+            .as_deref()
+            .and_then(NotuebernahmeErklaerung::parse)
+            .map(|e| e.grund)
+            .unwrap_or_default();
+        format!("Notübernahme durch {} bestätigt: {grund}", neu.fuehrer_name)
+    };
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,

@@ -81,7 +81,8 @@ describe('FuehrungHinweisband (LLH-1491)', () => {
   it('im Konflikt nennt es die führende ELW und bietet nur das Bestätigen (LLH-1669)', async () => {
     vi.mocked(loadFuehrung).mockResolvedValue({
       ...akte,
-      offen: { ...akte.offen!, von: 'ELW 1', konflikt: true },
+      art: 'notuebernahme',
+      offen: { von: 'ELW 1', epoche: 2, bruch_at: '2026-11-09 14:00:00', konflikt: true },
     });
     renderMitProviders(<FuehrungHinweisband einsatz={einsatz('einsatzleitung', true)} />);
     expect(
