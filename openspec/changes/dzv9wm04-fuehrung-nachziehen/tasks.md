@@ -14,6 +14,7 @@ Wortlauts steht in der Aufgabe.
 
 - [x] 2.1 `fuehrungText.test.ts`: `fuehrungMoeglich(f, { admin })` liefert `unterschrift` nur bei `notuebernahmeMitBeweis` und `admin`; `fuehrungText.ts` entsprechend erweitern (Funktion bleibt rein). Prüfen: `mise exec -- pnpm exec vitest run src/instanz/fuehrungText.test.ts` in `frontend/`
 - [x] 2.2 `FuehrungPaneel.test.tsx`: Einsatzleitung ohne Admin-Rolle sieht im Dialog „Notübernahme …“ keine Wahl „Eigene Unterschrift“, sondern das Feld „Code“, und das Absenden ruft den Code-Weg; ein Admin sieht „Beweis“ mit beiden Wahlen. Danach `FuehrungPaneel` (Prop für Admin aus `istAdmin(benutzer)` in `EinsatzdatenPage.tsx`, auf `EinsaetzeBeimGegenueber.tsx` immer Admin) und Anfangswert `beweis` nach Rolle. Prüfen: `mise exec -- pnpm exec vitest run src/instanz/` in `frontend/`, Gegenprobe Bedingung entfernt → rot
+- [x] 2.3 (aus dem Review) Integrationstest `unterschrift_der_einsatzleitung_ohne_admin_rolle_ist_403`; Gegenprobe ohne `ist_admin()` in `run_start` → 409 statt 403; dazu `darfFuehrungUnterschreiben` (Admin der Einsatz-Org) in `einsatz/schreibrecht.ts` mit Test, Prop `darfUnterschreiben`
 
 ## 3. Anwenderkapitel `instanzkopplung.md`
 

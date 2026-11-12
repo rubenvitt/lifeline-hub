@@ -519,6 +519,36 @@ async fn den_verlauf_lesen_personen_aber_keine_geraete() {
     assert_eq!(v["verlauf"][0]["art"], "angelegt");
 }
 
+/// LLH-1676 (Spec `instanz-fuehrung`, Szenario „Einsatzleitung ohne Admin-Rolle“): die
+/// Einsatzleitung bedient die Führung, unterschreiben kann sie nicht; das Paneel bietet ihr die
+/// Unterschrift deshalb nicht an.
+#[tokio::test]
+async fn unterschrift_der_einsatzleitung_ohne_admin_rolle_ist_403() {
+    let (_hub, elw) = gekoppelt().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let id = common::benutzer_anlegen(&elw.app, &elw.admin, "leitung", "keine").await;
+    common::funktion_setzen(&elw.app, &elw.admin, e, id, "einsatzleitung", None).await;
+    let leitung = common::login_cookie(&elw.app, "leitung", "leitungpw1").await;
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}/fuehrung"),
+        &leitung,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/fuehrung/notuebernahme/start"),
+        &leitung,
+        Some(&json!({"grund": "ohne Verbindung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+}
+
 #[tokio::test]
 async fn elw_fragt_an_und_uebernimmt_bei_ankunft() {
     let (hub, elw) = gekoppelt().await;
