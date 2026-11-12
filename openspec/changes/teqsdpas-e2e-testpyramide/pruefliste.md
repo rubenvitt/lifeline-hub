@@ -31,7 +31,7 @@ Chromium-Summe der eingecheckten `frontend/e2e/laufzeiten.json` (Stand `alpha` 1
 **Lokale Läufe** (Cloud-Sitzung, 4 vCPU, Debug-Binary, Chromium, `PW_WORKERS=2`): Ein Vorher-Lauf
 der 20 Specs schaffte rund 4 Fälle je Minute. Er wurde nach 168 von 532 Fällen abgebrochen, weil
 er die Prüfläufe der Umbauten blockierte. Gemessen wird deshalb eine Auswahl von 10 Specs vorher
-und nachher direkt hintereinander (Abschnitt 9).
+und nachher direkt hintereinander (Abschnitt 8).
 
 Auf dem unveränderten Stand schlugen lokal schon fehl (Umgebung, nicht diese Change):
 `etb-chronologie.spec.ts:117` (3 Stufen), `fokus-verdeckung.spec.ts:1712`, `funkplan.spec.ts:170`,
@@ -78,9 +78,63 @@ Auf dem unveränderten Stand schlugen lokal schon fehl (Umgebung, nicht diese Ch
   (Map `GATE1_SAAT`), Beobachter einmal je Worker, Mitglied jedes gesäten Einsatzes. Einsatz über
   die API. Wetter-Stub je Test.
 
-## 8. kopfhoehe-tonpruefung (D7)
+- **Mutationsprobe (`layout-gates-rollen`, „Mutationsprobe“):** `RechteHinweis` mit
+  `minWidth: 420` → `Gate 1 · mobil (390 px) · Beobachter · Lage und ETB` rot (Überblick, ETB,
+  Ablösung je 42 px über), `Gate 1 · mobil (390 px) · Lage und ETB` (Admin) grün — mit der Saat je
+  Worker. Zurückgesetzt.
+
+## 6. Duplikate (D7)
+
+| e2e-Fall | Entscheidung | Beleg |
+|---|---|---|
+| `lagekarte-smoke` „der alte Body eines veralteten Clients wird abgelehnt“ | gestrichen: reiner API-Fall | `tests/freies_zeichen.rs::altes_format_ist_400`; Probe: `&self.grundzeichen` aus `ablehnen` (`src/routes/freies_zeichen.rs`) genommen → `cargo test --test freies_zeichen altes_format_ist_400` rot |
+| `funkplan` „die Kennung einer Einheit führt auf ihre Detailseite“ | gestrichen | `FunkplanPage.test.tsx` „führt jede Zeile per Link zu ihrem Pflegeort“; Probe: `einheitDetailPfad(einsatzId, z.id + 1)` in `FunkplanPage.tsx` → Vitest rot |
+| `trefflaeche-pruefflaechen` „Gefahrenmatrix: jede Zelle ist ganz Ziel …“ | gestrichen, Deckungsprüfung nach gate3 „Gefahrenmatrix (LFH-373)“ | Probe: Knopf `width: calc(100% - 6px)` in `GefahrenMatrix.tsx` → gate3 rot an „Matrixzelle #1 (kompakt): Breite deckt die Zelle“ |
+| `funkplan` Übernahme in Lagebericht und Befehl (`:211`, `:231`) | bleibt: Ablauf über zwei Seiten (Funkplan → Bericht/Befehl), Vitest belegt nur Aufruf und Ziel | — |
+| `funkplan` Sprechgruppen (`:458`) | bleibt: Sprung auf die Einsatzdaten ist ein Ablauf; der 403-Teil kostet keine eigene Saat | — |
+| `dokumente` `:303`, `:396` | bleibt: Upload-Fortschritt (CDP-Drossel), Download-Dateiname und Dialog sind nur im Browser; der ETB-Abruf ist eine Anfrage ohne Ladung | — |
+| `fernmeldeskizze` `:643`, `:698`, `:1056` | bleibt: die Teile hängen an Seiten, die der Fall ohnehin lädt; Streichen spart keine Ladung | — |
+| `command-palette` `:198` | bleibt: Ablauf ETB → Fernmeldewesen über die Palette; die Rangfolge ist ein Nebenbefund | — |
+
+## 7. kopfhoehe-tonpruefung (D7)
 
 Entscheidung: **unverändert.** Die Herleitung (LLH-1158, LLH-1506) begründet „messen bis zum
 Endstand plus Nachlauf“; die Mindestdauer `MESSDAUER_MS` (5 s) ist das einzige Netz gegen spätere,
 unbekannte Sprünge des Kopfs in den ersten Sekunden. Der Beobachter nur in den Sprungbändern hieße
 Rollen-Abdeckung abgeben (LFH-435). Beides trägt die Herleitung nicht.
+
+## 8. Messung
+
+Auswahl von 10 Specs (CI-Anteil 107 von 335 min): gate3-trefflaeche, gate1-ueberlauf,
+fokus-verdeckung, trefflaeche-pruefflaechen, pegel-pruefliste, leisten-flaeche, funkplan,
+lagekarte-smoke, command-palette, orientierung. Chromium, `PW_WORKERS=2`, `--trace off`, dasselbe
+Debug-Binary, nacheinander auf derselben Maschine; Nachher-Stand Commit `0396de48` (vor der
+Gefahrenmatrix-Zusammenführung).
+
+| Spec | vorher min | nachher min |
+|---|---|---|
+| gate1-ueberlauf | 47,3 | 35,4 |
+| gate3-trefflaeche | 43,9 | 31,2 |
+| fokus-verdeckung | 24,1 | 19,8 |
+| trefflaeche-pruefflaechen | 11,3 | 9,5 |
+| pegel-pruefliste | 9,1 | 7,2 |
+| leisten-flaeche | 6,0 | 5,9 |
+| command-palette | 3,5 | 3,2 |
+| funkplan | 3,2 | 2,9 |
+| lagekarte-smoke | 3,2 | 2,8 |
+| orientierung | 2,4 | 2,3 |
+| **Summe Testzeit** | **153,9** | **120,4** |
+| Wanduhr | 83,1 | 62,0 |
+
+Nur über die 338 Fälle, die in beiden Läufen grün waren: **147,1 → 113,8 min, −33,3 min (−23 %)**.
+
+Rot in beiden Läufen (Umgebung): `funkplan` Einzug (Beobachter, Zeitlimit 30 s),
+`orientierung:40` (Titel bleibt „lifeline-hub“; auf dem alten Stand mit anderem Modul ebenso rot,
+einzeln nachgeprüft). Nur vorher rot: gate3 FMS-Tableau, Einheit aus Vorlage (Admin, Beobachter),
+Detailseiten, leisten Lagekarte, pruefflaechen C10. Nur nachher rot: gate3 Navigations-Drawer
+(„Page crashed“, einzeln grün).
+
+Lokal läuft die Suite langsamer als in der CI (Auswahl 147 statt 107 min). Hochgerechnet auf
+die CI-Zeiten der Auswahl sind −23 % rund −25 min; die übrigen 228 CI-Minuten tragen die
+API-Anmeldung, die Einsätze ohne Dialog und die Anmeldung ohne Startseite (190 Dateien), sind
+lokal aber nicht gemessen. Die Akzeptanz misst der CI-Lauf des PRs.

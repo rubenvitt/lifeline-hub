@@ -25,17 +25,19 @@ etwa ein Viertel der Frontend-PRs bliebe in einem Fachordner.
 - **Eine Ladung je Dichtestufe.** Die Gates setzen die Stufe vor dem Laden der gemessenen
   Seite, statt erst zu laden und dann neu zu laden (`stelleDichte`; gate3 69×,
   `fokus-verdeckung`, `pegel-pruefliste`, `leisten-flaeche`).
+- **Einsatz ohne Dialog.** Fälle, die den Dialog „Neuen Einsatz anlegen“ nicht prüfen, legen
+  ihren Einsatz über die API an (`einsatzPerApi`), mit denselben Werten wie der Dialog.
 - **Saat einmal statt je Fall.** Gate 1 sät den Überlaufstoff einmal je Worker statt in jedem
-  seiner 48 Tests. Admin- und Beobachter-Geschwister, die dieselben Daten säen, säen einmal und
-  wechseln die Rolle im selben Kontext.
-- **Gleiche Flächen einmal laden.** Wo gate3 und `fokus-verdeckung` dieselbe Seite mit derselben
-  Saat, Rolle und Breite messen, misst eine Ladung beides. Die Dichtetests in `fokus-verdeckung`
-  werden je Breite gebündelt. Die Titel- und h1-Prüfung aus `orientierung` läuft in der
-  Routenschleife von Gate 1 mit, wo diese die Route ohnehin lädt.
-- **Duplikate streichen oder verschieben**, je mit Mutationsprobe: `funkplan` (3 Fälle, dazu
-  einer nach Vitest), `lagekarte-smoke` (reiner API-Fall), `dokumente`, `fernmeldeskizze`,
-  `command-palette`, Gefahrenmatrix in `trefflaeche-pruefflaechen` (doppelt zu gate3).
-- **`kopfhoehe-tonpruefung` straffen**, soweit die Herleitung der Messdauer es trägt.
+  seiner 48 Tests.
+- **Nur falls die CI unter 34 min Ersparnis bleibt** (Entscheidung 12.11.2026 nach lokaler
+  Messung): Admin- und Beobachter-Geschwister mit gleicher Saat zusammenlegen, gleiche Flächen
+  von gate3 und `fokus-verdeckung` in einer Ladung messen, die Titelprüfung aus `orientierung`
+  in die Routenschleife von Gate 1 legen.
+- **Duplikate streichen**, je mit Mutationsprobe: der reine API-Fall in `lagekarte-smoke`, der
+  Zeilenlink in `funkplan`, die doppelte Gefahrenmatrix in `trefflaeche-pruefflaechen`. Weitere
+  Kandidaten aus der Durchsicht prüfen Abläufe über mehrere Seiten und bleiben e2e.
+- **`kopfhoehe-tonpruefung` bleibt unverändert**: Die Herleitung der Messdauer trägt keine
+  Kürzung.
 - **Regel in `frontend/e2e/AGENTS.md`:** e2e nur für Abläufe über mehrere Seiten und für das,
   was nur der Browser zeigt. Logik einer Seite gehört nach Vitest, Serververhalten nach `tests/`.
 - **Zielwert:** Die Chromium-Summe in `frontend/e2e/laufzeiten.json` sinkt um mindestens 10 %

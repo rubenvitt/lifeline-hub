@@ -91,6 +91,11 @@ dieser Teil als eigener Schritt vor dem Kern stehen.
 - **Riegel:** `no-restricted-syntax` für `e2e/**` gegen `getByLabel('Benutzername')` bzw. das
   Ausfüllen des Anmeldeformulars, mit dieser Liste als Ausnahme. Muster wie beim Riegel von
   `einsatz-kern` (LFH-1114).
+- **Einsatz ohne Dialog** (beim Bauen dazugekommen): `einsatzPerApi` in `e2e/einsatz-kern.ts`
+  legt den Einsatz per `POST /api/einsaetze` an, wo der Fall den Dialog nicht prüft und danach
+  ohnehin per `goto` lädt. Gleiche Daten: Der Dialog belegt Einsatzart `realeinsatz` und
+  Alarmzeit „jetzt“ vor (`EinsaetzePage.tsx`), dieselben Vorgaben setzt der Server ohne Angabe.
+  Gespart werden Einsatzliste, Einblenden des Dialogs und Laden des neuen Einsatzes.
 - **Alternative `storageState` je Worker:** verworfen. Die Gates wechseln Rollen im selben
   Kontext, und viele Specs legen eigene Konten an. Ein vorab gespeicherter Zustand bindet einen
   Benutzer an den Kontext, und die 412-Regel (Sitzung über mehrere Tabs) macht jeden Wechsel
@@ -116,18 +121,26 @@ und meldet das nicht als Fehler. Das trifft nur die erste Stufe eines Falls, der
 
 ### D4 Saat einmal je Worker in Gate 1
 
-`gate1Vorbereiten` wird eine Worker-Fixture. Sie öffnet einen eigenen API-Kontext, meldet als
-Admin an, legt den Einsatz an und sät, mit und ohne `vorlage` je einmal. Dazu legt sie einen
-Beobachter je Einsatz an, trägt ihn ein und quittiert seine Benachrichtigungen. Jeder Test meldet
-sich nur noch an (D2) und misst.
+`gate1Vorbereiten` sät einmal je Worker-Prozess und Einsatzart (mit und ohne `vorlage`), über
+die Sitzung des ersten Tests, der den Einsatz braucht; ein Beobachter je Worker wird Mitglied
+jedes gesäten Einsatzes, seine Benachrichtigungen sind quittiert. Jeder Test meldet sich nur noch
+an (D2), setzt den Wetter-Stub und misst. Startet ein Worker nach einem Fehler neu, sät er neu.
+
+- **Keine Worker-Fixture** (beim Bauen geändert): `kontoAnlegen` und
+  `benachrichtigungenQuittieren` brauchen `test.info()`, das es in Worker-Fixtures nicht gibt.
+  Ein Speicher auf Modulebene je Worker-Prozess trägt dasselbe ohne Umbau der Kern-Helfer.
 
 - **Vorbedingung:** Die Messung schreibt nicht. Das wird je Durchgang geprüft (`vorbereiten`,
   `lesend`). Ein Durchgang, der schreibt, behält die Saat je Test.
-- Die Titel- und h1-Prüfung aus `orientierung.spec.ts:40` läuft im Admin-Durchgang auf 1366 px
-  für die Routen mit, die Gate 1 ohnehin lädt. `orientierung` behält nur die Module, die Gate 1
-  nicht lädt.
+- **Zurückgestellt (12.11.2026):** Die Titel- und h1-Prüfung aus `orientierung.spec.ts:40` im
+  Admin-Durchgang auf 1366 px mitlaufen zu lassen, spart rund 1 min und koppelt zwei Specs (Gate 1
+  deckt 19 der 34 Module). Nur falls die CI unter 34 min Ersparnis bleibt.
 
 ### D5 Gleiche Flächen von gate3 und `fokus-verdeckung` einmal laden
+
+**Zurückgestellt (Entscheidung 12.11.2026):** Die lokale Messung zeigte schon ohne D5 und D6
+−23 % in den 10 längsten gemessenen Specs. D5 und D6 kommen nur, falls der CI-Lauf des PRs unter
+34 min Ersparnis bleibt; sie vergrößern den Diff in gate3 und legen getrennte Fälle zusammen.
 
 Wo beide Gates dieselbe Seite mit derselben Saat, Rolle, Breite und Stufe messen
 (`SPERR_SZENARIEN`, Einheit mit gesperrtem Personal, Unterkunft, Vorplanung, Vorlage), misst
@@ -138,6 +151,8 @@ Die Dichtetests von `fokus-verdeckung` (`:747`, `:2483`, `:2620`, `:2767`) werde
 einem Fall über `STAFFEL` gebündelt (D3 je Stufe).
 
 ### D6 Admin- und Beobachter-Geschwister säen einmal
+
+**Zurückgestellt (Entscheidung 12.11.2026):** wie D5.
 
 Wo ein Gate Admin und Beobachter als getrennte Tests mit gleicher Saat führt (gate3,
 `trefflaeche-pruefflaechen`, `leisten-flaeche`, `pegel-pruefliste`), wird daraus ein Fall:
@@ -153,30 +168,31 @@ Saat.
 
 ### D7 Duplikate und `kopfhoehe-tonpruefung`
 
-Je Fall eine Mutationsprobe am übernehmenden Test, festgehalten in `pruefliste.md` dieser Change:
+Beim Bauen präzisiert: Ein Fall bleibt e2e, wenn er einen Ablauf über mehrere Seiten prüft oder
+sein Streichen keine Ladung spart; ein Nebenbefund, den Vitest schon belegt, ist kein Grund zu
+streichen. Gestrichen, je mit Mutationsprobe am übernehmenden Test (`pruefliste.md`, Abschnitt 6):
 
-| e2e-Fall | übernimmt | Weg |
-|---|---|---|
-| `funkplan.spec.ts:211`, `:231`, `:254` | `FunkplanPage.test.tsx:386`, `:427`, `:280` | streichen |
-| `funkplan.spec.ts:458` (Sprechgruppen, Route-Mock) | neuer Fall in `FunkplanPage.test.tsx` | verschieben |
-| `lagekarte-smoke.spec.ts:763` (reiner API-Fall) | `tests/freies_zeichen.rs:226` | streichen |
-| `dokumente.spec.ts:385`, `:409` | `DokumentePage.test.tsx:509–564`, `:313`; ETB-Nachweis zum PATCH neu in `tests/dokument.rs` | verschieben |
-| `fernmeldeskizze.spec.ts:698`, `:643`, 403-Teil von `:1056` | `fernmeldenetz.test.ts:242`, Eigenschaftstest D11, `tests/stab_fernmeldeskizze.rs:154/:201` | Teile streichen, UI-Meldungen bleiben e2e |
-| `command-palette.spec.ts:198` (Rangfolge) | `befehle.test.ts:1028` | Rangfolge streichen, Navigieren bleibt e2e; Einsatz per API statt Dialog |
-| `trefflaeche-pruefflaechen.spec.ts:1761` (Gefahrenmatrix) | gate3 `:5073` | Deckungsprüfung nach gate3, Fall streichen |
+| e2e-Fall | übernimmt |
+|---|---|
+| `lagekarte-smoke` „der alte Body eines veralteten Clients wird abgelehnt“ (reiner API-Fall) | `tests/freies_zeichen.rs::altes_format_ist_400` |
+| `funkplan` „die Kennung einer Einheit führt auf ihre Detailseite“ | `FunkplanPage.test.tsx` „führt jede Zeile per Link zu ihrem Pflegeort“ |
+| `trefflaeche-pruefflaechen` „Gefahrenmatrix: jede Zelle ist ganz Ziel …“ | gate3 „Gefahrenmatrix (LFH-373)“, dort um die Deckungsprüfung ergänzt |
 
-`kopfhoehe-tonpruefung` (15 Breiten × 2 Rollen, `MESSDAUER_MS` 5 s): Gekürzt wird nur, was die
-Herleitung (LFH-637, LLH-1232) trägt. Kandidaten sind eine Messdauer bis Endstand plus Nachlauf
-statt fester 5 s und der Beobachter nur in den Bändern, in denen der Kopf je sprang (1100–1180
-und 1340–1420 px). Trägt die Herleitung das nicht, bleibt die Spec unverändert. Die 10 % sind
-ohne sie erreichbar.
+Geprüft und geblieben: `funkplan` Übernahmen und Sprechgruppen, `dokumente`, `fernmeldeskizze`,
+`command-palette` „Funk“ (Begründungen in `pruefliste.md`).
+
+`kopfhoehe-tonpruefung` bleibt unverändert: Die Herleitung (LLH-1158, LLH-1506) begründet
+„messen bis Endstand plus Nachlauf“; die Mindestdauer `MESSDAUER_MS` ist das einzige Netz gegen
+spätere, unbekannte Sprünge, und der Beobachter nur in den Sprungbändern gäbe Rollen-Abdeckung
+ab (LFH-435).
 
 ### D8 Messung des Zielwerts
 
 - **Vorher:** die Chromium-Summe der eingecheckten `laufzeiten.json`, 335,4 min.
-- **Vor dem Archiv:** Je umgebauter Spec ein lokaler Lauf vorher und nachher (Chromium, gleiche
-  `PW_WORKERS`). Die Summe der Differenzen muss ≥ 34 min sein, sonst kommt der Befund vor dem
-  Archiv zur Sprache.
+- **Vor dem Archiv:** Eine Auswahl von 10 umgebauten Specs lokal vorher und nachher (Chromium,
+  gleiche `PW_WORKERS`, nacheinander auf derselben Maschine); ein Lauf über alle umgebauten
+  Specs brauchte lokal zu lange (Entscheidung 12.11.2026). Die Auswahl zeigt die Richtung; den
+  Befund bekam der Mensch vor dem Archiv.
 - **Akzeptanz:** dieselbe Summe aus dem CI-Lauf des PRs (Artefakt `e2e-laufzeiten`). Weil die
   Change vor dem PR archiviert wird (Projektregel) und e2e nur im PR-Lauf entsteht, wird die
   Tabelle danach als Commit im PR aufgefrischt und das Ergebnis in der archivierten
@@ -196,8 +212,8 @@ ohne sie erreichbar.
   wo die Trennung in der Spec steht, bleibt getrennt.
 - [Mit einer Ladung weniger je Stufe sinkt die Wartezeit, und es treten Ladezustände auf, die
   der Reload bisher überdeckte] → Die Messhelfer warten schon heute wiederholt
-  (`mindestensKnoten`, LFH-885). Neue Wackler werden mit `--repeat-each` gegen die umgebaute Spec
-  geprüft, bevor sie als fertig gilt.
+  (`mindestensKnoten`, LFH-885). Nachweis (Entscheidung 12.11.2026, statt `--repeat-each`): der
+  Messlauf der 10 Specs, der Lauf der übrigen geänderten Specs und der CI-Lauf des PRs.
 - [Großer Diff in vielen Specs] → Commits je Hebel (Kern, Anmeldung, Dichte, Gate 1, Paare,
   Duplikate, Regel). Die mechanische Umstellung der Anmeldung läuft als eigener Commit.
 - [Die Schätzungen (≈ 2–3 s je gesparter Ladung) sind nicht gemessen] → Die lokalen
