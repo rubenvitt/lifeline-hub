@@ -61,6 +61,10 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   `/architektur/suche.json`; gemeinsame Teile in `src/daten/suche.ts`) entsteht beim Bauen aus denselben Kapiteln, mit den
   Sprungmarken der gerenderten Überschriften, und lädt erst beim ersten Öffnen. Kein Suchdienst,
   keine Suchbibliothek.
+- **Sitemap** (`src/pages/sitemap.xml.ts`): `/sitemap.xml` entsteht beim Bauen aus denselben
+  Collections wie die Seiten (Startseite, Doku, Architektur, Entscheidungen), ohne
+  `@astrojs/sitemap`. Absolute Adressen aus `site` in `astro.config.mjs`; `public/robots.txt`
+  nennt die Sitemap. Wer eine neue Seite oder Seitenfamilie anlegt, nimmt sie dort auf.
 - **Gestaltung wie die App** (`frontend/AGENTS.md`, Gestaltungssprache): Nachtbetrieb ist
   Vorgabe, Radius 0, Fugenraster, Rot bedient nichts, Zahlen in Mono. Schriften nur lokal,
   kein CDN.
