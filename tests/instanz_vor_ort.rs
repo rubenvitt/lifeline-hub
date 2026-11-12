@@ -1350,3 +1350,38 @@ async fn schon_gekoppelt_gilt_nur_mit_gueltiger_zuordnung_der_eigenen_org() {
     .await;
     assert_eq!(lan(&elw2).await, false);
 }
+
+#[tokio::test]
+async fn ein_widerruf_der_direktkopplung_holt_die_fuehrung_nicht_zurueck() {
+    // Spec `instanz-fuehrung`: Über eine Direktkopplung wechselt die Führung nicht, auch nicht
+    // durch das Zurückholen nach einem Widerruf. Sonst führten ELW 1 und ELW 2 denselben Einsatz.
+    let (elw1, elw2) = vor_ort().await;
+    fuehrung_an(&[&elw1, &elw2]).await;
+    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    melden(&elw2).await;
+    abgleichen(&elw2).await;
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let ich1 = kennung_von(&elw1).await;
+    assert_eq!(fuehrer(&elw2, &k).await, ich1);
+    let id: i64 = eine(&elw2.pool, "SELECT id FROM instanz_kopplung").await;
+    let (s, v) = common::anfrage(
+        &elw2.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        &elw2.admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    assert_eq!(fuehrer(&elw2, &k).await, ich1, "ELW 2 führt nicht selbst");
+    let art: String = eine(
+        &elw2.pool,
+        &format!("SELECT art FROM einsatz_fuehrung WHERE kennung = '{k}'"),
+    )
+    .await;
+    assert_ne!(art, "notuebernahme");
+}

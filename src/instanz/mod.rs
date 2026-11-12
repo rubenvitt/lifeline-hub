@@ -246,6 +246,8 @@ mod art_tests {
                 "Fluss::Fuehrungswechsel",
                 1,
             ),
+            // Kein Zurückholen nach dem Widerruf einer Direktkopplung.
+            ("src/instanz/repo.rs", "Fluss::Fuehrungswechsel", 1),
             // Beide Wege zum Gegenüber (zum Führer, zu einer genannten Instanz) fragen die Art ab.
             ("src/instanz/fuehrung/dienst.rs", "fordere_wechsel(&g)?", 2),
             (

@@ -482,14 +482,23 @@ pub async fn org_widerrufen(
         crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
         // Der Abgleich ihrer Einsätze endet; Spiegel bleiben lesbar (LLH-1492, D14).
         crate::instanz::spiegel::beende_fuer_zuordnung(conn, org_zeile_id, jetzt).await?;
-        // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491).
-        let (org_id, gegenueber): (i64, String) = sqlx::query_as(
-            "SELECT o.org_id, k.gegenueber_kennung FROM instanz_kopplung_org o \
+        // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491). Über eine
+        // Direktkopplung nicht: das wäre eine Notübernahme gegen die Gegenstelle vor Ort, und
+        // beide ELW führten danach denselben Einsatz (LLH-1497, Spec `instanz-fuehrung`, „Über
+        // eine Direktkopplung wechselt die Führung nicht“). Der Spiegel bleibt lesbar stehen.
+        let (org_id, gegenueber, art): (i64, String, String) = sqlx::query_as(
+            "SELECT o.org_id, k.gegenueber_kennung, k.art FROM instanz_kopplung_org o \
              JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
         )
         .bind(org_zeile_id)
         .fetch_one(&mut *conn)
         .await?;
+        // Eine unbekannte Art gilt wie `KopplungZeile::art` als die engere: vor Ort.
+        let art =
+            super::InstanzKopplungArt::parse(&art).unwrap_or(super::InstanzKopplungArt::VorOrt);
+        if !art.traegt(super::Fluss::Fuehrungswechsel) {
+            return Ok(Some(Vec::new()));
+        }
         Ok(Some(
             crate::instanz::fuehrung::repo::release_nach_widerruf(conn, org_id, &gegenueber)
                 .await?,

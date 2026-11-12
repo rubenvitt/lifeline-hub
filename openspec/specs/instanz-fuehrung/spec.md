@@ -239,7 +239,7 @@ Hinweisband „Spiegel von …“.
 
 ### Requirement: Widerruf holt die Führung zurück
 
-Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber,
+Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Standardkopplung, hier oder beim Gegenüber,
 SHALL diese Instanz jeden Einsatz der Org, den sie als Spiegel hält und dessen Akte das Gegenüber
 als Führer nennt, mit der nächsten Epoche selbst und schreibbar führen; Bruchstelle ist der
 Zeitpunkt, zu dem sie vom Widerruf erfährt. Offene Übernahmen dieses Gegenübers MUST verfallen.
@@ -271,6 +271,10 @@ angezeigt werden.
 #### Scenario: Einsätze beim Gegenüber
 - **WHEN** ELW 1 einen Einsatz der zugeordneten Org führt und ELW 2 sich als Direktkopplung meldet
 - **THEN** zeigt ELW 2 unter „Einsätze beim Gegenüber“ den Einsatz mit „Führung: ELW 1“
+
+#### Scenario: Widerruf einer Direktkopplung
+- **WHEN** ELW 1 einen Einsatz führt, den ELW 2 über die Direktkopplung spiegelt, und der Admin an ELW 2 die Org-Zuordnung widerruft
+- **THEN** holt ELW 2 die Führung nicht zurück: die Akte nennt weiter ELW 1, und der Spiegel bleibt lesbar stehen (die Anforderung „Widerruf holt die Führung zurück“ gilt nur für Standardkopplungen)
 
 ### Requirement: Eine Direktkopplung nimmt keinen Führungswechsel zwischen ihren Seiten an
 
