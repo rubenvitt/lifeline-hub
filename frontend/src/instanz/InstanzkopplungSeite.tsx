@@ -933,7 +933,6 @@ function ImNetzGefunden({
                     ? [
                         <Button
                           key="waehlen"
-                          size="small"
                           onClick={() => onWahl(adresse)}
                           data-lfh="instanz-im-netz-waehlen"
                         >
