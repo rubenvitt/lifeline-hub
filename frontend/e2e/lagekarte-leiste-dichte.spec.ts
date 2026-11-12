@@ -3,6 +3,7 @@ import { wechsleZuRolle } from './rollen-kern';
 import { ueberstaende } from './ueberstand-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { BAUM_SCHLUESSEL, FACHEBENEN_OFFEN } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Lagekarten-Leiste ist fest 300 px breit. Die Bildzeile trägt den mitwachsenden Kippschalter
@@ -40,12 +41,8 @@ const BAUM_OFFEN = JSON.stringify({
   bilder: true,
 });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function einsatzMitBild(page: Page, name: string): Promise<string> {

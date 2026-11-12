@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LFH-705: Eine offline vorgemerkte Standmeldung von einem Gerät, dessen Uhr 5 min vorgeht,
@@ -14,12 +15,8 @@ import { expect, test, type Page } from '@playwright/test';
 const VORLAUF_MS = 5 * 60_000;
 const BEZIRK = 'Deichweg 1–9';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function senden<T = { id: number }>(page: Page, pfad: string, data: unknown): Promise<T> {

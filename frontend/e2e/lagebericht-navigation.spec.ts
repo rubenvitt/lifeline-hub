@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzAnlegen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Verlassen-Schutz am Lagebericht-Entwurf (LLH-1351): dieselbe Rückfrage wie im Befehl
@@ -13,11 +14,7 @@ test.setTimeout(90_000);
 const TITEL = 'Lagebericht Navigation';
 
 async function vorbereiten(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
   const einsatzId = await einsatzAnlegen(page, `E2E Lagebericht-Blocker ${Date.now()}`);
   const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
     data: { vorlage: 'lagebeurteilung', titel: TITEL },

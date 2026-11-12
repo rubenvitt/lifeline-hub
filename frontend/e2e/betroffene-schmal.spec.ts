@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Betroffenen-Module am Handschirm: geprüft wird die WEICHE — bei 390 px der Kartenzweig,
@@ -32,12 +33,8 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 /** Subpixel-Spielraum: Chromium rechnet unter Last anders als im Einzellauf. */
 const SUBPIXEL = 0.5;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Seeding per `page.request`: die Session ist Cookie-basiert, der Jar wird geteilt. */
@@ -117,7 +114,7 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
   page,
 }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene schmal ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Betroffene schmal ${Date.now()}`);
   await seedeAlles(page, einsatzId);
 
   await page.setViewportSize(HANDSCHIRM);
@@ -165,7 +162,7 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
   // Zusätzliche Anmeldung gegenüber dem Admin-Geschwister.
   test.slow();
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene lesend ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Betroffene lesend ${Date.now()}`);
   await seedeAlles(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
@@ -216,7 +213,7 @@ test('bei 1366 px steht auf allen drei Listen die Tabelle statt der Karte', asyn
   // Die Gegenprobe: sonst wäre der Fall oben auch grün, wenn die Weiche bei JEDER Breite in
   // den Kartenzweig kippt.
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene breit ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Betroffene breit ${Date.now()}`);
   await seedeAlles(page, einsatzId);
 
   await page.setViewportSize(FUEKW);
@@ -251,7 +248,7 @@ test.describe('LFH-454: Treffflächen der Betroffenen-Routen', () => {
         page,
       }, testInfo) => {
         await anmelden(page);
-        const einsatzId = await einsatzAnlegen(page, `E2E Betroffene ${dichte} ${Date.now()}`);
+        const einsatzId = await einsatzPerApi(page, `E2E Betroffene ${dichte} ${Date.now()}`);
         await seedeAlles(page, einsatzId);
         await stelleDichte(page, dichte);
         await page.setViewportSize(viewport);

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LFH-895: Ein ETB-Eintrag und eine Meldung von einem Gerät, dessen Uhr 5 min vorgeht, tragen
@@ -13,12 +14,8 @@ import { expect, test, type Page } from '@playwright/test';
 const VORLAUF_MS = 5 * 60_000;
 const TOLERANZ_MS = 60_000;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 /** UTC-SQLite-String 'YYYY-MM-DD HH:MM:SS' → Millisekunden seit Epoch. */

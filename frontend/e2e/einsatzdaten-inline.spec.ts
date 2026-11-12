@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Einsatzdaten zeilenweise bearbeiten (LFH-472) im echten Browser.
@@ -15,11 +16,7 @@ test.use({ timezoneId: 'Europe/Berlin' });
 
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW);
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Einsatzdaten inline ${Date.now()}` },
   });

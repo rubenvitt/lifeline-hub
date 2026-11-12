@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { oeffneWerkzeugmenue } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Kartenleiste lässt sich auch am Fükw ausblenden, und die Wahl bleibt gemerkt. Bei
@@ -18,12 +19,8 @@ const FUEKW = { width: 1366, height: 768 };
 const UNTER_LG = { width: 900, height: 768 };
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function einsatzAnlegen(page: Page): Promise<string> {

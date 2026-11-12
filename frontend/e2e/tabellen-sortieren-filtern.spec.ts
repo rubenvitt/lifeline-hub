@@ -64,7 +64,7 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
   test('Zustand in der Adresse, Zurück, Neuladen und Sitzung — als Admin und als Beobachter', async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
     const liste = `/einsaetze/${einsatzId}/schaeden`;
 
@@ -138,7 +138,7 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
   test('Kontowechsel in einem anderen Tab: nach dem Neuladen keine Sicht der vorigen Person (LLH-1428)', async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
     const liste = `/einsaetze/${einsatzId}/schaeden`;
     const beobachter = await benutzerAnlegen(page, 'beobachter');

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Seitenrinne im Browser: dass sie WIRKT, ist nur hier messbar (die Verdrahtung bewacht
@@ -10,17 +11,13 @@ import { einsatzAnlegen } from './einsatz-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 test('Seitenrinne: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Rinne ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Rinne ${Date.now()}`);
 
   // BEIDE Layouts: `/einsaetze` hängt an der Ebene-1-Shell, die Modulseite am
   // Einsatz-Workspace — Geschwister, die einzeln umgestellt werden könnten.
@@ -44,8 +41,8 @@ test.describe('Seitenrinne auf dem Handschirm', () => {
     page,
   }) => {
     // Anmelden und Anlegen am breiten Schirm: gemessen wird die Rinne, nicht die Einsatzliste.
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E Rinne mobil ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `E2E Rinne mobil ${Date.now()}`);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/einsaetze/${einsatzId}/etb`);

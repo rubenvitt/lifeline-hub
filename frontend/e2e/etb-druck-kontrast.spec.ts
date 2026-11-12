@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kontrast der ETB-Druckansicht AM BILDSCHIRM (LFH-730, Folge aus LFH-22, Prüfliste
@@ -39,11 +40,7 @@ const FUNDSTELLEN = [
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<{ id: number }> {

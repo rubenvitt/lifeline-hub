@@ -35,7 +35,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
   page,
 }) => {
   test.setTimeout(120_000);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const angelegt = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Freigabe ${Date.now()}` },
   });

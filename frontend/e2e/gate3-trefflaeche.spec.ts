@@ -35,6 +35,7 @@ import {
   mindestensKnoten,
   rechteHinweisSteht,
   ruhigeHoehe,
+  ladeInDichte,
   stelleDichte,
 } from './trefflaeche-kern';
 import { oeffneAlleFachebenen, oeffneObjektGruppe, oeffneWerkzeugmenue } from './leisten-kern';
@@ -125,8 +126,7 @@ test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Sta
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lage-dashboard`, dichte);
 
     // Vor dem Laden stehen die Zellen als Platzhalter ohne Ziel (`div`); gemessen wird der Link.
     const kennzahlen = page
@@ -184,8 +184,7 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto('/einsaetze');
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, '/einsaetze', dichte);
 
     // Namentlich gegriffen, weil das Raster die Einsätze aller anderen Specs mitzeigt.
     const titelLink = page.getByRole('link', { name: kartenName, exact: true });
@@ -250,8 +249,7 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
   ] as const) {
     await page.setViewportSize(groesse);
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/personen/druck`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/druck`, dichte);
 
       // Gescopt auf den Pfad, sonst zählten Rail- und Kopfzeilen-Links mit.
       const pfad = page.locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad');
@@ -325,7 +323,7 @@ for (const { liste, api, daten, pfad } of [
   }) => {
     test.setTimeout(120_000);
     await page.setViewportSize(FUEKW);
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const antwort = await page.request.post(api, { data: await daten(page.request) });
     expect(antwort.ok(), `Seeding ${liste}: ${antwort.status()} ${await antwort.text()}`).toBe(
       true,
@@ -341,8 +339,7 @@ for (const { liste, api, daten, pfad } of [
     ] as const) {
       await page.setViewportSize(groesse);
       for (const { dichte, soll } of STAFFEL) {
-        await page.goto(pfad(id));
-        await stelleDichte(page, dichte);
+        await ladeInDichte(page, pfad(id), dichte);
 
         const links = page
           .locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad')
@@ -376,11 +373,10 @@ for (const { liste, api, daten, pfad } of [
 // ist das Bedienziel jeder Zeile. Gemessen wird er als Admin (nur dort ist er ein Ziel).
 test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px', async ({ page }) => {
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto('/admin/stammdaten/fuehrungsfunktionen');
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, '/admin/stammdaten/fuehrungsfunktionen', dichte);
     const knoepfe = page
       .getByRole('main')
       .getByRole('button', { name: /^Bezeichnung .+ bearbeiten$/ });
@@ -399,13 +395,12 @@ test('Profil: die Kopieraktion des Schlüssels zum zweiten Faktor hält 30 / 48 
   page,
 }) => {
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const konto = await benutzerAnlegen(page, 'fuehrungskraft');
   await wechsleZu(page, konto);
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto('/profil');
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, '/profil', dichte);
     await page.getByRole('button', { name: 'Zweiten Faktor einrichten' }).click();
     // Die Einrichtung verlangt das aktuelle Passwort (LFH-1013).
     const dialog = page.getByRole('dialog');
@@ -432,12 +427,11 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { pfad, namen } = await einheitMitZuordnungen(page);
   const messwerte: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(pfad);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, pfad, dichte);
     await detailBereit(page);
     const main = page.getByRole('main');
     const ziele = kopfFelder(page).map(({ name, huelle }) => ({ name, ziel: huelle }));
@@ -550,10 +544,9 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
   page,
 }) => {
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { pfad } = await einheitMitZuordnungen(page);
-  await page.goto(pfad);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, pfad, 'handschuh');
   await detailBereit(page);
   const name = zeilenAusloeser(page, 'Name');
   await haeltStufe(name, 72, 'Handschuhauslöser vor Mutation');
@@ -585,13 +578,12 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
     }) => {
       test.setTimeout(150_000);
       await page.setViewportSize(viewport);
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const { pfad, namen } = await seedEinheitPersonalGesperrt(page, rolle);
       const je = new Map<string, number>();
       const messwerte: string[] = [];
       for (const { dichte, soll } of STAFFEL) {
-        await page.goto(pfad);
-        await stelleDichte(page, dichte);
+        await ladeInDichte(page, pfad, dichte);
         await checkGesperrtReady(page, rolle);
         const gesperrt = zuordnungTargetsGesperrt(page, namen, rolle);
         const ziele: { name: string; ziel: Locator }[] = [];
@@ -679,12 +671,11 @@ for (const szenario of SPERR_SZENARIEN) {
       }) => {
         test.setTimeout(120_000);
         await page.setViewportSize(FUEKW);
-        await anmelden(page);
+        await anmelden(page, { startseite: false });
         const sperre = await seedKraefteGesperrt(page, szenario.module, rolle);
         const messwerte: string[] = [];
         for (const { dichte, soll } of STAFFEL) {
-          await page.goto(seite.pfad(sperre));
-          await stelleDichte(page, dichte);
+          await ladeInDichte(page, seite.pfad(sperre), dichte);
           await sperrzweigSteht(page, seite, sperre);
           let minimum = Infinity;
           const ziele = seite.ziele(page, rolle);
@@ -736,8 +727,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
 
   for (const { dichte } of STAFFEL) {
     // `…/personal` öffnet die Kategorie „Kräfte & Mittel": das Panel trägt ohne Klick fünf Module.
-    await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personal`, dichte);
 
     // Wache: der INLINE-Rahmen steht und der Drawer ist nicht im Baum — sonst wäre der Test
     // auch grün, wenn er versehentlich den Drawer misst.
@@ -848,13 +838,12 @@ test('Globale Kopfzeile: Logo, Verwaltungs-Link, Suchzugang und Benutzermenü fo
   await page.setViewportSize(FUEKW);
   // `/einsaetze` ist die Route von `AppLayout`, der zweiten Kopfzeile. Logo und
   // Verwaltungs-Link kommen nur dort vor.
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const gemessen: string[] = [];
 
   for (const { dichte } of STAFFEL) {
-    await page.goto('/einsaetze');
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, '/einsaetze', dichte);
 
     const kopf = page.locator('.ant-layout-header');
     await expect(kopf, 'genau eine Kopfzeile auf der Einsatzauswahl').toHaveCount(1);
@@ -901,7 +890,7 @@ test('Globale Kopfzeile (ohne Verwaltungsrecht): Logo, Suchzugang und Benutzerme
   // das Führungs-Tablet, die engste Breite, auf der der Tag steht.
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1024, height: 768 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   // Ohne `org_rolle` gilt 'keiner'/'keine' — `darfVerwaltung` ist false. Mitglied eines
   // Einsatzes muss der Benutzer dafür nicht sein.
   await wechsleZu(page, await benutzerAnlegen(page, 'beobachter'));
@@ -909,8 +898,7 @@ test('Globale Kopfzeile (ohne Verwaltungsrecht): Logo, Suchzugang und Benutzerme
   const gemessen: string[] = [];
 
   for (const { dichte } of STAFFEL) {
-    await page.goto('/einsaetze');
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, '/einsaetze', dichte);
 
     const kopf = page.locator('.ant-layout-header');
     await expect(kopf, 'genau eine Kopfzeile auf der Einsatzauswahl').toHaveCount(1);
@@ -972,8 +960,7 @@ test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und 
   const gemessen: string[] = [];
 
   for (const { dichte } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personal`, dichte);
 
     // Wache: hier gilt der SCHMAL-Zweig — der inline-Rahmen ist weg, der Griff steht.
     await expect(page.getByRole('navigation', { name: 'Kategorien' })).toHaveCount(0);
@@ -1069,8 +1056,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Anker: die Seite ist fertig geladen.
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
@@ -1139,8 +1125,7 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
     // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
@@ -1217,8 +1202,7 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
 
   for (const { dichte, soll } of STAFFEL) {
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
-    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
     const link = page.getByRole('link', { name: 'Meldebild', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
@@ -1261,8 +1245,7 @@ async function messeBesatzungsAusloeser(
   for (const { zweig, groesse } of BESATZUNG_ZWEIGE) {
     await page.setViewportSize(groesse);
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
       // Datenanker: beide gesäten Fahrzeuge tragen ihren Auslöser.
       const ausloeser = page.getByRole('button', { name: /^Details zu Florian Musterstadt 3\// });
@@ -1421,8 +1404,7 @@ test('Lagebesprechung: ETB-Links, Schnellwahl, Kopfaktion und Übernahme folgen 
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagebesprechung`, dichte);
     const { etbLinks, schnellwahl, terminFeld } = await lagebesprechungSteht(page);
 
     // (1) ETB-Links; sie müssen auch ins ETB zeigen.
@@ -1484,8 +1466,7 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagebesprechung`, dichte);
     // Datenanker: der Verlauf trägt beide Einträge, erst danach sind Sperren eine Aussage.
     const { etbLinks, schnellwahl, terminFeld } = await lagebesprechungSteht(page);
 
@@ -1569,8 +1550,7 @@ test('Informationstelefon: Erfassung, Statusauslöser und „Vermisste ↗“ fo
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/infotelefon`, dichte);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
     const erfassen = await haeltStufe(
       page.getByRole('button', { name: 'Erfassen', exact: true }),
@@ -1607,8 +1587,7 @@ test('Informationstelefon (Beobachter): „Vermisste ↗“ folgt der Staffel, d
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/infotelefon`, dichte);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
     // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
     await expect(
@@ -1663,8 +1642,7 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen`, dichte);
     const tabelle = page.getByRole('region', { name: 'Funkplan', exact: true });
     const luecken = page.getByRole('region', { name: 'Lücken', exact: true });
     // Datenanker: das Fahrzeug steht erst, wenn alle drei Ebenen geladen sind.
@@ -1717,8 +1695,7 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen`, dichte);
     const tabelle = page.getByRole('region', { name: 'Funkplan', exact: true });
     await expect(tabelle.getByRole('link', { name: 'Florian 1/42-1' })).toHaveCount(1);
     // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
@@ -1796,8 +1773,7 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
   for (const { modul, bereich, knoepfe, vergleich } of BAUMTABELLEN) {
     const je = new Map<string, number>();
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/${modul}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/${modul}`, dichte);
       const tabelle = page.getByRole('region', { name: bereich, exact: true });
       // Datenanker: der 1. Zug steht erst, wenn die gesäten Daten geladen sind.
       await expect(tabelle.getByText('1. Zug', { exact: true })).toHaveCount(1);
@@ -1912,8 +1888,7 @@ for (const schreibend of [true, false]) {
 
     const gemessen: string[] = [];
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen/kommunikationsplan`, dichte);
       gemessen.push(await messeKommunikationsplan(page, soll, dichte, schreibend));
     }
     test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -1943,8 +1918,11 @@ for (const schreibend of [true, false]) {
 
     const gemessen: string[] = [];
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/einheiten/aus-vorlage/${v.vorlageId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(
+        page,
+        `/einsaetze/${einsatzId}/einheiten/aus-vorlage/${v.vorlageId}`,
+        dichte,
+      );
       const main = page.getByRole('main');
       // Datenanker: das Kästchen eines Fahrzeugs der Staffel steht.
       await expect(main.getByRole('checkbox', { name: v.fahrzeuge.rtw2 })).toHaveCount(1);
@@ -2136,8 +2114,7 @@ test('Fernmeldeskizze: Werkzeugleiste, Palette, Paneel, Lücken-Wahl und Umschal
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`, dichte);
     // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
     await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     gemessen.push(await messeSkizze(page, soll, dichte, true));
@@ -2157,8 +2134,7 @@ test('Fernmeldeskizze (Beobachter): Werkzeugleiste, Paneel, Lücken-Wahl und Ums
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`, dichte);
     await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     gemessen.push(await messeSkizze(page, soll, dichte, false));
   }
@@ -2250,8 +2226,11 @@ test('Organigramm: Namen, Klappziele und Werkzeugknöpfe folgen der Dichte-Staff
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(
+      page,
+      `/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`,
+      dichte,
+    );
     // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
     await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
     gemessen.push(await messeOrganigramm(page, soll, dichte, true));
@@ -2271,8 +2250,11 @@ test('Organigramm (Beobachter): Namen, Klappziele und Drucken folgen der Staffel
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(
+      page,
+      `/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`,
+      dichte,
+    );
     await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
     gemessen.push(await messeOrganigramm(page, soll, dichte, false));
   }
@@ -2309,8 +2291,7 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/abloesung`, dichte);
 
     const karten = page.locator('[data-lfh="abloesung-karte"]');
     await expect(karten).toHaveCount(2);
@@ -2369,8 +2350,7 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/abloesung`, dichte);
 
     // Datenanker: beide Karten und die Vorgabezeile des Abschnitts sind geladen.
     const karten = page.locator('[data-lfh="abloesung-karte"]');
@@ -2503,8 +2483,7 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     // ── Evakuierung ──
-    await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/evakuierung`, dichte);
 
     const bezirkZeilen = page.locator('tr[data-row-key^="bezirk-"]');
     await expect(bezirkZeilen).toHaveCount(2);
@@ -2652,8 +2631,7 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     // ── Evakuierung ──
-    await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/evakuierung`, dichte);
 
     // Datenanker: zwei Bezirkszeilen sind geladen.
     const bezirkZeilen = page.locator('tr[data-row-key^="bezirk-"]');
@@ -2765,8 +2743,7 @@ test('Unterkunft planen (LLH-1525): Grundlage, Kopfaktionen und Dialog „Nachfo
   const gemessen: string[] = [];
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`, dichte);
     const grundlage = await unterkunftAufbauen(page);
 
     const segmente = page.getByRole('main').locator('[data-lfh="segmentleiste"] button');
@@ -2908,8 +2885,7 @@ test('Unterkunft planen (Beobachter, LLH-1525): Grundlage folgt der Staffel, bei
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`, dichte);
     await rechteHinweisSteht(page);
     const grundlage = page.getByRole('region', { name: 'Grundlage', exact: true });
     const raum1 = grundlage.getByRole('group', { name: 'Raum 1' });
@@ -2984,8 +2960,7 @@ test('Richtwerte Unterkunft (LLH-1525): die Felder in Stammdaten und Einsatz-Ein
       ['Organisation', '/admin/stammdaten/unterkunft'],
       ['Einsatz', `/einsaetze/${einsatzId}/einstellungen/unterkunft`],
     ] as const) {
-      await page.goto(pfad);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, pfad, dichte);
       // Datenanker: die Zeile „Schlaffläche je Person“ steht als Feld.
       await expect(
         page.getByRole('spinbutton', { name: 'Schlaffläche je Person (m²)' }),
@@ -3074,15 +3049,14 @@ test('Vorplanung (LLH-1595): Liste und Kopf im Bearbeiten folgen der Dichte-Staf
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung`);
 
   const gemessen: string[] = [];
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
     // ── Liste: Kopfaktion, Suche, Spaltenschalter, die Bezeichnung als Link.
-    await page.goto('/planungen');
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, '/planungen', dichte);
     const main = page.getByRole('main');
     await main.getByPlaceholder('Bezeichnung, Ort oder Zeitraum').fill(planung.bezeichnung);
     const link = main.getByRole('link', { name: planung.bezeichnung, exact: true });
@@ -3151,14 +3125,13 @@ test('Vorplanung (LLH-1595): Raster, Werkzeugzeile, Personenleiste und Dialog �
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung Plan`);
 
   const gemessen: string[] = [];
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/planungen/${planung.id}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/planungen/${planung.id}`, dichte);
     await waitForPlanung(page, planung.bezeichnung);
     await waitForRaster(page);
 
@@ -3240,15 +3213,14 @@ test('Vorplanung (LLH-1595): Reiter Posten mit ⋮-Menü und Dialog „Posten an
 }) => {
   test.setTimeout(150_000);
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung Posten`);
 
   const gemessen: string[] = [];
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
     // ── Reiter Posten: „Posten anlegen“, Spaltenschalter, je Zeile ⋮.
-    await page.goto(`/planungen/${planung.id}?reiter=posten`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/planungen/${planung.id}?reiter=posten`, dichte);
     await waitForPlanung(page, planung.bezeichnung);
     const posten = page.locator('[data-lfh="planung-posten"]');
     await expect(posten.getByText('Fußtrupp', { exact: true })).toBeVisible();
@@ -3381,14 +3353,13 @@ test('Vorplanung (LLH-1595): die Handy-Liste des Plans folgt auf 390 px der Dich
 }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(HANDSCHIRM);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const planung = await seedPlanung(page, `E2E Gate3 ${Date.now()} Vorplanung Handy`);
 
   const gemessen: string[] = [];
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/planungen/${planung.id}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/planungen/${planung.id}`, dichte);
     await waitForPlanung(page, planung.bezeichnung);
     const liste = page.locator('[data-lfh="schichtplan-liste"]');
     const bloecke = liste.locator('[data-lfh="schichtplan-listen-block"]');
@@ -3475,8 +3446,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/verpflegung`, dichte);
 
     const fruehstueck = page.getByRole('article', { name: /^Zeitfenster Frühstück Deich / });
     const mittagKarte = page.getByRole('article', { name: /^Zeitfenster Mittag Deich / });
@@ -3626,8 +3596,7 @@ test('Ausgabeansicht: „+1“ ≥ 72 px in jeder Stufe und unten, übrige Zähl
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`, dichte);
     await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
     const feld = page.locator('[data-lfh="zaehltasten"]');
     const plus1 = feld.getByRole('button', { name: '+1', exact: true });
@@ -3753,8 +3722,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/verpflegung`, dichte);
 
     // Datenanker: beide Karten mit ihrer Einstufung und die zwei Ausgaben am Mittag.
     const karten = page.locator('[data-lfh="verpflegung-karte"]');
@@ -3838,8 +3806,7 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/verpflegung`, dichte);
     await page.getByRole('radio', { name: 'Stellen (2)' }).click();
     const geplant = page.getByRole('article', { name: 'Stelle Zuführung Deich' });
     const aktiv = page.getByRole('article', { name: 'Stelle Feldküche BR Sportplatz' });
@@ -3973,8 +3940,7 @@ test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abst
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personen`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, dichte);
     const leer = page.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' });
     const voll = page.getByRole('button', { name: 'Zustand / Verdacht zu R-002 bearbeiten' });
     const hLeer = await haeltStufe(leer, soll, `Zustand-Knopf leer (${dichte})`);
@@ -4031,8 +3997,7 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personen`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, dichte);
 
     // Datenanker: die Zeile mit gesätem Zustand ist geladen und zeigt ihn als Text.
     await expect(personZeile(page, gefuellt)).toContainText('gehfähig');
@@ -4094,8 +4059,7 @@ test('Betroffene Detailseite: Knöpfe „+ …“ und Wertknöpfe der Personenda
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/${id}`, dichte);
     const daten = page.locator('[data-lfh="personendaten"]');
     const plus = daten.getByRole('button', { name: 'Geburtsdatum eintragen', exact: true });
     const wert = daten.getByRole('button', { name: 'Name bearbeiten', exact: true });
@@ -4124,8 +4088,7 @@ test('Betroffene Detailseite: die Knöpfe „+ …“ halten auch umgebrochen de
 
   const gemessen: string[] = [];
   for (const { dichte } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/${id}`, dichte);
     const zeile = page.locator('[data-lfh="personendaten"] [data-lfh="ohne-angabe"]');
     await expect(zeile.getByRole('button', { name: 'Notiz eintragen', exact: true })).toBeVisible();
     const reihen = await zeile.evaluate((el) => {
@@ -4165,8 +4128,7 @@ test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', asy
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/${id}`, dichte);
     const link = page.getByRole('link', { name: 'Auf Lagekarte verorten', exact: true });
     const hoehe = await haeltStufe(link, soll, `Verorten-Link (${dichte})`);
     const breite = (await link.boundingBox())!.width;
@@ -4214,8 +4176,7 @@ test('Betroffene Aufnahme: Zustand, Fundort und „vermisst seit" folgen der Sta
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     // Route (Modus betroffen): Zustand + Fundort (Ortsfeld; die Koordinate steht darin, LLH-1407).
-    await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/aufnahme`, dichte);
     await page.getByRole('button', { name: /Weitere Angaben/ }).click();
     const zustand = await haeltStufe(
       huelle(page.getByLabel('Zustand / Verdacht', { exact: true })),
@@ -4425,8 +4386,7 @@ test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dic
   const je = new Map<string, number>();
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/etb`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, dichte);
     const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
     await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(3);
 
@@ -4504,8 +4464,7 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Werkzeugmenü, Kartengrun
   await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, dichte);
     await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
       1,
       { timeout: 60_000 },
@@ -4707,8 +4666,7 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
   const gemessen: string[] = [];
 
   for (const { dichte } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, dichte);
     await karteBereit(page);
     await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
     // Zoom 17 liegt über `clusterMaxZoom` (14): der Marker steht einzeln, nicht im Donut.
@@ -4914,8 +4872,7 @@ test('Lagekarte (LFH-600): Punkt-Fachebenen tragen die Trefferzone der Staffel, 
   const gemessen: string[] = [];
 
   for (const { dichte } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, dichte);
     await karteBereit(page);
     await fachebenenAn(page);
     await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
@@ -5000,8 +4957,7 @@ test('Lagekarte (LFH-600): im Handschuh-Modus zoomt ein Tipp neben ein KRITIS-B�
   const einsatzId = await einsatzAnlegen(page, `E2E 600 Bündel ${Date.now()}`);
   kritisBuendelOrt = [9.25, 49.46];
   try {
-    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await stelleDichte(page, 'handschuh');
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, 'handschuh');
     await karteBereit(page);
     await fachebenenAn(page);
     await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
@@ -5088,8 +5044,7 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
   let groesstesKompakt = 0;
 
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/gefahren`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/gefahren`, dichte);
 
     // 13 Gefahrentypen × 5 Schutzobjekte, davon 7 Paare „nicht anwendbar" = 58, exakt.
     const zellen = page.getByRole('button', { name: /^Bewertung / });
@@ -5185,8 +5140,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
   const gemessen: string[] = [];
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/gefahren`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/gefahren`, dichte);
     // Datenanker: die Matrix des ersten Gebiets steht.
     await expect(page.getByRole('heading', { level: 3, name: gebiete[0] })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
@@ -5339,8 +5293,7 @@ test('Detailseiten (LFH-968): der ETB-Sprung hält die Staffel und den Zielabsta
     await page.setViewportSize(lage);
     for (const seite of seiten) {
       for (const { dichte, soll } of STAFFEL) {
-        await page.goto(seite.pfad);
-        await stelleDichte(page, dichte);
+        await ladeInDichte(page, seite.pfad, dichte);
         // Vorbedingung: der Schreibzweig steht („Fortschreiben“).
         await expect(
           page.getByRole('button', { name: seite.fortschreiben, exact: true }),
@@ -5382,8 +5335,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   const je = new Map<string, number>();
   for (const { dichte, soll } of STAFFEL) {
     for (const seite of seitenFrei) {
-      await page.goto(seite.pfad);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, seite.pfad, dichte);
       await expect(page.getByRole('button', { name: 'Drucken' })).toHaveCount(1);
       // Vorbedingung: der Rollenzweig steht — ohne Schreibrecht kein „Fortschreiben“.
       await expect(
@@ -5402,8 +5354,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
     }
 
     // Gesperrtes ETB: der Grund steht im Text, nicht nur im `title` (auf Touch unsichtbar).
-    await page.goto(berichtGesperrt.pfad);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, berichtGesperrt.pfad, dichte);
     const gesperrterSprung = page.getByRole('button', {
       name: 'Zum ETB-Eintrag (Keine Berechtigung)',
       exact: true,
@@ -5453,8 +5404,7 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
   for (const lage of [TABLET_HOCH, TABLET_QUER]) {
     await page.setViewportSize(lage);
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(pfad);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, pfad, dichte);
       const anzahl = await mindestensKnoten(zuweisen, 3, `zuweisen (${dichte})`);
       const hoehe = await alleHaltenStufe(zuweisen, soll, `zuweisen (${dichte})`, 3);
       // Klappkopf „Verlauf“ (LLH-1095 D12): Boden über den Kontext wie jedes `Collapse` (LFH-653).
@@ -5537,8 +5487,7 @@ test('Personenansicht: alle Ziele der vier Paneele halten 30 / 48 / 72 px, Entla
   const knopf = (name: string) => main.getByRole('button', { name, exact: true });
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personal/${epId}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personal/${epId}`, dichte);
     // Datenanker: die Einheit steht aufgelöst, die Zeitachse geladen.
     await expect(knopf('Einheit bearbeiten')).toHaveText(/Messeinheit Ansicht/);
     await expect(knopf('Nachtragen')).toBeVisible();
@@ -5608,8 +5557,7 @@ test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziel
   const main = page.getByRole('main');
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personal/${epId}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personal/${epId}`, dichte);
     // Datenanker vor der Abwesenheit: die Einheit steht aufgelöst, der Hinweis steht.
     await expect(main.getByText('Messeinheit Lesend', { exact: true })).toBeVisible();
     await expect(main.getByText(/^Nur Ansicht/).first()).toBeVisible();
@@ -5753,8 +5701,7 @@ test('Personal (LLH-1273): Kopfaktionen halten den Zielabstand, sortierbare Spal
   const main = page.getByRole('main');
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personal`, dichte);
     const disponieren = main.getByRole('button', { name: 'Personal disponieren', exact: true });
     const adhoc = main.getByRole('button', { name: 'Ad-hoc-Person', exact: true });
     await haeltStufe(disponieren, soll, `Personal disponieren (${dichte})`);
@@ -5785,8 +5732,7 @@ test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Polster`);
   await seedPersonal(page, einsatzId);
-  await page.goto(`/einsaetze/${einsatzId}/personal`);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/personal`, 'handschuh');
   const main = page.getByRole('main');
   await expect(main.getByText('Messkraft Kopf B', { exact: true })).toBeVisible();
 
@@ -5865,8 +5811,7 @@ test('Personal (Beobachter, LLH-1273): ohne Kopfaktionen halten die sortierbaren
   const main = page.getByRole('main');
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personal`, dichte);
     const kopf = await measurePersonalKopf(page, dichte, soll);
     // Nach dem Datenanker: ohne Schreibrecht fehlen beide Kopfaktionen.
     for (const name of ['Personal disponieren', 'Ad-hoc-Person']) {
@@ -5897,8 +5842,7 @@ test.describe('Rail bei 1366 × 520 in Handschuh (LLH-1273)', () => {
     await anmelden(page);
     await page.setViewportSize({ width: 1366, height: 520 });
     const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Rail`);
-    await page.goto(`/einsaetze/${einsatzId}/etb`);
-    await stelleDichte(page, 'handschuh');
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, 'handschuh');
 
     const rail = page.getByRole('navigation', { name: 'Kategorien' });
     const spalte = rail.locator('[data-lfh="rail-spalte"]');

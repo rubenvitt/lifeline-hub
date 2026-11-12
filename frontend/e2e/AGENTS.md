@@ -2,6 +2,25 @@
 
 Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/`.
 
+- **e2e prüft nur, was nur der Browser oder ein Ablauf zeigt** (LLH-1665, Spec `e2e-zuschnitt`):
+  Abläufe über mehrere Seiten und Geometrie, Überlauf, Trefffläche, Kontrast, Fokus, Gesten,
+  Druck, Kartengrafik, Service Worker, mehrere Tabs. Logik einer einzelnen Seite (Filter,
+  Sortierung, Validierung, Text aus einer gemockten Antwort) gehört nach Vitest, Serververhalten
+  nach `tests/`. Wer einen Fall streicht oder verschiebt, hält eine Mutationsprobe am
+  übernehmenden Test fest. Herleitung:
+  `openspec/changes/teqsdpas-e2e-testpyramide/design.md`.
+- **Layout-Gates laufen in jedem Lauf vollständig** (LLH-1665, D1): keine Auswahl der Seiten
+  nach dem Diff, im PR wie auf `alpha`. Gespart wird im Gate selbst.
+- **Angemeldet wird über die API** (LLH-1665): `anmeldenPerApi` aus `e2e/anmelde-kern.ts`, dahinter
+  `anmelden`, `anmeldenAls`, `anmeldenAlsAdmin`, `wechsleZu…`. `{ startseite: false }`, wenn der
+  nächste Schritt ohnehin ein `goto` ist. Das Formular füllen nur die Specs, die die Anmeldung
+  selbst prüfen; Riegel `no-restricted-syntax` mit Ausnahmeliste in `frontend/eslint.config.js`.
+  Einen Einsatz, dessen Dialog der Fall nicht prüft, legt `einsatzPerApi` aus `e2e/einsatz-kern.ts`
+  an.
+- **Eine Ladung je Dichtestufe** (LLH-1665): `ladeInDichte(page, pfad, dichte)` aus
+  `e2e/trefflaeche-kern.ts` statt `goto` und danach `stelleDichte` (das lud jede Seite zweimal).
+  `stelleDichte` bleibt für einen Stufenwechsel auf einer schon offenen Seite.
+
 - **`toBeVisible()` ist kein Beleg für Klickbarkeit** (LFH-355) — klicken. Ein Test, der eine
   Überdeckung umgeht, testet den Nutzerzustand nicht.
 - **Ein Layout-Gate misst jeden rollenabhängigen Zustand auch nicht-privilegiert** (LFH-435):

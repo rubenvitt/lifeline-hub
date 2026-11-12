@@ -1,15 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 test.setTimeout(90_000);
 
 async function vorbereiten(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
   await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(`E2E Router-Blocker ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();

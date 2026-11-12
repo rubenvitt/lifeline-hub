@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Kartenansicht der Betroffenen. Ob die Marker wirklich in der MapLibre-Quelle landen (lazy
 // geladenes Bündel, Startausschnitt aus dem Rahmen um die Personen, Clustering), sieht nur ein
@@ -21,12 +22,8 @@ interface PersonZeile {
   antreff_lon?: number | null;
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -57,7 +54,7 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
   page,
 }) => {
   test.setTimeout(120_000);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   // Kein Modulname im Einsatznamen (die Palette sucht Module und Einsätze gemeinsam).
   const einsatzId = await post(page, '/api/einsaetze', {

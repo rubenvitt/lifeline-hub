@@ -149,7 +149,7 @@ test.describe('Orientierung (LFH-954)', () => {
   });
 
   test('Verwaltung: Tab-Titel der Sektion, „Verwaltung“ als aktueller Ort', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     await page.goto('/admin/stammdaten/fahrzeuge');
     await expect(page).toHaveTitle('Fahrzeuge · Verwaltung · lifeline-hub');
     await expect(page.getByRole('link', { name: 'Verwaltung', exact: true })).toHaveAttribute(

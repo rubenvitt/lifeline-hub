@@ -1,7 +1,16 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import {
+  anmeldenAls,
+  anmeldenAlsAdmin,
+  benachrichtigungenQuittieren,
+  benutzerAnlegen,
+  mitgliedEintragen,
+  wechsleZu,
+  wechsleZuRolle,
+  type Konto,
+} from './rollen-kern';
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { oeffneObjektGruppe } from './leisten-kern';
 import { FOTO_JPEG } from './bildFixture';
 import { seedeVorlage, type GesaeteVorlage } from './vorlage-kern';
@@ -12,8 +21,8 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
   test.use({ hasTouch: true });
 
   test('kurzer Einsatzname hält den Handschuh-Boden', async ({ page }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, 'A');
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, 'A');
     await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
     for (const breite of [390, 1024]) {
       await page.setViewportSize({ width: breite, height: 900 });
@@ -204,8 +213,8 @@ const PRUEFBREITEN = [
   { name: 'mobil', breite: 390, hoehe: 844 },
 ] as const;
 
-async function anmelden(page: Page) {
-  await anmeldenAlsAdmin(page);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenAlsAdmin(page, optionen);
 }
 
 /**
@@ -377,12 +386,13 @@ async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string
 }
 
 /**
- * Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen — je Test. Die
- * org-weite Einheiten-Vorlage nur mit `vorlage` (siehe {@link Gate1Durchgang}).
+ * Legt den Einsatz an und sät den Überlaufstoff aller Routen; die Sitzung muss der Admin sein.
+ * Die org-weite Einheiten-Vorlage nur mit `vorlage` (siehe {@link Gate1Durchgang}). Läuft einmal
+ * je Worker und Einsatzart ({@link gate1Vorbereiten}), der Einsatz über die API: den Dialog
+ * prüfen `einsatz-kern.ts` und seine Specs.
  */
-async function gate1Vorbereiten(page: Page, { vorlage = false } = {}): Promise<string> {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate1 ${Date.now()}`);
+async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string> {
+  const einsatzId = await einsatzPerApi(page, `E2E Gate1 ${Date.now()}`);
   await seedeUeberlaufstoff(page, einsatzId, { vorlage });
   // Eine Schicht mit absichtlich langem Einheits- und Abschnittsnamen.
   {
@@ -485,7 +495,53 @@ async function gate1Vorbereiten(page: Page, { vorlage = false } = {}): Promise<s
     });
     expect(antwort.ok(), `Seeding ETB: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   }
-  // Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff.
+  return einsatzId;
+}
+
+/**
+ * Saat je Worker (LLH-1665, design.md D4 der Change `teqsdpas-e2e-testpyramide`): Die Messung
+ * von Gate 1 liest nur — Anker, Vorbedingungen und `vorbereiten` öffnen Reiter, Verläufe und
+ * Paletten, schreiben aber nichts. Deshalb sät der erste Test eines Workers den Einsatz seiner
+ * Art (mit und ohne Vorlage) und den Beobachter, die übrigen Tests desselben Workers messen
+ * dieselben Daten. Vorher säte jeder der 48 Tests neu (rund 13 Anfragen und der Einsatzdialog).
+ * Startet ein Worker nach einem Fehler neu, ist der Speicher leer und er sät erneut.
+ */
+const GATE1_SAAT = new Map<boolean, Promise<string>>();
+let gate1Beobachter: Promise<Konto> | undefined;
+
+/**
+ * Meldet als `rolle` an und liefert den gesäten Einsatz. Gesät wird als Admin, nur wenn der
+ * Worker diesen Einsatz noch nicht hat; der Beobachter ist Mitglied jedes gesäten Einsatzes.
+ */
+async function gate1Vorbereiten(
+  page: Page,
+  rolle: 'admin' | 'beobachter',
+  { vorlage = false } = {},
+): Promise<string> {
+  if (rolle === 'admin' || !GATE1_SAAT.has(vorlage)) await anmelden(page, { startseite: false });
+  let saat = GATE1_SAAT.get(vorlage);
+  if (!saat) {
+    saat = (async () => {
+      const einsatzId = await gate1Saeen(page, { vorlage });
+      gate1Beobachter ??= benutzerAnlegen(page, 'beobachter');
+      const beobachter = await gate1Beobachter;
+      await mitgliedEintragen(page, einsatzId, beobachter.id, 'beobachter');
+      await benachrichtigungenQuittieren(beobachter);
+      return einsatzId;
+    })();
+    GATE1_SAAT.set(vorlage, saat);
+  }
+  const einsatzId = await saat;
+  if (rolle === 'beobachter') {
+    const beobachter = await gate1Beobachter!;
+    await anmeldenAls(page, beobachter.benutzername, beobachter.passwort, { startseite: false });
+  }
+  await wetterStub(page, einsatzId);
+  return einsatzId;
+}
+
+/** Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff. */
+async function wetterStub(page: Page, einsatzId: string) {
   await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
     route.fulfill({
       json: {
@@ -507,7 +563,6 @@ async function gate1Vorbereiten(page: Page, { vorlage = false } = {}): Promise<s
       },
     }),
   );
-  return einsatzId;
 }
 
 type Gate1Rolle = 'admin' | 'beobachter' | 'fuehrungskraft';
@@ -1178,7 +1233,7 @@ test.describe('Gate 1', () => {
         // beim Teilen gleich (LLH-1363): vorher trug es alle 35 Routen, mit Trace bei einer
         // Wiederholung reichte es auf einem 2-vCPU-Runner nicht mehr.
         test.setTimeout(240_000);
-        const einsatzId = await gate1Vorbereiten(page, { vorlage: durchgang.vorlage });
+        const einsatzId = await gate1Vorbereiten(page, 'admin', { vorlage: durchgang.vorlage });
         await gate1Messen(
           page,
           durchgang.routen(einsatzId),
@@ -1192,9 +1247,10 @@ test.describe('Gate 1', () => {
         page,
       }) => {
         test.setTimeout(240_000);
-        // Gesät wird als Admin; der Wechsel im selben Kontext behält den Wetter-Stub.
-        const einsatzId = await gate1Vorbereiten(page, { vorlage: durchgang.vorlage });
-        await wechsleZuRolle(page, 'beobachter', einsatzId);
+        // Gesät wird als Admin, einmal je Worker; gemessen als Beobachter mit Wetter-Stub.
+        const einsatzId = await gate1Vorbereiten(page, 'beobachter', {
+          vorlage: durchgang.vorlage,
+        });
         await gate1Messen(
           page,
           durchgang.routen(einsatzId),
@@ -1509,7 +1565,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         page,
       }) => {
         await page.setViewportSize({ width: 1366, height: 768 });
-        await anmelden(page);
+        await anmelden(page, { startseite: false });
         const einsatzId = await seedeKraefte(page);
         if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
         await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
@@ -1578,7 +1634,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       page,
     }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const einsatzId = await seedeKraefte(page);
       if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.setViewportSize({ width: 1440, height: 900 });
@@ -1663,7 +1719,7 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       page,
     }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const neu = await page.request.post('/api/einsaetze', {
         data: { bezeichnung: `E2E Gliederung ${Date.now()}` },
       });
@@ -1858,7 +1914,7 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
     test(`Fükw (1440 px) · ${rolle}: Fahrzeuge mit Besatzung ohne Tabellenüberlauf`, async ({
       page,
     }) => {
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const einsatzId = await seedeFahrzeugMitBesatzung(page);
       if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.setViewportSize(FUEKW_TABELLE);
@@ -1898,7 +1954,7 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
     });
 
     test(`Fükw (1440 px) · ${rolle}: Dokumente ohne Tabellenüberlauf`, async ({ page }) => {
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const einsatzId = await seedeDokumente(page);
       if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.setViewportSize(FUEKW_TABELLE);
@@ -1935,7 +1991,7 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
    */
   for (const breite of [1440, 1366] as const) {
     test(`Fükw (${breite} px): Einheitsnamen brechen nicht mitten im Wort`, async ({ page }) => {
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const einsatzId = await neuerEinsatz(page, `E2E Fükw-Einheit ${Date.now()}`);
       const silben: Record<string, number[]> = {
         Betreuungsgruppe: [2, 6, 10, 14],
@@ -1995,7 +2051,7 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
   }
 
   test('Fükw (1440 px) · admin: Aufbewahrung ohne Tabellenüberlauf', async ({ page }) => {
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     // Einer mit laufender Frist (Datum in „Frist“), einer ohne.
     for (const [bezeichnung, mitFrist] of [
       [`E2E Brandsicherheitswache Stadtfest ${Date.now()}`, true],

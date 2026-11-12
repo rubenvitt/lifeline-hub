@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Spaltenschalter der Kartenverwaltungen am Handschirm: die Tabelle bleibt bei 390 px eine
 // Tabelle, die Werkzeugzeile mit Suche UND Schalter drückt nichts breit, und der Schalter ist
@@ -11,12 +12,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 test.use({ viewport: { width: BREITE, height: 844 } });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Das OFFENE Spaltenmenü — antd lässt geschlossene Portale im Baum stehen. */
@@ -41,7 +38,7 @@ async function breitenPruefen(page: Page) {
 test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einblendbar', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   // Eine Zeile legt der Spec selbst an — ohne Zeile wäre „bleibt eine Tabelle" nur ein Kopf.
   // INAKTIV und am Ende wieder gelöscht: Online-Quellen gelten instanzweit, und eine aktive
   // Quelle mit unerreichbarer URL brach jede spätere Lagekarte im selben Shard.
@@ -84,7 +81,7 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
 });
 
 test('Offline-Karten bei 390 px: Tabelle mit Schalter, Attribution gezählt', async ({ page }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await page.goto('/admin/karten/offline');
   // Die Offline-Liste ist im Harness leer — der Kopf ist trotzdem der einer Tabelle, und der
   // Zähler hängt an den Spalten, nicht an den Zeilen.

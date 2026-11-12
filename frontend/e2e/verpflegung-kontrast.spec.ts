@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast, pruefe, randKontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kriterium 5 der Prüfliste für `/einsaetze/:id/verpflegung`: Kontrast der ZUSAMMENGESETZTEN
@@ -47,12 +48,8 @@ const KARTEN = [
   { stufe: 'offen', name: 'Abendessen Kontrast', wort: 'offen' },
 ] as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function post<T = { id: number }>(page: Page, pfad: string, data?: unknown): Promise<T> {

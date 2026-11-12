@@ -13,25 +13,25 @@ in `pruefliste.md` dieser Change.
 
 ## 2. Regel und Riegel
 
-- [ ] 2.1 Regel in `frontend/e2e/AGENTS.md`: e2e nur für Abläufe über mehrere Seiten und für das, was nur der Browser zeigt; Logik einer Seite in Vitest, Serververhalten in `tests/`; Layout-Gates laufen in jedem Lauf vollständig (D1); Anmeldung per API (D2); eine Ladung je Dichtestufe (D3). Verifiziert: Prettier über `frontend/` grün, Verweis auf diese Change steht.
+- [x] 2.1 Regel in `frontend/e2e/AGENTS.md`: e2e nur für Abläufe über mehrere Seiten und für das, was nur der Browser zeigt; Logik einer Seite in Vitest, Serververhalten in `tests/`; Layout-Gates laufen in jedem Lauf vollständig (D1); Anmeldung per API (D2); eine Ladung je Dichtestufe (D3). Verifiziert: Prettier über `frontend/` grün, Verweis auf diese Change steht.
 
 ## 3. Anmelde-Kern und Umstellung der Anmeldung (D2)
 
-- [ ] 3.1 `e2e/anmelde-kern.ts` mit `anmeldenPerApi(page, benutzer, passwort, { startseite })` per TDD gegen eine kleine Probe-Spec: mit Startseite steht `/einsaetze` mit dem Benutzer im Menü, ohne Startseite ist keine Seite geladen und das erste `goto` zeigt den Benutzer; ein Konto unter Änderungszwang meldet einen klaren Fehler. Verifiziert: lokaler Lauf der Probe grün, Mutationsprobe (Zusicherung auf die Sitzung entfernt → Fall mit Änderungszwang wird nicht mehr rot) festgehalten.
+- [x] 3.1 `e2e/anmelde-kern.ts` mit `anmeldenPerApi(page, benutzer, passwort, { startseite })` per TDD gegen eine kleine Probe-Spec: mit Startseite steht `/einsaetze` mit dem Benutzer im Menü, ohne Startseite ist keine Seite geladen und das erste `goto` zeigt den Benutzer; ein Konto unter Änderungszwang meldet einen klaren Fehler. Verifiziert: lokaler Lauf der Probe grün, Mutationsprobe (Zusicherung auf die Sitzung entfernt → Fall mit Änderungszwang wird nicht mehr rot) festgehalten.
 - [ ] 3.2 `anmelden` (`trefflaeche-kern.ts`), `anmeldenAls`, `anmeldenAlsAdmin`, `wechsleZu`, `wechsleZuAdmin` (`rollen-kern.ts`), `anmeldenOhneStartseite` (`lageplan-kern.ts`) sowie die Kern-Kopien in `funkplan-kern.ts` und `meldebild-kern.ts` auf den Kern umstellen. Verifiziert: lokaler Lauf von `gate3-trefflaeche`, `gate1-ueberlauf`, `funkplan`, `meldebild*` grün.
 - [ ] 3.3 Die Specs mit eigener `anmelden`/`anmeldenAls`-Kopie (rund 40) auf Importe umstellen; was eine Kopie zusätzlich tut (Dichte, Helligkeit, Modus per `addInitScript`), bleibt als eigener Schritt davor. Specs, die die Anmeldung selbst prüfen, bleiben unverändert und kommen in die Ausnahmeliste. Verifiziert: `tsc` und ESLint für `e2e/**` grün, lokaler Lauf der umgestellten Specs grün.
 - [ ] 3.4 Mechanisch `startseite: false` setzen, wo der nächste Befehl nach der Anmeldung `page.goto(` ist (Skript in der Scratchpad, nicht committet). Verifiziert: Diff durchgesehen, lokaler Lauf der betroffenen Specs grün.
-- [ ] 3.5 Riegel `no-restricted-syntax` für `e2e/**` gegen das Ausfüllen des Anmeldeformulars außerhalb der Ausnahmeliste, mit Meldung, die auf `anmelde-kern.ts` zeigt. Verifiziert: ESLint grün; Mutationsprobe (Formular-Anmeldung in eine Gate-Spec zurückgesetzt → ESLint rot) festgehalten.
+- [x] 3.5 Riegel `no-restricted-syntax` für `e2e/**` gegen das Ausfüllen des Anmeldeformulars außerhalb der Ausnahmeliste, mit Meldung, die auf `anmelde-kern.ts` zeigt. Verifiziert: ESLint grün; Mutationsprobe (Formular-Anmeldung in eine Gate-Spec zurückgesetzt → ESLint rot) festgehalten.
 
 ## 4. Eine Ladung je Dichtestufe (D3)
 
-- [ ] 4.1 `ladeInDichte(page, pfad, dichte)` in `trefflaeche-kern.ts` per TDD: Stufe vor dem Laden gesetzt, Wache `data-dichte`, Rückfall auf `goto` + `stelleDichte` von `about:blank`. Verifiziert: Probe-Spec zählt die Navigationen (eine je Stufe); Mutationsprobe (Schlüssel nicht gesetzt → Wache rot vor der Messung) festgehalten.
+- [x] 4.1 `ladeInDichte(page, pfad, dichte)` in `trefflaeche-kern.ts` per TDD: Stufe vor dem Laden gesetzt, Wache `data-dichte`, Rückfall auf `goto` + `stelleDichte` von `about:blank`. Verifiziert: Probe-Spec zählt die Navigationen (eine je Stufe); Mutationsprobe (Schlüssel nicht gesetzt → Wache rot vor der Messung) festgehalten.
 - [ ] 4.2 gate3 auf `ladeInDichte` umstellen (69 Stellen). Verifiziert: lokaler Lauf grün mit `--repeat-each=3`; Zeit gegen Vorher-Wert in `pruefliste.md`.
 - [ ] 4.3 `fokus-verdeckung`, `pegel-pruefliste`, `leisten-flaeche` umstellen; die Dichtetests von `fokus-verdeckung` (`:747`, `:2483`, `:2620`, `:2767`) je Breite zu einem Fall über `STAFFEL` bündeln. Verifiziert: lokale Läufe grün mit `--repeat-each=3`, Zeiten eingetragen.
 
 ## 5. Saat einmal (D4, D6)
 
-- [ ] 5.1 Gate-1-Durchgänge auf Schreibzugriffe prüfen (`vorbereiten`, `lesend`) und das Ergebnis in `pruefliste.md` festhalten. Verifiziert: Liste der lesenden Durchgänge steht.
+- [x] 5.1 Gate-1-Durchgänge auf Schreibzugriffe prüfen (`vorbereiten`, `lesend`) und das Ergebnis in `pruefliste.md` festhalten. Verifiziert: Liste der lesenden Durchgänge steht.
 - [ ] 5.2 `gate1Vorbereiten` als Worker-Fixture für die lesenden Durchgänge (Einsatz mit und ohne `vorlage`, Beobachter je Einsatz); schreibende Durchgänge säen weiter je Test. Freistellungs- und Tot-Erkennung unverändert. Verifiziert: lokaler Lauf grün mit `--repeat-each=2`; Mutationsprobe aus `layout-gates-rollen` (Rechtehinweis breiter als 390 px → Beobachter rot, Admin grün) wiederholt.
 - [ ] 5.3 Titel- und h1-Prüfung aus `orientierung.spec.ts:40` in den Admin-Durchgang von Gate 1 auf 1366 px für die Routen, die Gate 1 lädt; `orientierung` behält die übrigen Module. Verifiziert: Routenabgleich in `pruefliste.md`, Mutationsprobe (falscher Seitentitel eines Moduls → Gate 1 rot) festgehalten.
 - [ ] 5.4 Admin-/Beobachter-Geschwister mit gleicher Saat in gate3, `trefflaeche-pruefflaechen`, `leisten-flaeche`, `pegel-pruefliste` zu je einem Fall mit `test.step('Admin …')` / `test.step('Beobachter …')` zusammenlegen. Verifiziert: Inventar der Paare in `pruefliste.md`; je Datei eine Mutationsprobe (nur Nicht-Admin-Zweig verbreitert → Beobachter-Schritt rot, Admin-Schritt grün); lokale Läufe grün.
@@ -52,7 +52,7 @@ in `pruefliste.md` dieser Change.
 
 ## 8. `kopfhoehe-tonpruefung` (D7)
 
-- [ ] 8.1 Herleitung der Messdauer (LFH-637, LLH-1232) lesen und entscheiden, ob Messdauer „Endstand + Nachlauf“ und Beobachter nur in den Sprungbändern tragen; Entscheidung mit Begründung in `pruefliste.md`. Trägt sie, umsetzen. Verifiziert: Mutationsprobe (später Kopfsprung nach Endstand bzw. in einem Band) bleibt rot; lokaler Lauf grün. Trägt sie nicht: Spec unverändert, Begründung steht.
+- [x] 8.1 Herleitung der Messdauer (LFH-637, LLH-1232) lesen und entscheiden, ob Messdauer „Endstand + Nachlauf“ und Beobachter nur in den Sprungbändern tragen; Entscheidung mit Begründung in `pruefliste.md`. Trägt sie, umsetzen. Verifiziert: Mutationsprobe (später Kopfsprung nach Endstand bzw. in einem Band) bleibt rot; lokaler Lauf grün. Trägt sie nicht: Spec unverändert, Begründung steht.
 
 ## 9. Gesamtnachweis
 

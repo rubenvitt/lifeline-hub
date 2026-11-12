@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { gedrueckt, ruheUndZeiger } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Gefahrrot in Ruhe UND unter dem Zeiger, Tag und Nacht (LFH-693, Spec `farbrollen-kontrast`):
@@ -26,12 +27,8 @@ import { gedrueckt, ruheUndZeiger } from './kontrast-kern';
 
 const TEXT = { light: 7, dark: 5 } as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function post<T = { id: number }>(page: Page, pfad: string, data?: unknown): Promise<T> {
@@ -45,7 +42,7 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
 
     // Ein Zeitfenster ohne Ausgabe: Erfassen + Bearbeiten + Löschen bündeln sich zum Menü.
     const { id: einsatzId } = await post(page, '/api/einsaetze', {

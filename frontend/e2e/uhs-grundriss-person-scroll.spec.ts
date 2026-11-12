@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Gezogen wird zwischen Liste und Platz: das verlangt die Drei-Spalten-Form, und die steht erst,
 // wenn die Fläche neben beiden Seitenspalten ganz in den Rahmen passt (`dreiSpaltenPassen` in
@@ -10,12 +11,8 @@ test.use({ viewport: { width: 1920, height: 720 } });
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Mausgesten-Helfer: zieht das Zentrum von `quelle` auf das Zentrum von `ziel`. */

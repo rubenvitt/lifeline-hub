@@ -102,7 +102,7 @@ test('Deeplink tief ins Tagebuch: Ziel im Bild, „Neuere laden“ führt zum Ko
 test('Deeplink tief ins Tagebuch: Ziel im Bild, „Neuere laden“ führt zum Kopf (Beobachter)', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const gesaet = await saeen(page);
   await wechsleZuRolle(page, 'beobachter', gesaet.einsatzId);
   await page.goto(`/einsaetze/${gesaet.einsatzId}/etb`);

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kein Sprung unter Zeiger und Fokus, wenn woanders ein Einsatz entsteht (LLH-1204,
@@ -20,12 +21,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const FUEKW = { width: 1366, height: 768 };
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function einsatz(page: Page, bezeichnung: string, begonnen_at?: string): Promise<number> {
@@ -87,7 +84,7 @@ test('Zeiger: ein woanders angelegter Einsatz verschiebt keine Kachel, wartet im
 }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const praefix = `E2E 1204 Zeiger ${Date.now()}`;
   await einsatz(page, `${praefix} A`, vor(2));
   await einsatz(page, `${praefix} B`, vor(1));
@@ -130,7 +127,7 @@ test('Fokus: die fokussierte Kachel bleibt stehen; „anzeigen" holt den neuen E
 }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const praefix = `E2E 1204 Fokus ${Date.now()}`;
   await einsatz(page, `${praefix} A`, vor(2));
   await einsatz(page, `${praefix} B`, vor(1));

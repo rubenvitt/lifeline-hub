@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Layoutstabilität der Betroffenen-Flächen (Kriterium 12 „kein Sprung unter dem Cursor").
@@ -17,12 +19,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const FUEKW = { width: 1366, height: 768 };
 const RUHE_MS = 700;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -34,12 +32,6 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 async function patch(page: Page, pfad: string, data: unknown) {
   const a = await page.request.patch(pfad, { data });
   expect(a.ok(), `${pfad}: ${a.status()} ${await a.text()}`).toBeTruthy();
-}
-
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
 interface Verschiebung {
@@ -116,7 +108,7 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
   test.setTimeout(150_000);
   await page.setViewportSize(FUEKW);
   await verschiebungenAufzeichnen(page);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E Layout ${Date.now()}` });
   const werte: string[] = [];
 
@@ -132,8 +124,7 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
       name: `Fundort ${dichte}`,
       antreff_ort: 'Deich am Pumpwerk',
     });
-    await page.goto(`/einsaetze/${einsatzId}/personen`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, dichte);
     const zeile = (id: number) => page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
     await expect(zeile(erste)).toBeVisible();
     // Gemessen wird die Zeile, die in DOM-Reihenfolge folgt — egal, wie die Tabelle sortiert.
@@ -201,7 +192,7 @@ test('Liste: Nachsichtung aus der Zeile in drei Tipps, die Zeile zeigt SK I, die
   page,
 }) => {
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Nachsichtung ${Date.now()}`,
   });
@@ -238,7 +229,7 @@ test('Schnellerfassung bei 390 px: die Hinweiszeile beim Tippen von „Name sk2 
 }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E Zeile ${Date.now()}` });
   await post(page, `/api/einsaetze/${einsatzId}/personen`, { name: 'Anker' });
   await page.goto(`/einsaetze/${einsatzId}/personen`);
@@ -277,7 +268,7 @@ test('Karte: die Hinweiszeile springt nicht, wenn die letzte Lücke live geschlo
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await verschiebungenAufzeichnen(page);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Hinweis ${Date.now()}`,
   });

@@ -1,6 +1,7 @@
 import { expect, test, type CDPSession, type Locator, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { waehleWerkzeug } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kreis um einen Punkt am Fükw (LLH-1043, Spec `lagekarte-zeichnen`): Start im Werkzeugmenü
@@ -41,12 +42,8 @@ interface ZoneAntwort {
   kreis_mitte_lon?: number;
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function lagekarteOeffnen(page: Page, suche = '') {

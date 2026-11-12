@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * „n neue Nachrichten"-Pille statt bedingungslosem Sprung. jsdom rechnet `scrollTop`,
@@ -16,12 +17,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 // Handschirm-Maße: der Strom läuft schon nach einem Dutzend Nachrichten über.
 const SCHMAL = { width: 390, height: 844 };
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Liefert die id des Standardkanals „Allgemein". */
@@ -56,8 +53,8 @@ async function stromFuellen(page: Page, anzahl: number) {
 }
 
 test('Chat: oben im Verlauf bleibt die Sicht stehen und die Pille zählt', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Pille ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Pille ${Date.now()}`);
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/chat`);
   await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
@@ -92,8 +89,8 @@ test('Chat: oben im Verlauf bleibt die Sicht stehen und die Pille zählt', async
 });
 
 test('Chat: unten am Strom springt die Sicht weiter mit — ohne Pille', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Mitspringen ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Mitspringen ${Date.now()}`);
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/chat`);
   await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
@@ -113,8 +110,8 @@ test('Chat: unten am Strom springt die Sicht weiter mit — ohne Pille', async (
 });
 
 test('Chat: der Kanalwechsel räumt Merker und Zähler', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Kanalwechsel ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Kanalwechsel ${Date.now()}`);
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/chat`);
   await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
@@ -159,8 +156,8 @@ test('Chat: der Kanalwechsel räumt Merker und Zähler', async ({ page }) => {
 });
 
 test('Chat: die eigene Absendung holt die Sicht ans Ende zurück', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Eigene Sendung ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Eigene Sendung ${Date.now()}`);
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/chat`);
   await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();

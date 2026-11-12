@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { ANSICHT_SCHLUESSEL, BAUM_SCHLUESSEL } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Ebenenbaum der Kartenleiste (LLH-1028), gemessen im echten Layout:
@@ -27,12 +28,8 @@ const PNG = Buffer.from(
 const GRUPPEN = ['kraefte', 'lage', 'betroffene', 'fachebenen', 'hintergrund'] as const;
 const ALLE_ZU = Object.fromEntries(GRUPPEN.map((g) => [g, false]));
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function einsatzMitBild(page: Page): Promise<string> {

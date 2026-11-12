@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Kommunikationsplan ohne Netz (LFH-848, design.md D9): der Weg des Feldes — Plan mit Netz
 // öffnen, Netz weg, NEU LADEN. Wie `lagebild-offline.spec.ts` gegen den Prod-Bundle, den das
@@ -28,12 +29,8 @@ const backendUrl = lauf
 
 test.use({ baseURL: backendUrl || undefined });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 /** Service Worker aktiv UND zuständig — Muster und Begründung: `lagebild-offline.spec.ts`. */

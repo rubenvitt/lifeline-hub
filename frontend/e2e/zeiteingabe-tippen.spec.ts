@@ -59,7 +59,7 @@ async function neuerEinsatz(page: Page, name: string): Promise<number> {
 test('ETB-Chip „Ereigniszeit“: HHMM + Enter übernimmt ohne Maus, der Eintrag trägt die Zeit', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await neuerEinsatz(page, 'Zeit-Chip');
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   const inhalt = `Lage ruhig ${Date.now()}`;
@@ -89,7 +89,7 @@ test('ETB-Chip „Ereigniszeit“: HHMM + Enter übernimmt ohne Maus, der Eintra
 test('Auftragsfrist: HHMM + Enter übernimmt die Frist und erteilt den Auftrag', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await neuerEinsatz(page, 'Auftragsfrist');
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);
   await page.getByRole('button', { name: 'Auftrag erteilen' }).first().click();
@@ -120,7 +120,7 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   page,
 }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await neuerEinsatz(page, 'Ablösung Zeit');
   const basis = `/api/einsaetze/${einsatzId}`;
   const sende = async (methode: 'post' | 'put', pfad: string, data: unknown, was: string) => {
@@ -168,7 +168,7 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
 test('doppelte Stunde: „0247“ um 02:50 Winterzeit ist im Ereignisfeld drei Minuten her', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await neuerEinsatz(page, 'Doppelte Stunde');
 
   // Gestellte Uhr: 25.10.2026, 02:50 Winterzeit. 02:47 gab es eine Stunde vorher schon einmal.

@@ -1,4 +1,5 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Deckel vor einer langen Tabelle im Einsatzbericht (LFH-1124, `druck/einsatzbericht/Bloecke.tsx`,
@@ -23,12 +24,8 @@ const KOEPFE = 15;
 
 test.setTimeout(120_000);
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Bis zu drei Versuche bei 503 („bitte erneut versuchen", SQLite-Schreibkonflikt). */

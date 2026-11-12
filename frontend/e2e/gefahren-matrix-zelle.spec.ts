@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Zelle der Gefahrenmatrix ist EIN Auslöser (Dropdown), kein 5-Wege-Segmentcontrol — das
@@ -17,12 +18,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 /** Subpixel-Toleranz: Chromium rechnet unter Last anders. */
 const SUBPIXEL = 0.5;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 test('jede Matrix-Zelle misst auf dem Tablet mindestens 44 px', async ({ page }) => {

@@ -49,7 +49,7 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const s = await seed(page);
 
   await page.goto(`/einsaetze/${s.einsatzId}/personal`);

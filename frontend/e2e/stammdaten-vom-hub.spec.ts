@@ -10,7 +10,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 test('Stammdaten vom Hub: Zeile gesperrt mit Grund, Ergänzung vor Ort bearbeitbar', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const anlegen = async (funkrufname: string) => {
     const antwort = await page.request.post('/api/fahrzeuge', { data: { funkrufname } });
     expect(antwort.ok()).toBe(true);

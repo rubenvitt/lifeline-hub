@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 import { ADMIN, ADMIN_PW } from './rollen-kern';
 
 /**
@@ -32,12 +33,9 @@ export const HANDSCHIRM = { width: 390, height: 844 };
 /** Schlüssel aus `theme/ThemeModeProvider.tsx`. Bewusst literal — Vertrag, kein Import. */
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 
-export async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(ADMIN_PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+/** Anmelden als Admin über die API (`anmelde-kern.ts`, LLH-1665). */
+export async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, ADMIN_PW, optionen);
 }
 
 /** Einsatz per API: acht Einsätze über die UI wären 32 Formularaktionen ohne Erkenntnisgewinn. */
@@ -72,6 +70,30 @@ export async function stelleDichte(page: Page, dichte: string) {
     dichte,
   ] as const);
   await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
+/**
+ * Lädt `pfad` in der Bediendichte `dichte` mit EINER Ladung (LLH-1665, Spec `e2e-zuschnitt`,
+ * „Eine Ladung je Dichtestufe“): Die Stufe geht in den Speicher, solange die alte Seite noch
+ * steht, und `ThemeModeProvider` liest sie beim Montieren der neuen. `goto` + `stelleDichte`
+ * luden jede gemessene Seite zweimal. Die Wache `data-dichte` steht wie bisher vor der Messung.
+ *
+ * Steht die Seite noch auf `about:blank` (Anmeldung ohne Startseite), gibt es keinen Speicher
+ * des Ursprungs: dann wie bisher laden und stellen. Kein `addInitScript`, das liefe bei jeder
+ * späteren Navigation mit und überschriebe ein `stelleDichte` im selben Fall still.
+ */
+export async function ladeInDichte(page: Page, pfad: string, dichte: string) {
+  if (!page.url().startsWith('http')) {
+    await page.goto(pfad);
+    await stelleDichte(page, dichte);
+    return;
+  }
+  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+    DICHTE_SCHLUESSEL,
+    dichte,
+  ] as const);
+  await page.goto(pfad);
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 

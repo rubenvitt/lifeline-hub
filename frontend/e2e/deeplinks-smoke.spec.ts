@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Browser-Smoke der jsdom-blinden Deeplink-Mechanismen: <Navigate>-Redirect bei ungültiger
 // Detail-ID und ?eintrag=-Highlight/Scroll im ETB (reales Router-/DOM-Verhalten).
@@ -7,12 +8,8 @@ import { einsatzDialogOeffnen } from './einsatz-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {

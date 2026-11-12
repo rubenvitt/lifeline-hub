@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsaetzePfad, ueberblickPfad } from '../src/routing/deeplinks';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Einsatzliste und Stammdaten sind live (LFH-734): was ein anderer Schirm anlegt oder abschließt,
@@ -18,11 +19,7 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 async function anmelden(page: Page) {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW);
 }
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<number> {

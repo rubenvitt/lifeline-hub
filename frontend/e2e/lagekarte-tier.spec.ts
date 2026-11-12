@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { oeffneEbenenGruppe } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Tiere auf der Lagekarte (LLH-1123) — Durchstich im echten Renderer: kommt der Platziermodus aus
 // der Tier-Detailseite an, landet das Tier mit dem Zeichen „Tier ohne Zustand“ (LLH-1343) in der
@@ -19,11 +20,7 @@ interface MapHaken {
 }
 
 async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, benutzer, passwort);
 }
 
 async function senden(

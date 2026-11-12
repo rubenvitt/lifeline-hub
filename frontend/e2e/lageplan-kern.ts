@@ -1,4 +1,5 @@
 import { expect, type APIResponse, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 import { api, einsatzAnlegen } from './fernmeldeskizze-kern';
 import {
   kachelnBeantworten,
@@ -64,8 +65,7 @@ function rechteck(dLon: number, dLat: number, versatzLon = 0) {
  * wurden rot, sobald die Einsatzliste langsamer aufbaute als das Seeding dauerte (CI).
  */
 export async function anmeldenOhneStartseite(page: Page, benutzername: string, passwort: string) {
-  const antwort = await page.request.post('/api/auth/login', { data: { benutzername, passwort } });
-  expect(antwort.ok(), `Anmelden ${benutzername}: ${antwort.status()}`).toBe(true);
+  await anmeldenPerApi(page, benutzername, passwort, { startseite: false });
 }
 
 /** Bis zu drei Versuche bei 503 (SQLite-Schreibkonflikt unter parallelen Workern). */

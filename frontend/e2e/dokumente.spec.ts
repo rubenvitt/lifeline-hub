@@ -4,7 +4,9 @@ import { waehleIn } from './auswahl-kern';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Dokumentenablage im Browser — was jsdom nicht tragen kann:
@@ -37,7 +39,6 @@ const HANDSCHIRM = { width: 390, height: 844 };
 /** Subpixel-Spielraum: Chromium rechnet unter Last anders als im Einzellauf. */
 const SUBPIXEL = 0.5;
 
-const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 /**
  * `soll` ist die Steuerhöhe, `sollSM` die kleine (antds Knöpfe der Bestätigungsblase), `fuge` der
  * Boden zwischen zwei Knöpfen eines Dialogfußes (LFH-653: ≥ 8 im Touch-, ≥ 16 im
@@ -58,11 +59,7 @@ const JPG = MINI_JPEG;
 async function anmelden(page: Page, modus?: 'light' | 'dark') {
   // Der Modus muss VOR dem ersten Laden stehen — der Bootstrap in `index.html` liest ihn.
   if (modus) await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, ADMIN, PW);
 }
 
 /** Seeding per `page.request` für die Layout-Läufe; den Ablegen-Weg über die Oberfläche prüft
@@ -107,16 +104,6 @@ async function keinQuerlauf(page: Page, pfad: string) {
       { message: `${pfad} läuft waagerecht über` },
     )
     .toBeLessThanOrEqual(SUBPIXEL);
-}
-
-/** Der Provider liest die gespeicherte Wahl beim Montieren, deshalb das Neuladen. */
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-    DICHTE_SCHLUESSEL,
-    dichte,
-  ] as const);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
 /**
@@ -244,7 +231,7 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
 
 test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ page }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Breite ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Ablage Breite ${Date.now()}`);
   await seedeDokument(page, einsatzId, 'Lageplan Nord', 'lagekarte_plan', 'Lageplan Nord.pdf', PDF);
   const pfad = `/einsaetze/${einsatzId}/dokumente`;
 
@@ -317,7 +304,7 @@ test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', as
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Fortschritt ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Ablage Fortschritt ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/dokumente`);
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 
@@ -411,7 +398,7 @@ test('Bearbeiten: Titel und Kategorie ändern, Datei bleibt, ETB weist die Ände
 }) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Bearbeiten ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Ablage Bearbeiten ${Date.now()}`);
   await seedeDokument(page, einsatzId, 'Lagepaln Nord', 'sonstiges', 'Lageplan Nord.pdf', PDF);
   await page.goto(`/einsaetze/${einsatzId}/dokumente`);
 
@@ -474,8 +461,7 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
         PDF,
       );
       await page.setViewportSize(FUEKW);
-      await page.goto(`/einsaetze/${einsatzId}/dokumente`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/dokumente`, dichte);
 
       const anker = page.getByRole('link', { name: 'Lageplan Nord' });
       await expect(anker, 'genau ein Anker je Zeile').toHaveCount(1);
@@ -582,7 +568,7 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Tastatur ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Ablage Tastatur ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/dokumente`);
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 
@@ -734,7 +720,7 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize(FUEKW);
     await anmelden(page, modus);
-    const einsatzId = await einsatzAnlegen(page, `E2E Ablage Kontrast ${modus} ${Date.now()}`);
+    const einsatzId = await einsatzPerApi(page, `E2E Ablage Kontrast ${modus} ${Date.now()}`);
     await seedeDokument(
       page,
       einsatzId,
@@ -877,8 +863,7 @@ for (const viewport of [FUEKW, HANDSCHIRM]) {
       await page.setViewportSize(viewport);
       await anmelden(page);
       const einsatzId = await einsatzAnlegen(page, `E2E Ablage Dialogfokus ${Date.now()}`);
-      await page.goto(`/einsaetze/${einsatzId}/dokumente`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/dokumente`, dichte);
       await page.getByRole('button', { name: 'Dokument ablegen' }).click();
       const dialog = ablegenDialog(page);
       await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();

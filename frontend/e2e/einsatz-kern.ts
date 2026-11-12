@@ -35,3 +35,16 @@ export async function einsatzAnlegen(page: Page, name: string): Promise<string> 
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
+
+/**
+ * Legt einen Einsatz über die API an, ohne Seite (LLH-1665, Spec `e2e-zuschnitt`): für Fälle,
+ * die den Dialog nicht prüfen und danach ohnehin ihre Seite per `goto` laden. Dieselben Werte
+ * wie der Dialog ohne Vorlage: Einsatzart „Realeinsatz“ und Alarmzeit „jetzt“ sind die
+ * Vorgaben des Servers. Der Dialog kostete die Einsatzliste, das Einblenden und das Laden des
+ * neuen Einsatzes.
+ */
+export async function einsatzPerApi(page: Page, name: string): Promise<string> {
+  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+  expect(antwort.ok(), `Einsatz „${name}“: ${antwort.status()} ${await antwort.text()}`).toBe(true);
+  return String(((await antwort.json()) as { id: number }).id);
+}

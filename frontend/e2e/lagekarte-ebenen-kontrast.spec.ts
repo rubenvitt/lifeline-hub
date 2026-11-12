@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast, pruefe } from './kontrast-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Zeilen im Paneel „Ebenen" der Lagekarte (LFH-671): Name und Anzahl jeder schaltbaren Zeile,
 // ein- wie ausgeschaltet, in Ruhe und unter dem Zeiger — Tag ≥ 7 : 1, Nacht ≥ 5 : 1. Den
@@ -9,11 +10,7 @@ import { einsatzDialogOeffnen } from './einsatz-kern';
 
 async function vorbereiten(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
   await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(`Ebenen ${modus} ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();

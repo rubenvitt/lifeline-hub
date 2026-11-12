@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Verankerte Aktionsleiste am Befehlsentwurf, Prüflisten-Zeile 13 der Bedien-Leitlinie
@@ -64,11 +65,7 @@ async function entwurfBereit(
   dichte: 'kompakt' | 'komfortabel' | 'handschuh' = 'kompakt',
 ) {
   await page.setViewportSize(viewport);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW);
 
   // Seeding per `page.request` (Cookie-Jar geteilt).
   const einsatz = await page.request.post('/api/einsaetze', {
