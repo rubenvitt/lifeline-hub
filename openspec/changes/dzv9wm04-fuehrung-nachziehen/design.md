@@ -30,8 +30,8 @@ Lücken im Verhalten. Am Stand `def2488f` sieht der Code so aus:
     denn Unterschriftsschlüssel haben nur Admins.
   - Das Paneel zeigt die Beweiswahl jedem, der bedienen darf, und belegt „Eigene Unterschrift“
     vor.
-- **Lesen der Führung:** `GET /api/einsaetze/{id}/fuehrung` zieht `EinsatzLesezugriff` und lässt
-  damit auch Gerätekonten durch. Die Oberfläche nutzt den Abruf im Paneel auf „Einsatzdaten“ und im
+- **Lesen der Führung:** `GET /api/einsaetze/{id}/fuehrung` zieht `EinsatzLesezugriff`; Geräte
+  hält die Routenliste der Gerätesitzungen fern (D1). Die Oberfläche nutzt den Abruf im Paneel auf „Einsatzdaten“ und im
   `FuehrungHinweisband` des Einsatz-Layouts. Ein Gerät öffnet keine der beiden Stellen.
 
 ## Goals / Non-Goals
@@ -53,14 +53,18 @@ Lücken im Verhalten. Am Stand `def2488f` sieht der Code so aus:
 
 ## Decisions
 
-### D1 Gerätekonto: 403 im Handler, nicht im Extraktor
+### D1 Gerätekonto: die Routenliste der Geräte trägt die 403
 
-`lesen` prüft `ctx.geraet.is_some()` und antwortet dann mit `AppError::Forbidden`, wie
-`EinsatzFuehrungszugriff` es für die Bedienung tut.
+Beim Umsetzen zeigte sich: `CurrentUser` lässt eine Gerätesitzung nur auf die Routen in
+`geraet::darf_route` (`ALLE_GERAETE`, `ALLE_ANSICHTEN`, Routen der Ansicht), und
+`GET /api/einsaetze/{id}/fuehrung` steht in keiner davon. Ein Gerät bekommt also schon heute 403;
+die Annahme der Gegenprüfung (Punkt 6) traf nicht zu. Es entsteht deshalb kein Code im Handler,
+sondern ein Integrationstest, der die 403 festhält. Die Gegenprobe ist die Route in
+`ALLE_ANSICHTEN`, dann wird der Test rot. Dazu kommt ein Doc-Kommentar an `lesen`.
 
-- *Alternative:* einen eigenen Extraktor „Lesezugriff ohne Gerät“ bauen. Verworfen, weil die
-  Prüfung sonst nur hier gebraucht wird und ein neues Gate in `SANKTIONIERTE_GATES` von
-  `tests/einsatz_kontext_guard.rs` Pflege kostet.
+- *Alternative:* eine zweite Prüfung `ctx.geraet.is_some()` im Handler. Verworfen, weil die
+  Routenliste die eine Stelle ist, an der Geräte zugelassen werden; ein zweiter Ort würde nur
+  doppelt pflegen.
 - *Alternative:* Verlauf und Gegenüber nur für Führungsberechtigte. Verworfen am Checkpoint, weil
   die Einsatzleitung den Verlauf auch für ihr Führungspersonal lesbar haben will.
 
@@ -102,10 +106,9 @@ Die Änderungen gehen als MODIFIED/ADDED in `instanz-fuehrung` und `einsatz-spie
 
 ## Risks / Trade-offs
 
-- [Ein Gerät mit offenem Einsatz-Layout ruft künftig 403 ab] → Der Abruf im `FuehrungHinweisband`
-  läuft nur bei `fuehrung.offen`, und Geräte nutzen ihre eigene Hülle (`frontend/src/geraet/`).
-  Ein Test prüft die 403. Im Rahmen der Aufgabe wird gegrept, ob eine Funktionsansicht
-  `loadFuehrung` nutzt.
+- [Eine Funktionsansicht bekommt die Route später in ihre Liste] → Der Integrationstest wird
+  dann rot und verlangt eine Änderung der Spec. Heute ruft kein Pfad unter `frontend/src/geraet/`
+  `loadFuehrung` auf.
 - [Die Ausnahme in `einsatz-spiegel` liest sich als Widerspruch zu ADR-0018] → ADR-0021 regelt
   schon, dass die Akte den Spiegel bestimmt. Die Ausnahme verweist auf `instanz-fuehrung` und
   ändert keine Regel von ADR-0018.

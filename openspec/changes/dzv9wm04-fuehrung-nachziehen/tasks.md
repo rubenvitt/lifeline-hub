@@ -7,8 +7,8 @@ Wortlauts steht in der Aufgabe.
 
 ## 1. Verlauf der Führung ohne Gerätekonten (D1)
 
-- [ ] 1.1 Integrationstest in `tests/instanz_fuehrung.rs`: ein Gerätekonto mit Lesezugriff auf den Einsatz ruft `GET /api/einsaetze/{id}/fuehrung` ab → 403; ein Mitglied mit der Rolle Beobachter → 200 mit Verlauf. Erst rot, dann in `src/routes/fuehrung.rs::lesen` bei `ctx.geraet.is_some()` mit `AppError::Forbidden` antworten; Doc-Kommentar der Route nennt den Leserkreis. Prüfen: `cargo test --test instanz_fuehrung`
-- [ ] 1.2 Gegenprobe und Nutzer prüfen: Prüfung entfernt → 1.1 rot; `git grep -n "loadFuehrung" frontend/src` zeigt keinen Aufruf aus `frontend/src/geraet/` (sonst Befund festhalten und lösen, bevor 1 als fertig gilt)
+- [x] 1.1 Integrationstest in `tests/instanz_fuehrung.rs`: ein Gerätekonto (Lagemonitor) mit Lesezugriff auf den Einsatz ruft `GET /api/einsaetze/{id}/fuehrung` ab → 403; ein Mitglied mit der Rolle Beobachter → 200 mit Verlauf. Die 403 trägt schon die Routenliste der Geräte (design.md D1), daher kein Handler-Code; Doc-Kommentar an `src/routes/fuehrung.rs::lesen` nennt den Leserkreis. Prüfen: `cargo test --test instanz_fuehrung den_verlauf_lesen`
+- [x] 1.2 Gegenprobe und Nutzer prüfen: Route vorübergehend in `geraet::ALLE_ANSICHTEN` → 1.1 rot (200 statt 403); `git grep -n "loadFuehrung" frontend/src` zeigt keinen Aufruf aus `frontend/src/geraet/` (Geräte nutzen weder `EinsatzLayout` noch `EinsatzdatenPage`)
 
 ## 2. Beweiswahl nur für Admins (D2)
 

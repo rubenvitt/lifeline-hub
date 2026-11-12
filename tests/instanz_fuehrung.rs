@@ -454,6 +454,71 @@ async fn fuehrungspersonal_bedient_die_fuehrung_nicht() {
     assert_eq!(s, StatusCode::OK, "lesen darf, wer den Einsatz liest");
 }
 
+/// Ein gekoppelter Lagemonitor am Einsatz: das Cookie seiner Gerätesitzung.
+async fn lagemonitor(i: &Instanz, einsatz: i64) -> String {
+    use tower::ServiceExt;
+    let (s, v) = common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &i.admin,
+        Some(&json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap().to_string();
+    let resp = i
+        .app
+        .clone()
+        .oneshot(
+            axum::http::Request::builder()
+                .method("POST")
+                .uri("/api/geraete/koppeln")
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(json!({ "code": code }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    resp.headers()
+        .get(axum::http::header::SET_COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .expect("Sitzungscookie")
+        .to_string()
+}
+
+/// LLH-1676 (Spec `instanz-fuehrung`, „Den Verlauf der Führung lesen nur Personen“): ein
+/// Gerätekonto, das den Einsatz lesen darf, bekommt den Verlauf mit Namen und Gründen nicht; ein
+/// Beobachter liest ihn. Getragen von der Routenliste der Geräte (`geraet::darf_route`).
+#[tokio::test]
+async fn den_verlauf_lesen_personen_aber_keine_geraete() {
+    let (_hub, elw) = gekoppelt().await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let pfad = format!("/api/einsaetze/{e}/fuehrung");
+
+    let geraet = lagemonitor(&elw, e).await;
+    let (s, _) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "das Gerät liest den Einsatz");
+    let (s, v) = common::anfrage(&elw.app, "GET", &pfad, &geraet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+
+    let id = common::benutzer_anlegen(&elw.app, &elw.admin, "beobachter", "keine").await;
+    common::funktion_setzen(&elw.app, &elw.admin, e, id, "beobachter", None).await;
+    let beob = common::login_cookie(&elw.app, "beobachter", "beobachterpw1").await;
+    let (s, v) = common::anfrage(&elw.app, "GET", &pfad, &beob, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["verlauf"][0]["art"], "angelegt");
+}
+
 #[tokio::test]
 async fn elw_fragt_an_und_uebernimmt_bei_ankunft() {
     let (hub, elw) = gekoppelt().await;
