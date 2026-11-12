@@ -63,8 +63,8 @@ den Konstanten `INSTANZ` und `MACHINE`.
 - Maschinen bekommen eigene Claim-Structs ohne `pv`:
   - `MachineAnfrage`: `iss aud iat exp jti htm htu bh`;
   - `MachineAntwort`: `iss aud iat exp jti req status bh`, wobei `req` die `jti` der Anfrage ist.
-- `code.rs` bekommt `derive(code, salz)`. `SALZ_INSTANZ` behält den heutigen Wert,
-  `SALZ_MACHINE` ist `lifeline-machine-client/1`.
+- `code.rs` bekommt `derive_mit_salz(code, salz)` mit `SALZ_MACHINE` =
+  `lifeline-machine-client/1`. `derive(code)` bleibt mit dem heutigen Salz.
 - Die Transkripte für Maschinen sind eigene Funktionen, damit kein Prüfwert zwischen den Profilen
   gilt:
   - Einlöser: `suche`, Schlüssel des Fremdsystems;
@@ -168,14 +168,12 @@ Wartezeit. Daraus wird `Retry-After`, aufgerundet auf ganze Sekunden, mindestens
   Zugriff aufgeräumt.
 - Die Zeit kommt als Parameter herein, damit Tests ohne Warten auskommen.
 
-### D5 Maschinenzähler je IP: die Sperrtabelle wird parametrisiert
+### D5 Maschinenzähler je IP: eine zweite Tabelle derselben Art
 
-`rate_limit.rs` bekommt `struct Sperre { fenster, max_fehlversuche, … }` mit zwei statischen
-Instanzen:
-
-- `ANMELDUNG`: die heutigen Werte. Die öffentlichen Funktionen `ist_gesperrt`, `sperre`,
-  `fehlversuch` und `erfolg` delegieren unverändert an sie.
-- `MASCHINE`: 10 Fehlversuche in 300 s, eigene Tabelle, eigene Meldedrossel im Log.
+`rate_limit.rs` bekommt das Untermodul `maschine` mit einer eigenen prozessweiten Tabelle. Es
+nutzt dieselbe `Tabelle` wie die Anmeldesperre: 10 Fehlversuche in 300 s je Quelle (IPv6 /64),
+Obergrenze, Aufräumen und Meldedrossel, aber ohne Konto. Die Funktionen der Anmeldesperre bleiben
+unverändert. Parameter braucht es nicht, solange beide Tabellen dieselben Werte haben.
 
 Gezählt werden nur zwei Fälle: ein unbekannter `kid` und ein gescheitertes Einlösen (unbekannte
 `suche` oder falscher Prüfwert). Die Quelle kommt aus `PeerIp`, also mit `--trusted-proxies` wie
@@ -196,9 +194,10 @@ Bei `uhr` steht die Abweichung `iat - jetzt` in Sekunden daneben. Die Seite rech
 Minuten um und zeigt die Richtung („geht 7 min nach“ oder „vor“).
 
 Geschrieben wird nur, wenn sich der Grund ändert oder der letzte Eintrag älter als 60 s ist. So
-erzeugt eine Flut falscher Anfragen eines bekannten Zugangs keine Schreiblast. `SignaturError`
-bekommt dafür eine Abbildung auf `AblehnungGrund`, und der Zeitfehler unterscheidet „zu alt“ von
-„aus der Zukunft“.
+erzeugt eine Flut falscher Anfragen eines bekannten Zugangs keine Schreiblast.
+`AblehnungGrund::aus_signatur` bildet `SignaturError` ab. Die Richtung der Uhr ergibt sich aus
+dem Vorzeichen der Abweichung, die `verify_machine_anfrage` mitliefert, sobald die Signatur gilt.
+`SignaturError` selbst bleibt unverändert.
 
 ### D7 Schlüsselwechsel
 

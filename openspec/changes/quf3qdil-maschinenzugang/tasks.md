@@ -6,7 +6,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 1. Geteilte Signatur und Code-Ableitung (Profil)
 
-- [ ] 1.1 `src/instanz/signatur.rs`:
+- [x] 1.1 `src/instanz/signatur.rs`:
   - `Profil` mit den Konstanten `INSTANZ` und `MACHINE`;
   - generisches `sign`/`verify` (`pub(crate)`) und `check_bindung`;
   - Claims `MachineAnfrage` und `MachineAntwort` ohne `pv`, mit `req`.
@@ -15,33 +15,35 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   - `cargo test instanz::signatur` und `cargo test --test instanz_kopplung` laufen ohne eine
     Änderung an bestehenden Tests grün;
   - ein neuer Test zeigt, dass ein JWS des einen Profils am anderen mit `Algorithmus` scheitert.
-- [ ] 1.2 `SignaturError::Zeit` in „zu alt“ und „aus der Zukunft“ trennen, mit Abbildung auf den
-  Ablehnungsgrund (D6). Verifizieren: Unit-Tests je Fall; die Ausgabe der Instanzkopplung bleibt
-  401 wie bisher.
-- [ ] 1.3 `src/instanz/code.rs`: `derive(code, salz)` mit `SALZ_INSTANZ` und `SALZ_MACHINE`, dazu
-  die Transkripte für Einlöser und Aussteller einer Maschine. Verifizieren:
+- [x] 1.2 `verify_machine_anfrage` liefert bei Ablehnung `MachineAblehnung` mit Fehler und, sobald
+  die Signatur gilt, der Uhrabweichung `iat - jetzt`; `AblehnungGrund::aus_signatur` bildet den
+  Fehler auf den Grund ab (D6). `SignaturError` bleibt unverändert, damit kein bestehender Test sich
+  ändert. Verifizieren: Unit-Tests „nach“, „vor“ und „fremde Signatur ohne Abweichung“; die
+  Instanzkopplung bleibt 401 wie bisher.
+- [x] 1.3 `src/instanz/code.rs`: `derive_mit_salz(code, salz)` und `SALZ_MACHINE` (`derive(code)`
+  bleibt für die Instanz), dazu die Transkripte für Einlöser und Aussteller einer Maschine. Verifizieren:
   - die bestehenden Code-Tests sind unverändert grün;
   - ein neuer Test zeigt, dass derselbe Code je Salz eine andere `suche` ergibt und ein Prüfwert
     der Instanz für die Maschine nicht gilt.
 
 ## 2. Datenmodell und Repo
 
-- [ ] 2.1 Migrationen mit Nummern über allen auf `origin/alpha`
+- [x] 2.1 Migrationen mit Nummern über allen auf `origin/alpha`
   (`scripts/check-migrationen.sh`):
   - `maschinenzugang`, `maschinenzugang_code`, `maschine_jti`, `maschine_abruf` mit CHECKs aus
     D2;
   - neu gebauter CHECK von `admin_audit` mit den fünf Aktionen.
 
   Verifizieren: `cargo test db::tests` und `jede_aktion_passiert_den_db_check` sind grün.
-- [ ] 2.2 `AdminAktion` um die fünf `maschinenzugang_*`-Werte erweitern, dazu `Ziel::Maschinenzugang`
+- [x] 2.2 `AdminAktion` um die fünf `maschinenzugang_*`-Werte erweitern, dazu `Ziel::Maschinenzugang`
   und die Angaben (Zugang, Name, Scopes, Fingerabdruck, Quell-IP). Verifizieren:
   - Eintrag in `tests/enum_wire_kontrakt.rs`;
   - `tests/admin_audit.rs` deckt jede Aktion ab;
   - das Zugangsprotokoll zeigt sie in Klartext (Vitest der Klartext-Tabelle).
-- [ ] 2.3 Enum `Scope` (`wire_enum!` mit `lage:read` … `rechner:use`) und Enum `AblehnungGrund`
+- [x] 2.3 Enum `Scope` (`wire_enum!` mit `lage:read` … `rechner:use`) und Enum `AblehnungGrund`
   (`wire_enum!`, D6). Verifizieren: Kontrakt-Test der Wire-Werte; `Scope::parse("alles:write")`
   ist `None`.
-- [ ] 2.4 Repo `src/public_api/zugang.rs`:
+- [x] 2.4 Repo `src/public_api/zugang.rs`:
   - anlegen, laden mit Org-Prüfung, Liste, ändern, widerrufen;
   - Code ausstellen (ersetzt offene Codes), Code einlösen (atomar), Schlüssel binden und
     wechseln (D7);
@@ -55,12 +57,12 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 3. Drosselung
 
-- [ ] 3.1 `src/auth/rate_limit.rs`: `Sperre` mit Parametern, die Instanzen `ANMELDUNG` (die
-  heutigen Werte und die heutigen Funktionen) und `MASCHINE`. Verifizieren:
+- [x] 3.1 `src/auth/rate_limit.rs`: zweite Tabelle `maschine` mit denselben Regeln (10 in 5 min je
+  Quelle, ohne Konto) neben der Anmeldesperre, deren Funktionen unverändert bleiben. Verifizieren:
   - die bestehenden Tests der Anmeldesperre sind unverändert grün;
   - ein neuer Test zeigt, dass Fehlversuche in `MASCHINE` `ist_gesperrt` der Anmeldung nicht
     berühren und umgekehrt.
-- [ ] 3.2 `src/public_api/drossel.rs`: `TokenBucket` mit Zeit als Parameter und die Tabelle je
+- [x] 3.2 `src/public_api/drossel.rs`: `TokenBucket` mit Zeit als Parameter und die Tabelle je
   Zugang mit Aufräumen. Verifizieren: Unit-Tests für die 61. Anfrage, `Retry-After` ≥ 1,
   Nachfüllen nach Wartezeit und das Aufräumen ungenutzter Einträge.
 
@@ -117,10 +119,10 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 6. Kommando und Referenz-Clients
 
-- [ ] 6.1 Crate `crates/lifeline-machine-client`: Schlüsseldatei, `sign_request`,
+- [x] 6.1 Crate `crates/lifeline-machine-client`: Schlüsseldatei, `sign_request`,
   `verify_response`, `redeem` hinter dem Feature `http`, als Workspace-Mitglied. Verifizieren:
   `cargo test -p lifeline-machine-client` mit den Testvektoren.
-- [ ] 6.2 Testvektoren `docs/api/machine-auth-testvektoren.json`. Die Crate schreibt sie im Test
+- [x] 6.2 Testvektoren `docs/api/machine-auth-testvektoren.json`. Die Crate schreibt sie im Test
   neu und scheitert bei Abweichung; ein Server-Test prüft das Vektor-JWS mit `verify` bei fester
   Zeit. Verifizieren: Beide Tests sind grün, eine geänderte Claim-Reihenfolge macht sie rot.
 - [ ] 6.3 Kommandos `lifeline-hub zugang redeem <url> <code> [--out]` und
@@ -129,7 +131,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   - Test des Arguments-Parsers;
   - ein Integrationstest, der gegen einen Testserver einlöst und `me` aufruft;
   - eine vorhandene Datei bleibt unverändert.
-- [ ] 6.4 `docs/api/clients/typescript/machineClient.ts` (nur WebCrypto) mit Vitest gegen die
+- [x] 6.4 `docs/api/clients/typescript/machineClient.ts` (nur WebCrypto) mit Vitest gegen die
   Testvektoren im Frontend-Lauf. Verifizieren: `mise exec -- pnpm -C frontend vitest run
   <testdatei>` ist grün.
 - [ ] 6.5 `docs/api/clients/python/machine_client.py` mit `--selftest` gegen die Testvektoren,
