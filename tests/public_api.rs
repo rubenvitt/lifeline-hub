@@ -162,6 +162,46 @@ async fn body_ueber_64_kib_scheitert_auch_an_einer_route_ohne_body() {
     assert_eq!(json(resp).await["code"], "payload_too_large");
 }
 
+/// Dasselbe ohne `Content-Length` (chunked, HTTP/2): die Grenze greift beim Puffern, weiterhin
+/// vor dem Handler.
+#[tokio::test]
+async fn body_ueber_64_kib_ohne_content_length_scheitert_vor_dem_handler() {
+    let app = common::setup().await;
+    let chunks = (0..65).map(|_| Ok::<_, std::io::Error>(vec![b'a'; 1024]));
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/openapi.json")
+                .body(Body::from_stream(futures::stream::iter(chunks)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(json(resp).await["code"], "payload_too_large");
+}
+
+/// Jede Operation im Dokument nennt die Fehlerantwort (`default` mit `ApiErrorBody`,
+/// `src/AGENTS.md`, „Öffentliche API v1“).
+#[test]
+fn jede_operation_nennt_die_fehlerantwort() {
+    let document = serde_json::to_value(public_api::openapi()).unwrap();
+    let mut missing = Vec::new();
+    for (path, item) in document["paths"].as_object().unwrap() {
+        for (method, operation) in item.as_object().unwrap() {
+            let schema =
+                &operation["responses"]["default"]["content"]["application/json"]["schema"]["$ref"];
+            if schema != "#/components/schemas/ApiErrorBody" {
+                missing.push(format!("{method} {path}"));
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "ohne Fehlerantwort im Dokument: {missing:?}"
+    );
+}
+
 #[derive(serde::Deserialize)]
 #[allow(dead_code)]
 struct Number {

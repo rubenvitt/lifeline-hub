@@ -129,7 +129,8 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   `cargo test --test public_api_spec_aktuell` und `docs/api/public-v1.json` mitcommitten
   (`scripts/check-typ-codegen.sh`, Schritt 2).
 - **Grenzen:** Body höchstens `PUBLIC_API_BODY_MAX` (64 KiB, `app.rs`), vor jedem Handler, auch
-  einem, der den Body roh liest (`public_api::mount`); jede Antwort `Cache-Control: no-store`
+  einem, der den Body roh liest, und ohne `Content-Length` (`public_api::body_limit_layer`
+  puffert ihn; ein Handler bekommt den Body ganz); jede Antwort `Cache-Control: no-store`
   (`public_api::contract_layer`, montiert in `app.rs`). Die innere Schicht setzt den Kopf nicht,
   sonst packte die Kompression keine v1-Antwort mehr.
 
