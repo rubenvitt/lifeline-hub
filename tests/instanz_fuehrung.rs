@@ -4385,3 +4385,33 @@ async fn zurueckgespielt_hub_verlorene_akte_kommt_auch_wenn_der_elw_inzwischen_a
         "die verlorene Akte kommt erneut"
     );
 }
+
+#[tokio::test]
+async fn antwort_hebt_den_zaehler_des_elw_genau_bis_zur_grenze() {
+    // Review B6: Die meldende Seite hebt ihren Zähler auf eine Quittung bis `STAND_RAISE_MAX`,
+    // darüber nicht.
+    use lifeline_hub::instanz::fuehrung::austausch::STAND_RAISE_MAX;
+    let (hub, elw) = gekoppelt().await;
+    let quittiert = |wert: i64| {
+        let pool = hub.pool.clone();
+        async move {
+            sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+                .bind(wert)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    quittiert(STAND_RAISE_MAX + 1).await;
+    nur_melden(&elw).await;
+    let (_, _, stand) = staende(&elw).await;
+    assert!(stand < STAND_RAISE_MAX, "{stand}");
+    quittiert(STAND_RAISE_MAX).await;
+    nur_melden(&elw).await;
+    let (_, _, stand) = staende(&elw).await;
+    assert_eq!(stand, STAND_RAISE_MAX);
+    assert!(hinweis(&elw)
+        .await
+        .unwrap_or_default()
+        .contains("zurückgespielt"));
+}

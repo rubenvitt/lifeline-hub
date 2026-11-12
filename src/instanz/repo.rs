@@ -547,6 +547,19 @@ pub async fn list_faellige_meldungen(
     .await?)
 }
 
+/// Aktive Kopplungen, in denen diese Instanz erreichte Seite ist (Neustempeln nach einem
+/// Rückschritt des Zählers, LLH-1708).
+pub async fn list_erreicht_aktiv(
+    conn: &mut SqliteConnection,
+) -> Result<Vec<KopplungZeile>, AppError> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung \
+         WHERE richtung = 'wird_gemeldet' AND zustand = 'aktiv' ORDER BY id"
+    )))
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
 /// Aktive Kopplungen, in denen diese Instanz sich meldet (Abgleich der Einsätze, LLH-1492).
 pub async fn list_meldend_aktiv(pool: &SqlitePool) -> Result<Vec<KopplungZeile>, AppError> {
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(

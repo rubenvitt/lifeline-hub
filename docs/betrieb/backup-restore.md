@@ -220,15 +220,31 @@ dem Zurückspielen von selbst ab. Ein Eingriff ist nicht nötig, gleich ob die S
 `restore` oder von Hand eingespielt wurde:
 
 - Einsätze, die die zurückgespielte Instanz danach anlegt oder ändert, erreichen das Gegenüber mit
-  der nächsten Meldung.
-- Akten, die das Gegenüber schon kannte und die mit der Sicherung verloren gingen, schickt es mit
-  den nächsten Meldungen erneut.
+  den nächsten Meldungen, auch bei mehreren Kopplungen.
+- Akten, die ein zurückgespielter Hub mit der Sicherung verloren hat, schickt der ELW mit den
+  nächsten Meldungen erneut. Das gilt auch, wenn der ELW während des Ausfalls weitergearbeitet hat.
 
-**Die Uhr des Servers muss stimmen.** Der Stand der Führungsakten folgt der Uhr. Geht sie nach
-dem Zurückspielen nach, fängt ein zweiter Weg das meist ab, und die Kopplung zeigt dann den
-Hinweis „… hat schon spätere Führungsakten quittiert …“. Nur wenn die Instanz vor ihrer ersten
-Meldung mehr Änderungen vergibt, als verloren gingen, erreicht eine Akte das Gegenüber erst mit
-ihrer nächsten Änderung. Herleitung:
+**Hinweis an der Kopplung.** Nach dem Zurückspielen erscheint auf der Seite „Instanzkopplung“ meist
+der Hinweis „… hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat (aus einer
+Sicherung zurückgespielt?)“, an weiteren Kopplungen „Der Zähler der Führungsakten lag unter einer
+Quittung …“. Das ist kein Fehler, sondern die Bestätigung, dass die Instanz den Rückstand erkannt
+hat und die Akten erneut schickt. Der Hinweis erscheint auch bei richtiger Uhr, weil der Zähler bis
+zur ersten Änderung auf dem Stand der Sicherung steht. Er bleibt stehen, bis ein neuerer Hinweis ihn
+ersetzt.
+
+**Grenzen:**
+
+- **Die Uhr des Servers muss stimmen.** Der Stand der Führungsakten folgt der Uhr. Geht sie nach und
+  vergibt die Instanz vor ihrer ersten Meldung mehr Änderungen, als verloren gingen, erreicht eine
+  Akte das Gegenüber erst mit ihrer nächsten Änderung. Bei mehreren Kopplungen kann das in seltenen
+  Fällen auch schon früher eintreten.
+- **Sicherung von vor der ersten Übernahme.** Stammt die Sicherung eines Hubs aus der Zeit, bevor er
+  die erste Akte des ELW übernommen hatte, kommen die verlorenen Akten erst mit ihrer nächsten
+  Änderung.
+- **Gegenstelle älteren Stands.** Läuft eine Seite mit einer Version vor LLH-1708, wirken die
+  Verbesserungen nur teilweise. Beide Seiten zu aktualisieren behebt das.
+
+Herleitung:
 `openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
 
 ## Sicherungen und Schwärzung (LFH-725)

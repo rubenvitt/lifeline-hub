@@ -601,11 +601,9 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 fuehrung_repo::reset_gesendet_bis(conn, kopplung.id, a.fuehrung_bis).await?;
             }
             // Rückschritt des eigenen Zählers (D3): Wer selbst zurückgespielt wurde, hebt ihn über
-            // die Quittung. Neu zu stempeln braucht diese Seite nichts, sie sendet ab ihrem
-            // eigenen `gesendet_bis`, und das Gegenüber nimmt jeden plausiblen Stand an.
-            if a.fuehrung_bis <= fuehrung_austausch::STAND_RAISE_MAX {
-                fuehrung_repo::raise_stand(conn, a.fuehrung_bis).await?;
-            }
+            // die Quittung. Für diese Kopplung braucht es kein neues Stempeln (sie sendet ab dem
+            // eigenen `gesendet_bis`), wohl aber für jede, in der diese Instanz erreichte Seite ist.
+            fuehrung_austausch::repair_stand(conn, kopplung, a.fuehrung_bis).await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -858,11 +856,7 @@ pub async fn handle_meldung(
             // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite. Davor ein
             // Rückschritt des eigenen Zählers (LLH-1708, D3), damit jeder Stand dieser Meldung
             // über der Quittung liegt.
-            let rueckschritt =
-                fuehrung_austausch::repair_stand(conn, kopplung, anfrage.fuehrung_bis).await?;
-            if let Some(h) = &rueckschritt {
-                repo::set_hinweis(conn, kopplung.id, h).await?;
-            }
+            fuehrung_austausch::repair_stand(conn, kopplung, anfrage.fuehrung_bis).await?;
             fuehrung_repo::ensure_akten(conn).await?;
             // Verlorene Quittung (LLH-1708, D5): Liegt der eigene Empfangsstand unter dem, was die
             // meldende Seite als quittiert führt, wurde diese Seite zurückgespielt. Dann gilt die
