@@ -343,7 +343,7 @@ async fn run_bestaetigen(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
-            .filter(|e| fuehrung::austausch::ist_gegen_mich(e, &ich))
+            .filter(|e| fuehrung::austausch::is_gegen_mich(e, &ich))
         {
             Some(e) => format!(
                 "Notübernahme durch {} bestätigt: {}",

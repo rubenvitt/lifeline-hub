@@ -39,7 +39,7 @@ herleitung:
   verwirft sie sie. Ausnahme: Ist ein Dritter beteiligt (er führt, das Gegenüber führt mit seiner
   Epoche, oder die Erklärung nennt ihn als bisherigen Führer eines anderen Stands als des eigenen),
   hält sie die Akte ohne Alarm offen, bis ein Mensch entscheidet; sonst nicht. Ob eine Erklärung
-  gegen diese Instanz gerichtet ist, sagt allein `austausch::ist_gegen_mich`.
+  gegen diese Instanz gerichtet ist, sagt allein `austausch::is_gegen_mich`.
 - MUST: Holt ein Widerruf die Führung zurück (`repo::release_nach_widerruf`), trägt die Akte eine
   Erklärung ohne Beweis gegen das widerrufene Gegenüber.
 - MUST: Epochen werden als Paar (Zähler, Instanzkennung) verglichen; das größere gilt. Ausnahme:
@@ -62,7 +62,7 @@ verlange 'pub fn entscheide\(' src/instanz/fuehrung/austausch.rs
 verlange 'then_with\(\|\| self\.instanz\.cmp\(&other\.instanz\)\)' src/instanz/fuehrung/mod.rs
 verlange 'pub fn ist_konflikt' src/instanz/fuehrung/austausch.rs
 verlange 'austausch::ist_konflikt' src/instanz/fuehrung/dienst.rs
-verlange 'pub fn ist_gegen_mich' src/instanz/fuehrung/austausch.rs
+verlange 'pub fn is_gegen_mich' src/instanz/fuehrung/austausch.rs
 verbiete 'fuehrer_alt (==|!=) ich' 'src/**/*.rs'
 ```
 

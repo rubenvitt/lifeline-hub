@@ -327,7 +327,7 @@ pub fn entscheide(
 /// dann muss ihr Beweis hier tragen, und nur dann gehören ihre Angaben (Grund, Unterzeichner) zu
 /// einer Übernahme gegen diese Instanz. Eine Erklärung gegen einen anderen zeigt nur, dass beim
 /// Gegenüber etwas ohne diese Instanz geschah (Change `d12cmcx1-hub-epoche-gegen-dritten`, D1).
-pub fn ist_gegen_mich(e: &NotuebernahmeErklaerung, kennung: &str) -> bool {
+pub fn is_gegen_mich(e: &NotuebernahmeErklaerung, kennung: &str) -> bool {
     e.fuehrer_alt == kennung
 }
 
@@ -350,7 +350,7 @@ pub(super) async fn check_unterschrift(
         || e.org != m.org
         || e.epoche_neu != m.epoche
         || e.fuehrer_neu != m.fuehrer
-        || !ist_gegen_mich(&e, &ich.kennung)
+        || !is_gegen_mich(&e, &ich.kennung)
         || &e.epoche_alt != alt
     {
         return Err("Erklärung passt nicht zur Übernahme".into());
@@ -713,7 +713,7 @@ async fn check_offene(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
-            .is_some_and(|e| ist_gegen_mich(&e, &ich.kennung));
+            .is_some_and(|e| is_gegen_mich(&e, &ich.kennung));
         if ist_konflikt(&m, &[kopplung.gegenueber_kennung.as_str()]) || !gegen_mich {
             continue;
         }
@@ -983,7 +983,7 @@ pub async fn apply_eingang(
                     && m.erklaerung
                         .as_deref()
                         .and_then(NotuebernahmeErklaerung::parse)
-                        .is_some_and(|e| !ist_gegen_mich(&e, &ich.kennung) && e.epoche_alt != alt);
+                        .is_some_and(|e| !is_gegen_mich(&e, &ich.kennung) && e.epoche_alt != alt);
                 let bewiesen = match richtung {
                     InstanzKopplungRichtung::WirdGemeldet => Ok(()),
                     InstanzKopplungRichtung::MeldetSich if gegen_dritten => {
