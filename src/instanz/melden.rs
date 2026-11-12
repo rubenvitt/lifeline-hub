@@ -38,6 +38,12 @@ pub const ANGEBAHNT_MINUTEN: i64 = 15;
 
 static ABSTAND_S: OnceLock<u64> = OnceLock::new();
 
+/// Byte-Budget der Stammdaten in einer Antwort, vor Abzug der Unterschriftsschlüssel. Das Budget
+/// der Führungsakten geht immer vorab ab, auch ohne Schalter (LLH-1672): sonst läge die Antwort
+/// über [`ANTWORT_MAX`] und würde bei jeder Wiederholung gleich gebaut.
+const STAMMDATEN_BUDGET: usize =
+    ANTWORT_MAX - stammdaten::ANTWORT_RESERVE - fuehrung_austausch::ANTWORT_BYTES;
+
 /// Setzt den Abstand einmal beim Start (`--instanz-melden-sekunden`).
 pub fn set_abstand(sekunden: u64) {
     let _ = ABSTAND_S.set(sekunden);
@@ -430,6 +436,9 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     } else {
         (fuehrung_austausch::Ausgang::default(), 0, 0)
     };
+    // Höchster Stand, den diese Meldung abdeckt: Mehr darf das Gegenüber nicht quittieren
+    // (LLH-1672); sonst fiele, was wegen `AKTEN_MAX` oder des Budgets hier blieb.
+    let gesendet_hoechst = fuehrung_ausgang.bis.max(fuehrung_gesendet);
     let anfrage = MeldenAnfrage {
         name: super::name().to_string(),
         softwarestand: super::softwarestand().to_string(),
@@ -475,7 +484,9 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     // Bleibt mehr Führung, als in diese Meldung passte, meldet sie sich gleich wieder (D3).
     // Eigener Rest nur, wenn das Gegenüber quittiert hat (sonst hörte ein Gegenüber ohne Schalter
     // die Meldung jede fünf Sekunden).
-    let fortschritt = a.fuehrung_bis > fuehrung_gesendet;
+    // Quittung des Gegenübers, höchstens bis zum Stand, den diese Meldung abdeckte (LLH-1672).
+    let quittung = a.fuehrung_bis.min(gesendet_hoechst);
+    let fortschritt = quittung > fuehrung_gesendet;
     let naechste = if fuehrung_an && ((fuehrung_ausgang.mehr && fortschritt) || a.fuehrung_mehr) {
         jetzt.clone()
     } else {
@@ -566,13 +577,8 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
-            fuehrung_repo::save_kopplung_staende(
-                conn,
-                kopplung.id,
-                Some(a.fuehrung_bis),
-                eingang.bis,
-            )
-            .await?;
+            fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
+                .await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -744,8 +750,9 @@ pub async fn handle_meldung(
             .iter()
             .filter_map(|a| StammdatenArt::parse(a))
             .collect();
-        // Die Stammdaten bekommen, was Unterschriftsschlüssel und Reserve übrig lassen (D2).
-        let mut stammdaten_budget = liefern::Budget::neu(ANTWORT_MAX - stammdaten::ANTWORT_RESERVE);
+        // Die Stammdaten bekommen, was Unterschriftsschlüssel, Führung und Reserve übrig lassen
+        // (D2, LLH-1672).
+        let mut stammdaten_budget = liefern::Budget::neu(STAMMDATEN_BUDGET);
         let mut orgs = Vec::with_capacity(anfrage_orgs.len());
         let mut gemeldet = Vec::new();
         // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
@@ -829,6 +836,8 @@ pub async fn handle_meldung(
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
+            // Die Quittung der meldenden Seite gilt hier nur für diesen Aufruf (`ab` unten); jeder
+            // Stand einer Akte kommt aus dem eigenen Zähler, eine Kappung darauf änderte nichts.
             fuehrung_repo::save_kopplung_staende(
                 conn,
                 kopplung.id,
@@ -1015,18 +1024,48 @@ mod tests {
         for o in &mut a.orgs {
             o.org = "k".repeat(88);
         }
-        a.orgs[0].unterschrift = vec![lieferung; unterschrift::LIEFERUNGEN_MAX];
-        // Stammdaten (LLH-1493, D2) füllen nur auf, was Unterschriftsschlüssel und Reserve übrig
-        // lassen; die Reserve trägt Hülle und Org-Einträge (hier schon mitgezählt) und eine
-        // einzelne übergroße Zeile (höchstens die halbe Reserve).
-        let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        a.fuehrung_bis = i64::MAX;
+        a.fuehrung_mehr = true;
+        // Hülle: alle Org-Einträge, ohne Schlüssel, Stammdaten und Akten.
+        let huelle = serde_json::to_vec(&a).expect("JSON").len();
+        a.orgs[0].unterschrift = vec![lieferung.clone(); unterschrift::LIEFERUNGEN_MAX];
+        let unterschrift_bytes =
+            serde_json::to_vec(&lieferung).expect("JSON").len() * unterschrift::LIEFERUNGEN_MAX;
+        // Führungsakten (LLH-1672): `build_ausgang` packt höchstens `ANTWORT_BYTES`, je Akte
+        // höchstens `AKTE_BYTES`.
+        let akte = fuehrung_austausch::tests::akte_mit_bytes(fuehrung_austausch::AKTE_BYTES);
+        let akte_bytes = serde_json::to_vec(&akte).expect("JSON").len();
+        let akten =
+            (fuehrung_austausch::ANTWORT_BYTES / akte_bytes).min(fuehrung_austausch::AKTEN_MAX);
         assert!(
-            groesse + stammdaten::ANTWORT_RESERVE / 2 < ANTWORT_MAX,
-            "{groesse} Byte lassen keinen Platz für eine übergroße Stammdatenzeile"
+            akten > 0,
+            "die größte Akte des Ausgangs passt in eine Antwort"
+        );
+        a.fuehrung = vec![akte; akten];
+        // Die Teile der Antwort: Schlüssel und Stammdaten zusammen höchstens `STAMMDATEN_BUDGET`
+        // (die Stammdaten füllen nur auf, was die Schlüssel übrig lassen), die Führung höchstens
+        // `ANTWORT_BYTES`, die Reserve trägt Hülle, Trennzeichen der Akten und eine einzelne
+        // übergroße Stammdatenzeile (höchstens die halbe Reserve).
+        assert!(
+            unterschrift_bytes <= STAMMDATEN_BUDGET,
+            "{unterschrift_bytes} Byte Schlüssel sprengen das Budget"
+        );
+        assert_eq!(
+            STAMMDATEN_BUDGET + fuehrung_austausch::ANTWORT_BYTES + stammdaten::ANTWORT_RESERVE,
+            ANTWORT_MAX,
+            "die Führung geht vom Budget der Stammdaten ab"
         );
         assert!(
-            groesse < ANTWORT_MAX,
-            "{groesse} Byte passen nicht in {ANTWORT_MAX}"
+            huelle + fuehrung_austausch::AKTEN_MAX + stammdaten::ANTWORT_RESERVE / 2
+                <= stammdaten::ANTWORT_RESERVE,
+            "{huelle} Byte Hülle lassen keinen Platz für eine übergroße Stammdatenzeile"
+        );
+        // Gegenprobe am Stück: volle Schlüssel und Akten, der Rest des Budgets als Stammdaten.
+        let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        let stammdaten_rest = STAMMDATEN_BUDGET - unterschrift_bytes;
+        assert!(
+            groesse + stammdaten_rest + stammdaten::ANTWORT_RESERVE / 2 < ANTWORT_MAX,
+            "{groesse} Byte und {stammdaten_rest} Byte Stammdaten passen nicht in {ANTWORT_MAX}"
         );
     }
 
