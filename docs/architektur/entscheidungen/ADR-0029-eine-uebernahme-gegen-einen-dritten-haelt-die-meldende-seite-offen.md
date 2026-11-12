@@ -7,6 +7,7 @@ ersetzt: ADR-0028
 gilt_fuer:
   - src/instanz/fuehrung/**
   - src/instanz/spiegel/fuehrung.rs
+  - src/routes/fuehrung.rs
   - src/einsatz/berechtigung.rs
   - src/einsatz/repo.rs
   - src/einsatz/kontext.rs
@@ -62,15 +63,14 @@ verlange 'then_with\(\|\| self\.instanz\.cmp\(&other\.instanz\)\)' src/instanz/f
 verlange 'pub fn ist_konflikt' src/instanz/fuehrung/austausch.rs
 verlange 'austausch::ist_konflikt' src/instanz/fuehrung/dienst.rs
 verlange 'pub fn ist_gegen_mich' src/instanz/fuehrung/austausch.rs
-verbiete 'fuehrer_alt == ich' 'src/instanz/fuehrung/dienst.rs'
+verbiete 'fuehrer_alt (==|!=) ich' 'src/**/*.rs'
 ```
 
 ## Kontext
 
-Holte sich der Hub die Führung von einer anderen ELW zurück, per Notübernahme oder Widerruf, prüfte
-eine unterlegene ELW die Akte unter ADR-0028 wie eine Übernahme gegen sich und schlug Fehlalarm.
-Der Widerruf trug keine Erklärung und glich am Draht einem Hub, der sich ohne Beweis zum Führer
-macht.
+Holte sich der Hub die Führung per Notübernahme oder Widerruf von einer anderen ELW zurück, schlug
+eine unterlegene ELW unter ADR-0028 Fehlalarm. Der Widerruf trug keine Erklärung und glich am Draht
+einem Hub, der sich ohne Beweis zum Führer macht.
 
 ## Konsequenzen
 

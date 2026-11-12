@@ -70,9 +70,10 @@ gegen einen Dritten nennt immer einen Stand, den die ELW nicht hat (in beiden F�
 Die Prüfung steht nach den Sonderwegen für eine nie vergebene eigene Epoche, für Verwahrung und
 für `!nimmt_mir`, also genau dort, wo heute `check_unterschrift` läuft. Sie geht über
 `austausch::entscheide` mit dem vorhandenen Merker `dritter` (ADR-0028: die Annahmeregel
-entscheidet). „Gegen mich“ steht damit an vier Stellen gleich (`anzeige`, `bestaetigen`,
-`widersprechen`, `check_offene`); die neue Stelle nutzt dieselbe Ableitung über eine gemeinsame
-Hilfsfunktion statt einer fünften Kopie.
+entscheidet). „Gegen mich“ stand vorher an sechs Stellen als eigener Vergleich (`anzeige`,
+`bestaetigen`, `widersprechen`, `check_offene`, `check_unterschrift` und die Route
+`run_bestaetigen` für die Admin-Spur); alle nutzen jetzt `austausch::ist_gegen_mich`, und die neue
+ADR verbietet den Vergleich anderswo (Befund B1 aus dem Review vor dem PR).
 
 Abgrenzung zum Angriff: Eine echte Übernahme gegen die ELW nennt die ELW als bisherigen Führer.
 Eine Erklärung, die einen anderen nennt, kann die Führung der ELW nicht rechtfertigen; sie zeigt
