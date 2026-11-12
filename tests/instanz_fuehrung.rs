@@ -1471,22 +1471,54 @@ async fn schwaerzung_auf_beiden_seiten_der_trennung_raeumt_die_bruchstelle() {
 /// geschwärzt gesichert, und ein Führer ohne Marke überschreibt die eigene nicht (Review #1284).
 #[tokio::test]
 async fn eigene_schwaerzung_in_der_trennung_laesst_die_bruchstelle_stehen() {
+    eigene_schwaerzung_in_der_trennung(false).await;
+}
+
+/// Wie oben, aber der neue Führer bringt die ältere Marke von vor der Trennung: Sie ist hier
+/// bekannt, also hat er seither nicht geschwärzt (Review #1284).
+#[tokio::test]
+async fn eigene_schwaerzung_in_der_trennung_mit_aelterer_marke_laesst_die_bruchstelle_stehen() {
+    eigene_schwaerzung_in_der_trennung(true).await;
+}
+
+async fn eigene_schwaerzung_in_der_trennung(vorher_geschwaerzt: bool) {
     let (hub, elw) = gekoppelt().await;
     let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let elw_schwaerzt = |person: i64| {
+        let pool = elw.pool.clone();
+        async move {
+            let mut tx = pool.begin().await.unwrap();
+            lifeline_hub::einsatz::schwaerzung_person::scrubbe_person(
+                &mut tx,
+                e,
+                lifeline_hub::einsatz::schwaerzung_person::PersonenArt::Betroffene,
+                person,
+            )
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+        }
+    };
+    if vorher_geschwaerzt {
+        elw_schwaerzt(987_654).await;
+    }
     abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    let am_hub: Option<String> =
+        sqlx::query_scalar("SELECT schwaerzung_marke FROM einsatz WHERE id = ?")
+            .bind(h)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        am_hub.is_some(),
+        vorher_geschwaerzt,
+        "die Marke kam beim Hub an"
+    );
     hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
     let (s, _) = etb(&elw, e).await;
     assert_eq!(s, StatusCode::CREATED);
-    let mut tx = elw.pool.begin().await.unwrap();
-    lifeline_hub::einsatz::schwaerzung_person::scrubbe_person(
-        &mut tx,
-        e,
-        lifeline_hub::einsatz::schwaerzung_person::PersonenArt::Betroffene,
-        987_655,
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
+    elw_schwaerzt(987_655).await;
     elw_meldet(&elw).await;
     let (s, v) = post(
         &elw,

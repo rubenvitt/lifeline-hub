@@ -481,7 +481,7 @@ async fn scrub_im_falschen_einsatz_aendert_nichts() {
     let b = testdaten::anlegen(&pool).await;
     // Jedes Löschersuchen setzt am Kopf seines Einsatzes eine neue Marke (LLH-1649), auch wenn es
     // nichts trifft. Marke und Spiegel-Log sind kein Inhalt; sie bleiben aus dem Vergleich.
-    let ohne_zaehler = || async {
+    let ohne_marke = || async {
         sqlx::query("UPDATE einsatz SET schwaerzung_marke = NULL")
             .execute(&pool)
             .await
@@ -490,9 +490,13 @@ async fn scrub_im_falschen_einsatz_aendert_nichts() {
             .execute(&pool)
             .await
             .unwrap();
+        sqlx::query("DELETE FROM einsatz_schwaerzung_marke")
+            .execute(&pool)
+            .await
+            .unwrap();
         testdaten::alle_texte(&pool).await
     };
-    let vorher = ohne_zaehler().await;
+    let vorher = ohne_marke().await;
     scrub(&pool, b.e2, PersonenArt::Betroffene, b.p1).await;
     scrub(&pool, b.e2, PersonenArt::ExterneKraft, b.k1).await;
     scrub(&pool, b.e2, PersonenArt::InfotelefonAnruf, b.anruf1).await;
@@ -503,7 +507,7 @@ async fn scrub_im_falschen_einsatz_aendert_nichts() {
             .await
             .unwrap();
     assert!(marke.is_some());
-    assert_eq!(ohne_zaehler().await, vorher);
+    assert_eq!(ohne_marke().await, vorher);
     let _ = (b.p_e2, b.p2, b.k2, b.anruf2);
 }
 

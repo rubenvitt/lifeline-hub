@@ -3337,11 +3337,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // Zeilen (Freitext, Personendaten), darum mit dem Einsatz weg. Das JSON sagt nicht, welche
     // Kategorie oder Person darin steht; deshalb geht sie bei jeder Schwärzung ganz
     // (`einsatz::repo::nach_schwaerzung_tx`). Am Spiegel laufen diese Wege nicht: Er räumt sie,
-    // sobald der Kopf eine andere `einsatz.schwaerzung_marke` bringt
+    // sobald der Kopf eine hier unbekannte `einsatz.schwaerzung_marke` bringt
     // (`instanz::spiegel::fuehrung::raeume_bruchstelle`, LLH-1649): Kopien und Geklärtes gehen,
     // offene Zeilen ohne Kopie werden weiter gefragt und gehen, sobald sie geklärt sind
     // (`geraeumt`). Mit dem Einsatz geht alles beim Abräumen
     // (Kaskade).
+    // Bekannte Schwärzungsmarken eines Einsatzes (LLH-1649): Zufallswerte ohne Inhalt, gehen mit
+    // dem Einsatz.
+    TabellenRegel {
+        tabelle: "einsatz_schwaerzung_marke",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("marke", G_SPIEGEL),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_bruchstelle",
         scoping: Scoping::EinsatzId,

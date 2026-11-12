@@ -552,7 +552,7 @@ async fn uebernimm_bruch_antwort(
 }
 
 /// Räumt am Spiegel die Bruchstelle eines Einsatzes (LLH-1649): Der Führer hat geschwärzt, sein
-/// Kopf bringt eine andere `einsatz.schwaerzung_marke`. Wie beim Führer
+/// Kopf bringt eine hier unbekannte `einsatz.schwaerzung_marke`. Wie beim Führer
 /// (`einsatz::repo::nach_schwaerzung_tx`) geht jede gesicherte Kopie (`daten`), weil das JSON
 /// nicht sagt, welche Kategorie oder Person darin steht; geklärte und entfernte Zeilen gehen ganz.
 /// Eine noch offene Zeile steht hier noch als lokale Zeile und kann Daten tragen, die der Führer

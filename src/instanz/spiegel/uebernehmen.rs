@@ -487,15 +487,16 @@ async fn kopf_uebernehmen(
     werte.retain(|(s, _)| s != "id" && s != "kennung");
     werte.push(("kennung".into(), Value::from(l.kennung.clone())));
     if let Some(id) = vorhanden {
-        let marke_vorher = schwaerzung_marke(conn, id).await?;
         // Ein Führer, der nie geschwärzt hat, überschreibt die eigene Marke nicht: Hat diese Seite
         // während einer Trennung selbst geschwärzt, ist ihre Bruchstelle schon geschwärzt
         // gesichert, und ein Wechsel auf NULL räumte sie grundlos (Review #1284).
         werte.retain(|(s, v)| !(s == "schwaerzung_marke" && v.is_null()));
         update(conn, t.name, &werte, "id", &id.to_string()).await?;
-        // Hat der Führer seither geschwärzt, räumt der Spiegel seine Bruchstelle (LLH-1649).
+        // Hat der Führer seither geschwärzt, räumt der Spiegel seine Bruchstelle (LLH-1649). Neu
+        // ist nur eine Marke, die dieser Einsatz hier nie hatte: Bringt ein neuer Führer nach
+        // einer Trennung die Marke von davor, zählt eine eigene Schwärzung dieser Seite nicht.
         // Ein Führer ohne Marke (älterer Stand) schickt keine; dann bleibt alles, wie es ist.
-        if schwaerzung_marke(conn, id).await? != marke_vorher {
+        if merke_schwaerzung_marke(conn, id).await? {
             super::fuehrung::raeume_bruchstelle(conn, id).await?;
         }
         return Ok(id);
@@ -528,20 +529,23 @@ async fn kopf_uebernehmen(
     .await?;
     // Kam die Akte des Gegenübers vor dem Spiegel an, hängt sie sich jetzt an ihn (E2).
     super::fuehrung::verknuepfe_akte(conn, id, &l.kennung).await?;
+    merke_schwaerzung_marke(conn, id).await?;
     Ok(id)
 }
 
-/// Die Marke der letzten Schwärzung am Einsatz (LLH-1649).
-async fn schwaerzung_marke(
+/// Merkt die Schwärzungsmarke am Kopf des Einsatzes (LLH-1649); `true`, wenn sie hier neu ist.
+async fn merke_schwaerzung_marke(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
-) -> Result<Option<String>, AppError> {
-    Ok(
-        sqlx::query_scalar("SELECT schwaerzung_marke FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?,
+) -> Result<bool, AppError> {
+    let neu = sqlx::query(
+        "INSERT OR IGNORE INTO einsatz_schwaerzung_marke (einsatz_id, marke) \
+         SELECT id, schwaerzung_marke FROM einsatz WHERE id = ? AND schwaerzung_marke IS NOT NULL",
     )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(neu.rows_affected() > 0)
 }
 
 async fn ist_mitgliedschaft_eines_stellvertreters(
