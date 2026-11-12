@@ -498,6 +498,7 @@ async fn quittungen_merken_angenommen_vor_und_halten_den_grund_fest() {
         kennung: format!("ich/{id}"),
         ergebnis: ergebnis.into(),
         grund: grund.map(Into::into),
+        epoche: None,
     };
 
     let mut tx = pool.begin().await.unwrap();
@@ -543,6 +544,68 @@ async fn quittungen_merken_angenommen_vor_und_halten_den_grund_fest() {
         .await
         .unwrap();
     assert_eq!(merker, 1);
+}
+
+/// LLH-1647: Kam die Akte der Gegenstelle vor der Quittung und hat diese Instanz die Verwahrung
+/// abgelehnt (eigene Epoche darüber), räumt eine später eintreffende Quittung nicht mehr ab. Eine
+/// Quittung mit neuerer Epoche (nächstes Angebot) räumt ab.
+#[tokio::test]
+async fn quittung_nach_abgelehnter_verwahrung_raeumt_nicht_ab() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let k = kopplung(&pool, "meldet_sich").await;
+    let (id, _) = einsatz(&pool, leit).await;
+    sqlx::query("UPDATE einsatz SET kennung = 'ich/' || id WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    setze_bis(&pool, id, "2026-11-01 00:00:00").await;
+    // Akte nach der Ablehnung: Epoche (3, ich), Art `verworfen`, die Gegenstelle hatte (2, gegen).
+    sqlx::query(
+        "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, bezeichnung, status, \
+            epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, stand, \
+            geaendert_at) \
+         VALUES ('ich/' || ?1, ?1, 1, 'Lage', 'abgeschlossen', 3, 'ich', 'ich', 'Ich', \
+            'verworfen', 1, ?2)",
+    )
+    .bind(id)
+    .bind(JETZT)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let gesendet = vec![verwahrt(
+        &format!("ich/{id}"),
+        stand_von(&pool, id).await,
+        vec![],
+    )];
+    let quittung = |zaehler: i64| LebensendeQuittung {
+        kennung: format!("ich/{id}"),
+        ergebnis: VERWAHRUNG_ANGENOMMEN.into(),
+        grund: None,
+        epoche: Some(crate::instanz::fuehrung::Epoche::neu(zaehler, "gegen")),
+    };
+
+    let mut tx = pool.begin().await.unwrap();
+    let ids = quittungen_uebernehmen(&mut tx, &k, "ich", &gesendet, &[quittung(2)], JETZT)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(ids.is_empty(), "veraltete Quittung räumt nicht ab");
+    let grund: Option<String> =
+        sqlx::query_scalar("SELECT grund FROM einsatz_verwahrung WHERE einsatz_id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(grund.as_deref(), Some("Verwahrung hier abgelehnt"));
+
+    let mut tx = pool.begin().await.unwrap();
+    let ids = quittungen_uebernehmen(&mut tx, &k, "ich", &gesendet, &[quittung(4)], JETZT)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(ids, vec![id], "neuere Epoche räumt ab");
 }
 
 async fn stand_von(pool: &SqlitePool, id: i64) -> i64 {

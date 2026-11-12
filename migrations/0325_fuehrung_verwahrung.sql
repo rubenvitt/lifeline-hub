@@ -10,9 +10,13 @@
 -- Ein DROP TABLE mit eingeschalteten Fremdschlüsseln löschte über die Kaskade den ganzen Verlauf.
 -- Deshalb `-- no-transaction` und PRAGMA foreign_keys = OFF (Muster 0286). Die ids bleiben 1:1.
 -- Schema = 0316 plus die Spalten aus 0321, nur der CHECK auf `art` kennt `verwahrung` dazu.
+-- Der Umbau läuft in einer eigenen Transaktion: Bricht er ab, bleibt keine halbe `_neu`-Tabelle
+-- stehen, an der der nächste Start scheitert. Das Pragma wirkt nur außerhalb, daher davor/danach.
 -- Abgesichert von db::tests::migration_0325_fuehrung_verwahrung.
 
 PRAGMA foreign_keys = OFF;
+
+BEGIN;
 
 CREATE TABLE einsatz_fuehrung_neu (
     id                   INTEGER PRIMARY KEY,
@@ -99,5 +103,7 @@ DROP TABLE einsatz_fuehrung_verlauf;
 ALTER TABLE einsatz_fuehrung_verlauf_neu RENAME TO einsatz_fuehrung_verlauf;
 
 CREATE INDEX idx_einsatz_fuehrung_verlauf ON einsatz_fuehrung_verlauf(fuehrung_id, id);
+
+COMMIT;
 
 PRAGMA foreign_keys = ON;

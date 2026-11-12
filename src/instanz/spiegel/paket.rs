@@ -111,6 +111,11 @@ pub struct LebensendeQuittung {
     pub ergebnis: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grund: Option<String>,
+    /// Bei `angenommen`: die Epoche, mit der die erreichte Seite den Einsatz führt (LLH-1647).
+    /// Die meldende Seite räumt nicht ab, wenn ihre Akte schon darüber hinaus ist, weil sie die
+    /// Verwahrung inzwischen abgelehnt hat. Fehlt ohne Führung je Einsatz.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epoche: Option<crate::instanz::fuehrung::Epoche>,
 }
 
 /// Art eines Lebensendes: gelöscht.
@@ -403,6 +408,7 @@ mod tests {
                 kennung: "x".into(),
                 ergebnis: VERWAHRUNG_WARTET.into(),
                 grund: None,
+                epoche: None,
             };
             EINSAETZE_MAX + 1
         ];

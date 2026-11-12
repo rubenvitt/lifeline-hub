@@ -186,15 +186,25 @@ fn wartet(kennung: &str, grund: String) -> LebensendeQuittung {
         kennung: kennung.to_string(),
         ergebnis: VERWAHRUNG_WARTET.into(),
         grund: Some(grund),
+        epoche: None,
     }
 }
 
-fn angenommen(kennung: &str) -> LebensendeQuittung {
-    LebensendeQuittung {
+/// `angenommen` mit der Epoche, mit der diese Instanz den Einsatz `id` nun führt (LLH-1647).
+async fn angenommen(
+    conn: &mut SqliteConnection,
+    kennung: &str,
+    id: i64,
+) -> Result<LebensendeQuittung, AppError> {
+    let epoche = crate::instanz::fuehrung::repo::find_by_einsatz(conn, id)
+        .await?
+        .map(|a| a.epoche());
+    Ok(LebensendeQuittung {
         kennung: kennung.to_string(),
         ergebnis: VERWAHRUNG_ANGENOMMEN.into(),
         grund: None,
-    }
+        epoche,
+    })
 }
 
 /// Erreichte Seite: nimmt einen zur Verwahrung übergebenen Einsatz an (D4) oder sagt, worauf er
@@ -225,7 +235,7 @@ pub async fn verwahrung_annehmen(
     .bind(&l.kennung)
     .fetch_optional(&mut *conn)
     .await?;
-    if let Some((_, stand)) = eigen {
+    if let Some((eigen_id, stand)) = eigen {
         return Ok(Some(match stand {
             Some(s) if s != l.stand => (
                 wartet(
@@ -234,7 +244,7 @@ pub async fn verwahrung_annehmen(
                 ),
                 None,
             ),
-            _ => (angenommen(&l.kennung), None),
+            _ => (angenommen(conn, &l.kennung, eigen_id).await?, None),
         }));
     }
     let Some((id, stand)) = spiegel_der_kopplung(conn, kopplung.id, &l.kennung).await? else {
@@ -296,7 +306,7 @@ pub async fn verwahrung_annehmen(
         )));
     };
     umwandeln(conn, kopplung, l, id, akteur).await?;
-    Ok(Some((angenommen(&l.kennung), Some(id))))
+    Ok(Some((angenommen(conn, &l.kennung, id).await?, Some(id))))
 }
 
 /// Macht aus dem Spiegel einen eigenen, abgeschlossenen Einsatz dieser Instanz (D4).
@@ -532,7 +542,19 @@ pub async fn quittungen_uebernehmen(
             .map(|l| l.stand);
         let noch_so = q.ergebnis != VERWAHRUNG_ANGENOMMEN
             || noch_wie_gesendet(conn, id, gesendeter_stand, jetzt).await?;
-        if !noch_so {
+        if q.ergebnis == VERWAHRUNG_ANGENOMMEN && verwahrung_abgelehnt(conn, id, q).await? {
+            // Die Akte kam vor der Quittung, und diese Instanz hat die Verwahrung abgelehnt
+            // (LLH-1647, E3). Die Gegenstelle wird wieder Spiegel; abräumen hieße, dass niemand
+            // den Einsatz mehr hat. Das nächste Angebot läuft mit einer neuen Epoche.
+            verwahrung_merken(
+                conn,
+                id,
+                &kopplung.gegenueber_name,
+                Some(GRUND_ABGELEHNT),
+                jetzt,
+            )
+            .await?;
+        } else if !noch_so {
             verwahrung_merken(
                 conn,
                 id,
@@ -562,6 +584,21 @@ pub async fn quittungen_uebernehmen(
         }
     }
     Ok(ids)
+}
+
+/// Meldende Seite (LLH-1647): Ob die eigene Akte über die Epoche der Quittung hinaus ist, diese
+/// Instanz die Verwahrung also schon abgelehnt hat. Ohne Epoche (Führung je Einsatz aus) nie.
+async fn verwahrung_abgelehnt(
+    conn: &mut SqliteConnection,
+    id: i64,
+    q: &LebensendeQuittung,
+) -> Result<bool, AppError> {
+    let Some(epoche) = &q.epoche else {
+        return Ok(false);
+    };
+    Ok(crate::instanz::fuehrung::repo::find_by_einsatz(conn, id)
+        .await?
+        .is_some_and(|a| a.epoche() > *epoche))
 }
 
 /// Ob der Einsatz noch so ist, wie er zur Verwahrung gesendet wurde: gleicher Stand und weiter
@@ -669,6 +706,8 @@ pub async fn grund_gegen_verwahrung(
 
 /// Grund der Quittung, wenn sich der Einsatz nach der Übergabe geändert hat.
 const GRUND_GEAENDERT: &str = "Nach der Übergabe geändert";
+/// Grund, wenn diese Instanz die Verwahrung abgelehnt hatte, bevor die Quittung kam (LLH-1647).
+const GRUND_ABGELEHNT: &str = "Verwahrung hier abgelehnt";
 
 /// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
 pub async fn abraeumen_nach_commit(pool: &sqlx::SqlitePool, ids: &[i64]) {
