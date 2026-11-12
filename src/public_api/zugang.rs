@@ -147,7 +147,7 @@ pub async fn liste(conn: &mut SqliteConnection, org_id: i64) -> Result<Vec<Zugan
     let zeilen: Vec<Zeile> = sqlx::query_as(concat!(
         "SELECT ",
         spalten!(),
-        " FROM maschinenzugang WHERE org_id = ? ORDER BY angelegt_at DESC, id"
+        " FROM maschinenzugang WHERE org_id = ? ORDER BY angelegt_at DESC, rowid DESC"
     ))
     .bind(org_id)
     .fetch_all(&mut *conn)

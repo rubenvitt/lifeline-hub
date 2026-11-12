@@ -259,6 +259,8 @@ export default function Anbindungen() {
                               <>
                                 Schlüssel <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
                               </>
+                            ) : widerrufenAm ? (
+                              'ohne Schlüssel'
                             ) : (
                               'Code noch nicht eingelöst'
                             )}
