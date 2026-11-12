@@ -202,6 +202,102 @@ async fn zu_kurzes_passwort_ist_400() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
+/// LLH-1702, Spec `eingabegrenzen` („Anzeigename eines Kontos ist begrenzt“): ein Zeichen über
+/// der Grenze ist 400 mit Feld und Grenze im Text, und es entsteht kein Konto.
+#[tokio::test]
+async fn anlegen_mit_zu_langem_anzeigenamen_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let max = lifeline_hub::auth::ANZEIGENAME_MAX;
+
+    let body = serde_json::json!({
+        "anzeigename": "a".repeat(max + 1),
+        "benutzername": "lang",
+        "passwort": "langespw1",
+    });
+    let (status, json) =
+        common::anfrage_json(&app, "POST", "/api/benutzer", &admin_cookie, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        json["error"],
+        format!("Anzeigename darf höchstens {max} Zeichen lang sein")
+    );
+
+    let (_, liste) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    assert!(
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|b| b["benutzername"] != "lang"),
+        "kein Konto bei abgelehntem Namen"
+    );
+}
+
+/// Genau an der Grenze, in Zeichen gezählt: 200 „ä“ sind 400 Byte und werden angenommen.
+#[tokio::test]
+async fn anlegen_mit_anzeigename_genau_an_der_grenze_gelingt() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let name = "ä".repeat(lifeline_hub::auth::ANZEIGENAME_MAX);
+
+    let body = serde_json::json!({
+        "anzeigename": name,
+        "benutzername": "grenze",
+        "passwort": "grenzepw1",
+    });
+    let (status, json) =
+        common::anfrage_json(&app, "POST", "/api/benutzer", &admin_cookie, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(json["anzeigename"], name);
+}
+
+/// Ein abgelehnter PATCH schreibt nichts: Name und Rollen bleiben.
+#[tokio::test]
+async fn patch_mit_zu_langem_anzeigenamen_ist_400_und_aendert_nichts() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+    let (_, vorher) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let vorher = vorher
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["id"] == erika_id)
+        .cloned()
+        .unwrap();
+
+    let max = lifeline_hub::auth::ANZEIGENAME_MAX;
+    let body = serde_json::json!({
+        "anzeigename": "a".repeat(max + 1),
+        "org_rolle": "fuehrungskraft",
+    });
+    let (status, json) = common::anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        json["error"],
+        format!("Anzeigename darf höchstens {max} Zeichen lang sein")
+    );
+
+    let (_, nachher) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let nachher = nachher
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["id"] == erika_id)
+        .cloned()
+        .unwrap();
+    assert_eq!(nachher["anzeigename"], vorher["anzeigename"]);
+    assert_eq!(nachher["org_rolle"], "keine");
+}
+
 #[tokio::test]
 async fn letzter_admin_kann_nicht_deaktiviert_werden() {
     let app = setup().await;

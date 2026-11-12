@@ -1173,6 +1173,40 @@ async fn admin_vom_hub_ist_am_elw_admin_nur_wenn_er_eine_org_traegt() {
     .contains("„annaadmin“ ist am Hub Admin, hier nicht"));
 }
 
+/// LLH-1702, Spec `eingabegrenzen` („Anzeigename von außen wird gekürzt übernommen“): ein
+/// Bestandsname am Hub über der Grenze kommt am ELW mit seinen ersten 200 Zeichen an, das Konto
+/// entsteht trotzdem, und die Kopplung bekommt dafür keinen Hinweis.
+#[tokio::test]
+async fn konto_mit_zu_langem_anzeigenamen_kommt_gekuerzt_und_ohne_hinweis() {
+    let (hub, elw) = gekoppelt().await;
+    let id = konto(&hub, "langername").await;
+    let max = lifeline_hub::auth::ANZEIGENAME_MAX;
+    let lang = format!("{}{}", "ä".repeat(max), "x".repeat(100));
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET anzeigename = '{lang}' WHERE id = {id}"),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            "SELECT anzeigename FROM benutzer WHERE benutzername = 'langername'"
+        )
+        .await,
+        "ä".repeat(max)
+    );
+    // Der Grundstock bringt eigene Hinweise mit („admin“ ist hier schon vergeben); zum
+    // gekürzten Konto steht keiner da.
+    let hinweis = eine::<Option<String>>(
+        &elw.pool,
+        "SELECT stammdaten_hinweis FROM instanz_kopplung_org",
+    )
+    .await
+    .unwrap_or_default();
+    assert!(!hinweis.contains("langername"), "{hinweis}");
+}
+
 #[tokio::test]
 async fn elw_verloren_geht_auch_nach_dem_widerruf_aber_nur_einmal() {
     let (hub, elw) = gekoppelt_mit_platte(true).await;

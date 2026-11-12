@@ -681,6 +681,17 @@ pub async fn uebernehmen(
                 zeilen_name(l)
             ));
         }
+        // Ein Anzeigename über der Grenze (Bestand am Hub, älterer Hub) wird gekürzt übernommen,
+        // ohne Hinweis: das Konto soll deshalb nicht fehlen (LLH-1702, `src/AGENTS.md`,
+        // „Eingabegrenzen“).
+        if *a == StammdatenArt::Konto {
+            if let Some(name) = uebersetzt["anzeigename"].as_str() {
+                let kurz = crate::auth::truncate_anzeigename(name);
+                if kurz != name {
+                    uebersetzt["anzeigename"] = Value::from(kurz);
+                }
+            }
+        }
         let vorher_aktiv: Option<bool> = if *a == StammdatenArt::Konto {
             match herkunft::find_lokal(conn, zuordnung.id, *a, &l.schluessel).await? {
                 Some(lokal) => {

@@ -81,15 +81,17 @@ fn sanitisiere_benutzername(roh: &str) -> String {
 }
 
 /// Leitet den Anzeigenamen ab (pur): `name` → `preferred_username` → `subject`, jeweils der
-/// erste nach dem Trimmen nicht leere Wert. `subject` ist OIDC-Pflichtclaim.
+/// erste nach dem Trimmen nicht leere Wert. `subject` ist OIDC-Pflichtclaim. Ein längerer Name
+/// des Anbieters wird gekürzt statt abgelehnt (LLH-1702): die Anmeldung soll daran nicht
+/// scheitern.
 pub fn plane_anzeigename(claims: &OidcClaims) -> String {
-    [claims.name.as_deref(), claims.preferred_username.as_deref()]
+    let name = [claims.name.as_deref(), claims.preferred_username.as_deref()]
         .into_iter()
         .flatten()
         .map(str::trim)
         .find(|s| !s.is_empty())
-        .unwrap_or_else(|| claims.subject.trim())
-        .to_string()
+        .unwrap_or_else(|| claims.subject.trim());
+    crate::auth::truncate_anzeigename(name)
 }
 
 /// Findet den Benutzer zu `(issuer, subject)` oder legt beim ersten Login ein least-privilege-
@@ -298,6 +300,16 @@ mod tests {
             Some("  "),
         );
         assert_eq!(plane_anzeigename(&c), "maxmuster");
+    }
+
+    /// LLH-1702: der Anbieter nennt einen Namen über der Grenze; das Konto bekommt die ersten
+    /// `ANZEIGENAME_MAX` Zeichen, die Anmeldung scheitert nicht daran.
+    #[test]
+    fn anzeigename_ueber_der_grenze_wird_gekuerzt() {
+        let max = crate::auth::ANZEIGENAME_MAX;
+        let lang = format!("{}{}", "ä".repeat(max), "x".repeat(100));
+        let c = claims("https://idp.example", "sub-x", None, Some(&lang));
+        assert_eq!(plane_anzeigename(&c), "ä".repeat(max));
     }
 
     // --- finde_oder_provisioniere (gegen test_pool) ---

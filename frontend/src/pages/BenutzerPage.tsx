@@ -16,6 +16,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
 import { PASSWORT_MIN_LAENGE } from '../api/auth';
+import { ANZEIGENAME_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
   bearbeiteBenutzer,
   deaktiviereBenutzer,
@@ -53,6 +55,12 @@ interface BearbeitenWerte {
   system_rolle: SystemRolle;
   org_rolle: OrgRolle;
 }
+
+/**
+ * Grenze des Anzeigenamens wie am Server (LLH-1702): Überlänge bleibt stehen und sperrt das
+ * Speichern, auch ein Bestandsname über der Grenze im Bearbeiten-Dialog.
+ */
+const anzeigenameRegel = zeichenRegel(ANZEIGENAME_MAX, 'Anzeigename');
 
 const SYSTEM_ROLLEN = [
   { value: 'keiner', label: SYSTEM_ROLLE_TEXT.keiner },
@@ -502,9 +510,9 @@ export default function BenutzerPage() {
         <Form.Item
           label="Anzeigename"
           name="anzeigename"
-          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
+          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }, anzeigenameRegel]}
         >
-          <Input />
+          <Input count={zeichenGrenze(ANZEIGENAME_MAX)} />
         </Form.Item>
         <Form.Item
           label="Benutzername"
@@ -603,9 +611,9 @@ export default function BenutzerPage() {
         <Form.Item
           label="Anzeigename"
           name="anzeigename"
-          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
+          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }, anzeigenameRegel]}
         >
-          <Input disabled={kontoVomHub(zuBearbeiten)} />
+          <Input count={zeichenGrenze(ANZEIGENAME_MAX)} disabled={kontoVomHub(zuBearbeiten)} />
         </Form.Item>
         <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
           <Select options={SYSTEM_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
