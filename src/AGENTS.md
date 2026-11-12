@@ -485,9 +485,10 @@ Herleitung in
     Nachbereitung abräumt. **Eine Akte ohne Einsatz löscht nur
     `fuehrung::repo::delete_ohne_spiegel`** (schreibt den Vermerk: Signal, Widerruf). Wem eine
     Seite die Akte nennt und von wem sie das Signal annimmt, sagt eine Regel für beides:
-    `fuehrung::repo::ist_frage_an_gegenueber` (der Führer der Akte; die meldende Seite auch ihr
-    einziger Hub). Genannte Kennungen sind auf `paket::KENNUNG_BYTES_MAX` Byte begrenzt und gehen
-    vom Paket-Budget ab. Der Weg über die Stände bleibt, wie er ist (Spiegel mit fremdem Präfix:
+    `fuehrung::repo::is_gegenueber_zustaendig` (der Führer der Akte; die meldende Seite auch ihr
+    einziger Hub, solange der Führer nicht selbst ihr Gegenüber ist). Genannt wird nur, was
+    `paket::is_kennung_nennbar` besteht (höchstens `KENNUNG_BYTES_MAX` Byte, druckbares ASCII);
+    die Akten gehen vom Paket-Budget ab (`abgleich::budget_fuer_zeilen`). Der Weg über die Stände bleibt, wie er ist (Spiegel mit fremdem Präfix:
     LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt „Akten ohne Spiegel“.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 

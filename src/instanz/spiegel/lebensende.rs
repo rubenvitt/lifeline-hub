@@ -80,7 +80,7 @@ pub async fn geloeschte(
 
 /// `geloescht` für jede genannte Akte ohne Spiegel, deren Ende diese Instanz belegt (LLH-1699,
 /// D4): mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
-/// Löschprotokoll ([`ist_vor_dem_vermerk_geloescht`]). In beiden Fällen nur, wenn hier weder
+/// Löschprotokoll ([`is_altbestand_geloescht`]). In beiden Fällen nur, wenn hier weder
 /// Einsatz noch Akte mit der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus
 /// einer Sicherung zurückgekehrte Instanz meldet nichts.
 pub async fn geloeschte_akten(
@@ -103,7 +103,7 @@ pub async fn geloeschte_akten(
             .collect();
     for k in &kennungen {
         if !belegt.contains(k)
-            && ist_vor_dem_vermerk_geloescht(conn, kopplung_id, eigene_kennung, k).await?
+            && is_altbestand_geloescht(conn, kopplung_id, eigene_kennung, k).await?
         {
             belegt.insert(k.clone());
         }
@@ -124,7 +124,7 @@ pub async fn geloeschte_akten(
 /// Org, die dieser Kopplung aktiv zugeordnet ist, und hier weder Einsatz noch Akte mit der
 /// Kennung. Die Art `spiegel` zählt nicht: Sie steht auch für einen Spiegel, den diese Instanz
 /// nach der Nachbereitung abgeräumt hat, während der Einsatz beim Führer weiterlebt.
-async fn ist_vor_dem_vermerk_geloescht(
+async fn is_altbestand_geloescht(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     eigene_kennung: &str,
@@ -157,7 +157,7 @@ async fn ist_vor_dem_vermerk_geloescht(
 /// Löscht die Akten ohne Spiegel, deren Einsatz das Gegenüber als `geloescht` meldet (LLH-1699,
 /// D3), und vermerkt ihr Ende. Nur bei eingeschalteter Führung, nur Akten ohne lokalen Einsatz
 /// einer Org, die dieser Kopplung aktiv zugeordnet ist, und nur, wenn das Gegenüber über diese
-/// Akte entscheidet (`fuehrung::repo::ist_frage_an_gegenueber`, dieselbe Regel wie beim Nennen):
+/// Akte entscheidet (`fuehrung::repo::is_gegenueber_zustaendig`, dieselbe Regel wie beim Nennen):
 /// Eine ELW löscht am Hub keine Akte einer anderen. Ein Spiegel endet nicht hier, sondern über
 /// [`geloescht_uebernehmen`]. Liefert die Zahl gelöschter Akten.
 pub async fn geloeschte_akten_uebernehmen(
@@ -185,12 +185,12 @@ pub async fn geloeschte_akten_uebernehmen(
         if a.einsatz_id.is_some() || !orgs.contains(&a.org_id) {
             continue;
         }
-        let hubs = akten::list_hubs(conn, a.org_id).await?.len();
-        if !akten::ist_frage_an_gegenueber(
+        let gegenueber_der_org = akten::list_gegenueber(conn, a.org_id).await?;
+        if !akten::is_gegenueber_zustaendig(
             richtung,
             &a.fuehrer_kennung,
             &kopplung.gegenueber_kennung,
-            hubs,
+            &gegenueber_der_org,
         ) {
             continue;
         }

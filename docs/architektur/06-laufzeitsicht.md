@@ -351,8 +351,8 @@ sequenceDiagram
   [ADR-0031](entscheidungen/ADR-0031-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
   Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung
   im Abgleich (`SpiegelPaket.akten`), und zwar dem Gegenüber, das über sie entscheidet: dem
-  Führer der Akte, die meldende Seite auch ihrem einzigen Hub
-  (`fuehrung::repo::ist_frage_an_gegenueber`). Das Gegenüber meldet `geloescht` auf demselben Weg
+  Führer der Akte, die meldende Seite auch ihrem einzigen Hub, solange der Führer nicht selbst
+  ihr Gegenüber ist (`fuehrung::repo::is_gegenueber_zustaendig`). Das Gegenüber meldet `geloescht` auf demselben Weg
   wie für Spiegel, aber nur mit Beleg: Löschvermerk (`src/instanz/fuehrung/loeschvermerk.rs`)
   oder, für ältere Löschungen, eigenes Präfix im Löschprotokoll. Der Vermerk entsteht, wo ein
   Einsatz endet (Skelett-Löschung, Verwahrung, `geloescht` des Führers an einem Spiegel). Der

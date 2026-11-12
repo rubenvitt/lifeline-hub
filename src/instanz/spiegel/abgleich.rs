@@ -174,11 +174,13 @@ async fn eigene_akten(
     ))
 }
 
-/// Platz, den die genannten Akten im Paket belegen (JSON: Kennung, Anführungszeichen, Komma). Er
-/// geht wie die Anträge vom Budget der Zeilen ab; mit [`EINSAETZE_MAX`] Kennungen zu höchstens
-/// `KENNUNG_BYTES_MAX` Byte bleibt er unter 64 KiB.
-fn akten_bytes(akten: &[String]) -> usize {
-    akten.iter().map(|k| k.len() + 3).sum()
+/// Budget der Zeilen eines Pakets: was neben der Reserve, den Anträgen und den genannten Akten
+/// bleibt. Die Akten belegen im JSON je Kennung ihre Länge plus Anführungszeichen und Komma
+/// (`paket::is_kennung_nennbar` lässt nichts zu, das JSON maskiert), zusammen höchstens
+/// `paket::AKTEN_BYTES_MAX`; damit bleibt das Budget nie unter `paket::ZEILE_MAX`.
+fn budget_fuer_zeilen(antrag_bytes: usize, akten: &[String]) -> Budget {
+    let akten_bytes: usize = akten.iter().map(|k| k.len() + 3).sum();
+    Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes - akten_bytes)
 }
 
 /// Höchstens [`EINSAETZE_MAX`] Akten je Paket. Sind es mehr, rückt die Auswahl je Abgleich um ein
@@ -515,7 +517,7 @@ pub async fn handle_abgleich(
         // Anträge stehen vorn (D8) und zählen ins Budget.
         let (antraege, antrag_bytes) =
             super::antrag::offene_antraege(conn, kopplung.id, false).await?;
-        let mut budget = Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes - akten_bytes(&akten));
+        let mut budget = budget_fuer_zeilen(antrag_bytes, &akten);
         let lieferungen = liefere_alle(conn, eigen, kopplung, &orgs, &staende, &mut budget).await?;
         let anhang_teile =
             super::anhang::liefere_teile(conn, kopplung.id, &anfrage.abrufe, budget.bytes).await?;
@@ -600,8 +602,7 @@ pub async fn abgleich_einmal(
             // Anträge stehen vorn (D8) und zählen ins Budget.
             let (antraege, antrag_bytes) =
                 super::antrag::offene_antraege(conn, kopplung.id, true).await?;
-            let mut budget =
-                Budget::neu(SPIEGEL_MAX - RESERVE - antrag_bytes - akten_bytes(&akten));
+            let mut budget = budget_fuer_zeilen(antrag_bytes, &akten);
             let lieferungen =
                 liefere_alle(conn, &eigen, kopplung, &orgs, &ziele, &mut budget).await?;
             let anhang_teile =
@@ -798,6 +799,32 @@ mod reihum_tests {
         assert_eq!(gesehen.len(), 700, "nach drei Runden war jede Akte dabei");
         let wenige: Vec<String> = (0..3).map(|i| format!("a{i}")).collect();
         assert_eq!(auswahl_akten(wenige.clone(), 5), wenige);
+    }
+
+    /// LLH-1699: Die genannten Akten gehen vom Budget der Zeilen ab, und auch mit vollen Anträgen
+    /// und vollen Akten bleibt dem ersten Einsatz eine Zeile bis `ZEILE_MAX`.
+    #[test]
+    fn genannte_akten_gehen_vom_budget_ab_und_lassen_platz_fuer_die_groesste_zeile() {
+        use super::super::paket::{
+            AKTEN_BYTES_MAX, ANTRAEGE_BYTES_MAX, KENNUNG_BYTES_MAX, ZEILE_MAX,
+        };
+        let ohne = budget_fuer_zeilen(0, &[]).bytes;
+        assert_eq!(ohne, SPIEGEL_MAX - RESERVE);
+        let akten = vec!["hub/7-ab12cd34".to_string(), "hub/8-ef".to_string()];
+        let belegt = serde_json::to_vec(&akten).unwrap().len();
+        let mit = budget_fuer_zeilen(1000, &akten).bytes;
+        assert_eq!(mit, ohne - 1000 - (14 + 3) - (8 + 3));
+        assert!(
+            ohne - 1000 - mit + 2 >= belegt,
+            "abgezogen wird, was das JSON belegt"
+        );
+        let voll = vec!["!".repeat(KENNUNG_BYTES_MAX); EINSAETZE_MAX];
+        assert_eq!(
+            budget_fuer_zeilen(ANTRAEGE_BYTES_MAX, &voll).bytes,
+            ZEILE_MAX,
+            "volle Anträge und volle Akten lassen genau ZEILE_MAX"
+        );
+        assert_eq!(voll.len() * (KENNUNG_BYTES_MAX + 3), AKTEN_BYTES_MAX);
     }
 
     /// Der Aufrufpfad: Stände und Lieferung zählen je Kopplung getrennt, jede Runde rückt um eins.

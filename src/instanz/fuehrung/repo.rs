@@ -163,9 +163,10 @@ pub async fn list_fremde_der_org(
 /// Kennungen der Akten ohne lokalen Einsatz, nach deren Ende diese Instanz das Gegenüber einer
 /// Kopplung fragt (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`, D2): nur bei
 /// eingeschalteter Führung und nur Akten einer Org, die der Kopplung aktiv zugeordnet ist. Welche
-/// davon, sagt [`ist_frage_an_gegenueber`]: dieselbe Regel, nach der `spiegel::lebensende` die
-/// Antwort annimmt. Kennungen über `KENNUNG_BYTES_MAX` Byte bleiben ungenannt: Sie kämen nur von
-/// einer fehlerhaften Instanz und sprengten das Paket.
+/// davon, sagt [`is_gegenueber_zustaendig`]: dieselbe Regel, nach der `spiegel::lebensende` die
+/// Antwort annimmt. Kennungen, die `paket::is_kennung_nennbar` nicht bestehen (überlang oder nicht
+/// druckbares ASCII), bleiben ungenannt: Sie kämen nur von einer fehlerhaften Instanz und
+/// sprengten das Paket.
 pub async fn list_ohne_spiegel(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -180,25 +181,23 @@ pub async fn list_ohne_spiegel(
          WHERE f.einsatz_id IS NULL \
            AND f.org_id IN (SELECT o.org_id FROM instanz_kopplung_org o \
                             WHERE o.kopplung_id = ?1 AND o.widerrufen_at IS NULL) \
-           AND length(CAST(f.kennung AS BLOB)) <= ?2 \
          ORDER BY f.id",
     )
     .bind(kopplung_id)
-    .bind(crate::instanz::spiegel::paket::KENNUNG_BYTES_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
-    let mut hubs_je_org: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+    let mut je_org: std::collections::HashMap<i64, Vec<FuehrungGegenueber>> =
+        std::collections::HashMap::new();
     let mut kennungen = Vec::new();
     for (kennung, org_id, fuehrer) in akten {
-        let hubs = match hubs_je_org.get(&org_id) {
-            Some(n) => *n,
-            None => {
-                let n = list_hubs(conn, org_id).await?.len();
-                hubs_je_org.insert(org_id, n);
-                n
-            }
-        };
-        if ist_frage_an_gegenueber(richtung, &fuehrer, gegenueber_kennung, hubs) {
+        if !crate::instanz::spiegel::paket::is_kennung_nennbar(&kennung) {
+            continue;
+        }
+        if !je_org.contains_key(&org_id) {
+            let g = list_gegenueber(conn, org_id).await?;
+            je_org.insert(org_id, g);
+        }
+        if is_gegenueber_zustaendig(richtung, &fuehrer, gegenueber_kennung, &je_org[&org_id]) {
             kennungen.push(kennung);
         }
     }
@@ -206,19 +205,28 @@ pub async fn list_ohne_spiegel(
 }
 
 /// Ob das Gegenüber einer Kopplung über das Ende einer Akte ohne Spiegel entscheidet, die
-/// `fuehrer` führt (LLH-1699, D2, D3). Gefragt und geglaubt wird immer der Führer der Akte selbst.
-/// Darüber hinaus glaubt nur die meldende Seite ihrer erreichten auch für Akten Dritter, die
-/// diese weiterreicht, und nur, solange die Org an keinem zweiten Hub hängt (`hubs` aus
-/// [`list_hubs`]): Sonst nähme ein Hub ihr eine Akte, die sie über den anderen weiter erreicht,
-/// etwa nach dessen Widerruf gegen den Führer. Die erreichte Seite glaubt einer meldenden nie für
-/// die Akte einer anderen.
-pub fn ist_frage_an_gegenueber(
+/// `fuehrer` führt (LLH-1699, D2, D3); `gegenueber_der_org` aus [`list_gegenueber`]. Gefragt und
+/// geglaubt wird immer der Führer der Akte selbst. Darüber hinaus glaubt nur die meldende Seite
+/// ihrer erreichten auch für Akten Dritter, die diese weiterreicht, und nur, solange sie den
+/// Einsatz auf keinem anderen Weg erreicht: Die Org hängt an keinem zweiten Hub, und der Führer
+/// ist nicht selbst ein Gegenüber der Org. Sonst nähme ihr ein Hub mit seinem Vermerk (etwa nach
+/// seinem Widerruf gegen den Führer) eine Akte, die sie weiter erreicht. Die erreichte Seite glaubt
+/// einer meldenden nie für die Akte einer anderen.
+pub fn is_gegenueber_zustaendig(
     richtung: InstanzKopplungRichtung,
     fuehrer: &str,
     gegenueber_kennung: &str,
-    hubs: usize,
+    gegenueber_der_org: &[FuehrungGegenueber],
 ) -> bool {
-    fuehrer == gegenueber_kennung || (richtung == InstanzKopplungRichtung::MeldetSich && hubs <= 1)
+    if fuehrer == gegenueber_kennung {
+        return true;
+    }
+    let hubs = gegenueber_der_org
+        .iter()
+        .filter(|g| g.richtung == InstanzKopplungRichtung::MeldetSich)
+        .count();
+    let fuehrer_gekoppelt = gegenueber_der_org.iter().any(|g| g.kennung == fuehrer);
+    richtung == InstanzKopplungRichtung::MeldetSich && hubs <= 1 && !fuehrer_gekoppelt
 }
 
 /// Löscht eine Akte ohne lokalen Einsatz samt Verlauf (Kaskade) und vermerkt ihr Ende
@@ -1314,17 +1322,67 @@ pub(crate) mod tests {
         );
     }
 
+    fn gegenueber(kennung: &str, richtung: InstanzKopplungRichtung) -> FuehrungGegenueber {
+        FuehrungGegenueber {
+            kopplung_id: 0,
+            kennung: kennung.into(),
+            name: kennung.into(),
+            richtung,
+            org_schluessel: String::new(),
+        }
+    }
+
     #[test]
     fn ueber_das_ende_einer_akte_entscheidet_ihr_fuehrer_oder_der_einzige_hub() {
         use InstanzKopplungRichtung::{MeldetSich, WirdGemeldet};
+        let ein_hub = [gegenueber("hub", MeldetSich)];
+        let zwei_hubs = [
+            gegenueber("hub", MeldetSich),
+            gegenueber("hub2", MeldetSich),
+        ];
+        let elw = [
+            gegenueber("elw1", WirdGemeldet),
+            gegenueber("elw2", WirdGemeldet),
+        ];
         // Der Führer selbst, in jeder Richtung und bei jeder Zahl von Hubs.
-        assert!(ist_frage_an_gegenueber(WirdGemeldet, "elw1", "elw1", 0));
-        assert!(ist_frage_an_gegenueber(MeldetSich, "hub", "hub", 2));
+        assert!(is_gegenueber_zustaendig(WirdGemeldet, "elw1", "elw1", &elw));
+        assert!(is_gegenueber_zustaendig(
+            MeldetSich, "hub", "hub", &zwei_hubs
+        ));
         // Akte eines Dritten: nur die meldende Seite, nur mit einem Hub.
-        assert!(ist_frage_an_gegenueber(MeldetSich, "elw2", "hub", 1));
-        assert!(!ist_frage_an_gegenueber(MeldetSich, "elw2", "hub", 2));
-        assert!(!ist_frage_an_gegenueber(WirdGemeldet, "elw2", "elw1", 0));
-        assert!(!ist_frage_an_gegenueber(WirdGemeldet, "elw2", "elw1", 1));
+        assert!(is_gegenueber_zustaendig(
+            MeldetSich, "elw2", "hub", &ein_hub
+        ));
+        assert!(!is_gegenueber_zustaendig(
+            MeldetSich, "elw2", "hub", &zwei_hubs
+        ));
+        assert!(!is_gegenueber_zustaendig(
+            WirdGemeldet,
+            "elw2",
+            "elw1",
+            &elw
+        ));
+        // Der Führer ist selbst ein Gegenüber der Org (diese Instanz meldet sich beim Hub und wird
+        // von ihm erreicht): Über seine Akte entscheidet nur er, nicht der Hub.
+        let hub_und_fuehrer = [gegenueber("hub", MeldetSich), gegenueber("x", WirdGemeldet)];
+        assert!(!is_gegenueber_zustaendig(
+            MeldetSich,
+            "x",
+            "hub",
+            &hub_und_fuehrer
+        ));
+        assert!(is_gegenueber_zustaendig(
+            WirdGemeldet,
+            "x",
+            "x",
+            &hub_und_fuehrer
+        ));
+        assert!(is_gegenueber_zustaendig(
+            MeldetSich,
+            "elw9",
+            "hub",
+            &hub_und_fuehrer
+        ));
     }
 
     #[tokio::test]

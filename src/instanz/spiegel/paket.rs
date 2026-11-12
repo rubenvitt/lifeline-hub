@@ -27,10 +27,10 @@ pub const ANTRAG_DATEN_MAX: usize = 64 * 1024;
 /// Höchstens so viele Bytes Anträge je Paket; sie gehen vor den Lieferungen vom Budget ab.
 pub const ANTRAEGE_BYTES_MAX: usize = 512 * 1024;
 /// Größte einzelne Zeile samt Bezügen, die ein Paket trägt (LLH-1630): so viel bleibt dem ersten
-/// Einsatz eines Pakets immer, auch neben Anträgen bis [`ANTRAEGE_BYTES_MAX`]. Größere gehen als
-/// [`Zeile::zu_gross`], damit kein Paket über [`SPIEGEL_MAX`] wächst und den Abgleich der ganzen
-/// Kopplung anhält.
-pub const ZEILE_MAX: usize = SPIEGEL_MAX - RESERVE - ANTRAEGE_BYTES_MAX;
+/// Einsatz eines Pakets immer, auch neben Anträgen bis [`ANTRAEGE_BYTES_MAX`] und genannten Akten
+/// bis [`AKTEN_BYTES_MAX`]. Größere gehen als [`Zeile::zu_gross`], damit kein Paket über
+/// [`SPIEGEL_MAX`] wächst und den Abgleich der ganzen Kopplung anhält.
+pub const ZEILE_MAX: usize = SPIEGEL_MAX - RESERVE - ANTRAEGE_BYTES_MAX - AKTEN_BYTES_MAX;
 /// Höchstzahl Anhang-Abrufe und -Stücke je Paket.
 pub const ANHAENGE_MAX: usize = 64;
 /// Größe eines Anhang-Stücks (D8).
@@ -39,9 +39,24 @@ pub const TEIL_GROESSE: usize = 256 * 1024;
 pub const BRUCH_MAX: usize = 1000;
 /// Höchstlänge einer genannten Aktenkennung in Byte. Eine echte Kennung
 /// (`<Instanzkennung>/<ID>-<Zufall>`) braucht etwa 55; in der Meldung dürfte eine Akte bis 500
-/// Zeichen tragen (`fuehrung::austausch`), und 256 solcher Kennungen einer fehlerhaften Instanz
-/// sprengten das Paket jeder anderen. Längere nennt `fuehrung::repo::list_ohne_spiegel` nicht.
+/// beliebige Zeichen tragen (`fuehrung::austausch`), und 256 solcher Kennungen einer fehlerhaften
+/// Instanz sprengten das Paket jeder anderen. Was [`is_kennung_nennbar`] nicht besteht, nennt
+/// `fuehrung::repo::list_ohne_spiegel` nicht.
 pub const KENNUNG_BYTES_MAX: usize = 200;
+/// Höchstens so viele Bytes belegen die genannten Akten in einem Paket (JSON: Kennung,
+/// Anführungszeichen, Komma). Sie gehen wie die Anträge vom Budget der Zeilen ab.
+pub const AKTEN_BYTES_MAX: usize = EINSAETZE_MAX * (KENNUNG_BYTES_MAX + 3);
+
+/// Ob eine Aktenkennung genannt werden darf: höchstens [`KENNUNG_BYTES_MAX`] Byte und nur
+/// druckbares ASCII ohne `"` und `\`. So belegt sie im JSON des Pakets genau ihre Länge; ein
+/// Steuerzeichen belegte dort sechs Byte und unterliefe [`AKTEN_BYTES_MAX`]. Echte Kennungen
+/// (UUID, `/`, Ziffern, `-`, Hex) bestehen das immer.
+pub fn is_kennung_nennbar(kennung: &str) -> bool {
+    kennung.len() <= KENNUNG_BYTES_MAX
+        && kennung
+            .bytes()
+            .all(|b| b.is_ascii_graphic() && b != b'"' && b != b'\\')
+}
 
 /// Anfrage und Antwort des Abgleichs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -345,8 +360,10 @@ impl SpiegelPaket {
         if self.akten.len() > EINSAETZE_MAX {
             return Err(format!("mehr als {EINSAETZE_MAX} Akten im Paket"));
         }
-        if self.akten.iter().any(|k| k.len() > KENNUNG_BYTES_MAX) {
-            return Err(format!("Kennung einer Akte über {KENNUNG_BYTES_MAX} Byte"));
+        if self.akten.iter().any(|k| !is_kennung_nennbar(k)) {
+            return Err(format!(
+                "Kennung einer Akte über {KENNUNG_BYTES_MAX} Byte oder nicht druckbares ASCII"
+            ));
         }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
@@ -465,9 +482,35 @@ mod tests {
         assert!(p.check().is_ok());
         p.akten = vec!["k".repeat(KENNUNG_BYTES_MAX + 1)];
         assert!(p.check().is_err(), "Kennung zu lang");
-        // Gezählt werden Byte, nicht Zeichen: „ä“ belegt zwei.
-        p.akten = vec!["ä".repeat(KENNUNG_BYTES_MAX / 2 + 1)];
-        assert!(p.check().is_err(), "Kennung in Byte zu lang");
+        // Nur druckbares ASCII ohne Anführungszeichen und Rückstrich: Alles andere belegte im
+        // JSON mehr als seine Länge (ein Steuerzeichen sechs Byte).
+        for k in ["hub/ä", "hub/\u{1}", "hub/a b", "hub/\"", "hub/\\"] {
+            p.akten = vec![k.to_string()];
+            assert!(p.check().is_err(), "{k:?}");
+        }
+        p.akten = vec!["3f2a9c1e-0000-4000-8000-123456789abc/42-ab12cd34".into()];
+        assert!(p.check().is_ok());
+    }
+
+    /// Eine nennbare Kennung belegt im Paket genau ihre Länge plus Anführungszeichen und Komma:
+    /// Darauf rechnen `AKTEN_BYTES_MAX` und das Budget in `abgleich`.
+    #[test]
+    fn nennbare_kennungen_belegen_im_json_hoechstens_das_berechnete() {
+        let voll = vec!["!".repeat(KENNUNG_BYTES_MAX); EINSAETZE_MAX];
+        assert!(voll.iter().all(|k| is_kennung_nennbar(k)));
+        let json = serde_json::to_vec(&voll).unwrap();
+        assert!(json.len() <= AKTEN_BYTES_MAX + 2, "{}", json.len());
+        // Jedes druckbare ASCII-Zeichen außer `"` und `\` steht im JSON unverändert.
+        let alle: String = (0x21u8..0x7f)
+            .filter(|b| *b != b'"' && *b != b'\\')
+            .map(char::from)
+            .collect();
+        assert!(is_kennung_nennbar(&alle));
+        assert_eq!(
+            serde_json::to_string(&alle).unwrap().len(),
+            alle.len() + 2,
+            "keine Maskierung"
+        );
     }
 
     #[test]

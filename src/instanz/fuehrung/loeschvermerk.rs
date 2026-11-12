@@ -1,13 +1,17 @@
 //! Löschvermerk je Einsatzkennung (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`,
 //! design.md D4; `migrations/0336_fuehrung_loeschvermerk.sql`).
 //!
-//! Der Vermerk hält fest, dass der Einsatz einer Kennung über diese Instanz nicht mehr zu haben
-//! ist. Er entsteht in der Transaktion, die den Anlass festschreibt:
+//! Der Vermerk hält fest, dass der Einsatz einer Kennung zu Ende ist: Über diese Instanz ist er
+//! nicht mehr zu haben. Er entsteht in der Transaktion, die den Anlass festschreibt:
 //!
-//! - ein Einsatz mit Kennung wird endgültig gelöscht oder abgeräumt ([`vermerken_einsatz`] aus
-//!   `einsatz::skelett_loeschung` und `einsatz::abraeumen`),
+//! - ein Einsatz mit Kennung wird endgültig gelöscht (`einsatz::skelett_loeschung`) oder nach der
+//!   Verwahrung abgeräumt (`einsatz::abraeumen`), oder der Führer meldet einen Spiegel gelöscht
+//!   (`spiegel::lebensende::geloescht_uebernehmen`): je über [`vermerken_einsatz`];
 //! - eine Akte ohne Spiegel wird auf ein Löschsignal hin oder beim Widerruf gelöscht
-//!   ([`vermerken`]).
+//!   (`fuehrung::repo::delete_ohne_spiegel` über [`vermerken`]).
+//!
+//! Kein Vermerk entsteht, wenn die meldende Seite einen Spiegel nach der Nachbereitung abräumt:
+//! Der Einsatz lebt beim Führer weiter.
 //!
 //! Mit ihm belegt eine Instanz das Lebensende `geloescht` für eine Akte, die das Gegenüber ohne
 //! Spiegel hält, auch für Kennungen mit fremdem Präfix ([`belegte`]). Ohne Vermerk meldet sie

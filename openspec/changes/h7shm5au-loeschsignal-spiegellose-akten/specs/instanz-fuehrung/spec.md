@@ -5,8 +5,8 @@
 ### Requirement: Eine Akte ohne Spiegel endet mit dem Einsatz beim Gegenüber
 
 Hält eine Instanz bei eingeschaltetem Schalter eine Führungsakte ohne lokalen Einsatz, SHALL sie
-deren Kennung beim Abgleich jedem Gegenüber nennen, über das die Akte gekommen sein kann. Meldet
-das Gegenüber den Einsatz als gelöscht, MUST die Instanz die Akte samt Verlauf löschen; sie
+deren Kennung beim Abgleich dem Gegenüber nennen, das über ihr Ende entscheidet. Meldet
+dieses Gegenüber den Einsatz als gelöscht, MUST die Instanz die Akte samt Verlauf löschen; sie
 erscheint danach nicht mehr unter „Einsätze beim Gegenüber“. Ein Gegenüber, das die Nennung nicht
 kennt, MUST weiter abgleichen können; die Akte bleibt dann stehen.
 
@@ -21,6 +21,10 @@ kennt, MUST weiter abgleichen können; die Akte bleibt dann stehen.
 #### Scenario: Der Einsatz besteht weiter
 - **WHEN** der ELW eine Akte ohne Spiegel nennt und der Hub den Einsatz noch hält
 - **THEN** bleibt die Akte am ELW stehen
+
+#### Scenario: Kennung außerhalb der Grenzen
+- **WHEN** eine Akte ohne Spiegel eine Kennung über 200 Byte oder mit anderen Zeichen als druckbarem ASCII trägt
+- **THEN** nennt die Instanz sie nicht, und der Abgleich läuft ungestört weiter
 
 #### Scenario: Älteres Gegenüber
 - **WHEN** das Gegenüber die Nennung von Akten ohne Spiegel nicht kennt
@@ -62,8 +66,9 @@ sie nicht kennt, MUST sie übergehen.
 
 Die erreichte Seite MUST die Meldung einer meldenden Seite, ein Einsatz sei gelöscht, nur für
 eine Akte ohne Spiegel annehmen, die diese meldende Seite als Führer nennt, und SHALL ihr nur
-solche Akten nennen. Die meldende Seite SHALL die Meldung der erreichten für jede Akte ohne
-Spiegel einer Org annehmen, die dieser Kopplung zugeordnet ist.
+solche Akten nennen. Die meldende Seite SHALL die Meldung ihrer einzigen erreichten Seite auch
+für Akten annehmen, die eine dritte Instanz führt, sofern die Org der Akte dieser Kopplung
+zugeordnet ist.
 
 #### Scenario: Ein ELW meldet den Einsatz eines anderen
 - **WHEN** der Hub eine Akte ohne Spiegel hält, die „ELW 1“ als Führer nennt, und „ELW 2“ deren Kennung als gelöscht meldet
@@ -75,14 +80,19 @@ Spiegel einer Org annehmen, die dieser Kopplung zugeordnet ist.
 
 ### Requirement: An mehreren erreichten Seiten entscheidet nur der Führer der Akte
 
-Hängt die Org einer meldenden Seite an mehr als einer erreichten Seite, MUST die meldende Seite
-die Meldung, ein Einsatz sei gelöscht, nur für Akten ohne Spiegel annehmen, die die meldende
-erreichte Seite selbst führt, und SHALL ihr nur solche nennen. Akten, die eine dritte Instanz
-führt, bleiben dann stehen.
+Erreicht eine meldende Seite den Einsatz einer Akte auf mehr als einem Weg, weil ihre Org an
+mehr als einer erreichten Seite hängt oder weil der Führer der Akte selbst ihr Gegenüber ist,
+MUST sie die Meldung, der Einsatz sei gelöscht, nur vom Führer der Akte annehmen und SHALL die
+Akte nur ihm nennen. Akten, die eine dritte Instanz führt, bleiben an zwei erreichten Seiten
+stehen.
 
 #### Scenario: ELW an zwei Hubs
 - **WHEN** die Org eines ELW an „Hub A“ und „Hub B“ hängt, der ELW die Akte eines Einsatzes hält, den eine andere ELW führt, und „Hub B“ ihn als gelöscht meldet
 - **THEN** bleibt die Akte am ELW stehen
+
+#### Scenario: Der Führer ist selbst gekoppelt
+- **WHEN** eine Instanz sich bei „Hub A“ meldet, zugleich von „ELW X“ erreicht wird, die Akte eines Einsatzes hält, den „ELW X“ führt, und „Hub A“ ihn als gelöscht meldet
+- **THEN** bleibt die Akte stehen, bis „ELW X“ selbst den Einsatz als gelöscht meldet
 
 #### Scenario: Der Hub löscht seinen eigenen Einsatz
 - **WHEN** die Org eines ELW an „Hub A“ und „Hub B“ hängt und „Hub B“ einen Einsatz endgültig löscht, den er selbst führte und den der ELW nur als Akte kennt

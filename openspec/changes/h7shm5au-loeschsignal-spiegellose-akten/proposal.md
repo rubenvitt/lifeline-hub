@@ -40,6 +40,9 @@ Nicht Teil der Change:
   selbst führt: Akten Dritter bleiben dort stehen, auch nach einer Löschung beim Führer oder
   einem Widerruf am Hub. Über welche Kopplung eine Akte kam, ist nicht gespeichert, und sonst
   nähme ihr ein Hub eine Akte, die sie über den anderen weiter erreicht (Review vor dem PR).
+- In einer Kette (X meldet sich bei M, M bei H) verliert X die Akte eines Einsatzes von H nicht,
+  wenn M seinen Spiegel nach der Nachbereitung abgeräumt hat und H den Einsatz erst danach
+  löscht: M hält dann weder Spiegel noch Akte und erfährt das Ende nicht mehr.
 - Die Bedienung „Einsätze beim Gegenüber“ findet eine gewählte Akte nur über ihre ID wieder, die
   SQLite nach dem Löschen neu vergibt (LLH-1862, Frontend).
 

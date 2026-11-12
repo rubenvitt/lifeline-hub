@@ -44,7 +44,7 @@ Beobachtet am Stand `3d74eba3`:
 **Non-Goals:**
 
 - Der Weg über die Stände (`geloeschte(staende)`, `geloescht_uebernehmen` für Spiegel) ändert
-  sich nicht. Ein gespiegelter Einsatz mit fremdem Präfix bleibt LLH-1852: Dort räumt die Annahme
+  sein Verhalten nicht; `geloescht_uebernehmen` hält zusätzlich das Ende fest (D4). Ein gespiegelter Einsatz mit fremdem Präfix bleibt LLH-1852: Dort räumt die Annahme
   einen ganzen Spiegel unumkehrbar ab.
 - Keine gespeicherte Herkunft der Akte (über welche Kopplung sie kam). Der Restfall „ELW an zwei
   Hubs, Akten Dritter über den widerrufenen Hub“ bleibt (proposal.md).
@@ -95,12 +95,12 @@ Org-Zuordnungen der Kopplung, nur `einsatz_id IS NULL`:
 
 Die Abfrage steht in `fuehrung::repo` (`list_ohne_spiegel`), der Abgleich ruft sie an den beiden
 Stellen, an denen er heute `eigene_staende` baut. Wem genannt wird und von wem angenommen wird
-(D3), sagt eine Funktion für beides: `fuehrung::repo::ist_frage_an_gegenueber`.
+(D3), sagt eine Funktion für beides: `fuehrung::repo::is_gegenueber_zustaendig`.
 
 ### D3 Wer was annimmt
 
-`lebensende::geloescht_uebernehmen` bleibt unverändert (Präfix des Gegenübers, Spiegel dieser
-Kopplung → `abraeumen::vormerken`). Daneben, nur bei eingeschaltetem Schalter, eine eigene
+`lebensende::geloescht_uebernehmen` entscheidet wie bisher (Präfix des Gegenübers, Spiegel dieser
+Kopplung → `abraeumen::vormerken`) und schreibt dabei den Vermerk (D4). Daneben, nur bei eingeschaltetem Schalter, eine eigene
 Funktion für Akten (`lebensende::geloeschte_akten_uebernehmen`):
 
 Die Akte mit der Kennung wird gelöscht, wenn sie keinen lokalen Einsatz hat, ihre Org dieser
@@ -141,7 +141,7 @@ festschreibt (`INSERT … ON CONFLICT (kennung) DO UPDATE`):
 Die beiden letzten löschen über `fuehrung::repo::delete_ohne_spiegel`, das den Vermerk schreibt:
 Eine Akte ohne Einsatz verschwindet auf keinem anderen Weg.
 
-Die beiden ersten lesen Kennung und Org vom Einsatz (`einsatz.kennung`, beim Spiegel die Kennung
+Die drei ersten lesen Kennung und Org vom Einsatz (`einsatz.kennung`, beim Spiegel die Kennung
 des Führers); ohne Kennung entsteht kein Vermerk (nie geliefert, keine Akte, Demo-Einsatz).
 
 **Beleg** (`lebensende::geloeschte_akten`): Eine genannte Kennung gilt als gelöscht, wenn hier
@@ -149,8 +149,9 @@ weder ein Einsatz noch eine Akte mit ihr steht und
 
 - ein Vermerk mit ihr steht, dessen Org dieser Kopplung aktiv zugeordnet ist
   (`loeschvermerk::belegte`, eine Abfrage über die genannte Liste per `json_each`), oder
-- `lebensende::ist_geloescht` sie belegt (eigenes Präfix, ID im Löschprotokoll): der Bestand von
-  vor dieser Change, je Kennung mit eigenem Präfix geprüft.
+- `lebensende::is_altbestand_geloescht` sie belegt (eigenes Präfix, ID im Löschprotokoll einer
+  der Kopplung zugeordneten Org, Art nicht `spiegel`): der Bestand von vor dieser Change, je
+  Kennung mit eigenem Präfix geprüft.
 
 „Keine Akte hier“ macht einen alten Vermerk wirkungslos, sobald die Akte wieder kommt (neue
 Zuordnung, neuer Stand beim Führer). Vermerke werden deshalb nie gelöscht; sie sind so klein und
@@ -170,7 +171,7 @@ aber eine Akte, die ohne Einsatz gelöscht wird (`einsatz_id` ist dort Pflicht u
 Weitergabe über den Hub bräuchte dann doch eine zweite Ablage.
 
 **Verworfen: Vermerk per Trigger an `einsatz_fuehrung`.** Er feuerte auch bei der Kaskade einer
-gelöschten Org und beim Neubau der Tabelle in einer Migration; die vier Stellen oben sind
+gelöschten Org und beim Neubau der Tabelle in einer Migration; die fünf Stellen oben sind
 ausdrücklich und prüfbar.
 
 ### D5 Widerruf
@@ -206,6 +207,12 @@ Glossar (12) nennen Ablauf und Begriff.
   sprengten überlange Kennungen einer fehlerhaften Instanz, vom Hub weitergereicht, das Paket
   jeder anderen ELW.
 - **Vermerk nur am Ende eines Einsatzes (D4):** siehe dort.
+- **Nachprüfung der Behebung:** Kennungen werden nur genannt, wenn sie druckbares ASCII sind
+  (`paket::is_kennung_nennbar`): Ein Steuerzeichen belegt im JSON sechs Byte und unterliefe die
+  Rechnung. `paket::ZEILE_MAX` sinkt um `AKTEN_BYTES_MAX`, damit dem ersten Einsatz eines Pakets
+  weiter eine ganze Zeile bleibt; beide Budget-Stellen rechnen über `budget_fuer_zeilen`. Der
+  Führer entscheidet auch dann allein, wenn er selbst ein Gegenüber der Org ist (eine Instanz,
+  die sich bei einem Hub meldet und von einer ELW erreicht wird). Restfall Kette: proposal.md.
 - **Schalter (D5):** Der Widerruf löscht unabhängig vom Schalter, wie er schon bisher die Führung
   zurückholt; das Szenario „Schalter aus“ der Spec meint Nennen und Annehmen im Abgleich.
 

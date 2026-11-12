@@ -31,9 +31,11 @@ herleitung:
   fragenden Kopplung zugeordnet ist und sie weder Einsatz noch Akte mit der Kennung hält
   (`lebensende::geloeschte_akten`).
 - MUST NOT: Eine unbekannte Kennung gilt als gelöscht.
-- MUST: Nennen und Annehmen folgen derselben Regel (`fuehrung::repo::ist_frage_an_gegenueber`):
+- MUST: Nennen und Annehmen folgen derselben Regel (`fuehrung::repo::is_gegenueber_zustaendig`):
   Über das Ende einer Akte entscheidet ihr Führer; die meldende Seite glaubt darüber hinaus nur
-  ihrem einzigen Hub.
+  ihrem einzigen Hub, und nur für Akten, deren Führer nicht selbst ihr Gegenüber ist.
+- MUST: Genannt wird nur eine Kennung, die `paket::is_kennung_nennbar` besteht; die genannten
+  Akten gehen vom Budget der Zeilen ab.
 - MUST NOT: Akten ohne Spiegel reisen als Stand mit Platzhalter in `staende`.
 
 ## Prüfung
@@ -44,7 +46,8 @@ verlange 'loeschvermerk::vermerken_einsatz\(' src/einsatz/skelett_loeschung.rs
 verlange 'loeschvermerk::vermerken_einsatz\(' src/instanz/spiegel/lebensende.rs
 verlange 'fn geloeschte_akten\(' src/instanz/spiegel/lebensende.rs
 verlange 'fn geloeschte_akten_uebernehmen\(' src/instanz/spiegel/lebensende.rs
-verlange 'ist_frage_an_gegenueber\(' src/instanz/spiegel/lebensende.rs
+verlange 'is_gegenueber_zustaendig\(' src/instanz/spiegel/lebensende.rs
+verlange 'is_kennung_nennbar\(' src/instanz/fuehrung/repo.rs
 verlange 'fn delete_ohne_spiegel\(' src/instanz/fuehrung/repo.rs
 verbiete 'DELETE FROM einsatz_fuehrung ' 'src/**' ':(exclude)src/instanz/fuehrung/repo.rs'
 ```
