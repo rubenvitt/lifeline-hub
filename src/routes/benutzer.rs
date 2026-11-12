@@ -211,7 +211,9 @@ pub async fn anlegen(
 /// Das Zielkonto einer Admin-Route unter `/api/benutzer/{id}…`: eine Person der Organisation des
 /// Admins (LFH-1123). Ein Konto einer fremden Organisation ist 404 wie ein unbekanntes, sonst
 /// sähe und änderte der Admin einer Org die Konten aller anderen. Ein Gerätekonto (LFH-892)
-/// verwaltet die Einsatzleitung über seine Kopplung, nicht der Admin: auch 404. Geteilt mit den
+/// verwaltet die Einsatzleitung über seine Kopplung, nicht der Admin: auch 404. Ebenso ein
+/// Stellvertreter eines Spiegels oder ein Platzhalter eines eingespielten Archivs
+/// (`spiegel::OHNE_STELLVERTRETER`): sie sind keine Personen dieser Instanz. Geteilt mit den
 /// Sitzungsrouten (`routes::sitzung`, LFH-1092).
 pub(crate) async fn ziel_laden(
     pool: &sqlx::SqlitePool,
@@ -219,8 +221,11 @@ pub(crate) async fn ziel_laden(
     id: i64,
 ) -> Result<crate::auth::Benutzer, AppError> {
     let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE id = ? AND org_id = ?",
+        sqlx::AssertSqlSafe(format!(
+            "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
+             FROM benutzer b WHERE id = ? AND org_id = ? AND {}",
+            crate::instanz::spiegel::OHNE_STELLVERTRETER
+        )),
     )
     .bind(id)
     .bind(admin.org_id)
