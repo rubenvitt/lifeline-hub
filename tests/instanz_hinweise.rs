@@ -596,26 +596,48 @@ async fn erledigt_wartet_auf_die_zeile_wie_der_hinweis() {
     assert!(am_hub[0].4, "quittiert");
 }
 
-/// Die Kenntnisnahme reist auch, wenn am ELW keine offene Zeile mehr steht.
+/// Die Kenntnisnahme reist auch, wenn am ELW keine offene Zeile mehr steht, aber nur mit
+/// Meldungen dieses Einsatzes, die wirklich gesehen sind: eine fremde Kennung hielte das Erledigt
+/// am Hub 12 Stunden fest.
 #[tokio::test]
-async fn die_kenntnisnahme_reist_ohne_eigene_offene_zeile() {
+async fn die_kenntnisnahme_reist_nur_mit_gesehenen_meldungen_des_einsatzes() {
     let w = welt(false, false).await;
-    lifeline_hub::meldung::benachrichtigung::lage_gesehen(
-        &w.elw.i.pool,
-        &w.elw.live,
-        w.einsatz,
-        &[4711],
+    let (s, lm) = common::anfrage_json(
+        &w.elw.i.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen", w.einsatz),
+        &w.elw.i.admin,
+        Some(&json!({
+            "absender": "Florian Nord 1", "meldeweg": "funk", "meldungsart": "lagemeldung",
+            "prioritaet": "dringend", "inhalt": "Brand unter Kontrolle",
+            "ereigniszeit": "2026-06-12 09:00:00", "lat": 51.4, "lon": 10.4
+        })),
     )
     .await;
+    assert_eq!(s, StatusCode::CREATED, "{lm}");
+    let mid = lm["id"].as_i64().unwrap();
+    abgleichen(&w.elw.i).await;
+    assert_eq!(ausgang(&w.elw.i).await, 0);
+    let (s, v) = common::anfrage_json(
+        &w.elw.i.app,
+        "POST",
+        &format!("/api/einsaetze/{}/lage/gesehen", w.einsatz),
+        &w.elw.i.admin,
+        Some(&json!({ "meldung_ids": [mid, 99_999] })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
     let daten: String = eine(
         &w.elw.i.pool,
-        "SELECT daten FROM hinweis_ausgang ORDER BY id DESC LIMIT 1",
+        "SELECT daten FROM hinweis_ausgang WHERE daten LIKE '%\"erledigen\":true%' \
+         ORDER BY id DESC LIMIT 1",
     )
     .await;
     let v: Value = serde_json::from_str(&daten).unwrap();
-    assert_eq!(v["erledigen"], true);
     assert_eq!(v["bezug_typ"], "lage_uebernahme");
-    assert_eq!(v["bezug_ids"], json!([4711]));
+    assert_eq!(v["bezug_ids"], json!([mid]), "nur die gesehene Meldung");
+    abgleichen(&w.elw.i).await;
+    assert_eq!(ausgang(&w.elw.i).await, 0, "am Hub angenommen");
 }
 
 /// Scheitert das Vormerken, pusht der ELW selbst: nichts geht still verloren.
