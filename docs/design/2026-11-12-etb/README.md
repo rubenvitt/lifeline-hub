@@ -9,8 +9,8 @@ Bild, Absender und Empfänger in 10 px grauer Mono-Schrift; Ereigniszeit und Mel
 **Stand dieses Ordners:** die Zeichenflächen des Canvas
 https://claude.ai/artifact/DfUn2roXXXbt3mL4wuExU8 (Artifact-Typ „Design“, Design System „Lifeline
 Hub“). Die Schriften laden die Dateien aus `ds/lifeline-hub/` des Canvas; im Repo liegen sie nicht,
-die Flächen fallen hier auf die Systemschrift zurück. **Vorschlag, noch nicht entschieden und nicht
-umgesetzt.**
+die Flächen fallen hier auf die Systemschrift zurück. **Von Ruben am 12.11.2026 freigegeben („passt
+gut so“), noch nicht umgesetzt.**
 
 | Datei                            | Zeichenfläche                                          | Dichte      |
 | -------------------------------- | ------------------------------------------------------ | ----------- |
@@ -50,21 +50,26 @@ umgesetzt.**
     eingeklappt eine Zeile; geöffnet stehen Typ, Zeit und Weg, Von, An, Inhalt und „Erfassen“
     über der Tastatur.
 
-## Zu entscheiden (Ruben)
+## Entscheidungen (Ruben, 12.11.2026)
 
-- **Vorgabe nach Typ (Punkt 3)** ersetzt den Standard-Rufnamen für beide Seiten (LFH-894,
-  `etb/standardRufname.ts`). Der Standard-Rufname bleibt die „eigene Stelle“.
-- **Systemeinträge in der Vorgabe aus (Punkt 9)**: heute stehen sie gebündelt im Strom (LLH-1106).
-- **Bilanz-Paneel entfällt (Punkt 10)**: „Berichtigungen“ als Liste gäbe es dann nur noch über den
-  Typfilter.
-- **Entwurfsreiter erst ab dem zweiten Entwurf**, „Vorschau“ nur bei Formatierung im Text. Die
-  Kurzbefehle (`/typ`, `/zeit`, `@`) bleiben als Beschleuniger, sind aber nie der einzige Weg.
-- **Schriftgrößen** (Zeit 15, Inhalt 14, Von → An 13, Typ und Vermerk 12 px) liegen über der
-  heutigen Skala; sie hängen an der Entscheidung zu LLH-1773.
+Der Entwurf ist als Ganzes freigegeben; damit gelten die fünf Punkte, die offen waren:
+
+1. **Vorgabe nach Typ (Punkt 3)** ersetzt den Standard-Rufnamen für beide Seiten (LFH-894,
+   `etb/standardRufname.ts`). Der Standard-Rufname bleibt die „eigene Stelle“.
+2. **Systemeinträge sind in der Vorgabe aus (Punkt 9)**; die Bündelung (LLH-1106) gilt weiter,
+   sobald sie eingeblendet sind.
+3. **Das Bilanz-Paneel entfällt (Punkt 10)**; Berichtigungen findet man über den Typfilter.
+4. **Entwurfsreiter erst ab dem zweiten Entwurf**, „Vorschau“ nur bei Formatierung im Text. Die
+   Kurzbefehle (`/typ`, `/zeit`, `@`) bleiben als Beschleuniger, sind aber nie der einzige Weg.
+5. **„auch in den Meldungseingang“** ersetzt „Nur protokollieren“ (Punkt 6).
+
+Die Schriftgrößen (Zeit 15, Inhalt 14, Von → An 13, Typ und Vermerk 12 px) gelten für das ETB wie
+gezeichnet; die Skala der übrigen App entscheidet LLH-1773. Die Umsetzung braucht eine Change
+(Route `entwurf`), die die Regeln in `frontend/src/etb/AGENTS.md` und die Specs fortschreibt.
 
 ## Abweichungen von geltenden Regeln
 
-- **Meldungstext unter 50 % der Contentbreite.** Mit offenem Modulpanel bleiben für die Spalte
+- **Meldungstext unter 50 % der Contentbreite (mit dem Entwurf freigegeben).** Mit offenem Modulpanel bleiben für die Spalte
   „Inhalt“ rund 550 von 1124 px (49 %); `frontend/src/etb/AGENTS.md` verlangt ≥ 50 %
   (`e2e/etb-chronologie.spec.ts`). Grund: Von → An hat eine eigene Spalte.
 - **Das Textfeld füllt die Zeile (≥ 60 %)**, weil die Felder in einer eigenen Reihe darüber stehen;
