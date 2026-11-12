@@ -899,8 +899,8 @@ async fn bezug(
 
 /// Ein Bezug, der (noch) nicht gilt, ist ein Zustand: 422 (`src/AGENTS.md`,
 /// Statuscode-Konvention). Wartet er nur, trägt der Fehler [`BEZUG_WARTET`], woran die Kette ihn
-/// erkennt ([`wartet_auf_bezug`]).
-fn bezug_fehler(b: &Bezug) -> AppError {
+/// erkennt ([`is_bezug_wartet`]).
+fn bezug_error(b: &Bezug) -> AppError {
     AppError::UnprocessableEntity(
         match b {
             Bezug::Wartet => BEZUG_WARTET,
@@ -928,7 +928,7 @@ async fn pfad_der_zeile(
     let pid = match bezug(conn, einsatz_id, "einsatz_person", &person).await? {
         Bezug::Unberuehrt => person,
         Bezug::Neu(neu) => neu,
-        b => return Err(bezug_fehler(&b)),
+        b => return Err(bezug_error(&b)),
     };
     Ok(vec![("pid".to_string(), pid)])
 }
@@ -989,7 +989,7 @@ async fn body_der_zeile(
             Bezug::Fehlt if VERZICHTBAR.contains(&(tabelle, v.pfad)) => {
                 body.remove(v.pfad);
             }
-            f => return Err(bezug_fehler(&f)),
+            f => return Err(bezug_error(&f)),
         }
     }
     Ok(Value::Object(body))
@@ -1228,18 +1228,18 @@ async fn ohne_wartenden_bezug(
     let Some(b) = BEANTRAGBAR.iter().find(|b| b.art == art) else {
         return Ok(true);
     };
-    if wartet_auf_bezug(&pfad_der_zeile(conn, einsatz_id, art, &d).await) {
+    if is_bezug_wartet(&pfad_der_zeile(conn, einsatz_id, art, &d).await) {
         return Ok(false);
     }
-    Ok(!wartet_auf_bezug(
+    Ok(!is_bezug_wartet(
         &body_der_zeile(conn, einsatz_id, &z.art, b, &d).await,
     ))
 }
 
 /// Ob ein Stellen nur daran scheitert, dass ein Bezug noch nicht beim Führer ist
-/// ([`bezug_fehler`] und [`antrag::lege_an_tx`]): Die Kette wartet dann, statt den Eintrag mit
+/// ([`bezug_error`] und [`antrag::lege_an_tx`]): Die Kette wartet dann, statt den Eintrag mit
 /// Grund zu lösen.
-fn wartet_auf_bezug<T>(r: &Result<T, AppError>) -> bool {
+fn is_bezug_wartet<T>(r: &Result<T, AppError>) -> bool {
     matches!(r, Err(AppError::UnprocessableEntity(g)) if g == BEZUG_WARTET)
 }
 
@@ -1322,7 +1322,7 @@ async fn kette_des_einsatzes(pool: &SqlitePool, einsatz_id: i64) -> Result<bool,
                 "Niemand mehr, in dessen Namen der Eintrag ginge.".into(),
             )),
         };
-        if wartet_auf_bezug(&lauf) {
+        if is_bezug_wartet(&lauf) {
             continue;
         }
         let grund = match lauf {
