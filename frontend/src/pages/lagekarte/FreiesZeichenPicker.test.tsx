@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
-import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import { PALETTE, type AnySpec } from '@einsatzzeichen/schema';
 import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichenUpdate } from '../../api/types';

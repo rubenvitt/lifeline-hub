@@ -31,7 +31,7 @@ import {
   SPEC_FIELD_VALUES,
   SPEC_FORMAT_VERSION,
   parseAnySpec,
-} from '@einsatzzeichen/core';
+} from '@einsatzzeichen/core/exact';
 import { BODY_MARK_RENDITION_IDS, FREESTANDING_KINDS } from '@einsatzzeichen/schema';
 import { format, resolveConfig } from 'prettier';
 
