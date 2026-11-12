@@ -187,10 +187,12 @@ belegt). Die Art heißt `ohne-e2e`; das Muster der Marke erlaubt dafür Ziffern.
 
 `scripts/ci-messung.sh --von <zeit> --bis <zeit>` fragt über `gh api` die Läufe von `ci.yml` und
 `e2e.yml` mit Ereignis `pull_request` im Zeitraum ab und gibt je PR (Kopf-Branch) eine Zeile aus:
-Läufe, davon abgebrochen/rot/grün/laufend, gestartete Jobs (ohne `skipped`), Job-Minuten und,
-getrennt, Läufe ohne gestarteten Job (die übersprungene zweite Stufe an einem PR in Arbeit belegt
-keinen Runner und zählt nicht als Lauf). Dazu eine Summenzeile. Nur ein 404 lässt einen Workflow
-aus (vor der Zweiteilung gibt es `e2e.yml` nicht); jeder andere Abruffehler und eine von GitHub
+Läufe, davon abgebrochen/rot/grün/laufend, Jobs mit Runner (`runner_name`; die API setzt
+`started_at` auch für vor dem Start abgebrochene Jobs), Job-Minuten und, getrennt, fertige Läufe,
+deren Jobs alle keinen Runner hatten (die übersprungene zweite Stufe an einem PR in Arbeit zählt
+nicht als Lauf; ein Lauf ganz ohne Jobs, `startup_failure`, zählt nach seinem Abschluss). Dazu
+eine Summenzeile. Nur `e2e.yml` darf in der Vorgabe mit 404 fehlen (vor der Zweiteilung); jeder
+andere Abruffehler, ein ausdrücklich genannter fehlender Workflow und eine von GitHub
 abgeschnittene Liste (höchstens 1000 Läufe mit diesen Filtern) brechen mit Exit 2 ab. Die Messung vorher (proposal.md) entstand von Hand über dieselbe API; das Skript
 rechnet sie für den Vergleich nach. Selbsttest mit eingespielten API-Antworten.
 
@@ -250,6 +252,12 @@ Die Artefakte der e2e-Jobs (`lifeline-hub-debug`, `playwright-blob-k`, `e2e-lauf
   Push wie PR behandelt (erst nach einem zusätzlichen Fall „Push mit reinem Doku-Diff“ getötet).
   Stau-Wächter: Wartezeit umgedreht, Auto-Merge-Bedingung entfernt, Uhr ab Kopf entfernt,
   übersprungen zählt als gelaufen.
+- **Messung vorher, echte API (12.11.2026):** Ein Gegenprüfer des Reviews hat das Skript
+  (Stand vor der Runner-Korrektur) gegen das Repository laufen lassen, `--von 2026-11-11T10:17:00Z
+  --bis 2026-11-12T07:51:00Z --workflow ci.yml`: 100 Läufe aus 19 Branches, 60 abgebrochen, 7 rot,
+  27 grün, 6 hängen auf `queued`, 1240 Jobs, 19 132 Job-Minuten. Die Jobzahl enthält noch Jobs,
+  die vor dem Start abgebrochen wurden (85 in den letzten 300 Läufen); nach der Korrektur zählen
+  sie nicht mehr. Die Folgeaufgabe rechnet vorher und nachher mit dem endgültigen Skript.
 - **Folgeaufgabe Messung:** LLH-1695
   (https://zunder.rubeen.dev/#/aufgabe/l9tq50mmn1hmbha9u6o0fv9s), hängt an LLH-1662 und misst
   vorher und nachher mit `scripts/ci-messung.sh`.
