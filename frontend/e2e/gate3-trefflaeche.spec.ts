@@ -2115,8 +2115,6 @@ test('Fernmeldeskizze: Werkzeugleiste, Palette, Paneel, Lücken-Wahl und Umschal
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`, dichte);
-    // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
-    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     gemessen.push(await messeSkizze(page, soll, dichte, true));
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -2135,7 +2133,6 @@ test('Fernmeldeskizze (Beobachter): Werkzeugleiste, Paneel, Lücken-Wahl und Ums
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`, dichte);
-    await page.goto(`/einsaetze/${einsatzId}/fernmeldewesen?ansicht=skizze`);
     gemessen.push(await messeSkizze(page, soll, dichte, false));
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -2231,8 +2228,6 @@ test('Organigramm: Namen, Klappziele und Werkzeugknöpfe folgen der Dichte-Staff
       `/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`,
       dichte,
     );
-    // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
-    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
     gemessen.push(await messeOrganigramm(page, soll, dichte, true));
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -2255,7 +2250,6 @@ test('Organigramm (Beobachter): Namen, Klappziele und Drucken folgen der Staffel
       `/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`,
       dichte,
     );
-    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
     gemessen.push(await messeOrganigramm(page, soll, dichte, false));
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

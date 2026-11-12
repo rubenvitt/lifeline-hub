@@ -8,7 +8,6 @@ import {
 } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { kontoAnlegen } from './konto-anlegen';
-import { anmeldenPerApi } from './anmelde-kern';
 
 /*
  * LFH-387 — Sitzung über mehrere Tabs.
@@ -65,7 +64,11 @@ function apiBeobachter(page: Page) {
 }
 
 async function anmelden(page: Page, benutzername: string, passwort: string) {
-  await anmeldenPerApi(page, benutzername, passwort);
+  await page.goto('/login');
+  await page.getByLabel('Benutzername').fill(benutzername);
+  await page.getByLabel('Passwort').fill(passwort);
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze/);
 }
 
 /** Legt (als angemeldeter Admin des Kontexts) einen zweiten Benutzer an. */

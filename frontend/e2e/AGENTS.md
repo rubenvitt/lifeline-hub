@@ -15,6 +15,8 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   `anmelden`, `anmeldenAls`, `anmeldenAlsAdmin`, `wechsleZu…`. `{ startseite: false }`, wenn der
   nächste Schritt ohnehin ein `goto` ist. Das Formular füllen nur die Specs, die die Anmeldung
   selbst prüfen; Riegel `no-restricted-syntax` mit Ausnahmeliste in `frontend/eslint.config.js`.
+  Wer die Kanalmeldung an andere Tabs braucht (Konfliktdialog, LFH-387), meldet im zweiten Tab
+  über die Anmeldeseite an (`anmeldenImFormular`): die API-Anmeldung meldet nichts an andere Tabs.
   Einen Einsatz, dessen Dialog der Fall nicht prüft, legt `einsatzPerApi` aus `e2e/einsatz-kern.ts`
   an.
 - **Eine Ladung je Dichtestufe** (LLH-1665): `ladeInDichte(page, pfad, dichte)` aus

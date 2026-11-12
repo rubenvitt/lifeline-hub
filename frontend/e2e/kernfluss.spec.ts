@@ -1,12 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzPerApi } from './einsatz-kern';
-import { anmeldenPerApi } from './anmelde-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
-  await anmeldenPerApi(page, ADMIN, PW, optionen);
+async function anmelden(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel('Benutzername').fill(ADMIN);
+  await page.getByLabel('Passwort').fill(PW);
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze/);
 }
 
 // Smoke-Kernfluss: Login → Einsatz anlegen → ETB-Eintrag erfassen → derselbe Eintrag erscheint
@@ -19,15 +22,15 @@ test('Login → Einsatz → Eintrag live in zweitem Client', async ({ browser })
   const b = await ctxB.newPage();
 
   // A legt den Einsatz an und öffnet dessen ETB.
-  await anmelden(a, { startseite: false });
+  await anmelden(a);
   const name = `E2E Einsatz ${Date.now()}`;
-  const einsatzId = await einsatzPerApi(a, name);
+  const einsatzId = await einsatzAnlegen(a, name);
   await a.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(a.getByPlaceholder('Inhalt …')).toBeVisible();
 
   // B öffnet dasselbe ETB und wird erst interaktiv (Erfassungsfeld sichtbar), BEVOR A absendet:
   // sonst verpasste Bs noch nicht verbundene EventSource das Event (kein Refetch-Fallback).
-  await anmelden(b, { startseite: false });
+  await anmelden(b);
   await b.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(b.getByPlaceholder('Inhalt …')).toBeVisible();
 

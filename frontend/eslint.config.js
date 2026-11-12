@@ -44,6 +44,7 @@ const E2E_ANMELDEFORMULAR_ERLAUBT = [
   'e2e/browserspeicher-gesperrt.spec.ts',
   'e2e/einmalpasswort.spec.ts',
   'e2e/sitzung-mehrere-tabs.spec.ts',
+  'e2e/kernfluss.spec.ts', // Smoke des Kernflusses: Anmeldung, Einsatz über den Dialog, ETB live
   'e2e/doku-bilder/**/*.ts', // Bildlauf der Anwenderdoku, kein e2e-Lauf (LFH-1128)
 ];
 

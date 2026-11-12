@@ -607,8 +607,9 @@ const NUR_SCHREIBENDE = /nur Einsatzleitung und Führungspersonal$/;
  * DIE ROUTEN VON GATE 1 in sechs Durchgängen (LLH-1363). Alle in einem Test passten mit Trace bei
  * einer Wiederholung auf einem 2-vCPU-Runner nicht mehr ins Budget: ein echter Fund kam als
  * Zeitüberschreitung an. Gemessen mit Trace auf zwei Kernen kostet jede Route rund 13 s (`goto`
- * allein rund 10 s), Anmeldung und Saat rund 18 s; sechs Routen je Durchgang bleiben damit unter
- * der Hälfte des Budgets. Jeder Durchgang ist ein eigener Test mit eigenem Einsatz. Eine neue
+ * allein rund 10 s), Anmeldung und Saat rund 18 s (die Saat nur im ersten Test eines Workers,
+ * {@link gate1Vorbereiten}); sechs Routen je Durchgang bleiben damit unter der Hälfte des Budgets.
+ * Jeder Durchgang ist ein eigener Test. Eine neue
  * Route kommt in den Durchgang ihrer Familie, solange er höchstens sieben trägt, sonst in einen
  * neuen; zusammen messen die Durchgänge jede Route genau einmal je Breite und Rolle.
  */
@@ -1219,7 +1220,8 @@ async function gate1Messen(
  * Nur-Lese-ETB; die Org-Führungskraft die Verwaltung ohne Admin-Recht.
  *
  * `mode: 'parallel'` verteilt die Tests auf Worker (die Konfiguration fährt kein
- * `fullyParallel`). Sie sind unabhängig, jeder legt seinen eigenen Einsatz an.
+ * `fullyParallel`). Sie messen unabhängig voneinander; die Einsätze sät der erste Test eines
+ * Workers je Einsatzart, die übrigen lesen nur (LLH-1665, {@link gate1Vorbereiten}).
  */
 test.describe('Gate 1', () => {
   test.describe.configure({ mode: 'parallel' });

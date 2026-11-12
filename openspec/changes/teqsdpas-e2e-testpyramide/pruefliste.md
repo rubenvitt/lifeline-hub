@@ -54,7 +54,10 @@ Auf dem unveränderten Stand schlugen lokal schon fehl (Umgebung, nicht diese Ch
 - **Riegel:** `no-restricted-syntax` gegen `getByLabel('Benutzername').fill(…)` in `e2e/**`,
   Ausnahmeliste `E2E_ANMELDEFORMULAR_ERLAUBT` in `frontend/eslint.config.js`: `rollen-kern.ts`
   (`anmeldenImFormular`), `primaerknopf-kontrast`, `fokusring-kontrast`,
-  `browserspeicher-gesperrt`, `einmalpasswort`, `sitzung-mehrere-tabs`, `doku-bilder/**`.
+  `browserspeicher-gesperrt`, `einmalpasswort`, `sitzung-mehrere-tabs`, `kernfluss` (nach Review),
+  `doku-bilder/**`. Der Riegel fängt die übliche Form `X.getByLabel('Benutzername').fill(…)`, nicht
+  aber Regex-, Rollen- oder Platzhalter-Varianten und Locator in Variablen; er ist ein Riegel gegen
+  das gewohnte Muster, kein Beweis.
 - **Mutationsprobe Riegel:** Formular-Anmeldung in `gate1-ueberlauf.spec.ts` eingefügt → ESLint
   rot mit Hinweis auf `anmelde-kern.ts`; dieselbe Zeile in `fokusring-kontrast.spec.ts` grün.
 
@@ -138,3 +141,17 @@ Lokal läuft die Suite langsamer als in der CI (Auswahl 147 statt 107 min). Hoch
 die CI-Zeiten der Auswahl sind −23 % rund −25 min; die übrigen 228 CI-Minuten tragen die
 API-Anmeldung, die Einsätze ohne Dialog und die Anmeldung ohne Startseite (190 Dateien), sind
 lokal aber nicht gemessen. Die Akzeptanz misst der CI-Lauf des PRs.
+
+## 9. Code-Review (Aufgabe 8.3)
+
+Unabhängiger Prüfer über den Diff gegen `alpha` (12.11.2026), rund 326 geänderte Stellen per Skript
+bis zum nächsten `goto` verfolgt, über 40 Helfer von Hand.
+
+| Befund | Schwere | Erledigt |
+|---|---|---|
+| `sitzung-mehrere-tabs.spec.ts`: Fall (a) lebt von der Anmeldung im App-Code (Kanalmeldung `AuthContext.login`); die API-Anmeldung meldet nichts an andere Tabs | Fehler | Datei auf `alpha`-Stand zurück (steht auf der Ausnahmeliste); Lauf grün |
+| `tabellen-sortieren-filtern.spec.ts` „Kontowechsel in einem anderen Tab“: `anmeldenAls` im zweiten Tab jetzt per API → kein Konfliktdialog | Fehler | zweiter Tab über `/login` + `anmeldenImFormular`; Regel dazu in `frontend/e2e/AGENTS.md`; Lauf grün |
+| `kernfluss.spec.ts`: Smoke „Login → Einsatz …“ lief per API | Abdeckung | auf `alpha`-Stand zurück, auf die Ausnahmeliste |
+| gate3 Fernmeldeskizze/Organigramm: überzähliges `goto` nach `ladeInDichte(…?ansicht=…)` | Laufzeit | entfernt; vier Fälle grün |
+| Kommentare in `gate1-ueberlauf` (eigener Einsatz je Test) und `tabellen-sortieren-filtern` (Räumung beim Start der Anmeldeseite) | Doku | nachgezogen |
+| Vermutung: Gate 1 misst in späteren Tests eines Workers einen älteren Einsatz (zeitabhängige Texte länger) | — | eher rot als grün; offen beobachten |
