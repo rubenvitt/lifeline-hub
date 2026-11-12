@@ -2298,3 +2298,161 @@ async fn ohne_schreibrecht_kein_nachreichen() {
     }
     assert_eq!(band_zaehlt(&elw, e).await, 2);
 }
+
+// ── Grenzen und Budgets (LLH-1672) ───────────────────────────────────────────────────────────
+
+async fn hinweis(i: &Instanz) -> Option<String> {
+    sqlx::query_scalar("SELECT hinweis FROM instanz_kopplung")
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn letzter_fehler(i: &Instanz) -> Option<String> {
+    sqlx::query_scalar("SELECT letzter_fehler FROM instanz_kopplung")
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn staende(i: &Instanz) -> (i64, i64, i64) {
+    sqlx::query_as(
+        "SELECT k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis, i.fuehrung_stand \
+         FROM instanz_kopplung k, instanz_identitaet i",
+    )
+    .fetch_one(&i.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn lange_bezeichnung_haelt_das_melden_nicht_auf() {
+    let (hub, elw) = gekoppelt().await;
+    // 80 KB Bezeichnung: ungekürzt sprengte sie jede Meldung (Rumpf höchstens 64 KiB).
+    common::einsatz_anlegen_mit(&elw.app, &elw.admin, &"ü".repeat(40_000)).await;
+    elw_meldet(&elw).await;
+    assert_eq!(letzter_fehler(&elw).await, None);
+    let akten = fremde(&hub).await;
+    assert_eq!(
+        akten.len(),
+        1,
+        "die Akte kommt an, nicht still übersprungen"
+    );
+    // Die Akte kam gekürzt (Unit-Test `kopf_wird_beim_bauen_gekuerzt`); angezeigt wird der Kopf
+    // des Spiegels, und der trägt den ganzen Einsatz.
+    assert_eq!(akten[0]["fuehrer_kennung"], elw.kennung);
+}
+
+#[tokio::test]
+async fn akte_ueber_dem_budget_geht_nicht_hinaus_und_nennt_den_grund() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    // Eine Akte, die das Gegenüber nicht annähme (Erklärung weit über der Grenze), soll weder
+    // die Meldung sprengen noch still verschwinden.
+    let stand: i64 = sqlx::query_scalar(
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+         RETURNING fuehrung_stand",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_fuehrung SET erklaerung = ?, stand = ? WHERE einsatz_id = ?")
+        .bind("x".repeat(70_000))
+        .bind(stand)
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    assert_eq!(
+        letzter_fehler(&elw).await,
+        None,
+        "die Meldung selbst geht durch"
+    );
+    let h = hinweis(&elw).await.unwrap_or_default();
+    assert!(h.contains("zu groß"), "Hinweis mit Grund: {h:?}");
+    let (gesendet, _, _) = staende(&elw).await;
+    assert!(gesendet < stand, "die Akte ist nicht quittiert");
+}
+
+#[tokio::test]
+async fn quittung_ueber_dem_eigenen_stand_wird_gekappt() {
+    let (hub, elw) = gekoppelt().await;
+    elw_einsatz(&hub, &elw).await;
+    // Ein fehlerhafter Hub quittiert einen Stand, den der ELW nie vergeben hat.
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+        .bind(i64::MAX)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let (gesendet, _, stand) = staende(&elw).await;
+    assert!(gesendet <= stand, "ELW kappt: {gesendet} über {stand}");
+    // Der Hub arbeitet wieder korrekt: neue Akten des ELW fließen wieder.
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = 0")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    elw_meldet(&elw).await;
+    assert_eq!(fremde(&hub).await.len(), 2, "die neue Akte des ELW ist da");
+    // Umgekehrt kappt der Hub die Quittung eines fehlerhaften ELW.
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+        .bind(i64::MAX)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let (gesendet, _, stand) = staende(&hub).await;
+    assert!(gesendet <= stand, "Hub kappt: {gesendet} über {stand}");
+}
+
+#[tokio::test]
+async fn unplausibler_stand_zaehlt_nicht_fuer_die_quittung() {
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    sqlx::query("UPDATE einsatz_fuehrung SET stand = ?")
+        .bind(i64::MAX)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let (_, empfangen, _) = staende(&elw).await;
+    assert!(empfangen < i64::MAX, "nicht aufs Maximum gesetzt");
+    let h = hinweis(&elw).await.unwrap_or_default();
+    assert!(h.contains("ungültige Führungsakte"), "nicht still: {h:?}");
+}
+
+#[tokio::test]
+async fn hub_legt_keine_akte_unter_fremdem_praefix_an() {
+    let (hub, elw) = gekoppelt().await;
+    elw_einsatz(&hub, &elw).await;
+    let stand: i64 = sqlx::query_scalar(
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+         RETURNING fuehrung_stand",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_fuehrung (kennung, org_id, bezeichnung, status, epoche_zaehler, \
+         epoche_instanz, fuehrer_kennung, fuehrer_name, art, stand, geaendert_at) \
+         VALUES ('fremd/99', 1, 'Fremd', 'aktiv', 1, ?, ?, 'ELW', 'angelegt', ?, '2026-11-12 10:00:00')",
+    )
+    .bind(&elw.kennung)
+    .bind(&elw.kennung)
+    .bind(stand)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    elw_meldet(&elw).await;
+    let akten = fremde(&hub).await;
+    assert_eq!(
+        akten.len(),
+        1,
+        "nur die Akte unter dem Präfix des ELW: {akten:?}"
+    );
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(h.contains("fremd/99"), "Hinweis am Hub: {h:?}");
+}

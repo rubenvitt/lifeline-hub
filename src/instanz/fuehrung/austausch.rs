@@ -27,14 +27,23 @@ use sqlx::SqliteConnection;
 pub const AKTEN_MAX: usize = 50;
 /// Byte-Budget der Akten in einer Meldung (der Rumpf darf höchstens 64 KiB groß sein).
 pub const MELDUNG_BYTES: usize = 40 * 1024;
-/// Byte-Budget der Akten in einer Antwort.
-pub const ANTWORT_BYTES: usize = 256 * 1024;
+/// Byte-Budget der Akten in einer Antwort. Es geht vom Budget der Stammdaten ab und muss neben
+/// der größten Nachlieferung der Unterschriftsschlüssel in `melden::ANTWORT_MAX` passen (Test
+/// `melden::tests::groesste_antwort_passt_in_die_lesegrenze`, LLH-1672).
+pub const ANTWORT_BYTES: usize = 128 * 1024;
 /// Obergrenzen der Textfelder einer gelieferten Akte (Zeichen).
 const TEXT_MAX: usize = 500;
 const ERKLAERUNG_MAX: usize = 4096;
 /// Größter Zähler einer gelieferten Epoche: weit über jedem echten Verlauf, weit unter dem
 /// Überlauf (`Epoche::naechste` rechnet plus eins).
 const ZAEHLER_MAX: i64 = 1 << 40;
+/// Größter Stand einer gelieferten Akte (LLH-1672): Stände zählen je Änderung eins hoch, wie
+/// Epochen weit darüber; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
+const STAND_MAX: i64 = 1 << 40;
+/// Länge eines Prüfwerts aus dem Abgabecode (HMAC-SHA256, Base64url: 43 Zeichen) mit Luft.
+const PRUEFWERT_MAX: usize = 64;
+/// Größte Akte in Byte (JSON): passt in jede Meldung ([`MELDUNG_BYTES`]) und jede Antwort.
+pub const AKTE_BYTES: usize = 32 * 1024;
 
 /// Eine Akte auf der Leitung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,18 +75,29 @@ pub struct AkteMeldung {
     pub stand: i64,
 }
 
+/// Kürzt einen Text auf höchstens `max` Zeichen.
+fn kuerze(s: &str, max: usize) -> String {
+    match s.char_indices().nth(max) {
+        Some((i, _)) => s[..i].to_string(),
+        None => s.to_string(),
+    }
+}
+
 impl AkteMeldung {
+    /// Baut die Akte für die Leitung. Die Kopf-Felder (Anzeige beim Gegenüber) kommen auf
+    /// [`TEXT_MAX`] gekürzt: lokal haben Bezeichnung und Stichwort keine Grenze, und eine Akte
+    /// darüber nähme das Gegenüber nicht an (LLH-1672).
     fn aus(a: &AkteZeile, org: &str) -> Self {
         Self {
             kennung: a.kennung.clone(),
             org: org.to_string(),
-            nummer: a.nummer.clone(),
-            bezeichnung: a.bezeichnung.clone(),
-            stichwort: a.stichwort.clone(),
+            nummer: a.nummer.as_deref().map(|n| kuerze(n, TEXT_MAX)),
+            bezeichnung: kuerze(&a.bezeichnung, TEXT_MAX),
+            stichwort: a.stichwort.as_deref().map(|s| kuerze(s, TEXT_MAX)),
             status: a.status.clone(),
             epoche: a.epoche(),
             fuehrer: a.fuehrer_kennung.clone(),
-            fuehrer_name: a.fuehrer_name.clone(),
+            fuehrer_name: kuerze(&a.fuehrer_name, TEXT_MAX),
             art: a.art.clone(),
             erklaerung: a.erklaerung.clone(),
             beweis: a
@@ -90,7 +110,35 @@ impl AkteMeldung {
         }
     }
 
-    /// Grenzen der Felder; eine Akte darüber wird nicht übernommen.
+    /// Ob der Stand der sendenden Seite plausibel ist; nur ein solcher zählt für die Quittung.
+    fn is_stand_plausibel(&self) -> bool {
+        (1..=STAND_MAX).contains(&self.stand)
+    }
+
+    /// Ob der Beweis in seinen Grenzen liegt (Assertion wie `pruefen::verify`, Prüfwert kurz).
+    fn is_beweis_in_grenzen(&self) -> bool {
+        use crate::auth::unterschrift::pruefen::{
+            AUTHENTICATOR_DATA_MAX, CLIENT_DATA_JSON_MAX, CREDENTIAL_ID_MAX, SIGNATUR_MAX,
+        };
+        match &self.beweis {
+            None => true,
+            Some(FuehrungBeweis::Unterschrift { assertion: a }) => {
+                a.credential_id.len() <= CREDENTIAL_ID_MAX
+                    && a.authenticator_data.len() <= AUTHENTICATOR_DATA_MAX
+                    && a.client_data_json.len() <= CLIENT_DATA_JSON_MAX
+                    && a.signatur.len() <= SIGNATUR_MAX
+            }
+            Some(FuehrungBeweis::Code { pruefwert }) => pruefwert.len() <= PRUEFWERT_MAX,
+        }
+    }
+
+    /// Größe auf der Leitung (JSON) in Byte.
+    fn bytes(&self) -> usize {
+        serde_json::to_vec(self).map_or(usize::MAX, |v| v.len())
+    }
+
+    /// Grenzen der Felder; eine Akte darüber wird nicht übernommen. Was hier durchgeht, wird
+    /// gespeichert und geht weiter, also passt es auch in jede Nachricht ([`AKTE_BYTES`]).
     fn is_in_grenzen(&self) -> bool {
         let kurz = |s: &str| s.chars().count() <= TEXT_MAX;
         kurz(&self.kennung)
@@ -108,6 +156,9 @@ impl AkteMeldung {
                 .erklaerung
                 .as_deref()
                 .is_none_or(|e| e.len() <= ERKLAERUNG_MAX)
+            && self.is_beweis_in_grenzen()
+            && self.is_stand_plausibel()
+            && self.bytes() <= AKTE_BYTES
     }
 }
 
@@ -120,6 +171,8 @@ pub struct Ausgang {
 }
 
 /// Baut die Akten für eine Kopplung: Stand über `ab`, höchstens [`AKTEN_MAX`] und `bytes`.
+/// Eine Akte über [`AKTE_BYTES`] nähme das Gegenüber nicht an: Sie und alles danach bleibt hier,
+/// mit Hinweis an der Kopplung, bis sie kleiner ist (LLH-1672); der Rest der Nachricht geht.
 pub async fn build_ausgang(
     conn: &mut SqliteConnection,
     kopplung: &KopplungZeile,
@@ -139,8 +192,23 @@ pub async fn build_ausgang(
             continue;
         };
         let m = AkteMeldung::aus(a, org);
-        let groesse = serde_json::to_vec(&m).map(|v| v.len()).unwrap_or(0);
-        if aus.akten.len() == AKTEN_MAX || (summe + groesse > bytes && !aus.akten.is_empty()) {
+        let groesse = m.bytes();
+        if groesse > AKTE_BYTES.min(bytes) {
+            crate::instanz::repo::set_hinweis(
+                conn,
+                kopplung.id,
+                &format!(
+                    "Führungsakte „{}“ ist zu groß für den Austausch ({groesse} Byte, höchstens \
+                     {} Byte): Sie und die Akten danach gehen nicht an {}, bis sie kleiner ist.",
+                    kuerze(&a.bezeichnung, 80),
+                    AKTE_BYTES.min(bytes),
+                    kopplung.gegenueber_name
+                ),
+            )
+            .await?;
+            break;
+        }
+        if aus.akten.len() == AKTEN_MAX || summe + groesse > bytes {
             aus.mehr = true;
             break;
         }
@@ -512,9 +580,21 @@ pub async fn apply_eingang(
     let bruch = zuletzt_gesehen
         .map(str::to_string)
         .unwrap_or_else(crate::zeit::jetzt);
+    let ablehnen = |m: &AkteMeldung, grund: &str| {
+        format!(
+            "{} schickt eine ungültige Führungsakte ({}): {grund}, abgelehnt",
+            kopplung.gegenueber_name,
+            kuerze(&m.kennung, 80)
+        )
+    };
     for m in akten.iter().take(AKTEN_MAX) {
-        aus.bis = Some(aus.bis.map_or(m.stand, |b| b.max(m.stand)));
+        // Nur ein plausibler Stand zählt für die Quittung: ein Wert wie `i64::MAX` setzte sie
+        // dauerhaft aufs Maximum (LLH-1672). Eine abgelehnte Akte wird quittiert, aber nicht still.
+        if m.is_stand_plausibel() {
+            aus.bis = Some(aus.bis.map_or(m.stand, |b| b.max(m.stand)));
+        }
         if !m.is_in_grenzen() {
+            aus.hinweis = Some(ablehnen(m, "über den Grenzen"));
             continue;
         }
         let Some(&(org_id, _)) = orgs.iter().find(|(_, k)| *k == m.org) else {
@@ -527,6 +607,14 @@ pub async fn apply_eingang(
                 continue;
             }
             if m.epoche.instanz != sender && richtung == InstanzKopplungRichtung::WirdGemeldet {
+                continue;
+            }
+            // Neu anlegen lässt die erreichte Seite die meldende nur deren eigene Akten, also nur
+            // unter ihrem Präfix (LLH-1672).
+            if richtung == InstanzKopplungRichtung::WirdGemeldet
+                && !m.kennung.starts_with(&format!("{sender}/"))
+            {
+                aus.hinweis = Some(ablehnen(m, "neue Akte nicht unter ihrem Präfix"));
                 continue;
             }
             let mut a = AkteZeile {
@@ -937,9 +1025,172 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use crate::auth::unterschrift::pruefen::{
+        AUTHENTICATOR_DATA_MAX, CLIENT_DATA_JSON_MAX, CREDENTIAL_ID_MAX, SIGNATUR_MAX,
+    };
     use InstanzKopplungRichtung::{MeldetSich, WirdGemeldet};
+
+    fn akte() -> AkteMeldung {
+        serde_json::from_value(serde_json::json!({
+            "kennung": "elw/1", "org": "hub/1", "bezeichnung": "Lage", "status": "aktiv",
+            "epoche": {"zaehler": 1, "instanz": "elw"}, "fuehrer": "elw",
+            "fuehrer_name": "ELW", "art": "angelegt", "stand": 3
+        }))
+        .unwrap()
+    }
+
+    fn assertion(cid: usize, auth: usize, cdj: usize, sig: usize) -> FuehrungBeweis {
+        serde_json::from_value(serde_json::json!({
+            "art": "unterschrift",
+            "assertion": {
+                "credential_id": "A".repeat(cid),
+                "authenticator_data": "a".repeat(auth),
+                "client_data_json": "c".repeat(cdj),
+                "signatur": "s".repeat(sig)
+            }
+        }))
+        .unwrap()
+    }
+
+    /// Die größte Akte, die [`AkteMeldung::is_in_grenzen`] annimmt: jedes Textfeld voll mit
+    /// Umlauten (zwei Byte je Zeichen), die Erklärung voll mit Anführungszeichen (in JSON zwei Byte
+    /// je Zeichen), der Beweis an allen Grenzen der Assertion.
+    pub(crate) fn groesste_akte() -> AkteMeldung {
+        let text = "ü".repeat(TEXT_MAX);
+        AkteMeldung {
+            kennung: text.clone(),
+            org: text.clone(),
+            nummer: Some(text.clone()),
+            bezeichnung: text.clone(),
+            stichwort: Some(text.clone()),
+            status: "abgeschlossen".into(),
+            epoche: Epoche {
+                zaehler: ZAEHLER_MAX,
+                instanz: text.clone(),
+            },
+            fuehrer: text.clone(),
+            fuehrer_name: text,
+            art: "notuebernahme".into(),
+            erklaerung: Some("\"".repeat(ERKLAERUNG_MAX)),
+            beweis: Some(assertion(
+                CREDENTIAL_ID_MAX,
+                AUTHENTICATOR_DATA_MAX,
+                CLIENT_DATA_JSON_MAX,
+                SIGNATUR_MAX,
+            )),
+            anfrage: true,
+            offen: true,
+            stand: STAND_MAX,
+        }
+    }
+
+    #[test]
+    fn grenzen_knapp_darunter_und_knapp_darueber() {
+        let ok = |f: &dyn Fn(&mut AkteMeldung)| {
+            let mut m = akte();
+            f(&mut m);
+            m.is_in_grenzen()
+        };
+        assert!(ok(&|m| m.bezeichnung = "ü".repeat(TEXT_MAX)));
+        assert!(!ok(&|m| m.bezeichnung = "ü".repeat(TEXT_MAX + 1)));
+        assert!(ok(&|m| m.fuehrer_name = "x".repeat(TEXT_MAX)));
+        assert!(!ok(&|m| m.fuehrer_name = "x".repeat(TEXT_MAX + 1)));
+        assert!(ok(&|m| m.epoche.zaehler = ZAEHLER_MAX));
+        assert!(!ok(&|m| m.epoche.zaehler = ZAEHLER_MAX + 1));
+        assert!(!ok(&|m| m.epoche.zaehler = 0));
+        assert!(ok(&|m| m.erklaerung = Some("e".repeat(ERKLAERUNG_MAX))));
+        assert!(!ok(&|m| m.erklaerung = Some("e".repeat(ERKLAERUNG_MAX + 1))));
+        assert!(ok(&|m| m.stand = STAND_MAX));
+        assert!(!ok(&|m| m.stand = STAND_MAX + 1));
+        assert!(!ok(&|m| m.stand = 0));
+        assert!(!ok(&|m| m.stand = i64::MAX));
+    }
+
+    #[test]
+    fn beweis_hat_grenzen() {
+        let mit = |b: FuehrungBeweis| {
+            let mut m = akte();
+            m.beweis = Some(b);
+            m.is_in_grenzen()
+        };
+        let (c, a, d, s) = (
+            CREDENTIAL_ID_MAX,
+            AUTHENTICATOR_DATA_MAX,
+            CLIENT_DATA_JSON_MAX,
+            SIGNATUR_MAX,
+        );
+        assert!(mit(assertion(c, a, d, s)));
+        assert!(!mit(assertion(c + 1, a, d, s)));
+        assert!(!mit(assertion(c, a + 1, d, s)));
+        assert!(!mit(assertion(c, a, d + 1, s)));
+        assert!(!mit(assertion(c, a, d, s + 1)));
+        let code = |n: usize| FuehrungBeweis::Code {
+            pruefwert: "p".repeat(n),
+        };
+        assert!(mit(code(PRUEFWERT_MAX)));
+        assert!(!mit(code(PRUEFWERT_MAX + 1)));
+    }
+
+    #[test]
+    fn groesste_akte_passt_in_eine_meldung() {
+        let m = groesste_akte();
+        assert!(m.is_in_grenzen(), "die größte Akte liegt in den Grenzen");
+        let groesse = serde_json::to_vec(&m).unwrap().len();
+        assert!(groesse <= AKTE_BYTES, "{groesse} Byte über {AKTE_BYTES}");
+        assert!(AKTE_BYTES <= MELDUNG_BYTES && AKTE_BYTES <= ANTWORT_BYTES);
+        // Über die Bytes hinaus (etwa Steuerzeichen, in JSON sechs Byte je Zeichen) gilt sie nicht.
+        let mut m = akte();
+        m.bezeichnung = "\u{1}".repeat(TEXT_MAX);
+        m.stichwort = Some(m.bezeichnung.clone());
+        m.nummer = Some(m.bezeichnung.clone());
+        m.fuehrer_name = m.bezeichnung.clone();
+        m.erklaerung = Some("\u{1}".repeat(ERKLAERUNG_MAX));
+        m.beweis = groesste_akte().beweis;
+        assert!(serde_json::to_vec(&m).unwrap().len() > AKTE_BYTES);
+        assert!(!m.is_in_grenzen());
+    }
+
+    #[test]
+    fn kopf_wird_beim_bauen_gekuerzt() {
+        let lang = "ü".repeat(TEXT_MAX * 200);
+        let zeile = AkteZeile {
+            id: 1,
+            kennung: "elw/1".into(),
+            einsatz_id: Some(1),
+            org_id: 1,
+            nummer: Some(lang.clone()),
+            bezeichnung: lang.clone(),
+            stichwort: Some(lang.clone()),
+            status: "aktiv".into(),
+            epoche_zaehler: 1,
+            epoche_instanz: "elw".into(),
+            fuehrer_kennung: "elw".into(),
+            fuehrer_name: lang,
+            art: "angelegt".into(),
+            erklaerung: None,
+            beweis: None,
+            offen: None,
+            offen_bruch_at: None,
+            abgabe_schluessel: None,
+            anfrage_at: None,
+            bruch_at: None,
+            stand: 7,
+            geaendert_at: String::new(),
+        };
+        let m = AkteMeldung::aus(&zeile, "hub/1");
+        assert_eq!(m.bezeichnung.chars().count(), TEXT_MAX);
+        assert_eq!(m.stichwort.unwrap().chars().count(), TEXT_MAX);
+        assert_eq!(m.nummer.unwrap().chars().count(), TEXT_MAX);
+        assert_eq!(m.fuehrer_name.chars().count(), TEXT_MAX);
+        let mut kurz = zeile.clone();
+        kurz.bezeichnung = "ü".repeat(TEXT_MAX);
+        assert_eq!(
+            AkteMeldung::aus(&kurz, "hub/1").bezeichnung,
+            kurz.bezeichnung
+        );
+    }
 
     #[test]
     fn annahmeregel_ueber_alle_zellen() {

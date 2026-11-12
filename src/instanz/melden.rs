@@ -38,6 +38,18 @@ pub const ANGEBAHNT_MINUTEN: i64 = 15;
 
 static ABSTAND_S: OnceLock<u64> = OnceLock::new();
 
+/// Byte-Budget der Stammdaten in einer Antwort, vor Abzug der Unterschriftsschlüssel. Mit
+/// Schalter geht das Budget der Führungsakten vorab ab (LLH-1672), sonst läge die Antwort über
+/// [`ANTWORT_MAX`] und würde bei jeder Wiederholung gleich gebaut.
+fn stammdaten_budget(fuehrung_an: bool) -> usize {
+    let fuehrung = if fuehrung_an {
+        fuehrung_austausch::ANTWORT_BYTES
+    } else {
+        0
+    };
+    ANTWORT_MAX - stammdaten::ANTWORT_RESERVE - fuehrung
+}
+
 /// Setzt den Abstand einmal beim Start (`--instanz-melden-sekunden`).
 pub fn set_abstand(sekunden: u64) {
     let _ = ABSTAND_S.set(sekunden);
@@ -475,6 +487,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     let mut stammdaten_geaendert: Vec<i64> = Vec::new();
     let mut sitzungen_beendet: Vec<String> = Vec::new();
     let mut fuehrung_folgen = Vec::new();
+    let mut quittung = fuehrung_gesendet;
     crate::write_retry!(pool, |conn| {
         abgelehnt_alle.clear();
         vom_gegenueber_widerrufen.clear();
@@ -555,13 +568,9 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
-            fuehrung_repo::save_kopplung_staende(
-                conn,
-                kopplung.id,
-                Some(a.fuehrung_bis),
-                eingang.bis,
-            )
-            .await?;
+            quittung = a.fuehrung_bis.min(fuehrung_repo::load_stand(conn).await?);
+            fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
+                .await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -578,7 +587,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     // Bleibt mehr Führung, als in diese Meldung passte, meldet sie sich gleich wieder (D3).
     // Eigener Rest nur, wenn das Gegenüber quittiert hat (sonst hörte ein Gegenüber ohne Schalter
     // die Meldung jede fünf Sekunden).
-    let fortschritt = a.fuehrung_bis > fuehrung_gesendet;
+    let fortschritt = quittung > fuehrung_gesendet;
     let naechste = if fuehrung_an && ((fuehrung_ausgang.mehr && fortschritt) || a.fuehrung_mehr) {
         jetzt.clone()
     } else {
@@ -738,8 +747,9 @@ pub async fn handle_meldung(
             .iter()
             .filter_map(|a| StammdatenArt::parse(a))
             .collect();
-        // Die Stammdaten bekommen, was Unterschriftsschlüssel und Reserve übrig lassen (D2).
-        let mut stammdaten_budget = liefern::Budget::neu(ANTWORT_MAX - stammdaten::ANTWORT_RESERVE);
+        // Die Stammdaten bekommen, was Unterschriftsschlüssel, Führung und Reserve übrig lassen
+        // (D2, LLH-1672).
+        let mut stammdaten_budget = liefern::Budget::neu(stammdaten_budget(fuehrung_an));
         let mut orgs = Vec::with_capacity(anfrage_orgs.len());
         let mut gemeldet = Vec::new();
         // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
@@ -823,13 +833,11 @@ pub async fn handle_meldung(
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
-            fuehrung_repo::save_kopplung_staende(
-                conn,
-                kopplung.id,
-                Some(anfrage.fuehrung_bis),
-                eingang.bis,
-            )
-            .await?;
+            let quittung = anfrage
+                .fuehrung_bis
+                .min(fuehrung_repo::load_stand(conn).await?);
+            fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
+                .await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -840,7 +848,7 @@ pub async fn handle_meldung(
             fuehrung_ausgang = fuehrung_austausch::build_ausgang(
                 conn,
                 kopplung,
-                anfrage.fuehrung_bis,
+                quittung,
                 fuehrung_austausch::ANTWORT_BYTES,
             )
             .await?;
@@ -1010,9 +1018,28 @@ mod tests {
             o.org = "k".repeat(88);
         }
         a.orgs[0].unterschrift = vec![lieferung; unterschrift::LIEFERUNGEN_MAX];
-        // Stammdaten (LLH-1493, D2) füllen nur auf, was Unterschriftsschlüssel und Reserve übrig
-        // lassen; die Reserve trägt Hülle und Org-Einträge (hier schon mitgezählt) und eine
+        // Führungsakten (LLH-1672): so viele der größten Akte, wie `build_ausgang` in
+        // `ANTWORT_BYTES` packt, höchstens `AKTEN_MAX`.
+        let akte = fuehrung_austausch::tests::groesste_akte();
+        let akte_bytes = serde_json::to_vec(&akte).expect("JSON").len();
+        let akten =
+            (fuehrung_austausch::ANTWORT_BYTES / akte_bytes).min(fuehrung_austausch::AKTEN_MAX);
+        assert!(akten > 0, "die größte Akte passt in eine Antwort");
+        a.fuehrung = vec![akte; akten];
+        a.fuehrung_bis = i64::MAX;
+        a.fuehrung_mehr = true;
+        // Stammdaten (LLH-1493, D2) füllen nur auf, was Unterschriftsschlüssel, Führung und Reserve
+        // übrig lassen; die Reserve trägt Hülle und Org-Einträge (hier schon mitgezählt) und eine
         // einzelne übergroße Zeile (höchstens die halbe Reserve).
+        assert_eq!(
+            stammdaten_budget(true) + fuehrung_austausch::ANTWORT_BYTES,
+            stammdaten_budget(false),
+            "die Führung geht vom Budget der Stammdaten ab"
+        );
+        assert_eq!(
+            stammdaten_budget(false) + stammdaten::ANTWORT_RESERVE,
+            ANTWORT_MAX
+        );
         let groesse = serde_json::to_vec(&a).expect("JSON").len();
         assert!(
             groesse + stammdaten::ANTWORT_RESERVE / 2 < ANTWORT_MAX,
