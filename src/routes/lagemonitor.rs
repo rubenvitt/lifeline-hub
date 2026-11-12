@@ -450,4 +450,104 @@ mod tests {
             Versorgung::Offen
         );
     }
+
+    /// Ein Einsatz mit Einsatzort und einem freien Zeichen, dazu eine Verdichtung mit Zone,
+    /// Abschnitt und verorteter UHS: jede Art von Karten-Feature einmal.
+    async fn karten_fall() -> (SqlitePool, crate::einsatz::Einsatz, LagemonitorAnzeige) {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatzort_lat, einsatzort_lon) \
+             VALUES (1, 'Lage', 52.1, 9.3) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO freies_zeichen (id, einsatz_id, lat, lon, zeichen_spec) \
+             VALUES (7, ?, 50.2, 8.7, '{\"v\":1}')",
+        )
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let kopf = crate::einsatz::repo::laden(&pool, einsatz_id)
+            .await
+            .unwrap();
+        let polygon = r#"{"type":"Polygon","coordinates":[[[9,52],[9.1,52],[9,52.1],[9,52]]]}"#;
+        let verdichtet = LagemonitorAnzeige {
+            stand_at: "2026-11-12 19:00:00".into(),
+            betroffene: LagemonitorBetroffene::default(),
+            kraefte: LagemonitorKraefte {
+                einheiten: 0,
+                personal: 0,
+                staerke: Staerke::neu(0, 0, 0),
+            },
+            uhs: vec![
+                LagemonitorUhs {
+                    id: 5,
+                    bezeichnung: "BHP Nord".into(),
+                    typ: UhsTyp::Behandlungsplatz,
+                    status: UhsStatus::Aktiv,
+                    lat: Some(52.11),
+                    lon: Some(9.31),
+                    belegt: 3,
+                    plaetze: 10,
+                    kraefte: 4,
+                },
+                // Ohne Koordinate: steht in der Liste, nicht in der Karte.
+                LagemonitorUhs {
+                    id: 6,
+                    bezeichnung: "PA Süd".into(),
+                    typ: UhsTyp::Patientenablage,
+                    status: UhsStatus::Geplant,
+                    lat: None,
+                    lon: None,
+                    belegt: 0,
+                    plaetze: 0,
+                    kraefte: 0,
+                },
+            ],
+            zonen: vec![LagemonitorZone {
+                id: 3,
+                typ: LageZoneTyp::Absperrbereich,
+                geometrie: format!(r#"{{"type":"Feature","properties":{{}},"geometry":{polygon}}}"#),
+            }],
+            abschnitte: vec![
+                LagemonitorAbschnitt {
+                    id: 4,
+                    bezeichnung: "Abschnitt Nord".into(),
+                    kurzbezeichnung: None,
+                    flaeche_geojson: polygon.into(),
+                },
+                // Kaputte Fläche bleibt weg, statt die Karte scheitern zu lassen.
+                LagemonitorAbschnitt {
+                    id: 8,
+                    bezeichnung: "Abschnitt Süd".into(),
+                    kurzbezeichnung: Some("EA-S".into()),
+                    flaeche_geojson: "kein json".into(),
+                },
+            ],
+            sofortmeldungen_offen: 0,
+            programm: Vec::new(),
+            sanitaetsdienst: None,
+        };
+        (pool, kopf, verdichtet)
+    }
+
+    /// Die Karte des Lagebilds für Externe, Byte für Byte (LLH-1638, design.md D7): der Umzug des
+    /// Kartenbaus auf getypte Features darf weder Inhalt noch `karte_etag` ändern.
+    const KARTE_LAGEBILD: &str = r##"{"features":[{"geometry":{"coordinates":[9.3,52.1],"type":"Point"},"properties":{"kind":"einsatzort"},"type":"Feature"},{"geometry":{"coordinates":[[[9,52],[9.1,52],[9,52.1],[9,52]]],"type":"Polygon"},"properties":{"id":3,"kind":"zone","typ":"absperrbereich"},"type":"Feature"},{"geometry":{"coordinates":[[[9,52],[9.1,52],[9,52.1],[9,52]]],"type":"Polygon"},"properties":{"bezeichnung":"Abschnitt Nord","id":4,"kind":"abschnitt","kurzbezeichnung":null},"type":"Feature"},{"geometry":{"coordinates":[9.31,52.11],"type":"Point"},"properties":{"belegt":3,"bezeichnung":"BHP Nord","id":5,"kind":"uhs","plaetze":10,"typ":"behandlungsplatz"},"type":"Feature"},{"geometry":{"coordinates":[8.7,50.2],"type":"Point"},"properties":{"id":7,"kind":"zeichen","zeichen_spec":"{\"v\":1}"},"type":"Feature"}],"type":"FeatureCollection"}"##;
+
+    #[tokio::test]
+    async fn karte_des_lagebilds_bleibt_byte_fuer_byte() {
+        let (pool, kopf, verdichtet) = karten_fall().await;
+        let karte = super::super::lagemonitor_v1::baue_karte(&pool, &kopf, &verdichtet)
+            .await
+            .unwrap();
+        assert_eq!(serde_json::to_string(&karte).unwrap(), KARTE_LAGEBILD);
+    }
 }

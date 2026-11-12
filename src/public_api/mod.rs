@@ -13,12 +13,14 @@
 //!   interne API hat keine Zusage).
 //!
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Repo [`zugang`], Scopes
-//! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`].
+//! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`]. Die Freigabe eines Einsatzes für
+//! einen Zugang (LLH-1638, ADR-0029) liegt in [`freigabe`].
 //!
 //! Regeln: `src/AGENTS.md`, „Öffentliche API v1“.
 
 pub mod drossel;
 pub mod error;
+pub mod freigabe;
 pub mod kommando;
 pub mod machine;
 pub mod routen;

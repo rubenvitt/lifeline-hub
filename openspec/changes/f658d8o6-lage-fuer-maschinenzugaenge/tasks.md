@@ -14,7 +14,7 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 
 - [ ] 2.1 `git fetch origin alpha`, dann Migration `0335_maschinenzugang_freigabe.sql` nach D2; `scripts/check-migrationen.sh` und `cargo test db::tests::migrationsnummern_sind_eindeutig` grün
 - [ ] 2.2 Tabelle in `einsatz::schwaerzung_registry::TABELLEN` und `instanz::spiegel::art::AUSGENOMMEN` einordnen; die Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, `entdeckte_tabellen_gleich_registry_tabellen` und `art::tests::jede_einsatztabelle_ist_eingeordnet` grün
-- [ ] 2.3 `Scope::braucht_einsatzfreigabe()` mit Unit-Test: wahr für `lage:read`, falsch für alle anderen heutigen Scopes
+- [ ] 2.3 `Scope::has_einsatzbezug()` mit Unit-Test: wahr für `lage:read`, falsch für alle anderen heutigen Scopes
 - [ ] 2.4 `src/public_api/freigabe.rs` mit `list_fuer_einsatz`, `freigeben_tx`, `beenden_tx`, `delete_fuer_einsatz_tx`, `delete_fuer_zugang_tx`, `freigegebener_einsatz`; Unit-Tests: Neu, Keine, Abgelöst, ein Einsatz für zwei Zugänge, wirksam nur am aktiven und nicht gelöschten Einsatz, Liste ohne widerrufene, abgelaufene und nicht freigebbare Zugänge
 - [ ] 2.5 ADR-0029 nach D12 anlegen (`scripts/adr-fuer.sh --alle` für die Nummer, Vorlage `VORLAGE.md`, unter 80 Zeilen, Prüfblock); `scripts/check-architektur.sh` grün
 

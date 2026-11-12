@@ -97,7 +97,7 @@ umgebaut.
 
 ### D3 Welche Zugänge freigebbar sind
 
-`Scope::braucht_einsatzfreigabe()` ist heute nur für `LageRead` wahr. `EinsaetzeRead` und
+`Scope::has_einsatzbezug()` ist heute nur für `LageRead` wahr. `EinsaetzeRead` und
 `EventsRead` kommen mit ihren Routen dazu (LLH-1655); bis dahin hätte eine Freigabe für sie keine
 Wirkung, und das Paneel zeigte Schalter ohne Folge.
 
@@ -323,8 +323,8 @@ Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
   Anwenderkapitel benannt.
 - [`subkind` in der Karte neben `kind` in der UHS-Liste ist uneinheitlich.] → Beide sind lokal
   eindeutig; die Tabelle in D7 kommt in die API-Doku.
-- [Zwei Scope-Listen laufen auseinander: `braucht_einsatzfreigabe` und die Routen.] → Test über
-  das Dokument: jede Route, deren Scope `braucht_einsatzfreigabe()` trägt, liest ohne Freigabe
+- [Zwei Scope-Listen laufen auseinander: `has_einsatzbezug` und die Routen.] → Test über
+  das Dokument: jede Route, deren Scope `has_einsatzbezug()` trägt, liest ohne Freigabe
   keinen Einsatz (heute eine Route; LLH-1655 erweitert ihn).
 
 ## Migration Plan
