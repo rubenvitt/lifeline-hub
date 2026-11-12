@@ -79,7 +79,10 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         width={640}
         destroyOnHidden
       >
-        {offen && <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} />}
+        {offen && (
+          // Bedienen darf diese Seite nur ein Admin; er darf auch unterschreiben (LLH-1676).
+          <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} admin={darfBedienen} />
+        )}
       </Modal>
     </Paneel>
   );

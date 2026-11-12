@@ -136,16 +136,19 @@ interface NotuebernahmeWerte {
 /**
  * Paneel „Führung“ (LLH-1491): wer führt, mit welcher Epoche, wie es dazu kam, und die Bedienung.
  * Auf der Seite Einsatzdaten für den lokalen Einsatz, auf der Seite „Instanzkopplung“ für einen
- * Einsatz beim Gegenüber. Ohne `darfBedienen` nur der Stand.
+ * Einsatz beim Gegenüber. Ohne `darfBedienen` nur der Stand. `admin`: das Konto ist Admin und darf
+ * mit eigener Unterschrift übernehmen; sonst bietet die Notübernahme nur den Code (LLH-1676).
  */
 export default function FuehrungPaneel({
   fuehrung,
   darfBedienen,
+  admin = false,
   titel = 'Führung',
   style,
 }: {
   fuehrung: FuehrungAnzeige;
   darfBedienen: boolean;
+  admin?: boolean;
   titel?: string;
   style?: React.CSSProperties;
 }) {
@@ -155,7 +158,7 @@ export default function FuehrungPaneel({
   const zeit = (wert: string) => zeitKurz(wert, konv);
   const nach = useNachFuehrung(fuehrung.einsatz_id ?? undefined);
   const ort = ortVon(fuehrung);
-  const moeglich = fuehrungMoeglich(fuehrung);
+  const moeglich = fuehrungMoeglich(fuehrung, { admin });
   const [neuerCode, setNeuerCode] = useState<FuehrungCodeAntwort | null>(null);
   const [notOffen, setNotOffen] = useState(false);
   const [form] = Form.useForm<NotuebernahmeWerte>();
@@ -186,7 +189,7 @@ export default function FuehrungPaneel({
     mutationFn: (w: NotuebernahmeWerte) => {
       const grund = (w.grund ?? '').trim();
       if (!moeglich.notuebernahmeMitBeweis) return uebernimmFuehrung(ort, grund);
-      return w.beweis === 'code'
+      return !moeglich.unterschrift || w.beweis === 'code'
         ? uebernimmFuehrungMitCode(ort, grund, w.code ?? '')
         : uebernimmFuehrungMitUnterschrift(ort, grund);
     },
@@ -347,7 +350,7 @@ export default function FuehrungPaneel({
         laeuft={notuebernahme.isPending}
         speicherung={notuebernahme}
         speicherFehlerTitel="Nicht übernommen"
-        initialValues={{ beweis: 'unterschrift' }}
+        initialValues={{ beweis: moeglich.unterschrift ? 'unterschrift' : 'code' }}
         onErfassen={(w) => notuebernahme.mutateAsync(w)}
         onFertig={() => setNotOffen(false)}
         onAbbrechen={() => {
@@ -371,16 +374,18 @@ export default function FuehrungPaneel({
         </Form.Item>
         {moeglich.notuebernahmeMitBeweis && (
           <>
-            <Form.Item label="Beweis" name="beweis">
-              <Radio.Group
-                optionType="button"
-                options={[
-                  { value: 'unterschrift', label: 'Eigene Unterschrift' },
-                  { value: 'code', label: 'Code des Gegenübers' },
-                ]}
-              />
-            </Form.Item>
-            {beweisWahl === 'code' && (
+            {moeglich.unterschrift && (
+              <Form.Item label="Beweis" name="beweis">
+                <Radio.Group
+                  optionType="button"
+                  options={[
+                    { value: 'unterschrift', label: 'Eigene Unterschrift' },
+                    { value: 'code', label: 'Code des Gegenübers' },
+                  ]}
+                />
+              </Form.Item>
+            )}
+            {(!moeglich.unterschrift || beweisWahl === 'code') && (
               <Form.Item
                 label="Code"
                 name="code"
