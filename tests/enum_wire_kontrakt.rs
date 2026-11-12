@@ -670,7 +670,7 @@ fn serde_wire_gleich_as_str() {
         MeldetSich,
         WirdGemeldet,
     });
-    // LLH-1497: Wire = DB-CHECK in 0329.
+    // LLH-1497: Wire = DB-CHECK in 0331.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungArt { Standard, VorOrt });
     enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzZertifikatZustand {
         Bestaetigt,

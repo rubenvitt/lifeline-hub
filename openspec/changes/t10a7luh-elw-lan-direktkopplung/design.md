@@ -350,8 +350,8 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   auslöst, trägt noch den alten Pin; „Zertifikat bestätigt“ zeigt die erreichte Seite ab der
   nächsten Meldung.
 - **12.11.2026, Admin-Spur.** Zwei neue Aktionen (`instanz_zertifikat_gewechselt`,
-  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0330, Muster
-  0317).
+  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0332; sie baut auf der Archiv-Spur von
+  `alpha`, 0330, auf, damit deren Aktionen im CHECK bleiben).
 - **12.11.2026, D4: eigene reine Funktion statt Parameter.** Die Regel steht als
   `austausch::entscheide_vor_ort(bisher, neu, sender, ich)` neben `entscheide`, nicht als
   zusätzlicher Parameter: Sie gilt vor allen richtungsabhängigen Zweigen und unabhängig von der
@@ -397,3 +397,7 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   steht „Code vor Ort“ (gesperrt mit Grund ohne Passkeys oder ohne `--tls`, Erklärung im
   Tooltip). Die Liste „Im Netz gefunden“ sucht auf Knopfdruck als Mutation, ohne eigenen
   Query-Key: sie ist ein einmaliger Abruf, kein Zustand der Seite.
+- **12.11.2026, Migrationen umgelegt.** `alpha` brachte 0329/0330 (Archiv, LLH-1494); die
+  Migrationen dieser Change liegen jetzt auf 0331 (Art, Zertifikat), 0332 (Spur) und 0333
+  (Ursprung). Der Neubau von `admin_audit` übernimmt die Liste aus `alpha` samt der vier
+  Archiv-Aktionen.
