@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs]
 ---
 
 ## Überblick
@@ -92,6 +92,11 @@ Für System-Admins:
    `age -d -i archiv-schluessel.txt -o einsatz.sqlite einsatz-…-block-1.sqlite.age`.
 
 Jeder Abruf steht im Zugangsprotokoll unter „Archiv heruntergeladen“.
+
+Zum Ansehen in Lifeline Hub spielt der Betrieb den Block per Befehl wieder ein (Handbuch Betrieb,
+„Archiv eines Einsatzes einspielen“). Der Einsatz steht dann bis zu 7 Tage lang in der
+Einsatzliste, nur lesbar, mit dem Band „Aus dem Archiv · bis …“ über jeder seiner Seiten, und
+verschwindet danach von selbst; endet eine Frist des Blocks früher, schon dann.
 
 ### Abgeschlossene Einsätze überblicken
 
@@ -254,7 +259,9 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - Das Aktenzeichen bleibt im Einsatztagebuch stehen und darf deshalb keinen Namen enthalten.
 - Möglich ist ein Löschersuchen nur an einem abgeschlossenen, noch nicht geschwärzten Einsatz.
   Ausnahme ist ein archivierter Einsatz: Er ist schon geschwärzt, ein Löschersuchen für den
-  ganzen Einsatz löscht sein Archiv.
+  ganzen Einsatz löscht sein Archiv. Heruntergeladene Blöcke erreicht es nicht: Sie sind mit zu
+  löschen. An dieser Installation lässt sich ein so gelöschter Block nicht wieder einspielen, und
+  eine schon eingespielte Kopie geht mit.
 
 ### Wer was darf
 
