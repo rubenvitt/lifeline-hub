@@ -4250,7 +4250,7 @@
               "string",
               "null"
             ],
-            "description": "Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`)."
+            "description": "Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`, `person`, `sichtung` …,\nsiehe [`NACHREICHBAR`])."
           },
           "folgen": {
             "type": "integer",

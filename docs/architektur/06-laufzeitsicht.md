@@ -397,7 +397,8 @@ sequenceDiagram
   kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine
   Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`). Personen gehen samt Verlauf
   (LLH-1657): Folge einer Person ist nur, was über `person_id` an ihr hängt (`URSPRUNG`), dazu
-  ihre Systemeinträge im ETB. Gestellt wird die Person; ist sie beim Spiegel zurück
+  ihre Systemeinträge im ETB; die Person selbst, ihr Haushalt und ihre UHS-Aufnahme sind immer
+  eigene Erfassungen. Gestellt wird die Person; ist sie beim Spiegel zurück
   (`spiegel_herkunft`), stellt `bruchstelle::ketten_fortsetzen` im Takt ihre Einträge in
   Zeitfolge mit dem Pfad auf die Person hier, danach einmal die Nachreich-Notiz (`notiz_at`). Ein
   abgelehnter oder nicht stellbarer Eintrag löst sich mit `grund` aus der Kette. Jede Schwärzung beim

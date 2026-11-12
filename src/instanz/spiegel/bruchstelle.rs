@@ -68,11 +68,14 @@ const AN_DER_PERSON: &[&str] = &[
 
 /// Verweise, über die eine Zeile dieser Tabellen Folge einer anderen wird (LLH-1657). Die übrigen
 /// Verweise zeigen auf ein Ziel (die UHS, die versorgende Einheit, die Betreuungsstelle eines
-/// Verbleibs), nicht auf den Ursprung: Eine Person in einer nach der Bruchstelle angelegten UHS
-/// bleibt eine eigene Erfassung, ein Verbleib an einer neuen Betreuungsstelle hängt an seiner
-/// Person. Tabellen ohne Eintrag folgen jedem Verweis.
+/// Verbleibs), nicht auf den Ursprung: Ein Verbleib an einer neuen Betreuungsstelle hängt an
+/// seiner Person. Eine Person ist immer eigene Erfassung, auch an einer neuen Meldung oder in
+/// einem neuen Haushalt; ein Haushalt und die Aufnahme in eine UHS ebenso (lesbar, verwerfbar).
+/// Tabellen ohne Eintrag folgen jedem Verweis.
 pub const URSPRUNG: &[(&str, &[&str])] = &[
-    ("einsatz_person", &["meldung_id", "haushalt_id"]),
+    ("einsatz_person", &[]),
+    ("haushalt", &[]),
+    ("person_uhs_belegung", &[]),
     ("person_sichtung", &["person_id"]),
     ("person_verbleib", &["person_id"]),
     ("person_verlaufsnotiz", &["person_id"]),
@@ -80,7 +83,6 @@ pub const URSPRUNG: &[(&str, &[&str])] = &[
     ("person_anlass", &["person_id"]),
     ("person_massnahme", &["person_id"]),
     ("person_verletzung", &["person_id"]),
-    ("person_uhs_belegung", &["person_id"]),
 ];
 
 /// Verweise, die keine Folge begründen: Beide Seiten sind eigene Erfassungen (die Berichtigung
@@ -102,15 +104,16 @@ const ETB_VORGANG: &[&str] = &[
     "befehl_id",
 ];
 
-/// Verweise, die beim Nachreichen wegfallen dürfen, wenn der Führer ihr Ziel nicht kennt: Die
+/// Verweise, die beim Nachreichen wegfallen dürfen, wenn der Führer ihr Ziel nicht kennt und nie
+/// kennen wird (nicht, solange es nur auf seine Quittung wartet): Die
 /// Route stuft sie dann ohnehin zu „ungebunden“ herab (Absender einer Meldung, LFH-610).
 const VERZICHTBAR: &[(&str, &str)] = &[
     ("meldung", "einheit_id"),
     ("meldung", "abschnitt_id"),
-    // Die Person kommt auch ohne versorgende Einheit und ohne den Eingang einer UHS an, die der
-    // Führer nicht kennt (LLH-1657, K6).
+    // Die Person kommt auch ohne versorgende Einheit und ohne Meldung an, die der Führer nicht
+    // kennt (LLH-1657, K6). Wartet der Bezug nur auf seine Quittung, wartet auch sie.
     ("einsatz_person", "versorgende_einheit_id"),
-    ("einsatz_person", "uhs_id"),
+    ("einsatz_person", "meldung_id"),
 ];
 
 /// Grund, wenn ein Bezug einer Erfassung schon nachgereicht, aber noch nicht wieder hier ist: Die
@@ -130,7 +133,8 @@ pub struct BruchErfassung {
     /// Tabelle der Zeile (`etb_eintrag`, `meldung`, `einsatz_person` …).
     pub tabelle: String,
     pub kategorie: SpiegelKategorie,
-    /// Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`).
+    /// Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`, `person`, `sichtung` …,
+    /// siehe [`NACHREICHBAR`]).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub antrag_art: Option<String>,
     /// Typ eines ETB-Eintrags (`meldung`, `lage`, …).
@@ -684,7 +688,6 @@ const PERSON_FELDER: &[(&str, &str)] = &[
     ("zeitpunkt_at", "erfasst_at"),
     ("versorgende_einheit_id", "versorgende_einheit_id"),
     ("meldung_id", "meldung_id"),
-    ("uhs_id", "aktuelle_uhs_id"),
     ("pat_nummer", "pat_nummer"),
     ("kontamination", "kontamination"),
     ("kostform", "kostform"),
@@ -789,6 +792,7 @@ async fn bezug(
     schluessel: &str,
 ) -> Result<Bezug, AppError> {
     type Zeile = (
+        i64,
         Option<String>,
         Option<String>,
         Option<i64>,
@@ -796,7 +800,8 @@ async fn bezug(
         Option<String>,
     );
     let zeile: Option<Zeile> = sqlx::query_as(
-        "SELECT nachgereicht_als, erledigt, folge_von, antrag_id, grund FROM einsatz_bruchstelle \
+        "SELECT id, nachgereicht_als, erledigt, folge_von, antrag_id, grund \
+         FROM einsatz_bruchstelle \
          WHERE einsatz_id = ? AND art = ? AND schluessel = ? AND entfernt = 1 \
          ORDER BY id DESC LIMIT 1",
     )
@@ -805,7 +810,7 @@ async fn bezug(
     .bind(schluessel)
     .fetch_optional(&mut *conn)
     .await?;
-    let Some((fremd, erledigt, folge_von, antrag_id, grund)) = zeile else {
+    let Some((id, fremd, erledigt, folge_von, antrag_id, grund)) = zeile else {
         return Ok(Bezug::Unberuehrt);
     };
     if let Some(fremd) = fremd {
@@ -823,10 +828,31 @@ async fn bezug(
     Ok(match erledigt.as_deref() {
         Some("nachgereicht") => Bezug::Wartet,
         Some(_) => Bezug::Fehlt,
-        // Ein Eintrag einer Kette, der noch gestellt wird.
-        None if folge_von.is_some() && antrag_id.is_none() && grund.is_none() => Bezug::Wartet,
+        // Ein Eintrag einer Kette, der noch gestellt wird; eine Folgezeile, die nie gestellt
+        // wird (eines nicht gestellten Ursprungs oder nicht nachreichbar), fehlt.
+        None if folge_von.is_some()
+            && antrag_id.is_none()
+            && grund.is_none()
+            && wartet_in_kette(conn, einsatz_id, id).await? =>
+        {
+            Bezug::Wartet
+        }
         None => Bezug::Fehlt,
     })
+}
+
+/// Ob die Kette eine Folgezeile noch stellt ([`Ketten::wartet`] für eine einzelne Zeile).
+async fn wartet_in_kette(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<bool, AppError> {
+    let zeilen = bruch_zeilen(conn, einsatz_id).await?;
+    let ketten = Ketten::neu(&zeilen);
+    Ok(zeilen
+        .iter()
+        .find(|z| z.id == id)
+        .is_some_and(|z| ketten.wartet(z)))
 }
 
 fn bezug_fehler(b: &Bezug) -> AppError {
@@ -915,7 +941,7 @@ async fn body_der_zeile(
                     .unwrap_or(Value::from(neu));
                 body.insert(v.pfad.to_string(), neu);
             }
-            _ if VERZICHTBAR.contains(&(tabelle, v.pfad)) => {
+            Bezug::Fehlt if VERZICHTBAR.contains(&(tabelle, v.pfad)) => {
                 body.remove(v.pfad);
             }
             f => return Err(bezug_fehler(&f)),
@@ -1097,14 +1123,35 @@ pub async fn alle_stellen(
 /// sich mit Grund von der Kette. Danach bekommt jede angekommene Person ihre Nachreich-Notiz
 /// (K3–K5). Läuft im Takt nach dem Abgleich; liefert die Einsätze, an denen sich etwas geändert hat.
 pub async fn ketten_fortsetzen(pool: &SqlitePool) -> Result<Vec<i64>, AppError> {
-    let einsaetze: Vec<i64> = sqlx::query_scalar(
-        "SELECT DISTINCT einsatz_id FROM einsatz_bruchstelle WHERE entfernt = 1 \
-         AND daten IS NOT NULL AND ((folge_von IS NOT NULL AND erledigt IS NULL \
-         AND antrag_id IS NULL AND grund IS NULL) \
-         OR (art = 'einsatz_person' AND erledigt = 'nachgereicht' AND notiz_at IS NULL))",
-    )
-    .fetch_all(pool)
-    .await?;
+    // Nur Einsätze, die hier noch Spiegel sind, und nur Ketten, deren Ursprung gestellt ist: Was
+    // nie gestellt wird, liest der Takt nicht jede Sekunde neu.
+    let tabellen: Vec<&str> = NACHREICHBAR
+        .iter()
+        .filter(|(_, art)| AN_DER_PERSON.contains(art))
+        .map(|(t, _)| *t)
+        .collect();
+    let platzhalter = vec!["?"; tabellen.len()].join(", ");
+    let sql = format!(
+        "WITH RECURSIVE weg(id, oben) AS ( \
+           SELECT id, folge_von FROM einsatz_bruchstelle WHERE entfernt = 1 \
+             AND daten IS NOT NULL AND folge_von IS NOT NULL AND erledigt IS NULL \
+             AND antrag_id IS NULL AND grund IS NULL AND art IN ({platzhalter}) \
+           UNION SELECT w.id, b.folge_von FROM weg w JOIN einsatz_bruchstelle b ON b.id = w.oben \
+             WHERE b.folge_von IS NOT NULL) \
+         SELECT DISTINCT b.einsatz_id FROM weg w JOIN einsatz_bruchstelle b ON b.id = w.oben \
+           JOIN einsatz e ON e.id = b.einsatz_id \
+           WHERE b.folge_von IS NULL AND b.erledigt = 'nachgereicht' AND e.spiegel = 1 \
+         UNION SELECT b.einsatz_id FROM einsatz_bruchstelle b JOIN einsatz e ON e.id = b.einsatz_id \
+           WHERE b.art = 'einsatz_person' AND b.entfernt = 1 AND b.daten IS NOT NULL \
+           AND b.erledigt = 'nachgereicht' AND b.notiz_at IS NULL \
+           AND b.nachgereicht_als IS NOT NULL AND e.spiegel = 1"
+    );
+    // Nur Platzhalter eingesetzt, die Tabellen gehen als Parameter.
+    let mut abfrage = sqlx::query_scalar(sqlx::AssertSqlSafe(sql));
+    for t in &tabellen {
+        abfrage = abfrage.bind(*t);
+    }
+    let einsaetze: Vec<i64> = abfrage.fetch_all(pool).await?;
     let mut geaendert = Vec::new();
     for e in einsaetze {
         match kette_des_einsatzes(pool, e).await {
@@ -1286,7 +1333,7 @@ fn nachreich_notiz_text(
     let mut teile = Vec::new();
     match person.get("registrier_nr").and_then(Value::as_i64) {
         Some(nr) => teile.push(format!(
-            "Vor der Notübernahme als {} erfasst, danach nachgereicht.",
+            "Als {} erfasst, nach der Notübernahme nachgereicht.",
             crate::person::registrier_anzeige(nr)
         )),
         None => teile.push("Nach der Notübernahme nachgereicht.".to_string()),
@@ -1295,6 +1342,9 @@ fn nachreich_notiz_text(
         if !matches!(status.as_str(), "erfasst" | "vermisst" | "betroffen") {
             teile.push(format!("Status vorher: {status}."));
         }
+    }
+    if person.get("haushalt_id").is_some_and(|h| !h.is_null()) {
+        teile.push("Haushalt nicht nachgereicht.".to_string());
     }
     for (tabelle, d) in eintraege {
         let Some(wort) = eintrag_wort(tabelle, d) else {
@@ -1472,15 +1522,18 @@ pub async fn quittung_uebernehmen(
 ) -> Result<(), AppError> {
     if abgelehnt {
         // Ein Eintrag einer Kette löst sich mit dem Grund von ihr und steht als eigene Zeile da
-        // (LLH-1657, K1); eine Erfassung ohne Ursprung behält ihren Platz.
-        let grund = grund
+        // (LLH-1657, K1); jede abgelehnte Zeile zeigt ihren Grund, auch beim zweiten Mal.
+        // Gekürzt wie der Grund am Antrag (`antrag::quittungen_uebernehmen`).
+        let grund: String = grund
             .map(str::trim)
             .filter(|g| !g.is_empty())
-            .unwrap_or("Abgelehnt.");
+            .unwrap_or("Abgelehnt.")
+            .chars()
+            .take(antrag::GRUND_MAX)
+            .collect();
         sqlx::query(
             "UPDATE einsatz_bruchstelle SET erledigt = NULL, erledigt_at = NULL, \
-             erledigt_von_id = NULL, \
-             grund = CASE WHEN folge_von IS NULL THEN grund ELSE ? END, folge_von = NULL \
+             erledigt_von_id = NULL, grund = ?, folge_von = NULL \
              WHERE antrag_id = ? AND erledigt = 'nachgereicht'",
         )
         .bind(grund)
@@ -1664,6 +1717,158 @@ mod tests {
         assert_eq!(liste[0].typ.as_deref(), Some("lage"));
     }
 
+    #[tokio::test]
+    async fn person_an_neuer_meldung_ist_eigene_erfassung_und_kommt_ohne_sie_an() {
+        let pool = crate::db::test_pool().await;
+        let e = einsatz(&pool).await;
+        gesichert(
+            &pool,
+            e,
+            "meldung",
+            "4",
+            serde_json::json!({"id": 4, "inhalt": "2 Verletzte", "von": "Abschnitt"}),
+        )
+        .await;
+        let p = gesichert(
+            &pool,
+            e,
+            "einsatz_person",
+            "5",
+            serde_json::json!({"id": 5, "name": "Muster", "meldung_id": 4, "haushalt_id": 9,
+                               "uhs_id": null, "aktuelle_uhs_id": 3}),
+        )
+        .await;
+        let b = gesichert(
+            &pool,
+            e,
+            "person_uhs_belegung",
+            "6",
+            serde_json::json!({"id": 6, "person_id": 5, "uhs_id": 3}),
+        )
+        .await;
+        ordnen(&pool, e).await;
+        assert_eq!(
+            folge_von(&pool, p).await,
+            None,
+            "die Person hängt nicht an der Meldung"
+        );
+        assert_eq!(
+            folge_von(&pool, b).await,
+            None,
+            "die Aufnahme in die UHS steht für sich"
+        );
+        let liste = liste(&pool, e, alles).await.unwrap();
+        let person = liste.iter().find(|l| l.id == p).unwrap();
+        assert_eq!(person.antrag_art.as_deref(), Some("person"));
+        let belegung = liste.iter().find(|l| l.id == b).unwrap();
+        assert!(
+            belegung.antrag_art.is_none(),
+            "nur lesbar und verwerfbar (K6)"
+        );
+
+        // Die offene Meldung kennt der Führer nicht: Die Person geht ohne sie und ohne UHS.
+        let mut conn = pool.acquire().await.unwrap();
+        let zeile = bruch_zeilen(&mut conn, e)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|z| z.id == p)
+            .unwrap();
+        let b = BEANTRAGBAR.iter().find(|b| b.art == "person").unwrap();
+        let body = body_der_zeile(&mut conn, e, "einsatz_person", b, &zeile.daten())
+            .await
+            .unwrap();
+        assert!(body.get("meldung_id").is_none(), "{body}");
+        assert!(body.get("uhs_id").is_none(), "{body}");
+        assert!(body.get("haushalt_id").is_none(), "{body}");
+    }
+
+    #[tokio::test]
+    async fn folgezeile_eines_nicht_gestellten_ursprungs_fehlt_statt_zu_warten() {
+        let pool = crate::db::test_pool().await;
+        let e = einsatz(&pool).await;
+        gesichert(
+            &pool,
+            e,
+            "einsatz_einheit",
+            "7",
+            serde_json::json!({"id": 7, "name": "Neue Einheit"}),
+        )
+        .await;
+        let f = gesichert(
+            &pool,
+            e,
+            "einsatz_fahrzeug",
+            "8",
+            serde_json::json!({"id": 8, "einheit_id": 7, "funkrufname": "RTW 1"}),
+        )
+        .await;
+        ordnen(&pool, e).await;
+        assert!(
+            folge_von(&pool, f).await.is_some(),
+            "das Fahrzeug hängt an der Einheit"
+        );
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(matches!(
+            bezug(&mut conn, e, "einsatz_fahrzeug", "8").await.unwrap(),
+            Bezug::Fehlt
+        ));
+    }
+
+    #[tokio::test]
+    async fn jede_ablehnung_haelt_ihren_grund_fest_gekuerzt() {
+        let pool = crate::db::test_pool().await;
+        let e = einsatz(&pool).await;
+        let z = gesichert(
+            &pool,
+            e,
+            "person_massnahme",
+            "3",
+            serde_json::json!({"id": 3, "person_id": 5, "art": "zugang"}),
+        )
+        .await;
+        let abgelehnt = |grund: String| {
+            let pool = pool.clone();
+            async move {
+                let mut conn = pool.acquire().await.unwrap();
+                // Der Antrag selbst spielt hier keine Rolle.
+                sqlx::query("PRAGMA foreign_keys = OFF")
+                    .execute(&mut *conn)
+                    .await
+                    .unwrap();
+                sqlx::query(
+                    "UPDATE einsatz_bruchstelle SET erledigt = 'nachgereicht', antrag_id = 41, \
+                     grund = NULL WHERE id = ?",
+                )
+                .bind(z)
+                .execute(&mut *conn)
+                .await
+                .unwrap();
+                quittung_uebernehmen(&mut conn, 41, true, None, Some(&grund))
+                    .await
+                    .unwrap();
+                sqlx::query("PRAGMA foreign_keys = ON")
+                    .execute(&mut *conn)
+                    .await
+                    .unwrap();
+                let g: Option<String> =
+                    sqlx::query_scalar("SELECT grund FROM einsatz_bruchstelle WHERE id = ?")
+                        .bind(z)
+                        .fetch_one(&mut *conn)
+                        .await
+                        .unwrap();
+                g
+            }
+        };
+        // Schon ohne Ursprung (wie nach der ersten Ablehnung): Der Grund steht trotzdem da.
+        assert_eq!(
+            abgelehnt("Unbekannte Maßnahme".into()).await.as_deref(),
+            Some("Unbekannte Maßnahme")
+        );
+        let lang = abgelehnt("x".repeat(10_000)).await.unwrap();
+        assert_eq!(lang.chars().count(), antrag::GRUND_MAX);
+    }
+
     #[test]
     fn systemeintrag_nennt_die_registriernummer() {
         assert_eq!(
@@ -1712,7 +1917,7 @@ mod tests {
             ],
         );
         assert!(
-            text.starts_with("Vor der Notübernahme als R-002 erfasst, danach nachgereicht."),
+            text.starts_with("Als R-002 erfasst, nach der Notübernahme nachgereicht."),
             "{text}"
         );
         assert!(text.contains("Status vorher: verstorben."), "{text}");

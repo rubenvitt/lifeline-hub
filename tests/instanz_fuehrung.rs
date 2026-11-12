@@ -2472,7 +2472,10 @@ async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
             .await
             .unwrap();
     assert_eq!(pat.as_deref(), Some("PAT-77"), "K2");
-    assert_eq!(status, "betroffen", "die Sichtung hebt wie am ELW");
+    assert_eq!(
+        status, "betroffen",
+        "Status wie am ELW, mit der Anlage übernommen"
+    );
     let massnahmen: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM person_massnahme WHERE person_id = ? AND art = 'blutstillung'",
     )
@@ -2489,7 +2492,7 @@ async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
             .unwrap();
     assert_eq!(notizen.len(), 1, "eine Nachreich-Notiz: {notizen:?}");
     assert!(
-        notizen[0].starts_with("Vor der Notübernahme als R-002 erfasst"),
+        notizen[0].starts_with("Als R-002 erfasst, nach der Notübernahme nachgereicht."),
         "K3: {notizen:?}"
     );
     assert!(

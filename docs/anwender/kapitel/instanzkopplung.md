@@ -492,10 +492,13 @@ nutzen darf.
   zweimal gestellt wird. Lehnt die führende ihn ab, steht die Erfassung wieder in der Liste.
 - **Personen** kommen samt Verlauf: Gestellt wird die Person, ihre Einträge folgen von selbst in
   der Reihenfolge ihrer Zeit, sobald die Person bei der führenden Installation angekommen ist.
-  Bis dahin steht in der Zeile „n Einträge folgen“. Danach bekommt die Person eine Notiz, unter
-  welcher Nummer sie vorher erfasst war und was dabei aufgehoben oder bestätigt wurde. Lehnt die
-  führende einen Eintrag ab, steht nur dieser wieder in der Liste, mit Grund. Einträge an einer
-  Person, die die führende schon kennt, stehen einzeln da.
+  Das Band zählt die gestellte Person nicht mehr; in der offenen Liste steht bis dahin „n Einträge
+  folgen“. Danach bekommt die Person eine Notiz, unter welcher Nummer sie vorher erfasst war und
+  was dabei aufgehoben oder bestätigt wurde. Lehnt die führende einen Eintrag ab, steht nur dieser
+  wieder in der Liste, mit Grund. Einträge an einer Person, die die führende schon kennt, stehen
+  einzeln da. Eine Person steht immer für sich, auch an einer neuen Meldung; kennt die führende
+  die Meldung nicht, kommt die Person ohne sie an. Haushalt und Aufnahme in eine UHS gehen nicht
+  mit; die Aufnahme steht als eigene Zeile da, den Haushalt nennt die Notiz.
 - **Alle stellen** erscheint ab zwei solchen Erfassungen und stellt sie in der Reihenfolge ihrer
   Zeit. Was noch nicht geht, etwa eine Meldung, deren Bezug die führende noch nicht kennt, bleibt
   in der Liste; der Grund steht neben dem Knopf.

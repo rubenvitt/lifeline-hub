@@ -1745,7 +1745,10 @@ export interface components {
         };
         /** @description Eine nicht übernommene Erfassung, wie die Liste am Band sie zeigt (N2). */
         BruchErfassung: {
-            /** @description Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`). */
+            /**
+             * @description Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`, `person`, `sichtung` …,
+             *     siehe [`NACHREICHBAR`]).
+             */
             antrag_art?: string | null;
             /**
              * Format: int64
