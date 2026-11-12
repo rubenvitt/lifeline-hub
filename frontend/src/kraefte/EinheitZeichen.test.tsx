@@ -1,5 +1,5 @@
 import { act } from '@testing-library/react';
-import { contrastSurface } from '@einsatzzeichen/core';
+import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { ConfigProvider, theme } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';

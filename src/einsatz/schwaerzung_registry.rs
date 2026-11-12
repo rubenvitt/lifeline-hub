@@ -2978,6 +2978,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
+    // Eingespieltes Archiv (LLH-1494, D10): wann der Einsatz wieder geht und die Prüfsumme der
+    // Datei, kein Personenbezug. Geht mit dem Einsatz.
+    TabellenRegel {
+        tabelle: "einsatz_archiv_eingespielt",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("sha256", G_ARCHIV),
+            retain("eingespielt_at", G_ZEIT),
+            retain("loeschen_at", G_ZEIT),
+        ],
+    },
+    // Platzhalter-Konten eines eingespielten Archivs (LLH-1494, D10): nur Kennungen. Der Name
+    // steht am Konto, das nach dem Einsatz gelöscht wird.
+    TabellenRegel {
+        tabelle: "archiv_konto",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("benutzer_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+        ],
+    },
     // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf
     // Stammdaten der Org, nie auf Einsatzzeilen.
     TabellenRegel {

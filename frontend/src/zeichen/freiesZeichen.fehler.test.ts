@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // hier mit einer Bibliothek, die solche Regeln vorspielt (Muster `fachobjektZeichen.fehler.test.ts`).
 const sperre = vi.hoisted(() => ({ feld: '' as string, fremd: false }));
 
-vi.mock('@einsatzzeichen/core', async (original) => {
-  const echt = await original<typeof import('@einsatzzeichen/core')>();
+vi.mock('@einsatzzeichen/core/exact', async (original) => {
+  const echt = await original<typeof import('@einsatzzeichen/core/exact')>();
   return {
     ...echt,
     drawAnySpec: vi.fn((spec: Record<string, unknown>) => {

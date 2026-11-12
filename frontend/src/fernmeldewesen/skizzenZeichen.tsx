@@ -23,17 +23,17 @@
 import {
   SKETCH_BUS_BAR_MARGIN_MM,
   SKETCH_CONDITION_SIGN_HEIGHT_MM,
-  TEXT_FONT_FAMILY_ATTR,
   busBar,
   busBarMinLength,
   commsArea,
   commsLink,
   conditionSign,
   conditionSignWidth,
-  pictogram,
   sketchPictogram,
   type SketchPictogramId,
-} from '@einsatzzeichen/core';
+} from '@einsatzzeichen/core/sketch';
+import { TEXT_FONT_FAMILY_ATTR } from '@einsatzzeichen/core';
+import { pictogram } from '@einsatzzeichen/core/blocks';
 import type {
   DepictionVariant,
   PictogramId,
