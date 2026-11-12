@@ -90,7 +90,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     auch lokal: `GITHUB_REPOSITORY=<owner>/<repo> scripts/stau-waechter.sh --nur-zeigen alle`
     (oder `alpha` für nur diesen Befund).
   - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`, für
-    „alpha rot“ das Archiv der Change `g10eo9co-alpha-rot-schutz`.
+    „alpha rot“ und „Baut mit Ziel-Branch“
+    `openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md`.
 - **Baut mit Ziel-Branch** (LLH-1849, `.github/workflows/ziel-branch-build.yml`,
   `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an oder Label
   `e2e`, kein Entwurf): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert

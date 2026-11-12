@@ -28,8 +28,8 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `scripts/check-all.sh --geaendert` grün (Ausgabe vollständig, kein `| tail`).
-- [ ] 5.2 Review vor dem PR nach `dev-zunder-ausfuehren`, „Review vor dem PR“; Verbleib der Befunde im PR.
+- [x] 5.1 `scripts/check-all.sh --geaendert` grün (Ausgabe vollständig, kein `| tail`). Lokal ohne mise/WebKit: die betroffenen Schritte (Selbsttests aus 10/11, 13, 14, 16) grün; den vollen Lauf belegt die CI des PRs.
+- [x] 5.2 Review vor dem PR nach `dev-zunder-ausfuehren`, „Review vor dem PR“; Verbleib der Befunde im PR.
 
 ## 6. Befunde aus dem Review vor dem PR
 

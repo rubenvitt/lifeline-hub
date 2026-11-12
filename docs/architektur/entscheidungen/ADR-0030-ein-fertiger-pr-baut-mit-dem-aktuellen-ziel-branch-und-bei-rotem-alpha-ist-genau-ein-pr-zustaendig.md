@@ -9,7 +9,7 @@ gilt_fuer:
   - scripts/ziel-branch-build.sh
   - scripts/stau-waechter.sh
 herleitung:
-  - openspec/changes/g10eo9co-alpha-rot-schutz/design.md
+  - openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md
   - Zunder LLH-1849 (Weg abgestimmt und Change freigegeben von Ruben am 12.11.2026)
 ---
 
