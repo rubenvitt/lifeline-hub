@@ -89,6 +89,38 @@ fn fordere_nicht_fuehrend(a: &AkteZeile, ich: &Ich) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Ob diese Instanz den Einsatz der Akte verwahrt (LLH-1647, E4).
+async fn ist_verwahrt(conn: &mut SqliteConnection, a: &AkteZeile) -> Result<bool, AppError> {
+    match a.einsatz_id {
+        Some(id) => crate::instanz::spiegel::lebensende::ist_verwahrt(conn, id).await,
+        None => Ok(false),
+    }
+}
+
+/// Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647, E4): Sonst ginge die Führung
+/// an eine Instanz, die den Einsatz nach der Nachbereitung gelöscht hat.
+async fn fordere_nicht_verwahrt(
+    conn: &mut SqliteConnection,
+    a: &AkteZeile,
+) -> Result<(), AppError> {
+    if ist_verwahrt(conn, a).await? {
+        return Err(AppError::Conflict("Einsatz ist verwahrt.".into()));
+    }
+    Ok(())
+}
+
+/// Eine Notübernahme braucht den Einsatz hier als Spiegel (LLH-1641, E4): Ohne ihn hätte diese
+/// Instanz nichts, womit sie weiterführen könnte.
+fn fordere_spiegel_hier(a: &AkteZeile) -> Result<(), AppError> {
+    if a.einsatz_id.is_none() {
+        return Err(AppError::Conflict(
+            "Der Einsatz liegt hier noch nicht vor. Übernehmen geht erst, wenn er gespiegelt ist."
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Reguläre Übergabe an das Gegenüber `an` (Spec „Reguläre Übergabe durch die führende Instanz“).
 pub async fn uebergeben(
     pool: &SqlitePool,
@@ -100,7 +132,14 @@ pub async fn uebergeben(
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
+        fordere_nicht_verwahrt(conn, &a).await?;
         let g = gegenueber(conn, &a, an).await?;
+        // Übergeben wird nur, was das Gegenüber vollständig hat (LLH-1641, E4); sonst entstünde
+        // ohne Not eine Bruchstelle.
+        if let Some(einsatz_id) = a.einsatz_id {
+            crate::instanz::spiegel::fuehrung::fordere_abgeglichen(conn, einsatz_id, g.kopplung_id)
+                .await?;
+        }
         a.set_epoche(&Epoche::naechste([&a.epoche()], &ich.kennung));
         a.fuehrer_kennung = g.kennung.clone();
         a.fuehrer_name = g.name.clone();
@@ -141,6 +180,7 @@ pub async fn code_abgeben(
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
+        fordere_nicht_verwahrt(conn, &a).await?;
         let g = gegenueber(conn, &a, an).await?;
         if g.richtung != InstanzKopplungRichtung::MeldetSich {
             return Err(AppError::UnprocessableEntity(
@@ -209,6 +249,7 @@ pub async fn notuebernahme_gegen_erreichte(
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_nicht_fuehrend(&a, &ich)?;
+        fordere_spiegel_hier(&a)?;
         let g = gegenueber_des_fuehrers(conn, &a).await?;
         if g.richtung != InstanzKopplungRichtung::MeldetSich {
             return Err(AppError::UnprocessableEntity(
@@ -271,6 +312,7 @@ pub async fn build_erklaerung_gegen_meldende(
     let ich = repo::ich(&mut conn).await?;
     let a = repo::load(&mut conn, akte_id).await?;
     fordere_nicht_fuehrend(&a, &ich)?;
+    fordere_spiegel_hier(&a)?;
     let g = gegenueber_des_fuehrers(&mut conn, &a).await?;
     if g.richtung != InstanzKopplungRichtung::WirdGemeldet {
         return Err(AppError::UnprocessableEntity(
@@ -309,6 +351,7 @@ pub async fn notuebernahme_gegen_meldende(
                 "Die Führung hat sich inzwischen geändert.".into(),
             ));
         }
+        fordere_spiegel_hier(&a)?;
         let von = a.fuehrer_name.clone();
         a.set_epoche(&e.epoche_neu);
         a.fuehrer_kennung = e.fuehrer_neu.clone();
@@ -507,6 +550,8 @@ pub struct FuehrungAnzeige {
     pub offen: Option<FuehrungOffen>,
     /// Diese Instanz hat die Führung beim Gegenüber erbeten.
     pub anfrage_offen: bool,
+    /// Diese Instanz verwahrt den Einsatz (LLH-1647, E4): keine Übergabe mehr.
+    pub verwahrt: bool,
     /// Die Gegenüber der Org, an die die Führung gehen kann.
     pub gegenueber: Vec<FuehrungGegenueber>,
     /// Richtung der Kopplung zur führenden Instanz, wenn ein Gegenüber führt: sie entscheidet,
@@ -556,6 +601,7 @@ pub async fn anzeige(
         bruch_at: a.bruch_at.clone(),
         offen,
         anfrage_offen: a.anfrage_at.is_some(),
+        verwahrt: ist_verwahrt(conn, a).await?,
         fuehrer_richtung: gegenueber
             .iter()
             .find(|g| g.kennung == a.fuehrer_kennung)
@@ -574,7 +620,9 @@ pub async fn load_fuer_einsatz(pool: &SqlitePool, einsatz_id: i64) -> Result<Akt
         .ok_or(AppError::NotFound)
 }
 
-/// Lädt eine Akte des Gegenübers der Org `org_id` (ohne lokalen Einsatz); sonst 404.
+/// Lädt eine Akte der Org `org_id` für die Seite „Instanzkopplung“; sonst 404. Gelistet werden
+/// dort die Akten des Gegenübers ([`repo::list_fremde_der_org`]); eine Akte, die inzwischen hier
+/// führt, antwortet weiter (409 aus den Regeln statt 404, LLH-1641).
 pub async fn load_fremde(
     pool: &SqlitePool,
     org_id: i64,
@@ -582,7 +630,7 @@ pub async fn load_fremde(
 ) -> Result<AkteZeile, AppError> {
     let mut conn = pool.acquire().await?;
     let a = repo::load(&mut conn, akte_id).await?;
-    if a.org_id != org_id || a.einsatz_id.is_some() {
+    if a.org_id != org_id {
         return Err(AppError::NotFound);
     }
     Ok(a)

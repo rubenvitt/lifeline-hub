@@ -1,7 +1,11 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { formatVor } from '../../anzeige/abstand';
-import type { EinsatzSpiegelAnzeige, SpiegelAntragAnzeige } from '../../api/types';
+import type {
+  AbgelehnterAntragAnzeige,
+  EinsatzSpiegelAnzeige,
+  SpiegelAntragAnzeige,
+} from '../../api/types';
 import type { PersonEintragAktion } from '../../offline/personEintrag';
 import { vormerkungText } from '../../personen/personEintragSpeichern';
 import {
@@ -75,6 +79,13 @@ export function antragZaehler(
   return teile;
 }
 
+/** Eigene Änderungen aus der Zeit vor dem Führungswechsel, die der neue Führer nicht kannte
+ *  (Bruchstelle, LLH-1641); ohne solche nichts. */
+export function bruchText(s: Pick<EinsatzSpiegelAnzeige, 'bruchstelle'>): string | null {
+  if (!s.bruchstelle) return null;
+  return `${s.bruchstelle} ${s.bruchstelle === 1 ? 'Änderung' : 'Änderungen'} nicht übernommen`;
+}
+
 /** Was beantragt wurde, als Wort; Arten wie in der Warteschlange. */
 const ART_WORT: Readonly<Record<string, string>> = {
   etb: 'ETB-Eintrag',
@@ -126,27 +137,31 @@ function personenAnzahl(n: number): string {
   return n === 1 ? '1 Person' : `${n} Personen`;
 }
 
-function auszug(text: string): string {
+function auszug(text: string, voll = false): string {
   const eineZeile = text.replace(/\s+/g, ' ');
-  return eineZeile.length > AUSZUG_MAX ? `${eineZeile.slice(0, AUSZUG_MAX)} …` : eineZeile;
+  return !voll && eineZeile.length > AUSZUG_MAX ? `${eineZeile.slice(0, AUSZUG_MAX)} …` : eineZeile;
 }
 
 /**
  * Die erfassten Daten in einer Zeile, soweit sie ohne Kennungen der führenden Instanz lesbar sind:
  * Wortlaut bei ETB, Meldung und Notiz, Name bei einer Person, Zahlen bei Meldungen und Ausgaben.
- * Leer, wenn nichts Lesbares da ist.
+ * Leer, wenn nichts Lesbares da ist. `voll` kürzt Freitexte nicht (LLH-1648: Karte und Kopie
+ * eines abgelehnten Antrags nach der Verwahrung).
  */
-export function antragDatenText(a: Pick<SpiegelAntragAnzeige, 'art' | 'daten'>): string {
+export function antragDatenText(
+  a: Pick<SpiegelAntragAnzeige, 'art' | 'daten'>,
+  { voll = false }: { voll?: boolean } = {},
+): string {
   const d = a.daten;
   switch (a.art) {
     case 'etb':
     case 'meldung': {
       const von = zeichenkette(d, a.art === 'etb' ? 'von' : 'absender');
       const inhalt = zeichenkette(d, 'inhalt');
-      return [von, inhalt ? auszug(inhalt) : null].filter(Boolean).join(': ');
+      return [von, inhalt ? auszug(inhalt, voll) : null].filter(Boolean).join(': ');
     }
     case 'notiz':
-      return auszug(zeichenkette(d, 'text') ?? '');
+      return auszug(zeichenkette(d, 'text') ?? '', voll);
     case 'person':
       return [zeichenkette(d, 'name'), zeichenkette(d, 'vorname')].filter(Boolean).join(', ');
     case 'stand': {
@@ -266,4 +281,31 @@ export function antragErfassungsort(
     default:
       return null;
   }
+}
+
+/** Einsatz eines abgelehnten Antrags nach der Verwahrung (LLH-1648): Nummer und Stichwort. */
+export function antragEinsatzText(
+  a: Pick<AbgelehnterAntragAnzeige, 'einsatz_id' | 'einsatznummer' | 'stichwort'>,
+): string {
+  const teile = [a.einsatznummer, a.stichwort].filter(Boolean);
+  return teile.length > 0 ? teile.join(' · ') : `#${a.einsatz_id}`;
+}
+
+/**
+ * Was „Kopieren“ an einem abgelehnten Antrag in die Zwischenablage legt (LLH-1648): Art, Einsatz,
+ * Erfassungszeit, die lesbaren Daten ungekürzt und der Grund, je eine Zeile. `zeit` formatiert in
+ * der Anzeigezone.
+ */
+export function antragKopierText(
+  a: AbgelehnterAntragAnzeige,
+  zeit: (utc: string) => string,
+): string {
+  const daten = antragDatenText(a, { voll: true });
+  return [
+    `Antrag: ${antragArtWort(a.art)}`,
+    `Einsatz: ${antragEinsatzText(a)}`,
+    `Erfasst: ${zeit(a.erfasst_at)}`,
+    ...(daten ? [`Daten: ${daten}`] : []),
+    ...(a.grund ? [`Grund: ${a.grund}`] : []),
+  ].join('\n');
 }

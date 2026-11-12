@@ -36,7 +36,8 @@ import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
  * 10.10.2026).
  *
  * Ein endgültig gelöschter Einsatz (LFH-750) ist nur noch eine Zeile des Löschprotokolls: ohne
- * Bezeichnung und ohne Akte, also ohne Link und ohne Zeilenklick.
+ * Bezeichnung und ohne Akte, also ohne Link und ohne Zeilenklick. Ebenso ein verwahrter
+ * (LLH-1494): ihn hält jetzt die genannte Installation.
  *
  * Sortieren und Filtern im Spaltenkopf (LLH-1096, Spec `tabellen-sortieren-filtern`): jede Spalte
  * sortiert, der Zustand filtert im Kopf (mehrere Zustände zugleich, je Wert gezählt) und ersetzt
@@ -49,12 +50,22 @@ const leer = '—';
 
 const GELOESCHT = 'endgültig gelöscht';
 
-function istGeloescht(e: Pick<AufbewahrungEintrag, 'zustand'>): boolean {
-  return e.zustand === 'endgueltig_geloescht';
+/** Nur noch eine Zeile des Löschprotokolls: endgültig gelöscht oder verwahrt, ohne Akte. */
+function ohneAkte(e: Pick<AufbewahrungEintrag, 'zustand'>): boolean {
+  return e.zustand === 'endgueltig_geloescht' || e.zustand === 'verwahrt';
 }
 
-/** Löschtermin des Skeletts, beim gelöschten Einsatz der Zeitpunkt der Löschung. */
+/** Was statt der Bezeichnung steht, wenn der Einsatz hier nicht mehr liegt. */
+function ohneBezeichnung(e: Pick<AufbewahrungEintrag, 'zustand' | 'gegenstelle'>): string {
+  return e.zustand === 'verwahrt' ? `An ${e.gegenstelle ?? 'Gegenstelle'} übergeben` : GELOESCHT;
+}
+
+/**
+ * Löschtermin des Skeletts, beim gelöschten Einsatz der Zeitpunkt der Löschung. Ein verwahrter
+ * Einsatz wird hier nicht gelöscht, sondern übergeben: kein Wert.
+ */
 function loeschung(e: AufbewahrungEintrag): string | undefined {
+  if (e.zustand === 'verwahrt') return undefined;
   return e.endgueltig_geloescht_at ?? e.loeschung_am ?? undefined;
 }
 
@@ -63,8 +74,10 @@ function loeschung(e: AufbewahrungEintrag): string | undefined {
  * zeigt die Bezeichnung, nie „—": die Zelle ist der Link in die Akte, n Links „—" wären nicht
  * zu unterscheiden.
  */
-function kennung(e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung'>) {
-  return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung ?? GELOESCHT}`;
+function kennung(
+  e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung' | 'zustand' | 'gegenstelle'>,
+) {
+  return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung ?? ohneBezeichnung(e)}`;
 }
 
 const spalten = spaltenFuer<AufbewahrungEintrag>()([
@@ -92,10 +105,10 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     key: 'bezeichnung',
     title: 'Bezeichnung',
     mindestBreite: 180,
-    sortWert: (e) => e.bezeichnung ?? GELOESCHT,
-    suchText: (e) => e.bezeichnung ?? GELOESCHT,
+    sortWert: (e) => e.bezeichnung ?? ohneBezeichnung(e),
+    suchText: (e) => e.bezeichnung ?? ohneBezeichnung(e),
     render: (_, e) =>
-      e.bezeichnung ?? <Typography.Text type="secondary">{GELOESCHT}</Typography.Text>,
+      e.bezeichnung ?? <Typography.Text type="secondary">{ohneBezeichnung(e)}</Typography.Text>,
   },
   {
     key: 'abgeschlossen',
@@ -173,7 +186,7 @@ const KARTE: Kartenplan<AufbewahrungEintrag, Spalte> = {
   art: 'plan',
   titel: {
     spalte: 'nummer',
-    ziel: (e) => (istGeloescht(e) ? null : adminAufbewahrungAktePfad(e.einsatz_id)),
+    ziel: (e) => (ohneAkte(e) ? null : adminAufbewahrungAktePfad(e.einsatz_id)),
   },
   status: (e) => aufbewahrungZustand[e.zustand],
   sekundaer: ['bezeichnung', 'frist', 'karenz'],
@@ -224,7 +237,7 @@ export default function AufbewahrungUebersicht() {
           mehrzahl="Einsätzen"
           gedaechtnis={gedaechtnis}
           onZeileKlick={(e) => {
-            if (!istGeloescht(e)) navigate(adminAufbewahrungAktePfad(e.einsatz_id));
+            if (!ohneAkte(e)) navigate(adminAufbewahrungAktePfad(e.einsatz_id));
           }}
         />
       )}

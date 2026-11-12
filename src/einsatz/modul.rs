@@ -270,6 +270,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     (EINSATZ_WURZEL, None),
     ("/api/einsaetze/{id}/abschliessen", None),
     ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
+    // Nachbereitungsfrist (LLH-1494): wie die Aufbewahrungsfrist.
+    ("/api/einsaetze/{id}/nachbereitung", None),
     ("/api/einsaetze/{id}/einstellungen", None),
     // Richtwerte des Unterkunftsrechners (LLH-1520): Einstellung des Einsatzes, modul-los wie die
     // übrigen Einstellungen; der Rechner der Betreuung und die Einstellungsseite lesen sie.

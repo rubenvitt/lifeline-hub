@@ -328,6 +328,52 @@ async fn verwerfen(
     grund: &str,
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
+    let text = format!("Übernahme durch {} verworfen: {grund}", m.fuehrer_name);
+    fuehre_weiter(conn, ich, a, m, &text, aus).await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Alarm { einsatz_id });
+    }
+    aus.folgen.push(Folge::Spur {
+        aktion: AdminAktion::FuehrungVerworfen,
+        org_id: a.org_id,
+        grund: spur_text(a, &text),
+    });
+    aus.hinweis = Some(format!(
+        "{} meldet eine ungültige Übernahme der Führung ({}): {grund}",
+        kopplung.gegenueber_name, a.bezeichnung
+    ));
+    Ok(())
+}
+
+/// Lehnt eine Verwahrung ab, die hier nicht quittiert ist (meldende Seite, LLH-1647, E3): Der
+/// Einsatz liegt weiter hier, etwa weil er sich nach dem Angebot noch geändert hat oder die
+/// Quittung noch fehlt. Ich führe mit der nächsten Epoche weiter, ohne Alarm und ohne Admin-Spur:
+/// Die Gegenstelle hat nichts Unrechtes getan, sie wird wieder Spiegel, und die Verwahrung läuft
+/// mit dem nächsten Angebot erneut.
+async fn verwahrung_ablehnen(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let grund = match a.einsatz_id {
+        Some(id) => crate::instanz::spiegel::lebensende::grund_gegen_verwahrung(conn, id).await?,
+        None => "Übergabe hier nicht bestätigt",
+    };
+    let text = format!("Verwahrung durch {} abgelehnt: {grund}", m.fuehrer_name);
+    fuehre_weiter(conn, ich, a, m, &text, aus).await
+}
+
+/// Ich führe gegen die Epoche `m` mit der nächsten weiter (Art `verworfen`), Verlauf mit `text`.
+async fn fuehre_weiter(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    text: &str,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
     let mut bekannte = vec![a.epoche(), m.epoche.clone()];
     if let Some(offen) = a
         .offen
@@ -349,44 +395,59 @@ async fn verwerfen(
     a.offen_bruch_at = None;
     a.abgabe_schluessel = None;
     repo::save(conn, a, true).await?;
-    let text = format!("Übernahme durch {} verworfen: {grund}", m.fuehrer_name);
     repo::add_verlauf(
         conn,
         a,
         VerlaufNeu {
             von_name: Some(&von),
             nach_name: &ich.name,
-            grund: Some(&text),
+            grund: Some(text),
             ..VerlaufNeu::default()
         },
     )
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
-        aus.folgen.push(Folge::Alarm { einsatz_id });
         aus.folgen.push(Folge::Kopf { einsatz_id });
     }
-    aus.folgen.push(Folge::Spur {
-        aktion: AdminAktion::FuehrungVerworfen,
-        org_id: a.org_id,
-        grund: spur_text(a, &text),
-    });
-    aus.hinweis = Some(format!(
-        "{} meldet eine ungültige Übernahme der Führung ({}): {grund}",
-        kopplung.gegenueber_name, a.bezeichnung
-    ));
     Ok(())
 }
 
-/// Erfüllt eine Anfrage: die erreichte Seite gibt an die meldende ab (D9).
+/// Erfüllt eine Anfrage: die erreichte Seite gibt an die meldende ab (D9). Hat die meldende Seite
+/// noch nicht alles, wartet die Anfrage (`anfrage_von`) und wird bei einer ihrer nächsten
+/// Meldungen erfüllt ([`erfuelle_wartende`], LLH-1641 E4). Die Epoche der Anfrage ist die der
+/// Akte (sie gilt nur dem Stand, den sie sah).
 async fn erfuelle_anfrage(
     conn: &mut SqliteConnection,
     ich: &Ich,
     kopplung: &KopplungZeile,
     a: &mut AkteZeile,
-    m: &AkteMeldung,
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
-    let neu = Epoche::naechste([&a.epoche(), &m.epoche], &ich.kennung);
+    if let Some(einsatz_id) = a.einsatz_id {
+        // Einen verwahrten Einsatz gibt diese Instanz nicht mehr ab (LLH-1647, E4).
+        if crate::instanz::spiegel::lebensende::ist_verwahrt(conn, einsatz_id).await? {
+            sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = NULL WHERE id = ?")
+                .bind(a.id)
+                .execute(&mut *conn)
+                .await?;
+            return Ok(());
+        }
+        if !crate::instanz::spiegel::fuehrung::ist_abgeglichen(conn, einsatz_id, kopplung.id)
+            .await?
+        {
+            sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = ? WHERE id = ?")
+                .bind(&kopplung.gegenueber_kennung)
+                .bind(a.id)
+                .execute(&mut *conn)
+                .await?;
+            return Ok(());
+        }
+    }
+    sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = NULL WHERE id = ?")
+        .bind(a.id)
+        .execute(&mut *conn)
+        .await?;
+    let neu = Epoche::naechste([&a.epoche()], &ich.kennung);
     a.set_epoche(&neu);
     a.fuehrer_kennung = kopplung.gegenueber_kennung.clone();
     a.fuehrer_name = kopplung.gegenueber_name.clone();
@@ -407,6 +468,28 @@ async fn erfuelle_anfrage(
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         aus.folgen.push(Folge::Kopf { einsatz_id });
+    }
+    Ok(())
+}
+
+/// Erfüllt wartende Anfragen der meldenden Seite, sobald sie alles hat (LLH-1641, E4).
+async fn erfuelle_wartende(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_fuehrung WHERE anfrage_von = ? AND fuehrer_kennung = ? \
+         AND offen IS NULL ORDER BY id",
+    )
+    .bind(&kopplung.gegenueber_kennung)
+    .bind(&ich.kennung)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in ids {
+        let mut a = repo::load(conn, id).await?;
+        erfuelle_anfrage(conn, ich, kopplung, &mut a, aus).await?;
     }
     Ok(())
 }
@@ -539,6 +622,47 @@ pub async fn apply_eingang(
                     ));
                     continue;
                 }
+                // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647, E4). Einzige
+                // Ausnahme: Die Gegenstelle, die ihn übergab, lehnt die Verwahrung ab, weil er dort
+                // noch liegt (E3); dann wird diese Instanz wieder Spiegel.
+                if nimmt_mir && richtung == InstanzKopplungRichtung::WirdGemeldet {
+                    if let Some(einsatz_id) = a.einsatz_id {
+                        let ablehnung = a.art() == FuehrungWechselArt::Verwahrung
+                            && m.art == FuehrungWechselArt::Verworfen.as_str()
+                            && m.fuehrer == sender
+                            && m.kennung.starts_with(&format!("{sender}/"));
+                        if !ablehnung
+                            && crate::instanz::spiegel::lebensende::ist_verwahrt(conn, einsatz_id)
+                                .await?
+                        {
+                            aus.hinweis = Some(format!(
+                                "{} beansprucht die Führung des verwahrten Einsatzes „{}“: abgelehnt",
+                                kopplung.gegenueber_name, a.bezeichnung
+                            ));
+                            continue;
+                        }
+                    }
+                }
+                // Verwahrung durch die erreichte Seite (LLH-1647, E2, E3): Hat sie die Übergabe
+                // quittiert, wird der Einsatz hier gleich abgeräumt, die Akte mit ihm; sonst liegt
+                // er weiter hier, und die Verwahrung wird ohne Alarm abgelehnt.
+                if nimmt_mir
+                    && richtung == InstanzKopplungRichtung::MeldetSich
+                    && m.art == FuehrungWechselArt::Verwahrung.as_str()
+                    && m.fuehrer == sender
+                {
+                    let quittiert = match a.einsatz_id {
+                        Some(id) => {
+                            crate::instanz::spiegel::lebensende::ist_verwahrung_quittiert(conn, id)
+                                .await?
+                        }
+                        None => false,
+                    };
+                    if !quittiert {
+                        verwahrung_ablehnen(conn, &ich, &mut a, m, &mut aus).await?;
+                    }
+                    continue;
+                }
                 if !nimmt_mir {
                     let gewinne = m.fuehrer == ich.kennung && !ich_fuehre;
                     let von = a.fuehrer_name.clone();
@@ -582,12 +706,20 @@ pub async fn apply_eingang(
                 match entscheide(richtung, bewiesen) {
                     Entscheid::Annehmen => {
                         let art = FuehrungWechselArt::parse(&m.art);
+                        let verwahrung_abgelehnt = a.art() == FuehrungWechselArt::Verwahrung;
                         uebernimm(&mut a, m);
                         a.bruch_at = Some(bruch.clone());
                         a.offen = None;
                         a.offen_bruch_at = None;
                         repo::save(conn, &mut a, true).await?;
-                        let grund = grund_der(m);
+                        let grund = if verwahrung_abgelehnt {
+                            Some(format!(
+                                "Verwahrung von {} abgelehnt, der Einsatz liegt dort weiter",
+                                kopplung.gegenueber_name
+                            ))
+                        } else {
+                            grund_der(m)
+                        };
                         repo::add_verlauf(
                             conn,
                             &a,
@@ -608,6 +740,13 @@ pub async fn apply_eingang(
                                 Some(AdminAktion::FuehrungWiderspruch),
                                 format!(
                                     "{} hat der Notübernahme widersprochen",
+                                    kopplung.gegenueber_name
+                                ),
+                            ),
+                            Some(FuehrungWechselArt::Verworfen) if verwahrung_abgelehnt => (
+                                None,
+                                format!(
+                                    "{} hat die Verwahrung abgelehnt",
                                     kopplung.gegenueber_name
                                 ),
                             ),
@@ -713,7 +852,7 @@ pub async fn apply_eingang(
                 // Eine Anfrage gilt nur dem Stand, den sie sah (Review LLH-1491: ein alter
                 // Merker gäbe die Führung sonst ohne Menschen zurück).
                 if m.anfrage && ich_fuehre && richtung == InstanzKopplungRichtung::WirdGemeldet {
-                    erfuelle_anfrage(conn, &ich, kopplung, &mut a, m, &mut aus).await?;
+                    erfuelle_anfrage(conn, &ich, kopplung, &mut a, &mut aus).await?;
                     continue;
                 }
                 if a.einsatz_id.is_none()
@@ -730,6 +869,9 @@ pub async fn apply_eingang(
                 repo::save(conn, &mut a, true).await?;
             }
         }
+    }
+    if richtung == InstanzKopplungRichtung::WirdGemeldet {
+        erfuelle_wartende(conn, &ich, kopplung, &mut aus).await?;
     }
     Ok(aus)
 }

@@ -57,7 +57,9 @@ pub struct Gefuehrt {
 }
 
 /// Die Einsätze der Org, die diese Instanz führt und liefert (D6): aktive, und abgeschlossene,
-/// solange die Gegenseite den Stand des Abschlusses noch nicht hat. Ohne Demo-Einsätze.
+/// solange die Gegenseite den Stand des Abschlusses noch nicht hat. Ohne Demo-Einsätze und ohne
+/// Einsätze, die gerade abgeräumt werden. Ein soft-gelöschter oder geschwärzter Einsatz geht weiter
+/// hinaus (LLH-1494, D2): so kommen Sperre, Wiederherstellung und Schwärzung beim Spiegel an.
 pub async fn list_gefuehrt(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -65,8 +67,9 @@ pub async fn list_gefuehrt(
 ) -> Result<Vec<Gefuehrt>, AppError> {
     let alle: Vec<Gefuehrt> = sqlx::query_as(
         "SELECT e.id, e.kennung, e.freigabestufe, e.status, e.org_id FROM einsatz e \
-         WHERE e.org_id = ? AND e.spiegel = 0 AND e.geloescht_at IS NULL \
-         AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) ORDER BY e.id",
+         WHERE e.org_id = ? AND e.spiegel = 0 \
+         AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id) ORDER BY e.id",
     )
     .bind(org_id)
     .fetch_all(&mut *conn)
@@ -101,7 +104,10 @@ pub async fn ensure_kennung(
     if let Some(k) = &e.kennung {
         return Ok(k.clone());
     }
-    let k = format!("{eigene_kennung}/{}", e.id);
+    // Mit Zufallsteil, damit eine neu aufgesetzte Instanz keine Kennung eines früheren Einsatzes
+    // wiederholt, die beim Gegenüber noch als Spiegel steht (LLH-1641, E2).
+    let zufall = uuid::Uuid::new_v4().simple().to_string();
+    let k = format!("{eigene_kennung}/{}-{}", e.id, &zufall[..8]);
     sqlx::query("UPDATE einsatz SET kennung = ? WHERE id = ? AND kennung IS NULL")
         .bind(&k)
         .bind(e.id)
@@ -130,7 +136,7 @@ fn select_sql(t: &Tabelle) -> String {
 }
 
 /// Lädt eine Zeile; `None`, wenn es sie nicht (mehr) gibt.
-async fn load_zeile(
+pub(super) async fn load_zeile(
     conn: &mut SqliteConnection,
     t: &Tabelle,
     schluessel: &str,
@@ -365,25 +371,44 @@ async fn konten(
 async fn baue_zeile(
     conn: &mut SqliteConnection,
     a: &Absender<'_>,
+    einsatz_id: i64,
     t: &Tabelle,
     schluessel: &str,
     stand: i64,
 ) -> Result<Zeile, AppError> {
     let geladen = load_zeile(conn, t, schluessel).await?;
     let mut gegen = None;
+    let mut katalogzeile = false;
     let (daten, blob, geloescht) = match geladen {
         Some((mut daten, blob)) => {
             if a.meldend {
                 stammdaten_hinaus(conn, a, t, &mut daten).await?;
                 if katalog::ist_katalog_daten(t.name, &daten) {
+                    katalogzeile = true;
                     gegen =
                         katalog::gegen_hinaus(conn, a.kopplung_org_id, t.name, schluessel).await?;
                 }
             }
+            // Ein Inhalt, den diese Instanz selbst noch abruft, ist unvollständig: Die Angabe
+            // kommt aus dem Abruf, damit der Empfänger auf den richtigen Inhalt wartet (E7).
+            let blob = match blob {
+                Some(b) if t.blob.is_some() => Some(
+                    super::anhang::offene_angabe(conn, t.name, schluessel)
+                        .await?
+                        .unwrap_or(b),
+                ),
+                b => b,
+            };
             (Some(Value::Object(daten)), blob, false)
         }
         None => (None, None, true),
     };
+    // Eine Zeile, die diese Instanz als Spiegel vom Empfänger bekam, trägt dessen Schlüssel mit
+    // (LLH-1641, E3); so ersetzt sie dort die eigene Zeile, statt eine zweite anzulegen.
+    if !katalogzeile {
+        gegen = super::fuehrung::gegen_hinaus(conn, einsatz_id, a.kopplung_id, t.name, schluessel)
+            .await?;
+    }
     Ok(Zeile {
         art: t.name.to_string(),
         schluessel: schluessel.to_string(),
@@ -464,7 +489,7 @@ pub async fn liefere_einsatz(
             bis = stand;
             continue;
         };
-        let z = begrenzt(baue_zeile(conn, a, t, &schluessel, stand).await?);
+        let z = begrenzt(baue_zeile(conn, a, e.id, t, &schluessel, stand).await?);
         let bytes = groesse(&z);
         // Eine einzelne Zeile über dem Rest des Budgets geht, wenn sie die erste des Pakets ist;
         // dort ist das Budget nie kleiner als `ZEILE_MAX`.
@@ -628,7 +653,7 @@ async fn abhaengige(
             let Some(t) = schema.tabelle(art) else {
                 continue;
             };
-            let z = begrenzt(baue_zeile(conn, a, t, &schluessel, stand).await?);
+            let z = begrenzt(baue_zeile(conn, a, einsatz_id, t, &schluessel, stand).await?);
             if z.geloescht {
                 continue;
             }

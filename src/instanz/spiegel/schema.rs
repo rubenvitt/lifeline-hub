@@ -14,8 +14,7 @@ use sqlx::SqliteConnection;
 use std::collections::HashMap;
 
 /// Spalten, die nur an dieser Instanz gelten und nie geliefert werden.
-/// `fuehrung_bei` ist die Schreibsperre aus der Führungsakte dieser Instanz (LLH-1491).
-pub const LOKALE_SPALTEN: &[(&str, &str)] = &[("einsatz", "spiegel"), ("einsatz", "fuehrung_bei")];
+pub const LOKALE_SPALTEN: &[(&str, &str)] = &[("einsatz", "spiegel")];
 
 /// Wohin ein Verweis zeigt und wie die Gegenseite ihn abbildet (D5).
 #[derive(Debug, Clone, PartialEq, Eq)]

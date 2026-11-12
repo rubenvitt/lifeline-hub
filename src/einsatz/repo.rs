@@ -305,12 +305,14 @@ macro_rules! einsatzleiter_joins {
 }
 
 /// Die Führung je Einsatz (LLH-1491), wortgleich in `laden` und `liste_fuer`: die Spalten hinter
-/// das SELECT, der Join hinter `FROM einsatz e`. Ohne Schalter findet der Join keine Akte, und
-/// `fuehrung_bei` ist NULL (der Start richtet es aus). Gelesen über
+/// das SELECT, der Join hinter `FROM einsatz e`. Ohne Schalter findet der Join keine Akte. Nur
+/// Anzeige; geschützt ist ein fremd geführter Einsatz als Spiegel (LLH-1641). Gelesen über
 /// `instanz::fuehrung::FuehrungSpalten`.
 macro_rules! fuehrung_spalten {
     () => {
-        "e.fuehrung_bei, ef.epoche_zaehler AS fuehrung_epoche, ef.fuehrer_name AS fuehrung_fuehrer, \
+        "COALESCE(ef.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet), 0) \
+           AS fuehrung_fremd, \
+         ef.epoche_zaehler AS fuehrung_epoche, ef.fuehrer_name AS fuehrung_fuehrer, \
          ef.offen IS NOT NULL AS fuehrung_offen"
     };
 }
@@ -331,7 +333,9 @@ macro_rules! spiegel_spalten {
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
              AND sa.zustand IN ('ausstehend', 'zugestellt')) AS spiegel_ausstehend, \
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
-             AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt"
+             AND sa.zustand = 'abgelehnt') AS spiegel_abgelehnt, \
+         (SELECT COUNT(*) FROM einsatz_bruchstelle eb WHERE eb.einsatz_id = e.id \
+             AND eb.entfernt = 1) AS spiegel_bruchstelle"
     };
 }
 
@@ -353,8 +357,12 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
+                e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 o.name AS org_name, \
+                (SELECT v.gegenstelle FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung_gegenstelle, \
+                (SELECT v.grund FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung_grund, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
@@ -479,6 +487,7 @@ pub async fn liste_fuer(
         sachverhalt: Option<String>,
         anzahl_betroffene_initial: Option<i64>,
         retention_bis: Option<String>,
+        nachbereitung_bis: Option<String>,
         geloescht_at: Option<String>,
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
@@ -515,7 +524,7 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
+                e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle, \
                 m.fuehrungsfunktion AS meine_fuehrungsfunktion, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
@@ -628,6 +637,8 @@ pub async fn liste_fuer(
                 sachverhalt: r.sachverhalt,
                 anzahl_betroffene_initial: r.anzahl_betroffene_initial,
                 retention_bis: r.retention_bis,
+                nachbereitung_bis: r.nachbereitung_bis,
+                verwahrung: None,
                 meine_rolle: r.meine_rolle,
                 meine_fuehrungsstelle,
                 meine_sachgebiete,
@@ -754,6 +765,21 @@ pub async fn abschliessen(
                     .await?;
                     etb_eintrag_ids.push(etb_id);
                 }
+            }
+        }
+        // LLH-1494 (design.md D1): Nachbereitungsfrist aus der Org-Vorgabe.
+        if let Some(tage) = org_einstellungen.nachbereitung_tage {
+            if let Some(etb_id) = super::nachbereitung::beim_abschluss(
+                &mut tx,
+                einsatz_id,
+                von_benutzer_id,
+                einstellungen.etb_startwert(),
+                &stil,
+                tage,
+            )
+            .await?
+            {
+                etb_eintrag_ids.push(etb_id);
             }
         }
         if !kategorie_vorgaben.is_empty() {
@@ -977,7 +1003,8 @@ pub(crate) async fn system_audit_tx(
 /// ist hart im WHERE — aktive Einsätze sind NIE fällig. Lexikografischer
 /// Zeitvergleich (kanonisches Format). Org-isoliert über die `einsatz`-Tabelle.
 pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<i64>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let ids = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM einsatz \
          WHERE status = ? AND retention_bis IS NOT NULL \
@@ -1178,7 +1205,8 @@ pub async fn faellige_purge(
     pool: &SqlitePool,
     _karenz_tage: i64,
 ) -> Result<Vec<(i64, String)>, AppError> {
-    // Spiegel bleiben aus (LLH-1492, design.md D10); ihr Lebensende regelt LLH-1494.
+    // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
+    // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let rows = sqlx::query_as::<_, (i64, String)>(sqlx::AssertSqlSafe(format!(
         "SELECT id, geloescht_at FROM einsatz \
          WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL AND {} \
@@ -1238,6 +1266,35 @@ pub(crate) async fn schwaerze_einsatz_auf_antrag_tx(
     Ok(true)
 }
 
+/// Nach jeder Schwärzung am Einsatz (Kategorie, Löschersuchen je Person, ganzer Einsatz), in der
+/// Transaktion der Schwärzung: Die Bruchstelle (LLH-1641, E6) hält ganze Zeilen als JSON, und
+/// welche Kategorie oder Person darin steht, sagt keine Spalte. Darum geht sie ganz. Die neue
+/// Zufallsmarke `schwaerzung_marke` am Kopf reist mit der Lieferung zum Spiegel, der daran seine
+/// eigene Bruchstelle räumt (LLH-1649, `instanz::spiegel::fuehrung::raeume_bruchstelle`). Jede
+/// Marke merkt sich der Einsatz (`einsatz_schwaerzung_marke`): Bringt ein neuer Führer später
+/// eine Marke, die diese Seite schon kannte, hat er seither nicht geschwärzt.
+pub(crate) async fn nach_schwaerzung_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("UPDATE einsatz SET schwaerzung_marke = lower(hex(randomblob(8))) WHERE id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO einsatz_schwaerzung_marke (einsatz_id, marke) \
+         SELECT id, schwaerzung_marke FROM einsatz WHERE id = ?",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Der Scrub einer Schwärzung des ganzen Einsatzes — für den fristbasierten Weg (Phase B) und den
 /// Antrag (LFH-751) derselbe: alle Scrub-Spalten gleich welcher Zuordnung, die Tombstones jeder
 /// Datenkategorie (LFH-749, design.md D5) und jeder offene Löschersuchen-Antrag als erfüllt, damit
@@ -1253,6 +1310,7 @@ async fn scrubbe_einsatz_ganz_tx(
         super::schwaerzung_registry::Umfang::Alles,
     )
     .await?;
+    nach_schwaerzung_tx(&mut *conn, einsatz_id).await?;
     sqlx::query(
         "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
          WHERE einsatz_id = ? AND geschwaerzt_at IS NULL",
@@ -1638,19 +1696,15 @@ pub(crate) async fn fordere_aktiv_in_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<(), AppError> {
-    let zeile: Option<(String, Option<String>)> =
-        sqlx::query_as("SELECT status, fuehrung_bei FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-    match zeile {
-        Some((status, _)) if status != "aktiv" => Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        )),
-        // Führung je Einsatz (LLH-1491): eine andere Instanz führt.
-        Some((_, Some(bei))) => Err(super::berechtigung::fuehrung_error(&bei)),
-        Some(_) => Ok(()),
-        None => Err(AppError::Conflict(
+    // Führt eine andere Instanz, ist der Einsatz hier ein Spiegel; den Schutz tragen dessen
+    // Trigger (LLH-1641, ADR-0018).
+    let status: Option<String> = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    match status {
+        Some(status) if status == "aktiv" => Ok(()),
+        _ => Err(AppError::Conflict(
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
         )),
     }
@@ -1826,6 +1880,12 @@ mod tests {
                     .unwrap()
             }
         };
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz WHERE id = ? AND schwaerzung_marke IS NOT NULL")
+                .await,
+            1,
+            "die Marke trägt die Schwärzung zum Spiegel (LLH-1649)"
+        );
         assert_eq!(
             zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,
             0,

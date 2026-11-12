@@ -38,6 +38,27 @@ pub(crate) async fn als_spiegel_markieren(pool: &sqlx::SqlitePool, einsatz_id: i
     tx.commit().await.unwrap();
 }
 
+/// Führt in Tests eine Anweisung an einem Spiegel unter dem Merker `spiegel_uebernahme` aus (wie
+/// [`als_spiegel_markieren`]); `ids` werden der Reihe nach gebunden.
+#[cfg(test)]
+pub(crate) async fn unter_merker(pool: &sqlx::SqlitePool, sql: &'static str, ids: &[i64]) {
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let mut q = sqlx::query(sql);
+    for id in ids {
+        q = q.bind(*id);
+    }
+    q.execute(&mut *tx).await.unwrap();
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

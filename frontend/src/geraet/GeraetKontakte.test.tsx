@@ -213,6 +213,7 @@ describe('Einheitengerät — Kontakte', () => {
       beendet: false,
       antraege_ausstehend: 0,
       antraege_abgelehnt: 0,
+      bruchstelle: 0,
     };
     function amSpiegel(antraege: unknown[] = []) {
       const { gesendet } = stelleBereit();

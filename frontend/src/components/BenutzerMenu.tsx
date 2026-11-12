@@ -1,34 +1,21 @@
 import {
   IconAbmelden,
   IconChevronRunter,
-  IconDokument,
   IconDokumente,
   IconGlocke,
   IconPerson,
   IconPosteingang,
-  IconSprechblase,
-  type Icon,
 } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
+import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
-import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
-import {
-  useDichte,
-  useHelligkeit,
-  useThemeMode,
-  type ThemeModus,
-} from '../theme/ThemeModeProvider';
-import { farbenDunkel, rahmenFarben, schrift, type Dichte } from '../theme/tokens';
-import {
-  DARSTELLUNG_OPTIONEN,
-  DICHTE_OPTIONEN,
-  HELLIGKEIT_OPTIONEN,
-} from '../theme/darstellungOptionen';
-import { HELLIGKEIT_BODEN_WARNUNG, alsHelligkeit } from '../theme/helligkeit';
+import { useDichte } from '../theme/ThemeModeProvider';
+import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
@@ -39,14 +26,13 @@ function initialen(name: string): string {
   return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
 }
 
-/** Präfixe der beiden Umschalt-Gruppen. Sie tragen den Wert im Schlüssel,
- *  damit `onClick` ohne zweite Zuordnungstabelle auskommt. */
-const DARSTELLUNG_PRAEFIX = 'darstellung:';
-const DICHTE_PRAEFIX = 'stufe:';
-const HELLIGKEIT_PRAEFIX = 'helligkeit:';
-
-/** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`). */
-const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
+/** Breite des geöffneten Menüs ab `md` (LLH-1642): die drei Leisten tragen ihre Wörter ganz. */
+const MENUE_BREITE = 320;
+/**
+ * Breite ab `md` im Handschuh-Betrieb (D12): fünf Helligkeitsstufen à 72 px plus Zielabstand
+ * (2 × 8 px) brauchen 440 px; mit Polsterung des Menüs 480.
+ */
+const MENUE_BREITE_HANDSCHUH = 480;
 
 /** Deckel des Etiketts am Trigger: längere Funktionen und Namen enden mit „…“. */
 const ETIKETT_DECKEL = 180;
@@ -60,21 +46,34 @@ const ETIKETT_DECKEL = 180;
 const ETIKETT_PLATZ = 120;
 
 /**
- * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
- * Kanal nach WCAG 1.4.1 und über den zugänglichen Namen prüfbar.
+ * Tab im geöffneten Menü (LLH-1642 D2): `rc-menu` wandert mit den Pfeilen nur über `menuitem`s,
+ * und `rc-dropdown` schließt beim zweiten Tab. Die Segmente der Gruppe „Anzeige“ wären so per
+ * Tastatur unerreichbar. Deshalb führt Tab vom Menü in die Gruppe und darin von Leiste zu Leiste
+ * (je das gewählte Segment, roving tabindex); Tab hinter der letzten Leiste und Umschalt+Tab vor der
+ * ersten fallen an `rc-dropdown` durch und schließen das Menü wie bisher. Das Abfangen am `<ul>`
+ * des Menüs reicht, weil React im Portal-Behälter lauscht und `stopPropagation` damit vor dem
+ * `window`-Lauscher von `rc-dropdown` greift.
  */
-function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Icon, aktiv: boolean) {
-  return {
-    key: `${praefix}${wert}`,
-    icon: <Icon size={16} />,
-    label: aktiv ? `${titel} ✓` : titel,
-  };
+function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
+  if (e.key !== 'Tab') return;
+  const gruppe = e.currentTarget.querySelector<HTMLElement>(`[data-lfh="${ANZEIGE_GRUPPE}"]`);
+  if (!gruppe) return;
+  const halte = [...gruppe.querySelectorAll<HTMLElement>('[role="radio"][tabindex="0"]')];
+  if (halte.length === 0) return;
+  const jetzt = halte.indexOf(document.activeElement as HTMLElement);
+  const ziel = jetzt === -1 ? (e.shiftKey ? halte.length - 1 : 0) : jetzt + (e.shiftKey ? -1 : 1);
+  if (ziel < 0 || ziel >= halte.length) return;
+  e.preventDefault();
+  e.stopPropagation();
+  halte[ziel]!.focus();
 }
 
 /**
  * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit Rollen-Übersicht und
- * Funktion, darunter sofort Profil und Abmelden, danach die Umschaltgruppen (LFH-952). Holt sich
- * Benutzer und Logout selbst, damit es in beiden Layout-Ebenen gleich nutzbar ist.
+ * Funktion, darunter sofort Profil und Abmelden, danach die Gruppe „Anzeige“ (LFH-952, LLH-1642),
+ * Benachrichtigungen, Neuigkeiten und Hilfe (Spec `benutzermenue`; Rückmeldung und Lizenzen stehen
+ * auf der Hilfe-Seite). Holt sich Benutzer und Logout selbst, damit es in beiden Layout-Ebenen
+ * gleich nutzbar ist.
  *
  * DIE INITIALEN STEHEN NEUTRAL: eine 24-px-Kachel auf `flaeche3`. Rot ist im Rahmen genau
  * zweimal vergeben (Quadrat der Bildmarke, aktive Rail-Marke). Neben der Kachel steht ab `xl` die
@@ -82,13 +81,11 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
  * ab (`EinsatzAnzeige.meine_funktion`, LFH-615), dieselbe Ableitung wie im ETB-Snapshot.
  *
  * DIE SCHWELLE `xl` GILT NUR DEM TRIGGER: darunter schrumpft er auf den Avatar, damit der Kopf
- * auf dem Führungs-Tablet einzeilig bleibt. Die zwei Umschaltgruppen hängen an KEINER Breite:
- * sie sind der einzige sichtbare Bedienweg für Darstellung und Bediendichte (die
- * Kommandopalette zeigt keinen aktiven Wert an), und A1 weist Tablet und Handschirm
- * `komfortabel` und `handschuh` zu.
- *
- * Angebunden über `useThemeMode`/`useDichte`, NICHT über die Kommandopalette: deren Hook wirft
- * außerhalb seines Providers, und der Test-Wrapper rendert keinen.
+ * auf dem Führungs-Tablet einzeilig bleibt. Die Gruppe „Anzeige“ hängt an KEINER Breite: sie ist
+ * der einzige sichtbare Bedienweg mit aktivem Wert für Darstellung, Bediendichte und Helligkeit
+ * (die Kommandopalette zeigt keinen an), und A1 weist Tablet und Handschirm `komfortabel` und
+ * `handschuh` zu. Angebunden in {@link AnzeigeLeisten}, NICHT über die Kommandopalette: deren Hook
+ * wirft außerhalb seines Providers, und der Test-Wrapper rendert keinen.
  *
  * `hasFixedWidth` (im Einsatz-Kopf, LLH-1272): das Etikett hält die Breite {@link ETIKETT_PLATZ},
  * statt sich nach dem Text zu richten. Die Funktion kommt erst mit dem Einsatz, davor steht der
@@ -109,11 +106,17 @@ export default function BenutzerMenu({
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
   // der Benutzer eintrifft.
   const { abBreite } = useViewport();
-  const { modus, setModus } = useThemeMode();
-  const { dichte, setDichte } = useDichte();
-  const { helligkeit, setHelligkeit, wirksam, warnungAktiv } = useHelligkeit();
+  // Handschuh (design.md D11): Kopf knapper, Profil und Abmelden nebeneinander — sonst läge am
+  // Handy unter dem zweizeiligen App-Kopf die Leiste „Helligkeit“ unter dem Rand.
+  const isKnapp = useDichte().dichte === 'handschuh';
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
+  // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
+  const menueBreite = !abBreite('md')
+    ? 'calc(100vw - 16px)'
+    : isKnapp
+      ? MENUE_BREITE_HANDSCHUH
+      : MENUE_BREITE;
 
   if (!benutzer) return null;
 
@@ -139,6 +142,16 @@ export default function BenutzerMenu({
     );
   }
 
+  // Zwei `menuitem`s je halbe Breite: Rollen, Tastatur und `onClick` bleiben unverändert (D11).
+  const halbeZeile = isKnapp
+    ? {
+        display: 'inline-flex',
+        width: 'calc(50% - 4px)',
+        boxSizing: 'border-box' as const,
+        verticalAlign: 'top',
+      }
+    : undefined;
+
   const items: MenuProps['items'] = [
     {
       key: 'kopf',
@@ -160,11 +173,28 @@ export default function BenutzerMenu({
             {initialen(benutzer.anzeigename)}
           </Avatar>
           <div style={{ minWidth: 0 }}>
-            <Typography.Text strong style={{ display: 'block', fontSize: 14, lineHeight: 1.3 }}>
-              {benutzer.anzeigename}
-            </Typography.Text>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                columnGap: 6,
+                rowGap: 4,
+              }}
+            >
+              <Typography.Text strong style={{ fontSize: 14, lineHeight: 1.3 }}>
+                {benutzer.anzeigename}
+              </Typography.Text>
+              {isKnapp && rollenTags.length > 0 && (
+                <Space size={4} wrap>
+                  {rollenTags}
+                </Space>
+              )}
+            </div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              @{benutzer.benutzername}
+              {isKnapp
+                ? `@${benutzer.benutzername} · Version ${__APP_VERSION__}`
+                : `@${benutzer.benutzername}`}
             </Typography.Text>
             {/* Die Funktion auf JEDER Breite (LFH-952, U89): am Auslöser steht sie erst ab `xl`, auf
                 Tablet und Handy war sie sonst nirgends zu sehen. */}
@@ -176,79 +206,39 @@ export default function BenutzerMenu({
                 {funktion}
               </Typography.Text>
             )}
-            {rollenTags.length > 0 && (
+            {!isKnapp && rollenTags.length > 0 && (
               <div style={{ marginTop: 6 }}>
                 <Space size={4} wrap>
                   {rollenTags}
                 </Space>
               </div>
             )}
-            <Typography.Text
-              type="secondary"
-              style={{ display: 'block', fontSize: 11, marginTop: 6 }}
-            >
-              Version {__APP_VERSION__}
-            </Typography.Text>
+            {!isKnapp && (
+              <Typography.Text
+                type="secondary"
+                style={{ display: 'block', fontSize: 11, marginTop: 6 }}
+              >
+                Version {__APP_VERSION__}
+              </Typography.Text>
+            )}
           </div>
         </div>
       ),
     },
-    // DIREKT UNTER DEM KOPF (LFH-952, U89): in `komfortabel` ist das Menü 920 px hoch, am Handy
+    // DIREKT UNTER DEM KOPF (LFH-952, U89): in `komfortabel` war das Menü 920 px hoch, am Handy
     // sichtbar 702 px — ganz unten lagen Profil und Abmelden unter dem Rand, beim Schichtwechsel
     // am geteilten Gerät. Rot steht durch den Trenner darunter abgesetzt.
     { type: 'divider' },
-    { key: 'profil', icon: <IconPerson />, label: 'Profil' },
-    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true },
-    // AUF JEDER BREITE (LFH-392): die Kopfzeile ist die Aktionsreihe, eine Einstellung gehört dort
-    // nicht hinein. Wer das an eine Breite hängt, nimmt beiden Achsen ihren einzigen sichtbaren
-    // Bedienweg — die Palette zeigt keinen aktiven Wert (`command-palette/typen.ts` kennt kein
-    // Zustandsfeld).
+    { key: 'profil', icon: <IconPerson />, label: 'Profil', style: halbeZeile },
+    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true, style: halbeZeile },
+    // AUF JEDER BREITE (LFH-392, LLH-1642): die Kopfzeile ist die Aktionsreihe, eine Einstellung
+    // gehört dort nicht hinein. Wer das an eine Breite hängt, nimmt allen drei Achsen ihren
+    // einzigen sichtbaren Bedienweg mit aktivem Wert — die Palette zeigt keinen
+    // (`command-palette/typen.ts` kennt kein Zustandsfeld). Inhalt eines Gruppentitels, kein
+    // `menuitem`: eine Wahl schließt das Menü nicht.
     { type: 'divider' },
-    {
-      key: 'darstellung',
-      type: 'group',
-      label: 'Darstellung',
-      children: DARSTELLUNG_OPTIONEN.map(({ wert, titel, Icon }) =>
-        umschaltEintrag(DARSTELLUNG_PRAEFIX, wert, titel, Icon, wert === modus),
-      ),
-    },
-    {
-      key: 'bediendichte',
-      type: 'group',
-      label: 'Bediendichte',
-      children: DICHTE_OPTIONEN.map(({ wert, titel, Icon }) =>
-        umschaltEintrag(DICHTE_PRAEFIX, wert, titel, Icon, wert === dichte),
-      ),
-    },
-    // DIE SPERRE WIRD ERKLÄRT, NICHT STUMM WEGGESCHALTET (LFH-397, M16): mit aktiver Warnung
-    // nennt die Überschrift Boden und Grund, die Stufen darunter sind gesperrt, und eine
-    // Wahl unter dem Boden sagt, was tatsächlich wirkt. Die Wahl selbst bleibt stehen —
-    // endet die Warnung, gilt sie wieder.
-    {
-      key: 'helligkeit',
-      type: 'group',
-      label: warnungAktiv
-        ? `Helligkeit · mind. ${HELLIGKEIT_BODEN_WARNUNG} % (Warnung aktiv)`
-        : 'Helligkeit',
-      children: HELLIGKEIT_OPTIONEN.map(({ wert, titel, Icon }) => {
-        const eintrag = umschaltEintrag(
-          HELLIGKEIT_PRAEFIX,
-          String(wert),
-          titel,
-          Icon,
-          wert === helligkeit,
-        );
-        const gesperrt = warnungAktiv && wert < HELLIGKEIT_BODEN_WARNUNG;
-        return {
-          ...eintrag,
-          label:
-            wert === helligkeit && wirksam !== wert
-              ? `${eintrag.label} (wirkt ${wirksam} %)`
-              : eintrag.label,
-          disabled: gesperrt,
-        };
-      }),
-    },
+    { key: 'anzeige', type: 'group', label: <AnzeigeLeisten /> },
+    { type: 'divider' },
     // Welche Hinweise kommen, stellt jede Person für sich ein (design.md D6).
     { key: 'benachrichtigungen', icon: <IconPosteingang />, label: 'Benachrichtigungen' },
     // Die Neuigkeiten mit einem Punkt, solange die laufende Version noch nicht gelesen ist (Spec
@@ -278,42 +268,23 @@ export default function BenutzerMenu({
         </span>
       ),
     },
-    // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`), ganz
-    // unten, weil er selten gebraucht wird. Über `onClick`, nicht als `<a>` im Label: sonst
-    // öffnete nur ein Klick genau auf den Text, Enter und die Polsterung nicht. Die Hilfe
-    // (LFH-1096) steht darüber, ebenso selten gebraucht.
-    { type: 'divider' },
+    // Hilfe (LFH-1096). Rückmeldung (LLH-1549) und Lizenzhinweis (LFH-1000) stehen seit LLH-1642
+    // auf der Hilfe-Seite; die Hilfe bekommt den Pfad mit, aus dem sie geöffnet wurde, damit die
+    // Rückmeldung dort den Bereich der App vorbefüllt (design.md D5).
     { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
-    // Rückmeldeweg (LLH-1549): das Issue-Formular im öffentlichen Repo, vorbefüllt mit Version,
-    // Oberfläche und Routenmuster (nie Kennungen). Immer sichtbar, nicht nur in Vorabversionen.
-    { key: 'rueckmeldung', icon: <IconSprechblase />, label: 'Rückmeldung' },
-    { key: 'lizenzen', icon: <IconDokument />, label: 'Lizenzen' },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') void abmelden();
-    else if (key === 'hilfe') navigate(HILFE_PFAD);
+    else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });
     else if (key === 'neuigkeiten') navigate(NEUIGKEITEN_PFAD);
     else if (key === 'benachrichtigungen') navigate(BENACHRICHTIGUNGEN_PFAD);
-    else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
-    else if (key === 'rueckmeldung')
-      window.open(
-        rueckmeldungsAdresse({ version: __APP_VERSION__, pfad: location.pathname }),
-        '_blank',
-        // ohne Referer: die Adresse der Installation bleibt bei uns
-        'noopener,noreferrer',
-      );
-    else if (key.startsWith(DARSTELLUNG_PRAEFIX))
-      setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);
-    else if (key.startsWith(DICHTE_PRAEFIX)) setDichte(key.slice(DICHTE_PRAEFIX.length) as Dichte);
-    else if (key.startsWith(HELLIGKEIT_PRAEFIX))
-      setHelligkeit(alsHelligkeit(key.slice(HELLIGKEIT_PRAEFIX.length)));
   };
 
   return (
     <Dropdown
-      menu={{ items, onClick, style: { minWidth: 240 } }}
+      menu={{ items, onClick, onKeyDown: handleMenuKeyDown, style: { width: menueBreite } }}
       trigger={['click']}
       placement="bottomRight"
     >

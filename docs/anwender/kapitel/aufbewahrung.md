@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/instanz/spiegel/lebensende.rs]
 ---
 
 ## Überblick
@@ -37,13 +37,22 @@ Ist der Einsatz abgeschlossen, stehen unter der Frist die Datenkategorien „Beh
 „Personenauskunft“ und „Anhänge“, jede mit eigenem „Frist ändern“. Die erste Frist einer
 Kategorie verlangt eine „Rechtsgrundlage“.
 
+### Die Nachbereitung eines Einsatzes ändern
+
+Für die Einsatzleitung und System-Admins der Organisation des Einsatzes, ab dem Abschluss:
+
+1. Im Einsatz „Einstellungen“ öffnen und den Reiter „Aufbewahrung“ wählen.
+2. Im Paneel „Nachbereitung“ „Nachbereitung ändern“ wählen.
+3. Unter „Ende der Nachbereitung“ einen Zeitpunkt wählen, oder „Ohne Nachbereitung“ einschalten.
+4. „Frist setzen“ wählen, ohne Nachbereitung „Frist aufheben“.
+
 ### Vorgaben der Organisation festlegen
 
 Für System-Admins:
 
 1. Oben „Verwaltung“ öffnen und unter „Einstellungen“ „Einsatz-Vorgaben“ wählen.
 2. Im Paneel „Aufbewahrung“ die „Aufbewahrungs-Dauer (Tage)“ eintragen und bei Bedarf „Skelett
-   endgültig löschen nach (Tage ab Abschluss)“.
+   endgültig löschen nach (Tage ab Abschluss)“ und „Nachbereitung (Tage ab Abschluss)“.
 3. Im Paneel „Aufbewahrung je Datenkategorie“ je Kategorie eine Dauer und die Rechtsgrundlage
    eintragen.
 4. „Speichern“ wählen.
@@ -62,6 +71,8 @@ Für System-Admins:
 
    ![Übersicht „Aufbewahrung“ mit zwei abgeschlossenen Einsätzen, einer ohne Frist, einer mit laufender Frist](../bilder/aufbewahrung/uebersicht.png)
 
+   Ein Einsatz, den ein ELW nach der Nachbereitung an den Hub übergeben hat, steht am ELW als
+   „verwahrt“ mit „An … übergeben“; eine Archivakte gibt es dazu nicht mehr.
 3. Unter 1600 px Fensterbreite stehen „Vorgemerkt am“, „Schwärzung auf Antrag ab“ und „Geschwärzt am“
    nicht in der Tabelle; bei Bedarf unter „Spalten“ einblenden.
 4. Eine Zeile wählen, um die Archivakte des Einsatzes zu öffnen.
@@ -114,6 +125,37 @@ Bis zum Vollzug lässt sich der Antrag in der Liste des Paneels zurücknehmen.
 
 Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch.
 
+### Nachbereitung und Verwahrung
+
+Die Nachbereitung ist die Zeit nach dem Abschluss, in der ein Einsatz an der Installation bleibt,
+an der er läuft. Hat die Organisation eine Nachbereitung in Tagen, setzt der Abschluss ihr Ende
+auf Abschluss plus Dauer; das Einsatztagebuch hält es fest, ebenso jede Änderung.
+
+Mit dem Ende der Nachbereitung gilt an einem ELW, der mit einem Hub gekoppelt ist:
+
+- **Eigene Einsätze** übergibt der ELW dem Hub zur Verwahrung. Der Hub übernimmt den Einsatz mit
+  allen Einträgen und Anhängen als eigenen Einsatz; ab dann gelten dort seine Aufbewahrung und
+  die Fristen je Datenkategorie, die der ELW mitgibt. Das Einsatztagebuch am Hub nennt „Zur
+  Verwahrung übernommen von …“. Trägt am Hub schon ein Einsatz dieselbe Einsatznummer, bekommt
+  der übernommene eine neue, und der Eintrag nennt beide. Erst wenn der Hub die Übernahme
+  bestätigt, löscht der ELW den Einsatz; im Löschprotokoll bleibt eine Zeile mit der Nummer.
+- **Fehlt dem Hub noch etwas**, etwa ein neuerer Stand oder ein Anhang, wartet die Übergabe.
+  Das Paneel „Nachbereitung“ nennt dann „Wartet auf …“ und den Grund; fehlende Anhänge holt der
+  Hub zuerst. Solange der Hub nicht bestätigt hat, bleibt der Einsatz am ELW. Läuft in dieser
+  Zeit seine Aufbewahrungsfrist ab, geht die Frist vor: der ELW merkt ihn zur Löschung vor und
+  schwärzt ihn wie jeden anderen Einsatz.
+- **Ändert sich der Einsatz am ELW während der Übergabe**, etwa seine Frist, bleibt er am ELW.
+  Das Paneel nennt „Nach der Übergabe geändert“. Der Hub behält seinen Stand vom Zeitpunkt der
+  Übernahme.
+- **Nicht übergeben** wird ein Einsatz, der zur Löschung vorgemerkt oder geschwärzt ist oder ein
+  offenes Löschersuchen hat.
+- **Spiegel von Einsätzen des Hubs** löscht der ELW nach dem Ende der Nachbereitung, sobald kein
+  Antrag mehr offen ist. Der Einsatz bleibt am Hub.
+
+Ohne Kopplung zu einem Hub bleibt ein Einsatz nach der Nachbereitung, wo er ist. Löscht eine
+Installation einen Einsatz, den sie führt, löscht die gekoppelte ihren Spiegel davon beim
+nächsten Abgleich.
+
 ### Fristen je Datenkategorie
 
 - **Behandlung**: Zustand, PAT-Nummer, benötigte Fachrichtung und Anlass der Hilfeleistung der
@@ -157,6 +199,7 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 
 - **Frist eines Einsatzes und der Kategorien:** Einsatzleitung und System-Admins der
   Organisation des Einsatzes, auch nach dem Abschluss.
+- **Nachbereitung eines Einsatzes:** wie die Frist, ab dem Abschluss.
 - **Aufbewahrungs-Dauer im Einsatz:** zusätzlich das Führungspersonal, solange der Einsatz läuft.
 - **Vorgaben, Übersicht, Archivakte, Löschersuchen und Wiederherstellen:** nur System-Admins,
   und nur für Einsätze der eigenen Organisation.

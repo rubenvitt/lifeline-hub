@@ -139,6 +139,9 @@ pub async fn uebernehmen(
                 "Einsatz {} wird hier geführt; Lieferung verworfen.",
                 l.kennung
             ));
+            // Den Stand des Absenders nicht zurücksetzen: Die Führung wechselt gerade, und die
+            // Akten klären gleich, wer liefert (LLH-1641).
+            ergebnis.stand = l.seit;
             return Ok(ergebnis);
         }
         if !l.zeilen.iter().any(|z| z.art == "einsatz" && !z.geloescht) {
@@ -191,6 +194,18 @@ async fn uebernehme_zeilen(
     ergebnis: &mut Ergebnis,
 ) -> Result<(), AppError> {
     let konten: HashMap<i64, &KontoAngabe> = l.konten.iter().map(|k| (k.id, k)).collect();
+    // Nach einem Führungswechsel nennt der neue Führer zu jeder Zeile, die er von hier bekam, den
+    // Schlüssel hier (LLH-1641, E3): Sie ersetzt dann die eigene Zeile, statt eine zweite
+    // anzulegen. Katalogzeilen haben ihr eigenes Gegenstück (LLH-1629).
+    if let Some(id) = vorhanden {
+        for z in &l.zeilen {
+            let Some(gegen) = &z.gegen else { continue };
+            if matches!(&z.daten, Some(Value::Object(d)) if katalog::ist_katalog_daten(&z.art, d)) {
+                continue;
+            }
+            super::fuehrung::uebernimm_gegen(conn, id, &z.art, &z.schluessel, gegen).await?;
+        }
+    }
     let mut einsatz_id = vorhanden;
     // Der Kopf zuerst: an ihm hängen alle anderen Zeilen.
     if let Some(kopf) = l
@@ -472,7 +487,18 @@ async fn kopf_uebernehmen(
     werte.retain(|(s, _)| s != "id" && s != "kennung");
     werte.push(("kennung".into(), Value::from(l.kennung.clone())));
     if let Some(id) = vorhanden {
+        // Ein Führer, der nie geschwärzt hat, überschreibt die eigene Marke nicht: Hat diese Seite
+        // während einer Trennung selbst geschwärzt, ist ihre Bruchstelle schon geschwärzt
+        // gesichert, und ein Wechsel auf NULL räumte sie grundlos (Review #1284).
+        werte.retain(|(s, v)| !(s == "schwaerzung_marke" && v.is_null()));
         update(conn, t.name, &werte, "id", &id.to_string()).await?;
+        // Hat der Führer seither geschwärzt, räumt der Spiegel seine Bruchstelle (LLH-1649). Neu
+        // ist nur eine Marke, die dieser Einsatz hier nie hatte: Bringt ein neuer Führer nach
+        // einer Trennung die Marke von davor, zählt eine eigene Schwärzung dieser Seite nicht.
+        // Ein Führer ohne Marke (älterer Stand) schickt keine; dann bleibt alles, wie es ist.
+        if merke_schwaerzung_marke(conn, id).await? {
+            super::fuehrung::raeume_bruchstelle(conn, id).await?;
+        }
         return Ok(id);
     }
     werte.push(("spiegel".into(), Value::from(1)));
@@ -501,7 +527,25 @@ async fn kopf_uebernehmen(
     .bind(id.to_string())
     .execute(&mut *conn)
     .await?;
+    // Kam die Akte des Gegenübers vor dem Spiegel an, hängt sie sich jetzt an ihn (E2).
+    super::fuehrung::verknuepfe_akte(conn, id, &l.kennung).await?;
+    merke_schwaerzung_marke(conn, id).await?;
     Ok(id)
+}
+
+/// Merkt die Schwärzungsmarke am Kopf des Einsatzes (LLH-1649); `true`, wenn sie hier neu ist.
+async fn merke_schwaerzung_marke(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    let neu = sqlx::query(
+        "INSERT OR IGNORE INTO einsatz_schwaerzung_marke (einsatz_id, marke) \
+         SELECT id, schwaerzung_marke FROM einsatz WHERE id = ? AND schwaerzung_marke IS NOT NULL",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(neu.rows_affected() > 0)
 }
 
 async fn ist_mitgliedschaft_eines_stellvertreters(

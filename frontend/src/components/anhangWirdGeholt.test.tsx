@@ -23,6 +23,7 @@ const spiegel = {
   beendet: false,
   antraege_ausstehend: 0,
   antraege_abgelehnt: 0,
+  bruchstelle: 0,
 };
 
 /** Ein Cache mit dem Kopf des Einsatzes 5: am Spiegel oder nicht. */

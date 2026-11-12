@@ -189,34 +189,45 @@ pub async fn uebersicht(
                 geschwaerzt_at: k.geschwaerzt_at,
                 antrag_faellig_at: k.antrag_faellig_at,
                 endgueltig_geloescht_at: None,
+                gegenstelle: None,
                 zustand,
             })
         })
         .collect();
 
-    // Endgültig gelöschte Einsätze (LFH-750): nur das Löschprotokoll der eigenen Org, ohne
-    // Bezeichnung.
+    // Endgültig gelöschte und verwahrte Einsätze (LFH-750, LLH-1494): nur das Löschprotokoll
+    // der eigenen Org, ohne Bezeichnung. Abgeräumte Spiegel fehlen: der Einsatz gehört dem
+    // Führer und steht dort.
     let geloescht = sqlx::query_as::<_, ProtokollZeile>(
-        "SELECT einsatz_id, einsatznummer_intern, abgeschlossen_at, geschwaerzt_at, geloescht_at \
-         FROM aufbewahrung_loeschprotokoll WHERE org_id = ?",
+        "SELECT einsatz_id, art, gegenstelle, einsatznummer_intern, abgeschlossen_at, \
+                geschwaerzt_at, geloescht_at \
+         FROM aufbewahrung_loeschprotokoll WHERE org_id = ? AND art <> 'spiegel'",
     )
     .bind(org_id)
     .fetch_all(pool)
     .await?;
-    liste.extend(geloescht.into_iter().map(|p| AufbewahrungEintragAnzeige {
-        einsatz_id: p.einsatz_id,
-        einsatznummer_intern: p.einsatznummer_intern,
-        bezeichnung: None,
-        abgeschlossen_at: p.abgeschlossen_at,
-        retention_bis: None,
-        geloescht_at: None,
-        karenz_ende: None,
-        geschwaerzt_at: Some(p.geschwaerzt_at),
-        loeschung_am: None,
-        endgueltig_geloescht_at: Some(p.geloescht_at),
-        // Ein gelöschter Einsatz hat keine Anträge mehr (CASCADE mit dem Einsatz, LFH-750).
-        antrag_faellig_at: None,
-        zustand: AufbewahrungZustand::EndgueltigGeloescht,
+    liste.extend(geloescht.into_iter().map(|p| {
+        let verwahrt = p.art == crate::einsatz::abraeumen::AbraeumArt::Verwahrt.as_str();
+        AufbewahrungEintragAnzeige {
+            einsatz_id: p.einsatz_id,
+            einsatznummer_intern: p.einsatznummer_intern,
+            bezeichnung: None,
+            abgeschlossen_at: p.abgeschlossen_at,
+            retention_bis: None,
+            geloescht_at: None,
+            karenz_ende: None,
+            geschwaerzt_at: p.geschwaerzt_at,
+            loeschung_am: None,
+            endgueltig_geloescht_at: Some(p.geloescht_at),
+            gegenstelle: p.gegenstelle.filter(|_| verwahrt),
+            // Ein gelöschter Einsatz hat keine Anträge mehr (CASCADE mit dem Einsatz, LFH-750).
+            antrag_faellig_at: None,
+            zustand: if verwahrt {
+                AufbewahrungZustand::Verwahrt
+            } else {
+                AufbewahrungZustand::EndgueltigGeloescht
+            },
+        }
     }));
     // Neuester Abschluss zuerst über beide Mengen (kanonisches Format sortiert lexikografisch).
     liste.sort_by(|a, b| {
@@ -231,9 +242,11 @@ pub async fn uebersicht(
 #[derive(Debug, sqlx::FromRow)]
 struct ProtokollZeile {
     einsatz_id: i64,
+    art: String,
+    gegenstelle: Option<String>,
     einsatznummer_intern: Option<String>,
     abgeschlossen_at: Option<String>,
-    geschwaerzt_at: String,
+    geschwaerzt_at: Option<String>,
     geloescht_at: String,
 }
 

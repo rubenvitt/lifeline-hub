@@ -244,8 +244,9 @@ export function useThemeMode(): ThemeModeWert {
 }
 
 /**
- * Benannter Zugang zur Bediendichte. Bedienwege sind die Umschaltgruppe im Benutzermenü (der
- * einzige, der die aktive Stufe auch anzeigt) und die Kommandopalette.
+ * Benannter Zugang zur Bediendichte. Bedienwege sind die Leiste „Bediendichte“ im Benutzermenü
+ * (Gruppe „Anzeige“, LLH-1642; der einzige, der die aktive Stufe auch anzeigt) und die
+ * Kommandopalette.
  *
  * Das zurückgegebene Objekt ist je Aufruf frisch und gehört NICHT in ein Dependency-Array;
  * `dichte` und `setDichte` (identitätsstabil) gehören hinein.

@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx]
 ---
 
 ## Überblick
@@ -116,15 +116,23 @@ Touch stehen diese Filter als Knöpfe am unteren Rand der Palette.
 
 ### Darstellung, Bediendichte und Helligkeit einstellen
 
-1. Oben rechts das „Benutzermenü“ öffnen.
-2. Unter „Darstellung“ „System“, „Hell“ oder „Dunkel“ wählen.
-3. Unter „Bediendichte“ „Kompakt“, „Komfortabel“ oder „Handschuh“ wählen.
-4. Unter „Helligkeit“ eine Stufe von „100 %“ bis „20 %“ wählen.
+1. Oben rechts das „Benutzermenü“ öffnen. Unter „Anzeige“ stehen drei Leisten.
+2. In der Leiste „Darstellung“ „Hell“, „Dunkel“ oder „System“ wählen.
+3. In der Leiste „Bediendichte“ „Kompakt“, „Komfortabel“ oder „Handschuh“ wählen.
+4. In der Leiste „Helligkeit in %“ eine Stufe von „100“ bis „20“ wählen.
 
-   ![Benutzermenü mit den Gruppen „Darstellung“, „Bediendichte“ und „Helligkeit“, die gewählte Stufe jeweils mit Häkchen](../bilder/einsatz-oberflaeche/darstellung.png)
+   ![Benutzermenü mit der Gruppe „Anzeige“: drei Leisten für Darstellung, Bediendichte und Helligkeit, die gewählte Stufe jeweils hervorgehoben](../bilder/einsatz-oberflaeche/darstellung.png)
 
-Die gewählte Stufe trägt ein Häkchen. Dieselben Einstellungen stehen in der Sprungpalette
-(„Darstellung: …“, „Dichte: …“, „Helligkeit: …“).
+Die gewählte Stufe ist in ihrer Leiste hervorgehoben. Jede Wahl gilt sofort, das Menü bleibt
+dabei offen; **Esc** oder ein Klick daneben schließt es. Mit der Tastatur führt **Tab** vom Menü
+in die Leisten und von Leiste zu Leiste, die **Pfeiltasten** wählen innerhalb einer Leiste.
+Dieselben Einstellungen stehen in der Sprungpalette („Darstellung: …“, „Dichte: …“,
+„Helligkeit: …“).
+
+Ist im Einsatz eine Warnung aktiv, lässt sich die Anzeige nicht unter eine Untergrenze dimmen: die
+Leiste nennt sie („mind. 80 % (Warnung aktiv)“), die dunkleren Stufen sind gesperrt, und eine Wahl
+darunter steht als „Gewählt 40 %, wirkt 80 %“ unter der Leiste. Endet die Warnung, gilt wieder die
+eigene Wahl.
 
 ### Eine Zeit eintragen
 
@@ -178,7 +186,8 @@ ebenso: Die Zahl sinkt sofort, die Markierung geht hinaus, sobald wieder Netz da
 
 ### Benachrichtigungen einstellen
 
-1. Oben rechts das „Benutzermenü“ öffnen und „Benachrichtigungen“ wählen.
+1. Oben rechts das „Benutzermenü“ öffnen und „Benachrichtigungen“ wählen. Im Einsatz führt auch
+   „Benachrichtigungen einstellen →“ unten in den „Eingängen“ dorthin.
 2. Unter „Hinweise“ den Schalter einer Art ausschalten, deren Hinweise nicht mehr erscheinen
    sollen, oder einschalten, um sie wieder zu bekommen. Die Änderung gilt sofort.
 
@@ -239,8 +248,9 @@ Von links nach rechts:
   „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung; was
   dann gilt, steht in [Arbeiten ohne Netz](ohne-netz.md).
 - **Uhr**: die Uhrzeit des Geräts.
-- **Benutzermenü** mit Name, Funktion im Einsatz, Profil, Abmelden, den Einstellungen des Geräts,
-  den Benachrichtigungen und der Hilfe.
+- **Benutzermenü** mit Name, Funktion im Einsatz, Profil, Abmelden, der Anzeige des Geräts
+  (Darstellung, Bediendichte, Helligkeit), den Benachrichtigungen, den Neuigkeiten und der Hilfe.
+  Rückmeldung und Lizenzen stehen in der Hilfe.
 
 Auf schmalen Schirmen zeigt die Kopfzeile Ruhezustände nur als Zeichen; jede Störung behält ihr
 Wort. Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge in einem

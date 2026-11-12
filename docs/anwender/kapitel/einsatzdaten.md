@@ -137,7 +137,7 @@ Für die Einsatzleitung:
 - Was die Rollen im Einzelnen bedeuten, steht in [Rechte im Einsatz](rechte-im-einsatz.md).
 - **Führung:** Gehört der Einsatz einer gekoppelten Organisation und ist die Führung je Einsatz
   eingeschaltet, steht vor „Einsatzabschluss“ das Paneel „Führung“. Führt eine andere
-  Installation, ist der ganze Einsatz hier „Nur Ansicht · Führung liegt bei …“. Bedienung und
+  Installation, ist der Einsatz hier ein Spiegel, an dem beantragt wird. Bedienung und
   Folgen stehen in [Instanzkopplung](instanzkopplung.md).
 
 ### Was eine Änderung bewirkt

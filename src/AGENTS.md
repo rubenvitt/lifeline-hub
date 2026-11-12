@@ -193,6 +193,10 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   dieselbe Bereinigung (`karte_hintergrundbild::bereinigt`; ETag `"<sha256>.b<n>"`,
   `BEREINIGT_CACHE_CONTROL`). Gespeichert bleibt das Original, einen Original-Abruf gibt es
   nicht. Was sich nicht bereinigen lässt, weist schon der Upload mit 422 ab.
+- **Organisationslogo (LLH-1640)** ist kein Beweismittel: `logo_hochladen` speichert nur die
+  bereinigten Bytes (`org::logo::bereinigt`, 422 bei Unbereinigbarem), `logo_lesen` bereinigt
+  trotzdem noch einmal (Bestand von vor LLH-1640, neuere `BEREINIGUNG_VERSION`). ETag
+  `"<sha256>.b<n>"` über `org::logo::etag_wert`; `sha256` an der Anzeige bleibt der Cache-Brecher.
 
 **Vorschau (LFH-759)** (Spec `anhang-vorschau`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`):
@@ -327,10 +331,14 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0020](../docs/architektur/entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md):
-  - **Ein neuer Schreibweg am Einsatz prüft `fordere_aktiv` bzw. `fordere_aktiv_in_tx`**; nur
-    dort greift die Sperre „Führung liegt bei …“ (`einsatz.fuehrung_bei`). Den Merker schreibt
-    allein `instanz::fuehrung::repo` (`save`, `sync_sperre*`), der Start richtet ihn aus.
+  [ADR-0021](../docs/architektur/entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md):
+  - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
+    (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
+    `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
+    (`richte_aus` aus `fuehrung::repo::save`); ein neuer Schreibweg braucht dafür nichts.
+  - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer
+    (`anfrage_von`), bis der Anfragende alles hat; eine Notübernahme nur an einem Einsatz, der
+    hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
     `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 nach.
@@ -417,6 +425,19 @@ Herleitung in
     damit ein wiederholter Antrag nach Abbruch vor der Quittung nicht doppelt wirkt (ADR-0008,
     Wächter `antrag::tests::jede_beantragbare_art_traegt_eine_client_id`).
   - Nachweis: `tests/instanz_spiegel.rs`, `tests/instanz_spiegel_live.rs`.
+  - **Lebensende (LLH-1494)**, Spec `aufbewahrung`, Herleitung
+    `/mnt/project-files/llh-1494/tkky2noy-archiv-nachbereitung/design.md` (D2–D7): Der Führer
+    liefert einen abgeschlossenen Einsatz weiter, solange die Gegenseite einen niedrigeren Stand
+    nennt, auch soft-gelöscht oder geschwärzt (`liefern::list_gefuehrt`). `geloescht` meldet
+    eine Seite nur für genannte Kennungen mit eigenem Präfix, deren ID im eigenen
+    Löschprotokoll steht (eine aus der Sicherung zurückgekehrte Instanz meldet nichts).
+    `verwahrt` geht nur von der meldenden Seite aus; die erreichte wandelt ihren Spiegel erst
+    bei gleichem Stand und ohne fehlenden Anhang (`spiegel::lebensende::verwahrung_annehmen`),
+    und erst ihre Quittung `angenommen` merkt den Einsatz der meldenden Seite zum Abräumen vor.
+    **Ein Einsatz verlässt eine Instanz nur über `einsatz::abraeumen`** (Merker
+    `einsatz_abraeumen` in der beschließenden Transaktion, Löschen nach dem Commit, Phase R holt
+    nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
+    `tests/instanz_lebensende.rs`.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
@@ -718,6 +739,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `skelett_dauer_bestaetigt` → 409. Das Protokoll sperrt ID und Einsatznummer
   (`einsatz::repo::anlegen_tx`). Herleitung:
   `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`.
+- **Nachbereitung und Abräumen** (LLH-1494): der Abschluss setzt `einsatz.nachbereitung_bis`
+  aus `org_einstellungen.nachbereitung_tage` (`einsatz/nachbereitung.rs`, ETB-Eintrag).
+  Danach räumt Phase R (`einsatz/abraeumen.rs`) Spiegel der meldenden Seite ab und holt jeden
+  stehen gebliebenen Merker `einsatz_abraeumen` nach. Das Löschprotokoll trägt `art`:
+  `skelett` (Pflichtfelder per CHECK), `verwahrt` (mit Nummer, an die Gegenstelle übergeben) und
+  `spiegel` (ohne Nummer, die gehört dem Führer; Übersicht lässt sie aus). Alle Arten sperren
+  die ID, nur Zeilen mit Nummer die Nummer.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

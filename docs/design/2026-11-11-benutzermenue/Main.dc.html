@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Benutzermenü heute</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.tel{width:390px;height:844px;position:relative;overflow:hidden;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee}
+.kopf{height:56px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:8px;padding:0 4px 0 12px;box-sizing:border-box}
+.marke{width:14px;height:14px;background:#a8071a;flex-shrink:0}
+.ktitel{font-size:14px;font-weight:600;flex:1}
+.kn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;color:#a0a8b1;padding:0}
+.ini{width:24px;height:24px;background:#16191d;color:#c6ccd2;font:500 10px "LFH Mono",monospace;display:inline-flex;align-items:center;justify-content:center}
+.zeile{height:44px;border-bottom:1px solid #22262b;margin:0 12px;display:flex;align-items:center;gap:12px;font-size:13px;color:#9aa2ab}
+.zeit{font:500 12px "LFH Mono",monospace;color:#c6ccd2}
+.schleier{position:absolute;left:0;right:0;top:56px;bottom:0;background:rgba(0,0,0,.5)}
+.menue{position:absolute;top:60px;right:8px;width:300px;background:#14171b;border:1px solid #2e343a;box-shadow:0 8px 24px rgba(0,0,0,.6);padding:4px 0}
+.mkopf{display:flex;gap:12px;padding:12px 16px}
+.av{width:32px;height:32px;background:#16191d;color:#e8ebee;font:500 12px "LFH Mono",monospace;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.name{font-size:14px;font-weight:600;line-height:1.3}
+.sek{font-size:12px;color:#9aa2ab}
+.tag{display:inline-block;border:1px solid #2e343a;font-size:11px;padding:0 6px;margin-top:6px;color:#c6ccd2}
+.ver{font-size:11px;color:#838b94;margin-top:6px}
+.trenner{height:1px;background:#22262b;margin:4px 0}
+.ein{display:flex;align-items:center;gap:12px;height:48px;padding:0 16px;font-size:14px;color:#e8ebee;width:100%;border:0;background:transparent;text-align:left;font-family:inherit;box-sizing:border-box}
+.ein svg{flex-shrink:0;color:#9aa2ab}
+.rot{color:#ff7070}
+.rot svg{color:#ff7070}
+.gruppe{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#838b94;padding:8px 16px 4px}
+.blende{position:absolute;left:8px;right:8px;bottom:0;height:120px;background:linear-gradient(rgba(8,9,11,0),#08090b 85%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:16px;box-sizing:border-box;font-size:12px;color:#ff7070;letter-spacing:.04em}
+</style>
+</helmet>
+<div class="tel">
+  <div class="kopf">
+    <span class="marke"></span>
+    <span class="ktitel">ETB · Hochwasser Elbe</span>
+    <button class="kn" aria-label="Ton"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg></button>
+    <button class="kn" aria-label="Benutzermenü"><span class="ini">RV</span></button>
+  </div>
+  <div class="zeile"><span class="zeit">14:52</span>Lagemeldung UA Nord: Deich hält</div>
+  <div class="zeile"><span class="zeit">14:47</span>Auftrag an BtrZ 2: Verpflegung</div>
+  <div class="zeile"><span class="zeit">14:40</span>Funkspruch Florian Elbe 1/44-1</div>
+  <div class="zeile"><span class="zeit">14:31</span>Nachforderung 2 RTW</div>
+  <div class="schleier"></div>
+  <div class="menue" role="menu" aria-label="Benutzermenü">
+    <div class="mkopf">
+      <div class="av">RV</div>
+      <div>
+        <div class="name">Ruben Vitt</div>
+        <div class="sek">@rvitt</div>
+        <div style="font-size:12px;margin-top:4px">S2 Lage</div>
+        <span class="tag">Führungskraft</span>
+        <div class="ver">Version 1.0.0-alpha.187</div>
+      </div>
+    </div>
+    <div class="trenner"></div>
+    <button class="ein" role="menuitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>Profil</button>
+    <button class="ein rot" role="menuitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 4H5v16h5"></path><path d="M14 8l4 4-4 4"></path><path d="M18 12H9"></path></svg>Abmelden</button>
+    <div class="trenner"></div>
+    <div class="gruppe">Darstellung</div>
+    <button class="ein" role="menuitemradio">System</button>
+    <button class="ein" role="menuitemradio">Hell</button>
+    <button class="ein" role="menuitemradio">Dunkel ✓</button>
+    <div class="gruppe">Bediendichte</div>
+    <button class="ein" role="menuitemradio">Kompakt</button>
+    <button class="ein" role="menuitemradio">Komfortabel ✓</button>
+    <button class="ein" role="menuitemradio">Handschuh</button>
+    <div class="gruppe">Helligkeit</div>
+    <button class="ein" role="menuitemradio">100 % ✓</button>
+    <button class="ein" role="menuitemradio">80 %</button>
+  </div>
+  <div class="blende">▼ noch 3 Helligkeitsstufen und 5 Einträge unter dem Rand</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

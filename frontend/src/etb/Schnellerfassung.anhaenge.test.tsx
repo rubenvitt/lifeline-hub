@@ -769,6 +769,7 @@ describe('Anhang am Spiegel (LLH-1492, design.md D9)', () => {
         beendet: false,
         antraege_ausstehend: 0,
         antraege_abgelehnt: 0,
+        bruchstelle: 0,
       },
     });
     const { container } = renderMitProviders(<Schnellerfassung {...props({ einsatz: spiegel })} />);

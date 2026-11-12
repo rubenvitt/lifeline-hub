@@ -6,6 +6,7 @@ import type {
   Datenkategorie,
   EtbTyp,
   FristSetzenBody,
+  NachbereitungSetzenBody,
   NeuerSchwaerzungsantrag,
   PersonTreffer,
   Schwaerzungsantrag,
@@ -73,6 +74,14 @@ export function setzeAufbewahrungsfrist(
   body: FristSetzenBody,
 ): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/aufbewahrungsfrist`, 'PUT', body);
+}
+
+/** `PUT …/nachbereitung` — Ende der Nachbereitung setzen oder aufheben (LLH-1494). */
+export function setzeNachbereitung(
+  einsatzId: number,
+  body: NachbereitungSetzenBody,
+): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/nachbereitung`, 'PUT', body);
 }
 
 /** `GET …/schwaerzungsantraege` — Löschersuchen nach Art. 17 des Einsatzes, neueste zuerst. */

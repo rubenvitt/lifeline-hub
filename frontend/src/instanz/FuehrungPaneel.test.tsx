@@ -38,6 +38,7 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
   fuehrend: true,
   art: 'angelegt',
   anfrage_offen: false,
+  verwahrt: false,
   gegenueber: [{ kopplung_id: 1, kennung: 'k-hub', name: 'Hub Nord', richtung: 'meldet_sich' }],
   verlauf: [
     {
@@ -184,7 +185,6 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     renderMitProviders(
       <FuehrungPaneel
         fuehrung={akte({
-          einsatz_id: undefined,
           fuehrend: false,
           fuehrer_name: 'ELW 1',
           fuehrer_richtung: 'wird_gemeldet',
@@ -201,7 +201,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
     await waitFor(() =>
       expect(uebernimmFuehrungMitCode).toHaveBeenCalledWith(
-        { akteId: 4 },
+        { einsatzId: 7 },
         'per Funk',
         'ABCD-EFGH-JKMN-PQRS',
       ),

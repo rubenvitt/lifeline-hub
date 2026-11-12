@@ -45,6 +45,8 @@ pub struct OrgEinstellungenUpdate {
     /// Bestätigt das erstmalige Setzen oder Verkürzen der Skelett-Frist; ohne → 409.
     #[serde(default)]
     pub skelett_dauer_bestaetigt: bool,
+    /// Nachbereitung in Tagen ab Abschluss (LLH-1494); `None` = keine Nachbereitungsfrist.
+    pub nachbereitung_tage: Option<i64>,
     /// Dauer und Rechtsgrundlage je Datenkategorie (LFH-749). Fehlt das Feld, bleiben die
     /// Vorgaben unverändert; eine Liste ersetzt sie (fehlende Kategorie = keine eigene Frist).
     pub aufbewahrung_kategorien: Option<Vec<KategorieVorgabeEingabe>>,
@@ -179,6 +181,15 @@ pub async fn setzen(
             ));
         }
     }
+    // Nachbereitung (LLH-1494): Grenzen wie die Aufbewahrungs-Dauer. Kein Bestätigungsschritt,
+    // ihr Ende löscht nichts, was nicht verwahrt ist.
+    if let Some(v) = req.nachbereitung_tage {
+        if !ist_gueltige_retention_dauer(v) {
+            return Err(AppError::Validation(
+                "Nachbereitung muss zwischen 1 und 3650 Tagen liegen".into(),
+            ));
+        }
+    }
     // Kategorie-Vorgaben (LFH-749): 400 je Feld, auch bei fehlender Rechtsgrundlage (Pflichtfeld
     // jedes Eintrags).
     let kategorien = req
@@ -207,6 +218,7 @@ pub async fn setzen(
             koordinatenformat: koordinatenformat.as_deref(),
             retention_dauer_tage: req.retention_dauer_tage,
             skelett_dauer_tage: req.skelett_dauer_tage,
+            nachbereitung_tage: req.nachbereitung_tage,
             etb_nummer_praefix: etb_nummer_praefix.as_deref(),
             meldung_nummer_praefix: meldung_nummer_praefix.as_deref(),
             auftrag_nummer_praefix: auftrag_nummer_praefix.as_deref(),
