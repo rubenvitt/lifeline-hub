@@ -38,9 +38,9 @@ pub struct WebPushStand {
     /// Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne
     /// Abo leer.
     pub stumm: Vec<BenachrichtigungArt>,
-    /// Push für diesen Nutzer läuft über einen gekoppelten Hub (LLH-1495, Spec `web-push`, „Push-
-    /// Einstellung am gekoppelten ELW verweist auf den Hub“): statt des Schalters ein Hinweis mit
-    /// Link; ein neues Abo lehnt der Server mit 422 ab.
+    /// Push für diesen Nutzer läuft über einen gekoppelten Hub, der sein Konto kennt (LLH-1495,
+    /// Spec `web-push`, „Push-Einstellung am gekoppelten ELW verweist auf den Hub“): statt des
+    /// Schalters ein Hinweis mit Link; ein neues Abo lehnt der Server mit 422 ab.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ueber_hub: Option<PushUeberHub>,
 }
@@ -54,10 +54,10 @@ pub struct PushUeberHub {
     pub adresse: String,
 }
 
-async fn ueber_hub(state: &AppState, org_id: i64) -> Result<Option<PushUeberHub>, AppError> {
+async fn ueber_hub(state: &AppState, benutzer_id: i64) -> Result<Option<PushUeberHub>, AppError> {
     let mut conn = state.pool.acquire().await?;
     Ok(
-        crate::instanz::spiegel::hinweis::push_hub_der_org(&mut conn, org_id)
+        crate::instanz::spiegel::hinweis::push_hub_fuer(&mut conn, benutzer_id)
             .await?
             .map(|(name, adresse)| PushUeberHub { name, adresse }),
     )
@@ -108,7 +108,7 @@ pub async fn stand(
         angemeldet,
         inhalt: wahl.inhalt,
         stumm: repo::stumm_bereinigt(&wahl.stumm),
-        ueber_hub: ueber_hub(&state, benutzer.org_id).await?,
+        ueber_hub: ueber_hub(&state, benutzer.id).await?,
     }))
 }
 
@@ -150,7 +150,7 @@ pub async fn anmelden(
         .collect();
     // Gekoppelter ELW (LLH-1495, design.md D7): ein Zustand, nicht das Feld, also 422. Bestehende
     // Abos bleiben und gelten nach dem Entkoppeln wieder.
-    if let Some(hub) = ueber_hub(&state, benutzer.org_id).await? {
+    if let Some(hub) = ueber_hub(&state, benutzer.id).await? {
         return Err(AppError::UnprocessableEntity(format!(
             "Push läuft über {}.",
             hub.name

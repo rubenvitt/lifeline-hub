@@ -115,8 +115,12 @@ Einsatz.
   `web_push: bool` (`LiveHub::web_push()` ist eingerichtet). Beide `serde(default)`: Ein älterer
   Hub liefert `false`. Der ELW speichert sie an `instanz_kopplung`
   (`gegenueber_hinweise`, `gegenueber_web_push`), wie Softwarestand und Protokoll.
-- Weiche in `ausliefern`: Der ELW pusht nicht, wenn der Einsatz hier geführt wird und seine Org
-  eine aktive meldende Kopplung mit beiden Fähigkeiten hat. Dieselbe Abfrage entscheidet über den
+- Weiche in `ausliefern`, je Empfänger (Nachtrag 12.11.2026 aus dem Review, mit Ruben
+  entschieden): Der ELW pusht einem Empfänger nicht, wenn der Einsatz hier geführt wird, seine
+  Org eine aktive meldende Kopplung mit beiden Fähigkeiten hat und das Konto des Empfängers aus
+  dieser Kopplung stammt (`stammdaten_herkunft`, `hinweis::konten_am_hub`). Konten, die nur am
+  ELW bestehen (Spontanhelfer) oder einer anderen Org angehören, kennt der Hub nicht; ihnen pusht
+  der ELW selbst, sonst erführen sie es nirgends. Dieselbe Abfrage entscheidet über den
   Ausgang (nur `gegenueber_hinweise`), damit nie ein Push wegfällt, ohne dass der Anlass reist.
 - Kennt der Hub Hinweise, bietet aber keinen Push an, reist der Anlass trotzdem (Hinweise am Hub)
   und der ELW pusht selbst.
@@ -147,7 +151,8 @@ wäre ein eigener Anlass mit `umadressieren`, ohne Protokollbruch.
 ### D7 Push-Einstellung am ELW
 
 - `WebPushStand` bekommt `ueber_hub: Option<{ name, adresse }>` (Name und Adresse der Kopplung),
-  gesetzt, wenn die Org des Nutzers die Bedingung aus D4 erfüllt. Wire additiv, Typen generiert.
+  gesetzt, wenn das Konto des Nutzers aus einer Kopplung seiner Org stammt, die die Bedingung aus
+  D4 erfüllt (`hinweis::push_hub_fuer`). Ein eigenes Konto des ELW behält den Schalter. Wire additiv, Typen generiert.
 - Ohne `--web-push` am ELW bleibt alles wie heute: 404, kein Schalter, kein Hinweis
   (Anforderung „Web Push nur auf Wunsch des Betreibers“). Verworfen: die Route dann trotzdem für
   den Hinweis öffnen. Das hätte die bestehende Anforderung aufgeweicht, und ein ELW ohne Push
@@ -179,6 +184,9 @@ der Wächter `art::tests::trigger_passen_zur_beschreibung` hält die Annahme.
   → Die Meldung läuft im Takt (Sekunden bis Minuten); der Hinweis am Hub bleibt. Hinnehmbar.
 - [Hinweis am Hub kommt spät] Er wartet auf den Abgleich. → `takt::wecken()` nach jedem
   Ausgang; ohne Verbindung kommt er nach, höchstens 12 Stunden.
+- [Gegenstand vor dem Hub gelöscht] Wird die Zeile eines Hinweises am ELW gelöscht, bevor sie
+  am Hub ankommt, wartet der Hinweis bis zu 12 Stunden und verfällt ohne Push. Hingenommen (mit
+  Ruben am 12.11.2026): der Gegenstand ist weg, ein Push dazu zeigte ins Leere.
 - [Zwei Konten, zwei Hinweise] Wer am ELW und am Hub angemeldet ist, sieht den Hinweis an beiden
   Instanzen. Das ist das bestehende Modell („jede Instanz führt ihre eigenen“), gepusht wird
   aber nur einmal.

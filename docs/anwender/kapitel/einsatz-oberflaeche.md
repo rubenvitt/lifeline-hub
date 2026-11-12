@@ -222,11 +222,12 @@ weggewischt wird. Wer ein Gerät nur selbst in der Hand hat, kann den Schalter e
 nennt die Meldung wie in der App den Absender und den Anfang des Wortlauts. Auch dieser Schalter
 gilt nur für dieses Gerät und bleibt nach einer neuen Anmeldung erhalten.
 
-Arbeitet die Instanz im Fahrzeug (ELW) mit einem Hub zusammen, kommen die Meldungen bei
-geschlossener App vom Hub. Statt des Schalters steht dann „Push läuft über ‹Name des Hubs›“ mit
-dem Link „Am Hub einschalten“: dort, an der Seite „Benachrichtigungen“ des Hubs, den Schalter wie
-oben einschalten. Das Gerät erhält dann Meldungen zu den Einsätzen des ELW, solange es dort
-angemeldet ist.
+Arbeitet die Instanz im Fahrzeug (ELW) mit einem Hub zusammen und stammt das eigene Konto vom
+Hub, kommen die Meldungen bei geschlossener App vom Hub. Statt des Schalters steht dann „Push
+läuft über ‹Name des Hubs›“ mit dem Link „Am Hub einschalten“: dort, an der Seite
+„Benachrichtigungen“ des Hubs, den Schalter wie oben einschalten. Das Gerät erhält dann Meldungen
+zu den Einsätzen des ELW, solange es dort angemeldet ist. Wer nur am ELW ein Konto hat, etwa als
+Spontanhelfer, schaltet wie gewohnt am ELW ein.
 
 Fehlt der Schalter, bietet ihn dieses Gerät nicht: Der Betrieb hat die Zustellung nicht
 eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop-App, die ohnehin selbst

@@ -25,21 +25,21 @@ herleitung:
   Einsatz und seine Zeilen im Spiegel stehen, höchstens einmal je Kennung und Inhalt (eine aus
   der Sicherung zurückgekehrte Gegenseite vergibt Kennungen neu), und verwirft ihn nach 12
   Stunden, mit unbekannten Werten oder als Erledigen eines Alarms.
-- MUST: Eine Instanz pusht für einen Einsatz nicht selbst, wenn sie ihn führt, der Anlass
-  vorgemerkt ist und eine solche Kopplung zusätzlich Web Push anbietet
-  (`hinweis::pusht_ueber_hub`). In jedem anderen Fall pusht sie wie ohne Kopplung.
+- MUST: Eine Instanz pusht einem Empfänger nicht selbst, wenn sie den Einsatz führt, der Anlass
+  vorgemerkt ist, eine solche Kopplung zusätzlich Web Push anbietet und das Konto des Empfängers
+  aus ihr stammt (`hinweis::konten_am_hub`). In jedem anderen Fall pusht sie wie ohne Kopplung.
 - MUST NOT: Benachrichtigungen oder Abos werden gespiegelt; jede Instanz führt ihre eigenen.
-- MUST NOT: Ein neues Abo wird an einer Instanz angenommen, deren Nutzer über den Hub gepusht
-  werden; bestehende bleiben gespeichert.
+- MUST NOT: Ein neues Abo eines Kontos, dem der Hub pusht, wird angenommen; bestehende bleiben
+  gespeichert.
 
 ## Prüfung
 
 ```sh
 verlange 'hinweis::vormerken\(' src/benachrichtigung/mod.rs
 verlange 'hinweis::vormerken_erledigt\(' src/benachrichtigung/mod.rs
-verlange 'pusht_ueber_hub' src/benachrichtigung/mod.rs
+verlange 'konten_am_hub' src/benachrichtigung/mod.rs
 verlange 'hinweis::annehmen\(' src/instanz/spiegel/abgleich.rs
-verlange 'push_hub_der_org' src/routes/web_push.rs
+verlange 'push_hub_fuer' src/routes/web_push.rs
 ```
 
 ## Kontext

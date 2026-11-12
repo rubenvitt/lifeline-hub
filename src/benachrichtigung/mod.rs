@@ -34,6 +34,7 @@ use crate::live::{LiveEvent, LiveHub, Zustellung};
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use std::collections::HashSet;
 use utoipa::ToSchema;
 
 wire_enum! {
@@ -483,10 +484,24 @@ async fn melden_mit_fehler(
             false
         }
     };
-    let push = !(vorgemerkt && crate::instanz::spiegel::hinweis::pusht_ueber_hub(&ziele));
     let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
+    // Den Push übernimmt der Hub nur für Konten, die er kennt; den übrigen (Spontanhelfer,
+    // Mitglieder anderer Orgs) pusht diese Instanz selbst (Entscheidung 12.11.2026).
+    let ueber_hub = if vorgemerkt && crate::instanz::spiegel::hinweis::pusht_ueber_hub(&ziele) {
+        konten_am_hub(pool, &ziele, &aufgeloest.benutzer_ids).await
+    } else {
+        HashSet::new()
+    };
     let mit_stufe = mit_stufe(anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids);
-    ausliefern(pool, live, anlass, aufgeloest.org_id, &mit_stufe, push).await?;
+    ausliefern(
+        pool,
+        live,
+        anlass,
+        aufgeloest.org_id,
+        &mit_stufe,
+        &ueber_hub,
+    )
+    .await?;
     Ok(aufgeloest.benutzer_ids)
 }
 
@@ -507,6 +522,23 @@ async fn hub_ziele(
             Vec::new()
         }
     }
+}
+
+/// Die Empfänger, an die der Hub pusht (LLH-1495, design.md D4); ein Fehler gilt als „keine“:
+/// dann pusht diese Instanz allen selbst.
+async fn konten_am_hub(
+    pool: &SqlitePool,
+    ziele: &[crate::instanz::spiegel::hinweis::Ziel],
+    benutzer_ids: &[i64],
+) -> HashSet<i64> {
+    let konten = async {
+        let mut conn = pool.acquire().await?;
+        crate::instanz::spiegel::hinweis::konten_am_hub(&mut conn, ziele, benutzer_ids).await
+    };
+    konten.await.unwrap_or_else(|e| {
+        tracing::warn!(fehler = %e, "Konten am Hub nicht lesbar, Push von hier");
+        HashSet::new()
+    })
 }
 
 async fn vormerken_fuer_hub(
@@ -543,14 +575,14 @@ fn mit_stufe(
 
 /// Schreibt je aufgelöstem Empfänger eine Zeile mit seiner Stufe und stellt sie zu (Live, Web
 /// Push). Nur für Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert hat.
-/// `push = false`: der Hub pusht für diesen Einsatz (LLH-1495, design.md D4).
+/// An `ueber_hub` geht kein Push: ihnen pusht der Hub (LLH-1495, design.md D4).
 async fn ausliefern(
     pool: &SqlitePool,
     live: &LiveHub,
     anlass: &Anlass,
     org_id: i64,
     mit_stufe: &[(i64, BenachrichtigungStufe)],
-    push: bool,
+    ueber_hub: &HashSet<i64>,
 ) -> Result<(), crate::error::AppError> {
     if mit_stufe.is_empty() {
         return Ok(());
@@ -577,13 +609,13 @@ async fn ausliefern(
     zustellen(live, org_id, anlass.einsatz_id, anlass.art, &ereignisse);
     // Web Push an die Geräte der Empfänger (LLH-1223, Spec `web-push`): dieselbe Nutzlast wie
     // das Live-Ereignis, in einem eigenen Task; ohne `--web-push` nichts.
-    if let Some(web_push) = live.web_push().filter(|_| push) {
+    if let Some(web_push) = live.web_push() {
         web_push.versenden(
             pool,
             ereignisse
                 .iter()
                 // Stilles erreicht kein Gerät (design.md D2): es ist schon gelesen.
-                .filter(|(_, e)| e.stufe != BenachrichtigungStufe::Still)
+                .filter(|(b, e)| e.stufe != BenachrichtigungStufe::Still && !ueber_hub.contains(b))
                 .map(|(benutzer_id, e)| crate::web_push::Sendung {
                     benutzer_id: *benutzer_id,
                     art: e.art,
@@ -736,7 +768,15 @@ async fn umadressieren_mit_fehler(
             .collect();
     // Neu Gemeinte pusht diese Instanz selbst: `umadressieren` reist nicht zum Hub (LLH-1495,
     // design.md D6), sonst erführen sie es nirgends.
-    ausliefern(pool, live, &anlass, aufgeloest.org_id, &dazu, true).await
+    ausliefern(
+        pool,
+        live,
+        &anlass,
+        aufgeloest.org_id,
+        &dazu,
+        &HashSet::new(),
+    )
+    .await
 }
 
 /// „Alle gelesen“ (LLH-1143, design.md D4): quittiert die eigenen Zeilen von `benutzer_id` im

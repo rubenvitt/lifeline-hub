@@ -5,10 +5,9 @@
 ### Requirement: Ein gekoppelter ELW pusht über den Hub
 
 Ist die Org eines Einsatzes mit einem Hub gekoppelt, der Hinweise annimmt und Web Push anbietet,
-MUST der ELW für diesen Einsatz keinen Push senden; den Push sendet der Hub an die Abos seiner
-Empfänger (Spec `benachrichtigungen`, „Hinweise zu einem Einsatz des ELW entstehen auch am Hub“).
-Bietet der Hub keinen Push an oder kennt er Hinweise nicht, SHALL der ELW pushen wie ohne
-Kopplung. Hinweis, Live-Ereignis und Ton am ELW bleiben.
+MUST der ELW für diesen Einsatz an Konten, die vom Hub stammen, keinen Push senden; ihnen pusht
+der Hub (Spec `benachrichtigungen`). Allen anderen Konten SHALL der ELW pushen wie ohne
+Kopplung, ebenso allen, wenn der Hub keinen Push anbietet oder Hinweise nicht kennt.
 
 #### Scenario: Hub mit Push
 - **WHEN** der ELW mit Push läuft, seine Org mit einem Hub mit Push gekoppelt ist und eine Sofortmeldung an Person A geht
@@ -22,13 +21,17 @@ Kopplung. Hinweis, Live-Ereignis und Ton am ELW bleiben.
 - **WHEN** der Hub einen Softwarestand hat, der Hinweise nicht annimmt
 - **THEN** pusht der ELW wie ohne Kopplung
 
+#### Scenario: Konto nur am ELW
+- **WHEN** ein Spontanhelfer mit einem Konto nur am ELW Push eingeschaltet hat und eine Sofortmeldung an ihn geht
+- **THEN** pusht der ELW an sein Abo, obwohl der Hub Push anbietet
+
 #### Scenario: Einsatz einer ungekoppelten Org
 - **WHEN** der ELW zwei Orgs hat, nur eine davon gekoppelt ist und ein Einsatz der anderen eine Sofortmeldung erhält
 - **THEN** pusht der ELW für diesen Einsatz selbst
 
 ### Requirement: Push-Einstellung am gekoppelten ELW verweist auf den Hub
 
-Bietet der ELW Push an und ist die Org eines Nutzers mit einem Hub mit Push gekoppelt, SHALL die
+Bietet der ELW Push an und stammt das Konto eines Nutzers von einem Hub mit Push, SHALL die
 Seite „Benachrichtigungen“ am ELW statt des Schalters den Hinweis „Push läuft über ‹Name des
 Hubs›“ mit einem Link zum Hub zeigen. Ein neues Abo dieses Nutzers am ELW MUST der Server mit 422
 ablehnen. Bestehende Abos MUST gespeichert bleiben und nach dem Entkoppeln wieder Pushs erhalten.
@@ -36,6 +39,10 @@ ablehnen. Bestehende Abos MUST gespeichert bleiben und nach dem Entkoppeln wiede
 #### Scenario: Seite am ELW
 - **WHEN** Person A am gekoppelten ELW die Seite „Benachrichtigungen“ öffnet
 - **THEN** sieht sie „Push läuft über ‹Name des Hubs›“ mit einem Link zum Hub und keinen Push-Schalter
+
+#### Scenario: Eigenes Konto des ELW
+- **WHEN** ein Konto, das nur am ELW besteht, die Seite „Benachrichtigungen“ öffnet
+- **THEN** sieht es den Push-Schalter wie ohne Kopplung
 
 #### Scenario: Neues Abo am ELW
 - **WHEN** ein Browser am gekoppelten ELW ein Abo anmelden will

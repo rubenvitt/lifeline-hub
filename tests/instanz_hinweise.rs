@@ -479,11 +479,27 @@ fn abo_body(endpoint: &str) -> String {
         .to_string()
 }
 
-/// Spec `web-push`, „Push-Einstellung am gekoppelten ELW verweist auf den Hub“.
+/// Eine Sitzung am ELW für ein Konto (ohne Anmeldung: das Passwort reist nur mit bestätigter
+/// Plattenverschlüsselung).
+async fn sitzung(i: &Instanz, benutzer: i64) -> String {
+    let token = lifeline_hub::auth::session::anlegen(
+        &i.pool,
+        benutzer,
+        None,
+        lifeline_hub::auth::provider::Anmeldeweg::Passwort,
+    )
+    .await
+    .unwrap();
+    format!("{}={token}", lifeline_hub::auth::session::SESSION_COOKIE)
+}
+
+/// Spec `web-push`, „Push-Einstellung am gekoppelten ELW verweist auf den Hub“: für ein Konto,
+/// das der Hub kennt.
 #[tokio::test]
 async fn der_gekoppelte_elw_verweist_auf_den_hub_und_lehnt_neue_abos_ab() {
     let w = welt(true, true).await;
-    let (s, v) = common::anfrage(&w.elw.i.app, "GET", "/api/web-push", &w.elw.i.admin, None).await;
+    let erika = sitzung(&w.elw.i, w.erika_elw).await;
+    let (s, v) = common::anfrage(&w.elw.i.app, "GET", "/api/web-push", &erika, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ueber_hub"]["adresse"], w.hub.i.adresse.as_str());
     assert!(v["ueber_hub"]["name"]
@@ -493,7 +509,7 @@ async fn der_gekoppelte_elw_verweist_auf_den_hub_und_lehnt_neue_abos_ab() {
         &w.elw.i.app,
         "PUT",
         "/api/web-push/abo",
-        &w.elw.i.admin,
+        &erika,
         Some(&abo_body("https://push.example.org/neu")),
     )
     .await;
@@ -643,4 +659,42 @@ async fn die_einsatzleitung_am_hub_wird_erreicht() {
             .any(|h| h.0 == w.erika_hub && h.2 == "lagebericht"),
         "{neu:?}"
     );
+}
+
+/// Ein Konto, das nur am ELW besteht, kennt der Hub nicht: der ELW zeigt ihm den Schalter und
+/// pusht ihm selbst (Entscheidung 12.11.2026, Spec `web-push`, Szenario „Konto nur am ELW“).
+#[tokio::test]
+async fn ein_konto_nur_am_elw_bekommt_den_push_vom_elw() {
+    let mut w = welt(true, true).await;
+    // Der Admin des ELW ist ein eigenes Konto des ELW.
+    let (s, v) = common::anfrage(&w.elw.i.app, "GET", "/api/web-push", &w.elw.i.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("ueber_hub").is_none(), "{v}");
+    let (s, v) = common::anfrage(
+        &w.elw.i.app,
+        "PUT",
+        "/api/web-push/abo",
+        &w.elw.i.admin,
+        Some(&abo_body("https://push.example.org/admin")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    let spontan = konto(&w.elw.i, "spontan").await;
+    let am_elw = w.elw.abo(spontan).await;
+    common::rolle_setzen(
+        &w.elw.i.app,
+        &w.elw.i.admin,
+        w.einsatz,
+        spontan,
+        "fuehrungspersonal",
+    )
+    .await;
+    // Die Aufnahme an das ELW-Konto: der ELW pusht selbst.
+    let n = w.elw.push(&am_elw).await;
+    assert_eq!(n["art"], "einsatz_aufnahme");
+    assert_eq!(n["einsatz_id"], w.einsatz);
+    // Ein Hinweis an Erika (Konto vom Hub) geht nicht vom ELW hinaus.
+    let _erika = w.elw.abo(w.erika_elw).await;
+    aufnahme_an_erika(&w).await;
+    w.elw.kein_push().await;
 }

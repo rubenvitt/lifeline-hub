@@ -550,7 +550,8 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   `melden` und `erledigen` merken für einen hier geführten Einsatz einer gekoppelten Org den
   Anlass in `hinweis_ausgang` vor (`instanz::spiegel::hinweis`), der Abgleich trägt ihn, die
   erreichte Seite meldet ihn nach dem Commit selbst. Bietet sie Push an, lässt `ausliefern` den
-  eigenen Push aus (`hinweis::pusht_ueber_hub`); `umadressieren` pusht immer selbst. Ein neuer
+  eigenen Push an Konten aus, die aus dieser Kopplung stammen (`hinweis::konten_am_hub`); allen
+  anderen und bei gescheitertem Vormerken pusht die Instanz selbst, `umadressieren` immer. Ein neuer
   Bezugstyp braucht seine Tabelle in `hinweis::bezug_tabelle` (Wächter
   `jeder_bezugstyp_ist_eingeordnet`), ein neuer Adressat seine Textform dort. Das Aufräumen
   schließt Spiegel ein. Nachweis `tests/instanz_hinweise.rs`.

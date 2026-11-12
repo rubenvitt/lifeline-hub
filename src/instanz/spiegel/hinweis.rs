@@ -163,21 +163,55 @@ pub fn pusht_ueber_hub(ziele: &[Ziel]) -> bool {
     ziele.iter().any(|z| z.web_push)
 }
 
-/// Der Hub, über den Nutzer dieser Org Push bekommen (design.md D7): aktive meldende Kopplung
-/// der Org, die Hinweise annimmt und Push anbietet. Name und Adresse für die Seite
-/// „Benachrichtigungen“.
-pub async fn push_hub_der_org(
+/// Welche dieser Konten der Hub kennt, der für diese Ziele pusht: ihr Konto kam aus einer
+/// solchen Kopplung (Herkunft der Stammdaten). Nur ihnen pusht der Hub; den übrigen pusht diese
+/// Instanz selbst (Entscheidung 12.11.2026, design.md D4).
+pub async fn konten_am_hub(
     conn: &mut SqliteConnection,
-    org_id: i64,
+    ziele: &[Ziel],
+    benutzer_ids: &[i64],
+) -> Result<std::collections::HashSet<i64>, sqlx::Error> {
+    let kopplungen: Vec<i64> = ziele
+        .iter()
+        .filter(|z| z.web_push)
+        .map(|z| z.kopplung_org_id)
+        .collect();
+    if kopplungen.is_empty() || benutzer_ids.is_empty() {
+        return Ok(std::collections::HashSet::new());
+    }
+    let konten: Vec<String> = benutzer_ids.iter().map(i64::to_string).collect();
+    let gefunden: Vec<String> = sqlx::query_scalar(
+        "SELECT lokaler_schluessel FROM stammdaten_herkunft WHERE art = 'konto' \
+           AND kopplung_org_id IN (SELECT value FROM json_each(?)) \
+           AND lokaler_schluessel IN (SELECT value FROM json_each(?))",
+    )
+    .bind(serde_json::to_string(&kopplungen).expect("IDs serialisierbar"))
+    .bind(serde_json::to_string(&konten).expect("IDs serialisierbar"))
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(gefunden.iter().filter_map(|k| k.parse().ok()).collect())
+}
+
+/// Der Hub, über den dieser Nutzer Push bekommt (design.md D7): sein Konto kam aus einer aktiven
+/// meldenden Kopplung seiner Org, die Hinweise annimmt und Push anbietet. Name und Adresse für
+/// die Seite „Benachrichtigungen“; `None` für Konten, die der Hub nicht kennt.
+pub async fn push_hub_fuer(
+    conn: &mut SqliteConnection,
+    benutzer_id: i64,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT k.gegenueber_name, COALESCE(k.gegenueber_adresse, '') FROM instanz_kopplung k \
-         JOIN instanz_kopplung_org o ON o.kopplung_id = k.id AND o.widerrufen_at IS NULL \
-         WHERE o.org_id = ? AND k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' \
+        "SELECT k.gegenueber_name, COALESCE(k.gegenueber_adresse, '') \
+         FROM stammdaten_herkunft h \
+         JOIN instanz_kopplung_org o ON o.id = h.kopplung_org_id AND o.widerrufen_at IS NULL \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         JOIN benutzer b ON b.org_id = o.org_id \
+         WHERE h.art = 'konto' AND h.lokaler_schluessel = ? AND b.id = ? \
+           AND k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' \
            AND k.gegenueber_hinweise = 1 AND k.gegenueber_web_push = 1 \
          ORDER BY k.id LIMIT 1",
     )
-    .bind(org_id)
+    .bind(benutzer_id.to_string())
+    .bind(benutzer_id)
     .fetch_optional(&mut *conn)
     .await
 }

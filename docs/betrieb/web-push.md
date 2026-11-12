@@ -68,10 +68,12 @@ Internet und zu den Push-Diensten, nicht der ELW.
 
 - Der Hub braucht dafür `LIFELINE_WEB_PUSH` und einen Kontakt wie oben. Er nennt dem ELW in
   jeder Meldung, ob er Push anbietet.
-- Bietet der Hub Push an, pusht der ELW für Einsätze der gekoppelten Org nicht mehr selbst. Sein
-  Schalter „Auch bei geschlossener App“ weicht dem Hinweis „Push läuft über ‹Hub›“ mit einem Link
-  zum Hub; neue Abos am ELW lehnt der Server ab. Bestehende Abos am ELW bleiben gespeichert und
-  gelten wieder, sobald die Kopplung der Org widerrufen ist.
+- Bietet der Hub Push an, pusht der ELW für Einsätze der gekoppelten Org nicht mehr an Konten,
+  die vom Hub stammen. Für sie weicht der Schalter „Auch bei geschlossener App“ am ELW dem
+  Hinweis „Push läuft über ‹Hub›“ mit einem Link zum Hub; neue Abos am ELW lehnt der Server ab.
+  Bestehende Abos bleiben gespeichert und gelten wieder, sobald die Kopplung der Org widerrufen
+  ist. Konten, die nur am ELW bestehen (etwa Spontanhelfer), kennt der Hub nicht: Ihnen pusht der
+  ELW weiter selbst, und sie behalten den Schalter.
 - Bietet der Hub keinen Push an (oder kennt er die Hinweise noch nicht, älterer Softwarestand),
   pusht der ELW wie ohne Kopplung, sofern er selbst `LIFELINE_WEB_PUSH` hat.
 - Der Link zeigt die Adresse, unter der der ELW den Hub erreicht. Läuft die Kopplung über ein
