@@ -252,9 +252,10 @@ fn zwischendatei(verzeichnis: &Path, einsatz_id: i64, teil: &str) -> Zwischendat
 
 const ZWISCHEN_PRAEFIX: &str = "lifeline-zwischen-archiv-";
 
-/// Legt eine Zwischendatei an, die nur der Dienst lesen kann (Klartext mit Personendaten). Die
-/// Nebendateien von SQLite übernehmen die Rechte der Hauptdatei, Kopien (`std::fs::copy`) auch.
-fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
+/// Legt eine Zwischendatei neu an, die nur der Dienst lesen kann (Klartext mit Personendaten).
+/// Ein vorhandener Pfad ist ein Fehler, nie ein Überschreiben. Die Nebendateien von SQLite
+/// übernehmen die Rechte der Hauptdatei.
+pub(super) fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
     let mut optionen = std::fs::OpenOptions::new();
     optionen.write(true).create_new(true);
     #[cfg(unix)]
@@ -297,14 +298,11 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     }
 }
 
-/// Ein Pool mit genau einer Verbindung auf einer Zwischendatei.
+/// Ein Pool mit genau einer Verbindung auf einer Zwischendatei, die `privat_anlegen` angelegt hat.
 async fn oeffnen(pfad: &Path, fremdschluessel: bool) -> Result<SqlitePool, AppError> {
-    if !pfad.exists() {
-        privat_anlegen(pfad)?;
-    }
     let optionen = SqliteConnectOptions::new()
         .filename(pfad)
-        .create_if_missing(true)
+        .create_if_missing(false)
         .journal_mode(SqliteJournalMode::Delete)
         .foreign_keys(fremdschluessel);
     Ok(SqlitePoolOptions::new()
@@ -456,6 +454,7 @@ async fn stamm_nachziehen(quelle: &SqlitePool, archiv: &SqlitePool) -> Result<()
 /// Die vollständige Kopie des Einsatzes, ohne Schwärzung (Grundlage aller Blöcke).
 pub async fn vollkopie(pool: &SqlitePool, einsatz_id: i64) -> Result<Zwischendatei, AppError> {
     let datei = zwischendatei(&verzeichnis(pool).await?, einsatz_id, "voll");
+    privat_anlegen(datei.pfad())?;
     let archiv = oeffnen(datei.pfad(), false).await?;
     crate::db::migrate(&archiv)
         .await
@@ -593,8 +592,15 @@ pub async fn baue_block(
         .map(Path::to_path_buf)
         .unwrap_or_else(std::env::temp_dir);
     let datei = zwischendatei(&verzeichnis, einsatz_id, &format!("block{}", plan.block));
-    std::fs::copy(voll.pfad(), datei.pfad())
-        .map_err(|e| AppError::Internal(format!("Archiv: Kopie für Block: {e}")))?;
+    {
+        // Über das Handle der exklusiv angelegten Datei kopieren: `std::fs::copy` überschriebe
+        // einen vorhandenen Pfad und setzte die Rechte erst danach.
+        let mut ziel = privat_anlegen(datei.pfad())?;
+        let mut quelle = std::fs::File::open(voll.pfad())
+            .map_err(|e| AppError::Internal(format!("Archiv: Kopie für Block: {e}")))?;
+        std::io::copy(&mut quelle, &mut ziel)
+            .map_err(|e| AppError::Internal(format!("Archiv: Kopie für Block: {e}")))?;
+    }
     let archiv = oeffnen(datei.pfad(), true).await?;
     for k in &plan.geschwaerzt {
         // Die Karenz gilt im Archiv nicht: der Block ist für die Zeit nach dem Fristende.
