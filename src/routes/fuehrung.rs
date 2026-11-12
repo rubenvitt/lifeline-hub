@@ -183,15 +183,27 @@ async fn run_notuebernahme(
     danach(state, &saved).await
 }
 
+/// Unterschreiben darf nur ein Admin der Org der Akte (Spec `instanz-fuehrung`, „Unterschreiben
+/// MUST nur ein Admin der Org“, LLH-1705): Das Gegenüber prüft die Unterschrift gegen die
+/// Schlüssel dieser Org und verwürfe die Übernahme eines anderen erst, nachdem diese Instanz schon
+/// geführt hat. [`EinsatzFuehrungszugriff`] lässt die Einsatzleitung ohne Blick auf ihre Org
+/// durch, darum steht die Prüfung vor Start und Abschluss. Die Oberfläche fragt dasselbe
+/// (`darfFuehrungUnterschreiben`).
+fn fordere_unterschriftsrecht(a: &AkteZeile, b: &Benutzer) -> Result<(), AppError> {
+    if b.ist_admin() && b.org_id == a.org_id {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden)
+    }
+}
+
 async fn run_start(
     state: &AppState,
     a: &AkteZeile,
     b: &Benutzer,
     grund: &str,
 ) -> Result<FuehrungUnterschriftStart, AppError> {
-    if !b.ist_admin() {
-        return Err(AppError::Forbidden);
-    }
+    fordere_unterschriftsrecht(a, b)?;
     let (rp_id, _) = crate::auth::unterschrift::rp().ok_or_else(|| {
         AppError::NotImplemented("Passkeys sind an dieser Instanz nicht eingerichtet.".into())
     })?;
@@ -231,6 +243,8 @@ async fn run_abschluss(
     body: &AbschlussBody,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
+    // Vor der Entnahme: Rolle oder Org können sich seit dem Start geändert haben.
+    fordere_unterschriftsrecht(a, b)?;
     let Some(Zeremonie::Fuehrungserklaerung {
         akte_id,
         erklaerung,
