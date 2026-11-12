@@ -8,7 +8,9 @@
 //! - **Führer werden** ([`werde_fuehrer`]): die Zeile in `einsatz_spiegel` fällt, die Akte merkt
 //!   sich, von welcher Kopplung die Zeilen stammen (`herkunft_kopplung_id`) und bis zu welchem
 //!   Stand des Logs sie der alte Führer kennt (`uebernommen_stand`). Offene Anträge führt der Takt
-//!   danach selbst aus (`antrag::fuehre_eigene_aus`, E5).
+//!   danach selbst aus (`antrag::fuehre_eigene_aus`, E5). Trägt diese Instanz die Einsatznummer
+//!   schon selbst, bekommt der Einsatz vorher eine freie (`nummer::ensure_freie_nummer`,
+//!   LLH-1703), und sein ETB nennt beide.
 //! - **Spiegel werden** ([`werde_spiegel`]): eigene Änderungen, die der neue Führer nicht kennen
 //!   kann, werden als Bruchstelle gesichert (E6); die Zeile in `einsatz_spiegel` beginnt bei Stand
 //!   0, damit der neue Führer alles liefert und seine Abbildung mitschickt (`Zeile.gegen`, E3).
@@ -47,10 +49,21 @@ pub async fn richte_aus(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<
             let neu = kopplung_org_des_fuehrers(conn, &akte).await?;
             if neu.is_some() && neu != ko {
                 sqlx::query(
-                    "UPDATE einsatz_spiegel SET kopplung_org_id = ?, stand = 0, beendet_at = NULL \
-                     WHERE einsatz_id = ?",
+                    "UPDATE einsatz_spiegel SET kopplung_org_id = ?, stand = 0, beendet_at = NULL, \
+                     hinweis = NULL WHERE einsatz_id = ?",
                 )
                 .bind(neu)
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
+            } else if neu.is_none() && ko.is_some() {
+                // Die Führung ging an eine Instanz, die hier nicht gekoppelt ist (etwa über eine
+                // Direktkopplung bezeugt, LLH-1497): der Spiegel bleibt lesbar, der Abgleich endet.
+                sqlx::query(
+                    "UPDATE einsatz_spiegel SET kopplung_org_id = NULL, beendet_at = ?, \
+                     hinweis = 'Die führende Instanz ist hier nicht gekoppelt.' WHERE einsatz_id = ?",
+                )
+                .bind(crate::zeit::jetzt())
                 .bind(einsatz_id)
                 .execute(&mut *conn)
                 .await?;
@@ -127,6 +140,24 @@ async fn werde_fuehrer(
     .bind(akte.id)
     .execute(&mut *conn)
     .await?;
+    // Mit der Zeile endet die Ausnahme von der Eindeutigkeit der Einsatznummer: Trägt diese
+    // Instanz die Nummer schon selbst, bekommt der Einsatz vorher eine freie (LLH-1703). Er ist
+    // hier noch Spiegel, also unter dem Merker; nach dem gelesenen Stand, damit die Änderung am
+    // Kopf über `uebernommen_stand` liegt.
+    let merker_vorher: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM spiegel_uebernahme)")
+            .fetch_one(&mut *conn)
+            .await?;
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *conn)
+        .await?;
+    let umnummeriert = super::nummer::ensure_freie_nummer(conn, einsatz_id).await;
+    if !merker_vorher {
+        sqlx::query("DELETE FROM spiegel_uebernahme")
+            .execute(&mut *conn)
+            .await?;
+    }
+    let umnummeriert = umnummeriert?;
     // Der Trigger `einsatz_spiegel_merker_d` setzt `einsatz.spiegel` zurück; der Schutz des
     // Einsatzes sieht die Zeile dann schon nicht mehr.
     sqlx::query("DELETE FROM einsatz_spiegel WHERE einsatz_id = ?")
@@ -137,7 +168,51 @@ async fn werde_fuehrer(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
+    if let Some((alt, neu)) = umnummeriert {
+        // Die Akte nennt die Nummer im Kopf: Sie folgt sofort, nicht erst mit `ensure_akten`,
+        // damit Antwort, Admin-Spur und die nächste Meldung die neue tragen.
+        sqlx::query("UPDATE einsatz_fuehrung SET nummer = ? WHERE id = ?")
+            .bind(&neu)
+            .bind(akte.id)
+            .execute(&mut *conn)
+            .await?;
+        add_nummer_eintrag(conn, einsatz_id, &alt, &neu).await?;
+    }
     super::takt::wecken();
+    Ok(())
+}
+
+/// Hält eine Umnummerierung beim Führungswechsel im Einsatztagebuch fest (Spec `einsatznummer`,
+/// „Eine Umnummerierung ist nachlesbar“). Der Einsatz ist hier schon eigen. Findet sich kein
+/// Konto für den Eintrag, entfällt er: Ein Führungswechsel wartet nicht darauf, anders als die
+/// Verwahrung (`lebensende::verwahrung_annehmen`).
+async fn add_nummer_eintrag(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    alt: &str,
+    neu: &str,
+) -> Result<(), AppError> {
+    let Some(akteur) = crate::einsatz::repo::ermittle_system_akteur(conn, einsatz_id).await? else {
+        tracing::warn!(
+            einsatz_id,
+            alt,
+            neu,
+            "Einsatznummer beim Führungswechsel neu vergeben, kein Konto für den ETB-Eintrag"
+        );
+        return Ok(());
+    };
+    let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
+    crate::etb::system_audit_tx(
+        conn,
+        einsatz_id,
+        akteur,
+        startwert,
+        &format!(
+            "Neue Einsatznummer {neu}, bisher {alt}: Die bisherige ist an dieser Installation \
+             schon vergeben."
+        ),
+    )
+    .await?;
     Ok(())
 }
 

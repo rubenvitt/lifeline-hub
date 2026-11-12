@@ -117,7 +117,7 @@ im Push nicht (die Nennung stand in der vorigen Antwort). Die Regel oben trägt 
 
 ### D4 Löschvermerk je Kennung
 
-Neue Tabelle (Migration `0336`, anhängend, Blatt, ohne Marker):
+Neue Tabelle (Migration `0339`, anhängend, Blatt, ohne Marker):
 
 ```sql
 CREATE TABLE fuehrung_loeschvermerk (
@@ -234,7 +234,7 @@ Glossar (12) nennen Ablauf und Begriff.
 
 ## Migration Plan
 
-- `0336_fuehrung_loeschvermerk.sql` legt nur die Tabelle an; vor dem Push `git fetch origin alpha`
+- `0339_fuehrung_loeschvermerk.sql` legt nur die Tabelle an; vor dem Push `git fetch origin alpha`
   und `scripts/check-migrationen.sh`.
 - Gemischter Betrieb: Eine neue Instanz neben einer älteren nennt Akten und bekommt keine Antwort;
   die ältere nennt nichts. Kein Schritt hängt an der Reihenfolge der Updates.

@@ -18,6 +18,37 @@ pub struct Instanz {
     pub adresse: String,
     pub admin: String,
     pub _server: tokio::task::JoinHandle<()>,
+    /// Nur bei [`instanz_tls`]: der Server, neu startbar mit neuem Zertifikat ([`zertifikat_neu`]).
+    pub tls: Option<TlsServer>,
+}
+
+pub struct TlsServer {
+    addr: std::net::SocketAddr,
+    handle: std::sync::Mutex<axum_server::Handle<std::net::SocketAddr>>,
+}
+
+/// Startet den Router per TLS auf `addr` mit dem PEM-Paar; liefert den Handle zum Beenden.
+pub async fn tls_starten(
+    app: axum::Router,
+    addr: std::net::SocketAddr,
+    cert: String,
+    key: String,
+) -> axum_server::Handle<std::net::SocketAddr> {
+    let config =
+        axum_server::tls_rustls::RustlsConfig::from_pem(cert.into_bytes(), key.into_bytes())
+            .await
+            .unwrap();
+    let handle = axum_server::Handle::new();
+    let h = handle.clone();
+    tokio::spawn(async move {
+        axum_server::bind_rustls(addr, config)
+            .handle(h)
+            .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .await
+            .unwrap();
+    });
+    handle.listening().await.expect("TLS-Server lauscht");
+    handle
 }
 
 pub async fn instanz() -> Instanz {
@@ -41,7 +72,97 @@ pub async fn instanz_aus(app: axum::Router, pool: sqlx::SqlitePool) -> Instanz {
         adresse,
         admin,
         _server: server,
+        tls: None,
     }
+}
+
+/// Eine Instanz, die selbst TLS spricht, mit einem selbstsignierten rcgen-Zertifikat (LLH-1497):
+/// kein Betriebssystem vertraut ihm. Der Fingerabdruck steht wie nach dem Start in der DB.
+pub async fn instanz_tls() -> Instanz {
+    let (app, pool) = common::setup_mit_pool().await;
+    lifeline_hub::auth::unterschrift::set_rp(RP.into(), ORIGIN.into());
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let (cert, key) =
+        lifeline_hub::tls::rcgen_pem(&["localhost".into(), "127.0.0.1".into()]).unwrap();
+    let fp = lifeline_hub::instanz::identitaet::tls_fingerabdruck_pem(cert.as_bytes()).unwrap();
+    lifeline_hub::instanz::identitaet::save_tls_zertifikat(&pool, Some(&fp))
+        .await
+        .unwrap();
+    let frei = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = frei.local_addr().unwrap();
+    drop(frei);
+    let handle = tls_starten(app.clone(), addr, cert, key).await;
+    Instanz {
+        app,
+        pool,
+        adresse: format!("https://{addr}"),
+        admin,
+        _server: tokio::spawn(async {}),
+        tls: Some(TlsServer {
+            addr,
+            handle: std::sync::Mutex::new(handle),
+        }),
+    }
+}
+
+/// Startet eine [`instanz_tls`] mit einem neuen Zertifikat neu (wie nach einem IP-Wechsel):
+/// offene Verbindungen enden, der neue Fingerabdruck steht in der DB; liefert ihn.
+pub async fn zertifikat_neu(i: &Instanz) -> String {
+    let tls = i.tls.as_ref().expect("nur an instanz_tls");
+    let alt = tls.handle.lock().unwrap().clone();
+    alt.shutdown();
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let (cert, key) =
+        lifeline_hub::tls::rcgen_pem(&["localhost".into(), "127.0.0.1".into()]).unwrap();
+    let fp = lifeline_hub::instanz::identitaet::tls_fingerabdruck_pem(cert.as_bytes()).unwrap();
+    lifeline_hub::instanz::identitaet::save_tls_zertifikat(&i.pool, Some(&fp))
+        .await
+        .unwrap();
+    let neu = tls_starten(i.app.clone(), tls.addr, cert, key).await;
+    *tls.handle.lock().unwrap() = neu;
+    fp
+}
+
+/// Stellt an `aussteller` einen Code der Art „vor Ort“ aus; liefert ihn.
+pub async fn code_vor_ort(aussteller: &Instanz) -> String {
+    let (s, v) = common::anfrage_json(
+        &aussteller.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &aussteller.admin,
+        Some(&json!({"art": "vor_ort"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["art"], "vor_ort");
+    v["code"].as_str().unwrap().to_string()
+}
+
+/// Löst `code` an `einloeser` mit der Adresse von `aussteller` ein; liefert Status und Antwort.
+pub async fn einloesen(
+    einloeser: &Instanz,
+    aussteller: &Instanz,
+    code: &str,
+) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &einloeser.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &einloeser.admin,
+        Some(&json!({"adresse": aussteller.adresse, "code": code})),
+    )
+    .await
+}
+
+/// Zwei ELW vor Ort: `elw1` stellt aus (TLS, selbstsigniert), `elw2` löst ein und meldet sich.
+pub async fn vor_ort() -> (Instanz, Instanz) {
+    let elw1 = instanz_tls().await;
+    let elw2 = instanz().await;
+    schluessel(&elw1).await;
+    let code = code_vor_ort(&elw1).await;
+    let (s, v) = einloesen(&elw2, &elw1, &code).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    (elw1, elw2)
 }
 
 pub async fn schluessel(i: &Instanz) {

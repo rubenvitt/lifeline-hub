@@ -66,7 +66,7 @@ Keine.
     `repo::release_nach_widerruf`)
   - `src/einsatz/abraeumen.rs`, `src/einsatz/skelett_loeschung.rs` (Vermerk in der Transaktion der
     Löschung)
-  - Migration `0336` (neue Tabelle, ohne Marker), Einordnung in den Tabellen-Wächtern
+  - Migration `0339` (neue Tabelle, ohne Marker), Einordnung in den Tabellen-Wächtern
   - Tests: `tests/instanz_fuehrung.rs` (zwei und drei Instanzen), Unit-Tests am Paket und am Beleg
 - Leitung: `POST /api/instanz/spiegel` bekommt ein Feld mit `serde(default)`; `PROTOKOLL` bleibt.
   Ältere Gegenüber überlesen es und bekommen nichts, was sie nicht kennen.
