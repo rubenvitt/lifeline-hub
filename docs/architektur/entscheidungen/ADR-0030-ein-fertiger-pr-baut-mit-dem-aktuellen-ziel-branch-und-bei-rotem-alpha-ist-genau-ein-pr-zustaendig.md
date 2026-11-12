@@ -33,7 +33,8 @@ herleitung:
 verbiete '^    name: Baut mit Ziel-Branch' .github/workflows/ziel-branch-build.yml
 verlange '^NAME="Baut mit Ziel-Branch"' scripts/ziel-branch-build.sh
 verlange '^  workflow_dispatch:' .github/workflows/ziel-branch-build.yml
-verlange 'if: \$\{\{ github\.event_name != .push. && needs\.vorbereiten' .github/workflows/ziel-branch-build.yml
+verlange 'github\.event_name != .push. && needs\.vorbereiten' .github/workflows/ziel-branch-build.yml
+verlange 'contains\(fromJSON\(.\["main", "beta", "alpha"\].\), github\.ref_name\)' .github/workflows/ziel-branch-build.yml
 verbiete 'uses: actions/cache(/save)?@' .github/workflows/ziel-branch-build.yml
 verlange 'workflows: \[CI\]' .github/workflows/stau-waechter.yml
 verlange '^MARKE_ALPHA="stau-waechter-alpha"' scripts/stau-waechter.sh

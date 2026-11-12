@@ -37,6 +37,7 @@
 - [x] 6.2 Build-Check: Release-Commits (`[skip ci]`) machen ein Ergebnis nicht überholt; Entwürfe und nicht fertige PRs mit altem Grün warten auch beim PR-Ereignis; ein API-Fehler hält die übrigen PRs nicht auf; ohne `--locked`. Prüfen: Fälle 1c, 4b, 9b, Mutationen je rot.
 - [x] 6.3 Formwächter und ADR-Prüfung: jeder rust-cache einzeln mit `save-if: false`, jede mise-Action ohne Cache, kein `actions/cache(/save)?@`. Prüfen: die drei Täuschungen des Reviewers sind je rot.
 - [x] 6.4 Wächter: neu gestarteter roter Lauf und unlesbare Jobs machen den Zustand unbestimmt; unlesbare Checks, laufende CI und gescheiterter Push lassen den Hinweis offen; Auftrag haftet eine Stunde (Entscheidung Ruben); Label wird angelegt (Entscheidung Ruben); Entwurf mit Auftrag wird „wartet“; Hinweis ohne Kandidaten; Texte „doppelt“ und Log. Prüfen: Fälle 52–59, Mutationen je rot.
+- [x] 6.6 Nach-Review des Behebungs-Commits: Einzellauf prüft PR und Ref (nie Kanal-Branch, nie Fork) und legt einen frischen Check an; Fehler beim „wartet“ und beim Lesen der Checks nicht still; nur „Workflow unbekannt“ gibt den Rat zum Einmergen; Entwurf mit Label wird `doppelt`; unlesbarer Halter verschiebt den Auftrag nicht; abgebrochene Checks laufen nicht; neue rote Jobs erneuern den Auftrag nicht; Log-Zeile; Doku. Prüfen: Fälle 1d–1f, 13–15, 60–63, Formprüfung F12, Mutationen je rot.
 - [x] 6.5 Texte nachgezogen: Spec, Design, `scripts/AGENTS.md`, ADR-0030, Skill (Zuständiger öffnet sofort einen Entwurfs-PR mit Label, dann Abstimmung).
 
 ## Workflow follow-up

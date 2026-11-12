@@ -27,7 +27,7 @@ Grün und erstem Rot gemergten PRs nennen.
 - **WHEN** der jüngste Lauf fehlgeschlagen ist und seine Jobs nicht lesbar sind
 - **THEN** gilt `alpha` als unbestimmt, nicht als grün
 
-### Requirement: Bei rotem alpha ist genau ein PR zuständig
+### Requirement: Bei rotem alpha ist höchstens ein PR zuständig
 Ist `alpha` rot, MUST höchstens ein offener PR zuständig sein. Ein PR mit Label `alpha-rot` ist der
 Fix und zuständig, bei mehreren der älteste. Sonst ist es ein offener PR gegen `alpha` ohne Entwurf,
 Fork oder Dependabot: zuerst der älteste, und ein erteilter Auftrag MUST eine volle Stunde an
@@ -55,8 +55,12 @@ anlegen.
 - **THEN** legt der Wächter es an
 
 #### Scenario: Zwei Fix-PRs
-- **WHEN** zwei offene PRs das Label `alpha-rot` tragen
+- **WHEN** zwei offene PRs das Label `alpha-rot` tragen, auch als Entwurf
 - **THEN** ist der ältere zuständig, und der jüngere trägt einen Hinweis, dass er doppelt ist
+
+#### Scenario: Halter kurz nicht lesbar
+- **WHEN** die Kommentare des PRs, der den Auftrag trägt, einmal nicht lesbar sind
+- **THEN** schreibt der Wächter in dieser Runde nichts zu „alpha rot“, und der Auftrag springt nicht
 
 ### Requirement: Bei rotem alpha trägt jeder offene PR einen Hinweis dazu
 Ist `alpha` rot, MUST jeder offene PR gegen `alpha` ohne Entwurf einen Hinweis mit Ursache und

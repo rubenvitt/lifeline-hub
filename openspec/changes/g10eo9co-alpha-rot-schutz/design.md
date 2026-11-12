@@ -51,9 +51,15 @@ Auslöser und Jobs:
 - `push` auf `alpha`, `beta`, `main`: Nur `verteilen` läuft. Es setzt den Check jedes fertigen PRs
   auf „läuft“ und startet für ihn einen **eigenen Lauf** dieses Workflows per `workflow_dispatch`
   auf seinem Branch; jeder übrige mit Check (auch ein Entwurf) bekommt „wartet“. Kennt ein Branch
-  den Workflow noch nicht, wird der Check rot mit dem Hinweis, den Ziel-Branch hineinzumergen.
-- `workflow_dispatch` (der eigene Lauf): `vorbereiten` übernimmt PR, Check und Stand aus den
-  Eingaben, dann `kompilieren` und `melden`.
+  den Workflow noch nicht (HTTP 422/404), wird der Check rot mit dem Hinweis, den Ziel-Branch
+  hineinzumergen; scheitert der Start sonst (5xx, Drosselung), wird er abgebrochen und der Lauf
+  rot, ohne falschen Rat.
+- `workflow_dispatch` (der eigene Lauf): `vorbereiten` prüft, dass der Lauf auf dem Kopf-Branch
+  des PRs läuft, der PR in diesem Repository liegt und der Ref kein Kanal-Branch ist (ein von
+  Hand ohne `--ref` gestarteter Lauf liefe sonst auf `alpha`); `kompilieren` sperrt Kanal-Refs
+  ein zweites Mal. Dann schließt es den Check von `verteilen` als übernommen und legt einen
+  frischen an: sonst bliebe der Check eines PR-Laufs, den der Einzellauf abgebrochen hat, als
+  jüngster auf „läuft“. Gerechnet wird gegen die aktuelle Spitze des Ziel-Branches.
 
 Eine Nebenläufigkeitsgruppe je PR (Ereignis und Einzellauf teilen sie) bzw. je Kanal-Branch bricht
 einen älteren Lauf ab. Ein Fehler an einem PR hält `verteilen` nicht auf; der Lauf endet dann rot.
@@ -104,19 +110,22 @@ mit warmem Cache.
 ### D4 „alpha rot“ liest den Zustand aus den CI-Läufen auf `alpha`
 
 `stau-waechter.yml` bekommt den Auslöser `workflow_run` (Workflow `CI`, `completed`, Branch `alpha`)
-und das Recht `actions: read`. Der Wächter liest die abgeschlossenen Push-Läufe von `ci.yml` auf
-`alpha`. Rot ist `alpha`, wenn im jüngsten ein Job außer `Release` fehlschlägt. Erster roter Lauf
-und letzter grüner Lauf davor ergeben die Spanne; die PRs dazu liefert
-`commits/<sha>/pulls` für jeden First-Parent-Commit der Spanne. `rot_seit` ist das Ende des ersten
-roten Laufs.
+und das Recht `actions: read`. Der Wächter liest die Push-Läufe von `ci.yml` auf `alpha`. Rot ist
+`alpha`, wenn im jüngsten abgeschlossenen ein Job außer dem Release (`Release / …`) fehlschlägt.
+Erster roter und letzter grüner Lauf davor ergeben die Spanne; die PRs dazu stehen in den
+Betreffen der First-Parent-Commits der Spanne (`Merge pull request #N …`, bei Squash `(#N)`), per
+`git log`, ohne weiteren API-Aufruf. Die ID des ersten roten Laufs ist die Kennung des Befunds.
 
 ### D5 Zuständigkeit: der Auftrag haftet eine Stunde
 
 Kandidaten sind die offenen PRs gegen `alpha`: kein Entwurf, kein Fork, nicht Dependabot und ohne
 Label `alpha-rot`, sortiert nach Nummer. Trägt ein PR das Label, ist er zuständig, bei mehreren der
-mit der kleinsten Nummer; ein Entwurf mit Label zählt, damit der Zuständige den Fix sofort belegen
-kann. Sonst liest der Wächter, welcher PR den Hinweis `zustaendig` trägt und wann er angelegt
-wurde. Ist das weniger als eine Stunde her und der PR noch Kandidat, bleibt er zuständig. Sonst
+mit der kleinsten Nummer, die übrigen sind `doppelt`; ein Entwurf mit Label zählt in beiden
+Rollen, damit der Zuständige den Fix sofort belegen kann. Sonst liest der Wächter, welcher PR den
+Hinweis `zustaendig` trägt und wann er angelegt wurde; ist ein PR dabei nicht lesbar, schreibt die
+Runde nichts (ein unbekannter Halter ist nicht „keiner“). Die Kennung des Auftrags hängt nur am
+ersten roten Lauf, nicht an Ursache oder roten Jobs: sonst erneuerte jeder weitere rote Lauf den
+Hinweis und damit die Stunde. Ist das weniger als eine Stunde her und der PR noch Kandidat, bleibt er zuständig. Sonst
 geht der Auftrag an den nächsten Kandidaten mit größerer Nummer, nach dem letzten an den ersten.
 Ohne Halter bekommt ihn der älteste.
 
@@ -142,7 +151,8 @@ Repository, legt der Wächter es an (`issues: write`).
 ### D7 Nach dem Fix: hineinmergen wie bei „ohne CI“
 
 Ist `alpha` grün und trägt ein PR einen offenen Hinweis dieser Marke, sieht der Wächter die Checks
-seines Kopfes an. Sind sie nicht lesbar oder läuft noch etwas, bleibt der Hinweis offen: ein
+seines Kopfes an. Sind sie nicht lesbar oder läuft noch ein Check (abgebrochene laufen nicht),
+bleibt der Hinweis offen: ein
 „behoben“ wäre endgültig, der nächste Lauf sähe den PR nicht mehr an. Ist der jüngste Lauf eines
 Checks rot, der PR kein Entwurf, konfliktfrei und ohne den grünen Stand von `alpha`, mergt der
 Wächter `alpha` mit `basis_hineinmergen` (gleicher Trailer, eigener Text) und setzt den Hinweis auf

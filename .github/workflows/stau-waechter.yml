@@ -16,7 +16,7 @@
 # zeigt sich erst nach einer Wartezeit; ohne Fix-PR wechselt die Zuständigkeit bei „alpha rot“) und
 # von Hand.
 #
-# ALPHA ROT (LLH-1849): Ist der jüngste CI-Lauf auf `alpha` rot, bestimmt der Wächter genau einen
+# ALPHA ROT (LLH-1849): Ist der jüngste CI-Lauf auf `alpha` rot, bestimmt der Wächter höchstens einen
 # zuständigen PR und schreibt an alle übrigen, dass sie nicht selbst reparieren; ist `alpha`
 # wieder grün, mergt er `alpha` in die PRs, deren CI rot ist. Kopf von `scripts/stau-waechter.sh`.
 #

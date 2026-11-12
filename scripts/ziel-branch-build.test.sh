@@ -46,10 +46,12 @@ case "$methode $pfad" in
     b="${pfad#repos/test/repo/git/ref/heads/}"
     printf '{"object":{"sha":"%s"}}\n' "$(cat "$F/ref-$b")" | aus ;;
   "GET repos/test/repo/commits/"*"/check-runs"*)
+    [ ! -e "$F/checkruns-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     sha="${pfad#repos/test/repo/commits/}"; sha="${sha%%/*}"
     if [ -f "$F/checks-$sha.json" ]; then aus < "$F/checks-$sha.json"; else echo '{"total_count":0,"check_runs":[]}' | aus; fi ;;
   "POST repos/test/repo/actions/workflows/ziel-branch-build.yml/dispatches")
     [ ! -e "$F/dispatch-kaputt" ] || { echo "HTTP 422 Workflow does not have 'workflow_dispatch' trigger" >&2; exit 1; }
+    [ ! -e "$F/dispatch-502" ] || { echo "HTTP 502 Bad Gateway" >&2; exit 1; }
     echo "DISPATCH ${feld[ref]} ${feld[inputs_nr]} ${feld[inputs_kopf]} ${feld[inputs_check_id]} ${feld[inputs_ziel_sha]}" >> "$F/log" ;;
   "GET repos/test/repo/compare/"*)
     if [ -f "$F/compare.json" ]; then aus < "$F/compare.json"; else
@@ -142,6 +144,29 @@ lauf "$f" verteilen alpha zielsha
 pruefe "1b ohne Einzellauf: Check rot" "POST k1 in_progress Baut mit Ziel-Branch;PATCH 901 failure" "$(log "$f")"
 pruefe "1b Grund nennt das Einmergen" 1 "$(grep -c 'hineinmergen' "$f/text-901")"
 
+# 1d — Ein anderer Fehler beim Start (502): kein Rat zum Einmergen, Check abgebrochen, Lauf rot.
+f="$(neu dispatch502)"
+printf '%s\n' '1|k1|false|false|true|' | prs "$f"
+touch "$f/dispatch-502"
+ZBB_EXIT=1 lauf "$f" verteilen alpha zielsha
+pruefe "1d 502 beim Start: Check abgebrochen" "POST k1 in_progress Baut mit Ziel-Branch;PATCH 901 cancelled" "$(log "$f")"
+pruefe "1d kein Rat zum Einmergen" 0 "$(grep -c 'hineinmergen' "$f/text-901" || true)"
+
+# 1e — „wartet“ lässt sich nicht setzen: nicht still, der Lauf endet rot.
+f="$(neu wartetkaputt)"
+printf '%s\n' '3|k3|false|false|false|' | prs "$f"
+hat_check "$f" k3 completed
+touch "$f/post-kaputt-k3"
+ZBB_EXIT=1 lauf "$f" verteilen alpha zielsha
+pruefe "1e wartet gescheitert: Warnung" 1 "$(grep -c 'warning::PR #3' "$ARBEIT/ausgabe")"
+
+# 1f — Die Checks eines nicht fertigen PRs sind nicht lesbar: nicht still „ohne Check“.
+f="$(neu checkskaputt)"
+printf '%s\n' '3|k3|false|false|false|' | prs "$f"
+touch "$f/checkruns-kaputt"
+ZBB_EXIT=1 lauf "$f" verteilen alpha zielsha
+pruefe "1f Checks nicht lesbar: Warnung" 1 "$(grep -c 'warning::PR #3' "$ARBEIT/ausgabe")"
+
 # 1c — Ein API-Fehler an einem PR hält die übrigen nicht auf; der Lauf endet rot.
 f="$(neu teilfehler)"
 printf '%s\n' '1|k1|false|false|true|' '2|k2|false|false|true|' '3|k3|false|false|true|' | prs "$f"
@@ -185,6 +210,40 @@ f="$(neu prfork)"
 printf '%s\n' '7|k7|false|true|true|' | prs "$f"
 lauf "$f" auswahl alpha zielsha 7
 pruefe "5 Fork: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
+
+echo "==> Baut mit Ziel-Branch: Einzellauf"
+
+# 13 — Einzellauf auf dem Branch des PRs: der Check von `verteilen` wird übernommen, ein frischer
+# Check rechnet (sonst bliebe ein Check eines abgebrochenen PR-Laufs als jüngster auf „läuft“).
+f="$(neu einzel)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+lauf "$f" einzellauf 7 zweig7 800 alpha zielsha
+pruefe "13 Einzellauf: alter Check übernommen, frischer läuft" \
+  "PATCH 800 cancelled;POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
+pruefe "13 Einzellauf rechnet den PR" "7:k7:901" "$(liste)"
+
+# 14 — Einzellauf auf einem Kanal-Branch (von Hand ohne --ref gestartet): nie rechnen.
+f="$(neu einzelalpha)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+lauf "$f" einzellauf 7 alpha 800 alpha zielsha
+pruefe "14 Einzellauf auf alpha: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
+
+# 14b — Auch wenn der Kopf-Branch des PRs selbst ein Kanal-Branch ist (PR alpha → main).
+f="$(neu einzelkanal)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+jq '.[0].head.ref = "alpha"' "$f/pulls.json" > "$f/p.neu" && mv "$f/p.neu" "$f/pulls.json"
+jq '.head.ref = "alpha"' "$f/pull-7.json" > "$f/p.neu" && mv "$f/p.neu" "$f/pull-7.json"
+lauf "$f" einzellauf 7 alpha 800 alpha zielsha
+pruefe "14b Kopf ist Kanal-Branch: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
+f="$(neu einzel)"
+
+# 15 — Einzellauf auf einem fremden Branch oder für einen Fork: nie rechnen.
+lauf "$f" einzellauf 7 anderer-zweig 800 alpha zielsha
+pruefe "15 Ref passt nicht zum PR: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
+f="$(neu einzelfork)"
+printf '%s\n' '7|k7|false|true|true|' | prs "$f"
+lauf "$f" einzellauf 7 zweig7 800 alpha zielsha
+pruefe "15 Fork: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 
 echo "==> Baut mit Ziel-Branch: Meldung"
 
@@ -289,7 +348,9 @@ pruefe "F4 jede mise-Action in kompilieren ohne Cache" 0 \
   "$(schritte_mit "$K" 'jdx/mise-action@' | grep -vc 'cache: false' || true)"
 form "F5 Checkout in kompilieren ohne Zugangsdaten" 0 hat "$K" 'persist-credentials: false'
 pruefe "F6 das Token sieht in kompilieren nur der Fetch" 1 "$(anzahl "$K" 'github.token')"
-form "F11 kompilieren läuft nie im Push-Lauf" 0 hat "$K" "if: .*github.event_name != 'push'"
+form "F11 kompilieren läuft nie im Push-Lauf" 0 hat "$K" "github.event_name != 'push' && needs.vorbereiten"
+form "F12 kompilieren läuft nie auf einem Kanal-Branch" 0 hat "$K" 'contains\(fromJSON\(.\["main", "beta", "alpha"\].\), github.ref_name\)'
+form "F12 der Einzellauf prüft PR und Ref" 0 hat "$(job vorbereiten)" 'ziel-branch-build.sh einzellauf'
 form "F11 melden läuft nie im Push-Lauf" 0 hat "$M" "if: .*github.event_name != 'push'"
 form "F11 verteilen läuft nur im Push-Lauf" 0 hat "$V" "if: \\$\\{\\{ github.event_name == 'push' \\}\\}"
 for j in verteilen vorbereiten melden; do

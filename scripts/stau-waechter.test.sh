@@ -62,6 +62,7 @@ case "$methode $pfad" in
   "GET repos/test/repo/issues/"*"/comments"*)
     [ ! -e "$F/kommentare-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     nr="${pfad#repos/test/repo/issues/}"; nr="${nr%%/*}"
+    [ ! -e "$F/kommentare-kaputt-$nr" ] || { echo "HTTP 502" >&2; exit 1; }
     d="$(kdatei "$nr")"; [ -f "$d" ] || echo '[]' > "$d"
     cat "$d" ;;
   "GET repos/test/repo/pulls"*) cat "$F/pulls.json" ;;
@@ -964,6 +965,62 @@ printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 8002
 printf '%s\n' '9|dep|false|false|dependabot[bot]|' | prs "$r"
 alpha_lauf "$r"
 pr_kommentar_enthaelt "59 ohne Kandidaten: Hinweis sagt, dass niemand beauftragt ist" "$r" 9 'Kein offener PR'
+
+# 60 — Zwei Fix-PRs als Entwurf (so empfiehlt es der Auftrag): der zweite ist doppelt.
+r="$(repo_neu entwurffixe)"
+zweig "$r" f11; zweig "$r" f13; zweig "$r" f14
+alpha_merge "$r" 70
+printf '%s\n' "9002|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 9002
+printf '%s\n' '11|f11|false|false|ruben|' '13|f13|true|false|ruben|alpha-rot' '14|f14|true|false|ruben|alpha-rot' | prs "$r"
+touch "$(fake "$r")/label-alpha-rot"
+export STAU_JETZT="$UM_1035"
+alpha_lauf "$r"
+pruefe "60 Entwurf #13 ist der Fix" 1 "$(zaehle "$r" 'POST#13 alpha-fix')"
+pruefe "60 Entwurf #14 ist doppelt" 1 "$(zaehle "$r" 'POST#14 alpha-doppelt')"
+
+# 61 — Der Halter ist kurz nicht lesbar: der Auftrag springt nicht, die Runde schreibt nichts.
+r="$(repo_neu halterkaputt)"
+zweig "$r" f11; zweig "$r" f12
+alpha_merge "$r" 80
+printf '%s\n' "9102|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 9102
+printf '%s\n' '11|f11|false|false|ruben|' '12|f12|false|false|ruben|' | prs "$r"
+touch "$(fake "$r")/label-alpha-rot"
+echo '[{"id": 900, "body": "<!-- stau-waechter-alpha:zustaendig:abc -->\nAuftrag", "user": {"login": "github-actions[bot]"}, "created_at": "2026-11-12T10:30:00Z"}]' \
+  > "$(fake "$r")/kommentare-12.json"
+touch "$(fake "$r")/kommentare-kaputt-12"
+alpha_lauf "$r"
+pruefe "61 Halter nicht lesbar: kein Schreibzugriff" "" "$(log "$r")"
+
+# 62 — Neue rote Jobs (ein weiterer roter Lauf) erneuern den Auftrag nicht: er haftet ab seiner
+# Erteilung, sonst behielte ein untätiger Halter ihn bei wechselnden Fehlern für immer.
+rm -f "$(fake "$r")/kommentare-kaputt-12"
+alpha_lauf "$r"
+vorher="$(wc -l < "$(fake "$r")/log")"
+printf '%s\n' "9103|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:50:00Z" \
+  "9102|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' 'Frontend-Suite 1/4|failure' | jobs_von "$r" 9103
+export STAU_JETZT=$((UM_1035 + 600))
+alpha_lauf "$r"
+pruefe "62 andere rote Jobs: Auftrag an #12 bleibt unverändert" 0 "$(tail -n +"$((vorher + 1))" "$(fake "$r")/log" | grep -c '#12' || true)"
+export STAU_JETZT="$UM_1136"
+alpha_lauf "$r"
+pruefe "62 nach der Stunde ab Erteilung geht der Auftrag weiter" 1 "$(zaehle "$r" 'POST#11 alpha-zustaendig')"
+
+# 63 — alpha wieder grün, der PR trägt nur grüne und abgebrochene Checks: nichts läuft, der
+# Hinweis wird behoben (nicht „läuft noch“ für immer).
+r="$(repo_neu abgebrochen)"
+zweig "$r" f11
+printf '%s\n' "9202|$(kopf "$r" alpha)|completed|success|2026-11-12T11:50:00Z" | laeufe "$r"
+printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
+printf '%s\n' 'Schnellprüfungen|completed|success|2026-11-12T10:40:00Z|2026-11-12T10:45:00Z' \
+  'e2e-Binary|completed|cancelled|2026-11-12T10:40:00Z|2026-11-12T10:50:00Z' | checks_von "$r" f11
+echo '[{"id": 950, "body": "<!-- stau-waechter-alpha:wartet:abc -->\nalpha ist rot", "user": {"login": "github-actions[bot]"}}]' \
+  > "$(fake "$r")/kommentare-11.json"
+export STAU_JETZT="$UM_1155"
+alpha_lauf "$r"
+pruefe "63 abgebrochener Check: Hinweis behoben" "PATCH#11 alpha-behoben" "$(log "$r")"
 
 # 48 — Nur der Release scheitert: alpha gilt nicht als rot.
 r="$(repo_neu nurrelease)"

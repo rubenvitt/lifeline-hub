@@ -63,6 +63,10 @@ MUST keinen Cache speichern. Ein PR aus einem Fork MUST den Check nie grün beko
 - **WHEN** nach einem Merge auf `alpha` ein fertiger PR neu rechnet, dessen Abhängigkeit beim Bauen Cache-Einträge anzulegen versucht
 - **THEN** läuft sein Code in einem Lauf auf seinem eigenen Branch, und kein Eintrag landet im Cache-Bereich von `alpha`
 
+#### Scenario: Einzellauf von Hand auf alpha
+- **WHEN** jemand den Lauf des Checks für einen PR von Hand auf `alpha` startet
+- **THEN** rechnet er nicht, und kein PR-Code läuft
+
 #### Scenario: Branch kennt den Workflow noch nicht
 - **WHEN** ein fertiger PR neu rechnen soll, dessen Branch den Workflow des Checks noch nicht enthält
 - **THEN** ist der Check rot und sagt, dass der Ziel-Branch hineinzumergen ist

@@ -71,7 +71,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     der mit Label `alpha-rot` (bei mehreren die kleinste Nummer, die übrigen `doppelt`; ein
     Entwurf mit Label zählt), sonst ein PR ohne Entwurf, Fork und Dependabot. Der Auftrag haftet
     eine volle Stunde ab seinem Hinweis an diesem PR und geht erst dann an den nächsten (größere
-    Nummer, dann von vorn); eine neue oder gemergte PR verschiebt ihn nicht. Alle übrigen bekommen
+    Nummer, dann von vorn); eine neue oder gemergte PR, neue rote Jobs oder ein nicht lesbarer
+    Halter verschieben ihn nicht. Alle übrigen bekommen
     den Hinweis, nicht selbst zu reparieren (den Fix-PR nennen sie erst, wenn es einen gibt: ein
     Wechsel des Auftrags soll keine wartende Sitzung wecken). Das Label legt der Wächter an, wenn
     es fehlt. Ein neu gestarteter roter Lauf, der noch läuft, oder nicht lesbare Jobs machen den
@@ -96,7 +97,9 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   (`check-all.sh --nur baut`). Nach jedem Push auf einen Kanal-Branch setzt `verteilen` den Check
   jedes fertigen PRs auf „läuft“ und startet **je PR einen eigenen Lauf auf dessen Branch**
   (`workflow_dispatch`); ein nicht fertiger mit Check (auch ein Entwurf) bekommt „wartet“, ein
-  Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Check entsteht über
+  Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Einzellauf rechnet
+  nur auf dem Kopf-Branch eines PRs dieses Repositorys, nie auf einem Kanal-Branch, und legt einen
+  frischen Check an. Der Check entsteht über
   die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
   einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
   und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort

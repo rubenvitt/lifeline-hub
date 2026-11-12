@@ -63,7 +63,8 @@ permissions:
 
 # Je PR (Ereignis und Einzellauf teilen sich die Gruppe) bzw. je Kanal-Branch: ein neuer Kopf oder
 # ein neuer Stand macht den laufenden Lauf wertlos. Ein abgebrochener Lauf hinterlässt seinen
-# Check auf „läuft“; der neue Lauf legt einen jüngeren an.
+# Check auf „läuft“; der neue Lauf legt in `vorbereiten` einen jüngeren an, auch der Einzellauf
+# (dessen Check von `verteilen` ist dann älter und wird als übernommen geschlossen).
 concurrency:
   group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr || github.ref }}
   cancel-in-progress: true
@@ -124,30 +125,35 @@ jobs:
           PR_NR: ${{ github.event.pull_request.number }}
           PR_ZIEL: ${{ github.event.pull_request.base.ref }}
           E_NR: ${{ inputs.nr }}
-          E_KOPF: ${{ inputs.kopf }}
           E_CHECK: ${{ inputs.check_id }}
           E_ZIEL: ${{ inputs.ziel }}
-          E_ZIEL_SHA: ${{ inputs.ziel_sha }}
         run: |
+          # Gerechnet wird gegen die aktuelle Spitze des Ziel-Branches, auch im Einzellauf.
+          if [ "$EREIGNIS" = workflow_dispatch ]; then ziel="$E_ZIEL"; else ziel="$PR_ZIEL"; fi
+          ziel_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$ziel" --jq .object.sha)"
           if [ "$EREIGNIS" = workflow_dispatch ]; then
-            nr="$E_NR" kopf="$E_KOPF" id="$E_CHECK" ziel="$E_ZIEL" ziel_sha="$E_ZIEL_SHA"
+            # Prüft PR und Ref (nie auf einem Kanal-Branch, nie für einen Fork) und legt einen
+            # frischen Check an; den von `verteilen` schließt es als übernommen.
+            liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$ziel" "$ziel_sha")"
           else
-            ziel="$PR_ZIEL"
-            ziel_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$ziel" --jq .object.sha)"
             liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"
-            echo "Rechnen: $liste"
-            if [ "$liste" = "[]" ]; then echo "rechnen=false" >> "$GITHUB_OUTPUT"; exit 0; fi
-            nr="$(jq -r '.[0].nr' <<< "$liste")" kopf="$(jq -r '.[0].kopf' <<< "$liste")"
-            id="$(jq -r '.[0].check_id' <<< "$liste")"
           fi
+          echo "Rechnen: $liste"
+          if [ "$liste" = "[]" ]; then echo "rechnen=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          nr="$(jq -r '.[0].nr' <<< "$liste")" kopf="$(jq -r '.[0].kopf' <<< "$liste")"
+          id="$(jq -r '.[0].check_id' <<< "$liste")"
           { echo "rechnen=true"; echo "nr=$nr"; echo "kopf=$kopf"; echo "check_id=$id"
             echo "ziel=$ziel"; echo "ziel_sha=$ziel_sha"; } >> "$GITHUB_OUTPUT"
 
   kompilieren:
     name: Kompilieren
     needs: vorbereiten
-    # Nie im Push-Lauf: der hat den Cache-Bereich des Kanal-Branches (Kopf).
-    if: ${{ github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
+    # Nie im Push-Lauf und nie in einem Lauf auf einem Kanal-Branch (ein Einzellauf ohne --ref):
+    # die haben den Cache-Bereich des Kanal-Branches (Kopf). `einzellauf` prüft das schon, dies ist
+    # die zweite Sperre.
+    if: >-
+      ${{ github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true'
+          && !contains(fromJSON('["main", "beta", "alpha"]'), github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # PR-Code läuft hier: nur lesen (Kopf).

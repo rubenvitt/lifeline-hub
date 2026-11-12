@@ -113,7 +113,7 @@ konflikt_dateien() { # <basis-commit> <kopf-commit>
 
 # Kennzahlen der Check-Runs eines Commits als eine Zeile:
 #   <hat-ci 0|1> <frühester Start, Unix> <alle fertig und grün 0|1> <spätestes Ende, Unix>
-#   <hat-e2e 0|1> <einer rot 0|1>
+#   <hat-e2e 0|1> <einer rot 0|1> <einer läuft noch 0|1>
 # (0 statt einer Zeit, wenn es keine gibt.) „Grün“ und „e2e gelaufen“ werten je Name den JÜNGSTEN
 # Check-Run, wie GitHub bei den Required Checks: ein abgebrochener erster Lauf auf demselben Kopf
 # (Auto-Merge aus und wieder an) bleibt in der Liste stehen, zählt aber nicht mehr. e2e gilt als
@@ -135,7 +135,8 @@ check_kennzahlen() { # <sha>
               or (.name == $auswahl and .status != "completed"))
             then 1 else 0 end),
           (if any($juengste[]; .conclusion == "failure" or .conclusion == "timed_out")
-            then 1 else 0 end)
+            then 1 else 0 end),
+          (if any($juengste[]; .status != "completed") then 1 else 0 end)
         ] | map(tostring) | join(" ")'
 }
 
@@ -288,7 +289,7 @@ git fetch origin $basis && git merge origin/$basis
 
   # ── CI-Lauf vorhanden? ──
   zahlen="$(check_kennzahlen "$k")" || { sag "Check-Runs nicht lesbar, übersprungen"; return 0; }
-  read -r hat_ci start gruen ende hat_e2e _ <<< "$zahlen"
+  read -r hat_ci start gruen ende hat_e2e _ _ <<< "$zahlen"
   if [ "$hat_ci" = 0 ]; then
     # Ohne jeden Check-Run zählt die letzte Änderung am PR (`updated_at`): sie liegt nie vor
     # dem Push. Das Commit-Datum taugt nicht, ein alter Commit kann eben erst gepusht sein.
@@ -487,7 +488,9 @@ $lage
 
 Mehrere offene PRs tragen das Label \`$ALPHA_LABEL\`; als Fix gilt der mit der kleinsten Nummer, #$fix. Diesen PR schließen, oder das Label entfernen, wenn er etwas anderes repariert." ;;
     zustaendig)
-      kenn="$(kennung "zustaendig $ALPHA_ROT_ID $ALPHA_URSACHE $ALPHA_FEHLER")"
+      # Ohne Ursache und rote Jobs: ein weiterer roter Lauf erneuert den Auftrag nicht. Er haftet
+      # ab seiner Erteilung; sonst behielte ein untätiger Halter ihn bei wechselnden Fehlern.
+      kenn="$(kennung "zustaendig $ALPHA_ROT_ID")"
       text="**\`alpha\` ist rot: dieser PR ist zuständig** (Stau-Wächter)
 
 $lage
@@ -499,7 +502,7 @@ Damit nicht mehrere Sitzungen denselben Fix bauen, ist genau ein PR beauftragt, 
 
 Gibt es eine volle Stunde nach diesem Auftrag keinen PR mit dem Label, geht der Auftrag an den nächsten offenen PR." ;;
     wartet)
-      kenn="$(kennung "wartet $ALPHA_ROT_ID $ALPHA_URSACHE $ALPHA_FEHLER $fix $niemand")"
+      kenn="$(kennung "wartet $ALPHA_ROT_ID $fix $niemand")"
       if [ -n "$fix" ]; then
         wer="#$fix ist der Fix (Label \`$ALPHA_LABEL\`)."
       elif [ "$niemand" = 1 ]; then
@@ -522,15 +525,15 @@ $wer **Diesen Bruch hier nicht selbst reparieren:** mehrere Fixe für dieselbe S
 alpha_nach_fix() { # <nr> <kopf-branch> <kopf-sha> <fork> <entwurf>
   local nr="$1" branch="$2" k="$3" fork="$4" entwurf="$5" HINWEIS_MARKE="$MARKE_ALPHA" alt alt_art="" b
   local HINWEIS_BEHOBEN="**Behoben** (Stau-Wächter): \`alpha\` ist wieder grün."
-  local zahlen start gruen rot code=0 neu grund
+  local zahlen rot laeuft code=0 neu grund
   alt="$(hinweis_lesen "$nr")" || { sag "Kommentare nicht lesbar, Hinweis bleibt, wie er ist"; return 0; }
   [ -n "$alt" ] && read -r _ alt_art _ _ <<< "$alt"
   case "$alt_art" in fix | doppelt | zustaendig | wartet) ;; *) return 0 ;; esac
   zahlen="$(check_kennzahlen "$k")" || { sag "Checks nicht lesbar, Hinweis bleibt offen"; return 0; }
-  read -r _ start gruen _ _ rot <<< "$zahlen"
-  # Weder grün noch rot, aber Check-Runs vorhanden: es läuft noch etwas. Ohne jeden Check-Run
-  # läuft nichts, dann ist nichts rot.
-  if [ "$rot" != 1 ] && [ "$gruen" != 1 ] && [ "$start" != 0 ]; then sag "CI des PRs läuft noch, abwarten"; return 0; fi
+  read -r _ _ _ _ _ rot laeuft <<< "$zahlen"
+  # Läuft noch ein Check und ist keiner rot, abwarten. Abgebrochene oder fehlende Checks laufen
+  # nicht: dann ist nichts rot, und der Hinweis wird behoben.
+  if [ "$rot" != 1 ] && [ "$laeuft" = 1 ]; then sag "CI des PRs läuft noch, abwarten"; return 0; fi
   b="$(git rev-parse --verify --quiet "refs/remotes/$REMOTE/alpha^{commit}")" || b=""
   grund=""
   if [ "$rot" != 1 ]; then grund="CI nicht rot"
@@ -565,12 +568,13 @@ Wer lokal auf diesem Branch weiterarbeitet: vor dem nächsten Push \`git pull\`.
 }
 
 # Wer hält den Auftrag gerade? Gibt "<nr> <angelegt, Unix>" des jüngsten Hinweises der Art
-# `zustaendig` unter den PRs auf stdin (eine Nummer je Zeile) aus, leer ohne.
+# `zustaendig` unter den PRs auf stdin (eine Nummer je Zeile) aus, leer ohne. Exit ≠ 0, wenn ein
+# PR nicht lesbar ist: dann ist der Halter unbekannt, nicht „keiner“, sonst spränge der Auftrag.
 alpha_halter() {
   local nr alt art angelegt halter="" seit=0 HINWEIS_MARKE="$MARKE_ALPHA"
   while read -r nr; do
     [ -n "$nr" ] || continue
-    alt="$(hinweis_lesen "$nr")" || continue
+    alt="$(hinweis_lesen "$nr")" || return 1
     [ -n "$alt" ] || continue
     read -r _ art _ angelegt <<< "$alt"
     if [ "$art" = zustaendig ] && [ "${angelegt:-0}" -ge "$seit" ]; then halter="$nr" seit="${angelegt:-0}"; fi
@@ -612,7 +616,11 @@ alpha_runde() {
       # Der Auftrag haftet eine volle Stunde ab seiner Erteilung an dem PR, der ihn trägt; erst
       # dann (oder wenn dieser PR kein Kandidat mehr ist) geht er an den nächsten mit größerer
       # Nummer, nach dem letzten wieder an den ersten. Eine Änderung der Liste verschiebt ihn nicht.
-      read -r halter seit <<< "$(cut -f1 <<< "$liste" | alpha_halter)" || true
+      if ! halter="$(cut -f1 <<< "$liste" | alpha_halter)"; then
+        sag "Hinweise nicht lesbar, Halter unbekannt: alpha-Runde übersprungen"
+        return 0
+      fi
+      read -r halter seit <<< "$halter" || true
       if [ -n "$halter" ] && [ $(( $(jetzt) - ${seit:-0} )) -lt 3600 ] \
         && case " $kandidaten " in *" $halter "*) true ;; *) false ;; esac; then
         zust="$halter"
@@ -625,14 +633,15 @@ alpha_runde() {
     else
       niemand=1
     fi
-    sag "zuständig: ${zust:+#$zust}${zust:+${fixe:+ (Fix-PR)}}${zust:-niemand}"
+    if [ -n "$zust" ]; then sag "zuständig: #$zust${fixe:+ (Fix-PR)}"; else sag "zuständig: niemand"; fi
   fi
 
   while IFS=$'\t' read -r nr branch kopf entwurf fork dependabot fix; do
     [ -n "$nr" ] || continue
     echo "==> PR #$nr ($branch, alpha $ALPHA_ZUSTAND)"
     if [ "$ALPHA_ZUSTAND" = rot ]; then
-      if [ "$entwurf" = true ] && ! { [ "$fix" = true ] && [ "$nr" = "$zust" ]; }; then
+      # Ein Entwurf mit Label ist ein Fix-PR (der Auftrag empfiehlt den Entwurf) und läuft unten mit.
+      if [ "$entwurf" = true ] && ! { [ "$fix" = true ] && [ "$fork" = false ]; }; then
         # Ein Entwurf bekommt keinen neuen Hinweis; trägt er noch einen Auftrag, wird der zu
         # „wartet“, sonst trügen zwei PRs den Auftrag.
         HINWEIS_MARKE="$MARKE_ALPHA"

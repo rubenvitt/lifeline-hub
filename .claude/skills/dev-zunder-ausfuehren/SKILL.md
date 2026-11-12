@@ -297,7 +297,7 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 ## alpha rot: wenn der Stau-Wächter weckt (LLH-1849)
 
 Schlägt die CI auf `alpha` fehl, schreibt der Stau-Wächter an jeden offenen PR gegen `alpha` einen
-Hinweis (Marke `stau-waechter-alpha`). Er bestimmt **genau einen** Zuständigen, damit nicht mehrere
+Hinweis (Marke `stau-waechter-alpha`). Er bestimmt **höchstens einen** Zuständigen, damit nicht mehrere
 Sitzungen denselben Fix bauen: Am 12.11.2026 waren es vier, und ihre Varianten kollidierten danach
 in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
 

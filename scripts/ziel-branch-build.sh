@@ -12,6 +12,11 @@
 #       Bei einem PR-Ereignis: ist der PR fertig, Check auf „läuft“; sonst, wenn er den Check
 #       trägt, auf „wartet“. Gibt den PR als JSON aus, wenn er rechnet, sonst []:
 #       [{"nr": <nr>, "kopf": "<sha>", "check_id": <id>}]
+#   scripts/ziel-branch-build.sh einzellauf <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
+#       Im Einzellauf: rechnet nur, wenn <ref> der Kopf-Branch des PRs ist, der PR in diesem
+#       Repository liegt und <ref> kein Kanal-Branch ist (ein von Hand ohne --ref gestarteter Lauf
+#       liefe sonst auf alpha). Schließt <check-id> als übernommen und arbeitet dann wie
+#       `auswahl`: ein frischer Check, damit kein Check eines abgebrochenen PR-Laufs jünger bleibt.
 #   scripts/ziel-branch-build.sh melden <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> \
 #       <ergebnis> <ausgabe-datei>
 #       Schließt den Check <check-id>: ergebnis `gruen` → grün; `rot`, `konflikt`, `veraltet`,
@@ -59,19 +64,24 @@ pr_zeilen() { # <prs-json>
 }
 
 # Ein nicht fertiger PR, der den Check trägt, bekommt ihn auf „wartet“ (nicht noch einmal).
+# Exit ≠ 0, wenn das nicht gelingt; jeder Aufruf ist einzeln geprüft, denn wer `warten` mit `||`
+# aufruft, schaltet `set -e` hier ab.
 warten() { # <nr> <kopf> <ziel> <ziel-sha>
-  case "$(check_status "$2")" in
+  local st
+  st="$(check_status "$2")" || return 1
+  case "$st" in
     "") echo "PR #$1: nicht fertig, ohne Check" >&2 ;;
     queued) echo "PR #$1: nicht fertig, wartet schon" >&2 ;;
     *)
       check_neu "$2" queued "Wartet: $3 hat sich bewegt" \
-        "\`$3\` steht jetzt auf $(kurz "$4"). Der Check rechnet neu, sobald der PR fertig ist (Auto-Merge an oder Label \`e2e\`, kein Entwurf)." > /dev/null
+        "\`$3\` steht jetzt auf $(kurz "$4"). Der Check rechnet neu, sobald der PR fertig ist (Auto-Merge an oder Label \`e2e\`, kein Entwurf)." > /dev/null \
+        || return 1
       echo "PR #$1: nicht fertig, Check wartet" >&2 ;;
   esac
 }
 
 verteilen() { # <ziel-branch> <ziel-sha>
-  local ziel="$1" ziel_sha="$2" prs nr kopf zweig fertig entwurf fork id fehler=0
+  local ziel="$1" ziel_sha="$2" prs nr kopf zweig fertig entwurf fork id antwort fehler=0
   prs="$(gh_api "repos/$REPO/pulls?state=open&base=$ziel&per_page=100" --paginate --jq '.' | jq -s 'add // []')"
   while IFS=$'\t' read -r nr kopf zweig fertig entwurf fork; do
     [ -n "$nr" ] || continue
@@ -80,16 +90,28 @@ verteilen() { # <ziel-branch> <ziel-sha>
       id="$(check_neu "$kopf" in_progress "Rechnet gegen $ziel $(kurz "$ziel_sha")" \
         "Der PR wird mit dem aktuellen Stand von \`$ziel\` zusammengeführt und kompiliert.")" \
         || { echo "::warning::PR #$nr: Check nicht gesetzt"; fehler=1; continue; }
-      if gh_api -X POST "repos/$REPO/actions/workflows/ziel-branch-build.yml/dispatches" -f ref="$zweig" \
+      if antwort="$(gh_api -X POST "repos/$REPO/actions/workflows/ziel-branch-build.yml/dispatches" -f ref="$zweig" \
         -f "inputs[nr]=$nr" -f "inputs[kopf]=$kopf" -f "inputs[check_id]=$id" \
-        -f "inputs[ziel]=$ziel" -f "inputs[ziel_sha]=$ziel_sha" > /dev/null; then
+        -f "inputs[ziel]=$ziel" -f "inputs[ziel_sha]=$ziel_sha" 2>&1)"; then
         echo "PR #$nr: fertig, eigener Lauf auf $zweig (Check $id)" >&2
       else
-        echo "::warning::PR #$nr: eigener Lauf auf $zweig nicht startbar"
-        gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=completed -f conclusion=failure \
-          -f "output[title]=Kann nicht neu rechnen" \
-          -f "output[summary]=Auf \`$zweig\` ließ sich der Workflow „$NAME“ nicht starten, meist weil der Branch ihn noch nicht kennt. \`$ziel\` in den Branch hineinmergen und pushen; dann rechnet der Check." > /dev/null \
-          || fehler=1
+        echo "::warning::PR #$nr: eigener Lauf auf $zweig nicht startbar: $antwort"
+        case "$antwort" in
+          *"HTTP 422"* | *"HTTP 404"*)
+            # Der Branch kennt den Workflow (noch) nicht, oder es gibt ihn nicht mehr.
+            gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=completed -f conclusion=failure \
+              -f "output[title]=Kann nicht neu rechnen" \
+              -f "output[summary]=Auf \`$zweig\` ließ sich der Workflow „$NAME“ nicht starten, meist weil der Branch ihn noch nicht kennt. \`$ziel\` in den Branch hineinmergen und pushen; dann rechnet der Check." > /dev/null \
+              || fehler=1 ;;
+          *)
+            # Vorübergehend (5xx, Drosselung): kein falscher Rat; der Lauf wird rot und lässt
+            # sich neu starten, jedes PR-Ereignis rechnet ebenso.
+            fehler=1
+            gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=completed -f conclusion=cancelled \
+              -f "output[title]=Neu rechnen gescheitert" \
+              -f "output[summary]=Der eigene Lauf auf \`$zweig\` ließ sich gerade nicht starten. Den Lauf „$NAME“ auf \`$ziel\` neu starten oder einen Commit pushen." > /dev/null \
+              || true ;;
+        esac
       fi
     else
       warten "$nr" "$kopf" "$ziel" "$ziel_sha" || { echo "::warning::PR #$nr: Check nicht gesetzt"; fehler=1; }
@@ -99,8 +121,11 @@ verteilen() { # <ziel-branch> <ziel-sha>
 }
 
 auswahl() { # <ziel-branch> <ziel-sha> <pr-nr>
-  local ziel="$1" ziel_sha="$2" prs nr kopf zweig fertig entwurf fork id liste="[]"
-  prs="$(gh_api "repos/$REPO/pulls/$3" --jq '[.]')"
+  auswahl_aus "$1" "$2" "$(gh_api "repos/$REPO/pulls/$3" --jq '[.]')"
+}
+
+auswahl_aus() { # <ziel-branch> <ziel-sha> <prs-json mit einem PR>
+  local ziel="$1" ziel_sha="$2" prs="$3" nr kopf zweig fertig entwurf fork id liste="[]"
   while IFS=$'\t' read -r nr kopf zweig fertig entwurf fork; do
     [ -n "$nr" ] || continue
     if [ "$fork" = true ]; then
@@ -116,6 +141,27 @@ auswahl() { # <ziel-branch> <ziel-sha> <pr-nr>
     fi
   done < <(pr_zeilen "$prs")
   printf '%s\n' "$liste"
+}
+
+einzellauf() { # <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
+  local nr="$1" ref="$2" alt_id="$3" ziel="$4" ziel_sha="$5" prs grund=""
+  prs="$(gh_api "repos/$REPO/pulls/$nr" --jq '[.]')"
+  case " alpha beta main " in *" $ref "*) grund="läuft auf dem Kanal-Branch $ref" ;; esac
+  if [ -z "$grund" ] && [ "$(jq -r '.[0].head.repo.full_name // ""' <<< "$prs")" != "$REPO" ]; then
+    grund="PR liegt nicht in diesem Repository"
+  fi
+  if [ -z "$grund" ] && [ "$(jq -r '.[0].head.ref' <<< "$prs")" != "$ref" ]; then
+    grund="läuft nicht auf dem Branch des PRs"
+  fi
+  if [ -n "$grund" ]; then
+    echo "Einzellauf für PR #$nr rechnet nicht: $grund" >&2
+    printf '[]\n'
+    return 0
+  fi
+  gh_api -X PATCH "repos/$REPO/check-runs/$alt_id" -f status=completed -f conclusion=cancelled \
+    -f "output[title]=Übernommen" -f "output[summary]=Der eigene Lauf dieses PRs rechnet mit einem neuen Check." > /dev/null \
+    || echo "PR #$nr: alter Check $alt_id nicht geschlossen" >&2
+  auswahl_aus "$ziel" "$ziel_sha" "$prs"
 }
 
 # Ist <neu> nur um Release-Commits weiter als <alt>? Die tragen `[skip ci]` und starten keinen
@@ -159,6 +205,7 @@ aufruf() { sed -n '6,/^#   Umgebung/p' "$0" >&2; exit 2; }
 case "${1:-}" in
   verteilen) [ $# -eq 3 ] || aufruf; shift; verteilen "$@" ;;
   auswahl) [ $# -eq 4 ] || aufruf; shift; auswahl "$@" ;;
+  einzellauf) [ $# -eq 6 ] || aufruf; shift; einzellauf "$@" ;;
   melden) [ $# -eq 8 ] || aufruf; shift; melden "$@" ;;
   *) aufruf ;;
 esac
