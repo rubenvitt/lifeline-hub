@@ -142,6 +142,18 @@ die CI-Zeiten der Auswahl sind −23 % rund −25 min; die übrigen 228 CI-Minut
 API-Anmeldung, die Einsätze ohne Dialog und die Anmeldung ohne Startseite (190 Dateien), sind
 lokal aber nicht gemessen. Die Akzeptanz misst der CI-Lauf des PRs.
 
+## 8a. Lauf der übrigen geänderten Specs
+
+174 geänderte Specs außerhalb der Messauswahl, Chromium, `PW_WORKERS=2`, Stand `4fc96aa5`:
+**703 grün, 13 rot, 8 übersprungen** (724 Fälle, 1,4 h). Jeder rote Fall einzeln nachgeprüft:
+
+| Fall | Ursache | Beleg |
+|---|---|---|
+| `etb-anhang:38`, `schaden-anhaenge:73`, `tier-anhaenge:66` | Umgebung: das Ersatz-Chromium der Cloud-Sitzung nennt den Download „download“ | auf dem `alpha`-Stand ebenso rot (einzeln, `--repeat-each=3` bei etb-anhang) |
+| `etb-chronologie:118`, `:183` (je 3 Stufen) | Umgebung (Zeitlimit 30 s unter Last) | auf dem `alpha`-Stand ebenso rot |
+| `betroffene-kontrast:67`, `betroffene-layout:105` | Last im Gesamtlauf | einzeln grün auf beiden Ständen |
+| `kraefte-schmal:134`, `uhs-grundriss-person-scroll:424` | Zeitlimit unter Last | einzeln grün auf beiden Ständen |
+
 ## 9. Code-Review (Aufgabe 8.3)
 
 Unabhängiger Prüfer über den Diff gegen `alpha` (12.11.2026), rund 326 geänderte Stellen per Skript
