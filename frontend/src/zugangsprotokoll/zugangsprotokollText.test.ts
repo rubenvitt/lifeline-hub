@@ -105,6 +105,8 @@ describe('Archiv am Hub (LLH-1494)', () => {
     expect(AKTION_TEXT.archiv_heruntergeladen).toBe('Archiv heruntergeladen');
     expect(hasNamensziel('archiv_schluessel_geprueft')).toBe(true);
     expect(hasNamensziel('archiv_heruntergeladen')).toBe(true);
+    expect(AKTION_TEXT.archiv_eingespielt).toBe('Archiv eingespielt');
+    expect(hasNamensziel('archiv_eingespielt')).toBe(true);
     expect(instanzText({ fingerabdruck: 'ab12:cd34', block: 2 })).toBe(
       'Fingerabdruck ab12:cd34 · Block 2',
     );

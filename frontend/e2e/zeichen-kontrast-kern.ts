@@ -1,5 +1,5 @@
 import { expect, type Locator } from '@playwright/test';
-import { contrastSurface } from '@einsatzzeichen/core';
+import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { ZEICHEN_THEME_DUNKEL } from '../src/zeichen/zeichenTheme';
 
 /**

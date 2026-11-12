@@ -1,4 +1,4 @@
-import { drawAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { drawAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import {
   PALETTE,
   type AnySpec,

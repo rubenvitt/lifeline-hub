@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { serializeAnySpec } from '@einsatzzeichen/core';
+import { serializeAnySpec } from '@einsatzzeichen/core/exact';
 import type { AnySpec } from '@einsatzzeichen/schema';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';

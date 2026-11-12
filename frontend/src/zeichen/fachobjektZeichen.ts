@@ -27,7 +27,7 @@ import {
   drawSymbol,
   serializeAnySpec,
   serializeSpec,
-} from '@einsatzzeichen/core';
+} from '@einsatzzeichen/core/exact';
 import {
   ORGANIZATION_IDS,
   type CapabilityId,
