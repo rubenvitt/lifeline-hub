@@ -370,7 +370,7 @@ aufgehoben oder entfällt sie, steht er wieder an, solange seine Zeit noch nicht
 ändert die Einstufung der Karte nicht.
 
 Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal; „Ablösung steht an“
-und „Ablösung fällig“ laut Plan je Zeitpunkt einmal (Abschnitt „Ein Hinweis je Zeitpunkt“). Die Hinweise kann
+laut Plan je Zeitpunkt einmal (Abschnitt „Ein Hinweis je Zeitpunkt“). Die Hinweise kann
 jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“ nicht (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen steht die
 Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
@@ -390,8 +390,9 @@ erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
 ### Ein Hinweis je Zeitpunkt
 
 Schichten, die laut Plan zum selben Zeitpunkt fällig sind, melden sich gemeinsam: je Zeitpunkt
-einmal „Ablösung steht an“ und einmal „Ablösung fällig“, etwa mit „15 Wechsel um 1400“, statt je
-Schicht. Wechselt um diese Zeit nur eine Einheit, nennt der Hinweis sie wie gewohnt („Florian 1,
+einmal „Ablösung steht an“, etwa mit „15 Wechsel um 1400“, statt je Schicht. Zum Zeitpunkt selbst
+kommt kein zweiter Hinweis; offen bleibt der Wechsel in der Leiste über dem Schichtplan. Nur eine
+Schicht, die erst nach ihrer Vorwarnzeit dazukam, meldet „Ablösung fällig“ für den Zeitpunkt. Wechselt um diese Zeit nur eine Einheit, nennt der Hinweis sie wie gewohnt („Florian 1,
 1400“). Gezählt werden die Einheiten, deren Block zu diesem Zeitpunkt beginnt oder endet; die Zahl
 steht beim Lesen fest, ein später verschobener Block ändert sie. Schichten nach Rhythmus melden
 sich weiter einzeln. Wechsel an UHS und Pause haben keine Frist: Sie stehen in der Leiste, melden

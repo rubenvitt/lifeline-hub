@@ -1,8 +1,9 @@
 //! Gebündelter Hinweis je Wechselzeitpunkt (LLH-1555 Welle 3, Change
 //! `qo0amhd5-wechsel-aus-schichtplan`, Spec `kraefte-schichtplan` „Ein Hinweis je Zeitpunkt“):
-//! Schichten, die laut Plan zum selben Zeitpunkt fällig sind, melden Vorwarnung und Fälligkeit
-//! je einmal, mit dem Zeitpunkt als Bezug (`schichtplan_wechsel`). Schichten außerhalb des Plans
-//! melden sich weiter einzeln (EEMUA 191: ein Anlass, ein Alarm).
+//! Schichten, die laut Plan zum selben Zeitpunkt fällig sind, melden die Vorwarnung einmal, mit
+//! dem Zeitpunkt als Bezug (`schichtplan_wechsel`); zum Zeitpunkt selbst kommt kein zweiter
+//! Hinweis, außer für eine Schicht, deren Vorwarnung nie ausgelöst hat. Schichten außerhalb des
+//! Plans melden sich weiter einzeln (EEMUA 191: ein Anlass, ein Alarm).
 
 use axum::http::StatusCode;
 use chrono::{DateTime, Duration, DurationRound, Utc};
@@ -80,8 +81,8 @@ async fn bezuege(pool: &sqlx::SqlitePool, art: &str, benutzer: i64) -> Vec<(Stri
 }
 
 /// Akzeptanzkriterium 2 (LLH-1555): 15 Posten mit gleichem Wechselzeitpunkt erzeugen eine
-/// Benachrichtigung, für die Vorwarnung wie für die Fälligkeit. Ein Zeitpunkt mit einem einzigen
-/// Wechsel nennt die Einheit; eine Schicht ohne Plan zur selben Zeit bleibt einzeln.
+/// Benachrichtigung, die Vorwarnung; zum Zeitpunkt selbst schweigen sie. Ein Zeitpunkt mit einem
+/// einzigen Wechsel nennt die Einheit; eine Schicht ohne Plan zur selben Zeit bleibt einzeln.
 #[tokio::test]
 async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() {
     let (app, pool, live) = setup_mit_pool_und_live().await;
@@ -146,32 +147,43 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     tick_einmal(&pool, &live, z + Duration::minutes(1)).await;
     assert_eq!(
         bezuege(&pool, "abloesung_faellig", admin_id).await,
-        vec![("abloesung".to_string(), einzeln), wechsel.clone()],
-        "ein Alarm für die 15 Posten"
+        vec![("abloesung".to_string(), einzeln)],
+        "kein zweiter Hinweis zum Zeitpunkt, die Schicht ohne Plan für sich"
     );
-    // Ein späterer Tick meldet den Zeitpunkt nicht noch einmal.
     tick_einmal(&pool, &live, z + Duration::minutes(2)).await;
-    assert_eq!(bezuege(&pool, "abloesung_faellig", admin_id).await.len(), 2);
-    // Kommt nach der Quittung eine Schicht zu diesem Zeitpunkt hinzu, meldet sie ihn neu, statt
-    // ohne Alarm fällig zu werden; solange der Alarm offen ist, schweigt sie (siehe oben).
+    assert_eq!(bezuege(&pool, "abloesung_faellig", admin_id).await.len(), 1);
+    // Kommt eine Schicht so spät hinzu, dass ihre Vorwarnzeit schon vorbei ist (der Server stellt
+    // dann keine Vorwarn-Frist), meldet ihre Fälligkeit den Zeitpunkt, statt ohne Hinweis fällig
+    // zu werden. Die Uhr des Servers läuft echt; die fehlende Frist stellt der Test nach.
+    let rtw16 = posten(&app, &admin, e, "RTW 16", beginn, z).await;
     sqlx::query(
-        "UPDATE benachrichtigung SET quittiert_at = ? WHERE bezug_typ = 'schichtplan_wechsel'",
+        "UPDATE erinnerung SET status = 'erledigt', erledigt_at = ? \
+         WHERE bezug_typ = 'abloesung_vorwarnung' AND bezug_id = ?",
     )
     .bind(f(z + Duration::minutes(3)))
+    .bind(rtw16)
     .execute(&pool)
     .await
     .unwrap();
-    posten(&app, &admin, e, "RTW 16", beginn, z).await;
     tick_einmal(&pool, &live, z + Duration::minutes(4)).await;
     assert_eq!(
         bezuege(&pool, "abloesung_faellig", admin_id).await,
-        vec![
-            ("abloesung".to_string(), einzeln),
-            wechsel.clone(),
-            wechsel.clone()
-        ],
-        "nach der Quittung ein neuer Alarm für den Nachzügler"
+        vec![("abloesung".to_string(), einzeln), wechsel.clone()],
+        "ein Hinweis für den Nachzügler ohne Vorwarnung"
     );
+    // Solange er offen ist, schweigt ein zweiter Nachzügler; der Text zählt ihn mit.
+    let rtw17 = posten(&app, &admin, e, "RTW 17", beginn, z).await;
+    sqlx::query(
+        "UPDATE erinnerung SET status = 'erledigt', erledigt_at = ? \
+         WHERE bezug_typ = 'abloesung_vorwarnung' AND bezug_id = ?",
+    )
+    .bind(f(z + Duration::minutes(5)))
+    .bind(rtw17)
+    .execute(&pool)
+    .await
+    .unwrap();
+    tick_einmal(&pool, &live, z + Duration::minutes(6)).await;
+    assert_eq!(bezuege(&pool, "abloesung_faellig", admin_id).await.len(), 2);
 
     let b: i64 = sqlx::query_scalar(
         "SELECT id FROM benachrichtigung WHERE art = 'abloesung_faellig' \
@@ -192,16 +204,19 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["titel"], "Ablösung fällig");
     let detail = v["detail"].as_str().unwrap_or_default();
-    assert!(detail.starts_with("16 Wechsel um "), "{v}");
+    assert!(detail.starts_with("17 Wechsel um "), "{v}");
     assert_eq!(
         v["pfad"],
         format!("/einsaetze/{e}/abloesung?ansicht=plan&wechsel={minute}").as_str()
     );
 
-    // Der Zeitpunkt mit einem einzigen Wechsel nennt die Einheit.
+    // Der Zeitpunkt mit einem einzigen Wechsel nennt die Einheit; nach seiner Vorwarnung
+    // schweigt auch er zum Zeitpunkt selbst.
+    tick_einmal(&pool, &live, z2 - Duration::minutes(29)).await;
     tick_einmal(&pool, &live, z2 + Duration::minutes(1)).await;
+    assert_eq!(bezuege(&pool, "abloesung_faellig", admin_id).await.len(), 2);
     let b2: i64 = sqlx::query_scalar(
-        "SELECT id FROM benachrichtigung WHERE art = 'abloesung_faellig' \
+        "SELECT id FROM benachrichtigung WHERE art = 'abloesung_vorwarnung' \
            AND bezug_typ = 'schichtplan_wechsel' AND bezug_id = ? AND benutzer_id = ?",
     )
     .bind(z2.timestamp() / 60)
