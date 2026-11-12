@@ -30,7 +30,7 @@
 //! abgelehnt wird, löst sich mit `grund` von der Kette und steht als eigene Zeile da. Einträge an
 //! einer Person, die der Führer kennt, sind sofort stellbar.
 
-use super::antrag::{self, Beantragbar, BEANTRAGBAR};
+use super::antrag::{self, Beantragbar, BEANTRAGBAR, BEZUG_WARTET};
 use super::schema::{self, Ziel};
 use super::SpiegelKategorie;
 use crate::error::AppError;
@@ -116,12 +116,11 @@ const VERZICHTBAR: &[(&str, &str)] = &[
     ("einsatz_person", "meldung_id"),
 ];
 
-/// Grund, wenn ein Bezug einer Erfassung schon nachgereicht, aber noch nicht wieder hier ist: Die
-/// Kette wartet ([`ketten_fortsetzen`]), ein einzelnes Stellen meldet ihn.
-pub const BEZUG_WARTET: &str = "Bezug noch nicht beim Führer.";
-
 /// Grund, wenn ein Bezug selbst nicht nachgereicht wird (verworfen, nicht nachreichbar, offen).
 pub const BEZUG_FEHLT: &str = "Bezug ist nicht nachgereicht.";
+
+/// Grund, wenn eine Zeile sich nicht nachreichen lässt.
+const NICHT_STELLBAR: &str = "Lässt sich nicht als Antrag stellen.";
 
 /// Grund an einem Eintrag einer Kette, wenn der Einsatz hier wieder selbst geführt wird.
 pub const FUEHRUNG_GEWECHSELT: &str = "Führung gewechselt; bitte neu erfassen.";
@@ -898,8 +897,11 @@ async fn bezug(
     )
 }
 
-fn bezug_fehler(b: &Bezug) -> AppError {
-    AppError::Validation(
+/// Ein Bezug, der (noch) nicht gilt, ist ein Zustand: 422 (`src/AGENTS.md`,
+/// Statuscode-Konvention). Wartet er nur, trägt der Fehler [`BEZUG_WARTET`], woran die Kette ihn
+/// erkennt ([`is_bezug_wartet`]).
+fn bezug_error(b: &Bezug) -> AppError {
+    AppError::UnprocessableEntity(
         match b {
             Bezug::Wartet => BEZUG_WARTET,
             _ => BEZUG_FEHLT,
@@ -922,11 +924,11 @@ async fn pfad_der_zeile(
     let person = d
         .get("person_id")
         .and_then(als_schluessel)
-        .ok_or_else(|| AppError::Validation("Lässt sich nicht als Antrag stellen.".into()))?;
+        .ok_or_else(|| AppError::UnprocessableEntity(NICHT_STELLBAR.into()))?;
     let pid = match bezug(conn, einsatz_id, "einsatz_person", &person).await? {
         Bezug::Unberuehrt => person,
         Bezug::Neu(neu) => neu,
-        b => return Err(bezug_fehler(&b)),
+        b => return Err(bezug_error(&b)),
     };
     Ok(vec![("pid".to_string(), pid)])
 }
@@ -987,7 +989,7 @@ async fn body_der_zeile(
             Bezug::Fehlt if VERZICHTBAR.contains(&(tabelle, v.pfad)) => {
                 body.remove(v.pfad);
             }
-            f => return Err(bezug_fehler(&f)),
+            f => return Err(bezug_error(&f)),
         }
     }
     Ok(Value::Object(body))
@@ -1073,7 +1075,7 @@ async fn stelle_zeile_tx(
         Ok(Value::Object(d)) => d,
         _ => Map::new(),
     };
-    let unmoeglich = || AppError::Validation("Lässt sich nicht als Antrag stellen.".into());
+    let unmoeglich = || AppError::UnprocessableEntity(NICHT_STELLBAR.into());
     let art = nachreichbar_als(&tabelle, &d).ok_or_else(unmoeglich)?;
     let b = BEANTRAGBAR
         .iter()
@@ -1148,7 +1150,11 @@ pub async fn alle_stellen(
         });
         match lauf {
             Ok(_) => ergebnis.gestellt += 1,
-            Err(AppError::Validation(grund) | AppError::Conflict(grund)) => {
+            Err(
+                AppError::Validation(grund)
+                | AppError::Conflict(grund)
+                | AppError::UnprocessableEntity(grund),
+            ) => {
                 ergebnis.offen.push(BruchOffen { id: e.id, grund });
             }
             Err(f) => return Err(f),
@@ -1222,15 +1228,19 @@ async fn ohne_wartenden_bezug(
     let Some(b) = BEANTRAGBAR.iter().find(|b| b.art == art) else {
         return Ok(true);
     };
-    fn wartet<T>(r: &Result<T, AppError>) -> bool {
-        matches!(r, Err(AppError::Validation(g)) if g == BEZUG_WARTET)
-    }
-    if wartet(&pfad_der_zeile(conn, einsatz_id, art, &d).await) {
+    if is_bezug_wartet(&pfad_der_zeile(conn, einsatz_id, art, &d).await) {
         return Ok(false);
     }
-    Ok(!wartet(
+    Ok(!is_bezug_wartet(
         &body_der_zeile(conn, einsatz_id, &z.art, b, &d).await,
     ))
+}
+
+/// Ob ein Stellen nur daran scheitert, dass ein Bezug noch nicht beim Führer ist
+/// ([`bezug_error`] und [`antrag::lege_an_tx`]): Die Kette wartet dann, statt den Eintrag mit
+/// Grund zu lösen.
+fn is_bezug_wartet<T>(r: &Result<T, AppError>) -> bool {
+    matches!(r, Err(AppError::UnprocessableEntity(g)) if g == BEZUG_WARTET)
 }
 
 /// Die Zeit, nach der eine Kette ihre Einträge stellt.
@@ -1308,16 +1318,18 @@ async fn kette_des_einsatzes(pool: &SqlitePool, einsatz_id: i64) -> Result<bool,
                 })
             }
             // Das Konto, das den Ursprung gestellt hat, gibt es nicht mehr.
-            None => Err(AppError::Validation(
+            None => Err(AppError::UnprocessableEntity(
                 "Niemand mehr, in dessen Namen der Eintrag ginge.".into(),
             )),
         };
+        if is_bezug_wartet(&lauf) {
+            continue;
+        }
         let grund = match lauf {
             Ok(_) => {
                 geaendert = true;
                 continue;
             }
-            Err(AppError::Validation(g)) if g == BEZUG_WARTET => continue,
             Err(AppError::NotFound) => continue,
             Err(
                 AppError::Validation(g) | AppError::Conflict(g) | AppError::UnprocessableEntity(g),
@@ -1556,7 +1568,9 @@ async fn nachreich_notiz_tx(
     .await
     {
         // Geht kein Antrag mehr (Abgleich beendet), bleibt es bei dem Versuch.
-        Ok(_) | Err(AppError::Conflict(_) | AppError::Validation(_)) => {}
+        Ok(_)
+        | Err(AppError::Conflict(_) | AppError::Validation(_) | AppError::UnprocessableEntity(_)) =>
+            {}
         Err(f) => return Err(f),
     }
     sqlx::query("UPDATE einsatz_bruchstelle SET notiz_at = ? WHERE id = ?")
@@ -1884,7 +1898,7 @@ mod tests {
             body_der_zeile(&mut conn, e, "einsatz_person", b, &zeile.daten()).await
         };
         assert!(
-            matches!(body_jetzt(pool.clone()).await, Err(AppError::Validation(g)) if g == BEZUG_FEHLT)
+            matches!(body_jetzt(pool.clone()).await, Err(AppError::UnprocessableEntity(g)) if g == BEZUG_FEHLT)
         );
         // Gestellt, aber noch nicht zurück: Die Person wartet auf sie.
         sqlx::query(
@@ -1894,7 +1908,7 @@ mod tests {
         .await
         .unwrap();
         assert!(
-            matches!(body_jetzt(pool.clone()).await, Err(AppError::Validation(g)) if g == BEZUG_WARTET)
+            matches!(body_jetzt(pool.clone()).await, Err(AppError::UnprocessableEntity(g)) if g == BEZUG_WARTET)
         );
         // Verworfen: Die Person geht ohne Meldung und ohne UHS.
         sqlx::query("UPDATE einsatz_bruchstelle SET erledigt = 'verworfen' WHERE art = 'meldung'")

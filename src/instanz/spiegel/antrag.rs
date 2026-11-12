@@ -518,11 +518,18 @@ async fn beantragen(
     Ok(antrag_antwort(id, &zustand))
 }
 
+/// Grund, wenn ein Verweis einer Erfassung auf eine Zeile zeigt, die der Führer (noch) nicht
+/// kennt: ein Zustand, also 422 (`src/AGENTS.md`, Statuscode-Konvention). Die Bruchstelle meldet
+/// damit auch einen Bezug, der schon nachgereicht, aber noch nicht wieder hier ist; ihre Kette
+/// wartet dann (`bruchstelle::ketten_fortsetzen`), ein einzelnes Stellen meldet ihn.
+pub const BEZUG_WARTET: &str = "Bezug noch nicht beim Führer.";
+
 /// Legt eine Erfassung am Spiegel als Antrag ab, auf einer offenen Transaktion: Kern von
 /// [`beantragen`] und vom Nachreichen der Bruchstelle (LLH-1646). Bildet die Verweise in Pfad
 /// (`pfad`, ohne `id`) und Body auf die Kennungen des Führers ab, setzt die Erfassungszeit und
 /// legt den Antrag an. Gibt es zur `client_id` schon einen, kommt dieser zurück (`neu` = false).
 /// `client_id_vorgabe` setzt die `client_id` im Body, wo sie fehlt. Liefert `(id, zustand, neu)`.
+/// 422 mit [`BEZUG_WARTET`], wenn ein Verweis keine Herkunft hat.
 pub(super) async fn lege_an_tx(
     conn: &mut SqliteConnection,
     b: &Beantragbar,
@@ -576,7 +583,7 @@ pub(super) async fn lege_an_tx(
             return Ok((id, zustand, false));
         }
     }
-    let fehlt = || AppError::Validation("Bezug noch nicht beim Führer.".into());
+    let fehlt = || AppError::UnprocessableEntity(BEZUG_WARTET.into());
     let mut pfad_parameter = serde_json::Map::new();
     let mut pfad_lokal = serde_json::Map::new();
     for (name, wert) in pfad {
