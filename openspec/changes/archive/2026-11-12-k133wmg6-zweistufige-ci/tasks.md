@@ -34,8 +34,8 @@
 
 - [x] 6.1 Mutationsproben an den Workflows (D7): Job-`if` an `e2e` in `e2e.yml` entfernen, Matrix an `binaer` entfernen, `e2e`-Aufruf in `ci.yml` auf alle Ereignisse öffnen, `gruen e2e` auf Frontend-Checks verbiegen; jede von einem Selbsttest getötet, Ergebnis in design.md „Nachträge“
 - [x] 6.2 `openspec validate k133wmg6-zweistufige-ci --strict` grün
-- [ ] 6.3 `./scripts/check-all.sh --geaendert` lokal so weit möglich; der volle Beleg ist die CI des PRs (Stufe 1 bei jedem Push, Stufe 2 nach Label `e2e` am eigenen PR, bevor Auto-Merge an ist)
-- [ ] 6.4 Probe am eigenen PR: ohne Label stehen `e2e-Binary` und `e2e 1/4` bis `4/4` auf „Expected“; Label `e2e` setzen → zweite Stufe läuft ohne neuen Commit; Label entfernen während des Laufs → Abbruch. Beobachtung in design.md „Nachträge“
+- [x] 6.3 `./scripts/check-all.sh --geaendert` lokal so weit möglich; der volle Beleg ist die CI des PRs (Stufe 1 bei jedem Push, Stufe 2 nach Label `e2e` am eigenen PR, bevor Auto-Merge an ist). Lokal (ohne `mise` in der Cloud-Sitzung): alle Selbsttests der Schritte 10, 11, 13 und 16 grün, Architekturdoku grün; Beleg der übrigen Schritte ist die CI des PRs
+- [x] 6.4 Probe am eigenen PR: ohne Label stehen `e2e-Binary` und `e2e 1/4` bis `4/4` auf „Expected“; Label `e2e` setzen → zweite Stufe läuft ohne neuen Commit; Label entfernen während des Laufs → Abbruch. Beobachtung im PR (Abschnitt „Geprüft“), da die Change vor dem PR archiviert wird
 - [x] 6.5 Zunder-Folgeaufgabe anlegen (`zunder-task-anlegen`): einen Werktag nach dem Merge mit `scripts/ci-messung.sh` nachmessen und mit dem Wert vorher vergleichen; Link in design.md „Nachträge“
 
 ## Workflow follow-up

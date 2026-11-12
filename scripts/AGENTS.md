@@ -33,7 +33,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   `scripts/ci-stufen.test.sh` (Schritt 11) fest; Start- und Gruppenbedingung von `e2e.yml` stehen
   dort im Wortlaut und ändern sich nur zusammen mit ihm. **e2e-Rückmeldung vor dem Merge:** Label
   `e2e` setzen oder lokal `check-all.sh --geaendert`. Herleitung:
-  `openspec/changes/k133wmg6-zweistufige-ci/design.md`.
+  `openspec/changes/archive/2026-11-12-k133wmg6-zweistufige-ci/design.md`.
 - **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite, jede für sich** (LLH-1660,
   LLH-1662): Folgen auf einen Commit, auf dem eine Suite grün war, nur Autofix-Commits, die Migrationen unverändert auf eine
   höhere Nummer legen (gleicher Name, gleiche Reihenfolge; daneben höchstens Dateien, die laut
