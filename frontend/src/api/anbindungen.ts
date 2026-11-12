@@ -73,14 +73,6 @@ export function setAnbindungFreigabe(
   );
 }
 
-/** Lese-Rechte mit Einsatzbezug: ihr Einsatz kommt aus der Freigabe der Einsatzleitung. */
-const SCOPES_MIT_EINSATZBEZUG: readonly Scope[] = ['lage:read'];
-
-/** Trägt die Anbindung ein Lese-Recht mit Einsatzbezug? Dann zeigt die Seite, was sie liest. */
-export function hasEinsatzbezug(scopes: readonly string[]): boolean {
-  return scopes.some((s) => (SCOPES_MIT_EINSATZBEZUG as readonly string[]).includes(s));
-}
-
 /**
  * Klartext der Rechte in der Reihenfolge der Auswahl. Exhaustiv: ein neuer Scope im Backend bricht
  * hier den Typecheck. Daneben steht der Wire-Wert, damit der Admin ihn mit der Doku des
