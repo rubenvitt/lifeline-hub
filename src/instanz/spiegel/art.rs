@@ -228,6 +228,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Verlauf der Führungsakte; reist mit ihr über die Meldung (LLH-1491)",
     ),
     (
+        "einsatz_schwaerzung_marke",
+        "Schwärzungsmarken, die diese Instanz kannte (LLH-1649); die aktuelle reist am Kopf",
+    ),
+    (
         "einsatz_bruchstelle",
         "Sicherung der eigenen Seite beim Führungswechsel (LLH-1641); bleibt an dieser Instanz",
     ),

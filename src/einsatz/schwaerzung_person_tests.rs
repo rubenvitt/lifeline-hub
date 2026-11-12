@@ -450,6 +450,27 @@ async fn scrub_nimmt_die_bruchstelle_des_einsatzes_mit() {
         .await
         .unwrap();
     assert_eq!(rest, vec![b.e2]);
+    // Die Marke am Kopf trägt die Schwärzung zum Spiegel (LLH-1649), nur im eigenen Einsatz,
+    // und jede Schwärzung setzt eine neue.
+    let marke = |e: i64| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, Option<String>>(
+                "SELECT schwaerzung_marke FROM einsatz WHERE id = ?",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let erste = marke(b.e1).await;
+    assert!(erste.is_some());
+    assert_eq!(marke(b.e2).await, None);
+    scrub(&pool, b.e1, PersonenArt::Betroffene, b.p2).await;
+    let zweite = marke(b.e1).await;
+    assert!(zweite.is_some());
+    assert_ne!(erste, zweite);
 }
 
 /// Die Einsatzgrenze hält: ein Scrub mit der ID einer Person, aber dem falschen Einsatz,
@@ -458,11 +479,35 @@ async fn scrub_nimmt_die_bruchstelle_des_einsatzes_mit() {
 async fn scrub_im_falschen_einsatz_aendert_nichts() {
     let pool = crate::db::test_pool().await;
     let b = testdaten::anlegen(&pool).await;
-    let vorher = testdaten::alle_texte(&pool).await;
+    // Jedes Löschersuchen setzt am Kopf seines Einsatzes eine neue Marke (LLH-1649), auch wenn es
+    // nichts trifft. Marke und Spiegel-Log sind kein Inhalt; sie bleiben aus dem Vergleich.
+    let ohne_marke = || async {
+        sqlx::query("UPDATE einsatz SET schwaerzung_marke = NULL")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz_aenderung")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz_schwaerzung_marke")
+            .execute(&pool)
+            .await
+            .unwrap();
+        testdaten::alle_texte(&pool).await
+    };
+    let vorher = ohne_marke().await;
     scrub(&pool, b.e2, PersonenArt::Betroffene, b.p1).await;
     scrub(&pool, b.e2, PersonenArt::ExterneKraft, b.k1).await;
     scrub(&pool, b.e2, PersonenArt::InfotelefonAnruf, b.anruf1).await;
-    assert_eq!(testdaten::alle_texte(&pool).await, vorher);
+    let marke: Option<String> =
+        sqlx::query_scalar("SELECT schwaerzung_marke FROM einsatz WHERE id = ?")
+            .bind(b.e2)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(marke.is_some());
+    assert_eq!(ohne_marke().await, vorher);
     let _ = (b.p_e2, b.p2, b.k2, b.anruf2);
 }
 

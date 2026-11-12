@@ -395,7 +395,14 @@ sequenceDiagram
   ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
   Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
   kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine
-  Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`).
+  Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`). Jede Schwärzung beim
+  Führer (Kategorie, Löschersuchen je Person, ganzer Einsatz) löscht dort die Bruchstelle und setzt
+  `einsatz.schwaerzung_marke` neu (Zufallswert); bringt der Kopf am Spiegel eine andere Marke,
+  räumt auch er seine Bruchstelle (`fuehrung::raeume_bruchstelle`, LLH-1649): Alle Kopien und
+  Geklärtes gehen; offene Zeilen fragt er ohne Kopie weiter (`geraeumt`) und löscht sie ganz,
+  sobald sie geklärt sind. Neu ist nur eine Marke, die der Einsatz an dieser Instanz nie hatte
+  (`einsatz_schwaerzung_marke`): Bringt der neue Führer nach einer Trennung die Marke von davor,
+  räumt eine eigene Schwärzung dieser Seite nichts; hat er selbst geschwärzt, räumt sie.
 - Offene Anträge der neuen führenden Seite führt sie selbst aus (`antrag::fuehre_eigene_aus`),
   genau einmal; Anhänge, die ihr fehlen, holt sie beim alten Führer.
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht

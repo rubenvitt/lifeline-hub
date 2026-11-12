@@ -3574,6 +3574,8 @@ export interface components {
             status: string;
             stichwort?: string | null;
             verlauf: components["schemas"]["FuehrungVerlaufEintrag"][];
+            /** @description Diese Instanz verwahrt den Einsatz (LLH-1647, E4): keine Übergabe mehr. */
+            verwahrt: boolean;
         };
         /** @description Der Abgabecode, genau einmal angezeigt. */
         FuehrungCodeAntwort: {
@@ -3630,7 +3632,7 @@ export interface components {
          * @description Wie die geltende Führung zustande kam (Verlauf und Akte).
          * @enum {string}
          */
-        FuehrungWechselArt: "angelegt" | "uebergabe" | "anfrage" | "notuebernahme" | "code_abgabe" | "bestaetigt" | "widerspruch" | "verworfen";
+        FuehrungWechselArt: "angelegt" | "uebergabe" | "anfrage" | "notuebernahme" | "code_abgabe" | "bestaetigt" | "widerspruch" | "verworfen" | "verwahrung";
         /**
          * @description Führungsfunktion aus dem Katalog. Wire == `as_str()`.
          *

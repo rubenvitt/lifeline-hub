@@ -241,6 +241,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("nachbereitung_bis", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
+            // Neue Zufallsmarke je Schwärzung am Einsatz, kein Inhalt; der Spiegel räumt daran
+            // seine Bruchstelle (LLH-1649).
+            retain("schwaerzung_marke", G_SPIEGEL),
             // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
             retain("kennung", G_SPIEGEL),
             retain("freigabestufe", G_ENUM),
@@ -3331,7 +3334,26 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Bruchstelle beim Führungswechsel (LLH-1641, E6): Inhalte eigener, nicht abgeglichener
-    // Zeilen (Freitext, Personendaten), darum mit dem Einsatz weg.
+    // Zeilen (Freitext, Personendaten), darum mit dem Einsatz weg. Das JSON sagt nicht, welche
+    // Kategorie oder Person darin steht; deshalb geht sie bei jeder Schwärzung ganz
+    // (`einsatz::repo::nach_schwaerzung_tx`). Am Spiegel laufen diese Wege nicht: Er räumt sie,
+    // sobald der Kopf eine hier unbekannte `einsatz.schwaerzung_marke` bringt
+    // (`instanz::spiegel::fuehrung::raeume_bruchstelle`, LLH-1649): Kopien und Geklärtes gehen,
+    // offene Zeilen ohne Kopie werden weiter gefragt und gehen, sobald sie geklärt sind
+    // (`geraeumt`). Mit dem Einsatz geht alles beim Abräumen
+    // (Kaskade).
+    // Bekannte Schwärzungsmarken eines Einsatzes (LLH-1649): Zufallswerte ohne Inhalt, gehen mit
+    // dem Einsatz.
+    TabellenRegel {
+        tabelle: "einsatz_schwaerzung_marke",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("marke", G_SPIEGEL),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_bruchstelle",
         scoping: Scoping::EinsatzId,
@@ -3346,6 +3368,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("entfernt", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("geklaert", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geraeumt", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gesichert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
             // Nachreichen (LLH-1646).
             scrub("folge_von", Strategie::ZeileLoeschen, Z_EINSATZ),

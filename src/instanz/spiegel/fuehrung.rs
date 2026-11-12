@@ -515,6 +515,15 @@ async fn uebernimm_bruch_antwort(
         .execute(&mut *conn)
         .await?;
     }
+    // Nach einer Schwärzung geräumte Zeilen (LLH-1649) gehen, sobald sie geklärt sind: Ihre
+    // Kopie ist schon fort, ein leerer Eintrag hielte nur das Hinweisband stehen.
+    sqlx::query(
+        "DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ? AND geraeumt = 1 \
+         AND (entfernt = 1 OR geklaert = 1)",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
     let offen: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0 \
          AND geklaert = 0)",
@@ -543,6 +552,39 @@ async fn uebernimm_bruch_antwort(
     // (LLH-1646).
     super::bruchstelle::ordne_folgen(conn, einsatz_id).await?;
     Ok(Some(einsatz_id))
+}
+
+/// Räumt am Spiegel die Bruchstelle eines Einsatzes (LLH-1649): Der Führer hat geschwärzt, sein
+/// Kopf bringt eine hier unbekannte `einsatz.schwaerzung_marke`. Wie beim Führer
+/// (`einsatz::repo::nach_schwaerzung_tx`) geht jede gesicherte Kopie (`daten`), weil das JSON
+/// nicht sagt, welche Kategorie oder Person darin steht; geklärte und entfernte Zeilen gehen ganz.
+/// Eine noch offene Zeile steht hier noch als lokale Zeile und kann Daten tragen, die der Führer
+/// nie schwärzen kann: Sie bleibt ohne Kopie in der Bruchstelle und wird weiter gefragt; kennt der
+/// Führer sie nicht, entfernt [`uebernimm_bruch_antwort`] sie wie bisher; ist sie geklärt, geht
+/// sie dort ganz (`geraeumt`, Review #1284). Ist nichts mehr offen, fragt der Spiegel nicht mehr.
+pub async fn raeume_bruchstelle(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ? AND (entfernt = 1 OR geklaert = 1)",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query("UPDATE einsatz_bruchstelle SET daten = NULL, geraeumt = 1 WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "UPDATE einsatz_spiegel SET bruch_offen = 0 WHERE einsatz_id = ? AND bruch_offen = 1 \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_bruchstelle WHERE einsatz_id = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Löst Verweise zwischen Zeilen, die gemeinsam entfernt werden (gefunden in LLH-1646): Eine Meldung und ihr
