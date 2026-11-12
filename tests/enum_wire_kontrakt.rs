@@ -667,6 +667,16 @@ fn serde_wire_gleich_as_str() {
         MaschinenzugangSchluesselGebunden,
         MaschinenzugangGeaendert,
         MaschinenzugangWiderrufen,
+        EinwurfZugangAngelegt,
+        EinwurfZugangSchluesselGewechselt,
+        EinwurfZugangWiderrufen,
+    });
+    // Einwurf (LLH-1654): Transportlage der Verwaltung.
+    enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {
+        Tls => "tls",
+        Proxy => "proxy",
+        Http => "http",
+        Keiner => "keiner",
     });
     // Maschinenzugang (LLH-1652): Scopes (Wire der öffentlichen API und JSON in
     // `maschinenzugang.scopes`), Zustand (DB-CHECK in `*_maschinenzugang.sql`) und Ablehnungsgrund.
