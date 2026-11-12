@@ -383,7 +383,10 @@ pub async fn liste_fuer_einsatz(
 
 /// Prüft, ob alle `ids` zur `org_id` als Katalog-Eintrag (`einsatz_id IS NULL`)
 /// **oder** als einsatz-lokale Sprechgruppe mit genau diesem `einsatz_id` gehören.
-/// Jede ID, die diese Bedingung nicht erfüllt, ergibt `UnprocessableEntity`.
+/// Jede ID, die diese Bedingung nicht erfüllt, ergibt `UnprocessableEntity`. Das Paar mit einer
+/// gleichnamigen Einsatz-Sprechgruppe (409) prüft erst die Schreibtransaktion
+/// ([`zuordnen_tx`], [`ersetzen_tx`], LLH-1650): Vorab auf eigener Verbindung könnte eine
+/// gleichzeitig angelegte Einsatz-Sprechgruppe durchrutschen.
 pub(crate) async fn pruefe_zuordenbar(
     pool: &SqlitePool,
     org_id: i64,
@@ -410,13 +413,14 @@ pub(crate) async fn pruefe_zuordenbar(
             "Sprechgruppe {id} ist für diese Organisation/diesen Einsatz nicht zuordenbar"
         )));
     }
-    pruefe_kein_lokales_paar(&mut *pool.acquire().await?, einsatz_id, ids).await
+    Ok(())
 }
 
 /// LLH-1645: Eine Katalog-Sprechgruppe, die der Einsatz noch nicht nutzt, darf kein Paar mit
 /// einer gleichnamigen Einsatz-Sprechgruppe stiften (etwa eine deaktivierte, die der Picker
-/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Auf der
-/// Verbindung, damit Schreibpfade wie die Lage der Fernmeldeskizze in ihrer Transaktion prüfen.
+/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Nur in der
+/// Schreibtransaktion der Zuordnung aufrufen (LLH-1650): Unter BEGIN IMMEDIATE sieht sie eine
+/// gleichzeitig angelegte Einsatz-Sprechgruppe, oder deren Anlegen sieht danach die Nutzung.
 pub(crate) async fn pruefe_kein_lokales_paar(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -455,8 +459,9 @@ fn ids_json(ids: &[i64]) -> Result<String, AppError> {
 /// Wer eine Sprechgruppe trägt (Zuordnungen aus 0073 und 0145). Eine Zuordnung entsteht und
 /// vergeht für alle Wege — PATCH mit `sprechgruppe_ids` als ganze Menge und die Einzel-Endpunkte
 /// `PUT/DELETE …/sprechgruppen/{sg}` (LFH-893, design.md D5) — nur über [`zuordnen_tx`] und
-/// [`loesen_tx`]. Die IDs prüft der Aufrufer vorher ([`pruefe_zuordenbar`]); dass der Datensatz
-/// zum Einsatz gehört, ebenfalls.
+/// [`loesen_tx`]. Die IDs prüft der Aufrufer vorher ([`pruefe_zuordenbar`], 422); dass der
+/// Datensatz zum Einsatz gehört, ebenfalls. Das Paar mit einer gleichnamigen
+/// Einsatz-Sprechgruppe (409) prüfen [`zuordnen_tx`] und [`ersetzen_tx`] selbst (LLH-1650).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Zuordnungsziel {
     Abschnitt(i64),
@@ -478,12 +483,16 @@ impl Zuordnungsziel {
     }
 }
 
-/// Ordnet dem Ziel eine Sprechgruppe zu, idempotent. `true`, wenn die Zuordnung neu ist.
+/// Ordnet dem Ziel eine Sprechgruppe des Einsatzes `einsatz_id` zu, idempotent. `true`, wenn die
+/// Zuordnung neu ist. Prüft vorher in derselben Transaktion das Paar mit einer gleichnamigen
+/// Einsatz-Sprechgruppe ([`pruefe_kein_lokales_paar`], 409, LLH-1650).
 pub async fn zuordnen_tx(
     conn: &mut SqliteConnection,
+    einsatz_id: i64,
     ziel: Zuordnungsziel,
     sprechgruppe_id: i64,
 ) -> Result<bool, AppError> {
+    pruefe_kein_lokales_paar(conn, einsatz_id, &[sprechgruppe_id]).await?;
     let (tabelle, spalte, bezug) = ziel.ort();
     let r = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT OR IGNORE INTO {tabelle} ({spalte}, sprechgruppe_id) VALUES (?, ?)"
@@ -515,12 +524,16 @@ pub async fn loesen_tx(
 /// Ersetzt die Zuordnung des Ziels durch genau `ids` (PATCH mit `sprechgruppe_ids`): löst, was
 /// nicht mehr dazugehört, und ordnet den Rest zu — in zwei Anweisungen, unabhängig von der
 /// Länge der Liste (LFH-937, design.md D5). Dieselben Zeilen wie [`loesen_tx`]/[`zuordnen_tx`]
-/// je ID; Dubletten in `ids` schaden nicht (`INSERT OR IGNORE`).
+/// je ID; Dubletten in `ids` schaden nicht (`INSERT OR IGNORE`). Prüft vorher in derselben
+/// Transaktion das Paar mit einer gleichnamigen Einsatz-Sprechgruppe
+/// ([`pruefe_kein_lokales_paar`], 409, LLH-1650).
 pub async fn ersetzen_tx(
     conn: &mut SqliteConnection,
+    einsatz_id: i64,
     ziel: Zuordnungsziel,
     ids: &[i64],
 ) -> Result<(), AppError> {
+    pruefe_kein_lokales_paar(conn, einsatz_id, ids).await?;
     let (tabelle, spalte, bezug) = ziel.ort();
     let ids = ids_json(ids)?;
     sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -584,7 +597,7 @@ pub async fn einzeln_zuordnen(
     pruefe_zuordenbar(pool, org_id, einsatz_id, &[sprechgruppe_id]).await?;
     crate::write_retry!(pool, |conn| {
         pruefe_ziel(conn, einsatz_id, ziel).await?;
-        zuordnen_tx(conn, ziel, sprechgruppe_id).await
+        zuordnen_tx(conn, einsatz_id, ziel, sprechgruppe_id).await
     })
 }
 
@@ -616,7 +629,13 @@ pub async fn setze_abschnitt_sprechgruppen(
     // Einzel-Zuordnungen am Sperr-Upgrade (SQLITE_BUSY → 503). `write_retry!` öffnet mit
     // BEGIN IMMEDIATE und versucht erneut (Muster `einsatz::fuehrungsstelle`).
     crate::write_retry!(pool, |conn| {
-        ersetzen_tx(conn, Zuordnungsziel::Abschnitt(abschnitt_id), ids).await
+        ersetzen_tx(
+            conn,
+            einsatz_id,
+            Zuordnungsziel::Abschnitt(abschnitt_id),
+            ids,
+        )
+        .await
     })
 }
 
@@ -662,7 +681,7 @@ pub async fn setze_einheit_sprechgruppen(
     // Einzel-Zuordnungen am Sperr-Upgrade (SQLITE_BUSY → 503). `write_retry!` öffnet mit
     // BEGIN IMMEDIATE und versucht erneut (Muster `einsatz::fuehrungsstelle`).
     crate::write_retry!(pool, |conn| {
-        ersetzen_tx(conn, Zuordnungsziel::Einheit(einheit_id), ids).await
+        ersetzen_tx(conn, einsatz_id, Zuordnungsziel::Einheit(einheit_id), ids).await
     })
 }
 
@@ -1588,5 +1607,149 @@ mod tests {
                 .unwrap()
                 .expect("kein Aufruf scheitert an der Sperre");
         }
+    }
+
+    /// LLH-1650: Stellt das Rennen nach. Eine zweite Anfrage legt die Einsatz-Sprechgruppe
+    /// „Sonder 1" (DMO) an und hält ihre Schreibtransaktion offen, während `zuordnen` eine
+    /// deaktivierte, ungenutzte Katalog-Sprechgruppe gleichen Namens zuordnet (deren lokales
+    /// Anlegen sperrt sie nicht). Vorab auf eigener Verbindung sähe die Zuordnung die neue Zeile
+    /// noch nicht; erst in ihrer Transaktion, nach dem Commit der zweiten, sieht sie sie.
+    async fn rennen_neben_lokalem_anlegen<F, Fut>(
+        pool: &SqlitePool,
+        e: i64,
+        zuordnen: F,
+    ) -> Result<(), AppError>
+    where
+        F: FnOnce(i64) -> Fut,
+        Fut: std::future::Future<Output = Result<(), AppError>> + Send + 'static,
+    {
+        let kat = anlegen_katalog(pool, 1, daten("Sonder 1", "DMO"))
+            .await
+            .unwrap();
+        sqlx::query("UPDATE sprechgruppe SET aktiv = 0 WHERE id = ?")
+            .bind(kat.id)
+            .execute(pool)
+            .await
+            .unwrap();
+        let mut anlegen = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        sqlx::query(
+            "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
+             VALUES (1, ?, 'Sonder 1', 'DMO')",
+        )
+        .bind(e)
+        .execute(&mut *anlegen)
+        .await
+        .unwrap();
+        let zuordnung = tokio::spawn(zuordnen(kat.id));
+        // Die Zuordnung läuft bis an die Schreibsperre; ist sie langsamer, prüft sie nach dem
+        // Commit und lehnt ebenso ab (der Test kann so nur zu Unrecht grün, nie zu Unrecht rot sein).
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        anlegen.commit().await.unwrap();
+        zuordnung.await.unwrap()
+    }
+
+    fn ist_paar_konflikt(r: &Result<(), AppError>) -> bool {
+        matches!(r, Err(AppError::Conflict(m)) if m.contains("schon als Einsatz-Sprechgruppe"))
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn einzelzuordnung_neben_gleichzeitigem_lokalen_anlegen_stiftet_kein_paar() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (e, a) = setup_einsatz_abschnitt(&pool).await;
+        let p = pool.clone();
+        let r = rennen_neben_lokalem_anlegen(&pool, e, move |sg| async move {
+            einzeln_zuordnen(&p, 1, e, Zuordnungsziel::Abschnitt(a), sg)
+                .await
+                .map(|_| ())
+        })
+        .await;
+        assert!(ist_paar_konflikt(&r), "{r:?}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mengenzuordnung_neben_gleichzeitigem_lokalen_anlegen_stiftet_kein_paar() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (e, _) = setup_einsatz_abschnitt(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let p = pool.clone();
+        let r = rennen_neben_lokalem_anlegen(&pool, e, move |sg| async move {
+            setze_einheit_sprechgruppen(&p, 1, e, einheit, &[sg]).await
+        })
+        .await;
+        assert!(ist_paar_konflikt(&r), "{r:?}");
+    }
+
+    async fn benutzer(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Funk', 'funk', 'x') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn kanal_der_externen_stelle_neben_gleichzeitigem_lokalen_anlegen_stiftet_kein_paar() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (e, _) = setup_einsatz_abschnitt(&pool).await;
+        let b = benutzer(&pool).await;
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_kommunikation_stelle \
+                (einsatz_id, stellenart, bezeichnung, geaendert_von_id) \
+             VALUES (?, 'leitstelle', 'ILS', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let p = pool.clone();
+        let r = rennen_neben_lokalem_anlegen(&pool, e, move |sg| async move {
+            crate::fernmeldewesen::kommunikation::kanal_setzen(
+                &p,
+                1,
+                e,
+                stelle,
+                sg,
+                crate::fernmeldewesen::fernmeldeskizze::Verbindungsstatus::Geplant,
+            )
+            .await
+            .map(|_| ())
+        })
+        .await;
+        assert!(ist_paar_konflikt(&r), "{r:?}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn kanal_der_skizzenkomponente_neben_gleichzeitigem_lokalen_anlegen_stiftet_kein_paar() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (e, _) = setup_einsatz_abschnitt(&pool).await;
+        let b = benutzer(&pool).await;
+        let komponente: i64 = sqlx::query_scalar(
+            "INSERT INTO fernmeldeskizze_komponente (einsatz_id, art, geaendert_von_id) \
+             VALUES (?, 'repeater', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let p = pool.clone();
+        let r = rennen_neben_lokalem_anlegen(&pool, e, move |sg| async move {
+            crate::fernmeldewesen::fernmeldeskizze::komponente_kanal_setzen(
+                &p, 1, e, komponente, sg,
+            )
+            .await
+            .map(|_| ())
+        })
+        .await;
+        assert!(ist_paar_konflikt(&r), "{r:?}");
     }
 }

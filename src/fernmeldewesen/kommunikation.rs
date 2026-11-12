@@ -450,8 +450,9 @@ async fn externe_stelle(
 
 /// Setzt einen Kanal der externen Stelle mit Status, idempotent (LFH-893, design.md D5). Erst
 /// die Stelle (404, Funktion 422), dann die Sprechgruppe wie der PATCH der Datensätze
-/// (`sprechgruppe::repo::pruefe_zuordenbar`, 422). `true`, wenn sich etwas geändert hat (neu
-/// oder anderer Status).
+/// (`sprechgruppe::repo::pruefe_zuordenbar`, 422); das Paar mit einer gleichnamigen
+/// Einsatz-Sprechgruppe (409) in der Schreibtransaktion (LLH-1650). `true`, wenn sich etwas
+/// geändert hat (neu oder anderer Status).
 pub async fn kanal_setzen(
     pool: &SqlitePool,
     org_id: i64,
@@ -466,6 +467,8 @@ pub async fn kanal_setzen(
     write_retry!(pool, |conn| {
         crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         externe_stelle(conn, einsatz_id, stelle_id).await?;
+        crate::sprechgruppe::repo::pruefe_kein_lokales_paar(conn, einsatz_id, &[sprechgruppe_id])
+            .await?;
         let r = sqlx::query(
             "INSERT INTO einsatz_kommunikation_stelle_sprechgruppe \
                 (stelle_id, sprechgruppe_id, status) VALUES (?1, ?2, ?3) \

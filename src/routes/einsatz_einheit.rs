@@ -202,6 +202,7 @@ pub async fn bilden(
         if let Some(ids) = &sprechgruppe_ids {
             crate::sprechgruppe::repo::ersetzen_tx(
                 conn,
+                einsatz_id,
                 crate::sprechgruppe::repo::Zuordnungsziel::Einheit(id),
                 ids,
             )
