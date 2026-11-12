@@ -1,5 +1,5 @@
 ---
-id: ADR-0029
+id: ADR-0032
 titel: Unterkunft rechnen zwei Kerne nach einer gemeinsamen Fallsammlung, die API prüft streng
 status: akzeptiert
 datum: 2026-11-12
@@ -15,7 +15,7 @@ herleitung:
   - LLH-1524 (mit Ruben am 12.11.2026 abgestimmt)
 ---
 
-# ADR-0029: Unterkunft rechnen zwei Kerne nach einer gemeinsamen Fallsammlung, die API prüft streng
+# ADR-0032: Unterkunft rechnen zwei Kerne nach einer gemeinsamen Fallsammlung, die API prüft streng
 
 ## Regeln
 
