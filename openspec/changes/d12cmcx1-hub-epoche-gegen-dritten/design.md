@@ -55,9 +55,17 @@ Im Zweig `Greater` der meldenden Seite gilt vor der Beweisprüfung:
 
 ```
 richtung == MeldetSich && nimmt_mir && von_sender
-  && erklaerung lesbar && erklaerung.fuehrer_alt != ich
+  && erklaerung lesbar && erklaerung.fuehrer_alt != ich && erklaerung.epoche_alt != alt
   → entscheide(.., dritter = true) → offen halten
 ```
+
+**Nachtrag beim Umsetzen: `epoche_alt != alt`.** Der Test
+`unterschriebene_erklaerung_mit_abweichendem_feld_wird_verworfen` schickt eine unterschriebene
+Erklärung, die den Stand der ELW (`epoche_alt = alt`) mit einem anderen bisherigen Führer nennt,
+und erwartet Verwerfen. Ohne die Bedingung hielte die ELW sie offen. Die Erklärung widerspricht sich
+aber selbst: Zu einer Epoche gehört genau ein Stand, und mit `alt` führt die ELW. Eine Erklärung
+gegen einen Dritten nennt immer einen Stand, den die ELW nicht hat (in beiden Fällen der Aufgabe
+`(2, E1)` gegen `(2, E2)`).
 
 Die Prüfung steht nach den Sonderwegen für eine nie vergebene eigene Epoche, für Verwahrung und
 für `!nimmt_mir`, also genau dort, wo heute `check_unterschrift` läuft. Sie geht über

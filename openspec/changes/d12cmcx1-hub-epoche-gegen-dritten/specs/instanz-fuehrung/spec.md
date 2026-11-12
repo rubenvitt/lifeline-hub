@@ -8,9 +8,10 @@ von einem gültigen Unterschriftsschlüssel der zugeordneten Org über genau die
 oder deren Code zu ihrem Abgabecode passt. Sonst MUST sie die Akte verwerfen und weiter führen.
 Ausgenommen ist eine Akte, an der eine dritte Instanz beteiligt ist (sie führt, sie hat die
 Epoche vergeben, mit der die erreichte Seite selbst führt, oder die Erklärung der Akte nennt sie
-als bisherigen Führer): Die MUST die meldende Seite ohne Alarm offen halten, bis die
-Einsatzleitung entscheidet. Eine Akte ohne Erklärung oder mit unlesbarer Erklärung fällt nicht
-unter die Ausnahme.
+als bisherigen Führer eines anderen Stands als dessen, mit dem die meldende Seite führt): Die MUST
+die meldende Seite ohne Alarm offen halten, bis die Einsatzleitung entscheidet. Eine Akte ohne
+Erklärung, mit unlesbarer Erklärung oder mit einer Erklärung, die den Stand der meldenden Seite
+mit einem anderen bisherigen Führer nennt, fällt nicht unter die Ausnahme.
 
 #### Scenario: Gültige Unterschrift
 - **WHEN** der ELW eine Erklärung des Hubs erhält, die Admin A mit einem am ELW gültigen Schlüssel unterschrieben hat
@@ -27,6 +28,10 @@ unter die Ausnahme.
 #### Scenario: Übernahme ohne Erklärung
 - **WHEN** der ELW führt und der Hub sich mit eigener, größerer Epoche als Führer meldet, ohne Erklärung
 - **THEN** verwirft der ELW die Übernahme mit der Benachrichtigung „Ungültige Übernahme der Führung“ und führt mit der nächsten Epoche weiter
+
+#### Scenario: Erklärung über den eigenen Stand mit anderem Führer
+- **WHEN** der ELW mit Epoche (1, ELW) führt und der Hub eine unterschriebene Erklärung schickt, die (1, ELW) als bisherigen Stand und eine andere Instanz als bisherigen Führer nennt
+- **THEN** verwirft der ELW die Übernahme mit der Benachrichtigung „Ungültige Übernahme der Führung“
 
 #### Scenario: Hub holt sich die Führung per Notübernahme von ELW 1 zurück
 - **WHEN** „ELW 2“ ohne Verbindung eine Notübernahme mit Epoche (2, ELW 2) gegen den Hub erklärt, am Hub „ELW 1“ mit (2, ELW 1) führt, der Hub per unterschriebener Notübernahme gegen „ELW 1“ mit (3, Hub) zurückholt und „ELW 2“ sich meldet

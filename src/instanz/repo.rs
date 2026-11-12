@@ -432,16 +432,26 @@ pub async fn org_widerrufen(
         // Der Abgleich ihrer Einsätze endet; Spiegel bleiben lesbar (LLH-1492, D14).
         crate::instanz::spiegel::beende_fuer_zuordnung(conn, org_zeile_id, jetzt).await?;
         // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491).
-        let (org_id, gegenueber): (i64, String) = sqlx::query_as(
-            "SELECT o.org_id, k.gegenueber_kennung FROM instanz_kopplung_org o \
+        // Der Org-Schlüssel wie in `fuehrung::repo::list_orgs_der_kopplung`: an einem Hub die
+        // Kennung der Org dort, sonst die eigene Kennung mit der Org-ID.
+        let (org_id, gegenueber, org_schluessel): (i64, String, String) = sqlx::query_as(
+            "SELECT o.org_id, k.gegenueber_kennung, \
+             CASE WHEN k.richtung = 'meldet_sich' THEN o.fremde_org_kennung \
+             ELSE (SELECT kennung FROM instanz_identitaet) || '/' || o.org_id END \
+             FROM instanz_kopplung_org o \
              JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
         )
         .bind(org_zeile_id)
         .fetch_one(&mut *conn)
         .await?;
         Ok(Some(
-            crate::instanz::fuehrung::repo::release_nach_widerruf(conn, org_id, &gegenueber)
-                .await?,
+            crate::instanz::fuehrung::repo::release_nach_widerruf(
+                conn,
+                org_id,
+                &org_schluessel,
+                &gegenueber,
+            )
+            .await?,
         ))
     }
 }

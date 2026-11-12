@@ -2034,6 +2034,196 @@ async fn bestaetigt_die_elw_die_fuehrung_des_hubs_wird_sie_spiegel() {
     assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
 }
 
+// ── Der Hub holt sich die Führung von einer anderen ELW zurück (LLH-1707) ─────────────────────
+//
+// Change `d12cmcx1-hub-epoche-gegen-dritten`: Richtet sich die Erklärung der Akte des Hubs gegen
+// eine andere ELW, hält die ELW sie ohne Alarm offen wie bei D7 der Change `faq7l7m4`.
+
+/// Wie der Hub die Führung von ELW 1 zurückholt.
+#[derive(Clone, Copy)]
+enum Zurueckholen {
+    /// Unterschriebene Notübernahme gegen ELW 1.
+    Notuebernahme,
+    /// Widerruf der Kopplung zu ELW 1 am Hub.
+    Widerruf,
+}
+
+/// Drei Instanzen, der Hub führt einen eigenen Einsatz mit (1, Hub), beide ELW kennen ihn. Mit
+/// `elw2_erklaert` erklärt ELW 2 ohne Verbindung die Notübernahme (2, ELW 2). ELW 1 übernimmt am Hub
+/// per Notübernahme mit (2, ELW 1), dann holt der Hub die Führung auf dem Weg `weg` mit (3, Hub)
+/// zurück. Ergebnis: (Hub, ELW 2, Einsatz am Hub, Einsatz an ELW 2); ELW 2 hat sich noch nicht
+/// gemeldet, seit der Hub zurückgeholt hat.
+async fn hub_holt_von_elw1_zurueck(
+    weg: Zurueckholen,
+    elw2_erklaert: bool,
+) -> (Instanz, Instanz, i64, i64) {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw1).await;
+    elw_meldet(&elw2).await;
+    let (akte1, _) = akte_und_einsatz(&elw1).await;
+    let (akte2, e2) = akte_und_einsatz(&elw2).await;
+    if elw2_erklaert {
+        ohne_verbindung(&elw2).await;
+        notuebernahme_gegen_hub(&elw2, akte2).await;
+    }
+    notuebernahme_gegen_hub(&elw1, akte1).await;
+    elw_meldet(&elw1).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], elw1.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 2);
+    match weg {
+        Zurueckholen::Notuebernahme => {
+            let akte = am_hub["id"].as_i64().unwrap();
+            hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW 1 ohne Verbindung").await;
+        }
+        Zurueckholen::Widerruf => {
+            let (_, u) =
+                common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+            let id = u["kopplungen"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|k| k["gegenueber_kennung"] == elw1.kennung.as_str())
+                .unwrap()["id"]
+                .as_i64()
+                .unwrap();
+            let (s, v) = post(
+                &hub,
+                &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+                json!({}),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "{v}");
+        }
+    }
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], hub.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 3);
+    if elw2_erklaert {
+        wieder_verbunden(&elw2, &hub).await;
+    }
+    (hub, elw2, h, e2)
+}
+
+/// ELW 2 meldet sich mehrmals und hält die Akte des Hubs offen: kein Konflikt, keine Angaben der
+/// Erklärung gegen ELW 1, ein Hinweis, kein Alarm, und sie schreibt weiter.
+async fn haelt_den_hub_offen_ohne_alarm(hub: &Instanz, elw2: &Instanz, h: i64, e2: i64) {
+    for _ in 0..3 {
+        elw_meldet(elw2).await;
+    }
+    let am_hub = fuehrung(hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], hub.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 3);
+    let f = fuehrung(elw2, e2).await;
+    assert_eq!(f["fuehrend"], true, "sie gibt nie still ab: {f}");
+    assert_ne!(f["art"], "verworfen", "{f}");
+    assert_eq!(
+        f["offen"]["konflikt"], false,
+        "der Hub ist kein Dritter: {f}"
+    );
+    assert_eq!(f["offen"]["epoche"], 3, "{f}");
+    assert!(
+        f["offen"]["grund"].is_null() && f["offen"]["unterzeichner"].is_null(),
+        "die Erklärung richtet sich gegen ELW 1: {f}"
+    );
+    let arten = benachrichtigungen(&elw2.pool).await;
+    assert_eq!(anzahl(&arten, "fuehrung_uebernommen"), 1, "{arten:?}");
+    assert_eq!(anzahl(&arten, "fuehrung_ungueltig"), 0, "{arten:?}");
+    assert!(!aktionen(&elw2.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+    let (s, v) = etb(elw2, e2).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "bis zur Entscheidung schreibt sie: {v}"
+    );
+}
+
+#[tokio::test]
+async fn holt_der_hub_per_notuebernahme_gegen_elw_1_zurueck_haelt_elw_2_offen_ohne_alarm() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Notuebernahme, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+}
+
+#[tokio::test]
+async fn holt_der_hub_per_widerruf_von_elw_1_zurueck_haelt_elw_2_offen_ohne_alarm() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+}
+
+#[tokio::test]
+async fn bestaetigt_elw_2_die_zurueckgeholte_fuehrung_des_hubs_wird_sie_spiegel() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Notuebernahme, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/einsaetze/{e2}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], false);
+    assert_eq!(v["fuehrer_kennung"], hub.kennung);
+    assert_eq!(v["epoche"], 3);
+    assert!(ist_spiegel(&elw2, e2).await);
+    let spur: String =
+        sqlx::query_scalar("SELECT detail FROM admin_audit ORDER BY id DESC LIMIT 1")
+            .fetch_one(&elw2.pool)
+            .await
+            .unwrap();
+    assert!(
+        !spur.contains("Notübernahme durch"),
+        "der Hub hat nichts gegen ELW 2 erklärt: {spur}"
+    );
+    elw_meldet(&elw2).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
+}
+
+#[tokio::test]
+async fn widerspricht_elw_2_der_zurueckgeholten_fuehrung_nimmt_der_hub_ihre_naechste_epoche_an() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Notuebernahme, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/einsaetze/{e2}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["epoche"], 4);
+    elw_meldet(&elw2).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], elw2.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 4);
+    let f = fuehrung(&elw2, e2).await;
+    assert_eq!(f["epoche"], 4);
+    assert!(f["offen"].is_null(), "{f}");
+}
+
+#[tokio::test]
+async fn ein_dritter_elw_sieht_den_widerruf_im_verlauf_ohne_unterzeichner() {
+    let (_hub, elw2, _h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, false).await;
+    elw_meldet(&elw2).await;
+    let f = fuehrung(&elw2, e2).await;
+    assert_eq!(f["fuehrend"], false, "{f}");
+    assert_eq!(f["epoche"], 3, "{f}");
+    let letzter = f["verlauf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .max_by_key(|v| v["epoche_zaehler"].as_i64())
+        .unwrap()
+        .clone();
+    assert_eq!(letzter["grund"], "Kopplung widerrufen", "{f}");
+    assert!(
+        letzter["unterzeichner"].is_null(),
+        "niemand hat unterschrieben: {f}"
+    );
+}
+
 #[tokio::test]
 async fn bestaetigen_des_konflikts_macht_die_unterlegene_elw_zum_spiegel() {
     let z = zwei_notuebernahmen().await;

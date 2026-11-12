@@ -443,7 +443,7 @@ pub async fn bestaetigen(
         let konflikt = austausch::ist_konflikt(&m, &hubs);
         // Eine Erklärung zählt hier nur, wenn sie gegen diese Instanz gerichtet ist; die Akte des
         // Hubs kann die Erklärung einer anderen ELW tragen (D7).
-        let gegen_mich = e.as_ref().filter(|e| e.fuehrer_alt == ich.kennung);
+        let gegen_mich = e.as_ref().filter(|e| austausch::ist_gegen_mich(e, &ich));
         if konflikt {
             // Der Hub nennt einen Dritten (D4): Es gilt sein Stand, auch mit kleinerer Epoche;
             // gekoppelt ist der Dritte nicht.
@@ -570,7 +570,7 @@ pub async fn widersprechen(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
-            .is_some_and(|e| e.fuehrer_alt == ich.kennung);
+            .is_some_and(|e| austausch::ist_gegen_mich(&e, &ich));
         let was = if gegen_mich {
             "Notübernahme"
         } else {
@@ -667,7 +667,7 @@ pub async fn anzeige(
                 .erklaerung
                 .as_deref()
                 .and_then(NotuebernahmeErklaerung::parse)
-                .filter(|e| e.fuehrer_alt == ich.kennung);
+                .filter(|e| austausch::ist_gegen_mich(e, &ich));
             let hubs: Vec<&str> = gegenueber
                 .iter()
                 .filter(|g| g.richtung == InstanzKopplungRichtung::MeldetSich)
