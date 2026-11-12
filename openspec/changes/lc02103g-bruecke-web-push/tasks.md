@@ -30,8 +30,8 @@ eigenen Testbinary, weil Live prozessweit ist (`tests/instanz_spiegel_live.rs`).
 
 ## 5. Push-Einstellung am ELW (D7)
 
-- [ ] 5.1 `WebPushStand.ueber_hub` (Name, Adresse) für Nutzer, deren Org die Bedingung erfüllt; `PUT /api/web-push/abo` dann 422, `DELETE` bleibt; bestehende Abos unverändert. Typen per `scripts/check-typ-codegen.sh` neu erzeugt und mitcommittet. Nachweis: Tests in `tests/web_push.rs` — Stand mit `ueber_hub`, 422 beim Anmelden, nach Widerruf der Kopplung Push wieder an das alte Abo.
-- [ ] 5.2 Frontend: `ladePushStand` kennt `'ueber_hub'`, `pushAbgleichen` überspringt ihn, die Seite „Benachrichtigungen“ zeigt „Push läuft über ‹Name›“ mit Link auf `<adresse>/benachrichtigungen`. Nachweis: Vitest für `webPush.ts` und die Seite; Lint und Typprüfung grün.
+- [x] 5.1 `WebPushStand.ueber_hub` (Name, Adresse) für Nutzer, deren Org die Bedingung erfüllt; `PUT /api/web-push/abo` dann 422, `DELETE` bleibt; bestehende Abos unverändert. Typen per `scripts/check-typ-codegen.sh` neu erzeugt und mitcommittet. Nachweis: Tests in `tests/web_push.rs` — Stand mit `ueber_hub`, 422 beim Anmelden, nach Widerruf der Kopplung Push wieder an das alte Abo.
+- [x] 5.2 Frontend: `ladePushStand` kennt `'ueber_hub'`, `pushAbgleichen` überspringt ihn, die Seite „Benachrichtigungen“ zeigt „Push läuft über ‹Name›“ mit Link auf `<adresse>/benachrichtigungen`. Nachweis: Vitest für `webPush.ts` und die Seite; Lint und Typprüfung grün.
 
 ## 6. Doku
 
