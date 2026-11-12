@@ -3,8 +3,8 @@ import { theme } from 'antd';
 
 // Zeichnet die Bibliothek das Tier ohne Zustand nicht, bleibt der Marker ein Kreis mit „T“
 // (Spec tier-lagekarte, Rückfall; LLH-1343).
-vi.mock('@einsatzzeichen/core', async (original) => {
-  const echt = await original<typeof import('@einsatzzeichen/core')>();
+vi.mock('@einsatzzeichen/core/exact', async (original) => {
+  const echt = await original<typeof import('@einsatzzeichen/core/exact')>();
   return {
     ...echt,
     drawAnySpec: vi.fn((spec: { kind?: string }) => {
