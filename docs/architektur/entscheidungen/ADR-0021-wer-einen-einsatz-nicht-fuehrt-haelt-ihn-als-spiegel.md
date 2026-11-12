@@ -25,8 +25,8 @@ herleitung:
   Transaktion (`repo::save` → `spiegel::fuehrung::richte_aus`). Nennt die Akte eine andere
   Instanz, ist der Einsatz hier ein Spiegel (ADR-0018), sonst nicht. Allein der Spiegel sperrt;
   eine eigene Sperre der Führung (`einsatz.fuehrung_bei`, ADR-0020) gibt es nicht mehr.
-- MUST NOT: `einsatz_spiegel` legt außerhalb der Übernahme nur `spiegel::fuehrung` an oder
-  entfernt sie (Führer werden, Spiegel werden).
+- MUST NOT: Außerhalb der Übernahme legt kein Weg außer `spiegel::fuehrung` eine Zeile in
+  `einsatz_spiegel` an oder entfernt sie (Führer werden, Spiegel werden).
 - MUST: Eine Akte und der Spiegel desselben Einsatzes tragen dieselbe Kennung (`einsatz.kennung`,
   `<instanz>/<id>-<zufall>`); ein Spiegel bekommt keine eigene Akte.
 - MUST: Übergabe und erfüllte Anfrage nur, wenn das Gegenüber alles hat
