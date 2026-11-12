@@ -353,7 +353,7 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
         antrag_art: 'massnahme',
         typ: null,
         von: null,
-        kurz: 'Maßnahme Blutstillung',
+        kurz: 'Blutstillung',
         grund: 'Abgelehnt.',
       }),
     ]);

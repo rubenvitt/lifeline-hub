@@ -2415,7 +2415,7 @@ async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
             panic!("die Sichtung an der bekannten Person steht für sich: {liste:?}")
         });
     assert_eq!(sichtung_bekannt["antrag_art"], "sichtung");
-    assert_eq!(sichtung_bekannt["kurz"], "Sichtung SK III");
+    assert_eq!(sichtung_bekannt["kurz"], "SK III");
     let vorher = band_zaehlt(&elw, e).await;
 
     // Die Person stellen, zweimal: derselbe Antrag. Die Zeile bleibt, bis die Kette durch ist.

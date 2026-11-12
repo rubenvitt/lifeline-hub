@@ -454,7 +454,9 @@ fn kurzinhalt(tabelle: &str, d: &Map<String, Value>) -> Option<String> {
         tabelle,
         "person_sichtung" | "person_massnahme" | "person_verletzung"
     ) {
-        return eintrag_wort(tabelle, d).map(kuerze);
+        return eintrag_wert(tabelle, d)
+            .filter(|w| !w.trim().is_empty())
+            .map(kuerze);
     }
     if tabelle == "einsatz_person" {
         let name: Vec<String> = ["name", "vorname"]
@@ -1249,17 +1251,26 @@ fn massnahme_wort(art: &str) -> String {
 
 /// Ein Eintrag an der Person in Kurzform: „Sichtung SK II“, „Maßnahme Blutstillung“.
 fn eintrag_wort(tabelle: &str, d: &Map<String, Value>) -> Option<String> {
+    let art = match tabelle {
+        "person_sichtung" => "Sichtung",
+        "person_massnahme" => "Maßnahme",
+        "person_verletzung" => "Verletzung",
+        "person_verbleib" => return Some("Verbleib".to_string()),
+        "person_transport" => return Some("Transport".to_string()),
+        _ => return None,
+    };
+    Some(format!("{art} {}", eintrag_wert(tabelle, d)?))
+}
+
+/// Was ein Eintrag an einer Person festhält, ohne seine Art: „SK II“, „Blutstillung“, „Kopf“.
+/// Die Liste nennt die Art schon davor.
+fn eintrag_wert(tabelle: &str, d: &Map<String, Value>) -> Option<String> {
     let wert = |f: &str| text(d, f).unwrap_or_default();
     Some(match tabelle {
-        "person_sichtung" => format!(
-            "Sichtung {}",
-            crate::person::Sichtungskategorie::parse(&wert("kategorie"))
-                .map_or_else(|| wert("kategorie"), |k| k.etb_label().to_string())
-        ),
-        "person_massnahme" => format!("Maßnahme {}", massnahme_wort(&wert("art"))),
-        "person_verletzung" => format!("Verletzung {}", wert("region").replace('_', " ")),
-        "person_verbleib" => "Verbleib".to_string(),
-        "person_transport" => "Transport".to_string(),
+        "person_sichtung" => crate::person::Sichtungskategorie::parse(&wert("kategorie"))
+            .map_or_else(|| wert("kategorie"), |k| k.etb_label().to_string()),
+        "person_massnahme" => massnahme_wort(&wert("art")),
+        "person_verletzung" => wert("region").replace('_', " "),
         _ => return None,
     })
 }
