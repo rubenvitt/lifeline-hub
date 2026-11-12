@@ -1039,6 +1039,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ein_zum_abraeumen_vorgemerkter_einsatz_hat_kein_ziel() {
+        let pool = crate::db::test_pool().await;
+        kopplung(&pool, "meldet_sich").await;
+        let e = einsatz(&pool).await;
+        assert_eq!(ziele_von(&pool, e).await.len(), 1);
+        sqlx::query("INSERT INTO einsatz_abraeumen (einsatz_id, art) VALUES (?, 'verwahrt')")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            ziele_von(&pool, e).await.is_empty(),
+            "wird nicht mehr geliefert"
+        );
+    }
+
+    #[tokio::test]
     async fn alt_alarm_erledigt_und_widerrufen() {
         let pool = crate::db::test_pool().await;
         let k = kopplung(&pool, "wird_gemeldet").await;

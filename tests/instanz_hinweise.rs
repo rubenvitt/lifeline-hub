@@ -526,14 +526,16 @@ async fn der_gekoppelte_elw_verweist_auf_den_hub_und_lehnt_neue_abos_ab() {
 #[tokio::test]
 async fn ohne_push_am_hub_bleibt_der_schalter_am_elw() {
     let w = welt(false, true).await;
-    let (s, v) = common::anfrage(&w.elw.i.app, "GET", "/api/web-push", &w.elw.i.admin, None).await;
+    // Erika stammt vom Hub: ohne Push am Hub bleibt ihr trotzdem der Schalter am ELW.
+    let erika = sitzung(&w.elw.i, w.erika_elw).await;
+    let (s, v) = common::anfrage(&w.elw.i.app, "GET", "/api/web-push", &erika, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(v.get("ueber_hub").is_none(), "{v}");
     let (s, v) = common::anfrage(
         &w.elw.i.app,
         "PUT",
         "/api/web-push/abo",
-        &w.elw.i.admin,
+        &erika,
         Some(&abo_body("https://push.example.org/neu")),
     )
     .await;

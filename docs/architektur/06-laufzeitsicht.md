@@ -501,7 +501,7 @@ sequenceDiagram
   participant HN as Hub src/benachrichtigung
   EN->>EA: melden(Anlass): ziele, vormerken (hinweis_ausgang)
   EA->>ET: wecken
-  EN->>EN: Zeilen und Live wie immer; Push nur, wenn der Hub keinen anbietet
+  EN->>EN: Zeilen und Live wie immer; Push an alle, die der Hub nicht erreicht
   ET->>H: POST /api/instanz/spiegel {lieferungen, hinweise}
   H->>H: Zeilen übernehmen, dann hinweis::annehmen (abbilden, hinweis_eingang)
   H-->>ET: hinweis_quittungen (ELW löscht sie aus dem Ausgang)
@@ -511,5 +511,7 @@ sequenceDiagram
 
 - Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort
   (`MeldenAntwort.hinweise`, `web_push`); die meldende Seite merkt es an der Kopplung.
+- Bietet der Hub Push an, lässt der ELW den Push nur an Konten aus, die aus der Kopplung stammen
+  (`hinweis::konten_am_hub`). Konten nur am ELW und ein gescheitertes Vormerken pusht er selbst.
 - Was am Spiegel noch fehlt, bleibt ohne Quittung und kommt mit dem nächsten Abgleich wieder;
   nach 12 Stunden geht ein Anlass nicht mehr hinaus (`hinweis::NACHREICHEN_STUNDEN`).
