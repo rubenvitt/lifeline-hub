@@ -1266,6 +1266,35 @@ pub(crate) async fn schwaerze_einsatz_auf_antrag_tx(
     Ok(true)
 }
 
+/// Nach jeder Schwärzung am Einsatz (Kategorie, Löschersuchen je Person, ganzer Einsatz), in der
+/// Transaktion der Schwärzung: Die Bruchstelle (LLH-1641, E6) hält ganze Zeilen als JSON, und
+/// welche Kategorie oder Person darin steht, sagt keine Spalte. Darum geht sie ganz. Die neue
+/// Zufallsmarke `schwaerzung_marke` am Kopf reist mit der Lieferung zum Spiegel, der daran seine
+/// eigene Bruchstelle räumt (LLH-1649, `instanz::spiegel::fuehrung::raeume_bruchstelle`). Jede
+/// Marke merkt sich der Einsatz (`einsatz_schwaerzung_marke`): Bringt ein neuer Führer später
+/// eine Marke, die diese Seite schon kannte, hat er seither nicht geschwärzt.
+pub(crate) async fn nach_schwaerzung_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("UPDATE einsatz SET schwaerzung_marke = lower(hex(randomblob(8))) WHERE id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO einsatz_schwaerzung_marke (einsatz_id, marke) \
+         SELECT id, schwaerzung_marke FROM einsatz WHERE id = ?",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Der Scrub einer Schwärzung des ganzen Einsatzes — für den fristbasierten Weg (Phase B) und den
 /// Antrag (LFH-751) derselbe: alle Scrub-Spalten gleich welcher Zuordnung, die Tombstones jeder
 /// Datenkategorie (LFH-749, design.md D5) und jeder offene Löschersuchen-Antrag als erfüllt, damit
@@ -1281,6 +1310,7 @@ async fn scrubbe_einsatz_ganz_tx(
         super::schwaerzung_registry::Umfang::Alles,
     )
     .await?;
+    nach_schwaerzung_tx(&mut *conn, einsatz_id).await?;
     sqlx::query(
         "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
          WHERE einsatz_id = ? AND geschwaerzt_at IS NULL",
@@ -1887,6 +1917,12 @@ mod tests {
                     .unwrap()
             }
         };
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz WHERE id = ? AND schwaerzung_marke IS NOT NULL")
+                .await,
+            1,
+            "die Marke trägt die Schwärzung zum Spiegel (LLH-1649)"
+        );
         assert_eq!(
             zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,
             0,
