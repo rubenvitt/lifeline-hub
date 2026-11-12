@@ -4,29 +4,35 @@
 #
 #   build-image.sh            baut aus dem Stand dieses Checkouts
 #   build-image.sh --update   holt vorher `origin/alpha` in diesen Checkout (nur im Server-Klon,
-#                             den nichts anderes benutzt: verwirft lokale Änderungen)
+#                             den nichts anderes benutzt: verwirft lokale Änderungen) und baut
+#                             ohne Build-Cache
+#   build-image.sh --no-cache baut ohne Build-Cache aus dem Stand dieses Checkouts
 #
 # Die Playwright-Version kommt aus `frontend/pnpm-lock.yaml`: die Browser im Image müssen zu der
 # Version passen, die der Job installiert, sonst lädt jeder Job sie neu (Warnung im Job-Log).
-# `--pull` holt jedes Mal das Basisimage frisch, so bleiben Runner und Systempakete aktuell; der
-# wöchentliche Timer (`lifeline-runner-image.timer`) ruft genau das. Danach löscht es die alten,
-# nun namenlosen Images dieses Typs, damit der Server nicht mit jedem Neubau voller wird.
+# `--pull` holt das Basisimage frisch (es ist per Digest gepinnt, neu wird es mit einem
+# Dependabot-Bump). Mit `--update`, also im wöchentlichen Timer (`lifeline-runner-image.timer`),
+# baut es ohne Build-Cache: sonst kämen apt-Pakete, rustup und Browser aus der Schicht von letzter
+# Woche, und der Neubau änderte nichts. Danach löscht es die alten, nun namenlosen Images dieses
+# Typs, damit der Server nicht mit jedem Neubau voller wird.
 set -euo pipefail
 
 HIER="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HIER/../.." && pwd)"
 IMAGE="${RUNNER_IMAGE:-lifeline-runner:latest}"
 
+cache_arg=""
 case "${1:-}" in
+  --no-cache) cache_arg="--no-cache" ;;
   --update)
     git -C "$ROOT" fetch --quiet origin alpha
     git -C "$ROOT" reset --quiet --hard origin/alpha
     # Neu einlesen: das Skript selbst kann sich mit dem Stand geändert haben.
-    exec "$HIER/build-image.sh"
+    exec "$HIER/build-image.sh" --no-cache
     ;;
   "") ;;
   *)
-    echo "Aufruf: $0 [--update]" >&2
+    echo "Aufruf: $0 [--update | --no-cache]" >&2
     exit 2
     ;;
 esac
@@ -38,7 +44,7 @@ if [ -z "$version" ]; then
 fi
 
 echo "==> Baue $IMAGE (Playwright $version, Stand $(git -C "$ROOT" rev-parse --short HEAD))"
-docker build --pull \
+docker build --pull $cache_arg \
   --build-arg "PLAYWRIGHT_VERSION=$version" \
   --tag "$IMAGE" \
   "$HIER"

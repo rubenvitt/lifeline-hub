@@ -73,8 +73,11 @@ verliert der Nutzer `runner` seine `sudo`-Rechte. Die Version steht als Umgebung
 
 `scripts/runner/build-image.sh` liest die Playwright-Version aus dem Lockfile und baut
 `lifeline-runner:latest`. Ein systemd-Timer (`lifeline-runner-image.timer`, wöchentlich) holt den
-Stand von `alpha` in einen Klon auf dem Server und baut mit `--pull` neu; so bleiben
-Runner-Version und Systempakete frisch, ohne dass jemand daran denkt. Die Runner-eigene
+Stand von `alpha` in einen Klon auf dem Server und baut mit `--pull --no-cache` neu (ohne
+`--no-cache` kämen apt, rustup und Browser aus der Schicht der Vorwoche); so bleiben Systempakete
+und Toolchain frisch, ohne dass jemand daran denkt. Das Basisimage selbst ist per Digest gepinnt
+und kommt mit Dependabot. Die Prüfsumme von `sccache` steht fest im Dockerfile, nicht vom
+Release-Server geladen. Die Runner-eigene
 Selbstaktualisierung bleibt an: ist das Image älter als die Mindestversion von GitHub,
 aktualisiert sich der Runner vor dem Job selbst, langsamer, aber ohne Ausfall.
 
@@ -97,11 +100,15 @@ Leerlauf, sonst lädt es die neuen Browser. Weicht `LIFELINE_RUNNER_PLAYWRIGHT` 
 
 `scripts/runner/select-runner.sh <ereignis> <kopf-repo> <repo> <label>` gibt das Label aus oder
 `ubuntu-latest`: das Label nur, wenn es nicht leer ist und das Ereignis kein `pull_request` aus
-einem fremden Repository ist. `aenderungen` ruft es und gibt das Ergebnis als Ausgabe `runner`
-weiter; `binaer` und `e2e` setzen
+einem fremden Repository ist. `aenderungen` ruft es, bei einem PR in der Fassung des Ziel-Branches
+(`git show HEAD^1:…`, sonst stellte ein Fork die Weiche mit einer Zeile um, ohne `.github/`
+anzufassen), mit `continue-on-error` (eine kaputte Weiche reißt die Bereichs-Erkennung nicht mit)
+und gibt das Ergebnis als Ausgabe `runner` weiter; `binaer` und `e2e` setzen
 `runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}`. Ein roter
 `aenderungen`-Job fällt damit auf GitHub-Runner zurück, wie „im Zweifel wird geprüft“ es
-verlangt. Selbsttest `scripts/runner/select-runner.test.sh` in Schritt 11 von `check-all.sh`.
+verlangt. Selbsttest `scripts/runner/select-runner.test.sh` in Schritt 11 von `check-all.sh`, dazu
+der Wächter `scripts/runner/ci-schritte.test.sh`: in `binaer` und `e2e` trägt jeder Schritt mit
+`sudo`, apt oder gehostetem Cache die Bedingung aus D3 (das Review fand genau diese Lücke).
 
 - **Statt des Ausdrucks direkt an beiden `runs-on`:** zweimal derselbe Ausdruck ohne Test, und
   ein Tippfehler schickte Fork-PRs auf den Server.
@@ -114,23 +121,37 @@ zur Regel samt der Pflicht, vor der Freigabe die Änderungen unter `.github/` zu
 ### D5 Isolation auf dem Host
 
 Container ohne `--privileged`, ohne Docker-Socket, ohne Host-Netz, in einem eigenen
-Docker-Netz; Grenzen je Container (`--cpus`, `--memory`, Vorgabe 3 Kerne und 6 GB, in
-`/etc/lifeline-runner/runner.env` änderbar). Geteilt über Volumes werden nur der
-`sccache`-Cache (`SCCACHE_CACHE_SIZE`, Vorgabe 20 GB, räumt selbst nach LRU) und das
-Cargo-Registry-Verzeichnis (Cargo sperrt es selbst, entfernt alte Einträge selbst). Kein
-geteiltes `target/`: Spec `worktree-bauziel` verlangt, dass verschiedene Quellstände keine
-Fingerprints teilen; der inhaltsadressierte Compiler-Cache tut das nicht.
+Docker-Netz ohne Verkehr zwischen den Containern (`enable_icc=false`); Grenzen je Container
+(`--cpus`, `--memory`, Vorgabe 3 Kerne und 6 GB, in `/etc/lifeline-runner/runner.env` änderbar).
+Geteilt über ein Volume wird nur der `sccache`-Cache (`SCCACHE_CACHE_SIZE`, Vorgabe 20 GB, räumt
+selbst nach LRU). Kein geteiltes `target/`: Spec `worktree-bauziel` verlangt, dass verschiedene
+Quellstände keine Fingerprints teilen; der inhaltsadressierte Compiler-Cache tut das nicht.
+
+- **Statt auch die Cargo-Registry zu teilen** (so im ersten Wurf): ihre Sperre und ihre
+  Aufräumdaten liegen in `CARGO_HOME` selbst, also je Container; zwei Container, die dieselbe Crate
+  entpacken, zerstörten sich das Verzeichnis, und gewachsen wäre es ohne Grenze. Das Review fand
+  es; die Registry kommt nun je Job frisch.
+- **Vertrauen (Ruben, 12.11.2026):** den Cache teilen alle Läufe des eigenen Repos, auch
+  Dependabot-PRs mit neuem Fremdcode; ein vergifteter Eintrag träfe nur das e2e-Binary, nicht die
+  Release-Artefakte. Angenommen statt getrennter Plätze je Vertrauensstufe. Ebenso angenommen: der
+  Server-Klon folgt `alpha`, jeder Merge ist Code auf dem Host mit dem Admin-Token (D2).
+
+Die Schleife wertet einen Container, der nach weniger als 60 s ohne Fehlercode endet, als Fehler
+(der Runner gibt auch bei eigenen Fehlern 0 zurück) und pausiert so, dass SIGTERM sofort greift.
 
 ### D6 Aufräumen im Lauf selbst, nicht im Workflow
 
 Ein eigenes Modul `frontend/e2e/run-dir.ts` (ohne Playwright-Import, damit der Selbsttest
-`scripts/e2e-run-dir.test.mjs` es mit nacktem Node lädt) bringt zwei Helfer: `createRunDir(praefix)` legt das
-Verzeichnis an und löscht vorher verwaiste gleichen Präfixes älter als 24 h (Fehler nur als
-Warnung), `deleteRunDir(envKey)` löscht das Verzeichnis des Laufs aus der vererbten
-Umgebungsvariablen. Beide Konfigurationen rufen den ersten im Hauptprozess und tragen ein
-`globalTeardown`, das den zweiten ruft. Playwright führt `globalTeardown` auch nach roten Tests
-aus und beendet die Webserver erst danach; unter Linux und macOS schadet das Löschen der offenen
-DB dem noch laufenden Backend nicht.
+`scripts/e2e-run-dir.test.mjs` es mit nacktem Node lädt): `createRunDir(prefix, { deleteOnExit })`
+legt das Verzeichnis an und löscht vorher verwaiste gleichen Präfixes älter als 24 h (Fehler nur
+als Warnung). Beide Konfigurationen rufen es im Hauptprozess mit `deleteOnExit`; der löscht genau
+das Verzeichnis, das er angelegt hat, synchron im `exit`-Ereignis, nachdem Playwright die
+Webserver beendet hat. Die Worker erben nur den Pfad.
+
+- **Statt `globalTeardown`** (so im ersten Wurf): Playwright meldet einen Teardown erst an, wenn
+  es ihn erreicht. Startet schon der Webserver nicht, wirft die Config oder läuft nur `--list`,
+  bliebe das Verzeichnis liegen; dazu stand der Name der Lauf-Variablen doppelt, und ein
+  vertippter Name hätte still nichts gelöscht. Das Review fand beides.
 
 - **Statt eines `rm` in `check-all.sh` oder im Workflow:** ein alleinstehendes `pnpm e2e` und der
   Bildlauf blieben ungeräumt.
@@ -153,12 +174,16 @@ Tabelle), `scripts/AGENTS.md` (Abschnitt „Eigener Runner“: Schritte mit `sud
   nennt den Handgriff als Erstes. Der Stau-Wächter aus LLH-1660 zeigt hängende PRs.
 - [Fork-PR mit verändertem `ci.yml` landet auf dem Server] → Freigabepflicht für Fork-Workflows
   (D4), Container ohne Privilegien und Socket (D5), keine Secrets in Fork-Läufen.
-- [Ein vertrauter PR vergiftet den geteilten Compiler- oder Registry-Cache] → nur Läufe aus dem
-  eigenen Repository erreichen den Server; Leeren des Volumes steht im README.
+- [Ein Lauf des eigenen Repos, etwa ein Dependabot-PR, vergiftet den Compiler-Cache] → trifft nur
+  das e2e-Binary; angenommen (D5), Leeren des Volumes steht im README.
+- [Ein Job erreicht Dienste des Hosts oder des LANs über das Gateway des Docker-Netzes] → README
+  nennt Firewall-Regeln; zwischen den Containern sperrt `enable_icc=false`.
+- [Fonts: das Image bringt die Schriften von `playwright install-deps`, `ubuntu-latest` womöglich
+  mehr] → Layout-Gates könnten je Runner-Art abweichen; prüft der Probe-PR (Migration Plan).
 - [Playwright-Bump ohne Image-Neubau] → Shard lädt die Browser selbst und warnt (D3); der Timer
   baut spätestens nach einer Woche neu.
-- [Teardown läuft nicht, weil der Prozess hart beendet wird] → die 24-h-Regel beim nächsten Start
-  räumt nach; auf dem Server verschwindet der Container ohnehin.
+- [Das Löschen beim Ende läuft nicht, weil der Prozess hart getötet wird (SIGKILL)] → die
+  24-h-Regel beim nächsten Start räumt nach; auf dem Server verschwindet der Container ohnehin.
 - [Merge-Konflikt mit LLH-1662 in `ci.yml`] → wer später merged, löst auf; die Änderungen
   betreffen verschiedene Zeilen (Runner und sudo-Schritte hier, Auslöser und Job-Bedingung dort).
 

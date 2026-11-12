@@ -183,8 +183,8 @@ flowchart LR
   `E2E_RUNNER` ein Label nennt und der Lauf nicht aus einem Fork kommt
   (`scripts/runner/select-runner.sh`). Dann laufen sie auf einem eigenen Server, je Job in einem
   frischen Container aus `scripts/runner/Dockerfile`, den `scripts/runner/runner-loop.sh` (ein
-  systemd-Dienst je Platz) per JIT-Registrierung startet und nach dem Job löscht. Geteilt sind
-  dort nur der Compiler-Cache und die Cargo-Registry als Volumes. Einrichtung und Betrieb:
+  systemd-Dienst je Platz) per JIT-Registrierung startet und nach dem Job löscht. Geteilt ist
+  dort nur der Compiler-Cache als Volume. Einrichtung und Betrieb:
   [`scripts/runner/README.md`](../../scripts/runner/README.md).
 
 ## 7.8 Beobachtbarkeit und Betrieb

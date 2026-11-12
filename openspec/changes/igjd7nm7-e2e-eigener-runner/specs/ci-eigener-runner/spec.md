@@ -33,6 +33,12 @@ Kanal-Branches und PRs aus dem eigenen Repository dürfen den eigenen Runner nut
 - **WHEN** `E2E_RUNNER` gesetzt ist und ein PR aus einem Fork einen Lauf startet
 - **THEN** laufen `e2e-Binary` und die e2e-Shards auf `ubuntu-latest`
 
+#### Scenario: Fork ändert die Weiche
+- **WHEN** ein PR aus einem Fork das Skript der Runner-Wahl so ändert, dass es immer das Label
+  ausgibt, und `ci.yml` unverändert lässt
+- **THEN** laufen `e2e-Binary` und die e2e-Shards trotzdem auf `ubuntu-latest`, weil die Wahl der
+  Fassung des Ziel-Branches folgt
+
 #### Scenario: Push auf alpha
 - **WHEN** `E2E_RUNNER` gesetzt ist und ein Merge auf `alpha` einen Push-Lauf startet
 - **THEN** laufen `e2e-Binary` und die e2e-Shards auf dem eigenen Runner

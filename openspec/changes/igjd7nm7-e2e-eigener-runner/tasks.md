@@ -3,8 +3,8 @@
 ## 1. Läufe räumen auf (Spec `e2e-lauf-aufraeumen`, D6)
 
 - [x] 1.1 `createRunDir(prefix)` in `frontend/e2e/run-dir.ts` (eigenes Modul ohne Playwright-Import, damit der Selbsttest es mit nacktem Node lädt) per TDD: legt das Verzeichnis an, löscht gleichpräfixige älter als 24 h, lässt jüngere stehen, warnt bei nicht löschbaren; belegt durch einen Node-Test mit gesetzten mtimes, der vorher rot war
-- [x] 1.2 `deleteRunDir(envKey)` per TDD: löscht das Verzeichnis zum DB-Pfad aus der Umgebungsvariablen, ohne Variable kein Fehler; belegt durch denselben Test
-- [x] 1.3 `playwright.config.ts` und `playwright.doku.config.ts` auf `createRunDir` umstellen, je ein `globalTeardown` mit `deleteRunDir`; belegt durch einen e2e-Teillauf (eine Spec, grün und einmal absichtlich rot), nach dem kein `lifeline-e2e-*` im Temp-Verzeichnis übrig ist, und einen Bildlauf-Probelauf für `lifeline-doku-*`
+- [x] 1.2 Löschen beim Ende des Hauptprozesses (`deleteOnExit`, nach dem Review statt `globalTeardown`/`deleteRunDir`) per TDD: Kindprozess endet grün, rot, mit Wurf und mit `process.exit`, das Verzeichnis ist jeweils weg, ein fremdes bleibt; belegt durch denselben Test, der vorher rot war
+- [x] 1.3 `playwright.config.ts` und `playwright.doku.config.ts` auf `createRunDir(…, { deleteOnExit: true })` umstellen; belegt durch echte Läufe ohne Rest in `/tmp`: eine Spec grün, eine absichtlich rot (Exit 1), ein Backend, das nicht startet (`PW_BINAER=/bin/false`), `--list` und ein Bildlauf für `lifeline-doku-*`
 - [x] 1.4 Regel in `frontend/e2e/AGENTS.md` („Lauf-Verzeichnis nur über `createRunDir`“), Prettier grün
 
 ## 2. Runner-Wahl in der CI (Spec `ci-eigener-runner`, D3/D4)
@@ -28,8 +28,8 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh --nur schnell` lokal grün, volle Suiten über die CI des PRs (ohne `E2E_RUNNER`, also unverändert auf GitHub)
-- [ ] 5.2 Review (Fan-out über Sicherheit, Workflow-Logik, Aufräumen) und bestätigte Funde behoben
+- [x] 5.1 `./scripts/check-all.sh --nur schnell` lokal grün, volle Suiten über die CI des PRs (ohne `E2E_RUNNER`, also unverändert auf GitHub) — in der Cloud-Sitzung ohne `mise` mit Node 22 statt 26: alle Schritte grün außer 8, dort vier Frist-Tests in `scripts/rueckmeldung/`, die dieser Branch nicht anfasst; volle Suiten belegt die CI des PRs
+- [x] 5.2 Review (Fan-out über Sicherheit, Workflow-Logik, Aufräumen) und bestätigte Funde behoben — ungeschützter `nasm`-Schritt in `e2e-Binary` (neuer Wächter `scripts/runner/ci-schritte.test.sh`), Weiche aus dem Ziel-Branch, kein Registry-Volume, `enable_icc=false`, kurze Container als Fehler, SIGTERM in der Pause, Netz-Wettlauf, Neubau ohne Cache, feste sccache-Prüfsumme, DejaVu im Image, Löschen beim Prozessende statt `globalTeardown`; Cache-Teilen und Klon auf `alpha` von Ruben angenommen (ADR-0025)
 
 ## Workflow follow-up
 

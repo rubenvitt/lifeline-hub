@@ -89,18 +89,28 @@ jobs:
         with:
           fetch-depth: 2
       # Wo `e2e-Binary` und die e2e-Shards laufen (LLH-1666, Kopf). Vor der Bereichs-Erkennung:
-      # scheitert die, steht die Wahl schon fest. Scheitert diese, bleibt die Ausgabe leer, und die
-      # Jobs fallen auf `ubuntu-latest` zurück.
+      # scheitert die, steht die Wahl schon fest. Scheitert diese, bleibt die Ausgabe leer, die
+      # Jobs fallen auf `ubuntu-latest` zurück, und die Bereichs-Erkennung läuft trotzdem.
       - name: Runner für die e2e-Jobs
         id: runner
+        continue-on-error: true
         env:
           EREIGNIS: ${{ github.event_name }}
           KOPF_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
           LABEL: ${{ vars.E2E_RUNNER }}
+        # Bei einem PR die Weiche aus dem ZIEL-Branch (HEAD^1 des Merge-Commits), nie aus dem PR:
+        # sonst stellte ein Fork sie mit einer Zeile in `select-runner.sh` auf den eigenen Server,
+        # ohne `.github/` anzufassen (ADR-0025). Fehlt sie dort noch, bleibt alles auf GitHub.
         run: |
           set -euo pipefail
-          runner="$(./scripts/runner/select-runner.sh "$EREIGNIS" "$KOPF_REPO" "$REPO" "$LABEL")"
+          weiche=./scripts/runner/select-runner.sh
+          if [ "$EREIGNIS" = pull_request ]; then
+            weiche="$RUNNER_TEMP/select-runner.sh"
+            git show HEAD^1:scripts/runner/select-runner.sh > "$weiche"
+            chmod +x "$weiche"
+          fi
+          runner="$("$weiche" "$EREIGNIS" "$KOPF_REPO" "$REPO" "$LABEL")"
           echo "runner=$runner" >> "$GITHUB_OUTPUT"
           echo "e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Betroffene Suiten
@@ -147,7 +157,6 @@ jobs:
       # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
       # zum Job-Timeout fest (LFH-1101).
       - name: System-Werkzeuge für die nativen Crates
-        if: runner.environment == 'github-hosted'
         run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
@@ -257,6 +266,7 @@ jobs:
       # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
       # zum Job-Timeout fest (LFH-1101).
       - name: System-Werkzeuge für die nativen Crates
+        if: runner.environment == 'github-hosted'
         run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable

@@ -16,15 +16,18 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { createRunDir, deleteRunDir } from '../frontend/e2e/run-dir.ts';
+import { createRunDir } from '../frontend/e2e/run-dir.ts';
+
+const MODUL = fileURLToPath(new URL('../frontend/e2e/run-dir.ts', import.meta.url));
 
 const STUNDE = 60 * 60 * 1000;
 
@@ -126,46 +129,74 @@ test('ein Fehler beim Löschen wird zur Warnung (Fehlerpfad ohne Schreibschutz)'
   rmSync(basis, { recursive: true, force: true });
 });
 
-test('deleteRunDir löscht das Verzeichnis zum DB-Pfad aus der Lauf-Variablen samt Inhalt', () => {
+/**
+ * Startet einen Node-Prozess, der wie die Playwright-Config ein Lauf-Verzeichnis anlegt und dann
+ * auf `ende` endet; liefert den Pfad. Das Löschen beim Beenden lässt sich nur am Prozessende
+ * prüfen, also in einem eigenen Prozess.
+ */
+function prozessMitLaufVerzeichnis(basis, ende) {
+  const code = `
+    import { createRunDir } from ${JSON.stringify(MODUL)};
+    const pfad = createRunDir('lifeline-e2e-', { baseDir: ${JSON.stringify(basis)}, deleteOnExit: true });
+    console.log(pfad);
+    ${ende}
+  `;
+  const lauf = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' });
+  return { pfad: lauf.stdout.trim().split('\n')[0], status: lauf.status };
+}
+
+test('deleteOnExit: ein normal endender Lauf hinterlässt sein Verzeichnis nicht', () => {
   const basis = sandbox();
-  const pfad = createRunDir('lifeline-e2e-', { baseDir: basis });
-  mkdirSync(join(pfad, 'karten'));
-  writeFileSync(join(pfad, 'lifeline.db'), 'x');
-  writeFileSync(join(pfad, 'lifeline.db-wal'), 'x');
-  process.env.TEST_LAUF = JSON.stringify({ datenbank: join(pfad, 'lifeline.db') });
-  deleteRunDir('TEST_LAUF', { baseDir: basis });
+  const { pfad, status } = prozessMitLaufVerzeichnis(
+    basis,
+    `import { writeFileSync, mkdirSync } from 'node:fs';
+     mkdirSync(pfad + '/karten'); writeFileSync(pfad + '/lifeline.db', 'x');`,
+  );
+  assert.equal(status, 0);
+  assert.match(pfad, /lifeline-e2e-/);
   assert.equal(existsSync(pfad), false);
-  delete process.env.TEST_LAUF;
   rmSync(basis, { recursive: true, force: true });
 });
 
-test('deleteRunDir ohne Lauf-Variable tut nichts und wirft nicht', () => {
-  delete process.env.TEST_LAUF;
-  assert.doesNotThrow(() => deleteRunDir('TEST_LAUF'));
-});
-
-test('deleteRunDir löscht nichts außerhalb des Temp-Verzeichnisses', () => {
+test('deleteOnExit: auch ein roter Lauf (Exit 1) räumt', () => {
   const basis = sandbox();
-  const anderswo = sandbox();
-  writeFileSync(join(anderswo, 'lifeline.db'), 'x');
-  process.env.TEST_LAUF = JSON.stringify({ datenbank: join(anderswo, 'lifeline.db') });
-  const { warnungen } = mitWarnungen(() => deleteRunDir('TEST_LAUF', { baseDir: basis }));
-  assert.ok(existsSync(join(anderswo, 'lifeline.db')));
-  assert.equal(warnungen.length, 1);
-  delete process.env.TEST_LAUF;
+  const { pfad, status } = prozessMitLaufVerzeichnis(basis, 'process.exitCode = 1;');
+  assert.equal(status, 1);
+  assert.equal(existsSync(pfad), false);
   rmSync(basis, { recursive: true, force: true });
-  rmSync(anderswo, { recursive: true, force: true });
+});
+
+test('deleteOnExit: auch ein Abbruch vor den Tests (Webserver startet nicht, Fehler in der Config)', () => {
+  const basis = sandbox();
+  const geworfen = prozessMitLaufVerzeichnis(basis, "throw new Error('Webserver startet nicht');");
+  assert.notEqual(geworfen.status, 0);
+  assert.equal(existsSync(geworfen.pfad), false);
+  const beendet = prozessMitLaufVerzeichnis(basis, 'process.exit(1);');
+  assert.equal(existsSync(beendet.pfad), false);
+  rmSync(basis, { recursive: true, force: true });
+});
+
+test('deleteOnExit: ein Verzeichnis, das ein anderer Lauf angelegt hat, bleibt', () => {
+  const basis = sandbox();
+  const fremd = createRunDir('lifeline-e2e-', { baseDir: basis });
+  prozessMitLaufVerzeichnis(basis, '');
+  assert.ok(existsSync(fremd));
+  rmSync(basis, { recursive: true, force: true });
+});
+
+test('ohne deleteOnExit bleibt das Verzeichnis nach dem Prozessende stehen', () => {
+  const basis = sandbox();
+  const code = `
+    import { createRunDir } from ${JSON.stringify(MODUL)};
+    console.log(createRunDir('lifeline-e2e-', { baseDir: ${JSON.stringify(basis)} }));
+  `;
+  const lauf = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' });
+  assert.ok(existsSync(lauf.stdout.trim()));
+  rmSync(basis, { recursive: true, force: true });
 });
 
 test('ohne baseDir gilt das Temp-Verzeichnis des Systems', () => {
   const pfad = createRunDir('lifeline-run-dir-test-');
   assert.equal(dirname(pfad), tmpdir());
-  process.env.TEST_LAUF = JSON.stringify({ datenbank: join(pfad, 'lifeline.db') });
-  deleteRunDir('TEST_LAUF');
-  assert.equal(existsSync(pfad), false);
-  assert.equal(
-    readdirSync(tmpdir()).some((n) => n === pfad.split('/').pop()),
-    false,
-  );
-  delete process.env.TEST_LAUF;
+  rmSync(pfad, { recursive: true, force: true });
 });

@@ -1,6 +1,6 @@
 import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 
 /**
  * Das Lauf-Verzeichnis der Playwright-Läufe (LLH-1666, Spec `e2e-lauf-aufraeumen`): DB und
@@ -18,6 +18,11 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 type RunDirOptions = {
   /** Wo die Verzeichnisse liegen; Vorgabe das Temp-Verzeichnis des Systems. */
   baseDir?: string;
+  /**
+   * Das Verzeichnis beim Ende dieses Prozesses löschen. Nur im Hauptprozess setzen, der es
+   * anlegt: die Worker erben den Pfad und dürfen es nicht vor ihm wegräumen.
+   */
+  deleteOnExit?: boolean;
   /** Nur für den Selbsttest: den Fehlerpfad des Löschens auslösen. */
   remove?: (path: string) => void;
 };
@@ -26,9 +31,15 @@ const removeRecursive = (path: string) => rmSync(path, { recursive: true, force:
 
 /**
  * Legt das Lauf-Verzeichnis an. Vorher räumt es verwaiste Verzeichnisse desselben Präfixes ab,
- * die abgebrochene Läufe hinterlassen haben (älter als 24 h). Jüngere bleiben: ein paralleler
+ * die hart beendete Läufe hinterlassen haben (älter als 24 h). Jüngere bleiben: ein paralleler
  * Lauf (anderer Worktree, anderer Anteil) benutzt sie gerade. Was sich nicht löschen lässt, wird
  * eine Warnung, kein Abbruch.
+ *
+ * Mit `deleteOnExit` löscht der Prozess das Verzeichnis bei seinem Ende, synchron im
+ * `exit`-Ereignis. Das greift bei grünem und rotem Lauf, aber auch, wenn schon der Webserver nicht
+ * startet, die Config wirft oder nur `--list` läuft; ein `globalTeardown` liefe dort nicht.
+ * Playwright beendet Backend und Vite vorher. Nur ein hart getöteter Prozess (SIGKILL)
+ * hinterlässt etwas, das räumt der nächste Lauf.
  */
 export function createRunDir(prefix: string, options: RunDirOptions = {}): string {
   const baseDir = options.baseDir ?? tmpdir();
@@ -45,25 +56,7 @@ export function createRunDir(prefix: string, options: RunDirOptions = {}): strin
       console.warn(`Verwaistes Lauf-Verzeichnis nicht gelöscht: ${path} (${String(error)})`);
     }
   }
-  return mkdtempSync(join(baseDir, prefix));
-}
-
-/**
- * Löscht das Verzeichnis des Laufs, dessen DB-Pfad die Konfiguration über `envKey` an die Worker
- * vererbt hat. Für `globalTeardown`: Playwright ruft es auch nach roten Tests und beendet die
- * Webserver erst danach; die offene DB zu löschen schadet dem Backend unter Linux und macOS
- * nicht. Ohne Variable tut es nichts. Ein Pfad außerhalb von `baseDir` bleibt stehen (Warnung):
- * die Variable kommt aus der Umgebung, und ein falscher Wert soll nichts Fremdes löschen.
- */
-export function deleteRunDir(envKey: string, options: Pick<RunDirOptions, 'baseDir'> = {}) {
-  const value = process.env[envKey];
-  if (!value) return;
-  const { datenbank } = JSON.parse(value) as { datenbank: string };
-  const runDir = dirname(resolve(datenbank));
-  const baseDir = resolve(options.baseDir ?? tmpdir());
-  if (dirname(runDir) !== baseDir) {
-    console.warn(`Lauf-Verzeichnis liegt nicht unter ${baseDir}, bleibt stehen: ${runDir}`);
-    return;
-  }
-  removeRecursive(runDir);
+  const runDir = mkdtempSync(join(baseDir, prefix));
+  if (options.deleteOnExit) process.on('exit', () => removeRecursive(runDir));
+  return runDir;
 }

@@ -10,8 +10,9 @@ mit jedem Lauf voller wird.
 
 ### Requirement: Ein Lauf löscht sein Lauf-Verzeichnis am Ende
 Das Temp-Verzeichnis, das ein Lauf für Datenbank und Karten des Backends anlegt, MUST am Ende des
-Laufs gelöscht sein, unabhängig davon, ob Tests rot waren. Das gilt für die e2e-Suite und den
-Bildlauf der Anwenderdoku, lokal wie in der CI, und für jeden Anteil (`PW_SHARD`).
+Laufs gelöscht sein, unabhängig davon, ob Tests rot waren oder der Lauf schon vor den Tests
+scheiterte. Das gilt für die e2e-Suite und den Bildlauf der Anwenderdoku, lokal wie in der CI,
+und für jeden Anteil (`PW_SHARD`).
 
 #### Scenario: Grüner Lauf
 - **WHEN** ein e2e-Lauf mit grünen Tests endet
@@ -21,6 +22,10 @@ Bildlauf der Anwenderdoku, lokal wie in der CI, und für jeden Anteil (`PW_SHARD
 - **WHEN** ein e2e-Lauf mit mindestens einem roten Test endet
 - **THEN** existiert sein Lauf-Verzeichnis ebenfalls nicht mehr, und der Lauf meldet weiterhin
   Rot
+
+#### Scenario: Backend startet nicht
+- **WHEN** ein e2e-Lauf abbricht, weil das Backend nicht startet
+- **THEN** existiert sein Lauf-Verzeichnis ebenfalls nicht mehr
 
 #### Scenario: Bildlauf der Anwenderdoku
 - **WHEN** ein Lauf mit `playwright.doku.config.ts` endet

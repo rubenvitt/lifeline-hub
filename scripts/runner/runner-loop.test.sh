@@ -56,11 +56,19 @@ if [ "$1" = run ]; then
   [ -z "${FAKE_DOCKER_BLOCKIEREN:-}" ] || /bin/sleep 30
   exit "${FAKE_DOCKER_EXIT:-0}"
 fi
+# Netz: gibt es erst, wenn es angelegt wurde; ein zweites Anlegen scheitert wie bei Docker.
+if [ "$1 $2" = "network inspect" ]; then [ -e "$WERK/netz" ]; exit; fi
+if [ "$1 $2" = "network create" ]; then
+  [ -z "${FAKE_NETZ_WETTLAUF:-}" ] || { touch "$WERK/netz"; exit 1; }
+  [ ! -e "$WERK/netz" ] || exit 1
+  touch "$WERK/netz"; exit 0
+fi
 exit 0
 EOF
 cat > "$WERK/bin/sleep" <<'EOF'
 #!/usr/bin/env bash
 echo "$1" >> "$WERK/sleep.args"
+[ -z "${FAKE_SLEEP_BLOCKIEREN:-}" ] || exec /bin/sleep 30
 EOF
 chmod +x "$WERK/bin/"*
 printf 'ghp_GEHEIMTOKEN\n' > "$WERK/token"
@@ -69,9 +77,9 @@ chmod 600 "$WERK/token"
 lauf() { # <max_läufe> <antworten…> — startet die Schleife mit frischen Mitschriften
   local max="$1"
   shift
-  rm -f "$WERK"/*.args "$WERK"/*.stdin "$WERK"/envfile.*
+  rm -f "$WERK"/*.args "$WERK"/*.stdin "$WERK"/envfile.* "$WERK/netz"
   printf '%s\n' "$@" > "$WERK/antworten"
-  WERK="$WERK" PATH="$WERK/bin:$PATH" \
+  WERK="$WERK" PATH="$WERK/bin:$PATH" RUNNER_MIN_JOB_SEK=0 \
     RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" RUNNER_MAX_RUNS="$max" \
     "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1
 }
@@ -92,8 +100,12 @@ pruefe "Container im eigenen Netz" grep -q -- '--network lifeline-runner' <<< "$
 pruefe "Container mit CPU- und Speichergrenze (Vorgabe)" \
   grep -q -- '--cpus 3 .*--memory 6g' <<< "$run_zeile"
 pruefe "Container ohne neue Privilegien" grep -q -- '--security-opt no-new-privileges' <<< "$run_zeile"
-pruefe "Container hängt Compiler-Cache und Registry als Volume ein" \
-  grep -q -- '-v lifeline-sccache:/home/runner/.cache/sccache -v lifeline-cargo-registry:/home/runner/.cargo/registry' <<< "$run_zeile"
+pruefe "Container hängt den Compiler-Cache als Volume ein" \
+  grep -q -- '-v lifeline-sccache:/home/runner/.cache/sccache' <<< "$run_zeile"
+pruefe "sonst kein Volume: die Cargo-Registry teilen Container nicht (Sperre liegt außerhalb)" \
+  bash -c "[ \"\$(grep -o -- ' -v ' <<< '$run_zeile' | wc -l)\" = 1 ]"
+pruefe "Netz ohne Verkehr zwischen den Containern angelegt" \
+  grep -q 'network create -o com.docker.network.bridge.enable_icc=false lifeline-runner' "$WERK/docker.args"
 pruefe "Container aus dem Runner-Image" grep -q 'lifeline-runner:latest' <<< "$run_zeile"
 pruefe "kein Docker-Socket im Container" bash -c "! grep -q docker.sock <<< '$run_zeile'"
 pruefe "kein --privileged" bash -c "! grep -q -- --privileged <<< '$run_zeile'"
@@ -117,7 +129,7 @@ pruefe "kein Container ohne JIT-Konfiguration" bash -c "[ \"\$(grep -c '^run ' '
 # ── Container scheitert: auch dann Pause statt Hämmern ─────────────────────────────────
 rm -f "$WERK"/*.args
 printf 'ok\nok\n' > "$WERK/antworten"
-WERK="$WERK" PATH="$WERK/bin:$PATH" FAKE_DOCKER_EXIT=125 \
+WERK="$WERK" PATH="$WERK/bin:$PATH" FAKE_DOCKER_EXIT=125 RUNNER_MIN_JOB_SEK=0 \
   RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" RUNNER_MAX_RUNS=2 \
   "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1 || true
 pruefe "gescheiterter Container führt zur Pause" grep -qx 30 "$WERK/sleep.args"
@@ -125,7 +137,7 @@ pruefe "gescheiterter Container führt zur Pause" grep -qx 30 "$WERK/sleep.args"
 # ── Eigene Werte aus runner.env ────────────────────────────────────────────────────────
 rm -f "$WERK"/*.args
 printf 'ok\n' > "$WERK/antworten"
-WERK="$WERK" PATH="$WERK/bin:$PATH" RUNNER_CPUS=2 RUNNER_MEMORY=4g RUNNER_LABEL=anders \
+WERK="$WERK" PATH="$WERK/bin:$PATH" RUNNER_CPUS=2 RUNNER_MEMORY=4g RUNNER_LABEL=anders RUNNER_MIN_JOB_SEK=0 \
   RUNNER_SCCACHE_SIZE=5G RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" \
   RUNNER_MAX_RUNS=1 "$SKRIPT" 2 > "$WERK/ausgabe" 2>&1
 pruefe "eigene Grenzen, Label und Cache-Größe greifen" \
@@ -133,6 +145,26 @@ pruefe "eigene Grenzen, Label und Cache-Größe greifen" \
     && grep -q -- '-e SCCACHE_CACHE_SIZE=5G' '$WERK/docker.args' \
     && grep -q '\"labels\":\[\"self-hosted\",\"anders\"\]' '$WERK/curl.args' \
     && grep -q -- '--name lifeline-runner-2' '$WERK/docker.args'"
+
+# ── Runner endet sofort (Exit 0, aber kein Job): als Fehler werten, nicht hämmern ─────────
+rm -f "$WERK"/*.args "$WERK/netz"
+printf 'ok\nok\n' > "$WERK/antworten"
+WERK="$WERK" PATH="$WERK/bin:$PATH" \
+  RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" RUNNER_MAX_RUNS=2 \
+  "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1
+pruefe "Container nach unter 60 s gilt als Fehler: Pause 30, dann 60" \
+  bash -c "[ \"\$(tr '\n' ' ' < '$WERK/sleep.args')\" = '30 60 ' ]"
+
+# ── Erster Start aller Plätze zugleich: ein verlorener Wettlauf ums Netz ist kein Fehler ─
+rm -f "$WERK"/*.args "$WERK/netz"
+printf 'ok\n' > "$WERK/antworten"
+if WERK="$WERK" PATH="$WERK/bin:$PATH" FAKE_NETZ_WETTLAUF=1 RUNNER_MIN_JOB_SEK=0 \
+  RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" RUNNER_MAX_RUNS=1 \
+  "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1; then
+  ok "Netz von einem anderen Platz angelegt → Schleife läuft"
+else
+  rot "Netz von einem anderen Platz angelegt → Abbruch"
+fi
 
 # ── Falsche Aufrufe ─────────────────────────────────────────────────────────────────────
 if WERK="$WERK" PATH="$WERK/bin:$PATH" RUNNER_REPO=x/y RUNNER_TOKEN_FILE="$WERK/token" "$SKRIPT" \
@@ -173,5 +205,23 @@ pruefe "SIGTERM stoppt den Container" grep -q '^stop .*lifeline-runner-1' "$WERK
 pruefe "SIGTERM beendet die Schleife sauber" test "$status" -eq 0
 pruefe "Env-Datei auch nach SIGTERM gelöscht" bash -c "[ ! -e \"\$(cat '$WERK/envfile.pfad')\" ]"
 pkill -f "$WERK/bin/docker" 2>/dev/null || true
+
+# ── Stopp während der Pause: wirkt sofort, nicht erst nach bis zu 5 min ────────────────
+rm -f "$WERK"/*.args "$WERK/netz"
+printf 'fehler\n' > "$WERK/antworten"
+WERK="$WERK" PATH="$WERK/bin:$PATH" FAKE_SLEEP_BLOCKIEREN=1 \
+  RUNNER_REPO=rubenvitt/lifeline-hub RUNNER_TOKEN_FILE="$WERK/token" \
+  "$SKRIPT" 1 > "$WERK/ausgabe" 2>&1 &
+pid=$!
+for _ in $(seq 50); do
+  [ -s "$WERK/sleep.args" ] && break
+  /bin/sleep 0.1
+done
+start=$SECONDS
+kill -TERM "$pid"
+if wait "$pid"; then status=0; else status=$?; fi
+pruefe "SIGTERM in der Pause beendet die Schleife binnen 5 s" test $((SECONDS - start)) -lt 5
+pruefe "SIGTERM in der Pause endet sauber" test "$status" -eq 0
+pkill -f "exec /bin/sleep 30" 2>/dev/null || true
 
 exit "$fehler"

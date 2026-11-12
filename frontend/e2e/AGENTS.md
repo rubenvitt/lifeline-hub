@@ -52,7 +52,8 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   beide Konfigurationen über `e2e/lauf-kern.ts`.
 - **Ein Lauf räumt sein Temp-Verzeichnis selbst** (LLH-1666, Spec `e2e-lauf-aufraeumen`): DB und
   `karten/` des Backends legen beide Konfigurationen nur über `createRunDir` aus `e2e/run-dir.ts`
-  an, und ihr `globalTeardown` löscht es mit `deleteRunDir`, auch nach roten Tests. Verwaiste
+  an, mit `deleteOnExit` im Hauptprozess: er löscht es bei seinem Ende, auch nach roten Tests oder
+  einem Webserver, der nicht startet (ein `globalTeardown` liefe dort nicht). Verwaiste
   Verzeichnisse älter als 24 h räumt der nächste Lauf. Kein `mkdtemp` an anderer Stelle: auf dem
   eigenen CI-Runner und jedem Laptop bliebe es liegen. Selbsttest
   `scripts/e2e-run-dir.test.mjs` (Schritt 11 des Gates).

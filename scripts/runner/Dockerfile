@@ -16,6 +16,10 @@ ARG PLAYWRIGHT_VERSION
 # Nur für `playwright install` beim Bau; im Job installiert `mise` die Version aus `mise.toml`.
 ARG NODE_VERSION=26.7.0
 ARG SCCACHE_VERSION=0.19.0
+# Fest eingetragen, nicht vom Release-Server geladen: eine Prüfsumme vom selben Ursprung schützte
+# nur gegen Übertragungsfehler. Bei einem Versionswechsel beide neu eintragen.
+ARG SCCACHE_SHA256_AMD64=aa73c7270c997894038c0d8f0d297865f57569e1687883322bc431713d4bb9dd
+ARG SCCACHE_SHA256_ARM64=3e47fc4a71b1ddd1b4294a0de9d34498922fdf41e3cd0bda5df3954e3d6deb9d
 ARG TARGETARCH
 
 LABEL de.lifeline-hub.runner="1"
@@ -24,10 +28,13 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Build-Werkzeuge für die nativen Crates des Backends (aws-lc braucht cmake und nasm, das
-# vendorte OpenSSL perl und make), dazu was Actions und Caches erwarten.
+# vendorte OpenSSL perl und make), dazu was Actions und Caches erwarten. DejaVu, weil die App für
+# Text auf die Systemschrift zurückfällt (kein `@font-face`, `frontend/src/theme/schriften.test.ts`)
+# und `ubuntu-latest` dafür DejaVu Sans nimmt: sonst wichen Textbreiten in den Layout-Gates ab.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    build-essential ca-certificates cmake curl git nasm perl pkg-config tzdata unzip xz-utils zstd \
+    build-essential ca-certificates cmake curl fonts-dejavu-core git nasm perl pkg-config tzdata \
+    unzip xz-utils zstd \
   && rm -rf /var/lib/apt/lists/*
 
 # Playwright-Browser und ihre Systempakete, in genau der Version des Lockfiles. Node nur für diesen
@@ -48,14 +55,18 @@ RUN set -eu; \
 ENV LIFELINE_RUNNER_PLAYWRIGHT=${PLAYWRIGHT_VERSION}
 
 # sccache: inhaltsadressierter Compiler-Cache auf einem Volume (`runner-loop.sh`), mit fester
-# Obergrenze (`SCCACHE_CACHE_SIZE`). Geprüft gegen die Prüfsumme des Releases.
+# Obergrenze (`SCCACHE_CACHE_SIZE`). Geprüft gegen die oben fest eingetragene Prüfsumme.
 RUN set -eu; \
-  case "${TARGETARCH:-amd64}" in amd64) arch=x86_64 ;; arm64) arch=aarch64 ;; *) exit 1 ;; esac; \
+  case "${TARGETARCH:-amd64}" in \
+    amd64) arch=x86_64 summe="${SCCACHE_SHA256_AMD64}" ;; \
+    arm64) arch=aarch64 summe="${SCCACHE_SHA256_ARM64}" ;; \
+    *) exit 1 ;; \
+  esac; \
   name="sccache-v${SCCACHE_VERSION}-${arch}-unknown-linux-musl"; \
   basis="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}"; \
   cd /tmp; \
   curl -fsSLO "${basis}/${name}.tar.gz"; \
-  echo "$(curl -fsSL "${basis}/${name}.tar.gz.sha256" | cut -d' ' -f1)  ${name}.tar.gz" | sha256sum -c -; \
+  echo "${summe}  ${name}.tar.gz" | sha256sum -c -; \
   tar -xzf "${name}.tar.gz"; \
   install -m 0755 "${name}/sccache" /usr/local/bin/sccache; \
   rm -rf "/tmp/${name}" "/tmp/${name}.tar.gz"
@@ -72,10 +83,10 @@ ENV RUSTUP_HOME=/home/runner/.rustup \
   PATH=/home/runner/.cargo/bin:${PATH}
 RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path \
-  && mkdir -p /home/runner/.cargo/registry /home/runner/.cache/sccache
+  && mkdir -p /home/runner/.cache/sccache
 
-# Die Volumes für Registry und Compiler-Cache hängen `runner-loop.sh` ein; ohne Volume bleibt der
-# Cache im Container und stirbt mit ihm.
+# Das Volume für den Compiler-Cache hängt `runner-loop.sh` ein; ohne Volume bleibt der Cache im
+# Container und stirbt mit ihm.
 ENV RUSTC_WRAPPER=sccache \
   SCCACHE_DIR=/home/runner/.cache/sccache \
   SCCACHE_CACHE_SIZE=20G

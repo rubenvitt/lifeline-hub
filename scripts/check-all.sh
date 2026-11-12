@@ -352,6 +352,9 @@ schritt_11() {
   # Schleife nie einen Container mit Docker-Socket, Privilegien oder dem Token starten.
   "$ROOT/scripts/runner/select-runner.test.sh"
   "$ROOT/scripts/runner/runner-loop.test.sh"
+  # Schritte mit `sudo` oder Caches der gehosteten Runner tragen in den Jobs des eigenen Runners
+  # ihre Bedingung; sonst scheitert der erste Lauf auf dem Server und sperrt jeden PR.
+  "$ROOT/scripts/runner/ci-schritte.test.sh"
 }
 
 schritt_12() {

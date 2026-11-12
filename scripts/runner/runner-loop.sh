@@ -7,11 +7,14 @@
 # eine Einmal-Registrierung (JIT) bei GitHub holen, einen frischen Container aus dem Runner-Image
 # starten, der genau EINEN Job nimmt, und ihn danach von Docker löschen lassen (`--rm`). So
 # beginnt jeder Job auf leerem Stand: kein Arbeitsverzeichnis, kein `/tmp`, keine Prozesse eines
-# früheren Jobs. Geteilt sind nur der Compiler-Cache und die Cargo-Registry (Volumes).
+# früheren Jobs. Geteilt ist nur der Compiler-Cache (Volume). Die Cargo-Registry nicht: ihre Sperre
+# und ihre Aufräumdaten liegen in `CARGO_HOME` selbst, also je Container, und zwei Container, die
+# dieselbe Crate entpacken, zerstörten sich das Verzeichnis gegenseitig.
 #
 # Geheimnisse bleiben aus jeder Kommandozeile (`ps` zeigt sie allen Nutzern): das Token geht über
 # stdin an curl, die JIT-Konfiguration über eine Env-Datei mit Modus 600 an Docker. Der Container
-# bekommt weder Docker-Socket noch Privilegien noch das Host-Netz.
+# bekommt weder Docker-Socket noch Privilegien noch das Host-Netz, und im eigenen Docker-Netz
+# erreichen sich gleichzeitige Jobs nicht (`enable_icc=false`).
 #
 # Konfiguration aus der Umgebung (systemd: `EnvironmentFile=/etc/lifeline-runner/runner.env`):
 #   RUNNER_REPO          owner/repo                         (Pflicht)
@@ -22,6 +25,8 @@
 #   RUNNER_MEMORY        Speicher je Container              (6g)
 #   RUNNER_SCCACHE_SIZE  Obergrenze des Compiler-Caches     (20G)
 #   RUNNER_NETWORK       Docker-Netz der Runner             (lifeline-runner)
+#   RUNNER_MIN_JOB_SEK   kürzer endende Container gelten als Fehler (60); der Runner gibt auch
+#                        bei einem eigenen Fehler Exit 0, die Schleife hämmerte sonst
 #   RUNNER_MAX_RUNS      nur für den Selbsttest: nach so vielen Durchläufen enden
 set -euo pipefail
 
@@ -39,6 +44,7 @@ MEMORY="${RUNNER_MEMORY:-6g}"
 SCCACHE_SIZE="${RUNNER_SCCACHE_SIZE:-20G}"
 NETWORK="${RUNNER_NETWORK:-lifeline-runner}"
 MAX_RUNS="${RUNNER_MAX_RUNS:-0}"
+MIN_JOB_SEK="${RUNNER_MIN_JOB_SEK:-60}"
 CONTAINER="lifeline-runner-$PLATZ"
 
 # Pause nach einem Fehler: 30 s, verdoppelt bis 5 min, nach einem guten Job wieder 30 s.
@@ -56,12 +62,14 @@ fi
 
 envdatei=""
 container_pid=""
+pause_pid=""
 aufraeumen() {
   [ -z "$envdatei" ] || rm -f "$envdatei"
   envdatei=""
 }
 beenden() {
   echo "Platz $PLATZ: Stopp angefordert, beende $CONTAINER."
+  [ -z "$pause_pid" ] || kill "$pause_pid" 2> /dev/null || true
   docker stop --time 60 "$CONTAINER" > /dev/null 2>&1 || true
   [ -z "$container_pid" ] || wait "$container_pid" 2> /dev/null || true
   aufraeumen
@@ -98,19 +106,33 @@ job_ausfuehren() {
     --cpus "$CPUS" --memory "$MEMORY" --pids-limit 4096 --shm-size 2g \
     --security-opt no-new-privileges \
     -v lifeline-sccache:/home/runner/.cache/sccache \
-    -v lifeline-cargo-registry:/home/runner/.cargo/registry \
     -e "SCCACHE_CACHE_SIZE=$SCCACHE_SIZE" \
     --env-file "$envdatei" \
     "$IMAGE" &
   container_pid=$!
-  local status=0
+  local status=0 start=$SECONDS
   wait "$container_pid" || status=$?
   container_pid=""
   aufraeumen
+  if [ "$status" -eq 0 ] && [ $((SECONDS - start)) -lt "$MIN_JOB_SEK" ]; then
+    echo "Platz $PLATZ: Container nach $((SECONDS - start))s ohne Fehlercode beendet, werte als Fehler." >&2
+    status=1
+  fi
   return "$status"
 }
 
-docker network inspect "$NETWORK" > /dev/null 2>&1 || docker network create "$NETWORK" > /dev/null
+# Pause, die SIGTERM sofort unterbricht (wie oben: Hintergrund plus `wait`).
+pausieren() {
+  sleep "$1" &
+  pause_pid=$!
+  wait "$pause_pid" || true
+  pause_pid=""
+}
+
+# Beim ersten Start legen alle Plätze zugleich an; wer verliert, findet das Netz danach vor.
+docker network inspect "$NETWORK" > /dev/null 2>&1 \
+  || docker network create -o com.docker.network.bridge.enable_icc=false "$NETWORK" > /dev/null 2>&1 \
+  || docker network inspect "$NETWORK" > /dev/null
 
 pause="$PAUSE_START"
 laeufe=0
@@ -119,13 +141,13 @@ while :; do
   jit="$(jit_holen)"
   if [ -z "$jit" ]; then
     echo "Platz $PLATZ: keine JIT-Konfiguration von GitHub, nächster Versuch in ${pause}s." >&2
-    sleep "$pause"
+    pausieren "$pause"
     pause=$((pause * 2 > PAUSE_MAX ? PAUSE_MAX : pause * 2))
   elif job_ausfuehren "$jit"; then
     pause="$PAUSE_START"
   else
     echo "Platz $PLATZ: Container endete mit Fehler, nächster Versuch in ${pause}s." >&2
-    sleep "$pause"
+    pausieren "$pause"
     pause=$((pause * 2 > PAUSE_MAX ? PAUSE_MAX : pause * 2))
   fi
   if [ "$MAX_RUNS" -gt 0 ] && [ "$laeufe" -ge "$MAX_RUNS" ]; then
