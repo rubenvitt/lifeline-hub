@@ -186,15 +186,25 @@ fn wartet(kennung: &str, grund: String) -> LebensendeQuittung {
         kennung: kennung.to_string(),
         ergebnis: VERWAHRUNG_WARTET.into(),
         grund: Some(grund),
+        epoche: None,
     }
 }
 
-fn angenommen(kennung: &str) -> LebensendeQuittung {
-    LebensendeQuittung {
+/// `angenommen` mit der Epoche, mit der diese Instanz den Einsatz `id` nun führt (LLH-1647).
+async fn angenommen(
+    conn: &mut SqliteConnection,
+    kennung: &str,
+    id: i64,
+) -> Result<LebensendeQuittung, AppError> {
+    let epoche = crate::instanz::fuehrung::repo::find_by_einsatz(conn, id)
+        .await?
+        .map(|a| a.epoche());
+    Ok(LebensendeQuittung {
         kennung: kennung.to_string(),
         ergebnis: VERWAHRUNG_ANGENOMMEN.into(),
         grund: None,
-    }
+        epoche,
+    })
 }
 
 /// Erreichte Seite: nimmt einen zur Verwahrung übergebenen Einsatz an (D4) oder sagt, worauf er
@@ -225,7 +235,7 @@ pub async fn verwahrung_annehmen(
     .bind(&l.kennung)
     .fetch_optional(&mut *conn)
     .await?;
-    if let Some((_, stand)) = eigen {
+    if let Some((eigen_id, stand)) = eigen {
         return Ok(Some(match stand {
             Some(s) if s != l.stand => (
                 wartet(
@@ -234,7 +244,7 @@ pub async fn verwahrung_annehmen(
                 ),
                 None,
             ),
-            _ => (angenommen(&l.kennung), None),
+            _ => (angenommen(conn, &l.kennung, eigen_id).await?, None),
         }));
     }
     let Some((id, stand)) = spiegel_der_kopplung(conn, kopplung.id, &l.kennung).await? else {
@@ -296,7 +306,7 @@ pub async fn verwahrung_annehmen(
         )));
     };
     umwandeln(conn, kopplung, l, id, akteur).await?;
-    Ok(Some((angenommen(&l.kennung), Some(id))))
+    Ok(Some((angenommen(conn, &l.kennung, id).await?, Some(id))))
 }
 
 /// Macht aus dem Spiegel einen eigenen, abgeschlossenen Einsatz dieser Instanz (D4).
@@ -333,13 +343,24 @@ async fn umwandeln(
         .execute(&mut *conn)
         .await?;
     }
-    for tabelle in ["spiegel_herkunft", "spiegel_anhang", "spiegel_katalog"] {
-        sqlx::query(sqlx::AssertSqlSafe(format!(
-            "DELETE FROM {tabelle} WHERE einsatz_id = ?"
-        )))
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
+    // Die Nummer vergeben ELW und Hub unabhängig; ein Spiegel ist von ihrer Eindeutigkeit
+    // ausgenommen. Ist sie hier belegt, bekommt der Einsatz eine Nummer dieser Instanz. Vor dem
+    // Wechsel der Akte: Der beendet den Spiegel, und ab da gilt die Eindeutigkeit (LLH-1647).
+    let umnummeriert = nummer_freimachen(conn, id).await?;
+    // Führungsakte (LLH-1647, E1): Mit eingeschalteter Führung führt diese Instanz ab jetzt, mit
+    // der nächsten Epoche und der Art `verwahrung`. Das richtet den Spiegel aus wie jeder Wechsel
+    // (`fuehrung::werde_fuehrer`): Die Herkunft der Zeilen bleibt, damit ein Rückfall zum Spiegel
+    // keine Zeile doppelt anlegt, wenn die Gegenstelle die Verwahrung ablehnt (E3).
+    let gewechselt = crate::instanz::fuehrung::repo::verwahren(conn, id).await?;
+    if !gewechselt {
+        for tabelle in ["spiegel_herkunft", "spiegel_anhang", "spiegel_katalog"] {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "DELETE FROM {tabelle} WHERE einsatz_id = ?"
+            )))
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+        }
     }
     // Abgelehnte Anträge bleiben mit ihren Daten für die erfassende Person, bis der Purge-Lauf
     // sie nach `antrag::ABGELEHNT_TAGE` räumt; offene gibt es hier nicht mehr (oben).
@@ -347,9 +368,6 @@ async fn umwandeln(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-    // Die Nummer vergeben ELW und Hub unabhängig; ein Spiegel ist von ihrer Eindeutigkeit
-    // ausgenommen. Ist sie hier belegt, bekommt der Einsatz eine Nummer dieser Instanz.
-    let umnummeriert = nummer_freimachen(conn, id).await?;
     // Die Kennung trägt der Spiegel schon (Übernahme); sie macht eine zweite Meldung erkennbar.
     sqlx::query("UPDATE einsatz SET kennung = ? WHERE id = ? AND kennung IS NULL")
         .bind(&l.kennung)
@@ -360,9 +378,11 @@ async fn umwandeln(
         .bind(id)
         .execute(&mut *conn)
         .await?;
+    // Nach einem Rückfall zum Spiegel (LLH-1647, E3) steht die Zeile schon: die neue Annahme gilt.
     sqlx::query(
         "INSERT INTO verwahrung_angenommen (einsatz_id, stand, angenommen_at) \
-         VALUES (?, ?, datetime('now'))",
+         VALUES (?, ?, datetime('now')) ON CONFLICT (einsatz_id) DO UPDATE SET \
+         stand = excluded.stand, angenommen_at = excluded.angenommen_at",
     )
     .bind(id)
     .bind(l.stand)
@@ -523,12 +543,24 @@ pub async fn quittungen_uebernehmen(
             .map(|l| l.stand);
         let noch_so = q.ergebnis != VERWAHRUNG_ANGENOMMEN
             || noch_wie_gesendet(conn, id, gesendeter_stand, jetzt).await?;
-        if !noch_so {
+        if q.ergebnis == VERWAHRUNG_ANGENOMMEN && verwahrung_abgelehnt(conn, id, q).await? {
+            // Die Akte kam vor der Quittung, und diese Instanz hat die Verwahrung abgelehnt
+            // (LLH-1647, E3). Die Gegenstelle wird wieder Spiegel; abräumen hieße, dass niemand
+            // den Einsatz mehr hat. Das nächste Angebot läuft mit einer neuen Epoche.
             verwahrung_merken(
                 conn,
                 id,
                 &kopplung.gegenueber_name,
-                Some("Nach der Übergabe geändert"),
+                Some(GRUND_ABGELEHNT),
+                jetzt,
+            )
+            .await?;
+        } else if !noch_so {
+            verwahrung_merken(
+                conn,
+                id,
+                &kopplung.gegenueber_name,
+                Some(GRUND_GEAENDERT),
                 jetzt,
             )
             .await?;
@@ -553,6 +585,21 @@ pub async fn quittungen_uebernehmen(
         }
     }
     Ok(ids)
+}
+
+/// Meldende Seite (LLH-1647): Ob die eigene Akte über die Epoche der Quittung hinaus ist, diese
+/// Instanz die Verwahrung also schon abgelehnt hat. Ohne Epoche (Führung je Einsatz aus) nie.
+async fn verwahrung_abgelehnt(
+    conn: &mut SqliteConnection,
+    id: i64,
+    q: &LebensendeQuittung,
+) -> Result<bool, AppError> {
+    let Some(epoche) = &q.epoche else {
+        return Ok(false);
+    };
+    Ok(crate::instanz::fuehrung::repo::find_by_einsatz(conn, id)
+        .await?
+        .is_some_and(|a| a.epoche() > *epoche))
 }
 
 /// Ob der Einsatz noch so ist, wie er zur Verwahrung gesendet wurde: gleicher Stand und weiter
@@ -614,6 +661,54 @@ async fn verwahrung_merken(
     .await?;
     Ok(())
 }
+
+/// Ob diese Instanz den Einsatz verwahrt: zur Verwahrung angenommen und kein Spiegel mehr
+/// (LLH-1647, E4). Nach einem Rückfall zum Spiegel (E3) nicht.
+pub async fn ist_verwahrt(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM verwahrung_angenommen v JOIN einsatz e ON e.id = v.einsatz_id \
+         WHERE v.einsatz_id = ? AND e.spiegel = 0)",
+    )
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Meldende Seite (LLH-1647, E2): Die Gegenstelle hat die Übergabe des eigenen Einsatzes
+/// `einsatz_id` mit `angenommen` quittiert; er wird gleich abgeräumt.
+pub async fn ist_verwahrung_quittiert(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_abraeumen WHERE einsatz_id = ? AND art = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(AbraeumArt::Verwahrt.as_str())
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Meldende Seite (LLH-1647, E3): Warum die Verwahrung des Einsatzes nicht gilt, für den Verlauf.
+pub async fn grund_gegen_verwahrung(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<&'static str, AppError> {
+    let grund: Option<Option<String>> =
+        sqlx::query_scalar("SELECT grund FROM einsatz_verwahrung WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    Ok(match grund.flatten().as_deref() {
+        Some(GRUND_GEAENDERT) => "nach der Übergabe geändert",
+        _ => "Übergabe hier nicht bestätigt",
+    })
+}
+
+/// Grund der Quittung, wenn sich der Einsatz nach der Übergabe geändert hat.
+const GRUND_GEAENDERT: &str = "Nach der Übergabe geändert";
+/// Grund, wenn diese Instanz die Verwahrung abgelehnt hatte, bevor die Quittung kam (LLH-1647).
+const GRUND_ABGELEHNT: &str = "Verwahrung hier abgelehnt";
 
 /// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
 pub async fn abraeumen_nach_commit(pool: &sqlx::SqlitePool, ids: &[i64]) {

@@ -45,6 +45,7 @@ ursprünglichen Entscheidung laut Herleitung, nicht der Tag der Niederschrift.
 | [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md) | Beta zählt neben Alpha und bekommt nur veröffentlichte Alpha-Tags über einen Nachzug | akzeptiert | 2026-11-11 | `release.config.mjs`, `scripts/release/kanal-nachziehen.sh`, `scripts/release/desktop-kanal.mjs`, `scripts/release/abbild-kanal.mjs`, `src-tauri/src/kanal.rs`, `.github/workflows/kanal-nachziehen.yml`, `.github/workflows/artefakte.yml` |
 | [ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md) | Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn | ersetzt | 2026-11-09 | `src/instanz/fuehrung/**`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs` |
 | [ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md) | Ein Einsatz hat genau eine führende Instanz; wer ihn nicht führt, hält ihn als Spiegel | akzeptiert | 2026-11-11 | `src/instanz/fuehrung/**`, `src/instanz/spiegel/fuehrung.rs`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs`, `frontend/src/einsatz/schreibrecht.ts` |
+| [ADR-0024](entscheidungen/ADR-0024-ein-verwahrter-einsatz-wird-vom-hub-gefuehrt.md) | Die Verwahrung wechselt die Führung; einen verwahrten Einsatz gibt der Hub nicht mehr ab | akzeptiert | 2026-11-12 | `src/instanz/fuehrung/**`, `src/instanz/spiegel/lebensende.rs` |
 
 ## 9.2 Weitere Entscheidungen ohne eigene ADR
 

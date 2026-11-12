@@ -328,6 +328,52 @@ async fn verwerfen(
     grund: &str,
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
+    let text = format!("Übernahme durch {} verworfen: {grund}", m.fuehrer_name);
+    fuehre_weiter(conn, ich, a, m, &text, aus).await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Alarm { einsatz_id });
+    }
+    aus.folgen.push(Folge::Spur {
+        aktion: AdminAktion::FuehrungVerworfen,
+        org_id: a.org_id,
+        grund: spur_text(a, &text),
+    });
+    aus.hinweis = Some(format!(
+        "{} meldet eine ungültige Übernahme der Führung ({}): {grund}",
+        kopplung.gegenueber_name, a.bezeichnung
+    ));
+    Ok(())
+}
+
+/// Lehnt eine Verwahrung ab, die hier nicht quittiert ist (meldende Seite, LLH-1647, E3): Der
+/// Einsatz liegt weiter hier, etwa weil er sich nach dem Angebot noch geändert hat oder die
+/// Quittung noch fehlt. Ich führe mit der nächsten Epoche weiter, ohne Alarm und ohne Admin-Spur:
+/// Die Gegenstelle hat nichts Unrechtes getan, sie wird wieder Spiegel, und die Verwahrung läuft
+/// mit dem nächsten Angebot erneut.
+async fn verwahrung_ablehnen(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let grund = match a.einsatz_id {
+        Some(id) => crate::instanz::spiegel::lebensende::grund_gegen_verwahrung(conn, id).await?,
+        None => "Übergabe hier nicht bestätigt",
+    };
+    let text = format!("Verwahrung durch {} abgelehnt: {grund}", m.fuehrer_name);
+    fuehre_weiter(conn, ich, a, m, &text, aus).await
+}
+
+/// Ich führe gegen die Epoche `m` mit der nächsten weiter (Art `verworfen`), Verlauf mit `text`.
+async fn fuehre_weiter(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    text: &str,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
     let mut bekannte = vec![a.epoche(), m.epoche.clone()];
     if let Some(offen) = a
         .offen
@@ -349,31 +395,20 @@ async fn verwerfen(
     a.offen_bruch_at = None;
     a.abgabe_schluessel = None;
     repo::save(conn, a, true).await?;
-    let text = format!("Übernahme durch {} verworfen: {grund}", m.fuehrer_name);
     repo::add_verlauf(
         conn,
         a,
         VerlaufNeu {
             von_name: Some(&von),
             nach_name: &ich.name,
-            grund: Some(&text),
+            grund: Some(text),
             ..VerlaufNeu::default()
         },
     )
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
-        aus.folgen.push(Folge::Alarm { einsatz_id });
         aus.folgen.push(Folge::Kopf { einsatz_id });
     }
-    aus.folgen.push(Folge::Spur {
-        aktion: AdminAktion::FuehrungVerworfen,
-        org_id: a.org_id,
-        grund: spur_text(a, &text),
-    });
-    aus.hinweis = Some(format!(
-        "{} meldet eine ungültige Übernahme der Führung ({}): {grund}",
-        kopplung.gegenueber_name, a.bezeichnung
-    ));
     Ok(())
 }
 
@@ -389,6 +424,14 @@ async fn erfuelle_anfrage(
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
     if let Some(einsatz_id) = a.einsatz_id {
+        // Einen verwahrten Einsatz gibt diese Instanz nicht mehr ab (LLH-1647, E4).
+        if crate::instanz::spiegel::lebensende::ist_verwahrt(conn, einsatz_id).await? {
+            sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = NULL WHERE id = ?")
+                .bind(a.id)
+                .execute(&mut *conn)
+                .await?;
+            return Ok(());
+        }
         if !crate::instanz::spiegel::fuehrung::ist_abgeglichen(conn, einsatz_id, kopplung.id)
             .await?
         {
@@ -579,6 +622,47 @@ pub async fn apply_eingang(
                     ));
                     continue;
                 }
+                // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647, E4). Einzige
+                // Ausnahme: Die Gegenstelle, die ihn übergab, lehnt die Verwahrung ab, weil er dort
+                // noch liegt (E3); dann wird diese Instanz wieder Spiegel.
+                if nimmt_mir && richtung == InstanzKopplungRichtung::WirdGemeldet {
+                    if let Some(einsatz_id) = a.einsatz_id {
+                        let ablehnung = a.art() == FuehrungWechselArt::Verwahrung
+                            && m.art == FuehrungWechselArt::Verworfen.as_str()
+                            && m.fuehrer == sender
+                            && m.kennung.starts_with(&format!("{sender}/"));
+                        if !ablehnung
+                            && crate::instanz::spiegel::lebensende::ist_verwahrt(conn, einsatz_id)
+                                .await?
+                        {
+                            aus.hinweis = Some(format!(
+                                "{} beansprucht die Führung des verwahrten Einsatzes „{}“: abgelehnt",
+                                kopplung.gegenueber_name, a.bezeichnung
+                            ));
+                            continue;
+                        }
+                    }
+                }
+                // Verwahrung durch die erreichte Seite (LLH-1647, E2, E3): Hat sie die Übergabe
+                // quittiert, wird der Einsatz hier gleich abgeräumt, die Akte mit ihm; sonst liegt
+                // er weiter hier, und die Verwahrung wird ohne Alarm abgelehnt.
+                if nimmt_mir
+                    && richtung == InstanzKopplungRichtung::MeldetSich
+                    && m.art == FuehrungWechselArt::Verwahrung.as_str()
+                    && m.fuehrer == sender
+                {
+                    let quittiert = match a.einsatz_id {
+                        Some(id) => {
+                            crate::instanz::spiegel::lebensende::ist_verwahrung_quittiert(conn, id)
+                                .await?
+                        }
+                        None => false,
+                    };
+                    if !quittiert {
+                        verwahrung_ablehnen(conn, &ich, &mut a, m, &mut aus).await?;
+                    }
+                    continue;
+                }
                 if !nimmt_mir {
                     let gewinne = m.fuehrer == ich.kennung && !ich_fuehre;
                     let von = a.fuehrer_name.clone();
@@ -622,12 +706,20 @@ pub async fn apply_eingang(
                 match entscheide(richtung, bewiesen) {
                     Entscheid::Annehmen => {
                         let art = FuehrungWechselArt::parse(&m.art);
+                        let verwahrung_abgelehnt = a.art() == FuehrungWechselArt::Verwahrung;
                         uebernimm(&mut a, m);
                         a.bruch_at = Some(bruch.clone());
                         a.offen = None;
                         a.offen_bruch_at = None;
                         repo::save(conn, &mut a, true).await?;
-                        let grund = grund_der(m);
+                        let grund = if verwahrung_abgelehnt {
+                            Some(format!(
+                                "Verwahrung von {} abgelehnt, der Einsatz liegt dort weiter",
+                                kopplung.gegenueber_name
+                            ))
+                        } else {
+                            grund_der(m)
+                        };
                         repo::add_verlauf(
                             conn,
                             &a,
@@ -648,6 +740,13 @@ pub async fn apply_eingang(
                                 Some(AdminAktion::FuehrungWiderspruch),
                                 format!(
                                     "{} hat der Notübernahme widersprochen",
+                                    kopplung.gegenueber_name
+                                ),
+                            ),
+                            Some(FuehrungWechselArt::Verworfen) if verwahrung_abgelehnt => (
+                                None,
+                                format!(
+                                    "{} hat die Verwahrung abgelehnt",
                                     kopplung.gegenueber_name
                                 ),
                             ),
