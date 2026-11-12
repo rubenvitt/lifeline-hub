@@ -5050,6 +5050,17 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
     const zellen = page.getByRole('button', { name: /^Bewertung / });
     await expect(zellen).toHaveCount(58);
     const zelle = await kurzeAchseHaelt(zellen, soll, `Matrixzelle (${dichte})`, 58);
+    // Deckung (LLH-1102, Spec `gefahrenmatrix`, „Die ganze Zelle ist das Bedienziel“): der Knopf
+    // füllt seine Zelle bis auf ihre 1-px-Linie; ein kleinerer ließe einen Tipp daneben ins Leere
+    // gehen. Bis LLH-1665 stand das in einem eigenen Fall in `trefflaeche-pruefflaechen.spec.ts`,
+    // der dieselbe Seite in denselben drei Stufen ein zweites Mal lud.
+    for (let i = 0; i < 58; i += 1) {
+      const knopf = (await zellen.nth(i).boundingBox())!;
+      const td = (await zellen.nth(i).locator('xpath=ancestor::td[1]').boundingBox())!;
+      const name = `Matrixzelle #${i + 1} (${dichte})`;
+      expect(td.width - knopf.width, `${name}: Breite deckt die Zelle`).toBeLessThanOrEqual(2);
+      expect(td.height - knopf.height, `${name}: Höhe deckt die Zelle`).toBeLessThanOrEqual(2);
+    }
     // Seit LLH-1102 füllt der Auslöser die Zelle: die Breite ist die der Spalte, die Höhe die
     // der Zeile. Die Obergrenze unten gilt deshalb der Höhe.
     if (dichte === 'kompakt') {
