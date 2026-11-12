@@ -1128,3 +1128,170 @@ async fn vermittler_ohne_signatur() -> (String, ()) {
     });
     (adresse, ())
 }
+
+// ── Befunde aus dem Review vor dem PR ────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn ein_fremdes_geraet_ohne_aussage_unter_der_adresse_passt_nicht() {
+    let (elw1, elw2) = vor_ort().await;
+    let pin_vorher: String = eine(&elw2.pool, "SELECT tls_zertifikat FROM instanz_kopplung").await;
+    let (fremd, _) = vermittler_ohne_signatur().await;
+    exec(
+        &elw2.pool,
+        &format!("UPDATE instanz_kopplung SET gegenueber_adresse = '{fremd}'"),
+    )
+    .await;
+    melden(&elw2).await;
+    let k2 = &kopplungen(&elw2).await[0];
+    assert_eq!(k2["zertifikat"], "passt_nicht", "{k2}");
+    assert_eq!(k2["letzter_fehler"], "Zertifikat passt nicht");
+    let pin: String = eine(&elw2.pool, "SELECT tls_zertifikat FROM instanz_kopplung").await;
+    assert_eq!(pin, pin_vorher);
+    let _ = elw1;
+}
+
+#[tokio::test]
+async fn das_neuaufloesen_laeuft_je_meldung_hoechstens_einmal() {
+    // ELW 1 ist unter zwei Adressen angekündigt. Beide liefern die signierte Aussage, brechen
+    // aber jede Meldung ab: ohne Grenze lösten die Adressen einander ohne Ende ab.
+    let (elw1, elw2) = vor_ort().await;
+    let (cert, key) =
+        lifeline_hub::tls::rcgen_pem(&["localhost".into(), "127.0.0.1".into()]).unwrap();
+    let fp = lifeline_hub::instanz::identitaet::tls_fingerabdruck_pem(cert.as_bytes()).unwrap();
+    lifeline_hub::instanz::identitaet::save_tls_zertifikat(&elw1.pool, Some(&fp))
+        .await
+        .unwrap();
+    let rueckfragen = Arc::new(Mutex::new(0usize));
+    let mut adressen = Vec::new();
+    for _ in 0..2 {
+        let zaehler = rueckfragen.clone();
+        let nur_aussage = elw1.app.clone().layer(axum::middleware::from_fn(
+            move |req: axum::extract::Request, next: axum::middleware::Next| {
+                let zaehler = zaehler.clone();
+                async move {
+                    if req.uri().path() != "/api/instanz/zertifikat" {
+                        panic!("Verbindung bricht ab");
+                    }
+                    *zaehler.lock().unwrap() += 1;
+                    next.run(req).await
+                }
+            },
+        ));
+        let frei = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = frei.local_addr().unwrap();
+        drop(frei);
+        let _handle = tls_starten(nur_aussage, addr, cert.clone(), key.clone()).await;
+        adressen.push(format!("https://{addr}"));
+    }
+    exec(
+        &elw2.pool,
+        "UPDATE instanz_kopplung SET gegenueber_adresse = 'https://127.0.0.1:9'",
+    )
+    .await;
+    let mut eintrag = gefunden(&elw1, &adressen[0]).await;
+    eintrag.adressen = adressen.clone();
+    attrappe(&elw2, vec![eintrag]).await;
+    tokio::time::timeout(std::time::Duration::from_secs(60), melden(&elw2))
+        .await
+        .expect("das Neuauflösen endet");
+    assert_eq!(*rueckfragen.lock().unwrap(), 1, "eine Adresse, ein Versuch");
+    let adresse: String = eine(
+        &elw2.pool,
+        "SELECT gegenueber_adresse FROM instanz_kopplung",
+    )
+    .await;
+    assert!(adressen.contains(&adresse), "{adresse}");
+    let k2 = &kopplungen(&elw2).await[0];
+    assert!(k2.get("letzter_fehler").is_some(), "{k2}");
+}
+
+#[tokio::test]
+async fn die_art_bleibt_solange_gelieferte_geheimnisse_gelten() {
+    let (hub, elw) = gekoppelt().await;
+    lifeline_hub::instanz::identitaet::save_tls_zertifikat(&hub.pool, Some("ab"))
+        .await
+        .unwrap();
+    for i in [&hub, &elw] {
+        exec(
+            &i.pool,
+            "UPDATE instanz_kopplung_org SET widerrufen_at = '2026-01-01 00:00:00'",
+        )
+        .await;
+    }
+    exec(
+        &hub.pool,
+        "INSERT INTO instanz_geheimnis_lieferung (kopplung_org_id, benutzer_id, geliefert_at) \
+         SELECT (SELECT id FROM instanz_kopplung_org), (SELECT MIN(id) FROM benutzer), \
+         '2026-01-01 00:00:00'",
+    )
+    .await;
+    let code = code_vor_ort(&hub).await;
+    let (s, v) = einloesen(&elw, &hub, &code).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains("schon eine Standardkopplung"),
+        "{v}"
+    );
+    let offen: i64 = eine(
+        &hub.pool,
+        "SELECT COUNT(*) FROM instanz_kopplungscode WHERE art = 'vor_ort' AND eingeloest_at IS NULL",
+    )
+    .await;
+    assert_eq!(offen, 1, "der Code bleibt einlösbar");
+    // Ohne gelieferte Geheimnisse und ohne Org scheitert es nicht mehr an der Art (hier dann am
+    // Zertifikat, weil der Hub nur zum Schein TLS hat).
+    exec(&hub.pool, "DELETE FROM instanz_geheimnis_lieferung").await;
+    let (_, v) = einloesen(&elw, &hub, &code).await;
+    assert!(
+        !v["error"].as_str().unwrap_or("").contains("schon eine"),
+        "{v}"
+    );
+}
+
+#[tokio::test]
+async fn ein_standardcode_an_einer_direktkopplung_nennt_die_bestehende_art() {
+    let (elw1, elw2) = vor_ort().await;
+    let (s, v) = common::anfrage(
+        &elw1.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &elw1.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = einloesen(&elw2, &elw1, v["code"].as_str().unwrap()).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains("schon eine Direktkopplung vor Ort"),
+        "{v}"
+    );
+}
+
+#[tokio::test]
+async fn schon_gekoppelt_gilt_nur_mit_gueltiger_zuordnung_der_eigenen_org() {
+    let (elw1, elw2) = vor_ort().await;
+    attrappe(&elw2, vec![gefunden(&elw1, &elw1.adresse).await]).await;
+    let lan = |i: &Instanz| {
+        let app = i.app.clone();
+        let admin = i.admin.clone();
+        async move {
+            let (s, v) = common::anfrage(&app, "GET", "/api/admin/instanz/lan", &admin, None).await;
+            assert_eq!(s, StatusCode::OK, "{v}");
+            v["gefunden"][0]["gekoppelt"].clone()
+        }
+    };
+    assert_eq!(lan(&elw2).await, true);
+    exec(
+        &elw2.pool,
+        "UPDATE instanz_kopplung_org SET widerrufen_at = '2026-01-01 00:00:00'",
+    )
+    .await;
+    assert_eq!(lan(&elw2).await, false);
+}

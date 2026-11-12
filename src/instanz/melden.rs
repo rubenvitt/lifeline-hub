@@ -252,7 +252,13 @@ pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
         Err(SendError::ZertifikatGewechselt) => {}
         sonst => return sonst,
     }
-    let neu = bestaetige_zertifikat(identitaet, kopplung).await?;
+    // Kann die Gegenstelle keine gültige Aussage liefern (unsigniert, abgelehnt), passt das
+    // gezeigte Zertifikat nicht; nur ein Netzfehler bleibt einer (Spec „Fremdes Zertifikat“).
+    let neu = match bestaetige_zertifikat(identitaet, kopplung).await {
+        Ok(neu) => neu,
+        Err(SendError::Netz(t)) => return Err(SendError::Netz(t)),
+        Err(_) => return Err(SendError::ZertifikatPasstNicht),
+    };
     if let Err(e) = save_neues_zertifikat(pool, kopplung, &neu).await {
         return Err(SendError::Netz(format!(
             "Zertifikat nicht gespeichert: {e}"
@@ -344,9 +350,15 @@ async fn neu_aufloesen(
     if !super::entdeckung::is_an(pool).await? {
         return Ok(Err(None));
     }
+    // Nur Ankündigungen mit Kennung UND Fingerabdruck der Gegenstelle: eine gefälschte mit
+    // fremdem Schlüssel kommt gar nicht erst in Frage (die Aussage prüft ohnehin die Signatur).
+    let fingerabdruck = super::basis32::parse_b64(&kopplung.gegenueber_schluessel)
+        .map(|b| super::basis32::fingerabdruck(&b))
+        .unwrap_or_default();
     let gefunden = super::entdeckung::suche_kennung(
         pool,
         &kopplung.gegenueber_kennung,
+        &fingerabdruck,
         super::entdeckung::SUCHDAUER,
     )
     .await?;
@@ -580,6 +592,16 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
 /// Widerruf mitgehen soll (sie sind schon nicht mehr aktiv). Fehler landen an der Kopplung, nicht
 /// beim Aufrufer.
 pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Result<(), AppError> {
+    melden_einmal_mit(pool, kopplung, true).await
+}
+
+/// Wie [`melden_einmal`]; `aufloesen` erlaubt höchstens ein Neuauflösen der Adresse je Lauf, damit
+/// zwei angekündigte Adressen einander nicht ohne Ende ablösen (LLH-1497, Review).
+async fn melden_einmal_mit(
+    pool: &SqlitePool,
+    kopplung: &KopplungZeile,
+    aufloesen: bool,
+) -> Result<(), AppError> {
     let identitaet = identitaet::load_or_create(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -594,7 +616,8 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             if stammdaten::herkunft::find_quelle(conn, o.org_id).await? == Some(o.id) {
                 repo::save_stammdaten_kennzeichen(conn, o.id, &kennzeichen).await?;
                 quellen.push(o.id);
-            } else {
+            } else if kopplung.art().traegt(super::Fluss::Stammdaten) {
+                // Über eine Direktkopplung fließen nie Stammdaten (LLH-1497): kein Hinweis dort.
                 repo::add_stammdaten_hinweise(
                     conn,
                     o.id,
@@ -670,11 +693,12 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             // Direktkopplung nicht erreichbar: die Gegenstelle im LAN unter ihrer Kennung suchen
             // (LLH-1497, Spec `instanz-entdeckung`). Gefunden und signiert bestätigt, gleich dort
             // melden; das Neuauflösen findet die dann gespeicherte Adresse nicht noch einmal.
-            let f = if matches!(f, SendError::Netz(_))
+            let f = if aufloesen
+                && matches!(f, SendError::Netz(_))
                 && kopplung.art() == super::InstanzKopplungArt::VorOrt
             {
                 match neu_aufloesen(pool, &identitaet, kopplung).await? {
-                    Ok(neu) => return Box::pin(melden_einmal(pool, &neu)).await,
+                    Ok(neu) => return Box::pin(melden_einmal_mit(pool, &neu, false)).await,
                     Err(Some(probe)) => probe,
                     Err(None) => f,
                 }

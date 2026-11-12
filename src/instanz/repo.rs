@@ -245,8 +245,10 @@ pub async fn create_or_renew_kopplung(
             ));
         }
         // Eine andere Art, solange eine Org-Zuordnung gilt: nie (Spec `instanz-kopplung`, „Eine
-        // weitere Org übernimmt die Art der Kopplung“). Ohne aktive Org darf sie wechseln.
-        if alt.art() != g.art && !list_orgs_aktiv(conn, alt.id).await?.is_empty() {
+        // weitere Org übernimmt die Art der Kopplung“). Ohne aktive Org darf sie wechseln, aber
+        // nicht, solange dorthin gelieferte Geheimnisse gelten: sonst ginge „ELW verloren“ für sie
+        // verloren (Review LLH-1497).
+        if alt.art() != g.art && is_art_fest(conn, alt.id).await? {
             return Err(AppError::Conflict(art_konflikt(alt.art())));
         }
         // Ein anderer Schlüssel unter bekannter Kennung: solange eine Org-Zuordnung gilt, nie.
@@ -301,6 +303,21 @@ pub async fn create_or_renew_kopplung(
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
+}
+
+/// Ob die Art einer Kopplung feststeht: eine gültige Org-Zuordnung oder dorthin gelieferte
+/// Kontogeheimnisse (die „ELW verloren“ noch entwerten können muss).
+pub async fn is_art_fest(conn: &mut SqliteConnection, kopplung_id: i64) -> Result<bool, AppError> {
+    if !list_orgs_aktiv(conn, kopplung_id).await?.is_empty() {
+        return Ok(true);
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_geheimnis_lieferung l \
+         JOIN instanz_kopplung_org o ON o.id = l.kopplung_org_id WHERE o.kopplung_id = ?)",
+    )
+    .bind(kopplung_id)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 /// Text des Konflikts, wenn ein Code einer anderen Art auf eine bestehende Kopplung trifft.

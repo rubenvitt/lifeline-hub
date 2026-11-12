@@ -499,17 +499,19 @@ async fn check_art(
                 .into(),
         )));
     }
+    // Erst die bestehende Kopplung: ihr Hinweis sagt, welche Art der Code haben muss (Spec
+    // „Art passt nicht“), auch wenn der Versuch ohne Kettenprüfung kam.
+    if let Some(alt) = repo::find_kopplung(conn, &a.kennung).await? {
+        if alt.art() != code.art && repo::is_art_fest(conn, alt.id).await? {
+            return Ok(Some(AppError::Conflict(repo::art_konflikt(alt.art()))));
+        }
+    }
     if a.nur_vor_ort && code.art != InstanzKopplungArt::VorOrt {
         return Ok(Some(AppError::Conflict(
             "Das Zertifikat der anderen Instanz ist nicht vertrauenswürdig. Ohne vertrauenswürdiges \
              Zertifikat geht nur ein Code der Art „Direktkopplung vor Ort“."
                 .into(),
         )));
-    }
-    if let Some(alt) = repo::find_kopplung(conn, &a.kennung).await? {
-        if alt.art() != code.art && !repo::list_orgs_aktiv(conn, alt.id).await?.is_empty() {
-            return Ok(Some(AppError::Conflict(repo::art_konflikt(alt.art()))));
-        }
     }
     Ok(None)
 }
@@ -796,10 +798,16 @@ async fn send_einloesen_mit(
             }
         }
         Some(InstanzKopplungArt::Standard) if !nur_vor_ort => None,
+        // Eine ausstellende Instanz mit Protokoll 2 kennt `nur_vor_ort` nicht und verbraucht
+        // den Code trotzdem (Review LLH-1497): klar sagen, dass er neu ausgestellt werden muss.
         Some(InstanzKopplungArt::Standard) => {
-            return Err(nicht_vertrauenswuerdig(
-                "Standardcode über ein nicht vertrauenswürdiges Zertifikat",
-            ))
+            return Err(EinloesenFehler::App(AppError::Conflict(
+                "Das Zertifikat der anderen Instanz ist nicht vertrauenswürdig, und sie hat den \
+                 Code als Standardkopplung eingelöst (eine Instanz ohne Direktkopplung vor Ort). \
+                 Der Code ist verbraucht: das Zertifikat dort vertrauenswürdig machen oder die \
+                 andere Instanz aktualisieren und einen neuen Code ausstellen."
+                    .into(),
+            )))
         }
         None => return Err(nicht_vertrauenswuerdig("unbekannte Art der Kopplung")),
     };
@@ -833,7 +841,7 @@ pub struct InstanzLanAntwort {
 /// Admins; eine Ankündigung begründet kein Vertrauen.
 pub async fn lan(
     State(state): State<AppState>,
-    AdminUser(_admin): AdminUser,
+    AdminUser(admin): AdminUser,
 ) -> Result<Json<InstanzLanAntwort>, AppError> {
     if !crate::instanz::entdeckung::is_an(&state.pool).await? {
         return Ok(Json(InstanzLanAntwort {
@@ -846,6 +854,7 @@ pub async fn lan(
         gefunden: crate::instanz::entdeckung::suche(
             &state.pool,
             crate::instanz::entdeckung::SUCHDAUER,
+            Some(admin.org_id),
         )
         .await?,
     }))

@@ -28,7 +28,7 @@ pub struct TlsServer {
 }
 
 /// Startet den Router per TLS auf `addr` mit dem PEM-Paar; liefert den Handle zum Beenden.
-async fn tls_starten(
+pub async fn tls_starten(
     app: axum::Router,
     addr: std::net::SocketAddr,
     cert: String,

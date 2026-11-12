@@ -39,7 +39,7 @@ const FAELLIG: &str = "FROM einsatz e \
        AND NOT EXISTS (SELECT 1 FROM instanz_kopplung_org ko \
                        JOIN instanz_kopplung k ON k.id = ko.kopplung_id \
                        WHERE ko.org_id = e.org_id AND k.richtung = 'meldet_sich' \
-                         AND ko.widerrufen_at IS NULL) \
+                         AND k.art = 'standard' AND ko.widerrufen_at IS NULL) \
        AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
        AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id) \
        AND NOT EXISTS (SELECT 1 FROM einsatz_archiv a WHERE a.einsatz_id = e.id) \

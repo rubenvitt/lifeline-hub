@@ -43,6 +43,15 @@ pub async fn has_herkunft(
     .await?)
 }
 
+/// Längste Ursprungskennung, die angenommen wird (`<instanzkennung>/<schlüssel>`, Kennung höchstens
+/// 64 Zeichen); eine längere ist eine Eingabe von außen ohne Sinn und gilt als nicht genannt.
+pub const URSPRUNG_MAX: usize = 160;
+
+/// Eine gelieferte Ursprungskennung, wenn sie die Grenze einhält.
+pub fn ursprung_gueltig(u: Option<&str>) -> Option<&str> {
+    u.filter(|u| !u.is_empty() && u.len() <= URSPRUNG_MAX)
+}
+
 /// Hält die Herkunft einer übernommenen Zeile fest, samt Ursprungskennung (LLH-1497, design.md
 /// D5): die gelieferte, sonst `<Kennung der Quelle>/<fremder Schlüssel>` (eine Quelle mit
 /// Protokoll 2 liefert keine und hat die Zeile selbst angelegt).
@@ -70,7 +79,7 @@ pub async fn save(
     .bind(art.as_str())
     .bind(fremd)
     .bind(lokal)
-    .bind(ursprung)
+    .bind(ursprung_gueltig(ursprung))
     .execute(&mut *conn)
     .await?;
     Ok(())
@@ -111,6 +120,9 @@ pub async fn find_nach_ursprung(
     art: StammdatenArt,
     ursprung: &str,
 ) -> Result<Option<String>, AppError> {
+    if ursprung_gueltig(Some(ursprung)).is_none() {
+        return Ok(None);
+    }
     let ich: String = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
         .fetch_one(&mut *conn)
         .await?;
@@ -277,4 +289,19 @@ pub async fn load_anzeige(
         vom_hub,
         admins_ohne_passkey,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eine_leere_oder_ueberlange_ursprungskennung_gilt_als_nicht_genannt() {
+        assert_eq!(ursprung_gueltig(Some("k-1/42")), Some("k-1/42"));
+        assert_eq!(ursprung_gueltig(Some("")), None);
+        assert_eq!(ursprung_gueltig(None), None);
+        let grenze = "x".repeat(URSPRUNG_MAX);
+        assert_eq!(ursprung_gueltig(Some(&grenze)), Some(grenze.as_str()));
+        assert_eq!(ursprung_gueltig(Some(&"x".repeat(URSPRUNG_MAX + 1))), None);
+    }
 }

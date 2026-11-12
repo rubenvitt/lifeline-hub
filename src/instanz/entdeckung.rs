@@ -26,6 +26,13 @@ pub const DIENST: &str = "_lifeline-hub._tcp.local.";
 /// So lange sucht die Liste „Im Netz gefunden“.
 pub const SUCHDAUER: Duration = Duration::from_secs(3);
 
+/// Höchstens so viele Instanzen zeigt die Liste, höchstens so viele Adressen je Instanz; eine
+/// Ankündigung ist eine Eingabe von außen (Review LLH-1497).
+pub const INSTANZEN_MAX: usize = 32;
+pub const ADRESSEN_MAX: usize = 8;
+/// Längste Kennung, Name oder Fingerabdruck, die aus einer Ankündigung übernommen werden.
+const TEXT_MAX: usize = 120;
+
 /// Was eine Instanz über sich ankündigt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ankuendigung {
@@ -165,9 +172,52 @@ pub async fn is_an(pool: &SqlitePool) -> Result<bool, AppError> {
     )
 }
 
-/// Sucht `dauer` lang und liefert die gefundenen Instanzen ohne die eigene, schon gekoppelte
-/// markiert. Leer, wenn die Entdeckung hier nicht läuft.
-pub async fn suche(pool: &SqlitePool, dauer: Duration) -> Result<Vec<InstanzGefunden>, AppError> {
+/// Führt Ankündigungen zusammen (LLH-1497, Review): gleiche Kennung UND gleicher Fingerabdruck
+/// ergeben einen Eintrag mit allen Adressen; eine Ankündigung mit fremdem Fingerabdruck unter
+/// derselben Kennung bleibt ein eigener Eintrag und verdrängt die echte nicht. Ohne die eigene
+/// Instanz, mit Obergrenzen.
+pub fn zusammenfuehren(roh: Vec<InstanzGefunden>, ich: &str) -> Vec<InstanzGefunden> {
+    let mut aus: Vec<InstanzGefunden> = Vec::new();
+    for mut g in roh {
+        if g.kennung == ich
+            || g.kennung.is_empty()
+            || g.kennung.len() > TEXT_MAX
+            || g.fingerabdruck.len() > TEXT_MAX
+        {
+            continue;
+        }
+        g.name = g.name.chars().take(TEXT_MAX).collect();
+        let gleich = aus
+            .iter()
+            .position(|a| a.kennung == g.kennung && a.fingerabdruck == g.fingerabdruck);
+        match gleich {
+            Some(i) => {
+                for adresse in g.adressen {
+                    if !aus[i].adressen.contains(&adresse) {
+                        aus[i].adressen.push(adresse);
+                    }
+                }
+            }
+            None if aus.len() < INSTANZEN_MAX => aus.push(g),
+            None => {}
+        }
+    }
+    for a in &mut aus {
+        a.adressen.sort();
+        a.adressen.truncate(ADRESSEN_MAX);
+    }
+    aus.sort_by(|a, b| a.name.cmp(&b.name).then(a.kennung.cmp(&b.kennung)));
+    aus
+}
+
+/// Sucht `dauer` lang und liefert die gefundenen Instanzen ohne die eigene. „Schon gekoppelt“
+/// gilt nur für eine Kopplung mit gültiger Zuordnung der Org `org_id` (die anderer Orgs sieht ihr
+/// Admin nicht). Leer, wenn die Entdeckung hier nicht läuft.
+pub async fn suche(
+    pool: &SqlitePool,
+    dauer: Duration,
+    org_id: Option<i64>,
+) -> Result<Vec<InstanzGefunden>, AppError> {
     if !is_an(pool).await? {
         return Ok(Vec::new());
     }
@@ -181,46 +231,66 @@ pub async fn suche(pool: &SqlitePool, dauer: Duration) -> Result<Vec<InstanzGefu
     else {
         return Ok(Vec::new());
     };
-    let mut gefunden = tokio::task::spawn_blocking(move || sucher.suche(dauer))
+    let roh = tokio::task::spawn_blocking(move || sucher.suche(dauer))
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
-    gefunden.retain(|g| g.kennung != ich);
-    gefunden.sort_by(|a, b| a.name.cmp(&b.name).then(a.kennung.cmp(&b.kennung)));
-    gefunden.dedup_by(|a, b| a.kennung == b.kennung);
-    for g in &mut gefunden {
-        g.gekoppelt = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM instanz_kopplung WHERE gegenueber_kennung = ? \
-             AND zustand IN ('aktiv', 'angebahnt'))",
-        )
-        .bind(&g.kennung)
-        .fetch_one(pool)
-        .await?;
+    let mut gefunden = zusammenfuehren(roh, &ich);
+    if let Some(org_id) = org_id {
+        for g in &mut gefunden {
+            g.gekoppelt = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM instanz_kopplung k \
+                 JOIN instanz_kopplung_org o ON o.kopplung_id = k.id \
+                 WHERE k.gegenueber_kennung = ? AND k.zustand IN ('aktiv', 'angebahnt') \
+                 AND o.org_id = ? AND o.widerrufen_at IS NULL)",
+            )
+            .bind(&g.kennung)
+            .bind(org_id)
+            .fetch_one(pool)
+            .await?;
+        }
     }
     Ok(gefunden)
 }
 
-/// Adressen, unter denen die Instanz `kennung` gerade angekündigt ist (Neuauflösen einer
-/// Direktkopplung, Spec „Eine Direktkopplung findet ihre Gegenstelle neu“).
+/// Adressen, unter denen die Instanz mit dieser Kennung und diesem Fingerabdruck gerade
+/// angekündigt ist (Neuauflösen einer Direktkopplung, Spec „Eine Direktkopplung findet ihre
+/// Gegenstelle neu“).
 pub async fn suche_kennung(
     pool: &SqlitePool,
     kennung: &str,
+    fingerabdruck: &str,
     dauer: Duration,
 ) -> Result<Vec<String>, AppError> {
-    Ok(suche(pool, dauer)
+    Ok(suche(pool, dauer, None)
         .await?
         .into_iter()
-        .filter(|g| g.kennung == kennung)
+        .filter(|g| g.kennung == kennung && g.fingerabdruck == fingerabdruck)
         .flat_map(|g| g.adressen)
         .collect())
 }
 
-/// Der echte Sucher über einen laufenden mDNS-Daemon.
+/// Der echte Sucher über einen laufenden mDNS-Daemon. Eine Suche zur Zeit: ein zweites `browse`
+/// desselben Diensts ersetzte den Empfang der ersten, `stop_browse` beendete beide (Review).
 pub struct MdnsSucher {
     daemon: mdns_sd::ServiceDaemon,
+    eine_zur_zeit: std::sync::Mutex<()>,
+}
+
+impl MdnsSucher {
+    pub fn new(daemon: mdns_sd::ServiceDaemon) -> Self {
+        Self {
+            daemon,
+            eine_zur_zeit: std::sync::Mutex::new(()),
+        }
+    }
 }
 
 impl Sucher for MdnsSucher {
     fn suche(&self, dauer: Duration) -> Vec<InstanzGefunden> {
+        let _riegel = self
+            .eine_zur_zeit
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let Ok(empfang) = self.daemon.browse(DIENST) else {
             return Vec::new();
         };
@@ -275,7 +345,7 @@ pub async fn starte(pool: &SqlitePool, a: &Ankuendigung, port: u16) -> Result<()
     daemon
         .register(info)
         .map_err(|e| AppError::Internal(format!("mDNS: {e}")))?;
-    set_sucher(pool, &a.kennung, Arc::new(MdnsSucher { daemon })).await
+    set_sucher(pool, &a.kennung, Arc::new(MdnsSucher::new(daemon))).await
 }
 
 #[cfg(test)]
@@ -346,9 +416,7 @@ mod tests {
         .unwrap()
         .enable_addr_auto();
         anbieter.register(info).unwrap();
-        let sucher = MdnsSucher {
-            daemon: mdns_sd::ServiceDaemon::new().unwrap(),
-        };
+        let sucher = MdnsSucher::new(mdns_sd::ServiceDaemon::new().unwrap());
         let gefunden = sucher.suche(Duration::from_secs(5));
         let _ = anbieter.shutdown();
         assert!(
@@ -356,6 +424,43 @@ mod tests {
                 .iter()
                 .any(|g| g.kennung == a.kennung && g.fingerabdruck == "AB12"),
             "{gefunden:?}"
+        );
+    }
+
+    #[test]
+    fn zusammenfuehren_haelt_eine_faelschung_neben_der_echten_und_begrenzt() {
+        let g = |kennung: &str, fp: &str, adresse: &str| InstanzGefunden {
+            kennung: kennung.into(),
+            name: "ELW 1".into(),
+            fingerabdruck: fp.into(),
+            protokoll: 3,
+            adressen: vec![adresse.into()],
+            gekoppelt: false,
+        };
+        let roh = vec![
+            g("k-1", "ECHT", "https://10.0.0.2:8443"),
+            g("k-1", "FALSCH", "https://10.0.0.66:8443"),
+            g("k-1", "ECHT", "https://10.0.1.2:8443"),
+            g("ich", "EIGEN", "https://10.0.0.9:8443"),
+        ];
+        let aus = zusammenfuehren(roh, "ich");
+        assert_eq!(aus.len(), 2, "{aus:?}");
+        let echt = aus.iter().find(|a| a.fingerabdruck == "ECHT").unwrap();
+        assert_eq!(
+            echt.adressen,
+            ["https://10.0.0.2:8443", "https://10.0.1.2:8443"]
+        );
+        assert!(aus.iter().any(|a| a.fingerabdruck == "FALSCH"));
+        let viele: Vec<InstanzGefunden> = (0..100)
+            .map(|i| g(&format!("k-{i}"), "F", &format!("https://10.0.0.{i}:1")))
+            .collect();
+        assert_eq!(zusammenfuehren(viele, "ich").len(), INSTANZEN_MAX);
+        let adressen: Vec<InstanzGefunden> = (0..20)
+            .map(|i| g("k-1", "F", &format!("https://10.0.0.{i}:1")))
+            .collect();
+        assert_eq!(
+            zusammenfuehren(adressen, "ich")[0].adressen.len(),
+            ADRESSEN_MAX
         );
     }
 

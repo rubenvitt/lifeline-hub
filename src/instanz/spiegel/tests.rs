@@ -28,7 +28,15 @@ where
 /// (Hub): Push wie im häufigsten Fall.
 async fn zwei_seiten() -> (SqlitePool, SqlitePool) {
     let f = crate::db::test_pool().await;
+    // Die Ursprungskennung braucht die eigene Instanzkennung (LLH-1497).
+    crate::instanz::identitaet::load_or_create(&f)
+        .await
+        .unwrap();
     let s = crate::db::test_pool().await;
+    // Die Ursprungskennung braucht die eigene Instanzkennung (LLH-1497).
+    crate::instanz::identitaet::load_or_create(&s)
+        .await
+        .unwrap();
     for (pool, richtung, adresse) in [
         (&f, "meldet_sich", "'https://hub.example.org'"),
         (&s, "wird_gemeldet", "NULL"),
