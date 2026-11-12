@@ -193,9 +193,11 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 9. Abschluss
 
-- [ ] 9.1 `./scripts/check-all.sh` ist grün (Verweis auf den CI-Lauf des PRs).
-- [ ] 9.2 Bilder der Seite „Anbindungen“ (Liste mit Ablehnungsgrund, Code-Dialog, gesperrter
-  Zustand) per Wegwerf-Spec im Bildlauf, für PR und Meldung.
+- [x] 9.1 `./scripts/check-all.sh` ist grün (Verweis auf den CI-Lauf des PRs; lokal Rust-Suite,
+  Vitest der Seite, e2e, Formatierung und Schnellprüfungen gefahren).
+- [x] 9.2 Bilder der Seite „Anbindungen“ (Liste mit Ablehnungsgrund, Anlegen, Code-Dialog,
+  Ansicht lesend und bearbeitend) per Wegwerf-Spec im Bildlauf, für PR und Meldung. Der gesperrte
+  Zustand am ELW braucht eine aktive Kopplung und ist im Vitest belegt, nicht fotografiert.
 
 ## Workflow follow-up
 
