@@ -545,6 +545,16 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   (`userVisibleOnly`), sonst ersetzt Chrome sie und Safari kündigt das Abo. Ein Alarm geht immer. Ziele nur aus `PUSH_DIENSTE` (https, Port 443, keine Weiterleitung), sonst wäre das
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
+- **Über den Hub (LLH-1495,
+  [ADR-0027](../docs/architektur/entscheidungen/ADR-0027-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)):**
+  `melden` und `erledigen` merken für einen hier geführten Einsatz einer gekoppelten Org den
+  Anlass in `hinweis_ausgang` vor (`instanz::spiegel::hinweis`), der Abgleich trägt ihn, die
+  erreichte Seite meldet ihn nach dem Commit selbst. Bietet sie Push an, lässt `ausliefern` den
+  eigenen Push an Konten aus, die aus dieser Kopplung stammen (`hinweis::konten_am_hub`); allen
+  anderen und bei gescheitertem Vormerken pusht die Instanz selbst, `umadressieren` immer. Ein neuer
+  Bezugstyp braucht seine Tabelle in `hinweis::bezug_tabelle` (Wächter
+  `jeder_bezugstyp_ist_eingeordnet`), ein neuer Adressat seine Textform dort. Das Aufräumen
+  schließt Spiegel ein. Nachweis `tests/instanz_hinweise.rs`.
 
 ## Backend — Meldungsmodell (LLH-1027)
 

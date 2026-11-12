@@ -3488,6 +3488,21 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("geaendert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
+    // Ausgang der Hinweise an den Hub (LLH-1495, design.md D2): Kennungen und Anzeigenamen von
+    // Einsatzkräften, nie Inhalte; mit dem Einsatz weg.
+    TabellenRegel {
+        tabelle: "hinweis_ausgang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("kopplung_org_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
     TabellenRegel {
         tabelle: "spiegel_ziel",
         scoping: Scoping::EinsatzId,
