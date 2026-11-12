@@ -306,10 +306,11 @@ pub enum Entscheid {
 /// Die Annahmeregel als reine Funktion (Tabelle in design.md D7 der Change `v6hj7xl2`, ergänzt in
 /// design.md D3 und D7 der Change `faq7l7m4-zwei-elw-unterlegene-seite`): `richtung` der Kopplung
 /// aus meiner Sicht, `bewiesen` = ob der Beweis gegen meine Schlüssel trägt (nur für die meldende
-/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, sie hat
-/// die Epoche vergeben, mit der die erreichte Seite selbst führt, oder die Erklärung nennt sie als
-/// bisherigen Führer, Change `d12cmcx1-hub-epoche-gegen-dritten`). Dann gibt es keinen Beweis
-/// gegen mich, und niemand hat Unrechtes getan: offen halten, ohne Alarm.
+/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, oder sie
+/// hat die Epoche vergeben, mit der die erreichte Seite selbst führt), oder die Erklärung nennt
+/// nicht mich, sondern eine andere Instanz als bisherigen Führer eines fremden Stands (Change
+/// `d12cmcx1-hub-epoche-gegen-dritten`). Dann gibt es keinen Beweis gegen mich, und niemand hat
+/// Unrechtes getan: offen halten, ohne Alarm.
 pub fn entscheide(
     richtung: InstanzKopplungRichtung,
     bewiesen: Result<(), String>,

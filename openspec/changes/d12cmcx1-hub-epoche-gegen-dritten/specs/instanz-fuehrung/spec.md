@@ -6,11 +6,11 @@ Erhält die meldende Seite eine Akte, die ihr die Führung nimmt, MUST sie diese
 sie eine reguläre Übergabe von ihr selbst bestätigt oder eine Erklärung trägt, deren Unterschrift
 von einem gültigen Unterschriftsschlüssel der zugeordneten Org über genau diese Erklärung stammt
 oder deren Code zu ihrem Abgabecode passt. Sonst MUST sie die Akte verwerfen und weiter führen.
-Ausgenommen ist eine Akte, an der eine dritte Instanz beteiligt ist (sie führt, sie hat die
-Epoche vergeben, mit der die erreichte Seite selbst führt, oder die Erklärung der Akte nennt eine
-andere Instanz als die meldende Seite als bisherigen Führer eines anderen Stands als dessen, mit
-dem die meldende Seite führt): Die MUST
-die meldende Seite ohne Alarm offen halten, bis die Einsatzleitung entscheidet. Eine Akte ohne
+Ausgenommen ist eine Akte, an der eine dritte Instanz beteiligt ist (sie führt, oder sie hat die
+Epoche vergeben, mit der die erreichte Seite selbst führt), und eine Akte, deren Erklärung nicht
+die meldende Seite, sondern eine andere Instanz als bisherigen Führer eines anderen Stands nennt
+als dessen, mit dem die meldende Seite führt: Die MUST die meldende Seite ohne Alarm offen halten,
+bis die Einsatzleitung entscheidet. Eine Akte ohne
 Erklärung, mit unlesbarer Erklärung oder mit einer Erklärung, die den Stand der meldenden Seite
 mit einem anderen bisherigen Führer nennt, fällt nicht unter die Ausnahme.
 

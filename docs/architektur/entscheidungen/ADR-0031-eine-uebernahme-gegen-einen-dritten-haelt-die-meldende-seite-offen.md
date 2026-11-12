@@ -1,5 +1,5 @@
 ---
-id: ADR-0029
+id: ADR-0031
 titel: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
 status: akzeptiert
 datum: 2026-11-12
@@ -18,7 +18,7 @@ herleitung:
   - LLH-1707 und LLH-1669 (mit Ruben am 12.11.2026 abgestimmt), LLH-1641
 ---
 
-# ADR-0029: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
+# ADR-0031: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
 
 ## Regeln
 
@@ -36,10 +36,10 @@ herleitung:
 - MUST: Eine eingehende Akte, die der meldenden Seite die Führung nimmt, entscheidet
   `austausch::entscheide`. Die meldende Seite nimmt eine Epoche des Gegenübers nur mit geprüftem
   Beweis an (Unterschrift oder Abgabecode) und erst nach der Entscheidung eines Menschen, sonst
-  verwirft sie sie. Ausnahme: Ist ein Dritter beteiligt (er führt, das Gegenüber führt mit seiner
-  Epoche, oder die Erklärung nennt ihn als bisherigen Führer eines anderen Stands als des eigenen),
-  hält sie die Akte ohne Alarm offen, bis ein Mensch entscheidet; sonst nicht. Ob eine Erklärung
-  gegen diese Instanz gerichtet ist, sagt allein `austausch::is_gegen_mich`.
+  verwirft sie sie. Ausnahme: Ist ein Dritter beteiligt (er führt, oder das Gegenüber führt mit
+  seiner Epoche) oder nennt die Erklärung nicht sie, sondern eine andere Instanz als bisherigen
+  Führer eines anderen Stands als des eigenen, hält sie die Akte ohne Alarm offen, bis ein Mensch
+  entscheidet. Ob eine Erklärung sie nennt, sagt allein `austausch::is_gegen_mich`.
 - MUST: Holt ein Widerruf die Führung zurück (`repo::release_nach_widerruf`), trägt die Akte eine
   Erklärung ohne Beweis gegen das widerrufene Gegenüber.
 - MUST: Epochen werden als Paar (Zähler, Instanzkennung) verglichen; das größere gilt. Ausnahme:
