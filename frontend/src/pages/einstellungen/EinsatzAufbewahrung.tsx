@@ -5,7 +5,7 @@ import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
-import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import {
   initialAufbewahrung,
   normalisiereAufbewahrung,
@@ -76,7 +76,7 @@ export default function EinsatzAufbewahrung() {
       <SeitenHinweise
         fehler={speichern.error}
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
-        rechteText={RECHTE_TEXT}
+        rechteText={daten.rechteGrund()}
       />
       {daten.einsatz && <FristPaneel einsatzId={einsatzId} einsatz={daten.einsatz} />}
       {/* LLH-1494: die Nachbereitung beginnt mit dem Abschluss. */}

@@ -23,11 +23,20 @@ const UUID_HMUE = '47174d8f-1b8e-4599-8a59-b580dd55bc87';
 const UUID_WAHN = '5f9c1b54-3c41-4d93-bb48-2b7c7c3f5a61';
 const UUID_KASS = 'a1b2c3d4-0000-4000-8000-000000000003';
 
-const einsatz = (meine_rolle = 'einsatzleitung') => ({
+const SPIEGEL = {
+  gegenstelle: 'ELW 1',
+  beendet: false,
+  antraege_ausstehend: 0,
+  antraege_abgelehnt: 0,
+  bruchstelle: 0,
+};
+
+const einsatz = (meine_rolle = 'einsatzleitung', spiegel: unknown = null) => ({
   id: 1,
   bezeichnung: 'Hochwasser Weser',
   status: 'aktiv',
   meine_rolle,
+  spiegel,
 });
 
 const pegel = (uuid: string, name: string, gewaesser: string, reihenfolge: number) => ({
@@ -69,6 +78,7 @@ const antwort = (status: 'ok' | 'offline' | 'leer', features: unknown[]) => ({
 
 interface Aufbau {
   rolle?: string;
+  spiegel?: unknown;
   liste?: unknown[];
   stationenStatus?: number;
   /** Das Backend antwortet 200, meldet die Quelle aber `offline` ohne Cache-Bestand. */
@@ -86,7 +96,7 @@ function stelleBereit(a: Aufbau = {}) {
   const aufrufe: { methode: string; body: unknown }[] = [];
   let liste = a.liste ?? [HMUE, WAHN];
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle))),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
@@ -515,6 +525,16 @@ describe('EinsatzPegel', () => {
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^Aktionen zu Pegel/ })).toBeNull();
+  });
+
+  // LLH-1675: Am Spiegel sperrt die führende Instanz, nicht die Rolle.
+  it('am Spiegel nennt der Grund die führende Instanz statt der Rollen', async () => {
+    stelleBereit({ spiegel: SPIEGEL });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    expect(await screen.findByText('Spiegel von ELW 1')).toBeInTheDocument();
+    expect(screen.queryByText('nur Einsatzleitung und Führungspersonal')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
   });
 
   it('der Admin der Einsatz-Org ohne Rolle ist gesperrt: die Pegel-Routen verlangen eine Schreibrolle (LFH-1118)', async () => {
