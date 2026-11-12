@@ -15,9 +15,9 @@ on:
   workflow_call:
     secrets:
       # Bewusst NICHT `required: true`: ohne eingerichtete App bräche sonst der Aufruf. Der Job
-      # prüft unten selbst und überspringt mit klarer Ansage.
-      RELEASE_APP_ID:
-        required: false
+      # prüft unten selbst und überspringt mit klarer Ansage. Die Client-ID der App ist kein
+      # Geheimnis: sie liegt als Repository-Variable `RELEASE_APP_CLIENT_ID` und kommt über den
+      # `vars`-Kontext an, ohne Weitergabe durch den Aufrufer (LLH-1698).
       RELEASE_APP_PRIVATE_KEY:
         required: false
       # Kein ANTHROPIC_API_KEY mehr: Claude meldet sich per Workload Identity Federation an
@@ -45,12 +45,12 @@ jobs:
       - name: Ist die Release-App eingerichtet?
         id: bereit
         env:
-          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          APP_CLIENT_ID: ${{ vars.RELEASE_APP_CLIENT_ID }}
         run: |
           set -euo pipefail
-          if [ -z "${APP_ID:-}" ]; then
+          if [ -z "${APP_CLIENT_ID:-}" ]; then
             echo "bereit=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Release übersprungen — das Secret RELEASE_APP_ID ist nicht gesetzt."
+            echo "::notice::Release übersprungen — die Variable RELEASE_APP_CLIENT_ID ist nicht gesetzt."
             echo "::notice::Einrichtung siehe LFH-527 (GitHub App anlegen, Secrets hinterlegen): https://zunder.rubeen.dev/#/clickup/123zgec1t79"
           else
             echo "bereit=true" >> "$GITHUB_OUTPUT"
@@ -69,7 +69,7 @@ jobs:
         id: app-token
         if: steps.bereit.outputs.bereit == 'true'
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
