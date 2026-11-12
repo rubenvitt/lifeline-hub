@@ -1393,7 +1393,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         onKreisMitteRef.current ? (m, fertig) => onKreisMitteRef.current?.(m, fertig) : undefined,
       );
       // Nur der neue Griff bekommt seine Lage hier; ein bestehender folgt im Layout-Effekt unten.
-      kreisGriffRef.current.setze(kreisMitte, kreisRadius);
+      kreisGriffRef.current.set(kreisMitte, kreisRadius);
     }
   }, [kreisAktiv, kreisMitte, kreisRadius, kreisFarbe]);
   // Die Lage eines bestehenden Griffs folgt im Commit, nicht im passiven Effekt (LLH-1700): der
@@ -1401,7 +1401,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Zieh-Radius träfe dann nach `dragend` ein und legte den Griff in den Osten. Im Commit läuft
   // ein Zieh-Render noch im Zug, und der erste Commit nach dem Loslassen trägt den letzten Radius.
   useLayoutEffect(() => {
-    if (kreisAktiv) kreisGriffRef.current?.setze(kreisMitte, kreisRadius);
+    if (kreisAktiv) kreisGriffRef.current?.set(kreisMitte, kreisRadius);
   }, [kreisAktiv, kreisMitte, kreisRadius]);
 
   // Punktweise Bearbeitung nachführen (LLH-1344, design.md D2): Vorschau und Griffe folgen dem

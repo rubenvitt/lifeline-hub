@@ -5,13 +5,13 @@ import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
 
 /**
  * Der Radius-Griff gegen einen nachgebauten `maplibregl.Marker` (jsdom hat kein WebGL). Geprüft
- * wird, wo der Griff nach `setze` steht: der Effekt der `Kartenflaeche` ruft es nach jedem Render,
+ * wird, wo der Griff nach `set` steht: der Effekt der `Kartenflaeche` ruft es nach jedem Render,
  * also auch erst nach dem Loslassen (LLH-1700).
  */
 const marker = new Map<string, FakeMarker>();
 
 class FakeMarker {
-  private hoerer = new Map<string, (() => void)[]>();
+  private listeners = new Map<string, (() => void)[]>();
   // Wie bei maplibre: ohne `setLngLat` hat ein Marker keine Lage.
   private lngLat: { lng: number; lat: number } | undefined;
   constructor(opts: { element: HTMLElement }) {
@@ -31,11 +31,11 @@ class FakeMarker {
     return this;
   }
   on(ereignis: string, f: () => void) {
-    this.hoerer.set(ereignis, [...(this.hoerer.get(ereignis) ?? []), f]);
+    this.listeners.set(ereignis, [...(this.listeners.get(ereignis) ?? []), f]);
     return this;
   }
-  feuere(ereignis: string) {
-    for (const f of this.hoerer.get(ereignis) ?? []) f();
+  fire(ereignis: string) {
+    for (const f of this.listeners.get(ereignis) ?? []) f();
   }
 }
 
@@ -53,7 +53,7 @@ const noerdlich = (p: GeoPunkt, nordM: number): GeoPunkt => ({
   lon: p.lon,
 });
 
-function aufbau() {
+function setup() {
   const onRadius = vi.fn<(radiusM: number, fertig: boolean) => void>();
   const griff = erzeugeKreisGriff(karte, KONTEXT, onRadius, vi.fn());
   const rand = marker.get('kreisgriff')!;
@@ -63,10 +63,10 @@ function aufbau() {
   };
   /** Ein ganzer Zug des Griffs nach `ziel`; liefert den zuletzt gemeldeten Radius. */
   const ziehe = (ziel: GeoPunkt): number => {
-    rand.feuere('dragstart');
+    rand.fire('dragstart');
     rand.setLngLat([ziel.lon, ziel.lat]);
-    rand.feuere('drag');
-    rand.feuere('dragend');
+    rand.fire('drag');
+    rand.fire('dragend');
     return onRadius.mock.lastCall![0];
   };
   return { griff, onRadius, lage, ziehe };
@@ -76,79 +76,79 @@ beforeEach(() => marker.clear());
 
 describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
   it('steht zuerst im Osten auf dem Rand', () => {
-    const { griff, lage } = aufbau();
-    griff.setze(MITTE, 300);
+    const { griff, lage } = setup();
+    griff.set(MITTE, 300);
     expect(lage()).toEqual(griffLage(MITTE, 300));
   });
 
   it('bleibt unter dem Zeiger, wenn der Effekt den gezogenen Radius erst nach dem Loslassen bringt', () => {
-    const { griff, onRadius, lage, ziehe } = aufbau();
-    griff.setze(MITTE, 300);
+    const { griff, onRadius, lage, ziehe } = setup();
+    griff.set(MITTE, 300);
     // Nach Nordwesten gezogen: weit weg von der Ost-Lage des neuen Kreises.
     const ziel = noerdlich(radiusPunkt(MITTE, -150), 180);
     const radius = ziehe(ziel);
     expect(onRadius).toHaveBeenLastCalledWith(radius, true);
     expect(abstandM(ziel, griffLage(MITTE, radius))).toBeGreaterThan(200);
 
-    griff.setze(MITTE, radius);
+    griff.set(MITTE, radius);
 
     expect(lage()).toEqual(ziel);
   });
 
   it('bleibt auch stehen, wenn danach nur die Farbe wechselt (gleiche Mitte, gleicher Radius)', () => {
-    const { griff, lage, ziehe } = aufbau();
-    griff.setze(MITTE, 300);
+    const { griff, lage, ziehe } = setup();
+    griff.set(MITTE, 300);
     const ziel = noerdlich(MITTE, 220);
     const radius = ziehe(ziel);
-    griff.setze(MITTE, radius);
-    griff.setze(MITTE, radius);
+    griff.set(MITTE, radius);
+    griff.set(MITTE, radius);
     expect(lage()).toEqual(ziel);
   });
 
   it('geht mit einem anderen Radius (Zahl im Band, Schnellwahl) wieder in den Osten', () => {
-    const { griff, lage, ziehe } = aufbau();
-    griff.setze(MITTE, 300);
+    const { griff, lage, ziehe } = setup();
+    griff.set(MITTE, 300);
     const radius = ziehe(noerdlich(MITTE, 220));
-    griff.setze(MITTE, radius);
+    griff.set(MITTE, radius);
 
-    griff.setze(MITTE, 500);
+    griff.set(MITTE, 500);
 
     expect(lage()).toEqual(griffLage(MITTE, 500));
   });
 
   it('geht mit einer neuen Mitte in deren Osten, auch wenn die alte Lage denselben Radius ergäbe', () => {
-    const { griff, lage } = aufbau();
-    griff.setze(MITTE, 300);
+    const { griff, lage } = setup();
+    griff.set(MITTE, 300);
     // 5 m nach Norden: die alte Ost-Lage liegt 300,04 m von der neuen Mitte, gerundet also 300 m.
     const neu = noerdlich(MITTE, 5);
     expect(Math.round(abstandM(neu, lage()))).toBe(300);
 
-    griff.setze(neu, 300);
+    griff.set(neu, 300);
 
     expect(lage()).toEqual(griffLage(neu, 300));
   });
 
   it('bleibt jenseits der Obergrenze unter dem Zeiger, der Radius ist gekappt', () => {
-    const { griff, lage, ziehe } = aufbau();
-    griff.setze(MITTE, 300);
+    const { griff, lage, ziehe } = setup();
+    griff.set(MITTE, 300);
     const ziel = noerdlich(MITTE, KREIS_RADIUS_M_MAX + 5_000);
     expect(ziehe(ziel)).toBe(KREIS_RADIUS_M_MAX);
 
-    griff.setze(MITTE, KREIS_RADIUS_M_MAX);
+    griff.set(MITTE, KREIS_RADIUS_M_MAX);
 
     expect(lage()).toEqual(ziel);
   });
 
   it('sitzt ohne Radius auf der Mitte und nach dem Abhängen wieder im Osten', () => {
-    const { griff, lage, ziehe } = aufbau();
-    griff.setze(MITTE, null);
+    const { griff, lage, ziehe } = setup();
+    griff.set(MITTE, null);
     expect(lage()).toEqual(MITTE);
 
-    griff.setze(MITTE, 300);
+    griff.set(MITTE, 300);
     const radius = ziehe(noerdlich(MITTE, 220));
     // Ohne Mitte hängt der Griff ab; ein neuer Kreis beginnt im Osten, nicht an der alten Lage.
-    griff.setze(null, null);
-    griff.setze(MITTE, radius);
+    griff.set(null, null);
+    griff.set(MITTE, radius);
     expect(lage()).toEqual(griffLage(MITTE, radius));
   });
 });
