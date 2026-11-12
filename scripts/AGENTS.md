@@ -7,13 +7,13 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-auswahl.test.sh` + `ci-stufen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
 - **Im PR laufen nur die betroffenen Suiten** (LFH-1111/1115): `scripts/bereiche.sh` ordnet
-  jede geänderte Datei den Suiten Rust, Frontend und e2e zu, der CI-Job `aenderungen` und
-  `check-all.sh --geaendert` fragen beide nur dieses Skript; die Schnellprüfungen und
-  Push-Läufe auf Kanal-Branches laufen immer voll. **Im Zweifel alles:** ein Pfad ohne Regel
+  jede geänderte Datei den Suiten Rust, Frontend und e2e zu, `scripts/ci-auswahl.sh` (Job
+  `aenderungen` beider Stufen) und `check-all.sh --geaendert` fragen beide nur dieses Skript;
+  die Schnellprüfungen und Push-Läufe auf Kanal-Branches laufen immer voll. **Im Zweifel alles:** ein Pfad ohne Regel
   fordert alle drei. Eine Datei, die eine Suite aus einem fremden Bereich liest (Rust liest
   `frontend/src/api/openapi.json`, Vitest liest `src-tauri/src/faehigkeiten.js`), braucht
   einen Querbezug in `bereiche.sh`; `scripts/bereiche.test.sh` (Schritt 11) sucht solche
@@ -21,16 +21,29 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   und grün durch statt per Job-`if`, sonst hingen ihre Required Checks auf „Expected"
   (Kopf von `ci.yml`). `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im
   PR, `--auswahl` zeigt sie nur an; ohne Argument läuft alles.
-- **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite** (LLH-1660): Folgen auf einen
-  Commit mit grünen schweren Suiten nur Autofix-Commits, die Migrationen unverändert auf eine
+- **Zwei Stufen im PR** (LLH-1662): `ci.yml` prüft jeden Push (Schnellprüfungen, Rust, Vitest).
+  e2e-Binary und `e2e 1/4` bis `4/4` stehen in `.github/workflows/e2e.yml` und laufen erst,
+  wenn der PR **fertig** ist: Auto-Merge an oder Label `e2e`. Beim Einschalten startet die
+  Stufe ohne neuen Commit, danach bei jedem Push; wer beides zurücknimmt, bricht sie ab. Davor
+  **fehlen** ihre Pflicht-Checks (übersprungene Matrix-Jobs, auch das Binary heißt über eine
+  Ein-Element-Matrix); nie leer grün, sonst mergte Ungeprüftes. Ob sie startet, entscheidet
+  allein das `if` des Jobs `aenderungen` in `e2e.yml`; neue Ereignistypen gehören nie in
+  `ci.yml` (das Einschalten von Auto-Merge bräche den laufenden Lauf ab). Push-Läufe auf
+  Kanal-Branches rufen `e2e.yml` aus `ci.yml` auf, der Release wartet darauf. Die Form hält
+  `scripts/ci-stufen.test.sh` (Schritt 11) fest; Start- und Gruppenbedingung von `e2e.yml` stehen
+  dort im Wortlaut und ändern sich nur zusammen mit ihm. **e2e-Rückmeldung vor dem Merge:** Label
+  `e2e` setzen oder lokal `check-all.sh --geaendert`. Herleitung:
+  `openspec/changes/archive/2026-11-12-k133wmg6-zweistufige-ci/design.md`.
+- **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite, jede für sich** (LLH-1660,
+  LLH-1662): Folgen auf einen Commit, auf dem eine Suite grün war, nur Autofix-Commits, die Migrationen unverändert auf eine
   höhere Nummer legen (gleicher Name, gleiche Reihenfolge; daneben höchstens Dateien, die laut
-  `bereiche.sh` keine Suite liest), laufen Frontend und e2e auf dem neuen Kopf leer durch. **Die
+  `bereiche.sh` keine Suite liest), läuft diese Suite auf dem neuen Kopf leer durch; ein
+  Vorgänger ohne e2e-Lauf (PR nicht fertig) verhindert nur die e2e-Übernahme. **Die
   Rust-Suite läuft immer neu:** der PR-Lauf prüft den Merge mit dem Ziel-Branch, und dort kam
   die Migration dazu, wegen der umnummeriert wurde. `scripts/nur-umnummeriert.sh` nennt den
-  Vorgänger und wertet dessen Check-Runs aus, der Schritt „Nur umnummeriert?“ im Job
-  `aenderungen` fragt es. Entschieden wird am Inhalt des Commits, nicht am Autor; jeder Zweifel
+  Vorgänger und wertet dessen Check-Runs je Suite aus, `scripts/ci-auswahl.sh` fragt es. Entschieden wird am Inhalt des Commits, nicht am Autor; jeder Zweifel
   lässt alles laufen. Die Liste der schweren Checks steht im Skript, der Selbsttest vergleicht
-  sie mit `ci.yml`: wer einen Anteil hinzufügt oder umbenennt, zieht sie nach.
+  sie mit `ci.yml` und `e2e.yml`: wer einen Anteil hinzufügt oder umbenennt, zieht sie nach.
 - **Stau-Wächter** (LLH-1660, `scripts/stau-waechter.sh`, `.github/workflows/stau-waechter.yml`:
   Push auf einen Ziel-Branch, stündlich, von Hand): bewertet jeden offenen PR, der kein Entwurf
   ist. Was er tut und warum, steht im Skriptkopf; die Grenzen belegt `stau-waechter.test.sh`.
@@ -42,6 +55,13 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
     Migrations-Autofix: nur PRs aus diesem Repository, nie `alpha`/`beta`/`main`, nur
     Fast-Forward auf genau den bewerteten Kopf (Push mit Lease), kein zweiter Versuch auf einem Wächter-Merge (Trailer
     `Stau-Waechter`). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
+  - **Auto-Merge an, e2e-Stufe fehlt** (LLH-1662; 20 Minuten ab dem späteren von erstem Check
+    des Kopfes und Einschalten von Auto-Merge): ein Hinweis, Auto-Merge aus- und wieder
+    einschalten (mit Label `e2e` vorher das Label entfernen). Kein Push. Geht „grün, nicht
+    gemergt“ vor, das sonst fälschlich anschlüge. Gelaufen ist die Stufe, wenn der jüngste Lauf
+    eines ihrer Pflicht-Checks weder übersprungen noch abgebrochen ist oder ihre Auswahl
+    (`e2e-Auswahl`) gerade läuft; je Name zählt wie bei den Required Checks der jüngste
+    Check-Run, auch für „grün“.
   - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
   - **Ein Hinweis je PR** (Marke `<!-- stau-waechter:<art>:<kennung> -->`): gleicher Befund
     schreibt nichts, neuer löscht und legt neu an, behobener ändert auf „behoben“. Wer eine Art
@@ -90,7 +110,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   `frontend/e2e/laufzeiten.json` die Dateien des Anteils wählt; nie zusätzlich `--shard` (die
   Config bricht ab). Eine neue Spec zählt bis zur nächsten Messung mit dem Median. Auffrischen:
   das Artefakt `e2e-laufzeiten` eines vollen Laufs einchecken; die Zusammenfassung des Jobs
-  „Testberichte zusammenführen“ zeigt, wie weit der langsamste Anteil über dem Mittel liegt.
+  „e2e-Bericht“ (`e2e.yml`) zeigt, wie weit der langsamste Anteil über dem Mittel liegt.
 - **Keine Namen, die sich nur in der Groß-/Kleinschreibung unterscheiden** (LFH-1053, Schritt 14,
   `scripts/check-schreibweisen.sh`): je Verzeichnis weder ganze Namen noch Modulnamen (ohne
   TS/JS-Endung, Verzeichnisse zählen mit). Die CI läuft nur unter Linux; den Konflikt sah erst
@@ -113,6 +133,13 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   hängender Ubuntu-Spiegel hielt sonst jeden Job bis zu seinem Timeout fest, auf allen PRs
   zugleich; apts eigene Zeitgrenzen fangen einen tröpfelnden Spiegel nicht. Selbsttest
   `scripts/wiederholen.test.sh` (Schritt 11).
+- **Eigener Runner** (LLH-1666, [ADR-0025](../docs/architektur/entscheidungen/ADR-0025-e2e-jobs-laufen-in-wegwerf-containern-auf-dem-eigenen-server.md)):
+  `e2e-Binary` und die e2e-Shards können auf einem eigenen Server laufen (Repo-Variable
+  `E2E_RUNNER`, `scripts/runner/`). Dort gibt es kein `sudo`: ein neuer Schritt in diesen Jobs,
+  der `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, trägt
+  `runner.environment == 'github-hosted'`, und was der eigene Runner dafür braucht, kommt ins
+  `scripts/runner/Dockerfile`. Nach einem Bump von `@playwright/test` das Image auf dem Server neu
+  bauen (`scripts/runner/README.md`). Selbsttests `scripts/runner/*.test.sh` (Schritt 11).
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über

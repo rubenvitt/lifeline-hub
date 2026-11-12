@@ -6,28 +6,36 @@
 #
 # Geteilt, weil die drei schweren Suiten (Rust, Vitest, Playwright) nicht voneinander abhängen;
 # der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
-# kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Die e2e-Shards teilen
-# nach gemessener Laufzeit je Spec-Datei (LFH-1117, `scripts/e2e-anteile.mjs`), Vitest nach
+# kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Vitest teilt nach
 # Dateizahl.
-# Die e2e-Shards fahren alle drei Playwright-Projekte (Firefox und WebKit nur die Druck-Specs,
-# LFH-729): ein roter Druckfall in Firefox oder WebKit sperrt so den PR über die gepinnten
-# Pflicht-Checks, ohne eigenen Job, der erst im Ruleset eingetragen werden müsste.
 #
-# NUR DIE BETROFFENEN SUITEN (LFH-1111, LFH-1115): Der Job `aenderungen` legt die geänderten
-# Dateien eines PRs `scripts/bereiche.sh` vor; das Skript sagt, welche der drei schweren Suiten
-# (Rust, Frontend, e2e) sie braucht, die Zuordnung samt Querbezügen steht nur dort. Eine nicht
-# gebrauchte Suite läuft leer durch; die Schnellprüfungen laufen immer. Leer heißt GRÜN, nicht
-# fehlend: die Shard-Namen sind Required Checks im Ruleset 17017911, und ein per Job-`if`
-# übersprungener Matrix-Job meldet sich unter seinem unexpandierten Namen („Frontend-Suite
-# ${{ matrix.shard }}/4"), die Pflicht-Checks hingen auf „Expected". Deshalb tragen die
-# Matrix-Jobs die Bedingung an jedem Schritt, die übrigen am Job (ein übersprungener Job ohne
-# Matrix erfüllt seinen Check).
+# ZWEI STUFEN IM PR (LLH-1662): Dieser Workflow ist die erste Stufe und prüft jeden Push. Die
+# e2e-Suite steht in `e2e.yml` und läuft im PR erst, wenn er fertig markiert ist (Auto-Merge an
+# oder Label `e2e`); bis dahin fehlen ihre Pflicht-Checks. Bei einem Push auf einen Kanal-Branch
+# ruft der Job `e2e` hier denselben Workflow auf, und der Release wartet darauf. Kopf von
+# `e2e.yml`. Weitere Ereignistypen gehören NICHT hierher: das Einschalten von Auto-Merge bräche
+# den laufenden Lauf ab (eine Gruppe je Ref).
+#
+# NUR DIE BETROFFENEN SUITEN (LFH-1111, LFH-1115): Der Job `aenderungen` fragt
+# `scripts/ci-auswahl.sh`, das die geänderten Dateien eines PRs `scripts/bereiche.sh` vorlegt;
+# die Zuordnung samt Querbezügen steht nur dort. Eine nicht gebrauchte Suite läuft leer durch;
+# die Schnellprüfungen laufen immer. Leer heißt GRÜN, nicht fehlend: die Shard-Namen sind
+# Required Checks im Ruleset 17017911, und ein per Job-`if` übersprungener Matrix-Job meldet sich
+# unter seinem unexpandierten Namen („Frontend-Suite ${{ matrix.shard }}/4"), die Pflicht-Checks
+# hingen auf „Expected". Deshalb tragen die Matrix-Jobs die Bedingung an jedem Schritt, die
+# übrigen am Job (ein übersprungener Job ohne Matrix erfüllt seinen Check). Die zweite Stufe
+# nutzt genau dieses Verhalten umgekehrt, damit ihre Checks fehlen (Kopf von `e2e.yml`).
 # Im Zweifel wird geprüft: Nur ein ausdrückliches `false` spart, ein roter `aenderungen`-Job
 # lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
 #
-# NUR UMNUMMERIERT (LLH-1660): Benennt der Migrations-Autofix auf einem grünen PR nur Migrationen
-# um, übernimmt der neue Kopf Frontend- und e2e-Suite vom Commit davor
-# (`scripts/nur-umnummeriert.sh`, Schritt im Job `aenderungen`). Schnellprüfungen,
+# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Shards laufen auf dem eigenen
+# Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
+# Fork stammt. Die Jobs und die Runner-Wahl stehen seit LLH-1662 in `e2e.yml` (Kopf dort); dieser
+# Workflow ruft ihn bei Push auf.
+#
+# NUR UMNUMMERIERT (LLH-1660, je Suite seit LLH-1662): Benennt der Migrations-Autofix nur
+# Migrationen um, übernimmt der neue Kopf jede Suite, die am Commit davor grün war
+# (`scripts/ci-auswahl.sh`, `scripts/nur-umnummeriert.sh`). Schnellprüfungen,
 # `Migrationsnummern` und die Rust-Suite laufen immer: sie prüft die umnummerierte Migration
 # zusammen mit der, die auf dem Ziel-Branch dazukam.
 #
@@ -63,12 +71,9 @@ env:
   # Die Debuginfo-Stufe (Zeilentabellen, keine für Abhängigkeiten) steht in Cargo.toml,
   # [profile.dev] (LFH-845), und gilt lokal wie hier.
   # Parallelität nach den Kernen des Runners (LLH-1664; der Schritt „Runner-Größe“ in den
-  # Suiten nennt Kerne und Speicher). Bei 4 Kernen: Playwright 3 statt 4 Worker, weil Vite-Server
-  # und Backend auf demselben Runner mitrechnen; Vitest 2 Dateien zugleich statt einer (lokale
-  # Vorgabe in check-all.sh bleibt 1). Zeigen wandernde Infrastruktur-Fehler (goto-Timeout,
-  # ERR_CONNECTION_REFUSED, Kopf von `workers` in frontend/playwright.config.ts), zuerst hier
-  # zurücknehmen. Messwerte vorher/nachher an der Aufgabe LLH-1664.
-  PW_WORKERS: 3
+  # Suiten nennt Kerne und Speicher). Vitest 2 Dateien zugleich statt einer (lokale Vorgabe in
+  # check-all.sh bleibt 1). Die Playwright-Worker stehen in `e2e.yml`. Messwerte vorher/nachher an
+  # der Aufgabe LLH-1664.
   VITEST_WORKERS: 2
   # Der Runner läuft in UTC. check-all.sh setzt die Zone selbst; hier steht sie für alles
   # außerhalb des Skripts.
@@ -80,80 +85,26 @@ jobs:
     name: Geänderte Bereiche
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # `checks: read` für die Check-Runs des Vorgängers (Umnummerierung, s. Schritt unten).
+    # `checks: read` für die Check-Runs des Vorgängers (Umnummerierung, `scripts/ci-auswahl.sh`).
     permissions:
       contents: read
       checks: read
     outputs:
       rust: ${{ steps.bereiche.outputs.rust }}
       frontend: ${{ steps.bereiche.outputs.frontend }}
-      e2e: ${{ steps.bereiche.outputs.e2e }}
     steps:
       # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches: zwei
-      # Commits Tiefe reichen für den Vergleich.
+      # Commits Tiefe reichen für den Vergleich. Bei Push prüft das Skript ohnehin voll.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'pull_request'
         with:
           fetch-depth: 2
-      # NUR UMNUMMERIERT (LLH-1660): Der Migrations-Autofix pusht einen Commit, der Migrationen
-      # nur umbenennt. Unterscheidet sich der Kopf des PRs vom letzten Commit mit grünen schweren
-      # Suiten nur dadurch, laufen Frontend und e2e nicht noch einmal: `scripts/nur-umnummeriert.sh`
-      # nennt diesen Commit, seine Check-Runs entscheiden. Die Rust-Suite läuft immer neu (s. u.).
-      # Jeder Zweifel und jeder Fehler (kein Vorgänger, Abfrage scheitert, ein Check fehlt oder
-      # ist rot) lässt alles laufen wie sonst.
-      - name: Nur umnummeriert?
-        id: umnummeriert
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          KOPF: ${{ github.event.pull_request.head.sha }}
-        run: |
-          # Kein `set -e`: dieser Schritt darf nie rot werden, er spart nur.
-          vorgaenger=""
-          # Der Kopf des PRs samt der Kette, die das Skript höchstens zurückgeht (5 + Rand).
-          if git fetch --no-tags --depth=8 origin "$KOPF" 2> /dev/null; then
-            vorgaenger="$(./scripts/nur-umnummeriert.sh vorgaenger "$KOPF" 2> /dev/null || true)"
-          fi
-          if [ -z "$vorgaenger" ]; then
-            echo "Kopf ist keine reine Umnummerierung."
-            exit 0
-          fi
-          echo "Kopf unterscheidet sich von $vorgaenger nur durch Umnummerierung."
-          # Erst holen, dann auswerten: eine gescheiterte Abfrage darf nicht als „grün“ enden.
-          if gh api "repos/$GITHUB_REPOSITORY/commits/$vorgaenger/check-runs?per_page=100" --paginate \
-              > "$RUNNER_TEMP/check-runs.json" \
-            && ./scripts/nur-umnummeriert.sh gruen < "$RUNNER_TEMP/check-runs.json"; then
-            echo "vorgaenger=$vorgaenger" >> "$GITHUB_OUTPUT"
-          else
-            echo "Schwere Suiten am Vorgänger nicht vollständig grün: alles läuft."
-          fi
       - name: Betroffene Suiten
         id: bereiche
         env:
-          EREIGNIS: ${{ github.event_name }}
-          VORGAENGER: ${{ steps.umnummeriert.outputs.vorgaenger }}
-        run: |
-          set -euo pipefail
-          grund="nein, nicht betroffen"
-          if [ "$EREIGNIS" = pull_request ] && [ -n "$VORGAENGER" ]; then
-            # Rust läuft trotzdem: dieser Lauf prüft den Merge mit dem aktuellen Ziel-Branch,
-            # und dort kam die Migration dazu, wegen der umnummeriert wurde.
-            printf 'rust=true\nfrontend=false\ne2e=false\n' > "$RUNNER_TEMP/bereiche"
-            grund="nein, nur umnummeriert seit ${VORGAENGER:0:8} (dort grün)"
-          elif [ "$EREIGNIS" = pull_request ]; then
-            git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/dateien"
-            cat "$RUNNER_TEMP/dateien"
-            ./scripts/bereiche.sh < "$RUNNER_TEMP/dateien" > "$RUNNER_TEMP/bereiche"
-          else
-            printf 'rust=true\nfrontend=true\ne2e=true\n' > "$RUNNER_TEMP/bereiche"
-          fi
-          tee -a "$GITHUB_OUTPUT" < "$RUNNER_TEMP/bereiche"
-          {
-            echo "| Suite | läuft |"
-            echo "| --- | --- |"
-            sed -E "s/^([a-z0-9]+)=true\$/| \\1 | ja |/; s/^([a-z0-9]+)=false\$/| \\1 | $grund |/" \
-              "$RUNNER_TEMP/bereiche"
-          } >> "$GITHUB_STEP_SUMMARY"
+          CI_EREIGNIS: ${{ github.event_name }}
+          CI_KOPF: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/ci-auswahl.sh eins | tee -a "$GITHUB_OUTPUT"
 
   # ── Die billigen Prüfungen, in einem Job und zuerst ──────────────────────────────────
   # Damit ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
@@ -260,46 +211,6 @@ jobs:
       - name: Rust-Suite
         run: ./scripts/check-all.sh --nur rust
 
-  # ── Backend-Binary für die e2e-Shards ───────────────────────────────────────────────
-  # Eigener Job: so starten die e2e-Shards nach dem Build statt nach Build PLUS Rust-Tests.
-  binaer:
-    name: e2e-Binary
-    needs: aenderungen
-    if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
-      - name: Plattenplatz schaffen (nur bei Bedarf)
-        run: |
-          df -h /
-          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
-          if [ "$frei_gb" -ge 40 ]; then
-            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
-            exit 0
-          fi
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
-          df -h /
-      # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
-      # zum Job-Timeout fest (LFH-1101).
-      - name: System-Werkzeuge für die nativen Crates
-        run: ./scripts/apt-pakete.sh nasm
-      - name: Rust-Toolchain (stable)
-        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          shared-key: rust-openssl-vendored
-          save-if: false
-          cache-on-failure: true
-      - name: Debug-Binary bauen
-        run: cargo build --bin lifeline-hub
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: lifeline-hub-debug
-          path: target/debug/lifeline-hub
-          retention-days: 1
-
   # ── Frontend-Suite, auf vier Runner geteilt ─────────────────────────────────────────
   frontend:
     name: Frontend-Suite ${{ matrix.shard }}/4
@@ -359,158 +270,26 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
-  # ── e2e-Suite, auf vier Runner geteilt ──────────────────────────────────────────────
+  # ── e2e-Suite der Kanal-Branches ────────────────────────────────────────────────────
+  # Im PR startet `e2e.yml` selbst (zweite Stufe, s. Kopf). Hier nur bei Push, damit der Release
+  # auf sie wartet. Der Name trägt keinen Pflicht-Check: ein übersprungener Aufruf erfüllt nichts.
   e2e:
-    name: e2e ${{ matrix.shard }}/4
-    needs: [aenderungen, binaer]
-    # Läuft auch bei übersprungenem e2e-Binary an (e2e nicht betroffen); die Bedingung `E2E`
-    # steht an jedem Schritt (s. Kopf). Ein ROTES Binary lässt die Shards wie bisher aus.
-    if: ${{ !cancelled() && (needs.binaer.result == 'success' || needs.binaer.result == 'skipped') }}
-    env:
-      E2E: ${{ needs.aenderungen.outputs.e2e }}
-    runs-on: ubuntu-latest
-    # 75 min (LLH-1488): gemessen am 27.10.2026 (Lauf 40581848993) brauchten die Tests je Shard
-    # 33, 58, 47 und 49 min; Shard 2 lief zweimal in die alte Frist von 60 min, ohne roten Test.
-    # Die Suite hat sich seit der Laufzeittabelle von LFH-1117 verdoppelt (180 → 267 Dateien,
-    # 173 → 337 Testminuten); nach der aufgefrischten `frontend/e2e/laufzeiten.json` sind es
-    # rechnerisch 45 min je Shard, `gate3-trefflaeche` allein 35 min. 45 von 75 min lässt Luft
-    # für langsame Runner und die Firefox/WebKit-Systempakete bei leerem apt-Cache (34 min bei
-    # einem langsamen Ubuntu-Mirror, PR #338).
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      # DIE SHARD-ZAHL IST EIN PIN (s. Frontend-Suite).
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.E2E != 'false'
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        if: env.E2E != 'false'
-        with:
-          version: 2026.9.1
-          cache: true
-      - name: pnpm-Store-Pfad ermitteln
-        if: env.E2E != 'false'
-        id: pnpm
-        run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false'
-        with:
-          path: ${{ steps.pnpm.outputs.store }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-          restore-keys: pnpm-${{ runner.os }}-
-      - name: Frontend-Abhängigkeiten
-        if: env.E2E != 'false'
-        run: mise exec -- pnpm -C frontend install --frozen-lockfile
-      # Die Browserliste steht im Schlüssel: ein Eintrag aus der Zeit, als nur Chromium installiert
-      # wurde, darf nicht als Treffer für alle drei gelten.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false'
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-      # SYSTEMPAKETE AUS DEM CACHE: Firefox und WebKit brauchen rund 125 MB .deb-Pakete, die das
-      # Runner-Image nicht mitbringt. Der Ubuntu-Mirror lieferte sie im ersten Lauf (PR #338) in
-      # zwei Shards mit 60–90 kB/s, 24 bzw. 34 min, und riss das 40-min-Limit; im dritten Shard in
-      # 28 s. Die Tests selbst blieben bei 11 min. apt-get nimmt Pakete, die passend in
-      # /var/cache/apt/archives liegen, statt sie zu laden. Ein veralteter Eintrag schadet nicht:
-      # was sich geändert hat, lädt apt nach. Der Schlüssel hängt am Lockfile, weil die
-      # Playwright-Version die Paketliste bestimmt.
-      #
-      # Laden und Speichern getrennt (`restore`/`save`): das kombinierte `actions/cache` speichert
-      # erst am Ende eines GRÜNEN Jobs — ein roter oder abgebrochener Shard hinterließe nichts, und
-      # der nächste Lauf stünde wieder am langsamen Mirror.
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false'
-        id: apt-cache
-        with:
-          path: ~/.cache/apt-playwright
-          key: apt-playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-          restore-keys: apt-playwright-${{ runner.os }}-${{ runner.arch }}-
-      - name: Systempakete aus dem Cache bereitlegen
-        if: env.E2E != 'false'
-        run: |
-          mkdir -p ~/.cache/apt-playwright
-          if compgen -G "$HOME/.cache/apt-playwright/*.deb" > /dev/null; then
-            sudo cp "$HOME"/.cache/apt-playwright/*.deb /var/cache/apt/archives/
-            echo "Aus dem Cache: $(ls "$HOME"/.cache/apt-playwright/*.deb | wc -l) Pakete"
-          fi
-      # ALLE DREI in jedem Shard: welcher Shard die Firefox- und WebKit-Fälle bekommt, entscheidet
-      # die Verteilung nach Laufzeit, und die verschiebt sich mit jeder aufgefrischten Tabelle.
-      # Systempakete und Browser getrennt. `install-deps` ruft apt-get: Frist und Wiederholung wie
-      # `scripts/apt-pakete.sh` (LFH-1101), und wie dort läuft die Schleife UNTER `sudo`
-      # (LLH-1420, LLH-1507). Darüber traf `timeout` nur `sudo`; das apt-get als root lud am
-      # hängenden Spiegel weiter, hielt den apt-Lock, und Versuch 2 und 3 endeten sofort mit
-      # „Could not get lock“. `install-deps` reicht apt keine Optionen durch, daher Sperr-Wartezeit
-      # und Netz-Fristen als apt-Konfiguration. 15 min je Versuch, weil ein Lauf ohne Paket-Cache
-      # am langsamen Spiegel schon 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen
-      # hat, bleibt im Archiv. Die Browser lädt der Runner-Nutzer, damit sie in seinem Cache liegen;
-      # meist kommen sie aus dem Cache, daher 5 min je Versuch. So endet der Schritt auch im
-      # schlimmsten Fall (3 × 15 + 3 × 5 min) mit eigenem Grund vor dem Job-Timeout von 75 min.
-      - name: Playwright-Browser (Chromium, Firefox, WebKit)
-        if: env.E2E != 'false'
-        run: |
-          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' \
-            'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' |
-            sudo tee /etc/apt/apt.conf.d/99lfh-fristen > /dev/null
-          node_bin="$(mise exec -- node -p 'process.execPath')"
-          sudo env "WIEDERHOLEN_PAUSE_SEK=15" ./scripts/wiederholen.sh 3 900 -- \
-            sh -c 'dpkg --configure -a && "$0" frontend/node_modules/@playwright/test/cli.js install-deps chromium firefox webkit' \
-            "$node_bin"
-          ./scripts/wiederholen.sh 3 300 -- \
-            mise exec -- pnpm -C frontend exec playwright install chromium firefox webkit
-          # Für den Cache (s. o.): was apt-get geladen hat, liegt danach in seinem Archiv.
-          if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
-            cp /var/cache/apt/archives/*.deb ~/.cache/apt-playwright/
-          fi
-      # Gleich nach der Installation, nicht erst am Jobende (s. o.). Nur ohne exakten Treffer: ein
-      # bestehender Schlüssel lässt sich nicht überschreiben.
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false' && steps.apt-cache.outputs.cache-hit != 'true'
-        with:
-          path: ~/.cache/apt-playwright
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: env.E2E != 'false'
-        with:
-          name: lifeline-hub-debug
-          path: bin
-      # PFLICHT: upload-artifact zippt ohne Dateirechte, alles kommt als 644 zurück.
-      # check-all.sh prüft das Bit und bräche sonst mit klarer Meldung ab.
-      - name: Ausführbar machen
-        if: env.E2E != 'false'
-        run: chmod +x bin/lifeline-hub
-      - name: Runner-Größe
-        if: env.E2E != 'false'
-        run: echo "Kerne $(nproc), Speicher $(free -h | awk '/^Mem:/ {print $2}')" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
-        if: env.E2E != 'false'
-        env:
-          PW_SHARD: ${{ matrix.shard }}/4
-          # Erspart die Rust-Toolchain: ohne die Variable fragte die Playwright-Config
-          # `cargo metadata` nach dem Target-Verzeichnis.
-          PW_BINAER: ${{ github.workspace }}/bin/lifeline-hub
-        run: ./scripts/check-all.sh --nur e2e
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() && env.E2E != 'false' }}
-        with:
-          name: playwright-blob-${{ matrix.shard }}
-          path: frontend/blob-report
-          retention-days: 1
+    name: e2e (Kanal)
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/e2e.yml
+    permissions:
+      contents: read
+      checks: read
 
-  # ── Ein Bericht aus den Teilläufen ──────────────────────────────────────────────────
+  # ── Ein Bericht aus den Vitest-Teilläufen ───────────────────────────────────────────
   # KEINE Required Checks — das sind die Shard-Jobs selbst: die Merge-Werkzeuge scheitern
   # nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen grünen Teilbericht. Mit
-  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht.
+  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht. Den e2e-Bericht baut `e2e.yml`.
   berichte:
     name: Testberichte zusammenführen
-    needs: [aenderungen, frontend, e2e]
-    # Ein Bericht über null Teilläufe hilft niemandem. Läuft nur eine der beiden Suiten, erwartet
-    # die Vollzähligkeit unten von der anderen keine Blobs, und deren Berichtsschritte entfallen.
-    if: >-
-      ${{ !cancelled() && (needs.aenderungen.outputs.frontend != 'false'
-      || needs.aenderungen.outputs.e2e != 'false') }}
+    needs: [aenderungen, frontend]
+    # Ein Bericht über null Teilläufe hilft niemandem.
+    if: ${{ !cancelled() && needs.aenderungen.outputs.frontend != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -521,86 +300,37 @@ jobs:
           cache: true
       - name: Frontend-Abhängigkeiten
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
-
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: frontend/.vitest/blob
           pattern: vitest-blob-*
           merge-multiple: true
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          path: frontend/all-blob-reports
-          pattern: playwright-blob-*
-          merge-multiple: true
-
       # Der Riegel gegen den stillen Teilbericht: fehlt ein Blob, wäre die Zusammenfassung
-      # eine Aussage über weniger Tests, als jemand beim Lesen annimmt. Eine übersprungene Suite
-      # (s. „Geänderte Bereiche“) soll null Blobs hinterlassen, eine gelaufene vier. Ohne Blobs
-      # legt download-artifact das Verzeichnis nicht an; `find` scheitert dort, und unter
-      # `pipefail` beendete das den Schritt (LLH-1205) — deshalb die Prüfung mit `-d` davor.
+      # eine Aussage über weniger Tests, als jemand beim Lesen annimmt. Ohne Blobs legt
+      # download-artifact das Verzeichnis nicht an (LLH-1205) — deshalb die Prüfung mit `-d`.
       - name: Vollzähligkeit der Teilberichte
-        env:
-          FRONTEND: ${{ needs.aenderungen.outputs.frontend }}
-          E2E: ${{ needs.aenderungen.outputs.e2e }}
         run: |
           set -euo pipefail
-          zaehle() { if [ -d "$1" ]; then find "$1" -name "$2" | wc -l | tr -d ' '; else echo 0; fi; }
-          soll() { if [ "$1" = false ]; then echo 0; else echo 4; fi; }
-          v="$(zaehle frontend/.vitest/blob 'blob-*.json')"
-          p="$(zaehle frontend/all-blob-reports '*.zip')"
-          v_soll="$(soll "$FRONTEND")"
-          p_soll="$(soll "$E2E")"
-          echo "Vitest-Blobs: $v von $v_soll | Playwright-Blobs: $p von $p_soll"
-          [ "$v" -eq "$v_soll" ] && [ "$p" -eq "$p_soll" ] || {
+          v=0
+          if [ -d frontend/.vitest/blob ]; then
+            v="$(find frontend/.vitest/blob -name 'blob-*.json' | wc -l | tr -d ' ')"
+          fi
+          echo "Vitest-Blobs: $v von 4"
+          [ "$v" -eq 4 ] || {
             echo "WARNUNG: nicht alle Shards haben einen Bericht hinterlassen." >&2
             echo "         Der zusammengeführte Bericht deckt dann WENIGER ab als die Suite." >&2
           }
-
       - name: Frontend-Bericht
-        if: ${{ !cancelled() && needs.aenderungen.outputs.frontend != 'false' }}
         run: mise exec -- pnpm -C frontend exec vitest run --merge-reports --reporter=default
         continue-on-error: true
-      - name: e2e-Bericht
-        if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
-        run: mise exec -- pnpm -C frontend exec playwright merge-reports --reporter html ./all-blob-reports
-        continue-on-error: true
-      # LAUFZEITEN DER e2e-ANTEILE (LFH-1117): die Shards verteilen nach `frontend/e2e/laufzeiten.json`.
-      # Hier entsteht dieselbe Tabelle aus diesem Lauf, als Artefakt `e2e-laufzeiten`; die
-      # Zusammenfassung zeigt, wie die bisherige Tabelle unter den neuen Messwerten trägt. Liegt
-      # der langsamste Anteil spürbar über dem Mittel, die Datei aus dem Artefakt einchecken.
-      # Nur bei vier Blobs: ein Teilbericht ergäbe eine Tabelle ohne die fehlenden Dateien. Gezählt
-      # nur `report-k.zip` auf oberster Ebene: der HTML-Bericht davor entpackt die Traces roter
-      # Tests als `resources/*.zip` in dasselbe Verzeichnis.
-      - name: e2e-Laufzeiten
-        if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          [ "$(find frontend/all-blob-reports -maxdepth 1 -name 'report-*.zip' | wc -l | tr -d ' ')" -eq 4 ] || {
-            echo "Nicht alle vier e2e-Blobs da: keine Laufzeittabelle."; exit 0; }
-          mise exec -- pnpm -C frontend exec playwright merge-reports --reporter json ./all-blob-reports > e2e-bericht.json
-          cp frontend/e2e/laufzeiten.json laufzeiten.json
-          mise exec -- node scripts/e2e-anteile.mjs aktualisieren --aus e2e-bericht.json --nach laufzeiten.json \
-            >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() && hashFiles('laufzeiten.json') != '' }}
-        with:
-          name: e2e-laufzeiten
-          path: laufzeiten.json
-          retention-days: 7
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() && needs.aenderungen.outputs.e2e != 'false' }}
-        with:
-          name: playwright-report-versuch-${{ github.run_attempt }}
-          path: frontend/playwright-report
-          retention-days: 7
 
   # Der Release hängt hier und nicht in einem `workflow_run`-Workflow: semantic-release liest
   # den Branch aus GITHUB_REF, und ein workflow_run-Lauf trägt dort immer den Default-Branch
   # (Näheres im Kopf von release.yml).
   #
-  # `needs` MUSS ALLE VIER PRÜFJOBS NENNEN (bei einer Matrix alle Instanzen) — sonst entstünde
-  # ein Release über einer roten Suite. Auf `berichte` wird bewusst NICHT gewartet: der läuft
+  # `needs` MUSS ALLE VIER PRÜFJOBS NENNEN (bei einer Matrix alle Instanzen; `e2e` ist der Aufruf
+  # von `e2e.yml` und wartet auf alle seine Jobs) — sonst entstünde ein Release über einer roten
+  # Suite. Auf `berichte` wird bewusst NICHT gewartet: der läuft
   # mit `!cancelled()` und wäre auch bei roten Shards grün.
   #
   # EIN AUFRUF IST KEIN RELEASE: mit dem Ruhefenster (`scripts/release-ruhefenster.sh`) tritt
@@ -621,5 +351,4 @@ jobs:
       actions: write
       id-token: write
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

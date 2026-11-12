@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +11,7 @@ import {
   umgebungRaeumen,
   viteServer,
 } from './e2e/lauf-kern';
+import { createRunDir } from './e2e/run-dir';
 
 // Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst.
 
@@ -35,9 +35,11 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
   ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      // Temp-DB je Lauf: kein Cleanup im Repo-Baum, die Specs dürfen ihre
-      // `Date.now()`-Fixtures behalten.
-      const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-e2e-')), 'lifeline.db');
+      // Temp-DB je Lauf: nichts im Repo-Baum, die Specs dürfen ihre `Date.now()`-Fixtures
+      // behalten. Der Hauptprozess löscht das Verzeichnis bei seinem Ende, auch wenn Tests rot
+      // sind oder schon der Webserver nicht startet; verwaiste räumt der nächste Lauf (LLH-1666,
+      // `e2e/run-dir.ts`).
+      const datenbank = join(createRunDir('lifeline-e2e-', { deleteOnExit: true }), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
       // Einmal im Hauptprozess, nicht je Worker: welches Backend der Lauf startet, steht damit im
@@ -55,7 +57,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * Eine weitere Druck-Spec kommt hier hinein, nicht als eigenes Projekt. Die Druckfälle von
  * Meldebild, Funkplan und Führungsorganisation stehen deshalb in eigenen `*-druck.spec.ts`
  * (Hilfen in `*-kern.ts`): sonst liefe jeweils die ganze Spec dreifach (LFH-915). Die CI fährt
- * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/ci.yml`); in welchem
+ * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/e2e.yml`); in welchem
  * Anteil die Firefox- und WebKit-Fälle landen, entscheidet die Verteilung unten. Lokal wählt
  * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
  */
@@ -85,7 +87,7 @@ const OHNE_WEBGL_SPECS =
  * nach den Messwerten in `e2e/laufzeiten.json` (`scripts/e2e-anteile.mjs`). Playwrights eigenes
  * `--shard` schneidet nach Testzahl in Dateireihenfolge, und die langsamen Layout-Gates stehen
  * alphabetisch beieinander: e2e 2/4 brauchte 33–36 min, die übrigen 19–26. Eine Datei ohne
- * Messwert zählt mit dem Median; die Tabelle frischt der Job „Testberichte zusammenführen" auf.
+ * Messwert zählt mit dem Median; die Tabelle frischt der Job „e2e-Bericht" (e2e.yml) auf.
  * Die Rechnung ist deterministisch, jeder Worker-Prozess kommt auf dieselbe Menge.
  */
 const SPEC_DATEI = /\.spec\.ts$/;

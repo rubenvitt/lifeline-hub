@@ -3,16 +3,17 @@
 #
 #   scripts/nur-umnummeriert.sh vorgaenger <kopf>
 #       Gibt den Commit aus, dessen Suiten für <kopf> gelten dürfen, oder nichts.
-#   scripts/nur-umnummeriert.sh gruen < check-runs.json
-#       Exit 0, wenn die schweren Suiten in den Check-Runs (Antwort von
-#       `gh api repos/…/commits/<sha>/check-runs --paginate`) alle grün waren, sonst 1.
+#   scripts/nur-umnummeriert.sh gruen <suite> < check-runs.json
+#       Exit 0, wenn die Suite (`frontend` oder `e2e`) in den Check-Runs (Antwort von
+#       `gh api repos/…/commits/<sha>/check-runs --paginate`) grün war, sonst 1.
 #   Exit 2 = Aufruf- oder Umgebungsfehler
 #
 # Der Migrations-Autofix (`migrationen-autofix.sh`) pusht einen Commit, der nur Dateien unter
 # `migrations/` umbenennt. Die Pflicht-Checks hängen am Kopf-Commit, also liefen Rust, Vitest und
 # e2e danach noch einmal voll (e2e bis über eine Stunde), für denselben Inhalt. Der Job
-# `aenderungen` in `ci.yml` fragt deshalb dieses Skript: Unterscheidet sich der Kopf vom letzten
-# Commit mit grünen schweren Suiten nur durch solche Umbenennungen, laufen sie leer durch.
+# Auswahl der Suiten (`scripts/ci-auswahl.sh`, beide Stufen der PR-CI) fragt deshalb dieses
+# Skript: Unterscheidet sich der Kopf von einem Commit, auf dem eine Suite grün war, nur durch
+# solche Umbenennungen, läuft diese Suite leer durch.
 #
 # `vorgaenger` geht vom Kopf rückwärts, solange jeder Commit
 #   (a) den Trailer des Autofix trägt,
@@ -28,21 +29,30 @@
 # Endung nimmt die Migration aus dem Lauf. Deshalb (c) so eng. Zieht der Autofix einen Verweis
 # in Code mit (`include_str!`), liest den eine Suite: dann läuft alles. Im Zweifel wird geprüft.
 #
-# WAS ÜBERNOMMEN WIRD: Frontend- und e2e-Suite. Die RUST-SUITE LÄUFT IMMER NEU (Job
-# `aenderungen` in ci.yml): der PR-Lauf prüft den Merge mit dem aktuellen Ziel-Branch, und eine
-# Nummernkollision heißt, dass dort eine fremde Migration dazukam. Ob beide Migrationen
-# zusammen einspielen und die Tests bestehen, zeigt nur dieser Lauf.
+# WAS ÜBERNOMMEN WIRD: Frontend- und e2e-Suite, JEDE FÜR SICH (LLH-1662): die e2e-Suite läuft
+# nur an PRs, die als fertig markiert sind, ihr Fehlen am Vorgänger darf die Übernahme der
+# Frontend-Suite nicht verhindern. Die RUST-SUITE LÄUFT IMMER NEU (`ci-auswahl.sh`): der PR-Lauf
+# prüft den Merge mit dem aktuellen Ziel-Branch, und eine Nummernkollision heißt, dass dort eine
+# fremde Migration dazukam. Ob beide Migrationen zusammen einspielen und die Tests bestehen,
+# zeigt nur dieser Lauf.
 set -euo pipefail
 
 TRAILER_SCHLUESSEL="Migrationsnummern-Autofix" # wie in migrationen-autofix.sh
 SCHRITTE_MAX=5
-# Die schweren Pflicht-Checks, wie `ci.yml` sie nennt. Der Selbsttest vergleicht die Liste mit
-# dem Workflow: ein umbenannter oder neuer Anteil fiele sonst still aus der Prüfung.
-SCHWERE_CHECKS=(
-  "Rust-Suite"
-  "Frontend-Suite 1/4" "Frontend-Suite 2/4" "Frontend-Suite 3/4" "Frontend-Suite 4/4"
-  "e2e 1/4" "e2e 2/4" "e2e 3/4" "e2e 4/4"
-)
+# Die Pflicht-Checks je übernehmbarer Suite, wie `ci.yml` und `e2e.yml` sie nennen. Der
+# Selbsttest vergleicht die Listen mit den Workflows: ein umbenannter oder neuer Anteil fiele
+# sonst still aus der Prüfung.
+FRONTEND_CHECKS=("Frontend-Suite 1/4" "Frontend-Suite 2/4" "Frontend-Suite 3/4" "Frontend-Suite 4/4")
+E2E_CHECKS=("e2e-Binary" "e2e 1/4" "e2e 2/4" "e2e 3/4" "e2e 4/4")
+
+# Die Checks einer Suite, einer je Zeile; Exit 2 bei unbekannter Suite.
+checks_von() { # <suite>
+  case "${1:-}" in
+    frontend) printf '%s\n' "${FRONTEND_CHECKS[@]}" ;;
+    e2e) printf '%s\n' "${E2E_CHECKS[@]}" ;;
+    *) echo "FEHLER: Suite '${1:-}' ist nicht übernehmbar (frontend oder e2e)." >&2; exit 2 ;;
+  esac
+}
 
 SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
 git() { command git -c core.quotePath=false "$@"; }
@@ -91,7 +101,9 @@ ist_umnummerierung() {
     # Nur drei ausdrückliche `=false` sparen. Scheitert bereiche.sh oder schweigt es, wird geprüft.
     bereiche="$(printf '%s' "$andere" | "$SKRIPTE/bereiche.sh")" || return 1
     [ "$(printf '%s\n' "$bereiche" | grep -c '=false$')" = 3 ] || return 1
-    printf '%s\n' "$bereiche" | grep -q '=true' && return 1
+    # Here-String statt Pipe: bricht `grep -q` früh ab, bekäme `printf` SIGPIPE, und unter
+    # `pipefail` fiele das `return 1` still aus.
+    grep -q '=true' <<< "$bereiche" && return 1
   fi
   return 0
 }
@@ -113,12 +125,15 @@ vorgaenger() {
   return 0
 }
 
-gruen() {
+gruen() { # <suite>
   command -v jq > /dev/null || { echo "FEHLER: jq fehlt." >&2; exit 2; }
-  local namen fehlend
-  namen="$(printf '%s\n' "${SCHWERE_CHECKS[@]}" | jq -R . | jq -s .)"
+  local namen fehlend liste
+  liste="$(checks_von "$1")"
+  namen="$(printf '%s\n' "$liste" | jq -R . | jq -s .)"
   # Je Name zählt der jüngste Check-Run (ein neu gestarteter Job hängt einen weiteren an).
   # `success` und `skipped` gelten: eine Suite, die `bereiche.sh` nicht brauchte, ist übersprungen.
+  # Gesucht wird der GERENDERTE Name: ein per Job-`if` übersprungener Matrix-Job meldet sich
+  # unter seinem unexpandierten Namen (`e2e ${{ matrix.shard }}/4`) und ist nie gelaufen.
   fehlend="$(jq -r -s --argjson namen "$namen" '
     [.[] | (.check_runs // [])[]] as $alle
     | $namen[] as $n
@@ -139,8 +154,8 @@ case "${1:-}" in
     [ $# -eq 2 ] || { sed -n '4,8p' "$0" >&2; exit 2; }
     vorgaenger "$2" ;;
   gruen)
-    [ $# -eq 1 ] || { sed -n '4,8p' "$0" >&2; exit 2; }
-    gruen ;;
-  checks) printf '%s\n' "${SCHWERE_CHECKS[@]}" ;; # für den Selbsttest
+    [ $# -eq 2 ] || { sed -n '4,8p' "$0" >&2; exit 2; }
+    gruen "$2" ;;
+  checks) [ $# -eq 2 ] || { sed -n '4,8p' "$0" >&2; exit 2; }; checks_von "$2" ;; # für Selbsttests
   *) sed -n '4,9p' "$0" >&2; exit 2 ;;
 esac

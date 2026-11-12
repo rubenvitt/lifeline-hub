@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Wächter für `.github/workflows/e2e.yml` (LLH-1666, Spec `ci-eigener-runner`, ADR-0025): In den
+# Jobs, die auf dem eigenen Runner laufen können (`binaer`, `e2e`), trägt jeder Schritt, der
+# `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, die Bedingung
+# `runner.environment == 'github-hosted'`.
+#
+# Ohne ihn fiel genau das nicht auf: die Bedingung landete am gleichnamigen Schritt eines anderen
+# Jobs, der auf dem Server `sudo` gerufen hätte. Rot wäre erst der erste echte Lauf geworden, und
+# die übersprungenen e2e-Shards hätten jeden PR gesperrt.
+#
+#   ci-schritte.test.sh [workflow-datei]    Vorgabe: .github/workflows/e2e.yml (seit LLH-1662
+#                                           stehen `binaer` und `e2e` dort, nicht in ci.yml)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+DATEI="${1:-$ROOT/.github/workflows/e2e.yml}"
+JOBS="binaer e2e"
+# Was nur auf einem gehosteten Runner geht oder nur dort Sinn hat.
+GEHOSTET='sudo |apt-pakete\.sh|install-deps|apt-get|Swatinem/rust-cache|ms-playwright|apt-playwright|AGENT_TOOLSDIRECTORY'
+BEDINGUNG="runner.environment == 'github-hosted'"
+
+# Zerlegt die Datei in Schritte: Job-Name, Kopfzeile und ganzer Block je Schritt, getrennt durch
+# ein Steuerzeichen. Jobs stehen mit zwei Leerzeichen Einzug, Schritte mit sechs und `- `.
+# Kommentarzeilen zählen nicht: sie stehen vor dem Schritt, den sie meinen, also im Block davor.
+schritte() {
+  awk -v jobs=" $JOBS " '
+    function ausgeben() { if (block != "" && index(jobs, " " job " ")) printf "%s\037%s\036", job, block; block = "" }
+    /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { ausgeben(); job = $1; sub(":", "", job); next }
+    /^[^ #]/ { ausgeben(); job = ""; next }
+    /^      - / { ausgeben(); block = $0 "\n"; next }
+    /^[[:space:]]*#/ { next }
+    block != "" { block = block $0 "\n" }
+    END { ausgeben() }
+  ' "$DATEI"
+}
+
+fehler=0
+geprueft=0
+while IFS=$'\037' read -r -d $'\036' job block; do
+  if grep -Eq "$GEHOSTET" <<< "$block"; then
+    geprueft=$((geprueft + 1))
+    kopf="$(sed -n '1s/^ *- //p' <<< "$block")"
+    if grep -qF "$BEDINGUNG" <<< "$block"; then
+      echo "ok   $job: $kopf"
+    else
+      echo "ROT  $job: $kopf — braucht \`if: … $BEDINGUNG\`" >&2
+      fehler=1
+    fi
+  fi
+done < <(schritte)
+
+# Ein Wächter, der nichts findet, prüft nichts: in beiden Jobs gibt es solche Schritte.
+if [ "$geprueft" -lt 5 ]; then
+  echo "ROT  nur $geprueft betroffene Schritte gefunden — passt die Zerlegung noch zu $(basename "$DATEI")?" >&2
+  fehler=1
+fi
+exit "$fehler"

@@ -508,7 +508,7 @@ pub async fn save_faehigkeiten(
 /// Meldende Seite: Ergebnis eines Meldeversuchs. Bei Erfolg (`fehler = None`) beginnt der Abstand
 /// wieder von vorn, sonst verdoppelt er sich bis zur Obergrenze (design.md D4).
 pub async fn save_meldeversuch(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     kopplung_id: i64,
     fehler: Option<&str>,
     naechste_meldung_at: &str,
@@ -522,7 +522,7 @@ pub async fn save_meldeversuch(
     .bind(fehler)
     .bind(naechste_meldung_at)
     .bind(kopplung_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
