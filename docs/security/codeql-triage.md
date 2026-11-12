@@ -1,6 +1,15 @@
-# CodeQL-Triage (GitHub Code Scanning, Default Setup)
+# CodeQL-Triage (GitHub Code Scanning)
 
-CodeQL läuft über GitHubs **Default Setup** — es gibt bewusst keine
+CodeQL läuft seit LLH-1664 (12.11.2026) über einen eigenen Workflow,
+`.github/workflows/codeql.yml`: bei jedem Push auf `alpha` und montags, **nicht mehr bei jedem
+PR-Push**. Das Default Setup davor fuhr bei jedem Push auf einen PR vier Jobs (Rust rund 20 min)
+und ließ sich in den Auslösern nicht einstellen; die Grenze der CI ist die Zahl gleichzeitiger
+Jobs. Entscheidung von Ruben: ein Fund erscheint erst nach dem Merge im Security-Tab, dafür
+wartet kein PR mehr auf CodeQL. Sprachen, Standard-Queries und Kategorien
+(`/language:<sprache>`) sind dieselben wie im Default Setup, die Alerts unten bleiben also
+zugeordnet.
+
+Es gibt weiterhin bewusst keine
 `.github/codeql/codeql-config.yml` und keine repoweite `query-filters`-Liste. Der Grund ist
 derselbe, aus dem `cargo clippy -D warnings` nicht im Gate steht (`AGENTS.md`, „Qualitäts-Gates"):
 **ein abgeschalteter Query ist von einem bestandenen nicht zu unterscheiden.** Wer

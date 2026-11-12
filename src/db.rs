@@ -1,6 +1,7 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
+mod migrationslauf;
 mod physisch;
 pub mod suche;
 #[cfg(test)]
@@ -82,9 +83,10 @@ pub(crate) async fn fk_pruefung_sicherstellen(
     Ok(())
 }
 
-/// Spielt alle eingebetteten Migrationen aus `./migrations` ein.
+/// Spielt alle eingebetteten Migrationen aus `./migrations` ein. Eine Migration mit
+/// `-- no-transaction` läuft dabei trotzdem ganz oder gar nicht (LLH-1659, [`migrationslauf`]).
 pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateError> {
-    sqlx::migrate!("./migrations").run(pool).await
+    migrationslauf::einspielen(sqlx::migrate!("./migrations"), pool).await
 }
 
 /// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird), mit
