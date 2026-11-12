@@ -625,32 +625,42 @@ pub async fn verwerfen(
     einsatz_id: i64,
     bruch_id: i64,
     benutzer_id: i64,
+    darf: impl Fn(&str) -> bool,
 ) -> Result<(), AppError> {
     crate::write_retry!(pool, |conn| {
-        let erledigt: Option<Option<String>> = sqlx::query_scalar(
-            "SELECT erledigt FROM einsatz_bruchstelle WHERE id = ? AND einsatz_id = ? \
+        let zeile: Option<(String, Option<String>)> = sqlx::query_as(
+            "SELECT art, erledigt FROM einsatz_bruchstelle WHERE id = ? AND einsatz_id = ? \
              AND entfernt = 1 AND daten IS NOT NULL AND folge_von IS NULL",
         )
         .bind(bruch_id)
         .bind(einsatz_id)
         .fetch_optional(&mut *conn)
         .await?;
-        match erledigt {
-            None => Err(AppError::NotFound),
-            Some(Some(_)) => Err(AppError::Conflict("Schon erledigt.".into())),
-            Some(None) => {
-                sqlx::query(
-                    "UPDATE einsatz_bruchstelle SET erledigt = 'verworfen', erledigt_at = ?, \
-                     erledigt_von_id = ? WHERE id = ?",
-                )
-                .bind(crate::zeit::jetzt())
-                .bind(benutzer_id)
-                .bind(bruch_id)
-                .execute(&mut *conn)
-                .await?;
-                Ok(())
-            }
+        let Some((tabelle, erledigt)) = zeile else {
+            return Err(AppError::NotFound);
+        };
+        // Ablegen nur, was die Person sehen darf: am Modul der Zeile, in derselben Transaktion.
+        let kategorie = schema::schema(&mut *conn)
+            .await?
+            .tabelle(&tabelle)
+            .map(|t| t.kategorie)
+            .unwrap_or(SpiegelKategorie::Fuehrung);
+        if !darf(modul_der_zeile(&tabelle, kategorie)) {
+            return Err(AppError::Forbidden);
         }
+        if erledigt.is_some() {
+            return Err(AppError::Conflict("Schon erledigt.".into()));
+        }
+        sqlx::query(
+            "UPDATE einsatz_bruchstelle SET erledigt = 'verworfen', erledigt_at = ?, \
+             erledigt_von_id = ? WHERE id = ?",
+        )
+        .bind(crate::zeit::jetzt())
+        .bind(benutzer_id)
+        .bind(bruch_id)
+        .execute(&mut *conn)
+        .await?;
+        Ok(())
     })
 }
 
@@ -907,10 +917,16 @@ mod tests {
         )
         .await;
         ordnen(&pool, e).await;
-        verwerfen(&pool, e, b, 1).await.unwrap();
+        // Ohne Freigabe des Moduls bleibt die Zeile offen (Prüfung in der Schreibtransaktion).
+        assert!(matches!(
+            verwerfen(&pool, e, b, 1, |_: &str| false).await,
+            Err(AppError::Forbidden)
+        ));
+        assert_eq!(liste(&pool, e, alles).await.unwrap().len(), 1);
+        verwerfen(&pool, e, b, 1, alles).await.unwrap();
         assert!(liste(&pool, e, alles).await.unwrap().is_empty());
         assert!(matches!(
-            verwerfen(&pool, e, b, 1).await,
+            verwerfen(&pool, e, b, 1, alles).await,
             Err(AppError::Conflict(_))
         ));
         let mut conn = pool.acquire().await.unwrap();
@@ -920,7 +936,7 @@ mod tests {
         ));
         drop(conn);
         assert!(matches!(
-            verwerfen(&pool, e + 1, b, 1).await,
+            verwerfen(&pool, e + 1, b, 1, alles).await,
             Err(AppError::NotFound)
         ));
     }
