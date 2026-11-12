@@ -1108,7 +1108,10 @@ async fn ein_ueberholter_anfrage_merker_gibt_die_fuehrung_nicht_ab() {
         elw_meldet(&elw1).await;
     }
     let f = fuehrung(&hub, h).await;
-    assert_eq!(f["fuehrer_kennung"], hub.kennung, "der Hub führt weiter: {f}");
+    assert_eq!(
+        f["fuehrer_kennung"], hub.kennung,
+        "der Hub führt weiter: {f}"
+    );
     assert_eq!(f["epoche"], 3);
     let e1 = einsatz_der_akte(&elw1, akte1).await;
     let a = fuehrung(&elw1, e1).await;

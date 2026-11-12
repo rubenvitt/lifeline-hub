@@ -258,10 +258,10 @@ fn check_code(a: &AkteZeile, m: &AkteMeldung) -> Result<NotuebernahmeErklaerung,
     Ok(e)
 }
 
-/// Übernimmt die Felder der Führung aus einer gelieferten Akte.
-/// Übernimmt eine größere Epoche des Gegenübers. Jeder Wechsel löscht den Anfrage-Merker: eine
-/// Anfrage gilt nur dem Stand, den sie sah, sonst gäbe die erreichte Seite die Führung später ohne
-/// Menschen ab (LLH-1673).
+/// Übernimmt die Felder der Führung aus einer gelieferten Akte mit größerer Epoche.
+///
+/// Jeder Wechsel löscht den Anfrage-Merker: Eine Anfrage gilt nur dem Stand, den sie sah, sonst
+/// gäbe die erreichte Seite die Führung später ohne Menschen ab (LLH-1673).
 fn uebernimm(a: &mut AkteZeile, m: &AkteMeldung) {
     a.set_epoche(&m.epoche);
     a.anfrage_at = None;
