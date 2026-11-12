@@ -23,21 +23,23 @@
 import {
   ALL_PICTOGRAMS,
   LEGACY_PICTOGRAMS,
-  checkAnySpec,
-  FREESTANDING_FIELD_VALUES,
   ORGANIZATION_LABELS,
-  SPEC_FIELD_VALUES,
   STRENGTH_LABELS,
   UNIT_GROUPING_LABELS,
+  parametricBlock,
+  symbolKindChoiceLabel,
+} from '@einsatzzeichen/core/blocks';
+import {
+  checkAnySpec,
+  FREESTANDING_FIELD_VALUES,
+  SPEC_FIELD_VALUES,
   drawAnySpec,
   freestandingRedirect,
   freestandingVocabulary,
-  parametricBlock,
   parseAnySpec,
   serializeAnySpec,
-  symbolKindChoiceLabel,
   vocabulary,
-} from '@einsatzzeichen/core';
+} from '@einsatzzeichen/core/exact';
 import {
   PALETTE,
   TECHNICAL_FILL_TOKENS,

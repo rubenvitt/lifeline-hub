@@ -662,6 +662,7 @@ fn serde_wire_gleich_as_str() {
         ArchivSchluesselGeprueft,
         ArchivSchluesselEntfernt,
         ArchivHeruntergeladen,
+        ArchivEingespielt,
         MaschinenzugangAngelegt,
         MaschinenzugangCodeAusgestellt,
         MaschinenzugangSchluesselGebunden,

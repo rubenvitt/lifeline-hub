@@ -6,7 +6,7 @@ import {
   conditionSign,
   conditionSignWidth,
   sketchPictogram,
-} from '@einsatzzeichen/core';
+} from '@einsatzzeichen/core/sketch';
 import {
   BEDINGUNGSZEICHEN_HOEHE,
   BereichsRahmen,
