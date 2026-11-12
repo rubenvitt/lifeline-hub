@@ -163,7 +163,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   Verifizieren:
   - Vitest der Seite: Klartext je Grund, Scope-Bezeichnungen, gesperrte Aktionen mit Grund;
   - `adminNav.test.tsx` ist grün.
-- [ ] 7.4 e2e `frontend/e2e/anbindungen.spec.ts`:
+- [x] 7.4 e2e `frontend/e2e/anbindungen.spec.ts`:
   - Admin legt einen Zugang an und sieht den Code;
   - ein signiertes `me` aus dem Test macht „zuletzt genutzt“ sichtbar;
   - ein Konto ohne Admin sieht die gesperrte Aktion mit Grund.

@@ -144,11 +144,6 @@ export default function Anbindungen() {
         onWahl: (key, z) => {
           if (key === 'bearbeiten') {
             aendern.reset();
-            form.setFieldsValue({
-              name: z.name,
-              scopes: z.scopes,
-              gueltig_bis: alsZeitpunkt(z.gueltig_bis) ?? null,
-            });
             setBearbeiten(z);
           } else if (key === 'code') {
             neuerCode.mutate(z);
@@ -181,7 +176,6 @@ export default function Anbindungen() {
             disabled={gesperrt != null}
             onClick={() => {
               anlegen.reset();
-              form.resetFields();
               setAnlegenOffen(true);
             }}
           >
@@ -304,7 +298,17 @@ export default function Anbindungen() {
       </Paneel>
 
       <ErfassungsModal<FormWerte>
+        key={bearbeiten?.id ?? 'neu'}
         offen={formularOffen}
+        initialValues={
+          bearbeiten
+            ? {
+                name: bearbeiten.name,
+                scopes: bearbeiten.scopes,
+                gueltig_bis: alsZeitpunkt(bearbeiten.gueltig_bis) ?? null,
+              }
+            : undefined
+        }
         titel={bearbeiten ? `${bearbeiten.name} bearbeiten` : 'Anbindung anlegen'}
         form={form}
         erfassenText={bearbeiten ? 'Speichern' : 'Anlegen und Code zeigen'}

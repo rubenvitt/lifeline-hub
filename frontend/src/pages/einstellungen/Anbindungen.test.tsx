@@ -58,6 +58,11 @@ function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | nu
         zugang('a', { zustand: 'widerrufen', widerrufen_at: '2026-11-12 10:00:00' }),
       );
     }),
+    http.patch('/api/admin/anbindungen/a', async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      aufrufe.push({ pfad: 'aendern', body });
+      return HttpResponse.json(zugang('a', { name: body.name, scopes: body.scopes }));
+    }),
     http.post('/api/admin/anbindungen/a/code', () => {
       aufrufe.push({ pfad: 'code', body: null });
       return HttpResponse.json(
@@ -151,6 +156,33 @@ describe('Anbindungen (LLH-1652)', () => {
       expect(aufrufe).toEqual([
         { pfad: 'code', body: null },
         { pfad: 'widerrufen', body: null },
+      ]),
+    );
+  });
+
+  it('Bearbeiten füllt den Dialog mit dem Stand und speichert alles', async () => {
+    const aufrufe = stelleBereit([zugang('a', { scopes: ['lage:read'] })]);
+    const user = userEvent.setup();
+    renderMitProviders(<Anbindungen />);
+    await screen.findByText('Adapter a');
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Aktionen zu Anbindung Adapter a' }),
+      /Bearbeiten/,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Adapter a bearbeiten' });
+    const name = within(dialog).getByRole('textbox', { name: 'Name' });
+    expect(name).toHaveValue('Adapter a');
+    expect(within(dialog).getByRole('checkbox', { name: /Lage lesen/ })).toBeChecked();
+    await user.clear(name);
+    await user.type(name, 'Adapter neu');
+    await user.click(within(dialog).getByRole('checkbox', { name: /Ereignisse abrufen/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          pfad: 'aendern',
+          body: { name: 'Adapter neu', scopes: ['lage:read', 'events:read'], gueltig_bis: null },
+        },
       ]),
     );
   });
