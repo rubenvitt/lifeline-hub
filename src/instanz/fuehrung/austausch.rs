@@ -76,7 +76,7 @@ pub struct AkteMeldung {
 }
 
 /// Kürzt einen Text auf höchstens `max` Zeichen.
-fn kuerze(s: &str, max: usize) -> String {
+fn truncate_chars(s: &str, max: usize) -> String {
     match s.char_indices().nth(max) {
         Some((i, _)) => s[..i].to_string(),
         None => s.to_string(),
@@ -91,13 +91,13 @@ impl AkteMeldung {
         Self {
             kennung: a.kennung.clone(),
             org: org.to_string(),
-            nummer: a.nummer.as_deref().map(|n| kuerze(n, TEXT_MAX)),
-            bezeichnung: kuerze(&a.bezeichnung, TEXT_MAX),
-            stichwort: a.stichwort.as_deref().map(|s| kuerze(s, TEXT_MAX)),
+            nummer: a.nummer.as_deref().map(|n| truncate_chars(n, TEXT_MAX)),
+            bezeichnung: truncate_chars(&a.bezeichnung, TEXT_MAX),
+            stichwort: a.stichwort.as_deref().map(|s| truncate_chars(s, TEXT_MAX)),
             status: a.status.clone(),
             epoche: a.epoche(),
             fuehrer: a.fuehrer_kennung.clone(),
-            fuehrer_name: kuerze(&a.fuehrer_name, TEXT_MAX),
+            fuehrer_name: truncate_chars(&a.fuehrer_name, TEXT_MAX),
             art: a.art.clone(),
             erklaerung: a.erklaerung.clone(),
             beweis: a
@@ -200,7 +200,7 @@ pub async fn build_ausgang(
                 &format!(
                     "Führungsakte „{}“ ist zu groß für den Austausch ({groesse} Byte, höchstens \
                      {} Byte): Sie und die Akten danach gehen nicht an {}, bis sie kleiner ist.",
-                    kuerze(&a.bezeichnung, 80),
+                    truncate_chars(&a.bezeichnung, 80),
                     AKTE_BYTES.min(bytes),
                     kopplung.gegenueber_name
                 ),
@@ -584,7 +584,7 @@ pub async fn apply_eingang(
         format!(
             "{} schickt eine ungültige Führungsakte ({}): {grund}, abgelehnt",
             kopplung.gegenueber_name,
-            kuerze(&m.kennung, 80)
+            truncate_chars(&m.kennung, 80)
         )
     };
     for m in akten.iter().take(AKTEN_MAX) {
