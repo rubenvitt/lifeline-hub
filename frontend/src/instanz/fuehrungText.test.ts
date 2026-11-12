@@ -74,6 +74,16 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
     ).toBe(false);
   });
 
+  it('ohne den Einsatz hier gibt es keine Notübernahme, nur die Anfrage (LLH-1641)', () => {
+    const ohne = { fuehrend: false, einsatz_id: undefined };
+    const m = fuehrungMoeglich(akte({ ...ohne, fuehrer_richtung: 'meldet_sich' }));
+    expect(m.notuebernahme).toBe(false);
+    expect(m.anfragen).toBe(true);
+    expect(
+      fuehrungMoeglich(akte({ ...ohne, fuehrer_richtung: 'wird_gemeldet' })).notuebernahmeMitBeweis,
+    ).toBe(false);
+  });
+
   it('führt die meldende Seite: Notübernahme nur mit Unterschrift oder Code', () => {
     const m = fuehrungMoeglich(akte({ fuehrend: false, fuehrer_richtung: 'wird_gemeldet' }));
     expect(m.notuebernahmeMitBeweis).toBe(true);

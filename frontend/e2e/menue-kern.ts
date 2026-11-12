@@ -61,3 +61,28 @@ export async function klickeEintrag(eintrag: Locator): Promise<void> {
   await expect(eintrag).toBeInViewport({ ratio: 1 });
   await eintrag.click();
 }
+
+/** Die drei Leisten der Gruppe „Anzeige“ im Benutzermenü (LLH-1642, Spec `benutzermenue`). */
+export type AnzeigeLeiste = 'Darstellung' | 'Bediendichte' | 'Helligkeit in %';
+
+/**
+ * Wahl in der Gruppe „Anzeige“ des Benutzermenüs (LLH-1642): öffnet das Menü, wählt in der Leiste
+ * `leiste` den Wert `wert` (zugänglicher Name: „Hell“, „Handschuh“, „60 %“) und schließt das Menü
+ * wieder per Esc. Eine Wahl lässt das Menü offen (die Leisten sind keine `menuitem`s); bliebe es
+ * stehen, ginge der nächste Klick der Spec ans Schließen statt an sein Ziel.
+ */
+export async function waehleAnzeige(
+  page: Page,
+  ausloeser: Locator,
+  leiste: AnzeigeLeiste,
+  wert: string,
+): Promise<void> {
+  const menue = await oeffneMenue(page, ausloeser);
+  const segment = menue
+    .getByRole('radiogroup', { name: leiste, exact: true })
+    .getByRole('radio', { name: wert, exact: true });
+  await klickeEintrag(segment);
+  await expect(segment).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await expect(offenesMenue(page)).toHaveCount(0);
+}

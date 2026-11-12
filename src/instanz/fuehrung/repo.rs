@@ -1,7 +1,8 @@
 //! Speicher der Führung je Einsatz (design.md D1, D4; `migrations/0316_einsatz_fuehrung.sql`).
 //!
-//! **`einsatz.fuehrung_bei` schreibt nur dieses Modul** ([`sync_sperre`], [`sync_sperre_alle`]),
-//! in der Transaktion des Wechsels (ADR-0020).
+//! Jede gespeicherte Akte richtet ihren Einsatz aus ([`save`] →
+//! `instanz::spiegel::fuehrung::richte_aus`, in der Transaktion des Wechsels): Führt eine andere
+//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0021).
 
 use super::{Epoche, FuehrungWechselArt};
 use crate::error::AppError;
@@ -133,13 +134,15 @@ pub async fn find_by_kennung(
     .await?)
 }
 
-/// Akten einer Org, deren Einsatz nicht hier liegt (Akten des Gegenübers).
+/// Akten einer Org, deren Einsatz beim Gegenüber liegt: ohne lokalen Einsatz oder hier nur als
+/// Spiegel (LLH-1641, E2).
 pub async fn list_fremde_der_org(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<Vec<AkteZeile>, AppError> {
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM einsatz_fuehrung WHERE org_id = ? AND einsatz_id IS NULL \
+        "SELECT {SPALTEN} FROM einsatz_fuehrung WHERE org_id = ? AND (einsatz_id IS NULL \
+           OR einsatz_id IN (SELECT id FROM einsatz WHERE spiegel = 1)) \
          ORDER BY status, geaendert_at DESC, id DESC"
     )))
     .bind(org_id)
@@ -147,7 +150,8 @@ pub async fn list_fremde_der_org(
     .await?)
 }
 
-/// Schreibt alle veränderlichen Felder zurück und richtet die Sperre des Einsatzes aus. `bump`:
+/// Schreibt alle veränderlichen Felder zurück und richtet den Einsatz nach der Akte aus (Führer
+/// oder Spiegel, LLH-1641). `bump`:
 /// neuer Stand, damit die Änderung an die Gegenüber geht.
 pub async fn save(
     conn: &mut SqliteConnection,
@@ -186,23 +190,33 @@ pub async fn save(
     .execute(&mut *conn)
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
-        sync_sperre(conn, einsatz_id).await?;
+        crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
     }
     Ok(())
 }
 
-/// Legt eine vom Gegenüber gelieferte Akte an (ohne lokalen Einsatz). `stand` neu, damit sie an
-/// weitere Gegenüber derselben Org geht.
+/// Legt eine vom Gegenüber gelieferte Akte an. Liegt der Einsatz hier schon als Spiegel (gleiche
+/// Kennung), hängt sie an ihm (LLH-1641, E2); sonst ohne lokalen Einsatz, bis der Spiegel kommt.
+/// `stand` neu, damit sie an weitere Gegenüber derselben Org geht.
 pub async fn insert_fremd(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Result<(), AppError> {
     a.stand = next_stand(conn).await?;
     a.geaendert_at = crate::zeit::jetzt();
+    a.einsatz_id = sqlx::query_scalar(
+        "SELECT id FROM einsatz WHERE kennung = ? AND org_id = ? AND spiegel = 1 \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_fuehrung f WHERE f.einsatz_id = einsatz.id)",
+    )
+    .bind(&a.kennung)
+    .bind(a.org_id)
+    .fetch_optional(&mut *conn)
+    .await?;
     a.id = sqlx::query_scalar(
         "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, nummer, bezeichnung, \
          stichwort, status, epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, \
          erklaerung, beweis, stand, geaendert_at) \
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(&a.kennung)
+    .bind(a.einsatz_id)
     .bind(a.org_id)
     .bind(&a.nummer)
     .bind(&a.bezeichnung)
@@ -219,6 +233,9 @@ pub async fn insert_fremd(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Res
     .bind(&a.geaendert_at)
     .fetch_one(&mut *conn)
     .await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+    }
     Ok(())
 }
 
@@ -295,73 +312,46 @@ pub async fn list_verlauf(
     .await?)
 }
 
-// ── Schreibsperre ────────────────────────────────────────────────────────────────────────────
-
-/// Wert von `einsatz.fuehrung_bei` aus der Akte: der Name der führenden Instanz, wenn eine andere
-/// führt und die Führung an ist, sonst NULL.
-macro_rules! sperre_wert {
-    () => {
-        "CASE WHEN (SELECT fuehrung_an FROM instanz_identitaet) = 1 THEN \
-         (SELECT CASE WHEN f.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet) \
-                 THEN f.fuehrer_name END \
-          FROM einsatz_fuehrung f WHERE f.einsatz_id = einsatz.id) END"
-    };
-}
-
-/// Richtet die Sperre eines Einsatzes nach seiner Akte aus.
-pub async fn sync_sperre(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<(), AppError> {
-    sqlx::query(concat!(
-        "UPDATE einsatz SET fuehrung_bei = ",
-        sperre_wert!(),
-        " WHERE id = ?"
-    ))
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?;
-    Ok(())
-}
-
-/// Richtet die Sperre aller Einsätze aus (Start, Schalter).
-pub async fn sync_sperre_alle(conn: &mut SqliteConnection) -> Result<(), AppError> {
-    sqlx::query(concat!(
-        "UPDATE einsatz SET fuehrung_bei = ",
-        sperre_wert!(),
-        " WHERE fuehrung_bei IS NOT NULL \
-           OR id IN (SELECT einsatz_id FROM einsatz_fuehrung WHERE einsatz_id IS NOT NULL)"
-    ))
-    .execute(&mut *conn)
-    .await?;
-    Ok(())
-}
-
 // ── Akten anlegen und nachführen ─────────────────────────────────────────────────────────────
 
-/// Legt für jeden nicht gelöschten Einsatz einer Org mit aktiver Kopplung eine Akte an (Epoche 1,
-/// diese Instanz führt) und führt den Kopf lokaler Akten nach (Spec „Jeder Einsatz einer
-/// gekoppelten Org hat eine Führungsakte“). Ohne Schalter: nichts. Läuft beim Start, vor jeder
-/// Meldung und vor jedem Lesen der Führung.
+/// Legt für jeden nicht gelöschten eigenen Einsatz einer Org mit aktiver Kopplung eine Akte an
+/// (Epoche 1, diese Instanz führt) und führt den Kopf lokaler Akten nach (Spec „Jeder Einsatz
+/// einer gekoppelten Org hat eine Führungsakte“). Die Akte trägt die Kennung des Einsatzes, unter
+/// der er auch gespiegelt wird (LLH-1641, E2); ein Spiegel bekommt keine eigene Akte, an ihm hängt
+/// die des Führers. Ohne Schalter: nichts. Läuft beim Start, vor jeder Meldung und vor jedem Lesen
+/// der Führung.
 pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
     if !is_enabled_tx(conn).await? {
         return Ok(());
     }
     let ich = ich(conn).await?;
     let jetzt = crate::zeit::jetzt();
-    let neu: Vec<i64> = sqlx::query_scalar(
-        "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, nummer, bezeichnung, \
-         stichwort, status, epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, \
-         stand, geaendert_at) \
-         SELECT ? || '/' || e.id || '-' || lower(hex(randomblob(4))), e.id, e.org_id, e.einsatznummer_intern, e.bezeichnung, \
-                e.stichwort, e.status, 1, ?, ?, ?, 'angelegt', 0, ? \
-         FROM einsatz e \
-         WHERE (e.geloescht_at IS NULL OR e.geloescht_at = '') \
+    const OHNE_AKTE: &str = "(e.geloescht_at IS NULL OR e.geloescht_at = '') AND e.spiegel = 0 \
+           AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
            AND NOT EXISTS (SELECT 1 FROM einsatz_fuehrung f WHERE f.einsatz_id = e.id) \
            AND EXISTS (SELECT 1 FROM instanz_kopplung_org o \
                        JOIN instanz_kopplung k ON k.id = o.kopplung_id \
                        WHERE o.org_id = e.org_id AND o.widerrufen_at IS NULL \
-                         AND k.zustand IN ('angebahnt', 'aktiv')) \
-         RETURNING id",
-    )
+                         AND k.zustand IN ('angebahnt', 'aktiv'))";
+    // Kennung wie beim ersten Liefern (`spiegel::liefern::ensure_kennung`): mit Zufallsteil.
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "UPDATE einsatz SET kennung = ? || '/' || id || '-' || lower(hex(randomblob(4))) \
+         WHERE kennung IS NULL AND id IN (SELECT e.id FROM einsatz e WHERE {OHNE_AKTE})"
+    )))
     .bind(&ich.kennung)
+    .execute(&mut *conn)
+    .await?;
+    let neu: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "INSERT INTO einsatz_fuehrung (kennung, einsatz_id, org_id, nummer, bezeichnung, \
+         stichwort, status, epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, \
+         stand, geaendert_at) \
+         SELECT e.kennung, e.id, e.org_id, e.einsatznummer_intern, e.bezeichnung, \
+                e.stichwort, e.status, 1, ?, ?, ?, 'angelegt', 0, ? \
+         FROM einsatz e \
+         WHERE {OHNE_AKTE} AND e.kennung IS NOT NULL \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_fuehrung f WHERE f.kennung = e.kennung) \
+         RETURNING id"
+    )))
     .bind(&ich.kennung)
     .bind(&ich.kennung)
     .bind(&ich.name)
@@ -382,22 +372,25 @@ pub async fn ensure_akten(conn: &mut SqliteConnection) -> Result<(), AppError> {
         )
         .await?;
     }
-    // Kopf lokaler Akten nachführen: der Einsatz liegt hier, also bestimmt diese Instanz ihn.
-    let geaendert: Vec<(i64, Option<String>, String, Option<String>, String)> = sqlx::query_as(
-        "SELECT f.id, e.einsatznummer_intern, e.bezeichnung, e.stichwort, e.status \
-         FROM einsatz_fuehrung f JOIN einsatz e ON e.id = f.einsatz_id \
-         WHERE f.nummer IS NOT e.einsatznummer_intern OR f.bezeichnung <> e.bezeichnung \
-            OR f.stichwort IS NOT e.stichwort OR f.status <> e.status",
-    )
-    .fetch_all(&mut *conn)
-    .await?;
-    for (id, nummer, bezeichnung, stichwort, status) in geaendert {
+    // Kopf lokaler Akten nachführen: Den eigenen Einsatz bestimmt diese Instanz, und die Akte geht
+    // mit neuem Stand hinaus; an einem Spiegel kommt der Kopf vom Führer und bleibt hier.
+    #[allow(clippy::type_complexity)]
+    let geaendert: Vec<(i64, Option<String>, String, Option<String>, String, bool)> =
+        sqlx::query_as(
+            "SELECT f.id, e.einsatznummer_intern, e.bezeichnung, e.stichwort, e.status, \
+             e.spiegel = 0 FROM einsatz_fuehrung f JOIN einsatz e ON e.id = f.einsatz_id \
+             WHERE f.nummer IS NOT e.einsatznummer_intern OR f.bezeichnung <> e.bezeichnung \
+                OR f.stichwort IS NOT e.stichwort OR f.status <> e.status",
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+    for (id, nummer, bezeichnung, stichwort, status, eigen) in geaendert {
         let mut a = load(conn, id).await?;
         a.nummer = nummer;
         a.bezeichnung = bezeichnung;
         a.stichwort = stichwort;
         a.status = status;
-        save(conn, &mut a, true).await?;
+        save(conn, &mut a, eigen).await?;
     }
     Ok(())
 }
@@ -675,8 +668,8 @@ pub(crate) mod tests {
         ensure_akten(&mut conn).await.unwrap();
     }
 
-    async fn bei(pool: &sqlx::SqlitePool, id: i64) -> Option<String> {
-        sqlx::query_scalar("SELECT fuehrung_bei FROM einsatz WHERE id = ?")
+    async fn ist_spiegel(pool: &sqlx::SqlitePool, id: i64) -> bool {
+        sqlx::query_scalar("SELECT spiegel FROM einsatz WHERE id = ?")
             .bind(id)
             .fetch_one(pool)
             .await
@@ -757,40 +750,49 @@ pub(crate) mod tests {
         assert!(a.stand > vorher);
     }
 
+    /// LLH-1641 (E1, E8): Die Akte entscheidet, der Spiegel folgt und sperrt; ohne Schalter bleibt
+    /// der Stand eingefroren.
     #[tokio::test]
-    async fn sperre_folgt_der_akte_und_dem_schalter() {
+    async fn spiegel_folgt_der_akte_und_der_schalter_friert_ein() {
         let pool = crate::db::test_pool().await;
         gekoppelt(&pool).await;
         super::super::save_schalter(&pool, true).await.unwrap();
         let id = einsatz(&pool, "Lage").await;
         ensure(&pool).await;
-        assert_eq!(bei(&pool, id).await, None);
+        assert!(!ist_spiegel(&pool, id).await);
         let mut conn = pool.acquire().await.unwrap();
         let mut a = find_by_einsatz(&mut conn, id).await.unwrap().unwrap();
         a.fuehrer_kennung = "hub".into();
         a.fuehrer_name = "Hub Nord".into();
         save(&mut conn, &mut a, true).await.unwrap();
         drop(conn);
-        assert_eq!(bei(&pool, id).await.as_deref(), Some("Hub Nord"));
-        let mut conn = pool.acquire().await.unwrap();
-        match crate::einsatz::repo::fordere_aktiv_in_tx(&mut conn, id).await {
-            Err(AppError::Conflict(t)) => assert_eq!(t, "Führung liegt bei „Hub Nord“."),
-            f => panic!("{f:?}"),
-        }
-        drop(conn);
+        assert!(ist_spiegel(&pool, id).await, "die Akte nennt den Hub");
+        let (fremd, stand): (String, i64) = sqlx::query_as(
+            "SELECT fremde_kennung, stand FROM einsatz_spiegel WHERE einsatz_id = ?",
+        )
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(fremd, a.kennung, "eine Kennung für Akte und Spiegel");
+        assert_eq!(stand, 0, "der neue Führer liefert alles");
+        let f = sqlx::query("UPDATE einsatz SET bezeichnung = 'anders' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        assert!(
+            f.to_string()
+                .contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
+            "{f}"
+        );
         let geladen = crate::einsatz::repo::laden(&pool, id).await.unwrap();
-        assert!(crate::einsatz::berechtigung::fordere_aktiv(&geladen).is_err());
         assert_eq!(
             geladen.fuehrung.anzeige().map(|f| (f.fuehrend, f.bei)),
             Some((false, "Hub Nord".to_string()))
         );
         super::super::save_schalter(&pool, false).await.unwrap();
-        assert_eq!(bei(&pool, id).await, None, "Schalter aus sperrt nichts");
-        let mut conn = pool.acquire().await.unwrap();
-        assert!(crate::einsatz::repo::fordere_aktiv_in_tx(&mut conn, id)
-            .await
-            .is_ok());
-        drop(conn);
+        assert!(ist_spiegel(&pool, id).await, "Schalter aus friert ein");
         assert_eq!(
             crate::einsatz::repo::laden(&pool, id)
                 .await
@@ -800,8 +802,15 @@ pub(crate) mod tests {
             None,
             "ohne Schalter keine Anzeige"
         );
+        sqlx::query("UPDATE einsatz_fuehrung SET fuehrer_kennung = (SELECT kennung FROM instanz_identitaet)")
+            .execute(&pool)
+            .await
+            .unwrap();
         super::super::save_schalter(&pool, true).await.unwrap();
-        assert_eq!(bei(&pool, id).await.as_deref(), Some("Hub Nord"));
+        assert!(
+            !ist_spiegel(&pool, id).await,
+            "die Akte nennt wieder diese Instanz"
+        );
     }
 
     #[tokio::test]

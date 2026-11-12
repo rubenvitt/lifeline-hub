@@ -123,7 +123,9 @@ pub async fn aktualisieren(
 
 /// POST /api/organisation/logo — Logo setzen oder ersetzen. Nur Admin. Multipart-Feld
 /// `datei`; PNG oder JPEG (am Inhalt erkannt), 1 Byte bis 1 MiB, vor dem Speichern
-/// gescannt. Antwort: die `OrganisationAnzeige` mit dem neuen `logo` (200, ein Upsert).
+/// gescannt. Gespeichert werden nur die von Metadaten bereinigten Bytes (LLH-1640); ein Bild,
+/// das sich nicht bereinigen lässt, ist 422. Antwort: die `OrganisationAnzeige` mit dem neuen
+/// `logo` (200, ein Upsert).
 pub async fn logo_hochladen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -145,13 +147,15 @@ pub async fn logo_hochladen(
     }
     let bytes = bytes.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))?;
 
-    // Reihenfolge: leer/zu groß → Typ am Inhalt (SVG fällt hier durch) → Virenscan. Alles vor dem
-    // Schreiben, damit ein abgelehnter Upload das bisherige Logo stehen lässt.
+    // Reihenfolge: leer/zu groß → Typ am Inhalt (SVG fällt hier durch) → Virenscan →
+    // Bereinigung (422). Alles vor dem Schreiben, damit ein abgelehnter Upload das bisherige
+    // Logo stehen lässt.
     logo::pruefe_groesse(bytes.len())?;
     let mime = crate::karte_hintergrundbild::erkenne_bild_mime(&bytes)?;
     crate::anhang::scan(crate::anhang::scan_config(), &bytes).await?;
+    let bereinigt = logo::bereinigt(&bytes, mime)?;
 
-    logo::setzen(&state.pool, benutzer.org_id, mime, &bytes, benutzer.id).await?;
+    logo::setzen(&state.pool, benutzer.org_id, mime, &bereinigt, benutzer.id).await?;
     Ok(Json(lade_anzeige(&state.pool, benutzer.org_id).await?))
 }
 
@@ -159,6 +163,10 @@ pub async fn logo_hochladen(
 /// `If-None-Match` zu den Metadaten, antwortet die Route 304, ohne den BLOB zu lesen. Sonst
 /// kommen Typ, Prüfsumme und Bytes in EINER Abfrage, damit Kopfzeilen und Bytes auch bei einem
 /// parallelen Ersetzen zusammenpassen. Kein Logo → 404.
+///
+/// Ausgeliefert wird bereinigt (LLH-1640), auch wenn der Upload schon bereinigt hat: so geht
+/// ein Logo von vor LLH-1640 ohne EXIF/GPS hinaus, und eine neue `BEREINIGUNG_VERSION` greift
+/// ohne Datenmigration. Lässt es sich nicht bereinigen → 422, nie das Original.
 pub async fn logo_lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -167,7 +175,7 @@ pub async fn logo_lesen(
     let meta = logo::meta(&state.pool, benutzer.org_id)
         .await?
         .ok_or(AppError::NotFound)?;
-    if if_none_match_matcht(&req_headers, &etag_von(&meta.sha256)) {
+    if if_none_match_matcht(&req_headers, &etag_von(&logo::etag_wert(&meta.sha256))) {
         return Ok((StatusCode::NOT_MODIFIED, logo_kopf(&meta.sha256)?).into_response());
     }
 
@@ -175,6 +183,7 @@ pub async fn logo_lesen(
     let inhalt = logo::inhalt(&state.pool, benutzer.org_id)
         .await?
         .ok_or(AppError::NotFound)?;
+    let daten = logo::bereinigt(&inhalt.daten, &inhalt.mime)?;
     let mut headers = logo_kopf(&inhalt.sha256)?;
     headers.insert(
         header::CONTENT_TYPE,
@@ -185,15 +194,16 @@ pub async fn logo_lesen(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    Ok((headers, inhalt.daten).into_response())
+    Ok((headers, daten).into_response())
 }
 
-/// ETag und `Cache-Control` des Logo-Abrufs — für 304 und 200 aus derselben Prüfsumme.
+/// ETag und `Cache-Control` des Logo-Abrufs — für 304 und 200 aus derselben Prüfsumme und
+/// Version der Bereinigung.
 fn logo_kopf(sha256: &str) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
     headers.insert(
         header::ETAG,
-        HeaderValue::from_str(&etag_von(sha256))
+        HeaderValue::from_str(&etag_von(&logo::etag_wert(sha256)))
             .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
     );
     headers.insert(

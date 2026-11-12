@@ -14,6 +14,8 @@ describe('archivText', () => {
       'geschwaerzt',
       'loeschung_ausstehend',
       'endgueltig_geloescht',
+      // LLH-1494: an die verwahrende Gegenstelle übergeben, danach nichts mehr hier.
+      'verwahrt',
     ]);
     expect([...ZUSTAENDE].sort()).toEqual(Object.keys(aufbewahrungZustand).sort());
   });
@@ -30,6 +32,7 @@ describe('archivText', () => {
       'wiederherstellen',
       null,
       // LFH-751: bei offenem Einsatz-Antrag steht die Rücknahme am Antrag, nicht im Kopf.
+      null,
       null,
       null,
       null,

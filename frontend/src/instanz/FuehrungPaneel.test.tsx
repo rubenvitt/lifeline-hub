@@ -184,7 +184,6 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     renderMitProviders(
       <FuehrungPaneel
         fuehrung={akte({
-          einsatz_id: undefined,
           fuehrend: false,
           fuehrer_name: 'ELW 1',
           fuehrer_richtung: 'wird_gemeldet',
@@ -201,7 +200,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
     await waitFor(() =>
       expect(uebernimmFuehrungMitCode).toHaveBeenCalledWith(
-        { akteId: 4 },
+        { einsatzId: 7 },
         'per Funk',
         'ABCD-EFGH-JKMN-PQRS',
       ),

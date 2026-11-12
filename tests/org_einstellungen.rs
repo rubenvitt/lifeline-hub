@@ -898,3 +898,50 @@ async fn skelett_dauer_als_fuehrungskraft_ist_403() {
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+// ------------------ Nachbereitung (LLH-1494, Spec `aufbewahrung`) ------------------
+
+/// Setzen, Lesen und Leeren der Nachbereitung; außerhalb von 1–3650 Tagen → 400.
+#[tokio::test]
+async fn nachbereitung_tage_setzen_grenzen_und_leeren() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"nachbereitung_tage": 30}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(body["nachbereitung_tage"], 30);
+
+    for falsch in [0, -1, 3651] {
+        let (status, _) = put_einstellungen(
+            &app,
+            &admin_cookie,
+            serde_json::json!({"nachbereitung_tage": falsch}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{falsch}");
+    }
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(body["nachbereitung_tage"], 30, "400 schreibt nichts");
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"nachbereitung_tage": 3650}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Obergrenze gilt");
+
+    let (status, _) = put_einstellungen(&app, &admin_cookie, serde_json::json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert!(
+        !body.as_object().unwrap().contains_key("nachbereitung_tage"),
+        "Vollersatz leert: body={body}"
+    );
+}

@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { App as AntApp, Form } from 'antd';
 import DokumentEntwurf, { type AbschnittAktion } from './DokumentEntwurf';
 import { vorlage } from '../lageberichte/vorlagen';
+import { warteAufMenueFokus } from '../test/menue';
 
 const acht = vorlage('lagebeurteilung')!.abschnitte;
 const [erster, zweiter, dritter] = acht;
@@ -49,14 +50,20 @@ const kopfVon = (label: string) =>
     .getByRole('heading', { level: 3, name: label })
     .closest<HTMLElement>('[data-lfh="abschnitt-kopf"]')!;
 
-/** Das ⋮-Menü trägt seinen Namen am Auslöser, nicht am Menü (`MenueAusloeser`). */
+/**
+ * Das ⋮-Menü trägt seinen Namen am Auslöser, nicht am Menü (`MenueAusloeser`). Gewählt wird erst,
+ * wenn der späte `autoFocus`-Aufruf des Menüs verbraucht ist: sonst zieht er unter Last den Fokus,
+ * den eine Aktion gerade gesetzt hat, ins geschlossene Menü zurück (LLH-1644, `test/menue.ts`).
+ */
 async function openDreipunkt(label: string) {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Abschnitt ${label}` }));
-  return waitFor(() =>
+  const menue = await waitFor(() =>
     document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]:not([aria-label])',
     )!,
   );
+  await warteAufMenueFokus();
+  return menue;
 }
 
 const scrollIntoView = vi.fn();
@@ -220,6 +227,7 @@ describe('DokumentEntwurf — Kontextmenü an Gliederung und Kopf', () => {
     ]);
     expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
 
+    await warteAufMenueFokus();
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Zum Abschnitt springen' }));
     const feld = screen.getByRole('textbox', { name: zweiter.label });
     await waitFor(() => expect(feld).toHaveFocus());
@@ -252,6 +260,7 @@ describe('DokumentEntwurf — Kontextmenü an Gliederung und Kopf', () => {
     const menue = await waitFor(() =>
       offenesMenue(`Aktionen zu Abschnitt ${erster.label} in der Gliederung`)!,
     );
+    await warteAufMenueFokus();
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abschnitt leeren' }));
     const dialog = await screen.findByRole('dialog', {
       name: `Abschnitt „${erster.label}“ leeren?`,
@@ -287,6 +296,7 @@ describe('DokumentEntwurf — Kontextmenü an Gliederung und Kopf', () => {
       'Text kopieren',
       'Abschnitt leeren',
     ]);
+    await warteAufMenueFokus();
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Zum Abschnitt springen' }));
     const lesen = screen.getByRole('tabpanel', { name: 'Lesefassung' });
     await waitFor(() => expect(lesen).toContainElement(lastScrollTarget()));

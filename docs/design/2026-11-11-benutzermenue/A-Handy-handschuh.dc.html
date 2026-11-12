@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Variante A, Handy Handschuh</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.tel{width:390px;height:844px;position:relative;overflow:hidden;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee}
+.kopf{height:72px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:8px;padding:0 0 0 12px;box-sizing:border-box}
+.marke{width:16px;height:16px;background:#a8071a;flex-shrink:0}
+.ktitel{font-size:15px;font-weight:600;flex:1}
+.kn{width:72px;height:72px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;color:#a0a8b1;padding:0}
+.ini{width:28px;height:28px;background:#16191d;color:#c6ccd2;font:500 11px "LFH Mono",monospace;display:inline-flex;align-items:center;justify-content:center}
+.schleier{position:absolute;left:0;right:0;top:72px;bottom:0;background:rgba(0,0,0,.5)}
+.menue{position:absolute;top:76px;right:8px;left:8px;background:#14171b;border:1px solid #2e343a;box-shadow:0 8px 24px rgba(0,0,0,.6);padding:4px 0}
+.mkopf{display:flex;gap:12px;padding:10px 16px}
+.av{width:36px;height:36px;background:#16191d;color:#e8ebee;font:500 13px "LFH Mono",monospace;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.name{font-size:16px;font-weight:600;line-height:1.3}
+.sek{font-size:13px;color:#9aa2ab}
+.tag{display:inline-block;border:1px solid #2e343a;font-size:12px;padding:0 6px;margin-left:8px;color:#c6ccd2}
+.trenner{height:1px;background:#22262b;margin:4px 0}
+.ein{display:flex;align-items:center;gap:14px;height:72px;padding:0 20px;font-size:16px;color:#e8ebee;width:100%;border:0;background:transparent;text-align:left;font-family:inherit;box-sizing:border-box}
+.ein svg{flex-shrink:0;color:#9aa2ab}
+.rot{color:#ff7070}
+.rot svg{color:#ff7070}
+.gruppe{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#838b94;padding:8px 16px 0}
+.achse{padding:4px 12px 4px}
+.aname{font-size:13px;color:#9aa2ab;margin:0 0 4px 4px}
+.seg{display:flex;gap:1px;background:#2e343a;border:1px solid #2e343a}
+.seg button{flex:1;min-width:0;height:72px;border:0;background:#0f1215;color:#9aa2ab;font-family:inherit;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 4px}
+.seg button.an{background:#16191d;color:#e8ebee;font-weight:600;box-shadow:inset 0 -3px 0 #4d94d6}
+.punkt{display:inline-block;width:9px;height:9px;border-radius:50%;background:#4d94d6;margin-left:8px}
+.rand{position:absolute;left:0;right:0;bottom:0;height:2px;background:#ff7070}
+.randtext{position:absolute;right:12px;bottom:6px;font-size:11px;color:#ff7070;background:#08090b;padding:2px 6px}
+</style>
+</helmet>
+<div class="tel">
+  <div class="kopf">
+    <span class="marke"></span>
+    <span class="ktitel">Hochwasser Elbe</span>
+    <button class="kn" aria-label="Benutzermenü"><span class="ini">RV</span></button>
+  </div>
+  <div class="schleier"></div>
+  <div class="menue" role="menu" aria-label="Benutzermenü">
+    <div class="mkopf">
+      <div class="av">RV</div>
+      <div>
+        <div class="name">Ruben Vitt<span class="tag">Führungskraft</span></div>
+        <div class="sek">@rvitt · S2 Lage · Version 1.0.0-alpha.187</div>
+      </div>
+    </div>
+    <div class="trenner"></div>
+    <button class="ein" role="menuitem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>Profil</button>
+    <button class="ein rot" role="menuitem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 4H5v16h5"></path><path d="M14 8l4 4-4 4"></path><path d="M18 12H9"></path></svg>Abmelden</button>
+    <div class="trenner"></div>
+    <div class="gruppe">Anzeige</div>
+    <div class="achse" role="radiogroup" aria-label="Darstellung">
+      <div class="aname">Darstellung</div>
+      <div class="seg">
+        <button role="radio" aria-checked="false">Hell</button>
+        <button role="radio" aria-checked="true" class="an">Dunkel</button>
+        <button role="radio" aria-checked="false">System</button>
+      </div>
+    </div>
+    <div class="achse" role="radiogroup" aria-label="Bediendichte">
+      <div class="aname">Bediendichte</div>
+      <div class="seg">
+        <button role="radio" aria-checked="false">Kompakt</button>
+        <button role="radio" aria-checked="false">Komfortabel</button>
+        <button role="radio" aria-checked="true" class="an">Handschuh</button>
+      </div>
+    </div>
+    <div class="achse" role="radiogroup" aria-label="Helligkeit in Prozent">
+      <div class="aname">Helligkeit in %</div>
+      <div class="seg">
+        <button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">100</button>
+        <button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">80</button>
+        <button role="radio" aria-checked="true" class="an" style="font-family:'LFH Mono',monospace">60</button>
+        <button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">40</button>
+        <button role="radio" aria-checked="false" style="font-family:'LFH Mono',monospace">20</button>
+      </div>
+    </div>
+    <div class="trenner"></div>
+    <button class="ein" role="menuitem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 13l3-8h12l3 8v6H3z"></path><path d="M3 13h5l1 2h6l1-2h5"></path></svg>Benachrichtigungen</button>
+    <button class="ein" role="menuitem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg><span>Neuigkeiten<span class="punkt" role="img" aria-label="ungelesen"></span></span></button>
+    <button class="ein" role="menuitem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"></path><path d="M9 11h7M9 15h7"></path></svg>Hilfe</button>
+  </div>
+  <div class="rand"></div>
+  <div class="randtext">Bildschirmrand: „Hilfe“ liegt knapp darunter</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

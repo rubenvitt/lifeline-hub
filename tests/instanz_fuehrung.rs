@@ -103,6 +103,9 @@ async fn gekoppelt() -> (Instanz, Instanz) {
     gekoppelt_mit(true, true).await
 }
 
+/// Der ELW meldet sich und gleicht danach die Einsätze ab (zwei Runden: erst danach kennt der
+/// Führer den Stand des Spiegels). Seit LLH-1641 hängt die Führung am Spiegel: Übergabe und
+/// Anfrage brauchen ein abgeglichenes Gegenüber, eine Notübernahme den Einsatz als Spiegel.
 async fn elw_meldet(elw: &Instanz) {
     sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
         .execute(&elw.pool)
@@ -111,6 +114,16 @@ async fn elw_meldet(elw: &Instanz) {
     lifeline_hub::instanz::melden::run_durchlauf(&elw.pool)
         .await
         .unwrap();
+    abgleichen(elw).await;
+}
+
+/// Zwei Runden Abgleich der Einsätze, vom ELW aus.
+async fn abgleichen(elw: &Instanz) {
+    for _ in 0..2 {
+        lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
+            .await
+            .unwrap();
+    }
 }
 
 async fn fuehrung(i: &Instanz, einsatz: i64) -> Value {
@@ -143,9 +156,39 @@ async fn etb(i: &Instanz, einsatz: i64) -> (StatusCode, Value) {
         i,
         &format!("/api/einsaetze/{einsatz}/etb"),
         json!({"von": "ELW 1", "an": "ELW 1", "typ": "meldung", "inhalt": "Lage erkundet",
-               "anhang_ids": []}),
+               "anhang_ids": [], "client_id": uuid::Uuid::new_v4().to_string()}),
     )
     .await
+}
+
+/// Am Spiegel (eine andere Instanz führt) schützt der Trigger jeden Schreibweg mit 409; eine
+/// beantragbare Erfassung wird zum Antrag (LLH-1641: nur der Spiegel sperrt).
+async fn ist_spiegel_mit_antraegen(i: &Instanz, einsatz: i64) {
+    let (s, v) = common::anfrage_json(
+        &i.app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}"),
+        &i.admin,
+        Some(&json!({"bezeichnung": "Anders"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Spiegel"), "{v}");
+    let (s, v) = etb(i, einsatz).await;
+    assert_eq!(
+        s,
+        StatusCode::ACCEPTED,
+        "Antrag an die führende Instanz: {v}"
+    );
+}
+
+/// Der Einsatz einer Akte an dieser Instanz (eigener oder Spiegel).
+async fn einsatz_der_akte(i: &Instanz, akte: i64) -> i64 {
+    sqlx::query_scalar("SELECT einsatz_id FROM einsatz_fuehrung WHERE id = ?")
+        .bind(akte)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
 }
 
 async fn aktionen(pool: &sqlx::SqlitePool) -> Vec<String> {
@@ -314,12 +357,31 @@ async fn elw_uebergibt_zur_verwahrung_und_schreibt_danach_nicht_mehr() {
         json!({"an": hub.kennung}),
     )
     .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "der Hub hat den Abschluss noch nicht: {v}"
+    );
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("Abgleich läuft noch"),
+        "{v}"
+    );
+    abgleichen(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "auch nach dem Abschluss: {v}");
     assert_eq!(v["fuehrend"], false);
     assert_eq!(v["epoche"], 2);
     elw_meldet(&elw).await;
-    let h = fremde(&hub).await;
-    let a = h.iter().find(|a| a["id"] == akte).unwrap();
+    let a = fuehrung(&hub, einsatz_der_akte(&hub, akte).await).await;
+    assert_eq!(a["id"], akte, "eine Akte für Spiegel und Führung");
     assert_eq!(a["fuehrer_kennung"], hub.kennung);
     assert_eq!(a["fuehrend"], true);
     assert_eq!(a["epoche"], 2);
@@ -337,12 +399,7 @@ async fn nach_uebergabe_ist_schreiben_409_und_lesen_bleibt() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, v) = etb(&elw, e).await;
-    assert_eq!(s, StatusCode::CONFLICT, "{v}");
-    assert!(v["error"]
-        .as_str()
-        .unwrap()
-        .starts_with("Führung liegt bei"));
+    ist_spiegel_mit_antraegen(&elw, e).await;
     let (s, _) = common::anfrage(
         &elw.app,
         "GET",
@@ -413,7 +470,8 @@ async fn elw_fragt_an_und_uebernimmt_bei_ankunft() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["anfrage_offen"], true);
     elw_meldet(&elw).await;
-    let a = &fremde(&elw).await[0];
+    let s = einsatz_der_akte(&elw, akte).await;
+    let a = fuehrung(&elw, s).await;
     assert_eq!(a["fuehrend"], true, "{a}");
     assert_eq!(a["epoche"], 2);
     assert_eq!(a["anfrage_offen"], false);
@@ -421,8 +479,23 @@ async fn elw_fragt_an_und_uebernimmt_bei_ankunft() {
     assert_eq!(f["fuehrend"], false);
     assert_eq!(f["fuehrer_kennung"], elw.kennung);
     assert_eq!(f["art"], "anfrage");
-    let (s, _) = etb(&hub, h).await;
-    assert_eq!(s, StatusCode::CONFLICT, "der Hub schreibt nicht mehr");
+    ist_spiegel_mit_antraegen(&hub, h).await;
+    // Ohne Merker: am früheren Spiegel greift kein Schutz-Trigger mehr.
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         SELECT ?, id, 'einsatzleitung' FROM benutzer WHERE benutzername = 'admin' \
+         AND id NOT IN (SELECT benutzer_id FROM spiegel_konto)",
+    )
+    .bind(s)
+    .execute(&elw.pool)
+    .await
+    .expect("der Einsatz ist am ELW kein Spiegel mehr");
+    let (st, v) = etb(&elw, s).await;
+    assert_eq!(
+        st,
+        StatusCode::CREATED,
+        "der ELW schreibt seinen früheren Spiegel: {v}"
+    );
 }
 
 #[tokio::test]
@@ -531,13 +604,12 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     let letzter = verlauf.last().unwrap();
     assert_eq!(letzter["art"], "bestaetigt");
     assert!(letzter["bruch_at"].as_str().is_some());
-    let (s, _) = etb(&elw, e).await;
-    assert_eq!(s, StatusCode::CONFLICT);
+    ist_spiegel_mit_antraegen(&elw, e).await;
     assert!(aktionen(&elw.pool)
         .await
         .contains(&"fuehrung_notuebernahme".to_string()));
     elw_meldet(&elw).await;
-    let a = &fremde(&hub).await[0];
+    let a = fuehrung(&hub, einsatz_der_akte(&hub, akte).await).await;
     assert_eq!(a["art"], "bestaetigt");
     // Ohne offene Übernahme ist Bestätigen 409.
     let (s, _) = post(
@@ -695,12 +767,8 @@ async fn abgabe_per_code_und_eingabe_am_hub() {
     let (e, akte) = elw_einsatz(&hub, &elw).await;
     let code = code_am_elw(&hub, &elw, e).await;
     assert_eq!(code.len(), 19, "Vierergruppen: {code}");
-    let (s, _) = etb(&elw, e).await;
-    assert_eq!(
-        s,
-        StatusCode::CONFLICT,
-        "ab dem Code schreibt der ELW nicht mehr"
-    );
+    // Ab dem Code schreibt der ELW nicht mehr; was er erfasst, wird Antrag an den Hub.
+    ist_spiegel_mit_antraegen(&elw, e).await;
     let gespeichert: Option<String> =
         sqlx::query_scalar("SELECT abgabe_schluessel FROM einsatz_fuehrung WHERE einsatz_id = ?")
             .bind(e)
@@ -806,7 +874,7 @@ async fn gleichstand_entscheidet_die_groessere_kennung_an_beiden_seiten() {
     elw_meldet(&elw).await;
     elw_meldet(&elw).await;
     let am_hub = fuehrung(&hub, h).await;
-    let am_elw = &fremde(&elw).await[0];
+    let am_elw = &fuehrung(&elw, einsatz_der_akte(&elw, akte_elw).await).await;
     assert_eq!(
         am_hub["fuehrer_kennung"], am_elw["fuehrer_kennung"],
         "beide Seiten einig: {am_hub} / {am_elw}"
@@ -837,8 +905,7 @@ async fn nach_dem_widerruf_holt_der_elw_seinen_einsatz_zurueck() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = etb(&elw, e).await;
-    assert_eq!(s, StatusCode::CONFLICT);
+    ist_spiegel_mit_antraegen(&elw, e).await;
     let (_, u) = common::anfrage(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
     let id = u["kopplungen"][0]["id"].as_i64().unwrap();
     let (s, v) = post(
@@ -983,4 +1050,693 @@ async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
     elw_meldet(&elw1).await;
     let f = fuehrung(&hub, h).await;
     assert_eq!(f["fuehrer_kennung"], elw2.kennung, "ELW 2 führt weiter");
+}
+
+// ── Führung auf dem Spiegel (LLH-1641) ───────────────────────────────────────────────────────
+
+/// Der Admin der Instanz wird Einsatzleitung, direkt in der DB und ohne Merker: geht nur, wenn
+/// der Einsatz hier kein Spiegel ist (sonst bricht der Schutz-Trigger ab).
+async fn mitglied_werden(i: &Instanz, einsatz: i64) {
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         SELECT ?, id, 'einsatzleitung' FROM benutzer WHERE benutzername = 'admin' \
+         AND id NOT IN (SELECT benutzer_id FROM spiegel_konto)",
+    )
+    .bind(einsatz)
+    .execute(&i.pool)
+    .await
+    .expect("der Einsatz ist hier kein Spiegel");
+}
+
+async fn ist_spiegel(i: &Instanz, einsatz: i64) -> bool {
+    sqlx::query_scalar("SELECT spiegel = 1 FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Laufende Nummern des ETB, aufsteigend.
+async fn etb_nummern(i: &Instanz, einsatz: i64) -> Vec<i64> {
+    sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr")
+        .bind(einsatz)
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Ein Konto, das der Hub vergibt und der ELW mit den Stammdaten bekommt; am ELW mit dem
+/// Passwort des Admins, weil das eigene ohne bestätigte Platte nicht mitkommt. (ID am ELW, Cookie
+/// am ELW.)
+async fn gemeinsames_konto(hub: &Instanz, elw: &Instanz, name: &str) -> (i64, String) {
+    let (s, v) = post(
+        hub,
+        "/api/benutzer",
+        json!({"anzeigename": name, "benutzername": name, "passwort": format!("{name}pw12345")}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    elw_meldet(elw).await;
+    sqlx::query(
+        "UPDATE benutzer SET passwort_hash = (SELECT passwort_hash FROM benutzer \
+         WHERE benutzername = 'admin'), passwort_wechsel_pflicht = 0 WHERE benutzername = ?",
+    )
+    .bind(name)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = ?")
+        .bind(name)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    (id, common::login_cookie(&elw.app, name, "startpw12").await)
+}
+
+#[tokio::test]
+async fn nach_der_uebergabe_schreibt_der_hub_und_der_elw_stellt_antraege() {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, erika) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(
+        ist_spiegel(&hub, h).await,
+        "vor der Übergabe spiegelt der Hub"
+    );
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await, "der ELW spiegelt sofort");
+    elw_meldet(&elw).await;
+    assert!(!ist_spiegel(&hub, h).await, "der Hub führt");
+    mitglied_werden(&hub, h).await;
+    let (s, v) = etb(&hub, h).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    // Am ELW wird Erikas Erfassung zum Antrag; der Hub führt ihn genau einmal aus.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/etb"),
+        &erika,
+        Some(
+            &json!({"von": "ELW 1", "an": "EL", "typ": "meldung", "inhalt": "Vom ELW",
+                     "anhang_ids": [], "client_id": "c-1"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    let antraege: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT zustand, grund FROM spiegel_antrag")
+            .fetch_all(&elw.pool)
+            .await
+            .unwrap();
+    let am_hub = etb_nummern(&hub, h).await;
+    assert_eq!(
+        am_hub.len(),
+        3,
+        "ELW-Eintrag, Hub-Eintrag, Antrag: {am_hub:?} {antraege:?}"
+    );
+    assert_eq!(
+        etb_nummern(&elw, e).await,
+        am_hub,
+        "der Spiegel holt alles nach"
+    );
+    assert!(
+        antraege.iter().all(|(z, _)| z == "uebernommen"),
+        "{antraege:?}"
+    );
+    abgleichen(&elw).await;
+    assert_eq!(etb_nummern(&hub, h).await.len(), 3, "kein zweites Mal");
+}
+
+#[tokio::test]
+async fn uebergabe_ohne_abgleich_ist_409() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(!ist_spiegel(&elw, e).await);
+}
+
+#[tokio::test]
+async fn notuebernahme_am_hub_macht_den_spiegel_beschreibbar() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(ist_spiegel(&hub, h).await);
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    assert!(!ist_spiegel(&hub, h).await, "der Hub schreibt sofort");
+    mitglied_werden(&hub, h).await;
+    let (s, v) = etb(&hub, h).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    // Der ELW schreibt bis zur Entscheidung weiter; was der Hub nicht kennt, wird Bruchstelle.
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    let am_hub = etb_nummern(&hub, h).await;
+    assert_eq!(
+        am_hub.len(),
+        2,
+        "ELW-Eintrag vor der Übernahme und Hub-Eintrag: {am_hub:?}"
+    );
+    assert_eq!(
+        etb_nummern(&elw, e).await,
+        am_hub,
+        "keine Doppelten am Spiegel"
+    );
+    let gesichert: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert!(gesichert >= 1, "der eigene Eintrag ist gesichert");
+    let (_, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert!(
+        kopf["spiegel"]["bruchstelle"].as_i64().unwrap() >= 1,
+        "{kopf}"
+    );
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+}
+
+/// Eine Meldung nach dem Bruch und ihr ETB-Eintrag zeigen aufeinander. Beide verlassen den
+/// Spiegel trotzdem, und die Bruchstelle kommt zu Ende (Befund aus LLH-1646).
+#[tokio::test]
+async fn meldung_nach_dem_bruch_verlaesst_den_spiegel() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+
+    let (s, m) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/meldungen"),
+        json!({"absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "Deich instabil",
+               "ereigniszeit": "2026-06-12 09:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+    let offen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(offen, 0, "Meldung und ETB-Eintrag sind entfernt");
+    let meldungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ?")
+        .bind(e)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(meldungen, 0, "die Meldung liegt nicht mehr am Spiegel");
+}
+
+async fn bruch_offen(i: &Instanz, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT bruch_offen FROM einsatz_spiegel WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Mehr als `BRUCH_MAX` gesicherte Zeilen klären sich über mehrere Runden; geschlossen wird
+/// erst, wenn keine ungefragte mehr übrig ist (Review LLH-1641).
+#[tokio::test]
+async fn eine_grosse_bruchstelle_klaert_sich_ueber_mehrere_runden() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    // Zeilen, die der Hub nicht kennt (und die es hier nicht mehr gibt): jede muss gefragt werden.
+    let zahl = lifeline_hub::instanz::spiegel::paket::BRUCH_MAX + 50;
+    for n in 0..zahl {
+        sqlx::query(
+            "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, gesichert_at) \
+             VALUES (?, 'etb_eintrag', ?, 1, '2026-11-11 12:00:00')",
+        )
+        .bind(e)
+        .bind(format!("{}", 900_000 + n))
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let ungeklaert: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0 \
+         AND schluessel >= '900000'",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(ungeklaert, 0, "jede Zeile ist gefragt und entfernt");
+    assert_eq!(bruch_offen(&elw, e).await, 0);
+}
+
+/// Eine ganze Seite, an der noch Verweise späterer Zeilen hängen, blockiert die Bruchstelle
+/// nicht: Sie wird zurückgestellt, die späteren Seiten laufen durch, dann geht sie (Review
+/// LLH-1641).
+#[tokio::test]
+async fn verweise_von_spaeteren_seiten_blockieren_die_bruchstelle_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    // Eine volle Seite Einheiten, jede mit einer Einsatzkraft darin; die Kräfte sortieren
+    // dahinter und kommen erst auf der zweiten Seite.
+    let zahl = lifeline_hub::instanz::spiegel::paket::BRUCH_MAX;
+    let mut tx = elw.pool.begin().await.unwrap();
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    for n in 0..zahl {
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(format!("Zug {n}"))
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        let kraft: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id) VALUES (?, ?, ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(format!("Kraft {n}"))
+        .bind(einheit)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        for (art, id) in [("einsatz_einheit", einheit), ("einsatz_personal", kraft)] {
+            sqlx::query(
+                "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, \
+                 gesichert_at) VALUES (?, ?, ?, 1, '2026-11-11 12:00:00')",
+            )
+            .bind(e)
+            .bind(art)
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+    }
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let einheiten: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert_eq!(einheiten, 0, "die Einheiten gehen nach ihren Kräften");
+    let ungeklaert: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND entfernt = 0",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(ungeklaert, 0);
+    assert_eq!(bruch_offen(&elw, e).await, 0);
+}
+
+/// Ein Schlüssel aus der Bruchstelle, den SQLite inzwischen in einem anderen Einsatz neu
+/// vergeben hat, löscht dort nichts: Geräumt wird nur im Einsatz der Bruchstelle (Review
+/// LLH-1641).
+#[tokio::test]
+async fn bruchstelle_raeumt_nur_im_eigenen_einsatz() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    abgleichen(&elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_spiegel(&elw, e).await);
+    // Ein zweiter Einsatz, den der ELW selbst führt, mit einer Einheit.
+    let anderer = common::einsatz_anlegen_mit(&elw.app, &elw.admin, "Zweiter Einsatz").await;
+    assert!(!ist_spiegel(&elw, anderer).await);
+    let einheit: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Fremder Zug') RETURNING id",
+    )
+    .bind(anderer)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    // Die Bruchstelle des Spiegels nennt dieselbe Kennung, als hätte SQLite sie neu vergeben.
+    sqlx::query(
+        "INSERT INTO einsatz_bruchstelle (einsatz_id, art, schluessel, stand, gesichert_at) \
+         VALUES (?, 'einsatz_einheit', ?, 1, '2026-11-11 12:00:00')",
+    )
+    .bind(e)
+    .bind(einheit.to_string())
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_spiegel SET bruch_offen = 1 WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    let bleibt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE id = ?")
+        .bind(einheit)
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(bleibt, 1, "die Einheit des anderen Einsatzes bleibt");
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+}
+
+#[tokio::test]
+async fn rueckuebergabe_bringt_keine_doppelten() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let (s, _) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    elw_meldet(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    mitglied_werden(&hub, h).await;
+    let (s, _) = etb(&hub, h).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let (s, v) = post(
+        &hub,
+        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        json!({"an": elw.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert!(!ist_spiegel(&elw, e).await, "der ELW führt wieder");
+    assert!(ist_spiegel(&hub, h).await);
+    let (s, _) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED);
+    abgleichen(&elw).await;
+    let am_elw = etb_nummern(&elw, e).await;
+    assert_eq!(am_elw, vec![1, 2, 3], "{am_elw:?}");
+    assert_eq!(etb_nummern(&hub, h).await, am_elw);
+}
+
+#[tokio::test]
+async fn ein_offener_antrag_am_spiegel_wird_beim_wechsel_genau_einmal_ausgefuehrt() {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, _) = gemeinsames_konto(&hub, &elw, "erika").await;
+    sqlx::query("UPDATE benutzer SET passwort_wechsel_pflicht = 0")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let erika = common::login_cookie(&hub.app, "erika", "erikapw12345").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    let h = einsatz_der_akte(&hub, akte).await;
+
+    // Am Hub (noch Spiegel) beantragt Erika einen Eintrag; bevor er beim ELW ankommt, wechselt
+    // die Führung.
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{h}/etb"),
+        &erika,
+        Some(
+            &json!({"von": "Stab", "an": "EL", "typ": "meldung", "inhalt": "Vom Stab",
+                     "anhang_ids": [], "client_id": "c-1"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    for _ in 0..2 {
+        lifeline_hub::instanz::spiegel::takt::durchlauf(&hub.pool, Some(&hub.app), true)
+            .await
+            .unwrap();
+        abgleichen(&elw).await;
+    }
+    let am_hub = etb_nummern(&hub, h).await;
+    assert_eq!(am_hub, vec![1], "der Antrag steht genau einmal am Hub");
+    assert_eq!(etb_nummern(&elw, e).await, am_hub);
+    let offen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM spiegel_antrag")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    assert_eq!(offen, 0, "ausgeführt und erledigt");
+}
+
+/// Anträge ohne eigene Erfassung gehen beim Wechsel nicht verloren (Review LLH-1641): der
+/// ETB-Antrag einer Freigabe (`etb_beantragen_tx`) und ein Antrag aus der Zeit vor LLH-1641
+/// (`daten_lokal` leer, keine Kennungen darin).
+#[tokio::test]
+async fn antraege_ohne_eigene_erfassung_werden_beim_wechsel_ausgefuehrt() {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, _) = gemeinsames_konto(&hub, &elw, "erika").await;
+    sqlx::query("UPDATE benutzer SET passwort_wechsel_pflicht = 0")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let erika = common::login_cookie(&hub.app, "erika", "erikapw12345").await;
+    let erika_hub: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'erika'")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    let h = einsatz_der_akte(&hub, akte).await;
+
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{h}/etb"),
+        &erika,
+        Some(
+            &json!({"von": "Stab", "an": "EL", "typ": "meldung", "inhalt": "Alter Antrag",
+                     "anhang_ids": [], "client_id": "c-alt"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    sqlx::query("UPDATE spiegel_antrag SET daten_lokal = NULL")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let mut conn = hub.pool.acquire().await.unwrap();
+    lifeline_hub::instanz::spiegel::antrag::etb_beantragen_tx(
+        &mut conn,
+        h,
+        erika_hub,
+        lifeline_hub::etb::EtbTyp::Meldung,
+        "Lagebild freigegeben",
+        "Stab",
+        "EL",
+    )
+    .await
+    .unwrap();
+    drop(conn);
+
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    for _ in 0..2 {
+        lifeline_hub::instanz::spiegel::takt::durchlauf(&hub.pool, Some(&hub.app), true)
+            .await
+            .unwrap();
+        abgleichen(&elw).await;
+    }
+    assert_eq!(
+        etb_nummern(&hub, h).await.len(),
+        2,
+        "beide Anträge stehen am Hub"
+    );
+    let offen: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT zustand, grund FROM spiegel_antrag")
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert!(offen.is_empty(), "ausgeführt und erledigt: {offen:?}");
+}
+
+#[tokio::test]
+async fn ein_anhang_den_der_neue_fuehrer_nicht_hat_kommt_vom_alten() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    // Vier Stücke: eine Runde Abgleich bringt nur die Metadaten.
+    let n = 3 * 256 * 1024 + 1000;
+    let bytes: Vec<u8> = (0..n).map(|i| (i * 7 % 251) as u8).collect();
+    sqlx::query(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'foto.bin', 'application/octet-stream', ?, 'x', ?, 1)",
+    )
+    .bind(e)
+    .bind(n as i64)
+    .bind(&bytes)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
+        .await
+        .unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    lifeline_hub::instanz::melden::run_durchlauf(&elw.pool)
+        .await
+        .unwrap();
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(!ist_spiegel(&hub, h).await, "der Hub führt");
+    let (hub_id, laenge): (i64, i64) =
+        sqlx::query_as("SELECT id, length(daten) FROM anhang WHERE einsatz_id = ?")
+            .bind(h)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert!((laenge as usize) < n, "noch nicht vollständig: {laenge}");
+    let f = lifeline_hub::instanz::spiegel::anhang::pruefe_vorhanden(
+        &hub.pool,
+        "anhang",
+        &hub_id.to_string(),
+    )
+    .await;
+    assert!(
+        matches!(f, Err(lifeline_hub::error::AppError::Conflict(ref t)) if t == lifeline_hub::instanz::spiegel::anhang::WIRD_GEHOLT),
+        "{f:?}"
+    );
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let am_hub: Vec<u8> = sqlx::query_scalar("SELECT daten FROM anhang WHERE id = ?")
+        .bind(hub_id)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    assert_eq!(am_hub, bytes, "vom ELW geholt");
 }

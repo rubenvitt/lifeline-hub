@@ -2,7 +2,7 @@
 //! Prüfsumme an. Seinen Inhalt holt der Spiegel in Stücken: angeforderte zuerst, dann im Leerlauf
 //! die übrigen. Erst bei voller Länge und passender Prüfsumme gilt der Inhalt.
 
-use super::paket::{AnhangAbruf, AnhangTeil, ANHAENGE_MAX, TEIL_GROESSE};
+use super::paket::{AnhangAbruf, AnhangTeil, BlobAngabe, ANHAENGE_MAX, TEIL_GROESSE};
 use super::schema;
 use super::uebernehmen::OffenerInhalt;
 use crate::error::AppError;
@@ -33,13 +33,37 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// Merkt sich nach einer Übernahme, welche Inhalte fehlen. Eine geänderte Prüfsumme beginnt neu;
-/// ein leerer Inhalt ist sofort fertig.
+/// ein leerer Inhalt ist sofort fertig. Hat die eigene Zeile den Inhalt schon (sie stammt von
+/// dieser Instanz, die den Einsatz vorher führte, LLH-1641 E7), fehlt nichts.
 pub async fn merke_inhalte(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     inhalte: &[OffenerInhalt],
 ) -> Result<(), AppError> {
+    let schema = schema::schema(conn).await?;
     for i in inhalte {
+        if let Some((t, b)) = schema
+            .tabelle(&i.art)
+            .and_then(|t| t.blob.as_deref().map(|b| (t, b)))
+        {
+            let lokal: Option<Option<Vec<u8>>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT \"{b}\" FROM {} WHERE {}",
+                t.name,
+                t.schluessel.gleich(t.name)
+            )))
+            .bind(&i.lokaler_schluessel)
+            .fetch_optional(&mut *conn)
+            .await?;
+            if let Some(Some(lokal)) = lokal {
+                if !lokal.is_empty()
+                    && lokal.len() as i64 == i.angabe.groesse
+                    && hex(&Sha256::digest(&lokal)) == i.angabe.sha256
+                {
+                    vergiss(conn, &i.art, &i.lokaler_schluessel).await?;
+                    continue;
+                }
+            }
+        }
         let bisher: Option<String> = sqlx::query_scalar(
             "SELECT sha256 FROM spiegel_anhang WHERE art = ? AND lokaler_schluessel = ?",
         )
@@ -87,6 +111,25 @@ pub async fn vergiss(
     Ok(())
 }
 
+/// Größe und Prüfsumme eines Inhalts, den diese Instanz selbst noch holt (LLH-1641, E7): Wer einen
+/// Einsatz übernommen hat, liefert die Angabe des alten Führers weiter, nicht die des leeren
+/// Platzhalters.
+pub async fn offene_angabe(
+    conn: &mut SqliteConnection,
+    art: &str,
+    lokaler_schluessel: &str,
+) -> Result<Option<BlobAngabe>, AppError> {
+    let zeile: Option<(i64, String)> = sqlx::query_as(
+        "SELECT groesse, sha256 FROM spiegel_anhang \
+         WHERE art = ? AND lokaler_schluessel = ? AND fertig_at IS NULL",
+    )
+    .bind(art)
+    .bind(lokaler_schluessel)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(zeile.map(|(groesse, sha256)| BlobAngabe { groesse, sha256 }))
+}
+
 /// Prüft vor einer Auslieferung, ob der Inhalt am Spiegel schon da ist. Fehlt er, wird er
 /// angefordert, der Abgleich geweckt, und die Antwort ist 409 [`WIRD_GEHOLT`].
 pub async fn pruefe_vorhanden(
@@ -124,22 +167,26 @@ pub async fn pruefe_vorhanden(
 }
 
 /// Was der Spiegel bei einer Kopplung holen will: angeforderte Inhalte zuerst, dann wenige zum
-/// Vorabladen.
+/// Vorabladen. Dazu Inhalte, die ein neuer Führer vom alten noch holt (LLH-1641, E7).
 pub async fn offene_abrufe(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<Vec<AnhangAbruf>, AppError> {
     let zeilen: Vec<(String, String, String, String, i64, Option<String>)> = sqlx::query_as(
-        "SELECT s.fremde_kennung, a.art, a.fremder_schluessel, a.sha256, a.empfangen, \
-         a.angefordert_at FROM spiegel_anhang a \
-         JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
-         JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-         WHERE o.kopplung_id = ? AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL \
-         AND a.fertig_at IS NULL AND a.groesse <= ? \
+        "SELECT e.kennung, a.art, a.fremder_schluessel, a.sha256, a.empfangen, \
+         a.angefordert_at FROM spiegel_anhang a JOIN einsatz e ON e.id = a.einsatz_id \
+         WHERE a.fertig_at IS NULL AND a.groesse <= ? AND e.kennung IS NOT NULL AND ( \
+           EXISTS (SELECT 1 FROM einsatz_spiegel s \
+                   JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+                   WHERE s.einsatz_id = a.einsatz_id AND o.kopplung_id = ? \
+                     AND o.widerrufen_at IS NULL AND s.beendet_at IS NULL) \
+           OR (e.spiegel = 0 AND EXISTS (SELECT 1 FROM einsatz_fuehrung f \
+                   WHERE f.einsatz_id = a.einsatz_id AND f.herkunft_kopplung_id = ?))) \
          ORDER BY a.angefordert_at IS NULL, a.angefordert_at, a.rowid LIMIT ?",
     )
-    .bind(kopplung_id)
     .bind(INHALT_MAX)
+    .bind(kopplung_id)
+    .bind(kopplung_id)
     .bind(ANHAENGE_MAX as i64)
     .fetch_all(&mut *conn)
     .await?;
@@ -163,8 +210,10 @@ pub async fn offene_abrufe(
     Ok(abrufe)
 }
 
-/// Liefert an der führenden Seite Stücke der abgerufenen Inhalte, bis `bytes` erschöpft ist.
-/// Ob der Inhalt sich inzwischen geändert hat, prüft der Spiegel am Ende über die Prüfsumme.
+/// Liefert Stücke der abgerufenen Inhalte, bis `bytes` erschöpft ist. Ob der Inhalt sich
+/// inzwischen geändert hat, prüft der Abrufer am Ende über die Prüfsumme. Liefern kann jede Seite,
+/// die den Inhalt vollständig hat: der Führer an seinen Spiegel, und nach einem Wechsel der alte
+/// Führer (jetzt Spiegel) an den neuen (LLH-1641, E7).
 pub async fn liefere_teile(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -182,11 +231,16 @@ pub async fn liefere_teile(
             continue;
         };
         let Some(spalte) = &t.blob else { continue };
-        // Nur Einsätze, die diese Kopplung bekommt: geführt und ihre Org ihr aktiv zugeordnet.
+        // Nur Einsätze, die diese Kopplung bekommt: ein hier geführter, dessen Org ihr aktiv
+        // zugeordnet ist, oder ein Spiegel genau dieser Kopplung (alter Führer, E7). Ein Spiegel
+        // einer anderen Kopplung derselben Org bleibt außen vor.
         let gefuehrt: Option<i64> = sqlx::query_scalar(
-            "SELECT e.id FROM einsatz e WHERE e.kennung = ? AND e.spiegel = 0 AND EXISTS ( \
-             SELECT 1 FROM instanz_kopplung_org o WHERE o.kopplung_id = ? \
-             AND o.org_id = e.org_id AND o.widerrufen_at IS NULL)",
+            "SELECT e.id FROM einsatz e WHERE e.kennung = ?1 AND ( \
+             (e.spiegel = 0 AND EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+               WHERE o.kopplung_id = ?2 AND o.org_id = e.org_id AND o.widerrufen_at IS NULL)) \
+             OR EXISTS (SELECT 1 FROM einsatz_spiegel s JOIN instanz_kopplung_org o \
+               ON o.id = s.kopplung_org_id WHERE s.einsatz_id = e.id AND o.kopplung_id = ?2 \
+               AND o.widerrufen_at IS NULL))",
         )
         .bind(&a.kennung)
         .bind(kopplung_id)
@@ -202,7 +256,7 @@ pub async fn liefere_teile(
         .bind(&a.schluessel)
         .fetch_one(&mut *conn)
         .await?;
-        if !besitzt || a.ab < 0 {
+        if !besitzt || a.ab < 0 || offene_angabe(conn, &a.art, &a.schluessel).await?.is_some() {
             continue;
         }
         if a.ab == 0
@@ -304,16 +358,21 @@ pub async fn uebernehme_teile(
         };
         let offen: Option<(i64, String, i64, i64)> = sqlx::query_as(
             "SELECT a.einsatz_id, a.lokaler_schluessel, a.groesse, a.empfangen \
-             FROM spiegel_anhang a JOIN einsatz_spiegel s ON s.einsatz_id = a.einsatz_id \
-             JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
-             WHERE s.fremde_kennung = ? AND o.kopplung_id = ? AND a.art = ? \
-             AND a.fremder_schluessel = ? AND a.sha256 = ? AND a.fertig_at IS NULL",
+             FROM spiegel_anhang a JOIN einsatz e ON e.id = a.einsatz_id \
+             WHERE e.kennung = ? AND a.art = ? AND a.fremder_schluessel = ? AND a.sha256 = ? \
+             AND a.fertig_at IS NULL AND ( \
+               EXISTS (SELECT 1 FROM einsatz_spiegel s \
+                       JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+                       WHERE s.einsatz_id = a.einsatz_id AND o.kopplung_id = ?) \
+               OR (e.spiegel = 0 AND EXISTS (SELECT 1 FROM einsatz_fuehrung f \
+                       WHERE f.einsatz_id = a.einsatz_id AND f.herkunft_kopplung_id = ?)))",
         )
         .bind(&t.kennung)
-        .bind(kopplung_id)
         .bind(&t.art)
         .bind(&t.schluessel)
         .bind(&t.sha256)
+        .bind(kopplung_id)
+        .bind(kopplung_id)
         .fetch_optional(&mut *conn)
         .await?;
         let Some((einsatz_id, lokal, groesse, empfangen)) = offen else {

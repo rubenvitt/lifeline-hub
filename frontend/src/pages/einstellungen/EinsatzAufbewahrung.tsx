@@ -19,6 +19,7 @@ import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
+import NachbereitungPaneel from '../../aufbewahrung/NachbereitungPaneel';
 import { EINSATZ_ABGESCHLOSSEN } from '../../components/nurAnsicht';
 
 /**
@@ -78,6 +79,10 @@ export default function EinsatzAufbewahrung() {
         rechteText={RECHTE_TEXT}
       />
       {daten.einsatz && <FristPaneel einsatzId={einsatzId} einsatz={daten.einsatz} />}
+      {/* LLH-1494: die Nachbereitung beginnt mit dem Abschluss. */}
+      {daten.einsatz && !daten.istAktiv && (
+        <NachbereitungPaneel einsatzId={einsatzId} einsatz={daten.einsatz} />
+      )}
       <Form<FormWerteAufbewahrung>
         form={form}
         layout="vertical"

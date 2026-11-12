@@ -12,9 +12,9 @@ import type { Dichte } from './tokens';
 import type { Helligkeit } from './helligkeit';
 
 /**
- * Die Stufen der zwei Darstellungsachsen (Modus, Dichte) mit Beschriftung und Symbol, an einem
- * Ort neben `ThemeModeProvider` und `tokens`, damit Benutzermenü und Kommandopalette dieselben
- * Stufen zeigen.
+ * Die Stufen der Darstellungsachsen (Modus, Dichte, Helligkeit) mit Beschriftung und Symbol, an
+ * einem Ort neben `ThemeModeProvider` und `tokens`, damit die Leisten des Benutzermenüs
+ * (`components/AnzeigeLeisten.tsx`) und die Kommandopalette dieselben Stufen zeigen.
  */
 type Darstellungsstufe<W> = { wert: W; titel: string; Icon: Icon };
 
@@ -25,10 +25,12 @@ type Darstellungsstufe<W> = { wert: W; titel: string; Icon: Icon };
  * die Liste zurück in ein Array-Literal zu schreiben nähme die Zusicherung still heraus.
  * `Object.values` erhält die Einfügereihenfolge, das ist die Reihenfolge im Menü.
  */
+// Hell, Dunkel, System: die Reihenfolge der Leiste im Benutzermenü (LLH-1642, Entwurf
+// `docs/design/2026-11-11-benutzermenue/`), die Systemwahl als Ausnahme am Ende.
 const DARSTELLUNG_INDEX: Record<ThemeModus, Darstellungsstufe<ThemeModus>> = {
-  system: { wert: 'system', titel: 'System', Icon: IconMonitor },
   light: { wert: 'light', titel: 'Hell', Icon: IconSonne },
   dark: { wert: 'dark', titel: 'Dunkel', Icon: IconMond },
+  system: { wert: 'system', titel: 'System', Icon: IconMonitor },
 };
 
 const DICHTE_INDEX: Record<Dichte, Darstellungsstufe<Dichte>> = {

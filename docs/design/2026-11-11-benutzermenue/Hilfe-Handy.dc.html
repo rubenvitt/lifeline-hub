@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hilfe mit Rückmeldung und Lizenzen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+a{color:#8ec2f0}a:hover{color:#7db3e8}
+.tel{width:390px;height:844px;position:relative;overflow:hidden;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee}
+.kopf{height:56px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:8px;padding:0 4px 0 12px;box-sizing:border-box}
+.marke{width:14px;height:14px;background:#a8071a;flex-shrink:0}
+.ktitel{font-size:14px;font-weight:600;flex:1}
+.kn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;color:#a0a8b1;padding:0}
+.ini{width:24px;height:24px;background:#16191d;color:#c6ccd2;font:500 10px "LFH Mono",monospace;display:inline-flex;align-items:center;justify-content:center}
+.seite{padding:12px;display:flex;flex-direction:column;gap:12px}
+.h1{font-size:20px;font-weight:600;margin:0}
+.suche{height:48px;border:1px solid #626a73;background:#0f1215;display:flex;align-items:center;padding:0 12px;color:#838b94;font-size:14px}
+.karten{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:#22262b;border:1px solid #22262b}
+.karte{background:#0f1215;padding:12px;min-height:72px}
+.kt{font-size:14px;font-weight:600;margin-bottom:4px}
+.kx{font-size:12px;color:#9aa2ab}
+.rueck{background:#0d1620;border:1px solid #2e343a;padding:12px;display:flex;flex-direction:column;gap:10px}
+.rt{font-size:14px;font-weight:600}
+.knopf{height:48px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #4d94d6;background:transparent;color:#8ec2f0;font-family:inherit;font-size:14px;text-decoration:none}
+.fuss{border-top:1px solid #22262b;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#838b94}
+.fuss a{display:inline-flex;align-items:center;min-height:44px}
+.mono{font-family:"LFH Mono",monospace}
+.neu{outline:2px dashed #4d94d6;outline-offset:3px}
+.marker{font-size:11px;color:#4d94d6;letter-spacing:.06em;text-transform:uppercase}
+</style>
+</helmet>
+<div class="tel">
+  <div class="kopf">
+    <span class="marke"></span>
+    <span class="ktitel">Hilfe</span>
+    <button class="kn" aria-label="Benutzermenü"><span class="ini">RV</span></button>
+  </div>
+  <div class="seite">
+    <h1 class="h1">Hilfe</h1>
+    <label class="suche">Hilfe durchsuchen …</label>
+    <div class="karten">
+      <div class="karte"><div class="kt">Erste Schritte</div><div class="kx">Anmelden, Rahmen, Sprungpalette</div></div>
+      <div class="karte"><div class="kt">Einsatz führen</div><div class="kx">ETB, Aufträge, Lagebild</div></div>
+      <div class="karte"><div class="kt">Personen</div><div class="kx">Sichtung, Betreuung</div></div>
+      <div class="karte"><div class="kt">Verwaltung</div><div class="kx">Einheiten, Benutzer</div></div>
+    </div>
+    <div class="marker">neu hier</div>
+    <section class="rueck neu" aria-labelledby="rt">
+      <div class="rt" id="rt">Fehler gefunden oder eine Idee?</div>
+      <div class="kx">Öffnet das Rückmeldeformular, vorbefüllt mit Version und Seite. Keine Einsatzdaten.</div>
+      <a class="knopf" href="#">Rückmeldung geben ↗</a>
+    </section>
+    <div class="fuss neu">
+      <span class="mono">Version 1.0.0-alpha.187</span>
+      <a href="#">Lizenzen ↗</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -377,16 +377,34 @@ async fn verwerfen(
     Ok(())
 }
 
-/// Erfüllt eine Anfrage: die erreichte Seite gibt an die meldende ab (D9).
+/// Erfüllt eine Anfrage: die erreichte Seite gibt an die meldende ab (D9). Hat die meldende Seite
+/// noch nicht alles, wartet die Anfrage (`anfrage_von`) und wird bei einer ihrer nächsten
+/// Meldungen erfüllt ([`erfuelle_wartende`], LLH-1641 E4). Die Epoche der Anfrage ist die der
+/// Akte (sie gilt nur dem Stand, den sie sah).
 async fn erfuelle_anfrage(
     conn: &mut SqliteConnection,
     ich: &Ich,
     kopplung: &KopplungZeile,
     a: &mut AkteZeile,
-    m: &AkteMeldung,
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
-    let neu = Epoche::naechste([&a.epoche(), &m.epoche], &ich.kennung);
+    if let Some(einsatz_id) = a.einsatz_id {
+        if !crate::instanz::spiegel::fuehrung::ist_abgeglichen(conn, einsatz_id, kopplung.id)
+            .await?
+        {
+            sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = ? WHERE id = ?")
+                .bind(&kopplung.gegenueber_kennung)
+                .bind(a.id)
+                .execute(&mut *conn)
+                .await?;
+            return Ok(());
+        }
+    }
+    sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = NULL WHERE id = ?")
+        .bind(a.id)
+        .execute(&mut *conn)
+        .await?;
+    let neu = Epoche::naechste([&a.epoche()], &ich.kennung);
     a.set_epoche(&neu);
     a.fuehrer_kennung = kopplung.gegenueber_kennung.clone();
     a.fuehrer_name = kopplung.gegenueber_name.clone();
@@ -407,6 +425,28 @@ async fn erfuelle_anfrage(
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         aus.folgen.push(Folge::Kopf { einsatz_id });
+    }
+    Ok(())
+}
+
+/// Erfüllt wartende Anfragen der meldenden Seite, sobald sie alles hat (LLH-1641, E4).
+async fn erfuelle_wartende(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_fuehrung WHERE anfrage_von = ? AND fuehrer_kennung = ? \
+         AND offen IS NULL ORDER BY id",
+    )
+    .bind(&kopplung.gegenueber_kennung)
+    .bind(&ich.kennung)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in ids {
+        let mut a = repo::load(conn, id).await?;
+        erfuelle_anfrage(conn, ich, kopplung, &mut a, aus).await?;
     }
     Ok(())
 }
@@ -713,7 +753,7 @@ pub async fn apply_eingang(
                 // Eine Anfrage gilt nur dem Stand, den sie sah (Review LLH-1491: ein alter
                 // Merker gäbe die Führung sonst ohne Menschen zurück).
                 if m.anfrage && ich_fuehre && richtung == InstanzKopplungRichtung::WirdGemeldet {
-                    erfuelle_anfrage(conn, &ich, kopplung, &mut a, m, &mut aus).await?;
+                    erfuelle_anfrage(conn, &ich, kopplung, &mut a, &mut aus).await?;
                     continue;
                 }
                 if a.einsatz_id.is_none()
@@ -730,6 +770,9 @@ pub async fn apply_eingang(
                 repo::save(conn, &mut a, true).await?;
             }
         }
+    }
+    if richtung == InstanzKopplungRichtung::WirdGemeldet {
+        erfuelle_wartende(conn, &ich, kopplung, &mut aus).await?;
     }
     Ok(aus)
 }

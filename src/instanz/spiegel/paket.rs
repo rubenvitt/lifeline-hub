@@ -33,6 +33,8 @@ pub const ZEILE_MAX: usize = SPIEGEL_MAX - RESERVE - ANTRAEGE_BYTES_MAX;
 pub const ANHAENGE_MAX: usize = 64;
 /// Größe eines Anhang-Stücks (D8).
 pub const TEIL_GROESSE: usize = 256 * 1024;
+/// Höchstzahl Zeilen einer Bruchstelle je Frage und je Antwort (LLH-1641, E6).
+pub const BRUCH_MAX: usize = 1000;
 
 /// Anfrage und Antwort des Abgleichs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -55,13 +57,98 @@ pub struct SpiegelPaket {
     /// Stücke von Anhängen, die das Gegenüber angefordert hat.
     #[serde(default)]
     pub anhang_teile: Vec<AnhangTeil>,
+    /// Lebensende von Einsätzen, die ich führe (LLH-1494, design.md D3): gelöscht oder zur
+    /// Verwahrung übergeben.
+    #[serde(default)]
+    pub lebensende: Vec<Lebensende>,
+    /// Antworten auf übergebene Einsätze (D4).
+    #[serde(default)]
+    pub lebensende_quittungen: Vec<LebensendeQuittung>,
+    /// Antworten auf die Bruchstellen in den Ständen des Gegenübers (LLH-1641, E6): welche der
+    /// gefragten Zeilen ich als Führer nicht kenne.
+    #[serde(default)]
+    pub bruch_antworten: Vec<BruchAntwort>,
 }
+
+/// Wie ein Einsatz beim Führer endet (D3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Lebensende {
+    pub kennung: String,
+    /// `geloescht`: der Führer hat den Einsatz nicht mehr, der Spiegel räumt ab. `verwahrt`: die
+    /// meldende Seite übergibt ihn der erreichten (D4). Text, damit eine ältere Seite eine neue Art
+    /// überliest statt am Lesen zu scheitern.
+    pub art: String,
+    /// Bei `verwahrt` der höchste Stand im Änderungslog des Führers; sonst 0.
+    #[serde(default)]
+    pub stand: i64,
+    /// Bei `verwahrt` die Fristen je Datenkategorie, die am Führer gelten.
+    #[serde(default)]
+    pub kategorien: Vec<KategorieFrist>,
+}
+
+/// Frist einer Datenkategorie, wie sie in `einsatz_aufbewahrung_kategorie` steht.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct KategorieFrist {
+    pub kategorie: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frist_bis: Option<String>,
+    pub rechtsgrundlage: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vorgemerkt_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geschwaerzt_at: Option<String>,
+    /// Wann die Frist am Führer gesetzt wurde: der Karenz-Beginn der Phase K1 rechnet damit
+    /// (LFH-1049). Fehlt bei einem älteren Führer; dann gilt wie bisher der Lauf selbst.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frist_gesetzt_at: Option<String>,
+}
+
+/// Antwort der erreichten Seite auf `verwahrt` (D4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LebensendeQuittung {
+    pub kennung: String,
+    /// `angenommen` oder `wartet`.
+    pub ergebnis: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grund: Option<String>,
+}
+
+/// Art eines Lebensendes: gelöscht.
+pub const LEBENSENDE_GELOESCHT: &str = "geloescht";
+/// Art eines Lebensendes: zur Verwahrung übergeben.
+pub const LEBENSENDE_VERWAHRT: &str = "verwahrt";
+/// Ergebnis einer Verwahrung: angenommen.
+pub const VERWAHRUNG_ANGENOMMEN: &str = "angenommen";
+/// Ergebnis einer Verwahrung: wartet (Grund dabei).
+pub const VERWAHRUNG_WARTET: &str = "wartet";
+/// Höchstzahl Kategorie-Fristen je Lebensende.
+pub const KATEGORIEN_MAX: usize = 16;
 
 /// Stand eines gespiegelten Einsatzes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EinsatzStand {
     pub kennung: String,
     pub stand: i64,
+    /// Zeilen (Art, Schlüssel beim Spiegel), die der Spiegel vor dem Führungswechsel selbst
+    /// geändert hat (Bruchstelle, LLH-1641 E6): Der Führer sagt, welche er nicht kennt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bruch: Vec<[String; 2]>,
+}
+
+/// Antwort des Führers auf eine Bruchstelle (LLH-1641, E6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BruchAntwort {
+    pub kennung: String,
+    /// Der Führer kann die Frage beantworten (er bekam den Einsatz als Spiegel dieser Kopplung);
+    /// sonst bleibt die Bruchstelle stehen und nichts wird entfernt.
+    pub kennt: bool,
+    /// Die gefragten Zeilen, die der Führer nicht kennt.
+    #[serde(default)]
+    pub unbekannt: Vec<[String; 2]>,
+    /// Die letzte gefragte Zeile (die Fragen sind nach Art und Schlüssel geordnet): Bis hierher
+    /// ist die Bruchstelle geklärt, dahinter fragt der Spiegel in der nächsten Runde weiter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bis: Option<[String; 2]>,
 }
 
 /// Zeilen eines Einsatzes seit einem Stand (D6).
@@ -197,7 +284,11 @@ pub struct AnhangTeil {
 impl SpiegelPaket {
     /// Prüft die Listen gegen ihre Grenzen (`src/AGENTS.md`, Listen von außen).
     pub fn check(&self) -> Result<(), String> {
-        if self.lieferungen.len() > EINSAETZE_MAX || self.staende.len() > EINSAETZE_MAX {
+        if self.lieferungen.len() > EINSAETZE_MAX
+            || self.staende.len() > EINSAETZE_MAX
+            || self.lebensende.len() > EINSAETZE_MAX
+            || self.lebensende_quittungen.len() > EINSAETZE_MAX
+        {
             return Err(format!("mehr als {EINSAETZE_MAX} Einsätze im Paket"));
         }
         let zeilen: usize = self.lieferungen.iter().map(|l| l.zeilen.len()).sum();
@@ -210,6 +301,15 @@ impl SpiegelPaket {
         if self.antraege.len() > ANTRAEGE_MAX || self.quittungen.len() > ANTRAEGE_MAX {
             return Err(format!("mehr als {ANTRAEGE_MAX} Anträge oder Quittungen"));
         }
+        if self.bruch_antworten.len() > EINSAETZE_MAX
+            || self.staende.iter().any(|s| s.bruch.len() > BRUCH_MAX)
+            || self
+                .bruch_antworten
+                .iter()
+                .any(|a| a.unbekannt.len() > BRUCH_MAX)
+        {
+            return Err(format!("mehr als {BRUCH_MAX} Zeilen einer Bruchstelle"));
+        }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
         }
@@ -217,6 +317,13 @@ impl SpiegelPaket {
         // Kopplungen enden).
         if self.lieferungen.iter().any(|l| l.seit > l.bis) {
             return Err("Lieferung mit Stand vor ihrem Beginn".into());
+        }
+        if self
+            .lebensende
+            .iter()
+            .any(|l| l.kategorien.len() > KATEGORIEN_MAX)
+        {
+            return Err("zu viele Kategorie-Fristen an einem Lebensende".into());
         }
         let mut gesehen = std::collections::HashSet::new();
         if !self.lieferungen.iter().all(|l| gesehen.insert(&l.kennung)) {
@@ -234,6 +341,9 @@ mod tests {
     fn leeres_paket_und_paket_ohne_neue_felder_sind_lesbar() {
         let p: SpiegelPaket = serde_json::from_str("{}").unwrap();
         assert!(p.check().is_ok());
+        assert!(p.lebensende.is_empty() && p.lebensende_quittungen.is_empty());
+        let l: Lebensende = serde_json::from_str(r#"{"kennung":"a/1","art":"geloescht"}"#).unwrap();
+        assert_eq!((l.stand, l.kategorien.len()), (0, 0));
         let l: EinsatzLieferung = serde_json::from_str(
             r#"{"kennung":"a/1","org":"h/1","org_id":1,"freigabestufe":"alles","seit":0,"bis":3}"#,
         )
@@ -257,11 +367,46 @@ mod tests {
         p.staende = vec![
             EinsatzStand {
                 kennung: "x".into(),
-                stand: 0
+                stand: 0,
+                bruch: Vec::new(),
             };
             EINSAETZE_MAX + 1
         ];
         assert!(p.check().is_err());
+        p.staende.clear();
+        let ende = Lebensende {
+            kennung: "x".into(),
+            art: LEBENSENDE_GELOESCHT.into(),
+            stand: 0,
+            kategorien: Vec::new(),
+        };
+        p.lebensende = vec![ende.clone(); EINSAETZE_MAX + 1];
+        assert!(p.check().is_err(), "zu viele Lebensenden");
+        p.lebensende = vec![Lebensende {
+            kategorien: vec![
+                KategorieFrist {
+                    kategorie: "anhaenge".into(),
+                    frist_bis: None,
+                    rechtsgrundlage: "RG".into(),
+                    vorgemerkt_at: None,
+                    geschwaerzt_at: None,
+                    frist_gesetzt_at: None,
+                };
+                KATEGORIEN_MAX + 1
+            ],
+            ..ende
+        }];
+        assert!(p.check().is_err(), "zu viele Kategorien");
+        p.lebensende.clear();
+        p.lebensende_quittungen = vec![
+            LebensendeQuittung {
+                kennung: "x".into(),
+                ergebnis: VERWAHRUNG_WARTET.into(),
+                grund: None,
+            };
+            EINSAETZE_MAX + 1
+        ];
+        assert!(p.check().is_err(), "zu viele Quittungen");
     }
 
     #[test]

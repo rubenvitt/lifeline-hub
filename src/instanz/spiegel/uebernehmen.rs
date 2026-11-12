@@ -139,6 +139,9 @@ pub async fn uebernehmen(
                 "Einsatz {} wird hier geführt; Lieferung verworfen.",
                 l.kennung
             ));
+            // Den Stand des Absenders nicht zurücksetzen: Die Führung wechselt gerade, und die
+            // Akten klären gleich, wer liefert (LLH-1641).
+            ergebnis.stand = l.seit;
             return Ok(ergebnis);
         }
         if !l.zeilen.iter().any(|z| z.art == "einsatz" && !z.geloescht) {
@@ -191,6 +194,18 @@ async fn uebernehme_zeilen(
     ergebnis: &mut Ergebnis,
 ) -> Result<(), AppError> {
     let konten: HashMap<i64, &KontoAngabe> = l.konten.iter().map(|k| (k.id, k)).collect();
+    // Nach einem Führungswechsel nennt der neue Führer zu jeder Zeile, die er von hier bekam, den
+    // Schlüssel hier (LLH-1641, E3): Sie ersetzt dann die eigene Zeile, statt eine zweite
+    // anzulegen. Katalogzeilen haben ihr eigenes Gegenstück (LLH-1629).
+    if let Some(id) = vorhanden {
+        for z in &l.zeilen {
+            let Some(gegen) = &z.gegen else { continue };
+            if matches!(&z.daten, Some(Value::Object(d)) if katalog::ist_katalog_daten(&z.art, d)) {
+                continue;
+            }
+            super::fuehrung::uebernimm_gegen(conn, id, &z.art, &z.schluessel, gegen).await?;
+        }
+    }
     let mut einsatz_id = vorhanden;
     // Der Kopf zuerst: an ihm hängen alle anderen Zeilen.
     if let Some(kopf) = l
@@ -501,6 +516,8 @@ async fn kopf_uebernehmen(
     .bind(id.to_string())
     .execute(&mut *conn)
     .await?;
+    // Kam die Akte des Gegenübers vor dem Spiegel an, hängt sie sich jetzt an ihn (E2).
+    super::fuehrung::verknuepfe_akte(conn, id, &l.kennung).await?;
     Ok(id)
 }
 

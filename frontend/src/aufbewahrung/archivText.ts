@@ -51,6 +51,9 @@ export const ZUSTAND_RANG: Record<AufbewahrungZustand, number> = {
   geschwaerzt: 6,
   loeschung_ausstehend: 7,
   endgueltig_geloescht: 8,
+  // LLH-1494: an die verwahrende Installation übergeben und hier abgeräumt — wie
+  // „endgültig gelöscht“ ein Endzustand an dieser Installation.
+  verwahrt: 9,
 };
 
 /** Die Zustände in Rangfolge — abgeleitet, nicht handgepflegt. */
@@ -96,6 +99,7 @@ export function primaeraktion(zustand: AufbewahrungZustand): AktePrimaeraktion {
     case 'geschwaerzt':
     case 'loeschung_ausstehend':
     case 'endgueltig_geloescht':
+    case 'verwahrt':
       return null;
   }
 }

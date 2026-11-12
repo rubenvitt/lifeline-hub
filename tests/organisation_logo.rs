@@ -3,9 +3,15 @@
 //!
 //! Der fail-closed-Pfad des Virenscans (503) steht in `tests/organisation_logo_scan.rs`:
 //! `init_scan_config` setzt eine prozessweite OnceLock und kippte hier jeden Upload auf 503.
+//!
+//! LLH-1640: gespeichert und ausgeliefert wird das Logo ohne EXIF/GPS, XMP und Kommentare.
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, Request, StatusCode};
+use image::codecs::jpeg::JpegEncoder;
+use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+use image::{ExtendedColorType, ImageEncoder, Rgb, RgbImage};
+use lifeline_hub::anhang::metadaten::BEREINIGUNG_VERSION;
 use lifeline_hub::anhang::{entscheide, ScanErgebnis};
 use serde_json::Value;
 use tower::ServiceExt;
@@ -37,7 +43,8 @@ fn jpeg() -> Vec<u8> {
     v
 }
 
-/// PNG-Magic-Bytes, auf `groesse` mit Nullen aufgefüllt.
+/// PNG-Magic-Bytes, auf `groesse` mit Nullen aufgefüllt. Die Bereinigung schneidet alles nach
+/// `IEND` ab: gespeichert wird nur [`png`].
 fn png_mit_groesse(groesse: usize) -> Vec<u8> {
     let mut v = png();
     v.resize(groesse, 0);
@@ -256,15 +263,14 @@ async fn genau_1_mib_angenommen_ein_byte_mehr_ist_400() {
 
     let (status, json) = hochladen(&app, &admin, &png_mit_groesse(MIB)).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
-    assert_eq!(json["logo"]["groesse"], MIB);
+    // Gespeichert ist die bereinigte Fassung: die Nullen nach `IEND` fallen weg (LLH-1640).
+    assert_eq!(json["logo"]["groesse"], png().len());
+    let sha_1_mib = json["logo"]["sha256"].clone();
 
     let (status, json) = hochladen(&app, &admin, &png_mit_groesse(MIB + 1)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
-    assert_eq!(
-        org(&app, &admin).await["logo"]["groesse"],
-        MIB,
-        "das 1-MiB-Logo bleibt"
-    );
+    let logo = org(&app, &admin).await["logo"].clone();
+    assert_eq!(logo["sha256"], sha_1_mib, "das 1-MiB-Logo bleibt");
 }
 
 /// Eine Datei deutlich über dem Body-Limit der Route (1 MiB + 64 KiB) ist ebenfalls 400,
@@ -345,7 +351,11 @@ async fn get_liefert_bytes_mit_typ_etag_und_nicht_unbefristetem_cache() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(bytes, png());
     assert_eq!(header_str(&h, header::CONTENT_TYPE), "image/png");
-    assert_eq!(header_str(&h, header::ETAG), format!("\"{sha}\""));
+    assert_eq!(
+        header_str(&h, header::ETAG),
+        format!("\"{sha}.b{BEREINIGUNG_VERSION}\""),
+        "ETag trägt die Version der Bereinigung"
+    );
     let cache = header_str(&h, header::CACHE_CONTROL);
     assert_eq!(cache, "private, no-cache");
     assert!(
@@ -522,4 +532,218 @@ async fn admin_von_a_kann_das_logo_von_b_nicht_aendern() {
     assert_eq!(header_str(&hb2, header::ETAG), etag_b);
     let (status, _, _) = logo_holen(&app, &admin_a, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "A hat seines entfernt");
+}
+
+// --- Metadaten-Bereinigung (LLH-1640) --------------------------------------------------
+
+/// TIFF-Block (II) mit Gerät, Ausrichtung 6 und GPS-IFD; die Personendaten tragen `MARKER`.
+fn exif_tiff() -> Vec<u8> {
+    let le16 = |v: u16| v.to_le_bytes();
+    let le32 = |v: u32| v.to_le_bytes();
+    let mut t = b"II*\0".to_vec();
+    t.extend(le32(8));
+    // IFD0 bei 8: 3 Einträge → 8 + 2 + 36 + 4 = 50.
+    t.extend(le16(3));
+    t.extend(le16(271)); // Make, ASCII, 12 Bytes bei 50
+    t.extend(le16(2));
+    t.extend(le32(12));
+    t.extend(le32(50));
+    t.extend(le16(274)); // Ausrichtung 6
+    t.extend(le16(3));
+    t.extend(le32(1));
+    t.extend(le16(6));
+    t.extend(le16(0));
+    t.extend(le16(34853)); // GPS-IFD bei 62
+    t.extend(le16(4));
+    t.extend(le32(1));
+    t.extend(le32(62));
+    t.extend(le32(0));
+    t.extend_from_slice(b"MARKER_MAKE\0");
+    // GPS-IFD bei 62: 1 Eintrag (Breite, für den Test als ASCII) → Daten bei 80.
+    t.extend(le16(1));
+    t.extend(le16(2));
+    t.extend(le16(2));
+    t.extend(le32(12));
+    t.extend(le32(80));
+    t.extend(le32(0));
+    t.extend_from_slice(b"MARKER_GPS1\0");
+    t
+}
+
+/// Ein echtes JPEG (Logo-Foto vom Handy, 240 × 120 px) mit EXIF samt GPS und einem Kommentar.
+fn logo_foto_mit_gps() -> Vec<u8> {
+    let bild = RgbImage::from_fn(240, 120, |x, _| {
+        if x < 120 {
+            Rgb([200, 30, 30])
+        } else {
+            Rgb([250, 250, 250])
+        }
+    });
+    let mut jpeg = Vec::new();
+    JpegEncoder::new_with_quality(&mut jpeg, 90)
+        .encode_image(&bild)
+        .unwrap();
+    let mut app1 = b"Exif\0\0".to_vec();
+    app1.extend(exif_tiff());
+    let com = b"MARKER_KOMMENTAR";
+    let mut foto = jpeg[..2].to_vec();
+    foto.extend([0xFF, 0xE1]);
+    foto.extend(((app1.len() + 2) as u16).to_be_bytes());
+    foto.extend(app1);
+    foto.extend([0xFF, 0xFE]);
+    foto.extend(((com.len() + 2) as u16).to_be_bytes());
+    foto.extend_from_slice(com);
+    foto.extend_from_slice(&jpeg[2..]);
+    foto
+}
+
+/// Ein lesbares PNG, das die Bereinigung trotzdem abweist: seine unkomprimierten Bildpunkte
+/// buchstabieren eine XMP-Signatur, und das Kontrollnetz verwirft die bereinigte Fassung.
+fn png_mit_signatur_in_bildpunkten() -> Vec<u8> {
+    let mut zeile = b"<x:xmpmeta".to_vec();
+    zeile.resize(36, b' ');
+    let roh: Vec<u8> = (0..4).flat_map(|_| zeile.clone()).collect();
+    let mut png = Vec::new();
+    PngEncoder::new_with_quality(
+        &mut png,
+        CompressionType::Uncompressed,
+        FilterType::NoFilter,
+    )
+    .write_image(&roh, 12, 4, ExtendedColorType::Rgb8)
+    .unwrap();
+    png
+}
+
+fn enthaelt(heuhaufen: &[u8], nadel: &[u8]) -> bool {
+    heuhaufen.windows(nadel.len()).any(|w| w == nadel)
+}
+
+/// Die gespeicherten Bytes der Org 1, am Repo vorbei gelesen.
+async fn gespeichert(pool: &sqlx::SqlitePool) -> Vec<u8> {
+    sqlx::query_scalar("SELECT daten FROM org_logo WHERE org_id = 1")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Stellt ein Logo von vor LLH-1640 nach: Bytes und Typ direkt in die Tabelle, an der
+/// Bereinigung des Uploads vorbei. Die Prüfsumme bleibt die des vorigen Uploads.
+async fn bestand_einschreiben(pool: &sqlx::SqlitePool, mime: &str, daten: &[u8]) {
+    sqlx::query("UPDATE org_logo SET mime = ?, groesse = ?, daten = ? WHERE org_id = 1")
+        .bind(mime)
+        .bind(daten.len() as i64)
+        .bind(daten)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+/// Ein Handyfoto mit GPS als Logo: gespeichert und ausgeliefert ohne GPS, Gerät und Kommentar,
+/// aber dasselbe Bild in gleicher Ausrichtung. `groesse` und `sha256` beschreiben die
+/// gespeicherte, bereinigte Fassung.
+#[tokio::test]
+async fn logo_jpeg_mit_gps_geht_ohne_gps_hinaus_und_wird_so_gespeichert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let foto = logo_foto_mit_gps();
+    assert!(enthaelt(&foto, b"MARKER_GPS1"), "Fixture trägt GPS");
+
+    let (status, json) = hochladen_als(&app, &admin, "logo.jpg", "image/jpeg", &foto).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let (status, h, bytes) = logo_holen(&app, &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(header_str(&h, header::CONTENT_TYPE), "image/jpeg");
+    assert!(
+        !enthaelt(&bytes, b"MARKER"),
+        "Metadaten in der Auslieferung"
+    );
+    // Mini-EXIF mit Ausrichtung 6 (II): Tag 274 = 0x0112, SHORT, 1, Wert 6.
+    assert!(
+        enthaelt(&bytes, &[0x12, 0x01, 3, 0, 1, 0, 0, 0, 6, 0]),
+        "Ausrichtung fehlt"
+    );
+    let gelesen = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
+        .expect("ausgeliefert wird ein lesbares JPEG");
+    assert_eq!((gelesen.width(), gelesen.height()), (240, 120));
+
+    let daten = gespeichert(&pool).await;
+    assert!(!enthaelt(&daten, b"MARKER"), "Metadaten in der Datenbank");
+    assert_eq!(daten, bytes, "gespeichert ist, was hinausgeht");
+    assert_eq!(json["logo"]["groesse"], daten.len());
+    assert_eq!(
+        json["logo"]["sha256"],
+        lifeline_hub::anhang::repo::sha256_hex(&daten),
+        "Prüfsumme der gespeicherten Fassung"
+    );
+}
+
+/// Ein Logo von vor LLH-1640 (mit GPS in der Tabelle) geht ebenso bereinigt hinaus: die
+/// Auslieferung bereinigt selbst, nicht nur der Upload.
+#[tokio::test]
+async fn bestandslogo_mit_gps_wird_bereinigt_ausgeliefert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = hochladen(&app, &admin, &png()).await;
+    assert_eq!(status, StatusCode::OK);
+    bestand_einschreiben(&pool, "image/jpeg", &logo_foto_mit_gps()).await;
+
+    let (status, h, bytes) = logo_holen(&app, &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(header_str(&h, header::CONTENT_TYPE), "image/jpeg");
+    assert!(
+        !enthaelt(&bytes, b"MARKER"),
+        "Metadaten in der Auslieferung"
+    );
+    assert!(bytes.starts_with(&[0xFF, 0xD8]) && bytes.ends_with(&[0xFF, 0xD9]));
+}
+
+/// Ein Validator aus der Zeit vor LLH-1640 (ETag ohne `.b<n>`) trägt nicht mehr: der Browser
+/// bekommt einmal die bereinigte Fassung statt eines 304 auf die rohe.
+#[tokio::test]
+async fn etag_ohne_bereinigungsversion_ist_kein_304() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = hochladen(&app, &admin, &png()).await;
+    let sha = json["logo"]["sha256"].as_str().unwrap().to_string();
+
+    let (status, _, bytes) = logo_holen(&app, &admin, Some(&format!("\"{sha}\""))).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(bytes, png());
+}
+
+/// Fail-closed beim Hochladen: ein Bild, das sich nicht bereinigen lässt, ist 422, und das
+/// bisherige Logo bleibt.
+#[tokio::test]
+async fn unbereinigbares_logo_ist_beim_hochladen_422_und_das_bisherige_bleibt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = hochladen(&app, &admin, &png()).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, json) = hochladen(&app, &admin, &png_mit_signatur_in_bildpunkten()).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    assert_eq!(
+        json["error"],
+        "Das Logo lässt sich nicht von Metadaten bereinigen."
+    );
+    assert_eq!(gespeichert(&pool).await, png(), "das bisherige Logo bleibt");
+}
+
+/// Fail-closed beim Ausliefern: lässt sich ein gespeichertes Logo nicht bereinigen, gibt es
+/// 422 und keine Bildbytes, nie das Original.
+#[tokio::test]
+async fn unbereinigbares_bestandslogo_ist_422_ohne_bildbytes() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = hochladen(&app, &admin, &png()).await;
+    assert_eq!(status, StatusCode::OK);
+    bestand_einschreiben(&pool, "image/png", &png_mit_signatur_in_bildpunkten()).await;
+
+    let (status, _, bytes) = logo_holen(&app, &admin, None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        !enthaelt(&bytes, b"<x:xmpmeta"),
+        "keine Bildbytes im Fehler"
+    );
 }

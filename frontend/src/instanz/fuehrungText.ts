@@ -35,7 +35,8 @@ export interface FuehrungMoeglich {
   perCode: FuehrungAnzeige['gegenueber'];
   /** Die Führung beim Gegenüber erbitten (meldende Seite, das Gegenüber führt). */
   anfragen: boolean;
-  /** Notübernahme ohne Beweis gegen die erreichte Seite. */
+  /** Notübernahme ohne Beweis gegen die erreichte Seite. Nur mit dem Einsatz hier als Spiegel
+   *  (LLH-1641): ohne ihn hätte diese Instanz nichts zum Weiterführen. */
   notuebernahme: boolean;
   /** Notübernahme gegen die meldende Seite: mit Unterschrift oder Code. */
   notuebernahmeMitBeweis: boolean;
@@ -45,12 +46,13 @@ export interface FuehrungMoeglich {
 
 export function fuehrungMoeglich(f: FuehrungAnzeige): FuehrungMoeglich {
   const frei = f.fuehrend && !f.offen;
+  const liegtHier = f.einsatz_id != null;
   return {
     uebergeben: frei ? f.gegenueber : [],
     perCode: frei ? f.gegenueber.filter((g) => g.richtung === 'meldet_sich') : [],
     anfragen: !f.fuehrend && f.fuehrer_richtung === 'meldet_sich' && !f.anfrage_offen,
-    notuebernahme: !f.fuehrend && f.fuehrer_richtung === 'meldet_sich',
-    notuebernahmeMitBeweis: !f.fuehrend && f.fuehrer_richtung === 'wird_gemeldet',
+    notuebernahme: liegtHier && !f.fuehrend && f.fuehrer_richtung === 'meldet_sich',
+    notuebernahmeMitBeweis: liegtHier && !f.fuehrend && f.fuehrer_richtung === 'wird_gemeldet',
     entscheiden: f.offen != null,
   };
 }

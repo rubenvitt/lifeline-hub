@@ -12,6 +12,11 @@ import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
 import { anzahl } from '../anzeige/anzahl';
+import {
+  AbgelehnteAntraegeQuelle,
+  useAbgelehnteAntraegeAusCache,
+  useAbgelehnteAntraegeLaden,
+} from '../einsatz/spiegel/abgelehnteAntraege';
 
 /**
  * Eine globale Betriebszeile für Leitung, Einsatz-Live-Feed und App-Version.
@@ -40,6 +45,10 @@ export default function LiveStatusBanner({
     benutzerId ?? null,
     geraet && benutzerId != null,
   );
+  // Abgelehnte Anträge nach der Verwahrung (LLH-1648): einsatzübergreifend wie die Offline-Queue.
+  // Eine Gerätesitzung stellt keine Anträge über einen Einsatz hinaus.
+  const antragQuelle = useAbgelehnteAntraegeLaden(benutzerId, !geraet);
+  const abgelehnteAntraege = useAbgelehnteAntraegeAusCache(geraet ? undefined : benutzerId).length;
   const { token } = theme.useToken();
   // Dieselbe Quelle wie das Instrumentenband des Lage-Dashboards.
   const status = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
@@ -96,16 +105,21 @@ export default function LiveStatusBanner({
   const klebt = klebend && !mittel && stoerung;
   const zeileRef = useRahmenObenQuelle<HTMLDivElement>(klebt);
 
+  const quelle =
+    antragQuelle.laden && antragQuelle.id != null ? (
+      <AbgelehnteAntraegeQuelle benutzerId={antragQuelle.id} />
+    ) : null;
   const bannerSichtbar =
     hinweise.length > 0 ||
     queue.ausstehend > 0 ||
     queue.abgelehnt > 0 ||
     queue.nicht_zugeordnet > 0 ||
-    fruehereKopplung > 0;
-  if (!bannerSichtbar && !recoveryOffen) return null;
+    fruehereKopplung > 0 ||
+    abgelehnteAntraege > 0;
+  if (!bannerSichtbar && !recoveryOffen) return quelle;
 
   const typ =
-    stoerung || queue.abgelehnt > 0
+    stoerung || queue.abgelehnt > 0 || abgelehnteAntraege > 0
       ? 'error'
       : status === 'connecting' ||
           queue.ausstehend > 0 ||
@@ -146,6 +160,20 @@ export default function LiveStatusBanner({
           </Space>
         </Button>
       )}
+      {abgelehnteAntraege > 0 && (
+        <Button
+          type="text"
+          danger
+          // Der Name beginnt mit dem sichtbaren Wortlaut (WCAG 2.5.3), die Zahl folgt.
+          aria-label={`Anträge abgelehnt (${anzahl(abgelehnteAntraege, 'Antrag', 'Anträge')})`}
+          onClick={() => setRecoveryOffen(true)}
+        >
+          <Space size={4}>
+            <Badge count={abgelehnteAntraege} overflowCount={999} color={token.colorError} />
+            <span>Anträge abgelehnt</span>
+          </Space>
+        </Button>
+      )}
       {fruehereKopplung > 0 && (
         <Button
           type="text"
@@ -178,6 +206,7 @@ export default function LiveStatusBanner({
 
   return (
     <>
+      {quelle}
       {bannerSichtbar && (
         <div ref={zeileRef} data-lfh="betriebszeile" style={klebt ? RAHMEN_KLEBT : undefined}>
           <Alert

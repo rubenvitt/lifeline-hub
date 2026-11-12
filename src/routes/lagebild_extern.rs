@@ -93,8 +93,8 @@ const OEFFENTLICHE_ZONEN: &[LageZoneTyp] = &[
 // ---------------------------------------------------------------------------------------------
 
 /// Darf die Einsatzleitung hier freigeben? Aktiver Einsatz, und diese Instanz führt ihn oder hält
-/// ihn als Spiegel (design.md D2). Führt eine andere Instanz, ohne dass hier ein Spiegel liegt,
-/// fehlt der Weg für den ETB-Eintrag: 409 wie jeder Schreibweg (LLH-1491).
+/// ihn als Spiegel (design.md D2). Wer einen Einsatz nicht führt, hält ihn als Spiegel, der
+/// ETB-Eintrag geht dann als Antrag an den Führer (LLH-1641, ADR-0021).
 fn fordere_freigabe_moeglich(ctx: &EinsatzLesezugriff) -> Result<(), AppError> {
     ctx.fordere_einsatzleitung()?;
     if !ctx.einsatz.ist_aktiv() {
@@ -102,17 +102,11 @@ fn fordere_freigabe_moeglich(ctx: &EinsatzLesezugriff) -> Result<(), AppError> {
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
         ));
     }
-    if !ctx.einsatz.spiegel.spiegel_ist {
-        if let Some(bei) = &ctx.einsatz.fuehrung.fuehrung_bei {
-            return Err(crate::einsatz::berechtigung::fuehrung_error(bei));
-        }
-    }
     Ok(())
 }
 
-/// Prüfung in der Transaktion: beim Führer Status und Führung (`fordere_aktiv_in_tx`, die
-/// Sperre „Führung liegt bei …“), am Spiegel nur der Status, denn dort führt immer die andere
-/// Instanz und der Eintrag geht als Antrag.
+/// Prüfung in der Transaktion: der Status des Einsatzes (`fordere_aktiv_in_tx` beim Führer). Am
+/// Spiegel führt immer die andere Instanz, der Eintrag geht dort als Antrag.
 async fn im_tx_aktiv(
     conn: &mut SqliteConnection,
     einsatz_id: i64,

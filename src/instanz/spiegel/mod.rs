@@ -12,7 +12,9 @@ pub mod abgleich;
 pub mod anhang;
 pub mod antrag;
 pub mod art;
+pub mod fuehrung;
 pub mod katalog;
+pub mod lebensende;
 pub mod liefern;
 pub mod paket;
 pub mod schema;
@@ -39,6 +41,7 @@ pub struct SpiegelSpalten {
     pub spiegel_beendet_at: Option<String>,
     pub spiegel_ausstehend: i64,
     pub spiegel_abgelehnt: i64,
+    pub spiegel_bruchstelle: i64,
 }
 
 /// Ein Spiegel, wie der Client ihn zeigt (Hinweisband).
@@ -53,6 +56,9 @@ pub struct EinsatzSpiegelAnzeige {
     pub beendet: bool,
     pub antraege_ausstehend: i64,
     pub antraege_abgelehnt: i64,
+    /// Eigene Änderungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
+    /// kannte (Bruchstelle, LLH-1641 E6): hier entfernt, in `einsatz_bruchstelle` gesichert.
+    pub bruchstelle: i64,
 }
 
 impl SpiegelSpalten {
@@ -66,6 +72,7 @@ impl SpiegelSpalten {
             beendet: self.spiegel_beendet_at.is_some(),
             antraege_ausstehend: self.spiegel_ausstehend,
             antraege_abgelehnt: self.spiegel_abgelehnt,
+            bruchstelle: self.spiegel_bruchstelle,
         })
     }
 }
@@ -99,6 +106,33 @@ pub async fn beende_fuer_zuordnung(
         .execute(&mut *conn)
         .await?;
     Ok(())
+}
+
+/// Löscht unter dem Merker der Übernahme (LLH-1494): das Abräumen eines Einsatzes
+/// (`einsatz::abraeumen`) geht durch die Schutz-Trigger eines Spiegels. Nur `DELETE`, in der
+/// Transaktion des Aufrufers; liefert die Zahl gelöschter Zeilen.
+pub async fn loeschen_unter_merker(
+    conn: &mut sqlx::SqliteConnection,
+    sql: &str,
+    id: i64,
+) -> Result<u64, crate::error::AppError> {
+    if !sql.starts_with("DELETE FROM ") {
+        return Err(crate::error::AppError::Internal(
+            "loeschen_unter_merker: nur DELETE".into(),
+        ));
+    }
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *conn)
+        .await?;
+    let n = sqlx::query(sqlx::AssertSqlSafe(sql.to_string()))
+        .bind(id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *conn)
+        .await?;
+    Ok(n)
 }
 
 /// Nachricht, mit der die Schutz-Trigger abbrechen; `AppError` macht daraus 409 (D10).
