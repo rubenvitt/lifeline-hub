@@ -38,7 +38,8 @@ import { doppelteSchluesselVerbieten } from './react-schluessel-kern';
  * - LÜCKEN IM ERSTEN BILD bei 1366 × 768 mit offenem Modulpanel (`toBeInViewport`).
  * - 390 px: Tabelle, nicht Karten; die Kennung bleibt fixiert.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
- * - ZEILENLINK: die Kennung einer Einheit führt auf ihre Detailseite.
+ * - ZEILENLINK: das Ziel jeder Kennung belegt `FunkplanPage.test.tsx` („führt jede Zeile per Link
+ *   zu ihrem Pflegeort“); der e2e-Fall dazu entfiel (LLH-1665, Spec `e2e-zuschnitt`).
  * - HÄNGENDER EINZUG (LFH-977): bei 390, 820, 1180 und 1440 px und im Druck bei A4-Breite steht
  *   der Text jeder Zeile rechts von dem ihrer Elternzeile, auch wenn er umbricht; als Admin und
  *   als Beobachter (LFH-435).
@@ -249,16 +250,6 @@ test('Übernahme in den Befehl (LFH-1027): genau ein POST, danach der LADEF-Befe
   await expect(page.getByText('Führung und Kommunikation').first()).toBeVisible();
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
   await expect(page.getByText(TELEFON)).toHaveCount(0);
-});
-
-test('die Kennung einer Einheit führt auf ihre Detailseite', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Link ${Date.now()}`);
-  const { einheit } = await seede(page, einsatzId);
-  await page.setViewportSize(FUEKW);
-  await oeffne(page, einsatzId);
-  await tabelle(page).getByRole('link', { name: EINHEIT }).click();
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einheiten/${einheit}$`));
 });
 
 // ── Eigene Führungsstelle (LFH-849) ─────────────────────────────────────────────────────────────

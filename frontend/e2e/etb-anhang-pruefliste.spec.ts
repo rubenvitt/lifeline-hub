@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Prüfliste für den Bedienweg „Anhang" im ETB, im Browser gemessen (jsdom rechnet kein
@@ -24,11 +25,7 @@ async function anmelden(page: Page, modus: 'light' | 'dark', dichte: string) {
     },
     [modus, dichte] as const,
   );
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
 }
 
 /** Einsatz mit einem Eintrag samt Foto, gesät über die API. */

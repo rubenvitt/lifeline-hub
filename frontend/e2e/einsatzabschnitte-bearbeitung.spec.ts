@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
-import { FUEKW, anlegen, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-kern';
+import { FUEKW, anlegen, anmelden, einsatzAnlegen, ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Einsatzabschnitt in der Ansicht bearbeiten (LFH-1208, Spec `einsatzabschnitt-bearbeitung`):
@@ -43,8 +43,7 @@ for (const dichte of DICHTEN) {
         { name: 'Abschnitt Nord', lagezustand: 'angespannt' },
         'Abschnitt',
       );
-      await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einsatzabschnitte`, dichte);
       const bodies = recordWrites(page, einsatzId);
 
       const detail = page.getByRole('region', { name: 'Abschnitt: Abschnitt Nord' });
@@ -74,8 +73,7 @@ for (const dichte of DICHTEN) {
       const einsatzId = await einsatzAnlegen(page, `E2E 1208 Leiter ${dichte} ${Date.now()}`);
       await anlegen(page, einsatzId, 'abschnitte', { name: 'Abschnitt Nord' }, 'Abschnitt');
       await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Carla Christ' } }, 'Personal');
-      await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einsatzabschnitte`, dichte);
       const bodies = recordWrites(page, einsatzId);
 
       const detail = page.getByRole('region', { name: 'Abschnitt: Abschnitt Nord' });
@@ -93,8 +91,7 @@ for (const dichte of DICHTEN) {
     test('Abschnitt anlegen: drei Felder, Enter sendet, danach gewählt', async ({ page }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1208 Anlegen ${dichte} ${Date.now()}`);
       await anlegen(page, einsatzId, 'abschnitte', { name: 'Abschnitt Nord' }, 'Abschnitt');
-      await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einsatzabschnitte`, dichte);
       await expect(page.getByRole('region', { name: 'Abschnitt: Abschnitt Nord' })).toBeVisible();
       const bodies = recordWrites(page, einsatzId);
 

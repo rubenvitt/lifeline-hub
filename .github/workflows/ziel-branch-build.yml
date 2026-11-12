@@ -1,0 +1,289 @@
+# Baut mit Ziel-Branch (LLH-1849) — Pflicht-Check: ein fertiger PR kompiliert zusammen mit dem
+# AKTUELLEN Stand seines Ziel-Branches.
+#
+# WARUM: `ci.yml` prüft einen PR gegen den Stand des Ziel-Branches beim letzten Push. Am 12.11.2026
+# waren #1319 (neuer Parameter) und #1315 (Test mit alter Signatur) einzeln grün und brachen
+# `alpha` zusammen. Eine Merge Queue gibt es für Repositories eines Benutzerkontos nicht. Dieser
+# Workflow rechnet deshalb bei jeder Bewegung des Ziel-Branches für jeden fertigen PR neu, und
+# zwar nur das Kompilieren (Backend mit allen Zielen, Frontend-Typprüfung, `check-all.sh --nur
+# baut`): wenige Minuten statt der vollen Suiten.
+#
+# WANN: Ein PR ist fertig wie für die zweite Stufe (`e2e.yml`): Auto-Merge an oder Label `e2e`,
+# kein Entwurf.
+#   - PR-Ereignis an einem fertigen PR: er rechnet gegen die Spitze des Ziel-Branches.
+#   - Push auf einen Kanal-Branch: `verteilen` setzt den Check an jedem fertigen PR auf „läuft“ und
+#     startet für ihn einen EIGENEN Lauf dieses Workflows auf seinem Branch (`workflow_dispatch`);
+#     ein nicht fertiger, der den Check trägt, bekommt ihn auf „wartet“ und rechnet, sobald er
+#     fertig wird. Release-Commits (`[skip ci]`) starten keinen Push-Lauf; `melden` lässt ein
+#     Ergebnis gelten, wenn der Ziel-Branch nur um solche weiter ist.
+#   Vorher fehlt der Check, und der PR ist nicht mergebar (Required Check im Ruleset 17017911).
+#
+# DER CHECK ENTSTEHT ÜBER DIE CHECKS-API, NICHT ALS JOB-NAME: Ein Push muss ihn an vielen
+# PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün (Kopf von `e2e.yml`).
+# Er steht sofort auf „läuft“, damit kein altes Grün mergt, während gerechnet wird; bis
+# `verteilen` läuft, bleibt ein Restfenster (design.md, „alpha rot“ fängt es auf). `melden` schließt
+# ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand stehen.
+#
+# PR-CODE LÄUFT NIE IN EINEM LAUF AUF EINEM KANAL-BRANCH (LLH-1849, Review): Ein Push-Lauf hat
+# den Cache-Bereich von `alpha`, und Code darin (etwa ein `build.rs` aus einem Dependabot-PR)
+# könnte über das Runtime-Token des Runners Cache-Einträge anlegen, die der Release-Build liest;
+# `save-if: false` und Co. verhindern nur, dass der eigene Code speichert. Deshalb kompiliert der
+# Push-Lauf nichts, und `kompilieren` läuft nur bei PR-Ereignis und Einzellauf, im Bereich des PRs
+# wie in `ci.yml`. Auch dort:
+#   - nur `contents: read`, keine Secrets; der Checkout legt keine Zugangsdaten ab, das Token
+#     bekommt nur der `git fetch` des PR-Kopfes als Umgebung seines Schritts;
+#   - kein Cache wird gespeichert (rust-cache `save-if: false`, nur `actions/cache/restore`, mise
+#     ohne Cache);
+#   - das Ergebnis geht als Artefakt an `melden`, das es nur als Text liest.
+# In einem Lauf eines PRs (Ereignis oder Einzellauf) stammen Workflow und Skripte aus dem PR
+# selbst, wie bei `ci.yml`: ein PR bestimmt dort seine eigenen Checks, das ist keine neue Grenze.
+# Die Form hält `scripts/ziel-branch-build.test.sh` fest; Verteilen, Auswahl und Meldung stehen in
+# `scripts/ziel-branch-build.sh`.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Baut mit Ziel-Branch
+
+on:
+  pull_request:
+    branches: [main, beta, alpha]
+    types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled, labeled]
+  push:
+    branches: [main, beta, alpha]
+  # Der eigene Lauf je fertigem PR, gestartet von `verteilen` auf dem Branch des PRs.
+  workflow_dispatch:
+    inputs:
+      nr: { description: 'PR-Nummer', required: true, type: string }
+      kopf: { description: 'Kopf-Commit des PRs', required: true, type: string }
+      check_id: { description: 'ID des Check-Runs', required: true, type: string }
+      ziel: { description: 'Ziel-Branch', required: true, type: string }
+      ziel_sha: { description: 'Stand des Ziel-Branches', required: true, type: string }
+
+permissions:
+  contents: read
+
+# Je PR (Ereignis und Einzellauf teilen sich die Gruppe) bzw. je Kanal-Branch: ein neuer Kopf oder
+# ein neuer Stand macht den laufenden Lauf wertlos. Ein abgebrochener Lauf hinterlässt seinen
+# Check auf „läuft“; der neue Lauf legt in `vorbereiten` einen jüngeren an, auch der Einzellauf
+# (dessen Check von `verteilen` ist dann älter und wird als übernommen geschlossen).
+concurrency:
+  group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Push auf einen Kanal-Branch: Checks setzen, je fertigem PR einen eigenen Lauf starten. Führt
+  # keinen PR-Code aus und kompiliert nichts.
+  verteilen:
+    name: Verteilen
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+      # workflow_dispatch auf den PR-Branches (GITHUB_TOKEN darf das, und es startet einen Lauf).
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checks setzen, Läufe der fertigen PRs starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ziel-branch-build.sh verteilen "$GITHUB_REF_NAME" "$GITHUB_SHA"
+
+  # PR-Ereignis oder Einzellauf: welcher PR, welcher Check, gegen welchen Stand.
+  vorbereiten:
+    name: Vorbereiten
+    # Forks bekämen nur ein Lese-Token, und ihr Check soll nie grün werden.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || (github.event_name == 'pull_request'
+              && github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    outputs:
+      rechnen: ${{ steps.wahl.outputs.rechnen }}
+      nr: ${{ steps.wahl.outputs.nr }}
+      kopf: ${{ steps.wahl.outputs.kopf }}
+      check_id: ${{ steps.wahl.outputs.check_id }}
+      ziel: ${{ steps.wahl.outputs.ziel }}
+      ziel_sha: ${{ steps.wahl.outputs.ziel_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: PR und Stand bestimmen
+        id: wahl
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EREIGNIS: ${{ github.event_name }}
+          PR_NR: ${{ github.event.pull_request.number }}
+          PR_ZIEL: ${{ github.event.pull_request.base.ref }}
+          E_NR: ${{ inputs.nr }}
+          E_CHECK: ${{ inputs.check_id }}
+          E_ZIEL: ${{ inputs.ziel }}
+        run: |
+          # Gerechnet wird gegen die aktuelle Spitze des Ziel-Branches, auch im Einzellauf.
+          if [ "$EREIGNIS" = workflow_dispatch ]; then ziel="$E_ZIEL"; else ziel="$PR_ZIEL"; fi
+          ziel_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$ziel" --jq .object.sha)"
+          if [ "$EREIGNIS" = workflow_dispatch ]; then
+            # Prüft PR und Ref (nie auf einem Kanal-Branch, nie für einen Fork) und legt einen
+            # frischen Check an; den von `verteilen` schließt es als übernommen.
+            liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$ziel" "$ziel_sha")"
+          else
+            liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"
+          fi
+          echo "Rechnen: $liste"
+          if [ "$liste" = "[]" ]; then echo "rechnen=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          nr="$(jq -r '.[0].nr' <<< "$liste")" kopf="$(jq -r '.[0].kopf' <<< "$liste")"
+          id="$(jq -r '.[0].check_id' <<< "$liste")"
+          { echo "rechnen=true"; echo "nr=$nr"; echo "kopf=$kopf"; echo "check_id=$id"
+            echo "ziel=$ziel"; echo "ziel_sha=$ziel_sha"; } >> "$GITHUB_OUTPUT"
+
+  kompilieren:
+    name: Kompilieren
+    needs: vorbereiten
+    # Nie im Push-Lauf und nie in einem Lauf auf einem Kanal-Branch (ein Einzellauf ohne --ref):
+    # die haben den Cache-Bereich des Kanal-Branches (Kopf). `einzellauf` prüft das schon, dies ist
+    # die zweite Sperre.
+    if: >-
+      ${{ github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true'
+          && !contains(fromJSON('["main", "beta", "alpha"]'), github.ref_name) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # PR-Code läuft hier: nur lesen (Kopf).
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.ziel_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: PR mit dem Ziel-Branch zusammenführen
+        id: merge
+        env:
+          NR: ${{ needs.vorbereiten.outputs.nr }}
+          KOPF: ${{ needs.vorbereiten.outputs.kopf }}
+          # Nur für den Fetch; nie auf der Platte, und die Schritte mit PR-Code sehen es nicht.
+          LESE_TOKEN: ${{ github.token }}
+        run: |
+          erg="$RUNNER_TEMP/ergebnis"
+          mkdir -p "$erg"
+          git config user.name "Baut mit Ziel-Branch"
+          git config user.email "baut-mit-ziel-branch@users.noreply.github.com"
+          kopfzeile="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$LESE_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=$kopfzeile" fetch --no-tags origin \
+            "+refs/pull/$NR/head:refs/remotes/pr/$NR"
+          if [ "$(git rev-parse "refs/remotes/pr/$NR")" != "$KOPF" ]; then
+            echo veraltet > "$erg/ergebnis"
+            echo "weiter=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git merge --no-edit --no-ff "refs/remotes/pr/$NR" > "$erg/ausgabe" 2>&1; then
+            cat "$erg/ausgabe"
+            echo konflikt > "$erg/ergebnis"
+            echo "weiter=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "weiter=true" >> "$GITHUB_OUTPUT"
+      # Nur bei Bedarf aufräumen (s. Schnellprüfungen in ci.yml).
+      - name: Plattenplatz schaffen (nur bei Bedarf)
+        if: steps.merge.outputs.weiter == 'true'
+        run: |
+          df -h /
+          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+          if [ "$frei_gb" -ge 40 ]; then
+            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
+            exit 0
+          fi
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          df -h /
+      # Wie in der Rust-Suite: die Hülle braucht GTK und WebKit.
+      - name: System-Werkzeuge für die nativen Crates
+        if: steps.merge.outputs.weiter == 'true'
+        env:
+          APT_FRIST_SEK: "600"
+        run: >-
+          ./scripts/apt-pakete.sh nasm
+          libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+          librsvg2-dev libayatana-appindicator3-dev
+      - name: Rust-Toolchain (stable)
+        if: steps.merge.outputs.weiter == 'true'
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      # Liest den Eintrag der Rust-Suite, schreibt nie (Kopf).
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.merge.outputs.weiter == 'true'
+        with:
+          shared-key: rust-openssl-vendored
+          save-if: false
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        if: steps.merge.outputs.weiter == 'true'
+        with:
+          version: 2026.9.1
+          cache: false
+      - name: pnpm-Store-Pfad ermitteln
+        if: steps.merge.outputs.weiter == 'true'
+        id: pnpm
+        run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.merge.outputs.weiter == 'true'
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Frontend-Abhängigkeiten
+        if: steps.merge.outputs.weiter == 'true'
+        run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      - name: Kompilieren
+        if: steps.merge.outputs.weiter == 'true'
+        run: |
+          erg="$RUNNER_TEMP/ergebnis"
+          code=0
+          ./scripts/check-all.sh --nur baut > "$erg/ausgabe" 2>&1 || code=$?
+          cat "$erg/ausgabe"
+          if [ "$code" = 0 ]; then echo gruen > "$erg/ergebnis"; else echo rot > "$erg/ergebnis"; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: baut
+          path: ${{ runner.temp }}/ergebnis
+          retention-days: 3
+
+  melden:
+    name: Melden
+    needs: [vorbereiten, kompilieren]
+    if: ${{ !cancelled() && github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Fehlt das Artefakt (Kompilierlauf abgebrochen), meldet `melden` „kein Ergebnis“, also rot.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: baut
+          path: ${{ runner.temp }}/ergebnis
+      - name: Check schließen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NR: ${{ needs.vorbereiten.outputs.nr }}
+          KOPF: ${{ needs.vorbereiten.outputs.kopf }}
+          CHECK_ID: ${{ needs.vorbereiten.outputs.check_id }}
+          ZIEL: ${{ needs.vorbereiten.outputs.ziel }}
+          ZIEL_SHA: ${{ needs.vorbereiten.outputs.ziel_sha }}
+        run: |
+          d="$RUNNER_TEMP/ergebnis"
+          ergebnis="$(cat "$d/ergebnis" 2> /dev/null || true)"
+          scripts/ziel-branch-build.sh melden "$NR" "$KOPF" "$CHECK_ID" "$ZIEL" "$ZIEL_SHA" "$ergebnis" "$d/ausgabe"

@@ -352,7 +352,7 @@ sequenceDiagram
 
 Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
 Führungsakten aus (LLH-1491,
-[ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md)). Genau eine
+[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Genau eine
 Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung). Seit LLH-1641
 entscheidet die Akte, wer führt, und der Spiegel folgt ihr: wer die Führung abgibt, wird Spiegel
 mit Anträgen; wer sie bekommt, schreibt den bisherigen Spiegel weiter.
@@ -382,6 +382,11 @@ sequenceDiagram
 - Die erreichte Seite (Hub) nimmt eine höhere Epoche der meldenden ohne Beweis an; die meldende
   (ELW) nur mit Unterschrift oder Abgabecode und nach der Entscheidung eines Menschen
   (`austausch::entscheide`).
+- Mehrere ELW an einem Hub: Der Hub behält die zuerst angenommene Führung. Nennt er einer ELW, die
+  selbst führt, einen Dritten als Führer, hält sie dessen Führung offen und gibt erst nach
+  Bestätigung ab (`austausch::ist_konflikt`, ohne Widerspruch); führt der Hub selbst mit der
+  Epoche eines Dritten, hält sie das als gewöhnliche Übernahme offen, und ihr Widerspruch nimmt der
+  Hub an ([ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)).
 - Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
   `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
   (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.
@@ -413,6 +418,37 @@ sequenceDiagram
   genau einmal; Anhänge, die ihr fehlen, holt sie beim alten Führer.
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht
   (`tests/instanz_fuehrung.rs`).
+
+## 6.6d Fremdsystem anbinden
+
+Ein Fremdsystem meldet sich nach demselben Verfahren wie eine Instanz an, mit eigenem Profil und
+eigenen Tabellen (LLH-1652,
+[ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
+
+```mermaid
+sequenceDiagram
+  participant Admin as frontend Anbindungen
+  participant Hub as lifeline-hub (src/routes/anbindungen.rs, src/public_api/)
+  participant F as Fremdsystem (crates/lifeline-machine-client)
+  Admin->>Hub: POST /api/admin/anbindungen {name, scopes}
+  Hub-->>Admin: Code (16 Zeichen, 15 min)
+  F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
+  Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
+  Hub-->>F: zugang_id, instanz_id, Instanzschlüssel, Prüfwert
+  F->>Hub: GET /api/v1/me (Authorization: Machine)
+  Hub->>Hub: MachineClient: Signatur, Zustand, Drossel, jti, Scope
+  Hub-->>F: Zugang, Org, Scopes, Serverzeit (Lifeline-Signature)
+```
+
+- Signatur und Code-Ableitung teilt `src/instanz/signatur.rs` bzw. `src/instanz/code.rs` mit der
+  Instanzkopplung über ein Profil (`MACHINE`, `SALZ_MACHINE`); ein Token des einen Profils
+  scheitert am anderen.
+- Ein gescheiterter Abruf antwortet 401 ohne Grund; der Grund (etwa die Uhrabweichung) steht am
+  Zugang (`src/public_api/zugang.rs`, `ablehnung_festhalten`) und auf der Seite „Anbindungen“.
+- Unbekannte Zugänge und gescheiterte Einlösungen zählen je Quelle im Zähler für Maschinen
+  (`src/auth/rate_limit.rs`, `maschine`), nie in der Anmeldesperre; je Zugang drosselt
+  `src/public_api/drossel.rs`.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 
@@ -491,3 +527,33 @@ sequenceDiagram
 - Specs: [`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md),
   [`web-push`](../../openspec/specs/web-push/spec.md); Betrieb:
   [`docs/betrieb/web-push.md`](../betrieb/web-push.md).
+
+### 6.8a Hinweis über den Hub
+
+Führt ein gekoppelter ELW den Einsatz, reist der Anlass im Abgleich zum Hub, und der Hub meldet
+für seine eigenen Empfänger (LLH-1495,
+[ADR-0027](entscheidungen/ADR-0027-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)).
+
+```mermaid
+sequenceDiagram
+  participant EN as ELW src/benachrichtigung
+  participant EA as ELW src/instanz/spiegel/hinweis.rs
+  participant ET as ELW src/instanz/spiegel/takt.rs
+  participant H as Hub src/instanz/spiegel/abgleich.rs
+  participant HN as Hub src/benachrichtigung
+  EN->>EA: melden(Anlass): ziele, vormerken (hinweis_ausgang)
+  EA->>ET: wecken
+  EN->>EN: Zeilen und Live wie immer; Push an alle, die der Hub nicht erreicht
+  ET->>H: POST /api/instanz/spiegel {lieferungen, hinweise}
+  H->>H: Zeilen übernehmen, dann hinweis::annehmen (abbilden, hinweis_eingang)
+  H-->>ET: hinweis_quittungen (ELW löscht sie aus dem Ausgang)
+  H->>HN: nach dem Commit melden bzw. erledigen
+  HN->>HN: Empfänger am Hub, Zeilen, Live, Web Push mit Kennungen des Hubs
+```
+
+- Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort
+  (`MeldenAntwort.hinweise`, `web_push`); die meldende Seite merkt es an der Kopplung.
+- Bietet der Hub Push an, lässt der ELW den Push nur an Konten aus, die aus der Kopplung stammen
+  (`hinweis::konten_am_hub`). Konten nur am ELW und ein gescheitertes Vormerken pusht er selbst.
+- Was am Spiegel noch fehlt, bleibt ohne Quittung und kommt mit dem nächsten Abgleich wieder;
+  nach 12 Stunden geht ein Anlass nicht mehr hinaus (`hinweis::NACHREICHEN_STUNDEN`).

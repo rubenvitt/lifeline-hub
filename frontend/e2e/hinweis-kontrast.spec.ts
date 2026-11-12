@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { farbenDunkel, farbenHell } from '../src/theme/tokens';
 import { randKontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Der Rand eines Knopfs auf einer Hinweisfläche hält ≥ 3 : 1, Tag und Nacht (LFH-739, Spec
@@ -30,12 +31,8 @@ function rgb(hex: string): number[] {
   return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)).concat(1);
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function randHaelt(knopf: Locator, flaeche: string, name: string) {

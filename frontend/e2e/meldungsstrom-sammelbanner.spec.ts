@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
-import { STAFFEL, haeltStufe, stelleDichte } from './trefflaeche-kern';
+import { STAFFEL, haeltStufe, ladeInDichte } from './trefflaeche-kern';
 
 /**
  * LFH-900 — der Sammelbanner im Paneel „Jüngste ETB-Einträge“ (im Code „Meldungsstrom“) des
@@ -65,7 +65,7 @@ for (const { viewport, dichte, soll, vorher: anzahl } of FAELLE) {
   test(`Lage-Dashboard ${viewport.width} px, ${dichte}, ${anzahl} ${anzahl === 1 ? 'Eintrag' : 'Einträge'}: der Sammelbanner verschiebt nichts`, async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const r = await page.request.post('/api/einsaetze', {
       data: { bezeichnung: `E2E Sammelbanner Meldungsstrom ${Date.now()}` },
     });
@@ -76,8 +76,7 @@ for (const { viewport, dichte, soll, vorher: anzahl } of FAELLE) {
     }
 
     await page.setViewportSize(viewport);
-    await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lage-dashboard`, dichte);
 
     const zeilen = strom(page).locator('li[data-lfd-nr]');
     await expect(zeilen).toHaveCount(anzahl);

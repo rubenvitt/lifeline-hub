@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { zeigeLeistenAnsicht } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Adresssuche ohne Internet aus der Offline-Karte (LLH-1119, Spec `lagekarte-ortssuche`,
 // „Adresssuche aus der Offline-Karte“): Mit dem Adressindex der Region „Testgebiet“ im
@@ -37,12 +38,8 @@ interface MapHaken {
   getCenter(): { lng: number; lat: number };
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function ruhe(page: Page) {
@@ -105,7 +102,7 @@ test('ohne Netz: Ortssuche findet „Hauptstraße 12, Musterstadt“ aus der Off
   const index = join(verzeichnis, 'e2e-testgebiet.adressen.sqlite');
   copyFileSync(FIXTURE, index);
 
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   // Port 9 (discard) auf Loopback: niemand antwortet, die Verbindung wird verweigert.
   const vorher = await geocoderSetzen(page.request, 'http://127.0.0.1:9');
   try {

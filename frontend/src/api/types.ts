@@ -31,6 +31,14 @@ export type GeraeteUebersicht = S['GeraeteUebersicht'];
 export type LesezugangAnzeige = S['LesezugangAnzeige'];
 export type LesezugangFreigabe = S['LesezugangFreigabe'];
 export type LesezugangMitSchluessel = S['LesezugangMitSchluessel'];
+// Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652)
+export type AnbindungenListe = S['AnbindungenListe'];
+export type AnbindungAnzeige = S['AnbindungAnzeige'];
+export type AnbindungAblehnung = S['AnbindungAblehnung'];
+export type AnbindungCode = S['AnbindungCode'];
+export type Scope = S['Scope'];
+export type ZugangZustand = S['ZugangZustand'];
+export type AblehnungGrund = S['AblehnungGrund'];
 // Lagebild für Externe (LLH-1496)
 export type LagebildStufe = S['LagebildStufe'];
 export type LagebildDauer = S['LagebildDauer'];

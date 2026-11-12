@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Anbindung anlegen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:1280px;height:800px;position:relative;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;overflow:hidden}
+.maske{position:absolute;inset:0;background:rgba(5,6,8,.72);display:flex;align-items:center;justify-content:center}
+.dialog{width:520px;background:#14171b;border:1px solid #2e343a;display:flex;flex-direction:column}
+.dkopf{height:44px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #22262b}
+h1{margin:0;font-size:15px;font-weight:600}
+.dinhalt{padding:16px;display:flex;flex-direction:column;gap:16px}
+label,.etikett{font-size:12px;color:#c6ccd2;font-weight:600}
+.feld{display:flex;flex-direction:column;gap:6px}
+input[type=text],input[type=datetime-local]{height:30px;box-sizing:border-box;padding:0 8px;background:#0f1215;border:1px solid #626a73;color:#e8ebee;font-family:inherit;font-size:13px}
+.recht{display:flex;align-items:center;gap:8px;min-height:30px;font-size:13px}
+.recht input{width:16px;height:16px;margin:0;accent-color:#4d94d6}
+.wire{font-family:"LFH Mono",monospace;font-size:11px;color:#838b94;margin-left:auto}
+.hilfe{font-size:12px;color:#9aa2ab}
+.dfuss{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid #22262b}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;font-family:inherit;font-size:13px;border:1px solid #626a73;background:transparent;color:#e8ebee;cursor:pointer}
+.knopf.primaer{background:#4d94d6;border-color:#4d94d6;color:#08090b;font-weight:600}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+legend{padding:0;margin-bottom:6px}
+</style>
+</helmet>
+<div class="schirm">
+  <div style="position:absolute;inset:0;opacity:.35;background:#08090b"></div>
+  <div class="maske">
+    <div class="dialog" role="dialog" aria-labelledby="titel">
+      <div class="dkopf"><h1 id="titel">Anbindung anlegen</h1></div>
+      <div class="dinhalt">
+        <div class="feld">
+          <label for="name">Name</label>
+          <input id="name" type="text" value="Traccar-Brücke">
+        </div>
+        <fieldset>
+          <legend class="etikett">Rechte</legend>
+          <label class="recht"><input type="checkbox"> Lage lesen <span class="wire">lage:read</span></label>
+          <label class="recht"><input type="checkbox"> Einsätze lesen <span class="wire">einsaetze:read</span></label>
+          <label class="recht"><input type="checkbox"> Ereignisse abrufen <span class="wire">events:read</span></label>
+          <label class="recht"><input type="checkbox"> Alarmmeldungen einliefern <span class="wire">alarmmeldungen:write</span></label>
+          <label class="recht"><input type="checkbox" checked> Positionen einliefern <span class="wire">positionen:write</span></label>
+          <label class="recht"><input type="checkbox"> Rechner nutzen <span class="wire">rechner:use</span></label>
+        </fieldset>
+        <div class="feld">
+          <label for="bis">Gültig bis</label>
+          <input id="bis" type="datetime-local" value="">
+          <span class="hilfe">Leer: gilt, bis du ihn widerrufst.</span>
+        </div>
+      </div>
+      <div class="dfuss">
+        <button class="knopf" type="button">Abbrechen</button>
+        <button class="knopf primaer" type="button">Anlegen und Code zeigen</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

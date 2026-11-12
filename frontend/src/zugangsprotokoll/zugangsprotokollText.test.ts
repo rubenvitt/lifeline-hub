@@ -105,8 +105,25 @@ describe('Archiv am Hub (LLH-1494)', () => {
     expect(AKTION_TEXT.archiv_heruntergeladen).toBe('Archiv heruntergeladen');
     expect(hasNamensziel('archiv_schluessel_geprueft')).toBe(true);
     expect(hasNamensziel('archiv_heruntergeladen')).toBe(true);
+    expect(AKTION_TEXT.archiv_eingespielt).toBe('Archiv eingespielt');
+    expect(hasNamensziel('archiv_eingespielt')).toBe(true);
     expect(instanzText({ fingerabdruck: 'ab12:cd34', block: 2 })).toBe(
       'Fingerabdruck ab12:cd34 · Block 2',
+    );
+  });
+});
+
+describe('Angaben einer Anbindung (LLH-1652)', () => {
+  it('nennt Rechte vorher → nachher und den abgelösten Schlüssel', () => {
+    expect(
+      instanzText({
+        scopes: ['lage:read', 'events:read'],
+        scopes_vorher: ['lage:read'],
+        fingerabdruck: 'NEU1',
+        fingerabdruck_vorher: 'ALT1',
+      }),
+    ).toBe(
+      'Fingerabdruck NEU1 · vorher ALT1 · Rechte: Lage lesen → Lage lesen, Ereignisse abrufen',
     );
   });
 });

@@ -1,7 +1,7 @@
 use clap::Parser;
 use lifeline_hub::app::{build_router_mit, AppState, RouterOptionen};
 use lifeline_hub::backup;
-use lifeline_hub::config::{Command, Config};
+use lifeline_hub::config::{ArchivBefehl, Command, Config};
 use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
 use lifeline_hub::verbindung;
@@ -60,6 +60,17 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::SqliteVersion) => cmd_sqlite_version().await,
         Some(Command::AdminZugangZuruecksetzen { benutzername }) => {
             cmd_admin_zugang_zuruecksetzen(&config.db_path, &benutzername).await
+        }
+        Some(Command::Archiv {
+            befehl:
+                ArchivBefehl::Einspielen {
+                    datei,
+                    identitaet,
+                    org,
+                },
+        }) => cmd_archiv_einspielen(&config.db_path, &datei, &identitaet, org).await,
+        Some(Command::Zugang(befehl)) => {
+            lifeline_hub::public_api::kommando::ausfuehren(befehl).await
         }
         Some(Command::Lizenz) => {
             print!("{}", lifeline_hub::lizenz::TEXT);
@@ -602,6 +613,66 @@ async fn cmd_admin_zugang_zuruecksetzen(db_path: &str, benutzername: &str) -> an
         "Einmalpasswort (nach der Anmeldung zu ändern): {}",
         z.einmalpasswort
     );
+    Ok(())
+}
+
+/// Subkommando `archiv einspielen` (LLH-1494, design.md D10): einen Archivblock als
+/// schreibgeschützten Einsatz einspielen, der bis zu 7 Tage bleibt.
+async fn cmd_archiv_einspielen(
+    db_path: &str,
+    datei: &str,
+    identitaet: &str,
+    org: Option<i64>,
+) -> anyhow::Result<()> {
+    if !Path::new(db_path).exists() {
+        anyhow::bail!("Datenbank nicht gefunden: {db_path} — Server wurde noch nicht gestartet?");
+    }
+    let schluessel = identitaet_laden(identitaet)?;
+    let pool = db::connect(db_path).await?;
+    // Der Server darf laufen: der Befehl migriert die Datenbank nicht selbst, sondern verlangt
+    // denselben Stand wie diese Version.
+    if let Some(abweichung) = db::stand_abweichung(&pool).await? {
+        pool.close().await;
+        anyhow::bail!(
+            "Die Datenbank passt nicht zu dieser Version ({abweichung}). Mit der Version \
+             einspielen, mit der der Server läuft."
+        );
+    }
+    // Ein Abbruch (Strg+C, SIGTERM) lässt das Einspielen fallen: so läuft `Drop` der
+    // entschlüsselten Zwischendatei, statt dass sie im Klartext neben der Datenbank liegen bleibt.
+    // Eine schon übernommene, unvollständige Kopie räumt der Purge-Lauf ab (`FERTIG_MINUTEN`).
+    let ergebnis = tokio::select! {
+        e = lifeline_hub::einsatz::archiv::einspielen::einspielen(
+            &pool,
+            Path::new(datei),
+            &schluessel,
+            org,
+            chrono::Utc::now(),
+        ) => Some(e),
+        () = shutdown_signal() => None,
+    };
+    pool.close().await;
+    let Some(ergebnis) = ergebnis else {
+        anyhow::bail!(
+            "Abgebrochen. Die entschlüsselte Zwischendatei ist gelöscht; eine schon übernommene \
+             Kopie räumt der Purge-Lauf nach {} Minuten ab.",
+            lifeline_hub::einsatz::archiv::einspielen::FERTIG_MINUTEN
+        );
+    };
+    let e = ergebnis.map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!(
+        "Eingespielt: {} ({}) in {}, Einsatz {} mit {} Inhalten. Schreibgeschützt bis {} (UTC), \
+         danach gelöscht.",
+        e.einsatznummer.as_deref().unwrap_or("ohne Nummer"),
+        e.bezeichnung,
+        e.org_name,
+        e.einsatz_id,
+        e.inhalte,
+        e.loeschen_at
+    );
+    for h in &e.hinweise {
+        println!("Hinweis: {h}");
+    }
     Ok(())
 }
 

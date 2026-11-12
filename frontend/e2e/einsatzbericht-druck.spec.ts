@@ -7,7 +7,8 @@ import {
   wechsleZuAdmin,
   wechsleZuRolle,
 } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, acht
@@ -41,12 +42,8 @@ const VORNAME = 'Wendelin';
 
 test.setTimeout(120_000);
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Bis zu drei Versuche bei 503 („bitte erneut versuchen", SQLite-Schreibkonflikt). */
@@ -106,8 +103,8 @@ async function saeen(page: Page, einsatzId: string) {
 test('Einsatzbericht: Einstieg, acht Blöcke, nicht genutztes Modul, kein Personenbezug, Druckbild', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Einsatzbericht ${Date.now()}`);
   await saeen(page, einsatzId);
 
   // ── Einstieg über die Einsatzdaten.
@@ -306,8 +303,8 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
 test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der Adresse (LFH-902)', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Auswahl ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Einsatzbericht Auswahl ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
   // Die Disposition setzt die Alarmierung selbst: die Kraft hat damit eine offene Periode.
   await sende(page, 'POST', `${basis}/personal`, { adhoc: { name: 'Hanna Helferin' } });

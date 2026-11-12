@@ -33,6 +33,9 @@ set -euo pipefail
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
+#   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
+#                    Frontend-Typprüfung (Check „Baut mit Ziel-Branch“, LLH-1849;
+#                    gehört nicht zum vollen Lauf, Schritt 3, 4, 15 bauen dasselbe mit Tests)
 # Nach Bereichen statt nach Bündel (LFH-1115), wie die CI im PR:
 #   --geaendert[=REF]  die Schnellprüfungen und nur die Suiten, die die Änderungen seit dem
 #                      Abzweig von REF (Vorgabe origin/alpha) brauchen — Commits, Index,
@@ -98,7 +101,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=16
+SCHRITTE=17
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -113,7 +116,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die sechzehn Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die siebzehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -133,6 +136,9 @@ schritt_3() {
   # ein fremdes Testbinary prüfte die openapi.json des anderen Worktrees.
   bauziel_pruefen "$ROOT"
   "$ROOT/scripts/check-typ-codegen.sh"
+  # Python-Beispiel des Maschinenzugangs gegen die Testvektoren (LLH-1652); ohne `cryptography`
+  # laut übersprungen.
+  "$ROOT/scripts/check-api-clients.sh"
 }
 
 schritt_4() {
@@ -343,7 +349,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Auswahl der Suiten, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Auswahl der Suiten, Baut mit Ziel-Branch, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -365,6 +371,10 @@ schritt_11() {
   # Ob ein PR ohne e2e-Lauf mergen kann, entscheidet die Form von ci.yml und e2e.yml: ein Job-`if`
   # an der falschen Stelle meldet einen Pflicht-Check leer grün, statt ihn fehlen zu lassen.
   "$ROOT/scripts/ci-stufen.test.sh"
+  # Der Check „Baut mit Ziel-Branch“ (LLH-1849): irrt die Auswahl, rechnet ein fertiger PR nicht
+  # gegen den neuen Ziel-Branch und mergt mit veraltetem Grün; irrt die Form, liefe PR-Code mit
+  # Schreibrecht oder schriebe einen Cache, den `alpha` liest.
+  "$ROOT/scripts/ziel-branch-build.test.sh"
   # Die Messung der PR-CI vor und nach der Zweiteilung: zählt sie falsch, belegt der Vergleich
   # das Gegenteil dessen, was passiert ist.
   "$ROOT/scripts/ci-messung.test.sh"
@@ -462,6 +472,23 @@ schritt_16() {
   fi
 }
 
+schritt_17() {
+  echo "==> [17/$SCHRITTE] Kompiliert: Backend mit allen Zielen, Frontend-Typprüfung (LLH-1849)"
+  # Der Kompilierlauf des Checks „Baut mit Ziel-Branch“ (.github/workflows/ziel-branch-build.yml):
+  # ein PR zusammen mit dem aktuellen Ziel-Branch, nur übersetzt, ohne Tests. Er fängt, was erst
+  # die Kombination zweier einzeln grüner PRs bricht (am 12.11.2026 ein Testaufruf mit alter
+  # Signatur). Paketzuschnitt wie Schritt 4 und 15, damit Cargo die Features von Server und Hülle
+  # nicht vereinigt. Nicht im vollen Lauf: Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
+  bauziel_pruefen "$ROOT"
+  # Ohne `--locked` wie Schritt 4 und 15: sonst wäre ein PR mit nicht nachgezogener Cargo.lock
+  # hier rot und in der CI grün, mit einer Meldung, die einen fremden Merge verdächtigt.
+  ohne_dev_env cargo check --workspace --exclude lifeline-desktop --all-targets
+  ohne_dev_env cargo check -p lifeline-desktop --all-targets
+  ohne_dev_env cargo check --workspace --exclude lifeline-desktop --all-targets \
+    --features lifeline-hub/dev-seeds
+  $PNPM -C "$FE" typecheck
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
@@ -470,14 +497,18 @@ BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14 16"
 BUENDEL_rust="4 15"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
+# `baut` steht außerhalb von `alle` (Kopf, Bündel-Auswahl): Schritt 17 übersetzt nur, was 3, 4 und
+# 15 ohnehin übersetzen und testen.
+BUENDEL_baut="17"
 BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die sechzehn Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die sechzehn Schritte von `alle`, jeden
+# einmal (`baut` zählt nicht mit) —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
 if [ "$_summe" != "$_soll" ]; then
-  echo "FEHLER: die Bündel decken nicht genau die $SCHRITTE Schritte ab." >&2
+  echo "FEHLER: die Bündel decken nicht genau die Schritte von 'alle' ab." >&2
   echo "        gebündelt: $_summe" >&2
   echo "        erwartet:  $_soll" >&2
   exit 2
@@ -526,9 +557,10 @@ case "$NUR" in
   rust)     lauf="$BUENDEL_rust" ;;
   frontend) lauf="$BUENDEL_frontend" ;;
   e2e)      lauf="$BUENDEL_e2e" ;;
+  baut)     lauf="$BUENDEL_baut" ;;
   *)
     echo "FEHLER: unbekanntes Bündel '$NUR'." >&2
-    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e" >&2
+    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, baut" >&2
     exit 2
     ;;
 esac

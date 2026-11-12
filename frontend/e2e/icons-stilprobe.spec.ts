@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { kontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Stilprobe des Iconsatzes (LFH-595, design.md D8): Aufnahmen und Messwerte, keine Norm.
@@ -34,12 +35,8 @@ const BREITEN = [390, 1024, 1440] as const;
 const MODI = ['dark', 'light'] as const;
 const DICHTEN = ['kompakt', 'komfortabel', 'handschuh'] as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzMitMeldungen(page: Page): Promise<string> {

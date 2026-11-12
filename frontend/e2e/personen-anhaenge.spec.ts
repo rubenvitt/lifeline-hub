@@ -3,6 +3,8 @@ import { MINI_JPEG } from './bildFixture';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { systemBuendelAufklappen } from './etb-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Fotos und Dateien an einer Person (LFH-757) im Browser: der Abschnitt der Detailseite lädt
@@ -17,19 +19,14 @@ const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const FUEKW = { width: 1280, height: 900 };
 const SUBPIXEL = 0.5;
-const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const STAFFEL = [
   { dichte: 'kompakt', soll: 30 },
   { dichte: 'komfortabel', soll: 48 },
   { dichte: 'handschuh', soll: 72 },
 ] as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
@@ -62,15 +59,6 @@ async function hoehe(ziel: Locator): Promise<number> {
   const kasten = await ziel.boundingBox();
   expect(kasten, 'kein Kasten messbar').not.toBeNull();
   return Math.round(kasten!.height * 10) / 10;
-}
-
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-    DICHTE_SCHLUESSEL,
-    dichte,
-  ] as const);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
 const bereich = (page: Page) => page.getByRole('region', { name: 'Fotos und Dateien' });
@@ -194,8 +182,7 @@ test.describe('Dichte-Staffel: Abschnitt „Fotos und Dateien“ an der Person',
       const personId = await personAnlegen(page, einsatzId);
       await seedeAnhang(page, einsatzId, personId, 'arm.jpg');
       await page.setViewportSize(FUEKW);
-      await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/${personId}`, dichte);
       await klappeAuf(page);
 
       const ziele: Record<string, Locator> = {
@@ -237,8 +224,7 @@ test.describe('Dichte-Staffel als Beobachter: nur der Download-Anker', () => {
       await seedeAnhang(page, einsatzId, personId, 'arm.jpg');
       await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.setViewportSize(FUEKW);
-      await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/${personId}`, dichte);
       await klappeAuf(page);
 
       const anker = bereich(page).getByRole('link', { name: /^arm\.jpg, / });

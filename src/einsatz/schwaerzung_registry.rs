@@ -2978,6 +2978,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
+    // Eingespieltes Archiv (LLH-1494, D10): wann der Einsatz wieder geht und die Prüfsumme der
+    // Datei, kein Personenbezug. Geht mit dem Einsatz.
+    TabellenRegel {
+        tabelle: "einsatz_archiv_eingespielt",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("sha256", G_ARCHIV),
+            retain("eingespielt_at", G_ZEIT),
+            retain("loeschen_at", G_ZEIT),
+        ],
+    },
+    // Platzhalter-Konten eines eingespielten Archivs (LLH-1494, D10): nur Kennungen. Der Name
+    // steht am Konto, das nach dem Einsatz gelöscht wird.
+    TabellenRegel {
+        tabelle: "archiv_konto",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("benutzer_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+        ],
+    },
     // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf
     // Stammdaten der Org, nie auf Einsatzzeilen.
     TabellenRegel {
@@ -3486,6 +3512,21 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("ergebnis_art", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("ergebnis_schluessel", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("geaendert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    // Ausgang der Hinweise an den Hub (LLH-1495, design.md D2): Kennungen und Anzeigenamen von
+    // Einsatzkräften, nie Inhalte; mit dem Einsatz weg.
+    TabellenRegel {
+        tabelle: "hinweis_ausgang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("kopplung_org_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {

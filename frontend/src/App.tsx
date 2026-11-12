@@ -40,6 +40,7 @@ import GeraetKontaktePage from './geraet/GeraetKontaktePage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
+import AnbindungAnsicht from './pages/einstellungen/AnbindungAnsicht';
 import EinheitVorlageDetailPage from './stammdaten/EinheitVorlageDetailPage';
 import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
@@ -441,6 +442,8 @@ export const appRouten = createRoutesFromElements(
             <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
             <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
             <Route path="stammdaten/einheiten/:vorlageId" element={<EinheitVorlageDetailPage />} />
+            {/* Ansicht einer Anbindung (LLH-1652); die Seite schützt die Schreibwege selbst. */}
+            <Route path="einstellungen/anbindungen/:zugangId" element={<AnbindungAnsicht />} />
           </Route>
         </Route>
         {/* Ebene 2 — Einsatz-Workspace */}

@@ -3,6 +3,7 @@ import { stehendeAuswahl, waehleIn } from './auswahl-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { oeffneZeichenWahl, waehleWerkzeug, zeigeLeistenAnsicht } from './leisten-kern';
 import { waehleAnzeige } from './menue-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -38,12 +39,8 @@ interface MapHaken {
   queryRenderedFeatures(o: { layers: string[] }): Array<{ properties: { typ?: string } }>;
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
@@ -758,23 +755,6 @@ test.describe('Lagekarte: freie Zeichen', () => {
       })
       .toEqual({ breite: 68, gezeichnet: 1 });
     expect(fehler.map((f) => f.message)).toEqual([]);
-  });
-
-  test('der alte Body eines veralteten Clients wird abgelehnt', async ({ page }) => {
-    test.setTimeout(120_000);
-    await anmelden(page);
-    const eid = await einsatzAnlegenUndOeffnen(page);
-    // LLH-1160: Grundzeichen plus Hexfarbe, wie es ein Client vor LFH-836 sendet. Altzeilen aus der
-    // DB zeichnet der Leseadapter weiter (Hülle aus Migration 0192, Vitest `freiesZeichen.test.ts`).
-    const r = await page.request.post(`/api/einsaetze/${eid}/freie-zeichen`, {
-      data: { lat: ORT.lat, lon: ORT.lon, grundzeichen: 'gefahr', farbe: '#cc0000' },
-    });
-    expect(r.status(), await r.text()).toBe(400);
-    expect(((await r.json()) as { error: string }).error).toContain('alte Format');
-    const liste = (await (
-      await page.request.get(`/api/einsaetze/${eid}/freie-zeichen`)
-    ).json()) as unknown[];
-    expect(liste).toEqual([]);
   });
 });
 

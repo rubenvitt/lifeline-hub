@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { kachelnBeantworten, kartenConfigBeantworten } from './kartenFixture';
 import { kartenpunktAufSeite, messeKante, type KantenStrahl } from './karten-pixel-kern';
 import { oeffneAlleFachebenen } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kontur der Fachebenen-Punkte gegen den Kartengrund (LFH-600, Prüfliste Kriterium 5, WCAG
@@ -208,11 +209,7 @@ for (const g of GRUNDLAGEN) {
     await grundlageStellen(page, g);
     await fachebenenBeantworten(page);
 
-    await page.goto('/login');
-    await page.getByLabel('Benutzername').fill(ADMIN);
-    await page.getByLabel('Passwort').fill(PW);
-    await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-    await expect(page).toHaveURL(/\/einsaetze/);
+    await anmeldenPerApi(page, ADMIN, PW, { startseite: false });
     const antwort = await page.request.post('/api/einsaetze', {
       data: { bezeichnung: `E2E 600 Kontrast ${Date.now()}` },
     });

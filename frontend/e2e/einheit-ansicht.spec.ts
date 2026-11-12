@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
 import { offeneAuswahl, waehleIn, waehleStehend } from './auswahl-kern';
 import { wechsleZuRolle } from './rollen-kern';
-import { FUEKW, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-kern';
+import { FUEKW, anmelden, einsatzAnlegen, ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Einheit-Ansicht (LLH-1036, Spec `einheit-ansicht`) am echten Backend, in `kompakt` und
@@ -112,8 +112,7 @@ for (const dichte of DICHTEN) {
     test('Name an der Zeile ändern: genau `name` geht hinaus', async ({ page }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Name ${dichte} ${Date.now()}`);
       const einheitId = await createEinheit(page, einsatzId, '1. Zug');
-      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
       const bodies = recordWrites(page, einsatzId, einheitId);
 
       const kopf = page.getByRole('region', { name: 'Kopfdaten' });
@@ -142,8 +141,7 @@ for (const dichte of DICHTEN) {
     }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Zeichen ${dichte} ${Date.now()}`);
       const einheitId = await createEinheit(page, einsatzId, '2. Zug');
-      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
       const bodies = recordWrites(page, einsatzId, einheitId);
 
       const zeichen = page.getByRole('region', { name: 'Taktisches Zeichen' });
@@ -179,8 +177,7 @@ for (const dichte of DICHTEN) {
         funkrufname: fahrzeug,
         fahrzeugtyp: 'RTW',
       });
-      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
       const bodies = recordSammel(page, einsatzId);
       const besatzung = recordBesatzung(page, einsatzId);
 
@@ -233,8 +230,7 @@ for (const dichte of DICHTEN) {
         await put(page, `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`);
         epIds.push(epId);
       }
-      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
       const bodies = recordBesatzung(page, einsatzId);
 
       const paneel = page.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
@@ -279,8 +275,7 @@ for (const dichte of DICHTEN) {
       );
       expect(zuordnung.ok(), await zuordnung.text()).toBe(true);
       await wechsleZuRolle(page, 'beobachter', einsatzId);
-      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
 
       const main = page.getByRole('main');
       // Erst der Inhaltsanker, sonst wäre „fehlt“ auch im Ladezustand wahr.

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Patientenverbleib mit Übergabe (LLH-1332, Change `y4l621ih-patientenverbleib-uebergabe`, Specs
@@ -14,12 +15,8 @@ import { einsatzAnlegen } from './einsatz-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function seedePerson(page: Page, einsatzId: string, data: unknown): Promise<number> {
@@ -45,8 +42,8 @@ async function seitlicherUeberlauf(page: Page): Promise<number> {
 test('Eigentransport ist unterwegs, die quittierte Übergabe schließt ab', async ({ page }) => {
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Übergabe ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Übergabe ${Date.now()}`);
   await seedeFahrzeug(page, einsatzId, '1/83-1');
   const personId = await seedePerson(page, einsatzId, {
     name: 'Übergabetest',
@@ -125,8 +122,8 @@ test('Eigentransport aus dem Wartebereich, Übergabe aus „Unterwegs“', async
   test.slow();
   // Drei-Spalten-Form: Wartebereich und „Unterwegs“ stehen neben der Fläche.
   await page.setViewportSize({ width: 1920, height: 900 });
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Wartebereich ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Wartebereich ${Date.now()}`);
   await seedeFahrzeug(page, einsatzId, '1/83-1');
   const uhs = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
     data: { typ: 'behandlungsplatz', bezeichnung: 'BHP Übergabe' },

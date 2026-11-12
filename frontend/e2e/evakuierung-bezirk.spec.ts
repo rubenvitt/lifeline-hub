@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LLH-1076: Detailseite eines Evakuierungsbezirks. Aus der Übersicht über den Kennungs-Link auf
@@ -6,12 +7,8 @@ import { expect, test, type Page } from '@playwright/test';
  * bearbeiten — gegen den echten Server, damit Kennzahlen, ETB-Folgen und PATCH echt laufen.
  */
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function senden<T = { id: number }>(page: Page, pfad: string, data: unknown): Promise<T> {
@@ -24,7 +21,7 @@ test('Bezirk: aus der Übersicht auf die Detailseite, melden, räumen, bearbeite
   page,
 }) => {
   test.setTimeout(120_000);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Bezirk-Detail ${Date.now()}`,
   });

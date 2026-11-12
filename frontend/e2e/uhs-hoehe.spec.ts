@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleAnzeige } from './menue-kern';
 import { wechsleZuRolle } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Eine feste Reserve verschenkt Platz oder schiebt die Unterkante aus dem Fenster. Echte
 // Layout-Messung; jsdom kann diesen Fehler nicht nachweisen.
@@ -10,11 +11,7 @@ async function aufbauen(page: Page) {
 
 /** Wie `aufbauen`, liefert zusätzlich die Einsatz-ID (für die Mitgliedschaft der Rolle). */
 async function aufbauenMitEinsatz(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
 
   async function anlegen(pfad: string, data: unknown) {
     const antwort = await page.request.post(pfad, { data });

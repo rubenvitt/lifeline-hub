@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Hilfen der Funkplan-Specs (LFH-548), geteilt von `funkplan.spec.ts` und `funkplan-druck.spec.ts`
@@ -24,12 +25,8 @@ export const FAHRZEUG = 'Florian Musterstadt-Nordwest 1/42-1';
 const FUEHRER = 'Kirchgassner-Wohlfahrt, Maximiliane';
 export const LOKAL = 'DMO 999 Reserve';
 
-export async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+export async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 export { einsatzAnlegen } from './einsatz-kern';

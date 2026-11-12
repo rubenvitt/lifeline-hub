@@ -13,10 +13,12 @@ import {
 } from './einheit-fixture';
 import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte-sperre-fixture';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi as einsatzOhneDialog } from './einsatz-kern';
 import { seedeVorlage } from './vorlage-kern';
 import { seedPlanung, waitForPlanung, waitForRaster } from './planung-kern';
 import { oeffneZeichenWahl, waehleWerkzeug } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
@@ -33,18 +35,14 @@ import { oeffneZeichenWahl, waehleWerkzeug } from './leisten-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 test('Selbstbeweis: der Messkern meldet eine erfundene Verdeckung', async ({ page }) => {
   // Der Messkern braucht einen Fall, der rot ist, solange er falsch rechnet — unabhängig von
   // jeder Produktfläche.
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await page.setViewportSize({ width: 390, height: 400 });
   await page.goto('/admin/benutzer');
   await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
@@ -77,7 +75,7 @@ test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker 
   // Kartenaufbauten sind `position: absolute`, die Vorgabe des Kerns wertet nur
   // `sticky|fixed`. Belegt beide Hälften des Opt-ins: MIT `zusatzKandidaten` findet der Kern
   // die Verdeckung, OHNE nicht — die Vorgabe enthält die Option also nicht still mit.
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await page.setViewportSize({ width: 390, height: 400 });
   // Der Devtools-Knopf (nur DEV-Build) liegt bei 390 × 400 im Tab-Umlauf und wäre ein Befund,
   // den es im Betrieb nicht gibt; die Aussage „ohne Zusatzkandidat leer“ hinge sonst an ihm.
@@ -117,7 +115,7 @@ test('Selbstbeweis (LFH-811): `beschnitt` meldet ein ganz abgeschnittenes Ziel �
 }) => {
   // Ein Band, das Höhe abgibt und in sich rollt, verdeckt nicht, es SCHNEIDET AB. Die Attrappe
   // ist ein Knopf in einer Hülle ohne Höhe mit `overflow: hidden`, als erstes Tabulaturziel.
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await page.setViewportSize({ width: 390, height: 400 });
 
   const laufMitAttrappe = async (optionen?: { beschnitt: boolean }) => {
@@ -327,8 +325,8 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
  * Feldern steht unmittelbar über der Leiste.
  */
 test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Fokus Einstellungen ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzOhneDialog(page, `Fokus Einstellungen ${Date.now()}`);
 
   // Ohne Bildlaufreserve klebt die Leiste am Seitenende statt über dem Inhalt.
   await page.setViewportSize({ width: 390, height: 420 });
@@ -401,8 +399,8 @@ async function kopfStopp(page: Page) {
 test('Kopf (LFH-952): rückwärts getabbt verschwindet kein Ziel hinter dem klebenden Kopf', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Fokus Kopf ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzOhneDialog(page, `Fokus Kopf ${Date.now()}`);
   await page.setViewportSize({ width: 1366, height: 520 });
   await page.goto(`/einsaetze/${einsatzId}/einstellungen/verhalten`);
   await expect(page.getByLabel('Präfix ETB')).toBeVisible();
@@ -449,8 +447,8 @@ test('Kopf (LFH-952): rückwärts getabbt verschwindet kein Ziel hinter dem kleb
 });
 
 test('Kopf (LFH-952): Tab durch den klebenden Kopf rollt die Seite nicht', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Fokus Kopf Tab ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzOhneDialog(page, `Fokus Kopf Tab ${Date.now()}`);
   await page.setViewportSize({ width: 1366, height: 520 });
   await page.goto(`/einsaetze/${einsatzId}/einstellungen/verhalten`);
   await expect(page.getByLabel('Präfix ETB')).toBeVisible();
@@ -647,7 +645,7 @@ for (const { name, feld, seite, vorbereiten } of LEISTEN_ROUTEN) {
     test(`${name} (LFH-475): Tabulaturdurchlauf unter der sticky Speicherleiste bei ${viewport.width}px`, async ({
       page,
     }) => {
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const pfad = await seite(page);
       await page.setViewportSize(viewport);
       await page.goto(pfad);
@@ -1310,8 +1308,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
     await page.setViewportSize(flaeche);
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
-      await page.goto(`/einsaetze/${einsatzId}/etb`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, dichte);
       const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
       await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(ZEILEN);
       await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
@@ -1414,8 +1411,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   }
 
   await page.setViewportSize({ width: 1366, height: 520 });
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, 'handschuh');
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(24);
   const LEISTE = '.etb-erfassung-sticky';
@@ -1540,8 +1536,7 @@ test('Ausgabeansicht (LLH-1032): kein „Zurücknehmen“ verschwindet beim Tabb
     await page.setViewportSize(flaeche);
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
-      await page.goto(`/einsaetze/${einsatzId}/verpflegung/${zfId}/ausgabe`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/verpflegung/${zfId}/ausgabe`, dichte);
       const zuruecknehmen = page.getByRole('button', { name: /^Zurücknehmen: Ausgabe \d+ EP/ });
       await expect(zuruecknehmen).toHaveCount(ANZAHL);
       await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
@@ -1617,8 +1612,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
     await page.setViewportSize(flaeche);
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
-      await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/infotelefon`, dichte);
       await expect(page.getByText(/^Probe \d+: Wasser im Keller$/)).toHaveCount(ANZAHL);
       await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
 
@@ -2013,8 +2007,7 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
     await page.setViewportSize(flaeche);
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
-      await page.goto(`/einsaetze/${einsatzId}/personen`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, dichte);
       const zeilen = page.locator('tr.ant-table-row');
       await expect(zeilen).toHaveCount(ANZAHL);
       await expect(page.locator('.ant-table-sticky-holder')).toHaveCSS('position', 'sticky');
@@ -2163,8 +2156,7 @@ test('Erste Zeile (LLH-1358): Benutzerliste — rückwärts steht kein Ziel unte
   for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
     const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
     await page.setViewportSize(flaeche);
-    await page.goto('/admin/benutzer');
-    await stelleDichte(page, 'handschuh');
+    await ladeInDichte(page, '/admin/benutzer', 'handschuh');
     // Die Liste ist global und blättert ab 50 Zeilen: auf die gesäten Zeilen verengen.
     await page.getByPlaceholder('Name oder Benutzername').fill(`Erste Zeile ${LAUF}`);
     const zeilen = page.locator('tr.ant-table-row');
@@ -2198,8 +2190,7 @@ test('Erste Zeile (LLH-1358): Personenliste — rückwärts steht kein Ziel unte
   for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
     const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
     await page.setViewportSize(flaeche);
-    await page.goto(`/einsaetze/${einsatzId}/personen`);
-    await stelleDichte(page, 'handschuh');
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, 'handschuh');
     if (flaeche.width < 768) {
       // Unter `md` Karten statt Tabelle: keine stehende Kopfzeile, kein Fall.
       await expect(page.locator('[data-lfh="datensicht-karte"]').first()).toBeVisible();
@@ -2241,8 +2232,7 @@ test('Erste Zeile (LLH-1358): Einheiten — rückwärts steht kein Ziel unter de
   for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
     const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
     await page.setViewportSize(flaeche);
-    await page.goto(`/einsaetze/${einsatzId}/einheiten`);
-    await stelleDichte(page, 'handschuh');
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten`, 'handschuh');
     const zeilen = page.locator('tr.ant-table-row');
     await expect(zeilen).toHaveCount(ANZAHL);
     await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();

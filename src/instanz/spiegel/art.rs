@@ -171,6 +171,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "benachrichtigung",
         "Zustellstand je Instanz: jede Instanz führt ihre eigenen Hinweise (Nachtrag 10.11.2026)",
     ),
+    (
+        "hinweis_ausgang",
+        "Ausgang der Hinweise an den Hub; der Anlass reist im Paket (LLH-1495)",
+    ),
     ("geraet_kopplung", "Geräte hängen an einer Instanz"),
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),
@@ -196,6 +200,14 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     (
         "einsatz_archiv",
         "Archiv der verwahrenden Instanz; verschlüsselt an die Schlüssel ihrer Org (LLH-1494)",
+    ),
+    (
+        "einsatz_archiv_eingespielt",
+        "Eingespieltes Archiv dieser Instanz; der Einsatz ist ein beendeter Spiegel (LLH-1494)",
+    ),
+    (
+        "archiv_konto",
+        "Platzhalter-Konten eines eingespielten Archivs an dieser Instanz (LLH-1494)",
     ),
     (
         "verwahrung_angenommen",

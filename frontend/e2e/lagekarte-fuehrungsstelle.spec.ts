@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Eigene Führungsstelle auf der Lagekarte (LFH-1181, Spec `lagekarte-taktische-zeichen`,
 // „Führungsstelle auf der Lagekarte“): mit Koordinate steht sie als lesender Marker in der festen
@@ -13,12 +14,8 @@ interface MapHaken {
   querySourceFeatures(quelle: string): { properties: Record<string, unknown> | null }[];
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function senden(page: Page, methode: 'post' | 'patch', pfad: string, data: unknown) {
@@ -44,7 +41,7 @@ test('LFH-1181: Führungsstelle mit Koordinate als Marker, ohne Koordinate fort'
   page,
 }) => {
   test.setTimeout(120_000);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { id } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `E2E Führungsstelle Karte ${Date.now()}`,
   });

@@ -1,4 +1,4 @@
-import { checkAnySpec, drawAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { checkAnySpec, drawAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import {
   PALETTE,
   TECHNICAL_FILL_TOKENS,

@@ -11,9 +11,11 @@ import BenachrichtigungenPage, {
   IMMER_AN,
   PUSH_INHALT_SCHALTER,
   PUSH_SCHALTER,
+  pushUeberHub,
   TEST_TEXT,
   TEST_TITEL,
   TEST_WORT,
+  ZUM_HUB,
 } from './BenachrichtigungenPage';
 
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -21,7 +23,7 @@ vi.mock('../alarm/alarmTon', async (original) => ({
   spieleAlarmTon: vi.fn(),
 }));
 
-type Stand = { zustand: string; inhalt: boolean };
+type Stand = { zustand: string; inhalt: boolean; hub?: { name: string; adresse: string } };
 const push = vi.hoisted(() => ({
   ladePushStand: vi.fn(async (): Promise<Stand> => ({ zustand: 'fehlt', inhalt: false })),
   pushEinschalten: vi.fn(async () => 'an'),
@@ -145,6 +147,21 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
     zeige();
     await screen.findByRole('region', { name: 'Hinweise' });
     await waitFor(() => expect(push.ladePushStand).toHaveBeenCalled());
+    expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
+  });
+
+  it('am gekoppelten ELW: Hinweis mit Link zum Hub statt des Schalters (LLH-1495)', async () => {
+    push.ladePushStand.mockResolvedValue({
+      zustand: 'ueber_hub',
+      inhalt: false,
+      hub: { name: 'Hub Kreisverband', adresse: 'https://hub.example.org' },
+    });
+    zeige();
+    expect(await screen.findByText(pushUeberHub('Hub Kreisverband'))).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: ZUM_HUB })).toHaveAttribute(
+      'href',
+      'https://hub.example.org/benachrichtigungen',
+    );
     expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
   });
 

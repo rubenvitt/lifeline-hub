@@ -662,6 +662,41 @@ fn serde_wire_gleich_as_str() {
         ArchivSchluesselGeprueft,
         ArchivSchluesselEntfernt,
         ArchivHeruntergeladen,
+        ArchivEingespielt,
+        MaschinenzugangAngelegt,
+        MaschinenzugangCodeAusgestellt,
+        MaschinenzugangSchluesselGebunden,
+        MaschinenzugangGeaendert,
+        MaschinenzugangWiderrufen,
+    });
+    // Maschinenzugang (LLH-1652): Scopes (Wire der öffentlichen API und JSON in
+    // `maschinenzugang.scopes`), Zustand (DB-CHECK in `*_maschinenzugang.sql`) und Ablehnungsgrund.
+    enum_wire!(lifeline_hub::public_api::scope::Scope {
+        LageRead => "lage:read",
+        EinsaetzeRead => "einsaetze:read",
+        EventsRead => "events:read",
+        AlarmmeldungenWrite => "alarmmeldungen:write",
+        PositionenWrite => "positionen:write",
+        RechnerUse => "rechner:use",
+    });
+    enum_wire!(lifeline_hub::public_api::scope::ZugangZustand {
+        Wartet => "wartet",
+        Aktiv => "aktiv",
+        Widerrufen => "widerrufen",
+    });
+    enum_wire!(lifeline_hub::public_api::scope::AblehnungGrund {
+        Uhr => "uhr",
+        Signatur => "signatur",
+        Body => "body",
+        Pfad => "pfad",
+        Methode => "methode",
+        Ziel => "ziel",
+        Form => "form",
+        Wiederholung => "wiederholung",
+        Abgelaufen => "abgelaufen",
+        Widerrufen => "widerrufen",
+        KeinSchluessel => "kein_schluessel",
+        InstanzGekoppelt => "instanz_gekoppelt",
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
@@ -1908,6 +1943,26 @@ fn verpflegungsstelle_wire() {
         Kalt => "kalt",
         Getraenke => "getraenke",
     } in lifeline_hub::verpflegung::Verpflegungsart::ALLE);
+}
+
+#[test]
+fn public_api_error_code_wire() {
+    enum_wire!(lifeline_hub::public_api::ErrorCode {
+        InvalidField => "invalid_field",
+        Unauthorized => "unauthorized",
+        MissingScope => "missing_scope",
+        TlsRequired => "tls_required",
+        NotFound => "not_found",
+        MethodNotAllowed => "method_not_allowed",
+        Conflict => "conflict",
+        FuehrungElsewhere => "fuehrung_elsewhere",
+        CursorExpired => "cursor_expired",
+        PayloadTooLarge => "payload_too_large",
+        Unprocessable => "unprocessable",
+        RateLimited => "rate_limited",
+        InternalError => "internal_error",
+        Unavailable => "unavailable",
+    } in lifeline_hub::public_api::ErrorCode::ALLE);
 }
 
 #[test]

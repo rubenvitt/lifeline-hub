@@ -108,6 +108,32 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   `#[schema(required)]`. **Testfalle:** Presence per `contains_key`, nicht `== Value::Null`
   (`tests/ort_vorschau.rs`).
 
+## Backend — Öffentliche API v1 (LLH-1653)
+
+Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0022](../docs/architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Spec `oeffentliche-api-vertrag`, Herleitung
+`openspec/changes/archive/2026-11-12-h5zpb97t-oeffentliche-api-vertrag/design.md`):
+- **Routen nur in `public_api::router()`** per `.routes(routes!(handler))`, jeder Handler mit
+  `#[utoipa::path]` und vollem Pfad `/api/v1/…`. Kein `.route(…)` dort, kein `/api/v1`-Pfad in
+  `app.rs` (`tests/public_api.rs`); so steht jede Route im Dokument.
+- **Eigene Schemas:** v1-Antworten und -Eingaben sind eigene Typen in `public_api`, aufgenommen in
+  `PublicApiDoc`; nie ein Typ aus `api_doc.rs` (die interne API hat keine Zusage). Wire-Namen nach
+  der Wurzel-`AGENTS.md`, „Bezeichner-Sprache“.
+- **Fehler:** v1-Handler geben `Result<_, ApiError>` zurück; `AppError` und `sqlx::Error` gehen per
+  `?` über. Ein besonderer Fall nimmt seinen Code ausdrücklich (`ApiError::new(ErrorCode::…, …)`).
+  Was neben dem Handler scheitert, ergänzen `public_api::error_code_layer` (an den Routen, vor der
+  Kompression) und `public_api::contract_layer` (außen). Jede Route nennt im Dokument ihre
+  besonderen Fehler und `status = "default"` mit `ApiErrorBody`. Ein neuer Code kommt nur hinzu
+  (Enum, `description.md`, `tests/enum_wire_kontrakt.rs`); keiner wird umbenannt oder entfernt.
+- **Drift:** nach jeder Änderung an einer v1-Route, einem v1-Schema oder `description.md`
+  `cargo test --test public_api_spec_aktuell` und `docs/api/public-v1.json` mitcommitten
+  (`scripts/check-typ-codegen.sh`, Schritt 2).
+- **Grenzen:** Body höchstens `PUBLIC_API_BODY_MAX` (64 KiB, `app.rs`), vor jedem Handler, auch
+  einem, der den Body roh liest, und ohne `Content-Length` (`public_api::body_limit_layer`
+  puffert ihn; ein Handler bekommt den Body ganz); jede Antwort `Cache-Control: no-store`
+  (`public_api::contract_layer`, montiert in `app.rs`). Die innere Schicht setzt den Kopf nicht,
+  sonst packte die Kompression keine v1-Antwort mehr.
+
 ## Anhänge
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)
@@ -293,7 +319,9 @@ Spec `passwort-anmeldung`, Herleitung
   `auth::admin_audit::schreibe`** (Tabelle `admin_audit`, nicht `auth_audit`): Konto anlegen,
   deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Auch
   ein zweiter Weg zur selben Wirkung (PATCH `bearbeiten`) schreibt; eine abgewiesene Aktion nicht.
-- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Eine neue Aktion braucht eine
+- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Ausnahme „Archiv eingespielt“
+  (LLH-1494): `admin_audit::schreibe_ohne_akteur_tx` schreibt in der Transaktion der Übernahme,
+  ein Fehler bricht das Einspielen ab. Eine neue Aktion braucht eine
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
 - **Gelesen werden Anmelde- und Admin-Spur nur über `routes::zugangsprotokoll`** (LFH-1097,
@@ -331,7 +359,7 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0021](../docs/architektur/entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md):
+  [ADR-0028](../docs/architektur/entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
@@ -341,7 +369,11 @@ Herleitung in
     hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
-    `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 nach.
+    `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 der Change
+    `v6hj7xl2-fuehrung-epoche` und ihre Ergänzung in design.md D3 der Change
+    `faq7l7m4-zwei-elw-unterlegene-seite`
+    (`openspec/changes/archive/2026-11-12-faq7l7m4-zwei-elw-unterlegene-seite/design.md`) nach. Ist ein Dritter beteiligt (mehrere ELW an einem
+    Hub), hält die meldende Seite offen; ob das ein Konflikt ist, sagt `austausch::ist_konflikt`.
   - Der Schalter steht in `instanz_identitaet.fuehrung_an` (je Instanz, auch im Testprozess);
     `instanz::fuehrung::is_enabled`, nie ein prozessweiter Merker.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
@@ -545,6 +577,16 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   (`userVisibleOnly`), sonst ersetzt Chrome sie und Safari kündigt das Abo. Ein Alarm geht immer. Ziele nur aus `PUSH_DIENSTE` (https, Port 443, keine Weiterleitung), sonst wäre das
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
+- **Über den Hub (LLH-1495,
+  [ADR-0027](../docs/architektur/entscheidungen/ADR-0027-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)):**
+  `melden` und `erledigen` merken für einen hier geführten Einsatz einer gekoppelten Org den
+  Anlass in `hinweis_ausgang` vor (`instanz::spiegel::hinweis`), der Abgleich trägt ihn, die
+  erreichte Seite meldet ihn nach dem Commit selbst. Bietet sie Push an, lässt `ausliefern` den
+  eigenen Push an Konten aus, die aus dieser Kopplung stammen (`hinweis::konten_am_hub`); allen
+  anderen und bei gescheitertem Vormerken pusht die Instanz selbst, `umadressieren` immer. Ein neuer
+  Bezugstyp braucht seine Tabelle in `hinweis::bezug_tabelle` (Wächter
+  `jeder_bezugstyp_ist_eingeordnet`), ein neuer Adressat seine Textform dort. Das Aufräumen
+  schließt Spiegel ein. Nachweis `tests/instanz_hinweise.rs`.
 
 ## Backend — Meldungsmodell (LLH-1027)
 
@@ -756,6 +798,17 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
   Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
   und löscht alle Blöcke.
+- **Archiv einspielen** (LLH-1494, `archiv/einspielen.rs`, Befehl `archiv einspielen`): migriert
+  die entschlüsselte Datei, schwärzt abgelaufene Kategorien nach und übernimmt den Einsatz über
+  die Spiegel-Maschinerie (`liefern`/`uebernehmen`) mit einer Kopplung, die nur in der
+  Transaktion lebt. Ergebnis: beendeter Spiegel ohne Kopplung (`einsatz_archiv_eingespielt`),
+  Konten als gesperrte Platzhalter (`archiv_konto`, raus aus `OHNE_STELLVERTRETER`, nie Mitglied,
+  für keine Admin-Route und keine Kopplung erreichbar). Phase R räumt ihn nach 7 Tagen ab, früher
+  bei einer Frist des Blocks; ein Block, der hier nicht mehr im Archiv steht, kommt nicht zurück,
+  und ein Löschersuchen nimmt eine eingespielte Kopie mit (`archiv::alle_loeschen_tx`). Den
+  Merker setzt auch hier nur `spiegel` (`loeschen_unter_merker`, `anhang::inhalt_einsetzen`).
+  Eine neue Stammtabelle in `STAMM` braucht einen Namen in `STAMM_NAME` (Guard
+  `stamm_name_deckt_die_stammdaten_des_archivs`).
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

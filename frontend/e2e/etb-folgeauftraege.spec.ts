@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * ETB-Folgeaufträge im Browser (LFH-815, Nachzug zu LFH-636 Aufgabe 4.2; Spec
@@ -17,12 +18,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 const ENTSCHEIDUNG = 'Ortsteil Nord wird geräumt';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Erteilt aus dem ETB-Eintrag `nr` einen Auftrag und liefert dessen `id` und `lfd_nr`. */
@@ -69,8 +66,8 @@ async function auftragErteilen(
 test('LFH-815: zwei Folgeaufträge aus einer Entscheidung — Zeitachse, Auswahl, Überblick', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Folgeaufträge ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Folgeaufträge ${Date.now()}`);
 
   // Entscheidung erfassen: `/entscheidung ` am Zeilenanfang setzt den Typ (Schnellerfassung).
   await page.goto(`/einsaetze/${einsatzId}/etb`);

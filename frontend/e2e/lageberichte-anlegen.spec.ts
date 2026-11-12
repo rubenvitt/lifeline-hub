@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Lageberichte (LLH-1064): „Neuer Lagevortrag“ legt mit EINEM POST an und öffnet den Entwurf,
@@ -13,12 +14,8 @@ import { einsatzAnlegen } from './einsatz-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 interface AnlegenBody {
@@ -47,8 +44,8 @@ const MIT_QUELLE = ['gefahren_schadenlage', 'eigene_lage', 'lageentwicklung', 'f
 test.setTimeout(90_000);
 
 test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag ${Date.now()}`);
   const posts = zaehleAnlegen(page, einsatzId);
 
   await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
@@ -89,8 +86,8 @@ test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', a
 test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leere Abschnitte nach', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag leer ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag leer ${Date.now()}`);
   const posts = zaehleAnlegen(page, einsatzId);
 
   await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
@@ -138,8 +135,8 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
   // schloss sie den Riegel und hielt den alten Stand fest (`entwurf/useEntwurfVerlustschutz.ts`).
   // Der Test legt diese Reihenfolge fest, statt auf sie zu hoffen: die Abrufe der Quellen warten
   // auf die Antwort des PATCH, der Refetch des Berichts auf die Füllung.
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag LLH-1607 ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag LLH-1607 ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
   await expect(page.getByText('Noch keine Lageberichte')).toBeVisible();
   await page.getByRole('button', { name: 'Andere Vorlage wählen' }).click();
@@ -215,8 +212,8 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
 test('der Pfeil legt einen freien Bericht an, die Übersicht zeigt ihn in Arbeit', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag Pfeil ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag Pfeil ${Date.now()}`);
   const posts = zaehleAnlegen(page, einsatzId);
 
   await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
@@ -244,8 +241,8 @@ test('der Pfeil legt einen freien Bericht an, die Übersicht zeigt ihn in Arbeit
 test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die neue Fassung', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag Stand ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag Stand ${Date.now()}`);
   const E = `/api/einsaetze/${einsatzId}/lageberichte`;
   const angelegt = await page.request.post(E, {
     data: {

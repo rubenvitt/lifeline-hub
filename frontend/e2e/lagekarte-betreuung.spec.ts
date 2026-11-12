@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { kontoAnlegen } from './konto-anlegen';
 import { oeffneEbenenGruppe } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Betreuung auf der Lagekarte — Durchstich im echten Renderer: landet eine verortete Stelle
 // in der Marker-Quelle, kommt der Platziermodus aus dem Modul an, bekommt eine zweite Karte
@@ -19,11 +20,7 @@ interface MapHaken {
 }
 
 async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, benutzer, passwort);
 }
 
 async function senden(

@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { DatabaseSync } from 'node:sqlite';
 import { kontrast, randKontrast } from './kontrast-kern';
 import { kontoAnlegen } from './konto-anlegen';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Aufbewahrung in der Verwaltung und am Einsatz.
@@ -71,11 +72,7 @@ function einsatzAntragSetzen(einsatzId: number) {
 }
 
 async function anmelden(page: Page, benutzer = 'admin', passwort = PW) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, benutzer, passwort);
 }
 
 interface Angelegt {

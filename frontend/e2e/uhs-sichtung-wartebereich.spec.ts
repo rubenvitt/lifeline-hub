@@ -32,7 +32,7 @@ for (const modus of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const e = (
       await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Dringlichkeit ${Date.now()}` })
     ).id;

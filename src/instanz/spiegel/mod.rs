@@ -14,6 +14,7 @@ pub mod antrag;
 pub mod art;
 pub mod bruchstelle;
 pub mod fuehrung;
+pub mod hinweis;
 pub mod katalog;
 pub mod lebensende;
 pub mod liefern;
@@ -27,10 +28,12 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Schließt Stellvertreter fremder Konten aus (design.md D5, Nachtrag 10.11.2026): sie sind keine
-/// Personen dieser Instanz, erscheinen in keiner Verwaltung und werden nie Mitglied. Erwartet den
-/// Alias `b` für `benutzer`.
+/// Personen dieser Instanz, erscheinen in keiner Verwaltung und werden nie Mitglied. Ebenso die
+/// Platzhalter-Konten eines eingespielten Archivs (LLH-1494, `archiv_konto`). Erwartet den Alias
+/// `b` für `benutzer`.
 pub const OHNE_STELLVERTRETER: &str =
-    "NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)";
+    "NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id) \
+     AND NOT EXISTS (SELECT 1 FROM archiv_konto ak WHERE ak.benutzer_id = b.id)";
 
 /// Spiegel-Angaben eines Einsatzes aus `einsatz_spiegel` (Spec `einsatz-spiegel`, „Der Spiegel
 /// zeigt seine Herkunft und seinen Stand“), gelesen von Einsatzkopf und Einsatzliste.
@@ -40,6 +43,8 @@ pub struct SpiegelSpalten {
     pub spiegel_gegenstelle: Option<String>,
     pub spiegel_abgleich_at: Option<String>,
     pub spiegel_beendet_at: Option<String>,
+    /// Eingespieltes Archiv (LLH-1494): wann es wieder geht.
+    pub spiegel_archiv_bis: Option<String>,
     pub spiegel_ausstehend: i64,
     pub spiegel_abgelehnt: i64,
     pub spiegel_bruchstelle: i64,
@@ -55,6 +60,10 @@ pub struct EinsatzSpiegelAnzeige {
     pub letzter_abgleich_at: Option<String>,
     /// Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar.
     pub beendet: bool,
+    /// Aus dem Archiv eingespielt (LLH-1494, D10): bis wann der Einsatz hier bleibt (UTC). Dann
+    /// ist `gegenstelle` „Archiv“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archiv_bis: Option<String>,
     pub antraege_ausstehend: i64,
     pub antraege_abgelehnt: i64,
     /// Eigene Erfassungen dieser Instanz aus der Zeit, als sie führte, die der neue Führer nicht
@@ -66,12 +75,14 @@ pub struct EinsatzSpiegelAnzeige {
 impl SpiegelSpalten {
     pub fn anzeige(&self) -> Option<EinsatzSpiegelAnzeige> {
         self.spiegel_ist.then(|| EinsatzSpiegelAnzeige {
-            gegenstelle: self
-                .spiegel_gegenstelle
-                .clone()
-                .unwrap_or_else(|| "Gegenstelle".into()),
+            gegenstelle: match (&self.spiegel_gegenstelle, &self.spiegel_archiv_bis) {
+                (Some(g), _) => g.clone(),
+                (None, Some(_)) => crate::einsatz::archiv::einspielen::GEGENSTELLE.into(),
+                (None, None) => "Gegenstelle".into(),
+            },
             letzter_abgleich_at: self.spiegel_abgleich_at.clone(),
             beendet: self.spiegel_beendet_at.is_some(),
+            archiv_bis: self.spiegel_archiv_bis.clone(),
             antraege_ausstehend: self.spiegel_ausstehend,
             antraege_abgelehnt: self.spiegel_abgelehnt,
             bruchstelle: self.spiegel_bruchstelle,

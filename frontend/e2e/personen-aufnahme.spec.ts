@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Der Aufnahmeweg für Personen: die Sichtungskategorie geht mit der Anlage mit.
@@ -15,12 +16,8 @@ import { einsatzAnlegen } from './einsatz-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -40,8 +37,8 @@ function skFlaeche(page: Page, label: string) {
 test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Aufnahme ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Aufnahme ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await expect(page.getByRole('button', { name: 'Betroffene erfassen' })).toBeVisible();
 
@@ -65,8 +62,8 @@ test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel
 });
 
 test('AK 3: „Speichern und nächste" leert, fokussiert zurück und zählt hoch', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Serie ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Serie ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   await expect(sichtung(page)).toBeVisible();
@@ -94,8 +91,8 @@ test('AK 3: „Speichern und nächste" leert, fokussiert zurück und zählt hoch
 test('die Aufnahme-Route zeigt dieselbe Maske und erfasst in Serie', async ({ page }) => {
   // Die Anspring-Adresse für andere Module: existiert und trägt. Die Interaktionszahl misst
   // der Fall oben am Modal.
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Aufnahmeroute ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Aufnahmeroute ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
 
   await expect(page.getByRole('heading', { name: /Aufnahme/ })).toBeVisible();
@@ -118,8 +115,8 @@ test('LFH-1142: nach „Speichern und nächste" sind beide Knöpfe sofort wieder
   // Ausblenden hängen, hieß der Knopf minutenlang „loading Erfassen“, obwohl er wieder bediente.
   // Das trat erst nach einigen Speicherungen auf, deshalb läuft die Serie mehrmals. Die Grenze
   // von 5 s liegt weit über dem Ausblenden (0,15 s) und weit unter dem Hängen (30 s bis 3 min).
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Aufnahme bedienbar ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Aufnahme bedienbar ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
   const serie = page.locator('main form button', { hasText: 'Speichern und nächste' });
   const erfassen = page.locator('main form button[type="submit"]');
@@ -149,8 +146,8 @@ test('LFH-1142: nach „Speichern und nächste" sind beide Knöpfe sofort wieder
 test('S7: die Erfassungszeile erfasst per Kürzel in Serie, ohne Dialog', async ({ page }) => {
   // Die Kurzeingabe: EINE Eingabe, Enter erfasst, das Feld ist danach leer und fokussiert, die
   // Quittung steht an der Zeile und kommt aus der ANTWORT.
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Zeile ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Zeile ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);
 
   const feld = page.getByRole('textbox', { name: 'Kurzeingabe Person' });

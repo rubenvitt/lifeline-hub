@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Der Einsatz-Navigationsrahmen auf dem Handschirm: kein waagerechter Überlauf und jede
@@ -36,12 +37,8 @@ const HANDSCHIRM = { width: 390, height: 844 };
 /** Erwartete Drawer-Breite als Literal — aus `theme/tokens` gelesen prüfte der Test sich selbst. */
 const DRAWER_BREITE = 280;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -129,8 +126,8 @@ function meldeFremdenUeberlauf(
 test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Nav schmal ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Nav schmal ${Date.now()}`);
 
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
@@ -185,8 +182,8 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
 test('Navigationsrahmen: am Fükw-Schirm steht er weiter inline', async ({ page }) => {
   // Gegenprobe ab `lg`: ohne sie wäre der Test oben auch grün, wenn der Hamburger bei JEDER
   // Breite erschiene.
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Nav breit ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Nav breit ${Date.now()}`);
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(page.getByRole('navigation', { name: 'Kategorien' })).toBeVisible();
@@ -200,8 +197,8 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
   // Eigene Frage: nicht OB der Drawer schmal genug ist, sondern WELCHE Box das Maß bekommt.
   // `size` ist in antd 6 zugleich die Achse der Vorgabestufen — ein numerischer Wert könnte
   // auf der Inhaltsbox statt auf dem Panel landen.
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Nav Box ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Nav Box ${Date.now()}`);
 
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/etb`);

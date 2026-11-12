@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { waehleWerkzeug } from './leisten-kern';
 import { waehleAnzeige } from './menue-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Korrigierbares Zeichnen und Eigenposition an der echten Karte. Vitest belegt Adapter und
@@ -31,12 +32,8 @@ function eigenpositionGezeichnet(page: Page) {
   });
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Name ohne Modulnamen — die Kommandopalette sucht Module und Einsätze gemeinsam. */
