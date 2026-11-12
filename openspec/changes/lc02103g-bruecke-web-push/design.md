@@ -136,8 +136,9 @@ gesichtet wird, statt 24 Stunden stehen zu bleiben.
 
 `umadressieren` (korrigierte Empfängerfunktion einer Meldung, LLH-1381) reist nicht mit. Es ist
 selten und braucht den Zustand der Zeilen am Hub; der Hub zeigt den alten Hinweis, bis die
-Meldung gesichtet ist (D5) oder 24 Stunden vergangen sind. Ein Nachzug wäre ein eigener Anlass
-mit `umadressieren`, ohne Protokollbruch.
+Meldung gesichtet ist (D5) oder 24 Stunden vergangen sind. Wen die Korrektur neu meint, den
+pusht der ELW selbst, auch wenn der Hub Push anbietet: sonst erführe er es nirgends. Ein Nachzug
+wäre ein eigener Anlass mit `umadressieren`, ohne Protokollbruch.
 
 ### D7 Push-Einstellung am ELW
 

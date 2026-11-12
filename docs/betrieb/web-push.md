@@ -59,6 +59,26 @@ ausgehenden Verkehr beschränkt, muss diese Hosts freigeben.
   Passwortwechsel, der die übrigen Sitzungen beendet, löschen ihre Abos. Meldet sich dieselbe
   Person im selben Browser wieder an, meldet die App das Abo selbst neu an.
 
+## Gekoppelter ELW: Push über den Hub (LLH-1495)
+
+Ist eine Instanz (ELW) mit einem Hub gekoppelt, schickt der Hub die Pushs für die Einsätze des
+ELW. Der ELW reicht dazu jeden Anlass einer Benachrichtigung im Abgleich an den Hub weiter; der
+Hub legt eigene Benachrichtigungen an und pusht an die Abos seiner Nutzer. So muss nur der Hub ins
+Internet und zu den Push-Diensten, nicht der ELW.
+
+- Der Hub braucht dafür `LIFELINE_WEB_PUSH` und einen Kontakt wie oben. Er nennt dem ELW in
+  jeder Meldung, ob er Push anbietet.
+- Bietet der Hub Push an, pusht der ELW für Einsätze der gekoppelten Org nicht mehr selbst. Sein
+  Schalter „Auch bei geschlossener App“ weicht dem Hinweis „Push läuft über ‹Hub›“ mit einem Link
+  zum Hub; neue Abos am ELW lehnt der Server ab. Bestehende Abos am ELW bleiben gespeichert und
+  gelten wieder, sobald die Kopplung der Org widerrufen ist.
+- Bietet der Hub keinen Push an (oder kennt er die Hinweise noch nicht, älterer Softwarestand),
+  pusht der ELW wie ohne Kopplung, sofern er selbst `LIFELINE_WEB_PUSH` hat.
+- Der Link zeigt die Adresse, unter der der ELW den Hub erreicht. Läuft die Kopplung über ein
+  internes Netz (Overlay, VPN), ist das diese interne Adresse.
+- Ein Hinweis am Hub kommt mit dem nächsten Abgleich an, ohne Verbindung später, höchstens 12
+  Stunden nach dem Anlass.
+
 ## Schlüssel und Sicherung
 
 Der Server erzeugt beim ersten Start mit `--web-push` ein Schlüsselpaar (VAPID, P-256) und legt es

@@ -485,3 +485,31 @@ sequenceDiagram
 - Specs: [`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md),
   [`web-push`](../../openspec/specs/web-push/spec.md); Betrieb:
   [`docs/betrieb/web-push.md`](../betrieb/web-push.md).
+
+### 6.8a Hinweis über den Hub
+
+Führt ein gekoppelter ELW den Einsatz, reist der Anlass im Abgleich zum Hub, und der Hub meldet
+für seine eigenen Empfänger (LLH-1495,
+[ADR-0025](entscheidungen/ADR-0025-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)).
+
+```mermaid
+sequenceDiagram
+  participant EN as ELW src/benachrichtigung
+  participant EA as ELW src/instanz/spiegel/hinweis.rs
+  participant ET as ELW src/instanz/spiegel/takt.rs
+  participant H as Hub src/instanz/spiegel/abgleich.rs
+  participant HN as Hub src/benachrichtigung
+  EN->>EA: melden(Anlass): ziele, vormerken (hinweis_ausgang)
+  EA->>ET: wecken
+  EN->>EN: Zeilen und Live wie immer; Push nur, wenn der Hub keinen anbietet
+  ET->>H: POST /api/instanz/spiegel {lieferungen, hinweise}
+  H->>H: Zeilen übernehmen, dann hinweis::annehmen (abbilden, hinweis_eingang)
+  H-->>ET: hinweis_quittungen (ELW löscht sie aus dem Ausgang)
+  H->>HN: nach dem Commit melden bzw. erledigen
+  HN->>HN: Empfänger am Hub, Zeilen, Live, Web Push mit Kennungen des Hubs
+```
+
+- Ob der Hub Hinweise annimmt und Push anbietet, nennt er in der Meldeantwort
+  (`MeldenAntwort.hinweise`, `web_push`); die meldende Seite merkt es an der Kopplung.
+- Was am Spiegel noch fehlt, bleibt ohne Quittung und kommt mit dem nächsten Abgleich wieder;
+  nach 12 Stunden geht ein Anlass nicht mehr hinaus (`hinweis::NACHREICHEN_STUNDEN`).
