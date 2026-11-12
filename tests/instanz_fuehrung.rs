@@ -2073,6 +2073,13 @@ async fn hub_holt_von_elw1_zurueck(
     let am_hub = fuehrung(&hub, h).await;
     assert_eq!(am_hub["fuehrer_kennung"], elw1.kennung, "{am_hub}");
     assert_eq!(am_hub["epoche"], 2);
+    if !elw2_erklaert {
+        // ELW 2 führt nicht und kennt die Akte über den Hub mit ELW 1 als Führer.
+        elw_meldet(&elw2).await;
+        let f = fuehrung(&elw2, e2).await;
+        assert_eq!(f["fuehrer_kennung"], elw1.kennung, "{f}");
+        assert_eq!(f["epoche"], 2);
+    }
     match weg {
         Zurueckholen::Notuebernahme => {
             let akte = am_hub["id"].as_i64().unwrap();
@@ -2205,18 +2212,23 @@ async fn widerspricht_elw_2_der_zurueckgeholten_fuehrung_nimmt_der_hub_ihre_naec
 
 #[tokio::test]
 async fn ein_dritter_elw_sieht_den_widerruf_im_verlauf_ohne_unterzeichner() {
-    let (_hub, elw2, _h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, false).await;
+    let (hub, elw2, _h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, false).await;
     elw_meldet(&elw2).await;
     let f = fuehrung(&elw2, e2).await;
     assert_eq!(f["fuehrend"], false, "{f}");
     assert_eq!(f["epoche"], 3, "{f}");
-    let letzter = f["verlauf"]
-        .as_array()
-        .unwrap()
+    assert_eq!(f["fuehrer_kennung"], hub.kennung, "{f}");
+    let verlauf = f["verlauf"].as_array().unwrap();
+    assert!(
+        verlauf.iter().any(|v| v["epoche_zaehler"] == 2),
+        "ELW 2 kannte die Führung von ELW 1 vor dem Widerruf: {f}"
+    );
+    let letzter = verlauf
         .iter()
         .max_by_key(|v| v["epoche_zaehler"].as_i64())
         .unwrap()
         .clone();
+    assert_eq!(letzter["epoche_zaehler"], 3, "{f}");
     assert_eq!(letzter["grund"], "Kopplung widerrufen", "{f}");
     assert!(
         letzter["unterzeichner"].is_null(),
