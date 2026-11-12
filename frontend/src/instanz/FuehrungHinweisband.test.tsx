@@ -49,6 +49,7 @@ const akte: FuehrungAnzeige = {
     grund: 'ELW ohne Verbindung',
     unterzeichner: 'Admin A',
     bruch_at: '2026-11-09 14:00:00',
+    konflikt: false,
   },
 };
 
@@ -91,6 +92,22 @@ describe('FuehrungHinweisband (LLH-1491)', () => {
     expect(await screen.findByText('Führung übernommen von Hub Nord')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Übernahme bestätigen' })).toBeNull();
   });
+  it('im Konflikt nennt es die führende ELW und bietet nur das Bestätigen (LLH-1669)', async () => {
+    vi.mocked(loadFuehrung).mockResolvedValue({
+      ...akte,
+      art: 'notuebernahme',
+      offen: { von: 'ELW 1', epoche: 2, bruch_at: '2026-11-09 14:00:00', konflikt: true },
+    });
+    renderMitProviders(<FuehrungHinweisband einsatz={einsatz('einsatzleitung', true)} />);
+    expect(
+      await screen.findByText(
+        'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Übernahme bestätigen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Widersprechen' })).toBeNull();
+  });
+
   it('ein gescheiterter Abruf lässt das Band mit „Erneut laden“ stehen', async () => {
     vi.mocked(loadFuehrung).mockRejectedValueOnce(new Error('Netz weg'));
     renderMitProviders(<FuehrungHinweisband einsatz={einsatz('einsatzleitung', true)} />);

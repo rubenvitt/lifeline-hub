@@ -31,7 +31,7 @@ import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { FuehrungAnzeige, FuehrungCodeAntwort, FuehrungVerlaufEintrag } from '../api/types';
-import { FUEHRUNG_ART_TEXT, fuehrungMoeglich } from './fuehrungText';
+import { FUEHRUNG_ART_TEXT, fuehrungMoeglich, offeneUebernahmeTitel } from './fuehrungText';
 
 /** Folge der Übergabe und der Abgabe per Code: steht in der Rückfrage, nicht neben dem Knopf. */
 const ABGABE_FOLGE = 'Danach ist der Einsatz hier nur noch zu lesen.';
@@ -76,7 +76,8 @@ function ortVon(f: FuehrungAnzeige): FuehrungOrt {
 /**
  * Bestätigen oder Widersprechen einer offenen Übernahme (Spec „Die meldende Seite gibt nie still
  * ab“, „Widersprechen heißt Rückübernahme“). Steht im Hinweisband unter der Kopfleiste und im
- * Paneel. Beide mit Rückfrage; Widersprechen ist die Rückübernahme.
+ * Paneel. Beide mit Rückfrage; Widersprechen ist die Rückübernahme. Im Konflikt (LLH-1669) nennt
+ * der Hub eine andere ELW als Führer und nähme keinen Widerspruch an: nur Bestätigen.
  */
 export function UebernahmeEntscheidung({
   fuehrung,
@@ -116,6 +117,7 @@ export function UebernahmeEntscheidung({
     },
   });
   const von = fuehrung.offen?.von ?? '';
+  const konflikt = fuehrung.offen?.konflikt === true;
   const laeuft = bestaetigen.isPending || widersprechen.isPending;
   const beschrieben = ohneNetz ? grundId : undefined;
   return (
@@ -141,26 +143,28 @@ export function UebernahmeEntscheidung({
             Übernahme bestätigen
           </Button>
         </Popconfirm>
-        <Popconfirm
-          title={`Der Übernahme durch ${von} widersprechen?`}
-          description="Die Führung bleibt hier."
-          okText="Widersprechen"
-          cancelText="Abbrechen"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => {
-            if (!ohneNetz && !laeuft) widersprechen.mutate();
-          }}
-        >
-          <Button
-            danger
-            loading={widersprechen.isPending}
-            disabled={ohneNetz || bestaetigen.isPending}
-            aria-describedby={beschrieben}
-            data-lfh="fuehrung-widersprechen"
+        {!konflikt && (
+          <Popconfirm
+            title={`Der Übernahme durch ${von} widersprechen?`}
+            description="Die Führung bleibt hier."
+            okText="Widersprechen"
+            cancelText="Abbrechen"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => {
+              if (!ohneNetz && !laeuft) widersprechen.mutate();
+            }}
           >
-            Widersprechen
-          </Button>
-        </Popconfirm>
+            <Button
+              danger
+              loading={widersprechen.isPending}
+              disabled={ohneNetz || bestaetigen.isPending}
+              aria-describedby={beschrieben}
+              data-lfh="fuehrung-widersprechen"
+            >
+              Widersprechen
+            </Button>
+          </Popconfirm>
+        )}
       </Space>
       <SpeicherFehler fehler={bestaetigen.error} titel="Nicht bestätigt" />
       <SpeicherFehler fehler={widersprechen.error} titel="Nicht widersprochen" />
@@ -312,17 +316,20 @@ export default function FuehrungPaneel({
           }}
         >
           <Typography.Text strong style={{ color: rollen.achtungText }}>
-            Führung übernommen von {fuehrung.offen.von}
+            {offeneUebernahmeTitel(fuehrung.offen, fuehrung.art)}
           </Typography.Text>
-          <Datenraster spalten={2}>
-            <Datenfeld label="Grund" breit>
-              {fuehrung.offen.grund ?? '—'}
-            </Datenfeld>
-            <Datenfeld label="Unterzeichnet von">{fuehrung.offen.unterzeichner ?? '—'}</Datenfeld>
-            <Datenfeld label="Erklärt">
-              {fuehrung.offen.zeitpunkt ? zeit(fuehrung.offen.zeitpunkt) : '—'}
-            </Datenfeld>
-          </Datenraster>
+          {/* Im Konflikt gehören Grund und Unterzeichner einer anderen ELW: weglassen. */}
+          {!fuehrung.offen.konflikt && (
+            <Datenraster spalten={2}>
+              <Datenfeld label="Grund" breit>
+                {fuehrung.offen.grund ?? '—'}
+              </Datenfeld>
+              <Datenfeld label="Unterzeichnet von">{fuehrung.offen.unterzeichner ?? '—'}</Datenfeld>
+              <Datenfeld label="Erklärt">
+                {fuehrung.offen.zeitpunkt ? zeit(fuehrung.offen.zeitpunkt) : '—'}
+              </Datenfeld>
+            </Datenraster>
+          )}
           {darfBedienen && (
             <div style={{ marginBlockStart: token.marginSM }}>
               <UebernahmeEntscheidung
