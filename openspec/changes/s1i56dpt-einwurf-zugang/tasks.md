@@ -82,7 +82,7 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
   `external_id` und gleicher Inhalt: Wiederholung“, „ohne Kennung dreimal in 30 s: ein Eintrag,
   Zähler 2“, „ohne Kennung nach 10 min: zweiter Eintrag mit `frueher_id`“, „anderer Zugang,
   gleiche Kennung: zwei Einträge“, „Tagesgrenze 429, Wiederholung zählt nicht“.
-- [ ] 5.4 Akzeptanztest über den Trace-Span: ein Einwurf mit gültigem und einer mit unbekanntem
+- [x] 5.4 Akzeptanztest über den Trace-Span: ein Einwurf mit gültigem und einer mit unbekanntem
   Schlüssel durch den ganzen Router mit `LogPuffer`. Verifizieren: Kein mitgeschnittenes Byte
   enthält den Schlüssel oder seinen Hash, und der Span nennt
   `/api/v1/einwurf/***/alarmmeldung`. Gegenprobe: Ohne den Aufruf aus 4.1 wird der Test rot.
@@ -192,9 +192,24 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
 
 - [ ] 11.1 `./scripts/check-all.sh` läuft grün (ohne `| tail`). Verifizieren: Ausgabe des Laufs;
   ein Kästchen, das erst die CI des PRs belegt, wird mit Verweis auf diesen Lauf abgehakt.
-- [ ] 11.2 Mutationsproben an drei Stellen: TLS-Prüfung entfernt, Maskierung entfernt, Bedingung
+- [x] 11.2 Mutationsproben an drei Stellen: TLS-Prüfung entfernt, Maskierung entfernt, Bedingung
   „älter wird nicht übernommen“ umgedreht. Verifizieren: Je Probe wird mindestens ein Test rot;
   danach ist der Code wieder im Ausgangszustand (`git diff` leer).
+
+## Nachweise (12.11.2026)
+
+- **5.4 und 11.2, Mutationsproben:** Drei Fehler zugleich eingebaut, danach wiederhergestellt
+  (`git status` sauber). Ohne den Aufruf von `einwurf::maskiere_pfad` in `pfad_fuer_protokoll`
+  werden `app::tests::einwurf_schluessel_steht_in_keiner_logzeile` und
+  `pfad_fuer_das_log_traegt_keinen_einwurf_schluessel` rot. Ohne die TLS-Prüfung in `pruefe` wird
+  `ohne_tls_und_ohne_schalter_ist_jeder_einwurf_403` (`tests/einwurf.rs`) rot. Mit umgedrehtem
+  Vergleich in `position_ablegen` werden `aeltere_position_wird_nicht_uebernommen`,
+  `neue_position_ersetzt_die_alte_ohne_verlauf` und
+  `position_haengt_an_der_kennung_und_ersetzt_ohne_verlauf` rot.
+- **Umgebung der Sitzung:** `mise` fehlt und ließ sich nicht installieren. Frontend-Prüfungen
+  liefen mit Node 22 statt 26.7.0, `./scripts/check-all.sh` lief nicht als Ganzes, und die volle
+  Backend-Suite passt nicht auf den Datenträger der Sitzung. Gelaufen sind die Schritte einzeln
+  (siehe 11.1); die volle Suite belegt die CI des PRs.
 
 ## Workflow follow-up
 
