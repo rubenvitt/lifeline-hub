@@ -74,11 +74,13 @@ export function kopplungHinweise(
 ): string[] {
   const aus: string[] = [];
   const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
+  // Über eine Direktkopplung vor Ort gehen nie Geheimnisse (LLH-1497): dort kein Hinweis dazu.
+  const geheimnisse = aktiv && k.art === 'standard';
   // Ohne bestätigte Plattenverschlüsselung kommen Konten ohne Passwort an (D6): hier sagen, warum.
-  if (aktiv && k.richtung === 'meldet_sich' && !datentraegerBestaetigt) {
+  if (geheimnisse && k.richtung === 'meldet_sich' && !datentraegerBestaetigt) {
     aus.push('Geheimnisse nicht verteilt: Datenträgerverschlüsselung nicht bestätigt');
   }
-  if (aktiv && k.richtung === 'wird_gemeldet' && !k.org.stammdaten.geheimnisse_verteilt) {
+  if (geheimnisse && k.richtung === 'wird_gemeldet' && !k.org.stammdaten.geheimnisse_verteilt) {
     aus.push(
       'Kontogeheimnisse gehen nicht hinaus: Datenträgerverschlüsselung dort nicht bestätigt',
     );

@@ -238,6 +238,24 @@ describe('Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`)', () => {
 });
 
 describe('Direktkopplung vor Ort (LLH-1497)', () => {
+  it('nennt an einer Direktkopplung keine Hinweise zu Kontogeheimnissen', () => {
+    const ohneVerteilung = {
+      ...kopplung().org,
+      stammdaten: { ...kopplung().org.stammdaten, geheimnisse_verteilt: false },
+    };
+    expect(
+      kopplungHinweise(kopplung({ richtung: 'wird_gemeldet', org: ohneVerteilung })),
+    ).toContain(
+      'Kontogeheimnisse gehen nicht hinaus: Datenträgerverschlüsselung dort nicht bestätigt',
+    );
+    expect(
+      kopplungHinweise(
+        kopplung({ art: 'vor_ort', richtung: 'wird_gemeldet', org: ohneVerteilung }),
+      ),
+    ).toEqual([]);
+    expect(kopplungHinweise(kopplung({ art: 'vor_ort' }), false)).toEqual([]);
+  });
+
   it('nennt den Zustand des Zertifikats nur an einer Direktkopplung', () => {
     expect(zertifikatZeile(kopplung())).toBeNull();
     const vorOrt = (zertifikat: InstanzKopplungAnzeige['zertifikat']) =>
