@@ -477,9 +477,11 @@ schritt_17() {
   # Signatur). Paketzuschnitt wie Schritt 4 und 15, damit Cargo die Features von Server und Hülle
   # nicht vereinigt. Nicht im vollen Lauf: Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   bauziel_pruefen "$ROOT"
-  ohne_dev_env cargo check --locked --workspace --exclude lifeline-desktop --all-targets
-  ohne_dev_env cargo check --locked -p lifeline-desktop --all-targets
-  ohne_dev_env cargo check --locked --workspace --exclude lifeline-desktop --all-targets \
+  # Ohne `--locked` wie Schritt 4 und 15: sonst wäre ein PR mit nicht nachgezogener Cargo.lock
+  # hier rot und in der CI grün, mit einer Meldung, die einen fremden Merge verdächtigt.
+  ohne_dev_env cargo check --workspace --exclude lifeline-desktop --all-targets
+  ohne_dev_env cargo check -p lifeline-desktop --all-targets
+  ohne_dev_env cargo check --workspace --exclude lifeline-desktop --all-targets \
     --features lifeline-hub/dev-seeds
   $PNPM -C "$FE" typecheck
 }

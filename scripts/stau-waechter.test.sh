@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -X) methode="$2"; shift 2 ;;
     --paginate) shift ;;
-    -f) body="${2#body=}"; shift 2 ;;
+    -f) case "$2" in body=*) body="${2#body=}" ;; esac; shift 2 ;;
     *) pfad="$1"; shift ;;
   esac
 done
@@ -53,6 +53,7 @@ kdatei_von() {
 naechste_id() { cat "$F"/kommentare*.json | jq -s '[.[][].id] | max // 100 | . + 1'; }
 case "$methode $pfad" in
   "GET repos/test/repo/commits/"*"/check-runs"*)
+    [ ! -e "$F/checks-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     sha="${pfad#repos/test/repo/commits/}"; sha="${sha%%/*}"
     if [ -f "$F/checks/$sha.json" ]; then cat "$F/checks/$sha.json"; else echo '{"check_runs":[]}'; fi ;;
   "GET repos/test/repo/commits/"*"/status")
@@ -67,7 +68,13 @@ case "$methode $pfad" in
   "GET repos/test/repo/actions/workflows/ci.yml/runs"*)
     [ ! -e "$F/laeufe-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     if [ -f "$F/laeufe.json" ]; then cat "$F/laeufe.json"; else echo '{"workflow_runs":[]}'; fi ;;
+  "GET repos/test/repo/labels/"*)
+    [ -e "$F/label-${pfad##*/}" ] || { echo "HTTP 404" >&2; exit 1; }
+    echo '{}' ;;
+  "POST repos/test/repo/labels")
+    touch "$F/label-alpha-rot"; echo "LABEL alpha-rot" >> "$F/log"; echo '{}' ;;
   "GET repos/test/repo/actions/runs/"*"/jobs"*)
+    [ ! -e "$F/jobs-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     id="${pfad#repos/test/repo/actions/runs/}"; id="${id%%/*}"
     if [ -f "$F/jobs/$id.json" ]; then cat "$F/jobs/$id.json"; else echo '{"jobs":[]}'; fi ;;
   "GET repos/test/repo/issues/"*"/timeline"*)
@@ -77,8 +84,8 @@ case "$methode $pfad" in
     nr="${pfad#repos/test/repo/issues/}"; nr="${nr%%/*}"
     d="$(kdatei "$nr")"; [ -f "$d" ] || echo '[]' > "$d"
     id="$(naechste_id)"
-    jq --argjson id "$id" --arg body "$body" \
-      '. + [{id: $id, body: $body, user: {login: "github-actions[bot]"}}]' "$d" > "$F/k.neu"
+    jq --argjson id "$id" --arg body "$body" --argjson jetzt "${STAU_JETZT:-0}" \
+      '. + [{id: $id, body: $body, user: {login: "github-actions[bot]"}, created_at: ($jetzt | todate)}]' "$d" > "$F/k.neu"
     mv "$F/k.neu" "$d"
     # PR #7 schreibt wie bisher ohne Nummer ins Protokoll, damit die Einzel-PR-Fälle gleich bleiben.
     if [ "$nr" = 7 ]; then echo "POST $(art "$body")" >> "$F/log"; else echo "POST#$nr $(art "$body")" >> "$F/log"; fi
@@ -678,11 +685,12 @@ zweig() { # <klon> <branch> [datei] [inhalt]
   git -C "$1" fetch -q origin
   aendere "$1" "$2" "${3:-$2.txt}" "${4:-$2}"
 }
-# CI-Läufe auf alpha, neuester zuerst: Zeilen "<id>|<sha>|<status>|<conclusion>|<ende>".
+# CI-Läufe auf alpha, neuester zuerst: Zeilen "<id>|<sha>|<status>|<conclusion>|<ende>[|<versuch>]".
 laeufe() { # <klon>
   jq -R -s '{workflow_runs: [split("\n")[] | select(length > 0) | split("|")
       | {id: (.[0] | tonumber), head_sha: .[1], status: .[2],
          conclusion: (if .[3] == "" then null else .[3] end), updated_at: .[4],
+         run_attempt: ((.[5] // "1") | tonumber),
          html_url: ("https://github.com/test/repo/actions/runs/" + .[0])}]}' \
     > "$(fake "$1")/laeufe.json"
 }
@@ -731,13 +739,14 @@ checks_von() { # <klon> <branch>  (Zeilen auf stdin)
 }
 UM_1035=1794479700 # 2026-11-12T10:35:00Z
 UM_1131=1794483060 # 2026-11-12T11:31:00Z
+UM_1136=1794483360 # 2026-11-12T11:36:00Z
 UM_1155=1794484500 # 2026-11-12T11:55:00Z
 
 # Lage wie am 12.11.: alpha grün (G), dann #1319 und #1315 gemergt, der Lauf darauf ist rot.
 r="$(repo_neu alpharot)"
 G="$(kopf "$r" alpha)"
 zweig "$r" f11; zweig "$r" f12; zweig "$r" f13; zweig "$r" f14 a.txt "f14 ändert a"
-zweig "$r" dep; zweig "$r" ausfork; zweig "$r" entwurf
+zweig "$r" dep; zweig "$r" ausfork; zweig "$r" entwurf; zweig "$r" f05
 alpha_merge "$r" 1319
 alpha_merge "$r" 1315
 F="$(kopf "$r" alpha)"
@@ -769,14 +778,28 @@ pr_kommentar_enthaelt "41 Wartende sollen nicht reparieren" "$r" 12 'nicht selbs
 pruefe "41 Konflikt-Hinweis an #12 bleibt" 1 \
   "$(jq '[.[] | select(.body | startswith("<!-- stau-waechter:konflikt:"))] | length' "$(fake "$r")/kommentare-12.json")"
 pruefe "41 #12 trägt beide Hinweise" 2 "$(jq length "$(fake "$r")/kommentare-12.json")"
+pruefe "41 das fehlende Label alpha-rot wird angelegt" 1 "$(zaehle "$r" 'LABEL alpha-rot')"
 
 # 42 — Gleicher Befund noch einmal: kein Schreibzugriff.
 vorher="$(wc -l < "$(fake "$r")/log")"
 alpha_lauf "$r"
 pruefe "42 gleicher Befund schreibt nichts" "$vorher" "$(wc -l < "$(fake "$r")/log")"
 
-# 43 — Nach einer Stunde ohne Fix-PR wechselt die Zuständigkeit; Wartende bekommen nichts Neues.
+# 53 — Mitten in der Stunde kommt ein PR mit kleinerer Nummer dazu: der Auftrag haftet an #11.
+export STAU_JETZT=$((UM_1035 + 900))
+printf '%s\n' '5|f05|false|false|ruben|' '11|f11|false|false|ruben|' '12|f12|false|false|ruben|' \
+  '13|f13|false|false|ruben|' | prs "$r"
+alpha_lauf "$r"
+pruefe "53 #11 behält den Auftrag" 1 "$(zaehle "$r" 'POST#11 alpha-zustaendig')"
+pruefe "53 der neue #5 wartet" 1 "$(zaehle "$r" 'POST#5 alpha-wartet')"
+pruefe "53 #11 bekommt keinen neuen Kommentar" 0 "$(zaehle "$r" 'DELETE#11')"
+
+# 43 — Nach einer vollen Stunde ohne Fix-PR geht der Auftrag an den nächsten nach #11; Wartende
+# bekommen nichts Neues. (Vor Ablauf der Stunde, um 11:31, bleibt er bei #11.)
 export STAU_JETZT="$UM_1131"
+alpha_lauf "$r"
+pruefe "43 vor Ablauf der Stunde: #11 behält den Auftrag" 0 "$(zaehle "$r" 'DELETE#11')"
+export STAU_JETZT="$UM_1136"
 alpha_lauf "$r"
 pruefe "43 #12 bekommt den Auftrag" 1 "$(zaehle "$r" 'POST#12 alpha-zustaendig')"
 pruefe "43 #11 wartet jetzt" 1 "$(zaehle "$r" 'POST#11 alpha-wartet')"
@@ -856,11 +879,98 @@ git -C "$r" fetch -q origin
 pruefe "51 grüner Stand schon im PR: kein Push" "$vorher11" "$(kopf "$r" f11)"
 pruefe "51 Hinweis behoben" "PATCH#11 alpha-behoben" "$(log "$r")"
 
+# 52 — Der Workflow ruft nur `alle`: auch dort kommt der Befund „alpha rot“ an.
+r="$(repo_neu alleweg)"
+zweig "$r" f11
+alpha_merge "$r" 30
+printf '%s\n' "5002|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" \
+  "5001|$(git -C "$r" rev-parse origin/alpha~1)|completed|success|2026-11-12T10:00:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 5002
+printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
+ci_gruen "$r"
+export STAU_JETZT="$UM_1035"
+code=0
+( cd "$r" && STAU_FAKE="$(fake "$r")" "$SKRIPT_UNTER_TEST" alle ) > "$ARBEIT/ausgabe" 2>&1 || code=$?
+pruefe "52 alle: Lauf grün" 0 "$code"
+pruefe "52 alle: #11 bekommt den Auftrag" 1 "$(zaehle "$r" 'POST#11 alpha-zustaendig')"
+
+# 54 — Der rote Lauf wird neu gestartet (gleiche ID, Versuch 2, läuft noch): der Zustand ist
+# unklar, nicht grün. Kein Hinweis wird „behoben“, nichts wird gemergt.
+r="$(repo_neu rerun)"
+zweig "$r" f11
+alpha_merge "$r" 40
+printf '%s\n' "6002|$(kopf "$r" alpha)|in_progress||2026-11-12T11:00:00Z|2" \
+  "6001|$(git -C "$r" rev-parse origin/alpha~1)|completed|success|2026-11-12T10:00:00Z" | laeufe "$r"
+printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
+printf '%s\n' 'Rust-Suite|completed|failure|2026-11-12T10:40:00Z|2026-11-12T11:00:00Z' | checks_von "$r" f11
+echo '[{"id": 700, "body": "<!-- stau-waechter-alpha:zustaendig:abc -->\nalpha ist rot", "user": {"login": "github-actions[bot]"}}]' \
+  > "$(fake "$r")/kommentare-11.json"
+vorher11="$(kopf "$r" f11)"
+export STAU_JETZT="$UM_1155"
+alpha_lauf "$r"
+pruefe "54 Re-run läuft: kein Schreibzugriff" "" "$(log "$r")"
+pruefe "54 Re-run läuft: kein Merge" "$vorher11" "$(kopf "$r" f11)"
+
+# 55 — Die Jobs des roten Laufs sind nicht lesbar: unklar, nicht grün.
+printf '%s\n' "6002|$(kopf "$r" alpha)|completed|failure|2026-11-12T11:30:00Z|2" \
+  "6001|$(git -C "$r" rev-parse origin/alpha~1)|completed|success|2026-11-12T10:00:00Z" | laeufe "$r"
+touch "$(fake "$r")/jobs-kaputt"
+alpha_lauf "$r"
+pruefe "55 Jobs nicht lesbar: kein Schreibzugriff" "" "$(log "$r")"
+rm -f "$(fake "$r")/jobs-kaputt"
+
+# 56 — alpha wieder grün, aber die Checks des PRs sind nicht lesbar: der Hinweis bleibt offen,
+# beim nächsten lesbaren Lauf wird gemergt.
+alpha_merge "$r" 41
+printf '%s\n' "6003|$(kopf "$r" alpha)|completed|success|2026-11-12T11:50:00Z" | laeufe "$r"
+touch "$(fake "$r")/checks-kaputt"
+alpha_lauf "$r"
+pruefe "56 Checks nicht lesbar: Hinweis bleibt" "" "$(log "$r")"
+rm -f "$(fake "$r")/checks-kaputt"
+# 57 — Die CI des PRs läuft noch: abwarten, Hinweis bleibt.
+printf '%s\n' 'Rust-Suite|in_progress||2026-11-12T11:40:00Z|' | checks_von "$r" f11
+alpha_lauf "$r"
+pruefe "57 PR-CI läuft noch: Hinweis bleibt" "" "$(log "$r")"
+printf '%s\n' 'Rust-Suite|completed|failure|2026-11-12T10:40:00Z|2026-11-12T11:00:00Z' | checks_von "$r" f11
+alpha_lauf "$r"
+git -C "$r" fetch -q origin
+pruefe "57 danach lesbar und rot: alpha wird hineingemergt" 1 "$(zaehle "$r" 'POST#11 alpha-angestossen')"
+
+# 58 — Ein Entwurf mit Auftrag: bei rotem alpha wird der Auftrag zu „wartet“, bei grünem „behoben“.
+r="$(repo_neu entwurfauftrag)"
+zweig "$r" f11; zweig "$r" f12
+alpha_merge "$r" 50
+printf '%s\n' "7002|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" \
+  "7001|$(git -C "$r" rev-parse origin/alpha~1)|completed|success|2026-11-12T10:00:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 7002
+printf '%s\n' '11|f11|true|false|ruben|' '12|f12|false|false|ruben|' | prs "$r"
+echo '[{"id": 800, "body": "<!-- stau-waechter-alpha:zustaendig:abc -->\nalpha ist rot", "user": {"login": "github-actions[bot]"}, "created_at": "2026-11-12T10:31:00Z"}]' \
+  > "$(fake "$r")/kommentare-11.json"
+touch "$(fake "$r")/label-alpha-rot"
+export STAU_JETZT="$UM_1035"
+alpha_lauf "$r"
+pruefe "58 Entwurf verliert den Auftrag" 1 "$(zaehle "$r" 'POST#11 alpha-wartet')"
+pruefe "58 #12 übernimmt" 1 "$(zaehle "$r" 'POST#12 alpha-zustaendig')"
+printf '%s\n' "7003|$(kopf "$r" alpha)|completed|success|2026-11-12T11:00:00Z" | laeufe "$r"
+alpha_lauf "$r"
+pruefe "58 grün: auch der Entwurf zeigt behoben" 1 "$(zaehle "$r" 'PATCH#11 alpha-behoben')"
+
+# 59 — Kein Kandidat (nur Dependabot): niemand ist zuständig, und der Hinweis sagt das.
+r="$(repo_neu niemand)"
+zweig "$r" dep
+alpha_merge "$r" 60
+printf '%s\n' "8002|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 8002
+printf '%s\n' '9|dep|false|false|dependabot[bot]|' | prs "$r"
+alpha_lauf "$r"
+pr_kommentar_enthaelt "59 ohne Kandidaten: Hinweis sagt, dass niemand beauftragt ist" "$r" 9 'Kein offener PR'
+
 # 48 — Nur der Release scheitert: alpha gilt nicht als rot.
 r="$(repo_neu nurrelease)"
 zweig "$r" f11
 printf '%s\n' "2002|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
-printf '%s\n' 'Schnellprüfungen|success' 'Rust-Suite|success' 'Release|failure' | jobs_von "$r" 2002
+# Der Release ist ein wiederverwendbarer Workflow: sein Job heißt „Release / release“ (ci.yml).
+printf '%s\n' 'Schnellprüfungen|success' 'Rust-Suite|success' 'Release / release|failure' | jobs_von "$r" 2002
 printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
 export STAU_JETZT="$UM_1035"
 alpha_lauf "$r"

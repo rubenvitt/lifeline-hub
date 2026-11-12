@@ -7,9 +7,9 @@
 
 ## 2. Workflow `Baut mit Ziel-Branch`
 
-- [x] 2.1 `.github/workflows/ziel-branch-build.yml` nach design.md D1/D2: PR-Ereignisse (nur fertig, kein Entwurf, kein Fork) und Push auf `alpha`/`beta`/`main` (Auswahl → Matrix je fertigem PR → Melden; nicht fertige mit vorhandenem Check auf `queued`). Kompilier-Job nur `contents: read`, keine Secrets, `rust-cache` ohne Speichern bei Push-Läufen; Melde-Job `checks: write`, checkt keinen PR-Code aus, schreibt nur, wenn PR-Kopf und Ziel-Branch noch dem gerechneten Stand entsprechen. Actions per SHA gepinnt. Prüfen: `actionlint` (falls vorhanden) und der Selbsttest aus 2.2.
+- [x] 2.1 `.github/workflows/ziel-branch-build.yml` nach design.md D1/D2: PR-Ereignisse (nur fertig, kein Entwurf, kein Fork) und Push auf `alpha`/`beta`/`main` (nach dem Review: Push-Lauf verteilt nur, je fertigem PR ein eigener Lauf auf dessen Branch; nicht fertige mit vorhandenem Check auf `queued`). Kompilier-Job nur `contents: read`, keine Secrets, `rust-cache` ohne Speichern bei Push-Läufen; Melde-Job `checks: write`, checkt keinen PR-Code aus, schreibt nur, wenn PR-Kopf und Ziel-Branch noch dem gerechneten Stand entsprechen. Actions per SHA gepinnt. Prüfen: `actionlint` (falls vorhanden) und der Selbsttest aus 2.2.
 - [x] 2.2 Form-Wächter für den neuen Workflow (in `scripts/ci-stufen.test.sh` oder eigenem Selbsttest, Schritt 11): Rechte je Job, kein Checkout von PR-Code im Melde-Job, `save-if` bei Push, Nebenläufigkeitsgruppen. Prüfen: erst rot gegen eine absichtlich falsche Form, dann grün.
-- [x] 2.3 Melde-Logik als Skript (`scripts/ziel-branch-build.sh` oder in der Auswahl), mit Selbsttest gegen eine `gh`-Attrappe wie bei `stau-waechter.test.sh`: fertig/nicht fertig, Fork, veralteter Stand → nichts schreiben, Konflikt → rot mit Grund. Prüfen: Selbsttest grün, im Gate eingehängt.
+- [x] 2.3 Melde-Logik als Skript (`scripts/ziel-branch-build.sh` oder in der Auswahl), mit Selbsttest gegen eine `gh`-Attrappe wie bei `stau-waechter.test.sh`: fertig/nicht fertig, Fork, veralteter Stand → „überholt“ (abgebrochen), Konflikt → rot mit Grund. Prüfen: Selbsttest grün, im Gate eingehängt.
 
 ## 3. Stau-Wächter „alpha rot“ (TDD in `scripts/stau-waechter.test.sh`)
 
@@ -30,6 +30,14 @@
 
 - [ ] 5.1 `scripts/check-all.sh --geaendert` grün (Ausgabe vollständig, kein `| tail`).
 - [ ] 5.2 Review vor dem PR nach `dev-zunder-ausfuehren`, „Review vor dem PR“; Verbleib der Befunde im PR.
+
+## 6. Befunde aus dem Review vor dem PR
+
+- [x] 6.1 Build-Check: PR-Code nie im Bereich eines Kanal-Branches (Push-Lauf `verteilen` startet je fertigem PR einen Lauf per `workflow_dispatch` auf dessen Branch; Entscheidung Ruben). Prüfen: Selbsttest Fall 1/1b, Formwächter F11, Mutation „kompilieren auch bei Push“ rot.
+- [x] 6.2 Build-Check: Release-Commits (`[skip ci]`) machen ein Ergebnis nicht überholt; Entwürfe und nicht fertige PRs mit altem Grün warten auch beim PR-Ereignis; ein API-Fehler hält die übrigen PRs nicht auf; ohne `--locked`. Prüfen: Fälle 1c, 4b, 9b, Mutationen je rot.
+- [x] 6.3 Formwächter und ADR-Prüfung: jeder rust-cache einzeln mit `save-if: false`, jede mise-Action ohne Cache, kein `actions/cache(/save)?@`. Prüfen: die drei Täuschungen des Reviewers sind je rot.
+- [x] 6.4 Wächter: neu gestarteter roter Lauf und unlesbare Jobs machen den Zustand unbestimmt; unlesbare Checks, laufende CI und gescheiterter Push lassen den Hinweis offen; Auftrag haftet eine Stunde (Entscheidung Ruben); Label wird angelegt (Entscheidung Ruben); Entwurf mit Auftrag wird „wartet“; Hinweis ohne Kandidaten; Texte „doppelt“ und Log. Prüfen: Fälle 52–59, Mutationen je rot.
+- [x] 6.5 Texte nachgezogen: Spec, Design, `scripts/AGENTS.md`, ADR-0030, Skill (Zuständiger öffnet sofort einen Entwurfs-PR mit Label, dann Abstimmung).
 
 ## Workflow follow-up
 

@@ -20,17 +20,21 @@ herleitung:
 - MUST: Es gelten die Regeln in `scripts/AGENTS.md`, „Baut mit Ziel-Branch“ und „Stau-Wächter“
   (Befund „alpha rot“).
 - MUST: Der Check `Baut mit Ziel-Branch` entsteht über die Checks-API, nie als Job-Name.
-- MUST NOT: PR-Code läuft in `ziel-branch-build.yml` außerhalb des Jobs `kompilieren`, und dort
-  mit Schreibrecht, Secret, gespeichertem Zugang oder speicherndem Cache.
-- MUST: Bei rotem `alpha` bekommt genau ein offener PR den Auftrag zum Fix; die übrigen warten.
+- MUST NOT: PR-Code läuft in einem Lauf, dessen Ref ein Kanal-Branch ist; nach einem Push rechnet
+  je fertigem PR ein eigener Lauf auf dessen Branch (`workflow_dispatch`).
+- MUST NOT: Der Job `kompilieren` hat Schreibrecht, Secret, gespeicherten Zugang oder speichernden
+  Cache.
+- MUST: Bei rotem `alpha` bekommt höchstens ein offener PR den Auftrag zum Fix; er haftet eine
+  Stunde an ihm, die übrigen warten.
 
 ## Prüfung
 
 ```sh
 verbiete '^    name: Baut mit Ziel-Branch' .github/workflows/ziel-branch-build.yml
 verlange '^NAME="Baut mit Ziel-Branch"' scripts/ziel-branch-build.sh
-verlange 'save-if: false' .github/workflows/ziel-branch-build.yml
-verbiete 'uses: actions/cache@' .github/workflows/ziel-branch-build.yml
+verlange '^  workflow_dispatch:' .github/workflows/ziel-branch-build.yml
+verlange 'if: \$\{\{ github\.event_name != .push. && needs\.vorbereiten' .github/workflows/ziel-branch-build.yml
+verbiete 'uses: actions/cache(/save)?@' .github/workflows/ziel-branch-build.yml
 verlange 'workflows: \[CI\]' .github/workflows/stau-waechter.yml
 verlange '^MARKE_ALPHA="stau-waechter-alpha"' scripts/stau-waechter.sh
 ```
@@ -44,7 +48,9 @@ Benutzerkontos nicht, „up to date“ erzwingen hieße die volle CI je Merge un
 
 ## Konsequenzen
 
-Ein Bruch, der sich beim Kompilieren zeigt, mergt nicht mehr; je Merge auf einen Kanal-Branch
-kostet jeder fertige PR einen Kompilierlauf von wenigen Minuten. Brüche, die erst ein Test zeigt,
+Ein Bruch, der sich beim Kompilieren zeigt, mergt nicht mehr, bis auf ein kurzes Fenster zwischen
+Push und Verteilen; je Merge auf einen Kanal-Branch kostet jeder fertige PR einen eigenen
+Kompilierlauf von wenigen Minuten. Der Push-Lauf führt keinen PR-Code aus, damit kein Cache im
+Bereich von `alpha` entsteht, den der Release-Build liest. Brüche, die erst ein Test zeigt,
 landen weiter auf `alpha`; dann baut genau ein Zuständiger den Fix, und der Wächter zieht die roten
 PRs danach nach. Der Check wird erst Pflicht, wenn Ruben ihn im Ruleset einträgt.

@@ -36,22 +36,27 @@ Motivation: proposal.md, „Why“. Was heute schon da ist:
 
 ### D1 Eigener Workflow `ziel-branch-build.yml` mit Check über die Checks-API
 
-Der Check `Baut mit Ziel-Branch` entsteht nicht als Job-Name, sondern wird von einem Melde-Job per
-Checks-API auf den Kopf-Commit des PRs geschrieben. Das hat zwei Gründe. Ein Push auf `alpha` muss
-den Check an vielen PR-Köpfen neu setzen, und das geht nur über die API. Und ein übersprungener Job
-meldete seinen Check grün; den Fehler hat `e2e.yml` schon einmal mit der Matrix-Krücke umgangen.
-Über die API entsteht der Check nur, wenn wirklich gerechnet wurde oder bewusst „wartet“ gemeldet
+Der Check `Baut mit Ziel-Branch` entsteht nicht als Job-Name, sondern per Checks-API am Kopf-Commit
+des PRs. Ein Push auf `alpha` muss ihn an vielen PR-Köpfen neu setzen, das geht nur über die API;
+und ein übersprungener Job meldete seinen Check grün (den Fehler umgeht `e2e.yml` mit der
+Matrix-Krücke). Über die API entsteht der Check nur, wenn gerechnet oder bewusst „wartet“ gemeldet
 wird. Sonst fehlt er.
 
-Auslöser:
+Auslöser und Jobs:
 
 - `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`, `auto_merge_enabled`,
-  `labeled`): rechnet nur, wenn der PR fertig ist (gleiche Definition wie `pr-pruefstufen`), kein
-  Entwurf und kein Fork. Eine Nebenläufigkeitsgruppe je PR bricht einen älteren Lauf ab.
-- `push` auf `alpha`, `beta`, `main`: Ein Auswahl-Job listet die offenen PRs gegen den Branch. Für
-  fertige PRs rechnet je PR ein Matrix-Job (begrenzte Parallelität). PRs, die nicht fertig sind und
-  den Check schon tragen, bekommen ihn als `queued` mit dem Text „wartet, bis der PR fertig ist“.
-  Eine Gruppe je Ziel-Branch bricht einen älteren Push-Lauf ab.
+  `labeled`): `vorbereiten` setzt den Check eines fertigen PRs (gleiche Definition wie
+  `pr-pruefstufen`, kein Entwurf, kein Fork) auf „läuft“, an einem nicht fertigen, der ihn trägt,
+  auf „wartet“. Dann `kompilieren` und `melden`.
+- `push` auf `alpha`, `beta`, `main`: Nur `verteilen` läuft. Es setzt den Check jedes fertigen PRs
+  auf „läuft“ und startet für ihn einen **eigenen Lauf** dieses Workflows per `workflow_dispatch`
+  auf seinem Branch; jeder übrige mit Check (auch ein Entwurf) bekommt „wartet“. Kennt ein Branch
+  den Workflow noch nicht, wird der Check rot mit dem Hinweis, den Ziel-Branch hineinzumergen.
+- `workflow_dispatch` (der eigene Lauf): `vorbereiten` übernimmt PR, Check und Stand aus den
+  Eingaben, dann `kompilieren` und `melden`.
+
+Eine Nebenläufigkeitsgruppe je PR (Ereignis und Einzellauf teilen sie) bzw. je Kanal-Branch bricht
+einen älteren Lauf ab. Ein Fehler an einem PR hält `verteilen` nicht auf; der Lauf endet dann rot.
 
 Verworfen:
 
@@ -61,24 +66,32 @@ Verworfen:
   die festgeschriebene Form der zweiten Stufe.
 - **Der Wächter mergt `alpha` in jeden fertigen PR:** löst je Merge auf `alpha` die volle CI samt
   e2e für jeden fertigen PR aus, über eine Stunde Runner-Zeit je PR.
+- **Im Push-Lauf selbst kompilieren (erster Entwurf, im Review verworfen):** Der Push-Lauf hat den
+  Cache-Bereich von `alpha`. Code aus dem PR (etwa ein `build.rs` einer Abhängigkeit in einem
+  Dependabot-PR) kann über das Runtime-Token des Runners Cache-Einträge anlegen, auch wenn keine
+  Action speichert, etwa durch Überschreiben einer später laufenden Action. `release.yml` führt
+  einen Binär-Cache mit dem Secret der Release-App aus. Entscheidung Ruben, 12.11.2026.
+- **Push-Lauf setzt nur „wartet“:** nach jedem Merge hinge jeder fertige PR, bis ihn jemand
+  anstößt.
 
-### D2 Kompilieren und Melden sind getrennte Jobs
+### D2 Kompilieren und Melden sind getrennte Jobs, PR-Code nur im Bereich des PRs
 
-Der Kompilier-Job führt PR-Code aus (Build-Skripte, Makros). Er läuft mit `permissions: contents:
-read`, ohne Secrets und ohne gespeicherte Zugangsdaten (das Token bekommt nur der Fetch des
-PR-Kopfes als Umgebung seines Schritts), und er speichert keinen Cache: `rust-cache` mit
-`save-if: false`, nur `actions/cache/restore`, mise ohne Cache. Ein Push-Lauf speichert in den
-Bereich des Kanal-Branches, und ein vergifteter Cache landete sonst im Release-Build. Er liest den
-Cache der Rust-Suite. Sein Ergebnis (grün, rot, Konflikt, veraltet und die Ausgabe) geht als
-Artefakt an den Melde-Job (`checks: write`), der keinen PR-Code ausführt und den Check schreibt.
+PR-Code läuft nur in `kompilieren` und nie in einem Lauf auf einem Kanal-Branch (D1). Auch dort mit
+`permissions: contents: read`, ohne Secrets und ohne gespeicherte Zugangsdaten (das Token bekommt
+nur der Fetch des PR-Kopfes als Umgebung seines Schritts), und ohne gespeicherten Cache:
+`rust-cache` mit `save-if: false`, nur `actions/cache/restore`, mise ohne Cache. Er liest den Cache
+der Rust-Suite. Sein Ergebnis (grün, rot, Konflikt, veraltet und die Ausgabe) geht als Artefakt an
+`melden` (`checks: write`), das es nur als Text liest.
 
-Bevor der Melde-Job ein Ergebnis schreibt, prüft er, ob Kopf-Commit des PRs und Ziel-Branch noch auf
-dem gerechneten Stand stehen. Wenn nicht, schreibt er nichts; der Lauf zum neueren Stand schreibt
-selbst. So bleibt nie ein Ergebnis gegen einen alten Stand als jüngstes stehen.
+In einem Lauf eines PRs (Ereignis oder Einzellauf) stammen Workflow und Skripte aus dem PR selbst,
+wie bei `ci.yml`. Ein PR bestimmt dort seine eigenen Checks; das ist keine neue Grenze und kein
+Ziel dieser Trennung. Die Trennung schützt den Bereich der Kanal-Branches.
 
-Verworfen: ein Job mit Schreibrechten, der selbst kompiliert. Am PR-Ereignis wäre das wegen des
-eingeschränkten Tokens noch harmlos, beim Push auf `alpha` liefe PR-Code aber mit dem Token des
-Kanal-Branches.
+Bevor `melden` ein Ergebnis schreibt, prüft es, ob Kopf-Commit des PRs und Ziel-Branch noch auf dem
+gerechneten Stand stehen. Wenn nicht, schließt es den Check als „überholt“ (abgebrochen), denn den
+neuen Stand rechnet dessen eigener Lauf. Ausnahme: Ist der Ziel-Branch nur um Release-Commits
+weiter, gilt das Ergebnis. Die tragen `[skip ci]` und starten keinen Push-Lauf, sonst hinge der PR
+bis zum nächsten Merge.
 
 ### D3 Der Umfang steht in `check-all.sh`, Bündel `baut`
 
@@ -97,16 +110,20 @@ und letzter grüner Lauf davor ergeben die Spanne; die PRs dazu liefert
 `commits/<sha>/pulls` für jeden First-Parent-Commit der Spanne. `rot_seit` ist das Ende des ersten
 roten Laufs.
 
-### D5 Zuständigkeit ohne gespeicherten Zustand
+### D5 Zuständigkeit: der Auftrag haftet eine Stunde
 
 Kandidaten sind die offenen PRs gegen `alpha`: kein Entwurf, kein Fork, nicht Dependabot und ohne
-Label `alpha-rot`. Sortiert nach Nummer. Trägt ein PR das Label, ist er zuständig, bei mehreren der
-mit der kleinsten Nummer. Sonst ist der Kandidat an Stelle `floor((jetzt − rot_seit) / 3600) mod n`
-zuständig. Das ergibt die stündliche Rotation ohne Zustand: Jeder Lauf rechnet dasselbe Ergebnis,
-und ein Wechsel ergibt einen neuen Befund und damit einen neuen Kommentar.
+Label `alpha-rot`, sortiert nach Nummer. Trägt ein PR das Label, ist er zuständig, bei mehreren der
+mit der kleinsten Nummer; ein Entwurf mit Label zählt, damit der Zuständige den Fix sofort belegen
+kann. Sonst liest der Wächter, welcher PR den Hinweis `zustaendig` trägt und wann er angelegt
+wurde. Ist das weniger als eine Stunde her und der PR noch Kandidat, bleibt er zuständig. Sonst
+geht der Auftrag an den nächsten Kandidaten mit größerer Nummer, nach dem letzten an den ersten.
+Ohne Halter bekommt ihn der älteste.
 
-Verworfen: die Zuständigkeit in den Kommentaren mitführen und nach einer Stunde weiterreichen. Das
-braucht Lesen, Parsen und Schreiben über mehrere Läufe und bricht bei jedem Aussetzer der API.
+Verworfen, im Review: die Stelle `floor((jetzt − rot_seit) / 3600) mod n` über die aktuelle Liste.
+Sie braucht keinen Zustand, verschiebt den Auftrag aber mitten in der Stunde, sobald ein PR gemergt,
+geöffnet oder zum Entwurf wird; die erste Sitzung baut dann vielleicht schon. Der Hinweis selbst ist
+der Zustand, der Wächter liest ihn ohnehin. Entscheidung Ruben, 12.11.2026.
 
 ### D6 Eigene Marke für den Hinweis
 
@@ -115,42 +132,64 @@ Arten `fix`, `zustaendig`, `wartet`, `doppelt`, `behoben` und `angestossen`. `hi
 `hinweis_setzen` lesen die Marke aus einer lokal gesetzten Variablen; die Regeln (ein Hinweis je
 Marke, gleicher Befund schreibt nichts, neuer löscht und legt neu an, behobener wird geändert, nur
 eigene Kommentare) bleiben dieselben. Die Kennung hasht Art, ersten roten Lauf, Ursache und
-fehlgeschlagene Jobs, bei `wartet` den Fix-PR, aber **nicht** den rotierenden Zuständigen: sonst
-weckte jede Stunde jede wartende Sitzung (beim Bau bemerkt, Spec entsprechend gefasst). Der Fix-PR
-bekommt eine kurze Bestätigung (`fix`), damit seine Sitzung weiß, dass die übrigen warten.
+fehlgeschlagene Jobs, bei `wartet` den Fix-PR, aber **nicht** den wechselnden Zuständigen: sonst
+weckte jeder Wechsel jede wartende Sitzung (beim Bau bemerkt, Spec entsprechend gefasst). Der Fix-PR
+bekommt eine kurze Bestätigung (`fix`), damit seine Sitzung weiß, dass die übrigen warten. Ein
+Entwurf bekommt keinen neuen Hinweis; trägt er noch den Auftrag, wird der zu `wartet`. Kann kein PR
+den Auftrag übernehmen (nur Entwürfe, Forks, Dependabot), sagt der Hinweis das. Fehlt das Label im
+Repository, legt der Wächter es an (`issues: write`).
 
 ### D7 Nach dem Fix: hineinmergen wie bei „ohne CI“
 
-Ist `alpha` grün und trägt ein PR einen offenen Hinweis dieser Marke, ist der Befund behoben. Ist
-der jüngste Lauf eines Checks auf dem Kopf-Commit rot, der PR konfliktfrei und der grüne Stand von
-`alpha` noch nicht im Branch, mergt der Wächter `alpha` mit `basis_hineinmergen` (gleicher Trailer,
-eigener Text) und setzt den Hinweis auf `angestossen`. Sonst setzt er ihn auf `behoben`. Die
-Schleifenbremse ergibt sich daraus, dass der Branch danach den grünen Stand enthält.
+Ist `alpha` grün und trägt ein PR einen offenen Hinweis dieser Marke, sieht der Wächter die Checks
+seines Kopfes an. Sind sie nicht lesbar oder läuft noch etwas, bleibt der Hinweis offen: ein
+„behoben“ wäre endgültig, der nächste Lauf sähe den PR nicht mehr an. Ist der jüngste Lauf eines
+Checks rot, der PR kein Entwurf, konfliktfrei und ohne den grünen Stand von `alpha`, mergt der
+Wächter `alpha` mit `basis_hineinmergen` (gleicher Trailer, eigener Text) und setzt den Hinweis auf
+`angestossen`; scheitert der Push, bleibt er offen. Sonst setzt er ihn auf `behoben`. Die
+Schleifenbremse ist, dass der Branch danach den grünen Stand enthält (nicht der Trailer wie bei
+`ohne-ci`).
+
+Den Zustand liest der Wächter ohne Filter auf abgeschlossene Läufe: Ein neu gestarteter roter Lauf
+(Versuch > 1), der noch läuft, macht den Zustand unbestimmt, ebenso ein fehlgeschlagener Lauf mit
+nicht lesbaren Jobs. Sonst gälte währenddessen das ältere Grün, und der Wächter mergte das noch
+rote `alpha` in die PRs.
 
 ### D8 Sitzungsverhalten steht in `dev-zunder-ausfuehren`
 
-Ein neuer Abschnitt sagt, was eine Sitzung tut, die der Hinweis weckt. Ist sie zuständig, baut sie
-den Fix in einem eigenen Branch von `alpha` und öffnet den PR mit Label `alpha-rot`, sonst ändert
-sie nichts an `alpha`-Brüchen in ihrem PR und wartet auf den Merge des Wächters.
+Ein neuer Abschnitt sagt, was eine Sitzung tut, die der Hinweis weckt. Ist sie zuständig, öffnet
+sie **sofort** einen PR von `alpha` mit Label `alpha-rot`, als Entwurf genügt, und belegt damit den
+Fix; erst dann baut sie ihn und stimmt Ursache und Fix mit dem Menschen ab. Ohne diesen Beleg
+wanderte der Auftrag nach einer Stunde weiter, während die erste Sitzung noch auf die Antwort
+wartet, und zwei Sitzungen bauten denselben Fix (Review, Entscheidung Ruben 12.11.2026). Sonst
+ändert sie nichts an `alpha`-Brüchen in ihrem PR und wartet auf den Merge des Wächters.
 `scripts/AGENTS.md` beschreibt die Mechanik bei Stau-Wächter und PR-Prüfstufen.
 
 ## Risks / Trade-offs
 
 - [Ein Flake auf `alpha` ruft einen Zuständigen auf den Plan] → Der Auftrag sagt, zuerst den
-  fehlgeschlagenen Job neu zu starten, wenn der Fehler nicht im Code liegt. Ein grüner Neulauf
-  beendet den Befund.
+  fehlgeschlagenen Job neu zu starten, wenn der Fehler nicht im Code liegt. Während des Neustarts
+  ist der Zustand unbestimmt, ein grüner Neulauf beendet den Befund.
 - [Zusätzliche Runner-Zeit: je Merge auf `alpha` ein Kompilierlauf je fertigem PR] → Nur fertige
-  PRs, Abbruch älterer Läufe, begrenzte Parallelität. Meist sind es null bis drei PRs.
+  PRs, Abbruch älterer Läufe je PR. Meist sind es null bis drei PRs.
 - [Der Check fängt nur, was beim Kompilieren bricht] → Für den Rest gibt es „alpha rot“. Beides
   zusammen ist das Ziel, keines allein.
-- [Der älteste PR ist verwaist] → Die Rotation reicht nach einer Stunde weiter.
+- [Restfenster: zwischen dem Push auf `alpha` und dem „läuft“ von `verteilen` steht an einem
+  fertigen PR noch das alte Grün; mergt GitHub ihn genau dann, landet der Bruch doch] → Ohne Merge
+  Queue oder „up to date“ nicht schließbar (D1). `verteilen` ist schlank und setzt den Check als
+  Erstes; was durchrutscht, fängt „alpha rot“ auf.
+- [Ein PR-Branch ohne den neuen Workflow kann keinen eigenen Lauf starten] → Der Check wird rot und
+  sagt, `alpha` hineinzumergen; einmalig nach der Einführung.
+- [Der älteste PR ist verwaist] → Nach einer Stunde geht der Auftrag weiter.
 - [Ein Required Check, der noch nie lief, sperrt jeden PR] → Er wird erst eingetragen, wenn er an
   einem PR grün gelaufen ist (Migration Plan).
 
 ## Migration Plan
 
 1. Merge dieses PRs. Ab dann rechnet `Baut mit Ziel-Branch` an fertigen PRs, ist aber noch nicht
-   Pflicht. „alpha rot“ ist sofort aktiv.
+   Pflicht. „alpha rot“ ist sofort aktiv; das Label `alpha-rot` legt der Wächter beim ersten Rot an.
+   Offene PR-Branches ohne den neuen Workflow bekommen nach dem nächsten Merge auf `alpha` einen
+   roten Check mit dem Hinweis, `alpha` hineinzumergen.
 2. Läuft der Check an einem PR grün, trägt Ruben `Baut mit Ziel-Branch` im Ruleset 17017911 als
    Required Check ein (ohne `integration_id`).
 3. Rückweg: den Required Check austragen; der Workflow und der Befund lassen sich einzeln

@@ -48,7 +48,14 @@ case "$methode $pfad" in
   "GET repos/test/repo/commits/"*"/check-runs"*)
     sha="${pfad#repos/test/repo/commits/}"; sha="${sha%%/*}"
     if [ -f "$F/checks-$sha.json" ]; then aus < "$F/checks-$sha.json"; else echo '{"total_count":0,"check_runs":[]}' | aus; fi ;;
+  "POST repos/test/repo/actions/workflows/ziel-branch-build.yml/dispatches")
+    [ ! -e "$F/dispatch-kaputt" ] || { echo "HTTP 422 Workflow does not have 'workflow_dispatch' trigger" >&2; exit 1; }
+    echo "DISPATCH ${feld[ref]} ${feld[inputs_nr]} ${feld[inputs_kopf]} ${feld[inputs_check_id]} ${feld[inputs_ziel_sha]}" >> "$F/log" ;;
+  "GET repos/test/repo/compare/"*)
+    if [ -f "$F/compare.json" ]; then aus < "$F/compare.json"; else
+      echo '{"status":"ahead","commits":[{"commit":{"message":"feat: etwas"}}]}' | aus; fi ;;
   "POST repos/test/repo/check-runs")
+    [ ! -e "$F/post-kaputt-${feld[head_sha]}" ] || { echo "HTTP 502" >&2; exit 1; }
     n=$(( $(cat "$F/naechste-id" 2> /dev/null || echo 900) + 1 )); echo "$n" > "$F/naechste-id"
     echo "POST ${feld[head_sha]} ${feld[status]} ${feld[name]}" >> "$F/log"
     printf '%s\n' "${feld[output_summary]:-}" > "$F/text-$n"
@@ -78,7 +85,7 @@ prs() { # <fake>
       --arg repo "$repo" --argjson am "$am" --arg labels "$labels" \
       '{number: $nr, draft: $entwurf, auto_merge: (if $am then {merge_method: "merge"} else null end),
         labels: ($labels | split(",") | map(select(length > 0) | {name: .})),
-        head: {sha: $kopf, repo: {full_name: $repo}}, base: {ref: "alpha"}}')"
+        head: {ref: ("zweig" + ($nr | tostring)), sha: $kopf, repo: {full_name: $repo}}, base: {ref: "alpha"}}')"
     printf '%s\n' "$eintrag" > "$1/pull-$nr.json"
     json="$(jq --argjson e "$eintrag" '. + [$e]' <<< "$json")"
   done
@@ -89,11 +96,11 @@ hat_check() { # <fake> <sha> <status>
   printf '{"total_count":1,"check_runs":[{"id":1,"name":"Baut mit Ziel-Branch","status":"%s"}]}\n' "$3" \
     > "$1/checks-$2.json"
 }
-lauf() { # <fake> <args…>  → stdout nach $ARBEIT/ausgabe
+lauf() { # <fake> <args…>  → stdout nach $ARBEIT/ausgabe; ZBB_EXIT: erwarteter Exit (Vorgabe 0)
   local f="$1" code=0
   shift
   ZBB_FAKE="$f" "$SKRIPT_UNTER_TEST" "$@" > "$ARBEIT/ausgabe" 2> "$ARBEIT/fehler" || code=$?
-  [ "$code" = 0 ] || { echo "  FEHL Lauf endete mit Exit $code:" >&2; sed 's/^/       /' "$ARBEIT/fehler" >&2; fehler=$((fehler + 1)); }
+  [ "$code" = "${ZBB_EXIT:-0}" ] || { echo "  FEHL Lauf endete mit Exit $code:" >&2; sed 's/^/       /' "$ARBEIT/fehler" >&2; fehler=$((fehler + 1)); }
 }
 pruefe() { # <name> <erwartet> <gemessen>
   if [ "$2" = "$3" ]; then
@@ -107,9 +114,11 @@ pruefe() { # <name> <erwartet> <gemessen>
 log() { tr '\n' ';' < "$1/log" | sed 's/;$//'; }
 liste() { jq -r -c '[.[] | "\(.nr):\(.kopf):\(.check_id)"] | join(" ")' "$ARBEIT/ausgabe"; }
 
-echo "==> Baut mit Ziel-Branch: Auswahl nach einem Push auf alpha"
+echo "==> Baut mit Ziel-Branch: Verteilen nach einem Push auf alpha"
 
-# 1 — Fertig ist, wer Auto-Merge oder das Label e2e hat. Entwürfe und Forks rechnen nie.
+# 1 — Fertig ist, wer Auto-Merge oder das Label e2e hat. Ein fertiger PR bekommt den Check auf
+# „läuft“ und einen eigenen Lauf auf seinem Branch (der Push-Lauf kompiliert nie selbst). Ein
+# nicht fertiger mit Check wartet, auch ein Entwurf. Forks rechnen nie.
 f="$(neu push)"
 printf '%s\n' \
   '1|k1|false|false|true|' \
@@ -119,19 +128,35 @@ printf '%s\n' \
   '5|k5|true|false|false|e2e' \
   '6|k6|false|true|true|' | prs "$f"
 hat_check "$f" k3 completed
-lauf "$f" auswahl alpha zielsha
-pruefe "1 fertige PRs rechnen, in Nummernfolge" "1:k1:901 2:k2:902" "$(liste)"
-pruefe "1 läuft an den fertigen, wartet am nicht fertigen mit Check" \
-  "POST k1 in_progress Baut mit Ziel-Branch;POST k2 in_progress Baut mit Ziel-Branch;POST k3 queued Baut mit Ziel-Branch" \
+hat_check "$f" k5 completed
+lauf "$f" verteilen alpha zielsha
+pruefe "1 läuft und eigener Lauf an den fertigen, wartet an den übrigen mit Check" \
+  "POST k1 in_progress Baut mit Ziel-Branch;DISPATCH zweig1 1 k1 901 zielsha;POST k2 in_progress Baut mit Ziel-Branch;DISPATCH zweig2 2 k2 902 zielsha;POST k3 queued Baut mit Ziel-Branch;POST k5 queued Baut mit Ziel-Branch" \
+  "$(log "$f")"
+
+# 1b — Der Branch kennt den Workflow noch nicht (kein Einzellauf möglich): Check rot mit Grund.
+f="$(neu ohneworkflow)"
+printf '%s\n' '1|k1|false|false|true|' | prs "$f"
+touch "$f/dispatch-kaputt"
+lauf "$f" verteilen alpha zielsha
+pruefe "1b ohne Einzellauf: Check rot" "POST k1 in_progress Baut mit Ziel-Branch;PATCH 901 failure" "$(log "$f")"
+pruefe "1b Grund nennt das Einmergen" 1 "$(grep -c 'hineinmergen' "$f/text-901")"
+
+# 1c — Ein API-Fehler an einem PR hält die übrigen nicht auf; der Lauf endet rot.
+f="$(neu teilfehler)"
+printf '%s\n' '1|k1|false|false|true|' '2|k2|false|false|true|' '3|k3|false|false|true|' | prs "$f"
+touch "$f/post-kaputt-k2"
+ZBB_EXIT=1 lauf "$f" verteilen alpha zielsha
+pruefe "1c PR 1 und 3 bekommen ihren Lauf trotz Fehler an PR 2" \
+  "POST k1 in_progress Baut mit Ziel-Branch;DISPATCH zweig1 1 k1 901 zielsha;POST k3 in_progress Baut mit Ziel-Branch;DISPATCH zweig3 3 k3 902 zielsha" \
   "$(log "$f")"
 
 # 2 — Wartet schon: kein zweiter Eintrag.
 f="$(neu wartetschon)"
 printf '%s\n' '3|k3|false|false|false|' | prs "$f"
 hat_check "$f" k3 queued
-lauf "$f" auswahl alpha zielsha
+lauf "$f" verteilen alpha zielsha
 pruefe "2 wartet schon: nichts" "" "$(log "$f")"
-pruefe "2 nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 
 echo "==> Baut mit Ziel-Branch: Auswahl bei einem PR-Ereignis"
 
@@ -147,6 +172,13 @@ printf '%s\n' '7|k7|false|false|false|' | prs "$f"
 lauf "$f" auswahl alpha zielsha 7
 pruefe "4 PR in Arbeit: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 pruefe "4 PR in Arbeit: kein Check" "" "$(log "$f")"
+
+# 4b — Nicht fertig, trägt aber ein altes Grün (wieder geöffnet, aus dem Entwurf geholt): wartet.
+f="$(neu prwieder)"
+printf '%s\n' '7|k7|false|false|false|' | prs "$f"
+hat_check "$f" k7 completed
+lauf "$f" auswahl alpha zielsha 7
+pruefe "4b altes Grün an nicht fertigem PR: wartet" "POST k7 queued Baut mit Ziel-Branch" "$(log "$f")"
 
 # 5 — Fork, fertig markiert: nie.
 f="$(neu prfork)"
@@ -188,6 +220,15 @@ printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 echo neuerezielsha > "$f/ref-alpha"
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
 pruefe "9 Ziel-Branch weiter: überholt" "PATCH 901 cancelled" "$(log "$f")"
+
+# 9b — alpha ist nur um einen Release-Commit weiter ([skip ci], startet keinen Lauf): das Ergebnis
+# gilt, sonst hinge der PR bis zum nächsten Merge.
+f="$(neu nurrelease)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo neuerezielsha > "$f/ref-alpha"
+echo '{"status":"ahead","commits":[{"commit":{"message":"chore(release): 1.0.0-alpha.189 [skip ci]\n\nNotizen"}}]}' > "$f/compare.json"
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "9b nur Release-Commit dazu: Ergebnis gilt" "PATCH 901 success" "$(log "$f")"
 
 # 10 — Der PR hat einen neuen Kopf: überholt.
 f="$(neu kopfweiter)"
@@ -233,24 +274,35 @@ form() { # <name> <0|1 erwartet> <bedingung …>
   pruefe "$name" "$soll" "$ist"
 }
 hat() { grep -qE -- "$2" <<< "$1"; }
-K="$(job kompilieren)" A="$(job auswahl)" M="$(job melden)"
+K="$(job kompilieren)" V="$(job verteilen)" M="$(job melden)" W="$(cat "$WF")"
+anzahl() { grep -cE -- "$2" <<< "$1" || true; }
+# Der Block eines `uses:`-Schritts bis zum nächsten Schritt, je Schritt eine Zeile (ohne Umbrüche).
+schritte_mit() { # <job-block> <uses-muster>
+  awk -v m="$2" '/^      - /{ if (b != "" && b ~ m) print b; b = "" } { b = b " " $0 } END { if (b ~ m) print b }' <<< "$1"
+}
 pruefe "F1 kompilieren darf nur lesen" "contents: read" "$(rechte kompilieren | tr '\n' ' ' | sed 's/ $//')"
 form "F2 kompilieren ohne Secrets" 1 hat "$K" 'secrets\.'
-form "F3 rust-cache in kompilieren speichert nie" 0 hat "$K" 'save-if: false'
-form "F4 kein speichernder actions/cache in kompilieren" 1 hat "$K" 'actions/cache@'
-form "F4 mise ohne Cache in kompilieren" 0 hat "$K" 'cache: false'
+pruefe "F3 jeder rust-cache in kompilieren speichert nie" 0 \
+  "$(schritte_mit "$K" 'Swatinem/rust-cache@' | grep -vc 'save-if: false' || true)"
+form "F4 kein speichernder actions/cache in kompilieren" 1 hat "$K" 'actions/cache(/save)?@'
+pruefe "F4 jede mise-Action in kompilieren ohne Cache" 0 \
+  "$(schritte_mit "$K" 'jdx/mise-action@' | grep -vc 'cache: false' || true)"
 form "F5 Checkout in kompilieren ohne Zugangsdaten" 0 hat "$K" 'persist-credentials: false'
-pruefe "F6 das Token sieht in kompilieren nur der Fetch" 1 "$(grep -c 'github.token' <<< "$K")"
-for j in auswahl melden; do
+pruefe "F6 das Token sieht in kompilieren nur der Fetch" 1 "$(anzahl "$K" 'github.token')"
+form "F11 kompilieren läuft nie im Push-Lauf" 0 hat "$K" "if: .*github.event_name != 'push'"
+form "F11 melden läuft nie im Push-Lauf" 0 hat "$M" "if: .*github.event_name != 'push'"
+form "F11 verteilen läuft nur im Push-Lauf" 0 hat "$V" "if: \\$\\{\\{ github.event_name == 'push' \\}\\}"
+for j in verteilen vorbereiten melden; do
   b="$(job "$j")"
   form "F7 $j kompiliert nichts" 1 hat "$b" 'check-all\.sh'
   form "F7 $j holt keinen PR-Kopf" 1 hat "$b" 'refs/pull/'
   form "F7 $j mergt nichts" 1 hat "$b" 'git merge'
 done
 form "F8 melden läuft auch nach rotem Kompilieren" 0 hat "$M" "if: .*!cancelled\(\)"
-form "F9 Einschalten von Auto-Merge löst aus" 0 hat "$(cat "$WF")" 'types: \[.*auto_merge_enabled'
-form "F9 Label löst aus" 0 hat "$(cat "$WF")" 'types: \[.*labeled'
-form "F10 ältere Läufe brechen ab" 0 hat "$(cat "$WF")" 'cancel-in-progress: true'
+form "F9 Einschalten von Auto-Merge löst aus" 0 hat "$W" 'types: \[.*auto_merge_enabled'
+form "F9 Label löst aus" 0 hat "$W" 'types: \[.*labeled'
+form "F9 Einzellauf je PR möglich" 0 hat "$W" '^  workflow_dispatch:'
+form "F10 ältere Läufe brechen ab" 0 hat "$W" 'cancel-in-progress: true'
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest von ziel-branch-build.sh." >&2

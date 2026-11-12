@@ -24,10 +24,10 @@ kompiliert. Solange der PR nicht fertig ist, MUST der Check auf dem Kopf-Commit 
 
 ### Requirement: Bewegt sich der Ziel-Branch, entsteht der Check neu
 Nach jedem Push auf `alpha`, `beta` oder `main` MUST `Baut mit Ziel-Branch` für jeden offenen,
-fertigen PR gegen diesen Branch neu berechnet werden, ohne neuen Commit am PR. Für einen offenen PR,
-der nicht fertig ist und den Check schon trägt, MUST der Check auf „wartet“ gehen und neu rechnen,
-sobald der PR fertig markiert wird. Ein Ergebnis gegen einen älteren Stand des Ziel-Branches MUST
-nie als jüngstes stehen bleiben.
+fertigen PR gegen diesen Branch auf „läuft“ gehen und neu berechnet werden, ohne neuen Commit am
+PR. Ein offener PR, der nicht fertig ist (auch ein Entwurf) und den Check trägt, MUST ihn auf
+„wartet“ bekommen. Ein Ergebnis gegen einen älteren Stand MUST nach dem Neuberechnen nicht als
+jüngstes stehen bleiben.
 
 #### Scenario: Fremder Merge, PR mit Auto-Merge
 - **WHEN** PR A auf `alpha` gemergt wird und PR B mit Auto-Merge offen ist
@@ -41,15 +41,31 @@ nie als jüngstes stehen bleiben.
 - **WHEN** während eines Laufs gegen Stand X von `alpha` ein weiterer PR gemergt wird
 - **THEN** zählt am Ende das Ergebnis gegen den neueren Stand, nicht das gegen X
 
-### Requirement: Der Kompilierlauf hat keine Schreibrechte
-Der Teil, der Code aus dem PR kompiliert, MUST ohne Schreibrechte am Repository und ohne Secrets
-laufen und MUST keinen Cache schreiben, den Läufe auf den Kanal-Branches später lesen. Den Check am
-PR MUST ein getrennter Teil schreiben, der keinen Code aus dem PR ausführt. Ein PR aus einem Fork
-MUST den Check nie grün bekommen.
+#### Scenario: Release-Commit auf alpha
+- **WHEN** während eines Laufs gegen Stand X auf `alpha` nur ein Release-Commit landet, der keinen Lauf startet
+- **THEN** gilt das Ergebnis gegen X, und der PR bleibt nicht auf „läuft“ hängen
+
+#### Scenario: Altes Grün an einem Entwurf
+- **WHEN** ein PR mit grünem Check zum Entwurf wird, `alpha` sich bewegt und der PR danach ohne Fertig-Markierung wieder bereit ist
+- **THEN** steht der Check auf „wartet“, nicht auf dem alten Grün
+
+### Requirement: PR-Code läuft nie im Bereich eines Kanal-Branches
+Code aus einem PR MUST nie in einem Lauf ausgeführt werden, dessen Ref ein Kanal-Branch ist. Das
+Neuberechnen nach einem Push MUST deshalb in einem eigenen Lauf auf dem Branch des PRs geschehen.
+Der Teil, der PR-Code kompiliert, MUST ohne Schreibrechte am Repository und ohne Secrets laufen und
+MUST keinen Cache speichern. Ein PR aus einem Fork MUST den Check nie grün bekommen.
 
 #### Scenario: Build-Skript im PR
 - **WHEN** ein PR ein Build-Skript enthält, das versucht, auf das Repository zu schreiben
 - **THEN** scheitert der Versuch, weil der Kompilierlauf nur lesen darf
+
+#### Scenario: Bösartiges Build-Skript beim Push auf alpha
+- **WHEN** nach einem Merge auf `alpha` ein fertiger PR neu rechnet, dessen Abhängigkeit beim Bauen Cache-Einträge anzulegen versucht
+- **THEN** läuft sein Code in einem Lauf auf seinem eigenen Branch, und kein Eintrag landet im Cache-Bereich von `alpha`
+
+#### Scenario: Branch kennt den Workflow noch nicht
+- **WHEN** ein fertiger PR neu rechnen soll, dessen Branch den Workflow des Checks noch nicht enthält
+- **THEN** ist der Check rot und sagt, dass der Ziel-Branch hineinzumergen ist
 
 #### Scenario: PR aus einem Fork
 - **WHEN** ein PR aus einem Fork fertig markiert wird

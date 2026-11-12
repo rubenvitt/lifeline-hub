@@ -56,7 +56,7 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Kopf-Commits, ohne jeden Check nach der letzten Änderung am PR): die Release-App mergt den Ziel-Branch in den PR-Branch. Grenzen wie beim
     Migrations-Autofix: nur PRs aus diesem Repository, nie `alpha`/`beta`/`main`, nur
     Fast-Forward auf genau den bewerteten Kopf (Push mit Lease), kein zweiter Versuch auf einem Wächter-Merge (Trailer
-    `Stau-Waechter`). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
+    `Stau-Waechter`; gilt nur hier, „alpha rot“ hat seine eigene Bremse). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
   - **Auto-Merge an, e2e-Stufe fehlt** (LLH-1662; 20 Minuten ab dem späteren von erstem Check
     des Kopfes und Einschalten von Auto-Merge): ein Hinweis, Auto-Merge aus- und wieder
     einschalten (mit Label `e2e` vorher das Label entfernen). Kein Push. Geht „grün, nicht
@@ -67,14 +67,20 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
   - **alpha rot** (LLH-1849; zusätzlich ausgelöst, wenn ein CI-Lauf auf `alpha` fertig ist):
     schlägt im jüngsten abgeschlossenen Push-Lauf von `ci.yml` auf `alpha` ein Job außer dem
-    Release fehl, ist **genau ein** offener PR zuständig: der mit Label `alpha-rot` (bei mehreren
-    der älteste, die übrigen `doppelt`), sonst der älteste ohne Entwurf, Fork und Dependabot,
-    ohne Fix-PR je volle Stunde seit dem ersten Rot der nächste. Er bekommt den Auftrag, alle
-    übrigen den Hinweis, nicht selbst zu reparieren (den Fix-PR nennen sie erst, wenn es einen
-    gibt: die Rotation soll keine wartende Sitzung wecken). Ist `alpha` wieder grün, wird der
-    Hinweis „behoben“, und an einem PR, dessen jüngster CI-Lauf rot ist, mergt die Release-App
-    `alpha` hinein (Grenzen wie bei „Kein CI-Lauf“; nicht bei Konflikt, nicht, wenn der grüne
-    Stand schon im Branch ist). Was die Sitzung tut: `dev-zunder-ausfuehren`, „alpha rot“.
+    Release fehl (dessen Jobs heißen „Release / …“), ist **höchstens ein** offener PR zuständig:
+    der mit Label `alpha-rot` (bei mehreren die kleinste Nummer, die übrigen `doppelt`; ein
+    Entwurf mit Label zählt), sonst ein PR ohne Entwurf, Fork und Dependabot. Der Auftrag haftet
+    eine volle Stunde ab seinem Hinweis an diesem PR und geht erst dann an den nächsten (größere
+    Nummer, dann von vorn); eine neue oder gemergte PR verschiebt ihn nicht. Alle übrigen bekommen
+    den Hinweis, nicht selbst zu reparieren (den Fix-PR nennen sie erst, wenn es einen gibt: ein
+    Wechsel des Auftrags soll keine wartende Sitzung wecken). Das Label legt der Wächter an, wenn
+    es fehlt. Ein neu gestarteter roter Lauf, der noch läuft, oder nicht lesbare Jobs machen den
+    Zustand unbestimmt: dann schreibt der Wächter nichts. Ist `alpha` wieder grün, mergt die
+    Release-App `alpha` in jeden PR mit Hinweis, dessen jüngster CI-Lauf rot ist (Hinweis
+    „angestoßen“; nicht bei Konflikt, Entwurf, Fork oder wenn der grüne Stand schon im Branch ist,
+    das ist die Schleifenbremse), sonst wird er „behoben“. Sind die Checks nicht lesbar, läuft die
+    CI noch oder scheitert der Push, bleibt er offen. Was die Sitzung tut:
+    `dev-zunder-ausfuehren`, „alpha rot“.
   - **Ein Hinweis je PR und Marke** (`<!-- stau-waechter:<art>:<kennung> -->` zum PR,
     `<!-- stau-waechter-alpha:<art>:<kennung> -->` zu „alpha rot“, die beiden verdrängen sich
     nicht): gleicher Befund schreibt nichts, neuer löscht und legt neu an, behobener ändert auf
@@ -86,14 +92,19 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     „alpha rot“ das Archiv der Change `g10eo9co-alpha-rot-schutz`.
 - **Baut mit Ziel-Branch** (LLH-1849, `.github/workflows/ziel-branch-build.yml`,
   `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an oder Label
-  `e2e`): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert (`check-all.sh --nur
-  baut`). Bei jedem Push auf einen Kanal-Branch rechnet er für jeden fertigen PR neu; ein nicht
-  fertiger mit Check bekommt ihn auf „wartet“. Der Check entsteht über die Checks-API, nie als
-  Job-Name (ein übersprungener Job meldete grün), und steht sofort auf „läuft“, damit kein altes
-  Grün mergt. **PR-Code läuft nur im Job `kompilieren`**, auch bei einem Push auf `alpha`: dort
-  nur `contents: read`, keine Secrets, kein gespeicherter Zugang, kein Cache, der gespeichert
-  wird. `auswahl` und `melden` führen keinen PR-Code aus. Die Form hält
-  `scripts/ziel-branch-build.test.sh` (Schritt 11) fest; wer den Workflow ändert, zieht ihn mit.
+  `e2e`, kein Entwurf): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert
+  (`check-all.sh --nur baut`). Nach jedem Push auf einen Kanal-Branch setzt `verteilen` den Check
+  jedes fertigen PRs auf „läuft“ und startet **je PR einen eigenen Lauf auf dessen Branch**
+  (`workflow_dispatch`); ein nicht fertiger mit Check (auch ein Entwurf) bekommt „wartet“, ein
+  Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Check entsteht über
+  die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
+  einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
+  und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort
+  `contents: read`, keine Secrets, kein gespeicherter Zugang, kein gespeicherter Cache. Ein
+  Ergebnis gilt, wenn der Ziel-Branch inzwischen nur um Release-Commits (`[skip ci]`) weiter ist.
+  Bis `verteilen` läuft, bleibt ein Restfenster mit altem Grün; was durchrutscht, fängt „alpha
+  rot“. Die Form hält `scripts/ziel-branch-build.test.sh` (Schritt 11) fest; wer den Workflow
+  ändert, zieht ihn mit.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,

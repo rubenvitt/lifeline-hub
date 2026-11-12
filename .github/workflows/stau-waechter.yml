@@ -69,6 +69,8 @@ jobs:
       statuses: read
       # Die CI-Läufe auf `alpha` und ihre Jobs (Befund „alpha rot“, LLH-1849).
       actions: read
+      # Das Label `alpha-rot` anlegen, falls es fehlt (Labels gehören zu den Issues).
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

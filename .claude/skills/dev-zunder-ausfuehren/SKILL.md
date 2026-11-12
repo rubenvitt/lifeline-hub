@@ -303,11 +303,16 @@ in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
 
 - **Dein PR ist zuständig** (Hinweis „dieser PR ist zuständig“): Erst prüfen, ob der Fehler im
   Code liegt. Ist es ein Ausfall oder ein wackliger Test, den fehlgeschlagenen Job neu starten;
-  ein grüner Lauf beendet den Befund. Sonst den Fix in einem **eigenen** Branch von `alpha`
-  bauen, nicht im eigenen PR, und den PR gegen `alpha` mit dem Label **`alpha-rot`** öffnen.
-  Am Label erkennen der Wächter und die übrigen PRs den Fix. Der Fix stellt Bestehendes wieder
-  her: Route `bug-unklar` bzw. `klar`, keine Change. Die Abstimmung aus „Gemeinsam ausarbeiten“
-  gilt auch hier; leg Ursache und Fix knapp in einer Nachricht vor, weil alle PRs warten.
+  ein grüner Lauf beendet den Befund. Sonst **sofort** einen eigenen Branch von `alpha` anlegen
+  und einen PR gegen `alpha` mit dem Label **`alpha-rot`** öffnen, als Entwurf genügt, noch vor
+  dem Fix. Das Label belegt den Fix: der Wächter und die übrigen PRs erkennen ihn daran, und der
+  Auftrag wandert nicht nach einer Stunde weiter, während du auf die Antwort des Menschen
+  wartest (Entscheidung 12.11.2026). Dann den Fix in diesem PR bauen, nicht im eigenen. Er stellt
+  Bestehendes wieder her: Route `bug-unklar` bzw. `klar`, keine Change. Die Abstimmung aus
+  „Gemeinsam ausarbeiten“ gilt auch hier; leg Ursache und Fix knapp in einer Nachricht vor, weil
+  alle PRs warten.
+- **Dein Auftrag ist weitergewandert** (der Hinweis zeigt jetzt „`alpha` ist rot“): Hast du den
+  Label-PR noch nicht geöffnet, hörst du auf; ein anderer PR baut den Fix.
 - **Dein PR wartet** (Hinweis „`alpha` ist rot“): den Bruch **nicht** im eigenen PR reparieren,
   auch wenn deine CI deswegen rot ist. Weiterarbeiten an der eigenen Aufgabe geht. Ist `alpha`
   wieder grün, mergt der Wächter `alpha` in deinen PR, falls dessen CI rot ist; danach vor dem

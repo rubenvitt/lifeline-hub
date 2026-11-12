@@ -1,10 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Der Zustand von alpha wird nach jedem CI-Lauf bewertet
-Nach jedem abgeschlossenen CI-Lauf auf `alpha`, mindestens stündlich und von Hand MUST der Wächter
-feststellen, ob `alpha` rot ist. Rot ist `alpha`, wenn im jüngsten abgeschlossenen CI-Lauf eine
-Prüfung fehlschlägt; ein Fehler allein beim Release zählt nicht. Als vermutliche Ursache MUST er die
-PRs nennen, die zwischen dem letzten grünen und dem ersten roten Lauf auf `alpha` gemergt wurden.
+Nach jedem abgeschlossenen CI-Lauf auf `alpha`, stündlich und von Hand MUST der Wächter
+feststellen, ob `alpha` rot ist: im jüngsten abgeschlossenen CI-Lauf schlägt eine Prüfung fehl,
+ein Fehler allein beim Release zählt nicht. Läuft ein neu gestarteter Lauf oder sind seine Jobs
+nicht lesbar, MUST der Zustand als unbestimmt gelten. Als Ursache MUST er die zwischen letztem
+Grün und erstem Rot gemergten PRs nennen.
 
 #### Scenario: Zwei Merges brechen zusammen
 - **WHEN** nach einem grünen Lauf #1319 und #1315 gemergt werden und der nächste CI-Lauf auf `alpha` in der Rust-Suite fehlschlägt
@@ -18,11 +19,20 @@ PRs nennen, die zwischen dem letzten grünen und dem ersten roten Lauf auf `alph
 - **WHEN** der jüngste CI-Lauf auf `alpha` noch läuft und der davor grün war
 - **THEN** gilt `alpha` nicht als rot
 
+#### Scenario: Roter Lauf wird neu gestartet
+- **WHEN** der rote Lauf neu gestartet wird und noch läuft
+- **THEN** gilt `alpha` weder als rot noch als grün: kein Hinweis wird geschlossen, nichts wird gemergt
+
+#### Scenario: Jobs nicht lesbar
+- **WHEN** der jüngste Lauf fehlgeschlagen ist und seine Jobs nicht lesbar sind
+- **THEN** gilt `alpha` als unbestimmt, nicht als grün
+
 ### Requirement: Bei rotem alpha ist genau ein PR zuständig
-Ist `alpha` rot, MUST genau ein offener PR als zuständig gelten. Trägt ein offener PR das Label
-`alpha-rot`, ist er der Fix und zuständig, bei mehreren der älteste. Sonst ist es der älteste
-offene PR gegen `alpha`, der kein Entwurf, kein Fork und nicht von Dependabot ist. Ohne Fix-PR MUST
-die Zuständigkeit je volle Stunde seit dem ersten roten Lauf zum nächsten dieser PRs wechseln.
+Ist `alpha` rot, MUST höchstens ein offener PR zuständig sein. Ein PR mit Label `alpha-rot` ist der
+Fix und zuständig, bei mehreren der älteste. Sonst ist es ein offener PR gegen `alpha` ohne Entwurf,
+Fork oder Dependabot: zuerst der älteste, und ein erteilter Auftrag MUST eine volle Stunde an
+seinem PR haften, bevor er an den nächsten geht. Fehlt das Label im Repository, MUST der Wächter es
+anlegen.
 
 #### Scenario: Noch kein Fix-PR
 - **WHEN** `alpha` rot wird und die offenen PRs #1314, #1318 und #1322 keinen mit Label `alpha-rot` enthalten
@@ -33,8 +43,16 @@ die Zuständigkeit je volle Stunde seit dem ersten roten Lauf zum nächsten dies
 - **THEN** ist dieser PR zuständig, und keiner der anderen bekommt mehr den Auftrag
 
 #### Scenario: Zuständiger reagiert nicht
-- **WHEN** `alpha` seit mehr als einer Stunde rot ist und kein PR das Label `alpha-rot` trägt
-- **THEN** ist der nächstälteste PR zuständig, und er bekommt den Auftrag als neuen Kommentar
+- **WHEN** der Auftrag seit mehr als einer Stunde an #1314 hängt und kein PR das Label `alpha-rot` trägt
+- **THEN** ist der nächste PR nach #1314 zuständig, und er bekommt den Auftrag als neuen Kommentar
+
+#### Scenario: Neuer PR mitten in der Stunde
+- **WHEN** #1314 den Auftrag seit zehn Minuten hat und ein PR mit kleinerer Nummer aus dem Entwurf kommt
+- **THEN** behält #1314 den Auftrag
+
+#### Scenario: Label fehlt
+- **WHEN** `alpha` rot wird und das Label `alpha-rot` im Repository fehlt
+- **THEN** legt der Wächter es an
 
 #### Scenario: Zwei Fix-PRs
 - **WHEN** zwei offene PRs das Label `alpha-rot` tragen
@@ -70,22 +88,27 @@ Rolle sich ändert (der bisherige und der neue Zuständige). Ein PR, der vorher 
 MUST seinen Hinweis unverändert behalten.
 
 #### Scenario: Zuständigkeit rotiert, PR wartet
-- **WHEN** ohne Fix-PR die Zuständigkeit nach einer Stunde von #1314 zu #1318 wechselt und #1322 wartet
+- **WHEN** ohne Fix-PR der Auftrag nach einer Stunde von #1314 zu #1318 wechselt und #1322 wartet
 - **THEN** bekommen #1314 und #1318 einen neuen Kommentar, #1322 keinen
 
 ### Requirement: Nach dem Fix bekommen rote PRs alpha hineingemergt
-Ist `alpha` wieder grün, MUST jeder Hinweis zu „alpha rot“ das als behoben zeigen. In jeden PR mit
-einem solchen Hinweis, dessen jüngster CI-Lauf auf dem Kopf-Commit rot ist, MUST der Wächter `alpha`
-als Merge-Commit pushen, sofern der PR konfliktfrei ist und den grünen Stand von `alpha` nicht schon
-enthält. Für den Push gelten die Regeln „Der Wächter schreibt nur per Fast-Forward auf PR-Branches“.
+Ist `alpha` wieder grün, MUST jeder Hinweis zu „alpha rot“ das zeigen. In jeden PR mit Hinweis,
+dessen jüngster CI-Lauf rot ist, MUST der Wächter `alpha` pushen, sofern er konfliktfrei ist, kein
+Entwurf und den grünen Stand nicht enthält; der Hinweis zeigt dann „angestoßen“, sonst „behoben“.
+Ist die Lage nicht bestimmbar (Checks nicht lesbar, CI läuft, Push gescheitert), MUST der Hinweis
+offen bleiben. Für den Push gilt „Der Wächter schreibt nur per Fast-Forward auf PR-Branches“.
 
 #### Scenario: Roter PR nach dem Fix
 - **WHEN** der Fix-PR gemergt ist, der CI-Lauf auf `alpha` grün ist und #1322 mit Hinweis eine rote Rust-Suite trägt
-- **THEN** trägt #1322 einen Merge-Commit von `alpha`, auf ihm läuft die CI, und der Hinweis zeigt „behoben“
+- **THEN** trägt #1322 einen Merge-Commit von `alpha`, auf ihm läuft die CI, und ein neuer Kommentar zeigt „angestoßen“
 
 #### Scenario: Grüner PR nach dem Fix
 - **WHEN** `alpha` wieder grün ist und ein PR mit Hinweis auf seinem Kopf grüne Checks trägt
 - **THEN** wird nichts gepusht, und der Hinweis zeigt „behoben“
+
+#### Scenario: Checks nach dem Fix nicht lesbar
+- **WHEN** `alpha` wieder grün ist und die Checks eines PRs mit Hinweis nicht lesbar sind
+- **THEN** bleibt der Hinweis offen, und der nächste Lauf entscheidet neu
 
 #### Scenario: PR mit Konflikt nach dem Fix
 - **WHEN** `alpha` wieder grün ist und ein PR mit Hinweis mit `alpha` kollidiert

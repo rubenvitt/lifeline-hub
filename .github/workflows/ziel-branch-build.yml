@@ -8,27 +8,37 @@
 # zwar nur das Kompilieren (Backend mit allen Zielen, Frontend-Typprüfung, `check-all.sh --nur
 # baut`): wenige Minuten statt der vollen Suiten.
 #
-# WANN: Ein PR ist fertig wie für die zweite Stufe (`e2e.yml`): Auto-Merge an oder Label `e2e`.
+# WANN: Ein PR ist fertig wie für die zweite Stufe (`e2e.yml`): Auto-Merge an oder Label `e2e`,
+# kein Entwurf.
 #   - PR-Ereignis an einem fertigen PR: er rechnet gegen die Spitze des Ziel-Branches.
-#   - Push auf einen Kanal-Branch: jeder fertige PR rechnet neu; ein nicht fertiger, der den Check
-#     trägt, bekommt ihn auf „wartet“ und rechnet, sobald er fertig wird.
+#   - Push auf einen Kanal-Branch: `verteilen` setzt den Check an jedem fertigen PR auf „läuft“ und
+#     startet für ihn einen EIGENEN Lauf dieses Workflows auf seinem Branch (`workflow_dispatch`);
+#     ein nicht fertiger, der den Check trägt, bekommt ihn auf „wartet“ und rechnet, sobald er
+#     fertig wird. Release-Commits (`[skip ci]`) starten keinen Push-Lauf; `melden` lässt ein
+#     Ergebnis gelten, wenn der Ziel-Branch nur um solche weiter ist.
 #   Vorher fehlt der Check, und der PR ist nicht mergebar (Required Check im Ruleset 17017911).
 #
 # DER CHECK ENTSTEHT ÜBER DIE CHECKS-API, NICHT ALS JOB-NAME: Ein Push muss ihn an vielen
 # PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün (Kopf von `e2e.yml`).
-# `auswahl` setzt ihn sofort auf „läuft“, damit kein altes Grün mergt, während gerechnet wird;
-# `melden` schließt ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand
-# stehen (sonst „überholt“, den neuen Stand meldet dessen eigener Lauf).
+# Er steht sofort auf „läuft“, damit kein altes Grün mergt, während gerechnet wird; bis
+# `verteilen` läuft, bleibt ein Restfenster (design.md, „alpha rot“ fängt es auf). `melden` schließt
+# ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand stehen.
 #
-# PR-CODE LÄUFT NUR IN `kompilieren` (Build-Skripte, Makros), auch bei einem Push auf `alpha`:
+# PR-CODE LÄUFT NIE IN EINEM LAUF AUF EINEM KANAL-BRANCH (LLH-1849, Review): Ein Push-Lauf hat
+# den Cache-Bereich von `alpha`, und Code darin (etwa ein `build.rs` aus einem Dependabot-PR)
+# könnte über das Runtime-Token des Runners Cache-Einträge anlegen, die der Release-Build liest;
+# `save-if: false` und Co. verhindern nur, dass der eigene Code speichert. Deshalb kompiliert der
+# Push-Lauf nichts, und `kompilieren` läuft nur bei PR-Ereignis und Einzellauf, im Bereich des PRs
+# wie in `ci.yml`. Auch dort:
 #   - nur `contents: read`, keine Secrets; der Checkout legt keine Zugangsdaten ab, das Token
 #     bekommt nur der `git fetch` des PR-Kopfes als Umgebung seines Schritts;
-#   - kein Cache wird geschrieben (rust-cache `save-if: false`, nur `actions/cache/restore`, mise
-#     ohne Cache): ein Push-Lauf speichert in den Bereich des Kanal-Branches, und ein vergifteter
-#     Cache landete im Release-Build;
+#   - kein Cache wird gespeichert (rust-cache `save-if: false`, nur `actions/cache/restore`, mise
+#     ohne Cache);
 #   - das Ergebnis geht als Artefakt an `melden`, das es nur als Text liest.
-# `auswahl` und `melden` führen keinen PR-Code aus. Die Form hält `scripts/ziel-branch-build.test.sh`
-# fest; Auswahl und Meldung stehen in `scripts/ziel-branch-build.sh`.
+# In einem Lauf eines PRs (Ereignis oder Einzellauf) stammen Workflow und Skripte aus dem PR
+# selbst, wie bei `ci.yml`: ein PR bestimmt dort seine eigenen Checks, das ist keine neue Grenze.
+# Die Form hält `scripts/ziel-branch-build.test.sh` fest; Verteilen, Auswahl und Meldung stehen in
+# `scripts/ziel-branch-build.sh`.
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
 name: Baut mit Ziel-Branch
@@ -39,21 +49,56 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled, labeled]
   push:
     branches: [main, beta, alpha]
+  # Der eigene Lauf je fertigem PR, gestartet von `verteilen` auf dem Branch des PRs.
+  workflow_dispatch:
+    inputs:
+      nr: { description: 'PR-Nummer', required: true, type: string }
+      kopf: { description: 'Kopf-Commit des PRs', required: true, type: string }
+      check_id: { description: 'ID des Check-Runs', required: true, type: string }
+      ziel: { description: 'Ziel-Branch', required: true, type: string }
+      ziel_sha: { description: 'Stand des Ziel-Branches', required: true, type: string }
 
 permissions:
   contents: read
 
-# Je PR bzw. je Kanal-Branch: ein neuer Kopf oder ein neuer Stand macht den laufenden Lauf wertlos.
-# Ein abgebrochener Lauf hinterlässt seinen Check auf „läuft“; der neue Lauf legt einen jüngeren an.
+# Je PR (Ereignis und Einzellauf teilen sich die Gruppe) bzw. je Kanal-Branch: ein neuer Kopf oder
+# ein neuer Stand macht den laufenden Lauf wertlos. Ein abgebrochener Lauf hinterlässt seinen
+# Check auf „läuft“; der neue Lauf legt einen jüngeren an.
 concurrency:
-  group: ziel-branch-build-${{ github.event.pull_request.number || github.ref }}
+  group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  auswahl:
-    name: Auswahl
+  # Push auf einen Kanal-Branch: Checks setzen, je fertigem PR einen eigenen Lauf starten. Führt
+  # keinen PR-Code aus und kompiliert nichts.
+  verteilen:
+    name: Verteilen
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+      # workflow_dispatch auf den PR-Branches (GITHUB_TOKEN darf das, und es startet einen Lauf).
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checks setzen, Läufe der fertigen PRs starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ziel-branch-build.sh verteilen "$GITHUB_REF_NAME" "$GITHUB_SHA"
+
+  # PR-Ereignis oder Einzellauf: welcher PR, welcher Check, gegen welchen Stand.
+  vorbereiten:
+    name: Vorbereiten
     # Forks bekämen nur ein Lese-Token, und ihr Check soll nie grün werden.
-    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || (github.event_name == 'pull_request'
+              && github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -61,60 +106,64 @@ jobs:
       pull-requests: read
       checks: write
     outputs:
-      liste: ${{ steps.auswahl.outputs.liste }}
-      ziel: ${{ steps.auswahl.outputs.ziel }}
-      ziel_sha: ${{ steps.auswahl.outputs.ziel_sha }}
+      rechnen: ${{ steps.wahl.outputs.rechnen }}
+      nr: ${{ steps.wahl.outputs.nr }}
+      kopf: ${{ steps.wahl.outputs.kopf }}
+      check_id: ${{ steps.wahl.outputs.check_id }}
+      ziel: ${{ steps.wahl.outputs.ziel }}
+      ziel_sha: ${{ steps.wahl.outputs.ziel_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Fertige PRs wählen, Check setzen
-        id: auswahl
+      - name: PR und Stand bestimmen
+        id: wahl
         env:
           GH_TOKEN: ${{ github.token }}
           EREIGNIS: ${{ github.event_name }}
           PR_NR: ${{ github.event.pull_request.number }}
           PR_ZIEL: ${{ github.event.pull_request.base.ref }}
-          PUSH_ZIEL: ${{ github.ref_name }}
-          PUSH_SHA: ${{ github.sha }}
+          E_NR: ${{ inputs.nr }}
+          E_KOPF: ${{ inputs.kopf }}
+          E_CHECK: ${{ inputs.check_id }}
+          E_ZIEL: ${{ inputs.ziel }}
+          E_ZIEL_SHA: ${{ inputs.ziel_sha }}
         run: |
-          if [ "$EREIGNIS" = push ]; then
-            ziel="$PUSH_ZIEL" ziel_sha="$PUSH_SHA"
-            liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha")"
+          if [ "$EREIGNIS" = workflow_dispatch ]; then
+            nr="$E_NR" kopf="$E_KOPF" id="$E_CHECK" ziel="$E_ZIEL" ziel_sha="$E_ZIEL_SHA"
           else
             ziel="$PR_ZIEL"
             ziel_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$ziel" --jq .object.sha)"
             liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"
+            echo "Rechnen: $liste"
+            if [ "$liste" = "[]" ]; then echo "rechnen=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+            nr="$(jq -r '.[0].nr' <<< "$liste")" kopf="$(jq -r '.[0].kopf' <<< "$liste")"
+            id="$(jq -r '.[0].check_id' <<< "$liste")"
           fi
-          echo "Rechnen: $liste"
-          { echo "ziel=$ziel"; echo "ziel_sha=$ziel_sha"; echo "liste=$liste"; } >> "$GITHUB_OUTPUT"
+          { echo "rechnen=true"; echo "nr=$nr"; echo "kopf=$kopf"; echo "check_id=$id"
+            echo "ziel=$ziel"; echo "ziel_sha=$ziel_sha"; } >> "$GITHUB_OUTPUT"
 
   kompilieren:
-    name: Kompilieren (#${{ matrix.pr.nr }})
-    needs: auswahl
-    if: ${{ needs.auswahl.outputs.liste != '' && needs.auswahl.outputs.liste != '[]' }}
+    name: Kompilieren
+    needs: vorbereiten
+    # Nie im Push-Lauf: der hat den Cache-Bereich des Kanal-Branches (Kopf).
+    if: ${{ github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # PR-Code läuft hier: nur lesen (Kopf).
     permissions:
       contents: read
-    strategy:
-      # Jeder PR für sich: ein roter darf den anderen das Ergebnis nicht nehmen.
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        pr: ${{ fromJSON(needs.auswahl.outputs.liste) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.auswahl.outputs.ziel_sha }}
+          ref: ${{ needs.vorbereiten.outputs.ziel_sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: PR mit dem Ziel-Branch zusammenführen
         id: merge
         env:
-          NR: ${{ matrix.pr.nr }}
-          KOPF: ${{ matrix.pr.kopf }}
+          NR: ${{ needs.vorbereiten.outputs.nr }}
+          KOPF: ${{ needs.vorbereiten.outputs.kopf }}
           # Nur für den Fetch; nie auf der Platte, und die Schritte mit PR-Code sehen es nicht.
           LESE_TOKEN: ${{ github.token }}
         run: |
@@ -196,14 +245,14 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: baut-${{ matrix.pr.nr }}
+          name: baut
           path: ${{ runner.temp }}/ergebnis
           retention-days: 3
 
   melden:
     name: Melden
-    needs: [auswahl, kompilieren]
-    if: ${{ !cancelled() && needs.auswahl.outputs.liste != '' && needs.auswahl.outputs.liste != '[]' }}
+    needs: [vorbereiten, kompilieren]
+    if: ${{ !cancelled() && github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -214,24 +263,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Fehlt ein Artefakt (Kompilierlauf abgebrochen), meldet `melden` „kein Ergebnis“, also rot.
+      # Fehlt das Artefakt (Kompilierlauf abgebrochen), meldet `melden` „kein Ergebnis“, also rot.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
         with:
-          path: ${{ runner.temp }}/ergebnisse
-          pattern: baut-*
-      - name: Checks schließen
+          name: baut
+          path: ${{ runner.temp }}/ergebnis
+      - name: Check schließen
         env:
           GH_TOKEN: ${{ github.token }}
-          LISTE: ${{ needs.auswahl.outputs.liste }}
-          ZIEL: ${{ needs.auswahl.outputs.ziel }}
-          ZIEL_SHA: ${{ needs.auswahl.outputs.ziel_sha }}
+          NR: ${{ needs.vorbereiten.outputs.nr }}
+          KOPF: ${{ needs.vorbereiten.outputs.kopf }}
+          CHECK_ID: ${{ needs.vorbereiten.outputs.check_id }}
+          ZIEL: ${{ needs.vorbereiten.outputs.ziel }}
+          ZIEL_SHA: ${{ needs.vorbereiten.outputs.ziel_sha }}
         run: |
-          # Ein Fehler an einem PR hält die übrigen nicht auf; der Schritt wird am Ende trotzdem rot.
-          fehler=0
-          while IFS=$'\t' read -r nr kopf id; do
-            d="$RUNNER_TEMP/ergebnisse/baut-$nr"
-            ergebnis="$(cat "$d/ergebnis" 2> /dev/null || true)"
-            scripts/ziel-branch-build.sh melden "$nr" "$kopf" "$id" "$ZIEL" "$ZIEL_SHA" "$ergebnis" "$d/ausgabe" \
-              || { echo "::warning::PR #$nr: Meldung gescheitert"; fehler=1; }
-          done < <(jq -r '.[] | [.nr, .kopf, .check_id] | @tsv' <<< "$LISTE")
-          exit "$fehler"
+          d="$RUNNER_TEMP/ergebnis"
+          ergebnis="$(cat "$d/ergebnis" 2> /dev/null || true)"
+          scripts/ziel-branch-build.sh melden "$NR" "$KOPF" "$CHECK_ID" "$ZIEL" "$ZIEL_SHA" "$ergebnis" "$d/ausgabe"
