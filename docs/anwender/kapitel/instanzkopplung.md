@@ -174,8 +174,10 @@ etwa am ELW bei Ankunft.
 1. Liegt der Einsatz hier als Spiegel vor, am Einsatz „Einsatzdaten“ öffnen. Sonst (nur für einen
    Admin) unter „Einstellungen“ „Instanzkopplung“ wählen und im Paneel „Einsätze beim Gegenüber“
    am Einsatz „Führung …“ wählen.
-2. Im Paneel „Führung“ „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
-   Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
+2. Im Paneel „Führung“ „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie
+   mit der nächsten Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
+   Wechselt die Führung vorher, etwa an eine andere Installation, verfällt die Anfrage; dann neu
+   anfragen.
 
 ### Notübernahme
 
@@ -470,8 +472,10 @@ zählt die **Epoche** hoch. Übergeben lässt sich die Führung erst, wenn beide
 (sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
 führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich nachgezogen hat:
 Bis dahin zeigt das Paneel „Führung“ unter „Anfrage“ „beim Gegenüber gestellt“, danach nennt es
-unter „Führung“ „hier“, und das Hinweisband „Spiegel von …“ verschwindet. Erklären zwei
-Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
+unter „Führung“ „hier“, und das Hinweisband „Spiegel von …“ verschwindet. Eine Anfrage gilt nur
+dem Stand, den sie sah: Wechselt die Führung inzwischen, verfällt sie, und das Paneel bietet
+„Führung anfragen“ wieder an. Erklären zwei Installationen ohne Verbindung dieselbe Epoche, gilt
+die Erklärung der Installation mit
 der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
 
 Gegen die Installation, die sich meldet (den ELW), braucht eine Notübernahme die Unterschrift
@@ -484,6 +488,9 @@ heißt, der ELW führt mit der nächsten Epoche weiter; die andere Installation 
 Kopplung „… hat der Notübernahme widersprochen“. Eine Übernahme ohne gültige Unterschrift oder
 mit falschem Code verwirft der ELW: er führt weiter, die Einsatzleitung bekommt den Alarm
 „Ungültige Übernahme der Führung“, und die Admin-Spur zeigt „Ungültige Übernahme verworfen“.
+Gilt die Unterschrift nicht mehr, bevor jemand entschieden hat, etwa weil der Schlüssel des
+Admins inzwischen widerrufen ist, verwirft der ELW die offene Übernahme mit der nächsten Meldung
+ebenso; Bestätigen lehnt er dann ab.
 
 Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
 Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der

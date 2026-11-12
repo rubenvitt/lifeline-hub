@@ -50,6 +50,13 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   eigene Temp-DB); `playwright.config.ts` schließt den Ordner aus. Regeln:
   `docs/anwender/AGENTS.md`, „Bilder“. Backend-Binary, Ports, Env-Hygiene und Vite-Start teilen
   beide Konfigurationen über `e2e/lauf-kern.ts`.
+- **Ein Lauf räumt sein Temp-Verzeichnis selbst** (LLH-1666, Spec `e2e-lauf-aufraeumen`): DB und
+  `karten/` des Backends legen beide Konfigurationen nur über `createRunDir` aus `e2e/run-dir.ts`
+  an, mit `deleteOnExit` im Hauptprozess: er löscht es bei seinem Ende, auch nach roten Tests oder
+  einem Webserver, der nicht startet (ein `globalTeardown` liefe dort nicht). Verwaiste
+  Verzeichnisse älter als 24 h räumt der nächste Lauf. Kein `mkdtemp` an anderer Stelle: auf dem
+  eigenen CI-Runner und jedem Laptop bliebe es liegen. Selbsttest
+  `scripts/e2e-run-dir.test.mjs` (Schritt 11 des Gates).
 - **In der Cloud-Sitzung startet ein Ersatz-Chromium aus `/opt/pw-browsers`** (LLH-1439): fehlt
   der Build, den das Playwright des Repos erwartet, nehmen beide Konfigurationen und Schritt 7 des
   Gates den dort vorinstallierten (`fallbackChromiumPath` in `e2e/lauf-kern.ts`);
