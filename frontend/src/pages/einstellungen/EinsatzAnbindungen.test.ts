@@ -9,6 +9,7 @@ const anbindung = (extra: Partial<AnbindungFreigabe> = {}): AnbindungFreigabe =>
   zustand: 'aktiv',
   freigegeben: false,
   anderer_einsatz: false,
+  ruht: false,
   ...extra,
 });
 const zeit = (wert: string) => wert.slice(11, 16);
@@ -19,6 +20,12 @@ describe('freigabeZustand (LLH-1638)', () => {
     expect(freigabeZustand(anbindung({ freigegeben: true }), zeit)).toBe('liest diesen Einsatz');
     expect(freigabeZustand(anbindung({ anderer_einsatz: true }), zeit)).toBe(
       'liest einen anderen Einsatz',
+    );
+  });
+
+  it('nennt eine ruhende Freigabe mit dem Grund, statt „liest“ zu behaupten', () => {
+    expect(freigabeZustand(anbindung({ freigegeben: true, ruht: true }), zeit)).toBe(
+      'Freigabe ruht: Instanz meldet sich bei einem Hub',
     );
   });
 

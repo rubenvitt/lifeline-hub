@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
+import { einsatzKeys } from '../../api/queryKeys';
 import { server } from '../../test/server';
 import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
@@ -472,6 +473,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
           zustand: 'aktiv',
           freigegeben: false,
           anderer_einsatz: false,
+          ruht: false,
         },
       ],
     });
@@ -496,6 +498,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       zustand: 'aktiv',
       freigegeben: false,
       anderer_einsatz: false,
+      ruht: false,
       ...extra,
     });
 
@@ -652,15 +655,99 @@ describe('EinsatzGeraete (LFH-892)', () => {
         name: 'Anbindung FüKW 1 liest diesen Einsatz',
       });
       await userEvent.setup().click(schalter);
-      expect(await screen.findByText('Nicht umgeschaltet')).toBeInTheDocument();
-      await waitFor(() =>
-        expect(
-          screen.queryByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
-        ).not.toBeInTheDocument(),
-      );
+      // Die Zeile fehlt nach dem Neuladen: der Grund nennt sie beim Namen.
+      expect(await screen.findByText('Anbindung „FüKW 1“ nicht geändert')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
+      ).not.toBeInTheDocument();
       expect(
         screen.getByRole('switch', { name: 'Anbindung FüKW 2 liest diesen Einsatz' }),
       ).toBeInTheDocument();
+    });
+
+    it('nennt den Grund weiter, wenn die einzige Anbindung nach der Ablehnung fehlt, schließbar', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      let widerrufen = false;
+      server.use(
+        http.get('/api/einsaetze/1/anbindungen', () =>
+          HttpResponse.json(widerrufen ? [] : [anbindung(1)]),
+        ),
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          widerrufen = true;
+          return HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 });
+        }),
+      );
+      rendern();
+      const schalter = await screen.findByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      const nutzer = userEvent.setup();
+      await nutzer.click(schalter);
+      // Die Zeile ist weg, das Paneel bleibt mit dem Grund stehen.
+      expect(await screen.findByText('Anbindung „FüKW 1“ nicht geändert')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Anbindungen')).toBeInTheDocument();
+      // Der Ort kommt nie wieder: der Grund lässt sich schließen, dann fehlt das Paneel.
+      await nutzer.click(screen.getByRole('button', { name: 'Hinweis schließen' }));
+      await waitFor(() => expect(screen.queryByText('Anbindungen')).not.toBeInTheDocument());
+    });
+
+    it('lässt einen Abruf von vor dem Umschalten die Antwort nicht überschreiben', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      let abrufe = 0;
+      let alterAbrufAntwortet: (() => void) | undefined;
+      server.use(
+        http.get('/api/einsaetze/1/anbindungen', async () => {
+          abrufe += 1;
+          // Der zweite Abruf liest vor dem Umschalten und antwortet erst danach.
+          if (abrufe === 2) {
+            await new Promise<void>((weiter) => {
+              alterAbrufAntwortet = weiter;
+            });
+          }
+          return HttpResponse.json([anbindung(1)]);
+        }),
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () =>
+          HttpResponse.json([anbindung(1, { freigegeben: true })]),
+        ),
+      );
+      const { client } = rendern();
+      const name = 'Anbindung FüKW 1 liest diesen Einsatz';
+      await screen.findByRole('switch', { name });
+      void client.refetchQueries({ queryKey: einsatzKeys.anbindungen(1) });
+      await waitFor(() => expect(abrufe).toBe(2));
+
+      await userEvent.setup().click(screen.getByRole('switch', { name }));
+      await waitFor(() => expect(screen.getByRole('switch', { name })).toBeChecked());
+      alterAbrufAntwortet!();
+      await new Promise((weiter) => setTimeout(weiter, 50));
+      expect(screen.getByRole('switch', { name })).toBeChecked();
+    });
+
+    it('zeigt am gekoppelten ELW die ruhende Freigabe und lässt sie beenden', async () => {
+      stelleBereit({ anbindungen: [anbindung(1, { freigegeben: true, ruht: true })] });
+      let beendet = false;
+      server.use(
+        http.delete('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          beendet = true;
+          return HttpResponse.json([]);
+        }),
+      );
+      rendern();
+      expect(
+        await screen.findByText('Freigabe ruht: Instanz meldet sich bei einem Hub'),
+      ).toBeInTheDocument();
+      const schalter = screen.getByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      expect(schalter).toBeChecked();
+      expect(schalter).toBeEnabled();
+      await userEvent.setup().click(schalter);
+      await waitFor(() => expect(beendet).toBe(true));
+      // Neu freigeben geht hier nicht: ohne ruhende Freigabe fehlt das Paneel.
+      await waitFor(() => expect(screen.queryByText('Anbindungen')).not.toBeInTheDocument());
     });
 
     it('behält die Liste, wenn das Neuladen scheitert, und nennt den veralteten Stand', async () => {
