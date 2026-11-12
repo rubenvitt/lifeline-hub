@@ -40,6 +40,10 @@ const ZAEHLER_MAX: i64 = 1 << 40;
 /// Größter Stand einer gelieferten Akte (LLH-1672): Stände zählen je Änderung eins hoch, wie
 /// Epochen weit darüber; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
 const STAND_MAX: i64 = 1 << 40;
+/// Bis hierher darf eine Quittung des Gegenübers den eigenen Zähler heben (LLH-1708, design.md
+/// D3): Eine gekoppelte Seite soll ihn nicht bis an [`STAND_MAX`] treiben können, ab dem jede
+/// weitere Akte abgelehnt würde.
+pub const STAND_HEBEN_MAX: i64 = STAND_MAX / 2;
 /// Länge eines Prüfwerts aus dem Abgabecode (HMAC-SHA256, Base64url: 43 Zeichen) mit Luft.
 const PRUEFWERT_MAX: usize = 64;
 /// Größte Akte in Byte (JSON), die hinausgeht: passt in jede Meldung ([`MELDUNG_BYTES`]) und
@@ -711,6 +715,36 @@ async fn check_offene(
         }
     }
     Ok(())
+}
+
+/// Rückschritt des eigenen Zählers (LLH-1708, design.md D3 der Change
+/// `xi5ugyt8-fuehrung-stand-nach-restore`): Quittiert die meldende Seite mehr, als dieser Zähler
+/// je vergeben hat, wurde diese Instanz aus einer Sicherung zurückgespielt, und ihre Uhr fing das
+/// nicht ab ([`repo::next_stand`]). Dann hebt die erreichte Seite den Zähler über die Quittung und
+/// stempelt die Akten der Kopplung über dem gespeicherten `fuehrung_gesendet_bis` neu; das ist mit
+/// der Sicherung zurückgekehrt und nennt, was das Gegenüber sicher hat. Liefert einen Hinweis für
+/// die Kopplung, wenn sie das tat. Läuft vor `ensure_akten` und [`apply_eingang`], damit auch deren
+/// Stände über der Quittung liegen.
+pub async fn repair_stand(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    quittung: i64,
+) -> Result<Option<String>, AppError> {
+    if !(1..=STAND_HEBEN_MAX).contains(&quittung) || quittung <= repo::load_stand(conn).await? {
+        return Ok(None);
+    }
+    let (gesendet, _) = repo::load_kopplung_staende(conn, kopplung.id).await?;
+    repo::raise_stand(conn, quittung).await?;
+    if let Some(richtung) = kopplung.richtung() {
+        let orgs = repo::list_orgs_der_kopplung(conn, kopplung.id, richtung).await?;
+        let ids: Vec<i64> = orgs.iter().map(|(id, _)| *id).collect();
+        repo::renew_stand_ueber(conn, &ids, gesendet).await?;
+    }
+    Ok(Some(format!(
+        "{0} hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat (aus \
+         einer Sicherung zurückgespielt?). Die Akten gehen erneut an {0}.",
+        kopplung.gegenueber_name
+    )))
 }
 
 /// Übernimmt die Akten einer Nachricht des Gegenübers. `zuletzt_gesehen` ist der Zeitpunkt der

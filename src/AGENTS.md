@@ -374,6 +374,12 @@ Herleitung in
     Hub), hält die meldende Seite offen; ob das ein Konflikt ist, sagt `austausch::ist_konflikt`.
   - Der Schalter steht in `instanz_identitaet.fuehrung_an` (je Instanz, auch im Testprozess);
     `instanz::fuehrung::is_enabled`, nie ein prozessweiter Merker.
+  - **Ein Stand kommt nur aus `fuehrung::repo::next_stand`** und folgt der Uhr
+    (`MAX(Zähler + 1, Unix-Sekunden)`), damit der Austausch das Zurückspielen einer Sicherung
+    übersteht (LLH-1708). Die Stände der Kopplung wandern nur vorwärts, mit zwei Ausnahmen: Die
+    meldende Seite setzt `fuehrung_gesendet_bis` auf eine kleinere Quittung zurück, und eine
+    Quittung über dem eigenen Zähler hebt ihn (`austausch::repair_stand`). Herleitung:
+    `openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
   (`akteur_id` NULL, Name der Gegenstelle).
 - **Stammdaten-Verteilung (LLH-1493)**, Spec `stammdaten-verteilung`, Herleitung

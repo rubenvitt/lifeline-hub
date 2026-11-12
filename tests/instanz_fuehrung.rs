@@ -4174,3 +4174,180 @@ async fn lauter_uebersprungene_akten_loesen_keine_sofortige_meldung_aus() {
     let h = hinweis(&hub).await.unwrap_or_default();
     assert!(h.contains("geht nicht an"), "{h:?}");
 }
+
+// ── Nach dem Zurückspielen einer Sicherung (LLH-1708) ────────────────────────────────────────
+//
+// Change `xi5ugyt8-fuehrung-stand-nach-restore`. Das Zurückspielen wird nachgestellt, soweit es
+// den Austausch betrifft: Zähler und Stände der Kopplung bekommen den Wert der Sicherung, und was
+// erst danach ankam, fehlt. Damit die Zeitachse eines echten Ausfalls in eine Sekunde passt,
+// liegen die verlorenen Stände in der Vergangenheit (`jetzt_s() - 1000`).
+
+fn jetzt_s() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+/// Setzt Zähler und Stände der Kopplung einer Instanz auf den Stand einer Sicherung.
+async fn zurueckspielen(i: &Instanz, stand: i64, gesendet: i64, empfangen: i64) {
+    sqlx::query("UPDATE instanz_identitaet SET fuehrung_stand = ?")
+        .bind(stand)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ?, fuehrung_empfangen_bis = ?",
+    )
+    .bind(gesendet)
+    .bind(empfangen)
+    .execute(&i.pool)
+    .await
+    .unwrap();
+}
+
+/// Kennt `i` die Akte des Einsatzes `einsatz` der Instanz `ursprung`? (Kennung
+/// `<Instanz>/<Einsatz-ID>-<Zufall>`.)
+async fn kennt(i: &Instanz, ursprung: &Instanz, einsatz: i64) -> bool {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{einsatz}-%", ursprung.kennung))
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+        == 1
+}
+
+/// Die Akten der neuen Einsätze entstehen sonst erst in der Meldung (`ensure_akten`); hier
+/// vorher, wie wenn jemand die Führung oder die Seite „Instanzkopplung“ öffnet.
+async fn akten_anlegen(i: &Instanz) {
+    fremde(i).await;
+}
+
+/// Nur die Meldung, ohne Abgleich der Einsätze: Die Akte bleibt beim Gegenüber ohne Spiegel.
+async fn nur_melden(elw: &Instanz) {
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    lifeline_hub::instanz::melden::run_durchlauf(&elw.pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_neue_einsaetze_erreichen_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    // Vor dem Ausfall hatte der ELW Akten des Hubs bis E übernommen; die Sicherung des Hubs
+    // stammt von kurz vor E (D1: die Uhr ist seitdem weitergelaufen).
+    let e = jetzt_s() - 1000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, e - 1, e - 1, 0).await;
+    // Zwei Einsätze vor der ersten Meldung: Ohne Uhr bekäme der erste den Stand E und ginge nie
+    // hinaus, und der zweite höbe den Zähler über E, sodass auch das Netz (D3) nichts sähe.
+    let a = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let b = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    akten_anlegen(&hub).await;
+    nur_melden(&elw).await;
+    assert!(
+        kennt(&elw, &hub, a).await,
+        "der erste Einsatz nach dem Zurückspielen"
+    );
+    assert!(kennt(&elw, &hub, b).await);
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_bekommt_die_verlorene_akte_des_elw_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(kennt(&hub, &elw, vor).await);
+    // Sicherung des Hubs: Er hatte den ELW bis hier übernommen.
+    let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
+        "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
+         FROM instanz_identitaet i, instanz_kopplung k",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert!(empfangen > 0);
+    let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(kennt(&hub, &elw, nach).await);
+    // Der Hub spielt die Sicherung zurück: die Akte von danach ist weg.
+    zurueckspielen(&hub, stand, gesendet, empfangen).await;
+    sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{nach}-%", elw.kennung))
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    // Erste Meldung: Der Hub quittiert weniger, der ELW setzt seinen Sendestand zurück (D2).
+    nur_melden(&elw).await;
+    nur_melden(&elw).await;
+    assert!(
+        kennt(&hub, &elw, nach).await,
+        "die verlorene Akte kommt erneut"
+    );
+}
+
+#[tokio::test]
+async fn quittung_null_eines_gegenuebers_ohne_schalter_sendet_nicht_erneut() {
+    let (_hub, elw) = gekoppelt_mit(false, true).await;
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let gesendet = jetzt_s() + 5;
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ?")
+        .bind(gesendet)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    nur_melden(&elw).await;
+    let (g, _, _) = staende(&elw).await;
+    assert_eq!(g, gesendet, "0 ist kein Rückschritt");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_mit_nachgehender_uhr_holt_das_netz() {
+    let (hub, elw) = gekoppelt().await;
+    // Die verlorenen Stände liegen über der Uhr des Hubs (seine Uhr geht nach): D1 greift nicht.
+    let e = jetzt_s() + 10_000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    let a = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    akten_anlegen(&hub).await;
+    nur_melden(&elw).await;
+    assert!(kennt(&elw, &hub, a).await, "das Netz (D3) stempelt neu");
+    let (_, _, stand) = staende(&hub).await;
+    assert!(stand > e, "der Zähler liegt über der Quittung: {stand}");
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(h.contains("erneut"), "{h:?}");
+}
+
+#[tokio::test]
+async fn unplausible_quittung_hebt_den_zaehler_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    let riesig = 1_i64 << 40;
+    zurueckspielen(&elw, 0, 0, riesig).await;
+    nur_melden(&elw).await;
+    let (_, _, stand) = staende(&hub).await;
+    assert!(stand < 1 << 39, "{stand}");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_elw_akten_fliessen_in_beide_richtungen() {
+    let (hub, elw) = gekoppelt().await;
+    let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(kennt(&hub, &elw, vor).await);
+    // Der ELW spielt zurück; vor dem Ausfall lief seine Uhr vor, der Hub hat Stände bis E.
+    let e = jetzt_s() + 10_000;
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+        .bind(e)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    zurueckspielen(&elw, 3, 0, 0).await;
+    let neu = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(kennt(&hub, &elw, neu).await, "ELW → Hub");
+    let (_, _, stand) = staende(&elw).await;
+    assert!(stand >= e, "der ELW hebt seinen Zähler (D3): {stand}");
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    nur_melden(&elw).await;
+    assert!(kennt(&elw, &hub, h).await, "Hub → ELW");
+}

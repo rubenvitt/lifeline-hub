@@ -587,6 +587,18 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             .await?;
             fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
                 .await?;
+            // Rückschritt des Gegenübers (LLH-1708, D2): Seine Quittung liegt unter dem, was es
+            // schon bestätigt hatte, es hat also Akten mit einer Sicherung verloren. 0 sagt ein
+            // Gegenüber ohne Schalter oder vor LLH-1491 immer; das ist kein Rückschritt.
+            if a.fuehrung_bis > 0 && a.fuehrung_bis < fuehrung_gesendet {
+                fuehrung_repo::reset_gesendet_bis(conn, kopplung.id, a.fuehrung_bis).await?;
+            }
+            // Rückschritt des eigenen Zählers (D3): Wer selbst zurückgespielt wurde, hebt ihn über
+            // die Quittung. Neu zu stempeln braucht diese Seite nichts, sie sendet ab ihrem
+            // eigenen `gesendet_bis`, und das Gegenüber nimmt jeden plausiblen Stand an.
+            if a.fuehrung_bis <= fuehrung_austausch::STAND_HEBEN_MAX {
+                fuehrung_repo::raise_stand(conn, a.fuehrung_bis).await?;
+            }
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -836,7 +848,14 @@ pub async fn handle_meldung(
         .await?;
         if fuehrung_an {
             // Führung je Einsatz (LLH-1491, D3, D7): erst übernehmen (eine Anfrage wird dabei
-            // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite.
+            // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite. Davor ein
+            // Rückschritt des eigenen Zählers (LLH-1708, D3), damit jeder Stand dieser Meldung
+            // über der Quittung liegt.
+            let rueckschritt =
+                fuehrung_austausch::repair_stand(conn, kopplung, anfrage.fuehrung_bis).await?;
+            if let Some(h) = &rueckschritt {
+                repo::set_hinweis(conn, kopplung.id, h).await?;
+            }
             fuehrung_repo::ensure_akten(conn).await?;
             let eingang = fuehrung_austausch::apply_eingang(
                 conn,

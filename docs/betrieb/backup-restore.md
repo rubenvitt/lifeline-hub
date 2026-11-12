@@ -213,6 +213,24 @@ arbeitet. Vorher sicherstellen, dass der Dienst beendet ist (`systemctl status �
 Das Entfernen der `-wal`/`-shm`-Dateien ist wichtig: Eine alte WAL-Datei würde
 sonst mit der zurückgespielten DB vermischt.
 
+### Gekoppelte Instanz zurückspielen (LLH-1708)
+
+Ist die Instanz mit einer anderen gekoppelt (ELW und Hub), gleichen beide die Führungsakten nach
+dem Zurückspielen von selbst ab. Ein Eingriff ist nicht nötig, gleich ob die Sicherung über
+`restore` oder von Hand eingespielt wurde:
+
+- Einsätze, die die zurückgespielte Instanz danach anlegt oder ändert, erreichen das Gegenüber mit
+  der nächsten Meldung.
+- Akten, die das Gegenüber schon kannte und die mit der Sicherung verloren gingen, schickt es mit
+  den nächsten Meldungen erneut.
+
+**Die Uhr des Servers muss stimmen.** Der Stand der Führungsakten folgt der Uhr. Geht sie nach
+dem Zurückspielen nach, fängt ein zweiter Weg das meist ab, und die Kopplung zeigt dann den
+Hinweis „… hat schon spätere Führungsakten quittiert …“. Nur wenn die Instanz vor ihrer ersten
+Meldung mehr Änderungen vergibt, als verloren gingen, erreicht eine Akte das Gegenüber erst mit
+ihrer nächsten Änderung. Herleitung:
+`openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
+
 ## Sicherungen und Schwärzung (LFH-725)
 
 Nach Ablauf von Aufbewahrungsfrist und Karenz schwärzt der Server die Personendaten eines
