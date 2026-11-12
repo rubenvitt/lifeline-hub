@@ -5120,12 +5120,22 @@ mod tests {
         assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
     }
 
-    /// 0336 (LLH-1638) entfernt den Lesezugang per Schlüssel `llh_lm_`: beide Tabellen fallen samt
-    /// Inhalt, ohne hängenden Fremdschlüssel; Einsatz, Benutzer und die alten Einträge der
-    /// Admin-Spur bleiben.
+    /// `migrations/0340_lagemonitor_zugang_entfernen.sql` (LLH-1638) entfernt den Lesezugang per
+    /// Schlüssel `llh_lm_`: beide Tabellen fallen samt Inhalt, ohne hängenden Fremdschlüssel;
+    /// Einsatz, Benutzer und die alten Einträge der Admin-Spur bleiben. Die Nummer liest der Test
+    /// aus der Migration selbst, damit ein Umnummerieren ihn nicht bricht.
     #[tokio::test]
-    async fn migration_0336_entfernt_die_lagemonitor_tabellen_samt_inhalt() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 335).await;
+    async fn lagemonitor_tabellen_fallen_samt_inhalt() {
+        let entfernen = sqlx::migrate!("./migrations")
+            .iter()
+            .find(|m| m.description == "lagemonitor zugang entfernen")
+            .expect("Migration …_lagemonitor_zugang_entfernen.sql")
+            .version;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            entfernen - 1,
+        )
+        .await;
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
             .await
@@ -5170,7 +5180,7 @@ mod tests {
         .await
         .unwrap();
 
-        migriere_bis(&pool, 336).await;
+        migriere_bis(&pool, entfernen).await;
 
         let tabellen: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM sqlite_master \
