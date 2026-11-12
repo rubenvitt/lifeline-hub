@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { FUEKW, SUBPIXEL, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-kern';
+import { FUEKW, SUBPIXEL, anmelden, einsatzAnlegen, ladeInDichte } from './trefflaeche-kern';
 import { zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
@@ -57,8 +57,7 @@ test('beschrifteter Optionsknopf hält die Dichte-Staffel (Kartenansicht lösche
   const je = new Map<Stufe, number>();
   const notiz: string[] = [];
   for (const stufe of STUFEN) {
-    await page.goto(`/einsaetze/${einsatzId}/lagekarte?ansicht=${ansichtId}`);
-    await stelleDichte(page, stufe);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte?ansicht=${ansichtId}`, stufe);
     const dialog = await oeffneLoeschDialog(page);
     const labels = dialog.locator('label.ant-radio-wrapper');
     // Vorbedingung: wirklich die beiden beschrifteten Optionsknöpfe, nicht `Radio.Button`.

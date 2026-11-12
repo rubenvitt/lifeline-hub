@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { waehleAnzeige } from './menue-kern';
 
 /**
@@ -86,7 +86,7 @@ test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste a
   page,
 }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Kopf ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Kopf ${Date.now()}`);
 
   // BEIDE Layouts: `/einsaetze` hängt an der Ebene-1-Shell, die Modulseite am
   // Einsatz-Workspace — Geschwister, die einzeln umgestellt werden könnten. Die Leiste ist
@@ -233,7 +233,7 @@ test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläch
   page,
 }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Suche ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Suche ${Date.now()}`);
 
   await page.setViewportSize(SCHMAL);
   for (const route of ['/einsaetze', `/einsaetze/${einsatzId}/etb`]) {
@@ -305,7 +305,7 @@ test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async 
    * nicht in ihr — ein `display: none` oder eine Nullbreite fiele auf.
    */
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Absetzung ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `E2E Absetzung ${Date.now()}`);
   await page.setViewportSize(BREIT);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
 

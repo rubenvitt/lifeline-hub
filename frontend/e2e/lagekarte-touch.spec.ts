@@ -9,6 +9,7 @@ import {
   werkzeugmenue,
 } from './leisten-kern';
 import { wechsleZuRolle } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Die Lagekarte unter Touch, auf Handschirm (390 px) und Führungs-Tablet (1024 px).
 //
@@ -72,12 +73,8 @@ const ZWISCHEN: [number, number] = [MITTE[0] + 0.005, MITTE[1]];
 const TRAUBE = ['Wache Nord', 'Wache Mitte', 'Wache Süd'];
 const ZOOM = 14;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -723,7 +720,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
         ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
         [DICHTE_SCHLUESSEL, dichte] as const,
       );
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const einsatzId = await post(page, '/api/einsaetze', {
         bezeichnung: `E2E Griffprobe ${Date.now()}`,
       });
@@ -854,7 +851,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
         },
       }),
     );
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E Klickziel ${Date.now()}`,
     });
@@ -1360,7 +1357,7 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
         },
       }),
     );
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E Flächenwahl ${Date.now()}`,
     });
@@ -1708,7 +1705,7 @@ for (const { viewport, dichte } of [
           ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
           [DICHTE_SCHLUESSEL, dichte] as const,
         );
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const saat = await einsatzFuerKontext(page);
       await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
       if (dichte) await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
@@ -1820,7 +1817,7 @@ for (const { viewport, dichte } of [
           ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
           [DICHTE_SCHLUESSEL, dichte] as const,
         );
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const saat = await einsatzFuerKontext(page);
       await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
       await ruhe(page);
@@ -1896,7 +1893,7 @@ for (const { viewport, dichte } of [
           ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
           [DICHTE_SCHLUESSEL, dichte] as const,
         );
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const saat = await einsatzFuerKontext(page);
       await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
       await ruhe(page);
@@ -2008,7 +2005,7 @@ test.describe('Kontextmenü per Rechtsklick am Fükw (LFH-776)', () => {
   test('Rechtsklick, Koordinate kopieren, Esc', async ({ page, context }) => {
     test.setTimeout(120_000);
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const saat = await einsatzFuerKontext(page);
     await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
     await ruhe(page);

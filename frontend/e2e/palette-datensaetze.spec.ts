@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Der Datensatz-Finder der Kommandopalette im echten Browser. Die Unit-Ebene belegt, dass
@@ -46,12 +47,8 @@ function datensatzOption(page: Page, kontext: string, name: RegExp): Locator {
     .filter({ has: page.locator('[id$="-kontext"]', { hasText: kontext }) });
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Hartes Navigieren zu einem Modul + warten, bis die App (Kopfzeile) steht — sonst kommt
@@ -71,8 +68,8 @@ async function suche(page: Page, begriff: string) {
 test('findet eine eben erfasste Person über ihre Registriernummer und öffnet ihre Detailseite', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Finder Person ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Finder Person ${Date.now()}`);
 
   // Über die Schnellaktion `?neu=1`, den Weg der Palette selbst.
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);

@@ -4,6 +4,7 @@ import {
   kartenConfigBeantworten,
   vektorStilBeantworten,
 } from './kartenFixture';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Die Kartengrundlage der Lagekarte im Browser (LFH-558, Spec `lagekarte-kartengrundlage`).
 // Alle drei Tests stellen ihre Grundlage selbst (`kartenFixture.ts`): kein Netz, keine echten Kacheln.
@@ -71,12 +72,8 @@ interface MapHaken {
   queryRenderedFeatures(optionen: { layers: string[] }): { properties: Record<string, unknown> }[];
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function senden(page: Page, methode: 'post' | 'patch', pfad: string, data: unknown) {
@@ -204,7 +201,7 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
     }),
   );
 
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const eid = await einsatzMitOrt(page, `E2E Grundlagewechsel ${Date.now()}`);
   const basis = `/api/einsaetze/${eid}`;
   await senden(page, 'post', `${basis}/zonen`, {
@@ -318,7 +315,7 @@ test('Style-JSON der Online-Karte liefert 404: Anzeige weicht auf die Offline-Re
   );
   const offlineKacheln = await kachelnBeantworten(page, OFFLINE.kachelPraefix, OFFLINE.layer);
 
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const eid = await einsatzMitOrt(page, `E2E Abstufung ${Date.now()}`);
   await page.goto(`/einsaetze/${eid}/lagekarte`);
   await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
@@ -425,7 +422,7 @@ test('frische Seite mit aktiver Offline-Karte zeigt sofort Kacheln, ohne Kartenf
   });
   const kacheln = await kachelnBeantworten(page, OFFLINE_ERST.kachelPraefix, OFFLINE_ERST.layer);
 
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const eid = await einsatzMitOrt(page, `E2E Erststil ${Date.now()}`);
   await page.goto(`/einsaetze/${eid}/lagekarte`);
   await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(

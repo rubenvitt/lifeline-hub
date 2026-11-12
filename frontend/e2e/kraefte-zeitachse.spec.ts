@@ -36,7 +36,7 @@ test('Nachtrag an der Einheit wird zur Einsatzdauer im Meldebild — Schreib- un
 }) => {
   // Zwei Rollenwechsel samt Anmeldung: unter der vollen parallelen Suite reichen 30 s nicht.
   test.setTimeout(90_000);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { einsatzId, einheitId } = await seedeEinheit(page);
   const schreiber = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zeitachse FP');
   await mitgliedEintragen(page, einsatzId, schreiber.id, 'fuehrungspersonal');

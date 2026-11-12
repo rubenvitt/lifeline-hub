@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { kanalVon, zerlegeChangelog } from '../scripts/changelog-zerlegen.mjs';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Neuigkeiten nach einem Update (Spec `neuigkeiten`, Change neuigkeiten-versionshinweise).
@@ -46,12 +47,11 @@ function lesestand(): string | null {
   }
 }
 
-async function anmelden(page: import('@playwright/test').Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(
+  page: import('@playwright/test').Page,
+  optionen?: { startseite?: boolean },
+) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 test('nach einem Update: Karte, Punkt und Seite führen zum Lesestand', async ({

@@ -1,4 +1,5 @@
 import { expect, request, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 import { kontoAnlegen } from './konto-anlegen';
 
 /**
@@ -14,7 +15,8 @@ import { kontoAnlegen } from './konto-anlegen';
  *    System-Admin (Sperrgründe, Rechtehinweis).
  *  - `fuehrungspersonal`: Einsatzrolle — schreibt, leitet aber nicht (Module, Mitglieder).
  *
- * Der Wechsel läuft im SELBEN Kontext (API-Logout im geteilten Cookie-Jar, dann UI-Login):
+ * Der Wechsel läuft im SELBEN Kontext (API-Logout im geteilten Cookie-Jar, dann API-Login und
+ * frisches Laden der Einsatzliste, `anmelde-kern.ts`):
  * `page.route`-Stubs und `addInitScript`-Einstellungen bleiben so erhalten. Danach jede Route
  * frisch per `goto` ansteuern, sonst trifft eine Seite mit alter Kennung auf 412 (LFH-387).
  */
@@ -30,9 +32,14 @@ export interface Konto {
   passwort: string;
 }
 
-export async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await anmeldenImFormular(page, benutzer, passwort);
+/** Anmelden über die API (`anmelde-kern.ts`, LLH-1665); das Formular prüfen die Anmelde-Specs. */
+export async function anmeldenAls(
+  page: Page,
+  benutzer: string,
+  passwort: string,
+  optionen?: { startseite?: boolean },
+) {
+  await anmeldenPerApi(page, benutzer, passwort, optionen);
 }
 
 /** Meldet im Formular der schon offenen Anmeldeseite an, ohne sie neu zu laden (LLH-1517). */
@@ -43,8 +50,8 @@ export async function anmeldenImFormular(page: Page, benutzer: string, passwort:
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-export async function anmeldenAlsAdmin(page: Page) {
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
+export async function anmeldenAlsAdmin(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenAls(page, ADMIN, ADMIN_PW, optionen);
 }
 
 let zaehler = 0;

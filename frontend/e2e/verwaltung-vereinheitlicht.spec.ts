@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Verwaltungsflächen im echten Layout: Trefflächenhöhe einer Zeilenaktion, Abstand zur
@@ -46,12 +47,8 @@ const STAFFEL = [
 /** Ein Modul, dessen Zeile in den Einsatz-Vorgaben immer steht. */
 const MODUL = 'Einsatzabschnitte';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -88,7 +85,7 @@ for (const { dichte, zeilenhoehe, abstandSm, abstandMd } of STAFFEL) {
     page,
   }) => {
     await dichteSetzen(page, dichte);
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     const fahrzeug = await fahrzeugAnlegen(page, `E2E Verwaltung ${dichte} ${Date.now()}`);
     // Die Vorbedingung der Abstandsmessung — siehe `fahrzeugAnlegen`.
     expect(
@@ -173,7 +170,7 @@ const LESBAR = 120;
 test('bei 390 px stapelt die Modulzeile der Einsatz-Vorgaben, die Spaltenköpfe fallen weg und der Rollen-Auswähler bleibt breit', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await page.setViewportSize(HANDSCHIRM);
   await page.goto('/admin/einstellungen/einsatz');
 
@@ -216,7 +213,7 @@ test('bei 390 px stapelt die Modulzeile der Einsatz-Vorgaben, die Spaltenköpfe 
 test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Vorgaben breit genug zum Lesen', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await page.setViewportSize(FUEKW);
   await page.goto('/admin/einstellungen/einsatz');
 
@@ -287,7 +284,7 @@ async function ueberlaufendeModulzeilen(page: Page) {
 test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Vorgaben, und keine Zeile läuft über (Führungskraft)', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await wechsleZuRolle(page, 'fuehrungskraft');
   await page.setViewportSize(HANDSCHIRM);
   await page.goto('/admin/einstellungen/einsatz');
@@ -343,7 +340,7 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Vorgaben, und kein
 test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Vorgaben breit genug zum Lesen, und keine Zeile läuft über (Führungskraft)', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   await wechsleZuRolle(page, 'fuehrungskraft');
   await page.setViewportSize(FUEKW);
   await page.goto('/admin/einstellungen/einsatz');
@@ -381,7 +378,7 @@ test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Vorgaben bre
 test('die Fahrzeug-Detailseite ist per Deeplink erreichbar und ihre Speicherleiste steht im Blickfeld', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const fahrzeug = await fahrzeugAnlegen(page, `E2E Detail ${Date.now()}`);
 
   await page.setViewportSize({ width: 1280, height: 420 });

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { musterKontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LLH-1090: eine nicht anwendbare Zelle der Gefahrenmatrix trägt keinen Text mehr, sondern eine
@@ -12,11 +13,7 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<{ id: number }> {

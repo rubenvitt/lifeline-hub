@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die ETB-Chronologie als Layoutmessung: das Tagebuch ist auf ALLEN Breiten eine Zeitachse
@@ -38,7 +39,7 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
   }) => {
     await page.setViewportSize(FUEKW);
     await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E Lagebesprechung ${Date.now()}`);
+    const einsatzId = await einsatzPerApi(page, `E2E Lagebesprechung ${Date.now()}`);
     await seedeEintrag(page, einsatzId);
     // Der Termin kommt aus dem Modul Lagebesprechung (LLH-1111): der eine Schreibweg ohne
     // Abschluss. Gesät mit Sekunden, damit die Wiedervorlage ihn nachweislich ungerundet übernimmt.
@@ -239,12 +240,8 @@ test.describe('LFH-523: langer Meldungstext in der Zeitachse', () => {
   }
 });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function seedeEintrag(page: Page, einsatzId: string, inhalt: string = MELDUNG) {
@@ -260,8 +257,8 @@ async function seedeEintrag(page: Page, einsatzId: string, inhalt: string = MELD
 test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie steht als Zeitachse', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E ETB Breite ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB Breite ${Date.now()}`);
   await seedeEintrag(page, einsatzId);
 
   await page.setViewportSize(HANDSCHIRM);
@@ -291,8 +288,8 @@ test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie ste
 test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E ETB Textbreite ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB Textbreite ${Date.now()}`);
   await seedeEintrag(page, einsatzId);
 
   await page.setViewportSize(FUEKW);
@@ -329,8 +326,8 @@ test.describe('LFH-683: Menüauslöser per Tastatur', () => {
     page,
   }) => {
     await page.setViewportSize(FUEKW);
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E Menüfokus ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `E2E Menüfokus ${Date.now()}`);
     await seedeEintrag(page, einsatzId);
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
-import { haeltStufe, stelleDichte } from './trefflaeche-kern';
+import { haeltStufe, ladeInDichte, stelleDichte } from './trefflaeche-kern';
 
 /**
  * Bereitstellungsraum (LFH-1042; Spec `funktionsansichten`): ein Tablet bei 1024 × 768 nimmt
@@ -298,8 +298,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
   const neu = einheiten.find((x) => x.name === 'Florian Nachbar 3');
   expect(neu, 'die unangemeldete Einheit ist angelegt').toBeDefined();
 
-  await page.goto(`/einsaetze/${e}/meldungen`);
-  await stelleDichte(page, 'kompakt');
+  await ladeInDichte(page, `/einsaetze/${e}/meldungen`, 'kompakt');
   const karte = page.locator('[data-meldung-id]').filter({ hasText: 'Florian Nachbar 3' });
   await expect(karte.getByRole('button', { name: 'Übernehmen' })).toBeVisible();
   await expect(karte.getByRole('button', { name: 'Abweisen' })).toBeVisible();
@@ -484,8 +483,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
     await expect(tablet.getByRole('button', { name: 'HLF Deich abrufen' })).toHaveCount(0);
 
     // Die Führung ruft ab.
-    await page.goto(`/einsaetze/${e}/bereitstellungsraeume/${raum.id}`);
-    await stelleDichte(page, 'kompakt');
+    await ladeInDichte(page, `/einsaetze/${e}/bereitstellungsraeume/${raum.id}`, 'kompakt');
     await page.getByRole('button', { name: 'HLF Deich abrufen' }).click();
     const dialog = page.getByRole('dialog', { name: 'HLF Deich abrufen' });
     await waehleIn(dialog.getByRole('combobox', { name: 'Ziel-Abschnitt' }), 'EA Deich');

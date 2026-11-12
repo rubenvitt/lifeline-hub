@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { FACHEBENEN } from '../src/pages/lagekarte/fachebenen';
 import type { FachebeneQuelle } from '../src/api/fachebenen';
 import { BAUM_SCHLUESSEL, FACHEBENEN_OFFEN } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LFH-601: Die Statusmarke einer Fachebene („offline“, „keine Daten“) steht einzeilig, auch
@@ -29,12 +30,8 @@ const MIT_GELTUNG: FachebeneQuelle[] = ['autobahn', 'luftqualitaet', 'odl'];
 
 const MARKE = { offline: 'offline', leer: 'keine Daten' } as const;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function einsatz(page: Page, bezeichnung: string): Promise<number> {
@@ -67,7 +64,7 @@ for (const zustand of ['offline', 'leer'] as const) {
         },
         [DICHTE_SCHLUESSEL, dichte, BAUM_SCHLUESSEL, FACHEBENEN_OFFEN] as const,
       );
-      await anmelden(page);
+      await anmelden(page, { startseite: false });
       const einsatzId = await einsatz(page, `Statusmarke ${zustand} ${dichte} ${Date.now()}`);
       await page.setViewportSize(TABLET);
       await page.goto(`/einsaetze/${einsatzId}/lagekarte`);

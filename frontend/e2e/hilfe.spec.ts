@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Hilfe (LFH-1096, Spec `anwenderdoku`): erreichbar vor der Anmeldung und aus dem Benutzermenü,
@@ -24,11 +25,7 @@ test('vor der Anmeldung: Hilfe zum Anmelden, zurück zur Anmeldung', async ({ pa
 test('angemeldet: Hilfe aus dem Benutzermenü, Gruppe wählen, zurück in die App', async ({
   page,
 }) => {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, ADMIN, PW);
 
   await page.getByRole('button', { name: 'Benutzermenü' }).click();
   await page.getByRole('menuitem', { name: 'Hilfe' }).click();

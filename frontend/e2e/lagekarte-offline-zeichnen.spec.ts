@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Zeichnet die Lagekarte ohne Netz ihre Ebenen? (LFH-723, design.md D9, Aufgabe 7.2)
 //
@@ -30,12 +31,8 @@ interface KartenHaken {
   setStyle(s: unknown, o?: { diff: boolean }): void;
 }
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -66,7 +63,7 @@ async function innerhalbNavigieren(page: Page, pfad: string) {
 
 test('Lagekarte (LFH-723): ohne Netz neu aufgebaut, zeichnet sie ihre Marker', async ({ page }) => {
   test.setTimeout(120_000);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Funkloch Karte ${Date.now()}`,
   });

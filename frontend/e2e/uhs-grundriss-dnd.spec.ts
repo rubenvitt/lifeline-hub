@@ -1,15 +1,12 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 // Eine Platz-Karte lässt sich per Maus verschieben, und die Layout-Mutation feuert genau

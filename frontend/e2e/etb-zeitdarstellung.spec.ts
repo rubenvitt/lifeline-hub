@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Taktische Zeit in der ETB-Zeitachse (LLH-1061, Specs `zeitdarstellung` und
@@ -24,12 +25,8 @@ const VORTAG_TEXT = 'Zeitprobe Vortag Lagemeldung Süd';
 
 test.use({ timezoneId: ZONE });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function seedeEintrag(page: Page, einsatzId: string, inhalt: string, ereigniszeit?: string) {
@@ -60,8 +57,8 @@ function kopfDerGruppe(page: Page, text: string) {
 test('ETB: taktisch heute `1446`, am Vortag `091446`; „Datum und Uhrzeit“ am Gerät wirkt', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E ETB Zeitdarstellung ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB Zeitdarstellung ${Date.now()}`);
   const vortag = new Date();
   vortag.setUTCDate(vortag.getUTCDate() - 1);
   vortag.setUTCHours(10, 46, 0, 0);

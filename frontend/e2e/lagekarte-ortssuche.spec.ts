@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { zeigeLeistenAnsicht } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Ortssuche der Lagekarte im Browser (LFH-638, Spec `lagekarte-ortssuche`): Koordinate tippen →
 // anfliegen → Suchnadel; Adresse auf Enter mit Direktflug; `?ort=` am Handschirm; und ein Tipp auf
@@ -23,12 +24,8 @@ interface MapHaken {
 /** Ein einzelnes Fahrzeug abseits, damit es als WebGL-Einzelzeichen steht, nicht im Cluster. */
 const PUMPE: [number, number] = [8.81, 53.0775];
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -112,7 +109,7 @@ test('Koordinate tippen → Anflug und Suchnadel; Tipp auf den Marker darunter w
   const seitenFehler: Error[] = [];
   page.on('pageerror', (f) => seitenFehler.push(f));
   const anfragen = await geocoder(page, []);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await einsatzMitPumpe(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await ruhe(page);
@@ -151,7 +148,7 @@ test('Adresse auf Enter: genau ein Treffer fliegt ohne Klick hin', async ({ page
   const anfragen = await geocoder(page, [
     { lat: ZIEL[1], lon: ZIEL[0], name: 'Rathausplatz 1, Musterstadt' },
   ]);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await einsatzMitPumpe(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await ruhe(page);
@@ -180,7 +177,7 @@ test('?ort= bei 390 px: Leiste offen, Treffer wählbar, Nadel-Band bedienbar', a
     { lat: 53.08, lon: 8.79, name: 'Hauptstraße 12, Musterstadt' },
     { lat: 52.5, lon: 13.4, name: 'Hauptstraße 12, Anderswo' },
   ]);
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const einsatzId = await einsatzMitPumpe(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte?ort=Hauptstra%C3%9Fe%2012`);
 

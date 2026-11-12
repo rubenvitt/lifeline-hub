@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Offline-Precache des maplibre-Tile-Workers: kommt `maplibre-gl-worker-*.js` nach `offline`
 // wirklich AUS DEM SERVICE WORKER? Ein nicht precachter Worker ließe die Karte offline tot
@@ -39,12 +40,8 @@ const backendUrl = lauf
 // Projekts erhalten bleiben.
 test.use({ baseURL: backendUrl || undefined });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Einsatz über die API; der Name trägt keinen Modulnamen (Palette). */

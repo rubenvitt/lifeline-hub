@@ -161,7 +161,7 @@ for (const ansicht of ANSICHTEN) {
       test(`${tabelle.name}: Status und Aktionen ohne Wischen erreichbar, Spaltenschalter zählt`, async ({
         page,
       }) => {
-        await anmeldenAlsAdmin(page);
+        await anmeldenAlsAdmin(page, { startseite: false });
         const marke = `${LAUF}-${ansicht.breite}`;
         const kennung = await tabelle.saeen(page, marke);
         await page.goto(tabelle.pfad);
@@ -215,7 +215,7 @@ test.describe('Verwaltungstabellen ohne Schreibrecht', () => {
    * Status muss trotzdem rechts im Bild stehen, auch neben einer langen Kennung.
    */
   test('Fahrzeuge (Führungskraft): Status ohne Wischen, keine Aktionen', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const marke = `${LAUF}-fk`;
     const kennung = await TABELLEN[1].saeen(page, marke);
     await wechsleZuRolle(page, 'fuehrungskraft');
@@ -237,7 +237,7 @@ test.describe('Verwaltungstabellen ohne Schreibrecht', () => {
 
   /** Sprechgruppen ändert nur der System-Admin; ohne ihn fehlt die Aktionsspalte, „Aktiv“ bleibt. */
   test('Sprechgruppen (Führungskraft): Aktiv ohne Wischen, keine Aktionen', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const marke = `${LAUF}-fk`;
     const kennung = await TABELLEN[3].saeen(page, marke);
     await wechsleZuRolle(page, 'fuehrungskraft');
@@ -261,7 +261,7 @@ test.describe('Abschneide-Indikator', () => {
   test('Fahrzeuge bei 390: die verdeckte Seite trägt eine Kante, am Ende verschwindet sie', async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const marke = `${LAUF}-kante`;
     const kennung = await TABELLEN[1].saeen(page, marke);
     await page.goto('/admin/stammdaten/fahrzeuge');
@@ -326,7 +326,7 @@ test.describe('Suchfeld', () => {
     '/admin/karten/online',
   ]) {
     test(`${pfad}: Platzhalter auf 1440 ungekürzt`, async ({ page }) => {
-      await anmeldenAlsAdmin(page);
+      await anmeldenAlsAdmin(page, { startseite: false });
       await page.goto(pfad);
       await expect(page.locator('[data-lfh="katalog-werkzeuge"] input')).toBeVisible();
       const { text, innen, platzhalter } = await platzhalterPasst(page);
@@ -336,7 +336,7 @@ test.describe('Suchfeld', () => {
 
   test('unter md nimmt das Suchfeld die volle Zeile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     await page.goto('/admin/stammdaten/fahrzeuge');
     const werkzeuge = page.locator('[data-lfh="katalog-werkzeuge"]');
     const feld = werkzeuge.locator('.ant-input-search').first();
@@ -372,7 +372,7 @@ test.describe('Seitenleiste der Verwaltung', () => {
               })
             : route.fallback(),
       );
-      await anmeldenAlsAdmin(page);
+      await anmeldenAlsAdmin(page, { startseite: false });
       await page.goto('/admin/demo-daten');
       const menue = page.locator('[data-lfh="verwaltung-menue"]');
       const eintrag = menue.getByRole('menuitem', { name: 'Demo-Daten' });
@@ -419,7 +419,7 @@ test.describe('Seitenleiste der Verwaltung', () => {
       (route) =>
         route.request().method() === 'GET' ? route.fulfill({ status: 404 }) : route.fallback(),
     );
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     await page.goto('/admin/aufbewahrung');
     const menue = page.locator('[data-lfh="verwaltung-menue"]');
     const eintrag = menue.getByRole('menuitem', { name: 'Aufbewahrung' });
@@ -444,7 +444,7 @@ test.describe('Seitenleiste der Verwaltung', () => {
 
   test('Desktop 1440: auf einer langen Seite klebt das Menü beim Bildlauf', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     // Lange Seite: genug Fahrzeuge, dass der Inhalt den Schirm überragt.
     for (let i = 0; i < 20; i += 1) {
       await saeen(page, '/api/fahrzeuge', { funkrufname: `E2E Leiste ${LAUF}-${i}` });

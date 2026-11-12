@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Zone bearbeiten am Fükw (LLH-1344, Spec `lagekarte-zeichnen`): eine Kreiszone punktweise ändern
@@ -33,11 +34,7 @@ interface ZoneAntwort {
 const MITTE = { lat: 54.0, lon: 9.5 };
 
 async function lagekarteMitKreis(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, ADMIN, PW);
   await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(`E2E Zone bearbeiten ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kennzahlenband und die drei Paneele des Lage-Dashboards auf den drei Prüfbreiten. Dass das
@@ -18,12 +19,8 @@ import { einsatzAnlegen } from './einsatz-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Einmal angelegt, von allen Tests der Datei weiterbenutzt. */
@@ -38,8 +35,8 @@ const PANEELE = (page: Page) => page.locator('[data-lfh="lagebild-paneele"]');
  * im Default-Viewport: auf 390 px liegt „Neuer Einsatz" hinter dem Kopfgriff.
  */
 async function dashboardOeffnen(page: Page, breite: number, hoehe: number) {
-  await anmelden(page);
-  einsatzId ??= await einsatzAnlegen(page, `E2E Kennzahlen ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  einsatzId ??= await einsatzPerApi(page, `E2E Kennzahlen ${Date.now()}`);
 
   await page.setViewportSize({ width: breite, height: hoehe });
   await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);

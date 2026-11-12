@@ -1,17 +1,16 @@
 import { expect, test } from '@playwright/test';
 import { einsatzEinstellungenPfad, etbPfad } from '../src/routing/deeplinks';
 import { benutzerAnlegen, wechsleZu } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 for (const breite of [1280, 390]) {
   test(`Führungsstelle pflegen; im ETB nur Vorschlag des Rufnamens (${breite}px)`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: breite, height: 900 });
-    await page.goto('/login');
-    await page.getByLabel('Benutzername').fill('admin');
-    await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-    await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-    await expect(page).toHaveURL(/\/einsaetze/);
+    await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', {
+      startseite: false,
+    });
     const ich = await (await page.request.get('/api/auth/me')).json();
     const anlegen = async (name: string) => {
       const response = await page.request.post('/api/einsaetze', {

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * ETB-Anhänge Ende zu Ende: Datei wählen → Text → Enter → der Eintrag steht mit
@@ -19,12 +20,8 @@ const FUEKW = { width: 1366, height: 768 };
 // Echte Bildbytes: ein Foto-Download wird bereinigt (LFH-747).
 const JPG = MINI_JPEG;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzPerApi(page: Page, bezeichnung: string): Promise<number> {

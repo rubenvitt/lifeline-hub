@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Lagebericht am Fükw-Maß und am schmalen Schirm: Seitenhöhe der Detailseite und
@@ -25,12 +26,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
  */
 const MAX_HOEHE = 1054;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Lagevortrag zur Entscheidung: die Vorlage mit den meisten Abschnitten (acht). */
@@ -186,8 +183,8 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
 test('Lageberichte: Liste ohne Querlauf und Detail unter der Höhengrenze (Beobachter)', async ({
   page,
 }) => {
-  await anmelden(page);
-  const eigenerEinsatz = await einsatzAnlegen(page, `E2E Lagebericht lesend ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const eigenerEinsatz = await einsatzPerApi(page, `E2E Lagebericht lesend ${Date.now()}`);
   const eigenerBericht = await lageberichtAnlegen(page, eigenerEinsatz);
   await wechsleZuRolle(page, 'beobachter', eigenerEinsatz);
 

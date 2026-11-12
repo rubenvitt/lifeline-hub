@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Betroffene ohne Freitexte auf dem Gerät (LFH-1095, Bedrohungsmodell 5 a).
 //
@@ -37,12 +38,8 @@ const FREITEXTE = {
 };
 const KOORDINATE = { antreff_lat: 53.0791, antreff_lon: 8.8017 };
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {

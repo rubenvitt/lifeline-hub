@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { kartenConfigBeantworten } from './kartenFixture';
 import { kartenpunktAufSeite } from './karten-pixel-kern';
 import { oeffneEbenenGruppe } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Gültigkeit der DWD-Warnungen auf der Lagekarte (LFH-662, Spec `lagekarte-fachebenen`):
@@ -118,11 +119,7 @@ test('DWD: abgelaufen fehlt, angekündigt gestrichelt, Inspector nennt „angek�
   await kartenConfigBeantworten(page, {});
   await dwdBeantworten(page);
 
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW, { startseite: false });
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E 662 DWD ${Date.now()}` },
   });

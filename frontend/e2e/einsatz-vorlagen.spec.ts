@@ -31,7 +31,7 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
   page,
 }) => {
   await page.setViewportSize(FUEKW);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   await page.goto('/einsaetze');
 
   const dialog = await einsatzDialogOeffnen(page);
@@ -65,7 +65,7 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
 });
 
 test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async ({ page }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const stichwort = `E2E-MANV-${Date.now()}`;
   const angelegt = await page.request.post('/api/stichwort-vorschlaege', {
     data: { text: stichwort },

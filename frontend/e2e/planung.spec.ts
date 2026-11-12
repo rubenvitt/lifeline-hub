@@ -7,6 +7,7 @@ import {
   wireZeit,
   zeitpunktAm,
 } from './planung-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Vorplanung ohne Einsatz (LLH-1586, Spec `vorplanung`): der ganze Weg über die Oberfläche gegen
@@ -20,12 +21,8 @@ import {
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Ein Tag eine Woche voraus als `TT.MM.JJ`: die Planung liegt in der Zukunft. */

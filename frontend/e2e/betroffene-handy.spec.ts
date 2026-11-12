@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Betroffene am Handschirm (LFH-963): Liste und Detail bei 390 × 844, das Detail auch bei 820
@@ -29,12 +30,8 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 
 test.use({ hasTouch: true });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Seeding per `page.request` (Cookie-Jar geteilt). Gibt die Id der Person zurück. */
@@ -241,8 +238,8 @@ test('Beobachter bei 390 px: Personenzeile und Sichtungszeile im ersten Bild, De
  */
 test('Admin bei 390 px: Nachsichtung in der Karte, Zeilenmenü in der Karte', async ({ page }) => {
   test.slow();
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene Karte ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Betroffene Karte ${Date.now()}`);
   await seedeLage(page, einsatzId);
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/personen`);
@@ -284,8 +281,8 @@ test('Admin bei 390 px: Nachsichtung in der Karte, Zeilenmenü in der Karte', as
 test('Gegenprobe bei 1180 px: Nebenwege als Knöpfe, Patientenkopf über den Personendaten', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene quer ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Betroffene quer ${Date.now()}`);
   const personId = await seedeLage(page, einsatzId);
 
   await page.setViewportSize(TABLET_QUER);

@@ -266,7 +266,7 @@ test('LLH-1048: Gerät an der Feldküche sieht die Turnhalle nicht und bucht an 
   // Zwei Kontexte und die Kopplungsmaske: lokal knapp unter dem Vorgabe-Budget von 30 s.
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1366, height: 768 });
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { id: e } = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Verpflegung an Stelle ${Date.now()}`,
   });

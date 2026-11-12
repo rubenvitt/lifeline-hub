@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { oeffneEbenenGruppe } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Sammelstellen der Evakuierungsbezirke auf der Lagekarte (LLH-1393) — Durchstich im echten
 // Renderer: steht die verortete Sammelstelle mit dem Zeichen „Sammelplatz für Betroffene“ in der
@@ -27,11 +28,7 @@ interface Bezirk {
 }
 
 async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, benutzer, passwort);
 }
 
 async function senden<T = { id: number }>(

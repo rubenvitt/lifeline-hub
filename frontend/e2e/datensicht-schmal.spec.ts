@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Das `Datensicht`-Primitiv am schmalen Schirm — gemessene Wirkung der Weiche (dass sie
@@ -58,12 +59,8 @@ const FUEKW = { width: 1366, height: 768 };
 /** Schlüssel aus `theme/ThemeModeProvider.tsx`, bewusst literal: der Wert ist Vertrag. */
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function anlegen(page: Page, einsatzId: string, pfad: string, data: unknown, was: string) {
@@ -120,8 +117,8 @@ async function seedeKraft(page: Page, einsatzId: string) {
 }
 
 test('LFH-464: Personal behält md auch im Bereich des neuen ETB-Umbruchs', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Default-Umbruch ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Default-Umbruch ${Date.now()}`);
   await seedeKraft(page, einsatzId);
   for (const breite of [767, 768, 991, 992, 1024, 1199, 1200, 1280]) {
     await page.setViewportSize({ width: breite, height: 900 });
@@ -136,8 +133,8 @@ test('LFH-464: Personal behält md auch im Bereich des neuen ETB-Umbruchs', asyn
 test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tabelle — Gegenprobe in beide Richtungen', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Datensicht Zweig ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Datensicht Zweig ${Date.now()}`);
   await seedeKraft(page, einsatzId);
 
   // ── 390 px: KARTENZWEIG
@@ -286,8 +283,8 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — I
   // Drei Dichtestufen mit je vier Seitenaufrufen samt Neuladen: unter Volllast reicht das
   // Vorgabebudget nicht.
   test.setTimeout(90_000);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Datensicht Dichte ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Datensicht Dichte ${Date.now()}`);
   await seedeKraft(page, einsatzId);
   // Der Status-Default `aktiv` deckt sich mit dem Standardreiter der Tierseite; ein anderer
   // fiele aus der Sicht.
@@ -395,8 +392,8 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
   page,
 }) => {
   await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Schalter Tastatur ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Schalter Tastatur ${Date.now()}`);
   await seedeKraft(page, einsatzId);
 
   await page.goto(`/einsaetze/${einsatzId}/personal`);

@@ -56,7 +56,7 @@ test('Mahlzeit in Stab-Schreibweise anlegen und den 29.03. aus dem Plan anlegen'
   page,
 }) => {
   test.setTimeout(90_000);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   try {
     // ── Verwaltung: „630“ wird 06:30, die Tabelle zeigt taktisch ────────────────────────
     await page.goto('/admin/stammdaten/verpflegungsplan');
@@ -127,7 +127,7 @@ test('390 px im Handschuh-Betrieb: Tag aus Vorlage und Verpflegungsplan ohne waa
   page,
 }) => {
   test.setTimeout(90_000);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   try {
     await senden(page, 'post', '/api/verpflegung-vorlagen', {
       bezeichnung: `Mittagessen mit einem langen Namen ${LAUF}`,

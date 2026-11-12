@@ -6,7 +6,8 @@ import {
   wechsleZuRolle,
 } from './rollen-kern';
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Einsatz-Einstellungen am Handschirm. Die Modulzeile stapelt unter `md`, damit das
@@ -43,12 +44,8 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 /** Ein Modul, dessen Zeile in JEDER Stufe da ist und dessen Name lang genug zum Drücken ist. */
 const MODUL = 'Einsatzabschnitte';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -114,7 +111,7 @@ test('die Modulzeile stapelt bei 390 px — und steht bei 1280 px nebeneinander'
   page,
 }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Modulzeile ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `Modulzeile ${Date.now()}`);
 
   async function lagen(): Promise<{ label: number; schalter: number }> {
     await page.goto(modulPfad(einsatzId));
@@ -149,8 +146,8 @@ test('die Modulzeile stapelt bei 390 px — und steht bei 1280 px nebeneinander'
  * eine Ordnung, die es nicht gibt.
  */
 test('die Spaltenköpfe stehen nur dort, wo es Spalten gibt', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Spaltenkopf ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `Spaltenkopf ${Date.now()}`);
 
   await page.setViewportSize(FUEKW);
   await page.goto(modulPfad(einsatzId));
@@ -167,8 +164,8 @@ for (const { dichte, soll } of STAFFEL) {
   test(`Stufe ${dichte}: die Modulzeile ist auf 390 px ein Ziel von ${soll} px`, async ({
     page,
   }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Modulziel ${dichte} ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `Modulziel ${dichte} ${Date.now()}`);
 
     await page.setViewportSize(HANDSCHIRM);
     await page.goto(modulPfad(einsatzId));
@@ -214,8 +211,8 @@ for (const [name, fenster] of [
   ['1280 px', FUEKW],
 ] as const) {
   test(`der Rollen-Auswähler bleibt auf ${name} breit genug zum Treffen`, async ({ page }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Rollenspalte ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `Rollenspalte ${Date.now()}`);
 
     await page.setViewportSize(fenster);
     await page.goto(modulPfad(einsatzId));

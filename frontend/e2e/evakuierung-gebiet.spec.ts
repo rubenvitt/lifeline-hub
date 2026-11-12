@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * LLH-1069: Evakuierungsbezirk mit Gebiet anlegen. Im Anlegedialog „Fläche zeichnen“ → die
@@ -10,12 +11,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const BEZIRK = 'Lindenstraße 1–20';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw', optionen);
 }
 
 async function senden<T = { id: number }>(page: Page, pfad: string, data: unknown): Promise<T> {
@@ -35,7 +32,7 @@ test('Bezirk mit Fläche anlegen: zeichnen, zuordnen, zurück zum Bezirk', async
   test.setTimeout(120_000);
   const seitenFehler: Error[] = [];
   page.on('pageerror', (f) => seitenFehler.push(f));
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Bezirk-Gebiet ${Date.now()}`,
   });
@@ -142,7 +139,7 @@ test('Bezirk mit Radius 500 m um den Einsatzort anlegen: Kreisfläche mit Zuordn
   test.setTimeout(120_000);
   const seitenFehler: Error[] = [];
   page.on('pageerror', (f) => seitenFehler.push(f));
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Bezirk-Radius ${Date.now()}`,
   });
