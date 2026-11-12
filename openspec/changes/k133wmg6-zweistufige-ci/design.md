@@ -1,0 +1,202 @@
+# Design
+
+## Context
+
+Motivation und Messung vorher: proposal.md, „Why“. Was die Lösung formt:
+
+- **Pflicht-Checks hängen am Namen und am Kopf-Commit.** Das Ruleset 17017911 verlangt unter
+  anderem `Schnellprüfungen`, `Rust-Suite`, `Frontend-Suite 1/4` bis `4/4`, `e2e-Binary` und
+  `e2e 1/4` bis `4/4`. Ein übersprungener Job **ohne** Matrix meldet sich unter seinem Namen als
+  `skipped` und erfüllt damit seinen Check. Ein per Job-`if` übersprungener **Matrix**-Job meldet
+  sich unter seinem unexpandierten Namen (`e2e ${{ matrix.shard }}/4`), der gerenderte Name fehlt
+  (Kopf von `ci.yml`). Gibt es zu einem Namen mehrere Check-Runs auf einem Commit, zählt der
+  jüngste.
+- **`ci.yml` bricht nur PR-Läufe ab** (`concurrency: ci-<ref>`, `cancel-in-progress` bei
+  `pull_request`). Jeder weitere Lauf desselben Workflows auf demselben PR bricht den laufenden ab.
+- **Der Release hängt in `ci.yml`** und nennt `schnell`, `rust`, `frontend`, `e2e` in `needs`.
+  `workflow_run` taugt nicht (semantic-release liest den Branch aus `GITHUB_REF`, Kopf von
+  `release.yml`).
+- **`pull_request` kennt die Ereignistypen `auto_merge_enabled`, `auto_merge_disabled`, `labeled`
+  und `unlabeled`.** Die Nutzlast trägt `pull_request.auto_merge` (Objekt oder `null`) und
+  `pull_request.labels` im Zustand **nach** dem Ereignis. Ein Lauf auf `pull_request` nimmt den
+  Workflow aus dem Merge-Commit von PR und Ziel-Branch; eine Änderung wirkt also auf alle offenen
+  PRs, sobald sie auf `alpha` liegt.
+- **Auto-Merge schalten Menschen ein.** Sitzungen mergen nicht; ein Label setzen dürfen sie.
+- **PR #1289 (LLH-1660)** zieht in `ci.yml` den Schritt „Nur umnummeriert?“ in den Job
+  `aenderungen` (`scripts/nur-umnummeriert.sh vorgaenger|gruen`) und bringt den Stau-Wächter
+  (`scripts/stau-waechter.sh`). `gruen` verlangt heute `Rust-Suite`, `Frontend-Suite k/4` und
+  `e2e k/4` gemeinsam. Diese Change setzt auf den Stand nach dem Merge auf.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Kein e2e-Job auf einem PR, der nicht fertig markiert ist; die zweite Stufe startet ohne neuen
+  Commit, sobald er es ist.
+- Keine Stelle, an der ein ungeprüfter Commit grüne e2e-Pflicht-Checks trägt.
+- Die e2e-Jobs stehen in genau einer Datei, für PR und Kanal-Branch.
+
+**Non-Goals:**
+
+- Den Zeitpunkt der ersten Stufe ändern (sie läuft weiter bei jedem Push).
+- Das Ruleset ändern oder Check-Namen umbenennen.
+- Die Merge Queue (LLH-1663) vorwegnehmen.
+
+## Decisions
+
+### D1 Die zweite Stufe ist ein eigener Workflow `e2e.yml`
+
+`e2e.yml` enthält die Jobs `aenderungen` (nur e2e-Auswahl), `binaer`, `e2e` (Matrix 1–4) und
+`berichte` (nur Playwright). Auslöser:
+
+- `pull_request` mit den Typen `opened`, `synchronize`, `reopened`, `auto_merge_enabled`,
+  `auto_merge_disabled`, `labeled`, `unlabeled`: die zweite Stufe für PRs.
+- `workflow_call`: `ci.yml` ruft ihn bei einem Push auf einen Kanal-Branch als Job `e2e` auf, und
+  `release` wartet darauf wie bisher.
+
+Im aufgerufenen Lauf ist `github.event_name` das Ereignis des Aufrufers (`push`). Bei Push heißen
+die Checks `e2e / e2e 1/4` usw.; auf Kanal-Branches verlangt das Ruleset keine Checks, also stört
+das Präfix nicht. Im PR heißen sie genau `e2e-Binary` und `e2e 1/4` bis `4/4`, weil der Workflow
+dort direkt läuft.
+
+Verworfen:
+
+- **Alles in `ci.yml`, mit den zusätzlichen Ereignistypen.** Das Einschalten von Auto-Merge
+  startete einen zweiten `ci.yml`-Lauf in derselben Nebenläufigkeitsgruppe und bräche den
+  laufenden ab (Rust mittendrin). Sollte der neue Lauf Schnellprüfungen und Rust überspringen,
+  meldete er sie als `skipped`, also als jüngsten und grünen Check-Run, auch über einem roten
+  (Lücke).
+- **Composite Action, e2e-Jobs in beiden Workflows.** Hält die Schritte einmal, aber die
+  Job-Definitionen (Bedingungen, Matrix, Artefakte, Bericht) doppelt. Der Aufruf als
+  wiederverwendbarer Workflow hält alles einmal. (In der Abstimmung am 12.11.2026 als „Composite
+  Action“ genannt; der Weg bleibt derselbe, nur das Mittel der Teilung ist ein anderes.)
+- **Kommentar `/e2e`** und **nur Label**: am Checkpoint mit Ruben verworfen.
+
+### D2 „Fertig“ steht als Ausdruck an den Jobs, nicht im Auslöser
+
+Die Bedingung an jedem Job der zweiten Stufe lautet sinngemäß:
+
+```
+github.event_name != 'pull_request'
+|| github.event.pull_request.auto_merge != null
+|| contains(github.event.pull_request.labels.*.name, 'e2e')
+```
+
+Sie liest den Zustand nach dem Ereignis. Ein Push auf einen fertigen PR (`synchronize`) startet
+die zweite Stufe also ohne eigenes Ereignis, ein Push auf einen PR in Arbeit lässt sie aus.
+
+### D3 Die Pflicht-Checks fehlen, weil beide Jobs Matrix-Jobs sind
+
+- `e2e` ist schon eine Matrix (`shard: [1, 2, 3, 4]`). Bisher trug er die Bedingung „e2e
+  betroffen“ an jedem Schritt (leer grün). Neu steht „fertig“ als Job-`if`, „e2e betroffen“
+  bleibt an den Schritten. Nicht fertig: unexpandierter Name, die gerenderten Checks fehlen.
+  Fertig, aber nicht betroffen: leer grün wie bisher.
+- `binaer` bekommt eine Matrix mit einem Eintrag, aus dem der Name entsteht
+  (`name: ${{ matrix.check }}`, `check: [e2e-Binary]`). Nicht fertig: Check-Run
+  `${{ matrix.check }}`, `e2e-Binary` fehlt. Fertig, aber nicht betroffen: Job-`if` wie bisher
+  ersetzt durch Schritt-Bedingungen, damit er leer grün meldet, statt als übersprungen unter dem
+  unexpandierten Namen zu fehlen.
+- Die `e2e`-Anteile laufen weiter nur bei grünem oder leerem Binary; ein rotes Binary lässt sie
+  per Job-`if` aus, also fehlen sie.
+- In `ci.yml` entfallen `binaer` und `e2e` als eigene Jobs; der Aufruf-Job `e2e` hat
+  `if: github.event_name == 'push'`. Sein Name enthält keinen Pflicht-Check-Namen, ein
+  übersprungener Aufruf erfüllt also nichts.
+
+Ein Selbsttest prüft die Workflows auf diese Form (D7), weil ein falsch gesetztes `if` sonst erst
+am ersten ungeprüft gemergten PR auffiele.
+
+### D4 Die Nebenläufigkeit unterscheidet umschaltende von bedeutungslosen Ereignissen
+
+`concurrency` von `e2e.yml` (`cancel-in-progress` nur im PR):
+
+- Gemeinsame Gruppe `e2e-pr-<nummer>` für Ereignisse, die den gewünschten Zustand ändern: neue
+  Commits (`opened`, `synchronize`, `reopened`), `auto_merge_enabled`, `labeled`/`unlabeled` mit
+  dem Label `e2e`, `auto_merge_disabled`. Ein neuer Lauf bricht den alten ab; ist der PR danach
+  nicht fertig, überspringt der neue Lauf alles, und der alte ist trotzdem beendet. So bricht
+  „Auto-Merge aus“ einen laufenden e2e-Lauf ab.
+- Eigene Gruppe je Lauf (`run_id`) für alles andere: ein fremdes Label, und `unlabeled e2e` oder
+  `auto_merge_disabled`, wenn der PR danach weiter fertig ist. Die bremsen keinen laufenden
+  e2e-Lauf.
+- Aufruf aus `ci.yml` (Push): eigene Gruppe je Lauf; die Nebenläufigkeit regelt dort `ci.yml`.
+
+Bekannte Verschwendung: Wird Auto-Merge eingeschaltet, während ein Lauf über das Label schon
+läuft, beginnt er neu. Selten; das Label ist für Läufe ohne Merge gedacht.
+
+### D5 Die Auswahl der Suiten wird ein Skript, das beide Workflows fragen
+
+Die Logik des Jobs `aenderungen` (nach #1289: Umnummerierung prüfen, sonst `bereiche.sh` auf den
+Diff) zieht nach `scripts/ci-auswahl.sh <stufe>` um. `stufe` ist `eins` (rust, frontend) oder
+`zwei` (e2e). Das Skript liest Ereignis, Kopf-Commit und Repository aus der Umgebung, holt
+Check-Runs über eine einzige Funktion (im Selbsttest ersetzt, Muster des Stau-Wächters) und
+schreibt die Zeilen für `$GITHUB_OUTPUT`. Push-Läufe bekommen alles. Jeder Fehler fällt auf „alles
+läuft“ zurück. Beide Workflows rufen es, keiner trägt die Logik inline.
+
+### D6 Die Umnummerierung entscheidet je Suite
+
+`nur-umnummeriert.sh gruen` bekommt die Suite als Argument (`frontend` oder `e2e`) und prüft nur
+deren Checks am Vorgänger: `Frontend-Suite 1/4` bis `4/4` bzw. `e2e-Binary` und `e2e 1/4` bis
+`4/4`, jeweils `success` oder `skipped` mit gerendertem Namen. Die Rust-Suite läuft weiter immer
+neu und wird nicht mehr abgefragt. Ein Vorgänger ohne e2e-Lauf lässt so nur die e2e-Übernahme
+scheitern, nicht die der Frontend-Suite. In der zweiten Stufe fehlen die e2e-Checks ohnehin, bis
+der PR fertig ist; ist er fertig und war e2e am Vorgänger grün, meldet die zweite Stufe leer grün.
+
+### D7 Selbsttests statt Vertrauen in YAML
+
+- `scripts/ci-auswahl.test.sh`: Stufe eins und zwei, Push, PR mit Diff, reine Umnummerierung mit
+  grünem, rotem und fehlendem Vorgänger je Suite, Fehler der Abfrage.
+- `scripts/ci-stufen.test.sh` (oder ein Fall in einem bestehenden Workflow-Test): liest
+  `ci.yml` und `e2e.yml` und prüft die Form aus D3 (Matrix an `binaer` und `e2e`, Fertig-Bedingung
+  als Job-`if`, kein Job in `ci.yml` mit einem Pflicht-Check-Namen der zweiten Stufe, `release`
+  nennt den Aufruf-Job). Mit `yq`, falls vorhanden, sonst Node mit dem YAML-Parser des Frontends.
+- Beide hängen an Schritt 11 von `check-all.sh` (Selbsttests der Gate-Skripte).
+- Mutationsproben am Ende: Job-`if` an `e2e` entfernen, Matrix an `binaer` entfernen,
+  `gruen e2e` auf Frontend-Checks verbiegen; die Tests müssen sie töten.
+
+### D8 Der Stau-Wächter meldet „Auto-Merge an, e2e fehlt“
+
+`stau-waechter.sh` bekommt einen vierten Befund neben Konflikt, fehlender CI und
+„grün, nicht gemergt“: Auto-Merge an, kein Check-Run eines e2e-Anteils auf dem Kopf-Commit,
+Wartezeit 20 Minuten. Die Uhr läuft ab dem späteren von (a) frühestem Check-Run des Kopf-Commits
+und (b) dem Zeitpunkt, zu dem Auto-Merge eingeschaltet wurde (Ereignis
+`auto_merge_enabled` der PR-Zeitleiste; fehlt es, gilt `updated_at` des PRs). Der Hinweis nennt
+den Handgriff: Auto-Merge aus- und wieder einschalten oder das Label `e2e` setzen. Kein Push.
+
+### D9 Messung als Skript
+
+`scripts/ci-messung.sh --von <zeit> --bis <zeit>` fragt über `gh api` die Läufe von `ci.yml` und
+`e2e.yml` mit Ereignis `pull_request` im Zeitraum ab und gibt je PR (Kopf-Branch) eine Zeile aus:
+Läufe, davon abgebrochen/rot/grün, gestartete Jobs (ohne `skipped`), Job-Minuten. Dazu eine
+Summenzeile. Die Messung vorher (proposal.md) entstand von Hand über dieselbe API; das Skript
+rechnet sie für den Vergleich nach. Selbsttest mit eingespielten API-Antworten.
+
+## Risks / Trade-offs
+
+- [Ein roter e2e-Fall fällt erst nach dem Einschalten von Auto-Merge auf, eine Stunde später als
+  heute] → Gewollter Tausch. Wer früher Rückmeldung will, setzt das Label `e2e` oder fährt
+  `check-all.sh --geaendert` lokal; das steht in `scripts/AGENTS.md` und in
+  `dev-zunder-ausfuehren`.
+- [GitHub schaltet Auto-Merge nach einem Push der Release-App (Autofix, Stau-Wächter) aus] →
+  Laut Doku nur bei Pushes ohne Schreibrecht; die App hat es. Nicht gemessen. Passiert es, fehlen
+  die e2e-Checks sichtbar, der PR mergt nicht; am ersten echten Fall prüfen.
+- [Der unexpandierte Name eines übersprungenen Matrix-Jobs zählt eines Tages als erfüllt oder
+  wird anders gerendert] → Dasselbe Verhalten trägt heute schon die Frontend-Suite; der
+  Selbsttest hält die Form fest, und Auto-Merge an einem frischen PR zeigt es sofort.
+- [Ein Ereignis kommt nicht an (Ausfall bei GitHub), Auto-Merge wartet für immer] → Befund D8
+  des Stau-Wächters.
+- [Die Check-Liste eines PRs zeigt Einträge wie `e2e ${{ matrix.shard }}/4` als übersprungen] →
+  Kosmetisch, heute schon bei der Frontend-Suite so; der Kopf von `e2e.yml` erklärt es.
+- [#1289 ändert sich im Review noch] → Die Umsetzung beginnt erst nach dessen Merge und baut auf
+  `alpha` auf; Abweichungen fließen per `/opsx:update` ein.
+
+## Migration Plan
+
+Ein PR gegen `alpha`, nach dem Merge von #1289. Ab dem Merge gilt die neue Form für jedes
+PR-Ereignis, weil `pull_request` den Workflow aus dem Merge mit `alpha` nimmt. Offene PRs mit
+Auto-Merge brauchen nach dem Merge einmal Aus- und Einschalten oder einen Push, damit die zweite
+Stufe startet; der Wächter (D8) weist darauf hin. Rückweg: `e2e.yml` entfernen und `binaer`/`e2e`
+in `ci.yml` wiederherstellen (ein Revert). Einen Tag nach dem Merge misst die Folgeaufgabe mit
+`scripts/ci-messung.sh` über denselben Zeitraum-Typ (ein Werktag) nach.
+
+Die Artefakte der e2e-Jobs (`lifeline-hub-debug`, `playwright-blob-k`, `e2e-laufzeiten`,
+`playwright-report-versuch-n`) liest kein anderer Workflow (geprüft 12.11.2026); ihr Umzug nach
+`e2e.yml` braucht keine Nachzüge.
