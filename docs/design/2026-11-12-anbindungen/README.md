@@ -30,3 +30,11 @@ Systemschrift zurück.
 - **Schlüsselwechsel** zeigt beide Fingerabdrücke, bis der neue zum ersten Mal signiert.
 - **Am gekoppelten ELW** ist Anlegen gesperrt (`RechteHinweis`), ein Band nennt den Hub.
 - Widerrufene Zugänge bleiben gedämpft in der Liste.
+
+## Abweichungen der Umsetzung
+
+- **Keine eigene Ansicht je Zugang.** Die Liste trägt Rechte, Zustand, Fingerabdrücke, „zuletzt
+  genutzt“ und die letzte Ablehnung je Eintrag; Bearbeiten (drei Felder) läuft im
+  Erfassungsdialog, „Neuer Code“ und Widerruf im Zeilenmenü (UI-Form-Leitlinie: Modal bis drei
+  Felder). Die Zeichenfläche `Ansicht.dc.html` bleibt als Richtung, falls weitere Angaben dazukommen.
+- Die Liste ist eine `Liste` wie bei den Lagemonitoren, keine Tabelle.

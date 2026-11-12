@@ -150,10 +150,10 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   `docs/design/<datum>-anbindungen/` (`frontend/AGENTS.md`, „Größere UI-Entwürfe über das Design
   System“). Verifizieren: Der Entwurf zeigt Liste, Anlegen, Code-Dialog, Ablehnungsgrund und den
   gesperrten Zustand (D10).
-- [ ] 7.2 API-Modul `frontend/src/api/anbindungen.ts` und Query-Key `globalKeys.anbindungen` in
+- [x] 7.2 API-Modul `frontend/src/api/anbindungen.ts` und Query-Key `globalKeys.anbindungen` in
   `NICHT_LIVE_GLOBAL_KEYS`. Verifizieren: `globalKeys.test.ts` ist grün, und der Wire-String ist
   eingefroren.
-- [ ] 7.3 Seite `frontend/src/pages/einstellungen/Anbindungen.tsx` und Sektion `anbindungen` in
+- [x] 7.3 Seite `frontend/src/pages/einstellungen/Anbindungen.tsx` und Sektion `anbindungen` in
   `adminNav.tsx`:
   - Liste, Anlegen im `ErfassungsModal`, Code-Dialog;
   - Ändern in der Ansicht, Widerruf, neuer Code;

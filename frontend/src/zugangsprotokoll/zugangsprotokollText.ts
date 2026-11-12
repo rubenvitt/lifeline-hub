@@ -1,4 +1,5 @@
 import type { AdminAktion, AnmeldeEreignis, Anmeldeweg, ZugangsAngaben } from '../api/types';
+import { scopeText } from '../api/anbindungen';
 import {
   ORG_ROLLE_FELD,
   ORG_ROLLE_TEXT,
@@ -131,6 +132,12 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
   const teile = [
     a.fremde_org ? `Org dort: ${a.fremde_org}` : null,
     a.fingerabdruck ? `Fingerabdruck ${a.fingerabdruck}` : null,
+    // Schlüsselwechsel einer Anbindung (LLH-1652): der abgelöste Schlüssel.
+    a.fingerabdruck_vorher ? `vorher ${a.fingerabdruck_vorher}` : null,
+    // Rechte einer Anbindung (LLH-1652), bei einer Änderung vorher → nachher.
+    a.scopes
+      ? `Rechte: ${a.scopes_vorher ? `${a.scopes_vorher.map(scopeText).join(', ')} → ` : ''}${a.scopes.map(scopeText).join(', ')}`
+      : null,
     a.adresse ?? null,
     a.grund ? `Grund: ${a.grund}` : null,
     // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.
