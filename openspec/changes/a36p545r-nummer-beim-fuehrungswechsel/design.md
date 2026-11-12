@@ -134,10 +134,18 @@ Verwahrung. `instanz-fuehrung` bleibt unverändert.
 ## Risks / Trade-offs
 
 - **Bruchstelle nach zurückgewiesener Notübernahme** → Weist die meldende Seite eine Notübernahme
-  zurück (falscher Code, Widerspruch), fällt die übernehmende Seite zum Spiegel zurück. Der
-  Systemeintrag zur Nummer ist dann eine eigene Änderung, die der Führer nicht kennt, und wird als
-  Bruchstelle gesichert. Bewusst hingenommen (12.11.2026); die Nummer selbst kommt mit dem Kopf des
-  Führers zurück. Ein Test hält fest, dass der Rückfall bei umnummeriertem Einsatz gelingt.
+  zurück (Widerspruch), fällt die übernehmende Seite zum Spiegel zurück. Der Systemeintrag zur
+  Nummer ist dann eine eigene Änderung, die der Führer nicht kennt, und wird als Bruchstelle
+  gesichert; die Nummer kommt mit dem nächsten Kopf des Führers zurück (Test
+  `nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw`).
+  **Nachtrag aus der Umsetzung (12.11.2026):** Diese Bruchstelle wird heute nie geklärt, wenn der
+  Führer den Einsatz selbst nie gespiegelt hat (`beantworte_bruch` antwortet `kennt: false`). Die
+  Zeile bleibt am Spiegel stehen, und ein späterer ETB-Eintrag des Führers mit derselben laufenden
+  Nummer kommt dort nicht an. Der Fehler besteht unabhängig von dieser Change für jede Erfassung
+  der übernehmenden Seite (ohne die Change nachgestellt) und ist LLH-1854. Mit Ruben abgestimmt:
+  Der Systemeintrag bleibt, LLH-1854 behebt die Bruchstelle. Bis dahin läuft auch eine
+  umnummerierte Notübernahme ohne weitere Erfassung in diesen Fehler, sobald ihr widersprochen
+  wird; ohne die Change scheiterte derselbe Fall schon an der Notübernahme selbst.
 - **Die Nummer eines Einsatzes kann mehrfach wechseln** (hin und zurück bei beidseitig belegten
   Nummern) → selten, jede Änderung steht im Einsatztagebuch; abgestimmte Nummernkreise bleiben als
   R30 offen.

@@ -362,6 +362,10 @@ Sonst legt der Spiegel eine Kopie als Sprechgruppe des Einsatzes an. Nur diese K
 
 Einsatznummern vergibt jede Installation selbst. Ein Spiegel trägt die Nummer der Installation,
 die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen wie ein Spiegel.
+Wechselt die Führung und hat die übernehmende Installation die Nummer schon selbst vergeben,
+bekommt der übernommene Einsatz dort die nächste freie Nummer. Sein Einsatztagebuch nennt dann
+„Neue Einsatznummer …, bisher …“, und die abgebende Installation zeigt die neue Nummer nach dem
+nächsten Abgleich. Geht die Führung später zurück, kehrt die frühere Nummer nicht wieder.
 
 Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
 das Quittieren gelten nur dort.

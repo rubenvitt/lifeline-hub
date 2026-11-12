@@ -49,7 +49,8 @@ async fn elw_meldet(elw: &Instanz) {
 
 /// Hub und ELW gekoppelt, Führung an, ein Einsatz des ELW am Hub gespiegelt. Der Hub legt vorher
 /// zwei eigene Einsätze an, damit sich die Einsatz-IDs beider Seiten auf dem gemeinsamen
-/// Verteiler nicht decken. Liefert (Hub, ELW, Verteiler, Einsatz am ELW, Akte am Hub).
+/// Verteiler nicht decken; der erste trägt dieselbe Nummer wie der Einsatz des ELW (LLH-1703).
+/// Liefert (Hub, ELW, Verteiler, Einsatz am ELW, Akte am Hub).
 async fn setup() -> (Instanz, Instanz, LiveHub, i64, i64) {
     let live = live_hub();
     let elw = instanz().await;
@@ -61,18 +62,8 @@ async fn setup() -> (Instanz, Instanz, LiveHub, i64, i64) {
     }
     schluessel(&hub).await;
     koppeln(&hub, &elw).await;
-    // Eigene Nummern weit weg von denen des ELW: Eine Notübernahme macht den Spiegel zum eigenen
-    // Einsatz, und dessen Nummer muss am Hub frei sein.
     for _ in 0..2 {
-        let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
-        exec(
-            &hub.pool,
-            &format!(
-                "UPDATE einsatz SET nummer_lfd = 900 + id, \
-                 einsatznummer_intern = 'E-2026-0' || (900 + id) WHERE id = {h}"
-            ),
-        )
-        .await;
+        common::einsatz_anlegen(&hub.app, &hub.admin).await;
     }
     let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
     elw_meldet(&elw).await;
@@ -170,38 +161,34 @@ async fn bestaetigung_des_gegenuebers_meldet_den_einsatzkopf_am_hub() {
     assert!(has_kopf(&mut rx), "der Wechsel meldet den Einsatzkopf");
 }
 
-/// LLH-1703 (Nachstellen): Hub und ELW haben je einen eigenen Einsatz mit derselben Nummer.
+/// Hub und ELW zählen ihre Einsatznummern unabhängig ab 1. Übernimmt der Hub die Führung, wird
+/// sein Spiegel zum eigenen Einsatz und bekommt eine freie Nummer, statt an der Eindeutigkeit zu
+/// scheitern (LLH-1703, Spec `einsatznummer`). Der ELW zeigt sie nach dem nächsten Abgleich.
 #[tokio::test]
 async fn notuebernahme_bei_gleicher_einsatznummer() {
     let _serial = lock_serial().await;
-    let live = live_hub();
-    let _ = live;
-    let elw = instanz().await;
-    let hub = instanz().await;
-    for i in [&hub, &elw] {
-        lifeline_hub::instanz::fuehrung::save_schalter(&i.pool, true)
-            .await
-            .unwrap();
-    }
-    schluessel(&hub).await;
-    koppeln(&hub, &elw).await;
-    for _ in 0..2 {
-        common::einsatz_anlegen(&hub.app, &hub.admin).await;
-    }
-    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
-    elw_meldet(&elw).await;
-    let akte: i64 = eine(
-        &hub.pool,
-        "SELECT id FROM einsatz_fuehrung WHERE kennung NOT LIKE \
-         (SELECT kennung FROM instanz_identitaet) || '/%'",
-    )
-    .await;
-    let nummern: Vec<(i64, String, i64)> =
-        sqlx::query_as("SELECT id, einsatznummer_intern, spiegel FROM einsatz ORDER BY id")
-            .fetch_all(&hub.pool)
-            .await
-            .unwrap();
-    eprintln!("Hub vorher: {nummern:?}");
+    let (hub, elw, _live, e, akte) = setup().await;
+    let nummern = |pool: sqlx::SqlitePool| async move {
+        sqlx::query_as::<_, (String, bool)>(
+            "SELECT einsatznummer_intern, spiegel = 1 FROM einsatz ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap()
+    };
+    let vorher = nummern(hub.pool.clone()).await;
+    let alt = vorher[0].0.clone();
+    let (kopf, _) = alt.rsplit_once('-').unwrap();
+    let (zweite, neu) = (format!("{kopf}-0002"), format!("{kopf}-0003"));
+    assert_eq!(
+        vorher,
+        vec![
+            (alt.clone(), false),
+            (zweite.clone(), false),
+            (alt.clone(), true)
+        ],
+        "zwei eigene Einsätze und der Spiegel mit der Nummer des ersten"
+    );
     let (s, v) = post(
         &elw,
         &format!("/api/einsaetze/{e}/fuehrung/code"),
@@ -216,4 +203,49 @@ async fn notuebernahme_bei_gleicher_einsatznummer() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        nummern(hub.pool.clone()).await,
+        vec![(alt.clone(), false), (zweite, false), (neu.clone(), false)],
+        "der übernommene Einsatz ist eigen und trägt die nächste freie Nummer"
+    );
+    let h: i64 = eine(
+        &hub.pool,
+        &format!("SELECT einsatz_id FROM einsatz_fuehrung WHERE id = {akte}"),
+    )
+    .await;
+    let eintraege: Vec<String> = sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+         AND inhalt LIKE 'Neue Einsatznummer %'",
+    )
+    .bind(h)
+    .fetch_all(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    assert!(
+        eintraege[0].contains(&neu) && eintraege[0].contains(&alt),
+        "{eintraege:?}"
+    );
+    // Der ELW bestätigt den Code, wird Spiegel und bekommt den Kopf vom Hub.
+    for _ in 0..2 {
+        elw_meldet(&elw).await;
+    }
+    let am_elw: (String, bool) =
+        sqlx::query_as("SELECT einsatznummer_intern, spiegel = 1 FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert_eq!(am_elw, (neu.clone(), true), "der Spiegel am ELW folgt");
+    for i in [&hub, &elw] {
+        let akte_nummer: Option<String> = sqlx::query_scalar(
+            "SELECT f.nummer FROM einsatz_fuehrung f JOIN einsatz e ON e.id = f.einsatz_id \
+             WHERE e.einsatznummer_intern = ?",
+        )
+        .bind(&neu)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap();
+        assert_eq!(akte_nummer.as_deref(), Some(neu.as_str()), "Akte folgt");
+    }
 }
