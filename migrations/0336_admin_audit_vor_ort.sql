@@ -1,8 +1,8 @@
 -- LLH-1497 (Change t10a7luh-elw-lan-direktkopplung, design.md D3, D6): Admin-Spur der
 -- Direktkopplung vor Ort. Neu im aktion-CHECK 'instanz_zertifikat_gewechselt' (die Gegenstelle
 -- zeigt ein neues, signiert beglaubigtes TLS-Zertifikat) und 'instanz_adresse_geaendert' (im LAN
--- unter neuer Adresse gefunden). Rebuild nach Muster der Archiv-Spur (LLH-1494, Teil 2); die
--- Liste übernimmt alles bis dahin. In einer Transaktion wie dort.
+-- unter neuer Adresse gefunden). Rebuild nach Muster 0330/0334 (in einer Transaktion); die Liste
+-- übernimmt alles bis 0334 (Maschinenzugang, LLH-1652).
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     zeitpunkt        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -23,6 +23,9 @@ CREATE TABLE admin_audit_neu (
                          'fuehrung_verworfen', 'fuehrung_widerspruch',
                          'archiv_schluessel_eingetragen', 'archiv_schluessel_geprueft',
                          'archiv_schluessel_entfernt', 'archiv_heruntergeladen',
+                         'maschinenzugang_angelegt', 'maschinenzugang_code_ausgestellt',
+                         'maschinenzugang_schluessel_gebunden', 'maschinenzugang_geaendert',
+                         'maschinenzugang_widerrufen',
                          'instanz_zertifikat_gewechselt', 'instanz_adresse_geaendert')),
     akteur_id        INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     akteur_name      TEXT,

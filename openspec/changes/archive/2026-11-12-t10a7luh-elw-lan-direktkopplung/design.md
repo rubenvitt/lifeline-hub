@@ -349,8 +349,9 @@ ADR-0029 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   auslöst, trägt noch den alten Pin; „Zertifikat bestätigt“ zeigt die erreichte Seite ab der
   nächsten Meldung.
 - **12.11.2026, Admin-Spur.** Zwei neue Aktionen (`instanz_zertifikat_gewechselt`,
-  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0334; sie baut auf der Archiv-Spur von
-  `alpha`, 0330, auf, damit deren Aktionen im CHECK bleiben).
+  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0336; sie baut
+  auf dem Neubau des Maschinenzugangs von `alpha`, 0334, auf, damit dessen Aktionen und die der
+  Archiv-Spur im CHECK bleiben).
 - **12.11.2026, D4: eigene reine Funktion statt Parameter.** Die Regel steht als
   `austausch::entscheide_vor_ort(bisher, neu, sender, ich)` neben `entscheide`, nicht als
   zusätzlicher Parameter: Sie gilt vor allen richtungsabhängigen Zweigen und unabhängig von der
@@ -397,6 +398,7 @@ ADR-0029 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   Tooltip). Die Liste „Im Netz gefunden“ sucht auf Knopfdruck als Mutation, ohne eigenen
   Query-Key: sie ist ein einmaliger Abruf, kein Zustand der Seite.
 - **12.11.2026, Migrationen umgelegt.** `alpha` brachte 0329/0330 (Archiv, LLH-1494); die
-  Migrationen dieser Change liegen jetzt auf 0333 (Art, Zertifikat), 0334 (Spur) und 0335
-  (Ursprung); 0331 und 0332 brachte `alpha` später noch (Bruchstelle LLH-1657, Hinweise LLH-1495). Der Neubau von
+  Migrationen dieser Change liegen jetzt auf 0335 (Art, Zertifikat), 0336 (Spur) und 0337
+  (Ursprung); 0331 bis 0334 brachte `alpha` später noch (Bruchstelle LLH-1657, Hinweise LLH-1495,
+  Maschinenzugang LLH-1652 samt eigenem Neubau von `admin_audit`, dessen Aktionen 0336 übernimmt). Der Neubau von
   `admin_audit` übernimmt die Liste aus `alpha` samt der vier Archiv-Aktionen.
