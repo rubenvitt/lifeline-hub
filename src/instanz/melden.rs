@@ -332,6 +332,63 @@ pub async fn save_neues_zertifikat(
     Ok(())
 }
 
+/// Sucht die Gegenstelle einer Direktkopplung im LAN unter neuer Adresse (LLH-1497, design.md
+/// D6). Eine Adresse gilt erst, wenn dort die signierte Aussage über das Zertifikat kommt; dann
+/// werden Adresse (und ein neuer Pin) gespeichert und in die Admin-Spur geschrieben.
+/// `Err(Some(fehler))`: eine Adresse antwortete, aber nicht gültig; `Err(None)`: nichts gefunden.
+async fn neu_aufloesen(
+    pool: &SqlitePool,
+    identitaet: &Identitaet,
+    kopplung: &KopplungZeile,
+) -> Result<Result<KopplungZeile, Option<SendError>>, AppError> {
+    if !super::entdeckung::is_an(pool).await? {
+        return Ok(Err(None));
+    }
+    let gefunden = super::entdeckung::suche_kennung(
+        pool,
+        &kopplung.gegenueber_kennung,
+        super::entdeckung::SUCHDAUER,
+    )
+    .await?;
+    let mut letzter = None;
+    for adresse in gefunden {
+        let Ok(adresse) = normalize_adresse(&adresse) else {
+            continue;
+        };
+        if kopplung.gegenueber_adresse.as_deref() == Some(adresse.as_str()) {
+            continue;
+        }
+        let mut k = kopplung.clone();
+        k.gegenueber_adresse = Some(adresse.clone());
+        match bestaetige_zertifikat(identitaet, &k).await {
+            Ok(fp) => {
+                let orgs = {
+                    let mut conn = pool.acquire().await?;
+                    repo::save_adresse(&mut conn, kopplung.id, &adresse).await?;
+                    repo::list_orgs_aktiv(&mut conn, kopplung.id).await?
+                };
+                save_neues_zertifikat(pool, kopplung, &fp).await?;
+                for o in orgs {
+                    admin_audit::schreibe_ohne_akteur(
+                        pool,
+                        AdminAktion::InstanzAdresseGeaendert,
+                        o.org_id,
+                        &kopplung.gegenueber_name,
+                        Ziel::Instanz(&kopplung.gegenueber_name),
+                        Some(build_angaben_gegenstelle(&k, &o.fremde_org_name)),
+                        None,
+                    )
+                    .await;
+                }
+                k.tls_zertifikat = Some(fp);
+                return Ok(Ok(k));
+            }
+            Err(e) => letzter = Some(e),
+        }
+    }
+    Ok(Err(letzter))
+}
+
 async fn send_signed_einmal<A: Serialize, T: DeserializeOwned>(
     identitaet: &Identitaet,
     kopplung: &KopplungZeile,
@@ -610,6 +667,20 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     }) {
         Ok(a) => a,
         Err(f) => {
+            // Direktkopplung nicht erreichbar: die Gegenstelle im LAN unter ihrer Kennung suchen
+            // (LLH-1497, Spec `instanz-entdeckung`). Gefunden und signiert bestätigt, gleich dort
+            // melden; das Neuauflösen findet die dann gespeicherte Adresse nicht noch einmal.
+            let f = if matches!(f, SendError::Netz(_))
+                && kopplung.art() == super::InstanzKopplungArt::VorOrt
+            {
+                match neu_aufloesen(pool, &identitaet, kopplung).await? {
+                    Ok(neu) => return Box::pin(melden_einmal(pool, &neu)).await,
+                    Err(Some(probe)) => probe,
+                    Err(None) => f,
+                }
+            } else {
+                f
+            };
             let abstand = next_abstand(abstand_s(), kopplung.fehlversuche as u32 + 1);
             let naechste = add_sekunden(&jetzt, abstand as i64).unwrap_or(jetzt);
             tracing::warn!(kopplung = kopplung.id, fehler = %f, "Meldung bei gekoppelter Instanz gescheitert");

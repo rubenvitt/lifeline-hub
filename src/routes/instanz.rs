@@ -819,6 +819,38 @@ pub async fn melden(
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
+/// Antwort von `GET /api/admin/instanz/lan`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InstanzLanAntwort {
+    /// Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`).
+    pub aus: bool,
+    #[schema(required)]
+    pub gefunden: Vec<crate::instanz::entdeckung::InstanzGefunden>,
+}
+
+/// GET /api/admin/instanz/lan — sucht einige Sekunden nach angekündigten Instanzen im lokalen
+/// Netz (LLH-1497, Spec `instanz-entdeckung`, „Liste „Im Netz gefunden“ beim Einlösen“). Nur für
+/// Admins; eine Ankündigung begründet kein Vertrauen.
+pub async fn lan(
+    State(state): State<AppState>,
+    AdminUser(_admin): AdminUser,
+) -> Result<Json<InstanzLanAntwort>, AppError> {
+    if !crate::instanz::entdeckung::is_an(&state.pool).await? {
+        return Ok(Json(InstanzLanAntwort {
+            aus: true,
+            gefunden: Vec::new(),
+        }));
+    }
+    Ok(Json(InstanzLanAntwort {
+        aus: false,
+        gefunden: crate::instanz::entdeckung::suche(
+            &state.pool,
+            crate::instanz::entdeckung::SUCHDAUER,
+        )
+        .await?,
+    }))
+}
+
 /// POST /api/instanz/zertifikat — signierte Aussage über das eigene TLS-Zertifikat für die
 /// meldende Seite einer Direktkopplung (LLH-1497, design.md D3). Ohne Nutzdaten; die meldende
 /// Seite vergleicht die Aussage mit dem Zertifikat, das sie gesehen hat.

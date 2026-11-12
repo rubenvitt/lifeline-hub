@@ -1176,3 +1176,21 @@ pub async fn save_tls_zertifikat_gemeldet(
         .await?;
     Ok(())
 }
+
+/// Meldende Seite einer Direktkopplung: neue Adresse der Gegenstelle, im LAN gefunden und signiert
+/// bestätigt (LLH-1497, design.md D6).
+pub async fn save_adresse(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    adresse: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE instanz_kopplung SET gegenueber_adresse = ? \
+         WHERE id = ? AND richtung = 'meldet_sich'",
+    )
+    .bind(adresse)
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}

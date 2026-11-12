@@ -383,3 +383,13 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   unbekannte Felder; die neuen sind optional und fehlen leer. Belegt per Unit-Test
   (`spiegel::tests::die_neuen_felder_sind_optional_und_fehlen_leer_auf_der_leitung`); eine
   Gegenseite mit Protokoll 2 lässt sich im selben Binary nicht starten.
+- **12.11.2026, D6: Neuauflösen über die Aussage zum Zertifikat.** Eine neu gefundene Adresse
+  prüft `melden` mit der signierten Rückfrage `POST /api/instanz/zertifikat` (ohne Nutzdaten),
+  nicht mit der Meldung selbst; erst danach gelten Adresse und gegebenenfalls ein neuer Pin, und
+  die Meldung geht gleich dorthin. Antwortet dort niemand gültig, bleibt die alte Adresse, und die
+  Kopplung zeigt den Fehler der Rückfrage („Antwort ungültig“).
+- **12.11.2026, D6: Version und Multicast.** `mdns-sd` ist auf 0.21.6 (19.10.2026) gepinnt;
+  0.21.7 war jünger als zwei Wochen. Der Test mit zwei echten Daemons
+  (`entdeckung::tests::zwei_daemons_finden_einander`) lief in der Cloud-Sitzung grün, steht aber
+  mit `#[ignore]`, weil Multicast in CI-Runnern nicht sicher ist; die Integrationstests nutzen die
+  Naht `Sucher`.

@@ -29,6 +29,10 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "rus
 # und derselbe Provider (aws-lc-rs), die reqwest mitbringt; kein zweiter Provider.
 rustls = { version = "0.23", default-features = false, features = ["std", "aws_lc_rs"] }
 rustls-pki-types = { version = "1", features = ["std"] }
+# LAN-Entdeckung der Direktkopplung (LLH-1497, `src/instanz/entdeckung.rs`): mDNS/DNS-SD in
+# reinem Rust mit eigenem Thread, ohne Avahi/Bonjour. Ohne Vorgabe-Features (kein async über
+# flume, kein `log`); fest gepinnt, Version älter als zwei Wochen.
+mdns-sd = { version = "=0.21.6", default-features = false }
 futures = "0.3"
 tracing = "0.1"
 # Nicht blockierendes Log auf stdout (LFH-925, `src/main.rs`).

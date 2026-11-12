@@ -1951,6 +1951,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/instanz/kopplungen/{id}/verloren",
             post(routes::instanz::elw_verloren),
         )
+        // LAN-Entdeckung (LLH-1497): Liste „Im Netz gefunden“.
+        .route("/api/admin/instanz/lan", get(routes::instanz::lan))
         .route(
             "/api/instanz/stammdaten/herkunft",
             get(routes::instanz::stammdaten_herkunft),

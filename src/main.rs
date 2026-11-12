@@ -232,6 +232,30 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // `--tls` setzt ihn die Cert-Beschaffung unten neu. Ohne TLS bleibt keine alte Beglaubigung.
     lifeline_hub::instanz::identitaet::save_tls_zertifikat(&pool, None).await?;
     let tls_pool = pool.clone();
+    // LAN-Entdeckung (LLH-1497, design.md D6): nur mit Schalter, TLS und ohne Loopback-Bind. Ein
+    // Fehler beim Start hält den Server nicht auf; die Adresse von Hand geht immer.
+    lifeline_hub::instanz::entdeckung::save_an(&pool, false).await?;
+    match lifeline_hub::instanz::entdeckung::startbedingung(
+        config.lan_entdeckung,
+        config.tls,
+        &config.bind,
+    ) {
+        Ok(port) => {
+            let i = lifeline_hub::instanz::identitaet::load_or_create(&pool).await?;
+            let ankuendigung = lifeline_hub::instanz::entdeckung::Ankuendigung {
+                kennung: i.kennung.clone(),
+                name: lifeline_hub::instanz::name().to_string(),
+                fingerabdruck: i.fingerabdruck(),
+                protokoll: lifeline_hub::instanz::PROTOKOLL,
+            };
+            match lifeline_hub::instanz::entdeckung::starte(&pool, &ankuendigung, port).await {
+                Ok(()) => tracing::info!("LAN-Entdeckung an (mDNS, Port {port})"),
+                Err(e) => tracing::warn!("LAN-Entdeckung nicht gestartet: {e}"),
+            }
+        }
+        Err(lifeline_hub::instanz::entdeckung::NichtGestartet::Aus) => {}
+        Err(grund) => tracing::warn!("{}", grund.text()),
+    }
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
     // Spiegel (LLH-1492): Abgleich der Einsätze mit gekoppelten Instanzen, eigener Takt.

@@ -916,3 +916,215 @@ async fn ein_antrag_vom_elw_vor_ort_laeuft_im_namen_desselben_kontos() {
     .await;
     assert_eq!(im_spiegel, 1, "übernommen und zurückgespiegelt");
 }
+
+// ── Entdeckung im LAN (D6) ───────────────────────────────────────────────────────────────────
+
+/// Ein Sucher, der immer dieselben Instanzen „findet“.
+struct Attrappe(Vec<lifeline_hub::instanz::entdeckung::InstanzGefunden>);
+
+impl lifeline_hub::instanz::entdeckung::Sucher for Attrappe {
+    fn suche(
+        &self,
+        _dauer: std::time::Duration,
+    ) -> Vec<lifeline_hub::instanz::entdeckung::InstanzGefunden> {
+        self.0.clone()
+    }
+}
+
+async fn gefunden(
+    i: &Instanz,
+    adresse: &str,
+) -> lifeline_hub::instanz::entdeckung::InstanzGefunden {
+    let ident = lifeline_hub::instanz::identitaet::load_or_create(&i.pool)
+        .await
+        .unwrap();
+    lifeline_hub::instanz::entdeckung::InstanzGefunden {
+        kennung: ident.kennung.clone(),
+        name: "ELW 1".into(),
+        fingerabdruck: ident.fingerabdruck(),
+        protokoll: lifeline_hub::instanz::PROTOKOLL,
+        adressen: vec![adresse.to_string()],
+        gekoppelt: false,
+    }
+}
+
+async fn attrappe(i: &Instanz, liste: Vec<lifeline_hub::instanz::entdeckung::InstanzGefunden>) {
+    let ich = lifeline_hub::instanz::identitaet::load_or_create(&i.pool)
+        .await
+        .unwrap()
+        .kennung;
+    lifeline_hub::instanz::entdeckung::set_sucher(&i.pool, &ich, Arc::new(Attrappe(liste)))
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn die_liste_im_netz_gefunden_ohne_eigene_und_mit_markierung() {
+    let elw1 = instanz_tls().await;
+    let elw2 = instanz().await;
+    // Schalter aus: Hinweis, keine Einträge.
+    let (s, v) = common::anfrage(
+        &elw2.app,
+        "GET",
+        "/api/admin/instanz/lan",
+        &elw2.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["aus"], true);
+    assert_eq!(v["gefunden"], json!([]));
+    let eigen = gefunden(&elw2, "https://10.0.0.2:8443").await;
+    attrappe(&elw2, vec![gefunden(&elw1, &elw1.adresse).await, eigen]).await;
+    let (s, v) = common::anfrage(
+        &elw2.app,
+        "GET",
+        "/api/admin/instanz/lan",
+        &elw2.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["aus"], false);
+    let liste = v["gefunden"].as_array().unwrap();
+    assert_eq!(liste.len(), 1, "ohne die eigene: {v}");
+    assert_eq!(liste[0]["kennung"], kennung_von(&elw1).await);
+    assert_eq!(liste[0]["gekoppelt"], false);
+    // Gewählte Adresse einlösen wie eine eingetippte, danach „schon gekoppelt“.
+    schluessel(&elw1).await;
+    let code = code_vor_ort(&elw1).await;
+    let adresse = liste[0]["adressen"][0].as_str().unwrap().to_string();
+    let (s, v) = common::anfrage_json(
+        &elw2.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw2.admin,
+        Some(&json!({"adresse": adresse, "code": code})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, v) = common::anfrage(
+        &elw2.app,
+        "GET",
+        "/api/admin/instanz/lan",
+        &elw2.admin,
+        None,
+    )
+    .await;
+    assert_eq!(v["gefunden"][0]["gekoppelt"], true);
+    // Nicht-Admin: 403.
+    let konto_id = konto(&elw2, "leser").await;
+    let _ = konto_id;
+    exec(
+        &elw2.pool,
+        "UPDATE benutzer SET passwort_wechsel_pflicht = 0 WHERE benutzername = 'leser'",
+    )
+    .await;
+    let leser = common::login_cookie(&elw2.app, "leser", "leser-pw-123").await;
+    let (s, _) = common::anfrage(&elw2.app, "GET", "/api/admin/instanz/lan", &leser, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn eine_gefaelschte_ankuendigung_begruendet_keine_kopplung() {
+    // Ein Gerät kündigt sich mit Kennung und Name von ELW 1 an, ist aber eine andere Instanz.
+    let elw1 = instanz_tls().await;
+    let faelscher = instanz_tls().await;
+    let elw2 = instanz().await;
+    schluessel(&elw1).await;
+    let code = code_vor_ort(&elw1).await;
+    attrappe(&elw2, vec![gefunden(&elw1, &faelscher.adresse).await]).await;
+    let (s, v) = einloesen(&elw2, &faelscher, &code).await;
+    assert!(
+        s == StatusCode::UNPROCESSABLE_ENTITY || s == StatusCode::CONFLICT,
+        "{s} {v}"
+    );
+    assert!(kopplungen(&elw2).await.is_empty());
+}
+
+#[tokio::test]
+async fn eine_direktkopplung_findet_ihre_gegenstelle_unter_neuer_adresse() {
+    let (elw1, elw2) = vor_ort().await;
+    // ELW 1 ist unter der gespeicherten Adresse nicht mehr da (neue IP per DHCP).
+    exec(
+        &elw2.pool,
+        "UPDATE instanz_kopplung SET gegenueber_adresse = 'https://127.0.0.1:9'",
+    )
+    .await;
+    attrappe(&elw2, vec![gefunden(&elw1, &elw1.adresse).await]).await;
+    let vorher: Option<String> = eine(
+        &elw1.pool,
+        "SELECT zuletzt_gesehen_at FROM instanz_kopplung",
+    )
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    melden(&elw2).await;
+    let adresse: String = eine(
+        &elw2.pool,
+        "SELECT gegenueber_adresse FROM instanz_kopplung",
+    )
+    .await;
+    assert_eq!(adresse, elw1.adresse);
+    assert!(aktionen(&elw2)
+        .await
+        .contains(&"instanz_adresse_geaendert".to_string()));
+    let k2 = &kopplungen(&elw2).await[0];
+    assert!(k2.get("letzter_fehler").is_none(), "{k2}");
+    let nachher: Option<String> = eine(
+        &elw1.pool,
+        "SELECT zuletzt_gesehen_at FROM instanz_kopplung",
+    )
+    .await;
+    assert_ne!(vorher, nachher, "gleich dort gemeldet");
+}
+
+#[tokio::test]
+async fn unter_der_neuen_adresse_ohne_signierte_antwort_bleibt_die_alte() {
+    let (elw1, elw2) = vor_ort().await;
+    let alt = "https://127.0.0.1:9";
+    exec(
+        &elw2.pool,
+        &format!("UPDATE instanz_kopplung SET gegenueber_adresse = '{alt}'"),
+    )
+    .await;
+    // Unter der „neuen“ Adresse antwortet ein Gerät ohne Signatur von ELW 1.
+    let (fremd, _) = vermittler_ohne_signatur().await;
+    attrappe(&elw2, vec![gefunden(&elw1, &fremd).await]).await;
+    melden(&elw2).await;
+    let adresse: String = eine(
+        &elw2.pool,
+        "SELECT gegenueber_adresse FROM instanz_kopplung",
+    )
+    .await;
+    assert_eq!(adresse, alt);
+    let k2 = &kopplungen(&elw2).await[0];
+    assert!(
+        k2["letzter_fehler"]
+            .as_str()
+            .unwrap()
+            .starts_with("Antwort ungültig"),
+        "{k2}"
+    );
+}
+
+/// Ein HTTPS-Gerät, das auf alles mit 200 und einem leeren JSON antwortet, ohne Signatur.
+async fn vermittler_ohne_signatur() -> (String, ()) {
+    let (cert, key) =
+        lifeline_hub::tls::rcgen_pem(&["localhost".into(), "127.0.0.1".into()]).unwrap();
+    let config =
+        axum_server::tls_rustls::RustlsConfig::from_pem(cert.into_bytes(), key.into_bytes())
+            .await
+            .unwrap();
+    let app = axum::Router::new().fallback(|| async { axum::Json(json!({})) });
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let adresse = format!("https://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        axum_server::from_tcp_rustls(listener, config)
+            .unwrap()
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    });
+    (adresse, ())
+}

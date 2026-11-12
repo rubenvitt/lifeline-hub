@@ -51,11 +51,11 @@ Code.
 
 ## 6. Entdeckung im LAN (D6)
 
-- [ ] 6.1 Crate `mdns-sd` mit fester Version aufnehmen. Prüfung: `scripts/check-deps.sh` grün, Lizenz in der Drittanbieter-Übersicht, falls das Repo eine führt
-- [ ] 6.2 Schalter `--lan-entdeckung` / `LIFELINE_LAN_ENTDECKUNG` in `src/config.rs` (Vorgabe aus). Start nur mit `--tls` und ohne Loopback-Bind, sonst eine Zeile im Log. Prüfung: Unit-Tests der Startbedingung (aus, ohne TLS, Loopback, an)
-- [ ] 6.3 `src/instanz/entdeckung.rs`: Ankündigen mit TXT `k`, `n`, `f`, `pv` und Suchen ohne die eigene Instanz. Prüfung: Unit-Test der TXT-Bildung (ohne Org-, Konto- oder Einsatzdaten); Test mit zwei Daemons auf derselben Maschine, wo Multicast verfügbar ist (sonst mit `#[ignore]` und Grund, im Nachtrag dokumentiert)
-- [ ] 6.4 Route `GET /api/admin/instanz/lan` (Admin, 3 s, `{aus: true}` ohne Schalter, Markierung „schon gekoppelt“). Prüfung: Tests „Nicht-Admin“ → 403 und „Schalter aus“
-- [ ] 6.5 Neuauflösen in `melden` für `vor_ort` nach einem Netzfehler, höchstens einmal je Backoff-Stufe. Eine neue Adresse gilt erst nach signierter Antwort und landet in der Admin-Spur. Prüfung: Tests mit einer Such-Naht (Trait) für „Neue IP per DHCP“ und „Antwort nicht signiert“
+- [x] 6.1 Crate `mdns-sd` mit fester Version aufnehmen. Prüfung: `scripts/check-deps.sh` grün, Lizenz in der Drittanbieter-Übersicht, falls das Repo eine führt
+- [x] 6.2 Schalter `--lan-entdeckung` / `LIFELINE_LAN_ENTDECKUNG` in `src/config.rs` (Vorgabe aus). Start nur mit `--tls` und ohne Loopback-Bind, sonst eine Zeile im Log. Prüfung: Unit-Tests der Startbedingung (aus, ohne TLS, Loopback, an)
+- [x] 6.3 `src/instanz/entdeckung.rs`: Ankündigen mit TXT `k`, `n`, `f`, `pv` und Suchen ohne die eigene Instanz. Prüfung: Unit-Test der TXT-Bildung (ohne Org-, Konto- oder Einsatzdaten); Test mit zwei Daemons auf derselben Maschine, wo Multicast verfügbar ist (sonst mit `#[ignore]` und Grund, im Nachtrag dokumentiert)
+- [x] 6.4 Route `GET /api/admin/instanz/lan` (Admin, 3 s, `{aus: true}` ohne Schalter, Markierung „schon gekoppelt“). Prüfung: Tests „Nicht-Admin“ → 403 und „Schalter aus“
+- [x] 6.5 Neuauflösen in `melden` für `vor_ort` nach einem Netzfehler, höchstens einmal je Backoff-Stufe. Eine neue Adresse gilt erst nach signierter Antwort und landet in der Admin-Spur. Prüfung: Tests mit einer Such-Naht (Trait) für „Neue IP per DHCP“ und „Antwort nicht signiert“
 - [ ] 6.6 Betriebsdoku: `docs/betrieb/packaging.md` (Satz zu mDNS, `network_mode: host`), `docs/betrieb-tls.md` (Direktkopplung braucht `--tls`), Schalter in der Konfigurationsübersicht. Prüfung: Wächter der Doku grün
 
 ## 7. Oberfläche (D8)
