@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,6 +156,40 @@ const neuigkeitenQuelle = (): Plugin => {
   };
 };
 
+// Precache-Grenze des Service Workers: Eine JS- oder CSS-Datei darüber bricht den Build ab
+// (`maximumFileSizeToCacheInBytes` unten). Damit das nicht erst ein PR merkt, der zufällig das
+// letzte Kilobyte bringt, meldet der Build jede Datei ab 90 % der Grenze (LLH-1658). In GitHub
+// Actions zusätzlich als `::warning`-Annotation, damit sie an den Checks des PRs steht.
+const PRECACHE_GRENZE = 3 * 1024 * 1024;
+const PRECACHE_WARNSCHWELLE = 0.9;
+
+const precacheGrenzeWarnen = (): Plugin => {
+  let ausgabe = '';
+  return {
+    name: 'lifeline-precache-grenze-warnen',
+    apply: 'build',
+    configResolved(config) {
+      ausgabe = resolve(config.root, config.build.outDir);
+    },
+    writeBundle(_optionen, bundle) {
+      for (const datei of Object.keys(bundle)) {
+        if (!/\.(js|css)$/.test(datei)) continue;
+        const groesse = statSync(join(ausgabe, datei)).size;
+        if (groesse < PRECACHE_GRENZE * PRECACHE_WARNSCHWELLE) continue;
+        const kb = (bytes: number) =>
+          (bytes / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+        const text =
+          `${datei} hat ${kb(groesse)} kB, ${Math.round((groesse / PRECACHE_GRENZE) * 100)} % der ` +
+          `Precache-Grenze (${kb(PRECACHE_GRENZE)} kB). Noch ${kb(PRECACHE_GRENZE - groesse)} kB, ` +
+          `dann bricht der Build ab. Selten genutzte Teile per lazy() laden oder eine Bibliothek ` +
+          `als eigene codeSplitting-Gruppe abtrennen.`;
+        this.warn(text);
+        if (process.env.GITHUB_ACTIONS) console.log(`::warning title=Precache-Grenze::${text}`);
+      }
+    },
+  };
+};
+
 // Dev-Port und Proxy-Ziel kommen aus .env.local und der Umgebung (process.env hat
 // Vorrang), weil Workspaces Ports dynamisch vergeben.
 export default defineConfig(({ mode }) => {
@@ -170,13 +204,15 @@ export default defineConfig(({ mode }) => {
       libheifBibliothek(),
       depsOhneSourcemap(env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1'),
       neuigkeitenQuelle(),
+      precacheGrenzeWarnen(),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
         workbox: {
-          // Der Haupt-Chunk liegt auch ohne maplibre (eigener Chunk, `codeSplitting` unten) an der
-          // 2-MiB-Vorgabe von Workbox. Liegt eine Datei über dieser Grenze, bricht der Build ab.
-          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+          // Der Haupt-Chunk liegt auch ohne die großen Bibliotheken (eigene Chunks, `codeSplitting`
+          // unten) über der 2-MiB-Vorgabe von Workbox. Liegt eine Datei über dieser Grenze, bricht
+          // der Build ab; ab 90 % warnt `precacheGrenzeWarnen`.
+          maximumFileSizeToCacheInBytes: PRECACHE_GRENZE,
           // Der HEIC-Decoder (LFH-759, 1,5 MB) kommt nicht in den Vorrat: ohne Netz gibt es auch
           // keine HEIC-Bytes zu dekodieren, und jeder Client lüde ihn sonst bei jedem Update vor.
           // Ein vom Betreiber ersetzter Decoder (LFH-1000) käme sonst auch nie an.
@@ -218,12 +254,25 @@ export default defineConfig(({ mode }) => {
             )
               ? `${DOKU_BILDER_ORDNER}/[name]-[hash][extname]`
               : 'assets/[name]-[hash][extname]',
-          // maplibre-gl (rund 0,8 MB) in einen eigenen Chunk: Kartenausschnitte außerhalb der
-          // Lagekarte binden es statisch ein, es landete sonst im Haupt-Chunk und schob ihn über
-          // die Precache-Grenze (`maximumFileSizeToCacheInBytes`). Geladen wird es weiter beim Start;
-          // der Chunk bleibt über Releases gleich und kommt dann aus dem Cache.
+          // Große Bibliotheken in eigene Chunks, damit der Haupt-Chunk unter der Precache-Grenze
+          // bleibt (`PRECACHE_GRENZE`). Alle drei werden weiter beim Start geladen und stehen im
+          // Precache, ohne Netz ändert sich also nichts. Ihre Chunks bleiben über Releases gleich,
+          // solange die Bibliothek nicht aktualisiert wird, und kommen dann aus dem Cache.
           codeSplitting: {
-            groups: [{ name: 'maplibre', test: /[\\/]node_modules[\\/]maplibre-gl[\\/]/ }],
+            groups: [
+              // maplibre-gl (rund 1 MB): Kartenausschnitte außerhalb der Lagekarte binden es
+              // statisch ein, es landete sonst im Haupt-Chunk.
+              { name: 'maplibre', test: /[\\/]node_modules[\\/]maplibre-gl[\\/]/ },
+              // Taktische Zeichen samt Schrift-Metriken (rund 0,8 MB, LLH-1658).
+              { name: 'einsatzzeichen', test: /[\\/]node_modules[\\/]@einsatzzeichen[\\/]/ },
+              // antd samt Bausteinen (rund 1,3 MB, LLH-1661). Die Gruppe zieht React, react-dom und
+              // dayjs mit; die Start-Last bleibt gleich, weil diese Teile vorher in geteilten
+              // Start-Chunks lagen.
+              {
+                name: 'antd',
+                test: /[\\/]node_modules[\\/](?:antd|@ant-design|@rc-component|rc-[^\\/]+)[\\/]/,
+              },
+            ],
           },
         },
       },

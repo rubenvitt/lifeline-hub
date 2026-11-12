@@ -5,6 +5,7 @@ import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
+import { SeitenSkeleton } from './components/SeitenZustand';
 import LoginPage from './pages/LoginPage';
 import AppAnmeldungPage from './pages/AppAnmeldungPage';
 import KoppelnPage from './geraet/KoppelnPage';
@@ -121,7 +122,6 @@ import DemoDatenPage from './admin/DemoDatenPage';
 import AufbewahrungUebersicht from './aufbewahrung/AufbewahrungUebersicht';
 import ZugangsprotokollPage from './zugangsprotokoll/ZugangsprotokollPage';
 import NurMitPlanungsrecht from './planung/NurMitPlanungsrecht';
-import ArchivAktePage from './aufbewahrung/ArchivAktePage';
 import {
   adminGruppen,
   adminBenutzerPfad,
@@ -161,6 +161,9 @@ const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
 const PlanungenPage = lazy(() => import('./planung/PlanungenPage'));
 const PlanungPage = lazy(() => import('./planung/PlanungPage'));
 const PlanungDruckPage = lazy(() => import('./planung/PlanungDruckPage'));
+// Archivakte (LFH-23, LLH-1494): eigener Chunk, nur der System-Admin kommt hierher. Der Haupt-Chunk
+// liegt an der Precache-Grenze (`maximumFileSizeToCacheInBytes` in vite.config.ts).
+const ArchivAktePage = lazy(() => import('./aufbewahrung/ArchivAktePage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -423,7 +426,14 @@ export const appRouten = createRoutesFromElements(
             {/* Aufbewahrung (LFH-23): nur für den System-Admin, beide Seiten schützen sich selbst;
                eine ungültige id leitet auf die Übersicht. */}
             <Route path="aufbewahrung" element={<AufbewahrungUebersicht />} />
-            <Route path="aufbewahrung/:einsatzId" element={<ArchivAktePage />} />
+            <Route
+              path="aufbewahrung/:einsatzId"
+              element={
+                <Suspense fallback={<SeitenSkeleton />}>
+                  <ArchivAktePage />
+                </Suspense>
+              }
+            />
             {/* Zugangsprotokoll (LFH-1097): nur für den System-Admin, die Seite schützt sich selbst. */}
             <Route path="zugangsprotokoll" element={<ZugangsprotokollPage />} />
             {/* Stammdaten-Detailrouten liegen IM `AdminLayout`, damit die Sidebar als Rückweg bleibt,

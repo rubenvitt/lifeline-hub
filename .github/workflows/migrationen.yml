@@ -16,12 +16,18 @@
 #
 # Die Regel steht in `scripts/check-migrationen.sh` und ist dort selbstgetestet.
 #
+# ADR-NUMMERN (LLH-1660): Dieselben zwei Auslöser setzen einen zweiten Status `ADR-Nummern`
+# (`scripts/check-adr-nummern.sh`). Seit Kapitel 9 keine ADR-Tabelle mehr führt, kollidieren zwei
+# PRs mit derselben ADR-Nummer nicht mehr in Git; ohne diesen Status fiele die doppelte Nummer
+# erst auf `alpha` auf. Kein Autofix: umnummerieren heißt Dateiname, `id` und Verweise ändern.
+# Der Workflow behält seinen Namen, weil der Jobname `Migrationen prüfen` in Auswertungen steht.
+#
 # AUTOFIX (LFH-1014): Ist ein PR aus diesem Repository nur wegen der Nummer rot, legt
 # `scripts/migrationen-autofix.sh` seine neuen Migrationen hinter den Ziel-Branch und pusht das
 # als Bot-Commit auf den PR-Branch — nie auf einen Ziel-Branch, nur als Fast-Forward. Gepusht
 # wird mit einem Token der Release-App, weil ein Push mit `GITHUB_TOKEN` keine CI auslöst und
 # der PR dann ohne Checks hinge. Der alte Kopf bleibt rot, der neue bekommt seinen Status aus
-# dem eigenen `pull_request`-Lauf. Ohne `RELEASE_APP_ID` wird nur geprüft.
+# dem eigenen `pull_request`-Lauf. Ohne `RELEASE_APP_CLIENT_ID` wird nur geprüft.
 # Herleitung: openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md.
 name: Migrationsnummern
 
@@ -57,9 +63,6 @@ jobs:
       # Nur für den Autofix-Kommentar: die Release-App darf Pull Requests nur lesen, und ein
       # Kommentar an einem PR braucht `pull-requests: write` (Issues-Recht reicht nicht, 403).
       pull-requests: write
-    env:
-      # Für die `if:` der Autofix-Schritte; ohne Release-App wird nur geprüft.
-      APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,16 +111,52 @@ jobs:
               -f state="$state" -f context=Migrationsnummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
           fi
+      - name: ADR-Nummern prüfen und Status setzen
+        id: adr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.event.pull_request.base.ref }}
+          KOPF: ${{ github.event.pull_request.head.sha }}
+          STATUS_SETZEN: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Wie oben: die Regel kommt vom Ziel-Branch, sonst aus dem PR. Trägt sie keiner von
+          # beiden (PR von vor LLH-1660 gegen einen Ziel-Branch ohne das Skript), gibt es nichts
+          # zu prüfen und keinen Status.
+          skript="$RUNNER_TEMP/pruefung/check-adr-nummern.sh"
+          if git cat-file -e "origin/$BASIS:scripts/check-adr-nummern.sh" 2> /dev/null; then
+            git show "origin/$BASIS:scripts/check-adr-nummern.sh" > "$skript"
+          elif [ -f scripts/check-adr-nummern.sh ]; then
+            cp scripts/check-adr-nummern.sh "$skript"
+          else
+            echo "::notice::ADR-Nummern übersprungen: weder $BASIS noch der PR tragen check-adr-nummern.sh."
+            echo "code=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          chmod +x "$skript"
+          code=0
+          "$skript" "origin/$BASIS" "$KOPF" || code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          case "$code" in
+            0) state=success; text="Neue ADRs tragen freie Nummern (gegen $BASIS)." ;;
+            1) state=failure; text="ADR-Nummer ist auf $BASIS schon vergeben, bitte umnummerieren." ;;
+            *) state=error; text="Prüfung nicht möglich, siehe Lauf." ;;
+          esac
+          if [ "$STATUS_SETZEN" = true ]; then
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$KOPF" \
+              -f state="$state" -f context=ADR-Nummern \
+              -f description="$text" -f target_url="$LAUF" > /dev/null
+          fi
       # Der Token entsteht erst, wenn es etwas zu reparieren gibt, und nur mit dem Recht, das der
       # Push braucht. Die App hat Bypass-Rechte auf `alpha`; die Grenzen dagegen stehen in
       # migrationen-autofix.sh und seinem Selbsttest.
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         if: >-
-          steps.pruefen.outputs.code == '1' && env.APP_ID != '' &&
+          steps.pruefen.outputs.code == '1' && vars.RELEASE_APP_CLIENT_ID != '' &&
           github.event.pull_request.head.repo.full_name == github.repository
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
       - name: Umnummerieren und auf den PR-Branch pushen
@@ -168,7 +207,10 @@ jobs:
       - name: Ergebnis der Prüfung
         env:
           CODE: ${{ steps.pruefen.outputs.code }}
-        run: exit "$CODE"
+          CODE_ADR: ${{ steps.adr.outputs.code }}
+        run: |
+          [ "$CODE" = 0 ] || exit "$CODE"
+          exit "${CODE_ADR:-0}"
 
   offene-prs:
     name: Offene PRs neu bewerten
@@ -179,8 +221,6 @@ jobs:
       contents: read
       statuses: write
       pull-requests: write # Autofix-Kommentar, siehe Job oben
-    env:
-      APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -199,6 +239,7 @@ jobs:
             --jq '.[] | "\(.number) \(.headRefName) \(.isCrossRepository)"' > prs.txt
           echo "Offene PRs gegen $BASIS: $(wc -l < prs.txt)"
           rot=0
+          adr_rot=0
           : > reparieren.txt
           while read -r nr branch fremd; do
             # Ein PR, der zwischen Liste und Abruf geschlossen wurde, bricht die Runde nicht ab.
@@ -221,12 +262,26 @@ jobs:
             gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
               -f state="$state" -f context=Migrationsnummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
+            # Zweiter Status, gleiche Runde (LLH-1660, s. Kopf). Ohne Autofix.
+            code=0
+            scripts/check-adr-nummern.sh "origin/$BASIS" "$kopf" || code=$?
+            case "$code" in
+              0) state=success; text="Neue ADRs tragen freie Nummern (gegen $BASIS)." ;;
+              1) state=failure; text="ADR-Nummer ist auf $BASIS schon vergeben, bitte umnummerieren."
+                 adr_rot=$((adr_rot + 1)); echo "::warning::PR #$nr: ADR-Nummer gegen $BASIS vergeben" ;;
+              *) state=error; text="Prüfung nicht möglich, siehe Lauf."
+                 adr_rot=$((adr_rot + 1)); echo "::warning::PR #$nr: ADR-Prüfung nicht möglich (Exit $code)" ;;
+            esac
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
+              -f state="$state" -f context=ADR-Nummern \
+              -f description="$text" -f target_url="$LAUF" > /dev/null
           done < prs.txt
+          echo "PRs mit rotem Status \`ADR-Nummern\`: $adr_rot" >> "$GITHUB_STEP_SUMMARY"
           # Der Lauf selbst bleibt grün: rot ist der PR, nicht der Ziel-Branch. Die Zahl steht
           # in der Zusammenfassung, damit ein Blick auf den Push-Lauf reicht.
           echo "PRs mit rotem Status \`Migrationsnummern\`: $rot" >> "$GITHUB_STEP_SUMMARY"
           echo "reparieren=$(wc -l < reparieren.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
-      - name: Ist der Status Pflicht?
+      - name: Sind die Status Pflicht?
         if: github.ref_name == 'alpha'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -235,18 +290,20 @@ jobs:
           # Fehlt der Eintrag im Ruleset, ist ein roter Status nur eine Anzeige: GitHub mergt
           # trotzdem (so geschehen mit #367 am 03.10.2026). Gemeldet, nicht rot — ein roter
           # Push-Lauf hielte keinen Merge auf.
-          pflicht="$(gh api "repos/$GITHUB_REPOSITORY/rules/branches/$BASIS" --jq \
+          pflichten="$(gh api "repos/$GITHUB_REPOSITORY/rules/branches/$BASIS" --jq \
             '[.[] | select(.type == "required_status_checks")
-              | .parameters.required_status_checks[].context] | index("Migrationsnummern")')"
-          if [ "$pflicht" = null ] || [ -z "$pflicht" ]; then
-            echo "::warning::\`Migrationsnummern\` ist auf $BASIS kein Required Check — rote PRs lassen sich mergen."
-            echo "⚠️ \`Migrationsnummern\` ist auf $BASIS kein Required Check (Ruleset 17017911)." >> "$GITHUB_STEP_SUMMARY"
-          fi
+              | .parameters.required_status_checks[].context] | .[]')"
+          for name in Migrationsnummern ADR-Nummern; do
+            if ! printf '%s\n' "$pflichten" | grep -qxF -- "$name"; then
+              echo "::warning::\`$name\` ist auf $BASIS kein Required Check — rote PRs lassen sich mergen."
+              echo "⚠️ \`$name\` ist auf $BASIS kein Required Check (Ruleset 17017911)." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
-        if: steps.pruefen.outputs.reparieren != '0' && env.APP_ID != ''
+        if: steps.pruefen.outputs.reparieren != '0' && vars.RELEASE_APP_CLIENT_ID != ''
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
       - name: Rote PRs umnummerieren

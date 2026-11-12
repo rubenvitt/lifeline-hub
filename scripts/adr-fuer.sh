@@ -7,6 +7,10 @@
 #
 # Aufruf: scripts/adr-fuer.sh <pfad>…        Pfade relativ zur Repo-Wurzel
 #         git diff --name-only origin/alpha | scripts/adr-fuer.sh -
+#         scripts/adr-fuer.sh --alle         Verzeichnis: Kennung, Status, Datum, Titel je ADR
+#
+# `--alle` ist das Verzeichnis der ADRs (LLH-1660): Kapitel 9 führt keine Tabelle mehr, weil
+# jede neue Zeile dort mit jedem anderen PR kollidierte, der auch eine ADR anlegt.
 set -euo pipefail
 
 SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
@@ -15,8 +19,16 @@ ROOT="$(cd "$SKRIPTE/.." && pwd)"
 . "$SKRIPTE/lib/adr.sh"
 
 if [ $# -eq 0 ]; then
-  echo "Aufruf: scripts/adr-fuer.sh <pfad>…   (oder '-' für Pfade über stdin)" >&2
+  echo "Aufruf: scripts/adr-fuer.sh <pfad>…   (oder '-' für Pfade über stdin, '--alle' für das Verzeichnis)" >&2
   exit 2
+fi
+if [ "$1" = --alle ]; then
+  for adr in "$ROOT"/docs/architektur/entscheidungen/ADR-*.md; do
+    [ -e "$adr" ] || continue
+    printf '%s  %-13s  %s  %s\n' "$(adr_kopf_wert "$adr" id)" "$(adr_kopf_wert "$adr" status)" \
+      "$(adr_kopf_wert "$adr" datum)" "$(adr_kopf_wert "$adr" titel)"
+  done
+  exit 0
 fi
 pfade=()
 for a in "$@"; do

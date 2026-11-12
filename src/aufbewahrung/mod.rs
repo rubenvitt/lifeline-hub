@@ -172,6 +172,9 @@ pub struct ArchivAkteAnzeige {
     pub personen: Vec<ArchivPersonAnzeige>,
     pub tiere: Vec<ArchivTierAnzeige>,
     pub schaeden: Vec<ArchivSchadenAnzeige>,
+    /// Das Archiv am Ende der Nachbereitung (LLH-1494): der Block, den ein Download liefert.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archiv: Option<crate::einsatz::archiv::ArchivAngabe>,
 }
 
 /// Ein ETB-Eintrag der Archivakte im Wortlaut — ohne Anhänge und ohne Rückverweise auf
