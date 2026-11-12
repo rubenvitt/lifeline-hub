@@ -198,6 +198,26 @@ async fn aktionen(pool: &sqlx::SqlitePool) -> Vec<String> {
         .unwrap()
 }
 
+/// Die Führungseinträge der Admin-Spur: Aktion, ob eine Person dieser Instanz handelte, Grund.
+async fn spur_fuehrung(pool: &sqlx::SqlitePool) -> Vec<(String, bool, String)> {
+    let rows: Vec<(String, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT aktion, akteur_id, detail FROM admin_audit WHERE aktion LIKE 'fuehrung_%' \
+         ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    rows.into_iter()
+        .map(|(aktion, akteur, detail)| {
+            let grund = detail
+                .and_then(|d| serde_json::from_str::<Value>(&d).ok())
+                .and_then(|d| d["grund"].as_str().map(str::to_string))
+                .unwrap_or_default();
+            (aktion, akteur.is_some(), grund)
+        })
+        .collect()
+}
+
 async fn benachrichtigungen(pool: &sqlx::SqlitePool) -> Vec<String> {
     sqlx::query_scalar("SELECT art FROM benachrichtigung ORDER BY id")
         .fetch_all(pool)
@@ -1010,6 +1030,77 @@ async fn abgabe_per_code_und_eingabe_am_hub() {
     assert!(benachrichtigungen(&elw.pool).await.is_empty(), "kein Alarm");
     let letzter = f["verlauf"].as_array().unwrap().last().unwrap().clone();
     assert_eq!(letzter["grund"], "per Funk");
+
+    // Admin-Spur auf beiden Seiten (LLH-1674): am Hub die Eingabe durch die Person, am ELW das
+    // Erzeugen durch die Person und die Annahme, ausgelöst vom Hub.
+    let hub_spur = spur_fuehrung(&hub.pool).await;
+    assert_eq!(hub_spur.len(), 1, "{hub_spur:?}");
+    assert_eq!(hub_spur[0].0, "fuehrung_notuebernahme");
+    assert!(hub_spur[0].1, "die Person am Hub handelt");
+    assert!(hub_spur[0].2.contains("mit Code: per Funk"), "{hub_spur:?}");
+    let elw_spur = spur_fuehrung(&elw.pool).await;
+    assert_eq!(elw_spur.len(), 2, "{elw_spur:?}");
+    assert!(elw_spur
+        .iter()
+        .all(|(aktion, _, _)| aktion == "fuehrung_notuebernahme"));
+    assert!(elw_spur[0].1, "das Erzeugen geht auf die Person am ELW");
+    assert!(elw_spur[0].2.contains("Abgabecode"), "{elw_spur:?}");
+    assert!(!elw_spur[1].1, "die Annahme löst der Hub aus");
+    assert!(elw_spur[1].2.contains("mit Code: per Funk"), "{elw_spur:?}");
+    // Eine weitere Meldung schreibt keinen zweiten Eintrag.
+    elw_meldet(&elw).await;
+    assert_eq!(spur_fuehrung(&elw.pool).await.len(), 2);
+}
+
+/// Klemmt am ELW das Festhalten des Meldeversuchs, gilt die ganze Meldung nicht (LLH-1674): Eine
+/// verworfene Übernahme ohne Alarm und Admin-Spur darf nicht entstehen. Die nächste Meldung holt
+/// alles nach.
+#[tokio::test]
+async fn klemmender_meldeversuch_laesst_keine_uebernahme_ohne_spur() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    code_am_elw(&hub, &elw, e).await;
+    let (s, _) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        json!({"grund": "per Funk", "code": "ABCD-EFGH-JKMN-PQRS"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "CREATE TRIGGER klemmt BEFORE UPDATE OF fehlversuche ON instanz_kopplung \
+         BEGIN SELECT RAISE(ABORT, 'klemmt'); END",
+    )
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let r = lifeline_hub::instanz::melden::run_durchlauf(&elw.pool).await;
+    assert!(r.is_err(), "der Meldeversuch klemmt");
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(
+        f["art"] == "verworfen",
+        aktionen(&elw.pool)
+            .await
+            .contains(&"fuehrung_verworfen".to_string()),
+        "verworfen nur mit Admin-Spur: {f}"
+    );
+    sqlx::query("DROP TRIGGER klemmt")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["art"], "verworfen");
+    assert!(aktionen(&elw.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+    assert!(benachrichtigungen(&elw.pool)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
 }
 
 #[tokio::test]

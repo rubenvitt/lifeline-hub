@@ -891,6 +891,20 @@ pub async fn apply_eingang(
                                 },
                             )
                             .await?;
+                            // Die Notübernahme mit Code gilt erst jetzt: Kopf und Admin-Spur wie
+                            // bei jeder Notübernahme (LLH-1674).
+                            if let Some(einsatz_id) = a.einsatz_id {
+                                aus.folgen.push(Folge::Kopf { einsatz_id });
+                            }
+                            let text = format!(
+                                "Notübernahme durch {} mit Code: {}",
+                                kopplung.gegenueber_name, e.grund
+                            );
+                            aus.folgen.push(Folge::Spur {
+                                aktion: AdminAktion::FuehrungNotuebernahme,
+                                org_id: a.org_id,
+                                grund: spur_text(&a, &text),
+                            });
                         }
                         Err(grund) => {
                             verwerfen(conn, &ich, kopplung, &mut a, m, &grund, &mut aus).await?;
@@ -914,6 +928,9 @@ pub async fn apply_eingang(
                         },
                     )
                     .await?;
+                    if let Some(einsatz_id) = a.einsatz_id {
+                        aus.folgen.push(Folge::Kopf { einsatz_id });
+                    }
                     continue;
                 }
                 // Eine Anfrage gilt nur dem Stand, den sie sah (Review LLH-1491: ein alter
