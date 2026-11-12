@@ -36,7 +36,7 @@ Jede Aufgabe entsteht per TDD (Test zuerst rot, dann grün). Bezüge: `design.md
 
 - [x] 5.1 `scripts/check-typ-codegen.sh` zeigt keinen Drift (keine DTO-Änderung erwartet). Belegt über die Schritte 1 und 2 des Skripts (`openapi_json_ist_aktuell`, `public_v1_json_ist_aktuell` grün); die Schritte 3 bis 5 brauchen `mise`, das der Cloud-Sitzung fehlt, und fährt die CI des PRs
 - [ ] 5.2 `./scripts/check-all.sh --geaendert` grün
-- [ ] 5.3 Bilder für PR und Meldung aufnehmen: Dialog „Neuen Benutzer anlegen“ mit Anzeigename über der Grenze (Zähler, „zu lang“) und der Dialog „Notübernahme …“ mit der Meldung des 422
+- [x] 5.3 Bilder für PR und Meldung aufnehmen: Dialog „Neuen Benutzer anlegen“ mit Anzeigename über der Grenze (Zähler, „zu lang“) und der Dialog „Notübernahme …“ mit der Meldung des 422
 
 ## Workflow follow-up
 
