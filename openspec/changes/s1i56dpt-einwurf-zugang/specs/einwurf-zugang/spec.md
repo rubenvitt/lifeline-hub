@@ -25,7 +25,7 @@ speichern und den Schlüssel genau einmal ausgeben, in der Antwort auf das Anleg
 
 #### Scenario: Unbekannter Zweck
 - **WHEN** ein Admin einen Einwurf-Zugang mit dem Zweck `lage:read` anlegen will
-- **THEN** antwortet der Server mit 422 und legt nichts an
+- **THEN** antwortet der Server mit 400 und legt nichts an
 
 #### Scenario: Ohne Admin-Recht
 - **WHEN** eine Führungskraft ohne System-Admin-Recht einen Einwurf-Zugang anlegen will
@@ -167,8 +167,8 @@ Alarmmeldungen in 24 Stunden und höchstens 200 Kennungen für Positionen speich
 Der Server SHALL eine eingeworfene Alarmmeldung unverändert ablegen: die Abfrage und den Body,
 dazu Zugang, Org und Empfangszeit. Er MUST den Inhalt nicht deuten und keine Felder verlangen,
 außer dass Abfrage oder Body nicht leer sind. Ein leerer Einwurf MUST 422 mit dem Code
-`unprocessable` ergeben. Aus Abfrage oder JSON-Body erkennt er nur `external_id` und
-`message_id`.
+`unprocessable` ergeben. Aus Abfrage, Formularfeldern oder JSON-Body erkennt er nur
+`external_id` und `message_id`; eine Kennung über 200 Zeichen MUST 400 ergeben.
 
 #### Scenario: BOSWatch-Aufruf
 - **WHEN** ein Absender `…/alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung` aufruft
@@ -239,7 +239,7 @@ löschen. Ein erneuter Empfang MUST die Frist nicht verlängern.
 Der Server SHALL eine eingeworfene Position mit Kennung (`id` oder `deviceid`), `lat`, `lon` und
 optionalem `timestamp` annehmen. Je Zugang und Kennung MUST er genau eine Position halten: Eine
 neue ersetzt die gespeicherte, ohne Verlauf. Fehlt die Kennung oder liegt eine Koordinate
-außerhalb des Wertebereichs, MUST er mit 422 antworten.
+außerhalb des Wertebereichs, MUST er mit 400 und dem Code `invalid_field` antworten.
 
 #### Scenario: OsmAnd-Aufruf
 - **WHEN** ein Absender `…/position?id=elw1&lat=52.1&lon=9.3&timestamp=1794423731` aufruft
@@ -251,13 +251,13 @@ außerhalb des Wertebereichs, MUST er mit 422 antworten.
 
 #### Scenario: Ungültige Koordinate
 - **WHEN** ein Absender `lat=123` schickt
-- **THEN** antwortet der Server mit 422 und ändert nichts
+- **THEN** antwortet der Server mit 400 und dem Code `invalid_field` und ändert nichts
 
 ### Requirement: Eine ältere Position wird nicht übernommen
 
 Der Server MUST eine Position mit älterem Zeitstempel als dem gespeicherten derselben Kennung
 nicht übernehmen; er antwortet trotzdem mit 204. Ohne `timestamp` gilt die Empfangszeit. Ein
-Zeitstempel, der mehr als 5 Minuten in der Zukunft liegt, MUST 422 ergeben.
+unlesbarer Zeitstempel MUST 400 ergeben, einer, der mehr als 5 Minuten in der Zukunft liegt, 422.
 
 #### Scenario: Verspätete Position
 - **WHEN** nach einer Position von 12:05 eine Position derselben Kennung von 12:03 ankommt

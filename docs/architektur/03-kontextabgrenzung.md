@@ -1,6 +1,6 @@
 # 3. Kontextabgrenzung
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654).
 
 Lifeline Hub ist ein einzelner Server (`lifeline-hub`), der Oberfläche, API und Live-Kanal
 ausliefert. An der Systemgrenze stehen Menschen an Geräten und Fremdsysteme, die der Server
@@ -34,6 +34,7 @@ flowchart LR
   end
 
   maschine["Fremdsystem mit Maschinenzugang<br/>(Adapter, Einsatzbuch,<br/>crates/lifeline-machine-client)"]
+  absender["Absender ohne Signatur<br/>(BOSWatch, FE2, Divera-Webhook,<br/>OsmAnd)"]
 
   hub["lifeline-hub<br/>(Server, SQLite eingebettet)"]
 
@@ -60,6 +61,7 @@ flowchart LR
   huelle -- "Webview lädt Server-Adresse" --> hub
   geraet -- "HTTP(S), REST + SSE" --> hub
   maschine -- "HTTP(S) /api/v1,<br/>Authorization: Machine" --> hub
+  absender -- "HTTPS /api/v1/einwurf,<br/>Schlüssel im Pfad, nur schreibend" --> hub
   browser -. "Redirect zur Anmeldung" .-> idp
   browser -. "Tiles direkt (Quelle ohne Proxy)" .-> online
   huelle -- "Updater: latest.json" --> gh
@@ -91,9 +93,10 @@ diese nur unter `/api/v1/`.
 | Oberfläche (eingebettetes `frontend/dist`) | Gerät → Server | HTTP(S), statische Dateien | `src/static_files.rs` (`rust-embed`) |
 | REST-API `/api/…` | Gerät → Server | HTTP(S), JSON; Vertrag als OpenAPI | `src/routes/`, `src/api_doc.rs`, `frontend/src/api/` |
 | Öffentliche API `/api/v1/` | Fremdsystem → Server | HTTP(S), JSON; je Anfrage ein JWS im Kopf `Authorization: Machine`, Antwort signiert in `Lifeline-Signature`; Vertrag `docs/api/public-v1.json` | `src/public_api/`, Referenz-Client `crates/lifeline-machine-client`; [`docs/api/maschinenzugang.md`](../api/maschinenzugang.md) |
+| Einwurf `/api/v1/einwurf/<schlüssel>/…` | Absender ohne Signatur → Server | HTTPS, GET oder POST; der Schlüssel im Pfad ist die Anmeldung, die Antwort ist 204 oder ein Fehler ohne Daten; nur über TLS ([ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md)) | `src/public_api/einwurf/`, Verwaltung `src/routes/einwurf_zugaenge.rs`; [`docs/api/einwurf.md`](../api/einwurf.md) |
 | Live-Kanal | Server → Gerät (vom Gerät geöffnet) | Server-Sent Events, Ereignisnamen als `LiveEvent` | `src/live/`, `frontend/src/live/` |
 | TLS am Server (optional) | Gerät → Server | rustls; eigenes Zertifikat oder selbstsigniertes per `rcgen` | `src/tls/`, `--tls`; [`docs/betrieb-tls.md`](../betrieb-tls.md) |
-| Reverse-Proxy davor (optional) | Proxy → Server | HTTP mit `X-Forwarded-For`/`-Proto` | `--trusted-proxies` in `src/config.rs`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md) |
+| Reverse-Proxy davor (optional) | Proxy → Server | HTTP mit `X-Forwarded-For`/`-Proto`; für den Einwurf zählt `X-Forwarded-Proto` nur von einem Proxy aus `--trusted-proxies`, und der Proxy protokolliert unter `/api/v1/einwurf/` nichts | `--trusted-proxies` in `src/config.rs`, `kam_ueber_tls` in `src/extract.rs`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md), [`docs/betrieb-tls.md`](../betrieb-tls.md) |
 | Desktop-Hülle | Hülle → Server | Webview lädt die https-Adresse; Anmeldung im Systembrowser über `POST /api/auth/app-code` | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md) |
 | Update der Desktop-Hülle | Hülle → GitHub | HTTPS, `latest.json` am Release (stabil) bzw. Tag `desktop-alpha` | `src-tauri/tauri.conf.json` (`plugins.updater`), `src-tauri/src/update.rs` |
 | OIDC-Anmeldung | Server → IdP (Discovery, Token); Browser → IdP (Redirect) | OpenID Connect über HTTPS, ohne Redirect-Folgen, Antwort gedeckelt | `src/auth/oidc/`, `LIFELINE_OIDC_*` in `src/config.rs`; [`docs/betrieb-oidc.md`](../betrieb-oidc.md) |

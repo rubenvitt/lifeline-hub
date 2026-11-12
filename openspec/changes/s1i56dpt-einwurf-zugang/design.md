@@ -63,10 +63,10 @@ Der Einwurf speichert, was ankam, und erkennt nur `external_id` und `message_id`
 
 - **Rohdaten** sind ein JSON-Text mit `abfrage` (Liste von Paaren in Empfangsreihenfolge),
   `inhaltstyp` (Wert von `Content-Type`, falls vorhanden) und `body` (Text). Der Body muss UTF-8
-  sein, sonst 422.
+  sein, sonst 400.
 - **Kennungen** stehen in der Abfrage oder, bei `application/json` mit einem Objekt als Wurzel,
   als Zeichenkette oder Zahl auf oberster Ebene. Bei `application/x-www-form-urlencoded` zählen
-  die Formularfelder wie die Abfrage. Der Body geht vor. Höchstens 200 Zeichen, sonst 422. Ein
+  die Formularfelder wie die Abfrage. Der Body geht vor. Höchstens 200 Zeichen, sonst 400. Ein
   JSON-Body, der sich nicht lesen lässt, wird trotzdem als Text abgelegt.
 - **Inhaltsgleichheit** ist der SHA-256 über die rohe Abfrage, ein Trennbyte und die Bytes des
   Bodys. Derselbe Absender erzeugt bei einer Wiederholung dieselben Bytes; eine Normalisierung
@@ -161,7 +161,7 @@ In einer Transaktion (`write_retry!`) wird genau einer von drei Wegen genommen:
   oder `deviceid` (höchstens 128 Zeichen), `lat` (−90 bis 90), `lon` (−180 bis 180), optional
   `timestamp`. Das ist das OsmAnd-Protokoll, das auch der Traccar-Client spricht.
 - **`timestamp`:** Unix-Sekunden, Unix-Millisekunden (ab 10¹¹) oder RFC 3339. Gespeichert wird
-  UTC in `zeit::FORMAT`. Nicht lesbar oder mehr als 5 Minuten in der Zukunft: 422. Ohne die
+  UTC in `zeit::FORMAT`. Nicht lesbar: 400; mehr als 5 Minuten in der Zukunft: 422. Ohne die
   Zukunftsgrenze fröre ein einzelnes Paket mit falscher Uhr die Position ein, weil alle späteren
   als „älter“ gälten.
 - **Schreiben:** ein `INSERT … ON CONFLICT (zugang_id, kennung) DO UPDATE … WHERE
@@ -176,8 +176,8 @@ In einer Transaktion (`write_retry!`) wird genau einer von drei Wegen genommen:
 
 ### D6 Reihenfolge der Prüfungen
 
-Ein Baustein `Einwurf` in `src/public_api/einwurf.rs` (kein Extractor mit `Rejection`, damit die
-Reihenfolge an einer Stelle steht), aufgerufen von den vier Handlern:
+Eine Funktion `pruefe` in `src/public_api/einwurf/routen.rs` (kein Extractor mit `Rejection`,
+damit die Reihenfolge an einer Stelle steht), aufgerufen von den vier Handlern:
 
 1. **TLS-Nachweis** (D7), sonst `403 tls_required`. Vor der Suche, damit eine Klartext-Anfrage
    kein Orakel für Schlüssel ist und nichts zählt.
@@ -311,13 +311,14 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
 - **ADR-0023** wird vor der Annahme angepasst, solange sie `vorgeschlagen` ist:
   - `gilt_fuer`: `src/public_api/**`, `src/routes/einwurf_zugaenge.rs`, `src/extract.rs`,
     `src/app.rs`, `src/auth/rate_limit.rs`.
-  - Prüfung: `verlange 'einwurf::maskiere_pfad' src/app.rs`, `verlange 'llh_ew_'
-    src/public_api/einwurf.rs`, `verlange 'kam_ueber_tls' src/public_api/einwurf.rs`.
+  - Prüfung: `verlange 'einwurf::maskiere_pfad' src/app.rs`, das Präfix `llh_ew_` in
+    `src/public_api/einwurf/mod.rs`, `kam_ueber_tls` und der Fehlversuch im Maschinenzähler in
+    `einwurf/routen.rs`, dazu ein Verbot von `tracing`-Aufrufen mit Schlüssel, Hash oder Pfad.
   - Wortlaut: „am bestehenden Vorschlag“ wird „am bestehenden Eintrag der Ablage“; die Regel zum
     TLS-Kopf nennt „jeder Wert“; neu die Obergrenzen aus D8.
   - Danach `status: akzeptiert`. Die Annahme ist Rubens Freigabe dieser Change.
-- **Neue ADR** mit der nächsten freien Nummer (heute 0029; vor dem Anlegen `git fetch origin
-  alpha` und die offenen PRs ansehen): `ersetzt: ADR-0014`, dieselben Regeln, `gilt_fuer` und
+- **Neue ADR** mit der nächsten freien Nummer (ADR-0031: `alpha` brachte am 12.11.2026 die
+  Nummern 0029 und 0030 mit): `ersetzt: ADR-0014`, dieselben Regeln, `gilt_fuer` und
   Prüfung, dazu die Regel, dass der Einwurf nach ADR-0023 die einzige Anmeldung einer Maschine
   ohne Schlüsselpaar ist. ADR-0014 bekommt `status: ersetzt` und `ersetzt_durch`.
 - **Verweise auf ADR-0014** in arc42, `AGENTS.md`-Dateien und Code-Kommentaren zeigen danach auf
@@ -325,6 +326,20 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
   über `ersetzt_durch` weiter.
 - **`src/AGENTS.md`**, „Öffentliche API v1“: ein Punkt zum Einwurf (Schlüssel nie loggen,
   Reihenfolge der Prüfungen an einer Stelle, Verweis auf die Spec).
+
+### D15 Nachträge aus der Umsetzung (12.11.2026)
+
+- **Statuscodes nach der Konvention des Projekts** (`src/AGENTS.md`, „Statuscode-Konvention“):
+  Ein Feld, das für sich ungültig ist, ergibt 400 `invalid_field`, nicht 422: unbekannter Zweck
+  beim Anlegen, zu lange Kennung, Body ohne UTF-8, fehlende oder ungültige Koordinate, unlesbarer
+  Zeitstempel. 422 bleibt für den Zusammenhang: leerer Einwurf, Zeitstempel in der Zukunft, zu
+  viele Kennungen. Die Spec ist angepasst.
+- **Modul als Ordner:** `src/public_api/einwurf/` mit `mod.rs` (Schlüssel, Repo, Maskierung,
+  Transportlage, Löschlauf), `ablage.rs` und `routen.rs`, statt einer Datei.
+- **Neue direkte Abhängigkeit `form_urlencoded`:** zerlegt Abfrage und Formular-Body in Paare.
+  Sie war über `url` schon im Baum; `Cargo.lock` bekommt keine neue Crate.
+- **`alpha` zusammengeführt:** Die Migrationen heißen 0339 und 0340, die neue ADR 0031.
+- **Paneel-Knopf in normaler Größe:** Die Layout-Gates messen die Trefffläche jeder Seite.
 
 ## Risks / Trade-offs
 
