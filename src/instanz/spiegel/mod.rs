@@ -18,6 +18,7 @@ pub mod hinweis;
 pub mod katalog;
 pub mod lebensende;
 pub mod liefern;
+mod nummer;
 pub mod paket;
 pub mod schema;
 pub mod takt;

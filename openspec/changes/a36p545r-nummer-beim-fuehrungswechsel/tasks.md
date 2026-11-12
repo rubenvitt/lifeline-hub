@@ -5,7 +5,7 @@ ist, dann der Code. Tests im Backend mit `cargo test --test <datei> <name>`.
 
 ## 1. Nummernvergabe gemeinsam nutzbar machen (design.md D2)
 
-- [ ] 1.1 `nummer_freimachen` aus `src/instanz/spiegel/lebensende.rs` nach `src/instanz/spiegel/nummer.rs` verschieben und in `ensure_freie_nummer` umbenennen (`pub(super)`), Aufruf in `lebensende::umwandeln` nachziehen. Eigener `refactor`-Commit ohne Verhaltensänderung. Verifikation: `cargo test --test instanz_lebensende mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer` und `cargo test --lib instanz::spiegel::lebensende` grün.
+- [x] 1.1 `nummer_freimachen` aus `src/instanz/spiegel/lebensende.rs` nach `src/instanz/spiegel/nummer.rs` verschieben und in `ensure_freie_nummer` umbenennen (`pub(super)`), Aufruf in `lebensende::umwandeln` nachziehen. Eigener `refactor`-Commit ohne Verhaltensänderung. Verifikation: `cargo test --test instanz_lebensende mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer` und `cargo test --lib instanz::spiegel::lebensende` grün.
 
 ## 2. Führungswechsel bei belegter Nummer (design.md D1, D3, D4)
 
