@@ -256,6 +256,12 @@ Anträge stehen danach wie nach der Verwahrung in der Zeile oben unter „Anträ
 „Kopieren“ und „Verwerfen“; neu erfasst wird direkt am nun eigenen Einsatz. In der Admin-Spur
 steht der Widerruf der Kopplung, nicht jeder zurückgeholte Einsatz.
 
+Ist die Führung je Einsatz ausgeschaltet, wenn die Installation vom Widerruf erfährt, holt sie
+keinen Einsatz zurück, auch nicht, wenn die Führung später wieder eingeschaltet wird: Der Spiegel
+bleibt gesperrt, und das Paneel „Führung“ bietet nichts an, bis die Organisation erneut mit
+derselben Installation gekoppelt ist. Eine Übernahme, die noch auf Bestätigung wartete, verfällt
+auch dann.
+
 ### Fingerabdruck und Sicherheit
 
 Jede Installation hat ein eigenes Schlüsselpaar; der Fingerabdruck ist eine Kurzform davon. Alle
@@ -408,6 +414,14 @@ Sonst legt der Spiegel eine Kopie als Sprechgruppe des Einsatzes an. Nur diese K
 
 Einsatznummern vergibt jede Installation selbst. Ein Spiegel trägt die Nummer der Installation,
 die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen wie ein Spiegel.
+Wechselt die Führung und hat die übernehmende Installation die Nummer schon selbst vergeben,
+bekommt der übernommene Einsatz dort eine neue Nummer, die über allen ihren Einsätzen des Jahres
+liegt. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
+Installation zeigt die neue Nummer, sobald sie den Einsatz als Spiegel hält, bei einer
+Notübernahme mit Unterschrift also erst nach dem Bestätigen. Übergibt die neue Installation die
+Führung später zurück, bleibt die neue Nummer, solange sie dort frei ist. Widerspricht der ELW
+dagegen einer Notübernahme, führt er mit seiner Nummer weiter, und der Hub zeigt sie wieder,
+sobald der ELW den Einsatz das nächste Mal ändert.
 
 Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
 das Quittieren gelten nur dort.
