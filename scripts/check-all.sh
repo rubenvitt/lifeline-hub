@@ -307,13 +307,18 @@ schritt_9() {
 }
 
 schritt_10() {
-  echo "==> [10/$SCHRITTE] Migrationsnummern gegen den Ziel-Branch, Autofix-Selbsttest (LFH-658/1014)"
+  echo "==> [10/$SCHRITTE] Migrationsnummern gegen den Ziel-Branch, Autofix, Stau-Wächter (LFH-658/1014, LLH-1660)"
   # Erst der Selbsttest: das Prüfskript bemerkt als einzige Stelle eine eingeschobene Nummer
   # (sqlx spielt sie still nach) und irrt in beide Richtungen still.
   "$ROOT/scripts/check-migrationen.test.sh"
   # Der Autofix (LFH-1014) pusht mit einem Token, das auf `alpha` Bypass-Rechte hat; seine
   # Grenzen (nie Ziel-Branch, nur Fast-Forward, Schleifenbremse) stehen nur in diesem Test.
   "$ROOT/scripts/migrationen-autofix.test.sh"
+  # Zwei weitere Stellen entscheiden über offene PRs, ohne dass ein Mensch zusieht (LLH-1660):
+  # `nur-umnummeriert.sh` lässt nach einem Autofix die schweren Suiten aus, der Stau-Wächter
+  # kommentiert und pusht auf PR-Branches. Beide irren still, ihre Grenzen stehen nur im Test.
+  "$ROOT/scripts/nur-umnummeriert.test.sh"
+  "$ROOT/scripts/stau-waechter.test.sh"
   # Dann die Prüfung gegen `origin/alpha`, so frisch wie der letzte `fetch` — eine
   # Frühwarnung; durchgesetzt wird über den Workflow `migrationen.yml`. Ohne den Ref (flacher
   # PR-Checkout) laut übersprungen.
@@ -415,6 +420,15 @@ schritt_16() {
   # gültige Doku an, würde er abgeschaltet).
   "$ROOT/scripts/check-architektur.test.sh"
   "$ROOT/scripts/check-architektur.sh"
+  # ADR-Nummern gegen den Ziel-Branch (LLH-1660): Kapitel 9 führt keine Tabelle mehr, zwei PRs
+  # mit derselben Nummer kollidieren also nicht in Git. Wie Schritt 10: erst der Selbsttest,
+  # dann die Frühwarnung gegen `origin/alpha`; durchgesetzt über `migrationen.yml`.
+  "$ROOT/scripts/check-adr-nummern.test.sh"
+  if git -C "$ROOT" rev-parse --verify --quiet 'origin/alpha^{commit}' > /dev/null; then
+    "$ROOT/scripts/check-adr-nummern.sh" origin/alpha
+  else
+    echo "    ÜBERSPRUNGEN: origin/alpha fehlt in diesem Checkout (ADR-Nummern)." >&2
+  fi
 }
 
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────

@@ -30,12 +30,12 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
 | `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
-| `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs) und ihre Prüfungen |
+| `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs), ihre Nummern und Prüfungen |
 | `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, Benachrichtigungen, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
-| `scripts/AGENTS.md` | Sammel-Gate im Detail, Werkzeugversionen, Bauziel, Advisories, Release |
+| `scripts/AGENTS.md` | Sammel-Gate im Detail, Stau-Wächter, Werkzeugversionen, Bauziel, Advisories, Release |
 
 - **Vor einer Änderung `scripts/adr-fuer.sh <pfad>…`**: nennt die Architekturentscheidungen
   (`docs/architektur/entscheidungen/`), die für die Dateien gelten, mit ihren Regeln.
@@ -118,10 +118,14 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   **`/opsx:apply` setzt um**. Dispatches: `superpowers:brainstorming` → `/opsx:explore`,
   `superpowers:writing-plans` → `/opsx:propose`, `superpowers:executing-plans` → `/opsx:apply`.
   Bei Superpowers bleiben `using-git-worktrees`, `systematic-debugging`,
-  `test-driven-development`, `verification-before-completion`, `requesting-code-review`,
-  `finishing-a-development-branch`.
+  `test-driven-development`, `verification-before-completion`, `finishing-a-development-branch`.
 - **`/opsx:apply` bringt keine Disziplin mit:** jede Aufgabe per `test-driven-development`, vor
-  jedem „fertig" `verification-before-completion` und `requesting-code-review`.
+  jedem „fertig" `verification-before-completion`, vor dem PR der Review.
+- **Review vor dem PR** (12.11.2026, Spec `review-vor-dem-pr`): Der Agent startet ihn selbst, mit
+  frischem Kontext gegen die Prüfliste; Befunde werden gegengeprüft, bestätigte vor dem PR
+  behandelt, der Verbleib steht im PR unter „Review“. Ablauf: `dev-zunder-ausfuehren`, „Review vor
+  dem PR“. Herleitung:
+  `openspec/changes/archive/2026-11-12-review-vor-dem-pr/design.md`.
 - **Mit dem Menschen** (08.11.2026): vor dem ersten Code den Lösungsweg gemeinsam ausarbeiten
   (außer `trivial`), am Ende Bilder der Änderung in PR und Meldung. Ablauf:
   `dev-zunder-ausfuehren`, „Gemeinsam ausarbeiten, bevor Code entsteht“ und „Bilder der Änderung“.
@@ -183,6 +187,8 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push
   den Branch holen. Herleitung:
   `openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md`.
+- **Stau-Wächter** (LLH-1660): meldet Konflikte am PR und mergt bei fehlendem CI-Lauf den
+  Ziel-Branch in den PR-Branch; auch danach erst holen, dann pushen. Regeln: `scripts/AGENTS.md`.
 - **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
   (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
 - **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.

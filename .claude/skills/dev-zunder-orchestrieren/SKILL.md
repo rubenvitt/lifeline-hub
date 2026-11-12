@@ -21,11 +21,11 @@ Das **Workflow-Tool und Subagents laufen im Hintergrund und können den User nic
 Lauf fragen.** Daraus folgt die ganze Architektur:
 
 - **Der Main-Loop (du) besitzt alles Interaktive**: Checkpoints, Entscheidungen,
-  Worktree-Anlage, interaktives TDD, Code-Review-Anfragen. Diese Dinge dürfen **nie** in
-  einem Workflow oder Subagent stecken.
+  Worktree-Anlage, interaktives TDD, die Entscheidung über Review-Befunde. Diese Dinge dürfen
+  **nie** in einem Workflow oder Subagent stecken.
 - **Workflows und Subagents besitzen das parallele Schwerlast-Lesen/Bewerten**: viele
   Subtasks/Subsysteme gleichzeitig scannen, konkurrierende Entwürfe bewerten,
-  Review-Dimensionen adversarial verifizieren.
+  den Review vor dem PR samt Gegenprüfung der Befunde.
 
 **Ob und wie viel Fan-out, entscheidest du selbst** — ein Opt-in wie „ultracode“ braucht es
 nicht (Festlegung des Users, 04.10.2026; Regeln, Abwägung Agent oder Workflow und Pflichtinhalt
@@ -47,7 +47,7 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 | 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, Pflicht: Lösungsweg gemeinsam ausarbeiten** |
 | 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
-| 4 Review | **Fan-out** (Workflow oder Subagents) + Main-Loop | Dimensionen→finden→verifizieren, dann Review-Anfrage | bei Findings |
+| 4 Review | **Fan-out** (Workflow oder Subagents) + Main-Loop | Prüfliste→finden→verifizieren, Verbleib in den PR | bei Findings |
 | 5 Abschluss & Status | Main-Loop | Merge, Board-Status | — |
 
 Konkrete, adaptierbare Workflow-Skripte für Phase 1/2/4 stehen in
@@ -199,11 +199,19 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
 
 ## Phase 4 — Review (Fan-out + Main-Loop)
 
-1. **Workflow oder Subagents:** Review über Dimensionen (Bugs, Sicherheit, Konventionen, Tests) →
-   Findings finden → **adversarial verifizieren** (Skelett: „Review-find-verify"). Nur
-   bestätigte Findings übernehmen.
-2. Bestätigte Findings abarbeiten (zurück in Phase 3, sequenziell).
-3. **Interaktiv:** `superpowers:requesting-code-review` vor dem Mergen.
+Der **Review vor dem PR** läuft hier **einmal über den ganzen Branch**, ohne Rückfrage, und nicht
+je Subtask. Wann, mit welchem Auftrag, wie Befunde gegengeprüft werden, was mit ihnen geschieht
+und wo es im PR steht, sagt `dev-zunder-ausfuehren`, Abschnitt „Review vor dem PR“; hier steht
+nur, was der Orchestrator anders macht.
+
+1. **Workflow oder Subagents:** Der Diff eines Tasks mit Subtasks ist meist groß, also das
+   Skelett „Review-find-verify“: je Gruppe von Klassen der Prüfliste
+   (`dev-zunder-ausfuehren/references/review-pruefliste.md`) ein Reviewer mit frischem Kontext →
+   Befunde → **adversarial verifizieren**. Nur bestätigte Befunde gehen weiter. Keine eigenen
+   Dimensionen neben der Prüfliste.
+2. Bestätigte Befunde abarbeiten (zurück in Phase 3, sequenziell), Verbleib nach der Tabelle
+   dort; was eine Entscheidung des Menschen braucht, geht an ihn.
+3. Befunde und Verbleib für den Abschnitt „Review“ des PRs festhalten.
    `superpowers:verification-before-completion` vor jeder „fertig"-Aussage.
 
 **Status:** bleibt `in_progress`; `review` erst mit offenem PR (Phase 5).
@@ -263,8 +271,9 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
 - Status-Spur, Routing, Task-Laden, Reservierung, Worktree-Logik **nicht** hier kopieren → an
   `dev-zunder-ausfuehren` delegieren.
-- **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Review) in einen Workflow oder
-  Subagent stecken — beide können nicht fragen.
+- **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Entscheidung über Review-Befunde) in
+  einen Workflow oder Subagent stecken — beide können nicht fragen. Der Review vor dem PR selbst
+  läuft dagegen immer als Subagent oder Workflow (Phase 4).
 - **Kein `/opsx:*` im Workflow oder Subagent** (`explore`, `propose`, `update`, `apply`,
   `archive`) und kein Anlegen oder Ändern unter `openspec/changes/`. Einzige Ausnahme: Ein
   autonomer Dev-Agent hakt Aufgaben einer freigegebenen Change ab. Ein Workflow-Agent oder
