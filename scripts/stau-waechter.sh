@@ -19,6 +19,8 @@
 # wartet still. Am 12.11.2026 lagen fünf PRs, aus drei Gründen, die sich wiederholen:
 #   konflikt  Ein fremder Merge macht den PR konfliktbehaftet. Dann startet keine CI.
 #   ohne-ci   Der Kopf-Commit trägt nach der Wartezeit keinen CI-Lauf (#1282, zehn Stunden).
+#   ohne-e2e  Auto-Merge ist an, aber die zweite Stufe (e2e.yml, LLH-1662) lief auf dem Kopf nie
+#             an. Ohne ihre Pflicht-Checks wartet Auto-Merge für immer.
 #   haengt    Alles ist grün, Auto-Merge ist an, gemergt wird trotzdem nicht (#1283).
 #
 # WAS ER TUT:
@@ -26,6 +28,7 @@
 #             die den PR betreut; gelöst wird der Konflikt dort, nie hier.
 #   ohne-ci   Er mergt den Ziel-Branch in den PR-Branch und pusht, damit die CI anläuft. Wo das
 #             nicht geht (Fork, nichts zu mergen, keine Release-App, schon versucht): Hinweis.
+#   ohne-e2e  Ein Hinweis am PR mit dem Handgriff, der die zweite Stufe startet. Kein Push.
 #   haengt    Ein Hinweis am PR.
 # Je PR gibt es höchstens EINEN Hinweis. Gleicher Befund (Art, Kopf-Commit, Dateien): nichts
 # tun. Neuer Befund: alten Hinweis löschen, neuen anlegen (nur ein neuer Kommentar
@@ -47,6 +50,9 @@ TRAILER_SCHLUESSEL="Stau-Waechter"
 TRAILER_WERT="LLH-1660"
 WARTEZEIT=1200 # Sekunden, bis ein fehlender CI-Lauf oder ein ausbleibender Merge als Befund gilt
 CI_CHECK="Schnellprüfungen" # läuft in ci.yml bei jedem PR-Lauf, unabhängig von den Bereichen
+# Die Jobs der zweiten Stufe (e2e.yml). Gelaufen ist sie, wenn einer davon nicht übersprungen ist;
+# übersprungen meldet sie sich an einem nicht fertigen PR (die Anteile unter unexpandiertem Namen).
+E2E_CHECKS='["e2e-Auswahl","e2e-Binary","e2e 1/4","e2e 2/4","e2e 3/4","e2e 4/4"]'
 ZIEL_BRANCHES=" alpha beta main "
 
 NUR_ZEIGEN=0
@@ -76,10 +82,11 @@ konflikt_dateien() { # <basis-commit> <kopf-commit>
 
 # Kennzahlen der Check-Runs eines Commits als eine Zeile:
 #   <hat-ci 0|1> <frühester Start, Unix> <alle fertig und grün 0|1> <spätestes Ende, Unix>
+#   <hat-e2e 0|1>
 # (0 statt einer Zeit, wenn es keine gibt.)
 check_kennzahlen() { # <sha>
   gh_api "repos/$REPO/commits/$1/check-runs?per_page=100" --paginate \
-    | jq -r -s --arg ci "$CI_CHECK" '
+    | jq -r -s --arg ci "$CI_CHECK" --argjson e2e "$E2E_CHECKS" '
         [.[] | (.check_runs // [])[]] as $alle
         | def zeit: if . == null then empty else (sub("\\.[0-9]+"; "") | fromdateiso8601) end;
         [ (if any($alle[]; .name == $ci) then 1 else 0 end),
@@ -87,7 +94,9 @@ check_kennzahlen() { # <sha>
           (if ($alle | length) > 0 and all($alle[]; .status == "completed"
               and (.conclusion == "success" or .conclusion == "skipped" or .conclusion == "neutral"))
             then 1 else 0 end),
-          ([$alle[] | .completed_at | zeit] | max // 0)
+          ([$alle[] | .completed_at | zeit] | max // 0),
+          (if any($alle[]; (.name as $n | $e2e | index($n)) and .conclusion != "skipped")
+            then 1 else 0 end)
         ] | map(tostring) | join(" ")'
 }
 
@@ -104,12 +113,20 @@ hinweis_lesen() { # <nr>
       [.[][] | select((.user.login // "") == $autor)
              | select((.body // "") | startswith("<!-- " + $marke + ":"))] | last
       | select(. != null)
-      | ((.body | capture("^<!-- " + $marke + ":(?<art>[a-z-]+):(?<kennung>[0-9a-f]+) -->"))
+      | ((.body | capture("^<!-- " + $marke + ":(?<art>[a-z0-9-]+):(?<kennung>[0-9a-f]+) -->"))
           // {art: "unbekannt", kennung: "0"}) as $m
       | "\(.id) \($m.art) \($m.kennung)"'
 }
 
 kennung() { printf '%s' "$*" | sha256sum | cut -c1-16; }
+
+# Wann wurde Auto-Merge an <nr> zuletzt eingeschaltet (Unix-Sekunden)? Leer, wenn die Zeitleiste
+# nicht lesbar ist oder das Ereignis nicht nennt.
+automerge_seit() { # <nr>
+  gh_api "repos/$REPO/issues/$1/timeline?per_page=100" --paginate 2> /dev/null \
+    | jq -r -s '[.[][] | select(.event == "auto_merge_enabled") | .created_at
+        | sub("\\.[0-9]+"; "") | fromdateiso8601] | max // empty' 2> /dev/null || true
+}
 
 # Setzt den Hinweis eines PRs auf <art> mit <text>. Leere Art = kein Befund.
 hinweis_setzen() { # <nr> <art> <kennung> <text>
@@ -190,7 +207,7 @@ basis_hineinmergen() { # <kopf-branch> <kopf-sha> <basis-branch> <basis-commit>
 
 bewerte() { # <nr> <kopf-branch> <kopf-sha> <basis-branch> <entwurf> <fork> <auto-merge> <geaendert>
   local nr="$1" branch="$2" kopf="$3" basis="$4" entwurf="$5" fork="$6" automerge="$7" geaendert="$8"
-  local k b dateien code kenn liste text zahlen hat_ci start gruen ende alter grund neu
+  local k b dateien code kenn liste text zahlen hat_ci start gruen ende hat_e2e alter grund neu seit
   echo "==> PR #$nr ($branch → $basis, $(kurz "$kopf"))"
 
   if [ "$entwurf" = true ]; then sag "Entwurf, übersprungen"; return 0; fi
@@ -226,7 +243,7 @@ git fetch origin $basis && git merge origin/$basis
 
   # ── CI-Lauf vorhanden? ──
   zahlen="$(check_kennzahlen "$k")" || { sag "Check-Runs nicht lesbar, übersprungen"; return 0; }
-  read -r hat_ci start gruen ende <<< "$zahlen"
+  read -r hat_ci start gruen ende hat_e2e <<< "$zahlen"
   if [ "$hat_ci" = 0 ]; then
     # Ohne jeden Check-Run zählt die letzte Änderung am PR (`updated_at`): sie liegt nie vor
     # dem Push. Das Commit-Datum taugt nicht, ein alter Commit kann eben erst gepusht sein.
@@ -273,6 +290,28 @@ Der Kopf-Commit \`$(kurz "$k")\` trägt seit $((alter / 60)) Minuten keinen CI-L
 $grund
 
 So geht es weiter: einen neuen Commit pushen, etwa \`$basis\` in den Branch mergen, sobald es dort Neues gibt."
+    return 0
+  fi
+
+  # ── Auto-Merge an, aber die zweite Stufe fehlt (LLH-1662) ──
+  # Vor „grün, nicht gemergt“: ohne e2e-Checks sind die vorhandenen grün, und der PR mergt
+  # trotzdem nie. Die Uhr läuft ab dem späteren von erstem Check des Kopfes und dem Einschalten
+  # von Auto-Merge; ist die Zeitleiste nicht lesbar, ab der letzten Änderung am PR.
+  if [ "$automerge" = true ] && [ "$hat_e2e" = 0 ]; then
+    seit="$(automerge_seit "$nr")"
+    [ -n "$seit" ] || seit="$geaendert"
+    [ "$start" -ge "$seit" ] && seit="$start"
+    alter=$(( $(jetzt) - seit ))
+    if [ "$alter" -lt "$WARTEZEIT" ]; then
+      sag "Auto-Merge an, e2e-Stufe noch nicht angelaufen, erst $((alter / 60)) min: abwarten"
+      return 0
+    fi
+    sag "Befund: Auto-Merge an, seit $((alter / 60)) min keine e2e-Stufe auf $(kurz "$k")"
+    hinweis_setzen "$nr" ohne-e2e "$(kennung "ohne-e2e $k")" "**e2e-Stufe fehlt** (Stau-Wächter)
+
+Auto-Merge ist eingeschaltet, aber auf \`$(kurz "$k")\` ist die zweite Stufe (\`e2e.yml\`) seit $((alter / 60)) Minuten nicht angelaufen. Ohne \`e2e-Binary\` und \`e2e 1/4\` bis \`4/4\` mergt der PR nie.
+
+So geht es weiter: Auto-Merge aus- und wieder einschalten (startet die Stufe ohne neuen Commit) oder einen neuen Commit pushen."
     return 0
   fi
 

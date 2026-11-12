@@ -85,7 +85,7 @@ const OHNE_WEBGL_SPECS =
  * nach den Messwerten in `e2e/laufzeiten.json` (`scripts/e2e-anteile.mjs`). Playwrights eigenes
  * `--shard` schneidet nach Testzahl in Dateireihenfolge, und die langsamen Layout-Gates stehen
  * alphabetisch beieinander: e2e 2/4 brauchte 33–36 min, die übrigen 19–26. Eine Datei ohne
- * Messwert zählt mit dem Median; die Tabelle frischt der Job „Testberichte zusammenführen" auf.
+ * Messwert zählt mit dem Median; die Tabelle frischt der Job „e2e-Bericht" (e2e.yml) auf.
  * Die Rechnung ist deterministisch, jeder Worker-Prozess kommt auf dieselbe Menge.
  */
 const SPEC_DATEI = /\.spec\.ts$/;

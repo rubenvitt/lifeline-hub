@@ -72,24 +72,27 @@ Verworfen:
   Action“ genannt; der Weg bleibt derselbe, nur das Mittel der Teilung ist ein anderes.)
 - **Kommentar `/e2e`** und **nur Label**: am Checkpoint mit Ruben verworfen.
 
-### D2 „Fertig“ steht als Ausdruck an den Jobs, nicht im Auslöser
+### D2 „Fertig“ und „starten“ stehen als Ausdruck am Job, nicht im Auslöser
 
-Die Bedingung an jedem Job der zweiten Stufe lautet sinngemäß:
+Fertig heißt `auto_merge != null || contains(labels.*.name, 'e2e')`, gelesen im Zustand nach dem
+Ereignis. Gestartet wird nicht bei jedem Ereignis, an dem der PR fertig ist, sondern nur, wenn
+sich etwas zu prüfen ergibt (sonst liefe etwa bei einem fremden Label ein zweiter e2e-Lauf neben
+dem ersten):
 
-```
-github.event_name != 'pull_request'
-|| github.event.pull_request.auto_merge != null
-|| contains(github.event.pull_request.labels.*.name, 'e2e')
-```
+- immer bei Push (Aufruf aus `ci.yml`);
+- bei einem neuen Commit (`opened`, `synchronize`, `reopened`), wenn der PR fertig ist;
+- bei `auto_merge_enabled`, wenn das Label `e2e` nicht schon gesetzt war;
+- bei `labeled` mit `e2e`, wenn Auto-Merge nicht schon an war.
 
-Sie liest den Zustand nach dem Ereignis. Ein Push auf einen fertigen PR (`synchronize`) startet
-die zweite Stufe also ohne eigenes Ereignis, ein Push auf einen PR in Arbeit lässt sie aus.
+Diese Bedingung steht **nur** am Job `aenderungen` (`e2e-Auswahl`); `binaer` und `e2e` hängen an
+dessen Ergebnis (`needs.aenderungen.result != 'skipped'`). Eine Stelle statt drei Kopien, und
+eine rote Auswahl lässt die Stufe trotzdem laufen (im Zweifel wird geprüft).
 
 ### D3 Die Pflicht-Checks fehlen, weil beide Jobs Matrix-Jobs sind
 
 - `e2e` ist schon eine Matrix (`shard: [1, 2, 3, 4]`). Bisher trug er die Bedingung „e2e
-  betroffen“ an jedem Schritt (leer grün). Neu steht „fertig“ als Job-`if`, „e2e betroffen“
-  bleibt an den Schritten. Nicht fertig: unexpandierter Name, die gerenderten Checks fehlen.
+  betroffen“ an jedem Schritt (leer grün). Neu hängt das Job-`if` am Ergebnis der Auswahl (D2),
+  „e2e betroffen“ bleibt an den Schritten. Nicht fertig: unexpandierter Name, die gerenderten Checks fehlen.
   Fertig, aber nicht betroffen: leer grün wie bisher.
 - `binaer` bekommt eine Matrix mit einem Eintrag, aus dem der Name entsteht
   (`name: ${{ matrix.check }}`, `check: [e2e-Binary]`). Nicht fertig: Check-Run
@@ -109,18 +112,19 @@ am ersten ungeprüft gemergten PR auffiele.
 
 `concurrency` von `e2e.yml` (`cancel-in-progress` nur im PR):
 
-- Gemeinsame Gruppe `e2e-pr-<nummer>` für Ereignisse, die den gewünschten Zustand ändern: neue
-  Commits (`opened`, `synchronize`, `reopened`), `auto_merge_enabled`, `labeled`/`unlabeled` mit
-  dem Label `e2e`, `auto_merge_disabled`. Ein neuer Lauf bricht den alten ab; ist der PR danach
-  nicht fertig, überspringt der neue Lauf alles, und der alte ist trotzdem beendet. So bricht
-  „Auto-Merge aus“ einen laufenden e2e-Lauf ab.
-- Eigene Gruppe je Lauf (`run_id`) für alles andere: ein fremdes Label, und `unlabeled e2e` oder
-  `auto_merge_disabled`, wenn der PR danach weiter fertig ist. Die bremsen keinen laufenden
-  e2e-Lauf.
+- Gemeinsame Gruppe `e2e-pr-<nummer>` für jeden neuen Commit, für jedes Ereignis, das nach D2
+  startet, und für das Zurücknehmen der letzten Fertig-Markierung (`auto_merge_disabled` oder
+  `unlabeled e2e`, wenn der PR danach nicht mehr fertig ist). Ein neuer Lauf bricht den alten ab;
+  startet er selbst nichts, ist der alte trotzdem beendet. So bricht „Auto-Merge aus“ einen
+  laufenden e2e-Lauf ab, und ein Push auf einen PR in Arbeit beendet einen Lauf für den alten
+  Kopf.
+- Eigene Gruppe je Lauf (`run_id`) für alles andere: ein fremdes Label, `unlabeled e2e` oder
+  `auto_merge_disabled` bei weiter fertigem PR, `auto_merge_enabled` bei schon gesetztem Label.
+  Diese Läufe starten nichts und bremsen keinen laufenden.
 - Aufruf aus `ci.yml` (Push): eigene Gruppe je Lauf; die Nebenläufigkeit regelt dort `ci.yml`.
 
-Bekannte Verschwendung: Wird Auto-Merge eingeschaltet, während ein Lauf über das Label schon
-läuft, beginnt er neu. Selten; das Label ist für Läufe ohne Merge gedacht.
+Folge: Wer Auto-Merge einschaltet, nachdem das Label schon einen Lauf gestartet hat, startet
+keinen zweiten; ist der erste grün, mergt GitHub.
 
 ### D5 Die Auswahl der Suiten wird ein Skript, das beide Workflows fragen
 
@@ -144,10 +148,11 @@ der PR fertig ist; ist er fertig und war e2e am Vorgänger grün, meldet die zwe
 
 - `scripts/ci-auswahl.test.sh`: Stufe eins und zwei, Push, PR mit Diff, reine Umnummerierung mit
   grünem, rotem und fehlendem Vorgänger je Suite, Fehler der Abfrage.
-- `scripts/ci-stufen.test.sh` (oder ein Fall in einem bestehenden Workflow-Test): liest
-  `ci.yml` und `e2e.yml` und prüft die Form aus D3 (Matrix an `binaer` und `e2e`, Fertig-Bedingung
-  als Job-`if`, kein Job in `ci.yml` mit einem Pflicht-Check-Namen der zweiten Stufe, `release`
-  nennt den Aufruf-Job). Mit `yq`, falls vorhanden, sonst Node mit dem YAML-Parser des Frontends.
+- `scripts/ci-stufen.test.sh`: liest `ci.yml` und `e2e.yml` und prüft die Form aus D2–D4
+  (Start-Bedingung an der Auswahl, Matrix an `binaer` und `e2e`, „betroffen“ nur an Schritten,
+  kein Job in `ci.yml` mit einem Pflicht-Check-Namen der zweiten Stufe, kein neuer Ereignistyp in
+  `ci.yml`, `release` nennt den Aufruf-Job, Gruppe und Start teilen die Ereignisliste). Ohne
+  YAML-Parser (keiner ist überall da, wo das Gate läuft): Jobblöcke per `awk`.
 - Beide hängen an Schritt 11 von `check-all.sh` (Selbsttests der Gate-Skripte).
 - Mutationsproben am Ende: Job-`if` an `e2e` entfernen, Matrix an `binaer` entfernen,
   `gruen e2e` auf Frontend-Checks verbiegen; die Tests müssen sie töten.
@@ -159,7 +164,11 @@ der PR fertig ist; ist er fertig und war e2e am Vorgänger grün, meldet die zwe
 Wartezeit 20 Minuten. Die Uhr läuft ab dem späteren von (a) frühestem Check-Run des Kopf-Commits
 und (b) dem Zeitpunkt, zu dem Auto-Merge eingeschaltet wurde (Ereignis
 `auto_merge_enabled` der PR-Zeitleiste; fehlt es, gilt `updated_at` des PRs). Der Hinweis nennt
-den Handgriff: Auto-Merge aus- und wieder einschalten oder das Label `e2e` setzen. Kein Push.
+den Handgriff: Auto-Merge aus- und wieder einschalten oder einen neuen Commit pushen. Das Label
+`e2e` hilft hier nicht: bei eingeschaltetem Auto-Merge ändert es den Zustand nicht und startet
+nach D4 nichts. Kein Push. Der Befund steht vor „grün, nicht gemergt“: ohne e2e-Checks sind die
+vorhandenen grün, und der alte Befund schlüge fälschlich an (im Selbsttest vor der Umsetzung
+belegt). Die Art heißt `ohne-e2e`; das Muster der Marke erlaubt dafür Ziffern.
 
 ### D9 Messung als Skript
 
@@ -200,3 +209,23 @@ in `ci.yml` wiederherstellen (ein Revert). Einen Tag nach dem Merge misst die Fo
 Die Artefakte der e2e-Jobs (`lifeline-hub-debug`, `playwright-blob-k`, `e2e-laufzeiten`,
 `playwright-report-versuch-n`) liest kein anderer Workflow (geprüft 12.11.2026); ihr Umzug nach
 `e2e.yml` braucht keine Nachzüge.
+
+## Nachträge
+
+- **Messung vorher, Jobs je PR (12.11.2026):** `scripts/ci-messung.sh` ist gegen eingespielte
+  API-Antworten geprüft, aber nicht gegen die echte API gelaufen: in der Cloud-Sitzung ist `gh`
+  nur für die Suche freigegeben. Die Zahlen in proposal.md (Läufe, Abschlüsse) stammen aus der
+  Workflow-Liste über den GitHub-Connector; Jobs und Job-Minuten je PR fehlen dort. Die
+  Folgeaufgabe misst deshalb beide Zeiträume mit demselben Skript (vorher: 11.11. 10:17 bis
+  12.11. 07:50 UTC; die Läufe bleiben 90 Tage abrufbar).
+- **Gruppe und Start (D2, D4) beim Umsetzen geschärft:** Die Start-Bedingung steht nur an der
+  Auswahl, `binaer` und `e2e` hängen an deren Ergebnis; ein Fertig-Ereignis, das den Zustand
+  nicht ändert (Label bei schon eingeschaltetem Auto-Merge und umgekehrt), startet nichts.
+- **Mutationsproben (12.11.2026):** 17 Verfälschungen, alle getötet. Workflows
+  (`ci-stufen.test.sh`): Job-`if` an `e2e` entfernt, Matrix-Name an `binaer` entfernt, „betroffen“
+  an den Binary-Job gezogen, Fertig-Bedingung bei neuem Commit entfernt, e2e-Aufruf in `ci.yml`
+  für alle Ereignisse, Auto-Merge-Ereignis in `ci.yml`, `release` ohne `e2e`. Skripte:
+  `gruen e2e` auf Frontend-Checks (von beiden Selbsttests getötet), Auswahl fragt immer Frontend,
+  Push wie PR behandelt (erst nach einem zusätzlichen Fall „Push mit reinem Doku-Diff“ getötet).
+  Stau-Wächter: Wartezeit umgedreht, Auto-Merge-Bedingung entfernt, Uhr ab Kopf entfernt,
+  übersprungen zählt als gelaufen.

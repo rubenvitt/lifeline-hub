@@ -17,7 +17,7 @@ TRAILER="Stau-Waechter: LLH-1660"
 export GITHUB_REPOSITORY=test/repo
 
 # ── Attrappe für gh ──────────────────────────────────────────────────────────────────
-# Zustand unter $STAU_FAKE: checks/<sha>.json, status/<sha>, kommentare.json, log.
+# Zustand unter $STAU_FAKE: checks/<sha>.json, status/<sha>, kommentare.json, zeitleiste.json, log.
 cat > "$ARBEIT/gh" <<'ATTRAPPE'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
 done
 F="$STAU_FAKE"
 [ -f "$F/kommentare.json" ] || echo '[]' > "$F/kommentare.json"
-art() { printf '%s' "$1" | sed -n -E '1s/^<!-- stau-waechter:([a-z-]+):.*/\1/p'; }
+art() { printf '%s' "$1" | sed -n -E '1s/^<!-- stau-waechter:([a-z0-9-]+):.*/\1/p'; }
 case "$methode $pfad" in
   "GET repos/test/repo/commits/"*"/check-runs"*)
     sha="${pfad#repos/test/repo/commits/}"; sha="${sha%%/*}"
@@ -46,6 +46,9 @@ case "$methode $pfad" in
     [ ! -e "$F/kommentare-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     cat "$F/kommentare.json" ;;
   "GET repos/test/repo/pulls"*) cat "$F/pulls.json" ;;
+  "GET repos/test/repo/issues/"*"/timeline"*)
+    [ ! -e "$F/zeitleiste-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
+    if [ -f "$F/zeitleiste.json" ]; then cat "$F/zeitleiste.json"; else echo '[]'; fi ;;
   "POST repos/test/repo/issues/"*"/comments")
     id=$(( $(jq 'map(.id) | max // 100' "$F/kommentare.json") + 1 ))
     jq --argjson id "$id" --arg body "$body" \
@@ -499,6 +502,89 @@ aendere "$r" feature b.txt "feature"
 ci_gruen "$r"
 STAU_JETZT=$((UM_1005 + 3600)) lauf "$r" false false true # 11:05, fünf Minuten nach dem Ende
 pruefe "23 frisch grün: nichts" "" "$(log "$r")"
+
+echo "==> Stau-Wächter: Auto-Merge an, e2e fehlt (LLH-1662)"
+export STAU_JETZT="$UM_1200"
+
+# Erste Stufe grün, die zweite nie angelaufen: nur übersprungene Einträge unter den
+# unexpandierten Namen und eine übersprungene Auswahl.
+stufe_eins_gruen() {
+  printf '%s\n' \
+    'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+    'Rust-Suite|completed|success|2026-11-12T10:00:05Z|2026-11-12T10:30:00Z' \
+    'e2e-Auswahl|completed|skipped|2026-11-12T10:00:01Z|2026-11-12T10:00:01Z' \
+    '${{ matrix.check }}|completed|skipped|2026-11-12T10:00:01Z|2026-11-12T10:00:01Z' \
+    'e2e ${{ matrix.shard }}/4|completed|skipped|2026-11-12T10:00:01Z|2026-11-12T10:00:01Z' | checks "$1"
+}
+automerge_um() { # <klon> <zeit>
+  printf '[{"event":"labeled","created_at":"2026-11-12T09:00:00Z"},{"event":"auto_merge_enabled","created_at":"%s"}]\n' \
+    "$2" > "$(fake "$1")/zeitleiste.json"
+}
+
+# 29 — Auto-Merge seit 10:30, um 12:00 noch kein e2e-Lauf: Hinweis, nicht „grün, nicht gemergt“.
+r="$(repo_neu ohnee2e)"
+aendere "$r" feature b.txt "feature"
+stufe_eins_gruen "$r"
+automerge_um "$r" 2026-11-12T10:30:00Z
+lauf "$r" false false true
+pruefe "29 Auto-Merge ohne e2e-Lauf: Hinweis" "POST ohne-e2e" "$(log "$r")"
+kommentar_enthaelt "29 Hinweis nennt den Handgriff" "$r" "Auto-Merge aus- und wieder einschalten"
+pruefe "29 kein Push" "$(git -C "$ARBEIT/ohnee2e.git" rev-parse refs/heads/feature)" "$(kopf "$r")"
+
+# 30 — Gleicher Befund beim nächsten Lauf: nichts Neues.
+lauf "$r" false false true
+pruefe "30 gleicher Befund: kein zweiter Hinweis" "POST ohne-e2e" "$(log "$r")"
+
+# 31 — Die zweite Stufe läuft an: der Hinweis wird „behoben“.
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e-Auswahl|completed|success|2026-11-12T12:01:00Z|2026-11-12T12:02:00Z' \
+  'e2e-Binary|in_progress||2026-11-12T12:02:00Z|' | checks "$r"
+lauf "$r" false false true
+pruefe "31 e2e läuft: behoben" "POST ohne-e2e PATCH behoben" "$(log "$r")"
+
+# 32 — Ohne Auto-Merge (auch mit Label e2e) wartet der PR auf den Menschen: kein Befund.
+r="$(repo_neu ohneautomerge)"
+aendere "$r" feature b.txt "feature"
+stufe_eins_gruen "$r"
+lauf "$r" false false false
+pruefe "32 ohne Auto-Merge: nichts" "" "$(log "$r")"
+
+# 33 — Auto-Merge erst um 11:50 eingeschaltet, auf einem Kopf von 10:00: abwarten.
+r="$(repo_neu frischautomerge)"
+aendere "$r" feature b.txt "feature"
+stufe_eins_gruen "$r"
+automerge_um "$r" 2026-11-12T11:50:00Z
+lauf "$r" false false true
+pruefe "33 Auto-Merge vor 10 min: nichts" "" "$(log "$r")"
+
+# 34 — Neuer Commit um 11:55 bei längst eingeschaltetem Auto-Merge: die Uhr läuft ab dem Kopf.
+r="$(repo_neu frischerkopf)"
+aendere "$r" feature b.txt "feature"
+printf '%s\n' \
+  'Schnellprüfungen|in_progress||2026-11-12T11:55:00Z|' | checks "$r"
+automerge_um "$r" 2026-11-12T09:30:00Z
+lauf "$r" false false true
+pruefe "34 Kopf vor 5 min: nichts" "" "$(log "$r")"
+
+# 35 — Zeitleiste nicht lesbar: die letzte Änderung am PR zählt (hier 11:55, also abwarten).
+r="$(repo_neu ohnezeitleiste)"
+aendere "$r" feature b.txt "feature"
+stufe_eins_gruen "$r"
+touch "$(fake "$r")/zeitleiste-kaputt"
+GEAENDERT=$((UM_1200 - 300)) lauf "$r" false false true
+pruefe "35 Zeitleiste kaputt, PR vor 5 min geändert: nichts" "" "$(log "$r")"
+GEAENDERT=$((UM_1200 - 3600)) lauf "$r" false false true
+pruefe "35b Zeitleiste kaputt, PR vor 60 min geändert: Hinweis" "POST ohne-e2e" "$(log "$r")"
+
+# 36 — Ein grüner e2e-Lauf zählt, auch wenn Auto-Merge danach wieder eingeschaltet wurde.
+r="$(repo_neu e2eda)"
+aendere "$r" feature b.txt "feature"
+ci_gruen "$r"
+automerge_um "$r" 2026-11-12T10:30:00Z
+echo pending > "$(fake "$r")/status/$(kopf "$r")"
+lauf "$r" false false true
+pruefe "36 e2e gelaufen: kein ohne-e2e" "" "$(log "$r")"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Stau-Wächter-Selbsttest." >&2
