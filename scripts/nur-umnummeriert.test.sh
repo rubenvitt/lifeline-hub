@@ -135,6 +135,53 @@ echo "CREATE TABLE c (id INTEGER);" > "$r/migrations/0003_c.sql"
 commit "$r" "neu" "$TRAILER"
 pruefe "10 neue Migration mit Trailer nichts" "" "$(vorg "$r")"
 
+# 11a — Umbenennung auf eine KLEINERE Nummer: sqlx spielte die Migration früher ein. Nichts.
+r="$(repo_neu kleiner)"
+echo "ALTER TABLE b ADD COLUMN x TEXT;" > "$r/migrations/0003_c.sql"; commit "$r" c
+git -C "$r" mv migrations/0003_c.sql migrations/0001_c.sql 2> /dev/null || git -C "$r" mv migrations/0003_c.sql migrations/0000_c.sql
+commit "$r" "harmlos" "$TRAILER"
+pruefe "11a kleinere Nummer nichts" "" "$(vorg "$r")"
+
+# 11b — Die Reihenfolge zweier umbenannter Migrationen kehrt sich um: nichts.
+r="$(repo_neu reihenfolge)"
+git -C "$r" mv migrations/0001_a.sql migrations/0009_a.sql
+git -C "$r" mv migrations/0002_b.sql migrations/0008_b.sql
+commit "$r" "harmlos" "$TRAILER"
+pruefe "11b vertauschte Reihenfolge nichts" "" "$(vorg "$r")"
+
+# 11c — Zwei Migrationen in gleicher Reihenfolge nach oben: so legt der Autofix um, gilt.
+r="$(repo_neu zwei)"
+git -C "$r" mv migrations/0001_a.sql migrations/0008_a.sql
+git -C "$r" mv migrations/0002_b.sql migrations/0009_b.sql
+commit "$r" "fix(migrationen): Nummern über alpha legen" "$TRAILER"
+pruefe "11c zwei in gleicher Reihenfolge gilt" "$(kurz "$r" HEAD~1)" "$(vorg "$r")"
+
+# 11d — Andere Endung: sqlx sähe die Migration nicht mehr. Nichts.
+r="$(repo_neu endung)"
+git -C "$r" mv migrations/0002_b.sql migrations/0005_b.sql.aus
+commit "$r" "harmlos" "$TRAILER"
+pruefe "11d andere Endung nichts" "" "$(vorg "$r")"
+
+# 11e — Anderer Name bei höherer Nummer: kein Umlegen, nichts.
+r="$(repo_neu name)"
+git -C "$r" mv migrations/0002_b.sql migrations/0005_anders.sql
+commit "$r" "harmlos" "$TRAILER"
+pruefe "11e anderer Name nichts" "" "$(vorg "$r")"
+
+# 11f — bereiche.sh scheitert: im Zweifel wird geprüft, also nichts. Dafür eine Kopie des
+# Skripts neben einem bereiche.sh, das ohne Ausgabe mit Fehler endet.
+r="$(repo_neu bereichekaputt)"
+mkdir -p "$r/docs"; echo "x" > "$r/docs/n.md"; commit "$r" doku
+git -C "$r" mv migrations/0002_b.sql migrations/0005_b.sql
+echo "y" > "$r/docs/n.md"
+commit "$r" "fix(migrationen): Nummern über alpha legen" "$TRAILER"
+pruefe "11f Vorprobe: mit echtem bereiche.sh gilt der Vorgänger" "$(kurz "$r" HEAD~1)" "$(vorg "$r")"
+mkdir -p "$ARBEIT/kaputt"
+cp "$SKRIPT_UNTER_TEST" "$ARBEIT/kaputt/nur-umnummeriert.sh"
+printf '#!/usr/bin/env bash\nexit 3\n' > "$ARBEIT/kaputt/bereiche.sh"
+chmod +x "$ARBEIT/kaputt/"*.sh
+pruefe "11f gescheitertes bereiche.sh nichts" "" "$(cd "$r" && "$ARBEIT/kaputt/nur-umnummeriert.sh" vorgaenger HEAD)"
+
 echo "==> nur-umnummeriert: grün am Vorgänger"
 
 laeufe() { # Zeilen "<name>|<status>|<conclusion>" → JSON wie von der API

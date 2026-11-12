@@ -4,13 +4,15 @@
 #   scripts/stau-waechter.sh [--nur-zeigen] alle
 #       Bewertet jeden offenen PR des Repositories ($GITHUB_REPOSITORY).
 #   scripts/stau-waechter.sh [--nur-zeigen] bewerte <nr> <kopf-branch> <kopf-sha> <basis-branch> \
-#       <entwurf> <fork> <auto-merge>           (die letzten drei: true|false)
+#       <entwurf> <fork> <auto-merge> <geaendert>
+#       (entwurf, fork, auto-merge: true|false; geaendert: `updated_at` des PRs in Unix-Sekunden)
 #       Bewertet einen PR; Kopf und Basis müssen lokal vorliegen (`alle` holt sie).
 #   Exit 0 = gelaufen (auch mit Befunden) · 2 = Aufruf- oder Umgebungsfehler
 #   --nur-zeigen: nennt Befund und geplante Aktion, schreibt nichts (kein Kommentar, kein Push).
 #   Umgebung: STAU_SCHREIBEN  1 = darf auf PR-Branches pushen (Release-App eingerichtet)
 #             STAU_REMOTE     Remote für Fetch und Push (Vorgabe origin)
 #             STAU_GH         Kommando für GitHub-Zugriffe (Vorgabe gh; der Selbsttest setzt eine Attrappe)
+#             STAU_AUTOR      Konto, dessen Kommentare als Hinweise zählen (Vorgabe github-actions[bot])
 #             STAU_JETZT      Uhrzeit als Unix-Sekunden (nur für den Selbsttest)
 #
 # WARUM: Eine Merge Queue gibt es für Repositories eines Benutzerkontos nicht, und Auto-Merge
@@ -31,8 +33,9 @@
 #
 # DIE GRENZEN beim Schreiben auf einen PR-Branch (wie migrationen-autofix.sh):
 #   1. Nie auf `alpha`, `beta`, `main`; nur PRs, deren Kopf in diesem Repository liegt.
-#   2. Nur Fast-Forward, nie Force: der Merge-Commit sitzt direkt auf dem bewerteten Kopf. Hat
-#      jemand inzwischen gepusht, weist das Remote den Push ab.
+#   2. Nur Fast-Forward auf GENAU den bewerteten Kopf (`--force-with-lease` als Bedingung, der
+#      Merge-Commit sitzt direkt darauf). Hat sich der Branch inzwischen bewegt, wurde er
+#      zurückgesetzt oder gelöscht, weist das Remote den Push ab.
 #   3. Schleifenbremse: ist der Kopf schon ein Merge des Wächters, pusht er nicht noch einmal.
 # PR-Code wird nie ausgeführt: gerechnet wird mit `git merge-tree`, gemergt mit `git merge`.
 #
@@ -90,14 +93,20 @@ check_kennzahlen() { # <sha>
 
 # ── Hinweis am PR ───────────────────────────────────────────────────────────────────
 
-# Der bestehende Hinweis eines PRs als "<kommentar-id> <art> <kennung>", leer, wenn es keinen gibt.
+# Der bestehende Hinweis eines PRs als "<kommentar-id> <art> <kennung>", leer, wenn es keinen
+# gibt. Exit ≠ 0, wenn die Kommentare nicht lesbar sind: das ist NICHT „kein Hinweis“, sonst
+# entstünde bei jedem Aussetzer der API ein zweiter. Nur Kommentare des Wächters selbst zählen
+# (STAU_AUTOR); eine von Hand veränderte Marke gilt als Art `unbekannt` und wird ersetzt.
 hinweis_lesen() { # <nr>
-  gh_api "repos/$REPO/issues/$1/comments?per_page=100" --paginate \
-    | jq -r -s --arg marke "$MARKE" '
-        [.[][] | select((.body // "") | startswith("<!-- " + $marke + ":"))] | last
-        | select(. != null)
-        | (.body | capture("^<!-- " + $marke + ":(?<art>[a-z-]+):(?<kennung>[0-9a-f]+) -->")) as $m
-        | "\(.id) \($m.art) \($m.kennung)"'
+  local seiten
+  seiten="$(gh_api "repos/$REPO/issues/$1/comments?per_page=100" --paginate)" || return 1
+  printf '%s' "$seiten" | jq -r -s --arg marke "$MARKE" --arg autor "${STAU_AUTOR:-github-actions[bot]}" '
+      [.[][] | select((.user.login // "") == $autor)
+             | select((.body // "") | startswith("<!-- " + $marke + ":"))] | last
+      | select(. != null)
+      | ((.body | capture("^<!-- " + $marke + ":(?<art>[a-z-]+):(?<kennung>[0-9a-f]+) -->"))
+          // {art: "unbekannt", kennung: "0"}) as $m
+      | "\(.id) \($m.art) \($m.kennung)"'
 }
 
 kennung() { printf '%s' "$*" | sha256sum | cut -c1-16; }
@@ -105,7 +114,7 @@ kennung() { printf '%s' "$*" | sha256sum | cut -c1-16; }
 # Setzt den Hinweis eines PRs auf <art> mit <text>. Leere Art = kein Befund.
 hinweis_setzen() { # <nr> <art> <kennung> <text>
   local nr="$1" art="$2" kenn="$3" text="$4" alt alt_id="" alt_art="" alt_kenn=""
-  alt="$(hinweis_lesen "$nr")" || alt=""
+  alt="$(hinweis_lesen "$nr")" || { sag "Kommentare nicht lesbar, Hinweis bleibt, wie er ist"; return 0; }
   if [ -n "$alt" ]; then read -r alt_id alt_art alt_kenn <<< "$alt"; fi
 
   if [ -z "$art" ]; then
@@ -157,12 +166,16 @@ basis_hineinmergen() { # <kopf-branch> <kopf-sha> <basis-branch> <basis-commit>
   else
     neu="$(git -C "$wt" rev-parse HEAD)"
     # Ohne Force: nur ein Fast-Forward vom bewerteten Kopf wird angenommen (Grenze 2).
-    if git -C "$wt" push -q "$REMOTE" "$neu:refs/heads/$branch" 2> "$tmp/ausgabe"; then
+    # Der Lease bindet den Push an GENAU den bewerteten Kopf. Ein einfacher Push prüfte nur
+    # Fast-Forward gegen das, was gerade im Remote steht: ein inzwischen gelöschter Branch
+    # entstünde neu, ein per Force zurückgesetzter bekäme die entfernten Commits zurück.
+    if git -C "$wt" push -q --force-with-lease="refs/heads/$branch:$k" "$REMOTE" \
+      "$neu:refs/heads/$branch" 2> "$tmp/ausgabe"; then
       printf '%s\n' "$neu"
     else
       # Bewegt oder verweigert? Nur ein bewegter Branch ist der erwartete Fall.
       jetzt_sha="$(git -C "$wt" ls-remote "$REMOTE" "refs/heads/$branch" | cut -f1)" || jetzt_sha=""
-      if [ -n "$jetzt_sha" ] && [ "$jetzt_sha" != "$k" ]; then
+      if [ "$jetzt_sha" != "$k" ]; then # bewegt, zurückgesetzt oder gelöscht
         code=4
       else
         cat "$tmp/ausgabe" >&2
@@ -175,8 +188,8 @@ basis_hineinmergen() { # <kopf-branch> <kopf-sha> <basis-branch> <basis-commit>
   return "$code"
 }
 
-bewerte() { # <nr> <kopf-branch> <kopf-sha> <basis-branch> <entwurf> <fork> <auto-merge>
-  local nr="$1" branch="$2" kopf="$3" basis="$4" entwurf="$5" fork="$6" automerge="$7"
+bewerte() { # <nr> <kopf-branch> <kopf-sha> <basis-branch> <entwurf> <fork> <auto-merge> <geaendert>
+  local nr="$1" branch="$2" kopf="$3" basis="$4" entwurf="$5" fork="$6" automerge="$7" geaendert="$8"
   local k b dateien code kenn liste text zahlen hat_ci start gruen ende alter grund neu
   echo "==> PR #$nr ($branch → $basis, $(kurz "$kopf"))"
 
@@ -215,8 +228,9 @@ git fetch origin $basis && git merge origin/$basis
   zahlen="$(check_kennzahlen "$k")" || { sag "Check-Runs nicht lesbar, übersprungen"; return 0; }
   read -r hat_ci start gruen ende <<< "$zahlen"
   if [ "$hat_ci" = 0 ]; then
-    # Ohne jeden Check-Run ist das Commit-Datum der einzige Anhalt für das Alter des Standes.
-    [ "$start" != 0 ] || start="$(git log -1 --format=%ct "$k")"
+    # Ohne jeden Check-Run zählt die letzte Änderung am PR (`updated_at`): sie liegt nie vor
+    # dem Push. Das Commit-Datum taugt nicht, ein alter Commit kann eben erst gepusht sein.
+    [ "$start" != 0 ] || start="$geaendert"
     alter=$(( $(jetzt) - start ))
     if [ "$alter" -lt "$WARTEZEIT" ]; then
       sag "kein CI-Lauf, aber erst $((alter / 60)) min alt: abwarten"
@@ -283,12 +297,13 @@ So geht es weiter: den PR von Hand mergen, oder Auto-Merge aus- und wieder einsc
 
 alle() {
   [ -n "$REPO" ] || { echo "FEHLER: GITHUB_REPOSITORY ist nicht gesetzt." >&2; exit 2; }
-  local nr branch kopf basis entwurf fork automerge geholt=" "
+  local nr branch kopf basis entwurf fork automerge geaendert geholt=" "
   gh_api "repos/$REPO/pulls?state=open&per_page=100" --paginate \
     | jq -r -s --arg repo "$REPO" '.[][] | [.number, .head.ref, .head.sha, .base.ref, .draft,
-        ((.head.repo.full_name // "") != $repo), (.auto_merge != null)] | @tsv' > "${TMPDIR:-/tmp}/stau-prs.$$"
+        ((.head.repo.full_name // "") != $repo), (.auto_merge != null),
+        (.updated_at | fromdateiso8601)] | @tsv' > "${TMPDIR:-/tmp}/stau-prs.$$"
   echo "Offene PRs: $(wc -l < "${TMPDIR:-/tmp}/stau-prs.$$" | tr -d ' ')"
-  while IFS=$'\t' read -r nr branch kopf basis entwurf fork automerge; do
+  while IFS=$'\t' read -r nr branch kopf basis entwurf fork automerge geaendert; do
     case "$geholt" in
       *" $basis "*) ;;
       *) git fetch --no-tags --quiet "$REMOTE" "+refs/heads/$basis:refs/remotes/$REMOTE/$basis" || true
@@ -298,7 +313,7 @@ alle() {
     git fetch --no-tags --quiet "$REMOTE" "+refs/pull/$nr/head:refs/remotes/pr/$nr" || {
       echo "==> PR #$nr: Kopf nicht abrufbar, übersprungen"; continue; }
     # Ein Fehler an einem PR hält die übrigen nicht auf.
-    bewerte "$nr" "$branch" "$kopf" "$basis" "$entwurf" "$fork" "$automerge" \
+    bewerte "$nr" "$branch" "$kopf" "$basis" "$entwurf" "$fork" "$automerge" "$geaendert" \
       || echo "::warning::PR #$nr: Bewertung gescheitert (Exit $?)"
   done < "${TMPDIR:-/tmp}/stau-prs.$$"
   rm -f "${TMPDIR:-/tmp}/stau-prs.$$"
@@ -307,7 +322,7 @@ alle() {
 case "${1:-}" in
   alle) [ $# -eq 1 ] || { sed -n '4,9p' "$0" >&2; exit 2; }; alle ;;
   bewerte)
-    [ $# -eq 8 ] || { sed -n '4,9p' "$0" >&2; exit 2; }
+    [ $# -eq 9 ] || { sed -n '4,10p' "$0" >&2; exit 2; }
     [ -n "$REPO" ] || { echo "FEHLER: GITHUB_REPOSITORY ist nicht gesetzt." >&2; exit 2; }
     shift; bewerte "$@" ;;
   *) sed -n '4,15p' "$0" >&2; exit 2 ;;

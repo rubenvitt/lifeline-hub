@@ -95,6 +95,9 @@ jobs:
           GIT_CONFIG_KEY_0: http.https://github.com/.extraheader
           GIT_CONFIG_VALUE_0: ""
         run: |
+          # Ohne pipefail verschluckte `tee` einen gescheiterten Lauf: ein dauerhaft kaputter
+          # Wächter bliebe grün und fiele nicht auf.
+          set -o pipefail
           # shellcheck disable=SC2086 # leer oder genau eine Option
           scripts/stau-waechter.sh $NUR_ZEIGEN alle | tee "$RUNNER_TEMP/bericht.txt"
           {

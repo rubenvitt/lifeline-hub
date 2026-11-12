@@ -21,14 +21,16 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   und grün durch statt per Job-`if`, sonst hingen ihre Required Checks auf „Expected"
   (Kopf von `ci.yml`). `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im
   PR, `--auswahl` zeigt sie nur an; ohne Argument läuft alles.
-- **Eine reine Umnummerierung übernimmt die schweren Suiten** (LLH-1660): Folgen auf einen
-  Commit mit grünen schweren Suiten nur Autofix-Commits, die Migrationen unverändert umbenennen
-  (daneben höchstens Dateien, die laut `bereiche.sh` keine Suite liest), laufen Rust, Frontend
-  und e2e auf dem neuen Kopf leer durch. `scripts/nur-umnummeriert.sh` nennt den Vorgänger und
-  wertet dessen Check-Runs aus, der Schritt „Nur umnummeriert?“ im Job `aenderungen` fragt es.
-  Entschieden wird am Inhalt des Commits, nicht am Autor; jeder Zweifel lässt alles laufen. Die
-  Liste der schweren Checks steht im Skript, der Selbsttest vergleicht sie mit `ci.yml`: wer
-  einen Anteil hinzufügt oder umbenennt, zieht sie nach.
+- **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite** (LLH-1660): Folgen auf einen
+  Commit mit grünen schweren Suiten nur Autofix-Commits, die Migrationen unverändert auf eine
+  höhere Nummer legen (gleicher Name, gleiche Reihenfolge; daneben höchstens Dateien, die laut
+  `bereiche.sh` keine Suite liest), laufen Frontend und e2e auf dem neuen Kopf leer durch. **Die
+  Rust-Suite läuft immer neu:** der PR-Lauf prüft den Merge mit dem Ziel-Branch, und dort kam
+  die Migration dazu, wegen der umnummeriert wurde. `scripts/nur-umnummeriert.sh` nennt den
+  Vorgänger und wertet dessen Check-Runs aus, der Schritt „Nur umnummeriert?“ im Job
+  `aenderungen` fragt es. Entschieden wird am Inhalt des Commits, nicht am Autor; jeder Zweifel
+  lässt alles laufen. Die Liste der schweren Checks steht im Skript, der Selbsttest vergleicht
+  sie mit `ci.yml`: wer einen Anteil hinzufügt oder umbenennt, zieht sie nach.
 - **Stau-Wächter** (LLH-1660, `scripts/stau-waechter.sh`, `.github/workflows/stau-waechter.yml`:
   Push auf einen Ziel-Branch, stündlich, von Hand): bewertet jeden offenen PR, der kein Entwurf
   ist. Was er tut und warum, steht im Skriptkopf; die Grenzen belegt `stau-waechter.test.sh`.
@@ -36,9 +38,9 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
     die den PR betreut (der Kommentar weckt sie), oder vom Menschen: Ziel-Branch in den PR-Branch
     mergen, kein Rebase, kein Force-Push. Der Wächter löst nie selbst.
   - **Kein CI-Lauf** (`Schnellprüfungen` fehlt 20 Minuten nach dem ersten Check des
-    Kopf-Commits): die Release-App mergt den Ziel-Branch in den PR-Branch. Grenzen wie beim
+    Kopf-Commits, ohne jeden Check nach der letzten Änderung am PR): die Release-App mergt den Ziel-Branch in den PR-Branch. Grenzen wie beim
     Migrations-Autofix: nur PRs aus diesem Repository, nie `alpha`/`beta`/`main`, nur
-    Fast-Forward auf den bewerteten Kopf, kein zweiter Versuch auf einem Wächter-Merge (Trailer
+    Fast-Forward auf genau den bewerteten Kopf (Push mit Lease), kein zweiter Versuch auf einem Wächter-Merge (Trailer
     `Stau-Waechter`). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
   - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
   - **Ein Hinweis je PR** (Marke `<!-- stau-waechter:<art>:<kennung> -->`): gleicher Befund

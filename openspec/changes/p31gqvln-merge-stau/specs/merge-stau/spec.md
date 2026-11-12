@@ -29,6 +29,8 @@ PR-Branch zu mergen ist. Je PR MUST es höchstens einen Hinweis geben. Ändert s
 nicht (gleicher Kopf-Commit, gleiche Dateien), MUST der Hinweis unverändert bleiben. Entsteht ein
 Konflikt neu oder ändert sich der Befund, MUST der Hinweis als neuer Kommentar erscheinen, damit
 Abonnenten des PRs benachrichtigt werden. Ist der Konflikt behoben, MUST der Hinweis das zeigen.
+Sind die Kommentare des PRs nicht lesbar, MUST kein weiterer Hinweis entstehen. Kommentare
+anderer Konten MUST unberührt bleiben.
 
 #### Scenario: Konflikt nach fremdem Merge
 - **WHEN** PR A gemergt wird und PR B danach in `docs/architektur/06-laufzeitsicht.md` kollidiert
@@ -57,7 +59,7 @@ MUST stattdessen ein Hinweis am PR stehen.
 - **THEN** trägt der PR-Branch danach einen Merge-Commit von `alpha`, auf ihm läuft die CI, und ein Hinweis am PR nennt den Commit
 
 #### Scenario: CI läuft gerade an
-- **WHEN** der Kopf-Commit eines PRs jünger als 20 Minuten ist
+- **WHEN** der Kopf-Commit eines PRs vor weniger als 20 Minuten gepusht wurde, auch wenn der Commit selbst älter ist
 - **THEN** wird nichts gepusht
 
 #### Scenario: Nichts zu mergen
@@ -91,6 +93,10 @@ einen Hinweis schreiben. Ohne eingerichtete Release-App MUST er nur Hinweise sch
 #### Scenario: Branch hat sich während des Laufs bewegt
 - **WHEN** zwischen Bewertung und Push ein neuer Commit auf den PR-Branch kommt
 - **THEN** wird der Push abgewiesen, und der Branch bleibt unverändert
+
+#### Scenario: Branch wurde gelöscht oder zurückgesetzt
+- **WHEN** der PR-Branch zwischen Bewertung und Push gelöscht oder per Force auf einen früheren Commit gesetzt wurde
+- **THEN** wird der Push abgewiesen: der Branch entsteht nicht neu, und entfernte Commits kommen nicht zurück
 
 #### Scenario: PR aus einem Fork
 - **WHEN** der Kopf eines PRs ohne CI-Lauf in einem Fork liegt

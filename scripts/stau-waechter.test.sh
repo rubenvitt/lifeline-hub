@@ -42,10 +42,14 @@ case "$methode $pfad" in
   "GET repos/test/repo/commits/"*"/status")
     sha="${pfad#repos/test/repo/commits/}"; sha="${sha%%/*}"
     printf '{"state":"%s"}\n' "$(cat "$F/status/$sha" 2> /dev/null || echo success)" ;;
-  "GET repos/test/repo/issues/"*"/comments"*) cat "$F/kommentare.json" ;;
+  "GET repos/test/repo/issues/"*"/comments"*)
+    [ ! -e "$F/kommentare-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
+    cat "$F/kommentare.json" ;;
+  "GET repos/test/repo/pulls"*) cat "$F/pulls.json" ;;
   "POST repos/test/repo/issues/"*"/comments")
     id=$(( $(jq 'map(.id) | max // 100' "$F/kommentare.json") + 1 ))
-    jq --argjson id "$id" --arg body "$body" '. + [{id: $id, body: $body}]' "$F/kommentare.json" > "$F/k.neu"
+    jq --argjson id "$id" --arg body "$body" \
+      '. + [{id: $id, body: $body, user: {login: "github-actions[bot]"}}]' "$F/kommentare.json" > "$F/k.neu"
     mv "$F/k.neu" "$F/kommentare.json"
     echo "POST $(art "$body")" >> "$F/log"
     echo '{}' ;;
@@ -127,10 +131,12 @@ UM_1005=1794477900 # 2026-11-12T10:05:00Z
 UM_1200=1794484800 # 2026-11-12T12:00:00Z
 
 # Bewertet PR #7 (`feature` → `alpha`). Weitere Argumente: entwurf, fork, auto-merge, branch.
+# `updated_at` des PRs ist das Commit-Datum des Kopfes, außer GEAENDERT ist gesetzt.
 lauf() { # <klon> [entwurf] [fork] [auto-merge] [kopf-branch] [vorab-option]
   local klon="$1" branch="${5:-feature}" code=0
   ( cd "$klon" && STAU_FAKE="$(fake "$klon")" "$SKRIPT_UNTER_TEST" ${6:+"$6"} bewerte 7 "$branch" \
-      "$(kopf "$klon" "$branch")" alpha "${2:-false}" "${3:-false}" "${4:-false}" ) \
+      "$(kopf "$klon" "$branch")" "${BASIS:-alpha}" "${2:-false}" "${3:-false}" "${4:-false}" \
+      "${GEAENDERT:-$(git -C "$klon" log -1 --format=%ct "origin/$branch")}" ) \
     > "$ARBEIT/ausgabe" 2>&1 || code=$?
   [ "$code" = 0 ] || { echo "  FEHL Lauf endete mit Exit $code:" >&2; sed 's/^/       /' "$ARBEIT/ausgabe" >&2; fehler=$((fehler + 1)); }
 }
@@ -335,12 +341,123 @@ git -C "$ARBEIT/bewegt-zweiter" commit -q -m fremd
 git -C "$ARBEIT/bewegt-zweiter" push -q origin feature
 fremd="$(git -C "$ARBEIT/bewegt-zweiter" rev-parse HEAD)"
 code=0
-( cd "$r" && STAU_FAKE="$(fake "$r")" STAU_SCHREIBEN=1 "$SKRIPT_UNTER_TEST" bewerte 7 feature "$alt" alpha false false false ) \
+( cd "$r" && STAU_FAKE="$(fake "$r")" STAU_SCHREIBEN=1 "$SKRIPT_UNTER_TEST" bewerte 7 feature "$alt" alpha false false false \
+    "$(git -C "$r" log -1 --format=%ct "$alt")" ) \
   > "$ARBEIT/ausgabe" 2>&1 || code=$?
 pruefe "18 bewegter Branch: Lauf bleibt grün" 0 "$code"
 pruefe "18 bewegter Branch: fremder Commit bleibt Kopf" "$fremd" \
   "$(git -C "$ARBEIT/bewegt.git" rev-parse refs/heads/feature)"
 pruefe "18 bewegter Branch: kein Hinweis" "" "$(log "$r")"
+
+# 18a — Der Branch wurde inzwischen gelöscht (PR gemergt): er entsteht nicht neu.
+r="$(ohne_ci geloescht 45)"; STAU_JETZT=$(( $(git -C "$r" log -1 --format=%ct origin/feature) + 2700 ))
+alt="$(kopf "$r")"
+git -C "$ARBEIT/geloescht.git" update-ref -d refs/heads/feature
+code=0
+( cd "$r" && STAU_FAKE="$(fake "$r")" STAU_SCHREIBEN=1 "$SKRIPT_UNTER_TEST" bewerte 7 feature "$alt" alpha false false false \
+    "$(git -C "$r" log -1 --format=%ct "$alt")" ) > "$ARBEIT/ausgabe" 2>&1 || code=$?
+pruefe "18a gelöschter Branch: Lauf bleibt grün" 0 "$code"
+pruefe "18a gelöschter Branch entsteht nicht neu" "" \
+  "$(git -C "$ARBEIT/geloescht.git" rev-parse --verify --quiet refs/heads/feature || true)"
+pruefe "18a gelöschter Branch: kein Hinweis" "" "$(log "$r")"
+
+# 18b — Der Branch wurde per Force auf einen Vorfahren zurückgesetzt: die entfernten Commits
+# kommen nicht zurück (ein einfacher Push wäre hier ein Fast-Forward).
+r="$(ohne_ci zurueck 45)"
+aendere "$r" feature e.txt "zweiter Commit auf feature"
+STAU_JETZT=$(( $(git -C "$r" log -1 --format=%ct origin/feature) + 2700 ))
+alt="$(kopf "$r")"
+vorfahr="$(git -C "$r" rev-parse "$alt^")"
+git -C "$ARBEIT/zurueck.git" update-ref refs/heads/feature "$vorfahr"
+code=0
+( cd "$r" && STAU_FAKE="$(fake "$r")" STAU_SCHREIBEN=1 "$SKRIPT_UNTER_TEST" bewerte 7 feature "$alt" alpha false false false \
+    "$(git -C "$r" log -1 --format=%ct "$alt")" ) > "$ARBEIT/ausgabe" 2>&1 || code=$?
+pruefe "18b zurückgesetzter Branch: Lauf bleibt grün" 0 "$code"
+pruefe "18b zurückgesetzter Branch bleibt, wo er ist" "$vorfahr" \
+  "$(git -C "$ARBEIT/zurueck.git" rev-parse refs/heads/feature)"
+
+# 18c — Alter Commit, eben erst gepusht (PR gerade geändert), noch kein Check: abwarten. Das
+# Commit-Datum allein hätte hier sofort gemergt.
+r="$(ohne_ci altercommit 600)"
+vorher="$(kopf "$r")"
+GEAENDERT=$((STAU_JETZT - 120)) STAU_SCHREIBEN=1 lauf "$r"
+git -C "$r" fetch -q origin
+pruefe "18c alter Commit, frischer PR-Stand: kein Push" "$vorher" "$(kopf "$r")"
+pruefe "18c alter Commit, frischer PR-Stand: kein Hinweis" "" "$(log "$r")"
+
+echo "==> Stau-Wächter: Hinweise und Liste"
+export STAU_JETZT="$UM_1005"
+
+# 24 — Kommentare nicht lesbar: kein zweiter Hinweis neben dem bestehenden.
+r="$(repo_neu lesefehler)"
+aendere "$r" feature a.txt "feature"
+aendere "$r" alpha a.txt "alpha"
+lauf "$r"
+touch "$(fake "$r")/kommentare-kaputt"
+aendere "$r" feature b.txt "feature"
+aendere "$r" alpha b.txt "alpha"
+lauf "$r"
+pruefe "24 Lesefehler schreibt nichts" "POST konflikt" "$(log "$r")"
+rm "$(fake "$r")/kommentare-kaputt"
+
+# 25 — Ein fremder Kommentar, der wie ein Hinweis beginnt, wird nicht angefasst.
+r="$(repo_neu fremd)"
+jq -n '[{id: 55, body: "<!-- stau-waechter:konflikt:abc123 -->\nvon Hand", user: {login: "jemand"}}]' \
+  > "$(fake "$r")/kommentare.json"
+aendere "$r" feature a.txt "feature"
+aendere "$r" alpha a.txt "alpha"
+lauf "$r"
+pruefe "25 fremder Kommentar bleibt, eigener kommt dazu" "POST konflikt" "$(log "$r")"
+pruefe "25 beide Kommentare stehen" 2 "$(kommentare "$r")"
+
+# 26 — Eine von Hand veränderte Marke im eigenen Hinweis: er wird ersetzt, nicht verdoppelt.
+r="$(repo_neu marke)"
+jq -n '[{id: 55, body: "<!-- stau-waechter:KAPUTT -->\nalt", user: {login: "github-actions[bot]"}}]' \
+  > "$(fake "$r")/kommentare.json"
+aendere "$r" feature a.txt "feature"
+aendere "$r" alpha a.txt "alpha"
+lauf "$r"
+pruefe "26 kaputte Marke wird ersetzt" "DELETE POST konflikt" "$(log "$r")"
+pruefe "26 es bleibt bei einem Hinweis" 1 "$(kommentare "$r")"
+
+# 27 — Ziel ist kein Kanal-Branch: übersprungen.
+r="$(repo_neu fremdziel)"
+aendere "$r" feature a.txt "feature"
+aendere "$r" alpha a.txt "alpha"
+BASIS=irgendwas lauf "$r"
+pruefe "27 fremdes Ziel schreibt nichts" "" "$(log "$r")"
+
+# 28 — `alle`: liest die PR-Liste, holt die Köpfe und leitet Entwurf, Fork und Auto-Merge aus
+# der Antwort ab. Drei PRs mit demselben Konflikt: einer aus dem Repo, ein Entwurf, ein Fork
+# ohne CI-Lauf (der bekäme einen Push, wäre er nicht als Fork erkannt).
+r="$(repo_neu liste)"
+aendere "$r" feature a.txt "feature"
+git -C "$r" push -q origin origin/feature:refs/heads/entwurf origin/feature:refs/heads/ausfork
+aendere "$r" ausfork z.txt "konfliktfrei im fork"
+aendere "$r" feature b.txt "noch ein Commit"
+aendere "$r" alpha a.txt "alpha"
+for paar in 7:feature 8:entwurf 9:ausfork; do
+  git -C "$ARBEIT/liste.git" update-ref "refs/pull/${paar%%:*}/head" "refs/heads/${paar#*:}"
+done
+git -C "$ARBEIT/liste.git" update-ref refs/pull/9/head "$(git -C "$r" rev-parse origin/alpha~1)"
+jq -n --arg k7 "$(kopf "$r" feature)" --arg k8 "$(kopf "$r" entwurf)" \
+  --arg k9 "$(git -C "$r" rev-parse origin/alpha~1)" '[
+  {number: 7, draft: false, auto_merge: null, updated_at: "2026-11-12T08:00:00Z",
+   head: {ref: "feature", sha: $k7, repo: {full_name: "test/repo"}}, base: {ref: "alpha"}},
+  {number: 8, draft: true, auto_merge: null, updated_at: "2026-11-12T08:00:00Z",
+   head: {ref: "entwurf", sha: $k8, repo: {full_name: "test/repo"}}, base: {ref: "alpha"}},
+  {number: 9, draft: false, auto_merge: {merge_method: "merge"}, updated_at: "2026-11-12T08:00:00Z",
+   head: {ref: "ausfork", sha: $k9, repo: {full_name: "jemand/repo"}}, base: {ref: "alpha"}}
+]' > "$(fake "$r")/pulls.json"
+vorher_fork="$(git -C "$ARBEIT/liste.git" rev-parse refs/heads/ausfork)"
+code=0
+( cd "$r" && STAU_FAKE="$(fake "$r")" STAU_SCHREIBEN=1 "$SKRIPT_UNTER_TEST" alle ) > "$ARBEIT/ausgabe" 2>&1 || code=$?
+pruefe "28 alle: Lauf grün" 0 "$code"
+pruefe "28 alle: drei PRs gesehen" 3 "$(grep -c '^==> PR #' "$ARBEIT/ausgabe")"
+pruefe "28 alle: Konflikt an #7 erkannt" 1 "$(grep -c 'Befund: Konflikt' "$ARBEIT/ausgabe")"
+pruefe "28 alle: Entwurf übersprungen" 1 "$(grep -c 'Entwurf, übersprungen' "$ARBEIT/ausgabe")"
+pruefe "28 alle: Fork bekommt keinen Push" "$vorher_fork" "$(git -C "$ARBEIT/liste.git" rev-parse refs/heads/ausfork)"
+pruefe "28 alle: Fork als Grund genannt" 1 "$(jq '[.[] | select(.body | contains("in einem Fork"))] | length' "$(fake "$r")/kommentare.json")"
 
 echo "==> Stau-Wächter: grün, aber nicht gemergt"
 export STAU_JETZT="$UM_1200"

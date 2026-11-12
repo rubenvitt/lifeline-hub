@@ -71,10 +71,14 @@ Dateien.
 
 ### D3 PR ohne CI-Lauf: der Ziel-Branch wird hineingemergt
 
-„Ohne CI-Lauf“ heißt: Kopf-Commit älter als 20 Minuten und kein Check-Run `Schnellprüfungen`
-auf ihm, gleich in welchem Zustand. Dann mergt der Wächter den Ziel-Branch in einem losgelösten
+„Ohne CI-Lauf“ heißt: kein Check-Run `Schnellprüfungen` auf dem Kopf-Commit, gleich in welchem
+Zustand, und das seit 20 Minuten. Die Uhr läuft ab dem frühesten Check-Run des Commits (fremde
+Checks wie der Vorschau-Build starten sofort), ohne jeden Check-Run ab `updated_at` des PRs. Das
+Commit-Datum taugt nicht: ein alter Commit kann eben erst gepusht sein. Dann mergt der Wächter den Ziel-Branch in einem losgelösten
 Arbeitsbaum und pusht mit dem Token der Release-App. Grenzen wie beim Autofix: nur PRs aus
-diesem Repository, nie ein Ziel-Branch, nur Fast-Forward auf den bewerteten Kopf. Der
+diesem Repository, nie ein Ziel-Branch, nur Fast-Forward auf genau den bewerteten Kopf
+(`--force-with-lease` als Bedingung: ein gelöschter Branch entsteht nicht neu, ein
+zurückgesetzter bekommt nichts zurück). Der
 Merge-Commit trägt den Trailer `Stau-Waechter: LLH-1660`; sitzt der schon an der Spitze, pusht
 der Wächter nicht erneut, sondern kommentiert (Schleifenbremse). Ist nichts zu mergen, kommentiert
 er ebenfalls.
@@ -83,29 +87,38 @@ Warum ein Merge und kein leerer Commit: ein leerer Commit verändert nichts auß
 der Merge bringt den PR zugleich auf den Stand, gegen den er ohnehin geprüft werden soll.
 Die Ursache an #1282 ist nicht ermittelt; der Wächter behandelt das Symptom.
 
-### D4 Reine Umnummerierung übernimmt die schweren Suiten vom letzten grünen Commit
+### D4 Reine Umnummerierung übernimmt Frontend- und e2e-Suite, die Rust-Suite läuft neu
 
-`scripts/nur-umnummeriert.sh <kopf>` geht vom Kopf-Commit des PRs rückwärts, solange jeder Commit
-(a) den Trailer `Migrationsnummern-Autofix` trägt, (b) genau einen Elternteil hat und (c) sein
-Diff nur aus unveränderten Umbenennungen (`R100`) von `migrations/*` nach `migrations/*` besteht.
-Es gibt den ersten Commit aus, der das nicht mehr erfüllt (höchstens fünf Schritte), oder nichts,
-wenn schon der Kopf es nicht erfüllt. Der Job `aenderungen` fragt für diesen Commit die
+`scripts/nur-umnummeriert.sh vorgaenger <kopf>` geht vom Kopf-Commit des PRs rückwärts, solange
+jeder Commit (a) den Trailer `Migrationsnummern-Autofix` trägt, (b) genau einen Elternteil hat,
+(c) mindestens eine Migration unverändert (`R100`) auf eine höhere Nummer mit gleichem Namen
+legt, ohne die Reihenfolge der umbenannten Dateien zu ändern, und (d) daneben nur Dateien ändert,
+die laut `bereiche.sh` keine schwere Suite liest. Es gibt den ersten Commit aus, der das nicht
+mehr erfüllt (höchstens fünf Schritte). Der Job `aenderungen` fragt für diesen Commit die
 Check-Runs ab: sind `Rust-Suite`, `Frontend-Suite 1/4` bis `4/4` und `e2e 1/4` bis `4/4` alle
-`success` oder `skipped`, setzt er `rust`, `frontend` und `e2e` auf `false`. In jedem anderen
-Fall, auch bei einem Fehler der Abfrage, gilt `bereiche.sh` wie bisher (im Zweifel wird geprüft).
+`success` oder `skipped`, setzt er `frontend` und `e2e` auf `false`, `rust` auf `true`. In jedem
+anderen Fall, auch bei einem Fehler der Abfrage, gilt `bereiche.sh` wie bisher (im Zweifel wird
+geprüft).
 
-- Entschieden wird am Inhalt des Commits, nicht am Autor: wer den Trailer fälscht, kann nur eine
-  inhaltsgleiche Umbenennung durchbringen, und eine umbenannte Bestandsmigration macht
-  `Migrationsnummern` rot.
+- **Warum Rust neu läuft (Korrektur nach dem Review, 12.11.2026):** Der erste Entwurf wollte alle
+  drei Suiten übernehmen, mit der Begründung, das Zusammenspiel mit dem Ziel-Branch prüfe ohnehin
+  kein PR-Lauf. Das war falsch: `ci.yml` prüft im PR den Merge mit dem aktuellen Ziel-Branch, und
+  nach einer Umnummerierung steht dort genau die fremde Migration, wegen der umgelegt wurde. Die
+  Kollision ist das Signal, dass zwei PRs am Schema arbeiten. Die Rust-Suite spielt alle
+  Migrationen ein und fährt die Tests darauf; sie kostet einen Job und rund eine halbe Stunde.
+  Frontend und e2e (acht Jobs, e2e bis über eine Stunde) hängen an der Reihenfolge zweier
+  Migrationen kaum und werden übernommen.
+- Entschieden wird am Inhalt des Commits, nicht am Autor. Eine Umbenennung ist nicht von selbst
+  harmlos (kleinere Nummer, vertauschte Reihenfolge, andere Endung ändern, was sqlx wann
+  einspielt), deshalb ist (c) so eng wie das, was der Autofix tatsächlich tut.
 - Mitgezogene Verweise: Der Autofix schreibt jeden Verweis auf den alten Dateinamen um, auch in
   der Doku (an #1286 am 12.11.2026 das Glossar). Was der Commit neben den Umbenennungen ändert,
-  bekommt deshalb `bereiche.sh` vorgelegt: liest keine schwere Suite die Dateien, gilt der
-  Vorgänger weiter; ein Verweis im Code (`include_str!`) fordert die Rust-Suite, dann läuft alles.
-- Was nicht mehr geprüft wird: das Zusammenspiel der umnummerierten Migration mit den neuen des
-  Ziel-Branches. Das prüft auch heute kein PR-Lauf, der vor dem fremden Merge fertig war; der
-  Push-Lauf auf `alpha` fängt es.
+  bekommt deshalb `bereiche.sh` vorgelegt: nur drei ausdrückliche `=false` sparen; ein Verweis im
+  Code (`include_str!`) fordert die Rust-Suite, dann läuft alles.
 - Wirkung nur, wenn der Vorgänger fertig grün war (PRs, die auf den Merge von Hand warten). Lief
   seine CI noch, bricht der neue Push sie ab, und der neue Kopf läuft voll.
+- Bekannte Grenze: Trägt derselbe Commit Check-Runs zweier PRs (ein Branch, zwei Ziel-Branches),
+  zählt je Name der jüngste. Selten, und die Rust-Suite läuft ohnehin neu.
 
 Alternative „CI-Lauf des Vorgängers weiterlaufen lassen und sein Ergebnis auf den neuen Commit
 schreiben“: verworfen, Check-Runs lassen sich nicht auf fremde Commits übertragen, und die
@@ -158,9 +171,14 @@ Herleitung in diesem Dokument.
 - [Der Wächter mergt in einen Branch, an dem gerade jemand arbeitet] → Nur Fast-Forward auf den
   bewerteten Kopf, 20 Minuten Wartezeit, nur bei fehlendem CI-Lauf. Wer danach pusht, muss vorher
   holen (wie nach dem Autofix).
-- [Übernommene Suiten verdecken einen echten Fehler] → Nur bei inhaltsgleicher Umbenennung, und
-  der Push-Lauf auf `alpha` prüft voll. Restrisiko wie bei jedem PR, der vor einem fremden Merge
-  grün wurde.
+- [Übernommene Suiten verdecken einen echten Fehler] → Nur Frontend und e2e, nur bei
+  inhaltsgleicher Umbenennung nach oben; die Rust-Suite läuft neu gegen den aktuellen
+  Ziel-Branch, und der Push-Lauf auf `alpha` prüft voll.
+- [Die Release-App darf keine Workflow-Dateien pushen] → Bringt der Merge des Ziel-Branches
+  Änderungen unter `.github/workflows/` mit, kann GitHub den Push einer App ohne
+  `workflows`-Recht abweisen. Nicht gemessen. Der Wächter schreibt dann den Hinweis „Versuch
+  gescheitert“ und versucht es nicht in Schleife. Am ersten echten Fall prüfen; reicht das Recht
+  nicht, entscheidet Ruben, ob die App es bekommt.
 - [`ADR-Nummern` ist erst Pflicht, wenn Ruben das Ruleset ergänzt] → Der Push-Lauf warnt, solange
   der Eintrag fehlt (wie bei `Migrationsnummern`).
 - [Stündlicher Lauf kostet Actions-Minuten] → Unter einer Minute je Lauf, kein Build.
@@ -198,4 +216,15 @@ die Tabelle ließe sich aus den ADR-Köpfen wiederherstellen. Nach dem Merge tr�
   ersten Konflikt-Hinweis nach dem Merge: Zeigt der PR innerhalb einer Stunde einen
   Merge-Commit der Sitzung, ist die Zustellung belegt. Bleibt er liegen, ist die vertagte
   geplante Claude-Aufgabe der nächste Schritt.
+- **Review (12.11.2026, unabhängiger Agent über den ganzen Diff):** neun Befunde, eingearbeitet:
+  Rust-Suite läuft nach einer Umnummerierung neu (D4); Umbenennung nur nach oben, gleicher Name,
+  gleiche Reihenfolge; Push mit Lease auf den bewerteten Kopf; Alter ab `updated_at` statt
+  Commit-Datum; `pipefail` im Wächter-Schritt (ein gescheiterter Lauf blieb grün);
+  `bereiche.sh`-Fehler lässt alles laufen; Lesefehler bei Kommentaren erzeugt keinen zweiten
+  Hinweis, fremde Kommentare bleiben unberührt; der Modus `alle` hat einen Testfall. Als Risiko
+  notiert statt behoben: das `workflows`-Recht der App und Check-Runs zweier PRs auf einem Commit.
+  Weitere acht Mutationsproben auf diese Korrekturen, sieben getötet; die achte (Fehler von
+  `bereiche.sh` verschluckt) fängt die folgende Zeile, die drei `=false` verlangt.
+- **Gleiche Schwäche im Migrations-Autofix:** `migrationen-autofix.sh` pusht ohne Lease und legte
+  einen inzwischen gelöschten Branch neu an. Nicht Teil dieser Change, als Aufgabe notiert.
 

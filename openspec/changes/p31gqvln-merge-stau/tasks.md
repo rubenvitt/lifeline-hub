@@ -37,7 +37,7 @@ daneben, Schritt in `check-all.sh`, Bündel `schnell`). Actions per Commit-SHA g
 
 - [x] 4.1 Die berührten Schritte einzeln grün (Selbsttests der drei Skripte, `check-architektur`, `check-migrationen`, `migrationen-autofix`, `bereiche`, `check-all.test`, `check-schreibweisen`); `check-toolversionen` scheitert in der Cloud-Sitzung am fehlenden `mise`, nicht am Diff; voller Lauf in der CI des PRs
 - [x] 4.2 Trockenlauf des Wächters gegen das echte Repository ohne Schreibzugriff (`--nur-zeigen`): Ausgabe nennt für jeden offenen PR Befund und geplante Aktion
-- [ ] 4.3 `superpowers:requesting-code-review` über den ganzen Diff, Befunde eingearbeitet
+- [x] 4.3 `superpowers:requesting-code-review` über den ganzen Diff, Befunde eingearbeitet (design.md, „Nachträge“)
 
 ## Workflow follow-up
 

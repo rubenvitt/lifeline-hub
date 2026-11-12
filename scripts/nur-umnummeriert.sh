@@ -17,18 +17,21 @@
 # `vorgaenger` geht vom Kopf rückwärts, solange jeder Commit
 #   (a) den Trailer des Autofix trägt,
 #   (b) genau einen Elternteil hat,
-#   (c) mindestens eine Migration unverändert umbenennt (R100, `migrations/*` nach
-#       `migrations/*`) und
+#   (c) mindestens eine Migration unverändert umbenennt (R100), und zwar so, wie der Autofix es
+#       tut: `migrations/NNNN_name.sql` auf eine HÖHERE Nummer mit demselben Namen, ohne die
+#       Reihenfolge der umbenannten Dateien zu ändern, und
 #   (d) daneben nur Dateien ändert, die laut `bereiche.sh` keine schwere Suite liest (der Autofix
 #       zieht Verweise auf den Dateinamen mit, etwa im Glossar),
 # höchstens SCHRITTE_MAX Commits weit. Ausgegeben wird der erste Commit, der das nicht erfüllt.
-# Entschieden wird am INHALT, nicht am Autor: wer den Trailer fälscht, bringt damit nur eine
-# inhaltsgleiche Umbenennung und Doku durch, und eine umbenannte Bestandsmigration macht
-# `Migrationsnummern` rot. Zieht der Autofix einen Verweis in Code mit (`include_str!`), liest
-# den eine Suite: dann läuft alles. Im Zweifel wird geprüft.
+# Entschieden wird am INHALT, nicht am Autor. Eine Umbenennung ist nicht von selbst harmlos: eine
+# kleinere Nummer oder eine andere Reihenfolge ändert, was sqlx wann einspielt, eine andere
+# Endung nimmt die Migration aus dem Lauf. Deshalb (c) so eng. Zieht der Autofix einen Verweis
+# in Code mit (`include_str!`), liest den eine Suite: dann läuft alles. Im Zweifel wird geprüft.
 #
-# Was dabei ungeprüft bleibt, prüft auch sonst kein PR-Lauf: das Zusammenspiel mit dem, was auf
-# dem Ziel-Branch inzwischen dazukam. Das fängt der Push-Lauf auf dem Ziel-Branch.
+# WAS ÜBERNOMMEN WIRD: Frontend- und e2e-Suite. Die RUST-SUITE LÄUFT IMMER NEU (Job
+# `aenderungen` in ci.yml): der PR-Lauf prüft den Merge mit dem aktuellen Ziel-Branch, und eine
+# Nummernkollision heißt, dass dort eine fremde Migration dazukam. Ob beide Migrationen
+# zusammen einspielen und die Tests bestehen, zeigt nur dieser Lauf.
 set -euo pipefail
 
 TRAILER_SCHLUESSEL="Migrationsnummern-Autofix" # wie in migrationen-autofix.sh
@@ -44,35 +47,53 @@ SCHWERE_CHECKS=(
 SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
 git() { command git -c core.quotePath=false "$@"; }
 
+# Nummer und Name einer Migration als "<nummer> <name>" (`migrations/0143_b.sql` → "143 b.sql");
+# leer, wenn der Pfad keine Migration direkt unter `migrations/` mit vierstelliger Nummer ist.
+migration_teile() {
+  local name="${1#migrations/}"
+  case "$1" in migrations/*) ;; *) return 0 ;; esac
+  if [[ "$name" =~ ^([0-9]{4})_([^/]+\.sql)$ ]]; then
+    printf '%d %s\n' "$((10#${BASH_REMATCH[1]}))" "${BASH_REMATCH[2]}"
+  fi
+}
+
 # Ist <commit> eine reine Umnummerierung des Autofix?
 ist_umnummerierung() {
-  local c="$1" trailer eltern zeilen status alt neu
+  local c="$1" trailer eltern zeilen status alt neu a b
+  local a_nr a_name b_nr b_name paare="" andere="" bereiche
   trailer="$(git log -1 --format="%(trailers:key=$TRAILER_SCHLUESSEL,valueonly)" "$c")"
   [ -n "$trailer" ] || return 1
   eltern="$(git rev-list --parents -n 1 "$c" | wc -w | tr -d ' ')"
   [ "$eltern" = 2 ] || return 1 # der Commit selbst plus genau ein Elternteil
   zeilen="$(git diff-tree -r --no-commit-id --find-renames=100% --name-status "$c^" "$c")"
   [ -n "$zeilen" ] || return 1
-  local umbenannt=0 andere=""
   while IFS=$'\t' read -r status alt neu; do
-    if [ "$status" = R100 ] && ist_migration "$alt" && ist_migration "$neu"; then
-      umbenannt=$((umbenannt + 1))
+    a="$(migration_teile "$alt")"
+    b="$(migration_teile "${neu:-}")"
+    if [ "$status" = R100 ] && [ -n "$a" ] && [ -n "$b" ]; then
+      read -r a_nr a_name <<< "$a"
+      read -r b_nr b_name <<< "$b"
+      # Gleicher Name, höhere Nummer: so benennt der Autofix um, und nur so.
+      [ "$a_name" = "$b_name" ] && [ "$b_nr" -gt "$a_nr" ] || return 1
+      paare="$paare$a_nr $b_nr"$'\n'
       continue
     fi
     # Alles andere, auch eine Migration, die nicht unverändert umbenannt wurde: `bereiche.sh`
     # entscheidet. `migrations/*` fordert dort die Rust-Suite, also läuft dann alles.
     andere="$andere$alt"$'\n'
-    [ -n "$neu" ] && andere="$andere$neu"$'\n'
+    [ -n "${neu:-}" ] && andere="$andere$neu"$'\n'
   done <<< "$zeilen"
-  [ "$umbenannt" -gt 0 ] || return 1
+  [ -n "$paare" ] || return 1
+  # Die Reihenfolge der umbenannten Migrationen bleibt: nach alter Nummer sortiert steigen auch
+  # die neuen Nummern.
+  printf '%s' "$paare" | sort -n -k1,1 | awk '{ if ($2 <= vor) exit 1; vor = $2 }' || return 1
   if [ -n "$andere" ]; then
-    printf '%s' "$andere" | "$SKRIPTE/bereiche.sh" | grep -q '=true' && return 1
+    # Nur drei ausdrückliche `=false` sparen. Scheitert bereiche.sh oder schweigt es, wird geprüft.
+    bereiche="$(printf '%s' "$andere" | "$SKRIPTE/bereiche.sh")" || return 1
+    [ "$(printf '%s\n' "$bereiche" | grep -c '=false$')" = 3 ] || return 1
+    printf '%s\n' "$bereiche" | grep -q '=true' && return 1
   fi
   return 0
-}
-
-ist_migration() {
-  case "$1" in migrations/*/*) return 1 ;; migrations/*) return 0 ;; *) return 1 ;; esac
 }
 
 vorgaenger() {
