@@ -205,6 +205,14 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Archiv der verwahrenden Instanz; verschlüsselt an die Schlüssel ihrer Org (LLH-1494)",
     ),
     (
+        "einsatz_archiv_eingespielt",
+        "Eingespieltes Archiv dieser Instanz; der Einsatz ist ein beendeter Spiegel (LLH-1494)",
+    ),
+    (
+        "archiv_konto",
+        "Platzhalter-Konten eines eingespielten Archivs an dieser Instanz (LLH-1494)",
+    ),
+    (
         "verwahrung_angenommen",
         "Stand der Annahme an der verwahrenden Instanz; nur sie vergleicht ihn",
     ),

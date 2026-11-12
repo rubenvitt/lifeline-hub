@@ -89,6 +89,29 @@ pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateErro
     migrationslauf::einspielen(sqlx::migrate!("./migrations"), pool).await
 }
 
+/// Ob die Datenbank genau auf dem Stand dieser Version ist: alle eingebetteten Migrationen
+/// eingespielt, keine fremde dazu. Für Befehle, die neben dem laufenden Server schreiben und
+/// darum selbst nicht migrieren dürfen (LLH-1494). Liefert die Abweichung als Text.
+pub async fn stand_abweichung(pool: &SqlitePool) -> Result<Option<String>, sqlx::Error> {
+    let eingespielt: Vec<i64> =
+        sqlx::query_scalar("SELECT version FROM _sqlx_migrations WHERE success ORDER BY version")
+            .fetch_all(pool)
+            .await?;
+    let eigene: Vec<i64> = sqlx::migrate!("./migrations")
+        .iter()
+        .map(|m| m.version)
+        .collect();
+    let fehlen = eigene.iter().filter(|v| !eingespielt.contains(v)).count();
+    let fremd = eingespielt.iter().filter(|v| !eigene.contains(v)).count();
+    Ok(match (fehlen, fremd) {
+        (0, 0) => None,
+        (n, 0) => Some(format!("{n} Migrationen dieser Version fehlen")),
+        (_, n) => Some(format!(
+            "{n} Migrationen einer neueren Version sind eingespielt"
+        )),
+    })
+}
+
 /// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird), mit
 /// eingespielten Migrationen.
 ///

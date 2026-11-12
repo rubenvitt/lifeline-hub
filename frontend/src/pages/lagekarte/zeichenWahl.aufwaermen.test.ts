@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Eigenes Modul je Datei: die Merker in `zeichenWahl.ts` sind Modulzustand, hier zählt der kalte
 // Anfang. Die Zählung läuft über die Vokabularfragen der Bibliothek (jede zeichnet probeweise).
-vi.mock('@einsatzzeichen/core', async (original) => {
-  const echt = await original<typeof import('@einsatzzeichen/core')>();
+vi.mock('@einsatzzeichen/core/exact', async (original) => {
+  const echt = await original<typeof import('@einsatzzeichen/core/exact')>();
   return {
     ...echt,
     vocabulary: vi.fn(echt.vocabulary),
@@ -12,7 +12,8 @@ vi.mock('@einsatzzeichen/core', async (original) => {
   };
 });
 
-const { vocabulary, freestandingVocabulary, drawAnySpec } = await import('@einsatzzeichen/core');
+const { vocabulary, freestandingVocabulary, drawAnySpec } =
+  await import('@einsatzzeichen/core/exact');
 const {
   GRUNDZEICHEN_NAMEN,
   detailOptionen,

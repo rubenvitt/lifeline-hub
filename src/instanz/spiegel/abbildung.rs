@@ -4,8 +4,11 @@
 //! - Stammdaten und Konten bildet die meldende Seite ab, denn nur sie hält
 //!   `stammdaten_herkunft` ([`stammdaten_fremd`], [`stammdaten_lokal`]).
 //! - Ein Konto ohne Gegenstück zeigt auf einen Stellvertreter ([`stellvertreter`]).
+//! - Vorher versucht jede Seite die Ursprungskennung ([`nach_ursprung`], LLH-1497): Zeilen aus
+//!   derselben Quelle gelten als dieselben, auch über eine Direktkopplung ohne Stammdaten.
 
 use super::paket::KontoAngabe;
+use crate::error::AppError;
 use crate::instanz::stammdaten::StammdatenArt;
 use sqlx::SqliteConnection;
 
@@ -95,12 +98,15 @@ pub async fn konto_lokal(
     angabe: &KontoAngabe,
 ) -> Result<i64, sqlx::Error> {
     // Die Kennung des Absenders zählt nur für ein echtes Konto der Org des Einsatzes: nie für ein
-    // Konto einer anderen Org und nie für einen Stellvertreter (auch nicht einer anderen Kopplung).
+    // Konto einer anderen Org und nie für einen Stellvertreter (auch nicht einer anderen Kopplung)
+    // oder ein Platzhalter eines eingespielten Archivs (das Einspielen trägt seine eigenen erst nach
+    // der Übernahme in `archiv_konto` ein).
     if let Some(id) = angabe.gegen_id {
-        let gibt: Option<i64> = sqlx::query_scalar(
+        let gibt: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT b.id FROM benutzer b WHERE b.id = ? AND b.org_id = ? \
-             AND NOT EXISTS (SELECT 1 FROM spiegel_konto sk WHERE sk.benutzer_id = b.id)",
-        )
+             AND {}",
+            super::OHNE_STELLVERTRETER
+        )))
         .bind(id)
         .bind(org_id)
         .fetch_optional(&mut *conn)
@@ -112,6 +118,17 @@ pub async fn konto_lokal(
     if meldend {
         if let Some(id) =
             stammdaten_lokal(conn, kopplung_org_id, StammdatenArt::Konto, angabe.id).await?
+        {
+            return Ok(id);
+        }
+    }
+    if let Some(u) = &angabe.ursprung {
+        if let Some(id) = nach_ursprung(conn, org_id, StammdatenArt::Konto, u)
+            .await
+            .map_err(|e| match e {
+                AppError::Database(d) => d,
+                andere => sqlx::Error::Protocol(andere.to_string()),
+            })?
         {
             return Ok(id);
         }
@@ -161,4 +178,81 @@ pub async fn stellvertreter(
         .execute(&mut *conn)
         .await?;
     Ok(id)
+}
+
+/// Ursprungskennung einer eigenen Stammdatenzeile (LLH-1497, design.md D5): die übernommene,
+/// sonst die eigene Instanz mit der lokalen ID. Eine ID ist je Tabelle eindeutig, darum ohne Org.
+/// `None` ohne eigene Instanzkennung, etwa beim Liefern aus einer Archivdatei (LLH-1494): dann
+/// wird keine erfunden, und die Gegenseite bildet wie bisher ab.
+pub async fn ursprung(
+    conn: &mut SqliteConnection,
+    art: StammdatenArt,
+    id: i64,
+) -> Result<Option<String>, sqlx::Error> {
+    let gespeichert: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT ursprung FROM stammdaten_herkunft WHERE art = ? AND lokaler_schluessel = ? \
+         ORDER BY id LIMIT 1",
+    )
+    .bind(art.as_str())
+    .bind(id.to_string())
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(Some(u)) = gespeichert {
+        return Ok(Some(u));
+    }
+    let ich: Option<String> = sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
+        .fetch_optional(&mut *conn)
+        .await?;
+    Ok(ich.map(|ich| format!("{ich}/{id}")))
+}
+
+/// Ursprungskennung eines Kontos; `None` für einen Stellvertreter (er ist nie ein echtes Konto).
+pub async fn konto_ursprung(
+    conn: &mut SqliteConnection,
+    id: i64,
+) -> Result<Option<String>, sqlx::Error> {
+    let stellvertreter: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM spiegel_konto WHERE benutzer_id = ?)")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if stellvertreter {
+        return Ok(None);
+    }
+    ursprung(conn, StammdatenArt::Konto, id).await
+}
+
+/// Die eigene Zeile der Org `org_id` mit dieser Ursprungskennung (LLH-1497, design.md D5): eigenes
+/// Präfix → die lokale Zeile, sonst die übernommene. Nur eine Zeile, die es in der Org gibt; ein
+/// Konto nur, wenn es kein Stellvertreter ist.
+pub async fn nach_ursprung(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    art: StammdatenArt,
+    ursprung: &str,
+) -> Result<Option<i64>, AppError> {
+    let Some(lokal) =
+        crate::instanz::stammdaten::herkunft::find_nach_ursprung(conn, org_id, art, ursprung)
+            .await?
+    else {
+        return Ok(None);
+    };
+    let Ok(id) = lokal.parse::<i64>() else {
+        return Ok(None);
+    };
+    let tabelle = crate::instanz::stammdaten::art::beschreibung(art).tabelle;
+    let gibt: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT EXISTS (SELECT 1 FROM {tabelle} WHERE id = ? AND org_id = ?)"
+    )))
+    .bind(id)
+    .bind(org_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if !gibt {
+        return Ok(None);
+    }
+    if art == StammdatenArt::Konto && konto_ursprung(conn, id).await?.is_none() {
+        return Ok(None);
+    }
+    Ok(Some(id))
 }

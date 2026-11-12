@@ -1,6 +1,6 @@
 import { Button, Popconfirm, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import type {
   FreiesZeichen,
   FreiesZeichenPatch,

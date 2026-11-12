@@ -72,7 +72,7 @@ fn abgelaufene_und_spaete_fristen() {
     );
 }
 
-async fn leitung(pool: &SqlitePool) -> i64 {
+pub(super) async fn leitung(pool: &SqlitePool) -> i64 {
     sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
         .execute(pool)
         .await
@@ -88,7 +88,7 @@ async fn leitung(pool: &SqlitePool) -> i64 {
 }
 
 /// Trägt einen geprüften Archiv-Schlüssel ein und liefert den privaten.
-async fn schluessel(pool: &SqlitePool) -> age::x25519::Identity {
+pub(super) async fn schluessel(pool: &SqlitePool) -> age::x25519::Identity {
     let id = age::x25519::Identity::generate();
     let r = id.to_public();
     sqlx::query(
@@ -501,13 +501,37 @@ async fn start_raeumt_liegengebliebene_zwischendateien_weg() {
         .path()
         .join("lifeline-zwischen-archiv-7-voll-00ff.sqlite-journal");
     let fremd = dir.path().join("sicherung.sqlite");
-    for p in [&liegen, &nachbar, &fremd] {
+    // Ein Einspielen läuft als eigener Prozess: seine Datei geht erst, wenn sie lange liegt.
+    let einspielen_frisch = dir
+        .path()
+        .join("lifeline-zwischen-archiv-0-einspielen-0a.sqlite");
+    let einspielen_alt = dir
+        .path()
+        .join("lifeline-zwischen-archiv-0-einspielen-0b.sqlite");
+    for p in [
+        &liegen,
+        &nachbar,
+        &fremd,
+        &einspielen_frisch,
+        &einspielen_alt,
+    ] {
         std::fs::write(p, b"x").unwrap();
     }
+    std::fs::File::options()
+        .write(true)
+        .open(&einspielen_alt)
+        .unwrap()
+        .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 3600))
+        .unwrap();
     zwischendateien_aufraeumen(&pool).await;
     assert!(!liegen.exists());
     assert!(!nachbar.exists());
     assert!(fremd.exists(), "nur Zwischendateien des Archivbaus");
+    assert!(
+        einspielen_frisch.exists(),
+        "ein laufendes Einspielen behält seine Datei"
+    );
+    assert!(!einspielen_alt.exists());
     assert!(dir.path().join("hub.sqlite").exists());
 }
 

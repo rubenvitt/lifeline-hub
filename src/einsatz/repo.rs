@@ -331,6 +331,8 @@ macro_rules! spiegel_spalten {
     () => {
         "sp.einsatz_id IS NOT NULL AS spiegel_ist, spk.gegenueber_name AS spiegel_gegenstelle, \
          sp.letzter_abgleich_at AS spiegel_abgleich_at, sp.beendet_at AS spiegel_beendet_at, \
+         (SELECT ae.loeschen_at FROM einsatz_archiv_eingespielt ae WHERE ae.einsatz_id = e.id) \
+             AS spiegel_archiv_bis, \
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \
              AND sa.zustand IN ('ausstehend', 'zugestellt')) AS spiegel_ausstehend, \
          (SELECT COUNT(*) FROM spiegel_antrag sa WHERE sa.einsatz_id = e.id \

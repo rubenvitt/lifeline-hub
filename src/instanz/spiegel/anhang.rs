@@ -444,34 +444,52 @@ pub async fn uebernehme_teile(
         let Some(tab) = schema.tabelle(&t.art) else {
             continue;
         };
-        let Some(spalte) = &tab.blob else { continue };
-        sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
-            .execute(&mut *conn)
-            .await?;
-        let geschrieben = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "UPDATE {} SET \"{spalte}\" = ? WHERE {}",
-            tab.name,
-            tab.schluessel.gleich(tab.name)
-        )))
-        .bind(&inhalt)
-        .bind(&lokal)
-        .execute(&mut *conn)
-        .await;
-        sqlx::query("DELETE FROM spiegel_uebernahme")
-            .execute(&mut *conn)
-            .await?;
-        geschrieben?;
-        sqlx::query(
-            "UPDATE spiegel_anhang SET fertig_at = ? WHERE art = ? AND lokaler_schluessel = ?",
-        )
-        .bind(crate::zeit::jetzt())
-        .bind(&t.art)
-        .bind(&lokal)
-        .execute(&mut *conn)
-        .await?;
+        if tab.blob.is_none() {
+            continue;
+        }
+        inhalt_einsetzen(conn, tab, &t.art, &lokal, &inhalt).await?;
         fertig.push(einsatz_id);
     }
     Ok(fertig)
+}
+
+/// Schreibt einen geprüften Inhalt unter dem Merker in seine Zeile und hakt ihn in
+/// `spiegel_anhang` ab, in der Transaktion des Aufrufers. Auch das Einspielen eines Archivblocks
+/// (LLH-1494) schreibt so. Liefert, ob es die Zeile gab; abgehakt wird in jedem Fall.
+pub async fn inhalt_einsetzen(
+    conn: &mut SqliteConnection,
+    tab: &schema::Tabelle,
+    art: &str,
+    lokal: &str,
+    inhalt: &[u8],
+) -> Result<bool, AppError> {
+    let spalte = tab
+        .blob
+        .as_deref()
+        .ok_or_else(|| AppError::Internal(format!("{} hat keinen Inhalt", tab.name)))?;
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *conn)
+        .await?;
+    let geschrieben = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "UPDATE {} SET \"{spalte}\" = ? WHERE {}",
+        tab.name,
+        tab.schluessel.gleich(tab.name)
+    )))
+    .bind(inhalt)
+    .bind(lokal)
+    .execute(&mut *conn)
+    .await;
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *conn)
+        .await?;
+    let zeilen = geschrieben?.rows_affected();
+    sqlx::query("UPDATE spiegel_anhang SET fertig_at = ? WHERE art = ? AND lokaler_schluessel = ?")
+        .bind(crate::zeit::jetzt())
+        .bind(art)
+        .bind(lokal)
+        .execute(&mut *conn)
+        .await?;
+    Ok(zeilen > 0)
 }
 
 #[cfg(test)]

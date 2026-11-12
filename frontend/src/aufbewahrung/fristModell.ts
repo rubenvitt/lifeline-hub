@@ -50,9 +50,7 @@ export function darfFristSetzen(
 
 /** Grund der Sperre an der Frist: am Spiegel die führende Instanz, sonst die Rollen. */
 export function fristSperrGrund(einsatz: FristEinsatzKontext): string {
-  return einsatz?.spiegel != null
-    ? spiegelGrund(einsatz.spiegel.gegenstelle)
-    : NUR_LEITUNG_ORG_ADMIN;
+  return einsatz?.spiegel != null ? spiegelGrund(einsatz.spiegel) : NUR_LEITUNG_ORG_ADMIN;
 }
 
 /**
