@@ -20,7 +20,7 @@ import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { antdToken, dichten, farbenDunkel } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
-import { contrastSurface } from '@einsatzzeichen/core';
+import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { ConfigProvider, theme } from 'antd';
 import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 
