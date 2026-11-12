@@ -342,6 +342,6 @@ Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 
 ## Open Questions
 
-- Soll `lifeline-hub zugang lage` die Karte standardmäßig weglassen (`?karte=none`)? Für die
-  Prüfung am Terminal ist die kurze Antwort lesbarer; entschieden wird beim Bau, die Route ändert
-  sich dadurch nicht.
+Keine mehr. Beim Bau entschieden (12.11.2026): `lifeline-hub zugang lage` lässt die Karte ohne
+`--karte` weg (`?karte=none`); am Terminal zählen Einsatz und Zahlen, die Route ändert sich
+dadurch nicht.

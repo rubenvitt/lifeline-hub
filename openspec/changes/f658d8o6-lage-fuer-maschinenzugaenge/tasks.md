@@ -16,7 +16,7 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 - [x] 2.2 Tabelle in `einsatz::schwaerzung_registry::TABELLEN` und `instanz::spiegel::art::AUSGENOMMEN` einordnen; die Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, `entdeckte_tabellen_gleich_registry_tabellen` und `art::tests::jede_einsatztabelle_ist_eingeordnet` grün
 - [x] 2.3 `Scope::has_einsatzbezug()` mit Unit-Test: wahr für `lage:read`, falsch für alle anderen heutigen Scopes
 - [x] 2.4 `src/public_api/freigabe.rs` mit `list_fuer_einsatz`, `freigeben_tx`, `beenden_tx`, `delete_fuer_einsatz_tx`, `delete_fuer_zugang_tx`, `freigegebener_einsatz`; Unit-Tests: Neu, Keine, Abgelöst, ein Einsatz für zwei Zugänge, wirksam nur am aktiven und nicht gelöschten Einsatz, Liste ohne widerrufene, abgelaufene und nicht freigebbare Zugänge
-- [ ] 2.5 ADR-0029 nach D12 anlegen (`scripts/adr-fuer.sh --alle` für die Nummer, Vorlage `VORLAGE.md`, unter 80 Zeilen, Prüfblock); `scripts/check-architektur.sh` grün
+- [x] 2.5 ADR-0029 nach D12 anlegen (`scripts/adr-fuer.sh --alle` für die Nummer, Vorlage `VORLAGE.md`, unter 80 Zeilen, Prüfblock); `scripts/check-architektur.sh` grün
 
 ## 3. Route `GET /api/v1/lage` (D1, D6, D7, D8; Spec `lage-schnittstelle`)
 
@@ -44,33 +44,33 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 
 ## 5. Oberfläche (D10)
 
-- [ ] 5.1 `frontend/src/api/anbindungen.ts`: `loadEinsatzAnbindungen`, `schalteAnbindungFreigabe`; Query-Key `einsatzKeys.anbindungen` in `NICHT_LIVE_KEYS` mit Doku-Zeile; `queryKeys.guard.test.ts` und `queryKeys.test.ts` grün
-- [ ] 5.2 `EinsatzAnbindungen.tsx` mit reiner Funktion für die Zustandszeile; Tests: drei Zustände, „wartet auf Schlüssel“, Rechte sichtbar, Schalter gesperrt ohne Leitung und am abgeschlossenen Einsatz, Paneel fehlt ohne Zugang, Ladefehler sichtbar, Umschalten setzt die Antwort
-- [ ] 5.3 In `EinsatzGeraete.tsx` einbinden mit der Bedingung von `darfLagebild`; `EinsatzGeraete.test.tsx` um den Block „Anbindungen“ ergänzen
-- [ ] 5.4 `Anbindungen.tsx` und `AnbindungAnsicht.tsx` zeigen „liest {Einsatz}“ oder „kein Einsatz freigegeben“ bei Zugängen mit „Lage lesen“, sonst nichts; Tests in `Anbindungen.test.tsx`
+- [x] 5.1 `frontend/src/api/anbindungen.ts`: `loadEinsatzAnbindungen`, `schalteAnbindungFreigabe`; Query-Key `einsatzKeys.anbindungen` in `NICHT_LIVE_KEYS` mit Doku-Zeile; `queryKeys.guard.test.ts` und `queryKeys.test.ts` grün
+- [x] 5.2 `EinsatzAnbindungen.tsx` mit reiner Funktion für die Zustandszeile; Tests: drei Zustände, „wartet auf Schlüssel“, Rechte sichtbar, Schalter gesperrt ohne Leitung und am abgeschlossenen Einsatz, Paneel fehlt ohne Zugang, Ladefehler sichtbar, Umschalten setzt die Antwort
+- [x] 5.3 In `EinsatzGeraete.tsx` einbinden mit der Bedingung von `darfLagebild`; `EinsatzGeraete.test.tsx` um den Block „Anbindungen“ ergänzen
+- [x] 5.4 `Anbindungen.tsx` und `AnbindungAnsicht.tsx` zeigen „liest {Einsatz}“ oder „kein Einsatz freigegeben“ bei Zugängen mit „Lage lesen“, sonst nichts; Tests in `Anbindungen.test.tsx`
 - [ ] 5.5 e2e in `frontend/e2e/anbindungen.spec.ts`: Admin legt Anbindung mit „Lage lesen“ an, Einsatzleitung schaltet sie auf „Geräte“ ein, die Seite „Anbindungen“ nennt den Einsatz; lokal mit `./scripts/check-all.sh --geaendert` oder Label `e2e` am PR belegt
 - [ ] 5.6 `mise exec -- pnpm -C frontend lint`, `typecheck` und die betroffenen Vitest-Dateien grün; Prettier über `frontend/`
 
 ## 6. Alten Weg entfernen (D9)
 
-- [ ] 6.1 Backend: `src/lagemonitor_zugang/`, `src/routes/lagemonitor_zugang.rs`, `src/routes/lagemonitor_v1.rs`, Routen in `src/app.rs`, Eintrag in `src/einsatz/modul.rs`, Typen in `src/api_doc.rs`, `BEZEICHNUNG_MAX` in `tests/eingabegrenzen_spiegel.rs` entfernen; `tests/lagemonitor_v1.rs` löschen, seine Inhaltsprüfungen sind in Gruppe 3 und 4 aufgegangen (vorher gegenlesen); `cargo check --all-targets` grün
-- [ ] 6.2 Tests anpassen: `tests/lagebild_extern.rs` (ein `llh_lb_`-Schlüssel an `/api/v1/lage` → 401), `tests/maschinenzugang.rs` (`kein_bearer_und_keine_sitzung_unter_v1` ohne Lagemonitor-Zugang), `tests/programmpunkt.rs` (`/api/v1/lage` trägt kein Programm); neuer Test: `GET /api/lagemonitor/v1/lage` → 404
-- [ ] 6.3 Migration `0336_lagemonitor_zugang_entfernen.sql` (Kind zuerst, ohne Marker), Einträge in `schwaerzung_registry` und `spiegel::art` entfernen; Registry-Wächter, `keine_toten_registry_eintraege` und `scripts/check-migrationen.sh` grün; Test: eine Datenbank mit Zeilen in beiden Tabellen migriert ohne Fehler
-- [ ] 6.4 Admin-Spur: `LesezugangAngelegt`/`LesezugangWiderrufen` bleiben lesbar, der Schreibweg (`Ziel::Lesezugang`) entfällt, soweit ungenutzt; `tests/enum_wire_kontrakt.rs` und der Test zu Migration 0269 in `src/db.rs` grün
-- [ ] 6.5 Frontend: `LagemonitorZugaenge.tsx`, `EinsatzLagemonitore.tsx`, `api/lagemonitorZugaenge.ts`, Nav-Eintrag, beide Query-Keys, `LAGEMONITOR_BEZEICHNUNG_MAX`, Barrel-Exporte und ihre Tests entfernen; Texte des Zugangsprotokolls für alte Einträge bleiben; `scripts/check-typ-codegen.sh`, Lint, Typecheck und Vitest grün
-- [ ] 6.6 `git grep -n 'llh_lm_\|lagemonitor-zugaenge\|lagemonitor/v1\|lagemonitor_zugang\|lagemonitor_freigabe'` zeigt nur noch Migrationen 0269/0270/0336, den 401- und den 404-Test, Admin-Spur-Texte und Doku-Verweise auf die Vergangenheit
+- [x] 6.1 Backend: `src/lagemonitor_zugang/`, `src/routes/lagemonitor_zugang.rs`, `src/routes/lagemonitor_v1.rs`, Routen in `src/app.rs`, Eintrag in `src/einsatz/modul.rs`, Typen in `src/api_doc.rs`, `BEZEICHNUNG_MAX` in `tests/eingabegrenzen_spiegel.rs` entfernen; `tests/lagemonitor_v1.rs` löschen, seine Inhaltsprüfungen sind in Gruppe 3 und 4 aufgegangen (vorher gegenlesen); `cargo check --all-targets` grün
+- [x] 6.2 Tests anpassen: `tests/lagebild_extern.rs` (ein `llh_lb_`-Schlüssel an `/api/v1/lage` → 401), `tests/maschinenzugang.rs` (`kein_bearer_und_keine_sitzung_unter_v1` ohne Lagemonitor-Zugang), `tests/programmpunkt.rs` (`/api/v1/lage` trägt kein Programm); neuer Test: `GET /api/lagemonitor/v1/lage` → 404
+- [x] 6.3 Migration `0336_lagemonitor_zugang_entfernen.sql` (Kind zuerst, ohne Marker), Einträge in `schwaerzung_registry` und `spiegel::art` entfernen; Registry-Wächter, `keine_toten_registry_eintraege` und `scripts/check-migrationen.sh` grün; Test: eine Datenbank mit Zeilen in beiden Tabellen migriert ohne Fehler
+- [x] 6.4 Admin-Spur: `LesezugangAngelegt`/`LesezugangWiderrufen` bleiben lesbar, der Schreibweg (`Ziel::Lesezugang`) entfällt, soweit ungenutzt; `tests/enum_wire_kontrakt.rs` und der Test zu Migration 0269 in `src/db.rs` grün
+- [x] 6.5 Frontend: `LagemonitorZugaenge.tsx`, `EinsatzLagemonitore.tsx`, `api/lagemonitorZugaenge.ts`, Nav-Eintrag, beide Query-Keys, `LAGEMONITOR_BEZEICHNUNG_MAX`, Barrel-Exporte und ihre Tests entfernen; Texte des Zugangsprotokolls für alte Einträge bleiben; `scripts/check-typ-codegen.sh`, Lint, Typecheck und Vitest grün
+- [x] 6.6 `git grep -n 'llh_lm_\|lagemonitor-zugaenge\|lagemonitor/v1\|lagemonitor_zugang\|lagemonitor_freigabe'` zeigt nur noch Migrationen 0269/0270/0336, den 401- und den 404-Test, Admin-Spur-Texte und Doku-Verweise auf die Vergangenheit
 
 ## 7. Referenz-Client und Kommando (D11)
 
-- [ ] 7.1 `crates/lifeline-machine-client`: `http::lage` mit `?karte=`; Test gegen den Testserver (signiert, Antwortsignatur geprüft, `htu` mit Abfrage)
-- [ ] 7.2 `lifeline-hub zugang lage` in `src/public_api/kommando.rs` und `src/config.rs`; Unit-Test der Ausgabe, offene Frage zur Karte aus design.md dabei entscheiden und dort vermerken
-- [ ] 7.3 `docs/api/maschinenzugang.md`: Kommando und Client-Aufruf im Abschnitt „Lage lesen“ und unter „Referenz-Clients“; das dokumentierte Kommando läuft wie beschrieben gegen einen lokalen Server
+- [x] 7.1 `crates/lifeline-machine-client`: `http::lage` mit `?karte=`; Test gegen den Testserver (signiert, Antwortsignatur geprüft, `htu` mit Abfrage)
+- [x] 7.2 `lifeline-hub zugang lage` in `src/public_api/kommando.rs` und `src/config.rs`; Unit-Test der Ausgabe, offene Frage zur Karte aus design.md dabei entscheiden und dort vermerken
+- [x] 7.3 `docs/api/maschinenzugang.md`: Kommando und Client-Aufruf im Abschnitt „Lage lesen“ und unter „Referenz-Clients“; das dokumentierte Kommando läuft wie beschrieben gegen einen lokalen Server
 
 ## 8. Doku und Architektur (D12, D13)
 
 - [ ] 8.1 Anwenderkapitel `externe-lagemonitore.md` neu fassen (Kopf mit neuen `quellen`, vier Abschnitte), jeden Ablauf am laufenden System nachklicken; `anbindungen.md` um Freigabe und gelesenen Einsatz ergänzen; Verweise in `verwaltung.md`, `zugangsprotokoll.md`, `lagebild-extern.md`, `README.md`; `mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` grün
-- [ ] 8.2 arc42: Kapitel 5 (Zeile `src/lagemonitor_zugang` weg, `public_api` und `routes/einsatz_anbindungen` ergänzt), Kapitel 11 (R33 ohne Lagemonitor-Bearer); ADR-0022 `gilt_fuer` ohne die entfernten Pfade; `scripts/check-architektur.sh` grün
-- [ ] 8.3 Konzept `docs/konzepte/2026-11-11-oeffentliche-api.md`: datierter Nachtrag an D6 (kein Übergang, Verweis auf diese Change); `grep` nach verbliebenen Verweisen auf `/api/lagemonitor/v1/lage` in `docs/` außerhalb von Archiv und Konzepthistorie ohne Treffer
+- [x] 8.2 arc42: Kapitel 5 (Zeile `src/lagemonitor_zugang` weg, `public_api` und `routes/einsatz_anbindungen` ergänzt), Kapitel 11 (R33 ohne Lagemonitor-Bearer); ADR-0022 `gilt_fuer` ohne die entfernten Pfade; `scripts/check-architektur.sh` grün
+- [x] 8.3 Konzept `docs/konzepte/2026-11-11-oeffentliche-api.md`: datierter Nachtrag an D6 (kein Übergang, Verweis auf diese Change); `grep` nach verbliebenen Verweisen auf `/api/lagemonitor/v1/lage` in `docs/` außerhalb von Archiv und Konzepthistorie ohne Treffer
 - [ ] 8.4 Kommentar an LGM-13 und LGM-14 in Zunder: neue Adresse `GET /api/v1/lage`, Einlösen per Code, Wire-Namen nach D6/D7 (über `add_comment`, im Main-Loop)
 
 ## 9. Integration
