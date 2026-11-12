@@ -1074,6 +1074,20 @@
           "angelegt_at": {
             "type": "string"
           },
+          "einsatz_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der aktive Einsatz, den der Zugang gerade liest (Freigabe der Einsatzleitung, LLH-1638)."
+          },
           "fingerabdruck": {
             "type": [
               "string",
@@ -1165,6 +1179,50 @@
           },
           "zugang": {
             "$ref": "#/components/schemas/AnbindungAnzeige"
+          }
+        }
+      },
+      "AnbindungFreigabe": {
+        "type": "object",
+        "description": "Ein Maschinenzugang aus Sicht eines Einsatzes (Paneel „Anbindungen“ der Seite „Geräte“).",
+        "required": [
+          "zugang_id",
+          "name",
+          "scopes",
+          "zustand",
+          "freigegeben",
+          "anderer_einsatz"
+        ],
+        "properties": {
+          "anderer_einsatz": {
+            "type": "boolean",
+            "description": "Der Zugang liest gerade einen anderen aktiven Einsatz; Einschalten stellt ihn um."
+          },
+          "freigegeben": {
+            "type": "boolean",
+            "description": "Der Zugang liest diesen Einsatz."
+          },
+          "name": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "zugang_id": {
+            "type": "string"
+          },
+          "zuletzt_genutzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/ZugangZustand",
+            "description": "`wartet`, solange das Fremdsystem seinen Code noch nicht eingelöst hat."
           }
         }
       },

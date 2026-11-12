@@ -16,7 +16,6 @@ use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::einsatz::Einsatzart;
 use crate::error::AppError;
-use crate::etb::EtbTyp;
 use crate::extract::{JsonBody, PfadParam};
 use crate::instanz::spiegel::{Freigabestufe, SpiegelKategorie};
 use crate::lage_zone::LageZoneTyp;
@@ -29,12 +28,14 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
 use super::lagemonitor::{
     build_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
     LagemonitorKraefte, LagemonitorLagemeldung, LagemonitorUhsZahl, KARTE_AUS,
+};
+use super::leitung_freigabe::{
+    etb_vermerken, fordere_freigabe_moeglich, im_tx_aktiv, SpiegelEintrag,
 };
 
 /// Version des Drahtformats (`/v1`). Neue Felder kommen nur hinzu; wer eines entfernt oder
@@ -90,77 +91,6 @@ const OEFFENTLICHE_ZONEN: &[LageZoneTyp] = &[
 // ---------------------------------------------------------------------------------------------
 // Freigaben der Einsatzleitung
 // ---------------------------------------------------------------------------------------------
-
-/// Darf die Einsatzleitung hier freigeben? Aktiver Einsatz, und diese Instanz führt ihn oder hält
-/// ihn als Spiegel (design.md D2). Wer einen Einsatz nicht führt, hält ihn als Spiegel, der
-/// ETB-Eintrag geht dann als Antrag an den Führer (LLH-1641, ADR-0028).
-fn fordere_freigabe_moeglich(ctx: &EinsatzLesezugriff) -> Result<(), AppError> {
-    ctx.fordere_einsatzleitung()?;
-    if !ctx.einsatz.ist_aktiv() {
-        return Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Prüfung in der Transaktion: der Status des Einsatzes (`fordere_aktiv_in_tx` beim Führer). Am
-/// Spiegel führt immer die andere Instanz, der Eintrag geht dort als Antrag.
-async fn im_tx_aktiv(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    spiegel: bool,
-) -> Result<(), AppError> {
-    if !spiegel {
-        return crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await;
-    }
-    let status: Option<String> = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
-        .bind(einsatz_id)
-        .fetch_optional(&mut *conn)
-        .await?;
-    if status.as_deref() != Some("aktiv") {
-        return Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Schreibt den ETB-Eintrag einer Freigabe (design.md D7): beim Führer als Systemeintrag, am
-/// Spiegel als Antrag an den Führer. Liefert die id eines direkt geschriebenen Eintrags.
-async fn etb_vermerken(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    spiegel: Option<SpiegelEintrag<'_>>,
-    von: i64,
-    text: &str,
-) -> Result<Option<i64>, AppError> {
-    if let Some(s) = spiegel {
-        crate::instanz::spiegel::antrag::etb_beantragen_tx(
-            conn,
-            einsatz_id,
-            von,
-            EtbTyp::Entscheidung,
-            text,
-            s.von,
-            s.an,
-        )
-        .await?;
-        return Ok(None);
-    }
-    let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
-    Ok(Some(
-        crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, text).await?,
-    ))
-}
-
-/// Von und An des Antrags am Spiegel: beim Führer ist es eine Entscheidung der Person an den
-/// Empfänger des Links.
-#[derive(Clone, Copy)]
-struct SpiegelEintrag<'a> {
-    von: &'a str,
-    an: &'a str,
-}
 
 fn stufe_wort(stufe: LagebildStufe) -> &'static str {
     match stufe {

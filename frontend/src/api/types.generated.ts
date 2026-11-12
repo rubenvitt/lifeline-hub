@@ -467,6 +467,12 @@ export interface components {
         /** @description Ein Zugang, wie die Seite „Anbindungen“ ihn zeigt. Schlüssel nur als Fingerabdruck. */
         AnbindungAnzeige: {
             angelegt_at: string;
+            einsatz_bezeichnung?: string | null;
+            /**
+             * Format: int64
+             * @description Der aktive Einsatz, den der Zugang gerade liest (Freigabe der Einsatzleitung, LLH-1638).
+             */
+            einsatz_id?: number | null;
             fingerabdruck?: string | null;
             /** @description Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert. */
             fingerabdruck_neu?: string | null;
@@ -491,6 +497,19 @@ export interface components {
             code: string;
             laeuft_ab_at: string;
             zugang: components["schemas"]["AnbindungAnzeige"];
+        };
+        /** @description Ein Maschinenzugang aus Sicht eines Einsatzes (Paneel „Anbindungen“ der Seite „Geräte“). */
+        AnbindungFreigabe: {
+            /** @description Der Zugang liest gerade einen anderen aktiven Einsatz; Einschalten stellt ihn um. */
+            anderer_einsatz: boolean;
+            /** @description Der Zugang liest diesen Einsatz. */
+            freigegeben: boolean;
+            name: string;
+            scopes: components["schemas"]["Scope"][];
+            zugang_id: string;
+            zuletzt_genutzt_at?: string | null;
+            /** @description `wartet`, solange das Fremdsystem seinen Code noch nicht eingelöst hat. */
+            zustand: components["schemas"]["ZugangZustand"];
         };
         /** @description Die Zugänge der Org und, falls Anbindungen hier nicht angenommen werden, der Grund. */
         AnbindungenListe: {

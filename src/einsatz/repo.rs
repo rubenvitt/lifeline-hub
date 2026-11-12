@@ -719,6 +719,8 @@ pub async fn abschliessen(
         // LLH-1484: Externe Anzeigen zeigen nur laufende Einsätze; der Abschluss beendet ihre
         // Freigabe in derselben Transaktion.
         crate::lagemonitor_zugang::freigaben_loeschen_tx(&mut tx, einsatz_id).await?;
+        // LLH-1638: dasselbe für Maschinenzugänge, die diesen Einsatz lesen (ADR-0029).
+        crate::public_api::freigabe::delete_fuer_einsatz_tx(&mut tx, einsatz_id).await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
         {

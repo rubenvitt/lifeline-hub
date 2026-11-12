@@ -293,6 +293,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/geraete", None),
     // Freigabe für externe Anzeigen (LLH-1484): Verwaltung der Einsatzleitung wie die Geräte.
     ("/api/einsaetze/{id}/lagemonitor-zugaenge", None),
+    // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
+    ("/api/einsaetze/{id}/anbindungen", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Lagemonitore.
     ("/api/einsaetze/{id}/lagebild-freigaben", None),
 ];

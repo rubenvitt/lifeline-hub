@@ -26,21 +26,21 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 - [x] 3.4 Tests und Umsetzung: Scope fehlt → 403 `missing_scope`; Bearer `llh_lm_…` an `/api/v1/lage` → 401; abgeschlossener Einsatz → `einsatz: null`; Org-Doppelprüfung
 - [x] 3.5 Tests und Umsetzung Karte: `karte` und `karte_etag` bei der ersten Abfrage, `?karte=<etag>` ohne Karte, geänderte Zone ergibt neue Fassung, `?karte=none` ohne beides; `htu` mit Abfrage wird akzeptiert
 - [x] 3.6 Test und Umsetzung: keine Namen, keine Personenkennungen, kein Sachverhalt, kein Meldungstext, kein Zeichentext in der Antwort (Muster `lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_personen`); Block `sanitaetsdienst` nur bei gewählter Reihe; der Abruf zählt im Abrufprotokoll unter `/api/v1/lage`
-- [ ] 3.7 Test und Umsetzung Spiegel in `tests/instanz_spiegel.rs` oder daneben: gespiegelter Einsatz liefert Zahlen und `einsatz.spiegel`; selbst geführter ohne den Block; Freigabestufe ohne alle Kategorien ergibt `einsatz: null` (Unit-Test der Prüffunktion)
+- [x] 3.7 Test und Umsetzung Spiegel in `tests/instanz_spiegel.rs` oder daneben: gespiegelter Einsatz liefert Zahlen und `einsatz.spiegel`; selbst geführter ohne den Block; Freigabestufe ohne alle Kategorien ergibt `einsatz: null` (Unit-Test der Prüffunktion)
 - [x] 3.8 `cargo test --test public_api_spec_aktuell`, `docs/api/public-v1.json` mitcommitten; `scripts/check-typ-codegen.sh` grün
 - [x] 3.9 `docs/api/maschinenzugang.md`: Abschnitt „Lage lesen“ (Freigabe, Beispielantwort, `?karte=`, Kartenarten, `einsatz.spiegel`), Satz zur Freigabe in `src/public_api/description.md`; Prettier und der Test `beschreibung_nennt_genau_die_fehlercodes` grün
 
 ## 4. Freigabe durch die Einsatzleitung (D4, D5; Spec `maschinenzugang`)
 
-- [ ] 4.1 Helfer `im_tx_aktiv` und `etb_vermerken` aus `routes/lagebild_extern.rs` an einen gemeinsamen Ort legen; `cargo test --test lagebild_extern` grün
-- [ ] 4.2 Neue Testdatei `tests/einsatz_anbindungen.rs`: Liste zeigt nur freigebbare Zugänge der Org; Freigeben und Beenden mit ETB-Eintrag; idempotent ohne zweiten Eintrag; Umstellen mit Eintrag in beiden Einsätzen; zuerst rot
-- [ ] 4.3 `src/routes/einsatz_anbindungen.rs` mit den drei Routen, `AnbindungFreigabe` in `src/api_doc.rs`, Routen in `src/app.rs`, modul-loser Eintrag in `src/einsatz/modul.rs`; Tests aus 4.2 grün
-- [ ] 4.4 Tests und Umsetzung Rechte: Mitglied ohne Leitung und Admin ohne Rolle → 403; Zugang fremder Org, widerrufen, abgelaufen oder ohne Scope nach D3 → 404; abgeschlossener Einsatz → 409; Abschluss zwischen Extractor und Transaktion hinterlässt keine Freigabe
-- [ ] 4.5 Tests und Umsetzung Spiegel: Freigabe an einem Spiegel legt einen ETB-Antrag an und wirkt sofort; Beenden bei beendetem Abgleich wirkt ohne Antrag; Umstellen mit früherem Einsatz als Spiegel
-- [ ] 4.6 Ende beim Abschluss: `einsatz::repo::abschliessen` löscht die Freigaben des Einsatzes; Test „Abschluss beendet die Freigabe, `/api/v1/lage` zeigt `einsatz: null`“
-- [ ] 4.7 Ende bei Widerruf und Scope-Entzug in `routes/anbindungen.rs`: Zeile löschen, ETB-Eintrag beim Führer, keiner am Spiegel; Tests: Widerruf, Entzug von `lage:read`, erneutes Erteilen ohne Freigabe, andere Änderung (Name) lässt die Freigabe stehen
-- [ ] 4.8 `AnbindungAnzeige` um `einsatz_id?` und `einsatz_bezeichnung?` ergänzen (nur wirksame Freigabe); Test in `tests/maschinenzugang.rs`
-- [ ] 4.9 `scripts/check-typ-codegen.sh`; `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten
+- [x] 4.1 Helfer `im_tx_aktiv` und `etb_vermerken` aus `routes/lagebild_extern.rs` an einen gemeinsamen Ort legen; `cargo test --test lagebild_extern` grün
+- [x] 4.2 Neue Testdatei `tests/einsatz_anbindungen.rs`: Liste zeigt nur freigebbare Zugänge der Org; Freigeben und Beenden mit ETB-Eintrag; idempotent ohne zweiten Eintrag; Umstellen mit Eintrag in beiden Einsätzen; zuerst rot
+- [x] 4.3 `src/routes/einsatz_anbindungen.rs` mit den drei Routen, `AnbindungFreigabe` in `src/api_doc.rs`, Routen in `src/app.rs`, modul-loser Eintrag in `src/einsatz/modul.rs`; Tests aus 4.2 grün
+- [x] 4.4 Tests und Umsetzung Rechte: Mitglied ohne Leitung und Admin ohne Rolle → 403; Zugang fremder Org, widerrufen, abgelaufen oder ohne Scope nach D3 → 404; abgeschlossener Einsatz → 409; Abschluss zwischen Extractor und Transaktion hinterlässt keine Freigabe
+- [x] 4.5 Tests und Umsetzung Spiegel: Freigabe an einem Spiegel legt einen ETB-Antrag an und wirkt sofort; Beenden bei beendetem Abgleich wirkt ohne Antrag; Umstellen mit früherem Einsatz als Spiegel
+- [x] 4.6 Ende beim Abschluss: `einsatz::repo::abschliessen` löscht die Freigaben des Einsatzes; Test „Abschluss beendet die Freigabe, `/api/v1/lage` zeigt `einsatz: null`“
+- [x] 4.7 Ende bei Widerruf und Scope-Entzug in `routes/anbindungen.rs`: Zeile löschen, ETB-Eintrag beim Führer, keiner am Spiegel; Tests: Widerruf, Entzug von `lage:read`, erneutes Erteilen ohne Freigabe, andere Änderung (Name) lässt die Freigabe stehen
+- [x] 4.8 `AnbindungAnzeige` um `einsatz_id?` und `einsatz_bezeichnung?` ergänzen (nur wirksame Freigabe); Test in `tests/maschinenzugang.rs`
+- [x] 4.9 `scripts/check-typ-codegen.sh`; `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten
 
 ## 5. Oberfläche (D10)
 

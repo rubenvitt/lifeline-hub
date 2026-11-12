@@ -214,6 +214,7 @@ use utoipa::OpenApi;
         crate::routes::anbindungen::AnbindungAblehnung,
         crate::routes::anbindungen::AnbindungCode,
         crate::public_api::scope::Scope,
+        crate::public_api::freigabe::AnbindungFreigabe,
         crate::public_api::scope::ZugangZustand,
         crate::public_api::scope::AblehnungGrund,
         crate::routes::lagemonitor_zugang::LesezugangMitSchluessel,

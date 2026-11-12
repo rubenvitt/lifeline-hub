@@ -127,8 +127,12 @@ Rechte und Ablauf wie `routes/lagebild_extern.rs`, dessen Helfer dafür geteilt 
 - In der Transaktion `im_tx_aktiv`, dann Zugang prüfen (D3; sonst 404), dann `freigeben_tx`.
 - ETB-Eintrag: beim Führer `etb::system_audit_tx`, am Spiegel `etb_beantragen_tx` (Typ
   Entscheidung, „von“ die handelnde Person, „an“ der Name des Zugangs). Beim Umstellen bekommt
-  auch der frühere Einsatz seinen Eintrag, je nach dessen Lage direkt oder als Antrag; ist dort
-  der Abgleich beendet, entfällt er.
+  auch der frühere Einsatz seinen Eintrag: geführt direkt, als Spiegel per Antrag. Der Antrag
+  entfällt, wenn dort der Abgleich beendet ist oder die handelnde Person im früheren Einsatz
+  nicht zur Führung gehört (Nachtrag beim Bau, 12.11.2026): der Führer lehnte ihn sonst ab, und
+  er stünde der Person dauerhaft als abgelehnt in der Liste.
+- Freigeben an einem Spiegel, dessen Abgleich beendet ist, scheitert mit 409 (kein Antrag
+  möglich), wie beim Lagebild-Link: die Zahlen würden nicht mehr aktuell.
 - Beenden an einem Spiegel ohne laufenden Abgleich gilt ohne Antrag (wie beim Lagebild-Link).
 - Idempotent; das ETB nennt nur Wirkungen.
 

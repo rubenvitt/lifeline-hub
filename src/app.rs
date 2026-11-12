@@ -1473,6 +1473,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::lagemonitor_zugang::freigeben)
                 .delete(routes::lagemonitor_zugang::freigabe_beenden),
         )
+        // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
+        // Spiegel).
+        .route(
+            "/api/einsaetze/{id}/anbindungen",
+            get(routes::einsatz_anbindungen::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/anbindungen/{zid}/freigabe",
+            put(routes::einsatz_anbindungen::freigeben)
+                .delete(routes::einsatz_anbindungen::freigabe_beenden),
+        )
         // LLH-1496: Lagebild für Externe, Links je Empfänger (Einsatzleitung, auch am Spiegel).
         .route(
             "/api/einsaetze/{id}/lagebild-freigaben",

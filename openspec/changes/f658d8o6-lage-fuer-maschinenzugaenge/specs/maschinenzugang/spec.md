@@ -37,13 +37,18 @@ Zustand zeigen. Freigabe und Ende MUST im Einsatztagebuch stehen.
 ### Requirement: Ein Zugang liest höchstens einen Einsatz
 
 Für einen Maschinenzugang MUST höchstens ein Einsatz freigegeben sein. Gibt die Einsatzleitung
-einen zweiten Einsatz für denselben Zugang frei, SHALL die frühere Freigabe enden, und beide
-Einsatztagebücher MUST die Umstellung nennen. Ein Einsatz kann für mehrere Zugänge freigegeben
-sein.
+einen zweiten Einsatz für denselben Zugang frei, SHALL die frühere Freigabe enden. Das
+Einsatztagebuch des neuen Einsatzes MUST die Freigabe nennen, das des früheren die Umstellung,
+sofern die Instanz ihn führt oder die handelnde Person dort zur Führung gehört. Ein Einsatz kann
+für mehrere Zugänge freigegeben sein.
 
 #### Scenario: Umstellen
 - **WHEN** der Zugang den Einsatz A liest und die Einsatzleitung des Einsatzes B ihn dort einschaltet
 - **THEN** liest der Zugang nur noch den Einsatz B, im Paneel des Einsatzes A steht „liest einen anderen Einsatz“, und beide Einsatztagebücher nennen die Umstellung
+
+#### Scenario: Früherer Einsatz ist ein Spiegel ohne Rolle der Person
+- **WHEN** der Zugang einen gespiegelten Einsatz liest und eine Einsatzleitung ohne Rolle in diesem Einsatz ihn an ihrem eigenen Einsatz einschaltet
+- **THEN** liest der Zugang den neuen Einsatz, und für den früheren entsteht kein Antrag
 
 #### Scenario: Zwei Zugänge an einem Einsatz
 - **WHEN** die Einsatzleitung denselben Einsatz für zwei Zugänge freigibt
