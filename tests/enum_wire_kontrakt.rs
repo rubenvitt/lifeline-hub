@@ -683,6 +683,33 @@ fn serde_wire_gleich_as_str() {
         Aktiv => "aktiv",
         Widerrufen => "widerrufen",
     });
+    // Rechner-API Unterkunft (LLH-1524): Wire der öffentlichen API v1, wächst nur.
+    enum_wire!(lifeline_hub::public_api::rechner::UnterkunftWeg {
+        Personen => "personen",
+        Raeume => "raeume",
+        Flaeche => "flaeche",
+        Zelte => "zelte",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::PersonenGruppe {
+        Gesamt => "gesamt",
+        Maenner => "maenner",
+        Frauen => "frauen",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::RaumBelegung {
+        Maenner => "maenner",
+        Frauen => "frauen",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::ZeltTyp {
+        Sg20 => "sg20",
+        Sg30 => "sg30",
+        Sg40 => "sg40",
+        Sg50 => "sg50",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::RichtwertEbene {
+        Basis => "basis",
+        Org => "org",
+        Anfrage => "anfrage",
+    });
     enum_wire!(lifeline_hub::public_api::scope::AblehnungGrund {
         Uhr => "uhr",
         Signatur => "signatur",

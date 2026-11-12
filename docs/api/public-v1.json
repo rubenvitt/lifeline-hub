@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Lifeline Hub, öffentliche API",
-    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |\n| Abfrage | – | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |\n| Abfrage | – | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
     "version": "1"
   },
   "servers": [
@@ -130,6 +130,170 @@
         }
       }
     },
+    "/api/v1/rechner/unterkunft": {
+      "post": {
+        "tags": [
+          "Rechner"
+        ],
+        "summary": "Unterkunft und Zelte durchrechnen. Speichert nichts.",
+        "description": "Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert der\nOrganisation des Zugangs, sonst die Vorgabe des Programms. Werte eines Einsatzes gehören nicht\ndazu.",
+        "operationId": "calculate_unterkunft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnterkunftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis, wirksame Richtwerte und Stand der Basis; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnterkunftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ein Feld für sich ist ungültig: kein JSON, unbekanntes Feld, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg, `gesamt` neben einer Gruppe oder bei Trennung, Belegung eines Raums passt nicht zur Trennung",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rechner/unterkunft/richtwerte": {
+      "get": {
+        "tags": [
+          "Rechner"
+        ],
+        "summary": "Die Richtwerte des Rechners mit Bezeichnung, Einheit und Grenzen, dazu die Zelttypen.",
+        "description": "`wert` ist der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms.",
+        "operationId": "get_unterkunft_richtwerte",
+        "responses": {
+          "200": {
+            "description": "Richtwerte und Zelttypen; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnterkunftRichtwerteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
     "/api/v1/zugang/redeem": {
       "post": {
         "tags": [
@@ -204,6 +368,25 @@
   },
   "components": {
     "schemas": {
+      "AbzugAngabe": {
+        "type": "object",
+        "description": "Abzug von der Fläche eines Raums (Bühne, Fluchtweg). Maße in Metern, größer als 0 und\nhöchstens 1000.",
+        "required": [
+          "laenge_m",
+          "breite_m"
+        ],
+        "properties": {
+          "breite_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "laenge_m": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "ApiErrorBody": {
         "type": "object",
         "description": "Body jeder Fehlerantwort unter `/api/v1/`.",
@@ -240,6 +423,40 @@
           "internal_error",
           "unavailable"
         ]
+      },
+      "FlaecheAngabe": {
+        "type": "object",
+        "description": "Fläche in Quadratmetern, aufgeteilt wie `personen`.",
+        "properties": {
+          "frauen_m2": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 1000000,
+            "minimum": 0
+          },
+          "gesamt_m2": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 1000000,
+            "minimum": 0
+          },
+          "maenner_m2": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 1000000,
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
       },
       "Jwk": {
         "type": "object",
@@ -359,6 +576,104 @@
           }
         }
       },
+      "PersonenAngabe": {
+        "type": "object",
+        "description": "Personenzahl: ohne Trennung `gesamt` oder `maenner` und `frauen` (dann zählt die Summe), mit\nTrennung `maenner` und `frauen`.",
+        "properties": {
+          "frauen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "maximum": 1000000,
+            "minimum": 0
+          },
+          "gesamt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "maximum": 1000000,
+            "minimum": 0
+          },
+          "maenner": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "maximum": 1000000,
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "PersonenGruppe": {
+        "type": "string",
+        "description": "Gruppe, für die gerechnet wurde: alle zusammen oder Männer und Frauen getrennt.",
+        "enum": [
+          "gesamt",
+          "maenner",
+          "frauen"
+        ]
+      },
+      "RaumAngabe": {
+        "type": "object",
+        "description": "Ein Raum. Maße in Metern, größer als 0 und höchstens 1000.",
+        "required": [
+          "laenge_m",
+          "breite_m"
+        ],
+        "properties": {
+          "abzuege": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AbzugAngabe"
+            },
+            "description": "Höchstens 20 Abzüge."
+          },
+          "belegung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RaumBelegung",
+                "description": "Bei Trennung Pflicht, ohne Trennung nicht erlaubt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Höchstens 80 Zeichen; steht ohne Leerraum am Rand im Ergebnis."
+          },
+          "breite_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "laenge_m": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RaumBelegung": {
+        "type": "string",
+        "description": "Welche Gruppe einen Raum belegt (nur bei Trennung).",
+        "enum": [
+          "maenner",
+          "frauen"
+        ]
+      },
       "RedeemRequest": {
         "type": "object",
         "description": "Body von `POST /api/v1/zugang/redeem`. Der Code selbst geht nie über die Leitung.",
@@ -410,6 +725,93 @@
           }
         }
       },
+      "RichtwertAuskunft": {
+        "type": "object",
+        "description": "Ein Richtwert mit seinen Angaben.",
+        "required": [
+          "schluessel",
+          "bezeichnung",
+          "gruppe",
+          "einheit",
+          "min",
+          "max",
+          "ganzzahl",
+          "basis",
+          "wert",
+          "herkunft"
+        ],
+        "properties": {
+          "basis": {
+            "type": "number",
+            "format": "double",
+            "description": "Vorgabe des Programms."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einheit": {
+            "type": "string"
+          },
+          "ganzzahl": {
+            "type": "boolean",
+            "description": "Nur ganze Zahlen erlaubt."
+          },
+          "gruppe": {
+            "type": "string",
+            "description": "Gliederung für die Anzeige, etwa `schlafen` oder `sanitaer`."
+          },
+          "herkunft": {
+            "$ref": "#/components/schemas/RichtwertEbene"
+          },
+          "max": {
+            "type": "number",
+            "format": "double"
+          },
+          "min": {
+            "type": "number",
+            "format": "double",
+            "description": "Kleinster und größter Wert, den `richtwerte` einer Anfrage annehmen darf."
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "wert": {
+            "type": "number",
+            "format": "double",
+            "description": "Wirksamer Wert ohne Werte einer Anfrage."
+          }
+        }
+      },
+      "RichtwertEbene": {
+        "type": "string",
+        "description": "Ebene, aus der ein wirksamer Richtwert stammt. `anfrage` gibt es nur in der Antwort einer\nRechnung.",
+        "enum": [
+          "basis",
+          "org",
+          "anfrage"
+        ]
+      },
+      "RichtwertWirksam": {
+        "type": "object",
+        "description": "Ein Richtwert, mit dem gerechnet wurde.",
+        "required": [
+          "schluessel",
+          "wert",
+          "herkunft"
+        ],
+        "properties": {
+          "herkunft": {
+            "$ref": "#/components/schemas/RichtwertEbene"
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "wert": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "Scope": {
         "type": "string",
         "description": "Was ein Maschinenzugang darf (Konzept D2). Wire-Werte nach LFH-1312: Fachbegriff deutsch,\nZugriffsart englisch. Neue Werte kommen nur hinzu (Stabilitätszusage v1).",
@@ -421,6 +823,543 @@
           "positionen:write",
           "rechner:use"
         ]
+      },
+      "UnterkunftErgebnis": {
+        "type": "object",
+        "description": "Ergebnis einer Rechnung. Bedarf ist aufgerundet, Kapazität abgerundet.",
+        "required": [
+          "weg",
+          "trennung",
+          "personen",
+          "gruppen",
+          "kapazitaet",
+          "schlafen",
+          "material",
+          "sanitaer",
+          "gesundheit",
+          "versorgung",
+          "verpflegung"
+        ],
+        "properties": {
+          "gesundheit": {
+            "$ref": "#/components/schemas/UnterkunftGesundheit"
+          },
+          "gruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnterkunftGruppe"
+            }
+          },
+          "kapazitaet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnterkunftKapazitaet",
+                "description": "Beim Weg `personen` `null`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "material": {
+            "$ref": "#/components/schemas/UnterkunftMaterial"
+          },
+          "personen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen, für die gerechnet wurde: die Angabe oder die errechnete Kapazität.",
+            "minimum": 0
+          },
+          "sanitaer": {
+            "$ref": "#/components/schemas/UnterkunftSanitaer"
+          },
+          "schlafen": {
+            "$ref": "#/components/schemas/UnterkunftSchlafen"
+          },
+          "trennung": {
+            "type": "boolean"
+          },
+          "verpflegung": {
+            "$ref": "#/components/schemas/UnterkunftVerpflegung"
+          },
+          "versorgung": {
+            "$ref": "#/components/schemas/UnterkunftVersorgung"
+          },
+          "weg": {
+            "$ref": "#/components/schemas/UnterkunftWeg"
+          }
+        }
+      },
+      "UnterkunftGesundheit": {
+        "type": "object",
+        "required": [
+          "betten",
+          "flaeche_m2",
+          "isolierstation"
+        ],
+        "properties": {
+          "betten": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "flaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "isolierstation": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UnterkunftGruppe": {
+        "type": "object",
+        "description": "Personen einer Gruppe.",
+        "required": [
+          "gruppe",
+          "personen"
+        ],
+        "properties": {
+          "gruppe": {
+            "$ref": "#/components/schemas/PersonenGruppe"
+          },
+          "personen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftKapazitaet": {
+        "type": "object",
+        "description": "Kapazität aus Räumen, Fläche oder Zelten.",
+        "required": [
+          "plaetze",
+          "raeume"
+        ],
+        "properties": {
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "raeume": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/UnterkunftRaum"
+            },
+            "description": "Die Räume einzeln; nur beim Weg `raeume`, sonst `null`."
+          }
+        }
+      },
+      "UnterkunftMaterial": {
+        "type": "object",
+        "required": [
+          "feldbetten",
+          "decken"
+        ],
+        "properties": {
+          "decken": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "feldbetten": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftRaum": {
+        "type": "object",
+        "description": "Ein Raum im Ergebnis: Nutzfläche nach Abzügen und Plätze (abgerundet).",
+        "required": [
+          "bezeichnung",
+          "nutzflaeche_m2",
+          "plaetze",
+          "gruppe"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "gruppe": {
+            "$ref": "#/components/schemas/PersonenGruppe"
+          },
+          "nutzflaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftRequest": {
+        "type": "object",
+        "description": "Body von `POST /api/v1/rechner/unterkunft`: `weg`, `trennung` und genau der Block des Wegs.\nEin unbekanntes Feld ist 400.",
+        "required": [
+          "weg",
+          "trennung"
+        ],
+        "properties": {
+          "flaeche": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FlaecheAngabe",
+                "description": "Nur beim Weg `flaeche`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "personen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonenAngabe",
+                "description": "Nur beim Weg `personen`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "raeume": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RaumAngabe"
+            },
+            "description": "Nur beim Weg `raeume`; höchstens 200 Räume."
+          },
+          "richtwerte": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Richtwerte nur für diese Anfrage, Schlüssel → Wert. Schlüssel und Grenzen nennt\n`GET /api/v1/rechner/unterkunft/richtwerte`.",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "trennung": {
+            "type": "boolean",
+            "description": "Männer und Frauen getrennt unterbringen und rechnen."
+          },
+          "weg": {
+            "$ref": "#/components/schemas/UnterkunftWeg"
+          },
+          "zelte": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZelteAngabe",
+                "description": "Nur beim Weg `zelte`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnterkunftResponse": {
+        "type": "object",
+        "description": "Antwort auf `POST /api/v1/rechner/unterkunft`.",
+        "required": [
+          "ergebnis",
+          "richtwerte",
+          "stand"
+        ],
+        "properties": {
+          "ergebnis": {
+            "$ref": "#/components/schemas/UnterkunftErgebnis"
+          },
+          "richtwerte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichtwertWirksam"
+            },
+            "description": "Jeder Richtwert der Basis genau einmal, mit dem wirksamen Wert."
+          },
+          "stand": {
+            "type": "string",
+            "description": "Stand der Basis (`JJJJ-MM-TT`)."
+          }
+        }
+      },
+      "UnterkunftRichtwerteResponse": {
+        "type": "object",
+        "description": "Antwort auf `GET /api/v1/rechner/unterkunft/richtwerte`.",
+        "required": [
+          "stand",
+          "zelttypen",
+          "richtwerte"
+        ],
+        "properties": {
+          "richtwerte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichtwertAuskunft"
+            }
+          },
+          "stand": {
+            "type": "string",
+            "description": "Stand der Basis (`JJJJ-MM-TT`)."
+          },
+          "zelttypen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZelttypAngabe"
+            }
+          }
+        }
+      },
+      "UnterkunftSanitaer": {
+        "type": "object",
+        "required": [
+          "toiletten",
+          "urinale",
+          "waschplaetze",
+          "duschen"
+        ],
+        "properties": {
+          "duschen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "toiletten": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "urinale": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "waschplaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftSchlafen": {
+        "type": "object",
+        "required": [
+          "flaeche_m2",
+          "zelte_je_typ",
+          "zeltmix",
+          "zeltmix_grundflaeche_m2",
+          "zeltmix_platzbedarf_m2"
+        ],
+        "properties": {
+          "flaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "zelte_je_typ": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeltAnzahl"
+            },
+            "description": "Zelte, wenn nur dieser Typ aufgebaut wird."
+          },
+          "zeltmix": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeltAnzahl"
+            },
+            "description": "Wenigste Zelte: das größte zuerst, der Rest ins kleinste passende."
+          },
+          "zeltmix_grundflaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "zeltmix_platzbedarf_m2": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grundfläche samt Abstand zwischen den Zelten.",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftVerpflegung": {
+        "type": "object",
+        "required": [
+          "ausgabestellen",
+          "sitzplaetze",
+          "garnituren",
+          "aufenthaltszelte_je_typ"
+        ],
+        "properties": {
+          "aufenthaltszelte_je_typ": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeltAnzahl"
+            }
+          },
+          "ausgabestellen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "garnituren": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sitzplaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftVersorgung": {
+        "type": "object",
+        "required": [
+          "wasser_l_tag",
+          "davon_trinkwasser_l_tag",
+          "faekalien_l_tag",
+          "abfall_l_tag"
+        ],
+        "properties": {
+          "abfall_l_tag": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "davon_trinkwasser_l_tag": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "faekalien_l_tag": {
+            "type": "number",
+            "format": "double"
+          },
+          "wasser_l_tag": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftWeg": {
+        "type": "string",
+        "description": "Grundlage der Rechnung: wovon sie ausgeht.",
+        "enum": [
+          "personen",
+          "raeume",
+          "flaeche",
+          "zelte"
+        ]
+      },
+      "ZeltAnzahl": {
+        "type": "object",
+        "description": "Anzahl je Zelttyp.",
+        "required": [
+          "typ",
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "typ": {
+            "$ref": "#/components/schemas/ZeltTyp"
+          }
+        }
+      },
+      "ZeltTyp": {
+        "type": "string",
+        "description": "Zelttyp, SG 20 bis SG 50.",
+        "enum": [
+          "sg20",
+          "sg30",
+          "sg40",
+          "sg50"
+        ]
+      },
+      "ZelteAngabe": {
+        "type": "object",
+        "description": "Zeltbestand: je Gruppe die Anzahl je Zelttyp (`sg20`, `sg30`, `sg40`, `sg50`), höchstens 1000\nje Typ. Ohne Trennung `gesamt`, mit Trennung `maenner` und `frauen`.",
+        "properties": {
+          "frauen": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "gesamt": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "maenner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ZelttypAngabe": {
+        "type": "object",
+        "description": "Ein Zelttyp mit seiner Bezeichnung.",
+        "required": [
+          "typ",
+          "bezeichnung"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/ZeltTyp"
+          }
+        }
       }
     },
     "securitySchemes": {
