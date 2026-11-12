@@ -469,11 +469,13 @@ Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet di
 geführt werden: die einer anderen Installation und eigene, deren Führung abgegeben ist. Es zeigt
 sie, solange die Organisation in einer aktiven Kopplung zugeordnet ist; mit dem Widerruf der
 letzten Zuordnung oder Kopplung fallen sie heraus. Wird eine von mehreren Kopplungen widerrufen,
-fallen die Einsätze heraus, die die widerrufene Installation führt. Ein Einsatz, den die führende
-Installation endgültig gelöscht hat, verschwindet mit dem nächsten Abgleich, auch wenn er hier
-nie gespiegelt wurde. Kennt eine Installation ihn nur über den Hub, etwa ein zweiter
-Einsatzleitwagen, verschwindet er dort einen Abgleich später. Läuft die Gegenstelle noch mit
-einem älteren Stand, bleibt ein dort gelöschter Einsatz stehen. Ist die Führung je Einsatz
+fallen die Einsätze heraus, die die widerrufene Installation führt. Ein nie gespiegelter
+Einsatz, den die führende Installation endgültig gelöscht hat, verschwindet mit dem nächsten
+Abgleich. Kennt eine Installation ihn nur über den Hub, etwa ein zweiter Einsatzleitwagen,
+verschwindet er dort einen Abgleich später; hängt die Organisation an zwei Hubs, bleibt er dort
+stehen. Stehen bleibt auch ein Einsatz, dessen Führung abgegeben wurde und den die übernehmende
+Installation löscht, und jeder Einsatz, den eine Gegenstelle mit einem älteren Stand gelöscht
+hat. Ist die Führung je Einsatz
 aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
 steht dort der Fehler mit „Erneut laden“.
 

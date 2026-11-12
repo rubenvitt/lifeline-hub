@@ -19,16 +19,21 @@ herleitung:
 
 ## Regeln
 
-- MUST: Wer einen Einsatz endgültig löscht oder abräumt, schreibt in derselben Transaktion den
-  Löschvermerk seiner Kennung (`fuehrung::loeschvermerk::vermerken_einsatz`).
+- MUST: Wo ein Einsatz mit Kennung endet, entsteht in derselben Transaktion der Löschvermerk
+  (`fuehrung::loeschvermerk::vermerken_einsatz`): Skelett-Löschung, Abräumen eines verwahrten
+  Einsatzes, `geloescht` des Führers an einem Spiegel.
+- MUST NOT: Das Abräumen eines Spiegels nach der Nachbereitung schreibt einen Vermerk; der
+  Einsatz lebt beim Führer weiter.
 - MUST: Eine Führungsakte ohne lokalen Einsatz löscht nur `fuehrung::repo::delete_ohne_spiegel`;
   es schreibt den Vermerk.
 - MUST: `geloescht` für eine genannte Akte meldet eine Instanz nur, wenn ein Löschvermerk oder,
-  bei eigenem Präfix, das Löschprotokoll das Ende belegt und sie weder Einsatz noch Akte mit der
-  Kennung hält (`lebensende::geloeschte_akten`).
+  für ältere Löschungen mit eigenem Präfix, das Löschprotokoll das Ende belegt, die Org der
+  fragenden Kopplung zugeordnet ist und sie weder Einsatz noch Akte mit der Kennung hält
+  (`lebensende::geloeschte_akten`).
 - MUST NOT: Eine unbekannte Kennung gilt als gelöscht.
-- MUST: Die erreichte Seite löscht eine Akte ohne Spiegel nur auf Meldung der Instanz, die die
-  Akte als Führer nennt, und nennt ihr nur solche Akten.
+- MUST: Nennen und Annehmen folgen derselben Regel (`fuehrung::repo::ist_frage_an_gegenueber`):
+  Über das Ende einer Akte entscheidet ihr Führer; die meldende Seite glaubt darüber hinaus nur
+  ihrem einzigen Hub.
 - MUST NOT: Akten ohne Spiegel reisen als Stand mit Platzhalter in `staende`.
 
 ## Prüfung
@@ -36,10 +41,12 @@ herleitung:
 ```sh
 verlange 'loeschvermerk::vermerken_einsatz\(' src/einsatz/abraeumen.rs
 verlange 'loeschvermerk::vermerken_einsatz\(' src/einsatz/skelett_loeschung.rs
+verlange 'loeschvermerk::vermerken_einsatz\(' src/instanz/spiegel/lebensende.rs
 verlange 'fn geloeschte_akten\(' src/instanz/spiegel/lebensende.rs
 verlange 'fn geloeschte_akten_uebernehmen\(' src/instanz/spiegel/lebensende.rs
+verlange 'ist_frage_an_gegenueber\(' src/instanz/spiegel/lebensende.rs
 verlange 'fn delete_ohne_spiegel\(' src/instanz/fuehrung/repo.rs
-verbiete 'DELETE FROM einsatz_fuehrung ' src/instanz/spiegel/** src/einsatz/** src/routes/**
+verbiete 'DELETE FROM einsatz_fuehrung ' 'src/**' ':(exclude)src/instanz/fuehrung/repo.rs'
 ```
 
 ## Kontext
@@ -52,7 +59,8 @@ niemandem belegen, und eine zweite ELW hing ganz an ihm.
 
 ## Konsequenzen
 
-Jede Instanz hält je Kennung fest, dass der Einsatz über sie nicht mehr zu haben ist, und reicht
-das an weitere meldende Seiten derselben Org weiter. Eine aus einer Sicherung zurückgekehrte
-Instanz löscht beim Gegenüber nichts. Löschungen von vor dem Vermerk mit fremdem Präfix bleiben
-unbelegt. Der Weg über die Stände eines Spiegels bleibt, wie er war (LLH-1852).
+Jede Instanz hält je Kennung fest, dass der Einsatz zu Ende ist, und reicht das an weitere
+meldende Seiten derselben Org weiter. Eine aus einer Sicherung zurückgekehrte Instanz löscht beim
+Gegenüber nichts. Löschungen von vor dem Vermerk mit fremdem Präfix bleiben unbelegt, ebenso
+Akten Dritter an einer Instanz mit zwei Hubs. Der Weg über die Stände eines Spiegels bleibt, wie
+er war (LLH-1852).

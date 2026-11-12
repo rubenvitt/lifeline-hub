@@ -43,6 +43,14 @@ Wurzel-`AGENTS.md`, „Bezeichner-Sprache“.
 - [ ] 6.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt
 - [ ] 6.3 Bilder der Änderung: „Einsätze beim Gegenüber“ vor und nach dem Abgleich, sofern der Bildlauf zwei gekoppelte Instanzen trägt; sonst im PR ein Satz, warum es kein Bild gibt (die Liste verliert nur eine Zeile, belegt durch die Integrationstests)
 
+## 7. Aus dem Review vor dem PR
+
+- [x] 7.1 Grenze der genannten Kennungen in Byte (`KENNUNG_BYTES_MAX`), längere nicht nennen, Feld vom Paket-Budget abziehen. Prüfen: `paket::tests::zu_viele_akten_und_ueberlange_kennungen_sind_ungueltig`, `fuehrung::repo::tests::genannt_werden_…`, Gegenproben rot
+- [x] 7.2 Vermerk nur, wo der Einsatz endet: `abraeumen::ausfuehren` nur bei `verwahrt`, `lebensende::geloescht_uebernehmen` beim Vormerken des Spiegels; Beleg aus dem Löschprotokoll ohne Art `spiegel`, nur für eine der Kopplung zugeordnete Org und nur ohne Akte hier. Prüfen: `ein_abgeraeumter_spiegel_bekommt_vom_abraeumen_keinen_vermerk`, `geloescht_merkt_nur_spiegel_dieser_kopplung_vor`, `das_loeschprotokoll_belegt_nur_fuer_die_org_der_kopplung_und_keinen_spiegel`, `eine_genannte_akte_gilt_nur_mit_beleg_als_geloescht`, Integrationstest `zwei_elw_loescht_die_eine_einen_am_hub_gespiegelten_einsatz_…`, Gegenproben rot
+- [x] 7.3 Zwei Hubs: eine Regel für Nennen und Annehmen (`ist_frage_an_gegenueber`). Prüfen: `ueber_das_ende_einer_akte_entscheidet_ihr_fuehrer_oder_der_einzige_hub`, `an_zwei_hubs_loescht_die_meldende_seite_nur_akten_die_der_hub_selbst_fuehrt`, Gegenprobe rot
+- [x] 7.4 Doku und Regeln nachgezogen: Anwenderkapitel „Instanzkopplung“ (nur nie gespiegelte Einsätze, zwei Hubs, abgegebene Führung) und „Aufbewahrung“ (Löschvermerk bleibt), `src/AGENTS.md`, Kopfkommentare von `skelett_loeschung.rs` und `purge_scheduler.rs`, ADR-0031 (Regeln, Prüfung über `src/**`), Spec-Delta (zwei Hubs, Schalter beim Widerruf, Vermerk nicht nach der Nachbereitung). Prüfen: `scripts/check-architektur.sh`, `openspec validate --strict`
+- [ ] 7.5 Folgeaufgabe LLH-1862 (Frontend findet die gewählte Akte nur über die ID) angelegt und im PR verlinkt; Verweise auf den Archivpfad nach `/opsx:archive` gegen den tatsächlichen Ordnernamen geprüft
+
 ## Workflow follow-up
 
 - `/opsx:archive h7shm5au-loeschsignal-spiegellose-akten` im selben Branch vor dem PR (Spec-Sync nach `openspec/specs/instanz-fuehrung`)

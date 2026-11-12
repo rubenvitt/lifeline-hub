@@ -350,12 +350,16 @@ sequenceDiagram
 - **Ende einer Akte ohne Spiegel** (LLH-1699,
   [ADR-0031](entscheidungen/ADR-0031-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
   Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung
-  im Abgleich (`SpiegelPaket.akten`). Das Gegenüber meldet `geloescht` auf demselben Weg wie für
-  Spiegel, aber nur mit Beleg: Löschvermerk (`src/instanz/fuehrung/loeschvermerk.rs`) oder eigenes
-  Präfix im Löschprotokoll. Der Empfänger löscht die Akte und vermerkt ihr Ende selbst; so
-  erfährt es eine weitere ELW vom Hub mit ihrem nächsten Abgleich. Der Widerruf einer
-  Org-Zuordnung löscht und vermerkt die Akten ohne Spiegel, die das widerrufene Gegenüber führt
-  (`fuehrung::repo::release_nach_widerruf`). Nachweis: `tests/instanz_fuehrung.rs`.
+  im Abgleich (`SpiegelPaket.akten`), und zwar dem Gegenüber, das über sie entscheidet: dem
+  Führer der Akte, die meldende Seite auch ihrem einzigen Hub
+  (`fuehrung::repo::ist_frage_an_gegenueber`). Das Gegenüber meldet `geloescht` auf demselben Weg
+  wie für Spiegel, aber nur mit Beleg: Löschvermerk (`src/instanz/fuehrung/loeschvermerk.rs`)
+  oder, für ältere Löschungen, eigenes Präfix im Löschprotokoll. Der Vermerk entsteht, wo ein
+  Einsatz endet (Skelett-Löschung, Verwahrung, `geloescht` des Führers an einem Spiegel). Der
+  Empfänger löscht die Akte und vermerkt ihr Ende selbst; so erfährt es eine weitere ELW vom Hub
+  mit ihrem nächsten Abgleich. Der Widerruf einer Org-Zuordnung löscht und vermerkt die Akten
+  ohne Spiegel, die das widerrufene Gegenüber führt (`fuehrung::repo::release_nach_widerruf`).
+  Nachweis: `tests/instanz_fuehrung.rs`.
 
 ## 6.6c Führung je Einsatz: Notübernahme gegen den ELW
 

@@ -36,8 +36,12 @@ Nicht Teil der Change:
 
 - Ein *gespiegelter* Einsatz mit fremdem Präfix bekommt weiterhin kein `geloescht`, wenn der
   löschende Führer nicht der Ursprung ist (LLH-1852). Der Weg über die Stände bleibt unverändert.
-- Ein ELW an zwei Hubs behält Akten Dritter, die über den widerrufenen Hub kamen, solange die Org
-  am anderen Hub hängt: Über welche Kopplung eine Akte kam, ist nicht gespeichert.
+- Hängt die Org einer meldenden Seite an zwei Hubs, glaubt sie einem Hub nur für Akten, die er
+  selbst führt: Akten Dritter bleiben dort stehen, auch nach einer Löschung beim Führer oder
+  einem Widerruf am Hub. Über welche Kopplung eine Akte kam, ist nicht gespeichert, und sonst
+  nähme ihr ein Hub eine Akte, die sie über den anderen weiter erreicht (Review vor dem PR).
+- Die Bedienung „Einsätze beim Gegenüber“ findet eine gewählte Akte nur über ihre ID wieder, die
+  SQLite nach dem Löschen neu vergibt (LLH-1862, Frontend).
 
 ## Capabilities
 

@@ -63,8 +63,8 @@ Absender hält. Die Antwort steht in `lebensende` mit der Art `geloescht`, wie b
   `geloescht` in der nächsten Runde desselben Abgleichs. Das ist der vorhandene Weg
   `geloescht_offen` in `abgleich_einmal`; die belegten Akten kommen zu den belegten Ständen.
 
-Grenzen in `SpiegelPaket::check`: höchstens `EINSAETZE_MAX` Kennungen, jede höchstens so lang wie
-die Kennung einer Akte auf der Leitung (500 Zeichen, `austausch::TEXT_MAX`). Sind es mehr Akten,
+Grenzen in `SpiegelPaket::check`: höchstens `EINSAETZE_MAX` Kennungen, jede höchstens
+`KENNUNG_BYTES_MAX` Byte (Nachtrag aus dem Review, unten). Sind es mehr Akten,
 rückt die Auswahl je Abgleich weiter (`reihum` mit eigenem Zähler, wie bei den Ständen, LLH-1630).
 
 Ein älteres Gegenüber überliest `akten` und antwortet nicht; eine Instanz, die nichts nennt,
@@ -87,13 +87,15 @@ Genannt wird nur bei eingeschaltetem Schalter (`fuehrung::repo::is_enabled_tx`),
 Org-Zuordnungen der Kopplung, nur `einsatz_id IS NULL`:
 
 - **Meldende Seite:** alle solchen Akten der Org. Die erreichte Seite kann auch für Einsätze
-  Dritter antworten (D4).
+  Dritter antworten (D4). Hängt die Org an mehr als einem Hub (`list_hubs`), nur Akten, die der
+  gefragte Hub selbst führt (Nachtrag aus dem Review, unten).
 - **Erreichte Seite:** nur Akten, deren `fuehrer_kennung` das Gegenüber ist. Andere nähme sie von
   ihm nicht an (D3); sie zu nennen kostete je Abgleich eine zusätzliche Runde, wenn das Gegenüber
   zufällig einen Beleg hat (eigenes Präfix, Spiegel nach der Nachbereitung abgeräumt).
 
 Die Abfrage steht in `fuehrung::repo` (`list_ohne_spiegel`), der Abgleich ruft sie an den beiden
-Stellen, an denen er heute `eigene_staende` baut.
+Stellen, an denen er heute `eigene_staende` baut. Wem genannt wird und von wem angenommen wird
+(D3), sagt eine Funktion für beides: `fuehrung::repo::ist_frage_an_gegenueber`.
 
 ### D3 Wer was annimmt
 
@@ -131,7 +133,8 @@ festschreibt (`INSERT … ON CONFLICT (kennung) DO UPDATE`):
 | Anlass | Stelle |
 | --- | --- |
 | Einsatz endgültig gelöscht (Skelett) | `einsatz::skelett_loeschung::loeschen`, neben der Protokollzeile |
-| Einsatz abgeräumt (verwahrt oder Spiegel) | `einsatz::abraeumen::ausfuehren`, neben der Protokollzeile |
+| Verwahrter Einsatz abgeräumt | `einsatz::abraeumen::ausfuehren`, neben der Protokollzeile |
+| Führer meldet einen Spiegel gelöscht | `lebensende::geloescht_uebernehmen`, beim Vormerken |
 | Akte auf ein Signal hin gelöscht | `lebensende::geloeschte_akten_uebernehmen` (D3) |
 | Akte beim Widerruf gelöscht | `fuehrung::repo::release_nach_widerruf` (D5) |
 
@@ -154,10 +157,13 @@ Zuordnung, neuer Stand beim Führer). Vermerke werden deshalb nie gelöscht; sie
 so dauerhaft wie das Löschprotokoll und tragen nur die Kennung (Instanzkennung, ID, Zufallsteil),
 keinen Inhalt des Einsatzes.
 
-Ein Vermerk entsteht auch, wenn die meldende Seite einen Spiegel nach der Nachbereitung abräumt
-(Phase R), obwohl der Einsatz beim Führer weiterlebt. Das schadet nicht: Gefragt wird eine
-meldende Seite nur nach Akten, die sie als Führer nennen (D2), und für die gilt „hier nicht mehr
-zu haben“ genauso; dasselbe beantwortet `ist_geloescht` heute schon für die Stände.
+Kein Vermerk entsteht, wenn die meldende Seite einen Spiegel nach der Nachbereitung abräumt
+(Phase R): Der Einsatz lebt beim Führer weiter. Der Entwurf hielt einen Vermerk dort zuerst für
+unschädlich, weil eine meldende Seite nur nach Akten gefragt werde, die sie führt. Das stimmt
+nicht für eine Instanz, die sich bei einer meldet und von einer anderen erreicht wird (die Spec
+`instanz-kopplung` lässt das zu): Sie hätte ihrer meldenden Seite einen lebenden Einsatz als
+gelöscht gemeldet (Review vor dem PR). Aus demselben Grund zählt im Beleg aus dem Löschprotokoll
+die Art `spiegel` nicht, und er gilt nur für eine Org, die der fragenden Kopplung zugeordnet ist.
 
 **Verworfen: Spalte `kennung` am Löschprotokoll.** Sie deckte die Löschung eines Einsatzes, nicht
 aber eine Akte, die ohne Einsatz gelöscht wird (`einsatz_id` ist dort Pflicht und eindeutig); die
@@ -187,6 +193,21 @@ Der Filter in `list_fremde_der_org` bleibt, sein Kommentar verliert den Verweis 
 Nach `docs/architektur/AGENTS.md` (Mitänderungsregel) bekommt eine Entscheidung der Route
 `entwurf` eine ADR: `ADR-0031` hält die Regeln aus D2–D4 mit Prüfung fest; Laufzeitsicht (6) und
 Glossar (12) nennen Ablauf und Begriff.
+
+### Nachträge aus dem Review vor dem PR (12.11.2026)
+
+- **Zwei Hubs (D2, D3):** Hängt die Org einer meldenden Seite an zwei Hubs, nähme ihr ein Hub mit
+  seinem Vermerk (Widerruf gegen den Führer, abgeräumter Spiegel) eine Akte, die sie über den
+  anderen weiter erreicht, und bei jeder Neulieferung wieder. Sie nennt einem Hub deshalb nur
+  noch Akten, die er selbst führt, und nimmt nur für diese an. Akten Dritter bleiben dort stehen
+  (proposal.md).
+- **Grenze der genannten Kennungen (D1):** in Byte (`paket::KENNUNG_BYTES_MAX`, 200) statt 500
+  Zeichen, längere werden nicht genannt, und das Feld geht vom Budget der Zeilen ab. Sonst
+  sprengten überlange Kennungen einer fehlerhaften Instanz, vom Hub weitergereicht, das Paket
+  jeder anderen ELW.
+- **Vermerk nur am Ende eines Einsatzes (D4):** siehe dort.
+- **Schalter (D5):** Der Widerruf löscht unabhängig vom Schalter, wie er schon bisher die Führung
+  zurückholt; das Szenario „Schalter aus“ der Spec meint Nennen und Annehmen im Abgleich.
 
 ## Risks / Trade-offs
 
