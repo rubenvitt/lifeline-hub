@@ -8,7 +8,7 @@ import {
 import RichtwerteListe from '../../betreuung/unterkunft/RichtwerteListe';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
-import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 
 /**
  * Sektion `…/einstellungen/unterkunft` (LLH-1520, design.md D2): die Richtwerte des
@@ -48,7 +48,7 @@ export default function EinsatzUnterkunft() {
         fehler={setzen.error}
         fehlerTitel="Richtwert nicht gespeichert"
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
-        rechteText={RECHTE_TEXT}
+        rechteText={daten.rechteGrund()}
       />
       <RichtwerteListe
         ebenen={query.data}

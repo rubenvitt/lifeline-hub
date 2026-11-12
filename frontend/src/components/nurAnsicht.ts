@@ -61,14 +61,16 @@ export function spiegelGrund(gegenstelle: string): string {
  * Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. Mit dem Einsatz statt
  * nur seinem Status nennt er am Spiegel die führende Instanz (LLH-1492; führt eine gekoppelte
  * Instanz, ist der Einsatz hier ein Spiegel, LLH-1641); sonst abgeschlossen, sonst die Rollen.
+ * `rollen` nennt sie für Flächen mit anderem Recht, etwa die Einsatz-Einstellungen (LLH-1675).
  */
 export function einsatzRechteGrund(
   einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'spiegel'>,
+  rollen: string = NUR_LEITUNG_FUEHRUNG,
 ): string {
   if (typeof einsatz !== 'string' && einsatz.spiegel != null) {
     return spiegelGrund(einsatz.spiegel.gegenstelle);
   }
   const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
   if (status !== 'aktiv') return EINSATZ_ABGESCHLOSSEN;
-  return NUR_LEITUNG_FUEHRUNG;
+  return rollen;
 }

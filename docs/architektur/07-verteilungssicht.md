@@ -139,7 +139,9 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 
 ```mermaid
 flowchart LR
-  PR["PR auf alpha"] --> CI["ci.yml<br/>scripts/check-all.sh"]
+  PR["PR auf alpha"] -->|jeder Push| CI["ci.yml<br/>scripts/check-all.sh"]
+  PR -->|"fertig: Auto-Merge<br/>oder Label e2e"| E2E["e2e.yml<br/>e2e-Binary, e2e 1/4 bis 4/4"]
+  CI -->|Push: ruft auf| E2E
   CI -->|Push| REL["release.yml<br/>Ruhefenster, semantic-release"]
   REL --> TAG["Tag, Versions-Commit,<br/>Release als Entwurf"]
   TAG --> ART["artefakte.yml"]
@@ -154,6 +156,11 @@ flowchart LR
   F -->|alpha| DEP["deployment.yml<br/>→ Pull-Agent am Server"]
   F -->|alpha, beta| DA["desktop-alpha<br/>→ desktop-kanal"]
 ```
+
+Im PR prüft `ci.yml` jeden Push, die e2e-Suite in `e2e.yml` läuft erst, wenn der PR fertig
+markiert ist; bis dahin fehlen ihre Pflicht-Checks. Auf `alpha`, `beta` und `main` ruft `ci.yml`
+sie bei jedem Push auf, und der Release wartet darauf (Regel: `scripts/AGENTS.md`, „Zwei Stufen
+im PR“).
 
 | Kanal | Branch | Version | Desktop-Update liest |
 | --- | --- | --- | --- |

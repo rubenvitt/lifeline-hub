@@ -18,8 +18,8 @@ starten.
 | `Dockerfile` | Runner-Image: Runner, Playwright-Browser samt Systempaketen, Build-Werkzeuge, `sccache`, kein `sudo` |
 | `build-image.sh` | baut `lifeline-runner:latest` mit der Playwright-Version aus dem Lockfile, löscht alte Images; `--update` holt vorher `alpha` und baut ohne Cache |
 | `runner-loop.sh` | ein Platz: JIT-Registrierung holen, Container für einen Job starten, von vorn |
-| `select-runner.sh` | Runner-Wahl in `ci.yml` (Job `aenderungen`, bei PRs aus dem Ziel-Branch gelesen) |
-| `*.test.sh` | Selbsttests im Sammel-Gate (Schritt 11), auch der Wächter über die `sudo`-Schritte in `ci.yml` |
+| `select-runner.sh` | Runner-Wahl in `e2e.yml` (Job `aenderungen`, bei PRs aus dem Ziel-Branch gelesen) |
+| `*.test.sh` | Selbsttests im Sammel-Gate (Schritt 11), auch der Wächter über die `sudo`-Schritte in `e2e.yml` |
 | `systemd/` | `lifeline-runner@.service` je Platz, Timer für den wöchentlichen Neubau |
 | `runner.env.beispiel` | Vorlage für `/etc/lifeline-runner/runner.env` |
 

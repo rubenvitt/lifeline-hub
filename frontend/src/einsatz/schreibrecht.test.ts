@@ -14,6 +14,7 @@ import {
   istEinsatzLeitung,
   fuehrtHier,
   istSpiegel,
+  isEinsatzGesperrt,
 } from './schreibrecht';
 
 // Wahrheitstabelle für die zentrale Schreibrecht-Regel (LFH-234). Pinnt die beiden bewussten
@@ -57,6 +58,25 @@ describe('darfImEinsatzSchreiben', () => {
   it('ist fail-closed bei fehlendem Einsatz', () => {
     expect(darfImEinsatzSchreiben(undefined)).toBe(false);
     expect(darfImEinsatzSchreiben(null)).toBe(false);
+  });
+});
+
+// LLH-1675: Wann eine Seite „Nur Ansicht“ mit Grund zeigt, ohne dass die Rolle ihn trägt.
+describe('isEinsatzGesperrt', () => {
+  const spiegel = {
+    gegenstelle: 'ELW 1',
+    beendet: false,
+    antraege_ausstehend: 0,
+    antraege_abgelehnt: 0,
+    bruchstelle: 0,
+  };
+  it('sperrt den abgeschlossenen Einsatz und den Spiegel, auch für die Einsatzleitung', () => {
+    expect(isEinsatzGesperrt({ ...zu, meine_rolle: 'einsatzleitung' })).toBe(true);
+    expect(isEinsatzGesperrt({ ...aktiv, meine_rolle: 'einsatzleitung', spiegel })).toBe(true);
+  });
+  it('nicht den aktiven eigenen Einsatz, auch ohne Rolle', () => {
+    expect(isEinsatzGesperrt({ ...aktiv, meine_rolle: 'einsatzleitung' })).toBe(false);
+    expect(isEinsatzGesperrt({ ...aktiv, meine_rolle: null, spiegel: null })).toBe(false);
   });
 });
 

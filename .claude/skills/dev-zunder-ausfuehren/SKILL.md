@@ -282,6 +282,10 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   `review`, erst der gemergte PR führt auf `done` (wer ihn zuerst gemergt sieht, setzt ihn;
   „Merge nachtragen“ oben). Abweichen nur, wenn der User im
   laufenden Task ausdrücklich etwas anderes sagt.
+- **e2e läuft im PR erst, wenn er fertig ist** (Auto-Merge an oder Label `e2e`; Regel:
+  `scripts/AGENTS.md`, „Zwei Stufen im PR“). Braucht die Änderung e2e-Rückmeldung, bevor der
+  Mensch Auto-Merge einschaltet (UI, Abläufe, Backend-Verhalten), setzt du am eigenen PR das Label
+  `e2e`, oder du fährst vorher lokal `./scripts/check-all.sh --geaendert`.
 - Wird der Task verworfen statt umgesetzt → **Status: `dropped`**, `release_task`
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.

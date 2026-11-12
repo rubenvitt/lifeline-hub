@@ -1,11 +1,11 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
+import { App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
-import { darfImEinsatzSchreiben, darfVerwaltung } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
@@ -40,7 +40,11 @@ import {
 import { gibFahrzeugFrei, listeEinheiten, ordneFahrzeugZu } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { freigabeVon, istKeyFreigegeben } from '../einsatz/modulRegistry';
-import { MODUL_EINHEITEN_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../components/nurAnsicht';
+import {
+  MODUL_EINHEITEN_GESPERRT,
+  MODUL_PERSONAL_GESPERRT,
+  einsatzRechteGrund,
+} from '../components/nurAnsicht';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import EinheitAngabe from '../kraefte/EinheitAngabe';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
@@ -634,6 +638,8 @@ function FahrzeugeInhalt() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Abgeschlossen oder Spiegel: der Grund steht auf der Seite (LLH-1675).
+  const nurAnsicht = isEinsatzGesperrt(einsatz);
 
   const efs = efQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
@@ -1072,17 +1078,14 @@ function FahrzeugeInhalt() {
         </Space>
       }
       hinweis={
-        (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            {!darfSchreiben && einsatz.status !== 'aktiv' && (
-              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-            )}
-            <SeitenHinweise
-              fehler={rueckgaengigFehler}
-              fehlerTitel="Nicht erneut disponiert"
-              fehlerFallback="Rückgängig fehlgeschlagen"
-            />
-          </Space>
+        nurAnsicht || rueckgaengigFehler != null ? (
+          <SeitenHinweise
+            rechteText={einsatzRechteGrund(einsatz)}
+            rechteFehlt={nurAnsicht}
+            fehler={rueckgaengigFehler}
+            fehlerTitel="Nicht erneut disponiert"
+            fehlerFallback="Rückgängig fehlgeschlagen"
+          />
         ) : null
       }
     >

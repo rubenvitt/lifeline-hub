@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wächter für `.github/workflows/ci.yml` (LLH-1666, Spec `ci-eigener-runner`, ADR-0025): In den
+# Wächter für `.github/workflows/e2e.yml` (LLH-1666, Spec `ci-eigener-runner`, ADR-0025): In den
 # Jobs, die auf dem eigenen Runner laufen können (`binaer`, `e2e`), trägt jeder Schritt, der
 # `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, die Bedingung
 # `runner.environment == 'github-hosted'`.
@@ -8,11 +8,12 @@
 # Jobs, der auf dem Server `sudo` gerufen hätte. Rot wäre erst der erste echte Lauf geworden, und
 # die übersprungenen e2e-Shards hätten jeden PR gesperrt.
 #
-#   ci-schritte.test.sh [workflow-datei]    Vorgabe: .github/workflows/ci.yml
+#   ci-schritte.test.sh [workflow-datei]    Vorgabe: .github/workflows/e2e.yml (seit LLH-1662
+#                                           stehen `binaer` und `e2e` dort, nicht in ci.yml)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-DATEI="${1:-$ROOT/.github/workflows/ci.yml}"
+DATEI="${1:-$ROOT/.github/workflows/e2e.yml}"
 JOBS="binaer e2e"
 # Was nur auf einem gehosteten Runner geht oder nur dort Sinn hat.
 GEHOSTET='sudo |apt-pakete\.sh|install-deps|apt-get|Swatinem/rust-cache|ms-playwright|apt-playwright|AGENT_TOOLSDIRECTORY'
@@ -36,10 +37,10 @@ schritte() {
 fehler=0
 geprueft=0
 while IFS=$'\037' read -r -d $'\036' job block; do
-  if printf '%s' "$block" | grep -Eq "$GEHOSTET"; then
+  if grep -Eq "$GEHOSTET" <<< "$block"; then
     geprueft=$((geprueft + 1))
-    kopf="$(printf '%s' "$block" | head -n 1 | sed 's/^ *- //')"
-    if printf '%s' "$block" | grep -qF "$BEDINGUNG"; then
+    kopf="$(sed -n '1s/^ *- //p' <<< "$block")"
+    if grep -qF "$BEDINGUNG" <<< "$block"; then
       echo "ok   $job: $kopf"
     else
       echo "ROT  $job: $kopf — braucht \`if: … $BEDINGUNG\`" >&2
@@ -50,7 +51,7 @@ done < <(schritte)
 
 # Ein Wächter, der nichts findet, prüft nichts: in beiden Jobs gibt es solche Schritte.
 if [ "$geprueft" -lt 5 ]; then
-  echo "ROT  nur $geprueft betroffene Schritte gefunden — passt die Zerlegung noch zu ci.yml?" >&2
+  echo "ROT  nur $geprueft betroffene Schritte gefunden — passt die Zerlegung noch zu $(basename "$DATEI")?" >&2
   fehler=1
 fi
 exit "$fehler"

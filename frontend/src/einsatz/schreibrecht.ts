@@ -43,6 +43,15 @@ export function istSpiegel(einsatz?: EinsatzSchreibkontext): boolean {
   return einsatz?.spiegel != null;
 }
 
+/**
+ * Der Einsatz ist hier für jede Rolle gesperrt: abgeschlossen oder ein Spiegel (LLH-1675). Eine
+ * Seite zeigt dann „Nur Ansicht“ mit {@link einsatzRechteGrund}; fehlt nur die Schreibrolle im
+ * aktiven eigenen Einsatz, sagen es die fehlenden Knöpfe.
+ */
+export function isEinsatzGesperrt(einsatz?: EinsatzSchreibkontext): boolean {
+  return einsatz?.status !== 'aktiv' || istSpiegel(einsatz);
+}
+
 /** Beobachter-Rolle im Einsatz (rein lesend). */
 export function istBeobachter(einsatz?: EinsatzSchreibkontext): boolean {
   return einsatz?.meine_rolle === 'beobachter';

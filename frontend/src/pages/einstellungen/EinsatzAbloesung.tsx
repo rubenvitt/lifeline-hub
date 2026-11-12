@@ -150,7 +150,7 @@ export default function EinsatzAbloesung() {
         fehlerTitel="Vorgabe nicht geändert"
         fehlerFallback="Ändern fehlgeschlagen"
         rechteFehlt={daten.istAktiv && !darf}
-        rechteText={NUR_LEITUNG_FUEHRUNG}
+        rechteText={daten.rechteGrund(NUR_LEITUNG_FUEHRUNG)}
       />
       <Formularpaneel
         titel="Schichtmodell des Einsatzes"
