@@ -39,7 +39,15 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
   art: 'angelegt',
   anfrage_offen: false,
   verwahrt: false,
-  gegenueber: [{ kopplung_id: 1, kennung: 'k-hub', name: 'Hub Nord', richtung: 'meldet_sich' }],
+  gegenueber: [
+    {
+      kopplung_id: 1,
+      kennung: 'k-hub',
+      name: 'Hub Nord',
+      richtung: 'meldet_sich',
+      art: 'standard',
+    },
+  ],
   verlauf: [
     {
       epoche_zaehler: 1,

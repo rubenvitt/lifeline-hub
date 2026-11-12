@@ -1,18 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import type { FuehrungAnzeige, FuehrungGegenueber } from '../api/types';
-import { FUEHRUNG_ART_TEXT, fuehrungBeiKurz, fuehrungKurz, fuehrungMoeglich } from './fuehrungText';
+import {
+  FUEHRUNG_ART_TEXT,
+  fuehrungBeiKurz,
+  fuehrungKurz,
+  fuehrungMoeglich,
+  vorOrtHinweis,
+} from './fuehrungText';
 
 const hub: FuehrungGegenueber = {
   kopplung_id: 1,
   kennung: 'k-hub',
   name: 'Hub Nord',
   richtung: 'meldet_sich',
+  art: 'standard',
 };
 const elw: FuehrungGegenueber = {
   kopplung_id: 2,
   kennung: 'k-elw',
   name: 'ELW 1',
   richtung: 'wird_gemeldet',
+  art: 'standard',
 };
 
 const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
@@ -107,5 +115,58 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
     expect(m.entscheiden).toBe(true);
     expect(m.uebergeben).toEqual([]);
     expect(m.perCode).toEqual([]);
+  });
+});
+
+describe('Führung vor Ort (LLH-1497)', () => {
+  const vorOrt: FuehrungGegenueber = {
+    kopplung_id: 3,
+    kennung: 'k-elw2',
+    name: 'ELW 2',
+    richtung: 'wird_gemeldet',
+    art: 'vor_ort',
+  };
+  const akte = (teil: Partial<FuehrungAnzeige>): FuehrungAnzeige => ({
+    id: 1,
+    kennung: 'x/1',
+    einsatz_id: 5,
+    nummer: '1',
+    bezeichnung: 'Unwetter',
+    stichwort: 'TH',
+    status: 'aktiv',
+    epoche: 1,
+    fuehrer_name: 'ELW 1',
+    fuehrer_kennung: 'ich',
+    fuehrend: true,
+    art: 'angelegt',
+    anfrage_offen: false,
+    verwahrt: false,
+    gegenueber: [hub, vorOrt],
+    verlauf: [],
+    ...teil,
+  });
+
+  it('übergibt nicht an eine Gegenstelle vor Ort und nennt den Grund', () => {
+    const m = fuehrungMoeglich(akte({}));
+    expect(m.uebergeben.map((g) => g.name)).toEqual(['Hub Nord']);
+    expect(m.vorOrt).toEqual(['ELW 2']);
+    expect(vorOrtHinweis('ELW 2')).toBe(
+      'ELW 2 ist vor Ort gekoppelt: Führungswechsel dorthin kommt später.',
+    );
+  });
+
+  it('führt die Gegenstelle vor Ort, gibt es weder Anfrage noch Notübernahme', () => {
+    const m = fuehrungMoeglich(
+      akte({
+        fuehrend: false,
+        fuehrer_kennung: 'k-elw2',
+        fuehrer_name: 'ELW 2',
+        fuehrer_richtung: 'wird_gemeldet',
+      }),
+    );
+    expect(m.anfragen).toBe(false);
+    expect(m.notuebernahme).toBe(false);
+    expect(m.notuebernahmeMitBeweis).toBe(false);
+    expect(m.vorOrt).toEqual(['ELW 2']);
   });
 });

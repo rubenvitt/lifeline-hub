@@ -2,16 +2,21 @@ import { describe, expect, it } from 'vitest';
 import type { InstanzKopplungAnzeige, InstanzUebersicht } from '../api/types';
 import {
   codeAusstellenSperre,
+  codeVorOrtSperre,
+  gefundenZeile,
   kopplungHinweise,
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
   spiegelEinsatzZeile,
   stammdatenZeile,
+  zertifikatWarnt,
+  zertifikatZeile,
 } from './instanzText';
 
 const kopplung = (teil: Partial<InstanzKopplungAnzeige> = {}): InstanzKopplungAnzeige => ({
   id: 1,
+  art: 'standard',
   gegenueber_name: 'Hub DRK',
   gegenueber_kennung: 'k',
   gegenueber_fingerabdruck: 'ABCD-EFGH',
@@ -173,11 +178,21 @@ describe('instanzText', () => {
       passkeys_eingerichtet: true,
       eigener_schluessel: true,
       datentraeger_bestaetigt: true,
+      tls_eigen: true,
+      lan_entdeckung: false,
       kopplungen: [],
       schluessel: [],
       ...teil,
     });
     expect(codeAusstellenSperre(u({}))).toBeUndefined();
+    // Direktkopplung (LLH-1497): zusätzlich nur mit eigenem TLS.
+    expect(codeVorOrtSperre(u({}))).toBeUndefined();
+    expect(codeVorOrtSperre(u({ tls_eigen: false }))).toBe(
+      'Eine Direktkopplung vor Ort braucht TLS an dieser Instanz (--tls)',
+    );
+    expect(codeVorOrtSperre(u({ eigener_schluessel: false }))).toBe(
+      'Erst einen eigenen Unterschriftsschlüssel registrieren',
+    );
     expect(codeAusstellenSperre(u({ eigener_schluessel: false }))).toBe(
       'Erst einen eigenen Unterschriftsschlüssel registrieren',
     );
@@ -219,5 +234,37 @@ describe('Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`)', () => {
       ),
     ).toContain('Gegenüber spiegelt noch nicht (Update nötig).');
     expect(kopplungHinweise(kopplung())).toEqual([]);
+  });
+});
+
+describe('Direktkopplung vor Ort (LLH-1497)', () => {
+  it('nennt den Zustand des Zertifikats nur an einer Direktkopplung', () => {
+    expect(zertifikatZeile(kopplung())).toBeNull();
+    const vorOrt = (zertifikat: InstanzKopplungAnzeige['zertifikat']) =>
+      kopplung({ art: 'vor_ort', zertifikat });
+    expect(zertifikatZeile(vorOrt('bestaetigt'))).toBe('Zertifikat bestätigt');
+    expect(zertifikatWarnt(vorOrt('bestaetigt'))).toBe(false);
+    expect(zertifikatZeile(vorOrt('passt_nicht'))).toBe(
+      'Zertifikat passt nicht: es geht nichts hinaus',
+    );
+    expect(zertifikatWarnt(vorOrt('passt_nicht'))).toBe(true);
+    expect(zertifikatZeile(vorOrt('gegenstelle_kennt_aelteres'))).toBe(
+      'Gegenstelle kennt ein älteres Zertifikat dieser Instanz',
+    );
+  });
+
+  it('beschreibt eine gefundene Instanz mit Fingerabdruck, Adresse und Kopplung', () => {
+    const g = {
+      kennung: 'k-1',
+      name: 'ELW 1',
+      fingerabdruck: 'AB12',
+      protokoll: 3,
+      adressen: ['https://10.0.0.2:8443', 'https://[2001:db8::5]:8443'],
+      gekoppelt: false,
+    };
+    expect(gefundenZeile(g)).toBe('AB12 · https://10.0.0.2:8443 · Protokoll 3');
+    expect(gefundenZeile({ ...g, adressen: [], gekoppelt: true })).toBe(
+      'AB12 · ohne Adresse · Protokoll 3 · schon gekoppelt',
+    );
   });
 });

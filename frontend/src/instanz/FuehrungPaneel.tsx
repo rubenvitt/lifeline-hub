@@ -30,7 +30,7 @@ import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { FuehrungAnzeige, FuehrungCodeAntwort, FuehrungVerlaufEintrag } from '../api/types';
-import { FUEHRUNG_ART_TEXT, fuehrungMoeglich } from './fuehrungText';
+import { FUEHRUNG_ART_TEXT, fuehrungMoeglich, vorOrtHinweis } from './fuehrungText';
 
 /** Folge der Übergabe und der Abgabe per Code: steht in der Rückfrage, nicht neben dem Knopf. */
 const ABGABE_FOLGE = 'Danach ist der Einsatz hier nur noch zu lesen.';
@@ -301,6 +301,15 @@ export default function FuehrungPaneel({
           )}
         </Space>
       )}
+      {moeglich.vorOrt.map((name) => (
+        <Typography.Paragraph
+          key={`vo-${name}`}
+          style={{ color: rollen.gedaempft, marginBlock: token.marginXS }}
+          data-lfh="fuehrung-vor-ort"
+        >
+          {vorOrtHinweis(name)}
+        </Typography.Paragraph>
+      ))}
       <div style={{ marginBlockStart: token.marginSM }}>
         <SpeicherFehler fehler={uebergeben.error} titel="Nicht übergeben" />
         <SpeicherFehler fehler={perCode.error} titel="Kein Code" />

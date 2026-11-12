@@ -393,3 +393,7 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   (`entdeckung::tests::zwei_daemons_finden_einander`) lief in der Cloud-Sitzung grün, steht aber
   mit `#[ignore]`, weil Multicast in CI-Runnern nicht sicher ist; die Integrationstests nutzen die
   Naht `Sucher`.
+- **12.11.2026, D8: eigener Knopf statt Wahl im Dialog.** „Code ausstellen“ bleibt ein Klick; daneben
+  steht „Code vor Ort“ (gesperrt mit Grund ohne Passkeys oder ohne `--tls`, Erklärung im
+  Tooltip). Die Liste „Im Netz gefunden“ sucht auf Knopfdruck als Mutation, ohne eigenen
+  Query-Key: sie ist ein einmaliger Abruf, kein Zustand der Seite.

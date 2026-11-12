@@ -60,11 +60,11 @@ Code.
 
 ## 7. Oberfläche (D8)
 
-- [ ] 7.1 API und Typen: `api/instanz.ts` (Art, Zertifikatszustand, LAN-Liste), Query-Keys aus der Registry. Prüfung: `scripts/check-typ-codegen.sh` grün, Vitest für die Abfrage
-- [ ] 7.2 Code ausstellen mit der Wahl „Direktkopplung vor Ort“, gesperrt ohne TLS mit Grund; Code einlösen mit „Im Netz suchen“ und Liste, Klick übernimmt die Adresse. Prüfung: Vitest/RTL je Zustand (Liste, leer, „LAN-Entdeckung ist aus“, schon gekoppelt)
-- [ ] 7.3 Kopplungskarte: Chip „vor Ort“, Zeile „Zertifikat“, kein „ELW verloren“ auf `vor_ort`. Texte in `instanzText.ts`. Prüfung: Vitest je Zustand
-- [ ] 7.4 Paneel „Führung“: Gegenstelle vor Ort nicht als Ziel, Hinweis mit Grund. Prüfung: Vitest
-- [ ] 7.5 e2e: Seite „Instanzkopplung“ mit gemockter LAN-Liste, Ausstellen „vor Ort“. Prüfung: e2e grün nach `frontend/e2e/AGENTS.md`
+- [x] 7.1 API und Typen: `api/instanz.ts` (Art, Zertifikatszustand, LAN-Liste), Query-Keys aus der Registry. Prüfung: `scripts/check-typ-codegen.sh` grün, Vitest für die Abfrage
+- [x] 7.2 Code ausstellen mit der Wahl „Direktkopplung vor Ort“, gesperrt ohne TLS mit Grund; Code einlösen mit „Im Netz suchen“ und Liste, Klick übernimmt die Adresse. Prüfung: Vitest/RTL je Zustand (Liste, leer, „LAN-Entdeckung ist aus“, schon gekoppelt)
+- [x] 7.3 Kopplungskarte: Chip „vor Ort“, Zeile „Zertifikat“, kein „ELW verloren“ auf `vor_ort`. Texte in `instanzText.ts`. Prüfung: Vitest je Zustand
+- [x] 7.4 Paneel „Führung“: Gegenstelle vor Ort nicht als Ziel, Hinweis mit Grund. Prüfung: Vitest
+- [x] 7.5 e2e: Seite „Instanzkopplung“ mit gemockter LAN-Liste, Ausstellen „vor Ort“. Prüfung: e2e grün nach `frontend/e2e/AGENTS.md`
 
 ## 8. Doku
 

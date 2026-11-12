@@ -13,6 +13,7 @@ vi.mock('../api/instanz', () => ({
   loadInstanzUebersicht: vi.fn(),
   issueKopplungscode: vi.fn(),
   redeemKopplungscode: vi.fn(),
+  searchInstanzenImNetz: vi.fn(),
   widerrufeKopplung: vi.fn(),
   meldeElwVerloren: vi.fn(),
   gleicheStammdatenNeuAb: vi.fn(),
@@ -31,6 +32,7 @@ import {
   loadInstanzUebersicht,
   issueKopplungscode,
   meldeElwVerloren,
+  searchInstanzenImNetz,
   widerrufeKopplung,
   widerrufeUnterschriftsschluessel,
 } from '../api/instanz';
@@ -45,9 +47,12 @@ const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht =>
   passkeys_eingerichtet: true,
   eigener_schluessel: true,
   datentraeger_bestaetigt: true,
+  tls_eigen: true,
+  lan_entdeckung: true,
   kopplungen: [
     {
       id: 1,
+      art: 'standard',
       gegenueber_name: 'Hub Landesverband',
       gegenueber_kennung: 'k-hub',
       gegenueber_fingerabdruck: 'ZZZZ-YYYY',
@@ -159,6 +164,7 @@ describe('InstanzkopplungSeite', () => {
       code: 'ABCD-EFGH-JKMN-PQRS',
       laeuft_ab_at: '2026-11-08 12:15:00',
       fingerabdruck: 'AAAA',
+      art: 'standard',
     });
     renderMitProviders(<InstanzkopplungSeite />);
     const knopf = await screen.findByRole('button', { name: /Code ausstellen/ });
@@ -379,4 +385,91 @@ describe('InstanzkopplungSeite', () => {
       expect(screen.queryByText('Widerrufen …')).not.toBeInTheDocument();
     },
   );
+
+  describe('Direktkopplung vor Ort (LLH-1497)', () => {
+    const vorOrt = {
+      ...uebersicht().kopplungen[0],
+      id: 4,
+      art: 'vor_ort' as const,
+      gegenueber_name: 'ELW 2',
+      richtung: 'wird_gemeldet' as const,
+      protokoll: 'passt' as const,
+      zertifikat: 'gegenstelle_kennt_aelteres' as const,
+    };
+
+    it('Code vor Ort stellt einen Code der Art vor Ort aus und erklärt ihn', async () => {
+      vi.mocked(issueKopplungscode).mockResolvedValue({
+        code: 'ABCD-EFGH-JKMN-PQRS',
+        laeuft_ab_at: '2026-11-08 12:15:00',
+        fingerabdruck: 'AAAA',
+        art: 'vor_ort',
+      });
+      renderMitProviders(<InstanzkopplungSeite />);
+      const knopf = await screen.findByRole('button', { name: /Code vor Ort/ });
+      await waitFor(() => expect(knopf).not.toBeDisabled());
+      await userEvent.click(knopf);
+      await waitFor(() => expect(issueKopplungscode).toHaveBeenCalledWith(true));
+      const dialog = await screen.findByRole('dialog', { name: 'Kopplungscode' });
+      expect(within(dialog).getByText(/Direktkopplung vor Ort/)).toBeInTheDocument();
+    });
+
+    it('ohne eigenes TLS ist Code vor Ort gesperrt', async () => {
+      vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht({ tls_eigen: false }));
+      renderMitProviders(<InstanzkopplungSeite />);
+      const ausstellen = await screen.findByRole('button', { name: /Code ausstellen/ });
+      await waitFor(() => expect(ausstellen).not.toBeDisabled());
+      expect(screen.getByRole('button', { name: /Code vor Ort/ })).toBeDisabled();
+    });
+
+    it('zeigt Chip und Zertifikat und bietet weder Stammdaten noch ELW verloren an', async () => {
+      vi.mocked(loadInstanzUebersicht).mockResolvedValue(uebersicht({ kopplungen: [vorOrt] }));
+      renderMitProviders(<InstanzkopplungSeite />);
+      expect(await screen.findByText('vor Ort')).toBeInTheDocument();
+      expect(
+        screen.getByText('Gegenstelle kennt ein älteres Zertifikat dieser Instanz'),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zur Kopplung mit ELW 2' }),
+      );
+      expect(await screen.findByText('Widerrufen …')).toBeInTheDocument();
+      expect(screen.queryByText('ELW verloren …')).not.toBeInTheDocument();
+      expect(screen.queryByText('Stammdaten erneut abgleichen')).not.toBeInTheDocument();
+    });
+
+    it('Im Netz suchen listet Instanzen, ein Klick übernimmt die Adresse', async () => {
+      vi.mocked(searchInstanzenImNetz).mockResolvedValue({
+        aus: false,
+        gefunden: [
+          {
+            kennung: 'k-1',
+            name: 'ELW 1',
+            fingerabdruck: 'AB12',
+            protokoll: 3,
+            adressen: ['https://10.0.0.2:8443'],
+            gekoppelt: false,
+          },
+        ],
+      });
+      renderMitProviders(<InstanzkopplungSeite />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Code einlösen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Code einlösen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Im Netz suchen' }));
+      expect(
+        await within(dialog).findByText('AB12 · https://10.0.0.2:8443 · Protokoll 3'),
+      ).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+      expect(within(dialog).getByLabelText('Adresse der anderen Instanz')).toHaveValue(
+        'https://10.0.0.2:8443',
+      );
+    });
+
+    it('ohne LAN-Entdeckung sagt die Liste, dass sie aus ist', async () => {
+      vi.mocked(searchInstanzenImNetz).mockResolvedValue({ aus: true, gefunden: [] });
+      renderMitProviders(<InstanzkopplungSeite />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Code einlösen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Code einlösen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Im Netz suchen' }));
+      expect(await within(dialog).findByText(/LAN-Entdeckung ist aus/)).toBeInTheDocument();
+    });
+  });
 });

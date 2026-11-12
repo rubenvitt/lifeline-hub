@@ -1,8 +1,10 @@
 import type {
+  InstanzGefunden,
   InstanzKopplungAnzeige,
   InstanzSpiegelEinsatz,
   InstanzKopplungZustand,
   InstanzUebersicht,
+  InstanzZertifikatZustand,
   UnterschriftSchluesselAnzeige,
   UnterschriftSchluesselZustand,
 } from '../api/types';
@@ -134,6 +136,54 @@ export function codeAusstellenSperre(u: InstanzUebersicht): string | undefined {
   if (!u.passkeys_eingerichtet) return 'Passkeys sind an dieser Instanz nicht eingerichtet';
   if (!u.eigener_schluessel) return 'Erst einen eigenen Unterschriftsschlüssel registrieren';
   return undefined;
+}
+
+/** Grund, warum kein Code „vor Ort“ geht; sonst `undefined` (LLH-1497, design.md D3). */
+export function codeVorOrtSperre(u: InstanzUebersicht): string | undefined {
+  return (
+    codeAusstellenSperre(u) ??
+    (u.tls_eigen ? undefined : 'Eine Direktkopplung vor Ort braucht TLS an dieser Instanz (--tls)')
+  );
+}
+
+/** Erklärung der Direktkopplung vor Ort, kurz (Knopf, Code-Dialog, Kopplung). */
+export const VOR_ORT_ERKLAERUNG =
+  'Direktkopplung vor Ort: zwei Instanzen im selben Netz lesen einander und stellen Anträge. ' +
+  'Kein Führungswechsel, keine Stammdaten, keine Verwahrung.';
+
+/** Chip einer Direktkopplung. */
+export const VOR_ORT_CHIP = 'vor Ort';
+
+export const ZERTIFIKAT_TEXT: Record<InstanzZertifikatZustand, string> = {
+  bestaetigt: 'Zertifikat bestätigt',
+  passt_nicht: 'Zertifikat passt nicht: es geht nichts hinaus',
+  gegenstelle_kennt_aelteres: 'Gegenstelle kennt ein älteres Zertifikat dieser Instanz',
+};
+
+/** Zeile zum beglaubigten Zertifikat einer Direktkopplung; `null` an einer Standardkopplung. */
+export function zertifikatZeile(k: InstanzKopplungAnzeige): string | null {
+  return k.zertifikat ? ZERTIFIKAT_TEXT[k.zertifikat] : null;
+}
+
+/** Ob das Zertifikat einer Kopplung Aufmerksamkeit braucht (Farbe der Zeile). */
+export function zertifikatWarnt(k: InstanzKopplungAnzeige): boolean {
+  return k.zertifikat != null && k.zertifikat !== 'bestaetigt';
+}
+
+/** Hinweis, wenn die LAN-Entdeckung hier nicht läuft (Spec `instanz-entdeckung`). */
+export const LAN_AUS =
+  'LAN-Entdeckung ist aus. Der Betreiber schaltet sie mit --lan-entdeckung (und --tls) ein; die ' +
+  'Adresse lässt sich immer von Hand eingeben.';
+
+/** Zeile einer im Netz gefundenen Instanz: Fingerabdruck, Adresse, Protokoll, schon gekoppelt. */
+export function gefundenZeile(g: InstanzGefunden): string {
+  const teile: (string | null)[] = [
+    g.fingerabdruck,
+    g.adressen[0] ?? 'ohne Adresse',
+    `Protokoll ${g.protokoll}`,
+    g.gekoppelt ? 'schon gekoppelt' : null,
+  ];
+  return teile.filter(Boolean).join(' · ');
 }
 
 /** Zustandszeile eines Unterschriftsschlüssels. */
