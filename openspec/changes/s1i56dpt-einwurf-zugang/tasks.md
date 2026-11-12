@@ -89,7 +89,7 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
 - [x] 5.5 Kein Leseweg: Test, dass `GET /api/v1/einwurf/<schlüssel>` und ein fremder Unterpfad
   404 oder 405 ergeben und dass ein Einwurf-Schlüssel an `GET /api/v1/me` (Kopf und Abfrage) 401
   ergibt. Verifizieren: `cargo test --test einwurf` ist grün.
-- [ ] 5.6 Vertrag und Doku: `src/public_api/description.md` (Abschnitt „Einwurf“),
+- [x] 5.6 Vertrag und Doku: `src/public_api/description.md` (Abschnitt „Einwurf“),
   `docs/api/einwurf.md` (Adressen, Kennungen, Antworten, Doppelerkennung, Grenzen, je ein
   Beispiel für GET und POST), Verweis in `docs/api/maschinenzugang.md`,
   `docs/architektur/05-bausteinsicht.md` und `06-laufzeitsicht.md`. Verifizieren:
@@ -106,7 +106,7 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
   „ohne `timestamp` gilt der Empfang“, „Millisekunden und RFC 3339“, „30 Minuten in der Zukunft
   422“, „`lat=123` 422“, „ohne Kennung 422“, „201. Kennung 422, die 200 bleiben“, „Zugang für
   Alarmmeldungen an `…/position` 403“.
-- [ ] 6.2 Vertrag und Doku: Abschnitt „Position“ in `docs/api/einwurf.md` mit einem
+- [x] 6.2 Vertrag und Doku: Abschnitt „Position“ in `docs/api/einwurf.md` mit einem
   OsmAnd-Beispiel, `description.md`. Verifizieren: `cargo test --test public_api_spec_aktuell`
   ist grün, das Beispiel ist gegen einen laufenden Server ausgeführt.
 
@@ -162,7 +162,7 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
   aufrufen, 204, Zeile zeigt zuletzt genutzt, widerrufen, Aufruf ergibt 401“. Verifizieren: der
   Spec läuft lokal grün (`mise exec -- pnpm -C frontend exec playwright test
   e2e/anbindungen.spec.ts --trace off`).
-- [ ] 9.7 Anwenderkapitel `docs/anwender/kapitel/anbindungen.md`: Abläufe „Einwurf-Zugang
+- [x] 9.7 Anwenderkapitel `docs/anwender/kapitel/anbindungen.md`: Abläufe „Einwurf-Zugang
   anlegen“, „Schlüssel wechseln“, „Einwurf-Zugang widerrufen“; Hintergrund (was ein Einwurf kann
   und nicht kann, TLS, doppelte Einwürfe, Löschfristen, Adresse hinter einem Proxy, Positionen
   ohne Karte bis LLH-1199); der Satz „Heute nutzt ein Fremdsystem nur die Prüfung seiner
@@ -206,6 +206,12 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
   Vergleich in `position_ablegen` werden `aeltere_position_wird_nicht_uebernommen`,
   `neue_position_ersetzt_die_alte_ohne_verlauf` und
   `position_haengt_an_der_kennung_und_ersetzt_ohne_verlauf` rot.
+- **5.6, 6.2 und 9.7, am laufenden System:** Ein Wegwerf-Lauf im Browser (nicht committet) hat
+  die drei Abläufe des Anwenderkapitels nachgeklickt (anlegen für beide Zwecke, Schlüssel
+  wechseln, widerrufen) und die Beispiele aus `docs/api/einwurf.md` gegen den Server geschickt:
+  BOSWatch-GET 204, POST mit JSON 204, OsmAnd-Position 204, falscher Zweck 403, leerer Einwurf
+  422, alter Schlüssel nach Wechsel und nach Widerruf 401, neuer Schlüssel 204. Das
+  Zugangsprotokoll zeigte die drei Aktionen in Klartext.
 - **Umgebung der Sitzung:** `mise` fehlt und ließ sich nicht installieren. Frontend-Prüfungen
   liefen mit Node 22 statt 26.7.0, `./scripts/check-all.sh` lief nicht als Ganzes, und die volle
   Backend-Suite passt nicht auf den Datenträger der Sitzung. Gelaufen sind die Schritte einzeln
