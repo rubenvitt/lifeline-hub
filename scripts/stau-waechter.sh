@@ -50,9 +50,12 @@ TRAILER_SCHLUESSEL="Stau-Waechter"
 TRAILER_WERT="LLH-1660"
 WARTEZEIT=1200 # Sekunden, bis ein fehlender CI-Lauf oder ein ausbleibender Merge als Befund gilt
 CI_CHECK="Schnellprüfungen" # läuft in ci.yml bei jedem PR-Lauf, unabhängig von den Bereichen
-# Die Jobs der zweiten Stufe (e2e.yml). Gelaufen ist sie, wenn einer davon nicht übersprungen ist;
-# übersprungen meldet sie sich an einem nicht fertigen PR (die Anteile unter unexpandiertem Namen).
-E2E_CHECKS='["e2e-Auswahl","e2e-Binary","e2e 1/4","e2e 2/4","e2e 3/4","e2e 4/4"]'
+# Die Pflicht-Checks der zweiten Stufe (e2e.yml). Gelaufen ist sie, wenn der jüngste Lauf eines
+# davon weder übersprungen noch abgebrochen ist, oder solange ihre Auswahl (`e2e-Auswahl`) gerade
+# läuft. An einem nicht fertigen PR meldet sie sich nur übersprungen (die Pflicht-Checks unter
+# unexpandiertem Namen).
+E2E_CHECKS='["e2e-Binary","e2e 1/4","e2e 2/4","e2e 3/4","e2e 4/4"]'
+E2E_AUSWAHL="e2e-Auswahl"
 ZIEL_BRANCHES=" alpha beta main "
 
 NUR_ZEIGEN=0
@@ -83,19 +86,25 @@ konflikt_dateien() { # <basis-commit> <kopf-commit>
 # Kennzahlen der Check-Runs eines Commits als eine Zeile:
 #   <hat-ci 0|1> <frühester Start, Unix> <alle fertig und grün 0|1> <spätestes Ende, Unix>
 #   <hat-e2e 0|1>
-# (0 statt einer Zeit, wenn es keine gibt.)
+# (0 statt einer Zeit, wenn es keine gibt.) „Grün“ und „e2e gelaufen“ werten je Name den JÜNGSTEN
+# Check-Run, wie GitHub bei den Required Checks: ein abgebrochener erster Lauf auf demselben Kopf
+# (Auto-Merge aus und wieder an) bleibt in der Liste stehen, zählt aber nicht mehr. e2e gilt als
+# gelaufen wie bei E2E_CHECKS beschrieben.
 check_kennzahlen() { # <sha>
   gh_api "repos/$REPO/commits/$1/check-runs?per_page=100" --paginate \
-    | jq -r -s --arg ci "$CI_CHECK" --argjson e2e "$E2E_CHECKS" '
+    | jq -r -s --arg ci "$CI_CHECK" --argjson e2e "$E2E_CHECKS" --arg auswahl "$E2E_AUSWAHL" '
         [.[] | (.check_runs // [])[]] as $alle
+        | [$alle | group_by(.name)[] | sort_by(.id // 0, .started_at // "") | last] as $juengste
         | def zeit: if . == null then empty else (sub("\\.[0-9]+"; "") | fromdateiso8601) end;
         [ (if any($alle[]; .name == $ci) then 1 else 0 end),
           ([$alle[] | .started_at | zeit] | min // 0),
-          (if ($alle | length) > 0 and all($alle[]; .status == "completed"
+          (if ($juengste | length) > 0 and all($juengste[]; .status == "completed"
               and (.conclusion == "success" or .conclusion == "skipped" or .conclusion == "neutral"))
             then 1 else 0 end),
           ([$alle[] | .completed_at | zeit] | max // 0),
-          (if any($alle[]; (.name as $n | $e2e | index($n)) and .conclusion != "skipped")
+          (if any($juengste[]; ((.name as $n | $e2e | index($n))
+                and .conclusion != "skipped" and .conclusion != "cancelled")
+              or (.name == $auswahl and .status != "completed"))
             then 1 else 0 end)
         ] | map(tostring) | join(" ")'
 }
@@ -311,7 +320,7 @@ So geht es weiter: einen neuen Commit pushen, etwa \`$basis\` in den Branch merg
 
 Auto-Merge ist eingeschaltet, aber auf \`$(kurz "$k")\` ist die zweite Stufe (\`e2e.yml\`) seit $((alter / 60)) Minuten nicht angelaufen. Ohne \`e2e-Binary\` und \`e2e 1/4\` bis \`4/4\` mergt der PR nie.
 
-So geht es weiter: Auto-Merge aus- und wieder einschalten (startet die Stufe ohne neuen Commit) oder einen neuen Commit pushen."
+So geht es weiter: Auto-Merge aus- und wieder einschalten (startet die Stufe ohne neuen Commit; trägt der PR das Label \`e2e\`, startet das nichts, dann vorher das Label entfernen) oder einen neuen Commit pushen."
     return 0
   fi
 

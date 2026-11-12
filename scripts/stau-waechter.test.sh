@@ -529,6 +529,7 @@ automerge_um "$r" 2026-11-12T10:30:00Z
 lauf "$r" false false true
 pruefe "29 Auto-Merge ohne e2e-Lauf: Hinweis" "POST ohne-e2e" "$(log "$r")"
 kommentar_enthaelt "29 Hinweis nennt den Handgriff" "$r" "Auto-Merge aus- und wieder einschalten"
+kommentar_enthaelt "29b Hinweis nennt den Fall mit Label" "$r" "Label \`e2e\`"
 pruefe "29 kein Push" "$(git -C "$ARBEIT/ohnee2e.git" rev-parse refs/heads/feature)" "$(kopf "$r")"
 
 # 30 — Gleicher Befund beim nächsten Lauf: nichts Neues.
@@ -585,6 +586,50 @@ automerge_um "$r" 2026-11-12T10:30:00Z
 echo pending > "$(fake "$r")/status/$(kopf "$r")"
 lauf "$r" false false true
 pruefe "36 e2e gelaufen: kein ohne-e2e" "" "$(log "$r")"
+
+# 37 — Je Name zählt der jüngste Check-Run (wie bei den Required Checks): ein abgebrochener
+# erster Lauf auf demselben Kopf (Auto-Merge aus und wieder an) hält „grün, nicht gemergt“ nicht
+# für immer zurück.
+r="$(repo_neu neuerlauf)"
+aendere "$r" feature b.txt "feature"
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e-Binary|completed|cancelled|2026-11-12T10:02:00Z|2026-11-12T10:10:00Z' \
+  'e2e 1/4|completed|cancelled|2026-11-12T10:03:00Z|2026-11-12T10:10:00Z' \
+  'e2e-Binary|completed|success|2026-11-12T10:12:00Z|2026-11-12T10:20:00Z' \
+  'e2e 1/4|completed|success|2026-11-12T10:21:00Z|2026-11-12T11:00:00Z' | checks "$r"
+lauf "$r" false false true
+pruefe "37 abgebrochen, dann grün: grün, nicht gemergt" "POST haengt" "$(log "$r")"
+
+# 38 — Nur abgebrochene e2e-Läufe auf dem Kopf (ein später eingereihtes „Auto-Merge aus“ brach
+# den Lauf ab): die Stufe fehlt.
+r="$(repo_neu nurabgebrochen)"
+aendere "$r" feature b.txt "feature"
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e-Auswahl|completed|success|2026-11-12T10:01:00Z|2026-11-12T10:02:00Z' \
+  'e2e-Binary|completed|cancelled|2026-11-12T10:02:00Z|2026-11-12T10:10:00Z' | checks "$r"
+automerge_um "$r" 2026-11-12T10:30:00Z
+lauf "$r" false false true
+pruefe "38 nur abgebrochen: Stufe fehlt" "POST ohne-e2e" "$(log "$r")"
+
+# 39 — Erst abgebrochen, dann läuft ein neuer Lauf: kein Befund.
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e-Binary|completed|cancelled|2026-11-12T10:02:00Z|2026-11-12T10:10:00Z' \
+  'e2e-Binary|in_progress||2026-11-12T11:58:00Z|' | checks "$r"
+lauf "$r" false false true
+pruefe "39 neuer Lauf nach Abbruch: behoben" "POST ohne-e2e PATCH behoben" "$(log "$r")"
+
+# 40 — Die Auswahl der Stufe läuft gerade an (Binary und Anteile noch ohne Check-Run): kein Befund.
+r="$(repo_neu auswahllaeuft)"
+aendere "$r" feature b.txt "feature"
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e-Auswahl|in_progress||2026-11-12T11:59:00Z|' | checks "$r"
+automerge_um "$r" 2026-11-12T10:30:00Z
+lauf "$r" false false true
+pruefe "40 Auswahl läuft: nichts" "" "$(log "$r")"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Stau-Wächter-Selbsttest." >&2

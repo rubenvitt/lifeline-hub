@@ -56,7 +56,10 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
     `Stau-Waechter`). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
   - **Auto-Merge an, e2e-Stufe fehlt** (LLH-1662; 20 Minuten ab dem späteren von erstem Check
     des Kopfes und Einschalten von Auto-Merge): ein Hinweis, Auto-Merge aus- und wieder
-    einschalten. Kein Push. Geht „grün, nicht gemergt“ vor, das sonst fälschlich anschlüge.
+    einschalten (mit Label `e2e` vorher das Label entfernen). Kein Push. Geht „grün, nicht
+    gemergt“ vor, das sonst fälschlich anschlüge. Gelaufen ist die Stufe, wenn der jüngste Lauf
+    eines ihrer Pflicht-Checks weder übersprungen noch abgebrochen ist; je Name zählt wie bei den
+    Required Checks der jüngste Check-Run, auch für „grün“.
   - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
   - **Ein Hinweis je PR** (Marke `<!-- stau-waechter:<art>:<kennung> -->`): gleicher Befund
     schreibt nichts, neuer löscht und legt neu an, behobener ändert auf „behoben“. Wer eine Art

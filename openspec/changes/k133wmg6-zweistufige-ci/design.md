@@ -167,13 +167,18 @@ der PR fertig ist; ist er fertig und war e2e am Vorgänger grün, meldet die zwe
 ### D8 Der Stau-Wächter meldet „Auto-Merge an, e2e fehlt“
 
 `stau-waechter.sh` bekommt einen vierten Befund neben Konflikt, fehlender CI und
-„grün, nicht gemergt“: Auto-Merge an, kein Check-Run eines e2e-Anteils auf dem Kopf-Commit,
-Wartezeit 20 Minuten. Die Uhr läuft ab dem späteren von (a) frühestem Check-Run des Kopf-Commits
+„grün, nicht gemergt“: Auto-Merge an, die zweite Stufe ist auf dem Kopf-Commit nicht gelaufen,
+Wartezeit 20 Minuten. Gelaufen ist sie, wenn der jüngste Lauf von `e2e-Binary` oder eines
+Anteils weder übersprungen noch abgebrochen ist, oder solange `e2e-Auswahl` läuft (das
+Startfenster, bevor die übrigen Checks entstehen). Je Name zählt der jüngste Check-Run, wie bei
+den Required Checks; das gilt seit dem Review auch für „grün, nicht gemergt“, das sonst ein
+abgebrochener erster Lauf auf demselben Kopf für immer abschaltete. Die Uhr läuft ab dem späteren von (a) frühestem Check-Run des Kopf-Commits
 und (b) dem Zeitpunkt, zu dem Auto-Merge eingeschaltet wurde (Ereignis
 `auto_merge_enabled` der PR-Zeitleiste; fehlt es, gilt `updated_at` des PRs). Der Hinweis nennt
 den Handgriff: Auto-Merge aus- und wieder einschalten oder einen neuen Commit pushen. Das Label
 `e2e` hilft hier nicht: bei eingeschaltetem Auto-Merge ändert es den Zustand nicht und startet
-nach D4 nichts. Kein Push. Der Befund steht vor „grün, nicht gemergt“: ohne e2e-Checks sind die
+nach D4 nichts. Umgekehrt startet Aus- und Einschalten nichts, wenn das Label gesetzt ist; der
+Wächter kennt die Labels nicht und nennt deshalb beides im Text (Label vorher entfernen). Kein Push. Der Befund steht vor „grün, nicht gemergt“: ohne e2e-Checks sind die
 vorhandenen grün, und der alte Befund schlüge fälschlich an (im Selbsttest vor der Umsetzung
 belegt). Die Art heißt `ohne-e2e`; das Muster der Marke erlaubt dafür Ziffern.
 
