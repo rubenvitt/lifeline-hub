@@ -160,15 +160,21 @@ Beispiele:
 - `92596c79`: Der Wächter zählte die Klammer nach `'\\'` mit; ein Testmodul konnte folgenden
   produktiven Code verschlucken.
 
-## 7. Verhalten gegen Spec
+## 7. Verhalten gegen Spec und Projektregeln
 
 **Trifft zu, wenn** es zu dem geänderten Verhalten eine Spec unter `openspec/specs/`, eine
-Delta-Spec der Change oder ein Anwenderkapitel gibt.
+Delta-Spec der Change oder ein Anwenderkapitel gibt, oder wenn eine `AGENTS.md` auf dem Weg zu
+den geänderten Dateien eine Regel für diese Art Code hat. Das ist fast immer der Fall.
 
 - Tut der Code, was dort steht, auch im leeren Fall, im Fehlerfall und am Rand (keiner, genau
   einer, mehr als einer)?
-- Antwortet das Backend mit dem Statuscode der Konvention (`src/AGENTS.md`, Statuscode-Konvention)?
+- Antwortet jede neue oder geänderte Route in jedem Fehlerfall mit dem Statuscode der Konvention
+  (`src/AGENTS.md`, Statuscode-Konvention)? Jeden Fehlerzweig einzeln durchgehen, nicht nur den
+  Hauptweg.
 - Sperrt oder verändert ein Aufruf etwas, der laut Spec ohne Wirkung bleiben soll?
+- Hält jede neue Anzeige die Regeln ihres Bereichs ein, die für alle gelten: Anzeige-Konventionen
+  des Einsatzes (Zeit, Namen, Zahlen), Eingabegrenzen im Spiegel, Bausteine statt Eigenbau? Die
+  Regeln der Bereichs-`AGENTS.md` Punkt für Punkt gegen die neuen Stellen halten.
 
 Beispiele:
 
@@ -176,6 +182,9 @@ Beispiele:
   verlangt genau einen Ausgang, sonst 422.
 - `a146a42f`: Eine Übernahme ohne jede Änderung in einen laufenden Einsatz sperrte die Planung,
   statt mit 422 nichts zu tun.
+- `773b6b44`: Eine fremde Zeremonie antwortete nicht mit 422; das Hinweisband zeigte Zeit und
+  Namen ohne die Anzeige-Konventionen des Einsatzes. Beides fand der Probelauf des eigenen Reviews
+  am 12.11.2026 nicht, daher die zwei Fragen oben.
 
 ## 8. Atomarität
 

@@ -26,10 +26,49 @@ werden könnte. Jede Aufgabe nennt deshalb, woran ihr Ergebnis zu prüfen ist.
 
 ## 5. Probelauf und Abschluss
 
-- [ ] 5.1 Probelauf am echten Fall: den Reviewer nach der neuen Vorlage auf den Diff eines gemergten PRs der Testphase ansetzen, in dem CodeRabbit etwas fand, und zwar auf den Stand **vor** der Behebung (Vorschlag: #1243 vor `773b6b44`). Prüfung: Ergebnis als Tabelle in dieser Datei unter „Probelauf“: welche der dort von CodeRabbit gemeldeten Fehler der eigene Review findet, welche nicht. Fehlt eine ganze Klasse, Prüffrage schärfen und Lauf wiederholen
-- [ ] 5.2 Verweise prüfen: `grep -rn "requesting-code-review" AGENTS.md .claude .github` ist leer; Verweise auf den Abschnitt „Review vor dem PR“ und auf `review-pruefliste.md` zeigen auf vorhandene Stellen
-- [ ] 5.3 `./scripts/check-all.sh --nur schnell` grün (Prettier und der Archiv-Wächter betreffen die geänderten Dateien)
+- [x] 5.1 Probelauf am echten Fall: den Reviewer nach der neuen Vorlage auf den Diff eines gemergten PRs der Testphase ansetzen, in dem CodeRabbit etwas fand, und zwar auf den Stand **vor** der Behebung (Vorschlag: #1243 vor `773b6b44`). Prüfung: Ergebnis als Tabelle in dieser Datei unter „Probelauf“: welche der dort von CodeRabbit gemeldeten Fehler der eigene Review findet, welche nicht. Fehlt eine ganze Klasse, Prüffrage schärfen und Lauf wiederholen
+- [x] 5.2 Verweise prüfen: `grep -rn "requesting-code-review" AGENTS.md .claude .github` ist leer; Verweise auf den Abschnitt „Review vor dem PR“ und auf `review-pruefliste.md` zeigen auf vorhandene Stellen
+- [x] 5.3 `./scripts/check-all.sh --nur schnell` grün (Prettier und der Archiv-Wächter betreffen die geänderten Dateien)
+  Lauf vom 12.11.2026 mit `--geaendert` (Schritte 1 2 3 6 8 9 10 11 12 13 14 16): grün 9, 10, 13
+  (Archiv-Wächter), 14, 16 (Architekturdoku). Rot 1, 2, 3, 6, 8, 11, 12, jeder mit
+  `mise: command not found`: die Cloud-Sitzung hat kein mise. Keiner dieser Schritte liest eine
+  Datei dieses Diffs (Prettier prüft nur `frontend/` und `website/`). Der volle Lauf gilt in der
+  CI des PRs.
 - [ ] 5.4 Der Review dieser Change selbst läuft nach dem neuen Abschnitt; der PR trägt den Abschnitt „Review“
+
+## Probelauf
+
+12.11.2026, PR #1243 („Führung je Einsatz“, LLH-1491) auf dem Stand `887c79cd`, also vor den
+Behebungen `773b6b44` und `da7c3553`; Diff `8176add9...887c79cd`, rund 7800 Zeilen in 99 Dateien.
+Wegen der Größe vier Reviewer nach den Gruppen aus D3, je mit dem Auftrag aus dem Abschnitt
+„Review vor dem PR“. Ohne Gegenprüfung: gemessen wurde, ob der Review die Fehler findet, nicht,
+wie viele seiner übrigen Befunde zutreffen.
+
+| Befund von CodeRabbit | Behoben in | Gefunden | Von |
+| --- | --- | --- | --- |
+| Ein ELW nimmt einem anderen ELW die Führung | `773b6b44` | ja ¹ | `zugriff`, `belege` |
+| Widerruf räumt offene Übernahmen nicht | `773b6b44` | ja | `zugriff` |
+| Bestätigen verlangt kein gekoppeltes Gegenüber | `773b6b44` | ja | `zugriff` |
+| Schwärzung setzt `offen` ohne `offen_bruch_at` auf NULL | `773b6b44` | ja | `daten` |
+| „Sofort wieder melden“ ohne Fortschritt der Quittung | `773b6b44` | ja | `daten` |
+| Fremde Zeremonie ist nicht 422 | `773b6b44` | nein | |
+| Grund-Grenze fehlt im Eingabegrenzen-Spiegel | `773b6b44` | ja | `daten`, `belege` |
+| Hinweisband ohne Anzeige-Konventionen des Einsatzes | `773b6b44` | nein | |
+| Paneel „Führung“ ohne Fehlerzustand | `773b6b44` | ja | `oberflaeche`, `zugriff`, `belege` |
+| Neue Org-Zuordnung gibt Akten keinen frischen Stand | `da7c3553` | ja | `daten` |
+| Widerruf meldet die freigegebenen Einsätze nicht | `da7c3553` | ja ¹ | `zugriff` |
+| Hinweisband verschwindet bei Ladefehler | `da7c3553` | ja | `oberflaeche`, `zugriff`, `belege` |
+
+10 von 12 gefunden. ¹ Diese zwei Fälle stehen als Beispiel in der Prüfliste (Klassen 4 und 9);
+der Reviewer hatte hier also einen Hinweis. Ohne sie: 8 von 10.
+
+Keine Klasse fiel ganz aus. Die zwei verfehlten Fälle sind Regelverstöße im Einzelnen
+(Statuscode eines Fehlerzweigs, Anzeige-Konvention an einer neuen Stelle). Daraufhin Klasse 7 um
+Projektregeln erweitert und zwei Prüffragen ergänzt; auf einen zweiten Lauf verzichtet, weil
+keine Klasse fehlte und ein Lauf dieser Größe rund 900 000 Tokens kostet.
+
+Daneben meldeten die Reviewer rund 30 weitere Befunde, die CodeRabbit nicht hatte, ungeprüft.
+Sie betreffen den Stand vom 09.11.2026 und gehören nicht zu dieser Change.
 
 ## Workflow follow-up
 

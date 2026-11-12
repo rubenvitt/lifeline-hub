@@ -93,7 +93,7 @@ Gruppen des Skeletts (ersetzen `bugs`, `security`, `konventionen`, `tests`):
 | `daten` | Stiller Verlust, Atomarität, Grenzen für Eingaben von außen |
 | `zugriff` | Berechtigung und Geltungsbereich, Live-Verteilung |
 | `oberflaeche` | Lade-, Fehler- und Offline-Zustand, veralteter Zustand im Frontend |
-| `belege` | Tests, die nichts prüfen; Verhalten gegen Spec; Doku, ADR und Spec untereinander; Projektregeln der `AGENTS.md` |
+| `belege` | Tests, die nichts prüfen; Verhalten gegen Spec und Projektregeln; Doku, ADR und Spec untereinander |
 
 Das Skelett liest die Prüffragen nicht als Kopie: Jeder Agent bekommt den Pfad der Prüfliste und
 die Namen seiner Klassen.
