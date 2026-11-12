@@ -37,12 +37,15 @@ job() { # <datei> <id>
     in_jobs && aktiv { print }
   ' "$1"
 }
-# Das Job-`if` als eine Zeile, leer ohne.
+# Das Job-`if` als eine Zeile, leer ohne. awk liest bis zum Ende statt mit `exit` abzubrechen:
+# sonst bekäme `job` vor der Pipe SIGPIPE, und unter `pipefail` endete der Test mit Exit 141
+# (so geschehen auf dem Runner, lokal nicht).
 job_if() { # <datei> <id>
   job "$1" "$2" | awk '
+    fertig { next }
     /^    if:/ { im_if = 1; sub(/^    if:[ ]*(>-)?/, ""); printf "%s ", $0; next }
     im_if && /^      / { sub(/^ +/, ""); printf "%s ", $0; next }
-    im_if { exit }
+    im_if { fertig = 1 }
   '
 }
 # Kopf bis `jobs:` (Auslöser, Rechte, Nebenläufigkeit).

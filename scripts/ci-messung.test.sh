@@ -108,7 +108,7 @@ exit_von() { local code=0; "$@" > /dev/null 2>&1 || code=$?; printf '%s\n' "$cod
 
 echo "==> ci-messung"
 aus="$(messen)"
-zeile() { printf '%s\n' "$aus" | grep -F "| $1 |" | head -1 | tr -s ' '; }
+zeile() { grep -m1 -F "| $1 |" <<< "$aus" | tr -s ' '; }
 pruefe "1 Branch a: Läufe, abgebrochen, rot, grün, laufend, Jobs, Job-Minuten, ohne Job" \
   "| a | 3 | 1 | 0 | 2 | 0 | 8 | 360 | 0 |" "$(zeile a)"
 pruefe "2 Branch b: laufender Lauf, laufender Job, ein Lauf ohne Job" \

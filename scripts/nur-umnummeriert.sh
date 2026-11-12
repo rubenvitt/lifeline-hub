@@ -101,7 +101,9 @@ ist_umnummerierung() {
     # Nur drei ausdrückliche `=false` sparen. Scheitert bereiche.sh oder schweigt es, wird geprüft.
     bereiche="$(printf '%s' "$andere" | "$SKRIPTE/bereiche.sh")" || return 1
     [ "$(printf '%s\n' "$bereiche" | grep -c '=false$')" = 3 ] || return 1
-    printf '%s\n' "$bereiche" | grep -q '=true' && return 1
+    # Here-String statt Pipe: bricht `grep -q` früh ab, bekäme `printf` SIGPIPE, und unter
+    # `pipefail` fiele das `return 1` still aus.
+    grep -q '=true' <<< "$bereiche" && return 1
   fi
   return 0
 }

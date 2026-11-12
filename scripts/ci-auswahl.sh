@@ -69,7 +69,7 @@ bereiche="$(printf '%s\n' "$dateien" | "$SKRIPTE/bereiche.sh")" || {
   ausgeben
 }
 for s in $SUITEN; do
-  if printf '%s\n' "$bereiche" | grep -qx "$s=false"; then
+  if grep -qx "$s=false" <<< "$bereiche"; then
     laeuft[$s]=false
     grund[$s]="nein, nicht betroffen"
   fi
