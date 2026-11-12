@@ -136,6 +136,13 @@ pub struct MeldenAntwort {
     /// Es bleiben weitere Akten: die meldende Seite meldet sich gleich wieder.
     #[serde(default)]
     pub fuehrung_mehr: bool,
+    /// Die erreichte Seite nimmt Hinweise im Abgleich an (LLH-1495, design.md D4). Ein älterer
+    /// Stand nennt es nicht: dann `false`, und die meldende Seite pusht selbst.
+    #[serde(default)]
+    pub hinweise: bool,
+    /// Die erreichte Seite bietet Web Push an (D4).
+    #[serde(default)]
+    pub web_push: bool,
 }
 
 fn client() -> &'static reqwest::Client {
@@ -512,6 +519,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             &jetzt,
         )
         .await?;
+        repo::save_faehigkeiten(conn, kopplung.id, a.hinweise, a.web_push).await?;
         let ids: Vec<i64> = offen.iter().map(|o| o.id).collect();
         repo::mark_widerruf_gemeldet(conn, &ids, &jetzt).await?;
         for oa in &a.orgs {
@@ -690,6 +698,7 @@ pub async fn handle_meldung(
     identitaet: &Identitaet,
     kopplung: &KopplungZeile,
     anfrage: &MeldenAnfrage,
+    web_push: bool,
 ) -> Result<MeldenAntwort, AppError> {
     if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
@@ -883,6 +892,8 @@ pub async fn handle_meldung(
         fuehrung: fuehrung_ausgang.akten,
         fuehrung_bis,
         fuehrung_mehr: fuehrung_ausgang.mehr,
+        hinweise: true,
+        web_push,
     })
 }
 
@@ -964,7 +975,19 @@ mod tests {
             fuehrung: Vec::new(),
             fuehrung_bis: 0,
             fuehrung_mehr: false,
+            hinweise: true,
+            web_push: false,
         }
+    }
+
+    #[test]
+    fn antwort_eines_aelteren_hubs_nennt_keine_faehigkeiten() {
+        let a: MeldenAntwort = serde_json::from_value(serde_json::json!({
+            "name": "Hub", "softwarestand": "1", "protokoll": PROTOKOLL, "orgs": []
+        }))
+        .expect("ältere Antwort");
+        assert!(!a.hinweise);
+        assert!(!a.web_push);
     }
 
     #[test]

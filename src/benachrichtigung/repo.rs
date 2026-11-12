@@ -347,19 +347,17 @@ pub async fn quittieren_fuer_bezug_ausser(
 /// [`QUITTIERT_AUFBEWAHRUNG_STUNDEN`] ist, und unquittierte, älter als [`VERLAUF_STUNDEN`]
 /// (LLH-1143). Liefert die Zahl der gelöschten Zeilen.
 ///
-/// Spiegel bleiben aus (LLH-1492, design.md D10): ihre Zeilen räumt der Führer ab, und eine
-/// einzige Zeile eines Spiegels ließe die ganze Anweisung am Schutz-Trigger scheitern.
+/// Spiegel gehören dazu (LLH-1495, design.md D8): am Hub entstehen Hinweise an Spiegeln, und
+/// `benachrichtigung` wird nicht gespiegelt, hat also keinen Schutz-Trigger.
 pub async fn aufraeumen(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let quittiert_vor =
         crate::zeit::formatiere_utc(jetzt - Duration::hours(QUITTIERT_AUFBEWAHRUNG_STUNDEN));
     let erstellt_vor = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERLAUF_STUNDEN));
-    Ok(sqlx::query(sqlx::AssertSqlSafe(format!(
+    Ok(sqlx::query(
         "DELETE FROM benachrichtigung \
-         WHERE ((quittiert_at IS NOT NULL AND quittiert_at < ?) \
-                OR (quittiert_at IS NULL AND erstellt_at < ?)) \
-           AND {}",
-        crate::einsatz::spiegel_filter::nicht_gespiegelt("benachrichtigung.einsatz_id")
-    )))
+         WHERE (quittiert_at IS NOT NULL AND quittiert_at < ?) \
+            OR (quittiert_at IS NULL AND erstellt_at < ?)",
+    )
     .bind(quittiert_vor)
     .bind(erstellt_vor)
     .execute(pool)

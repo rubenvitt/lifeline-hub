@@ -32,6 +32,10 @@ pub struct KopplungZeile {
     pub gegenueber_age_empfaenger: Option<String>,
     /// Erreichte Seite: das Gegenüber hat die Datenträgerverschlüsselung bestätigt.
     pub gegenueber_datentraeger_verschluesselt: bool,
+    /// Meldende Seite: das Gegenüber nimmt Hinweise an (LLH-1495, design.md D4).
+    pub gegenueber_hinweise: bool,
+    /// Meldende Seite: das Gegenüber bietet Web Push an.
+    pub gegenueber_web_push: bool,
 }
 
 impl KopplungZeile {
@@ -47,7 +51,7 @@ const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, g
      richtung, gegenueber_adresse, zustand, zuletzt_gesehen_at, gegenueber_softwarestand, \
      gegenueber_protokoll, letzter_fehler, hinweis, uhr_abweichung_s, fehlversuche, \
      naechste_meldung_at, angebahnt_at, erstellt_at, gegenueber_age_empfaenger, \
-     gegenueber_datentraeger_verschluesselt";
+     gegenueber_datentraeger_verschluesselt, gegenueber_hinweise, gegenueber_web_push";
 
 /// Eine Org-Zuordnung einer Kopplung.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -477,6 +481,24 @@ pub async fn mark_gesehen(
     .bind(softwarestand)
     .bind(i64::from(protokoll))
     .bind(uhr_abweichung_s)
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Meldende Seite: die Fähigkeiten des Gegenübers aus seiner Meldeantwort (LLH-1495, D4).
+pub async fn save_faehigkeiten(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    hinweise: bool,
+    web_push: bool,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung SET gegenueber_hinweise = ?, gegenueber_web_push = ? WHERE id = ?",
+    )
+    .bind(hinweise)
+    .bind(web_push)
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;
