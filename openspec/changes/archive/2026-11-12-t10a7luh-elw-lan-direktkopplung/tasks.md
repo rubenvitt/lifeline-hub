@@ -73,10 +73,10 @@ Code.
 
 ## 9. Abschluss
 
-- [ ] 9.1 Verifikation `superpowers:verification-before-completion`: Gesamtszenario mit Hub, ELW 1 und ELW 2. ELW 2 liest einen Einsatz von ELW 1 über die Direktkopplung und stellt einen Antrag, ELW 1 übernimmt ihn. Prüfung: Integrationstest grün
-- [ ] 9.2 Review vor dem PR (Phase 4 von `dev-zunder-orchestrieren`); bestätigte Befunde behandelt. Prüfung: Abschnitt „Review“ im PR
-- [ ] 9.3 Bilder der Änderung: Ausstellen „vor Ort“, Liste „Im Netz gefunden“, Kopplungskarte mit Chip und Zertifikat, Paneel „Führung“ mit Hinweis. Prüfung: Bilder in PR und Meldung
-- [ ] 9.4 `./scripts/check-all.sh` grün (lokal das Bündel `schnell` und die betroffenen Suiten, voll über die CI des PRs)
+- [x] 9.1 Verifikation `superpowers:verification-before-completion`: Gesamtszenario mit Hub, ELW 1 und ELW 2. ELW 2 liest einen Einsatz von ELW 1 über die Direktkopplung und stellt einen Antrag, ELW 1 übernimmt ihn. Prüfung: Integrationstest grün
+- [x] 9.2 Review vor dem PR (Phase 4 von `dev-zunder-orchestrieren`); bestätigte Befunde behandelt. Prüfung: Abschnitt „Review“ im PR
+- [x] 9.3 Bilder der Änderung: Ausstellen „vor Ort“, Liste „Im Netz gefunden“, Kopplungskarte mit Chip und Zertifikat, Paneel „Führung“ mit Hinweis. Prüfung: Bilder in PR und Meldung
+- [x] 9.4 `./scripts/check-all.sh` grün (lokal das Bündel `schnell` und die betroffenen Suiten, voll über die CI des PRs)
 
 ## Workflow follow-up
 
