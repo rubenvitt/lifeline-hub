@@ -348,7 +348,7 @@ sequenceDiagram
   genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Nachweis:
   `tests/instanz_lebensende.rs`.
 - **Ende einer Akte ohne Spiegel** (LLH-1699,
-  [ADR-0029](entscheidungen/ADR-0029-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
+  [ADR-0031](entscheidungen/ADR-0031-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
   Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung
   im Abgleich (`SpiegelPaket.akten`). Das Gegenüber meldet `geloescht` auf demselben Weg wie für
   Spiegel, aber nur mit Beleg: Löschvermerk (`src/instanz/fuehrung/loeschvermerk.rs`) oder eigenes

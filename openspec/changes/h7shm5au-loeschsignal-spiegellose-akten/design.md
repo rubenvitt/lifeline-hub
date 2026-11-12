@@ -115,7 +115,7 @@ im Push nicht (die Nennung stand in der vorigen Antwort). Die Regel oben trägt 
 
 ### D4 Löschvermerk je Kennung
 
-Neue Tabelle (Migration `0335`, anhängend, Blatt, ohne Marker):
+Neue Tabelle (Migration `0336`, anhängend, Blatt, ohne Marker):
 
 ```sql
 CREATE TABLE fuehrung_loeschvermerk (
@@ -182,10 +182,10 @@ Weitergabe).
 
 Der Filter in `list_fremde_der_org` bleibt, sein Kommentar verliert den Verweis auf LLH-1699.
 
-### D6 Die Entscheidung steht als ADR-0029
+### D6 Die Entscheidung steht als ADR-0031
 
 Nach `docs/architektur/AGENTS.md` (Mitänderungsregel) bekommt eine Entscheidung der Route
-`entwurf` eine ADR: `ADR-0029` hält die Regeln aus D2–D4 mit Prüfung fest; Laufzeitsicht (6) und
+`entwurf` eine ADR: `ADR-0031` hält die Regeln aus D2–D4 mit Prüfung fest; Laufzeitsicht (6) und
 Glossar (12) nennen Ablauf und Begriff.
 
 ## Risks / Trade-offs
@@ -206,7 +206,7 @@ Glossar (12) nennen Ablauf und Begriff.
 
 ## Migration Plan
 
-- `0335_fuehrung_loeschvermerk.sql` legt nur die Tabelle an; vor dem Push `git fetch origin alpha`
+- `0336_fuehrung_loeschvermerk.sql` legt nur die Tabelle an; vor dem Push `git fetch origin alpha`
   und `scripts/check-migrationen.sh`.
 - Gemischter Betrieb: Eine neue Instanz neben einer älteren nennt Akten und bekommt keine Antwort;
   die ältere nennt nichts. Kein Schritt hängt an der Reihenfolge der Updates.
