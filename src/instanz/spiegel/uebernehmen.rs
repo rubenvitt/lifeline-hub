@@ -25,8 +25,12 @@ pub struct Empfaenger {
     pub kopplung_org_id: i64,
     /// Lokale Org der Zuordnung.
     pub org_id: i64,
-    /// Diese Instanz meldet sich; dann bildet sie Stammdaten fremd → lokal ab (D5).
+    /// Diese Instanz meldet sich über eine Standardkopplung; dann bildet sie Stammdaten fremd →
+    /// lokal ab (D5).
     pub meldend: bool,
+    /// Direktkopplung vor Ort (LLH-1497): Stammdaten kommen mit den Kennungen des Absenders und
+    /// werden allein über die Ursprungskennung abgebildet.
+    pub vor_ort: bool,
 }
 
 /// Ein Inhalt auf Abruf, den der Spiegel noch holen muss (D8).
@@ -283,7 +287,7 @@ async fn uebernehme_zeilen(
             } else {
                 daten
             };
-            match abbilden(conn, t, e, l, einsatz_id, daten, &konten).await? {
+            match abbilden(conn, t, e, l, einsatz_id, daten, &konten, &z.ursprung).await? {
                 Abgebildet::Wartet => naechste.push(z),
                 Abgebildet::Fertig(werte, _)
                     if ist_mitgliedschaft_eines_stellvertreters(conn, t, &werte).await? =>
@@ -479,8 +483,17 @@ async fn kopf_uebernehmen(
     let Some(Value::Object(daten)) = &kopf.daten else {
         return Err(AppError::Internal("Kopf ohne Daten".into()));
     };
-    let Abgebildet::Fertig(mut werte, _) =
-        abbilden(conn, t, e, l, vorhanden.unwrap_or(0), daten, konten).await?
+    let Abgebildet::Fertig(mut werte, _) = abbilden(
+        conn,
+        t,
+        e,
+        l,
+        vorhanden.unwrap_or(0),
+        daten,
+        konten,
+        &kopf.ursprung,
+    )
+    .await?
     else {
         return Err(AppError::Internal("Kopf nicht abbildbar".into()));
     };
@@ -599,6 +612,7 @@ async fn abbilden(
     einsatz_id: i64,
     daten: &Map<String, Value>,
     konten: &HashMap<i64, &KontoAngabe>,
+    ursprung: &std::collections::BTreeMap<String, Value>,
 ) -> Result<Abgebildet, AppError> {
     let mut werte = Vec::new();
     let mut spaeter = Vec::new();
@@ -611,7 +625,8 @@ async fn abbilden(
         let wert = match (&s.verweis, wert) {
             (_, Value::Null) | (None, _) => wert.clone(),
             (Some(ziel), _) => {
-                match ziel_abbilden(conn, ziel, e, l, einsatz_id, daten, wert, konten).await? {
+                let u = ursprung.get(&s.name);
+                match ziel_abbilden(conn, ziel, e, l, einsatz_id, daten, wert, konten, u).await? {
                     Ziel1::Wert(w) => w,
                     Ziel1::Fehlt(ziel_t, fremd) => {
                         if s.pflicht {
@@ -630,6 +645,19 @@ async fn abbilden(
         werte.push((s.name.clone(), wert));
     }
     Ok(Abgebildet::Fertig(werte, spaeter))
+}
+
+/// Eigene Zeile der Org zur Ursprungskennung, falls eine genannt ist (LLH-1497, D5).
+async fn ueber_ursprung(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    art: StammdatenArt,
+    ursprung: Option<&str>,
+) -> Result<Option<i64>, AppError> {
+    match ursprung {
+        Some(u) => abbildung::nach_ursprung(conn, org_id, art, u).await,
+        None => Ok(None),
+    }
 }
 
 /// Ergebnis der Abbildung eines Verweises.
@@ -651,6 +679,7 @@ async fn ziel_abbilden(
     daten: &Map<String, Value>,
     wert: &Value,
     konten: &HashMap<i64, &KontoAngabe>,
+    ursprung: Option<&Value>,
 ) -> Result<Ziel1, AppError> {
     let einsatzzeile = |t: &'static str| (t, wert.as_i64().map(|i| i.to_string()));
     let (ziel_t, fremd) = match ziel {
@@ -675,6 +704,7 @@ async fn ziel_abbilden(
                         id,
                         anzeigename: format!("Konto {id}"),
                         gegen_id: None,
+                        ursprung: None,
                     };
                     &ersatz
                 }
@@ -691,6 +721,14 @@ async fn ziel_abbilden(
             return Ok(Ziel1::Wert(Value::from(lokal)));
         }
         Ziel::Stammdaten(art) => {
+            let u = ursprung.and_then(Value::as_str);
+            if e.vor_ort {
+                // Kennungen des Absenders: allein die Ursprungskennung zählt (LLH-1497, D5).
+                return Ok(match ueber_ursprung(conn, e.org_id, *art, u).await? {
+                    Some(l) => Ziel1::Wert(Value::from(l)),
+                    None => Ziel1::Leer,
+                });
+            }
             if !e.meldend {
                 // Die meldende Seite hat schon übersetzt (D5).
                 return Ok(Ziel1::Wert(wert.clone()));
@@ -698,12 +736,15 @@ async fn ziel_abbilden(
             let Some(id) = wert.as_i64() else {
                 return Ok(Ziel1::Leer);
             };
-            return Ok(
-                match abbildung::stammdaten_lokal(conn, e.kopplung_org_id, *art, id).await? {
-                    Some(l) => Ziel1::Wert(Value::from(l)),
-                    None => Ziel1::Leer,
-                },
-            );
+            let lokal = match abbildung::stammdaten_lokal(conn, e.kopplung_org_id, *art, id).await?
+            {
+                Some(l) => Some(l),
+                None => ueber_ursprung(conn, e.org_id, *art, u).await?,
+            };
+            return Ok(match lokal {
+                Some(l) => Ziel1::Wert(Value::from(l)),
+                None => Ziel1::Leer,
+            });
         }
         Ziel::Org => {
             return Ok(if wert.as_i64() == Some(l.org_id) {
@@ -713,6 +754,29 @@ async fn ziel_abbilden(
             });
         }
         Ziel::QualiSoll | Ziel::QualiListe => {
+            if e.vor_ort {
+                let je = ursprung.and_then(Value::as_object);
+                let mut abb = HashMap::new();
+                for q in quali_ids(wert) {
+                    let lokal = match je
+                        .and_then(|j| j.get(&q.to_string()))
+                        .and_then(Value::as_str)
+                    {
+                        Some(u) => {
+                            abbildung::nach_ursprung(
+                                conn,
+                                e.org_id,
+                                StammdatenArt::Qualifikation,
+                                u,
+                            )
+                            .await?
+                        }
+                        None => None,
+                    };
+                    abb.insert(q, lokal);
+                }
+                return Ok(Ziel1::Wert(quali_ersetzen(wert, &abb)));
+            }
             if !e.meldend {
                 return Ok(Ziel1::Wert(wert.clone()));
             }

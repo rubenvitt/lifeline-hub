@@ -465,6 +465,8 @@ async fn uebernehmen_tx(
         kopplung_org_id,
         org_id: ziel_org,
         meldend: false,
+        // Keine Direktkopplung (LLH-1497): Abbildung wie bisher, Ursprung nur als letzter Versuch.
+        vor_ort: false,
     };
     let kurz = kennung.trim_start_matches("archiv/");
     let mut konten: HashMap<i64, i64> = HashMap::new();

@@ -239,6 +239,37 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
     }
     lifeline_hub::instanz::fuehrung::save_schalter(&pool, config.fuehrung).await?;
+    // Fingerabdruck des eigenen TLS-Zertifikats (LLH-1497, design.md D3): erst leeren, unter
+    // `--tls` setzt ihn die Cert-Beschaffung unten neu. Ohne TLS bleibt keine alte Beglaubigung.
+    lifeline_hub::instanz::identitaet::save_tls_zertifikat(&pool, None).await?;
+    let tls_pool = pool.clone();
+    // LAN-Entdeckung (LLH-1497, design.md D6): nur mit Schalter, TLS und ohne Loopback-Bind. Ein
+    // Fehler beim Start hält den Server nicht auf; die Adresse von Hand geht immer.
+    lifeline_hub::instanz::entdeckung::save_an(&pool, false).await?;
+    match lifeline_hub::instanz::entdeckung::startbedingung(
+        config.lan_entdeckung,
+        config.tls,
+        &config.bind,
+    ) {
+        Ok(port) => {
+            let i = lifeline_hub::instanz::identitaet::load_or_create(&pool).await?;
+            let ankuendigung = lifeline_hub::instanz::entdeckung::Ankuendigung {
+                kennung: i.kennung.clone(),
+                name: lifeline_hub::instanz::name().to_string(),
+                fingerabdruck: i.fingerabdruck(),
+                protokoll: lifeline_hub::instanz::PROTOKOLL,
+            };
+            match lifeline_hub::instanz::entdeckung::starte(&pool, &ankuendigung, port).await {
+                // Sicherheitsrelevanter Schalter (docs/betrieb/env-registry.md): sichtbar im LAN.
+                Ok(()) => {
+                    tracing::warn!("LAN-Entdeckung an: Instanz per mDNS angekündigt (Port {port})")
+                }
+                Err(e) => tracing::warn!("LAN-Entdeckung nicht gestartet: {e}"),
+            }
+        }
+        Err(lifeline_hub::instanz::entdeckung::NichtGestartet::Aus) => {}
+        Err(grund) => tracing::warn!("{}", grund.text()),
+    }
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
     // Spiegel (LLH-1492): Abgleich der Einsätze mit gekoppelten Instanzen, eigener Takt.
@@ -509,6 +540,11 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
 
         let (cert_pfad, key_pfad) = lifeline_hub::tls::beschaffe_cert(&config, sans).await?;
+        let fingerabdruck = std::fs::read(&cert_pfad)
+            .ok()
+            .and_then(|pem| lifeline_hub::instanz::identitaet::tls_fingerabdruck_pem(&pem));
+        lifeline_hub::instanz::identitaet::save_tls_zertifikat(&tls_pool, fingerabdruck.as_deref())
+            .await?;
         let tls_config =
             axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_pfad, &key_pfad).await?;
 
