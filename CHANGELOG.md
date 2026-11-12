@@ -1,3 +1,100 @@
+## [1.0.0-alpha.188](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.187...v1.0.0-alpha.188) (2026-11-12)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Dieses Release spielt mehrere Migrationen ein. Sie betreffen die Führung je Einsatz, den Primärschlüssel der Planschicht-Zuordnungen, das Lagebild für Externe sowie Nachbereitung und Lebensende. Das Löschprotokoll wird dabei neu angelegt und führt jetzt auch die Art der Löschung und die Gegenstelle.
+- **Vorhandene Führungsakten werden gelöscht:** Die Führung je Einsatz baut jetzt auf dem Spiegel auf. Die bisherige eigene Führungssperre am Einsatz entfällt, und vorhandene Führungsakten werden neu angelegt. Betroffen ist nur, wer die Führung je Einsatz (`LIFELINE_FUEHRUNG`) bereits eingeschaltet hatte.
+- **Neue Schnittstellen:**
+  - öffentlicher Abruf des Lagebilds für Externe, nur mit dem Schlüssel aus dem Link
+  - abgelehnte Anträge des eigenen Kontos über alle Einsätze hinweg
+  - Ändern der Nachbereitungsfrist am Einsatz
+  - Abfrage von Sprechgruppen, die im Katalog und im Einsatz denselben Namen tragen
+- **Sprechgruppen:** Eine Katalog-Sprechgruppe und eine Einsatz-Sprechgruppe mit gleichem Namen und gleicher Betriebsart werden jetzt mit einer Fehlermeldung abgelehnt.
+- **Rückmeldungen:** Freie GitHub-Issues sind abgeschaltet. Rückmeldungen laufen nur noch über das Formular „Rückmeldung“.
+
+### Führung und Instanzkopplung
+
+- **Führung je Einsatz:** Gekoppelte Instanzen einigen sich je Einsatz auf genau eine führende Instanz. Dafür gibt es diese Wege:
+  - Übergabe
+  - Anfrage
+  - Abgabe per Code
+  - Notübernahme mit Grund und Admin-Unterschrift oder Code
+- **Notübernahme:** Die meldende Seite gibt die Führung nie still ab. Eine gültige Übernahme wartet dort auf „Übernahme bestätigen“ oder „Widersprechen“. Eine ungültige wird verworfen, löst einen Alarm aus und wird in der Admin-Spur vermerkt.
+- **Wechsel der Führung:** Wer die Führung abgibt, hält den Einsatz danach als Spiegel und stellt Anträge. Wer sie bekommt, schreibt den bisherigen Spiegel weiter.
+  - Übergabe und Anfrage gehen erst, wenn der Abgleich nachgezogen hat; vorher meldet das System „Abgleich läuft noch“.
+  - Offene Anträge des früheren Spiegels führt der neue Führer genau einmal aus. Fehlende Anhänge holt er beim alten Führer.
+- **Bruchstelle:** Die abgelöste Seite fragt nach, was der neue Führer nicht kennt, nimmt es aus dem Einsatz und sichert es gesondert. Das Hinweisband zählt diese Einträge.
+- **Anzeige:**
+  - Das Paneel „Führung“ unter Einsatzdaten zeigt Übergabe, Anfrage, Notübernahme und den Verlauf.
+  - Auf der Seite Instanzkopplung steht neu die Liste „Einsätze beim Gegenüber“.
+  - Der Chip „Führung: …“ im Einsatzkopf erscheint nur, wenn eine andere Instanz führt.
+- **Widerruf einer Org-Zuordnung:** Einsätze, die das Gegenüber führte, kommen danach zurück und bleiben nicht gesperrt.
+- **Feld „Grund“:** Es zeigt einen Zeichenzähler, statt eingefügten Text still zu kürzen.
+- **Zuverlässigerer Spiegel:**
+  - Anhänge sind auf 32 MiB begrenzt.
+  - Zu große Zeilen kommen als Hinweis an und halten den Abgleich nicht mehr auf.
+  - Prüfsummen werden verlässlicher geprüft.
+  - Bei vielen Spiegeln kommen alle reihum dran.
+  - Abgeschlossene Spiegel behalten einen Platz im Abgleich.
+- **Lagebild-Freigabe beim Führungswechsel:** ETB-Anträge aus einer Lagebild-Freigabe gehen beim Wechsel der Führung nicht mehr verloren.
+
+### Einsatzabschluss, Nachbereitung und Aufbewahrung
+
+- **Nachbereitungsfrist:**
+  - Neue Org-Vorgabe „Nachbereitung (Tage ab Abschluss)“.
+  - Der Abschluss setzt daraus das Ende der Nachbereitung und vermerkt es im ETB.
+  - Einsatzleitung und Admin der Einsatz-Org können die Frist am abgeschlossenen Einsatz im Paneel „Nachbereitung“ ändern oder aufheben.
+- **Verwahrung am Hub:**
+  - Nach der Nachbereitung übergibt ein ELW seinen Einsatz zur Verwahrung an den Hub. Das geht nur mit Hub-Kopplung.
+  - Der Hub macht aus seinem Spiegel einen eigenen Einsatz und vergibt bei einer Kollision eine neue Nummer. Erst danach räumt der ELW ab.
+  - Fehlen Daten oder Anhänge, wartet die Übergabe und nennt den Grund.
+  - Wird der Einsatz während der Übergabe geändert, bleibt er am ELW.
+- **Gelöschte Einsätze:** Der Führer meldet sie an die gekoppelte Gegenstelle, und die räumt ihren Spiegel ab. Das gilt in beide Richtungen. Soft-gelöschte Einsätze kommen weiter an, damit Sperre und Wiederherstellung greifen.
+- **Aufbewahrungsübersicht:** Sie zeigt verwahrte Einsätze mit dem Zustand „verwahrt“ und der Gegenstelle.
+- **Abgelehnte Anträge nach der Verwahrung:**
+  - Die eigenen abgelehnten Anträge bleiben 30 Tage nach der Ablehnung erreichbar, über alle Einsätze hinweg.
+  - Sie stehen in der Betriebszeile („Anträge abgelehnt“) und im Wiederherstellungs-Drawer, jeweils mit Einsatz, vollständigen Daten, Grund und Frist.
+  - Dort gibt es „Kopieren“ und „Verwerfen“.
+
+### Lagebild für Externe
+
+- **Links je Empfänger:** Die Einsatzleitung gibt das Lagebild auf der Seite „Geräte“ als Link je Empfänger frei.
+  - Stufe „Lagebild“ oder „Öffentlich“
+  - Gültig 2, 12 oder 24 Stunden oder bis zum Einsatzende
+  - Der Link wird einmal mit QR-Code angezeigt und lässt sich nach Rückfrage widerrufen.
+  - Die Liste nennt Öffnungen und Abrufe. Protokolliert wird ohne IP-Adresse.
+- **Seite `/extern`:**
+  - Aktualisiert sich alle 30 Sekunden.
+  - Zeigt je nach Stufe Zahlen, Unfallhilfsstellen, Karte mit Quellenangabe und die Lagemeldung.
+  - Nennt Felder, die nicht übertragen werden.
+  - Meldet bei ungültigem Link „Dieser Link gilt nicht mehr.“
+
+### Kommunikation
+
+- **Gleichnamige Sprechgruppen:**
+  - Der Auswahldialog wählt eine vorhandene Sprechgruppe gleichen Namens aus, statt eine neue anzulegen.
+  - Bereits vorhandene Doppelungen zeigen die Stammdaten mit der Marke „auch lokal“ und den betroffenen Einsätzen.
+
+### Oberfläche
+
+- **Benutzermenü:**
+  - Darstellung, Bediendichte und Helligkeit stehen unter „Anzeige“ als je eine Segmentleiste. Eine Wahl wirkt sofort, und das Menü bleibt offen.
+  - Im Handschuh-Betrieb stehen Profil und Abmelden nebeneinander. Am Handy überlappen die Helligkeitsstufen nicht mehr.
+- **Hilfe und Eingänge:**
+  - Rückmeldung und Lizenzen sind in die Übersicht der Hilfe umgezogen.
+  - Die Eingänge führen zusätzlich zu den Benachrichtigungs-Einstellungen.
+
+### Rückmeldung
+
+- **Formular „Rückmeldung“:** Der Eintrag „Rückmeldung“ in der Hilfe öffnet ein GitHub-Formular. Es ist mit Version, Oberfläche und Bereich vorbefüllt, nie mit Kennungen aus dem Einsatz.
+- **Eingang:** Jede Rückmeldung landet automatisch im Eingang der Entwicklung und wird mit „aufgenommen“ oder „nicht-aufgenommen“ gekennzeichnet.
+- **Ersatzweg und Sicherheitsmeldungen:** Ohne GitHub geht es per E-Mail an rueckmeldung@lifeline-hub.de. Sicherheitslücken lassen sich privat melden.
+
+### Verwaltung und Datenschutz
+
+- **Organisationslogo:** Es wird ohne Metadaten wie Gerät, Aufnahmezeit oder GPS gespeichert und ausgeliefert. Das gilt auch für bereits hochgeladene Logos. Ein Bild, das sich nicht bereinigen lässt, wird abgelehnt.
+- **Gesicherte Einträge aus der Bruchstelle:** Löschersuchen nach Art. 17 DSGVO und das Schwärzen von Datenkategorien erfassen sie mit.
+
 ## [1.0.0-alpha.187](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.186...v1.0.0-alpha.187) (2026-11-11)
 
 ### Wichtige Änderungen
