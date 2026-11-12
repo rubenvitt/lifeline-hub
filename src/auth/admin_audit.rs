@@ -99,6 +99,18 @@ wire_enum! {
         ArchivSchluesselGeprueft => "archiv_schluessel_geprueft",
         ArchivSchluesselEntfernt => "archiv_schluessel_entfernt",
         ArchivHeruntergeladen => "archiv_heruntergeladen",
+        /// Maschinenzugang für ein Fremdsystem angelegt (LLH-1652, Migration
+        /// `*_admin_audit_maschinenzugang.sql`). Der Code steht nie in der Spur.
+        MaschinenzugangAngelegt => "maschinenzugang_angelegt",
+        /// Neuer Einmal-Code für einen bestehenden Zugang (Schlüsselwechsel).
+        MaschinenzugangCodeAusgestellt => "maschinenzugang_code_ausgestellt",
+        /// Ein Fremdsystem hat einen Code eingelöst und seinen Schlüssel gebunden (ausgelöst
+        /// vom Fremdsystem, ohne handelnde Person).
+        MaschinenzugangSchluesselGebunden => "maschinenzugang_schluessel_gebunden",
+        /// Name, Scopes oder „gültig bis“ eines Zugangs geändert.
+        MaschinenzugangGeaendert => "maschinenzugang_geaendert",
+        /// Maschinenzugang widerrufen.
+        MaschinenzugangWiderrufen => "maschinenzugang_widerrufen",
     }
 }
 
@@ -117,6 +129,8 @@ pub enum Ziel<'a> {
     Unterschrift(&'a str),
     /// Ein Archiv-Schlüssel der Org (Bezeichnung) oder ein Einsatz im Archiv (Nummer), LLH-1494.
     Archiv(&'a str),
+    /// Ein Maschinenzugang für ein Fremdsystem, mit seinem Namen (LLH-1652).
+    Maschinenzugang(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -133,6 +147,9 @@ pub enum Ziel<'a> {
 ///   des Blocks, durch Komma getrennt) und `block`.
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
+/// - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich
+///   `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich
+///   `scopes_vorher`, falls die Scopes wechselten.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ZugangsAngaben {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -174,6 +191,18 @@ pub struct ZugangsAngaben {
     /// Archiv (LLH-1494): Nummer des heruntergeladenen Blocks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block: Option<i64>,
+    /// Maschinenzugang (LLH-1652): seine Kennung.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zugang_id: Option<String>,
+    /// Maschinenzugang: Scopes (Wire-Werte) nach der Aktion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<String>>,
+    /// Maschinenzugang: Scopes vor einer Änderung.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scopes_vorher: Option<Vec<String>>,
+    /// Maschinenzugang: Fingerabdruck des abgelösten Schlüssels beim Wechsel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerabdruck_vorher: Option<String>,
 }
 
 impl ZugangsAngaben {
@@ -215,7 +244,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
         | Ziel::Lesezugang(id)
         | Ziel::Instanz(id)
         | Ziel::Unterschrift(id)
-        | Ziel::Archiv(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
+        | Ziel::Archiv(id)
+        | Ziel::Maschinenzugang(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
@@ -276,7 +306,8 @@ pub async fn schreibe_ohne_akteur(
         | Ziel::Lesezugang(t)
         | Ziel::Instanz(t)
         | Ziel::Unterschrift(t)
-        | Ziel::Archiv(t) => (None, t),
+        | Ziel::Archiv(t)
+        | Ziel::Maschinenzugang(t) => (None, t),
     };
     let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
     let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);

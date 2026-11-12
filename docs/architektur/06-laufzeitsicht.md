@@ -419,6 +419,37 @@ sequenceDiagram
 - Akten gehen als Delta über einen Stand je Instanz, höchstens 50 je Nachricht
   (`tests/instanz_fuehrung.rs`).
 
+## 6.6d Fremdsystem anbinden
+
+Ein Fremdsystem meldet sich nach demselben Verfahren wie eine Instanz an, mit eigenem Profil und
+eigenen Tabellen (LLH-1652,
+[ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
+
+```mermaid
+sequenceDiagram
+  participant Admin as frontend Anbindungen
+  participant Hub as lifeline-hub (src/routes/anbindungen.rs, src/public_api/)
+  participant F as Fremdsystem (crates/lifeline-machine-client)
+  Admin->>Hub: POST /api/admin/anbindungen {name, scopes}
+  Hub-->>Admin: Code (16 Zeichen, 15 min)
+  F->>Hub: POST /api/v1/zugang/redeem {lookup, public_key, proof}
+  Hub->>Hub: Prüfwert, Code verbrauchen, Schlüssel binden
+  Hub-->>F: zugang_id, instanz_id, Instanzschlüssel, Prüfwert
+  F->>Hub: GET /api/v1/me (Authorization: Machine)
+  Hub->>Hub: MachineClient: Signatur, Zustand, Drossel, jti, Scope
+  Hub-->>F: Zugang, Org, Scopes, Serverzeit (Lifeline-Signature)
+```
+
+- Signatur und Code-Ableitung teilt `src/instanz/signatur.rs` bzw. `src/instanz/code.rs` mit der
+  Instanzkopplung über ein Profil (`MACHINE`, `SALZ_MACHINE`); ein Token des einen Profils
+  scheitert am anderen.
+- Ein gescheiterter Abruf antwortet 401 ohne Grund; der Grund (etwa die Uhrabweichung) steht am
+  Zugang (`src/public_api/zugang.rs`, `ablehnung_festhalten`) und auf der Seite „Anbindungen“.
+- Unbekannte Zugänge und gescheiterte Einlösungen zählen je Quelle im Zähler für Maschinen
+  (`src/auth/rate_limit.rs`, `maschine`), nie in der Anmeldesperre; je Zugang drosselt
+  `src/public_api/drossel.rs`.
+
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 
 ```mermaid

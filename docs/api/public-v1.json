@@ -1,0 +1,435 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Lifeline Hub, öffentliche API",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |\n| Abfrage | – | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Diese Instanz"
+    }
+  ],
+  "paths": {
+    "/api/v1/instanz/jwks.json": {
+      "get": {
+        "tags": [
+          "Anmeldung"
+        ],
+        "summary": "Öffentlicher Schlüssel dieser Instanz, ohne Anmeldung. Dient dem Schlüsselwechsel; die erste\nBindung kommt mit dem Einlösen.",
+        "operationId": "get_instanz_jwks",
+        "responses": {
+          "200": {
+            "description": "JWKS mit dem Ed25519-Schlüssel der Instanz",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Jwks"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "Anmeldung"
+        ],
+        "summary": "Prüfroute: Zugang, Org, Scopes, Serverzeit und Abweichung der Uhr. Der erste Aufruf jeder\nAnbindung.",
+        "operationId": "get_me",
+        "responses": {
+          "200": {
+            "description": "Angemeldet; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": [
+          "Vertrag"
+        ],
+        "summary": "Das OpenAPI-Dokument dieser API.",
+        "operationId": "get_openapi",
+        "responses": {
+          "200": {
+            "description": "OpenAPI-Dokument (3.1) der öffentlichen API v1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler; `code` nach der Tabelle in `info.description`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zugang/redeem": {
+      "post": {
+        "tags": [
+          "Anmeldung"
+        ],
+        "summary": "Einen Einmal-Code einlösen und den Schlüssel des Fremdsystems an den Zugang binden.",
+        "operationId": "redeem_zugang",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Schlüssel gebunden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedeemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Schlüssel unlesbar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Code unbekannt, abgelaufen, schon eingelöst oder Prüfwert falsch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Zu viele gescheiterte Einlösungen von dieser Quelle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiErrorBody": {
+        "type": "object",
+        "description": "Body jeder Fehlerantwort unter `/api/v1/`.",
+        "required": [
+          "error",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "error": {
+            "type": "string",
+            "description": "Lesbarer Text (deutsch). Kein Vertrag: Clients werten `code` aus."
+          }
+        }
+      },
+      "ErrorCode": {
+        "type": "string",
+        "description": "Stabiler Fehlercode unter `/api/v1/`. Innerhalb von v1 kommen Codes nur hinzu; keiner wird\numbenannt, umgedeutet oder entfernt. Clients überspringen unbekannte Werte.",
+        "enum": [
+          "invalid_field",
+          "unauthorized",
+          "missing_scope",
+          "tls_required",
+          "not_found",
+          "method_not_allowed",
+          "conflict",
+          "fuehrung_elsewhere",
+          "cursor_expired",
+          "payload_too_large",
+          "unprocessable",
+          "rate_limited",
+          "internal_error",
+          "unavailable"
+        ]
+      },
+      "Jwk": {
+        "type": "object",
+        "description": "Öffentlicher Ed25519-Schlüssel als JWK (RFC 8037).",
+        "required": [
+          "kty",
+          "crv",
+          "x"
+        ],
+        "properties": {
+          "alg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crv": {
+            "type": "string",
+            "description": "Immer `Ed25519`."
+          },
+          "kid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kty": {
+            "type": "string",
+            "description": "Immer `OKP`."
+          },
+          "use": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "description": "Die 32 Bytes des Schlüssels, Base64url ohne Auffüllung."
+          }
+        }
+      },
+      "Jwks": {
+        "type": "object",
+        "description": "JWKS dieser Instanz.",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Jwk"
+            }
+          }
+        }
+      },
+      "MeOrg": {
+        "type": "object",
+        "description": "Org eines Zugangs.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "MeResponse": {
+        "type": "object",
+        "description": "Antwort der Prüfroute.",
+        "required": [
+          "zugang_id",
+          "name",
+          "org",
+          "scopes",
+          "server_time_at",
+          "clock_offset_s"
+        ],
+        "properties": {
+          "clock_offset_s": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Serverzeit minus `iat` dieser Anfrage in Sekunden. Positiv: die Uhr des Fremdsystems geht\nnach. Ab ±300 s scheitern Anfragen."
+          },
+          "name": {
+            "type": "string"
+          },
+          "org": {
+            "$ref": "#/components/schemas/MeOrg"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "server_time_at": {
+            "type": "string",
+            "description": "Serverzeit (UTC, `JJJJ-MM-TT hh:mm:ss`)."
+          },
+          "valid_until_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ablauf des Zugangs (UTC, `JJJJ-MM-TT hh:mm:ss`); ohne Ablauf `null`."
+          },
+          "zugang_id": {
+            "type": "string"
+          }
+        }
+      },
+      "RedeemRequest": {
+        "type": "object",
+        "description": "Body von `POST /api/v1/zugang/redeem`. Der Code selbst geht nie über die Leitung.",
+        "required": [
+          "lookup",
+          "public_key",
+          "proof"
+        ],
+        "properties": {
+          "lookup": {
+            "type": "string",
+            "description": "Aus dem Code abgeleiteter Suchwert (HKDF-SHA256, Salz `lifeline-machine-client/1`,\nInfo `suche`)."
+          },
+          "proof": {
+            "type": "string",
+            "description": "HMAC-SHA256 über das Transkript `machine-einloeser` mit dem Schlüssel `einloeser`."
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/Jwk",
+            "description": "Öffentlicher Schlüssel des Fremdsystems."
+          }
+        }
+      },
+      "RedeemResponse": {
+        "type": "object",
+        "description": "Antwort auf das Einlösen.",
+        "required": [
+          "zugang_id",
+          "instanz_id",
+          "instanz_public_key",
+          "proof"
+        ],
+        "properties": {
+          "instanz_id": {
+            "type": "string",
+            "description": "Kennung dieser Instanz: `aud` jeder Anfrage."
+          },
+          "instanz_public_key": {
+            "$ref": "#/components/schemas/Jwk",
+            "description": "Schlüssel, mit dem die Instanz ihre Antworten signiert."
+          },
+          "proof": {
+            "type": "string",
+            "description": "HMAC-SHA256 über das Transkript `machine-aussteller` mit dem Schlüssel `aussteller`:\nbeweist, dass diese Instanz den Code ausgestellt hat."
+          },
+          "zugang_id": {
+            "type": "string",
+            "description": "Kennung des Zugangs: `kid` und `iss` jeder Anfrage."
+          }
+        }
+      },
+      "Scope": {
+        "type": "string",
+        "description": "Was ein Maschinenzugang darf (Konzept D2). Wire-Werte nach LFH-1312: Fachbegriff deutsch,\nZugriffsart englisch. Neue Werte kommen nur hinzu (Stabilitätszusage v1).",
+        "enum": [
+          "lage:read",
+          "einsaetze:read",
+          "events:read",
+          "alarmmeldungen:write",
+          "positionen:write",
+          "rechner:use"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "machine": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "`Machine <jws>`: je Anfrage ein kompaktes JWS (EdDSA, `typ` `lifeline-machine+jwt`, `kid` = Zugangs-ID) mit den Claims `iss`, `aud` (Instanz-UUID), `iat`, `exp` (höchstens 60 s nach `iat`), `jti`, `htm`, `htu` (Pfad mit Abfrage) und `bh` (SHA-256 des Bodys, Base64url). Uhren dürfen 5 min abweichen. Verfahren, Code-Ableitung und Testvektoren: `docs/api/maschinenzugang.md`."
+      }
+    }
+  }
+}

@@ -67,6 +67,7 @@ pub mod person;
 pub mod personal;
 pub mod planung;
 pub mod programmpunkt;
+pub mod public_api;
 pub mod routes;
 pub mod schaden;
 pub mod schichtmodell;

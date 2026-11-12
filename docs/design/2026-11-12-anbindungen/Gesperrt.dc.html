@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Anbindungen am gekoppelten ELW</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:1280px;height:560px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:44px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:12px;padding:0 12px 0 0;box-sizing:border-box;flex-shrink:0}
+.markenzelle{width:56px;height:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.marke{width:14px;height:14px;background:#a8071a}
+.koerper{display:flex;flex:1;min-height:0}
+.nav{width:220px;border-right:1px solid #22262b;background:#0a0c0e;padding:16px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.augenbraue{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab;padding:10px 16px 6px}
+.navlink{display:block;padding:7px 16px;font-size:13px;color:#c6ccd2;text-decoration:none;border-left:2px solid transparent}
+.navlink.aktiv{background:#16191d;color:#e8ebee;border-left-color:#4d94d6}
+.inhalt{flex:1;min-width:0;padding:0 24px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.seitenkopf{height:56px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #22262b}
+h1{margin:0;font-size:18px;font-weight:600}
+.meta{font-size:12px;color:#9aa2ab}
+.platz{flex:1}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;border:1px solid #2e343a;background:#16191d;color:#8f97a0;cursor:not-allowed}
+.banner{display:flex;gap:12px;align-items:flex-start;padding:12px;background:#0d1520;border:1px solid #1d3a5c;font-size:13px;color:#e8ebee}
+.banner p{margin:0}
+.leer{padding:24px;border:1px solid #2e343a;background:#0a0c0e;color:#9aa2ab;font-size:13px}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <div class="markenzelle"><div class="marke"></div></div>
+    <span style="font-size:13px;font-weight:600">Verwaltung</span>
+    <span class="meta">ELW 1 · DRK Kreisverband Musterstadt</span>
+  </div>
+  <div class="koerper">
+    <nav class="nav" aria-label="Verwaltung">
+      <div class="augenbraue">Einstellungen</div>
+      <a class="navlink" href="#">Organisation</a>
+      <a class="navlink" href="#">Lagemonitore</a>
+      <a class="navlink aktiv" href="#" aria-current="page">Anbindungen</a>
+      <a class="navlink" href="#">Instanzkopplung</a>
+    </nav>
+    <main class="inhalt">
+      <div class="seitenkopf">
+        <h1>Anbindungen</h1>
+        <div class="platz"></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+          <button class="knopf" type="button" disabled aria-describedby="grund">Anbindung anlegen</button>
+          <span class="meta" id="grund">Nur Ansicht · gehört an den Hub</span>
+        </div>
+      </div>
+      <div class="banner" role="status">
+        <strong style="white-space:nowrap;color:#8ec2f0">Am Hub anbinden</strong>
+        <p>Diese Instanz meldet sich für die Organisation bei <strong>Hub Kreis</strong> (https://hub.drk-musterstadt.de). Anbindungen von Fremdsystemen gehören dorthin.</p>
+      </div>
+      <div class="leer">Keine Anbindungen an dieser Instanz.</div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

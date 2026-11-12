@@ -21,6 +21,7 @@ import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
 import LagemonitorZugaenge from '../pages/einstellungen/LagemonitorZugaenge';
+import Anbindungen from '../pages/einstellungen/Anbindungen';
 import InstanzkopplungSeite from '../instanz/InstanzkopplungSeite';
 import KartenOnlineSektion from '../karten/KartenOnlineSektion';
 import KartenOfflineSektion from '../karten/KartenOfflineSektion';
@@ -95,6 +96,8 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'anmeldung', label: 'Anmeldeverfahren', element: <Anmeldeverfahren /> },
       // LLH-1484: Lesezugänge externer Lagemonitore; den Einsatz gibt die Einsatzleitung frei.
       { key: 'lagemonitore', label: 'Lagemonitore', element: <LagemonitorZugaenge /> },
+      // LLH-1652: Maschinenzugänge für Fremdsysteme an der öffentlichen API (`/api/v1/`).
+      { key: 'anbindungen', label: 'Anbindungen', element: <Anbindungen /> },
       // LLH-1490: diese Instanz mit einer anderen koppeln (ELW und Hub), Unterschriftsschlüssel.
       { key: 'instanzkopplung', label: 'Instanzkopplung', element: <InstanzkopplungSeite /> },
       // LLH-1494: Schlüssel, an die der Hub einen Einsatz nach der Nachbereitung verschlüsselt.

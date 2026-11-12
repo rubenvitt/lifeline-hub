@@ -805,6 +805,32 @@ pub enum Command {
         /// Benutzername des Admins.
         benutzername: String,
     },
+    /// Ein Fremdsystem an einen Lifeline Hub anbinden (Maschinenzugang, LLH-1652). Für
+    /// Betreiber eines Fremdsystems; der Hub selbst braucht dieses Kommando nicht.
+    #[command(subcommand)]
+    Zugang(ZugangCommand),
+}
+
+/// Unterkommandos von `lifeline-hub zugang`.
+#[derive(Subcommand, Debug, Clone)]
+pub enum ZugangCommand {
+    /// Einmal-Code einlösen: erzeugt ein Schlüsselpaar, bindet es an den Zugang und legt die
+    /// Schlüsseldatei ab (nur für den Besitzer lesbar, wird nie überschrieben).
+    Redeem {
+        /// Basisadresse des Hubs, z. B. `https://hub.example`.
+        url: String,
+        /// Einmal-Code von der Seite „Anbindungen“, z. B. `ABCD-EFGH-JKMN-PQRS`.
+        code: String,
+        /// Pfad der Schlüsseldatei.
+        #[arg(long, default_value = "lifeline-zugang.json")]
+        out: String,
+    },
+    /// Prüfroute `GET /api/v1/me` signiert aufrufen: zeigt Zugang, Org, Scopes und
+    /// Uhrabweichung.
+    Me {
+        /// Pfad der Schlüsseldatei aus `redeem`.
+        datei: String,
+    },
 }
 
 #[cfg(test)]
