@@ -41,6 +41,10 @@ export interface FuehrungMoeglich {
   notuebernahme: boolean;
   /** Notübernahme gegen die meldende Seite: mit Unterschrift oder Code. */
   notuebernahmeMitBeweis: boolean;
+  /** Bei `notuebernahmeMitBeweis` die eigene Unterschrift als Beweis anbieten: nur wer
+   *  `darfFuehrungUnterschreiben` (Admin der Einsatz-Org, LLH-1676, Spec `instanz-fuehrung`).
+   *  Sonst bleibt der Code des Gegenübers. */
+  unterschrift: boolean;
   /** Eine Übernahme gegen diese Instanz wartet auf Bestätigen oder Widersprechen. */
   entscheiden: boolean;
   /** Gegenüber vor Ort, mit denen die Führung hier wechseln würde, es aber nicht darf
@@ -53,7 +57,10 @@ export function vorOrtHinweis(name: string): string {
   return `${name} ist vor Ort gekoppelt: Führungswechsel dorthin kommt später.`;
 }
 
-export function fuehrungMoeglich(f: FuehrungAnzeige): FuehrungMoeglich {
+export function fuehrungMoeglich(
+  f: FuehrungAnzeige,
+  { darfUnterschreiben = false }: { darfUnterschreiben?: boolean } = {},
+): FuehrungMoeglich {
   // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647).
   const frei = f.fuehrend && !f.offen && !f.verwahrt;
   const liegtHier = f.einsatz_id != null;
@@ -68,13 +75,14 @@ export function fuehrungMoeglich(f: FuehrungAnzeige): FuehrungMoeglich {
     : fuehrerVorOrt && !f.fuehrend
       ? [fuehrerVorOrt.name]
       : [];
+  const mitBeweis = liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'wird_gemeldet';
   return {
     uebergeben: frei ? standard : [],
     perCode: frei ? standard.filter((g) => g.richtung === 'meldet_sich') : [],
     anfragen: wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich' && !f.anfrage_offen,
     notuebernahme: liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich',
-    notuebernahmeMitBeweis:
-      liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'wird_gemeldet',
+    notuebernahmeMitBeweis: mitBeweis,
+    unterschrift: mitBeweis && darfUnterschreiben,
     entscheiden: f.offen != null,
     vorOrt,
   };

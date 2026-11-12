@@ -65,6 +65,7 @@ import {
   darfEinsatzLeiten,
   darfEinsatzVerwalten,
   darfFuehrungBedienen,
+  darfFuehrungUnterschreiben,
 } from '../einsatz/schreibrecht';
 import FuehrungPaneel from '../instanz/FuehrungPaneel';
 import { loadFuehrung } from '../api/fuehrung';
@@ -1472,6 +1473,7 @@ export default function EinsatzdatenPage() {
         <FuehrungAbschnitt
           einsatzId={einsatzId}
           darfBedienen={darfFuehrungBedienen(einsatz, benutzer)}
+          darfUnterschreiben={darfFuehrungUnterschreiben(einsatz, benutzer)}
         />
       )}
 
@@ -1487,9 +1489,11 @@ export default function EinsatzdatenPage() {
 function FuehrungAbschnitt({
   einsatzId,
   darfBedienen,
+  darfUnterschreiben,
 }: {
   einsatzId: number;
   darfBedienen: boolean;
+  darfUnterschreiben: boolean;
 }) {
   const { token } = useRollen();
   const q = useQuery({
@@ -1515,6 +1519,7 @@ function FuehrungAbschnitt({
     <FuehrungPaneel
       fuehrung={q.data}
       darfBedienen={darfBedienen}
+      darfUnterschreiben={darfUnterschreiben}
       style={{ marginTop: token.marginLG }}
     />
   );
