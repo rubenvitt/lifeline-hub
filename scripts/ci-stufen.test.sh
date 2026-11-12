@@ -54,8 +54,9 @@ gleich() { [ "$(ohne_leerraum <<< "$1")" = "$(ohne_leerraum <<< "$2")" ]; }
 
 # DIE ZWEI AUSDRÜCKE, die über Start und Abbruch der zweiten Stufe entscheiden, stehen hier im
 # Wortlaut (Leerraum zählt nicht). Eine Teilzeichenkette fängt keine logische Umkehrung (`&&` zu
-# `||`, eine gestrichene Klausel); wer einen Ausdruck ändert, ändert ihn hier mit und begründet
-# das in `scripts/AGENTS.md`, „Zwei Stufen im PR“.
+# `||`, eine gestrichene Klausel); wer einen Ausdruck ändert, ändert ihn hier mit (Regel:
+# `scripts/AGENTS.md`, „Zwei Stufen im PR“; Herleitung im design.md der Change
+# `k133wmg6-zweistufige-ci`).
 #   Fertig:  Auto-Merge an oder Label `e2e`, im Zustand NACH dem Ereignis.
 #   Start:   Push (Aufruf aus ci.yml); neuer Commit an einem fertigen PR; Auto-Merge an, wenn das
 #            Label fehlte; Label `e2e`, wenn Auto-Merge aus war.

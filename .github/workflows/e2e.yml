@@ -24,7 +24,8 @@
 #
 # KANAL-BRANCHES: `ci.yml` ruft diesen Workflow bei jedem Push auf `alpha`, `beta`, `main` auf
 # (`workflow_call`, dort ist `github.event_name` = `push`), und der Release wartet darauf. Die
-# Checks heißen dann `e2e / e2e 1/4` usw.; auf Kanal-Branches verlangt das Ruleset keine.
+# Checks heißen dann `e2e (Kanal) / e2e 1/4` usw. (Name des Aufruf-Jobs als Vorsilbe); auf
+# Kanal-Branches verlangt das Ruleset keine.
 #
 # Warum ein eigener Workflow und nicht mehr Ereignisse in `ci.yml`: das Einschalten von Auto-Merge
 # bräche dort den laufenden Lauf ab (eine Gruppe je Ref), und ein Lauf, der Rust und

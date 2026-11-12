@@ -30,7 +30,8 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   allein das `if` des Jobs `aenderungen` in `e2e.yml`; neue Ereignistypen gehören nie in
   `ci.yml` (das Einschalten von Auto-Merge bräche den laufenden Lauf ab). Push-Läufe auf
   Kanal-Branches rufen `e2e.yml` aus `ci.yml` auf, der Release wartet darauf. Die Form hält
-  `scripts/ci-stufen.test.sh` (Schritt 11) fest. **e2e-Rückmeldung vor dem Merge:** Label
+  `scripts/ci-stufen.test.sh` (Schritt 11) fest; Start- und Gruppenbedingung von `e2e.yml` stehen
+  dort im Wortlaut und ändern sich nur zusammen mit ihm. **e2e-Rückmeldung vor dem Merge:** Label
   `e2e` setzen oder lokal `check-all.sh --geaendert`. Herleitung:
   `openspec/changes/k133wmg6-zweistufige-ci/design.md`.
 - **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite, jede für sich** (LLH-1660,

@@ -17,17 +17,12 @@ herleitung:
 
 ## Regeln
 
-- MUST: Jeder Push auf einen PR startet nur die erste Stufe in `ci.yml` (Schnellprüfungen, Rust,
-  Vitest). e2e-Binary und `e2e 1/4` bis `4/4` stehen in `e2e.yml`.
-- MUST: Fertig heißt Auto-Merge an oder Label `e2e`. Ob die zweite Stufe startet, entscheidet
-  allein das `if` der Auswahl in `e2e.yml`; die übrigen Jobs hängen an deren Ergebnis.
-- MUST NOT: Vor der zweiten Stufe meldet kein Lauf `e2e-Binary` oder `e2e k/4` übersprungen oder
-  leer grün; beide sind Matrix-Jobs, ihr gerenderter Name fehlt dann.
-- MUST NOT: `ci.yml` hört auf keine weiteren `pull_request`-Ereignistypen (Auto-Merge, Labels).
-- MUST: Push-Läufe auf Kanal-Branches rufen `e2e.yml` aus `ci.yml` auf, und `release` wartet
-  darauf.
-- MUST: Start- und Gruppenbedingung von `e2e.yml` ändern sich nur zusammen mit dem Wortlaut in
-  `scripts/ci-stufen.test.sh` (Regel: `scripts/AGENTS.md`, „Zwei Stufen im PR“).
+- MUST: Es gelten die Regeln in `scripts/AGENTS.md`, „Zwei Stufen im PR“: erste Stufe in `ci.yml`
+  bei jedem Push, e2e-Suite in `e2e.yml` erst am fertig markierten PR, ihre Pflicht-Checks fehlen
+  davor, keine weiteren Ereignistypen in `ci.yml`, Kanal-Push ruft `e2e.yml` auf, Start- und
+  Gruppenbedingung nur zusammen mit ihrem Wortlaut im Formtest.
+- MUST: In `e2e.yml` steht die Start-Bedingung nur an der Auswahl (`aenderungen`); `binaer`, `e2e`
+  und `berichte` hängen an deren Ergebnis, nie an einer eigenen Kopie der Bedingung.
 
 ## Prüfung
 
@@ -52,6 +47,6 @@ seinen Check, ein übersprungener Matrix-Job nicht.
 
 Ein roter e2e-Fall fällt erst nach dem Einschalten von Auto-Merge auf; wer früher Rückmeldung
 braucht, setzt das Label `e2e` oder fährt das Gate lokal. Auto-Merge wartet auf die fehlenden
-Checks, ohne eigenes Zutun. Bei Push heißen die Checks `e2e / e2e k/4`; auf Kanal-Branches
-verlangt das Ruleset keine. Der Stau-Wächter meldet einen PR mit Auto-Merge, an dem die Stufe nie
+Checks, ohne eigenes Zutun. Bei Push heißen die Checks `e2e (Kanal) / e2e k/4`; auf
+Kanal-Branches verlangt das Ruleset keine. Der Stau-Wächter meldet einen PR mit Auto-Merge, an dem die Stufe nie
 anlief.

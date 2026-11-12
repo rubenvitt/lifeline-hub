@@ -55,7 +55,8 @@ Motivation und Messung vorher: proposal.md, „Why“. Was die Lösung formt:
   `release` wartet darauf wie bisher.
 
 Im aufgerufenen Lauf ist `github.event_name` das Ereignis des Aufrufers (`push`). Bei Push heißen
-die Checks `e2e / e2e 1/4` usw.; auf Kanal-Branches verlangt das Ruleset keine Checks, also stört
+die Checks `e2e (Kanal) / e2e 1/4` usw. (Name des Aufruf-Jobs als Vorsilbe, an `Release / release`
+belegt); auf Kanal-Branches verlangt das Ruleset keine Checks, also stört
 das Präfix nicht. Im PR heißen sie genau `e2e-Binary` und `e2e 1/4` bis `4/4`, weil der Workflow
 dort direkt läuft.
 
@@ -209,6 +210,11 @@ rechnet sie für den Vergleich nach. Selbsttest mit eingespielten API-Antworten.
   des Stau-Wächters.
 - [Die Check-Liste eines PRs zeigt Einträge wie `e2e ${{ matrix.shard }}/4` als übersprungen] →
   Kosmetisch, heute schon bei der Frontend-Suite so; der Kopf von `e2e.yml` erklärt es.
+- [`continue-on-error` am Job `berichte` hält den Aufruf in `ci.yml` womöglich nicht grün] → Die
+  GitHub-Doku sagt nur, dass der Workflow-Lauf dann nicht scheitert; für den Aufrufer eines
+  wiederverwendbaren Workflows ist es nicht belegt. Am ersten Push-Lauf mit rotem Bericht prüfen;
+  hält es nicht, wandert der Bericht bei Push in einen eigenen Job in `ci.yml`, auf den `release`
+  nicht wartet.
 - [#1289 ändert sich im Review noch] → Die Umsetzung beginnt erst nach dessen Merge und baut auf
   `alpha` auf; Abweichungen fließen per `/opsx:update` ein.
 
