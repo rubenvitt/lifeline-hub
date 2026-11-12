@@ -48,8 +48,8 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 - [x] 5.2 `EinsatzAnbindungen.tsx` mit reiner Funktion für die Zustandszeile; Tests: drei Zustände, „wartet auf Schlüssel“, Rechte sichtbar, Schalter gesperrt ohne Leitung und am abgeschlossenen Einsatz, Paneel fehlt ohne Zugang, Ladefehler sichtbar, Umschalten setzt die Antwort
 - [x] 5.3 In `EinsatzGeraete.tsx` einbinden mit der Bedingung von `darfLagebild`; `EinsatzGeraete.test.tsx` um den Block „Anbindungen“ ergänzen
 - [x] 5.4 `Anbindungen.tsx` und `AnbindungAnsicht.tsx` zeigen „liest {Einsatz}“ oder „kein Einsatz freigegeben“ bei Zugängen mit „Lage lesen“, sonst nichts; Tests in `Anbindungen.test.tsx`
-- [ ] 5.5 e2e in `frontend/e2e/anbindungen.spec.ts`: Admin legt Anbindung mit „Lage lesen“ an, Einsatzleitung schaltet sie auf „Geräte“ ein, die Seite „Anbindungen“ nennt den Einsatz; lokal mit `./scripts/check-all.sh --geaendert` oder Label `e2e` am PR belegt
-- [ ] 5.6 `mise exec -- pnpm -C frontend lint`, `typecheck` und die betroffenen Vitest-Dateien grün; Prettier über `frontend/`
+- [x] 5.5 e2e in `frontend/e2e/anbindungen.spec.ts`: Admin legt Anbindung mit „Lage lesen“ an, Einsatzleitung schaltet sie auf „Geräte“ ein, die Seite „Anbindungen“ nennt den Einsatz; lokal mit `./scripts/check-all.sh --geaendert` oder Label `e2e` am PR belegt
+- [x] 5.6 `mise exec -- pnpm -C frontend lint`, `typecheck` und die betroffenen Vitest-Dateien grün; Prettier über `frontend/`
 
 ## 6. Alten Weg entfernen (D9)
 
@@ -68,15 +68,15 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 
 ## 8. Doku und Architektur (D12, D13)
 
-- [ ] 8.1 Anwenderkapitel `externe-lagemonitore.md` neu fassen (Kopf mit neuen `quellen`, vier Abschnitte), jeden Ablauf am laufenden System nachklicken; `anbindungen.md` um Freigabe und gelesenen Einsatz ergänzen; Verweise in `verwaltung.md`, `zugangsprotokoll.md`, `lagebild-extern.md`, `README.md`; `mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` grün
+- [x] 8.1 Anwenderkapitel `externe-lagemonitore.md` neu fassen (Kopf mit neuen `quellen`, vier Abschnitte), jeden Ablauf am laufenden System nachklicken; `anbindungen.md` um Freigabe und gelesenen Einsatz ergänzen; Verweise in `verwaltung.md`, `zugangsprotokoll.md`, `lagebild-extern.md`, `README.md`; `mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` grün
 - [x] 8.2 arc42: Kapitel 5 (Zeile `src/lagemonitor_zugang` weg, `public_api` und `routes/einsatz_anbindungen` ergänzt), Kapitel 11 (R33 ohne Lagemonitor-Bearer); ADR-0022 `gilt_fuer` ohne die entfernten Pfade; `scripts/check-architektur.sh` grün
 - [x] 8.3 Konzept `docs/konzepte/2026-11-11-oeffentliche-api.md`: datierter Nachtrag an D6 (kein Übergang, Verweis auf diese Change); `grep` nach verbliebenen Verweisen auf `/api/lagemonitor/v1/lage` in `docs/` außerhalb von Archiv und Konzepthistorie ohne Treffer
-- [ ] 8.4 Kommentar an LGM-13 und LGM-14 in Zunder: neue Adresse `GET /api/v1/lage`, Einlösen per Code, Wire-Namen nach D6/D7 (über `add_comment`, im Main-Loop)
+- [x] 8.4 Kommentar an LGM-13 und LGM-14 in Zunder: neue Adresse `GET /api/v1/lage`, Einlösen per Code, Wire-Namen nach D6/D7 (über `add_comment`, im Main-Loop)
 
 ## 9. Integration
 
 - [ ] 9.1 `./scripts/check-all.sh` ohne `| tail` grün (oder der CI-Lauf des PRs, dann mit Verweis auf den Lauf abhaken)
-- [ ] 9.2 Handprobe am laufenden System: Anbindung anlegen, `lifeline-hub zugang redeem`, Einsatz freigeben, `lifeline-hub zugang lage` zeigt den Einsatz; Freigabe beenden zeigt `einsatz: null`; Bilder des Paneels „Anbindungen“ und der Seite „Anbindungen“ für PR und Meldung aufnehmen
+- [x] 9.2 Handprobe am laufenden System: Anbindung anlegen, `lifeline-hub zugang redeem`, Einsatz freigeben, `lifeline-hub zugang lage` zeigt den Einsatz; Freigabe beenden zeigt `einsatz: null`; Bilder des Paneels „Anbindungen“ und der Seite „Anbindungen“ für PR und Meldung aufnehmen
 
 ## Workflow follow-up
 
