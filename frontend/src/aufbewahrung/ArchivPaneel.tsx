@@ -8,7 +8,8 @@ import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { formatGroesse } from '../karten/formatGroesse';
 
-/** `einsatz-E-2026-0001-block-1.sqlite.age`, wie der Server ihn nennt. */
+/** `einsatz-E-2026-0001-block-1.sqlite.age`, wie der Server ihn nennt (Ersatz, falls die Antwort
+ *  keinen Namen trägt). */
 export function archivDateiname(kennung: string, block: number): string {
   return `einsatz-${kennung.replace(/[^A-Za-z0-9_-]/g, '_')}-block-${block}.sqlite.age`;
 }
@@ -30,14 +31,13 @@ export default function ArchivPaneel({
   const { token } = theme.useToken();
   const laden = useMutation({
     mutationFn: () => ladeArchivBlock(einsatzId),
-    onSuccess: (datei) => speichereDatei(datei, archivDateiname(kennung, archiv.block)),
+    // Der Name kommt aus derselben Antwort: endet ein Block zwischen Laden und Abruf, liefert
+    // der Server schon den nächsten.
+    onSuccess: ({ datei, dateiname }) =>
+      speichereDatei(datei, dateiname ?? archivDateiname(kennung, archiv.block)),
   });
   return (
-    <Paneel
-      titel="Archiv"
-      meta={archiv.bloecke > 1 ? `Block ${archiv.block} von ${archiv.bloecke}` : undefined}
-      koerperPolster
-    >
+    <Paneel titel="Archiv" meta={`Block ${archiv.block}`} koerperPolster>
       <Datenraster spalten={3} beschriftung="Archiv">
         <Datenfeld label="Archiviert" mono>
           <ZeitAnzeige wert={archiv.archiviert_at} />

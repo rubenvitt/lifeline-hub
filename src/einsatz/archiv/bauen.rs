@@ -12,8 +12,9 @@
 //!    (vorhandener Code, [`crate::einsatz::aufbewahrung_kategorie::schwaerzen`]). Danach wird sie
 //!    neu geschrieben (`VACUUM`) und an die Empfänger verschlüsselt.
 //!
-//! Die Zwischendateien liegen nur während des Baus im Klartext neben der Datenbank und werden in
-//! jedem Fall gelöscht ([`Zwischendatei`]).
+//! Die Zwischendateien liegen nur während des Baus neben der Datenbank, nur für den Dienst lesbar,
+//! und werden gelöscht ([`Zwischendatei`]); was ein Prozessabbruch liegen lässt, räumt der Start
+//! des Purge-Laufs weg ([`zwischendateien_aufraeumen`]).
 
 use crate::einsatz::aufbewahrung_kategorie as kategorie;
 use crate::einsatz::retention::Datenkategorie;
@@ -245,12 +246,62 @@ fn zwischendatei(verzeichnis: &Path, einsatz_id: i64, teil: &str) -> Zwischendat
         OsRng.next_u64()
     };
     Zwischendatei(verzeichnis.join(format!(
-        "lifeline-zwischen-archiv-{einsatz_id}-{teil}-{zufall:016x}.sqlite"
+        "{ZWISCHEN_PRAEFIX}{einsatz_id}-{teil}-{zufall:016x}.sqlite"
     )))
+}
+
+const ZWISCHEN_PRAEFIX: &str = "lifeline-zwischen-archiv-";
+
+/// Legt eine Zwischendatei an, die nur der Dienst lesen kann (Klartext mit Personendaten). Die
+/// Nebendateien von SQLite übernehmen die Rechte der Hauptdatei, Kopien (`std::fs::copy`) auch.
+fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
+    let mut optionen = std::fs::OpenOptions::new();
+    optionen.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        optionen.mode(0o600);
+    }
+    optionen
+        .open(pfad)
+        .map_err(|e| AppError::Internal(format!("Archiv: Zwischendatei nicht anlegbar: {e}")))
+}
+
+/// Löscht Zwischendateien, die ein abgebrochener Bau liegen ließ (`Drop` läuft bei einem
+/// Prozessabbruch nicht). Nur beim Start des Purge-Laufs, der als einziger Archive baut.
+pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
+    let verzeichnis = match verzeichnis(pool).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("Archiv: Verzeichnis der Zwischendateien unbekannt: {e}");
+            return;
+        }
+    };
+    let Ok(eintraege) = std::fs::read_dir(&verzeichnis) else {
+        return;
+    };
+    for eintrag in eintraege.flatten() {
+        let name = eintrag.file_name();
+        if name.to_string_lossy().starts_with(ZWISCHEN_PRAEFIX) {
+            match std::fs::remove_file(eintrag.path()) {
+                Ok(()) => tracing::warn!(
+                    datei = %name.to_string_lossy(),
+                    "Archiv: Zwischendatei eines abgebrochenen Baus gelöscht"
+                ),
+                Err(e) => tracing::error!(
+                    datei = %name.to_string_lossy(),
+                    "Archiv: Zwischendatei nicht löschbar: {e}"
+                ),
+            }
+        }
+    }
 }
 
 /// Ein Pool mit genau einer Verbindung auf einer Zwischendatei.
 async fn oeffnen(pfad: &Path, fremdschluessel: bool) -> Result<SqlitePool, AppError> {
+    if !pfad.exists() {
+        privat_anlegen(pfad)?;
+    }
     let optionen = SqliteConnectOptions::new()
         .filename(pfad)
         .create_if_missing(true)
@@ -489,11 +540,42 @@ pub fn plane_bloecke(
     plan
 }
 
-/// Ein fertiger, verschlüsselter Block.
+/// Ein fertiger, verschlüsselter Block. Der Inhalt liegt bis zur Ablage in einer Datei: so hält
+/// der Bau nie mehrere ganze Blöcke im Speicher (Anhänge machen sie groß).
 pub struct Block {
     pub plan: BlockPlan,
-    pub inhalt: Vec<u8>,
+    pub datei: Zwischendatei,
+    pub groesse: i64,
     pub sha256: String,
+}
+
+impl Block {
+    /// Der verschlüsselte Inhalt für die Ablage.
+    pub fn inhalt(&self) -> Result<Vec<u8>, AppError> {
+        std::fs::read(self.datei.pfad()).map_err(|e| {
+            AppError::Internal(format!("Archiv: Block {} lesen: {e}", self.plan.block))
+        })
+    }
+}
+
+/// Schreibt durch und zählt Länge und SHA-256 mit.
+struct Mitzaehlen<W> {
+    innen: W,
+    hash: Sha256,
+    laenge: u64,
+}
+
+impl<W: std::io::Write> std::io::Write for Mitzaehlen<W> {
+    fn write(&mut self, puffer: &[u8]) -> std::io::Result<usize> {
+        let n = self.innen.write(puffer)?;
+        self.hash.update(&puffer[..n]);
+        self.laenge += n as u64;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.innen.flush()
+    }
 }
 
 /// Baut einen Block aus der Vollkopie: Kopie, Schwärzung der Kategorien des Plans, `VACUUM`,
@@ -542,26 +624,41 @@ pub async fn baue_block(
 
     let empfaenger = crate::backup::verschluesselung::Empfaenger::neu(empfaenger.to_vec());
     let abbruch = std::sync::atomic::AtomicBool::new(false);
+    let ziel = zwischendatei(
+        &verzeichnis,
+        einsatz_id,
+        &format!("block{}-age", plan.block),
+    );
+    let ausgabe = Mitzaehlen {
+        innen: std::io::BufWriter::new(privat_anlegen(ziel.pfad())?),
+        hash: Sha256::new(),
+        laenge: 0,
+    };
     let pfad = datei.pfad().to_path_buf();
-    let inhalt = tokio::task::spawn_blocking(move || {
-        crate::backup::verschluesselung::verschluessele_datei(
+    let fertig = tokio::task::spawn_blocking(move || {
+        let mut fertig = crate::backup::verschluesselung::verschluessele_datei(
             &pfad,
-            Vec::new(),
+            ausgabe,
             &empfaenger,
             &abbruch,
-        )
+        )?;
+        std::io::Write::flush(&mut fertig)?;
+        Ok::<_, std::io::Error>(fertig)
     })
     .await
     .map_err(|e| AppError::Internal(format!("Archiv: Verschlüsselung: {e}")))?
     .map_err(|e| AppError::Internal(format!("Archiv: Verschlüsselung: {e}")))?;
     drop(datei);
-    let sha256 = Sha256::digest(&inhalt)
+    let sha256 = fertig
+        .hash
+        .finalize()
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
     Ok(Block {
         plan,
-        inhalt,
+        datei: ziel,
+        groesse: fertig.laenge as i64,
         sha256,
     })
 }

@@ -260,6 +260,17 @@ interface DateiOptionen {
  * je Abruf auditiert) und hat im HTTP-Cache des Browsers nichts verloren.
  */
 export async function apiDatei(pfad: string, optionen: DateiOptionen = {}): Promise<Blob> {
+  return (await apiDateiMitName(pfad, optionen)).datei;
+}
+
+/**
+ * Wie {@link apiDatei}, dazu der Dateiname aus `Content-Disposition` derselben Antwort (`null`
+ * ohne). Für Dateien, deren Name erst der Server festlegt (Archivblock, LLH-1494).
+ */
+export async function apiDateiMitName(
+  pfad: string,
+  optionen: DateiOptionen = {},
+): Promise<{ datei: Blob; dateiname: string | null }> {
   try {
     const res = await fetch(pfad, {
       credentials: 'same-origin',
@@ -267,7 +278,8 @@ export async function apiDatei(pfad: string, optionen: DateiOptionen = {}): Prom
       signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
     if (!res.ok) return fehlerWerfen(res, lese403Pruefen('GET', pfad));
-    return await res.blob();
+    const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+    return { datei: await res.blob(), dateiname: name ? name[1] : null };
   } catch (e) {
     netzFehlerWerfen(e);
   }

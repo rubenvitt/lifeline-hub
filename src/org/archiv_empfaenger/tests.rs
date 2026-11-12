@@ -51,8 +51,12 @@ async fn probe_bestanden_macht_den_empfaenger_gueltig() {
 
     let code = probe_lesen(&neu.probe, &schluessel);
     assert_eq!(code.trim().len(), 8);
-    let geprueft = pruefen(&pool, 1, neu.empfaenger.id, &code).await.unwrap();
+    let (geprueft, erstmals) = pruefen(&pool, 1, neu.empfaenger.id, &code).await.unwrap();
     assert!(geprueft.geprueft_at.is_some());
+    assert!(erstmals);
+    // Ein zweiter Aufruf bestätigt nur noch: er hat nichts geprüft (keine zweite Admin-Spur).
+    let (_, nochmal) = pruefen(&pool, 1, neu.empfaenger.id, &code).await.unwrap();
+    assert!(!nochmal);
     let gueltig = gepruefte(&pool, 1).await.unwrap();
     assert_eq!(gueltig.len(), 1);
     assert_eq!(gueltig[0].0.to_string(), schluessel.to_public().to_string());
@@ -83,7 +87,7 @@ async fn falscher_code_zaehlt_und_sperrt_nach_fuenf_versuchen() {
         let e = pruefen(&pool, 1, neu.empfaenger.id, falsch)
             .await
             .unwrap_err();
-        assert!(matches!(e, AppError::Validation(_)), "{e:?}");
+        assert!(matches!(e, AppError::UnprocessableEntity(_)), "{e:?}");
     }
     let e = pruefen(&pool, 1, neu.empfaenger.id, &richtig)
         .await
@@ -138,4 +142,8 @@ async fn doppelter_schluessel_ist_ein_konflikt_und_fremde_org_sieht_nichts() {
     ));
     entfernen(&pool, 1, neu.empfaenger.id).await.unwrap();
     assert!(liste(&pool, 1).await.unwrap().is_empty());
+    assert!(matches!(
+        entfernen(&pool, 1, neu.empfaenger.id).await,
+        Err(AppError::NotFound)
+    ));
 }

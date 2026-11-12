@@ -100,6 +100,9 @@ pub async fn tick_mit_rueckschrieb(
                     Ok(true) => {
                         anzahl += 1;
                         geschwaerzt += 1;
+                        // Gesperrt und geschwärzt: offene Tabs und Geräte erfahren es über den
+                        // Kopf wie nach Phase A (src/AGENTS.md).
+                        crate::live::org::kopf_melden(pool, live, id, &[]).await;
                     }
                     Ok(false) => {}
                     Err(e) => tracing::error!(einsatz_id = id, "Purge Phase N fehlgeschlagen: {e}"),
@@ -114,7 +117,11 @@ pub async fn tick_mit_rueckschrieb(
             anzahl += n;
             geloescht += n;
         }
-        Err(e) => tracing::warn!("Purge Phase N: Löschen abgelaufener Blöcke fehlgeschlagen: {e}"),
+        Err(e) => {
+            tracing::warn!("Purge Phase N: Löschen abgelaufener Blöcke fehlgeschlagen: {e}");
+            // Jeder Block löscht in eigener Transaktion: frühere können schon weg sein.
+            *rueckschrieb_ausstehend = true;
+        }
     }
 
     // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start ab Fristablauf) ---
@@ -424,6 +431,9 @@ pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
         // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
         // etwa nach einem Absturz zwischen Schwärzung und Rückschrieb.
         let mut rueckschrieb_ausstehend = true;
+        // Klartext-Zwischendateien eines abgebrochenen Archivbaus (LLH-1494): außer diesem Task
+        // baut niemand Archive, also gehört jede vorhandene zu einem toten Lauf.
+        super::archiv::zwischendateien_aufraeumen(&pool).await;
         loop {
             ticker.tick().await;
             tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;

@@ -1869,7 +1869,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/aufbewahrung/einsaetze/{id}/archiv",
-            get(routes::aufbewahrung::archiv_herunterladen),
+            get(routes::aufbewahrung::archiv_herunterladen).route_layer(download_grenze()),
         )
         // LLH-1484: Lesezugänge externer Anzeigen (Verwaltung) und ihr Abruf. Der Abruf zieht
         // keinen `CurrentUser`, nur den Schlüssel (`lagemonitor_zugang::LagemonitorZugriff`).

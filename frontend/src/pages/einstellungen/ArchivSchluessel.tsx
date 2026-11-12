@@ -203,7 +203,7 @@ export default function ArchivSchluessel() {
                     title={<span data-lfh="archiv-schluessel-titel">{s.bezeichnung}</span>}
                     description={
                       <span
-                        style={{ color: rollen.gedaempft }}
+                        style={{ ...monoStil(13), color: rollen.gedaempft }}
                         data-lfh="archiv-schluessel-zustand"
                       >
                         {schluesselZustand(s, zeit)}
@@ -302,8 +302,13 @@ export default function ArchivSchluessel() {
         okText="Entfernen"
         cancelText="Abbrechen"
         okButtonProps={{ danger: true, loading: entfernen.isPending }}
+        // Läuft das Entfernen, bleibt der Dialog stehen, bis die Antwort da ist.
+        cancelButtonProps={{ disabled: entfernen.isPending }}
+        closable={!entfernen.isPending}
+        maskClosable={!entfernen.isPending}
+        keyboard={!entfernen.isPending}
         onOk={() => entfernenFuer && entfernen.mutate(entfernenFuer)}
-        onCancel={() => setEntfernenFuer(null)}
+        onCancel={() => !entfernen.isPending && setEntfernenFuer(null)}
         destroyOnHidden
       >
         {entfernenFuer && (

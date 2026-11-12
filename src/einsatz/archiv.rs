@@ -14,6 +14,7 @@
 //! ([`abgelaufene_bloecke_loeschen`]); das Skelett wartet in Phase D auf den letzten.
 
 pub mod bauen;
+pub use bauen::zwischendateien_aufraeumen;
 
 use crate::einsatz::aufbewahrung_kategorie as kategorie;
 use crate::einsatz::STATUS_ABGESCHLOSSEN;
@@ -178,9 +179,9 @@ pub async fn archivieren(
             .bind(b.plan.block)
             .bind(b.plan.gueltig_bis.as_deref())
             .bind(&fingerabdruecke)
-            .bind(b.inhalt.len() as i64)
+            .bind(b.groesse)
             .bind(&b.sha256)
-            .bind(&b.inhalt)
+            .bind(b.inhalt()?)
             .bind(&jetzt_s)
             .execute(&mut *conn)
             .await?;

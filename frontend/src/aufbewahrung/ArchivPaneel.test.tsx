@@ -21,7 +21,35 @@ const ARCHIV = {
 };
 
 describe('ArchivPaneel (LLH-1494)', () => {
-  it('lädt den Block und speichert ihn unter dem Namen des Servers', async () => {
+  it('lädt den Block und speichert ihn unter dem Namen aus der Antwort', async () => {
+    // Block 2 ist seit dem Laden der Akte abgelaufen: der Server liefert Block 3.
+    server.use(
+      http.get(
+        '/api/aufbewahrung/einsaetze/7/archiv',
+        () =>
+          new HttpResponse(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: {
+              'Content-Disposition':
+                'attachment; filename="einsatz-E-2026-0007-block-3.sqlite.age"',
+            },
+          }),
+      ),
+    );
+    renderMitProviders(<ArchivPaneel einsatzId={7} kennung="E-2026-0007" archiv={ARCHIV} />);
+    expect(screen.getByText('wie der Einsatz')).toBeInTheDocument();
+    expect(screen.getByText('Block 2')).toBeInTheDocument();
+    expect(screen.getByText('ab12:cd34:ef56:7890, 1111:2222:3333:4444')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Herunterladen' }));
+    await waitFor(() =>
+      expect(vi.mocked(speichereDatei)).toHaveBeenCalledWith(
+        expect.any(Blob),
+        'einsatz-E-2026-0007-block-3.sqlite.age',
+      ),
+    );
+  });
+
+  it('nimmt ohne Namen in der Antwort den Block der Akte', async () => {
     server.use(
       http.get(
         '/api/aufbewahrung/einsaetze/7/archiv',
@@ -29,8 +57,6 @@ describe('ArchivPaneel (LLH-1494)', () => {
       ),
     );
     renderMitProviders(<ArchivPaneel einsatzId={7} kennung="E-2026-0007" archiv={ARCHIV} />);
-    expect(screen.getByText('wie der Einsatz')).toBeInTheDocument();
-    expect(screen.getByText('ab12:cd34:ef56:7890, 1111:2222:3333:4444')).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Herunterladen' }));
     await waitFor(() =>
       expect(vi.mocked(speichereDatei)).toHaveBeenCalledWith(

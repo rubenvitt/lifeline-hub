@@ -480,3 +480,55 @@ async fn purge_archiviert_und_das_skelett_wartet_auf_das_archiv() {
         .unwrap();
     assert_eq!(da, 1, "das Skelett bleibt, solange das Archiv gilt");
 }
+
+/// Ein Prozessabbruch lässt Zwischendateien liegen; der Start räumt nur sie weg.
+#[tokio::test]
+async fn start_raeumt_liegengebliebene_zwischendateien_weg() {
+    let dir = tempfile::tempdir().unwrap();
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(dir.path().join("hub.sqlite"))
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+    let liegen = dir
+        .path()
+        .join("lifeline-zwischen-archiv-7-voll-00ff.sqlite");
+    let nachbar = dir
+        .path()
+        .join("lifeline-zwischen-archiv-7-voll-00ff.sqlite-journal");
+    let fremd = dir.path().join("sicherung.sqlite");
+    for p in [&liegen, &nachbar, &fremd] {
+        std::fs::write(p, b"x").unwrap();
+    }
+    zwischendateien_aufraeumen(&pool).await;
+    assert!(!liegen.exists());
+    assert!(!nachbar.exists());
+    assert!(fremd.exists(), "nur Zwischendateien des Archivbaus");
+    assert!(dir.path().join("hub.sqlite").exists());
+}
+
+/// Die Klartext-Kopie ist nur für den Dienst lesbar, von Anfang an.
+#[cfg(unix)]
+#[tokio::test]
+async fn vollkopie_ist_nur_fuer_den_dienst_lesbar() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let pfad = dir.path().join("hub.sqlite");
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(&pfad)
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+    crate::db::migrate(&pool).await.unwrap();
+    let voll = bauen::vollkopie(&pool, 1).await.unwrap();
+    let modus = std::fs::metadata(voll.pfad()).unwrap().permissions().mode();
+    assert_eq!(modus & 0o077, 0, "{modus:o}");
+}

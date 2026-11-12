@@ -129,6 +129,34 @@ describe('ArchivSchluessel (LLH-1494)', () => {
     await waitFor(() => expect(aufrufe).toEqual([{ pfad: 'entfernen 1', body: null }]));
   });
 
+  it('lässt den Dialog stehen, solange das Entfernen läuft', async () => {
+    stelleBereit();
+    let freigeben: () => void = () => {};
+    server.use(
+      http.delete(
+        '/api/org-archiv-schluessel/:id',
+        () =>
+          new Promise<Response>((fertig) => {
+            freigeben = () => fertig(new HttpResponse(null, { status: 204 }));
+          }),
+      ),
+    );
+    renderMitProviders(<ArchivSchluessel />);
+    await screen.findByText('Tresor 1');
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Aktionen zu Archiv-Schlüssel Tresor 1' }),
+      /Entfernen/,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Tresor 1 entfernen?' });
+    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Entfernen' }));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled(),
+    );
+    expect(within(dialog).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    freigeben();
+    expect(await screen.findByText('Tresor 1 entfernt')).toBeInTheDocument();
+  });
+
   it('lädt ohne System-Admin nichts', async () => {
     vi.mocked(useAuth).mockReturnValue(authWertFixture(benutzerFixture()));
     const abrufe = vi.fn();

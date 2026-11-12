@@ -47,6 +47,10 @@ const KANDIDAT_SELECT: &str = "SELECT e.id, e.abgeschlossen_at, e.geschwaerzt_at
      FROM einsatz e JOIN org_einstellungen o ON o.org_id = e.org_id \
      WHERE e.status = ? AND e.geschwaerzt_at IS NOT NULL AND o.skelett_dauer_tage IS NOT NULL";
 
+/// Solange ein Archivblock gilt, bleibt das Skelett (LLH-1494): die Kaskade nähme ihn mit.
+const OHNE_ARCHIV: &str =
+    " AND NOT EXISTS (SELECT 1 FROM einsatz_archiv a WHERE a.einsatz_id = e.id)";
+
 /// Phase-D-Kandidaten: IDs abgeschlossener, geschwärzter Einsätze, deren Org eine
 /// Skelett-Frist hat und deren Frist zu `jetzt` abgelaufen ist.
 ///
@@ -64,9 +68,7 @@ pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64
     // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
     // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let eigen = super::spiegel_filter::nicht_gespiegelt("e.id");
-    // Solange ein Archivblock gilt, bleibt das Skelett (LLH-1494): die Kaskade nähme ihn mit.
-    let ohne_archiv = " AND NOT EXISTS (SELECT 1 FROM einsatz_archiv a WHERE a.einsatz_id = e.id)";
-    let sql = format!("{KANDIDAT_SELECT} AND {eigen}{ohne_reste}{ohne_archiv} ORDER BY e.id");
+    let sql = format!("{KANDIDAT_SELECT} AND {eigen}{ohne_reste}{OHNE_ARCHIV} ORDER BY e.id");
     let kandidaten = sqlx::query_as::<_, Kandidat>(sqlx::AssertSqlSafe(sql))
         .bind(STATUS_ABGESCHLOSSEN)
         .fetch_all(pool)
@@ -92,7 +94,8 @@ pub async fn loeschen(
 ) -> Result<bool, AppError> {
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     crate::write_retry!(pool, |conn| {
-        let sql = format!("{KANDIDAT_SELECT} AND e.id = ?");
+        // Auch hier, anders als die Reste: die Kaskade nähme gültige Archivblöcke unumkehrbar mit.
+        let sql = format!("{KANDIDAT_SELECT}{OHNE_ARCHIV} AND e.id = ?");
         let kandidat = sqlx::query_as::<_, Kandidat>(sqlx::AssertSqlSafe(sql))
             .bind(STATUS_ABGESCHLOSSEN)
             .bind(einsatz_id)

@@ -723,6 +723,12 @@ fn fremde_archivpfade(app_rs: &str, erkannt: usize, weitere: &[(String, String)]
         ));
     }
     for (datei, inhalt) in weitere {
+        // Die Ausnahmeliste der Zulassung nennt Pfade, sie legt keine Route an (LLH-1494:
+        // Archiv-Download mit Download-Grenze); `tests/zulassung_guard.rs` gleicht sie mit den
+        // Routen ab.
+        if datei.ends_with("src/zulassung.rs") {
+            continue;
+        }
         if literale(inhalt) > 0 {
             verstoesse.push(format!(
                 "{datei}: Archivpfad außerhalb eines erkannten .route(…) in app.rs (per .merge \

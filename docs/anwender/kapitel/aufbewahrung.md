@@ -125,7 +125,8 @@ Für System-Admins, wenn eine Person die Löschung ihrer Daten verlangt:
 2. Im Paneel „Löschersuchen (Art. 17)“ „Person suchen und schwärzen“ wählen, unter „Name oder
    Rufnummer“ den ganzen Namen oder die Rufnummer eintragen, „Suchen“ wählen und beim Treffer
    „Antrag stellen“. Soll der ganze Einsatz geschwärzt werden, stattdessen „Einsatz sofort
-   schwärzen“ wählen.
+   schwärzen“ wählen. Bei einem archivierten Einsatz gibt es keine Personensuche: Das
+   Löschersuchen geht dort nur für den ganzen Einsatz und löscht das Archiv.
 3. Das „Aktenzeichen des Löschersuchens“ eintragen, ohne Namen.
 4. Zur Bestätigung die angezeigte Kennung eintippen.
 
@@ -252,6 +253,8 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
   Einsatztagebuch bleibt im Wortlaut.
 - Das Aktenzeichen bleibt im Einsatztagebuch stehen und darf deshalb keinen Namen enthalten.
 - Möglich ist ein Löschersuchen nur an einem abgeschlossenen, noch nicht geschwärzten Einsatz.
+  Ausnahme ist ein archivierter Einsatz: Er ist schon geschwärzt, ein Löschersuchen für den
+  ganzen Einsatz löscht sein Archiv.
 
 ### Wer was darf
 

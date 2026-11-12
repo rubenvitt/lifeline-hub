@@ -85,13 +85,9 @@ pub async fn pruefen(
     PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<Probe>,
 ) -> Result<Json<ArchivEmpfaengerAnzeige>, AppError> {
-    let vorher = empfaenger::liste(&state.pool, admin.org_id)
-        .await?
-        .into_iter()
-        .find(|e| e.id == id)
-        .ok_or(AppError::NotFound)?;
-    let geprueft = empfaenger::pruefen(&state.pool, admin.org_id, id, &body.code).await?;
-    if vorher.geprueft_at.is_none() {
+    let (geprueft, erstmals) =
+        empfaenger::pruefen(&state.pool, admin.org_id, id, &body.code).await?;
+    if erstmals {
         admin_audit::schreibe(
             &state.pool,
             AdminEintrag {

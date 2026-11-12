@@ -472,7 +472,7 @@ describe('ArchivAktePage — Archiv (LLH-1494)', () => {
         fingerabdruecke: ['ab12:cd34:ef56:7890'],
       },
     });
-    expect(await screen.findByText('Block 1 von 2')).toBeInTheDocument();
+    expect(await screen.findByText('Block 1')).toBeInTheDocument();
     expect(screen.getByText('ab12:cd34:ef56:7890')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Herunterladen' })).toBeInTheDocument();
   });

@@ -226,15 +226,17 @@ pub async fn anlegen(
 
 /// Prüft den eingegebenen Code. Richtig: der Empfänger gilt ab jetzt. Falsch: ein Fehlversuch;
 /// nach [`VERSUCHE_MAX`] ist die Probe gesperrt, und der Schlüssel muss neu eingetragen werden.
+/// Der zweite Wert ist `true`, wenn genau dieser Aufruf den Schlüssel erstmals geprüft hat (die
+/// Admin-Spur schreibt nur dann).
 pub async fn pruefen(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
     code: &str,
-) -> Result<ArchivEmpfaengerAnzeige, AppError> {
+) -> Result<(ArchivEmpfaengerAnzeige, bool), AppError> {
     let code: String = code.chars().filter(char::is_ascii_digit).collect();
     let jetzt = crate::zeit::jetzt();
-    let richtig = crate::write_retry!(pool, |conn| {
+    let ergebnis = crate::write_retry!(pool, |conn| {
         let zeile: Option<(Option<String>, Option<String>, i64)> = sqlx::query_as(
             "SELECT geprueft_at, probe_hash, probe_versuche FROM org_archiv_empfaenger \
              WHERE org_id = ? AND id = ?",
@@ -247,7 +249,7 @@ pub async fn pruefen(
             return Err(AppError::NotFound);
         };
         if geprueft_at.is_some() {
-            return Ok(true);
+            return Ok(Some(false));
         }
         if versuche >= VERSUCHE_MAX {
             return Err(AppError::Conflict(
@@ -262,7 +264,7 @@ pub async fn pruefen(
             .bind(id)
             .execute(&mut *conn)
             .await?;
-            Ok(true)
+            Ok(Some(true))
         } else {
             sqlx::query(
                 "UPDATE org_archiv_empfaenger SET probe_versuche = probe_versuche + 1 WHERE id = ?",
@@ -270,13 +272,16 @@ pub async fn pruefen(
             .bind(id)
             .execute(&mut *conn)
             .await?;
-            Ok(false)
+            Ok(None)
         }
     })?;
-    if !richtig {
-        return Err(AppError::Validation("Der Code stimmt nicht.".into()));
-    }
-    eine(pool, org_id, id).await
+    // Der Code passt nicht zum Zustand des Schlüssels: 422 (Zusammenhang), nicht 400.
+    let Some(erstmals) = ergebnis else {
+        return Err(AppError::UnprocessableEntity(
+            "Der Code stimmt nicht.".into(),
+        ));
+    };
+    Ok((eine(pool, org_id, id).await?, erstmals))
 }
 
 /// Entfernt einen Empfänger. Archive, die schon an ihn verschlüsselt sind, bleiben es.
@@ -286,14 +291,21 @@ pub async fn entfernen(
     id: i64,
 ) -> Result<ArchivEmpfaengerAnzeige, AppError> {
     let vorher = eine(pool, org_id, id).await?;
-    crate::write_retry!(pool, |conn| {
-        sqlx::query("DELETE FROM org_archiv_empfaenger WHERE org_id = ? AND id = ?")
-            .bind(org_id)
-            .bind(id)
-            .execute(&mut *conn)
-            .await?;
-        Ok(())
+    // Nur wer die Zeile wirklich entfernt, meldet Erfolg: zwei gleichzeitige Anfragen schreiben
+    // sonst zwei Einträge in die Admin-Spur.
+    let entfernt = crate::write_retry!(pool, |conn| {
+        Ok(
+            sqlx::query("DELETE FROM org_archiv_empfaenger WHERE org_id = ? AND id = ?")
+                .bind(org_id)
+                .bind(id)
+                .execute(&mut *conn)
+                .await?
+                .rows_affected(),
+        )
     })?;
+    if entfernt == 0 {
+        return Err(AppError::NotFound);
+    }
     Ok(vorher)
 }
 

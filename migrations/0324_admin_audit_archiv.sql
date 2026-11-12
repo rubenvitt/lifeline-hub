@@ -1,8 +1,8 @@
--- no-transaction
 -- LLH-1494, Teil 2 (Change tkky2noy-archiv-nachbereitung, design.md D9): Admin-Spur des Archivs.
 -- Neu im aktion-CHECK 'archiv_schluessel_eingetragen', 'archiv_schluessel_geprueft',
 -- 'archiv_schluessel_entfernt' und 'archiv_heruntergeladen'. Rebuild nach Muster 0317; die Liste
--- übernimmt alles bis 0317.
+-- übernimmt alles bis 0317. Anders als 0317 in einer Transaktion: ein Abbruch zwischen DROP und
+-- RENAME ließe sonst keine admin_audit zurück (kein PRAGMA nötig, admin_audit ist Leaf).
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     zeitpunkt        TEXT NOT NULL DEFAULT (datetime('now')),
