@@ -207,9 +207,12 @@ src/api_doc.rs` greift erst, wenn die ADR akzeptiert ist.
   Body der Antwort. Konstruktoren gibt es zwei: `ApiError::new(code, text)` und
   `ApiError::from_code(code)`, keinen je Code.
 - **D3, Grenze vor jedem Handler:** `DefaultBodyLimit` wirkt nur über Extraktoren. Ein Handler, der
-  den Body nicht oder roh liest (Signaturprüfung über `bh`, LLH-1652), sah keine Grenze. `mount`
-  legt deshalb zusätzlich `tower_http::limit::RequestBodyLimitLayer` (Feature `limit`) an. Sie
-  lehnt nach `Content-Length` vor dem Handler ab, ihr 413 bekommt seinen Code von der Schicht.
+  den Body nicht oder roh liest (Signaturprüfung über `bh`, LLH-1652), sah keine Grenze. Ein
+  erster Ausweg, `tower_http::limit::RequestBodyLimitLayer`, lehnt nur nach `Content-Length` ab;
+  ohne den Kopf (chunked, HTTP/2) liefe der Handler weiter an (Nachprüfung des Reviews). `mount`
+  legt deshalb `body_limit_layer` an: sie lehnt nach `Content-Length` sofort ab und puffert sonst
+  bis zur Grenze (413) vor dem Handler. Höchstens 64 KiB je Anfrage, die ein Handler ohnehin
+  puffert; der Long-Poll (`GET`) hat keinen Body.
 - **D4, Fehler im Dokument:** Jede Route nennt `status = "default"` mit `ApiErrorBody`, so steht
   die Fehlerform an jeder Operation.
 - **Gate:** `scripts/bereiche.sh` kennt `docs/api/*` und `src/public_api/*.md` als Querbezug der

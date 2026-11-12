@@ -114,9 +114,9 @@ pub fn openapi() -> &'static utoipa::openapi::OpenApi {
 
 /// Macht aus dem v1-Router den Router, den `crate::app` einhängt (design.md D2, D3):
 ///
-/// - Body-Grenze `crate::app::PUBLIC_API_BODY_MAX` auf zwei Ebenen: `RequestBodyLimitLayer` lehnt
-///   vor jedem Handler ab, auch wenn er den Body roh liest; `DefaultBodyLimit` stellt die
-///   Extraktoren (`JsonBody`) auf dieselbe Grenze, damit ihre Ablehnung 413 bleibt.
+/// - Body-Grenze `crate::app::PUBLIC_API_BODY_MAX` vor jedem Handler, auch einem, der den Body
+///   nicht oder roh liest: [`body_limit_layer`] puffert den Body, mit und ohne `Content-Length`.
+///   `DefaultBodyLimit` stellt die Extraktoren (`JsonBody`) auf dieselbe Grenze.
 /// - [`error_code_layer`] an den Routen, also innerhalb der Antwortkompression: ein langer
 ///   Fehler-Body (etwa eine Ablehnung, die die Eingabe zurückgibt) bekommt seinen `code`, bevor
 ///   er gepackt wird.
@@ -129,9 +129,7 @@ where
     let (router, _) = router.split_for_parts();
     router
         .layer(DefaultBodyLimit::max(crate::app::PUBLIC_API_BODY_MAX))
-        .layer(tower_http::limit::RequestBodyLimitLayer::new(
-            crate::app::PUBLIC_API_BODY_MAX,
-        ))
+        .layer(axum::middleware::from_fn(body_limit_layer))
         .layer(axum::middleware::from_fn(error_code_layer))
 }
 
@@ -158,6 +156,50 @@ pub fn is_v1(path: &str) -> bool {
         || path
             .strip_prefix(PREFIX)
             .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// Liest den Body einer v1-Anfrage ganz, bevor der Handler läuft, und lehnt einen über
+/// `crate::app::PUBLIC_API_BODY_MAX` mit 413 `payload_too_large` ab: nach `Content-Length` ohne
+/// zu lesen, sonst beim Puffern (chunked, HTTP/2 ohne Länge). Ein abgebrochener oder kaputter
+/// Body ist 400 `invalid_field`. Kosten: höchstens 64 KiB je Anfrage, die ein Handler ohnehin
+/// puffert.
+pub async fn body_limit_layer(req: Request, next: Next) -> Response {
+    let max = crate::app::PUBLIC_API_BODY_MAX;
+    let declared = req
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok());
+    if declared.is_some_and(|length| length > max as u64) {
+        return ApiError::from_code(ErrorCode::PayloadTooLarge).into_response();
+    }
+    let (parts, body) = req.into_parts();
+    match to_bytes(body, max).await {
+        Ok(bytes) => {
+            next.run(Request::from_parts(parts, Body::from(bytes)))
+                .await
+        }
+        Err(err) if is_length_limit(&err) => {
+            ApiError::from_code(ErrorCode::PayloadTooLarge).into_response()
+        }
+        Err(_) => ApiError::new(
+            ErrorCode::InvalidField,
+            "Der Anfrage-Body ließ sich nicht lesen.",
+        )
+        .into_response(),
+    }
+}
+
+/// `true`, wenn das Puffern an der Längengrenze scheiterte.
+fn is_length_limit(err: &axum::Error) -> bool {
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(err);
+    while let Some(e) = source {
+        if e.is::<http_body_util::LengthLimitError>() {
+            return true;
+        }
+        source = e.source();
+    }
+    false
 }
 
 /// Höchstgröße eines Fehler-Bodys, den die Schichten lesen. Darüber wird der Body durch den
