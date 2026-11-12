@@ -312,6 +312,26 @@ async fn ohne_scope_403_mit_bearer_401_und_ein_abgeschlossener_einsatz_ist_null(
     assert!(v.get("karte").is_none());
 }
 
+/// Der frühere Schlüsselweg (LLH-1484) ist entfernt: Pfad und Verwaltung gibt es nicht mehr.
+#[tokio::test]
+async fn der_fruehere_schluesselweg_ist_entfernt() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let bearer = "Bearer llh_lm_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string();
+    let (s, _, _) = senden(
+        &app,
+        "GET",
+        "/api/lagemonitor/v1/lage",
+        Some(("authorization", bearer)),
+        vec![],
+        IP,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = anfrage(&app, "GET", "/api/lagemonitor-zugaenge", &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
 #[tokio::test]
 async fn karte_kommt_mit_fassung_und_nur_wenn_sie_sich_geaendert_hat() {
     let (app, pool) = setup_mit_pool().await;

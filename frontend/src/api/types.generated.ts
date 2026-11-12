@@ -5034,28 +5034,6 @@ export interface components {
             /** Format: int64 */
             vermisst: number;
         };
-        /**
-         * @description Der gezeigte Einsatz, ohne Sachverhalt, Adresstext und meldende Stelle. Die Koordinate des
-         *     Einsatzorts steht als Feature `einsatzort` in der Karte.
-         */
-        LagemonitorEinsatz: {
-            /** @description UTC, SQLite-Format. */
-            begonnen_at: string;
-            betroffene: components["schemas"]["LagemonitorBetroffene"];
-            bezeichnung: string;
-            einsatzart: components["schemas"]["Einsatzart"];
-            kraefte: components["schemas"]["LagemonitorKraefte"];
-            lagemeldung: components["schemas"]["LagemonitorLagemeldung"] | null;
-            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
-            /**
-             * Format: int64
-             * @description Unbestätigte, nicht erledigte Sofortmeldungen; nur die Zahl.
-             */
-            sofortmeldungen_offen: number;
-            stichwort?: string | null;
-            /** @description Nicht aufgelöste UHS mit Belegung als Zahl; die Lage steht in der Karte. */
-            uhs: components["schemas"]["LagemonitorUhsZahl"][];
-        };
         /** @description Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke. */
         LagemonitorKraefte: {
             /** Format: int64 */
@@ -5063,17 +5041,6 @@ export interface components {
             /** Format: int64 */
             personal: number;
             staerke: components["schemas"]["Staerke"];
-        };
-        /** @description Antwort der Schnittstelle. */
-        LagemonitorLage: {
-            /** Format: int32 */
-            api_version: number;
-            einsatz: components["schemas"]["LagemonitorEinsatz"] | null;
-            karte?: components["schemas"]["GeoJsonFeatureCollection"] | null;
-            /** @description Fassung der Karte; fehlt ohne Einsatz und bei `?karte=aus`. */
-            karte_etag?: string | null;
-            /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
-            stand_at: string;
         };
         /** @description Die Lagemeldung für die Anzeige. */
         LagemonitorLagemeldung: {
@@ -5167,41 +5134,6 @@ export interface components {
             /** Format: int64 */
             id: number;
             typ: components["schemas"]["LageZoneTyp"];
-        };
-        /** @description Ein Lesezugang, wie die Verwaltung ihn sieht. Der Schlüssel steht nie darin. */
-        LesezugangAnzeige: {
-            /** @description UTC im SQLite-Format. */
-            angelegt_at: string;
-            /** @description Anzeigename der Person, die ihn angelegt hat; fehlt, wenn ihr Konto gelöscht ist. */
-            angelegt_von_name?: string | null;
-            bezeichnung: string;
-            einsatz_bezeichnung?: string | null;
-            /**
-             * Format: int64
-             * @description Der Einsatz, den der Zugang gerade zeigt; fehlt ohne aktive Freigabe.
-             */
-            einsatz_id?: number | null;
-            /** Format: int64 */
-            id: number;
-            widerrufen_at?: string | null;
-            /** @description Letzter Abruf (höchstens minütlich fortgeschrieben); fehlt, solange ihn niemand nutzte. */
-            zuletzt_genutzt_at?: string | null;
-        };
-        /** @description Ein Lesezugang aus Sicht eines Einsatzes (Seite „Geräte“ der Einsatzleitung). */
-        LesezugangFreigabe: {
-            /** @description Der Zugang zeigt gerade einen anderen aktiven Einsatz. Welchen, sagt die Antwort nicht. */
-            anderer_einsatz: boolean;
-            bezeichnung: string;
-            /** @description Dieser Einsatz ist für den Zugang freigegeben. */
-            freigegeben: boolean;
-            /** Format: int64 */
-            zugang_id: number;
-            zuletzt_genutzt_at?: string | null;
-        };
-        /** @description Ein frisch angelegter Zugang. Der Schlüssel verlässt den Server nur hier, einmal. */
-        LesezugangMitSchluessel: {
-            schluessel: string;
-            zugang: components["schemas"]["LesezugangAnzeige"];
         };
         /**
          * @description Die beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266, design.md D1/D2). Namen

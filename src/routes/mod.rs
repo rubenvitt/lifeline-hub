@@ -62,8 +62,6 @@ pub mod lagebesprechung;
 pub mod lagebild_extern;
 pub mod lagekennzahl_wahl;
 pub mod lagemonitor;
-pub mod lagemonitor_v1;
-pub mod lagemonitor_zugang;
 pub mod leitung_freigabe;
 pub mod live;
 pub mod material;

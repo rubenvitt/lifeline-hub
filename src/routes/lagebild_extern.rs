@@ -2,8 +2,8 @@
 //! öffentliche Abruf `GET /api/extern/v1/lagebild`.
 //!
 //! Herleitung: `/mnt/project-files/llh-1496/openspec/k11guwns-lagebild-extern/design.md`. Die
-//! Zahlen und die Karte kommen aus derselben Verdichtung wie beim externen Lagemonitor
-//! ([`super::lagemonitor::verdichte`], [`super::lagemonitor_v1`]). Wie dort gilt: **keine Namen,
+//! Zahlen und die Karte kommen aus derselben Verdichtung wie bei der Lage der öffentlichen API
+//! ([`super::lagemonitor::verdichte`], `public_api::lage`). Wie dort gilt: **keine Namen,
 //! keine Personenkennungen, keine freien Notizen**; die Stufe `oeffentlich` zeigt nur
 //! Gesamtzahlen, den Einsatzort und die Absperrungen.
 //!

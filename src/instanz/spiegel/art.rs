@@ -158,7 +158,6 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Zugriffsprotokoll: jede Instanz protokolliert ihre eigenen Zugriffe",
     ),
     ("etb_lesemarke", "Lesestand einer Person an dieser Instanz"),
-    ("lagemonitor_freigabe", "Geräte hängen an einer Instanz"),
     (
         "maschinenzugang_freigabe",
         "Zugänge von Fremdsystemen hängen an einer Instanz (LLH-1638, ADR-0029)",

@@ -36,6 +36,7 @@ import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
 import {
   ANBINDUNGEN_ABRUF_MS,
   anbindungPath,
+  einsatzAnzeige,
   uebernimmAnbindung,
   zustandAnzeige,
 } from './anbindungAnzeige';
@@ -205,6 +206,7 @@ export default function Anbindungen() {
               renderItem={(z) => {
                 const zustand = zustandAnzeige(z);
                 const widerrufenAm = z.zustand === 'widerrufen';
+                const einsatz = einsatzAnzeige(z);
                 return (
                   <div data-lfh="anbindung-eintrag" {...(menue ? kontext.ausloeser(z) : {})}>
                     <ListenEintrag
@@ -266,6 +268,7 @@ export default function Anbindungen() {
                               {z.widerrufen_at &&
                                 ` · widerrufen ${zeit(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
                             </span>
+                            {einsatz && <span data-lfh="anbindung-einsatz">{einsatz}</span>}
                             {z.letzte_ablehnung && !widerrufenAm && (
                               <span
                                 data-lfh="anbindung-ablehnung"
