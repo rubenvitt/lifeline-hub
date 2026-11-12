@@ -1,4 +1,12 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 // Namespace-Import: maplibre-gl ab 6 ist ESM ohne Default-Export. Kein named-Import der Klassen:
 // `Map` beschattete den globalen `Map`, den die Zeichen-Registry als
 // `useRef<Map<string, Drawing>>` nutzt. `import * as ns, { type X }` ist kein gültiges ES,
@@ -1359,6 +1367,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const kreisRadius = kreis?.radiusM ?? null;
   const kreisFarbe = kreis?.farbe ?? null;
   const kreisAktiv = kreis != null;
+  const kreisMitte = useMemo(
+    () =>
+      kreisMitteLat != null && kreisMitteLon != null
+        ? { lat: kreisMitteLat, lon: kreisMitteLon }
+        : null,
+    [kreisMitteLat, kreisMitteLon],
+  );
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1377,13 +1392,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         // Der Mittengriff (LLH-1344) steht nur, wenn die Seite die Mitte annimmt.
         onKreisMitteRef.current ? (m, fertig) => onKreisMitteRef.current?.(m, fertig) : undefined,
       );
+      // Nur der neue Griff bekommt seine Lage hier; ein bestehender folgt im Layout-Effekt unten.
+      kreisGriffRef.current.setze(kreisMitte, kreisRadius);
     }
-    const mitte =
-      kreisMitteLat != null && kreisMitteLon != null
-        ? { lat: kreisMitteLat, lon: kreisMitteLon }
-        : null;
-    kreisGriffRef.current.setze(mitte, kreisRadius);
-  }, [kreisAktiv, kreisMitteLat, kreisMitteLon, kreisRadius, kreisFarbe]);
+  }, [kreisAktiv, kreisMitte, kreisRadius, kreisFarbe]);
+  // Die Lage eines bestehenden Griffs folgt im Commit, nicht im passiven Effekt (LLH-1700): der
+  // läuft später, unter Last erst nach weiteren Zeigerereignissen. Ein Effekt mit einem älteren
+  // Zieh-Radius träfe dann nach `dragend` ein und legte den Griff in den Osten. Im Commit läuft
+  // ein Zieh-Render noch im Zug, und der erste Commit nach dem Loslassen trägt den letzten Radius.
+  useLayoutEffect(() => {
+    if (kreisAktiv) kreisGriffRef.current?.setze(kreisMitte, kreisRadius);
+  }, [kreisAktiv, kreisMitte, kreisRadius]);
 
   // Punktweise Bearbeitung nachführen (LLH-1344, design.md D2): Vorschau und Griffe folgen dem
   // Stand der Seite; jede Änderung kommt als neue Geometrie (Identität aus dem Reducer).
