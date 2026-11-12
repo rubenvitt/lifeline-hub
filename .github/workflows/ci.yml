@@ -62,8 +62,14 @@ env:
   CARGO_TERM_COLOR: always
   # Die Debuginfo-Stufe (Zeilentabellen, keine für Abhängigkeiten) steht in Cargo.toml,
   # [profile.dev] (LFH-845), und gilt lokal wie hier.
-  # 2 vCPU: die lokale Vorgabe von 3 Playwright-Workern überzeichnete den Runner.
-  PW_WORKERS: 2
+  # Parallelität nach den Kernen des Runners (LLH-1664; der Schritt „Runner-Größe“ in den
+  # Suiten nennt Kerne und Speicher). Bei 4 Kernen: Playwright 3 statt 4 Worker, weil Vite-Server
+  # und Backend auf demselben Runner mitrechnen; Vitest 2 Dateien zugleich statt einer (lokale
+  # Vorgabe in check-all.sh bleibt 1). Zeigen wandernde Infrastruktur-Fehler (goto-Timeout,
+  # ERR_CONNECTION_REFUSED, Kopf von `workers` in frontend/playwright.config.ts), zuerst hier
+  # zurücknehmen. Messwerte vorher/nachher an der Aufgabe LLH-1664.
+  PW_WORKERS: 3
+  VITEST_WORKERS: 2
   # Der Runner läuft in UTC. check-all.sh setzt die Zone selbst; hier steht sie für alles
   # außerhalb des Skripts.
   TZ: Europe/Berlin
@@ -335,6 +341,9 @@ jobs:
       - name: Frontend-Abhängigkeiten
         if: env.FRONTEND != 'false'
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      - name: Runner-Größe
+        if: env.FRONTEND != 'false'
+        run: echo "Kerne $(nproc), Speicher $(free -h | awk '/^Mem:/ {print $2}')" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Frontend-Suite (Anteil ${{ matrix.shard }}/4)
         if: env.FRONTEND != 'false'
         env:
@@ -472,6 +481,9 @@ jobs:
       - name: Ausführbar machen
         if: env.E2E != 'false'
         run: chmod +x bin/lifeline-hub
+      - name: Runner-Größe
+        if: env.E2E != 'false'
+        run: echo "Kerne $(nproc), Speicher $(free -h | awk '/^Mem:/ {print $2}')" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
         if: env.E2E != 'false'
         env:
