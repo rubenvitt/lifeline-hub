@@ -21,7 +21,7 @@ Datei im Repo belegt.
 | 6 | [Laufzeitsicht](06-laufzeitsicht.md) | Abläufe über mehrere Bausteine |
 | 7 | [Verteilungssicht](07-verteilungssicht.md) | Auslieferung, Prozesse, Ports, Speicherorte, Release-Kanäle |
 | 8 | [Querschnittliche Konzepte](08-querschnittliche-konzepte.md) | Übergreifende Konzepte mit Verweis auf die tragende Regel |
-| 9 | [Architekturentscheidungen](09-architekturentscheidungen.md) | Verzeichnis der ADRs |
+| 9 | [Architekturentscheidungen](09-architekturentscheidungen.md) | Form und Fundort der ADRs, weitere Entscheidungen |
 | 10 | [Qualitätsanforderungen](10-qualitaetsanforderungen.md) | Qualitätsbaum und Szenarien |
 | 11 | [Risiken und technische Schulden](11-risiken-und-technische-schulden.md) | Offene Risiken, bekannte Schulden |
 | 12 | [Glossar](12-glossar.md) | Fach- und Technikbegriffe |

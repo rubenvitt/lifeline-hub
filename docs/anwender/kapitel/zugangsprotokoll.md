@@ -80,6 +80,12 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Lagemonitor-Zugang angelegt“** und **„Lagemonitor-Zugang widerrufen“**: unter
   „Einstellungen“, „Lagemonitore“. „Ziel“ ist die Bezeichnung des Zugangs; ein zweiter Widerruf
   schreibt nichts.
+- **„Archiv-Schlüssel eingetragen“**, **„Archiv-Schlüssel geprüft“** und **„Archiv-Schlüssel
+  entfernt“**: unter „Einstellungen“, „Archiv-Schlüssel“. „Ziel“ ist die Bezeichnung des
+  Schlüssels, „Detail“ sein Fingerabdruck; ein zweites Prüfen schreibt nichts.
+- **„Archiv heruntergeladen“**: in der Archivakte im Paneel „Archiv“. „Ziel“ ist die
+  Einsatznummer, „Detail“ die Fingerabdrücke der Schlüssel und der Block, siehe
+  [Aufbewahrung](aufbewahrung.md).
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.
 

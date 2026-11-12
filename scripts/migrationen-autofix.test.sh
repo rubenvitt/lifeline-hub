@@ -154,6 +154,36 @@ fremd="$(remote_kopf bewegt feature)"
 pruefe "bewegter Branch Exit 4" 4 "$(lauf "$r" feature "$geprueft")"
 pruefe "bewegter Branch bleibt auf dem fremden Commit" "$fremd" "$(remote_kopf bewegt feature)"
 
+# 4a — Zwischen Prüfung und Push wurde der Branch gelöscht (PR gemergt, Branch automatisch
+# entfernt). Ein einfacher Push legte ihn neu an; der Autofix darf das nicht (LLH-1667).
+r="$(repo_neu geloescht)"
+datei "$r" feature migrations/0003_eigen.sql
+datei "$r" alpha migrations/0003_fremd.sql
+geprueft="$(remote_kopf geloescht feature)"
+git -C "$r" fetch -q origin
+git -C "$ARBEIT/geloescht.git" update-ref -d refs/heads/feature
+code=0
+( cd "$r" && "$SKRIPT_UNTER_TEST" origin/alpha feature "$geprueft" ) > "$ARBEIT/ausgabe" 2>&1 || code=$?
+pruefe "gelöschter Branch Exit 4" 4 "$code"
+pruefe "gelöschter Branch entsteht nicht neu" "" \
+  "$(git -C "$ARBEIT/geloescht.git" rev-parse --verify --quiet refs/heads/feature || true)"
+enthaelt "gelöschter Branch wird als gelöscht gemeldet" "$ARBEIT/ausgabe" "gibt es nicht mehr"
+
+# 4b — Der Branch wurde per Force auf einen Vorfahren zurückgesetzt. Ein einfacher Push wäre
+# hier ein Fast-Forward und brächte die entfernten Commits zurück (LLH-1667).
+r="$(repo_neu zurueck)"
+datei "$r" feature migrations/0003_eigen.sql
+datei "$r" feature src/zweiter.rs
+datei "$r" alpha migrations/0003_fremd.sql
+geprueft="$(remote_kopf zurueck feature)"
+vorfahr="$(git -C "$ARBEIT/zurueck.git" rev-parse "$geprueft^")"
+git -C "$r" fetch -q origin
+git -C "$ARBEIT/zurueck.git" update-ref refs/heads/feature "$vorfahr"
+code=0
+( cd "$r" && "$SKRIPT_UNTER_TEST" origin/alpha feature "$geprueft" ) > "$ARBEIT/ausgabe" 2>&1 || code=$?
+pruefe "zurückgesetzter Branch Exit 4" 4 "$code"
+pruefe "zurückgesetzter Branch bleibt, wo er ist" "$vorfahr" "$(remote_kopf zurueck feature)"
+
 # 5 — Nie auf einen Ziel-Branch, gleich was der Aufrufer übergibt.
 for ziel in alpha beta main; do
   r="$(repo_neu "ziel-$ziel")"
