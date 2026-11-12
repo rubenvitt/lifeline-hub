@@ -96,19 +96,35 @@ einem Widerspruch oder einem Verwerfen, also mit derselben Struktur, aber andere
 
 Die Akte des Hubs landet in `offen` und `offen_bruch_at` wie bei einer gültigen Übernahme gegen
 die ELW (Zweig `OffenHalten`): mit `Folge::Offen` (Benachrichtigung `FuehrungUebernommen` an die
-Einsatzleitung) und `Folge::Kopf`. Bleibt der Inhalt gleich, wird nichts neu geschrieben. Eine
-eigene Spalte gibt es nicht. Konflikt heißt: Die gehaltene Akte trägt keine Erklärung gegen diese
-Instanz, also keine parsebare `NotuebernahmeErklaerung` mit `fuehrer_alt == ich`. Eine gültige
-Übernahme gegen die ELW trägt diese Erklärung immer (`check_unterschrift` setzt sie voraus), eine
-Abgabe per Code läuft nicht über `offen`. Die Ableitung steht an genau einer Stelle
-(`ist_konflikt(&AkteMeldung, &Ich)`).
+Einsatzleitung) und `Folge::Kopf`. Eine eigene Spalte gibt es nicht. Konflikt heißt: Der Führer der
+gehaltenen Akte ist kein gekoppeltes Gegenüber der Org. Die Ableitung steht an genau einer Stelle
+(`ist_konflikt(&AkteMeldung, gekoppelt)`). Der Weg läuft über `austausch::entscheide`, das dafür
+den Merker `dritter` bekommt: An der meldenden Seite heißt `dritter` immer offen halten, ohne
+Beweisprüfung und ohne Alarm. Die Tabelle D7 der Vorgänger-Change bekommt damit eine Zeile:
+
+| Eingehende Akte nimmt mir die Führung | `wird_gemeldet` (Hub) | `meldet_sich` (ELW) |
+| --- | --- | --- |
+| Ein Dritter führt, oder er hat die Epoche vergeben, mit der das Gegenüber selbst führt | — | offen halten, ohne Alarm (D3, D7) |
+
+**Gleicher Inhalt** heißt gleiche Akte ohne `stand` und ohne die Merker `offen` und `anfrage`. Ändert
+sich nur der Stand des Hubs, schreibt die ELW nichts und meldet nichts. Sonst schaukelten sich beide
+Stände je Meldetakt hoch, wenn die Epoche des Hubs größer ist (Zweig `Less` am Hub): Der Hub
+schickte seine Akte mit neuem Stand zurück, die ELW hielte sie erneut offen, und die
+Einsatzleitung bekäme jedes Mal einen Hinweis (Befund aus dem Review). `offen_bruch_at` bleibt die
+Bruchstelle der ersten offenen Übernahme.
+
+**Angaben im Band:** Grund, Unterzeichner und Zeitpunkt zeigt `anzeige` nur aus einer Erklärung
+gegen diese Instanz (`fuehrer_alt == ich`). Im Konflikt trägt die Akte meist die Erklärung der
+anderen ELW gegen den Hub, und deren Angaben sähen sonst wie die eigenen aus.
 
 Die ELW schreibt weiter, bis ihre Einsatzleitung bestätigt. `fordere_fuehrend` sperrt Übergabe und
 Code-Abgabe, solange etwas offen ist; das gilt hier genauso.
 
 `FuehrungOffen` bekommt `konflikt: bool`, erzeugt per Codegen. Das Hinweisband zeigt dann den Titel
 „Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei <Name>“ und als einzige
-Aktion „Übernahme bestätigen“. Das Paneel „Führung“ zeigt dieselbe Entscheidung.
+Aktion „Übernahme bestätigen“. War die eigene Führung keine Notübernahme (Übergabe, Anfrage,
+Widerspruch, Verwerfen), heißt der Titel „Die Führung liegt am Hub bei <Name>, nicht hier“. Das
+Paneel „Führung“ zeigt dieselbe Entscheidung, ohne die Felder der Erklärung.
 
 **Verworfen: eine neue Benachrichtigungsart.** Dafür bräuchte es eine Migration für den CHECK.
 „Führung übernommen“ stimmt inhaltlich, die Einzelheiten zeigt das Band.
@@ -127,7 +143,9 @@ Dann übernimmt die ELW Epoche, Führer und Art der gehaltenen Akte, setzt `bruc
 gleich wie am Hub (`Equal`), und der Takt ist ruhig. Ist die Epoche des Hubs kleiner als die eigene,
 geht die Epoche lokal zurück. Das ist hier richtig, denn die größere Epoche gilt an keiner Stelle:
 Der Hub hat sie nie angenommen. Der Verlauf bekommt einen Eintrag „bestätigt“ mit dem Grund „Notübernahme
-hat am Hub nicht gegriffen, Führung bei <Name>“ und der Bruchstelle.
+hat am Hub nicht gegriffen, Führung bei <Name>“ (ohne eigene Notübernahme: „Führung hat am Hub nicht
+gegriffen, sie liegt bei <Name>“) und der Bruchstelle, ohne Unterzeichner. Die Admin-Spur schreibt
+denselben Text, nicht „Notübernahme bestätigt“ mit dem Grund der anderen ELW.
 
 ### D5 Widersprechen im Konflikt ist 422
 
@@ -141,38 +159,42 @@ Kommt vom Hub eine Akte, deren Führer die ELW selbst oder der Hub ist, während
 ist, leert die ELW `offen` und `offen_bruch_at`, und zwar vor der übrigen Behandlung der Akte. Das
 folgende Live-Ereignis am Kopf blendet das Band aus. Danach nimmt der Ablauf seinen gewohnten Weg:
 Eine Akte des Hubs mit dem Hub als Führer und kleinerer Epoche führt zu `Less`, die ELW schickt ihre
-Akte neu, und der Hub nimmt sie jetzt an.
+Akte neu, und der Hub nimmt sie jetzt an. Führt der Hub mit der Epoche eines Dritten, greift D7.
 
-### D7 Eine überholte Übernahme gegen den Hub zieht die meldende Seite still nach
+Auch der Widerruf einer Kopplung räumt einen Konflikt ab (`repo::release_nach_widerruf`): Ohne
+Kopplung kommt keine Akte mehr, die ihn erlöschen ließe, und die ELW stünde sonst dauerhaft mit Band
+und gesperrter Übergabe da.
 
-Nachtrag beim Umsetzen, **abgestimmt mit Ruben am 12.11.2026.** Eine ELW führt, und der Hub führt
-laut seiner Akte selbst, mit einer größeren Epoche, die eine dritte Instanz vergeben hat. Das
-passiert etwa, wenn eine andere ELW die Führung regulär an den Hub zurückgegeben hat, während diese
-ELW ohne Verbindung ihre Notübernahme gegen den Hub mit kleinerem Zähler erklärte. Dann vergibt die
-ELW die nächste Epoche über beiden. Eine Erklärung an der Akte zieht sie auf den neuen Stand nach
-(`epoche_alt`, `epoche_neu`; Grund, Unterzeichner und Zeitpunkt bleiben). Dazu kommt ein
-Verlaufseintrag „Notübernahme gegen <Hub> mit neuem Stand erneuert“, ohne Alarm und ohne
-Admin-Spur.
+### D7 Führt der Hub mit der Epoche eines Dritten, entscheidet ein Mensch
+
+Nachtrag beim Umsetzen. Eine ELW führt, und der Hub führt laut seiner Akte selbst, mit einer
+größeren Epoche, die eine dritte Instanz vergeben hat. Das passiert etwa, wenn eine andere ELW die
+Führung regulär an den Hub zurückgegeben hat, während diese ELW ohne Verbindung ihre Notübernahme
+gegen den Hub mit kleinerem Zähler erklärte. Vorher übersprang die ELW die Akte, und beide führten.
+
+Die ELW hält die Akte des Hubs als gewöhnliche offene Übernahme (kein Konflikt, D3): Band „Führung
+übernommen von <Hub>“, ein Hinweis an die Einsatzleitung, kein Alarm, sie schreibt weiter.
+„Übernahme bestätigen“ macht sie zum Spiegel. „Widersprechen“ vergibt die nächste Epoche (D10 der
+Vorgänger-Change), und der Hub nimmt sie an, weil er selbst führt.
 
 ```
 richtung == MeldetSich && ich_fuehre && m.epoche > alt && m.fuehrer == sender
   && m.epoche.instanz != sender && m.epoche.instanz != ich
-  → nachziehen: (max+1, ich), Akte geht mit neuem Stand hinaus
+  → entscheide(.., dritter = true) → offen halten
 ```
 
-Der Hub nimmt die größere Epoche danach nach D7 der Vorgänger-Change an, weil die Führung bei ihm
-selbst liegt. Kommt dabei die andere ELW wieder ins Spiel, gilt D1.
+**Abgestimmt mit Ruben am 12.11.2026, zweimal.** Zuerst stand hier „still nachziehen“: die nächste
+Epoche ohne Rückfrage. Der Review vor dem PR zeigte, dass das eine unterschriebene Notübernahme des
+Hubs gegen die ELW ohne Menschen zurückdrehen kann. Der Hub holt der ELW die Führung per
+Unterschrift, gibt sie an eine andere ELW und bekommt sie zurück; meldet sich die erste ELW danach,
+sieht ihre Akte genau so aus wie im gemeinten Fall. Ob der Hub die eigene Führung kannte, steht an
+keiner Akte. Deshalb entscheidet jetzt die Einsatzleitung.
 
-**Warum das sicher ist:** Nennt der Hub sich selbst als Führer, während die ELW führt, kennt er die
-Führung der ELW nicht. Sonst stünde sie in seiner Akte, denn er hält je Kennung nur eine. Die ELW
-hat ihre Führung also selbst erklärt, als Notübernahme, Widerspruch oder Verwerfen, und genau so
-etwas nimmt der Hub ohne Rückfrage an. Das Nachziehen erzeugt den Stand, den der Hub angenommen
-hätte, wäre der Zähler aktuell gewesen.
-
-**Verworfen: Verwerfen mit Alarm wie in D7 der Vorgänger-Change.** Am Ende stünde dasselbe, aber
-mit dem Alarm „ungültige Übernahme“, obwohl niemand etwas Unrechtes getan hat.
-
-**Verworfen: als Folgeaufgabe.** Dann führten Hub und ELW bis dahin beide.
+**Verworfen: still nachziehen** (siehe oben). **Verworfen: still nur bei eigener Notübernahme.** Das
+bliebe offen für den Fall, dass der Hub die eigene Notübernahme der ELW erst angenommen und dann
+zurückgeholt hat. **Verworfen: eine Spalte, ob der Hub die eigene Epoche bestätigt hat.** Das ist
+genauer, braucht aber eine Migration für einen seltenen Fall. **Verworfen: Verwerfen mit Alarm wie
+in D7 der Vorgänger-Change.** Es gibt keinen Beweis gegen die ELW, also auch nichts Ungültiges.
 
 ## Risks / Trade-offs
 
@@ -187,8 +209,14 @@ mit dem Alarm „ungültige Übernahme“, obwohl niemand etwas Unrechtes getan 
   eingehenden Akten und über `Epoche::naechste` gelesen. Beide sehen danach den Stand des Hubs, und
   die nächste eigene Epoche zählt von dort weiter. Ein Test belegt den ruhigen Takt danach.
 - [Die Daten der ELW aus der Zeit, in der sie führte, kommen nicht bei der führenden ELW an] →
-  Non-Goal. Sie bleiben als Bruchstelle gesichert. Fällt das im Betrieb auf, wird es eine eigene
-  Aufgabe.
+  Non-Goal. Sie bleiben als Bruchstelle gesichert. Ist die führende ELW hier nicht gekoppelt, endet
+  der Spiegel nach dem Bestätigen mit Hinweis und bekommt keine Änderungen mehr; das Anwenderkapitel
+  sagt das. Fällt das im Betrieb auf, wird es eine eigene Aufgabe.
+- [Eine Epoche, die der Hub selbst vergab, nimmt der ELW die Führung ohne Beweis gegen sie, etwa
+  der Widerruf einer anderen ELW am Hub oder seine Notübernahme gegen die andere ELW] → Das läuft
+  wie vor dieser Change auf Verwerfen mit Alarm, und danach führt die ELW. Die Erklärung richtet
+  sich dann gegen einen Dritten, und die ELW könnte das erkennen. Das ist eine eigene Aufgabe, denn
+  der Weg ändert sich mit dieser Change nicht.
 
 ## Migration Plan
 

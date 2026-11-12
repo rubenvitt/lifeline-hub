@@ -33,18 +33,41 @@ die meldende Seite nicht widersprechen lassen und mit 422 antworten.
 - **WHEN** an „ELW 2“ die Führung von „ELW 1“ offen ist und die Einsatzleitung widersprechen will
 - **THEN** antwortet der Server mit 422, und das Hinweisband bietet nur „Übernahme bestätigen“
 
+### Requirement: Die meldende Seite prüft jede Übernahme gegen sie
+
+Erhält die meldende Seite eine Akte, die ihr die Führung nimmt, MUST sie diese nur annehmen, wenn
+sie eine reguläre Übergabe von ihr selbst bestätigt oder eine Erklärung trägt, deren Unterschrift
+von einem gültigen Unterschriftsschlüssel der zugeordneten Org über genau diese Erklärung stammt
+oder deren Code zu ihrem Abgabecode passt. Sonst MUST sie die Akte verwerfen und weiter führen.
+Ausgenommen ist eine Akte, an der eine dritte Instanz beteiligt ist (sie führt, oder sie hat die
+Epoche vergeben, mit der die erreichte Seite selbst führt): Die MUST die meldende Seite ohne Alarm
+offen halten, bis die Einsatzleitung entscheidet.
+
+#### Scenario: Gültige Unterschrift
+- **WHEN** der ELW eine Erklärung des Hubs erhält, die Admin A mit einem am ELW gültigen Schlüssel unterschrieben hat
+- **THEN** zeigt der ELW über die volle Breite „Führung übernommen von Hub Nord, 14:32, Admin A: ELW ohne Verbindung seit 40 min“ mit „Übernahme bestätigen“ und „Widersprechen“ und schreibt weiter
+
+#### Scenario: Schlüssel wartet auf Bestätigung
+- **WHEN** die Unterschrift von einem Schlüssel stammt, der am ELW noch auf Bestätigung wartet
+- **THEN** verwirft der ELW die Übernahme als ungültig
+
+#### Scenario: Ungültige Übernahme
+- **WHEN** der ELW eine Übernahme ohne gültige Unterschrift und ohne passenden Code erhält
+- **THEN** führt der ELW weiter, löst den Alarm „Gegenüber meldet ungültige Übernahme“ an die Einsatzleitung aus und schreibt einen Eintrag in die Admin-Spur
+
 ## ADDED Requirements
 
 ### Requirement: Die unterlegene meldende Seite hält die Führung des Dritten offen
 
-Führt die meldende Seite einen Einsatz und nennt die Akte der erreichten Seite eine dritte Instanz
-als Führer, MUST die meldende Seite diese Akte als offene Übernahme halten, gleich welche Epoche
-größer ist. Sie MUST weiter schreiben lassen, das Hinweisband zeigen und die Einsatzleitung
-benachrichtigen. Nennt die erreichte Seite keinen Dritten mehr, MUST die offene Übernahme erlöschen.
+Führt die meldende Seite einen Einsatz und nennt die Akte der erreichten Seite eine Instanz als
+Führer, mit der die meldende Seite nicht gekoppelt ist, MUST sie diese Akte als offene Übernahme
+halten, gleich welche Epoche größer ist. Sie MUST weiter schreiben lassen, das Hinweisband zeigen
+und die Einsatzleitung einmal benachrichtigen. Nennt die erreichte Seite keinen Dritten mehr oder
+endet die Kopplung, MUST die offene Übernahme erlöschen.
 
 #### Scenario: ELW 2 erfährt, dass ELW 1 führt
 - **WHEN** der Hub die Notübernahme von „ELW 1“ angenommen hat und „ELW 2“ mit eigener Notübernahme sich danach meldet
-- **THEN** schreibt „ELW 2“ weiter und zeigt „Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1“, und die Einsatzleitung von „ELW 2“ bekommt den Hinweis „Führung übernommen“
+- **THEN** schreibt „ELW 2“ weiter und zeigt „Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1“ ohne Grund und Unterzeichner von „ELW 1“, und die Einsatzleitung von „ELW 2“ bekommt den Hinweis „Führung übernommen“
 
 #### Scenario: Reguläre Übergabe an ELW 1
 - **WHEN** der Hub den Einsatz auf Anfrage an „ELW 1“ abgegeben hat und „ELW 2“ ohne Verbindung vom alten Stand eine Notübernahme erklärt hat und sich meldet
@@ -54,17 +77,34 @@ benachrichtigen. Nennt die erreichte Seite keinen Dritten mehr, MUST die offene 
 - **WHEN** die Einsatzleitung an „ELW 2“ diese offene Übernahme bestätigt
 - **THEN** ist der Einsatz an „ELW 2“ „Nur Ansicht · Führung liegt bei „ELW 1““, und der Verlauf zeigt die Bruchstelle
 
+#### Scenario: Ohne eigene Notübernahme
+- **WHEN** „ELW 2“ die Führung per Übergabe bekam und die Akte des Hubs danach „ELW 1“ als Führer nennt
+- **THEN** zeigt „ELW 2“ „Die Führung liegt am Hub bei ELW 1, nicht hier“
+
+#### Scenario: Weitere Meldetakte
+- **WHEN** an „ELW 2“ eine solche Übernahme offen ist und sich „ELW 2“ mehrmals meldet, ohne dass sich am Hub etwas ändert
+- **THEN** bleibt es bei einem Hinweis „Führung übernommen“, und keine Seite ändert ihre Akte
+
 #### Scenario: Der Hub nennt keinen Dritten mehr
 - **WHEN** an „ELW 2“ eine solche Übernahme offen ist und die Akte des Hubs danach wieder den Hub oder „ELW 2“ als Führer nennt
-- **THEN** zeigt „ELW 2“ keine offene Übernahme mehr
+- **THEN** zeigt „ELW 2“ keine Übernahme mit „ELW 1“ mehr
 
-### Requirement: Die meldende Seite zieht eine überholte Übernahme gegen die erreichte Seite nach
+#### Scenario: Kopplung widerrufen
+- **WHEN** an „ELW 2“ eine solche Übernahme offen ist und die Kopplung zum Hub widerrufen wird
+- **THEN** zeigt „ELW 2“ keine offene Übernahme mehr und führt weiter
+
+### Requirement: Führt die erreichte Seite mit der Epoche eines Dritten, entscheidet ein Mensch der meldenden Seite
 
 Führt die meldende Seite einen Einsatz und nennt die Akte der erreichten Seite diese selbst als
 Führer, mit einer größeren Epoche, die eine dritte Instanz vergeben hat, MUST die meldende Seite
-mit der nächsten Epoche weiter führen, ohne Alarm und mit einem Eintrag im Verlauf. Die erreichte
-Seite MUST diese Epoche bei der nächsten Meldung annehmen.
+die Akte als offene Übernahme halten, ohne Alarm und mit „Übernahme bestätigen“ und
+„Widersprechen“. Widerspricht die Einsatzleitung, MUST die erreichte Seite die nächste Epoche der
+meldenden Seite bei der nächsten Meldung annehmen.
 
 #### Scenario: Hub hat zwischendurch von ELW 1 zurückbekommen
 - **WHEN** „ELW 2“ ohne Verbindung eine Notübernahme mit Epoche (2, ELW 2) erklärt, während „ELW 1“ die Führung mit Epoche (3, ELW 1) an den Hub zurückgegeben hat, und „ELW 2“ sich meldet
-- **THEN** führt nach dem nächsten Meldetakt „ELW 2“ mit Epoche (4, ELW 2) an beiden Seiten, ohne Alarm „Gegenüber meldet ungültige Übernahme“, und der Verlauf an „ELW 2“ zeigt „Notübernahme gegen Hub mit neuem Stand erneuert“
+- **THEN** zeigt „ELW 2“ „Führung übernommen von Hub“ mit „Übernahme bestätigen“ und „Widersprechen“, ohne Alarm „Gegenüber meldet ungültige Übernahme“, und der Hub führt weiter
+
+#### Scenario: Widersprechen
+- **WHEN** die Einsatzleitung an „ELW 2“ dieser Übernahme widerspricht und „ELW 2“ sich meldet
+- **THEN** führt „ELW 2“ mit Epoche (4, ELW 2) an beiden Seiten
