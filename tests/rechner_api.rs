@@ -244,6 +244,13 @@ async fn ungueltige_eingaben_tragen_code_und_nennen_das_feld() {
             "invalid_field",
             "einsatz_id",
         ),
+        // Ein falscher Typ nennt den Pfad des Felds.
+        (
+            json!({ "weg": "personen", "trennung": false, "personen": { "gesamt": "100" } }),
+            400,
+            "invalid_field",
+            "personen.gesamt",
+        ),
         (mit("raeume", json!([])), 422, "unprocessable", "raeume"),
         (
             json!({ "weg": "personen", "trennung": true, "personen": { "gesamt": 100 } }),
@@ -354,6 +361,54 @@ async fn auskunft_nennt_richtwerte_mit_angaben_und_zelttypen() {
             { "typ": "sg50", "bezeichnung": "SG 50" }
         ])
     );
+}
+
+/// Die Feldgrenzen passen zur Body-Grenze der öffentlichen API (64 KiB): die größte Anfrage in
+/// üblicher Schreibweise (200 Räume mit Namen, je 5 Abzüge, Maße mit zwei Nachkommastellen) wird
+/// gerechnet. Was darüber liegt, endet vor dem Handler mit 413.
+#[tokio::test]
+async fn groesste_anfrage_passt_in_den_body() {
+    use lifeline_hub::unterkunft::rechner::{ABZUEGE_MAX, RAEUME_MAX};
+    let (app, _pool, _admin, cred, ip) = aufbau(210).await;
+    let raum = |i: usize, name: usize| {
+        json!({
+            "bezeichnung": format!("Raum {i:03} {}", "x".repeat(name)),
+            "laenge_m": 123.45,
+            "breite_m": 67.89,
+            "belegung": if i % 2 == 0 { "maenner" } else { "frauen" },
+            "abzuege": vec![json!({ "laenge_m": 12.34, "breite_m": 5.67 }); ABZUEGE_MAX],
+        })
+    };
+    let anfrage = |name: usize| {
+        json!({
+            "weg": "raeume",
+            "trennung": true,
+            "raeume": (0..RAEUME_MAX).map(|i| raum(i, name)).collect::<Vec<_>>(),
+        })
+    };
+
+    let body = anfrage(20);
+    let bytes = body.to_string().len();
+    assert!(
+        bytes <= lifeline_hub::app::PUBLIC_API_BODY_MAX,
+        "{bytes} Bytes"
+    );
+    let (s, _, v) = rechnen(&app, &cred, &ip, "g1", &body).await;
+    assert_eq!(s, StatusCode::OK, "{bytes} Bytes → {v}");
+    assert_eq!(
+        v["ergebnis"]["kapazitaet"]["raeume"]
+            .as_array()
+            .unwrap()
+            .len(),
+        RAEUME_MAX
+    );
+
+    // Mit langen Bezeichnungen liegt dieselbe Anfrage über 64 KiB.
+    let zu_gross = anfrage(70);
+    assert!(zu_gross.to_string().len() > lifeline_hub::app::PUBLIC_API_BODY_MAX);
+    let (s, _, v) = rechnen(&app, &cred, &ip, "g2", &zu_gross).await;
+    assert_eq!(s, StatusCode::PAYLOAD_TOO_LARGE, "{v}");
+    assert_eq!(v["code"], "payload_too_large");
 }
 
 /// Jeder Abruf steht im Abrufprotokoll des Zugangs, je Route (ADR-0022).

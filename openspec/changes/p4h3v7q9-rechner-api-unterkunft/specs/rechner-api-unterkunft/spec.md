@@ -46,7 +46,7 @@ ihres Wegs tragen, optional `richtwerte`. Jede `eingabe` aus
 - **THEN** rechnet der Server für 100 Personen
 
 #### Scenario: Summe aus Gruppen ohne Trennung
-- **WHEN** die Anfrage ohne Trennung nur `personen.maenner = 30` und `personen.frauen = 12` nennt
+- **WHEN** die Anfrage ohne Trennung `personen.maenner = 30` und `personen.frauen = 12` nennt und kein `gesamt`
 - **THEN** rechnet der Server für 42 Personen als eine Gruppe
 
 #### Scenario: Räume mit Abzug
@@ -56,9 +56,10 @@ ihres Wegs tragen, optional `richtwerte`. Jede `eingabe` aus
 ### Requirement: Ein ungültiges Feld ist 400 und nennt das Feld
 
 Der Server MUST mit 400 und dem Code `invalid_field` antworten, wenn ein Feld für sich ungültig
-ist, und das Feld im Text nennen. Das gilt für ein unbekanntes Feld, einen unbekannten Wert von
-`weg` oder `belegung`, einen unbekannten Zelttyp, eine Zahl, die negativ, nicht endlich oder bei
-Personen und Zelten nicht ganz ist, und für jede überschrittene Grenze.
+ist, und das Feld im Text nennen. Das gilt für ein unbekanntes oder doppeltes Feld, einen falschen
+Typ, eine Liste an Stelle eines Objekts, einen unbekannten Wert von `weg` oder `belegung`, einen
+unbekannten Zelttyp, eine Zahl, die negativ, nicht darstellbar oder bei Personen und Zelten nicht
+ganz ist, und für jede überschrittene Grenze.
 
 #### Scenario: Unbekanntes Feld
 - **WHEN** die Anfrage das Feld `einsatz_id` trägt
@@ -68,6 +69,22 @@ Personen und Zelten nicht ganz ist, und für jede überschrittene Grenze.
 - **WHEN** `personen.gesamt` 10,5 ist
 - **THEN** antwortet der Server mit 400 und nennt `personen.gesamt`
 
+#### Scenario: Falscher Typ
+- **WHEN** `personen.gesamt` die Zeichenkette `"100"` ist
+- **THEN** antwortet der Server mit 400 und nennt `personen.gesamt`
+
+#### Scenario: Nicht darstellbare Zahl
+- **WHEN** `personen.gesamt` den Wert `1e999` trägt
+- **THEN** antwortet der Server mit 400 und nennt `personen.gesamt`
+
+#### Scenario: Doppelter Schlüssel
+- **WHEN** `richtwerte` den Schlüssel `wasser_je_person_l` zweimal trägt, mit 4 und mit 15
+- **THEN** antwortet der Server mit 400 und nennt den Schlüssel, statt mit dem letzten Wert zu rechnen
+
+#### Scenario: Liste statt Objekt
+- **WHEN** `personen` die Liste `[100, null, null]` ist
+- **THEN** antwortet der Server mit 400 und nennt `personen`
+
 #### Scenario: Kein JSON
 - **WHEN** der Body leer oder kein gültiges JSON ist
 - **THEN** antwortet der Server mit 400 und dem Code `invalid_field`
@@ -75,13 +92,21 @@ Personen und Zelten nicht ganz ist, und für jede überschrittene Grenze.
 ### Requirement: Die Eingabe hat feste Grenzen
 
 Der Server MUST Eingaben über diesen Grenzen mit 400 ablehnen: höchstens 200 Räume, je Raum
-höchstens 20 Abzüge, Maße über 0 und höchstens 1000 m, Flächen höchstens 1 000 000 m², Personen
+höchstens 5 Abzüge, Maße über 0 und höchstens 1000 m, Flächen höchstens 1 000 000 m², Personen
 je Angabe höchstens 1 000 000, Zelte je Typ höchstens 1000, Bezeichnung eines Raums höchstens 80
-Zeichen.
+Zeichen. Daneben gilt die Body-Grenze der öffentlichen API von 64 KiB (413).
 
 #### Scenario: Zu viele Räume
 - **WHEN** die Anfrage 201 Räume nennt
 - **THEN** antwortet der Server mit 400 und nennt `raeume`
+
+#### Scenario: Größte übliche Anfrage
+- **WHEN** die Anfrage 200 Räume mit kurzer Bezeichnung, Belegung und je 5 Abzügen nennt, Maße mit zwei Nachkommastellen, ohne Leerraum geschrieben
+- **THEN** liegt sie unter 64 KiB und wird gerechnet
+
+#### Scenario: Body über 64 KiB
+- **WHEN** eine Anfrage innerhalb der Feldgrenzen größer als 64 KiB ist, etwa durch 80 Zeichen Bezeichnung an jedem von 200 Räumen
+- **THEN** antwortet der Server mit 413 und dem Code `payload_too_large`
 
 #### Scenario: Maß über der Grenze
 - **WHEN** ein Raum 1000,5 m lang ist
@@ -94,9 +119,10 @@ Zeichen.
 ### Requirement: Eine widersprüchliche Grundlage ist 422
 
 Der Server MUST mit 422 und dem Code `unprocessable` antworten, wenn die Felder nicht
-zusammenpassen: der Block des Wegs fehlt, ein Block eines anderen Wegs ist dabei, `gesamt` steht
-neben `maenner` oder `frauen`, `gesamt` steht bei Trennung, bei Trennung fehlen beide Gruppen, ein
-Raum trägt bei Trennung keine `belegung` oder ohne Trennung eine.
+zusammenpassen: der Block des Wegs fehlt oder ist leer, ein Block eines anderen Wegs ist dabei,
+`gesamt` steht neben einer Gruppe oder bei Trennung, von `maenner` und `frauen` fehlt eine, Zelte
+ohne Trennung kommen ohne `gesamt`, ein Raum trägt bei Trennung keine `belegung` oder ohne
+Trennung eine. Eine leere Gruppe wird ausdrücklich mit 0 genannt.
 
 #### Scenario: Block passt nicht zum Weg
 - **WHEN** die Anfrage `weg` `personen` nennt und zusätzlich `raeume` trägt
@@ -104,6 +130,18 @@ Raum trägt bei Trennung keine `belegung` oder ohne Trennung eine.
 
 #### Scenario: Gesamt bei Trennung
 - **WHEN** die Anfrage mit Trennung `personen.gesamt = 100` nennt
+- **THEN** antwortet der Server mit 422
+
+#### Scenario: Eine Gruppe fehlt
+- **WHEN** die Anfrage mit Trennung nur `personen.maenner = 50` nennt
+- **THEN** antwortet der Server mit 422, statt mit 0 Frauen zu rechnen
+
+#### Scenario: Leere Gruppe ausdrücklich
+- **WHEN** die Anfrage mit Trennung `personen.maenner = 50` und `personen.frauen = 0` nennt
+- **THEN** rechnet der Server für 50 Männer und 0 Frauen
+
+#### Scenario: Zelte ohne Trennung nur je Gruppe
+- **WHEN** die Anfrage ohne Trennung `zelte.maenner` und `zelte.frauen` nennt, aber kein `zelte.gesamt`
 - **THEN** antwortet der Server mit 422
 
 #### Scenario: Raum ohne Belegung bei Trennung
@@ -153,8 +191,8 @@ Der Server MUST für jeden Fall der gemeinsamen Fallsammlung dasselbe Ergebnis l
 Rechner der Oberfläche: jede Zahl gleich, jede Liste in derselben Reihenfolge.
 
 #### Scenario: Fall der Fallsammlung
-- **WHEN** die `eingabe` und die `richtwerte` eines Falls an die Rechnung gehen
-- **THEN** ist das Ergebnis gleich dem Feld `erwartet` des Falls
+- **WHEN** die `eingabe` eines Falls mit seinen `richtwerte` als Feld `richtwerte` an die Rechnung geht und die Organisation keine eigenen Werte gesetzt hat
+- **THEN** ist das Ergebnis gleich dem Feld `erwartet` des Falls, auch im Vorzeichen einer Null
 
 #### Scenario: Rechnung geändert
 - **WHEN** eine Seite ihre Rechnung ändert, ohne die Fallsammlung anzupassen

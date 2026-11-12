@@ -193,7 +193,9 @@ Gesundheit, Versorgung und Verpflegung für 70 Personen), `richtwerte` (jeder Ri
 wirksamem Wert und Herkunft) und `stand` (Stand der Vorgaben). Weitere Beispiele für jeden Weg
 stehen als `eingabe` und `erwartet` in
 [`tests/fixtures/unterkunft/faelle.json`](../../tests/fixtures/unterkunft/faelle.json); jede
-`eingabe` dort ist eine gültige Anfrage.
+`eingabe` dort ist eine gültige Anfrage. Trägt ein Fall `richtwerte`, gehören sie als Feld
+`richtwerte` in die Anfrage, sonst kommt nicht `erwartet` heraus. `erwartet` gilt, solange die
+Organisation keine eigenen Werte gesetzt hat.
 
 **Richtwerte.** Wirksam ist je Schlüssel:
 
@@ -207,18 +209,28 @@ Schlüssel, Bezeichnung, Einheit und Grenzen jedes Richtwerts und die Zelttypen 
 nicht dazu: Ein Feld `einsatz_id` gibt es noch nicht, es wird als unbekanntes Feld abgelehnt.
 
 **Prüfung.** Anders als die Maske der Oberfläche rechnet die API nie still mit 0. Zusammen passen
-die Felder, wenn genau der Block des Wegs da ist, `gesamt` nicht neben `maenner` oder `frauen`
-steht, bei Trennung die Gruppen einzeln genannt sind und ein Raum genau dann eine `belegung`
-trägt, wenn getrennt wird.
+die Felder, wenn
+
+- genau der Block des Wegs da ist;
+- ohne Trennung `gesamt` steht (bei Personen und Fläche gehen stattdessen `maenner` und `frauen`
+  zusammen, dann zählt die Summe; Zelte brauchen `gesamt`);
+- mit Trennung `maenner` und `frauen` stehen, beide und ohne `gesamt`; eine leere Gruppe ist
+  ausdrücklich `0`, bei Zelten `{}`;
+- ein Raum genau dann eine `belegung` trägt, wenn getrennt wird.
 
 | Status | `code`          | Wann                                                                                            |
 | ------ | --------------- | ----------------------------------------------------------------------------------------------- |
 | 400    | `invalid_field` | Ein Feld für sich: unbekanntes Feld, unbekannter Richtwert, Zahl außerhalb der Grenzen.         |
 | 422    | `unprocessable` | Die Felder passen nicht zusammen, etwa ein Block eines anderen Wegs oder `gesamt` bei Trennung. |
 
-Der Text nennt das Feld, etwa `raeume[1].laenge_m`. Grenzen: höchstens 200 Räume mit je höchstens
-20 Abzügen, Maße über 0 und höchstens 1000 m, Flächen höchstens 1 000 000 m², Personen je Angabe
-höchstens 1 000 000, Zelte je Typ höchstens 1000, Bezeichnung eines Raums höchstens 80 Zeichen.
+Der Text nennt das Feld, etwa `raeume[1].laenge_m`, auch bei einem falschen Typ. Ein doppelter
+Schlüssel und eine Liste an Stelle eines Objekts sind 400.
+
+Grenzen: höchstens 200 Räume mit je höchstens 5 Abzügen, Maße über 0 und höchstens 1000 m, Flächen
+höchstens 1 000 000 m², Personen je Angabe höchstens 1 000 000, Zelte je Typ höchstens 1000,
+Bezeichnung eines Raums höchstens 80 Zeichen. Daneben gilt wie überall die Body-Grenze von 64 KiB
+(`413 payload_too_large`): 200 Räume mit je 5 Abzügen passen hinein, wenn die Bezeichnungen kurz
+bleiben und das JSON ohne Einrückung geschrieben ist.
 
 ## Referenz-Clients
 

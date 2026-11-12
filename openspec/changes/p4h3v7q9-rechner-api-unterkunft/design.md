@@ -129,7 +129,7 @@ Grenzen als Konstanten in `src/unterkunft/rechner.rs`:
 | Konstante | Wert | Herkunft |
 | --- | --- | --- |
 | `RAEUME_MAX` | 200 | Task, Maske |
-| `ABZUEGE_MAX` | 20 je Raum | neu; die Maske kennt keine |
+| `ABZUEGE_MAX` | 5 je Raum | neu; die Maske kennt keine. Mit 20 passten 200 Räume nicht in 64 KiB (Review) |
 | `MASS_MAX_M` | 1000, Maß > 0 | Task, Maske |
 | `FLAECHE_MAX_M2` | 1 000 000 | Maske (`MASS_MAX_M²`) |
 | Personen | `betreuung::MAX_PERSONEN` (1 000 000) | Entscheidung Ruben, 12.11.2026 |
@@ -145,7 +145,29 @@ hat meist ein Feld nicht gefüllt. Eine leere Raumliste ist dagegen gültig und 
 wie `personen.gesamt = 0`.
 
 Der Fall „ohne Trennung nur `maenner` und `frauen`“ bleibt gültig und ergibt die Summe (Fall
-`personen_ohne_gesamt_summe_aus_gruppen`); nur `gesamt` neben einer Gruppe ist 422.
+`personen_ohne_gesamt_summe_aus_gruppen`). Gruppen kommen immer als Paar: fehlt eine, ist das
+422, mit und ohne Trennung; eine leere Gruppe heißt ausdrücklich 0 (bei Zelten `{}`). Zelte ohne
+Trennung brauchen `gesamt`, weil auch der TS-Kern dort nur `gesamt` liest.
+
+**Nachtrag aus dem Review vor dem PR (12.11.2026):**
+
+- *Feldgrenzen gegen die Body-Grenze.* 200 Räume mit je 20 Abzügen sind als kürzestes JSON 120 KB
+  und endeten mit 413. Keine Feldgrenze kann 64 KiB garantieren (ein Client darf Zahlen beliebig
+  lang schreiben), deshalb zwei Dinge: `ABZUEGE_MAX` 5, sodass die größte Anfrage in üblicher
+  Schreibweise passt (Routentest `groesste_anfrage_passt_in_den_body`), und Spec und Anleitung
+  nennen die 64 KiB als zweite Grenze mit 413. Verworfen: ein eigenes, größeres Body-Limit für
+  die Route; die 64 KiB sind Vertrag der ganzen API.
+- *Paar statt stiller 0.* Die erste Fassung ließ bei Trennung eine Gruppe genügen und zählte die
+  andere als 0. Das widersprach dem Grundsatz dieser Entscheidung. Innerhalb von v1 lässt sich
+  eine Ablehnung später lockern, eine Annahme nicht mehr zurücknehmen; deshalb streng.
+- *Einlesen.* `serde_path_to_error` (über axum schon im Lockfile) liefert den Pfad auch bei
+  falschem Typ und fehlendem Pflichtfeld; `1e999` ist für serde_json ein Syntaxfehler und wird
+  eigens als Zahl am Feld gemeldet. Eine Hülle `Objekt<T>` nimmt nur JSON-Objekte an (ein
+  abgeleitetes `Deserialize` läse ein Struct auch aus einer Liste), die Hülle `Werte` lehnt
+  doppelte Schlüssel ab (`BTreeMap` nähme den letzten).
+- *Negative Null.* Eine leere `f64`-Summe ist in Rust `-0.0`, der TS-Kern summiert ab `0`.
+  `glatt` hängt `+ 0.0` an, die Prüfung normalisiert `-0.0` der Eingabe, und der Paritätstest
+  vergleicht Zahlen Bit für Bit.
 
 Die Werte der Anfrage prüft die vorhandene `unterkunft::pruefe` (Schlüssel, Grenzen, Ganzzahl);
 ihr Text nennt den Schlüssel schon.

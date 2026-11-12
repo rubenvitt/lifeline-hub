@@ -160,7 +160,7 @@
             }
           },
           "400": {
-            "description": "Ein Feld für sich ist ungültig: kein JSON, unbekanntes Feld, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.",
+            "description": "Ein Feld für sich ist ungültig: kein JSON, unbekanntes oder doppeltes Feld, falscher Typ, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.",
             "content": {
               "application/json": {
                 "schema": {
@@ -189,8 +189,18 @@
               }
             }
           },
+          "413": {
+            "description": "Der Body ist größer als 64 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "422": {
-            "description": "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg, `gesamt` neben einer Gruppe oder bei Trennung, Belegung eines Raums passt nicht zur Trennung",
+            "description": "Die Felder passen nicht zusammen: Block fehlt, ist leer oder gehört zu einem anderen Weg; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung",
             "content": {
               "application/json": {
                 "schema": {
@@ -426,7 +436,7 @@
       },
       "FlaecheAngabe": {
         "type": "object",
-        "description": "Fläche in Quadratmetern, aufgeteilt wie `personen`.",
+        "description": "Fläche in Quadratmetern, aufgeteilt wie `personen`: `gesamt_m2` oder `maenner_m2` und\n`frauen_m2` zusammen.",
         "properties": {
           "frauen_m2": {
             "type": [
@@ -578,7 +588,7 @@
       },
       "PersonenAngabe": {
         "type": "object",
-        "description": "Personenzahl: ohne Trennung `gesamt` oder `maenner` und `frauen` (dann zählt die Summe), mit\nTrennung `maenner` und `frauen`.",
+        "description": "Personenzahl: ohne Trennung `gesamt` oder `maenner` und `frauen` zusammen (dann zählt die\nSumme), mit Trennung `maenner` und `frauen`, beide; eine leere Gruppe ist 0.",
         "properties": {
           "frauen": {
             "type": [
@@ -635,7 +645,7 @@
             "items": {
               "$ref": "#/components/schemas/AbzugAngabe"
             },
-            "description": "Höchstens 20 Abzüge."
+            "description": "Höchstens 5 Abzüge."
           },
           "belegung": {
             "oneOf": [
@@ -1003,7 +1013,7 @@
       },
       "UnterkunftRequest": {
         "type": "object",
-        "description": "Body von `POST /api/v1/rechner/unterkunft`: `weg`, `trennung` und genau der Block des Wegs.\nEin unbekanntes Feld ist 400.",
+        "description": "Body von `POST /api/v1/rechner/unterkunft`: `weg`, `trennung` und genau der Block des Wegs.\nEin unbekanntes Feld ist 400. Der ganze Body ist höchstens 64 KiB groß.",
         "required": [
           "weg",
           "trennung"
@@ -1301,7 +1311,7 @@
       },
       "ZelteAngabe": {
         "type": "object",
-        "description": "Zeltbestand: je Gruppe die Anzahl je Zelttyp (`sg20`, `sg30`, `sg40`, `sg50`), höchstens 1000\nje Typ. Ohne Trennung `gesamt`, mit Trennung `maenner` und `frauen`.",
+        "description": "Zeltbestand: je Gruppe die Anzahl je Zelttyp (`sg20`, `sg30`, `sg40`, `sg50`), höchstens 1000\nje Typ. Ohne Trennung `gesamt`, mit Trennung `maenner` und `frauen`, beide; eine Gruppe ohne\nZelte ist `{}`.",
         "properties": {
           "frauen": {
             "type": [

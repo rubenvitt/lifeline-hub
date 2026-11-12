@@ -50,7 +50,7 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
   `ZELTE_JE_TYP_MAX`, `BEZEICHNUNG_MAX`), Personen über `betreuung::MAX_PERSONEN`.
   Prüfen: Unit-Tests (erst rot), je Zeile der Spec ein Fall:
   - 400: unbekanntes Feld `einsatz_id`, unbekannter `weg`, unbekannte `belegung`, unbekannter
-    Zelttyp, negative Zahl, 10,5 Personen, 201 Räume, 21 Abzüge, Maß 0 und 1000,5, Fläche über
+    Zelttyp, negative Zahl, 10,5 Personen, 201 Räume, Abzüge über `ABZUEGE_MAX`, Maß 0 und 1000,5, Fläche über
     1 000 000, 1 000 001 Personen (1 000 000 geht), 1001 Zelte, Bezeichnung mit 81 Zeichen;
     der Text nennt jeweils das Feld.
   - 422: Block fehlt, Block eines anderen Wegs, `gesamt` neben `maenner`, `gesamt` bei Trennung,
@@ -125,11 +125,27 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
   findet nichts mehr; `mise exec -- pnpm -C frontend exec prettier --check src/betreuung/AGENTS.md`
   grün; der Fixture-Test der Oberfläche (`rechnerFixture.test.ts`) grün.
 
-## 6. Gesamtprüfung
+## 6. Befunde des Reviews vor dem PR
 
-- [ ] 6.1 `scripts/check-typ-codegen.sh` grün, `frontend/src/api/openapi.json` und
+- [x] 6.1 Feldgrenzen gegen die Body-Grenze: `ABZUEGE_MAX` 5; Spec und Anleitung nennen die
+  64 KiB als zweite Grenze. Prüfen: `groesste_anfrage_passt_in_den_body` in `tests/rechner_api.rs`
+  (200 Räume mit je 5 Abzügen ergeben 200, eine Anfrage über 64 KiB ergibt 413).
+- [x] 6.2 Keine negative Null: `glatt` hängt `+ 0.0` an, die Prüfung normalisiert `-0.0` der
+  Eingabe, der Paritätstest vergleicht Bit für Bit. Prüfen: `die_antwort_traegt_keine_negative_null`;
+  Probe ohne das `+ 0.0` macht diesen Test und den Fall `personen_null` rot.
+- [x] 6.3 Einlesen: Feldpfad über `serde_path_to_error` auch bei falschem Typ, `1e999` als Zahl am
+  Feld, doppelte Schlüssel und Listen statt Objekten sind 400. Prüfen:
+  `das_einlesen_ist_streng_und_nennt_den_pfad`.
+- [x] 6.4 Gruppen als Paar: eine fehlende Gruppe ist 422, mit und ohne Trennung; Spec, Design und
+  Anleitung nennen alle 422-Fälle, auch Zelte ohne Trennung und den leeren Block. Prüfen:
+  `eine_widerspruechliche_grundlage_ist_422`, `gueltige_randfaelle`.
+- [x] 6.5 Anleitung: Fälle der Fallsammlung mit `richtwerte` und ohne Werte der Organisation.
+
+## 7. Gesamtprüfung
+
+- [ ] 7.1 `scripts/check-typ-codegen.sh` grün, `frontend/src/api/openapi.json` und
   `types.generated.ts` unverändert (keine v1-Typen in `api_doc.rs`).
-- [ ] 6.2 `./scripts/check-all.sh` grün; ersatzweise in der Cloud-Sitzung die Bündel, die dort
+- [ ] 7.2 `./scripts/check-all.sh` grün; ersatzweise in der Cloud-Sitzung die Bündel, die dort
   laufen, und der Rest über die CI des PRs (mit Verweis auf den Lauf abhaken).
 
 ## Workflow follow-up

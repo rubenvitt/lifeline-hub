@@ -100,7 +100,18 @@ fn ein_ungueltiges_feld_ist_400_und_nennt_das_feld() {
         F,
         "trennung",
     );
-    abgelehnt(personen(json!("zehn")), F, "Format");
+    abgelehnt(personen(json!("zehn")), F, "personen.gesamt");
+    abgelehnt(
+        json!({ "weg": "personen", "trennung": "ja", "personen": { "gesamt": 1 } }),
+        F,
+        "trennung",
+    );
+    abgelehnt(
+        raeume(json!([raum(), { "laenge_m": "10", "breite_m": 8 }])),
+        F,
+        "raeume[1].laenge_m",
+    );
+    abgelehnt(raeume(json!([{ "laenge_m": 10 }])), F, "raeume[0]");
 }
 
 #[test]
@@ -198,6 +209,27 @@ fn eine_widerspruechliche_grundlage_ist_422() {
         U,
         "zelte",
     );
+    // Gruppen kommen als Paar: eine fehlende Gruppe zählte sonst still 0.
+    abgelehnt(
+        json!({ "weg": "personen", "trennung": true, "personen": { "maenner": 50 } }),
+        U,
+        "maenner und frauen",
+    );
+    abgelehnt(
+        json!({ "weg": "personen", "trennung": false, "personen": { "maenner": 30 } }),
+        U,
+        "maenner und frauen",
+    );
+    abgelehnt(
+        json!({ "weg": "flaeche", "trennung": false, "flaeche": { "frauen_m2": 30 } }),
+        U,
+        "maenner_m2 und frauen_m2",
+    );
+    abgelehnt(
+        json!({ "weg": "zelte", "trennung": true, "zelte": { "frauen": { "sg20": 1 } } }),
+        U,
+        "maenner und frauen",
+    );
     // Belegung eines Raums gegen die Trennung.
     abgelehnt(
         json!({ "weg": "raeume", "trennung": true, "raeume": [raum()] }),
@@ -237,11 +269,19 @@ fn gueltige_randfaelle() {
     assert_eq!(e.personen, 42);
     assert_eq!(e.gruppen.len(), 1);
     assert_eq!(e.gruppen[0].gruppe, PersonenGruppe::Gesamt);
-    // Mit Trennung genügt eine Gruppe; die andere zählt 0.
-    let e = rechnen(json!({ "weg": "personen", "trennung": true, "personen": { "frauen": 12 } }))
-        .expect("gültig")
-        .ergebnis;
+    // Mit Trennung beide Gruppen; eine leere ist ausdrücklich 0.
+    let e = rechnen(
+        json!({ "weg": "personen", "trennung": true, "personen": { "maenner": 0, "frauen": 12 } }),
+    )
+    .expect("gültig")
+    .ergebnis;
     assert_eq!((e.gruppen[0].personen, e.gruppen[1].personen), (0, 12));
+    let e = rechnen(
+        json!({ "weg": "zelte", "trennung": true, "zelte": { "maenner": {}, "frauen": { "sg50": 1 } } }),
+    )
+    .expect("gültig")
+    .ergebnis;
+    assert_eq!((e.gruppen[0].personen, e.gruppen[1].personen), (0, 14));
     // Keine Räume und keine Personen ergeben 0, keinen Fehler.
     assert_eq!(
         rechnen(raeume(json!([])))
@@ -326,8 +366,94 @@ fn ein_richtwert_der_anfrage_wird_wie_ein_gespeicherter_geprueft() {
         F,
         "zelt_sg30_schlafplaetze",
     );
-    abgelehnt(mit(json!({ "wasser_je_person_l": null })), F, "Format");
+    abgelehnt(
+        mit(json!({ "wasser_je_person_l": null })),
+        F,
+        "richtwerte.wasser_je_person_l",
+    );
     assert!(rechnen(mit(json!({}))).is_ok());
+}
+
+/// Was `serde_json` für sich annähme oder ohne Feld meldete (Befunde des Reviews vor dem PR).
+#[test]
+fn das_einlesen_ist_streng_und_nennt_den_pfad() {
+    #[track_caller]
+    fn abgelehnt_roh(body: &str, feld: &str) {
+        let e = parse_body::<UnterkunftRequest>(body.as_bytes())
+            .and_then(|req| calculate(req, &HashMap::new()))
+            .err()
+            .unwrap_or_else(|| panic!("{body} wurde angenommen"));
+        assert_eq!(e.code, ErrorCode::InvalidField, "{body} → {}", e.message);
+        assert!(
+            e.message.contains(feld),
+            "{body}: „{}“ nennt {feld} nicht",
+            e.message
+        );
+    }
+    // Eine Zahl, die kein f64 fasst, ist gültiges JSON an einem bestimmten Feld.
+    abgelehnt_roh(
+        r#"{"weg":"personen","trennung":false,"personen":{"gesamt":1e999}}"#,
+        "personen.gesamt: Zahl außerhalb des darstellbaren Bereichs",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"raeume","trennung":false,"raeume":[{"laenge_m":1e999,"breite_m":1}]}"#,
+        "raeume[0].laenge_m",
+    );
+    // Ein doppelter Schlüssel: der erste Wert entginge sonst der Prüfung.
+    abgelehnt_roh(
+        r#"{"weg":"personen","trennung":false,"personen":{"gesamt":1},
+            "richtwerte":{"wasser_je_person_l":4,"wasser_je_person_l":15}}"#,
+        "wasser_je_person_l",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"zelte","trennung":false,"zelte":{"gesamt":{"sg50":1001,"sg50":3}}}"#,
+        "sg50",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"personen","trennung":false,"personen":{"gesamt":1,"gesamt":2}}"#,
+        "gesamt",
+    );
+    // Eine Liste an Stelle eines Objekts: serde läse sie sonst in Feldreihenfolge.
+    abgelehnt_roh(
+        r#"{"weg":"personen","trennung":false,"personen":[100,null,null]}"#,
+        "personen",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"raeume","trennung":false,"raeume":[[null,10,8]]}"#,
+        "raeume[0]",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"raeume","trennung":false,"raeume":[{"laenge_m":10,"breite_m":8,"abzuege":[[1,1]]}]}"#,
+        "raeume[0].abzuege[0]",
+    );
+    abgelehnt_roh(r#"["personen",false,{"gesamt":1}]"#, "Format");
+    // Zeichen hinter dem Objekt.
+    abgelehnt_roh(
+        r#"{"weg":"personen","trennung":false,"personen":{"gesamt":1}} {}"#,
+        "JSON",
+    );
+}
+
+/// Die Antwort trägt nie eine negative Null: eine leere `f64`-Summe ist in Rust `-0.0`, und JSON
+/// kennt `-0.0` auch als Eingabe.
+#[test]
+fn die_antwort_traegt_keine_negative_null() {
+    let text = |body: &str| {
+        let req: UnterkunftRequest = parse_body(body.as_bytes()).expect("lesbar");
+        serde_json::to_string(&calculate(req, &HashMap::new()).expect("gültig")).unwrap()
+    };
+    for body in [
+        r#"{"weg":"personen","trennung":false,"personen":{"gesamt":0}}"#,
+        r#"{"weg":"raeume","trennung":false,"raeume":[]}"#,
+        r#"{"weg":"raeume","trennung":false,"raeume":[{"laenge_m":1,"breite_m":1,"abzuege":[{"laenge_m":1.001,"breite_m":1}]}]}"#,
+        r#"{"weg":"flaeche","trennung":false,"flaeche":{"gesamt_m2":-0.0}}"#,
+        r#"{"weg":"flaeche","trennung":false,"flaeche":{"maenner_m2":-0.0,"frauen_m2":-0.0}}"#,
+        r#"{"weg":"personen","trennung":false,"personen":{"gesamt":10},"richtwerte":{"faekalien_je_person_l":-0.0,"zelt_abstand_m":-0.0}}"#,
+    ] {
+        // Als Zahlenwert, also hinter dem Doppelpunkt: der Stand `2026-11-01` enthält auch „-0“.
+        let antwort = text(body);
+        assert!(!antwort.contains(":-0"), "{body} → {antwort}");
+    }
 }
 
 #[test]
@@ -338,12 +464,14 @@ fn kein_json_ist_400() {
     }
 }
 
-/// Erster Unterschied zweier JSON-Bäume als Pfad, Zahlen als `f64` verglichen (`400.0` gleich
-/// `400`), alles andere wörtlich, Listen in ihrer Reihenfolge.
+/// Erster Unterschied zweier JSON-Bäume als Pfad, Zahlen als `f64` Bit für Bit verglichen
+/// (`400.0` gleich `400`, aber `-0.0` ungleich `0`), alles andere wörtlich, Listen in ihrer
+/// Reihenfolge.
 fn unterschied(pfad: &str, ist: &Value, soll: &Value) -> Option<String> {
     match (ist, soll) {
         (Value::Number(a), Value::Number(b)) => {
-            (a.as_f64() != b.as_f64()).then(|| format!("{pfad}: ist {a}, soll {b}"))
+            let bits = |n: &serde_json::Number| n.as_f64().map(f64::to_bits);
+            (bits(a) != bits(b)).then(|| format!("{pfad}: ist {a}, soll {b}"))
         }
         (Value::Array(a), Value::Array(b)) => {
             if a.len() != b.len() {

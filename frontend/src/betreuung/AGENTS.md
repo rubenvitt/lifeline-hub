@@ -85,8 +85,11 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   (`src/public_api/rechner/tests.rs`) schickt jeden Fall durch Einlesen, Prüfung, Rechnung und
   Serialisierung. Ein neues Feld der Rechnung kommt also in beide Kerne, die Fallsammlung und die
   v1-Schemas (nur additiv, `docs/api/public-v1.json`). **Die API prüft streng, die Maske
-  nachsichtig**: erst jedes Feld (400, der Text nennt es), dann der Zusammenhang (422); Grenzen in
-  `src/unterkunft/rechner.rs`, Personen über `betreuung::MAX_PERSONEN`. Wirksam ist Anfrage vor
+  nachsichtig**: erst jedes Feld (400, der Text nennt es, auch bei falschem Typ; doppelte Schlüssel
+  und Listen statt Objekten sind 400), dann der Zusammenhang (422; `maenner` und `frauen` kommen
+  als Paar, eine leere Gruppe heißt 0); Grenzen in `src/unterkunft/rechner.rs`, so gewählt, dass
+  die größte übliche Anfrage in 64 KiB passt, Personen über `betreuung::MAX_PERSONEN`. Die Antwort
+  trägt keine negative Null. Wirksam ist Anfrage vor
   Organisation des Zugangs vor Basis; **ohne Einsatz**: `einsatz_id` ist ein unbekanntes Feld, bis
   es eine Einsatz-Freigabe für Zugänge gibt. Jeder Schlüssel der Basis wird in beiden Kernen
   gelesen (`richtwerte.guard.test.ts`, `der_kern_liest_jeden_schluessel_der_basis`).

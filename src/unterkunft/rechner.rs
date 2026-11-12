@@ -17,8 +17,10 @@ use std::collections::HashMap;
 
 /// Höchstzahl der Räume einer Rechnung.
 pub const RAEUME_MAX: usize = 200;
-/// Höchstzahl der Abzüge eines Raums.
-pub const ABZUEGE_MAX: usize = 20;
+/// Höchstzahl der Abzüge eines Raums. Mit [`RAEUME_MAX`] so gewählt, dass die größte Anfrage in
+/// üblicher Schreibweise in den Body der öffentlichen API passt (64 KiB,
+/// `tests/rechner_api.rs`, `groesste_anfrage_passt_in_den_body`).
+pub const ABZUEGE_MAX: usize = 5;
 /// Größtes Maß eines Raums oder Abzugs in Metern; ein Maß ist größer als 0.
 pub const MASS_MAX_M: f64 = 1000.0;
 /// Größte Fläche einer Angabe in Quadratmetern (`MASS_MAX_M` im Quadrat).
@@ -252,9 +254,11 @@ pub struct Ergebnis {
 }
 
 /// Glättet Gleitkomma-Reste (3,0000000004) vor dem Runden. Alle Größen sind nicht negativ, damit
-/// runden `f64::round` und `Math.round` des TS-Kerns gleich.
+/// runden `f64::round` und `Math.round` des TS-Kerns gleich. Das `+ 0.0` macht aus einer
+/// negativen Null die positive: eine leere `f64`-Summe ist in Rust `-0.0`, der TS-Kern summiert
+/// ab `0`, und `-0.0` stünde so in der Antwort.
 fn glatt(x: f64) -> f64 {
-    (x * 1e6).round() / 1e6
+    (x * 1e6).round() / 1e6 + 0.0
 }
 
 fn auf(x: f64) -> f64 {
@@ -315,7 +319,8 @@ pub fn nutzflaeche(raum: &Raum) -> f64 {
     for a in &raum.abzuege {
         f -= a.laenge_m * a.breite_m;
     }
-    zwei_stellen(f).max(0.0)
+    // `f64::max` lässt bei gemischten Nullen das Vorzeichen offen.
+    zwei_stellen(f).max(0.0) + 0.0
 }
 
 /// Zeltmix für `n` Personen: so wenige Zelte wie möglich, das größte zuerst, der Rest ins
