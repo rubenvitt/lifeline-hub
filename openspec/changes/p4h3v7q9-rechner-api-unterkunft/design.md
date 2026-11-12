@@ -162,12 +162,12 @@ Trennung brauchen `gesamt`, weil auch der TS-Kern dort nur `gesamt` liest.
   eine Ablehnung später lockern, eine Annahme nicht mehr zurücknehmen; deshalb streng.
 - *Einlesen.* `serde_path_to_error` (über axum schon im Lockfile) liefert den Pfad auch bei
   falschem Typ und fehlendem Pflichtfeld; `1e999` ist für serde_json ein Syntaxfehler und wird
-  eigens als Zahl am Feld gemeldet. Eine Hülle `Objekt<T>` nimmt nur JSON-Objekte an (ein
+  eigens als Zahl am Feld gemeldet. Eine Hülle `ObjectOnly<T>` nimmt nur JSON-Objekte an (ein
   abgeleitetes `Deserialize` läse ein Struct auch aus einer Liste), die Hülle `Werte` lehnt
   doppelte Schlüssel ab (`BTreeMap` nähme den letzten).
 - *Negative Null.* Eine leere `f64`-Summe ist in Rust `-0.0`, der TS-Kern summiert ab `0`.
-  `glatt` hängt `+ 0.0` an, die Prüfung normalisiert `-0.0` der Eingabe, und der Paritätstest
-  vergleicht Zahlen Bit für Bit.
+  `glatt` hängt `+ 0.0` an, die Prüfung normalisiert `-0.0` in den Richtwerten der Anfrage, und
+  der Paritätstest vergleicht Zahlen Bit für Bit.
 
 Die Werte der Anfrage prüft die vorhandene `unterkunft::pruefe` (Schlüssel, Grenzen, Ganzzahl);
 ihr Text nennt den Schlüssel schon.

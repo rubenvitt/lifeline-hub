@@ -105,7 +105,7 @@ Zeichen. Daneben gilt die Body-Grenze der öffentlichen API von 64 KiB (413).
 - **THEN** liegt sie unter 64 KiB und wird gerechnet
 
 #### Scenario: Body über 64 KiB
-- **WHEN** eine Anfrage innerhalb der Feldgrenzen größer als 64 KiB ist, etwa durch 80 Zeichen Bezeichnung an jedem von 200 Räumen
+- **WHEN** eine Anfrage innerhalb der Feldgrenzen größer als 64 KiB ist, etwa 200 Räume mit je 5 Abzügen und 80 Zeichen Bezeichnung
 - **THEN** antwortet der Server mit 413 und dem Code `payload_too_large`
 
 #### Scenario: Maß über der Grenze
@@ -119,10 +119,10 @@ Zeichen. Daneben gilt die Body-Grenze der öffentlichen API von 64 KiB (413).
 ### Requirement: Eine widersprüchliche Grundlage ist 422
 
 Der Server MUST mit 422 und dem Code `unprocessable` antworten, wenn die Felder nicht
-zusammenpassen: der Block des Wegs fehlt oder ist leer, ein Block eines anderen Wegs ist dabei,
-`gesamt` steht neben einer Gruppe oder bei Trennung, von `maenner` und `frauen` fehlt eine, Zelte
-ohne Trennung kommen ohne `gesamt`, ein Raum trägt bei Trennung keine `belegung` oder ohne
-Trennung eine. Eine leere Gruppe wird ausdrücklich mit 0 genannt.
+zusammenpassen: der Block des Wegs fehlt oder kommt ohne Angabe, ein Block eines anderen Wegs
+ist dabei, `gesamt` steht neben einer Gruppe oder bei Trennung, von `maenner` und `frauen` fehlt
+eine, Zelte ohne Trennung kommen ohne `gesamt`, die `belegung` eines Raums passt nicht zur
+Trennung. Eine leere Gruppe wird ausdrücklich genannt (0, bei Zelten `{}`).
 
 #### Scenario: Block passt nicht zum Weg
 - **WHEN** die Anfrage `weg` `personen` nennt und zusätzlich `raeume` trägt
@@ -139,6 +139,10 @@ Trennung eine. Eine leere Gruppe wird ausdrücklich mit 0 genannt.
 #### Scenario: Leere Gruppe ausdrücklich
 - **WHEN** die Anfrage mit Trennung `personen.maenner = 50` und `personen.frauen = 0` nennt
 - **THEN** rechnet der Server für 50 Männer und 0 Frauen
+
+#### Scenario: Leere Raumliste
+- **WHEN** die Anfrage den Weg `raeume` mit einer leeren Liste nennt
+- **THEN** rechnet der Server 0 Plätze und antwortet mit 200
 
 #### Scenario: Zelte ohne Trennung nur je Gruppe
 - **WHEN** die Anfrage ohne Trennung `zelte.maenner` und `zelte.frauen` nennt, aber kein `zelte.gesamt`

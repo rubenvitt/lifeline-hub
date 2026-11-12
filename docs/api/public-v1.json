@@ -200,7 +200,7 @@
             }
           },
           "422": {
-            "description": "Die Felder passen nicht zusammen: Block fehlt, ist leer oder gehört zu einem anderen Weg; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung",
+            "description": "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg; `personen`, `flaeche` oder `zelte` ohne Angabe; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung. Eine leere Raumliste ist gültig und ergibt 0 Plätze.",
             "content": {
               "application/json": {
                 "schema": {

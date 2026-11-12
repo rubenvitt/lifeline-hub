@@ -99,12 +99,12 @@ wire_enum! {
 /// einer Liste in Feldreihenfolge (`"personen": [100]`); die strenge Prüfung (design.md D4) will
 /// das nicht, und einmal angenommen wäre es Vertrag.
 #[derive(Debug)]
-pub struct Objekt<T>(pub T);
+pub struct ObjectOnly<T>(pub T);
 
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Objekt<T> {
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for ObjectOnly<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct NurObjekt<T>(std::marker::PhantomData<T>);
-        impl<'de, T: Deserialize<'de>> Visitor<'de> for NurObjekt<T> {
+        struct ObjectVisitor<T>(std::marker::PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for ObjectVisitor<T> {
             type Value = T;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("an object")
@@ -114,8 +114,8 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Objekt<T> {
             }
         }
         deserializer
-            .deserialize_map(NurObjekt(std::marker::PhantomData))
-            .map(Objekt)
+            .deserialize_map(ObjectVisitor(std::marker::PhantomData))
+            .map(ObjectOnly)
     }
 }
 
@@ -126,8 +126,8 @@ pub struct Werte(pub BTreeMap<String, f64>);
 
 impl<'de> Deserialize<'de> for Werte {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct OhneDoppelte;
-        impl<'de> Visitor<'de> for OhneDoppelte {
+        struct UniqueKeysVisitor;
+        impl<'de> Visitor<'de> for UniqueKeysVisitor {
             type Value = Werte;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("an object of numbers")
@@ -144,7 +144,7 @@ impl<'de> Deserialize<'de> for Werte {
                 Ok(Werte(werte))
             }
         }
-        deserializer.deserialize_map(OhneDoppelte)
+        deserializer.deserialize_map(UniqueKeysVisitor)
     }
 }
 
@@ -193,7 +193,7 @@ pub struct RaumAngabe {
     pub breite_m: f64,
     /// Höchstens 5 Abzüge.
     #[schema(value_type = Option<Vec<AbzugAngabe>>)]
-    pub abzuege: Option<Vec<Objekt<AbzugAngabe>>>,
+    pub abzuege: Option<Vec<ObjectOnly<AbzugAngabe>>>,
     /// Bei Trennung Pflicht, ohne Trennung nicht erlaubt.
     #[schema(value_type = Option<RaumBelegung>)]
     pub belegung: Option<String>,
@@ -224,16 +224,16 @@ pub struct UnterkunftRequest {
     pub trennung: bool,
     /// Nur beim Weg `personen`.
     #[schema(value_type = Option<PersonenAngabe>)]
-    pub personen: Option<Objekt<PersonenAngabe>>,
+    pub personen: Option<ObjectOnly<PersonenAngabe>>,
     /// Nur beim Weg `flaeche`.
     #[schema(value_type = Option<FlaecheAngabe>)]
-    pub flaeche: Option<Objekt<FlaecheAngabe>>,
+    pub flaeche: Option<ObjectOnly<FlaecheAngabe>>,
     /// Nur beim Weg `raeume`; höchstens 200 Räume.
     #[schema(value_type = Option<Vec<RaumAngabe>>)]
-    pub raeume: Option<Vec<Objekt<RaumAngabe>>>,
+    pub raeume: Option<Vec<ObjectOnly<RaumAngabe>>>,
     /// Nur beim Weg `zelte`.
     #[schema(value_type = Option<ZelteAngabe>)]
-    pub zelte: Option<Objekt<ZelteAngabe>>,
+    pub zelte: Option<ObjectOnly<ZelteAngabe>>,
     /// Richtwerte nur für diese Anfrage, Schlüssel → Wert. Schlüssel und Grenzen nennt
     /// `GET /api/v1/rechner/unterkunft/richtwerte`.
     #[schema(value_type = Option<HashMap<String, f64>>)]
@@ -407,36 +407,38 @@ fn unprocessable(text: impl Into<String>) -> ApiError {
 /// der Text nennt den Pfad des Felds (`raeume[1].laenge_m`), soweit es einen gibt.
 fn parse_body<T: DeserializeOwned>(body: &[u8]) -> Result<T, ApiError> {
     let mut json = serde_json::Deserializer::from_slice(body);
-    let gelesen: Result<Objekt<T>, _> = serde_path_to_error::deserialize(&mut json);
-    let fehler = match gelesen {
-        Ok(Objekt(wert)) => match json.end() {
+    let parsed: Result<ObjectOnly<T>, _> = serde_path_to_error::deserialize(&mut json);
+    let error = match parsed {
+        Ok(ObjectOnly(wert)) => match json.end() {
             Ok(()) => return Ok(wert),
             Err(_) => return Err(invalid("Anfrage-Body ist kein gültiges JSON.")),
         },
-        Err(fehler) => fehler,
+        Err(error) => error,
     };
-    let pfad = fehler.path().to_string();
-    let ursache = fehler.into_inner();
+    let path = error.path().to_string();
+    let cause = error.into_inner();
     // serde_json stuft eine Zahl wie 1e999 als Syntaxfehler ein; sie ist aber gültiges JSON an
     // einem bestimmten Feld.
-    let zahl_zu_gross = ursache.to_string().starts_with("number out of range");
-    if !zahl_zu_gross && !ursache.is_data() {
+    let is_out_of_range = cause.to_string().starts_with("number out of range");
+    if !is_out_of_range && !cause.is_data() {
         return Err(invalid("Anfrage-Body ist kein gültiges JSON."));
     }
-    let ursache = if zahl_zu_gross {
+    let cause = if is_out_of_range {
         "Zahl außerhalb des darstellbaren Bereichs".to_string()
     } else {
-        ursache.to_string()
+        cause.to_string()
     };
-    Err(invalid(if pfad == "." {
-        format!("Anfrage-Body passt nicht zum erwarteten Format: {ursache}")
+    Err(invalid(if path == "." {
+        format!("Anfrage-Body passt nicht zum erwarteten Format: {cause}")
     } else {
-        format!("Anfrage-Body passt nicht zum erwarteten Format: {pfad}: {ursache}")
+        format!("Anfrage-Body passt nicht zum erwarteten Format: {path}: {cause}")
     }))
 }
 
-/// Macht aus `-0.0` die `0.0`. JSON kennt die negative Null, die Antwort soll sie nicht tragen.
-fn ohne_minus_null(wert: f64) -> f64 {
+/// Macht aus `-0.0` die `0.0`. JSON kennt die negative Null, die Antwort soll sie nicht tragen:
+/// ein Richtwert der Anfrage steht unverändert in `richtwerte`. Was durch die Rechnung geht,
+/// glättet der Kern (`glatt`).
+fn normalize_zero(wert: f64) -> f64 {
     wert + 0.0
 }
 
@@ -474,7 +476,7 @@ fn check_flaeche(feld: &str, wert: f64) -> Result<f64, ApiError> {
             "{feld} darf höchstens {FLAECHE_MAX_M2} m² sein"
         )));
     }
-    Ok(ohne_minus_null(wert))
+    Ok(wert)
 }
 
 /// Zeltbestand einer Gruppe: bekannte Typen, je Typ eine ganze Zahl bis [`ZELTE_JE_TYP_MAX`].
@@ -505,11 +507,13 @@ impl<T> Angaben<T> {
     /// Führt die Angaben nach der Trennung zusammen (422 bei Widerspruch). Gruppen kommen immer
     /// als Paar: fehlte eine, rechnete die API still mit 0. `summe` bildet ohne Trennung aus
     /// `maenner` und `frauen` die Gesamtangabe; fehlt sie, verlangt der Block `gesamt`.
-    /// `nachsilbe` ist der Rest des Feldnamens (`_m2` bei Flächen).
+    /// `nachsilbe` ist der Rest des Feldnamens (`_m2` bei Flächen), `leer` die Schreibweise einer
+    /// leeren Gruppe (`0`, bei Zelten `{}`).
     fn aufteilen(
         self,
         block: &str,
         nachsilbe: &str,
+        leer: &str,
         trennung: bool,
         summe: Option<fn(T, T) -> T>,
     ) -> Result<Aufteilung<T>, ApiError> {
@@ -523,13 +527,13 @@ impl<T> Angaben<T> {
             return match (self.maenner, self.frauen) {
                 (Some(maenner), Some(frauen)) => Ok(Aufteilung::Getrennt { maenner, frauen }),
                 _ => Err(unprocessable(format!(
-                    "{block} braucht bei Trennung {paar}, beide; eine leere Gruppe ist 0"
+                    "{block} braucht bei Trennung {paar}, beide; eine leere Gruppe ist {leer}"
                 ))),
             };
         }
         match (self.gesamt, self.maenner, self.frauen, summe) {
             (Some(gesamt), None, None, _) => Ok(Aufteilung::Gesamt(gesamt)),
-            (Some(_), _, _, _) => Err(unprocessable(format!(
+            (Some(_), _, _, Some(_)) => Err(unprocessable(format!(
                 "{block}.gesamt{nachsilbe} steht neben einer Gruppe; \
                  gesamt{nachsilbe} oder {paar} angeben"
             ))),
@@ -539,8 +543,8 @@ impl<T> Angaben<T> {
             (None, _, _, Some(_)) => Err(unprocessable(format!(
                 "{block} braucht gesamt{nachsilbe} oder {paar}, beide"
             ))),
-            (None, _, _, None) => Err(unprocessable(format!(
-                "{block} braucht ohne Trennung gesamt{nachsilbe}"
+            (_, _, _, None) => Err(unprocessable(format!(
+                "{block} braucht ohne Trennung gesamt{nachsilbe}, ohne {paar}"
             ))),
         }
     }
@@ -555,7 +559,7 @@ struct RaumGeprueft {
     belegung: Option<RaumBelegung>,
 }
 
-fn check_raeume(raeume: Vec<Objekt<RaumAngabe>>) -> Result<Vec<RaumGeprueft>, ApiError> {
+fn check_raeume(raeume: Vec<ObjectOnly<RaumAngabe>>) -> Result<Vec<RaumGeprueft>, ApiError> {
     if raeume.len() > RAEUME_MAX {
         return Err(invalid(format!(
             "raeume darf höchstens {RAEUME_MAX} Räume nennen"
@@ -564,7 +568,7 @@ fn check_raeume(raeume: Vec<Objekt<RaumAngabe>>) -> Result<Vec<RaumGeprueft>, Ap
     raeume
         .into_iter()
         .enumerate()
-        .map(|(i, Objekt(r))| {
+        .map(|(i, ObjectOnly(r))| {
             let feld = format!("raeume[{i}]");
             let bezeichnung = r.bezeichnung.unwrap_or_default().trim().to_string();
             if bezeichnung.chars().count() > BEZEICHNUNG_MAX {
@@ -581,7 +585,7 @@ fn check_raeume(raeume: Vec<Objekt<RaumAngabe>>) -> Result<Vec<RaumGeprueft>, Ap
             let abzuege = abzuege
                 .into_iter()
                 .enumerate()
-                .map(|(j, Objekt(a))| {
+                .map(|(j, ObjectOnly(a))| {
                     Ok(kern::Abzug {
                         laenge_m: check_mass(&format!("{feld}.abzuege[{j}].laenge_m"), a.laenge_m)?,
                         breite_m: check_mass(&format!("{feld}.abzuege[{j}].breite_m"), a.breite_m)?,
@@ -660,7 +664,7 @@ fn check_request(
     let personen_max = MAX_PERSONEN as u64;
     let personen = req
         .personen
-        .map(|Objekt(p)| {
+        .map(|ObjectOnly(p)| {
             let zahl = |feld: &str, wert: Option<f64>| {
                 wert.map(|w| check_anzahl(&format!("personen.{feld}"), w, personen_max))
                     .transpose()
@@ -674,7 +678,7 @@ fn check_request(
         .transpose()?;
     let flaeche = req
         .flaeche
-        .map(|Objekt(f)| {
+        .map(|ObjectOnly(f)| {
             let zahl = |feld: &str, wert: Option<f64>| {
                 wert.map(|w| check_flaeche(&format!("flaeche.{feld}"), w))
                     .transpose()
@@ -689,7 +693,7 @@ fn check_request(
     let raeume = req.raeume.map(check_raeume).transpose()?;
     let zelte = req
         .zelte
-        .map(|Objekt(z)| {
+        .map(|ObjectOnly(z)| {
             let bestand = |feld: &str, wert: Option<Werte>| {
                 wert.map(|Werte(b)| check_zeltbestand(&format!("zelte.{feld}"), &b))
                     .transpose()
@@ -704,7 +708,7 @@ fn check_request(
     let Werte(mut richtwerte) = req.richtwerte.unwrap_or_default();
     for (schluessel, wert) in &mut richtwerte {
         unterkunft::pruefe(schluessel, *wert)?;
-        *wert = ohne_minus_null(*wert);
+        *wert = normalize_zero(*wert);
     }
 
     // 2. Der Zusammenhang: genau der Block des Wegs, passend zur Trennung.
@@ -734,12 +738,14 @@ fn check_request(
         UnterkunftWeg::Personen => kern::Eingabe::Personen(personen.ok_or_else(fehlt)?.aufteilen(
             "personen",
             "",
+            "0",
             trennung,
             Some(|m, f| m + f),
         )?),
         UnterkunftWeg::Flaeche => kern::Eingabe::Flaeche(flaeche.ok_or_else(fehlt)?.aufteilen(
             "flaeche",
             "_m2",
+            "0",
             trennung,
             Some(|m, f| m + f),
         )?),
@@ -751,7 +757,7 @@ fn check_request(
         UnterkunftWeg::Zelte => kern::Eingabe::Zelte(
             zelte
                 .ok_or_else(fehlt)?
-                .aufteilen("zelte", "", trennung, None)?,
+                .aufteilen("zelte", "", "{}", trennung, None)?,
         ),
     };
     Ok((eingabe, richtwerte))
@@ -922,7 +928,7 @@ async fn load_org_werte(state: &AppState, org_id: i64) -> Result<HashMap<String,
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 403, description = "Dem Zugang fehlt das Recht `rechner:use`", body = super::ApiErrorBody),
         (status = 413, description = "Der Body ist größer als 64 KiB", body = super::ApiErrorBody),
-        (status = 422, description = "Die Felder passen nicht zusammen: Block fehlt, ist leer oder gehört zu einem anderen Weg; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung", body = super::ApiErrorBody),
+        (status = 422, description = "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg; `personen`, `flaeche` oder `zelte` ohne Angabe; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung. Eine leere Raumliste ist gültig und ergibt 0 Plätze.", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),

@@ -225,10 +225,23 @@ fn eine_widerspruechliche_grundlage_ist_422() {
         U,
         "maenner_m2 und frauen_m2",
     );
+    // Bei Zelten heißt die leere Gruppe `{}`, nicht 0.
     abgelehnt(
         json!({ "weg": "zelte", "trennung": true, "zelte": { "frauen": { "sg20": 1 } } }),
         U,
-        "maenner und frauen",
+        "eine leere Gruppe ist {}",
+    );
+    abgelehnt(
+        json!({ "weg": "personen", "trennung": true, "personen": { "frauen": 1 } }),
+        U,
+        "eine leere Gruppe ist 0",
+    );
+    // Zelte ohne Trennung: nur `gesamt`, auch nicht neben den Gruppen.
+    abgelehnt(
+        json!({ "weg": "zelte", "trennung": false,
+                "zelte": { "gesamt": { "sg20": 1 }, "maenner": { "sg20": 1 } } }),
+        U,
+        "zelte braucht ohne Trennung gesamt",
     );
     // Belegung eines Raums gegen die Trennung.
     abgelehnt(
@@ -418,15 +431,31 @@ fn das_einlesen_ist_streng_und_nennt_den_pfad() {
         r#"{"weg":"personen","trennung":false,"personen":[100,null,null]}"#,
         "personen",
     );
+    // In voller Feldlänge: eine kürzere Liste lehnte auch das abgeleitete `Deserialize` ab.
     abgelehnt_roh(
-        r#"{"weg":"raeume","trennung":false,"raeume":[[null,10,8]]}"#,
+        r#"{"weg":"raeume","trennung":false,"raeume":[[null,10,8,null,null]]}"#,
         "raeume[0]",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"flaeche","trennung":false,"flaeche":[100,null,null]}"#,
+        "flaeche",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"zelte","trennung":false,"zelte":[{"sg50":1},null,null]}"#,
+        "zelte",
+    );
+    abgelehnt_roh(
+        r#"{"weg":"zelte","trennung":false,"zelte":{"gesamt":[1,2]}}"#,
+        "zelte.gesamt",
     );
     abgelehnt_roh(
         r#"{"weg":"raeume","trennung":false,"raeume":[{"laenge_m":10,"breite_m":8,"abzuege":[[1,1]]}]}"#,
         "raeume[0].abzuege[0]",
     );
-    abgelehnt_roh(r#"["personen",false,{"gesamt":1}]"#, "Format");
+    abgelehnt_roh(
+        r#"["personen",false,{"gesamt":1},null,null,null,null]"#,
+        "expected an object",
+    );
     // Zeichen hinter dem Objekt.
     abgelehnt_roh(
         r#"{"weg":"personen","trennung":false,"personen":{"gesamt":1}} {}"#,
@@ -445,7 +474,7 @@ fn die_antwort_traegt_keine_negative_null() {
     for body in [
         r#"{"weg":"personen","trennung":false,"personen":{"gesamt":0}}"#,
         r#"{"weg":"raeume","trennung":false,"raeume":[]}"#,
-        r#"{"weg":"raeume","trennung":false,"raeume":[{"laenge_m":1,"breite_m":1,"abzuege":[{"laenge_m":1.001,"breite_m":1}]}]}"#,
+        r#"{"weg":"raeume","trennung":false,"raeume":[{"laenge_m":1,"breite_m":1,"abzuege":[{"laenge_m":1.004,"breite_m":1}]}]}"#,
         r#"{"weg":"flaeche","trennung":false,"flaeche":{"gesamt_m2":-0.0}}"#,
         r#"{"weg":"flaeche","trennung":false,"flaeche":{"maenner_m2":-0.0,"frauen_m2":-0.0}}"#,
         r#"{"weg":"personen","trennung":false,"personen":{"gesamt":10},"richtwerte":{"faekalien_je_person_l":-0.0,"zelt_abstand_m":-0.0}}"#,

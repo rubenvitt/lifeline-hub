@@ -230,7 +230,8 @@ Grenzen: höchstens 200 Räume mit je höchstens 5 Abzügen, Maße über 0 und h
 höchstens 1 000 000 m², Personen je Angabe höchstens 1 000 000, Zelte je Typ höchstens 1000,
 Bezeichnung eines Raums höchstens 80 Zeichen. Daneben gilt wie überall die Body-Grenze von 64 KiB
 (`413 payload_too_large`): 200 Räume mit je 5 Abzügen passen hinein, wenn die Bezeichnungen kurz
-bleiben und das JSON ohne Einrückung geschrieben ist.
+bleiben, die Maße höchstens zwei Nachkommastellen tragen und das JSON ohne Einrückung geschrieben
+ist. Eine leere Raumliste ist gültig und ergibt 0 Plätze.
 
 ## Referenz-Clients
 

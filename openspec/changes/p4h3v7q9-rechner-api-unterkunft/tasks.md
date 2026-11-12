@@ -131,8 +131,10 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
   64 KiB als zweite Grenze. Prüfen: `groesste_anfrage_passt_in_den_body` in `tests/rechner_api.rs`
   (200 Räume mit je 5 Abzügen ergeben 200, eine Anfrage über 64 KiB ergibt 413).
 - [x] 6.2 Keine negative Null: `glatt` hängt `+ 0.0` an, die Prüfung normalisiert `-0.0` der
-  Eingabe, der Paritätstest vergleicht Bit für Bit. Prüfen: `die_antwort_traegt_keine_negative_null`;
-  Probe ohne das `+ 0.0` macht diesen Test und den Fall `personen_null` rot.
+  Richtwerte der Anfrage, der Paritätstest vergleicht Bit für Bit. Prüfen:
+  `die_antwort_traegt_keine_negative_null`; Probe ohne das `+ 0.0` in `glatt` macht diesen Test
+  und den Fall `personen_null` rot. Das `+ 0.0` in `nutzflaeche` sichert nur gegen das bei
+  gemischten Nullen offene Vorzeichen von `f64::max`; auf x86-64 lässt es sich nicht rot proben.
 - [x] 6.3 Einlesen: Feldpfad über `serde_path_to_error` auch bei falschem Typ, `1e999` als Zahl am
   Feld, doppelte Schlüssel und Listen statt Objekten sind 400. Prüfen:
   `das_einlesen_ist_streng_und_nennt_den_pfad`.
@@ -140,6 +142,11 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
   Anleitung nennen alle 422-Fälle, auch Zelte ohne Trennung und den leeren Block. Prüfen:
   `eine_widerspruechliche_grundlage_ist_422`, `gueltige_randfaelle`.
 - [x] 6.5 Anleitung: Fälle der Fallsammlung mit `richtwerte` und ohne Werte der Organisation.
+- [x] 6.6 Nachreview des Fix-Commits: Listen-Fälle in voller Feldlänge und für jeden Block, Hinweis
+  zur leeren Gruppe je Block (`0` oder `{}`), „Block ohne Angabe“ statt „leer“ (eine leere
+  Raumliste ist gültig), Body-Grenze mit „zwei Nachkommastellen“, technische Bezeichner englisch
+  (`ObjectOnly`, `normalize_zero`). Prüfen: `das_einlesen_ist_streng_und_nennt_den_pfad`,
+  `eine_widerspruechliche_grundlage_ist_422`.
 
 ## 7. Gesamtprüfung
 
