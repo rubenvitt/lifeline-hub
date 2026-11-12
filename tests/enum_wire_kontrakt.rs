@@ -699,7 +699,7 @@ fn serde_wire_gleich_as_str() {
         InstanzGekoppelt => "instanz_gekoppelt",
     });
     // Ausgangsereignisse (LLH-1655): Wire der öffentlichen API und DB-CHECK in
-    // `0337_maschine_ereignis.sql` (Abgleich in `tests/public_api_events.rs`).
+    // `0338_maschine_ereignis.sql` (Abgleich in `tests/public_api_events.rs`).
     enum_wire!(lifeline_hub::public_api::events::EventType {
         EinsatzCreated => "einsatz.created",
         EinsatzUpdated => "einsatz.updated",

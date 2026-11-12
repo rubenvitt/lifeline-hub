@@ -3531,7 +3531,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
-    // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, migrations/0337) ----------
+    // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
     // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
     // der Purge-Lauf löscht nach sieben Tagen, der Trigger am Einsatz mit dem Einsatz.
     TabellenRegel {
