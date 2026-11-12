@@ -71,6 +71,21 @@ impl MachineClient {
     }
 }
 
+/// Höchstlänge einer `jti`; sie landet in `maschine_jti`.
+pub const JTI_MAX: usize = 64;
+
+/// Liest den `kid` aus dem Kopf eines Tokens, ohne `alg` und `typ` zu prüfen. Nur, um einem
+/// bekannten Zugang den Grund einer Ablehnung zuzuordnen; geprüft wird damit nichts.
+fn kid_ohne_pruefung(token: &str) -> Option<String> {
+    let teil = token.split('.').next()?;
+    if teil.len() > 1024 {
+        return None;
+    }
+    let bytes = crate::instanz::basis32::parse_b64(teil)?;
+    let wert: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    wert.get("kid")?.as_str().map(str::to_string)
+}
+
 fn unauthorized() -> Response {
     ApiError::new(ErrorCode::Unauthorized, "Anmeldung fehlgeschlagen").into_response()
 }
@@ -175,22 +190,31 @@ impl FromRequest<AppState> for MachineClient {
         else {
             return Err(unauthorized());
         };
-        let Ok(kopf) = signatur::parse_kopf(&token, MACHINE.typ_anfrage) else {
-            return Err(unauthorized());
+        // Bei falschem `alg` oder `typ` den `kid` trotzdem lesen: ein bekannter Zugang bekommt
+        // dann seinen Grund („form“), ein unbekannter zählt wie jeder unbekannte.
+        let (kid, kopf_gilt) = match signatur::parse_kopf(&token, MACHINE.typ_anfrage) {
+            Ok(kopf) => (kopf.kid, true),
+            Err(_) => match kid_ohne_pruefung(&token) {
+                Some(kid) => (kid, false),
+                None => return Err(unauthorized()),
+            },
         };
 
         // 3. Zugang.
         let geladen = {
             let mut conn = state.pool.acquire().await.map_err(intern)?;
-            zugang::laden(&mut conn, &kopf.kid).await.map_err(intern)?
+            zugang::laden(&mut conn, &kid).await.map_err(intern)?
         };
         let Some(zugang) = geladen else {
             if let Some(ip) = peer_ip {
                 rate_limit::maschine::fehlversuch(ip);
             }
-            tracing::debug!(kid = %kopf.kid, "Anfrage mit unbekanntem Maschinenzugang");
+            tracing::debug!(kid = %kid, "Anfrage mit unbekanntem Maschinenzugang");
             return Err(unauthorized());
         };
+        if !kopf_gilt {
+            return Err(ablehnen(state, &zugang, AblehnungGrund::Form, None).await);
+        }
 
         // 4. Body, höchstens bis zur Grenze der öffentlichen API.
         let body = axum::body::to_bytes(body, crate::app::PUBLIC_API_BODY_MAX)
@@ -227,6 +251,11 @@ impl FromRequest<AppState> for MachineClient {
                 return Err(ablehnen(state, &zugang, grund, a.abweichung_s).await);
             }
         };
+
+        // Die `jti` wird gespeichert: höchstens 64 Zeichen (Referenz-Clients: 22).
+        if claims.jti.is_empty() || claims.jti.len() > JTI_MAX {
+            return Err(ablehnen(state, &zugang, AblehnungGrund::Form, None).await);
+        }
 
         // 6. Zustand: aktiv, nicht abgelaufen, Org nicht meldend gekoppelt.
         let jetzt_text = crate::zeit::jetzt();

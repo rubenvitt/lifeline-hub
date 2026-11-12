@@ -45,7 +45,11 @@ pub struct AnbindungAnzeige {
     /// Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert.
     pub fingerabdruck_neu: Option<String>,
     pub angelegt_at: String,
+    /// Stand für das optimistische Lock beim Bearbeiten (`basis_geaendert_at`).
+    pub geaendert_at: String,
     pub widerrufen_at: Option<String>,
+    /// Anzeigename des Admins, der widerrufen hat.
+    pub widerrufen_von_name: Option<String>,
     pub zuletzt_genutzt_at: Option<String>,
     pub letzte_ablehnung: Option<AnbindungAblehnung>,
 }
@@ -68,7 +72,9 @@ impl AnbindungAnzeige {
             fingerabdruck: fingerabdruck_von(z.schluessel.as_deref()),
             fingerabdruck_neu: fingerabdruck_von(z.schluessel_neu.as_deref()),
             angelegt_at: z.angelegt_at.clone(),
+            geaendert_at: z.stand().to_string(),
             widerrufen_at: z.widerrufen_at.clone(),
+            widerrufen_von_name: z.widerrufen_von_name.clone(),
             zuletzt_genutzt_at: z.zuletzt_genutzt_at.clone(),
             letzte_ablehnung: match (&z.letzte_ablehnung_at, z.letzte_ablehnung_grund) {
                 (Some(at), Some(grund)) => Some(AnbindungAblehnung {
@@ -111,25 +117,29 @@ pub struct AnbindungEingabe {
     pub gueltig_bis: Option<String>,
 }
 
-/// Prüft die Eingabe: Name 1..=80 Zeichen, mindestens ein bekannter Scope, „gültig bis“ in der
-/// Zukunft (UTC, `zeit::FORMAT` oder ohne Sekunden).
-fn check_eingabe(
-    e: &AnbindungEingabe,
-    jetzt: &str,
-) -> Result<(String, Vec<Scope>, Option<String>), AppError> {
-    let name = crate::routes::support::pflicht_max(&e.name, "name", NAME_MAX)?;
-    if e.scopes.len() > 32 {
+fn check_name(roh: &str) -> Result<String, AppError> {
+    crate::routes::support::pflicht_max(roh, "name", NAME_MAX)
+}
+
+/// Mindestens ein bekannter Scope, sortiert und ohne Dopplung.
+fn check_scopes(roh: &[String]) -> Result<Vec<Scope>, AppError> {
+    if roh.len() > 32 {
         return Err(AppError::Validation("scopes: zu viele Einträge".into()));
     }
-    let scopes = parse_scopes(e.scopes.iter().map(String::as_str))
+    let scopes = parse_scopes(roh.iter().map(String::as_str))
         .map_err(|s| AppError::Validation(format!("scopes: unbekannter Wert „{s}“")))?;
     if scopes.is_empty() {
         return Err(AppError::Validation(
             "scopes: mindestens ein Recht ist nötig".into(),
         ));
     }
-    let gueltig_bis = match e.gueltig_bis.as_deref().map(str::trim) {
-        None | Some("") => None,
+    Ok(scopes)
+}
+
+/// „gültig bis“ in der Zukunft (UTC, `zeit::FORMAT` oder ohne Sekunden); leer heißt unbegrenzt.
+fn check_gueltig_bis(roh: Option<&str>, jetzt: &str) -> Result<Option<String>, AppError> {
+    match roh.map(str::trim) {
+        None | Some("") => Ok(None),
         Some(roh) => {
             let normal = crate::zeit::normalisiere_eingabe(roh).ok_or_else(|| {
                 AppError::Validation("gueltig_bis: Zeitpunkt nicht lesbar".into())
@@ -140,10 +150,41 @@ fn check_eingabe(
                     "gueltig_bis: Zeitpunkt liegt in der Vergangenheit".into(),
                 ));
             }
-            Some(normal)
+            Ok(Some(normal))
         }
-    };
-    Ok((name, scopes, gueltig_bis))
+    }
+}
+
+/// Prüft die Eingabe des Anlegens: Name 1..=80 Zeichen, mindestens ein bekannter Scope, „gültig
+/// bis“ in der Zukunft.
+fn check_eingabe(
+    e: &AnbindungEingabe,
+    jetzt: &str,
+) -> Result<(String, Vec<Scope>, Option<String>), AppError> {
+    Ok((
+        check_name(&e.name)?,
+        check_scopes(&e.scopes)?,
+        check_gueltig_bis(e.gueltig_bis.as_deref(), jetzt)?,
+    ))
+}
+
+/// Body von `PATCH /api/admin/anbindungen/{id}`: nur geänderte Felder (LLH-1139).
+#[derive(Debug, Deserialize)]
+pub struct AnbindungAenderung {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub scopes: Option<Vec<String>>,
+    /// Tri-State: fehlt = unverändert, `null` = unbegrenzt.
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub gueltig_bis: Option<Option<String>>,
+    /// Optimistisches Lock: `geaendert_at` beim Öffnen. Weicht er ab → 409; fehlt er („Meine
+    /// Änderung übernehmen“ nach der Rückfrage), wird ohne Vergleich geschrieben.
+    #[serde(default)]
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// Text für den gekoppelten ELW (design.md D10), `None` wenn Anbindungen hier angenommen werden.
@@ -220,7 +261,7 @@ pub async fn anlegen(
     let jetzt = crate::zeit::jetzt();
     let (name, scopes, gueltig_bis) = check_eingabe(&body, &jetzt)?;
     let (org_id, von) = (admin.org_id, admin.id);
-    let (id, code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
+    let (z, code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
         if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
             return Err(AppError::Conflict(grund));
         }
@@ -235,7 +276,10 @@ pub async fn anlegen(
         )
         .await?;
         let (code, laeuft_ab_at) = neuer_code(&mut *conn, &id, von, &jetzt).await?;
-        Ok((id, code, laeuft_ab_at))
+        let z = zugang::laden(&mut *conn, &id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Maschinenzugang verschwunden".into()))?;
+        Ok((z, code, laeuft_ab_at))
     })?;
     admin_audit::schreibe(
         &state.pool,
@@ -244,7 +288,7 @@ pub async fn anlegen(
             akteur: &admin,
             ziel: Ziel::Maschinenzugang(&name),
             angaben: Some(ZugangsAngaben {
-                zugang_id: Some(id.clone()),
+                zugang_id: Some(z.id.clone()),
                 scopes: Some(scopes_wire(&scopes)),
                 ..Default::default()
             }),
@@ -252,10 +296,6 @@ pub async fn anlegen(
         },
     )
     .await;
-    let mut conn = state.pool.acquire().await?;
-    let z = zugang::laden(&mut conn, &id)
-        .await?
-        .ok_or_else(|| AppError::Internal("Maschinenzugang verschwunden".into()))?;
     Ok((
         StatusCode::CREATED,
         Json(AnbindungCode {
@@ -266,29 +306,32 @@ pub async fn anlegen(
     ))
 }
 
-/// PATCH /api/admin/anbindungen/{id} — Name, Scopes und „gültig bis“ ersetzen. Ein widerrufener
-/// Zugang: 409. Admin-Spur `maschinenzugang_geaendert` nur bei einer Änderung.
+/// PATCH /api/admin/anbindungen/{id} — nur die gesendeten Felder (LLH-1139); Konflikt über
+/// `basis_geaendert_at` (409). Ein widerrufener Zugang: 409. Admin-Spur
+/// `maschinenzugang_geaendert` nur bei einer wirksamen Änderung.
 pub async fn aendern(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<String>,
-    JsonBody(body): JsonBody<AnbindungEingabe>,
+    JsonBody(body): JsonBody<AnbindungAenderung>,
 ) -> Result<Json<AnbindungAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
-    let (name, scopes, gueltig_bis) = check_eingabe(&body, &jetzt)?;
+    let aenderung = zugang::Aenderung {
+        name: body.name.as_deref().map(check_name).transpose()?,
+        scopes: body.scopes.as_deref().map(check_scopes).transpose()?,
+        gueltig_bis: body
+            .gueltig_bis
+            .as_ref()
+            .map(|g| check_gueltig_bis(g.as_deref(), &jetzt))
+            .transpose()?,
+        basis: body.basis_geaendert_at,
+    };
     let org_id = admin.org_id;
     let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
-        zugang::aendern(
-            &mut *conn,
-            org_id,
-            &id,
-            &name,
-            &scopes,
-            gueltig_bis.as_deref(),
-        )
-        .await?
-        .ok_or(AppError::NotFound)
+        zugang::aendern(&mut *conn, org_id, &id, &aenderung, &jetzt)
+            .await?
+            .ok_or(AppError::NotFound)
     })?;
     if vorher != nachher {
         admin_audit::schreibe(
@@ -310,6 +353,22 @@ pub async fn aendern(
         .await;
     }
     Ok(Json(AnbindungAnzeige::aus(&nachher, &jetzt)))
+}
+
+/// GET /api/admin/anbindungen/{id} — ein Zugang der eigenen Org (Ansicht, Deeplink).
+pub async fn laden(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(id): PfadParam<String>,
+) -> Result<Json<AnbindungAnzeige>, AppError> {
+    if !benutzer.darf_admin_bereich() {
+        return Err(AppError::Forbidden);
+    }
+    let mut conn = state.pool.acquire().await?;
+    let z = zugang::laden_in_org(&mut conn, benutzer.org_id, &id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(AnbindungAnzeige::aus(&z, &crate::zeit::jetzt())))
 }
 
 /// POST /api/admin/anbindungen/{id}/code — neuer Einmal-Code für einen bestehenden Zugang
@@ -373,18 +432,17 @@ pub async fn widerrufen(
 ) -> Result<Json<AnbindungAnzeige>, AppError> {
     let jetzt = crate::zeit::jetzt();
     let (org_id, von) = (admin.org_id, admin.id);
-    let wirkung = crate::write_retry!(&state.pool, |conn| {
-        zugang::widerrufen(&mut *conn, org_id, &id, Some(von), &jetzt)
+    // Der Stand für Antwort und Spur kommt aus derselben Transaktion: scheiterte ein Lesen nach
+    // dem Commit, gälte der Widerruf ohne Spureintrag (Prüfliste, Atomarität).
+    let (wirkung, z) = crate::write_retry!(&state.pool, |conn| {
+        let wirkung = zugang::widerrufen(&mut *conn, org_id, &id, Some(von), &jetzt)
             .await?
-            .ok_or(AppError::NotFound)
+            .ok_or(AppError::NotFound)?;
+        let z = zugang::laden(&mut *conn, &id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        Ok((wirkung, z))
     })?;
-    let z = {
-        let mut conn = state.pool.acquire().await?;
-        zugang::laden(&mut conn, &id)
-            .await?
-            .ok_or(AppError::NotFound)?
-    };
-    // Die Verbindung ist zurück im Pool: die Admin-Spur braucht eine eigene.
     if wirkung {
         admin_audit::schreibe(
             &state.pool,

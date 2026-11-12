@@ -18,6 +18,9 @@ CREATE TABLE maschinenzugang (
     schluessel_neu                TEXT,
     angelegt_at                   TEXT    NOT NULL DEFAULT (datetime('now')),
     angelegt_von                  INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
+    -- Letzte Änderung durch einen Admin (Ändern, Widerruf); Basis des optimistischen Locks
+    -- (`basis_geaendert_at`), ohne Änderung gilt `angelegt_at`.
+    geaendert_at                  TEXT,
     widerrufen_at                 TEXT,
     widerrufen_von                INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     -- höchstens minütlich fortgeschrieben

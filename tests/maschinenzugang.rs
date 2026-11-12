@@ -1034,35 +1034,35 @@ async fn drosselung_je_zugang_ohne_verbrauchte_jti() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let ip = "198.51.100.100";
     let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(12), ip).await;
-    for i in 0..60 {
-        let (s, _, v) = signiert(
-            &app,
-            &cred,
-            "GET",
-            "/api/v1/me",
-            jetzt(),
-            &format!("d{i}"),
-            ip,
-        )
-        .await;
+    // Senden bis zur ersten 429: mindestens 60 gehen durch (der Vorrat), und unter Last füllt sich
+    // höchstens einer je Sekunde nach.
+    let mut ok = 0;
+    let mut gedrosselt = None;
+    for i in 0..200 {
+        let iat = jetzt();
+        let jti = format!("d{i}");
+        let (s, h, v) = signiert(&app, &cred, "GET", "/api/v1/me", iat, &jti, ip).await;
+        if s == StatusCode::TOO_MANY_REQUESTS {
+            assert_eq!(v["code"], "rate_limited");
+            let retry: u64 = h
+                .get("retry-after")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .parse()
+                .unwrap();
+            assert!(retry >= 1);
+            gedrosselt = Some((iat, jti));
+            break;
+        }
         assert_eq!(s, StatusCode::OK, "{i}: {v}");
+        ok += 1;
     }
-    let iat = jetzt();
-    let (s, h, v) = signiert(&app, &cred, "GET", "/api/v1/me", iat, "d60", ip).await;
-    assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(v["code"], "rate_limited");
-    assert!(
-        h.get("retry-after")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
-            >= 1
-    );
+    assert!(ok >= 60, "{ok}");
+    let (iat, jti) = gedrosselt.expect("nach dem Vorrat kommt 429");
     // Dieselbe `jti` nach der Wartezeit: nicht als Wiederholung abgewiesen.
     tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
-    let (s, _, _) = signiert(&app, &cred, "GET", "/api/v1/me", iat, "d60", ip).await;
+    let (s, _, _) = signiert(&app, &cred, "GET", "/api/v1/me", iat, &jti, ip).await;
     assert_eq!(s, StatusCode::OK);
 }
 
@@ -1145,4 +1145,254 @@ async fn kommando_loest_ein_und_ruft_me_gegen_einen_echten_server() {
         .unwrap();
     assert_eq!(me["zugang_id"], json!(cred.zugang_id));
     assert_eq!(me["name"], "CLI");
+}
+
+// ── Befunde des Reviews vor dem PR ──────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn aendern_nur_gesendete_felder_mit_konfliktpruefung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "A", "scopes": ["lage:read"] }),
+    )
+    .await;
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    let stand = v["zugang"]["geaendert_at"].as_str().unwrap().to_string();
+
+    // Admin B entzieht ein Recht; Admin A ändert danach mit dem alten Stand nur den Namen → 409,
+    // statt das Recht still zurückzusetzen.
+    let (s, b) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &admin,
+        Some(&json!({ "scopes": ["events:read"], "basis_geaendert_at": stand })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    sqlx::query("UPDATE maschinenzugang SET geaendert_at = '2026-01-01 00:00:00' WHERE id = ?")
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &admin,
+        Some(&json!({ "name": "A neu", "basis_geaendert_at": stand })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    // Nur der Name, mit aktuellem Stand: Scopes bleiben, wie sie sind.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &admin,
+        Some(&json!({ "name": "A neu", "basis_geaendert_at": "2026-01-01 00:00:00" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        (v["name"].as_str(), &v["scopes"]),
+        (Some("A neu"), &json!(["events:read"]))
+    );
+}
+
+#[tokio::test]
+async fn abgelaufener_zugang_laesst_sich_umbenennen_und_verlaengern() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "alt", "scopes": ["lage:read"] }),
+    )
+    .await;
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    sqlx::query("UPDATE maschinenzugang SET gueltig_bis = '2000-01-01 00:00:00' WHERE id = ?")
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &admin,
+        Some(&json!({ "name": "neu" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["is_abgelaufen"], true);
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &admin,
+        Some(&json!({ "gueltig_bis": null })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["gueltig_bis"].is_null());
+    assert_eq!(v["is_abgelaufen"], false);
+    // Ansicht per Deeplink.
+    let (s, v) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}"), &admin, None).await;
+    assert_eq!((s, v["name"].as_str()), (StatusCode::OK, Some("neu")));
+}
+
+#[tokio::test]
+async fn gescheiterte_einloesungen_fuellen_den_maschinenzaehler() {
+    let (app, _pool) = setup_mit_pool().await;
+    let ip = "198.51.100.120";
+    for i in 0..10u8 {
+        let (s, _) = einloesen(&app, "ZZZZ-ZZZZ-ZZZZ-ZZZZ", &schluessel(40 + i), ip).await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED);
+    }
+    let (s, _) = einloesen(&app, "ZZZZ-ZZZZ-ZZZZ-ZZZZ", &schluessel(60), ip).await;
+    assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
+    assert!(!lifeline_hub::auth::rate_limit::ist_gesperrt(
+        ip.parse().unwrap()
+    ));
+}
+
+#[tokio::test]
+async fn einloesen_am_gekoppelten_elw_laesst_den_code_offen_und_nennt_den_grund() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "x", "scopes": ["lage:read"] }),
+    )
+    .await;
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    let code = v["code"].as_str().unwrap().to_string();
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let k: i64 = sqlx::query_scalar(
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, gegenueber_adresse, zustand) VALUES ('hub-3', 'X', 'Hub', 'meldet_sich', \
+         'https://hub.example', 'aktiv') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
+         VALUES (?, ?, 'hub-3/1', 'Kreis')",
+    )
+    .bind(k)
+    .bind(org)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let ip = "198.51.100.130";
+    assert_eq!(
+        einloesen(&app, &code, &schluessel(70), ip).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let z = zugang_zeile(&app, &admin, &id).await;
+    assert_eq!(z["letzte_ablehnung"]["grund"], "instanz_gekoppelt");
+    // Endet die Kopplung, ist der Code noch einlösbar.
+    sqlx::query("UPDATE instanz_kopplung SET zustand = 'widerrufen' WHERE id = ?")
+        .bind(k)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        einloesen(&app, &code, &schluessel(70), ip).await.0,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn zu_lange_jti_und_falscher_typ_eines_bekannten_zugangs() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let ip = "198.51.100.140";
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(71), ip).await;
+    let lang = "x".repeat(65);
+    assert_eq!(
+        signiert(&app, &cred, "GET", "/api/v1/me", jetzt(), &lang, ip)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let z = zugang_zeile(&app, &admin, &cred.zugang_id).await;
+    assert_eq!(z["letzte_ablehnung"]["grund"], "form");
+
+    // Kopf mit fremdem `typ`, aber bekanntem `kid`.
+    let auth = cred
+        .sign_request("GET", "/api/v1/me", b"", jetzt(), "t1")
+        .unwrap();
+    let jws = auth.strip_prefix("Machine ").unwrap();
+    let rest = &jws[jws.find('.').unwrap()..];
+    let kopf = lifeline_machine_client::b64(
+        format!(
+            r#"{{"alg":"EdDSA","typ":"lifeline-instanz+jwt","kid":"{}"}}"#,
+            cred.zugang_id
+        )
+        .as_bytes(),
+    );
+    sqlx::query("UPDATE maschinenzugang SET letzte_ablehnung_grund = NULL WHERE id = ?")
+        .bind(&cred.zugang_id)
+        .execute(&_pool)
+        .await
+        .unwrap();
+    let (s, _, _) = senden(
+        &app,
+        "GET",
+        "/api/v1/me",
+        Some(("authorization", format!("Machine {kopf}{rest}"))),
+        vec![],
+        ip,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let z = zugang_zeile(&app, &admin, &cred.zugang_id).await;
+    assert_eq!(z["letzte_ablehnung"]["grund"], "form");
+}
+
+/// design.md D8: Jede Route mit Sicherheitsschema `machine` im v1-Dokument trägt eine
+/// Scope-Angabe; ohne sie endete ein gültig signierter Aufruf mit 500.
+#[tokio::test]
+async fn jede_route_mit_maschinenanmeldung_traegt_eine_scope_angabe() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let ip = "198.51.100.150";
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(72), ip).await;
+    let dok = serde_json::to_value(lifeline_hub::public_api::openapi()).unwrap();
+    let mut geprueft = 0;
+    for (pfad, ops) in dok["paths"].as_object().unwrap() {
+        for (methode, op) in ops.as_object().unwrap() {
+            let maschine = op["security"]
+                .as_array()
+                .is_some_and(|l| l.iter().any(|s| s.get("machine").is_some()));
+            if !maschine {
+                continue;
+            }
+            let konkret = pfad.replace('{', "").replace('}', "");
+            let m = methode.to_uppercase();
+            let (s, _, v) = signiert(
+                &app,
+                &cred,
+                &m,
+                &konkret,
+                jetzt(),
+                &format!("g{geprueft}"),
+                ip,
+            )
+            .await;
+            assert_ne!(s, StatusCode::INTERNAL_SERVER_ERROR, "{m} {pfad}: {v}");
+            geprueft += 1;
+        }
+    }
+    assert!(geprueft >= 1, "mindestens GET /api/v1/me");
 }

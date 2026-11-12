@@ -120,6 +120,7 @@ fn unauthorized() -> ApiError {
         (status = 400, description = "Schlüssel unlesbar", body = super::ApiErrorBody),
         (status = 401, description = "Code unbekannt, abgelaufen, schon eingelöst oder Prüfwert falsch", body = super::ApiErrorBody),
         (status = 429, description = "Zu viele gescheiterte Einlösungen von dieser Quelle", body = super::ApiErrorBody),
+        (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),
 )]
 pub async fn redeem(
@@ -169,21 +170,43 @@ pub async fn redeem(
     let lookup = body.lookup.clone();
     let schluessel = pk.x.clone();
     let zugang_id = code.zugang_id.clone();
+    /// Was das Einlösen ergab.
+    enum Einloesung {
+        Gebunden(zugang::Zugang, Option<String>),
+        /// Ein anderer hat den Code gerade eingelöst.
+        Verbraucht,
+        /// Die Org meldet sich bei einem Hub (Konzept D8): der Code bleibt offen.
+        AmElw(zugang::Zugang),
+    }
     let ergebnis = crate::write_retry!(&state.pool, |conn| {
-        if !zugang::consume_code(&mut *conn, &lookup, &jetzt).await? {
-            return Ok(None);
-        }
         let z = zugang::laden(&mut *conn, &zugang_id)
             .await?
             .ok_or(crate::error::AppError::NotFound)?;
+        // Vor dem Verbrauch: am gekoppelten ELW bleibt der Code einlösbar, falls die Kopplung
+        // endet, und der Grund steht am Zugang.
         if zugang::hub_fuer_org(&mut *conn, z.org_id).await?.is_some() {
-            return Ok(None);
+            return Ok(Einloesung::AmElw(z));
+        }
+        if !zugang::consume_code(&mut *conn, &lookup, &jetzt).await? {
+            return Ok(Einloesung::Verbraucht);
         }
         let vorher = zugang::schluessel_binden(&mut *conn, &zugang_id, &schluessel).await?;
-        Ok(Some((z, vorher)))
+        Ok(Einloesung::Gebunden(z, vorher))
     })?;
-    let Some((z, vorher)) = ergebnis else {
-        return Err(unauthorized());
+    let (z, vorher) = match ergebnis {
+        Einloesung::Gebunden(z, vorher) => (z, vorher),
+        Einloesung::Verbraucht => return Err(unauthorized()),
+        Einloesung::AmElw(z) => {
+            zugang::ablehnung_festhalten(
+                &state.pool,
+                &z.id,
+                super::scope::AblehnungGrund::InstanzGekoppelt,
+                None,
+                &jetzt,
+            )
+            .await?;
+            return Err(unauthorized());
+        }
     };
 
     let fp = |b64: &str| parse_b64(b64).map(|b| fingerabdruck(&b));
@@ -237,6 +260,7 @@ pub async fn redeem(
         (status = 200, description = "Angemeldet; Antwort signiert im Kopf `Lifeline-Signature`", body = MeResponse),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
+        (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),
 )]
 pub async fn me(
@@ -272,7 +296,10 @@ pub async fn me(
     path = "/api/v1/instanz/jwks.json",
     tag = "Anmeldung",
     operation_id = "get_instanz_jwks",
-    responses((status = 200, description = "JWKS mit dem Ed25519-Schlüssel der Instanz", body = Jwks)),
+    responses(
+        (status = 200, description = "JWKS mit dem Ed25519-Schlüssel der Instanz", body = Jwks),
+        (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
+    ),
 )]
 pub async fn jwks(State(state): State<AppState>) -> Result<Json<Jwks>, ApiError> {
     let i = identitaet::load_or_create(&state.pool)

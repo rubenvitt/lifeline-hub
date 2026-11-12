@@ -20,14 +20,23 @@ pub struct Zugang {
     pub schluessel: Option<String>,
     pub schluessel_neu: Option<String>,
     pub angelegt_at: String,
+    /// Letzte Änderung durch einen Admin; `None` bis zur ersten.
+    pub geaendert_at: Option<String>,
     pub widerrufen_at: Option<String>,
     pub zuletzt_genutzt_at: Option<String>,
     pub letzte_ablehnung_at: Option<String>,
     pub letzte_ablehnung_grund: Option<AblehnungGrund>,
     pub letzte_ablehnung_abweichung_s: Option<i64>,
+    /// Anzeigename des Admins, der widerrufen hat.
+    pub widerrufen_von_name: Option<String>,
 }
 
 impl Zugang {
+    /// Stand für das optimistische Lock: letzte Änderung oder Anlage.
+    pub fn stand(&self) -> &str {
+        self.geaendert_at.as_deref().unwrap_or(&self.angelegt_at)
+    }
+
     /// Ist „gültig bis“ verstrichen? `jetzt` in `zeit::FORMAT`.
     pub fn is_abgelaufen(&self, jetzt: &str) -> bool {
         self.gueltig_bis.as_deref().is_some_and(|bis| bis <= jetzt)
@@ -53,6 +62,8 @@ type Zeile = (
     Option<String>,
     Option<String>,
     Option<i64>,
+    Option<String>,
+    Option<String>,
 );
 
 /// Spalten in der Reihenfolge von [`Zeile`]; ein Makro, weil sqlx nur statische Texte nimmt.
@@ -60,7 +71,8 @@ macro_rules! spalten {
     () => {
         "id, org_id, name, scopes, gueltig_bis, zustand, schluessel, schluessel_neu, \
          angelegt_at, widerrufen_at, zuletzt_genutzt_at, letzte_ablehnung_at, \
-         letzte_ablehnung_grund, letzte_ablehnung_abweichung_s"
+         letzte_ablehnung_grund, letzte_ablehnung_abweichung_s, \
+         (SELECT anzeigename FROM benutzer WHERE id = widerrufen_von), geaendert_at"
     };
 }
 
@@ -84,6 +96,8 @@ fn aus_zeile(z: Zeile) -> Result<Zugang, AppError> {
         zuletzt_genutzt_at: z.10,
         letzte_ablehnung_at: z.11,
         letzte_ablehnung_abweichung_s: z.13,
+        widerrufen_von_name: z.14,
+        geaendert_at: z.15,
     })
 }
 
@@ -155,15 +169,27 @@ pub async fn liste(conn: &mut SqliteConnection, org_id: i64) -> Result<Vec<Zugan
     zeilen.into_iter().map(aus_zeile).collect()
 }
 
-/// Ändert Name, Scopes und „gültig bis“ eines nicht widerrufenen Zugangs der Org. `Ok(None)`:
-/// unbekannt oder fremd (404); `Err(Conflict)`: widerrufen (409).
+/// Was eine Änderung setzt; `None` heißt unverändert. Bei `gueltig_bis` heißt `Some(None)`
+/// unbegrenzt.
+#[derive(Debug, Clone, Default)]
+pub struct Aenderung {
+    pub name: Option<String>,
+    pub scopes: Option<Vec<Scope>>,
+    pub gueltig_bis: Option<Option<String>>,
+    /// Stand beim Öffnen (`Zugang::stand`); weicht er ab, 409. Fehlt er, ohne Vergleich.
+    pub basis: Option<String>,
+}
+
+/// Ändert die gesendeten Felder eines nicht widerrufenen Zugangs der Org (LLH-1139: nur geänderte
+/// Felder, Konflikt über den Stand). `Ok(None)`: unbekannt oder fremd (404); `Err(Conflict)`:
+/// widerrufen oder zwischenzeitlich geändert (409). Ohne wirksame Änderung kein Schreiben, und
+/// vorher gleich nachher.
 pub async fn aendern(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: &str,
-    name: &str,
-    scopes: &[Scope],
-    gueltig_bis: Option<&str>,
+    aenderung: &Aenderung,
+    jetzt: &str,
 ) -> Result<Option<(Zugang, Zugang)>, AppError> {
     let Some(vorher) = laden_in_org(conn, org_id, id).await? else {
         return Ok(None);
@@ -173,13 +199,38 @@ pub async fn aendern(
             "Ein widerrufener Zugang lässt sich nicht mehr ändern.".into(),
         ));
     }
+    if aenderung
+        .basis
+        .as_deref()
+        .is_some_and(|b| b != vorher.stand())
+    {
+        return Err(AppError::Conflict(
+            "Die Anbindung wurde zwischenzeitlich geändert.".into(),
+        ));
+    }
+    let name = aenderung
+        .name
+        .clone()
+        .unwrap_or_else(|| vorher.name.clone());
+    let scopes = aenderung
+        .scopes
+        .clone()
+        .unwrap_or_else(|| vorher.scopes.clone());
+    let gueltig_bis = aenderung
+        .gueltig_bis
+        .clone()
+        .unwrap_or_else(|| vorher.gueltig_bis.clone());
+    if name == vorher.name && scopes == vorher.scopes && gueltig_bis == vorher.gueltig_bis {
+        return Ok(Some((vorher.clone(), vorher)));
+    }
     sqlx::query(
-        "UPDATE maschinenzugang SET name = ?, scopes = ?, gueltig_bis = ? \
+        "UPDATE maschinenzugang SET name = ?, scopes = ?, gueltig_bis = ?, geaendert_at = ? \
          WHERE id = ? AND zustand <> 'widerrufen'",
     )
-    .bind(name)
-    .bind(scopes_json(scopes))
-    .bind(gueltig_bis)
+    .bind(&name)
+    .bind(scopes_json(&scopes))
+    .bind(&gueltig_bis)
+    .bind(jetzt)
     .bind(id)
     .execute(&mut *conn)
     .await?;
@@ -202,8 +253,8 @@ pub async fn widerrufen(
         return Ok(None);
     }
     let n = sqlx::query(
-        "UPDATE maschinenzugang SET zustand = 'widerrufen', widerrufen_at = ?, \
-         widerrufen_von = ? WHERE id = ? AND zustand <> 'widerrufen'",
+        "UPDATE maschinenzugang SET zustand = 'widerrufen', widerrufen_at = ?1, \
+         geaendert_at = ?1, widerrufen_von = ?2 WHERE id = ?3 AND zustand <> 'widerrufen'",
     )
     .bind(jetzt)
     .bind(von)
@@ -406,9 +457,47 @@ pub async fn abruf_zaehlen(
     Ok(())
 }
 
-/// Hält den Grund einer Ablehnung am Zugang fest. Geschrieben wird nur, wenn der Grund wechselt
-/// oder der letzte Eintrag mindestens 60 s alt ist; eine Flut falscher Anfragen erzeugt so keine
-/// Schreiblast (design.md D6).
+/// Vorrat an Ablehnungs-Schreibvorgängen je Zugang: 10, danach einer je 6 s. Wer eine Zugangs-ID
+/// kennt, erzeugt mit wechselnden Fehlern sonst je Anfrage einen Schreibvorgang.
+const ABLEHNUNG_VORRAT: f64 = 10.0;
+const ABLEHNUNG_NACHFUELLEN_S: f64 = 6.0;
+
+/// Ob jetzt eine Ablehnung für den Zugang geschrieben werden darf (prozessweit, R10).
+fn darf_ablehnung_schreiben(
+    tabelle: &mut std::collections::HashMap<String, (f64, std::time::Instant)>,
+    zugang_id: &str,
+    jetzt: std::time::Instant,
+) -> bool {
+    if tabelle.len() > 1024 {
+        tabelle.retain(|_, (_, t)| jetzt.saturating_duration_since(*t).as_secs() < 600);
+    }
+    let (stand, zuletzt) = tabelle
+        .entry(zugang_id.to_string())
+        .or_insert((ABLEHNUNG_VORRAT, jetzt));
+    let vergangen = jetzt.saturating_duration_since(*zuletzt).as_secs_f64();
+    *stand = (*stand + vergangen / ABLEHNUNG_NACHFUELLEN_S).min(ABLEHNUNG_VORRAT);
+    *zuletzt = jetzt.max(*zuletzt);
+    if *stand >= 1.0 {
+        *stand -= 1.0;
+        true
+    } else {
+        false
+    }
+}
+
+fn ablehnung_erlaubt(zugang_id: &str) -> bool {
+    use std::collections::HashMap;
+    use std::sync::{LazyLock, Mutex};
+    static VORRAT: LazyLock<Mutex<HashMap<String, (f64, std::time::Instant)>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    let mut tabelle = VORRAT.lock().unwrap_or_else(|e| e.into_inner());
+    darf_ablehnung_schreiben(&mut tabelle, zugang_id, std::time::Instant::now())
+}
+
+/// Hält den Grund einer Ablehnung am Zugang fest. Geschrieben wird aus einem Vorrat je Zugang (10,
+/// dann einer je 6 s), und auch dann nur, wenn der Grund wechselt oder der letzte Eintrag
+/// mindestens 60 s alt ist; eine Flut falscher Anfragen erzeugt so keine Schreiblast
+/// (design.md D6).
 pub async fn ablehnung_festhalten(
     pool: &SqlitePool,
     zugang_id: &str,
@@ -416,6 +505,9 @@ pub async fn ablehnung_festhalten(
     abweichung_s: Option<i64>,
     jetzt: &str,
 ) -> Result<(), AppError> {
+    if !ablehnung_erlaubt(zugang_id) {
+        return Ok(());
+    }
     sqlx::query(
         "UPDATE maschinenzugang SET letzte_ablehnung_at = ?1, letzte_ablehnung_grund = ?2, \
          letzte_ablehnung_abweichung_s = ?3 WHERE id = ?4 \
@@ -604,7 +696,17 @@ mod tests {
             .unwrap()
             .is_none());
         assert!(matches!(
-            aendern(&mut c, org, &id, "x", &[Scope::LageRead], None).await,
+            aendern(
+                &mut c,
+                org,
+                &id,
+                &Aenderung {
+                    name: Some("x".into()),
+                    ..Default::default()
+                },
+                JETZT
+            )
+            .await,
             Err(AppError::Conflict(_))
         ));
         assert_eq!(
@@ -750,5 +852,29 @@ mod tests {
             .await
             .unwrap();
         assert_eq!((jti, abruf, code), (1, 1, 0));
+    }
+
+    #[test]
+    fn ablehnungen_schreiben_aus_einem_vorrat() {
+        let mut t = std::collections::HashMap::new();
+        let start = std::time::Instant::now();
+        let erlaubt = (0..50)
+            .filter(|_| darf_ablehnung_schreiben(&mut t, "z", start))
+            .count();
+        assert_eq!(erlaubt, 10, "im selben Augenblick höchstens der Vorrat");
+        assert!(!darf_ablehnung_schreiben(
+            &mut t,
+            "z",
+            start + std::time::Duration::from_secs(3)
+        ));
+        assert!(darf_ablehnung_schreiben(
+            &mut t,
+            "z",
+            start + std::time::Duration::from_secs(7)
+        ));
+        assert!(
+            darf_ablehnung_schreiben(&mut t, "anderer", start),
+            "je Zugang getrennt"
+        );
     }
 }

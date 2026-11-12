@@ -1067,7 +1067,8 @@
           "scopes",
           "zustand",
           "is_abgelaufen",
-          "angelegt_at"
+          "angelegt_at",
+          "geaendert_at"
         ],
         "properties": {
           "angelegt_at": {
@@ -1085,6 +1086,10 @@
               "null"
             ],
             "description": "Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert."
+          },
+          "geaendert_at": {
+            "type": "string",
+            "description": "Stand für das optimistische Lock beim Bearbeiten (`basis_geaendert_at`)."
           },
           "gueltig_bis": {
             "type": [
@@ -1123,6 +1128,13 @@
               "string",
               "null"
             ]
+          },
+          "widerrufen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename des Admins, der widerrufen hat."
           },
           "zuletzt_genutzt_at": {
             "type": [

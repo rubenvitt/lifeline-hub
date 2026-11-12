@@ -1884,7 +1884,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/admin/anbindungen/{id}",
-            patch(routes::anbindungen::aendern),
+            get(routes::anbindungen::laden).patch(routes::anbindungen::aendern),
         )
         .route(
             "/api/admin/anbindungen/{id}/code",

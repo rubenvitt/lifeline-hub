@@ -470,6 +470,8 @@ export interface components {
             fingerabdruck?: string | null;
             /** @description Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert. */
             fingerabdruck_neu?: string | null;
+            /** @description Stand für das optimistische Lock beim Bearbeiten (`basis_geaendert_at`). */
+            geaendert_at: string;
             gueltig_bis?: string | null;
             id: string;
             /** @description „gültig bis“ ist verstrichen; der Zugang verhält sich wie widerrufen. */
@@ -478,6 +480,8 @@ export interface components {
             name: string;
             scopes: components["schemas"]["Scope"][];
             widerrufen_at?: string | null;
+            /** @description Anzeigename des Admins, der widerrufen hat. */
+            widerrufen_von_name?: string | null;
             zuletzt_genutzt_at?: string | null;
             zustand: components["schemas"]["ZugangZustand"];
         };

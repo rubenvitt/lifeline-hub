@@ -29,6 +29,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -63,6 +73,16 @@
           },
           "429": {
             "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
             "content": {
               "application/json": {
                 "schema": {
@@ -160,6 +180,16 @@
           },
           "429": {
             "description": "Zu viele gescheiterte Einlösungen von dieser Quelle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
             "content": {
               "application/json": {
                 "schema": {
