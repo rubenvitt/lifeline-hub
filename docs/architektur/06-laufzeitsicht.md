@@ -391,8 +391,12 @@ sequenceDiagram
 - Nach dem Wechsel liefert der neue Führer; der Kopf jeder Zeile trägt im Feld `gegen` den
   Schlüssel des Empfängers, damit Zeilen beider Seiten zusammenfinden. Was die abgelöste Seite
   nach der Bruchstelle schrieb, fragt sie beim Führer nach (`EinsatzStand.bruch`); was er nicht
-  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Jede Schwärzung beim Führer
-  (Kategorie, Löschersuchen je Person, ganzer Einsatz) löscht dort die Bruchstelle und setzt
+  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Zeilen, die aufeinander zeigen,
+  ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
+  Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
+  kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine
+  Übernahme merkt sich den Schlüssel beim Führer (`nachgereicht_als`). Jede Schwärzung beim
+  Führer (Kategorie, Löschersuchen je Person, ganzer Einsatz) löscht dort die Bruchstelle und setzt
   `einsatz.schwaerzung_marke` neu (Zufallswert); bringt der Kopf am Spiegel eine andere Marke,
   räumt auch er seine Bruchstelle (`fuehrung::raeume_bruchstelle`, LLH-1649): Alle Kopien und
   Geklärtes gehen; offene Zeilen fragt er ohne Kopie weiter (`geraeumt`) und löscht sie ganz,

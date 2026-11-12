@@ -1,6 +1,6 @@
 import { Button, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -27,13 +27,33 @@ import {
   spiegelTitel,
 } from './spiegelText';
 
+// Die Liste kommt erst beim Aufklappen (LLH-1646). Im Haupt-Chunk schob sie diesen über die
+// Precache-Grenze (`maximumFileSizeToCacheInBytes`, vite.config.ts); der Vorrat hält sie trotzdem.
+// Scheitert das Nachladen (erste Sitzung ohne Netz), steht nur im Band ein Hinweis. `lazy` merkt
+// sich den Ersatz und lädt nicht von selbst erneut, darum führt nur „Neu laden“ zur Liste.
+const BruchstelleListe = lazy(() =>
+  import('./BruchstelleListe').catch(() => ({ default: ListeNichtGeladen })),
+);
+
+function ListeNichtGeladen() {
+  return (
+    <Typography.Text type="secondary">
+      Liste nicht geladen
+      <Button type="link" onClick={() => location.reload()}>
+        Neu laden
+      </Button>
+    </Typography.Text>
+  );
+}
+
 /**
  * Hinweisband am Spiegel (LLH-1492, design.md D13, Spec `einsatz-spiegel`, „Der Spiegel zeigt
  * seine Herkunft und seinen Stand“): über jeder Einsatzseite, im Rahmen. „Spiegel von <Gegenstelle>“,
  * der Stand des Abgleichs („keine Verbindung seit …“, „Abgleich beendet“) und die Zahl der eigenen
  * Anträge aus dem Kopf; aufgeklappt die Anträge mit Zustand, abgelehnte mit Grund, „Neu erfassen“
  * und „Verwerfen“. Nach einem Führungswechsel die eigenen Änderungen, die der neue Führer nicht
- * kannte („3 Änderungen nicht übernommen“, LLH-1641).
+ * kannte („3 Änderungen nicht übernommen“, LLH-1641); aufgeklappt unter „Nicht übernommen“ zum
+ * Nachreichen als Antrag oder Verwerfen (LLH-1646).
  *
  * FARBE: Grund `bannerGrund`, Kante `bannerLinie` wie ein Hinweis; eine Störung des Abgleichs,
  * abgelehnte Anträge und nicht übernommene Änderungen in `achtungText` (zweiter Kanal: das Wort).
@@ -66,6 +86,16 @@ export default function SpiegelBand({ einsatz }: { einsatz: EinsatzAnzeige | und
     if (vorher == null || zaehler == null || vorher === zaehler) return;
     void qc.invalidateQueries({ queryKey: einsatzKeys.antraege(einsatzId) });
   }, [zaehler, qc, einsatzId]);
+  // Eine abgelehnte Nachreichung öffnet ihre Erfassung wieder (LLH-1646, N2): der Zähler der
+  // Bruchstelle steigt, die Liste lädt neu.
+  const bruchZahl = spiegel?.bruchstelle ?? null;
+  const vorigeBruchZahl = useRef(bruchZahl);
+  useEffect(() => {
+    const vorher = vorigeBruchZahl.current;
+    vorigeBruchZahl.current = bruchZahl;
+    if (vorher == null || bruchZahl == null || vorher === bruchZahl) return;
+    void qc.invalidateQueries({ queryKey: einsatzKeys.bruchstelle(einsatzId) });
+  }, [bruchZahl, qc, einsatzId]);
   if (!einsatz || !spiegel) return null;
   return (
     <BandInhalt einsatz={einsatz} antraege={antraege.data} antraegeFehler={antraege.isError} />
@@ -86,7 +116,9 @@ function BandInhalt({
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useMinutenTakt();
   const [offen, setOffen] = useState(false);
+  const [bruchOffen, setBruchOffen] = useState(false);
   const listeId = useId();
+  const bruchListeId = useId();
   const stand = spiegelStand(spiegel, einsatz.status === 'aktiv', jetzt, (w) =>
     zeitKurz(w, konventionen),
   );
@@ -147,20 +179,53 @@ function BandInhalt({
             <span style={NUR_VORLESER}>Keine Verbindung zur führenden Instanz</span>
           )}
         </span>
-        {hatAntraege && (
-          <Button
-            type="link"
-            aria-expanded={offen}
-            aria-controls={listeId}
-            icon={offen ? <IconChevronHoch /> : <IconChevronRunter />}
-            iconPlacement="end"
-            onClick={() => setOffen((o) => !o)}
-            style={{ marginInlineStart: 'auto', paddingInline: 0 }}
-          >
-            Anträge
-          </Button>
+        {(bruch || bruchOffen || hatAntraege) && (
+          <span style={{ display: 'inline-flex', gap: token.marginSM, marginInlineStart: 'auto' }}>
+            {/* LLH-1646, N4: die nicht übernommenen Erfassungen klappen wie die Anträge auf.
+                Offen bleibt der Knopf auch, wenn die letzte Erfassung erledigt ist, damit die Liste
+                zuklappt. */}
+            {(bruch || bruchOffen) && (
+              <Button
+                type="link"
+                aria-expanded={bruchOffen}
+                aria-controls={bruchListeId}
+                icon={bruchOffen ? <IconChevronHoch /> : <IconChevronRunter />}
+                iconPlacement="end"
+                onClick={() => setBruchOffen((o) => !o)}
+                style={{ paddingInline: 0 }}
+              >
+                Nicht übernommen
+              </Button>
+            )}
+            {hatAntraege && (
+              <Button
+                type="link"
+                aria-expanded={offen}
+                aria-controls={listeId}
+                icon={offen ? <IconChevronHoch /> : <IconChevronRunter />}
+                iconPlacement="end"
+                onClick={() => setOffen((o) => !o)}
+                style={{ paddingInline: 0 }}
+              >
+                Anträge
+              </Button>
+            )}
+          </span>
         )}
       </div>
+      {bruchOffen && (
+        <div
+          id={bruchListeId}
+          data-lfh="spiegel-band-bruchliste"
+          style={{ paddingBlockEnd: token.paddingXS }}
+        >
+          <Suspense
+            fallback={<Typography.Text type="secondary">Liste wird geladen</Typography.Text>}
+          >
+            <BruchstelleListe einsatz={einsatz} />
+          </Suspense>
+        </div>
+      )}
       {offen && (
         <div id={listeId} data-lfh="spiegel-antraege" style={{ paddingBlockEnd: token.paddingXS }}>
           {antraegeFehler && antraege == null ? (
