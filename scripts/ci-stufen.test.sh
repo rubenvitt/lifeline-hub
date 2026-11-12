@@ -40,7 +40,7 @@ job() { # <datei> <id>
 # Das Job-`if` als eine Zeile, leer ohne.
 job_if() { # <datei> <id>
   job "$1" "$2" | awk '
-    /^    if:/ { im_if = 1; sub(/^    if:[ ]*/, ""); printf "%s ", $0; next }
+    /^    if:/ { im_if = 1; sub(/^    if:[ ]*(>-)?/, ""); printf "%s ", $0; next }
     im_if && /^      / { sub(/^ +/, ""); printf "%s ", $0; next }
     im_if { exit }
   '
@@ -49,6 +49,53 @@ job_if() { # <datei> <id>
 kopf() { awk '/^jobs:/ { exit } { print }' "$1"; }
 
 enthaelt() { grep -qF -- "$2" <<< "$1"; }
+ohne_leerraum() { tr -d ' \n\t'; }
+gleich() { [ "$(ohne_leerraum <<< "$1")" = "$(ohne_leerraum <<< "$2")" ]; }
+
+# DIE ZWEI AUSDRÜCKE, die über Start und Abbruch der zweiten Stufe entscheiden, stehen hier im
+# Wortlaut (Leerraum zählt nicht). Eine Teilzeichenkette fängt keine logische Umkehrung (`&&` zu
+# `||`, eine gestrichene Klausel); wer einen Ausdruck ändert, ändert ihn hier mit und begründet
+# das in `scripts/AGENTS.md`, „Zwei Stufen im PR“.
+#   Fertig:  Auto-Merge an oder Label `e2e`, im Zustand NACH dem Ereignis.
+#   Start:   Push (Aufruf aus ci.yml); neuer Commit an einem fertigen PR; Auto-Merge an, wenn das
+#            Label fehlte; Label `e2e`, wenn Auto-Merge aus war.
+#   Gruppe:  gemeinsam für jeden Start und für das Zurücknehmen der letzten Markierung; ein
+#            Commit-Ereignis an einem nicht fertigen PR teilt sie NICHT (seine Nutzlast kann
+#            veraltet sein und bräche sonst einen gerade gestarteten Lauf ab).
+ERWARTET_START="$(cat << 'AUSDRUCK'
+${{ github.event_name != 'pull_request'
+  || (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+      && (github.event.pull_request.auto_merge != null
+          || contains(github.event.pull_request.labels.*.name, 'e2e')))
+  || (github.event.action == 'auto_merge_enabled'
+      && !contains(github.event.pull_request.labels.*.name, 'e2e'))
+  || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
+      && github.event.pull_request.auto_merge == null) }}
+AUSDRUCK
+)"
+ERWARTET_GRUPPE="$(cat << 'AUSDRUCK'
+${{ (github.event_name == 'pull_request' && (
+      (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+       && (github.event.pull_request.auto_merge != null
+           || contains(github.event.pull_request.labels.*.name, 'e2e')))
+      || (github.event.action == 'auto_merge_enabled'
+          && !contains(github.event.pull_request.labels.*.name, 'e2e'))
+      || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
+          && github.event.pull_request.auto_merge == null)
+      || ((github.event.action == 'auto_merge_disabled'
+           || (github.event.action == 'unlabeled' && github.event.label.name == 'e2e'))
+          && github.event.pull_request.auto_merge == null
+          && !contains(github.event.pull_request.labels.*.name, 'e2e'))))
+    && format('e2e-pr-{0}', github.event.pull_request.number)
+    || format('e2e-lauf-{0}', github.run_id) }}
+AUSDRUCK
+)"
+# Der Ausdruck nach `group:` (Block-Skalar `>-`) bis `cancel-in-progress:`.
+gruppe() {
+  awk '/^  group:/ { an = 1; sub(/^  group:[ ]*(>-)?/, ""); print; next }
+       an && /^  cancel-in-progress:/ { exit }
+       an { print }' "$1"
+}
 fehlt() { ! grep -qF -- "$2" <<< "$1"; }
 
 echo "==> ci-stufen: e2e.yml"
@@ -57,21 +104,13 @@ pruefe "e2e.yml lässt sich aus ci.yml aufrufen (workflow_call)" enthaelt "$k" "
 for typ in opened synchronize reopened auto_merge_enabled auto_merge_disabled labeled unlabeled; do
   pruefe "e2e.yml hört auf pull_request/$typ" enthaelt "$k" "$typ"
 done
-pruefe "Nebenläufigkeit: gemeinsame Gruppe je PR" enthaelt "$k" "e2e-pr-{0}"
-pruefe "Nebenläufigkeit: eigene Gruppe für alles andere" enthaelt "$k" "github.run_id"
+pruefe "Nebenläufigkeit: Gruppe im Wortlaut" gleich "$(gruppe "$E2E")" "$ERWARTET_GRUPPE"
 pruefe "Nebenläufigkeit: Abbruch nur im PR" enthaelt "$k" "cancel-in-progress: \${{ github.event_name == 'pull_request' }}"
 
 a="$(job "$E2E" aenderungen)"; a_if="$(job_if "$E2E" aenderungen)"
 pruefe "Auswahl heißt e2e-Auswahl" enthaelt "$a" "name: e2e-Auswahl"
 pruefe "Auswahl fragt ci-auswahl.sh zwei" enthaelt "$a" "scripts/ci-auswahl.sh zwei"
-pruefe "Auswahl startet bei Push (Aufruf aus ci.yml)" enthaelt "$a_if" "github.event_name != 'pull_request'"
-pruefe "Auswahl startet bei neuem Commit nur, wenn fertig" enthaelt "$a_if" "github.event.pull_request.auto_merge != null"
-pruefe "Auswahl kennt das Label e2e" enthaelt "$a_if" "github.event.label.name == 'e2e'"
-pruefe "Auswahl startet beim Einschalten von Auto-Merge" enthaelt "$a_if" "github.event.action == 'auto_merge_enabled'"
-# Die Bedingung der Gruppe und der Start der Auswahl müssen dieselben Ereignisse meinen: sonst
-# liefe ein Start in einer eigenen Gruppe neben einem laufenden Lauf her.
-pruefe "Gruppe und Start teilen die Ereignisliste" enthaelt "$k" "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action)"
-pruefe "Start nennt dieselbe Ereignisliste" enthaelt "$a_if" "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action)"
+pruefe "Start der Auswahl im Wortlaut" gleich "$a_if" "$ERWARTET_START"
 
 b="$(job "$E2E" binaer)"; b_if="$(job_if "$E2E" binaer)"
 pruefe "e2e-Binary heißt über eine Matrix (fehlt, wenn übersprungen)" enthaelt "$b" "name: \${{ matrix.check }}"

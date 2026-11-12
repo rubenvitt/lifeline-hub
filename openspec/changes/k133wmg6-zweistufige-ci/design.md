@@ -112,15 +112,22 @@ am ersten ungeprüft gemergten PR auffiele.
 
 `concurrency` von `e2e.yml` (`cancel-in-progress` nur im PR):
 
-- Gemeinsame Gruppe `e2e-pr-<nummer>` für jeden neuen Commit, für jedes Ereignis, das nach D2
-  startet, und für das Zurücknehmen der letzten Fertig-Markierung (`auto_merge_disabled` oder
-  `unlabeled e2e`, wenn der PR danach nicht mehr fertig ist). Ein neuer Lauf bricht den alten ab;
-  startet er selbst nichts, ist der alte trotzdem beendet. So bricht „Auto-Merge aus“ einen
-  laufenden e2e-Lauf ab, und ein Push auf einen PR in Arbeit beendet einen Lauf für den alten
-  Kopf.
+- Gemeinsame Gruppe `e2e-pr-<nummer>` für jedes Ereignis, das nach D2 startet (auch einen neuen
+  Commit an einem fertigen PR), und für das Zurücknehmen der letzten Fertig-Markierung
+  (`auto_merge_disabled` oder `unlabeled e2e`, wenn der PR danach nicht mehr fertig ist). Ein
+  neuer Lauf bricht den alten ab; startet er selbst nichts, ist der alte trotzdem beendet. So
+  bricht „Auto-Merge aus“ einen laufenden e2e-Lauf ab.
 - Eigene Gruppe je Lauf (`run_id`) für alles andere: ein fremdes Label, `unlabeled e2e` oder
-  `auto_merge_disabled` bei weiter fertigem PR, `auto_merge_enabled` bei schon gesetztem Label.
-  Diese Läufe starten nichts und bremsen keinen laufenden.
+  `auto_merge_disabled` bei weiter fertigem PR, `auto_merge_enabled` bei schon gesetztem Label,
+  und ein neuer Commit an einem PR, der laut Nutzlast nicht fertig ist. Diese Läufe starten nichts
+  und bremsen keinen laufenden. Der letzte Fall ist eine Korrektur aus dem Review: Die Nutzlast ist
+  der Stand beim Ereignis, und GitHub garantiert die Reihenfolge der Läufe nicht. Pusht jemand und
+  schaltet Sekunden später Auto-Merge ein, oder legt eine Sitzung den PR mit Label an (`opened`,
+  dann `labeled`), käme der Commit-Lauf mit der Nutzlast „nicht fertig“ unter Umständen erst
+  danach und bräche den gerade gestarteten e2e-Lauf ab.
+- Bleibt ein Rest: Ein `auto_merge_disabled`-Lauf, der erst nach einem späteren
+  `auto_merge_enabled` eingereiht wird, bricht dessen Lauf ab. Dann stehen auf dem Kopf nur
+  abgebrochene e2e-Checks; der Stau-Wächter meldet das nach 20 Minuten (D8).
 - Aufruf aus `ci.yml` (Push): eigene Gruppe je Lauf; die Nebenläufigkeit regelt dort `ci.yml`.
 
 Folge: Wer Auto-Merge einschaltet, nachdem das Label schon einen Lauf gestartet hat, startet

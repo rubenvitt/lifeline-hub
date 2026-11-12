@@ -15,10 +15,11 @@
 # (`aenderungen`); `binaer` und `e2e` hängen an ihrem Ergebnis. „e2e betroffen“ steht wie bisher
 # an jedem Schritt: ein fertiger PR ohne e2e-relevante Änderung meldet leer grün.
 #
-# NEBENLÄUFIGKEIT: Ereignisse, die den gewünschten Zustand ändern (neuer Commit, Fertig-Markierung
-# gesetzt oder zurückgenommen), teilen sich eine Gruppe je PR und brechen einen laufenden Lauf
-# ab; so beendet „Auto-Merge aus“ einen laufenden e2e-Lauf. Alles andere (ein fremdes Label, das
-# Entfernen von `e2e` bei weiter eingeschaltetem Auto-Merge) läuft in einer eigenen Gruppe und
+# NEBENLÄUFIGKEIT: Ereignisse, die eine Stufe starten oder die letzte Fertig-Markierung
+# zurücknehmen, teilen sich eine Gruppe je PR und brechen einen laufenden Lauf ab; so beendet
+# „Auto-Merge aus“ einen laufenden e2e-Lauf, und ein neuer Commit an einem fertigen PR den Lauf
+# für den alten Kopf. Alles andere (ein fremdes Label, das Entfernen von `e2e` bei weiter
+# eingeschaltetem Auto-Merge, ein Commit an einem PR in Arbeit) läuft in einer eigenen Gruppe und
 # startet nichts.
 #
 # KANAL-BRANCHES: `ci.yml` ruft diesen Workflow bei jedem Push auf `alpha`, `beta`, `main` auf
@@ -43,11 +44,16 @@ permissions:
   contents: read
 
 concurrency:
-  # Gemeinsame Gruppe je PR für neue Commits, für das Setzen einer Fertig-Markierung, die vorher
-  # fehlte, und für das Zurücknehmen der letzten; sonst eine eigene je Lauf (s. Kopf).
+  # Gemeinsame Gruppe je PR für jeden Start (s. `if` der Auswahl) und für das Zurücknehmen der
+  # letzten Fertig-Markierung; sonst eine eigene je Lauf (s. Kopf). Ein neuer Commit an einem
+  # NICHT fertigen PR teilt sie nicht: die Nutzlast ist der Stand beim Ereignis, und ein Lauf, der
+  # nach dem Einschalten von Auto-Merge eingereiht wird, bräche sonst den gerade gestarteten ab
+  # (GitHub garantiert die Reihenfolge nicht). Formtest: scripts/ci-stufen.test.sh.
   group: >-
     ${{ (github.event_name == 'pull_request' && (
-          contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+          (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+           && (github.event.pull_request.auto_merge != null
+               || contains(github.event.pull_request.labels.*.name, 'e2e')))
           || (github.event.action == 'auto_merge_enabled'
               && !contains(github.event.pull_request.labels.*.name, 'e2e'))
           || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
