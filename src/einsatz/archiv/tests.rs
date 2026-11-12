@@ -452,3 +452,31 @@ async fn stamm_deckt_alle_verweise_und_spalten() {
         assert_eq!(schema, eingeordnet, "{t}: jede Spalte in STAMM einordnen");
     }
 }
+
+/// Der Purge-Lauf archiviert (Phase N); das Skelett wartet in Phase D auf den letzten Block.
+#[tokio::test]
+async fn purge_archiviert_und_das_skelett_wartet_auf_das_archiv() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    schluessel(&pool).await;
+    let id = einsatz(&pool, leit).await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, skelett_dauer_tage) VALUES (1, 1) \
+         ON CONFLICT (org_id) DO UPDATE SET skelett_dauer_tage = 1",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let live = crate::live::LiveHub::new();
+    assert!(crate::einsatz::purge_scheduler::tick_einmal(&pool, &live, Utc::now()).await >= 1);
+    assert_eq!(bloecke(&pool, id).await.len(), 1);
+
+    let spaeter = Utc::now() + chrono::Duration::days(400);
+    crate::einsatz::purge_scheduler::tick_einmal(&pool, &live, spaeter).await;
+    let da: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(da, 1, "das Skelett bleibt, solange das Archiv gilt");
+}

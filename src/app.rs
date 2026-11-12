@@ -1867,6 +1867,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/aufbewahrung/einsaetze/{id}/personensuche",
             post(routes::aufbewahrung::personensuche),
         )
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}/archiv",
+            get(routes::aufbewahrung::archiv_herunterladen),
+        )
         // LLH-1484: Lesezugänge externer Anzeigen (Verwaltung) und ihr Abruf. Der Abruf zieht
         // keinen `CurrentUser`, nur den Schlüssel (`lagemonitor_zugang::LagemonitorZugriff`).
         .route(
@@ -2038,6 +2042,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/org-einstellungen",
             get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),
+        )
+        // Archiv-Schlüssel der Org (LLH-1494): nur System-Admins, Admin-Spur.
+        .route(
+            "/api/org-archiv-schluessel",
+            get(routes::archiv_empfaenger::liste).post(routes::archiv_empfaenger::anlegen),
+        )
+        .route(
+            "/api/org-archiv-schluessel/{id}",
+            delete(routes::archiv_empfaenger::entfernen),
+        )
+        .route(
+            "/api/org-archiv-schluessel/{id}/pruefen",
+            post(routes::archiv_empfaenger::pruefen),
         )
         .route(
             "/api/fuehrungsfunktionen",

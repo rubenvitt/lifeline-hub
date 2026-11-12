@@ -862,11 +862,11 @@ fn archiv_namensraum_nur_lesend_und_admin() {
     let routen_rs = std::fs::read_to_string("src/routes/aufbewahrung.rs").unwrap();
     let suche_rs = std::fs::read_to_string("src/aufbewahrung/suche.rs").unwrap();
     let routen = archivrouten(&app_rs);
-    assert_eq!(routen.len(), 7, "sieben Archivpfade erwartet: {routen:?}");
+    assert_eq!(routen.len(), 8, "acht Archivpfade erwartet: {routen:?}");
     assert_eq!(
         routen.iter().map(|r| r.handler.len()).sum::<usize>(),
-        8,
-        "acht Archivrouten erwartet: {routen:?}"
+        9,
+        "neun Archivrouten erwartet (LLH-1494: Archiv-Download): {routen:?}"
     );
     let weitere = weitere_quellen();
     assert!(

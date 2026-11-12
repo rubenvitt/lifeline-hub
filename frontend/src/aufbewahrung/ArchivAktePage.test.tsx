@@ -458,3 +458,28 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
     expect(screen.queryByText('Eintrag 3')).toBeNull();
   });
 });
+
+describe('ArchivAktePage — Archiv (LLH-1494)', () => {
+  it('zeigt das Archiv nur, wenn es eines gibt', async () => {
+    zeige('geschwaerzt', undefined, undefined, {
+      ...akte('geschwaerzt'),
+      archiv: {
+        archiviert_at: '2026-11-12 08:00:00',
+        block: 1,
+        bloecke: 2,
+        gueltig_bis: '2027-05-01 18:00:00',
+        groesse: 2048,
+        fingerabdruecke: ['ab12:cd34:ef56:7890'],
+      },
+    });
+    expect(await screen.findByText('Block 1 von 2')).toBeInTheDocument();
+    expect(screen.getByText('ab12:cd34:ef56:7890')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Herunterladen' })).toBeInTheDocument();
+  });
+
+  it('ohne Archiv kein Paneel', async () => {
+    zeige('frist_laeuft');
+    await screen.findByText('Löschersuchen (Art. 17)');
+    expect(screen.queryByRole('button', { name: 'Herunterladen' })).not.toBeInTheDocument();
+  });
+});

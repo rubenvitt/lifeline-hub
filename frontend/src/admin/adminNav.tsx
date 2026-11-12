@@ -21,6 +21,7 @@ import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
 import LagemonitorZugaenge from '../pages/einstellungen/LagemonitorZugaenge';
+import ArchivSchluessel from '../pages/einstellungen/ArchivSchluessel';
 import InstanzkopplungSeite from '../instanz/InstanzkopplungSeite';
 import KartenOnlineSektion from '../karten/KartenOnlineSektion';
 import KartenOfflineSektion from '../karten/KartenOfflineSektion';
@@ -92,6 +93,8 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'lagemonitore', label: 'Lagemonitore', element: <LagemonitorZugaenge /> },
       // LLH-1490: diese Instanz mit einer anderen koppeln (ELW und Hub), Unterschriftsschlüssel.
       { key: 'instanzkopplung', label: 'Instanzkopplung', element: <InstanzkopplungSeite /> },
+      // LLH-1494: Schlüssel, an die der Hub einen Einsatz nach der Nachbereitung verschlüsselt.
+      { key: 'archiv-schluessel', label: 'Archiv-Schlüssel', element: <ArchivSchluessel /> },
     ],
   },
   {

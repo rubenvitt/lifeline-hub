@@ -14,7 +14,7 @@ import type {
   KategorieFristBody,
   WiederherstellenBody,
 } from './types';
-import { apiGet, apiSend, mitParametern } from './client';
+import { apiDatei, apiGet, apiSend, mitParametern } from './client';
 
 /**
  * Aufbewahrung abgeschlossener Einsätze (LFH-23).
@@ -37,6 +37,17 @@ export function ladeAufbewahrung(): Promise<AufbewahrungEintrag[]> {
 /** `GET /api/aufbewahrung/einsaetze/{id}` — pseudonyme Archivakte. */
 export function ladeArchivAkte(einsatzId: number): Promise<ArchivAkte> {
   return apiGet<ArchivAkte>(`${BASIS}/einsaetze/${einsatzId}`);
+}
+
+/** Ein Archivblock ist eine ganze Einsatz-Datenbank; 15 s reichen dafür nicht immer. */
+const ARCHIV_TIMEOUT_MS = 120_000;
+
+/**
+ * `GET /api/aufbewahrung/einsaetze/{id}/archiv` — der gültige Archivblock (LLH-1494), age-
+ * verschlüsselt. Jeder Abruf steht im Zugangsprotokoll.
+ */
+export function ladeArchivBlock(einsatzId: number): Promise<Blob> {
+  return apiDatei(`${BASIS}/einsaetze/${einsatzId}/archiv`, { timeoutMs: ARCHIV_TIMEOUT_MS });
 }
 
 interface ArchivEtbFilter {

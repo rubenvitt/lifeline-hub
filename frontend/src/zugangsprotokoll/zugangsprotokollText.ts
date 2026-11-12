@@ -48,12 +48,17 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   fuehrung_notuebernahme: 'Notübernahme der Führung',
   fuehrung_verworfen: 'Ungültige Übernahme verworfen',
   fuehrung_widerspruch: 'Notübernahme widersprochen',
+  archiv_schluessel_eingetragen: 'Archiv-Schlüssel eingetragen',
+  archiv_schluessel_geprueft: 'Archiv-Schlüssel geprüft',
+  archiv_schluessel_entfernt: 'Archiv-Schlüssel entfernt',
+  archiv_heruntergeladen: 'Archiv heruntergeladen',
 };
 
 /**
  * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
  * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber),
- * Führung je Einsatz (LLH-1491, die Gegenstelle).
+ * Führung je Einsatz (LLH-1491, die Gegenstelle), Archiv (LLH-1494, Bezeichnung des Schlüssels
+ * bzw. Einsatzkennung).
  */
 export function hasNamensziel(aktion: AdminAktion): boolean {
   return (
@@ -61,7 +66,8 @@ export function hasNamensziel(aktion: AdminAktion): boolean {
     aktion === 'lesezugang_widerrufen' ||
     aktion.startsWith('instanz_') ||
     aktion.startsWith('unterschrift_') ||
-    aktion.startsWith('fuehrung_')
+    aktion.startsWith('fuehrung_') ||
+    aktion.startsWith('archiv_')
   );
 }
 
@@ -112,7 +118,7 @@ export function rollenText(a: ZugangsAngaben): string | undefined {
 /**
  * Angaben der Instanzkopplung und der Unterschriftsschlüssel (LLH-1490): Gegenstelle mit Org,
  * Fingerabdruck, Adresse, bei `unterschrift_abgelehnt` der Grund, bei `instanz_elw_verloren` die
- * Zahl der Konten und beim Einmalpasswort für einen Admin unter Passkey-Pflicht die entfernten
+ * Zahl der Konten, beim Archiv-Abruf der Block und beim Einmalpasswort für einen Admin unter Passkey-Pflicht die entfernten
  * Passkeys. `undefined`, wenn keine dieser Angaben steht.
  */
 export function instanzText(a: ZugangsAngaben): string | undefined {
@@ -123,6 +129,8 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
     a.grund ? `Grund: ${a.grund}` : null,
     // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.
     a.anzahl != null ? `${a.anzahl} ${a.anzahl === 1 ? 'Konto' : 'Konten'} gesperrt` : null,
+    // Archiv-Abruf (LLH-1494): der heruntergeladene Block.
+    a.block != null ? `Block ${a.block}` : null,
     // Einmalpasswort unter Passkey-Pflicht oder Notfallbefehl (LLH-1493).
     a.passkeys_entfernt != null
       ? `${a.passkeys_entfernt} ${a.passkeys_entfernt === 1 ? 'Passkey' : 'Passkeys'} entfernt`

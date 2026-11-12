@@ -359,6 +359,8 @@ pub async fn akte(
         personen,
         tiere,
         schaeden,
+        archiv: crate::einsatz::archiv::angabe(pool, kopf.id, &crate::zeit::formatiere_utc(jetzt))
+            .await?,
     })
 }
 

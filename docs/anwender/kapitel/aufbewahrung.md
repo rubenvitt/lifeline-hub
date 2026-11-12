@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/instanz/spiegel/lebensende.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs]
 ---
 
 ## Überblick
@@ -58,6 +58,40 @@ Für System-Admins:
 4. „Speichern“ wählen.
 5. Wird die Skelett-Frist zum ersten Mal gesetzt oder verkürzt, die Rückfrage „Skelett-Frist
    bestätigen?“ mit „Skelette löschen lassen“ bestätigen.
+
+### Archiv-Schlüssel einrichten
+
+Für System-Admins am Hub. Nötig ist das Werkzeug [age](https://age-encryption.org) auf dem
+Rechner, der den privaten Schlüssel verwahrt.
+
+1. Dort einen Schlüssel erzeugen: `age-keygen -o archiv-schluessel.txt`. Die Datei enthält den
+   privaten Schlüssel; die Zeile `# public key: age1…` nennt den öffentlichen.
+2. In der Verwaltung unter „Einstellungen“ „Archiv-Schlüssel“ öffnen und „Schlüssel eintragen“
+   wählen.
+3. Eine „Bezeichnung“ eintragen, etwa den Ort der Verwahrung, und unter „Öffentlicher Schlüssel“
+   die Zeichenkette `age1…` einfügen. „Eintragen“ wählen.
+4. Der Dialog „Probe für …“ zeigt einen verschlüsselten Text. Ihn kopieren, in eine Datei
+   `probe.age` legen und dort entschlüsseln: `age -d -i archiv-schluessel.txt probe.age`.
+5. Den achtstelligen Code unter „Code“ eintragen und „Prüfen“ wählen.
+
+Erst ein geprüfter Schlüssel gilt. Wer den Dialog vorher schließt, gibt den Code später über das
+Menü des Schlüssels mit „Code eingeben …“ ein; die Probe selbst zeigt die App nur einmal. Nach
+fünf falschen Codes ist die Probe gesperrt: dann den Schlüssel entfernen und neu eintragen.
+
+Mindestens zwei geprüfte Schlüssel an getrennten Orten verwahren. Geht der private Schlüssel
+verloren, lässt sich kein Archiv mehr öffnen, das an ihn verschlüsselt ist.
+
+### Ein Archiv herunterladen
+
+Für System-Admins:
+
+1. In der Verwaltung „Aufbewahrung“ öffnen und die Archivakte des Einsatzes wählen.
+2. Im Paneel „Archiv“ „Herunterladen“ wählen. Die Datei heißt
+   `einsatz-<Einsatznummer>-block-<n>.sqlite.age`.
+3. Am Rechner mit dem privaten Schlüssel entschlüsseln:
+   `age -d -i archiv-schluessel.txt -o einsatz.sqlite einsatz-…-block-1.sqlite.age`.
+
+Jeder Abruf steht im Zugangsprotokoll unter „Archiv heruntergeladen“.
 
 ### Abgeschlossene Einsätze überblicken
 
@@ -152,9 +186,33 @@ Mit dem Ende der Nachbereitung gilt an einem ELW, der mit einem Hub gekoppelt is
 - **Spiegel von Einsätzen des Hubs** löscht der ELW nach dem Ende der Nachbereitung, sobald kein
   Antrag mehr offen ist. Der Einsatz bleibt am Hub.
 
-Ohne Kopplung zu einem Hub bleibt ein Einsatz nach der Nachbereitung, wo er ist. Löscht eine
+Ohne Kopplung zu einem Hub bleibt ein Einsatz nach der Nachbereitung, wo er ist, außer die
+Organisation hat einen geprüften Archiv-Schlüssel (siehe „Archiv nach der Nachbereitung“). Löscht eine
 Installation einen Einsatz, den sie führt, löscht die gekoppelte ihren Spiegel davon beim
 nächsten Abgleich.
+
+### Archiv nach der Nachbereitung
+
+Hat die Organisation am Hub mindestens einen geprüften Archiv-Schlüssel, archiviert der Server
+jeden ihrer Einsätze, sobald dessen Nachbereitung endet:
+
+- Er legt eine Datei mit dem ganzen Einsatz an, mit Einträgen, Registern, Lagekarte und
+  Anhängen, und verschlüsselt sie an alle geprüften Schlüssel der Organisation. Lesen kann das
+  Archiv nur, wer einen der privaten Schlüssel hat, auch der Server selbst nicht.
+- Danach schwärzt er den Einsatz sofort, ohne Karenz. Am Hub bleiben das Skelett und die
+  Archivakte; das Einsatztagebuch nennt die Archivierung.
+- **Fristen je Datenkategorie** gelten im Archiv weiter. Läuft eine Kategorie früher ab als der
+  Einsatz, entstehen mehrere Blöcke: Block 1 mit allem gilt bis zur ersten Kategorie-Frist,
+  Block 2 ohne diese Kategorie bis zur nächsten, und so fort; der letzte gilt bis zum Ende der
+  Aufbewahrungsfrist des Einsatzes, ohne Frist unbegrenzt. Ein abgelaufener Block wird gelöscht,
+  das Einsatztagebuch nennt ihn. Heruntergeladen wird immer der Block, der gerade gilt.
+- **Nicht archiviert** wird ein Einsatz, dessen Aufbewahrungsfrist schon abgelaufen ist, der zur
+  Löschung vorgemerkt, geschwärzt oder zum Abräumen vorgemerkt ist, ein Demo-Einsatz und ein
+  Einsatz mit offenem Löschersuchen. Ein ELW, der seine Einsätze einem Hub übergibt,
+  archiviert nicht selbst.
+- Ein **Löschersuchen** an einem archivierten Einsatz geht nur für den ganzen Einsatz; sein
+  Vollzug löscht alle Blöcke unwiderruflich.
+- Die Skelett-Frist wartet, bis der letzte Block gelöscht ist.
 
 ### Fristen je Datenkategorie
 
@@ -203,10 +261,14 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - **Aufbewahrungs-Dauer im Einsatz:** zusätzlich das Führungspersonal, solange der Einsatz läuft.
 - **Vorgaben, Übersicht, Archivakte, Löschersuchen und Wiederherstellen:** nur System-Admins,
   und nur für Einsätze der eigenen Organisation.
+- **Archiv-Schlüssel und Archiv-Download:** nur System-Admins der eigenen Organisation; jede
+  Änderung und jeder Abruf steht im Zugangsprotokoll.
 
 ## Grundlagen und Quellen
 
 - **Art. 17 DSGVO** (Recht auf Löschung): Grundlage des Löschersuchens.
+- **age** ([age-encryption.org](https://age-encryption.org)): Format und Werkzeug der
+  Verschlüsselung von Archiv und Schlüsselprobe.
 - Vorschläge für die Dauer je Datenkategorie, die die App beim Eintragen nennt:
   - Behandlung 3650 Tage, nach § 630f Abs. 3 BGB entsprechend und der Empfehlung des DRK-LV
     Saarland zur patientenbezogenen Datenerfassung im Sanitätsdienst.

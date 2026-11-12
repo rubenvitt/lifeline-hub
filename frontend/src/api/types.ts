@@ -1893,6 +1893,10 @@ export type AufbewahrungZustand = S['AufbewahrungZustand'];
 export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
 /** Pseudonyme Archivakte: Kopf, Zustand, Register — nur Retain-Spalten. */
 export type ArchivAkte = S['ArchivAkteAnzeige'];
+// Archiv am Hub (LLH-1494): Block der Archivakte und Archiv-Schlüssel der Org.
+export type ArchivAngabe = S['ArchivAngabe'];
+export type ArchivEmpfaengerAnzeige = S['ArchivEmpfaengerAnzeige'];
+export type NeuerArchivEmpfaenger = S['NeuerArchivEmpfaenger'];
 export type ArchivPerson = S['ArchivPersonAnzeige'];
 export type ArchivTier = S['ArchivTierAnzeige'];
 export type ArchivSchaden = S['ArchivSchadenAnzeige'];

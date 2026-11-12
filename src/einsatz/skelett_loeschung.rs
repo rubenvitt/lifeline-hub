@@ -64,7 +64,9 @@ pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64
     // Spiegel bleiben aus (LLH-1492, design.md D10): sie enden mit dem Lebensende beim Führer
     // oder nach der Nachbereitung (`einsatz::abraeumen`, LLH-1494).
     let eigen = super::spiegel_filter::nicht_gespiegelt("e.id");
-    let sql = format!("{KANDIDAT_SELECT} AND {eigen}{ohne_reste} ORDER BY e.id");
+    // Solange ein Archivblock gilt, bleibt das Skelett (LLH-1494): die Kaskade nähme ihn mit.
+    let ohne_archiv = " AND NOT EXISTS (SELECT 1 FROM einsatz_archiv a WHERE a.einsatz_id = e.id)";
+    let sql = format!("{KANDIDAT_SELECT} AND {eigen}{ohne_reste}{ohne_archiv} ORDER BY e.id");
     let kandidaten = sqlx::query_as::<_, Kandidat>(sqlx::AssertSqlSafe(sql))
         .bind(STATUS_ABGESCHLOSSEN)
         .fetch_all(pool)

@@ -259,7 +259,27 @@ pub async fn stellen(
             ));
         }
         if geschwaerzt_at.is_some() {
-            return Err(AppError::Conflict("Einsatz ist bereits geschwärzt".into()));
+            // Ein archivierter Einsatz (LLH-1494, K8): das Ersuchen für den ganzen Einsatz löscht
+            // das Archiv. Eine Person im Archiv lässt sich ohne Klartext nicht finden.
+            let archiviert: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM einsatz_archiv WHERE einsatz_id = ?)",
+            )
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            match (archiviert, &ziel) {
+                (true, AntragZiel::Einsatz) => {}
+                (true, AntragZiel::Person(..)) => {
+                    return Err(AppError::Conflict(
+                        "Der Einsatz ist archiviert. Ein Löschersuchen geht nur für den ganzen \
+                         Einsatz; es löscht das Archiv."
+                            .into(),
+                    ))
+                }
+                (false, _) => {
+                    return Err(AppError::Conflict("Einsatz ist bereits geschwärzt".into()))
+                }
+            }
         }
         let kennung = match ziel {
             AntragZiel::Einsatz => einsatz_kennung(nummer.as_deref(), einsatz_id),
@@ -615,7 +635,26 @@ pub async fn vollziehen_ergebnis(
                 .bind(z.einsatz_id)
                 .fetch_one(&mut *conn)
                 .await?;
-        let (audit, geaendert) = if geschwaerzt.is_some() {
+        let archiv_bloecke = if geschwaerzt.is_some() && art == AntragZielArt::Einsatz {
+            crate::einsatz::archiv::alle_loeschen_tx(&mut *conn, z.einsatz_id).await?
+        } else {
+            0
+        };
+        let (audit, geaendert) = if archiv_bloecke > 0 {
+            (
+                format!(
+                    "Löschersuchen (Aktenzeichen {}) für {ziel} vollzogen: das Archiv des \
+                     Einsatzes ({archiv_bloecke} {}) ist unwiderruflich gelöscht.",
+                    z.aktenzeichen,
+                    if archiv_bloecke == 1 {
+                        "Block"
+                    } else {
+                        "Blöcke"
+                    }
+                ),
+                Vollzug::Einsatz(z.einsatz_id),
+            )
+        } else if geschwaerzt.is_some() {
             (
                 format!(
                     "Löschersuchen (Aktenzeichen {}) für {ziel} erledigt: der Einsatz war \

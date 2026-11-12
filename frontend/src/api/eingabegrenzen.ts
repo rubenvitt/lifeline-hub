@@ -264,3 +264,7 @@ export const ZEITACHSE_NOTIZ_MAX = 500;
 export const LAGEMONITOR_BEZEICHNUNG_MAX = 60;
 /** Empfänger eines Links auf das Lagebild für Externe (LLH-1496). */
 export const LAGEBILD_EMPFAENGER_MAX = 80;
+/** Bezeichnung eines Archiv-Schlüssels der Organisation (LLH-1494). */
+export const ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX = 100;
+/** Archiv-Schlüssel je Organisation (LLH-1494). */
+export const ARCHIV_SCHLUESSEL_MAX = 10;

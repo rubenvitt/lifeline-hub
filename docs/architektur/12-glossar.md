@@ -14,6 +14,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Begriff | Bedeutung | Quelle |
 | --- | --- | --- |
 | Ablösung | Ablösen einer Einheit nach ihrer Schicht; eine Zeile ist eine Schicht mit Fälligkeit, geplanter ablösender Einheit und Vollzug. | `src/abloesung/mod.rs`, Spec [`kraefte-abloesung`](../../openspec/specs/kraefte-abloesung/spec.md) |
+| Archiv (Einsatz) | Age-verschlüsselte SQLite-Datei eines Einsatzes am Hub, angelegt am Ende der Nachbereitung an die geprüften Archiv-Schlüssel der Org; je Kategorie-Frist ein Block. Danach ist der Einsatz geschwärzt. | `src/einsatz/archiv.rs`, `einsatz_archiv` und `org_archiv_empfaenger` in `migrations/0323_einsatz_archiv.sql` |
 | Auftrag | Top-down-Strang des Führungsvorgangs (Befehlsgebung, Vollzug, Kontrolle) mit Quittung je Empfänger. | `src/auftrag/mod.rs`, Spec [`auftraege-befehle`](../../openspec/specs/auftraege-befehle/spec.md) |
 | Belegungsart (gezählt, namentlich geführt) | Wie eine Betreuungsstelle ihre Belegung führt: gemeldet oder vom Server aus den dort Registrierten. | [ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md), `src/betreuung/repo.rs` |
 | Bereitstellungsraum (BR) | Ort, an dem Einheiten und Fahrzeuge auf ihren Einsatz warten; Status `geplant`, `aktiv`, `aufgeloest`. | `BrStatus` in `src/bereitstellungsraum/mod.rs`, Spec [`bereitstellungsraum-belegung`](../../openspec/specs/bereitstellungsraum-belegung/spec.md) |

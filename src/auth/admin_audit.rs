@@ -95,6 +95,10 @@ wire_enum! {
         /// LLH-1493: „ELW verloren“ — Kopplung widerrufen, Geheimnisse der dorthin verteilten
         /// Konten ungültig (Migration 0307).
         InstanzElwVerloren => "instanz_elw_verloren",
+        ArchivSchluesselEingetragen => "archiv_schluessel_eingetragen",
+        ArchivSchluesselGeprueft => "archiv_schluessel_geprueft",
+        ArchivSchluesselEntfernt => "archiv_schluessel_entfernt",
+        ArchivHeruntergeladen => "archiv_heruntergeladen",
     }
 }
 
@@ -111,6 +115,8 @@ pub enum Ziel<'a> {
     Instanz(&'a str),
     /// Ein Unterschriftsschlüssel, mit Inhaber und Bezeichnung (LLH-1490).
     Unterschrift(&'a str),
+    /// Ein Archiv-Schlüssel der Org (Bezeichnung) oder ein Einsatz im Archiv (Nummer), LLH-1494.
+    Archiv(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -123,6 +129,8 @@ pub enum Ziel<'a> {
 /// - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
 /// - `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;
 ///   `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
+/// - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
+///   des Blocks, durch Komma getrennt) und `block`.
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -163,6 +171,9 @@ pub struct ZugangsAngaben {
     /// Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passkeys_entfernt: Option<i64>,
+    /// Archiv (LLH-1494): Nummer des heruntergeladenen Blocks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block: Option<i64>,
 }
 
 impl ZugangsAngaben {
@@ -203,7 +214,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
         Ziel::Anmeldeweg(id)
         | Ziel::Lesezugang(id)
         | Ziel::Instanz(id)
-        | Ziel::Unterschrift(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
+        | Ziel::Unterschrift(id)
+        | Ziel::Archiv(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
@@ -260,9 +272,11 @@ pub async fn schreibe_ohne_akteur(
 ) {
     let (ziel_benutzer_id, ziel) = match ziel {
         Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
-        Ziel::Anmeldeweg(t) | Ziel::Lesezugang(t) | Ziel::Instanz(t) | Ziel::Unterschrift(t) => {
-            (None, t)
-        }
+        Ziel::Anmeldeweg(t)
+        | Ziel::Lesezugang(t)
+        | Ziel::Instanz(t)
+        | Ziel::Unterschrift(t)
+        | Ziel::Archiv(t) => (None, t),
     };
     let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
     let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);

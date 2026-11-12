@@ -4,6 +4,10 @@
 //! testbar. Idempotent über WHERE-Guards in den Repo-Queries.
 //!
 //! Phasen in dieser Reihenfolge:
+//! - **Phase N** (IRREVERSIBEL für den Klartext, LLH-1494): am Ende der Nachbereitung legt die
+//!   verwahrende Instanz einen Einsatz als age-verschlüsselte Blöcke ab und schwärzt ihn ohne
+//!   Karenz (`archiv::archivieren`), wenn die Org geprüfte Archiv-Schlüssel hat. Blöcke, deren
+//!   Frist abgelaufen ist, löscht dieselbe Phase (`archiv::abgelaufene_bloecke_loeschen`).
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
 //!   soft-gelöscht (`geloescht_at` = Karenz-Start: Fristablauf bzw. Setzen einer Frist in die
 //!   Vergangenheit, höchstens jetzt; LFH-906). Ab da am Datenzugriff
@@ -85,6 +89,33 @@ pub async fn tick_mit_rueckschrieb(
     let mut anzahl = 0;
     let mut geschwaerzt = 0;
     let mut geloescht = 0;
+
+    // --- Phase N: Archiv am Ende der Nachbereitung (LLH-1494, IRREVERSIBEL für den Klartext) ---
+    // Vor Phase A: ein archivierter Einsatz ist danach vorgemerkt und geschwärzt, Phase A und B
+    // übergehen ihn. Zählt für den WAL-Rückschrieb wie Phase B.
+    match super::archiv::faellige(pool, &jetzt_s).await {
+        Ok(ids) => {
+            for id in ids {
+                match super::archiv::archivieren(pool, id, jetzt).await {
+                    Ok(true) => {
+                        anzahl += 1;
+                        geschwaerzt += 1;
+                    }
+                    Ok(false) => {}
+                    Err(e) => tracing::error!(einsatz_id = id, "Purge Phase N fehlgeschlagen: {e}"),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("Purge Phase N: Abfrage fehlgeschlagen: {e}"),
+    }
+    match super::archiv::abgelaufene_bloecke_loeschen(pool, &jetzt_s).await {
+        Ok(0) => {}
+        Ok(n) => {
+            anzahl += n;
+            geloescht += n;
+        }
+        Err(e) => tracing::warn!("Purge Phase N: Löschen abgelaufener Blöcke fehlgeschlagen: {e}"),
+    }
 
     // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start ab Fristablauf) ---
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
