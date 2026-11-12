@@ -833,7 +833,8 @@ async fn falscher_code_wirft_die_fuehrung_an_den_elw_zurueck() {
 // Zwei Notübernahmen mit demselben Zähler entstehen nur zwischen zwei Instanzen, die beide nicht
 // führen, also nur mit mindestens drei Instanzen (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
 // design.md, Context). Der Hub behält die zuerst angenommene Führung (D1); die unterlegene ELW hält
-// die Führung des Dritten offen (D2, D3) oder zieht eine überholte Übernahme still nach (D7).
+// die Führung des Dritten offen (D2, D3); führt der Hub mit der Epoche eines Dritten, entscheidet
+// ihre Einsatzleitung (D7).
 
 /// Eine weitere ELW derselben Hub-Org.
 async fn weiterer_elw(hub: &Instanz) -> Instanz {
@@ -1076,7 +1077,8 @@ async fn nach_der_uebergabe_an_elw_1_haelt_elw_2_ihre_fuehrung_offen_ohne_alarm(
 #[tokio::test]
 async fn der_konflikt_erlischt_wenn_der_hub_keinen_dritten_mehr_nennt() {
     let (hub, elw1, elw2, h, e1, e2) = uebergabe_an_elw1_und_notuebernahme_von_elw2().await;
-    assert_eq!(fuehrung(&elw2, e2).await["offen"]["konflikt"], true);
+    let vorher = fuehrung(&elw2, e2).await;
+    assert_eq!(vorher["offen"]["konflikt"], true);
     an_hub_zurueck(&elw1, &hub, e1).await;
     elw_meldet(&elw2).await;
     // Der Konflikt ist weg; der Hub führt jetzt selbst mit der Epoche von ELW 1, und darüber
@@ -1085,7 +1087,85 @@ async fn der_konflikt_erlischt_wenn_der_hub_keinen_dritten_mehr_nennt() {
     assert_eq!(f["fuehrend"], true);
     assert_eq!(f["offen"]["konflikt"], false, "{f}");
     assert_eq!(f["offen"]["epoche"], 5, "{f}");
+    assert_eq!(
+        f["offen"]["bruch_at"], vorher["offen"]["bruch_at"],
+        "die Bruchstelle bleibt die der ersten offenen Übernahme"
+    );
     assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
+}
+
+#[tokio::test]
+async fn eine_kopplung_zur_fuehrenden_elw_macht_den_konflikt_nicht_zur_uebernahme() {
+    let (_hub, elw1, elw2, _h, _e1, e2) = uebergabe_an_elw1_und_notuebernahme_von_elw2().await;
+    // ELW 1 koppelt sich zusätzlich bei ELW 2 (meldet sich dort); ELW 2 erreicht sie nicht.
+    {
+        let p = SoftwarePasskey::new("b", [2u8; 32]);
+        let oeff = p.oeffentlich();
+        let mut conn = elw2.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: 1,
+                benutzer_name: "Admin",
+                credential_id: &p.credential_id,
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Stick B",
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let (s, v) = common::anfrage(
+        &elw2.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &elw2.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw1.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw1.admin,
+        Some(&json!({"adresse": elw2.adresse, "code": v["code"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let f = fuehrung(&elw2, e2).await;
+    assert_eq!(
+        f["offen"]["konflikt"], true,
+        "der Hub nennt einen Dritten: {f}"
+    );
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/einsaetze/{e2}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    // Der Widerruf dieser zusätzlichen Kopplung räumt den Konflikt mit dem Hub nicht ab.
+    let (_, u) = common::anfrage(&elw2.app, "GET", "/api/admin/instanz", &elw2.admin, None).await;
+    let k = u["kopplungen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|k| k["gegenueber_kennung"] == elw1.kennung)
+        .unwrap_or_else(|| panic!("Kopplung zu ELW 1: {u}"))["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/admin/instanz/kopplungen/{k}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(fuehrung(&elw2, e2).await["offen"]["konflikt"], true);
 }
 
 #[tokio::test]
@@ -1187,6 +1267,15 @@ async fn bestaetigt_die_elw_die_fuehrung_des_hubs_wird_sie_spiegel() {
     assert_eq!(v["fuehrend"], false);
     assert_eq!(v["fuehrer_kennung"], hub.kennung);
     assert!(ist_spiegel(&b, e_b).await);
+    let spur: String =
+        sqlx::query_scalar("SELECT detail FROM admin_audit ORDER BY id DESC LIMIT 1")
+            .fetch_one(&b.pool)
+            .await
+            .unwrap();
+    assert!(
+        spur.contains("Übernahme durch") && !spur.contains("Notübernahme durch"),
+        "der Hub hat nichts gegen B erklärt: {spur}"
+    );
     elw_meldet(&b).await;
     assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
 }

@@ -467,15 +467,18 @@ pub async fn release_nach_widerruf(
     .bind(gegenueber_kennung)
     .fetch_all(&mut *conn)
     .await?;
-    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung, ebenso ein Konflikt, den
-    // nur ein Gegenüber melden konnte: Er nennt einen Dritten, mit dem diese Instanz nicht
-    // gekoppelt ist, und ohne Kopplung kommt keine Akte mehr, die ihn erlöschen ließe (Change
-    // `faq7l7m4-zwei-elw-unterlegene-seite`, D6).
-    let gekoppelt: Vec<String> = list_gegenueber(conn, org_id)
-        .await?
-        .into_iter()
-        .map(|g| g.kennung)
-        .collect();
+    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung. Ein Konflikt (die Akte eines
+    // Hubs nennt einen Dritten) verfällt, wenn ein Hub widerrufen wird und kein verbleibender Hub
+    // den Dritten ist: Ohne den Hub kommt keine Akte mehr, die ihn ersetzen oder abräumen ließe
+    // (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D6).
+    let war_hub: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung WHERE gegenueber_kennung = ? \
+         AND richtung = 'meldet_sich')",
+    )
+    .bind(gegenueber_kennung)
+    .fetch_one(&mut *conn)
+    .await?;
+    let hubs = list_hubs(conn, org_id).await?;
     let kandidaten: Vec<(i64, Option<String>)> = sqlx::query_as(
         "SELECT id, json_extract(offen, '$.fuehrer') FROM einsatz_fuehrung \
          WHERE org_id = ? AND offen IS NOT NULL",
@@ -485,7 +488,8 @@ pub async fn release_nach_widerruf(
     .await?;
     let offene = kandidaten.into_iter().filter_map(|(id, fuehrer)| {
         let fuehrer = fuehrer.unwrap_or_default();
-        (fuehrer == gegenueber_kennung || !gekoppelt.contains(&fuehrer)).then_some(id)
+        // Eine offene Übernahme kommt immer von einem Hub: nur sein Widerruf räumt sie ab.
+        (war_hub && (fuehrer == gegenueber_kennung || !hubs.contains(&fuehrer))).then_some(id)
     });
     for id in offene.collect::<Vec<_>>() {
         let mut a = load(conn, id).await?;
@@ -567,6 +571,18 @@ pub struct FuehrungGegenueber {
     /// Org-Schlüssel der Akte auf der Leitung (die Org der erreichten Seite).
     #[serde(skip)]
     pub org_schluessel: String,
+}
+
+/// Die Hubs einer Org: Gegenüber, bei denen sich diese Instanz meldet. Nur von ihnen kommt eine
+/// Akte, die eine offene Übernahme auslöst; ob sie ein Konflikt ist, misst
+/// `austausch::ist_konflikt` an ihnen.
+pub async fn list_hubs(conn: &mut SqliteConnection, org_id: i64) -> Result<Vec<String>, AppError> {
+    Ok(list_gegenueber(conn, org_id)
+        .await?
+        .into_iter()
+        .filter(|g| g.richtung == InstanzKopplungRichtung::MeldetSich)
+        .map(|g| g.kennung)
+        .collect())
 }
 
 /// Die Gegenüber einer Org (aktive Kopplungen mit gültiger Zuordnung).

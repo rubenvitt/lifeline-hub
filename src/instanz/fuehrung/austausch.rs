@@ -421,11 +421,12 @@ async fn fuehre_weiter(
 }
 
 /// Ob eine offene Übernahme ein Konflikt ist (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
-/// design.md D3): Die erreichte Seite nennt als Führer eine Instanz, mit der diese nicht gekoppelt
-/// ist (`gekoppelt`: Kennungen der Gegenüber der Org). Eine Übernahme durch das Gegenüber selbst
-/// ist keiner, auch nicht mit der Epoche eines Dritten (D7).
-pub fn ist_konflikt(offen: &AkteMeldung, gekoppelt: &[&str]) -> bool {
-    !gekoppelt.contains(&offen.fuehrer.as_str())
+/// design.md D3): Die erreichte Seite nennt als Führer eine Instanz, die keiner der Hubs ist, bei
+/// denen sich diese Instanz für die Org meldet (`hubs`, [`repo::list_hubs`]; im Austausch der
+/// Absender). Eine Übernahme durch den Hub selbst ist keiner, auch nicht mit der Epoche eines
+/// Dritten (D7).
+pub fn ist_konflikt(offen: &AkteMeldung, hubs: &[&str]) -> bool {
+    !hubs.contains(&offen.fuehrer.as_str())
 }
 
 /// Der Inhalt einer gehaltenen Akte ohne das, was sich bei jedem Takt ändert (Stand, Merker der
@@ -648,29 +649,17 @@ pub async fn apply_eingang(
                 && m.epoche > alt
                 && m.epoche.instanz != sender
                 && m.epoche.instanz != ich.kennung;
-            if a.offen
-                .as_deref()
-                .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok())
-                .is_some_and(|o| ist_konflikt(&o, &[sender]))
-                && !(ich_fuehre && dritter_fuehrt)
-            {
-                // Der Hub nennt keinen Dritten mehr: der Konflikt erlischt (D6).
-                a.offen = None;
-                a.offen_bruch_at = None;
-                repo::save(conn, &mut a, true).await?;
-                if let Some(einsatz_id) = a.einsatz_id {
-                    aus.folgen.push(Folge::Kopf { einsatz_id });
-                }
-            }
+            // Einen eigenen Zweig zum Erlöschen braucht es nicht (D6): Nennt der Hub keinen Dritten
+            // mehr, ersetzt die nächste Akte die gehaltene (halte_offen, D7), oder Verwerfen bzw.
+            // Annahme unten räumen `offen` ab.
             if ich_fuehre && fremd_vergeben && (dritter_fuehrt || dritte_epoche) {
-                let entscheid = entscheide(
-                    richtung,
-                    Err("keine Übernahme gegen diese Instanz".into()),
-                    true,
+                // Läuft über die Annahmeregel (src/AGENTS.md); mit einem Dritten heißt sie offen
+                // halten.
+                debug_assert_eq!(
+                    entscheide(richtung, Err(String::new()), true),
+                    Entscheid::OffenHalten
                 );
-                if entscheid == Entscheid::OffenHalten {
-                    halte_offen(conn, &mut a, m, &bruch, &mut aus).await?;
-                }
+                halte_offen(conn, &mut a, m, &bruch, &mut aus).await?;
                 continue;
             }
         }

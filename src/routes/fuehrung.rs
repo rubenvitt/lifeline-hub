@@ -322,13 +322,24 @@ async fn run_bestaetigen(
             dienst::konflikt_text(eigene_notuebernahme, &neu.fuehrer_name)
         )
     } else {
-        let grund = neu
+        // Grund und „Notübernahme“ nur aus einer Erklärung gegen diese Instanz (D7: der Hub kann mit
+        // der Epoche eines Dritten führen und dessen Erklärung tragen).
+        let ich = crate::instanz::identitaet::load_or_create(&state.pool)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?
+            .kennung;
+        match neu
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
-            .map(|e| e.grund)
-            .unwrap_or_default();
-        format!("Notübernahme durch {} bestätigt: {grund}", neu.fuehrer_name)
+            .filter(|e| e.fuehrer_alt == ich)
+        {
+            Some(e) => format!(
+                "Notübernahme durch {} bestätigt: {}",
+                neu.fuehrer_name, e.grund
+            ),
+            None => format!("Übernahme durch {} bestätigt", neu.fuehrer_name),
+        }
     };
     spur(
         state,
