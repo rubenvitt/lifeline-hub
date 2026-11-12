@@ -5,9 +5,7 @@ Die Einsatznummer MUST nach der Vergabe unverändert bleiben. `PATCH /api/einsae
 SHALL einen Body, der das Feld `einsatznummer_intern` enthält, mit 400 abweisen, egal ob mit
 Wert oder `null`. Andere Felder dieses Requests werden dann nicht übernommen. Die
 Leitstellen-Nr. (`leitstellen_nr`) bleibt über denselben Endpunkt frei setzbar und leerbar.
-Einzige Ausnahme ist die Vergabe einer freien Nummer, wenn ein Spiegel zum eigenen Einsatz wird
-(Anforderung „Freie Nummer, wenn ein Spiegel zum eigenen Einsatz wird“); keine Bedienung ändert
-die Nummer.
+Ausnahme ist allein die neue Nummer, wenn ein Spiegel zum eigenen Einsatz wird.
 
 #### Scenario: Überschreiben abgewiesen
 - **WHEN** ein PATCH `einsatznummer_intern: "EN-4711"` schickt

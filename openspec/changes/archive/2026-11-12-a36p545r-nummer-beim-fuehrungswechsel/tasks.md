@@ -26,7 +26,16 @@ ist, dann der Code. Tests im Backend mit `cargo test --test <datei> <name>`.
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh` ist grün (lokal mindestens `--nur schnell` und die Rust-Tests der berührten Dateien; die volle Suite belegt die CI des PRs).
+- [x] 4.1 `./scripts/check-all.sh` ist grün. Belegt durch die CI des PRs (dasselbe Skript). Lokal am 12.11.2026: `cargo fmt --check`, `check-architektur.sh`, `check-openspec-archiv.sh`, `check-schreibweisen.sh`, `check-migrationen.sh`, `check-adr-nummern.sh` grün; `cargo test` für `instanz_fuehrung` (80), `instanz_fuehrung_live` (4), `instanz_lebensende` (11), `instanz_spiegel` (22), `instanz_spiegel_live` (1), `instanz_kopplung` (32), `instanz_hinweise` (18), die drei `instanz_stammdaten*`-Dateien (36) und `--lib instanz::` (177) grün; Wächter der Anwenderdoku grün (mit Node 22). Nicht lokal gefahren: Frontend-Lint, Prettier, Typ-Drift, Werkzeugversionen und die Selbsttests des Gates, weil `mise` im Container der Sitzung fehlt; die übrige Rust-Suite, Vitest und e2e.
+
+## 5. Nach dem Review vor dem PR (12.11.2026)
+
+- [x] 5.1 Live: Jeder Führungswechsel an einem lokalen Einsatz meldet Kopf und Vollabgleich (`fuehrung::melde_wechsel`), damit der Systemeintrag offene Schirme erreicht (design.md D4, Nachtrag). Tests `notuebernahme_bei_gleicher_einsatznummer` (Route) und `uebergabe_meldet_am_hub_kopf_und_vollabgleich` (Abgleich); Mutationsprobe ohne `lagged` macht beide rot.
+- [x] 5.2 Akte, Antwort und Admin-Spur nennen die neue Nummer (`werde_fuehrer` zieht `einsatz_fuehrung.nummer` mit, `save`/`insert_fremd` lesen neu). Test in `notuebernahme_bei_gleicher_einsatznummer` und `nummer::tests`; Mutationsprobe ohne das `UPDATE` macht den Live-Test rot.
+- [x] 5.3 Delta-Spec: Ausnahme „kein Konto für den Eintrag“, Zählung über Spiegel samt Szenario, eigene Anforderung „Die neue Nummer gilt an beiden Seiten“; Test `die_neue_nummer_liegt_ueber_den_spiegeln`, Rückgabe mit behaltener Nummer im Live-Test.
+- [x] 5.4 Verwahrung mit Führung prüft den Wortlaut des Eintrags und dass kein zweiter entsteht (`mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer`).
+- [x] 5.5 Anwenderkapitel: wann die abgebende Installation die neue Nummer zeigt, was nach einem Widerspruch gilt.
+- [x] 5.6 Folgeaufgaben angelegt: LLH-1854 (Bruchstelle nach Widerspruch), LLH-1858 (Vorplanung zeigt die alte Nummer), LLH-1859 (laufende Nummer der Gegenstelle ungeprüft).
 
 ## Workflow follow-up
 

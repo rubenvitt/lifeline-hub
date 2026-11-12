@@ -196,7 +196,7 @@ mod tests {
     }
 
     /// Kein Konto für den ETB-Eintrag: Der Wechsel gelingt trotzdem, nur der Eintrag entfällt
-    /// (design.md D4 der Change `a36p545r-nummer-beim-fuehrungswechsel`).
+    /// (`openspec/changes/archive/2026-11-12-a36p545r-nummer-beim-fuehrungswechsel/design.md`, D4).
     #[tokio::test]
     async fn ohne_konto_wird_umnummeriert_und_kein_eintrag_geschrieben() {
         let pool = pool().await;
