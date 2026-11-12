@@ -1,6 +1,6 @@
 # Maschinenzugang: Fremdsysteme an Lifeline Hub anbinden
 
-Stand: 12.11.2026 · LLH-1652 · Regeln: [ADR-0022](../architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Stand: 12.11.2026 · LLH-1652, LLH-1638 · Regeln: [ADR-0022](../architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
 Spec `maschinenzugang`, Vertrag der API: [`public-v1.json`](public-v1.json).
 
 Ein Fremdsystem (Alarm-Adapter, Lagemonitor, Einsatzbuch, Rechner) meldet sich mit einem eigenen
@@ -42,8 +42,9 @@ Ohne das Binary: die Referenz-Clients unten tun dasselbe.
 | `positionen:write`     | Positionen einliefern                     |
 | `rechner:use`          | Rechner nutzen                            |
 
-Lese-Scopes mit Einsatzbezug sehen nur Einsätze, die die Einsatzleitung für den Zugang freigegeben
-hat. Neue Scopes kommen nur hinzu; ein Client überspringt unbekannte Werte.
+Lese-Scopes mit Einsatzbezug (heute `lage:read`) sehen nur den Einsatz, den die Einsatzleitung für
+den Zugang freigegeben hat; siehe „Lage lesen“. Neue Scopes kommen nur hinzu; ein Client
+überspringt unbekannte Werte.
 
 ## Einlösen im Einzelnen
 
@@ -141,6 +142,86 @@ mit `typ` `lifeline-machine-response+jwt`, `kid` = `instanz_id` und den Claims `
 `status` und `bh` (SHA-256 des Antwort-Bodys, wie empfangen). Geprüft wird gegen
 `instanz_public_key` aus dem Einlösen; `GET /api/v1/instanz/jwks.json` dient nur dem Wechsel des
 Instanzschlüssels. Die Prüfung ist freiwillig, aber empfohlen.
+
+## Lage lesen
+
+`GET /api/v1/lage` mit dem Scope `lage:read` liefert das Lagebild genau eines Einsatzes: Kopf,
+Zahlen zu Betroffenen und Kräften, Belegung der Unfallhilfsstellen, offene Sofortmeldungen als
+Zahl, die Lagemeldung und die Lagekarte. Namen, Personenkennungen und freie Notizen kommen nicht
+vor. Gedacht ist die Route für Anzeigen wie den Lagemonitor im Führungskraftwagen.
+
+**Freigabe.** Welchen Einsatz ein Zugang liest, entscheidet die Einsatzleitung: im Einsatz unter
+„Einstellungen“, „Geräte“ im Paneel „Anbindungen“. Ein Zugang liest höchstens einen Einsatz.
+Schaltet die Einsatzleitung ihn an einem zweiten Einsatz ein, liest er ab dann diesen. Die
+Freigabe endet mit dem Abschluss des Einsatzes, dem Widerruf oder Ablauf des Zugangs und dem
+Entzug von `lage:read`.
+
+**Ohne Freigabe** ist die Antwort kein Fehler:
+
+```json
+{ "stand_at": "2026-11-12 19:02:11", "einsatz": null }
+```
+
+**Mit Freigabe** (gekürzt):
+
+```json
+{
+  "stand_at": "2026-11-12 19:02:11",
+  "einsatz": {
+    "id": 42,
+    "bezeichnung": "Stadtfest",
+    "stichwort": "San 2",
+    "einsatzart": "sanitaetsdienst",
+    "begonnen_at": "2026-11-12 16:00:00",
+    "betroffene": {
+      "gesamt": 4, "patienten": 3, "sk1": 1, "sk2": 1, "sk3": 1, "sk4": 0,
+      "tot": 0, "unverletzt": 0, "ohne": 0, "vermisst": 1, "abgeschlossen": 0
+    },
+    "kraefte": {
+      "einheiten": 2, "personal": 8,
+      "staerke": { "fuehrer": 0, "unterfuehrer": 2, "mannschaft": 6 }
+    },
+    "uhs": [
+      {
+        "id": 5, "bezeichnung": "BHP Nord", "kind": "behandlungsplatz", "state": "aktiv",
+        "belegt": 3, "plaetze": 10, "kraefte": 4
+      }
+    ],
+    "sofortmeldungen_offen": 0,
+    "lagemeldung": { "text": "Lage stabil.", "freigegeben_at": "2026-11-12 18:30:00" }
+  },
+  "karte": { "type": "FeatureCollection", "features": [] },
+  "karte_etag": "3f1c0a9d2b7e4c55"
+}
+```
+
+- `stand_at` ist der Zeitpunkt der Berechnung. `lagemeldung` ist die Zusammenfassung des jüngsten
+  freigegebenen Lageberichts, ohne einen solchen `null`.
+- `einsatz.sanitaetsdienst` (`kontakte`, `kontakte_letzte_stunde`, `in_versorgung`, `transporte`)
+  kommt nur, wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist.
+- `einsatz.spiegel` (`letzter_abgleich_at`, `abgleich_beendet`) kommt nur, wenn die Instanz den
+  Einsatz als Spiegel einer anderen hält, etwa der Hub einen Einsatz, den ein ELW führt. Die
+  Zahlen sind dann so alt wie der letzte Abgleich; eine Anzeige sollte das kennzeichnen.
+
+**Karte.** `karte` ist eine GeoJSON-FeatureCollection in WGS 84. `properties.kind` nennt die Art
+jedes Features; unbekannte Arten überspringt ein Client.
+
+| `kind`       | Weitere Eigenschaften                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| `einsatzort` | keine; ein Punkt                                                                           |
+| `zone`       | `id`, `subkind`: `gefahrengebiet`, `absperrbereich`, `absperrgrenze` oder `sperrgebiet`    |
+| `abschnitt`  | `id`, `bezeichnung`, optional `kurzbezeichnung`                                            |
+| `uhs`        | `id` (wie in `einsatz.uhs`), `bezeichnung`, `subkind` (wie `uhs[].kind`), `belegt`, `plaetze` |
+| `zeichen`    | `id`, `zeichen_spec`: die Zeichenbeschreibung als JSON-Text, ohne Beschriftung             |
+
+Die Karte ändert sich selten und ist der größte Teil der Antwort. `karte_etag` nennt ihre
+Fassung:
+
+- `GET /api/v1/lage?karte=<karte_etag>`: Gleicht die genannte Fassung der aktuellen, fehlt
+  `karte`, und `karte_etag` bleibt. Sonst kommt die neue Karte mit neuer Fassung.
+- `GET /api/v1/lage?karte=none`: weder `karte` noch `karte_etag`.
+
+Die Abfrage gehört zum signierten Pfad (`htu` ist `/api/v1/lage?karte=…`).
 
 ## Fehler
 

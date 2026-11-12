@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Lifeline Hub, öffentliche API",
-    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |\n| Abfrage | – | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | – | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`) sieht nur den Einsatz, den die Einsatzleitung für\nden Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist das höchstens\neiner. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null`, nicht mit einem Fehler.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
     "version": "1"
   },
   "servers": [
@@ -41,6 +41,86 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/lage": {
+      "get": {
+        "tags": [
+          "Lage"
+        ],
+        "summary": "Das Lagebild des Einsatzes, den die Einsatzleitung für diesen Zugang freigegeben hat.",
+        "description": "Ohne Freigabe ist `einsatz` `null`. Gibt die Einsatzleitung einen Einsatz frei oder beendet\ndie Freigabe, ändert sich die Antwort beim nächsten Abruf.",
+        "operationId": "get_lage",
+        "parameters": [
+          {
+            "name": "karte",
+            "in": "query",
+            "description": "`none` bestellt die Karte ab. Sonst die Fassung (`karte_etag`), die das Fremdsystem schon\nhat: gleicht sie der aktuellen, fehlt `karte` in der Antwort.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lagebild; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `lage:read`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": [
+              "lage:read"
+            ]
+          }
+        ]
       }
     },
     "/api/v1/me": {
@@ -296,6 +376,582 @@
             }
           }
         }
+      },
+      "LageBetroffene": {
+        "type": "object",
+        "description": "Betroffene in Zahlen.",
+        "required": [
+          "gesamt",
+          "patienten",
+          "sk1",
+          "sk2",
+          "sk3",
+          "sk4",
+          "tot",
+          "unverletzt",
+          "ohne",
+          "vermisst",
+          "abgeschlossen"
+        ],
+        "properties": {
+          "abgeschlossen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Abgeschlossene Patienten: in `gesamt` enthalten, in keiner Sichtungszahl."
+          },
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ohne": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Noch nicht gesichtet."
+          },
+          "patienten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sichtungskategorie I bis IV zusammen."
+          },
+          "sk1": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk2": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk4": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unverletzt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vermisst": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LageEinsatz": {
+        "type": "object",
+        "description": "Der gelesene Einsatz, ohne Sachverhalt, Adresse und meldende Stelle. Die Koordinate des\nEinsatzorts steht als Feature `einsatzort` in der Karte.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "einsatzart",
+          "begonnen_at",
+          "betroffene",
+          "kraefte",
+          "uhs",
+          "sofortmeldungen_offen",
+          "lagemeldung"
+        ],
+        "properties": {
+          "begonnen_at": {
+            "type": "string",
+            "description": "Beginn des Einsatzes (UTC, `JJJJ-MM-TT hh:mm:ss`)."
+          },
+          "betroffene": {
+            "$ref": "#/components/schemas/LageBetroffene"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/LageEinsatzart"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kennung des Einsatzes; Ereignisse nennen sie als `einsatz_id`."
+          },
+          "kraefte": {
+            "$ref": "#/components/schemas/LageKraefte"
+          },
+          "lagemeldung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LageLagemeldung",
+                "description": "Zusammenfassung des jüngsten freigegebenen Lageberichts; `null` ohne einen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sanitaetsdienst": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LageSanitaetsdienst",
+                "description": "Hilfeleistungen in Zahlen; nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sofortmeldungen_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unbestätigte, nicht erledigte Sofortmeldungen; nur die Zahl."
+          },
+          "spiegel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LageSpiegel",
+                "description": "Nur wenn diese Instanz den Einsatz als Spiegel einer anderen hält: die Zahlen sind so\nalt wie der letzte Abgleich."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LageUhs"
+            },
+            "description": "Nicht aufgelöste Unfallhilfsstellen mit Belegung als Zahl; ihre Lage steht in der Karte."
+          }
+        }
+      },
+      "LageEinsatzart": {
+        "type": "string",
+        "description": "Art des Einsatzes.",
+        "enum": [
+          "realeinsatz",
+          "uebung",
+          "sanitaetsdienst",
+          "bereitstellung"
+        ]
+      },
+      "LageKarte": {
+        "type": "object",
+        "description": "Die Lagekarte: eine GeoJSON-FeatureCollection.",
+        "required": [
+          "type",
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LageKarteFeature"
+            }
+          },
+          "type": {
+            "type": "string",
+            "description": "Immer `FeatureCollection`."
+          }
+        }
+      },
+      "LageKarteFeature": {
+        "type": "object",
+        "description": "Ein GeoJSON-Feature der Lagekarte.",
+        "required": [
+          "type",
+          "geometry",
+          "properties"
+        ],
+        "properties": {
+          "geometry": {
+            "type": "object",
+            "description": "GeoJSON-Geometrie (Punkt, Linie oder Fläche) in WGS 84."
+          },
+          "properties": {
+            "$ref": "#/components/schemas/LageKarteProperties"
+          },
+          "type": {
+            "type": "string",
+            "description": "Immer `Feature`."
+          }
+        }
+      },
+      "LageKarteProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Die Koordinate des Einsatzorts.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "einsatzort"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Gefahrenzone.",
+            "required": [
+              "id",
+              "subkind",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "zone"
+                ]
+              },
+              "subkind": {
+                "$ref": "#/components/schemas/LageZoneKind"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Fläche eines Einsatzabschnitts.",
+            "required": [
+              "id",
+              "bezeichnung",
+              "kind"
+            ],
+            "properties": {
+              "bezeichnung": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "abschnitt"
+                ]
+              },
+              "kurzbezeichnung": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Kurzbezeichnung im Einsatz, etwa „EA-N“."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Verortete Unfallhilfsstelle; `id` wie in `einsatz.uhs`.",
+            "required": [
+              "id",
+              "bezeichnung",
+              "subkind",
+              "belegt",
+              "plaetze",
+              "kind"
+            ],
+            "properties": {
+              "belegt": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "bezeichnung": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "uhs"
+                ]
+              },
+              "plaetze": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "subkind": {
+                "$ref": "#/components/schemas/LageUhsKind"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Freies taktisches Zeichen; `zeichen_spec` ist seine Zeichenbeschreibung als JSON-Text,\nohne Beschriftung.",
+            "required": [
+              "id",
+              "zeichen_spec",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "zeichen"
+                ]
+              },
+              "zeichen_spec": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "Was ein Feature zeigt; `kind` nennt die Art. Ein Client überspringt unbekannte Arten."
+      },
+      "LageKraefte": {
+        "type": "object",
+        "description": "Kräfte in Zahlen.",
+        "required": [
+          "einheiten",
+          "personal",
+          "staerke"
+        ],
+        "properties": {
+          "einheiten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "personal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "staerke": {
+            "$ref": "#/components/schemas/LageStaerke"
+          }
+        }
+      },
+      "LageLagemeldung": {
+        "type": "object",
+        "description": "Die Lagemeldung.",
+        "required": [
+          "text",
+          "freigegeben_at"
+        ],
+        "properties": {
+          "freigegeben_at": {
+            "type": "string",
+            "description": "Freigabe des Lageberichts (UTC, `JJJJ-MM-TT hh:mm:ss`)."
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "LageResponse": {
+        "type": "object",
+        "description": "Antwort von `GET /api/v1/lage`.",
+        "required": [
+          "stand_at",
+          "einsatz"
+        ],
+        "properties": {
+          "einsatz": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LageEinsatz",
+                "description": "Der freigegebene, laufende Einsatz; `null`, wenn keiner freigegeben ist."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "karte": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LageKarte",
+                "description": "Lagekarte als GeoJSON-FeatureCollection; fehlt ohne Einsatz, bei `?karte=none` und wenn\nsie der Fassung aus `?karte=<karte_etag>` gleicht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "karte_etag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fassung der Karte; fehlt ohne Einsatz und bei `?karte=none`."
+          },
+          "stand_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Berechnung (UTC, `JJJJ-MM-TT hh:mm:ss`)."
+          }
+        }
+      },
+      "LageSanitaetsdienst": {
+        "type": "object",
+        "description": "Hilfeleistungen der Reihe „Sanitätsdienst“ in Zahlen.",
+        "required": [
+          "kontakte",
+          "kontakte_letzte_stunde",
+          "in_versorgung",
+          "transporte"
+        ],
+        "properties": {
+          "in_versorgung": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Angetroffene, die noch nicht abgeschlossen sind."
+          },
+          "kontakte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Alle Personen außer Vermissten."
+          },
+          "kontakte_letzte_stunde": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kontakte, die in den letzten 60 Minuten erfasst wurden."
+          },
+          "transporte": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LageSpiegel": {
+        "type": "object",
+        "description": "Abgleich eines gespiegelten Einsatzes mit der Instanz, die ihn führt.",
+        "required": [
+          "letzter_abgleich_at",
+          "abgleich_beendet"
+        ],
+        "properties": {
+          "abgleich_beendet": {
+            "type": "boolean",
+            "description": "Der Abgleich ist beendet; die Zahlen werden nicht mehr aktuell."
+          },
+          "letzter_abgleich_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abgleich (UTC, `JJJJ-MM-TT hh:mm:ss`); `null`, solange keiner lief."
+          }
+        }
+      },
+      "LageStaerke": {
+        "type": "object",
+        "description": "Taktische Stärke: Führer / Unterführer / Mannschaft.",
+        "required": [
+          "fuehrer",
+          "unterfuehrer",
+          "mannschaft"
+        ],
+        "properties": {
+          "fuehrer": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "mannschaft": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "unterfuehrer": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "LageUhs": {
+        "type": "object",
+        "description": "Eine Unfallhilfsstelle in Zahlen.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "kind",
+          "state",
+          "belegt",
+          "plaetze",
+          "kraefte"
+        ],
+        "properties": {
+          "belegt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen, die gerade dort liegen."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LageUhsKind"
+          },
+          "kraefte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Stärke der zugeordneten Kräfte."
+          },
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Plätze ohne Wartebereich."
+          },
+          "state": {
+            "$ref": "#/components/schemas/LageUhsState"
+          }
+        }
+      },
+      "LageUhsKind": {
+        "type": "string",
+        "description": "Art einer Unfallhilfsstelle.",
+        "enum": [
+          "patientenablage",
+          "behandlungsplatz",
+          "verletztensammelstelle",
+          "sonstige"
+        ]
+      },
+      "LageUhsState": {
+        "type": "string",
+        "description": "Zustand einer Unfallhilfsstelle. Aufgelöste stehen nicht in der Lage.",
+        "enum": [
+          "geplant",
+          "aktiv",
+          "aufgeloest"
+        ]
+      },
+      "LageZoneKind": {
+        "type": "string",
+        "description": "Art einer Gefahrenzone in der Karte.",
+        "enum": [
+          "gefahrengebiet",
+          "absperrbereich",
+          "absperrgrenze",
+          "sperrgebiet"
+        ]
       },
       "MeOrg": {
         "type": "object",

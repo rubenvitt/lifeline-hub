@@ -392,6 +392,23 @@ fn uebertragen(stufe: Option<Freigabestufe>, feld: &str) -> bool {
     }
 }
 
+/// Die Freigabestufe, mit der diese Instanz den Einsatz hält. Sie gilt nur am Spiegel; geführt
+/// liegt hier alles (design.md D5). `None`: eine Stufe, die diese Fassung nicht kennt.
+pub(crate) async fn load_freigabestufe(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+) -> Result<Option<Freigabestufe>, AppError> {
+    let stufe_spiegel: Option<String> =
+        sqlx::query_scalar("SELECT freigabestufe FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(match &stufe_spiegel {
+        Some(s) => Freigabestufe::parse(s),
+        None => Some(Freigabestufe::Alles),
+    })
+}
+
 /// GET /api/extern/v1/lagebild — das Lagebild des Links. Ohne wirksamen Schlüssel 401.
 pub async fn abruf(
     State(state): State<AppState>,
@@ -409,16 +426,7 @@ pub async fn abruf(
             .fetch_one(pool)
             .await?;
     let kopf = crate::einsatz::repo::laden(pool, zugriff.einsatz_id).await?;
-    // Die Freigabestufe gilt nur am Spiegel; geführt liegt hier alles (design.md D5).
-    let stufe_spiegel: Option<String> =
-        sqlx::query_scalar("SELECT freigabestufe FROM einsatz_spiegel WHERE einsatz_id = ?")
-            .bind(kopf.id)
-            .fetch_optional(pool)
-            .await?;
-    let freigabestufe = match &stufe_spiegel {
-        Some(s) => Freigabestufe::parse(s),
-        None => Some(Freigabestufe::Alles),
-    };
+    let freigabestufe = load_freigabestufe(pool, kopf.id).await?;
     let quelle = LagebildQuelle {
         spiegel: kopf.spiegel.spiegel_ist,
         letzter_abgleich_at: kopf

@@ -22,6 +22,7 @@ pub mod drossel;
 pub mod error;
 pub mod freigabe;
 pub mod kommando;
+pub mod lage;
 pub mod machine;
 pub mod routen;
 pub mod scope;
@@ -101,6 +102,10 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
         .routes(routes!(routen::redeem).layer(DefaultBodyLimit::max(REDEEM_BODY_MAX)))
         .routes(routes!(routen::jwks))
         .routes(routes!(routen::me).layer(Extension(ScopeAnforderung::Keine)))
+        // Lage des freigegebenen Einsatzes (LLH-1638).
+        .routes(
+            routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(scope::Scope::LageRead))),
+        )
 }
 
 /// Das fertige Dokument, einmal aus [`router`] gebaut.

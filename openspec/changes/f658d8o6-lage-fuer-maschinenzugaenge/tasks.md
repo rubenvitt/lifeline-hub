@@ -5,30 +5,30 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 
 ## 1. Kartenbau umziehen, ohne Verhalten zu ändern (D7, D9)
 
-- [ ] 1.1 Test in `src/routes/lagemonitor.rs`, der für einen festen Einsatz (Einsatzort, Zone, Abschnitt, UHS, freies Zeichen) die Karte des Lagebild-Links als JSON festhält; er läuft gegen den heutigen `baue_karte` grün
-- [ ] 1.2 Getypte Zwischenform `KartenFeature` und `load_karten_features` in `src/routes/lagemonitor.rs`; `baue_karte` serialisiert daraus; der Test aus 1.1 und `cargo test --test lagebild_extern` bleiben grün
-- [ ] 1.3 `karte_etag`, `lagemeldung`, `LageQuery`, `KARTE_AUS`, `LagemonitorUhsZahl`, `LagemonitorLagemeldung` und den Kartenbau nach `src/routes/lagemonitor.rs` verschieben, `lagebild_extern.rs` darauf umstellen; `cargo test --test lagebild_extern` und die verschobenen Unit-Tests grün
-- [ ] 1.4 Eigener `refactor`-Commit: `baue_karte` → `build_karte` samt Verwendungen; `cargo check` und `git grep baue_karte` ohne Treffer in `src/`
+- [x] 1.1 Test in `src/routes/lagemonitor.rs`, der für einen festen Einsatz (Einsatzort, Zone, Abschnitt, UHS, freies Zeichen) die Karte des Lagebild-Links als JSON festhält; er läuft gegen den heutigen `baue_karte` grün
+- [x] 1.2 Getypte Zwischenform `KartenFeature` und `load_karten_features` in `src/routes/lagemonitor.rs`; `baue_karte` serialisiert daraus; der Test aus 1.1 und `cargo test --test lagebild_extern` bleiben grün
+- [x] 1.3 `karte_etag`, `lagemeldung`, `LageQuery`, `KARTE_AUS`, `LagemonitorUhsZahl`, `LagemonitorLagemeldung` und den Kartenbau nach `src/routes/lagemonitor.rs` verschieben, `lagebild_extern.rs` darauf umstellen; `cargo test --test lagebild_extern` und die verschobenen Unit-Tests grün
+- [x] 1.4 Eigener `refactor`-Commit: `baue_karte` → `build_karte` samt Verwendungen; `cargo check` und `git grep baue_karte` ohne Treffer in `src/`
 
 ## 2. Freigabe-Tabelle und Repo (D2, D3)
 
-- [ ] 2.1 `git fetch origin alpha`, dann Migration `0335_maschinenzugang_freigabe.sql` nach D2; `scripts/check-migrationen.sh` und `cargo test db::tests::migrationsnummern_sind_eindeutig` grün
-- [ ] 2.2 Tabelle in `einsatz::schwaerzung_registry::TABELLEN` und `instanz::spiegel::art::AUSGENOMMEN` einordnen; die Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, `entdeckte_tabellen_gleich_registry_tabellen` und `art::tests::jede_einsatztabelle_ist_eingeordnet` grün
-- [ ] 2.3 `Scope::has_einsatzbezug()` mit Unit-Test: wahr für `lage:read`, falsch für alle anderen heutigen Scopes
-- [ ] 2.4 `src/public_api/freigabe.rs` mit `list_fuer_einsatz`, `freigeben_tx`, `beenden_tx`, `delete_fuer_einsatz_tx`, `delete_fuer_zugang_tx`, `freigegebener_einsatz`; Unit-Tests: Neu, Keine, Abgelöst, ein Einsatz für zwei Zugänge, wirksam nur am aktiven und nicht gelöschten Einsatz, Liste ohne widerrufene, abgelaufene und nicht freigebbare Zugänge
+- [x] 2.1 `git fetch origin alpha`, dann Migration `0335_maschinenzugang_freigabe.sql` nach D2; `scripts/check-migrationen.sh` und `cargo test db::tests::migrationsnummern_sind_eindeutig` grün
+- [x] 2.2 Tabelle in `einsatz::schwaerzung_registry::TABELLEN` und `instanz::spiegel::art::AUSGENOMMEN` einordnen; die Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, `entdeckte_tabellen_gleich_registry_tabellen` und `art::tests::jede_einsatztabelle_ist_eingeordnet` grün
+- [x] 2.3 `Scope::has_einsatzbezug()` mit Unit-Test: wahr für `lage:read`, falsch für alle anderen heutigen Scopes
+- [x] 2.4 `src/public_api/freigabe.rs` mit `list_fuer_einsatz`, `freigeben_tx`, `beenden_tx`, `delete_fuer_einsatz_tx`, `delete_fuer_zugang_tx`, `freigegebener_einsatz`; Unit-Tests: Neu, Keine, Abgelöst, ein Einsatz für zwei Zugänge, wirksam nur am aktiven und nicht gelöschten Einsatz, Liste ohne widerrufene, abgelaufene und nicht freigebbare Zugänge
 - [ ] 2.5 ADR-0029 nach D12 anlegen (`scripts/adr-fuer.sh --alle` für die Nummer, Vorlage `VORLAGE.md`, unter 80 Zeilen, Prüfblock); `scripts/check-architektur.sh` grün
 
 ## 3. Route `GET /api/v1/lage` (D1, D6, D7, D8; Spec `lage-schnittstelle`)
 
-- [ ] 3.1 Schema-Typen und eigene Wire-Enums in `src/public_api/lage.rs` mit erschöpfendem `From`; Einträge in `tests/enum_wire_kontrakt.rs`; Unit-Tests für die Abbildung von `LagemonitorAnzeige` und `KartenFeature` (Namen nach D6/D7, `subkind`, kein `typ`, kein `api_version`)
-- [ ] 3.2 Neue Testdatei `tests/public_api_lage.rs` mit den Helfern aus `tests/maschinenzugang.rs` (in `tests/common` teilen statt kopieren): ohne Freigabe 200 mit `einsatz: null` ohne Karte; mit Freigabe Kopf, Zahlen, UHS mit `kind`/`state`, Lagemeldung, Antwortsignatur gültig; zuerst rot
-- [ ] 3.3 Handler `lage` mit `#[utoipa::path]`, `security(("machine" = ["lage:read"]))`, in `public_api::router()` mit `ScopeAnforderung::Scope(Scope::LageRead)`; Tests aus 3.2 grün, dazu `tests/maschinenzugang.rs` (`jede_route_mit_maschinenanmeldung_traegt_eine_scope_angabe`) und `tests/public_api.rs` grün
-- [ ] 3.4 Tests und Umsetzung: Scope fehlt → 403 `missing_scope`; Bearer `llh_lm_…` an `/api/v1/lage` → 401; abgeschlossener Einsatz → `einsatz: null`; Org-Doppelprüfung
-- [ ] 3.5 Tests und Umsetzung Karte: `karte` und `karte_etag` bei der ersten Abfrage, `?karte=<etag>` ohne Karte, geänderte Zone ergibt neue Fassung, `?karte=none` ohne beides; `htu` mit Abfrage wird akzeptiert
-- [ ] 3.6 Test und Umsetzung: keine Namen, keine Personenkennungen, kein Sachverhalt, kein Meldungstext, kein Zeichentext in der Antwort (Muster `lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_personen`); Block `sanitaetsdienst` nur bei gewählter Reihe; der Abruf zählt im Abrufprotokoll unter `/api/v1/lage`
+- [x] 3.1 Schema-Typen und eigene Wire-Enums in `src/public_api/lage.rs` mit erschöpfendem `From`; Einträge in `tests/enum_wire_kontrakt.rs`; Unit-Tests für die Abbildung von `LagemonitorAnzeige` und `KartenFeature` (Namen nach D6/D7, `subkind`, kein `typ`, kein `api_version`)
+- [x] 3.2 Neue Testdatei `tests/public_api_lage.rs` mit den Helfern aus `tests/maschinenzugang.rs` (in `tests/common` teilen statt kopieren): ohne Freigabe 200 mit `einsatz: null` ohne Karte; mit Freigabe Kopf, Zahlen, UHS mit `kind`/`state`, Lagemeldung, Antwortsignatur gültig; zuerst rot
+- [x] 3.3 Handler `lage` mit `#[utoipa::path]`, `security(("machine" = ["lage:read"]))`, in `public_api::router()` mit `ScopeAnforderung::Scope(Scope::LageRead)`; Tests aus 3.2 grün, dazu `tests/maschinenzugang.rs` (`jede_route_mit_maschinenanmeldung_traegt_eine_scope_angabe`) und `tests/public_api.rs` grün
+- [x] 3.4 Tests und Umsetzung: Scope fehlt → 403 `missing_scope`; Bearer `llh_lm_…` an `/api/v1/lage` → 401; abgeschlossener Einsatz → `einsatz: null`; Org-Doppelprüfung
+- [x] 3.5 Tests und Umsetzung Karte: `karte` und `karte_etag` bei der ersten Abfrage, `?karte=<etag>` ohne Karte, geänderte Zone ergibt neue Fassung, `?karte=none` ohne beides; `htu` mit Abfrage wird akzeptiert
+- [x] 3.6 Test und Umsetzung: keine Namen, keine Personenkennungen, kein Sachverhalt, kein Meldungstext, kein Zeichentext in der Antwort (Muster `lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_personen`); Block `sanitaetsdienst` nur bei gewählter Reihe; der Abruf zählt im Abrufprotokoll unter `/api/v1/lage`
 - [ ] 3.7 Test und Umsetzung Spiegel in `tests/instanz_spiegel.rs` oder daneben: gespiegelter Einsatz liefert Zahlen und `einsatz.spiegel`; selbst geführter ohne den Block; Freigabestufe ohne alle Kategorien ergibt `einsatz: null` (Unit-Test der Prüffunktion)
-- [ ] 3.8 `cargo test --test public_api_spec_aktuell`, `docs/api/public-v1.json` mitcommitten; `scripts/check-typ-codegen.sh` grün
-- [ ] 3.9 `docs/api/maschinenzugang.md`: Abschnitt „Lage lesen“ (Freigabe, Beispielantwort, `?karte=`, Kartenarten, `einsatz.spiegel`), Satz zur Freigabe in `src/public_api/description.md`; Prettier und der Test `beschreibung_nennt_genau_die_fehlercodes` grün
+- [x] 3.8 `cargo test --test public_api_spec_aktuell`, `docs/api/public-v1.json` mitcommitten; `scripts/check-typ-codegen.sh` grün
+- [x] 3.9 `docs/api/maschinenzugang.md`: Abschnitt „Lage lesen“ (Freigabe, Beispielantwort, `?karte=`, Kartenarten, `einsatz.spiegel`), Satz zur Freigabe in `src/public_api/description.md`; Prettier und der Test `beschreibung_nennt_genau_die_fehlercodes` grün
 
 ## 4. Freigabe durch die Einsatzleitung (D4, D5; Spec `maschinenzugang`)
 
