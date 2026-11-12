@@ -343,6 +343,10 @@ async fn umwandeln(
         .execute(&mut *conn)
         .await?;
     }
+    // Die Nummer vergeben ELW und Hub unabhängig; ein Spiegel ist von ihrer Eindeutigkeit
+    // ausgenommen. Ist sie hier belegt, bekommt der Einsatz eine Nummer dieser Instanz. Vor dem
+    // Wechsel der Akte: Der beendet den Spiegel, und ab da gilt die Eindeutigkeit (LLH-1647).
+    let umnummeriert = nummer_freimachen(conn, id).await?;
     // Führungsakte (LLH-1647, E1): Mit eingeschalteter Führung führt diese Instanz ab jetzt, mit
     // der nächsten Epoche und der Art `verwahrung`. Das richtet den Spiegel aus wie jeder Wechsel
     // (`fuehrung::werde_fuehrer`): Die Herkunft der Zeilen bleibt, damit ein Rückfall zum Spiegel
@@ -364,9 +368,6 @@ async fn umwandeln(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-    // Die Nummer vergeben ELW und Hub unabhängig; ein Spiegel ist von ihrer Eindeutigkeit
-    // ausgenommen. Ist sie hier belegt, bekommt der Einsatz eine Nummer dieser Instanz.
-    let umnummeriert = nummer_freimachen(conn, id).await?;
     // Die Kennung trägt der Spiegel schon (Übernahme); sie macht eine zweite Meldung erkennbar.
     sqlx::query("UPDATE einsatz SET kennung = ? WHERE id = ? AND kennung IS NULL")
         .bind(&l.kennung)

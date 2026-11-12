@@ -472,6 +472,51 @@ async fn mit_fuehrung_fuehrt_der_hub_den_verwahrten_einsatz_mit_nachvollziehbare
     assert_eq!(v["error"], "Einsatz ist verwahrt.", "{v}");
 }
 
+/// Trägt am Hub ein eigener Einsatz schon die Nummer, wird vor dem Wechsel der Akte umnummeriert:
+/// Sonst stieße der verwahrte Einsatz beim Ende des Spiegels auf die Eindeutigkeit der Nummer.
+#[tokio::test]
+async fn mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer() {
+    let (hub, elw) = mit_fuehrung().await;
+    let (e, k) = abgeschlossen_gespiegelt(&hub, &elw).await;
+    let (h, _) = am_hub(&hub, &k).await;
+    let eigen = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Eigener Einsatz").await;
+    sqlx::query(
+        "UPDATE einsatz SET (einsatznummer_intern, nummer_jahr, nummer_lfd) = \
+         (SELECT einsatznummer_intern, nummer_jahr, nummer_lfd FROM einsatz WHERE id = ?1) \
+         WHERE id = ?2",
+    )
+    .bind(h)
+    .bind(eigen)
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    let nummer: String = eine(
+        &hub.pool,
+        &format!("SELECT einsatznummer_intern FROM einsatz WHERE id = {h}"),
+    )
+    .await;
+
+    nachbereitung_vorbei(&elw, e).await;
+    abgleichen(&elw).await;
+
+    assert_eq!(
+        am_hub(&hub, &k).await,
+        (h, false),
+        "am Hub ein eigener Einsatz"
+    );
+    assert!(
+        !gibt_es(&elw.pool, &format!("SELECT 1 FROM einsatz WHERE id = {e}")).await,
+        "am ELW abgeräumt"
+    );
+    let neu: String = eine(
+        &hub.pool,
+        &format!("SELECT einsatznummer_intern FROM einsatz WHERE id = {h}"),
+    )
+    .await;
+    assert_ne!(neu, nummer, "eigene Nummer am Hub");
+    assert_eq!(fuehrung_am(&hub, h).await["art"], "verwahrung");
+}
+
 #[tokio::test]
 async fn ohne_quittung_lehnt_der_elw_die_verwahrung_still_ab_und_sie_gelingt_spaeter() {
     use lifeline_hub::instanz::repo as kopplungen;
