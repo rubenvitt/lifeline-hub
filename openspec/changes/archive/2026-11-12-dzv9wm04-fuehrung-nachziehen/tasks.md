@@ -30,9 +30,9 @@ Wortlauts steht in der Aufgabe.
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (bzw. die CI des PRs, mit Verweis auf den Lauf)
-- [ ] 5.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt
-- [ ] 5.3 Bilder der Änderung: Dialog „Notübernahme“ als Einsatzleitung (nur Code) und als Admin (Wahl), vorher/nachher; Ablage `pr-bilder/dzv9wm04/`
+- [x] 5.1 `./scripts/check-all.sh` grün: in der Cloud-Sitzung lief das Bündel `schnell` (grün bis auf Schritt 8 und 12, beide an der Umgebung: kein `mise`, Node 22 statt 26), `cargo test --test instanz_fuehrung` und die Vitest-Suite; der volle Lauf ist die CI des PRs (`.github/workflows/ci.yml`)
+- [x] 5.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt
+- [x] 5.3 Bilder der Änderung: Dialog „Notübernahme“ als Einsatzleitung (nur Code) und als Admin (Wahl), vorher/nachher; Ablage `pr-bilder/dzv9wm04/`
 
 ## Workflow follow-up
 

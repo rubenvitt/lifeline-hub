@@ -6,7 +6,7 @@ Eine Instanz, die einen Einsatz nicht führt, MUST ihn als Spiegel der führende
 (Spec `einsatz-spiegel`). Jeder direkte Schreibvorgang an ihm MUST mit dem 409 des Spiegels
 scheitern, ausgenommen die beantragbaren Erfassungen (Spec `spiegel-antraege`). Lesen MUST
 unverändert möglich sein. Die Oberfläche MUST den Einsatz dort mit dem Hinweisband „Spiegel von
-<Name>“ zeigen, ab mittlerer Fensterbreite dazu im Einsatzkopf „Führung: <Name>“. Die Bedienung der Führung selbst ist
+<Name>“ zeigen. Die Bedienung der Führung selbst ist
 kein Schreibvorgang am Einsatz.
 
 #### Scenario: Schreiben am abgelösten ELW
@@ -49,8 +49,7 @@ Die erreichte Seite SHALL die Führung eines Einsatzes, den die meldende Seite f
 Erklärung übernehmen, die entweder die Passkey-Unterschrift eines Admins der Org über ihren Hash
 trägt oder einen Code der meldenden Seite. Die Erklärung MUST Einsatzkennung, alte und neue
 Epoche, alte und neue führende Instanz, Grund, Zeitpunkt und Unterzeichner enthalten. Ein Grund
-MUST angegeben sein. Mit eigener Unterschrift MUST nur ein Admin übernehmen können; die
-Einsatzleitung übernimmt mit dem Code.
+MUST angegeben sein. Unterschreiben MUST nur ein Admin der Org.
 
 #### Scenario: Notübernahme mit Unterschrift
 - **WHEN** ein Admin am Hub für einen Einsatz des ELW mit Epoche (2, ELW) den Grund „ELW ohne Verbindung seit 40 min“ eingibt und mit seinem Unterschriftsschlüssel unterschreibt
@@ -165,10 +164,8 @@ Hinweisband „Spiegel von …“.
 
 Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber,
 SHALL diese Instanz jeden Einsatz der Org, den sie als Spiegel hält und dessen Akte das Gegenüber
-als Führer nennt, mit der nächsten Epoche selbst führen; Bruchstelle ist der Zeitpunkt, zu dem
-sie vom Widerruf erfährt. Der Spiegel MUST dabei zu einem eigenen,
-schreibbaren Einsatz werden. Offene Übernahmen dieses Gegenübers MUST verfallen. Einsätze, die es
-hier nur als Akte gibt, bleiben, wie sie sind.
+als Führer nennt, mit der nächsten Epoche selbst und schreibbar führen; Bruchstelle ist der
+Zeitpunkt, zu dem sie vom Widerruf erfährt. Offene Übernahmen dieses Gegenübers MUST verfallen.
 
 #### Scenario: Widerruf am ELW
 - **WHEN** der Hub einen Einsatz mit Epoche (3, Hub) führt, den der ELW spiegelt, und der Admin am ELW die Org-Zuordnung widerruft
