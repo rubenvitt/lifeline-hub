@@ -169,3 +169,51 @@ async fn bestaetigung_des_gegenuebers_meldet_den_einsatzkopf_am_hub() {
     assert_eq!(art, "bestaetigt");
     assert!(has_kopf(&mut rx), "der Wechsel meldet den Einsatzkopf");
 }
+
+/// LLH-1703 (Nachstellen): Hub und ELW haben je einen eigenen Einsatz mit derselben Nummer.
+#[tokio::test]
+async fn notuebernahme_bei_gleicher_einsatznummer() {
+    let _serial = lock_serial().await;
+    let live = live_hub();
+    let _ = live;
+    let elw = instanz().await;
+    let hub = instanz().await;
+    for i in [&hub, &elw] {
+        lifeline_hub::instanz::fuehrung::save_schalter(&i.pool, true)
+            .await
+            .unwrap();
+    }
+    schluessel(&hub).await;
+    koppeln(&hub, &elw).await;
+    for _ in 0..2 {
+        common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    }
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    elw_meldet(&elw).await;
+    let akte: i64 = eine(
+        &hub.pool,
+        "SELECT id FROM einsatz_fuehrung WHERE kennung NOT LIKE \
+         (SELECT kennung FROM instanz_identitaet) || '/%'",
+    )
+    .await;
+    let nummern: Vec<(i64, String, i64)> =
+        sqlx::query_as("SELECT id, einsatznummer_intern, spiegel FROM einsatz ORDER BY id")
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    eprintln!("Hub vorher: {nummern:?}");
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/code"),
+        json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        json!({"grund": "per Funk", "code": v["code"]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
