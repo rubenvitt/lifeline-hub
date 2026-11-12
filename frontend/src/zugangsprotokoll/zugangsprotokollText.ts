@@ -52,13 +52,18 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   archiv_schluessel_geprueft: 'Archiv-Schlüssel geprüft',
   archiv_schluessel_entfernt: 'Archiv-Schlüssel entfernt',
   archiv_heruntergeladen: 'Archiv heruntergeladen',
+  maschinenzugang_angelegt: 'Anbindung angelegt',
+  maschinenzugang_code_ausgestellt: 'Anbindungscode ausgestellt',
+  maschinenzugang_schluessel_gebunden: 'Schlüssel einer Anbindung gebunden',
+  maschinenzugang_geaendert: 'Anbindung geändert',
+  maschinenzugang_widerrufen: 'Anbindung widerrufen',
 };
 
 /**
  * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
  * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber),
  * Führung je Einsatz (LLH-1491, die Gegenstelle), Archiv (LLH-1494, Bezeichnung des Schlüssels
- * bzw. Einsatzkennung).
+ * bzw. Einsatzkennung), Anbindung eines Fremdsystems (LLH-1652, ihr Name).
  */
 export function hasNamensziel(aktion: AdminAktion): boolean {
   return (
@@ -67,7 +72,8 @@ export function hasNamensziel(aktion: AdminAktion): boolean {
     aktion.startsWith('instanz_') ||
     aktion.startsWith('unterschrift_') ||
     aktion.startsWith('fuehrung_') ||
-    aktion.startsWith('archiv_')
+    aktion.startsWith('archiv_') ||
+    aktion.startsWith('maschinenzugang_')
   );
 }
 

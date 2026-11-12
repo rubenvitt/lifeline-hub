@@ -662,6 +662,11 @@ fn serde_wire_gleich_as_str() {
         ArchivSchluesselGeprueft,
         ArchivSchluesselEntfernt,
         ArchivHeruntergeladen,
+        MaschinenzugangAngelegt,
+        MaschinenzugangCodeAusgestellt,
+        MaschinenzugangSchluesselGebunden,
+        MaschinenzugangGeaendert,
+        MaschinenzugangWiderrufen,
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
