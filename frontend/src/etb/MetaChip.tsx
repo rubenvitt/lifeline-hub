@@ -65,6 +65,13 @@ interface Props {
    */
   quellen?: readonly Vorschlagsquelle[];
   onCommit: (feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) => void;
+  /**
+   * Der offene Editor hat einen Wert übernommen, bleibt aber offen (LLH-1842): die Ereigniszeit,
+   * wenn ihr Feld verlassen wird (Spec `zeiteingabe`, „Verlassen übernimmt“). `onCommit` meldet
+   * weiter nur das ausdrückliche Übernehmen und schließt. Ein geleertes Feld meldet nichts, wie
+   * bei Enter.
+   */
+  onChange?: (feld: MetaFeld, wert: dayjs.Dayjs) => void;
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
   onEdit: (feld: MetaFeld) => void;
@@ -128,6 +135,7 @@ export default function MetaChip({
   wert,
   quellen,
   onCommit,
+  onChange,
   onCancel,
   onRemove,
   onEdit,
@@ -244,6 +252,9 @@ export default function MetaChip({
         // öffnen, OK“ und „Chip weglassen“ zwei Zeiten (LFH-895, `frontend/src/offline/AGENTS.md`,
         // „Schreiben ohne Netz“).
         defaultValue={dayjs.isDayjs(wert) ? wert : serverJetzt()}
+        onChange={(v) => {
+          if (v) onChange?.(feld, v);
+        }}
         onOk={(v) => {
           if (v) onCommit(feld, v);
         }}

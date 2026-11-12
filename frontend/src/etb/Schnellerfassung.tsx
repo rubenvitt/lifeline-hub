@@ -385,6 +385,11 @@ export default function Schnellerfassung({
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
   const { zone: anzeigeZone } = useZeitEingabe();
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
+  /**
+   * Der offene Editor wurde für ein Feld OHNE Wert geöffnet (LLH-1842). Er steht dann am Ende der
+   * Chips und bleibt dort, bis er schließt (`chipFelder`), auch wenn sein Wert schon gilt.
+   */
+  const [editNeu, setEditNeu] = useState(false);
   // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
   // (die Eingabe fokussiert sich selbst). Ohne Chip in Bearbeitung steht die Zeile am Anfang.
   useEffect(() => {
@@ -492,6 +497,16 @@ export default function Schnellerfassung({
   }, [menuOffen]);
 
   const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => wirksam[f] != null);
+  /*
+   * Die Chips der Zeile in EINER Liste (LLH-1842): gesetzte Felder in fester Folge; ein Feld, dessen
+   * Editor ohne Wert geöffnet wurde, steht am Ende und bleibt dort, solange er offen ist. Die
+   * Ereigniszeit gilt schon beim Verlassen des Felds (`setFeldWert`); wechselte ihr Editor dabei
+   * Platz oder Schlüssel, montierte React ihn neu, und sein Selbstfokus holte den Fokus zurück.
+   */
+  const chipFelder =
+    editFeld != null && editNeu
+      ? [...gesetzteFelder.filter((f) => f !== editFeld), editFeld]
+      : gesetzteFelder;
   // Die Abfrage steht nur, wenn das Fach gelesen ist — eine Zeile, die nach der Antwort wieder
   // verschwände, wäre ein Sprung unter dem Cursor. In der Berichtigung gilt der vorhandene
   // Standard, gefragt wird dort nicht.
@@ -590,11 +605,29 @@ export default function Schnellerfassung({
       setMetadaten((m) => ({ ...m, [feld]: wert }));
       fokusInsFeld();
     } else if (e.art === 'feld') {
-      setEditFeld(e.key as MetaFeld);
+      openEditor(e.key as MetaFeld);
     } else {
       const b = bausteine.find((x) => String(x.id) === e.key) ?? null;
       setBausteinOffen(b);
     }
+  }
+
+  /** Öffnet den Editor eines Felds und merkt, ob es dabei schon einen Wert hatte (`chipFelder`). */
+  function openEditor(feld: MetaFeld) {
+    setEditNeu(wirksam[feld] == null);
+    setEditFeld(feld);
+  }
+
+  /**
+   * Ein offener Editor hat einen Wert übernommen, bleibt aber offen (LLH-1842; Spec `zeiteingabe`,
+   * „Verlassen übernimmt“): die Ereigniszeit, wenn das Feld mit Tab oder Klick verlassen wird. Der
+   * Wert gilt sofort. Sonst stand die Zeit im Feld, das nächste geöffnete Feld ersetzte den
+   * Editor, und der Eintrag bekam „jetzt“.
+   */
+  function setFeldWert(feld: MetaFeld, wert: dayjs.Dayjs) {
+    if (sendet) return;
+    if (feld === 'ereigniszeit') setZukunftsGrund(null);
+    setMetadaten((m) => ({ ...m, [feld]: wert }));
   }
 
   function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
@@ -1188,7 +1221,7 @@ export default function Schnellerfassung({
              gesetzten Chips aus dem Bild. */}
             {istSchmal && feldKnopf}
             {istSchmal && anhangTeil}
-            {gesetzteFelder.map((feld) => (
+            {chipFelder.map((feld) => (
               <MetaChip
                 key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
                 feld={feld}
@@ -1205,6 +1238,7 @@ export default function Schnellerfassung({
                 }
                 quellen={feld === 'von' || feld === 'an' ? vonAnQuellen : undefined}
                 onCommit={commitFeld}
+                onChange={setFeldWert}
                 onCancel={() => {
                   setEditFeld(null);
                   fokusInsFeld();
@@ -1215,30 +1249,13 @@ export default function Schnellerfassung({
                   setMetadaten((m) => ({ ...m, [f]: undefined }));
                 }}
                 onEdit={(f) => {
-                  if (!sendet) setEditFeld(f);
+                  if (!sendet) openEditor(f);
                 }}
+                // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
                 gesperrt={sendet}
                 grund={feld === 'ereigniszeit' ? zukunftsGrund : null}
               />
             ))}
-            {editFeld != null && wirksam[editFeld] == null && (
-              <MetaChip
-                key={`${editFeld}-edit-new`}
-                feld={editFeld}
-                editing
-                wert={undefined}
-                quellen={editFeld === 'von' || editFeld === 'an' ? vonAnQuellen : undefined}
-                onCommit={commitFeld}
-                onCancel={() => {
-                  setEditFeld(null);
-                  fokusInsFeld();
-                }}
-                onRemove={() => setEditFeld(null)}
-                onEdit={() => {}}
-                // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
-                gesperrt={sendet}
-              />
-            )}
             {!istSchmal && feldKnopf}
             {!istSchmal && anhangTeil}
             {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
@@ -1350,7 +1367,7 @@ export default function Schnellerfassung({
             <Button
               disabled={sendet}
               onClick={() => {
-                setEditFeld(pflichtHinweis);
+                openEditor(pflichtHinweis);
                 setPflichtHinweis(null);
               }}
             >
