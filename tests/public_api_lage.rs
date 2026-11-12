@@ -431,7 +431,18 @@ async fn routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe() {
     for (i, pfad) in UEBER_FREIGABE.iter().enumerate() {
         let (s, _, v) = signiert(&app, &cred, "GET", pfad, jetzt(), &format!("jti-{i}"), IP).await;
         assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
-        assert!(v["einsatz"].is_null(), "{pfad} liest ohne Freigabe: {v}");
+        // Der Schlüssel muss da sein und `null` tragen: `v["einsatz"].is_null()` wäre auch bei
+        // fehlendem Schlüssel oder leerem Body wahr (`src/AGENTS.md`, Typ-Codegen, Testfalle).
+        assert_eq!(
+            v.get("einsatz"),
+            Some(&Value::Null),
+            "{pfad} liest ohne Freigabe: {v}"
+        );
+        // Unabhängig von der Form der Antwort: der Einsatz der Org kommt nicht vor.
+        assert!(
+            !v.to_string().contains("Stadtfest"),
+            "{pfad} nennt ohne Freigabe einen Einsatz: {v}"
+        );
     }
 }
 
