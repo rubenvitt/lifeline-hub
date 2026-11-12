@@ -167,3 +167,11 @@ bis zum nächsten `goto` verfolgt, über 40 Helfer von Hand.
 | gate3 Fernmeldeskizze/Organigramm: überzähliges `goto` nach `ladeInDichte(…?ansicht=…)` | Laufzeit | entfernt; vier Fälle grün |
 | Kommentare in `gate1-ueberlauf` (eigener Einsatz je Test) und `tabellen-sortieren-filtern` (Räumung beim Start der Anmeldeseite) | Doku | nachgezogen |
 | Vermutung: Gate 1 misst in späteren Tests eines Workers einen älteren Einsatz (zeitabhängige Texte länger) | — | eher rot als grün; offen beobachten |
+
+## 10. Sammel-Gate (Aufgabe 8.1)
+
+- `./scripts/check-all.sh --nur schnell`: grün (Format, Lint, Typ-Drift, Advisories,
+  Selbsttests, OpenSpec-Archiv-Wache).
+- `./scripts/check-all.sh --nur frontend`: grün, 1.232 Dateien, 19.647 Fälle.
+- Rust- und e2e-Bündel: über die CI des PRs (lokal nur `cargo build` und die Rust-Probe
+  `freies_zeichen`); e2e lokal siehe Abschnitte 8 und 8a.

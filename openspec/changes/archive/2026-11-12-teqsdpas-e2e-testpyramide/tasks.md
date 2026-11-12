@@ -50,7 +50,7 @@ geänderten Specs und der CI-Lauf des PRs.
 
 ## 8. Gesamtnachweis
 
-- [ ] 8.1 `./scripts/check-all.sh` grün (lokal die Bündel `schnell` und `frontend`, e2e über die CI des PRs; Verweis auf den Lauf). Verifiziert: Ausgabe bzw. Lauf-URL in `pruefliste.md`.
+- [x] 8.1 `./scripts/check-all.sh` grün (lokal die Bündel `schnell` und `frontend`, e2e über die CI des PRs; Verweis auf den Lauf). Verifiziert: Ausgabe bzw. Lauf-URL in `pruefliste.md`.
 - [x] 8.2 Lokale Bilanz der Auswahl (vorher/nachher, Chromium, Testzeit) in `pruefliste.md` und dem Menschen vor dem Archiv vorgelegt. Verifiziert: 147,1 → 113,8 min über die in beiden Läufen grünen Fälle (−23 %), vorgelegt am 12.11.2026; Entscheidung: Akzeptanz über den CI-Lauf, D5/D6 nur bei Bedarf.
 - [x] 8.3 Code-Review (`superpowers:requesting-code-review`) und bestätigte Findings abgearbeitet. Verifiziert: Findings-Liste in `pruefliste.md` mit Erledigt-Vermerk.
 

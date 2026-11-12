@@ -8,7 +8,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   Sortierung, Validierung, Text aus einer gemockten Antwort) gehört nach Vitest, Serververhalten
   nach `tests/`. Wer einen Fall streicht oder verschiebt, hält eine Mutationsprobe am
   übernehmenden Test fest. Herleitung:
-  `openspec/changes/teqsdpas-e2e-testpyramide/design.md`.
+  `openspec/changes/archive/2026-11-12-teqsdpas-e2e-testpyramide/design.md`.
 - **Layout-Gates laufen in jedem Lauf vollständig** (LLH-1665, D1): keine Auswahl der Seiten
   nach dem Diff, im PR wie auf `alpha`. Gespart wird im Gate selbst.
 - **Angemeldet wird über die API** (LLH-1665): `anmeldenPerApi` aus `e2e/anmelde-kern.ts`, dahinter
