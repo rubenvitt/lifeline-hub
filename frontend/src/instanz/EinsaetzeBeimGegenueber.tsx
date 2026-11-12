@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Button, Modal } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
+import { Alert, Button, Modal } from 'antd';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Paneel, StatusChip, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { loadFuehrungFremd } from '../api/fuehrung';
@@ -17,7 +17,26 @@ import { FUEHRUNG_ART_TEXT, fuehrungKurz } from './fuehrungText';
  */
 export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolean }) {
   const { token } = useRollen();
-  const [offenId, setOffenId] = useState<number | null>(null);
+  const qc = useQueryClient();
+  // Die beim Öffnen gewählte Akte (LLH-1670): Der Dialog hängt nicht am 30-s-Abruf. Steht sie
+  // in der Liste, gilt deren Stand; fällt sie heraus, bleibt der letzte mit Hinweis stehen, samt
+  // getipptem Grund, eingegebenem Code und einer Erfolgsmeldung.
+  const [gewaehlt, setGewaehlt] = useState<FuehrungAnzeige | null>(null);
+  // Solange eine Aktion läuft, bleibt der Dialog offen: Ihre Antwort (etwa der einmalige Code)
+  // hätte sonst keinen Ort.
+  const [laeuft, setLaeuft] = useState(false);
+  // Die Antwort einer eigenen Aktion ist der neueste Stand, in der Liste wie im Dialog, bis der
+  // nächste Abruf gelingt; danach fällt die Akte oft aus der Liste (eine Notübernahme löscht den
+  // Spiegel). Den Dialog betrifft sie nur, solange er noch diese Akte zeigt.
+  const nachAktion = useCallback(
+    (f: FuehrungAnzeige) => {
+      qc.setQueryData<FuehrungAnzeige[]>(globalKeys.instanzkopplungFuehrung(), (liste) =>
+        liste?.map((a) => (a.id === f.id ? f : a)),
+      );
+      setGewaehlt((g) => (g?.id === f.id ? f : g));
+    },
+    [qc],
+  );
   const q = useQuery({
     queryKey: globalKeys.instanzkopplungFuehrung(),
     queryFn: loadFuehrungFremd,
@@ -25,7 +44,9 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
     retry: false,
   });
   if (!q.data) return null;
-  const offen = q.data.find((a) => a.id === offenId) ?? null;
+  const ausDerListe = gewaehlt ? (q.data.find((a) => a.id === gewaehlt.id) ?? null) : null;
+  const offen = ausDerListe ?? gewaehlt;
+  const nichtMehrGelistet = gewaehlt != null && ausDerListe == null;
   return (
     <Paneel
       titel="Einsätze beim Gegenüber"
@@ -41,7 +62,7 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         renderItem={(a) => (
           <ListenEintrag
             actions={[
-              <Button key="fuehrung" onClick={() => setOffenId(a.id)} data-lfh="fremd-fuehrung">
+              <Button key="fuehrung" onClick={() => setGewaehlt(a)} data-lfh="fremd-fuehrung">
                 Führung …
               </Button>,
             ]}
@@ -75,16 +96,34 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         open={offen != null}
         title={offen ? offen.bezeichnung : ''}
         footer={null}
-        onCancel={() => setOffenId(null)}
+        onCancel={() => {
+          if (!laeuft) setGewaehlt(null);
+        }}
+        closable={laeuft ? { disabled: true } : true}
+        mask={{ closable: !laeuft }}
+        keyboard={!laeuft}
         width={640}
         destroyOnHidden
       >
+        {nichtMehrGelistet && (
+          <Alert
+            type="info"
+            showIcon
+            data-lfh="fremd-fuehrung-nicht-gelistet"
+            style={{ marginBlockEnd: token.marginSM }}
+            title="Nicht mehr unter „Einsätze beim Gegenüber“"
+            description="Zuletzt bekannter Stand. Die Führung kann sich inzwischen geändert haben."
+          />
+        )}
         {offen && (
           // Bedienen darf diese Seite nur ein Admin; er darf auch unterschreiben (LLH-1676).
           <FuehrungPaneel
+            key={offen.id}
             fuehrung={offen}
             darfBedienen={darfBedienen}
             darfUnterschreiben={darfBedienen}
+            onGeaendert={nachAktion}
+            onLaeuft={setLaeuft}
           />
         )}
       </Modal>
