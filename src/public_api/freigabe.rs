@@ -187,15 +187,15 @@ pub async fn beenden_tx(
     zugang_id: &str,
     einsatz_id: i64,
 ) -> Result<bool, AppError> {
-    Ok(sqlx::query(
-        "DELETE FROM maschinenzugang_freigabe WHERE zugang_id = ? AND einsatz_id = ?",
+    Ok(
+        sqlx::query("DELETE FROM maschinenzugang_freigabe WHERE zugang_id = ? AND einsatz_id = ?")
+            .bind(zugang_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected()
+            == 1,
     )
-    .bind(zugang_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?
-    .rows_affected()
-        == 1)
 }
 
 /// Löscht alle Freigaben eines Einsatzes (beim Abschluss, in dessen Transaktion).
@@ -302,8 +302,14 @@ mod tests {
         let mut c = pool.acquire().await.unwrap();
         freigeben_tx(&mut c, &z1, e, von).await.unwrap();
         freigeben_tx(&mut c, &z2, e, von).await.unwrap();
-        assert_eq!(freigegebener_einsatz_tx(&mut c, &z1).await.unwrap(), Some(e));
-        assert_eq!(freigegebener_einsatz_tx(&mut c, &z2).await.unwrap(), Some(e));
+        assert_eq!(
+            freigegebener_einsatz_tx(&mut c, &z1).await.unwrap(),
+            Some(e)
+        );
+        assert_eq!(
+            freigegebener_einsatz_tx(&mut c, &z2).await.unwrap(),
+            Some(e)
+        );
         delete_fuer_einsatz_tx(&mut c, e).await.unwrap();
         assert_eq!(freigegebener_einsatz_tx(&mut c, &z1).await.unwrap(), None);
         assert_eq!(freigegebener_einsatz_tx(&mut c, &z2).await.unwrap(), None);
@@ -378,7 +384,11 @@ mod tests {
 
         let liste = list_fuer_einsatz(&mut c, 1, a, JETZT).await.unwrap();
         let namen: Vec<&str> = liste.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(namen, ["A Monitor", "b Monitor"], "nach Namen, ohne Groß/Klein");
+        assert_eq!(
+            namen,
+            ["A Monitor", "b Monitor"],
+            "nach Namen, ohne Groß/Klein"
+        );
         assert!(liste[1].freigegeben && !liste[1].anderer_einsatz);
         assert!(!liste[0].freigegeben && liste[0].anderer_einsatz);
         assert_eq!(liste[1].zustand, ZugangZustand::Wartet);

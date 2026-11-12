@@ -32,10 +32,9 @@ use serde_json::Value;
 use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
-use super::lagemonitor::{verdichte, LagemonitorBetroffene, LagemonitorKraefte};
-use super::lagemonitor_v1::{
-    baue_karte, karte_etag, lagemeldung, LageQuery, LagemonitorLagemeldung, LagemonitorUhsZahl,
-    KARTE_AUS,
+use super::lagemonitor::{
+    baue_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
+    LagemonitorKraefte, LagemonitorLagemeldung, LagemonitorUhsZahl, KARTE_AUS,
 };
 
 /// Version des Drahtformats (`/v1`). Neue Felder kommen nur hinzu; wer eines entfernt oder
