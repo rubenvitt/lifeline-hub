@@ -11,7 +11,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { Collapse, Input, Space, Tooltip, Typography } from 'antd';
-import { serializeAnySpec } from '@einsatzzeichen/core';
+import { serializeAnySpec } from '@einsatzzeichen/core/exact';
 import type { AnySpec, Drawing, SymbolKind, SymbolSpec } from '@einsatzzeichen/schema';
 import { Select } from '../../components/Select';
 import type { FreiesZeichenUpdate } from '../../api/types';

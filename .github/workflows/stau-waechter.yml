@@ -11,8 +11,14 @@
 # Befund) und mergt bei fehlendem CI-Lauf den Ziel-Branch in den PR-Branch. Konflikte löst er
 # nie selbst; der Kommentar weckt die Sitzung, die den PR betreut.
 #
-# Drei Auslöser: der Ziel-Branch bewegt sich (dann entstehen Konflikte), stündlich (ein fehlender
-# CI-Lauf zeigt sich erst nach einer Wartezeit) und von Hand.
+# Vier Auslöser: der Ziel-Branch bewegt sich (dann entstehen Konflikte), ein CI-Lauf auf `alpha`
+# ist fertig (dann zeigt sich, ob `alpha` rot ist, LLH-1849), stündlich (ein fehlender CI-Lauf
+# zeigt sich erst nach einer Wartezeit; ohne Fix-PR wechselt die Zuständigkeit bei „alpha rot“) und
+# von Hand.
+#
+# ALPHA ROT (LLH-1849): Ist der jüngste CI-Lauf auf `alpha` rot, bestimmt der Wächter höchstens einen
+# zuständigen PR und schreibt an alle übrigen, dass sie nicht selbst reparieren; ist `alpha`
+# wieder grün, mergt er `alpha` in die PRs, deren CI rot ist. Kopf von `scripts/stau-waechter.sh`.
 #
 # Gepusht wird mit einem Token der Release-App: ein Push mit GITHUB_TOKEN startete keine CI, und
 # genau die soll anlaufen. Kommentiert wird mit GITHUB_TOKEN. Ohne die Variable
@@ -25,6 +31,11 @@ name: Stau-Wächter
 on:
   push:
     branches: [main, beta, alpha]
+  # Läuft mit dem Workflow vom Standard-Branch, nie aus einem PR.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [alpha]
   schedule:
     # Krumme Minute: zur vollen Stunde stauen sich die Zeitpläne bei GitHub.
     - cron: '23 * * * *'
@@ -56,6 +67,10 @@ jobs:
       pull-requests: write
       checks: read
       statuses: read
+      # Die CI-Läufe auf `alpha` und ihre Jobs (Befund „alpha rot“, LLH-1849).
+      actions: read
+      # Das Label `alpha-rot` anlegen, falls es fehlt (Labels gehören zu den Issues).
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

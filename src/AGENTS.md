@@ -319,7 +319,9 @@ Spec `passwort-anmeldung`, Herleitung
   `auth::admin_audit::schreibe`** (Tabelle `admin_audit`, nicht `auth_audit`): Konto anlegen,
   deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Auch
   ein zweiter Weg zur selben Wirkung (PATCH `bearbeiten`) schreibt; eine abgewiesene Aktion nicht.
-- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Eine neue Aktion braucht eine
+- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Ausnahme „Archiv eingespielt“
+  (LLH-1494): `admin_audit::schreibe_ohne_akteur_tx` schreibt in der Transaktion der Übernahme,
+  ein Fehler bricht das Einspielen ab. Eine neue Aktion braucht eine
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
 - **Gelesen werden Anmelde- und Admin-Spur nur über `routes::zugangsprotokoll`** (LFH-1097,
@@ -796,6 +798,17 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
   Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
   und löscht alle Blöcke.
+- **Archiv einspielen** (LLH-1494, `archiv/einspielen.rs`, Befehl `archiv einspielen`): migriert
+  die entschlüsselte Datei, schwärzt abgelaufene Kategorien nach und übernimmt den Einsatz über
+  die Spiegel-Maschinerie (`liefern`/`uebernehmen`) mit einer Kopplung, die nur in der
+  Transaktion lebt. Ergebnis: beendeter Spiegel ohne Kopplung (`einsatz_archiv_eingespielt`),
+  Konten als gesperrte Platzhalter (`archiv_konto`, raus aus `OHNE_STELLVERTRETER`, nie Mitglied,
+  für keine Admin-Route und keine Kopplung erreichbar). Phase R räumt ihn nach 7 Tagen ab, früher
+  bei einer Frist des Blocks; ein Block, der hier nicht mehr im Archiv steht, kommt nicht zurück,
+  und ein Löschersuchen nimmt eine eingespielte Kopie mit (`archiv::alle_loeschen_tx`). Den
+  Merker setzt auch hier nur `spiegel` (`loeschen_unter_merker`, `anhang::inhalt_einsetzen`).
+  Eine neue Stammtabelle in `STAMM` braucht einen Namen in `STAMM_NAME` (Guard
+  `stamm_name_deckt_die_stammdaten_des_archivs`).
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
