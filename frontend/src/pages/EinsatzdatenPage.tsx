@@ -1222,11 +1222,7 @@ export default function EinsatzdatenPage() {
         !darfBearbeiten && (
           <RechteHinweis
             sichtbar
-            text={
-              einsatz.spiegel
-                ? spiegelGrund(einsatz.spiegel.gegenstelle)
-                : NUR_LEITUNG_FUEHRUNG_ORG_ADMIN
-            }
+            text={einsatz.spiegel ? spiegelGrund(einsatz.spiegel) : NUR_LEITUNG_FUEHRUNG_ORG_ADMIN}
           />
         )
       }
