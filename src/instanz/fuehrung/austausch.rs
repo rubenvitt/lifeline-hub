@@ -90,6 +90,14 @@ impl AkteMeldung {
         }
     }
 
+    /// Derselbe Führungswechsel: Epoche, Führer und Erklärung. `stand` und Kopf ändern sich mit
+    /// jeder Meldung des Gegenübers und zählen nicht (LLH-1671).
+    fn is_gleicher_wechsel(&self, other: &Self) -> bool {
+        self.epoche == other.epoche
+            && self.fuehrer == other.fuehrer
+            && self.erklaerung == other.erklaerung
+    }
+
     /// Grenzen der Felder; eine Akte darüber wird nicht übernommen.
     fn is_in_grenzen(&self) -> bool {
         let kurz = |s: &str| s.chars().count() <= TEXT_MAX;
@@ -779,12 +787,24 @@ pub async fn apply_eingang(
                         }
                     }
                     Entscheid::OffenHalten => {
-                        let offen = serde_json::to_string(m).expect("serialisierbar");
-                        if a.offen.as_deref() == Some(offen.as_str()) {
+                        let vorher = a
+                            .offen
+                            .as_deref()
+                            .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok());
+                        // Dieselbe Übernahme kommt mit jeder Meldung des Gegenübers wieder, mit
+                        // neuem `stand`: kein neuer Stand, keine neue Bruchstelle, keine neue
+                        // Benachrichtigung (LLH-1671).
+                        if vorher.as_ref().is_some_and(|o| o.is_gleicher_wechsel(m)) {
                             continue;
                         }
-                        a.offen = Some(offen);
-                        a.offen_bruch_at = Some(bruch.clone());
+                        // Die Bruchstelle gilt der Übernahme, nicht der Meldung: Bei derselben
+                        // Epoche bleibt sie die erste, erst eine größere bekommt ihre eigene.
+                        if !vorher.is_some_and(|o| o.epoche == m.epoche)
+                            || a.offen_bruch_at.is_none()
+                        {
+                            a.offen_bruch_at = Some(bruch.clone());
+                        }
+                        a.offen = Some(serde_json::to_string(m).expect("serialisierbar"));
                         repo::save(conn, &mut a, true).await?;
                         if let Some(einsatz_id) = a.einsatz_id {
                             aus.folgen.push(Folge::Offen { einsatz_id });
@@ -865,8 +885,12 @@ pub async fn apply_eingang(
             std::cmp::Ordering::Less => {
                 // Das Gegenüber ist hinter dieser Seite zurück: die eigene Akte geht mit einem
                 // neuen Stand noch einmal hinaus, damit beide wieder gleich stehen. Eine Anfrage
-                // auf einen alten Stand wird nicht erfüllt.
-                repo::save(conn, &mut a, true).await?;
+                // auf einen alten Stand wird nicht erfüllt. Hält das Gegenüber eine Übernahme
+                // gegen sich offen, hat es diese Akte schon; ein neuer Stand schickte sie nur je
+                // Meldetakt erneut (LLH-1671).
+                if !m.offen {
+                    repo::save(conn, &mut a, true).await?;
+                }
             }
         }
     }

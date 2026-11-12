@@ -570,13 +570,53 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     // die Bruchstelle bleibt die letzte Meldung vor der ersten, es gibt genau eine
     // Benachrichtigung. Die Meldezeit wird je Takt gesetzt, sonst lägen alle in derselben Sekunde.
     const BRUCH: &str = "2026-01-01 10:00:00";
-    for zuletzt in [BRUCH, "2026-01-01 10:01:00", "2026-01-01 10:02:00"] {
+    let stand_am_hub = || async {
+        sqlx::query_scalar::<_, i64>("SELECT stand FROM einsatz_fuehrung WHERE id = ?")
+            .bind(akte)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap()
+    };
+    let mut stand_nach_erster = 0;
+    for (takt, zuletzt) in [BRUCH, "2026-01-01 10:01:00", "2026-01-01 10:02:00"]
+        .into_iter()
+        .enumerate()
+    {
         sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
             .bind(zuletzt)
             .execute(&elw.pool)
             .await
             .unwrap();
         elw_meldet(&elw).await;
+        match takt {
+            0 => stand_nach_erster = stand_am_hub().await,
+            1 => {
+                assert_eq!(
+                    stand_am_hub().await,
+                    stand_nach_erster,
+                    "der Hub schickt seine Akte nicht neu, weil der ELW sie offen hält"
+                );
+                // Der Hub schickt dieselbe Übernahme doch noch einmal mit neuem Stand und
+                // geändertem Kopf (etwa nach einer Änderung der Bezeichnung am Hub).
+                let stand: i64 = sqlx::query_scalar(
+                    "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+                     RETURNING fuehrung_stand",
+                )
+                .fetch_one(&hub.pool)
+                .await
+                .unwrap();
+                sqlx::query(
+                    "UPDATE einsatz_fuehrung SET stand = ?, bezeichnung = bezeichnung || ' (neu)' \
+                     WHERE id = ?",
+                )
+                .bind(stand)
+                .bind(akte)
+                .execute(&hub.pool)
+                .await
+                .unwrap();
+            }
+            _ => {}
+        }
     }
     let f = fuehrung(&elw, e).await;
     assert_eq!(f["fuehrend"], true, "der ELW gibt nie still ab");
@@ -643,6 +683,63 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn offene_uebernahme_behaelt_ihre_bruchstelle_bei_neuer_erklaerung_derselben_epoche() {
+    // Kommt zur offenen Epoche eine andere, gültig unterschriebene Erklärung, gilt die neue,
+    // aber die Bruchstelle gehört der Übernahme und bleibt (LLH-1671).
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "erste Erklärung").await;
+    const BRUCH: &str = "2026-01-01 10:00:00";
+    let melde_mit = |zuletzt: &'static str| {
+        let elw = &elw;
+        async move {
+            sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
+                .bind(zuletzt)
+                .execute(&elw.pool)
+                .await
+                .unwrap();
+            elw_meldet(elw).await;
+        }
+    };
+    melde_mit(BRUCH).await;
+    assert_eq!(fuehrung(&elw, e).await["offen"]["bruch_at"], BRUCH);
+
+    let text: String = sqlx::query_scalar("SELECT erklaerung FROM einsatz_fuehrung WHERE id = ?")
+        .bind(akte)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let mut erklaerung: Value = serde_json::from_str(&text).unwrap();
+    erklaerung["grund"] = json!("zweite Erklärung");
+    let text = erklaerung.to_string();
+    let assertion = passkey().sign(&text, ORIGIN, RP, 0x05);
+    let beweis = json!({"art": "unterschrift", "assertion": assertion}).to_string();
+    let stand: i64 = sqlx::query_scalar(
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+         RETURNING fuehrung_stand",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_fuehrung SET erklaerung = ?, beweis = ?, stand = ? WHERE id = ?")
+        .bind(&text)
+        .bind(&beweis)
+        .bind(stand)
+        .bind(akte)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    melde_mit("2026-01-01 10:01:00").await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["offen"]["grund"], "zweite Erklärung", "{f}");
+    assert_eq!(f["offen"]["epoche"], 2);
+    assert_eq!(
+        f["offen"]["bruch_at"], BRUCH,
+        "dieselbe Epoche behält ihre Bruchstelle"
+    );
 }
 
 #[tokio::test]
