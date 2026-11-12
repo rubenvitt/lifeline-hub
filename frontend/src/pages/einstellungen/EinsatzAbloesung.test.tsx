@@ -15,11 +15,20 @@ import EinsatzAbloesung from './EinsatzAbloesung';
  * Paneel „Dienst und Ruhe“ (LLH-1603): Höchstdienst und Mindestruhe des Einsatzes.
  */
 
-const einsatz = (meine_rolle = 'einsatzleitung') => ({
+const SPIEGEL = {
+  gegenstelle: 'ELW 1',
+  beendet: false,
+  antraege_ausstehend: 0,
+  antraege_abgelehnt: 0,
+  bruchstelle: 0,
+};
+
+const einsatz = (meine_rolle = 'einsatzleitung', spiegel: unknown = null) => ({
   id: 1,
   bezeichnung: 'Hochwasser Weser',
   status: 'aktiv',
   meine_rolle,
+  spiegel,
   org_id: 1,
 });
 
@@ -73,6 +82,7 @@ const VORGABEN: Grenzwerte = {
 
 interface Aufbau {
   rolle?: string;
+  spiegel?: unknown;
   vorgabe?: unknown | null;
   freigaben?: ModulFreigaben;
   putStatus?: number;
@@ -91,7 +101,7 @@ function stelleBereit(a: Aufbau = {}) {
     laufende_schichten: 2,
   });
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle))),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
@@ -273,6 +283,17 @@ describe('EinsatzAbloesung (LLH-1122)', () => {
     expect(within(p).queryByRole('button', { name: 'Werte ändern' })).toBeNull();
     expect(within(p).queryByRole('button', { name: 'Übernehmen' })).toBeNull();
     expect(within(p).queryByRole('button', { name: 'Vorgabe entfernen' })).toBeNull();
+  });
+
+  // LLH-1675: Am Spiegel sperrt die führende Instanz, nicht die Rolle.
+  it('am Spiegel nennt der Grund die führende Instanz statt der Rollen', async () => {
+    stelleBereit({ spiegel: SPIEGEL });
+    rendern();
+    const p = await paneel();
+    await within(p).findByText('Wechsel 0600/1800 · Mindestdauer 4 h');
+    expect(screen.getByText('Spiegel von ELW 1')).toBeInTheDocument();
+    expect(screen.queryByText(/nur Einsatzleitung und Führungspersonal/)).toBeNull();
+    expect(within(p).queryByRole('button', { name: 'Werte ändern' })).toBeNull();
   });
 
   it('ohne Freigabe des Moduls Ablösung: Zustand statt Anfrage', async () => {

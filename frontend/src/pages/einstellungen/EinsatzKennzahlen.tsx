@@ -71,7 +71,7 @@ export default function EinsatzKennzahlen() {
       <SeitenHinweise
         fehler={waehlen.error}
         rechteFehlt={daten.istAktiv && !darf}
-        rechteText={NUR_LEITUNG_FUEHRUNG}
+        rechteText={daten.rechteGrund(NUR_LEITUNG_FUEHRUNG)}
       />
       <Formularpaneel titel="Lage in Zahlen">
         <Flex vertical gap={token.marginXS}>

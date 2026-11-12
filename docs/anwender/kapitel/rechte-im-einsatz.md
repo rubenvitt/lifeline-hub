@@ -69,7 +69,8 @@ Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die List
 - **Beobachter** lesen nur.
 - Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte. Alle anderen sehen den
   Reiter „Zugriff“ als „Nur Ansicht“ mit dem Grund „nur Einsatzleitung“; die Schnellaktion
-  „Mitglied aufnehmen“ und der Sprung „Zugriff verwalten“ fehlen ihnen.
+  „Mitglied aufnehmen“ und der Sprung „Zugriff verwalten“ fehlen ihnen. Am Spiegel nennt der Grund
+  die führende Installation, auch der Einsatzleitung (siehe [Instanzkopplung](instanzkopplung.md)).
 
 Die letzte Einsatzleitung eines Einsatzes lässt sich nicht entfernen („Gesperrt: letzte
 Einsatzleitung“).

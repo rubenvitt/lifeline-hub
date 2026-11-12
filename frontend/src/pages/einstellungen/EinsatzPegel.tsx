@@ -329,7 +329,7 @@ export default function EinsatzPegel() {
       <SeitenHinweise
         fehler={aendern.error ?? prognoseLoeschen.error ?? prognoseWiederherstellen.error}
         rechteFehlt={daten.istAktiv && !darf}
-        rechteText={NUR_LEITUNG_FUEHRUNG}
+        rechteText={daten.rechteGrund(NUR_LEITUNG_FUEHRUNG)}
       />
       <Formularpaneel
         titel="Maßgebliche Pegel"

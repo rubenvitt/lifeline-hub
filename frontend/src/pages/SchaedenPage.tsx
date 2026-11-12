@@ -5,11 +5,12 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { Alert, Breadcrumb, Button, Flex, Tag, Typography, theme } from 'antd';
+import { Breadcrumb, Button, Tag, Typography, theme } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import {
   ladeSchadenKennzahlen,
   ladeSchaedenExport,
@@ -47,7 +48,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { modulName } from '../einsatz/modulRegistry';
 import { useCsvExport } from '../components/useCsvExport';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -353,7 +354,8 @@ export default function SchaedenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
+  // Abgeschlossen oder Spiegel: der Grund steht auf der Seite (LLH-1675).
+  const nurAnsicht = isEinsatzGesperrt(einsatz);
 
   const geladen = schaedenQuery.data?.pages.flat() ?? [];
   const ausschnitt = ausschnittQuery.data;
@@ -425,16 +427,13 @@ export default function SchaedenPage() {
       neueZeile={darfSchreiben ? () => setErfassenOffen(true) : undefined}
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
-          <Flex vertical gap={8}>
-            {nurAnsicht && (
-              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-            )}
-            <SpeicherFehler
-              fehler={csvExport.fehler}
-              titel="Export fehlgeschlagen"
-              fallback="Keine Verbindung zum Server — Export nicht möglich"
-            />
-          </Flex>
+          <SeitenHinweise
+            rechteText={einsatzRechteGrund(einsatz)}
+            rechteFehlt={nurAnsicht}
+            fehler={csvExport.fehler}
+            fehlerTitel="Export fehlgeschlagen"
+            fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
+          />
         )
       }
     >

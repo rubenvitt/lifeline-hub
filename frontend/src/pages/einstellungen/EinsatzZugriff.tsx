@@ -46,7 +46,7 @@ export default function EinsatzZugriff() {
     <>
       {daten.istAktiv && !darfVerwalten && (
         <div style={{ marginBottom: token.margin }}>
-          <RechteHinweis sichtbar text={NUR_LEITUNG} />
+          <RechteHinweis sichtbar text={daten.rechteGrund(NUR_LEITUNG)} />
         </div>
       )}
       <MitgliederAbschnitt
