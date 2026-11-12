@@ -38,11 +38,15 @@ Abruf, zweiter sind die Webhooks (LLH-1656).
     `lage.changed` braucht `lage:read`.
 - **Leserouten** (Scope `einsaetze:read`):
   - `GET /api/v1/einsaetze`: die laufenden, für den Zugang freigegebenen Einsätze, dazu der
-    Cursor für den Neuaufbau.
+    Cursor für den Neuaufbau. LLH-1638 erlaubt heute einen Einsatz je Anbindung; die Route ist
+    trotzdem eine Liste, damit der Vertrag bleibt, wenn diese Grenze fällt.
   - `GET /api/v1/einsaetze/{id}`: ein Einsatz, sonst `404 not_found`.
   - Felder: `id`, `einsatznummer`, `bezeichnung`, `stichwort`, `einsatzart`, `leitstellen_nr`,
     `einsatzort`, `koordinate`, `begonnen_at`. Sachverhalt, meldende Stelle und Betroffenenzahl
     bleiben draußen.
+- **Freigebbare Zugänge:** Die Einsatzleitung kann einen Einsatz auch für einen Zugang mit
+  `einsaetze:read` freigeben, nicht nur für einen mit `lage:read` (LLH-1638). `events:read`
+  allein macht einen Zugang nicht freigebbar, weil es keine Ereignisart öffnet.
 - **Aufbewahrung:** Ereignisse werden nach sieben Tagen gelöscht (Phase C des Purge-Laufs). Die
   Löschgrenze bleibt festgehalten, damit ein alter Cursor erkannt wird.
 - **Neue ADR:** Die Outbox wird per Trigger und je Zugang geschrieben; kein Rust-Schreibweg
@@ -88,13 +92,16 @@ Einsatzfreigabe steht in der Spec, die LLH-1638 anlegt oder ändert.
   - neu: `src/public_api/events.rs` (Abruf, Wartegrenzen, Purge, Ereignisart als `wire_enum!`)
     und `src/public_api/einsaetze.rs` (Leserouten, Schema `Einsatz`);
   - `src/public_api/mod.rs` (Routen mit `ScopeAnforderung`), `src/public_api/description.md`;
+  - `src/public_api/scope.rs`: `Scope::braucht_einsatzfreigabe()` aus LLH-1638 gilt auch für
+    `einsaetze:read`;
   - `src/einsatz/purge_scheduler.rs` (Phase C);
   - `src/einsatz/schwaerzung_registry.rs` und `src/instanz/spiegel/art.rs` (Einordnung der neuen
     Tabelle);
   - kein Eingriff in `src/einsatz/repo.rs`, `src/live/` oder die Spiegel-Übernahme.
-- **Migration:** eine Datei mit zwei Tabellen und den Triggern an `einsatz`,
-  `einsatz_aenderung` und der Freigabe-Tabelle aus LLH-1638. Die Nummer liegt über allen auf
-  `alpha`, also auch über der von LLH-1638.
+- **Migrationen:** zwei Dateien. Die erste legt die zwei Tabellen an und braucht LLH-1638 nicht.
+  Die zweite legt die Trigger an `einsatz`, `einsatz_aenderung` und `maschinenzugang_freigabe`
+  an und kommt hinter die Migrationen von LLH-1638 (0335, 0336). Beide Nummern liegen über allen
+  auf `alpha`.
 - **Vertrag:** `docs/api/public-v1.json` wächst um drei Routen und ihre Schemas
   (`cargo test --test public_api_spec_aktuell`); `tests/enum_wire_kontrakt.rs` bekommt die
   Ereignisart.
@@ -102,5 +109,7 @@ Einsatzfreigabe steht in der Spec, die LLH-1638 anlegt oder ändert.
 - **Doku:** `docs/api/ereignisse.md` (neu), `docs/api/maschinenzugang.md`,
   `docs/anwender/kapitel/anbindungen.md`, `docs/architektur/` (Kapitel 6, 8, 11, neue ADR),
   `src/AGENTS.md`.
-- **Abhängigkeit:** LLH-1638 muss vor `/opsx:apply` auf `alpha` liegen. Diese Change hängt
-  Trigger an dessen Freigabe-Tabelle und liest sie in den Leserouten.
+- **Abhängigkeit:** LLH-1638 (Change `f658d8o6-lage-fuer-maschinenzugaenge`). Diese Change
+  hängt Trigger an dessen Tabelle `maschinenzugang_freigabe` und liest sie in den Leserouten.
+  Tabellen, Abruf und Purge entstehen vorher (Entscheidung Ruben, 12.11.2026); Trigger und
+  Leserouten folgen, sobald LLH-1638 auf `alpha` liegt.

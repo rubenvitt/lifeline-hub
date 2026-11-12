@@ -1,44 +1,93 @@
 # Tasks
 
-Vor 1.1: LLH-1638 liegt auf `alpha`. Jede Aufgabe entsteht per TDD: zuerst der Test, der rot
-ist, dann der Code. Rust-Tests laufen im eigenen `target/` des Checkouts; Node und pnpm nur über
-`mise exec --`.
+Jede Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code. Rust-Tests laufen im
+eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`.
 
-## 1. Voraussetzung einholen
+Die Gruppen 1 und 2 brauchen LLH-1638 nicht und entstehen sofort (Entscheidung Ruben,
+12.11.2026). Ab Gruppe 3 muss LLH-1638 (Change `f658d8o6-lage-fuer-maschinenzugaenge`) auf
+`alpha` liegen.
 
-- [ ] 1.1 `git fetch origin alpha` und `origin/alpha` in den Branch mergen. Am gemergten Stand
-  die Freigabe aus LLH-1638 gegen design.md D1 prüfen:
-  - Tabelle mit je einer Zeile je (Zugang, Einsatz);
-  - Ende als gelöschte Zeile, beim Abschluss und beim Zurücknehmen;
-  - Beginn per `INSERT`, kein `INSERT OR REPLACE`, kein UPDATE von `einsatz_id`.
+## 1. Outbox: Tabellen
 
-  Verifizieren: Tabellenname, Spalten und die Fundstellen der drei Punkte stehen als Kommentar an
-  LLH-1655. Weicht einer ab, läuft `/opsx:update`, bevor 2.1 beginnt.
-- [ ] 1.2 Test-Helfer für signierte Anfragen (`schluessel`, `senden`, `einloesen`, `signiert`,
-  `angebunden` aus `tests/maschinenzugang.rs`) aus `tests/common/` nutzbar machen, falls LLH-1638
-  das nicht schon getan hat; als eigener `refactor`-Commit. Verifizieren:
-  `cargo test --test maschinenzugang` ist ohne inhaltliche Änderung grün.
-
-## 2. Outbox: Tabellen und Trigger
-
-- [ ] 2.1 Migration mit Nummer über allen auf `origin/alpha`: `maschine_ereignis`,
-  `maschine_ereignis_stand`, die zwei Indizes (D4), noch ohne Trigger. Einordnung nach D13:
+- [ ] 1.1 Erste Migration mit Nummer über allen auf `origin/alpha`: `maschine_ereignis`,
+  `maschine_ereignis_stand` und die zwei Indizes (D4), ohne Trigger. Einordnung nach D13:
   `TabellenRegel` in `schwaerzung_registry`, Eintrag in `spiegel::art::AUSGENOMMEN`. Verifizieren:
   `scripts/check-migrationen.sh`, `cargo test db::tests`, `cargo test schwaerzung_registry` und
   `cargo test instanz::spiegel::art` sind grün.
-- [ ] 2.2 Trigger an der Freigabe (D5): `…_freigabe_ereignis_i` und `…_freigabe_ereignis_d`.
-  Verifizieren mit Tests in `src/public_api/events.rs`:
+
+## 2. Abruf GET /api/v1/events (ohne Freigabe)
+
+Bis zum Merge von LLH-1638 fügen die Tests Zeilen direkt in `maschine_ereignis` ein, und zwar nur
+unter `tests/` (die ADR aus 5.1 verbietet es unter `src/`). Die Tests rufen die Funktionen aus
+`public_api::events` auf; die Tests über HTTP mit Signatur folgen in Gruppe 4, sobald die Helfer
+in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
+
+- [ ] 2.1 `wire_enum!` `EventType` in `src/public_api/events.rs` mit den vier Werten.
+  Verifizieren: Eintrag in `tests/enum_wire_kontrakt.rs`; ein Test vergleicht die Werte mit dem
+  CHECK von `maschine_ereignis`.
+- [ ] 2.2 Lesen ohne Warten (D8) als Funktion in `public_api::events`: Höchststand, Löschgrenze,
+  Arten aus den Scopes, Seite von 500, Cursor. Verifizieren mit `tests/public_api_events.rs`:
+  - ohne `after` kommt der Höchststand ohne Ereignisse;
+  - Zeilen eines Zugangs kommen aufsteigend ab dem Cursor; Zeilen eines anderen Zugangs nie;
+  - 600 Zeilen kommen in zwei Seiten, der Cursor der ersten ist die `id` der 500.;
+  - mit `lage:read` ohne `einsaetze:read` kommt nur `lage.changed`, umgekehrt nur `einsatz.*`;
+  - ein Zugang ohne eigene Zeilen bekommt den Höchststand als Cursor, auch wenn nur andere
+    Zugänge Zeilen haben;
+  - ein Cursor unter `purged_until` und ein Cursor über dem Höchststand ergeben `cursor_expired`.
+- [ ] 2.3 Long-Poll (D9): Nachfragen im Sekundentakt, keine gehaltene Verbindung. Verifizieren:
+  - ein wartender Abruf kehrt binnen zwei Sekunden zurück, nachdem eine Zeile entstanden ist;
+  - ohne Zeile kehrt er nach der Wartezeit leer mit dem Cursor zurück (verkürztes Intervall im
+    Test);
+  - mit einem Pool der Größe 1 kann während des Wartens geschrieben werden.
+- [ ] 2.4 Wartegrenzen (D10): 32 gesamt, einer je Zugang. Verifizieren:
+  - der zweite wartende Abruf desselben Zugangs kehrt sofort zurück und meldet „nicht gewartet“,
+    der erste wartet weiter;
+  - bei belegten Plätzen kehrt ein weiterer Zugang sofort zurück (Grenze im Test verkleinert);
+  - ein abgebrochener wartender Abruf gibt seinen Platz frei.
+- [ ] 2.5 Purge (D12): `public_api::events::purge` in Phase C von `purge_scheduler`, Modulkopf
+  dort nachgetragen. Verifizieren: Ein Test mit acht und sechs Tage alten Zeilen löscht nach
+  einem Lauf nur die alten und setzt `purged_until`; danach ergibt der alte Cursor
+  `cursor_expired`.
+- [ ] 2.6 Route: Handler mit `#[utoipa::path]`, Schemas `EventsResponse` und `Event`, Prüfung
+  von `after` und `wait` (0 bis 25, sonst `invalid_field`), `Retry-After: 10` an der leeren
+  Antwort ohne Warteplatz, Eintrag in `public_api::router()` mit
+  `ScopeAnforderung::Scope(Scope::EventsRead)`, Antwort über `client.antwort(..)`. Verifizieren:
+  - Unit-Tests der Parameterprüfung (`abc`, `-1`, `60`, `x`, fehlend);
+  - `cargo test --test maschinenzugang` (Inventar der Scope-Angaben), `cargo test --test
+    public_api` und `cargo test --test zulassung_guard` sind grün; die Route steht nicht in
+    `OHNE_ZULASSUNGSGRENZE`.
+- [ ] 2.7 Vertrag: `src/public_api/description.md` um die Ereignisarten, `after`, `wait` und das
+  Verhalten bei 410 ergänzen; `cargo test --test public_api_spec_aktuell` und
+  `docs/api/public-v1.json` committen. Verifizieren: `scripts/check-typ-codegen.sh` ist grün.
+
+## 3. Trigger (nach LLH-1638)
+
+- [ ] 3.1 `git fetch origin alpha` und `origin/alpha` in den Branch mergen (LLH-1638 liegt
+  darauf); das erzeugte `docs/api/public-v1.json` neu erzeugen statt zusammenführen. Am gemergten
+  Stand design.md D1 prüfen:
+  - Tabelle `maschinenzugang_freigabe` mit den Spalten aus D1;
+  - der Upsert in `public_api::freigabe::freigeben_tx` ist kein `INSERT OR REPLACE`;
+  - die Zeile endet durch `DELETE` beim Abschluss, Zurücknehmen, Widerruf und Scope-Entzug.
+
+  Verifizieren: Die Fundstellen stehen als Kommentar an LLH-1655, und `cargo test` der Gruppen 1
+  und 2 ist am gemergten Stand grün. Weicht ein Punkt ab, läuft `/opsx:update`, bevor 3.2
+  beginnt.
+- [ ] 3.2 Zweite Migration (Nummer über allen auf `origin/alpha`) mit den Triggern an der
+  Freigabe (D5): `…_freigabe_ereignis_i`, `…_freigabe_ereignis_d`, `…_freigabe_ereignis_u`.
+  Verifizieren mit Tests in `tests/public_api_events.rs` über `public_api::freigabe`:
   - Freigabe eines laufenden Einsatzes schreibt `einsatz.created` und `lage.changed` für genau
     diesen Zugang;
   - Zurücknehmen schreibt `einsatz.closed` nur für diesen Zugang;
+  - Umstellen auf einen anderen Einsatz schreibt `einsatz.closed` für den alten und
+    `einsatz.created` für den neuen;
   - Löschen eines Zugangs samt Freigabe scheitert nicht und hinterlässt keine Zeile.
-- [ ] 2.3 Trigger am Kopf (D7): `einsatz_ereignis_kopf` und die Konstante `KOPF_SPALTEN`.
+- [ ] 3.3 Trigger am Kopf (D7): `einsatz_ereignis_kopf` und die Konstante `KOPF_SPALTEN`.
   Verifizieren:
   - je Spalte aus `KOPF_SPALTEN` ergibt eine Änderung ein `einsatz.updated` je Freigabe;
   - eine Änderung nur an `sachverhalt` ergibt keines, ebenso ein UPDATE mit gleichen Werten;
   - ohne Freigabe entsteht nichts;
   - ein Test vergleicht `KOPF_SPALTEN` mit dem Trigger-Text aus `sqlite_master`.
-- [ ] 2.4 Trigger für das Ende (D5): `einsatz_ereignis_ende` und `einsatz_ereignis_d`.
+- [ ] 3.4 Trigger für das Ende (D5): `einsatz_ereignis_ende` und `einsatz_ereignis_d`.
   Verifizieren:
   - `einsatz::repo::abschliessen` ergibt je Zugang genau ein `einsatz.closed`;
   - ein Statuswechsel ohne Löschen der Freigabe (Weg der Spiegel-Übernahme) ebenso;
@@ -46,88 +95,66 @@ ist, dann der Code. Rust-Tests laufen im eigenen `target/` des Checkouts; Node u
     Zugang und keine frühere Zeile zurück;
   - Löschen eines abgeschlossenen Einsatzes lässt keine Zeile zurück (`cargo test
     skelett_loeschung` grün).
-- [ ] 2.5 Trigger für die Lage (D6): `einsatz_aenderung_ereignis_i`, `einsatz_ereignis_lage` und
+- [ ] 3.5 Trigger für die Lage (D6): `einsatz_aenderung_ereignis_i`, `einsatz_ereignis_lage` und
   die Konstante `LAGE_ARTEN`. Verifizieren:
   - zwanzig Einfügungen in `einsatz_person` ergeben je Zugang eine Zeile `lage.changed`, deren
     `id` mit jeder Änderung steigt;
   - ein neuer ETB-Eintrag ergibt keine;
   - eine geänderte `bezeichnung` ergibt `einsatz.updated` und `lage.changed`;
   - ein Test vergleicht `LAGE_ARTEN` mit dem Trigger-Text und prüft, dass jede Art in
-    `spiegel::art::GESPIEGELT` steht.
-- [ ] 2.6 Die Ereignisse entstehen auf den Wegen neben der Oberfläche. Verifizieren:
+    `spiegel::art::GESPIEGELT` steht; die Quellen von `public_api::lage` sind gegen die Liste
+    gelesen, das Ergebnis steht im Kommentar an `LAGE_ARTEN`.
+- [ ] 3.6 Die Tests aus Gruppe 2 fügen nicht mehr direkt ein, wo ein Trigger dasselbe leistet.
+  Verifizieren: `git grep -n 'INSERT INTO maschine_ereignis' -- src tests` zeigt nur noch Tests,
+  die eine Menge oder ein Alter brauchen (Seiten, Purge), jeweils mit Kommentar.
+- [ ] 3.7 Die Ereignisse entstehen auf den Wegen neben der Oberfläche. Verifizieren:
   - ein Test in `tests/` übernimmt für einen freigegebenen Spiegel einen geänderten Kopf und
     findet `einsatz.updated` (Muster der bestehenden Spiegel-Tests);
   - eine zurückgerollte Transaktion hinterlässt keine Zeile;
   - `cargo test --test demo_daten` ist unverändert grün.
-- [ ] 2.7 Schreiblast messen: Demo-Import der größten Lage vor und nach der Migration, je drei
-  Läufe. Verifizieren: Die Zahlen stehen als Kommentar an LLH-1655; liegt der Import mehr als
-  10 % langsamer, wird der Befund vor Gruppe 3 mit Ruben besprochen.
+- [ ] 3.8 Schreiblast messen: Demo-Import der größten Lage vor und nach der Trigger-Migration, je
+  drei Läufe. Verifizieren: Die Zahlen stehen als Kommentar an LLH-1655; liegt der Import mehr
+  als 10 % langsamer, wird der Befund vor Gruppe 4 mit Ruben besprochen.
 
-## 3. Abruf GET /api/v1/events
+## 4. Abruf über HTTP und Leserouten (nach LLH-1638)
 
-- [ ] 3.1 `wire_enum!` `EventType` in `src/public_api/events.rs` mit den vier Werten.
-  Verifizieren: Eintrag in `tests/enum_wire_kontrakt.rs`; ein Test vergleicht die Werte mit dem
-  CHECK von `maschine_ereignis`.
-- [ ] 3.2 Lesen ohne Warten (D8): Handler mit `#[utoipa::path]`, Schemas `EventsResponse` und
-  `Event`, Route in `public_api::router()` mit `ScopeAnforderung::Scope(Scope::EventsRead)`,
-  Antwort über `client.antwort(..)`. Verifizieren mit `tests/public_api_events.rs`:
-  - ohne `after` kommt sofort `{cursor, events: []}`;
-  - nach Freigabe, zwei Kopfänderungen und Abschluss liefert der alte Cursor die vier Ereignisse
-    in Reihenfolge (Akzeptanzkriterium „zehn Minuten offline“);
-  - 600 Ereignisse kommen in zwei Seiten;
-  - `after=abc` ergibt 400 `invalid_field`;
-  - ohne `events:read` 403 `missing_scope`;
+- [ ] 4.1 `Scope::braucht_einsatzfreigabe()` gilt auch für `EinsaetzeRead` (D15). Verifizieren:
+  - Unit-Test: wahr für `lage:read` und `einsaetze:read`, falsch für `events:read` und die
+    übrigen;
+  - ein Zugang nur mit `einsaetze:read` steht in `GET /api/einsaetze/{id}/anbindungen` und lässt
+    sich freigeben; einer nur mit `events:read` nicht;
+  - Entzug von `einsaetze:read` als letztem solchen Scope löscht die Freigabe und ergibt
+    `einsatz.closed`;
+  - Texte im Paneel „Anbindungen“ der Seite „Geräte“, die nur von „Lage“ sprechen, sind
+    angepasst (Vitest des Paneels grün).
+- [ ] 4.2 Abruf über HTTP mit signierten Anfragen (Helfer aus `tests/common`). Verifizieren:
+  - nach Freigabe, zwei Kopfänderungen und Abschluss liefert der alte Cursor die Ereignisse in
+    Reihenfolge (Akzeptanzkriterium „zehn Minuten offline“);
+  - `after=abc` und `wait=60` ergeben 400 `invalid_field`, ohne `events:read` 403
+    `missing_scope`;
   - ein Zugang einer anderen Org und ein Zugang ohne Freigabe sehen nichts;
-  - mit `lage:read` ohne `einsaetze:read` kommt nur `lage.changed`;
+  - ein Abruf mit `wait=25` antwortet binnen zwei Sekunden nach einer Kopfänderung;
+  - der zweite wartende Abruf desselben Zugangs antwortet sofort mit 200 und `Retry-After: 10`;
+  - nach dem Purge ergibt der alte Cursor 410 `cursor_expired`;
   - die Antwort trägt nur `id`, `type`, `occurred_at`, `einsatz_id` und eine gültige
     Antwortsignatur.
-- [ ] 3.3 Cursor ohne Ereignisse und 410 (D8). Verifizieren:
-  - ein Zugang ohne eigene Ereignisse bekommt den Höchststand als Cursor, auch wenn nur andere
-    Zugänge Ereignisse haben;
-  - ein Cursor unter `purged_until` und ein Cursor über dem Höchststand ergeben je 410
-    `cursor_expired`.
-- [ ] 3.4 Long-Poll (D9): `wait` von 0 bis 25, Nachfragen im Sekundentakt, keine gehaltene
-  Verbindung. Verifizieren:
-  - `wait=60` und `wait=x` ergeben 400 `invalid_field`;
-  - ein Abruf mit `wait=25` antwortet binnen zwei Sekunden nach einer Kopfänderung;
-  - `wait=3` ohne Ereignis antwortet nach etwa drei Sekunden leer (mit verkürztem Intervall im
-    Test);
-  - ein Test mit einem Pool der Größe 1 zeigt, dass während des Wartens eine andere Anfrage
-    schreiben kann.
-- [ ] 3.5 Wartegrenzen (D10): 32 gesamt, einer je Zugang, sonst sofort mit `Retry-After: 10`.
-  Verifizieren:
-  - der zweite wartende Abruf desselben Zugangs antwortet sofort mit 200 und `Retry-After: 10`,
-    der erste wartet weiter;
-  - bei belegten 32 Plätzen antwortet ein weiterer Zugang sofort (Grenze im Test verkleinert);
-  - ein abgebrochener wartender Abruf gibt seinen Platz frei;
-  - `cargo test --test zulassung_guard` ist grün, die Route steht nicht in
-    `OHNE_ZULASSUNGSGRENZE`.
-- [ ] 3.6 Purge (D12): `public_api::events::purge` in Phase C von `purge_scheduler`, Modulkopf
-  dort nachgetragen. Verifizieren: Ein Test mit acht und sechs Tage alten Zeilen löscht nach
-  einem Lauf nur die alten und setzt `purged_until`; danach ergibt der alte Cursor 410.
-- [ ] 3.7 Vertrag: `src/public_api/description.md` um die Ereignisarten, `after`, `wait` und das
-  Verhalten bei 410 ergänzen; `cargo test --test public_api_spec_aktuell` und
-  `docs/api/public-v1.json` committen. Verifizieren: `scripts/check-typ-codegen.sh`,
-  `cargo test --test public_api` und `cargo test --test maschinenzugang` sind grün.
-
-## 4. Leserouten für Einsätze
-
-- [ ] 4.1 Schema `Einsatz` und `Koordinate` in `src/public_api/einsaetze.rs`, `SELECT` aus
+- [ ] 4.3 Schema `Einsatz` und `Koordinate` in `src/public_api/einsaetze.rs`, `SELECT` aus
   `KOPF_SPALTEN` (D11). Verifizieren: Ein Unit-Test serialisiert einen Einsatz mit Sachverhalt
   und meldender Stelle und findet beides nicht; ohne Koordinate fehlt das Feld.
-- [ ] 4.2 `GET /api/v1/einsaetze` mit `ScopeAnforderung::Scope(Scope::EinsaetzeRead)`.
+- [ ] 4.4 `GET /api/v1/einsaetze` mit `ScopeAnforderung::Scope(Scope::EinsaetzeRead)`.
   Verifizieren mit `tests/public_api_einsaetze.rs`:
-  - nur laufende, freigegebene Einsätze der eigenen Org stehen in der Liste;
+  - nur der laufende, freigegebene Einsatz der eigenen Org steht in der Liste;
   - ohne Freigabe kommt eine leere Liste mit Cursor;
   - ein abgeschlossener Einsatz fehlt;
   - ein Ereignis nach dem Lesen der Liste kommt beim Abruf ab dem gelieferten Cursor
     (Neuaufbau nach 410).
-- [ ] 4.3 `GET /api/v1/einsaetze/{id}`. Verifizieren:
+- [ ] 4.5 `GET /api/v1/einsaetze/{id}`. Verifizieren:
   - freigegeben und laufend ergibt 200;
   - nicht freigegeben, fremde Org, abgeschlossen, unbekannt und `id` ohne Zahl ergeben dieselbe
     404 `not_found`;
-  - ohne `einsaetze:read` 403 `missing_scope`.
-- [ ] 4.4 Vertrag nachziehen: `cargo test --test public_api_spec_aktuell`,
+  - ohne `einsaetze:read` 403 `missing_scope`;
+  - der Test aus LLH-1638 über `braucht_einsatzfreigabe()` deckt beide Leserouten.
+- [ ] 4.6 Vertrag nachziehen: `cargo test --test public_api_spec_aktuell`,
   `docs/api/public-v1.json` committen. Verifizieren: `scripts/check-typ-codegen.sh` und
   `cargo test --test maschinenzugang` (Inventar der Scope-Angaben) sind grün.
 
@@ -152,8 +179,9 @@ ist, dann der Code. Rust-Tests laufen im eigenen `target/` des Checkouts; Node u
   Kommando einmal durchgespielt; die Ausgabe steht im PR.
 - [ ] 5.5 `docs/anwender/kapitel/anbindungen.md`: Abschnitt „Rechte“ sagt, was „Einsätze lesen“
   und „Ereignisse abrufen“ heute öffnen, und dass ohne Freigabe der Einsatzleitung nichts
-  hinausgeht. Der Satz „Heute nutzt ein Fremdsystem nur die Prüfung seiner Anmeldung“ fällt.
-  Verifizieren: `mise exec -- pnpm -C frontend test anwenderdoku` ist grün.
+  hinausgeht. Der Satz „Heute nutzt ein Fremdsystem nur die Prüfung seiner Anmeldung“ fällt,
+  soweit LLH-1638 ihn stehen ließ. Zeigt ein Bild des Kapitels das Paneel aus 4.1, wird es neu
+  erzeugt. Verifizieren: `mise exec -- pnpm -C frontend test anwenderdoku` ist grün.
 - [ ] 5.6 Konzept `docs/konzepte/2026-11-11-oeffentliche-api.md`: im Abschnitt „Richtung hinaus“
   ein Satz mit Verweis auf die ADR, dass Trigger und Sichtbarkeit je Zugang den Wortlaut dort
   ablösen. Verifizieren: Der Verweis löst auf.
@@ -164,8 +192,8 @@ ist, dann der Code. Rust-Tests laufen im eigenen `target/` des Checkouts; Node u
   ungekürzt bereit.
 - [ ] 6.2 Durchspiel am laufenden Stack mit Demo-Daten: Zugang mit `events:read` und
   `einsaetze:read` anlegen und einlösen, Einsatz freigeben, Kopf ändern, abschließen; dazwischen
-  `GET /api/v1/events` mit `wait=25`. Verifizieren: Die vier Ereignisse kommen in Reihenfolge,
-  die Antworten stehen im PR (statt Bildern: die Änderung hat keine Oberfläche).
+  `GET /api/v1/events` mit `wait=25`. Verifizieren: Die Ereignisse kommen in Reihenfolge, die
+  Antworten stehen im PR; ändert 4.1 das Paneel sichtbar, kommt davon ein Bild dazu.
 
 ## Workflow follow-up
 

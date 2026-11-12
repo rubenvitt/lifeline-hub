@@ -64,6 +64,10 @@ ihn freigegeben wird. Das MUST auch gelten, wenn der Einsatz schon länger beste
 - **WHEN** die Einsatzleitung einen seit zwei Stunden laufenden Einsatz für einen Zugang freigibt
 - **THEN** liefert der nächste Abruf des Zugangs ein `einsatz.created` mit der ID dieses Einsatzes
 
+#### Scenario: Anbindung auf einen anderen Einsatz umgestellt
+- **WHEN** die Einsatzleitung eine Anbindung, die den laufenden Einsatz A liest, auf den laufenden Einsatz B umstellt
+- **THEN** liefert der nächste Abruf des Zugangs ein `einsatz.closed` für A und ein `einsatz.created` für B
+
 #### Scenario: Neuer Einsatz ohne Freigabe
 - **WHEN** ein Einsatz angelegt wird und für keinen Zugang freigegeben ist
 - **THEN** entsteht kein Ereignis
@@ -89,8 +93,9 @@ ein Schreiben ohne geänderten Wert MUST NOT `einsatz.updated` auslösen.
 ### Requirement: Das Ende der Lesbarkeit meldet einsatz.closed
 
 Das System SHALL `einsatz.closed` für einen Zugang festhalten, wenn ein freigegebener Einsatz für
-ihn nicht mehr lesbar ist: Der Einsatz wird abgeschlossen, die Freigabe wird zurückgenommen, oder
-der laufende Einsatz wird gelöscht. Je Zugang und Ende MUST genau ein `einsatz.closed` entstehen.
+ihn nicht mehr lesbar ist: Der Einsatz wird abgeschlossen, die Freigabe wird zurückgenommen oder
+auf einen anderen Einsatz umgestellt, oder der laufende Einsatz wird gelöscht. Je Zugang und Ende
+MUST genau ein `einsatz.closed` entstehen.
 
 #### Scenario: Abschluss
 - **WHEN** die Einsatzleitung einen freigegebenen Einsatz abschließt
