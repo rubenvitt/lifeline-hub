@@ -19,13 +19,13 @@ use utoipa::ToSchema;
 /// Live-Ereignis des Wechsels dürfen nicht daran scheitern; ohne Anstoß meldet sich die Kopplung
 /// mit ihrem nächsten regulären Takt.
 pub async fn anstossen(pool: &SqlitePool) {
-    let ergebnis = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE instanz_kopplung SET naechste_meldung_at = NULL \
          WHERE richtung = 'meldet_sich' AND zustand = 'aktiv'",
     )
     .execute(pool)
-    .await;
-    if let Err(e) = ergebnis {
+    .await
+    {
         tracing::warn!(error = %e, "Führung: nächste Meldung nicht angestoßen");
     }
 }

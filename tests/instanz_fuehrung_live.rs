@@ -16,9 +16,9 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::{Mutex, MutexGuard};
 
 /// Der prozessweite Verteiler, einmal gesetzt.
-fn verteiler() -> LiveHub {
-    static VERTEILER: OnceLock<LiveHub> = OnceLock::new();
-    VERTEILER
+fn live_hub() -> LiveHub {
+    static LIVE_HUB: OnceLock<LiveHub> = OnceLock::new();
+    LIVE_HUB
         .get_or_init(|| {
             let live = LiveHub::new();
             lifeline_hub::instanz::stammdaten::set_live(live.clone());
@@ -28,9 +28,9 @@ fn verteiler() -> LiveHub {
 }
 
 /// Nacheinander: Die Einsatz-IDs der Tests decken sich auf dem gemeinsamen Verteiler.
-async fn nacheinander() -> MutexGuard<'static, ()> {
-    static SPERRE: Mutex<()> = Mutex::const_new(());
-    SPERRE.lock().await
+async fn lock_serial() -> MutexGuard<'static, ()> {
+    static SERIAL_LOCK: Mutex<()> = Mutex::const_new(());
+    SERIAL_LOCK.lock().await
 }
 
 async fn post(i: &Instanz, pfad: &str, body: Value) -> (StatusCode, Value) {
@@ -50,8 +50,8 @@ async fn elw_meldet(elw: &Instanz) {
 /// Hub und ELW gekoppelt, Führung an, ein Einsatz des ELW am Hub gespiegelt. Der Hub legt vorher
 /// zwei eigene Einsätze an, damit sich die Einsatz-IDs beider Seiten auf dem gemeinsamen
 /// Verteiler nicht decken. Liefert (Hub, ELW, Verteiler, Einsatz am ELW, Akte am Hub).
-async fn aufbau() -> (Instanz, Instanz, LiveHub, i64, i64) {
-    let live = verteiler();
+async fn setup() -> (Instanz, Instanz, LiveHub, i64, i64) {
+    let live = live_hub();
     let elw = instanz().await;
     let hub = instanz().await;
     for i in [&hub, &elw] {
@@ -85,18 +85,18 @@ async fn aufbau() -> (Instanz, Instanz, LiveHub, i64, i64) {
     (hub, elw, live, e, akte)
 }
 
-fn hat_kopf(rx: &mut Receiver<LiveNachricht>) -> bool {
-    let mut kopf = false;
+fn has_kopf(rx: &mut Receiver<LiveNachricht>) -> bool {
+    let mut found = false;
     while let Ok(m) = rx.try_recv() {
-        kopf |= m.event == LiveEvent::Einsatz;
+        found |= m.event == LiveEvent::Einsatz;
     }
-    kopf
+    found
 }
 
 #[tokio::test]
 async fn bestaetigter_code_meldet_den_einsatzkopf_am_elw() {
-    let _reihe = nacheinander().await;
-    let (hub, elw, live, e, akte) = aufbau().await;
+    let _serial = lock_serial().await;
+    let (hub, elw, live, e, akte) = setup().await;
     let (s, v) = post(
         &elw,
         &format!("/api/einsaetze/{e}/fuehrung/code"),
@@ -119,13 +119,13 @@ async fn bestaetigter_code_meldet_den_einsatzkopf_am_elw() {
     )
     .await;
     assert_eq!(art, "notuebernahme", "der Code ist bestätigt");
-    assert!(hat_kopf(&mut rx), "der Wechsel meldet den Einsatzkopf");
+    assert!(has_kopf(&mut rx), "der Wechsel meldet den Einsatzkopf");
 }
 
 #[tokio::test]
 async fn bestaetigung_des_gegenuebers_meldet_den_einsatzkopf_am_hub() {
-    let _reihe = nacheinander().await;
-    let (hub, elw, live, e, akte) = aufbau().await;
+    let _serial = lock_serial().await;
+    let (hub, elw, live, e, akte) = setup().await;
     let (s, start) = post(
         &hub,
         &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start"),
@@ -167,5 +167,5 @@ async fn bestaetigung_des_gegenuebers_meldet_den_einsatzkopf_am_hub() {
     )
     .await;
     assert_eq!(art, "bestaetigt");
-    assert!(hat_kopf(&mut rx), "der Wechsel meldet den Einsatzkopf");
+    assert!(has_kopf(&mut rx), "der Wechsel meldet den Einsatzkopf");
 }

@@ -122,8 +122,8 @@ async fn run_uebergeben(
     b: &Benutzer,
     an: &str,
 ) -> Result<FuehrungAnzeige, AppError> {
-    let neu = dienst::uebergeben(&state.pool, a.id, an, &b.anzeigename).await?;
-    danach(state, &neu).await
+    let saved = dienst::uebergeben(&state.pool, a.id, an, &b.anzeigename).await?;
+    danach(state, &saved).await
 }
 
 async fn run_code(
@@ -133,22 +133,22 @@ async fn run_code(
     an: &str,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungCodeAntwort, AppError> {
-    let (c, neu) = dienst::code_abgeben(&state.pool, a.id, an, &b.anzeigename).await?;
+    let (c, saved) = dienst::code_abgeben(&state.pool, a.id, an, &b.anzeigename).await?;
     // Der Code ist die Zustimmung dieser Seite zur Notübernahme durch das Gegenüber (LLH-1674).
     let text = format!(
         "Abgabecode für die Notübernahme durch {} erzeugt",
-        neu.fuehrer_name
+        saved.fuehrer_name
     );
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    let fuehrung = danach(state, &neu).await?;
+    let fuehrung = danach(state, &saved).await?;
     Ok(FuehrungCodeAntwort {
         code: code::format_anzeige(&c),
         fuehrung,
@@ -156,8 +156,8 @@ async fn run_code(
 }
 
 async fn run_anfragen(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige, AppError> {
-    let neu = dienst::anfragen(&state.pool, a.id).await?;
-    danach(state, &neu).await
+    let saved = dienst::anfragen(&state.pool, a.id).await?;
+    danach(state, &saved).await
 }
 
 async fn run_notuebernahme(
@@ -168,19 +168,19 @@ async fn run_notuebernahme(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
-    let neu =
+    let saved =
         dienst::notuebernahme_gegen_erreichte(&state.pool, a.id, grund, &b.anzeigename).await?;
     let text = format!("Notübernahme gegen {vorher}: {}", grund.trim());
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_start(
@@ -267,7 +267,7 @@ async fn run_abschluss(
     let e = NotuebernahmeErklaerung::parse(&erklaerung)
         .ok_or_else(|| AppError::Internal("Erklärung unlesbar".into()))?;
     let vorher = a.fuehrer_name.clone();
-    let neu = dienst::notuebernahme_gegen_meldende(
+    let saved = dienst::notuebernahme_gegen_meldende(
         &state.pool,
         a.id,
         &e,
@@ -282,12 +282,12 @@ async fn run_abschluss(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_mit_code(
@@ -298,7 +298,7 @@ async fn run_mit_code(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
-    let neu =
+    let saved =
         dienst::notuebernahme_mit_code(&state.pool, a.id, &body.grund, &body.code, &b.anzeigename)
             .await?;
     let text = format!(
@@ -309,12 +309,12 @@ async fn run_mit_code(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_bestaetigen(
@@ -323,24 +323,27 @@ async fn run_bestaetigen(
     b: &Benutzer,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
-    let neu = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
-    let grund = neu
+    let saved = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
+    let grund = saved
         .erklaerung
         .as_deref()
         .and_then(NotuebernahmeErklaerung::parse)
         .map(|e| e.grund)
         .unwrap_or_default();
-    let text = format!("Notübernahme durch {} bestätigt: {grund}", neu.fuehrer_name);
+    let text = format!(
+        "Notübernahme durch {} bestätigt: {grund}",
+        saved.fuehrer_name
+    );
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,
         b,
-        &neu,
+        &saved,
         &text,
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 async fn run_widersprechen(
@@ -349,17 +352,17 @@ async fn run_widersprechen(
     b: &Benutzer,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
-    let neu = dienst::widersprechen(&state.pool, a.id, &b.anzeigename).await?;
+    let saved = dienst::widersprechen(&state.pool, a.id, &b.anzeigename).await?;
     spur(
         state,
         AdminAktion::FuehrungWiderspruch,
         b,
-        &neu,
+        &saved,
         "Notübernahme widersprochen",
         peer_ip,
     )
     .await;
-    danach(state, &neu).await
+    danach(state, &saved).await
 }
 
 // ── Lokaler Einsatz ──────────────────────────────────────────────────────────────────────────

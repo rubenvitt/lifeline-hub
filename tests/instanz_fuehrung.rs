@@ -200,15 +200,14 @@ async fn aktionen(pool: &sqlx::SqlitePool) -> Vec<String> {
 
 /// Die Führungseinträge der Admin-Spur: Aktion, ob eine Person dieser Instanz handelte, Grund.
 async fn spur_fuehrung(pool: &sqlx::SqlitePool) -> Vec<(String, bool, String)> {
-    let zeilen: Vec<(String, Option<i64>, Option<String>)> = sqlx::query_as(
+    let rows: Vec<(String, Option<i64>, Option<String>)> = sqlx::query_as(
         "SELECT aktion, akteur_id, detail FROM admin_audit WHERE aktion LIKE 'fuehrung_%' \
          ORDER BY id",
     )
     .fetch_all(pool)
     .await
     .unwrap();
-    zeilen
-        .into_iter()
+    rows.into_iter()
         .map(|(aktion, akteur, detail)| {
             let grund = detail
                 .and_then(|d| serde_json::from_str::<Value>(&d).ok())
