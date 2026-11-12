@@ -5,6 +5,7 @@ use super::*;
 use crate::einsatz::archiv::tests::{leitung, schluessel};
 use crate::einsatz::repo::{abschliessen, anlegen, NeuerEinsatzDaten};
 use crate::einsatz::retention::Datenkategorie as K;
+use crate::instanz::spiegel::paket::KontoAngabe;
 use age::secrecy::ExposeSecret;
 use std::path::PathBuf;
 
@@ -270,6 +271,49 @@ async fn eingespielt_schreibgeschuetzt_mit_platzhaltern_und_nach_7_tagen_weg() {
     )
     .await;
     assert_eq!(sichtbar, 0);
+    // Platzhalter werden nicht Mitglied, keine Admin-Route erreicht sie, und keine Kopplung kann
+    // ihre Kennung für ein eigenes Konto nennen.
+    assert_eq!(
+        eine::<i64>(
+            &pool,
+            &format!("SELECT COUNT(*) FROM einsatz_mitgliedschaft WHERE einsatz_id = {neu}")
+        )
+        .await,
+        0
+    );
+    let admin: crate::auth::Benutzer = sqlx::query_as(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(leit)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(matches!(
+        crate::routes::benutzer::ziel_laden(&pool, &admin, erfasser).await,
+        Err(AppError::NotFound)
+    ));
+    {
+        let mut c = pool.acquire().await.unwrap();
+        let kopplung: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, zustand) VALUES ('elw', '', 'ELW', 'wird_gemeldet', \
+             'aktiv') RETURNING id",
+        )
+        .fetch_one(&mut *c)
+        .await
+        .unwrap();
+        let angabe = KontoAngabe {
+            id: 5,
+            anzeigename: "Fremd".into(),
+            gegen_id: Some(erfasser),
+        };
+        let lokal =
+            crate::instanz::spiegel::abbildung::konto_lokal(&mut c, kopplung, 0, 1, false, &angabe)
+                .await
+                .unwrap();
+        assert_ne!(lokal, erfasser);
+    }
 
     // Die Anzeige nennt das Archiv und bis wann.
     let einsatz = crate::einsatz::repo::laden(&pool, neu).await.unwrap();
@@ -483,4 +527,92 @@ async fn stamm_name_deckt_die_stammdaten_des_archivs() {
             "{t} ist keine verteilte Stammdatenart"
         );
     }
+}
+
+#[tokio::test]
+async fn eine_frist_des_blocks_kuerzt_die_zeit_hier() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let id = schluessel(&pool).await;
+    let fz = fahrzeuge(&pool).await;
+    // Block 1 gilt nur bis zum Ende der Personenauskunft in 2 Tagen.
+    let (_, block) = archivierter_einsatz(&pool, leit, fz, &[(K::Personenauskunft, 2)]).await;
+    let (_dir, datei, s) = als_datei(&block, &id);
+    let jetzt = Utc::now();
+
+    let e = einspielen(&pool, &datei, &s, None, jetzt).await.unwrap();
+    let frist: String = eine(
+        &pool,
+        "SELECT frist_bis FROM einsatz_aufbewahrung_kategorie WHERE kategorie = 'personenauskunft' \
+         ORDER BY einsatz_id LIMIT 1",
+    )
+    .await;
+    assert_eq!(e.loeschen_at, frist);
+    assert!(
+        e.hinweise.iter().any(|h| h.contains("Frist des Blocks")),
+        "{:?}",
+        e.hinweise
+    );
+    let bis: String = eine(
+        &pool,
+        &format!(
+            "SELECT loeschen_at FROM einsatz_archiv_eingespielt WHERE einsatz_id = {}",
+            e.einsatz_id
+        ),
+    )
+    .await;
+    assert_eq!(bis, frist);
+    let danach = crate::zeit::formatiere_utc(jetzt + TimeDelta::days(3));
+    assert_eq!(faellige_vormerken(&pool, &danach).await, 1);
+}
+
+#[tokio::test]
+async fn ein_hier_geloeschter_block_kommt_nicht_zurueck() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let id = schluessel(&pool).await;
+    let fz = fahrzeuge(&pool).await;
+    let (alt, block) = archivierter_einsatz(&pool, leit, fz, &[]).await;
+    let (_dir, datei, s) = als_datei(&block, &id);
+    // Ein Löschersuchen hat das Archiv gelöscht; die heruntergeladene Kopie bleibt draußen.
+    exec(
+        &pool,
+        &format!("DELETE FROM einsatz_archiv WHERE einsatz_id = {alt}"),
+    )
+    .await;
+    let vorher = eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz").await;
+    let f = einspielen(&pool, &datei, &s, None, Utc::now())
+        .await
+        .unwrap_err();
+    assert!(f.to_string().contains("nicht mehr im Archiv"), "{f}");
+    assert_eq!(
+        eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz").await,
+        vorher
+    );
+}
+
+#[tokio::test]
+async fn ohne_org_nur_in_die_org_gleichen_namens() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let id = schluessel(&pool).await;
+    let fz = fahrzeuge(&pool).await;
+    let (_, block) = archivierter_einsatz(&pool, leit, fz, &[]).await;
+    let (_dir, datei, s) = als_datei(&block, &id);
+    // Hier heißt Org 1 anders als im Archiv, etwa an einer anderen Installation.
+    exec(
+        &pool,
+        "UPDATE organisation SET name = 'KV Süd' WHERE id = 1",
+    )
+    .await;
+
+    let f = einspielen(&pool, &datei, &s, None, Utc::now())
+        .await
+        .unwrap_err();
+    assert!(f.to_string().contains("--org"), "{f}");
+    assert!(f.to_string().contains("KV Süd"), "{f}");
+    let e = einspielen(&pool, &datei, &s, Some(1), Utc::now())
+        .await
+        .unwrap();
+    assert_eq!(e.org_name, "KV Süd");
 }

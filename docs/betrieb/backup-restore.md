@@ -229,20 +229,34 @@ lifeline-hub --db-path … archiv einspielen --datei … --identitaet … --org 
 ```
 
 - Der Block wird mit einem privaten Archiv-Schlüssel der Organisation geöffnet, neben der
-  Datenbank als Zwischendatei (nur für den Dienst lesbar, danach gelöscht) entschlüsselt und auf
-  den Stand dieser Version gebracht. Ein Block einer neueren Version lässt sich nur dort einspielen.
+  Datenbank als Zwischendatei (nur für den Dienst lesbar, danach gelöscht, auch bei Strg+C oder
+  SIGTERM) entschlüsselt und auf den Stand dieser Version gebracht. Ein Block einer neueren
+  Version lässt sich nur dort einspielen. Nach einem harten Abbruch (`kill -9`, Absturz) löscht
+  der nächste Serverstart eine liegen gebliebene Zwischendatei, sobald sie 6 Stunden alt ist.
 - Der Einsatz erscheint als eigener Einsatz mit dem Band „Aus dem Archiv · bis …“, nur lesbar,
   für Admins und Führungskräfte der Organisation. Ein Skelett desselben Einsatzes bleibt daneben
-  unberührt.
-- **Nach 7 Tagen** löscht der Purge-Lauf ihn wieder; das Löschprotokoll nennt ihn als Spiegel
-  mit Gegenstelle „Archiv“.
+  unberührt. Offene Einsatzlisten zeigen ihn erst nach dem Neuladen.
+- **Nach 7 Tagen** löscht der Purge-Lauf ihn wieder, früher, wenn eine Frist des Blocks
+  (Datenkategorie oder Aufbewahrung) eher endet; die Ausgabe nennt das. Das Löschprotokoll nennt
+  ihn als Spiegel mit Gegenstelle „Archiv“. Bricht der Befehl nach der Übernahme ab, ist die
+  unvollständige Kopie nach einer Stunde fällig.
 - Personen aus dem Archiv stehen als gesperrte Konten mit ihrem damaligen Namen darin. Sie
-  erscheinen in keiner Verwaltung und gehen mit dem Einsatz. Fahrzeuge, Personal, Material und
-  Status gelten nur als dieselben, wenn es sie hier mit derselben Kennung und demselben Namen gibt.
-- **Abgelehnt** wird ein Block, dessen Aufbewahrung abgelaufen ist. Ist seit dem Download die
-  Frist einer Datenkategorie abgelaufen, schwärzt der Befehl sie vor dem Einspielen; die Ausgabe
-  nennt sie.
-- Das Zugangsprotokoll hält jedes Einspielen unter „Archiv eingespielt“ fest.
+  erscheinen in keiner Verwaltung, werden nicht Mitglied und gehen mit dem Einsatz. Fahrzeuge,
+  Personal, Material und Status gelten nur als dieselben, wenn es sie hier mit derselben Kennung
+  und demselben Namen gibt.
+- **Organisation:** Ohne `--org` geht der Einsatz in die Organisation mit seiner Kennung, aber
+  nur, wenn sie hier denselben Namen trägt wie im Archiv. Sonst bricht der Befehl ab, und
+  `--org` nennt die Ziel-Organisation.
+- **Abgelehnt** wird ein Block, dessen Aufbewahrung abgelaufen ist. Stammt er von dieser
+  Installation, muss er hier noch im Archiv stehen: Einen Block, den seine Frist oder ein
+  Löschersuchen gelöscht hat, oder einen endgültig gelöschten Einsatz spielt der Befehl nicht
+  ein. An einer anderen Installation weiß er davon nichts; heruntergeladene Blöcke sind beim
+  Löschersuchen mit zu löschen. Ist seit dem Download die Frist einer Datenkategorie
+  abgelaufen, schwärzt der Befehl sie vor dem Einspielen; die Ausgabe nennt sie.
+- Die Übernahme läuft in einer Transaktion. Ein großer Block hält währenddessen die Schreiber des
+  laufenden Servers auf; während eines laufenden Einsatzes besser nicht einspielen.
+- Das Zugangsprotokoll hält jedes Einspielen unter „Archiv eingespielt“ fest, in derselben
+  Transaktion wie die Übernahme.
 
 ## Sicherungen und Schwärzung (LFH-725)
 

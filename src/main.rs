@@ -627,15 +627,26 @@ async fn cmd_archiv_einspielen(
     let schluessel = identitaet_laden(identitaet)?;
     let pool = db::connect(db_path).await?;
     db::migrate(&pool).await?;
-    let ergebnis = lifeline_hub::einsatz::archiv::einspielen::einspielen(
-        &pool,
-        Path::new(datei),
-        &schluessel,
-        org,
-        chrono::Utc::now(),
-    )
-    .await;
+    // Ein Abbruch (Strg+C, SIGTERM) lässt das Einspielen fallen: so läuft `Drop` der
+    // entschlüsselten Zwischendatei, statt dass sie im Klartext neben der Datenbank liegen bleibt.
+    // Eine schon übernommene, unvollständige Kopie räumt der Purge-Lauf ab (`FERTIG_MINUTEN`).
+    let ergebnis = tokio::select! {
+        e = lifeline_hub::einsatz::archiv::einspielen::einspielen(
+            &pool,
+            Path::new(datei),
+            &schluessel,
+            org,
+            chrono::Utc::now(),
+        ) => Some(e),
+        () = shutdown_signal() => None,
+    };
     pool.close().await;
+    let Some(ergebnis) = ergebnis else {
+        anyhow::bail!(
+            "Abgebrochen. Die entschlüsselte Zwischendatei ist gelöscht; eine schon übernommene \
+             Kopie geht mit dem nächsten Purge-Lauf."
+        );
+    };
     let e = ergebnis.map_err(|e| anyhow::anyhow!("{e}"))?;
     println!(
         "Eingespielt: {} ({}) in {}, Einsatz {} mit {} Inhalten. Schreibgeschützt bis {} (UTC), \

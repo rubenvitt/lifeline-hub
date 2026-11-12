@@ -16,6 +16,12 @@
 //!   derselben ID und demselben Namen gibt ([`STAMM_NAME`]); sonst fällt der Verweis weg.
 //! - Ist die Aufbewahrung im Block abgelaufen, wird nicht eingespielt. Eine Kategorie, deren Frist
 //!   inzwischen abgelaufen ist (ein veralteter Block), wird vorher in der Zwischendatei geschwärzt.
+//!   Der Einsatz bleibt höchstens bis zur nächsten Frist des Blocks (Kategorie oder Aufbewahrung):
+//!   danach gilt der nächste Block.
+//! - Stammt der Block von dieser Installation, muss er hier noch im Archiv stehen: ein Block, den
+//!   ein Löschersuchen oder seine Frist hier gelöscht hat, kommt nicht über eine Kopie zurück.
+//! - Bis die Inhalte geschrieben sind, ist der Einsatz nach [`FERTIG_MINUTEN`] fällig: bricht der
+//!   Befehl ab, räumt Phase R den halben Einsatz bald ab.
 
 use super::bauen;
 use crate::backup::verschluesselung::Schluessel;
@@ -39,6 +45,10 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 7;
 
 /// Name der Gegenstelle eines eingespielten Einsatzes (Band, Löschprotokoll).
 pub const GEGENSTELLE: &str = "Archiv";
+
+/// So lange darf das Schreiben der Inhalte nach der Übernahme dauern; bricht der Befehl ab, ist
+/// der halbe Einsatz danach zum Abräumen fällig.
+pub const FERTIG_MINUTEN: i64 = 60;
 
 /// Wer einspielt, in der Admin-Spur.
 const BEFEHL: &str = "Befehl archiv einspielen";
@@ -116,7 +126,7 @@ pub async fn einspielen(
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let sha256 = datei_sha256(datei)?;
     let (zwischen, handle) =
-        bauen::zwischendatei(&bauen::verzeichnis(pool).await?, 0, "einspielen")?;
+        bauen::zwischendatei(&bauen::verzeichnis(pool).await?, 0, bauen::TEIL_EINSPIELEN)?;
     schluessel
         .entschluessele_datei(datei, std::io::BufWriter::new(handle))
         .and_then(|mut w| {
@@ -181,6 +191,8 @@ async fn einspielen_aus(
         )));
     }
 
+    hier_geloescht(pool, &kopf, sha256).await?;
+
     let ziel_org = org.unwrap_or(kopf.org_id);
     let org_name: String = sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
         .bind(ziel_org)
@@ -192,16 +204,47 @@ async fn einspielen_aus(
                  angeben."
             ))
         })?;
+    if org.is_none() {
+        // Org-IDs vergibt jede Installation selbst: ohne --org nur in die Org gleichen Namens.
+        let im_archiv: Option<String> =
+            sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
+                .bind(kopf.org_id)
+                .fetch_optional(archiv)
+                .await?;
+        if im_archiv.as_deref() != Some(org_name.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Organisation {ziel_org} heißt hier „{org_name}“, im Archiv „{}“; mit --org die \
+                 Ziel-Organisation angeben.",
+                im_archiv.unwrap_or_default()
+            )));
+        }
+    }
 
     let mut hinweise = Vec::new();
-    // Ein veralteter Block: was inzwischen abgelaufen ist, wird vor dem Einspielen geschwärzt.
-    let veraltet: Vec<_> = kategorie::laden(archiv, kopf.id)
+    let offen: Vec<_> = kategorie::laden(archiv, kopf.id)
         .await?
         .into_iter()
         .filter(|k| k.geschwaerzt_at.is_none())
+        .collect();
+    // Ein veralteter Block: was inzwischen abgelaufen ist, wird vor dem Einspielen geschwärzt.
+    let veraltet: Vec<_> = offen
+        .iter()
         .filter(|k| k.frist_bis.as_deref().is_some_and(|f| f <= jetzt_s))
         .map(|k| k.kategorie)
         .collect();
+    // Der Einsatz bleibt höchstens bis zur nächsten Frist des Blocks.
+    let sieben_tage = crate::zeit::formatiere_utc(jetzt + TimeDelta::days(AUFBEWAHRUNG_TAGE));
+    let loeschen_at = offen
+        .iter()
+        .filter_map(|k| k.frist_bis.clone())
+        .filter(|f| f.as_str() > jetzt_s)
+        .chain(kopf.retention_bis.clone())
+        .fold(sieben_tage.clone(), |a, f| a.min(f));
+    if loeschen_at < sieben_tage {
+        hinweise.push(format!(
+            "Eine Frist des Blocks endet am {loeschen_at} (UTC); der Einsatz geht dann schon."
+        ));
+    }
     if !veraltet.is_empty() {
         bauen::schwaerze_ohne_karenz(archiv, kopf.id, &veraltet, jetzt, "der eingespielten Datei")
             .await?;
@@ -219,7 +262,8 @@ async fn einspielen_aus(
     let kennung = format!("archiv/{}", &zufall[..16]);
     vorbereiten(pool, archiv, &kopf, ziel_org, &kennung).await?;
 
-    let loeschen_at = crate::zeit::formatiere_utc(jetzt + TimeDelta::days(AUFBEWAHRUNG_TAGE));
+    let vorlaeufig_bis = crate::zeit::formatiere_utc(jetzt + TimeDelta::minutes(FERTIG_MINUTEN))
+        .min(loeschen_at.clone());
     let gefuehrt = Gefuehrt {
         id: kopf.id,
         kennung: Some(kennung.clone()),
@@ -237,7 +281,8 @@ async fn einspielen_aus(
             &org_name,
             sha256,
             jetzt_s,
-            &loeschen_at,
+            &vorlaeufig_bis,
+            kopf.einsatznummer_intern.as_deref(),
         )
         .await
     })?;
@@ -256,21 +301,22 @@ async fn einspielen_aus(
             return Err(f);
         }
     };
-
-    let ziel = crate::aufbewahrung::antrag::einsatz_kennung(
-        kopf.einsatznummer_intern.as_deref(),
-        einsatz_id,
-    );
-    crate::auth::admin_audit::schreibe_ohne_akteur(
-        pool,
-        crate::auth::admin_audit::AdminAktion::ArchivEingespielt,
-        ziel_org,
-        BEFEHL,
-        crate::auth::admin_audit::Ziel::Archiv(&ziel),
-        None,
-        None,
-    )
-    .await;
+    // Erst jetzt ist der Einsatz vollständig und bekommt seine Zeit.
+    let gesetzt = crate::write_retry!(pool, |conn| {
+        Ok(sqlx::query(
+            "UPDATE einsatz_archiv_eingespielt SET loeschen_at = ? WHERE einsatz_id = ?",
+        )
+        .bind(&loeschen_at)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected())
+    })?;
+    if gesetzt == 0 {
+        return Err(AppError::Internal(
+            "Archiv: der Einsatz wurde abgeräumt, bevor seine Inhalte geschrieben waren.".into(),
+        ));
+    }
     tracing::warn!(
         einsatz_id,
         %loeschen_at,
@@ -371,6 +417,7 @@ async fn uebernehmen_tx(
     sha256: &str,
     jetzt_s: &str,
     loeschen_at: &str,
+    einsatznummer: Option<&str>,
 ) -> Result<(i64, Vec<String>), AppError> {
     // Die Org-Zuordnung, die `uebernehmen` für `einsatz_spiegel` braucht; sie geht unten wieder.
     let kopplung_id: i64 = sqlx::query_scalar(
@@ -487,7 +534,77 @@ async fn uebernehmen_tx(
             .execute(&mut *conn)
             .await?;
     }
+    // Platzhalter werden wie Stellvertreter nie Mitglied (`spiegel::OHNE_STELLVERTRETER`).
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ? \
+         AND benutzer_id IN (SELECT benutzer_id FROM archiv_konto WHERE einsatz_id = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *conn)
+        .await?;
+    // Die Spur gehört zur Übernahme: ohne sie gilt das Einspielen nicht.
+    let ziel = crate::aufbewahrung::antrag::einsatz_kennung(einsatznummer, einsatz_id);
+    crate::auth::admin_audit::schreibe_ohne_akteur_tx(
+        conn,
+        crate::auth::admin_audit::AdminAktion::ArchivEingespielt,
+        ziel_org,
+        BEFEHL,
+        crate::auth::admin_audit::Ziel::Archiv(&ziel),
+    )
+    .await?;
     Ok((einsatz_id, hinweise))
+}
+
+/// Lehnt einen Block ab, der von dieser Installation stammt und hier nicht mehr im Archiv steht
+/// (Frist abgelaufen oder Löschersuchen vollzogen), oder dessen Einsatz hier endgültig gelöscht
+/// ist. Von dieser Installation heißt: ein Einsatz mit derselben ID und Einsatznummer.
+async fn hier_geloescht(pool: &SqlitePool, kopf: &Kopf, sha256: &str) -> Result<(), AppError> {
+    let skelett: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz WHERE id = ? AND einsatznummer_intern IS ? \
+         AND spiegel = 0)",
+    )
+    .bind(kopf.id)
+    .bind(kopf.einsatznummer_intern.as_deref())
+    .fetch_one(pool)
+    .await?;
+    if skelett {
+        let im_archiv: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM einsatz_archiv WHERE einsatz_id = ? AND sha256 = ?)",
+        )
+        .bind(kopf.id)
+        .bind(sha256)
+        .fetch_one(pool)
+        .await?;
+        if !im_archiv {
+            return Err(AppError::Validation(
+                "Dieser Block ist hier nicht mehr im Archiv des Einsatzes (Frist abgelaufen oder \
+                 Löschersuchen vollzogen); er wird nicht eingespielt."
+                    .into(),
+            ));
+        }
+        return Ok(());
+    }
+    let geloescht: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM aufbewahrung_loeschprotokoll WHERE einsatz_id = ? \
+         AND art = 'skelett' AND einsatznummer_intern IS ?)",
+    )
+    .bind(kopf.id)
+    .bind(kopf.einsatznummer_intern.as_deref())
+    .fetch_one(pool)
+    .await?;
+    if geloescht {
+        return Err(AppError::Validation(
+            "Dieser Einsatz ist hier endgültig gelöscht; sein Block wird nicht eingespielt.".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Ein gesperrtes Platzhalter-Konto mit dem Namen aus dem Archiv. Es kann sich nie anmelden.

@@ -273,6 +273,37 @@ pub async fn schreibe_ohne_akteur(
     angaben: Option<ZugangsAngaben>,
     peer_ip: Option<IpAddr>,
 ) {
+    if let Err(e) =
+        einfuegen_ohne_akteur(pool, aktion, org_id, gegenstelle, ziel, angaben, peer_ip).await
+    {
+        tracing::error!(
+            aktion = aktion.as_str(),
+            "Admin-Audit konnte nicht geschrieben werden: {e}"
+        );
+    }
+}
+
+/// Wie [`schreibe_ohne_akteur`], aber in der Transaktion `conn` und mit Fehler: für einen
+/// Schreibweg, der ohne seinen Eintrag nicht gelten soll (Archiv einspielen, LLH-1494).
+pub async fn schreibe_ohne_akteur_tx(
+    conn: &mut sqlx::SqliteConnection,
+    aktion: AdminAktion,
+    org_id: i64,
+    gegenstelle: &str,
+    ziel: Ziel<'_>,
+) -> Result<(), sqlx::Error> {
+    einfuegen_ohne_akteur(conn, aktion, org_id, gegenstelle, ziel, None, None).await
+}
+
+async fn einfuegen_ohne_akteur<'e>(
+    e: impl sqlx::SqliteExecutor<'e>,
+    aktion: AdminAktion,
+    org_id: i64,
+    gegenstelle: &str,
+    ziel: Ziel<'_>,
+    angaben: Option<ZugangsAngaben>,
+    peer_ip: Option<IpAddr>,
+) -> Result<(), sqlx::Error> {
     let (ziel_benutzer_id, ziel) = match ziel {
         Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
         Ziel::Anmeldeweg(t)
@@ -293,7 +324,7 @@ pub async fn schreibe_ohne_akteur(
         detail = ?detail,
         "Zugang durch gekoppelte Instanz geändert"
     );
-    let ergebnis = sqlx::query(
+    sqlx::query(
         "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
          VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
     )
@@ -304,14 +335,9 @@ pub async fn schreibe_ohne_akteur(
     .bind(detail.as_deref())
     .bind(peer_ip.map(|ip| ip.to_string()))
     .bind(org_id)
-    .execute(pool)
-    .await;
-    if let Err(e) = ergebnis {
-        tracing::error!(
-            aktion = aktion.as_str(),
-            "Admin-Audit konnte nicht geschrieben werden: {e}"
-        );
-    }
+    .execute(e)
+    .await?;
+    Ok(())
 }
 
 /// Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097).

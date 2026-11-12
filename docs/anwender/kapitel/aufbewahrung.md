@@ -94,8 +94,9 @@ Für System-Admins:
 Jeder Abruf steht im Zugangsprotokoll unter „Archiv heruntergeladen“.
 
 Zum Ansehen in Lifeline Hub spielt der Betrieb den Block per Befehl wieder ein (Handbuch Betrieb,
-„Archiv eines Einsatzes einspielen“). Der Einsatz steht dann 7 Tage lang mit dem Band „Aus dem
-Archiv“ in der Einsatzliste, nur lesbar, und verschwindet danach von selbst.
+„Archiv eines Einsatzes einspielen“). Der Einsatz steht dann bis zu 7 Tage lang in der
+Einsatzliste, nur lesbar, mit dem Band „Aus dem Archiv · bis …“ über jeder seiner Seiten, und
+verschwindet danach von selbst; endet eine Frist des Blocks früher, schon dann.
 
 ### Abgeschlossene Einsätze überblicken
 
@@ -258,7 +259,8 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - Das Aktenzeichen bleibt im Einsatztagebuch stehen und darf deshalb keinen Namen enthalten.
 - Möglich ist ein Löschersuchen nur an einem abgeschlossenen, noch nicht geschwärzten Einsatz.
   Ausnahme ist ein archivierter Einsatz: Er ist schon geschwärzt, ein Löschersuchen für den
-  ganzen Einsatz löscht sein Archiv.
+  ganzen Einsatz löscht sein Archiv. Heruntergeladene Blöcke erreicht es nicht: Sie sind mit zu
+  löschen. An dieser Installation lässt sich ein so gelöschter Block nicht wieder einspielen.
 
 ### Wer was darf
 

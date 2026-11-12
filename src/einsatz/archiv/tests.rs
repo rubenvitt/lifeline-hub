@@ -501,13 +501,37 @@ async fn start_raeumt_liegengebliebene_zwischendateien_weg() {
         .path()
         .join("lifeline-zwischen-archiv-7-voll-00ff.sqlite-journal");
     let fremd = dir.path().join("sicherung.sqlite");
-    for p in [&liegen, &nachbar, &fremd] {
+    // Ein Einspielen läuft als eigener Prozess: seine Datei geht erst, wenn sie lange liegt.
+    let einspielen_frisch = dir
+        .path()
+        .join("lifeline-zwischen-archiv-0-einspielen-0a.sqlite");
+    let einspielen_alt = dir
+        .path()
+        .join("lifeline-zwischen-archiv-0-einspielen-0b.sqlite");
+    for p in [
+        &liegen,
+        &nachbar,
+        &fremd,
+        &einspielen_frisch,
+        &einspielen_alt,
+    ] {
         std::fs::write(p, b"x").unwrap();
     }
+    std::fs::File::options()
+        .write(true)
+        .open(&einspielen_alt)
+        .unwrap()
+        .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 3600))
+        .unwrap();
     zwischendateien_aufraeumen(&pool).await;
     assert!(!liegen.exists());
     assert!(!nachbar.exists());
     assert!(fremd.exists(), "nur Zwischendateien des Archivbaus");
+    assert!(
+        einspielen_frisch.exists(),
+        "ein laufendes Einspielen behält seine Datei"
+    );
+    assert!(!einspielen_alt.exists());
     assert!(dir.path().join("hub.sqlite").exists());
 }
 

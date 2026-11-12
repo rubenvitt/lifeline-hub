@@ -279,8 +279,16 @@ fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
         .map_err(|e| AppError::Internal(format!("Archiv: Zwischendatei nicht anlegbar: {e}")))
 }
 
+/// Teil im Namen der Zwischendatei des Befehls `archiv einspielen` (`einspielen.rs`).
+pub(super) const TEIL_EINSPIELEN: &str = "einspielen";
+
+/// So alt muss die Zwischendatei eines Einspielens sein, bevor der Serverstart sie löscht: der
+/// Befehl läuft als eigener Prozess und kann gerade an ihr arbeiten.
+const EINSPIELEN_LIEGT_STUNDEN: u64 = 6;
+
 /// Löscht Zwischendateien, die ein abgebrochener Bau liegen ließ (`Drop` läuft bei einem
-/// Prozessabbruch nicht). Nur beim Start des Purge-Laufs, der als einziger Archive baut.
+/// Prozessabbruch nicht). Nur beim Start des Purge-Laufs, der als einziger Archive baut; die
+/// Datei eines Einspielens (eigener Prozess) erst nach [`EINSPIELEN_LIEGT_STUNDEN`].
 pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     let verzeichnis = match verzeichnis(pool).await {
         Ok(v) => v,
@@ -294,7 +302,19 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     };
     for eintrag in eintraege.flatten() {
         let name = eintrag.file_name();
-        if name.to_string_lossy().starts_with(ZWISCHEN_PRAEFIX) {
+        let name_s = name.to_string_lossy();
+        let einspielen = name_s.contains(&format!("-{TEIL_EINSPIELEN}-"));
+        let frisch = || {
+            eintrag
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .is_none_or(|alter| {
+                    alter < std::time::Duration::from_secs(EINSPIELEN_LIEGT_STUNDEN * 3600)
+                })
+        };
+        if name_s.starts_with(ZWISCHEN_PRAEFIX) && !(einspielen && frisch()) {
             match std::fs::remove_file(eintrag.path()) {
                 Ok(()) => tracing::warn!(
                     datei = %name.to_string_lossy(),
