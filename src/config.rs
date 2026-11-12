@@ -555,6 +555,14 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_FUEHRUNG", default_value_t = false)]
     pub fuehrung: bool,
 
+    /// LAN-Entdeckung für die Direktkopplung vor Ort (LLH-1497, Spec `instanz-entdeckung`):
+    /// kündigt die Instanz per mDNS/DNS-SD als `_lifeline-hub._tcp` an und sucht andere im
+    /// lokalen Netz. **Vorgabe AUS**; wirkt nur mit `--tls` und nie auf einem Loopback-Bind. Ohne
+    /// den Schalter sendet die Instanz kein Multicast. Die Umgebungsvariable nimmt nur
+    /// `true`/`false`.
+    #[arg(long, env = "LIFELINE_LAN_ENTDECKUNG", default_value_t = false)]
+    pub lan_entdeckung: bool,
+
     /// Abstand in Sekunden des Abgleichs gespiegelter Einsätze, solange an einer Kopplung ein
     /// Einsatz aktiv ist oder etwas aussteht (LLH-1492, design.md D12); sonst gilt der Abstand der
     /// Meldung. Bei Fehlern verdoppelt er sich bis zehn Minuten.
@@ -813,10 +821,39 @@ pub enum Command {
         /// Benutzername des Admins.
         benutzername: String,
     },
+    /// Archiv eines Einsatzes (LLH-1494).
+    Archiv {
+        #[command(subcommand)]
+        befehl: ArchivBefehl,
+    },
     /// Ein Fremdsystem an einen Lifeline Hub anbinden (Maschinenzugang, LLH-1652). Für
     /// Betreiber eines Fremdsystems; der Hub selbst braucht dieses Kommando nicht.
     #[command(subcommand)]
     Zugang(ZugangCommand),
+}
+
+/// Befehle zum Archiv.
+#[derive(Subcommand, Debug, Clone)]
+pub enum ArchivBefehl {
+    /// Einen Archivblock einspielen: der Einsatz erscheint bis zu 7 Tage lang schreibgeschützt.
+    ///
+    /// Der Block (`.age`, aus der Archivakte) wird mit einem privaten Archiv-Schlüssel der
+    /// Organisation geöffnet, auf den Stand dieser Version gebracht und als Einsatz „aus dem
+    /// Archiv“ übernommen. Die Admin-Spur hält es fest. Geht auch bei laufendem Server, mit
+    /// dessen Version.
+    Einspielen {
+        /// Der Archivblock.
+        #[arg(long)]
+        datei: String,
+        /// `age`-Identitätsdatei mit einem privaten Archiv-Schlüssel (`AGE-SECRET-KEY-1…`); `-`
+        /// liest sie von stdin. Eine mit Passphrase geschützte Datei (`age -p`) fragt die
+        /// Passphrase auf stdin ab.
+        #[arg(long)]
+        identitaet: String,
+        /// Ziel-Organisation (ID); ohne Angabe die Organisation des Einsatzes.
+        #[arg(long)]
+        org: Option<i64>,
+    },
 }
 
 /// Unterkommandos von `lifeline-hub zugang`.

@@ -76,8 +76,8 @@ Der Einwurf speichert, was ankam, und erkennt nur `external_id` und `message_id`
 
 ### D3 Datenmodell
 
-Drei Tabellen, Nummern über allen auf `origin/alpha` (heute 0335), eine vierte Migration baut den
-CHECK von `admin_audit` neu (heute 0336).
+Drei Tabellen, Nummern über allen auf `origin/alpha` (nach dem Zusammenführen von `alpha` am 12.11.2026: 0339), eine vierte Migration baut den
+CHECK von `admin_audit` neu (0340).
 
 ```sql
 CREATE TABLE einwurf_zugang (

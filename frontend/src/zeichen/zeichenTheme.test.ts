@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contrastSurface, paintColor } from '@einsatzzeichen/core';
+import { contrastSurface, paintColor } from '@einsatzzeichen/core/blocks';
 import { kontrast } from '../test/farbmass';
 import { farbenDunkel } from '../theme/tokens';
 import { ZEICHEN_THEME_DUNKEL, zeichenTheme } from './zeichenTheme';

@@ -1,7 +1,31 @@
--- LLH-1654 (Change s1i56dpt-einwurf-zugang, design.md D11): Admin-Spur des Einwurf-Zugangs.
--- Neu im aktion-CHECK 'einwurf_zugang_angelegt', 'einwurf_zugang_schluessel_gewechselt' und
--- 'einwurf_zugang_widerrufen'. Rebuild nach Muster 0334 (in einer Transaktion); die Liste
--- übernimmt alles bis 0334.
+-- LLH-1494, Teil 3 (Change tkky2noy-archiv-nachbereitung, design.md D10): Einspielen eines
+-- Archivblocks per Befehl. Der Einsatz erscheint als beendeter Spiegel ohne Kopplung und wird
+-- 7 Tage später abgeräumt.
+
+-- Eingespielte Einsätze und wann sie wieder gehen. `sha256` ist die Prüfsumme der eingespielten
+-- Datei (Admin-Spur, Abgleich mit `einsatz_archiv.sha256`).
+CREATE TABLE einsatz_archiv_eingespielt (
+    einsatz_id     INTEGER PRIMARY KEY REFERENCES einsatz(id) ON DELETE CASCADE,
+    sha256         TEXT NOT NULL,
+    eingespielt_at TEXT NOT NULL,
+    loeschen_at    TEXT NOT NULL
+);
+
+CREATE INDEX idx_einsatz_archiv_eingespielt_loeschen ON einsatz_archiv_eingespielt (loeschen_at);
+
+-- Gesperrte Platzhalter-Konten für die Konten eines eingespielten Einsatzes, mit dem Namen aus dem
+-- Archiv. Sie erscheinen in keiner Verwaltung (`OHNE_STELLVERTRETER`) und gehen nach dem Einsatz.
+-- `einsatz_id` ohne Fremdschlüssel: nach dem Abräumen des Einsatzes findet das Aufräumen die
+-- Konten noch.
+CREATE TABLE archiv_konto (
+    benutzer_id INTEGER PRIMARY KEY REFERENCES benutzer(id) ON DELETE CASCADE,
+    einsatz_id  INTEGER NOT NULL
+);
+
+CREATE INDEX idx_archiv_konto_einsatz ON archiv_konto (einsatz_id);
+
+-- Admin-Spur: neu im aktion-CHECK 'archiv_eingespielt' (Liste bis 0334). Rebuild nach Muster 0330, in einer
+-- Transaktion (admin_audit ist Leaf).
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     zeitpunkt        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -24,9 +48,7 @@ CREATE TABLE admin_audit_neu (
                          'archiv_schluessel_entfernt', 'archiv_heruntergeladen',
                          'maschinenzugang_angelegt', 'maschinenzugang_code_ausgestellt',
                          'maschinenzugang_schluessel_gebunden', 'maschinenzugang_geaendert',
-                         'maschinenzugang_widerrufen', 'einwurf_zugang_angelegt',
-                         'einwurf_zugang_schluessel_gewechselt',
-                         'einwurf_zugang_widerrufen')),
+                         'maschinenzugang_widerrufen', 'archiv_eingespielt')),
     akteur_id        INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     akteur_name      TEXT,
     ziel_benutzer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,

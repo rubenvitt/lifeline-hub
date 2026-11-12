@@ -39,10 +39,12 @@ async fn load_daten(
 ) -> Result<Option<Value>, AppError> {
     let objekt = art::json_object_sql(b.spalten, "");
     // Stellvertreter fremder Konten (LLH-1492) gehören keiner Org dieser Instanz und gehen nie
-    // hinaus; geliefert werden sie als gelöscht.
+    // hinaus; geliefert werden sie als gelöscht. Ebenso Platzhalter eines eingespielten Archivs
+    // (LLH-1494).
     if b.art == super::StammdatenArt::Konto {
         let stellvertreter: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM spiegel_konto WHERE CAST(benutzer_id AS TEXT) = ?)",
+            "SELECT EXISTS (SELECT 1 FROM spiegel_konto WHERE CAST(benutzer_id AS TEXT) = ?1) \
+             OR EXISTS (SELECT 1 FROM archiv_konto WHERE CAST(benutzer_id AS TEXT) = ?1)",
         )
         .bind(schluessel)
         .fetch_one(&mut *conn)
@@ -220,6 +222,7 @@ async fn build_lieferung(
         },
         _ => None,
     };
+    let ursprung = Some(super::herkunft::ursprung(conn, org_id, art, schluessel).await?);
     Ok(StammdatenLieferung {
         art: art.as_str().to_string(),
         schluessel: schluessel.to_string(),
@@ -227,6 +230,7 @@ async fn build_lieferung(
         geloescht: daten.is_none(),
         daten,
         geheimnis,
+        ursprung,
     })
 }
 

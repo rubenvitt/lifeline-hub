@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { Alert, App, Button, Form, Input, Modal, Space, Spin, Tooltip, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Form,
+  Input,
+  Modal,
+  Space,
+  Spin,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
@@ -23,25 +35,35 @@ import {
   issueKopplungscode,
   gleicheStammdatenNeuAb,
   meldeElwVerloren,
+  searchInstanzenImNetz,
   widerrufeKopplung,
   widerrufeUnterschriftsschluessel,
 } from '../api/instanz';
 import { globalKeys } from '../api/queryKeys';
 import type {
+  InstanzGefunden,
   InstanzKopplungAnzeige,
+  InstanzLanAntwort,
   InstanzSpiegelEinsatz,
   KopplungscodeAntwort,
   UnterschriftSchluesselAnzeige,
 } from '../api/types';
 import { EinsaetzeBeimGegenueber } from './EinsaetzeBeimGegenueber';
 import {
+  LAN_AUS,
+  VOR_ORT_CHIP,
+  VOR_ORT_ERKLAERUNG,
   codeAusstellenSperre,
+  codeVorOrtSperre,
+  gefundenZeile,
   kopplungHinweise,
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
   spiegelEinsatzZeile,
   stammdatenZeile,
+  zertifikatWarnt,
+  zertifikatZeile,
 } from './instanzText';
 
 /** Längste Bezeichnung eines Unterschriftsschlüssels (`routes::instanz::BEZEICHNUNG_MAX`). */
@@ -100,11 +122,18 @@ export default function InstanzkopplungSeite() {
   });
   const reload = () => qc.invalidateQueries({ queryKey: globalKeys.instanzkopplung() });
 
+  // `networkMode: 'always'` (Review LLH-1497): im Einsatz-LAN ohne Internet meldet der Browser
+  // womöglich „offline“; Ausstellen, Suchen und Einlösen gehen trotzdem hinaus, statt still zu
+  // pausieren — scheitern sie, sagt es der Fehler.
   const codeAusstellen = useMutation({
-    mutationFn: issueKopplungscode,
+    networkMode: 'always',
+    mutationFn: (vorOrt: boolean) => issueKopplungscode(vorOrt),
     onSuccess: (c) => setNeuerCode(c),
   });
+  // LAN-Entdeckung (LLH-1497): auf Knopfdruck, die Suche dauert einige Sekunden.
+  const imNetz = useMutation({ networkMode: 'always', mutationFn: searchInstanzenImNetz });
   const einloesen = useMutation({
+    networkMode: 'always',
     mutationFn: (w: { adresse: string; code: string }) => redeemKopplungscode(w.adresse, w.code),
     onSuccess: (k) => {
       void reload();
@@ -176,6 +205,7 @@ export default function InstanzkopplungSeite() {
   const zeit = (wert: string) => zeitKurz(wert, konv);
   const u = uebersichtQ.data;
   const sperre = u ? codeAusstellenSperre(u) : undefined;
+  const sperreVorOrt = u ? codeVorOrtSperre(u) : undefined;
 
   return (
     <AdminPage
@@ -188,12 +218,30 @@ export default function InstanzkopplungSeite() {
               <Button
                 type="primary"
                 icon={<IconPlus />}
-                disabled={!u || sperre != null}
-                loading={codeAusstellen.isPending}
-                onClick={() => codeAusstellen.mutate()}
+                disabled={
+                  !u ||
+                  sperre != null ||
+                  (codeAusstellen.isPending && codeAusstellen.variables === true)
+                }
+                loading={codeAusstellen.isPending && codeAusstellen.variables === false}
+                onClick={() => codeAusstellen.mutate(false)}
                 data-lfh="instanz-code-ausstellen"
               >
                 Code ausstellen
+              </Button>
+            </Tooltip>
+            <Tooltip title={sperreVorOrt ?? VOR_ORT_ERKLAERUNG}>
+              <Button
+                disabled={
+                  !u ||
+                  sperreVorOrt != null ||
+                  (codeAusstellen.isPending && codeAusstellen.variables === false)
+                }
+                loading={codeAusstellen.isPending && codeAusstellen.variables === true}
+                onClick={() => codeAusstellen.mutate(true)}
+                data-lfh="instanz-code-vor-ort"
+              >
+                Code vor Ort
               </Button>
             </Tooltip>
             <Button onClick={() => setEinloesenOffen(true)} data-lfh="instanz-code-einloesen">
@@ -254,11 +302,15 @@ export default function InstanzkopplungSeite() {
                 // Stammdaten (LLH-1493): an der meldenden Seite neu abgleichen, solange die
                 // Zuordnung gilt. An der erreichten „ELW verloren“ auch nach dem Widerruf, solange
                 // dort gelieferte Passwörter gelten; danach räumt die Meldung sie.
+                // Über eine Direktkopplung gehen weder Stammdaten noch Passwörter (LLH-1497).
+                const standard = k.art === 'standard';
                 const verlorenMoeglich =
+                  standard &&
                   k.richtung === 'wird_gemeldet' &&
                   (aktiv || k.org.stammdaten.konten_mit_geheimnis > 0);
+                const zertifikat = zertifikatZeile(k);
                 const eintraege: MenueEintrag[] = [
-                  ...(aktiv && k.richtung === 'meldet_sich'
+                  ...(aktiv && standard && k.richtung === 'meldet_sich'
                     ? [{ key: 'abgleichen', label: 'Stammdaten erneut abgleichen' }]
                     : []),
                   ...(verlorenMoeglich
@@ -308,6 +360,17 @@ export default function InstanzkopplungSeite() {
                       title={
                         <span data-lfh="instanz-kopplung-titel">
                           {k.gegenueber_name} · {richtungText(k)}
+                          {!standard && (
+                            <Tooltip title={VOR_ORT_ERKLAERUNG}>
+                              <Tag
+                                bordered
+                                style={{ marginInlineStart: token.marginXS }}
+                                data-lfh="instanz-kopplung-vor-ort"
+                              >
+                                {VOR_ORT_CHIP}
+                              </Tag>
+                            </Tooltip>
+                          )}
                         </span>
                       }
                       description={
@@ -322,6 +385,16 @@ export default function InstanzkopplungSeite() {
                             {k.gegenueber_fingerabdruck}
                             {k.gegenueber_adresse ? ` · ${k.gegenueber_adresse}` : ''}
                           </div>
+                          {zertifikat && (
+                            <div
+                              style={{
+                                color: zertifikatWarnt(k) ? rollen.achtungText : rollen.gedaempft,
+                              }}
+                              data-lfh="instanz-kopplung-zertifikat"
+                            >
+                              {zertifikat}
+                            </div>
+                          )}
                           {stammdaten && (
                             <div
                               style={{ color: rollen.gedaempft }}
@@ -477,12 +550,23 @@ export default function InstanzkopplungSeite() {
             code: (w.code ?? '').trim(),
           })
         }
-        onFertig={() => setEinloesenOffen(false)}
+        onFertig={() => {
+          imNetz.reset();
+          setEinloesenOffen(false);
+        }}
         onAbbrechen={() => {
           einloesen.reset();
+          imNetz.reset();
           setEinloesenOffen(false);
         }}
       >
+        <ImNetzGefunden
+          laeuft={imNetz.isPending}
+          antwort={imNetz.data}
+          fehler={imNetz.error}
+          onSuchen={() => imNetz.mutate()}
+          onWahl={(adresse) => einloesenForm.setFieldValue('adresse', adresse)}
+        />
         <Form.Item
           label="Adresse der anderen Instanz"
           name="adresse"
@@ -657,6 +741,15 @@ export default function InstanzkopplungSeite() {
               Nach dem Koppeln zeigt die andere Instanz diesen Fingerabdruck. Er muss gleich sein:
             </p>
             <span style={monoStil(13)}>{neuerCode.fingerabdruck}</span>
+            {neuerCode.art === 'vor_ort' && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBlockStart: token.marginSM }}
+                title={VOR_ORT_ERKLAERUNG}
+                data-lfh="instanz-code-vor-ort-hinweis"
+              />
+            )}
           </div>
         )}
       </Modal>
@@ -784,5 +877,84 @@ function SpiegelEinsaetze({
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * „Im Netz gefunden“ im Dialog „Code einlösen“ (LLH-1497, Spec `instanz-entdeckung`): auf Knopfdruck
+ * einige Sekunden suchen, ein Klick übernimmt die Adresse. Eine Ankündigung begründet kein
+ * Vertrauen: geprüft wird wie bei einer eingetippten Adresse, und der Fingerabdruck steht zum
+ * Abgleich mit dem Code-Dialog der anderen Instanz daneben.
+ */
+function ImNetzGefunden({
+  laeuft,
+  antwort,
+  fehler,
+  onSuchen,
+  onWahl,
+}: {
+  laeuft: boolean;
+  antwort?: InstanzLanAntwort;
+  fehler: Error | null;
+  onSuchen: () => void;
+  onWahl: (adresse: string) => void;
+}) {
+  const { rollen } = useRollen();
+  return (
+    <div style={{ marginBlockEnd: 16 }} data-lfh="instanz-im-netz">
+      <Button onClick={onSuchen} loading={laeuft} data-lfh="instanz-im-netz-suchen">
+        Im Netz suchen
+      </Button>
+      <SpeicherFehler fehler={fehler} titel="Suche nicht möglich" />
+      {antwort?.aus && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBlockStart: 8 }}
+          title={LAN_AUS}
+          data-lfh="instanz-im-netz-aus"
+        />
+      )}
+      {antwort && !antwort.aus && (
+        <Liste<InstanzGefunden>
+          bordered
+          style={{ marginBlockStart: 8 }}
+          dataSource={antwort.gefunden}
+          // Kennung UND Fingerabdruck: eine fremde Ankündigung unter derselben Kennung ist ein
+          // eigener Eintrag (Review LLH-1497).
+          rowKey={(g) => `${g.kennung}-${g.fingerabdruck}`}
+          emptyText="Nichts gefunden"
+          renderItem={(g) => {
+            const adresse = g.adressen[0];
+            return (
+              <ListenEintrag
+                actions={
+                  adresse
+                    ? [
+                        <Button
+                          key="waehlen"
+                          onClick={() => onWahl(adresse)}
+                          data-lfh="instanz-im-netz-waehlen"
+                        >
+                          Übernehmen
+                        </Button>,
+                      ]
+                    : undefined
+                }
+              >
+                <ListenEintragMeta
+                  title={<span data-lfh="instanz-im-netz-name">{g.name || g.kennung}</span>}
+                  description={
+                    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                      {gefundenZeile(g)}
+                    </span>
+                  }
+                />
+              </ListenEintrag>
+            );
+          }}
+        />
+      )}
+    </div>
   );
 }

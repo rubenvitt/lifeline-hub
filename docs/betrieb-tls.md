@@ -121,6 +121,18 @@ zusätzlich `--tls-hostname` setzen (oder direkt an eine konkrete LAN-IP
 binden, z.B. `--bind 192.168.1.10:8443`) — sonst deckt das Zertifikat nur
 `localhost`/`127.0.0.1` ab und andere Geräte bekommen eine Zertifikatswarnung.
 
+## Direktkopplung vor Ort (LLH-1497)
+
+Zwei Instanzen im selben Netz (etwa zwei ELW) koppeln sich auch mit selbst signiertem oder
+mkcert-Zertifikat, ohne dass eine Seite der anderen vertraut: Die ausstellende Seite nennt beim
+Koppeln den Fingerabdruck ihres Zertifikats in einer signierten Antwort, die einlösende pinnt
+ihn. Nach einem neuen Zertifikat (etwa neu erzeugt nach einem IP-Wechsel) holt die einlösende
+Seite zuerst eine signierte Aussage ein, bevor sie wieder Daten schickt
+([ADR-0029](architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)).
+Voraussetzung: **`--tls` an der ausstellenden Instanz**; hinter einem TLS-Proxy kennt die Instanz
+ihr Zertifikat nicht, dort gibt es keinen Code „vor Ort“. Für die Bedienung im Browser bleibt das
+Vertrauen ins Zertifikat nötig wie oben beschrieben.
+
 ## Manueller Smoke-Test
 
 ```bash

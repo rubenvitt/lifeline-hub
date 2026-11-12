@@ -319,7 +319,9 @@ Spec `passwort-anmeldung`, Herleitung
   `auth::admin_audit::schreibe`** (Tabelle `admin_audit`, nicht `auth_audit`): Konto anlegen,
   deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Auch
   ein zweiter Weg zur selben Wirkung (PATCH `bearbeiten`) schreibt; eine abgewiesene Aktion nicht.
-- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Eine neue Aktion braucht eine
+- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Ausnahme „Archiv eingespielt“
+  (LLH-1494): `admin_audit::schreibe_ohne_akteur_tx` schreibt in der Transaktion der Übernahme,
+  ein Fehler bricht das Einspielen ab. Eine neue Aktion braucht eine
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
 - **Gelesen werden Anmelde- und Admin-Spur nur über `routes::zugangsprotokoll`** (LFH-1097,
@@ -362,6 +364,14 @@ Herleitung in
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
     (`richte_aus` aus `fuehrung::repo::save`); ein neuer Schreibweg braucht dafür nichts.
+  - **Wer die Zeile in `einsatz_spiegel` entfernt, macht vorher die Einsatznummer frei**
+    (`spiegel::nummer::ensure_freie_nummer`, LLH-1703, Spec `einsatznummer`): Mit der Zeile endet
+    die Ausnahme von der Eindeutigkeit, und eine hier schon vergebene Nummer ließe den Wechsel
+    sonst mit 409 scheitern, im Abgleich in jedem Takt. Heute `fuehrung::werde_fuehrer` und
+    `lebensende::umwandeln`. Nach einem Führungswechsel an einem lokalen Einsatz meldet der
+    Aufrufer Kopf und Vollabgleich über `instanz::fuehrung::notify_wechsel`, nie `kopf_melden`
+    allein: Der Wechsel kann ins ETB geschrieben haben. Herleitung:
+    `openspec/changes/archive/2026-11-12-a36p545r-nummer-beim-fuehrungswechsel/design.md`.
   - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer
     (`anfrage_von`), bis der Anfragende alles hat; eine Notübernahme nur an einem Einsatz, der
     hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
@@ -468,6 +478,22 @@ Herleitung in
     `einsatz_abraeumen` in der beschließenden Transaktion, Löschen nach dem Commit, Phase R holt
     nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
     `tests/instanz_lebensende.rs`.
+- **Direktkopplung vor Ort (LLH-1497)**, Specs `instanz-kopplung`, `instanz-entdeckung`,
+  [ADR-0029](../docs/architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+  Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
+  - **Was eine Kopplung trägt, fragt jede Stelle über `InstanzKopplungArt::traegt(Fluss)`**
+    (in SQL `k.art = 'standard'`). Eine neue Stelle, die Stammdaten, Geheimnisse, Verwahrung oder
+    einen Führungswechsel auslöst oder annimmt, prüft die Art und steht im Wächter
+    `instanz::art_tests::jeder_fluss_hat_seine_pruefstellen`.
+  - **Über `vor_ort` gehen Nutzdaten nur über `zertifikat::client(pin)`**; ein Zertifikatswechsel
+    läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instanz/zertifikat`). Kein
+    eigener Client für eine Direktkopplung.
+  - **„Übersetzt über die Herkunft“ heißt `spiegel::abgleich::uebersetzt`** (meldende Seite einer
+    Standardkopplung), nicht `richtung == MeldetSich`. Ein neuer Verweis auf Stammdaten in einer
+    gespiegelten Zeile oder einem Antrag trägt seine Ursprungskennung (`abbildung::ursprung`,
+    `nach_ursprung`).
+  - Nachweis: `tests/instanz_vor_ort.rs` (TLS mit rcgen-Zertifikat auf Loopback, Attrappe des
+    Suchers statt Multicast).
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
@@ -796,6 +822,17 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
   Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
   und löscht alle Blöcke.
+- **Archiv einspielen** (LLH-1494, `archiv/einspielen.rs`, Befehl `archiv einspielen`): migriert
+  die entschlüsselte Datei, schwärzt abgelaufene Kategorien nach und übernimmt den Einsatz über
+  die Spiegel-Maschinerie (`liefern`/`uebernehmen`) mit einer Kopplung, die nur in der
+  Transaktion lebt. Ergebnis: beendeter Spiegel ohne Kopplung (`einsatz_archiv_eingespielt`),
+  Konten als gesperrte Platzhalter (`archiv_konto`, raus aus `OHNE_STELLVERTRETER`, nie Mitglied,
+  für keine Admin-Route und keine Kopplung erreichbar). Phase R räumt ihn nach 7 Tagen ab, früher
+  bei einer Frist des Blocks; ein Block, der hier nicht mehr im Archiv steht, kommt nicht zurück,
+  und ein Löschersuchen nimmt eine eingespielte Kopie mit (`archiv::alle_loeschen_tx`). Den
+  Merker setzt auch hier nur `spiegel` (`loeschen_unter_merker`, `anhang::inhalt_einsetzen`).
+  Eine neue Stammtabelle in `STAMM` braucht einen Namen in `STAMM_NAME` (Guard
+  `stamm_name_deckt_die_stammdaten_des_archivs`).
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

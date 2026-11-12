@@ -90,7 +90,7 @@ vorgeschlagen). Die Alarmübernahme (LLH-1192) und die Ortung (LLH-1199) warten 
     `src/auth/admin_audit.rs`, `src/einsatz/purge_scheduler.rs`, `src/api_doc.rs`,
     `src/public_api/{mod.rs,description.md}`.
 - **Migrationen:** drei neue Tabellen (`einwurf_zugang`, `alarmmeldung`, `position_letzte`) und
-  der neu gebaute CHECK von `admin_audit`. Nummern über allen auf `alpha` (heute 0335, 0336).
+  der neu gebaute CHECK von `admin_audit`. Nummern über allen auf `alpha` (0339, 0340).
 - **Vertrag:** `docs/api/public-v1.json` bekommt vier Operationen; `frontend/src/api/openapi.json`
   und `types.generated.ts` die Admin-Typen.
 - **Frontend:** Paneel und Dialoge unter `frontend/src/pages/einstellungen/`, API-Modul,

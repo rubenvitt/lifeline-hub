@@ -6,7 +6,7 @@ import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichen } from '../../api/types';
 import { ConfigProvider, theme } from 'antd';
 import FreiesZeichenInspector, { type FreiesZeichenInspectorProps } from './FreiesZeichenInspector';
-import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import { PALETTE, type AnySpec } from '@einsatzzeichen/schema';
 import { FREIES_ZEICHEN_TINTE } from './marker';
 import { antdToken, farbenDunkel } from '../../theme/tokens';
