@@ -27,8 +27,12 @@ Zustand zeigen. Freigabe und Ende MUST im Einsatztagebuch stehen.
 - **THEN** antwortet der Server mit 403
 
 #### Scenario: Instanz meldet sich bei einem Hub
-- **WHEN** die Instanz sich für die Org bei einem Hub meldet
+- **WHEN** die Instanz sich für die Org bei einem Hub meldet und kein Zugang den Einsatz liest
 - **THEN** zeigt das Paneel „Anbindungen“ keinen Zugang, und eine Freigabe antwortet 404
+
+#### Scenario: Abgelehntes Umschalten an einer überholten Zeile
+- **WHEN** ein Admin den einzigen Zugang des Paneels widerruft und die Einsatzleitung ihn einschaltet, bevor das Paneel nachgefragt hat
+- **THEN** bleibt das Paneel mit dem Grund der Ablehnung und dem Namen des Zugangs stehen, bis die Einsatzleitung den Hinweis schließt
 
 #### Scenario: Ohne Verbindung
 - **WHEN** die Einsatzleitung ohne Verbindung zum Server ist
@@ -61,6 +65,26 @@ für mehrere Zugänge freigegeben sein.
 #### Scenario: Zwei Zugänge an einem Einsatz
 - **WHEN** die Einsatzleitung denselben Einsatz für zwei Zugänge freigibt
 - **THEN** lesen beide Zugänge diesen Einsatz
+
+### Requirement: Eine Freigabe ruht, solange die Instanz sich bei einem Hub meldet
+
+Liest ein Zugang einen Einsatz und meldet sich die Instanz danach für die Org bei einem Hub,
+SHALL die Freigabe bestehen bleiben und nach dem Ende der Kopplung wieder gelten. Solange die
+Kopplung besteht, MUST das Paneel „Anbindungen“ des Einsatzes diesen Zugang mit „Freigabe ruht:
+Instanz meldet sich bei einem Hub“ zeigen, und die Einsatzleitung MUST die Freigabe dort beenden
+können. Eine neue Freigabe MUST NOT möglich sein, solange die Kopplung besteht.
+
+#### Scenario: Kopplung bei bestehender Freigabe
+- **WHEN** der Zugang „FüKW Monitor“ den Einsatz liest und die Instanz sich danach für die Org bei einem Hub meldet
+- **THEN** antwortet der Server dem Zugang mit 401, und das Paneel des Einsatzes zeigt nur diesen Zugang, mit „Freigabe ruht: Instanz meldet sich bei einem Hub“
+
+#### Scenario: Ruhende Freigabe beenden
+- **WHEN** die Einsatzleitung den Schalter der ruhenden Freigabe ausschaltet
+- **THEN** endet die Freigabe, das Einsatztagebuch nennt das Ende, und der Zugang liest den Einsatz auch nach dem Ende der Kopplung nicht
+
+#### Scenario: Kopplung endet
+- **WHEN** die Kopplung endet, der Einsatz noch läuft und niemand die Freigabe beendet hat
+- **THEN** liest der Zugang den Einsatz wieder
 
 ### Requirement: Die Freigabe geht auch an einem Spiegel
 
@@ -103,8 +127,10 @@ nennen.
 
 ### Requirement: Die Anbindung zeigt den gelesenen Einsatz
 
-Die Seite „Anbindungen“ SHALL an jedem Zugang mit einem Lese-Scope mit Einsatzbezug zeigen,
-welchen Einsatz er gerade liest, oder dass keiner freigegeben ist.
+Die Seite „Anbindungen“ SHALL an jedem Zugang, für den sich ein Einsatz freigeben lässt (nicht
+widerrufen, nicht abgelaufen, mit einem Lese-Scope mit Einsatzbezug), zeigen, welchen Einsatz er
+gerade liest, oder dass keiner freigegeben ist. An einer Instanz, die sich für die Org bei einem
+Hub meldet, MUST die Seite an keinem Zugang einen gelesenen Einsatz nennen.
 
 #### Scenario: Zugang liest einen Einsatz
 - **WHEN** die Einsatzleitung den Einsatz „Stadtfest“ für den Zugang freigegeben hat und ein Admin die Seite „Anbindungen“ öffnet
@@ -113,6 +139,10 @@ welchen Einsatz er gerade liest, oder dass keiner freigegeben ist.
 #### Scenario: Keine Freigabe
 - **WHEN** der Zugang `lage:read` trägt und kein Einsatz für ihn freigegeben ist
 - **THEN** steht an seiner Zeile „kein Einsatz freigegeben“
+
+#### Scenario: Widerrufener Zugang
+- **WHEN** der Zugang widerrufen ist
+- **THEN** nennt seine Zeile weder einen Einsatz noch „kein Einsatz freigegeben“
 
 ## MODIFIED Requirements
 

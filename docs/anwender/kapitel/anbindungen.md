@@ -93,7 +93,8 @@ Fremdsystems vergleichen. Ein Fremdsystem legt nie selbst einen Einsatz an.
 
 Eine Anbindung mit „Lage lesen“ sieht nur den Einsatz, den die Einsatzleitung auf der Seite
 „Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben hat, und höchstens einen.
-Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“. Die
+Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“,
+solange die Anbindung weder widerrufen noch abgelaufen ist. Die
 Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
 wenn ihr „Lage lesen“ genommen wird; bekommt sie das Recht wieder oder wird ein verstrichenes
 „Gültig bis“ verlängert, braucht es eine neue Freigabe.
@@ -117,7 +118,9 @@ Fremdsystem selbst erfährt nur „Anmeldung fehlgeschlagen“. Die häufigsten 
 ### Am ELW
 
 Meldet sich die Instanz für die Organisation bei einem Hub, nimmt sie keine Fremdsysteme an. Die
-Seite nennt dann den Hub; Anbindungen werden dort angelegt.
+Seite nennt dann den Hub; Anbindungen werden dort angelegt. Bestehende Anbindungen bleiben
+stehen und gelten wieder, sobald die Kopplung endet; solange nennt ihre Zeile keinen Einsatz.
+Eine Freigabe aus der Zeit davor ruht (siehe [Externe Lagemonitore](externe-lagemonitore.md)).
 
 ### Schlüssel und Code
 

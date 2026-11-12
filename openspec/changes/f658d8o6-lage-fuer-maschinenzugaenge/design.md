@@ -103,8 +103,20 @@ Wirkung, und das Paneel zeigte Schalter ohne Folge.
 
 Freigebbar ist ein Zugang der Org des Einsatzes, nicht widerrufen, nicht abgelaufen, mit
 mindestens einem solchen Scope, und nur an einer Instanz, die sich für die Org nicht bei einem
-Hub meldet (dort lehnt der Extractor jeden Zugang ab). Auch ein Zugang im Zustand `wartet` (Code noch nicht eingelöst):
-die Einsatzleitung kann vorab freigeben, das Paneel zeigt „wartet auf Schlüssel“.
+Hub meldet (dort lehnt der Extractor jeden Zugang ab). Auch ein Zugang im Zustand `wartet` (Code
+noch nicht eingelöst): die Einsatzleitung kann vorab freigeben, das Paneel zeigt „wartet auf
+Schlüssel“.
+
+**Eine Freigabe von vor der Kopplung ruht** (Befund des Nachreviews, 12.11.2026). Die Spec
+`maschinenzugang` lässt einen Zugang die Kopplung überleben: er wird abgewiesen, nicht
+widerrufen, und gilt wieder, sobald die Kopplung endet. Die Freigabe hängt am Zugang und folgt
+ihm: sie bleibt stehen und gilt nach dem Ende der Kopplung wieder. Damit das niemanden
+überrascht, zeigt das Paneel am gekoppelten ELW genau die Zugänge, die diesen Einsatz schon
+lesen, mit „Freigabe ruht: Instanz meldet sich bei einem Hub“ (`AnbindungFreigabe.ruht`); die
+Einsatzleitung kann die Freigabe dort beenden, aber keine neue erteilen. Verworfen: die Freigabe
+beim Koppeln löschen. Das träfe auch die kurze Direktkopplung vor Ort und verlangte nach jeder
+Kopplung eine neue Freigabe, obwohl sich an der Entscheidung der Einsatzleitung nichts geändert
+hat.
 
 ### D4 Freigabe-Routen am Einsatz, auch am Spiegel
 
@@ -267,17 +279,21 @@ es gibt keine Stelle mehr, an der er stünde.
   Paneels „Externe Lagemonitore“. Je Zugang Name, darunter Rechte (`RechteText`) und Zustand:
   „liest diesen Einsatz“ · „liest einen anderen Einsatz“ · „nicht freigegeben“, dazu „wartet auf
   Schlüssel“ und „zuletzt …“. Schalter mit `aria-label` „Anbindung {name} liest diesen Einsatz“.
-  Ohne freigebbaren Zugang bleibt das Paneel weg; ein Ladefehler ist sichtbar.
+  Ohne freigebbaren Zugang bleibt das Paneel weg; ein Ladefehler ist sichtbar. Fehlt nach einem
+  abgelehnten Umschalten die Zeile (widerrufen, abgelaufen), steht der Grund als schließbarer
+  Hinweis im Paneel, auch wenn es sonst leer wäre (Befund des Nachreviews, 12.11.2026).
 - **Schaltbar**, wenn `leitung && istAktiv` und die Instanz den Einsatz führt oder als Spiegel
   hält (dieselbe Bedingung wie `darfLagebild`).
 - **Query-Key** `einsatzKeys.anbindungen` in `NICHT_LIVE_KEYS` (wie `geraete`): die eigene
   Änderung setzt die Antwort, ein Abruf des Fremdsystems ist kein Ereignis. Weil Umstellen,
   Widerruf und Rechteentzug den Stand von außen ändern, fragt das Paneel alle 30 s nach und
   nach jedem gescheiterten Umschalten. Ohne Verbindung sind die Schalter gesperrt, die Mutation
-  läuft mit `networkMode: 'always'` (Befunde des Reviews, 12.11.2026).
+  läuft mit `networkMode: 'always'` (Befunde des Reviews, 12.11.2026). Das Umschalten bricht
+  einen laufenden Abruf ab, sonst überschriebe dessen ältere Antwort den neuen Stand.
 - **Seite „Anbindungen“:** `AnbindungAnzeige` bekommt `einsatz_id?` und `einsatz_bezeichnung?`.
   Liste und Ansicht zeigen bei Zugängen nach D3 „liest {Einsatz}“ oder „kein Einsatz
-  freigegeben“.
+  freigegeben“ (`einsatz_freigebbar`). An widerrufenen und abgelaufenen Zugängen und an einer
+  Instanz, die sich für die Org bei einem Hub meldet, steht nichts davon: dort liest kein Zugang.
 - Kein Entwurf über das Design System: ein Paneel nach vorhandenem Muster und eine Zeile mehr,
   keine neue Seite und kein neuer Baustein (`frontend/AGENTS.md`).
 

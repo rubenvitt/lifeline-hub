@@ -60,6 +60,9 @@ Auch ein System-Admin ohne Rolle im Einsatz gibt nicht frei. Das Paneel „Anbin
 Anbindungen mit dem Recht „Lage lesen“, die weder widerrufen noch abgelaufen sind; ohne eine
 solche fehlt es.
 
+Lehnt der Server ein Umschalten ab, weil die Anbindung inzwischen widerrufen oder abgelaufen
+ist, verschwindet ihre Zeile. Der Grund bleibt im Paneel stehen, bis er geschlossen wird.
+
 ### Ein Monitor, ein Einsatz
 
 Eine Anbindung liest höchstens einen Einsatz. Gibt die Einsatzleitung eines zweiten Einsatzes
@@ -75,8 +78,8 @@ Die Freigabe endet
 Bekommt die Anbindung das Recht später wieder oder verlängert der System-Admin ein
 verstrichenes „Gültig bis“, liest sie erst nach einer neuen Freigabe.
 
-Die Seite „Anbindungen“ nennt an jeder Anbindung mit „Lage lesen“, welchen Einsatz sie gerade
-liest.
+Die Seite „Anbindungen“ nennt an jeder Anbindung mit „Lage lesen“, die weder widerrufen noch
+abgelaufen ist, welchen Einsatz sie gerade liest.
 
 ### Was der Monitor erhält
 
@@ -101,6 +104,18 @@ Einsatzleitung gibt ihn dort genauso frei. Der Monitor erhält dann die Zahlen d
 dem Zeitpunkt des letzten Abgleichs. Ist der Abgleich des Spiegels beendet, lässt sich der
 Einsatz nicht mehr neu freigeben; eine bestehende Freigabe lässt sich weiter beenden.
 
+### Instanz, die sich selbst bei einem Hub meldet
+
+Meldet sich die Instanz für die Organisation bei einem Hub, nimmt sie keine Fremdsysteme an
+(siehe [Anbindungen](anbindungen.md)). Das Paneel „Anbindungen“ fehlt dort, und die Seite
+„Anbindungen“ nennt keinen gelesenen Einsatz.
+
+Las ein Monitor den Einsatz schon vor der Kopplung, ruht seine Freigabe: Er erhält kein
+Lagebild, solange die Kopplung besteht, und liest danach wieder. Das Paneel zeigt dann nur
+diesen Monitor mit „Freigabe ruht: Instanz meldet sich bei einem Hub“. Die Einsatzleitung kann
+die Freigabe dort beenden; neu freigeben lässt sich an dieser Instanz erst wieder nach dem Ende
+der Kopplung.
+
 ### Stand des Paneels und Verhalten ohne Netz
 
 Das Paneel „Anbindungen“ fragt alle 30 Sekunden nach. Stellt eine andere Einsatzleitung die
@@ -118,4 +133,5 @@ die Instanz ihn führt oder die Person auch dort zur Führung gehört.
 Widerruft der System-Admin die Anbindung oder nimmt er ihr „Lage lesen“, steht das im
 Einsatztagebuch des gelesenen Einsatzes, wenn die Instanz ihn führt, und immer im
 [Zugangsprotokoll](zugangsprotokoll.md). Das Ende durch ein verstrichenes „Gültig bis“ trägt das
-Einsatztagebuch nach, sobald der System-Admin die Anbindung das nächste Mal ändert.
+Einsatztagebuch nach, sobald der System-Admin die Anbindung das nächste Mal ändert, wenn die
+Instanz den Einsatz führt und er noch läuft. An einem Spiegel entsteht dafür kein Eintrag.
