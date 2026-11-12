@@ -136,19 +136,19 @@ interface NotuebernahmeWerte {
 /**
  * Paneel „Führung“ (LLH-1491): wer führt, mit welcher Epoche, wie es dazu kam, und die Bedienung.
  * Auf der Seite Einsatzdaten für den lokalen Einsatz, auf der Seite „Instanzkopplung“ für einen
- * Einsatz beim Gegenüber. Ohne `darfBedienen` nur der Stand. `admin`: das Konto ist Admin und darf
- * mit eigener Unterschrift übernehmen; sonst bietet die Notübernahme nur den Code (LLH-1676).
+ * Einsatz beim Gegenüber. Ohne `darfBedienen` nur der Stand. `darfUnterschreiben`: das Konto ist Admin
+ * der Einsatz-Org und darf mit eigener Unterschrift übernehmen; sonst bietet die Notübernahme nur den Code (LLH-1676).
  */
 export default function FuehrungPaneel({
   fuehrung,
   darfBedienen,
-  admin = false,
+  darfUnterschreiben = false,
   titel = 'Führung',
   style,
 }: {
   fuehrung: FuehrungAnzeige;
   darfBedienen: boolean;
-  admin?: boolean;
+  darfUnterschreiben?: boolean;
   titel?: string;
   style?: React.CSSProperties;
 }) {
@@ -158,7 +158,7 @@ export default function FuehrungPaneel({
   const zeit = (wert: string) => zeitKurz(wert, konv);
   const nach = useNachFuehrung(fuehrung.einsatz_id ?? undefined);
   const ort = ortVon(fuehrung);
-  const moeglich = fuehrungMoeglich(fuehrung, { admin });
+  const moeglich = fuehrungMoeglich(fuehrung, { darfUnterschreiben });
   const [neuerCode, setNeuerCode] = useState<FuehrungCodeAntwort | null>(null);
   const [notOffen, setNotOffen] = useState(false);
   const [form] = Form.useForm<NotuebernahmeWerte>();

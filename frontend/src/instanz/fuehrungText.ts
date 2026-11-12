@@ -41,9 +41,9 @@ export interface FuehrungMoeglich {
   notuebernahme: boolean;
   /** Notübernahme gegen die meldende Seite: mit Unterschrift oder Code. */
   notuebernahmeMitBeweis: boolean;
-  /** Bei `notuebernahmeMitBeweis` die eigene Unterschrift als Beweis anbieten: nur einem Admin,
-   *  denn nur Admins haben Unterschriftsschlüssel, und der Server antwortet allen anderen mit 403
-   *  (LLH-1676, Spec `instanz-fuehrung`). Sonst bleibt der Code des Gegenübers. */
+  /** Bei `notuebernahmeMitBeweis` die eigene Unterschrift als Beweis anbieten: nur wer
+   *  `darfFuehrungUnterschreiben` (Admin der Einsatz-Org, LLH-1676, Spec `instanz-fuehrung`).
+   *  Sonst bleibt der Code des Gegenübers. */
   unterschrift: boolean;
   /** Eine Übernahme gegen diese Instanz wartet auf Bestätigen oder Widersprechen. */
   entscheiden: boolean;
@@ -51,7 +51,7 @@ export interface FuehrungMoeglich {
 
 export function fuehrungMoeglich(
   f: FuehrungAnzeige,
-  { admin = false }: { admin?: boolean } = {},
+  { darfUnterschreiben = false }: { darfUnterschreiben?: boolean } = {},
 ): FuehrungMoeglich {
   // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647).
   const frei = f.fuehrend && !f.offen && !f.verwahrt;
@@ -63,7 +63,7 @@ export function fuehrungMoeglich(
     anfragen: !f.fuehrend && f.fuehrer_richtung === 'meldet_sich' && !f.anfrage_offen,
     notuebernahme: liegtHier && !f.fuehrend && f.fuehrer_richtung === 'meldet_sich',
     notuebernahmeMitBeweis: mitBeweis,
-    unterschrift: mitBeweis && admin,
+    unterschrift: mitBeweis && darfUnterschreiben,
     entscheiden: f.offen != null,
   };
 }

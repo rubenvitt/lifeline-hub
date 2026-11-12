@@ -191,7 +191,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
           fuehrer_richtung: 'wird_gemeldet',
         })}
         darfBedienen
-        admin
+        darfUnterschreiben
       />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
@@ -248,7 +248,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
           fuehrer_richtung: 'wird_gemeldet',
         })}
         darfBedienen
-        admin
+        darfUnterschreiben
       />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));

@@ -5,6 +5,7 @@ import {
   darfImEinsatzSchreiben,
   darfEinsatzVerwalten,
   darfFuehrungBedienen,
+  darfFuehrungUnterschreiben,
   darfModuleVerwalten,
   darfOriginalLaden,
   darfVerwaltung,
@@ -279,6 +280,14 @@ describe('Führung je Einsatz (LLH-1491)', () => {
       ),
     ).toBe(false);
     expect(darfFuehrungBedienen(undefined, orgAdmin)).toBe(false);
+  });
+
+  it('mit eigener Unterschrift übernimmt nur ein Admin der Einsatz-Org (LLH-1676)', () => {
+    const e = { ...el, org_id: 1, fuehrung: hub };
+    expect(darfFuehrungUnterschreiben(e, { ...admin, org_id: 1 })).toBe(true);
+    expect(darfFuehrungUnterschreiben(e, { ...admin, org_id: 2 })).toBe(false);
+    expect(darfFuehrungUnterschreiben(e, { ...keiner, org_id: 1 })).toBe(false);
+    expect(darfFuehrungUnterschreiben(undefined, { ...admin, org_id: 1 })).toBe(false);
   });
 });
 

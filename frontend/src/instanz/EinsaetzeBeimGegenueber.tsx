@@ -81,7 +81,11 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
       >
         {offen && (
           // Bedienen darf diese Seite nur ein Admin; er darf auch unterschreiben (LLH-1676).
-          <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} admin={darfBedienen} />
+          <FuehrungPaneel
+            fuehrung={offen}
+            darfBedienen={darfBedienen}
+            darfUnterschreiben={darfBedienen}
+          />
         )}
       </Modal>
     </Paneel>

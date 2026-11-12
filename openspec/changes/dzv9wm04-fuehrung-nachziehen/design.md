@@ -68,18 +68,21 @@ sondern ein Integrationstest, der die 403 festhält. Die Gegenprobe ist die Rout
 - *Alternative:* Verlauf und Gegenüber nur für Führungsberechtigte. Verworfen am Checkpoint, weil
   die Einsatzleitung den Verlauf auch für ihr Führungspersonal lesbar haben will.
 
-### D2 Beweiswahl nach Rolle, Spiegel des Servers
+### D2 Beweiswahl nach Rolle
 
 `fuehrungMoeglich` bekommt ein Feld `unterschrift: boolean`. Es ist genau dann wahr, wenn
-`notuebernahmeMitBeweis` gilt und das Konto Admin ist. Die Admin-Eigenschaft gibt das Paneel als
-Prop herein, die Funktion bleibt rein.
+`notuebernahmeMitBeweis` gilt und das Konto unterschreiben darf. Das sagt
+`darfFuehrungUnterschreiben` in `einsatz/schreibrecht.ts`: System-Admin **der Einsatz-Org**. Das
+Paneel bekommt es als Prop `darfUnterschreiben`, die Funktion bleibt rein.
 
 - Ohne Unterschrift entfällt im Dialog die Gruppe „Beweis“, das Feld „Code“ steht direkt da, und
   der Anfangswert ist `beweis: 'code'`.
-- Die Bedingung folgt dem Server (`ist_admin()`). Wer nach dem Server unterschreiben darf, sieht
-  die Wahl, und wer es nicht darf, sieht sie nicht.
-- Auf „Instanzkopplung“ (`EinsaetzeBeimGegenueber`) ist jeder Betrachter Admin, die Prop ist dort
-  immer wahr.
+- Die Org gehört dazu, weil das Gegenüber die Unterschrift gegen die Schlüssel der Einsatz-Org
+  prüft (`find_gueltig_der_org`). Ein Admin einer anderen Org, der Einsatzleitung ist, würde eine
+  Übernahme erklären, die das Gegenüber als ungültig verwirft. Der Server (`run_start`) prüft
+  bisher nur `ist_admin()`; das zieht eine Folgeaufgabe nach (Review, siehe PR).
+- Auf „Instanzkopplung“ (`EinsaetzeBeimGegenueber`) ist jeder Bediener Admin der Org der Akte,
+  die Prop folgt dort `darfBedienen`.
 - *Alternative:* den Knopf belassen und nur das Kapitel ändern. Verworfen am Checkpoint, weil die
   Einsatzleitung sonst in eine 403 läuft.
 
