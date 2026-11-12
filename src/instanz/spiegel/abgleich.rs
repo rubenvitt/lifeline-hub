@@ -4,6 +4,8 @@
 //! Führt die meldende Seite einen Einsatz, liefert sie ihn in der Anfrage und merkt sich den Stand
 //! aus der Antwort (`spiegel_ziel`, Push). Führt die erreichte Seite, nennt die meldende ihren
 //! Stand und bekommt die Lieferung in der Antwort (Pull). Den Stand nennt immer, wer spiegelt.
+//! Ebenso nennt, wer eine Führungsakte ohne Spiegel hält, ihre Kennung (`akten`, LLH-1699), und
+//! erfährt in `lebensende`, ob der Einsatz beim Gegenüber endgültig weg ist.
 
 use super::lebensende;
 use super::liefern::{self, Absender, Budget};
@@ -46,6 +48,8 @@ fn org_wire(eigen: &Identitaet, kopplung: &KopplungZeile, o: &OrgZeile) -> Strin
 /// je Pfad in Zweierschritten vor und träfe bei einer geraden Zahl übriger Plätze nie alle.
 static RUNDE_STAENDE: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
 static RUNDE_LIEFERN: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
+/// Zähler je Kopplung für die Auswahl der genannten Akten ohne Spiegel (LLH-1699).
+static RUNDE_AKTEN: Mutex<Option<HashMap<i64, usize>>> = Mutex::new(None);
 
 /// Die nächste Runde dieser Kopplung auf diesem Zähler: 0, 1, 2, …
 fn naechste_runde(zaehler: &Mutex<Option<HashMap<i64, usize>>>, kopplung_id: i64) -> usize {
@@ -142,6 +146,43 @@ fn auswahl_staende(zeilen: Vec<(String, i64, bool)>, runde: usize) -> Vec<Einsat
             bruch: Vec::new(),
         })
         .collect()
+}
+
+/// Kennungen der Akten ohne Spiegel, nach denen diese Instanz das Gegenüber fragt (LLH-1699,
+/// Change `h7shm5au-loeschsignal-spiegellose-akten`, D1, D2); welche das sind, sagt
+/// `fuehrung::repo::list_ohne_spiegel`.
+async fn eigene_akten(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+) -> Result<Vec<String>, AppError> {
+    let Some(richtung) = kopplung.richtung() else {
+        return Ok(Vec::new());
+    };
+    let alle = crate::instanz::fuehrung::repo::list_ohne_spiegel(
+        conn,
+        kopplung.id,
+        richtung,
+        &kopplung.gegenueber_kennung,
+    )
+    .await?;
+    if alle.len() <= EINSAETZE_MAX {
+        return Ok(alle);
+    }
+    Ok(auswahl_akten(
+        alle,
+        naechste_runde(&RUNDE_AKTEN, kopplung.id),
+    ))
+}
+
+/// Höchstens [`EINSAETZE_MAX`] Akten je Paket. Sind es mehr, rückt die Auswahl je Abgleich um ein
+/// ganzes Paket weiter: Über alle Runden kommt jede Akte dran, auch wenn keine je endet.
+fn auswahl_akten(mut alle: Vec<String>, runde: usize) -> Vec<String> {
+    let n = alle.len();
+    if n > EINSAETZE_MAX {
+        alle.rotate_left(runde.wrapping_mul(EINSAETZE_MAX) % n);
+        alle.truncate(EINSAETZE_MAX);
+    }
+    alle
 }
 
 /// Liefert die geführten Einsätze aller aktiven Orgs ab den genannten Ständen.
@@ -430,6 +471,8 @@ pub async fn handle_abgleich(
         // angefordert und gehen unten mit den Abrufen hinaus).
         abzuraeumen =
             lebensende::geloescht_uebernehmen(conn, kopplung, &anfrage.lebensende).await?;
+        // Push (LLH-1699): Akten ohne Spiegel, deren Einsatz die meldende Seite gelöscht hat.
+        lebensende::geloeschte_akten_uebernehmen(conn, kopplung, &anfrage.lebensende).await?;
         let mut lebensende_quittungen = Vec::new();
         for l in &anfrage.lebensende {
             if let Some((q, umgewandelt)) =
@@ -439,8 +482,19 @@ pub async fn handle_abgleich(
                 uebernommen.einsaetze.extend(umgewandelt);
             }
         }
-        // Pull: genannte Einsätze, die hier gelöscht sind.
-        let geloescht = lebensende::geloeschte(conn, &eigen.kennung, &anfrage.staende).await?;
+        // Pull: genannte Einsätze, die hier gelöscht sind; dazu genannte Akten ohne Spiegel,
+        // deren Ende diese Instanz belegt (LLH-1699).
+        let mut geloescht = lebensende::geloeschte(conn, &eigen.kennung, &anfrage.staende).await?;
+        let platz = EINSAETZE_MAX.saturating_sub(geloescht.len());
+        geloescht.extend(
+            lebensende::geloeschte_akten(conn, kopplung.id, &eigen.kennung, &anfrage.akten)
+                .await?
+                .into_iter()
+                .take(platz),
+        );
+        // Push: die eigenen Akten ohne Spiegel, die die meldende Seite führt (nach dem Löschen
+        // oben, damit eine eben gelöschte nicht noch einmal genannt wird).
+        let akten = eigene_akten(conn, kopplung).await?;
         // Push: die Stände aller Spiegel dieser Kopplung, damit die meldende Seite gelöschte
         // Einsätze erkennt (ein älterer Stand überliest Kennungen ohne Lieferung).
         for s in eigene_staende(conn, kopplung.id).await? {
@@ -473,6 +527,7 @@ pub async fn handle_abgleich(
             bruch_antworten,
             hinweise: Vec::new(),
             hinweis_quittungen,
+            akten,
         })
     })?;
     melde_live(pool, &uebernommen).await;
@@ -516,6 +571,7 @@ pub async fn abgleich_einmal(
         let anfrage = crate::write_retry!(pool, |conn| {
             let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
             let staende = eigene_staende(conn, kopplung.id).await?;
+            let akten = eigene_akten(conn, kopplung).await?;
             let ziele: Vec<(String, i64)> = sqlx::query_as(
                 "SELECT e.kennung, z.stand FROM spiegel_ziel z JOIN einsatz e ON e.id = z.einsatz_id \
                  JOIN instanz_kopplung_org o ON o.id = z.kopplung_org_id \
@@ -561,6 +617,7 @@ pub async fn abgleich_einmal(
                 bruch_antworten: bruch_antworten.clone(),
                 hinweise,
                 hinweis_quittungen: Vec::new(),
+                akten,
             })
         })
         .map_err(fehler)?;
@@ -628,6 +685,8 @@ pub async fn abgleich_einmal(
             // in der nächsten Anfrage melden.
             abzuraeumen =
                 lebensende::geloescht_uebernehmen(conn, kopplung, &antwort.lebensende).await?;
+            // Pull (LLH-1699): Akten ohne Spiegel, deren Einsatz die erreichte Seite nicht mehr hat.
+            lebensende::geloeschte_akten_uebernehmen(conn, kopplung, &antwort.lebensende).await?;
             abzuraeumen.extend(
                 lebensende::quittungen_uebernehmen(
                     conn,
@@ -645,9 +704,15 @@ pub async fn abgleich_einmal(
                 .filter(|l| l.art == LEBENSENDE_GELOESCHT)
                 .map(|l| l.kennung.as_str())
                 .collect();
+            // Push (LLH-1699): Akten ohne Spiegel, die die erreichte Seite nennt und deren Ende
+            // diese Instanz belegt, gehen wie die gelöschten Spiegel mit der nächsten Runde hinaus.
+            let akten_geloescht =
+                lebensende::geloeschte_akten(conn, kopplung.id, &eigen.kennung, &antwort.akten)
+                    .await?;
             geloescht_offen = lebensende::geloeschte(conn, &eigen.kennung, &antwort.staende)
                 .await?
                 .into_iter()
+                .chain(akten_geloescht)
                 .filter(|l| !gesendet.contains(&l.kennung.as_str()))
                 .collect();
             Ok(())
@@ -709,6 +774,22 @@ mod reihum_tests {
             alle.extend(kennungen);
         }
         assert_eq!(alle.len(), 410, "jeder Spiegel kommt irgendwann dran");
+    }
+
+    /// LLH-1699: Mehr Akten ohne Spiegel, als ein Paket trägt, kommen über die Runden alle dran,
+    /// jede Runde ein ganzes Paket weiter; passen sie hinein, bleibt die Liste, wie sie ist.
+    #[test]
+    fn mehr_akten_als_ein_paket_traegt_kommen_paketweise_alle_dran() {
+        let alle: Vec<String> = (0..700).map(|i| format!("a{i}")).collect();
+        let mut gesehen = BTreeSet::new();
+        for runde in 0..3 {
+            let auswahl = auswahl_akten(alle.clone(), runde);
+            assert_eq!(auswahl.len(), EINSAETZE_MAX);
+            gesehen.extend(auswahl);
+        }
+        assert_eq!(gesehen.len(), 700, "nach drei Runden war jede Akte dabei");
+        let wenige: Vec<String> = (0..3).map(|i| format!("a{i}")).collect();
+        assert_eq!(auswahl_akten(wenige.clone(), 5), wenige);
     }
 
     /// Der Aufrufpfad: Stände und Lieferung zählen je Kopplung getrennt, jede Runde rückt um eins.

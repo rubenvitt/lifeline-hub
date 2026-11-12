@@ -36,6 +36,9 @@ pub const ANHAENGE_MAX: usize = 64;
 pub const TEIL_GROESSE: usize = 256 * 1024;
 /// Höchstzahl Zeilen einer Bruchstelle je Frage und je Antwort (LLH-1641, E6).
 pub const BRUCH_MAX: usize = 1000;
+/// Höchstlänge einer genannten Aktenkennung (Zeichen), wie die Kennung einer Akte in der Meldung
+/// (`fuehrung::austausch`).
+pub const KENNUNG_MAX: usize = 500;
 
 /// Anfrage und Antwort des Abgleichs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -75,6 +78,12 @@ pub struct SpiegelPaket {
     /// Kennungen der Hinweise des Gegenübers, die ich angenommen oder verworfen habe.
     #[serde(default)]
     pub hinweis_quittungen: Vec<i64>,
+    /// Kennungen von Führungsakten, die ich ohne lokalen Einsatz halte (LLH-1699, Change
+    /// `h7shm5au-loeschsignal-spiegellose-akten`, D1). Das Gegenüber meldet in `lebensende` als
+    /// `geloescht`, welche dieser Einsätze es endgültig nicht mehr hat; ein älteres überliest das
+    /// Feld.
+    #[serde(default)]
+    pub akten: Vec<String>,
 }
 
 /// Wie ein Einsatz beim Führer endet (D3).
@@ -330,6 +339,12 @@ impl SpiegelPaket {
                 super::hinweis::HINWEISE_MAX
             ));
         }
+        if self.akten.len() > EINSAETZE_MAX {
+            return Err(format!("mehr als {EINSAETZE_MAX} Akten im Paket"));
+        }
+        if self.akten.iter().any(|k| k.chars().count() > KENNUNG_MAX) {
+            return Err(format!("Kennung einer Akte über {KENNUNG_MAX} Zeichen"));
+        }
         if self.abrufe.len() > ANHAENGE_MAX || self.anhang_teile.len() > ANHAENGE_MAX {
             return Err(format!("mehr als {ANHAENGE_MAX} Anhänge im Paket"));
         }
@@ -362,6 +377,10 @@ mod tests {
         let p: SpiegelPaket = serde_json::from_str("{}").unwrap();
         assert!(p.check().is_ok());
         assert!(p.lebensende.is_empty() && p.lebensende_quittungen.is_empty());
+        assert!(
+            p.akten.is_empty(),
+            "ein älteres Gegenüber nennt keine Akten"
+        );
         let l: Lebensende = serde_json::from_str(r#"{"kennung":"a/1","art":"geloescht"}"#).unwrap();
         assert_eq!((l.stand, l.kategorien.len()), (0, 0));
         let l: EinsatzLieferung = serde_json::from_str(
@@ -428,6 +447,21 @@ mod tests {
             EINSAETZE_MAX + 1
         ];
         assert!(p.check().is_err(), "zu viele Quittungen");
+    }
+
+    #[test]
+    fn zu_viele_akten_und_ueberlange_kennungen_sind_ungueltig() {
+        let mut p = SpiegelPaket {
+            akten: vec!["a/1-x".into(); EINSAETZE_MAX],
+            ..Default::default()
+        };
+        assert!(p.check().is_ok());
+        p.akten.push("a/2-y".into());
+        assert!(p.check().is_err(), "zu viele Akten");
+        p.akten = vec!["k".repeat(KENNUNG_MAX)];
+        assert!(p.check().is_ok());
+        p.akten = vec!["k".repeat(KENNUNG_MAX + 1)];
+        assert!(p.check().is_err(), "Kennung zu lang");
     }
 
     #[test]

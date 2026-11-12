@@ -7,6 +7,8 @@
 //! - [`erklaerung`]: Erklärung der Notübernahme, Unterschrift und Abgabecode (D6, D8).
 //! - [`austausch`]: Akten in der Meldung, Annahmeregel nach Richtung (D3, D7, D10).
 //! - [`dienst`]: die Bedienung (Übergabe, Code, Notübernahme, Bestätigen, Widersprechen, D9).
+//! - [`loeschvermerk`]: Ende eines Einsatzes je Kennung, Beleg für das Löschsignal an Akten ohne
+//!   Spiegel (LLH-1699).
 //!
 //! Der Schalter `LIFELINE_FUEHRUNG` steht in `instanz_identitaet.fuehrung_an` (beim Start
 //! geschrieben). Ohne ihn tauscht die Instanz keine Akten aus, ändert an Führer und Spiegel nichts
@@ -15,6 +17,7 @@
 pub mod austausch;
 pub mod dienst;
 pub mod erklaerung;
+pub mod loeschvermerk;
 pub mod repo;
 
 use crate::error::AppError;

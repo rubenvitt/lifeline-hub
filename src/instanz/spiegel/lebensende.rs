@@ -7,6 +7,10 @@
 //!   - Pull (die erreichte Seite führt): die meldende Seite nennt ihre Stände in der Anfrage.
 //!   - Push (die meldende Seite führt): die erreichte Seite nennt die Stände ihrer Spiegel in der
 //!     Antwort, die meldende meldet `geloescht` in der nächsten Anfrage.
+//!   - Akten ohne Spiegel (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`): Wer eine
+//!     Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung in `akten`. Belegt wird ihr Ende
+//!     mit dem Löschvermerk ([`geloeschte_akten`]), auch für Kennungen mit fremdem Präfix; der
+//!     Empfänger löscht die Akte ([`geloeschte_akten_uebernehmen`]).
 //! - **`verwahrt`** (nur meldende → erreichte Seite): Nach der Nachbereitung übergibt die meldende
 //!   Seite einen eigenen Einsatz. Die erreichte macht aus ihrem vollständigen Spiegel einen eigenen
 //!   Einsatz und quittiert `angenommen`; erst dann räumt die meldende Seite ab.
@@ -72,6 +76,98 @@ pub async fn geloeschte(
         }
     }
     Ok(ergebnis)
+}
+
+/// `geloescht` für jede genannte Akte ohne Spiegel, deren Ende diese Instanz belegt (LLH-1699,
+/// D4): mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
+/// Löschprotokoll ([`ist_geloescht`]). In beiden Fällen nur, wenn hier weder Einsatz noch Akte mit
+/// der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus einer Sicherung
+/// zurückgekehrte Instanz meldet nichts.
+pub async fn geloeschte_akten(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    eigene_kennung: &str,
+    akten: &[String],
+) -> Result<Vec<Lebensende>, AppError> {
+    let mut gesehen = HashSet::new();
+    let kennungen: Vec<String> = akten
+        .iter()
+        .filter(|k| gesehen.insert(k.as_str()))
+        .take(EINSAETZE_MAX)
+        .cloned()
+        .collect();
+    let mut belegt: HashSet<String> =
+        crate::instanz::fuehrung::loeschvermerk::belegte(conn, kopplung_id, &kennungen)
+            .await?
+            .into_iter()
+            .collect();
+    let praefix = format!("{eigene_kennung}/");
+    for k in &kennungen {
+        if !belegt.contains(k)
+            && k.starts_with(&praefix)
+            && ist_geloescht(conn, eigene_kennung, k).await?
+            && crate::instanz::fuehrung::repo::find_by_kennung(conn, k)
+                .await?
+                .is_none()
+        {
+            belegt.insert(k.clone());
+        }
+    }
+    Ok(kennungen
+        .into_iter()
+        .filter(|k| belegt.contains(k))
+        .map(|kennung| Lebensende {
+            kennung,
+            art: LEBENSENDE_GELOESCHT.into(),
+            stand: 0,
+            kategorien: Vec::new(),
+        })
+        .collect())
+}
+
+/// Löscht die Akten ohne Spiegel, deren Einsatz das Gegenüber als `geloescht` meldet (LLH-1699,
+/// D3), und vermerkt ihr Ende. Nur bei eingeschalteter Führung, nur Akten ohne lokalen Einsatz
+/// einer Org, die dieser Kopplung aktiv zugeordnet ist. Die erreichte Seite nimmt die Meldung
+/// einer meldenden nur für Akten an, die diese als Führer nennen: Eine ELW löscht am Hub keine
+/// Akte einer anderen. Die meldende Seite nimmt sie für jede solche Akte an, denn die erreichte
+/// reicht auch Akten Dritter weiter. Ein Spiegel endet nicht hier, sondern über
+/// [`geloescht_uebernehmen`]. Liefert die Zahl gelöschter Akten.
+pub async fn geloeschte_akten_uebernehmen(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    liste: &[Lebensende],
+) -> Result<usize, AppError> {
+    use crate::instanz::fuehrung::repo as akten;
+    use crate::instanz::InstanzKopplungRichtung;
+    let Some(richtung) = kopplung.richtung() else {
+        return Ok(0);
+    };
+    if !liste.iter().any(|l| l.art == LEBENSENDE_GELOESCHT) || !akten::is_enabled_tx(conn).await? {
+        return Ok(0);
+    }
+    let orgs: Vec<i64> = akten::list_orgs_der_kopplung(conn, kopplung.id, richtung)
+        .await?
+        .into_iter()
+        .map(|(org_id, _)| org_id)
+        .collect();
+    let mut geloescht = 0;
+    for l in liste.iter().filter(|l| l.art == LEBENSENDE_GELOESCHT) {
+        let Some(a) = akten::find_by_kennung(conn, &l.kennung).await? else {
+            continue;
+        };
+        if a.einsatz_id.is_some() || !orgs.contains(&a.org_id) {
+            continue;
+        }
+        if richtung == InstanzKopplungRichtung::WirdGemeldet
+            && a.fuehrer_kennung != kopplung.gegenueber_kennung
+        {
+            continue;
+        }
+        if akten::delete_ohne_spiegel(conn, &a).await? {
+            geloescht += 1;
+        }
+    }
+    Ok(geloescht)
 }
 
 /// Der Spiegel dieser Kopplung mit der Kennung, samt Stand.

@@ -367,6 +367,222 @@ async fn geloescht_merkt_nur_spiegel_dieser_kopplung_vor() {
     assert_eq!(art, "spiegel");
 }
 
+// ── Akten ohne Spiegel (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`) ──────────
+
+/// Eine Akte ohne lokalen Einsatz in Org `org_id`, geführt von `fuehrer`.
+async fn akte(pool: &SqlitePool, kennung: &str, org_id: i64, fuehrer: &str) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatz_fuehrung (kennung, org_id, bezeichnung, status, epoche_zaehler, \
+         epoche_instanz, fuehrer_kennung, fuehrer_name, art, stand, geaendert_at) \
+         VALUES (?, ?, 'Akte', 'abgeschlossen', 1, ?, ?, 'Führer', 'angelegt', 1, \
+         '2026-11-01 00:00:00') RETURNING id",
+    )
+    .bind(kennung)
+    .bind(org_id)
+    .bind(fuehrer)
+    .bind(fuehrer)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+async fn akten_kennungen(pool: &SqlitePool) -> Vec<String> {
+    sqlx::query_scalar("SELECT kennung FROM einsatz_fuehrung ORDER BY kennung")
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+async fn vermerke(pool: &SqlitePool) -> Vec<String> {
+    sqlx::query_scalar("SELECT kennung FROM fuehrung_loeschvermerk ORDER BY kennung")
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+fn geloescht(kennung: &str) -> Lebensende {
+    Lebensende {
+        kennung: kennung.into(),
+        art: LEBENSENDE_GELOESCHT.into(),
+        stand: 0,
+        kategorien: vec![],
+    }
+}
+
+async fn akten_uebernehmen(pool: &SqlitePool, k: &KopplungZeile, liste: &[Lebensende]) -> usize {
+    let mut tx = pool.begin().await.unwrap();
+    let n = geloeschte_akten_uebernehmen(&mut tx, k, liste)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    n
+}
+
+#[tokio::test]
+async fn die_meldende_seite_loescht_jede_akte_ohne_spiegel_einer_zugeordneten_org() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let k = kopplung(&pool, "meldet_sich").await;
+    crate::instanz::fuehrung::save_schalter(&pool, true)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    akte(&pool, "gegen/1-aa", 1, "gegen").await;
+    // Die erreichte Seite reicht auch Akten Dritter weiter: Führer ist eine andere ELW.
+    akte(&pool, "elw2/2-bb", 1, "elw2").await;
+    akte(&pool, "gegen/3-cc", 1, "gegen").await;
+    // Org 2 ist dieser Kopplung nicht zugeordnet.
+    akte(&pool, "gegen/4-dd", 2, "gegen").await;
+    // Eine Akte mit lokalem Einsatz (Spiegel) endet nicht hier.
+    let s = spiegel(&pool, leit, "gegen/5-ee", 2).await;
+    let mit_einsatz = akte(&pool, "gegen/5-ee", 1, "gegen").await;
+    sqlx::query("UPDATE einsatz_fuehrung SET einsatz_id = ? WHERE id = ?")
+        .bind(s)
+        .bind(mit_einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let verlauf: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_fuehrung_verlauf (fuehrung_id, epoche_zaehler, epoche_instanz, art, \
+         nach_name, at) SELECT id, 1, 'gegen', 'angelegt', 'Führer', '2026-11-01 00:00:00' \
+         FROM einsatz_fuehrung WHERE kennung = 'gegen/1-aa' RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let n = akten_uebernehmen(
+        &pool,
+        &k,
+        &[
+            geloescht("gegen/1-aa"),
+            geloescht("elw2/2-bb"),
+            geloescht("gegen/4-dd"),
+            geloescht("gegen/5-ee"),
+            geloescht("unbekannt/9-zz"),
+            // Eine andere Art löscht nichts.
+            verwahrt("gegen/3-cc", 2, vec![]),
+        ],
+    )
+    .await;
+
+    assert_eq!(n, 2);
+    assert_eq!(
+        akten_kennungen(&pool).await,
+        vec!["gegen/3-cc", "gegen/4-dd", "gegen/5-ee"]
+    );
+    assert_eq!(vermerke(&pool).await, vec!["elw2/2-bb", "gegen/1-aa"]);
+    let rest: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrung_verlauf WHERE id = ?")
+            .bind(verlauf)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(rest, 0, "der Verlauf geht mit der Akte");
+}
+
+#[tokio::test]
+async fn die_erreichte_seite_loescht_nur_akten_die_der_absender_fuehrt() {
+    let pool = crate::db::test_pool().await;
+    leitung(&pool).await;
+    let k = kopplung(&pool, "wird_gemeldet").await;
+    crate::instanz::fuehrung::save_schalter(&pool, true)
+        .await
+        .unwrap();
+    akte(&pool, "gegen/1-aa", 1, "gegen").await;
+    // Die Akte einer anderen ELW: Der Absender führt sie nicht.
+    akte(&pool, "elw2/2-bb", 1, "elw2").await;
+
+    let n = akten_uebernehmen(
+        &pool,
+        &k,
+        &[geloescht("gegen/1-aa"), geloescht("elw2/2-bb")],
+    )
+    .await;
+
+    assert_eq!(n, 1);
+    assert_eq!(akten_kennungen(&pool).await, vec!["elw2/2-bb"]);
+    assert_eq!(vermerke(&pool).await, vec!["gegen/1-aa"]);
+}
+
+#[tokio::test]
+async fn ohne_schalter_bleibt_jede_akte() {
+    let pool = crate::db::test_pool().await;
+    leitung(&pool).await;
+    let k = kopplung(&pool, "meldet_sich").await;
+    akte(&pool, "gegen/1-aa", 1, "gegen").await;
+
+    assert_eq!(
+        akten_uebernehmen(&pool, &k, &[geloescht("gegen/1-aa")]).await,
+        0
+    );
+    assert_eq!(akten_kennungen(&pool).await, vec!["gegen/1-aa"]);
+    assert!(vermerke(&pool).await.is_empty());
+}
+
+#[tokio::test]
+async fn eine_genannte_akte_gilt_nur_mit_beleg_als_geloescht() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    kopplung(&pool, "wird_gemeldet").await;
+    // Bestand von vor dem Vermerk: eigenes Präfix, ID im Löschprotokoll (der Einsatz trug nie
+    // eine Kennung, sein Abräumen vermerkt also nichts).
+    let (alt, _) = einsatz(&pool, leit).await;
+    {
+        // Der Test-Pool hat eine Verbindung: vor jedem Aufruf mit `&pool` zurückgeben.
+        let mut conn = pool.acquire().await.unwrap();
+        // Vermerk mit fremdem Präfix: ein verwahrter Einsatz der ELW 1, hier endgültig gelöscht.
+        crate::instanz::fuehrung::loeschvermerk::vermerken(&mut conn, "elw1/5-ab", 1)
+            .await
+            .unwrap();
+        abraeumen::vormerken(&mut conn, alt, AbraeumArt::Verwahrt, None)
+            .await
+            .unwrap();
+    }
+    assert!(abraeumen::ausfuehren(&pool, alt).await.unwrap());
+    assert_eq!(vermerke(&pool).await, vec!["elw1/5-ab"]);
+    // Ein eigener Einsatz, der noch steht, und eine Kennung, die hier niemand kennt (Rückkehr aus
+    // einer Sicherung): beides ohne Beleg.
+    let (lebt, _) = einsatz(&pool, leit).await;
+    sqlx::query("UPDATE einsatz SET kennung = ? WHERE id = ?")
+        .bind(format!("ich/{lebt}-ff"))
+        .bind(lebt)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let genannt = vec![
+        "elw1/5-ab".to_string(),
+        format!("ich/{alt}-cd"),
+        format!("ich/{lebt}-ff"),
+        "ich/9999-zz".to_string(),
+        "elw1/6-unbekannt".to_string(),
+        "elw1/5-ab".to_string(),
+    ];
+    let mut conn = pool.acquire().await.unwrap();
+    let ende = geloeschte_akten(&mut conn, 1, "ich", &genannt)
+        .await
+        .unwrap();
+    assert_eq!(
+        ende.iter().map(|l| l.kennung.clone()).collect::<Vec<_>>(),
+        vec!["elw1/5-ab".to_string(), format!("ich/{alt}-cd")],
+        "Vermerk und Löschprotokoll belegen, jede Kennung einmal"
+    );
+    assert!(ende.iter().all(|l| l.art == LEBENSENDE_GELOESCHT));
+
+    // Kommt die Akte wieder, belegt der Vermerk nichts mehr.
+    drop(conn);
+    akte(&pool, "elw1/5-ab", 1, "elw1").await;
+    let mut conn = pool.acquire().await.unwrap();
+    let ende = geloeschte_akten(&mut conn, 1, "ich", &["elw1/5-ab".to_string()])
+        .await
+        .unwrap();
+    assert!(ende.is_empty());
+}
+
 async fn setze_bis(pool: &SqlitePool, id: i64, bis: &str) {
     sqlx::query("UPDATE einsatz SET nachbereitung_bis = ? WHERE id = ?")
         .bind(bis)
