@@ -743,6 +743,59 @@ async fn offene_uebernahme_behaelt_ihre_bruchstelle_bei_neuer_erklaerung_derselb
 }
 
 #[tokio::test]
+async fn widerrufener_schluessel_verwirft_die_offene_uebernahme_beim_naechsten_eingang() {
+    // Der Schlüssel von A wird widerrufen, während die Übernahme am ELW offen ist; der Widerruf
+    // ist angekommen (LLH-1671). Der nächste Eingang verwirft sie wie bei Ankunft.
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    elw_meldet(&elw).await;
+    assert_eq!(fuehrung(&elw, e).await["offen"]["epoche"], 2);
+    sqlx::query("UPDATE unterschrift_schluessel SET zustand = 'widerrufen'")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let f = fuehrung(&elw, e).await;
+    assert!(f["offen"].is_null(), "{f}");
+    assert_eq!(f["fuehrend"], true);
+    assert_eq!(f["art"], "verworfen");
+    assert_eq!(f["epoche"], 3);
+    assert!(benachrichtigungen(&elw.pool)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
+    elw_meldet(&elw).await;
+    let a = &fremde(&hub).await[0];
+    assert_eq!(a["fuehrer_kennung"], elw.kennung);
+    assert_eq!(a["art"], "verworfen");
+}
+
+#[tokio::test]
+async fn bestaetigen_mit_widerrufenem_schluessel_ist_409() {
+    // Der Widerruf kommt zwischen Anzeige und Klick: Bestätigen gibt die Führung nicht ab
+    // (LLH-1671).
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    elw_meldet(&elw).await;
+    sqlx::query("UPDATE unterschrift_schluessel SET zustand = 'widerrufen'")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Unterschrift"), "{v}");
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["fuehrend"], true);
+    assert_eq!(f["offen"]["epoche"], 2, "die Entscheidung bleibt offen");
+}
+
+#[tokio::test]
 async fn widerspruch_heisst_rueckuebernahme() {
     let (hub, elw) = gekoppelt().await;
     let (e, akte) = elw_einsatz(&hub, &elw).await;

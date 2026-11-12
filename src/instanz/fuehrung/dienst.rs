@@ -436,6 +436,16 @@ pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(
                 "Die übernehmende Instanz ist nicht mehr gekoppelt.".into(),
             ));
         }
+        // Die Unterschrift muss auch beim Bestätigen noch tragen: Ein inzwischen widerrufener
+        // Schlüssel gibt die Führung nicht ab (LLH-1671).
+        let alt = a.epoche();
+        if let Err(grund) =
+            super::austausch::check_unterschrift(conn, &ich, a.org_id, &m, &alt).await
+        {
+            return Err(AppError::Conflict(format!(
+                "Die Unterschrift der Übernahme gilt hier nicht mehr ({grund})."
+            )));
+        }
         let bruch = a.offen_bruch_at.clone();
         a.set_epoche(&m.epoche);
         a.fuehrer_kennung = m.fuehrer.clone();

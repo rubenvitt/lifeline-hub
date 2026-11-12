@@ -90,8 +90,10 @@ impl AkteMeldung {
         }
     }
 
-    /// Derselbe Führungswechsel: Epoche, Führer und Erklärung. `stand` und Kopf ändern sich mit
-    /// jeder Meldung des Gegenübers und zählen nicht (LLH-1671).
+    /// Derselbe Führungswechsel: Epoche, Führer und Erklärung. Die übrigen Felder zählen nicht:
+    /// `stand` vergibt das Gegenüber bei jedem erneuten Senden neu, der Kopf ändert sich mit dem
+    /// Einsatz und nicht mit der Führung, und ein Beweis kommt nur bis hierher, wenn er diese
+    /// Erklärung trägt (`check_unterschrift`) (LLH-1671).
     fn is_gleicher_wechsel(&self, other: &Self) -> bool {
         self.epoche == other.epoche
             && self.fuehrer == other.fuehrer
@@ -208,8 +210,9 @@ pub fn entscheide(richtung: InstanzKopplungRichtung, bewiesen: Result<(), String
 }
 
 /// Prüft den Beweis einer Notübernahme gegen mich (D6): Erklärung passt zur Akte, Unterschrift
-/// von einem gültigen Schlüssel meiner Org über genau diese Erklärung.
-async fn check_unterschrift(
+/// von einem gültigen Schlüssel meiner Org über genau diese Erklärung. Gilt bei Ankunft, bei jedem
+/// weiteren Eingang einer offenen Übernahme und beim Bestätigen (LLH-1671).
+pub(super) async fn check_unterschrift(
     conn: &mut SqliteConnection,
     ich: &Ich,
     org_id: i64,
@@ -502,6 +505,44 @@ async fn erfuelle_wartende(
     Ok(())
 }
 
+/// Prüft die offenen Übernahmen dieser Kopplung erneut gegen die gültigen Schlüssel (LLH-1671).
+/// Ein Widerruf, der mit dieser Nachricht kam, ist schon übernommen (`melden.rs`); trägt die
+/// Unterschrift nicht mehr, wird verworfen wie bei Ankunft. Früher prüfte das nur nebenbei die je
+/// Meldetakt zurückkommende Akte, die nun nicht mehr kommt.
+async fn check_offene(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    orgs: &[(i64, String)],
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM einsatz_fuehrung WHERE offen IS NOT NULL ORDER BY id")
+            .fetch_all(&mut *conn)
+            .await?;
+    for id in ids {
+        let mut a = repo::load(conn, id).await?;
+        if !orgs.iter().any(|(org_id, _)| *org_id == a.org_id) {
+            continue;
+        }
+        let Some(m) = a
+            .offen
+            .as_deref()
+            .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok())
+        else {
+            continue;
+        };
+        if m.epoche.instanz != kopplung.gegenueber_kennung {
+            continue;
+        }
+        let alt = a.epoche();
+        if let Err(grund) = check_unterschrift(conn, ich, a.org_id, &m, &alt).await {
+            verwerfen(conn, ich, kopplung, &mut a, &m, &grund, aus).await?;
+        }
+    }
+    Ok(())
+}
+
 /// Übernimmt die Akten einer Nachricht des Gegenübers. `zuletzt_gesehen` ist der Zeitpunkt der
 /// letzten erfolgreichen Meldung vor dieser Nachricht (Bruchstelle, D11).
 pub async fn apply_eingang(
@@ -520,6 +561,9 @@ pub async fn apply_eingang(
     let bruch = zuletzt_gesehen
         .map(str::to_string)
         .unwrap_or_else(crate::zeit::jetzt);
+    if richtung == InstanzKopplungRichtung::MeldetSich {
+        check_offene(conn, &ich, kopplung, &orgs, &mut aus).await?;
+    }
     for m in akten.iter().take(AKTEN_MAX) {
         aus.bis = Some(aus.bis.map_or(m.stand, |b| b.max(m.stand)));
         if !m.is_in_grenzen() {
