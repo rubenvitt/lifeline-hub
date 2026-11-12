@@ -287,8 +287,9 @@ pub(super) const TEIL_EINSPIELEN: &str = "einspielen";
 const EINSPIELEN_LIEGT_STUNDEN: u64 = 6;
 
 /// Löscht Zwischendateien, die ein abgebrochener Bau liegen ließ (`Drop` läuft bei einem
-/// Prozessabbruch nicht). Nur beim Start des Purge-Laufs, der als einziger Archive baut; die
-/// Datei eines Einspielens (eigener Prozess) erst nach [`EINSPIELEN_LIEGT_STUNDEN`].
+/// Prozessabbruch nicht). Vor jedem Purge-Lauf, der als einziger Archive baut, also nie während
+/// eines Baus; die Datei eines Einspielens (eigener Prozess) erst nach
+/// [`EINSPIELEN_LIEGT_STUNDEN`].
 pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     let verzeichnis = match verzeichnis(pool).await {
         Ok(v) => v,

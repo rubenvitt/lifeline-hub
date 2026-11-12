@@ -4,7 +4,7 @@
 //! Datenbank, bringt sie mit den Migrationen auf den Stand dieser Version und übernimmt den Einsatz
 //! wie einen Spiegel: die Datei liefert (`spiegel::liefern`), die Installation übernimmt
 //! (`spiegel::uebernehmen`). Der Einsatz erscheint als beendeter Spiegel „aus dem Archiv“, lesbar
-//! und schreibgeschützt, und wird nach [`AUFBEWAHRUNG_TAGE`] Tagen abgeräumt.
+//! und schreibgeschützt, und wird nach höchstens [`AUFBEWAHRUNG_TAGE`] Tagen abgeräumt.
 //!
 //! - Die Datei trägt kein Änderungslog; der Grundstock der Spiegel-Trigger trägt jede Zeile ein.
 //! - Der Einsatz bekommt eine neue Kennung `archiv/…`: das Skelett desselben Einsatzes kann hier
@@ -20,6 +20,8 @@
 //!   danach gilt der nächste Block.
 //! - Stammt der Block von dieser Installation, muss er hier noch im Archiv stehen: ein Block, den
 //!   ein Löschersuchen oder seine Frist hier gelöscht hat, kommt nicht über eine Kopie zurück.
+//!   Vollzieht ein Löschersuchen später, geht eine eingespielte Kopie seiner Blöcke mit
+//!   (`archiv::alle_loeschen_tx`).
 //! - Bis die Inhalte geschrieben sind, ist der Einsatz nach [`FERTIG_MINUTEN`] fällig: bricht der
 //!   Befehl ab, räumt Phase R den halben Einsatz bald ab.
 
@@ -32,7 +34,7 @@ use crate::error::AppError;
 use crate::instanz::spiegel::liefern::{self, Absender, Budget, Gefuehrt};
 use crate::instanz::spiegel::paket::{KontoAngabe, SPIEGEL_MAX};
 use crate::instanz::spiegel::uebernehmen::{self, Empfaenger};
-use crate::instanz::spiegel::{art, schema};
+use crate::instanz::spiegel::{anhang, art, schema};
 use crate::instanz::stammdaten::art as stammdaten_art;
 use chrono::{DateTime, TimeDelta, Utc};
 use sha2::{Digest, Sha256};
@@ -92,6 +94,7 @@ struct Kopf {
     freigabestufe: String,
     bezeichnung: String,
     einsatznummer_intern: Option<String>,
+    abgeschlossen_at: Option<String>,
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -176,7 +179,7 @@ async fn einspielen_aus(
         .await?;
     let koepfe: Vec<Kopf> = sqlx::query_as(
         "SELECT id, org_id, status, retention_bis, freigabestufe, bezeichnung, \
-         einsatznummer_intern FROM einsatz",
+         einsatznummer_intern, abgeschlossen_at FROM einsatz",
     )
     .fetch_all(archiv)
     .await?;
@@ -191,7 +194,8 @@ async fn einspielen_aus(
         )));
     }
 
-    hier_geloescht(pool, &kopf, sha256).await?;
+    // Vorab für eine klare Meldung; die Übernahme prüft es in ihrer Transaktion erneut.
+    hier_geloescht(&mut *pool.acquire().await?, &kopf, sha256).await?;
 
     let ziel_org = org.unwrap_or(kopf.org_id);
     let org_name: String = sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
@@ -262,8 +266,6 @@ async fn einspielen_aus(
     let kennung = format!("archiv/{}", &zufall[..16]);
     vorbereiten(pool, archiv, &kopf, ziel_org, &kennung).await?;
 
-    let vorlaeufig_bis = crate::zeit::formatiere_utc(jetzt + TimeDelta::minutes(FERTIG_MINUTEN))
-        .min(loeschen_at.clone());
     let gefuehrt = Gefuehrt {
         id: kopf.id,
         kennung: Some(kennung.clone()),
@@ -271,10 +273,16 @@ async fn einspielen_aus(
         status: kopf.status.clone(),
         org_id: kopf.org_id,
     };
+    // Ab dem Beginn der Übernahme gezählt, nicht ab dem Start des Befehls: Entschlüsseln und
+    // Migrieren eines großen Blocks dauern.
+    let vorlaeufig_bis =
+        crate::zeit::formatiere_utc(Utc::now() + TimeDelta::minutes(FERTIG_MINUTEN))
+            .min(loeschen_at.clone());
     let (einsatz_id, uebernahme_hinweise) = crate::write_retry!(pool, |conn| {
         uebernehmen_tx(
             conn,
             archiv,
+            &kopf,
             &gefuehrt,
             &kennung,
             ziel_org,
@@ -282,7 +290,6 @@ async fn einspielen_aus(
             sha256,
             jetzt_s,
             &vorlaeufig_bis,
-            kopf.einsatznummer_intern.as_deref(),
         )
         .await
     })?;
@@ -301,10 +308,12 @@ async fn einspielen_aus(
             return Err(f);
         }
     };
-    // Erst jetzt ist der Einsatz vollständig und bekommt seine Zeit.
+    // Erst jetzt ist der Einsatz vollständig und bekommt seine Zeit; ist er schon zum Abräumen
+    // vorgemerkt (Frist, Löschersuchen), bleibt es dabei.
     let gesetzt = crate::write_retry!(pool, |conn| {
         Ok(sqlx::query(
-            "UPDATE einsatz_archiv_eingespielt SET loeschen_at = ? WHERE einsatz_id = ?",
+            "UPDATE einsatz_archiv_eingespielt SET loeschen_at = ?1 WHERE einsatz_id = ?2 \
+             AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen WHERE einsatz_id = ?2)",
         )
         .bind(&loeschen_at)
         .bind(einsatz_id)
@@ -314,7 +323,9 @@ async fn einspielen_aus(
     })?;
     if gesetzt == 0 {
         return Err(AppError::Internal(
-            "Archiv: der Einsatz wurde abgeräumt, bevor seine Inhalte geschrieben waren.".into(),
+            "Archiv: der Einsatz wurde abgeräumt oder dazu vorgemerkt, bevor seine Inhalte \
+             geschrieben waren."
+                .into(),
         ));
     }
     tracing::warn!(
@@ -410,6 +421,7 @@ async fn vorbereiten(
 async fn uebernehmen_tx(
     conn: &mut SqliteConnection,
     archiv: &SqlitePool,
+    kopf: &Kopf,
     gefuehrt: &Gefuehrt,
     kennung: &str,
     ziel_org: i64,
@@ -417,8 +429,10 @@ async fn uebernehmen_tx(
     sha256: &str,
     jetzt_s: &str,
     loeschen_at: &str,
-    einsatznummer: Option<&str>,
 ) -> Result<(i64, Vec<String>), AppError> {
+    // In der Schreibtransaktion: ein Löschersuchen oder eine Frist zwischen Vorprüfung und
+    // Übernahme greift auch hier.
+    hier_geloescht(&mut *conn, kopf, sha256).await?;
     // Die Org-Zuordnung, die `uebernehmen` für `einsatz_spiegel` braucht; sie geht unten wieder.
     let kopplung_id: i64 = sqlx::query_scalar(
         "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
@@ -535,22 +549,18 @@ async fn uebernehmen_tx(
             .await?;
     }
     // Platzhalter werden wie Stellvertreter nie Mitglied (`spiegel::OHNE_STELLVERTRETER`).
-    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
-        .execute(&mut *conn)
-        .await?;
-    sqlx::query(
-        "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ? \
-         AND benutzer_id IN (SELECT benutzer_id FROM archiv_konto WHERE einsatz_id = ?)",
+    crate::instanz::spiegel::loeschen_unter_merker(
+        conn,
+        "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ?1 \
+         AND benutzer_id IN (SELECT benutzer_id FROM archiv_konto WHERE einsatz_id = ?1)",
+        einsatz_id,
     )
-    .bind(einsatz_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
     .await?;
-    sqlx::query("DELETE FROM spiegel_uebernahme")
-        .execute(&mut *conn)
-        .await?;
     // Die Spur gehört zur Übernahme: ohne sie gilt das Einspielen nicht.
-    let ziel = crate::aufbewahrung::antrag::einsatz_kennung(einsatznummer, einsatz_id);
+    let ziel = crate::aufbewahrung::antrag::einsatz_kennung(
+        kopf.einsatznummer_intern.as_deref(),
+        einsatz_id,
+    );
     crate::auth::admin_audit::schreibe_ohne_akteur_tx(
         conn,
         crate::auth::admin_audit::AdminAktion::ArchivEingespielt,
@@ -564,15 +574,21 @@ async fn uebernehmen_tx(
 
 /// Lehnt einen Block ab, der von dieser Installation stammt und hier nicht mehr im Archiv steht
 /// (Frist abgelaufen oder Löschersuchen vollzogen), oder dessen Einsatz hier endgültig gelöscht
-/// ist. Von dieser Installation heißt: ein Einsatz mit derselben ID und Einsatznummer.
-async fn hier_geloescht(pool: &SqlitePool, kopf: &Kopf, sha256: &str) -> Result<(), AppError> {
+/// ist. Von dieser Installation heißt: ein Einsatz mit derselben ID, Einsatznummer und
+/// Abschlusszeit.
+async fn hier_geloescht(
+    conn: &mut SqliteConnection,
+    kopf: &Kopf,
+    sha256: &str,
+) -> Result<(), AppError> {
     let skelett: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM einsatz WHERE id = ? AND einsatznummer_intern IS ? \
-         AND spiegel = 0)",
+         AND abgeschlossen_at IS ? AND spiegel = 0)",
     )
     .bind(kopf.id)
     .bind(kopf.einsatznummer_intern.as_deref())
-    .fetch_one(pool)
+    .bind(kopf.abgeschlossen_at.as_deref())
+    .fetch_one(&mut *conn)
     .await?;
     if skelett {
         let im_archiv: bool = sqlx::query_scalar(
@@ -580,7 +596,7 @@ async fn hier_geloescht(pool: &SqlitePool, kopf: &Kopf, sha256: &str) -> Result<
         )
         .bind(kopf.id)
         .bind(sha256)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await?;
         if !im_archiv {
             return Err(AppError::Validation(
@@ -593,11 +609,12 @@ async fn hier_geloescht(pool: &SqlitePool, kopf: &Kopf, sha256: &str) -> Result<
     }
     let geloescht: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM aufbewahrung_loeschprotokoll WHERE einsatz_id = ? \
-         AND art = 'skelett' AND einsatznummer_intern IS ?)",
+         AND art = 'skelett' AND einsatznummer_intern IS ? AND abgeschlossen_at IS ?)",
     )
     .bind(kopf.id)
     .bind(kopf.einsatznummer_intern.as_deref())
-    .fetch_one(pool)
+    .bind(kopf.abgeschlossen_at.as_deref())
+    .fetch_one(&mut *conn)
     .await?;
     if geloescht {
         return Err(AppError::Validation(
@@ -654,6 +671,7 @@ async fn inhalte_schreiben(
             .blob
             .as_deref()
             .ok_or_else(|| AppError::Internal(format!("Archiv: {art} hat keinen Inhalt")))?;
+        let lokal = lokal.as_str();
         let inhalt: Option<Vec<u8>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT \"{spalte}\" FROM {} WHERE {}",
             t.name,
@@ -670,30 +688,13 @@ async fn inhalte_schreiben(
             )));
         }
         crate::write_retry!(pool, |conn| {
-            sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
-                .execute(&mut *conn)
-                .await?;
-            sqlx::query(sqlx::AssertSqlSafe(format!(
-                "UPDATE {} SET \"{spalte}\" = ? WHERE {}",
-                t.name,
-                t.schluessel.gleich(t.name)
-            )))
-            .bind(&inhalt)
-            .bind(&lokal)
-            .execute(&mut *conn)
-            .await?;
-            sqlx::query("DELETE FROM spiegel_uebernahme")
-                .execute(&mut *conn)
-                .await?;
-            sqlx::query(
-                "UPDATE spiegel_anhang SET fertig_at = ? WHERE art = ? AND lokaler_schluessel = ?",
-            )
-            .bind(crate::zeit::jetzt())
-            .bind(&art)
-            .bind(&lokal)
-            .execute(&mut *conn)
-            .await?;
-            Ok(())
+            if anhang::inhalt_einsetzen(conn, t, &art, lokal, &inhalt).await? {
+                Ok(())
+            } else {
+                Err(AppError::Internal(format!(
+                    "Archiv: Zeile {art} {lokal} fehlt; der Einsatz wurde inzwischen abgeräumt."
+                )))
+            }
         })?;
         anzahl += 1;
     }
@@ -736,8 +737,8 @@ pub async fn faellige_vormerken(pool: &SqlitePool, jetzt: &str) -> usize {
             Ok(()) => {
                 tracing::warn!(
                     einsatz_id = id,
-                    "Purge Phase R: eingespielter Einsatz nach {AUFBEWAHRUNG_TAGE} Tagen zum \
-                     Abräumen vorgemerkt"
+                    "Purge Phase R: eingespielter Einsatz nach seiner Zeit zum Abräumen \
+                     vorgemerkt"
                 );
                 n += 1;
             }

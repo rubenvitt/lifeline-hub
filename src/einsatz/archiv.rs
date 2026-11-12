@@ -249,16 +249,33 @@ pub async fn abgelaufene_bloecke_loeschen(
     Ok(anzahl)
 }
 
-/// Löscht alle Blöcke eines Einsatzes (Löschersuchen für den ganzen Einsatz, K8). Liefert die
-/// Zahl gelöschter Blöcke.
+/// Löscht alle Blöcke eines Einsatzes (Löschersuchen für den ganzen Einsatz, K8). Eine hier
+/// eingespielte Kopie eines dieser Blöcke geht mit: sie wird zum Abräumen vorgemerkt (Phase R).
+/// Liefert die Zahl gelöschter Blöcke.
 pub async fn alle_loeschen_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<u64, AppError> {
+    let kopien: Vec<i64> = sqlx::query_scalar(
+        "SELECT einsatz_id FROM einsatz_archiv_eingespielt WHERE sha256 IN \
+         (SELECT sha256 FROM einsatz_archiv WHERE einsatz_id = ?) ORDER BY einsatz_id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for kopie in kopien {
+        super::abraeumen::vormerken(
+            &mut *conn,
+            kopie,
+            super::abraeumen::AbraeumArt::Spiegel,
+            Some(einspielen::GEGENSTELLE),
+        )
+        .await?;
+    }
     Ok(
         sqlx::query("DELETE FROM einsatz_archiv WHERE einsatz_id = ?")
             .bind(einsatz_id)
-            .execute(conn)
+            .execute(&mut *conn)
             .await?
             .rows_affected(),
     )

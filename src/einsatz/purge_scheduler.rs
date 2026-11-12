@@ -344,7 +344,8 @@ pub async fn tick_mit_rueckschrieb(
     // Holt Merker nach, deren Abräumen nach dem Abgleich scheiterte, und räumt Spiegel der
     // meldenden Seite nach der Nachbereitung ab (design.md D5, D6). Schreibt den WAL selbst
     // zurück.
-    // Eingespielte Archive gehen nach 7 Tagen denselben Weg (D10), ihre Platzhalter-Konten danach.
+    // Eingespielte Archive gehen nach ihrer Zeit denselben Weg (D10), ihre Platzhalter-Konten
+    // danach.
     super::archiv::einspielen::faellige_vormerken(pool, &jetzt_s).await;
     anzahl += super::abraeumen::phase_r(pool, &jetzt_s).await;
     super::archiv::einspielen::konten_aufraeumen(pool).await;
@@ -435,11 +436,12 @@ pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
         // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
         // etwa nach einem Absturz zwischen Schwärzung und Rückschrieb.
         let mut rueckschrieb_ausstehend = true;
-        // Klartext-Zwischendateien eines abgebrochenen Archivbaus (LLH-1494): außer diesem Task
-        // baut niemand Archive, also gehört jede vorhandene zu einem toten Lauf.
-        super::archiv::zwischendateien_aufraeumen(&pool).await;
         loop {
             ticker.tick().await;
+            // Klartext-Zwischendateien eines abgebrochenen Archivbaus (LLH-1494): außer diesem
+            // Task baut niemand Archive, also gehört zwischen zwei Läufen jede vorhandene zu
+            // einem toten Bau; die eines Einspielens erst nach einigen Stunden.
+            super::archiv::zwischendateien_aufraeumen(&pool).await;
             tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
         }
     });

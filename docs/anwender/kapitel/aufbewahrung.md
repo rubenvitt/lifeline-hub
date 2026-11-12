@@ -260,7 +260,8 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - Möglich ist ein Löschersuchen nur an einem abgeschlossenen, noch nicht geschwärzten Einsatz.
   Ausnahme ist ein archivierter Einsatz: Er ist schon geschwärzt, ein Löschersuchen für den
   ganzen Einsatz löscht sein Archiv. Heruntergeladene Blöcke erreicht es nicht: Sie sind mit zu
-  löschen. An dieser Installation lässt sich ein so gelöschter Block nicht wieder einspielen.
+  löschen. An dieser Installation lässt sich ein so gelöschter Block nicht wieder einspielen, und
+  eine schon eingespielte Kopie geht mit.
 
 ### Wer was darf
 

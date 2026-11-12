@@ -614,7 +614,7 @@ async fn cmd_admin_zugang_zuruecksetzen(db_path: &str, benutzername: &str) -> an
 }
 
 /// Subkommando `archiv einspielen` (LLH-1494, design.md D10): einen Archivblock als
-/// schreibgeschützten Einsatz einspielen, der 7 Tage bleibt.
+/// schreibgeschützten Einsatz einspielen, der bis zu 7 Tage bleibt.
 async fn cmd_archiv_einspielen(
     db_path: &str,
     datei: &str,
@@ -626,7 +626,15 @@ async fn cmd_archiv_einspielen(
     }
     let schluessel = identitaet_laden(identitaet)?;
     let pool = db::connect(db_path).await?;
-    db::migrate(&pool).await?;
+    // Der Server darf laufen: der Befehl migriert die Datenbank nicht selbst, sondern verlangt
+    // denselben Stand wie diese Version.
+    if let Some(abweichung) = db::stand_abweichung(&pool).await? {
+        pool.close().await;
+        anyhow::bail!(
+            "Die Datenbank passt nicht zu dieser Version ({abweichung}). Mit der Version \
+             einspielen, mit der der Server läuft."
+        );
+    }
     // Ein Abbruch (Strg+C, SIGTERM) lässt das Einspielen fallen: so läuft `Drop` der
     // entschlüsselten Zwischendatei, statt dass sie im Klartext neben der Datenbank liegen bleibt.
     // Eine schon übernommene, unvollständige Kopie räumt der Purge-Lauf ab (`FERTIG_MINUTEN`).
@@ -644,7 +652,8 @@ async fn cmd_archiv_einspielen(
     let Some(ergebnis) = ergebnis else {
         anyhow::bail!(
             "Abgebrochen. Die entschlüsselte Zwischendatei ist gelöscht; eine schon übernommene \
-             Kopie geht mit dem nächsten Purge-Lauf."
+             Kopie räumt der Purge-Lauf nach {} Minuten ab.",
+            lifeline_hub::einsatz::archiv::einspielen::FERTIG_MINUTEN
         );
     };
     let e = ergebnis.map_err(|e| anyhow::anyhow!("{e}"))?;

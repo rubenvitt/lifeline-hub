@@ -616,3 +616,114 @@ async fn ohne_org_nur_in_die_org_gleichen_namens() {
         .unwrap();
     assert_eq!(e.org_name, "KV Süd");
 }
+
+#[tokio::test]
+async fn ein_loeschersuchen_nimmt_die_eingespielte_kopie_mit() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let id = schluessel(&pool).await;
+    let fz = fahrzeuge(&pool).await;
+    let (alt, block) = archivierter_einsatz(&pool, leit, fz, &[]).await;
+    let (_dir, datei, s) = als_datei(&block, &id);
+    let e = einspielen(&pool, &datei, &s, None, Utc::now())
+        .await
+        .unwrap();
+
+    let mut conn = pool.acquire().await.unwrap();
+    let geloescht = super::super::alle_loeschen_tx(&mut conn, alt)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(geloescht, 1);
+    let vorgemerkt: Option<String> = sqlx::query_scalar(
+        "SELECT gegenstelle FROM einsatz_abraeumen WHERE einsatz_id = ? AND art = 'spiegel'",
+    )
+    .bind(e.einsatz_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap()
+    .flatten();
+    assert_eq!(vorgemerkt.as_deref(), Some(GEGENSTELLE));
+    abraeumen::alle_vorgemerkten(&pool).await;
+    assert_eq!(
+        eine::<i64>(
+            &pool,
+            &format!("SELECT COUNT(*) FROM einsatz WHERE id = {}", e.einsatz_id)
+        )
+        .await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn ein_endgueltig_geloeschter_einsatz_kommt_nicht_zurueck() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let id = schluessel(&pool).await;
+    let fz = fahrzeuge(&pool).await;
+    let (alt, block) = archivierter_einsatz(&pool, leit, fz, &[]).await;
+    let (_dir, datei, s) = als_datei(&block, &id);
+    // Phase D hat das Skelett gelöscht; das Löschprotokoll trägt Nummer und Abschlusszeit.
+    let (nummer, abgeschlossen): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT einsatznummer_intern, abgeschlossen_at FROM einsatz WHERE id = ?")
+            .bind(alt)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    exec(&pool, &format!("DELETE FROM einsatz WHERE id = {alt}")).await;
+    sqlx::query(
+        "INSERT INTO aufbewahrung_loeschprotokoll (org_id, einsatz_id, einsatznummer_intern, \
+         abgeschlossen_at, geschwaerzt_at, geloescht_at, skelett_dauer_tage, akteur_id) \
+         VALUES (1, ?, ?, ?, 'x', 'x', 1, ?)",
+    )
+    .bind(alt)
+    .bind(nummer.as_deref())
+    .bind(abgeschlossen.as_deref())
+    .bind(leit)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let f = einspielen(&pool, &datei, &s, None, Utc::now())
+        .await
+        .unwrap_err();
+    assert!(f.to_string().contains("endgültig gelöscht"), "{f}");
+
+    // Gleiche ID und Nummer, aber ein anderer Abschluss: ein Einsatz einer anderen Installation.
+    exec(
+        &pool,
+        &format!(
+            "UPDATE aufbewahrung_loeschprotokoll SET abgeschlossen_at = '2001-01-01T00:00:00Z' \
+             WHERE einsatz_id = {alt}"
+        ),
+    )
+    .await;
+    einspielen(&pool, &datei, &s, None, Utc::now())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn der_befehl_verlangt_den_stand_seiner_version() {
+    let pool = crate::db::test_pool().await;
+    assert_eq!(crate::db::stand_abweichung(&pool).await.unwrap(), None);
+    exec(
+        &pool,
+        "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) \
+         VALUES (99999999, 'neuer', 1, x'00', 0)",
+    )
+    .await;
+    let neuer = crate::db::stand_abweichung(&pool).await.unwrap().unwrap();
+    assert!(neuer.contains("neueren Version"), "{neuer}");
+    exec(
+        &pool,
+        "DELETE FROM _sqlx_migrations WHERE version IN (99999999, \
+         (SELECT MAX(version) FROM _sqlx_migrations WHERE version < 99999999))",
+    )
+    .await;
+    let fehlt = crate::db::stand_abweichung(&pool).await.unwrap().unwrap();
+    assert!(
+        fehlt.contains("1 Migrationen dieser Version fehlen"),
+        "{fehlt}"
+    );
+}

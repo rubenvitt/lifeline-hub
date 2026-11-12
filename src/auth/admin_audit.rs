@@ -273,6 +273,13 @@ pub async fn schreibe_ohne_akteur(
     angaben: Option<ZugangsAngaben>,
     peer_ip: Option<IpAddr>,
 ) {
+    tracing::info!(
+        aktion = aktion.as_str(),
+        gegenstelle = %crate::auth::benutzername::fuer_protokoll(gegenstelle),
+        ziel = %crate::auth::benutzername::fuer_protokoll(ziel_teile(ziel).1),
+        detail = ?angaben.as_ref().and_then(|a| serde_json::to_string(a).ok()),
+        "Zugang durch gekoppelte Instanz geändert"
+    );
     if let Err(e) =
         einfuegen_ohne_akteur(pool, aktion, org_id, gegenstelle, ziel, angaben, peer_ip).await
     {
@@ -284,7 +291,9 @@ pub async fn schreibe_ohne_akteur(
 }
 
 /// Wie [`schreibe_ohne_akteur`], aber in der Transaktion `conn` und mit Fehler: für einen
-/// Schreibweg, der ohne seinen Eintrag nicht gelten soll (Archiv einspielen, LLH-1494).
+/// Schreibweg, der ohne seinen Eintrag nicht gelten soll (Archiv einspielen, LLH-1494). Ohne
+/// eigene Log-Zeile: die Transaktion kann wiederholt werden, der Aufrufer protokolliert nach dem
+/// Commit.
 pub async fn schreibe_ohne_akteur_tx(
     conn: &mut sqlx::SqliteConnection,
     aktion: AdminAktion,
@@ -293,6 +302,18 @@ pub async fn schreibe_ohne_akteur_tx(
     ziel: Ziel<'_>,
 ) -> Result<(), sqlx::Error> {
     einfuegen_ohne_akteur(conn, aktion, org_id, gegenstelle, ziel, None, None).await
+}
+
+/// Konto (falls eines) und Text eines Ziels.
+fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
+    match ziel {
+        Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
+        Ziel::Anmeldeweg(t)
+        | Ziel::Lesezugang(t)
+        | Ziel::Instanz(t)
+        | Ziel::Unterschrift(t)
+        | Ziel::Archiv(t) => (None, t),
+    }
 }
 
 async fn einfuegen_ohne_akteur<'e>(
@@ -304,26 +325,12 @@ async fn einfuegen_ohne_akteur<'e>(
     angaben: Option<ZugangsAngaben>,
     peer_ip: Option<IpAddr>,
 ) -> Result<(), sqlx::Error> {
-    let (ziel_benutzer_id, ziel) = match ziel {
-        Ziel::Benutzer { id, benutzername } => (Some(id), benutzername),
-        Ziel::Anmeldeweg(t)
-        | Ziel::Lesezugang(t)
-        | Ziel::Instanz(t)
-        | Ziel::Unterschrift(t)
-        | Ziel::Archiv(t) => (None, t),
-    };
+    let (ziel_benutzer_id, ziel) = ziel_teile(ziel);
     let ziel = crate::auth::benutzername::fuer_protokoll(ziel);
     let akteur_name = crate::auth::benutzername::fuer_protokoll(gegenstelle);
     let detail = angaben
         .as_ref()
         .map(|a| serde_json::to_string(a).expect("ZugangsAngaben sind serialisierbar"));
-    tracing::info!(
-        aktion = aktion.as_str(),
-        gegenstelle = %akteur_name,
-        ziel = %ziel,
-        detail = ?detail,
-        "Zugang durch gekoppelte Instanz geändert"
-    );
     sqlx::query(
         "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
          VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
