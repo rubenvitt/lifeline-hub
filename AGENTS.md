@@ -118,10 +118,13 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   **`/opsx:apply` setzt um**. Dispatches: `superpowers:brainstorming` → `/opsx:explore`,
   `superpowers:writing-plans` → `/opsx:propose`, `superpowers:executing-plans` → `/opsx:apply`.
   Bei Superpowers bleiben `using-git-worktrees`, `systematic-debugging`,
-  `test-driven-development`, `verification-before-completion`, `requesting-code-review`,
-  `finishing-a-development-branch`.
+  `test-driven-development`, `verification-before-completion`, `finishing-a-development-branch`.
 - **`/opsx:apply` bringt keine Disziplin mit:** jede Aufgabe per `test-driven-development`, vor
-  jedem „fertig" `verification-before-completion` und `requesting-code-review`.
+  jedem „fertig" `verification-before-completion`, vor dem PR der Review.
+- **Review vor dem PR** (12.11.2026, Spec `review-vor-dem-pr`): Der Agent startet ihn selbst, mit
+  frischem Kontext gegen die Prüfliste; Befunde werden gegengeprüft, bestätigte vor dem PR
+  behoben, der Verbleib steht im PR unter „Review“. Ablauf: `dev-zunder-ausfuehren`, „Review vor
+  dem PR“. Herleitung: `openspec/changes/review-vor-dem-pr/design.md`.
 - **Mit dem Menschen** (08.11.2026): vor dem ersten Code den Lösungsweg gemeinsam ausarbeiten
   (außer `trivial`), am Ende Bilder der Änderung in PR und Meldung. Ablauf:
   `dev-zunder-ausfuehren`, „Gemeinsam ausarbeiten, bevor Code entsteht“ und „Bilder der Änderung“.

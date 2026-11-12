@@ -147,27 +147,35 @@ verworfene Alternativen samt Grund. Die Wahl trifft der Mensch am **Freigabe-Che
 
 ## 3. Review-find-verify (Phase 4)
 
-Kanonisches Muster: Dimensionen → finden → adversarial verifizieren (pipeline, jede Dimension
-verifiziert sobald ihr Review fertig ist).
+Der Review vor dem PR für große Diffs (`dev-zunder-ausfuehren`, Abschnitt „Review vor dem PR“):
+je Gruppe von Klassen der Prüfliste ein Reviewer mit frischem Kontext → finden → adversarial
+verifizieren (pipeline, jede Gruppe verifiziert, sobald ihr Review fertig ist). Die Prüffragen
+stehen **nur** in `.claude/skills/dev-zunder-ausfuehren/references/review-pruefliste.md`; das
+Skript nennt die Klassen beim Namen und kopiert keine Fragen. `args.spec` ist der Pfad der
+Delta-Spec oder leer.
 
 ```js
 export const meta = {
-  name: 'review-zunder-changes',
-  description: 'Review the changes for a Zunder task across dimensions, verify each finding',
+  name: 'review-vor-dem-pr',
+  description: 'Review the branch diff against the review checklist, verify each finding',
   phases: [{ title: 'Review' }, { title: 'Verify' }],
 }
-const DIMENSIONS = [
-  { key: 'bugs', prompt: 'Logikfehler, Race Conditions, Null/Boundary in den geänderten Files.' },
-  { key: 'security', prompt: 'Org-Isolation/Berechtigung, Injection, Datenleck in den geänderten Files.' },
-  { key: 'konventionen', prompt: 'Abweichungen von den Projekt-Konventionen (AGENTS.md-Dateien, Nachbarschaftscode).' },
-  { key: 'tests', prompt: 'Fehlende/zu schwache Tests für die neue Logik.' },
+const PRUEFLISTE = '.claude/skills/dev-zunder-ausfuehren/references/review-pruefliste.md'
+const GRUPPEN = [
+  { key: 'daten', klassen: ['Stiller Verlust', 'Atomarität', 'Grenzen für Eingaben von außen'] },
+  { key: 'zugriff', klassen: ['Berechtigung und Geltungsbereich', 'Live-Verteilung'] },
+  { key: 'oberflaeche', klassen: ['Lade-, Fehler- und Offline-Zustand', 'Veralteter Zustand im Frontend'] },
+  { key: 'belege', klassen: ['Tests, die nichts prüfen', 'Verhalten gegen Spec', 'Doku, ADR und Spec untereinander'] },
 ]
 const FINDINGS = {
   type: 'object',
   properties: { findings: { type: 'array', items: {
     type: 'object',
-    properties: { title: { type: 'string' }, file: { type: 'string' }, detail: { type: 'string' } },
-    required: ['title', 'file', 'detail'],
+    properties: {
+      title: { type: 'string' }, file: { type: 'string' }, klasse: { type: 'string' },
+      fall: { type: 'string' },
+    },
+    required: ['title', 'file', 'klasse', 'fall'],
   } } },
   required: ['findings'],
 }
@@ -176,18 +184,32 @@ const VERDICT = {
   properties: { isReal: { type: 'boolean' }, why: { type: 'string' } },
   required: ['isReal', 'why'],
 }
+const NUR_LESEN = 'Du änderst keine Datei, pushst nicht, öffnest keinen PR, rufst weder Zunder noch /opsx:* auf und legst nichts unter openspec/changes/ an.'
+const auftrag = g => [
+  'Du prüfst eine Änderung im Repo Lifeline Hub vor dem PR. Du kennst ihre Vorgeschichte nicht, und das ist Absicht: urteile nur nach dem, was im Repo steht.',
+  '1. `git fetch origin alpha`, dann `git diff origin/alpha...HEAD --stat` und den Diff lesen. Erzeugte Dateien, Lockfiles und Bilder überspringen; wo der Diff nicht reicht, Datei und Aufrufer lesen.',
+  '2. Jede AGENTS.md von der Wurzel bis zu den geänderten Dateien lesen, dazu `scripts/adr-fuer.sh <geänderte Pfade>`.',
+  `3. ${PRUEFLISTE} lesen. Du bist einer von ${GRUPPEN.length} Reviewern; deine Klassen: ${g.klassen.join('; ')}. Prüfe jede, deren „Trifft zu, wenn“ auf den Diff passt. Fehler außerhalb deiner Klassen meldest du genauso.`,
+  args.spec ? `4. Die Delta-Spec ${args.spec} lesen und das Verhalten dagegen prüfen.` : '',
+  'Je Befund: Datei und Zeile, Klasse (oder „außerhalb“), der konkrete Fall (welche Eingabe oder welcher Zustand führt zu welchem falschen Ergebnis). Kein Befund ohne konkreten Fall; Stilfragen, die Formatter oder Linter entscheiden, sind keine Befunde.',
+  NUR_LESEN,
+].filter(Boolean).join('\n')
 const results = await pipeline(
-  DIMENSIONS,
-  d => agent(`Review die geänderten Files für ${args.kurz} — Dimension „${d.key}": ${d.prompt}`,
-    { label: `review:${d.key}`, phase: 'Review', schema: FINDINGS }),
+  GRUPPEN,
+  g => agent(auftrag(g), { label: `review:${g.key}`, phase: 'Review', schema: FINDINGS }),
   review => parallel((review?.findings ?? []).map(f => () =>
-    agent(`Versuche zu widerlegen: ${f.title} (${f.file}). ${f.detail}\nDefault: isReal=false bei Unsicherheit.`,
+    agent(`Versuche zu widerlegen: ${f.title} (${f.file}). Fall: ${f.fall}\nLies den Code, auch Aufrufer und vorhandene Tests. Default: isReal=false bei Unsicherheit. ${NUR_LESEN}`,
       { label: `verify:${f.file}`, phase: 'Verify', schema: VERDICT })
       .then(v => ({ ...f, verdict: v }))
   ))
 )
-return results.flat().filter(Boolean).filter(f => f.verdict?.isReal)
+const alle = results.flat().filter(Boolean)
+return {
+  bestaetigt: alle.filter(f => f.verdict?.isReal),
+  verworfen: alle.filter(f => !f.verdict?.isReal),
+}
 ```
 
-Im Main-Loop: bestätigte Findings abarbeiten (zurück in Phase 3), dann
-`superpowers:requesting-code-review`.
+Im Main-Loop: bestätigte Befunde nach der Tabelle „Verbleib“ in `dev-zunder-ausfuehren`
+behandeln (zurück in Phase 3), bestätigte und verworfene für den Abschnitt „Review“ des PRs
+festhalten.

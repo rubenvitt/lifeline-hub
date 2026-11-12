@@ -52,7 +52,7 @@ auch dann recht, wenn er den Main-Loop von breitem Lesen entlastet. Herleitung:
 | Lohnt sich | Lohnt sich nicht |
 |---|---|
 | Scope über mehr als ein Subsystem oder mehrere Subtasks | Was ein Grep oder ein Read beantwortet |
-| Review parallel zu laufenden Gates (`check-all.sh`, Vitest) | Route `trivial` |
+| Der Review vor dem PR, parallel zu laufenden Gates (Abschnitt „Review vor dem PR“; dort Pflicht, nicht Ermessen) | Route `trivial` |
 | Ursachensuche über viel unbekannten Code (`bug-unklar`) | Alles Interaktive: Checkpoint, Rückfrage, Freigabe |
 | Unabhängige Subtasks im autonomen Modus (`dev-zunder-orchestrieren`, Phase 3) | `/opsx:*`, TDD-Zyklus des Main-Loops |
 | Gegenlesen eines Entwurfs oder eines heiklen Diffs | |
@@ -255,6 +255,8 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 ## Schritt 4: Abschluss
 
 - **`superpowers:verification-before-completion`** — vor jeder „fertig"-Aussage
+- **Review vor dem PR** (Abschnitt unten): du startest ihn selbst, ohne Rückfrage, auf jeder Route
+  außer `trivial`; bestätigte Befunde sind behandelt, bevor der PR entsteht
 - **OpenSpec-Change archivieren, BEVOR der PR entsteht** (Entscheidung 30.09.2026): Ist die
   `tasks.md` der Change abgehakt, läuft **`/opsx:archive <name>` im selben Branch** — Spec-Sync
   nach `openspec/specs/`, Verschieben nach `openspec/changes/archive/<datum>-<name>/`, Verweise
@@ -263,7 +265,6 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
   macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt
   („`check-all.sh` grün“), werden mit Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
-- **`superpowers:requesting-code-review`** vor dem Mergen
 - **Bilder der Änderung** in PR-Beschreibung und Meldung an den Menschen (Abschnitt „Bilder der
   Änderung“ unten)
 - Commit-Body und PR-Beschreibung tragen die Zeile
@@ -281,6 +282,81 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - Wird der Task verworfen statt umgesetzt → **Status: `dropped`**, `release_task`
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.
+
+## Review vor dem PR
+
+**Festlegung des Users vom 12.11.2026: Der Review wird „im Prozess verankert“ und vom Agenten
+selbst gestartet.** Er ersetzt CodeRabbit und den früheren Review-Skill von Superpowers und
+braucht nur das Agent- und das Workflow-Tool, läuft also lokal und in der Cloud gleich. Spec
+`review-vor-dem-pr`, Herleitung: `openspec/changes/review-vor-dem-pr/design.md`.
+
+- **Wann:** nach der Verifikation, vor dem Archivieren und vor dem PR, auf jeder Route außer
+  `trivial`, auch bei reinen Doku-Änderungen. Er darf parallel zu `check-all.sh` starten. Je PR
+  ein Review über den ganzen Diff des Branches.
+- **Ruft `dev-zunder-orchestrieren` auf,** entfällt der Review hier: Phase 4 dort startet ihn
+  einmal über den ganzen Branch, nach diesem Abschnitt.
+- **Wer:** ein eigener Agent mit frischem Kontext, nie der Main-Loop selbst. Du hast den Code
+  geschrieben und liest ihn mit denselben Annahmen.
+- **Größe:** bis etwa 600 geänderte Zeilen (ohne Erzeugtes, Lockfiles, Bilder) ein Reviewer über
+  das Agent-Tool. Darüber, oder wenn der Diff Backend und Frontend zugleich berührt, das Skelett
+  „Review-find-verify“ aus `dev-zunder-orchestrieren/references/workflow-bausteine.md`. Die
+  Grenze ist ein Richtwert.
+
+**Auftrag an den Reviewer** (so übernehmen, Platzhalter füllen). Er enthält nicht, warum der Code
+so gebaut wurde: der zweite Blick taugt nur ohne die Begründung des ersten.
+
+```text
+Du prüfst eine Änderung im Repo Lifeline Hub vor dem PR. Du kennst ihre Vorgeschichte nicht, und
+das ist Absicht: urteile nur nach dem, was im Repo steht.
+
+1. `git fetch origin alpha`, dann `git diff origin/alpha...HEAD --stat` und den Diff lesen.
+   Erzeugte Dateien, Lockfiles und Bilder überspringen. Wo der Diff allein nicht reicht, die
+   Datei und ihre Aufrufer lesen.
+2. Die Regeln lesen: jede `AGENTS.md` von der Wurzel bis zu den geänderten Dateien, dazu
+   `scripts/adr-fuer.sh <geänderte Pfade>`.
+3. `.claude/skills/dev-zunder-ausfuehren/references/review-pruefliste.md` lesen und jede Klasse
+   prüfen, deren „Trifft zu, wenn“ auf den Diff passt. Fehler außerhalb der Liste meldest du
+   genauso.
+4. <Nur mit Change:> Die Delta-Spec unter `openspec/changes/<name>/specs/` lesen und das
+   Verhalten dagegen prüfen.
+
+Gib je Befund zurück: Datei und Zeile, Klasse der Prüfliste (oder „außerhalb“), den konkreten
+Fall (welche Eingabe oder welcher Zustand führt zu welchem falschen Ergebnis) und, falls
+naheliegend, den Ausweg. Kein Befund ohne konkreten Fall. Stilfragen, die Prettier, rustfmt oder
+der Linter entscheiden, sind keine Befunde. Nenne am Ende die Klassen, die du geprüft hast, und
+die, die nicht zutrafen.
+
+Du änderst keine Datei, pushst nicht, öffnest keinen PR, rufst weder Zunder noch `/opsx:*` auf
+und legst nichts unter `openspec/changes/` an. Kannst du etwas nur mit einer Antwort des Menschen
+beurteilen, gib es als offene Frage zurück, statt zu raten.
+```
+
+**Gegenprüfung:** Je Befund ein zweiter Agent, parallel, mit dem Auftrag, ihn am Code zu
+widerlegen: „Versuche zu widerlegen: <Befund mit Datei, Zeile, Fall>. Lies den Code, auch die
+Aufrufer und vorhandene Tests. Antworte mit bestätigt oder verworfen und der Begründung; bei
+Unsicherheit verworfen. Du änderst nichts.“ Nur bestätigte Befunde gehen weiter.
+
+**Verbleib:**
+
+| Ergebnis | Was du tust |
+| --- | --- |
+| Bestätigt, ein klarer Ausweg | Beheben, mit Test, der ohne die Behebung rot wird; eigener Commit; Gates der Bereiche erneut |
+| Bestätigt, der Ausweg ändert Verhalten für Anwender oder es gibt mehrere vertretbare Wege | Dem Menschen vorlegen (Task auf `blocked`), wie in „Gemeinsam ausarbeiten“ |
+| Bestätigt, gehört nicht in diesen Task | Aufgabe über `zunder-task-anlegen`, Link im PR |
+| Verworfen | Im PR mit einem Satz Grund |
+
+Nach einer Behebung läuft kein zweiter voller Review. Ändert sie mehr als die gemeldete Stelle,
+prüft ein Gegenprüfer nur diesen Commit.
+
+**Nachweis:** Die PR-Beschreibung trägt den Abschnitt „Review“ (Vorlage
+`.github/pull_request_template.md`): je bestätigtem Befund was, wo und der Commit der Behebung,
+je verworfenem was und warum, ohne Befund ein Satz. Lief kein Review, steht dort der Grund (Route
+`trivial`).
+
+**Die Prüfliste wächst mit:** Zeigt ein Fehler nach dem Review (im PR, in der CI, später), dass
+eine Fehlerart fehlt oder ihre Prüffrage ihn nicht trifft, ergänzt die Behebung
+`references/review-pruefliste.md` im selben Branch: eine Fehlerart, kein Einzelfall. Passt der
+Fehler in eine vorhandene Klasse, die Frage schärfen oder das Beispiel tauschen.
 
 ## Bilder der Änderung
 
@@ -352,6 +428,8 @@ hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt
 - Komplexität nicht überspringen — auch „kleine" Features brauchen TDD.
 - Keine Agents für Interaktives, `/opsx:*` oder Triviales, und kein Worker-Prompt ohne die
   Pflichtpunkte aus „Agenten nach Bedarf“.
+- Keinen PR ohne den Review aus „Review vor dem PR“ und ohne den Abschnitt „Review“ in der
+  Beschreibung; den Review nicht selbst im Main-Loop machen.
 - Keinen neuen Task anlegen — das ist `zunder-task-anlegen`.
 - Nicht an einer Aufgabe arbeiten, die ein anderer Agent per `claim_task` hält.
 - Status nicht rückwärts oder redundant setzen — nur vorwärts entlang der Spur.
