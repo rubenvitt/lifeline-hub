@@ -10,9 +10,9 @@ Ausgenommen ist eine Akte, an der eine dritte Instanz beteiligt ist (sie führt,
 Epoche vergeben, mit der die erreichte Seite selbst führt), und eine Akte, deren Erklärung nicht
 die meldende Seite, sondern eine andere Instanz als bisherigen Führer eines anderen Stands nennt
 als dessen, mit dem die meldende Seite führt: Die MUST die meldende Seite ohne Alarm offen halten,
-bis die Einsatzleitung entscheidet. Eine Akte ohne
-Erklärung, mit unlesbarer Erklärung oder mit einer Erklärung, die den Stand der meldenden Seite
-mit einem anderen bisherigen Führer nennt, fällt nicht unter die Ausnahme.
+bis die Einsatzleitung entscheidet. Eine Akte ohne Erklärung, mit unlesbarer Erklärung oder mit
+einer Erklärung, die den Stand der meldenden Seite mit einem anderen bisherigen Führer nennt, fällt
+nicht unter die Ausnahme.
 
 #### Scenario: Gültige Unterschrift
 - **WHEN** der ELW eine Erklärung des Hubs erhält, die Admin A mit einem am ELW gültigen Schlüssel unterschrieben hat

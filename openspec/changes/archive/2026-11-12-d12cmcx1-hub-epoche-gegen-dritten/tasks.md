@@ -19,7 +19,7 @@
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh` ist grün (lokal mindestens `--nur schnell`, `cargo test --test instanz_fuehrung`, `cargo test --lib instanz::fuehrung`; vollständig über die CI des PRs).
+- [x] 4.1 `./scripts/check-all.sh` ist grün. Belegt durch die CI des PRs (dasselbe Skript); lokal liefen `--nur schnell` (grün bis auf die Schritte 8 und 12, die hier an Node 22 statt 26 und fehlendem `mise` scheitern; der Branch fasst `scripts/` nicht an), `cargo test --test instanz_fuehrung`, `cargo test --lib instanz`, die Suiten `instanz_*` und `eingabegrenzen_spiegel`, `anwenderdoku.guard.test.ts` und Prettier.
 
 ## Workflow follow-up
 
