@@ -191,3 +191,16 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
 - **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.
   Herleitung: `openspec/changes/archive/2026-09-29-lfh-658-migrationsnummern-vor-dem-merge/design.md`.
+
+## Backend — Tabellenumbau und `-- no-transaction` (LLH-1659)
+
+- **Marker nur für `PRAGMA foreign_keys = OFF`:** `-- no-transaction` (erste Zeile) braucht nur
+  ein Umbau einer Tabelle, auf die andere verweisen; das Pragma wirkt in einer Transaktion
+  nicht. Ein Blatt-Umbau kommt ohne Marker aus und läuft in der Transaktion von sqlx (Muster
+  0208, 0324). Wächter: `db::migrationslauf::tests::neue_marker_migration_schaltet_fremdschluessel_aus`.
+- **Atomar trotz Marker:** `db::migrate` rahmt jede Marker-Migration ohne eigenes `COMMIT` in
+  eine Transaktion und schaltet die Fremdschlüssel bei Bedarf davor aus und danach wieder ein
+  (`src/db/migrationslauf.rs`). Ein eigenes `BEGIN … COMMIT` ist nicht nötig; wer es schreibt
+  (0325), läuft ohne äußere Transaktion.
+- Tests, die Migrationen über einen eigenen `Migrator { … }` einspielen, laufen an diesem
+  Rahmen vorbei; ein Umbau mit Marker ist dort nicht atomar.
