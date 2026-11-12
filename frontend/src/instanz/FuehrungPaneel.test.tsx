@@ -257,15 +257,77 @@ describe('FuehrungPaneel (LLH-1491)', () => {
       },
     );
 
-    it('eine Aktion wird nie angehalten: sie geht sofort hinaus oder scheitert sofort', async () => {
-      vi.mocked(uebergebeFuehrung).mockResolvedValue(akte({ fuehrend: false }));
-      renderMitProviders(<FuehrungPaneel fuehrung={akte()} darfBedienen />);
-      // Nur TanStack hält sich für offline; die App selbst sieht Netz (`useOhneVerbindung`).
-      onlineManager.setOnline(false);
-      await userEvent.click(screen.getByRole('button', { name: 'Führung an Hub Nord übergeben' }));
-      await bestaetigeRueckfrage('Führung übergeben');
-      await waitFor(() => expect(uebergebeFuehrung).toHaveBeenCalledTimes(1));
-    });
+    // Je Mutation ein Fall: Die Sperre der Knöpfe deckte ein fehlendes `networkMode` sonst zu.
+    const offeneUebernahme = () =>
+      akte({ offen: { von: 'Hub Nord', epoche: 2, bruch_at: '2026-11-09 14:00:00' } });
+    it.each([
+      {
+        aktion: 'Übergabe',
+        fuehrung: akte,
+        api: uebergebeFuehrung,
+        ausloesen: async () => {
+          await userEvent.click(
+            screen.getByRole('button', { name: 'Führung an Hub Nord übergeben' }),
+          );
+          await bestaetigeRueckfrage('Führung übergeben');
+        },
+      },
+      {
+        aktion: 'Abgabe per Code',
+        fuehrung: akte,
+        api: gibFuehrungPerCodeAb,
+        ausloesen: async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Führung per Code abgeben' }));
+          await bestaetigeRueckfrage('Code erzeugen');
+        },
+      },
+      {
+        aktion: 'Anfrage',
+        fuehrung: gegenueberFuehrt,
+        api: frageFuehrungAn,
+        ausloesen: () => userEvent.click(screen.getByRole('button', { name: 'Führung anfragen' })),
+      },
+      {
+        aktion: 'Notübernahme',
+        fuehrung: gegenueberFuehrt,
+        api: uebernimmFuehrung,
+        ausloesen: async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+          const dialog = await screen.findByRole('dialog');
+          await userEvent.type(within(dialog).getByLabelText('Grund'), 'Hub weg');
+          await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
+        },
+      },
+      {
+        aktion: 'Bestätigen',
+        fuehrung: offeneUebernahme,
+        api: bestaetigeUebernahme,
+        ausloesen: async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
+          await bestaetigeRueckfrage('Übernahme bestätigen');
+        },
+      },
+      {
+        aktion: 'Widersprechen',
+        fuehrung: offeneUebernahme,
+        api: widersprecheUebernahme,
+        ausloesen: async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
+          await bestaetigeRueckfrage('Widersprechen');
+        },
+      },
+    ])(
+      '$aktion wird nie angehalten: sie geht sofort hinaus oder scheitert sofort',
+      async ({ fuehrung, api, ausloesen }) => {
+        // Die Antwort ist hier gleich; geprüft wird nur, ob die Anfrage sofort hinausgeht.
+        vi.mocked(api).mockResolvedValue(akte() as never);
+        renderMitProviders(<FuehrungPaneel fuehrung={fuehrung()} darfBedienen />);
+        // Nur TanStack hält sich für offline; die App selbst sieht Netz (`useOhneVerbindung`).
+        onlineManager.setOnline(false);
+        await ausloesen();
+        await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+      },
+    );
 
     it('Netz fällt bei offenem Notübernahme-Dialog weg: der getippte Grund bleibt, nichts geht hinaus', async () => {
       renderMitProviders(<FuehrungPaneel fuehrung={gegenueberFuehrt()} darfBedienen />);
