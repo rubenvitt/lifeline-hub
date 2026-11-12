@@ -737,14 +737,15 @@ async fn widerspruch_heisst_rueckuebernahme() {
 }
 
 /// Die Bruchstelle ist die letzte erfolgreiche Meldung vor der Übernahme, nicht der Zeitpunkt der
-/// Meldung, die sie bringt und nicht der des Bestätigens (Spec „Bruchstelle“, LLH-1677, Punkt 6).
+/// Meldung, die sie bringt und nicht der des Bestätigens (Spec „Die meldende Seite gibt nie
+/// still ab“, LLH-1677, Punkt 6).
 #[tokio::test]
 async fn bruchstelle_ist_die_letzte_meldung_vor_der_uebernahme() {
     let (hub, elw) = gekoppelt().await;
     let (e, akte) = elw_einsatz(&hub, &elw).await;
     hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ohne Verbindung").await;
     // Fester, alter Zeitpunkt: weder „jetzt“ noch der Zeitpunkt dieser Meldung trifft ihn zufällig.
-    let zuletzt = "2026-11-12 08:00:00";
+    let zuletzt = "2026-01-01 08:00:00";
     sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
         .bind(zuletzt)
         .execute(&elw.pool)
@@ -792,25 +793,42 @@ async fn bestaetigen_ist_409_geaendert(elw: &Instanz, e: i64) {
 
 /// Bestätigen gilt nur dem Stand, gegen den die Übernahme erklärt wurde: hat sich die Epoche der
 /// Akte seither geändert, ist es 409 (LLH-1677, Punkt 4). Erste Hälfte der Bedingung: die Akte
-/// steht schon auf der Epoche der Übernahme oder darüber. Ohne lesbare Erklärung greift nur sie.
+/// steht schon auf der Epoche der Übernahme (2, Hub) oder darüber (3, ELW). Ohne lesbare
+/// Erklärung greift nur sie.
 #[tokio::test]
 async fn bestaetigen_nach_epoche_ueber_der_uebernahme_ist_409() {
-    let (_hub, elw, e) = offen_am_elw().await;
-    let offen: String =
-        sqlx::query_scalar("SELECT offen FROM einsatz_fuehrung WHERE einsatz_id = ?")
-            .bind(e)
-            .fetch_one(&elw.pool)
-            .await
-            .unwrap();
-    let mut offen: Value = serde_json::from_str(&offen).unwrap();
-    offen["erklaerung"] = Value::Null;
-    sqlx::query("UPDATE einsatz_fuehrung SET epoche_zaehler = 3, offen = ? WHERE einsatz_id = ?")
+    for gleich in [true, false] {
+        let (hub, elw, e) = offen_am_elw().await;
+        let offen: String =
+            sqlx::query_scalar("SELECT offen FROM einsatz_fuehrung WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&elw.pool)
+                .await
+                .unwrap();
+        let mut offen: Value = serde_json::from_str(&offen).unwrap();
+        assert_eq!(
+            offen["epoche"],
+            json!({"zaehler": 2, "instanz": hub.kennung})
+        );
+        offen["erklaerung"] = Value::Null;
+        let (zaehler, instanz) = if gleich {
+            (2, hub.kennung.clone())
+        } else {
+            (3, elw.kennung.clone())
+        };
+        sqlx::query(
+            "UPDATE einsatz_fuehrung SET epoche_zaehler = ?, epoche_instanz = ?, offen = ? \
+             WHERE einsatz_id = ?",
+        )
+        .bind(zaehler)
+        .bind(instanz)
         .bind(offen.to_string())
         .bind(e)
         .execute(&elw.pool)
         .await
         .unwrap();
-    bestaetigen_ist_409_geaendert(&elw, e).await;
+        bestaetigen_ist_409_geaendert(&elw, e).await;
+    }
 }
 
 /// Zweite Hälfte: die Epoche der Akte liegt weiter unter der Übernahme, ist aber nicht mehr die,
@@ -948,7 +966,11 @@ async fn unterschriebene_erklaerung_mit_abweichendem_feld_wird_verworfen() {
         let anderer = &kennungen[(i + 1) % kennungen.len()];
         aendern(&mut v, &hub.kennung, anderer);
         let neu = v.to_string();
-        assert_ne!(neu, text, "{feld}: die Abweichung ändert die Erklärung");
+        assert_ne!(
+            v,
+            serde_json::from_str::<Value>(&text).unwrap(),
+            "{feld}: die Abweichung ändert die Erklärung"
+        );
         let assertion = passkey().sign(&neu, ORIGIN, RP, 0x05);
         sqlx::query("UPDATE einsatz_fuehrung SET erklaerung = ?, beweis = ? WHERE id = ?")
             .bind(&neu)
@@ -1083,8 +1105,10 @@ async fn falscher_code_wirft_die_fuehrung_an_den_elw_zurueck() {
 }
 
 /// Ein neuer Code macht den vorigen ungültig (Spec „Code zur Abgabe erzeugt die meldende Seite“,
-/// LLH-1677, Punkt 3). Ablauf: Code 1, der Hub tippt falsch, der ELW verwirft und führt wieder,
-/// gleicht ab und erzeugt Code 2. Danach gibt der Hub `eingabe` ein (Code 1 oder Code 2).
+/// LLH-1677, Punkt 3). Einen zweiten Code gibt es nur, wenn der ELW wieder führt, also auf einer
+/// neuen Epoche; die Regel tragen das Verwerfen (es löscht den Schlüssel) und die Bindung des
+/// Schlüssels an die Epoche. Ablauf: Code 1, der Hub tippt falsch, der ELW verwirft und führt
+/// wieder, gleicht ab und erzeugt Code 2. Danach gibt der Hub Code 1 oder Code 2 ein.
 async fn nach_zweitem_code(erster_gilt: bool) -> (Instanz, Instanz, i64) {
     let (hub, elw) = gekoppelt().await;
     let (e, akte) = elw_einsatz(&hub, &elw).await;
@@ -1098,6 +1122,16 @@ async fn nach_zweitem_code(erster_gilt: bool) -> (Instanz, Instanz, i64) {
     assert_eq!(s, StatusCode::OK, "{v}");
     elw_meldet(&elw).await;
     assert_eq!(fuehrung(&elw, e).await["fuehrend"], true, "verworfen");
+    let schluessel: Option<String> =
+        sqlx::query_scalar("SELECT abgabe_schluessel FROM einsatz_fuehrung WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert!(
+        schluessel.is_none(),
+        "das Verwerfen löscht den Schlüssel von Code 1"
+    );
     elw_meldet(&elw).await;
     let a = fuehrung(&hub, einsatz_der_akte(&hub, akte).await).await;
     assert_eq!(
@@ -1124,6 +1158,12 @@ async fn der_erste_code_traegt_nach_einem_zweiten_nicht_mehr() {
     let f = fuehrung(&elw, e).await;
     assert_eq!(f["fuehrend"], true, "{f}");
     assert_eq!(f["art"], "verworfen");
+    // Geprüft gegen den Schlüssel von Code 2 auf dessen Epoche, nicht an einer fremden Epoche.
+    let grund = f["verlauf"].as_array().unwrap().last().unwrap()["grund"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(grund.contains("Code passt nicht"), "{grund}");
 }
 
 #[tokio::test]
@@ -1507,7 +1547,8 @@ async fn uebergabe_ohne_abgleich_ist_409() {
 }
 
 /// Die Aufbewahrungsfrist und die Frist einer Datenkategorie lassen sich am Spiegel nicht setzen;
-/// die Sperre tragen die Schutz-Trigger des Spiegels (LLH-1677, Punkt 7).
+/// die Sperre tragen die Schutz-Trigger des Spiegels (LLH-1677, Punkt 7). Die Kategorie-Tabelle
+/// wird nicht gespiegelt; dort bricht der Trigger am ETB-Eintrag derselben Transaktion ab.
 #[tokio::test]
 async fn fristen_am_spiegel_sind_409() {
     let (hub, elw) = gekoppelt().await;
