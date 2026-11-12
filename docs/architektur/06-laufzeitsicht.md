@@ -283,7 +283,7 @@ sequenceDiagram
   (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
 
 **Direktkopplung vor Ort** (LLH-1497,
-[ADR-0025](entscheidungen/ADR-0025-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)):
+[ADR-0026](entscheidungen/ADR-0026-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)):
 zwei ELW im selben LAN, A mit selbstsigniertem Zertifikat.
 
 ```mermaid

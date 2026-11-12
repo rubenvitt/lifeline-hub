@@ -1,5 +1,5 @@
 //! Beglaubigtes TLS-Zertifikat einer Direktkopplung vor Ort (LLH-1497, Change
-//! `t10a7luh-elw-lan-direktkopplung`, design.md D3, ADR-0025).
+//! `t10a7luh-elw-lan-direktkopplung`, design.md D3, ADR-0026).
 //!
 //! Auf einer Direktkopplung zählt nicht das Vertrauen des Betriebssystems in das Zertifikat der
 //! erreichten Seite, sondern eine Aussage, die diese mit ihrem Instanzschlüssel signiert: „Ich
