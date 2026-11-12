@@ -8696,6 +8696,7 @@
           "fuehrend",
           "art",
           "anfrage_offen",
+          "verwahrt",
           "gegenueber",
           "verlauf"
         ],
@@ -8792,6 +8793,10 @@
             "items": {
               "$ref": "#/components/schemas/FuehrungVerlaufEintrag"
             }
+          },
+          "verwahrt": {
+            "type": "boolean",
+            "description": "Diese Instanz verwahrt den Einsatz (LLH-1647, E4): keine Übergabe mehr."
           }
         }
       },
@@ -8976,7 +8981,8 @@
           "code_abgabe",
           "bestaetigt",
           "widerspruch",
-          "verworfen"
+          "verworfen",
+          "verwahrung"
         ]
       },
       "Fuehrungsfunktion": {

@@ -429,6 +429,13 @@ Der Spiegel am Hub wird dabei zu einem eigenen Einsatz des Hubs, und der ELW lö
 Spiegel von Einsätzen des Hubs löscht der ELW nach der Nachbereitung. Das Kapitel
 [Aufbewahrung](aufbewahrung.md) beschreibt die Einzelheiten.
 
+Ist die Führung je Einsatz eingeschaltet, ist die Verwahrung ein Wechsel der Führung: Der Hub
+führt den Einsatz ab dann mit der nächsten Epoche, der Verlauf im Paneel „Führung“ zeigt den
+Wechsel vom ELW an den Hub als „Verwahrung“, und übergeben lässt sich der Einsatz nicht mehr.
+Hat der ELW den Einsatz nach dem Angebot noch geändert oder die Bestätigung des Hubs nicht
+erhalten, behält er ihn samt Führung, ohne Alarm. Der Hub hält ihn dann wieder als Spiegel, und
+die Verwahrung folgt mit einem späteren Abgleich.
+
 ### Führung je Einsatz
 
 Die Führung je Einsatz schaltet der Betrieb mit `LIFELINE_FUEHRUNG` an beiden Installationen
@@ -465,7 +472,9 @@ Unterzeichner. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; 
 der abgelösten Installation geschrieben wurde, kennt die neue nicht. Mit dem Bestätigen wird die
 abgelöste Installation zum Spiegel. Was sie seit der Bruchstelle geschrieben hat und die neue
 nicht kennt, nimmt sie aus dem Einsatz und hebt es auf; das Hinweisband zeigt dann „n Änderungen
-nicht übernommen“. Anträge, die beim Wechsel noch offen waren, führt die neue führende
+nicht übernommen“. Aufgehoben bleibt es, bis die führende Installation Daten des Einsatzes
+schwärzt, etwa nach Ablauf einer Frist oder auf ein Löschersuchen. Mit dem nächsten Abgleich
+verwirft die abgelöste Installation dann alles Aufgehobene, und das Hinweisband verschwindet. Anträge, die beim Wechsel noch offen waren, führt die neue führende
 Installation genau einmal aus. Anhänge, die ihr noch fehlen, holt sie bei der bisherigen. Die
 Übergabe geht auch nach dem Einsatzabschluss, etwa zur Verwahrung am Hub.
 

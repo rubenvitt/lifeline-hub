@@ -15,6 +15,7 @@ export const FUEHRUNG_ART_TEXT: Record<FuehrungWechselArt, string> = {
   bestaetigt: 'Notübernahme bestätigt',
   widerspruch: 'Widerspruch',
   verworfen: 'Übernahme verworfen',
+  verwahrung: 'Verwahrung',
 };
 
 /** Kurzform in Listen: „Führung: hier · Epoche 1“ oder „Führung: Hub Nord · Epoche 3“. */
@@ -45,7 +46,8 @@ export interface FuehrungMoeglich {
 }
 
 export function fuehrungMoeglich(f: FuehrungAnzeige): FuehrungMoeglich {
-  const frei = f.fuehrend && !f.offen;
+  // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647).
+  const frei = f.fuehrend && !f.offen && !f.verwahrt;
   const liegtHier = f.einsatz_id != null;
   return {
     uebergeben: frei ? f.gegenueber : [],
