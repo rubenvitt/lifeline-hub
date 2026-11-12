@@ -14,14 +14,20 @@ use utoipa::ToSchema;
 
 /// Stößt die nächste Meldung jeder meldenden Kopplung an (der Hintergrund-Task nimmt sie beim
 /// nächsten Takt). Die erreichte Seite wartet auf die Meldung des Gegenübers.
-pub async fn anstossen(pool: &SqlitePool) -> Result<(), AppError> {
-    sqlx::query(
+///
+/// Läuft nach dem Commit des Wechsels und schlägt deshalb nicht durch (LLH-1674): Admin-Spur und
+/// Live-Ereignis des Wechsels dürfen nicht daran scheitern; ohne Anstoß meldet sich die Kopplung
+/// mit ihrem nächsten regulären Takt.
+pub async fn anstossen(pool: &SqlitePool) {
+    let ergebnis = sqlx::query(
         "UPDATE instanz_kopplung SET naechste_meldung_at = NULL \
          WHERE richtung = 'meldet_sich' AND zustand = 'aktiv'",
     )
     .execute(pool)
-    .await?;
-    Ok(())
+    .await;
+    if let Err(e) = ergebnis {
+        tracing::warn!(error = %e, "Führung: nächste Meldung nicht angestoßen");
+    }
 }
 
 /// Prüft und kürzt den Grund (Pflicht, höchstens [`GRUND_MAX`] Zeichen).
@@ -127,8 +133,8 @@ pub async fn uebergeben(
     akte_id: i64,
     an: &str,
     wer: &str,
-) -> Result<(), AppError> {
-    crate::write_retry!(pool, |conn| {
+) -> Result<AkteZeile, AppError> {
+    let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
@@ -162,9 +168,10 @@ pub async fn uebergeben(
             },
         )
         .await?;
-        Ok(())
+        Ok(a)
     })?;
-    anstossen(pool).await
+    anstossen(pool).await;
+    Ok(a)
 }
 
 /// Abgabe per Code (D8): nur die meldende, führende Seite; der Code gilt für das Gegenüber `an`,
@@ -174,9 +181,9 @@ pub async fn code_abgeben(
     akte_id: i64,
     an: &str,
     wer: &str,
-) -> Result<String, AppError> {
+) -> Result<(String, AkteZeile), AppError> {
     let c = code::generate();
-    crate::write_retry!(pool, |conn| {
+    let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
@@ -211,15 +218,15 @@ pub async fn code_abgeben(
             },
         )
         .await?;
-        Ok(())
+        Ok(a)
     })?;
-    anstossen(pool).await?;
-    Ok(c)
+    anstossen(pool).await;
+    Ok((c, a))
 }
 
 /// Anfrage der meldenden Seite an eine Akte, die das Gegenüber führt (D9).
-pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<(), AppError> {
-    crate::write_retry!(pool, |conn| {
+pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<AkteZeile, AppError> {
+    let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_nicht_fuehrend(&a, &ich)?;
@@ -231,9 +238,10 @@ pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<(), AppError> {
         }
         a.anfrage_at = Some(crate::zeit::jetzt());
         repo::save(conn, &mut a, true).await?;
-        Ok(())
+        Ok(a)
     })?;
-    anstossen(pool).await
+    anstossen(pool).await;
+    Ok(a)
 }
 
 /// Notübernahme gegen die erreichte Seite (Spec „Übernahme gegen die erreichte Seite bestätigt
@@ -243,9 +251,9 @@ pub async fn notuebernahme_gegen_erreichte(
     akte_id: i64,
     grund: &str,
     wer: &str,
-) -> Result<(), AppError> {
+) -> Result<AkteZeile, AppError> {
     let grund = check_grund(grund)?;
-    crate::write_retry!(pool, |conn| {
+    let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_nicht_fuehrend(&a, &ich)?;
@@ -294,9 +302,10 @@ pub async fn notuebernahme_gegen_erreichte(
             },
         )
         .await?;
-        Ok(())
+        Ok(a)
     })?;
-    anstossen(pool).await
+    anstossen(pool).await;
+    Ok(a)
 }
 
 /// Die Erklärung einer Notübernahme gegen die meldende Seite (D6), noch ohne Beweis. 409, wenn
@@ -342,7 +351,7 @@ pub async fn notuebernahme_gegen_meldende(
     e: &NotuebernahmeErklaerung,
     beweis: &FuehrungBeweis,
     wer: &str,
-) -> Result<(), AppError> {
+) -> Result<AkteZeile, AppError> {
     crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
@@ -378,7 +387,7 @@ pub async fn notuebernahme_gegen_meldende(
             },
         )
         .await?;
-        Ok(())
+        Ok(a)
     })
 }
 
@@ -391,7 +400,7 @@ pub async fn notuebernahme_mit_code(
     grund: &str,
     code_eingabe: &str,
     wer: &str,
-) -> Result<(), AppError> {
+) -> Result<AkteZeile, AppError> {
     let c = code::normalize(code_eingabe).ok_or_else(|| {
         AppError::UnprocessableEntity("Der Code hat 16 Zeichen aus Ziffern und Buchstaben.".into())
     })?;
@@ -408,8 +417,12 @@ pub async fn notuebernahme_mit_code(
 
 /// Bestätigt eine offene Übernahme gegen diese Instanz (meldende Seite): sie gilt, die Bruchstelle
 /// wird festgehalten (D7, D11).
-pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(), AppError> {
-    crate::write_retry!(pool, |conn| {
+pub async fn bestaetigen(
+    pool: &SqlitePool,
+    akte_id: i64,
+    wer: &str,
+) -> Result<AkteZeile, AppError> {
+    let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         let m: AkteMeldung = a
@@ -465,14 +478,19 @@ pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(
             },
         )
         .await?;
-        Ok(())
+        Ok(a)
     })?;
-    anstossen(pool).await
+    anstossen(pool).await;
+    Ok(a)
 }
 
 /// Widerspricht einer offenen Übernahme: diese Instanz führt mit der nächsten Epoche weiter (D10).
-pub async fn widersprechen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(), AppError> {
-    crate::write_retry!(pool, |conn| {
+pub async fn widersprechen(
+    pool: &SqlitePool,
+    akte_id: i64,
+    wer: &str,
+) -> Result<AkteZeile, AppError> {
+    let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         let m: AkteMeldung = a
@@ -504,9 +522,10 @@ pub async fn widersprechen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result
             },
         )
         .await?;
-        Ok(())
+        Ok(a)
     })?;
-    anstossen(pool).await
+    anstossen(pool).await;
+    Ok(a)
 }
 
 // ── Anzeige ──────────────────────────────────────────────────────────────────────────────────
