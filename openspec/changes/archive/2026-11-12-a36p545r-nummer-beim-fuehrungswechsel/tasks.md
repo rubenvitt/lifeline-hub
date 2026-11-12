@@ -35,7 +35,8 @@ ist, dann der Code. Tests im Backend mit `cargo test --test <datei> <name>`.
 - [x] 5.3 Delta-Spec: Ausnahme „kein Konto für den Eintrag“, Zählung über Spiegel samt Szenario, eigene Anforderung „Die neue Nummer gilt an beiden Seiten“; Test `die_neue_nummer_liegt_ueber_den_spiegeln`, Rückgabe mit behaltener Nummer im Live-Test.
 - [x] 5.4 Verwahrung mit Führung prüft den Wortlaut des Eintrags und dass kein zweiter entsteht (`mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer`).
 - [x] 5.5 Anwenderkapitel: wann die abgebende Installation die neue Nummer zeigt, was nach einem Widerspruch gilt.
-- [x] 5.6 Folgeaufgaben angelegt: LLH-1854 (Bruchstelle nach Widerspruch), LLH-1858 (Vorplanung zeigt die alte Nummer), LLH-1859 (laufende Nummer der Gegenstelle ungeprüft).
+- [x] 5.6 Folgeaufgaben angelegt: LLH-1854 (Bruchstelle nach Widerspruch), LLH-1858 (Vorplanung zeigt die alte Nummer), LLH-1859 (laufende Nummer der Gegenstelle ungeprüft), LLH-1860 (Widerruf per Meldung und erste Akte melden den Wechsel nicht live; Altfehler aus dem Nachreview).
+- [x] 5.7 Nachreview des Behebungs-Commits: Test `die_neue_nummer_liegt_ueber_den_spiegeln` geschärft (Spiegel mit fremdem Präfix; Mutationsprobe „nur eigene zählen“ macht ihn rot), Anwenderkapitel präzisiert, `melde_wechsel` in `notify_wechsel` umbenannt.
 
 ## Workflow follow-up
 
