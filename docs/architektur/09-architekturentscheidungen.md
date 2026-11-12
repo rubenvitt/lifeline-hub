@@ -61,6 +61,7 @@ will.
 | [`lfh-690-demo-daten-laufzeit-import`](../../openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/design.md) | Demo-Daten spielt ein System-Admin im laufenden Betrieb ein, freigeschaltet über `--demo-daten`, im selben Binary. |
 | [`lfh-1053-schreibweisen-waechter`](../../openspec/changes/archive/2026-10-05-lfh-1053-schreibweisen-waechter/design.md) | Ein Wächter verbietet Dateinamen, die sich nur in der Groß- und Kleinschreibung unterscheiden. |
 | [`uzfj5f43-design-system-aus-code`](../../openspec/changes/archive/2026-10-19-uzfj5f43-design-system-aus-code/design.md) | Das Design System wird aus dem Code erzeugt und versioniert unter `docs/design/design-system/` abgelegt; ein Wächter macht Drift rot. |
+| [`a36p545r-nummer-beim-fuehrungswechsel`](../../openspec/changes/archive/2026-11-12-a36p545r-nummer-beim-fuehrungswechsel/design.md) | Wird ein Spiegel zum eigenen Einsatz und ist seine Einsatznummer dort schon vergeben, bekommt er eine neue (über allen Einsätzen des Jahres, auch Spiegeln), statt den Wechsel scheitern zu lassen; das ETB hält sie fest, und ein Führungswechsel meldet Kopf und Vollabgleich. |
 
 Ohne datierbare Herleitung im Repo und deshalb ohne ADR: die Regelablage je Bereich in
 `AGENTS.md`-Dateien (LFH-556, Wurzel-[`AGENTS.md`](../../AGENTS.md), „Wo die Regeln stehen“) und

@@ -199,7 +199,19 @@ pub async fn save(
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+        refresh_nummer(conn, a).await?;
     }
+    Ok(())
+}
+
+/// Liest die Nummer der Akte nach dem Ausrichten neu: Wird der Spiegel dabei zum eigenen Einsatz
+/// und ist seine Nummer hier belegt, hat `spiegel::fuehrung::werde_fuehrer` ihn umnummeriert und
+/// die Zeile nachgezogen (LLH-1703). Der Aufrufer arbeitet mit `a` weiter (Antwort, Admin-Spur).
+async fn refresh_nummer(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Result<(), AppError> {
+    a.nummer = sqlx::query_scalar("SELECT nummer FROM einsatz_fuehrung WHERE id = ?")
+        .bind(a.id)
+        .fetch_one(&mut *conn)
+        .await?;
     Ok(())
 }
 
@@ -243,6 +255,7 @@ pub async fn insert_fremd(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Res
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+        refresh_nummer(conn, a).await?;
     }
     Ok(())
 }
@@ -464,6 +477,12 @@ const GRUND_WIDERRUF: &str = "Kopplung widerrufen";
 /// dieses Gegenüber führt, holt diese Instanz mit der nächsten Epoche zurück. Sonst bliebe ein Einsatz
 /// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491). Gibt die
 /// Einsätze zurück, deren Akte sich geändert hat; der Aufrufer meldet ihren Kopf nach dem Commit.
+/// Ohne Schalter holt sie nichts zurück (LLH-1704): Die Führung ist dann eingefroren
+/// (`src/AGENTS.md`, „Backend — Instanzkopplung (LLH-1490)“; LLH-1641, E8). `save` richtete den
+/// Spiegel nicht aus, die Akte widerspräche dem Einsatz, und das nächste Einschalten machte ihn
+/// beim Start schreibbar; solche Einsätze bleiben Spiegel (Ausweg: LLH-1850). Offene Übernahmen
+/// verfallen auch ohne Schalter: Dort führt diese Instanz ohnehin, und nach dem Einschalten
+/// stünden sie als Konflikt da, dem niemand mehr widersprechen kann.
 ///
 /// `org_schluessel` ist der Schlüssel der Org an der widerrufenen Kopplung, wie
 /// [`list_orgs_der_kopplung`] ihn bildet; er steht in der Erklärung, die die Akte danach trägt.
@@ -517,7 +536,7 @@ pub async fn release_nach_widerruf(
         save(conn, &mut a, true).await?;
         einsaetze.extend(a.einsatz_id);
     }
-    if ids.is_empty() {
+    if ids.is_empty() || !is_enabled_tx(conn).await? {
         return Ok(einsaetze);
     }
     let ich = ich(conn).await?;
@@ -1013,6 +1032,115 @@ pub(crate) mod tests {
         .await
         .unwrap();
         assert_eq!(noch_mal, None, "schon widerrufen");
+    }
+
+    /// LLH-1704 (LLH-1641, E8): Ohne Schalter bleibt die Führung eingefroren, auch wenn die
+    /// Kopplung widerrufen wird. Sonst nennte die Akte diese Instanz, während der Einsatz Spiegel
+    /// bleibt, und das nächste Einschalten machte ihn beim Start schreibbar. Eine offene Übernahme
+    /// des widerrufenen Hubs verfällt trotzdem: Sie stünde nach dem Einschalten als Konflikt da,
+    /// dem niemand mehr widersprechen kann (ADR-0028).
+    #[tokio::test]
+    async fn widerruf_ohne_schalter_laesst_die_fuehrung_stehen_und_raeumt_offene_uebernahmen() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        let gefuehrt = einsatz(&pool, "Beim Hub").await;
+        let eigen = einsatz(&pool, "Hier").await;
+        ensure(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut a = find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap();
+        a.fuehrer_kennung = "hub".into();
+        a.fuehrer_name = "Hub Nord".into();
+        save(&mut conn, &mut a, true).await.unwrap();
+        // Am eigenen Einsatz wartet eine Übernahme des Hubs auf die Entscheidung.
+        let mut b = find_by_einsatz(&mut conn, eigen).await.unwrap().unwrap();
+        b.offen = Some(
+            serde_json::to_string(&super::super::austausch::AkteMeldung {
+                kennung: b.kennung.clone(),
+                org: "hub/1".into(),
+                nummer: None,
+                bezeichnung: b.bezeichnung.clone(),
+                stichwort: None,
+                status: b.status.clone(),
+                epoche: Epoche::neu(2, "hub"),
+                fuehrer: "hub".into(),
+                fuehrer_name: "Hub Nord".into(),
+                art: "notuebernahme".into(),
+                erklaerung: None,
+                beweis: None,
+                anfrage: false,
+                offen: false,
+                stand: 1,
+            })
+            .unwrap(),
+        );
+        b.offen_bruch_at = Some("2026-11-10 09:00:00".into());
+        save(&mut conn, &mut b, true).await.unwrap();
+        drop(conn);
+        assert!(ist_spiegel(&pool, gefuehrt).await);
+
+        super::super::save_schalter(&pool, false).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let beim_hub = find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap();
+        let hier = find_by_einsatz(&mut conn, eigen).await.unwrap().unwrap();
+        let verlauf_vorher: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrung_verlauf")
+                .fetch_one(&mut *conn)
+                .await
+                .unwrap();
+        let zeile: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung_org")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        let w = crate::instanz::repo::org_widerrufen(
+            &mut conn,
+            zeile,
+            None,
+            "2026-11-10 10:00:00",
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            w,
+            Some(vec![eigen]),
+            "nur die offene Übernahme fällt, der Einsatz beim Hub wird nicht freigegeben"
+        );
+        assert_eq!(
+            find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap(),
+            beim_hub,
+            "die Akte nennt weiter den Hub"
+        );
+        let hier_danach = find_by_einsatz(&mut conn, eigen).await.unwrap().unwrap();
+        assert_eq!(
+            (&hier_danach.offen, &hier_danach.offen_bruch_at),
+            (&None, &None),
+            "die offene Übernahme ist verfallen"
+        );
+        assert_eq!(
+            (hier_danach.epoche(), &hier_danach.fuehrer_kennung),
+            (hier.epoche(), &hier.fuehrer_kennung),
+            "diese Instanz führt mit derselben Epoche weiter"
+        );
+        let verlauf: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrung_verlauf")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        assert_eq!(verlauf, verlauf_vorher, "kein Eintrag im Verlauf");
+        drop(conn);
+
+        super::super::save_schalter(&pool, true).await.unwrap();
+        assert!(
+            ist_spiegel(&pool, gefuehrt).await,
+            "Einschalten macht den Spiegel nicht schreibbar"
+        );
+        assert!(!ist_spiegel(&pool, eigen).await);
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap(),
+            beim_hub,
+            "auch das Einschalten ändert die Akte nicht"
+        );
     }
 
     #[tokio::test]
