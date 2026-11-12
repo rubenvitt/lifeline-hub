@@ -54,7 +54,7 @@ MUST stattdessen ein Hinweis am PR stehen.
 
 #### Scenario: CI nie angelaufen
 - **WHEN** der Kopf-Commit eines konfliktfreien PRs seit mehr als 20 Minuten besteht, keinen CI-Lauf trägt und `alpha` neuere Commits hat
-- **THEN** trägt der PR-Branch danach einen Merge-Commit von `alpha`, und auf ihm läuft die CI
+- **THEN** trägt der PR-Branch danach einen Merge-Commit von `alpha`, auf ihm läuft die CI, und ein Hinweis am PR nennt den Commit
 
 #### Scenario: CI läuft gerade an
 - **WHEN** der Kopf-Commit eines PRs jünger als 20 Minuten ist
@@ -63,6 +63,23 @@ MUST stattdessen ein Hinweis am PR stehen.
 #### Scenario: Nichts zu mergen
 - **WHEN** ein PR ohne CI-Lauf den Stand von `alpha` schon enthält
 - **THEN** wird nichts gepusht, und der PR trägt einen Hinweis, dass die CI fehlt
+
+### Requirement: Ein grüner PR mit Auto-Merge, der nicht mergt, steht als Hinweis am PR
+Sind alle Checks und Commit-Status auf dem Kopf-Commit eines konfliktfreien PRs seit einer
+Wartezeit grün und ist Auto-Merge eingeschaltet, der PR aber weiter offen, MUST am PR ein Hinweis
+stehen. Ohne eingeschaltetes Auto-Merge wartet der PR auf einen Menschen und bekommt keinen.
+
+#### Scenario: Grün seit einer Stunde
+- **WHEN** alle Checks eines PRs seit mehr als 20 Minuten grün sind, Auto-Merge eingeschaltet ist und der PR offen ist
+- **THEN** trägt der PR einen Hinweis, dass er von Hand zu mergen ist
+
+#### Scenario: Ohne Auto-Merge
+- **WHEN** alle Checks eines PRs grün sind und Auto-Merge nicht eingeschaltet ist
+- **THEN** entsteht kein Hinweis
+
+#### Scenario: Ein Status steht noch aus
+- **WHEN** alle Check-Runs grün sind, ein Commit-Status aber noch aussteht oder rot ist
+- **THEN** entsteht kein Hinweis
 
 ### Requirement: Der Wächter schreibt nur per Fast-Forward auf PR-Branches
 Der Wächter MUST ausschließlich auf den Kopf-Branch eines PRs schreiben, dessen Kopf in diesem

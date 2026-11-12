@@ -97,8 +97,10 @@ Fall, auch bei einem Fehler der Abfrage, gilt `bereiche.sh` wie bisher (im Zweif
 - Entschieden wird am Inhalt des Commits, nicht am Autor: wer den Trailer fälscht, kann nur eine
   inhaltsgleiche Umbenennung durchbringen, und eine umbenannte Bestandsmigration macht
   `Migrationsnummern` rot.
-- Mitgezogene Verweise (`include_str!`) sind keine reine Umbenennung, dann läuft alles. Das ist
-  selten und bewusst streng.
+- Mitgezogene Verweise: Der Autofix schreibt jeden Verweis auf den alten Dateinamen um, auch in
+  der Doku (an #1286 am 12.11.2026 das Glossar). Was der Commit neben den Umbenennungen ändert,
+  bekommt deshalb `bereiche.sh` vorgelegt: liest keine schwere Suite die Dateien, gilt der
+  Vorgänger weiter; ein Verweis im Code (`include_str!`) fordert die Rust-Suite, dann läuft alles.
 - Was nicht mehr geprüft wird: das Zusammenspiel der umnummerierten Migration mit den neuen des
   Ziel-Branches. Das prüft auch heute kein PR-Lauf, der vor dem fremden Merge fertig war; der
   Push-Lauf auf `alpha` fängt es.
@@ -132,6 +134,14 @@ Sitzung des PRs. Der Workflow behält seinen Namen.
 
 Alternative „nur Hinweis vom Stau-Wächter“: verworfen, ein Hinweis hält einen grünen PR nicht
 auf, wenn zwei von Hand nacheinander gemergt werden.
+
+### D8 „Grün, aber nicht gemergt“ ist ein dritter Befund
+
+Nachtrag vom 12.11.2026, vor der Umsetzung mit Ruben besprochen: #1283 war eine Viertelstunde
+lang vollständig grün, Auto-Merge war an, gemergt wurde erst von Hand. Der Wächter meldet das
+als Hinweis (Check-Runs fertig und grün, kombinierter Commit-Status `success`, Auto-Merge an,
+20 Minuten seit dem letzten Check). Er mergt nicht selbst: ein Merge mit Bypass-Rechten gehört
+nicht in einen Lauf ohne Menschen. Die Ursache ist nicht ermittelt.
 
 ### D7 Keine eigene ADR
 
@@ -167,3 +177,25 @@ die Tabelle ließe sich aus den ADR-Köpfen wiederherstellen. Nach dem Merge tr�
 
 - Warum lief die CI an #1282 nicht an? Für die Lösung nicht nötig; wenn der Wächter den Fall
   öfter meldet, lohnt die Suche.
+
+## Nachträge
+
+- **Schritte im Sammel-Gate:** Die Selbsttests hängen an den bestehenden Schritten 10
+  (Migrationsnummern, Autofix, jetzt auch `nur-umnummeriert` und Stau-Wächter) und 16
+  (Architekturdoku, jetzt auch ADR-Nummern), statt neue Schritte zu zählen. Die Schrittzahl
+  steht an vielen Stellen, und die Tests gehören fachlich dorthin.
+- **Mutationsproben (12.11.2026):** 13 Verfälschungen an den drei Skripten (Schreibgrenzen des
+  Wächters, Wartezeit, Schleifenbremse, „gleicher Befund“, Trailer- und Elternprüfung,
+  Kollisionsregel), alle von den Selbsttests getötet; der Fall „Merge-Commit mit
+  Autofix-Kennzeichen“ wurde dafür geschärft.
+- **Probe an echten Commits:** `nur-umnummeriert.sh vorgaenger` nennt für den Bot-Commit
+  `26cffdbe` (#1285) den grünen Vorgänger `68efd644` und für `11ba20af` (#1286, zwei Autofixes,
+  einer mit Glossar-Verweis) `64b440b5`.
+- **Trockenlauf:** `scripts/stau-waechter.sh --nur-zeigen alle` gegen das echte Repository am
+  12.11.2026: vier offene PRs, kein Befund (alle konfliktfrei und in der CI).
+- **Offen bis zum ersten echten Fall (Aufgabe 2.6):** Kommt ein Kommentar des Wächters
+  (`github-actions[bot]`) als Ereignis bei der Sitzung an, die den PR betreut? Zu prüfen am
+  ersten Konflikt-Hinweis nach dem Merge: Zeigt der PR innerhalb einer Stunde einen
+  Merge-Commit der Sitzung, ist die Zustellung belegt. Bleibt er liegen, ist die vertagte
+  geplante Claude-Aufgabe der nächste Schritt.
+

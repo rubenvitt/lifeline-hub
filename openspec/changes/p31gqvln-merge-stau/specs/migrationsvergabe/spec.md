@@ -9,9 +9,10 @@ nächsten freien Nummern über dem Ziel-Branch legen, Verweise auf die alten Dat
 mitziehen und das Ergebnis als eigenen Commit auf den Kopf-Branch des PRs pushen. Auf dem
 neuen Kopf-Commit MUST `Migrationsnummern` und die Schnellprüfungen neu laufen. Die schweren
 Suiten (Rust, Frontend, e2e) MUST dort ebenfalls laufen, außer der Kopf-Commit unterscheidet sich
-vom letzten Commit mit grünen schweren Suiten nur durch Autofix-Commits, die ausschließlich
-Dateien unter `migrations/` unverändert umbenennen: dann MAY ihr Ergebnis von diesem Commit
-übernommen werden, und die Pflicht-Checks des PRs MUST trotzdem erfüllt sein.
+vom letzten Commit mit grünen schweren Suiten nur durch Autofix-Commits, die Dateien unter
+`migrations/` unverändert umbenennen und daneben höchstens Dateien ändern, die keine der
+schweren Suiten liest: dann MAY ihr Ergebnis von diesem Commit übernommen werden, und die
+Pflicht-Checks des PRs MUST trotzdem erfüllt sein.
 
 #### Scenario: Kollision nach fremdem Merge
 - **WHEN** PR B `0143_b.sql` mitbringt und auf `alpha` gerade PR A mit `0143_a.sql` gemergt wurde
@@ -37,10 +38,14 @@ Dateien unter `migrations/` unverändert umbenennen: dann MAY ihr Ergebnis von d
 - **WHEN** der Autofix-Commit auf einem Commit sitzt, dessen schwere Suiten noch liefen, abgebrochen wurden oder rot waren
 - **THEN** laufen die schweren Suiten auf dem neuen Kopf-Commit voll
 
-#### Scenario: Umnummerierung mit mitgezogenen Verweisen
-- **WHEN** der Autofix-Commit neben der Umbenennung einen Verweis in einer anderen Datei umschreibt
+#### Scenario: Umnummerierung mit mitgezogenem Verweis im Code
+- **WHEN** der Autofix-Commit neben der Umbenennung einen Verweis in einer Datei umschreibt, die eine der schweren Suiten liest
 - **THEN** laufen die schweren Suiten auf dem neuen Kopf-Commit voll
 
+#### Scenario: Umnummerierung mit mitgezogenem Verweis in der Doku
+- **WHEN** der Autofix-Commit neben der Umbenennung nur einen Verweis in einer Datei umschreibt, die keine der schweren Suiten liest
+- **THEN** laufen die schweren Suiten nicht erneut
+
 #### Scenario: Fremder Commit mit Autofix-Kennzeichen
-- **WHEN** ein Commit das Kennzeichen des Autofix trägt, aber eine Datei inhaltlich ändert oder außerhalb von `migrations/` etwas berührt
+- **WHEN** ein Commit das Kennzeichen des Autofix trägt, aber eine Migration inhaltlich ändert, Code berührt oder gar keine Migration umbenennt
 - **THEN** laufen die schweren Suiten voll
