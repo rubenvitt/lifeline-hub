@@ -213,8 +213,11 @@ Glossar (12) nennen Ablauf und Begriff.
   weiter eine ganze Zeile bleibt; beide Budget-Stellen rechnen über `budget_fuer_zeilen`. Der
   Führer entscheidet auch dann allein, wenn er selbst ein Gegenüber der Org ist (eine Instanz,
   die sich bei einem Hub meldet und von einer ELW erreicht wird). Restfall Kette: proposal.md.
-- **Schalter (D5):** Der Widerruf löscht unabhängig vom Schalter, wie er schon bisher die Führung
-  zurückholt; das Szenario „Schalter aus“ der Spec meint Nennen und Annehmen im Abgleich.
+- **Schalter (D5):** Der Widerruf löscht die Akten ohne Spiegel nur bei eingeschaltetem Schalter.
+  Zuerst löschte er unabhängig davon; beim Einholen von `alpha` kam LLH-1704 dazu (ohne Schalter
+  ist die Führung eingefroren, der Widerruf holt nichts zurück), und die Akten folgen derselben
+  Regel. Nach dem Wiedereinschalten bleiben solche Akten stehen, bis das Gegenüber neu
+  zugeordnet ist oder ihr Führer sie als gelöscht meldet.
 
 ## Risks / Trade-offs
 

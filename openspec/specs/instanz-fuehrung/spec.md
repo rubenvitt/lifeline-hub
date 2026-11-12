@@ -423,11 +423,11 @@ Org als gelöscht melden, die seine Akte ohne Spiegel nennt.
 
 ### Requirement: Widerruf entfernt die Akten ohne Spiegel des Gegenübers
 
-Endet die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber, SHALL die Instanz jede Akte
-ohne Spiegel dieser Org löschen, die das widerrufene Gegenüber als Führer nennt, und ihr Ende
-festhalten, auch bei ausgeschaltetem Schalter. Akten, die eine andere Instanz als Führer nennen,
-MUST sie behalten. Nach einer neuen Zuordnung zeigt sie die Akten wieder, die das Gegenüber ihr
-dann übergibt.
+Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber,
+SHALL die Instanz jede Akte ohne Spiegel dieser Org löschen, die das widerrufene Gegenüber als
+Führer nennt, und ihr Ende festhalten. Akten, die eine andere Instanz als Führer nennen, MUST sie
+behalten. Nach einer neuen Zuordnung zeigt sie die Akten wieder, die das Gegenüber ihr dann
+übergibt. Bei ausgeschaltetem Schalter MUST der Widerruf die Akten stehen lassen.
 
 #### Scenario: Ein ELW von zweien wird widerrufen
 - **WHEN** eine Org am Hub „ELW 1“ und „ELW 2“ zugeordnet ist, der Hub Akten ohne Spiegel beider hält und der Admin die Zuordnung zu „ELW 1“ widerruft
@@ -436,6 +436,10 @@ dann übergibt.
 #### Scenario: Neue Zuordnung
 - **WHEN** die widerrufene Zuordnung zu „ELW 1“ neu angelegt wird und „ELW 1“ sich meldet
 - **THEN** zeigt der Hub die Einsätze von „ELW 1“ wieder
+
+#### Scenario: Widerruf bei ausgeschaltetem Schalter
+- **WHEN** die Führung je Einsatz am Hub ausgeschaltet ist und der Admin die Zuordnung zu „ELW 1“ widerruft
+- **THEN** bleiben die Akten ohne Spiegel von „ELW 1“ am Hub stehen, und der Hub meldet sie niemandem als gelöscht
 
 ### Requirement: Über eine Direktkopplung wechselt die Führung nicht
 
