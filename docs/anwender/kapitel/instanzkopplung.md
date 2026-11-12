@@ -462,6 +462,9 @@ heißt, der ELW führt mit der nächsten Epoche weiter; die andere Installation 
 Kopplung „… hat der Notübernahme widersprochen“. Eine Übernahme ohne gültige Unterschrift oder
 mit falschem Code verwirft der ELW: er führt weiter, die Einsatzleitung bekommt den Alarm
 „Ungültige Übernahme der Führung“, und die Admin-Spur zeigt „Ungültige Übernahme verworfen“.
+Gilt die Unterschrift nicht mehr, bevor jemand entschieden hat, etwa weil der Schlüssel des
+Admins inzwischen widerrufen ist, verwirft der ELW die offene Übernahme mit der nächsten Meldung
+ebenso; Bestätigen lehnt er dann ab.
 
 Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
 Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr; ein
