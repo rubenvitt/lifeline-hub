@@ -5,6 +5,7 @@ import {
   fuehrungBeiKurz,
   fuehrungKurz,
   fuehrungMoeglich,
+  offeneUebernahmeTitel,
   vorOrtHinweis,
 } from './fuehrungText';
 
@@ -119,7 +120,9 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
 
   it('eine offene Übernahme sperrt die Übergabe und verlangt die Entscheidung', () => {
     const m = fuehrungMoeglich(
-      akte({ offen: { von: 'Hub Nord', epoche: 2, bruch_at: '2026-11-09 14:00:00' } }),
+      akte({
+        offen: { von: 'Hub Nord', epoche: 2, bruch_at: '2026-11-09 14:00:00', konflikt: false },
+      }),
     );
     expect(m.entscheiden).toBe(true);
     expect(m.uebergeben).toEqual([]);
@@ -177,5 +180,25 @@ describe('Führung vor Ort (LLH-1497)', () => {
     expect(m.notuebernahme).toBe(false);
     expect(m.notuebernahmeMitBeweis).toBe(false);
     expect(m.vorOrt).toEqual(['ELW 2']);
+  });
+});
+
+describe('offeneUebernahmeTitel (LLH-1669)', () => {
+  it('nennt ohne Konflikt, wer übernommen hat', () => {
+    expect(offeneUebernahmeTitel({ von: 'Hub Nord', konflikt: false }, 'angelegt')).toBe(
+      'Führung übernommen von Hub Nord',
+    );
+  });
+
+  it('sagt im Konflikt, dass die eigene Notübernahme nicht gegriffen hat', () => {
+    expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true }, 'notuebernahme')).toBe(
+      'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+    );
+  });
+
+  it('nennt ohne eigene Notübernahme keine', () => {
+    expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true }, 'uebergabe')).toBe(
+      'Die Führung liegt am Hub bei ELW 1, nicht hier',
+    );
   });
 });

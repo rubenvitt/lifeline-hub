@@ -287,7 +287,7 @@ Bausteinen.
 
 ### D9 Regel als ADR
 
-ADR-0028 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Zertifikat“.
+ADR-0029 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Zertifikat“.
 
 **MUST-Regeln**
 - Nutzdaten nur über eine Verbindung mit beglaubigtem Fingerabdruck

@@ -124,6 +124,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
         unterzeichner: 'Admin A',
         zeitpunkt: '2026-11-09 14:32:00',
         bruch_at: '2026-11-09 14:00:00',
+        konflikt: false,
       },
     });
     renderMitProviders(<FuehrungPaneel fuehrung={offen} darfBedienen />);
@@ -134,6 +135,30 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
     await bestaetigeRueckfrage('Widersprechen');
     await waitFor(() => expect(widersprecheUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));
+    await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
+    await bestaetigeRueckfrage('Übernahme bestätigen');
+    await waitFor(() => expect(bestaetigeUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));
+  });
+
+  it('im Konflikt gibt es nur das Bestätigen, kein Widersprechen (LLH-1669)', async () => {
+    vi.mocked(bestaetigeUebernahme).mockResolvedValue(akte({ fuehrend: false }));
+    const konflikt = akte({
+      art: 'notuebernahme',
+      offen: {
+        von: 'ELW 1',
+        epoche: 2,
+        bruch_at: '2026-11-09 14:00:00',
+        konflikt: true,
+      },
+    });
+    renderMitProviders(<FuehrungPaneel fuehrung={konflikt} darfBedienen />);
+    expect(
+      screen.getByText(
+        'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Widersprechen' })).toBeNull();
+    expect(screen.queryByText('Unterzeichnet von')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
     await bestaetigeRueckfrage('Übernahme bestätigen');
     await waitFor(() => expect(bestaetigeUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));
@@ -317,7 +342,9 @@ describe('FuehrungPaneel (LLH-1491)', () => {
 
     // Je Mutation ein Fall: Die Sperre der Knöpfe deckte ein fehlendes `networkMode` sonst zu.
     const offeneUebernahme = () =>
-      akte({ offen: { von: 'Hub Nord', epoche: 2, bruch_at: '2026-11-09 14:00:00' } });
+      akte({
+        offen: { von: 'Hub Nord', epoche: 2, bruch_at: '2026-11-09 14:00:00', konflikt: false },
+      });
     const AKTIONEN: {
       aktion: string;
       fuehrung: () => FuehrungAnzeige;
@@ -445,6 +472,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
           epoche: 2,
           grund: 'ELW ohne Verbindung',
           bruch_at: '2026-11-09 14:00:00',
+          konflikt: false,
         },
       });
       renderMitProviders(<FuehrungPaneel fuehrung={offen} darfBedienen />);

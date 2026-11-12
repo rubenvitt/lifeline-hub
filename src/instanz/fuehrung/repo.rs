@@ -2,7 +2,7 @@
 //!
 //! Jede gespeicherte Akte richtet ihren Einsatz aus ([`save`] →
 //! `instanz::spiegel::fuehrung::richte_aus`, in der Transaktion des Wechsels): Führt eine andere
-//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0021).
+//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0028).
 
 use super::{Epoche, FuehrungWechselArt};
 use crate::error::AppError;
@@ -475,15 +475,34 @@ pub async fn release_nach_widerruf(
     .bind(gegenueber_kennung)
     .fetch_all(&mut *conn)
     .await?;
-    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung.
-    let offene: Vec<i64> = sqlx::query_scalar(
-        "SELECT id FROM einsatz_fuehrung WHERE org_id = ? AND offen IS NOT NULL \
-         AND json_extract(offen, '$.fuehrer') = ?",
+    // Offene Übernahmen dieses Gegenübers verfallen mit der Kopplung. Ein Konflikt (die Akte eines
+    // Hubs nennt einen Dritten) verfällt, wenn ein Hub widerrufen wird und kein verbleibender Hub
+    // den Dritten ist: Ohne den Hub kommt keine Akte mehr, die ihn ersetzen oder abräumen ließe
+    // (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D6).
+    let war_hub: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung WHERE gegenueber_kennung = ? \
+         AND richtung = 'meldet_sich')",
+    )
+    .bind(gegenueber_kennung)
+    .fetch_one(&mut *conn)
+    .await?;
+    let hubs = list_hubs(conn, org_id).await?;
+    let kandidaten: Vec<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, json_extract(offen, '$.fuehrer') FROM einsatz_fuehrung \
+         WHERE org_id = ? AND offen IS NOT NULL",
     )
     .bind(org_id)
-    .bind(gegenueber_kennung)
     .fetch_all(&mut *conn)
     .await?;
+    // Eine offene Übernahme kommt immer von einem Hub: nur sein Widerruf räumt sie ab. Die Liste
+    // steht fest, bevor geschrieben wird (kein Iterator mit Leihgaben über ein `await`).
+    let mut offene: Vec<i64> = Vec::new();
+    for (id, fuehrer) in kandidaten {
+        let fuehrer = fuehrer.unwrap_or_default();
+        if war_hub && (fuehrer == gegenueber_kennung || !hubs.contains(&fuehrer)) {
+            offene.push(id);
+        }
+    }
     for id in offene {
         let mut a = load(conn, id).await?;
         a.offen = None;
@@ -566,6 +585,18 @@ pub struct FuehrungGegenueber {
     /// Org-Schlüssel der Akte auf der Leitung (die Org der erreichten Seite).
     #[serde(skip)]
     pub org_schluessel: String,
+}
+
+/// Die Hubs einer Org: Gegenüber, bei denen sich diese Instanz meldet. Nur von ihnen kommt eine
+/// Akte, die eine offene Übernahme auslöst; ob sie ein Konflikt ist, misst
+/// `austausch::ist_konflikt` an ihnen.
+pub async fn list_hubs(conn: &mut SqliteConnection, org_id: i64) -> Result<Vec<String>, AppError> {
+    Ok(list_gegenueber(conn, org_id)
+        .await?
+        .into_iter()
+        .filter(|g| g.richtung == InstanzKopplungRichtung::MeldetSich)
+        .map(|g| g.kennung)
+        .collect())
 }
 
 /// Die Gegenüber einer Org (aktive Kopplungen mit gültiger Zuordnung).

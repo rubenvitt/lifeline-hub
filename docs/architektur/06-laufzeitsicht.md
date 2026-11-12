@@ -283,7 +283,7 @@ sequenceDiagram
   (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
 
 **Direktkopplung vor Ort** (LLH-1497,
-[ADR-0028](entscheidungen/ADR-0028-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)):
+[ADR-0029](entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)):
 zwei ELW im selben LAN, A mit selbstsigniertem Zertifikat.
 
 ```mermaid
@@ -382,7 +382,7 @@ sequenceDiagram
 
 Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
 Führungsakten aus (LLH-1491,
-[ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md)). Genau eine
+[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Genau eine
 Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung). Seit LLH-1641
 entscheidet die Akte, wer führt, und der Spiegel folgt ihr: wer die Führung abgibt, wird Spiegel
 mit Anträgen; wer sie bekommt, schreibt den bisherigen Spiegel weiter.
@@ -412,6 +412,11 @@ sequenceDiagram
 - Die erreichte Seite (Hub) nimmt eine höhere Epoche der meldenden ohne Beweis an; die meldende
   (ELW) nur mit Unterschrift oder Abgabecode und nach der Entscheidung eines Menschen
   (`austausch::entscheide`).
+- Mehrere ELW an einem Hub: Der Hub behält die zuerst angenommene Führung. Nennt er einer ELW, die
+  selbst führt, einen Dritten als Führer, hält sie dessen Führung offen und gibt erst nach
+  Bestätigung ab (`austausch::ist_konflikt`, ohne Widerspruch); führt der Hub selbst mit der
+  Epoche eines Dritten, hält sie das als gewöhnliche Übernahme offen, und ihr Widerspruch nimmt der
+  Hub an ([ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)).
 - Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
   `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
   (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.

@@ -331,7 +331,7 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0021](../docs/architektur/entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md):
+  [ADR-0028](../docs/architektur/entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
@@ -341,7 +341,11 @@ Herleitung in
     hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
-    `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 nach.
+    `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 der Change
+    `v6hj7xl2-fuehrung-epoche` und ihre Ergänzung in design.md D3 der Change
+    `faq7l7m4-zwei-elw-unterlegene-seite`
+    (`openspec/changes/archive/2026-11-12-faq7l7m4-zwei-elw-unterlegene-seite/design.md`) nach. Ist ein Dritter beteiligt (mehrere ELW an einem
+    Hub), hält die meldende Seite offen; ob das ein Konflikt ist, sagt `austausch::ist_konflikt`.
   - Der Schalter steht in `instanz_identitaet.fuehrung_an` (je Instanz, auch im Testprozess);
     `instanz::fuehrung::is_enabled`, nie ein prozessweiter Merker.
 - Admin-Spur: vom Gegenüber ausgelöste Einträge über `admin_audit::schreibe_ohne_akteur`
@@ -439,7 +443,7 @@ Herleitung in
     nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
     `tests/instanz_lebensende.rs`.
 - **Direktkopplung vor Ort (LLH-1497)**, Specs `instanz-kopplung`, `instanz-entdeckung`,
-  [ADR-0028](../docs/architektur/entscheidungen/ADR-0028-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+  [ADR-0029](../docs/architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
   - **Was eine Kopplung trägt, fragt jede Stelle über `InstanzKopplungArt::traegt(Fluss)`**
     (in SQL `k.art = 'standard'`). Eine neue Stelle, die Stammdaten, Geheimnisse, Verwahrung oder

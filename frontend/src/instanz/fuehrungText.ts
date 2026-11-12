@@ -1,4 +1,9 @@
-import type { EinsatzFuehrung, FuehrungAnzeige, FuehrungWechselArt } from '../api/types';
+import type {
+  EinsatzFuehrung,
+  FuehrungAnzeige,
+  FuehrungOffen,
+  FuehrungWechselArt,
+} from '../api/types';
 
 /**
  * Texte der Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`). Reine Funktionen, damit Chip,
@@ -17,6 +22,21 @@ export const FUEHRUNG_ART_TEXT: Record<FuehrungWechselArt, string> = {
   verworfen: 'Übernahme verworfen',
   verwahrung: 'Verwahrung',
 };
+
+/**
+ * Titel einer offenen Übernahme in Hinweisband und Paneel. Im Konflikt (LLH-1669) nennt der Hub
+ * eine andere ELW als Führer: Die eigene Führung hat dort nicht gegriffen. „Notübernahme“ sagt der
+ * Titel nur, wenn die eigene Führung eine war (`art` der eigenen Akte).
+ */
+export function offeneUebernahmeTitel(
+  o: Pick<FuehrungOffen, 'von' | 'konflikt'>,
+  art: FuehrungWechselArt,
+): string {
+  if (!o.konflikt) return `Führung übernommen von ${o.von}`;
+  return art === 'notuebernahme'
+    ? `Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ${o.von}`
+    : `Die Führung liegt am Hub bei ${o.von}, nicht hier`;
+}
 
 /** Kurzform in Listen: „Führung: hier · Epoche 1“ oder „Führung: Hub Nord · Epoche 3“. */
 export function fuehrungKurz(f: Pick<EinsatzFuehrung, 'fuehrend' | 'bei' | 'epoche'>): string {

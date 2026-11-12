@@ -222,7 +222,7 @@ letzten vier Zeichen des Fingerabdrucks beim Inhaber erfragt (LLH-1605).
 
 Eine Direktkopplung zweier Instanzen vor Ort (LLH-1497) vertraut nicht dem Betriebssystem, sondern
 einer signierten Aussage der Gegenstelle über ihr TLS-Zertifikat und pinnt es
-([ADR-0028](entscheidungen/ADR-0028-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+([ADR-0029](entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
 `src/instanz/zertifikat.rs`). Konten und Stammdaten erkennen zwei Instanzen derselben Quelle an
 ihrer Ursprungskennung `<instanzkennung>/<schlüssel>` (`src/instanz/stammdaten/herkunft.rs`,
 Spec `stammdaten-verteilung`); sie erweitert das Vertrauen in eine gekoppelte Instanz nicht.
@@ -247,7 +247,7 @@ am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
 
 Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
 `LIFELINE_FUEHRUNG`,
-[ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md)). Jede andere
+[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Jede andere
 hält den Einsatz als Spiegel (LLH-1641): die Akte entscheidet, `einsatz.spiegel` folgt ihr, und
 nur der Schutz-Trigger des Spiegels sperrt, am Server wie in `schreibrecht.ts`. Am Spiegel wird
 beantragt. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
