@@ -110,7 +110,7 @@ impl AnbindungAnzeige {
         jetzt: &str,
     ) -> Result<Self, AppError> {
         let mut anzeige = Self::aus(z, jetzt);
-        if freigabe::is_freigebbar(z, jetzt) && freigabe::is_org_angebunden(conn, z.org_id).await? {
+        if freigabe::is_freigebbar(z, jetzt) && !freigabe::is_org_am_hub(conn, z.org_id).await? {
             anzeige.einsatz_freigebbar = true;
             if let Some((id, bezeichnung)) = freigabe::gelesener_einsatz(conn, &z.id).await? {
                 anzeige.einsatz_id = Some(id);

@@ -35,6 +35,9 @@ pub struct AnbindungFreigabe {
     pub freigegeben: bool,
     /// Der Zugang liest gerade einen anderen aktiven Einsatz; Einschalten stellt ihn um.
     pub anderer_einsatz: bool,
+    /// Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:
+    /// die Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden.
+    pub ruht: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zuletzt_genutzt_at: Option<String>,
 }
@@ -48,25 +51,26 @@ pub fn is_freigebbar(zugang: &Zugang, jetzt: &str) -> bool {
         && zugang.has_einsatzbezug()
 }
 
-/// Nimmt diese Instanz für die Org Fremdsysteme an? Meldet sie sich für die Org bei einem Hub,
-/// lehnt der Extractor jeden Zugang der Org ab (Spec `maschinenzugang`, „Ein gekoppelter ELW
-/// nimmt keine Fremdsysteme an“): eine Freigabe hätte dort keine Wirkung, das Paneel zeigte
-/// Schalter ohne Folge.
-pub async fn is_org_angebunden(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
-    Ok(zugang::hub_fuer_org(conn, org_id).await?.is_none())
+/// Meldet sich diese Instanz für die Org bei einem Hub? Dann lehnt der Extractor jeden Zugang
+/// der Org ab (Spec `maschinenzugang`, „Ein gekoppelter ELW nimmt keine Fremdsysteme an“): eine
+/// neue Freigabe hätte dort keine Wirkung, das Paneel zeigte Schalter ohne Folge. Die Zugänge
+/// selbst bleiben und gelten wieder, sobald die Kopplung endet; eine bestehende Freigabe ruht
+/// solange.
+pub async fn is_org_am_hub(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
+    Ok(zugang::hub_fuer_org(conn, org_id).await?.is_some())
 }
 
-/// Die freigebbaren Zugänge der Org aus Sicht eines Einsatzes, nach Namen. Leer an einer
-/// Instanz, die sich für die Org bei einem Hub meldet.
+/// Die freigebbaren Zugänge der Org aus Sicht eines Einsatzes, nach Namen. An einer Instanz, die
+/// sich für die Org bei einem Hub meldet, nur die, die diesen Einsatz schon lesen (`ruht`): die
+/// Einsatzleitung sieht die Freigabe, die nach dem Ende der Kopplung wieder gilt, und kann sie
+/// beenden.
 pub async fn list_fuer_einsatz(
     conn: &mut SqliteConnection,
     org_id: i64,
     einsatz_id: i64,
     jetzt: &str,
 ) -> Result<Vec<AnbindungFreigabe>, AppError> {
-    if !is_org_angebunden(conn, org_id).await? {
-        return Ok(Vec::new());
-    }
+    let ruht = is_org_am_hub(conn, org_id).await?;
     let wirksam: Vec<(String, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(FREIGABE_WIRKSAM))
         .fetch_all(&mut *conn)
         .await?;
@@ -82,6 +86,7 @@ pub async fn list_fuer_einsatz(
             AnbindungFreigabe {
                 freigegeben: liest == Some(einsatz_id),
                 anderer_einsatz: liest.is_some_and(|e| e != einsatz_id),
+                ruht,
                 zugang_id: z.id,
                 name: z.name,
                 scopes: z.scopes,
@@ -89,6 +94,7 @@ pub async fn list_fuer_einsatz(
                 zuletzt_genutzt_at: z.zuletzt_genutzt_at,
             }
         })
+        .filter(|f| !f.ruht || f.freigegeben)
         .collect();
     liste.sort_by(|a, b| {
         a.name
@@ -107,7 +113,7 @@ pub async fn load_freigebbar(
     zugang_id: &str,
     jetzt: &str,
 ) -> Result<Zugang, AppError> {
-    if !is_org_angebunden(conn, org_id).await? {
+    if is_org_am_hub(conn, org_id).await? {
         return Err(AppError::NotFound);
     }
     zugang::laden_in_org(conn, org_id, zugang_id)
@@ -374,19 +380,7 @@ mod tests {
         assert_eq!(delete_fuer_zugang_tx(&mut c, &z).await.unwrap(), None);
     }
 
-    /// Meldet sich die Instanz für die Org bei einem Hub, lehnt der Extractor ihre Zugänge ab:
-    /// dann gibt es auch nichts freizugeben.
-    #[tokio::test]
-    async fn am_gekoppelten_elw_ist_kein_zugang_freigebbar() {
-        let pool = db::test_pool().await;
-        let z = neuer_zugang(&pool, "Monitor", &[Scope::LageRead]).await;
-        let e = neuer_einsatz(&pool, "A").await;
-        let mut c = pool.acquire().await.unwrap();
-        assert_eq!(
-            list_fuer_einsatz(&mut c, 1, e, JETZT).await.unwrap().len(),
-            1
-        );
-
+    async fn org_an_hub_koppeln(c: &mut SqliteConnection) -> i64 {
         let kopplung: i64 = sqlx::query_scalar(
             "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
              gegenueber_name, richtung, gegenueber_adresse, zustand) \
@@ -404,6 +398,22 @@ mod tests {
         .execute(&mut *c)
         .await
         .unwrap();
+        kopplung
+    }
+
+    /// Meldet sich die Instanz für die Org bei einem Hub, lehnt der Extractor ihre Zugänge ab:
+    /// dann gibt es auch nichts freizugeben.
+    #[tokio::test]
+    async fn am_gekoppelten_elw_ist_kein_zugang_freigebbar() {
+        let pool = db::test_pool().await;
+        let z = neuer_zugang(&pool, "Monitor", &[Scope::LageRead]).await;
+        let e = neuer_einsatz(&pool, "A").await;
+        let mut c = pool.acquire().await.unwrap();
+        let vorher = list_fuer_einsatz(&mut c, 1, e, JETZT).await.unwrap();
+        assert_eq!(vorher.len(), 1);
+        assert!(!vorher[0].ruht);
+
+        org_an_hub_koppeln(&mut c).await;
 
         assert!(list_fuer_einsatz(&mut c, 1, e, JETZT)
             .await
@@ -413,6 +423,47 @@ mod tests {
             load_freigebbar(&mut c, 1, &z, JETZT).await,
             Err(AppError::NotFound)
         ));
+    }
+
+    /// Eine Freigabe von vor der Kopplung ruht: die Einsatzleitung sieht sie und kann sie
+    /// beenden. Sonst gälte sie nach dem Ende der Kopplung wieder, ohne dass sie in der
+    /// Zwischenzeit jemand gesehen hätte.
+    #[tokio::test]
+    async fn freigabe_ruht_am_gekoppelten_elw_und_gilt_nach_der_kopplung_wieder() {
+        let pool = db::test_pool().await;
+        let liest = neuer_zugang(&pool, "Monitor", &[Scope::LageRead]).await;
+        let woanders = neuer_zugang(&pool, "Monitor B", &[Scope::LageRead]).await;
+        neuer_zugang(&pool, "Monitor C", &[Scope::LageRead]).await;
+        let e = neuer_einsatz(&pool, "A").await;
+        let anderer = neuer_einsatz(&pool, "B").await;
+        let mut c = pool.acquire().await.unwrap();
+        freigeben_tx(&mut c, &liest, e, 1).await.unwrap();
+        freigeben_tx(&mut c, &woanders, anderer, 1).await.unwrap();
+
+        let kopplung = org_an_hub_koppeln(&mut c).await;
+
+        // Nur die Freigabe dieses Einsatzes steht da: umstellen und neu freigeben geht hier nicht.
+        let liste = list_fuer_einsatz(&mut c, 1, e, JETZT).await.unwrap();
+        assert_eq!(liste.len(), 1, "{liste:?}");
+        assert_eq!(liste[0].zugang_id, liest);
+        assert!(liste[0].freigegeben && liste[0].ruht);
+
+        // Endet die Kopplung, gilt die Freigabe wieder, und alle Zugänge stehen im Paneel.
+        sqlx::query(
+            "UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-12 09:00:00' \
+             WHERE kopplung_id = ?",
+        )
+        .bind(kopplung)
+        .execute(&mut *c)
+        .await
+        .unwrap();
+        let liste = list_fuer_einsatz(&mut c, 1, e, JETZT).await.unwrap();
+        assert_eq!(liste.len(), 3, "{liste:?}");
+        assert!(liste.iter().all(|f| !f.ruht));
+        assert_eq!(
+            freigegebener_einsatz_tx(&mut c, &liest).await.unwrap(),
+            Some(e)
+        );
     }
 
     #[tokio::test]

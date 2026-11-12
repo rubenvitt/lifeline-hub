@@ -511,6 +511,11 @@ export interface components {
             /** @description Der Zugang liest diesen Einsatz. */
             freigegeben: boolean;
             name: string;
+            /**
+             * @description Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:
+             *     die Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden.
+             */
+            ruht: boolean;
             scopes: components["schemas"]["Scope"][];
             zugang_id: string;
             zuletzt_genutzt_at?: string | null;
