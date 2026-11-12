@@ -207,6 +207,13 @@ fn zum_einsatz(tabelle: &str) -> String {
 pub struct Zwischendatei(PathBuf);
 
 impl Zwischendatei {
+    /// Legt die Datei exklusiv an (`privat_anlegen`). Erst danach gilt sie als eigene und wird
+    /// beim Fallenlassen gelöscht: ein fremder, schon vorhandener Pfad bleibt unberührt.
+    pub(super) fn anlegen(pfad: PathBuf) -> Result<(Self, std::fs::File), AppError> {
+        let datei = privat_anlegen(&pfad)?;
+        Ok((Self(pfad), datei))
+    }
+
     pub fn pfad(&self) -> &Path {
         &self.0
     }
@@ -240,12 +247,16 @@ async fn verzeichnis(pool: &SqlitePool) -> Result<PathBuf, AppError> {
     )
 }
 
-fn zwischendatei(verzeichnis: &Path, einsatz_id: i64, teil: &str) -> Zwischendatei {
+fn zwischendatei(
+    verzeichnis: &Path,
+    einsatz_id: i64,
+    teil: &str,
+) -> Result<(Zwischendatei, std::fs::File), AppError> {
     let zufall: u64 = {
         use argon2::password_hash::rand_core::{OsRng, RngCore};
         OsRng.next_u64()
     };
-    Zwischendatei(verzeichnis.join(format!(
+    Zwischendatei::anlegen(verzeichnis.join(format!(
         "{ZWISCHEN_PRAEFIX}{einsatz_id}-{teil}-{zufall:016x}.sqlite"
     )))
 }
@@ -255,7 +266,7 @@ const ZWISCHEN_PRAEFIX: &str = "lifeline-zwischen-archiv-";
 /// Legt eine Zwischendatei neu an, die nur der Dienst lesen kann (Klartext mit Personendaten).
 /// Ein vorhandener Pfad ist ein Fehler, nie ein Überschreiben. Die Nebendateien von SQLite
 /// übernehmen die Rechte der Hauptdatei.
-pub(super) fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
+fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
     let mut optionen = std::fs::OpenOptions::new();
     optionen.write(true).create_new(true);
     #[cfg(unix)]
@@ -298,7 +309,8 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     }
 }
 
-/// Ein Pool mit genau einer Verbindung auf einer Zwischendatei, die `privat_anlegen` angelegt hat.
+/// Ein Pool mit genau einer Verbindung auf einer Zwischendatei, die `Zwischendatei::anlegen` angelegt
+/// hat.
 async fn oeffnen(pfad: &Path, fremdschluessel: bool) -> Result<SqlitePool, AppError> {
     let optionen = SqliteConnectOptions::new()
         .filename(pfad)
@@ -453,8 +465,7 @@ async fn stamm_nachziehen(quelle: &SqlitePool, archiv: &SqlitePool) -> Result<()
 
 /// Die vollständige Kopie des Einsatzes, ohne Schwärzung (Grundlage aller Blöcke).
 pub async fn vollkopie(pool: &SqlitePool, einsatz_id: i64) -> Result<Zwischendatei, AppError> {
-    let datei = zwischendatei(&verzeichnis(pool).await?, einsatz_id, "voll");
-    privat_anlegen(datei.pfad())?;
+    let (datei, _) = zwischendatei(&verzeichnis(pool).await?, einsatz_id, "voll")?;
     let archiv = oeffnen(datei.pfad(), false).await?;
     crate::db::migrate(&archiv)
         .await
@@ -591,15 +602,16 @@ pub async fn baue_block(
         .parent()
         .map(Path::to_path_buf)
         .unwrap_or_else(std::env::temp_dir);
-    let datei = zwischendatei(&verzeichnis, einsatz_id, &format!("block{}", plan.block));
+    let (datei, mut ziel) =
+        zwischendatei(&verzeichnis, einsatz_id, &format!("block{}", plan.block))?;
     {
         // Über das Handle der exklusiv angelegten Datei kopieren: `std::fs::copy` überschriebe
         // einen vorhandenen Pfad und setzte die Rechte erst danach.
-        let mut ziel = privat_anlegen(datei.pfad())?;
         let mut quelle = std::fs::File::open(voll.pfad())
             .map_err(|e| AppError::Internal(format!("Archiv: Kopie für Block: {e}")))?;
         std::io::copy(&mut quelle, &mut ziel)
             .map_err(|e| AppError::Internal(format!("Archiv: Kopie für Block: {e}")))?;
+        drop(ziel);
     }
     let archiv = oeffnen(datei.pfad(), true).await?;
     for k in &plan.geschwaerzt {
@@ -630,13 +642,13 @@ pub async fn baue_block(
 
     let empfaenger = crate::backup::verschluesselung::Empfaenger::neu(empfaenger.to_vec());
     let abbruch = std::sync::atomic::AtomicBool::new(false);
-    let ziel = zwischendatei(
+    let (ziel, ziel_datei) = zwischendatei(
         &verzeichnis,
         einsatz_id,
         &format!("block{}-age", plan.block),
-    );
+    )?;
     let ausgabe = Mitzaehlen {
-        innen: std::io::BufWriter::new(privat_anlegen(ziel.pfad())?),
+        innen: std::io::BufWriter::new(ziel_datei),
         hash: Sha256::new(),
         laenge: 0,
     };

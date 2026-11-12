@@ -533,20 +533,24 @@ async fn vollkopie_ist_nur_fuer_den_dienst_lesbar() {
     assert_eq!(modus & 0o077, 0, "{modus:o}");
 }
 
-/// Eine Zwischendatei entsteht nur neu und privat, ein vorhandener Pfad bleibt unberührt.
+/// Eine Zwischendatei entsteht nur neu und privat. Ein vorhandener Pfad bleibt unberührt, auch
+/// nicht beim Aufräumen des gescheiterten Versuchs.
 #[cfg(unix)]
 #[test]
-fn zwischendatei_ueberschreibt_keinen_vorhandenen_pfad() {
+fn zwischendatei_ueberschreibt_und_loescht_keinen_vorhandenen_pfad() {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     let pfad = dir
         .path()
         .join("lifeline-zwischen-archiv-1-block1-0.sqlite");
-    let neu = bauen::privat_anlegen(&pfad).unwrap();
-    drop(neu);
+    let (eigene, handle) = bauen::Zwischendatei::anlegen(pfad.clone()).unwrap();
+    drop(handle);
     let modus = std::fs::metadata(&pfad).unwrap().permissions().mode();
     assert_eq!(modus & 0o077, 0, "{modus:o}");
+    drop(eigene);
+    assert!(!pfad.exists());
+
     std::fs::write(&pfad, b"fremd").unwrap();
-    assert!(bauen::privat_anlegen(&pfad).is_err());
+    assert!(bauen::Zwischendatei::anlegen(pfad.clone()).is_err());
     assert_eq!(std::fs::read(&pfad).unwrap(), b"fremd");
 }
