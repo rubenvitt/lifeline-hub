@@ -442,6 +442,13 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     } else {
         (fuehrung_austausch::Ausgang::default(), 0, 0)
     };
+    // Höchster Stand, der mit dieser Meldung hinausgeht: Mehr darf das Gegenüber nicht quittieren
+    // (LLH-1672); sonst fiele, was wegen `AKTEN_MAX` oder des Budgets hier blieb.
+    let gesendet_hoechst = fuehrung_ausgang
+        .akten
+        .iter()
+        .map(|a| a.stand)
+        .fold(fuehrung_gesendet, i64::max);
     let anfrage = MeldenAnfrage {
         name: super::name().to_string(),
         softwarestand: super::softwarestand().to_string(),
@@ -568,7 +575,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
-            quittung = a.fuehrung_bis.min(fuehrung_repo::load_stand(conn).await?);
+            quittung = a.fuehrung_bis.min(gesendet_hoechst);
             fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
                 .await?;
             if let Some(h) = &eingang.hinweis {

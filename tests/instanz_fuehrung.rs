@@ -2456,3 +2456,30 @@ async fn hub_legt_keine_akte_unter_fremdem_praefix_an() {
     let h = hinweis(&hub).await.unwrap_or_default();
     assert!(h.contains("fremd/99"), "Hinweis am Hub: {h:?}");
 }
+
+#[tokio::test]
+async fn ueberhoehte_quittung_laesst_ungesendete_akten_nicht_fallen() {
+    let (hub, elw) = gekoppelt().await;
+    elw_einsatz(&hub, &elw).await;
+    // Der Hub quittiert zu viel (fehlerhaft, oder der ELW kam aus einer Sicherung zurück).
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+        .bind(i64::MAX)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    for i in 0..120 {
+        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, ?)")
+            .bind(format!("Einsatz {i}"))
+            .execute(&elw.pool)
+            .await
+            .unwrap();
+    }
+    for _ in 0..4 {
+        elw_meldet(&elw).await;
+    }
+    assert_eq!(
+        fremde(&hub).await.len(),
+        121,
+        "quittiert ist nur, was hinausging"
+    );
+}

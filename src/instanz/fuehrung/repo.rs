@@ -652,9 +652,9 @@ pub async fn save_kopplung_staende(
     Ok(())
 }
 
-/// Höchster Stand, den diese Instanz vergeben hat. Eine Quittung darüber kommt von einem
-/// fehlerhaften Gegenüber und wird darauf gekappt (LLH-1672): sonst stünde der Stand der Kopplung
-/// dauerhaft über jeder Akte, und in diese Richtung flösse nichts mehr.
+/// Höchster Stand, den diese Instanz vergeben hat. Die erreichte Seite kappt die Quittung der
+/// meldenden darauf (LLH-1672): sonst sendete sie ab einem Stand über jeder Akte, und in diese
+/// Richtung flösse nichts. Die meldende Seite kappt enger, auf das tatsächlich Gesendete.
 pub async fn load_stand(conn: &mut SqliteConnection) -> Result<i64, AppError> {
     Ok(
         sqlx::query_scalar("SELECT fuehrung_stand FROM instanz_identitaet")
