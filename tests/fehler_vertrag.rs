@@ -346,3 +346,86 @@ async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
     assert_eq!(falscher_code.status(), StatusCode::UNAUTHORIZED);
     assert_fehler_envelope(falscher_code, "Koppeln mit falschem Code").await;
 }
+
+// ── Öffentliche API v1 (LLH-1653, Spec `oeffentliche-api-vertrag`) ─────────────────────────────
+
+/// Wie [`assert_fehler_envelope`], zusätzlich mit dem stabilen `code` der öffentlichen API.
+async fn assert_v1_fehler(resp: axum::response::Response, fall: &str, code: &str) -> Value {
+    assert_eq!(
+        resp.headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|v| v.to_str().ok()),
+        Some("no-store"),
+        "[{fall}] v1-Fehler ohne Cache-Control: no-store"
+    );
+    let json = assert_fehler_envelope(resp, fall).await;
+    assert_eq!(json["code"], code, "[{fall}] falscher code: {json}");
+    json
+}
+
+fn anfrage(methode: &str, pfad: &str) -> Request<Body> {
+    Request::builder()
+        .method(methode)
+        .uri(pfad)
+        .body(Body::empty())
+        .unwrap()
+}
+
+#[tokio::test]
+async fn unbekannter_v1_pfad_ist_404_not_found() {
+    let app = common::setup().await;
+    let resp = app
+        .oneshot(anfrage("GET", "/api/v1/gibt-es-nicht"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    assert_v1_fehler(resp, "unbekannter v1-Pfad", "not_found").await;
+}
+
+#[tokio::test]
+async fn falsche_methode_unter_v1_ist_405_method_not_allowed() {
+    let app = common::setup().await;
+    let resp = app
+        .oneshot(anfrage("DELETE", "/api/v1/openapi.json"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert_v1_fehler(resp, "falsche Methode unter v1", "method_not_allowed").await;
+}
+
+/// Ein Fehler-Body unter der Packgrenze bleibt ungepackt und bekommt seinen Code, auch wenn der
+/// Client Brotli anbietet.
+#[tokio::test]
+async fn v1_fehler_mit_accept_encoding_traegt_code() {
+    let app = common::setup().await;
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/gibt-es-nicht")
+                .header(header::ACCEPT_ENCODING, "br, gzip")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(resp.headers().get(header::CONTENT_ENCODING).is_none());
+    assert_v1_fehler(resp, "v1-Fehler mit Accept-Encoding", "not_found").await;
+}
+
+/// Außerhalb von `/api/v1/` bleibt die Fehlerform `{error}`, ohne `code` und ohne `no-store`.
+#[tokio::test]
+async fn interne_fehler_bleiben_ohne_code() {
+    let app = common::setup().await;
+    for pfad in ["/api/gibt-es-nicht", "/api/v10/x", "/api/v1x"] {
+        let resp = app.clone().oneshot(anfrage("GET", pfad)).await.unwrap();
+        assert!(
+            resp.headers().get(header::CACHE_CONTROL).is_none(),
+            "[{pfad}] interne Route mit no-store"
+        );
+        let json = assert_fehler_envelope(resp, pfad).await;
+        assert!(
+            !json.as_object().unwrap().contains_key("code"),
+            "[{pfad}] interne Route mit code: {json}"
+        );
+    }
+}

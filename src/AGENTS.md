@@ -108,6 +108,27 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   `#[schema(required)]`. **Testfalle:** Presence per `contains_key`, nicht `== Value::Null`
   (`tests/ort_vorschau.rs`).
 
+## Backend — Öffentliche API v1 (LLH-1653)
+
+Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0022](../docs/architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Spec `oeffentliche-api-vertrag`, Herleitung
+`openspec/changes/archive/2026-11-12-h5zpb97t-oeffentliche-api-vertrag/design.md`):
+- **Routen nur in `public_api::router()`** per `.routes(routes!(handler))`, jeder Handler mit
+  `#[utoipa::path]` und vollem Pfad `/api/v1/…`. Kein `.route(…)` dort, kein `/api/v1`-Pfad in
+  `app.rs` (`tests/public_api.rs`); so steht jede Route im Dokument.
+- **Eigene Schemas:** v1-Antworten und -Eingaben sind eigene Typen in `public_api`, aufgenommen in
+  `PublicApiDoc`; nie ein Typ aus `api_doc.rs` (die interne API hat keine Zusage). Wire-Namen nach
+  der Wurzel-`AGENTS.md`, „Bezeichner-Sprache“.
+- **Fehler:** v1-Handler geben `Result<_, ApiError>` zurück; `AppError` und `sqlx::Error` gehen per
+  `?` über. Ein besonderer Fall nimmt seinen Code ausdrücklich (`ApiError::new(ErrorCode::…, …)`).
+  Was neben dem Handler scheitert, ergänzt `public_api::schicht`. Ein neuer Code kommt nur hinzu
+  (Enum, `beschreibung.md`, `tests/enum_wire_kontrakt.rs`); keiner wird umbenannt oder entfernt.
+- **Drift:** nach jeder Änderung an einer v1-Route, einem v1-Schema oder `beschreibung.md`
+  `cargo test --test public_api_spec_aktuell` und `docs/api/public-v1.json` mitcommitten
+  (`scripts/check-typ-codegen.sh`, Schritt 2).
+- **Grenzen:** Body höchstens `PUBLIC_API_BODY_MAX` (64 KiB, `app.rs`), jede Antwort
+  `Cache-Control: no-store`; beides montiert `public_api` selbst.
+
 ## Anhänge
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)
