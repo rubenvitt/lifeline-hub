@@ -828,68 +828,351 @@ async fn falscher_code_wirft_die_fuehrung_an_den_elw_zurueck() {
         .contains(&"fuehrung_ungueltig".to_string()));
 }
 
-// ── Gleichstand ──────────────────────────────────────────────────────────────────────────────
+// ── Zwei ELW an einem Hub (LLH-1669) ─────────────────────────────────────────────────────────
+//
+// Zwei Notübernahmen mit demselben Zähler entstehen nur zwischen zwei Instanzen, die beide nicht
+// führen, also nur mit mindestens drei Instanzen (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
+// design.md, Context). Der Hub behält die zuerst angenommene Führung (D1); die unterlegene ELW hält
+// die Führung des Dritten offen (D2, D3) oder zieht eine überholte Übernahme still nach (D7).
 
-#[tokio::test]
-async fn gleichstand_entscheidet_die_groessere_kennung_an_beiden_seiten() {
-    let (hub, elw) = gekoppelt().await;
-    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
-    elw_meldet(&elw).await;
-    let akte_elw = fremde(&elw).await[0]["id"].as_i64().unwrap();
-    // Ohne Verbindung: der ELW übernimmt gegen den Hub (Zähler 2) …
+/// Eine weitere ELW derselben Hub-Org.
+async fn weiterer_elw(hub: &Instanz) -> Instanz {
+    let elw = instanz(true).await;
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw.admin,
+        Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    elw
+}
+
+/// Die ELW erreicht den Hub nicht mehr (auch der Anstoß nach einer Bedienung läuft ins Leere).
+async fn ohne_verbindung(elw: &Instanz) {
     sqlx::query("UPDATE instanz_kopplung SET gegenueber_adresse = 'http://127.0.0.1:9'")
         .execute(&elw.pool)
         .await
         .unwrap();
-    let (s, _) = post(
-        &elw,
-        &format!("/api/admin/instanz/fuehrung/{akte_elw}/notuebernahme"),
-        json!({"grund": "Hub weg"}),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    // … und am Hub entsteht unabhängig davon ebenfalls eine Epoche mit Zähler 2.
-    let stand: i64 = sqlx::query_scalar(
-        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
-         RETURNING fuehrung_stand",
-    )
-    .fetch_one(&hub.pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "UPDATE einsatz_fuehrung SET epoche_zaehler = 2, epoche_instanz = ?, stand = ? \
-         WHERE einsatz_id = ?",
-    )
-    .bind(&hub.kennung)
-    .bind(stand)
-    .bind(h)
-    .execute(&hub.pool)
-    .await
-    .unwrap();
+}
+
+async fn wieder_verbunden(elw: &Instanz, hub: &Instanz) {
     sqlx::query("UPDATE instanz_kopplung SET gegenueber_adresse = ?")
         .bind(&hub.adresse)
         .execute(&elw.pool)
         .await
         .unwrap();
-    elw_meldet(&elw).await;
-    elw_meldet(&elw).await;
-    let am_hub = fuehrung(&hub, h).await;
-    let am_elw = &fuehrung(&elw, einsatz_der_akte(&elw, akte_elw).await).await;
-    assert_eq!(
-        am_hub["fuehrer_kennung"], am_elw["fuehrer_kennung"],
-        "beide Seiten einig: {am_hub} / {am_elw}"
-    );
-    assert_eq!(am_hub["epoche"], am_elw["epoche"]);
-    if elw.kennung > hub.kennung {
-        // (2, ELW) ist größer: der Hub nimmt sie an.
-        assert_eq!(am_hub["fuehrer_kennung"], elw.kennung);
-        assert_eq!(am_hub["epoche"], 2);
+}
+
+/// Die einzige Akte an einer ELW (der Einsatz des Hubs) und ihr Einsatz dort.
+async fn akte_und_einsatz(elw: &Instanz) -> (i64, i64) {
+    let akte = fremde(elw).await[0]["id"].as_i64().unwrap();
+    (akte, einsatz_der_akte(elw, akte).await)
+}
+
+/// Notübernahme gegen den Hub; danach ist der Admin Einsatzleitung (der Einsatz ist hier kein
+/// Spiegel mehr), damit ihn der Hinweis „Führung übernommen“ erreicht.
+async fn notuebernahme_gegen_hub(elw: &Instanz, akte: i64) {
+    let (s, v) = post(
+        elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        json!({"grund": "Hub nicht erreichbar"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], true);
+    mitglied_werden(elw, einsatz_der_akte(elw, akte).await).await;
+}
+
+/// Die ELW fragt die Führung beim Hub an und bekommt sie mit der nächsten Meldung.
+async fn anfragen_und_melden(elw: &Instanz, akte: i64) {
+    let (s, v) = post(
+        elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(elw).await;
+}
+
+/// Die ELW gibt die Führung an den Hub zurück und meldet sich.
+async fn an_hub_zurueck(elw: &Instanz, hub: &Instanz, einsatz: i64) {
+    abgleichen(elw).await;
+    let (s, v) = post(
+        elw,
+        &format!("/api/einsaetze/{einsatz}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(elw).await;
+}
+
+struct ZweiElw {
+    hub: Instanz,
+    /// Die ELW mit der größeren Kennung: ihre Epoche (2, gross) ist die größere.
+    gross: Instanz,
+    klein: Instanz,
+    h: i64,
+    e_gross: i64,
+    e_klein: i64,
+}
+
+/// Der Hub führt einen eigenen Einsatz mit (1, Hub); beide ELW kennen ihn und erklären ohne
+/// Verbindung die Notübernahme, (2, gross) und (2, klein). Die Rollen hängen an den Kennungen,
+/// damit jeder Test denselben Zweig nimmt.
+async fn zwei_notuebernahmen() -> ZweiElw {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw1).await;
+    elw_meldet(&elw2).await;
+    let (gross, klein) = if elw1.kennung > elw2.kennung {
+        (elw1, elw2)
     } else {
-        // (2, Hub) ist größer, aber ohne Unterschrift: der ELW verwirft sie und führt mit 3.
-        assert_eq!(am_hub["fuehrer_kennung"], elw.kennung);
-        assert_eq!(am_hub["epoche"], 3);
-        assert_eq!(am_elw["art"], "verworfen");
+        (elw2, elw1)
+    };
+    let mut einsaetze = Vec::new();
+    for elw in [&gross, &klein] {
+        let (akte, e) = akte_und_einsatz(elw).await;
+        ohne_verbindung(elw).await;
+        notuebernahme_gegen_hub(elw, akte).await;
+        wieder_verbunden(elw, &hub).await;
+        einsaetze.push(e);
     }
+    ZweiElw {
+        hub,
+        gross,
+        klein,
+        h,
+        e_gross: einsaetze[0],
+        e_klein: einsaetze[1],
+    }
+}
+
+/// Die ELW führt noch, hält aber die Führung der anderen offen und schreibt weiter.
+async fn haelt_konflikt_offen(elw: &Instanz, einsatz: i64, epoche_hub: i64) {
+    let f = fuehrung(elw, einsatz).await;
+    assert_eq!(f["fuehrend"], true, "sie gibt nie still ab: {f}");
+    assert_eq!(f["offen"]["konflikt"], true, "{f}");
+    assert_eq!(f["offen"]["epoche"], epoche_hub, "{f}");
+    let (_, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(kopf["fuehrung"]["offen"], true, "{kopf}");
+    let (s, v) = etb(elw, einsatz).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "bis zur Bestätigung schreibt sie: {v}"
+    );
+    assert!(benachrichtigungen(&elw.pool)
+        .await
+        .contains(&"fuehrung_uebernommen".to_string()));
+    assert!(!benachrichtigungen(&elw.pool)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
+    assert!(!aktionen(&elw.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+}
+
+#[tokio::test]
+async fn zwei_elw_die_spaetere_mit_groesserer_epoche_haelt_die_fuehrung_der_anderen_offen() {
+    let z = zwei_notuebernahmen().await;
+    elw_meldet(&z.klein).await;
+    elw_meldet(&z.gross).await;
+    elw_meldet(&z.gross).await;
+    let am_hub = fuehrung(&z.hub, z.h).await;
+    assert_eq!(
+        am_hub["fuehrer_kennung"], z.klein.kennung,
+        "wer zuerst kommt"
+    );
+    assert_eq!(am_hub["epoche"], 2);
+    haelt_konflikt_offen(&z.gross, z.e_gross, 2).await;
+    let f = fuehrung(&z.klein, z.e_klein).await;
+    assert_eq!(f["fuehrend"], true);
+    assert!(f["offen"].is_null(), "{f}");
+}
+
+#[tokio::test]
+async fn zwei_elw_die_spaetere_mit_kleinerer_epoche_haelt_die_fuehrung_der_anderen_offen() {
+    let z = zwei_notuebernahmen().await;
+    elw_meldet(&z.gross).await;
+    elw_meldet(&z.klein).await;
+    elw_meldet(&z.klein).await;
+    let am_hub = fuehrung(&z.hub, z.h).await;
+    assert_eq!(
+        am_hub["fuehrer_kennung"], z.gross.kennung,
+        "wer zuerst kommt"
+    );
+    haelt_konflikt_offen(&z.klein, z.e_klein, 2).await;
+}
+
+/// Der Hub hat über Anfragen an ELW 1 abgegeben und steht dabei bei (4, Hub); ELW 2 kennt nur
+/// (1, Hub) und erklärt ohne Verbindung (2, ELW 2).
+/// Ergebnis: (Hub, ELW 1, ELW 2, Einsatz am Hub, Einsatz an ELW 1, Einsatz an ELW 2).
+async fn uebergabe_an_elw1_und_notuebernahme_von_elw2() -> (Instanz, Instanz, Instanz, i64, i64, i64)
+{
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw1).await;
+    elw_meldet(&elw2).await;
+    let (akte1, e1) = akte_und_einsatz(&elw1).await;
+    let (akte2, e2) = akte_und_einsatz(&elw2).await;
+    anfragen_und_melden(&elw1, akte1).await;
+    an_hub_zurueck(&elw1, &hub, e1).await;
+    anfragen_und_melden(&elw1, akte1).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], elw1.kennung);
+    assert_eq!(am_hub["epoche"], 4);
+    ohne_verbindung(&elw2).await;
+    notuebernahme_gegen_hub(&elw2, akte2).await;
+    wieder_verbunden(&elw2, &hub).await;
+    elw_meldet(&elw2).await;
+    elw_meldet(&elw2).await;
+    (hub, elw1, elw2, h, e1, e2)
+}
+
+#[tokio::test]
+async fn nach_der_uebergabe_an_elw_1_haelt_elw_2_ihre_fuehrung_offen_ohne_alarm() {
+    let (hub, elw1, elw2, h, _, e2) = uebergabe_an_elw1_und_notuebernahme_von_elw2().await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], elw1.kennung);
+    let f = fuehrung(&elw2, e2).await;
+    assert_ne!(f["art"], "verworfen", "{f}");
+    haelt_konflikt_offen(&elw2, e2, 4).await;
+}
+
+#[tokio::test]
+async fn der_konflikt_erlischt_wenn_der_hub_keinen_dritten_mehr_nennt() {
+    let (hub, elw1, elw2, h, e1, e2) = uebergabe_an_elw1_und_notuebernahme_von_elw2().await;
+    assert_eq!(fuehrung(&elw2, e2).await["offen"]["konflikt"], true);
+    an_hub_zurueck(&elw1, &hub, e1).await;
+    elw_meldet(&elw2).await;
+    let f = fuehrung(&elw2, e2).await;
+    assert!(f["offen"].is_null(), "{f}");
+    assert_eq!(f["fuehrend"], true);
+    elw_meldet(&elw2).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], elw2.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], f["epoche"]);
+}
+
+#[tokio::test]
+async fn eine_ueberholte_notuebernahme_gegen_den_hub_zieht_die_elw_still_nach() {
+    let (hub, a) = gekoppelt().await;
+    let b = weiterer_elw(&hub).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&a).await;
+    elw_meldet(&b).await;
+    let (akte_a, e_a) = akte_und_einsatz(&a).await;
+    let (akte_b, e_b) = akte_und_einsatz(&b).await;
+    ohne_verbindung(&b).await;
+    anfragen_und_melden(&a, akte_a).await;
+    an_hub_zurueck(&a, &hub, e_a).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], hub.kennung);
+    assert_eq!(am_hub["epoche"], 3);
+    notuebernahme_gegen_hub(&b, akte_b).await;
+    wieder_verbunden(&b, &hub).await;
+    elw_meldet(&b).await;
+    elw_meldet(&b).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], b.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 4);
+    let f = fuehrung(&b, e_b).await;
+    assert_eq!(f["fuehrend"], true);
+    assert_eq!(f["epoche"], 4);
+    assert!(f["offen"].is_null(), "{f}");
+    assert!(
+        f["verlauf"].as_array().unwrap().iter().any(|v| v["grund"]
+            .as_str()
+            .is_some_and(|g| g.contains("mit neuem Stand erneuert"))),
+        "{f}"
+    );
+    assert!(!benachrichtigungen(&b.pool)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
+    assert!(!aktionen(&b.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+}
+
+#[tokio::test]
+async fn bestaetigen_des_konflikts_macht_die_unterlegene_elw_zum_spiegel() {
+    let z = zwei_notuebernahmen().await;
+    elw_meldet(&z.klein).await;
+    elw_meldet(&z.gross).await;
+    let (s, v) = post(
+        &z.gross,
+        &format!("/api/einsaetze/{}/fuehrung/bestaetigen", z.e_gross),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], false);
+    assert_eq!(v["fuehrer_kennung"], z.klein.kennung);
+    assert_eq!(
+        v["epoche"], 2,
+        "der Stand des Hubs gilt, auch wenn er kleiner ist"
+    );
+    assert!(v["offen"].is_null(), "{v}");
+    assert!(v["bruch_at"].as_str().is_some(), "{v}");
+    let letzter = v["verlauf"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(letzter["art"], "bestaetigt", "{letzter}");
+    assert!(
+        letzter["grund"]
+            .as_str()
+            .unwrap()
+            .contains("hat am Hub nicht gegriffen"),
+        "{letzter}"
+    );
+    assert!(ist_spiegel(&z.gross, z.e_gross).await);
+    // Ruhiger Takt: niemand ändert danach noch etwas an der Akte.
+    elw_meldet(&z.gross).await;
+    elw_meldet(&z.klein).await;
+    elw_meldet(&z.gross).await;
+    let am_hub = fuehrung(&z.hub, z.h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], z.klein.kennung);
+    assert_eq!(am_hub["epoche"], 2);
+    let f = fuehrung(&z.gross, z.e_gross).await;
+    assert_eq!(f["fuehrend"], false);
+    assert_eq!(f["epoche"], 2);
+    assert!(f["offen"].is_null(), "{f}");
+}
+
+#[tokio::test]
+async fn widerspruch_gegen_den_dritten_ist_422() {
+    let z = zwei_notuebernahmen().await;
+    elw_meldet(&z.gross).await;
+    elw_meldet(&z.klein).await;
+    let (s, v) = post(
+        &z.klein,
+        &format!("/api/einsaetze/{}/fuehrung/widersprechen", z.e_klein),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let f = fuehrung(&z.klein, z.e_klein).await;
+    assert_eq!(f["offen"]["konflikt"], true, "bleibt offen: {f}");
 }
 
 // ── Befunde aus dem Review ───────────────────────────────────────────────────────────────────

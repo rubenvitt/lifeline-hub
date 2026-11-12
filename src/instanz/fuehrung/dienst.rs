@@ -2,7 +2,7 @@
 //! Notübernahme, Bestätigen und Widersprechen. Die Routen (`routes::fuehrung`) prüfen Rolle und
 //! Schalter; hier liegen Regeln und Transaktion. Jede Änderung stößt die nächste Meldung an.
 
-use super::austausch::AkteMeldung;
+use super::austausch::{self, AkteMeldung};
 use super::erklaerung::{self, FuehrungBeweis, NotuebernahmeErklaerung, TYP_NOTUEBERNAHME};
 use super::repo::{self, AkteZeile, FuehrungGegenueber, FuehrungVerlaufEintrag, Ich, VerlaufNeu};
 use super::{Epoche, FuehrungWechselArt, GRUND_MAX};
@@ -421,26 +421,43 @@ pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse);
-        // Die Übernahme muss noch dem Stand gelten, gegen den sie erklärt wurde.
-        if m.epoche <= a.epoche() || e.as_ref().is_some_and(|e| e.epoche_alt != a.epoche()) {
-            return Err(AppError::Conflict(
-                "Die Führung hat sich inzwischen geändert.".into(),
-            ));
-        }
-        if !repo::list_gegenueber(conn, a.org_id)
-            .await?
-            .iter()
-            .any(|g| g.kennung == m.fuehrer)
-        {
-            return Err(AppError::Conflict(
-                "Die übernehmende Instanz ist nicht mehr gekoppelt.".into(),
-            ));
+        let konflikt = austausch::ist_konflikt(&m, &ich.kennung);
+        if konflikt {
+            // Der Hub nennt einen Dritten (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D4): Es
+            // gilt sein Stand, auch mit kleinerer Epoche; gekoppelt ist der Dritte nicht.
+            if a.fuehrer_kennung != ich.kennung {
+                return Err(AppError::Conflict(
+                    "Die Führung hat sich inzwischen geändert.".into(),
+                ));
+            }
+        } else {
+            // Die Übernahme muss noch dem Stand gelten, gegen den sie erklärt wurde.
+            if m.epoche <= a.epoche() || e.as_ref().is_some_and(|e| e.epoche_alt != a.epoche()) {
+                return Err(AppError::Conflict(
+                    "Die Führung hat sich inzwischen geändert.".into(),
+                ));
+            }
+            if !repo::list_gegenueber(conn, a.org_id)
+                .await?
+                .iter()
+                .any(|g| g.kennung == m.fuehrer)
+            {
+                return Err(AppError::Conflict(
+                    "Die übernehmende Instanz ist nicht mehr gekoppelt.".into(),
+                ));
+            }
         }
         let bruch = a.offen_bruch_at.clone();
         a.set_epoche(&m.epoche);
         a.fuehrer_kennung = m.fuehrer.clone();
         a.fuehrer_name = m.fuehrer_name.clone();
-        a.set_art(FuehrungWechselArt::Bestaetigt);
+        // Im Konflikt bleibt die Art des Hubs: Er hat nichts zu bestätigen, und gleiche Epoche mit
+        // gleicher Art lässt den Takt ruhig.
+        if konflikt {
+            a.art = m.art.clone();
+        } else {
+            a.set_art(FuehrungWechselArt::Bestaetigt);
+        }
         a.erklaerung = m.erklaerung.clone();
         a.beweis = m
             .beweis
@@ -450,16 +467,29 @@ pub async fn bestaetigen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result<(
         a.offen_bruch_at = None;
         a.bruch_at = bruch.clone();
         a.abgabe_schluessel = None;
+        let grund = if konflikt {
+            Some(format!(
+                "Notübernahme hat am Hub nicht gegriffen, Führung bei {}",
+                m.fuehrer_name
+            ))
+        } else {
+            e.as_ref().map(|e| e.grund.clone())
+        };
         repo::save(conn, &mut a, true).await?;
         repo::add_verlauf(
             conn,
             &a,
             VerlaufNeu {
+                art: Some(FuehrungWechselArt::Bestaetigt),
                 von_name: Some(&ich.name),
                 nach_name: &m.fuehrer_name,
                 wer: Some(wer),
-                grund: e.as_ref().map(|e| e.grund.as_str()),
-                unterzeichner: e.as_ref().map(|e| e.unterzeichner.as_str()),
+                grund: grund.as_deref(),
+                unterzeichner: if konflikt {
+                    None
+                } else {
+                    e.as_ref().map(|e| e.unterzeichner.as_str())
+                },
                 bruch_at: bruch.as_deref(),
                 ..VerlaufNeu::default()
             },
@@ -480,6 +510,13 @@ pub async fn widersprechen(pool: &SqlitePool, akte_id: i64, wer: &str) -> Result
             .as_deref()
             .and_then(|o| serde_json::from_str(o).ok())
             .ok_or_else(|| AppError::Conflict("Keine Übernahme wartet.".into()))?;
+        if austausch::ist_konflikt(&m, &ich.kennung) {
+            // D5: Der Hub nimmt keinen Widerspruch an, solange ein Dritter führt.
+            return Err(AppError::UnprocessableEntity(format!(
+                "Die Führung liegt bei „{}“; ein Widerspruch würde am Hub nicht greifen.",
+                m.fuehrer_name
+            )));
+        }
         let neu = Epoche::naechste([&a.epoche(), &m.epoche], &ich.kennung);
         a.set_epoche(&neu);
         a.fuehrer_kennung = ich.kennung.clone();
@@ -523,6 +560,9 @@ pub struct FuehrungOffen {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zeitpunkt: Option<String>,
     pub bruch_at: String,
+    /// Die erreichte Seite nennt einen Dritten als Führer: nur Bestätigen, kein Widerspruch
+    /// (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D3).
+    pub konflikt: bool,
 }
 
 /// Die Führung einer Akte samt Verlauf (Paneel „Führung“, Seite „Instanzkopplung“).
@@ -583,6 +623,7 @@ pub async fn anzeige(
                 unterzeichner: e.as_ref().map(|e| e.unterzeichner.clone()),
                 zeitpunkt: e.map(|e| e.zeitpunkt),
                 bruch_at: a.offen_bruch_at.clone().unwrap_or_default(),
+                konflikt: austausch::ist_konflikt(&m, &ich.kennung),
             }
         });
     Ok(FuehrungAnzeige {

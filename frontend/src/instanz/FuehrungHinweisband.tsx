@@ -8,11 +8,13 @@ import type { EinsatzAnzeige } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { darfFuehrungBedienen } from '../einsatz/schreibrecht';
 import { UebernahmeEntscheidung } from './FuehrungPaneel';
+import { offeneUebernahmeTitel } from './fuehrungText';
 
 /**
  * Hinweisband unter der Kopfleiste (LLH-1491, Spec „Die meldende Seite prüft jede Übernahme gegen
  * sie“): eine gültige Notübernahme wartet auf die Einsatzleitung. Von wem, wann, warum, dazu
- * „Übernahme bestätigen“ und „Widersprechen“. Bis zur Entscheidung schreibt diese Instanz weiter.
+ * „Übernahme bestätigen“ und „Widersprechen“, im Konflikt (LLH-1669) nur „Übernahme bestätigen“.
+ * Bis zur Entscheidung schreibt diese Instanz weiter.
  * `warning`, weil Rot der Gefahr vorbehalten ist; der Alarm einer ungültigen Übernahme läuft über
  * die Benachrichtigungen.
  */
@@ -55,7 +57,7 @@ export default function FuehrungHinweisband({ einsatz }: { einsatz: EinsatzAnzei
         type="warning"
         showIcon
         banner
-        title={`Führung übernommen von ${f.offen.von}`}
+        title={offeneUebernahmeTitel(f.offen)}
         description={teile.join(' · ')}
         action={
           darfFuehrungBedienen(einsatz, benutzer) ? (

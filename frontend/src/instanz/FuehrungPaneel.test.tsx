@@ -113,6 +113,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
         unterzeichner: 'Admin A',
         zeitpunkt: '2026-11-09 14:32:00',
         bruch_at: '2026-11-09 14:00:00',
+        konflikt: false,
       },
     });
     renderMitProviders(<FuehrungPaneel fuehrung={offen} darfBedienen />);
@@ -123,6 +124,29 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
     await bestaetigeRueckfrage('Widersprechen');
     await waitFor(() => expect(widersprecheUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));
+    await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
+    await bestaetigeRueckfrage('Übernahme bestätigen');
+    await waitFor(() => expect(bestaetigeUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));
+  });
+
+  it('im Konflikt gibt es nur das Bestätigen, kein Widersprechen (LLH-1669)', async () => {
+    vi.mocked(bestaetigeUebernahme).mockResolvedValue(akte({ fuehrend: false }));
+    const konflikt = akte({
+      offen: {
+        von: 'ELW 1',
+        epoche: 2,
+        grund: 'Hub nicht erreichbar',
+        bruch_at: '2026-11-09 14:00:00',
+        konflikt: true,
+      },
+    });
+    renderMitProviders(<FuehrungPaneel fuehrung={konflikt} darfBedienen />);
+    expect(
+      screen.getByText(
+        'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Widersprechen' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Übernahme bestätigen' }));
     await bestaetigeRueckfrage('Übernahme bestätigen');
     await waitFor(() => expect(bestaetigeUebernahme).toHaveBeenCalledWith({ einsatzId: 7 }));

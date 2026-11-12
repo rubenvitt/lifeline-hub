@@ -8,7 +8,7 @@ Akte).
 
 Beobachtet am Stand `2cfab2c9` in `apply_eingang` (`src/instanz/fuehrung/austausch.rs`): Die meldende
 Seite (ELW 2, sie führt selbst) bekommt vom Hub eine Akte, deren Führer weder sie noch der Hub ist.
-Je nach Epoche läuft sie in einen von drei Zweigen, und keiner davon klärt den Zustand:
+Je nach Epoche läuft sie in einen von drei Zweigen, und keiner davon klärt den Zustand (ein vierter, verwandter Fall steht in D7):
 
 | Fall | Zweig | Heute |
 | --- | --- | --- |
@@ -142,6 +142,37 @@ ist, leert die ELW `offen` und `offen_bruch_at`, und zwar vor der übrigen Behan
 folgende Live-Ereignis am Kopf blendet das Band aus. Danach nimmt der Ablauf seinen gewohnten Weg:
 Eine Akte des Hubs mit dem Hub als Führer und kleinerer Epoche führt zu `Less`, die ELW schickt ihre
 Akte neu, und der Hub nimmt sie jetzt an.
+
+### D7 Eine überholte Übernahme gegen den Hub zieht die meldende Seite still nach
+
+Nachtrag beim Umsetzen, **abgestimmt mit Ruben am 12.11.2026.** Eine ELW führt, und der Hub führt
+laut seiner Akte selbst, mit einer größeren Epoche, die eine dritte Instanz vergeben hat. Das
+passiert etwa, wenn eine andere ELW die Führung regulär an den Hub zurückgegeben hat, während diese
+ELW ohne Verbindung ihre Notübernahme gegen den Hub mit kleinerem Zähler erklärte. Dann vergibt die
+ELW die nächste Epoche über beiden. Eine Erklärung an der Akte zieht sie auf den neuen Stand nach
+(`epoche_alt`, `epoche_neu`; Grund, Unterzeichner und Zeitpunkt bleiben). Dazu kommt ein
+Verlaufseintrag „Notübernahme gegen <Hub> mit neuem Stand erneuert“, ohne Alarm und ohne
+Admin-Spur.
+
+```
+richtung == MeldetSich && ich_fuehre && m.epoche > alt && m.fuehrer == sender
+  && m.epoche.instanz != sender && m.epoche.instanz != ich
+  → nachziehen: (max+1, ich), Akte geht mit neuem Stand hinaus
+```
+
+Der Hub nimmt die größere Epoche danach nach D7 der Vorgänger-Change an, weil die Führung bei ihm
+selbst liegt. Kommt dabei die andere ELW wieder ins Spiel, gilt D1.
+
+**Warum das sicher ist:** Nennt der Hub sich selbst als Führer, während die ELW führt, kennt er die
+Führung der ELW nicht. Sonst stünde sie in seiner Akte, denn er hält je Kennung nur eine. Die ELW
+hat ihre Führung also selbst erklärt, als Notübernahme, Widerspruch oder Verwerfen, und genau so
+etwas nimmt der Hub ohne Rückfrage an. Das Nachziehen erzeugt den Stand, den der Hub angenommen
+hätte, wäre der Zähler aktuell gewesen.
+
+**Verworfen: Verwerfen mit Alarm wie in D7 der Vorgänger-Change.** Am Ende stünde dasselbe, aber
+mit dem Alarm „ungültige Übernahme“, obwohl niemand etwas Unrechtes getan hat.
+
+**Verworfen: als Folgeaufgabe.** Dann führten Hub und ELW bis dahin beide.
 
 ## Risks / Trade-offs
 

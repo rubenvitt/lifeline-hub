@@ -412,6 +412,86 @@ async fn fuehre_weiter(
     Ok(())
 }
 
+/// Ob eine offene Übernahme ein Konflikt ist (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
+/// design.md D3): Die erreichte Seite nennt einen Dritten als Führer, die Akte trägt also keine
+/// Erklärung gegen diese Instanz. Eine gültige Übernahme gegen sie trägt sie immer
+/// ([`check_unterschrift`] setzt sie voraus); eine Abgabe per Code läuft nicht über `offen`.
+pub fn ist_konflikt(offen: &AkteMeldung, ich: &str) -> bool {
+    !offen
+        .erklaerung
+        .as_deref()
+        .and_then(NotuebernahmeErklaerung::parse)
+        .is_some_and(|e| e.fuehrer_alt == ich)
+}
+
+/// Hält eine Übernahme gegen mich offen, bis die Einsatzleitung entscheidet; bei gleichem Inhalt
+/// ändert sich nichts.
+async fn halte_offen(
+    conn: &mut SqliteConnection,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    bruch: &str,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let offen = serde_json::to_string(m).expect("serialisierbar");
+    if a.offen.as_deref() == Some(offen.as_str()) {
+        return Ok(());
+    }
+    a.offen = Some(offen);
+    a.offen_bruch_at = Some(bruch.to_string());
+    repo::save(conn, a, true).await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Offen { einsatz_id });
+        aus.folgen.push(Folge::Kopf { einsatz_id });
+    }
+    Ok(())
+}
+
+/// Zieht meine Führung über die Epoche `m` des Hubs nach (D7): nächste Epoche, eine Erklärung an
+/// der Akte auf den neuen Stand, Verlauf ohne Alarm. Die Akte geht mit neuem Stand hinaus, und der
+/// Hub nimmt sie an, weil er selbst führt.
+async fn ziehe_nach(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+) -> Result<(), AppError> {
+    let neu = Epoche::naechste([&a.epoche(), &m.epoche], &ich.kennung);
+    if let Some(mut e) = a
+        .erklaerung
+        .as_deref()
+        .and_then(NotuebernahmeErklaerung::parse)
+    {
+        e.epoche_alt = m.epoche.clone();
+        e.epoche_neu = neu.clone();
+        e.fuehrer_alt = m.fuehrer.clone();
+        a.erklaerung = Some(e.to_text());
+    }
+    a.set_epoche(&neu);
+    repo::save(conn, a, true).await?;
+    let was = if a.art() == FuehrungWechselArt::Notuebernahme {
+        "Notübernahme"
+    } else {
+        "Führung"
+    };
+    let grund = format!(
+        "{was} gegen {} mit neuem Stand erneuert",
+        kopplung.gegenueber_name
+    );
+    repo::add_verlauf(
+        conn,
+        a,
+        VerlaufNeu {
+            von_name: Some(&m.fuehrer_name),
+            nach_name: &ich.name,
+            grund: Some(&grund),
+            ..VerlaufNeu::default()
+        },
+    )
+    .await
+}
+
 /// Erfüllt eine Anfrage: die erreichte Seite gibt an die meldende ab (D9). Hat die meldende Seite
 /// noch nicht alles, wartet die Anfrage (`anfrage_von`) und wird bei einer ihrer nächsten
 /// Meldungen erfüllt ([`erfuelle_wartende`], LLH-1641 E4). Die Epoche der Anfrage ist die der
@@ -575,6 +655,44 @@ pub async fn apply_eingang(
         }
         let alt = a.epoche();
         let ich_fuehre = a.fuehrer_kennung == ich.kennung;
+        if richtung == InstanzKopplungRichtung::MeldetSich {
+            // Eine größere Epoche mit meiner Kennung, die ich nie vergeben habe, prüft der Zweig
+            // `Greater` unten (Verwerfen); sie ist weder Konflikt noch Nachziehen.
+            let fremd_vergeben = !(m.epoche > alt && m.epoche.instanz == ich.kennung);
+            let dritter = m.fuehrer != ich.kennung && m.fuehrer != sender;
+            if ich_fuehre && dritter && fremd_vergeben {
+                // Der Hub nennt einen Dritten: er nimmt nichts mehr an, was ich schicke (sein
+                // Schutz vor dem Diebstahl unter ELW). Ich halte die Führung des Dritten offen
+                // (Change `faq7l7m4-zwei-elw-unterlegene-seite`, design.md D2, D3).
+                halte_offen(conn, &mut a, m, &bruch, &mut aus).await?;
+                continue;
+            }
+            if a.offen
+                .as_deref()
+                .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok())
+                .is_some_and(|o| ist_konflikt(&o, &ich.kennung))
+            {
+                // Der Hub nennt keinen Dritten mehr: der Konflikt erlischt (D6).
+                a.offen = None;
+                a.offen_bruch_at = None;
+                repo::save(conn, &mut a, true).await?;
+                if let Some(einsatz_id) = a.einsatz_id {
+                    aus.folgen.push(Folge::Kopf { einsatz_id });
+                }
+            }
+            if ich_fuehre
+                && m.fuehrer == sender
+                && m.epoche > alt
+                && m.epoche.instanz != sender
+                && m.epoche.instanz != ich.kennung
+            {
+                // Der Hub führt laut seiner Akte selbst, mit einer Epoche, die ein Dritter vergab:
+                // Meine Führung kennt er nicht, also habe ich sie selbst erklärt, und er nähme sie
+                // an, wäre mein Zähler aktuell. Ich ziehe still nach (D7).
+                ziehe_nach(conn, &ich, kopplung, &mut a, m).await?;
+                continue;
+            }
+        }
         match m.epoche.cmp(&alt) {
             std::cmp::Ordering::Greater => {
                 let nimmt_mir = ich_fuehre && m.fuehrer != ich.kennung;
@@ -779,17 +897,7 @@ pub async fn apply_eingang(
                         }
                     }
                     Entscheid::OffenHalten => {
-                        let offen = serde_json::to_string(m).expect("serialisierbar");
-                        if a.offen.as_deref() == Some(offen.as_str()) {
-                            continue;
-                        }
-                        a.offen = Some(offen);
-                        a.offen_bruch_at = Some(bruch.clone());
-                        repo::save(conn, &mut a, true).await?;
-                        if let Some(einsatz_id) = a.einsatz_id {
-                            aus.folgen.push(Folge::Offen { einsatz_id });
-                            aus.folgen.push(Folge::Kopf { einsatz_id });
-                        }
+                        halte_offen(conn, &mut a, m, &bruch, &mut aus).await?;
                     }
                     Entscheid::Verwerfen(grund) => {
                         verwerfen(conn, &ich, kopplung, &mut a, m, &grund, &mut aus).await?;
@@ -954,6 +1062,45 @@ mod tests {
             entscheide(MeldetSich, Err("x".into())),
             Entscheid::Verwerfen("x".into())
         );
+    }
+
+    fn akte_mit_erklaerung(fuehrer_alt: Option<&str>) -> AkteMeldung {
+        let mut m: AkteMeldung = serde_json::from_value(serde_json::json!({
+            "kennung": "hub/1", "org": "hub/1", "bezeichnung": "Lage", "status": "aktiv",
+            "epoche": {"zaehler": 2, "instanz": "elw1"}, "fuehrer": "elw1",
+            "fuehrer_name": "ELW 1", "art": "notuebernahme", "stand": 3
+        }))
+        .unwrap();
+        m.erklaerung = fuehrer_alt.map(|alt| {
+            NotuebernahmeErklaerung {
+                typ: erklaerung::TYP_NOTUEBERNAHME.into(),
+                einsatz: "hub/1".into(),
+                org: "hub/1".into(),
+                epoche_alt: Epoche::neu(1, "hub"),
+                epoche_neu: Epoche::neu(2, "elw1"),
+                fuehrer_alt: alt.into(),
+                fuehrer_neu: "elw1".into(),
+                grund: "Hub weg".into(),
+                zeitpunkt: "2026-11-12 09:00:00".into(),
+                unterzeichner: "Admin".into(),
+            }
+            .to_text()
+        });
+        m
+    }
+
+    #[test]
+    fn eine_erklaerung_gegen_mich_ist_kein_konflikt() {
+        assert!(!ist_konflikt(&akte_mit_erklaerung(Some("elw2")), "elw2"));
+    }
+
+    #[test]
+    fn ohne_erklaerung_oder_gegen_einen_anderen_ist_es_ein_konflikt() {
+        assert!(ist_konflikt(&akte_mit_erklaerung(None), "elw2"));
+        assert!(ist_konflikt(&akte_mit_erklaerung(Some("hub")), "elw2"));
+        let mut kaputt = akte_mit_erklaerung(None);
+        kaputt.erklaerung = Some("kein json".into());
+        assert!(ist_konflikt(&kaputt, "elw2"));
     }
 
     #[test]

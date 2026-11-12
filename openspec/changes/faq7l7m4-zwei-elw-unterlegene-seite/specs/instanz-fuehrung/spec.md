@@ -57,3 +57,14 @@ benachrichtigen. Nennt die erreichte Seite keinen Dritten mehr, MUST die offene 
 #### Scenario: Der Hub nennt keinen Dritten mehr
 - **WHEN** an „ELW 2“ eine solche Übernahme offen ist und die Akte des Hubs danach wieder den Hub oder „ELW 2“ als Führer nennt
 - **THEN** zeigt „ELW 2“ keine offene Übernahme mehr
+
+### Requirement: Die meldende Seite zieht eine überholte Übernahme gegen die erreichte Seite nach
+
+Führt die meldende Seite einen Einsatz und nennt die Akte der erreichten Seite diese selbst als
+Führer, mit einer größeren Epoche, die eine dritte Instanz vergeben hat, MUST die meldende Seite
+mit der nächsten Epoche weiter führen, ohne Alarm und mit einem Eintrag im Verlauf. Die erreichte
+Seite MUST diese Epoche bei der nächsten Meldung annehmen.
+
+#### Scenario: Hub hat zwischendurch von ELW 1 zurückbekommen
+- **WHEN** „ELW 2“ ohne Verbindung eine Notübernahme mit Epoche (2, ELW 2) erklärt, während „ELW 1“ die Führung mit Epoche (3, ELW 1) an den Hub zurückgegeben hat, und „ELW 2“ sich meldet
+- **THEN** führt nach dem nächsten Meldetakt „ELW 2“ mit Epoche (4, ELW 2) an beiden Seiten, ohne Alarm „Gegenüber meldet ungültige Übernahme“, und der Verlauf an „ELW 2“ zeigt „Notübernahme gegen Hub mit neuem Stand erneuert“
