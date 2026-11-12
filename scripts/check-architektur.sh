@@ -14,8 +14,11 @@
 #     `gilt_fuer`-Muster, das keine versionierte Datei trifft;
 #   - eine akzeptierte ADR, deren Prüfblock scheitert — die Entscheidung gilt im Code nicht mehr:
 #     Code zurückführen oder die Abkehr als neue ADR festhalten;
-#   - eine ADR, die Kapitel 9 nicht nennt;
 #   - ein relativer Link in `docs/architektur/`, der nicht auflöst.
+#
+# Kapitel 9 muss eine ADR NICHT nennen (LLH-1660): das Verzeichnis ist der Ordner, eine
+# Tabelle dort kollidierte bei jedem zweiten PR mit ADR. Doppelte Nummern über PRs hinweg
+# fängt `check-adr-nummern.sh`.
 #
 # Geprüft werden versionierte und neue, nicht ignorierte Dateien (wie check-schreibweisen.sh).
 #
@@ -69,7 +72,6 @@ if [ -n "$kap5" ]; then
 fi
 
 # ── Entscheidungen ──────────────────────────────────────────────────────────────────
-kap9="$(find "$DOKU" -maxdepth 1 -name '09-*.md' | head -1)"
 ids=""
 gefahren=0
 manuell=0
@@ -131,9 +133,6 @@ for adr in "$DOKU"/entscheidungen/ADR-*.md; do
       melde "$rel: Prüfung scheitert — die Entscheidung gilt im Code nicht mehr. Code zurückführen oder die Abkehr als neue ADR festhalten."
       printf '%s\n' "$ausgabe" | head -20 | sed 's/^/         /' >&2
     fi
-  fi
-  if [ -n "$kap9" ] && [ -n "$id" ] && ! grep -qF -- "$id" "$kap9"; then
-    melde "${kap9#"$ROOT"/} nennt $id nicht."
   fi
 done
 

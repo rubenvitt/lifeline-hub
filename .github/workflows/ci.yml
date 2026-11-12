@@ -25,6 +25,12 @@
 # Im Zweifel wird geprüft: Nur ein ausdrückliches `false` spart, ein roter `aenderungen`-Job
 # lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
 #
+# NUR UMNUMMERIERT (LLH-1660): Benennt der Migrations-Autofix auf einem grünen PR nur Migrationen
+# um, übernimmt der neue Kopf Frontend- und e2e-Suite vom Commit davor
+# (`scripts/nur-umnummeriert.sh`, Schritt im Job `aenderungen`). Schnellprüfungen,
+# `Migrationsnummern` und die Rust-Suite laufen immer: sie prüft die umnummerierte Migration
+# zusammen mit der, die auf dem Ziel-Branch dazukam.
+#
 # Coverage steht in coverage.yml: dieser Lauf wird auf einem Kanal-Branch nicht abgebrochen,
 # ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
@@ -68,6 +74,10 @@ jobs:
     name: Geänderte Bereiche
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # `checks: read` für die Check-Runs des Vorgängers (Umnummerierung, s. Schritt unten).
+    permissions:
+      contents: read
+      checks: read
     outputs:
       rust: ${{ steps.bereiche.outputs.rust }}
       frontend: ${{ steps.bereiche.outputs.frontend }}
@@ -79,13 +89,52 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           fetch-depth: 2
+      # NUR UMNUMMERIERT (LLH-1660): Der Migrations-Autofix pusht einen Commit, der Migrationen
+      # nur umbenennt. Unterscheidet sich der Kopf des PRs vom letzten Commit mit grünen schweren
+      # Suiten nur dadurch, laufen Frontend und e2e nicht noch einmal: `scripts/nur-umnummeriert.sh`
+      # nennt diesen Commit, seine Check-Runs entscheiden. Die Rust-Suite läuft immer neu (s. u.).
+      # Jeder Zweifel und jeder Fehler (kein Vorgänger, Abfrage scheitert, ein Check fehlt oder
+      # ist rot) lässt alles laufen wie sonst.
+      - name: Nur umnummeriert?
+        id: umnummeriert
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KOPF: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Kein `set -e`: dieser Schritt darf nie rot werden, er spart nur.
+          vorgaenger=""
+          # Der Kopf des PRs samt der Kette, die das Skript höchstens zurückgeht (5 + Rand).
+          if git fetch --no-tags --depth=8 origin "$KOPF" 2> /dev/null; then
+            vorgaenger="$(./scripts/nur-umnummeriert.sh vorgaenger "$KOPF" 2> /dev/null || true)"
+          fi
+          if [ -z "$vorgaenger" ]; then
+            echo "Kopf ist keine reine Umnummerierung."
+            exit 0
+          fi
+          echo "Kopf unterscheidet sich von $vorgaenger nur durch Umnummerierung."
+          # Erst holen, dann auswerten: eine gescheiterte Abfrage darf nicht als „grün“ enden.
+          if gh api "repos/$GITHUB_REPOSITORY/commits/$vorgaenger/check-runs?per_page=100" --paginate \
+              > "$RUNNER_TEMP/check-runs.json" \
+            && ./scripts/nur-umnummeriert.sh gruen < "$RUNNER_TEMP/check-runs.json"; then
+            echo "vorgaenger=$vorgaenger" >> "$GITHUB_OUTPUT"
+          else
+            echo "Schwere Suiten am Vorgänger nicht vollständig grün: alles läuft."
+          fi
       - name: Betroffene Suiten
         id: bereiche
         env:
           EREIGNIS: ${{ github.event_name }}
+          VORGAENGER: ${{ steps.umnummeriert.outputs.vorgaenger }}
         run: |
           set -euo pipefail
-          if [ "$EREIGNIS" = pull_request ]; then
+          grund="nein, nicht betroffen"
+          if [ "$EREIGNIS" = pull_request ] && [ -n "$VORGAENGER" ]; then
+            # Rust läuft trotzdem: dieser Lauf prüft den Merge mit dem aktuellen Ziel-Branch,
+            # und dort kam die Migration dazu, wegen der umnummeriert wurde.
+            printf 'rust=true\nfrontend=false\ne2e=false\n' > "$RUNNER_TEMP/bereiche"
+            grund="nein, nur umnummeriert seit ${VORGAENGER:0:8} (dort grün)"
+          elif [ "$EREIGNIS" = pull_request ]; then
             git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/dateien"
             cat "$RUNNER_TEMP/dateien"
             ./scripts/bereiche.sh < "$RUNNER_TEMP/dateien" > "$RUNNER_TEMP/bereiche"
@@ -96,7 +145,7 @@ jobs:
           {
             echo "| Suite | läuft |"
             echo "| --- | --- |"
-            sed -E 's/^([a-z0-9]+)=true$/| \1 | ja |/; s/^([a-z0-9]+)=false$/| \1 | nein, nicht betroffen |/' \
+            sed -E "s/^([a-z0-9]+)=true\$/| \\1 | ja |/; s/^([a-z0-9]+)=false\$/| \\1 | $grund |/" \
               "$RUNNER_TEMP/bereiche"
           } >> "$GITHUB_STEP_SUMMARY"
 

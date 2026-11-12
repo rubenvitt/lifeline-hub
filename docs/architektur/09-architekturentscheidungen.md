@@ -22,32 +22,16 @@ ursprünglichen Entscheidung laut Herleitung, nicht der Tag der Niederschrift.
 
 ## 9.1 Verzeichnis der ADRs
 
-| ID | Titel | Status | Datum | gilt für |
-| --- | --- | --- | --- | --- |
-| [ADR-0001](entscheidungen/ADR-0001-ein-binary-liefert-api-und-frontend.md) | Ein Rust-Binary mit axum liefert API und Frontend aus | akzeptiert | 2026-05-23 | `Cargo.toml`, `src/main.rs`, `src/app.rs`, `src/static_files.rs`, `Dockerfile` |
-| [ADR-0002](entscheidungen/ADR-0002-sqlite-eingebettet-als-einzige-datenbank.md) | SQLite ist eingebettet die einzige Datenbank, angesprochen über sqlx | akzeptiert | 2026-05-23 | `Cargo.toml`, `src/db.rs`, `src/db/**`, `src/cache_db.rs`, `src/tx.rs`, `migrations/**` |
-| [ADR-0003](entscheidungen/ADR-0003-live-aktualisierung-ueber-sse-mit-liveevent-kontrakt.md) | Live-Aktualisierung läuft über SSE, das Enum LiveEvent ist der Kontrakt | akzeptiert | 2026-05-23 | `src/live/**`, `src/routes/live.rs`, `src/routes/support.rs`, `frontend/src/live/**`, `frontend/src/api/queryKeys.ts`, `frontend/src/api/*.contract.test.ts`, `tests/enum_wire_kontrakt.rs` |
-| [ADR-0004](entscheidungen/ADR-0004-openapi-codegen-als-api-kontrakt.md) | Antworttypen kommen per Codegen aus dem Rust-Code (OpenAPI nach TypeScript) | akzeptiert | 2026-07-08 | `src/api_doc.rs`, `frontend/src/api/**`, `scripts/check-typ-codegen.sh`, `crates/karten-katalog/**` |
-| [ADR-0005](entscheidungen/ADR-0005-einsatz-autorisierung-ueber-typisierte-extractor.md) | Einsatz-Autorisierung steckt in typisierten Extractoren, nicht im Handlerrumpf | akzeptiert | 2026-07-11 | `src/einsatz/kontext.rs`, `src/einsatz/berechtigung.rs`, `src/einsatz/modul.rs`, `src/routes/**`, `tests/einsatz_kontext_guard.rs`, `frontend/src/einsatz/schreibrecht.ts` |
-| [ADR-0006](entscheidungen/ADR-0006-domaenenwerte-als-wire-enum.md) | Domänenwerte mit fester Wertemenge sind Rust-Enums aus wire_enum! | akzeptiert | 2026-07-10 | `src/**/*.rs`, `tests/enum_wire_kontrakt.rs` |
-| [ADR-0007](entscheidungen/ADR-0007-frontend-react-antd-tanstack-query-pwa.md) | Das Frontend ist eine React-PWA mit antd und TanStack Query | akzeptiert | 2026-05-23 | `frontend/package.json`, `frontend/vite.config.ts`, `frontend/src/main.tsx`, `frontend/src/api/queryClient.ts` |
-| [ADR-0008](entscheidungen/ADR-0008-offline-lagebild-und-schreib-warteschlange.md) | Ohne Netz liest der Client ein gefiltertes Lagebild und merkt Erfassungen in einer Warteschlange vor | akzeptiert | 2026-09-30 | `frontend/src/offline/**`, `frontend/src/api/queryKeys.ts`, `frontend/src/api/queryClient.ts`, `frontend/vite.config.ts` |
-| [ADR-0009](entscheidungen/ADR-0009-desktop-huelle-tauri-ohne-anwendungslogik.md) | Die Desktop-App ist eine Tauri-Hülle ohne Anwendungslogik, die die Server-Adresse lädt | akzeptiert | 2026-09-25 | `src-tauri/**`, `frontend/package.json`, `frontend/src/huelle/**` |
-| [ADR-0010](entscheidungen/ADR-0010-offline-karten-aus-eigenem-build-service.md) | Offline-Karten baut ein eigener Karten-Service, der Server lädt sie nur herunter | akzeptiert | 2026-07-05 | `karten-service/**`, `karten-build/**`, `crates/karten-katalog/**`, `src/karte/download.rs`, `src/karte/katalog.rs` |
-| [ADR-0011](entscheidungen/ADR-0011-anmeldewege-als-provider-mit-einer-sitzung.md) | Anmeldewege sind schaltbare Provider, die alle in dieselbe Server-Sitzung münden | ersetzt | 2026-07-14 | `src/auth/**`, `src/routes/auth.rs` |
-| [ADR-0012](entscheidungen/ADR-0012-zeit-utc-auf-dem-wire-anzeigezone-im-client.md) | Zeitpunkte reisen in UTC, angezeigt und eingegeben werden sie in der Anzeigezone | akzeptiert | 2026-10-01 | `src/zeit.rs`, `src/uhrzeit.rs`, `src/**/*.rs`, `frontend/src/anzeige/**` |
-| [ADR-0013](entscheidungen/ADR-0013-openspec-traegt-den-aenderungszyklus.md) | OpenSpec trägt den Änderungszyklus, Fähigkeits-Specs liegen unter openspec/specs | akzeptiert | 2026-09-20 | `openspec/**`, `scripts/check-openspec-archiv.sh` |
-| [ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md) | Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus | akzeptiert | 2026-11-08 | `src/instanz/**`, `src/routes/instanz.rs`, `src/auth/unterschrift/**` |
-| [ADR-0015](entscheidungen/ADR-0015-lifeline-hub-hat-kein-stab-modul.md) | Lifeline Hub hat kein Stab-Modul, Führungsfunktionen kommen aus der Mitgliedschaft | akzeptiert | 2026-11-08 | `src/lib.rs`, `src/einsatz/modul.rs`, `src/fuehrung/**`, `src/infotelefon/**`, `src/fernmeldewesen/**`, `frontend/src/einsatz/modulRegistry.ts`, `frontend/src/fuehrung/**`, `frontend/src/infotelefon/**`, `frontend/src/fernmeldewesen/**` |
-| [ADR-0016](entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md) | Anmeldewege sind schaltbare Provider; Admins einer verteilenden Instanz melden sich per Passkey an | akzeptiert | 2026-11-09 | `src/auth/**`, `src/routes/auth.rs`, `src/instanz/stammdaten/geheimnis.rs` |
-| [ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md) | Die Belegung einer Betreuungsstelle hat eine Meldereihe, auch wenn sie namentlich geführt wird | akzeptiert | 2026-11-09 | `src/betreuung/**`, `src/person/verbleib_repo.rs`, `src/routes/betreuung.rs`, `src/routes/betreuung_registrierung.rs`, `migrations/0310_registrierstelle.sql` |
-| [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md) | Ein Einsatz wird an einer anderen Instanz als Spiegel in denselben Tabellen gehalten | akzeptiert | 2026-11-09 | `src/instanz/spiegel/**`, `src/einsatz/spiegel_filter.rs`, `src/einsatz/schwaerzung_registry.rs`, `src/auth/session.rs`, `migrations/0314_einsatz_spiegel.sql`, `frontend/src/offline/queue.ts` |
-| [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md) | Beta zählt neben Alpha und bekommt nur veröffentlichte Alpha-Tags über einen Nachzug | akzeptiert | 2026-11-11 | `release.config.mjs`, `scripts/release/kanal-nachziehen.sh`, `scripts/release/desktop-kanal.mjs`, `scripts/release/abbild-kanal.mjs`, `src-tauri/src/kanal.rs`, `.github/workflows/kanal-nachziehen.yml`, `.github/workflows/artefakte.yml` |
-| [ADR-0020](entscheidungen/ADR-0020-ein-einsatz-hat-genau-eine-fuehrende-instanz.md) | Ein Einsatz hat genau eine führende Instanz, und nur sie schreibt ihn | ersetzt | 2026-11-09 | `src/instanz/fuehrung/**`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs` |
-| [ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md) | Ein Einsatz hat genau eine führende Instanz; wer ihn nicht führt, hält ihn als Spiegel | akzeptiert | 2026-11-11 | `src/instanz/fuehrung/**`, `src/instanz/spiegel/fuehrung.rs`, `src/einsatz/berechtigung.rs`, `src/einsatz/repo.rs`, `src/einsatz/kontext.rs`, `frontend/src/einsatz/schreibrecht.ts` |
-| [ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md) | Fremdsysteme sprechen signiert und mit festen Scopes mit der öffentlichen API unter /api/v1 | vorgeschlagen | 2026-11-11 | `src/app.rs`, `src/api_doc.rs`, `src/instanz/signatur.rs`, `src/lagemonitor_zugang/**`, `src/routes/lagemonitor_v1.rs` |
-| [ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md) | Absender ohne Signatur werfen über einen Einwurf-Zugang ein, der nur schreibt | vorgeschlagen | 2026-11-11 | `src/app.rs`, `src/auth/rate_limit.rs` |
-| [ADR-0024](entscheidungen/ADR-0024-ein-verwahrter-einsatz-wird-vom-hub-gefuehrt.md) | Die Verwahrung wechselt die Führung; einen verwahrten Einsatz gibt der Hub nicht mehr ab | akzeptiert | 2026-11-12 | `src/instanz/fuehrung/**`, `src/instanz/spiegel/lebensende.rs` |
+Das Verzeichnis ist der Ordner [`entscheidungen/`](entscheidungen/): eine Datei je ADR, der
+Dateiname trägt Nummer und Kurztitel. Eine Tabelle steht hier bewusst nicht (LLH-1660): Jede
+neue Zeile kollidierte mit jedem anderen offenen Pull Request, der auch eine ADR anlegt.
+
+- **Im Terminal:** `scripts/adr-fuer.sh --alle` gibt je ADR Kennung, Status, Datum und Titel aus.
+- **Auf der Website:** die Seite `/architektur/` listet die ADRs aus denselben Dateien
+  (`website/src/pages/architektur/index.astro`).
+- **Nummern:** Eine neue ADR nimmt eine Nummer, die auf dem Ziel-Branch frei ist. Geprüft wird
+  das je Pull Request über den Status `ADR-Nummern` (`scripts/check-adr-nummern.sh`,
+  [`AGENTS.md`](AGENTS.md), Abschnitt „Entscheidungen (ADRs)“).
 
 ## 9.2 Weitere Entscheidungen ohne eigene ADR
 

@@ -127,7 +127,8 @@ fall 'ADR: Muster trifft keine Datei' rot "schreibe $ADR \"\$(adr_text ADR-0001 
 fall 'ADR: Regeln ohne MUST/SHOULD' rot "schreibe $ADR \"\$(adr_text ADR-0001 akzeptiert 'src/live/**' \"\$PRUEF_GRUEN\" '- Man sollte.')\"" "keine Zeile '- MUST"
 fall 'ADR: zu lang' rot "for i in \$(seq 1 80); do echo 'Zeile' >> $ADR; done" 'höchstens 80'
 fall 'ADR: Kopf fehlt' rot "sed -i.bak 1d $ADR" 'Kopf fehlt'
-fall 'ADR fehlt in Kapitel 9' rot 'schreibe docs/architektur/09-entscheidungen.md "# 9."' 'nennt ADR-0001 nicht'
+# LLH-1660: Kapitel 9 führt kein Verzeichnis mehr, eine dort ungenannte ADR ist in Ordnung.
+fall 'ADR fehlt in Kapitel 9' gruen 'schreibe docs/architektur/09-entscheidungen.md "# 9."'
 fall 'toter Link' rot 'echo "[weg](gibt-es-nicht.md)" >> docs/architektur/README.md' "Link 'gibt-es-nicht.md' löst nicht auf"
 fall 'Link mit Anker auf bestehende Datei' gruen 'echo "[fünf](05-bausteinsicht.md#ebene-1)" >> docs/architektur/README.md'
 

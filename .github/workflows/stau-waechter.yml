@@ -1,0 +1,107 @@
+# Stau-Wächter (LLH-1660) — bewertet jeden offenen PR, wenn sich ein Ziel-Branch bewegt.
+#
+# Eine Merge Queue gibt es für Repositories eines Benutzerkontos nicht, und Auto-Merge wartet
+# still. Ohne diesen Lauf bleibt ein PR liegen, bis ihn jemand von Hand anfasst:
+#   - Ein fremder Merge macht ihn konfliktbehaftet; dann startet keine CI.
+#   - Der Kopf-Commit trägt keinen CI-Lauf.
+#   - Alles ist grün, Auto-Merge ist an, gemergt wird trotzdem nicht.
+#
+# Was der Wächter tut, wo seine Grenzen liegen und warum, steht in `scripts/stau-waechter.sh`
+# und ist dort selbstgetestet. Kurz: Er kommentiert am PR (ein Hinweis je PR, neu nur bei neuem
+# Befund) und mergt bei fehlendem CI-Lauf den Ziel-Branch in den PR-Branch. Konflikte löst er
+# nie selbst; der Kommentar weckt die Sitzung, die den PR betreut.
+#
+# Drei Auslöser: der Ziel-Branch bewegt sich (dann entstehen Konflikte), stündlich (ein fehlender
+# CI-Lauf zeigt sich erst nach einer Wartezeit) und von Hand.
+#
+# Gepusht wird mit einem Token der Release-App: ein Push mit GITHUB_TOKEN startete keine CI, und
+# genau die soll anlaufen. Kommentiert wird mit GITHUB_TOKEN. Ohne `RELEASE_APP_ID` kommentiert
+# der Wächter nur.
+#
+# Das Skript kommt vom Branch dieses Laufs (Standard-Branch bei Zeitplan), nie aus einem PR; es
+# führt keinen PR-Code aus.
+name: Stau-Wächter
+
+on:
+  push:
+    branches: [main, beta, alpha]
+  schedule:
+    # Krumme Minute: zur vollen Stunde stauen sich die Zeitpläne bei GitHub.
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      nur_zeigen:
+        description: 'Nur Befund und geplante Aktion nennen, nichts schreiben'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Ein Lauf zur Zeit, ohne Abbruch: ein abgebrochener Lauf könnte zwischen Löschen und Anlegen
+# eines Hinweises enden. Wartende Läufe ersetzt GitHub durch den jüngsten.
+concurrency:
+  group: stau-waechter
+  cancel-in-progress: false
+
+jobs:
+  waechter:
+    name: Offene PRs bewerten
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Hinweise am PR: ein Kommentar an einem PR braucht `pull-requests: write` (Issues-Recht
+      # reicht nicht, 403; so gemessen in migrationen.yml).
+      pull-requests: write
+      checks: read
+      statuses: read
+    env:
+      # Für die `if:` der App-Schritte; ohne Release-App wird nur kommentiert.
+      APP_ID: ${{ secrets.RELEASE_APP_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Nur mit dem Recht, das der Push braucht. Die App hat Bypass-Rechte auf `alpha`; die
+      # Grenzen dagegen stehen in stau-waechter.sh und seinem Selbsttest.
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        if: env.APP_ID != ''
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Push als Release-App einrichten
+        if: steps.app-token.outputs.token != ''
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          git remote set-url --push origin \
+            "https://x-access-token:$APP_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          id="$(GH_TOKEN="$APP_TOKEN" gh api "users/$APP_SLUG%5Bbot%5D" --jq .id)"
+          git config --global user.name "$APP_SLUG[bot]"
+          git config --global user.email "$id+$APP_SLUG[bot]@users.noreply.github.com"
+      - name: Offene PRs bewerten
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAU_SCHREIBEN: ${{ steps.app-token.outputs.token != '' && '1' || '0' }}
+          NUR_ZEIGEN: ${{ inputs.nur_zeigen && '--nur-zeigen' || '' }}
+          # Der Checkout hinterlegt den GITHUB_TOKEN als Header (auch für Arbeitsbäume). Er
+          # schlüge die Push-URL, und der Push liefe als github-actions[bot] ins 403 (gemessen
+          # in migrationen.yml, Probe #409). Ein leerer Wert setzt die Header-Liste zurück.
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0: ""
+        run: |
+          # Ohne pipefail verschluckte `tee` einen gescheiterten Lauf: ein dauerhaft kaputter
+          # Wächter bliebe grün und fiele nicht auf.
+          set -o pipefail
+          # shellcheck disable=SC2086 # leer oder genau eine Option
+          scripts/stau-waechter.sh $NUR_ZEIGEN alle | tee "$RUNNER_TEMP/bericht.txt"
+          {
+            echo '```'
+            cat "$RUNNER_TEMP/bericht.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

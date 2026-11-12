@@ -34,7 +34,7 @@ Der PR, der die Architektur ändert, zieht die Doku im selben Branch mit:
 | neuer Ablauf über mehrere Bausteine (Live-Kanal, Offline, Anmeldung, Kopplung …) | Kapitel 6 |
 | Auslieferung, Prozesse, Ports, Speicherorte, Release-Kanäle | Kapitel 7 |
 | neues übergreifendes Konzept oder neue Bereichs-`AGENTS.md` | Kapitel 8 |
-| Entscheidung (Route `entwurf`, E1) oder Abkehr von einer ADR | neue ADR + Kapitel 9 |
+| Entscheidung (Route `entwurf`, E1) oder Abkehr von einer ADR | neue ADR (Kapitel 9 führt kein Verzeichnis) |
 | neues Risiko, behobene Schuld | Kapitel 11 |
 | neuer Fachbegriff | Kapitel 12 (Fachbegriffe der Oberfläche stehen in `openspec/specs/bedien-begriffe/`) |
 
@@ -69,7 +69,15 @@ Vorlage `entscheidungen/VORLAGE.md`. Geschrieben für Agenten, die sie vor einer
   Abkehr ist eine neue ADR mit `ersetzt: ADR-…`; die alte bekommt `status: ersetzt` und
   `ersetzt_durch`. Erlaubt bleiben Pfadnachzüge in `gilt_fuer` und in der Prüfung nach einem
   Verschieben sowie tote Links.
-- Kapitel 9 listet jede ADR (Wächter).
+- **Nummer:** die nächste freie auf dem Ziel-Branch, vorher `git fetch origin alpha` und einen
+  Blick auf offene PRs (`scripts/adr-fuer.sh --alle` zeigt den eigenen Stand). Durchgesetzt
+  über den Commit-Status `ADR-Nummern` (`scripts/check-adr-nummern.sh`,
+  `.github/workflows/migrationen.yml`): er wird für jeden offenen PR neu gesetzt, wenn sich der
+  Ziel-Branch bewegt. Ist er rot, nummeriert der PR um (Dateiname, `id`, Verweise); einen
+  Autofix gibt es nicht.
+- **Kapitel 9 listet die ADRs nicht** (LLH-1660): jede Zeile dort kollidierte mit jedem anderen
+  PR, der eine ADR anlegt. Das Verzeichnis ist der Ordner, `scripts/adr-fuer.sh --alle` und die
+  Website. Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`.
 
 ## Pflege durch Agenten
 
