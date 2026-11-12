@@ -109,6 +109,17 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
             routes!(events::events)
                 .layer(Extension(ScopeAnforderung::Scope(scope::Scope::EventsRead))),
         )
+        // Freigegebene Einsätze (LLH-1655).
+        .routes(
+            routes!(einsaetze::liste).layer(Extension(ScopeAnforderung::Scope(
+                scope::Scope::EinsaetzeRead,
+            ))),
+        )
+        .routes(
+            routes!(einsaetze::einzeln).layer(Extension(ScopeAnforderung::Scope(
+                scope::Scope::EinsaetzeRead,
+            ))),
+        )
         // Lage des freigegebenen Einsatzes (LLH-1638).
         .routes(
             routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(scope::Scope::LageRead))),

@@ -163,6 +163,12 @@ async fn stand(pool: &SqlitePool) -> Result<Stand, sqlx::Error> {
     Ok(Stand { head, purged_until })
 }
 
+/// Der Höchststand der Outbox: der Cursor, ab dem ein Abruf nichts verpasst, was nach diesem
+/// Aufruf festgeschrieben wird. Die Einsatzliste liest ihn **vor** den Einsätzen (design.md D11).
+pub async fn hoechststand(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+    Ok(stand(pool).await?.head)
+}
+
 /// Die Arten, die ein Zugang mit diesen Scopes sieht.
 fn sichtbare_arten(scopes: &[Scope]) -> Vec<EventType> {
     EventType::ALLE

@@ -333,6 +333,12 @@ describe('Anbindungen · gelesener Einsatz (LLH-1638)', () => {
       einsatzAnzeige({ ...basis, scopes: [...basis.scopes], einsatz_bezeichnung: 'Stadtfest' }),
     ).toBe('liest Stadtfest');
     expect(einsatzAnzeige({ ...basis, scopes: ['rechner:use'] })).toBeNull();
+    // „Einsätze lesen“ braucht die Freigabe ebenso (LLH-1655); „Ereignisse abrufen“ allein öffnet
+    // nichts und zeigt deshalb keine Zeile.
+    expect(einsatzAnzeige({ ...basis, scopes: ['einsaetze:read', 'events:read'] })).toBe(
+      'kein Einsatz freigegeben',
+    );
+    expect(einsatzAnzeige({ ...basis, scopes: ['events:read'] })).toBeNull();
     expect(
       einsatzAnzeige({ ...basis, scopes: [...basis.scopes], zustand: 'widerrufen' }),
     ).toBeNull();

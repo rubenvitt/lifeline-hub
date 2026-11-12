@@ -72,7 +72,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   Verifizieren: Die Fundstellen stehen als Kommentar an LLH-1655, und `cargo test` der Gruppen 1
   und 2 ist am gemergten Stand grün. Weicht ein Punkt ab, läuft `/opsx:update`, bevor 3.2
   beginnt.
-- [ ] 3.2 Zweite Migration (Nummer über allen auf `origin/alpha`) mit den Triggern an der
+- [x] 3.2 Zweite Migration (Nummer über allen auf `origin/alpha`) mit den Triggern an der
   Freigabe (D5): `…_freigabe_ereignis_i`, `…_freigabe_ereignis_d`, `…_freigabe_ereignis_u`.
   Verifizieren mit Tests in `tests/public_api_events.rs` über `public_api::freigabe`:
   - Freigabe eines laufenden Einsatzes schreibt `einsatz.created` und `lage.changed` für genau
@@ -81,13 +81,13 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   - Umstellen auf einen anderen Einsatz schreibt `einsatz.closed` für den alten und
     `einsatz.created` für den neuen;
   - Löschen eines Zugangs samt Freigabe scheitert nicht und hinterlässt keine Zeile.
-- [ ] 3.3 Trigger am Kopf (D7): `einsatz_ereignis_kopf` und die Konstante `KOPF_SPALTEN`.
+- [x] 3.3 Trigger am Kopf (D7): `einsatz_ereignis_kopf` und die Konstante `KOPF_SPALTEN`.
   Verifizieren:
   - je Spalte aus `KOPF_SPALTEN` ergibt eine Änderung ein `einsatz.updated` je Freigabe;
   - eine Änderung nur an `sachverhalt` ergibt keines, ebenso ein UPDATE mit gleichen Werten;
   - ohne Freigabe entsteht nichts;
   - ein Test vergleicht `KOPF_SPALTEN` mit dem Trigger-Text aus `sqlite_master`.
-- [ ] 3.4 Trigger für das Ende (D5): `einsatz_ereignis_ende` und `einsatz_ereignis_d`.
+- [x] 3.4 Trigger für das Ende (D5): `einsatz_ereignis_ende` und `einsatz_ereignis_d`.
   Verifizieren:
   - `einsatz::repo::abschliessen` ergibt je Zugang genau ein `einsatz.closed`;
   - ein Statuswechsel ohne Löschen der Freigabe (Weg der Spiegel-Übernahme) ebenso;
@@ -95,7 +95,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
     Zugang und keine frühere Zeile zurück;
   - Löschen eines abgeschlossenen Einsatzes lässt keine Zeile zurück (`cargo test
     skelett_loeschung` grün).
-- [ ] 3.5 Trigger für die Lage (D6): `einsatz_aenderung_ereignis_i`, `einsatz_ereignis_lage` und
+- [x] 3.5 Trigger für die Lage (D6): `einsatz_aenderung_ereignis_i`, `einsatz_ereignis_lage` und
   die Konstante `LAGE_ARTEN`. Verifizieren:
   - zwanzig Einfügungen in `einsatz_person` ergeben je Zugang eine Zeile `lage.changed`, deren
     `id` mit jeder Änderung steigt;
@@ -104,10 +104,10 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   - ein Test vergleicht `LAGE_ARTEN` mit dem Trigger-Text und prüft, dass jede Art in
     `spiegel::art::GESPIEGELT` steht; die Quellen von `public_api::lage` sind gegen die Liste
     gelesen, das Ergebnis steht im Kommentar an `LAGE_ARTEN`.
-- [ ] 3.6 Die Tests aus Gruppe 2 fügen nicht mehr direkt ein, wo ein Trigger dasselbe leistet.
+- [x] 3.6 Die Tests aus Gruppe 2 fügen nicht mehr direkt ein, wo ein Trigger dasselbe leistet.
   Verifizieren: `git grep -n 'INSERT INTO maschine_ereignis' -- src tests` zeigt nur noch Tests,
   die eine Menge oder ein Alter brauchen (Seiten, Purge), jeweils mit Kommentar.
-- [ ] 3.7 Die Ereignisse entstehen auf den Wegen neben der Oberfläche. Verifizieren:
+- [x] 3.7 Die Ereignisse entstehen auf den Wegen neben der Oberfläche. Verifizieren:
   - ein Test in `tests/` übernimmt für einen freigegebenen Spiegel einen geänderten Kopf und
     findet `einsatz.updated` (Muster der bestehenden Spiegel-Tests);
   - eine zurückgerollte Transaktion hinterlässt keine Zeile;
@@ -118,7 +118,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
 
 ## 4. Abruf über HTTP und Leserouten (nach LLH-1638)
 
-- [ ] 4.1 `Scope::braucht_einsatzfreigabe()` gilt auch für `EinsaetzeRead` (D15). Verifizieren:
+- [x] 4.1 `Scope::braucht_einsatzfreigabe()` gilt auch für `EinsaetzeRead` (D15). Verifizieren:
   - Unit-Test: wahr für `lage:read` und `einsaetze:read`, falsch für `events:read` und die
     übrigen;
   - ein Zugang nur mit `einsaetze:read` steht in `GET /api/einsaetze/{id}/anbindungen` und lässt
@@ -127,7 +127,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
     `einsatz.closed`;
   - Texte im Paneel „Anbindungen“ der Seite „Geräte“, die nur von „Lage“ sprechen, sind
     angepasst (Vitest des Paneels grün).
-- [ ] 4.2 Abruf über HTTP mit signierten Anfragen (Helfer aus `tests/common`). Verifizieren:
+- [x] 4.2 Abruf über HTTP mit signierten Anfragen (Helfer aus `tests/common`). Verifizieren:
   - nach Freigabe, zwei Kopfänderungen und Abschluss liefert der alte Cursor die Ereignisse in
     Reihenfolge (Akzeptanzkriterium „zehn Minuten offline“);
   - `after=abc` und `wait=60` ergeben 400 `invalid_field`, ohne `events:read` 403
@@ -138,23 +138,23 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   - nach dem Purge ergibt der alte Cursor 410 `cursor_expired`;
   - die Antwort trägt nur `id`, `type`, `occurred_at`, `einsatz_id` und eine gültige
     Antwortsignatur.
-- [ ] 4.3 Schema `Einsatz` und `Koordinate` in `src/public_api/einsaetze.rs`, `SELECT` aus
+- [x] 4.3 Schema `Einsatz` und `Koordinate` in `src/public_api/einsaetze.rs`, `SELECT` aus
   `KOPF_SPALTEN` (D11). Verifizieren: Ein Unit-Test serialisiert einen Einsatz mit Sachverhalt
   und meldender Stelle und findet beides nicht; ohne Koordinate fehlt das Feld.
-- [ ] 4.4 `GET /api/v1/einsaetze` mit `ScopeAnforderung::Scope(Scope::EinsaetzeRead)`.
+- [x] 4.4 `GET /api/v1/einsaetze` mit `ScopeAnforderung::Scope(Scope::EinsaetzeRead)`.
   Verifizieren mit `tests/public_api_einsaetze.rs`:
   - nur der laufende, freigegebene Einsatz der eigenen Org steht in der Liste;
   - ohne Freigabe kommt eine leere Liste mit Cursor;
   - ein abgeschlossener Einsatz fehlt;
   - ein Ereignis nach dem Lesen der Liste kommt beim Abruf ab dem gelieferten Cursor
     (Neuaufbau nach 410).
-- [ ] 4.5 `GET /api/v1/einsaetze/{id}`. Verifizieren:
+- [x] 4.5 `GET /api/v1/einsaetze/{id}`. Verifizieren:
   - freigegeben und laufend ergibt 200;
   - nicht freigegeben, fremde Org, abgeschlossen, unbekannt und `id` ohne Zahl ergeben dieselbe
     404 `not_found`;
   - ohne `einsaetze:read` 403 `missing_scope`;
   - der Test aus LLH-1638 über `braucht_einsatzfreigabe()` deckt beide Leserouten.
-- [ ] 4.6 Vertrag nachziehen: `cargo test --test public_api_spec_aktuell`,
+- [x] 4.6 Vertrag nachziehen: `cargo test --test public_api_spec_aktuell`,
   `docs/api/public-v1.json` committen. Verifizieren: `scripts/check-typ-codegen.sh` und
   `cargo test --test maschinenzugang` (Inventar der Scope-Angaben) sind grün.
 

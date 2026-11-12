@@ -27,9 +27,12 @@ Felder sind `snake_case`.
 
 ## Einsatzbezug
 
-Ein Lese-Scope mit Einsatzbezug (`lage:read`) sieht nur den Einsatz, den die Einsatzleitung für
-den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist das höchstens
-einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null`, nicht mit einem Fehler.
+Ein Lese-Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`) sieht nur den Einsatz, den die
+Einsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist
+das höchstens einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null` und
+`GET /api/v1/einsaetze` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/einsaetze/{id}`
+antwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen
+Einsatz.
 
 ## Zeitpunkte
 

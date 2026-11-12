@@ -133,6 +133,22 @@ pub async fn freigegebener_einsatz(
     freigegebener_einsatz_tx(&mut conn, zugang_id).await
 }
 
+/// Die aktiven Einsätze, die der Zugang liest. Heute höchstens einer (eindeutiger Index auf
+/// `zugang_id`); die Leserouten für Einsätze (LLH-1655) liefern trotzdem eine Liste, damit ihr
+/// Vertrag bleibt, wenn diese Grenze fällt.
+pub async fn freigegebene_einsaetze(
+    conn: &mut SqliteConnection,
+    zugang_id: &str,
+) -> Result<Vec<i64>, AppError> {
+    let sql = format!(
+        "SELECT einsatz_id FROM ({FREIGABE_WIRKSAM}) WHERE zugang_id = ? ORDER BY einsatz_id"
+    );
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .bind(zugang_id)
+        .fetch_all(&mut *conn)
+        .await?)
+}
+
 /// Der gelesene Einsatz mit Bezeichnung, für die Seite „Anbindungen“.
 pub async fn gelesener_einsatz(
     conn: &mut SqliteConnection,

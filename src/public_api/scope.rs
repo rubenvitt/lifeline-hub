@@ -23,8 +23,11 @@ impl Scope {
     /// Zugang freigegeben hat (`super::freigabe`, ADR-0029). Ein neuer solcher Scope kommt hier
     /// dazu, sobald seine Route steht; vorher zeigte das Paneel „Anbindungen“ einen Schalter
     /// ohne Wirkung.
+    ///
+    /// `events:read` gehört nicht dazu: allein öffnet es keine Ereignisart
+    /// (`super::events::EventType::scope`), ein Schalter hätte keine Folge (LLH-1655).
     pub fn has_einsatzbezug(self) -> bool {
-        matches!(self, Scope::LageRead)
+        matches!(self, Scope::LageRead | Scope::EinsaetzeRead)
     }
 }
 
@@ -118,13 +121,23 @@ mod tests {
     }
 
     #[test]
-    fn nur_lage_lesen_hat_einsatzbezug() {
+    fn lage_und_einsaetze_lesen_haben_einsatzbezug() {
         let mit: Vec<&str> = Scope::ALLE
             .iter()
             .filter(|s| s.has_einsatzbezug())
             .map(|s| s.as_str())
             .collect();
-        assert_eq!(mit, ["lage:read"]);
+        assert_eq!(mit, ["lage:read", "einsaetze:read"]);
+    }
+
+    /// Jede Ereignisart hängt an einem Scope mit Einsatzbezug; `events:read` allein macht einen
+    /// Zugang deshalb nicht freigebbar.
+    #[test]
+    fn jede_ereignisart_haengt_an_einem_scope_mit_einsatzbezug() {
+        for art in crate::public_api::events::EventType::ALLE {
+            assert!(art.scope().has_einsatzbezug(), "{}", art.as_str());
+        }
+        assert!(!Scope::EventsRead.has_einsatzbezug());
     }
 
     #[test]

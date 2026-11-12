@@ -362,9 +362,15 @@ pub async fn aendern(
         // Mit dem letzten Lese-Scope mit Einsatzbezug endet die Freigabe (LLH-1638): bekäme der
         // Zugang das Recht später wieder, läse er sonst ohne neue Entscheidung der Einsatzleitung.
         let etb = if vorher.has_einsatzbezug() && !nachher.has_einsatzbezug() {
+            // Ein Zugang, der nur Einsätze las (LLH-1655), hatte nie eine Lage.
+            let was = if vorher.has_scope(Scope::LageRead) {
+                "darf keine Lage mehr lesen"
+            } else {
+                "darf den Einsatz nicht mehr lesen"
+            };
             let text = format!(
-                "Anbindung „{}“ darf keine Lage mehr lesen (geändert von {admin_name}); die \
-                 Freigabe dieses Einsatzes ist beendet.",
+                "Anbindung „{}“ {was} (geändert von {admin_name}); die Freigabe dieses \
+                 Einsatzes ist beendet.",
                 nachher.name
             );
             freigabe_entziehen_tx(&mut *conn, &nachher.id, von, &text).await?

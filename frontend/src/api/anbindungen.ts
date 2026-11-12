@@ -73,8 +73,12 @@ export function setAnbindungFreigabe(
   );
 }
 
-/** Lese-Rechte mit Einsatzbezug: ihr Einsatz kommt aus der Freigabe der Einsatzleitung. */
-const SCOPES_MIT_EINSATZBEZUG: readonly Scope[] = ['lage:read'];
+/**
+ * Lese-Rechte mit Einsatzbezug: ihr Einsatz kommt aus der Freigabe der Einsatzleitung. Dieselbe
+ * Liste wie `Scope::has_einsatzbezug` im Backend; „Ereignisse abrufen“ gehört nicht dazu, weil
+ * es allein nichts öffnet (LLH-1655).
+ */
+const SCOPES_MIT_EINSATZBEZUG: readonly Scope[] = ['lage:read', 'einsaetze:read'];
 
 /** Trägt die Anbindung ein Lese-Recht mit Einsatzbezug? Dann zeigt die Seite, was sie liest. */
 export function hasEinsatzbezug(scopes: readonly string[]): boolean {
