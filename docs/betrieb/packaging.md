@@ -190,8 +190,13 @@ gestartet mit `--bind 0.0.0.0:8443 --tls --tls-hostname elw.local` (`--tls` änd
 Port nicht, der kommt allein aus `--bind`; Einzelheiten in [betrieb-tls.md](../betrieb-tls.md)).
 Zwei Voraussetzungen bringt die Anwendung dabei nicht selbst mit:
 
-- **Der Name muss auflösbar sein.** Die Binary kündigt sich nicht per mDNS an; `elw.local`
-  kommt vom Betriebssystem des ELW-Rechners (Bonjour, Avahi) oder aus dem lokalen DNS.
+- **Der Name muss auflösbar sein.** Die Binary löst keinen Hostnamen per mDNS auf; `elw.local`
+  kommt vom Betriebssystem des ELW-Rechners (Bonjour, Avahi) oder aus dem lokalen DNS. Mit
+  `--lan-entdeckung` kündigt sie sich zusätzlich als Dienst `_lifeline-hub._tcp` an, damit eine
+  andere Instanz sie für eine Direktkopplung vor Ort findet (LLH-1497,
+  [env-registry.md](env-registry.md)). Im Container geht das nur mit Host-Netz
+  (`network_mode: host`), und ein Router oder WLAN, das UDP 5353 filtert, verhindert es; die
+  Adresse von Hand geht immer.
 - **Das Zertifikat muss auf jedem Gerät vertraut sein** (mkcert-Root-CA ausrollen oder ein
   eigenes Zertifikat der Organisation). Wer die Zertifikatswarnung nur wegklickt, bekommt
   dieselben Einschränkungen wie bei Klartext-HTTP.

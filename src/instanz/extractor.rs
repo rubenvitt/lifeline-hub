@@ -108,8 +108,10 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             return Err(reject("Wiederholung", Some(&kopf.kid)));
         }
         check_protokoll(parts.uri.path(), claims.pv)?;
-        // Außer Melden (das Widerrufe überbringt) nur bei aktiver Kopplung.
+        // Außer Melden (das Widerrufe überbringt) und der Aussage über das Zertifikat (die vor der
+        // ersten Meldung nötig sein kann, LLH-1497) nur bei aktiver Kopplung.
         if parts.uri.path() != MELDEN_PFAD
+            && parts.uri.path() != super::melden::ZERTIFIKAT_PFAD
             && kopplung.zustand() != Some(super::InstanzKopplungZustand::Aktiv)
         {
             return Err(reject("Kopplung nicht aktiv", Some(&kopf.kid)));

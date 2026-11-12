@@ -1,6 +1,6 @@
 # 11. Risiken und technische Schulden
 
-Stand: 11.11.2026.
+Stand: 12.11.2026.
 
 Grundlage ist das [Architektur-Review vom 11.07.2026](../architektur-review-2026-07-11.html)
 mit 46 Befunden (F01 bis F36, G01 bis G10). Jeder Befund ist am Code und in Zunder (Projekt
@@ -47,6 +47,7 @@ Repository; was sich nicht belegen ließ, fehlt hier.
 | R31 | Der Vorgabe-Katalog der Offline-Karten liegt im Bucket des karten-service auf dem Alpha-Server (`https://karten.rubeen.dev`); die Adresse ist einkompiliert. | Jede Installation ohne `--offline-katalog-manifest-url` lädt ihre Offline-Karten von dort. Fällt der Server aus oder zieht der Bucket um, sehen ältere Installationen keine neuen Stände mehr; bereits geladene Karten bleiben nutzbar. | `src/karte/katalog.rs` (`KARTEN_BASIS_URL`, `OFFLINE_KATALOG_MANIFEST_URL`), `src/config.rs` (`default_offline_katalog`), `crates/karten-katalog/src/lib.rs` | – |
 | R32 | Ein kompromittierter Hub kann sich die Unterschrift eines Admins für eine Notübernahme erschleichen, wie bei R24: er liefert die Seite aus, auf der der Admin unterschreibt. | Am ELW greift die Übernahme erst, wenn die Einsatzleitung dort sie bestätigt; sie sieht Grund, Unterzeichner und Zeit. Bleibt die Gewöhnung an das Bestätigen. Seit LLH-1641 hängt die Führung am Spiegel; abgeschaltet bleibt sie per `LIFELINE_FUEHRUNG`, bis ein Betrieb sie bewusst einschaltet. | `src/instanz/fuehrung/`, `openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md` (Risiken) | LLH-1491 |
 | R33 | Ein Teil der Maschinenwege von außen ist nicht gedrosselt: Die signierten Instanzrouten und der Bearer-Lesezugang des Lagemonitors zählen Fehlversuche nicht, ein unbekannter `kid` oder Schlüssel kostet dort je Anfrage einen DB-Zugriff; Lagemonitor-Schlüssel (`llh_lm_`) laufen nie ab. Die Fremdsysteme unter `/api/v1/` sind seit LLH-1652 gedrosselt (je Zugang 60/min, unbekannte Zugänge im Zähler für Maschinen je Quelle). | Durchprobieren ist bei 256-Bit-Schlüsseln und Signaturen aussichtslos, aber Last auf SQLite (R09) lässt sich über die verbliebenen Wege ungebremst erzeugen; ein geleakter Lagemonitor-Schlüssel gilt bis zum Widerruf. | `src/instanz/extractor.rs`, `src/lagemonitor_zugang/mod.rs` (`LagemonitorZugriff`), `src/auth/rate_limit.rs`, `src/public_api/drossel.rs` | Zunder LLH-1638 (Lagemonitor nach `/api/v1/`) |
+| R34 | Die LAN-Entdeckung braucht Multicast: im Container ohne Host-Netz, hinter einem Router, der UDP 5353 filtert, oder zwischen WLAN-Segmenten findet die Liste „Im Netz gefunden“ nichts, und eine Direktkopplung findet ihre Gegenstelle nach einem IP-Wechsel nicht neu. Eine Direktkopplung geht nur mit `--tls` an der ausstellenden Seite, nicht hinter einem Reverse-Proxy. | Die Adresse von Hand geht immer; die Liste sagt „nichts gefunden“ statt zu schweigen. `docs/betrieb/packaging.md` nennt `network_mode: host`. Ein Angreifer im LAN kann sich ankündigen, aber nicht koppeln (Code, Prüfwert, signierte Aussage, ADR-0029). | `src/instanz/entdeckung.rs`, `src/instanz/zertifikat.rs`, `tests/instanz_vor_ort.rs` | LLH-1678 (Führungswechsel vor Ort) |
 
 ## 11.3 Behobene Befunde aus dem Review
 

@@ -79,13 +79,15 @@ pub async fn save_datentraeger_bestaetigt(pool: &SqlitePool, wert: bool) -> Resu
 }
 
 /// Ob die Org eines Kontos hier ihre Geheimnisse verteilt: diese Instanz ist für sie die
-/// erreichte Seite einer aktiven Kopplung (Spec `passwort-anmeldung`, design.md D7).
+/// erreichte Seite einer aktiven Kopplung, die Geheimnisse trägt (Spec `passwort-anmeldung`,
+/// design.md D7; LLH-1497: `traegt(Fluss::Geheimnisse)`, eine Direktkopplung vor Ort nie).
 pub async fn is_org_verteilend(pool: &SqlitePool, org_id: i64) -> Result<bool, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM instanz_kopplung_org o \
          JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE o.org_id = ? AND o.widerrufen_at IS NULL \
-           AND k.richtung = 'wird_gemeldet' AND k.zustand IN ('aktiv', 'angebahnt'))",
+           AND k.richtung = 'wird_gemeldet' AND k.zustand IN ('aktiv', 'angebahnt') \
+           AND k.art = 'standard')",
     )
     .bind(org_id)
     .fetch_one(pool)

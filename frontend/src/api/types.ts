@@ -57,6 +57,11 @@ export type StammdatenHerkunftAnzeige = S['StammdatenHerkunftAnzeige'];
 export type StammdatenArt = S['StammdatenArt'];
 export type ElwVerlorenAntwort = S['ElwVerlorenAntwort'];
 export type InstanzKopplungRichtung = S['InstanzKopplungRichtung'];
+// Direktkopplung vor Ort (LLH-1497).
+export type InstanzKopplungArt = S['InstanzKopplungArt'];
+export type InstanzZertifikatZustand = S['InstanzZertifikatZustand'];
+export type InstanzLanAntwort = S['InstanzLanAntwort'];
+export type InstanzGefunden = S['InstanzGefunden'];
 export type InstanzKopplungZustand = S['InstanzKopplungZustand'];
 export type InstanzProtokoll = S['InstanzProtokoll'];
 // Spiegel und Anträge (LLH-1492)
