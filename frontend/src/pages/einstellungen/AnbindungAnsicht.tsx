@@ -31,7 +31,7 @@ import {
   ladeAnbindungen,
   stelleAnbindungsCodeAus,
   widerrufeAnbindung,
-  type AnbindungAenderung,
+  type AnbindungPatch,
 } from '../../api/anbindungen';
 import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
@@ -65,8 +65,8 @@ const fristText = (d: Dayjs | null) => (d ? alsBackendZeit(d) : null);
  * die Rechte als Menge (die Reihenfolge der Haken ändert nichts), die Frist auf die Minute des
  * Wire-Formats; `gueltig_bis: null` hebt sie auf. Rein und exportiert für den Test.
  */
-export function zugangPatch(vorher: ZugangWerte, nachher: ZugangWerte): AnbindungAenderung {
-  const patch: AnbindungAenderung = {};
+export function zugangPatch(vorher: ZugangWerte, nachher: ZugangWerte): AnbindungPatch {
+  const patch: AnbindungPatch = {};
   const name = (nachher.name ?? '').trim();
   if (name !== vorher.name) patch.name = name;
   const scopes = nachher.scopes ?? [];
@@ -149,7 +149,7 @@ export default function AnbindungAnsicht() {
   const istWiderrufen = zugang.zustand === 'widerrufen';
   const gesperrt = liste.gesperrt_grund ?? null;
 
-  const speichern = async (patch: AnbindungAenderung, basis: string | undefined) => {
+  const speichern = async (patch: AnbindungPatch, basis: string | undefined) => {
     const z = await aendereAnbindung(zugang.id, {
       ...patch,
       ...(basis !== undefined ? { basis_geaendert_at: basis } : {}),
@@ -256,7 +256,7 @@ export default function AnbindungAnsicht() {
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
-        <BearbeitbaresPaneel<ZugangWerte, AnbindungAenderung>
+        <BearbeitbaresPaneel<ZugangWerte, AnbindungPatch>
           key={zugang.id}
           titel="Zugang"
           datensatz={zugang}

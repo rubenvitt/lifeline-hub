@@ -32,17 +32,14 @@ export function legeAnbindungAn(eingabe: AnbindungEingabe): Promise<AnbindungCod
  * bleibt, wie er ist, `gueltig_bis: null` hebt die Frist auf. `basis_geaendert_at` ist der Stand
  * beim Öffnen; hat ein anderer den Zugang inzwischen geändert, antwortet der Server 409.
  */
-export interface AnbindungAenderung {
+export interface AnbindungPatch {
   name?: string;
   scopes?: Scope[];
   gueltig_bis?: string | null;
   basis_geaendert_at?: string;
 }
 
-export function aendereAnbindung(
-  id: string,
-  aenderung: AnbindungAenderung,
-): Promise<AnbindungAnzeige> {
+export function aendereAnbindung(id: string, aenderung: AnbindungPatch): Promise<AnbindungAnzeige> {
   return apiSend<AnbindungAnzeige>(`/api/admin/anbindungen/${id}`, 'PATCH', aenderung);
 }
 
