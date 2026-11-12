@@ -19,7 +19,7 @@ use crate::auth::unterschrift::pruefen;
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::error::AppError;
 use crate::instanz::repo::KopplungZeile;
-use crate::instanz::InstanzKopplungRichtung;
+use crate::instanz::{InstanzKopplungArt, InstanzKopplungRichtung};
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 
@@ -196,6 +196,70 @@ pub fn entscheide(richtung: InstanzKopplungRichtung, bewiesen: Result<(), String
         (InstanzKopplungRichtung::WirdGemeldet, _) => Entscheid::Annehmen,
         (InstanzKopplungRichtung::MeldetSich, Ok(())) => Entscheid::OffenHalten,
         (InstanzKopplungRichtung::MeldetSich, Err(grund)) => Entscheid::Verwerfen(grund),
+    }
+}
+
+/// Übernimmt eine Akte, die mir die Führung nicht nimmt: Epoche und Führer des Absenders, eine
+/// überholte offene Übernahme fällt weg, Verlauf und Kopf folgen.
+async fn folge_dem_absender(
+    conn: &mut SqliteConnection,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let von = a.fuehrer_name.clone();
+    uebernimm(a, m);
+    if a.offen
+        .as_deref()
+        .is_some_and(|o| serde_json::from_str::<AkteMeldung>(o).is_ok_and(|o| o.epoche <= m.epoche))
+    {
+        a.offen = None;
+        a.offen_bruch_at = None;
+    }
+    repo::save(conn, a, true).await?;
+    repo::add_verlauf(
+        conn,
+        a,
+        VerlaufNeu {
+            von_name: Some(&von),
+            nach_name: &m.fuehrer_name,
+            grund: grund_der(m).as_deref(),
+            unterzeichner: unterzeichner_der(m).as_deref(),
+            ..VerlaufNeu::default()
+        },
+    )
+    .await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Kopf { einsatz_id });
+    }
+    Ok(())
+}
+
+/// Wie eine Akte mit höherer Epoche über eine Direktkopplung vor Ort behandelt wird (LLH-1497,
+/// Change `t10a7luh-elw-lan-direktkopplung`, design.md D4), gleich in welcher Richtung die
+/// Kopplung läuft.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VorOrtEntscheid {
+    /// Die Führung wechselte zwischen den beiden Seiten: verwerfen, Hinweis an der Kopplung.
+    Verwerfen,
+    /// Der bisherige Führer ist der Absender und bezeugt seine Abgabe an eine dritte Instanz oder
+    /// führt mit neuer Epoche weiter: annehmen, der Spiegel folgt.
+    Annehmen,
+    /// Weder noch (etwa von einer Dritten weitergereicht): nur zur Anzeige, nichts ändert sich.
+    NurAnzeige,
+}
+
+/// Die Annahmeregel einer Direktkopplung als reine Funktion (Tabelle in design.md D4): `bisher`
+/// der Führer laut eigener Akte, `neu` der Führer der eingehenden Akte, `sender` und `ich` die
+/// beiden Seiten der Kopplung.
+pub fn entscheide_vor_ort(bisher: &str, neu: &str, sender: &str, ich: &str) -> VorOrtEntscheid {
+    let seite = |k: &str| k == sender || k == ich;
+    if seite(bisher) && seite(neu) && bisher != neu {
+        VorOrtEntscheid::Verwerfen
+    } else if bisher == sender {
+        VorOrtEntscheid::Annehmen
+    } else {
+        VorOrtEntscheid::NurAnzeige
     }
 }
 
@@ -595,6 +659,25 @@ pub async fn apply_eingang(
                     }
                     continue;
                 }
+                // Direktkopplung vor Ort (LLH-1497, D4): kein Führungswechsel zwischen den beiden
+                // Seiten, gleich in welcher Richtung; die Abgabe des bisherigen Führers an eine
+                // Dritte gilt, damit der Spiegel ihr folgt.
+                if kopplung.art() == InstanzKopplungArt::VorOrt {
+                    match entscheide_vor_ort(&a.fuehrer_kennung, &m.fuehrer, sender, &ich.kennung) {
+                        VorOrtEntscheid::Verwerfen => {
+                            aus.hinweis = Some(format!(
+                                "{} beansprucht die Führung von „{}“ über eine Direktkopplung: \
+                                 abgelehnt",
+                                kopplung.gegenueber_name, a.bezeichnung
+                            ));
+                        }
+                        VorOrtEntscheid::Annehmen => {
+                            folge_dem_absender(conn, &mut a, m, &mut aus).await?;
+                        }
+                        VorOrtEntscheid::NurAnzeige => {}
+                    }
+                    continue;
+                }
                 // Die erreichte Seite nimmt von der meldenden nur sie selbst oder sich als Führer
                 // an; die meldende sieht auch eine Übergabe an eine dritte Instanz (mehrere ELW an
                 // einem Hub), nimmt sie aber nur zur Anzeige oder mit Beweis an (unten).
@@ -665,34 +748,11 @@ pub async fn apply_eingang(
                 }
                 if !nimmt_mir {
                     let gewinne = m.fuehrer == ich.kennung && !ich_fuehre;
-                    let von = a.fuehrer_name.clone();
-                    uebernimm(&mut a, m);
                     if gewinne {
                         a.anfrage_at = None;
                         a.bruch_at = None;
                     }
-                    if a.offen.as_deref().is_some_and(|o| {
-                        serde_json::from_str::<AkteMeldung>(o).is_ok_and(|o| o.epoche <= m.epoche)
-                    }) {
-                        a.offen = None;
-                        a.offen_bruch_at = None;
-                    }
-                    repo::save(conn, &mut a, true).await?;
-                    repo::add_verlauf(
-                        conn,
-                        &a,
-                        VerlaufNeu {
-                            von_name: Some(&von),
-                            nach_name: &m.fuehrer_name,
-                            grund: grund_der(m).as_deref(),
-                            unterzeichner: unterzeichner_der(m).as_deref(),
-                            ..VerlaufNeu::default()
-                        },
-                    )
-                    .await?;
-                    if let Some(einsatz_id) = a.einsatz_id {
-                        aus.folgen.push(Folge::Kopf { einsatz_id });
-                    }
+                    folge_dem_absender(conn, &mut a, m, &mut aus).await?;
                     continue;
                 }
                 let bewiesen = match richtung {
@@ -954,6 +1014,48 @@ mod tests {
             entscheide(MeldetSich, Err("x".into())),
             Entscheid::Verwerfen("x".into())
         );
+    }
+
+    /// Tabelle aus design.md D4 (LLH-1497): Zeilen je Fall, beide Richtungen sind dieselbe Regel.
+    #[test]
+    fn annahmeregel_vor_ort_ueber_alle_zellen() {
+        use VorOrtEntscheid::*;
+        let (s, i, d) = ("sender", "ich", "dritte");
+        // Wechsel zwischen den beiden Seiten, in beide Richtungen.
+        assert_eq!(
+            entscheide_vor_ort(i, s, s, i),
+            Verwerfen,
+            "Sender nimmt mir die Führung"
+        );
+        assert_eq!(
+            entscheide_vor_ort(s, i, s, i),
+            Verwerfen,
+            "Sender gibt sie mir"
+        );
+        // Der bisherige Führer ist der Absender.
+        assert_eq!(
+            entscheide_vor_ort(s, d, s, i),
+            Annehmen,
+            "Abgabe an eine Dritte"
+        );
+        assert_eq!(
+            entscheide_vor_ort(s, s, s, i),
+            Annehmen,
+            "Sender führt weiter"
+        );
+        // Alles andere nur zur Anzeige.
+        assert_eq!(
+            entscheide_vor_ort(d, s, s, i),
+            NurAnzeige,
+            "Sender beansprucht von Dritter"
+        );
+        assert_eq!(entscheide_vor_ort(d, d, s, i), NurAnzeige);
+        assert_eq!(
+            entscheide_vor_ort(i, d, s, i),
+            NurAnzeige,
+            "meine Führung an eine Dritte"
+        );
+        assert_eq!(entscheide_vor_ort(i, i, s, i), NurAnzeige);
     }
 
     #[test]

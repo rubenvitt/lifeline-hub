@@ -361,3 +361,296 @@ async fn unter_fremdem_zertifikat_geht_nur_die_leere_rueckfrage_hinaus() {
         .await
         .contains(&"instanz_zertifikat_gewechselt".to_string()));
 }
+
+// ── Nebenwirkungen der Richtung (D2) ─────────────────────────────────────────────────────────
+
+async fn kennung_von(i: &Instanz) -> String {
+    eine(&i.pool, "SELECT kennung FROM instanz_identitaet").await
+}
+
+async fn abgleichen(i: &Instanz) {
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&i.pool, Some(&i.app), true)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn erst_vor_ort_dann_hub_die_stammdaten_kommen_nur_vom_hub() {
+    let (elw1, elw2) = vor_ort().await;
+    konto(&elw1, "nurelwa").await;
+    melden(&elw2).await;
+    let hub = instanz().await;
+    schluessel(&hub).await;
+    konto(&hub, "vomhub").await;
+    koppeln(&hub, &elw2).await;
+    melden(&elw2).await;
+    let namen: Vec<String> = sqlx::query_scalar("SELECT benutzername FROM benutzer ORDER BY id")
+        .fetch_all(&elw2.pool)
+        .await
+        .unwrap();
+    assert!(namen.contains(&"vomhub".to_string()), "{namen:?}");
+    assert!(!namen.contains(&"nurelwa".to_string()), "{namen:?}");
+    let quelle: i64 = eine(
+        &elw2.pool,
+        "SELECT COUNT(*) FROM stammdaten_herkunft h JOIN instanz_kopplung_org o \
+         ON o.id = h.kopplung_org_id JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE k.art = 'vor_ort'",
+    )
+    .await;
+    assert_eq!(quelle, 0, "nichts über die Direktkopplung übernommen");
+}
+
+#[tokio::test]
+async fn vor_ort_macht_die_org_nicht_verteilend_und_kennt_kein_elw_verloren() {
+    use lifeline_hub::instanz::stammdaten::geheimnis::is_org_verteilend;
+    let (elw1, _elw2) = vor_ort().await;
+    assert!(!is_org_verteilend(&elw1.pool, 1).await.unwrap());
+    let id = kopplungen(&elw1).await[0]["id"].as_i64().unwrap();
+    let (s, v) = common::anfrage(
+        &elw1.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{id}/verloren"),
+        &elw1.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    // Gegenprobe: eine Standardkopplung macht verteilend.
+    let (hub, _elw) = gekoppelt().await;
+    assert!(is_org_verteilend(&hub.pool, 1).await.unwrap());
+}
+
+async fn abschliessen_und_nachbereitung_vorbei(i: &Instanz, einsatz: i64) {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &i.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(i).await;
+    exec(
+        &i.pool,
+        &format!(
+            "UPDATE einsatz SET nachbereitung_bis = '2000-01-01 00:00:00' WHERE id = {einsatz}"
+        ),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn nur_vor_ort_gekoppelt_wird_nichts_verwahrt() {
+    let (elw1, elw2) = vor_ort().await;
+    let e = common::einsatz_anlegen_mit(&elw2.app, &elw2.admin, "Brand").await;
+    abgleichen(&elw2).await;
+    let k: String = eine(
+        &elw2.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let spiegel: bool = eine(
+        &elw1.pool,
+        &format!("SELECT spiegel FROM einsatz WHERE kennung = '{k}'"),
+    )
+    .await;
+    assert!(spiegel, "ELW 1 spiegelt über die Direktkopplung");
+    abschliessen_und_nachbereitung_vorbei(&elw2, e).await;
+    for _ in 0..3 {
+        abgleichen(&elw2).await;
+    }
+    let spiegel: bool = eine(
+        &elw1.pool,
+        &format!("SELECT spiegel FROM einsatz WHERE kennung = '{k}'"),
+    )
+    .await;
+    assert!(spiegel, "kein eigener Einsatz aus dem Spiegel");
+    let n: i64 = eine(
+        &elw2.pool,
+        &format!("SELECT COUNT(*) FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    assert_eq!(n, 1, "ELW 2 behält den Einsatz");
+}
+
+#[tokio::test]
+async fn mit_hub_und_vor_ort_geht_die_verwahrung_nur_an_den_hub() {
+    let (elw1, elw2) = vor_ort().await;
+    let hub = instanz().await;
+    schluessel(&hub).await;
+    koppeln(&hub, &elw2).await;
+    melden(&elw2).await;
+    let e = common::einsatz_anlegen_mit(&elw2.app, &elw2.admin, "Brand").await;
+    abgleichen(&elw2).await;
+    let k: String = eine(
+        &elw2.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    abschliessen_und_nachbereitung_vorbei(&elw2, e).await;
+    for _ in 0..3 {
+        abgleichen(&elw2).await;
+    }
+    let am_hub: bool = eine(
+        &hub.pool,
+        &format!("SELECT spiegel FROM einsatz WHERE kennung = '{k}'"),
+    )
+    .await;
+    assert!(!am_hub, "der Hub verwahrt");
+    let am_elw1: i64 = eine(
+        &elw1.pool,
+        &format!("SELECT COUNT(*) FROM einsatz WHERE kennung = '{k}' AND spiegel = 0"),
+    )
+    .await;
+    assert_eq!(am_elw1, 0, "ELW 1 nicht");
+}
+
+// ── Führung über eine Direktkopplung (D4) ────────────────────────────────────────────────────
+
+async fn fuehrung_an(instanzen: &[&Instanz]) {
+    for i in instanzen {
+        lifeline_hub::instanz::fuehrung::save_schalter(&i.pool, true)
+            .await
+            .unwrap();
+    }
+}
+
+async fn fuehrer(i: &Instanz, kennung: &str) -> String {
+    eine(
+        &i.pool,
+        &format!("SELECT fuehrer_kennung FROM einsatz_fuehrung WHERE kennung = '{kennung}'"),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn die_gegenstelle_vor_ort_kann_die_fuehrung_nicht_beanspruchen() {
+    let (elw1, elw2) = vor_ort().await;
+    fuehrung_an(&[&elw1, &elw2]).await;
+    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    melden(&elw2).await;
+    abgleichen(&elw2).await;
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let ich1 = kennung_von(&elw1).await;
+    let ich2 = kennung_von(&elw2).await;
+    assert_eq!(fuehrer(&elw2, &k).await, ich1);
+    // Die Route der Notübernahme an ELW 2 endet mit 409.
+    let s2: i64 = eine(
+        &elw2.pool,
+        &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
+    )
+    .await;
+    let (s, v) = common::anfrage_json(
+        &elw2.app,
+        "POST",
+        &format!("/api/einsaetze/{s2}/fuehrung/notuebernahme"),
+        &elw2.admin,
+        Some(&json!({"grund": "ELW 1 antwortet nicht"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(
+        v["error"].as_str().unwrap().contains("vor Ort gekoppelt"),
+        "{v}"
+    );
+    // ELW 2 behauptet trotzdem eine höhere Epoche mit sich als Führer.
+    exec(
+        &elw2.pool,
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1",
+    )
+    .await;
+    exec(
+        &elw2.pool,
+        &format!(
+            "UPDATE einsatz_fuehrung SET epoche_zaehler = epoche_zaehler + 5, \
+             epoche_instanz = '{ich2}', fuehrer_kennung = '{ich2}', fuehrer_name = 'ELW 2', \
+             stand = (SELECT fuehrung_stand FROM instanz_identitaet) WHERE kennung = '{k}'"
+        ),
+    )
+    .await;
+    melden(&elw2).await;
+    assert_eq!(fuehrer(&elw1, &k).await, ich1, "ELW 1 führt weiter");
+    let hinweis = kopplungen(&elw1).await[0]["hinweis"].clone();
+    assert!(
+        hinweis
+            .as_str()
+            .unwrap_or_default()
+            .contains("über eine Direktkopplung"),
+        "{hinweis}"
+    );
+    // Das Paneel zeigt die Gegenstelle mit ihrer Art.
+    let (s, v) = common::anfrage(
+        &elw1.app,
+        "GET",
+        &format!("/api/einsaetze/{e}/fuehrung"),
+        &elw1.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["gegenueber"][0]["art"], "vor_ort", "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw1.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &elw1.admin,
+        Some(&json!({"an": ich2})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}
+
+#[tokio::test]
+async fn gibt_der_fuehrer_an_den_hub_ab_folgt_die_akte_vor_ort() {
+    let hub = instanz().await;
+    let (elw1, elw2) = vor_ort().await;
+    schluessel(&hub).await;
+    koppeln(&hub, &elw1).await;
+    fuehrung_an(&[&hub, &elw1, &elw2]).await;
+    melden(&elw1).await;
+    melden(&elw2).await;
+    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    for _ in 0..2 {
+        melden(&elw1).await;
+        abgleichen(&elw1).await;
+        melden(&elw2).await;
+        abgleichen(&elw2).await;
+    }
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+    )
+    .await;
+    let ich_hub = kennung_von(&hub).await;
+    let (s, v) = common::anfrage_json(
+        &elw1.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        &elw1.admin,
+        Some(&json!({"an": ich_hub})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    melden(&elw1).await;
+    assert_eq!(fuehrer(&hub, &k).await, ich_hub);
+    // ELW 2 ist nur mit ELW 1 gekoppelt: es nimmt die Abgabe an, der Spiegel bleibt stehen.
+    melden(&elw2).await;
+    assert_eq!(fuehrer(&elw2, &k).await, ich_hub);
+    let hinweis: Option<String> = eine(
+        &elw2.pool,
+        &format!(
+            "SELECT s.hinweis FROM einsatz_spiegel s JOIN einsatz e ON e.id = s.einsatz_id \
+             WHERE e.kennung = '{k}'"
+        ),
+    )
+    .await;
+    assert_eq!(
+        hinweis.as_deref(),
+        Some("Die führende Instanz ist hier nicht gekoppelt.")
+    );
+}

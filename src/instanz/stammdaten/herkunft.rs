@@ -134,7 +134,9 @@ pub async fn save_merkmal(
 }
 
 /// Die Org-Zuordnung, aus der eine lokale Org ihre Stammdaten bezieht: die älteste aktive, in der
-/// diese Instanz sich meldet (D3). `None`, wenn die Org keine Quelle hat.
+/// diese Instanz sich meldet (D3), und nur über eine Kopplung, die Stammdaten trägt (LLH-1497:
+/// `traegt(Fluss::Stammdaten)`, eine Direktkopplung vor Ort nie). `None`, wenn die Org keine Quelle
+/// hat.
 pub async fn find_quelle(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -143,7 +145,7 @@ pub async fn find_quelle(
         "SELECT MIN(o.id) FROM instanz_kopplung_org o \
          JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE o.org_id = ? AND o.widerrufen_at IS NULL \
-           AND k.richtung = 'meldet_sich' AND k.zustand = 'aktiv'",
+           AND k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' AND k.art = 'standard'",
     )
     .bind(org_id)
     .fetch_one(&mut *conn)

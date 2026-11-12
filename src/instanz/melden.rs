@@ -922,7 +922,10 @@ pub async fn handle_meldung(
                         .sum();
                     stammdaten_budget.bytes =
                         stammdaten_budget.bytes.saturating_sub(unterschrift_bytes);
-                    let nach = if mo.stammdaten_stand < 0 {
+                    // Stammdaten und Geheimnisse nur über eine Kopplung, die sie trägt (LLH-1497).
+                    let nach = if mo.stammdaten_stand < 0
+                        || !kopplung.art().traegt(super::Fluss::Stammdaten)
+                    {
                         liefern::Nachlieferung::default()
                     } else {
                         liefern::nachlieferung(

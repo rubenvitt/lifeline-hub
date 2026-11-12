@@ -425,7 +425,10 @@ pub async fn handle_abgleich(
         abzuraeumen =
             lebensende::geloescht_uebernehmen(conn, kopplung, &anfrage.lebensende).await?;
         let mut lebensende_quittungen = Vec::new();
-        for l in &anfrage.lebensende {
+        // Verwahrung nur über eine Kopplung, die sie trägt (LLH-1497): vor Ort wird kein
+        // übergebener Einsatz angenommen.
+        let verwahrung = kopplung.art().traegt(crate::instanz::Fluss::Verwahrung);
+        for l in anfrage.lebensende.iter().filter(|_| verwahrung) {
             if let Some((q, umgewandelt)) =
                 lebensende::verwahrung_annehmen(conn, kopplung, l, &jetzt).await?
             {
@@ -517,8 +520,11 @@ pub async fn abgleich_einmal(
             let mut ziele: HashMap<String, i64> = ziele.into_iter().collect();
             // Zur Verwahrung fällige Einsätze (LLH-1494, D4) gehen auch hinaus, wenn das Gegenüber
             // sie noch nicht kennt (etwa ohne Netz angelegt und abgeschlossen).
-            let mut lebensende =
-                lebensende::faellige_verwahrungen(conn, &eigen.kennung, &orgs, &jetzt).await?;
+            let mut lebensende = if kopplung.art().traegt(crate::instanz::Fluss::Verwahrung) {
+                lebensende::faellige_verwahrungen(conn, &eigen.kennung, &orgs, &jetzt).await?
+            } else {
+                Vec::new()
+            };
             for l in &lebensende {
                 ziele.entry(l.kennung.clone()).or_insert(0);
             }

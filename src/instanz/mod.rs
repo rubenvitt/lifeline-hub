@@ -193,3 +193,70 @@ mod tests {
         assert_eq!(org_kennung("abc", 7), "abc/7");
     }
 }
+
+#[cfg(test)]
+mod art_tests {
+    use super::{Fluss, InstanzKopplungArt};
+
+    #[test]
+    fn standard_traegt_alles_vor_ort_nichts() {
+        for f in [
+            Fluss::Stammdaten,
+            Fluss::Geheimnisse,
+            Fluss::Verwahrung,
+            Fluss::Fuehrungswechsel,
+        ] {
+            assert!(InstanzKopplungArt::Standard.traegt(f), "{f:?}");
+            assert!(!InstanzKopplungArt::VorOrt.traegt(f), "{f:?}");
+        }
+    }
+
+    /// Wächter (LLH-1497, design.md D2): Jede Stelle, die einen Fluss auslöst oder annimmt, fragt
+    /// die Art der Kopplung. Verliert eine Stelle die Prüfung, wird dieser Test rot; eine neue
+    /// Stelle gehört in die Liste.
+    #[test]
+    fn jeder_fluss_hat_seine_pruefstellen() {
+        let stellen: &[(&str, &str, usize)] = &[
+            // Stammdaten: Quelle der meldenden Seite, Lieferung der erreichten Seite.
+            (
+                "src/instanz/stammdaten/herkunft.rs",
+                "k.art = 'standard'",
+                1,
+            ),
+            (
+                "src/instanz/melden.rs",
+                "traegt(super::Fluss::Stammdaten)",
+                1,
+            ),
+            // Geheimnisse: „verteilend“ (Passkey-Pflicht) und „ELW verloren“.
+            (
+                "src/instanz/stammdaten/geheimnis.rs",
+                "k.art = 'standard'",
+                1,
+            ),
+            ("src/routes/instanz.rs", "Fluss::Geheimnisse", 1),
+            // Verwahrung: anbieten (meldende Seite) und annehmen (erreichte Seite).
+            ("src/instanz/spiegel/abgleich.rs", "Fluss::Verwahrung", 2),
+            // Führungswechsel: Bedienung (Übergabe, Code, Anfrage, Notübernahme) und Austausch.
+            (
+                "src/instanz/fuehrung/dienst.rs",
+                "Fluss::Fuehrungswechsel",
+                1,
+            ),
+            (
+                "src/instanz/fuehrung/austausch.rs",
+                "InstanzKopplungArt::VorOrt",
+                1,
+            ),
+        ];
+        let wurzel = env!("CARGO_MANIFEST_DIR");
+        for (datei, nadel, mindestens) in stellen {
+            let text = std::fs::read_to_string(format!("{wurzel}/{datei}")).unwrap();
+            let n = text.matches(nadel).count();
+            assert!(
+                n >= *mindestens,
+                "{datei}: „{nadel}“ {n}-mal, erwartet mindestens {mindestens}"
+            );
+        }
+    }
+}

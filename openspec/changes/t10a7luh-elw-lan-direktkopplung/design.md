@@ -352,3 +352,16 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
 - **12.11.2026, Admin-Spur.** Zwei neue Aktionen (`instanz_zertifikat_gewechselt`,
   `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0330, Muster
   0317).
+- **12.11.2026, D4: eigene reine Funktion statt Parameter.** Die Regel steht als
+  `austausch::entscheide_vor_ort(bisher, neu, sender, ich)` neben `entscheide`, nicht als
+  zusätzlicher Parameter: Sie gilt vor allen richtungsabhängigen Zweigen und unabhängig von der
+  Richtung. Maßgeblich ist, ob der Absender bisher führte (nicht, wer die Epoche vergab); so gilt
+  auch eine Notübernahme durch den Hub, die der bisherige Führer bestätigt hat und vor Ort meldet.
+- **12.11.2026, D4: Spiegel ohne gekoppelten Führer.** Geht die Führung an eine Instanz, die hier
+  nicht gekoppelt ist, löst `spiegel::fuehrung::richte_aus` den Spiegel von der alten Kopplung
+  („Abgleich beendet“, „Die führende Instanz ist hier nicht gekoppelt.“). Vorher blieb er an der
+  alten Kopplung und fragte dort vergeblich nach. Wird der neue Führer später gekoppelt, hängt
+  sich der Spiegel wie bisher an.
+- **12.11.2026, D2: Prüfstellen in SQL.** `find_quelle` und `is_org_verteilend` filtern in SQL auf
+  `k.art = 'standard'`; der Wächter `instanz::art_tests::jeder_fluss_hat_seine_pruefstellen`
+  zählt sie mit.

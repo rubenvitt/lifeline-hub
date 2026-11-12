@@ -47,10 +47,21 @@ pub async fn richte_aus(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<
             let neu = kopplung_org_des_fuehrers(conn, &akte).await?;
             if neu.is_some() && neu != ko {
                 sqlx::query(
-                    "UPDATE einsatz_spiegel SET kopplung_org_id = ?, stand = 0, beendet_at = NULL \
-                     WHERE einsatz_id = ?",
+                    "UPDATE einsatz_spiegel SET kopplung_org_id = ?, stand = 0, beendet_at = NULL, \
+                     hinweis = NULL WHERE einsatz_id = ?",
                 )
                 .bind(neu)
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
+            } else if neu.is_none() && ko.is_some() {
+                // Die Führung ging an eine Instanz, die hier nicht gekoppelt ist (etwa über eine
+                // Direktkopplung bezeugt, LLH-1497): der Spiegel bleibt lesbar, der Abgleich endet.
+                sqlx::query(
+                    "UPDATE einsatz_spiegel SET kopplung_org_id = NULL, beendet_at = ?, \
+                     hinweis = 'Die führende Instanz ist hier nicht gekoppelt.' WHERE einsatz_id = ?",
+                )
+                .bind(crate::zeit::jetzt())
                 .bind(einsatz_id)
                 .execute(&mut *conn)
                 .await?;

@@ -1155,6 +1155,14 @@ pub async fn elw_verloren(
             "„ELW verloren“ gibt es nur an der Instanz, bei der sich der ELW meldet.".into(),
         ));
     }
+    // Über eine Direktkopplung gingen nie Geheimnisse (LLH-1497): nichts zu entwerten.
+    if !kopplung.art().traegt(crate::instanz::Fluss::Geheimnisse) {
+        return Err(AppError::Conflict(
+            "„ELW verloren“ gibt es nur an einer Standardkopplung: vor Ort gehen keine \
+             Passwörter über die Kopplung."
+                .into(),
+        ));
+    }
     // Nach einem normalen Widerruf bleibt die Aktion, solange dort gelieferte Geheimnisse
     // gelten; ein zweites Mal setzte sie wiederhergestellte Zugänge erneut zurück.
     if vorher.org.widerrufen_at.is_some() && vorher.org.stammdaten.konten_mit_geheimnis == 0 {

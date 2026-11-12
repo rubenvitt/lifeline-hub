@@ -16,7 +16,7 @@ Code.
 
 - [x] 1.1 Migration: `instanz_kopplung.art`, `instanz_kopplungscode.art` (Vorgabe `standard`, CHECK), `instanz_kopplung.tls_zertifikat`. Wire-Enum `InstanzKopplungArt` per `wire_enum!` mit Fällen in `tests/enum_wire_kontrakt.rs`. `PROTOKOLL = 3`. Prüfung: Test „bestehende Kopplung gilt als standard“ grün, `scripts/check-migrationen.sh` grün
 - [x] 1.2 Code ausstellen mit `art`. Ohne eigenes TLS → 409 mit Hinweis. `KoppelnAntwort.art`; die einlösende Seite übernimmt sie. Ein Code `vor_ort` an `protokoll < 3` → 426, ohne Verbrauch und ohne angebahnte Kopplung. Eine weitere Org mit anderer Art → 409. Prüfung: Integrationstests je Szenario aus Spec `instanz-kopplung` („Direktkopplung zweier ELW“, „ELW am Hub und vor Ort“, „Art passt nicht“, „Einlösende Seite zu alt“, „Ausstellen ohne eigenes TLS“)
-- [ ] 1.3 `InstanzKopplungArt::traegt(Fluss)` mit den Flüssen Stammdaten, Geheimnisse, Verwahrung und Führungswechsel. Unit-Test der Tabelle. Wächter-Test, der die Aufrufstellen je Fluss zählt (Liste aus D2). Prüfung: Wächter rot ohne Aufrufe, grün mit
+- [x] 1.3 `InstanzKopplungArt::traegt(Fluss)` mit den Flüssen Stammdaten, Geheimnisse, Verwahrung und Führungswechsel. Unit-Test der Tabelle. Wächter-Test, der die Aufrufstellen je Fluss zählt (Liste aus D2). Prüfung: Wächter rot ohne Aufrufe, grün mit
 - [x] 1.4 Admin-Spur: Art beim Ausstellen und Einlösen nennen. Prüfung: Test auf den Spur-Eintrag mit Art
 
 ## 2. Beglaubigtes Zertifikat (D3, D9)
@@ -30,15 +30,15 @@ Code.
 
 ## 3. Nebenwirkungen der Richtung auf `vor_ort` sperren (D2)
 
-- [ ] 3.1 Stammdaten: `find_quelle`, Liefern und Übernehmen nur über `standard`. Prüfung: Integrationstest „Erst vor Ort, dann Hub“ (Quelle ist der Hub, von ELW 1 kommt nichts)
-- [ ] 3.2 Geheimnisse und Passkey-Pflicht: `is_org_verteilend` nur über `standard`; „ELW verloren“ auf `vor_ort` → 409. Prüfung: Tests „Admin an ELW 1 mit Passwort“ und „Kein ELW verloren vor Ort“
-- [ ] 3.3 Verwahrung: `faellige_verwahrungen` nur für `standard`; die erreichte Seite lehnt `verwahrt` auf `vor_ort` ab. Prüfung: Integrationstests „Nachbereitung abgelaufen, ELW mit Hub und vor Ort“ und „Nur vor Ort gekoppelt“
+- [x] 3.1 Stammdaten: `find_quelle`, Liefern und Übernehmen nur über `standard`. Prüfung: Integrationstest „Erst vor Ort, dann Hub“ (Quelle ist der Hub, von ELW 1 kommt nichts)
+- [x] 3.2 Geheimnisse und Passkey-Pflicht: `is_org_verteilend` nur über `standard`; „ELW verloren“ auf `vor_ort` → 409. Prüfung: Tests „Admin an ELW 1 mit Passwort“ und „Kein ELW verloren vor Ort“
+- [x] 3.3 Verwahrung: `faellige_verwahrungen` nur für `standard`; die erreichte Seite lehnt `verwahrt` auf `vor_ort` ab. Prüfung: Integrationstests „Nachbereitung abgelaufen, ELW mit Hub und vor Ort“ und „Nur vor Ort gekoppelt“
 
 ## 4. Führung über eine Direktkopplung (D4)
 
-- [ ] 4.1 `entscheide` mit Art als Parameter, Tabelle aus D4 als reine Funktion mit Unit-Tests je Zeile und Richtung. Prüfung: Unit-Tests grün, bestehende Tests für `standard` unverändert grün
-- [ ] 4.2 `austausch`: Führungswechsel zwischen den Seiten einer Direktkopplung verwerfen, mit Hinweis an der Kopplung; eine Abgabe des bisherigen Führers an eine Dritte annehmen, und der Spiegel folgt (`richte_aus`). Prüfung: Integrationstests mit drei Instanzen „Gegenstelle beansprucht die Führung“, „ELW übergibt an den Hub“, „Neuer Führer hier nicht gekoppelt“
-- [ ] 4.3 `fuehrung::repo` (Ziele der Übergabe) und `fuehrung::dienst` (Anfrage, Notübernahme, Abgabecode) für Gegenstellen vor Ort sperren, 409. Prüfung: Tests „Notübernahme per Route“ und Übergabe-Ziele ohne Gegenstelle vor Ort; „Einsätze beim Gegenüber“ zeigt den Einsatz weiter
+- [x] 4.1 `entscheide` mit Art als Parameter, Tabelle aus D4 als reine Funktion mit Unit-Tests je Zeile und Richtung. Prüfung: Unit-Tests grün, bestehende Tests für `standard` unverändert grün
+- [x] 4.2 `austausch`: Führungswechsel zwischen den Seiten einer Direktkopplung verwerfen, mit Hinweis an der Kopplung; eine Abgabe des bisherigen Führers an eine Dritte annehmen, und der Spiegel folgt (`richte_aus`). Prüfung: Integrationstests mit drei Instanzen „Gegenstelle beansprucht die Führung“, „ELW übergibt an den Hub“, „Neuer Führer hier nicht gekoppelt“
+- [x] 4.3 `fuehrung::repo` (Ziele der Übergabe) und `fuehrung::dienst` (Anfrage, Notübernahme, Abgabecode) für Gegenstellen vor Ort sperren, 409. Prüfung: Tests „Notübernahme per Route“ und Übergabe-Ziele ohne Gegenstelle vor Ort; „Einsätze beim Gegenüber“ zeigt den Einsatz weiter
 
 ## 5. Ursprungskennung (D5)
 
