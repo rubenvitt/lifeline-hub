@@ -1,0 +1,237 @@
+# Baut mit Ziel-Branch (LLH-1849) — Pflicht-Check: ein fertiger PR kompiliert zusammen mit dem
+# AKTUELLEN Stand seines Ziel-Branches.
+#
+# WARUM: `ci.yml` prüft einen PR gegen den Stand des Ziel-Branches beim letzten Push. Am 12.11.2026
+# waren #1319 (neuer Parameter) und #1315 (Test mit alter Signatur) einzeln grün und brachen
+# `alpha` zusammen. Eine Merge Queue gibt es für Repositories eines Benutzerkontos nicht. Dieser
+# Workflow rechnet deshalb bei jeder Bewegung des Ziel-Branches für jeden fertigen PR neu, und
+# zwar nur das Kompilieren (Backend mit allen Zielen, Frontend-Typprüfung, `check-all.sh --nur
+# baut`): wenige Minuten statt der vollen Suiten.
+#
+# WANN: Ein PR ist fertig wie für die zweite Stufe (`e2e.yml`): Auto-Merge an oder Label `e2e`.
+#   - PR-Ereignis an einem fertigen PR: er rechnet gegen die Spitze des Ziel-Branches.
+#   - Push auf einen Kanal-Branch: jeder fertige PR rechnet neu; ein nicht fertiger, der den Check
+#     trägt, bekommt ihn auf „wartet“ und rechnet, sobald er fertig wird.
+#   Vorher fehlt der Check, und der PR ist nicht mergebar (Required Check im Ruleset 17017911).
+#
+# DER CHECK ENTSTEHT ÜBER DIE CHECKS-API, NICHT ALS JOB-NAME: Ein Push muss ihn an vielen
+# PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün (Kopf von `e2e.yml`).
+# `auswahl` setzt ihn sofort auf „läuft“, damit kein altes Grün mergt, während gerechnet wird;
+# `melden` schließt ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand
+# stehen (sonst „überholt“, den neuen Stand meldet dessen eigener Lauf).
+#
+# PR-CODE LÄUFT NUR IN `kompilieren` (Build-Skripte, Makros), auch bei einem Push auf `alpha`:
+#   - nur `contents: read`, keine Secrets; der Checkout legt keine Zugangsdaten ab, das Token
+#     bekommt nur der `git fetch` des PR-Kopfes als Umgebung seines Schritts;
+#   - kein Cache wird geschrieben (rust-cache `save-if: false`, nur `actions/cache/restore`, mise
+#     ohne Cache): ein Push-Lauf speichert in den Bereich des Kanal-Branches, und ein vergifteter
+#     Cache landete im Release-Build;
+#   - das Ergebnis geht als Artefakt an `melden`, das es nur als Text liest.
+# `auswahl` und `melden` führen keinen PR-Code aus. Die Form hält `scripts/ziel-branch-build.test.sh`
+# fest; Auswahl und Meldung stehen in `scripts/ziel-branch-build.sh`.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Baut mit Ziel-Branch
+
+on:
+  pull_request:
+    branches: [main, beta, alpha]
+    types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled, labeled]
+  push:
+    branches: [main, beta, alpha]
+
+permissions:
+  contents: read
+
+# Je PR bzw. je Kanal-Branch: ein neuer Kopf oder ein neuer Stand macht den laufenden Lauf wertlos.
+# Ein abgebrochener Lauf hinterlässt seinen Check auf „läuft“; der neue Lauf legt einen jüngeren an.
+concurrency:
+  group: ziel-branch-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auswahl:
+    name: Auswahl
+    # Forks bekämen nur ein Lese-Token, und ihr Check soll nie grün werden.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    outputs:
+      liste: ${{ steps.auswahl.outputs.liste }}
+      ziel: ${{ steps.auswahl.outputs.ziel }}
+      ziel_sha: ${{ steps.auswahl.outputs.ziel_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fertige PRs wählen, Check setzen
+        id: auswahl
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EREIGNIS: ${{ github.event_name }}
+          PR_NR: ${{ github.event.pull_request.number }}
+          PR_ZIEL: ${{ github.event.pull_request.base.ref }}
+          PUSH_ZIEL: ${{ github.ref_name }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EREIGNIS" = push ]; then
+            ziel="$PUSH_ZIEL" ziel_sha="$PUSH_SHA"
+            liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha")"
+          else
+            ziel="$PR_ZIEL"
+            ziel_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$ziel" --jq .object.sha)"
+            liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"
+          fi
+          echo "Rechnen: $liste"
+          { echo "ziel=$ziel"; echo "ziel_sha=$ziel_sha"; echo "liste=$liste"; } >> "$GITHUB_OUTPUT"
+
+  kompilieren:
+    name: Kompilieren (#${{ matrix.pr.nr }})
+    needs: auswahl
+    if: ${{ needs.auswahl.outputs.liste != '' && needs.auswahl.outputs.liste != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # PR-Code läuft hier: nur lesen (Kopf).
+    permissions:
+      contents: read
+    strategy:
+      # Jeder PR für sich: ein roter darf den anderen das Ergebnis nicht nehmen.
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        pr: ${{ fromJSON(needs.auswahl.outputs.liste) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.auswahl.outputs.ziel_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: PR mit dem Ziel-Branch zusammenführen
+        id: merge
+        env:
+          NR: ${{ matrix.pr.nr }}
+          KOPF: ${{ matrix.pr.kopf }}
+          # Nur für den Fetch; nie auf der Platte, und die Schritte mit PR-Code sehen es nicht.
+          LESE_TOKEN: ${{ github.token }}
+        run: |
+          erg="$RUNNER_TEMP/ergebnis"
+          mkdir -p "$erg"
+          git config user.name "Baut mit Ziel-Branch"
+          git config user.email "baut-mit-ziel-branch@users.noreply.github.com"
+          kopfzeile="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$LESE_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=$kopfzeile" fetch --no-tags origin \
+            "+refs/pull/$NR/head:refs/remotes/pr/$NR"
+          if [ "$(git rev-parse "refs/remotes/pr/$NR")" != "$KOPF" ]; then
+            echo veraltet > "$erg/ergebnis"
+            echo "weiter=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git merge --no-edit --no-ff "refs/remotes/pr/$NR" > "$erg/ausgabe" 2>&1; then
+            cat "$erg/ausgabe"
+            echo konflikt > "$erg/ergebnis"
+            echo "weiter=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "weiter=true" >> "$GITHUB_OUTPUT"
+      # Nur bei Bedarf aufräumen (s. Schnellprüfungen in ci.yml).
+      - name: Plattenplatz schaffen (nur bei Bedarf)
+        if: steps.merge.outputs.weiter == 'true'
+        run: |
+          df -h /
+          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+          if [ "$frei_gb" -ge 40 ]; then
+            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
+            exit 0
+          fi
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          df -h /
+      # Wie in der Rust-Suite: die Hülle braucht GTK und WebKit.
+      - name: System-Werkzeuge für die nativen Crates
+        if: steps.merge.outputs.weiter == 'true'
+        env:
+          APT_FRIST_SEK: "600"
+        run: >-
+          ./scripts/apt-pakete.sh nasm
+          libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+          librsvg2-dev libayatana-appindicator3-dev
+      - name: Rust-Toolchain (stable)
+        if: steps.merge.outputs.weiter == 'true'
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      # Liest den Eintrag der Rust-Suite, schreibt nie (Kopf).
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.merge.outputs.weiter == 'true'
+        with:
+          shared-key: rust-openssl-vendored
+          save-if: false
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        if: steps.merge.outputs.weiter == 'true'
+        with:
+          version: 2026.9.1
+          cache: false
+      - name: pnpm-Store-Pfad ermitteln
+        if: steps.merge.outputs.weiter == 'true'
+        id: pnpm
+        run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.merge.outputs.weiter == 'true'
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Frontend-Abhängigkeiten
+        if: steps.merge.outputs.weiter == 'true'
+        run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      - name: Kompilieren
+        if: steps.merge.outputs.weiter == 'true'
+        run: |
+          erg="$RUNNER_TEMP/ergebnis"
+          code=0
+          ./scripts/check-all.sh --nur baut > "$erg/ausgabe" 2>&1 || code=$?
+          cat "$erg/ausgabe"
+          if [ "$code" = 0 ]; then echo gruen > "$erg/ergebnis"; else echo rot > "$erg/ergebnis"; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: baut-${{ matrix.pr.nr }}
+          path: ${{ runner.temp }}/ergebnis
+          retention-days: 3
+
+  melden:
+    name: Melden
+    needs: [auswahl, kompilieren]
+    if: ${{ !cancelled() && needs.auswahl.outputs.liste != '' && needs.auswahl.outputs.liste != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Fehlt ein Artefakt (Kompilierlauf abgebrochen), meldet `melden` „kein Ergebnis“, also rot.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/ergebnisse
+          pattern: baut-*
+      - name: Checks schließen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LISTE: ${{ needs.auswahl.outputs.liste }}
+          ZIEL: ${{ needs.auswahl.outputs.ziel }}
+          ZIEL_SHA: ${{ needs.auswahl.outputs.ziel_sha }}
+        run: |
+          # Ein Fehler an einem PR hält die übrigen nicht auf; der Schritt wird am Ende trotzdem rot.
+          fehler=0
+          while IFS=$'\t' read -r nr kopf id; do
+            d="$RUNNER_TEMP/ergebnisse/baut-$nr"
+            ergebnis="$(cat "$d/ergebnis" 2> /dev/null || true)"
+            scripts/ziel-branch-build.sh melden "$nr" "$kopf" "$id" "$ZIEL" "$ZIEL_SHA" "$ergebnis" "$d/ausgabe" \
+              || { echo "::warning::PR #$nr: Meldung gescheitert"; fehler=1; }
+          done < <(jq -r '.[] | [.nr, .kopf, .check_id] | @tsv' <<< "$LISTE")
+          exit "$fehler"

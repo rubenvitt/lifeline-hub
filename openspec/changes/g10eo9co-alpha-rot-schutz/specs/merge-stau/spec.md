@@ -41,16 +41,16 @@ die Zuständigkeit je volle Stunde seit dem ersten roten Lauf zum nächsten dies
 - **THEN** ist der ältere zuständig, und der jüngere trägt einen Hinweis, dass er doppelt ist
 
 ### Requirement: Bei rotem alpha trägt jeder offene PR einen Hinweis dazu
-Ist `alpha` rot, MUST jeder offene PR gegen `alpha`, der kein Entwurf ist, einen Hinweis tragen,
-der die vermutliche Ursache und die fehlgeschlagenen Prüfungen nennt. Dem Zuständigen ohne Label
-MUST er auftragen, den Fix in einem eigenen PR von `alpha` mit Label `alpha-rot` zu bauen; allen
-übrigen MUST er sagen, wer sich kümmert und dass sie nicht selbst reparieren. Dieser Hinweis MUST
-neben einem Hinweis zum PR stehen und ihn nicht verdrängen; sonst gelten die Regeln des
-Konflikt-Hinweises.
+Ist `alpha` rot, MUST jeder offene PR gegen `alpha` ohne Entwurf einen Hinweis mit Ursache und
+roten Prüfungen tragen. Dem Zuständigen ohne Label trägt er auf, den Fix in einem eigenen PR von
+`alpha` mit Label `alpha-rot` zu bauen; den übrigen sagt er, nicht selbst zu reparieren, und nennt
+den Fix-PR, sobald es ihn gibt. Er MUST neben dem Hinweis zum PR stehen, ohne ihn zu verdrängen;
+sonst gelten die Regeln des Konflikt-Hinweises.
 
 #### Scenario: PR ist nicht zuständig
-- **WHEN** `alpha` rot ist und #1318 nicht zuständig ist
-- **THEN** trägt #1318 einen Hinweis, der den zuständigen PR nennt und sagt, dass #1318 nichts reparieren soll
+- **WHEN** `alpha` rot ist, #1318 nicht zuständig ist und ein Fix-PR mit Label `alpha-rot` offen ist
+- **THEN** trägt #1318 einen Hinweis, der den Fix-PR nennt und sagt, dass #1318 nichts reparieren soll
+
 
 #### Scenario: PR trägt schon einen Konflikt-Hinweis
 - **WHEN** `alpha` rot wird und PR B schon einen Konflikt-Hinweis trägt
@@ -63,6 +63,15 @@ Konflikt-Hinweises.
 #### Scenario: Befund unverändert
 - **WHEN** der Wächter erneut läuft und Ursache, Zuständiger und fehlgeschlagene Prüfungen gleich sind
 - **THEN** entsteht kein weiterer Kommentar
+
+### Requirement: Eine Rotation weckt keinen wartenden PR
+Wechselt die Zuständigkeit ohne Fix-PR, MUST nur an den PRs ein neuer Kommentar entstehen, deren
+Rolle sich ändert (der bisherige und der neue Zuständige). Ein PR, der vorher und nachher wartet,
+MUST seinen Hinweis unverändert behalten.
+
+#### Scenario: Zuständigkeit rotiert, PR wartet
+- **WHEN** ohne Fix-PR die Zuständigkeit nach einer Stunde von #1314 zu #1318 wechselt und #1322 wartet
+- **THEN** bekommen #1314 und #1318 einen neuen Kommentar, #1322 keinen
 
 ### Requirement: Nach dem Fix bekommen rote PRs alpha hineingemergt
 Ist `alpha` wieder grün, MUST jeder Hinweis zu „alpha rot“ das als behoben zeigen. In jeden PR mit

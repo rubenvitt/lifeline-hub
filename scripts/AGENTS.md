@@ -7,9 +7,11 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-auswahl.test.sh` + `ci-stufen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-auswahl.test.sh` + `ci-stufen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
+Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) für den Check „Baut mit
+Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
 - **Im PR laufen nur die betroffenen Suiten** (LFH-1111/1115): `scripts/bereiche.sh` ordnet
   jede geänderte Datei den Suiten Rust, Frontend und e2e zu, `scripts/ci-auswahl.sh` (Job
   `aenderungen` beider Stufen) und `check-all.sh --geaendert` fragen beide nur dieses Skript;
@@ -63,12 +65,35 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
     (`e2e-Auswahl`) gerade läuft; je Name zählt wie bei den Required Checks der jüngste
     Check-Run, auch für „grün“.
   - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
-  - **Ein Hinweis je PR** (Marke `<!-- stau-waechter:<art>:<kennung> -->`): gleicher Befund
-    schreibt nichts, neuer löscht und legt neu an, behobener ändert auf „behoben“. Wer eine Art
-    hinzufügt, ergänzt Skriptkopf, Selbsttest und die Spec `merge-stau`.
+  - **alpha rot** (LLH-1849; zusätzlich ausgelöst, wenn ein CI-Lauf auf `alpha` fertig ist):
+    schlägt im jüngsten abgeschlossenen Push-Lauf von `ci.yml` auf `alpha` ein Job außer dem
+    Release fehl, ist **genau ein** offener PR zuständig: der mit Label `alpha-rot` (bei mehreren
+    der älteste, die übrigen `doppelt`), sonst der älteste ohne Entwurf, Fork und Dependabot,
+    ohne Fix-PR je volle Stunde seit dem ersten Rot der nächste. Er bekommt den Auftrag, alle
+    übrigen den Hinweis, nicht selbst zu reparieren (den Fix-PR nennen sie erst, wenn es einen
+    gibt: die Rotation soll keine wartende Sitzung wecken). Ist `alpha` wieder grün, wird der
+    Hinweis „behoben“, und an einem PR, dessen jüngster CI-Lauf rot ist, mergt die Release-App
+    `alpha` hinein (Grenzen wie bei „Kein CI-Lauf“; nicht bei Konflikt, nicht, wenn der grüne
+    Stand schon im Branch ist). Was die Sitzung tut: `dev-zunder-ausfuehren`, „alpha rot“.
+  - **Ein Hinweis je PR und Marke** (`<!-- stau-waechter:<art>:<kennung> -->` zum PR,
+    `<!-- stau-waechter-alpha:<art>:<kennung> -->` zu „alpha rot“, die beiden verdrängen sich
+    nicht): gleicher Befund schreibt nichts, neuer löscht und legt neu an, behobener ändert auf
+    „behoben“. Wer eine Art hinzufügt, ergänzt Skriptkopf, Selbsttest und die Spec `merge-stau`.
   - Kein Schritt führt PR-Code aus. `--nur-zeigen` nennt Befund und Aktion, ohne zu schreiben,
-    auch lokal: `GITHUB_REPOSITORY=<owner>/<repo> scripts/stau-waechter.sh --nur-zeigen alle`.
-  - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`.
+    auch lokal: `GITHUB_REPOSITORY=<owner>/<repo> scripts/stau-waechter.sh --nur-zeigen alle`
+    (oder `alpha` für nur diesen Befund).
+  - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`, für
+    „alpha rot“ das Archiv der Change `g10eo9co-alpha-rot-schutz`.
+- **Baut mit Ziel-Branch** (LLH-1849, `.github/workflows/ziel-branch-build.yml`,
+  `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an oder Label
+  `e2e`): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert (`check-all.sh --nur
+  baut`). Bei jedem Push auf einen Kanal-Branch rechnet er für jeden fertigen PR neu; ein nicht
+  fertiger mit Check bekommt ihn auf „wartet“. Der Check entsteht über die Checks-API, nie als
+  Job-Name (ein übersprungener Job meldete grün), und steht sofort auf „läuft“, damit kein altes
+  Grün mergt. **PR-Code läuft nur im Job `kompilieren`**, auch bei einem Push auf `alpha`: dort
+  nur `contents: read`, keine Secrets, kein gespeicherter Zugang, kein Cache, der gespeichert
+  wird. `auswahl` und `melden` führen keinen PR-Code aus. Die Form hält
+  `scripts/ziel-branch-build.test.sh` (Schritt 11) fest; wer den Workflow ändert, zieht ihn mit.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,

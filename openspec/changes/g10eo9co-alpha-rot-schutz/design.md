@@ -65,11 +65,12 @@ Verworfen:
 ### D2 Kompilieren und Melden sind getrennte Jobs
 
 Der Kompilier-Job führt PR-Code aus (Build-Skripte, Makros). Er läuft mit `permissions: contents:
-read`, ohne Secrets, und schreibt keinen Cache, den Läufe auf `alpha` lesen: Bei Push-Läufen steht
-`rust-cache` auf `save-if: false`, weil der Cache-Scope dort der Kanal-Branch ist und ein
-vergifteter Cache sonst im Release-Build landete. Er gibt nur sein Ergebnis aus (grün, rot, Konflikt
-und eine gekürzte Fehlerausgabe). Der Melde-Job (`checks: write`) checkt keinen PR-Code aus und
-schreibt den Check.
+read`, ohne Secrets und ohne gespeicherte Zugangsdaten (das Token bekommt nur der Fetch des
+PR-Kopfes als Umgebung seines Schritts), und er speichert keinen Cache: `rust-cache` mit
+`save-if: false`, nur `actions/cache/restore`, mise ohne Cache. Ein Push-Lauf speichert in den
+Bereich des Kanal-Branches, und ein vergifteter Cache landete sonst im Release-Build. Er liest den
+Cache der Rust-Suite. Sein Ergebnis (grün, rot, Konflikt, veraltet und die Ausgabe) geht als
+Artefakt an den Melde-Job (`checks: write`), der keinen PR-Code ausführt und den Check schreibt.
 
 Bevor der Melde-Job ein Ergebnis schreibt, prüft er, ob Kopf-Commit des PRs und Ziel-Branch noch auf
 dem gerechneten Stand stehen. Wenn nicht, schreibt er nichts; der Lauf zum neueren Stand schreibt
@@ -110,11 +111,13 @@ braucht Lesen, Parsen und Schreiben über mehrere Läufe und bricht bei jedem Au
 ### D6 Eigene Marke für den Hinweis
 
 Die Hinweise zu „alpha rot“ tragen die Marke `<!-- stau-waechter-alpha:<art>:<kennung> -->`, die
-Arten `zustaendig`, `wartet`, `doppelt`, `behoben` und `angestossen`. `hinweis_lesen` und
-`hinweis_setzen` bekommen die Marke als Parameter; die Regeln (ein Hinweis je Marke, gleicher Befund
-schreibt nichts, neuer löscht und legt neu an, behobener wird geändert, nur eigene Kommentare)
-bleiben dieselben. Die Kennung hasht Art, ersten roten Lauf, Zuständigen, Ursache und
-fehlgeschlagene Jobs. Der zuständige Fix-PR selbst bekommt keinen Hinweis.
+Arten `fix`, `zustaendig`, `wartet`, `doppelt`, `behoben` und `angestossen`. `hinweis_lesen` und
+`hinweis_setzen` lesen die Marke aus einer lokal gesetzten Variablen; die Regeln (ein Hinweis je
+Marke, gleicher Befund schreibt nichts, neuer löscht und legt neu an, behobener wird geändert, nur
+eigene Kommentare) bleiben dieselben. Die Kennung hasht Art, ersten roten Lauf, Ursache und
+fehlgeschlagene Jobs, bei `wartet` den Fix-PR, aber **nicht** den rotierenden Zuständigen: sonst
+weckte jede Stunde jede wartende Sitzung (beim Bau bemerkt, Spec entsprechend gefasst). Der Fix-PR
+bekommt eine kurze Bestätigung (`fix`), damit seine Sitzung weiß, dass die übrigen warten.
 
 ### D7 Nach dem Fix: hineinmergen wie bei „ohne CI“
 
