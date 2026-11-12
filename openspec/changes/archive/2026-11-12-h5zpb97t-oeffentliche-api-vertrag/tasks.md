@@ -74,7 +74,7 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 - [x] 4.1 `src/AGENTS.md`: Abschnitt „Backend — Öffentliche API v1 (LLH-1653)“ nach D5; die Zeile
   für `src/AGENTS.md` in der Tabelle der Wurzel-`AGENTS.md` um „Öffentliche API v1“ ergänzen.
   Prüfen: Wurzeldatei unter 200 Zeilen.
-- [ ] 4.2 Architektur:
+- [x] 4.2 Architektur:
   - Kapitel 5 bekommt eine Zeile für `src/public_api/`, Kapitel 8 einen kurzen Querschnitt mit
     Verweis auf ADR-0022.
   - In ADR-0022 kommt `src/public_api/**` in `gilt_fuer`.
@@ -83,11 +83,11 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 
 ## 5. Zusammen prüfen
 
-- [ ] 5.1 Verifikation (`superpowers:verification-before-completion`): `cargo fmt --check`,
+- [x] 5.1 Verifikation (`superpowers:verification-before-completion`): `cargo fmt --check`,
   `cargo test` für die berührten Tests, `scripts/check-typ-codegen.sh`, `scripts/check-all.sh`
   in den Bündeln, die der Diff berührt. Rote Schritte, die nicht am Diff liegen, mit Grund
   festhalten; der volle Lauf geschieht in der CI des PRs.
-- [ ] 5.2 Review vor dem PR (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde
+- [x] 5.2 Review vor dem PR (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde
   behandelt, Verbleib für den Abschnitt „Review“ im PR festgehalten.
 
 ## Workflow follow-up
