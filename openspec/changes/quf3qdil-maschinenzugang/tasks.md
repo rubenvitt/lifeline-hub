@@ -146,7 +146,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 7. Seite „Anbindungen“
 
-- [ ] 7.1 Design-Entwurf mit `/design` auf Grundlage des Design Systems „Lifeline Hub“ unter
+- [x] 7.1 Design-Entwurf mit `/design` auf Grundlage des Design Systems „Lifeline Hub“ unter
   `docs/design/<datum>-anbindungen/` (`frontend/AGENTS.md`, „Größere UI-Entwürfe über das Design
   System“). Verifizieren: Der Entwurf zeigt Liste, Anlegen, Code-Dialog, Ablehnungsgrund und den
   gesperrten Zustand (D10).

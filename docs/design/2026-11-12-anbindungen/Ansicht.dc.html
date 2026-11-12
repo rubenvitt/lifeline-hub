@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Anbindung, Ansicht</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:1280px;height:800px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:44px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:12px;padding:0 12px 0 0;box-sizing:border-box;flex-shrink:0}
+.markenzelle{width:56px;height:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.marke{width:14px;height:14px;background:#a8071a}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.koerper{display:flex;flex:1;min-height:0}
+.nav{width:220px;border-right:1px solid #22262b;background:#0a0c0e;padding:16px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.augenbraue{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab;padding:10px 16px 6px}
+.navlink{display:block;padding:7px 16px;font-size:13px;color:#c6ccd2;text-decoration:none;border-left:2px solid transparent}
+.navlink.aktiv{background:#16191d;color:#e8ebee;border-left-color:#4d94d6}
+.inhalt{flex:1;min-width:0;padding:0 24px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.seitenkopf{height:56px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #22262b}
+h1{margin:0;font-size:18px;font-weight:600}
+.meta{font-size:12px;color:#9aa2ab}
+.platz{flex:1}
+.knopf{height:30px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;border:1px solid #626a73;background:transparent;color:#e8ebee;cursor:pointer}
+.knopf.gefahr{border-color:#ff6b6b;color:#ff6b6b}
+.paneel{background:#0a0c0e;border:1px solid #2e343a}
+.paneelkopf{height:36px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #22262b;gap:8px}
+h2{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#9aa2ab}
+.raster{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:#22262b}
+.feld{background:#0a0c0e;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-height:52px}
+.etikett{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9aa2ab}
+.wert{font-size:13px}
+.wire{font-family:"LFH Mono",monospace;font-size:11px;color:#838b94}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;font-size:12px;border:1px solid;align-self:flex-start}
+.chip.ok{background:#0d1a0a;color:#7ddc4a;border-color:#52c41a}
+.band{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:#1c1705;border:1px solid #e8cc3a;color:#e8cc3a;font-size:13px}
+.band p{margin:0;color:#e8ebee}
+.zeit{color:#838b94;font-size:12px}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <div class="markenzelle"><div class="marke"></div></div>
+    <span style="font-size:13px;font-weight:600">Verwaltung</span>
+    <span class="meta">DRK Kreisverband Musterstadt</span>
+  </div>
+  <div class="koerper">
+    <nav class="nav" aria-label="Verwaltung">
+      <div class="augenbraue">Einstellungen</div>
+      <a class="navlink" href="#">Organisation</a>
+      <a class="navlink" href="#">Anmeldewege</a>
+      <a class="navlink" href="#">Lagemonitore</a>
+      <a class="navlink aktiv" href="Main.dc.html" aria-current="page">Anbindungen</a>
+      <a class="navlink" href="#">Instanzkopplung</a>
+    </nav>
+    <main class="inhalt">
+      <div class="seitenkopf">
+        <a href="Main.dc.html" class="meta" style="text-decoration:none">Anbindungen ›</a>
+        <h1>Einsatzbuch iuk-suite</h1>
+        <span class="chip ok">aktiv</span>
+        <div class="platz"></div>
+        <button class="knopf" type="button">Bearbeiten</button>
+        <button class="knopf" type="button">Neuer Code (Schlüssel wechseln)</button>
+        <button class="knopf gefahr" type="button">Widerrufen</button>
+      </div>
+      <div class="band" role="status">
+        <strong style="white-space:nowrap">Letzte Ablehnung</strong>
+        <p>Uhr des Fremdsystems geht <strong class="mono">7 min</strong> nach (erlaubt sind 5 min). Das Fremdsystem bekommt nur „Anmeldung fehlgeschlagen“. <span class="mono zeit">12.11.2026 10:38</span></p>
+      </div>
+      <section class="paneel" aria-labelledby="angaben">
+        <div class="paneelkopf"><h2 id="angaben">Zugang</h2></div>
+        <div class="raster">
+          <div class="feld"><span class="etikett">Rechte</span><span class="wert">Einsätze lesen <span class="wire">einsaetze:read</span></span><span class="wert">Ereignisse abrufen <span class="wire">events:read</span></span></div>
+          <div class="feld"><span class="etikett">Gültig bis</span><span class="wert">unbegrenzt</span></div>
+          <div class="feld"><span class="etikett">Zuletzt genutzt</span><span class="wert mono">12.11.2026 10:12</span></div>
+          <div class="feld"><span class="etikett">Schlüssel</span><span class="wert mono">9KQ3-HV2T-6PNE-0D1M-XW4R-B7CJ-Q5ZA-T8KG</span></div>
+          <div class="feld"><span class="etikett">Neuer Schlüssel</span><span class="wert mono">4MZT-1EXB-…</span><span class="zeit">eingelöst, gilt ab der ersten Anfrage damit</span></div>
+          <div class="feld"><span class="etikett">Kennung</span><span class="wert mono" style="font-size:12px">0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12</span></div>
+          <div class="feld"><span class="etikett">Angelegt</span><span class="wert"><span class="mono">01.11.2026 09:14</span> · R. Vitt</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
