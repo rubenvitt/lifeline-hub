@@ -6,6 +6,7 @@ import { renderMitProviders, setzeOnline } from '../test/utils';
 import FuehrungPaneel from './FuehrungPaneel';
 import type { FuehrungAnzeige } from '../api/types';
 import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
+import { ApiError } from '../api/client';
 
 vi.mock('../api/fuehrung', () => ({
   bestaetigeUebernahme: vi.fn(),
@@ -206,6 +207,30 @@ describe('FuehrungPaneel (LLH-1491)', () => {
       ),
     ).toBeInTheDocument();
     expect(uebernimmFuehrung).not.toHaveBeenCalled();
+  });
+
+  it('eine abgelehnte Notübernahme zeigt den Text des Servers im Dialog und behält den Grund (LLH-1702)', async () => {
+    const ablehnung =
+      'Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den Grund kürzen.';
+    vi.mocked(uebernimmFuehrung).mockRejectedValue(new ApiError(422, ablehnung));
+    renderMitProviders(
+      <FuehrungPaneel
+        fuehrung={akte({
+          fuehrend: false,
+          fuehrer_name: 'Hub Nord',
+          fuehrer_kennung: 'k-hub',
+          fuehrer_richtung: 'meldet_sich',
+        })}
+        darfBedienen
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Grund');
+    await userEvent.type(feld, 'Hub weg');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
+    expect(await within(dialog).findByText(ablehnung)).toBeInTheDocument();
+    expect(feld).toHaveValue('Hub weg');
   });
 
   it('Notübernahme gegen die meldende Seite mit dem Code des Gegenübers', async () => {

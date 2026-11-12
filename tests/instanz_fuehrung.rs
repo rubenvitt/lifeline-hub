@@ -4174,3 +4174,215 @@ async fn lauter_uebersprungene_akten_loesen_keine_sofortige_meldung_aus() {
     let h = hinweis(&hub).await.unwrap_or_default();
     assert!(h.contains("geht nicht an"), "{h:?}");
 }
+
+// ── Größe der Erklärung (LLH-1702) ───────────────────────────────────────────────────────────
+
+/// Größte Erklärung, die das Gegenüber an einer Akte annimmt (`austausch::ERKLAERUNG_MAX`, dort
+/// nicht öffentlich). Die Tests rechnen bewusst mit der Zahl der Spec `instanz-fuehrung`: ändert
+/// jemand die Konstante, fällt der Unterschied hier auf.
+const ERKLAERUNG_BYTES: usize = 4096;
+
+/// Byte eines Texts in JSON, ohne die Anführungszeichen (Steuerzeichen als `\u00XX`).
+fn json_bytes(s: &str) -> usize {
+    serde_json::to_string(s).unwrap().len() - 2
+}
+
+/// Ein Grund, der in JSON genau `bytes` Byte braucht: Steuerzeichen (je sechs Byte) zwischen
+/// ASCII-Rändern, damit das Trimmen des Servers nichts wegnimmt. Höchstens 500 Zeichen.
+fn grund_mit_bytes(bytes: usize) -> String {
+    let steuer = bytes.saturating_sub(500).div_ceil(5);
+    let ascii = bytes - steuer * 6;
+    assert!(
+        ascii >= 2 && steuer + ascii <= 500,
+        "{bytes} Byte passen nicht in einen Grund"
+    );
+    let g = format!("a{}{}", "\u{1}".repeat(steuer), "b".repeat(ascii - 1));
+    assert_eq!(json_bytes(&g), bytes);
+    g
+}
+
+async fn set_anzeigename(i: &Instanz, name: &str) {
+    sqlx::query("UPDATE benutzer SET anzeigename = ? WHERE benutzername = 'admin'")
+        .bind(name)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+}
+
+async fn erklaerung_der_akte(i: &Instanz, akte: i64) -> Option<String> {
+    sqlx::query_scalar("SELECT erklaerung FROM einsatz_fuehrung WHERE id = ?")
+        .bind(akte)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn verlauf_zahl(i: &Instanz, akte: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrung_verlauf WHERE fuehrung_id = ?")
+        .bind(akte)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Spec „Die Erklärung einer Notübernahme passt in die Grenze des Gegenübers“, gegen die
+/// erreichte Seite: ein Byte über der Grenze ist 422 und ändert nichts, genau an der Grenze gilt
+/// die Übernahme und der Hub nimmt die Akte an. Die Länge der übrigen Erklärung liest der Test
+/// an einer ersten Übernahme ab (zweiter Einsatz, gleiche Epoche, gleich lange Kennung).
+#[tokio::test]
+async fn erklaerung_ueber_der_grenze_ist_422_und_genau_an_der_grenze_gilt_sie() {
+    let (hub, elw) = gekoppelt().await;
+    // Ein Name aus Steuerzeichen an der Namensgrenze: ohne ihn reichte kein Grund an die 4096.
+    set_anzeigename(&elw, &"\u{1}".repeat(lifeline_hub::auth::ANZEIGENAME_MAX)).await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let h2 = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let akten = fremde(&elw).await;
+    assert_eq!(akten.len(), 2);
+    // Beide Seiten nennen die Akte bei derselben Kennung; `ziel` ist die Akte von `h2`.
+    let kennung = fuehrung(&hub, h2).await["kennung"].clone();
+    let ist_ziel = |a: &&Value| a["kennung"] == kennung;
+    let ziel = akten
+        .iter()
+        .find(ist_ziel)
+        .expect("Akte des zweiten Einsatzes");
+    let sonde = akten.iter().find(|a| !ist_ziel(a)).unwrap();
+    let (sonde_id, ziel_id) = (sonde["id"].as_i64().unwrap(), ziel["id"].as_i64().unwrap());
+    assert_eq!(
+        sonde["kennung"].as_str().unwrap().len(),
+        ziel["kennung"].as_str().unwrap().len(),
+        "sonst stimmt die abgelesene Länge nicht"
+    );
+
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{sonde_id}/notuebernahme"),
+        json!({"grund": "Sonde"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let rest = erklaerung_der_akte(&elw, sonde_id).await.unwrap().len() - json_bytes("Sonde");
+
+    let vorher = verlauf_zahl(&elw, ziel_id).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{ziel_id}/notuebernahme"),
+        json!({"grund": grund_mit_bytes(ERKLAERUNG_BYTES + 1 - rest)}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Grund kürzen"), "{v}");
+    let danach = fremde(&elw).await;
+    let akte = danach.iter().find(|a| a["id"] == ziel_id).unwrap();
+    assert_eq!(akte["fuehrer_kennung"], hub.kennung, "Führung bleibt");
+    assert_eq!(akte["fuehrend"], false);
+    assert_eq!(erklaerung_der_akte(&elw, ziel_id).await, None);
+    assert_eq!(verlauf_zahl(&elw, ziel_id).await, vorher, "kein Eintrag");
+
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{ziel_id}/notuebernahme"),
+        json!({"grund": grund_mit_bytes(ERKLAERUNG_BYTES - rest)}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], true);
+    assert_eq!(
+        erklaerung_der_akte(&elw, ziel_id).await.unwrap().len(),
+        ERKLAERUNG_BYTES
+    );
+    elw_meldet(&elw).await;
+    let f = fuehrung(&hub, h2).await;
+    assert_eq!(
+        f["fuehrer_kennung"], elw.kennung,
+        "der Hub nimmt die Akte an"
+    );
+    assert_eq!(f["art"], "notuebernahme");
+}
+
+/// Ein Konto mit Bestandsnamen weit über der Grenze kann im Notfall übernehmen: die Erklärung
+/// nennt die ersten 200 Zeichen, und die Akte kommt beim Hub an (vor LLH-1702 blieb sie liegen,
+/// und beide Seiten hielten sich für die führende Instanz).
+#[tokio::test]
+async fn langer_bestandsname_wird_in_der_erklaerung_gekuerzt_und_der_hub_nimmt_an() {
+    let (hub, elw) = gekoppelt().await;
+    let max = lifeline_hub::auth::ANZEIGENAME_MAX;
+    let name = format!("{}{}", "Ä".repeat(max), "x".repeat(3000 - max));
+    set_anzeigename(&elw, &name).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme"),
+        json!({"grund": "Hub ohne Verbindung"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let erklaerung: Value =
+        serde_json::from_str(&erklaerung_der_akte(&elw, akte).await.unwrap()).unwrap();
+    assert_eq!(erklaerung["unterzeichner"], "Ä".repeat(max));
+    elw_meldet(&elw).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], elw.kennung);
+}
+
+/// Dasselbe am Hub: was der Admin unterschreibt, nennt schon den gekürzten Namen.
+#[tokio::test]
+async fn langer_bestandsname_am_hub_steht_gekuerzt_in_der_erklaerung_zur_unterschrift() {
+    let (hub, elw) = gekoppelt().await;
+    let max = lifeline_hub::auth::ANZEIGENAME_MAX;
+    set_anzeigename(
+        &hub,
+        &format!("{}{}", "Ä".repeat(max), "x".repeat(3000 - max)),
+    )
+    .await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let v = hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ohne Verbindung seit 40 min").await;
+    assert_eq!(v["fuehrend"], true);
+    let erklaerung: Value =
+        serde_json::from_str(&erklaerung_der_akte(&hub, akte).await.unwrap()).unwrap();
+    assert_eq!(erklaerung["unterzeichner"], "Ä".repeat(max));
+}
+
+/// Gegen die meldende Seite: mit Unterschrift antwortet schon der Beginn mit 422 (nichts liegt
+/// zum Unterschreiben vor), mit Code der Aufruf selbst; die Führung bleibt beim ELW. Genau an
+/// der Grenze geht die Unterschrift durch.
+#[tokio::test]
+async fn zu_grosse_erklaerung_am_hub_ist_422_vor_unterschrift_und_mit_code() {
+    let (hub, elw) = gekoppelt().await;
+    set_anzeigename(&hub, &"\u{1}".repeat(lifeline_hub::auth::ANZEIGENAME_MAX)).await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let start = format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start");
+
+    let (s, sonde) = post(&hub, &start, json!({"grund": "Sonde"})).await;
+    assert_eq!(s, StatusCode::OK, "{sonde}");
+    let rest = sonde["erklaerung"].as_str().unwrap().len() - json_bytes("Sonde");
+    let zu_gross = grund_mit_bytes(ERKLAERUNG_BYTES + 1 - rest);
+    let vorher = verlauf_zahl(&hub, akte).await;
+
+    let (s, v) = post(&hub, &start, json!({"grund": zu_gross})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Grund kürzen"), "{v}");
+    assert!(v.get("zeremonie").is_none(), "nichts zum Unterschreiben");
+
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        json!({"grund": zu_gross, "code": "2345 6789 ABCD EFGH"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Grund kürzen"), "{v}");
+
+    let f = &fremde(&hub).await[0];
+    assert_eq!(f["fuehrer_kennung"], elw.kennung, "Führung bleibt beim ELW");
+    assert_eq!(verlauf_zahl(&hub, akte).await, vorher, "kein Eintrag");
+
+    let v = hub_uebernimmt_mit_unterschrift(&hub, akte, &grund_mit_bytes(ERKLAERUNG_BYTES - rest))
+        .await;
+    assert_eq!(v["fuehrend"], true);
+    assert_eq!(
+        erklaerung_der_akte(&hub, akte).await.unwrap().len(),
+        ERKLAERUNG_BYTES
+    );
+}
