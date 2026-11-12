@@ -56,7 +56,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   - `cargo test --test maschinenzugang` (Inventar der Scope-Angaben), `cargo test --test
     public_api` und `cargo test --test zulassung_guard` sind grün; die Route steht nicht in
     `OHNE_ZULASSUNGSGRENZE`.
-- [ ] 2.7 Vertrag: `src/public_api/description.md` um die Ereignisarten, `after`, `wait` und das
+- [x] 2.7 Vertrag: `src/public_api/description.md` um die Ereignisarten, `after`, `wait` und das
   Verhalten bei 410 ergänzen; `cargo test --test public_api_spec_aktuell` und
   `docs/api/public-v1.json` committen. Verifizieren: `scripts/check-typ-codegen.sh` ist grün.
 
