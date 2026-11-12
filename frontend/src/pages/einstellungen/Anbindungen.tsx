@@ -59,8 +59,9 @@ function eingabe(w: FormWerte): AnbindungEingabe {
  * Spec `maschinenzugang`, Entwurf `docs/design/2026-11-12-anbindungen/`). Anlegen, neuer Code und
  * Widerruf nur der System-Admin; Name, Rechte und Frist ändert er in der Ansicht des Zugangs
  * (`AnbindungAnsicht`, Item-Route), wohin die Seite nach dem Anlegen springt. Der Einmal-Code
- * steht genau einmal im Dialog; danach zeigt die Seite nur Fingerabdrücke. Den Grund einer
- * abgelehnten Anfrage sieht nur der Admin.
+ * steht genau einmal im Dialog; danach zeigt die Seite nur Fingerabdrücke. Lesen darf, wer in
+ * die Verwaltung darf (design.md D11), samt Ablehnungsgrund: das Fremdsystem fragt nicht
+ * mit dem Grund zurück, der Betreiber erfährt ihn hier.
  */
 export default function Anbindungen() {
   const { benutzer } = useAuth();
