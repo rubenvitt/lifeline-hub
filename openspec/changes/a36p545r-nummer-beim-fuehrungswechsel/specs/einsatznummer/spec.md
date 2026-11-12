@@ -24,15 +24,19 @@ die Nummer.
 ## ADDED Requirements
 
 ### Requirement: Freie Nummer, wenn ein Spiegel zum eigenen Einsatz wird
-Gekoppelte Instanzen vergeben Einsatznummern unabhängig; ein Spiegel trägt die Nummer der
-führenden Instanz und ist von der Eindeutigkeit ausgenommen. Wird ein Spiegel zum eigenen Einsatz
-(Führungswechsel jeder Art, Verwahrung) und ist seine Nummer in der Organisation dieser Instanz
-schon vergeben, SHALL das System ihm die nächste freie Nummer dieser Instanz geben. Der Übergang
-MUST NOT an der Eindeutigkeit der Nummer scheitern. Ist die Nummer frei, MUST sie bleiben.
+Ein Spiegel trägt die Nummer der führenden Instanz und ist von der Eindeutigkeit ausgenommen. Wird
+er zum eigenen Einsatz (Führungswechsel jeder Art, Verwahrung) und ist seine Nummer in der
+Organisation dieser Instanz schon vergeben, SHALL das System ihm eine neue Nummer geben: die
+laufende Nummer über allen Einsätzen des Jahres, die die Instanz kennt, auch ihren Spiegeln. Der
+Übergang MUST NOT an der Eindeutigkeit scheitern. Ist die Nummer frei, MUST sie bleiben.
 
 #### Scenario: Notübernahme bei gleicher Nummer
 - **WHEN** der Hub die eigenen Einsätze `E-2026-0001` und `E-2026-0002` hat, den Einsatz `E-2026-0001` des ELW spiegelt und ein Admin am Hub die Notübernahme vollzieht
 - **THEN** gelingt die Notübernahme, und der übernommene Einsatz trägt am Hub `E-2026-0003`
+
+#### Scenario: Neue Nummer über den Spiegeln
+- **WHEN** der Hub die eigenen Einsätze `E-2026-0001` und `E-2026-0002` hat, die Einsätze `E-2026-0001` bis `E-2026-0005` des ELW spiegelt und die Führung des gespiegelten `E-2026-0001` übernimmt
+- **THEN** trägt der übernommene Einsatz am Hub `E-2026-0006`
 
 #### Scenario: Übergabe bei gleicher Nummer
 - **WHEN** der ELW seinen Einsatz `E-2026-0001` an den Hub übergibt und der Hub schon einen eigenen Einsatz `E-2026-0001` hat

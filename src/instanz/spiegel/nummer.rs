@@ -59,7 +59,9 @@ pub(super) async fn ensure_freie_nummer(
             zeitzone.as_deref(),
         )),
     };
-    // Wie bei der Anlage: über allen Einsätzen (auch Spiegeln) und dem Löschprotokoll.
+    // Über allen Einsätzen des Jahres, auch Spiegeln, und dem Löschprotokoll: anders als die
+    // Anlage (`einsatz::repo::anlegen_tx` zählt nur eigene), damit die neue Nummer keinem Spiegel
+    // gleicht, der später selbst eigen werden kann und dann wieder umnummeriert würde.
     let max_lfd: Option<i64> = sqlx::query_scalar(
         "SELECT MAX(lfd) FROM ( \
              SELECT nummer_lfd AS lfd FROM einsatz WHERE org_id = ?1 AND nummer_jahr = ?2 \
