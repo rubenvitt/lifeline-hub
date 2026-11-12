@@ -484,9 +484,7 @@ führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich n
 Bis dahin zeigt das Paneel „Führung“ unter „Anfrage“ „beim Gegenüber gestellt“, danach nennt es
 unter „Führung“ „hier“, und das Hinweisband „Spiegel von …“ verschwindet. Eine Anfrage gilt nur
 dem Stand, den sie sah: Wechselt die Führung inzwischen, verfällt sie, und das Paneel bietet
-„Führung anfragen“ wieder an. Erklären zwei Installationen ohne Verbindung dieselbe Epoche, gilt
-die Erklärung der Installation mit
-der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
+„Führung anfragen“ wieder an.
 
 Gegen die Installation, die sich meldet (den ELW), braucht eine Notübernahme die Unterschrift
 eines Admins oder den Code, den die Einsatzleitung oder ein Admin am ELW mit „Führung per Code
@@ -503,7 +501,20 @@ Admins inzwischen widerrufen ist, verwirft der ELW die offene Übernahme mit der
 ebenso; Bestätigen lehnt er dann ab.
 
 Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
-Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der
+Meldung an und zeigt sie im Verlauf. Erklären zwei ELW ohne Verbindung beide eine Notübernahme
+gegen denselben Hub, behält der Hub die zuerst gemeldete. Der andere ELW zeigt nach seiner
+nächsten Meldung das Hinweisband „Deine Notübernahme hat am Hub nicht gegriffen, die Führung
+liegt bei …“ (war seine Führung keine Notübernahme: „Die Führung liegt am Hub bei …, nicht hier“),
+und seine Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Bis
+jemand „Übernahme bestätigen“ wählt, schreibt er weiter; widersprechen lässt sich hier nicht,
+denn der Hub nähme den Widerspruch nicht an. Mit dem Bestätigen wird der Einsatz dort zum
+Spiegel. Ist dieser ELW mit dem führenden ELW nicht selbst gekoppelt, bekommt der Spiegel danach
+keine Änderungen mehr und zeigt das im Hinweisband; was er seit seiner Notübernahme erfasst hat,
+bleibt dort als Bruchstelle aufgehoben. Wird die Kopplung zum Hub widerrufen, verschwindet das
+Hinweisband, und der ELW führt weiter. Hat der Hub die Führung inzwischen von einem anderen ELW
+zurückbekommen, zeigt der ELW „Führung übernommen von …“ mit „Übernahme bestätigen“ und
+„Widersprechen“, ohne Alarm; widerspricht die Einsatzleitung, führt er mit der nächsten Epoche
+weiter, und der Hub nimmt das an. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der
 Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“, ohne auf den Hub zu
 warten. Ein Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
 
