@@ -1,6 +1,6 @@
 import { Button, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -14,7 +14,6 @@ import { NUR_VORLESER, monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
-import BruchstelleListe from './BruchstelleListe';
 import { useSpiegelAntraege } from './useSpiegelAntraege';
 import {
   ANTRAG_ZUSTAND_WORT,
@@ -27,6 +26,10 @@ import {
   spiegelStand,
   spiegelTitel,
 } from './spiegelText';
+
+// Die Liste kommt erst beim Aufklappen (LLH-1646). Im Haupt-Chunk schob sie diesen über die
+// Precache-Grenze (`maximumFileSizeToCacheInBytes`, vite.config.ts); der Vorrat hält sie trotzdem.
+const BruchstelleListe = lazy(() => import('./BruchstelleListe'));
 
 /**
  * Hinweisband am Spiegel (LLH-1492, design.md D13, Spec `einsatz-spiegel`, „Der Spiegel zeigt
@@ -201,7 +204,11 @@ function BandInhalt({
           data-lfh="spiegel-band-bruchliste"
           style={{ paddingBlockEnd: token.paddingXS }}
         >
-          <BruchstelleListe einsatz={einsatz} />
+          <Suspense
+            fallback={<Typography.Text type="secondary">Liste wird geladen</Typography.Text>}
+          >
+            <BruchstelleListe einsatz={einsatz} />
+          </Suspense>
         </div>
       )}
       {offen && (
