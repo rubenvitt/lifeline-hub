@@ -100,7 +100,7 @@ der erste Schritt zur P2P-Linie der Native-Apps-Roadmap.
   - `stammdaten/{liefern,uebernehmen,herkunft,geheimnis}.rs`
   - `src/routes/instanz.rs`, `src/config.rs`, `src/tls/mod.rs` (Fingerabdruck des eigenen
     Zertifikats), `src/main.rs`
-- **Datenbank:** neue Migrationen (0331–0333) mit `instanz_kopplung.art`,
+- **Datenbank:** neue Migrationen (0332–0334) mit `instanz_kopplung.art`,
   `instanz_kopplung.tls_zertifikat` (SHA-256 über das ganze Zertifikat, siehe design.md D3),
   `instanz_kopplungscode.art`, `stammdaten_herkunft.ursprung` samt Index und Backfill.
 - **API und Typ-Codegen:** Antworten der Instanzkopplung bekommen Art, Zertifikatszustand und
