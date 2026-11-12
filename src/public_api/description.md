@@ -18,8 +18,8 @@ Fachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschri
 
 | Art | Deutsch (Fachbegriff) | Englisch (Technik) |
 | --- | --- | --- |
-| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |
-| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |
+| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |
+| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |
 | Abfrage | – | `after`, `wait` |
 | Fehler | Text (`error`) | `code` |
 
