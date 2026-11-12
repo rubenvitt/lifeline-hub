@@ -57,7 +57,9 @@ pub struct Gefuehrt {
 }
 
 /// Die Einsätze der Org, die diese Instanz führt und liefert (D6): aktive, und abgeschlossene,
-/// solange die Gegenseite den Stand des Abschlusses noch nicht hat. Ohne Demo-Einsätze.
+/// solange die Gegenseite den Stand des Abschlusses noch nicht hat. Ohne Demo-Einsätze und ohne
+/// Einsätze, die gerade abgeräumt werden. Ein soft-gelöschter oder geschwärzter Einsatz geht weiter
+/// hinaus (LLH-1494, D2): so kommen Sperre, Wiederherstellung und Schwärzung beim Spiegel an.
 pub async fn list_gefuehrt(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -65,8 +67,9 @@ pub async fn list_gefuehrt(
 ) -> Result<Vec<Gefuehrt>, AppError> {
     let alle: Vec<Gefuehrt> = sqlx::query_as(
         "SELECT e.id, e.kennung, e.freigabestufe, e.status, e.org_id FROM einsatz e \
-         WHERE e.org_id = ? AND e.spiegel = 0 AND e.geloescht_at IS NULL \
-         AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) ORDER BY e.id",
+         WHERE e.org_id = ? AND e.spiegel = 0 \
+         AND NOT EXISTS (SELECT 1 FROM demo_import d WHERE d.einsatz_id = e.id) \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen m WHERE m.einsatz_id = e.id) ORDER BY e.id",
     )
     .bind(org_id)
     .fetch_all(&mut *conn)

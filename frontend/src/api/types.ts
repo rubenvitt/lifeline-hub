@@ -55,7 +55,9 @@ export type InstanzProtokoll = S['InstanzProtokoll'];
 export type InstanzSpiegelStand = S['InstanzSpiegelStand'];
 export type InstanzSpiegelEinsatz = S['InstanzSpiegelEinsatz'];
 export type EinsatzSpiegelAnzeige = S['EinsatzSpiegelAnzeige'];
+export type EinsatzVerwahrungAnzeige = S['EinsatzVerwahrungAnzeige'];
 export type SpiegelAntragAnzeige = S['SpiegelAntragAnzeige'];
+export type AbgelehnterAntragAnzeige = S['AbgelehnterAntragAnzeige'];
 // Nicht übernommene Erfassungen am Spiegel (LLH-1646).
 export type BruchErfassung = S['BruchErfassung'];
 export type BruchAlleErgebnis = S['BruchAlleErgebnis'];
@@ -172,6 +174,8 @@ export interface OrgEinstellungenUpdate {
   skelett_dauer_tage: number | null;
   /** Bestätigt das erstmalige Setzen oder Verkürzen der Skelett-Frist; ohne → 409. */
   skelett_dauer_bestaetigt?: boolean;
+  /** Nachbereitung in Tagen ab Abschluss (LLH-1494); null = keine. */
+  nachbereitung_tage: number | null;
   etb_nummer_praefix: string | null;
   meldung_nummer_praefix: string | null;
   auftrag_nummer_praefix: string | null;
@@ -1910,6 +1914,12 @@ export interface WiederherstellenBody {
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
+}
+
+/** Body von `PUT /api/einsaetze/{id}/nachbereitung` (LLH-1494). `null` hebt die Frist auf.
+ *  Kein Backend-Schema, FE-lokal. */
+export interface NachbereitungSetzenBody {
+  nachbereitung_bis: string | null;
 }
 
 // ---- Löschersuchen nach Art. 17 (LFH-751) ----

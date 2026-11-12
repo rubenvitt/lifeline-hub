@@ -1407,6 +1407,126 @@ pub async fn verwerfen(
 /// Frist abgelehnter Anträge (Spec `spiegel-antraege`, wie die Offline-Warteschlange).
 pub const ABGELEHNT_TAGE: i64 = 30;
 
+// ── Nach der Verwahrung (LLH-1648) ───────────────────────────────────────────────────────────
+
+/// Ein abgelehnter Antrag an einem Einsatz, der kein Spiegel mehr ist: der Hub hat ihn in
+/// Verwahrung genommen (`lebensende::umwandeln`). Das Hinweisband am Spiegel gibt es dann nicht
+/// mehr, und nach der Schonfrist liest ein Mitglied den Einsatz nicht mehr. Die Person sieht ihre
+/// abgelehnten Anträge deshalb einsatzübergreifend, bis [`ABGELEHNT_TAGE`] vorbei sind.
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+pub struct AbgelehnterAntragAnzeige {
+    pub id: i64,
+    pub einsatz_id: i64,
+    /// Nummer und Stichwort des Einsatzes; Lagedaten trägt der Antrag nicht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatznummer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stichwort: Option<String>,
+    /// Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …).
+    pub art: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grund: Option<String>,
+    pub erfasst_at: String,
+    /// Bis dahin bleibt der Antrag (30 Tage nach der Ablehnung); danach räumt ihn der Purge.
+    pub frist_bis: String,
+    /// Die erfassten Daten (Kennungen der führenden Instanz).
+    #[schema(value_type = Object)]
+    pub daten: Value,
+}
+
+/// Die abgelehnten Anträge eines Kontos an Einsätzen ohne Spiegel, ältester zuerst. Ohne
+/// Einsatz-Lese-Gate: der Antrag ist Buchführung des Kontos, keine Einsatzdaten (wie
+/// [`verwerfen`]). Ein gelöschter Einsatz (Tombstone) und eine abgelaufene Frist fallen heraus.
+pub async fn abgelehnte_ohne_spiegel(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+) -> Result<Vec<AbgelehnterAntragAnzeige>, AppError> {
+    let grenze =
+        crate::zeit::formatiere_utc(chrono::Utc::now() - chrono::Duration::days(ABGELEHNT_TAGE));
+    #[allow(clippy::type_complexity)]
+    let zeilen: Vec<(
+        i64,
+        i64,
+        Option<String>,
+        Option<String>,
+        String,
+        Option<String>,
+        String,
+        String,
+        String,
+    )> = sqlx::query_as(
+        "SELECT a.id, a.einsatz_id, e.einsatznummer_intern, e.stichwort, a.art, a.grund, \
+                a.erfasst_at, a.geaendert_at, a.daten \
+         FROM spiegel_antrag a JOIN einsatz e ON e.id = a.einsatz_id \
+         WHERE a.benutzer_id = ? AND a.zustand = 'abgelehnt' AND a.geaendert_at >= ? \
+           AND e.geloescht_at IS NULL \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_spiegel s WHERE s.einsatz_id = a.einsatz_id) \
+         ORDER BY a.geaendert_at, a.id",
+    )
+    .bind(benutzer_id)
+    .bind(grenze)
+    .fetch_all(pool)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(
+            |(
+                id,
+                einsatz_id,
+                einsatznummer,
+                stichwort,
+                art,
+                grund,
+                erfasst_at,
+                abgelehnt,
+                daten,
+            )| {
+                let frist_bis = crate::zeit::parse_utc(&abgelehnt)
+                    .map(|t| {
+                        crate::zeit::formatiere_utc(t + chrono::Duration::days(ABGELEHNT_TAGE))
+                    })
+                    .unwrap_or(abgelehnt);
+                AbgelehnterAntragAnzeige {
+                    id,
+                    einsatz_id,
+                    einsatznummer: einsatznummer.filter(|n| !n.trim().is_empty()),
+                    stichwort: stichwort.filter(|s| !s.trim().is_empty()),
+                    art,
+                    grund,
+                    erfasst_at,
+                    frist_bis,
+                    daten: serde_json::from_str(&daten).unwrap_or(Value::Null),
+                }
+            },
+        )
+        .collect())
+}
+
+/// Verwirft einen eigenen, abgelehnten Antrag an einem Einsatz ohne Spiegel; sonst 404. Am
+/// Spiegel bleibt [`verwerfen`] mit dem Einsatz im Pfad zuständig.
+pub async fn verwerfen_ohne_spiegel(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    antrag_id: i64,
+) -> Result<(), AppError> {
+    let geloescht = crate::write_retry!(pool, |conn| {
+        Ok(sqlx::query(
+            "DELETE FROM spiegel_antrag WHERE id = ? AND benutzer_id = ? AND zustand = 'abgelehnt' \
+             AND NOT EXISTS (SELECT 1 FROM einsatz_spiegel s \
+                             WHERE s.einsatz_id = spiegel_antrag.einsatz_id)",
+        )
+        .bind(antrag_id)
+        .bind(benutzer_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected())
+    })?;
+    if geloescht == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
 /// Räumt abgelehnte Anträge nach [`ABGELEHNT_TAGE`] und übernommene, deren Zeile der Spiegel hat.
 pub async fn aufraeumen(pool: &SqlitePool) -> Result<u64, AppError> {
     let grenze =

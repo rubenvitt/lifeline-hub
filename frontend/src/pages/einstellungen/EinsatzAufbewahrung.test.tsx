@@ -24,6 +24,7 @@ vi.mock('../../api/einsaetze', () => ({
 
 vi.mock('../../api/aufbewahrung', () => ({
   setzeAufbewahrungsfrist: vi.fn(),
+  setzeNachbereitung: vi.fn(),
 }));
 
 import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/einsaetze';
@@ -91,6 +92,8 @@ describe('EinsatzAufbewahrung', () => {
     expect((screen.getByLabelText('Aufbewahrungs-Dauer (Tage)') as HTMLInputElement).value).toBe(
       '365',
     );
+    // Die Nachbereitung beginnt erst mit dem Abschluss (LLH-1494).
+    expect(screen.queryByRole('button', { name: 'Nachbereitung ändern' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -244,6 +247,10 @@ describe('EinsatzAufbewahrung', () => {
     expect(aendern).toBeEnabled();
     // Das Paneel steht AUSSERHALB des Vollersatz-Formulars.
     expect(aendern.closest('form')).toBeNull();
+    // LLH-1494: ab dem Abschluss daneben die Nachbereitung, ebenso außerhalb.
+    const nachbereitung = screen.getByRole('button', { name: 'Nachbereitung ändern' });
+    expect(nachbereitung).toBeEnabled();
+    expect(nachbereitung.closest('form')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Frist aufheben' }));
     await waitFor(() =>

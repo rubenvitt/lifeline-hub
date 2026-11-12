@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   KEINE_VERBINDUNG_AB_MS,
   antragDatenText,
+  antragEinsatzText,
+  antragKopierText,
   antragErfassungsort,
   antragZaehler,
   bruchArtWort,
@@ -108,6 +110,44 @@ describe('Hinweisband am Spiegel (LLH-1492, Spec `einsatz-spiegel`)', () => {
     expect(text('eintreffen', { kraft: { objekt_typ: 'einheit', objekt_id: 9 } })).toBe('Kraft');
     // Unlesbare Daten ergeben nichts statt eines Fehlers.
     expect(text('sichtung', { kategorie: 'xx' })).toBe('');
+  });
+
+  it('kürzt Freitexte nur im Band, nicht mit voll (LLH-1648)', () => {
+    const inhalt = 'x'.repeat(100);
+    expect(antragDatenText({ art: 'notiz', daten: { text: inhalt } as never })).toBe(
+      `${'x'.repeat(80)} …`,
+    );
+    expect(
+      antragDatenText({ art: 'notiz', daten: { text: inhalt } as never }, { voll: true }),
+    ).toBe(inhalt);
+  });
+
+  it('nennt den verwahrten Einsatz mit Nummer und Stichwort und kopiert den Antrag (LLH-1648)', () => {
+    const antrag = {
+      id: 4,
+      einsatz_id: 7,
+      einsatznummer: 'E-2026-0042',
+      stichwort: 'RD 1',
+      art: 'etb',
+      grund: 'Einsatz abgeschlossen.',
+      erfasst_at: '2026-11-10 13:30:00',
+      frist_bis: '2026-12-11 08:00:00',
+      daten: { von: 'UHS', inhalt: 'Patient übergeben' } as never,
+    };
+    expect(antragEinsatzText(antrag)).toBe('E-2026-0042 · RD 1');
+    expect(antragEinsatzText({ ...antrag, stichwort: undefined })).toBe('E-2026-0042');
+    expect(antragEinsatzText({ ...antrag, einsatznummer: undefined, stichwort: undefined })).toBe(
+      '#7',
+    );
+    expect(antragKopierText(antrag, (w) => `<${w}>`)).toBe(
+      [
+        'Antrag: ETB-Eintrag',
+        'Einsatz: E-2026-0042 · RD 1',
+        'Erfasst: <2026-11-10 13:30:00>',
+        'Daten: UHS: Patient übergeben',
+        'Grund: Einsatz abgeschlossen.',
+      ].join('\n'),
+    );
   });
 
   it('führt „Neu erfassen“ an den Ort der Erfassung, mit lokalem Ziel', () => {

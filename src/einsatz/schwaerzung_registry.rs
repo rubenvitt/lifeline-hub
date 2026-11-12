@@ -237,6 +237,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("anzahl_betroffene_initial", G_ZAEHLER),
             retain("retention_bis", G_ZEIT),
             retain("retention_gesetzt_at", G_ZEIT),
+            // Ende der Nachbereitung (LLH-1494, D1): Zeitpunkt, kein Personenbezug.
+            retain("nachbereitung_bis", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
             // Spiegel (LLH-1492, design.md D2): Kennung über Instanzen und Freigabestufe.
@@ -2897,6 +2899,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "ID des endgültig gelöschten Einsatzes, bewusst ohne FK: sperrt ID und \
                  Einsatznummer gegen die Wiedervergabe (LFH-750 D5), kein Personenbezug",
             ),
+            // Wie der Einsatz endete (LLH-1494, D7): Skelett gelöscht, verwahrt oder Spiegel
+            // abgeräumt; die Gegenstelle ist der Name einer gekoppelten Instanz.
+            retain("art", G_ENUM),
+            retain("gegenstelle", G_SPIEGEL),
             retain("einsatznummer_intern", G_ZAEHLER),
             retain("nummer_jahr", G_ZAEHLER),
             retain("nummer_lfd", G_ZAEHLER),
@@ -2905,6 +2911,45 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geloescht_at", G_ZEIT),
             retain("skelett_dauer_tage", G_KONFIG),
             retain("akteur_id", G_FK),
+        ],
+    },
+    // Merker „wird abgeräumt“ (LLH-1494, D6): lebt Sekunden, bis der Einsatz samt Merker geht.
+    TabellenRegel {
+        tabelle: "einsatz_abraeumen",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_ENUM),
+            retain("gegenstelle", G_SPIEGEL),
+            retain("vorgemerkt_at", G_ZEIT),
+        ],
+    },
+    // Letzte Quittung der Verwahrung (LLH-1494, D4/D8): Name der Gegenstelle und ein Grund aus
+    // Zählern („Stand 12 von 15“), kein Personenbezug.
+    TabellenRegel {
+        tabelle: "einsatz_verwahrung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("gegenstelle", G_SPIEGEL),
+            retain("grund", G_SPIEGEL),
+            retain("quittiert_at", G_ZEIT),
+        ],
+    },
+    // Stand der Annahme einer Verwahrung an der erreichten Seite (LLH-1494, D4): eine Zahl.
+    TabellenRegel {
+        tabelle: "verwahrung_angenommen",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("stand", G_ZAEHLER),
+            retain("angenommen_at", G_ZEIT),
         ],
     },
     // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf

@@ -332,6 +332,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
+            "/api/einsaetze/{id}/nachbereitung",
+            put(routes::einsatz::nachbereitung_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}",
             put(routes::einsatz::kategorie_frist_setzen),
         )
@@ -2016,6 +2020,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/bruchstelle/{bruch_id}/verwerfen",
             post(routes::instanz::bruchstelle_verwerfen),
+        )
+        // Abgelehnte Anträge nach der Verwahrung (LLH-1648): einsatzübergreifend, nur die eigenen.
+        .route(
+            "/api/antraege/abgelehnt",
+            get(routes::instanz::antraege_abgelehnt),
+        )
+        .route(
+            "/api/antraege/abgelehnt/{antrag_id}",
+            delete(routes::instanz::antrag_abgelehnt_verwerfen),
         )
         // Abgleich der Einsätze (LLH-1492): Pakete bis `SPIEGEL_MAX`, signiert wie Melden.
         .route(

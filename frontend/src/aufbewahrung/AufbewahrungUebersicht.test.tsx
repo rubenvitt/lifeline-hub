@@ -246,6 +246,41 @@ describe('AufbewahrungUebersicht', () => {
   });
 });
 
+describe('AufbewahrungUebersicht — verwahrt (LLH-1494)', () => {
+  it('ein verwahrter Einsatz nennt die Gegenstelle, führt in keine Akte und hat keinen Löschtermin', async () => {
+    server.use(
+      meHandler(ME_ADMIN),
+      http.get('/api/aufbewahrung', () =>
+        HttpResponse.json([
+          {
+            einsatz_id: 9201,
+            einsatznummer_intern: 'E-2026-0011',
+            abgeschlossen_at: '2026-10-01 10:00:00',
+            endgueltig_geloescht_at: '2026-11-01 10:00:00',
+            gegenstelle: 'Hub Kreis',
+            zustand: 'verwahrt',
+          },
+        ] satisfies AufbewahrungEintrag[]),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/admin/aufbewahrung" element={<AufbewahrungUebersicht />} />
+        <Route path="/admin/aufbewahrung/:einsatzId" element={<Ort />} />
+      </Routes>,
+      { route: '/admin/aufbewahrung' },
+    );
+    const t = await tabelle();
+    await within(t).findByText('E-2026-0011');
+    expect(within(t).getByText('An Hub Kreis übergeben')).toBeInTheDocument();
+    expect(within(t).getAllByText('verwahrt').length).toBeGreaterThanOrEqual(1);
+    expect(within(t).queryByRole('link', { name: 'E-2026-0011' })).toBeNull();
+    expect(
+      within(t).queryByText(zeitpunkt('2026-11-01 10:00:00', DEFAULT_KONVENTIONEN)),
+    ).toBeNull();
+  });
+});
+
 describe('AufbewahrungUebersicht — gescheiterter Abruf (LFH-756)', () => {
   it('ein Ladefehler behauptet keinen leeren Bestand', async () => {
     server.use(

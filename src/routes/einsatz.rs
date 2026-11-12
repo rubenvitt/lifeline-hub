@@ -364,6 +364,68 @@ pub async fn aufbewahrungsfrist_setzen(
     )))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct NachbereitungSetzen {
+    /// Neues Ende der Nachbereitung (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer hebt
+    /// die Nachbereitungsfrist auf. Pflichtfeld: fehlt es, ist das 400 (äußeres `None`), damit
+    /// ein unvollständiger Body keine Frist aufhebt.
+    #[serde(default, deserialize_with = "vorhanden")]
+    pub nachbereitung_bis: Option<Option<String>>,
+}
+
+/// Unterscheidet ein gesendetes `null` (`Some(None)`) von einem fehlenden Feld (`None`).
+fn vorhanden<'de, D>(d: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(d).map(Some)
+}
+
+/// PUT /api/einsaetze/{id}/nachbereitung — Nachbereitungsfrist setzen, ändern oder aufheben
+/// (LLH-1494, design.md D1). Rechte wie der Frist-PUT: Einsatzleitung oder System-Admin der
+/// Einsatz-Org. Nur an einem abgeschlossenen Einsatz (laufend 422), der weder vorgemerkt noch
+/// geschwärzt noch übergeben ist (409); am Spiegel 409 aus dem Schutz. Fehlt das Feld, 400.
+/// ETB-Eintrag mit altem und neuem Wert.
+pub async fn nachbereitung_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzKontext,
+    JsonBody(req): JsonBody<NachbereitungSetzen>,
+) -> Result<Json<EinsatzAnzeige>, AppError> {
+    let id = ctx.einsatz.id;
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
+        ctx.fordere_einsatzleitung()?;
+    }
+    let Some(bis) = req.nachbereitung_bis else {
+        return Err(AppError::Validation(
+            "nachbereitung_bis fehlt (null hebt die Frist auf)".into(),
+        ));
+    };
+    let neu = match bis.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(s) => Some(crate::etb::normalisiere_zeit(s)?),
+        None => None,
+    };
+    let ergebnis =
+        crate::einsatz::nachbereitung::setzen(&state.pool, id, ctx.benutzer.id, neu.as_deref())
+            .await?;
+    if !ergebnis.etb_eintrag_ids.is_empty() {
+        kopf_geaendert(&state, id).await;
+        etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    }
+    let aktualisiert = ergebnis.einsatz;
+    let anzeige = aktualisiert.anzeige(
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
+    );
+    Ok(Json(ohne_kopf_pii_wenn_gesperrt(
+        anzeige,
+        &aktualisiert,
+        &ctx.benutzer,
+        ctx.rolle,
+    )))
+}
+
 /// GET /api/einsaetze/{id}/aufbewahrung-kategorien — Aufbewahrung je Datenkategorie (LFH-749,
 /// Spec `aufbewahrung-kategorien`, „Zustand je Kategorie“): alle drei Kategorien mit Frist,
 /// Zustand und Rechtsgrundlage, bei einem aktiven Einsatz mit der Dauer der Org-Vorgabe. Kein

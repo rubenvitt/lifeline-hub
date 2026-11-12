@@ -7,6 +7,29 @@ export type paths = Record<string, never>;
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Ein abgelehnter Antrag an einem Einsatz, der kein Spiegel mehr ist: der Hub hat ihn in
+         *     Verwahrung genommen (`lebensende::umwandeln`). Das Hinweisband am Spiegel gibt es dann nicht
+         *     mehr, und nach der Schonfrist liest ein Mitglied den Einsatz nicht mehr. Die Person sieht ihre
+         *     abgelehnten Anträge deshalb einsatzübergreifend, bis [`ABGELEHNT_TAGE`] vorbei sind.
+         */
+        AbgelehnterAntragAnzeige: {
+            /** @description Art wie in der Offline-Warteschlange (`etb`, `sichtung`, …). */
+            art: string;
+            /** @description Die erfassten Daten (Kennungen der führenden Instanz). */
+            daten: Record<string, never>;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Nummer und Stichwort des Einsatzes; Lagedaten trägt der Antrag nicht. */
+            einsatznummer?: string | null;
+            erfasst_at: string;
+            /** @description Bis dahin bleibt der Antrag (30 Tage nach der Ablehnung); danach räumt ihn der Purge. */
+            frist_bis: string;
+            grund?: string | null;
+            /** Format: int64 */
+            id: number;
+            stichwort?: string | null;
+        };
         /** @description Ein Vermisstenabgleich (1:1 zu `person_abgleich`). */
         AbgleichAnzeige: {
             /** Format: int64 */
@@ -655,8 +678,13 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             einsatznummer_intern?: string | null;
-            /** @description Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`. */
+            /**
+             * @description Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`, im Zustand
+             *     `verwahrt` der Zeitpunkt, zu dem der Einsatz hier abgeräumt wurde.
+             */
             endgueltig_geloescht_at?: string | null;
+            /** @description Name der Installation, die den Einsatz verwahrt (LLH-1494); nur im Zustand `verwahrt`. */
+            gegenstelle?: string | null;
             /** @description Zeitpunkt der Löschvormerkung (Beginn der Karenz). */
             geloescht_at?: string | null;
             geschwaerzt_at?: string | null;
@@ -678,7 +706,7 @@ export interface components {
          *     `tests/enum_wire_kontrakt.rs`.
          * @enum {string}
          */
-        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "schwaerzung_beantragt" | "loeschung_ausstehend" | "endgueltig_geloescht";
+        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "schwaerzung_beantragt" | "loeschung_ausstehend" | "endgueltig_geloescht" | "verwahrt";
         /**
          * @description Wo eine Person gerade in einer UHS steht (LLH-1129): für den Patientenkopf im Personen-Detail,
          *     damit er UHS- und Platznamen ohne zweiten Abruf nennt. UHS- und Platzbezeichnung sind
@@ -2392,6 +2420,8 @@ export interface components {
              */
             meine_sachgebiete: components["schemas"]["Sachgebiet"][];
             meldende_stelle?: string | null;
+            /** @description Ende der Nachbereitung (LLH-1494, UTC); fehlt = keine Nachbereitungsfrist. */
+            nachbereitung_bis?: string | null;
             /** @description Nächste Lagebesprechung als expliziter UTC-Termin; fehlt ohne gesetzten Termin. */
             naechste_lagebesprechung_at?: string | null;
             /** Format: int64 */
@@ -2411,6 +2441,7 @@ export interface components {
              *     Nennt bewusst weder Person noch Zeitpunkt noch Modul.
              */
             teilschwaerzungen?: number | null;
+            verwahrung?: components["schemas"]["EinsatzVerwahrungAnzeige"] | null;
         };
         /**
          * @description Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel
@@ -2713,6 +2744,15 @@ export interface components {
             einsatz_fahrzeug_id: number;
             fahrzeugtyp?: string | null;
             funkrufname: string;
+        };
+        /**
+         * @description Stand der Übergabe an die verwahrende Gegenstelle (LLH-1494, D8): ihre letzte Quittung
+         *     „wartet“.
+         */
+        EinsatzVerwahrungAnzeige: {
+            gegenstelle: string;
+            /** @description Worauf die Gegenstelle wartet, etwa „1 Anhang fehlt“. */
+            grund?: string | null;
         };
         /**
          * @description Eine Einsatz-Vorlage der Organisation. `ausgeblendet` sind die Modulschlüssel, die ein mit ihr
@@ -5820,6 +5860,11 @@ export interface components {
             /** Format: int64 */
             meldung_bestaetigung_frist_min?: number | null;
             meldung_nummer_praefix?: string | null;
+            /**
+             * Format: int64
+             * @description Nachbereitung in Tagen ab Abschluss (LLH-1494); fehlt = keine Nachbereitungsfrist.
+             */
+            nachbereitung_tage?: number | null;
             /** Format: int64 */
             org_id: number;
             /** Format: int64 */

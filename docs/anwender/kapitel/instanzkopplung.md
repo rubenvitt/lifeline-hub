@@ -129,6 +129,19 @@ unter „Was am Spiegel geht“).
    wird ein neuer Antrag.
 3. Oder „Verwerfen“ wählen. Der abgelehnte Antrag ist dann weg.
 
+### Abgelehnten Antrag nach der Verwahrung ansehen
+
+Hat der Hub den Einsatz in Verwahrung genommen, ist er kein Spiegel mehr, und das Hinweisband
+fehlt. Abgelehnte Anträge bleiben trotzdem 30 Tage nach der Ablehnung erreichbar, auch wenn der
+Einsatz selbst nicht mehr lesbar ist:
+
+1. In der Zeile oben „Anträge abgelehnt“ wählen.
+2. Jeder Antrag steht mit Einsatznummer und Stichwort, den erfassten Daten, dem Grund und dem
+   Tag, bis zu dem er bleibt.
+3. „Kopieren“ legt Art, Einsatz, Zeit, Daten und Grund in die Zwischenablage.
+4. „Verwerfen“ entfernt den Antrag. „Neu erfassen“ gibt es hier nicht: der Einsatz ist
+   abgeschlossen.
+
 ### Abgleich der Einsätze prüfen
 
 Für den System-Admin:
@@ -403,6 +416,18 @@ Mit dem Widerruf einer Kopplung endet der Abgleich ihrer Einsätze, an beiden In
 Vorhandene Spiegel bleiben lesbar und gesperrt; das Hinweisband zeigt „Abgleich beendet“. Offene
 Anträge an diese Spiegel sind abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Spiegel
 dabei nicht.
+
+### Ende eines Spiegels
+
+Ein zur Löschung vorgemerkter Einsatz ist auch am Spiegel gesperrt, eine Wiederherstellung
+hebt die Sperre auch dort auf, und eine Schwärzung kommt ebenso an. Löscht die Installation, die
+einen Einsatz führt, ihn endgültig, löscht die andere ihren Spiegel beim nächsten Abgleich; das
+Löschprotokoll dort nennt die Gegenstelle, aber keine Nummer.
+
+Nach dem Ende der Nachbereitung übergibt ein ELW seine eigenen Einsätze dem Hub zur Verwahrung:
+Der Spiegel am Hub wird dabei zu einem eigenen Einsatz des Hubs, und der ELW löscht seinen.
+Spiegel von Einsätzen des Hubs löscht der ELW nach der Nachbereitung. Das Kapitel
+[Aufbewahrung](aufbewahrung.md) beschreibt die Einzelheiten.
 
 ### Führung je Einsatz
 

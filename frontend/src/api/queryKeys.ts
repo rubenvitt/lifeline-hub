@@ -1070,6 +1070,9 @@ export const GLOBAL_KEYS = {
   benutzerEinstellungen: 'benutzer-einstellungen',
   // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
   versionsstand: 'versionsstand',
+  // Abgelehnte Anträge des angemeldeten Kontos an Einsätzen ohne Spiegel (LLH-1648, nach der
+  // Verwahrung am Hub); einsatzübergreifend in der Betriebszeile.
+  abgelehnteAntraege: 'abgelehnte-antraege',
   // Laufende Sitzungen (LFH-1092): die eigenen und die einer Person für den Admin.
   sitzungen: 'sitzungen',
   // Stand der Demo-Daten der eigenen Organisation, nur für den System-Admin; 404 heißt „nicht
@@ -1288,6 +1291,9 @@ export const globalKeys = {
   benutzerEinstellungenVon: (benutzerId: number | null) =>
     [GLOBAL_KEYS.benutzerEinstellungen, benutzerId] as const,
   versionsstand: () => [GLOBAL_KEYS.versionsstand] as const,
+  /** An die Person gebunden wie {@link benutzerEinstellungenVon}; `null` = niemand angemeldet. */
+  abgelehnteAntraegeVon: (benutzerId: number | null) =>
+    [GLOBAL_KEYS.abgelehnteAntraege, benutzerId] as const,
 
   // Karte: barer Prefix (invalidiereKarte trifft alle sieben Bereiche) + adressierter Bereich.
   datentraeger: () => [GLOBAL_KEYS.datentraeger] as const,
@@ -1378,6 +1384,9 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
  * - `sitzungen`: Anmeldungen einer Person, gelesen beim Öffnen und nach dem Beenden.
+ * - `abgelehnteAntraege` (LLH-1648): eigene abgelehnte Anträge nach der Verwahrung; die Ablehnung
+ *   kam vorher, die Verwahrung meldet kein Org-Ereignis. Gelesen beim Laden, beim Fokus und nach
+ *   dem Verwerfen.
  * - `adminKarte`, `karteConfig`, `datentraeger`: instanzweit, nicht mandantenbezogen.
  * - `fachebene`: externe Quellen mit eigener Nachfrage.
  * - `zugangsprotokoll`: geladen beim Öffnen und bei Filterwechsel, nie live (LFH-1097).
@@ -1399,6 +1408,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzerEinstellungen,
   GLOBAL_KEYS.versionsstand,
   GLOBAL_KEYS.sitzungen,
+  GLOBAL_KEYS.abgelehnteAntraege,
   GLOBAL_KEYS.adminKarte,
   GLOBAL_KEYS.karteConfig,
   GLOBAL_KEYS.datentraeger,

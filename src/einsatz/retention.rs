@@ -76,6 +76,9 @@ wire_enum! {
         LoeschungAusstehend => "loeschung_ausstehend",
         /// Endgültig gelöscht — nur eine Zeile des Löschprotokolls; [`zustand`] liefert ihn nie.
         EndgueltigGeloescht => "endgueltig_geloescht",
+        /// An die verwahrende Gegenstelle übergeben und hier abgeräumt (LLH-1494) — nur eine
+        /// Zeile des Löschprotokolls; [`zustand`] liefert ihn nie.
+        Verwahrt => "verwahrt",
     }
 }
 

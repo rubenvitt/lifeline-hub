@@ -32,6 +32,7 @@ export interface FormWerteAnzeige {
 export interface FormWerteEinsatz {
   retention_dauer_tage?: number;
   skelett_dauer_tage?: number;
+  nachbereitung_tage?: number;
   etb_nummer_praefix?: string;
   meldung_nummer_praefix?: string;
   auftrag_nummer_praefix?: string;
@@ -60,6 +61,7 @@ export function zuUpdate(e: OrgEinstellungen): OrgEinstellungenUpdate {
     koordinatenformat: e.koordinatenformat ?? null,
     retention_dauer_tage: e.retention_dauer_tage ?? null,
     skelett_dauer_tage: e.skelett_dauer_tage ?? null,
+    nachbereitung_tage: e.nachbereitung_tage ?? null,
     etb_nummer_praefix: e.etb_nummer_praefix ?? null,
     meldung_nummer_praefix: e.meldung_nummer_praefix ?? null,
     auftrag_nummer_praefix: e.auftrag_nummer_praefix ?? null,
@@ -96,6 +98,7 @@ export function normalisiereEinsatz(
   OrgEinstellungenUpdate,
   | 'retention_dauer_tage'
   | 'skelett_dauer_tage'
+  | 'nachbereitung_tage'
   | 'etb_nummer_praefix'
   | 'meldung_nummer_praefix'
   | 'auftrag_nummer_praefix'
@@ -109,6 +112,7 @@ export function normalisiereEinsatz(
   return {
     retention_dauer_tage: w.retention_dauer_tage ?? null,
     skelett_dauer_tage: w.skelett_dauer_tage ?? null,
+    nachbereitung_tage: w.nachbereitung_tage ?? null,
     etb_nummer_praefix: w.etb_nummer_praefix?.trim() || null,
     meldung_nummer_praefix: w.meldung_nummer_praefix?.trim() || null,
     auftrag_nummer_praefix: w.auftrag_nummer_praefix?.trim() || null,
@@ -153,6 +157,7 @@ export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
   return {
     retention_dauer_tage: e.retention_dauer_tage ?? undefined,
     skelett_dauer_tage: e.skelett_dauer_tage ?? undefined,
+    nachbereitung_tage: e.nachbereitung_tage ?? undefined,
     etb_nummer_praefix: e.etb_nummer_praefix ?? undefined,
     meldung_nummer_praefix: e.meldung_nummer_praefix ?? undefined,
     auftrag_nummer_praefix: e.auftrag_nummer_praefix ?? undefined,
