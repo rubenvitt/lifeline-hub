@@ -228,7 +228,19 @@ pub async fn save(
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+        refresh_nummer(conn, a).await?;
     }
+    Ok(())
+}
+
+/// Liest die Nummer der Akte nach dem Ausrichten neu: Wird der Spiegel dabei zum eigenen Einsatz
+/// und ist seine Nummer hier belegt, hat `spiegel::fuehrung::werde_fuehrer` ihn umnummeriert und
+/// die Zeile nachgezogen (LLH-1703). Der Aufrufer arbeitet mit `a` weiter (Antwort, Admin-Spur).
+async fn refresh_nummer(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Result<(), AppError> {
+    a.nummer = sqlx::query_scalar("SELECT nummer FROM einsatz_fuehrung WHERE id = ?")
+        .bind(a.id)
+        .fetch_one(&mut *conn)
+        .await?;
     Ok(())
 }
 
@@ -272,6 +284,7 @@ pub async fn insert_fremd(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Res
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+        refresh_nummer(conn, a).await?;
     }
     Ok(())
 }

@@ -4660,3 +4660,189 @@ async fn zurueckgespielt_hub_erkennt_den_rueckschritt_auch_nach_verlorener_antwo
         "die verlorene Akte kommt trotzdem erneut"
     );
 }
+
+// ── Einsatznummer beim Führungswechsel (LLH-1703, Spec `einsatznummer`) ──────────────────────
+
+async fn nummer(i: &Instanz, einsatz: i64) -> String {
+    sqlx::query_scalar("SELECT einsatznummer_intern FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Dieselbe Nummer mit einer anderen laufenden Nummer (`E-2026-0001`, 3 → `E-2026-0003`).
+fn mit_lfd(nummer: &str, lfd: u32) -> String {
+    let (kopf, _) = nummer.rsplit_once('-').unwrap();
+    format!("{kopf}-{lfd:04}")
+}
+
+/// Systemeinträge im ETB, die eine Umnummerierung festhalten.
+async fn nummer_eintraege(i: &Instanz, einsatz: i64) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+         AND inhalt LIKE 'Neue Einsatznummer %' ORDER BY id",
+    )
+    .bind(einsatz)
+    .fetch_all(&i.pool)
+    .await
+    .unwrap()
+}
+
+/// Fehler der letzten Meldung des ELW.
+async fn meldefehler(elw: &Instanz) -> Option<String> {
+    sqlx::query_scalar("SELECT letzter_fehler FROM instanz_kopplung")
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap()
+}
+
+/// Die empfangende Seite einer Übergabe wird im Abgleich zum Führer: Trägt sie die Nummer schon
+/// selbst, bekommt der übernommene Einsatz eine freie, und die Meldung läuft weiter.
+#[tokio::test]
+async fn uebergabe_an_den_hub_bei_gleicher_einsatznummer() {
+    let (hub, elw) = gekoppelt().await;
+    let eigen = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let alt = nummer(&elw, e).await;
+    assert_eq!(nummer(&hub, eigen).await, alt, "beide Seiten zählen ab 1");
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None, "die Meldung läuft durch");
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(!ist_spiegel(&hub, h).await, "der Hub führt den Einsatz");
+    let neu = mit_lfd(&alt, 2);
+    assert_eq!(nummer(&hub, h).await, neu, "freie Nummer am Hub");
+    assert_eq!(nummer(&hub, eigen).await, alt, "der eigene behält seine");
+    let eintraege = nummer_eintraege(&hub, h).await;
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    assert!(
+        eintraege[0].contains(&neu) && eintraege[0].contains(&alt),
+        "{eintraege:?}"
+    );
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None);
+    assert_eq!(
+        nummer(&hub, h).await,
+        neu,
+        "eine zweite Meldung ändert nichts"
+    );
+    assert_eq!(nummer_eintraege(&hub, h).await.len(), 1);
+    assert_eq!(nummer(&elw, e).await, neu, "der Spiegel am ELW folgt");
+}
+
+/// Gibt der ELW seinen ersten Einsatz ab und legt einen neuen an, trägt der wieder dieselbe
+/// Nummer (Spiegel zählen nicht mit). Holt der ELW den ersten zurück, stoßen beide aufeinander.
+#[tokio::test]
+async fn anfrage_des_elw_bei_gleicher_einsatznummer() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let alt = nummer(&elw, e).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+    let zweiter = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    assert_eq!(
+        nummer(&elw, zweiter).await,
+        alt,
+        "Voraussetzung: die Nummer des Spiegels ist wieder vergeben"
+    );
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None, "die Meldung läuft durch");
+    let a = fuehrung(&elw, e).await;
+    assert_eq!(a["fuehrend"], true, "{a}");
+    let neu = mit_lfd(&alt, 2);
+    assert_eq!(nummer(&elw, e).await, neu, "freie Nummer am ELW");
+    assert_eq!(nummer(&elw, zweiter).await, alt, "der neue behält seine");
+    let eintraege = nummer_eintraege(&elw, e).await;
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    assert!(
+        eintraege[0].contains(&neu) && eintraege[0].contains(&alt),
+        "{eintraege:?}"
+    );
+}
+
+#[tokio::test]
+async fn freie_nummer_bleibt_beim_fuehrungswechsel() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(!ist_spiegel(&hub, h).await);
+    assert_eq!(nummer(&hub, h).await, nummer(&elw, e).await);
+    assert!(nummer_eintraege(&hub, h).await.is_empty());
+}
+
+/// Widerspricht der ELW einer Notübernahme, fällt der Hub zum Spiegel zurück. Mit dem nächsten
+/// Kopf des ELW trägt der Einsatz dort wieder dessen Nummer (ein Spiegel ist von der
+/// Eindeutigkeit ausgenommen); der Systemeintrag zur Nummer ist eine Änderung, die der ELW nicht
+/// kennt, und liegt in der Bruchstelle. Dass diese Bruchstelle danach nicht geklärt wird, ist
+/// LLH-1854 und hier nicht geprüft.
+#[tokio::test]
+async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
+    let (hub, elw) = gekoppelt().await;
+    let eigen = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let alt = nummer(&elw, e).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert_eq!(nummer(&hub, h).await, mit_lfd(&alt, 2), "umnummeriert");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        nummer(&elw, e).await,
+        alt,
+        "der ELW führt weiter mit seiner"
+    );
+    // Der ELW ändert den Kopf: Der Abgleich bringt ihn zum Hub.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        Some(&json!({"leitstellen_nr": "L-4711"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..2 {
+        elw_meldet(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None, "die Meldung läuft durch");
+    }
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
+    assert_eq!(nummer(&hub, h).await, alt, "Nummer des ELW");
+    assert_eq!(nummer(&hub, eigen).await, alt, "der eigene unberührt");
+    let gesichert: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND art = 'etb_eintrag'",
+    )
+    .bind(h)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(gesichert, 1, "der Systemeintrag zur Nummer ist gesichert");
+}

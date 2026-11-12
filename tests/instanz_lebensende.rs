@@ -515,6 +515,20 @@ async fn mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer() {
     .await;
     assert_ne!(neu, nummer, "eigene Nummer am Hub");
     assert_eq!(fuehrung_am(&hub, h).await["art"], "verwahrung");
+    // Der Eintrag der Verwahrung nennt beide Nummern; der Führungswechsel in derselben
+    // Transaktion findet die Nummer schon frei und schreibt keinen zweiten (LLH-1703).
+    let texte = etb_texte(&hub.pool, h).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t.starts_with("Zur Verwahrung übernommen von ")
+                && t.ends_with(&format!("(Einsatznummer {neu}, dort {nummer})"))),
+        "{texte:?}"
+    );
+    assert!(
+        !texte.iter().any(|t| t.starts_with("Neue Einsatznummer ")),
+        "{texte:?}"
+    );
 }
 
 #[tokio::test]
