@@ -86,6 +86,8 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Archiv heruntergeladen“**: in der Archivakte im Paneel „Archiv“. „Ziel“ ist die
   Einsatznummer, „Detail“ die Fingerabdrücke der Schlüssel und der Block, siehe
   [Aufbewahrung](aufbewahrung.md).
+- **„Archiv eingespielt“**: per Befehl am Server; unter „Admin“ steht der Befehl.
+  „Ziel“ ist die Einsatznummer.
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.
 

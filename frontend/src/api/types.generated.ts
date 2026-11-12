@@ -411,7 +411,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -2827,6 +2827,11 @@ export interface components {
             antraege_abgelehnt: number;
             /** Format: int64 */
             antraege_ausstehend: number;
+            /**
+             * @description Aus dem Archiv eingespielt (LLH-1494, D10): bis wann der Einsatz hier bleibt (UTC). Dann
+             *     ist `gegenstelle` „Archiv“.
+             */
+            archiv_bis?: string | null;
             /** @description Der Abgleich ist beendet (Widerruf); der Spiegel bleibt lesbar. */
             beendet: boolean;
             /**
@@ -9198,6 +9203,7 @@ export interface components {
          *       `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).
          *     - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
          *       des Blocks, durch Komma getrennt) und `block`.
+         *     - `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.
          *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
          *       Gegenstelle.
          *     - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich

@@ -31,7 +31,7 @@ import {
   referenceMovementSpec,
   serializeAnySpec,
   vocabulary,
-} from '@einsatzzeichen/core';
+} from '@einsatzzeichen/core/exact';
 import {
   PALETTE,
   TECHNICAL_FILL_TOKENS,

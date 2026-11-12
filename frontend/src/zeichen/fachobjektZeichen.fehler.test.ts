@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Ein Wurf, der kein Kombinationsverbot ist (CompositionError/NotMeasuredError), deutet auf einen
 // Programmfehler: Rückfall wie sonst, in DEV aber mit Warnung (design.md D3).
-vi.mock('@einsatzzeichen/core', async (original) => {
-  const echt = await original<typeof import('@einsatzzeichen/core')>();
+vi.mock('@einsatzzeichen/core/exact', async (original) => {
+  const echt = await original<typeof import('@einsatzzeichen/core/exact')>();
   return {
     ...echt,
     drawSymbol: vi.fn((spec: { organization?: string; states?: readonly string[] }) => {
