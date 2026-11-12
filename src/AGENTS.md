@@ -439,7 +439,7 @@ Herleitung in
     nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
     `tests/instanz_lebensende.rs`.
 - **Direktkopplung vor Ort (LLH-1497)**, Specs `instanz-kopplung`, `instanz-entdeckung`,
-  [ADR-0026](../docs/architektur/entscheidungen/ADR-0026-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+  [ADR-0027](../docs/architektur/entscheidungen/ADR-0027-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
   - **Was eine Kopplung trägt, fragt jede Stelle über `InstanzKopplungArt::traegt(Fluss)`**
     (in SQL `k.art = 'standard'`). Eine neue Stelle, die Stammdaten, Geheimnisse, Verwahrung oder

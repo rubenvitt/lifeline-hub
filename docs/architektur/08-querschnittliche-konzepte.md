@@ -222,7 +222,7 @@ letzten vier Zeichen des Fingerabdrucks beim Inhaber erfragt (LLH-1605).
 
 Eine Direktkopplung zweier Instanzen vor Ort (LLH-1497) vertraut nicht dem Betriebssystem, sondern
 einer signierten Aussage der Gegenstelle über ihr TLS-Zertifikat und pinnt es
-([ADR-0026](entscheidungen/ADR-0026-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+([ADR-0027](entscheidungen/ADR-0027-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
 `src/instanz/zertifikat.rs`). Konten und Stammdaten erkennen zwei Instanzen derselben Quelle an
 ihrer Ursprungskennung `<instanzkennung>/<schlüssel>` (`src/instanz/stammdaten/herkunft.rs`,
 Spec `stammdaten-verteilung`); sie erweitert das Vertrauen in eine gekoppelte Instanz nicht.

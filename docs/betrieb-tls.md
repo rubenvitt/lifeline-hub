@@ -81,7 +81,7 @@ mkcert-Zertifikat, ohne dass eine Seite der anderen vertraut: Die ausstellende S
 Koppeln den Fingerabdruck ihres Zertifikats in einer signierten Antwort, die einlösende pinnt
 ihn. Nach einem neuen Zertifikat (etwa neu erzeugt nach einem IP-Wechsel) holt die einlösende
 Seite zuerst eine signierte Aussage ein, bevor sie wieder Daten schickt
-([ADR-0026](architektur/entscheidungen/ADR-0026-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)).
+([ADR-0027](architektur/entscheidungen/ADR-0027-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)).
 Voraussetzung: **`--tls` an der ausstellenden Instanz**; hinter einem TLS-Proxy kennt die Instanz
 ihr Zertifikat nicht, dort gibt es keinen Code „vor Ort“. Für die Bedienung im Browser bleibt das
 Vertrauen ins Zertifikat nötig wie oben beschrieben.

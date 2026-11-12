@@ -1,5 +1,5 @@
 ---
-id: ADR-0026
+id: ADR-0027
 titel: Eine Direktkopplung vor Ort beglaubigt das TLS-Zertifikat per signierter Aussage
 status: akzeptiert
 datum: 2026-11-12
@@ -13,7 +13,7 @@ herleitung:
   - LLH-1497 (Lösungsweg mit Ruben am 12.11.2026 abgestimmt)
 ---
 
-# ADR-0026: Eine Direktkopplung vor Ort beglaubigt das TLS-Zertifikat per signierter Aussage
+# ADR-0027: Eine Direktkopplung vor Ort beglaubigt das TLS-Zertifikat per signierter Aussage
 
 ## Regeln
 

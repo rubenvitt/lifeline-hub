@@ -207,7 +207,7 @@ sequenceDiagram
   beim Einlösen, Neuauflösen per Kennung. Die Direktkopplung vor Ort trägt zuerst nur Spiegel und
   Anträge; das TLS-Zertifikat beglaubigt eine signierte Aussage, Konten erkennt die
   Ursprungskennung. Führungswechsel zwischen ELW folgt mit LLH-1678
-  ([ADR-0026](../architektur/entscheidungen/ADR-0026-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+  ([ADR-0027](../architektur/entscheidungen/ADR-0027-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`).
 
 ## Vorschlag für Folgeaufgaben
