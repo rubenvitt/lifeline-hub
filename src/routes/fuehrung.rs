@@ -323,17 +323,35 @@ async fn run_bestaetigen(
     b: &Benutzer,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
-    let saved = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
-    let grund = saved
-        .erklaerung
-        .as_deref()
-        .and_then(NotuebernahmeErklaerung::parse)
-        .map(|e| e.grund)
-        .unwrap_or_default();
-    let text = format!(
-        "Notübernahme durch {} bestätigt: {grund}",
-        saved.fuehrer_name
-    );
+    let eigene_notuebernahme = a.art() == fuehrung::FuehrungWechselArt::Notuebernahme;
+    let (saved, konflikt) = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
+    let text = if konflikt {
+        // Die erreichte Seite nannte einen Dritten (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
+        // D4): keine Notübernahme gegen diese Instanz, und die Erklärung gehört einer anderen ELW.
+        format!(
+            "Bestätigt: {}",
+            dienst::konflikt_text(eigene_notuebernahme, &saved.fuehrer_name)
+        )
+    } else {
+        // Grund und „Notübernahme“ nur aus einer Erklärung gegen diese Instanz (D7: der Hub kann mit
+        // der Epoche eines Dritten führen und dessen Erklärung tragen).
+        let ich = crate::instanz::identitaet::load_or_create(&state.pool)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?
+            .kennung;
+        match saved
+            .erklaerung
+            .as_deref()
+            .and_then(NotuebernahmeErklaerung::parse)
+            .filter(|e| e.fuehrer_alt == ich)
+        {
+            Some(e) => format!(
+                "Notübernahme durch {} bestätigt: {}",
+                saved.fuehrer_name, e.grund
+            ),
+            None => format!("Übernahme durch {} bestätigt", saved.fuehrer_name),
+        }
+    };
     spur(
         state,
         AdminAktion::FuehrungNotuebernahme,

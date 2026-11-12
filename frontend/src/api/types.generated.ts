@@ -3711,6 +3711,11 @@ export interface components {
             /** Format: int64 */
             epoche: number;
             grund?: string | null;
+            /**
+             * @description Die erreichte Seite nennt einen Dritten als Führer: nur Bestätigen, kein Widerspruch
+             *     (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D3).
+             */
+            konflikt: boolean;
             unterzeichner?: string | null;
             von: string;
             zeitpunkt?: string | null;

@@ -9258,7 +9258,8 @@
         "required": [
           "von",
           "epoche",
-          "bruch_at"
+          "bruch_at",
+          "konflikt"
         ],
         "properties": {
           "bruch_at": {
@@ -9273,6 +9274,10 @@
               "string",
               "null"
             ]
+          },
+          "konflikt": {
+            "type": "boolean",
+            "description": "Die erreichte Seite nennt einen Dritten als Führer: nur Bestätigen, kein Widerspruch\n(Change `faq7l7m4-zwei-elw-unterlegene-seite`, D3)."
           },
           "unterzeichner": {
             "type": [

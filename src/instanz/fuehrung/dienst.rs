@@ -2,7 +2,7 @@
 //! Notübernahme, Bestätigen und Widersprechen. Die Routen (`routes::fuehrung`) prüfen Rolle und
 //! Schalter; hier liegen Regeln und Transaktion. Jede Änderung stößt die nächste Meldung an.
 
-use super::austausch::AkteMeldung;
+use super::austausch::{self, AkteMeldung};
 use super::erklaerung::{self, FuehrungBeweis, NotuebernahmeErklaerung, TYP_NOTUEBERNAHME};
 use super::repo::{self, AkteZeile, FuehrungGegenueber, FuehrungVerlaufEintrag, Ich, VerlaufNeu};
 use super::{Epoche, FuehrungWechselArt, GRUND_MAX};
@@ -417,12 +417,16 @@ pub async fn notuebernahme_mit_code(
 
 /// Bestätigt eine offene Übernahme gegen diese Instanz (meldende Seite): sie gilt, die Bruchstelle
 /// wird festgehalten (D7, D11).
+///
+/// Ergebnis: die gespeicherte Akte und ob es ein Konflikt war (die erreichte Seite nannte einen
+/// Dritten, D4 der Change `faq7l7m4-zwei-elw-unterlegene-seite`); die Admin-Spur beschreibt ihn
+/// anders.
 pub async fn bestaetigen(
     pool: &SqlitePool,
     akte_id: i64,
     wer: &str,
-) -> Result<AkteZeile, AppError> {
-    let a = crate::write_retry!(pool, |conn| {
+) -> Result<(AkteZeile, bool), AppError> {
+    let (a, konflikt) = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         let m: AkteMeldung = a
@@ -434,36 +438,53 @@ pub async fn bestaetigen(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse);
-        // Die Übernahme muss noch dem Stand gelten, gegen den sie erklärt wurde.
-        if m.epoche <= a.epoche() || e.as_ref().is_some_and(|e| e.epoche_alt != a.epoche()) {
-            return Err(AppError::Conflict(
-                "Die Führung hat sich inzwischen geändert.".into(),
-            ));
+        let hubs = repo::list_hubs(conn, a.org_id).await?;
+        let hubs: Vec<&str> = hubs.iter().map(String::as_str).collect();
+        let konflikt = austausch::ist_konflikt(&m, &hubs);
+        // Eine Erklärung zählt hier nur, wenn sie gegen diese Instanz gerichtet ist; die Akte des
+        // Hubs kann die Erklärung einer anderen ELW tragen (D7).
+        let gegen_mich = e.as_ref().filter(|e| e.fuehrer_alt == ich.kennung);
+        if konflikt {
+            // Der Hub nennt einen Dritten (D4): Es gilt sein Stand, auch mit kleinerer Epoche;
+            // gekoppelt ist der Dritte nicht.
+            if a.fuehrer_kennung != ich.kennung {
+                return Err(AppError::Conflict(
+                    "Die Führung hat sich inzwischen geändert.".into(),
+                ));
+            }
+        } else {
+            // Die Übernahme muss noch dem Stand gelten, gegen den sie erklärt wurde.
+            if m.epoche <= a.epoche() || gegen_mich.is_some_and(|e| e.epoche_alt != a.epoche()) {
+                return Err(AppError::Conflict(
+                    "Die Führung hat sich inzwischen geändert.".into(),
+                ));
+            }
         }
-        if !repo::list_gegenueber(conn, a.org_id)
-            .await?
-            .iter()
-            .any(|g| g.kennung == m.fuehrer)
-        {
-            return Err(AppError::Conflict(
-                "Die übernehmende Instanz ist nicht mehr gekoppelt.".into(),
-            ));
-        }
+        let eigene_notuebernahme = a.art() == FuehrungWechselArt::Notuebernahme;
         // Die Unterschrift muss auch beim Bestätigen noch tragen: Ein inzwischen widerrufener
-        // Schlüssel gibt die Führung nicht ab (LLH-1671).
-        let alt = a.epoche();
-        if let Err(grund) =
-            super::austausch::check_unterschrift(conn, &ich, a.org_id, &m, &alt).await
-        {
-            return Err(AppError::Conflict(format!(
-                "Die Unterschrift der Übernahme gilt hier nicht mehr ({grund})."
-            )));
+        // Schlüssel gibt die Führung nicht ab (LLH-1671). Ohne Erklärung gegen diese Instanz
+        // (Konflikt, D7 der Change `faq7l7m4-zwei-elw-unterlegene-seite`) gibt es keine.
+        if !konflikt && gegen_mich.is_some() {
+            let alt = a.epoche();
+            if let Err(grund) =
+                super::austausch::check_unterschrift(conn, &ich, a.org_id, &m, &alt).await
+            {
+                return Err(AppError::Conflict(format!(
+                    "Die Unterschrift der Übernahme gilt hier nicht mehr ({grund})."
+                )));
+            }
         }
         let bruch = a.offen_bruch_at.clone();
         a.set_epoche(&m.epoche);
         a.fuehrer_kennung = m.fuehrer.clone();
         a.fuehrer_name = m.fuehrer_name.clone();
-        a.set_art(FuehrungWechselArt::Bestaetigt);
+        // Im Konflikt bleibt die Art des Hubs: Er hat nichts zu bestätigen, und gleiche Epoche mit
+        // gleicher Art lässt den Takt ruhig.
+        if konflikt {
+            a.art = m.art.clone();
+        } else {
+            a.set_art(FuehrungWechselArt::Bestaetigt);
+        }
         a.erklaerung = m.erklaerung.clone();
         a.beweis = m
             .beweis
@@ -473,25 +494,40 @@ pub async fn bestaetigen(
         a.offen_bruch_at = None;
         a.bruch_at = bruch.clone();
         a.abgabe_schluessel = None;
+        let grund = if konflikt {
+            Some(konflikt_text(eigene_notuebernahme, &m.fuehrer_name))
+        } else {
+            gegen_mich.map(|e| e.grund.clone())
+        };
         repo::save(conn, &mut a, true).await?;
         repo::add_verlauf(
             conn,
             &a,
             VerlaufNeu {
+                art: Some(FuehrungWechselArt::Bestaetigt),
                 von_name: Some(&ich.name),
                 nach_name: &m.fuehrer_name,
                 wer: Some(wer),
-                grund: e.as_ref().map(|e| e.grund.as_str()),
-                unterzeichner: e.as_ref().map(|e| e.unterzeichner.as_str()),
+                grund: grund.as_deref(),
+                unterzeichner: gegen_mich.map(|e| e.unterzeichner.as_str()),
                 bruch_at: bruch.as_deref(),
                 ..VerlaufNeu::default()
             },
         )
         .await?;
-        Ok(a)
+        Ok((a, konflikt))
     })?;
     anstossen(pool).await;
-    Ok(a)
+    Ok((a, konflikt))
+}
+
+/// Grund im Verlauf und in der Admin-Spur, wenn die eigene Führung am Hub nicht gegriffen hat.
+pub fn konflikt_text(eigene_notuebernahme: bool, fuehrer: &str) -> String {
+    if eigene_notuebernahme {
+        format!("Notübernahme hat am Hub nicht gegriffen, Führung bei {fuehrer}")
+    } else {
+        format!("Führung hat am Hub nicht gegriffen, sie liegt bei {fuehrer}")
+    }
 }
 
 /// Widerspricht einer offenen Übernahme: diese Instanz führt mit der nächsten Epoche weiter (D10).
@@ -508,6 +544,15 @@ pub async fn widersprechen(
             .as_deref()
             .and_then(|o| serde_json::from_str(o).ok())
             .ok_or_else(|| AppError::Conflict("Keine Übernahme wartet.".into()))?;
+        let hubs = repo::list_hubs(conn, a.org_id).await?;
+        let hubs: Vec<&str> = hubs.iter().map(String::as_str).collect();
+        if austausch::ist_konflikt(&m, &hubs) {
+            // D5: Der Hub nimmt keinen Widerspruch an, solange ein Dritter führt.
+            return Err(AppError::UnprocessableEntity(format!(
+                "Die Führung liegt bei „{}“; ein Widerspruch würde am Hub nicht greifen.",
+                m.fuehrer_name
+            )));
+        }
         let neu = Epoche::naechste([&a.epoche(), &m.epoche], &ich.kennung);
         a.set_epoche(&neu);
         a.fuehrer_kennung = ich.kennung.clone();
@@ -519,7 +564,19 @@ pub async fn widersprechen(
         a.offen = None;
         a.offen_bruch_at = None;
         repo::save(conn, &mut a, true).await?;
-        let grund = format!("Notübernahme durch {} widersprochen", m.fuehrer_name);
+        // „Notübernahme“ nur, wenn eine Erklärung gegen diese Instanz vorliegt (D7: der Hub kann mit
+        // der Epoche eines Dritten führen, ohne etwas gegen sie erklärt zu haben).
+        let gegen_mich = m
+            .erklaerung
+            .as_deref()
+            .and_then(NotuebernahmeErklaerung::parse)
+            .is_some_and(|e| e.fuehrer_alt == ich.kennung);
+        let was = if gegen_mich {
+            "Notübernahme"
+        } else {
+            "Übernahme"
+        };
+        let grund = format!("{was} durch {} widersprochen", m.fuehrer_name);
         repo::add_verlauf(
             conn,
             &a,
@@ -552,6 +609,9 @@ pub struct FuehrungOffen {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zeitpunkt: Option<String>,
     pub bruch_at: String,
+    /// Die erreichte Seite nennt einen Dritten als Führer: nur Bestätigen, kein Widerspruch
+    /// (Change `faq7l7m4-zwei-elw-unterlegene-seite`, D3).
+    pub konflikt: bool,
 }
 
 /// Die Führung einer Akte samt Verlauf (Paneel „Führung“, Seite „Instanzkopplung“).
@@ -601,10 +661,18 @@ pub async fn anzeige(
         .as_deref()
         .and_then(|o| serde_json::from_str::<AkteMeldung>(o).ok())
         .map(|m| {
+            // Angaben einer Erklärung nur, wenn sie gegen diese Instanz gerichtet ist; sonst
+            // gehören Grund und Unterzeichner einer anderen ELW (Konflikt, D3 und D7).
             let e = m
                 .erklaerung
                 .as_deref()
-                .and_then(NotuebernahmeErklaerung::parse);
+                .and_then(NotuebernahmeErklaerung::parse)
+                .filter(|e| e.fuehrer_alt == ich.kennung);
+            let hubs: Vec<&str> = gegenueber
+                .iter()
+                .filter(|g| g.richtung == InstanzKopplungRichtung::MeldetSich)
+                .map(|g| g.kennung.as_str())
+                .collect();
             FuehrungOffen {
                 von: m.fuehrer_name.clone(),
                 epoche: m.epoche.zaehler,
@@ -612,6 +680,7 @@ pub async fn anzeige(
                 unterzeichner: e.as_ref().map(|e| e.unterzeichner.clone()),
                 zeitpunkt: e.map(|e| e.zeitpunkt),
                 bruch_at: a.offen_bruch_at.clone().unwrap_or_default(),
+                konflikt: austausch::ist_konflikt(&m, &hubs),
             }
         });
     Ok(FuehrungAnzeige {
