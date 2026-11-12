@@ -378,10 +378,13 @@ pub async fn widerrufen(
             .await?
             .ok_or(AppError::NotFound)
     })?;
-    let mut conn = state.pool.acquire().await?;
-    let z = zugang::laden(&mut conn, &id)
-        .await?
-        .ok_or(AppError::NotFound)?;
+    let z = {
+        let mut conn = state.pool.acquire().await?;
+        zugang::laden(&mut conn, &id)
+            .await?
+            .ok_or(AppError::NotFound)?
+    };
+    // Die Verbindung ist zurück im Pool: die Admin-Spur braucht eine eigene.
     if wirkung {
         admin_audit::schreibe(
             &state.pool,

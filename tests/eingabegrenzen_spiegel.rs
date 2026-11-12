@@ -290,6 +290,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "LAGEMONITOR_BEZEICHNUNG_MAX",
             lagemonitor_zugang::BEZEICHNUNG_MAX,
         ),
+        (
+            "ANBINDUNG_NAME_MAX",
+            lifeline_hub::routes::anbindungen::NAME_MAX,
+        ),
         ("LAGEBILD_EMPFAENGER_MAX", lagebild_extern::EMPFAENGER_MAX),
         (
             "ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX",

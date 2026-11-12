@@ -51,7 +51,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
   Verifizieren: Repo-Tests je Funktion, darunter „zweites Einlösen scheitert“, „neuer Code macht
   den alten ungültig“ und „Ablehnung wird höchstens einmal je 60 s geschrieben“.
-- [ ] 2.5 Aufräumen in Phase C von `purge_scheduler`: `maschine_jti` nach `bis`, Codes nach einem
+- [x] 2.5 Aufräumen in Phase C von `purge_scheduler`: `maschine_jti` nach `bis`, Codes nach einem
   Tag, `maschine_abruf` nach 365 Tagen. Verifizieren: Test mit eingefügten alten Zeilen nach
   `tick_einmal`.
 
@@ -108,7 +108,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 5. Admin-Routen
 
-- [ ] 5.1 Routen `/api/admin/anbindungen…` aus D11 mit `AdminUser` (schreiben),
+- [x] 5.1 Routen `/api/admin/anbindungen…` aus D11 mit `AdminUser` (schreiben),
   `darf_admin_bereich` (lesen), Org-Prüfung, `JsonBody`/`PfadParam` und Grenzen `*_MAX`
   (gespiegelt in `frontend/src/api/eingabegrenzen.ts`). Dazu die DTOs in `src/api_doc.rs`.
   Verifizieren:
