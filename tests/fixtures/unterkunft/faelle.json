@@ -1,5 +1,5 @@
 {
-  "_zweck": "Gemeinsame Testfälle des Unterkunfts- und Zeltrechners (LLH-1520, design.md D1). Gelesen von frontend/src/betreuung/unterkunft/rechnerFixture.test.ts, später auch vom Rust-Kern der Rechner-API (LLH-1524). Je Fall: eingabe, richtwerte (Overrides über der Basis aus src/unterkunft/richtwerte_basis.json) und das vollständige erwartete Ergebnis. bezug nennt den Befund aus LLH-1519 (W1–W9) oder die Grenze, die der Fall festhält.",
+  "_zweck": "Gemeinsame Testfälle des Unterkunfts- und Zeltrechners (LLH-1520, design.md D1). Gelesen von frontend/src/betreuung/unterkunft/rechnerFixture.test.ts und vom Rust-Kern der Rechner-API (LLH-1524, src/public_api/rechner/tests.rs); jede eingabe ist zugleich eine gültige Anfrage an POST /api/v1/rechner/unterkunft. Je Fall: eingabe, richtwerte (Overrides über der Basis aus src/unterkunft/richtwerte_basis.json) und das vollständige erwartete Ergebnis. bezug nennt den Befund aus LLH-1519 (W1–W9) oder die Grenze, die der Fall festhält.",
   "faelle": [
     {
       "name": "personen_getrennt_50_50",
@@ -1836,6 +1836,112 @@
             {
               "typ": "sg40",
               "anzahl": 2
+            },
+            {
+              "typ": "sg50",
+              "anzahl": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "flaeche_gleitkomma_glatt",
+      "bezug": "Gleitkomma-Rest 220 m² / 4,4 m² = 49,999…99 ergibt 50 Plätze (glatt vor dem Abrunden)",
+      "eingabe": {
+        "weg": "flaeche",
+        "trennung": false,
+        "flaeche": {
+          "gesamt_m2": 220
+        }
+      },
+      "richtwerte": {
+        "flaeche_je_person_m2": 4.4
+      },
+      "erwartet": {
+        "weg": "flaeche",
+        "trennung": false,
+        "personen": 50,
+        "gruppen": [
+          {
+            "gruppe": "gesamt",
+            "personen": 50
+          }
+        ],
+        "kapazitaet": {
+          "plaetze": 50,
+          "raeume": null
+        },
+        "schlafen": {
+          "flaeche_m2": 220,
+          "zelte_je_typ": [
+            {
+              "typ": "sg20",
+              "anzahl": 9
+            },
+            {
+              "typ": "sg30",
+              "anzahl": 5
+            },
+            {
+              "typ": "sg40",
+              "anzahl": 5
+            },
+            {
+              "typ": "sg50",
+              "anzahl": 4
+            }
+          ],
+          "zeltmix": [
+            {
+              "typ": "sg30",
+              "anzahl": 1
+            },
+            {
+              "typ": "sg50",
+              "anzahl": 3
+            }
+          ],
+          "zeltmix_grundflaeche_m2": 202.8,
+          "zeltmix_platzbedarf_m2": 336
+        },
+        "material": {
+          "feldbetten": 50,
+          "decken": 100
+        },
+        "sanitaer": {
+          "toiletten": 3,
+          "urinale": 2,
+          "waschplaetze": 10,
+          "duschen": 3
+        },
+        "gesundheit": {
+          "betten": 3,
+          "flaeche_m2": 22.5,
+          "isolierstation": false
+        },
+        "versorgung": {
+          "wasser_l_tag": 1250,
+          "davon_trinkwasser_l_tag": 150,
+          "faekalien_l_tag": 75,
+          "abfall_l_tag": 150
+        },
+        "verpflegung": {
+          "ausgabestellen": 1,
+          "sitzplaetze": 17,
+          "garnituren": 3,
+          "aufenthaltszelte_je_typ": [
+            {
+              "typ": "sg20",
+              "anzahl": 1
+            },
+            {
+              "typ": "sg30",
+              "anzahl": 1
+            },
+            {
+              "typ": "sg40",
+              "anzahl": 1
             },
             {
               "typ": "sg50",

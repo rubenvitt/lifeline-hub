@@ -1,6 +1,7 @@
-//! Helfer für signierte Anfragen eines Fremdsystems (LLH-1652, LLH-1638): Anbindung anlegen, Code
-//! einlösen, signiert senden. Geteilt von `tests/maschinenzugang.rs`, `tests/public_api_lage.rs`
-//! und `tests/einsatz_anbindungen.rs`.
+//! Helfer für signierte Anfragen eines Fremdsystems unter `/api/v1/` (LLH-1652, LLH-1638):
+//! Anbindung anlegen, Code einlösen, signieren und senden. Geteilt von
+//! `tests/maschinenzugang.rs`, `tests/public_api_lage.rs`, `tests/einsatz_anbindungen.rs`,
+//! `tests/programmpunkt.rs` und `tests/rechner_api.rs`.
 
 use super::anfrage_json;
 use axum::body::{to_bytes, Body};
@@ -90,7 +91,7 @@ pub async fn einloesen(
     )
 }
 
-/// Signiert und sendet; liefert Status, Köpfe und Body als JSON.
+/// Signiert und sendet ohne Body; liefert Status, Köpfe und Body als JSON.
 pub async fn signiert(
     app: &axum::Router,
     cred: &Credentials,
@@ -100,16 +101,23 @@ pub async fn signiert(
     jti: &str,
     ip: &str,
 ) -> (StatusCode, axum::http::HeaderMap, Value) {
-    let auth = cred.sign_request(methode, pfad, b"", iat, jti).unwrap();
-    let (s, h, b) = senden(
-        app,
-        methode,
-        pfad,
-        Some(("authorization", auth)),
-        vec![],
-        ip,
-    )
-    .await;
+    signiert_mit_body(app, cred, methode, pfad, vec![], iat, jti, ip).await
+}
+
+/// Signiert über `body` und sendet ihn; liefert Status, Köpfe und Body als JSON.
+#[allow(clippy::too_many_arguments)]
+pub async fn signiert_mit_body(
+    app: &axum::Router,
+    cred: &Credentials,
+    methode: &str,
+    pfad: &str,
+    body: Vec<u8>,
+    iat: i64,
+    jti: &str,
+    ip: &str,
+) -> (StatusCode, axum::http::HeaderMap, Value) {
+    let auth = cred.sign_request(methode, pfad, &body, iat, jti).unwrap();
+    let (s, h, b) = senden(app, methode, pfad, Some(("authorization", auth)), body, ip).await;
     (s, h, serde_json::from_slice(&b).unwrap_or(Value::Null))
 }
 

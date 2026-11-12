@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs]
 ---
 
 ## Überblick
@@ -83,11 +83,18 @@ eigene Organisation. Eine Führungskraft sieht Liste und Ansicht ohne Aktionen.
 | Positionen einliefern     | Positionen melden                                  |
 | Rechner nutzen            | die Rechner verwenden                              |
 
-Die Rechte stehen fest, die Wege dahinter kommen nach und nach: Heute öffnet „Lage lesen“ das
-Lagebild eines Einsatzes; die übrigen Rechte nutzt ein Fremdsystem noch nur zur Prüfung seiner
-Anmeldung. Welche Daten ein Recht öffnet, nennt dieses Kapitel, sobald es sie gibt. Neben jedem
-Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich mit der Doku des
-Fremdsystems vergleichen. Ein Fremdsystem legt nie selbst einen Einsatz an.
+Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen zwei Rechte etwas:
+
+- „Rechner nutzen“: Damit rechnet ein Fremdsystem Unterkunft und Zelte durch, mit denselben
+  Regeln wie der [Unterkunftsrechner](betreuung.md) und mit den Richtwerten der Organisation aus
+  den [Stammdaten](stammdaten.md). Eigene Werte darf es je Rechnung mitschicken; gespeichert wird
+  davon nichts, und die Werte eines Einsatzes sieht es nicht.
+- „Lage lesen“: das Lagebild eines Einsatzes, siehe unten.
+
+Mit den übrigen Rechten prüft ein Fremdsystem bisher nur seine Anmeldung. Welche Daten sie später
+öffnen, nennt dieses Kapitel, sobald es sie gibt. Neben jedem Recht steht der technische Name,
+etwa `alarmmeldungen:write`; so lässt es sich mit der Doku des Fremdsystems vergleichen. Ein
+Fremdsystem legt nie selbst einen Einsatz an.
 
 ### Lage lesen braucht die Freigabe der Einsatzleitung
 

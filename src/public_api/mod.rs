@@ -16,6 +16,9 @@
 //! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`]. Die Freigabe eines Einsatzes für
 //! einen Zugang (LLH-1638, ADR-0031) liegt in [`freigabe`].
 //!
+//! Fachrouten: Rechner Unterkunft und Zelte in [`rechner`] (LLH-1524, Spec
+//! `rechner-api-unterkunft`).
+//!
 //! Regeln: `src/AGENTS.md`, „Öffentliche API v1“.
 
 pub mod drossel;
@@ -24,6 +27,7 @@ pub mod freigabe;
 pub mod kommando;
 pub mod lage;
 pub mod machine;
+pub mod rechner;
 pub mod routen;
 pub mod scope;
 pub mod zugang;
@@ -95,6 +99,7 @@ const REDEEM_BODY_MAX: usize = 4 * 1024;
 pub fn router() -> OpenApiRouter<crate::app::AppState> {
     use axum::Extension;
     use machine::ScopeAnforderung;
+    use scope::Scope;
     OpenApiRouter::with_openapi(PublicApiDoc::openapi())
         .routes(routes!(openapi_json))
         // Maschinenzugang (LLH-1652). Jede Route mit `MachineClient` trägt ihre
@@ -103,8 +108,15 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
         .routes(routes!(routen::jwks))
         .routes(routes!(routen::me).layer(Extension(ScopeAnforderung::Keine)))
         // Lage des freigegebenen Einsatzes (LLH-1638).
+        .routes(routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(Scope::LageRead))))
+        // Rechner (LLH-1524, Spec `rechner-api-unterkunft`).
         .routes(
-            routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(scope::Scope::LageRead))),
+            routes!(rechner::calculate_unterkunft)
+                .layer(Extension(ScopeAnforderung::Scope(Scope::RechnerUse))),
+        )
+        .routes(
+            routes!(rechner::get_unterkunft_richtwerte)
+                .layer(Extension(ScopeAnforderung::Scope(Scope::RechnerUse))),
         )
 }
 

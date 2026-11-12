@@ -1,11 +1,15 @@
 //! Richtwerte des Unterkunfts- und Zeltrechners (LLH-1520, design.md D2).
 //!
-//! Die Rechnung selbst läuft im Browser (`frontend/src/betreuung/unterkunft/rechnerKern.ts`), damit
-//! sie ohne Netz geht. Der Server hält nur die Ebenen der Richtwerte: Basis im Programm
+//! Die Oberfläche rechnet im Browser (`frontend/src/betreuung/unterkunft/rechnerKern.ts`), damit
+//! es ohne Netz geht. Der Server hält die Ebenen der Richtwerte: Basis im Programm
 //! (`richtwerte_basis.json`, dieselbe Datei importiert die Oberfläche), darüber die Organisation
-//! und darüber der Einsatz. Wirksam ist je Schlüssel die höchste gesetzte Ebene. Die Rechner-API
-//! für fremde Apps mit der Ebene „Anfrage“ folgt in LLH-1524.
+//! und darüber der Einsatz. Wirksam ist je Schlüssel die höchste gesetzte Ebene.
+//!
+//! Für Fremdsysteme rechnet der Server selbst (LLH-1524, Spec `rechner-api-unterkunft`): der
+//! Rechenkern [`rechner`] bildet den TS-Kern nach, die Routen stehen in
+//! `crate::public_api::rechner`. Dort gilt Anfrage vor Organisation vor Basis, ohne Einsatz.
 
+pub mod rechner;
 pub mod repo;
 
 #[cfg(test)]
@@ -18,20 +22,32 @@ use utoipa::ToSchema;
 
 use crate::error::AppError;
 
-/// Ein Basis-Richtwert aus der Datei. Die Oberfläche liest Bezeichnung, Einheit und Quelle selbst
-/// aus derselben Datei; der Server braucht Wert und Grenzen.
+/// Ein Basis-Richtwert aus der Datei. Quelle und Beleg liest nur die Oberfläche aus derselben
+/// Datei; der Server braucht Wert und Grenzen, die Auskunft der Rechner-API dazu Bezeichnung,
+/// Gruppe und Einheit.
 #[derive(Debug, Deserialize)]
 pub struct Basiswert {
     pub schluessel: String,
+    pub gruppe: String,
+    pub bezeichnung: String,
     pub wert: f64,
+    pub einheit: String,
     pub min: f64,
     pub max: f64,
     pub ganzzahl: bool,
 }
 
+/// Ein Zelttyp der Basis. Seine Richtwerte heißen `zelt_<typ>_…`.
+#[derive(Debug, Deserialize)]
+pub struct Zelttyp {
+    pub typ: String,
+    pub bezeichnung: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct BasisDatei {
     stand: String,
+    zelttypen: Vec<Zelttyp>,
     werte: Vec<Basiswert>,
 }
 
@@ -44,6 +60,11 @@ static BASIS: LazyLock<BasisDatei> = LazyLock::new(|| {
 /// Alle Basiswerte in der Reihenfolge der Datei.
 pub fn basis() -> &'static [Basiswert] {
     &BASIS.werte
+}
+
+/// Die Zelttypen in der Reihenfolge der Datei.
+pub fn zelttypen() -> &'static [Zelttyp] {
+    &BASIS.zelttypen
 }
 
 /// Stand der Basis (Datum der Recherche).
