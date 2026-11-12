@@ -39,7 +39,7 @@ Wurzel-`AGENTS.md`, „Bezeichner-Sprache“.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `cargo test` für die Bereiche (`--lib instanz::`, `--lib einsatz::`, `--test instanz_fuehrung --test instanz_lebensende --test instanz_spiegel --test instanz_kopplung`), `scripts/check-fmt.sh`, dann `./scripts/check-all.sh` (in der Cloud-Sitzung das Bündel, das die Umgebung trägt; der volle Lauf ist die CI des PRs)
+- [x] 6.1 `cargo test` für die Bereiche (`--lib instanz::`, `--lib einsatz::`, `--test instanz_fuehrung --test instanz_lebensende --test instanz_spiegel --test instanz_kopplung`), `scripts/check-fmt.sh`, dann `./scripts/check-all.sh` (in der Cloud-Sitzung das Bündel, das die Umgebung trägt; der volle Lauf ist die CI des PRs). Gemessen am 12.11.2026: vor dem Merge von `alpha` `cargo test --lib` ganz (4131 grün); danach `--lib instanz:: einsatz:: db::` (787 grün) und die Integrations-Suiten `instanz_fuehrung` (83), `instanz_lebensende` (11), `instanz_spiegel` (22), `instanz_kopplung` (32), `aufbewahrung` (14) grün; `cargo fmt --check` sauber; Bündel `schnell`: Schritte 9, 10, 13, 14, 16 grün und in Schritt 3 die beiden OpenAPI-Dokumente ohne Drift, die übrigen Schritte brechen in der Cloud-Sitzung an fehlendem `mise` ab und laufen in der CI des PRs (`.github/workflows/ci.yml`)
 - [ ] 6.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt
 - [ ] 6.3 Bilder der Änderung: „Einsätze beim Gegenüber“ vor und nach dem Abgleich, sofern der Bildlauf zwei gekoppelte Instanzen trägt; sonst im PR ein Satz, warum es kein Bild gibt (die Liste verliert nur eine Zeile, belegt durch die Integrationstests)
 
