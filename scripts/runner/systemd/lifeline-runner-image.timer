@@ -1,0 +1,12 @@
+# Wöchentlicher Neubau des Runner-Images (LLH-1666): hält Runner-Version, Systempakete und
+# Browser aktuell, ohne dass jemand daran denkt.
+[Unit]
+Description=Lifeline-Hub e2e-Runner: Image wöchentlich neu bauen
+
+[Timer]
+OnCalendar=Sun *-*-* 03:17:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

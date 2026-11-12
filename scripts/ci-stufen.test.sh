@@ -139,7 +139,8 @@ r="$(job "$E2E" berichte)"
 pruefe "e2e-Bericht hält den Release nicht auf (continue-on-error am Job)" grep -qx "    continue-on-error: true" <<< "$r"
 
 echo "==> ci-stufen: ci.yml"
-pruefe "ci.yml hat keinen Job e2e-Binary" fehlt "$(cat "$CI")" "e2e-Binary"
+# Ein Job oder Matrix-Eintrag dieses Namens, nicht ein Kommentar, der ihn erwähnt.
+pruefe "ci.yml hat keinen Job e2e-Binary" fehlt "$(grep -Ev '^[[:space:]]*#' "$CI")" "e2e-Binary"
 pruefe "ci.yml hat keine e2e-Anteile" fehlt "$(cat "$CI")" "name: e2e \${{ matrix.shard }}/4"
 k="$(kopf "$CI")"
 pruefe "ci.yml startet nicht auf Auto-Merge (Abbruch des laufenden Laufs)" fehlt "$k" "auto_merge"

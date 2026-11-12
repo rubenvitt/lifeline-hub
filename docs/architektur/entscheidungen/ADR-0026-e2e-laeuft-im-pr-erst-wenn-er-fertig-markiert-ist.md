@@ -1,5 +1,5 @@
 ---
-id: ADR-0025
+id: ADR-0026
 titel: Die e2e-Suite läuft im PR erst, wenn er fertig markiert ist, und ihre Pflicht-Checks fehlen davor
 status: akzeptiert
 datum: 2026-11-12
@@ -13,7 +13,7 @@ herleitung:
   - Zunder LLH-1662 (Weg abgestimmt und Change freigegeben von Ruben am 12.11.2026)
 ---
 
-# ADR-0025: Die e2e-Suite läuft im PR erst, wenn er fertig markiert ist, und ihre Pflicht-Checks fehlen davor
+# ADR-0026: Die e2e-Suite läuft im PR erst, wenn er fertig markiert ist, und ihre Pflicht-Checks fehlen davor
 
 ## Regeln
 

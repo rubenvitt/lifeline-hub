@@ -28,6 +28,11 @@
 # Im Zweifel wird geprüft: Nur ein ausdrückliches `false` spart, ein roter `aenderungen`-Job
 # lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
 #
+# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Shards laufen auf dem eigenen
+# Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
+# Fork stammt. Die Jobs und die Runner-Wahl stehen seit LLH-1662 in `e2e.yml` (Kopf dort); dieser
+# Workflow ruft ihn bei Push auf.
+#
 # NUR UMNUMMERIERT (LLH-1660, je Suite seit LLH-1662): Benennt der Migrations-Autofix nur
 # Migrationen um, übernimmt der neue Kopf jede Suite, die am Commit davor grün war
 # (`scripts/ci-auswahl.sh`, `scripts/nur-umnummeriert.sh`). Schnellprüfungen,
@@ -346,5 +351,4 @@ jobs:
       actions: write
       id-token: write
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

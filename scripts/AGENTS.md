@@ -133,6 +133,13 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   hängender Ubuntu-Spiegel hielt sonst jeden Job bis zu seinem Timeout fest, auf allen PRs
   zugleich; apts eigene Zeitgrenzen fangen einen tröpfelnden Spiegel nicht. Selbsttest
   `scripts/wiederholen.test.sh` (Schritt 11).
+- **Eigener Runner** (LLH-1666, [ADR-0025](../docs/architektur/entscheidungen/ADR-0025-e2e-jobs-laufen-in-wegwerf-containern-auf-dem-eigenen-server.md)):
+  `e2e-Binary` und die e2e-Shards können auf einem eigenen Server laufen (Repo-Variable
+  `E2E_RUNNER`, `scripts/runner/`). Dort gibt es kein `sudo`: ein neuer Schritt in diesen Jobs,
+  der `sudo`, apt oder einen Cache nur der gehosteten Runner braucht, trägt
+  `runner.environment == 'github-hosted'`, und was der eigene Runner dafür braucht, kommt ins
+  `scripts/runner/Dockerfile`. Nach einem Bump von `@playwright/test` das Image auf dem Server neu
+  bauen (`scripts/runner/README.md`). Selbsttests `scripts/runner/*.test.sh` (Schritt 11).
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über

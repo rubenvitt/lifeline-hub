@@ -38,10 +38,10 @@ jobs:
     steps:
       - name: Ist die Release-App eingerichtet?
         env:
-          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          APP_CLIENT_ID: ${{ vars.RELEASE_APP_CLIENT_ID }}
         run: |
-          if [ -z "${APP_ID:-}" ]; then
-            echo "::error::Das Secret RELEASE_APP_ID fehlt; ohne Release-App kann nichts nach beta geschrieben werden."
+          if [ -z "${APP_CLIENT_ID:-}" ]; then
+            echo "::error::Die Variable RELEASE_APP_CLIENT_ID fehlt; ohne Release-App kann nichts nach beta geschrieben werden."
             exit 1
           fi
 
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       # Volle Historie und alle Tags: das Skript prüft, ob der Tag schon in `beta` steckt, und

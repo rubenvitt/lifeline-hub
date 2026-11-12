@@ -261,3 +261,8 @@ Die Artefakte der e2e-Jobs (`lifeline-hub-debug`, `playwright-blob-k`, `e2e-lauf
 - **Folgeaufgabe Messung:** LLH-1695
   (https://zunder.rubeen.dev/#/aufgabe/l9tq50mmn1hmbha9u6o0fv9s), hängt an LLH-1662 und misst
   vorher und nachher mit `scripts/ci-messung.sh`.
+- **Merge mit LLH-1666 (eigener Runner, 12.11.2026):** Auf `alpha` liefen `e2e-Binary` und die
+  Anteile inzwischen über `scripts/runner/select-runner.sh` auf dem eigenen Server (ADR-0025).
+  Die Runner-Wahl, `runs-on` und die Bedingung `runner.environment == 'github-hosted'` zogen mit
+  den Jobs nach `e2e.yml`; ADR-0025 bekam den Pfadnachzug, `scripts/runner/ci-schritte.test.sh`
+  prüft `e2e.yml`. Die eigene ADR dieser Change wurde von 0025 auf ADR-0026 umnummeriert.
