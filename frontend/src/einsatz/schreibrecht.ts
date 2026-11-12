@@ -90,6 +90,17 @@ export function darfFuehrungBedienen(
   return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
 }
 
+/** Notübernahme mit eigener Unterschrift (LLH-1676, Spec `instanz-fuehrung`): nur ein System-Admin
+    der Einsatz-Org. Unterschriftsschlüssel haben nur Admins, und das Gegenüber prüft die
+    Unterschrift gegen die Schlüssel der Einsatz-Org; die Einsatzleitung übernimmt mit dem Code. */
+export function darfFuehrungUnterschreiben(
+  einsatz: EinsatzOrgKontext,
+  benutzer: BenutzerOrgKontext,
+): boolean {
+  if (!einsatz) return false;
+  return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
+}
+
 /** Einsatz-Kontext mit Org — nur für Rechte, deren Admin-Zweig an der Einsatz-Org hängt. Eigener
     Typ, damit die geteilten `…Schreibkontext`-Typen und ihre Fixtures unberührt bleiben. */
 export type EinsatzOrgKontext =

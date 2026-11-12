@@ -61,6 +61,7 @@ use utoipa::OpenApi;
         crate::benachrichtigung::vorgabe::VorgabeFunktionAnzeige,
         crate::routes::benachrichtigung::VorgabeEingabe,
         crate::routes::web_push::WebPushStand,
+        crate::routes::web_push::PushUeberHub,
         crate::benutzer_einstellungen::BenutzerEinstellungenAnzeige,
         crate::betreuung::BelegungKopfzahl,
         crate::betreuung::BelegungKopfzahlStelle,

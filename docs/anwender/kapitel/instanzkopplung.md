@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts]
 ---
 
 ## Überblick
@@ -163,29 +163,35 @@ Organisation, an der Installation, die den Einsatz führt.
 
 Ohne Verbindung zum Hub gibt die Installation, die sich meldet, die Führung per Code ab:
 „Führung per Code abgeben“, Rückfrage mit „Code erzeugen“ bestätigen und den Code, der nur
-einmal erscheint, per Funk oder Telefon durchgeben.
+einmal erscheint, per Funk oder Telefon durchgeben. Ab dem Code ist der Einsatz hier ein
+Spiegel, und der Verlauf zeigt „Abgabe per Code“.
 
 ### Führung anfragen
 
-Für einen Admin der Organisation, an der Installation, die sich meldet, etwa am ELW bei Ankunft.
+Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, die sich meldet,
+etwa am ELW bei Ankunft.
 
-1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
-2. Im Paneel „Einsätze beim Gegenüber“ am Einsatz „Führung …“ wählen.
-3. „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
-   Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat. Wechselt die
-   Führung vorher, etwa an eine andere Installation, verfällt die Anfrage; dann neu anfragen.
+1. Liegt der Einsatz hier als Spiegel vor, am Einsatz „Einsatzdaten“ öffnen. Sonst (nur für einen
+   Admin) unter „Einstellungen“ „Instanzkopplung“ wählen und im Paneel „Einsätze beim Gegenüber“
+   am Einsatz „Führung …“ wählen.
+2. Im Paneel „Führung“ „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie
+   mit der nächsten Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
+   Wechselt die Führung vorher, etwa an eine andere Installation, verfällt die Anfrage; dann neu
+   anfragen.
 
 ### Notübernahme
 
-Für einen Admin der Organisation, wenn die führende Installation nicht erreichbar ist. Übernehmen
-lässt sich nur ein Einsatz, der hier schon als Spiegel vorliegt; der Knopf steht im Paneel
-„Führung“ auf „Einsatzdaten“ des Spiegels und unter „Einsätze beim Gegenüber“.
+Für die Einsatzleitung oder einen Admin der Organisation, wenn die führende Installation nicht
+erreichbar ist. Übernehmen lässt sich nur ein Einsatz, der hier schon als Spiegel vorliegt; der
+Knopf steht im Paneel „Führung“ auf „Einsatzdaten“ des Spiegels und, nur für einen Admin, unter
+„Einsätze beim Gegenüber“.
 
 1. „Notübernahme …“ wählen.
 2. Einen „Grund“ eintragen, etwa „ELW ohne Verbindung seit 40 min“.
-3. Führt eine Installation, die sich hier meldet (der ELW), unter „Beweis“ „Eigene
-   Unterschrift“ wählen und mit dem Unterschriftsschlüssel bestätigen, oder „Code des
-   Gegenübers“ wählen und den durchgegebenen Code eintragen.
+3. Führt eine Installation, die sich hier meldet (der ELW), braucht es einen Beweis. Ein Admin
+   wählt unter „Beweis“ „Eigene Unterschrift“ und bestätigt mit dem Unterschriftsschlüssel, oder
+   „Code des Gegenübers“ und trägt den durchgegebenen Code ein. Die Einsatzleitung ohne
+   Admin-Rolle trägt den Code unter „Code“ ein; unterschreiben kann sie nicht.
 4. „Führung übernehmen“ wählen.
 
 ### Übernahme bestätigen oder widersprechen
@@ -223,6 +229,18 @@ beim Gegenüber, wird nachgereicht“. Sie versucht es weiter und schickt dabei 
 Widerruf. Sobald die andere Installation ihn bestätigt hat, verschwindet der Hinweis, und die
 Meldungen hören auf. Bleibt die andere Installation dauerhaft unerreichbar, sollte ihr Admin
 die Kopplung dort selbst widerrufen.
+
+Ist die Führung je Einsatz eingeschaltet, holt jede der beiden Installationen, sobald sie vom
+Widerruf weiß, die Einsätze der Organisation zurück, die sie als Spiegel hält und die laut
+Paneel „Führung“ die andere führte: Sie führt sie ab dann selbst, mit der nächsten Epoche. Das
+Hinweisband „Spiegel von …“ verschwindet, der Einsatz ist wieder schreibbar, und der Verlauf im
+Paneel „Führung“ zeigt eine Notübernahme mit dem Grund „Kopplung widerrufen“. Bruchstelle ist der
+Zeitpunkt, an dem diese Installation vom Widerruf erfährt: hier sofort, an der anderen mit ihrer
+nächsten Meldung. Was die andere seit dem letzten Abgleich geschrieben hat, kommt nicht mehr an.
+Eine Übernahme der anderen Installation, die noch auf Bestätigung wartete, verfällt. Abgelehnte
+Anträge stehen danach wie nach der Verwahrung in der Zeile oben unter „Anträge abgelehnt“, mit
+„Kopieren“ und „Verwerfen“; neu erfasst wird direkt am nun eigenen Einsatz. In der Admin-Spur
+steht der Widerruf der Kopplung, nicht jeder zurückgeholte Einsatz.
 
 ### Fingerabdruck und Sicherheit
 
@@ -416,9 +434,10 @@ Fassung; die Einsätze-Übersicht der Kopplung nennt ihn unter den Hinweisen. De
 ### Widerruf und Spiegel
 
 Mit dem Widerruf einer Kopplung endet der Abgleich ihrer Einsätze, an beiden Installationen.
-Vorhandene Spiegel bleiben lesbar und gesperrt; das Hinweisband zeigt „Abgleich beendet“. Offene
-Anträge an diese Spiegel sind abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Spiegel
-dabei nicht.
+Ohne Führung je Einsatz bleiben vorhandene Spiegel lesbar und gesperrt; das Hinweisband zeigt
+„Abgleich beendet“. Mit eingeschalteter Führung je Einsatz wird jeder Spiegel, den die andere
+Installation führte, zum eigenen Einsatz (siehe „Widerruf“ oben). Offene Anträge an die Spiegel sind
+in beiden Fällen abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Spiegel dabei nicht.
 
 ### Ende eines Spiegels
 
@@ -456,19 +475,23 @@ steht dort der Fehler mit „Erneut laden“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
-dem beantragt wird, und der Einsatzkopf zeigt „Führung: … · Epoche n“. Jeder Wechsel zählt die
-**Epoche** hoch. Übergeben lässt sich die Führung erst, wenn beide Seiten abgeglichen sind
+dem beantragt wird, und der Einsatzkopf zeigt ab mittlerer Fensterbreite „Führung: …“ mit dem
+Namen der führenden Installation. An der führenden fehlt dieser Hinweis im Kopf; das Paneel „Führung“ nennt dort
+„hier“. Unter „Einsätze beim Gegenüber“ steht je Einsatz „Führung: … · Epoche n“. Jeder Wechsel
+zählt die **Epoche** hoch. Übergeben lässt sich die Führung erst, wenn beide Seiten abgeglichen sind
 (sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
 führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich nachgezogen hat:
-Bis dahin zeigt das Paneel „Führung“ sie als offen, danach steht im Einsatzkopf „Führung: hier“.
-Eine Anfrage gilt nur dem Stand, den sie sah: Wechselt die Führung inzwischen, verfällt sie, und
-das Paneel bietet „Führung anfragen“ wieder an.
-Erklären
-zwei Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
+Bis dahin zeigt das Paneel „Führung“ unter „Anfrage“ „beim Gegenüber gestellt“, danach nennt es
+unter „Führung“ „hier“, und das Hinweisband „Spiegel von …“ verschwindet. Eine Anfrage gilt nur
+dem Stand, den sie sah: Wechselt die Führung inzwischen, verfällt sie, und das Paneel bietet
+„Führung anfragen“ wieder an. Erklären zwei Installationen ohne Verbindung dieselbe Epoche, gilt
+die Erklärung der Installation mit
 der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
 
 Gegen die Installation, die sich meldet (den ELW), braucht eine Notübernahme die Unterschrift
-eines Admins oder dessen Code. Der ELW prüft die Unterschrift gegen die Unterschriftsschlüssel,
+eines Admins oder den Code, den die Einsatzleitung oder ein Admin am ELW mit „Führung per Code
+abgeben“ erzeugt hat. Unterschreiben kann nur ein Admin, denn nur Admins haben
+Unterschriftsschlüssel; die Einsatzleitung übernimmt mit dem Code. Der ELW prüft die Unterschrift gegen die Unterschriftsschlüssel,
 die bei ihm gelten, und gibt nie still ab: bis jemand bestätigt oder widerspricht, schreibt er
 weiter, und die Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Widersprechen
 heißt, der ELW führt mit der nächsten Epoche weiter; die andere Installation zeigt an der
@@ -480,11 +503,13 @@ Admins inzwischen widerrufen ist, verwirft der ELW die offene Übernahme mit der
 ebenso; Bestätigen lehnt er dann ab.
 
 Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
-Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr; ein
-Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
+Meldung an und zeigt sie im Verlauf. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der
+Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“, ohne auf den Hub zu
+warten. Ein Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
 
 Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und
-Unterzeichner. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
+Unterzeichner. Das Paneel mit dem Verlauf liest jede Person, die den Einsatz liest; gekoppelte
+Geräte sehen es nicht, nur wie jede andere Ansicht das Hinweisband „Spiegel von …“. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
 der abgelösten Installation geschrieben wurde, kennt die neue nicht. Mit dem Bestätigen wird die
 abgelöste Installation zum Spiegel. Was sie seit der Bruchstelle geschrieben hat und die neue
 nicht kennt, nimmt sie aus dem Einsatz und hebt es auf; das Hinweisband zeigt dann „n Änderungen

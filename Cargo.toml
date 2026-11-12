@@ -94,7 +94,7 @@ karten-katalog = { path = "crates/karten-katalog", features = ["schema"] }
 # den No-op-Stub baut.
 clamav-client = { version = "2.2", optional = true, default-features = false, features = ["tokio"] }
 # TLS-Bind über rustls; rcgen erzeugt das selbstsignierte Zertifikat (Fallback).
-axum-server = { version = "0.8", features = ["tls-rustls"] }
+axum-server = { version = "0.9", features = ["tls-rustls"] }
 rcgen = "0.14"
 # Nur für `TokioTimer`: hyper braucht einen Timer, bevor `header_read_timeout` gesetzt werden
 # darf (sonst Panik beim Verbindungsaufbau).

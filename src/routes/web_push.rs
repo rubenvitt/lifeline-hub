@@ -38,6 +38,29 @@ pub struct WebPushStand {
     /// Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne
     /// Abo leer.
     pub stumm: Vec<BenachrichtigungArt>,
+    /// Push für diesen Nutzer läuft über einen gekoppelten Hub, der sein Konto kennt (LLH-1495,
+    /// Spec `web-push`, „Push-Einstellung am gekoppelten ELW verweist auf den Hub“): statt des
+    /// Schalters ein Hinweis mit Link; ein neues Abo lehnt der Server mit 422 ab.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ueber_hub: Option<PushUeberHub>,
+}
+
+/// Der Hub, über den Push läuft.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PushUeberHub {
+    /// Name der Instanz, wie sie sich meldet.
+    pub name: String,
+    /// Adresse, unter der diese Instanz den Hub erreicht.
+    pub adresse: String,
+}
+
+async fn ueber_hub(state: &AppState, benutzer_id: i64) -> Result<Option<PushUeberHub>, AppError> {
+    let mut conn = state.pool.acquire().await?;
+    Ok(
+        crate::instanz::spiegel::hinweis::push_hub_fuer(&mut conn, benutzer_id)
+            .await?
+            .map(|(name, adresse)| PushUeberHub { name, adresse }),
+    )
 }
 
 /// Höchstzahl der Einträge in `stumm`; mehr Arten gibt es nicht.
@@ -73,7 +96,7 @@ fn sitzung(jar: &CookieJar) -> Result<String, AppError> {
 /// GET /api/web-push
 pub async fn stand(
     State(state): State<AppState>,
-    CurrentUser(_benutzer): CurrentUser,
+    CurrentUser(benutzer): CurrentUser,
     jar: CookieJar,
 ) -> Result<Json<WebPushStand>, AppError> {
     let wp = web_push(&state)?;
@@ -85,6 +108,7 @@ pub async fn stand(
         angemeldet,
         inhalt: wahl.inhalt,
         stumm: repo::stumm_bereinigt(&wahl.stumm),
+        ueber_hub: ueber_hub(&state, benutzer.id).await?,
     }))
 }
 
@@ -124,6 +148,14 @@ pub async fn anmelden(
         .iter()
         .filter_map(|a| BenachrichtigungArt::parse(a))
         .collect();
+    // Gekoppelter ELW (LLH-1495, design.md D7): ein Zustand, nicht das Feld, also 422. Bestehende
+    // Abos bleiben und gelten nach dem Entkoppeln wieder.
+    if let Some(hub) = ueber_hub(&state, benutzer.id).await? {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Push läuft über {}.",
+            hub.name
+        )));
+    }
     // Normalisiert speichern: ohne Auffüllung, wie der Versand sie liest.
     repo::anmelden(
         &state.pool,
