@@ -1,0 +1,23 @@
+[package]
+name = "lifeline-machine-client"
+version = "0.1.0"
+edition = "2021"
+description = "Referenz-Client für den Maschinenzugang der öffentlichen API von Lifeline Hub (ADR-0022)"
+publish = false
+
+# Absichtlich unabhängig vom Server (design.md D9): Die Testvektoren beweisen so, dass eine zweite
+# Implementierung nach der Doku auf dasselbe JWS kommt.
+[dependencies]
+base64 = "0.23"
+ed25519-dalek = "3.0"
+getrandom = "0.3"
+hkdf = "0.13"
+hmac = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"], optional = true }
+
+[features]
+# HTTP-Aufrufe (Einlösen, `me`). Ohne das Feature bleibt die Crate reine Krypto.
+http = ["dep:reqwest"]

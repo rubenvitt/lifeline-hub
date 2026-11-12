@@ -1,0 +1,63 @@
+{
+  "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0022, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
+  "client_fingerprint": "CPV0-CWYP-XP44-QW0W-5GH2-V0ND-M1T0-YADC",
+  "client_private_key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+  "client_public_key": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+  "code": "abcd-efgh-jkmn-pqrs",
+  "code_normalized": "ABCDEFGHJKMNPQRS",
+  "instanz_id": "7d3e9b1a-5c2f-4e8d-a6b4-1f0c3e5a7b9d",
+  "instanz_private_key": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+  "instanz_public_key": "zRSzf5VulTGU_3-3Oz2B3MVh1hp1OAlLfD4aZD7l86o",
+  "redeem_request": {
+    "lookup": "D7naZvz_HhMUBlODnmcaS_btKQIXVd-alx6X4T113vU",
+    "proof": "4B5xz2jr7O_YWR-mA5TpE5N6UHiDGXLagy9nEPF0VB8",
+    "public_key": {
+      "crv": "Ed25519",
+      "kty": "OKP",
+      "x": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+    }
+  },
+  "redeem_response": {
+    "instanz_id": "7d3e9b1a-5c2f-4e8d-a6b4-1f0c3e5a7b9d",
+    "instanz_public_key": {
+      "crv": "Ed25519",
+      "kty": "OKP",
+      "x": "zRSzf5VulTGU_3-3Oz2B3MVh1hp1OAlLfD4aZD7l86o"
+    },
+    "proof": "ejIVezFcGTCf-XYUqYKk9xstU6eZnyr_Va64VQabJ8g",
+    "zugang_id": "0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12"
+  },
+  "requests": [
+    {
+      "body": "",
+      "claims_json": "{\"iss\":\"0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12\",\"aud\":\"7d3e9b1a-5c2f-4e8d-a6b4-1f0c3e5a7b9d\",\"iat\":1794423731,\"exp\":1794423791,\"jti\":\"AAECAwQFBgcICQoLDA0ODw\",\"htm\":\"GET\",\"htu\":\"/api/v1/me\",\"bh\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\"}",
+      "header_json": "{\"alg\":\"EdDSA\",\"typ\":\"lifeline-machine+jwt\",\"kid\":\"0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12\"}",
+      "iat": 1794423731,
+      "jti": "AAECAwQFBgcICQoLDA0ODw",
+      "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxpZmVsaW5lLW1hY2hpbmUrand0Iiwia2lkIjoiMGY4YzJhNmUtM2IxZC00YzVhLTllN2YtMmQ0YjZhOGMwZTEyIn0.eyJpc3MiOiIwZjhjMmE2ZS0zYjFkLTRjNWEtOWU3Zi0yZDRiNmE4YzBlMTIiLCJhdWQiOiI3ZDNlOWIxYS01YzJmLTRlOGQtYTZiNC0xZjBjM2U1YTdiOWQiLCJpYXQiOjE3OTQ0MjM3MzEsImV4cCI6MTc5NDQyMzc5MSwianRpIjoiQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImh0bSI6IkdFVCIsImh0dSI6Ii9hcGkvdjEvbWUiLCJiaCI6IjQ3REVRcGo4SEJTYS1fVEltVy01SkNldVFlUmttNU5NcEpXWkczaFN1RlUifQ.bhsrnscItEw_M_X5dRsRQd8bhOiP8W3R9H_7s9ztBAQyfoHqRkJrXr-MjfGN98xJyH4HbykENncYk6f4lwkVDA",
+      "method": "GET",
+      "path": "/api/v1/me"
+    },
+    {
+      "body": "{\"external_id\":\"LS-2026-118833\",\"kind\":\"neu\",\"stichwort\":\"RD 2\"}",
+      "claims_json": "{\"iss\":\"0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12\",\"aud\":\"7d3e9b1a-5c2f-4e8d-a6b4-1f0c3e5a7b9d\",\"iat\":1794423740,\"exp\":1794423800,\"jti\":\"EBESExQVFhcYGRobHB0eHw\",\"htm\":\"POST\",\"htu\":\"/api/v1/alarmmeldungen?dry_run=1\",\"bh\":\"G_5y2xiezzFA737YlrImhT_KSQattvaxOq17r6lQkRo\"}",
+      "header_json": "{\"alg\":\"EdDSA\",\"typ\":\"lifeline-machine+jwt\",\"kid\":\"0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12\"}",
+      "iat": 1794423740,
+      "jti": "EBESExQVFhcYGRobHB0eHw",
+      "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxpZmVsaW5lLW1hY2hpbmUrand0Iiwia2lkIjoiMGY4YzJhNmUtM2IxZC00YzVhLTllN2YtMmQ0YjZhOGMwZTEyIn0.eyJpc3MiOiIwZjhjMmE2ZS0zYjFkLTRjNWEtOWU3Zi0yZDRiNmE4YzBlMTIiLCJhdWQiOiI3ZDNlOWIxYS01YzJmLTRlOGQtYTZiNC0xZjBjM2U1YTdiOWQiLCJpYXQiOjE3OTQ0MjM3NDAsImV4cCI6MTc5NDQyMzgwMCwianRpIjoiRUJFU0V4UVZGaGNZR1JvYkhCMGVIdyIsImh0bSI6IlBPU1QiLCJodHUiOiIvYXBpL3YxL2FsYXJtbWVsZHVuZ2VuP2RyeV9ydW49MSIsImJoIjoiR181eTJ4aWV6ekZBNzM3WWxySW1oVF9LU1FhdHR2YXhPcTE3cjZsUWtSbyJ9.yXClEiBGFPUbzvbhXBXZOxYdCK5zaNOUsQp-9qScizzGc5b842_P9qyQWmw-TeuF8SGh20mKk7NhvnUBUWr4Aw",
+      "method": "POST",
+      "path": "/api/v1/alarmmeldungen?dry_run=1"
+    }
+  ],
+  "response": {
+    "body": "{\"id\":\"a1\",\"state\":\"offen\"}",
+    "claims_json": "{\"iss\":\"7d3e9b1a-5c2f-4e8d-a6b4-1f0c3e5a7b9d\",\"aud\":\"0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12\",\"iat\":1794423741,\"exp\":1794423801,\"jti\":\"ICEiIyQlJicoKSorLC0uLw\",\"req\":\"EBESExQVFhcYGRobHB0eHw\",\"status\":201,\"bh\":\"DbMUT5Bb3P_q8qgSFmA1SSgYXkrP1GBydyokAH6P5Pk\"}",
+    "iat": 1794423741,
+    "jti": "ICEiIyQlJicoKSorLC0uLw",
+    "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxpZmVsaW5lLW1hY2hpbmUtcmVzcG9uc2Urand0Iiwia2lkIjoiN2QzZTliMWEtNWMyZi00ZThkLWE2YjQtMWYwYzNlNWE3YjlkIn0.eyJpc3MiOiI3ZDNlOWIxYS01YzJmLTRlOGQtYTZiNC0xZjBjM2U1YTdiOWQiLCJhdWQiOiIwZjhjMmE2ZS0zYjFkLTRjNWEtOWU3Zi0yZDRiNmE4YzBlMTIiLCJpYXQiOjE3OTQ0MjM3NDEsImV4cCI6MTc5NDQyMzgwMSwianRpIjoiSUNFaUl5UWxKaWNvS1NvckxDMHVMdyIsInJlcSI6IkVCRVNFeFFWRmhjWUdSb2JIQjBlSHciLCJzdGF0dXMiOjIwMSwiYmgiOiJEYk1VVDVCYjNQX3E4cWdTRm1BMVNTZ1lYa3JQMUdCeWR5b2tBSDZQNVBrIn0.Sowp9v0xcDg50ToTLLXstDk_2EOq4yBZhq8SH3S11GQ4bjmtVX9M2xfOq7m3jGNQMzm4V-KioMiMC8qVmgSyCg",
+    "req": "EBESExQVFhcYGRobHB0eHw",
+    "status": 201
+  },
+  "salt": "lifeline-machine-client/1",
+  "zugang_id": "0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12"
+}

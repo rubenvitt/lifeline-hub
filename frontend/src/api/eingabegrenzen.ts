@@ -268,3 +268,5 @@ export const LAGEBILD_EMPFAENGER_MAX = 80;
 export const ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX = 100;
 /** Archiv-Schlüssel je Organisation (LLH-1494). */
 export const ARCHIV_SCHLUESSEL_MAX = 10;
+/** Name einer Anbindung (Maschinenzugang eines Fremdsystems, LLH-1652). */
+export const ANBINDUNG_NAME_MAX = 80;

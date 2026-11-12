@@ -10,14 +10,43 @@ use super::identitaet::Identitaet;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+/// Was ein Anmeldeprofil nach ADR-0014 festlegt: `typ` von Anfrage und Antwort, das Schema im
+/// Kopf `Authorization` und den Kopf der Antwortsignatur. Instanzen und Fremdsysteme
+/// (Maschinenzugang, ADR-0022) teilen Signatur und Prüfung und unterscheiden sich nur hierin; ein
+/// Token des einen Profils scheitert am anderen schon am `typ`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Profil {
+    pub typ_anfrage: &'static str,
+    pub typ_antwort: &'static str,
+    pub schema: &'static str,
+    pub antwort_kopf: &'static str,
+}
+
+/// Gekoppelte Instanzen (Kopplungsprotokoll mit `pv`).
+pub const INSTANZ: Profil = Profil {
+    typ_anfrage: "lifeline-instanz+jwt",
+    typ_antwort: "lifeline-instanz-antwort+jwt",
+    schema: "Instanz",
+    antwort_kopf: "lifeline-instanz-antwort",
+};
+
+/// Fremdsysteme an der öffentlichen API (`/api/v1/`, ADR-0022). Wire-Namen sind Technik und
+/// deshalb englisch (Konzept D9).
+pub const MACHINE: Profil = Profil {
+    typ_anfrage: "lifeline-machine+jwt",
+    typ_antwort: "lifeline-machine-response+jwt",
+    schema: "Machine",
+    antwort_kopf: "Lifeline-Signature",
+};
+
 /// `typ` einer Anfrage.
-pub const TYP_ANFRAGE: &str = "lifeline-instanz+jwt";
+pub const TYP_ANFRAGE: &str = INSTANZ.typ_anfrage;
 /// `typ` einer Antwort.
-pub const TYP_ANTWORT: &str = "lifeline-instanz-antwort+jwt";
+pub const TYP_ANTWORT: &str = INSTANZ.typ_antwort;
 /// Kopf, der eine Anfrage trägt: `Authorization: Instanz <jws>`.
-pub const SCHEMA: &str = "Instanz";
+pub const SCHEMA: &str = INSTANZ.schema;
 /// Kopf, der eine Antwort trägt.
-pub const ANTWORT_KOPF: &str = "lifeline-instanz-antwort";
+pub const ANTWORT_KOPF: &str = INSTANZ.antwort_kopf;
 /// Höchste Lebensdauer eines Tokens.
 pub const LEBENSDAUER_S: i64 = 60;
 /// Erlaubte Abweichung der Uhren beider Seiten.
@@ -59,6 +88,34 @@ pub struct Antwort {
     pub status: u16,
     pub bh: String,
     pub pv: u32,
+}
+
+/// Claims einer Anfrage eines Fremdsystems: wie [`Anfrage`], ohne `pv` (die Version steckt im
+/// Pfad `/api/v1/`). `iss` ist die Zugangs-ID, `aud` die Instanz-UUID. Die Reihenfolge der Felder
+/// ist die der Testvektoren (`docs/api/machine-auth-testvektoren.json`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MachineAnfrage {
+    pub iss: String,
+    pub aud: String,
+    pub iat: i64,
+    pub exp: i64,
+    pub jti: String,
+    pub htm: String,
+    pub htu: String,
+    pub bh: String,
+}
+
+/// Claims der Antwort an ein Fremdsystem. `req` ist die `jti` der Anfrage.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MachineAntwort {
+    pub iss: String,
+    pub aud: String,
+    pub iat: i64,
+    pub exp: i64,
+    pub jti: String,
+    pub req: String,
+    pub status: u16,
+    pub bh: String,
 }
 
 /// Warum ein Token nicht gilt. Nach außen ist jeder Fall 401; die Unterscheidung dient Log und
@@ -103,7 +160,7 @@ pub fn new_jti() -> String {
     b64(&b)
 }
 
-fn sign<C: Serialize>(identitaet: &Identitaet, typ: &str, claims: &C) -> String {
+pub(crate) fn sign<C: Serialize>(identitaet: &Identitaet, typ: &str, claims: &C) -> String {
     let kopf = Kopf {
         alg: "EdDSA".to_string(),
         typ: typ.to_string(),
@@ -132,7 +189,7 @@ pub fn parse_kopf(token: &str, typ: &str) -> Result<Kopf, SignaturError> {
 }
 
 /// Prüft Kopf und Signatur und liefert die Claims.
-fn verify<C: DeserializeOwned>(
+pub(crate) fn verify<C: DeserializeOwned>(
     token: &str,
     typ: &str,
     schluessel: &VerifyingKey,
@@ -209,22 +266,144 @@ pub fn verify_anfrage(
     jetzt: i64,
 ) -> Result<Anfrage, SignaturError> {
     let c: Anfrage = verify(token, TYP_ANFRAGE, schluessel)?;
-    if c.iss != absender_kennung || c.aud != eigene_kennung {
+    check_bindung(
+        &Bindung {
+            iss: &c.iss,
+            aud: &c.aud,
+            iat: c.iat,
+            exp: c.exp,
+            htm: &c.htm,
+            htu: &c.htu,
+            bh: &c.bh,
+        },
+        &Erwartung {
+            absender: absender_kennung,
+            eigene: eigene_kennung,
+            methode,
+            pfad,
+            body,
+            jetzt,
+        },
+    )?;
+    Ok(c)
+}
+
+/// Die Teile einer Anfrage, die an Absender, Ziel, Methode, Pfad, Body und Zeit binden.
+struct Bindung<'a> {
+    iss: &'a str,
+    aud: &'a str,
+    iat: i64,
+    exp: i64,
+    htm: &'a str,
+    htu: &'a str,
+    bh: &'a str,
+}
+
+/// Was beim Empfänger ankam.
+struct Erwartung<'a> {
+    absender: &'a str,
+    eigene: &'a str,
+    methode: &'a str,
+    pfad: &'a str,
+    body: &'a [u8],
+    jetzt: i64,
+}
+
+/// Gemeinsamer Abgleich beider Profile, in fester Reihenfolge: Ziel, Methode, Pfad, Body, Zeit.
+fn check_bindung(b: &Bindung<'_>, e: &Erwartung<'_>) -> Result<(), SignaturError> {
+    if b.iss != e.absender || b.aud != e.eigene {
         return Err(SignaturError::Ziel);
     }
-    if !c.htm.eq_ignore_ascii_case(methode) {
+    if !b.htm.eq_ignore_ascii_case(e.methode) {
         return Err(SignaturError::Methode);
     }
-    if c.htu != pfad {
+    if b.htu != e.pfad {
         return Err(SignaturError::Pfad);
     }
-    if c.bh != sha256_b64(body) {
+    if b.bh != sha256_b64(e.body) {
         return Err(SignaturError::Body);
     }
-    if !is_zeit_valid(c.iat, c.exp, jetzt) {
+    if !is_zeit_valid(b.iat, b.exp, e.jetzt) {
         return Err(SignaturError::Zeit);
     }
+    Ok(())
+}
+
+/// Ablehnung einer Anfrage eines Fremdsystems: der Fehler und, sobald die Signatur gilt, die
+/// Abweichung `iat - jetzt` in Sekunden. Nach außen ist jeder Fall 401; Grund und Abweichung
+/// stehen nur am Zugang (Seite „Anbindungen“), damit der Admin eine falsch gehende Uhr erkennt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MachineAblehnung {
+    pub fehler: SignaturError,
+    pub abweichung_s: Option<i64>,
+}
+
+/// Prüft die Anfrage eines Fremdsystems (Profil [`MACHINE`]). `zugang_id` ist die Kennung des
+/// Zugangs aus dem `kid`, `eigene_kennung` die Instanz-UUID. Den Wiederholschutz (`jti`) trägt der
+/// Aufrufer.
+#[allow(clippy::too_many_arguments)]
+pub fn verify_machine_anfrage(
+    token: &str,
+    schluessel: &VerifyingKey,
+    zugang_id: &str,
+    eigene_kennung: &str,
+    methode: &str,
+    pfad: &str,
+    body: &[u8],
+    jetzt: i64,
+) -> Result<MachineAnfrage, MachineAblehnung> {
+    let c: MachineAnfrage =
+        verify(token, MACHINE.typ_anfrage, schluessel).map_err(|fehler| MachineAblehnung {
+            fehler,
+            abweichung_s: None,
+        })?;
+    check_bindung(
+        &Bindung {
+            iss: &c.iss,
+            aud: &c.aud,
+            iat: c.iat,
+            exp: c.exp,
+            htm: &c.htm,
+            htu: &c.htu,
+            bh: &c.bh,
+        },
+        &Erwartung {
+            absender: zugang_id,
+            eigene: eigene_kennung,
+            methode,
+            pfad,
+            body,
+            jetzt,
+        },
+    )
+    .map_err(|fehler| MachineAblehnung {
+        fehler,
+        abweichung_s: Some(c.iat.saturating_sub(jetzt)),
+    })?;
     Ok(c)
+}
+
+/// Signiert die Antwort an ein Fremdsystem (Profil [`MACHINE`]); `req` ist die `jti` seiner
+/// Anfrage.
+pub fn sign_machine_antwort(
+    identitaet: &Identitaet,
+    zugang_id: &str,
+    req: &str,
+    status: u16,
+    body: &[u8],
+    jetzt: i64,
+) -> String {
+    let claims = MachineAntwort {
+        iss: identitaet.kennung.clone(),
+        aud: zugang_id.to_string(),
+        iat: jetzt,
+        exp: jetzt + LEBENSDAUER_S,
+        jti: new_jti(),
+        req: req.to_string(),
+        status,
+        bh: sha256_b64(body),
+    };
+    sign(identitaet, MACHINE.typ_antwort, &claims)
 }
 
 /// Signiert eine Antwort auf die Anfrage mit `bezug` an `ziel_kennung`.
@@ -550,6 +729,247 @@ mod tests {
                 JETZT
             ),
             Err(SignaturError::Algorithmus)
+        );
+    }
+    /// Signiert wie ein Fremdsystem: `kid` und `iss` sind die Zugangs-ID.
+    fn machine_token(
+        zugang: &Identitaet,
+        aud: &str,
+        htm: &str,
+        htu: &str,
+        body: &[u8],
+        iat: i64,
+    ) -> String {
+        let claims = MachineAnfrage {
+            iss: zugang.kennung.clone(),
+            aud: aud.into(),
+            iat,
+            exp: iat + LEBENSDAUER_S,
+            jti: "j-1".into(),
+            htm: htm.into(),
+            htu: htu.into(),
+            bh: sha256_b64(body),
+        };
+        sign(zugang, MACHINE.typ_anfrage, &claims)
+    }
+
+    fn zugang() -> Identitaet {
+        Identitaet::from_parts("zugang-1", [3u8; 32])
+    }
+
+    fn pruefe_machine(
+        token: &str,
+        body: &[u8],
+        jetzt: i64,
+    ) -> Result<MachineAnfrage, MachineAblehnung> {
+        verify_machine_anfrage(
+            token,
+            &pk(&zugang()),
+            "zugang-1",
+            "hub",
+            "GET",
+            "/api/v1/me",
+            body,
+            jetzt,
+        )
+    }
+
+    #[test]
+    fn machine_anfrage_gilt_ohne_pv() {
+        let t = machine_token(&zugang(), "hub", "get", "/api/v1/me", b"", JETZT);
+        let c = pruefe_machine(&t, b"", JETZT).unwrap();
+        assert_eq!(c.iss, "zugang-1");
+        let claims = parse_b64(t.split('.').nth(1).unwrap()).unwrap();
+        assert!(!String::from_utf8(claims).unwrap().contains("\"pv\""));
+    }
+
+    #[test]
+    fn profile_sind_getrennt() {
+        let m = machine_token(
+            &zugang(),
+            "hub",
+            "POST",
+            "/api/instanz/melden",
+            b"{}",
+            JETZT,
+        );
+        assert_eq!(
+            verify_anfrage(
+                &m,
+                &pk(&zugang()),
+                "zugang-1",
+                "hub",
+                "POST",
+                "/api/instanz/melden",
+                b"{}",
+                JETZT
+            ),
+            Err(SignaturError::Algorithmus),
+            "ein Maschinen-Token gilt nicht als Instanz-Anfrage"
+        );
+        let (i, _) = sign_anfrage(
+            &zugang(),
+            &AnfrageDraft {
+                ziel_kennung: "hub",
+                methode: "GET",
+                pfad: "/api/v1/me",
+                body: b"",
+            },
+            JETZT,
+        );
+        assert_eq!(
+            pruefe_machine(&i, b"", JETZT).unwrap_err().fehler,
+            SignaturError::Algorithmus,
+            "eine Instanz-Anfrage gilt nicht als Maschinen-Token"
+        );
+    }
+
+    #[test]
+    fn machine_ablehnung_nennt_die_uhrabweichung() {
+        // Uhr des Fremdsystems geht 7 min nach.
+        let t = machine_token(&zugang(), "hub", "GET", "/api/v1/me", b"", JETZT - 420);
+        let a = pruefe_machine(&t, b"", JETZT).unwrap_err();
+        assert_eq!(a.fehler, SignaturError::Zeit);
+        assert_eq!(a.abweichung_s, Some(-420));
+        // Uhr geht 7 min vor.
+        let t = machine_token(&zugang(), "hub", "GET", "/api/v1/me", b"", JETZT + 420);
+        assert_eq!(
+            pruefe_machine(&t, b"", JETZT).unwrap_err().abweichung_s,
+            Some(420)
+        );
+        // Ohne gültige Signatur keine Abweichung: sie stammte sonst von einem Fremden.
+        let fremd = machine_token(&hub(), "hub", "GET", "/api/v1/me", b"", JETZT - 420);
+        let a = pruefe_machine(&fremd, b"", JETZT).unwrap_err();
+        assert_eq!(
+            a,
+            MachineAblehnung {
+                fehler: SignaturError::Signatur,
+                abweichung_s: None
+            }
+        );
+    }
+
+    #[test]
+    fn machine_anfrage_bindet_ziel_methode_pfad_body() {
+        let t = machine_token(&zugang(), "andere-instanz", "GET", "/api/v1/me", b"", JETZT);
+        assert_eq!(
+            pruefe_machine(&t, b"", JETZT).unwrap_err().fehler,
+            SignaturError::Ziel
+        );
+        let t = machine_token(&zugang(), "hub", "POST", "/api/v1/me", b"", JETZT);
+        assert_eq!(
+            pruefe_machine(&t, b"", JETZT).unwrap_err().fehler,
+            SignaturError::Methode
+        );
+        let t = machine_token(&zugang(), "hub", "GET", "/api/v1/me?x=1", b"", JETZT);
+        assert_eq!(
+            pruefe_machine(&t, b"", JETZT).unwrap_err().fehler,
+            SignaturError::Pfad
+        );
+        let t = machine_token(&zugang(), "hub", "GET", "/api/v1/me", b"", JETZT);
+        assert_eq!(
+            pruefe_machine(&t, b"x", JETZT).unwrap_err().fehler,
+            SignaturError::Body
+        );
+    }
+
+    #[test]
+    fn machine_antwort_ist_an_zugang_und_anfrage_gebunden() {
+        let t = sign_machine_antwort(&hub(), "zugang-1", "j-1", 200, b"{}", JETZT);
+        let c: MachineAntwort = verify(&t, MACHINE.typ_antwort, &pk(&hub())).unwrap();
+        assert_eq!(
+            (c.iss.as_str(), c.aud.as_str(), c.req.as_str(), c.status),
+            ("hub", "zugang-1", "j-1", 200)
+        );
+        assert_eq!(c.bh, sha256_b64(b"{}"));
+        assert_eq!(
+            verify::<MachineAntwort>(&t, MACHINE.typ_anfrage, &pk(&hub())),
+            Err(SignaturError::Algorithmus),
+            "eine Antwort ist keine Anfrage"
+        );
+    }
+    /// Der Server prüft die Testvektoren des Referenz-Clients (`docs/api/machine-auth-testvektoren.json`,
+    /// design.md D9): Code-Ableitung, beide Prüfwerte des Einlösens, jede Anfrage und die
+    /// Antwortsignatur. Zwei unabhängige Implementierungen, eine Datei.
+    #[test]
+    fn testvektoren_des_maschinenzugangs() {
+        use crate::instanz::code;
+        use serde_json::Value;
+        let pfad = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/docs/api/machine-auth-testvektoren.json"
+        );
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(pfad).unwrap()).unwrap();
+        let s = |k: &str| v[k].as_str().unwrap().to_string();
+
+        let d = code::derive_mit_salz(&s("code_normalized"), code::SALZ_MACHINE);
+        assert_eq!(d.suche, v["redeem_request"]["lookup"].as_str().unwrap());
+        let client_pub = s("client_public_key");
+        assert_eq!(
+            v["redeem_request"]["public_key"]["x"].as_str().unwrap(),
+            client_pub
+        );
+        assert!(code::is_pruefwert_valid(
+            &d.k_einloeser,
+            &code::transkript_machine_einloeser(&d.suche, &client_pub),
+            v["redeem_request"]["proof"].as_str().unwrap(),
+        ));
+        let instanz_id = s("instanz_id");
+        let zugang_id = s("zugang_id");
+        assert_eq!(
+            code::pruefwert(
+                &d.k_aussteller,
+                &code::transkript_machine_aussteller(
+                    &d.suche,
+                    &client_pub,
+                    &instanz_id,
+                    &s("instanz_public_key"),
+                    &zugang_id,
+                ),
+            ),
+            v["redeem_response"]["proof"].as_str().unwrap()
+        );
+        assert_eq!(
+            crate::instanz::basis32::fingerabdruck(&parse_b64(&client_pub).unwrap()),
+            s("client_fingerprint")
+        );
+
+        let schluessel = crate::instanz::identitaet::parse_oeffentlich(&client_pub).unwrap();
+        for a in v["requests"].as_array().unwrap() {
+            let t = |k: &str| a[k].as_str().unwrap();
+            let c = verify_machine_anfrage(
+                t("jws"),
+                &schluessel,
+                &zugang_id,
+                &instanz_id,
+                t("method"),
+                t("path"),
+                t("body").as_bytes(),
+                a["iat"].as_i64().unwrap(),
+            )
+            .unwrap();
+            assert_eq!(serde_json::to_string(&c).unwrap(), t("claims_json"));
+        }
+
+        let geheim: [u8; 32] = parse_b64(&s("instanz_private_key"))
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let instanz = Identitaet::from_parts(&instanz_id, geheim);
+        let r = &v["response"];
+        let claims = MachineAntwort {
+            iss: instanz_id.clone(),
+            aud: zugang_id.clone(),
+            iat: r["iat"].as_i64().unwrap(),
+            exp: r["iat"].as_i64().unwrap() + LEBENSDAUER_S,
+            jti: r["jti"].as_str().unwrap().into(),
+            req: r["req"].as_str().unwrap().into(),
+            status: r["status"].as_u64().unwrap() as u16,
+            bh: sha256_b64(r["body"].as_str().unwrap().as_bytes()),
+        };
+        assert_eq!(
+            sign(&instanz, MACHINE.typ_antwort, &claims),
+            r["jws"].as_str().unwrap()
         );
     }
 }

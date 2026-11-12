@@ -1,4 +1,5 @@
 import type { AdminAktion, AnmeldeEreignis, Anmeldeweg, ZugangsAngaben } from '../api/types';
+import { scopeText } from '../api/anbindungen';
 import {
   ORG_ROLLE_FELD,
   ORG_ROLLE_TEXT,
@@ -54,13 +55,18 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   archiv_schluessel_geprueft: 'Archiv-Schlüssel geprüft',
   archiv_schluessel_entfernt: 'Archiv-Schlüssel entfernt',
   archiv_heruntergeladen: 'Archiv heruntergeladen',
+  maschinenzugang_angelegt: 'Anbindung angelegt',
+  maschinenzugang_code_ausgestellt: 'Anbindungscode ausgestellt',
+  maschinenzugang_schluessel_gebunden: 'Schlüssel einer Anbindung gebunden',
+  maschinenzugang_geaendert: 'Anbindung geändert',
+  maschinenzugang_widerrufen: 'Anbindung widerrufen',
 };
 
 /**
  * Aktionen, deren Ziel ein Name ist und kein Anmeldeweg: Lagemonitor-Zugang (LLH-1484, die
  * Bezeichnung), Instanzkopplung und Unterschriftsschlüssel (LLH-1490, Instanz bzw. Inhaber),
  * Führung je Einsatz (LLH-1491, die Gegenstelle), Archiv (LLH-1494, Bezeichnung des Schlüssels
- * bzw. Einsatzkennung).
+ * bzw. Einsatzkennung), Anbindung eines Fremdsystems (LLH-1652, ihr Name).
  */
 export function hasNamensziel(aktion: AdminAktion): boolean {
   return (
@@ -69,7 +75,8 @@ export function hasNamensziel(aktion: AdminAktion): boolean {
     aktion.startsWith('instanz_') ||
     aktion.startsWith('unterschrift_') ||
     aktion.startsWith('fuehrung_') ||
-    aktion.startsWith('archiv_')
+    aktion.startsWith('archiv_') ||
+    aktion.startsWith('maschinenzugang_')
   );
 }
 
@@ -127,6 +134,12 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
   const teile = [
     a.fremde_org ? `Org dort: ${a.fremde_org}` : null,
     a.fingerabdruck ? `Fingerabdruck ${a.fingerabdruck}` : null,
+    // Schlüsselwechsel einer Anbindung (LLH-1652): der abgelöste Schlüssel.
+    a.fingerabdruck_vorher ? `vorher ${a.fingerabdruck_vorher}` : null,
+    // Rechte einer Anbindung (LLH-1652), bei einer Änderung vorher → nachher.
+    a.scopes
+      ? `Rechte: ${a.scopes_vorher ? `${a.scopes_vorher.map(scopeText).join(', ')} → ` : ''}${a.scopes.map(scopeText).join(', ')}`
+      : null,
     a.adresse ?? null,
     a.grund ? `Grund: ${a.grund}` : null,
     // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.

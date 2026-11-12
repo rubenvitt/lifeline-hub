@@ -15,6 +15,9 @@ pub const LAENGE: usize = 16;
 pub const GUELTIG_MINUTEN: i64 = 15;
 /// Salz der Ableitung; trägt die Fassung des Verfahrens.
 const SALZ: &[u8] = b"lifeline-instanzkopplung/1";
+/// Salz der Ableitung für den Code eines Maschinenzugangs (Fremdsystem, ADR-0022). Ein eigenes
+/// Salz trennt beide Verfahren: Derselbe Code ergibt eine andere `suche` und andere Schlüssel.
+pub const SALZ_MACHINE: &[u8] = b"lifeline-machine-client/1";
 
 /// Erzeugt einen neuen, zufälligen Code in Normalform (ohne Trennzeichen).
 pub fn generate() -> String {
@@ -72,9 +75,14 @@ impl std::fmt::Debug for Ableitung {
     }
 }
 
-/// Leitet aus einem normalisierten Code die drei Werte ab.
+/// Leitet aus einem normalisierten Kopplungscode die drei Werte ab.
 pub fn derive(code: &str) -> Ableitung {
-    let (prk, _) = Hkdf::<Sha256>::extract(Some(SALZ), code.as_bytes());
+    derive_mit_salz(code, SALZ)
+}
+
+/// Leitet aus einem normalisierten Code mit dem Salz eines Verfahrens die drei Werte ab.
+pub fn derive_mit_salz(code: &str, salz: &[u8]) -> Ableitung {
+    let (prk, _) = Hkdf::<Sha256>::extract(Some(salz), code.as_bytes());
     Ableitung {
         suche: b64(&expand_block(&prk, b"suche")),
         k_einloeser: expand_block(&prk, b"einloeser"),
@@ -131,6 +139,44 @@ pub fn transkript_aussteller(transkript_e: &[u8], kennung: &str, schluessel_b64:
         t.extend_from_slice(teil.as_bytes());
     }
     t
+}
+
+/// Hängt Teile mit Längenpräfix (u32, Big Endian) an eine Kennung an.
+fn transkript(kennung: &[u8], teile: &[&str]) -> Vec<u8> {
+    let mut t = kennung.to_vec();
+    for teil in teile {
+        t.extend_from_slice(&(teil.len() as u32).to_be_bytes());
+        t.extend_from_slice(teil.as_bytes());
+    }
+    t
+}
+
+/// Was ein Fremdsystem beim Einlösen bindet: `suche` und seinen öffentlichen Schlüssel (Base64url
+/// der 32 Rohbytes). Die Kennung `machine-einloeser` trennt es vom Transkript der Instanz.
+/// Clients bauen es nach `docs/api/maschinenzugang.md` nach.
+pub fn transkript_machine_einloeser(suche: &str, schluessel_b64: &str) -> Vec<u8> {
+    transkript(b"machine-einloeser", &[suche, schluessel_b64])
+}
+
+/// Was die Instanz in der Antwort aufs Einlösen bindet: `suche`, den Schlüssel des Fremdsystems,
+/// Instanz-UUID, Instanzschlüssel und Zugangs-ID.
+pub fn transkript_machine_aussteller(
+    suche: &str,
+    schluessel_b64: &str,
+    instanz_id: &str,
+    instanz_schluessel_b64: &str,
+    zugang_id: &str,
+) -> Vec<u8> {
+    transkript(
+        b"machine-aussteller",
+        &[
+            suche,
+            schluessel_b64,
+            instanz_id,
+            instanz_schluessel_b64,
+            zugang_id,
+        ],
+    )
 }
 
 /// HMAC-SHA256 über `transkript` als Base64url.
@@ -249,5 +295,37 @@ mod tests {
         let a = derive("ABCDEFGHJKMNPQRS");
         let text = format!("{a:?}");
         assert!(!text.contains("k_einloeser"));
+    }
+    #[test]
+    fn salz_trennt_instanz_und_maschine() {
+        let i = derive("ABCDEFGHJKMNPQRS");
+        let m = derive_mit_salz("ABCDEFGHJKMNPQRS", SALZ_MACHINE);
+        assert_ne!(i.suche, m.suche);
+        assert_ne!(i.k_einloeser, m.k_einloeser);
+        assert_eq!(derive_mit_salz("ABCDEFGHJKMNPQRS", SALZ), i);
+    }
+
+    #[test]
+    fn pruefwert_der_maschine_gilt_nur_fuer_ihren_schluessel() {
+        let m = derive_mit_salz("ABCDEFGHJKMNPQRS", SALZ_MACHINE);
+        let t = transkript_machine_einloeser(&m.suche, "SCHLUESSEL_A");
+        let p = pruefwert(&m.k_einloeser, &t);
+        assert!(is_pruefwert_valid(&m.k_einloeser, &t, &p));
+        assert!(!is_pruefwert_valid(
+            &m.k_einloeser,
+            &transkript_machine_einloeser(&m.suche, "SCHLUESSEL_B"),
+            &p
+        ));
+        // Ein Prüfwert des Instanzverfahrens über dieselben Werte gilt nicht.
+        let i = derive("ABCDEFGHJKMNPQRS");
+        assert!(!is_pruefwert_valid(&i.k_einloeser, &t, &p));
+        assert_ne!(
+            transkript_machine_einloeser("a", "b"),
+            transkript_einloeser("a", "b", "", "", "", "", "")
+        );
+        assert_ne!(
+            transkript_machine_aussteller("ab", "c", "d", "e", "f"),
+            transkript_machine_aussteller("a", "bc", "d", "e", "f")
+        );
     }
 }

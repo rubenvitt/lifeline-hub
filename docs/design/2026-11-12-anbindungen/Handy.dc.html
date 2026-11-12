@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Anbindungen am Handy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:390px;height:844px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:48px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:10px;padding:0 12px 0 0;box-sizing:border-box}
+.markenzelle{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.marke{width:14px;height:14px;background:#a8071a}
+.inhalt{padding:12px;display:flex;flex-direction:column;gap:12px}
+h1{margin:0;font-size:18px;font-weight:600}
+.knopf{height:48px;padding:0 16px;display:flex;align-items:center;justify-content:center;font-family:inherit;font-size:15px;border:1px solid #4d94d6;background:#4d94d6;color:#08090b;font-weight:600}
+.karte{display:block;text-decoration:none;color:inherit;background:#0a0c0e;border:1px solid #2e343a;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:48px}
+.zeile{display:flex;align-items:center;gap:8px}
+.name{font-size:15px;font-weight:600;color:#8ec2f0;flex:1}
+.recht{font-size:13px;color:#c6ccd2}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.zeit{color:#838b94;font-size:12px}
+.chip{display:inline-flex;align-items:center;height:24px;padding:0 8px;font-size:12px;border:1px solid}
+.chip.ok{background:#0d1a0a;color:#7ddc4a;border-color:#52c41a}
+.chip.bedien{background:#0d1620;color:#8ec2f0;border-color:#1d3a5c}
+.achtung{color:#e8cc3a;font-size:13px}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <div class="markenzelle"><div class="marke"></div></div>
+    <span style="font-size:14px;font-weight:600">Verwaltung</span>
+  </div>
+  <main class="inhalt">
+    <h1>Anbindungen</h1>
+    <button class="knopf" type="button">Anbindung anlegen</button>
+    <a class="karte" href="Ansicht.dc.html">
+      <span class="zeile"><span class="name">Einsatzbuch iuk-suite</span><span class="chip ok">aktiv</span></span>
+      <span class="recht">Einsätze lesen · Ereignisse abrufen</span>
+      <span class="achtung">Uhr geht 7 min nach <span class="mono zeit">10:38</span></span>
+    </a>
+    <a class="karte" href="Ansicht.dc.html">
+      <span class="zeile"><span class="name">Alarm-Adapter Wache 1</span><span class="chip ok">aktiv</span></span>
+      <span class="recht">Alarmmeldungen einliefern</span>
+      <span class="zeit">zuletzt <span class="mono">10:41</span></span>
+    </a>
+    <a class="karte" href="Ansicht.dc.html">
+      <span class="zeile"><span class="name">Traccar-Brücke</span><span class="chip bedien">wartet auf Schlüssel</span></span>
+      <span class="recht">Positionen einliefern</span>
+      <span class="zeit">Code gilt bis <span class="mono">10:57</span></span>
+    </a>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

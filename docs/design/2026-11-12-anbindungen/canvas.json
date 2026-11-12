@@ -1,0 +1,28 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-12T10:30:00Z" },
+  "title": "Anbindungen (LLH-1652)",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 800, "title": "Liste · Desktop · kompakt" },
+    "Ansicht.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 800, "title": "Ansicht eines Zugangs · Ablehnung und Schlüsselwechsel" },
+    "Anlegen.dc.html": { "x": 0, "y": 920, "w": 1280, "h": 800, "title": "Anlegen (Erfassungsdialog)" },
+    "Code.dc.html": { "x": 1360, "y": 920, "w": 1280, "h": 800, "title": "Einmal-Code nach dem Anlegen" },
+    "Gesperrt.dc.html": { "x": 0, "y": 1840, "w": 1280, "h": 560, "title": "Gekoppelter ELW: Anlegen gesperrt" },
+    "Handy.dc.html": { "x": 1360, "y": 1840, "w": 390, "h": 844, "title": "Liste · Handy 390 × 844 · komfortabel" }
+  },
+  "order": ["Main.dc.html", "Ansicht.dc.html", "Anlegen.dc.html", "Code.dc.html", "Gesperrt.dc.html", "Handy.dc.html"],
+  "notes": {
+    "titel": { "x": 0, "y": -300, "text": "Anbindungen: Maschinenzugänge für Fremdsysteme", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": "1794337645-6364",
+      "copiedAt": "2026-11-12T10:30:00Z"
+    }
+  ]
+}

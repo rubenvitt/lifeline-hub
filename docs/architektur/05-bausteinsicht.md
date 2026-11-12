@@ -22,6 +22,8 @@ flowchart LR
     fe["frontend<br/>(eingebettet aus frontend/dist)"]
   end
   katalog["crates/karten-katalog"]
+  mclient["crates/lifeline-machine-client"]
+  fremd([Fremdsystem])
   ks["karten-service"]
   kb["karten-build"]
   s3[(S3-Speicher)]
@@ -33,6 +35,9 @@ flowchart LR
   ks -- "MBTiles + Manifest" --> s3
   hub -.-|Wire-Typen| katalog
   ks -.-|Wire-Typen| katalog
+  fremd -- "HTTPS /api/v1, signiert" --> hub
+  fremd -.-|Referenz-Client| mclient
+  hub -.-|Kommando zugang| mclient
 ```
 
 | Baustein | Verantwortung | Schnittstellen | Code |
@@ -43,12 +48,14 @@ flowchart LR
 | `karten-service` | Zentraler Dienst, der Offline-Kartenregionen baut und in S3 ablegt | `/regions`, `/builds`, `/builds/{id}`, `/zeitplan`, `/healthz` (`karten-service/src/api.rs`) | `karten-service/` |
 | `karten-build` | Bau-zeitiges Erzeugen der Shortbread-MBTiles mit Planetiler, nie zur Laufzeit der App | `make tiles AREA=…`, `make validate` (`karten-build/README.md`) | `karten-build/` |
 | `crates/karten-katalog` | Geteilte Wire-Typen des Offline-Kartenkatalogs und der Bau-Jobs | Lib-Crate, Feature `schema` für den Typ-Codegen (`crates/karten-katalog/Cargo.toml`) | `crates/karten-katalog/src/lib.rs` |
+| `crates/lifeline-machine-client` | Referenz-Client des Maschinenzugangs: Code einlösen, Anfragen signieren, Antworten prüfen; absichtlich unabhängig vom Server | Lib-Crate, Feature `http` (`crates/lifeline-machine-client/Cargo.toml`); genutzt vom Kommando `lifeline-hub zugang` | `crates/lifeline-machine-client/src/lib.rs` |
 | `website` | Marketing-Seite und Anwenderdoku, eigenständig, nicht im Binary | Cloudflare Pages, liest `docs/anwender/kapitel/` | `website/` ([AGENTS.md](../../website/AGENTS.md)) |
 
 Belege: Der Release-Build bettet `frontend/dist` per `rust-embed` ein, der Debug-Build liest vom
 Dateisystem (`src/static_files.rs`); unbekannte Pfade ohne Dateiendung fallen auf `index.html`
 zurück, eingehängt als Router-Fallback in `src/app.rs`. Der Workspace umfasst `.`,
-`crates/karten-katalog`, `karten-service` und `src-tauri` (`Cargo.toml`). Die Kopplung an den
+`crates/karten-katalog`, `crates/lifeline-machine-client`, `karten-service` und `src-tauri`
+(`Cargo.toml`). Die Kopplung an den
 `karten-service` ist optional: ohne `LIFELINE_KARTEN_SERVICE_URL` und
 `LIFELINE_KARTEN_SERVICE_TOKEN` ist der Region-Bau aus (`src/config.rs`); die Proxy-Routen
 `/api/karte/offline-karten/bauen|baubare-regionen|bau-status` stehen in `src/app.rs`. Der
@@ -204,6 +211,7 @@ Regeln: [frontend/src/geraet/AGENTS.md](../../frontend/src/geraet/AGENTS.md).
 | `src/geraet` | Gerätekopplung per Code, Gerätekonto, Funktionsansicht, Stellenbindung, Routen-Whitelist | `…/{id}/geraete`, `POST /api/geraete/koppeln`, `…/{id}/lagemonitor` |
 | `src/lagemonitor_zugang` | Lesezugang externer Lagemonitore: Schlüssel (nur Hash), Freigabe je Einsatz durch die Einsatzleitung, Extractor `LagemonitorZugriff` nur für den Abruf | `/api/lagemonitor-zugaenge`, `…/{id}/lagemonitor-zugaenge`, `GET /api/lagemonitor/v1/lage` (Bearer) |
 | `src/lagebild_extern` | Lagebild für Externe (LLH-1496): Link je Empfänger ohne Konto (Schlüssel nur als Hash), Stufen „Lagebild“ und „Öffentlich“, Ablauf und Widerruf, Protokoll je Öffnung ohne IP; Extractor `LagebildZugriff` für den Abruf, `KartenZugriff` öffnet den Karten-Proxy für Sitzung oder gültigen Link; gilt nur an der ausgebenden Instanz (aus dem Spiegel ausgenommen) | `…/{id}/lagebild-freigaben`, `GET /api/extern/v1/lagebild` (Bearer) |
+| `src/public_api` | Öffentliche API für Fremdsysteme unter `/api/v1/` (LLH-1653, [ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md)): Router und OpenAPI-Dokument entstehen zusammen (`utoipa-axum`), Fehler `{error, code}` mit stabilem Code (`ApiError`, `ErrorCode`), Schichten für `code` und `no-store`, Body-Grenze 64 KiB vor jedem Handler. Maschinenzugang (LLH-1652): Extractor `MachineClient` (Signatur, Widerruf, Ablauf, Drosselung, Scope), Repo der Zugänge, Codes, `jti` und Abrufe, Kommando `lifeline-hub zugang` | `GET /api/v1/openapi.json`, versioniert als `docs/api/public-v1.json`; `POST /api/v1/zugang/redeem`, `GET /api/v1/me`, `GET /api/v1/instanz/jwks.json`; Verwaltung über `/api/admin/anbindungen` (`src/routes/anbindungen.rs`) |
 | `src/instanz` | Instanzkopplung (LLH-1490): Identität und Ed25519-Schlüssel der Instanz, Kopplungscode, signierte Anfragen und Antworten, Extractor `GekoppelteInstanz`, Melden im Hintergrund, Widerruf ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)); `src/instanz/stammdaten` verteilt die Stammdaten einer Org von der erreichten zur meldenden Instanz (LLH-1493: Änderungslog und Schreibschutz per Trigger, Nachlieferung mit jeder Meldung, Kontogeheimnisse mit age); `src/instanz/fuehrung` hält je Einsatz die führende Instanz mit Epoche, tauscht die Akten in der Meldung und richtet den Spiegel danach aus: wer nicht führt, hält den Einsatz als Spiegel (LLH-1491, LLH-1641, [ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)); `src/instanz/spiegel` hält Einsätze einer gekoppelten Instanz als Spiegel in denselben Tabellen (LLH-1492, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md)): Beschreibung der Tabellen und Trigger-Generator (`art`, `schema`), Liefern und Übernehmen über den Stand im Änderungslog `einsatz_aenderung`, Anhänge auf Abruf (`anhang`), Anträge am Spiegel und Ausführen beim Führer (`antrag`), eigener Takt (`takt`); Direktkopplung vor Ort (LLH-1497, [ADR-0029](entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)): Art der Kopplung und ihre Flüsse (`InstanzKopplungArt::traegt`), beglaubigtes TLS-Zertifikat (`zertifikat`), LAN-Entdeckung per mDNS (`entdeckung`), Ursprungskennung der Stammdaten (`stammdaten::herkunft`, `spiegel::abbildung`) | `/api/admin/instanz/…`, `/api/einsaetze/{id}/fuehrung/…`, `GET /api/instanz/stammdaten/herkunft`, `POST /api/instanz/koppeln`, `POST /api/instanz/melden`, `POST /api/instanz/spiegel`, `POST /api/instanz/zertifikat` (signiert); `GET /api/admin/instanz/lan`; `GET /api/einsaetze/{id}/antraege`, `DELETE …/antraege/{antrag_id}`, `GET /api/antraege/abgelehnt`, `DELETE /api/antraege/abgelehnt/{antrag_id}` (LLH-1648, nach der Verwahrung); Unterschriftsschlüssel in `src/auth/unterschrift` |
 
 ### Auth & Organisation
@@ -420,6 +428,14 @@ dient Garage als S3-Speicher (`compose.yml`).
 Lib-Crate mit `OfflineKatalogEintrag` und den Job-Typen des Kartenbaus
 (`crates/karten-katalog/src/lib.rs`); `lifeline-hub` bindet es mit Feature `schema` für den
 Typ-Codegen ein, `karten-service` ohne (`Cargo.toml`, `karten-service/Cargo.toml`).
+
+### `crates/lifeline-machine-client`
+
+Lib-Crate für Fremdsysteme (`crates/lifeline-machine-client/src/lib.rs`): Code ableiten und
+einlösen (`prepare_redeem`, `finish_redeem`), Anfragen signieren (`Credentials::sign_request`),
+Antworten prüfen (`verify_response`), mit Feature `http` auch `redeem` und `me`. Es hängt nicht vom
+Server ab; die Testvektoren `docs/api/machine-auth-testvektoren.json` prüfen beide gegeneinander.
+`lifeline-hub` bindet es für das Kommando `zugang` ein (`src/public_api/kommando.rs`).
 
 ### `karten-build`
 

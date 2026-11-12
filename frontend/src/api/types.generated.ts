@@ -53,6 +53,12 @@ export interface components {
          * @enum {string}
          */
         AbgleichStatus: "verdacht" | "bestaetigt" | "verworfen";
+        /**
+         * @description Warum die letzte Anfrage eines bekannten Zugangs scheiterte. Steht nur am Zugang (Seite
+         *     „Anbindungen“); das Fremdsystem bekommt nur 401.
+         * @enum {string}
+         */
+        AblehnungGrund: "uhr" | "signatur" | "body" | "pfad" | "methode" | "ziel" | "form" | "wiederholung" | "abgelaufen" | "widerrufen" | "kein_schluessel" | "instanz_gekoppelt";
         /** @description Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`). */
         AbloesungAbloeser: {
             /** Format: int64 */
@@ -405,7 +411,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -447,6 +453,55 @@ export interface components {
              */
             name?: string | null;
             zustand: components["schemas"]["BesetzungsZustand"];
+        };
+        /** @description Letzte Ablehnung einer Anfrage eines Zugangs (design.md D6). */
+        AnbindungAblehnung: {
+            /**
+             * Format: int64
+             * @description Bei `uhr`: Abweichung der Uhr des Fremdsystems in Sekunden (negativ: geht nach).
+             */
+            abweichung_s?: number | null;
+            at: string;
+            grund: components["schemas"]["AblehnungGrund"];
+        };
+        /** @description Ein Zugang, wie die Seite „Anbindungen“ ihn zeigt. Schlüssel nur als Fingerabdruck. */
+        AnbindungAnzeige: {
+            angelegt_at: string;
+            fingerabdruck?: string | null;
+            /** @description Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert. */
+            fingerabdruck_neu?: string | null;
+            /** @description Stand für das optimistische Lock beim Bearbeiten (`basis_geaendert_at`). */
+            geaendert_at: string;
+            gueltig_bis?: string | null;
+            id: string;
+            /** @description „gültig bis“ ist verstrichen; der Zugang verhält sich wie widerrufen. */
+            is_abgelaufen: boolean;
+            letzte_ablehnung?: components["schemas"]["AnbindungAblehnung"] | null;
+            name: string;
+            scopes: components["schemas"]["Scope"][];
+            widerrufen_at?: string | null;
+            /** @description Anzeigename des Admins, der widerrufen hat. */
+            widerrufen_von_name?: string | null;
+            zuletzt_genutzt_at?: string | null;
+            zustand: components["schemas"]["ZugangZustand"];
+        };
+        /** @description Ein frisch ausgestellter Einmal-Code. Er verlässt den Server nur hier, einmal. */
+        AnbindungCode: {
+            /** @description In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`. */
+            code: string;
+            laeuft_ab_at: string;
+            zugang: components["schemas"]["AnbindungAnzeige"];
+        };
+        /** @description Die Zugänge der Org und, falls Anbindungen hier nicht angenommen werden, der Grund. */
+        AnbindungenListe: {
+            /**
+             * @description Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):
+             *     Anlegen und neue Codes sind dann gesperrt.
+             */
+            gesperrt_grund?: string | null;
+            /** @description Fingerabdruck dieser Instanz, zum Abgleich am Fremdsystem. */
+            instanz_fingerabdruck: string;
+            zugaenge: components["schemas"]["AnbindungAnzeige"][];
         };
         /**
          * @description Öffentliche Darstellung eines Anhangs — ohne die Bytes (`daten`), die nur
@@ -3644,8 +3699,6 @@ export interface components {
          *     der Akte zugeordnet ist.
          */
         FuehrungGegenueber: {
-            /** @description Art der Kopplung (LLH-1497): über eine Direktkopplung `vor_ort` wechselt die Führung nicht. */
-            art: components["schemas"]["InstanzKopplungArt"];
             kennung: string;
             /** Format: int64 */
             kopplung_id: number;
@@ -4121,22 +4174,8 @@ export interface components {
              */
             offen: number;
         };
-        /** @description Eine im lokalen Netz gefundene Instanz. */
-        InstanzGefunden: {
-            /** @description Adressen zum Einlösen, bevorzugt IPv4, etwa `https://192.168.1.20:8443`. */
-            adressen: string[];
-            fingerabdruck: string;
-            /** @description Mit dieser Instanz besteht schon eine Kopplung. */
-            gekoppelt: boolean;
-            kennung: string;
-            name: string;
-            /** Format: int32 */
-            protokoll: number;
-        };
         /** @description Eine Kopplung, wie die Admin-Seite sie zeigt: aus Sicht einer Org. */
         InstanzKopplungAnzeige: {
-            /** @description Art der Kopplung (LLH-1497). */
-            art: components["schemas"]["InstanzKopplungArt"];
             gegenueber_adresse?: string | null;
             gegenueber_fingerabdruck: string;
             gegenueber_kennung: string;
@@ -4170,17 +4209,9 @@ export interface components {
              *     (LLH-1605).
              */
             wartende_schluessel: number;
-            zertifikat?: components["schemas"]["InstanzZertifikatZustand"] | null;
             zuletzt_gesehen_at?: string | null;
             zustand: components["schemas"]["InstanzKopplungZustand"];
         };
-        /**
-         * @description Art einer Kopplung (LLH-1497, design.md D1). Sie beschreibt die Kopplung, nicht die
-         *     Instanz: dieselbe Instanz kann beim Hub `standard` und bei einem zweiten ELW `vor_ort`
-         *     gekoppelt sein. Was über eine Art fließt, sagt allein [`InstanzKopplungArt::traegt`].
-         * @enum {string}
-         */
-        InstanzKopplungArt: "standard" | "vor_ort";
         /**
          * @description Richtung einer Kopplung aus Sicht dieser Instanz (design.md D6). Die einlösende Seite meldet
          *     sich, die ausstellende wird gemeldet und baut nie selbst eine Verbindung auf.
@@ -4192,12 +4223,6 @@ export interface components {
          * @enum {string}
          */
         InstanzKopplungZustand: "angebahnt" | "aktiv" | "widerrufen" | "vom_gegenueber_widerrufen";
-        /** @description Antwort von `GET /api/admin/instanz/lan`. */
-        InstanzLanAntwort: {
-            /** @description Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`). */
-            aus: boolean;
-            gefunden: components["schemas"]["InstanzGefunden"][];
-        };
         InstanzOrgZuordnung: {
             angelegt_at: string;
             fremde_org_kennung: string;
@@ -4270,8 +4295,6 @@ export interface components {
             fingerabdruck: string;
             kennung: string;
             kopplungen: components["schemas"]["InstanzKopplungAnzeige"][];
-            /** @description Die LAN-Entdeckung ist eingeschaltet (`--lan-entdeckung`, design.md D6). */
-            lan_entdeckung: boolean;
             name: string;
             /**
              * @description Passkeys sind eingerichtet (`--webauthn-rp-id`); ohne sie gibt es keine
@@ -4282,17 +4305,7 @@ export interface components {
             protokoll: number;
             schluessel: components["schemas"]["UnterschriftSchluesselAnzeige"][];
             softwarestand: string;
-            /**
-             * @description Diese Instanz spricht selbst TLS (`--tls`): Voraussetzung für einen Code der Art „vor Ort“
-             *     (LLH-1497, design.md D3).
-             */
-            tls_eigen: boolean;
         };
-        /**
-         * @description Zustand des beglaubigten Zertifikats einer Direktkopplung (LLH-1497, design.md D3).
-         * @enum {string}
-         */
-        InstanzZertifikatZustand: "bestaetigt" | "passt_nicht" | "gegenstelle_kennt_aelteres";
         JetztAktualisierenAntwort: {
             phase: components["schemas"]["JetztPhase"];
         };
@@ -4495,8 +4508,6 @@ export interface components {
         };
         /** @description Ein frisch ausgestellter Kopplungscode. Der Code verlässt den Server nur hier, einmal. */
         KopplungscodeAntwort: {
-            /** @description Art der Kopplung, die der Code stiftet (LLH-1497). */
-            art: components["schemas"]["InstanzKopplungArt"];
             /** @description In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`. */
             code: string;
             /** @description Fingerabdruck dieser Instanz zum Abgleich an der einlösenden Seite. */
@@ -7317,6 +7328,12 @@ export interface components {
             /** @description Offen und noch nicht fällig. */
             zuruecknehmbar: boolean;
         };
+        /**
+         * @description Was ein Maschinenzugang darf (Konzept D2). Wire-Werte nach LFH-1312: Fachbegriff deutsch,
+         *     Zugriffsart englisch. Neue Werte kommen nur hinzu (Stabilitätszusage v1).
+         * @enum {string}
+         */
+        Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use";
         /** @description Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`). */
         SichtungAnzeige: {
             /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
@@ -9163,6 +9180,12 @@ export interface components {
             von_at: string;
         };
         /**
+         * @description Zustand eines Maschinenzugangs. „Abgelaufen“ ist kein Zustand, sondern ergibt sich aus
+         *     `gueltig_bis` (design.md D2).
+         * @enum {string}
+         */
+        ZugangZustand: "wartet" | "aktiv" | "widerrufen";
+        /**
          * @description Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
          *     `admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren
          *     Konventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.
@@ -9177,6 +9200,9 @@ export interface components {
          *       des Blocks, durch Komma getrennt) und `block`.
          *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
          *       Gegenstelle.
+         *     - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich
+         *       `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich
+         *       `scopes_vorher`, falls die Scopes wechselten.
          */
         ZugangsAngaben: {
             /** @description Adresse der Gegenstelle (nur auf der Seite, die sich meldet). */
@@ -9195,6 +9221,8 @@ export interface components {
             block?: number | null;
             /** @description Fingerabdruck der Gegenstelle oder des Unterschriftsschlüssels. */
             fingerabdruck?: string | null;
+            /** @description Maschinenzugang: Fingerabdruck des abgelösten Schlüssels beim Wechsel. */
+            fingerabdruck_vorher?: string | null;
             /** @description Org der Gegenstelle. */
             fremde_org?: string | null;
             /** @description Grobe Gerätebezeichnung der beendeten Sitzung. */
@@ -9211,8 +9239,14 @@ export interface components {
              *     Anmelde-Passkeys; ebenso beim Notfallbefehl `admin-zugang-zuruecksetzen`.
              */
             passkeys_entfernt?: number | null;
+            /** @description Maschinenzugang: Scopes (Wire-Werte) nach der Aktion. */
+            scopes?: string[] | null;
+            /** @description Maschinenzugang: Scopes vor einer Änderung. */
+            scopes_vorher?: string[] | null;
             system_rolle?: components["schemas"]["SystemRolle"] | null;
             system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
+            /** @description Maschinenzugang (LLH-1652): seine Kennung. */
+            zugang_id?: string | null;
         };
         /** @description Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097). */
         ZugangsaenderungAnzeige: {

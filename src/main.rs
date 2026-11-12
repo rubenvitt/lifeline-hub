@@ -61,6 +61,9 @@ async fn main() -> anyhow::Result<()> {
         Some(Command::AdminZugangZuruecksetzen { benutzername }) => {
             cmd_admin_zugang_zuruecksetzen(&config.db_path, &benutzername).await
         }
+        Some(Command::Zugang(befehl)) => {
+            lifeline_hub::public_api::kommando::ausfuehren(befehl).await
+        }
         Some(Command::Lizenz) => {
             print!("{}", lifeline_hub::lizenz::TEXT);
             Ok(())
