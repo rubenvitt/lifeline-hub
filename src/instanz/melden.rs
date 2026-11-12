@@ -474,17 +474,29 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             let abstand = next_abstand(abstand_s(), kopplung.fehlversuche as u32 + 1);
             let naechste = add_sekunden(&jetzt, abstand as i64).unwrap_or(jetzt);
             tracing::warn!(kopplung = kopplung.id, fehler = %f, "Meldung bei gekoppelter Instanz gescheitert");
-            repo::save_meldeversuch(pool, kopplung.id, Some(&f.to_string()), &naechste).await?;
+            let mut conn = pool.acquire().await?;
+            repo::save_meldeversuch(&mut conn, kopplung.id, Some(&f.to_string()), &naechste)
+                .await?;
             return Ok(());
         }
     };
     let a = antwort.wert;
+    // Bleibt mehr Führung, als in diese Meldung passte, meldet sie sich gleich wieder (D3).
+    // Eigener Rest nur, wenn das Gegenüber quittiert hat (sonst hörte ein Gegenüber ohne Schalter
+    // die Meldung jede fünf Sekunden).
+    // Quittung des Gegenübers, höchstens bis zum Stand, den diese Meldung abdeckte (LLH-1672).
+    let quittung = a.fuehrung_bis.min(gesendet_hoechst);
+    let fortschritt = quittung > fuehrung_gesendet;
+    let naechste = if fuehrung_an && ((fuehrung_ausgang.mehr && fortschritt) || a.fuehrung_mehr) {
+        jetzt.clone()
+    } else {
+        add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone())
+    };
     let mut abgelehnt_alle = Vec::new();
     let mut vom_gegenueber_widerrufen = Vec::new();
     let mut stammdaten_geaendert: Vec<i64> = Vec::new();
     let mut sitzungen_beendet: Vec<String> = Vec::new();
     let mut fuehrung_folgen = Vec::new();
-    let mut quittung = fuehrung_gesendet;
     crate::write_retry!(pool, |conn| {
         abgelehnt_alle.clear();
         vom_gegenueber_widerrufen.clear();
@@ -565,7 +577,6 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 kopplung.zuletzt_gesehen_at.as_deref(),
             )
             .await?;
-            quittung = a.fuehrung_bis.min(gesendet_hoechst);
             fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
                 .await?;
             if let Some(h) = &eingang.hinweis {
@@ -579,18 +590,13 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             InstanzKopplungZustand::VomGegenueberWiderrufen,
         )
         .await?;
+        // Der Meldeversuch gehört zur Meldung (LLH-1674): Klemmt er, gilt nichts davon, und die
+        // nächste Meldung holt alles nach. Sonst stünden committete Wechsel ohne ihre Folgen.
+        repo::save_meldeversuch(conn, kopplung.id, None, &naechste).await?;
         Ok(())
     })?;
-    // Bleibt mehr Führung, als in diese Meldung passte, meldet sie sich gleich wieder (D3).
-    // Eigener Rest nur, wenn das Gegenüber quittiert hat (sonst hörte ein Gegenüber ohne Schalter
-    // die Meldung jede fünf Sekunden).
-    let fortschritt = quittung > fuehrung_gesendet;
-    let naechste = if fuehrung_an && ((fuehrung_ausgang.mehr && fortschritt) || a.fuehrung_mehr) {
-        jetzt.clone()
-    } else {
-        add_sekunden(&jetzt, abstand_s() as i64).unwrap_or(jetzt.clone())
-    };
-    repo::save_meldeversuch(pool, kopplung.id, None, &naechste).await?;
+    // Nach dem Commit kein `?` mehr vor den Folgen: Alarm, Benachrichtigung, Kopf-Ereignis und
+    // Admin-Spur der übernommenen Akten.
     fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     if let Some(live) = stammdaten::live() {
         for org_id in &stammdaten_geaendert {
