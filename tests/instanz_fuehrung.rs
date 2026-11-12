@@ -744,17 +744,62 @@ async fn offene_uebernahme_behaelt_ihre_bruchstelle_bei_neuer_erklaerung_derselb
 
 #[tokio::test]
 async fn widerrufener_schluessel_verwirft_die_offene_uebernahme_beim_naechsten_eingang() {
-    // Der Schlüssel von A wird widerrufen, während die Übernahme am ELW offen ist; der Widerruf
-    // ist angekommen (LLH-1671). Der nächste Eingang verwirft sie wie bei Ankunft.
+    // Der Schlüssel von A wird am Hub widerrufen, während die Übernahme am ELW offen ist
+    // (LLH-1671). Die Meldung, mit der der Widerruf ankommt, verwirft sie wie bei Ankunft.
     let (hub, elw) = gekoppelt().await;
     let (e, akte) = elw_einsatz(&hub, &elw).await;
     hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
     elw_meldet(&elw).await;
     assert_eq!(fuehrung(&elw, e).await["offen"]["epoche"], 2);
-    sqlx::query("UPDATE unterschrift_schluessel SET zustand = 'widerrufen'")
-        .execute(&elw.pool)
+    // A wird am Hub widerrufen; dafür braucht die Org einen zweiten, gegengezeichneten Schlüssel.
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let oeff_b = b.oeffentlich();
+    let id_b = {
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: 1,
+                benutzer_name: "Admin",
+                credential_id: &b.credential_id,
+                schluessel: &oeff_b,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Stick B",
+            },
+        )
         .await
-        .unwrap();
+        .unwrap()
+    };
+    let (s, start) = post(
+        &hub,
+        &format!("/api/admin/instanz/unterschrift/{id_b}/gegenzeichnen/start"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{start}");
+    let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/unterschrift/{id_b}/gegenzeichnen/abschluss"),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let id_a: i64 =
+        sqlx::query_scalar("SELECT id FROM unterschrift_schluessel WHERE credential_id = 'a'")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/unterschrift/{id_a}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // Genau eine Meldung: Der Widerruf kommt mit ihr und verwirft im selben Takt.
     elw_meldet(&elw).await;
     let f = fuehrung(&elw, e).await;
     assert!(f["offen"].is_null(), "{f}");
