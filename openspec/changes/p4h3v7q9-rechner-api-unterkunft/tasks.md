@@ -150,10 +150,18 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 
 ## 7. Gesamtprüfung
 
-- [ ] 7.1 `scripts/check-typ-codegen.sh` grün, `frontend/src/api/openapi.json` und
-  `types.generated.ts` unverändert (keine v1-Typen in `api_doc.rs`).
-- [ ] 7.2 `./scripts/check-all.sh` grün; ersatzweise in der Cloud-Sitzung die Bündel, die dort
-  laufen, und der Rest über die CI des PRs (mit Verweis auf den Lauf abhaken).
+- [x] 7.1 `scripts/check-typ-codegen.sh` grün, `frontend/src/api/openapi.json` und
+  `types.generated.ts` unverändert (keine v1-Typen in `api_doc.rs`). Gelaufen am 12.11.2026 auf
+  dem Stand nach dem Nachreview: alle fünf Schritte grün.
+- [x] 7.2 `./scripts/check-all.sh` grün; ersatzweise in der Cloud-Sitzung die Bündel, die dort
+  laufen, und der Rest über die CI des PRs (mit Verweis auf den Lauf abhaken). In der
+  Cloud-Sitzung gelaufen und grün: `check-fmt.sh`, `check-typ-codegen.sh`, `check-deps.sh`,
+  `check-architektur.sh`, `check-adr-nummern.sh`, `check-migrationen.sh`,
+  `check-schreibweisen.sh`, `cargo test --lib` (4146 Tests), die Integrationstests `rechner_api`,
+  `maschinenzugang`, `public_api`, `public_api_spec_aktuell` und `enum_wire_kontrakt`, dazu
+  `rechnerFixture.test.ts`, `richtwerte.guard.test.ts` und `anwenderdoku.guard.test.ts`. Die
+  übrigen Integrationstests, die ganze Vitest-Suite, Lint und e2e belegt die CI des PRs: der
+  volle `cargo test` sprengte in der Sitzung den Plattenplatz.
 
 ## Workflow follow-up
 
