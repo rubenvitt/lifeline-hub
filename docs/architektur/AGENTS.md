@@ -77,7 +77,7 @@ Vorlage `entscheidungen/VORLAGE.md`. Geschrieben für Agenten, die sie vor einer
   Autofix gibt es nicht.
 - **Kapitel 9 listet die ADRs nicht** (LLH-1660): jede Zeile dort kollidierte mit jedem anderen
   PR, der eine ADR anlegt. Das Verzeichnis ist der Ordner, `scripts/adr-fuer.sh --alle` und die
-  Website. Herleitung: `openspec/changes/p31gqvln-merge-stau/design.md`.
+  Website. Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`.
 
 ## Pflege durch Agenten
 

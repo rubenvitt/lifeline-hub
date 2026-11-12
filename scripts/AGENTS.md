@@ -48,7 +48,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
     hinzufügt, ergänzt Skriptkopf, Selbsttest und die Spec `merge-stau`.
   - Kein Schritt führt PR-Code aus. `--nur-zeigen` nennt Befund und Aktion, ohne zu schreiben,
     auch lokal: `GITHUB_REPOSITORY=<owner>/<repo> scripts/stau-waechter.sh --nur-zeigen alle`.
-  - Herleitung: `openspec/changes/p31gqvln-merge-stau/design.md`.
+  - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
