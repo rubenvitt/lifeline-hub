@@ -1786,19 +1786,34 @@ export interface components {
         };
         /** @description Eine nicht übernommene Erfassung, wie die Liste am Band sie zeigt (N2). */
         BruchErfassung: {
-            /** @description Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`). */
+            /**
+             * @description Art des Antrags, wenn sie sich nachreichen lässt (`etb`, `meldung`, `person`, `sichtung` …,
+             *     siehe [`NACHREICHBAR`]).
+             */
             antrag_art?: string | null;
             /**
              * Format: int64
              * @description Zahl der Folgezeilen, die mit ihr gingen.
              */
             folgen: number;
+            /**
+             * Format: int64
+             * @description Einträge der Kette, die der Spiegel noch selbst stellt, sobald ihr Bezug beim Führer ist.
+             */
+            folgen_offen: number;
             gesichert_at: string;
+            /** @description Warum ein Eintrag der Kette als eigene Zeile zurück ist (abgelehnt, ein Bezug fehlt). */
+            grund?: string | null;
             /** Format: int64 */
             id: number;
             kategorie: components["schemas"]["SpiegelKategorie"];
             /** @description Inhalt in Kurzform (höchstens [`KURZ_MAX`] Zeichen). */
             kurz?: string | null;
+            /**
+             * @description Schon gestellt; die Zeile steht nur noch da, weil Einträge ihrer Kette folgen (LLH-1657).
+             *     Kein Stellen, kein Verwerfen, zählt nicht im Band.
+             */
+            nachgereicht: boolean;
             /** @description Tabelle der Zeile (`etb_eintrag`, `meldung`, `einsatz_person` …). */
             tabelle: string;
             /** @description Typ eines ETB-Eintrags (`meldung`, `lage`, …). */

@@ -198,6 +198,26 @@ async fn aktionen(pool: &sqlx::SqlitePool) -> Vec<String> {
         .unwrap()
 }
 
+/// Die Führungseinträge der Admin-Spur: Aktion, ob eine Person dieser Instanz handelte, Grund.
+async fn spur_fuehrung(pool: &sqlx::SqlitePool) -> Vec<(String, bool, String)> {
+    let rows: Vec<(String, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT aktion, akteur_id, detail FROM admin_audit WHERE aktion LIKE 'fuehrung_%' \
+         ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    rows.into_iter()
+        .map(|(aktion, akteur, detail)| {
+            let grund = detail
+                .and_then(|d| serde_json::from_str::<Value>(&d).ok())
+                .and_then(|d| d["grund"].as_str().map(str::to_string))
+                .unwrap_or_default();
+            (aktion, akteur.is_some(), grund)
+        })
+        .collect()
+}
+
 async fn benachrichtigungen(pool: &sqlx::SqlitePool) -> Vec<String> {
     sqlx::query_scalar("SELECT art FROM benachrichtigung ORDER BY id")
         .fetch_all(pool)
@@ -284,6 +304,35 @@ async fn hub_ohne_schalter_nimmt_nichts_an() {
         .await
         .unwrap();
     assert_eq!(n, 0);
+}
+
+/// Die Admin-Routen der Akten des Gegenübers sind ohne Schalter 404, auch wenn aus der Zeit mit
+/// Schalter eine Akte da ist (LLH-1677, Punkt 5).
+#[tokio::test]
+async fn ohne_schalter_sind_die_akten_des_gegenuebers_404() {
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
+    lifeline_hub::instanz::fuehrung::save_schalter(&elw.pool, false)
+        .await
+        .unwrap();
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "GET",
+        "/api/admin/instanz/fuehrung",
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Liste: {v}");
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Akte: {v}");
 }
 
 // ── Akte und Austausch ───────────────────────────────────────────────────────────────────────
@@ -524,6 +573,55 @@ async fn anfrage_nur_von_einem_admin_der_org() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
+/// Der Admin einer anderen Org derselben Instanz sieht die Akte nicht und kann sie nicht
+/// anfragen: 404 wie für eine unbekannte Akte (LLH-1677, Punkt 1, `dienst::load_fremde`).
+#[tokio::test]
+async fn akte_einer_anderen_org_ist_404() {
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&elw).await[0]["id"].as_i64().unwrap();
+    let (org_b, admin_b) = common::fremde_org_anlegen(
+        &elw.pool,
+        "Fremde Org",
+        "orgbadmin",
+        "orgbadminpw1",
+        "keine",
+    )
+    .await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(admin_b)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    assert_ne!(org_b, 1);
+    let cookie = common::login_cookie(&elw.app, "orgbadmin", "orgbadminpw1").await;
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "GET",
+        "/api/admin/instanz/fuehrung",
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, json!([]), "die Liste der fremden Org bleibt leer");
+    for pfad in ["anfragen", "notuebernahme"] {
+        let (s, v) = common::anfrage_json(
+            &elw.app,
+            "POST",
+            &format!("/api/admin/instanz/fuehrung/{akte}/{pfad}"),
+            &cookie,
+            Some(&json!({"grund": "Probe"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{pfad}: {v}");
+    }
+    let f = &fremde(&elw).await[0];
+    assert_eq!(f["anfrage_offen"], false, "nichts hat die Akte verändert");
+    assert_eq!(f["fuehrer_kennung"], hub.kennung);
+}
+
 #[tokio::test]
 async fn notuebernahme_gegen_den_hub_nimmt_er_ohne_rueckfrage_an() {
     let (hub, elw) = gekoppelt().await;
@@ -566,11 +664,75 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     let v = hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ohne Verbindung seit 40 min").await;
     assert_eq!(v["fuehrend"], true);
     assert_eq!(v["epoche"], 2);
-    elw_meldet(&elw).await;
+    // Drei Meldetakte, bevor jemand entscheidet (LLH-1671): Die offene Übernahme pendelt nicht,
+    // die Bruchstelle bleibt die letzte Meldung vor der ersten, es gibt genau eine
+    // Benachrichtigung. Die Meldezeit wird je Takt gesetzt, sonst lägen alle in derselben Sekunde.
+    const BRUCH: &str = "2026-01-01 10:00:00";
+    let stand_am_hub = || async {
+        sqlx::query_scalar::<_, i64>("SELECT stand FROM einsatz_fuehrung WHERE id = ?")
+            .bind(akte)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap()
+    };
+    let mut stand_nach_erster = 0;
+    for (takt, zuletzt) in [BRUCH, "2026-01-01 10:01:00", "2026-01-01 10:02:00"]
+        .into_iter()
+        .enumerate()
+    {
+        sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
+            .bind(zuletzt)
+            .execute(&elw.pool)
+            .await
+            .unwrap();
+        elw_meldet(&elw).await;
+        match takt {
+            0 => stand_nach_erster = stand_am_hub().await,
+            1 => {
+                assert_eq!(
+                    stand_am_hub().await,
+                    stand_nach_erster,
+                    "der Hub schickt seine Akte nicht neu, weil der ELW sie offen hält"
+                );
+                // Der Hub schickt dieselbe Übernahme doch noch einmal mit neuem Stand und
+                // geändertem Kopf (etwa nach einer Änderung der Bezeichnung am Hub).
+                let stand: i64 = sqlx::query_scalar(
+                    "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+                     RETURNING fuehrung_stand",
+                )
+                .fetch_one(&hub.pool)
+                .await
+                .unwrap();
+                sqlx::query(
+                    "UPDATE einsatz_fuehrung SET stand = ?, bezeichnung = bezeichnung || ' (neu)' \
+                     WHERE id = ?",
+                )
+                .bind(stand)
+                .bind(akte)
+                .execute(&hub.pool)
+                .await
+                .unwrap();
+            }
+            _ => {}
+        }
+    }
     let f = fuehrung(&elw, e).await;
     assert_eq!(f["fuehrend"], true, "der ELW gibt nie still ab");
     assert_eq!(f["offen"]["grund"], "ELW ohne Verbindung seit 40 min");
     assert_eq!(f["offen"]["epoche"], 2);
+    assert_eq!(
+        f["offen"]["bruch_at"], BRUCH,
+        "die Bruchstelle wandert nicht mit jeder Meldung"
+    );
+    assert_eq!(
+        benachrichtigungen(&elw.pool)
+            .await
+            .iter()
+            .filter(|a| *a == "fuehrung_uebernommen")
+            .count(),
+        1,
+        "eine offene Übernahme meldet sich einmal, nicht je Meldetakt"
+    );
     assert!(f["offen"]["unterzeichner"].as_str().is_some());
     let (s, _) = etb(&elw, e).await;
     assert_eq!(
@@ -599,11 +761,11 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["fuehrend"], false);
-    assert!(v["bruch_at"].as_str().is_some());
+    assert_eq!(v["bruch_at"], BRUCH);
     let verlauf = v["verlauf"].as_array().unwrap();
     let letzter = verlauf.last().unwrap();
     assert_eq!(letzter["art"], "bestaetigt");
-    assert!(letzter["bruch_at"].as_str().is_some());
+    assert_eq!(letzter["bruch_at"], BRUCH);
     ist_spiegel_mit_antraegen(&elw, e).await;
     assert!(aktionen(&elw.pool)
         .await
@@ -619,6 +781,161 @@ async fn notuebernahme_mit_unterschrift_wartet_am_elw_auf_bestaetigung() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn offene_uebernahme_behaelt_ihre_bruchstelle_bei_neuer_erklaerung_derselben_epoche() {
+    // Kommt zur offenen Epoche eine andere, gültig unterschriebene Erklärung, gilt die neue,
+    // aber die Bruchstelle gehört der Übernahme und bleibt (LLH-1671).
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "erste Erklärung").await;
+    const BRUCH: &str = "2026-01-01 10:00:00";
+    let melde_mit = |zuletzt: &'static str| {
+        let elw = &elw;
+        async move {
+            sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
+                .bind(zuletzt)
+                .execute(&elw.pool)
+                .await
+                .unwrap();
+            elw_meldet(elw).await;
+        }
+    };
+    melde_mit(BRUCH).await;
+    assert_eq!(fuehrung(&elw, e).await["offen"]["bruch_at"], BRUCH);
+
+    let text: String = sqlx::query_scalar("SELECT erklaerung FROM einsatz_fuehrung WHERE id = ?")
+        .bind(akte)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let mut erklaerung: Value = serde_json::from_str(&text).unwrap();
+    erklaerung["grund"] = json!("zweite Erklärung");
+    let text = erklaerung.to_string();
+    let assertion = passkey().sign(&text, ORIGIN, RP, 0x05);
+    let beweis = json!({"art": "unterschrift", "assertion": assertion}).to_string();
+    let stand: i64 = sqlx::query_scalar(
+        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+         RETURNING fuehrung_stand",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_fuehrung SET erklaerung = ?, beweis = ?, stand = ? WHERE id = ?")
+        .bind(&text)
+        .bind(&beweis)
+        .bind(stand)
+        .bind(akte)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    melde_mit("2026-01-01 10:01:00").await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["offen"]["grund"], "zweite Erklärung", "{f}");
+    assert_eq!(f["offen"]["epoche"], 2);
+    assert_eq!(
+        f["offen"]["bruch_at"], BRUCH,
+        "dieselbe Epoche behält ihre Bruchstelle"
+    );
+}
+
+#[tokio::test]
+async fn widerrufener_schluessel_verwirft_die_offene_uebernahme_beim_naechsten_eingang() {
+    // Der Schlüssel von A wird am Hub widerrufen, während die Übernahme am ELW offen ist
+    // (LLH-1671). Die Meldung, mit der der Widerruf ankommt, verwirft sie wie bei Ankunft.
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    elw_meldet(&elw).await;
+    assert_eq!(fuehrung(&elw, e).await["offen"]["epoche"], 2);
+    // A wird am Hub widerrufen; dafür braucht die Org einen zweiten, gegengezeichneten Schlüssel.
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let oeff_b = b.oeffentlich();
+    let id_b = {
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: 1,
+                benutzer_name: "Admin",
+                credential_id: &b.credential_id,
+                schluessel: &oeff_b,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Stick B",
+            },
+        )
+        .await
+        .unwrap()
+    };
+    let (s, start) = post(
+        &hub,
+        &format!("/api/admin/instanz/unterschrift/{id_b}/gegenzeichnen/start"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{start}");
+    let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/unterschrift/{id_b}/gegenzeichnen/abschluss"),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let id_a: i64 =
+        sqlx::query_scalar("SELECT id FROM unterschrift_schluessel WHERE credential_id = 'a'")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/unterschrift/{id_a}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // Genau eine Meldung: Der Widerruf kommt mit ihr und verwirft im selben Takt.
+    elw_meldet(&elw).await;
+    let f = fuehrung(&elw, e).await;
+    assert!(f["offen"].is_null(), "{f}");
+    assert_eq!(f["fuehrend"], true);
+    assert_eq!(f["art"], "verworfen");
+    assert_eq!(f["epoche"], 3);
+    assert!(benachrichtigungen(&elw.pool)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
+    elw_meldet(&elw).await;
+    let a = &fremde(&hub).await[0];
+    assert_eq!(a["fuehrer_kennung"], elw.kennung);
+    assert_eq!(a["art"], "verworfen");
+}
+
+#[tokio::test]
+async fn bestaetigen_mit_widerrufenem_schluessel_ist_409() {
+    // Der Widerruf kommt zwischen Anzeige und Klick: Bestätigen gibt die Führung nicht ab
+    // (LLH-1671).
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    elw_meldet(&elw).await;
+    sqlx::query("UPDATE unterschrift_schluessel SET zustand = 'widerrufen'")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("Unterschrift"), "{v}");
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["fuehrend"], true);
+    assert_eq!(f["offen"]["epoche"], 2, "die Entscheidung bleibt offen");
 }
 
 #[tokio::test]
@@ -656,6 +973,116 @@ async fn widerspruch_heisst_rueckuebernahme() {
     assert!(aktionen(&elw.pool)
         .await
         .contains(&"fuehrung_widerspruch".to_string()));
+}
+
+/// Die Bruchstelle ist die letzte erfolgreiche Meldung vor der Übernahme, nicht der Zeitpunkt der
+/// Meldung, die sie bringt und nicht der des Bestätigens (Spec „Die meldende Seite gibt nie
+/// still ab“, LLH-1677, Punkt 6).
+#[tokio::test]
+async fn bruchstelle_ist_die_letzte_meldung_vor_der_uebernahme() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ohne Verbindung").await;
+    // Fester, alter Zeitpunkt: weder „jetzt“ noch der Zeitpunkt dieser Meldung trifft ihn zufällig.
+    let zuletzt = "2026-01-01 08:00:00";
+    sqlx::query("UPDATE instanz_kopplung SET zuletzt_gesehen_at = ?")
+        .bind(zuletzt)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bruch_at"], zuletzt, "{v}");
+    let letzter = v["verlauf"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(letzter["art"], "bestaetigt");
+    assert_eq!(letzter["bruch_at"], zuletzt, "{letzter}");
+}
+
+/// Eine offene Übernahme am ELW, deren Epoche danach an der Akte per SQL verändert wird.
+async fn offen_am_elw() -> (Instanz, Instanz, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    elw_meldet(&elw).await;
+    assert!(fuehrung(&elw, e).await["offen"].is_object());
+    (hub, elw, e)
+}
+
+async fn bestaetigen_ist_409_geaendert(elw: &Instanz, e: i64) {
+    let (s, v) = post(
+        elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(
+        v["error"], "Die Führung hat sich inzwischen geändert.",
+        "{v}"
+    );
+    let f = fuehrung(elw, e).await;
+    assert_eq!(f["fuehrend"], true, "nichts übernommen");
+}
+
+/// Bestätigen gilt nur dem Stand, gegen den die Übernahme erklärt wurde: hat sich die Epoche der
+/// Akte seither geändert, ist es 409 (LLH-1677, Punkt 4). Erste Hälfte der Bedingung: die Akte
+/// steht schon auf der Epoche der Übernahme (2, Hub) oder darüber (3, ELW). Ohne lesbare
+/// Erklärung greift nur sie.
+#[tokio::test]
+async fn bestaetigen_nach_epoche_ueber_der_uebernahme_ist_409() {
+    for gleich in [true, false] {
+        let (hub, elw, e) = offen_am_elw().await;
+        let offen: String =
+            sqlx::query_scalar("SELECT offen FROM einsatz_fuehrung WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&elw.pool)
+                .await
+                .unwrap();
+        let mut offen: Value = serde_json::from_str(&offen).unwrap();
+        assert_eq!(
+            offen["epoche"],
+            json!({"zaehler": 2, "instanz": hub.kennung})
+        );
+        offen["erklaerung"] = Value::Null;
+        let (zaehler, instanz) = if gleich {
+            (2, hub.kennung.clone())
+        } else {
+            (3, elw.kennung.clone())
+        };
+        sqlx::query(
+            "UPDATE einsatz_fuehrung SET epoche_zaehler = ?, epoche_instanz = ?, offen = ? \
+             WHERE einsatz_id = ?",
+        )
+        .bind(zaehler)
+        .bind(instanz)
+        .bind(offen.to_string())
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+        bestaetigen_ist_409_geaendert(&elw, e).await;
+    }
+}
+
+/// Zweite Hälfte: die Epoche der Akte liegt weiter unter der Übernahme, ist aber nicht mehr die,
+/// gegen die erklärt wurde.
+#[tokio::test]
+async fn bestaetigen_nach_anderer_alter_epoche_ist_409() {
+    let (_hub, elw, e) = offen_am_elw().await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["epoche"], 1);
+    sqlx::query("UPDATE einsatz_fuehrung SET epoche_instanz = 'dritte' WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    bestaetigen_ist_409_geaendert(&elw, e).await;
 }
 
 #[tokio::test]
@@ -718,6 +1145,94 @@ async fn unterschrift_eines_wartenden_schluessels_traegt_nicht() {
     let f = fuehrung(&elw, e).await;
     assert_eq!(f["art"], "verworfen");
     assert_eq!(f["fuehrend"], true);
+}
+
+/// Eine gültig unterschriebene Erklärung trägt nur die Übernahme, zu der sie passt: je Feld
+/// (Einsatz, Org, neue und alte Epoche, neuer und alter Führer) eine Abweichung, jede mit
+/// gültiger Unterschrift über genau den abweichenden Text. Der ELW verwirft alle mit „passt
+/// nicht“ und nicht an der Unterschrift (LLH-1677, Punkt 2, `austausch::check_unterschrift`).
+#[tokio::test]
+async fn unterschriebene_erklaerung_mit_abweichendem_feld_wird_verworfen() {
+    type Abweichung = (&'static str, fn(&mut Value, &str, &str));
+    let abweichungen: [Abweichung; 6] = [
+        ("einsatz", |v, _, anderer| v["einsatz"] = json!(anderer)),
+        ("org", |v, _, _| {
+            v["org"] = json!(format!("{}-fremd", v["org"].as_str().unwrap()))
+        }),
+        ("epoche_neu", |v, _, _| {
+            v["epoche_neu"]["zaehler"] = json!(3)
+        }),
+        ("fuehrer_neu", |v, _, _| v["fuehrer_neu"] = json!("dritte")),
+        ("fuehrer_alt", |v, _, _| v["fuehrer_alt"] = json!("dritte")),
+        ("epoche_alt", |v, hub, _| {
+            v["epoche_alt"]["instanz"] = json!(hub)
+        }),
+    ];
+    let (hub, elw) = gekoppelt().await;
+    let mut einsaetze = Vec::new();
+    for _ in &abweichungen {
+        einsaetze.push(common::einsatz_anlegen(&elw.app, &elw.admin).await);
+    }
+    elw_meldet(&elw).await;
+    let akten = fremde(&hub).await;
+    let mut kennungen = Vec::new();
+    for e in &einsaetze {
+        kennungen.push(
+            fuehrung(&elw, *e).await["kennung"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        );
+    }
+    let akte_von = |kennung: &str| {
+        akten
+            .iter()
+            .find(|a| a["kennung"] == kennung)
+            .unwrap_or_else(|| panic!("Akte {kennung} fehlt am Hub"))["id"]
+            .as_i64()
+            .unwrap()
+    };
+    for (i, (feld, aendern)) in abweichungen.iter().enumerate() {
+        let akte = akte_von(&kennungen[i]);
+        hub_uebernimmt_mit_unterschrift(&hub, akte, feld).await;
+        let text: String =
+            sqlx::query_scalar("SELECT erklaerung FROM einsatz_fuehrung WHERE id = ?")
+                .bind(akte)
+                .fetch_one(&hub.pool)
+                .await
+                .unwrap();
+        let mut v: Value = serde_json::from_str(&text).unwrap();
+        let anderer = &kennungen[(i + 1) % kennungen.len()];
+        aendern(&mut v, &hub.kennung, anderer);
+        let neu = v.to_string();
+        assert_ne!(
+            v,
+            serde_json::from_str::<Value>(&text).unwrap(),
+            "{feld}: die Abweichung ändert die Erklärung"
+        );
+        let assertion = passkey().sign(&neu, ORIGIN, RP, 0x05);
+        sqlx::query("UPDATE einsatz_fuehrung SET erklaerung = ?, beweis = ? WHERE id = ?")
+            .bind(&neu)
+            .bind(json!({"art": "unterschrift", "assertion": assertion}).to_string())
+            .bind(akte)
+            .execute(&hub.pool)
+            .await
+            .unwrap();
+    }
+    elw_meldet(&elw).await;
+    for (i, (feld, _)) in abweichungen.iter().enumerate() {
+        let f = fuehrung(&elw, einsaetze[i]).await;
+        assert_eq!(f["art"], "verworfen", "{feld}: {f}");
+        assert_eq!(f["fuehrend"], true, "{feld}");
+        let grund = f["verlauf"].as_array().unwrap().last().unwrap()["grund"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            grund.contains("passt nicht zur Übernahme"),
+            "{feld}: verworfen am Feldvergleich, nicht an der Unterschrift: {grund}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -791,6 +1306,77 @@ async fn abgabe_per_code_und_eingabe_am_hub() {
     assert!(benachrichtigungen(&elw.pool).await.is_empty(), "kein Alarm");
     let letzter = f["verlauf"].as_array().unwrap().last().unwrap().clone();
     assert_eq!(letzter["grund"], "per Funk");
+
+    // Admin-Spur auf beiden Seiten (LLH-1674): am Hub die Eingabe durch die Person, am ELW das
+    // Erzeugen durch die Person und die Annahme, ausgelöst vom Hub.
+    let hub_spur = spur_fuehrung(&hub.pool).await;
+    assert_eq!(hub_spur.len(), 1, "{hub_spur:?}");
+    assert_eq!(hub_spur[0].0, "fuehrung_notuebernahme");
+    assert!(hub_spur[0].1, "die Person am Hub handelt");
+    assert!(hub_spur[0].2.contains("mit Code: per Funk"), "{hub_spur:?}");
+    let elw_spur = spur_fuehrung(&elw.pool).await;
+    assert_eq!(elw_spur.len(), 2, "{elw_spur:?}");
+    assert!(elw_spur
+        .iter()
+        .all(|(aktion, _, _)| aktion == "fuehrung_notuebernahme"));
+    assert!(elw_spur[0].1, "das Erzeugen geht auf die Person am ELW");
+    assert!(elw_spur[0].2.contains("Abgabecode"), "{elw_spur:?}");
+    assert!(!elw_spur[1].1, "die Annahme löst der Hub aus");
+    assert!(elw_spur[1].2.contains("mit Code: per Funk"), "{elw_spur:?}");
+    // Eine weitere Meldung schreibt keinen zweiten Eintrag.
+    elw_meldet(&elw).await;
+    assert_eq!(spur_fuehrung(&elw.pool).await.len(), 2);
+}
+
+/// Klemmt am ELW das Festhalten des Meldeversuchs, gilt die ganze Meldung nicht (LLH-1674): Eine
+/// verworfene Übernahme ohne Alarm und Admin-Spur darf nicht entstehen. Die nächste Meldung holt
+/// alles nach.
+#[tokio::test]
+async fn klemmender_meldeversuch_laesst_keine_uebernahme_ohne_spur() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    code_am_elw(&hub, &elw, e).await;
+    let (s, _) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        json!({"grund": "per Funk", "code": "ABCD-EFGH-JKMN-PQRS"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "CREATE TRIGGER klemmt BEFORE UPDATE OF fehlversuche ON instanz_kopplung \
+         BEGIN SELECT RAISE(ABORT, 'klemmt'); END",
+    )
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let r = lifeline_hub::instanz::melden::run_durchlauf(&elw.pool).await;
+    assert!(r.is_err(), "der Meldeversuch klemmt");
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(
+        f["art"] == "verworfen",
+        aktionen(&elw.pool)
+            .await
+            .contains(&"fuehrung_verworfen".to_string()),
+        "verworfen nur mit Admin-Spur: {f}"
+    );
+    sqlx::query("DROP TRIGGER klemmt")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["art"], "verworfen");
+    assert!(aktionen(&elw.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+    assert!(benachrichtigungen(&elw.pool)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
 }
 
 #[tokio::test]
@@ -826,6 +1412,78 @@ async fn falscher_code_wirft_die_fuehrung_an_den_elw_zurueck() {
     assert!(benachrichtigungen(&elw.pool)
         .await
         .contains(&"fuehrung_ungueltig".to_string()));
+}
+
+/// Ein neuer Code macht den vorigen ungültig (Spec „Code zur Abgabe erzeugt die meldende Seite“,
+/// LLH-1677, Punkt 3). Einen zweiten Code gibt es nur, wenn der ELW wieder führt, also auf einer
+/// neuen Epoche; die Regel tragen das Verwerfen (es löscht den Schlüssel) und die Bindung des
+/// Schlüssels an die Epoche. Ablauf: Code 1, der Hub tippt falsch, der ELW verwirft und führt
+/// wieder, gleicht ab und erzeugt Code 2. Danach gibt der Hub Code 1 oder Code 2 ein.
+async fn nach_zweitem_code(erster_gilt: bool) -> (Instanz, Instanz, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let erster = code_am_elw(&hub, &elw, e).await;
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        json!({"grund": "vertippt", "code": "ABCD-EFGH-JKMN-PQRS"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(fuehrung(&elw, e).await["fuehrend"], true, "verworfen");
+    let schluessel: Option<String> =
+        sqlx::query_scalar("SELECT abgabe_schluessel FROM einsatz_fuehrung WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert!(
+        schluessel.is_none(),
+        "das Verwerfen löscht den Schlüssel von Code 1"
+    );
+    elw_meldet(&elw).await;
+    let a = fuehrung(&hub, einsatz_der_akte(&hub, akte).await).await;
+    assert_eq!(
+        a["fuehrer_kennung"], elw.kennung,
+        "der Hub kennt den neuen Stand"
+    );
+    let zweiter = code_am_elw(&hub, &elw, e).await;
+    assert_ne!(erster, zweiter);
+    let eingabe = if erster_gilt { erster } else { zweiter };
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/code"),
+        json!({"grund": "per Funk", "code": eingabe}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    (hub, elw, e)
+}
+
+#[tokio::test]
+async fn der_erste_code_traegt_nach_einem_zweiten_nicht_mehr() {
+    let (_hub, elw, e) = nach_zweitem_code(true).await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["fuehrend"], true, "{f}");
+    assert_eq!(f["art"], "verworfen");
+    // Geprüft gegen den Schlüssel von Code 2 auf dessen Epoche, nicht an einer fremden Epoche.
+    let grund = f["verlauf"].as_array().unwrap().last().unwrap()["grund"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(grund.contains("Code passt nicht"), "{grund}");
+}
+
+#[tokio::test]
+async fn der_zweite_code_traegt() {
+    let (hub, elw, e) = nach_zweitem_code(false).await;
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(f["fuehrend"], false, "{f}");
+    assert_eq!(f["fuehrer_kennung"], hub.kennung);
+    let letzter = f["verlauf"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(letzter["grund"], "per Funk");
 }
 
 // ── Gleichstand ──────────────────────────────────────────────────────────────────────────────
@@ -1263,6 +1921,47 @@ async fn uebergabe_ohne_abgleich_ist_409() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
     assert!(!ist_spiegel(&elw, e).await);
+}
+
+/// Die Aufbewahrungsfrist und die Frist einer Datenkategorie lassen sich am Spiegel nicht setzen;
+/// die Sperre tragen die Schutz-Trigger des Spiegels (LLH-1677, Punkt 7). Die Kategorie-Tabelle
+/// wird nicht gespiegelt; dort bricht der Trigger am ETB-Eintrag derselben Transaktion ab.
+#[tokio::test]
+async fn fristen_am_spiegel_sind_409() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let (s, v) = common::anfrage(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    code_am_elw(&hub, &elw, e).await;
+    assert!(ist_spiegel(&elw, e).await);
+    let bis = (chrono::Utc::now() + chrono::Duration::days(400))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    for (pfad, body) in [
+        (
+            format!("/api/einsaetze/{e}/aufbewahrungsfrist"),
+            json!({"retention_bis": bis, "bestaetigt": true}),
+        ),
+        (
+            format!("/api/einsaetze/{e}/aufbewahrungsfrist/personenauskunft"),
+            json!({"retention_bis": bis, "rechtsgrundlage": "Probe", "bestaetigt": true}),
+        ),
+    ] {
+        let (s, v) = common::anfrage_json(&elw.app, "PUT", &pfad, &elw.admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::CONFLICT, "{pfad}: {v}");
+        assert!(
+            v["error"].as_str().unwrap_or_default().contains("Spiegel"),
+            "{pfad}: {v}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -2364,4 +3063,275 @@ async fn ohne_schreibrecht_kein_nachreichen() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}: {v}");
     }
     assert_eq!(band_zaehlt(&elw, e).await, 2);
+}
+
+// ── Personen samt Verlauf nachreichen (LLH-1657) ─────────────────────────────────────────────
+
+/// Wie [`bruch_nach_notuebernahme`], nur schreibt Erika nach dem Bruch Personen: eine neue Person
+/// mit Erst-Sichtung und PAT-Nummer, an ihr eine zweite Sichtung und eine Maßnahme, die sie wieder
+/// aufhebt, und eine Sichtung an einer Person, die der Hub schon kennt. (Hub, ELW, Einsatz am
+/// ELW, Einsatz am Hub, Erikas Cookie am ELW.)
+async fn bruch_mit_personen() -> (Instanz, Instanz, i64, i64, String) {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, erika) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    let bekannt = common::person_anlegen(&elw.app, &erika, e, r#"{"name":"Bekannt"}"#).await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    mitglied_werden(&hub, h).await;
+
+    let schreibe = |pfad: String, body: Value| {
+        let (app, erika) = (elw.app.clone(), erika.clone());
+        async move {
+            let (s, v) = common::anfrage_json(&app, "POST", &pfad, &erika, Some(&body)).await;
+            assert_eq!(s, StatusCode::CREATED, "{pfad}: {v}");
+            v
+        }
+    };
+    let neu = schreibe(
+        format!("/api/einsaetze/{e}/personen"),
+        json!({"name": "Muster", "vorname": "Max", "sichtung": "sk2", "pat_nummer": "PAT-77",
+               "client_id": "bruch-person-1"}),
+    )
+    .await;
+    let p = neu["id"].as_i64().unwrap();
+    schreibe(
+        format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        json!({"kategorie": "sk1", "client_id": "bruch-sichtung-1"}),
+    )
+    .await;
+    let m = schreibe(
+        format!("/api/einsaetze/{e}/personen/{p}/massnahmen"),
+        json!({"art": "blutstillung", "client_id": "bruch-massnahme-1"}),
+    )
+    .await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{e}/personen/{p}/massnahmen/{}/aufheben",
+            m["id"].as_i64().unwrap()
+        ),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    schreibe(
+        format!("/api/einsaetze/{e}/personen/{bekannt}/sichtung"),
+        json!({"kategorie": "sk3", "client_id": "bruch-sichtung-bekannt"}),
+    )
+    .await;
+
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+    (hub, elw, e, h, erika)
+}
+
+/// Die Personen eines Einsatzes mit Namen (Name, Kennung).
+async fn personen_mit_namen(i: &Instanz, einsatz: i64, name: &str) -> Vec<i64> {
+    sqlx::query_scalar("SELECT id FROM einsatz_person WHERE einsatz_id = ? AND name = ?")
+        .bind(einsatz)
+        .bind(name)
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn sichtungen(i: &Instanz, person: i64) -> Vec<String> {
+    sqlx::query_scalar("SELECT kategorie FROM person_sichtung WHERE person_id = ? ORDER BY id")
+        .bind(person)
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let person = liste
+        .iter()
+        .find(|l| l["tabelle"] == "einsatz_person")
+        .unwrap_or_else(|| panic!("die neue Person ist eine Erfassung: {liste:?}"));
+    assert_eq!(person["antrag_art"], "person", "{person}");
+    assert_eq!(person["kurz"], "Muster, Max");
+    assert!(
+        person["folgen"].as_i64().unwrap() >= 3,
+        "Sichtungen und Maßnahme hängen an ihr: {person}"
+    );
+    let sichtung_bekannt = liste
+        .iter()
+        .find(|l| l["tabelle"] == "person_sichtung")
+        .unwrap_or_else(|| {
+            panic!("die Sichtung an der bekannten Person steht für sich: {liste:?}")
+        });
+    assert_eq!(sichtung_bekannt["antrag_art"], "sichtung");
+    assert_eq!(sichtung_bekannt["kurz"], "SK III");
+    let vorher = band_zaehlt(&elw, e).await;
+
+    // Die Person stellen, zweimal: derselbe Antrag. Die Zeile bleibt, bis die Kette durch ist.
+    let pfad = format!(
+        "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+        person["id"].as_i64().unwrap()
+    );
+    let (s, v1) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v1}");
+    let (s, v2) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v2}");
+    assert_eq!(v1["antrag"]["id"], v2["antrag"]["id"]);
+    assert_eq!(band_zaehlt(&elw, e).await, vorher - 1);
+    let wartend = bruchstelle(&elw, &erika, e).await;
+    let zeile = wartend.iter().find(|l| l["id"] == person["id"]).unwrap();
+    assert_eq!(zeile["nachgereicht"], true, "{zeile}");
+    assert!(zeile["folgen_offen"].as_i64().unwrap() >= 3, "{zeile}");
+    assert!(
+        zeile.get("antrag_art").is_none(),
+        "nicht noch einmal stellbar"
+    );
+
+    // Die bekannte Person: Sichtung sofort stellbar.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+            sichtung_bekannt["id"].as_i64().unwrap()
+        ),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+
+    // Antrag der Person → Quittung → Person zurück → Kette stellt → Hub führt aus.
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+
+    let am_hub = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(am_hub.len(), 1, "genau einmal");
+    let neu = am_hub[0];
+    assert_eq!(
+        sichtungen(&hub, neu).await,
+        ["sk2", "sk1"],
+        "beide Sichtungen an der neuen Person"
+    );
+    let (pat, status): (Option<String>, String) =
+        sqlx::query_as("SELECT pat_nummer, status FROM einsatz_person WHERE id = ?")
+            .bind(neu)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(pat.as_deref(), Some("PAT-77"), "K2");
+    assert_eq!(
+        status, "betroffen",
+        "Status wie am ELW, mit der Anlage übernommen"
+    );
+    let massnahmen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_massnahme WHERE person_id = ? AND art = 'blutstillung'",
+    )
+    .bind(neu)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(massnahmen, 1, "K4: auch die aufgehobene geht mit");
+    let notizen: Vec<String> =
+        sqlx::query_scalar("SELECT text FROM person_verlaufsnotiz WHERE person_id = ?")
+            .bind(neu)
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(notizen.len(), 1, "eine Nachreich-Notiz: {notizen:?}");
+    assert!(
+        notizen[0].starts_with("Als R-002 erfasst, nach der Notübernahme nachgereicht."),
+        "K3: {notizen:?}"
+    );
+    assert!(
+        notizen[0].contains("Aufgehoben: Maßnahme Blutstillung"),
+        "K4: {notizen:?}"
+    );
+    let bekannt = personen_mit_namen(&hub, h, "Bekannt").await;
+    assert_eq!(
+        sichtungen(&hub, bekannt[0]).await,
+        ["sk3"],
+        "an der bekannten Person"
+    );
+
+    // Liste leer, Band null; ein weiterer Durchlauf und ein erneutes Stellen ändern nichts.
+    assert!(
+        bruchstelle(&elw, &erika, e).await.is_empty(),
+        "{:?}",
+        bruchstelle(&elw, &erika, e).await
+    );
+    assert_eq!(band_zaehlt(&elw, e).await, 0);
+    let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert!(
+        s == StatusCode::ACCEPTED || s == StatusCode::CONFLICT,
+        "{s}"
+    );
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert_eq!(personen_mit_namen(&hub, h, "Muster").await.len(), 1);
+    assert_eq!(sichtungen(&hub, neu).await.len(), 2);
+    let notizen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM person_verlaufsnotiz WHERE person_id = ?")
+            .bind(neu)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(notizen, 1);
+}
+
+#[tokio::test]
+async fn ein_abgelehnter_eintrag_der_kette_kommt_als_eigene_zeile_zurueck() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    // Die Maßnahme so verfälschen, dass der Hub sie ablehnt (unbekannte Art: 400).
+    sqlx::query(
+        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.art', 'unbekannt') \
+         WHERE einsatz_id = ? AND art = 'person_massnahme'",
+    )
+    .bind(e)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["gestellt"], 2, "Person und Sichtung der bekannten: {v}");
+    for _ in 0..5 {
+        abgleichen(&elw).await;
+    }
+    let neu = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(neu.len(), 1);
+    assert_eq!(
+        sichtungen(&hub, neu[0]).await,
+        ["sk2", "sk1"],
+        "der Rest der Kette"
+    );
+    let liste = bruchstelle(&elw, &erika, e).await;
+    assert_eq!(liste.len(), 1, "nur die Maßnahme ist zurück: {liste:?}");
+    assert_eq!(liste[0]["tabelle"], "person_massnahme");
+    assert!(liste[0]["grund"].as_str().is_some(), "{liste:?}");
+    assert_eq!(band_zaehlt(&elw, e).await, 1);
 }

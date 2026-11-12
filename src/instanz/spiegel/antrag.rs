@@ -878,7 +878,7 @@ pub async fn quittungen_uebernehmen(
         .bind(
             q.grund
                 .as_deref()
-                .map(|g| g.chars().take(500).collect::<String>()),
+                .map(|g| g.chars().take(GRUND_MAX).collect::<String>()),
         )
         .bind(&q.ergebnis_art)
         .bind(&q.ergebnis_schluessel)
@@ -894,6 +894,7 @@ pub async fn quittungen_uebernehmen(
                 q.id,
                 zustand == "abgelehnt",
                 q.ergebnis_schluessel.as_deref(),
+                q.grund.as_deref(),
             )
             .await?;
         }
@@ -1233,7 +1234,7 @@ pub async fn fuehre_eigene_aus(pool: &SqlitePool, router: &Router) -> Result<Vec
                         "UPDATE spiegel_antrag SET zustand = 'abgelehnt', grund = ?, \
                          geaendert_at = ? WHERE id = ?",
                     )
-                    .bind(grund.chars().take(500).collect::<String>())
+                    .bind(grund.chars().take(GRUND_MAX).collect::<String>())
                     .bind(crate::zeit::jetzt())
                     .bind(id)
                     .execute(&mut *conn)
@@ -1470,6 +1471,9 @@ pub async fn verwerfen(
 
 /// Frist abgelehnter Anträge (Spec `spiegel-antraege`, wie die Offline-Warteschlange).
 pub const ABGELEHNT_TAGE: i64 = 30;
+
+/// Höchstlänge eines Ablehnungsgrunds, der hier gespeichert wird (Zeichen).
+pub const GRUND_MAX: usize = 500;
 
 // ── Nach der Verwahrung (LLH-1648) ───────────────────────────────────────────────────────────
 

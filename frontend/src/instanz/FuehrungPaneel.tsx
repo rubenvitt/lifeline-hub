@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { App, Button, Form, Input, Modal, Popconfirm, Radio, Space, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -14,6 +14,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import KopierbarerText from '../components/KopierbarerText';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
   bestaetigeUebernahme,
@@ -34,6 +35,24 @@ import { FUEHRUNG_ART_TEXT, fuehrungMoeglich, vorOrtHinweis } from './fuehrungTe
 
 /** Folge der Übergabe und der Abgabe per Code: steht in der Rückfrage, nicht neben dem Knopf. */
 const ABGABE_FOLGE = 'Danach ist der Einsatz hier nur noch zu lesen.';
+
+/**
+ * Jede Aktion der Führung ist ohne Verbindung gesperrt, nie vorgemerkt (LLH-1670): Es gibt keinen
+ * Weg in die Queue, und eine angehaltene Übergabe oder Code-Abgabe ginge sonst bei der Rückkehr
+ * des Netzes hinaus, auch nach Verlassen der Seite, und der einmalige Code landete im Nichts.
+ * `'always'` sendet sofort oder scheitert sofort (`frontend/src/offline/AGENTS.md`, „Schreiben
+ * ohne Netz“); die Knöpfe fragen `useOhneVerbindung`.
+ */
+const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
+
+/** Der Grund, der an gesperrten Aktionen der Führung steht (`aria-describedby`). */
+function OhneNetzGrund({ id }: { id: string }) {
+  return (
+    <Typography.Text id={id} type="secondary" data-lfh="fuehrung-ohne-netz">
+      {OHNE_VERBINDUNG_NICHT_AENDERBAR}
+    </Typography.Text>
+  );
+}
 
 /**
  * Nach jeder Änderung der Führung: die Akte, der Einsatzkopf (Chip, Hinweisband, Schreibrechte)
@@ -62,42 +81,61 @@ function ortVon(f: FuehrungAnzeige): FuehrungOrt {
 export function UebernahmeEntscheidung({
   fuehrung,
   einsatzId,
+  ohneNetzGrundId,
+  onGeaendert,
 }: {
   fuehrung: FuehrungAnzeige;
   einsatzId?: number;
+  /** Steht der Grund „ohne Verbindung“ schon im umgebenden Paneel, verweisen die Knöpfe dorthin. */
+  ohneNetzGrundId?: string;
+  /** Der Stand nach einer erfolgreichen Entscheidung, so wie ihn der Server meldet. */
+  onGeaendert?: (f: FuehrungAnzeige) => void;
 }) {
   const { message } = App.useApp();
   const nach = useNachFuehrung(einsatzId ?? fuehrung.einsatz_id ?? undefined);
   const ort = ortVon(fuehrung);
+  const ohneNetz = useOhneVerbindung();
+  const eigeneGrundId = useId();
+  const grundId = ohneNetzGrundId ?? eigeneGrundId;
   const bestaetigen = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: () => bestaetigeUebernahme(ort),
     onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success(`Führung liegt jetzt bei ${f.fuehrer_name}`);
     },
   });
   const widersprechen = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: () => widersprecheUebernahme(ort),
-    onSuccess: () => {
+    onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success('Widersprochen, die Führung bleibt hier');
     },
   });
   const von = fuehrung.offen?.von ?? '';
+  const laeuft = bestaetigen.isPending || widersprechen.isPending;
+  const beschrieben = ohneNetz ? grundId : undefined;
   return (
     <Space orientation="vertical" size="small">
+      {ohneNetz && ohneNetzGrundId == null && <OhneNetzGrund id={eigeneGrundId} />}
       <Space wrap>
         <Popconfirm
           title={`Übernahme durch ${von} bestätigen?`}
           description={ABGABE_FOLGE}
           okText="Übernahme bestätigen"
           cancelText="Abbrechen"
-          onConfirm={() => bestaetigen.mutate()}
+          onConfirm={() => {
+            if (!ohneNetz && !laeuft) bestaetigen.mutate();
+          }}
         >
           <Button
             type="primary"
             loading={bestaetigen.isPending}
-            disabled={widersprechen.isPending}
+            disabled={ohneNetz || widersprechen.isPending}
+            aria-describedby={beschrieben}
             data-lfh="fuehrung-bestaetigen"
           >
             Übernahme bestätigen
@@ -109,12 +147,15 @@ export function UebernahmeEntscheidung({
           okText="Widersprechen"
           cancelText="Abbrechen"
           okButtonProps={{ danger: true }}
-          onConfirm={() => widersprechen.mutate()}
+          onConfirm={() => {
+            if (!ohneNetz && !laeuft) widersprechen.mutate();
+          }}
         >
           <Button
             danger
             loading={widersprechen.isPending}
-            disabled={bestaetigen.isPending}
+            disabled={ohneNetz || bestaetigen.isPending}
+            aria-describedby={beschrieben}
             data-lfh="fuehrung-widersprechen"
           >
             Widersprechen
@@ -143,11 +184,21 @@ export default function FuehrungPaneel({
   darfBedienen,
   titel = 'Führung',
   style,
+  onGeaendert,
+  onLaeuft,
 }: {
   fuehrung: FuehrungAnzeige;
   darfBedienen: boolean;
   titel?: string;
   style?: React.CSSProperties;
+  /**
+   * Der Stand nach einer erfolgreichen Aktion, so wie ihn der Server meldet (LLH-1670). Für einen
+   * Ort, der die Akte nicht selbst nachlädt: „Einsätze beim Gegenüber“ hält sie fest, auch wenn
+   * sie danach aus der Liste fällt.
+   */
+  onGeaendert?: (f: FuehrungAnzeige) => void;
+  /** Ob gerade eine Aktion läuft; ein umgebender Dialog sperrt so lange sein Schließen. */
+  onLaeuft?: (laeuft: boolean) => void;
 }) {
   const { token, rollen } = useRollen();
   const { message } = App.useApp();
@@ -160,29 +211,38 @@ export default function FuehrungPaneel({
   const [notOffen, setNotOffen] = useState(false);
   const [form] = Form.useForm<NotuebernahmeWerte>();
   const beweisWahl = Form.useWatch('beweis', form);
+  const ohneNetz = useOhneVerbindung();
+  const grundId = useId();
 
   const uebergeben = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: (an: string) => uebergebeFuehrung(ort, an),
     onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success(`Führung an ${f.fuehrer_name} übergeben`);
     },
   });
   const perCode = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: (an: string) => gibFuehrungPerCodeAb(ort, an),
     onSuccess: (c) => {
       nach();
+      onGeaendert?.(c.fuehrung);
       setNeuerCode(c);
     },
   });
   const anfragen = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: () => frageFuehrungAn(ort),
-    onSuccess: () => {
+    onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success('Führung angefragt');
     },
   });
   const notuebernahme = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: (w: NotuebernahmeWerte) => {
       const grund = (w.grund ?? '').trim();
       if (!moeglich.notuebernahmeMitBeweis) return uebernimmFuehrung(ort, grund);
@@ -190,11 +250,27 @@ export default function FuehrungPaneel({
         ? uebernimmFuehrungMitCode(ort, grund, w.code ?? '')
         : uebernimmFuehrungMitUnterschrift(ort, grund);
     },
-    onSuccess: () => {
+    onSuccess: (f) => {
       nach();
+      onGeaendert?.(f);
       message.success('Führung übernommen');
     },
   });
+  // Eine Aktion zur Zeit (LLH-1670): eine zweite während der ersten endete mit 409 neben dem Erfolg.
+  const laeuft =
+    uebergeben.isPending || perCode.isPending || anfragen.isPending || notuebernahme.isPending;
+  useEffect(() => {
+    onLaeuft?.(laeuft);
+  }, [laeuft, onLaeuft]);
+  /** Gesperrt, außer es ist die Aktion, die gerade läuft (die zeigt ihren Ladezustand). */
+  const sperre = (selbst: boolean) => ohneNetz || (laeuft && !selbst);
+  const beschrieben = ohneNetz ? grundId : undefined;
+  const hatAktionen =
+    moeglich.uebergeben.length > 0 ||
+    moeglich.perCode.length > 0 ||
+    moeglich.anfragen ||
+    moeglich.notuebernahme ||
+    moeglich.notuebernahmeMitBeweis;
 
   const stand = (
     <Datenraster spalten={2}>
@@ -216,6 +292,12 @@ export default function FuehrungPaneel({
   return (
     <Paneel titel={titel} koerperPolster style={style}>
       {stand}
+
+      {darfBedienen && ohneNetz && (hatAktionen || fuehrung.offen) && (
+        <div style={{ marginBlockStart: token.marginMD }}>
+          <OhneNetzGrund id={grundId} />
+        </div>
+      )}
 
       {fuehrung.offen && (
         <div
@@ -240,7 +322,11 @@ export default function FuehrungPaneel({
           </Datenraster>
           {darfBedienen && (
             <div style={{ marginBlockStart: token.marginSM }}>
-              <UebernahmeEntscheidung fuehrung={fuehrung} />
+              <UebernahmeEntscheidung
+                fuehrung={fuehrung}
+                ohneNetzGrundId={grundId}
+                onGeaendert={onGeaendert}
+              />
             </div>
           )}
         </div>
@@ -248,40 +334,65 @@ export default function FuehrungPaneel({
 
       {darfBedienen && (
         <Space wrap style={{ marginBlockStart: token.marginMD }}>
-          {moeglich.uebergeben.map((g) => (
-            <Popconfirm
-              key={`u-${g.kennung}`}
-              title={`Führung an ${g.name} übergeben?`}
-              description={ABGABE_FOLGE}
-              okText="Führung übergeben"
-              cancelText="Abbrechen"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => uebergeben.mutate(g.kennung)}
-            >
-              <Button loading={uebergeben.isPending} data-lfh="fuehrung-uebergeben">
-                Führung an {g.name} übergeben
-              </Button>
-            </Popconfirm>
-          ))}
-          {moeglich.perCode.map((g) => (
-            <Popconfirm
-              key={`c-${g.kennung}`}
-              title={`Führung per Code an ${g.name} abgeben?`}
-              description={ABGABE_FOLGE}
-              okText="Code erzeugen"
-              cancelText="Abbrechen"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => perCode.mutate(g.kennung)}
-            >
-              <Button loading={perCode.isPending} data-lfh="fuehrung-code">
-                Führung per Code abgeben
-              </Button>
-            </Popconfirm>
-          ))}
+          {moeglich.uebergeben.map((g) => {
+            const selbst = uebergeben.isPending && uebergeben.variables === g.kennung;
+            return (
+              <Popconfirm
+                key={`u-${g.kennung}`}
+                title={`Führung an ${g.name} übergeben?`}
+                description={ABGABE_FOLGE}
+                okText="Führung übergeben"
+                cancelText="Abbrechen"
+                okButtonProps={{ danger: true }}
+                // Die Rückfrage kann offen sein, während das Netz wegfällt: dann geht nichts hinaus.
+                onConfirm={() => {
+                  if (!sperre(false)) uebergeben.mutate(g.kennung);
+                }}
+              >
+                <Button
+                  loading={selbst}
+                  disabled={sperre(selbst)}
+                  aria-describedby={beschrieben}
+                  data-lfh="fuehrung-uebergeben"
+                >
+                  Führung an {g.name} übergeben
+                </Button>
+              </Popconfirm>
+            );
+          })}
+          {moeglich.perCode.map((g) => {
+            const selbst = perCode.isPending && perCode.variables === g.kennung;
+            return (
+              <Popconfirm
+                key={`c-${g.kennung}`}
+                title={`Führung per Code an ${g.name} abgeben?`}
+                description={ABGABE_FOLGE}
+                okText="Code erzeugen"
+                cancelText="Abbrechen"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => {
+                  if (!sperre(false)) perCode.mutate(g.kennung);
+                }}
+              >
+                <Button
+                  loading={selbst}
+                  disabled={sperre(selbst)}
+                  aria-describedby={beschrieben}
+                  data-lfh="fuehrung-code"
+                >
+                  Führung per Code abgeben
+                </Button>
+              </Popconfirm>
+            );
+          })}
           {moeglich.anfragen && (
             <Button
               loading={anfragen.isPending}
-              onClick={() => anfragen.mutate()}
+              disabled={sperre(anfragen.isPending)}
+              aria-describedby={beschrieben}
+              onClick={() => {
+                if (!sperre(false)) anfragen.mutate();
+              }}
               data-lfh="fuehrung-anfragen"
             >
               Führung anfragen
@@ -290,6 +401,8 @@ export default function FuehrungPaneel({
           {(moeglich.notuebernahme || moeglich.notuebernahmeMitBeweis) && (
             <Button
               danger
+              disabled={sperre(false)}
+              aria-describedby={beschrieben}
               onClick={() => {
                 notuebernahme.reset();
                 setNotOffen(true);
@@ -355,6 +468,11 @@ export default function FuehrungPaneel({
         erfassenText="Führung übernehmen"
         unumkehrbar
         laeuft={notuebernahme.isPending}
+        // Fällt das Netz bei offenem Dialog weg, bleibt der getippte Grund stehen, das Absenden
+        // ist gesperrt, bis die Verbindung zurück ist (LLH-1670).
+        gesperrt={ohneNetz}
+        // Der Grund steht am gesperrten Knopf (die Zeile trägt `aria-describedby`).
+        zusammenfassung={ohneNetz ? OHNE_VERBINDUNG_NICHT_AENDERBAR : undefined}
         speicherung={notuebernahme}
         speicherFehlerTitel="Nicht übernommen"
         initialValues={{ beweis: 'unterschrift' }}
