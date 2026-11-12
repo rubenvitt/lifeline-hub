@@ -167,7 +167,7 @@ const GRUPPEN = [
   { key: 'daten', klassen: ['Stiller Verlust', 'Atomarität', 'Grenzen für Eingaben von außen'] },
   { key: 'zugriff', klassen: ['Berechtigung und Geltungsbereich', 'Live-Verteilung'] },
   { key: 'oberflaeche', klassen: ['Lade-, Fehler- und Offline-Zustand', 'Veralteter Zustand im Frontend'] },
-  { key: 'belege', rest: true, klassen: ['Tests, die nichts prüfen', 'Verhalten gegen Spec und Projektregeln', 'Doku, ADR und Spec untereinander'] },
+  { key: 'belege', rest: true, klassen: ['Tests, die nichts prüfen', 'Verhalten gegen Spec und Projektregeln', 'Doku, ADR und Spec untereinander', 'Shell unter `set -euo pipefail`'] },
 ]
 const FINDINGS = {
   type: 'object',

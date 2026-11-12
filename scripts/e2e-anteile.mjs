@@ -13,8 +13,8 @@
  * Die Einheit ist (Projekt, Datei): Playwright teilt eine Datei ohne `mode: 'parallel'` ohnehin
  * nicht auf, und Firefox/WebKit fahren dieselbe Druck-Spec mit eigener Laufzeit.
  *
- * Auffrischen der Tabelle (der Job „Testberichte zusammenführen" in `.github/workflows/ci.yml`
- * legt sie fertig als Artefakt `e2e-laufzeiten` ab und zeigt die Bilanz in der Zusammenfassung):
+ * Auffrischen der Tabelle (der Job „e2e-Bericht" in `.github/workflows/e2e.yml` legt sie
+ * fertig als Artefakt `e2e-laufzeiten` ab und zeigt die Bilanz in der Zusammenfassung):
  *
  *   node scripts/e2e-anteile.mjs aktualisieren --aus bericht.json [--aus …] \
  *     --nach frontend/e2e/laufzeiten.json [--anteile 4]
