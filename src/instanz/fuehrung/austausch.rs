@@ -1485,7 +1485,7 @@ pub(crate) mod tests {
         );
     }
 
-    fn akte(fuehrer: &str, stand: i64) -> AkteMeldung {
+    fn akte_von(fuehrer: &str, stand: i64) -> AkteMeldung {
         serde_json::from_value(serde_json::json!({
             "kennung": "hub/1", "org": "hub/1", "bezeichnung": "Lage", "status": "aktiv",
             "epoche": {"zaehler": 2, "instanz": "elw1"}, "fuehrer": fuehrer,
@@ -1496,10 +1496,10 @@ pub(crate) mod tests {
 
     #[test]
     fn konflikt_heisst_der_fuehrer_ist_kein_gegenueber() {
-        assert!(ist_konflikt(&akte("elw1", 3), &["hub"]));
-        assert!(!ist_konflikt(&akte("hub", 3), &["hub"]));
+        assert!(ist_konflikt(&akte_von("elw1", 3), &["hub"]));
+        assert!(!ist_konflikt(&akte_von("hub", 3), &["hub"]));
         assert!(
-            ist_konflikt(&akte("hub", 3), &[]),
+            ist_konflikt(&akte_von("hub", 3), &[]),
             "ohne Kopplung führt ein Dritter"
         );
     }
