@@ -436,9 +436,10 @@ mod tests {
         neuer_zugang(&pool, "Monitor C", &[Scope::LageRead]).await;
         let e = neuer_einsatz(&pool, "A").await;
         let anderer = neuer_einsatz(&pool, "B").await;
+        let von = benutzer(&pool).await;
         let mut c = pool.acquire().await.unwrap();
-        freigeben_tx(&mut c, &liest, e, 1).await.unwrap();
-        freigeben_tx(&mut c, &woanders, anderer, 1).await.unwrap();
+        freigeben_tx(&mut c, &liest, e, von).await.unwrap();
+        freigeben_tx(&mut c, &woanders, anderer, von).await.unwrap();
 
         let kopplung = org_an_hub_koppeln(&mut c).await;
 
