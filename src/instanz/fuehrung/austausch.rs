@@ -322,9 +322,13 @@ fn check_code(a: &AkteZeile, m: &AkteMeldung) -> Result<NotuebernahmeErklaerung,
     Ok(e)
 }
 
-/// Übernimmt die Felder der Führung aus einer gelieferten Akte.
+/// Übernimmt die Felder der Führung aus einer gelieferten Akte mit größerer Epoche.
+///
+/// Jeder Wechsel löscht den Anfrage-Merker: Eine Anfrage gilt nur dem Stand, den sie sah, sonst
+/// gäbe die erreichte Seite die Führung später ohne Menschen ab (LLH-1673).
 fn uebernimm(a: &mut AkteZeile, m: &AkteMeldung) {
     a.set_epoche(&m.epoche);
+    a.anfrage_at = None;
     a.fuehrer_kennung = m.fuehrer.clone();
     a.fuehrer_name = m.fuehrer_name.clone();
     a.art = m.art.clone();
@@ -749,7 +753,6 @@ pub async fn apply_eingang(
                 if !nimmt_mir {
                     let gewinne = m.fuehrer == ich.kennung && !ich_fuehre;
                     if gewinne {
-                        a.anfrage_at = None;
                         a.bruch_at = None;
                     }
                     folge_dem_absender(conn, &mut a, m, &mut aus).await?;

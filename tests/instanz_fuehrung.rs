@@ -992,10 +992,8 @@ async fn widerruf_raeumt_eine_offene_uebernahme() {
     assert_eq!(s, StatusCode::CREATED);
 }
 
-#[tokio::test]
-async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
-    let (hub, elw1) = gekoppelt().await;
-    // Zweiter ELW derselben Hub-Org.
+/// Zweiter ELW derselben Hub-Org, am Hub gekoppelt.
+async fn zweiter_elw(hub: &Instanz) -> Instanz {
     let elw2 = instanz(true).await;
     let (s, v) = common::anfrage(
         &hub.app,
@@ -1015,6 +1013,13 @@ async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
+    elw2
+}
+
+#[tokio::test]
+async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = zweiter_elw(&hub).await;
     // Der Hub führt einen eigenen Einsatz und gibt ihn auf Anfrage an ELW 2.
     let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
     elw_meldet(&elw2).await;
@@ -1050,6 +1055,68 @@ async fn ein_elw_nimmt_einem_anderen_elw_die_fuehrung_nicht() {
     elw_meldet(&elw1).await;
     let f = fuehrung(&hub, h).await;
     assert_eq!(f["fuehrer_kennung"], elw2.kennung, "ELW 2 führt weiter");
+}
+
+/// LLH-1673: Eine Anfrage gilt nur dem Stand, den sie sah. Überholt sie ein Wechsel, den das
+/// Gegenüber liefert (hier: Übergabe an ELW 2 und zurück), verfällt der Merker; der Hub gibt
+/// danach nicht ohne Menschen ab.
+#[tokio::test]
+async fn ein_ueberholter_anfrage_merker_gibt_die_fuehrung_nicht_ab() {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = zweiter_elw(&hub).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw1).await;
+    elw_meldet(&elw2).await;
+    let akte1 = fremde(&elw1).await[0]["id"].as_i64().unwrap();
+    let akte2 = fremde(&elw2).await[0]["id"].as_i64().unwrap();
+    // ELW 1 fragt auf Epoche 1 an, meldet aber erst, als der Hub schon an ELW 2 gegeben hat.
+    let (s, v) = post(
+        &elw1,
+        &format!("/api/admin/instanz/fuehrung/{akte1}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["anfrage_offen"], true);
+    let (s, _) = post(
+        &elw2,
+        &format!("/api/admin/instanz/fuehrung/{akte2}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    elw_meldet(&elw2).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], elw2.kennung);
+    // Die Anfrage auf den alten Stand wird nicht erfüllt; ELW 1 sieht die Übergabe an ELW 2.
+    elw_meldet(&elw1).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], elw2.kennung);
+    // ELW 2 gibt regulär an den Hub zurück.
+    let e2 = einsatz_der_akte(&elw2, akte2).await;
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/einsaetze/{e2}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw2).await;
+    let f = fuehrung(&hub, h).await;
+    assert_eq!(f["fuehrend"], true, "{f}");
+    assert_eq!(f["epoche"], 3);
+    // ELW 1 bekommt die Rückgabe weitergereicht und meldet mehrmals.
+    for _ in 0..3 {
+        elw_meldet(&elw1).await;
+    }
+    let f = fuehrung(&hub, h).await;
+    assert_eq!(
+        f["fuehrer_kennung"], hub.kennung,
+        "der Hub führt weiter: {f}"
+    );
+    assert_eq!(f["epoche"], 3);
+    let e1 = einsatz_der_akte(&elw1, akte1).await;
+    let a = fuehrung(&elw1, e1).await;
+    assert_eq!(a["fuehrer_kennung"], hub.kennung, "{a}");
+    assert_eq!(a["anfrage_offen"], false, "der Merker ist verfallen: {a}");
 }
 
 // ── Führung auf dem Spiegel (LLH-1641) ───────────────────────────────────────────────────────

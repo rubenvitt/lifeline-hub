@@ -186,7 +186,8 @@ Für einen Admin der Organisation, an der Installation, die sich meldet, etwa am
 1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
 2. Im Paneel „Einsätze beim Gegenüber“ am Einsatz „Führung …“ wählen.
 3. „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
-   Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
+   Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat. Wechselt die
+   Führung vorher, etwa an eine andere Installation, verfällt die Anfrage; dann neu anfragen.
 
 ### Notübernahme
 
@@ -496,6 +497,8 @@ dem beantragt wird, und der Einsatzkopf zeigt „Führung: … · Epoche n“. J
 (sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
 führende Installation jederzeit an, erfüllt sie aber erst, wenn der Abgleich nachgezogen hat:
 Bis dahin zeigt das Paneel „Führung“ sie als offen, danach steht im Einsatzkopf „Führung: hier“.
+Eine Anfrage gilt nur dem Stand, den sie sah: Wechselt die Führung inzwischen, verfällt sie, und
+das Paneel bietet „Führung anfragen“ wieder an.
 Erklären
 zwei Installationen ohne Verbindung dieselbe Epoche, gilt die Erklärung der Installation mit
 der größeren Kennung; die andere behandelt sie wie jede Übernahme gegen sich.
