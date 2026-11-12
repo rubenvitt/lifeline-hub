@@ -140,7 +140,7 @@ function ohnePush(e: unknown): boolean {
 /** Der Stand für die Schalter. Wirft bei einem Fehler des Servers (die Seite zeigt ihn). */
 export async function ladePushStand(): Promise<PushStand> {
   if (!moeglich()) return { zustand: 'fehlt', inhalt: false };
-  let stand: { angemeldet: boolean; inhalt?: boolean; ueber_hub?: PushHub };
+  let stand: { angemeldet: boolean; inhalt?: boolean; ueber_hub?: PushHub | null };
   try {
     stand = await ladeWebPushStand();
   } catch (e) {
