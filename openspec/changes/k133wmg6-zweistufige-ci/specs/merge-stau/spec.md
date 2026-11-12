@@ -16,7 +16,7 @@ nichts pushen; für den Hinweis gelten die Regeln des Konflikt-Hinweises.
 - **THEN** trägt der PR denselben Hinweis
 
 #### Scenario: Zweite Stufe läuft
-- **WHEN** an einem PR Auto-Merge eingeschaltet ist und auf seinem Kopf-Commit die Auswahl der zweiten Stufe oder ein e2e-Pflicht-Check läuft oder fertig ist
+- **WHEN** an einem PR Auto-Merge eingeschaltet ist und auf seinem Kopf-Commit die Auswahl der zweiten Stufe gerade läuft oder der jüngste Lauf eines e2e-Pflicht-Checks läuft oder weder übersprungen noch abgebrochen fertig ist
 - **THEN** entsteht kein Hinweis
 
 #### Scenario: PR in Arbeit
