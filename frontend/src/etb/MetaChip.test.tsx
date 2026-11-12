@@ -501,10 +501,25 @@ describe('MetaChip — Ereigniszeit: Verlassen übernimmt (LLH-1842)', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it('gesperrt meldet der Editor nichts', async () => {
-    const { onChange } = editor({ gesperrt: true });
-    expect(screen.getByRole('textbox', { name: 'Ereigniszeit' })).toBeDisabled();
-    expect(onChange).not.toHaveBeenCalled();
+  it('ein geleertes Feld meldet beim Verlassen „kein Zeitpunkt“', async () => {
+    const user = userEvent.setup();
+    const { onCommit, onChange } = editor();
+    await user.clear(screen.getByRole('textbox', { name: 'Ereigniszeit' }));
+    await user.tab();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith('ereigniszeit', null);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('Enter im geleerten Feld schließt den Editor, ohne eine Zeit zu übernehmen', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const { onCommit, onChange } = editor({ onCancel });
+    await user.clear(screen.getByRole('textbox', { name: 'Ereigniszeit' }));
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenCalledWith('ereigniszeit', null);
+    expect(onCancel).toHaveBeenCalledWith('ereigniszeit');
+    expect(onCommit).not.toHaveBeenCalled();
   });
 });
 

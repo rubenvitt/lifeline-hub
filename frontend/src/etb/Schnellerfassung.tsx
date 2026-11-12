@@ -504,9 +504,12 @@ export default function Schnellerfassung({
    * Platz oder Schlüssel, montierte React ihn neu, und sein Selbstfokus holte den Fokus zurück.
    */
   const chipFelder =
-    editFeld != null && editNeu
-      ? [...gesetzteFelder.filter((f) => f !== editFeld), editFeld]
-      : gesetzteFelder;
+    editFeld == null
+      ? gesetzteFelder
+      : editNeu
+        ? [...gesetzteFelder.filter((f) => f !== editFeld), editFeld]
+        : // Ein gesetztes Feld in Bearbeitung behält seinen Platz, auch wenn es geleert wird.
+          METADATEN_FELDER.map((d) => d.feld).filter((f) => wirksam[f] != null || f === editFeld);
   // Die Abfrage steht nur, wenn das Fach gelesen ist — eine Zeile, die nach der Antwort wieder
   // verschwände, wäre ein Sprung unter dem Cursor. In der Berichtigung gilt der vorhandene
   // Standard, gefragt wird dort nicht.
@@ -560,6 +563,8 @@ export default function Schnellerfassung({
     if (zeit?.ok && ausloesen) {
       setMetadaten((m) => ({ ...m, ereigniszeit: zeit.zeitpunkt }));
       setZukunftsGrund(null);
+      // Ein offener Zeit-Editor zeigte weiter seinen alten Wert (LLH-1842): der Chip zeigt den neuen.
+      if (editFeld === 'ereigniszeit') setEditFeld(null);
       text = zeit.rest;
     }
     setZeitBefehlGrund(zeit && !zeit.ok ? zeit.grund : null);
@@ -622,12 +627,13 @@ export default function Schnellerfassung({
    * Ein offener Editor hat einen Wert übernommen, bleibt aber offen (LLH-1842; Spec `zeiteingabe`,
    * „Verlassen übernimmt“): die Ereigniszeit, wenn das Feld mit Tab oder Klick verlassen wird. Der
    * Wert gilt sofort. Sonst stand die Zeit im Feld, das nächste geöffnete Feld ersetzte den
-   * Editor, und der Eintrag bekam „jetzt“.
+   * Editor, und der Eintrag bekam „jetzt“. `null` ist das geleerte Feld: keine Ereigniszeit.
+   * Bewusst ohne Sperre beim Senden: der Editor ist dann ohnehin gesperrt, und eine Zeit, die im
+   * Feld steht, aber nicht gälte, wäre derselbe Fehler noch einmal.
    */
-  function setFeldWert(feld: MetaFeld, wert: dayjs.Dayjs) {
-    if (sendet) return;
+  function setFeldWert(feld: MetaFeld, wert: dayjs.Dayjs | null) {
     if (feld === 'ereigniszeit') setZukunftsGrund(null);
-    setMetadaten((m) => ({ ...m, [feld]: wert }));
+    setMetadaten((m) => ({ ...m, [feld]: wert ?? undefined }));
   }
 
   function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
@@ -755,7 +761,12 @@ export default function Schnellerfassung({
     // Felder bleiben.
     const zukunft = zukunftsVerstoss(wirksam, serverJetzt());
     setZukunftsGrund(zukunft);
-    if (zukunft) return;
+    if (zukunft) {
+      // Den Grund trägt der geschlossene Chip. Die Zeit gilt seit LLH-1842 schon beim Verlassen
+      // des Felds, der Editor kann also noch offen stehen: ohne Schließen stünde der Grund nirgends.
+      if (editFeld === 'ereigniszeit') setEditFeld(null);
+      return;
+    }
     // Nur der UPLOAD braucht Netz. Mit Dateien in der Liste wird ohne Verbindung abgewiesen, ohne
     // etwas zu leeren — ein Eintrag ohne die gewählten Dateien wäre eine stille Auslassung.
     // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte mit 400, und die

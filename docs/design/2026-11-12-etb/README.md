@@ -9,7 +9,9 @@ Bild, Absender und Empfänger in 10 px grauer Mono-Schrift; Ereigniszeit und Mel
 **Stand dieses Ordners:** die Zeichenflächen des Canvas
 https://claude.ai/artifact/DfUn2roXXXbt3mL4wuExU8 (Artifact-Typ „Design“, Design System „Lifeline
 Hub“). Die Schriften laden die Dateien aus `ds/lifeline-hub/` des Canvas; im Repo liegen sie nicht,
-die Flächen fallen hier auf die Systemschrift zurück. **Von Ruben am 12.11.2026 freigegeben („passt
+die Flächen fallen hier auf die Systemschrift zurück. Ebenso lädt `Heute-Fuekw.dc.html` sein Bild
+von einer Adresse des Canvas (`/_blob/…`) und zeigt im Repo keins; `heute-fuekw.png` ist die Kopie
+dieses Bildes. **Von Ruben am 12.11.2026 freigegeben („passt
 gut so“), noch nicht umgesetzt.**
 
 | Datei                            | Zeichenfläche                                          | Dichte      |
